@@ -7,6 +7,8 @@ deploy/.env
 # Build outputs
 projects/risk-control/**/bin/*.exe
 projects/risk-control/data-service/bin/
+projects/risk-control/auth-service/bin/
+admin-risk/.vite/
 
 # Logs and OS files
 *.log
