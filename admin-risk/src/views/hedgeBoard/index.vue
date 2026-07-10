@@ -28,8 +28,10 @@
               type="button"
               @click="jumpToSection(section.id)"
             >
-              <span>{{ String(index + 1).padStart(2, '0') }}</span>
-              <strong>{{ getSectionTitle(section.id, section.title) }}</strong>
+              <span class="module-subnav__title-row">
+                <span class="module-subnav__index">{{ String(index + 1).padStart(2, '0') }}</span>
+                <strong>{{ getSectionTitle(section.id, section.title) }}</strong>
+              </span>
             </button>
           </nav>
 
@@ -50,7 +52,6 @@
           >
             <div class="chart-section__heading">
               <div>
-                <p class="eyebrow">{{ getSectionEyebrow(section.id, section.eyebrow) }}</p>
                 <h4>{{ getSectionTitle(section.id, section.title) }}</h4>
               </div>
               <p>{{ getSectionDescription(section.id, section.description) }}</p>
@@ -63,9 +64,11 @@
                 class="widget-card"
               >
                 <div class="widget-card__header">
-                  <div>
+                  <div class="widget-card__title-row">
+                    <span class="widget-card__index">
+                      {{ getWidgetSubtitle(widget.localKey, widget.subtitle) }}
+                    </span>
                     <h5>{{ getWidgetTitle(widget.localKey, widget.title) }}</h5>
-                    <p>{{ getWidgetSubtitle(widget.localKey, widget.subtitle) }}</p>
                   </div>
                 </div>
 
@@ -407,6 +410,10 @@
     'gold-rates': {
       eyebrow: '利率与通胀',
       title: '利率与通胀',
+      description: '',
+    },
+    'crypto-etf': {
+      title: '加密资金面',
       description: '',
     },
   };
@@ -2220,24 +2227,32 @@
     background: rgba(242, 247, 251, 0.88);
     text-align: left;
     cursor: pointer;
+  }
 
-    span,
-    strong {
-      display: block;
-    }
+  .module-subnav__title-row {
+    display: inline-flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 8px;
+    color: var(--hedge-cool-text);
+    font-size: 14px;
+    font-weight: 700;
+    line-height: 1.4;
+  }
 
-    span {
-      color: var(--hedge-cool-muted);
-      font-size: 11px;
-      font-weight: 700;
-      letter-spacing: 0.14em;
-    }
+  .module-subnav__title-row strong {
+    color: inherit;
+    font-size: inherit;
+    font-weight: inherit;
+    line-height: inherit;
+  }
 
-    strong {
-      margin-top: 8px;
-      color: var(--hedge-cool-text);
-      font-size: 14px;
-    }
+  .module-subnav__index {
+    color: inherit;
+    font-size: inherit;
+    font-weight: inherit;
+    line-height: inherit;
+    letter-spacing: 0.01em;
   }
 
   .formula-strip {
@@ -2279,7 +2294,7 @@
   }
 
   .chart-section__heading h4 {
-    margin-top: 8px;
+    margin-top: 0;
     font-size: 28px;
   }
 
@@ -2316,14 +2331,31 @@
     padding: 18px 20px 10px;
   }
 
+  .widget-card__title-row {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
   .widget-card__header h5 {
+    margin: 0;
     font-size: 18px;
     line-height: 1.3;
   }
 
-  .widget-card__header p,
+  .widget-card__index,
   .widget-card__footer {
     margin: 8px 0 0;
+  }
+
+  .widget-card__index {
+    margin: 0;
+    color: var(--hedge-cool-text);
+    font-size: 18px;
+    font-weight: 700;
+    line-height: 1.3;
+    letter-spacing: 0.01em;
   }
 
   .widget-card__footer {
@@ -2738,6 +2770,11 @@
     letter-spacing: 0.01em;
   }
 
+  .chart-section--gold .widget-card__index {
+    font-size: 17px;
+    letter-spacing: 0.01em;
+  }
+
   .chart-section--gold .widget-card__footer {
     padding: 12px 18px 16px;
   }
@@ -3105,7 +3142,6 @@
 
   .strategy-sidebar__link span,
   .strategy-strip__card span,
-  .module-subnav button span,
   .formula-strip span,
   .metric-strip span {
     color: var(--hedge-cool-muted);

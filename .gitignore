@@ -9,8 +9,12 @@ projects/risk-control/**/bin/*.exe
 projects/risk-control/data-service/bin/
 projects/risk-control/auth-service/bin/
 admin-risk/.vite/
+admin-risk/docs/superpowers/
+docs/superpowers/
 
 # Logs and OS files
 *.log
+*.swp
+*.swo
 .DS_Store
 Thumbs.db

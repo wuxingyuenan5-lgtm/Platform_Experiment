@@ -22,6 +22,7 @@ export const marketDetailCatalog: Record<CatalogMarketId, CatalogGroup[]> = {
         { id: 'macro-walcl', name: '美联储总资产', symbol: 'WALCL', tvSymbol: 'FRED:WALCL' },
         { id: 'macro-wdtgal', name: 'TGA 余额', symbol: 'WDTGAL', tvSymbol: 'FRED:WDTGAL' },
         { id: 'macro-rrp', name: '逆回购余额', symbol: 'RRPONTTLD', tvSymbol: 'FRED:RRPONTTLD' },
+    
       ],
     },
     {

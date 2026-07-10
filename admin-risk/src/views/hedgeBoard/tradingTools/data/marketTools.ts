@@ -1,4 +1,4 @@
-export interface TradingToolLink {
+﻿export interface TradingToolLink {
   id: string;
   name: string;
   url: string;
@@ -30,3635 +30,3531 @@ export type TradingToolCategoryId =
   | 'general';
 
 export const tradingToolPageMeta = {
-  title: "\u4ea4\u6613\u5de5\u5177",
-  eyebrow: "Bookmark Library",
-  summary: "\u57fa\u4e8e\u4f60\u672c\u673a Chrome \u4e66\u7b7e\u81ea\u52a8\u6574\u7406\u7684\u5de5\u5177\u5e93\uff0c\u5df2\u6309\u5b8f\u89c2\u3001\u80a1\u5e02\u3001\u52a0\u5bc6\u3001\u91d1\u5c5e\u3001\u91cf\u5316\u7b49\u6846\u67b6\u91cd\u7ec4\u3002",
+  title: '交易工具',
+  eyebrow: 'Trading Toolkit',
+  summary: '按你最新 Markdown 清单同步后的交易工具页。',
 } as const;
 
 export const tradingToolCategories: TradingToolCategory[] = [
-        {
-      "id": "macro",
-      "title": "\u5b8f\u89c2\u5de5\u5177",
-      "description": "\u5229\u7387\u3001\u6d41\u52a8\u6027\u3001\u503a\u5238\u3001\u7ecf\u6d4e\u6570\u636e\u4e0e\u8de8\u533a\u57df\u5b8f\u89c2\u8ddf\u8e2a\u3002",
-      "groups": [
-          {
-              "id": "macro-\u5b8f\u89c2\u603b\u89c8",
-              "title": "\u5b8f\u89c2\u603b\u89c8",
-              "description": "\u6765\u81ea\u4f60\u6574\u7406\u540e\u7684 Markdown \u5206\u7ec4\u201c\u5b8f\u89c2\u603b\u89c8\u201d\u3002",
-              "tools": [
-                  {
-                      "id": "macro-tradingeconomics-com-1",
-                      "name": "\u7ecf\u6d4e\u65e5\u5386tradingeconomics",
-                      "url": "https://tradingeconomics.com/calendar",
-                      "description": "\u6765\u6e90: \u5b8f\u89c2\u603b\u89c8",
-                      "domain": "tradingeconomics.com",
-                      "tags": [
-                          "\u5b8f\u89c2",
-                          "\u5b8f\u89c2\u603b\u89c8"
-                      ]
-                  },
-                  {
-                      "id": "macro-www-jin10-com-1",
-                      "name": "\u91d1\u5341\u6570\u636e \u5b98\u65b9\u7f51\u7ad9 - \u4e00\u4e2a\u4ea4\u6613\u5de5\u5177\uff01",
-                      "url": "https://www.jin10.com/",
-                      "description": "\u6765\u6e90: \u5b8f\u89c2\u603b\u89c8",
-                      "domain": "www.jin10.com",
-                      "tags": [
-                          "\u5b8f\u89c2",
-                          "\u5b8f\u89c2\u603b\u89c8"
-                      ]
-                  },
-                  {
-                      "id": "macro-thedailyshot-com-1",
-                      "name": "\u6bcf\u65e5\u5b8f\u89c2\u7b80\u8baf",
-                      "url": "https://thedailyshot.com/",
-                      "description": "\u6765\u6e90: \u5b8f\u89c2\u603b\u89c8",
-                      "domain": "thedailyshot.com",
-                      "tags": [
-                          "\u5b8f\u89c2",
-                          "\u5b8f\u89c2\u603b\u89c8"
-                      ]
-                  },
-                  {
-                      "id": "macro-www-cmegroup-com-1",
-                      "name": "CME \u7f8e\u8054\u50a8\u8def\u5f84 - \u829d\u5546\u6240",
-                      "url": "https://www.cmegroup.com/markets/interest-rates/cme-fedwatch-tool.html",
-                      "description": "\u6765\u6e90: \u5b8f\u89c2\u603b\u89c8",
-                      "domain": "www.cmegroup.com",
-                      "tags": [
-                          "\u5b8f\u89c2",
-                          "\u5b8f\u89c2\u603b\u89c8"
-                      ]
-                  },
-                  {
-                      "id": "macro-datacenter-jin10-com-1",
-                      "name": "\u91d1\u5341\u6570\u636e\u4e2d\u5fc3",
-                      "url": "https://datacenter.jin10.com/",
-                      "description": "\u6765\u6e90: \u5b8f\u89c2\u603b\u89c8",
-                      "domain": "datacenter.jin10.com",
-                      "tags": [
-                          "\u5b8f\u89c2",
-                          "\u5b8f\u89c2\u603b\u89c8"
-                      ]
-                  },
-                  {
-                      "id": "macro-en-macromicro-me-1",
-                      "name": "macromicro\u5b8f\u89c2\u6570\u636e\u65e5\u62a5",
-                      "url": "https://en.macromicro.me/quickie",
-                      "description": "\u6765\u6e90: \u5b8f\u89c2\u603b\u89c8",
-                      "domain": "en.macromicro.me",
-                      "tags": [
-                          "\u5b8f\u89c2",
-                          "\u5b8f\u89c2\u603b\u89c8"
-                      ]
-                  },
-                  {
-                      "id": "macro-x-qhkch-com-1",
-                      "name": "\u7ecf\u6d4e\u6570\u636e - \u5947\u8d27\u53ef\u67e5",
-                      "url": "https://x.qhkch.com/fundamental/nationGdpMetrics?country=%E7%BE%8E%E5%9B%BD",
-                      "description": "\u6765\u6e90: \u5b8f\u89c2\u603b\u89c8",
-                      "domain": "x.qhkch.com",
-                      "tags": [
-                          "\u5b8f\u89c2",
-                          "\u5b8f\u89c2\u603b\u89c8"
-                      ]
-                  },
-                  {
-                      "id": "macro-macro-ops-com-1",
-                      "name": "\u5b8f\u89c2\u4ea4\u6613\u7b56\u7565",
-                      "url": "https://macro-ops.com/",
-                      "description": "\u6765\u6e90: \u5b8f\u89c2\u603b\u89c8",
-                      "domain": "macro-ops.com",
-                      "tags": [
-                          "\u5b8f\u89c2",
-                          "\u5b8f\u89c2\u603b\u89c8"
-                      ]
-                  },
-                  {
-                      "id": "macro-robo-datayes-com-1",
-                      "name": "\u5b8f\u89c2\u7ecf\u6d4e+\u80a1\u5e02 \u841d\u535c\u6295\u7814",
-                      "url": "https://robo.datayes.com/v2/landing/macrogrp",
-                      "description": "\u6765\u6e90: \u5b8f\u89c2\u603b\u89c8",
-                      "domain": "robo.datayes.com",
-                      "tags": [
-                          "\u5b8f\u89c2",
-                          "\u5b8f\u89c2\u603b\u89c8"
-                      ]
-                  },
-                  {
-                      "id": "macro-tradingeconomics-com-2",
-                      "name": "\u5404\u56fd\u5b8f\u89c2\u7ecf\u6d4e\u6307\u6807 | \u6309\u7c7b\u522b\u5217\u51fa",
-                      "url": "https://tradingeconomics.com/indicators",
-                      "description": "\u6765\u6e90: \u5b8f\u89c2\u603b\u89c8",
-                      "domain": "tradingeconomics.com",
-                      "tags": [
-                          "\u5b8f\u89c2",
-                          "\u5b8f\u89c2\u603b\u89c8"
-                      ]
-                  },
-                  {
-                      "id": "macro-www-haver-com-1",
-                      "name": "Haver\u5b8f\u89c2\u8bc4\u8bba",
-                      "url": "https://www.haver.com/",
-                      "description": "\u6765\u6e90: \u5b8f\u89c2\u603b\u89c8",
-                      "domain": "www.haver.com",
-                      "tags": [
-                          "\u5b8f\u89c2",
-                          "\u5b8f\u89c2\u603b\u89c8"
-                      ]
-                  },
-                  {
-                      "id": "macro-www-forexfactory-com-1",
-                      "name": "\u65e5\u5386 | AI\u597d\u8bfb\u53d6",
-                      "url": "https://www.forexfactory.com/calendar?day=jan3.2026",
-                      "description": "\u6765\u6e90: \u5b8f\u89c2\u603b\u89c8",
-                      "domain": "www.forexfactory.com",
-                      "tags": [
-                          "\u5b8f\u89c2",
-                          "\u5b8f\u89c2\u603b\u89c8"
-                      ]
-                  },
-                  {
-                      "id": "macro-truflation-com-1",
-                      "name": "\u5176\u4ed6\u5b8f\u89c2\u6570\u636e\u56fe\u8868\u5e93",
-                      "url": "https://truflation.com/marketplace?auth=google&code=e2e58bd7-c221-4d97-9997-ad2d612810a2&isSigningUp=true&period=annual&stake=false&tier=undefined",
-                      "description": "\u6765\u6e90: \u5b8f\u89c2\u603b\u89c8",
-                      "domain": "truflation.com",
-                      "tags": [
-                          "\u5b8f\u89c2",
-                          "\u5b8f\u89c2\u603b\u89c8"
-                      ]
-                  },
-                  {
-                      "id": "macro-www-notion-so-1",
-                      "name": "\u5b8f\u89c2\u8fb9\u9645MacroMargin",
-                      "url": "https://www.notion.so/trusting-glitter-4f0/MacroMargin-27e6782525ab41e188cb81510803d95b",
-                      "description": "\u6765\u6e90: \u5b8f\u89c2\u603b\u89c8",
-                      "domain": "www.notion.so",
-                      "tags": [
-                          "\u5b8f\u89c2",
-                          "\u5b8f\u89c2\u603b\u89c8"
-                      ]
-                  },
-                  {
-                      "id": "macro-wx-zsxq-com-1",
-                      "name": "\u77e5\u8bc6\u661f\u7403",
-                      "url": "https://wx.zsxq.com/login",
-                      "description": "\u6765\u6e90: \u5b8f\u89c2\u603b\u89c8",
-                      "domain": "wx.zsxq.com",
-                      "tags": [
-                          "\u5b8f\u89c2",
-                          "\u5b8f\u89c2\u603b\u89c8"
-                      ]
-                  },
-                  {
-                      "id": "macro-www-vaneck-com-1",
-                      "name": "VanEck \u5206\u6790",
-                      "url": "https://www.vaneck.com/asia/en/insights/",
-                      "description": "\u6765\u6e90: \u5b8f\u89c2\u603b\u89c8",
-                      "domain": "www.vaneck.com",
-                      "tags": [
-                          "\u5b8f\u89c2",
-                          "\u5b8f\u89c2\u603b\u89c8"
-                      ]
-                  }
-              ]
-          },
-          {
-              "id": "macro-\u7f8e\u8054\u50a8-\u7f8e\u56fd\u7ecf\u6d4e\u6570\u636e",
-              "title": "\u7f8e\u8054\u50a8\u3001\u7f8e\u56fd\u7ecf\u6d4e\u6570\u636e",
-              "description": "\u6765\u81ea\u4f60\u6574\u7406\u540e\u7684 Markdown \u5206\u7ec4\u201c\u7f8e\u8054\u50a8\u3001\u7f8e\u56fd\u7ecf\u6d4e\u6570\u636e\u201d\u3002",
-              "tools": [
-                  {
-                      "id": "macro-www-newyorkfed-org-1",
-                      "name": "Repo Operations - FEDERAL RESERVE BANK of NEW YORK",
-                      "url": "https://www.newyorkfed.org/markets/desk-operations/repo",
-                      "description": "\u6765\u6e90: \u7f8e\u8054\u50a8\u3001\u7f8e\u56fd\u7ecf\u6d4e\u6570\u636e",
-                      "domain": "www.newyorkfed.org",
-                      "tags": [
-                          "\u5b8f\u89c2",
-                          "\u7f8e\u8054\u50a8\u3001\u7f8e\u56fd\u7ecf\u6d4e\u6570\u636e"
-                      ]
-                  },
-                  {
-                      "id": "macro-sc-macromicro-me-1",
-                      "name": "\u57fa\u51c6\u5229\u7387&\u7f8e\u8054\u50a8\u8d44\u4ea7\u8d1f\u503a\u8868\u89c4\u6a21vs.\u9ec4\u91d1 | \u9ec4\u91d1 | \u56fe\u7ec4 | MacroMicro \u8d22\u7ecfM\u5e73\u65b9",
-                      "url": "https://sc.macromicro.me/collections/45/mm-gold-price/24057/us-fed-funds-rate-and-total-assets-vs-gold-price",
-                      "description": "\u6765\u6e90: \u7f8e\u8054\u50a8\u3001\u7f8e\u56fd\u7ecf\u6d4e\u6570\u636e",
-                      "domain": "sc.macromicro.me",
-                      "tags": [
-                          "\u5b8f\u89c2",
-                          "\u7f8e\u8054\u50a8\u3001\u7f8e\u56fd\u7ecf\u6d4e\u6570\u636e"
-                      ]
-                  },
-                  {
-                      "id": "macro-fred-stlouisfed-org-1",
-                      "name": "\u4fe1\u7528\u5229\u5dee",
-                      "url": "https://fred.stlouisfed.org/series/BAMLH0A0HYM2",
-                      "description": "\u6765\u6e90: \u7f8e\u8054\u50a8\u3001\u7f8e\u56fd\u7ecf\u6d4e\u6570\u636e",
-                      "domain": "fred.stlouisfed.org",
-                      "tags": [
-                          "\u5b8f\u89c2",
-                          "\u7f8e\u8054\u50a8\u3001\u7f8e\u56fd\u7ecf\u6d4e\u6570\u636e"
-                      ]
-                  },
-                  {
-                      "id": "macro-www-federalreserve-gov-1",
-                      "name": "\u7f8e\u8054\u50a8\u8d44\u4ea7\u8d1f\u503a\u8868",
-                      "url": "https://www.federalreserve.gov/releases/h41/",
-                      "description": "\u6765\u6e90: \u7f8e\u8054\u50a8\u3001\u7f8e\u56fd\u7ecf\u6d4e\u6570\u636e",
-                      "domain": "www.federalreserve.gov",
-                      "tags": [
-                          "\u5b8f\u89c2",
-                          "\u7f8e\u8054\u50a8\u3001\u7f8e\u56fd\u7ecf\u6d4e\u6570\u636e"
-                      ]
-                  },
-                  {
-                      "id": "macro-www-federalreserve-gov-2",
-                      "name": "\u7f8e\u8054\u50a8 - \u4f1a\u8bae\u65e5\u7a0b\u548c\u4fe1\u606f",
-                      "url": "https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm",
-                      "description": "\u6765\u6e90: \u7f8e\u8054\u50a8\u3001\u7f8e\u56fd\u7ecf\u6d4e\u6570\u636e",
-                      "domain": "www.federalreserve.gov",
-                      "tags": [
-                          "\u5b8f\u89c2",
-                          "\u7f8e\u8054\u50a8\u3001\u7f8e\u56fd\u7ecf\u6d4e\u6570\u636e"
-                      ]
-                  },
-                  {
-                      "id": "macro-www-federalreserve-gov-3",
-                      "name": "FOMC\u4f1a\u8bae\u58f0\u660e/\u8bb0\u8005\u4f1a",
-                      "url": "https://www.federalreserve.gov/videos.htm",
-                      "description": "\u6765\u6e90: \u7f8e\u8054\u50a8\u3001\u7f8e\u56fd\u7ecf\u6d4e\u6570\u636e",
-                      "domain": "www.federalreserve.gov",
-                      "tags": [
-                          "\u5b8f\u89c2",
-                          "\u7f8e\u8054\u50a8\u3001\u7f8e\u56fd\u7ecf\u6d4e\u6570\u636e"
-                      ]
-                  },
-                  {
-                      "id": "macro-sc-macromicro-me-2",
-                      "name": "\u7f8e\u56fd-\u7f8e\u8054\u50a8\u8d1f\u503a\u7aef\u7ed3\u6784 | \u7f8e\u56fd-\u7f8e\u8054\u50a8 | \u56fe\u7ec4 | MacroMicro \u8d22\u7ecfM\u5e73\u65b9",
-                      "url": "https://sc.macromicro.me/collections/4238/us-federal/1320/us-fed-liabilities-structure",
-                      "description": "\u6765\u6e90: \u7f8e\u8054\u50a8\u3001\u7f8e\u56fd\u7ecf\u6d4e\u6570\u636e",
-                      "domain": "sc.macromicro.me",
-                      "tags": [
-                          "\u5b8f\u89c2",
-                          "\u7f8e\u8054\u50a8\u3001\u7f8e\u56fd\u7ecf\u6d4e\u6570\u636e"
-                      ]
-                  },
-                  {
-                      "id": "macro-fred-stlouisfed-org-2",
-                      "name": "\u62c5\u4fdd\u9694\u591c\u878d\u8d44\u5229\u7387 (SOFR) | FRED | \u5723\u8def\u6613\u65af\u8054\u50a8",
-                      "url": "https://fred.stlouisfed.org/series/SOFR",
-                      "description": "\u6765\u6e90: \u7f8e\u8054\u50a8\u3001\u7f8e\u56fd\u7ecf\u6d4e\u6570\u636e",
-                      "domain": "fred.stlouisfed.org",
-                      "tags": [
-                          "\u5b8f\u89c2",
-                          "\u7f8e\u8054\u50a8\u3001\u7f8e\u56fd\u7ecf\u6d4e\u6570\u636e"
-                      ]
-                  },
-                  {
-                      "id": "macro-fred-stlouisfed-org-3",
-                      "name": "10\u5e74\u671f\u76c8\u4e8f\u5e73\u8861\u901a\u80c0\u7387 (T10YIE) | FRED | \u5723\u8def\u6613\u65af\u8054\u50a8",
-                      "url": "https://fred.stlouisfed.org/series/T10YIE",
-                      "description": "\u6765\u6e90: \u7f8e\u8054\u50a8\u3001\u7f8e\u56fd\u7ecf\u6d4e\u6570\u636e",
-                      "domain": "fred.stlouisfed.org",
-                      "tags": [
-                          "\u5b8f\u89c2",
-                          "\u7f8e\u8054\u50a8\u3001\u7f8e\u56fd\u7ecf\u6d4e\u6570\u636e"
-                      ]
-                  },
-                  {
-                      "id": "macro-fred-stlouisfed-org-4",
-                      "name": "10\u5e74\u671f\u56fa\u5b9a\u671f\u9650\u7f8e\u56fd\u56fd\u503a\u5e02\u573a\u6536\u76ca\u7387\uff0c\u4ee5\u6295\u8d44\u4e3a\u57fa\u7840\u62a5\u4ef7\uff0c\u901a\u80c0\u4fdd\u503c (DFII10) | FRED | \u5723\u8def\u6613\u65af\u8054\u50a8",
-                      "url": "https://fred.stlouisfed.org/series/DFII10",
-                      "description": "\u6765\u6e90: \u7f8e\u8054\u50a8\u3001\u7f8e\u56fd\u7ecf\u6d4e\u6570\u636e",
-                      "domain": "fred.stlouisfed.org",
-                      "tags": [
-                          "\u5b8f\u89c2",
-                          "\u7f8e\u8054\u50a8\u3001\u7f8e\u56fd\u7ecf\u6d4e\u6570\u636e"
-                      ]
-                  },
-                  {
-                      "id": "macro-en-macromicro-me-2",
-                      "name": "\u5404\u56fd\u592e\u884c\u5229\u7387",
-                      "url": "https://en.macromicro.me/central_bank/overview",
-                      "description": "\u6765\u6e90: \u7f8e\u8054\u50a8\u3001\u7f8e\u56fd\u7ecf\u6d4e\u6570\u636e",
-                      "domain": "en.macromicro.me",
-                      "tags": [
-                          "\u5b8f\u89c2",
-                          "\u7f8e\u8054\u50a8\u3001\u7f8e\u56fd\u7ecf\u6d4e\u6570\u636e"
-                      ]
-                  },
-                  {
-                      "id": "macro-en-macromicro-me-3",
-                      "name": "\u5404\u56fd\u592e\u884c\u52a0\u606f/\u964d\u606f\u9884\u671f\uff082024\u5e74\uff09| MacroMicro",
-                      "url": "https://en.macromicro.me/charts/89119/cbs-interest-rate-cuts-expectation-2024",
-                      "description": "\u6765\u6e90: \u7f8e\u8054\u50a8\u3001\u7f8e\u56fd\u7ecf\u6d4e\u6570\u636e",
-                      "domain": "en.macromicro.me",
-                      "tags": [
-                          "\u5b8f\u89c2",
-                          "\u7f8e\u8054\u50a8\u3001\u7f8e\u56fd\u7ecf\u6d4e\u6570\u636e"
-                      ]
-                  },
-                  {
-                      "id": "macro-fred-stlouisfed-org-5",
-                      "name": "\u5229\u5dee/\u6807\u666e\u76f8\u5173\u6027",
-                      "url": "https://fred.stlouisfed.org/series/BAMLH0A0HYM2#0",
-                      "description": "\u6765\u6e90: \u7f8e\u8054\u50a8\u3001\u7f8e\u56fd\u7ecf\u6d4e\u6570\u636e",
-                      "domain": "fred.stlouisfed.org",
-                      "tags": [
-                          "\u5b8f\u89c2",
-                          "\u7f8e\u8054\u50a8\u3001\u7f8e\u56fd\u7ecf\u6d4e\u6570\u636e"
-                      ]
-                  },
-                  {
-                      "id": "macro-www-newyorkfed-org-2",
-                      "name": "\u7ebd\u7ea6\u8054\u90a6\u50a8\u5907\u94f6\u884c\u2014\u2014\u670d\u52a1\u4e8e\u7b2c\u4e8c\u533a\u53ca\u5168\u7f8e\u2014\u2014\u7ebd\u7ea6\u8054\u90a6\u50a8\u5907\u94f6\u884c",
-                      "url": "https://www.newyorkfed.org/",
-                      "description": "\u6765\u6e90: \u7f8e\u8054\u50a8\u3001\u7f8e\u56fd\u7ecf\u6d4e\u6570\u636e",
-                      "domain": "www.newyorkfed.org",
-                      "tags": [
-                          "\u5b8f\u89c2",
-                          "\u7f8e\u8054\u50a8\u3001\u7f8e\u56fd\u7ecf\u6d4e\u6570\u636e"
-                      ]
-                  },
-                  {
-                      "id": "macro-fraser-stlouisfed-org-1",
-                      "name": "\u7f8e\u8054\u50a8\u5386\u53f2",
-                      "url": "https://fraser.stlouisfed.org/",
-                      "description": "\u6765\u6e90: \u7f8e\u8054\u50a8\u3001\u7f8e\u56fd\u7ecf\u6d4e\u6570\u636e",
-                      "domain": "fraser.stlouisfed.org",
-                      "tags": [
-                          "\u5b8f\u89c2",
-                          "\u7f8e\u8054\u50a8\u3001\u7f8e\u56fd\u7ecf\u6d4e\u6570\u636e"
-                      ]
-                  },
-                  {
-                      "id": "macro-www-newyorkfed-org-3",
-                      "name": "\u54a8\u8be2\u5c0f\u7ec4 - \u7ebd\u7ea6\u8054\u90a6\u50a8\u5907\u94f6\u884c",
-                      "url": "https://www.newyorkfed.org/aboutthefed/external_committees",
-                      "description": "\u6765\u6e90: \u7f8e\u8054\u50a8\u3001\u7f8e\u56fd\u7ecf\u6d4e\u6570\u636e",
-                      "domain": "www.newyorkfed.org",
-                      "tags": [
-                          "\u5b8f\u89c2",
-                          "\u7f8e\u8054\u50a8\u3001\u7f8e\u56fd\u7ecf\u6d4e\u6570\u636e"
-                      ]
-                  },
-                  {
-                      "id": "macro-home-treasury-gov-1",
-                      "name": "U.S. Department of the Treasury",
-                      "url": "https://home.treasury.gov/policy-issues/financing-the-government/quarterly-refunding/most-recent-quarterly-refunding-documents,",
-                      "description": "\u6765\u6e90: \u7f8e\u8054\u50a8\u3001\u7f8e\u56fd\u7ecf\u6d4e\u6570\u636e",
-                      "domain": "home.treasury.gov",
-                      "tags": [
-                          "\u5b8f\u89c2",
-                          "\u7f8e\u8054\u50a8\u3001\u7f8e\u56fd\u7ecf\u6d4e\u6570\u636e"
-                      ]
-                  },
-                  {
-                      "id": "macro-fred-stlouisfed-org-6",
-                      "name": "\u7f8e\u8054\u50a8\u7ecf\u6d4e\u6570\u636e | FRED | \u5723\u8def\u6613\u65af\u8054\u50a8",
-                      "url": "https://fred.stlouisfed.org/",
-                      "description": "\u6765\u6e90: \u7f8e\u8054\u50a8\u3001\u7f8e\u56fd\u7ecf\u6d4e\u6570\u636e",
-                      "domain": "fred.stlouisfed.org",
-                      "tags": [
-                          "\u5b8f\u89c2",
-                          "\u7f8e\u8054\u50a8\u3001\u7f8e\u56fd\u7ecf\u6d4e\u6570\u636e"
-                      ]
-                  },
-                  {
-                      "id": "macro-www-atlantafed-org-1",
-                      "name": "GDPNow - \u4e9a\u7279\u5170\u5927\u8054\u90a6\u50a8\u5907\u94f6\u884c",
-                      "url": "https://www.atlantafed.org/cqer/research/gdpnow",
-                      "description": "\u6765\u6e90: \u7f8e\u8054\u50a8\u3001\u7f8e\u56fd\u7ecf\u6d4e\u6570\u636e",
-                      "domain": "www.atlantafed.org",
-                      "tags": [
-                          "\u5b8f\u89c2",
-                          "\u7f8e\u8054\u50a8\u3001\u7f8e\u56fd\u7ecf\u6d4e\u6570\u636e"
-                      ]
-                  },
-                  {
-                      "id": "macro-www-atlantafed-org-2",
-                      "name": "\u4e9a\u7279\u5170\u5927\u5de5\u8d44\u589e\u957f\u8ffd\u8e2a",
-                      "url": "https://www.atlantafed.org/chcs/wage-growth-tracker",
-                      "description": "\u6765\u6e90: \u7f8e\u8054\u50a8\u3001\u7f8e\u56fd\u7ecf\u6d4e\u6570\u636e",
-                      "domain": "www.atlantafed.org",
-                      "tags": [
-                          "\u5b8f\u89c2",
-                          "\u7f8e\u8054\u50a8\u3001\u7f8e\u56fd\u7ecf\u6d4e\u6570\u636e"
-                      ]
-                  },
-                  {
-                      "id": "macro-fred-stlouisfed-org-7",
-                      "name": "\u6838\u5fc3PCE",
-                      "url": "https://fred.stlouisfed.org/series/DPCCRV1Q225SBEA",
-                      "description": "\u6765\u6e90: \u7f8e\u8054\u50a8\u3001\u7f8e\u56fd\u7ecf\u6d4e\u6570\u636e",
-                      "domain": "fred.stlouisfed.org",
-                      "tags": [
-                          "\u5b8f\u89c2",
-                          "\u7f8e\u8054\u50a8\u3001\u7f8e\u56fd\u7ecf\u6d4e\u6570\u636e"
-                      ]
-                  },
-                  {
-                      "id": "macro-www-macromicro-me-1",
-                      "name": "\u7f8e\u56fdPCE\uff06corePCE(\u5e74\u589e\u7387) | MacroMicro \u8d22\u7ecfM\u5e73\u65b9",
-                      "url": "https://www.macromicro.me/charts/107685/mei-guo-PCE-corePCE-nian-zeng-lyu",
-                      "description": "\u6765\u6e90: \u7f8e\u8054\u50a8\u3001\u7f8e\u56fd\u7ecf\u6d4e\u6570\u636e",
-                      "domain": "www.macromicro.me",
-                      "tags": [
-                          "\u5b8f\u89c2",
-                          "\u7f8e\u8054\u50a8\u3001\u7f8e\u56fd\u7ecf\u6d4e\u6570\u636e"
-                      ]
-                  },
-                  {
-                      "id": "macro-www-clevelandfed-org-1",
-                      "name": "10\u5e74\u671f\u901a\u80c0\u9884\u671f\u548c\u98ce\u9669\u6ea2\u4ef7",
-                      "url": "https://www.clevelandfed.org/indicators-and-data/inflation-expectations",
-                      "description": "\u6765\u6e90: \u7f8e\u8054\u50a8\u3001\u7f8e\u56fd\u7ecf\u6d4e\u6570\u636e",
-                      "domain": "www.clevelandfed.org",
-                      "tags": [
-                          "\u5b8f\u89c2",
-                          "\u7f8e\u8054\u50a8\u3001\u7f8e\u56fd\u7ecf\u6d4e\u6570\u636e"
-                      ]
-                  },
-                  {
-                      "id": "macro-www-newyorkfed-org-4",
-                      "name": "1/3/5\u6d88\u8d39\u8005\u901a\u80c0\u9884\u671f",
-                      "url": "https://www.newyorkfed.org/microeconomics/sce#/inflexp-1",
-                      "description": "\u6765\u6e90: \u7f8e\u8054\u50a8\u3001\u7f8e\u56fd\u7ecf\u6d4e\u6570\u636e",
-                      "domain": "www.newyorkfed.org",
-                      "tags": [
-                          "\u5b8f\u89c2",
-                          "\u7f8e\u8054\u50a8\u3001\u7f8e\u56fd\u7ecf\u6d4e\u6570\u636e"
-                      ]
-                  },
-                  {
-                      "id": "macro-www-clevelandfed-org-2",
-                      "name": "PCE\u9884\u6d4b",
-                      "url": "https://www.clevelandfed.org/indicators-and-data/inflation-nowcasting",
-                      "description": "\u6765\u6e90: \u7f8e\u8054\u50a8\u3001\u7f8e\u56fd\u7ecf\u6d4e\u6570\u636e",
-                      "domain": "www.clevelandfed.org",
-                      "tags": [
-                          "\u5b8f\u89c2",
-                          "\u7f8e\u8054\u50a8\u3001\u7f8e\u56fd\u7ecf\u6d4e\u6570\u636e"
-                      ]
-                  },
-                  {
-                      "id": "macro-item-1",
-                      "name": "\u7f8e\u56fd-\u6d88\u8d39\u8005\u7269\u4ef7\u7ec6\u9879[CPI",
-                      "url": "\u73af\u6bd4",
-                      "description": "\u6765\u6e90: \u7f8e\u8054\u50a8\u3001\u7f8e\u56fd\u7ecf\u6d4e\u6570\u636e",
-                      "domain": "",
-                      "tags": [
-                          "\u5b8f\u89c2",
-                          "\u7f8e\u8054\u50a8\u3001\u7f8e\u56fd\u7ecf\u6d4e\u6570\u636e"
-                      ]
-                  },
-                  {
-                      "id": "macro-fred-stlouisfed-org-8",
-                      "name": "10\u5e74\u671f\u56fd\u503a-2\u5e74\u671f\u56fd\u503a\u56fa\u5b9a\u5230\u671f\u65e5\uff08T10Y2Y\uff09| FRED | \u5723\u8def\u6613\u65af\u8054\u50a8",
-                      "url": "https://fred.stlouisfed.org/series/T10Y2Y",
-                      "description": "\u6765\u6e90: \u7f8e\u8054\u50a8\u3001\u7f8e\u56fd\u7ecf\u6d4e\u6570\u636e",
-                      "domain": "fred.stlouisfed.org",
-                      "tags": [
-                          "\u5b8f\u89c2",
-                          "\u7f8e\u8054\u50a8\u3001\u7f8e\u56fd\u7ecf\u6d4e\u6570\u636e"
-                      ]
-                  },
-                  {
-                      "id": "macro-fred-stlouisfed-org-9",
-                      "name": "\u804c\u4f4d\u7a7a\u7f3a\uff1a\u975e\u519c\u5c31\u4e1a\u6570\u636e (JTSJOL) | FRED | \u5723\u8def\u6613\u65af\u8054\u50a8",
-                      "url": "https://fred.stlouisfed.org/series/JTSJOL",
-                      "description": "\u6765\u6e90: \u7f8e\u8054\u50a8\u3001\u7f8e\u56fd\u7ecf\u6d4e\u6570\u636e",
-                      "domain": "fred.stlouisfed.org",
-                      "tags": [
-                          "\u5b8f\u89c2",
-                          "\u7f8e\u8054\u50a8\u3001\u7f8e\u56fd\u7ecf\u6d4e\u6570\u636e"
-                      ]
-                  },
-                  {
-                      "id": "macro-en-macromicro-me-4",
-                      "name": "\u7f8e\u56fd - ADP \u975e\u519c\u5c31\u4e1a\u6570\u636e | \u7f8e\u56fd\u5c31\u4e1a\u6570\u636e | \u6570\u636e\u6536\u96c6 | MacroMicro",
-                      "url": "https://en.macromicro.me/collections/4/us-employ-relative/36/adp",
-                      "description": "\u6765\u6e90: \u7f8e\u8054\u50a8\u3001\u7f8e\u56fd\u7ecf\u6d4e\u6570\u636e",
-                      "domain": "en.macromicro.me",
-                      "tags": [
-                          "\u5b8f\u89c2",
-                          "\u7f8e\u8054\u50a8\u3001\u7f8e\u56fd\u7ecf\u6d4e\u6570\u636e"
-                      ]
-                  },
-                  {
-                      "id": "macro-en-macromicro-me-5",
-                      "name": "\u7f8e\u56fd\u52b3\u52a8\u529b\u5e02\u573a",
-                      "url": "https://en.macromicro.me/collections/4/us-employ-relative/87/jolts",
-                      "description": "\u6765\u6e90: \u7f8e\u8054\u50a8\u3001\u7f8e\u56fd\u7ecf\u6d4e\u6570\u636e",
-                      "domain": "en.macromicro.me",
-                      "tags": [
-                          "\u5b8f\u89c2",
-                          "\u7f8e\u8054\u50a8\u3001\u7f8e\u56fd\u7ecf\u6d4e\u6570\u636e"
-                      ]
-                  },
-                  {
-                      "id": "macro-fred-stlouisfed-org-10",
-                      "name": "\u52b3\u52a8\u529b\u53c2\u4e0e\u7387 (CIVPART) | FRED | \u5723\u8def\u6613\u65af\u8054\u50a8",
-                      "url": "https://fred.stlouisfed.org/series/CIVPART",
-                      "description": "\u6765\u6e90: \u7f8e\u8054\u50a8\u3001\u7f8e\u56fd\u7ecf\u6d4e\u6570\u636e",
-                      "domain": "fred.stlouisfed.org",
-                      "tags": [
-                          "\u5b8f\u89c2",
-                          "\u7f8e\u8054\u50a8\u3001\u7f8e\u56fd\u7ecf\u6d4e\u6570\u636e"
-                      ]
-                  },
-                  {
-                      "id": "macro-fred-stlouisfed-org-11",
-                      "name": "\u4e2a\u4eba\u50a8\u84c4\u7387 (PSAVERT) | FRED | \u5723\u8def\u6613\u65af\u8054\u50a8",
-                      "url": "https://fred.stlouisfed.org/series/PSAVERT",
-                      "description": "\u6765\u6e90: \u7f8e\u8054\u50a8\u3001\u7f8e\u56fd\u7ecf\u6d4e\u6570\u636e",
-                      "domain": "fred.stlouisfed.org",
-                      "tags": [
-                          "\u5b8f\u89c2",
-                          "\u7f8e\u8054\u50a8\u3001\u7f8e\u56fd\u7ecf\u6d4e\u6570\u636e"
-                      ]
-                  },
-                  {
-                      "id": "macro-fred-stlouisfed-org-12",
-                      "name": "\u4fe1\u7528\u5361\u8d37\u6b3e\u62d6\u6b20\u7387 (DRCCLACBS) | FRED | \u5723\u8def\u6613\u65af\u8054\u50a8",
-                      "url": "https://fred.stlouisfed.org/series/DRCCLACBS",
-                      "description": "\u6765\u6e90: \u7f8e\u8054\u50a8\u3001\u7f8e\u56fd\u7ecf\u6d4e\u6570\u636e",
-                      "domain": "fred.stlouisfed.org",
-                      "tags": [
-                          "\u5b8f\u89c2",
-                          "\u7f8e\u8054\u50a8\u3001\u7f8e\u56fd\u7ecf\u6d4e\u6570\u636e"
-                      ]
-                  },
-                  {
-                      "id": "macro-fred-stlouisfed-org-13",
-                      "name": "\u7f8e\u56fd 30 \u5e74\u671f\u56fa\u5b9a\u5229\u7387\u62b5\u62bc\u8d37\u6b3e\u5e73\u5747\u503c (MORTGAGE30US) | FRED | \u5723\u8def\u6613\u65af\u8054\u50a8",
-                      "url": "https://fred.stlouisfed.org/series/MORTGAGE30US",
-                      "description": "\u6765\u6e90: \u7f8e\u8054\u50a8\u3001\u7f8e\u56fd\u7ecf\u6d4e\u6570\u636e",
-                      "domain": "fred.stlouisfed.org",
-                      "tags": [
-                          "\u5b8f\u89c2",
-                          "\u7f8e\u8054\u50a8\u3001\u7f8e\u56fd\u7ecf\u6d4e\u6570\u636e"
-                      ]
-                  },
-                  {
-                      "id": "macro-en-macromicro-me-6",
-                      "name": "\u7f8e\u56fd\u2014\u2014\u94f6\u884c\u6536\u7d27\u5546\u4e1a\u548c\u5de5\u4e1a\u8d37\u6b3e\u6807\u51c6\u7684\u51c0\u767e\u5206\u6bd4 | MacroMicro",
-                      "url": "https://en.macromicro.me/charts/1241/us-bank-net-percent-tight-loan",
-                      "description": "\u6765\u6e90: \u7f8e\u8054\u50a8\u3001\u7f8e\u56fd\u7ecf\u6d4e\u6570\u636e",
-                      "domain": "en.macromicro.me",
-                      "tags": [
-                          "\u5b8f\u89c2",
-                          "\u7f8e\u8054\u50a8\u3001\u7f8e\u56fd\u7ecf\u6d4e\u6570\u636e"
-                      ]
-                  },
-                  {
-                      "id": "macro-www-redfin-com-1",
-                      "name": "\u7f8e\u56fd\u623f\u5730\u4ea7\u5e02\u573a\u548c\u4ef7\u683c | Redfin",
-                      "url": "https://www.redfin.com/us-housing-market",
-                      "description": "\u6765\u6e90: \u7f8e\u8054\u50a8\u3001\u7f8e\u56fd\u7ecf\u6d4e\u6570\u636e",
-                      "domain": "www.redfin.com",
-                      "tags": [
-                          "\u5b8f\u89c2",
-                          "\u7f8e\u8054\u50a8\u3001\u7f8e\u56fd\u7ecf\u6d4e\u6570\u636e"
-                      ]
-                  }
-              ]
-          },
-          {
-              "id": "macro-\u7f8e\u503a\u7c7b",
-              "title": "\u7f8e\u503a\u7c7b",
-              "description": "\u6765\u81ea\u4f60\u6574\u7406\u540e\u7684 Markdown \u5206\u7ec4\u201c\u7f8e\u503a\u7c7b\u201d\u3002",
-              "tools": [
-                  {
-                      "id": "macro-treasurydirect-gov-1",
-                      "name": "\u7f8e\u503a\u62cd\u5356\u65f6\u95f4",
-                      "url": "https://treasurydirect.gov/auctions/upcoming/",
-                      "description": "\u6765\u6e90: \u7f8e\u503a\u7c7b",
-                      "domain": "treasurydirect.gov",
-                      "tags": [
-                          "\u5b8f\u89c2",
-                          "\u7f8e\u503a\u7c7b"
-                      ]
-                  },
-                  {
-                      "id": "macro-www-treasurydirect-gov-1",
-                      "name": "\u56fd\u503a\u62cd\u5356",
-                      "url": "https://www.treasurydirect.gov/auctions/announcements-data-results/announcement-results-press-releases/",
-                      "description": "\u6765\u6e90: \u7f8e\u503a\u7c7b",
-                      "domain": "www.treasurydirect.gov",
-                      "tags": [
-                          "\u5b8f\u89c2",
-                          "\u7f8e\u503a\u7c7b"
-                      ]
-                  },
-                  {
-                      "id": "macro-www-usdebtclock-org-1",
-                      "name": "\u7f8e\u56fd\u503a\u52a1\u65f6\u949f",
-                      "url": "https://www.usdebtclock.org/",
-                      "description": "\u6765\u6e90: \u7f8e\u503a\u7c7b",
-                      "domain": "www.usdebtclock.org",
-                      "tags": [
-                          "\u5b8f\u89c2",
-                          "\u7f8e\u503a\u7c7b"
-                      ]
-                  },
-                  {
-                      "id": "macro-ticdata-treasury-gov-1",
-                      "name": "\u5404\u56fd\u7f8e\u503a\u6301\u6709\u4ed3\u4f4d\u5360\u6bd4",
-                      "url": "https://ticdata.treasury.gov/resource-center/data-chart-center/tic/Documents/slt_table5.html",
-                      "description": "\u6765\u6e90: \u7f8e\u503a\u7c7b",
-                      "domain": "ticdata.treasury.gov",
-                      "tags": [
-                          "\u5b8f\u89c2",
-                          "\u7f8e\u503a\u7c7b"
-                      ]
-                  },
-                  {
-                      "id": "macro-en-macromicro-me-7",
-                      "name": "10\u5e74\u671f\u56fd\u503a\u4e70\u5356\u6bd4 | \u7f8e\u56fd\u56fd\u503a | \u6536\u85cf | MacroMicro",
-                      "url": "https://en.macromicro.me/collections/51/us-treasury-bond/30431/us-10y-bid-to-cover-ratio",
-                      "description": "\u6765\u6e90: \u7f8e\u503a\u7c7b",
-                      "domain": "en.macromicro.me",
-                      "tags": [
-                          "\u5b8f\u89c2",
-                          "\u7f8e\u503a\u7c7b"
-                      ]
-                  },
-                  {
-                      "id": "macro-sc-macromicro-me-3",
-                      "name": "\u7f8e\u56fd-\u8d22\u653f\u90e8\u6bcf\u6708\u503a\u5238\u53d1\u884c\u91cf | MacroMicro \u8d22\u7ecfM\u5e73\u65b9",
-                      "url": "https://sc.macromicro.me/charts/4458/us-treasury-issuance-gross",
-                      "description": "\u6765\u6e90: \u7f8e\u503a\u7c7b",
-                      "domain": "sc.macromicro.me",
-                      "tags": [
-                          "\u5b8f\u89c2",
-                          "\u7f8e\u503a\u7c7b"
-                      ]
-                  },
-                  {
-                      "id": "macro-fred-stlouisfed-org-14",
-                      "name": "\u7f8e\u56fd\u503a\u52a1\u5360\u56fd\u5185\u751f\u4ea7\u603b\u503c\u7684\u767e\u5206\u6bd4 (GFDEGDQ188S) | FRED | \u5723\u8def\u6613\u65af\u8054\u50a8",
-                      "url": "https://fred.stlouisfed.org/series/GFDEGDQ188S",
-                      "description": "\u6765\u6e90: \u7f8e\u503a\u7c7b",
-                      "domain": "fred.stlouisfed.org",
-                      "tags": [
-                          "\u5b8f\u89c2",
-                          "\u7f8e\u503a\u7c7b"
-                      ]
-                  },
-                  {
-                      "id": "macro-www-pgpf-org-1",
-                      "name": "\u56fd\u5bb6\u503a\u52a1\u65f6\u949f\uff1a\u73b0\u5728\u7684\u56fd\u5bb6\u503a\u52a1\u662f\u591a\u5c11\uff1f",
-                      "url": "https://www.pgpf.org/national-debt-clock/",
-                      "description": "\u6765\u6e90: \u7f8e\u503a\u7c7b",
-                      "domain": "www.pgpf.org",
-                      "tags": [
-                          "\u5b8f\u89c2",
-                          "\u7f8e\u503a\u7c7b"
-                      ]
-                  }
-              ]
-          },
-          {
-              "id": "macro-\u5176\u4ed6",
-              "title": "\u5176\u4ed6",
-              "description": "\u6765\u81ea\u4f60\u6574\u7406\u540e\u7684 Markdown \u5206\u7ec4\u201c\u5176\u4ed6\u201d\u3002",
-              "tools": [
-                  {
-                      "id": "macro-www-ici-org-1",
-                      "name": "\u673a\u6784\u73b0\u91d1\u4ed3\u4f4d",
-                      "url": "https://www.ici.org/research/stats/mmf",
-                      "description": "\u6765\u6e90: \u5176\u4ed6",
-                      "domain": "www.ici.org",
-                      "tags": [
-                          "\u5b8f\u89c2",
-                          "\u5176\u4ed6"
-                      ]
-                  },
-                  {
-                      "id": "macro-data-worldbank-org-1",
-                      "name": "\u4e16\u754c\u94f6\u884c\u5f00\u653e\u6570\u636e | \u5404\u56fd\u957f\u671f\u7ecf\u6d4e\u6570\u636e\u5bf9\u6bd4",
-                      "url": "https://data.worldbank.org/",
-                      "description": "\u6765\u6e90: \u5176\u4ed6",
-                      "domain": "data.worldbank.org",
-                      "tags": [
-                          "\u5b8f\u89c2",
-                          "\u5176\u4ed6"
-                      ]
-                  },
-                  {
-                      "id": "macro-worldpopulationreview-com-1",
-                      "name": "\u5404\u56fd\u503a\u52a1/GDP\u5360\u6bd4",
-                      "url": "https://worldpopulationreview.com/country-rankings/countries-by-national-debt",
-                      "description": "\u6765\u6e90: \u5176\u4ed6",
-                      "domain": "worldpopulationreview.com",
-                      "tags": [
-                          "\u5b8f\u89c2",
-                          "\u5176\u4ed6"
-                      ]
-                  },
-                  {
-                      "id": "macro-population-pyramid-net-1",
-                      "name": "\u4e16\u754c\u5404\u56fd\u7684\u4eba\u53e3\u91d1\u5b57\u5854 2025 - \u4eba\u53e3\u91d1\u5b57\u5854",
-                      "url": "https://population-pyramid.net/zh-cn",
-                      "description": "\u6765\u6e90: \u5176\u4ed6",
-                      "domain": "population-pyramid.net",
-                      "tags": [
-                          "\u5b8f\u89c2",
-                          "\u5176\u4ed6"
-                      ]
-                  },
-                  {
-                      "id": "macro-tradingeconomics-com-3",
-                      "name": "\u5168\u7403\u6570\u636e",
-                      "url": "https://tradingeconomics.com/",
-                      "description": "\u6765\u6e90: \u5176\u4ed6",
-                      "domain": "tradingeconomics.com",
-                      "tags": [
-                          "\u5b8f\u89c2",
-                          "\u5176\u4ed6"
-                      ]
-                  },
-                  {
-                      "id": "macro-www-imf-org-1",
-                      "name": "IMF\u5168\u7403\u91d1\u878d/\u5916\u6c47/\u503a\u52a1\u6307\u6807\u6570\u636e\u5e93",
-                      "url": "https://www.imf.org/en/Data",
-                      "description": "\u6765\u6e90: \u5176\u4ed6",
-                      "domain": "www.imf.org",
-                      "tags": [
-                          "\u5b8f\u89c2",
-                          "\u5176\u4ed6"
-                      ]
-                  },
-                  {
-                      "id": "macro-news-usni-org-1",
-                      "name": "\u7f8e\u56fd\u822a\u6bcd\u52a8\u6001\uff1aUSNI News Fleet and Marine Tracker: June 9, 2025",
-                      "url": "https://news.usni.org/2025/06/09/usni-news-fleet-and-marine-tracker-june-9-2025",
-                      "description": "\u6765\u6e90: \u5176\u4ed6",
-                      "domain": "news.usni.org",
-                      "tags": [
-                          "\u5b8f\u89c2",
-                          "\u5176\u4ed6"
-                      ]
-                  },
-                  {
-                      "id": "macro-www-flightradar24-com-1",
-                      "name": "\u5404\u56fd\u9886\u7a7a\u60c5\u51b5\uff1aFlightradar24: Live Flight Tracker - Real-Time Flight Tracker Map",
-                      "url": "https://www.flightradar24.com/30.37,52.68/5",
-                      "description": "\u6765\u6e90: \u5176\u4ed6",
-                      "domain": "www.flightradar24.com",
-                      "tags": [
-                          "\u5b8f\u89c2",
-                          "\u5176\u4ed6"
-                      ]
-                  }
-              ]
-          }
-      ]
-  },
-      {
-      "id": "equity",
-      "title": "\u80a1\u5e02\u5de5\u5177",
-      "description": "\u4e2a\u80a1\u3001ETF\u3001\u884d\u751f\u54c1\u3001\u6301\u4ed3\u8ffd\u8e2a\u4e0e\u5e02\u573a\u60c5\u7eea\u5de5\u5177\u3002",
-      "groups": [
-          {
-              "id": "equity-\u80a1\u5e02\u603b\u89c8",
-              "title": "\u80a1\u5e02\u603b\u89c8",
-              "description": "\u6765\u81ea\u4f60\u6574\u7406\u540e\u7684 Markdown \u5206\u7ec4\u201c\u80a1\u5e02\u603b\u89c8\u201d\u3002",
-              "tools": [
-                  {
-                      "id": "equity-pro-openbb-co-1",
-                      "name": "OpenBB \u5de5\u4f5c\u533a",
-                      "url": "https://pro.openbb.co/app/ad4c0196-5796-4114-bcec-cf6dc21f914d",
-                      "description": "\u6765\u6e90: \u80a1\u5e02\u603b\u89c8",
-                      "domain": "pro.openbb.co",
-                      "tags": [
-                          "\u80a1\u5e02",
-                          "\u80a1\u5e02\u603b\u89c8"
-                      ]
-                  },
-                  {
-                      "id": "equity-companiesmarketcap-com-1",
-                      "name": "\u7f8e\u56fd\u516c\u53f8\u5e02\u503c\u6392\u540d",
-                      "url": "https://companiesmarketcap.com/usa/largest-companies-in-the-usa-by-market-cap/",
-                      "description": "\u6765\u6e90: \u80a1\u5e02\u603b\u89c8",
-                      "domain": "companiesmarketcap.com",
-                      "tags": [
-                          "\u80a1\u5e02",
-                          "\u80a1\u5e02\u603b\u89c8"
-                      ]
-                  },
-                  {
-                      "id": "equity-dapanyuntu-com-1",
-                      "name": "A\u80a1\u677f\u5757\u8d70\u52bf",
-                      "url": "https://dapanyuntu.com/",
-                      "description": "\u6765\u6e90: \u80a1\u5e02\u603b\u89c8",
-                      "domain": "dapanyuntu.com",
-                      "tags": [
-                          "\u80a1\u5e02",
-                          "\u80a1\u5e02\u603b\u89c8"
-                      ]
-                  },
-                  {
-                      "id": "equity-finviz-com-1",
-                      "name": "\u80a1\u7968\u7b5b\u9009\u5668\u548c\u70ed\u529b\u56fe--FINVIZ.com",
-                      "url": "https://finviz.com/",
-                      "description": "\u6765\u6e90: \u80a1\u5e02\u603b\u89c8",
-                      "domain": "finviz.com",
-                      "tags": [
-                          "\u80a1\u5e02",
-                          "\u80a1\u5e02\u603b\u89c8"
-                      ]
-                  },
-                  {
-                      "id": "equity-finviz-com-2",
-                      "name": "finviz\u8d22\u62a5\u53ef\u89c6\u5316",
-                      "url": "https://finviz.com/quote.ashx?t=AAPL&ty=ea&p=d&b=1",
-                      "description": "\u6765\u6e90: \u80a1\u5e02\u603b\u89c8",
-                      "domain": "finviz.com",
-                      "tags": [
-                          "\u80a1\u5e02",
-                          "\u80a1\u5e02\u603b\u89c8"
-                      ]
-                  },
-                  {
-                      "id": "equity-en-macromicro-me-1",
-                      "name": "\u7f8e\u80a1\u5e02\u573a\u60c5\u7eea\u6307\u6570 | MacroMicro",
-                      "url": "https://en.macromicro.me/charts/80778/US-CNN-Fear-and-Greed-Index",
-                      "description": "\u6765\u6e90: \u80a1\u5e02\u603b\u89c8",
-                      "domain": "en.macromicro.me",
-                      "tags": [
-                          "\u80a1\u5e02",
-                          "\u80a1\u5e02\u603b\u89c8"
-                      ]
-                  },
-                  {
-                      "id": "equity-tickernerd-com-1",
-                      "name": "Ticker Nerd \u80a1\u7968\u6587\u4ef6\u67e5\u627e",
-                      "url": "https://tickernerd.com/resources/",
-                      "description": "\u6765\u6e90: \u80a1\u5e02\u603b\u89c8",
-                      "domain": "tickernerd.com",
-                      "tags": [
-                          "\u80a1\u5e02",
-                          "\u80a1\u5e02\u603b\u89c8"
-                      ]
-                  },
-                  {
-                      "id": "equity-www-sec-gov-1",
-                      "name": "SEC\u8d22\u62a5",
-                      "url": "https://www.sec.gov/",
-                      "description": "\u6765\u6e90: \u80a1\u5e02\u603b\u89c8",
-                      "domain": "www.sec.gov",
-                      "tags": [
-                          "\u80a1\u5e02",
-                          "\u80a1\u5e02\u603b\u89c8"
-                      ]
-                  },
-                  {
-                      "id": "equity-insight-factset-com-1",
-                      "name": "\u6bcf\u5b63\u5ea6\u8d22\u62a5\u7edf\u8ba1\u53caforward EPS/PE",
-                      "url": "https://insight.factset.com/topic/earnings",
-                      "description": "\u6765\u6e90: \u80a1\u5e02\u603b\u89c8",
-                      "domain": "insight.factset.com",
-                      "tags": [
-                          "\u80a1\u5e02",
-                          "\u80a1\u5e02\u603b\u89c8"
-                      ]
-                  },
-                  {
-                      "id": "equity-whalewisdom-com-1",
-                      "name": "\u5229\u752813F\u6587\u4ef6\u548c\u9cb8\u9c7c\u6570\u636e\u8ffd\u8e2a\u5bf9\u51b2\u57fa\u91d1\u6295\u8d44\u7ec4\u5408",
-                      "url": "https://whalewisdom.com/",
-                      "description": "\u6765\u6e90: \u80a1\u5e02\u603b\u89c8",
-                      "domain": "whalewisdom.com",
-                      "tags": [
-                          "\u80a1\u5e02",
-                          "\u80a1\u5e02\u603b\u89c8"
-                      ]
-                  },
-                  {
-                      "id": "equity-seekingalpha-com-1",
-                      "name": "Seeking Alpha | \u80a1\u5e02\u5206\u6790\u53ca\u6295\u8d44\u8005\u5de5\u5177",
-                      "url": "https://seekingalpha.com/",
-                      "description": "\u6765\u6e90: \u80a1\u5e02\u603b\u89c8",
-                      "domain": "seekingalpha.com",
-                      "tags": [
-                          "\u80a1\u5e02",
-                          "\u80a1\u5e02\u603b\u89c8"
-                      ]
-                  },
-                  {
-                      "id": "equity-www-lixinger-com-1",
-                      "name": "\u793e\u4fdd\u673a\u6784\u6301\u4ed3",
-                      "url": "https://www.lixinger.com/analytics/shareholders/search",
-                      "description": "\u6765\u6e90: \u80a1\u5e02\u603b\u89c8",
-                      "domain": "www.lixinger.com",
-                      "tags": [
-                          "\u80a1\u5e02",
-                          "\u80a1\u5e02\u603b\u89c8"
-                      ]
-                  },
-                  {
-                      "id": "equity-ark-alien-tomato-com-1",
-                      "name": "Ark\u57fa\u91d1\u6700\u65b0\u52a8\u5411",
-                      "url": "https://ark.alien-tomato.com/",
-                      "description": "\u6765\u6e90: \u80a1\u5e02\u603b\u89c8",
-                      "domain": "ark.alien-tomato.com",
-                      "tags": [
-                          "\u80a1\u5e02",
-                          "\u80a1\u5e02\u603b\u89c8"
-                      ]
-                  },
-                  {
-                      "id": "equity-www-perplexity-ai-1",
-                      "name": "\u7f8e\u56fd\u8bae\u5458\u6295\u8d44\u7ec4\u5408",
-                      "url": "https://www.perplexity.ai/finance/politicians",
-                      "description": "\u6765\u6e90: \u80a1\u5e02\u603b\u89c8",
-                      "domain": "www.perplexity.ai",
-                      "tags": [
-                          "\u80a1\u5e02",
-                          "\u80a1\u5e02\u603b\u89c8"
-                      ]
-                  },
-                  {
-                      "id": "equity-www-cninfo-com-cn-1",
-                      "name": "A\u80a1\u5de8\u6f6e\u8d44\u8baf\u7f51",
-                      "url": "https://www.cninfo.com.cn/new/index.jsp",
-                      "description": "\u6765\u6e90: \u80a1\u5e02\u603b\u89c8",
-                      "domain": "www.cninfo.com.cn",
-                      "tags": [
-                          "\u80a1\u5e02",
-                          "\u80a1\u5e02\u603b\u89c8"
-                      ]
-                  },
-                  {
-                      "id": "equity-robo-datayes-com-1",
-                      "name": "\u841d\u535c\u6295\u7814-\u667a\u80fd\u80a1\u7968\u6295\u7814|\u9009\u80a1_\u57fa\u672c\u9762\u5206\u6790|\u9009\u80a1|\u7814\u7a76|\u6295\u7814_\u770b\u7814\u62a5",
-                      "url": "https://robo.datayes.com/",
-                      "description": "\u6765\u6e90: \u80a1\u5e02\u603b\u89c8",
-                      "domain": "robo.datayes.com",
-                      "tags": [
-                          "\u80a1\u5e02",
-                          "\u80a1\u5e02\u603b\u89c8"
-                      ]
-                  }
-              ]
-          },
-          {
-              "id": "equity-etf\u603b\u89c8",
-              "title": "ETF\u603b\u89c8",
-              "description": "\u6765\u81ea\u4f60\u6574\u7406\u540e\u7684 Markdown \u5206\u7ec4\u201cETF\u603b\u89c8\u201d\u3002",
-              "tools": [
-                  {
-                      "id": "equity-www-etf-com-1",
-                      "name": "ETF \u6bd4\u8f83\u5de5\u5177 - \u8f7b\u677e\u6bd4\u8f83\u57fa\u91d1 | etf.com",
-                      "url": "https://www.etf.com/tools/etf-comparison",
-                      "description": "\u6765\u6e90: ETF\u603b\u89c8",
-                      "domain": "www.etf.com",
-                      "tags": [
-                          "\u80a1\u5e02",
-                          "ETF\u603b\u89c8"
-                      ]
-                  },
-                  {
-                      "id": "equity-www-etfrc-com-1",
-                      "name": "ETF\u7814\u7a76\u4e2d\u5fc3",
-                      "url": "https://www.etfrc.com/",
-                      "description": "\u6765\u6e90: ETF\u603b\u89c8",
-                      "domain": "www.etfrc.com",
-                      "tags": [
-                          "\u80a1\u5e02",
-                          "ETF\u603b\u89c8"
-                      ]
-                  },
-                  {
-                      "id": "equity-etfdb-com-1",
-                      "name": "ETF \u6570\u636e\u5e93\uff1aETF \u539f\u521b\u7efc\u5408\u6307\u5357",
-                      "url": "https://etfdb.com/",
-                      "description": "\u6765\u6e90: ETF\u603b\u89c8",
-                      "domain": "etfdb.com",
-                      "tags": [
-                          "\u80a1\u5e02",
-                          "ETF\u603b\u89c8"
-                      ]
-                  },
-                  {
-                      "id": "equity-www-etf-com-2",
-                      "name": "ETF \u57fa\u91d1\u6d41\u91cf\u5de5\u5177\uff1a\u641c\u7d22\u6d41\u5165\u548c\u6d41\u51fa\u6700\u591a\u7684\u8d44\u91d1",
-                      "url": "https://www.etf.com/etfanalytics/etf-fund-flows-tool",
-                      "description": "\u6765\u6e90: ETF\u603b\u89c8",
-                      "domain": "www.etf.com",
-                      "tags": [
-                          "\u80a1\u5e02",
-                          "ETF\u603b\u89c8"
-                      ]
-                  },
-                  {
-                      "id": "equity-www-lazyportfolioetf-com-1",
-                      "name": "\u61d2\u60f0\u6295\u8d44\u7ec4\u5408\u548cETF\u7ec4\u5408",
-                      "url": "https://www.lazyportfolioetf.com/#google_vignette",
-                      "description": "\u6765\u6e90: ETF\u603b\u89c8",
-                      "domain": "www.lazyportfolioetf.com",
-                      "tags": [
-                          "\u80a1\u5e02",
-                          "ETF\u603b\u89c8"
-                      ]
-                  },
-                  {
-                      "id": "equity-www-portfoliovisualizer-com-1",
-                      "name": "\u6295\u8d44\u7ec4\u5408\u53ef\u89c6\u5316\u5de5\u5177",
-                      "url": "https://www.portfoliovisualizer.com/",
-                      "description": "\u6765\u6e90: ETF\u603b\u89c8",
-                      "domain": "www.portfoliovisualizer.com",
-                      "tags": [
-                          "\u80a1\u5e02",
-                          "ETF\u603b\u89c8"
-                      ]
-                  },
-                  {
-                      "id": "equity-funddb-cn-1",
-                      "name": "\u97ed\u5708\u513f_\u57fa\u91d1\u914d\u7f6e\u9ad8\u624b\u805a\u96c6\u5730",
-                      "url": "https://funddb.cn/",
-                      "description": "\u6765\u6e90: ETF\u603b\u89c8",
-                      "domain": "funddb.cn",
-                      "tags": [
-                          "\u80a1\u5e02",
-                          "ETF\u603b\u89c8"
-                      ]
-                  }
-              ]
-          }
-      ]
-  },
-  {
-    "id": "crypto",
-    "title": "\u52a0\u5bc6\u5de5\u5177",
-    "description": "\u94fe\u4e0a\u3001\u884d\u751f\u54c1\u3001\u673a\u6784\u7814\u7a76\u3001\u4e00\u7ea7\u5e02\u573a\u4e0e\u52a0\u5bc6\u65b0\u95fb\u8d44\u6e90\u3002",
-    "groups": [
-      {
-        "id": "crypto-item",
-        "title": "\u6838\u5fc3\u770b\u677f",
-        "description": "\u6765\u81ea\u4e66\u7b7e\u6587\u4ef6\u5939\u201c\u6838\u5fc3\u770b\u677f\u201d\u7684\u6574\u7406\u7ed3\u679c\u3002",
-        "tools": [
-          {
-            "id": "crypto-btcdayu-gitbook-io-1",
-            "name": "\u5e01\u5708\u79d1\u666e\uff1a\u4e0d\u51bb\u5361\u51fa\u91d1\u3001\u7092\u7f8e\u80a1\uff0c\u4e00\u6b21\u5168\u641e\u5b9a | \u806a\u660e\u7684\u6295\u8d44\u8005\uff08\u5e01\u5708\u7248\uff09",
-            "url": "https://btcdayu.gitbook.io/dayu/dao-hang-yu-ru-men/xin-shou-ru-men/bu-dong-ka-chu-jin-chao-mei-gu-yi-ci-quan-gao-ding",
-            "description": "\u6765\u6e90: \u52a0\u5bc6",
-            "domain": "btcdayu.gitbook.io",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177"
-            ]
-          },
-          {
-            "id": "crypto-charts-bgeometrics-com-2",
-            "name": "\u5927\u5c0f\u9cb8\u9c7c\u94fe\u4e0a\u5730\u5740\u8d2d\u4e70\u60c5\u51b5",
-            "url": "https://charts.bgeometrics.com/bitcoin_distribution_coins_tables.html",
-            "description": "\u6765\u6e90: \u52a0\u5bc6",
-            "domain": "charts.bgeometrics.com",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177"
-            ]
-          },
-          {
-            "id": "crypto-charts-bgeometrics-com-3",
-            "name": "URPD",
-            "url": "https://charts.bgeometrics.com/distribution_realized_price.html",
-            "description": "\u6765\u6e90: \u52a0\u5bc6",
-            "domain": "charts.bgeometrics.com",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177"
-            ]
-          },
-          {
-            "id": "crypto-insights-glassnode-com-4",
-            "name": "\u94fe\u4e0a\u90e8\u5206\u6559\u5b66",
-            "url": "https://insights.glassnode.com/tag/product/",
-            "description": "\u6765\u6e90: \u52a0\u5bc6",
-            "domain": "insights.glassnode.com",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177"
-            ]
-          },
-          {
-            "id": "crypto-insights-glassnode-com-5",
-            "name": "Glassnode \u94fe\u4e0a\u6bcf\u5468\u7b80\u62a5",
-            "url": "https://insights.glassnode.com/tag/newsletter/",
-            "description": "\u6765\u6e90: \u52a0\u5bc6",
-            "domain": "insights.glassnode.com",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177"
-            ]
-          },
-          {
-            "id": "crypto-studio-glassnode-com-6",
-            "name": "Glassnode Studio - \u94fe\u4e0a\u5404\u7c7b\u6570\u636e",
-            "url": "https://studio.glassnode.com/charts/addresses.ActiveCount?a=BTC",
-            "description": "\u6765\u6e90: \u52a0\u5bc6",
-            "domain": "studio.glassnode.com",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177"
-            ]
-          },
-          {
-            "id": "crypto-cryptoquant-com-7",
-            "name": "\u52a0\u5bc6\u5404\u7c7b\u94fe\u4e0a\u6570\u636e | CryptoQuant",
-            "url": "https://cryptoquant.com/asset/btc/summary",
-            "description": "\u6765\u6e90: \u52a0\u5bc6",
-            "domain": "cryptoquant.com",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177"
-            ]
-          },
-          {
-            "id": "crypto-www-valuescan-io-8",
-            "name": "\u52a0\u5bc6AI\u76d1\u63a7\u8d44\u91d1\u6d41valuescan",
-            "url": "https://www.valuescan.io/tokenDetails?keyword=1",
-            "description": "\u6765\u6e90: \u52a0\u5bc6",
-            "domain": "www.valuescan.io",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177"
-            ]
-          },
-          {
-            "id": "crypto-www-coinglass-com-9",
-            "name": "\u6301\u4ed3\u8d44\u8d39\u8ffd\u8e2a | CoinGlass",
-            "url": "https://www.coinglass.com/tv/zh/Binance_BTCUSDT",
-            "description": "\u6765\u6e90: \u52a0\u5bc6",
-            "domain": "www.coinglass.com",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177"
-            ]
-          },
-          {
-            "id": "crypto-www-coinglass-com-10",
-            "name": "CoinGlass\u9996\u9875",
-            "url": "https://www.coinglass.com/zh",
-            "description": "\u6765\u6e90: \u52a0\u5bc6",
-            "domain": "www.coinglass.com",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177"
-            ]
-          },
-          {
-            "id": "crypto-farside-co-uk-11",
-            "name": "\u6bd4\u7279\u5e01 ETF \u6d41\u5411 \u2013 Farside \u6295\u8d44\u8005",
-            "url": "https://farside.co.uk/?p=997",
-            "description": "\u6765\u6e90: \u52a0\u5bc6",
-            "domain": "farside.co.uk",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177"
-            ]
-          },
-          {
-            "id": "crypto-sosovalue-com-12",
-            "name": "sosovalue\u52a0\u5bc6\u5404\u9879\u6570\u636e",
-            "url": "https://sosovalue.com/zh/assets/etf/us-btc-spot",
-            "description": "\u6765\u6e90: \u52a0\u5bc6",
-            "domain": "sosovalue.com",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177"
-            ]
-          },
-          {
-            "id": "crypto-www-greeks-live-13",
-            "name": "\u52a0\u5bc6\u671f\u6743\u6570\u636e--greeks",
-            "url": "https://www.greeks.live/#/deribit/tools/datalab?currency=BTC",
-            "description": "\u6765\u6e90: \u52a0\u5bc6",
-            "domain": "www.greeks.live",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177"
-            ]
-          },
-          {
-            "id": "crypto-www-deribit-com-14",
-            "name": "Bitcoin Metrics - Deribit by Coinbase",
-            "url": "https://www.deribit.com/statistics/BTC/metrics/options",
-            "description": "\u6765\u6e90: \u52a0\u5bc6",
-            "domain": "www.deribit.com",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177"
-            ]
-          },
-          {
-            "id": "crypto-charts-checkonchain-com-15",
-            "name": "BTC\u671f\u8d27\u671f\u9650\u7ed3\u6784",
-            "url": "https://charts.checkonchain.com/btconchain/derivatives/derivatives_termstructure_0/derivatives_termstructure_0_light.html",
-            "description": "\u6765\u6e90: \u52a0\u5bc6",
-            "domain": "charts.checkonchain.com",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177"
-            ]
-          },
-          {
-            "id": "crypto-saylortracker-com-16",
-            "name": "\u5fae\u7b56\u7565\u8d2d\u4e70\u8bb0\u5f55",
-            "url": "https://saylortracker.com/",
-            "description": "\u6765\u6e90: \u52a0\u5bc6",
-            "domain": "saylortracker.com",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177"
-            ]
-          },
-          {
-            "id": "crypto-bitcointreasuries-net-17",
-            "name": "BTC\u516c\u53f8\u3001ETF\u3001\u653f\u5e9c\u7b49\u8d2d\u4e70\u548c\u5206\u5e03\u60c5\u51b5",
-            "url": "https://bitcointreasuries.net/",
-            "description": "\u6765\u6e90: \u52a0\u5bc6",
-            "domain": "bitcointreasuries.net",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177"
-            ]
-          },
-          {
-            "id": "crypto-www-strategicethreserve-xyz-18",
-            "name": "E\u7b56\u7565\u6570\u636e",
-            "url": "https://www.strategicethreserve.xyz/",
-            "description": "\u6765\u6e90: \u52a0\u5bc6",
-            "domain": "www.strategicethreserve.xyz",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177"
-            ]
-          },
-          {
-            "id": "crypto-www-validatorqueue-com-19",
-            "name": "ETH\u9a8c\u8bc1\u8005\u961f\u5217",
-            "url": "https://www.validatorqueue.com/",
-            "description": "\u6765\u6e90: \u52a0\u5bc6",
-            "domain": "www.validatorqueue.com",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177"
-            ]
-          },
-          {
-            "id": "crypto-bitcoinlaws-io-20",
-            "name": "\u7f8e\u56fd\u52a0\u5bc6\u653f\u7b56\u8ddf\u8e2a",
-            "url": "https://bitcoinlaws.io/",
-            "description": "\u6765\u6e90: \u52a0\u5bc6",
-            "domain": "bitcoinlaws.io",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177"
-            ]
-          },
-          {
-            "id": "crypto-cryptobubbles-net-21",
-            "name": "Crypto Bubbles",
-            "url": "https://cryptobubbles.net/",
-            "description": "\u6765\u6e90: \u52a0\u5bc6",
-            "domain": "cryptobubbles.net",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177"
-            ]
-          },
-          {
-            "id": "crypto-coinmarketcap-com-22",
-            "name": "\u52a0\u5bc6\u8d5b\u9053\u548c\u5e02\u503cCoinMarketCap",
-            "url": "https://coinmarketcap.com/",
-            "description": "\u6765\u6e90: \u52a0\u5bc6",
-            "domain": "coinmarketcap.com",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177"
-            ]
-          },
-          {
-            "id": "crypto-intothecryptoverse-com-23",
-            "name": "\u8ba2\u9605\u7cbe\u7b80\u7248\u8ba1\u5212 \u2013 \u8fdb\u5165\u52a0\u5bc6\u8d27\u5e01\u4e16\u754c",
-            "url": "https://intothecryptoverse.com/product-lite-plan/",
-            "description": "\u6765\u6e90: \u52a0\u5bc6",
-            "domain": "intothecryptoverse.com",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177"
-            ]
-          },
-          {
-            "id": "crypto-tokenomist-ai-24",
-            "name": "\u4ee3\u5e01\u89e3\u9501 | \u8ffd\u8e2a\u6700\u65b0\u6570\u636e\u5e76\u5b8c\u6210\u89e3\u9501\u8ba1\u5212",
-            "url": "https://tokenomist.ai/",
-            "description": "\u6765\u6e90: \u52a0\u5bc6",
-            "domain": "tokenomist.ai",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177"
-            ]
-          },
-          {
-            "id": "crypto-intel-arkm-com-25",
-            "name": "\u94fe\u4e0a | Arkham",
-            "url": "https://intel.arkm.com/",
-            "description": "\u6765\u6e90: \u52a0\u5bc6",
-            "domain": "intel.arkm.com",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177"
-            ]
-          },
-          {
-            "id": "crypto-intel-arkm-com-26",
-            "name": "\u7f8e\u56fd\u653f\u5e9c\u6301\u5e01\u6570",
-            "url": "https://intel.arkm.com/explorer/entity/usg",
-            "description": "\u6765\u6e90: \u52a0\u5bc6",
-            "domain": "intel.arkm.com",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177"
-            ]
-          },
-          {
-            "id": "crypto-www-oklink-com-27",
-            "name": "\u533a\u5757\u94fe\u6d4f\u89c8\u5668\u67e5\u8be2 | \u6b27\u79d1\u4e91\u94fe OKLink",
-            "url": "https://www.oklink.com/zh-hans",
-            "description": "\u6765\u6e90: \u52a0\u5bc6",
-            "domain": "www.oklink.com",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177"
-            ]
-          },
-          {
-            "id": "crypto-app-rwa-xyz-28",
-            "name": "RWA.xyz | \u533a\u5757\u94fe\u73b0\u5b9e\u4e16\u754c\u8d44\u4ea7\u5206\u6790---RWA.xyz |\u4ee3\u5e01\u5316\u73b0\u5b9e\u4e16\u754c\u8d44\u4ea7\u5206\u6790",
-            "url": "https://app.rwa.xyz/",
-            "description": "\u6765\u6e90: \u52a0\u5bc6",
-            "domain": "app.rwa.xyz",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177"
-            ]
-          },
-          {
-            "id": "crypto-app-intothecryptoverse-com-29",
-            "name": "\u4eea\u8868\u677f | ITC",
-            "url": "https://app.intothecryptoverse.com/dashboard",
-            "description": "\u6765\u6e90: \u52a0\u5bc6",
-            "domain": "app.intothecryptoverse.com",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177"
-            ]
-          },
-          {
-            "id": "crypto-stats-hyperliquid-xyz-30",
-            "name": "Hyperliquid \u7edf\u8ba1\u6570\u636e",
-            "url": "https://stats.hyperliquid.xyz/",
-            "description": "\u6765\u6e90: \u52a0\u5bc6",
-            "domain": "stats.hyperliquid.xyz",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177"
-            ]
-          },
-          {
-            "id": "crypto-hypurrscan-io-31",
-            "name": "HypurrScan | Hyperliquid Explorer",
-            "url": "https://hypurrscan.io/address/0x5078C2fBeA2b2aD61bc840Bc023E35Fce56BeDb6?s=09",
-            "description": "\u6765\u6e90: \u52a0\u5bc6",
-            "domain": "hypurrscan.io",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177"
-            ]
-          },
-          {
-            "id": "crypto-www-chaincatcher-com-32",
-            "name": "\u94fe\u6355\u624bChainCatcher \u2014 \u4e13\u4e1a\u7684\u533a\u5757\u94fe\u6280\u672f\u7814\u7a76\u4e0e\u8d44\u8baf\u5e73\u53f0-Chain Catcher",
-            "url": "https://www.chaincatcher.com/",
-            "description": "\u6765\u6e90: \u52a0\u5bc6",
-            "domain": "www.chaincatcher.com",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177"
-            ]
-          },
-          {
-            "id": "crypto-www-wintermute-com-33",
-            "name": "\u505a\u5e02\u5546Wintermute",
-            "url": "https://www.wintermute.com/",
-            "description": "\u6765\u6e90: \u52a0\u5bc6",
-            "domain": "www.wintermute.com",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177"
-            ]
-          },
-          {
-            "id": "crypto-www-signalplus-com-34",
-            "name": "\u505a\u671f\u6743\u7684\uff1aSignalPlus - Democratizing Options for Digital Assets",
-            "url": "https://www.signalplus.com/",
-            "description": "\u6765\u6e90: \u52a0\u5bc6",
-            "domain": "www.signalplus.com",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177"
-            ]
-          },
-          {
-            "id": "crypto-github-com-35",
-            "name": "\u533a\u5757\u94fe\u6697\u68ee\u6797\u81ea\u536b\u624b\u518c",
-            "url": "https://github.com/slowmist/Blockchain-dark-forest-selfguard-handbook",
-            "description": "\u6765\u6e90: \u52a0\u5bc6",
-            "domain": "github.com",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177"
-            ]
-          },
-          {
-            "id": "crypto-github-com-36",
-            "name": "\u9ed1\u6697\u624b\u518c\u62d3\u5c55",
-            "url": "https://github.com/evilcos/darkhandbook",
-            "description": "\u6765\u6e90: \u52a0\u5bc6",
-            "domain": "github.com",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177"
-            ]
-          },
-          {
-            "id": "crypto-unbias-fyi-37",
-            "name": "\u6240\u6709\u5206\u6790\u5e08\u2014\u2014\u516c\u6b63\u65e0\u504f",
-            "url": "https://unbias.fyi/analysts?source=all",
-            "description": "\u6765\u6e90: \u52a0\u5bc6",
-            "domain": "unbias.fyi",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177"
-            ]
-          },
-          {
-            "id": "crypto-www-benjamincowen-com-38",
-            "name": "Benjamin Cowen | Macroeconomic Analyst & Data Scientist",
-            "url": "https://www.benjamincowen.com/#services",
-            "description": "\u6765\u6e90: \u52a0\u5bc6",
-            "domain": "www.benjamincowen.com",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177"
-            ]
-          },
-          {
-            "id": "crypto-charts-checkonchain-com-39",
-            "name": "\u6bd4\u7279\u5e01\u94fe\u4e0a\u5206\u6790\u4e0e\u56fe\u8868 - _checkonchain | BTC \u6307\u6807\u3001\u6307\u6570\u4e0e\u5e02\u573a\u6570\u636e",
-            "url": "https://charts.checkonchain.com/",
-            "description": "\u6765\u6e90: \u52a0\u5bc6",
-            "domain": "charts.checkonchain.com",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177"
-            ]
-          },
-          {
-            "id": "crypto-strc-live-40",
-            "name": "\u91cd\u8981\uff1aSTRC Price Today | Live Quote, 11.5% Yield & ATM Tracker",
-            "url": "https://strc.live/ticker/strc",
-            "description": "\u6765\u6e90: \u52a0\u5bc6",
-            "domain": "strc.live",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177"
-            ]
-          },
-          {
-            "id": "crypto-cryptorank-io-41",
-            "name": "\u505a\u7684\u633a\u597d\uff0c\u5c24\u5176\u4e00\u7ea7\u548c\u9884\u6d4b\u5e02\u573a\uff1aCryptoRank.io",
-            "url": "https://cryptorank.io/prediction-markets",
-            "description": "\u6765\u6e90: \u52a0\u5bc6",
-            "domain": "cryptorank.io",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177"
-            ]
-          }
-        ]
-      },
-      {
-        "id": "crypto-kronos-btc",
-        "title": "Kronos\u5b9e\u65f6\u9884\u6d4b | BTC",
-        "description": "\u6765\u81ea\u4e66\u7b7e\u6587\u4ef6\u5939\u201cKronos\u5b9e\u65f6\u9884\u6d4b | BTC\u201d\u7684\u6574\u7406\u7ed3\u679c\u3002",
-        "tools": [
-          {
-            "id": "crypto-shiyu-coder-github-io-1",
-            "name": "Kronos\u5b9e\u65f6\u9884\u6d4b | BTC/USDT",
-            "url": "https://shiyu-coder.github.io/Kronos-demo/",
-            "description": "\u6765\u6e90: Kronos\u5b9e\u65f6\u9884\u6d4b | BTC",
-            "domain": "shiyu-coder.github.io",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177",
-              "Kronos\u5b9e\u65f6\u9884\u6d4b | BTC"
-            ]
-          }
-        ]
-      },
-      {
-        "id": "crypto-item",
-        "title": "\u5176\u4ed6",
-        "description": "\u6765\u81ea\u4e66\u7b7e\u6587\u4ef6\u5939\u201c\u5176\u4ed6\u201d\u7684\u6574\u7406\u7ed3\u679c\u3002",
-        "tools": [
-          {
-            "id": "crypto-www-aicoinzh-com-1",
-            "name": "\u770b\u76d8\u8f6f\u4ef6--AICoin",
-            "url": "https://www.aicoinzh.com/",
-            "description": "\u6765\u6e90: \u5176\u4ed6",
-            "domain": "www.aicoinzh.com",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177",
-              "\u5176\u4ed6"
-            ]
-          },
-          {
-            "id": "crypto-aggr-trade-2",
-            "name": "\u52a0\u5bc6\u53e6\u4e00\u4e2a\u770b\u76d8\u8f6f\u4ef6\uff0c\u8c8c\u4f3c\u53ef\u770b\u8ba2\u5355\u6d41",
-            "url": "https://aggr.trade/bi81",
-            "description": "\u6765\u6e90: \u5176\u4ed6",
-            "domain": "aggr.trade",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177",
-              "\u5176\u4ed6"
-            ]
-          },
-          {
-            "id": "crypto-tradinglite-com-3",
-            "name": "\u6d41\u52a8\u6027\u548c\u8ba2\u5355\u6d41--TradingLite \u4ea4\u6613\u5e73\u53f0",
-            "url": "https://tradinglite.com/",
-            "description": "\u6765\u6e90: \u5176\u4ed6",
-            "domain": "tradinglite.com",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177",
-              "\u5176\u4ed6"
-            ]
-          },
-          {
-            "id": "crypto-bitbo-io-4",
-            "name": "\u6bd4\u7279\u5e01\u65e5\u5386",
-            "url": "https://bitbo.io/calendar/",
-            "description": "\u6765\u6e90: \u5176\u4ed6",
-            "domain": "bitbo.io",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177",
-              "\u5176\u4ed6"
-            ]
-          },
-          {
-            "id": "crypto-www-coincarp-com-5",
-            "name": "\u52a0\u5bc6\u8d27\u5e01\u6d3b\u52a8\u65e5\u5386 | CoinCarp",
-            "url": "https://www.coincarp.com/events/",
-            "description": "\u6765\u6e90: \u5176\u4ed6",
-            "domain": "www.coincarp.com",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177",
-              "\u5176\u4ed6"
-            ]
-          },
-          {
-            "id": "crypto-gmgn-ai-6",
-            "name": "\u806a\u660e\u94b1\u8ffd\u8e2a--GMGN.AI",
-            "url": "https://gmgn.ai/?ref=NtZl14CJ&chain=sol",
-            "description": "\u6765\u6e90: \u5176\u4ed6",
-            "domain": "gmgn.ai",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177",
-              "\u5176\u4ed6"
-            ]
-          },
-          {
-            "id": "crypto-axiom-trade-7",
-            "name": "\u806a\u660e\u94b1|discover",
-            "url": "https://axiom.trade/",
-            "description": "\u6765\u6e90: \u5176\u4ed6",
-            "domain": "axiom.trade",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177",
-              "\u5176\u4ed6"
-            ]
-          },
-          {
-            "id": "crypto-xxi-money-8",
-            "name": "21\u8d44\u672c\u5b98\u7f51",
-            "url": "https://xxi.money/",
-            "description": "\u6765\u6e90: \u5176\u4ed6",
-            "domain": "xxi.money",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177",
-              "\u5176\u4ed6"
-            ]
-          },
-          {
-            "id": "crypto-www-ishares-com-9",
-            "name": "IBIT\u5b98\u7f51",
-            "url": "https://www.ishares.com/us/products/333011/ishares-bitcoin-trust-etf#/",
-            "description": "\u6765\u6e90: \u5176\u4ed6",
-            "domain": "www.ishares.com",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177",
-              "\u5176\u4ed6"
-            ]
-          },
-          {
-            "id": "crypto-www-bitcoinmagazinepro-com-10",
-            "name": "\u548cglassnode\u7c7b\u4f3c | BM Pro",
-            "url": "https://www.bitcoinmagazinepro.com/charts/mvrv-zscore/",
-            "description": "\u6765\u6e90: \u5176\u4ed6",
-            "domain": "www.bitcoinmagazinepro.com",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177",
-              "\u5176\u4ed6"
-            ]
-          },
-          {
-            "id": "crypto-cn-investing-com-11",
-            "name": "\u6bd4\u7279\u5e01\u5386\u53f2\u6570\u636e\u514d\u8d39\u4e0b\u8f7d--\u82f1\u4e3a\u8d22\u60c5",
-            "url": "https://cn.investing.com/crypto/bitcoin/historical-data",
-            "description": "\u6765\u6e90: \u5176\u4ed6",
-            "domain": "cn.investing.com",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177",
-              "\u5176\u4ed6"
-            ]
-          },
-          {
-            "id": "crypto-www-cryptodatadownload-com-12",
-            "name": "\u52a0\u5bc6\u514d\u8d39\u6570\u636e",
-            "url": "https://www.cryptodatadownload.com/data/gemini/",
-            "description": "\u6765\u6e90: \u5176\u4ed6",
-            "domain": "www.cryptodatadownload.com",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177",
-              "\u5176\u4ed6"
-            ]
-          },
-          {
-            "id": "crypto-www-amberdata-io-13",
-            "name": "\u52a0\u5bc6\u673a\u6784\u7ea7\u671f\u6743\u5206\u6790",
-            "url": "https://www.amberdata.io/ad-derivatives",
-            "description": "\u6765\u6e90: \u5176\u4ed6",
-            "domain": "www.amberdata.io",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177",
-              "\u5176\u4ed6"
-            ]
-          },
-          {
-            "id": "crypto-coinmetrics-io-14",
-            "name": "\u4e3b\u9875 - Coin Metrics",
-            "url": "https://coinmetrics.io/",
-            "description": "\u6765\u6e90: \u5176\u4ed6",
-            "domain": "coinmetrics.io",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177",
-              "\u5176\u4ed6"
-            ]
-          },
-          {
-            "id": "crypto-santiment-net-15",
-            "name": "\u52a0\u5bc6\u7814\u7a76\u3001\u6570\u636e\u3001\u5de5\u5177 - \u63a2\u7d22\u884c\u4e3a\u5206\u6790",
-            "url": "https://santiment.net/",
-            "description": "\u6765\u6e90: \u5176\u4ed6",
-            "domain": "santiment.net",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177",
-              "\u5176\u4ed6"
-            ]
-          },
-          {
-            "id": "crypto-www-chainalysis-com-16",
-            "name": "The Blockchain Data Platform - Chainalysis",
-            "url": "https://www.chainalysis.com/#research",
-            "description": "\u6765\u6e90: \u5176\u4ed6",
-            "domain": "www.chainalysis.com",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177",
-              "\u5176\u4ed6"
-            ]
-          },
-          {
-            "id": "crypto-messari-io-17",
-            "name": "\u52a0\u5bc6\u8d27\u5e01\u7814\u7a76\u3001\u62a5\u544a\u3001\u4eba\u5de5\u667a\u80fd\u65b0\u95fb\u3001\u5b9e\u65f6\u4ef7\u683c\u3001\u4ee3\u5e01\u89e3\u9501\u548c\u7b79\u6b3e\u6570\u636e",
-            "url": "https://messari.io/",
-            "description": "\u6765\u6e90: \u5176\u4ed6",
-            "domain": "messari.io",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177",
-              "\u5176\u4ed6"
-            ]
-          },
-          {
-            "id": "crypto-dune-com-18",
-            "name": "Dune \u2014 \u7531\u793e\u533a\u63d0\u4f9b\u652f\u6301\u7684\u52a0\u5bc6\u5206\u6790\u3002",
-            "url": "https://dune.com/home",
-            "description": "\u6765\u6e90: \u5176\u4ed6",
-            "domain": "dune.com",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177",
-              "\u5176\u4ed6"
-            ]
-          },
-          {
-            "id": "crypto-uniscan-cc-19",
-            "name": "UniScan | \u652f\u6301\u5e8f\u6570\u8bcd\u3001\u7b26\u6587\u3001\u70f7\u70c3",
-            "url": "https://uniscan.cc/fractal/",
-            "description": "\u6765\u6e90: \u5176\u4ed6",
-            "domain": "uniscan.cc",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177",
-              "\u5176\u4ed6"
-            ]
-          },
-          {
-            "id": "crypto-mempool-space-20",
-            "name": "mempool - Bitcoin Explorer",
-            "url": "https://mempool.space/zh/",
-            "description": "\u6765\u6e90: \u5176\u4ed6",
-            "domain": "mempool.space",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177",
-              "\u5176\u4ed6"
-            ]
-          },
-          {
-            "id": "crypto-etherscan-io-21",
-            "name": "Ethereum Gas Tracker | Etherscan",
-            "url": "https://etherscan.io/gastracker",
-            "description": "\u6765\u6e90: \u5176\u4ed6",
-            "domain": "etherscan.io",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177",
-              "\u5176\u4ed6"
-            ]
-          },
-          {
-            "id": "crypto-ultrasound-money-22",
-            "name": "0 Gwei | $4,481 | ultrasound.money",
-            "url": "https://ultrasound.money/",
-            "description": "\u6765\u6e90: \u5176\u4ed6",
-            "domain": "ultrasound.money",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177",
-              "\u5176\u4ed6"
-            ]
-          },
-          {
-            "id": "crypto-platform-spotonchain-ai-23",
-            "name": "Spot On Chain - \u5e73\u53f0",
-            "url": "https://platform.spotonchain.ai/zh",
-            "description": "\u6765\u6e90: \u5176\u4ed6",
-            "domain": "platform.spotonchain.ai",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177",
-              "\u5176\u4ed6"
-            ]
-          },
-          {
-            "id": "crypto-www-macromicro-me-24",
-            "name": "\u6bd4\u7279\u5e01BTC\u9a71\u52a8\u4e09\u5927\u56e0\u7d20\uff1a\u6d41\u52a8\u6027\uff06\u5b9e\u9645\u5229\u7387\uff06PE | \u7528\u6237\u56fe\u7ec4| MacroMicro \u8d22\u7ecfM\u5e73\u65b9",
-            "url": "https://www.macromicro.me/collections/22514/bi-te-bi_418919/111972/bi-te-bi-BTC-qu-dong-san-da-yin-su-liu-dong-xing-shi-ji-li-lyu-GDP",
-            "description": "\u6765\u6e90: \u5176\u4ed6",
-            "domain": "www.macromicro.me",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177",
-              "\u5176\u4ed6"
-            ]
-          },
-          {
-            "id": "crypto-chart-kiyotaka-ai-25",
-            "name": "\u770b\u8ba2\u5355\u6d41\u548c\u52a0\u603bOI\u7684\u770b\u76d8\u8f6f\u4ef6",
-            "url": "https://chart.kiyotaka.ai/JF9o688G",
-            "description": "\u6765\u6e90: \u5176\u4ed6",
-            "domain": "chart.kiyotaka.ai",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177",
-              "\u5176\u4ed6"
-            ]
-          }
-        ]
-      },
-      {
-        "id": "crypto-item",
-        "title": "\u673a\u6784",
-        "description": "\u6765\u81ea\u4e66\u7b7e\u6587\u4ef6\u5939\u201c\u673a\u6784\u201d\u7684\u6574\u7406\u7ed3\u679c\u3002",
-        "tools": [
-          {
-            "id": "crypto-coinshares-com-1",
-            "name": "CoinShares | \u6253\u9020\u6295\u8d44\u7684\u672a\u6765",
-            "url": "https://coinshares.com/corp/",
-            "description": "\u6765\u6e90: \u673a\u6784",
-            "domain": "coinshares.com",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177",
-              "\u673a\u6784"
-            ]
-          },
-          {
-            "id": "crypto-a16zcrypto-substack-com-2",
-            "name": "\u6765\u81ea a16zcrypto \u7684 web3 \u4fe1\u4ef6 | a16z \u52a0\u5bc6 | Substack",
-            "url": "https://a16zcrypto.substack.com/",
-            "description": "\u6765\u6e90: \u673a\u6784",
-            "domain": "a16zcrypto.substack.com",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177",
-              "\u673a\u6784"
-            ]
-          },
-          {
-            "id": "crypto-www-vaneck-com-3",
-            "name": "\u6570\u5b57\u8d44\u4ea7 | \u6d1e\u5bdf | VanEck",
-            "url": "https://www.vaneck.com/us/en/insights/digital-assets/?p=1",
-            "description": "\u6765\u6e90: \u673a\u6784",
-            "domain": "www.vaneck.com",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177",
-              "\u673a\u6784"
-            ]
-          },
-          {
-            "id": "crypto-blog-river-com-4",
-            "name": "Bitcoin Research\u7814\u62a5- River Intelligence Unit | River Financial",
-            "url": "https://blog.river.com/tag/river-research/",
-            "description": "\u6765\u6e90: \u673a\u6784",
-            "domain": "blog.river.com",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177",
-              "\u673a\u6784"
-            ]
-          },
-          {
-            "id": "crypto-bitwiseinvestments-com-5",
-            "name": "Insights | Bitwise Investments",
-            "url": "https://bitwiseinvestments.com/crypto-market-insights",
-            "description": "\u6765\u6e90: \u673a\u6784",
-            "domain": "bitwiseinvestments.com",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177",
-              "\u673a\u6784"
-            ]
-          },
-          {
-            "id": "crypto-experts-bitwiseinvestments-com-5b",
-            "name": "Bitwise \u6bcf\u5468\u5206\u6790",
-            "url": "https://experts.bitwiseinvestments.com/cio-memos",
-            "description": "\u6765\u6e90: \u673a\u6784",
-            "domain": "experts.bitwiseinvestments.com",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177",
-              "\u673a\u6784",
-              "\u7814\u62a5"
-            ]
-          },
-          {
-            "id": "crypto-www-coinbase-com-6",
-            "name": "Research - Coinbase Research & Insights Hub",
-            "url": "https://www.coinbase.com/zh-cn/institutional/research-insights/research",
-            "description": "\u6765\u6e90: \u673a\u6784",
-            "domain": "www.coinbase.com",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177",
-              "\u673a\u6784"
-            ]
-          },
-          {
-            "id": "crypto-research-grayscale-com-7",
-            "name": "\u7814\u7a76\u4e0e\u5e02\u573a\u5206\u6790 | \u7070\u5ea6",
-            "url": "https://research.grayscale.com/",
-            "description": "\u6765\u6e90: \u673a\u6784",
-            "domain": "research.grayscale.com",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177",
-              "\u673a\u6784"
-            ]
-          },
-          {
-            "id": "crypto-www-binance-com-8",
-            "name": "\u5e01\u5b89\u7814\u7a76\u9662",
-            "url": "https://www.binance.com/zh-CN/research",
-            "description": "\u6765\u6e90: \u673a\u6784",
-            "domain": "www.binance.com",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177",
-              "\u673a\u6784"
-            ]
-          },
-          {
-            "id": "crypto-www-ark-invest-com-9",
-            "name": "Innovation Research and Models by ARK Invest",
-            "url": "https://www.ark-invest.com/articles",
-            "description": "\u6765\u6e90: \u673a\u6784",
-            "domain": "www.ark-invest.com",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177",
-              "\u673a\u6784"
-            ]
-          },
-          {
-            "id": "crypto-cryptohayes-substack-com-10",
-            "name": "\u52a0\u5bc6\u8d27\u5e01\u4ea4\u6613\u8005\u6587\u6458 | Arthur Hayes | Substack",
-            "url": "https://cryptohayes.substack.com/",
-            "description": "\u6765\u6e90: \u673a\u6784",
-            "domain": "cryptohayes.substack.com",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177",
-              "\u673a\u6784"
-            ]
-          },
-          {
-            "id": "crypto-4pillars-io-11",
-            "name": "\u56db\u5927\u652f\u67f1",
-            "url": "https://4pillars.io/en",
-            "description": "\u6765\u6e90: \u673a\u6784",
-            "domain": "4pillars.io",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177",
-              "\u673a\u6784"
-            ]
-          },
-          {
-            "id": "crypto-supersaiyan1957-substack-com-12",
-            "name": "BTC \u6bcf\u5468\u6df1\u5ea6\u5206\u6790\u62a5\u544a ( + \u7f8e\u80a1\uff09 | 08 03 2026",
-            "url": "https://supersaiyan1957.substack.com/p/btc-08-03-2026?r=1edbq9&utm_campaign=post&utm_medium=web&triedRedirect=true&_src_ref=bit.ly",
-            "description": "\u6765\u6e90: \u673a\u6784",
-            "domain": "supersaiyan1957.substack.com",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177",
-              "\u673a\u6784"
-            ]
-          }
-        ]
-      },
-      {
-        "id": "crypto-item",
-        "title": "\u7406\u8d22\u548c\u4e00\u7ea7",
-        "description": "\u6765\u81ea\u4e66\u7b7e\u6587\u4ef6\u5939\u201c\u7406\u8d22\u548c\u4e00\u7ea7\u201d\u7684\u6574\u7406\u7ed3\u679c\u3002",
-        "tools": [
-          {
-            "id": "crypto-www-rootdata-com-1",
-            "name": "Web3 \u70ed\u95e8\u9879\u76ee\u6392\u540d",
-            "url": "https://www.rootdata.com/zh",
-            "description": "\u6765\u6e90: \u7406\u8d22\u548c\u4e00\u7ea7",
-            "domain": "www.rootdata.com",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177",
-              "\u7406\u8d22\u548c\u4e00\u7ea7"
-            ]
-          },
-          {
-            "id": "crypto-www-theblockbeats-info-2",
-            "name": "BlockBeats - \u4e13\u4e1a\u7684\u533a\u5757\u94fe\u7814\u7a76\u673a\u6784\u4e0e\u8d44\u8baf\u5e73\u53f0",
-            "url": "https://www.theblockbeats.info/",
-            "description": "\u6765\u6e90: \u7406\u8d22\u548c\u4e00\u7ea7",
-            "domain": "www.theblockbeats.info",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177",
-              "\u7406\u8d22\u548c\u4e00\u7ea7"
-            ]
-          },
-          {
-            "id": "crypto-www-bybit-com-3",
-            "name": "Launchpool",
-            "url": "https://www.bybit.com/zh-MY/trade/spot/launchpool",
-            "description": "\u6765\u6e90: \u7406\u8d22\u548c\u4e00\u7ea7",
-            "domain": "www.bybit.com",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177",
-              "\u7406\u8d22\u548c\u4e00\u7ea7"
-            ]
-          },
-          {
-            "id": "crypto-app-ethena-fi-4",
-            "name": "\u804c\u4f4d | Ethena",
-            "url": "https://app.ethena.fi/dashboards/positions",
-            "description": "\u6765\u6e90: \u7406\u8d22\u548c\u4e00\u7ea7",
-            "domain": "app.ethena.fi",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177",
-              "\u7406\u8d22\u548c\u4e00\u7ea7"
-            ]
-          },
-          {
-            "id": "crypto-defillama-com-5",
-            "name": "Ethereum - DefiLlama",
-            "url": "https://defillama.com/chain/Ethereum",
-            "description": "\u6765\u6e90: \u7406\u8d22\u548c\u4e00\u7ea7",
-            "domain": "defillama.com",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177",
-              "\u7406\u8d22\u548c\u4e00\u7ea7"
-            ]
-          },
-          {
-            "id": "crypto-btc-com-6",
-            "name": "BTC.com \u4e3a\u5168\u7403\u533a\u5757\u94fe\u7231\u597d\u8005\u63d0\u4f9b\u4e13\u4e1a\u7684\u6570\u636e\u4e0e\u77ff\u6c60\u670d\u52a1",
-            "url": "https://btc.com/zh-CN",
-            "description": "\u6765\u6e90: \u7406\u8d22\u548c\u4e00\u7ea7",
-            "domain": "btc.com",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177",
-              "\u7406\u8d22\u548c\u4e00\u7ea7"
-            ]
-          },
-          {
-            "id": "crypto-dexscreener-com-7",
-            "name": "DEX Screener",
-            "url": "https://dexscreener.com/",
-            "description": "\u6765\u6e90: \u7406\u8d22\u548c\u4e00\u7ea7",
-            "domain": "dexscreener.com",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177",
-              "\u7406\u8d22\u548c\u4e00\u7ea7"
-            ]
-          },
-          {
-            "id": "crypto-app-pendle-finance-8",
-            "name": "Pendle",
-            "url": "https://app.pendle.finance/trade/markets?utm_source=landing&utm_medium=landing",
-            "description": "\u6765\u6e90: \u7406\u8d22\u548c\u4e00\u7ea7",
-            "domain": "app.pendle.finance",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177",
-              "\u7406\u8d22\u548c\u4e00\u7ea7"
-            ]
-          },
-          {
-            "id": "crypto-miningpoolstats-stream-9",
-            "name": "\u6316\u77ffBTC\u6570\u636e",
-            "url": "https://miningpoolstats.stream/bitcoin",
-            "description": "\u6765\u6e90: \u7406\u8d22\u548c\u4e00\u7ea7",
-            "domain": "miningpoolstats.stream",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177",
-              "\u7406\u8d22\u548c\u4e00\u7ea7"
-            ]
-          },
-          {
-            "id": "crypto-morpho-org-10",
-            "name": "Morpho | The most trusted network for onchain loans",
-            "url": "https://morpho.org/",
-            "description": "\u6765\u6e90: \u7406\u8d22\u548c\u4e00\u7ea7",
-            "domain": "morpho.org",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177",
-              "\u7406\u8d22\u548c\u4e00\u7ea7"
-            ]
-          },
-          {
-            "id": "crypto-app-kamino-finance-11",
-            "name": "\u8d37\u6b3e | \u5361\u7c73\u8bfa\u91d1\u878d",
-            "url": "https://app.kamino.finance/earn/lend",
-            "description": "\u6765\u6e90: \u7406\u8d22\u548c\u4e00\u7ea7",
-            "domain": "app.kamino.finance",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177",
-              "\u7406\u8d22\u548c\u4e00\u7ea7"
-            ]
-          },
-          {
-            "id": "crypto-app-lulo-fi-12",
-            "name": "Lulo",
-            "url": "https://app.lulo.fi/",
-            "description": "\u6765\u6e90: \u7406\u8d22\u548c\u4e00\u7ea7",
-            "domain": "app.lulo.fi",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177",
-              "\u7406\u8d22\u548c\u4e00\u7ea7"
-            ]
-          },
-          {
-            "id": "crypto-app-uniswap-org-13",
-            "name": "\u5728 Uniswap \u4e0a\u63a2\u7d22 Ethereum \u7684\u70ed\u95e8\u8d44\u91d1\u6c60",
-            "url": "https://app.uniswap.org/explore/pools",
-            "description": "\u6765\u6e90: \u7406\u8d22\u548c\u4e00\u7ea7",
-            "domain": "app.uniswap.org",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177",
-              "\u7406\u8d22\u548c\u4e00\u7ea7"
-            ]
-          },
-          {
-            "id": "crypto-app-spark-fi-14",
-            "name": "Spark\uff1a\u5229\u7528\u7a33\u5b9a\u5e01\u8d5a\u94b1",
-            "url": "https://app.spark.fi/",
-            "description": "\u6765\u6e90: \u7406\u8d22\u548c\u4e00\u7ea7",
-            "domain": "app.spark.fi",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177",
-              "\u7406\u8d22\u548c\u4e00\u7ea7"
-            ]
-          },
-          {
-            "id": "crypto-1key-so-15",
-            "name": "OneKey",
-            "url": "https://1key.so/earn",
-            "description": "\u6765\u6e90: \u7406\u8d22\u548c\u4e00\u7ea7",
-            "domain": "1key.so",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177",
-              "\u7406\u8d22\u548c\u4e00\u7ea7"
-            ]
-          },
-          {
-            "id": "crypto-www-apeoclock-com-16",
-            "name": "defi\u9879\u76ee\u53d1\u5e03\u65e5\u5386",
-            "url": "https://www.apeoclock.com/",
-            "description": "\u6765\u6e90: \u7406\u8d22\u548c\u4e00\u7ea7",
-            "domain": "www.apeoclock.com",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177",
-              "\u7406\u8d22\u548c\u4e00\u7ea7"
-            ]
-          },
-          {
-            "id": "crypto-stake-lido-fi-17",
-            "name": "ETH\u8d28\u62bc",
-            "url": "https://stake.lido.fi/",
-            "description": "\u6765\u6e90: \u7406\u8d22\u548c\u4e00\u7ea7",
-            "domain": "stake.lido.fi",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177",
-              "\u7406\u8d22\u548c\u4e00\u7ea7"
-            ]
-          },
-          {
-            "id": "crypto-web3daoge-com-18",
-            "name": "\u7a33\u5b9a\u5e01\u7406\u8d22\u770b\u677f",
-            "url": "https://web3daoge.com/",
-            "description": "\u6765\u6e90: \u7406\u8d22\u548c\u4e00\u7ea7",
-            "domain": "web3daoge.com",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177",
-              "\u7406\u8d22\u548c\u4e00\u7ea7"
-            ]
-          },
-          {
-            "id": "crypto-app-barker-money-19",
-            "name": "Barker - Find the Best Stablecoin Yields",
-            "url": "https://app.barker.money/campaigns",
-            "description": "\u6765\u6e90: \u7406\u8d22\u548c\u4e00\u7ea7",
-            "domain": "app.barker.money",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177",
-              "\u7406\u8d22\u548c\u4e00\u7ea7"
-            ]
-          }
-        ]
-      },
-      {
-        "id": "crypto-item",
-        "title": "\u5f71\u5b50\u94f6\u884c\u7b49",
-        "description": "\u6765\u81ea\u4e66\u7b7e\u6587\u4ef6\u5939\u201c\u5f71\u5b50\u94f6\u884c\u7b49\u201d\u7684\u6574\u7406\u7ed3\u679c\u3002",
-        "tools": [
-          {
-            "id": "crypto-hackernoon-com-1",
-            "name": "\u5f71\u5b50\u94f6\u884c",
-            "url": "https://hackernoon.com/u/antongolub",
-            "description": "\u6765\u6e90: \u5f71\u5b50\u94f6\u884c\u7b49",
-            "domain": "hackernoon.com",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177",
-              "\u5f71\u5b50\u94f6\u884c\u7b49"
-            ]
-          },
-          {
-            "id": "crypto-blog-bitmex-com-2",
-            "name": "\u60a8\u641c\u7d22\u7684\u662f\u201cReckless \u2013 Chapter\u201d | BitMEX \u535a\u5ba2",
-            "url": "https://blog.bitmex.com/?s=Reckless+%E2%80%93+Chapter&lang=en_us",
-            "description": "\u6765\u6e90: \u5f71\u5b50\u94f6\u884c\u7b49",
-            "domain": "blog.bitmex.com",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177",
-              "\u5f71\u5b50\u94f6\u884c\u7b49"
-            ]
-          }
-        ]
-      }
-    ]
-  },
-  {
-    "id": "metal",
-    "title": "\u91d1\u5c5e\u5de5\u5177",
-    "description": "\u9ec4\u91d1\u3001\u8d35\u91d1\u5c5e\u4e0e\u5546\u54c1\u94fe\u6761\u76f8\u5173\u4ea4\u6613\u5de5\u5177\u3002",
-    "groups": [
-      {
-        "id": "metal-item",
-        "title": "\u9ec4\u91d1",
-        "description": "\u6765\u81ea\u4e66\u7b7e\u6587\u4ef6\u5939\u201c\u9ec4\u91d1\u201d\u7684\u6574\u7406\u7ed3\u679c\u3002",
-        "tools": [
-          {
-            "id": "metal-chartexchange-com-1",
-            "name": "GLD \u501f\u6b3e\u5229\u7387 (CTB) | ChartExchange",
-            "url": "https://chartexchange.com/symbol/nyse-gld/borrow-fee/",
-            "description": "\u6765\u6e90: \u9ec4\u91d1",
-            "domain": "chartexchange.com",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177",
-              "\u9ec4\u91d1"
-            ]
-          },
-          {
-            "id": "metal-www-lbma-org-uk-2",
-            "name": "\u4f26\u6566\u91d1\u5e93\u6570\u636e | LBMA",
-            "url": "https://www.lbma.org.uk/prices-and-data/london-vault-data",
-            "description": "\u6765\u6e90: \u9ec4\u91d1",
-            "domain": "www.lbma.org.uk",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177",
-              "\u9ec4\u91d1"
-            ]
-          },
-          {
-            "id": "metal-commoditieschart-net-3",
-            "name": "Comex \u91d1\u5e93\u5b58",
-            "url": "https://commoditieschart.net/zh/metals/gold/comex-gold-stocks",
-            "description": "\u6765\u6e90: \u9ec4\u91d1",
-            "domain": "commoditieschart.net",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177",
-              "\u9ec4\u91d1"
-            ]
-          },
-          {
-            "id": "metal-china-gold-org-4",
-            "name": "\u4e16\u754c\u9ec4\u91d1\u534f\u4f1a\uff1a\u9ec4\u91d1ETF\u7684\u6301\u6709\u91cf\u548c\u6d41\u91cf | World Gold Council",
-            "url": "https://china.gold.org/goldhub/data/gold-etfs-holdings-and-flows#from-login=1&login-type=wechat",
-            "description": "\u6765\u6e90: \u9ec4\u91d1",
-            "domain": "china.gold.org",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177",
-              "\u9ec4\u91d1"
-            ]
-          },
-          {
-            "id": "metal-www-gold-org-5",
-            "name": "\u5404\u56fd\u592e\u884c\u9ec4\u91d1\u50a8\u5907 | \u4e16\u754c\u9ec4\u91d1\u534f\u4f1a",
-            "url": "https://www.gold.org/goldhub/data/gold-reserves-by-country",
-            "description": "\u6765\u6e90: \u9ec4\u91d1",
-            "domain": "www.gold.org",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177",
-              "\u9ec4\u91d1"
-            ]
-          },
-          {
-            "id": "metal-www-gold-org-6",
-            "name": "\u5404\u5927\u4ea4\u6613\u6240\u672a\u5e73\u4ed3\u5408\u7ea6\u6570",
-            "url": "https://www.gold.org/goldhub/data/gold-open-interest",
-            "description": "\u6765\u6e90: \u9ec4\u91d1",
-            "domain": "www.gold.org",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177",
-              "\u9ec4\u91d1"
-            ]
-          },
-          {
-            "id": "metal-china-gold-org-7",
-            "name": "\u9ec4\u91d1\u671f\u8d27\u4ef7\u683c\u66f2\u7ebf\uff5c\u4e16\u754c\u9ec4\u91d1\u534f\u4f1a",
-            "url": "https://china.gold.org/goldhub/data/gold-futures-curves#from-login=1&login-type=wechat",
-            "description": "\u6765\u6e90: \u9ec4\u91d1",
-            "domain": "china.gold.org",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177",
-              "\u9ec4\u91d1"
-            ]
-          },
-          {
-            "id": "metal-www-jiaoyifamen-com-8",
-            "name": "\u4ea4\u6613\u6cd5\u95e8",
-            "url": "https://www.jiaoyifamen.com/variety/positionAnalysis-CFTC",
-            "description": "\u6765\u6e90: \u9ec4\u91d1",
-            "domain": "www.jiaoyifamen.com",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177",
-              "\u9ec4\u91d1"
-            ]
-          },
-          {
-            "id": "metal-www-cmegroup-com-9",
-            "name": "CME Group Volatility Indexes (CVOL) - CME Group",
-            "url": "https://www.cmegroup.com/market-data/cme-group-benchmark-administration/cme-group-volatility-indexes.html",
-            "description": "\u6765\u6e90: \u9ec4\u91d1",
-            "domain": "www.cmegroup.com",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177",
-              "\u9ec4\u91d1"
-            ]
-          },
-          {
-            "id": "metal-www-cmegroup-com-10",
-            "name": "\u9ec4\u91d1\u671f\u8d27\u4ea4\u6613\u91cf\u4e0e\u6301\u4ed3\u91cf - CME \u96c6\u56e2 --- Gold Futures Volume & Open Interest - CME Group",
-            "url": "https://www.cmegroup.com/markets/metals/precious/gold.volume.html?utm_source=chatgpt.com",
-            "description": "\u6765\u6e90: \u9ec4\u91d1",
-            "domain": "www.cmegroup.com",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177",
-              "\u9ec4\u91d1"
-            ]
-          },
-          {
-            "id": "metal-www-cmegroup-com-11",
-            "name": "COT\u62a5\u544a\u6301\u4ed3",
-            "url": "https://www.cmegroup.com/tools-information/quikstrike/commitment-of-traders.html?pid=40#cmeloginteaser1",
-            "description": "\u6765\u6e90: \u9ec4\u91d1",
-            "domain": "www.cmegroup.com",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177",
-              "\u9ec4\u91d1"
-            ]
-          },
-          {
-            "id": "metal-giresearch-substack-com-12",
-            "name": "\u9ec4\u91d1\u6295\u8d44\u8005\u7814\u7a76 | Chris Rutherglen \u535a\u58eb | Substack",
-            "url": "https://giresearch.substack.com/?utm_source=%2Fsearch%2FGold%2520Investor%2520Research&utm_medium=reader2&utm_campaign=reader2",
-            "description": "\u6765\u6e90: \u9ec4\u91d1",
-            "domain": "giresearch.substack.com",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177",
-              "\u9ec4\u91d1"
-            ]
-          },
-          {
-            "id": "metal-www-incrementum-li-13",
-            "name": "\u671f\u520a - Incrementum",
-            "url": "https://www.incrementum.li/en/journal/",
-            "description": "\u6765\u6e90: \u9ec4\u91d1",
-            "domain": "www.incrementum.li",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177",
-              "\u9ec4\u91d1"
-            ]
-          },
-          {
-            "id": "metal-www-cmegroup-com-14",
-            "name": "Gold Option Volume & Open Interest - CME Group",
-            "url": "https://www.cmegroup.com/markets/metals/precious/gold.volume.options.html#optionProductId=192",
-            "description": "\u6765\u6e90: \u9ec4\u91d1",
-            "domain": "www.cmegroup.com",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177",
-              "\u9ec4\u91d1"
-            ]
-          },
-          {
-            "id": "metal-www-cmegroup-com-15",
-            "name": "\u91d1\u5c5e\u6bcf\u65e5\u4ea4\u6613\u91cf\u53ca\u672a\u5e73\u4ed3\u5408\u7ea6 - \u829d\u5546\u6240\u96c6\u56e2",
-            "url": "https://www.cmegroup.com/market-data/browse-data/metals-volume.html",
-            "description": "\u6765\u6e90: \u9ec4\u91d1",
-            "domain": "www.cmegroup.com",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177",
-              "\u9ec4\u91d1"
-            ]
-          },
-          {
-            "id": "metal-www-lbma-org-uk-16",
-            "name": "Clearing Data | LBMA",
-            "url": "https://www.lbma.org.uk/prices-and-data/clearing-data",
-            "description": "\u6765\u6e90: \u9ec4\u91d1",
-            "domain": "www.lbma.org.uk",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177",
-              "\u9ec4\u91d1"
-            ]
-          }
-        ]
-      },
-      {
-        "id": "metal-item",
-        "title": "\u5546\u54c1",
-        "description": "\u6765\u81ea\u4e66\u7b7e\u6587\u4ef6\u5939\u201c\u5546\u54c1\u201d\u7684\u6574\u7406\u7ed3\u679c\u3002",
-        "tools": [
-          {
-            "id": "metal-www-jiaoyifamen-com-1",
-            "name": "\u4ea4\u6613\u6cd5\u95e8",
-            "url": "https://www.jiaoyifamen.com/variety/varieties-varieties",
-            "description": "\u6765\u6e90: \u5546\u54c1",
-            "domain": "www.jiaoyifamen.com",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177",
-              "\u5546\u54c1"
-            ]
-          },
-          {
-            "id": "metal-x-qhkch-com-2",
-            "name": "\u56fd\u5185\u5546\u54c1\u671f\u8d27\u5404\u7c7b\u6570\u636e- \u5947\u8d27\u53ef\u67e5",
-            "url": "https://x.qhkch.com/variety/position",
-            "description": "\u6765\u6e90: \u5546\u54c1",
-            "domain": "x.qhkch.com",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177",
-              "\u5546\u54c1"
-            ]
-          },
-          {
-            "id": "metal-en-macromicro-me-3",
-            "name": "US - Crack Spread vs. Oil Price | Crude Oil | Collection | MacroMicro",
-            "url": "https://en.macromicro.me/collections/19/mm-oil-price/4376/crude-oil-cracking-spread-vs-wti",
-            "description": "\u6765\u6e90: \u5546\u54c1",
-            "domain": "en.macromicro.me",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177",
-              "\u5546\u54c1"
-            ]
-          },
-          {
-            "id": "metal-www-1qh-cn-4",
-            "name": "\u671f\u8d27\u5957\u5229\u5206\u6790_\u8de8\u671f\u4ef7\u5dee\u67e5\u8be2_\u6700\u65b0\u4ef7\u5dee\u8d70\u52bf\u56fe-\u4e00\u671f\u8d27",
-            "url": "https://www.1qh.cn/tools/spread.html",
-            "description": "\u6765\u6e90: \u5546\u54c1",
-            "domain": "www.1qh.cn",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177",
-              "\u5546\u54c1"
-            ]
-          },
-          {
-            "id": "metal-business-ucdenver-edu-5",
-            "name": "\u6469\u6839\u5927\u901a\u5546\u54c1\u4e0e\u80fd\u6e90\u7ba1\u7406\u4e2d\u5fc3 | \u79d1\u7f57\u62c9\u591a\u5927\u5b66\u4e39\u4f5b\u5546\u5b66\u9662",
-            "url": "https://business.ucdenver.edu/jpmorgancenter",
-            "description": "\u6765\u6e90: \u5546\u54c1",
-            "domain": "business.ucdenver.edu",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177",
-              "\u5546\u54c1"
-            ]
-          },
-          {
-            "id": "metal-ent-htfc-com-6",
-            "name": "\u5de5\u4f5c\u53f0-\u534e\u6cf0\u5929\u7391",
-            "url": "https://ent.htfc.com/#/homePage/index?reportId&catalogId",
-            "description": "\u6765\u6e90: \u5546\u54c1",
-            "domain": "ent.htfc.com",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177",
-              "\u5546\u54c1"
-            ]
-          },
-          {
-            "id": "metal-hq-smm-cn-7",
-            "name": "\u6709\u8272\u91d1\u5c5e\u671f\u8d27\u8fdb\u53e3\u76c8\u4e8f\u7387_\u4e0a\u6d77\u6709\u8272\u7f51",
-            "url": "https://hq.smm.cn/data/arbi",
-            "description": "\u6765\u6e90: \u5546\u54c1",
-            "domain": "hq.smm.cn",
-            "tags": [
-              "\u4ea4\u6613\u5de5\u5177",
-              "\u5546\u54c1"
-            ]
-          }
-        ]
-      }
-    ]
-  },
-  {
-    "id": "quant",
-    "title": "\u91cf\u5316\u5de5\u5177",
-    "description": "\u91cf\u5316\u7814\u7a76\u3001\u6570\u636e\u63a5\u53e3\u3001\u56de\u6d4b\u6846\u67b6\u4e0e\u91cf\u5316\u793e\u533a\u3002",
-    "groups": [
-      {
-        "id": "quant-item",
-        "title": "\u91cf\u5316\u7c7b\u597d\u6587\u7ae0",
-        "description": "\u6765\u81ea\u4e66\u7b7e\u6587\u4ef6\u5939\u201c\u91cf\u5316\u7c7b\u597d\u6587\u7ae0\u201d\u7684\u6574\u7406\u7ed3\u679c\u3002",
-        "tools": [
-          {
-            "id": "quant-bigquant-com-1",
-            "name": "\u91d1\u5de5CTA\u7cfb\u5217\u4e4b\u4e00\uff1a\u57fa\u4e8e\u57fa\u672c\u9762\u591a\u56e0\u5b50\u6a21\u578b\u7684\u9ec4\u91d1\u4ea4\u6613\u7b56\u7565 \u4e2d\u6cf0\u8bc1\u5238_20181231 - BigQuant\u91cf\u5316\u4ea4\u6613",
-            "url": "https://bigquant.com/wiki/doc/oiVYuLosvU",
-            "description": "\u6765\u6e90: \u91cf\u5316\u7c7b\u597d\u6587\u7ae0",
-            "domain": "bigquant.com",
-            "tags": [
-              "\u91cf\u5316",
-              "\u91cf\u5316\u7c7b\u597d\u6587\u7ae0"
-            ]
-          },
-          {
-            "id": "quant-blog-csdn-net-2",
-            "name": "\u7edf\u8ba1\u5957\u5229\u7b56\u7565\u7684\u4e94\u5927\u4e3b\u6d41\u7b56\u7565\u5206\u6790\u4e0e\u4f18\u7f3a\u70b9_copula\u51fd\u6570\u7684\u7f3a\u70b9-CSDN\u535a\u5ba2",
-            "url": "https://blog.csdn.net/zk168_net/article/details/107536782",
-            "description": "\u6765\u6e90: \u91cf\u5316\u7c7b\u597d\u6587\u7ae0",
-            "domain": "blog.csdn.net",
-            "tags": [
-              "\u91cf\u5316",
-              "\u91cf\u5316\u7c7b\u597d\u6587\u7ae0"
-            ]
-          },
-          {
-            "id": "quant-www-myquant-cn-3",
-            "name": "\u8de8\u671f\u5957\u5229(\u671f\u8d27) - \u7ecf\u5178\u7b56\u7565 - \u6398\u91d1\u91cf\u5316",
-            "url": "https://www.myquant.cn/docs/python_strategyies/107",
-            "description": "\u6765\u6e90: \u91cf\u5316\u7c7b\u597d\u6587\u7ae0",
-            "domain": "www.myquant.cn",
-            "tags": [
-              "\u91cf\u5316",
-              "\u91cf\u5316\u7c7b\u597d\u6587\u7ae0"
-            ]
-          }
-        ]
-      },
-      {
-        "id": "quant-item",
-        "title": "\u91cf\u5316\u603b\u89c8",
-        "description": "\u6765\u81ea\u4e66\u7b7e\u6587\u4ef6\u5939\u201c\u91cf\u5316\u603b\u89c8\u201d\u7684\u6574\u7406\u7ed3\u679c\u3002",
-        "tools": [
-          {
-            "id": "quant-www-wolai-com-1",
-            "name": "2025\u5e748\u6708 \u91cf\u5316\u91d1\u5de5\u6708\u5ea6\u70ed\u70b9\u7814\u62a5",
-            "url": "https://www.wolai.com/ustfinance/uyMty39PGZafSZa2YU93mQ",
-            "description": "\u6765\u6e90: \u91cf\u5316",
-            "domain": "www.wolai.com",
-            "tags": [
-              "\u91cf\u5316"
-            ]
-          },
-          {
-            "id": "quant-www-wolai-com-2",
-            "name": "\u91cf\u5316\u5b66\u4e60\u8def\u5f84",
-            "url": "https://www.wolai.com/ustfinance/uQLt7axQsJBeTdJaMiNvW9",
-            "description": "\u6765\u6e90: \u91cf\u5316",
-            "domain": "www.wolai.com",
-            "tags": [
-              "\u91cf\u5316"
-            ]
-          },
-          {
-            "id": "quant-blog-csdn-net-3",
-            "name": "CSDN\u535a\u5ba2",
-            "url": "https://blog.csdn.net/weixin_42219751/article/details/93621991",
-            "description": "\u6765\u6e90: \u91cf\u5316",
-            "domain": "blog.csdn.net",
-            "tags": [
-              "\u91cf\u5316"
-            ]
-          },
-          {
-            "id": "quant-bigquant-com-4",
-            "name": "bigquant:\u3010\u5386\u53f2\u6587\u6863\u3011\u7b56\u7565\u793a\u4f8b-\u671f\u8d27\u7b56\u7565-\u57fa\u4e8e\u534f\u6574\u7684\u8de8\u671f\u5957\u5229 v1.0",
-            "url": "https://bigquant.com/wiki/doc/Tqrre7n7tb",
-            "description": "\u6765\u6e90: \u91cf\u5316",
-            "domain": "bigquant.com",
-            "tags": [
-              "\u91cf\u5316"
-            ]
-          },
-          {
-            "id": "quant-www-joinquant-com-5",
-            "name": "\u793e\u533a - JoinQuant",
-            "url": "https://www.joinquant.com/view/community/list?listType=1",
-            "description": "\u6765\u6e90: \u91cf\u5316",
-            "domain": "www.joinquant.com",
-            "tags": [
-              "\u91cf\u5316"
-            ]
-          },
-          {
-            "id": "quant-www-joinquant-com-6",
-            "name": "JoinQuant\u805a\u5bbd\u91cf\u5316\u6295\u7814\u5e73\u53f0",
-            "url": "https://www.joinquant.com/",
-            "description": "\u6765\u6e90: \u91cf\u5316",
-            "domain": "www.joinquant.com",
-            "tags": [
-              "\u91cf\u5316"
-            ]
-          },
-          {
-            "id": "quant-www-quantconnect-com-7",
-            "name": "\u5f00\u6e90\u7b97\u6cd5\u4ea4\u6613\u5e73\u53f0\u3002 - QuantConnect.com",
-            "url": "https://www.quantconnect.com/",
-            "description": "\u6765\u6e90: \u91cf\u5316",
-            "domain": "www.quantconnect.com",
-            "tags": [
-              "\u91cf\u5316"
-            ]
-          },
-          {
-            "id": "quant-uqer-datayes-com-8",
-            "name": "\u4f18\u77ff - \u5927\u6570\u636e\u65f6\u4ee3\u7684\u91cf\u5316\u6295\u8d44 - \u901a\u8054\u91cf\u5316\u5b9e\u9a8c\u5ba4",
-            "url": "https://uqer.datayes.com/",
-            "description": "\u6765\u6e90: \u91cf\u5316",
-            "domain": "uqer.datayes.com",
-            "tags": [
-              "\u91cf\u5316"
-            ]
-          },
-          {
-            "id": "quant-uqer-datayes-com-9",
-            "name": "labs - \u77e5\u8bc6\u5e93 - \u4f18\u77ff",
-            "url": "https://uqer.datayes.com/labs/knowledge/%E4%BC%98%E7%9F%BF%E4%BA%A7%E5%93%81%E7%99%BD%E7%9A%AE%E4%B9%A6%2F%E9%87%8F%E5%8C%96%E6%8A%95%E8%B5%84%E5%8F%8A%E5%85%B6%E7%A0%94%E7%A9%B6%E6%96%B9%E6%B3%95.nb",
-            "description": "\u6765\u6e90: \u91cf\u5316",
-            "domain": "uqer.datayes.com",
-            "tags": [
-              "\u91cf\u5316"
-            ]
-          },
-          {
-            "id": "quant-tushare-pro-10",
-            "name": "Tushare\u6570\u636e",
-            "url": "https://tushare.pro/",
-            "description": "\u6765\u6e90: \u91cf\u5316",
-            "domain": "tushare.pro",
-            "tags": [
-              "\u91cf\u5316"
-            ]
-          },
-          {
-            "id": "quant-quantopian-github-io-11",
-            "name": "Alphalens \u2014 Alphalens 0.2.1+48.gad0be10 \u6587\u6863",
-            "url": "https://quantopian.github.io/alphalens/",
-            "description": "\u6765\u6e90: \u91cf\u5316",
-            "domain": "quantopian.github.io",
-            "tags": [
-              "\u91cf\u5316"
-            ]
-          },
-          {
-            "id": "quant-github-com-12",
-            "name": "\u91cf\u5316\u62a5\u544a\u8d44\u6599\u5e93",
-            "url": "https://github.com/QuantNi/Quant-Report",
-            "description": "\u6765\u6e90: \u91cf\u5316",
-            "domain": "github.com",
-            "tags": [
-              "\u91cf\u5316"
-            ]
-          },
-          {
-            "id": "quant-gallery-pyecharts-org-13",
-            "name": "Document",
-            "url": "https://gallery.pyecharts.org/#/",
-            "description": "\u6765\u6e90: \u91cf\u5316",
-            "domain": "gallery.pyecharts.org",
-            "tags": [
-              "\u91cf\u5316"
-            ]
-          },
-          {
-            "id": "quant-substack-com-14",
-            "name": "\u52a0\u5bc6\u91cf\u5316\u535a\u4e3b",
-            "url": "https://substack.com/@unexpectedcorrelations",
-            "description": "\u6765\u6e90: \u91cf\u5316",
-            "domain": "substack.com",
-            "tags": [
-              "\u91cf\u5316"
-            ]
-          },
-          {
-            "id": "quant-docs-pandas-ai-com-15",
-            "name": "PandasAI\u7b80\u4ecb - PandasAI",
-            "url": "https://docs.pandas-ai.com/v2/intro",
-            "description": "\u6765\u6e90: \u91cf\u5316",
-            "domain": "docs.pandas-ai.com",
-            "tags": [
-              "\u91cf\u5316"
-            ]
-          },
-          {
-            "id": "quant-quantpedia-com-16",
-            "name": "\u4e3b\u9875 - QuantPedia",
-            "url": "https://quantpedia.com/",
-            "description": "\u6765\u6e90: \u91cf\u5316",
-            "domain": "quantpedia.com",
-            "tags": [
-              "\u91cf\u5316"
-            ]
-          },
-          {
-            "id": "quant-mp-weixin-qq-com-17",
-            "name": "\u300c\u91cf\u5316\u754c\u300d\u5e74\u5ea6\u6700\u53d7\u6b22\u8fce\u768410\u7bc7\u535a\u5ba2",
-            "url": "https://mp.weixin.qq.com/s/CYZ7tPcNYxGr3pSVkd2NSQ",
-            "description": "\u6765\u6e90: \u91cf\u5316",
-            "domain": "mp.weixin.qq.com",
-            "tags": [
-              "\u91cf\u5316"
-            ]
-          },
-          {
-            "id": "quant-quantpedia-com-18",
-            "name": "\u5982\u4f55\u5229\u7528\u6bd4\u7279\u5e01\u9694\u591c\u4ea4\u6613\u83b7\u5229\uff1f - QuantPedia",
-            "url": "https://quantpedia.com/how-to-profitably-trade-bitcoins-overnight-sessions/",
-            "description": "\u6765\u6e90: \u91cf\u5316",
-            "domain": "quantpedia.com",
-            "tags": [
-              "\u91cf\u5316"
-            ]
-          },
-          {
-            "id": "quant-quantpedia-com-19",
-            "name": "\u6211\u4eec\u5e94\u8be5\u5728\u6295\u8d44\u7ec4\u5408\u4e2d\u5206\u914d\u591a\u5c11\u6bd4\u7279\u5e01\uff1f - QuantPedia",
-            "url": "https://quantpedia.com/how-much-bitcoin-should-we-allocate-to-the-portfolio/",
-            "description": "\u6765\u6e90: \u91cf\u5316",
-            "domain": "quantpedia.com",
-            "tags": [
-              "\u91cf\u5316"
-            ]
-          },
-          {
-            "id": "quant-www-chartjs-org-20",
-            "name": "Chart.js Samples | Chart.js",
-            "url": "https://www.chartjs.org/docs/latest/samples/information.html",
-            "description": "\u6765\u6e90: \u91cf\u5316",
-            "domain": "www.chartjs.org",
-            "tags": [
-              "\u91cf\u5316"
-            ]
-          },
-          {
-            "id": "quant-www-pandaai-online-21",
-            "name": "Panda AI - \u91cf\u53d8\u5b66\u9662\uff0c\u53ef\u4ee5agent\u4ea4\u6613",
-            "url": "https://www.pandaai.online/",
-            "description": "\u6765\u6e90: \u91cf\u5316",
-            "domain": "www.pandaai.online",
-            "tags": [
-              "\u91cf\u5316"
-            ]
-          },
-          {
-            "id": "quant-www-vnpy-com-22",
-            "name": "VeighNa\u91cf\u5316\u793e\u533a - \u4f60\u7684\u5f00\u6e90\u793e\u533a\u91cf\u5316\u4ea4\u6613\u5e73\u53f0 | vn.py | vnpy",
-            "url": "https://www.vnpy.com/",
-            "description": "\u6765\u6e90: \u91cf\u5316",
-            "domain": "www.vnpy.com",
-            "tags": [
-              "\u91cf\u5316"
-            ]
-          },
-          {
-            "id": "quant-zhuanlan-zhihu-com-23",
-            "name": "vnpy\uff1a\u56fd\u5185\u6700\u53d7\u6b22\u8fce\u7684\u5f00\u6e90\u91cf\u5316\u4ea4\u6613\u5e73\u53f0\u6df1\u5ea6\u89e3\u6790 - \u77e5\u4e4e",
-            "url": "https://zhuanlan.zhihu.com/p/1934373021193343584",
-            "description": "\u6765\u6e90: \u91cf\u5316",
-            "domain": "zhuanlan.zhihu.com",
-            "tags": [
-              "\u91cf\u5316"
-            ]
-          },
-          {
-            "id": "quant-jupyter-org-24",
-            "name": "JupyterLite",
-            "url": "https://jupyter.org/try-jupyter/lab/",
-            "description": "\u6765\u6e90: \u91cf\u5316",
-            "domain": "jupyter.org",
-            "tags": [
-              "\u91cf\u5316"
-            ]
-          },
-          {
-            "id": "quant-www-joinquant-com-25",
-            "name": "\u805a\u5bbd",
-            "url": "https://www.joinquant.com/view/user/floor?type=mainFloor",
-            "description": "\u6765\u6e90: \u91cf\u5316",
-            "domain": "www.joinquant.com",
-            "tags": [
-              "\u91cf\u5316"
-            ]
-          },
-          {
-            "id": "quant-backtest-10jqka-com-cn-26",
-            "name": "\u81ea\u7136\u8bed\u8a00\u5373\u53ef\u56de\u6d4b\uff1aBackTest \u91cf\u5316\u7b56\u7565\u5e73\u53f0",
-            "url": "https://backtest.10jqka.com.cn/",
-            "description": "\u6765\u6e90: \u91cf\u5316",
-            "domain": "backtest.10jqka.com.cn",
-            "tags": [
-              "\u91cf\u5316"
-            ]
-          },
-          {
-            "id": "quant-bigquant-com-27",
-            "name": "\u89e3\u9501 AI \u91cf\u5316\u65b0\u5883\u754c\uff1aQbot \u643a\u624b iTick - BigQuant\u91cf\u5316\u4ea4\u6613",
-            "url": "https://bigquant.com/wiki/doc/kq9FxV9GUg",
-            "description": "\u6765\u6e90: \u91cf\u5316",
-            "domain": "bigquant.com",
-            "tags": [
-              "\u91cf\u5316"
-            ]
-          },
-          {
-            "id": "quant-www-quantstart-com-28",
-            "name": "\u91cf\u5316\u81ea\u5b66\uff1a\u7b97\u6cd5\u4ea4\u6613\u3001\u91cf\u5316\u4ea4\u6613\u3001\u4ea4\u6613\u7b56\u7565\u3001\u56de\u6d4b\u4e0e\u5b9e\u65bd | QuantStart",
-            "url": "https://www.quantstart.com/",
-            "description": "\u6765\u6e90: \u91cf\u5316",
-            "domain": "www.quantstart.com",
-            "tags": [
-              "\u91cf\u5316"
-            ]
-          },
-          {
-            "id": "quant-blog-headlandstech-com-29",
-            "name": "Headlands Technologies LLC \u535a\u5ba2 \u2013 \u5168\u7403\u91cf\u5316\u4ea4\u6613\u516c\u53f8",
-            "url": "https://blog.headlandstech.com/",
-            "description": "\u6765\u6e90: \u91cf\u5316",
-            "domain": "blog.headlandstech.com",
-            "tags": [
-              "\u91cf\u5316"
-            ]
-          },
-          {
-            "id": "quant-github-com-30",
-            "name": "AI \u4ee3\u7801\u6307\u5357\u662f\u5f00\u59cb\u4f7f\u7528 AI \u8fdb\u884c\u7f16\u7801\u7684\u8def\u7ebf\u56fe\u3002",
-            "url": "https://github.com/automata/aicodeguide",
-            "description": "\u6765\u6e90: \u91cf\u5316",
-            "domain": "github.com",
-            "tags": [
-              "\u91cf\u5316"
-            ]
-          },
-          {
-            "id": "quant-aurora-gold-insight-pages-dev-31",
-            "name": "Aurora Gold Insight",
-            "url": "https://aurora-gold-insight.pages.dev/#knowledge",
-            "description": "\u6765\u6e90: \u91cf\u5316",
-            "domain": "aurora-gold-insight.pages.dev",
-            "tags": [
-              "\u91cf\u5316"
-            ]
-          },
-          {
-            "id": "quant-cn-tradingview-com-32",
-            "name": "BTCUSD 88,957.39 \u25b2 +0.25% \u5927\u7c7b\u8d44\u4ea7",
-            "url": "https://cn.tradingview.com/chart/QlE64yj4/",
-            "description": "\u6765\u6e90: \u91cf\u5316",
-            "domain": "cn.tradingview.com",
-            "tags": [
-              "\u91cf\u5316"
-            ]
-          },
-          {
-            "id": "quant-ptradeapi-com-33",
-            "name": "Ptrade \u91cf\u5316\u4ea4\u6613 API\u63a5\u53e3\u6587\u6863",
-            "url": "https://ptradeapi.com/",
-            "description": "\u6765\u6e90: \u91cf\u5316",
-            "domain": "ptradeapi.com",
-            "tags": [
-              "\u91cf\u5316"
-            ]
-          },
-          {
-            "id": "quant-www-thinktrader-net-34",
-            "name": "\u8fc5\u6295-\u4ee5\u601d\u8003\u7684\u901f\u5ea6\u4ea4\u6613qmt-\uff08\u5b98\u65b9\uff09",
-            "url": "https://www.thinktrader.net/",
-            "description": "\u6765\u6e90: \u91cf\u5316",
-            "domain": "www.thinktrader.net",
-            "tags": [
-              "\u91cf\u5316"
-            ]
-          },
-          {
-            "id": "quant-github-com-35",
-            "name": "\u4ea4\u6613\u5e73\u53f0\u642d\u5efa",
-            "url": "https://github.com/zhangjunmengyang/quant-research-platform/tree/main",
-            "description": "\u6765\u6e90: \u91cf\u5316",
-            "domain": "github.com",
-            "tags": [
-              "\u91cf\u5316"
-            ]
-          },
-          {
-            "id": "quant-www-ivolatility-com-36",
-            "name": "\u4ed8\u8d39API\uff0c\u4f46\u5f88\u4fbf\u5b9c",
-            "url": "https://www.ivolatility.com/data-cloud-api/?gad_source=1&gad_campaignid=20419477335&gbraid=0AAAAADyngPXx6BuAUQUg015xdcmQ1rc_M&gclid=CjwKCAiAssfLBhBDEiwAcLpwfulC_7LbiHzzBFUPw60W144ByHitONsLKbUJQo9B58SCDD_1ktS0NhoCyUsQAvD_BwE",
-            "description": "\u6765\u6e90: \u91cf\u5316",
-            "domain": "www.ivolatility.com",
-            "tags": [
-              "\u91cf\u5316"
-            ]
-          },
-          {
-            "id": "quant-alltick-co-37",
-            "name": "API\uff1aReal-time Tick Data for Forex, US & HK Stocks, and Crypto CFD Data API - High Frequency Financial Data API - AllTick",
-            "url": "https://alltick.co/#pricing",
-            "description": "\u6765\u6e90: \u91cf\u5316",
-            "domain": "alltick.co",
-            "tags": [
-              "\u91cf\u5316"
-            ]
-          },
-          {
-            "id": "quant-calendarific-com-38",
-            "name": "\u5168\u7403\u8282\u5047\u65e5\u65e5\u5386 API\uff0c\u6db5\u76d6\u56fd\u5bb6\u548c\u5b97\u6559\u8282\u65e5\u3002",
-            "url": "https://calendarific.com/",
-            "description": "\u6765\u6e90: \u91cf\u5316",
-            "domain": "calendarific.com",
-            "tags": [
-              "\u91cf\u5316"
-            ]
-          },
-          {
-            "id": "quant-github-com-39",
-            "name": "AI\u91cf\u5316\u5b66\u4e60",
-            "url": "https://github.com/waylandzhang/ai-quant-book/tree/main/manuscript/cn",
-            "description": "\u6765\u6e90: \u91cf\u5316",
-            "domain": "github.com",
-            "tags": [
-              "\u91cf\u5316"
-            ]
-          },
-          {
-            "id": "quant-www-fmz-com-40",
-            "name": "\u8d44\u8d39\u7684\u53c2\u8003\u8d44\u7ba1\u5e73\u53f0",
-            "url": "https://www.fmz.com/m/dashboard",
-            "description": "\u6765\u6e90: \u91cf\u5316",
-            "domain": "www.fmz.com",
-            "tags": [
-              "\u91cf\u5316"
-            ]
-          },
-          {
-            "id": "quant-gitee-com-41",
-            "name": "gitee",
-            "url": "https://gitee.com/JavaLionLi/plus-ui",
-            "description": "\u6765\u6e90: \u91cf\u5316",
-            "domain": "gitee.com",
-            "tags": [
-              "\u91cf\u5316"
-            ]
-          }
-        ]
-      },
-      {
-        "id": "quant-item",
-        "title": "\u63a5\u53e3",
-        "description": "\u6765\u81ea\u4e66\u7b7e\u6587\u4ef6\u5939\u201c\u63a5\u53e3\u201d\u7684\u6574\u7406\u7ed3\u679c\u3002",
-        "tools": [
-          {
-            "id": "quant-tushare-pro-1",
-            "name": "Tushare\u6570\u636e",
-            "url": "https://tushare.pro/document/2?doc_id=284",
-            "description": "\u6765\u6e90: \u63a5\u53e3",
-            "domain": "tushare.pro",
-            "tags": [
-              "\u91cf\u5316",
-              "\u63a5\u53e3"
-            ]
-          },
-          {
-            "id": "quant-www-alphavantage-co-2",
-            "name": "API Documentation | Alpha Vantage",
-            "url": "https://www.alphavantage.co/documentation/",
-            "description": "\u6765\u6e90: \u63a5\u53e3",
-            "domain": "www.alphavantage.co",
-            "tags": [
-              "\u91cf\u5316",
-              "\u63a5\u53e3"
-            ]
-          },
-          {
-            "id": "quant-akshare-akfamily-xyz-3",
-            "name": "AKShare \u5916\u6c47\u6570\u636e \u2014 AKShare 1.17.83 \u6587\u6863",
-            "url": "https://akshare.akfamily.xyz/data/fx/fx.html",
-            "description": "\u6765\u6e90: \u63a5\u53e3",
-            "domain": "akshare.akfamily.xyz",
-            "tags": [
-              "\u91cf\u5316",
-              "\u63a5\u53e3"
-            ]
-          },
-          {
-            "id": "quant-tushare-pro-4",
-            "name": "Tushare\u6570\u636e",
-            "url": "https://tushare.pro/document/2",
-            "description": "\u6765\u6e90: \u63a5\u53e3",
-            "domain": "tushare.pro",
-            "tags": [
-              "\u91cf\u5316",
-              "\u63a5\u53e3"
-            ]
-          },
-          {
-            "id": "quant-www-juejinshuju-com-5",
-            "name": "\u6398\u91d1\uff1a\u56fd\u5185\u671f\u8d27\u5386\u53f2\u6570\u636e-\u4e3b\u8fde\u5206\u949fK\u7ebf-\u671f\u8d27\u4e3b\u8fde\u5386\u53f2\u5206\u949f\u6570\u636e\u4e0b\u8f7d-\u6398\u91d1\u6570\u636e",
-            "url": "http://www.juejinshuju.com/future_continue_min/",
-            "description": "\u6765\u6e90: \u63a5\u53e3",
-            "domain": "www.juejinshuju.com",
-            "tags": [
-              "\u91cf\u5316",
-              "\u63a5\u53e3"
-            ]
-          },
-          {
-            "id": "quant-www-ricequant-com-6",
-            "name": "RQData Python API \u624b\u518c | Ricequant Docs",
-            "url": "https://www.ricequant.com/doc/rqdata/python/index-rqdatac",
-            "description": "\u6765\u6e90: \u63a5\u53e3",
-            "domain": "www.ricequant.com",
-            "tags": [
-              "\u91cf\u5316",
-              "\u63a5\u53e3"
-            ]
-          },
-          {
-            "id": "quant-itick-org-7",
-            "name": "\u4e13\u4e1a\u91d1\u878d\u6570\u636eAPI\u63a5\u53e3 | \u80a1\u7968\u5916\u6c47\u52a0\u5bc6\u8d27\u5e01\u5b9e\u65f6\u884c\u60c5API | \u8d35\u91d1\u5c5e\u671f\u8d27\u57fa\u91d1\u6570\u636e | \u5b9e\u65f6\u62a5\u4ef7API | \u91cf\u5316\u4ea4\u6613\u63a5\u53e3 - iTick",
-            "url": "https://itick.org/",
-            "description": "\u6765\u6e90: \u63a5\u53e3",
-            "domain": "itick.org",
-            "tags": [
-              "\u91cf\u5316",
-              "\u63a5\u53e3"
-            ]
-          },
-          {
-            "id": "quant-docs-itick-org-8",
-            "name": "\u6587\u6863\u8bf4\u660e - iTick \u6587\u6863",
-            "url": "https://docs.itick.org/",
-            "description": "\u6765\u6e90: \u63a5\u53e3",
-            "domain": "docs.itick.org",
-            "tags": [
-              "\u91cf\u5316",
-              "\u63a5\u53e3"
-            ]
-          },
-          {
-            "id": "quant-www-dataroma-com-9",
-            "name": "DATAROMA \u8d85\u7ea7\u6295\u8d44\u8005\u6301\u80a1\u6458\u8981",
-            "url": "https://www.dataroma.com/m/managers.php",
-            "description": "\u6765\u6e90: \u63a5\u53e3",
-            "domain": "www.dataroma.com",
-            "tags": [
-              "\u91cf\u5316",
-              "\u63a5\u53e3"
-            ]
-          },
-          {
-            "id": "quant-doc-shinnytech-com-10",
-            "name": "\u5341\u5206\u949f\u5feb\u901f\u5165\u95e8 \u2014 TianQin Python SDK 3.8.7 \u6587\u6863",
-            "url": "https://doc.shinnytech.com/tqsdk/latest/quickstart.html#quickstart-0",
-            "description": "\u6765\u6e90: \u63a5\u53e3",
-            "domain": "doc.shinnytech.com",
-            "tags": [
-              "\u91cf\u5316",
-              "\u63a5\u53e3"
-            ]
-          }
-        ]
-      },
-      {
-        "id": "quant-github-vnpy",
-        "title": "GitHub - vnpy",
-        "description": "\u6765\u81ea\u4e66\u7b7e\u6587\u4ef6\u5939\u201cGitHub - vnpy\u201d\u7684\u6574\u7406\u7ed3\u679c\u3002",
-        "tools": [
-          {
-            "id": "quant-github-com-1",
-            "name": "GitHub - vnpy/vnpy: \u57fa\u4e8ePython\u7684\u5f00\u6e90\u91cf\u5316\u4ea4\u6613\u5e73\u53f0\u5f00\u53d1\u6846\u67b6",
-            "url": "https://github.com/vnpy/vnpy",
-            "description": "\u6765\u6e90: GitHub - vnpy",
-            "domain": "github.com",
-            "tags": [
-              "\u91cf\u5316",
-              "GitHub - vnpy"
-            ]
-          }
-        ]
-      },
-      {
-        "id": "quant-github-shiyu-coder",
-        "title": "GitHub - shiyu-coder",
-        "description": "\u6765\u81ea\u4e66\u7b7e\u6587\u4ef6\u5939\u201cGitHub - shiyu-coder\u201d\u7684\u6574\u7406\u7ed3\u679c\u3002",
-        "tools": [
-          {
-            "id": "quant-github-com-1",
-            "name": "GitHub - shiyu-coder/Kronos\uff1aKronos\uff1a\u91d1\u878d\u5e02\u573a\u8bed\u8a00\u7684\u57fa\u7840\u6a21\u578b",
-            "url": "https://github.com/shiyu-coder/Kronos",
-            "description": "\u6765\u6e90: GitHub - shiyu-coder",
-            "domain": "github.com",
-            "tags": [
-              "\u91cf\u5316",
-              "GitHub - shiyu-coder"
-            ]
-          }
-        ]
-      },
-      {
-        "id": "quant-github-ufund-me",
-        "title": "GitHub - UFund-Me",
-        "description": "\u6765\u81ea\u4e66\u7b7e\u6587\u4ef6\u5939\u201cGitHub - UFund-Me\u201d\u7684\u6574\u7406\u7ed3\u679c\u3002",
-        "tools": [
-          {
-            "id": "quant-github-com-1",
-            "name": "GitHub - UFund-Me/Qbot: [\ud83d\udd25updating ...] AI \u81ea\u52a8\u91cf\u5316\u4ea4\u6613\u673a\u5668\u4eba(\u5b8c\u5168\u672c\u5730\u90e8\u7f72) AI-powered Quantitative Investment Research Platform. \ud83d\udcc3 online docs: https://ufund-me.github.io/Qbot \u2728 qbot-mini: https://github.com/Charmve/iQuant",
-            "url": "https://github.com/UFund-Me/Qbot",
-            "description": "\u6765\u6e90: Charmve",
-            "domain": "github.com",
-            "tags": [
-              "\u91cf\u5316",
-              "GitHub - UFund-Me"
-            ]
-          }
-        ]
-      },
-      {
-        "id": "quant-quantni",
-        "title": "QuantNi",
-        "description": "\u6765\u81ea\u4e66\u7b7e\u6587\u4ef6\u5939\u201cQuantNi\u201d\u7684\u6574\u7406\u7ed3\u679c\u3002",
-        "tools": [
-          {
-            "id": "quant-github-com-1",
-            "name": "QuantNi/Quant-Report",
-            "url": "https://github.com/quantni/quant-report",
-            "description": "\u6765\u6e90: QuantNi",
-            "domain": "github.com",
-            "tags": [
-              "\u91cf\u5316",
-              "QuantNi"
-            ]
-          }
-        ]
-      },
-      {
-        "id": "quant-pandaai-tech",
-        "title": "PandaAI-Tech",
-        "description": "\u6765\u81ea\u4e66\u7b7e\u6587\u4ef6\u5939\u201cPandaAI-Tech\u201d\u7684\u6574\u7406\u7ed3\u679c\u3002",
-        "tools": [
-          {
-            "id": "quant-github-com-1",
-            "name": "PandaAI-Tech/panda_quantflow",
-            "url": "https://github.com/PandaAI-Tech/panda_quantflow",
-            "description": "\u6765\u6e90: PandaAI-Tech",
-            "domain": "github.com",
-            "tags": [
-              "\u91cf\u5316",
-              "PandaAI-Tech"
-            ]
-          }
-        ]
-      }
-    ]
-  },
     {
-      "id": "general",
-      "title": "\u7efc\u5408\u5de5\u5177",
-      "description": "\u8de8\u5e02\u573a\u8d44\u8baf\u3001\u4ea4\u6613\u65b0\u95fb\u4e0e\u96be\u4ee5\u5f52\u5165\u5355\u4e00\u8d44\u4ea7\u7684\u8f85\u52a9\u5de5\u5177\u3002",
-      "groups": [
-          {
-              "id": "general-\u4ea4\u6613\u65b0\u95fb\u548c\u9ad8\u624b\u8ddf\u8e2a\u7c7b\u603b\u89c8",
-              "title": "\u4ea4\u6613\u65b0\u95fb\u548c\u9ad8\u624b\u8ddf\u8e2a\u7c7b\u603b\u89c8",
-              "description": "\u6765\u81ea\u4f60\u6574\u7406\u540e\u7684 Markdown \u5206\u7ec4\u201c\u4ea4\u6613\u65b0\u95fb\u548c\u9ad8\u624b\u8ddf\u8e2a\u7c7b\u603b\u89c8\u201d\u3002",
-              "tools": [
-                  {
-                      "id": "general-app-hedgeye-com-1",
-                      "name": "\u5f88\u6742\u7684\u5206\u6790",
-                      "url": "https://app.hedgeye.com/?",
-                      "description": "\u6765\u6e90: \u4ea4\u6613\u65b0\u95fb\u548c\u9ad8\u624b\u8ddf\u8e2a\u7c7b\u603b\u89c8",
-                      "domain": "app.hedgeye.com",
-                      "tags": [
-                          "\u7efc\u5408",
-                          "\u4ea4\u6613\u65b0\u95fb\u548c\u9ad8\u624b\u8ddf\u8e2a\u7c7b\u603b\u89c8"
-                      ]
-                  },
-                  {
-                      "id": "general-x-com-1",
-                      "name": "(28) Home / X",
-                      "url": "https://x.com/home",
-                      "description": "\u6765\u6e90: \u4ea4\u6613\u65b0\u95fb\u548c\u9ad8\u624b\u8ddf\u8e2a\u7c7b\u603b\u89c8",
-                      "domain": "x.com",
-                      "tags": [
-                          "\u7efc\u5408",
-                          "\u4ea4\u6613\u65b0\u95fb\u548c\u9ad8\u624b\u8ddf\u8e2a\u7c7b\u603b\u89c8"
-                      ]
-                  },
-                  {
-                      "id": "general-www-financialjuice-com-1",
-                      "name": "FinancialJuice\u9002\u5408\u62ff\u6765\u770b\u5b9e\u65f6\u7684",
-                      "url": "https://www.financialjuice.com/home",
-                      "description": "\u6765\u6e90: \u4ea4\u6613\u65b0\u95fb\u548c\u9ad8\u624b\u8ddf\u8e2a\u7c7b\u603b\u89c8",
-                      "domain": "www.financialjuice.com",
-                      "tags": [
-                          "\u7efc\u5408",
-                          "\u4ea4\u6613\u65b0\u95fb\u548c\u9ad8\u624b\u8ddf\u8e2a\u7c7b\u603b\u89c8"
-                      ]
-                  },
-                  {
-                      "id": "general-cointelegraph-com-1",
-                      "name": "\u7279\u8272 \u2014 Cointelegraph \u6742\u5fd7\u7684\u52a0\u5bc6\u8d27\u5e01\u6df1\u5ea6\u63a2\u7d22",
-                      "url": "https://cointelegraph.com/magazine/features/",
-                      "description": "\u6765\u6e90: \u4ea4\u6613\u65b0\u95fb\u548c\u9ad8\u624b\u8ddf\u8e2a\u7c7b\u603b\u89c8",
-                      "domain": "cointelegraph.com",
-                      "tags": [
-                          "\u7efc\u5408",
-                          "\u4ea4\u6613\u65b0\u95fb\u548c\u9ad8\u624b\u8ddf\u8e2a\u7c7b\u603b\u89c8"
-                      ]
-                  },
-                  {
-                      "id": "general-foresightnews-pro-1",
-                      "name": "FN\u7cbe\u9009 - Foresight News",
-                      "url": "https://foresightnews.pro/",
-                      "description": "\u6765\u6e90: \u4ea4\u6613\u65b0\u95fb\u548c\u9ad8\u624b\u8ddf\u8e2a\u7c7b\u603b\u89c8",
-                      "domain": "foresightnews.pro",
-                      "tags": [
-                          "\u7efc\u5408",
-                          "\u4ea4\u6613\u65b0\u95fb\u548c\u9ad8\u624b\u8ddf\u8e2a\u7c7b\u603b\u89c8"
-                      ]
-                  },
-                  {
-                      "id": "general-www-jinse-cn-1",
-                      "name": "\u91d1\u8272\u8d22\u7ecf_\u5728\u8fd9\u91cc\uff0c\u8bfb\u61c2\u533a\u5757\u94fe",
-                      "url": "https://www.jinse.cn/",
-                      "description": "\u6765\u6e90: \u4ea4\u6613\u65b0\u95fb\u548c\u9ad8\u624b\u8ddf\u8e2a\u7c7b\u603b\u89c8",
-                      "domain": "www.jinse.cn",
-                      "tags": [
-                          "\u7efc\u5408",
-                          "\u4ea4\u6613\u65b0\u95fb\u548c\u9ad8\u624b\u8ddf\u8e2a\u7c7b\u603b\u89c8"
-                      ]
-                  },
-                  {
-                      "id": "general-www-panewslab-com-1",
-                      "name": "PANews \u4f60\u7684Web3\u4fe1\u606f\u5b98 | PANews",
-                      "url": "https://www.panewslab.com/zh",
-                      "description": "\u6765\u6e90: \u4ea4\u6613\u65b0\u95fb\u548c\u9ad8\u624b\u8ddf\u8e2a\u7c7b\u603b\u89c8",
-                      "domain": "www.panewslab.com",
-                      "tags": [
-                          "\u7efc\u5408",
-                          "\u4ea4\u6613\u65b0\u95fb\u548c\u9ad8\u624b\u8ddf\u8e2a\u7c7b\u603b\u89c8"
-                      ]
-                  },
-                  {
-                      "id": "general-www-techflowpost-com-1",
-                      "name": "\u4e13\u6ce8 Web3 \u4e0e AI \u884c\u4e1a\u6df1\u5ea6\u62a5\u9053\uff0c\u6d1e\u5bdf\u6f6e\u6c34\u6d41\u52a8\u7684\u65b9\u5411 - \u533a\u5757\u94fe\u5a92\u4f53 - \u533a\u5757\u94fe\u65b0\u95fb\u8d44\u8baf - \u533a\u5757\u94fe\u6280\u672f\u5e94\u7528 - \u533a\u5757\u94fe\u9879\u76ee\u673a\u6784 - \u6df1\u6f6eTechFlow",
-                      "url": "https://www.techflowpost.com/",
-                      "description": "\u6765\u6e90: \u4ea4\u6613\u65b0\u95fb\u548c\u9ad8\u624b\u8ddf\u8e2a\u7c7b\u603b\u89c8",
-                      "domain": "www.techflowpost.com",
-                      "tags": [
-                          "\u7efc\u5408",
-                          "\u4ea4\u6613\u65b0\u95fb\u548c\u9ad8\u624b\u8ddf\u8e2a\u7c7b\u603b\u89c8"
-                      ]
-                  },
-                  {
-                      "id": "general-www-coindesk-com-1",
-                      "name": "CoinDesk: Bitcoin, Ethereum, Crypto News and Price Data",
-                      "url": "https://www.coindesk.com/?_gl=1*v3vlyj*_up*MQ..*_ga*MTA4MTg5NzY1LjE3MjA2MTQ0Nzg.*_ga_VM3STRYVN8*MTcyMjMwNTY2OS4xMC4xLjE3MjIzMDcyMDQuMC4wLjU3MTY4MDIyNg..",
-                      "description": "\u6765\u6e90: \u4ea4\u6613\u65b0\u95fb\u548c\u9ad8\u624b\u8ddf\u8e2a\u7c7b\u603b\u89c8",
-                      "domain": "www.coindesk.com",
-                      "tags": [
-                          "\u7efc\u5408",
-                          "\u4ea4\u6613\u65b0\u95fb\u548c\u9ad8\u624b\u8ddf\u8e2a\u7c7b\u603b\u89c8"
-                      ]
-                  },
-                  {
-                      "id": "general-www-odaily-news-1",
-                      "name": "Odaily\u661f\u7403\u65e5\u62a5 | \u4e13\u4e1a\u533a\u5757\u94fe\u4e0e\u52a0\u5bc6\u8d27\u5e01\u65b0\u95fb\u3001\u884c\u60c5\u5206\u6790\u4e0e\u6295\u8d44\u8d44\u8baf\u5e73\u53f0",
-                      "url": "https://www.odaily.news/",
-                      "description": "\u6765\u6e90: \u4ea4\u6613\u65b0\u95fb\u548c\u9ad8\u624b\u8ddf\u8e2a\u7c7b\u603b\u89c8",
-                      "domain": "www.odaily.news",
-                      "tags": [
-                          "\u7efc\u5408",
-                          "\u4ea4\u6613\u65b0\u95fb\u548c\u9ad8\u624b\u8ddf\u8e2a\u7c7b\u603b\u89c8"
-                      ]
-                  },
-                  {
-                      "id": "general-coinpedia-org-1",
-                      "name": "Coinpedia - Fintech & Cryptocurrency News Media| Crypto Guide",
-                      "url": "https://coinpedia.org/",
-                      "description": "\u6765\u6e90: \u4ea4\u6613\u65b0\u95fb\u548c\u9ad8\u624b\u8ddf\u8e2a\u7c7b\u603b\u89c8",
-                      "domain": "coinpedia.org",
-                      "tags": [
-                          "\u7efc\u5408",
-                          "\u4ea4\u6613\u65b0\u95fb\u548c\u9ad8\u624b\u8ddf\u8e2a\u7c7b\u603b\u89c8"
-                      ]
-                  },
-                  {
-                      "id": "general-www-theblock-co-1",
-                      "name": "the block",
-                      "url": "https://www.theblock.co/",
-                      "description": "\u6765\u6e90: \u4ea4\u6613\u65b0\u95fb\u548c\u9ad8\u624b\u8ddf\u8e2a\u7c7b\u603b\u89c8",
-                      "domain": "www.theblock.co",
-                      "tags": [
-                          "\u7efc\u5408",
-                          "\u4ea4\u6613\u65b0\u95fb\u548c\u9ad8\u624b\u8ddf\u8e2a\u7c7b\u603b\u89c8"
-                      ]
-                  },
-                  {
-                      "id": "general-m-weibo-cn-1",
-                      "name": "\u67f3\u5927\u6ce2\u6d6a",
-                      "url": "https://m.weibo.cn/u/1644724561?wm=3333_2001&from=10F1293010&sourcetype=weixin&s_trans=7101261740_&s_channel=4",
-                      "description": "\u6765\u6e90: \u4ea4\u6613\u65b0\u95fb\u548c\u9ad8\u624b\u8ddf\u8e2a\u7c7b\u603b\u89c8",
-                      "domain": "m.weibo.cn",
-                      "tags": [
-                          "\u7efc\u5408",
-                          "\u4ea4\u6613\u65b0\u95fb\u548c\u9ad8\u624b\u8ddf\u8e2a\u7c7b\u603b\u89c8"
-                      ]
-                  },
-                  {
-                      "id": "general-flowus-cn-1",
-                      "name": "Web3\u533a\u522b\u5730",
-                      "url": "https://flowus.cn/qubiedi/share/8827172d-31de-4486-8571-f1172cbe7fdd?code=UMMDMR",
-                      "description": "\u6765\u6e90: \u4ea4\u6613\u65b0\u95fb\u548c\u9ad8\u624b\u8ddf\u8e2a\u7c7b\u603b\u89c8",
-                      "domain": "flowus.cn",
-                      "tags": [
-                          "\u7efc\u5408",
-                          "\u4ea4\u6613\u65b0\u95fb\u548c\u9ad8\u624b\u8ddf\u8e2a\u7c7b\u603b\u89c8"
-                      ]
-                  },
-                  {
-                      "id": "general-www-investing-com-1",
-                      "name": "Investing.com - \u80a1\u7968\u5e02\u573a\u884c\u60c5\u548c\u8d22\u7ecf\u65b0\u95fb",
-                      "url": "https://www.investing.com/",
-                      "description": "\u6765\u6e90: \u4ea4\u6613\u65b0\u95fb\u548c\u9ad8\u624b\u8ddf\u8e2a\u7c7b\u603b\u89c8",
-                      "domain": "www.investing.com",
-                      "tags": [
-                          "\u7efc\u5408",
-                          "\u4ea4\u6613\u65b0\u95fb\u548c\u9ad8\u624b\u8ddf\u8e2a\u7c7b\u603b\u89c8"
-                      ]
-                  },
-                  {
-                      "id": "general-www-reuters-com-1",
-                      "name": "\u8def\u900f\u793e | \u7a81\u53d1\u56fd\u9645\u65b0\u95fb\u4e0e\u89c2\u70b9",
-                      "url": "https://www.reuters.com/",
-                      "description": "\u6765\u6e90: \u4ea4\u6613\u65b0\u95fb\u548c\u9ad8\u624b\u8ddf\u8e2a\u7c7b\u603b\u89c8",
-                      "domain": "www.reuters.com",
-                      "tags": [
-                          "\u7efc\u5408",
-                          "\u4ea4\u6613\u65b0\u95fb\u548c\u9ad8\u624b\u8ddf\u8e2a\u7c7b\u603b\u89c8"
-                      ]
-                  },
-                  {
-                      "id": "general-www-marketwatch-com-1",
-                      "name": "MarketWatch\uff1a\u80a1\u5e02\u65b0\u95fb - \u8d22\u7ecf\u65b0\u95fb - MarketWatch",
-                      "url": "https://www.marketwatch.com/",
-                      "description": "\u6765\u6e90: \u4ea4\u6613\u65b0\u95fb\u548c\u9ad8\u624b\u8ddf\u8e2a\u7c7b\u603b\u89c8",
-                      "domain": "www.marketwatch.com",
-                      "tags": [
-                          "\u7efc\u5408",
-                          "\u4ea4\u6613\u65b0\u95fb\u548c\u9ad8\u624b\u8ddf\u8e2a\u7c7b\u603b\u89c8"
-                      ]
-                  },
-                  {
-                      "id": "general-www-forbes-com-1",
-                      "name": "\u300a\u798f\u5e03\u65af\u300b",
-                      "url": "https://www.forbes.com/",
-                      "description": "\u6765\u6e90: \u4ea4\u6613\u65b0\u95fb\u548c\u9ad8\u624b\u8ddf\u8e2a\u7c7b\u603b\u89c8",
-                      "domain": "www.forbes.com",
-                      "tags": [
-                          "\u7efc\u5408",
-                          "\u4ea4\u6613\u65b0\u95fb\u548c\u9ad8\u624b\u8ddf\u8e2a\u7c7b\u603b\u89c8"
-                      ]
-                  },
-                  {
-                      "id": "general-www-hibor-com-cn-1",
-                      "name": "\u6167\u535a\u6295\u7814\u8d44\u8baf-\u4e13\u4e1a\u7684\u6295\u8d44\u7814\u7a76\u62a5\u544a\u5927\u6570\u636e\u5e73\u53f0-\u514d\u8d39\u7684\u7814\u62a5\u5206\u4eab\u5e73\u53f0-\u6167\u535a\u8d44\u8baf",
-                      "url": "https://www.hibor.com.cn/",
-                      "description": "\u6765\u6e90: \u4ea4\u6613\u65b0\u95fb\u548c\u9ad8\u624b\u8ddf\u8e2a\u7c7b\u603b\u89c8",
-                      "domain": "www.hibor.com.cn",
-                      "tags": [
-                          "\u7efc\u5408",
-                          "\u4ea4\u6613\u65b0\u95fb\u548c\u9ad8\u624b\u8ddf\u8e2a\u7c7b\u603b\u89c8"
-                      ]
-                  },
-                  {
-                      "id": "general-xnews-jin10-com-1",
-                      "name": "\u6211\u7684\u8ba2\u9605-\u6587\u7ae0-\u5e02\u573a\u53c2\u8003-\u91d1\u5341\u6570\u636e",
-                      "url": "https://xnews.jin10.com/topic/group/my",
-                      "description": "\u6765\u6e90: \u4ea4\u6613\u65b0\u95fb\u548c\u9ad8\u624b\u8ddf\u8e2a\u7c7b\u603b\u89c8",
-                      "domain": "xnews.jin10.com",
-                      "tags": [
-                          "\u7efc\u5408",
-                          "\u4ea4\u6613\u65b0\u95fb\u548c\u9ad8\u624b\u8ddf\u8e2a\u7c7b\u603b\u89c8"
-                      ]
-                  },
-                  {
-                      "id": "general-polymarket-com-1",
-                      "name": "Polymarket | The World's Largest Prediction Market",
-                      "url": "https://polymarket.com/",
-                      "description": "\u6765\u6e90: \u4ea4\u6613\u65b0\u95fb\u548c\u9ad8\u624b\u8ddf\u8e2a\u7c7b\u603b\u89c8",
-                      "domain": "polymarket.com",
-                      "tags": [
-                          "\u7efc\u5408",
-                          "\u4ea4\u6613\u65b0\u95fb\u548c\u9ad8\u624b\u8ddf\u8e2a\u7c7b\u603b\u89c8"
-                      ]
-                  },
-                  {
-                      "id": "general-worldmonitor-app-1",
-                      "name": "\u4e16\u754c\u76d1\u6d4b - \u5b9e\u65f6\u5168\u7403\u60c5\u62a5\u4eea\u8868\u76d8",
-                      "url": "https://worldmonitor.app/?lat=8.0000&lon=0.0000&zoom=1.00&view=global&timeRange=7d&layers=conflicts%2Cbases%2Chotspots%2Cnuclear%2Csanctions%2Cweather%2Ceconomic%2Cwaterways%2Coutages%2Cmilitary%2Cnatural",
-                      "description": "\u6765\u6e90: \u4ea4\u6613\u65b0\u95fb\u548c\u9ad8\u624b\u8ddf\u8e2a\u7c7b\u603b\u89c8",
-                      "domain": "worldmonitor.app",
-                      "tags": [
-                          "\u7efc\u5408",
-                          "\u4ea4\u6613\u65b0\u95fb\u548c\u9ad8\u624b\u8ddf\u8e2a\u7c7b\u603b\u89c8"
-                      ]
-                  },
-                  {
-                      "id": "general-www-pizzint-watch-1",
-                      "name": "Polyglobe - \u5b9e\u65f6\u5730\u7f18\u653f\u6cbb\u5e02\u573a\u60c5\u62a5 | PizzINT",
-                      "url": "https://www.pizzint.watch/polyglobe",
-                      "description": "\u6765\u6e90: \u4ea4\u6613\u65b0\u95fb\u548c\u9ad8\u624b\u8ddf\u8e2a\u7c7b\u603b\u89c8",
-                      "domain": "www.pizzint.watch",
-                      "tags": [
-                          "\u7efc\u5408",
-                          "\u4ea4\u6613\u65b0\u95fb\u548c\u9ad8\u624b\u8ddf\u8e2a\u7c7b\u603b\u89c8"
-                      ]
-                  },
-                  {
-                      "id": "general-wallstreetcn-com-1",
-                      "name": "\u534e\u5c14\u8857\u89c1\u95fb",
-                      "url": "https://wallstreetcn.com/",
-                      "description": "\u6765\u6e90: \u4ea4\u6613\u65b0\u95fb\u548c\u9ad8\u624b\u8ddf\u8e2a\u7c7b\u603b\u89c8",
-                      "domain": "wallstreetcn.com",
-                      "tags": [
-                          "\u7efc\u5408",
-                          "\u4ea4\u6613\u65b0\u95fb\u548c\u9ad8\u624b\u8ddf\u8e2a\u7c7b\u603b\u89c8"
-                      ]
-                  },
-                  {
-                      "id": "general-www-reuters-com-2",
-                      "name": "\u5168\u7403\u5e02\u573a\u5934\u6761 |  \u8def\u900f\u793e",
-                      "url": "https://www.reuters.com/markets/",
-                      "description": "\u6765\u6e90: \u4ea4\u6613\u65b0\u95fb\u548c\u9ad8\u624b\u8ddf\u8e2a\u7c7b\u603b\u89c8",
-                      "domain": "www.reuters.com",
-                      "tags": [
-                          "\u7efc\u5408",
-                          "\u4ea4\u6613\u65b0\u95fb\u548c\u9ad8\u624b\u8ddf\u8e2a\u7c7b\u603b\u89c8"
-                      ]
-                  }
-              ]
-          },
-          {
-              "id": "general-\u5176\u4ed6\u603b\u89c8",
-              "title": "\u5176\u4ed6\u603b\u89c8",
-              "description": "\u6765\u81ea\u4f60\u6574\u7406\u540e\u7684 Markdown \u5206\u7ec4\u201c\u5176\u4ed6\u603b\u89c8\u201d\u3002",
-              "tools": [
-                  {
-                      "id": "general-fintel-io-1",
-                      "name": "IBIT-\u76d1\u7ba1\u4fe1\u606f\u62ab\u9732\u5e73\u53f0",
-                      "url": "https://fintel.io/so/us/ibit",
-                      "description": "\u6765\u6e90: \u5176\u4ed6\u603b\u89c8",
-                      "domain": "fintel.io",
-                      "tags": [
-                          "\u7efc\u5408",
-                          "\u5176\u4ed6\u603b\u89c8"
-                      ]
-                  },
-                  {
-                      "id": "general-ycharts-com-1",
-                      "name": "GBTC \u6298\u4ef7\u6216\u6ea2\u4ef7\u81f3 NAV \u5206\u6790 | YCharts",
-                      "url": "https://ycharts.com/stocks",
-                      "description": "\u6765\u6e90: \u5176\u4ed6\u603b\u89c8",
-                      "domain": "ycharts.com",
-                      "tags": [
-                          "\u7efc\u5408",
-                          "\u5176\u4ed6\u603b\u89c8"
-                      ]
-                  },
-                  {
-                      "id": "general-www-sec-gov-1",
-                      "name": "SEC13F\u5b63\u5ea6\u6301\u4ed3",
-                      "url": "https://www.sec.gov/edgar/search/",
-                      "description": "\u6765\u6e90: \u5176\u4ed6\u603b\u89c8",
-                      "domain": "www.sec.gov",
-                      "tags": [
-                          "\u7efc\u5408",
-                          "\u5176\u4ed6\u603b\u89c8"
-                      ]
-                  },
-                  {
-                      "id": "general-www-sec-gov-2",
-                      "name": "SEC FORM 13-F Information Table",
-                      "url": "https://www.sec.gov/Archives/edgar/data/1166588/000116658824000009/xslForm13F_X02/PBI13f03312024.xml",
-                      "description": "\u6765\u6e90: \u5176\u4ed6\u603b\u89c8",
-                      "domain": "www.sec.gov",
-                      "tags": [
-                          "\u7efc\u5408",
-                          "\u5176\u4ed6\u603b\u89c8"
-                      ]
-                  },
-                  {
-                      "id": "general-www-cmegroup-com-1",
-                      "name": "CME",
-                      "url": "https://www.cmegroup.com/tools-information/quikstrike/vol2vol-expected-range.html",
-                      "description": "\u6765\u6e90: \u5176\u4ed6\u603b\u89c8",
-                      "domain": "www.cmegroup.com",
-                      "tags": [
-                          "\u7efc\u5408",
-                          "\u5176\u4ed6\u603b\u89c8"
-                      ]
-                  },
-                  {
-                      "id": "general-www-cmegroup-com-2",
-                      "name": "\u6295\u8d44\u8005\u6301\u4ed3\u62a5\u544a\u7528\u6237\u6307\u5357 - \u829d\u5546\u6240",
-                      "url": "https://www.cmegroup.com/cn-s/tools-information/quikstrike/quikstrike-cftc-commitment-of-traders-report-user-guide.html",
-                      "description": "\u6765\u6e90: \u5176\u4ed6\u603b\u89c8",
-                      "domain": "www.cmegroup.com",
-                      "tags": [
-                          "\u7efc\u5408",
-                          "\u5176\u4ed6\u603b\u89c8"
-                      ]
-                  },
-                  {
-                      "id": "general-www-cftc-gov-1",
-                      "name": "\u4ea4\u6613\u5458\u6301\u4ed3\u627f\u8bfa | CFTC",
-                      "url": "https://www.cftc.gov/MarketReports/CommitmentsofTraders/index.htm",
-                      "description": "\u6765\u6e90: \u5176\u4ed6\u603b\u89c8",
-                      "domain": "www.cftc.gov",
-                      "tags": [
-                          "\u7efc\u5408",
-                          "\u5176\u4ed6\u603b\u89c8"
-                      ]
-                  },
-                  {
-                      "id": "general-spotgamma-com-1",
-                      "name": "\u671f\u6743\u6df1\u5ea6\u5206\u6790--SpotGamma",
-                      "url": "https://spotgamma.com/",
-                      "description": "\u6765\u6e90: \u5176\u4ed6\u603b\u89c8",
-                      "domain": "spotgamma.com",
-                      "tags": [
-                          "\u7efc\u5408",
-                          "\u5176\u4ed6\u603b\u89c8"
-                      ]
-                  },
-                  {
-                      "id": "general-www-simnow-com-cn-1",
-                      "name": "\u671f\u8d27\u6a21\u62df\u4eff\u771f\u7cfb\u7edf--\u4e0a\u6d77\u671f\u8d27\u4ea4\u6613\u6240SimNow",
-                      "url": "https://www.simnow.com.cn/",
-                      "description": "\u6765\u6e90: \u5176\u4ed6\u603b\u89c8",
-                      "domain": "www.simnow.com.cn",
-                      "tags": [
-                          "\u7efc\u5408",
-                          "\u5176\u4ed6\u603b\u89c8"
-                      ]
-                  },
-                  {
-                      "id": "general-p-pandaremit-com-1",
-                      "name": "\u718a\u732b\u901f\u6c47",
-                      "url": "https://p.pandaremit.com/h5activity/launchInvitationCode?countryCode=HKG&shareCode=MTE1NTQ4OTE%3D&lang=zh-hans",
-                      "description": "\u6765\u6e90: \u5176\u4ed6\u603b\u89c8",
-                      "domain": "p.pandaremit.com",
-                      "tags": [
-                          "\u7efc\u5408",
-                          "\u5176\u4ed6\u603b\u89c8"
-                      ]
-                  },
-                  {
-                      "id": "general-www-cftc-gov-2",
-                      "name": "\u4ea4\u6613\u8005\u627f\u8bfa | CFTC",
-                      "url": "https://www.cftc.gov/MarketReports/CommitmentsofTraders/index.htm?utm_source=chatgpt.com",
-                      "description": "\u6765\u6e90: \u5176\u4ed6\u603b\u89c8",
-                      "domain": "www.cftc.gov",
-                      "tags": [
-                          "\u7efc\u5408",
-                          "\u5176\u4ed6\u603b\u89c8"
-                      ]
-                  },
-                  {
-                      "id": "general-chartexchange-com-1",
-                      "name": "CFEGF\u80a1\u7968\u4ef7\u683c\u53ca\u56fe\u8868 | ChartExchange",
-                      "url": "https://chartexchange.com/symbol/otc-cfegf/",
-                      "description": "\u6765\u6e90: \u5176\u4ed6\u603b\u89c8",
-                      "domain": "chartexchange.com",
-                      "tags": [
-                          "\u7efc\u5408",
-                          "\u5176\u4ed6\u603b\u89c8"
-                      ]
-                  },
-                  {
-                      "id": "general-www-tradingster-com-1",
-                      "name": "COT\u62a5\u544a\uff1a\u7f8e\u5143\u6307\u6570COT\u56fe\u8868\uff08\u4ec5\u9650\u671f\u8d27\uff09- Tradingster",
-                      "url": "https://www.tradingster.com/cot/futures/fin/098662",
-                      "description": "\u6765\u6e90: \u5176\u4ed6\u603b\u89c8",
-                      "domain": "www.tradingster.com",
-                      "tags": [
-                          "\u7efc\u5408",
-                          "\u5176\u4ed6\u603b\u89c8"
-                      ]
-                  }
-              ]
-          },
-          {
-              "id": "general-\u884d\u751f\u54c1\u603b\u89c8",
-              "title": "\u884d\u751f\u54c1\u603b\u89c8",
-              "description": "\u6765\u81ea\u4f60\u6574\u7406\u540e\u7684 Markdown \u5206\u7ec4\u201c\u884d\u751f\u54c1\u603b\u89c8\u201d\u3002",
-              "tools": [
-                  {
-                      "id": "general-www-openvlab-cn-1",
-                      "name": "OpenVlab - \u4e13\u4e1a\u671f\u6743\u4ea4\u6613\u4e0e\u6ce2\u52a8\u7387\u5206\u6790\u5e73\u53f0",
-                      "url": "https://www.openvlab.cn/",
-                      "description": "\u6765\u6e90: \u884d\u751f\u54c1\u603b\u89c8",
-                      "domain": "www.openvlab.cn",
-                      "tags": [
-                          "\u7efc\u5408",
-                          "\u884d\u751f\u54c1\u603b\u89c8"
-                      ]
-                  },
-                  {
-                      "id": "general-www-cboe-com-1",
-                      "name": "\u829d\u52a0\u54e5\u671f\u6743\u4ea4\u6613\u6240\u5168\u7403\u5e02\u573a",
-                      "url": "https://www.cboe.com/",
-                      "description": "\u6765\u6e90: \u884d\u751f\u54c1\u603b\u89c8",
-                      "domain": "www.cboe.com",
-                      "tags": [
-                          "\u7efc\u5408",
-                          "\u884d\u751f\u54c1\u603b\u89c8"
-                      ]
-                  },
-                  {
-                      "id": "general-www-bybit-com-1",
-                      "name": "\u671f\u6743\u8ba1\u7b97\u5668",
-                      "url": "https://www.bybit.com/trade/option/usdt/pb/BTC",
-                      "description": "\u6765\u6e90: \u884d\u751f\u54c1\u603b\u89c8",
-                      "domain": "www.bybit.com",
-                      "tags": [
-                          "\u7efc\u5408",
-                          "\u884d\u751f\u54c1\u603b\u89c8"
-                      ]
-                  },
-                  {
-                      "id": "general-www-theblock-co-2",
-                      "name": "\u52a0\u5bc6\u671f\u6743\u672a\u5e73\u4ed3\u5408\u7ea6\u3001\u6210\u4ea4\u91cf\u548c\u9690\u542b\u6ce2\u52a8\u7387\u6570\u636e\u53ca\u56fe\u8868",
-                      "url": "https://www.theblock.co/data/crypto-markets/options",
-                      "description": "\u6765\u6e90: \u884d\u751f\u54c1\u603b\u89c8",
-                      "domain": "www.theblock.co",
-                      "tags": [
-                          "\u7efc\u5408",
-                          "\u884d\u751f\u54c1\u603b\u89c8"
-                      ]
-                  },
-                  {
-                      "id": "general-squeezemetrics-com-1",
-                      "name": "sqzme | \u80a1\u7968\u6570\u636e\u7684\u65b0\u89c6\u89d2",
-                      "url": "https://squeezemetrics.com/monitor",
-                      "description": "\u6765\u6e90: \u884d\u751f\u54c1\u603b\u89c8",
-                      "domain": "squeezemetrics.com",
-                      "tags": [
-                          "\u7efc\u5408",
-                          "\u884d\u751f\u54c1\u603b\u89c8"
-                      ]
-                  }
-              ]
-          }
-      ]
-  }
+        "id":  "macro",
+        "title":  "宏观工具",
+        "description":  "利率、流动性、债券、经济数据与跨区域宏观跟踪。",
+        "groups":  [
+                       {
+                           "id":  "macro-宏观总览",
+                           "title":  "宏观总览",
+                           "description":  "来自你整理后的 Markdown 分组 \u0027宏观总览\u0027。",
+                           "tools":  [
+                                         {
+                                             "id":  "macro-tradingeconomics-com-1",
+                                             "name":  "经济日历tradingeconomics",
+                                             "url":  "https://tradingeconomics.com/calendar",
+                                             "description":  "来源：宏观总览",
+                                             "domain":  "tradingeconomics.com",
+                                             "tags":  [
+                                                          "宏观",
+                                                          "宏观总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "macro-www-jin10-com-1",
+                                             "name":  "金十数据官网站",
+                                             "url":  "https://www.jin10.com/",
+                                             "description":  "来源：宏观总览",
+                                             "domain":  "www.jin10.com",
+                                             "tags":  [
+                                                          "宏观",
+                                                          "宏观总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "macro-thedailyshot-com-1",
+                                             "name":  "每日宏观简讯",
+                                             "url":  "https://thedailyshot.com/",
+                                             "description":  "来源：宏观总览",
+                                             "domain":  "thedailyshot.com",
+                                             "tags":  [
+                                                          "宏观",
+                                                          "宏观总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "macro-www-cmegroup-com-1",
+                                             "name":  "CME 美联储路径",
+                                             "url":  "https://www.cmegroup.com/markets/interest-rates/cme-fedwatch-tool.html",
+                                             "description":  "来源：宏观总览",
+                                             "domain":  "www.cmegroup.com",
+                                             "tags":  [
+                                                          "宏观",
+                                                          "宏观总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "macro-datacenter-jin10-com-1",
+                                             "name":  "金十数据中心",
+                                             "url":  "https://datacenter.jin10.com/",
+                                             "description":  "来源：宏观总览",
+                                             "domain":  "datacenter.jin10.com",
+                                             "tags":  [
+                                                          "宏观",
+                                                          "宏观总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "macro-en-macromicro-me-1",
+                                             "name":  "macromicro宏观数据日报",
+                                             "url":  "https://en.macromicro.me/quickie",
+                                             "description":  "来源：宏观总览",
+                                             "domain":  "en.macromicro.me",
+                                             "tags":  [
+                                                          "宏观",
+                                                          "宏观总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "macro-x-qhkch-com-1",
+                                             "name":  "经济数据 - 奇货可查",
+                                             "url":  "https://x.qhkch.com/fundamental/nationGdpMetrics?country=%E7%BE%8E%E5%9B%BD",
+                                             "description":  "来源：宏观总览",
+                                             "domain":  "x.qhkch.com",
+                                             "tags":  [
+                                                          "宏观",
+                                                          "宏观总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "macro-macro-ops-com-1",
+                                             "name":  "宏观交易策略",
+                                             "url":  "https://macro-ops.com/",
+                                             "description":  "来源：宏观总览",
+                                             "domain":  "macro-ops.com",
+                                             "tags":  [
+                                                          "宏观",
+                                                          "宏观总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "macro-robo-datayes-com-1",
+                                             "name":  "宏观经济+股市 萝卜投研",
+                                             "url":  "https://robo.datayes.com/v2/landing/macrogrp",
+                                             "description":  "来源：宏观总览",
+                                             "domain":  "robo.datayes.com",
+                                             "tags":  [
+                                                          "宏观",
+                                                          "宏观总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "macro-tradingeconomics-com-2",
+                                             "name":  "各国宏观经济指标 | 按类别列出",
+                                             "url":  "https://tradingeconomics.com/indicators",
+                                             "description":  "来源：宏观总览",
+                                             "domain":  "tradingeconomics.com",
+                                             "tags":  [
+                                                          "宏观",
+                                                          "宏观总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "macro-www-haver-com-1",
+                                             "name":  "Haver宏观评论",
+                                             "url":  "https://www.haver.com/",
+                                             "description":  "来源：宏观总览",
+                                             "domain":  "www.haver.com",
+                                             "tags":  [
+                                                          "宏观",
+                                                          "宏观总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "macro-www-forexfactory-com-1",
+                                             "name":  "日历 | AI好读取",
+                                             "url":  "https://www.forexfactory.com/calendar?day=jan3.2026",
+                                             "description":  "来源：宏观总览",
+                                             "domain":  "www.forexfactory.com",
+                                             "tags":  [
+                                                          "宏观",
+                                                          "宏观总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "macro-truflation-com-1",
+                                             "name":  "其他宏观数据图表库",
+                                             "url":  "https://truflation.com/marketplace?auth=google\u0026code=e2e58bd7-c221-4d97-9997-ad2d612810a2\u0026isSigningUp=true\u0026period=annual\u0026stake=false\u0026tier=undefined",
+                                             "description":  "来源：宏观总览",
+                                             "domain":  "truflation.com",
+                                             "tags":  [
+                                                          "宏观",
+                                                          "宏观总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "macro-www-notion-so-1",
+                                             "name":  "宏观边际",
+                                             "url":  "https://www.notion.so/trusting-glitter-4f0/MacroMargin-27e6782525ab41e188cb81510803d95b",
+                                             "description":  "来源：宏观总览",
+                                             "domain":  "www.notion.so",
+                                             "tags":  [
+                                                          "宏观",
+                                                          "宏观总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "macro-wx-zsxq-com-1",
+                                             "name":  "知识星球",
+                                             "url":  "https://wx.zsxq.com/login",
+                                             "description":  "来源：宏观总览",
+                                             "domain":  "wx.zsxq.com",
+                                             "tags":  [
+                                                          "宏观",
+                                                          "宏观总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "macro-www-vaneck-com-1",
+                                             "name":  "VanEck 分析",
+                                             "url":  "https://www.vaneck.com/asia/en/insights/",
+                                             "description":  "来源：宏观总览",
+                                             "domain":  "www.vaneck.com",
+                                             "tags":  [
+                                                          "宏观",
+                                                          "宏观总览"
+                                                      ]
+                                         }
+                                     ]
+                       },
+                       {
+                           "id":  "macro-美联储-美国经济数据",
+                           "title":  "美联储、美国经济数据",
+                           "description":  "来自你整理后的 Markdown 分组 \u0027美联储、美国经济数据\u0027。",
+                           "tools":  [
+                                         {
+                                             "id":  "macro-www-newyorkfed-org-1",
+                                             "name":  "Repo Operations",
+                                             "url":  "https://www.newyorkfed.org/markets/desk-operations/repo",
+                                             "description":  "来源：美联储、美国经济数据",
+                                             "domain":  "www.newyorkfed.org",
+                                             "tags":  [
+                                                          "宏观",
+                                                          "美联储、美国经济数据"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "macro-sc-macromicro-me-1",
+                                             "name":  "利率\u0026美资产负债表vs.黄金",
+                                             "url":  "https://sc.macromicro.me/collections/45/mm-gold-price/24057/us-fed-funds-rate-and-total-assets-vs-gold-price",
+                                             "description":  "来源：美联储、美国经济数据",
+                                             "domain":  "sc.macromicro.me",
+                                             "tags":  [
+                                                          "宏观",
+                                                          "美联储、美国经济数据"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "macro-fred-stlouisfed-org-1",
+                                             "name":  "信用利差",
+                                             "url":  "https://fred.stlouisfed.org/series/BAMLH0A0HYM2",
+                                             "description":  "来源：美联储、美国经济数据",
+                                             "domain":  "fred.stlouisfed.org",
+                                             "tags":  [
+                                                          "宏观",
+                                                          "美联储、美国经济数据"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "macro-www-federalreserve-gov-1",
+                                             "name":  "美联储资产负债表",
+                                             "url":  "https://www.federalreserve.gov/releases/h41/",
+                                             "description":  "来源：美联储、美国经济数据",
+                                             "domain":  "www.federalreserve.gov",
+                                             "tags":  [
+                                                          "宏观",
+                                                          "美联储、美国经济数据"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "macro-www-federalreserve-gov-2",
+                                             "name":  "美联储 - 会议日程和信息",
+                                             "url":  "https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm",
+                                             "description":  "来源：美联储、美国经济数据",
+                                             "domain":  "www.federalreserve.gov",
+                                             "tags":  [
+                                                          "宏观",
+                                                          "美联储、美国经济数据"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "macro-www-federalreserve-gov-3",
+                                             "name":  "FOMC会议声明/记者会",
+                                             "url":  "https://www.federalreserve.gov/videos.htm",
+                                             "description":  "来源：美联储、美国经济数据",
+                                             "domain":  "www.federalreserve.gov",
+                                             "tags":  [
+                                                          "宏观",
+                                                          "美联储、美国经济数据"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "macro-sc-macromicro-me-2",
+                                             "name":  "美国-美联储负债端结构|MacroMicro",
+                                             "url":  "https://sc.macromicro.me/collections/4238/us-federal/1320/us-fed-liabilities-structure",
+                                             "description":  "来源：美联储、美国经济数据",
+                                             "domain":  "sc.macromicro.me",
+                                             "tags":  [
+                                                          "宏观",
+                                                          "美联储、美国经济数据"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "macro-fred-stlouisfed-org-2",
+                                             "name":  "担保隔夜融资利率 (SOFR)",
+                                             "url":  "https://fred.stlouisfed.org/series/SOFR",
+                                             "description":  "来源：美联储、美国经济数据",
+                                             "domain":  "fred.stlouisfed.org",
+                                             "tags":  [
+                                                          "宏观",
+                                                          "美联储、美国经济数据"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "macro-fred-stlouisfed-org-3",
+                                             "name":  "10年期盈亏平衡通胀率 (T10YIE)",
+                                             "url":  "https://fred.stlouisfed.org/series/T10YIE",
+                                             "description":  "来源：美联储、美国经济数据",
+                                             "domain":  "fred.stlouisfed.org",
+                                             "tags":  [
+                                                          "宏观",
+                                                          "美联储、美国经济数据"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "macro-fred-stlouisfed-org-4",
+                                             "name":  "10年期固定期限美债市场收益率，通胀保值 DFII10)",
+                                             "url":  "https://fred.stlouisfed.org/series/DFII10",
+                                             "description":  "来源：美联储、美国经济数据",
+                                             "domain":  "fred.stlouisfed.org",
+                                             "tags":  [
+                                                          "宏观",
+                                                          "美联储、美国经济数据"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "macro-en-macromicro-me-2",
+                                             "name":  "各国央行利率",
+                                             "url":  "https://en.macromicro.me/central_bank/overview",
+                                             "description":  "来源：美联储、美国经济数据",
+                                             "domain":  "en.macromicro.me",
+                                             "tags":  [
+                                                          "宏观",
+                                                          "美联储、美国经济数据"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "macro-en-macromicro-me-3",
+                                             "name":  "各国央行加息/降息预期（2024年）| MacroMicro",
+                                             "url":  "https://en.macromicro.me/charts/89119/cbs-interest-rate-cuts-expectation-2024",
+                                             "description":  "来源：美联储、美国经济数据",
+                                             "domain":  "en.macromicro.me",
+                                             "tags":  [
+                                                          "宏观",
+                                                          "美联储、美国经济数据"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "macro-fred-stlouisfed-org-5",
+                                             "name":  "利差/标普相关性",
+                                             "url":  "https://fred.stlouisfed.org/series/BAMLH0A0HYM2#0",
+                                             "description":  "来源：美联储、美国经济数据",
+                                             "domain":  "fred.stlouisfed.org",
+                                             "tags":  [
+                                                          "宏观",
+                                                          "美联储、美国经济数据"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "macro-www-newyorkfed-org-2",
+                                             "name":  "纽约联邦储备银行",
+                                             "url":  "https://www.newyorkfed.org/",
+                                             "description":  "来源：美联储、美国经济数据",
+                                             "domain":  "www.newyorkfed.org",
+                                             "tags":  [
+                                                          "宏观",
+                                                          "美联储、美国经济数据"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "macro-fraser-stlouisfed-org-1",
+                                             "name":  "美联储历史",
+                                             "url":  "https://fraser.stlouisfed.org/",
+                                             "description":  "来源：美联储、美国经济数据",
+                                             "domain":  "fraser.stlouisfed.org",
+                                             "tags":  [
+                                                          "宏观",
+                                                          "美联储、美国经济数据"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "macro-www-newyorkfed-org-3",
+                                             "name":  "咨询小组 - 纽约联邦储备银行",
+                                             "url":  "https://www.newyorkfed.org/aboutthefed/external_committees",
+                                             "description":  "来源：美联储、美国经济数据",
+                                             "domain":  "www.newyorkfed.org",
+                                             "tags":  [
+                                                          "宏观",
+                                                          "美联储、美国经济数据"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "macro-home-treasury-gov-1",
+                                             "name":  "U.S. Department of the Treasury",
+                                             "url":  "https://home.treasury.gov/policy-issues/financing-the-government/quarterly-refunding/most-recent-quarterly-refunding-documents,",
+                                             "description":  "来源：美联储、美国经济数据",
+                                             "domain":  "home.treasury.gov",
+                                             "tags":  [
+                                                          "宏观",
+                                                          "美联储、美国经济数据"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "macro-fred-stlouisfed-org-6",
+                                             "name":  "美联储经济数据",
+                                             "url":  "https://fred.stlouisfed.org/",
+                                             "description":  "来源：美联储、美国经济数据",
+                                             "domain":  "fred.stlouisfed.org",
+                                             "tags":  [
+                                                          "宏观",
+                                                          "美联储、美国经济数据"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "macro-www-atlantafed-org-1",
+                                             "name":  "GDPNow - 亚特兰大联邦储备银行",
+                                             "url":  "https://www.atlantafed.org/cqer/research/gdpnow",
+                                             "description":  "来源：美联储、美国经济数据",
+                                             "domain":  "www.atlantafed.org",
+                                             "tags":  [
+                                                          "宏观",
+                                                          "美联储、美国经济数据"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "macro-www-atlantafed-org-2",
+                                             "name":  "亚特兰大工资增长追踪",
+                                             "url":  "https://www.atlantafed.org/chcs/wage-growth-tracker",
+                                             "description":  "来源：美联储、美国经济数据",
+                                             "domain":  "www.atlantafed.org",
+                                             "tags":  [
+                                                          "宏观",
+                                                          "美联储、美国经济数据"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "macro-fred-stlouisfed-org-7",
+                                             "name":  "核心PCE",
+                                             "url":  "https://fred.stlouisfed.org/series/DPCCRV1Q225SBEA",
+                                             "description":  "来源：美联储、美国经济数据",
+                                             "domain":  "fred.stlouisfed.org",
+                                             "tags":  [
+                                                          "宏观",
+                                                          "美联储、美国经济数据"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "macro-www-macromicro-me-1",
+                                             "name":  "美国PCE＆corePCE(年增率)",
+                                             "url":  "https://www.macromicro.me/charts/107685/mei-guo-PCE-corePCE-nian-zeng-lyu",
+                                             "description":  "来源：美联储、美国经济数据",
+                                             "domain":  "www.macromicro.me",
+                                             "tags":  [
+                                                          "宏观",
+                                                          "美联储、美国经济数据"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "macro-www-clevelandfed-org-1",
+                                             "name":  "10年期通胀预期和风险溢价",
+                                             "url":  "https://www.clevelandfed.org/indicators-and-data/inflation-expectations",
+                                             "description":  "来源：美联储、美国经济数据",
+                                             "domain":  "www.clevelandfed.org",
+                                             "tags":  [
+                                                          "宏观",
+                                                          "美联储、美国经济数据"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "macro-www-newyorkfed-org-4",
+                                             "name":  "1/3/5消费者通胀预期",
+                                             "url":  "https://www.newyorkfed.org/microeconomics/sce#/inflexp-1",
+                                             "description":  "来源：美联储、美国经济数据",
+                                             "domain":  "www.newyorkfed.org",
+                                             "tags":  [
+                                                          "宏观",
+                                                          "美联储、美国经济数据"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "macro-www-clevelandfed-org-2",
+                                             "name":  "PCE预测",
+                                             "url":  "https://www.clevelandfed.org/indicators-and-data/inflation-nowcasting",
+                                             "description":  "来源：美联储、美国经济数据",
+                                             "domain":  "www.clevelandfed.org",
+                                             "tags":  [
+                                                          "宏观",
+                                                          "美联储、美国经济数据"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "macro-sc-macromicro-me-3",
+                                             "name":  "美国CPI(环比)",
+                                             "url":  "https://sc.macromicro.me/collections/5/us-price-relative/89/cpi-items-mom",
+                                             "description":  "来源：美联储、美国经济数据",
+                                             "domain":  "sc.macromicro.me",
+                                             "tags":  [
+                                                          "宏观",
+                                                          "美联储、美国经济数据"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "macro-fred-stlouisfed-org-8",
+                                             "name":  "10年期国债-2年期国债利率（T10Y2Y）",
+                                             "url":  "https://fred.stlouisfed.org/series/T10Y2Y",
+                                             "description":  "来源：美联储、美国经济数据",
+                                             "domain":  "fred.stlouisfed.org",
+                                             "tags":  [
+                                                          "宏观",
+                                                          "美联储、美国经济数据"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "macro-fred-stlouisfed-org-9",
+                                             "name":  "职位空缺：非农就业数据 (JTSJOL)",
+                                             "url":  "https://fred.stlouisfed.org/series/JTSJOL",
+                                             "description":  "来源：美联储、美国经济数据",
+                                             "domain":  "fred.stlouisfed.org",
+                                             "tags":  [
+                                                          "宏观",
+                                                          "美联储、美国经济数据"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "macro-en-macromicro-me-4",
+                                             "name":  "美国ADP 非农就业数据",
+                                             "url":  "https://en.macromicro.me/collections/4/us-employ-relative/36/adp",
+                                             "description":  "来源：美联储、美国经济数据",
+                                             "domain":  "en.macromicro.me",
+                                             "tags":  [
+                                                          "宏观",
+                                                          "美联储、美国经济数据"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "macro-en-macromicro-me-5",
+                                             "name":  "美国劳动力市场",
+                                             "url":  "https://en.macromicro.me/collections/4/us-employ-relative/87/jolts",
+                                             "description":  "来源：美联储、美国经济数据",
+                                             "domain":  "en.macromicro.me",
+                                             "tags":  [
+                                                          "宏观",
+                                                          "美联储、美国经济数据"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "macro-fred-stlouisfed-org-10",
+                                             "name":  "劳动力参与率 (CIVPART)",
+                                             "url":  "https://fred.stlouisfed.org/series/CIVPART",
+                                             "description":  "来源：美联储、美国经济数据",
+                                             "domain":  "fred.stlouisfed.org",
+                                             "tags":  [
+                                                          "宏观",
+                                                          "美联储、美国经济数据"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "macro-fred-stlouisfed-org-11",
+                                             "name":  "个人储蓄率 (PSAVERT)",
+                                             "url":  "https://fred.stlouisfed.org/series/PSAVERT",
+                                             "description":  "来源：美联储、美国经济数据",
+                                             "domain":  "fred.stlouisfed.org",
+                                             "tags":  [
+                                                          "宏观",
+                                                          "美联储、美国经济数据"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "macro-fred-stlouisfed-org-12",
+                                             "name":  "信用卡贷款拖欠率 (DRCCLACBS)",
+                                             "url":  "https://fred.stlouisfed.org/series/DRCCLACBS",
+                                             "description":  "来源：美联储、美国经济数据",
+                                             "domain":  "fred.stlouisfed.org",
+                                             "tags":  [
+                                                          "宏观",
+                                                          "美联储、美国经济数据"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "macro-fred-stlouisfed-org-13",
+                                             "name":  "美国30年期固定利率抵押贷款平均值 (MORTGAGE30US)",
+                                             "url":  "https://fred.stlouisfed.org/series/MORTGAGE30US",
+                                             "description":  "来源：美联储、美国经济数据",
+                                             "domain":  "fred.stlouisfed.org",
+                                             "tags":  [
+                                                          "宏观",
+                                                          "美联储、美国经济数据"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "macro-en-macromicro-me-6",
+                                             "name":  "美国——银行收紧商业和工业贷款标准的净百分比",
+                                             "url":  "https://en.macromicro.me/charts/1241/us-bank-net-percent-tight-loan",
+                                             "description":  "来源：美联储、美国经济数据",
+                                             "domain":  "en.macromicro.me",
+                                             "tags":  [
+                                                          "宏观",
+                                                          "美联储、美国经济数据"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "macro-www-redfin-com-1",
+                                             "name":  "美国房地产市场和价格",
+                                             "url":  "https://www.redfin.com/us-housing-market",
+                                             "description":  "来源：美联储、美国经济数据",
+                                             "domain":  "www.redfin.com",
+                                             "tags":  [
+                                                          "宏观",
+                                                          "美联储、美国经济数据"
+                                                      ]
+                                         }
+                                     ]
+                       },
+                       {
+                           "id":  "macro-美债类",
+                           "title":  "美债类",
+                           "description":  "来自你整理后的 Markdown 分组 \u0027美债类\u0027。",
+                           "tools":  [
+                                         {
+                                             "id":  "macro-treasurydirect-gov-1",
+                                             "name":  "美债拍卖时间",
+                                             "url":  "https://treasurydirect.gov/auctions/upcoming/",
+                                             "description":  "来源：美债类",
+                                             "domain":  "treasurydirect.gov",
+                                             "tags":  [
+                                                          "宏观",
+                                                          "美债类"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "macro-www-treasurydirect-gov-1",
+                                             "name":  "国债拍卖",
+                                             "url":  "https://www.treasurydirect.gov/auctions/announcements-data-results/announcement-results-press-releases/",
+                                             "description":  "来源：美债类",
+                                             "domain":  "www.treasurydirect.gov",
+                                             "tags":  [
+                                                          "宏观",
+                                                          "美债类"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "macro-www-usdebtclock-org-1",
+                                             "name":  "美国债务时钟",
+                                             "url":  "https://www.usdebtclock.org/",
+                                             "description":  "来源：美债类",
+                                             "domain":  "www.usdebtclock.org",
+                                             "tags":  [
+                                                          "宏观",
+                                                          "美债类"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "macro-ticdata-treasury-gov-1",
+                                             "name":  "各国美债持有仓位占比",
+                                             "url":  "https://ticdata.treasury.gov/resource-center/data-chart-center/tic/Documents/slt_table5.html",
+                                             "description":  "来源：美债类",
+                                             "domain":  "ticdata.treasury.gov",
+                                             "tags":  [
+                                                          "宏观",
+                                                          "美债类"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "macro-en-macromicro-me-7",
+                                             "name":  "10年期美债买卖比",
+                                             "url":  "https://en.macromicro.me/collections/51/us-treasury-bond/30431/us-10y-bid-to-cover-ratio",
+                                             "description":  "来源：美债类",
+                                             "domain":  "en.macromicro.me",
+                                             "tags":  [
+                                                          "宏观",
+                                                          "美债类"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "macro-sc-macromicro-me-4",
+                                             "name":  "美国-财政部每月债券发行量 | MacroMicro 财经M平方",
+                                             "url":  "https://sc.macromicro.me/charts/4458/us-treasury-issuance-gross",
+                                             "description":  "来源：美债类",
+                                             "domain":  "sc.macromicro.me",
+                                             "tags":  [
+                                                          "宏观",
+                                                          "美债类"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "macro-fred-stlouisfed-org-14",
+                                             "name":  "美国债务占国内生产总值的百分比 (GFDEGDQ188S)",
+                                             "url":  "https://fred.stlouisfed.org/series/GFDEGDQ188S",
+                                             "description":  "来源：美债类",
+                                             "domain":  "fred.stlouisfed.org",
+                                             "tags":  [
+                                                          "宏观",
+                                                          "美债类"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "macro-www-pgpf-org-1",
+                                             "name":  "国家债务时钟：现在的国家债务是多少？",
+                                             "url":  "https://www.pgpf.org/national-debt-clock/",
+                                             "description":  "来源：美债类",
+                                             "domain":  "www.pgpf.org",
+                                             "tags":  [
+                                                          "宏观",
+                                                          "美债类"
+                                                      ]
+                                         }
+                                     ]
+                       },
+                       {
+                           "id":  "macro-其他",
+                           "title":  "其他",
+                           "description":  "来自你整理后的 Markdown 分组 \u0027其他\u0027。",
+                           "tools":  [
+                                         {
+                                             "id":  "macro-www-ici-org-1",
+                                             "name":  "机构现金仓位",
+                                             "url":  "https://www.ici.org/research/stats/mmf",
+                                             "description":  "来源：其他",
+                                             "domain":  "www.ici.org",
+                                             "tags":  [
+                                                          "宏观",
+                                                          "其他"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "macro-data-worldbank-org-1",
+                                             "name":  "世界银行开放数据 | 各国长期经济数据对比",
+                                             "url":  "https://data.worldbank.org/",
+                                             "description":  "来源：其他",
+                                             "domain":  "data.worldbank.org",
+                                             "tags":  [
+                                                          "宏观",
+                                                          "其他"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "macro-worldpopulationreview-com-1",
+                                             "name":  "各国债务/GDP占比",
+                                             "url":  "https://worldpopulationreview.com/country-rankings/countries-by-national-debt",
+                                             "description":  "来源：其他",
+                                             "domain":  "worldpopulationreview.com",
+                                             "tags":  [
+                                                          "宏观",
+                                                          "其他"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "macro-population-pyramid-net-1",
+                                             "name":  "世界各国的人口金字塔 2025 - 人口金字塔",
+                                             "url":  "https://population-pyramid.net/zh-cn",
+                                             "description":  "来源：其他",
+                                             "domain":  "population-pyramid.net",
+                                             "tags":  [
+                                                          "宏观",
+                                                          "其他"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "macro-tradingeconomics-com-3",
+                                             "name":  "全球数据",
+                                             "url":  "https://tradingeconomics.com/",
+                                             "description":  "来源：其他",
+                                             "domain":  "tradingeconomics.com",
+                                             "tags":  [
+                                                          "宏观",
+                                                          "其他"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "macro-www-imf-org-1",
+                                             "name":  "IMF全球金融/外汇/债务指标数据库",
+                                             "url":  "https://www.imf.org/en/Data",
+                                             "description":  "来源：其他",
+                                             "domain":  "www.imf.org",
+                                             "tags":  [
+                                                          "宏观",
+                                                          "其他"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "macro-news-usni-org-1",
+                                             "name":  "美国航母动态",
+                                             "url":  "https://news.usni.org/2025/06/09/usni-news-fleet-and-marine-tracker-june-9-2025",
+                                             "description":  "来源：其他",
+                                             "domain":  "news.usni.org",
+                                             "tags":  [
+                                                          "宏观",
+                                                          "其他"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "macro-www-flightradar24-com-1",
+                                             "name":  "各国领空情况",
+                                             "url":  "https://www.flightradar24.com/30.37,52.68/5",
+                                             "description":  "来源：其他",
+                                             "domain":  "www.flightradar24.com",
+                                             "tags":  [
+                                                          "宏观",
+                                                          "其他"
+                                                      ]
+                                         }
+                                     ]
+                       }
+                   ]
+    },
+    {
+        "id":  "equity",
+        "title":  "股市工具",
+        "description":  "股票、ETF、财报、持仓与市场情绪观察。",
+        "groups":  [
+                       {
+                           "id":  "equity-股市总览",
+                           "title":  "股市总览",
+                           "description":  "来自你整理后的 Markdown 分组 \u0027股市总览\u0027。",
+                           "tools":  [
+                                         {
+                                             "id":  "equity-pro-openbb-co-1",
+                                             "name":  "OpenBB 工作区",
+                                             "url":  "https://pro.openbb.co/app/ad4c0196-5796-4114-bcec-cf6dc21f914d",
+                                             "description":  "来源：股市总览",
+                                             "domain":  "pro.openbb.co",
+                                             "tags":  [
+                                                          "股市",
+                                                          "股市总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "equity-companiesmarketcap-com-1",
+                                             "name":  "美国公司市值排名",
+                                             "url":  "https://companiesmarketcap.com/usa/largest-companies-in-the-usa-by-market-cap/",
+                                             "description":  "来源：股市总览",
+                                             "domain":  "companiesmarketcap.com",
+                                             "tags":  [
+                                                          "股市",
+                                                          "股市总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "equity-dapanyuntu-com-1",
+                                             "name":  "A股板块走势",
+                                             "url":  "https://dapanyuntu.com/",
+                                             "description":  "来源：股市总览",
+                                             "domain":  "dapanyuntu.com",
+                                             "tags":  [
+                                                          "股市",
+                                                          "股市总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "equity-finviz-com-1",
+                                             "name":  "股票筛选器和热力图--FINVIZ.com",
+                                             "url":  "https://finviz.com/",
+                                             "description":  "来源：股市总览",
+                                             "domain":  "finviz.com",
+                                             "tags":  [
+                                                          "股市",
+                                                          "股市总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "equity-finviz-com-2",
+                                             "name":  "finviz财报可视化",
+                                             "url":  "https://finviz.com/quote.ashx?t=AAPL\u0026ty=ea\u0026p=d\u0026b=1",
+                                             "description":  "来源：股市总览",
+                                             "domain":  "finviz.com",
+                                             "tags":  [
+                                                          "股市",
+                                                          "股市总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "equity-en-macromicro-me-1",
+                                             "name":  "美股市场情绪指数",
+                                             "url":  "https://en.macromicro.me/charts/80778/US-CNN-Fear-and-Greed-Index",
+                                             "description":  "来源：股市总览",
+                                             "domain":  "en.macromicro.me",
+                                             "tags":  [
+                                                          "股市",
+                                                          "股市总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "equity-tickernerd-com-1",
+                                             "name":  "Ticker Nerd 股票文件查找",
+                                             "url":  "https://tickernerd.com/resources/",
+                                             "description":  "来源：股市总览",
+                                             "domain":  "tickernerd.com",
+                                             "tags":  [
+                                                          "股市",
+                                                          "股市总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "equity-www-sec-gov-1",
+                                             "name":  "SEC财报",
+                                             "url":  "https://www.sec.gov/",
+                                             "description":  "来源：股市总览",
+                                             "domain":  "www.sec.gov",
+                                             "tags":  [
+                                                          "股市",
+                                                          "股市总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "equity-insight-factset-com-1",
+                                             "name":  "每季度财报统计及forward EPS/PE",
+                                             "url":  "https://insight.factset.com/topic/earnings",
+                                             "description":  "来源：股市总览",
+                                             "domain":  "insight.factset.com",
+                                             "tags":  [
+                                                          "股市",
+                                                          "股市总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "equity-whalewisdom-com-1",
+                                             "name":  "利用13F文件和鲸鱼数据追踪对冲基金投资组合",
+                                             "url":  "https://whalewisdom.com/",
+                                             "description":  "来源：股市总览",
+                                             "domain":  "whalewisdom.com",
+                                             "tags":  [
+                                                          "股市",
+                                                          "股市总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "equity-seekingalpha-com-1",
+                                             "name":  "Seeking Alpha | 股市分析及投资者工具",
+                                             "url":  "https://seekingalpha.com/",
+                                             "description":  "来源：股市总览",
+                                             "domain":  "seekingalpha.com",
+                                             "tags":  [
+                                                          "股市",
+                                                          "股市总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "equity-www-lixinger-com-1",
+                                             "name":  "社保机构持仓",
+                                             "url":  "https://www.lixinger.com/analytics/shareholders/search",
+                                             "description":  "来源：股市总览",
+                                             "domain":  "www.lixinger.com",
+                                             "tags":  [
+                                                          "股市",
+                                                          "股市总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "equity-ark-alien-tomato-com-1",
+                                             "name":  "Ark基金最新动向",
+                                             "url":  "https://ark.alien-tomato.com/",
+                                             "description":  "来源：股市总览",
+                                             "domain":  "ark.alien-tomato.com",
+                                             "tags":  [
+                                                          "股市",
+                                                          "股市总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "equity-www-perplexity-ai-1",
+                                             "name":  "美国议员投资组合",
+                                             "url":  "https://www.perplexity.ai/finance/politicians",
+                                             "description":  "来源：股市总览",
+                                             "domain":  "www.perplexity.ai",
+                                             "tags":  [
+                                                          "股市",
+                                                          "股市总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "equity-www-cninfo-com-cn-1",
+                                             "name":  "A股巨潮资讯网",
+                                             "url":  "https://www.cninfo.com.cn/new/index.jsp",
+                                             "description":  "来源：股市总览",
+                                             "domain":  "www.cninfo.com.cn",
+                                             "tags":  [
+                                                          "股市",
+                                                          "股市总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "equity-robo-datayes-com-1",
+                                             "name":  "萝卜投研-智能股票投研",
+                                             "url":  "https://robo.datayes.com/",
+                                             "description":  "来源：股市总览",
+                                             "domain":  "robo.datayes.com",
+                                             "tags":  [
+                                                          "股市",
+                                                          "股市总览"
+                                                      ]
+                                         }
+                                     ]
+                       },
+                       {
+                           "id":  "equity-etf总览",
+                           "title":  "ETF总览",
+                           "description":  "来自你整理后的 Markdown 分组 \u0027ETF总览\u0027。",
+                           "tools":  [
+                                         {
+                                             "id":  "equity-www-etf-com-1",
+                                             "name":  "ETF 比较工具",
+                                             "url":  "https://www.etf.com/tools/etf-comparison",
+                                             "description":  "来源：ETF总览",
+                                             "domain":  "www.etf.com",
+                                             "tags":  [
+                                                          "股市",
+                                                          "ETF总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "equity-www-etfrc-com-1",
+                                             "name":  "ETF研究中心",
+                                             "url":  "https://www.etfrc.com/",
+                                             "description":  "来源：ETF总览",
+                                             "domain":  "www.etfrc.com",
+                                             "tags":  [
+                                                          "股市",
+                                                          "ETF总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "equity-etfdb-com-1",
+                                             "name":  "ETF 数据库：ETF 原创综合指南",
+                                             "url":  "https://etfdb.com/",
+                                             "description":  "来源：ETF总览",
+                                             "domain":  "etfdb.com",
+                                             "tags":  [
+                                                          "股市",
+                                                          "ETF总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "equity-www-etf-com-2",
+                                             "name":  "ETF 基金流量工具",
+                                             "url":  "https://www.etf.com/etfanalytics/etf-fund-flows-tool",
+                                             "description":  "来源：ETF总览",
+                                             "domain":  "www.etf.com",
+                                             "tags":  [
+                                                          "股市",
+                                                          "ETF总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "equity-www-lazyportfolioetf-com-1",
+                                             "name":  "懒惰投资组合和ETF组合",
+                                             "url":  "https://www.lazyportfolioetf.com/#google_vignette",
+                                             "description":  "来源：ETF总览",
+                                             "domain":  "www.lazyportfolioetf.com",
+                                             "tags":  [
+                                                          "股市",
+                                                          "ETF总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "equity-www-portfoliovisualizer-com-1",
+                                             "name":  "投资组合可视化工具",
+                                             "url":  "https://www.portfoliovisualizer.com/",
+                                             "description":  "来源：ETF总览",
+                                             "domain":  "www.portfoliovisualizer.com",
+                                             "tags":  [
+                                                          "股市",
+                                                          "ETF总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "equity-funddb-cn-1",
+                                             "name":  "韭圈儿_基金配置高手聚集地",
+                                             "url":  "https://funddb.cn/",
+                                             "description":  "来源：ETF总览",
+                                             "domain":  "funddb.cn",
+                                             "tags":  [
+                                                          "股市",
+                                                          "ETF总览"
+                                                      ]
+                                         }
+                                     ]
+                       }
+                   ]
+    },
+    {
+        "id":  "crypto",
+        "title":  "加密工具",
+        "description":  "研报、交易、链上、基本面与媒体信息入口。",
+        "groups":  [
+                       {
+                           "id":  "crypto-研报类",
+                           "title":  "研报类",
+                           "description":  "来自你整理后的 Markdown 分组 \u0027研报类\u0027。",
+                           "tools":  [
+                                         {
+                                             "id":  "crypto-insights-glassnode-com-1",
+                                             "name":  "Glassnode 每周简报",
+                                             "url":  "https://insights.glassnode.com/tag/newsletter/",
+                                             "description":  "来源：研报类",
+                                             "domain":  "insights.glassnode.com",
+                                             "tags":  [
+                                                          "加密",
+                                                          "研报类"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "crypto-research-glassnode-com-1",
+                                             "name":  "Glassnode 市场脉搏",
+                                             "url":  "https://research.glassnode.com/tag/market-pulse/",
+                                             "description":  "来源：研报类",
+                                             "domain":  "research.glassnode.com",
+                                             "tags":  [
+                                                          "加密",
+                                                          "研报类"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "crypto-www-galaxy-com-1",
+                                             "name":  "Galaxy 研究",
+                                             "url":  "https://www.galaxy.com/insights/research",
+                                             "description":  "来源：研报类",
+                                             "domain":  "www.galaxy.com",
+                                             "tags":  [
+                                                          "加密",
+                                                          "研报类"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "crypto-www-coinbase-com-1",
+                                             "name":  "Coinbase 机构研究",
+                                             "url":  "https://www.coinbase.com/zh-cn/institutional/research-insights/research",
+                                             "description":  "来源：研报类",
+                                             "domain":  "www.coinbase.com",
+                                             "tags":  [
+                                                          "加密",
+                                                          "研报类"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "crypto-a16zcrypto-substack-com-1",
+                                             "name":  "a16z 加密研究",
+                                             "url":  "https://a16zcrypto.substack.com/",
+                                             "description":  "来源：研报类",
+                                             "domain":  "a16zcrypto.substack.com",
+                                             "tags":  [
+                                                          "加密",
+                                                          "研报类"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "crypto-www-vaneck-com-1",
+                                             "name":  "VanEck 数字资产",
+                                             "url":  "https://www.vaneck.com/us/en/insights/digital-assets/?p=1",
+                                             "description":  "来源：研报类",
+                                             "domain":  "www.vaneck.com",
+                                             "tags":  [
+                                                          "加密",
+                                                          "研报类"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "crypto-river-com-1",
+                                             "name":  "River 比特币研究",
+                                             "url":  "https://river.com/research",
+                                             "description":  "来源：研报类",
+                                             "domain":  "river.com",
+                                             "tags":  [
+                                                          "加密",
+                                                          "研报类"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "crypto-research-grayscale-com-1",
+                                             "name":  "Grayscale 研究",
+                                             "url":  "https://research.grayscale.com/",
+                                             "description":  "来源：研报类",
+                                             "domain":  "research.grayscale.com",
+                                             "tags":  [
+                                                          "加密",
+                                                          "研报类"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "crypto-www-binance-com-1",
+                                             "name":  "币安研究院",
+                                             "url":  "https://www.binance.com/zh-CN/research",
+                                             "description":  "来源：研报类",
+                                             "domain":  "www.binance.com",
+                                             "tags":  [
+                                                          "加密",
+                                                          "研报类"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "crypto-www-ark-invest-com-1",
+                                             "name":  "ARK 研究文章",
+                                             "url":  "https://www.ark-invest.com/articles",
+                                             "description":  "来源：研报类",
+                                             "domain":  "www.ark-invest.com",
+                                             "tags":  [
+                                                          "加密",
+                                                          "研报类"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "crypto-bitwiseinvestments-com-1",
+                                             "name":  "Bitwise 市场洞察",
+                                             "url":  "https://bitwiseinvestments.com/crypto-market-insights",
+                                             "description":  "来源：研报类",
+                                             "domain":  "bitwiseinvestments.com",
+                                             "tags":  [
+                                                          "加密",
+                                                          "研报类"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "crypto-experts-bitwiseinvestments-com-1",
+                                             "name":  "Bitwise 每周分析",
+                                             "url":  "https://experts.bitwiseinvestments.com/cio-memos",
+                                             "description":  "来源：研报类",
+                                             "domain":  "experts.bitwiseinvestments.com",
+                                             "tags":  [
+                                                          "加密",
+                                                          "研报类"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "crypto-members-delphidigital-io-1",
+                                             "name":  "Messari / Delphi 前瞻报告",
+                                             "url":  "https://members.delphidigital.io/reports/the-year-ahead-for-markets-2026#concluding-thoughts-949c",
+                                             "description":  "来源：研报类",
+                                             "domain":  "members.delphidigital.io",
+                                             "tags":  [
+                                                          "加密",
+                                                          "研报类"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "crypto-cryptohayes-substack-com-1",
+                                             "name":  "Arthur Hayes 研究",
+                                             "url":  "https://cryptohayes.substack.com/",
+                                             "description":  "来源：研报类",
+                                             "domain":  "cryptohayes.substack.com",
+                                             "tags":  [
+                                                          "加密",
+                                                          "研报类"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "crypto-coinshares-com-1",
+                                             "name":  "CoinShares 洞察",
+                                             "url":  "https://coinshares.com/corp/insights/",
+                                             "description":  "来源：研报类",
+                                             "domain":  "coinshares.com",
+                                             "tags":  [
+                                                          "加密",
+                                                          "研报类"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "crypto-unbias-fyi-1",
+                                             "name":  "Unbias 分析师聚合",
+                                             "url":  "https://unbias.fyi/analysts?source=all",
+                                             "description":  "来源：研报类",
+                                             "domain":  "unbias.fyi",
+                                             "tags":  [
+                                                          "加密",
+                                                          "研报类"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "crypto-x-com-1",
+                                             "name":  "Market Beggar",
+                                             "url":  "https://x.com/market_beggar",
+                                             "description":  "来源：研报类",
+                                             "domain":  "x.com",
+                                             "tags":  [
+                                                          "加密",
+                                                          "研报类"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "crypto-supersaiyan1957-substack-com-1",
+                                             "name":  "BTC美股周报告",
+                                             "url":  "https://supersaiyan1957.substack.com/",
+                                             "description":  "来源：研报类",
+                                             "domain":  "supersaiyan1957.substack.com",
+                                             "tags":  [
+                                                          "加密",
+                                                          "研报类"
+                                                      ]
+                                         }
+                                     ]
+                       },
+                       {
+                           "id":  "crypto-交易类",
+                           "title":  "交易类",
+                           "description":  "来自你整理后的 Markdown 分组 \u0027交易类\u0027。",
+                           "tools":  [
+                                         {
+                                             "id":  "crypto-www-macromicro-me-1",
+                                             "name":  "比特币BTC驱动三大因素：流动性＆实际利率＆PE",
+                                             "url":  "https://www.macromicro.me/collections/22514/bi-te-bi_418919/111972/bi-te-bi-BTC-qu-dong-san-da-yin-su-liu-dong-xing-shi-ji-li-lyu-GDP",
+                                             "description":  "来源：交易类",
+                                             "domain":  "www.macromicro.me",
+                                             "tags":  [
+                                                          "加密",
+                                                          "交易类"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "crypto-www-coinglass-com-1",
+                                             "name":  "减半后表现",
+                                             "url":  "https://www.coinglass.com/pro/i/bitcoin-price-performance-since-halving",
+                                             "description":  "来源：交易类",
+                                             "domain":  "www.coinglass.com",
+                                             "tags":  [
+                                                          "加密",
+                                                          "交易类"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "crypto-www-coinglass-com-2",
+                                             "name":  "Coinglass 资费+持仓量",
+                                             "url":  "https://www.coinglass.com/tv/zh/Binance_BTCUSDT",
+                                             "description":  "来源：交易类",
+                                             "domain":  "www.coinglass.com",
+                                             "tags":  [
+                                                          "加密",
+                                                          "交易类"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "crypto-www-coinglass-com-3",
+                                             "name":  "爆仓热力图",
+                                             "url":  "https://www.coinglass.com/zh/pro/futures/LiquidationHeatMap",
+                                             "description":  "来源：交易类",
+                                             "domain":  "www.coinglass.com",
+                                             "tags":  [
+                                                          "加密",
+                                                          "交易类"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "crypto-charts-checkonchain-com-1",
+                                             "name":  "BTC 期限结构",
+                                             "url":  "https://charts.checkonchain.com/btconchain/derivatives/derivatives_termstructure_0/derivatives_termstructure_0_light.html",
+                                             "description":  "来源：交易类",
+                                             "domain":  "charts.checkonchain.com",
+                                             "tags":  [
+                                                          "加密",
+                                                          "交易类"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "crypto-www-greeks-live-1",
+                                             "name":  "Greeks.live BTC 数据实验室",
+                                             "url":  "https://www.greeks.live/deribit/tools/datalab/BTC",
+                                             "description":  "来源：交易类",
+                                             "domain":  "www.greeks.live",
+                                             "tags":  [
+                                                          "加密",
+                                                          "交易类"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "crypto-www-deribit-com-1",
+                                             "name":  "Deribit 期权指标",
+                                             "url":  "https://www.deribit.com/statistics/BTC/metrics/options",
+                                             "description":  "来源：交易类",
+                                             "domain":  "www.deribit.com",
+                                             "tags":  [
+                                                          "加密",
+                                                          "交易类"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "crypto-www-coinglass-com-4",
+                                             "name":  "加密衍生品指数",
+                                             "url":  "https://www.coinglass.com/zh/pro/i/CGDI",
+                                             "description":  "来源：交易类",
+                                             "domain":  "www.coinglass.com",
+                                             "tags":  [
+                                                          "加密",
+                                                          "交易类"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "crypto-www-coinglass-com-5",
+                                             "name":  "Coinbase 溢价指数",
+                                             "url":  "https://www.coinglass.com/pro/i/coinbase-bitcoin-premium-index",
+                                             "description":  "来源：交易类",
+                                             "domain":  "www.coinglass.com",
+                                             "tags":  [
+                                                          "加密",
+                                                          "交易类"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "crypto-www-coinglass-com-6",
+                                             "name":  "ETF 溢折价",
+                                             "url":  "https://www.coinglass.com/pro/etf/Premium",
+                                             "description":  "来源：交易类",
+                                             "domain":  "www.coinglass.com",
+                                             "tags":  [
+                                                          "加密",
+                                                          "交易类"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "crypto-www-coinglass-com-7",
+                                             "name":  "未平仓合约",
+                                             "url":  "https://www.coinglass.com/zh/pro/futures/OpenInterest",
+                                             "description":  "来源：交易类",
+                                             "domain":  "www.coinglass.com",
+                                             "tags":  [
+                                                          "加密",
+                                                          "交易类"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "crypto-www-coinglass-com-8",
+                                             "name":  "恐慌与贪婪指数",
+                                             "url":  "https://www.coinglass.com/zh/pro/i/FearGreedIndex",
+                                             "description":  "来源：交易类",
+                                             "domain":  "www.coinglass.com",
+                                             "tags":  [
+                                                          "加密",
+                                                          "交易类"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "crypto-www-coinglass-com-9",
+                                             "name":  "杠杆借贷成本",
+                                             "url":  "https://www.coinglass.com/zh/pro/i/MarginFeeChart",
+                                             "description":  "来源：交易类",
+                                             "domain":  "www.coinglass.com",
+                                             "tags":  [
+                                                          "加密",
+                                                          "交易类"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "crypto-www-coinglass-com-10",
+                                             "name":  "资金费率",
+                                             "url":  "https://www.coinglass.com/FundingRate",
+                                             "description":  "来源：交易类",
+                                             "domain":  "www.coinglass.com",
+                                             "tags":  [
+                                                          "加密",
+                                                          "交易类"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "crypto-charts-checkonchain-com-2",
+                                             "name":  "Checkonchain 图表库",
+                                             "url":  "https://charts.checkonchain.com/",
+                                             "description":  "来源：交易类",
+                                             "domain":  "charts.checkonchain.com",
+                                             "tags":  [
+                                                          "加密",
+                                                          "交易类"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "crypto-studio-glassnode-com-1",
+                                             "name":  "Glassnode 活跃地址",
+                                             "url":  "https://studio.glassnode.com/charts/addresses.ActiveCount?a=BTC",
+                                             "description":  "来源：交易类",
+                                             "domain":  "studio.glassnode.com",
+                                             "tags":  [
+                                                          "加密",
+                                                          "交易类"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "crypto-www-coinglass-com-11",
+                                             "name":  "加密热力图",
+                                             "url":  "https://www.coinglass.com/zh/pro/heatmap/price-change",
+                                             "description":  "来源：交易类",
+                                             "domain":  "www.coinglass.com",
+                                             "tags":  [
+                                                          "加密",
+                                                          "交易类"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "crypto-sosovalue-com-1",
+                                             "name":  "加密各板块指数",
+                                             "url":  "https://sosovalue.com/zh/assets/cryptoindex/verified-index",
+                                             "description":  "来源：交易类",
+                                             "domain":  "sosovalue.com",
+                                             "tags":  [
+                                                          "加密",
+                                                          "交易类"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "crypto-cryptobubbles-net-1",
+                                             "name":  "CryptoBubbles 泡泡图",
+                                             "url":  "https://cryptobubbles.net/",
+                                             "description":  "来源：交易类",
+                                             "domain":  "cryptobubbles.net",
+                                             "tags":  [
+                                                          "加密",
+                                                          "交易类"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "crypto-coinmarketcap-com-1",
+                                             "name":  "CoinMarketCap 市值总览",
+                                             "url":  "https://coinmarketcap.com/",
+                                             "description":  "来源：交易类",
+                                             "domain":  "coinmarketcap.com",
+                                             "tags":  [
+                                                          "加密",
+                                                          "交易类"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "crypto-www-coinglass-com-12",
+                                             "name":  "CME / CFTC 持仓",
+                                             "url":  "https://www.coinglass.com/pro/cme/cftc",
+                                             "description":  "来源：交易类",
+                                             "domain":  "www.coinglass.com",
+                                             "tags":  [
+                                                          "加密",
+                                                          "交易类"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "crypto-www-coinglass-com-13",
+                                             "name":  "多空比",
+                                             "url":  "https://www.coinglass.com/LongShortRatio",
+                                             "description":  "来源：交易类",
+                                             "domain":  "www.coinglass.com",
+                                             "tags":  [
+                                                          "加密",
+                                                          "交易类"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "crypto-www-coinglass-com-14",
+                                             "name":  "Hyperliquid 钱包多空分布",
+                                             "url":  "https://www.coinglass.com/hl",
+                                             "description":  "来源：交易类",
+                                             "domain":  "www.coinglass.com",
+                                             "tags":  [
+                                                          "加密",
+                                                          "交易类"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "crypto-charts-bgeometrics-com-1",
+                                             "name":  "大小鲸鱼购买情况以及其他链上指标",
+                                             "url":  "https://charts.bgeometrics.com/bitcoin_distribution_coins_tables.html",
+                                             "description":  "来源：交易类",
+                                             "domain":  "charts.bgeometrics.com",
+                                             "tags":  [
+                                                          "加密",
+                                                          "交易类"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "crypto-cryptoquant-com-1",
+                                             "name":  "加密各类链上数据 | CryptoQuant",
+                                             "url":  "https://cryptoquant.com/asset/btc/summary",
+                                             "description":  "来源：交易类",
+                                             "domain":  "cryptoquant.com",
+                                             "tags":  [
+                                                          "加密",
+                                                          "交易类"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "crypto-tokenomist-ai-1",
+                                             "name":  "代币解锁 | 追踪最新数据并完成解锁计划",
+                                             "url":  "https://tokenomist.ai/",
+                                             "description":  "来源：交易类",
+                                             "domain":  "tokenomist.ai",
+                                             "tags":  [
+                                                          "加密",
+                                                          "交易类"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "crypto-intel-arkm-com-1",
+                                             "name":  "链上 | Arkham",
+                                             "url":  "https://intel.arkm.com/",
+                                             "description":  "来源：交易类",
+                                             "domain":  "intel.arkm.com",
+                                             "tags":  [
+                                                          "加密",
+                                                          "交易类"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "crypto-www-oklink-com-1",
+                                             "name":  "区块链浏览器查询 | 欧科云链 OKLink",
+                                             "url":  "https://www.oklink.com/zh-hans",
+                                             "description":  "来源：交易类",
+                                             "domain":  "www.oklink.com",
+                                             "tags":  [
+                                                          "加密",
+                                                          "交易类"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "crypto-stats-hyperliquid-xyz-1",
+                                             "name":  "Hyperliquid 统计数据",
+                                             "url":  "https://stats.hyperliquid.xyz/",
+                                             "description":  "来源：交易类",
+                                             "domain":  "stats.hyperliquid.xyz",
+                                             "tags":  [
+                                                          "加密",
+                                                          "交易类"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "crypto-charts-checkonchain-com-3",
+                                             "name":  "比特币链上分析与图表",
+                                             "url":  "https://charts.checkonchain.com/",
+                                             "description":  "来源：交易类",
+                                             "domain":  "charts.checkonchain.com",
+                                             "tags":  [
+                                                          "加密",
+                                                          "交易类"
+                                                      ]
+                                         }
+                                     ]
+                       },
+                       {
+                           "id":  "crypto-基本面类",
+                           "title":  "基本面类",
+                           "description":  "来自你整理后的 Markdown 分组 \u0027基本面类\u0027。",
+                           "tools":  [
+                                         {
+                                             "id":  "crypto-www-benjamincowen-com-1",
+                                             "name":  "Benjamin Cowen网站",
+                                             "url":  "https://www.benjamincowen.com/#services",
+                                             "description":  "来源：基本面类",
+                                             "domain":  "www.benjamincowen.com",
+                                             "tags":  [
+                                                          "加密",
+                                                          "基本面类"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "crypto-bitcoinlaws-io-1",
+                                             "name":  "Bitcoin Laws 政策追踪",
+                                             "url":  "https://bitcoinlaws.io/",
+                                             "description":  "来源：基本面类",
+                                             "domain":  "bitcoinlaws.io",
+                                             "tags":  [
+                                                          "加密",
+                                                          "基本面类"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "crypto-sosovalue-com-2",
+                                             "name":  "SoSoValue BTC / ETH ETF",
+                                             "url":  "https://sosovalue.com/zh/assets/etf/us-btc-spot",
+                                             "description":  "来源：基本面类",
+                                             "domain":  "sosovalue.com",
+                                             "tags":  [
+                                                          "加密",
+                                                          "基本面类"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "crypto-sosovalue-com-3",
+                                             "name":  "SoSoValue 比特币储备",
+                                             "url":  "https://sosovalue.com/zh/assets/bitcoin-treasuries",
+                                             "description":  "来源：基本面类",
+                                             "domain":  "sosovalue.com",
+                                             "tags":  [
+                                                          "加密",
+                                                          "基本面类"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "crypto-www-coinglass-com-15",
+                                             "name":  "Coinglass 比特币储备总量",
+                                             "url":  "https://www.coinglass.com/BitcoinTreasuries",
+                                             "description":  "来源：基本面类",
+                                             "domain":  "www.coinglass.com",
+                                             "tags":  [
+                                                          "加密",
+                                                          "基本面类"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "crypto-bitcointreasuries-net-1",
+                                             "name":  "BTC分布明细",
+                                             "url":  "https://bitcointreasuries.net/",
+                                             "description":  "来源：基本面类",
+                                             "domain":  "bitcointreasuries.net",
+                                             "tags":  [
+                                                          "加密",
+                                                          "基本面类"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "crypto-www-strategicethreserve-xyz-1",
+                                             "name":  "战略 ETH 储备",
+                                             "url":  "https://www.strategicethreserve.xyz/",
+                                             "description":  "来源：基本面类",
+                                             "domain":  "www.strategicethreserve.xyz",
+                                             "tags":  [
+                                                          "加密",
+                                                          "基本面类"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "crypto-www-coinglass-com-16",
+                                             "name":  "政府比特币储备",
+                                             "url":  "https://www.coinglass.com/zh/pro/i/bitcoin-government-treasuries",
+                                             "description":  "来源：基本面类",
+                                             "domain":  "www.coinglass.com",
+                                             "tags":  [
+                                                          "加密",
+                                                          "基本面类"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "crypto-saylortracker-com-1",
+                                             "name":  "微策略购买记录",
+                                             "url":  "https://saylortracker.com/",
+                                             "description":  "来源：基本面类",
+                                             "domain":  "saylortracker.com",
+                                             "tags":  [
+                                                          "加密",
+                                                          "基本面类"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "crypto-strc-live-1",
+                                             "name":  "STRC",
+                                             "url":  "https://strc.live/ticker/strc",
+                                             "description":  "来源：基本面类",
+                                             "domain":  "strc.live",
+                                             "tags":  [
+                                                          "加密",
+                                                          "基本面类"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "crypto-app-rwa-xyz-1",
+                                             "name":  "RWA.xyz",
+                                             "url":  "https://app.rwa.xyz/",
+                                             "description":  "来源：基本面类",
+                                             "domain":  "app.rwa.xyz",
+                                             "tags":  [
+                                                          "加密",
+                                                          "基本面类"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "crypto-app-intothecryptoverse-com-1",
+                                             "name":  "仪表板 | ITC",
+                                             "url":  "https://app.intothecryptoverse.com/dashboard",
+                                             "description":  "来源：基本面类",
+                                             "domain":  "app.intothecryptoverse.com",
+                                             "tags":  [
+                                                          "加密",
+                                                          "基本面类"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "crypto-hypurrscan-io-1",
+                                             "name":  "HypurrScan",
+                                             "url":  "https://hypurrscan.io/address/0x5078C2fBeA2b2aD61bc840Bc023E35Fce56BeDb6?s=09",
+                                             "description":  "来源：基本面类",
+                                             "domain":  "hypurrscan.io",
+                                             "tags":  [
+                                                          "加密",
+                                                          "基本面类"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "crypto-xxi-money-1",
+                                             "name":  "21资本官网",
+                                             "url":  "https://xxi.money/",
+                                             "description":  "来源：基本面类",
+                                             "domain":  "xxi.money",
+                                             "tags":  [
+                                                          "加密",
+                                                          "基本面类"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "crypto-www-ishares-com-1",
+                                             "name":  "IBIT官网",
+                                             "url":  "https://www.ishares.com/us/products/333011/ishares-bitcoin-trust-etf#/",
+                                             "description":  "来源：基本面类",
+                                             "domain":  "www.ishares.com",
+                                             "tags":  [
+                                                          "加密",
+                                                          "基本面类"
+                                                      ]
+                                         }
+                                     ]
+                       },
+                       {
+                           "id":  "crypto-媒体类",
+                           "title":  "媒体类",
+                           "description":  "来自你整理后的 Markdown 分组 \u0027媒体类\u0027。",
+                           "tools":  [
+                                         {
+                                             "id":  "crypto-foresightnews-pro-1",
+                                             "name":  "Foresight News",
+                                             "url":  "https://foresightnews.pro/",
+                                             "description":  "来源：媒体类",
+                                             "domain":  "foresightnews.pro",
+                                             "tags":  [
+                                                          "加密",
+                                                          "媒体类"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "crypto-www-jinse2-com-1",
+                                             "name":  "金色财经",
+                                             "url":  "https://www.jinse2.com/",
+                                             "description":  "来源：媒体类",
+                                             "domain":  "www.jinse2.com",
+                                             "tags":  [
+                                                          "加密",
+                                                          "媒体类"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "crypto-sosovalue-com-4",
+                                             "name":  "SoSoValue 研究",
+                                             "url":  "https://sosovalue.com/zh/research",
+                                             "description":  "来源：媒体类",
+                                             "domain":  "sosovalue.com",
+                                             "tags":  [
+                                                          "加密",
+                                                          "媒体类"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "crypto-www-techflowpost-com-1",
+                                             "name":  "TechFlow",
+                                             "url":  "https://www.techflowpost.com/",
+                                             "description":  "来源：媒体类",
+                                             "domain":  "www.techflowpost.com",
+                                             "tags":  [
+                                                          "加密",
+                                                          "媒体类"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "crypto-www-panewslab-com-1",
+                                             "name":  "PANews",
+                                             "url":  "https://www.panewslab.com/zh-hant",
+                                             "description":  "来源：媒体类",
+                                             "domain":  "www.panewslab.com",
+                                             "tags":  [
+                                                          "加密",
+                                                          "媒体类"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "crypto-www-theblock-co-1",
+                                             "name":  "The Block",
+                                             "url":  "https://www.theblock.co/",
+                                             "description":  "来源：媒体类",
+                                             "domain":  "www.theblock.co",
+                                             "tags":  [
+                                                          "加密",
+                                                          "媒体类"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "crypto-www-theblockbeats-info-1",
+                                             "name":  "BlockBeats",
+                                             "url":  "https://www.theblockbeats.info/",
+                                             "description":  "来源：媒体类",
+                                             "domain":  "www.theblockbeats.info",
+                                             "tags":  [
+                                                          "加密",
+                                                          "媒体类"
+                                                      ]
+                                         }
+                                     ]
+                       },
+                       {
+                           "id":  "crypto-理财与其他",
+                           "title":  "理财与其他",
+                           "description":  "来自你整理后的 Markdown 分组 \u0027理财与其他\u0027。",
+                           "tools":  [
+                                         {
+                                             "id":  "crypto-app-barker-money-1",
+                                             "name":  "Barker",
+                                             "url":  "https://app.barker.money/campaigns",
+                                             "description":  "来源：理财与其他",
+                                             "domain":  "app.barker.money",
+                                             "tags":  [
+                                                          "加密",
+                                                          "理财与其他"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "crypto-www-rootdata-com-1",
+                                             "name":  "Web3 热门项目排名",
+                                             "url":  "https://www.rootdata.com/zh",
+                                             "description":  "来源：理财与其他",
+                                             "domain":  "www.rootdata.com",
+                                             "tags":  [
+                                                          "加密",
+                                                          "理财与其他"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "crypto-app-ethena-fi-1",
+                                             "name":  "Ethena信息",
+                                             "url":  "https://app.ethena.fi/dashboards/positions",
+                                             "description":  "来源：理财与其他",
+                                             "domain":  "app.ethena.fi",
+                                             "tags":  [
+                                                          "加密",
+                                                          "理财与其他"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "crypto-defillama-com-1",
+                                             "name":  "Ethereum - DefiLlama",
+                                             "url":  "https://defillama.com/chain/Ethereum",
+                                             "description":  "来源：理财与其他",
+                                             "domain":  "defillama.com",
+                                             "tags":  [
+                                                          "加密",
+                                                          "理财与其他"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "crypto-btc-com-1",
+                                             "name":  "BTC.com数据与矿池",
+                                             "url":  "https://btc.com/zh-CN",
+                                             "description":  "来源：理财与其他",
+                                             "domain":  "btc.com",
+                                             "tags":  [
+                                                          "加密",
+                                                          "理财与其他"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "crypto-dexscreener-com-1",
+                                             "name":  "DEX Screener",
+                                             "url":  "https://dexscreener.com/",
+                                             "description":  "来源：理财与其他",
+                                             "domain":  "dexscreener.com",
+                                             "tags":  [
+                                                          "加密",
+                                                          "理财与其他"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "crypto-app-pendle-finance-1",
+                                             "name":  "Pendle",
+                                             "url":  "https://app.pendle.finance/trade/markets?utm_source=landing\u0026utm_medium=landing",
+                                             "description":  "来源：理财与其他",
+                                             "domain":  "app.pendle.finance",
+                                             "tags":  [
+                                                          "加密",
+                                                          "理财与其他"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "crypto-miningpoolstats-stream-1",
+                                             "name":  "挖矿BTC数据",
+                                             "url":  "https://miningpoolstats.stream/bitcoin",
+                                             "description":  "来源：理财与其他",
+                                             "domain":  "miningpoolstats.stream",
+                                             "tags":  [
+                                                          "加密",
+                                                          "理财与其他"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "crypto-morpho-org-1",
+                                             "name":  "Morpho",
+                                             "url":  "https://morpho.org/",
+                                             "description":  "来源：理财与其他",
+                                             "domain":  "morpho.org",
+                                             "tags":  [
+                                                          "加密",
+                                                          "理财与其他"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "crypto-app-kamino-finance-1",
+                                             "name":  "贷款 | 卡米诺金融",
+                                             "url":  "https://app.kamino.finance/earn/lend",
+                                             "description":  "来源：理财与其他",
+                                             "domain":  "app.kamino.finance",
+                                             "tags":  [
+                                                          "加密",
+                                                          "理财与其他"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "crypto-app-lulo-fi-1",
+                                             "name":  "Lulo",
+                                             "url":  "https://app.lulo.fi/",
+                                             "description":  "来源：理财与其他",
+                                             "domain":  "app.lulo.fi",
+                                             "tags":  [
+                                                          "加密",
+                                                          "理财与其他"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "crypto-app-uniswap-org-1",
+                                             "name":  "Uniswap Ethereum 热门资金池",
+                                             "url":  "https://app.uniswap.org/explore/pools",
+                                             "description":  "来源：理财与其他",
+                                             "domain":  "app.uniswap.org",
+                                             "tags":  [
+                                                          "加密",
+                                                          "理财与其他"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "crypto-app-spark-fi-1",
+                                             "name":  "Spark：利用稳定币赚钱",
+                                             "url":  "https://app.spark.fi/",
+                                             "description":  "来源：理财与其他",
+                                             "domain":  "app.spark.fi",
+                                             "tags":  [
+                                                          "加密",
+                                                          "理财与其他"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "crypto-1key-so-1",
+                                             "name":  "OneKey",
+                                             "url":  "https://1key.so/earn",
+                                             "description":  "来源：理财与其他",
+                                             "domain":  "1key.so",
+                                             "tags":  [
+                                                          "加密",
+                                                          "理财与其他"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "crypto-www-apeoclock-com-1",
+                                             "name":  "defi项目发布日历",
+                                             "url":  "https://www.apeoclock.com/",
+                                             "description":  "来源：理财与其他",
+                                             "domain":  "www.apeoclock.com",
+                                             "tags":  [
+                                                          "加密",
+                                                          "理财与其他"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "crypto-stake-lido-fi-1",
+                                             "name":  "ETH质押",
+                                             "url":  "https://stake.lido.fi/",
+                                             "description":  "来源：理财与其他",
+                                             "domain":  "stake.lido.fi",
+                                             "tags":  [
+                                                          "加密",
+                                                          "理财与其他"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "crypto-cryptorank-io-1",
+                                             "name":  "一级和预测市场：CryptoRank.io",
+                                             "url":  "https://cryptorank.io/prediction-markets",
+                                             "description":  "来源：理财与其他",
+                                             "domain":  "cryptorank.io",
+                                             "tags":  [
+                                                          "加密",
+                                                          "理财与其他"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "crypto-bitbo-io-1",
+                                             "name":  "比特币日历",
+                                             "url":  "https://bitbo.io/calendar/",
+                                             "description":  "来源：理财与其他",
+                                             "domain":  "bitbo.io",
+                                             "tags":  [
+                                                          "加密",
+                                                          "理财与其他"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "crypto-www-coincarp-com-1",
+                                             "name":  "加密货币活动日历 | CoinCarp",
+                                             "url":  "https://www.coincarp.com/events/",
+                                             "description":  "来源：理财与其他",
+                                             "domain":  "www.coincarp.com",
+                                             "tags":  [
+                                                          "加密",
+                                                          "理财与其他"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "crypto-gmgn-ai-1",
+                                             "name":  "聪明钱追踪--GMGN.AI",
+                                             "url":  "https://gmgn.ai/?ref=NtZl14CJ\u0026chain=sol",
+                                             "description":  "来源：理财与其他",
+                                             "domain":  "gmgn.ai",
+                                             "tags":  [
+                                                          "加密",
+                                                          "理财与其他"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "crypto-axiom-trade-1",
+                                             "name":  "聪明钱|discover",
+                                             "url":  "https://axiom.trade/",
+                                             "description":  "来源：理财与其他",
+                                             "domain":  "axiom.trade",
+                                             "tags":  [
+                                                          "加密",
+                                                          "理财与其他"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "crypto-dune-com-1",
+                                             "name":  "Dune — 由社区提供支持的加密分析。",
+                                             "url":  "https://dune.com/home",
+                                             "description":  "来源：理财与其他",
+                                             "domain":  "dune.com",
+                                             "tags":  [
+                                                          "加密",
+                                                          "理财与其他"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "crypto-uniscan-cc-1",
+                                             "name":  "UniScan",
+                                             "url":  "https://uniscan.cc/fractal/",
+                                             "description":  "来源：理财与其他",
+                                             "domain":  "uniscan.cc",
+                                             "tags":  [
+                                                          "加密",
+                                                          "理财与其他"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "crypto-mempool-space-1",
+                                             "name":  "mempool - Bitcoin Explorer",
+                                             "url":  "https://mempool.space/zh/",
+                                             "description":  "来源：理财与其他",
+                                             "domain":  "mempool.space",
+                                             "tags":  [
+                                                          "加密",
+                                                          "理财与其他"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "crypto-etherscan-io-1",
+                                             "name":  "Ethereum Gas Tracker",
+                                             "url":  "https://etherscan.io/gastracker",
+                                             "description":  "来源：理财与其他",
+                                             "domain":  "etherscan.io",
+                                             "tags":  [
+                                                          "加密",
+                                                          "理财与其他"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "crypto-ultrasound-money-1",
+                                             "name":  "ultrasound.money",
+                                             "url":  "https://ultrasound.money/",
+                                             "description":  "来源：理财与其他",
+                                             "domain":  "ultrasound.money",
+                                             "tags":  [
+                                                          "加密",
+                                                          "理财与其他"
+                                                      ]
+                                         }
+                                     ]
+                       }
+                   ]
+    },
+    {
+        "id":  "metal",
+        "title":  "金属工具",
+        "description":  "黄金、商品、库存、期限结构与贵金属观察。",
+        "groups":  [
+                       {
+                           "id":  "metal-黄金总览",
+                           "title":  "黄金总览",
+                           "description":  "来自你整理后的 Markdown 分组 \u0027黄金总览\u0027。",
+                           "tools":  [
+                                         {
+                                             "id":  "metal-chartexchange-com-1",
+                                             "name":  "GLD 借款利率 (CTB) | ChartExchange",
+                                             "url":  "https://chartexchange.com/symbol/nyse-gld/borrow-fee/",
+                                             "description":  "来源：黄金总览",
+                                             "domain":  "chartexchange.com",
+                                             "tags":  [
+                                                          "金属",
+                                                          "黄金总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "metal-www-lbma-org-uk-1",
+                                             "name":  "伦敦金库数据 | LBMA",
+                                             "url":  "https://www.lbma.org.uk/prices-and-data/london-vault-data",
+                                             "description":  "来源：黄金总览",
+                                             "domain":  "www.lbma.org.uk",
+                                             "tags":  [
+                                                          "金属",
+                                                          "黄金总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "metal-commoditieschart-net-1",
+                                             "name":  "Comex 金库存",
+                                             "url":  "https://commoditieschart.net/zh/metals/gold/comex-gold-stocks",
+                                             "description":  "来源：黄金总览",
+                                             "domain":  "commoditieschart.net",
+                                             "tags":  [
+                                                          "金属",
+                                                          "黄金总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "metal-china-gold-org-1",
+                                             "name":  "世界黄金协会：黄金ETF的持有量和流量 | World Gold Council",
+                                             "url":  "https://china.gold.org/goldhub/data/gold-etfs-holdings-and-flows#from-login=1\u0026login-type=wechat",
+                                             "description":  "来源：黄金总览",
+                                             "domain":  "china.gold.org",
+                                             "tags":  [
+                                                          "金属",
+                                                          "黄金总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "metal-www-gold-org-1",
+                                             "name":  "各国央行黄金储备 | 世界黄金协会",
+                                             "url":  "https://www.gold.org/goldhub/data/gold-reserves-by-country",
+                                             "description":  "来源：黄金总览",
+                                             "domain":  "www.gold.org",
+                                             "tags":  [
+                                                          "金属",
+                                                          "黄金总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "metal-www-gold-org-2",
+                                             "name":  "各大交易所未平仓合约数",
+                                             "url":  "https://www.gold.org/goldhub/data/gold-open-interest",
+                                             "description":  "来源：黄金总览",
+                                             "domain":  "www.gold.org",
+                                             "tags":  [
+                                                          "金属",
+                                                          "黄金总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "metal-china-gold-org-2",
+                                             "name":  "黄金期货价格曲线｜世界黄金协会",
+                                             "url":  "https://china.gold.org/goldhub/data/gold-futures-curves#from-login=1\u0026login-type=wechat",
+                                             "description":  "来源：黄金总览",
+                                             "domain":  "china.gold.org",
+                                             "tags":  [
+                                                          "金属",
+                                                          "黄金总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "metal-sc-macromicro-me-1",
+                                             "name":  "SPDR黄金ETF流量",
+                                             "url":  "https://sc.macromicro.me/collections/45/mm-gold-price/23274/gld-fund-flow",
+                                             "description":  "来源：黄金总览",
+                                             "domain":  "sc.macromicro.me",
+                                             "tags":  [
+                                                          "金属",
+                                                          "黄金总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "metal-sc-macromicro-me-2",
+                                             "name":  "SPDR黄金ETF持仓量",
+                                             "url":  "https://sc.macromicro.me/collections/45/mm-gold-price/712/spdr-gold-trust-etf-gold-price",
+                                             "description":  "来源：黄金总览",
+                                             "domain":  "sc.macromicro.me",
+                                             "tags":  [
+                                                          "金属",
+                                                          "黄金总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "metal-www-jiaoyifamen-com-1",
+                                             "name":  "交易法门",
+                                             "url":  "https://www.jiaoyifamen.com/variety/positionAnalysis-CFTC",
+                                             "description":  "来源：黄金总览",
+                                             "domain":  "www.jiaoyifamen.com",
+                                             "tags":  [
+                                                          "金属",
+                                                          "黄金总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "metal-www-cmegroup-com-1",
+                                             "name":  "CVOL",
+                                             "url":  "https://www.cmegroup.com/market-data/cme-group-benchmark-administration/cme-group-volatility-indexes.html",
+                                             "description":  "来源：黄金总览",
+                                             "domain":  "www.cmegroup.com",
+                                             "tags":  [
+                                                          "金属",
+                                                          "黄金总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "metal-www-cmegroup-com-2",
+                                             "name":  "黄金期货交易量与持仓量-CME",
+                                             "url":  "https://www.cmegroup.com/markets/metals/precious/gold.volume.html?utm_source=chatgpt.com",
+                                             "description":  "来源：黄金总览",
+                                             "domain":  "www.cmegroup.com",
+                                             "tags":  [
+                                                          "金属",
+                                                          "黄金总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "metal-www-cmegroup-com-3",
+                                             "name":  "COT报告持仓",
+                                             "url":  "https://www.cmegroup.com/tools-information/quikstrike/commitment-of-traders.html?pid=40#cmeloginteaser1",
+                                             "description":  "来源：黄金总览",
+                                             "domain":  "www.cmegroup.com",
+                                             "tags":  [
+                                                          "金属",
+                                                          "黄金总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "metal-giresearch-substack-com-1",
+                                             "name":  "黄金投资者研究|Chris Rutherglen博士|Substack",
+                                             "url":  "https://giresearch.substack.com/?utm_source=%2Fsearch%2FGold%2520Investor%2520Research\u0026utm_medium=reader2\u0026utm_campaign=reader2",
+                                             "description":  "来源：黄金总览",
+                                             "domain":  "giresearch.substack.com",
+                                             "tags":  [
+                                                          "金属",
+                                                          "黄金总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "metal-www-incrementum-li-1",
+                                             "name":  "期刊 - Incrementum",
+                                             "url":  "https://www.incrementum.li/en/journal/",
+                                             "description":  "来源：黄金总览",
+                                             "domain":  "www.incrementum.li",
+                                             "tags":  [
+                                                          "金属",
+                                                          "黄金总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "metal-www-cmegroup-com-4",
+                                             "name":  "Gold Option Volume \u0026 Open Interest",
+                                             "url":  "https://www.cmegroup.com/markets/metals/precious/gold.volume.options.html#optionProductId=192",
+                                             "description":  "来源：黄金总览",
+                                             "domain":  "www.cmegroup.com",
+                                             "tags":  [
+                                                          "金属",
+                                                          "黄金总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "metal-www-cmegroup-com-5",
+                                             "name":  "金属每日交易量及未平仓合约",
+                                             "url":  "https://www.cmegroup.com/market-data/browse-data/metals-volume.html",
+                                             "description":  "来源：黄金总览",
+                                             "domain":  "www.cmegroup.com",
+                                             "tags":  [
+                                                          "金属",
+                                                          "黄金总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "metal-www-lbma-org-uk-2",
+                                             "name":  "Clearing Data | LBMA",
+                                             "url":  "https://www.lbma.org.uk/prices-and-data/clearing-data",
+                                             "description":  "来源：黄金总览",
+                                             "domain":  "www.lbma.org.uk",
+                                             "tags":  [
+                                                          "金属",
+                                                          "黄金总览"
+                                                      ]
+                                         }
+                                     ]
+                       },
+                       {
+                           "id":  "metal-商品总览",
+                           "title":  "商品总览",
+                           "description":  "来自你整理后的 Markdown 分组 \u0027商品总览\u0027。",
+                           "tools":  [
+                                         {
+                                             "id":  "metal-www-jiaoyifamen-com-2",
+                                             "name":  "交易法门",
+                                             "url":  "https://www.jiaoyifamen.com/variety/varieties-varieties",
+                                             "description":  "来源：商品总览",
+                                             "domain":  "www.jiaoyifamen.com",
+                                             "tags":  [
+                                                          "金属",
+                                                          "商品总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "metal-x-qhkch-com-1",
+                                             "name":  "国内商品期货各类数据- 奇货可查",
+                                             "url":  "https://x.qhkch.com/variety/position",
+                                             "description":  "来源：商品总览",
+                                             "domain":  "x.qhkch.com",
+                                             "tags":  [
+                                                          "金属",
+                                                          "商品总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "metal-en-macromicro-me-1",
+                                             "name":  "US - Crack Spread vs. Oil Price",
+                                             "url":  "https://en.macromicro.me/collections/19/mm-oil-price/4376/crude-oil-cracking-spread-vs-wti",
+                                             "description":  "来源：商品总览",
+                                             "domain":  "en.macromicro.me",
+                                             "tags":  [
+                                                          "金属",
+                                                          "商品总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "metal-www-1qh-cn-1",
+                                             "name":  "期货套利分析_跨期价差查询",
+                                             "url":  "https://www.1qh.cn/tools/spread.html",
+                                             "description":  "来源：商品总览",
+                                             "domain":  "www.1qh.cn",
+                                             "tags":  [
+                                                          "金属",
+                                                          "商品总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "metal-business-ucdenver-edu-1",
+                                             "name":  "摩根大通商品与能源管理中心",
+                                             "url":  "https://business.ucdenver.edu/jpmorgancenter",
+                                             "description":  "来源：商品总览",
+                                             "domain":  "business.ucdenver.edu",
+                                             "tags":  [
+                                                          "金属",
+                                                          "商品总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "metal-ent-htfc-com-1",
+                                             "name":  "工作台-华泰天玑",
+                                             "url":  "https://ent.htfc.com/#/homePage/index?reportId\u0026catalogId",
+                                             "description":  "来源：商品总览",
+                                             "domain":  "ent.htfc.com",
+                                             "tags":  [
+                                                          "金属",
+                                                          "商品总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "metal-hq-smm-cn-1",
+                                             "name":  "有色金属期货进口盈亏率_上海有色网",
+                                             "url":  "https://hq.smm.cn/data/arbi",
+                                             "description":  "来源：商品总览",
+                                             "domain":  "hq.smm.cn",
+                                             "tags":  [
+                                                          "金属",
+                                                          "商品总览"
+                                                      ]
+                                         }
+                                     ]
+                       }
+                   ]
+    },
+    {
+        "id":  "general",
+        "title":  "综合工具",
+        "description":  "新闻、衍生品、跨市场辅助工具与综合观察。",
+        "groups":  [
+                       {
+                           "id":  "general-交易新闻和高手跟踪类总览",
+                           "title":  "交易新闻和高手跟踪类总览",
+                           "description":  "来自你整理后的 Markdown 分组 \u0027交易新闻和高手跟踪类总览\u0027。",
+                           "tools":  [
+                                         {
+                                             "id":  "general-xnews-jin10-com-1",
+                                             "name":  "金十数据-我的订阅",
+                                             "url":  "https://xnews.jin10.com/topic/group/my",
+                                             "description":  "来源：交易新闻和高手跟踪类总览",
+                                             "domain":  "xnews.jin10.com",
+                                             "tags":  [
+                                                          "综合",
+                                                          "交易新闻和高手跟踪类总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "general-polymarket-com-1",
+                                             "name":  "Polymarket | The World\u0027s Largest Prediction Market",
+                                             "url":  "https://polymarket.com/",
+                                             "description":  "来源：交易新闻和高手跟踪类总览",
+                                             "domain":  "polymarket.com",
+                                             "tags":  [
+                                                          "综合",
+                                                          "交易新闻和高手跟踪类总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "general-app-hedgeye-com-1",
+                                             "name":  "很杂的分析",
+                                             "url":  "https://app.hedgeye.com/?",
+                                             "description":  "来源：交易新闻和高手跟踪类总览",
+                                             "domain":  "app.hedgeye.com",
+                                             "tags":  [
+                                                          "综合",
+                                                          "交易新闻和高手跟踪类总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "general-x-com-1",
+                                             "name":  "(28) Home / X",
+                                             "url":  "https://x.com/home",
+                                             "description":  "来源：交易新闻和高手跟踪类总览",
+                                             "domain":  "x.com",
+                                             "tags":  [
+                                                          "综合",
+                                                          "交易新闻和高手跟踪类总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "general-wallstreetcn-com-1",
+                                             "name":  "华尔街见闻",
+                                             "url":  "https://wallstreetcn.com/",
+                                             "description":  "来源：交易新闻和高手跟踪类总览",
+                                             "domain":  "wallstreetcn.com",
+                                             "tags":  [
+                                                          "综合",
+                                                          "交易新闻和高手跟踪类总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "general-www-financialjuice-com-1",
+                                             "name":  "FinancialJuice适合看实时的",
+                                             "url":  "https://www.financialjuice.com/home",
+                                             "description":  "来源：交易新闻和高手跟踪类总览",
+                                             "domain":  "www.financialjuice.com",
+                                             "tags":  [
+                                                          "综合",
+                                                          "交易新闻和高手跟踪类总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "general-cointelegraph-com-1",
+                                             "name":  "Cointelegraph 杂志的加密货币深度探索",
+                                             "url":  "https://cointelegraph.com/magazine/features/",
+                                             "description":  "来源：交易新闻和高手跟踪类总览",
+                                             "domain":  "cointelegraph.com",
+                                             "tags":  [
+                                                          "综合",
+                                                          "交易新闻和高手跟踪类总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "general-foresightnews-pro-1",
+                                             "name":  "Foresight News",
+                                             "url":  "https://foresightnews.pro/",
+                                             "description":  "来源：交易新闻和高手跟踪类总览",
+                                             "domain":  "foresightnews.pro",
+                                             "tags":  [
+                                                          "综合",
+                                                          "交易新闻和高手跟踪类总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "general-www-jinse-cn-1",
+                                             "name":  "金色财经",
+                                             "url":  "https://www.jinse.cn/",
+                                             "description":  "来源：交易新闻和高手跟踪类总览",
+                                             "domain":  "www.jinse.cn",
+                                             "tags":  [
+                                                          "综合",
+                                                          "交易新闻和高手跟踪类总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "general-www-panewslab-com-1",
+                                             "name":  "PANews",
+                                             "url":  "https://www.panewslab.com/zh",
+                                             "description":  "来源：交易新闻和高手跟踪类总览",
+                                             "domain":  "www.panewslab.com",
+                                             "tags":  [
+                                                          "综合",
+                                                          "交易新闻和高手跟踪类总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "general-www-techflowpost-com-1",
+                                             "name":  "深潮TechFlow",
+                                             "url":  "https://www.techflowpost.com/",
+                                             "description":  "来源：交易新闻和高手跟踪类总览",
+                                             "domain":  "www.techflowpost.com",
+                                             "tags":  [
+                                                          "综合",
+                                                          "交易新闻和高手跟踪类总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "general-www-coindesk-com-1",
+                                             "name":  "CoinDesk",
+                                             "url":  "https://www.coindesk.com/?_gl=1*v3vlyj*_up*MQ..*_ga*MTA4MTg5NzY1LjE3MjA2MTQ0Nzg.*_ga_VM3STRYVN8*MTcyMjMwNTY2OS4xMC4xLjE3MjIzMDcyMDQuMC4wLjU3MTY4MDIyNg..",
+                                             "description":  "来源：交易新闻和高手跟踪类总览",
+                                             "domain":  "www.coindesk.com",
+                                             "tags":  [
+                                                          "综合",
+                                                          "交易新闻和高手跟踪类总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "general-www-odaily-news-1",
+                                             "name":  "Odaily星球日报",
+                                             "url":  "https://www.odaily.news/",
+                                             "description":  "来源：交易新闻和高手跟踪类总览",
+                                             "domain":  "www.odaily.news",
+                                             "tags":  [
+                                                          "综合",
+                                                          "交易新闻和高手跟踪类总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "general-coinpedia-org-1",
+                                             "name":  "Coinpedia",
+                                             "url":  "https://coinpedia.org/",
+                                             "description":  "来源：交易新闻和高手跟踪类总览",
+                                             "domain":  "coinpedia.org",
+                                             "tags":  [
+                                                          "综合",
+                                                          "交易新闻和高手跟踪类总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "general-www-theblock-co-1",
+                                             "name":  "the block",
+                                             "url":  "https://www.theblock.co/",
+                                             "description":  "来源：交易新闻和高手跟踪类总览",
+                                             "domain":  "www.theblock.co",
+                                             "tags":  [
+                                                          "综合",
+                                                          "交易新闻和高手跟踪类总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "general-m-weibo-cn-1",
+                                             "name":  "柳大波浪",
+                                             "url":  "https://m.weibo.cn/u/1644724561?wm=3333_2001\u0026from=10F1293010\u0026sourcetype=weixin\u0026s_trans=7101261740_\u0026s_channel=4",
+                                             "description":  "来源：交易新闻和高手跟踪类总览",
+                                             "domain":  "m.weibo.cn",
+                                             "tags":  [
+                                                          "综合",
+                                                          "交易新闻和高手跟踪类总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "general-flowus-cn-1",
+                                             "name":  "Web3区别地",
+                                             "url":  "https://flowus.cn/qubiedi/share/8827172d-31de-4486-8571-f1172cbe7fdd?code=UMMDMR",
+                                             "description":  "来源：交易新闻和高手跟踪类总览",
+                                             "domain":  "flowus.cn",
+                                             "tags":  [
+                                                          "综合",
+                                                          "交易新闻和高手跟踪类总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "general-www-investing-com-1",
+                                             "name":  "Investing.com",
+                                             "url":  "https://www.investing.com/",
+                                             "description":  "来源：交易新闻和高手跟踪类总览",
+                                             "domain":  "www.investing.com",
+                                             "tags":  [
+                                                          "综合",
+                                                          "交易新闻和高手跟踪类总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "general-www-reuters-com-1",
+                                             "name":  "路透社",
+                                             "url":  "https://www.reuters.com/",
+                                             "description":  "来源：交易新闻和高手跟踪类总览",
+                                             "domain":  "www.reuters.com",
+                                             "tags":  [
+                                                          "综合",
+                                                          "交易新闻和高手跟踪类总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "general-www-marketwatch-com-1",
+                                             "name":  "MarketWatch：股市新闻",
+                                             "url":  "https://www.marketwatch.com/",
+                                             "description":  "来源：交易新闻和高手跟踪类总览",
+                                             "domain":  "www.marketwatch.com",
+                                             "tags":  [
+                                                          "综合",
+                                                          "交易新闻和高手跟踪类总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "general-www-forbes-com-1",
+                                             "name":  "《福布斯》",
+                                             "url":  "https://www.forbes.com/",
+                                             "description":  "来源：交易新闻和高手跟踪类总览",
+                                             "domain":  "www.forbes.com",
+                                             "tags":  [
+                                                          "综合",
+                                                          "交易新闻和高手跟踪类总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "general-www-hibor-com-cn-1",
+                                             "name":  "慧博投研资讯",
+                                             "url":  "https://www.hibor.com.cn/",
+                                             "description":  "来源：交易新闻和高手跟踪类总览",
+                                             "domain":  "www.hibor.com.cn",
+                                             "tags":  [
+                                                          "综合",
+                                                          "交易新闻和高手跟踪类总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "general-worldmonitor-app-1",
+                                             "name":  "世界监测 - 实时全球情报仪表盘",
+                                             "url":  "https://worldmonitor.app/?lat=8.0000\u0026lon=0.0000\u0026zoom=1.00\u0026view=global\u0026timeRange=7d\u0026layers=conflicts%2Cbases%2Chotspots%2Cnuclear%2Csanctions%2Cweather%2Ceconomic%2Cwaterways%2Coutages%2Cmilitary%2Cnatural",
+                                             "description":  "来源：交易新闻和高手跟踪类总览",
+                                             "domain":  "worldmonitor.app",
+                                             "tags":  [
+                                                          "综合",
+                                                          "交易新闻和高手跟踪类总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "general-www-pizzint-watch-1",
+                                             "name":  "Polyglobe - 实时地缘政治市场情报 | PizzINT",
+                                             "url":  "https://www.pizzint.watch/polyglobe",
+                                             "description":  "来源：交易新闻和高手跟踪类总览",
+                                             "domain":  "www.pizzint.watch",
+                                             "tags":  [
+                                                          "综合",
+                                                          "交易新闻和高手跟踪类总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "general-www-reuters-com-2",
+                                             "name":  "全球市场头条 |  路透社",
+                                             "url":  "https://www.reuters.com/markets/",
+                                             "description":  "来源：交易新闻和高手跟踪类总览",
+                                             "domain":  "www.reuters.com",
+                                             "tags":  [
+                                                          "综合",
+                                                          "交易新闻和高手跟踪类总览"
+                                                      ]
+                                         }
+                                     ]
+                       },
+                       {
+                           "id":  "general-其他总览",
+                           "title":  "其他总览",
+                           "description":  "来自你整理后的 Markdown 分组 \u0027其他总览\u0027。",
+                           "tools":  [
+                                         {
+                                             "id":  "general-fintel-io-1",
+                                             "name":  "IBIT-监管信息披露平台",
+                                             "url":  "https://fintel.io/so/us/ibit",
+                                             "description":  "来源：其他总览",
+                                             "domain":  "fintel.io",
+                                             "tags":  [
+                                                          "综合",
+                                                          "其他总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "general-ycharts-com-1",
+                                             "name":  "GBTC 折价或溢价至 NAV 分析",
+                                             "url":  "https://ycharts.com/stocks",
+                                             "description":  "来源：其他总览",
+                                             "domain":  "ycharts.com",
+                                             "tags":  [
+                                                          "综合",
+                                                          "其他总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "general-www-sec-gov-1",
+                                             "name":  "SEC13F季度持仓",
+                                             "url":  "https://www.sec.gov/edgar/search/",
+                                             "description":  "来源：其他总览",
+                                             "domain":  "www.sec.gov",
+                                             "tags":  [
+                                                          "综合",
+                                                          "其他总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "general-www-sec-gov-2",
+                                             "name":  "SEC FORM 13-F",
+                                             "url":  "https://www.sec.gov/Archives/edgar/data/1166588/000116658824000009/xslForm13F_X02/PBI13f03312024.xml",
+                                             "description":  "来源：其他总览",
+                                             "domain":  "www.sec.gov",
+                                             "tags":  [
+                                                          "综合",
+                                                          "其他总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "general-www-cmegroup-com-1",
+                                             "name":  "CME",
+                                             "url":  "https://www.cmegroup.com/tools-information/quikstrike/vol2vol-expected-range.html",
+                                             "description":  "来源：其他总览",
+                                             "domain":  "www.cmegroup.com",
+                                             "tags":  [
+                                                          "综合",
+                                                          "其他总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "general-www-cmegroup-com-2",
+                                             "name":  "投资者持仓报告用户指南",
+                                             "url":  "https://www.cmegroup.com/cn-s/tools-information/quikstrike/quikstrike-cftc-commitment-of-traders-report-user-guide.html",
+                                             "description":  "来源：其他总览",
+                                             "domain":  "www.cmegroup.com",
+                                             "tags":  [
+                                                          "综合",
+                                                          "其他总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "general-www-cftc-gov-1",
+                                             "name":  "交易员持仓承诺",
+                                             "url":  "https://www.cftc.gov/MarketReports/CommitmentsofTraders/index.htm",
+                                             "description":  "来源：其他总览",
+                                             "domain":  "www.cftc.gov",
+                                             "tags":  [
+                                                          "综合",
+                                                          "其他总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "general-spotgamma-com-1",
+                                             "name":  "期权深度分析--SpotGamma",
+                                             "url":  "https://spotgamma.com/",
+                                             "description":  "来源：其他总览",
+                                             "domain":  "spotgamma.com",
+                                             "tags":  [
+                                                          "综合",
+                                                          "其他总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "general-p-pandaremit-com-1",
+                                             "name":  "熊猫速汇",
+                                             "url":  "https://p.pandaremit.com/h5activity/launchInvitationCode?countryCode=HKG\u0026shareCode=MTE1NTQ4OTE%3D\u0026lang=zh-hans",
+                                             "description":  "来源：其他总览",
+                                             "domain":  "p.pandaremit.com",
+                                             "tags":  [
+                                                          "综合",
+                                                          "其他总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "general-www-cftc-gov-2",
+                                             "name":  "交易者承诺 | CFTC",
+                                             "url":  "https://www.cftc.gov/MarketReports/CommitmentsofTraders/index.htm?utm_source=chatgpt.com",
+                                             "description":  "来源：其他总览",
+                                             "domain":  "www.cftc.gov",
+                                             "tags":  [
+                                                          "综合",
+                                                          "其他总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "general-chartexchange-com-1",
+                                             "name":  "CFEGF股票价格及图表",
+                                             "url":  "https://chartexchange.com/symbol/otc-cfegf/",
+                                             "description":  "来源：其他总览",
+                                             "domain":  "chartexchange.com",
+                                             "tags":  [
+                                                          "综合",
+                                                          "其他总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "general-www-tradingster-com-1",
+                                             "name":  "COT报告：美元指数COT图表",
+                                             "url":  "https://www.tradingster.com/cot/futures/fin/098662",
+                                             "description":  "来源：其他总览",
+                                             "domain":  "www.tradingster.com",
+                                             "tags":  [
+                                                          "综合",
+                                                          "其他总览"
+                                                      ]
+                                         }
+                                     ]
+                       },
+                       {
+                           "id":  "general-衍生品总览",
+                           "title":  "衍生品总览",
+                           "description":  "来自你整理后的 Markdown 分组 \u0027衍生品总览\u0027。",
+                           "tools":  [
+                                         {
+                                             "id":  "general-www-openvlab-cn-1",
+                                             "name":  "OpenVlab分析平台",
+                                             "url":  "https://www.openvlab.cn/",
+                                             "description":  "来源：衍生品总览",
+                                             "domain":  "www.openvlab.cn",
+                                             "tags":  [
+                                                          "综合",
+                                                          "衍生品总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "general-www-cboe-com-1",
+                                             "name":  "芝加哥期权交易所全球市场",
+                                             "url":  "https://www.cboe.com/",
+                                             "description":  "来源：衍生品总览",
+                                             "domain":  "www.cboe.com",
+                                             "tags":  [
+                                                          "综合",
+                                                          "衍生品总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "general-www-bybit-com-1",
+                                             "name":  "期权计算器",
+                                             "url":  "https://www.bybit.com/trade/option/usdt/pb/BTC",
+                                             "description":  "来源：衍生品总览",
+                                             "domain":  "www.bybit.com",
+                                             "tags":  [
+                                                          "综合",
+                                                          "衍生品总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "general-www-theblock-co-2",
+                                             "name":  "加密期权未平仓合约、成交量和隐含波动率图表",
+                                             "url":  "https://www.theblock.co/data/crypto-markets/options",
+                                             "description":  "来源：衍生品总览",
+                                             "domain":  "www.theblock.co",
+                                             "tags":  [
+                                                          "综合",
+                                                          "衍生品总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "general-squeezemetrics-com-1",
+                                             "name":  "sqzme股票数据的新视角",
+                                             "url":  "https://squeezemetrics.com/monitor",
+                                             "description":  "来源：衍生品总览",
+                                             "domain":  "squeezemetrics.com",
+                                             "tags":  [
+                                                          "综合",
+                                                          "衍生品总览"
+                                                      ]
+                                         }
+                                     ]
+                       }
+                   ]
+    },
+    {
+        "id":  "quant",
+        "title":  "量化工具",
+        "description":  "量化研究、接口、平台、回测与文章资料。",
+        "groups":  [
+                       {
+                           "id":  "quant-量化总览",
+                           "title":  "量化总览",
+                           "description":  "来自你整理后的 Markdown 分组 \u0027量化总览\u0027。",
+                           "tools":  [
+                                         {
+                                             "id":  "quant-www-wolai-com-1",
+                                             "name":  "2025年8月 量化金工月度热点研报",
+                                             "url":  "https://www.wolai.com/ustfinance/uyMty39PGZafSZa2YU93mQ",
+                                             "description":  "来源：量化总览",
+                                             "domain":  "www.wolai.com",
+                                             "tags":  [
+                                                          "量化",
+                                                          "量化总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "quant-www-wolai-com-2",
+                                             "name":  "量化学习路径",
+                                             "url":  "https://www.wolai.com/ustfinance/uQLt7axQsJBeTdJaMiNvW9",
+                                             "description":  "来源：量化总览",
+                                             "domain":  "www.wolai.com",
+                                             "tags":  [
+                                                          "量化",
+                                                          "量化总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "quant-blog-csdn-net-1",
+                                             "name":  "CSDN博客",
+                                             "url":  "https://blog.csdn.net/weixin_42219751/article/details/93621991",
+                                             "description":  "来源：量化总览",
+                                             "domain":  "blog.csdn.net",
+                                             "tags":  [
+                                                          "量化",
+                                                          "量化总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "quant-bigquant-com-1",
+                                             "name":  "bigquant:【历史文档】策略示例-期货策略-基于协整的跨期套利 v1.0",
+                                             "url":  "https://bigquant.com/wiki/doc/Tqrre7n7tb",
+                                             "description":  "来源：量化总览",
+                                             "domain":  "bigquant.com",
+                                             "tags":  [
+                                                          "量化",
+                                                          "量化总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "quant-www-joinquant-com-1",
+                                             "name":  "社区 - JoinQuant",
+                                             "url":  "https://www.joinquant.com/view/community/list?listType=1",
+                                             "description":  "来源：量化总览",
+                                             "domain":  "www.joinquant.com",
+                                             "tags":  [
+                                                          "量化",
+                                                          "量化总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "quant-www-joinquant-com-2",
+                                             "name":  "JoinQuant聚宽量化投研平台",
+                                             "url":  "https://www.joinquant.com/",
+                                             "description":  "来源：量化总览",
+                                             "domain":  "www.joinquant.com",
+                                             "tags":  [
+                                                          "量化",
+                                                          "量化总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "quant-www-quantconnect-com-1",
+                                             "name":  "开源算法交易平台。 - QuantConnect.com",
+                                             "url":  "https://www.quantconnect.com/",
+                                             "description":  "来源：量化总览",
+                                             "domain":  "www.quantconnect.com",
+                                             "tags":  [
+                                                          "量化",
+                                                          "量化总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "quant-uqer-datayes-com-1",
+                                             "name":  "优矿 - 大数据时代的量化投资 - 通联量化实验室",
+                                             "url":  "https://uqer.datayes.com/",
+                                             "description":  "来源：量化总览",
+                                             "domain":  "uqer.datayes.com",
+                                             "tags":  [
+                                                          "量化",
+                                                          "量化总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "quant-uqer-datayes-com-2",
+                                             "name":  "labs - 知识库 - 优矿",
+                                             "url":  "https://uqer.datayes.com/labs/knowledge/%E4%BC%98%E7%9F%BF%E4%BA%A7%E5%93%81%E7%99%BD%E7%9A%AE%E4%B9%A6%2F%E9%87%8F%E5%8C%96%E6%8A%95%E8%B5%84%E5%8F%8A%E5%85%B6%E7%A0%94%E7%A9%B6%E6%96%B9%E6%B3%95.nb",
+                                             "description":  "来源：量化总览",
+                                             "domain":  "uqer.datayes.com",
+                                             "tags":  [
+                                                          "量化",
+                                                          "量化总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "quant-tushare-pro-1",
+                                             "name":  "Tushare数据",
+                                             "url":  "https://tushare.pro/",
+                                             "description":  "来源：量化总览",
+                                             "domain":  "tushare.pro",
+                                             "tags":  [
+                                                          "量化",
+                                                          "量化总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "quant-quantopian-github-io-1",
+                                             "name":  "Alphalens — Alphalens 0.2.1+48.gad0be10 文档",
+                                             "url":  "https://quantopian.github.io/alphalens/",
+                                             "description":  "来源：量化总览",
+                                             "domain":  "quantopian.github.io",
+                                             "tags":  [
+                                                          "量化",
+                                                          "量化总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "quant-gallery-pyecharts-org-1",
+                                             "name":  "Document",
+                                             "url":  "https://gallery.pyecharts.org/#/",
+                                             "description":  "来源：量化总览",
+                                             "domain":  "gallery.pyecharts.org",
+                                             "tags":  [
+                                                          "量化",
+                                                          "量化总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "quant-substack-com-1",
+                                             "name":  "加密量化博主",
+                                             "url":  "https://substack.com/@unexpectedcorrelations",
+                                             "description":  "来源：量化总览",
+                                             "domain":  "substack.com",
+                                             "tags":  [
+                                                          "量化",
+                                                          "量化总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "quant-ptradeapi-com-1",
+                                             "name":  "Ptrade 量化交易 API接口文档",
+                                             "url":  "https://ptradeapi.com/",
+                                             "description":  "来源：量化总览",
+                                             "domain":  "ptradeapi.com",
+                                             "tags":  [
+                                                          "量化",
+                                                          "量化总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "quant-www-thinktrader-net-1",
+                                             "name":  "迅投-以思考的速度交易qmt-（官方）",
+                                             "url":  "https://www.thinktrader.net/",
+                                             "description":  "来源：量化总览",
+                                             "domain":  "www.thinktrader.net",
+                                             "tags":  [
+                                                          "量化",
+                                                          "量化总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "quant-docs-pandas-ai-com-1",
+                                             "name":  "PandasAI简介 - PandasAI",
+                                             "url":  "https://docs.pandas-ai.com/v2/intro",
+                                             "description":  "来源：量化总览",
+                                             "domain":  "docs.pandas-ai.com",
+                                             "tags":  [
+                                                          "量化",
+                                                          "量化总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "quant-quantpedia-com-1",
+                                             "name":  "主页 - QuantPedia",
+                                             "url":  "https://quantpedia.com/",
+                                             "description":  "来源：量化总览",
+                                             "domain":  "quantpedia.com",
+                                             "tags":  [
+                                                          "量化",
+                                                          "量化总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "quant-mp-weixin-qq-com-1",
+                                             "name":  "「量化界」年度最受欢迎的10篇博客",
+                                             "url":  "https://mp.weixin.qq.com/s/CYZ7tPcNYxGr3pSVkd2NSQ",
+                                             "description":  "来源：量化总览",
+                                             "domain":  "mp.weixin.qq.com",
+                                             "tags":  [
+                                                          "量化",
+                                                          "量化总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "quant-quantpedia-com-2",
+                                             "name":  "如何利用比特币隔夜交易获利？ - QuantPedia",
+                                             "url":  "https://quantpedia.com/how-to-profitably-trade-bitcoins-overnight-sessions/",
+                                             "description":  "来源：量化总览",
+                                             "domain":  "quantpedia.com",
+                                             "tags":  [
+                                                          "量化",
+                                                          "量化总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "quant-quantpedia-com-3",
+                                             "name":  "我们应该在投资组合中分配多少比特币？ - QuantPedia",
+                                             "url":  "https://quantpedia.com/how-much-bitcoin-should-we-allocate-to-the-portfolio/",
+                                             "description":  "来源：量化总览",
+                                             "domain":  "quantpedia.com",
+                                             "tags":  [
+                                                          "量化",
+                                                          "量化总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "quant-www-chartjs-org-1",
+                                             "name":  "Chart.js Samples | Chart.js",
+                                             "url":  "https://www.chartjs.org/docs/latest/samples/information.html",
+                                             "description":  "来源：量化总览",
+                                             "domain":  "www.chartjs.org",
+                                             "tags":  [
+                                                          "量化",
+                                                          "量化总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "quant-www-pandaai-online-1",
+                                             "name":  "Panda AI - 量变学院，可以agent交易",
+                                             "url":  "https://www.pandaai.online/",
+                                             "description":  "来源：量化总览",
+                                             "domain":  "www.pandaai.online",
+                                             "tags":  [
+                                                          "量化",
+                                                          "量化总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "quant-www-vnpy-com-1",
+                                             "name":  "开源量化平台vnpy",
+                                             "url":  "https://www.vnpy.com/",
+                                             "description":  "来源：量化总览",
+                                             "domain":  "www.vnpy.com",
+                                             "tags":  [
+                                                          "量化",
+                                                          "量化总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "quant-zhuanlan-zhihu-com-1",
+                                             "name":  "vnpy：国内最受欢迎的开源量化交易平台深度解析 - 知乎",
+                                             "url":  "https://zhuanlan.zhihu.com/p/1934373021193343584",
+                                             "description":  "来源：量化总览",
+                                             "domain":  "zhuanlan.zhihu.com",
+                                             "tags":  [
+                                                          "量化",
+                                                          "量化总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "quant-jupyter-org-1",
+                                             "name":  "JupyterLite",
+                                             "url":  "https://jupyter.org/try-jupyter/lab/",
+                                             "description":  "来源：量化总览",
+                                             "domain":  "jupyter.org",
+                                             "tags":  [
+                                                          "量化",
+                                                          "量化总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "quant-www-joinquant-com-3",
+                                             "name":  "聚宽",
+                                             "url":  "https://www.joinquant.com/view/user/floor?type=mainFloor",
+                                             "description":  "来源：量化总览",
+                                             "domain":  "www.joinquant.com",
+                                             "tags":  [
+                                                          "量化",
+                                                          "量化总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "quant-backtest-10jqka-com-cn-1",
+                                             "name":  "自然语言即可回测：BackTest 量化策略平台",
+                                             "url":  "https://backtest.10jqka.com.cn/",
+                                             "description":  "来源：量化总览",
+                                             "domain":  "backtest.10jqka.com.cn",
+                                             "tags":  [
+                                                          "量化",
+                                                          "量化总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "quant-bigquant-com-2",
+                                             "name":  "解锁 AI 量化新境界：Qbot 携手 iTick - BigQuant量化交易",
+                                             "url":  "https://bigquant.com/wiki/doc/kq9FxV9GUg",
+                                             "description":  "来源：量化总览",
+                                             "domain":  "bigquant.com",
+                                             "tags":  [
+                                                          "量化",
+                                                          "量化总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "quant-www-quantstart-com-1",
+                                             "name":  "量化自学：算法交易、量化交易、交易策略、回测与实施 | QuantStart",
+                                             "url":  "https://www.quantstart.com/",
+                                             "description":  "来源：量化总览",
+                                             "domain":  "www.quantstart.com",
+                                             "tags":  [
+                                                          "量化",
+                                                          "量化总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "quant-blog-headlandstech-com-1",
+                                             "name":  "Headlands Technologies LLC 博客",
+                                             "url":  "https://blog.headlandstech.com/",
+                                             "description":  "来源：量化总览",
+                                             "domain":  "blog.headlandstech.com",
+                                             "tags":  [
+                                                          "量化",
+                                                          "量化总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "quant-aurora-gold-insight-pages-dev-1",
+                                             "name":  "Aurora Gold Insight",
+                                             "url":  "https://aurora-gold-insight.pages.dev/#knowledge",
+                                             "description":  "来源：量化总览",
+                                             "domain":  "aurora-gold-insight.pages.dev",
+                                             "tags":  [
+                                                          "量化",
+                                                          "量化总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "quant-cn-tradingview-com-1",
+                                             "name":  "BTCUSD 88,957.39 ▲ +0.25% 大类资产",
+                                             "url":  "https://cn.tradingview.com/chart/QlE64yj4/",
+                                             "description":  "来源：量化总览",
+                                             "domain":  "cn.tradingview.com",
+                                             "tags":  [
+                                                          "量化",
+                                                          "量化总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "quant-calendarific-com-1",
+                                             "name":  "全球节假日日历 API，涵盖国家和宗教节日。",
+                                             "url":  "https://calendarific.com/",
+                                             "description":  "来源：量化总览",
+                                             "domain":  "calendarific.com",
+                                             "tags":  [
+                                                          "量化",
+                                                          "量化总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "quant-www-fmz-com-1",
+                                             "name":  "资费的参考资管平台",
+                                             "url":  "https://www.fmz.com/m/dashboard",
+                                             "description":  "来源：量化总览",
+                                             "domain":  "www.fmz.com",
+                                             "tags":  [
+                                                          "量化",
+                                                          "量化总览"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "quant-gitee-com-1",
+                                             "name":  "gitee",
+                                             "url":  "https://gitee.com/JavaLionLi/plus-ui",
+                                             "description":  "来源：量化总览",
+                                             "domain":  "gitee.com",
+                                             "tags":  [
+                                                          "量化",
+                                                          "量化总览"
+                                                      ]
+                                         }
+                                     ]
+                       },
+                       {
+                           "id":  "quant-量化类好文章",
+                           "title":  "量化类好文章",
+                           "description":  "来自你整理后的 Markdown 分组 \u0027量化类好文章\u0027。",
+                           "tools":  [
+                                         {
+                                             "id":  "quant-bigquant-com-3",
+                                             "name":  "金工CTA系列之一：基于基本面多因子模型的黄金交易策略",
+                                             "url":  "https://bigquant.com/wiki/doc/oiVYuLosvU",
+                                             "description":  "来源：量化类好文章",
+                                             "domain":  "bigquant.com",
+                                             "tags":  [
+                                                          "量化",
+                                                          "量化类好文章"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "quant-blog-csdn-net-2",
+                                             "name":  "统计套利策略的五大主流策略分析与优缺点_copula函数的缺点",
+                                             "url":  "https://blog.csdn.net/zk168_net/article/details/107536782",
+                                             "description":  "来源：量化类好文章",
+                                             "domain":  "blog.csdn.net",
+                                             "tags":  [
+                                                          "量化",
+                                                          "量化类好文章"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "quant-www-myquant-cn-1",
+                                             "name":  "跨期套利(期货)",
+                                             "url":  "https://www.myquant.cn/docs/python_strategyies/107",
+                                             "description":  "来源：量化类好文章",
+                                             "domain":  "www.myquant.cn",
+                                             "tags":  [
+                                                          "量化",
+                                                          "量化类好文章"
+                                                      ]
+                                         }
+                                     ]
+                       },
+                       {
+                           "id":  "quant-接口",
+                           "title":  "接口",
+                           "description":  "来自你整理后的 Markdown 分组 \u0027接口\u0027。",
+                           "tools":  [
+                                         {
+                                             "id":  "quant-tushare-pro-2",
+                                             "name":  "Tushare数据",
+                                             "url":  "https://tushare.pro/document/2?doc_id=284",
+                                             "description":  "来源：接口",
+                                             "domain":  "tushare.pro",
+                                             "tags":  [
+                                                          "量化",
+                                                          "接口"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "quant-www-alphavantage-co-1",
+                                             "name":  "API Documentation | Alpha Vantage",
+                                             "url":  "https://www.alphavantage.co/documentation/",
+                                             "description":  "来源：接口",
+                                             "domain":  "www.alphavantage.co",
+                                             "tags":  [
+                                                          "量化",
+                                                          "接口"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "quant-akshare-akfamily-xyz-1",
+                                             "name":  "AKShare 外汇数据 — AKShare 1.17.83 文档",
+                                             "url":  "https://akshare.akfamily.xyz/data/fx/fx.html",
+                                             "description":  "来源：接口",
+                                             "domain":  "akshare.akfamily.xyz",
+                                             "tags":  [
+                                                          "量化",
+                                                          "接口"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "quant-tushare-pro-3",
+                                             "name":  "Tushare数据",
+                                             "url":  "https://tushare.pro/document/2",
+                                             "description":  "来源：接口",
+                                             "domain":  "tushare.pro",
+                                             "tags":  [
+                                                          "量化",
+                                                          "接口"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "quant-www-juejinshuju-com-1",
+                                             "name":  "掘金：国内期货历史数据-主连分钟K线-期货主连历史分钟数据下载",
+                                             "url":  "http://www.juejinshuju.com/future_continue_min/",
+                                             "description":  "来源：接口",
+                                             "domain":  "www.juejinshuju.com",
+                                             "tags":  [
+                                                          "量化",
+                                                          "接口"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "quant-www-ricequant-com-1",
+                                             "name":  "RQData Python API 手册 | Ricequant Docs",
+                                             "url":  "https://www.ricequant.com/doc/rqdata/python/index-rqdatac",
+                                             "description":  "来源：接口",
+                                             "domain":  "www.ricequant.com",
+                                             "tags":  [
+                                                          "量化",
+                                                          "接口"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "quant-itick-org-1",
+                                             "name":  "量化交易接口 - iTick",
+                                             "url":  "https://itick.org/",
+                                             "description":  "来源：接口",
+                                             "domain":  "itick.org",
+                                             "tags":  [
+                                                          "量化",
+                                                          "接口"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "quant-docs-itick-org-1",
+                                             "name":  "文档说明 - iTick 文档",
+                                             "url":  "https://docs.itick.org/",
+                                             "description":  "来源：接口",
+                                             "domain":  "docs.itick.org",
+                                             "tags":  [
+                                                          "量化",
+                                                          "接口"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "quant-www-dataroma-com-1",
+                                             "name":  "DATAROMA 超级投资者持股摘要",
+                                             "url":  "https://www.dataroma.com/m/managers.php",
+                                             "description":  "来源：接口",
+                                             "domain":  "www.dataroma.com",
+                                             "tags":  [
+                                                          "量化",
+                                                          "接口"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "quant-doc-shinnytech-com-1",
+                                             "name":  "十分钟快速入门 — TianQin Python SDK 3.8.7 文档",
+                                             "url":  "https://doc.shinnytech.com/tqsdk/latest/quickstart.html#quickstart-0",
+                                             "description":  "来源：接口",
+                                             "domain":  "doc.shinnytech.com",
+                                             "tags":  [
+                                                          "量化",
+                                                          "接口"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "quant-www-ivolatility-com-1",
+                                             "name":  "付费API，但很便宜",
+                                             "url":  "https://www.ivolatility.com/data-cloud-api/?gad_source=1\u0026gad_campaignid=20419477335\u0026gbraid=0AAAAADyngPXx6BuAUQUg015xdcmQ1rc_M\u0026gclid=CjwKCAiAssfLBhBDEiwAcLpwfulC_7LbiHzzBFUPw60W144ByHitONsLKbUJQo9B58SCDD_1ktS0NhoCyUsQAvD_BwE",
+                                             "description":  "来源：接口",
+                                             "domain":  "www.ivolatility.com",
+                                             "tags":  [
+                                                          "量化",
+                                                          "接口"
+                                                      ]
+                                         },
+                                         {
+                                             "id":  "quant-alltick-co-1",
+                                             "name":  "API- AllTick",
+                                             "url":  "https://alltick.co/#pricing",
+                                             "description":  "来源：接口",
+                                             "domain":  "alltick.co",
+                                             "tags":  [
+                                                          "量化",
+                                                          "接口"
+                                                      ]
+                                         }
+                                     ]
+                       }
+                   ]
+    }
 ];
 
 export const tradingToolCategoryMap = tradingToolCategories.reduce(
