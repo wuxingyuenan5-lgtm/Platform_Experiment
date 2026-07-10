@@ -1,0 +1,16 @@
+{
+  "exchange":"交易所",
+  "24hMin":"24h最小",
+  "basisRate":"基差",
+  "askImpactDepth":"卖盘",
+  "bidImpactDepth":"买盘",
+  "future":"期货",
+  "spot":"现货",
+  "symbol":"标的",
+  "currency":"币种",
+  "purchasePrice":"成交价格",
+  "markPrice":"标记价格",
+  "highestLever":"最高杠杆",
+  "basisSpread":"基差",
+  "apr":"APR"
+}

@@ -1,0 +1,33 @@
+.ant-tabs-small > .ant-tabs-nav {
+  .ant-tabs-tab {
+    padding: 4px 0;
+    color: @text-color-secondary;
+
+    &.ant-tabs-tab-active .ant-tabs-tab-btn{
+      text-shadow: none;
+    }
+  }
+
+}
+
+.ant-tabs .ant-tabs-tab + .ant-tabs-tab {
+  margin-left: 24px;
+}
+
+.dashboard-tabs {
+  &.ant-tabs .ant-tabs-ink-bar {
+    background: transparent;
+  }
+
+  &.ant-tabs-top > .ant-tabs-nav {
+    margin: 0;
+
+    &::before {
+      border-bottom-color: transparent;
+    }
+  }
+
+  &.ant-tabs .ant-tabs-tab {
+    padding: 4px 0;
+  }
+}

@@ -1,0 +1,14 @@
+# Local secrets
+projects/risk-control/data-service/bitget-data-service/bybitapi.txt
+.env.local
+*.local
+deploy/.env
+
+# Build outputs
+projects/risk-control/**/bin/*.exe
+projects/risk-control/data-service/bin/
+
+# Logs and OS files
+*.log
+.DS_Store
+Thumbs.db

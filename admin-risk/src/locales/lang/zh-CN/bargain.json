@@ -1,0 +1,9 @@
+{
+  "todayProfitAndLoss":"今日盈亏",
+  "unsettledProfitAndLoss":"未结算盈亏",
+  "currency":"币种",
+  "position":"持仓",
+  "value":"价值",
+  "markprice":"标记价格",
+  "positionPrice":"持仓均价"
+}

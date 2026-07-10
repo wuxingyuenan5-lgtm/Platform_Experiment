@@ -1,0 +1,57 @@
+// 修复气泡确认框内的按钮在内容宽度不够换行的情况
+// 初始问题发现在 2.10.1 版本 固定列页面 http://ip:port/#/comp/table/fixedColumn
+.ant-popconfirm {
+  &-buttons {
+    white-space: nowrap;
+  }
+}
+
+.risk-message {
+  .ant-message-notice-content {
+    border: 1px solid #ffccc7;
+    background: #fff1f0;
+  }
+}
+
+// .risk-notification {
+//   &.ant-notification-notice {
+//     z-index:100000;
+//     width: unset;
+//     margin-bottom: 6px;
+//     padding: 9px;
+//     border: 1px solid #ffccc7;
+//     background: #fff1f0;
+//     line-height: 22px;
+
+//     .ant-notification-notice-message {
+//       margin-bottom: 0;
+//       padding-inline-end: 0;
+//     }
+//   }
+
+//   .ant-notification-notice-close {
+//     display: none;
+//   }
+// }
+.risk-msg {
+  // display: flex;
+  position: fixed;
+  z-index: 999;
+  top: 0;
+  width: calc(100% - 450px);
+  height: 1px;
+  // 自动换行
+  // flex-wrap: wrap;
+  // justify-content: center;
+  text-align: center;
+
+  .risk-msg_item {
+    display: inline-block;
+    // width: 750px;
+    margin: 4px auto 0;
+    padding: 9px;
+    border: 1px solid #ffccc7;
+    background: #fff1f0;
+    line-height: 22px;
+  }
+}

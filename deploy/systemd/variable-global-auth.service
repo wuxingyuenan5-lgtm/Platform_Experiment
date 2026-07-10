@@ -1,0 +1,21 @@
+[Unit]
+Description=Variable Global authentication service
+After=network-online.target mysql.service mariadb.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=variable-global
+Group=variable-global
+EnvironmentFile=/etc/variable-global/auth.env
+WorkingDirectory=/var/lib/variable-global
+ExecStart=/usr/local/lib/variable-global/auth-service
+Restart=on-failure
+RestartSec=3s
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+
+[Install]
+WantedBy=multi-user.target

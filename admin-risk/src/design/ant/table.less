@@ -1,0 +1,18 @@
+@prefix-cls: ~'@{namespace}-basic-table';
+
+.@{prefix-cls} {
+  .ant-table-wrapper .ant-table-thead > tr > th {
+    // font-weight: 500;
+  }
+
+  &.no-header-bg {
+    .ant-table-wrapper .ant-table-thead > tr > th {
+      background-color: transparent;
+    }
+  }
+}
+
+.ant-table-wrapper .ant-table-thead > tr > th {
+  color: var(--text-color-secondary);
+  font-weight: 400;
+}

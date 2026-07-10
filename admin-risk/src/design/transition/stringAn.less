@@ -1,0 +1,79 @@
+// 小值-上升
+@keyframes shortanfr {
+  0% {
+    background-color: fade(@color-success, 30);
+    color: @text-color-base;
+  }
+
+  50% {
+    color: fade(@color-error, 30);
+  }
+
+  100% {
+    color: @color-success;
+  }
+}
+
+// 大值-上升
+@keyframes shortanfr2 {
+  0% {
+    background-color: fade(@color-success, 10);
+    color: @text-color-base;
+  }
+
+  50% {
+    color: fade(@color-success, 30);
+  }
+
+  100% {
+    color: @color-error;
+  }
+}
+
+// 小值-下降
+@keyframes longanfr {
+  0% {
+    background-color: fade(@color-error, 30);
+    color: @text-color-base;
+  }
+
+  50% {
+    color: fade(@color-error, 30);
+  }
+
+  100% {
+    color: @color-success;
+  }
+}
+
+// 大值-下降
+@keyframes longanfr2 {
+  0% {
+    background-color: fade(@color-error, 10);
+    color: @text-color-base;
+  }
+
+  50% {
+    color: fade(@color-success, 30);
+  }
+
+  100% {
+    color: @color-error;
+  }
+}
+
+.longstylefr {
+  animation: longanfr 1.6s ease-in-out 1;
+}
+
+.shortstylefr {
+  animation: shortanfr 1.6s ease-in-out 1;
+}
+
+.longstylefr2 {
+  animation: longanfr2 1.6s ease-in-out 1;
+}
+
+.shortstylefr2 {
+  animation: shortanfr2 1.6s ease-in-out 1;
+}

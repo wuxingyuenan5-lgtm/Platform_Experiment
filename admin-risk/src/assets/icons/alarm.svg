@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="56px" height="56px" viewBox="0 0 56 56" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <!-- <title>icon/56/警报</title> -->
+    <g id="页面-1" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd" stroke-linejoin="round">
+        <g id="策略-交互效果" transform="translate(-366, -805)" stroke="currentColor" stroke-width="3">
+            <g id="风险提示" transform="translate(256, 732)">
+                <g id="编组" transform="translate(114, 77)">
+                    <path d="M10.5995867,25.7933885 C10.5995867,18.6708022 16.3736946,12.8966943 23.4962809,12.8966943 C30.6188672,12.8966943 36.3929752,18.6708022 36.3929752,25.7933885 L36.3929752,46.4280993 L10.5995867,46.4280993 L10.5995867,25.7933885 Z" id="路径"></path>
+                    <line x1="23.4962809" y1="0" x2="23.4962809" y2="3.86900828" id="路径" stroke-linecap="round"></line>
+                    <line x1="38.8327718" y1="5.5819859" x2="36.3457733" y2="8.54586548" id="路径" stroke-linecap="round"></line>
+                    <line x1="46.9923813" y1="19.7155634" x2="43.182053" y2="20.3874812" id="路径" stroke-linecap="round"></line>
+                    <line x1="0" y1="19.7156924" x2="3.81022514" y2="20.3874812" id="路径" stroke-linecap="round"></line>
+                    <line x1="8.16030591" y1="5.58171507" x2="10.6473044" y2="8.54560755" id="路径" stroke-linecap="round"></line>
+                    <line x1="0.282231257" y1="46.4280993" x2="48" y2="46.4280993" id="路径" stroke-linecap="round"></line>
+                </g>
+            </g>
+        </g>
+    </g>
+</svg>

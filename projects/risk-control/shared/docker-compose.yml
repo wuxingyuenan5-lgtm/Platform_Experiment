@@ -1,0 +1,5 @@
+# placeholder docker-compose
+version: '3.8'
+services:
+  auth-service:
+    image: alpine
