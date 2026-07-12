@@ -1,6 +1,6 @@
 import type { StrategyDeskKey, StrategyDeskProfile, StrategyOverviewPeriodData } from '../types';
 
-export const strategyDeskOrder: StrategyDeskKey[] = ['funding', 'crossSpread', 'domesticOverseas', 'dip'];
+export const strategyDeskOrder: StrategyDeskKey[] = ['funding', 'crossSpread', 'domesticOverseas', 'dip', 'shortLineTraderL'];
 
 function makeOverviewDataset(base: Partial<StrategyOverviewPeriodData> & Pick<StrategyOverviewPeriodData, 'periodLabel' | 'dateLabel' | 'totalFund' | 'xLabels' | 'barValues' | 'lineValues' | 'statCards' | 'stateCounts' | 'profitRows' | 'lossRows' | 'syncRows'>): StrategyOverviewPeriodData {
   return base;
@@ -1474,4 +1474,389 @@ export const strategyDeskProfiles: Record<StrategyDeskKey, StrategyDeskProfile> 
   ...baseStrategyDeskProfiles,
   crossSpread: crossSpreadProfile,
   domesticOverseas: domesticOverseasProfile,
+  shortLineTraderL: (() => {
+    const profile = cloneStrategyDeskProfile(domesticOverseasProfile);
+    profile.key = 'shortLineTraderL';
+    profile.label = '短线交易员L';
+    profile.title = '短线交易员L策略管理';
+    profile.subtitle = '聚焦股指期货、黄金、币的日内风险交易，先统一损益、资金与订单三页语义，再逐步细化到独立工作台。';
+    profile.strategyName = '短线交易员L';
+    profile.filters = ['股指期货', '黄金', '币', '日内', '止盈止损'];
+    profile.overview = {
+      periods: fundingOverview.periods,
+      datasets: {
+        day: makeOverviewDataset({
+          periodLabel: '2026年07月12日',
+          dateLabel: '2026-07-12 09:00 - 2026-07-12 15:00',
+          totalFund: '6,842,190.50 CNY',
+          xLabels: ['09:00', '09:30', '10:00', '10:30', '11:00', '13:00', '13:30', '14:00', '14:30', '15:00'],
+          barValues: [22, 46, -18, 38, 54, 61, -12, 28, 44, 18],
+          lineValues: [4, 12, 8, 16, 24, 30, 26, 31, 38, 42],
+          statCards: [
+            { label: '日内净收益', value: '+42,680', subValue: '股指 + 黄金主导', tone: 'positive' },
+            { label: '已实现收益', value: '+31,240', subValue: '平仓兑现部分', tone: 'positive' },
+            { label: '浮动盈亏', value: '+11,440', subValue: '尾盘仍有持仓', tone: 'positive' },
+            { label: '胜率', value: '63.6%', subValue: '当日 11 笔有效单', tone: 'positive' },
+            { label: '最大回撤', value: '-12,360', subValue: '10:05 附近回撤', tone: 'negative' },
+            { label: '风险状态', value: '正常', subValue: '未触发强平或熔断保护', tone: 'positive' },
+          ],
+          stateCounts: [
+            { label: '新开仓', count: '7', subLabel: '总计' },
+            { label: '已平仓', count: '5', subLabel: '总计' },
+            { label: '持仓中', count: '3', subLabel: '总计' },
+          ],
+          profitRows: [
+            { type: '股指期货', strategyCount: '3', pnl: '+21,480', ratio: '50.3%', tone: 'positive' },
+            { type: '黄金', strategyCount: '4', pnl: '+12,940', ratio: '30.3%', tone: 'positive' },
+            { type: '币', strategyCount: '4', pnl: '+8,260', ratio: '19.4%', tone: 'positive' },
+          ],
+          lossRows: [
+            { type: '止损单', strategyCount: '2', pnl: '-7,820', ratio: '63.3%', tone: 'negative' },
+            { type: '追单滑点', strategyCount: '2', pnl: '-4,540', ratio: '36.7%', tone: 'negative' },
+          ],
+          syncRows: [
+            { category: '成交同步', status: '已完成', message: '股指、黄金、币的成交回报已汇总。', time: '15:02:18', tone: 'positive' },
+            { category: '止损检查', status: '已完成', message: '全部保护单状态已刷新。', time: '15:01:42', tone: 'positive' },
+            { category: '风险复核', status: '监控中', message: 'BTC 余仓继续观察，不留过夜。', time: '14:58:07', tone: 'neutral' },
+          ],
+        }),
+        week: makeOverviewDataset({
+          periodLabel: '2026 第28周',
+          dateLabel: '2026-07-08 - 2026-07-12',
+          totalFund: '6,842,190.50 CNY',
+          xLabels: ['07-08', '07-09', '07-10', '07-11', '07-12'],
+          barValues: [18, -12, 26, 34, 42],
+          lineValues: [6, 4, 12, 18, 24],
+          statCards: [
+            { label: '周度净收益', value: '+118,420', subValue: '周内累计', tone: 'positive' },
+            { label: '已实现收益', value: '+94,180', subValue: '主动止盈较多', tone: 'positive' },
+            { label: '浮动盈亏', value: '+24,240', subValue: '剩余轻仓', tone: 'positive' },
+            { label: '胜率', value: '61.2%', subValue: '周内 49 笔有效单', tone: 'positive' },
+            { label: '最大回撤', value: '-38,650', subValue: '周内最大单日回撤', tone: 'negative' },
+            { label: '风险状态', value: '正常', subValue: '风控边界内', tone: 'positive' },
+          ],
+          stateCounts: [
+            { label: '新开仓', count: '31', subLabel: '总计' },
+            { label: '已平仓', count: '28', subLabel: '总计' },
+            { label: '持仓中', count: '4', subLabel: '总计' },
+          ],
+          profitRows: [
+            { type: '股指期货', strategyCount: '12', pnl: '+58,320', ratio: '49.2%', tone: 'positive' },
+            { type: '黄金', strategyCount: '15', pnl: '+37,860', ratio: '32.0%', tone: 'positive' },
+            { type: '币', strategyCount: '22', pnl: '+22,240', ratio: '18.8%', tone: 'positive' },
+          ],
+          lossRows: [
+            { type: '止损单', strategyCount: '9', pnl: '-22,160', ratio: '57.3%', tone: 'negative' },
+            { type: '滑点与手续费', strategyCount: '12', pnl: '-16,490', ratio: '42.7%', tone: 'negative' },
+          ],
+          syncRows: [
+            { category: '成交同步', status: '已完成', message: '周内成交已完成汇总。', time: '15:02:18', tone: 'positive' },
+            { category: '止损检查', status: '已完成', message: '全部保护单状态已刷新。', time: '15:01:42', tone: 'positive' },
+            { category: '风险复核', status: '监控中', message: '周内最大回撤仍在容忍区间。', time: '14:58:07', tone: 'neutral' },
+          ],
+        }),
+        month: makeOverviewDataset({
+          periodLabel: '2026年07月',
+          dateLabel: '2026-07-01 - 2026-07-12',
+          totalFund: '6,842,190.50 CNY',
+          xLabels: ['07-01', '07-03', '07-05', '07-07', '07-09', '07-11', '07-12'],
+          barValues: [12, 18, -14, 26, 34, 28, 42],
+          lineValues: [4, 8, 6, 10, 16, 21, 27],
+          statCards: [
+            { label: '月内净收益', value: '+236,580', subValue: '月内累计', tone: 'positive' },
+            { label: '已实现收益', value: '+194,760', subValue: '平仓兑现', tone: 'positive' },
+            { label: '浮动盈亏', value: '+41,820', subValue: '轻仓留存', tone: 'positive' },
+            { label: '胜率', value: '59.8%', subValue: '月内 118 笔有效单', tone: 'positive' },
+            { label: '最大回撤', value: '-86,240', subValue: '月内单日回撤', tone: 'negative' },
+            { label: '风险状态', value: '正常', subValue: '无重大异常', tone: 'positive' },
+          ],
+          stateCounts: [
+            { label: '新开仓', count: '76', subLabel: '总计' },
+            { label: '已平仓', count: '69', subLabel: '总计' },
+            { label: '持仓中', count: '6', subLabel: '总计' },
+          ],
+          profitRows: [
+            { type: '股指期货', strategyCount: '26', pnl: '+116,340', ratio: '49.2%', tone: 'positive' },
+            { type: '黄金', strategyCount: '34', pnl: '+73,820', ratio: '31.2%', tone: 'positive' },
+            { type: '币', strategyCount: '58', pnl: '+46,420', ratio: '19.6%', tone: 'positive' },
+          ],
+          lossRows: [
+            { type: '止损单', strategyCount: '22', pnl: '-46,080', ratio: '53.4%', tone: 'negative' },
+            { type: '滑点与手续费', strategyCount: '31', pnl: '-40,160', ratio: '46.6%', tone: 'negative' },
+          ],
+          syncRows: [
+            { category: '成交同步', status: '已完成', message: '月内成交已完成汇总。', time: '15:02:18', tone: 'positive' },
+            { category: '止损检查', status: '已完成', message: '全部保护单状态已刷新。', time: '15:01:42', tone: 'positive' },
+            { category: '风险复核', status: '监控中', message: '月内风险曲线稳定。', time: '14:58:07', tone: 'neutral' },
+          ],
+        }),
+        custom: makeOverviewDataset({
+          periodLabel: '自定义窗口',
+          dateLabel: '2026-07-10 - 2026-07-12',
+          totalFund: '6,842,190.50 CNY',
+          xLabels: ['07-10', '07-11', '07-12'],
+          barValues: [26, 34, 42],
+          lineValues: [8, 16, 24],
+          statCards: [
+            { label: '窗口净收益', value: '+102,480', subValue: '近三日累计', tone: 'positive' },
+            { label: '已实现收益', value: '+83,960', subValue: '平仓兑现', tone: 'positive' },
+            { label: '浮动盈亏', value: '+18,520', subValue: '尾盘余仓', tone: 'positive' },
+            { label: '胜率', value: '62.5%', subValue: '近三日 32 笔有效单', tone: 'positive' },
+            { label: '最大回撤', value: '-24,280', subValue: '窗口内回撤', tone: 'negative' },
+            { label: '风险状态', value: '正常', subValue: '未触发熔断保护', tone: 'positive' },
+          ],
+          stateCounts: [
+            { label: '新开仓', count: '19', subLabel: '总计' },
+            { label: '已平仓', count: '16', subLabel: '总计' },
+            { label: '持仓中', count: '3', subLabel: '总计' },
+          ],
+          profitRows: [
+            { type: '股指期货', strategyCount: '6', pnl: '+46,220', ratio: '45.1%', tone: 'positive' },
+            { type: '黄金', strategyCount: '8', pnl: '+33,760', ratio: '32.9%', tone: 'positive' },
+            { type: '币', strategyCount: '18', pnl: '+22,500', ratio: '22.0%', tone: 'positive' },
+          ],
+          lossRows: [
+            { type: '止损单', strategyCount: '5', pnl: '-13,480', ratio: '55.5%', tone: 'negative' },
+            { type: '滑点与手续费', strategyCount: '8', pnl: '-10,800', ratio: '44.5%', tone: 'negative' },
+          ],
+          syncRows: [
+            { category: '成交同步', status: '已完成', message: '窗口内成交已完成汇总。', time: '15:02:18', tone: 'positive' },
+            { category: '止损检查', status: '已完成', message: '全部保护单状态已刷新。', time: '15:01:42', tone: 'positive' },
+            { category: '风险复核', status: '监控中', message: 'BTC 余仓继续观察，不留过夜。', time: '14:58:07', tone: 'neutral' },
+          ],
+        }),
+      },
+    };
+    profile.detail = {
+      title: '短线交易员L · 日内交易快照',
+      status: '运行中',
+      actions: ['减仓', '平仓', '止盈调整', '回补快照'],
+      metrics: [
+        { label: '当日交易数', value: '11', tone: 'neutral' },
+        { label: '当日净收益', value: '+42,680', tone: 'positive' },
+        { label: '已实现收益', value: '+31,240', tone: 'positive' },
+        { label: '浮动盈亏', value: '+11,440', tone: 'positive' },
+        { label: '最大回撤', value: '-12,360', tone: 'negative' },
+        { label: '保护单覆盖', value: '73%', tone: 'positive' },
+      ],
+      legs: [
+        {
+          title: '股指期货组',
+          market: 'CFFEX / 日内',
+          symbol: 'IF2609 / IC2609',
+          actions: ['查看持仓', '收紧止损', '平掉余仓'],
+          rows: [
+            { label: '主方向', value: '多头' },
+            { label: '开仓窗口', value: '09:32 - 10:08' },
+            { label: '已实现收益', value: '+21,480', tone: 'positive' },
+            { label: '浮动盈亏', value: '+2,880', tone: 'positive' },
+            { label: '当日回撤', value: '-5,120', tone: 'negative' },
+            { label: '保护状态', value: '止损已挂出', tone: 'positive' },
+          ],
+        },
+        {
+          title: '黄金组',
+          market: 'SHFE / XAUUSD',
+          symbol: 'AU2510 / XAUUSD',
+          actions: ['查看持仓', '止盈调整', '手动平仓'],
+          rows: [
+            { label: '主方向', value: '空头' },
+            { label: '开仓窗口', value: '10:16 - 10:44' },
+            { label: '已实现收益', value: '+12,940', tone: 'positive' },
+            { label: '浮动盈亏', value: '+1,260', tone: 'positive' },
+            { label: '当日回撤', value: '-3,640', tone: 'negative' },
+            { label: '保护状态', value: '止盈单待优化', tone: 'neutral' },
+          ],
+        },
+        {
+          title: '币组',
+          market: 'Binance / Bybit',
+          symbol: 'BTCUSDT / ETHUSDT / SOLUSDT',
+          actions: ['查看持仓', '撤单重挂', '减小仓位'],
+          rows: [
+            { label: '主方向', value: '突破追单' },
+            { label: '开仓窗口', value: '13:05 - 14:12' },
+            { label: '已实现收益', value: '+8,260', tone: 'positive' },
+            { label: '浮动盈亏', value: '-880', tone: 'negative' },
+            { label: '当日回撤', value: '-3,600', tone: 'negative' },
+            { label: '保护状态', value: '余仓继续观察', tone: 'neutral' },
+          ],
+        },
+      ],
+      exposureRows: [
+        { label: '股指期货名义敞口', value: '1,860,000 CNY' },
+        { label: '黄金名义敞口', value: '920,000 CNY' },
+        { label: '币名义敞口', value: '510,000 CNY' },
+        { label: '隔夜敞口', value: '0', tone: 'positive' },
+      ],
+      tabs: [
+        { key: 'records', label: '当日成交' },
+        { key: 'riskFlow', label: '风控动作' },
+        { key: 'timeline', label: '交易时间轴' },
+      ],
+      tabTables: {
+        records: {
+          columns: [
+            { key: 'market', label: '市场' },
+            { key: 'symbol', label: '品种' },
+            { key: 'side', label: '方向' },
+            { key: 'price', label: '成交价' },
+            { key: 'qty', label: '数量' },
+            { key: 'time', label: '成交时间' },
+          ],
+          rows: [
+            { market: '股指期货', symbol: 'IF2609', side: '买入', price: '4,012.6', qty: '4', time: '2026-07-12 09:34:19' },
+            { market: '黄金', symbol: 'XAUUSD', side: '卖出', price: '2,364.2', qty: '1.50', time: '2026-07-12 10:16:45' },
+            { market: '币', symbol: 'BTCUSDT', side: '买入', price: '108,438', qty: '0.30', time: '2026-07-12 13:05:10' },
+          ],
+        },
+        riskFlow: {
+          columns: [
+            { key: 'time', label: '时间' },
+            { key: 'symbol', label: '品种' },
+            { key: 'event', label: '风险动作' },
+            { key: 'remark', label: '说明' },
+          ],
+          rows: [
+            { time: '2026-07-12 09:36:08', symbol: 'IF2609', event: '挂止损', remark: '开仓后同步挂保护止损。' },
+            { time: '2026-07-12 10:18:44', symbol: 'XAUUSD', event: '撤止盈单', remark: '回撤未到目标位，改为手动平仓。' },
+            { time: '2026-07-12 13:12:33', symbol: 'BTCUSDT', event: '减小仓位', remark: '波动加大，先减半。' },
+          ],
+        },
+        timeline: {
+          columns: [
+            { key: 'time', label: '时间' },
+            { key: 'event', label: '事件' },
+            { key: 'remark', label: '说明' },
+          ],
+          rows: [
+            { time: '2026-07-12 09:34:19', event: '股指开仓', remark: '开盘二次突破，按计划开仓。' },
+            { time: '2026-07-12 10:16:45', event: '黄金开仓', remark: '日内冲高转弱，切入空头。' },
+            { time: '2026-07-12 13:05:10', event: 'BTC 追单', remark: '放量突破后跟进。' },
+          ],
+        },
+      },
+    };
+    profile.kpis = [
+      { label: '账户净值', value: '6,842,190.50', unit: 'CNY', note: '短线交易总账户', tone: 'neutral' },
+      { label: '可用资金', value: '4,118,240.60', unit: 'CNY', note: '可继续支持日内调仓', tone: 'positive' },
+      { label: '保证金占用', value: '1,862,420.30', unit: 'CNY', note: '股指期货与黄金占用为主', tone: 'neutral' },
+      { label: '当日净收益', value: '+42,680', unit: 'CNY', note: '日内累计', tone: 'positive' },
+      { label: '风险等级', value: '中低', note: '距离风控阈值仍有缓冲', tone: 'positive' },
+      { label: '隔夜仓位', value: '0%', note: '当前目标不留隔夜', tone: 'positive' },
+    ];
+    profile.gauges = [
+      { label: '保证金使用', value: '27%', subValue: '当前保证金使用率', progress: 27, leftLabel: '已占用', rightLabel: '可用', leftColor: '#2f80ed', rightColor: '#94a3b8' },
+      { label: '风险缓冲', value: '74%', subValue: '距离日内风控线剩余空间', progress: 74, leftLabel: '缓冲', rightLabel: '已用', leftColor: '#22a06b', rightColor: '#d74d4d' },
+    ];
+    profile.accountBreakdown = [
+      { label: '股指期货账户', value: '3,120,000 CNY', note: '主交易账户，日内占用最高', tone: 'neutral' },
+      { label: '黄金账户', value: '1,840,000 CNY', note: '兼顾沪金与外盘金', tone: 'neutral' },
+      { label: '币账户', value: '1,120,000 CNY', note: '弹性高，单笔仓位受控', tone: 'neutral' },
+      { label: '可用保证金', value: '4,118,240.60 CNY', note: '支持继续调仓', tone: 'positive' },
+      { label: '风控预警线', value: '55%', note: '当前使用率明显低于阈值', tone: 'positive' },
+      { label: '保护单覆盖', value: '73%', note: '仍需继续补齐', tone: 'negative' },
+    ];
+    profile.executionMetrics = [
+      { label: '可用资金率', before: '64%', after: '60%', tone: 'neutral' },
+      { label: '单品种集中度', before: '38%', after: '34%', tone: 'positive' },
+      { label: '保护单覆盖', before: '68%', after: '73%', tone: 'positive' },
+    ];
+    profile.logs = [
+      { time: '2026-07-12 13:12:33', text: 'BTC 追单后波动加大，已先减半。', tone: 'neutral' },
+      { time: '2026-07-12 10:18:44', text: '黄金止盈单撤回，改为手动平仓方案。', tone: 'neutral' },
+      { time: '2026-07-12 09:36:08', text: 'IF2609 保护止损已同步挂出。', tone: 'positive' },
+    ];
+    profile.curves = [
+      { title: '日内累计收益', amount: '+42,680', unit: 'CNY', tone: 'positive', points: [{ date: '09:00', value: 4 }, { date: '09:30', value: 12 }, { date: '10:00', value: 8 }, { date: '10:30', value: 16 }, { date: '11:00', value: 24 }, { date: '13:00', value: 30 }, { date: '13:30', value: 26 }, { date: '14:00', value: 31 }, { date: '14:30', value: 38 }, { date: '15:00', value: 42 }] },
+      { title: '已实现收益', amount: '+31,240', unit: 'CNY', tone: 'positive', points: [{ date: '09:00', value: 2 }, { date: '09:30', value: 8 }, { date: '10:00', value: 6 }, { date: '10:30', value: 12 }, { date: '11:00', value: 18 }, { date: '13:00', value: 22 }, { date: '13:30', value: 23 }, { date: '14:00', value: 26 }, { date: '14:30', value: 29 }, { date: '15:00', value: 31 }] },
+      { title: '日内回撤', amount: '-12,360', unit: 'CNY', tone: 'negative', points: [{ date: '09:00', value: -1 }, { date: '09:30', value: -2 }, { date: '10:00', value: -6 }, { date: '10:30', value: -4 }, { date: '11:00', value: -3 }, { date: '13:00', value: -5 }, { date: '13:30', value: -8 }, { date: '14:00', value: -6 }, { date: '14:30', value: -4 }, { date: '15:00', value: -3 }] },
+    ];
+    profile.tabs = [
+      { key: 'current', label: '当前持仓' },
+      { key: 'history', label: '历史订单' },
+      { key: 'fills', label: '成交记录' },
+      { key: 'execution', label: '执行记录' },
+    ];
+    profile.tables = {
+      current: makeTable(
+        [
+          { key: 'symbol', label: '品种' },
+          { key: 'market', label: '市场' },
+          { key: 'direction', label: '方向' },
+          { key: 'entryType', label: '开仓类型' },
+          { key: 'entryTime', label: '开仓时间' },
+          { key: 'entryPrice', label: '开仓价' },
+          { key: 'markPrice', label: '当前价' },
+          { key: 'pnl', label: '浮盈浮亏' },
+          { key: 'stopBand', label: '止盈/止损' },
+          { key: 'status', label: '订单状态' },
+        ],
+        [
+          { symbol: 'IF2609', market: '股指期货', direction: '多头', entryType: '信号开仓', entryTime: '2026-07-12 09:34:18', entryPrice: '4,012.4', markPrice: '4,026.8', pnl: '+2,880', stopBand: '4,038 / 3,998', status: '已提交' },
+          { symbol: 'XAUUSD', market: '黄金', direction: '空头', entryType: '手动开仓', entryTime: '2026-07-12 10:16:42', entryPrice: '2,364.2', markPrice: '2,357.9', pnl: '+1,260', stopBand: '2,352 / 2,370', status: '部分成交' },
+          { symbol: 'BTCUSDT', market: '币', direction: '多头', entryType: '突破追单', entryTime: '2026-07-12 13:05:09', entryPrice: '108,420', markPrice: '107,980', pnl: '-880', stopBand: '109,600 / 107,600', status: '已提交' },
+        ],
+      ),
+      history: makeTable(
+        [
+          { key: 'time', label: '下单时间' },
+          { key: 'symbol', label: '品种' },
+          { key: 'market', label: '市场' },
+          { key: 'direction', label: '方向' },
+          { key: 'offset', label: '开仓/平仓' },
+          { key: 'orderType', label: '委托类型' },
+          { key: 'price', label: '委托价格' },
+          { key: 'qty', label: '委托数量' },
+          { key: 'status', label: '订单状态' },
+          { key: 'orderId', label: '订单号' },
+        ],
+        [
+          { time: '2026-07-12 13:05:09', symbol: 'BTCUSDT', market: '币', direction: '买入', offset: '开仓', orderType: '市价单', price: '108,420', qty: '0.50', status: '已提交', orderId: 'STL-130509' },
+          { time: '2026-07-12 10:18:44', symbol: 'XAUUSD', market: '黄金', direction: '买入', offset: '平仓', orderType: '止盈单', price: '2,352.0', qty: '2.00', status: '已撤单', orderId: 'STL-101844' },
+          { time: '2026-07-12 09:34:18', symbol: 'IF2609', market: '股指期货', direction: '买入', offset: '开仓', orderType: '限价单', price: '4,012.4', qty: '4', status: '全部成交', orderId: 'STL-093418' },
+          { time: '2026-07-12 09:11:06', symbol: 'AU2510', market: '黄金', direction: '卖出', offset: '开仓', orderType: '条件单', price: '768.3', qty: '3', status: '已失败', orderId: 'STL-091106' },
+        ],
+      ),
+      fills: makeTable(
+        [
+          { key: 'time', label: '成交时间' },
+          { key: 'symbol', label: '品种' },
+          { key: 'market', label: '市场' },
+          { key: 'direction', label: '方向' },
+          { key: 'offset', label: '开仓/平仓' },
+          { key: 'fillPrice', label: '成交价' },
+          { key: 'fillQty', label: '成交量' },
+          { key: 'amount', label: '成交金额' },
+          { key: 'fee', label: '手续费' },
+          { key: 'status', label: '订单状态' },
+        ],
+        [
+          { time: '2026-07-12 13:05:10', symbol: 'BTCUSDT', market: '币', direction: '买入', offset: '开仓', fillPrice: '108,438', fillQty: '0.30', amount: '32,531.40', fee: '9.76', status: '部分成交' },
+          { time: '2026-07-12 10:16:45', symbol: 'XAUUSD', market: '黄金', direction: '卖出', offset: '开仓', fillPrice: '2,364.2', fillQty: '1.50', amount: '3,546.30', fee: '5.20', status: '全部成交' },
+          { time: '2026-07-12 09:34:19', symbol: 'IF2609', market: '股指期货', direction: '买入', offset: '开仓', fillPrice: '4,012.6', fillQty: '4', amount: '802,520', fee: '32.00', status: '全部成交' },
+        ],
+      ),
+      execution: makeTable(
+        [
+          { key: 'time', label: '执行时间' },
+          { key: 'symbol', label: '品种' },
+          { key: 'market', label: '市场' },
+          { key: 'action', label: '执行动作' },
+          { key: 'trigger', label: '触发原因' },
+          { key: 'price', label: '执行价格' },
+          { key: 'qty', label: '数量' },
+          { key: 'status', label: '订单状态' },
+          { key: 'remark', label: '备注' },
+        ],
+        [
+          { time: '2026-07-12 13:05:10', symbol: 'BTCUSDT', market: '币', action: '突破追单', trigger: '盘中放量上破', price: '108,438', qty: '0.30', status: '部分成交', remark: '剩余数量继续排队' },
+          { time: '2026-07-12 10:18:44', symbol: 'XAUUSD', market: '黄金', action: '止盈撤单', trigger: '回撤未到止盈位', price: '2,352.0', qty: '2.00', status: '已撤单', remark: '改用手动平仓' },
+          { time: '2026-07-12 09:34:19', symbol: 'IF2609', market: '股指期货', action: '信号开仓', trigger: '开盘二次突破', price: '4,012.6', qty: '4', status: '全部成交', remark: '已同步挂出保护止损' },
+          { time: '2026-07-12 09:11:08', symbol: 'AU2510', market: '黄金', action: '条件单触发', trigger: '早盘弱势破位', price: '768.3', qty: '3', status: '已失败', remark: '交易时段限制，需改到主力合约' },
+        ],
+      ),
+    };
+    return profile;
+  })(),
 };

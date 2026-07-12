@@ -474,12 +474,7 @@
     min-width: 0;
   }
   .panel-eyebrow {
-    margin: 0 0 8px;
-    color: #64748b;
-    font-size: 11px;
-    font-weight: 700;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
+    display: none;
   }
   .terminal-panel h3 {
     margin: 0;

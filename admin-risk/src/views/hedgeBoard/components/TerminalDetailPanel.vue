@@ -663,8 +663,51 @@
     return Math.max(36, Math.min(100, 100 - distance * 1.35));
   }
 
-  function resolveTradingViewSymbol(_marketId: TerminalMarketId, _symbol: string, tvSymbol?: string) {
-    return tvSymbol || '';
+  const GLOBAL_TICKER_TO_TV_SYMBOL: Record<string, string> = {
+    EWA: 'AMEX:EWA',
+    EWC: 'AMEX:EWC',
+    EWQ: 'AMEX:EWQ',
+    EWG: 'AMEX:EWG',
+    EWH: 'AMEX:EWH',
+    EWI: 'AMEX:EWI',
+    EWJ: 'AMEX:EWJ',
+    EWN: 'AMEX:EWN',
+    EWS: 'AMEX:EWS',
+    EWP: 'AMEX:EWP',
+    EWL: 'AMEX:EWL',
+    EWU: 'AMEX:EWU',
+    ARGT: 'AMEX:ARGT',
+    EWZ: 'AMEX:EWZ',
+    ECH: 'AMEX:ECH',
+    MCHI: 'NASDAQ:MCHI',
+    INDA: 'BATS:INDA',
+    EIDO: 'AMEX:EIDO',
+    EWM: 'AMEX:EWM',
+    EWW: 'AMEX:EWW',
+    EPHE: 'AMEX:EPHE',
+    EPOL: 'AMEX:EPOL',
+    RSX: 'AMEX:RSX',
+    EZA: 'AMEX:EZA',
+    EWY: 'AMEX:EWY',
+    EWT: 'AMEX:EWT',
+    THD: 'AMEX:THD',
+    TUR: 'AMEX:TUR',
+    VNM: 'AMEX:VNM',
+    EFA: 'AMEX:EFA',
+    EEM: 'AMEX:EEM',
+    IEMG: 'NASDAQ:IEMG',
+    VEA: 'AMEX:VEA',
+    VWO: 'AMEX:VWO',
+    VIGI: 'NYSEARCA:VIGI',
+    AIA: 'NASDAQ:AIA',
+  };
+  function resolveTradingViewSymbol(marketId: TerminalMarketId, symbol: string, tvSymbol?: string) {
+    if (tvSymbol) return tvSymbol;
+    const normalized = symbol.trim().toUpperCase();
+    if (marketId === 'global') {
+      return GLOBAL_TICKER_TO_TV_SYMBOL[normalized] ?? '';
+    }
+    return '';
   }
 
   function canOpenTickerChart(symbol: string, tvSymbol?: string) {

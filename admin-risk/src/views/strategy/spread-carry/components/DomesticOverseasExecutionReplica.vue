@@ -1101,10 +1101,7 @@
   }
 
   .trade-modal__eyebrow {
-    margin: 0 0 6px;
-    color: #7f90aa;
-    font-size: 11px;
-    letter-spacing: 0.14em;
+    display: none;
   }
 
   .trade-modal__header h3 {

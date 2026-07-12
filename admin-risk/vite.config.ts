@@ -23,6 +23,8 @@ export default defineApplicationConfig({
       ],
     },
     server: {
+      port: 4373,
+      strictPort: true,
       watch: {
         usePolling: true,
       },

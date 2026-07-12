@@ -350,12 +350,7 @@
   }
 
   .eyebrow {
-    margin: 0 0 6px;
-    color: #a38a60;
-    font-size: 11px;
-    font-weight: 700;
-    letter-spacing: 0.22em;
-    text-transform: uppercase;
+    display: none;
   }
 
   .capital-head h3 {

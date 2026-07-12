@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="strategy-management-page">
     <section class="top-toolbar">
       <div class="top-toolbar__left">
@@ -11,6 +11,8 @@
     </section>
 
     <template v-if="activeSection === 'pnl'">
+      <DomesticOverseasOrdersAddon v-if="activeDesk === 'domesticOverseas'" />
+
       <StrategyOverviewBoard
         :overview="profile.overview"
         v-model:activePeriod="activePeriod"
@@ -26,11 +28,15 @@
     <template v-else-if="activeSection === 'capital'">
       <StrategyKpiGrid :items="profile.kpis" />
 
+      <StrategyCapitalFinanceBoard />
+
       <StrategyRuntimePanel
         :strategy-name="profile.strategyName"
         :gauges="profile.gauges"
         :breakdown="profile.accountBreakdown"
       />
+
+      <StrategyCapitalNetValueBoard />
 
       <DomesticOverseasCapitalAddon v-if="activeDesk === 'domesticOverseas'" />
     </template>
@@ -42,8 +48,6 @@
           :tables="profile.tables"
           v-model:activeTab="activeRecordTab"
         />
-
-        <DomesticOverseasOrdersAddon v-if="activeDesk === 'domesticOverseas'" />
       </section>
     </template>
   </div>
@@ -59,9 +63,10 @@
   import StrategyRuntimePanel from './components/StrategyRuntimePanel.vue';
   import StrategyCurveGrid from './components/StrategyCurveGrid.vue';
   import StrategyRecordsPanel from './components/StrategyRecordsPanel.vue';
+  import StrategyCapitalFinanceBoard from './components/StrategyCapitalFinanceBoard.vue';
+  import StrategyCapitalNetValueBoard from './components/StrategyCapitalNetValueBoard.vue';
   import DomesticOverseasPnlAddon from './components/DomesticOverseasPnlAddon.vue';
   import DomesticOverseasCapitalAddon from './components/DomesticOverseasCapitalAddon.vue';
-  import DomesticOverseasOrdersAddon from './components/DomesticOverseasOrdersAddon.vue';
   import { strategyDeskOrder, strategyDeskProfiles } from './mock/data';
   import type { StrategyDeskKey, StrategyPeriodKey } from './types';
 

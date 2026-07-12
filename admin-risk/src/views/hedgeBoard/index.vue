@@ -63,12 +63,23 @@
                 :key="`${section.id}-${widget.title}`"
                 class="widget-card"
               >
-                <div class="widget-card__header">
-                  <div class="widget-card__title-row">
-                    <span class="widget-card__index">
-                      {{ getWidgetSubtitle(widget.localKey, widget.subtitle) }}
-                    </span>
-                    <h5>{{ getWidgetTitle(widget.localKey, widget.title) }}</h5>
+                <div v-if="!shouldHideWidgetHeader(section.id, widget)" class="widget-card__header">
+                  <div class="widget-card__header-main">
+                    <div class="widget-card__title-row">
+                      <span class="widget-card__index">
+                        {{ getWidgetSubtitle(widget.localKey, widget.subtitle) }}
+                      </span>
+                      <h5>{{ getWidgetTitle(widget.localKey, widget.title) }}</h5>
+                    </div>
+                    <a
+                      v-if="getWidgetSourceLink(widget.localKey)"
+                      class="widget-card__link"
+                      :href="getWidgetSourceLink(widget.localKey)"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      原网址
+                    </a>
                   </div>
                 </div>
 
@@ -463,6 +474,12 @@
     return '';
   }
 
+  const widgetSourceLinks: Partial<Record<string, string>> = {
+    'btc-etf-flow': 'https://sosovalue.com/zh/assets/etf/Total_Crypto_Spot_ETF_Fund_Flow?page=usBTC',
+    'btc-treasury-flow': 'https://sosovalue.com/zh/assets/bitcoin-treasuries/weekly-net-inflow',
+    'spdr-daily-flow': 'https://sc.macromicro.me/collections/45/mm-gold-price/23274/gld-fund-flow',
+    'spdr-holdings-vs-price': 'https://sc.macromicro.me/collections/45/mm-gold-price/712/spdr-gold-trust-etf-gold-price',
+  };
   function getWidgetTitle(localKey: string | undefined, fallback: string) {
     if (!localKey) return fallback;
     return widgetTextOverrides[localKey]?.title ?? fallback;
@@ -470,6 +487,16 @@
 
   function getWidgetSubtitle() {
     return '';
+  }
+
+  function getWidgetSourceLink(localKey: string | undefined) {
+    if (!localKey) return '';
+    return widgetSourceLinks[localKey] ?? '';
+  }
+
+  function shouldHideWidgetHeader(sectionId: string, widget: WidgetConfig) {
+    if (sectionId === 'macro-liquidity' || sectionId === 'gold-main' || sectionId === 'crypto-main') return true;
+    return widget.kind === 'local-chart' && widget.localKey?.includes('market-detail-table');
   }
 
   function getWidgetSourceNote() {
@@ -510,6 +537,49 @@
     setup(props) {
       const mountRef = ref<HTMLDivElement | null>(null);
       const loadFailed = ref(false);
+      let resizeObserver: ResizeObserver | null = null;
+      let intersectionObserver: IntersectionObserver | null = null;
+      let renderTimer: number | null = null;
+      let verifyTimers: number[] = [];
+      let frameToken = 0;
+      let lastSizeKey = '';
+      let repairAttempts = 0;
+
+      const clearRenderTimers = () => {
+        if (renderTimer) window.clearTimeout(renderTimer);
+        verifyTimers.forEach((timer) => window.clearTimeout(timer));
+        renderTimer = null;
+        verifyTimers = [];
+      };
+
+      const verifyWidgetLayout = () => {
+        const mountNode = mountRef.value;
+        if (!mountNode) return;
+
+        const hostWidth = mountNode.clientWidth;
+        if (!hostWidth) return;
+
+        const iframe = mountNode.querySelector('iframe') as HTMLIFrameElement | null;
+        const iframeWidth = iframe?.clientWidth ?? 0;
+        if (iframe && iframeWidth > 0 && iframeWidth < hostWidth * 0.9 && repairAttempts < 3) {
+          repairAttempts += 1;
+          lastSizeKey = '';
+          scheduleRender(true);
+          return;
+        }
+
+        if (iframe && iframeWidth >= hostWidth * 0.9) repairAttempts = 0;
+      };
+
+      const scheduleLayoutHealing = () => {
+        verifyTimers.forEach((timer) => window.clearTimeout(timer));
+        verifyTimers = [180, 520, 1100, 1900].map((delay) =>
+          window.setTimeout(() => {
+            verifyWidgetLayout();
+            window.dispatchEvent(new Event('resize'));
+          }, delay),
+        );
+      };
 
       const renderWidget = () => {
         const mountNode = mountRef.value;
@@ -521,9 +591,13 @@
         try {
           const container = document.createElement('div');
           container.className = 'tradingview-widget-container';
+          container.style.width = '100%';
+          container.style.height = '100%';
 
           const widgetNode = document.createElement('div');
           widgetNode.className = 'tradingview-widget-container__widget';
+          widgetNode.style.width = '100%';
+          widgetNode.style.height = '100%';
           container.appendChild(widgetNode);
 
           const script = document.createElement('script');
@@ -531,6 +605,9 @@
           script.async = true;
           script.type = 'text/javascript';
           script.innerHTML = JSON.stringify(props.widget.config);
+          script.onload = () => {
+            scheduleLayoutHealing();
+          };
           script.onerror = () => {
             loadFailed.value = true;
             if (mountRef.value) mountRef.value.innerHTML = '';
@@ -545,9 +622,57 @@
         }
       };
 
-      onMounted(renderWidget);
-      watch(() => props.widget, renderWidget, { deep: true });
+      const scheduleRender = (force = false) => {
+        const mountNode = mountRef.value;
+        if (!mountNode) return;
+
+        const width = mountNode.clientWidth;
+        const height = mountNode.clientHeight;
+        if (!width || !height) return;
+        if (!mountNode.getClientRects().length) return;
+
+        const nextSizeKey = `${Math.round(width)}x${Math.round(height)}`;
+        if (!force && nextSizeKey === lastSizeKey && mountNode.childElementCount) return;
+        lastSizeKey = nextSizeKey;
+
+        clearRenderTimers();
+        if (force) repairAttempts = 0;
+        renderTimer = window.setTimeout(() => {
+          renderWidget();
+        }, 96);
+      };
+
+      onMounted(() => {
+        scheduleRender();
+        frameToken = window.requestAnimationFrame(() => {
+          frameToken = window.requestAnimationFrame(() => {
+            scheduleRender();
+          });
+        });
+
+        if (typeof ResizeObserver !== 'undefined' && mountRef.value) {
+          resizeObserver = new ResizeObserver(() => {
+            scheduleRender();
+          });
+          resizeObserver.observe(mountRef.value);
+        }
+
+        if (typeof IntersectionObserver !== 'undefined' && mountRef.value) {
+          intersectionObserver = new IntersectionObserver((entries) => {
+            if (entries.some((entry) => entry.isIntersecting)) {
+              scheduleRender(true);
+            }
+          }, { threshold: 0.2 });
+          intersectionObserver.observe(mountRef.value);
+        }
+      });
+
+      watch(() => props.widget, () => scheduleRender(true), { deep: true });
       onBeforeUnmount(() => {
+        if (frameToken) window.cancelAnimationFrame(frameToken);
+        clearRenderTimers();
+        resizeObserver?.disconnect();
+        intersectionObserver?.disconnect();
         if (mountRef.value) mountRef.value.innerHTML = '';
       });
 
@@ -624,6 +749,330 @@
     },
   });
 
+  function buildRangeOverview(values: number[], width: number, height: number) {
+    if (values.length <= 1) {
+      const midY = (height / 2).toFixed(2);
+      return {
+        linePath: `M 0 ${midY} L ${width.toFixed(2)} ${midY}`,
+        areaPath: `M 0 ${height.toFixed(2)} L 0 ${midY} L ${width.toFixed(2)} ${midY} L ${width.toFixed(2)} ${height.toFixed(2)} Z`,
+      };
+    }
+
+    const range = getRange(values);
+    const points = values.map((value, index) => {
+      const x = scaleX(index, values.length, width);
+      const y = scaleY(value, range.min, range.max, height - 4) + 2;
+      return { x, y };
+    });
+    const linePath = points
+      .map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x.toFixed(2)} ${point.y.toFixed(2)}`)
+      .join(' ');
+    const areaPath = [
+      `M ${points[0].x.toFixed(2)} ${height.toFixed(2)}`,
+      ...points.map((point) => `L ${point.x.toFixed(2)} ${point.y.toFixed(2)}`),
+      `L ${points.at(-1)!.x.toFixed(2)} ${height.toFixed(2)}`,
+      'Z',
+    ].join(' ');
+
+    return { linePath, areaPath };
+  }
+
+  function clampRangeValue(value: number, min: number, max: number) {
+    return Math.min(max, Math.max(min, value));
+  }
+
+  function beginChartRangeDrag(
+    event: MouseEvent,
+    options: {
+      mode: 'start' | 'end' | 'window' | 'jump';
+      viewport: HTMLElement | null;
+      maxIndex: number;
+      minGap: number;
+      startIndex: number;
+      endIndex: number;
+      onStartChange: (value: number) => void;
+      onEndChange: (value: number) => void;
+    },
+  ) {
+    const { viewport, mode, maxIndex, minGap, startIndex, endIndex, onStartChange, onEndChange } = options;
+    if (!viewport || maxIndex <= 0) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    const rect = viewport.getBoundingClientRect();
+    const pixelToIndex = (clientX: number) => {
+      const ratio = clampRangeValue((clientX - rect.left) / rect.width, 0, 1);
+      return Math.round(ratio * maxIndex);
+    };
+
+    const windowSpan = endIndex - startIndex;
+    const anchorIndex = pixelToIndex(event.clientX);
+
+    if (mode === 'jump') {
+      const centeredStart = clampRangeValue(
+        anchorIndex - Math.round(windowSpan / 2),
+        0,
+        Math.max(0, maxIndex - windowSpan),
+      );
+      onStartChange(centeredStart);
+      onEndChange(centeredStart + windowSpan);
+      return;
+    }
+
+    const dragOriginX = event.clientX;
+    const dragOriginStart = startIndex;
+    const dragOriginEnd = endIndex;
+
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      if (mode === 'window') {
+        const deltaRatio = (moveEvent.clientX - dragOriginX) / rect.width;
+        const deltaIndex = Math.round(deltaRatio * maxIndex);
+        const nextStart = clampRangeValue(
+          dragOriginStart + deltaIndex,
+          0,
+          Math.max(0, maxIndex - windowSpan),
+        );
+        onStartChange(nextStart);
+        onEndChange(nextStart + windowSpan);
+        return;
+      }
+
+      const nextIndex = pixelToIndex(moveEvent.clientX);
+      if (mode === 'start') {
+        onStartChange(clampRangeValue(nextIndex, 0, dragOriginEnd - minGap));
+        return;
+      }
+      onEndChange(clampRangeValue(nextIndex, dragOriginStart + minGap, maxIndex));
+    };
+
+    const handleMouseUp = () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+  }
+
+  function renderChartRangeSelector(options: {
+    labels: string[];
+    values: number[];
+    startIndex: number;
+    endIndex: number;
+    minWindowSize: number;
+    onStartChange: (value: number) => void;
+    onEndChange: (value: number) => void;
+  }) {
+    const { labels, values, startIndex, endIndex, minWindowSize, onStartChange, onEndChange } = options;
+    if (labels.length <= 1) return null;
+
+    const maxIndex = labels.length - 1;
+    const minSpan = Math.max(2, Math.min(minWindowSize, labels.length));
+    const minGap = minSpan - 1;
+    const safeStart = Math.max(0, Math.min(startIndex, Math.max(0, maxIndex - minGap)));
+    const safeEnd = Math.max(safeStart + minGap, Math.min(endIndex, maxIndex));
+    const startPercent = maxIndex <= 0 ? 0 : (safeStart / maxIndex) * 100;
+    const endPercent = maxIndex <= 0 ? 100 : (safeEnd / maxIndex) * 100;
+    const getLabelTransform = (percent: number, side: 'start' | 'end') => {
+      if (side === 'start') {
+        if (percent < 8) return 'translateX(0)';
+        if (percent > 92) return 'translateX(-100%)';
+      } else {
+        if (percent < 8) return 'translateX(0)';
+        if (percent > 92) return 'translateX(-100%)';
+      }
+      return 'translateX(-50%)';
+    };
+    const { linePath, areaPath } = buildRangeOverview(values, 100, 20);
+    const metaStyle = {
+      position: 'relative',
+      height: '16px',
+      marginBottom: '4px',
+      fontSize: '11px',
+      lineHeight: 1,
+      color: 'var(--hedge-cool-muted)',
+    } as const;
+    const viewportStyle = {
+      position: 'relative',
+      height: '22px',
+      background: 'transparent',
+      overflow: 'hidden',
+    } as const;
+    const overviewStyle = {
+      position: 'absolute',
+      inset: '1px 0',
+      width: '100%',
+      height: 'calc(100% - 2px)',
+      display: 'block',
+      pointerEvents: 'none',
+      zIndex: 0,
+    } as const;
+    const railStyle = {
+      position: 'absolute',
+      left: 0,
+      right: 0,
+      top: '50%',
+      transform: 'translateY(-50%)',
+      height: '12px',
+      borderRadius: '999px',
+      border: '1px solid rgba(192, 205, 227, 0.92)',
+      background: 'rgba(225, 235, 252, 0.28)',
+      boxShadow: 'inset 0 1px 1px rgba(255, 255, 255, 0.72)',
+      zIndex: 1,
+      cursor: 'pointer',
+    } as const;
+    const selectionStyle = {
+      left: `${startPercent}%`,
+      width: `${Math.max(4, endPercent - startPercent)}%`,
+      position: 'absolute',
+      top: '50%',
+      transform: 'translateY(-50%)',
+      height: '12px',
+      borderRadius: '999px',
+      background: 'rgba(202, 218, 251, 0.46)',
+      border: '1px solid rgba(142, 171, 235, 0.88)',
+      boxShadow: 'inset 0 0 0 1px rgba(255, 255, 255, 0.32)',
+      zIndex: 2,
+      cursor: 'grab',
+    } as const;
+    const handleBaseStyle = {
+      position: 'absolute',
+      top: '50%',
+      width: '6px',
+      height: '14px',
+      borderRadius: '999px',
+      background: 'rgba(255, 255, 255, 0.98)',
+      border: '1px solid rgba(146, 171, 230, 0.9)',
+      boxShadow: '0 1px 2px rgba(124, 145, 186, 0.14)',
+      transform: 'translateY(-50%)',
+      cursor: 'ew-resize',
+      zIndex: 3,
+    } as const;
+
+    return h('div', { class: 'chart-range' }, [
+      h('div', { class: 'chart-range__labels', style: metaStyle }, [
+        h('span', {
+          class: 'chart-range__label chart-range__label--start',
+          style: {
+            position: 'absolute',
+            left: `${startPercent}%`,
+            top: 0,
+            transform: getLabelTransform(startPercent, 'start'),
+            whiteSpace: 'nowrap',
+          },
+        }, labels[safeStart] ?? ''),
+        h('span', {
+          class: 'chart-range__label chart-range__label--end',
+          style: {
+            position: 'absolute',
+            left: `${endPercent}%`,
+            top: 0,
+            transform: getLabelTransform(endPercent, 'end'),
+            whiteSpace: 'nowrap',
+          },
+        }, labels[safeEnd] ?? ''),
+      ]),
+      h('div', {
+        class: 'chart-range__viewport',
+        style: viewportStyle,
+        onMousedown: (mouseEvent: MouseEvent) =>
+          beginChartRangeDrag(mouseEvent, {
+            mode: 'jump',
+            viewport: mouseEvent.currentTarget as HTMLElement,
+            maxIndex,
+            minGap,
+            startIndex: safeStart,
+            endIndex: safeEnd,
+            onStartChange,
+            onEndChange,
+          }),
+      }, [
+        h(
+          'svg',
+          {
+            viewBox: '0 0 100 20',
+            preserveAspectRatio: 'none',
+            class: 'chart-range__overview',
+            style: overviewStyle,
+            'aria-hidden': 'true',
+          },
+          [
+            h('path', {
+              d: areaPath,
+              class: 'chart-range__overview-area',
+              fill: 'rgba(197, 214, 249, 0.7)',
+            }),
+            h('path', {
+              d: linePath,
+              class: 'chart-range__overview-line',
+              fill: 'none',
+              stroke: 'rgba(137, 167, 233, 0.95)',
+              'stroke-width': 1.1,
+              'stroke-linecap': 'round',
+              'stroke-linejoin': 'round',
+            }),
+          ],
+        ),
+        h('span', {
+          class: 'chart-range__rail',
+          style: railStyle,
+          'aria-hidden': 'true',
+        }),
+        h(
+          'div',
+          {
+            class: 'chart-range__selection',
+            style: selectionStyle,
+            onMousedown: (mouseEvent: MouseEvent) =>
+              beginChartRangeDrag(mouseEvent, {
+                mode: 'window',
+                viewport: (mouseEvent.currentTarget as HTMLElement).closest('.chart-range__viewport') as HTMLElement | null,
+                maxIndex,
+                minGap,
+                startIndex: safeStart,
+                endIndex: safeEnd,
+                onStartChange,
+                onEndChange,
+              }),
+          },
+          [
+            h('span', {
+              class: 'chart-range__handle chart-range__handle--start',
+              style: { ...handleBaseStyle, left: '-3px' },
+              onMousedown: (mouseEvent: MouseEvent) =>
+                beginChartRangeDrag(mouseEvent, {
+                  mode: 'start',
+                  viewport: (mouseEvent.currentTarget as HTMLElement).closest('.chart-range__viewport') as HTMLElement | null,
+                  maxIndex,
+                  minGap,
+                  startIndex: safeStart,
+                  endIndex: safeEnd,
+                  onStartChange,
+                  onEndChange,
+                }),
+            }),
+            h('span', {
+              class: 'chart-range__handle chart-range__handle--end',
+              style: { ...handleBaseStyle, right: '-3px' },
+              onMousedown: (mouseEvent: MouseEvent) =>
+                beginChartRangeDrag(mouseEvent, {
+                  mode: 'end',
+                  viewport: (mouseEvent.currentTarget as HTMLElement).closest('.chart-range__viewport') as HTMLElement | null,
+                  maxIndex,
+                  minGap,
+                  startIndex: safeStart,
+                  endIndex: safeEnd,
+                  onStartChange,
+                  onEndChange,
+                }),
+            }),
+          ],
+        ),
+      ]),
+    ]);
+  }
+
   const DualAxisChart = defineComponent({
     name: 'DualAxisChart',
     props: {
@@ -686,25 +1135,47 @@
     },
     setup(props) {
       const startIndex = ref(0);
+      const endIndex = ref(0);
 
       watch(
-        () => [props.rows.length, props.windowSize],
+        () => [props.rows.length, props.windowSize, props.showRangeSlider],
         () => {
-          const visibleCount = Math.max(2, Math.min(props.windowSize, props.rows.length || props.windowSize));
-          const maxStart = Math.max(0, props.rows.length - visibleCount);
-          if (startIndex.value > maxStart) startIndex.value = maxStart;
+          const minSpan = Math.max(2, Math.min(props.windowSize, props.rows.length || props.windowSize));
+          const maxIndex = Math.max(0, props.rows.length - 1);
+
+          if (!props.showRangeSlider) {
+            startIndex.value = 0;
+            endIndex.value = maxIndex;
+            return;
+          }
+
+          if (maxIndex < minSpan - 1) {
+            startIndex.value = 0;
+            endIndex.value = maxIndex;
+            return;
+          }
+
+          if (endIndex.value <= 0) {
+            endIndex.value = Math.min(maxIndex, minSpan - 1);
+          }
+          if (endIndex.value > maxIndex) endIndex.value = maxIndex;
+          if (startIndex.value > endIndex.value - (minSpan - 1)) {
+            startIndex.value = Math.max(0, endIndex.value - (minSpan - 1));
+          }
+          if (endIndex.value < startIndex.value + (minSpan - 1)) {
+            endIndex.value = Math.min(maxIndex, startIndex.value + (minSpan - 1));
+          }
         },
         { immediate: true },
       );
 
       return () => {
-        const visibleCount = props.showRangeSlider
+        const minSpan = props.showRangeSlider
           ? Math.max(2, Math.min(props.windowSize, props.rows.length || props.windowSize))
           : props.rows.length;
-        const maxStart = Math.max(0, props.rows.length - visibleCount);
         const visibleRows =
-          props.showRangeSlider && maxStart > 0
-            ? props.rows.slice(startIndex.value, startIndex.value + visibleCount)
+          props.showRangeSlider && props.rows.length > minSpan
+            ? props.rows.slice(startIndex.value, endIndex.value + 1)
             : props.rows;
         const innerWidth = CHART_WIDTH - CHART_PADDING.left - CHART_PADDING.right;
         const innerHeight = CHART_HEIGHT - CHART_PADDING.top - CHART_PADDING.bottom;
@@ -718,7 +1189,7 @@
           ? ''
           : buildLinePath(
               visibleRows,
-              (_row, index) => scaleX(index, props.rows.length, innerWidth),
+              (_row, index) => scaleX(index, visibleRows.length, innerWidth),
               (row) => scaleY(row.left, leftRange.min, leftRange.max, innerHeight),
             );
         const rightLinePath = buildLinePath(
@@ -811,66 +1282,65 @@
                         formatAxis(tick),
                       );
                     }),
-                    ...visibleRows
-                      .map((row, index) => {
-                        if (!props.leftAsBars) return null;
-                        const x = scaleX(index, visibleRows.length, innerWidth);
-                        const y = scaleY(row.left, leftRange.min, leftRange.max, innerHeight);
-                        const height = Math.abs(zeroY - y);
-                        const barY = row.left >= 0 ? y : zeroY;
-                        return h('rect', {
-                          key: `${row.date}-bar`,
-                          x: x - barWidth / 2,
-                          y: barY,
-                          width: barWidth,
-                          height: Math.max(height, 1),
-                          rx: 2,
-                          fill: props.divergingBars
-                            ? row.left >= 0
-                              ? props.barPositiveColor || '#0f8b6d'
-                              : props.barNegativeColor || '#dc2626'
-                            : props.leftColor,
-                          opacity: 0.86,
-                        });
-                      })
-                      .filter(Boolean),
-                    leftLinePath
-                      ? h('path', {
+                    props.leftAsBars
+                      ? h(
+                          'g',
+                          visibleRows.map((row, index) => {
+                            const value = row.left;
+                            const y = scaleY(value, leftRange.min, leftRange.max, innerHeight);
+                            const x = scaleX(index, visibleRows.length, innerWidth) - barWidth / 2;
+                            const height = Math.abs(zeroY - y);
+                            return h('rect', {
+                              key: `bar-${row.date}`,
+                              x,
+                              y: value >= 0 ? y : zeroY,
+                              width: barWidth,
+                              height: Math.max(1, height),
+                              rx: 3,
+                              fill:
+                                value >= 0
+                                  ? props.barPositiveColor || props.leftColor
+                                  : props.barNegativeColor || props.leftColor,
+                              opacity: 0.88,
+                            });
+                          }),
+                        )
+                      : h('path', {
                           d: leftLinePath,
                           fill: 'none',
                           stroke: props.leftColor,
-                          strokeWidth: 2.5,
+                          strokeWidth: 2.4,
                           strokeLinecap: 'round',
-                        })
-                      : null,
+                          strokeLinejoin: 'round',
+                        }),
                     h('path', {
                       d: rightLinePath,
                       fill: 'none',
                       stroke: props.rightColor,
-                      strokeWidth: 2.5,
+                      strokeWidth: 2.6,
                       strokeLinecap: 'round',
+                      strokeLinejoin: 'round',
                     }),
                     ...renderDateLabels(visibleRows, innerWidth, innerHeight),
-                  ].filter(Boolean),
+                  ],
                 ),
               ],
             ),
           ]),
-          props.showRangeSlider && maxStart > 0
-            ? h('div', { class: 'chart-range' }, [
-                h('span', visibleRows[0]?.date ?? ''),
-                h('input', {
-                  class: 'chart-range__input',
-                  type: 'range',
-                  min: 0,
-                  max: maxStart,
-                  value: startIndex.value,
-                  onInput: (event: Event) => {
-                    startIndex.value = Number((event.target as HTMLInputElement).value);
-                  },
-                }),
-                h('span', visibleRows.at(-1)?.date ?? ''),
-              ])
+          props.showRangeSlider && props.rows.length > minSpan
+            ? renderChartRangeSelector({
+                labels: props.rows.map((row) => row.date),
+                values: props.rows.map((row) => row.right),
+                startIndex: startIndex.value,
+                endIndex: endIndex.value,
+                minWindowSize: minSpan,
+                onStartChange: (value) => {
+                  startIndex.value = value;
+                },
+                onEndChange: (value) => {
+                  endIndex.value = value;
+                },
+              })
             : null,
         ]);
       };
@@ -881,14 +1351,41 @@
     name: 'TreasuryFlowChart',
     setup() {
       const startIndex = ref(0);
+      const endIndex = ref(0);
       const windowSize = 4;
 
+      watch(
+        () => BTC_TREASURY_FLOW_ROWS.length,
+        () => {
+          const minSpan = Math.max(2, Math.min(windowSize, BTC_TREASURY_FLOW_ROWS.length || windowSize));
+          const maxIndex = Math.max(0, BTC_TREASURY_FLOW_ROWS.length - 1);
+
+          if (maxIndex < minSpan - 1) {
+            startIndex.value = 0;
+            endIndex.value = maxIndex;
+            return;
+          }
+
+          if (endIndex.value <= 0) {
+            endIndex.value = Math.min(maxIndex, minSpan - 1);
+          }
+          if (endIndex.value > maxIndex) endIndex.value = maxIndex;
+          if (startIndex.value > endIndex.value - (minSpan - 1)) {
+            startIndex.value = Math.max(0, endIndex.value - (minSpan - 1));
+          }
+          if (endIndex.value < startIndex.value + (minSpan - 1)) {
+            endIndex.value = Math.min(maxIndex, startIndex.value + (minSpan - 1));
+          }
+        },
+        { immediate: true },
+      );
+
       return () => {
-        const rows = BTC_TREASURY_FLOW_ROWS.slice(
-          startIndex.value,
-          startIndex.value + Math.min(windowSize, BTC_TREASURY_FLOW_ROWS.length),
-        );
-        const maxStart = Math.max(0, BTC_TREASURY_FLOW_ROWS.length - windowSize);
+        const minSpan = Math.max(2, Math.min(windowSize, BTC_TREASURY_FLOW_ROWS.length || windowSize));
+        const rows =
+          BTC_TREASURY_FLOW_ROWS.length > minSpan
+            ? BTC_TREASURY_FLOW_ROWS.slice(startIndex.value, endIndex.value + 1)
+            : BTC_TREASURY_FLOW_ROWS;
         const series = [
           { key: 'listed', label: '上市公司', color: '#356df3' },
           { key: 'private', label: '私营财库', color: '#6d93ad' },
@@ -959,8 +1456,7 @@
                     const centerX = scaleX(rowIndex, rows.length, innerWidth);
                     return series.map((item, seriesIndex) => {
                       const value = Number(row[item.key]);
-                      const x =
-                        centerX - singleBarWidth * 1.45 + seriesIndex * (singleBarWidth + 4);
+                      const x = centerX - singleBarWidth * 1.45 + seriesIndex * (singleBarWidth + 4);
                       const y = scaleY(value, Math.min(0, range.min), range.max, innerHeight);
                       const height = Math.abs(baseY - y);
                       return h('rect', {
@@ -983,21 +1479,22 @@
               ],
             ),
           ]),
-          maxStart > 0
-            ? h('div', { class: 'chart-range' }, [
-                h('span', String(rows[0]?.date ?? '')),
-                h('input', {
-                  class: 'chart-range__input',
-                  type: 'range',
-                  min: 0,
-                  max: maxStart,
-                  value: startIndex.value,
-                  onInput: (event: Event) => {
-                    startIndex.value = Number((event.target as HTMLInputElement).value);
-                  },
-                }),
-                h('span', String(rows.at(-1)?.date ?? '')),
-              ])
+          BTC_TREASURY_FLOW_ROWS.length > minSpan
+            ? renderChartRangeSelector({
+                labels: BTC_TREASURY_FLOW_ROWS.map((row) => String(row.date)),
+                values: BTC_TREASURY_FLOW_ROWS.map(
+                  (row) => Number(row.listed) + Number(row.private) + Number(row.funds),
+                ),
+                startIndex: startIndex.value,
+                endIndex: endIndex.value,
+                minWindowSize: minSpan,
+                onStartChange: (value) => {
+                  startIndex.value = value;
+                },
+                onEndChange: (value) => {
+                  endIndex.value = value;
+                },
+              })
             : null,
         ]);
       };
@@ -1166,23 +1663,54 @@
                 h('button', { type: 'button' }, '每月'),
                 h('button', { type: 'button', class: 'is-active' }, '每周'),
               ]),
-              h(
-                'a',
-                {
-                  class: 'etf-weekly-panel__link',
-                  href: ETF_REFERENCE_URL,
-                  target: '_blank',
-                  rel: 'noreferrer',
-                },
-                '官方数据页',
-              ),
             ]),
           ]),
           h('div', { class: 'etf-weekly-panel__axis-head' }, [
             h('span', '需求（吨）'),
             h('span', '黄金（美元/盎司）'),
           ]),
-          h('div', { class: 'chart-shell chart-shell--etf-weekly' }, [
+          h('div', {
+            class: 'chart-shell chart-shell--etf-weekly',
+            style: {
+              position: 'relative',
+              paddingTop: '8px',
+              borderRadius: 0,
+              borderLeft: 'none',
+              borderRight: 'none',
+              borderBottom: 'none',
+              background: 'transparent',
+            },
+          }, [
+            h(
+              'a',
+              {
+                class: 'widget-card__link chart-shell__link-overlay etf-weekly-panel__link',
+                href: ETF_REFERENCE_URL,
+                target: '_blank',
+                rel: 'noreferrer',
+                style: {
+                  position: 'absolute',
+                  top: '8px',
+                  right: '8px',
+                  zIndex: 5,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  minHeight: '34px',
+                  padding: '0 14px',
+                  border: '1px solid rgba(189, 206, 232, 0.96)',
+                  borderRadius: '15px',
+                  background: 'rgba(255, 255, 255, 0.98)',
+                  color: '#2b3b52',
+                  fontSize: '12px',
+                  fontWeight: 700,
+                  lineHeight: 1,
+                  textDecoration: 'none',
+                  boxShadow: '0 1px 2px rgba(148, 163, 184, 0.08)',
+                },
+              },
+              '原网址',
+            ),
             h(
               'svg',
               {
@@ -2231,7 +2759,7 @@
 
   .module-subnav__title-row {
     display: inline-flex;
-    align-items: baseline;
+    align-items: center;
     flex-wrap: wrap;
     gap: 8px;
     color: var(--hedge-cool-text);
@@ -2248,10 +2776,13 @@
   }
 
   .module-subnav__index {
+    display: inline-flex;
+    align-items: center;
     color: inherit;
-    font-size: inherit;
-    font-weight: inherit;
-    line-height: inherit;
+    font-size: 14px;
+    font-weight: 700;
+    line-height: 1.4;
+    font-family: inherit;
     letter-spacing: 0.01em;
   }
 
@@ -2331,11 +2862,43 @@
     padding: 18px 20px 10px;
   }
 
+  .widget-card__header-main {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+  }
+
   .widget-card__title-row {
     display: flex;
     align-items: baseline;
     flex-wrap: wrap;
     gap: 12px;
+    min-width: 0;
+  }
+
+  .widget-card__link {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 32px;
+    padding: 0 12px;
+    border: 1px solid rgba(191, 205, 224, 0.9);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.92);
+    color: var(--hedge-cool-text);
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1;
+    text-decoration: none;
+    transition: border-color 0.2s ease, color 0.2s ease, background-color 0.2s ease;
+  }
+
+  .widget-card__link:hover {
+    border-color: rgba(59, 130, 246, 0.42);
+    color: #1d4ed8;
+    background: rgba(239, 246, 255, 0.95);
   }
 
   .widget-card__header h5 {
@@ -2407,10 +2970,18 @@
   }
 
   .chart-shell {
+    position: relative;
     overflow: hidden;
     border: 1px solid rgba(201, 213, 226, 0.58);
     border-radius: 18px;
     background: #fff;
+  }
+
+  .chart-shell__link-overlay {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    z-index: 3;
   }
 
   .local-chart-svg {
@@ -2480,6 +3051,145 @@
     stroke-dasharray: 3 3;
   }
 
+  .chart-range {
+    display: grid;
+    gap: 6px;
+    margin-top: 14px;
+  }
+
+  .chart-range__labels {
+    position: relative;
+    height: 16px;
+    color: var(--hedge-cool-muted);
+    font-size: 11px;
+    line-height: 1;
+    letter-spacing: 0.01em;
+  }
+
+  .chart-range__label {
+    position: absolute;
+    top: 0;
+    white-space: nowrap;
+  }
+
+  .chart-range__viewport {
+    position: relative;
+    height: 22px;
+    background: transparent;
+  }
+
+  .chart-range__overview {
+    position: absolute;
+    inset: 1px 0;
+    width: 100%;
+    height: calc(100% - 2px);
+  }
+
+  .chart-range__overview-area {
+    fill: rgba(197, 214, 249, 0.7);
+  }
+
+  .chart-range__overview-line {
+    fill: none;
+    stroke: rgba(137, 167, 233, 0.95);
+    stroke-width: 1.1;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .chart-range__rail,
+  .chart-range__selection {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    height: 12px;
+    border-radius: 999px;
+  }
+
+  .chart-range__rail {
+    left: 0;
+    right: 0;
+    border: 1px solid rgba(192, 205, 227, 0.92);
+    background: rgba(225, 235, 252, 0.28);
+    box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.72);
+  }
+
+  .chart-range__selection {
+    background: rgba(202, 218, 251, 0.34);
+    border: 1px solid rgba(142, 171, 235, 0.88);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.32);
+    pointer-events: none;
+  }
+
+  .chart-range__handle {
+    position: absolute;
+    top: 50%;
+    width: 2px;
+    height: 12px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.98);
+    box-shadow: 0 0 0 1px rgba(126, 151, 211, 0.3);
+    transform: translateY(-50%);
+  }
+
+  .chart-range__handle--start {
+    left: 3px;
+  }
+
+  .chart-range__handle--end {
+    right: 3px;
+  }
+
+  .chart-range__input {
+    position: absolute;
+    inset: 0;
+    z-index: 3;
+    width: 100%;
+    margin: 0;
+    background: transparent;
+    appearance: none;
+    -webkit-appearance: none;
+    pointer-events: none;
+  }
+
+  .chart-range__input--end {
+    z-index: 4;
+  }
+
+  .chart-range__input::-webkit-slider-runnable-track {
+    height: 22px;
+    background: transparent;
+  }
+
+  .chart-range__input::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 10px;
+    height: 22px;
+    margin-top: 0;
+    border: 1px solid rgba(162, 180, 218, 0.88);
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.98);
+    box-shadow: 0 1px 3px rgba(124, 145, 186, 0.18);
+    cursor: ew-resize;
+    pointer-events: auto;
+  }
+
+  .chart-range__input::-moz-range-track {
+    height: 22px;
+    background: transparent;
+  }
+
+  .chart-range__input::-moz-range-thumb {
+    width: 10px;
+    height: 22px;
+    border: 1px solid rgba(162, 180, 218, 0.88);
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.98);
+    box-shadow: 0 1px 3px rgba(124, 145, 186, 0.18);
+    cursor: ew-resize;
+    pointer-events: auto;
+  }
+
   .etf-weekly-panel {
     gap: 12px;
     padding-top: 4px;
@@ -2527,15 +3237,22 @@
   }
 
   .etf-weekly-panel__link {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    padding: 10px 14px;
-    border-radius: 10px;
-    background: #35586e;
-    color: #fff;
-    font-size: 13px;
+    min-height: 34px;
+    padding: 0 14px;
+    border-color: rgba(189, 206, 232, 0.96);
+    border-radius: 15px;
+    background: rgba(255, 255, 255, 0.98);
+    color: #2b3b52;
+    font-size: 12px;
     font-weight: 700;
+    box-shadow: 0 1px 2px rgba(148, 163, 184, 0.08);
+  }
+
+  .widget-frame .tradingview-widget-container,
+  .widget-frame .tradingview-widget-container__widget {
+    width: 100%;
+    height: 100%;
+    min-height: inherit;
   }
 
   .etf-weekly-panel__axis-head {
@@ -2548,11 +3265,17 @@
   }
 
   .chart-shell--etf-weekly {
+    padding-top: 8px;
     border-radius: 0;
     border-left: none;
     border-right: none;
     border-bottom: none;
     background: transparent;
+  }
+
+  .chart-shell--etf-weekly .chart-shell__link-overlay {
+    top: 8px;
+    right: 8px;
   }
 
 .chart-legend--weekly {
@@ -3277,6 +4000,11 @@
       font-size: 24px;
     }
 
+    .widget-card__header-main {
+      flex-wrap: wrap;
+      align-items: flex-start;
+    }
+
     .widget-card__header,
     .widget-card__footer,
     .widget-frame,
@@ -3287,3 +4015,9 @@
     }
   }
 </style>
+
+
+
+
+
+

@@ -290,6 +290,9 @@ export const researchModules: ResearchModule[] = [
             height: 620,
             hide_side_toolbar: false,
           }),
+          advancedChart('Gold IV (GVZCLS)', '', 'FRED:GVZCLS', {
+            height: 320,
+          }),
         ],
       },
       {
@@ -394,6 +397,9 @@ export const researchModules: ResearchModule[] = [
             height: 620,
             hide_side_toolbar: false,
           }),
+          advancedChart('BTC IV (DERIBIT DVOL)', '', 'DERIBIT:DVOL', {
+            height: 320,
+          }),
         ],
       },
       {
@@ -429,3 +435,4 @@ export const researchModules: ResearchModule[] = [
     ],
   },
 ];
+

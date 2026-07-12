@@ -500,9 +500,7 @@
   }
 
   .sync-card p {
-    margin: 8px 0 0;
-    color: #8a94a1;
-    font-size: 12px;
+    display: none;
   }
 
   .sync-card__actions {

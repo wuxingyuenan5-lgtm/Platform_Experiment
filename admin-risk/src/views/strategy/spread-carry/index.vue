@@ -3,11 +3,6 @@
     <section v-if="activeSection === 'analysis'" class="spread-workspace-head">
       <div class="spread-workspace-head__main">
         <h2>{{ workspaceTitle }}</h2>
-        <div class="spread-workspace-head__meta">
-          <span>{{ selectedVenue }}</span>
-          <span>{{ leftLegSymbol }} - {{ rightLegSymbol }}</span>
-          <span>{{ selectedResolution }}</span>
-        </div>
       </div>
     </section>
 
@@ -61,7 +56,19 @@
 
       <section class="spread-chart-card">
         <div class="spread-chart-toolbar">
-          <div class="spread-chart-filters">
+          <div class="spread-chart-toolbar__left">
+            <label class="chart-select chart-select--plain">
+              <select v-model="progressLevel">
+                <option value="15min">15min</option>
+                <option value="1h">1h</option>
+                <option value="4h">4h</option>
+                <option value="日线">日线</option>
+              </select>
+            </label>
+            <input v-model="startDate" type="date" />
+            <input v-model="endDate" type="date" />
+          </div>
+          <div class="spread-chart-toolbar__center">
             <div class="spread-series-inline">
               <button
                 type="button"
@@ -80,17 +87,8 @@
                 黄金价格
               </button>
             </div>
-            <label class="chart-select chart-select--plain">
-              <select v-model="progressLevel">
-                <option value="15min">15min</option>
-                <option value="1h">1h</option>
-                <option value="4h">4h</option>
-                <option value="日线">日线</option>
-              </select>
-            </label>
-            <input v-model="startDate" type="date" />
-            <input v-model="endDate" type="date" />
           </div>
+          <div class="spread-chart-toolbar__right"></div>
         </div>
 
         <div ref="mainChartRef" class="spread-chart"></div>
@@ -197,28 +195,28 @@
 
       <section class="statistics-section">
         <div class="section-head">
-        <div>
-          <p>Spread Analytics</p>
-          <h3>统计分析</h3>
-        </div>
-
-        <div class="section-filters">
-            <label class="chart-select chart-select--plain">
-              <select v-model="progressLevel">
-                <option value="15min">15min</option>
-                <option value="1h">1h</option>
-                <option value="4h">4h</option>
-                <option value="日线">日线</option>
-              </select>
-            </label>
-            <input v-model="startDate" type="date" />
-            <input v-model="endDate" type="date" />
+          <div>
+            <h3>统计分析</h3>
           </div>
         </div>
 
         <div class="statistics-grid">
           <article class="stats-card stats-card--summary">
-            <header>区间统计</header>
+            <header class="stats-card__header">
+              <span>区间统计</span>
+              <div class="stats-card__controls">
+                <label class="chart-select chart-select--plain">
+                  <select v-model="progressLevel">
+                    <option value="15min">15min</option>
+                    <option value="1h">1h</option>
+                    <option value="4h">4h</option>
+                    <option value="日线">日线</option>
+                  </select>
+                </label>
+                <input v-model="startDate" type="date" />
+                <input v-model="endDate" type="date" />
+              </div>
+            </header>
             <div class="stats-kpi-grid">
               <div v-for="item in statsRows" :key="item.label" class="stats-kpi">
                 <span>{{ item.label }}</span>
@@ -570,7 +568,7 @@
     await seasonalChart.setOptions({
       color: ['#4ca7dd', '#f2a43a', '#65c1bb', '#de6f7b', '#7286ff'],
       tooltip: { trigger: 'axis' },
-      legend: { top: 8, left: 0, itemWidth: 10, itemHeight: 10 },
+      legend: { top: 8, left: 'center', itemWidth: 10, itemHeight: 10 },
       grid: { left: 16, right: 16, top: 42, bottom: 18, containLabel: true },
       xAxis: {
         type: 'category',
@@ -640,26 +638,6 @@
     font-size: 20px;
     font-weight: 900;
     letter-spacing: 0.01em;
-  }
-
-  .spread-workspace-head__meta {
-    display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 10px;
-  }
-
-  .spread-workspace-head__meta span {
-    display: inline-flex;
-    align-items: center;
-    min-height: 32px;
-    padding: 0 12px;
-    border: 1px solid var(--strategy-border);
-    border-radius: 999px;
-    background: linear-gradient(180deg, var(--strategy-surface) 0%, var(--strategy-surface-soft) 100%);
-    color: var(--strategy-text-3);
-    font-size: 12px;
-    font-weight: 800;
   }
 
   .spread-overview {
@@ -767,12 +745,36 @@
   }
 
   .spread-chart-filters,
-  .section-filters {
+  .stats-card__controls {
     display: flex;
     align-items: center;
     flex-wrap: wrap;
     justify-content: flex-end;
     gap: 10px;
+  }
+
+  .spread-chart-toolbar__left,
+  .spread-chart-toolbar__center,
+  .spread-chart-toolbar__right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+  }
+
+  .spread-chart-toolbar__left {
+    flex: 0 0 auto;
+    flex-wrap: nowrap;
+  }
+
+  .spread-chart-toolbar__center {
+    flex: 1;
+    justify-content: center;
+  }
+
+  .spread-chart-toolbar__right {
+    flex: 0 0 auto;
+    justify-content: flex-end;
   }
 
   .spread-series-inline {
@@ -784,8 +786,8 @@
   .series-switch,
   .spread-chart-filters input,
   .spread-chart-filters select,
-  .section-filters input,
-  .section-filters select {
+  .stats-card__controls input,
+  .stats-card__controls select {
     height: 38px;
     padding: 0 14px;
     border: 1px solid var(--strategy-border-strong);
@@ -812,6 +814,29 @@
     gap: 6px;
   }
 
+  .spread-chart-toolbar__left .chart-select {
+    gap: 0;
+    flex: 0 0 auto;
+  }
+
+  .spread-chart-toolbar__left input,
+  .spread-chart-toolbar__left select {
+    height: 32px;
+    padding: 0 12px;
+    border: 1px solid rgba(191, 205, 224, 0.96);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.98);
+    color: #3b4b63;
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1;
+    box-shadow: 0 1px 2px rgba(148, 163, 184, 0.06);
+  }
+
+  .spread-chart-toolbar__left input {
+    min-width: 122px;
+  }
+
   .chart-select span,
   .section-head p {
     color: var(--strategy-text-faint);
@@ -819,6 +844,41 @@
     font-weight: 800;
     letter-spacing: 0.14em;
     text-transform: uppercase;
+  }
+
+  .stats-card__header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 18px;
+  }
+
+  .stats-card__header > span {
+    color: var(--strategy-text-2);
+    font-size: 16px;
+    font-weight: 800;
+  }
+
+  .stats-card__controls {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+
+  .stats-card__controls .chart-select {
+    gap: 0;
+  }
+
+  .stats-card__controls input,
+  .stats-card__controls select {
+    height: 32px;
+    padding: 0 10px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 700;
   }
 
   .spread-chart {
@@ -911,7 +971,7 @@
   }
 
   .section-head h3 {
-    margin: 8px 0 0;
+    margin: 0;
     color: var(--strategy-text-1);
     font-family: var(--strategy-font-sans);
     font-size: 26px;
@@ -1039,9 +1099,20 @@
     }
 
     .spread-chart-filters,
-    .section-filters,
+    .stats-card__controls,
     .domestic-realtime-toolbar {
       justify-content: flex-start;
+    }
+
+    .spread-chart-toolbar__left,
+    .spread-chart-toolbar__center,
+    .spread-chart-toolbar__right {
+      width: 100%;
+      justify-content: flex-start;
+    }
+
+    .spread-chart-toolbar__left {
+      flex-wrap: wrap;
     }
   }
 

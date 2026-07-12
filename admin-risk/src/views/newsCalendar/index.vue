@@ -77,12 +77,7 @@
           <section class="wealth-page">
             <header class="wealth-header">
               <div>
-                <div class="wealth-eyebrow">WEALTH CAMPAIGNS</div>
                 <h2>理财信息</h2>
-                <p>
-                  参考 Barker campaigns 的浅色风格、筛选器和活动列表，把稳定币与美元类理财活动沉淀为平台内信息台。
-                </p>
-                <strong class="wealth-source">当前数据源：本地兜底数据</strong>
               </div>
 
               <div class="wealth-actions">
@@ -548,7 +543,7 @@
 
   .section-head h2,
   .wealth-header h2 {
-    margin: 0;
+    margin: -2px 0 0;
     color: #1f2d3a;
     font-size: 30px;
     font-weight: 700;
@@ -697,7 +692,7 @@
     align-items: flex-start;
     justify-content: space-between;
     gap: 24px;
-    margin-bottom: 22px;
+    margin-bottom: 18px;
   }
 
   .wealth-header p {

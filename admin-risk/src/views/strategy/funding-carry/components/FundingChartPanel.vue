@@ -196,12 +196,7 @@
   }
 
   .eyebrow {
-    margin: 0;
-    color: rgba(36, 29, 21, 0.46);
-    font-size: 11px;
-    font-weight: 700;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
+    display: none;
   }
 
   .chart-panel__header {

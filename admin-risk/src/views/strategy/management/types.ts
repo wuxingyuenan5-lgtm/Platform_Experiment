@@ -1,4 +1,4 @@
-export type StrategyDeskKey = 'funding' | 'spread' | 'crossSpread' | 'domesticOverseas' | 'dip';
+export type StrategyDeskKey = 'funding' | 'spread' | 'crossSpread' | 'domesticOverseas' | 'dip' | 'shortLineTraderL';
 export type StrategyPeriodKey = 'day' | 'week' | 'month' | 'custom';
 
 export interface StrategyKpiCard {

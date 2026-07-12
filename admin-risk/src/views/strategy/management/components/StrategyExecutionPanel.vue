@@ -403,6 +403,10 @@
     color: var(--strategy-text-3);
   }
 
+  .panel-head p {
+    display: none;
+  }
+
   .ghost-btn,
   .status-tabs,
   .status-tabs button {

@@ -122,7 +122,7 @@
       <section class="cross-card cross-card--chart">
         <div class="card-head card-head--between">
           <div>
-            <h3>做多价差趋势</h3>
+            <h3>做多价差走势</h3>
             <span>(BY Ask - MT5 Bid)</span>
           </div>
           <div class="range-tabs">
@@ -1859,10 +1859,7 @@
   }
 
   .trade-modal__eyebrow {
-    margin: 0 0 6px;
-    color: #8091ac;
-    font-size: 11px;
-    letter-spacing: 0.14em;
+    display: none;
   }
 
   .trade-modal__header h3 {
