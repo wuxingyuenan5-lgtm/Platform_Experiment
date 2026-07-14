@@ -3,25 +3,40 @@
     <template v-if="activeSection === 'analysis'">
       <FundingMarketBoard
         :data="fundingMarketBoard"
+        :exchange="selectedExchange"
         :selected-range="selectedRange"
-        :selected-symbol="selectedMarketSymbol"
+        :selected-symbol="selectedSymbol"
         :selected-resolution="selectedResolution"
         :range-options="rangeOptions"
         @update:selected-range="selectedRange = $event"
-        @update:selected-symbol="selectedMarketSymbol = $event"
+        @update:selected-symbol="handleChartSymbolUpdate"
         @update:selected-resolution="selectedResolution = $event"
       />
 
-      <FundingChartPanel :data="fundingChartPanel" :symbol="selectedSymbol" />
+      <FundingChartPanel
+        :data="fundingChartPanel"
+        :exchange="selectedExchange"
+        :symbol="selectedSymbol"
+        :range="selectedRange"
+        :resolution="selectedResolution"
+        :start-date="selectedStartDate"
+        :end-date="selectedEndDate"
+        @update:exchange="selectedExchange = $event"
+        @update:symbol="handleChartSymbolUpdate"
+        @update:range="selectedRange = $event"
+        @update:resolution="selectedResolution = $event"
+        @update:start-date="selectedStartDate = $event"
+        @update:end-date="selectedEndDate = $event"
+      />
 
       <FundingDetailPanel
         :exchange="selectedExchange"
         :symbol="selectedSymbol"
-        :active-view="selectedView"
-        :view-label="viewLabel"
+        :selected-range="selectedRange"
+        :resolution="selectedResolution"
+        :start-date="selectedStartDate"
+        :end-date="selectedEndDate"
         :research="currentResearch"
-        :views="viewOptions"
-        @change-view="selectedView = $event"
       />
     </template>
 
@@ -44,9 +59,8 @@
     fundingMarketBoard,
     fundingOrderPanel,
     fundingRangeLabels,
-    fundingViewLabels,
   } from './mock/data';
-  import type { FundingExchange, FundingMarketRange, FundingSymbol, FundingViewMode } from './types';
+  import type { FundingExchange, FundingMarketRange, FundingSymbol } from './types';
 
   const props = withDefaults(
     defineProps<{
@@ -65,13 +79,12 @@
 
   const selectedExchange = ref<FundingExchange>(props.selectedExchange);
   const selectedSymbol = ref<FundingSymbol>(props.selectedSymbol);
-  const selectedView = ref<FundingViewMode>('funding');
   const selectedRange = ref<FundingMarketRange>('current');
-  const selectedMarketSymbol = ref<string>(props.selectedSymbol);
   const selectedResolution = ref<string>(props.selectedResolution);
+  const selectedStartDate = ref('2026-05-28');
+  const selectedEndDate = ref('2026-06-24');
 
   const profile = computed(() => fundingCarryProfiles[selectedExchange.value] ?? fundingCarryProfiles.Bybit);
-  const viewLabel = computed(() => fundingViewLabels[selectedView.value]);
   const currentResearch = computed(() => profile.value.research[selectedSymbol.value] ?? profile.value.research[defaultSymbol]);
 
   const rangeOptions = computed(() =>
@@ -81,17 +94,14 @@
     })),
   );
 
-  const viewOptions = computed(() =>
-    (['funding'] as FundingViewMode[]).map((value) => ({
-      value,
-      label: fundingViewLabels[value],
-    })),
-  );
-
   const profileOrderPanel = computed(() => ({
     ...fundingOrderPanel,
-    strategyLabel: `${selectedExchange.value} 路 ${selectedSymbol.value} 单交易所资金费率套利`,
+    strategyLabel: `${selectedExchange.value} ${selectedSymbol.value}资金费率套利`,
   }));
+
+  function handleChartSymbolUpdate(value: string) {
+    selectedSymbol.value = value as FundingSymbol;
+  }
 
   watch(
     () => props.selectedExchange,
@@ -105,7 +115,6 @@
     () => props.selectedSymbol,
     (value) => {
       selectedSymbol.value = value;
-      selectedMarketSymbol.value = value;
     },
     { immediate: true },
   );

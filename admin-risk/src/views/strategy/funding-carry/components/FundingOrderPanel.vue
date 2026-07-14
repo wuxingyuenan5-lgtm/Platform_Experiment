@@ -2,17 +2,10 @@
   <section class="funding-exec-shell">
     <header class="funding-exec-topbar">
       <div class="topbar-title">
-        <h2>资金费率交易面板</h2>
-        <span class="run-pill">运行中</span>
-      </div>
-
-      <div class="topbar-controls">
         <div class="selector-chip">
           <span>标的</span>
           <strong>{{ data.strategyLabel }}</strong>
         </div>
-        <div class="latency-chip">刷新间隔: 18ms</div>
-        <button class="gear-btn" type="button">⚙</button>
       </div>
     </header>
 
@@ -86,19 +79,14 @@
     <div class="funding-lower-grid">
       <section class="panel status-panel">
         <div class="panel-title">
-          <h3>策略执行</h3>
+          <h3>交易规则</h3>
         </div>
 
-        <div class="status-head">
-          <span>最大杠杆</span>
-          <span>执行方式</span>
-          <span>状态</span>
-          <span>操作</span>
-        </div>
-
-        <div class="status-empty">
-          <div class="status-empty__icon"></div>
-          <span>暂无数据</span>
+        <div class="rule-list">
+          <div v-for="item in tradingRuleRows" :key="item.label" class="rule-list__row">
+            <span class="rule-list__label">{{ item.label }}</span>
+            <span class="rule-list__value">{{ item.value }}</span>
+          </div>
         </div>
 
         <div class="status-feedback">
@@ -502,6 +490,13 @@
   const fundingEntryBasis = ref('20.0');
   const fundingTakeProfit = ref('2.0');
   const fundingCloseBasis = ref('4.0');
+  const tradingRuleRows = [
+    { label: '手续费', value: '—' },
+    { label: '交易时间', value: '24H' },
+    { label: '个人最高杠杆', value: '—' },
+    { label: '每日最大回撤', value: '—' },
+    { label: '其他限制', value: '—' },
+  ] as const;
 
   const exchangeCards = [
     {
@@ -812,13 +807,13 @@
   .selector-chip span,
   .latency-chip {
     color: #556274;
-    font-size: 13px;
+    font-size: 14px;
     font-weight: 600;
   }
 
   .selector-chip strong {
     color: #111827;
-    font-size: 14px;
+    font-size: 15px;
     font-weight: 700;
   }
 
@@ -884,32 +879,35 @@
     min-height: 684px;
   }
 
-  .status-head {
+  .rule-list {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    padding: 2px 2px 10px;
+    gap: 10px;
+  }
+
+  .rule-list__row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    min-height: 42px;
+    padding: 0 12px;
+    border: 1px solid #e6ebf2;
+    border-radius: 10px;
+    background: #fff;
+  }
+
+  .rule-list__label {
     color: #5d6d80;
     font-size: 13px;
     font-weight: 700;
   }
 
-  .status-empty {
-    display: flex;
-    min-height: 174px;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 12px;
-    border: 1px solid #e6ebf2;
-    background: #fff;
-    color: #b7c0cf;
-  }
-
-  .status-empty__icon {
-    width: 28px;
-    height: 28px;
-    border: 2px solid #c8d2e3;
-    background: linear-gradient(180deg, #ffffff 0%, #f5f8fd 100%);
+  .rule-list__value {
+    color: #364152;
+    font-size: 12px;
+    font-weight: 700;
+    text-align: right;
+    line-height: 1.45;
   }
 
   .status-feedback {
@@ -1485,7 +1483,7 @@
   .selector-chip span,
   .latency-chip,
   .field-label,
-  .status-head,
+  .rule-list__label,
   .analysis-table th,
   .positions-table th,
   .positions-footer,
@@ -1533,7 +1531,7 @@
 
   @media (max-width: 1024px) {
     .funding-close-head,
-    .status-head {
+    .rule-list {
       gap: 10px;
     }
 

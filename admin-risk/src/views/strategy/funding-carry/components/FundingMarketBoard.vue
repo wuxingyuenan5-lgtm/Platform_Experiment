@@ -1,5 +1,20 @@
 <template>
   <section class="market-board">
+    <div class="market-board__context">
+      <div class="context-chip">
+        <span>交易所</span>
+        <strong>{{ exchange }}</strong>
+      </div>
+      <div class="context-chip">
+        <span>币种</span>
+        <strong>{{ selectedSymbol }}</strong>
+      </div>
+      <div class="context-chip">
+        <span>时间精度</span>
+        <strong>{{ selectedResolution }}</strong>
+      </div>
+    </div>
+
     <div class="market-board__top">
       <div class="summary-grid">
         <article v-for="item in data.summaryCards" :key="item.title" class="summary-card">
@@ -100,6 +115,7 @@
 
   defineProps<{
     data: FundingMarketBoardData;
+    exchange: string;
     selectedRange: FundingMarketRange;
     selectedSymbol: string;
     selectedResolution: string;
@@ -136,6 +152,33 @@
     border-radius: 22px;
     background: rgba(255, 255, 255, 0.9);
     box-shadow: 0 16px 36px rgba(94, 76, 52, 0.06);
+  }
+
+  .market-board__context {
+    display: none;
+  }
+
+  .context-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 36px;
+    padding: 0 12px;
+    border: 1px solid rgba(134, 115, 87, 0.1);
+    border-radius: 10px;
+    background: #fff;
+  }
+
+  .context-chip span {
+    color: rgba(36, 29, 21, 0.58);
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  .context-chip strong {
+    color: #1f2937;
+    font-size: 13px;
+    font-weight: 800;
   }
 
   .market-board__top {

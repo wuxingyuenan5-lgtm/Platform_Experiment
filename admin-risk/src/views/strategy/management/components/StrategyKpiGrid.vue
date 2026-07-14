@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <section class="kpi-grid">
     <article v-for="item in items" :key="item.label" class="kpi-card">
       <label>{{ item.label }}</label>
@@ -6,7 +6,6 @@
         {{ item.value }}
         <span v-if="item.unit">{{ item.unit }}</span>
       </strong>
-      <p>{{ item.note }}</p>
     </article>
   </section>
 </template>
@@ -28,18 +27,15 @@
     background: rgba(255, 255, 255, 0.88);
     box-shadow: inset 0 0 0 1px rgba(229, 235, 243, 0.92);
   }
-  .kpi-card label,
-  .kpi-card p {
-    display: block;
-  }
   .kpi-card label {
+    display: block;
     color: var(--strategy-text-3);
     font-size: 11px;
     font-weight: 700;
   }
   .kpi-card strong {
     display: block;
-    margin: 8px 0 4px;
+    margin: 8px 0 0;
     font-size: 24px;
     line-height: 1.1;
   }
@@ -48,12 +44,6 @@
     font-size: 11px;
     font-weight: 600;
     color: var(--strategy-text-3);
-  }
-  .kpi-card p {
-    margin: 0;
-    color: var(--strategy-text-3);
-    font-size: 11px;
-    line-height: 1.45;
   }
   .is-positive { color: #1d9f6e; }
   .is-negative { color: #d8585f; }

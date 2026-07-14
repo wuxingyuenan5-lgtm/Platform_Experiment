@@ -18,7 +18,10 @@
           <CompactSegmentTabs class="section-switcher" :items="platformSections" v-model="activeSection" />
         </div>
 
-        <div class="ribbon-content">
+        <div
+          v-if="!(currentKey === 'domesticOverseas' && activeSection === 'execution')"
+          class="ribbon-content"
+        >
           <div class="control-row">
             <template v-if="currentKey === 'funding'">
               <label class="control-box">
@@ -225,8 +228,7 @@
   }
 
   .ribbon-content {
-    min-height: 126px;
-    padding: 10px 16px 18px;
+    display: none;
   }
 
   .desk-switcher {

@@ -1,13 +1,57 @@
-<template>
+﻿<template>
   <div class="spread-page">
     <section v-if="activeSection === 'analysis'" class="spread-workspace-head">
       <div class="spread-workspace-head__main">
-        <h2>{{ workspaceTitle }}</h2>
+        <label v-if="variant === 'domesticOverseas'" class="workspace-control">
+          <span>标的</span>
+          <select v-model="domesticMetal">
+            <option value="gold">金</option>
+            <option value="silver">银</option>
+            <option value="copper">铜</option>
+          </select>
+        </label>
+
+        <label v-else class="workspace-control">
+          <span>主交易所</span>
+          <select v-model="selectedVenue">
+            <option value="Bybit">Bybit</option>
+            <option value="Binance">Binance</option>
+            <option value="OKX">OKX</option>
+          </select>
+        </label>
+
+        <label class="workspace-control">
+          <span>主腿</span>
+          <select v-model="leftLegSymbol">
+            <option value="XAUTUSDT.P">XAUTUSDT.P</option>
+            <option value="SHFE.au2604">SHFE.au2604</option>
+            <option value="SHFE.ag2510">SHFE.ag2510</option>
+          </select>
+        </label>
+
+        <label class="workspace-control">
+          <span>对冲腿</span>
+          <select v-model="rightLegSymbol">
+            <option value="XAUUSD">XAUUSD</option>
+            <option value="SHFE.au2606">SHFE.au2606</option>
+            <option value="SHFE.ag2512">SHFE.ag2512</option>
+          </select>
+        </label>
+
+        <label class="workspace-control">
+          <span>时间精度</span>
+          <select v-model="selectedResolution">
+            <option value="15分钟">15分钟</option>
+            <option value="30分钟">30分钟</option>
+            <option value="1小时">1小时</option>
+            <option value="4小时">4小时</option>
+          </select>
+        </label>
       </div>
     </section>
 
     <template v-if="activeSection === 'analysis'">
-      <section class="spread-overview">
+      <section v-if="variant !== 'domesticOverseas'" class="spread-overview">
         <article class="spread-card spread-card--table">
           <header>期限结构</header>
           <table>
@@ -53,6 +97,8 @@
           </div>
         </article>
       </section>
+
+      <DomesticOverseasMarketInsight v-if="variant === 'domesticOverseas'" :selected-metal="domesticMetal" />
 
       <section class="spread-chart-card">
         <div class="spread-chart-toolbar">
@@ -191,8 +237,6 @@
         </article>
       </section>
 
-      <DomesticOverseasMarketInsight v-if="variant === 'domesticOverseas'" />
-
       <section class="statistics-section">
         <div class="section-head">
           <div>
@@ -296,6 +340,7 @@
   const leftLegSymbol = ref(props.leftLegSymbol);
   const rightLegSymbol = ref(props.rightLegSymbol);
   const selectedResolution = ref(props.selectedResolution);
+  const domesticMetal = ref<'gold' | 'silver' | 'copper'>('gold');
   const startDate = ref('2026-03-16');
   const endDate = ref('2026-04-16');
   const progressLevel = ref<'15min' | '1h' | '4h' | '日线'>('日线');
@@ -310,11 +355,6 @@
   const mainChart = useECharts(mainChartRef as Ref<HTMLDivElement>);
   const distributionChart = useECharts(distributionRef as Ref<HTMLDivElement>);
   const seasonalChart = useECharts(seasonalRef as Ref<HTMLDivElement>);
-
-  const workspaceTitle = computed(() => {
-    const modeLabel = props.activeSection === 'execution' ? '交易面板' : '分析面板';
-    return variant.value === 'domesticOverseas' ? `黄金海内外价差${modeLabel}` : `黄金跨所价差${modeLabel}`;
-  });
 
   const monthLabels = ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'];
 
@@ -417,7 +457,7 @@
         { symbol: 'SHFE.cu2510', lastPrice: '80,918', overseasPrice: '9,842', spread: '1,900.16' },
         { symbol: 'SHFE.cu2511', lastPrice: '80,982', overseasPrice: '9,842', spread: '1,964.18' },
       ],
-    };
+    } as const;
 
     return maps[domesticRealtimeSymbol.value];
   });
@@ -460,6 +500,15 @@
   watch(() => props.rightLegSymbol, (v) => (rightLegSymbol.value = v), { immediate: true });
   watch(() => props.selectedResolution, (v) => (selectedResolution.value = v), { immediate: true });
   watch(() => props.variant, (v) => (variant.value = v), { immediate: true });
+  watch(
+    () => variant.value,
+    (value) => {
+      if (value === 'domesticOverseas') {
+        leftLegSymbol.value = 'XAUTUSDT.P';
+      }
+    },
+    { immediate: true },
+  );
 
   function touchRefresh() {}
 
@@ -628,16 +677,49 @@
   }
 
   .spread-workspace-head__main {
-    display: grid;
+    display: flex;
+    flex-wrap: nowrap;
     gap: 8px;
+    align-items: center;
+    width: auto;
+    max-width: 100%;
+    flex: 0 0 auto;
+    min-height: 48px;
+    padding: 4px 10px;
+    border: 1px solid rgba(191, 205, 224, 0.96);
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.98);
+    box-shadow: 0 1px 2px rgba(148, 163, 184, 0.06);
   }
 
-  .spread-workspace-head h2 {
-    margin: 0;
-    color: var(--strategy-text-1);
-    font-size: 20px;
-    font-weight: 900;
-    letter-spacing: 0.01em;
+
+  .workspace-control {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    flex: 0 0 auto;
+  }
+
+  .workspace-control span {
+    color: #64748b;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0;
+    white-space: nowrap;
+  }
+
+  .workspace-control select {
+    height: 34px;
+    padding: 0 8px;
+    border: none;
+    border-radius: 10px;
+    background: transparent;
+    color: #304056;
+    font-size: 14px;
+    font-weight: 700;
+    min-width: 88px;
+    width: auto;
   }
 
   .spread-overview {

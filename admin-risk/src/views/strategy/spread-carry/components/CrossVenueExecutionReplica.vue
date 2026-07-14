@@ -1,11 +1,6 @@
 <template>
   <section class="cross-replica">
     <header class="cross-head">
-      <div class="cross-head__title">
-        <h2>黄金跨所价差交易面板</h2>
-        <span class="status-pill">运行中</span>
-      </div>
-
       <div class="cross-head__controls">
         <label class="select-chip">
           <span>标的</span>
@@ -13,12 +8,6 @@
             <option :value="`${leftLegSymbol}-${rightLegSymbol}`">BYBIT: {{ leftLegSymbol }} vs MT5: {{ rightLegSymbol }}</option>
           </select>
         </label>
-        <div class="meta-chip">
-          <span>刷新间隔:</span>
-          <strong>{{ latencyMs }}ms</strong>
-          <i class="online-dot"></i>
-        </div>
-        <button class="gear-btn" type="button">⚙</button>
       </div>
     </header>
 
@@ -146,20 +135,15 @@
       <section class="cross-card cross-card--status">
         <div class="card-head">
           <div>
-            <h3>策略执行</h3>
+            <h3>交易规则</h3>
           </div>
         </div>
 
-        <div class="status-mini-head">
-          <span>最大杠杆</span>
-          <span>执行方式</span>
-          <span>状态</span>
-          <span>操作</span>
-        </div>
-
-        <div class="status-mini-empty">
-          <div class="status-mini-empty__icon"></div>
-          <span>暂无数据</span>
+        <div class="rule-list">
+          <div v-for="item in tradingRuleRows" :key="item.label" class="rule-list__row">
+            <span class="rule-list__label">{{ item.label }}</span>
+            <span class="rule-list__value">{{ item.value }}</span>
+          </div>
         </div>
 
         <div class="status-mini-log">
@@ -659,6 +643,16 @@
   const submitLoading = ref(false);
   const confirmVisible = ref(false);
   const confirmAction = ref('OPEN_LONG');
+  const tradingRuleRows = [
+    { label: '手续费', value: '—' },
+    {
+      label: '交易时间',
+      value: 'XAUTUSDT.P：24H；XAUUSD+：工作日23H，北京时间05-06（冬）/ 06-07（夏）维护',
+    },
+    { label: '个人最高杠杆', value: '—' },
+    { label: '每日最大回撤', value: '—' },
+    { label: '其他限制', value: '—' },
+  ] as const;
   const openDirection = ref<'long' | 'short'>('long');
   const monitorRunning = ref(true);
   const monitorRuntime = ref('01:26:45');
@@ -1117,9 +1111,9 @@
   .card-head span {
     margin-top: 4px;
     display: inline-block;
-    color: #687b97;
+    color: #2f3640;
     font-size: 12px;
-    font-weight: 500;
+    font-weight: 700;
   }
 
   .quote-grid,
@@ -1130,32 +1124,34 @@
     gap: 12px;
   }
 
-  .status-mini-head {
+  .rule-list {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    padding: 2px 2px 10px;
-    color: #60738e;
-    font-size: 12px;
-    font-weight: 600;
+    gap: 10px;
   }
 
-  .status-mini-empty {
+  .rule-list__row {
     display: flex;
-    min-height: 168px;
-    flex-direction: column;
     align-items: center;
-    justify-content: center;
-    gap: 12px;
+    justify-content: space-between;
+    gap: 16px;
+    min-height: 40px;
+    padding: 0 12px;
     border: 1px solid #e6ebf2;
+    border-radius: 10px;
     background: #fff;
-    color: #b7c0cf;
   }
 
-  .status-mini-empty__icon {
-    width: 28px;
-    height: 28px;
-    border: 2px solid #c8d2e3;
-    background: linear-gradient(180deg, #ffffff 0%, #f5f8fd 100%);
+  .rule-list__label {
+    color: #2f3640;
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  .rule-list__value {
+    color: #475467;
+    font-size: 12px;
+    font-weight: 700;
+    text-align: right;
   }
 
   .status-mini-log {
@@ -1268,9 +1264,9 @@
   .field-block span,
   .stats-list span,
   .monitor-status span {
-    color: #4d6383;
+    color: #2f3640;
     font-size: 13px;
-    font-weight: 600;
+    font-weight: 700;
   }
 
   .quote-stat strong {
@@ -1283,9 +1279,9 @@
   }
 
   .quote-stat small {
-    color: #7285a1;
+    color: #2f3640;
     font-size: 11px;
-    font-weight: 500;
+    font-weight: 700;
   }
 
   .summary-grid {
@@ -1324,9 +1320,9 @@
   }
 
   .summary-item label small {
-    color: #6b7f9c;
+    color: #2f3640;
     font-size: 12px;
-    font-weight: 500;
+    font-weight: 700;
   }
 
   .summary-item strong {
@@ -1516,9 +1512,9 @@
   .mini-panel__title {
     display: block;
     margin-bottom: 10px;
-    color: #516682;
+    color: #2f3640;
     font-size: 13px;
-    font-weight: 600;
+    font-weight: 700;
   }
 
   .mini-grid {
@@ -1608,9 +1604,9 @@
 
   .basic-table th,
   .overview-table th {
-    color: #60738e;
+    color: #2f3640;
     font-size: 12px;
-    font-weight: 600;
+    font-weight: 700;
   }
 
   .basic-table td,
@@ -1960,9 +1956,9 @@
   .quote-stat small,
   .mini-panel__title,
   .analysis-group span,
-  .status-mini-head,
+  .rule-list__label,
   .overview-summary__item span {
-    color: var(--strategy-text-3);
+    color: #2f3640;
   }
 
   .status-pill {

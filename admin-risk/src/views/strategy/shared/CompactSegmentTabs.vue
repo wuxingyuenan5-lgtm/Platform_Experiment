@@ -27,8 +27,8 @@
   .segment-tabs {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
-    padding: 4px;
+    gap: 7px;
+    padding: 5px;
     border: 1px solid var(--strategy-border);
     border-radius: 12px;
     background: rgba(255, 255, 255, 0.97);
@@ -36,14 +36,14 @@
   }
 
   .segment-tabs button {
-    min-width: 82px;
-    height: 34px;
-    padding: 0 15px;
+    min-width: 94px;
+    height: 38px;
+    padding: 0 18px;
     border: none;
     border-radius: 10px;
     background: transparent;
     color: var(--strategy-text-3);
-    font-size: 12px;
+    font-size: 13px;
     font-weight: 800;
     cursor: pointer;
     transition: all 0.2s ease;

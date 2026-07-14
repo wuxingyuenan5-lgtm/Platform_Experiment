@@ -14,8 +14,9 @@
 <style scoped lang="less">
   .curve-grid {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
     gap: 16px;
+    align-items: stretch;
   }
   @media (max-width: 1320px) {
     .curve-grid { grid-template-columns: 1fr; }

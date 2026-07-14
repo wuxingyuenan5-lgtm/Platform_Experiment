@@ -28,22 +28,22 @@
 <style scoped lang="less">
   .desk-tabs {
     display: inline-flex;
-    gap: 4px;
-    padding: 4px;
+    gap: 6px;
+    padding: 5px;
     border: 1px solid var(--strategy-border);
     border-radius: 12px;
     background: rgba(255, 255, 255, 0.96);
     box-shadow: var(--strategy-shadow);
   }
   .desk-tabs button {
-    min-width: 82px;
-    height: 34px;
-    padding: 0 15px;
+    min-width: 94px;
+    height: 38px;
+    padding: 0 18px;
     border: none;
     border-radius: 10px;
     background: transparent;
     color: var(--strategy-text-3);
-    font-size: 12px;
+    font-size: 13px;
     font-weight: 800;
     cursor: pointer;
   }

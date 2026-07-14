@@ -2,7 +2,6 @@
   <section class="chart-panel">
     <div class="chart-panel__header">
       <div>
-        <p class="eyebrow">Funding Trend</p>
         <h2>{{ panelTitle }}</h2>
       </div>
 
@@ -19,9 +18,23 @@
           </button>
         </div>
 
+        <label class="toolbar-field">
+          <span>交易所</span>
+          <select v-model="selectedExchange">
+            <option v-for="item in exchangeOptions" :key="item" :value="item">{{ item }}</option>
+          </select>
+        </label>
+
         <select v-model="selectedSymbol">
           <option v-for="item in symbolOptions" :key="item" :value="item">{{ item }}</option>
         </select>
+
+        <label class="toolbar-field">
+          <span>时间精度</span>
+          <select v-model="selectedResolution">
+            <option v-for="item in resolutionOptions" :key="item" :value="item">{{ item }}</option>
+          </select>
+        </label>
 
         <input v-model="startDate" type="date" />
         <input v-model="endDate" type="date" />
@@ -57,23 +70,69 @@
   import type { Ref } from 'vue';
   import { computed, nextTick, onMounted, ref, watch } from 'vue';
   import { useECharts } from '@/hooks/web/useECharts';
-  import type { FundingChartPanelData } from '../types';
+  import type { FundingChartPanelData, FundingMarketRange } from '../types';
 
   const props = defineProps<{
     data: FundingChartPanelData;
+    exchange: string;
     symbol: string;
+    range: FundingMarketRange;
+    resolution: string;
+    startDate: string;
+    endDate: string;
+  }>();
+
+  const emit = defineEmits<{
+    (e: 'update:exchange', value: string): void;
+    (e: 'update:symbol', value: string): void;
+    (e: 'update:range', value: FundingMarketRange): void;
+    (e: 'update:resolution', value: string): void;
+    (e: 'update:start-date', value: string): void;
+    (e: 'update:end-date', value: string): void;
   }>();
 
   const chartRef = ref<HTMLDivElement | null>(null);
   const { setOptions, resize } = useECharts(chartRef as Ref<HTMLDivElement>);
   const rangeOptions = ['当前', '7日', '30日'];
+  const exchangeOptions = ['Binance', 'Bybit', 'OKX'];
+  const rangeToLabelMap: Record<FundingMarketRange, string> = {
+    current: '当前',
+    '1d': '当前',
+    '7d': '7日',
+    '30d': '30日',
+    '1y': '30日',
+  };
+  const labelToRangeMap: Record<string, FundingMarketRange> = {
+    当前: 'current',
+    '7日': '7d',
+    '30日': '30d',
+  };
   const symbolOptions = ['BTC', 'ETH', 'SOL', 'DOGE', 'XRP', 'XAUT'];
-  const selectedRange = ref('当前');
+  const resolutionOptions = ['15分钟', '30分钟', '1小时', '4小时'];
+  const selectedRange = ref(props.range);
+  const selectedExchange = ref(props.exchange);
   const selectedSymbol = ref(props.symbol);
-  const startDate = ref(props.data.points[0]?.date || '2026-05-28');
-  const endDate = ref(props.data.points[props.data.points.length - 1]?.date || '2026-06-24');
+  const selectedResolution = ref(props.resolution);
+  const startDate = ref(props.startDate || props.data.points[0]?.date || '2026-05-28');
+  const endDate = ref(props.endDate || props.data.points[props.data.points.length - 1]?.date || '2026-06-24');
   const showFunding = ref(true);
   const showPrice = ref(true);
+
+  watch(
+    () => props.range,
+    (value) => {
+      selectedRange.value = rangeToLabelMap[value] ?? '当前';
+    },
+    { immediate: true },
+  );
+
+  watch(
+    () => props.exchange,
+    (value) => {
+      selectedExchange.value = value;
+    },
+    { immediate: true },
+  );
 
   watch(
     () => props.symbol,
@@ -82,6 +141,37 @@
     },
     { immediate: true },
   );
+
+  watch(
+    () => props.resolution,
+    (value) => {
+      selectedResolution.value = value;
+    },
+    { immediate: true },
+  );
+
+  watch(
+    () => props.startDate,
+    (value) => {
+      startDate.value = value;
+    },
+    { immediate: true },
+  );
+
+  watch(
+    () => props.endDate,
+    (value) => {
+      endDate.value = value;
+    },
+    { immediate: true },
+  );
+
+  watch(selectedRange, (value) => emit('update:range', labelToRangeMap[value] ?? 'current'));
+  watch(selectedExchange, (value) => emit('update:exchange', value));
+  watch(selectedSymbol, (value) => emit('update:symbol', value));
+  watch(selectedResolution, (value) => emit('update:resolution', value));
+  watch(startDate, (value) => emit('update:start-date', value));
+  watch(endDate, (value) => emit('update:end-date', value));
 
   const filteredPoints = computed(() => {
     const start = new Date(startDate.value).getTime();
@@ -95,7 +185,7 @@
     return base;
   });
 
-  const panelTitle = computed(() => `${selectedSymbol.value} 持仓加权资金费率`);
+  const panelTitle = computed(() => '持仓加权资金费率');
 
   async function renderChart() {
     await setOptions({
@@ -207,19 +297,20 @@
   }
 
   .chart-panel__header h2 {
-    margin: 10px 0 0;
+    margin: 0;
     color: var(--strategy-text-1);
     font-family: var(--strategy-font-sans);
-    font-size: 27px;
+    font-size: 24px;
     font-weight: 900;
   }
 
   .toolbar {
     display: flex;
-    flex-wrap: wrap;
-    align-items: center;
+    flex-wrap: nowrap;
+    align-items: end;
     justify-content: flex-end;
     gap: 10px;
+    width: 100%;
   }
 
   .toolbar-group {
@@ -254,6 +345,34 @@
     color: var(--strategy-text-2);
     font-size: 12px;
     font-weight: 700;
+  }
+
+  .toolbar-field {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    height: 32px;
+    padding: 0 10px 0 12px;
+    border: 1px solid var(--strategy-border-strong);
+    border-radius: 8px;
+    background: var(--strategy-surface);
+    color: var(--strategy-text-2);
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  .toolbar-field span {
+    white-space: nowrap;
+  }
+
+  .toolbar-field select {
+    min-width: 88px;
+    height: 100%;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
   }
 
   .toolbar-group button {

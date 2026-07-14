@@ -24,8 +24,8 @@
 
   const lineColor = computed(() => {
     if (props.item.tone === 'negative') return '#d8585f';
-    if (props.item.tone === 'neutral') return '#45556c';
-    return '#cf3f4f';
+    if (props.item.tone === 'neutral') return '#4f647d';
+    return '#2fa86e';
   });
 
   async function renderChart() {
@@ -65,6 +65,18 @@
           color: '#98a2b3',
         },
       },
+      dataZoom: [
+        { type: 'inside', start: 0, end: 100 },
+        {
+          type: 'slider',
+          height: 16,
+          bottom: 4,
+          borderColor: 'rgba(205, 214, 224, 0.8)',
+          fillerColor: 'rgba(125, 167, 255, 0.12)',
+          backgroundColor: 'rgba(240, 244, 248, 0.9)',
+          brushSelect: false,
+        },
+      ],
       series: [
         {
           name: props.item.title,
@@ -87,27 +99,32 @@
 
 <style scoped lang="less">
   .curve-card {
+    min-width: 0;
     padding: 18px 18px 14px;
-    border-radius: 18px;
-    background: linear-gradient(180deg, rgba(255,255,255,.97), rgba(255,251,245,.94));
-    box-shadow: 0 18px 40px rgba(28,35,40,.05);
-    border: 1px solid rgba(201,164,95,.14);
+    border-radius: 16px;
+    background: linear-gradient(180deg, rgba(255,255,255,.99), rgba(248,250,252,.98));
+    box-shadow: 0 14px 34px rgba(28,35,40,.04);
+    border: 1px solid rgba(223,230,240,.92);
   }
 
   .curve-card h3 {
     margin: 0;
-    color: #15252a;
-    font-size: 16px;
+    color: #17222d;
+    font-size: 18px;
+    font-weight: 800;
+    letter-spacing: 0.01em;
   }
 
   .curve-card p {
-    margin: 8px 0 0;
-    color: #8a94a1;
+    margin: 6px 0 0;
+    color: #52606f;
     font-size: 13px;
+    font-weight: 600;
   }
 
   .curve-stage {
     height: 210px;
     margin-top: 10px;
+    min-width: 0;
   }
 </style>

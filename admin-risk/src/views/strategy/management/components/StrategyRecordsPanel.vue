@@ -3,7 +3,6 @@
     <header class="records-head">
       <div>
         <h3>订单信息</h3>
-        <p class="records-subtitle">支持按时间、状态快速筛选，并按页查看当前列表。</p>
       </div>
       <div class="records-head__meta">
         <span class="records-total">总数 {{ filteredRows.length }}</span>
@@ -201,12 +200,9 @@
   .records-head h3 {
     margin: 0;
     color: #172947;
-    font-size: 18px;
-    font-weight: 700;
-  }
-
-  .records-subtitle {
-    display: none;
+    font-size: 22px;
+    font-weight: 800;
+    letter-spacing: 0.01em;
   }
 
   .records-head__meta {
@@ -226,7 +222,8 @@
     border-radius: 8px;
     background: #fff;
     color: #667788;
-    font-size: 13px;
+    font-size: 14px;
+    font-weight: 600;
     cursor: pointer;
   }
 
@@ -252,8 +249,8 @@
 
   .records-filter span {
     color: #8a97ab;
-    font-size: 12px;
-    font-weight: 600;
+    font-size: 13px;
+    font-weight: 700;
   }
 
   .records-filter input,
@@ -264,7 +261,8 @@
     border-radius: 8px;
     background: #fff;
     color: #30435f;
-    font-size: 13px;
+    font-size: 14px;
+    font-weight: 600;
   }
 
   .records-tabs {
@@ -277,19 +275,19 @@
 
   .records-tabs button {
     position: relative;
-    height: 40px;
-    padding: 0 16px;
+    height: 44px;
+    padding: 0 18px;
     border: none;
     background: transparent;
-    color: #6b7280;
-    font-size: 13px;
-    font-weight: 500;
+    color: #536174;
+    font-size: 14px;
+    font-weight: 700;
     cursor: pointer;
   }
 
   .records-tabs .is-active {
-    color: #d97706;
-    font-weight: 700;
+    color: #cf4d4d;
+    font-weight: 800;
   }
 
   .records-tabs .is-active::after {
@@ -298,9 +296,9 @@
     right: 10px;
     bottom: 0;
     left: 10px;
-    height: 2px;
+    height: 3px;
     border-radius: 999px;
-    background: #f59e0b;
+    background: #d8585f;
   }
 
   .records-table {
@@ -322,14 +320,15 @@
   }
 
   .records-table th {
-    color: #8a97ab;
-    font-size: 12px;
-    font-weight: 600;
+    color: #728097;
+    font-size: 13px;
+    font-weight: 700;
   }
 
   .records-table td {
     color: #30435f;
-    font-size: 13px;
+    font-size: 14px;
+    font-weight: 600;
   }
 
   .records-empty {
@@ -344,7 +343,8 @@
     gap: 12px;
     padding: 14px 16px 16px;
     color: #667788;
-    font-size: 12px;
+    font-size: 13px;
+    font-weight: 600;
   }
 
   .records-pagination__actions {
@@ -359,6 +359,8 @@
     border-radius: 8px;
     background: #fff;
     color: #667788;
+    font-size: 13px;
+    font-weight: 600;
     cursor: pointer;
   }
 

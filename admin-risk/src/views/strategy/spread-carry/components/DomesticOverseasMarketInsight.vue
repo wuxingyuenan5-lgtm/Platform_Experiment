@@ -1,24 +1,10 @@
 <template>
   <section class="market-insight">
-    <div class="market-tabs">
-      <button
-        v-for="item in metalTabs"
-        :key="item.key"
-        type="button"
-        class="market-tab"
-        :class="{ 'is-active': activeMetal === item.key }"
-        @click="activeMetal = item.key"
-      >
-        {{ item.label }}
-      </button>
-    </div>
-
-    <div class="headline-strip">
-      <span>国内{{ activeSnapshot.label }}: <strong class="is-warm">{{ activeSnapshot.domesticSpot }}</strong></span>
-      <span>国外{{ activeSnapshot.label }}: <strong class="is-cool">{{ activeSnapshot.overseasSpot }}</strong></span>
-    </div>
-
     <div class="fx-grid">
+      <article class="fx-card fx-card--spot">
+        <label>{{ activeSnapshot.spotCardLabel }}</label>
+        <strong>{{ activeSnapshot.spotCardValue }}</strong>
+      </article>
       <article v-for="item in activeSnapshot.fxCards" :key="item.label" class="fx-card">
         <label>{{ item.label }}</label>
         <strong>{{ item.value }}</strong>
@@ -161,23 +147,28 @@
 
   type MetalKey = 'gold' | 'silver' | 'copper';
 
-  const activeMetal = ref<MetalKey>('gold');
+  const props = withDefaults(
+    defineProps<{
+      selectedMetal?: MetalKey;
+    }>(),
+    {
+      selectedMetal: 'gold',
+    },
+  );
+
+  const activeMetal = ref<MetalKey>(props.selectedMetal);
   const historyPeriod = ref<'day' | 'week'>('day');
   const historySymbol = ref('XAUUSD+');
   const startDate = ref('2026-03-16');
   const endDate = ref('2026-04-16');
-
-  const metalTabs = [
-    { key: 'gold', label: '金' },
-    { key: 'silver', label: '银' },
-    { key: 'copper', label: '铜' },
-  ] as const;
 
   const snapshots = {
     gold: {
       label: '金',
       domesticSpot: '1,055.5 元',
       overseasSpot: '4,812.77 美元',
+      spotCardLabel: '金价',
+      spotCardValue: '国内 1,055.5元 | 国外 4,812.77美元',
       symbolOptions: ['XAUUSD+', 'SHFE.au2606', 'SHFE.au2612'],
       fxCards: [
         { label: '离岸汇率', value: '6.8182' },
@@ -217,6 +208,8 @@
       label: '银',
       domesticSpot: '8,766 元',
       overseasSpot: '36.18 美元',
+      spotCardLabel: '银价',
+      spotCardValue: '国内 8,766元 | 国外 36.18美元',
       symbolOptions: ['XAGUSD+', 'SHFE.ag2510', 'SHFE.ag2512'],
       fxCards: [
         { label: '离岸汇率', value: '6.8182' },
@@ -254,6 +247,8 @@
       label: '铜',
       domesticSpot: '80,982 元',
       overseasSpot: '9,842 美元',
+      spotCardLabel: '铜价',
+      spotCardValue: '国内 80,982元 | 国外 9,842美元',
       symbolOptions: ['COPPER', 'SHFE.cu2511', 'SHFE.cu2512'],
       fxCards: [
         { label: '离岸汇率', value: '6.8182' },
@@ -290,6 +285,13 @@
   } as const;
 
   const activeSnapshot = computed(() => snapshots[activeMetal.value]);
+
+  watch(
+    () => props.selectedMetal,
+    (value) => {
+      activeMetal.value = value;
+    },
+  );
 
   watch(
     activeMetal,
@@ -403,51 +405,6 @@
     padding: 12px 0 0;
   }
 
-  .market-tabs {
-    display: inline-flex;
-    width: fit-content;
-    overflow: hidden;
-    border: 1px solid #efe4d3;
-    border-radius: 14px;
-    background: #fff;
-  }
-
-  .market-tab {
-    min-width: 46px;
-    height: 36px;
-    padding: 0 18px;
-    border: none;
-    border-right: 1px solid #efe4d3;
-    background: transparent;
-    color: #7b8794;
-    font-size: 14px;
-    font-weight: 700;
-    cursor: pointer;
-  }
-
-  .market-tab:last-child {
-    border-right: none;
-  }
-
-  .market-tab.is-active {
-    background: #fbfbf9;
-    color: #c75f5f;
-  }
-
-  .headline-strip {
-    display: flex;
-    justify-content: center;
-    gap: 28px;
-    padding: 12px 16px 2px;
-    color: #263446;
-    font-size: 18px;
-    font-weight: 800;
-  }
-
-  .headline-strip strong {
-    font-weight: 900;
-  }
-
   .is-warm {
     color: #df5a5a;
   }
@@ -463,7 +420,12 @@
   }
 
   .fx-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .fx-card--spot strong {
+    font-size: 16px;
+    line-height: 1.5;
   }
 
   .insight-grid {
@@ -634,7 +596,6 @@
   }
 
   @media (max-width: 980px) {
-    .headline-strip,
     .history-head,
     .history-controls {
       flex-direction: column;

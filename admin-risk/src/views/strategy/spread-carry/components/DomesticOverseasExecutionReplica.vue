@@ -2,12 +2,36 @@
   <section class="domestic-replica">
     <header class="domestic-topbar">
       <div class="domestic-topbar__left">
-        <button class="menu-btn" type="button">☰</button>
-        <select v-model="strategyCode" class="strategy-select">
-          <option value="SHFE_XAU">沪金伦敦金多空策略/SHFE_XAU</option>
-          <option value="SHFE_SPREAD">沪金跨期套利策略/SHFE_SPREAD</option>
-          <option value="GOLD_GRID">黄金网格策略/GOLD_GRID</option>
-        </select>
+        <label class="topbar-control">
+          <span>交易场景</span>
+          <select v-model="selectedVenueState">
+            <option value="SHFE / XAUUSD">SHFE / XAUUSD</option>
+            <option value="AU9999 / XAUUSD">AU9999 / XAUUSD</option>
+          </select>
+        </label>
+        <label class="topbar-control">
+          <span>主腿标的</span>
+          <select v-model="selectedMainLegState" @change="applyTopbarMainLeg">
+            <option value="SHFE.au2604">SHFE.au2604</option>
+            <option value="SHFE.au2606">SHFE.au2606</option>
+            <option value="SHFE.au2612">SHFE.au2612</option>
+            <option value="AU9999">AU9999</option>
+          </select>
+        </label>
+        <label class="topbar-control">
+          <span>对冲腿标的</span>
+          <select v-model="selectedHedgeLegState">
+            <option value="XAUUSD">XAUUSD</option>
+          </select>
+        </label>
+        <label class="topbar-control">
+          <span>时间精度</span>
+          <select v-model="selectedResolutionState">
+            <option value="30分钟">30分钟</option>
+            <option value="1小时">1小时</option>
+            <option value="4小时">4小时</option>
+          </select>
+        </label>
       </div>
 
       <div class="domestic-topbar__right">
@@ -125,17 +149,11 @@
     <section class="main-board">
       <aside class="left-column">
         <section class="block-card">
-          <div class="block-title">策略执行</div>
-          <div class="command-table">
-            <div class="command-table__head">
-              <span>最大杠杆</span>
-              <span>执行方式</span>
-              <span>状态</span>
-              <span>操作</span>
-            </div>
-            <div class="command-empty">
-              <div class="command-empty__icon">□</div>
-              <span>暂无数据</span>
+          <div class="block-title">交易规则</div>
+          <div class="rule-list">
+            <div v-for="item in tradingRuleRows" :key="item.label" class="rule-list__row">
+              <span class="rule-list__label">{{ item.label }}</span>
+              <span class="rule-list__value">{{ item.value }}</span>
             </div>
           </div>
         </section>
@@ -160,14 +178,6 @@
             <button :class="{ active: activeTradeTab === 'open' }" @click="activeTradeTab = 'open'">开仓</button>
             <button :class="{ active: activeTradeTab === 'rollover' }" @click="activeTradeTab = 'rollover'">移仓</button>
           </div>
-          <div class="trade-quote-strip">
-            <span>AU9999: <b class="red">1057.65</b></span>
-            <span>汇率: <b class="red">6.82</b></span>
-            <span class="blue">与伦敦金价差: {{ spreadPercent.toFixed(4) }}% 、 {{ spreadCny.toFixed(2) }}CNY</span>
-          </div>
-          <button class="refresh-btn" :disabled="refreshing" @click="triggerRefresh">
-            {{ refreshing ? '刷新中' : '刷新' }}
-          </button>
         </div>
 
         <div class="selector-row">
@@ -185,7 +195,7 @@
               <option value="SHFE.au2704">沪金2704</option>
             </select>
           </div>
-          <div class="selector-right">{{ rightLegSymbol }}</div>
+          <div class="selector-right">{{ selectedHedgeLegState }}</div>
         </div>
 
         <div class="legs-grid">
@@ -313,7 +323,7 @@
 </template>
 
 <script setup lang="ts">
-  import { computed, ref } from 'vue';
+  import { computed, ref, watch } from 'vue';
 
   interface LogItem {
     id: string;
@@ -323,18 +333,35 @@
   }
 
   defineProps<{
+    selectedVenue: string;
+    leftLegSymbol: string;
     rightLegSymbol: string;
+    selectedResolution: string;
   }>();
 
-  const strategyCode = ref('SHFE_XAU');
+  const latencyMs = ref(18);
   const activeTradeTab = ref<'open' | 'rollover'>('open');
   const balanceMode = ref<'gram_balance' | 'value_balance' | 'lot_balance' | 'custom_ratio'>('gram_balance');
-  const selectedContract = ref('SHFE.au2604');
+  const selectedVenueState = ref('SHFE / XAUUSD');
+  const selectedMainLegState = ref('SHFE.au2606');
+  const selectedHedgeLegState = ref('XAUUSD');
+  const selectedResolutionState = ref('30分钟');
+  const selectedContract = ref('SHFE.au2606');
   const selectedAction = ref<'open' | 'close' | 'takeProfit' | 'gridOpen' | null>(null);
   const shfeLots = ref(0);
   const refreshing = ref(false);
   const executing = ref(false);
   const confirmVisible = ref(false);
+  const tradingRuleRows = [
+    { label: '手续费', value: '—' },
+    {
+      label: '交易时间',
+      value: '沪金主力：09:00-11:30 / 13:30-15:00 / 21:00-02:30；XAUUSD+：工作日23H，北京时间05-06（冬）/ 06-07（夏）维护',
+    },
+    { label: '个人最高杠杆', value: '—' },
+    { label: '每日最大回撤', value: '—' },
+    { label: '其他限制', value: '—' },
+  ] as const;
 
   const shfeLast = ref(1058.5);
   const xauLast = ref(4820.01);
@@ -419,6 +446,11 @@
     spreadPercent.value = 0.199;
   }
 
+  function applyTopbarMainLeg() {
+    selectedContract.value = selectedMainLegState.value;
+    applyContractPreset();
+  }
+
   function prepareAction(action: 'open' | 'close' | 'takeProfit' | 'gridOpen') {
     selectedAction.value = action;
   }
@@ -482,7 +514,7 @@
     align-items: center;
     justify-content: space-between;
     height: 48px;
-    padding: 0 14px;
+    padding: 4px 10px;
   }
 
   .domestic-topbar__left,
@@ -499,11 +531,42 @@
 
   .domestic-topbar__left,
   .selector-left {
-    gap: 10px;
+    gap: 8px;
+    flex-wrap: nowrap;
+  }
+
+  .topbar-control {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    flex: 0 0 auto;
+  }
+
+  .topbar-control span {
+    color: #64748b;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0;
+    white-space: nowrap;
+  }
+
+  .topbar-control select {
+    height: 34px;
+    padding: 0 8px;
+    border: none;
+    border-radius: 10px;
+    background: transparent;
+    color: #425470;
+    font-size: 13px;
+    font-weight: 700;
+    min-width: 88px;
+    width: auto;
   }
 
   .menu-btn,
-  .refresh-btn {
+  .refresh-btn,
+  .gear-btn {
     border: 1px solid #dbe2ed;
     background: #fff;
     color: #60708c;
@@ -530,6 +593,43 @@
     min-width: 340px;
     height: 32px;
     padding: 0 10px;
+  }
+
+  .selector-chip,
+  .meta-chip,
+  .gear-btn {
+    min-height: 42px;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    background: #fff;
+  }
+
+  .selector-chip,
+  .meta-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0 14px;
+  }
+
+  .selector-chip span,
+  .meta-chip span {
+    color: #556274;
+    font-size: 14px;
+    font-weight: 600;
+  }
+
+  .selector-chip strong,
+  .meta-chip strong {
+    color: #111827;
+    font-size: 15px;
+    font-weight: 700;
+  }
+
+  .gear-btn {
+    width: 42px;
+    padding: 0;
+    border-radius: 12px;
   }
 
   .domestic-topbar__right {
@@ -795,33 +895,36 @@
     font-weight: 700;
   }
 
-  .command-table {
+  .rule-list {
+    display: grid;
+    gap: 10px;
     margin-top: 10px;
   }
 
-  .command-table__head {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    padding: 0 4px 10px;
+  .rule-list__row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    min-height: 42px;
+    padding: 0 12px;
+    border: 1px solid #eef2f6;
+    border-radius: 10px;
+    background: #fff;
+  }
+
+  .rule-list__label {
     color: #5f7390;
     font-size: 13px;
     font-weight: 700;
   }
 
-  .command-empty {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 10px;
-    height: 172px;
-    border: 1px solid #eef2f6;
-    color: #b7c0cf;
-  }
-
-  .command-empty__icon {
-    font-size: 34px;
-    line-height: 1;
+  .rule-list__value {
+    color: #37485f;
+    font-size: 12px;
+    font-weight: 700;
+    text-align: right;
+    line-height: 1.45;
   }
 
   .log-list {
@@ -1044,6 +1147,26 @@
     background: linear-gradient(180deg, #ffffff 0%, #fbfbf9 100%);
   }
 
+  .impact-card span {
+    display: block;
+    margin-bottom: 8px;
+    color: #7a889d;
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  .impact-card strong {
+    color: #1f314d;
+    font-size: 18px;
+    font-weight: 800;
+    font-style: normal;
+  }
+
+  .impact-card em {
+    margin-left: 4px;
+    font-style: normal;
+  }
+
   .confirm-row {
     justify-content: center;
     margin-top: 14px;
@@ -1164,6 +1287,9 @@
 
   .menu-btn,
   .refresh-btn,
+  .selector-chip,
+  .meta-chip,
+  .gear-btn,
   .strategy-select,
   .selector-left select,
   .leg-panel input,
@@ -1235,6 +1361,10 @@
 
     .strategy-select {
       min-width: 0;
+      width: 100%;
+    }
+
+    .topbar-control {
       width: 100%;
     }
   }

@@ -6,7 +6,6 @@
         {{ profileName }}
       </span>
     </span>
-    <span :class="`${prefixCls}__caret`">></span>
   </button>
 </template>
 
@@ -72,13 +71,13 @@
   .@{prefix-cls} {
     align-items: center;
     height: 40px;
-    padding: 0 12px 0 8px;
+    padding: 0 4px 0 2px;
     overflow: hidden;
     cursor: pointer;
-    border: 1px solid rgba(214, 221, 229, 0.95);
+    border: none;
     border-radius: 999px;
-    background: rgba(255, 255, 255, 0.92);
-    box-shadow: 0 8px 20px rgba(135, 155, 182, 0.1);
+    background: transparent;
+    box-shadow: none;
     outline: none;
 
     img {
@@ -101,11 +100,5 @@
       line-height: 1;
     }
 
-    &__caret {
-      margin-left: 4px;
-      color: #64748b;
-      font-size: 13px;
-      font-weight: 600;
-    }
   }
 </style>

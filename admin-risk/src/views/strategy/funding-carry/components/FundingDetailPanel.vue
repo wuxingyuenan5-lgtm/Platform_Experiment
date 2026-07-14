@@ -1,16 +1,5 @@
 <template>
   <section class="detail-panel">
-    <div v-if="views.length > 1" class="view-tabs">
-      <button
-        v-for="item in views"
-        :key="item.value"
-        type="button"
-        :class="{ 'is-active': item.value === activeView }"
-        @click="$emit('change-view', item.value)"
-      >
-        {{ item.label }}
-      </button>
-    </div>
 
     <div class="compact-shell">
       <section class="chart-grid">
@@ -18,17 +7,6 @@
           <div class="chart-toolbar">
             <h3>期现价差</h3>
 
-            <div class="range-switch">
-              <button
-                v-for="range in borrowRanges"
-                :key="range"
-                type="button"
-                :class="{ 'is-active': borrowRange === range }"
-                @click="borrowRange = range"
-              >
-                {{ range }}
-              </button>
-            </div>
           </div>
 
           <div ref="basisChartRef" class="borrow-chart"></div>
@@ -47,7 +25,6 @@
         <article class="table-card">
           <div class="table-head">
             <div>
-              <p>Basis Table</p>
               <h3>期现价差表</h3>
             </div>
           </div>
@@ -75,7 +52,6 @@
         <article class="table-card">
           <div class="table-head">
             <div>
-              <p>Borrow Table</p>
               <h3>借贷费率表</h3>
             </div>
           </div>
@@ -107,23 +83,18 @@
 <script setup lang="ts">
   import { computed, nextTick, onMounted, ref, watch, type Ref } from 'vue';
   import { useECharts } from '@/hooks/web/useECharts';
-  import type { FundingAssetResearch, FundingExchange, FundingSymbol, FundingViewMode } from '../types';
+  import type { FundingAssetResearch, FundingExchange, FundingSymbol } from '../types';
 
   const props = defineProps<{
     exchange: FundingExchange;
     symbol: FundingSymbol;
-    activeView: FundingViewMode;
-    viewLabel: string;
+    selectedRange: 'current' | '7d' | '30d';
+    resolution: string;
+    startDate: string;
+    endDate: string;
     research: FundingAssetResearch;
-    views: Array<{ value: FundingViewMode; label: string }>;
   }>();
 
-  defineEmits<{
-    (e: 'change-view', value: FundingViewMode): void;
-  }>();
-
-  const borrowRange = ref<'当前' | '7日' | '30日'>('当前');
-  const borrowRanges = ['当前', '7日', '30日'] as const;
   const basisChartRef = ref<HTMLDivElement | null>(null);
   const borrowChartRef = ref<HTMLDivElement | null>(null);
   const basisChart = useECharts(basisChartRef as Ref<HTMLDivElement>);
@@ -166,13 +137,28 @@
 
   const visibleSlice = computed(() => {
     const { dates, basis, borrow } = currentBorrowSeries.value;
-    let startIndex = 0;
-    if (borrowRange.value === '7日') startIndex = Math.max(dates.length - 7, 0);
-    if (borrowRange.value === '30日') startIndex = Math.max(dates.length - 30, 0);
+    const start = new Date(props.startDate).getTime();
+    const end = new Date(props.endDate).getTime();
+    const filteredIndexes = dates
+      .map((date, index) => ({ date: `2026-${date}`, index }))
+      .filter((item) => {
+        const time = new Date(item.date).getTime();
+        return time >= start && time <= end;
+      })
+      .map((item) => item.index);
+
+    const scopedIndexes = filteredIndexes.length
+      ? filteredIndexes
+      : dates.map((_, index) => index);
+
+    let rangeIndexes = scopedIndexes;
+    if (props.selectedRange === '7d') rangeIndexes = scopedIndexes.slice(-7);
+    if (props.selectedRange === '30d') rangeIndexes = scopedIndexes.slice(-30);
+
     return {
-      dates: dates.slice(startIndex),
-      basis: basis.slice(startIndex),
-      borrow: borrow.slice(startIndex),
+      dates: rangeIndexes.map((index) => dates[index]),
+      basis: rangeIndexes.map((index) => basis[index]),
+      borrow: rangeIndexes.map((index) => borrow[index]),
     };
   });
 
@@ -324,7 +310,7 @@
   }
 
   watch(
-    () => [props.symbol, props.activeView, borrowRange.value],
+    () => [props.symbol, props.selectedRange, props.startDate, props.endDate],
     () => {
       renderBasisChart();
       renderBorrowChart();
@@ -346,50 +332,12 @@
     box-shadow: 0 16px 36px rgba(94, 76, 52, 0.06);
   }
 
-  .table-head p {
-    margin: 0;
-    color: rgba(36, 29, 21, 0.46);
-    font-size: 11px;
-    font-weight: 700;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-  }
-
   .chart-toolbar h3,
   .table-head h3 {
-    margin: 10px 0 0;
+    margin: 0;
     color: var(--strategy-text-1);
     font-family: var(--strategy-font-sans);
     font-weight: 900;
-  }
-
-  .view-tabs {
-    display: flex;
-    gap: 0;
-    overflow: auto;
-  }
-
-  .view-tabs button {
-    min-width: 132px;
-    height: 42px;
-    border: 1px solid var(--strategy-border);
-    background: var(--strategy-surface-muted);
-    color: var(--strategy-text-3);
-    cursor: pointer;
-  }
-
-  .view-tabs button.is-active {
-    background: var(--strategy-accent-soft);
-    border-color: rgba(201, 72, 72, 0.18);
-    color: var(--strategy-accent-strong);
-  }
-
-  .view-tabs button:first-child {
-    border-radius: 12px 0 0 0;
-  }
-
-  .view-tabs button:last-child {
-    border-radius: 0 12px 0 0;
   }
 
   .compact-shell {
@@ -419,31 +367,6 @@
     align-items: center;
     justify-content: space-between;
     gap: 16px;
-  }
-
-  .range-switch {
-    display: inline-flex;
-    padding: 3px;
-    border: 1px solid var(--strategy-border);
-    border-radius: 10px;
-    background: #fff;
-  }
-
-  .range-switch button {
-    min-width: 52px;
-    height: 32px;
-    border: none;
-    border-radius: 8px;
-    background: transparent;
-    color: var(--strategy-text-2);
-    font-size: 12px;
-    font-weight: 700;
-    cursor: pointer;
-  }
-
-  .range-switch .is-active {
-    color: var(--strategy-success);
-    background: var(--strategy-success-soft);
   }
 
   .borrow-chart {

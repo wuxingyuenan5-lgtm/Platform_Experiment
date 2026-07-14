@@ -1,163 +1,172 @@
-<template>
-  <section class="runtime-grid">
-    <article class="runtime-card">
+﻿<template>
+  <section class="runtime-grid" v-if="cards.length">
+    <article v-for="item in cards" :key="item.title" class="runtime-card">
       <header>
-        <h3>策略账户信息</h3>
-        <span>{{ strategyName }}</span>
+        <div>
+          <h3>{{ item.title }}</h3>
+        </div>
+        <strong>{{ item.centerValue }}</strong>
       </header>
 
-      <div class="gauge-grid">
-        <div v-for="item in gauges" :key="item.label" class="gauge-card">
-          <div
-            class="gauge-ring"
-            :style="{
-              background: `conic-gradient(${item.leftColor} 0 ${item.progress}%, ${item.rightColor} ${item.progress}% 100%)`,
-            }"
-          >
-            <div class="gauge-ring__inner">
-              <strong>{{ item.value }}</strong>
-              <span>{{ item.label }}</span>
-            </div>
-          </div>
-          <div class="gauge-footer">
-            <span :style="{ color: item.leftColor }">{{ item.leftLabel }}</span>
-            <em>{{ item.subValue }}</em>
-            <span :style="{ color: item.rightColor }">{{ item.rightLabel }}</span>
-          </div>
+      <div
+        class="runtime-ring"
+        :style="{
+          background: `conic-gradient(${item.startColor || '#3f7cff'} 0 ${item.progress}%, ${item.endColor || '#d9e5f7'} ${item.progress}% 100%)`,
+        }"
+      >
+        <div class="runtime-ring__inner">
+          <span>当前对照</span>
+          <strong>{{ item.progress }}%</strong>
         </div>
       </div>
 
-      <div class="breakdown-grid">
-        <div v-for="item in breakdown" :key="item.label" class="breakdown-item">
-          <label>{{ item.label }}</label>
-          <strong :class="item.tone ? `is-${item.tone}` : 'is-neutral'">{{ item.value }}</strong>
-          <p>{{ item.note }}</p>
-        </div>
+      <div class="runtime-ends">
+        <article>
+          <label>{{ item.leftLabel }}</label>
+          <strong>{{ item.leftValue }}</strong>
+          <span v-if="item.leftNote">{{ item.leftNote }}</span>
+        </article>
+        <article>
+          <label>{{ item.rightLabel }}</label>
+          <strong>{{ item.rightValue }}</strong>
+          <span v-if="item.rightNote">{{ item.rightNote }}</span>
+        </article>
       </div>
     </article>
   </section>
 </template>
 
 <script setup lang="ts">
-  import type { StrategyAccountBreakdown, StrategyGaugeMetric } from '../types';
-  defineProps<{
-    strategyName: string;
-    gauges: StrategyGaugeMetric[];
-    breakdown: StrategyAccountBreakdown[];
-  }>();
+  import type { StrategyCapitalComparisonCard } from '../types';
+
+  withDefaults(
+    defineProps<{
+      cards?: StrategyCapitalComparisonCard[];
+    }>(),
+    {
+      cards: () => [],
+    },
+  );
 </script>
 
 <style scoped lang="less">
-  .runtime-grid { display: block; }
-  .runtime-card {
-    padding: 22px;
-    border-radius: 24px;
-    background: linear-gradient(180deg, rgba(255,255,255,.97), rgba(255,251,245,.94));
-    box-shadow: 0 18px 40px rgba(28,35,40,.05);
-    border: 1px solid rgba(201,164,95,.14);
+  .runtime-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 12px;
   }
+
+  .runtime-card {
+    padding: 20px 22px;
+    border-radius: 22px;
+    background: linear-gradient(180deg, var(--strategy-surface) 0%, var(--strategy-surface-soft) 100%);
+    box-shadow: var(--strategy-shadow);
+    border: 1px solid var(--strategy-border);
+  }
+
   .runtime-card header {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     justify-content: space-between;
-    gap: 12px;
+    gap: 16px;
     margin-bottom: 18px;
   }
+
   .runtime-card h3 {
     margin: 0;
-    color: #15252a;
+    color: var(--strategy-text-1);
     font-size: 18px;
+    font-weight: 700;
   }
-  .runtime-card header span {
-    color: #8a94a1;
-    font-size: 12px;
-  }
-  .gauge-grid {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 16px;
-  }
-  .gauge-card {
-    padding: 18px;
-    border-radius: 18px;
-    background: rgba(255,255,255,.78);
-    box-shadow: inset 0 0 0 1px rgba(201,164,95,.08);
-  }
-  .gauge-ring {
-    display: grid;
-    place-items: center;
-    width: 164px;
-    height: 164px;
-    margin: 0 auto 14px;
-    border-radius: 50%;
-  }
-  .gauge-ring__inner {
-    display: grid;
-    place-items: center;
-    width: 118px;
-    height: 118px;
-    border-radius: 50%;
-    background: #fff;
-    text-align: center;
-  }
-  .gauge-ring__inner strong {
-    color: #21313d;
+
+  .runtime-card header strong {
+    color: var(--strategy-text-1);
     font-size: 22px;
     line-height: 1.1;
+    font-weight: 700;
+    text-align: right;
   }
-  .gauge-ring__inner span {
-    color: #8a94a1;
-    font-size: 12px;
-  }
-  .gauge-footer {
+
+  .runtime-ring {
     display: grid;
-    grid-template-columns: auto 1fr auto;
-    align-items: center;
+    place-items: center;
+    width: 184px;
+    height: 184px;
+    margin: 0 auto 18px;
+    border-radius: 50%;
+  }
+
+  .runtime-ring__inner {
+    display: grid;
+    place-items: center;
+    width: 132px;
+    height: 132px;
+    border-radius: 50%;
+    background: var(--strategy-surface);
+    text-align: center;
+    box-shadow: inset 0 0 0 1px rgba(221, 229, 241, 0.85);
+  }
+
+  .runtime-ring__inner span {
+    color: var(--strategy-text-3);
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  .runtime-ring__inner strong {
+    margin-top: 6px;
+    color: var(--strategy-text-1);
+    font-size: 28px;
+    line-height: 1.1;
+    font-weight: 800;
+  }
+
+  .runtime-ends {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 12px;
+  }
+
+  .runtime-ends article {
+    padding: 14px 16px;
+    border-radius: 16px;
+    background: var(--strategy-surface-muted);
+    border: 1px solid rgba(219, 228, 240, 0.9);
+  }
+
+  .runtime-ends label {
+    display: block;
+    color: var(--strategy-text-3);
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  .runtime-ends strong {
+    display: block;
+    margin-top: 10px;
+    color: var(--strategy-text-1);
+    font-size: 20px;
+    line-height: 1.12;
+    font-weight: 700;
+  }
+
+  .runtime-ends span {
+    display: block;
+    margin-top: 6px;
+    color: var(--strategy-text-3);
     font-size: 13px;
     font-weight: 700;
   }
-  .gauge-footer em {
-    color: #6b7280;
-    font-style: normal;
-    text-align: center;
-    font-weight: 500;
+
+  @media (max-width: 1180px) {
+    .runtime-grid {
+      grid-template-columns: 1fr;
+    }
   }
-  .breakdown-grid {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 14px;
-    margin-top: 18px;
-  }
-  .breakdown-item {
-    padding: 16px 18px;
-    border-radius: 16px;
-    background: rgba(255,255,255,.78);
-    box-shadow: inset 0 0 0 1px rgba(201,164,95,.08);
-  }
-  .breakdown-item label,
-  .breakdown-item p {
-    display: block;
-  }
-  .breakdown-item label {
-    color: #8a94a1;
-    font-size: 12px;
-  }
-  .breakdown-item strong {
-    display: block;
-    margin: 10px 0 6px;
-    font-size: 22px;
-  }
-  .breakdown-item p {
-    margin: 0;
-    color: #7c8693;
-    font-size: 12px;
-  }
-  .is-positive { color: #1d9f6e; }
-  .is-negative { color: #d8585f; }
-  .is-neutral { color: #1f2e3d; }
-  @media (max-width: 1200px) {
-    .gauge-grid,
-    .breakdown-grid { grid-template-columns: 1fr; }
+
+  @media (max-width: 860px) {
+    .runtime-ends {
+      grid-template-columns: 1fr;
+    }
   }
 </style>

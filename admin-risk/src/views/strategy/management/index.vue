@@ -11,41 +11,42 @@
     </section>
 
     <template v-if="activeSection === 'pnl'">
-      <DomesticOverseasOrdersAddon v-if="activeDesk === 'domesticOverseas'" />
-
-      <StrategyOverviewBoard
-        :overview="profile.overview"
-        v-model:activePeriod="activePeriod"
-      />
-
-      <StrategyDetailPanel :detail="profile.detail" />
-
-      <StrategyCurveGrid :curves="profile.curves" />
-
-      <DomesticOverseasPnlAddon v-if="activeDesk === 'domesticOverseas'" />
+      <StrategyPnlPanel :active-desk="activeDesk" />
     </template>
 
     <template v-else-if="activeSection === 'capital'">
-      <StrategyKpiGrid :items="profile.kpis" />
+      <StrategyKpiGrid :items="capitalProfile.overview" />
 
-      <StrategyCapitalFinanceBoard />
-
-      <StrategyRuntimePanel
-        :strategy-name="profile.strategyName"
-        :gauges="profile.gauges"
-        :breakdown="profile.accountBreakdown"
+      <StrategyCapitalFinanceBoard
+        :risk-cards="capitalProfile.riskCards"
+        :structure-cards="capitalProfile.structureCards"
       />
 
-      <StrategyCapitalNetValueBoard />
+      <StrategyCapitalRulePanel
+        v-if="capitalProfile.specialRulePanel"
+        :panel="capitalProfile.specialRulePanel"
+      />
 
-      <DomesticOverseasCapitalAddon v-if="activeDesk === 'domesticOverseas'" />
+      <StrategyCapitalRiskOverview
+        v-if="capitalProfile.riskOverview"
+        :overview="capitalProfile.riskOverview"
+      />
+
+      <StrategyRuntimePanel :cards="capitalProfile.comparisonCards" />
+
+      <StrategyCapitalNetValueBoard :curve="capitalProfile.curve" />
+
+      <StrategyCurveGrid
+        v-if="capitalProfile.metricCurves?.length"
+        :curves="capitalProfile.metricCurves"
+      />
     </template>
 
     <template v-else>
       <section class="records-only-grid">
         <StrategyRecordsPanel
-          :tabs="profile.tabs"
-          :tables="profile.tables"
+          :tabs="orderProfile.tabs"
+          :tables="orderProfile.tables"
           v-model:activeTab="activeRecordTab"
         />
       </section>
@@ -57,27 +58,26 @@
   import { computed, ref, watch } from 'vue';
   import CompactSegmentTabs from '../shared/CompactSegmentTabs.vue';
   import StrategyDeskTabs from './components/StrategyDeskTabs.vue';
-  import StrategyOverviewBoard from './components/StrategyOverviewBoard.vue';
-  import StrategyDetailPanel from './components/StrategyDetailPanel.vue';
   import StrategyKpiGrid from './components/StrategyKpiGrid.vue';
   import StrategyRuntimePanel from './components/StrategyRuntimePanel.vue';
   import StrategyCurveGrid from './components/StrategyCurveGrid.vue';
   import StrategyRecordsPanel from './components/StrategyRecordsPanel.vue';
   import StrategyCapitalFinanceBoard from './components/StrategyCapitalFinanceBoard.vue';
   import StrategyCapitalNetValueBoard from './components/StrategyCapitalNetValueBoard.vue';
-  import DomesticOverseasPnlAddon from './components/DomesticOverseasPnlAddon.vue';
-  import DomesticOverseasCapitalAddon from './components/DomesticOverseasCapitalAddon.vue';
-  import { strategyDeskOrder, strategyDeskProfiles } from './mock/data';
-  import type { StrategyDeskKey, StrategyPeriodKey } from './types';
+  import StrategyCapitalRulePanel from './components/StrategyCapitalRulePanel.vue';
+  import StrategyCapitalRiskOverview from './components/StrategyCapitalRiskOverview.vue';
+  import StrategyPnlPanel from './components/StrategyPnlPanel.vue';
+  import { strategyCapitalProfiles } from './mock/capital';
+  import { strategyDeskOrder, strategyOrderProfiles } from './mock/orders';
+  import type { StrategyDeskKey } from './types';
 
   const activeDesk = ref<StrategyDeskKey>('funding');
-  const activePeriod = ref<StrategyPeriodKey>('week');
   const activeRecordTab = ref('positions');
   const activeSection = ref<'pnl' | 'capital' | 'orders'>('pnl');
 
   const deskTabs = strategyDeskOrder.map((key) => ({
     key,
-    label: strategyDeskProfiles[key].label,
+    label: strategyOrderProfiles[key].label,
   }));
 
   const sectionTabs = [
@@ -86,13 +86,13 @@
     { key: 'orders', label: '订单信息' },
   ];
 
-  const profile = computed(() => strategyDeskProfiles[activeDesk.value]);
+  const orderProfile = computed(() => strategyOrderProfiles[activeDesk.value]);
+  const capitalProfile = computed(() => strategyCapitalProfiles[activeDesk.value]);
 
   watch(
     () => activeDesk.value,
     () => {
-      activeRecordTab.value = profile.value.tabs[0]?.key || 'positions';
-      activePeriod.value = 'week';
+      activeRecordTab.value = orderProfile.value.tabs[0]?.key || 'positions';
       activeSection.value = 'pnl';
     },
     { immediate: true },

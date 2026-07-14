@@ -1,10 +1,18 @@
 <template>
   <CrossVenueExecutionReplica
     v-if="variant === 'crossVenue'"
+    :selected-venue="selectedVenue"
     :left-leg-symbol="leftLegSymbol"
     :right-leg-symbol="rightLegSymbol"
+    :selected-resolution="selectedResolution"
   />
-  <DomesticOverseasExecutionReplica v-else :right-leg-symbol="rightLegSymbol" />
+  <DomesticOverseasExecutionReplica
+    v-else
+    :selected-venue="selectedVenue"
+    :left-leg-symbol="leftLegSymbol"
+    :right-leg-symbol="rightLegSymbol"
+    :selected-resolution="selectedResolution"
+  />
 </template>
 
 <script setup lang="ts">
@@ -18,12 +26,14 @@
       selectedVenue?: string;
       leftLegSymbol?: string;
       rightLegSymbol?: string;
+      selectedResolution?: string;
     }>(),
     {
       variant: 'crossVenue',
       selectedVenue: 'Bybit',
       leftLegSymbol: 'XAUTUSDT.P',
       rightLegSymbol: 'XAUUSD',
+      selectedResolution: '30分钟',
     },
   );
 </script>

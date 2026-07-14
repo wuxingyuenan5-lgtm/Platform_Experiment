@@ -1,6 +1,11 @@
-export type StrategyDeskKey = 'funding' | 'spread' | 'crossSpread' | 'domesticOverseas' | 'dip' | 'shortLineTraderL';
-export type StrategyPeriodKey = 'day' | 'week' | 'month' | 'custom';
-
+export type StrategyDeskKey =
+  | 'funding'
+  | 'spread'
+  | 'crossSpread'
+  | 'domesticOverseas'
+  | 'dip'
+  | 'shortLineTraderL'
+  | 'shortLineTraderW';
 export interface StrategyKpiCard {
   label: string;
   value: string;
@@ -13,31 +18,6 @@ export interface StrategyAccountBreakdown {
   label: string;
   value: string;
   note: string;
-  tone?: 'positive' | 'negative' | 'neutral';
-}
-
-export interface StrategyGaugeMetric {
-  label: string;
-  value: string;
-  subValue: string;
-  progress: number;
-  leftLabel: string;
-  rightLabel: string;
-  leftColor: string;
-  rightColor: string;
-}
-
-export interface StrategyExecutionMetric {
-  label: string;
-  before: string;
-  after: string;
-  alert?: string;
-  tone?: 'positive' | 'negative' | 'neutral';
-}
-
-export interface StrategyLogItem {
-  time: string;
-  text: string;
   tone?: 'positive' | 'negative' | 'neutral';
 }
 
@@ -73,102 +53,99 @@ export interface StrategyTableSection {
   rows: StrategyTableRow[];
 }
 
-export interface StrategyOverviewStatCard {
+export interface StrategyCapitalRiskCard {
   label: string;
   value: string;
-  subValue?: string;
+  note: string;
   tone?: 'positive' | 'negative' | 'neutral';
 }
 
-export interface StrategyOverviewCountCard {
-  label: string;
-  count: string;
-  subLabel: string;
-}
-
-export interface StrategyAttributionRow {
-  type: string;
-  strategyCount: string;
-  pnl: string;
-  ratio: string;
-  tone?: 'positive' | 'negative' | 'neutral';
-}
-
-export interface StrategySyncRow {
-  category: string;
-  status: string;
-  message: string;
-  time: string;
-  tone?: 'positive' | 'negative' | 'neutral';
-}
-
-export interface StrategyOverviewPeriodData {
-  periodLabel: string;
-  dateLabel: string;
-  totalFund: string;
-  xLabels: string[];
-  barValues: number[];
-  lineValues: number[];
-  statCards: StrategyOverviewStatCard[];
-  stateCounts: StrategyOverviewCountCard[];
-  profitRows: StrategyAttributionRow[];
-  lossRows: StrategyAttributionRow[];
-  syncRows: StrategySyncRow[];
-}
-
-export interface StrategyOverviewConfig {
-  periods: readonly { key: StrategyPeriodKey; label: string }[];
-  datasets: Record<StrategyPeriodKey, StrategyOverviewPeriodData>;
-}
-
-export interface StrategyDetailMetric {
-  label: string;
-  value: string;
-  tone?: 'positive' | 'negative' | 'neutral';
-}
-
-export interface StrategyDetailLegRow {
-  label: string;
-  value: string;
-  tone?: 'positive' | 'negative' | 'neutral';
-}
-
-export interface StrategyDetailLeg {
+export interface StrategyCapitalComparisonCard {
   title: string;
-  market: string;
-  symbol: string;
-  actions: string[];
-  rows: StrategyDetailLegRow[];
+  centerValue: string;
+  centerLabel: string;
+  leftLabel: string;
+  leftValue: string;
+  rightLabel: string;
+  rightValue: string;
+  leftNote?: string;
+  rightNote?: string;
+  progress: number;
+  startColor?: string;
+  endColor?: string;
 }
 
-export interface StrategyDetailSnapshot {
-  title: string;
-  status: string;
-  actions: string[];
-  metrics: StrategyDetailMetric[];
-  legs: StrategyDetailLeg[];
-  exposureRows: StrategyDetailLegRow[];
-  tabs: { key: string; label: string }[];
-  tabTables: Record<string, StrategyTableSection>;
-}
-
-export interface StrategyDeskProfile {
-  key: StrategyDeskKey;
+export interface StrategyCapitalCurveOption {
+  key: string;
   label: string;
+}
+
+export interface StrategyCapitalCurveSummary {
+  label: string;
+  value: string;
+  tone?: 'positive' | 'negative' | 'neutral';
+}
+
+export interface StrategyCapitalCurveConfig {
   title: string;
   subtitle: string;
-  strategyName: string;
-  filters: string[];
-  overview: StrategyOverviewConfig;
-  detail: StrategyDetailSnapshot;
-  kpis: StrategyKpiCard[];
-  gauges: StrategyGaugeMetric[];
-  accountBreakdown: StrategyAccountBreakdown[];
-  executionHeader: string;
-  executionStatus: string[];
-  executionMetrics: StrategyExecutionMetric[];
-  logs: StrategyLogItem[];
-  curves: StrategyCurveCard[];
-  tabs: StrategyTableTab[];
-  tables: Record<string, StrategyTableSection>;
+  metricOptions: StrategyCapitalCurveOption[];
+  periodOptions: StrategyCapitalCurveOption[];
+  modeOptions?: StrategyCapitalCurveOption[];
+  defaultMetric: string;
+  defaultPeriod: string;
+  defaultMode?: string;
+  xLabels: string[];
+  netValueData: number[];
+  drawdownData: number[];
+  summaries: StrategyCapitalCurveSummary[];
+}
+
+export interface StrategyCapitalRuleMetric {
+  label: string;
+  value: string;
+  note: string;
+  tone?: 'positive' | 'negative' | 'neutral';
+}
+
+export interface StrategyCapitalRuleAlert {
+  time: string;
+  text: string;
+  tone?: 'positive' | 'negative' | 'neutral';
+}
+
+export interface StrategyCapitalRulePanel {
+  title: string;
+  status: string;
+  statusNote: string;
+  tone?: 'positive' | 'negative' | 'neutral';
+  metrics: StrategyCapitalRuleMetric[];
+  alerts: StrategyCapitalRuleAlert[];
+}
+
+export interface StrategyCapitalRiskOverview {
+  title: string;
+  rows: Array<{
+    product: string;
+    type: string;
+    level: string;
+    factor: string;
+    firstValue: string;
+    latestValue: string;
+    latestTime: string;
+    count: string;
+    status: string;
+    tone?: 'positive' | 'negative' | 'neutral';
+  }>;
+}
+
+export interface StrategyCapitalProfile {
+  overview: StrategyKpiCard[];
+  riskCards: StrategyCapitalRiskCard[];
+  structureCards: StrategyAccountBreakdown[];
+  comparisonCards?: StrategyCapitalComparisonCard[];
+  curve: StrategyCapitalCurveConfig;
+  metricCurves?: StrategyCurveCard[];
+  specialRulePanel?: StrategyCapitalRulePanel;
+  riskOverview?: StrategyCapitalRiskOverview;
 }
