@@ -1,24 +1,24 @@
 # Platform V6 架构文档入口
 
 状态：`active`  
-适用分支：`refactor/frontend-architecture-v6`
+产品基线：Platform V5  
+架构版本：Platform V6  
+适用分支：`refactor/frontend-architecture-v6`  
+文档层级：架构入口
 
 ## 1. 文档定位
 
-本目录定义 Platform V6 的技术架构。产品模块、页面功能和视觉要求分别由 `docs/modules/`、`docs/strategies/` 和 `docs/design/` 管理；本目录重点说明系统如何组织、各层如何协作、业务对象由谁负责，以及平台如何从前端原型逐步演进到受控实盘。
+本目录定义 Platform V6 技术架构。产品功能和视觉要求分别由 `docs/modules/`、`docs/strategies/` 和 `docs/design/` 管理；本目录说明系统如何组织、各层如何协作、业务对象由谁负责以及安全可靠性要求。
 
-V6 技术架构划分为四层：
+V6 技术架构分为：
 
 1. 前端架构。
 2. 后端架构。
 3. 前后端协作架构。
 4. 公共领域模型。
+5. 跨层安全、可观测性和治理。
 
-安全、可观测性、数据治理和实施路线作为跨层规范管理。
-
-四层必须分别设计，但使用统一的策略、账户、订单、成交、持仓、损益和风险语义。
-
-## 2. 产品架构与技术架构的关系
+## 2. 产品架构与技术架构
 
 平台继续保持六个一级产品模块：
 
@@ -29,13 +29,7 @@ V6 技术架构划分为四层：
 - 风险管理。
 - 金融 AI。
 
-一级模块决定用户从哪里进入功能，不直接决定后端服务、数据库表或代码包的归属。
-
-例如：
-
-- “账户与资产”可以位于风险管理菜单内，但技术上属于 Account／Asset 领域。
-- “用户与权限”可以位于风险管理菜单内，但技术上属于 IAM／Permission 领域。
-- “审计”可以位于风险管理菜单内，但技术上属于 Audit 领域。
+一级模块决定用户从哪里进入功能，不直接决定后端服务、数据库表或代码包归属。
 
 必须区分：
 
@@ -43,94 +37,12 @@ V6 技术架构划分为四层：
 |---|---|---|
 | 产品归属 | 用户从哪里进入、页面服务什么任务 | `docs/modules/`、`module-ownership-matrix.md` |
 | 前端归属 | 路由、页面、组件和状态如何组织 | `frontend/` |
-| 后端归属 | 业务规则、服务、存储和可靠性由谁负责 | `backend/` |
-| 协作契约 | 前后端如何交换命令、查询、事件和错误 | `integration/` |
+| 后端归属 | 规则、模块、存储和可靠性由谁负责 | `backend/` |
+| 协作契约 | API、命令、查询、事件和错误如何交换 | `integration/` |
 | 领域归属 | Strategy、Order、PnL 等对象的共同语义 | `domain/`、`domain-model-boundaries.md` |
-| 跨层治理 | 安全、监控、发布、恢复和实施顺序 | 本目录跨层文档 |
+| 跨层治理 | 安全、监控、发布、恢复和文档治理 | 本目录跨层文档、`docs/governance/` |
 
-## 3. 架构总览
-
-### 3.1 前端架构
-
-负责：
-
-- 路由和页面装配。
-- 页面、模块和全局状态。
-- 用户输入、交互反馈和权限结果展示。
-- 图表、表格和 Design Token。
-- API／Mock 数据适配。
-- 前端构建、测试和发布门槛。
-
-核心文档：
-
-- `frontend/frontend-overview.md`
-- `frontend/routing-permission-and-environment.md`
-- `frontend/data-adapter-and-view-model.md`
-- `frontend-state-ownership.md`
-- `shared-ui-governance.md`
-- `strategy-registry.md`
-
-### 3.2 后端架构
-
-负责：
-
-- 身份认证和权限判定。
-- 行情、账户、持仓、订单、成交和执行服务。
-- 损益、风险、对账、审计和数据质量。
-- 数据存储、事件处理、任务调度和系统恢复。
-- 交易所、经纪商和其他外部系统接入。
-
-核心文档：
-
-- `backend/backend-overview.md`
-- `backend/service-boundaries.md`
-- `backend/trading-execution-reliability.md`
-- `backend/storage-ledger-and-audit.md`
-
-当前后端目标采用模块化单体，并为交易执行、Gateway、行情接入和重型异步任务保留独立进程边界。
-
-当前文档不提前绑定 vn.py、数据库或消息队列等具体技术方案。
-
-### 3.3 前后端协作架构
-
-负责：
-
-- API、WebSocket 和 SSE 边界。
-- 命令、查询和事件的区别。
-- 鉴权、权限、幂等、错误码和版本兼容。
-- 时间、币种、单位、分页和状态枚举。
-- 实时事件、断线重连和权威状态恢复。
-- Mock 数据向真实接口迁移的方式。
-
-核心文档：
-
-- `integration/frontend-backend-integration.md`
-- `integration/api-contract-and-versioning.md`
-- `integration/realtime-events-and-recovery.md`
-
-### 3.4 公共领域模型
-
-负责：
-
-- 定义前后端共同理解的业务对象。
-- 区分订单、成交、执行批次、持仓和损益。
-- 定义对象身份、状态、生命周期和关联关系。
-- 避免页面字段或接口字段直接成为业务模型。
-
-核心文档：
-
-- `domain/domain-overview.md`
-- `domain-model-boundaries.md`
-- `domain/status-enums-and-lifecycles.md`
-
-### 3.5 跨层规范
-
-- `module-ownership-matrix.md`：产品归属、技术领域和数据权威。
-- `security-observability-and-operations.md`：安全、日志、指标、追踪、告警、发布和恢复。
-- `implementation-roadmap.md`：从当前前端原型到受控实盘的分阶段路线。
-- `strategy-capability-matrix.md`：策略页面能力。
-
-## 4. 当前目标架构
+## 3. 当前目标结构
 
 ```text
 Vue Frontend
@@ -164,7 +76,7 @@ Repository Interface
 Mock Adapter / API Adapter
 ```
 
-双腿交易核心链路：
+双腿交易：
 
 ```text
 TradeIntent
@@ -178,24 +90,90 @@ LegInstruction
 Order
   ↓
 Execution / Fill
-  ↓
-Position / Exposure / PnL
 ```
 
-## 5. 当前架构状态
+## 4. 前端架构
 
-| 层级 | 当前成熟度 | 说明 |
-|---|---|---|
-| 产品架构 | 已形成正式基线 | 六个一级模块和核心职责已确认 |
-| 前端架构 | 详细规范已形成，代码待接入 | 页面仍存在 V5 硬编码、Mock 直连和大型组件 |
-| 公共领域模型 | 核心模型和生命周期已形成 | 后续需结合具体接口和策略继续校验 |
-| 前后端协作 | 契约、实时和恢复规范已形成 | 尚未形成具体 OpenAPI 接口清单 |
-| 后端架构 | 模块、交易可靠性和存储边界已形成 | 真实服务、数据库和 Gateway 尚未实现 |
-| 安全与运维 | 目标规范已形成 | 具体工具、SLO、RPO 和 RTO 尚待实施阶段确认 |
+核心文档：
 
-## 6. 架构决策
+- `frontend/frontend-overview.md`
+- `frontend/routing-permission-and-environment.md`
+- `frontend/data-adapter-and-view-model.md`
+- `frontend-state-ownership.md`
+- `shared-ui-governance.md`
+- `strategy-registry.md`
 
-当前有效 ADR：
+核心原则：
+
+- 路由表达可恢复主上下文。
+- 页面不直接依赖 API DTO 和大型 Mock。
+- DeploymentEnvironment、TradingMode 和 TradingPermissionState 分开。
+- 权限展示不替代后端校验。
+- Domain Model、View Model 和请求状态分开。
+
+## 5. 后端架构
+
+核心文档：
+
+- `backend/backend-overview.md`
+- `backend/service-boundaries.md`
+- `backend/trading-execution-reliability.md`
+- `backend/storage-ledger-and-audit.md`
+- `backend/query-and-read-models.md`
+- `backend/research-data-and-content-boundaries.md`
+
+当前后端优先采用模块化单体，并为 Gateway、交易执行、行情接入和重型异步任务保留独立进程边界。
+
+核心原则：
+
+- 每个对象具有唯一主责模块。
+- StrategyAccountBinding 归属 Strategy，Account 主档归属 Account。
+- Execution Market Data、Research Data 和 Content／Calendar Data 分开。
+- Strategy Economic Ledger 不等于完整财务会计总账。
+- Backend Read Model 不形成第二套数据权威。
+
+## 6. 前后端协作架构
+
+核心文档：
+
+- `integration/frontend-backend-integration.md`
+- `integration/api-contract-and-versioning.md`
+- `integration/realtime-events-and-recovery.md`
+
+核心原则：
+
+- Query、Command 和 Event 分开。
+- 命令已受理不等于交易已完成。
+- API 具备稳定错误码、幂等和版本策略。
+- 实时通道不是唯一数据来源。
+- 断线后通过权威 Query 恢复状态。
+
+## 7. 公共领域模型
+
+核心文档：
+
+- `domain/domain-overview.md`
+- `domain-model-boundaries.md`
+- `domain/status-enums-and-lifecycles.md`
+- `domain/approval-and-dual-control.md`
+
+核心原则：
+
+- DTO、Domain Model、Backend Read Model、API DTO 和 View Model 分开。
+- TradeCommand 只表达命令受理，ExecutionBatch 表达执行过程。
+- Order、Fill、Position、Exposure、PnL 和 Risk 分开。
+- ExecutionBalanceStatus 不表示账户余额。
+- 权限、审批、风险和审计不能相互替代。
+
+## 8. 跨层规范
+
+- `module-ownership-matrix.md`：产品归属、技术领域和数据权威。
+- `strategy-capability-matrix.md`：策略页面能力。
+- `security-observability-and-operations.md`：安全、日志、指标、告警、发布和恢复。
+- `../governance/document-rules.md`：文档状态、元数据和唯一来源。
+- `../governance/glossary.md`：统一术语。
+
+## 9. 架构决策
 
 - `decisions/ADR-001-一级架构保持不变.md`
 - `decisions/ADR-002-交易平台与策略管理策略范围不同.md`
@@ -203,93 +181,89 @@ Position / Exposure / PnL
 - `decisions/ADR-004-交易工具由Markdown生成.md`
 - `decisions/ADR-005-技术架构分层.md`
 - `decisions/ADR-006-后端优先采用模块化单体.md`
+- `decisions/ADR-007-部署环境与交易模式分离.md`
 
-具体交易内核、数据库、消息队列、Gateway 和实盘部署方式仍需专项方案和新 ADR。
+## 10. 唯一事实来源速查
 
-## 7. 文档使用顺序
+| 内容 | 主文档 |
+|---|---|
+| 公共对象 | `domain-model-boundaries.md` |
+| 状态枚举和生命周期 | `domain/status-enums-and-lifecycles.md` |
+| 模块所有权 | `backend/service-boundaries.md` |
+| 产品归属和数据权威 | `module-ownership-matrix.md` |
+| 交易可靠性 | `backend/trading-execution-reliability.md` |
+| API、错误、幂等和版本 | `integration/api-contract-and-versioning.md` |
+| 实时事件和恢复 | `integration/realtime-events-and-recovery.md` |
+| 审批和 Maker／Checker | `domain/approval-and-dual-control.md` |
+| 研究、行情和内容数据 | `backend/research-data-and-content-boundaries.md` |
+| Backend Read Model | `backend/query-and-read-models.md` |
+| 中文术语 | `../governance/glossary.md` |
 
-### 7.1 前端页面任务
+## 11. 当前成熟度
+
+| 层级 | 当前状态 |
+|---|---|
+| 产品架构 | 已形成正式基线 |
+| 前端架构 | 规范已形成，代码仍需逐步接入 |
+| 公共领域模型 | 已形成主要对象、状态和审批边界 |
+| 前后端协作 | 已形成基础契约，尚未建立具体 OpenAPI |
+| 后端架构 | 逻辑边界已形成，尚未建设真实服务和存储 |
+| 实盘能力 | 尚未接入，不具备真实交易条件 |
+
+## 12. 文档读取顺序
+
+### 前端页面任务
 
 1. `docs/README.md`
 2. 对应模块和策略文档
 3. `frontend/frontend-overview.md`
 4. `frontend/routing-permission-and-environment.md`
-5. `frontend-state-ownership.md`
-6. `frontend/data-adapter-and-view-model.md`
+5. `frontend/data-adapter-and-view-model.md`
+6. `frontend-state-ownership.md`
 7. `shared-ui-governance.md`
 8. 相关代码
 
-### 7.2 后端模块设计任务
+### 后端领域任务
 
 1. 对应模块和策略需求
-2. `domain/domain-overview.md`
-3. `domain-model-boundaries.md`
-4. `domain/status-enums-and-lifecycles.md`
-5. `backend/backend-overview.md`
-6. `backend/service-boundaries.md`
-7. 相关专项文档
-8. ADR
+2. `domain-model-boundaries.md`
+3. `domain/status-enums-and-lifecycles.md`
+4. `backend/service-boundaries.md`
+5. 对应后端专题文档
+6. `integration/frontend-backend-integration.md`
+7. 专项技术方案和 ADR
 
-### 7.3 交易执行任务
-
-1. `modules/交易平台-需求文档.md`
-2. 对应策略文档
-3. `domain-model-boundaries.md`
-4. `domain/status-enums-and-lifecycles.md`
-5. `backend/trading-execution-reliability.md`
-6. `integration/api-contract-and-versioning.md`
-7. `integration/realtime-events-and-recovery.md`
-8. 安全、审计和测试方案
-
-### 7.4 前后端接口任务
+### API 和实时任务
 
 1. 对应业务需求
 2. `domain-model-boundaries.md`
-3. `domain/status-enums-and-lifecycles.md`
-4. `integration/frontend-backend-integration.md`
-5. `integration/api-contract-and-versioning.md`
-6. 前端 View Model 和后端 API DTO
-7. 具体 OpenAPI 契约
+3. `integration/frontend-backend-integration.md`
+4. `integration/api-contract-and-versioning.md`
+5. `integration/realtime-events-and-recovery.md`
+6. 具体 OpenAPI 和事件契约
 
-### 7.5 数据、账本和审计任务
+### 高风险操作任务
 
-1. 对应策略损益和账户需求
-2. `domain-model-boundaries.md`
-3. `backend/storage-ledger-and-audit.md`
-4. `module-ownership-matrix.md`
-5. 数据库和迁移专项方案
+1. 对应业务需求
+2. `domain/approval-and-dual-control.md`
+3. 权限、风险和审计文档
+4. 具体审批策略和命令契约
 
-### 7.6 发布和运维任务
+## 13. Draft 文档
 
-1. `security-observability-and-operations.md`
-2. `implementation-roadmap.md`
-3. `docs/quality/release-gate.md`
-4. `docs/quality/smoke-checklist.md`
-5. 环境专项部署方案
+以下文件只用于后续讨论，不是当前实施依据：
 
-## 8. 实施顺序
+- `implementation-roadmap.md`
+- `2026-07-16-vnpy平台架构初步方案-DRAFT.md`
+- `2026-07-16-平台新增功能初步方案-DRAFT.md`
 
-架构实施按 `implementation-roadmap.md` 分阶段推进：
+正式规划和技术选型确认后，应将结论合并进 active 文档或形成 ADR。
 
-0. 文档与前端代码基线对齐。
-1. 公共领域与接口契约。
-2. 后端基础与身份权限。
-3. 只读数据服务。
-4. 模拟交易执行。
-5. 测试网、沙盒或 Paper Trading。
-6. 受控小范围实盘。
-7. 扩展策略、账户和 Gateway。
+## 14. 治理原则
 
-当前最优先是阶段 0，不直接开始实盘交易系统。
-
-## 9. 治理原则
-
-- 产品导航变化、技术服务拆分和数据库设计是不同决策，不得混为一体。
-- 前端不得成为订单、账户、损益和风险的最终数据权威。
-- 后端不得通过接口字段结构直接控制页面布局。
-- 公共领域模型只定义稳定业务语义，不包含页面样式和数据库实现细节。
-- 查询、命令和事件必须分开。
-- 订单、成交、执行批次、配平、风险和数据质量状态必须分开。
-- 演示、模拟、测试、Paper 和实盘环境必须明确隔离。
+- 产品导航、技术模块、数据库设计和实施计划是不同决策。
+- 前端不得成为交易、账户、损益和风险最终数据权威。
+- 后端不得通过 API 字段直接控制页面布局。
+- Read Model 和报表不得形成第二套业务事实。
 - 具体技术选型通过专项方案和 ADR 确认。
-- `DRAFT` 文档不替代本入口列出的 `active` 规范。
+- Draft 不替代 active 规范。
