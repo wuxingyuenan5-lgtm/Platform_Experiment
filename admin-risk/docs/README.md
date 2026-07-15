@@ -1,111 +1,234 @@
 # Admin-Risk 文档入口
 
-> 当前文档基线：Platform V5  
+> 当前产品基线：Platform V5  
 > 基线提交：`bd6a2046814e92a2688ec6c8a8de026f95f4fcc2`  
 > 文档重构分支：`refactor/frontend-architecture-v6`
 
-## 1. 使用规则
+## 1. 文档入口定位
 
-本目录是项目需求、模块定位和前端架构的唯一有效入口。
+本文件是项目产品需求、模块定位、策略定义和前端架构规范的唯一有效入口。
 
-后续进行产品讨论、前端修改或 Codex 开发时，应优先读取本文件列出的 `active` 文档。未列入有效文档清单的历史文件，不得直接作为当前实现依据。
+后续进行产品讨论、前端修改或 Codex 开发时，应优先读取本文件列出的 `active` 文档。
 
-文档状态统一为：
+未列入有效文档清单的旧 DOCX、阶段性交接、历史需求和临时设计稿，不得直接作为当前实现依据。
 
-- `active`：当前唯一有效口径。
-- `draft`：正在讨论，不能直接作为最终实现依据。
-- `superseded`：已被其他文档替代。
+## 2. 文档状态
+
+- `active`：当前有效，可以作为产品和开发依据。
+- `draft`：正在讨论，不能直接替代 active 文档。
+- `superseded`：已被新文档替代。
 - `archived`：仅供历史追溯。
 
-## 2. 当前有效文档
+完整规则见：
 
-### 2.1 资产与现状
+- `governance/document-rules.md`
 
-- `audit/v5-asset-inventory.md`：V5 页面、代码、文档与工程资产盘点。
+## 3. 当前有效文档
 
-### 2.2 架构规则
+### 3.1 文档治理
 
-- `architecture/module-ownership-matrix.md`：模块职责和跨模块数据展示边界。
-- `architecture/strategy-capability-matrix.md`：各策略在交易平台和策略管理中的能力范围。
-- `architecture/strategy-registry.md`：统一策略注册表的设计规范。
+- `governance/document-rules.md`：文档目录、状态、命名、变更、归档和 AI 读取规则。
+- `governance/glossary.md`：平台、策略、交易、损益、账户、风控和工程术语的统一定义。
 
-### 2.3 模块定位
+### 3.2 资产盘点与遗留清单
+
+- `audit/v5-asset-inventory.md`：V5 页面、代码、文档和工程资产初步盘点。
+- `audit/legacy-document-inventory.md`：旧 DOCX、交接文档和历史需求的归档计划。
+- `audit/legacy-code-inventory.md`：遗留组件、大型页面、重复入口、生成文件和旧 API 占位清单。
+
+### 3.3 跨模块架构
+
+- `architecture/module-ownership-matrix.md`：模块主责和跨模块摘要展示边界。
+- `architecture/strategy-capability-matrix.md`：六类策略在交易平台和策略管理中的能力范围。
+- `architecture/strategy-registry.md`：统一策略注册表设计规范。
+- `architecture/shared-ui-governance.md`：共享组件、主题变量、图表、表格和样式治理规范。
+
+### 3.4 一级和支撑模块定位
+
+- `modules/一级模块定位总表.md`
+- `modules/首页-模块定位.md`
+- `modules/策略-模块定位.md`
+- `modules/对冲基金看板-模块定位.md`
+- `modules/新闻日历与理财-模块定位.md`
+- `modules/风控管理-模块定位.md`
+- `modules/金融AI分析-模块定位.md`
+- `modules/支撑模块-模块定位.md`
+
+一级架构、一级导航、模块名称和现有路由均视为既定约束，本轮不做调整。
+
+### 3.5 交易平台
 
 - `modules/交易平台-模块定位.md`
+- `modules/交易平台-需求文档.md`
+
+当前策略范围：
+
+- 资费套利。
+- 跨所价差。
+- 海内外价差。
+
+固定页面：
+
+- 行情分析。
+- 交易执行。
+
+### 3.6 策略管理
+
 - `modules/策略管理-模块定位.md`
+- `modules/策略管理-需求文档.md`
 
-其他一级模块的定位文档，应在完成对应模块盘点和确认后逐步补充。一级架构、一级导航和模块名称均视为既定约束，不在本轮重构中调整。
+当前纳管策略：
 
-## 3. 当前实施范围
+- 资费套利。
+- 跨所价差。
+- 海内外价差。
+- 抄底。
+- 短线交易员 L。
+- 短线交易员 W。
 
-本轮工作包含：
+固定页面：
 
-1. 冻结 V5 并建立独立重构分支。
-2. 盘点 V5 资产。
-3. 重建模块定位和需求文档体系。
-4. 建立模块职责矩阵。
-5. 建立统一策略能力模型和策略注册表规范。
-6. 后续整理共享组件、主题和遗留文件。
+- 策略损益。
+- 账户资金。
+- 订单信息。
 
-本轮暂不包含：
+### 3.7 策略文档
 
-- 资费套利代码迁移。
-- 跨所价差代码迁移。
-- 海内外价差代码迁移。
-- 抄底和短线交易策略代码迁移。
+- `strategies/资费套利.md`
+- `strategies/跨所价差.md`
+- `strategies/海内外价差.md`
+- `strategies/抄底.md`
+- `strategies/短线交易员L.md`
+- `strategies/短线交易员W.md`
+
+策略能力结论：
+
+| 策略 | 交易平台 | 策略管理 |
+|---|---:|---:|
+| 资费套利 | 是 | 是 |
+| 跨所价差 | 是 | 是 |
+| 海内外价差 | 是 | 是 |
+| 抄底 | 否 | 是 |
+| 短线交易员 L | 否 | 是 |
+| 短线交易员 W | 否 | 是 |
+
+### 3.8 特殊单一数据源
+
+- `trading-tools-bookmarks-review.md`：交易工具目录的唯一人工维护来源。
+
+交易工具数据更新规则：
+
+1. 修改该 Markdown 文件。
+2. 执行 `pnpm sync:trading-tools`。
+3. 生成 `src/views/hedgeBoard/tradingTools/data/marketTools.ts`。
+4. 不直接人工修改生成文件中的工具内容。
+
+## 4. 当前代码配置
+
+统一策略注册表：
+
+- `src/views/strategy/shared/strategyRegistry.ts`
+
+当前状态：
+
+- 已建立六类策略统一定义。
+- 已明确平台和策略管理能力。
+- 尚未接入现有页面。
+- 暂不接入阶段 7－10 的策略页面，避免与用户本地修改冲突。
+
+## 5. 本轮已完成范围
+
+- 冻结 V5 基线并创建独立重构分支。
+- 建立 V5 资产盘点。
+- 建立全部现有一级模块和支撑模块定位。
+- 建立交易平台和策略管理模块需求。
+- 建立六类策略正式文档。
+- 建立模块职责矩阵。
+- 建立策略能力矩阵和策略注册表规范。
+- 建立平台术语表。
+- 建立文档治理规则。
+- 建立遗留文档和遗留代码清单。
+- 建立共享组件和主题治理规范。
+
+## 6. 本轮明确不包含
+
+- 资费套利具体代码迁移。
+- 跨所价差具体代码迁移。
+- 海内外价差具体代码迁移。
+- 抄底具体代码迁移。
+- 短线交易员 L/W 具体代码迁移。
 - 后端、数据库和真实数据接入。
+- 大规模目录搬迁。
+- 旧文件和旧代码的实际删除。
 
-上述策略页面的具体代码迁移由本地开发单独推进。
+上述策略页面修改由用户本地单独推进。
 
-## 4. 历史文档处理规则
+## 7. AI / Codex 开发读取顺序
 
-类似以下历史文件：
+### 模块任务
+
+1. `docs/README.md`
+2. 对应 `modules/*-模块定位.md`
+3. 对应 `modules/*-需求文档.md`，如存在
+4. `architecture/module-ownership-matrix.md`
+5. `governance/glossary.md`
+6. 相关源代码
+
+### 策略任务
+
+1. `docs/README.md`
+2. `modules/策略-模块定位.md`
+3. `modules/交易平台-需求文档.md` 或 `modules/策略管理-需求文档.md`
+4. 对应 `strategies/*.md`
+5. `architecture/strategy-capability-matrix.md`
+6. `architecture/strategy-registry.md`
+7. `architecture/shared-ui-governance.md`
+8. 相关源代码
+
+### 清理任务
+
+1. `audit/legacy-document-inventory.md`
+2. `audit/legacy-code-inventory.md`
+3. `governance/document-rules.md`
+4. 搜索实际引用
+5. 完成替代后再删除
+
+## 8. 历史文档处理
+
+用户确认存在的旧文件：
 
 - `核心模块.docx`
 - `需求文档.docx`
-- 已被当前页面和设计文档替代的阶段性需求文件
 
 处理原则：
 
-1. 先提取仍有价值且未被新文档覆盖的内容。
-2. 将有效内容合并进当前 `active` 文档。
-3. 再移入 `docs/archive/legacy/`。
-4. 归档文件仅用于历史追溯，不再作为开发依据。
-5. 未确认引用关系前，不直接删除文件。
+1. 本地确认精确路径。
+2. 提取仍有效且新文档未覆盖的信息。
+3. 合并进入对应 active Markdown 文档。
+4. 移入 `docs/archive/legacy-docx/`。
+5. 不直接删除。
 
-## 5. 文档编写要求
+其他阶段性交接和历史策略文档的具体处理见：
 
-每份模块文档至少说明：
+- `audit/legacy-document-inventory.md`
 
-1. 模块定位。
-2. 核心用户和核心任务。
-3. 包含的页面和功能。
-4. 模块拥有的业务对象。
-5. 明确负责和不负责的内容。
-6. 与其他模块的输入输出关系。
-7. 当前实现状态。
-8. 验收标准。
+## 9. 当前禁止事项
 
-每份策略文档至少说明：
+- 不改变一级架构。
+- 不让旧 DOCX 覆盖当前 active 文档。
+- 不直接删除 Legacy 组件。
+- 不批量清理 API 占位文件。
+- 不直接修改交易工具生成文件。
+- 不因单页问题重写共享主题。
+- 不在没有业务确认的情况下新增损益项、风险阈值或策略能力。
 
-1. 策略定位。
-2. 是否通过交易平台下单。
-3. 策略腿和账户结构。
-4. 损益、资金、订单和风险结构。
-5. 在交易平台展示的能力。
-6. 在策略管理展示的能力。
-7. 当前实现状态。
+## 10. 维护规则
 
-## 6. AI / Codex 开发读取顺序
+产品口径变化时：
 
-执行前端任务时，建议按以下顺序读取：
+1. 先更新对应 active 文档。
+2. 再更新职责矩阵、能力矩阵或术语表。
+3. 然后修改代码。
+4. 最后检查文档和代码一致性。
 
-1. `docs/README.md`
-2. 对应模块的模块定位与需求文档
-3. `architecture/module-ownership-matrix.md`
-4. `architecture/strategy-capability-matrix.md`
-5. `architecture/strategy-registry.md`
-6. 对应策略文档
-7. 相关源代码
-
-不得仅根据 `archive`、旧版 DOCX 或零散交接记录推断当前需求。
+当代码与 active 文档冲突时，应先指出冲突并由用户确认，不得自动以旧代码或旧文档为准。
