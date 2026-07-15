@@ -38,6 +38,8 @@ V6 技术架构分为四层：
 3. 前后端协作架构。
 4. 公共领域模型。
 
+同时设置跨层安全、可观测性、数据治理和实施路线规范。
+
 统一入口：
 
 - `architecture/README.md`
@@ -49,6 +51,7 @@ V6 技术架构分为四层：
 - 后端架构决定业务规则、服务、存储和数据权威。
 - 协作架构决定 API、命令、事件和错误如何交换。
 - 公共领域模型定义前后端共同业务语言。
+- 跨层规范决定安全、监控、发布、恢复和实施顺序。
 
 ## 4. 当前有效文档
 
@@ -84,11 +87,14 @@ V6 技术架构分为四层：
 - `architecture/README.md`
 - `architecture/module-ownership-matrix.md`
 - `architecture/strategy-capability-matrix.md`
-- `architecture/domain-model-boundaries.md`
+- `architecture/security-observability-and-operations.md`
+- `architecture/implementation-roadmap.md`
 
 ### 4.5 前端架构
 
 - `architecture/frontend/frontend-overview.md`
+- `architecture/frontend/routing-permission-and-environment.md`
+- `architecture/frontend/data-adapter-and-view-model.md`
 - `architecture/frontend-state-ownership.md`
 - `architecture/shared-ui-governance.md`
 - `architecture/strategy-registry.md`
@@ -96,17 +102,23 @@ V6 技术架构分为四层：
 ### 4.6 后端架构
 
 - `architecture/backend/backend-overview.md`
+- `architecture/backend/service-boundaries.md`
+- `architecture/backend/trading-execution-reliability.md`
+- `architecture/backend/storage-ledger-and-audit.md`
 
-当前只定义目标边界和建设原则，不代表后端、数据库和真实交易系统已经实现。
+当前后端文档定义目标边界、可靠性和数据原则，不代表后端、数据库和真实交易系统已经实现。
 
 ### 4.7 前后端协作架构
 
 - `architecture/integration/frontend-backend-integration.md`
+- `architecture/integration/api-contract-and-versioning.md`
+- `architecture/integration/realtime-events-and-recovery.md`
 
 ### 4.8 公共领域模型
 
 - `architecture/domain/domain-overview.md`
 - `architecture/domain-model-boundaries.md`
+- `architecture/domain/status-enums-and-lifecycles.md`
 
 ### 4.9 架构决策
 
@@ -115,6 +127,7 @@ V6 技术架构分为四层：
 - `architecture/decisions/ADR-003-策略注册表作为唯一策略定义来源.md`
 - `architecture/decisions/ADR-004-交易工具由Markdown生成.md`
 - `architecture/decisions/ADR-005-技术架构分层.md`
+- `architecture/decisions/ADR-006-后端优先采用模块化单体.md`
 
 架构决策发生变化时，应新增替代 ADR，并保留原决策记录。
 
@@ -158,42 +171,91 @@ V6 技术架构分为四层：
 5. `architecture/strategy-capability-matrix.md`
 6. `architecture/strategy-registry.md`
 7. `architecture/domain-model-boundaries.md`
-8. 相关代码
+8. `architecture/domain/status-enums-and-lifecycles.md`
+9. 相关代码
 
 ### 5.3 前端页面和组件任务
 
 1. `architecture/frontend/frontend-overview.md`
-2. `design/platform-ui-guidelines.md`
-3. `architecture/frontend-state-ownership.md`
-4. `architecture/shared-ui-governance.md`
-5. 对应模块和策略文档
-6. 当前组件、主题变量和页面代码
+2. 对应模块和策略文档
+3. `architecture/frontend/routing-permission-and-environment.md`
+4. `architecture/frontend-state-ownership.md`
+5. `architecture/frontend/data-adapter-and-view-model.md`
+6. `design/platform-ui-guidelines.md`
+7. `architecture/shared-ui-governance.md`
+8. 当前组件、主题变量和页面代码
 
-### 5.4 后端设计任务
+### 5.4 后端模块任务
 
 1. 对应模块和策略需求
 2. `architecture/domain/domain-overview.md`
 3. `architecture/domain-model-boundaries.md`
-4. `architecture/backend/backend-overview.md`
-5. `architecture/integration/frontend-backend-integration.md`
-6. 专项技术方案和 ADR
+4. `architecture/domain/status-enums-and-lifecycles.md`
+5. `architecture/backend/backend-overview.md`
+6. `architecture/backend/service-boundaries.md`
+7. 对应后端专项文档
+8. ADR
 
-### 5.5 前后端接口任务
+### 5.5 交易执行任务
+
+1. `modules/交易平台-需求文档.md`
+2. 对应策略文档
+3. `architecture/domain-model-boundaries.md`
+4. `architecture/domain/status-enums-and-lifecycles.md`
+5. `architecture/backend/trading-execution-reliability.md`
+6. `architecture/integration/api-contract-and-versioning.md`
+7. `architecture/integration/realtime-events-and-recovery.md`
+8. `architecture/security-observability-and-operations.md`
+
+### 5.6 前后端接口任务
 
 1. 对应业务需求
 2. `architecture/domain-model-boundaries.md`
-3. `architecture/integration/frontend-backend-integration.md`
-4. 前端 Repository／View Model
-5. 后端 API DTO／Service
-6. 具体接口契约
+3. `architecture/domain/status-enums-and-lifecycles.md`
+4. `architecture/integration/frontend-backend-integration.md`
+5. `architecture/integration/api-contract-and-versioning.md`
+6. 前端 Repository／View Model
+7. 后端 API DTO／Application Service
+8. 具体 OpenAPI 契约
 
-### 5.6 发布与清理任务
+### 5.7 数据、账本和审计任务
+
+1. 对应策略和模块需求
+2. `architecture/domain-model-boundaries.md`
+3. `architecture/backend/storage-ledger-and-audit.md`
+4. `architecture/module-ownership-matrix.md`
+5. 数据库和迁移专项方案
+
+### 5.8 发布、运维与安全任务
+
+1. `architecture/security-observability-and-operations.md`
+2. `architecture/implementation-roadmap.md`
+3. `quality/release-gate.md`
+4. `quality/smoke-checklist.md`
+5. 环境、部署和恢复专项方案
+
+### 5.9 发布与清理任务
 
 - 发布检查：`quality/release-gate.md`、`quality/smoke-checklist.md`
 - 文档清理：`audit/legacy-document-inventory.md`
 - 代码清理：`audit/legacy-code-inventory.md`
 
-## 6. 文档状态
+## 6. 当前实施阶段
+
+当前处于 `architecture/implementation-roadmap.md` 的阶段 0：文档与前端代码基线对齐。
+
+优先事项：
+
+- 统一策略注册表真正接入页面。
+- 路由状态与正式需求对齐。
+- 建立前端权限与环境模型。
+- 建立 Repository／Adapter 分层。
+- 修正字符串化金额和状态。
+- 建立仓库根目录可运行 CI。
+
+在这些基础完成前，不直接进入真实资金交易开发。
+
+## 7. 文档状态
 
 - `active`：当前有效，可作为产品或架构依据。
 - `draft`：讨论稿，不替代 active 文档。
@@ -204,13 +266,14 @@ V6 技术架构分为四层：
 
 两份 `2026-07-16-*-DRAFT.md` 暂不纳入有效架构体系，只有完成评审并更新相应 active 文档或 ADR 后才可作为实施依据。
 
-## 7. 维护原则
+## 8. 维护原则
 
 - 产品边界变化时，先更新模块或策略文档，再调整职责矩阵和代码。
-- 前端架构变化时，更新前端总览、状态或组件规范。
+- 前端架构变化时，更新前端总览、路由权限、状态或数据适配规范。
 - 后端边界或技术选型变化时，更新后端文档并形成 ADR。
 - API、事件、错误和数据规范变化时，更新前后端协作文档。
-- 公共业务对象变化时，先更新领域模型，再调整前端类型、后端模型和接口。
+- 公共业务对象或状态变化时，先更新领域模型，再调整前端类型、后端模型和接口。
+- 安全、发布、监控和恢复变化时，更新跨层运维规范。
 - UI 视觉和交互变化时，先更新全平台 UI 规范。
 - 同一业务规则只在主责文档中完整定义，其他文档通过引用保持一致。
 - 当前实现进度、临时任务和对话过程不写入正式产品文档。
