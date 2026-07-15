@@ -6,7 +6,7 @@
 
 ## 1. 文档定位
 
-本目录是 Platform V5 产品架构、模块需求、策略定义和前端规范的统一入口。
+本目录是 Platform V5 产品架构、模块需求、策略定义、UI 设计和前端规范的统一入口。
 
 项目讨论、需求调整和开发任务应以本文件列出的 `active` 文档为准。历史交接、旧版需求、归档文件和未列入索引的临时文档不作为当前实现依据。
 
@@ -53,16 +53,20 @@ Platform V5 由六个一级模块构成：
 - `strategies/短线交易员L.md`
 - `strategies/短线交易员W.md`
 
-### 3.3 架构规范
+### 3.3 UI 设计
+
+- `design/platform-ui-guidelines.md`：全平台视觉语言、页面结构、控件、图表、表格、状态和交互规范。
+
+### 3.4 架构规范
 
 - `architecture/module-ownership-matrix.md`
 - `architecture/strategy-capability-matrix.md`
 - `architecture/strategy-registry.md`
-- `architecture/shared-ui-governance.md`
+- `architecture/shared-ui-governance.md`：组件分层、共享范围、主题和代码组织治理。
 - `architecture/frontend-state-ownership.md`
 - `architecture/domain-model-boundaries.md`
 
-### 3.4 架构决策
+### 3.5 架构决策
 
 - `architecture/decisions/ADR-001-一级架构保持不变.md`
 - `architecture/decisions/ADR-002-交易平台与策略管理策略范围不同.md`
@@ -71,12 +75,12 @@ Platform V5 由六个一级模块构成：
 
 架构决策发生变化时，应新增替代 ADR，并保留原决策记录。
 
-### 3.5 文档治理与术语
+### 3.6 文档治理与术语
 
 - `governance/document-rules.md`
 - `governance/glossary.md`
 
-### 3.6 资产盘点与质量控制
+### 3.7 资产盘点与质量控制
 
 - `audit/v5-asset-inventory.md`
 - `audit/legacy-document-inventory.md`
@@ -84,7 +88,7 @@ Platform V5 由六个一级模块构成：
 - `quality/release-gate.md`
 - `quality/smoke-checklist.md`
 
-### 3.7 特殊数据源
+### 3.8 特殊数据源
 
 - `trading-tools-bookmarks-review.md`：交易工具目录的人工维护源。
 
@@ -98,8 +102,9 @@ Platform V5 由六个一级模块构成：
 2. `modules/一级模块定位总表.md`
 3. 对应模块定位文档
 4. 对应模块需求文档
-5. `architecture/module-ownership-matrix.md`
-6. 相关源代码
+5. `design/platform-ui-guidelines.md`
+6. `architecture/module-ownership-matrix.md`
+7. 相关源代码
 
 ### 4.2 策略任务
 
@@ -107,18 +112,26 @@ Platform V5 由六个一级模块构成：
 2. `modules/策略-模块定位.md`
 3. `modules/交易平台-需求文档.md` 或 `modules/策略管理-需求文档.md`
 4. 对应 `strategies/*.md`
-5. `architecture/strategy-capability-matrix.md`
-6. `architecture/strategy-registry.md`
-7. 相关源代码
+5. `design/platform-ui-guidelines.md`
+6. `architecture/strategy-capability-matrix.md`
+7. `architecture/strategy-registry.md`
+8. 相关源代码
 
-### 4.3 接口与业务对象任务
+### 4.3 UI 与组件任务
+
+1. `design/platform-ui-guidelines.md`
+2. `architecture/shared-ui-governance.md`
+3. 对应模块定位与需求文档
+4. 当前共享组件、主题变量和页面样式
+
+### 4.4 接口与业务对象任务
 
 1. `architecture/domain-model-boundaries.md`
 2. `governance/glossary.md`
 3. 对应模块与策略文档
 4. 当前 API、Mock 和页面类型
 
-### 4.4 发布与清理任务
+### 4.5 发布与清理任务
 
 - 发布检查：`quality/release-gate.md`、`quality/smoke-checklist.md`
 - 文档清理：`audit/legacy-document-inventory.md`
@@ -136,6 +149,7 @@ Platform V5 由六个一级模块构成：
 ## 6. 维护原则
 
 - 产品边界变化时，先更新模块或策略文档，再调整架构矩阵和代码。
+- UI 视觉和交互变化时，先更新全平台 UI 规范，再调整组件与页面。
 - 同一业务规则只在主责文档中完整定义，其他文档通过引用保持一致。
-- 模块定位描述长期职责，需求文档描述功能要求，架构文档描述对象、状态和技术边界。
+- 模块定位描述长期职责，需求文档描述功能要求，UI 文档描述视觉与交互标准，架构文档描述对象、状态和技术边界。
 - 当前实现进度、临时任务和对话过程不写入正式产品文档。
