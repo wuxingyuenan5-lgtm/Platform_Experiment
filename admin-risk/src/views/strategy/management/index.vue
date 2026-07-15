@@ -1,11 +1,11 @@
 ﻿<template>
   <div class="strategy-management-page">
-    <section class="top-toolbar">
-      <div class="top-toolbar__left">
-        <StrategyDeskTabs :tabs="deskTabs" v-model:activeKey="activeDesk" />
+    <section class="strategy-top-toolbar">
+      <div class="strategy-top-toolbar__left">
+        <CompactSegmentTabs :items="deskTabs" v-model="activeDesk" />
       </div>
 
-      <div class="top-toolbar__meta">
+      <div class="strategy-top-toolbar__meta">
         <CompactSegmentTabs :items="sectionTabs" v-model="activeSection" />
       </div>
     </section>
@@ -57,7 +57,6 @@
 <script setup lang="ts">
   import { computed, ref, watch } from 'vue';
   import CompactSegmentTabs from '../shared/CompactSegmentTabs.vue';
-  import StrategyDeskTabs from './components/StrategyDeskTabs.vue';
   import StrategyKpiGrid from './components/StrategyKpiGrid.vue';
   import StrategyRuntimePanel from './components/StrategyRuntimePanel.vue';
   import StrategyCurveGrid from './components/StrategyCurveGrid.vue';
@@ -113,40 +112,9 @@
     color: var(--strategy-text-1);
   }
 
-  .top-toolbar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 16px;
-    padding: 4px 2px 2px;
-  }
-
-  .top-toolbar__left {
-    display: flex;
-    align-items: center;
-  }
-
-  .top-toolbar__meta {
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    gap: 10px;
-  }
-
   .records-only-grid {
     display: grid;
     grid-template-columns: 1fr;
     gap: 16px;
-  }
-
-  @media (max-width: 980px) {
-    .top-toolbar {
-      align-items: flex-start;
-      flex-direction: column;
-    }
-
-    .top-toolbar__meta {
-      justify-content: flex-start;
-    }
   }
 </style>

@@ -7,7 +7,7 @@ export default defineApplicationConfig({
   overrides: {
     build: {
       rollupOptions: {
-        maxParallelFileOps: 8,
+        maxParallelFileOps: 1,
       },
     },
     optimizeDeps: {

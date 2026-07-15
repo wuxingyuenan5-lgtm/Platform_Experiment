@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <section class="market-insight">
     <div class="fx-grid">
       <article class="fx-card fx-card--spot">
@@ -146,6 +146,12 @@
   import { useECharts } from '@/hooks/web/useECharts';
 
   type MetalKey = 'gold' | 'silver' | 'copper';
+  type RollRow = {
+    contract: string;
+    ratio: string;
+    days: string;
+    main?: boolean;
+  };
 
   const props = withDefaults(
     defineProps<{
@@ -181,7 +187,7 @@
         { contract: '沪金2610', ratio: '7.82%', days: '182天' },
         { contract: '沪金2612', ratio: '4.60%', days: '243天' },
         { contract: '沪金2702', ratio: '1.02%', days: '305天' },
-      ],
+      ] as RollRow[],
       termRows: [
         { contract: 'SHFE.au2604', price: '1,053', premium: '5.00', annualized: '174.14%' },
         { contract: 'SHFE.au2605', price: '1,056.38', premium: '8.38', annualized: '9.73%' },
@@ -221,7 +227,7 @@
         { contract: '沪银2512', ratio: '28.16%', days: '152天' },
         { contract: '沪银2602', ratio: '15.10%', days: '214天' },
         { contract: '沪银2604', ratio: '8.52%', days: '274天' },
-      ],
+      ] as RollRow[],
       termRows: [
         { contract: 'SHFE.ag2508', price: '8,742', premium: '1.84', annualized: '21.60%' },
         { contract: 'SHFE.ag2510', price: '8,766', premium: '2.08', annualized: '12.44%' },
@@ -260,7 +266,7 @@
         { contract: '沪铜2512', ratio: '23.40%', days: '138天' },
         { contract: '沪铜2601', ratio: '14.72%', days: '169天' },
         { contract: '沪铜2602', ratio: '10.50%', days: '198天' },
-      ],
+      ] as RollRow[],
       termRows: [
         { contract: 'SHFE.cu2509', price: '80,660', premium: '1,642.16', annualized: '16.22%' },
         { contract: 'SHFE.cu2510', price: '80,918', premium: '1,900.16', annualized: '12.03%' },
@@ -362,28 +368,28 @@
       series: [
         {
           name: '多头',
-          type: 'bar',
+          type: 'bar' as const,
           stack: 'carry',
           barWidth: 22,
           itemStyle: { color: '#d33131', borderRadius: [0, 0, 4, 4] },
-          data: data.longBars,
+          data: [...data.longBars],
         },
         {
           name: '空头',
-          type: 'bar',
+          type: 'bar' as const,
           stack: 'carry',
           barWidth: 22,
           itemStyle: { color: '#22b573', borderRadius: [4, 4, 0, 0] },
-          data: data.shortBars,
+          data: [...data.shortBars],
         },
         {
           name: '价差',
-          type: 'line',
+          type: 'line' as const,
           yAxisIndex: 1,
           smooth: true,
           symbol: 'none',
           lineStyle: { width: 3, color: '#e0a221' },
-          data: data.line,
+          data: [...data.line],
         },
       ],
     });
@@ -401,8 +407,8 @@
   .market-insight {
     display: flex;
     flex-direction: column;
-    gap: 12px;
-    padding: 12px 0 0;
+    gap: var(--strategy-space-2);
+    padding: var(--strategy-space-2) 0 0;
   }
 
   .is-warm {
@@ -416,7 +422,7 @@
   .fx-grid,
   .insight-grid {
     display: grid;
-    gap: 12px;
+    gap: var(--strategy-space-2);
   }
 
   .fx-grid {
@@ -424,7 +430,7 @@
   }
 
   .fx-card--spot strong {
-    font-size: 16px;
+    font-size: var(--strategy-font-card-title);
     line-height: 1.5;
   }
 
@@ -435,29 +441,29 @@
   .fx-card,
   .insight-card,
   .history-card {
-    border: 1px solid #efefef;
-    border-radius: 18px;
-    background: #fff;
-    box-shadow: 0 10px 24px rgba(18, 29, 53, 0.04);
+    border: 1px solid var(--strategy-border);
+    border-radius: var(--strategy-radius-panel);
+    background: var(--strategy-surface);
+    box-shadow: var(--strategy-shadow-card);
   }
 
   .fx-card {
     min-height: 86px;
-    padding: 14px 18px;
+    padding: 14px var(--strategy-space-4);
   }
 
   .fx-card label {
     display: block;
-    color: #7d8897;
-    font-size: 13px;
+    color: var(--strategy-text-3);
+    font-size: var(--strategy-font-sm);
     font-weight: 700;
   }
 
   .fx-card strong {
     display: block;
     margin-top: 6px;
-    color: #283548;
-    font-size: 18px;
+    color: var(--strategy-text-1);
+    font-size: var(--strategy-font-section-title);
     font-weight: 800;
   }
 
@@ -471,9 +477,9 @@
     align-items: center;
     justify-content: space-between;
     margin: 0;
-    padding: 0 18px 12px;
-    color: #445264;
-    font-size: 16px;
+    padding: 0 var(--strategy-space-4) var(--strategy-space-2);
+    color: var(--strategy-text-1);
+    font-size: var(--strategy-font-card-title);
     font-weight: 800;
   }
 
@@ -482,12 +488,14 @@
   }
 
   .refresh-btn {
-    height: 30px;
-    padding: 0 12px;
-    border: 1px solid #e5e7eb;
-    border-radius: 8px;
-    background: #fff;
-    color: #667085;
+    height: var(--strategy-control-height);
+    padding: 0 var(--strategy-space-2);
+    border: 1px solid var(--strategy-border);
+    border-radius: var(--strategy-radius-control);
+    background: var(--strategy-surface);
+    color: var(--strategy-text-2);
+    font-size: var(--strategy-font-base);
+    font-weight: 700;
     cursor: pointer;
   }
 
@@ -498,20 +506,21 @@
 
   .compact-table th,
   .compact-table td {
-    padding: 11px 18px;
-    border-bottom: 1px solid #f2f4f7;
+    padding: 11px var(--strategy-space-4);
+    border-bottom: 1px solid var(--strategy-border-soft);
     text-align: left;
-    font-size: 13px;
+    font-size: var(--strategy-font-sm);
     white-space: nowrap;
   }
 
   .compact-table th {
-    color: #8a97aa;
+    color: var(--strategy-text-3);
     font-weight: 700;
+    background: var(--strategy-table-head-bg);
   }
 
   .compact-table td {
-    color: #334155;
+    color: var(--strategy-text-1);
     font-weight: 700;
   }
 
@@ -532,7 +541,7 @@
     height: 14px;
     margin-left: 4px;
     border-radius: 999px;
-    background: #dc3d3d;
+    background: var(--strategy-accent-strong);
     color: #fff;
     font-size: 10px;
     font-style: normal;
@@ -540,40 +549,41 @@
   }
 
   .history-card {
-    padding: 14px 16px 12px;
+    padding: 14px var(--strategy-space-3) var(--strategy-space-2);
   }
 
   .history-head {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 16px;
+    gap: var(--strategy-space-3);
     margin-bottom: 8px;
   }
 
   .history-head h3 {
     margin: 0;
-    color: #364254;
-    font-size: 18px;
+    color: var(--strategy-text-1);
+    font-size: var(--strategy-font-section-title);
     font-weight: 800;
   }
 
   .history-controls {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: var(--strategy-space-1);
   }
 
   .history-controls input,
   .history-controls select {
-    height: 34px;
-    padding: 0 12px;
-    border: 1px solid #d9dee7;
-    border-radius: 10px;
-    background: #fff;
-    color: #556273;
-    font-size: 13px;
-    font-weight: 600;
+    height: var(--strategy-control-height);
+    padding: 0 var(--strategy-space-2);
+    border: 1px solid var(--strategy-border-strong);
+    border-radius: var(--strategy-radius-control);
+    background: var(--strategy-surface);
+    color: var(--strategy-text-1);
+    font-size: var(--strategy-font-base);
+    font-weight: 700;
+    box-shadow: var(--strategy-shadow-soft);
   }
 
   .control-select {
@@ -608,3 +618,4 @@
     }
   }
 </style>
+

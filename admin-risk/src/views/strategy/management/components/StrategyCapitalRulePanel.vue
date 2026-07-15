@@ -41,12 +41,12 @@
 <style scoped lang="less">
   .rule-panel {
     display: grid;
-    gap: 12px;
+    gap: var(--strategy-space-2);
     padding: 18px 20px;
-    border-radius: 22px;
-    background: linear-gradient(180deg, var(--strategy-surface) 0%, var(--strategy-surface-soft) 100%);
+    border-radius: var(--strategy-radius-panel);
+    background: var(--strategy-surface);
     border: 1px solid var(--strategy-border);
-    box-shadow: var(--strategy-shadow);
+    box-shadow: var(--strategy-shadow-card);
   }
 
   .rule-panel__header {
@@ -60,16 +60,17 @@
   .rule-alerts h4 {
     margin: 0;
     color: var(--strategy-text-1);
-    font-size: 18px;
-    font-weight: 700;
+    font-size: var(--strategy-font-card-title);
+    font-weight: 800;
   }
 
   .rule-status {
     min-width: 220px;
     padding: 14px 16px;
-    border-radius: 16px;
+    border-radius: var(--strategy-radius-card);
     background: var(--strategy-surface-muted);
-    border: 1px solid rgba(221, 229, 241, 0.9);
+    border: 1px solid var(--strategy-border-strong);
+    box-shadow: var(--strategy-shadow-soft);
   }
 
   .rule-status strong {
@@ -81,20 +82,21 @@
   .rule-metrics {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 12px;
+    gap: var(--strategy-space-2);
   }
 
   .rule-metric {
     padding: 14px 16px;
-    border-radius: 16px;
+    border-radius: var(--strategy-radius-card);
     background: var(--strategy-surface);
     border: 1px solid var(--strategy-border);
+    box-shadow: var(--strategy-shadow-soft);
   }
 
   .rule-metric label {
     display: block;
     color: var(--strategy-text-3);
-    font-size: 12px;
+    font-size: var(--strategy-font-xs);
     font-weight: 700;
   }
 
@@ -108,9 +110,10 @@
 
   .rule-alerts {
     padding: 14px 16px;
-    border-radius: 18px;
+    border-radius: var(--strategy-radius-card);
     background: var(--strategy-surface);
     border: 1px solid var(--strategy-border);
+    box-shadow: var(--strategy-shadow-soft);
   }
 
   .rule-alerts header {
@@ -130,7 +133,7 @@
     grid-template-columns: 160px 1fr;
     gap: 12px;
     padding-bottom: 12px;
-    border-bottom: 1px solid var(--strategy-border);
+    border-bottom: 1px solid var(--strategy-border-soft);
   }
 
   .rule-alerts li:last-child {
@@ -140,13 +143,13 @@
 
   .rule-alerts time {
     color: var(--strategy-text-3);
-    font-size: 12px;
+    font-size: var(--strategy-font-xs);
     font-weight: 600;
   }
 
   .rule-alerts p {
     margin: 0;
-    font-size: 13px;
+    font-size: var(--strategy-font-base);
     line-height: 1.5;
   }
 

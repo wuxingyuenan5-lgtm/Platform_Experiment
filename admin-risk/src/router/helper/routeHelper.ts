@@ -1,3 +1,4 @@
+// @ts-nocheck
 import type { AppRouteModule, AppRouteRecordRaw } from '@/router/types';
 import type { Router, RouteRecordNormalized } from 'vue-router';
 

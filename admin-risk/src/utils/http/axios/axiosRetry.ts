@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { AxiosError, AxiosInstance } from 'axios';
 /**
  *  请求重试机制

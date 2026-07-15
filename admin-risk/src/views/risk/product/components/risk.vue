@@ -145,7 +145,7 @@
 <style lang="less">
   .risk-table {
     width: 100%;
-    background: #ffe5bc;
+    background: #f4f8fb;
     line-height: 38px;
     text-align: left;
 
@@ -153,7 +153,7 @@
       th {
         padding-left: 12px;
         border: transparent !important;
-        background: #ffe5bc !important;
+        background: #f4f8fb !important;
         color: @text-color-secondary;
         font-weight: 400;
       }
@@ -164,7 +164,7 @@
         td {
           padding-left: 12px;
           border: transparent !important;
-          background: #ffe5bc !important;
+          background: #f4f8fb !important;
           color: @text-color-base;
         }
       }

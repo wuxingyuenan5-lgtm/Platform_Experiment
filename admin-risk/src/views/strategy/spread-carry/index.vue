@@ -679,44 +679,44 @@
   .spread-workspace-head__main {
     display: flex;
     flex-wrap: nowrap;
-    gap: 8px;
+    gap: var(--strategy-space-2);
     align-items: center;
     width: auto;
     max-width: 100%;
     flex: 0 0 auto;
-    min-height: 48px;
-    padding: 4px 10px;
-    border: 1px solid rgba(191, 205, 224, 0.96);
-    border-radius: 14px;
-    background: rgba(255, 255, 255, 0.98);
-    box-shadow: 0 1px 2px rgba(148, 163, 184, 0.06);
+    min-height: 46px;
+    padding: 5px var(--strategy-space-2);
+    border: 1px solid var(--strategy-border);
+    border-radius: var(--strategy-radius-card);
+    background: var(--strategy-surface);
+    box-shadow: var(--strategy-shadow-soft);
   }
 
 
   .workspace-control {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--strategy-space-1);
     min-width: 0;
     flex: 0 0 auto;
   }
 
   .workspace-control span {
-    color: #64748b;
-    font-size: 12px;
+    color: var(--strategy-text-3);
+    font-size: var(--strategy-font-sm);
     font-weight: 700;
     letter-spacing: 0;
     white-space: nowrap;
   }
 
   .workspace-control select {
-    height: 34px;
-    padding: 0 8px;
-    border: none;
-    border-radius: 10px;
-    background: transparent;
-    color: #304056;
-    font-size: 14px;
+    height: var(--strategy-control-height);
+    padding: 0 var(--strategy-space-2);
+    border: 1px solid var(--strategy-border-strong);
+    border-radius: var(--strategy-radius-control);
+    background: var(--strategy-surface);
+    color: var(--strategy-text-1);
+    font-size: var(--strategy-font-base);
     font-weight: 700;
     min-width: 88px;
     width: auto;
@@ -733,13 +733,13 @@
   .stats-card {
     border: 1px solid var(--strategy-border);
     background: var(--strategy-surface);
-    box-shadow: var(--strategy-shadow);
-    border-radius: 18px;
+    box-shadow: var(--strategy-shadow-card);
+    border-radius: var(--strategy-radius-panel);
   }
 
   .spread-card,
   .stats-card {
-    padding: 16px;
+    padding: var(--strategy-space-3);
   }
 
   .spread-card header,
@@ -748,18 +748,21 @@
     align-items: center;
     justify-content: space-between;
     margin-bottom: 16px;
-    color: var(--strategy-text-2);
-    font-size: 16px;
+    color: var(--strategy-text-1);
+    font-size: var(--strategy-font-card-title);
     font-weight: 800;
   }
 
   .spread-card header button {
-    height: 30px;
-    padding: 0 12px;
-    border: 1px solid var(--strategy-border);
-    border-radius: 8px;
+    height: var(--strategy-control-height);
+    padding: 0 var(--strategy-space-2);
+    border: 1px solid var(--strategy-border-strong);
+    border-radius: var(--strategy-radius-control);
     background: var(--strategy-surface);
-    color: var(--strategy-text-3);
+    color: var(--strategy-text-2);
+    font-size: var(--strategy-font-base);
+    font-weight: 700;
+    box-shadow: var(--strategy-shadow-soft);
     cursor: pointer;
   }
 
@@ -771,13 +774,13 @@
   th,
   td {
     padding: 10px 0;
-    border-bottom: 1px solid #edf2f7;
+    border-bottom: 1px solid var(--strategy-border-soft);
     text-align: left;
-    font-size: 13px;
+    font-size: var(--strategy-font-sm);
   }
 
   th {
-    color: var(--strategy-text-faint);
+    color: var(--strategy-text-3);
     font-weight: 700;
   }
 
@@ -797,7 +800,7 @@
     grid-template-columns: 1.2fr repeat(4, 1fr);
     gap: 12px;
     align-items: center;
-    font-size: 13px;
+    font-size: var(--strategy-font-sm);
   }
 
   .analysis-head {
@@ -810,12 +813,12 @@
   }
 
   .analysis-row strong {
-    font-size: 15px;
+    font-size: var(--strategy-font-card-title);
     font-weight: 800;
   }
 
   .spread-chart-card {
-    padding: 18px 18px 12px;
+    padding: var(--strategy-space-4) var(--strategy-space-4) var(--strategy-space-2);
   }
 
   .spread-chart-toolbar,
@@ -870,14 +873,15 @@
   .spread-chart-filters select,
   .stats-card__controls input,
   .stats-card__controls select {
-    height: 38px;
-    padding: 0 14px;
+    height: var(--strategy-control-height);
+    padding: 0 var(--strategy-space-2);
     border: 1px solid var(--strategy-border-strong);
-    border-radius: 10px;
+    border-radius: var(--strategy-radius-control);
     background: var(--strategy-surface);
-    color: var(--strategy-text-2);
-    font-size: 13px;
+    color: var(--strategy-text-1);
+    font-size: var(--strategy-font-base);
     font-weight: 700;
+    box-shadow: var(--strategy-shadow-soft);
   }
 
   .series-switch {
@@ -885,10 +889,10 @@
   }
 
   .series-switch.is-active {
-    border-color: rgba(201, 72, 72, 0.18);
+    border-color: var(--strategy-accent-soft);
     background: var(--strategy-accent-soft);
     color: var(--strategy-accent-strong);
-    box-shadow: inset 0 0 0 1px rgba(201, 72, 72, 0.08);
+    box-shadow: inset 0 0 0 1px var(--strategy-accent-ring);
   }
 
   .chart-select {
@@ -903,16 +907,16 @@
 
   .spread-chart-toolbar__left input,
   .spread-chart-toolbar__left select {
-    height: 32px;
+    height: var(--strategy-control-height);
     padding: 0 12px;
-    border: 1px solid rgba(191, 205, 224, 0.96);
-    border-radius: 8px;
-    background: rgba(255, 255, 255, 0.98);
-    color: #3b4b63;
-    font-size: 12px;
+    border: 1px solid var(--strategy-border-strong);
+    border-radius: var(--strategy-radius-control);
+    background: var(--strategy-surface);
+    color: var(--strategy-text-1);
+    font-size: var(--strategy-font-base);
     font-weight: 700;
     line-height: 1;
-    box-shadow: 0 1px 2px rgba(148, 163, 184, 0.06);
+    box-shadow: var(--strategy-shadow-soft);
   }
 
   .spread-chart-toolbar__left input {
@@ -937,8 +941,8 @@
   }
 
   .stats-card__header > span {
-    color: var(--strategy-text-2);
-    font-size: 16px;
+    color: var(--strategy-text-1);
+    font-size: var(--strategy-font-card-title);
     font-weight: 800;
   }
 
@@ -956,10 +960,10 @@
 
   .stats-card__controls input,
   .stats-card__controls select {
-    height: 32px;
-    padding: 0 10px;
-    border-radius: 8px;
-    font-size: 12px;
+    height: var(--strategy-control-height);
+    padding: 0 var(--strategy-space-2);
+    border-radius: var(--strategy-radius-control);
+    font-size: var(--strategy-font-base);
     font-weight: 700;
   }
 
@@ -999,23 +1003,23 @@
   .domestic-realtime-table th,
   .domestic-realtime-table td {
     padding: 12px 16px;
-    border-bottom: 1px solid #f2f4f7;
+    border-bottom: 1px solid var(--strategy-border-soft);
     text-align: center;
     white-space: nowrap;
-    font-size: 13px;
+    font-size: var(--strategy-font-sm);
   }
 
   .domestic-analysis-table th,
   .domestic-realtime-table th {
-    color: #7b8794;
+    color: var(--strategy-text-3);
     font-weight: 700;
-    background: #fcfcfd;
+    background: var(--strategy-table-head-bg);
   }
 
   .domestic-analysis-table td,
   .domestic-realtime-table td {
-    color: #334155;
-    font-weight: 600;
+    color: var(--strategy-text-2);
+    font-weight: 700;
   }
 
   .domestic-realtime-head {
@@ -1032,13 +1036,15 @@
   }
 
   .domestic-realtime-toolbar button {
-    height: 34px;
-    padding: 0 14px;
-    border: 1px solid #e5e7eb;
-    border-radius: 8px;
-    background: #fff;
-    color: #667085;
-    font-weight: 600;
+    height: var(--strategy-control-height);
+    padding: 0 var(--strategy-space-2);
+    border: 1px solid var(--strategy-border-strong);
+    border-radius: var(--strategy-radius-control);
+    background: var(--strategy-surface);
+    color: var(--strategy-text-2);
+    font-size: var(--strategy-font-base);
+    font-weight: 700;
+    box-shadow: var(--strategy-shadow-soft);
     cursor: pointer;
   }
 
@@ -1056,8 +1062,8 @@
     margin: 0;
     color: var(--strategy-text-1);
     font-family: var(--strategy-font-sans);
-    font-size: 26px;
-    font-weight: 900;
+    font-size: var(--strategy-font-section-title);
+    font-weight: 800;
   }
 
   .statistics-grid {
@@ -1078,8 +1084,8 @@
 
   .stats-kpi {
     padding: 14px;
-    border: 1px solid var(--strategy-border);
-    border-radius: 12px;
+    border: 1px solid var(--strategy-border-strong);
+    border-radius: var(--strategy-radius-card);
     background: var(--strategy-surface-muted);
   }
 
@@ -1093,8 +1099,8 @@
   .stats-kpi strong {
     display: block;
     margin-top: 8px;
-    font-size: 20px;
-    font-weight: 900;
+    font-size: 24px;
+    font-weight: 800;
   }
 
   .is-negative {
@@ -1142,13 +1148,13 @@
   }
 
   .heatmap-head span {
-    background: #f5f7fa;
-    color: #64748b;
+    background: var(--strategy-table-head-bg);
+    color: var(--strategy-text-3);
   }
 
   .heatmap-year {
-    background: #f5f7fa;
-    color: #314053;
+    background: var(--strategy-table-head-bg);
+    color: var(--strategy-text-2);
   }
 
   .heatmap-cell.is-warm {

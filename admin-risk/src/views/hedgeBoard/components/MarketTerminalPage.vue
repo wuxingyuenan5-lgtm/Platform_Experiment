@@ -1442,6 +1442,7 @@
     align-items: center;
     justify-content: center;
     height: min(78vh, 860px);
+    background: linear-gradient(180deg, rgba(251, 253, 255, 0.98), rgba(243, 248, 252, 0.98));
     color: var(--terminal-muted);
     font-size: 14px;
     font-weight: 700;

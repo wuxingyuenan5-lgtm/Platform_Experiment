@@ -183,10 +183,10 @@
 
 <style scoped lang="less">
   .records-card {
-    border: 1px solid #edf1f6;
-    border-radius: 18px;
-    background: #fff;
-    box-shadow: 0 8px 20px rgba(18, 29, 53, 0.04);
+    border: 1px solid var(--strategy-border);
+    border-radius: var(--strategy-radius-panel);
+    background: var(--strategy-surface);
+    box-shadow: var(--strategy-shadow-card);
   }
 
   .records-head {
@@ -199,8 +199,8 @@
 
   .records-head h3 {
     margin: 0;
-    color: #172947;
-    font-size: 22px;
+    color: var(--strategy-text-1);
+    font-size: var(--strategy-font-section-title);
     font-weight: 800;
     letter-spacing: 0.01em;
   }
@@ -216,24 +216,25 @@
   }
 
   .refresh-btn {
-    height: 32px;
-    padding: 0 14px;
-    border: 1px solid #e4e8ef;
-    border-radius: 8px;
-    background: #fff;
-    color: #667788;
-    font-size: 14px;
-    font-weight: 600;
+    height: var(--strategy-control-height);
+    padding: 0 var(--strategy-space-2);
+    border: 1px solid var(--strategy-border-strong);
+    border-radius: var(--strategy-radius-control);
+    background: var(--strategy-surface);
+    color: var(--strategy-text-2);
+    font-size: var(--strategy-font-base);
+    font-weight: 700;
+    box-shadow: var(--strategy-shadow-soft);
     cursor: pointer;
   }
 
   .records-filters {
     display: flex;
     flex-wrap: wrap;
-    gap: 12px;
+    gap: var(--strategy-space-2);
     padding: 14px 16px;
-    border-bottom: 1px solid #eef2f6;
-    background: #fafbfd;
+    border-bottom: 1px solid var(--strategy-border-soft);
+    background: var(--strategy-table-head-bg);
   }
 
   .records-filter {
@@ -248,57 +249,53 @@
   }
 
   .records-filter span {
-    color: #8a97ab;
-    font-size: 13px;
+    color: var(--strategy-text-3);
+    font-size: var(--strategy-font-sm);
     font-weight: 700;
   }
 
   .records-filter input,
   .records-filter select {
-    height: 34px;
-    padding: 0 10px;
-    border: 1px solid #dde5ef;
-    border-radius: 8px;
-    background: #fff;
-    color: #30435f;
-    font-size: 14px;
-    font-weight: 600;
+    height: var(--strategy-control-height);
+    padding: 0 var(--strategy-space-2);
+    border: 1px solid var(--strategy-border-strong);
+    border-radius: var(--strategy-radius-control);
+    background: var(--strategy-surface);
+    color: var(--strategy-text-1);
+    font-size: var(--strategy-font-base);
+    font-weight: 700;
+    box-shadow: var(--strategy-shadow-soft);
   }
 
   .records-tabs {
-    display: flex;
+    display: inline-flex;
     flex-wrap: wrap;
-    gap: 0;
-    padding: 0 16px;
-    border-bottom: 1px solid #eef2f6;
+    gap: 6px;
+    margin: 0 16px;
+    padding: 5px;
+    border: 1px solid var(--strategy-border);
+    border-radius: var(--strategy-radius-card);
+    background: var(--strategy-surface);
+    box-shadow: var(--strategy-shadow-soft);
   }
 
   .records-tabs button {
-    position: relative;
-    height: 44px;
-    padding: 0 18px;
+    height: var(--strategy-tab-height);
+    padding: 0 16px;
     border: none;
     background: transparent;
-    color: #536174;
-    font-size: 14px;
+    border-radius: var(--strategy-radius-control);
+    color: var(--strategy-text-3);
+    font-size: var(--strategy-font-base);
     font-weight: 700;
     cursor: pointer;
   }
 
   .records-tabs .is-active {
-    color: #cf4d4d;
+    background: var(--strategy-accent-soft);
+    color: var(--strategy-accent-strong);
     font-weight: 800;
-  }
-
-  .records-tabs .is-active::after {
-    content: '';
-    position: absolute;
-    right: 10px;
-    bottom: 0;
-    left: 10px;
-    height: 3px;
-    border-radius: 999px;
-    background: #d8585f;
+    box-shadow: inset 0 0 0 1px var(--strategy-accent-ring);
   }
 
   .records-table {
@@ -314,21 +311,22 @@
   .records-table th,
   .records-table td {
     padding: 12px 14px;
-    border-bottom: 1px solid #f0f3f7;
+    border-bottom: 1px solid var(--strategy-border-soft);
     white-space: nowrap;
     text-align: left;
   }
 
   .records-table th {
-    color: #728097;
-    font-size: 13px;
+    color: var(--strategy-text-3);
+    font-size: var(--strategy-font-base);
     font-weight: 700;
+    background: var(--strategy-table-head-bg);
   }
 
   .records-table td {
-    color: #30435f;
-    font-size: 14px;
-    font-weight: 600;
+    color: var(--strategy-text-2);
+    font-size: var(--strategy-font-base);
+    font-weight: 700;
   }
 
   .records-empty {
@@ -342,9 +340,9 @@
     justify-content: space-between;
     gap: 12px;
     padding: 14px 16px 16px;
-    color: #667788;
-    font-size: 13px;
-    font-weight: 600;
+    color: var(--strategy-text-3);
+    font-size: var(--strategy-font-sm);
+    font-weight: 700;
   }
 
   .records-pagination__actions {
@@ -353,14 +351,15 @@
   }
 
   .records-pagination__actions button {
-    height: 32px;
-    padding: 0 12px;
-    border: 1px solid #e4e8ef;
-    border-radius: 8px;
-    background: #fff;
-    color: #667788;
-    font-size: 13px;
-    font-weight: 600;
+    height: var(--strategy-control-height);
+    padding: 0 var(--strategy-space-2);
+    border: 1px solid var(--strategy-border-strong);
+    border-radius: var(--strategy-radius-control);
+    background: var(--strategy-surface);
+    color: var(--strategy-text-2);
+    font-size: var(--strategy-font-sm);
+    font-weight: 700;
+    box-shadow: var(--strategy-shadow-soft);
     cursor: pointer;
   }
 
@@ -370,17 +369,17 @@
   }
 
   .cell-positive {
-    color: #18a058;
-    font-weight: 600;
+    color: var(--strategy-success);
+    font-weight: 700;
   }
 
   .cell-negative {
-    color: #ef4444;
-    font-weight: 600;
+    color: var(--strategy-danger);
+    font-weight: 700;
   }
 
   .cell-muted {
-    color: #a8b2c3;
+    color: var(--strategy-text-faint);
   }
 
   @media (max-width: 860px) {

@@ -5,7 +5,7 @@ import { readPackageJSON } from 'pkg-types';
 import { defineConfig, loadEnv, mergeConfig, type UserConfig } from 'vite';
 
 import { createPlugins } from '../plugins';
-import { generateModifyVars } from '../utils/modifyVars';
+import { generateModifyVars, getSharedLessSource } from '../utils/modifyVars';
 import { commonConfig } from './common';
 
 interface DefineOptions {
@@ -75,6 +75,7 @@ function defineApplicationConfig(defineOptions: DefineOptions = {}) {
       css: {
         preprocessorOptions: {
           less: {
+            additionalData: getSharedLessSource(),
             modifyVars: generateModifyVars(),
             javascriptEnabled: true,
           },

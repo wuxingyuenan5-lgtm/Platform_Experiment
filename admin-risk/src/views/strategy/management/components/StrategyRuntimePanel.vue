@@ -53,14 +53,14 @@
   .runtime-grid {
     display: grid;
     grid-template-columns: 1fr;
-    gap: 12px;
+    gap: var(--strategy-space-2);
   }
 
   .runtime-card {
     padding: 20px 22px;
-    border-radius: 22px;
-    background: linear-gradient(180deg, var(--strategy-surface) 0%, var(--strategy-surface-soft) 100%);
-    box-shadow: var(--strategy-shadow);
+    border-radius: var(--strategy-radius-panel);
+    background: var(--strategy-surface);
+    box-shadow: var(--strategy-shadow-card);
     border: 1px solid var(--strategy-border);
   }
 
@@ -75,8 +75,8 @@
   .runtime-card h3 {
     margin: 0;
     color: var(--strategy-text-1);
-    font-size: 18px;
-    font-weight: 700;
+    font-size: var(--strategy-font-card-title);
+    font-weight: 800;
   }
 
   .runtime-card header strong {
@@ -104,12 +104,12 @@
     border-radius: 50%;
     background: var(--strategy-surface);
     text-align: center;
-    box-shadow: inset 0 0 0 1px rgba(221, 229, 241, 0.85);
+    box-shadow: inset 0 0 0 1px var(--strategy-border);
   }
 
   .runtime-ring__inner span {
     color: var(--strategy-text-3);
-    font-size: 12px;
+    font-size: var(--strategy-font-xs);
     font-weight: 600;
   }
 
@@ -129,15 +129,16 @@
 
   .runtime-ends article {
     padding: 14px 16px;
-    border-radius: 16px;
+    border-radius: var(--strategy-radius-card);
     background: var(--strategy-surface-muted);
-    border: 1px solid rgba(219, 228, 240, 0.9);
+    border: 1px solid var(--strategy-border-strong);
+    box-shadow: var(--strategy-shadow-soft);
   }
 
   .runtime-ends label {
     display: block;
     color: var(--strategy-text-3);
-    font-size: 12px;
+    font-size: var(--strategy-font-xs);
     font-weight: 700;
   }
 
@@ -154,7 +155,7 @@
     display: block;
     margin-top: 6px;
     color: var(--strategy-text-3);
-    font-size: 13px;
+    font-size: var(--strategy-font-base);
     font-weight: 700;
   }
 

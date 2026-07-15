@@ -186,12 +186,10 @@
                 <div class="funding-leg-card">
                   <span>现货头寸</span>
                   <strong>{{ fundingLegs.spot }}</strong>
-                  <em>买入 {{ selectedVenue }} 现货</em>
                 </div>
                 <div class="funding-leg-card">
                   <span>合约头寸</span>
                   <strong>{{ fundingLegs.perp }}</strong>
-                  <em>卖出 {{ selectedVenue }} 永续</em>
                 </div>
               </div>
             </section>
@@ -222,14 +220,6 @@
                 <div class="mini-kpi">
                   <span>现货-永续价差</span>
                   <strong>+10.5 USDT (+0.0102%)</strong>
-                </div>
-                <div class="mini-kpi">
-                  <span>资费 | 买方库存费 | 卖方库存费</span>
-                  <strong>+0.0810% | 0.0120% | 0.0090%</strong>
-                </div>
-                <div class="mini-kpi">
-                  <span>预计持仓周期</span>
-                  <strong>30 天</strong>
                 </div>
               </div>
 
@@ -269,32 +259,6 @@
                 </label>
               </div>
             </section>
-          </div>
-
-          <div class="yield-strip">
-            <div class="yield-item">
-              <span>预计资金费收益</span>
-              <strong class="green">+2,430.00 USDT</strong>
-              <em>(2.43%)</em>
-            </div>
-            <div class="yield-op">-</div>
-            <div class="yield-item">
-              <span>手续费成本</span>
-              <strong class="red">-120.00 USDT</strong>
-              <em>(-0.12%)</em>
-            </div>
-            <div class="yield-op">+</div>
-            <div class="yield-item">
-              <span>基差回归收益</span>
-              <strong class="green">+30.50 USDT</strong>
-              <em>(+0.03%)</em>
-            </div>
-            <div class="yield-op">=</div>
-            <div class="yield-item">
-              <span>综合净收益</span>
-              <strong class="green">+2,340.50 USDT</strong>
-              <em>(2.34%)</em>
-            </div>
           </div>
 
           <div class="funding-action-row">
@@ -646,9 +610,8 @@
 
   const fundingLegs = computed(() => {
     const qty = Number(orderQty.value || 0).toFixed(4);
-    const directionLabel = fundingOpenDirection.value === 'collect' ? '正套' : '反套';
     return {
-      spot: `${directionLabel} ${qty} BTC`,
+      spot: `${qty} BTC`,
       perp: `${qty} BTC`,
     };
   });
@@ -857,7 +820,7 @@
   .panel-title h3 {
     margin: 0;
     color: #12243f;
-    font-size: 18px;
+    font-size: 16px;
     font-weight: 900;
   }
 
@@ -877,6 +840,14 @@
 
   .order-panel {
     min-height: 684px;
+  }
+
+  .order-panel .panel-title h3 {
+    font-family: var(--strategy-font-heading);
+    font-size: 21px;
+    font-weight: 800;
+    letter-spacing: -0.012em;
+    color: #162845;
   }
 
   .rule-list {
@@ -976,10 +947,12 @@
   }
 
   .exchange-card {
-    min-height: 214px;
+    display: flex;
+    flex-direction: column;
+    min-height: 230px;
     border: 1px solid #edf2f7;
     border-radius: 14px;
-    padding: 14px 14px 16px;
+    padding: 16px 14px 14px;
   }
 
   .exchange-brand {
@@ -1021,9 +994,12 @@
   }
 
   .exchange-stats {
+    flex: 1;
     display: grid;
     gap: 9px;
     margin-top: 14px;
+    height: 100%;
+    align-content: space-between;
   }
 
   .exchange-stats div,
@@ -1044,7 +1020,7 @@
   .positions-metric span,
   .funding-leg-card span {
     color: #566578;
-    font-size: 13px;
+    font-size: 12px;
     font-weight: 700;
   }
 
@@ -1053,7 +1029,7 @@
   .mini-kpi strong,
   .yield-item strong,
   .positions-metric strong {
-    font-size: 15px;
+    font-size: 14px;
     font-weight: 700;
     color: #111827;
   }
@@ -1127,6 +1103,14 @@
     margin-bottom: 14px;
   }
 
+  .order-panel .stage-tabs button,
+  .order-panel .funding-mode-tabs button {
+    color: #47617f;
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+  }
+
   .funding-order-grid {
     display: grid;
     grid-template-columns: 1.03fr 1fr;
@@ -1152,9 +1136,10 @@
   }
 
   .field--compact span {
-    font-size: 14px;
-    font-weight: 900;
-    color: #465e7d;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    color: #2f3640;
   }
 
   .field select,
@@ -1166,8 +1151,9 @@
     background: #fff;
     padding: 0 12px;
     color: #13233f;
-    font-size: 15px;
+    font-size: 14px;
     font-weight: 700;
+    letter-spacing: -0.01em;
   }
 
   .input-with-unit {
@@ -1188,10 +1174,11 @@
     align-items: center;
     justify-content: center;
     background: #ffffff;
-    color: #866948;
-    font-size: 14px;
+    color: #6b7280;
+    font-size: 13px;
     font-style: normal;
     font-weight: 800;
+    letter-spacing: 0.02em;
   }
 
   .funding-leg-grid {
@@ -1202,25 +1189,27 @@
 
   .funding-leg-card {
     display: grid;
-    gap: 8px;
-    min-height: 96px;
-    padding: 14px;
+    gap: 6px;
+    min-height: 88px;
+    padding: 12px 14px;
     border: 1px solid #e9edf2;
     border-radius: 14px;
     background: linear-gradient(180deg, #ffffff 0%, #fcfdff 100%);
   }
 
-  .funding-leg-card strong {
-    color: #111827;
-    font-size: 24px;
-    font-weight: 800;
+  .funding-leg-card span {
+    color: #2f3640;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.01em;
   }
 
-  .funding-leg-card em {
-    color: #6d7d90;
-    font-size: 12px;
-    font-style: normal;
-    font-weight: 700;
+  .funding-leg-card strong {
+    color: #111827;
+    font-size: 20px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
   }
 
   .funding-mode-tabs {
@@ -1240,41 +1229,27 @@
   }
 
   .mini-kpi {
-    min-height: 88px;
+    min-height: 76px;
     border: 1px solid #e9edf2;
     border-radius: 14px;
     background: linear-gradient(180deg, #ffffff 0%, #fcfdff 100%);
-    padding: 14px;
+    padding: 12px 14px;
   }
 
-  .yield-strip {
-    display: grid;
-    grid-template-columns: 1fr 32px 1fr 32px 1fr 32px 1fr;
-    gap: 10px;
-    align-items: center;
-    margin-top: 14px;
-    padding: 14px;
-    border: 1px solid #e9edf2;
-    border-radius: 14px;
-    background: linear-gradient(180deg, #ffffff 0%, #fcfdff 100%);
-  }
-
-  .yield-item {
-    justify-content: space-between;
-  }
-
-  .yield-item em {
-    color: #708094;
-    font-size: 12px;
-    font-style: normal;
+  .mini-kpi span {
+    color: #2f3640;
+    font-size: 13px;
     font-weight: 700;
+    letter-spacing: 0.01em;
   }
 
-  .yield-op {
-    color: #98a2b3;
-    text-align: center;
-    font-size: 18px;
+  .mini-kpi strong {
+    color: #111827;
+    font-size: 20px;
     font-weight: 800;
+    line-height: 1.2;
+    letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
   }
 
   .funding-action-row {
@@ -1290,8 +1265,9 @@
     border: none;
     border-radius: 12px;
     color: #fff;
-    font-size: 16px;
-    font-weight: 900;
+    font-size: 15px;
+    font-weight: 800;
+    letter-spacing: 0.01em;
   }
 
   .submit-btn--green {
@@ -1351,7 +1327,8 @@
     color: #5b6b7f;
     font-weight: 700;
     background: #fcfcfd;
-    font-size: 12px;
+    font-size: 13px;
+    letter-spacing: 0.01em;
   }
 
   .positions-panel {
@@ -1495,7 +1472,48 @@
   .funding-mode-tabs .active {
     background: var(--strategy-accent-soft);
     color: var(--strategy-accent-strong);
-    box-shadow: inset 0 0 0 1px rgba(201, 72, 72, 0.1);
+    box-shadow: inset 0 0 0 1px var(--strategy-accent-ring);
+  }
+
+  .panel-title h3 {
+    font-size: 16px;
+    font-weight: 800;
+  }
+
+  .funding-close-table th,
+  .analysis-table th,
+  .positions-table th {
+    color: var(--strategy-text-3);
+    background: var(--strategy-table-head-bg);
+    font-size: var(--strategy-font-sm);
+  }
+
+  .funding-close-table td,
+  .analysis-table td,
+  .positions-table td {
+    border-bottom-color: var(--strategy-border-soft);
+    font-size: var(--strategy-font-sm);
+    font-weight: 700;
+    color: var(--strategy-text-2);
+  }
+
+  .positions-metric {
+    border-color: var(--strategy-border);
+    border-radius: var(--strategy-radius-card);
+    background: var(--strategy-surface);
+    box-shadow: var(--strategy-shadow-soft);
+  }
+
+  .flat-action {
+    border-color: var(--strategy-border-strong);
+    border-radius: var(--strategy-radius-control);
+    font-size: var(--strategy-font-base);
+  }
+
+  .order-panel .flat-action {
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0.01em;
   }
 
   @media (max-width: 1400px) {
@@ -1520,13 +1538,6 @@
       align-items: flex-start;
     }
 
-    .yield-strip {
-      grid-template-columns: 1fr;
-    }
-
-    .yield-op {
-      display: none;
-    }
   }
 
   @media (max-width: 1024px) {

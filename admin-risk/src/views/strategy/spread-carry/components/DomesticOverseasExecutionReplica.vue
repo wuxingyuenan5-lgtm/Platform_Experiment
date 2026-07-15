@@ -34,9 +34,6 @@
         </label>
       </div>
 
-      <div class="domestic-topbar__right">
-        <span>下一交易阶段: 13:30:00—15:00:00</span>
-      </div>
     </header>
 
     <div class="hero-grid">
@@ -181,21 +178,39 @@
         </div>
 
         <div class="selector-row">
-          <div class="selector-left">
-            <select v-model="balanceMode">
-              <option value="gram_balance">克数配平</option>
-              <option value="value_balance">金额配平</option>
-              <option value="lot_balance">手数配平</option>
-              <option value="custom_ratio">自定义比例</option>
-            </select>
-            <select v-model="selectedContract" @change="applyContractPreset">
-              <option value="SHFE.au2604">沪金2604</option>
-              <option value="SHFE.au2606">沪金2606</option>
-              <option value="SHFE.au2612">沪金2612</option>
-              <option value="SHFE.au2704">沪金2704</option>
-            </select>
+          <div class="selector-toolbar">
+            <div class="selector-group">
+              <span>配平方式</span>
+              <div class="balance-tabs">
+                <button :class="{ active: balanceMode === 'gram_balance' }" @click="setBalanceMode('gram_balance')">克数配平</button>
+                <button :class="{ active: balanceMode === 'value_balance' }" @click="setBalanceMode('value_balance')">金额配平</button>
+                <button :class="{ active: balanceMode === 'lot_balance' }" @click="setBalanceMode('lot_balance')">手数配平</button>
+                <button :class="{ active: balanceMode === 'custom_ratio' }" @click="setBalanceMode('custom_ratio')">自定义比例</button>
+              </div>
+            </div>
+
+            <div class="selector-group">
+              <span>主腿标的</span>
+              <div class="contract-tabs">
+                <button :class="{ active: selectedContract === 'SHFE.au2604' }" @click="setContract('SHFE.au2604')">沪金2604</button>
+                <button :class="{ active: selectedContract === 'SHFE.au2606' }" @click="setContract('SHFE.au2606')">沪金2606</button>
+                <button :class="{ active: selectedContract === 'SHFE.au2612' }" @click="setContract('SHFE.au2612')">沪金2612</button>
+                <button :class="{ active: selectedContract === 'SHFE.au2704' }" @click="setContract('SHFE.au2704')">沪金2704</button>
+              </div>
+            </div>
           </div>
           <div class="selector-right">{{ selectedHedgeLegState }}</div>
+        </div>
+
+        <div v-if="balanceMode === 'custom_ratio'" class="custom-ratio-row">
+          <label class="custom-ratio-field">
+            <span>主腿比例</span>
+            <input v-model="customMainRatio" type="number" min="0" step="0.01" />
+          </label>
+          <label class="custom-ratio-field">
+            <span>对冲腿比例</span>
+            <input v-model="customHedgeRatio" type="number" min="0" step="0.01" />
+          </label>
         </div>
 
         <div class="legs-grid">
@@ -323,7 +338,7 @@
 </template>
 
 <script setup lang="ts">
-  import { computed, ref, watch } from 'vue';
+  import { computed, ref } from 'vue';
 
   interface LogItem {
     id: string;
@@ -339,7 +354,6 @@
     selectedResolution: string;
   }>();
 
-  const latencyMs = ref(18);
   const activeTradeTab = ref<'open' | 'rollover'>('open');
   const balanceMode = ref<'gram_balance' | 'value_balance' | 'lot_balance' | 'custom_ratio'>('gram_balance');
   const selectedVenueState = ref('SHFE / XAUUSD');
@@ -347,6 +361,8 @@
   const selectedHedgeLegState = ref('XAUUSD');
   const selectedResolutionState = ref('30分钟');
   const selectedContract = ref('SHFE.au2606');
+  const customMainRatio = ref('1.00');
+  const customHedgeRatio = ref('1.00');
   const selectedAction = ref<'open' | 'close' | 'takeProfit' | 'gridOpen' | null>(null);
   const shfeLots = ref(0);
   const refreshing = ref(false);
@@ -434,6 +450,16 @@
     shfeLots.value = Number.isFinite(value) ? Math.max(0, Math.round(value)) : 0;
   }
 
+  function setBalanceMode(mode: typeof balanceMode.value) {
+    balanceMode.value = mode;
+  }
+
+  function setContract(contract: string) {
+    selectedMainLegState.value = contract;
+    selectedContract.value = contract;
+    applyContractPreset();
+  }
+
   function applyContractPreset() {
     if (selectedContract.value === 'SHFE.au2612') {
       shfeLast.value = 1075.42;
@@ -513,8 +539,9 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    height: 48px;
-    padding: 4px 10px;
+    min-height: 48px;
+    padding: 8px 12px;
+    border-radius: var(--strategy-radius-card);
   }
 
   .domestic-topbar__left,
@@ -531,37 +558,38 @@
 
   .domestic-topbar__left,
   .selector-left {
-    gap: 8px;
-    flex-wrap: nowrap;
+    gap: var(--strategy-space-1);
+    flex-wrap: wrap;
   }
 
   .topbar-control {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--strategy-space-1);
     min-width: 0;
     flex: 0 0 auto;
   }
 
   .topbar-control span {
-    color: #64748b;
-    font-size: 11px;
+    color: var(--strategy-text-3);
+    font-size: var(--strategy-font-sm);
     font-weight: 700;
     letter-spacing: 0;
     white-space: nowrap;
   }
 
   .topbar-control select {
-    height: 34px;
-    padding: 0 8px;
-    border: none;
-    border-radius: 10px;
-    background: transparent;
-    color: #425470;
-    font-size: 13px;
+    height: var(--strategy-control-height);
+    padding: 0 var(--strategy-space-2);
+    border: 1px solid var(--strategy-border-strong);
+    border-radius: var(--strategy-radius-control);
+    background: var(--strategy-surface);
+    color: var(--strategy-text-1);
+    font-size: var(--strategy-font-base);
     font-weight: 700;
     min-width: 88px;
     width: auto;
+    box-shadow: var(--strategy-shadow-soft);
   }
 
   .menu-btn,
@@ -765,10 +793,11 @@
   }
 
   .refresh-btn {
-    height: 30px;
+    height: var(--strategy-control-height);
     padding: 0 12px;
-    border-radius: 4px;
-    font-size: 12px;
+    border-radius: var(--strategy-radius-control);
+    font-size: var(--strategy-font-base);
+    font-weight: 700;
   }
 
   .account-rows {
@@ -982,28 +1011,29 @@
   }
 
   .trade-tabs button {
-    width: 74px;
-    height: 40px;
-    border: 1px solid #ebe8e1;
-    background: #fff;
-    color: #586d8a;
+    min-width: 88px;
+    height: var(--strategy-tab-height);
+    border: 1px solid var(--strategy-border-strong);
+    background: var(--strategy-surface);
+    color: var(--strategy-text-2);
     font-size: 14px;
-    font-weight: 800;
+    font-weight: 700;
+    letter-spacing: 0.01em;
     cursor: pointer;
   }
 
   .trade-tabs button:first-child {
-    border-radius: 4px 0 0 4px;
+    border-radius: 12px 0 0 12px;
   }
 
   .trade-tabs button:last-child {
-    border-radius: 0 4px 4px 0;
+    border-radius: 0 12px 12px 0;
   }
 
   .trade-tabs button.active {
-    border-color: rgba(220, 82, 82, 0.38);
-    background: linear-gradient(180deg, #ff6868 0%, #ef4343 100%);
-    color: #fff;
+    border-color: var(--strategy-accent-soft);
+    background: var(--strategy-accent-soft);
+    color: var(--strategy-accent-strong);
   }
 
   .trade-quote-strip {
@@ -1036,19 +1066,113 @@
     margin-bottom: 10px;
   }
 
-  .selector-left select,
+  .selector-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+
+  .selector-group {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  .selector-group > span {
+    color: #2f3640;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    white-space: nowrap;
+  }
+
+  .balance-tabs,
+  .contract-tabs {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    flex-wrap: wrap;
+  }
+
+  .balance-tabs button,
+  .contract-tabs button {
+    min-width: 84px;
+    height: 42px;
+    padding: 0 14px;
+    border: 1px solid #d7e2ef;
+    background: #fff;
+    color: #47617f;
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    cursor: pointer;
+  }
+
+  .balance-tabs button:first-child,
+  .contract-tabs button:first-child {
+    border-radius: 12px 0 0 12px;
+  }
+
+  .balance-tabs button:last-child,
+  .contract-tabs button:last-child {
+    border-radius: 0 12px 12px 0;
+  }
+
+  .balance-tabs button:not(:first-child),
+  .contract-tabs button:not(:first-child) {
+    margin-left: -1px;
+  }
+
+  .balance-tabs button.active,
+  .contract-tabs button.active {
+    border-color: rgba(220, 82, 82, 0.38);
+    background: linear-gradient(180deg, #ff6868 0%, #ef4343 100%);
+    color: #fff;
+    position: relative;
+    z-index: 1;
+  }
+
+  .custom-ratio-row {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 180px));
+    gap: 12px;
+    margin-bottom: 10px;
+  }
+
+  .custom-ratio-field {
+    display: grid;
+    gap: 6px;
+  }
+
+  .custom-ratio-field span {
+    color: #2f3640;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+  }
+
+  .custom-ratio-field input,
   .selector-right,
   .leg-panel input {
     height: 42px;
     padding: 0 12px;
+    border: 1px solid #d9e2ed;
+    border-radius: 10px;
+    background: #fff;
+    color: #13233f;
     font-size: 14px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
   }
 
   .selector-right {
     min-width: 132px;
     display: flex;
     align-items: center;
-    color: #5b6d87;
+    justify-content: flex-end;
+    font-variant-numeric: tabular-nums;
   }
 
   .legs-grid {
@@ -1062,7 +1186,7 @@
     padding: 16px 18px;
     border: 1px solid #ede9e2;
     border-radius: 16px;
-    background: linear-gradient(180deg, #ffffff 0%, #fbfbf9 100%);
+    background: linear-gradient(180deg, #ffffff 0%, #f4f8fb 100%);
   }
 
   .leg-panel__stats {
@@ -1078,8 +1202,9 @@
     color: #1b2c49;
     font-size: 28px;
     line-height: 1.08;
-    font-weight: 700;
+    font-weight: 800;
     letter-spacing: -0.03em;
+    font-variant-numeric: tabular-nums;
   }
 
   .leg-panel__entry label {
@@ -1093,7 +1218,8 @@
     margin-top: 8px;
     color: #627793;
     font-size: 12px;
-    font-weight: 600;
+    font-weight: 700;
+    letter-spacing: 0.01em;
   }
 
   .action-row {
@@ -1107,19 +1233,20 @@
     min-width: 0;
     height: 46px;
     padding: 0 18px;
-    border: 1px solid #ebe8e1;
-    border-radius: 12px;
-    background: #fffefd;
-    color: #4f6583;
+    border: 1px solid var(--strategy-border-strong);
+    border-radius: var(--strategy-radius-card);
+    background: var(--strategy-surface);
+    color: var(--strategy-text-2);
     font-size: 15px;
     font-weight: 800;
+    letter-spacing: 0.01em;
     cursor: pointer;
   }
 
   .action-btn.active {
-    border-color: rgba(220, 82, 82, 0.38);
-    background: linear-gradient(180deg, #ff6868 0%, #ef4343 100%);
-    color: #fff;
+    border-color: var(--strategy-accent-soft);
+    background: var(--strategy-accent-soft);
+    color: var(--strategy-accent-strong);
   }
 
   .impact-board {
@@ -1129,8 +1256,10 @@
   .impact-title {
     margin-bottom: 10px;
     color: #1d2e4a;
-    font-size: 16px;
+    font-family: var(--strategy-font-heading);
+    font-size: 21px;
     font-weight: 800;
+    letter-spacing: -0.012em;
   }
 
   .impact-grid {
@@ -1144,22 +1273,26 @@
     padding: 14px 16px;
     border: 1px solid #ede9e2;
     border-radius: 14px;
-    background: linear-gradient(180deg, #ffffff 0%, #fbfbf9 100%);
+    background: linear-gradient(180deg, #ffffff 0%, #f4f8fb 100%);
   }
 
   .impact-card span {
     display: block;
     margin-bottom: 8px;
-    color: #7a889d;
-    font-size: 12px;
+    color: #2f3640;
+    font-size: 13px;
     font-weight: 700;
+    letter-spacing: 0.01em;
   }
 
   .impact-card strong {
     color: #1f314d;
-    font-size: 18px;
+    font-size: 20px;
     font-weight: 800;
     font-style: normal;
+    line-height: 1.2;
+    letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
   }
 
   .impact-card em {
@@ -1179,8 +1312,9 @@
     border-radius: 12px;
     background: #fff;
     color: #526682;
-    font-size: 14px;
+    font-size: 15px;
     font-weight: 800;
+    letter-spacing: 0.01em;
     cursor: pointer;
   }
 
@@ -1305,8 +1439,8 @@
   .modal-btn--primary {
     background: var(--strategy-accent-soft);
     color: var(--strategy-accent-strong);
-    box-shadow: inset 0 0 0 1px rgba(201, 72, 72, 0.1);
-    border-color: rgba(201, 72, 72, 0.18);
+    box-shadow: inset 0 0 0 1px var(--strategy-accent-ring);
+    border-color: var(--strategy-accent-soft);
   }
 
   .account-head,

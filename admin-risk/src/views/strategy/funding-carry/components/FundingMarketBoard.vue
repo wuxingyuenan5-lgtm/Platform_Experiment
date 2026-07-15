@@ -68,11 +68,6 @@
     </div>
 
     <div class="heatmap-shell">
-      <div class="heatmap-caption">
-        <span>USDT / USD 合约</span>
-        <span>币本位合约</span>
-      </div>
-
       <div class="heatmap-table">
         <div class="heatmap-table__header">
           <div class="symbol-cell">币种</div>
@@ -147,11 +142,11 @@
 
 <style scoped lang="less">
   .market-board {
-    padding: 26px;
-    border: 1px solid rgba(134, 115, 87, 0.12);
-    border-radius: 22px;
-    background: rgba(255, 255, 255, 0.9);
-    box-shadow: 0 16px 36px rgba(94, 76, 52, 0.06);
+    padding: var(--strategy-space-5);
+    border: 1px solid var(--strategy-border);
+    border-radius: var(--strategy-radius-panel);
+    background: var(--strategy-surface);
+    box-shadow: var(--strategy-shadow-card);
   }
 
   .market-board__context {
@@ -164,20 +159,20 @@
     gap: 8px;
     min-height: 36px;
     padding: 0 12px;
-    border: 1px solid rgba(134, 115, 87, 0.1);
-    border-radius: 10px;
-    background: #fff;
+    border: 1px solid var(--strategy-border);
+    border-radius: var(--strategy-radius-control);
+    background: var(--strategy-surface);
   }
 
   .context-chip span {
-    color: rgba(36, 29, 21, 0.58);
-    font-size: 12px;
+    color: var(--strategy-text-3);
+    font-size: var(--strategy-font-xs);
     font-weight: 700;
   }
 
   .context-chip strong {
-    color: #1f2937;
-    font-size: 13px;
+    color: var(--strategy-text-1);
+    font-size: var(--strategy-font-sm);
     font-weight: 800;
   }
 
@@ -195,9 +190,10 @@
 
   .summary-card,
   .extrema-card {
-    border: 1px solid rgba(134, 115, 87, 0.08);
-    border-radius: 14px;
-    background: #fff;
+    border: 1px solid var(--strategy-border);
+    border-radius: var(--strategy-radius-panel);
+    background: var(--strategy-surface);
+    box-shadow: var(--strategy-shadow-soft);
   }
 
   .summary-card {
@@ -209,23 +205,24 @@
 
   .summary-card__title {
     padding: 8px 14px;
-    border-radius: 10px;
-    background: #f3f6f8;
-    color: rgba(36, 29, 21, 0.7);
-    font-size: 14px;
-    font-weight: 700;
+    border-radius: var(--strategy-radius-control);
+    background: var(--strategy-surface-muted);
+    color: var(--strategy-text-1);
+    font-size: 16px;
+    font-weight: 800;
     text-align: center;
   }
 
   .summary-card__value {
-    font-size: 20px;
-    font-weight: 700;
+    font-size: 24px;
+    font-weight: 800;
     text-align: center;
   }
 
   .summary-card__subtitle {
-    color: rgba(36, 29, 21, 0.62);
-    font-size: 13px;
+    color: var(--strategy-text-3);
+    font-size: var(--strategy-font-sm);
+    font-weight: 600;
     text-align: center;
   }
 
@@ -241,9 +238,9 @@
 
   .extrema-card h3 {
     margin: 0;
-    color: #241d15;
-    font-size: 22px;
-    font-weight: 600;
+    color: var(--strategy-text-1);
+    font-size: 16px;
+    font-weight: 800;
   }
 
   .extrema-list {
@@ -260,8 +257,8 @@
   }
 
   .extrema-row span {
-    color: rgba(36, 29, 21, 0.74);
-    font-size: 14px;
+    color: var(--strategy-text-2);
+    font-size: var(--strategy-font-base);
   }
 
   .extrema-row strong {
@@ -270,15 +267,15 @@
   }
 
   .is-positive {
-    color: #10b981;
+    color: var(--strategy-success);
   }
 
   .is-negative {
-    color: #ff3040;
+    color: var(--strategy-danger);
   }
 
   .is-hot {
-    color: #ff6b6b;
+    color: var(--strategy-danger);
   }
 
   .market-board__toolbar {
@@ -298,26 +295,28 @@
 
   .range-tabs button,
   .board-actions button {
-    height: 36px;
-    padding: 0 16px;
-    border: 1px solid rgba(134, 115, 87, 0.08);
-    border-radius: 10px;
-    background: #f4f6f8;
-    color: rgba(36, 29, 21, 0.72);
-    font-size: 14px;
-    font-weight: 600;
+    height: var(--strategy-control-height);
+    padding: 0 var(--strategy-space-2);
+    border: 1px solid var(--strategy-border-strong);
+    border-radius: var(--strategy-radius-control);
+    background: var(--strategy-surface);
+    color: var(--strategy-text-2);
+    font-size: var(--strategy-font-base);
+    font-weight: 700;
     cursor: pointer;
+    box-shadow: var(--strategy-shadow-soft);
   }
 
   .range-tabs .is-active {
-    background: #111827;
-    border-color: #111827;
-    color: #fff;
+    background: var(--strategy-accent-soft);
+    border-color: var(--strategy-accent-soft);
+    color: var(--strategy-accent-strong);
+    box-shadow: inset 0 0 0 1px var(--strategy-accent-ring);
   }
 
   .heatmap-shell {
     margin-top: 14px;
-    border-top: 1px solid rgba(134, 115, 87, 0.08);
+    border-top: 1px solid var(--strategy-border);
     padding-top: 16px;
   }
 
@@ -326,8 +325,8 @@
     grid-template-columns: minmax(120px, 140px) minmax(0, 1fr) minmax(240px, 280px);
     align-items: center;
     margin-bottom: 10px;
-    color: rgba(36, 29, 21, 0.72);
-    font-size: 14px;
+    color: var(--strategy-text-2);
+    font-size: var(--strategy-font-base);
     font-weight: 600;
   }
 
@@ -345,12 +344,13 @@
 
   .heatmap-table__header {
     padding: 12px 0;
-    border-bottom: 1px solid rgba(134, 115, 87, 0.08);
+    border-bottom: 1px solid var(--strategy-border);
+    background: var(--strategy-table-head-bg);
   }
 
   .heatmap-table__row {
     min-height: 58px;
-    border-bottom: 1px solid rgba(134, 115, 87, 0.06);
+    border-bottom: 1px solid var(--strategy-border-soft);
   }
 
   .group-header,
@@ -361,45 +361,45 @@
   }
 
   .group-header span {
-    color: #334155;
-    font-size: 13px;
+    color: var(--strategy-text-2);
+    font-size: var(--strategy-font-sm);
     font-weight: 700;
     text-align: center;
   }
 
   .group-row span {
     padding: 12px 8px;
-    color: #1f2937;
-    font-size: 13px;
+    color: var(--strategy-text-1);
+    font-size: var(--strategy-font-sm);
     font-weight: 700;
     text-align: center;
   }
 
   .group-row .is-positive {
-    color: #0ea768;
+    color: var(--strategy-success);
   }
 
   .group-row .is-negative {
-    color: #19a463;
+    color: var(--strategy-success);
   }
 
   .group-row .is-hot {
-    color: #ff6472;
+    color: var(--strategy-danger);
   }
 
   .group-row .is-empty {
-    color: rgba(36, 29, 21, 0.34);
+    color: var(--strategy-text-faint);
   }
 
   .symbol-cell {
-    color: rgba(36, 29, 21, 0.62);
-    font-size: 13px;
+    color: var(--strategy-text-3);
+    font-size: var(--strategy-font-sm);
     font-weight: 700;
   }
 
   .symbol-cell--row {
-    color: #1f2937;
-    font-size: 16px;
+    color: var(--strategy-text-1);
+    font-size: var(--strategy-font-card-title);
   }
 
   @media (max-width: 1200px) {

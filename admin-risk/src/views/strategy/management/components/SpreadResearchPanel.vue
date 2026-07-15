@@ -320,7 +320,7 @@
   }
 
   async function renderIntraday() {
-    const mainSeries = [];
+    const mainSeries: any[] = [];
     if (intradayVisible.value.includes('spread')) {
       mainSeries.push({
         name: '价差',
@@ -328,7 +328,9 @@
         xAxisIndex: 0,
         yAxisIndex: 0,
         barWidth: 10,
-        itemStyle: { color: (params) => (params.data >= 0 ? '#ef4444' : '#22d3ee') },
+        itemStyle: {
+          color: (params: any) => (Number(params?.data ?? params?.value ?? 0) >= 0 ? '#ef4444' : '#22d3ee'),
+        },
         data: intradayData.value.spread,
       });
     }
@@ -403,7 +405,13 @@
       grid: { left: 18, right: 10, top: 16, bottom: 18, containLabel: true },
       xAxis: { type: 'category', data: ['2022', '2023', '2024', '2025', '2026'], axisLabel: { color: '#94a3b8' } },
       yAxis: { type: 'value', axisLabel: { color: '#94a3b8', formatter: '{value}%' }, splitLine: { lineStyle: { color: 'rgba(148,163,184,.08)' } } },
-      series: [{ type: 'bar', data: [-2.79, 2.10, -4.77, -2.94, -2.65], itemStyle: { color: (params) => (params.data >= 0 ? '#ef4444' : '#22c55e') } }],
+      series: [{
+        type: 'bar',
+        data: [-2.79, 2.10, -4.77, -2.94, -2.65],
+        itemStyle: {
+          color: (params: any) => (Number(params?.data ?? params?.value ?? 0) >= 0 ? '#ef4444' : '#22c55e'),
+        },
+      }],
     });
     seasonalSideChart.resize();
   }

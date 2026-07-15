@@ -2,9 +2,6 @@
 
 这份清单来自你本机 Chrome 收藏夹，方便你筛选没用的网址，并重新规划最终分类。
 
-- 大类数：6
-- 分组数：21
-- 站点数：338
 
 ## 使用建议
 
@@ -36,11 +33,11 @@
   - 域名：`macro-ops.com`
 - [宏观经济+股市 萝卜投研](https://robo.datayes.com/v2/landing/macrogrp)
   - 域名：`robo.datayes.com`
-- [各国宏观经济指标 | 按类别列出](https://tradingeconomics.com/indicators)
+- [各国宏观经济指标](https://tradingeconomics.com/indicators)
   - 域名：`tradingeconomics.com`
 - [Haver宏观评论](https://www.haver.com/)
   - 域名：`www.haver.com`
-- [日历 | AI好读取](https://www.forexfactory.com/calendar?day=jan3.2026)
+- [日历，AI好读取](https://www.forexfactory.com/calendar?day=jan3.2026)
   - 域名：`www.forexfactory.com`
 - [其他宏观数据图表库](https://truflation.com/marketplace?auth=google&code=e2e58bd7-c221-4d97-9997-ad2d612810a2&isSigningUp=true&period=annual&stake=false&tier=undefined)
   - 域名：`truflation.com`
@@ -56,46 +53,46 @@
   - 域名：`www.newyorkfed.org`
 - [利率&美资产负债表vs.黄金](https://sc.macromicro.me/collections/45/mm-gold-price/24057/us-fed-funds-rate-and-total-assets-vs-gold-price)
   - 域名：`sc.macromicro.me`
+- [利差/标普相关性](https://fred.stlouisfed.org/series/BAMLH0A0HYM2#0)
+  - 域名：`fred.stlouisfed.org`
 - [信用利差](https://fred.stlouisfed.org/series/BAMLH0A0HYM2)
   - 域名：`fred.stlouisfed.org`
 - [美联储资产负债表](https://www.federalreserve.gov/releases/h41/)
   - 域名：`www.federalreserve.gov`
-- [美联储 - 会议日程和信息](https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm)
+- [美联储会议日程和信息](https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm)
   - 域名：`www.federalreserve.gov`
 - [FOMC会议声明/记者会](https://www.federalreserve.gov/videos.htm)
   - 域名：`www.federalreserve.gov`
-- [美国-美联储负债端结构|MacroMicro ](https://sc.macromicro.me/collections/4238/us-federal/1320/us-fed-liabilities-structure)
+- [美联储负债端结构|MacroMicro ](https://sc.macromicro.me/collections/4238/us-federal/1320/us-fed-liabilities-structure)
   - 域名：`sc.macromicro.me`
 - [担保隔夜融资利率 (SOFR)](https://fred.stlouisfed.org/series/SOFR)
   - 域名：`fred.stlouisfed.org`
 - [10年期盈亏平衡通胀率 (T10YIE) ](https://fred.stlouisfed.org/series/T10YIE)
   - 域名：`fred.stlouisfed.org`
-- [10年期固定期限美债市场收益率，通胀保值 DFII10)](https://fred.stlouisfed.org/series/DFII10)
+- [10年期固定期限美债收益率DFII10)](https://fred.stlouisfed.org/series/DFII10)
   - 域名：`fred.stlouisfed.org`
 - [各国央行利率](https://en.macromicro.me/central_bank/overview)
   - 域名：`en.macromicro.me`
-- [各国央行加息/降息预期（2024年）| MacroMicro](https://en.macromicro.me/charts/89119/cbs-interest-rate-cuts-expectation-2024)
+- [各国央行加息/降息预期|MacroMicro](https://en.macromicro.me/charts/89119/cbs-interest-rate-cuts-expectation-2024)
   - 域名：`en.macromicro.me`
-- [利差/标普相关性](https://fred.stlouisfed.org/series/BAMLH0A0HYM2#0)
-  - 域名：`fred.stlouisfed.org`
 - [纽约联邦储备银行](https://www.newyorkfed.org/)
   - 域名：`www.newyorkfed.org`
 - [美联储历史](https://fraser.stlouisfed.org/)
   - 域名：`fraser.stlouisfed.org`
-- [咨询小组 - 纽约联邦储备银行](https://www.newyorkfed.org/aboutthefed/external_committees)
+- [纽约联邦储备银行](https://www.newyorkfed.org/aboutthefed/external_committees)
   - 域名：`www.newyorkfed.org`
-- [U.S. Department of the Treasury](https://home.treasury.gov/policy-issues/financing-the-government/quarterly-refunding/most-recent-quarterly-refunding-documents,)
+- [美国财政部](https://home.treasury.gov/)
   - 域名：`home.treasury.gov`
 
 - [美联储经济数据](https://fred.stlouisfed.org/)
   - 域名：`fred.stlouisfed.org`
-- [GDPNow - 亚特兰大联邦储备银行](https://www.atlantafed.org/cqer/research/gdpnow)
+- [GDPNow-亚特兰大联邦储备银行](https://www.atlantafed.org/cqer/research/gdpnow)
   - 域名：`www.atlantafed.org`
 - [亚特兰大工资增长追踪](https://www.atlantafed.org/chcs/wage-growth-tracker)
   - 域名：`www.atlantafed.org`
 - [核心PCE](https://fred.stlouisfed.org/series/DPCCRV1Q225SBEA)
   - 域名：`fred.stlouisfed.org`
-- [美国PCE＆corePCE(年增率) ](https://www.macromicro.me/charts/107685/mei-guo-PCE-corePCE-nian-zeng-lyu)
+- [美国PCE＆corePCE](https://www.macromicro.me/charts/107685/mei-guo-PCE-corePCE-nian-zeng-lyu)
   - 域名：`www.macromicro.me`
 - [10年期通胀预期和风险溢价](https://www.clevelandfed.org/indicators-and-data/inflation-expectations)
   - 域名：`www.clevelandfed.org`
@@ -103,31 +100,33 @@
   - 域名：`www.newyorkfed.org`
 - [PCE预测](https://www.clevelandfed.org/indicators-and-data/inflation-nowcasting)
   - 域名：`www.clevelandfed.org`
-- [美国CPI(环比)  ](https://sc.macromicro.me/collections/5/us-price-relative/89/cpi-items-mom)
+- [美国CPI](https://sc.macromicro.me/collections/5/us-price-relative/89/cpi-items-mom)
   - 域名：`sc.macromicro.me`
 - [10年期国债-2年期国债利率（T10Y2Y）](https://fred.stlouisfed.org/series/T10Y2Y)
   - 域名：`fred.stlouisfed.org`
 - [职位空缺：非农就业数据 (JTSJOL)](https://fred.stlouisfed.org/series/JTSJOL)
   - 域名：`fred.stlouisfed.org`
-- [美国ADP 非农就业数据](https://en.macromicro.me/collections/4/us-employ-relative/36/adp)
+- [美国ADP就业数据](https://en.macromicro.me/collections/4/us-employ-relative/36/adp)
   - 域名：`en.macromicro.me`
 - [美国劳动力市场](https://en.macromicro.me/collections/4/us-employ-relative/87/jolts)
   - 域名：`en.macromicro.me`
-- [劳动力参与率 (CIVPART)](https://fred.stlouisfed.org/series/CIVPART)
+- [劳动力参与率](https://fred.stlouisfed.org/series/CIVPART)
   - 域名：`fred.stlouisfed.org`
-- [个人储蓄率 (PSAVERT) ](https://fred.stlouisfed.org/series/PSAVERT)
+- [个人储蓄率 ](https://fred.stlouisfed.org/series/PSAVERT)
   - 域名：`fred.stlouisfed.org`
-- [信用卡贷款拖欠率 (DRCCLACBS) ](https://fred.stlouisfed.org/series/DRCCLACBS)
+- [信用卡贷款拖欠率 ](https://fred.stlouisfed.org/series/DRCCLACBS)
   - 域名：`fred.stlouisfed.org`
-- [美国30年期固定利率抵押贷款平均值 (MORTGAGE30US)](https://fred.stlouisfed.org/series/MORTGAGE30US)
+- [美国30年期固定利率抵押贷款平均值](https://fred.stlouisfed.org/series/MORTGAGE30US)
   - 域名：`fred.stlouisfed.org`
-- [美国——银行收紧商业和工业贷款标准的净百分比](https://en.macromicro.me/charts/1241/us-bank-net-percent-tight-loan)
+- [美国银行收紧商业和工业贷款标准的净百分比](https://en.macromicro.me/charts/1241/us-bank-net-percent-tight-loan)
   - 域名：`en.macromicro.me`
 - [美国房地产市场和价格](https://www.redfin.com/us-housing-market)
   - 域名：`www.redfin.com`
 
 ### 美债类
 
+- [美国财政部每月债券发行量|MacroMicro](https://sc.macromicro.me/charts/4458/us-treasury-issuance-gross)
+  - 域名：`sc.macromicro.me`
 - [美债拍卖时间](https://treasurydirect.gov/auctions/upcoming/)
   - 域名：`treasurydirect.gov`
 - [国债拍卖](https://www.treasurydirect.gov/auctions/announcements-data-results/announcement-results-press-releases/)
@@ -138,11 +137,9 @@
   - 域名：`ticdata.treasury.gov`
 - [10年期美债买卖比](https://en.macromicro.me/collections/51/us-treasury-bond/30431/us-10y-bid-to-cover-ratio)
   - 域名：`en.macromicro.me`
-- [美国-财政部每月债券发行量 | MacroMicro 财经M平方](https://sc.macromicro.me/charts/4458/us-treasury-issuance-gross)
-  - 域名：`sc.macromicro.me`
-- [美国债务占国内生产总值的百分比 (GFDEGDQ188S) ](https://fred.stlouisfed.org/series/GFDEGDQ188S)
+- [美国债务占国内生产总值的百分比](https://fred.stlouisfed.org/series/GFDEGDQ188S)
   - 域名：`fred.stlouisfed.org`
-- [国家债务时钟：现在的国家债务是多少？](https://www.pgpf.org/national-debt-clock/)
+- [国家债务时钟](https://www.pgpf.org/national-debt-clock/)
   - 域名：`www.pgpf.org`
 
 ### 其他
@@ -150,11 +147,11 @@
 
 - [机构现金仓位](https://www.ici.org/research/stats/mmf)
   - 域名：`www.ici.org`
-- [世界银行开放数据 | 各国长期经济数据对比](https://data.worldbank.org/)
+- [世界银行各国长期经济数据对比](https://data.worldbank.org/)
   - 域名：`data.worldbank.org`
 - [各国债务/GDP占比](https://worldpopulationreview.com/country-rankings/countries-by-national-debt)
   - 域名：`worldpopulationreview.com`
-- [世界各国的人口金字塔 2025 - 人口金字塔](https://population-pyramid.net/zh-cn)
+- [世界各国的人口金字塔](https://population-pyramid.net/zh-cn)
   - 域名：`population-pyramid.net`
 - [全球数据](https://tradingeconomics.com/)
   - 域名：`tradingeconomics.com`
@@ -175,7 +172,7 @@
   - 域名：`companiesmarketcap.com`
 - [A股板块走势](https://dapanyuntu.com/)
   - 域名：`dapanyuntu.com`
-- [股票筛选器和热力图--FINVIZ.com](https://finviz.com/)
+- [股票筛选器和热力图FINVIZ](https://finviz.com/)
   - 域名：`finviz.com`
 - [finviz财报可视化](https://finviz.com/quote.ashx?t=AAPL&ty=ea&p=d&b=1)
   - 域名：`finviz.com`
@@ -187,9 +184,9 @@
   - 域名：`www.sec.gov`
 - [每季度财报统计及forward EPS/PE](https://insight.factset.com/topic/earnings)
   - 域名：`insight.factset.com`
-- [利用13F文件和鲸鱼数据追踪对冲基金投资组合](https://whalewisdom.com/)
+- [追踪对冲基金投资组合](https://whalewisdom.com/)
   - 域名：`whalewisdom.com`
-- [Seeking Alpha | 股市分析及投资者工具](https://seekingalpha.com/)
+- [Seeking Alpha|股市分析及投资者工具](https://seekingalpha.com/)
   - 域名：`seekingalpha.com`
 - [社保机构持仓](https://www.lixinger.com/analytics/shareholders/search)
   - 域名：`www.lixinger.com`
@@ -217,7 +214,7 @@
   - 域名：`www.lazyportfolioetf.com`
 - [投资组合可视化工具](https://www.portfoliovisualizer.com/)
   - 域名：`www.portfoliovisualizer.com`
-- [韭圈儿_基金配置高手聚集地](https://funddb.cn/)
+- [基金配置高手聚集地](https://funddb.cn/)
   - 域名：`funddb.cn`
 
 
@@ -237,7 +234,7 @@
 - [ARK 研究文章](https://www.ark-invest.com/articles)
 - [Bitwise 市场洞察](https://bitwiseinvestments.com/crypto-market-insights)
 - [Bitwise 每周分析](https://experts.bitwiseinvestments.com/cio-memos)
-- [Messari / Delphi 前瞻报告](https://members.delphidigital.io/reports/the-year-ahead-for-markets-2026#concluding-thoughts-949c)
+- [Messari/Delphi前瞻报告](https://members.delphidigital.io/reports/the-year-ahead-for-markets-2026#concluding-thoughts-949c)
 - [Arthur Hayes 研究](https://cryptohayes.substack.com/)
 - [CoinShares 洞察](https://coinshares.com/corp/insights/)
 - [Unbias 分析师聚合](https://unbias.fyi/analysts?source=all)
@@ -245,7 +242,7 @@
 - [BTC美股周报告](https://supersaiyan1957.substack.com/)
   - 域名：`supersaiyan1957.substack.com`
 ### 交易类
-- [比特币BTC驱动三大因素：流动性＆实际利率＆PE ](https://www.macromicro.me/collections/22514/bi-te-bi_418919/111972/bi-te-bi-BTC-qu-dong-san-da-yin-su-liu-dong-xing-shi-ji-li-lyu-GDP)
+- [BTC驱动三大因素：流动性＆实际利率＆PE ](https://www.macromicro.me/collections/22514/bi-te-bi_418919/111972/bi-te-bi-BTC-qu-dong-san-da-yin-su-liu-dong-xing-shi-ji-li-lyu-GDP)
   - 域名：`www.macromicro.me`
 - [减半后表现](https://www.coinglass.com/pro/i/bitcoin-price-performance-since-halving)
 - [Coinglass 资费+持仓量](https://www.coinglass.com/tv/zh/Binance_BTCUSDT)
@@ -269,15 +266,15 @@
 - [CME / CFTC 持仓](https://www.coinglass.com/pro/cme/cftc)
 - [多空比](https://www.coinglass.com/LongShortRatio)
 - [Hyperliquid 钱包多空分布](https://www.coinglass.com/hl)
-- [大小鲸鱼购买情况以及其他链上指标](https://charts.bgeometrics.com/bitcoin_distribution_coins_tables.html)
+- [大小鲸鱼购买情况及其他链上指标](https://charts.bgeometrics.com/bitcoin_distribution_coins_tables.html)
   - 域名：`charts.bgeometrics.com`
-- [加密各类链上数据 | CryptoQuant](https://cryptoquant.com/asset/btc/summary)
+- [加密各类链上数据|CryptoQuant](https://cryptoquant.com/asset/btc/summary)
   - 域名：`cryptoquant.com`
-- [代币解锁 | 追踪最新数据并完成解锁计划](https://tokenomist.ai/)
+- [代币解锁计划](https://tokenomist.ai/)
   - 域名：`tokenomist.ai`
-- [链上 | Arkham](https://intel.arkm.com/)
+- [链上|Arkham](https://intel.arkm.com/)
   - 域名：`intel.arkm.com`
-- [区块链浏览器查询 | 欧科云链 OKLink](https://www.oklink.com/zh-hans)
+- [区块链浏览器查询|欧科云链 OKLink](https://www.oklink.com/zh-hans)
   - 域名：`www.oklink.com`
 - [Hyperliquid 统计数据](https://stats.hyperliquid.xyz/)
   - 域名：`stats.hyperliquid.xyz`
@@ -327,7 +324,7 @@
   - 域名：`app.ethena.fi`
 - [Ethereum - DefiLlama](https://defillama.com/chain/Ethereum)
   - 域名：`defillama.com`
-- [BTC.com数据与矿池](https://btc.com/zh-CN)
+- [BTC.com与矿池](https://btc.com/zh-CN)
   - 域名：`btc.com`
 - [DEX Screener](https://dexscreener.com/)
   - 域名：`dexscreener.com`
@@ -337,11 +334,11 @@
   - 域名：`miningpoolstats.stream`
 - [Morpho ](https://morpho.org/)
   - 域名：`morpho.org`
-- [贷款 | 卡米诺金融](https://app.kamino.finance/earn/lend)
+- [kamino金融](https://app.kamino.finance/earn/lend)
   - 域名：`app.kamino.finance`
 - [Lulo](https://app.lulo.fi/)
   - 域名：`app.lulo.fi`
-- [Uniswap Ethereum 热门资金池](https://app.uniswap.org/explore/pools)
+- [Uniswap Ethereum资金池](https://app.uniswap.org/explore/pools)
   - 域名：`app.uniswap.org`
 - [Spark：利用稳定币赚钱](https://app.spark.fi/)
   - 域名：`app.spark.fi`
@@ -351,17 +348,17 @@
   - 域名：`www.apeoclock.com`
 - [ETH质押](https://stake.lido.fi/)
   - 域名：`stake.lido.fi`
-- [一级和预测市场：CryptoRank.io](https://cryptorank.io/prediction-markets)
+- [一级和预测市场CryptoRank.io](https://cryptorank.io/prediction-markets)
   - 域名：`cryptorank.io`
 - [比特币日历](https://bitbo.io/calendar/)
   - 域名：`bitbo.io`
-- [加密货币活动日历 | CoinCarp](https://www.coincarp.com/events/)
+- [加密货币活动日历CoinCarp](https://www.coincarp.com/events/)
   - 域名：`www.coincarp.com`
 - [聪明钱追踪--GMGN.AI](https://gmgn.ai/?ref=NtZl14CJ&chain=sol)
   - 域名：`gmgn.ai`
 - [聪明钱|discover](https://axiom.trade/)
   - 域名：`axiom.trade`
-- [Dune — 由社区提供支持的加密分析。](https://dune.com/home)
+- [Dune社区加密分析](https://dune.com/home)
   - 域名：`dune.com`
 - [UniScan ](https://uniscan.cc/fractal/)
   - 域名：`uniscan.cc`
@@ -382,19 +379,19 @@
 - 来源：`交易工具 / 黄金`
 - 数量：16
 
-- [GLD 借款利率 (CTB) | ChartExchange](https://chartexchange.com/symbol/nyse-gld/borrow-fee/)
+- [GLD 借款利率 (CTB)](https://chartexchange.com/symbol/nyse-gld/borrow-fee/)
   - 域名：`chartexchange.com`
-- [伦敦金库数据 | LBMA](https://www.lbma.org.uk/prices-and-data/london-vault-data)
+- [伦敦金库数据LBMA](https://www.lbma.org.uk/prices-and-data/london-vault-data)
   - 域名：`www.lbma.org.uk`
 - [Comex 金库存](https://commoditieschart.net/zh/metals/gold/comex-gold-stocks)
   - 域名：`commoditieschart.net`
-- [世界黄金协会：黄金ETF的持有量和流量 | World Gold Council](https://china.gold.org/goldhub/data/gold-etfs-holdings-and-flows#from-login=1&login-type=wechat)
+- [黄金ETF的持有量和流量](https://china.gold.org/goldhub/data/gold-etfs-holdings-and-flows#from-login=1&login-type=wechat)
   - 域名：`china.gold.org`
-- [各国央行黄金储备 | 世界黄金协会](https://www.gold.org/goldhub/data/gold-reserves-by-country)
+- [各国央行黄金储备](https://www.gold.org/goldhub/data/gold-reserves-by-country)
   - 域名：`www.gold.org`
 - [各大交易所未平仓合约数](https://www.gold.org/goldhub/data/gold-open-interest)
   - 域名：`www.gold.org`
-- [黄金期货价格曲线｜世界黄金协会](https://china.gold.org/goldhub/data/gold-futures-curves#from-login=1&login-type=wechat)
+- [美黄金期货价格曲线](https://china.gold.org/goldhub/data/gold-futures-curves#from-login=1&login-type=wechat)
   - 域名：`china.gold.org`
 - [SPDR黄金ETF流量](https://sc.macromicro.me/collections/45/mm-gold-price/23274/gld-fund-flow)
 - [SPDR黄金ETF持仓量](https://sc.macromicro.me/collections/45/mm-gold-price/712/spdr-gold-trust-etf-gold-price)
@@ -407,9 +404,9 @@
   - 域名：`www.cmegroup.com`
 - [COT报告持仓](https://www.cmegroup.com/tools-information/quikstrike/commitment-of-traders.html?pid=40#cmeloginteaser1)
   - 域名：`www.cmegroup.com`
-- [黄金投资者研究|Chris Rutherglen博士|Substack](https://giresearch.substack.com/?utm_source=%2Fsearch%2FGold%2520Investor%2520Research&utm_medium=reader2&utm_campaign=reader2)
+- [黄金研究|Chris 博士|Substack](https://giresearch.substack.com/?utm_source=%2Fsearch%2FGold%2520Investor%2520Research&utm_medium=reader2&utm_campaign=reader2)
   - 域名：`giresearch.substack.com`
-- [期刊 - Incrementum](https://www.incrementum.li/en/journal/)
+- [期刊Incrementum](https://www.incrementum.li/en/journal/)
   - 域名：`www.incrementum.li`
 - [Gold Option Volume & Open Interest](https://www.cmegroup.com/markets/metals/precious/gold.volume.options.html#optionProductId=192)
   - 域名：`www.cmegroup.com`
@@ -427,7 +424,7 @@
   - 域名：`www.jiaoyifamen.com`
 - [国内商品期货各类数据- 奇货可查](https://x.qhkch.com/variety/position)
   - 域名：`x.qhkch.com`
-- [US - Crack Spread vs. Oil Price](https://en.macromicro.me/collections/19/mm-oil-price/4376/crude-oil-cracking-spread-vs-wti)
+- [US Crack Spread vs. Oil Price](https://en.macromicro.me/collections/19/mm-oil-price/4376/crude-oil-cracking-spread-vs-wti)
   - 域名：`en.macromicro.me`
 - [期货套利分析_跨期价差查询](https://www.1qh.cn/tools/spread.html)
   - 域名：`www.1qh.cn`
@@ -444,11 +441,11 @@
 
 - [金十数据-我的订阅](https://xnews.jin10.com/topic/group/my)
   - 域名：`xnews.jin10.com`
-- [Polymarket | The World's Largest Prediction Market](https://polymarket.com/)
+- [Polymarket](https://polymarket.com/)
   - 域名：`polymarket.com`
 - [很杂的分析](https://app.hedgeye.com/?)
   - 域名：`app.hedgeye.com`
-- [(28) Home / X](https://x.com/home)
+- [推特X](https://x.com/home)
   - 域名：`x.com`
 - [华尔街见闻](https://wallstreetcn.com/)
   - 域名：`wallstreetcn.com`
@@ -478,19 +475,17 @@
   - 域名：`flowus.cn`
 - [Investing.com](https://www.investing.com/)
   - 域名：`www.investing.com`
-- [路透社](https://www.reuters.com/)
-  - 域名：`www.reuters.com`
 - [MarketWatch：股市新闻](https://www.marketwatch.com/)
   - 域名：`www.marketwatch.com`
-- [《福布斯》](https://www.forbes.com/)
+- [福布斯](https://www.forbes.com/)
   - 域名：`www.forbes.com`
 - [慧博投研资讯](https://www.hibor.com.cn/)
   - 域名：`www.hibor.com.cn`
 - [世界监测 - 实时全球情报仪表盘](https://worldmonitor.app/?lat=8.0000&lon=0.0000&zoom=1.00&view=global&timeRange=7d&layers=conflicts%2Cbases%2Chotspots%2Cnuclear%2Csanctions%2Cweather%2Ceconomic%2Cwaterways%2Coutages%2Cmilitary%2Cnatural)
   - 域名：`worldmonitor.app`
-- [Polyglobe - 实时地缘政治市场情报 | PizzINT](https://www.pizzint.watch/polyglobe)
+- [Polyglobe-实时地缘情报](https://www.pizzint.watch/polyglobe)
   - 域名：`www.pizzint.watch`
-- [全球市场头条 |  路透社](https://www.reuters.com/markets/)
+- [全球市场头条|路透社](https://www.reuters.com/markets/)
   - 域名：`www.reuters.com`
 
 
@@ -532,7 +527,7 @@
   - 域名：`www.cboe.com`
 - [期权计算器](https://www.bybit.com/trade/option/usdt/pb/BTC)
   - 域名：`www.bybit.com`
-- [加密期权未平仓合约、成交量和隐含波动率图表](https://www.theblock.co/data/crypto-markets/options)
+- [加密期权成交量和IV图表](https://www.theblock.co/data/crypto-markets/options)
   - 域名：`www.theblock.co`
 - [sqzme股票数据的新视角](https://squeezemetrics.com/monitor)
   - 域名：`squeezemetrics.com`
@@ -551,17 +546,17 @@
   - 域名：`www.wolai.com`
 - [CSDN博客](https://blog.csdn.net/weixin_42219751/article/details/93621991)
   - 域名：`blog.csdn.net`
-- [bigquant:【历史文档】策略示例-期货策略-基于协整的跨期套利 v1.0](https://bigquant.com/wiki/doc/Tqrre7n7tb)
+- [bigquant-基于协整的跨期套利 v1.0](https://bigquant.com/wiki/doc/Tqrre7n7tb)
   - 域名：`bigquant.com`
 - [社区 - JoinQuant](https://www.joinquant.com/view/community/list?listType=1)
   - 域名：`www.joinquant.com`
 - [JoinQuant聚宽量化投研平台](https://www.joinquant.com/)
   - 域名：`www.joinquant.com`
-- [开源算法交易平台。 - QuantConnect.com](https://www.quantconnect.com/)
+- [开源算法交易平台QuantConnect.com](https://www.quantconnect.com/)
   - 域名：`www.quantconnect.com`
-- [优矿 - 大数据时代的量化投资 - 通联量化实验室](https://uqer.datayes.com/)
+- [优矿- 通联量化实验室](https://uqer.datayes.com/)
   - 域名：`uqer.datayes.com`
-- [labs - 知识库 - 优矿](https://uqer.datayes.com/labs/knowledge/%E4%BC%98%E7%9F%BF%E4%BA%A7%E5%93%81%E7%99%BD%E7%9A%AE%E4%B9%A6%2F%E9%87%8F%E5%8C%96%E6%8A%95%E8%B5%84%E5%8F%8A%E5%85%B6%E7%A0%94%E7%A9%B6%E6%96%B9%E6%B3%95.nb)
+- [优矿知识库](https://uqer.datayes.com/labs/knowledge/%E4%BC%98%E7%9F%BF%E4%BA%A7%E5%93%81%E7%99%BD%E7%9A%AE%E4%B9%A6%2F%E9%87%8F%E5%8C%96%E6%8A%95%E8%B5%84%E5%8F%8A%E5%85%B6%E7%A0%94%E7%A9%B6%E6%96%B9%E6%B3%95.nb)
   - 域名：`uqer.datayes.com`
 - [Tushare数据](https://tushare.pro/)
   - 域名：`tushare.pro`
@@ -571,8 +566,6 @@
   - 域名：`gallery.pyecharts.org`
 - [加密量化博主](https://substack.com/@unexpectedcorrelations)
   - 域名：`substack.com`
-- [Ptrade 量化交易 API接口文档](https://ptradeapi.com/)
-  - 域名：`ptradeapi.com`
 - [迅投-以思考的速度交易qmt-（官方）](https://www.thinktrader.net/)
   - 域名：`www.thinktrader.net`
 - [PandasAI简介 - PandasAI](https://docs.pandas-ai.com/v2/intro)
@@ -581,13 +574,13 @@
   - 域名：`quantpedia.com`
 - [「量化界」年度最受欢迎的10篇博客](https://mp.weixin.qq.com/s/CYZ7tPcNYxGr3pSVkd2NSQ)
   - 域名：`mp.weixin.qq.com`
-- [如何利用比特币隔夜交易获利？ - QuantPedia](https://quantpedia.com/how-to-profitably-trade-bitcoins-overnight-sessions/)
+- [如何利用比特币隔夜交易获利？-QuantPedia](https://quantpedia.com/how-to-profitably-trade-bitcoins-overnight-sessions/)
   - 域名：`quantpedia.com`
-- [我们应该在投资组合中分配多少比特币？ - QuantPedia](https://quantpedia.com/how-much-bitcoin-should-we-allocate-to-the-portfolio/)
+- [我们应该在投资组合中分配多少比特币？-QuantPedia](https://quantpedia.com/how-much-bitcoin-should-we-allocate-to-the-portfolio/)
   - 域名：`quantpedia.com`
-- [Chart.js Samples | Chart.js](https://www.chartjs.org/docs/latest/samples/information.html)
+- [Chart.js Samples|Chart.js](https://www.chartjs.org/docs/latest/samples/information.html)
   - 域名：`www.chartjs.org`
-- [Panda AI - 量变学院，可以agent交易](https://www.pandaai.online/)
+- [Panda AI ](https://www.pandaai.online/)
   - 域名：`www.pandaai.online`
 - [开源量化平台vnpy](https://www.vnpy.com/)
   - 域名：`www.vnpy.com`
@@ -599,7 +592,7 @@
   - 域名：`www.joinquant.com`
 - [自然语言即可回测：BackTest 量化策略平台](https://backtest.10jqka.com.cn/)
   - 域名：`backtest.10jqka.com.cn`
-- [解锁 AI 量化新境界：Qbot 携手 iTick - BigQuant量化交易](https://bigquant.com/wiki/doc/kq9FxV9GUg)
+- [BigQuant量化交易](https://bigquant.com/wiki/doc/kq9FxV9GUg)
   - 域名：`bigquant.com`
 - [量化自学：算法交易、量化交易、交易策略、回测与实施 | QuantStart](https://www.quantstart.com/)
   - 域名：`www.quantstart.com`
@@ -607,12 +600,6 @@
   - 域名：`blog.headlandstech.com`
 - [Aurora Gold Insight](https://aurora-gold-insight.pages.dev/#knowledge)
   - 域名：`aurora-gold-insight.pages.dev`
-- [BTCUSD 88,957.39 ▲ +0.25% 大类资产](https://cn.tradingview.com/chart/QlE64yj4/)
-  - 域名：`cn.tradingview.com`
-- [全球节假日日历 API，涵盖国家和宗教节日。](https://calendarific.com/)
-  - 域名：`calendarific.com`
-- [资费的参考资管平台](https://www.fmz.com/m/dashboard)
-  - 域名：`www.fmz.com`
 - [gitee](https://gitee.com/JavaLionLi/plus-ui)
   - 域名：`gitee.com`
 
@@ -623,7 +610,7 @@
 
 - [金工CTA系列之一：基于基本面多因子模型的黄金交易策略](https://bigquant.com/wiki/doc/oiVYuLosvU)
   - 域名：`bigquant.com`
-- [统计套利策略的五大主流策略分析与优缺点_copula函数的缺点](https://blog.csdn.net/zk168_net/article/details/107536782)
+- [统计套利策略的五大主流策略分析与优缺点_](https://blog.csdn.net/zk168_net/article/details/107536782)
   - 域名：`blog.csdn.net`
 - [跨期套利(期货) ](https://www.myquant.cn/docs/python_strategyies/107)
   - 域名：`www.myquant.cn`
@@ -657,3 +644,7 @@
   - 域名：`www.ivolatility.com`
 - [API- AllTick](https://alltick.co/#pricing)
   - 域名：`alltick.co`
+- [全球节假日日历 API，涵盖国家和宗教节日](https://calendarific.com/)
+  - 域名：`calendarific.com`
+- [Ptrade 量化交易 API接口文档](https://ptradeapi.com/)
+  - 域名：`ptradeapi.com`

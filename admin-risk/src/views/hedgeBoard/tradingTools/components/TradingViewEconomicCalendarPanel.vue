@@ -120,7 +120,6 @@
   <section class="macro-calendar-panel">
     <div class="macro-calendar-panel__header">
       <div>
-        <p class="macro-calendar-panel__eyebrow">Macro Calendar</p>
         <h3>宏观日历</h3>
       </div>
 

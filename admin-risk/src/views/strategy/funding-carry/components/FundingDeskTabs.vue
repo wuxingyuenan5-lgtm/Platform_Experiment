@@ -28,23 +28,25 @@
 <style scoped lang="less">
   .desk-tabs {
     display: inline-flex;
-    padding: 6px;
+    align-items: center;
+    padding: 4px;
     border: 1px solid var(--strategy-border);
-    border-radius: 16px;
-    background: rgba(255, 255, 255, 0.96);
-    box-shadow: var(--strategy-shadow);
-    gap: 4px;
+    border-radius: var(--strategy-radius-card);
+    background: var(--strategy-surface);
+    box-shadow: var(--strategy-shadow-soft);
+    gap: 6px;
 
     button {
-      min-width: 92px;
-      height: 40px;
-      padding: 0 16px;
+      min-width: 88px;
+      height: var(--strategy-tab-height);
+      padding: 0 18px;
       border: 0;
       border-radius: 12px;
       background: transparent;
-      color: var(--strategy-text-3);
-      font-size: 14px;
-      font-weight: 800;
+      color: var(--strategy-text-2);
+      font-size: var(--strategy-font-base);
+      font-weight: 700;
+      white-space: nowrap;
       cursor: pointer;
       transition: all 0.2s ease;
     }
@@ -52,7 +54,7 @@
     .is-active {
       background: var(--strategy-accent-soft);
       color: var(--strategy-accent-strong);
-      box-shadow: inset 0 0 0 1px rgba(201, 72, 72, 0.1);
+      box-shadow: inset 0 0 0 1px var(--strategy-accent-ring);
     }
   }
 </style>

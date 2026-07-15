@@ -45,15 +45,15 @@
   .capital-insight-board {
     display: grid;
     grid-template-columns: 1.05fr 1fr;
-    gap: 12px;
+    gap: var(--strategy-space-2);
   }
 
   .insight-card {
     padding: 18px 20px;
-    border-radius: 20px;
-    background: linear-gradient(180deg, var(--strategy-surface) 0%, var(--strategy-surface-soft) 100%);
+    border-radius: var(--strategy-radius-panel);
+    background: var(--strategy-surface);
     border: 1px solid var(--strategy-border);
-    box-shadow: var(--strategy-shadow);
+    box-shadow: var(--strategy-shadow-card);
   }
 
   .insight-card__header {
@@ -66,8 +66,8 @@
 
   .insight-card__header h3 {
     margin: 0;
-    font-size: 16px;
-    font-weight: 700;
+    font-size: var(--strategy-font-card-title);
+    font-weight: 800;
     color: var(--strategy-text-1);
   }
 
@@ -81,16 +81,17 @@
   .risk-item,
   .structure-item {
     padding: 14px 16px;
-    border-radius: 16px;
+    border-radius: var(--strategy-radius-card);
     background: var(--strategy-surface);
-    border: 1px solid var(--strategy-border);
+    border: 1px solid var(--strategy-border-strong);
+    box-shadow: var(--strategy-shadow-soft);
   }
 
   .risk-item label,
   .structure-item label {
     display: block;
     color: var(--strategy-text-3);
-    font-size: 12px;
+    font-size: var(--strategy-font-xs);
     font-weight: 700;
   }
 
@@ -100,6 +101,7 @@
     margin-top: 10px;
     font-size: 22px;
     line-height: 1.12;
+    font-weight: 800;
     color: var(--strategy-text-1);
   }
 

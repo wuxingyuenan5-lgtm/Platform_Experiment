@@ -211,7 +211,7 @@
       width: 100%;
       height: 54px;
       padding: 0 14px;
-      border: 1px solid rgba(201, 164, 95, 0.14);
+      border: 1px solid rgba(180, 196, 214, 0.38);
       border-radius: 16px;
       background: rgba(255, 255, 255, 0.82);
       overflow: hidden;

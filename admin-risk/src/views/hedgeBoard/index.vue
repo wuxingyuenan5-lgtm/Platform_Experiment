@@ -1,17 +1,11 @@
 ﻿<template>
   <PageWrapper :title="pageTitle">
     <div class="hedge-board">
-      <nav class="hedge-board__tabs" aria-label="对冲基金看板导航">
-        <RouterLink
-          v-for="item in hedgeBoardNav"
-          :key="item.id"
-          :to="item.path"
-          class="hedge-board__tab"
-          :class="{ 'is-active': item.id === activeCategory }"
-        >
-          <span>{{ item.label }}</span>
-        </RouterLink>
-      </nav>
+      <section class="strategy-top-toolbar">
+        <div class="strategy-top-toolbar__left">
+          <CompactSegmentTabs :items="hedgeBoardTabs" :model-value="activeCategory" @update:modelValue="selectBoardCategory" />
+        </div>
+      </section>
 
       <MarketTerminalPage
         v-if="isTerminalCategory && activeTerminalConfig"
@@ -40,7 +34,6 @@
               <span>核心公式</span>
               <strong>{{ activeModule.formula.title }}</strong>
             </div>
-            <p>{{ activeModule.formula.description }}</p>
           </div>
 
           <section
@@ -54,7 +47,6 @@
               <div>
                 <h4>{{ getSectionTitle(section.id, section.title) }}</h4>
               </div>
-              <p>{{ getSectionDescription(section.id, section.description) }}</p>
             </div>
 
             <div class="widget-grid" :class="`widget-grid--${section.layout ?? 'three'}`">
@@ -66,9 +58,6 @@
                 <div v-if="!shouldHideWidgetHeader(section.id, widget)" class="widget-card__header">
                   <div class="widget-card__header-main">
                     <div class="widget-card__title-row">
-                      <span class="widget-card__index">
-                        {{ getWidgetSubtitle(widget.localKey, widget.subtitle) }}
-                      </span>
                       <h5>{{ getWidgetTitle(widget.localKey, widget.title) }}</h5>
                     </div>
                     <a
@@ -94,6 +83,20 @@
             </div>
           </section>
         </section>
+
+        <section v-if="activeTradingToolCatalog" class="hedge-board__tool-board">
+          <div class="hedge-board__tool-board-head">
+            <h3>{{ activeTradingToolCatalog.title }}</h3>
+          </div>
+
+          <div class="hedge-board__tool-board-body">
+            <ToolGroupSection
+              v-for="group in activeTradingToolCatalog.groups"
+              :key="group.id"
+              :group="group"
+            />
+          </div>
+        </section>
       </div>
     </div>
   </PageWrapper>
@@ -113,9 +116,11 @@
     useSlots,
     watch,
   } from 'vue';
-  import { RouterLink, useRoute } from 'vue-router';
+  import { useRoute, useRouter } from 'vue-router';
   import { PageWrapper } from '@/components/Page';
+  import CompactSegmentTabs from '@/views/strategy/shared/CompactSegmentTabs.vue';
   import MarketTerminalPage from './components/MarketTerminalPage.vue';
+  import ToolGroupSection from './tradingTools/components/ToolGroupSection.vue';
   import TerminalDetailPanel from './components/TerminalDetailPanel.vue';
   import {
     researchModules,
@@ -128,6 +133,7 @@
     marketTerminalConfigs,
     type TerminalMarketId,
   } from './nativeData/marketTerminal';
+  import { tradingToolBoardCatalogMap } from './tradingTools/data/catalog';
 
   type HedgeCategory = 'macro' | 'gold' | 'crypto' | 'us' | 'global' | 'aShare';
 
@@ -278,6 +284,7 @@
   ];
 
   const route = useRoute();
+  const router = useRouter();
 
   const moduleRoutes: Record<HedgeCategory, string> = {
     macro: '/hedge-board/macro',
@@ -291,53 +298,46 @@
   const hedgeBoardNav: Array<{
     id: HedgeCategory;
     label: string;
-    eyebrow: string;
     path: string;
-    description: string;
   }> = [
     {
       id: 'macro',
       label: '宏观',
-      eyebrow: 'Macro',
       path: moduleRoutes.macro,
-      description: '流动性、通胀、利率与跨资产环境。',
     },
     {
       id: 'gold',
       label: '商品',
-      eyebrow: 'Commodities',
       path: moduleRoutes.gold,
-      description: '贵金属、能源、ETF 资金面与比价结构。',
     },
     {
       id: 'crypto',
       label: '加密',
-      eyebrow: 'Crypto',
       path: moduleRoutes.crypto,
-      description: 'BTC 主图、扩散结构与高 beta 风险偏好。',
     },
     {
       id: 'us',
       label: '美股',
-      eyebrow: 'US',
       path: moduleRoutes.us,
-      description: '复刻 MarketGrep 的温度终端与活跃度结构。',
     },
     {
       id: 'aShare',
       label: 'A股',
-      eyebrow: 'A-Share',
       path: moduleRoutes.aShare,
-      description: '沿用同一终端壳，重排为 A 股语境。',
     },
     {
       id: 'global',
       label: '全球',
-      eyebrow: 'Global',
       path: moduleRoutes.global,
-      description: '区域风险偏好、发达市场与新兴市场分化。',
     },
   ];
+
+  const hedgeBoardTabs = computed(() =>
+    hedgeBoardNav.map((item) => ({
+      key: item.id,
+      label: item.label,
+    })),
+  );
 
   const activeCategory = computed<HedgeCategory>(() => {
     const routeName = String(route.name ?? '');
@@ -378,6 +378,12 @@
   const activeModule = computed<ResearchModule>(
     () => researchModules.find((module) => module.id === activeCategory.value) ?? researchModules[0],
   );
+  const activeTradingToolCatalog = computed(() => {
+    if (activeCategory.value === 'macro') return tradingToolBoardCatalogMap.macro;
+    if (activeCategory.value === 'gold') return tradingToolBoardCatalogMap.gold;
+    if (activeCategory.value === 'crypto') return tradingToolBoardCatalogMap.crypto;
+    return null;
+  });
   const useUnifiedResearchUi = computed(() => true);
   const visibleSections = computed(() => activeModule.value.sections);
 
@@ -402,76 +408,47 @@
     });
   }
 
-  const sectionLabelOverrides: Record<string, { eyebrow?: string; title?: string; description?: string }> = {
+  const sectionLabelOverrides: Record<string, { title?: string }> = {
     'gold-flows': {
-      eyebrow: '资金面',
       title: 'ETF与资金面',
-      description: '',
     },
     'gold-central-bank': {
-      eyebrow: '官方部门',
       title: '央行购金',
-      description: '',
     },
     'gold-main': {
-      eyebrow: '价格',
       title: '黄金主图',
-      description: '',
     },
     'gold-rates': {
-      eyebrow: '利率与通胀',
       title: '利率与通胀',
-      description: '',
     },
     'crypto-etf': {
       title: '加密资金面',
-      description: '',
     },
   };
 
-  const widgetTextOverrides: Record<string, { title?: string; subtitle?: string; sourceNote?: string }> = {
+  const widgetTextOverrides: Record<string, { title?: string }> = {
     'etf-weekly-flows': {
       title: '全球各地区ETF每周流入',
-      subtitle: '',
-      sourceNote: '',
     },
     'etf-ytd-summary': {
       title: '全球 ETF 年内汇总',
-      subtitle: '',
-      sourceNote: '',
     },
     'spdr-daily-flow': {
       title: '金价 vs SPDR 每日流量',
-      subtitle: '',
-      sourceNote: '',
     },
     'spdr-holdings-vs-price': {
       title: 'SPDR 持仓量 vs 黄金价格',
-      subtitle: '',
-      sourceNote: '',
     },
     'central-bank-holders': {
       title: '官方黄金储备前十',
-      subtitle: '',
-      sourceNote: '',
     },
     'central-bank-buyers': {
       title: '近一年持续增持的央行',
-      subtitle: '',
-      sourceNote: '',
     },
   };
 
-  function getSectionEyebrow(sectionId: string, fallback: string) {
-    return sectionLabelOverrides[sectionId]?.eyebrow ?? fallback;
-  }
-
   function getSectionTitle(sectionId: string, fallback: string) {
     return sectionLabelOverrides[sectionId]?.title ?? fallback;
-  }
-
-  function getSectionDescription() {
-    return '';
   }
 
   const widgetSourceLinks: Partial<Record<string, string>> = {
@@ -485,22 +462,21 @@
     return widgetTextOverrides[localKey]?.title ?? fallback;
   }
 
-  function getWidgetSubtitle() {
-    return '';
-  }
-
   function getWidgetSourceLink(localKey: string | undefined) {
     if (!localKey) return '';
     return widgetSourceLinks[localKey] ?? '';
   }
 
+  function selectBoardCategory(key: string) {
+    const nextPath = moduleRoutes[key as HedgeCategory];
+    if (nextPath) {
+      router.push(nextPath);
+    }
+  }
+
   function shouldHideWidgetHeader(sectionId: string, widget: WidgetConfig) {
     if (sectionId === 'macro-liquidity' || sectionId === 'gold-main' || sectionId === 'crypto-main') return true;
     return widget.kind === 'local-chart' && widget.localKey?.includes('market-detail-table');
-  }
-
-  function getWidgetSourceNote() {
-    return '';
   }
 
   function jumpToSection(sectionId: string) {
@@ -2180,6 +2156,8 @@
     },
   });
 
+  void [LOCAL_MARKET_DETAIL_TABLES, GroupedBarChart, SnapshotDetailTable];
+
   function mergeGoldWithSeries(key: 'nominal10Y' | 'real10Y' | 'breakeven10Y'): DualChartRow[] {
     const goldMap = new Map<string, number>(
       marketData.spdr.history.map((point) => [point.date as string, point.goldPrice]),
@@ -2214,7 +2192,7 @@
     const goldMap = new Map<string, number>(
       marketData.spdr.history.map((point) => [point.date as string, point.goldPrice]),
     );
-    let latestKnownGold = marketData.spot.price;
+    let latestKnownGold: number = marketData.spot.price;
 
     return marketData.etf.weeklyFlows.map((row) => {
       const date = String(row.date);
@@ -2371,38 +2349,12 @@
 </script>
 
 <style lang="less" scoped>
+  @import '../strategy/shared/strategy-theme.less';
+
   .hedge-board {
     display: flex;
     flex-direction: column;
     gap: 16px;
-  }
-
-  .hedge-board__tabs {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
-  }
-
-  .hedge-board__tab {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-width: 78px;
-    padding: 10px 16px;
-    border: 1px solid var(--hedge-cool-border);
-    border-radius: 999px;
-    background: rgba(247, 251, 253, 0.94);
-    color: #54636a;
-    font-size: 13px;
-    font-weight: 700;
-    transition: all 0.2s ease;
-  }
-
-  .hedge-board__tab.is-active {
-    border-color: rgba(22, 93, 255, 0.2);
-    background: var(--hedge-cool-text);
-    color: #fff;
-    box-shadow: 0 10px 24px rgba(23, 50, 45, 0.12);
   }
 
   .terminal-page {
@@ -2530,6 +2482,28 @@
     flex-direction: column;
     gap: 16px;
     min-width: 0;
+  }
+
+  .hedge-board__tool-board {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    padding: 8px 0 0;
+  }
+
+  .hedge-board__tool-board-head h3 {
+    margin: 0;
+    color: var(--hedge-cool-text);
+    font-size: 24px;
+    line-height: 1.25;
+    font-weight: 800;
+    letter-spacing: 0.01em;
+  }
+
+  .hedge-board__tool-board-body {
+    display: flex;
+    flex-direction: column;
+    gap: 28px;
   }
 
   .platform-topbar,
@@ -2704,8 +2678,6 @@
 
   .module-heading__lead,
   .module-heading__summary p,
-  .chart-section__heading p,
-  .widget-card__header p,
   .widget-card__footer,
   .chart-caption {
     color: var(--hedge-cool-muted);
@@ -2809,13 +2781,6 @@
     font-size: 18px;
   }
 
-  .formula-strip p {
-    margin: 0;
-    color: var(--hedge-cool-muted);
-    font-size: 14px;
-    line-height: 1.9;
-  }
-
   .chart-section__heading {
     display: flex;
     align-items: flex-end;
@@ -2827,11 +2792,6 @@
   .chart-section__heading h4 {
     margin-top: 0;
     font-size: 28px;
-  }
-
-  .chart-section__heading p {
-    max-width: 720px;
-    margin: 0;
   }
 
   .widget-grid {
@@ -2907,18 +2867,8 @@
     line-height: 1.3;
   }
 
-  .widget-card__index,
   .widget-card__footer {
     margin: 8px 0 0;
-  }
-
-  .widget-card__index {
-    margin: 0;
-    color: var(--hedge-cool-text);
-    font-size: 18px;
-    font-weight: 700;
-    line-height: 1.3;
-    letter-spacing: 0.01em;
   }
 
   .widget-card__footer {
@@ -3414,12 +3364,6 @@
     font-weight: 700;
   }
 
-  .chart-section--gold .widget-card__header p {
-    max-width: 920px;
-    color: var(--hedge-cool-muted);
-    line-height: 1.75;
-  }
-
   .terminal-page--gold {
     display: block;
   }
@@ -3489,11 +3433,6 @@
   }
 
   .chart-section--gold .widget-card__header h5 {
-    font-size: 17px;
-    letter-spacing: 0.01em;
-  }
-
-  .chart-section--gold .widget-card__index {
     font-size: 17px;
     letter-spacing: 0.01em;
   }
@@ -3792,19 +3731,6 @@
     --hedge-cool-accent: #35586e;
   }
 
-  .hedge-board__tab {
-    border-color: var(--hedge-cool-border);
-    background: var(--hedge-cool-pill);
-    color: var(--hedge-cool-muted);
-  }
-
-  .hedge-board__tab.is-active {
-    border-color: rgba(79, 114, 140, 0.4);
-    background: linear-gradient(135deg, #183844, #35586e);
-    color: #fff;
-    box-shadow: 0 14px 30px rgba(24, 56, 68, 0.16);
-  }
-
   .strategy-sidebar,
   .platform-topbar,
   .hero-panel,
@@ -3841,12 +3767,9 @@
   .strategy-sidebar__intro p,
   .module-heading__lead,
   .module-heading__summary p,
-  .chart-section__heading p,
-  .widget-card__header p,
   .widget-card__footer,
   .chart-caption,
-  .platform-topbar__title span,
-  .formula-strip p {
+  .platform-topbar__title span {
     color: var(--hedge-cool-muted);
   }
 
@@ -3900,10 +3823,6 @@
 
   .chart-section--gold .chart-section__heading .eyebrow {
     color: var(--hedge-cool-accent);
-  }
-
-  .chart-section--gold .widget-card__header p {
-    color: var(--hedge-cool-muted);
   }
 
   @media (max-width: 1280px) {
@@ -3974,10 +3893,6 @@
   }
 
   @media (max-width: 768px) {
-    .hedge-board__tabs {
-      gap: 8px;
-    }
-
     .platform-topbar,
     .hero-panel,
     .module-subnav,

@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "strict": false,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false
+  },
+  "include": [
+    "vite.config.ts",
+    "internal/**/*.ts",
+    "src/design/**/*.ts",
+    "src/design/**/*.d.ts",
+    "src/design/**/*.vue",
+    "src/hooks/web/useECharts.ts",
+    "src/layouts/default/menu/**/*.vue",
+    "src/components/Loading/**/*.vue",
+    "src/components/SimpleMenu/**/*.vue",
+    "src/components/SimpleMenu/**/*.ts",
+    "src/views/hedgeBoard/**/*.ts",
+    "src/views/hedgeBoard/**/*.vue",
+    "src/views/landing/**/*.ts",
+    "src/views/landing/**/*.vue",
+    "src/views/newsCalendar/**/*.ts",
+    "src/views/newsCalendar/**/*.vue",
+    "src/views/platform/**/*.ts",
+    "src/views/platform/**/*.vue",
+    "src/views/strategy/**/*.ts",
+    "src/views/strategy/**/*.vue",
+    "types/**/*.d.ts",
+    "types/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "**/*.js",
+    "src/router/helper/routeHelper.ts",
+    "src/store/modules/multipleTab.ts",
+    "src/store/modules/permission.ts",
+    "src/store/modules/user.ts",
+    "src/utils/http/axios/axiosRetry.ts"
+  ]
+}

@@ -83,12 +83,12 @@
 <script setup lang="ts">
   import { computed, nextTick, onMounted, ref, watch, type Ref } from 'vue';
   import { useECharts } from '@/hooks/web/useECharts';
-  import type { FundingAssetResearch, FundingExchange, FundingSymbol } from '../types';
+  import type { FundingAssetResearch, FundingExchange, FundingMarketRange, FundingSymbol } from '../types';
 
   const props = defineProps<{
     exchange: FundingExchange;
     symbol: FundingSymbol;
-    selectedRange: 'current' | '7d' | '30d';
+    selectedRange: FundingMarketRange;
     resolution: string;
     startDate: string;
     endDate: string;
@@ -325,11 +325,11 @@
 
 <style scoped lang="less">
   .detail-panel {
-    padding: 24px;
-    border: 1px solid rgba(134, 115, 87, 0.12);
-    border-radius: 18px;
-    background: rgba(255, 255, 255, 0.86);
-    box-shadow: 0 16px 36px rgba(94, 76, 52, 0.06);
+    padding: var(--strategy-space-5);
+    border: 1px solid var(--strategy-border);
+    border-radius: var(--strategy-radius-panel);
+    background: var(--strategy-surface);
+    box-shadow: var(--strategy-shadow-card);
   }
 
   .chart-toolbar h3,
@@ -337,7 +337,8 @@
     margin: 0;
     color: var(--strategy-text-1);
     font-family: var(--strategy-font-sans);
-    font-weight: 900;
+    font-size: 16px;
+    font-weight: 800;
   }
 
   .compact-shell {
@@ -349,10 +350,11 @@
 
   .chart-card,
   .table-card {
-    padding: 20px;
+    padding: var(--strategy-space-4);
     border: 1px solid var(--strategy-border);
-    border-radius: 18px;
+    border-radius: var(--strategy-radius-panel);
     background: var(--strategy-surface);
+    box-shadow: var(--strategy-shadow-soft);
   }
 
   .chart-grid,
@@ -384,13 +386,14 @@
   .data-table td {
     padding: 12px 10px;
     text-align: left;
-    border-bottom: 1px solid rgba(134, 115, 87, 0.08);
-    font-size: 13px;
+    border-bottom: 1px solid var(--strategy-border-soft);
+    font-size: var(--strategy-font-sm);
   }
 
   .data-table th {
-    color: rgba(36, 29, 21, 0.56);
+    color: var(--strategy-text-3);
     font-weight: 700;
+    background: var(--strategy-table-head-bg);
   }
 
   .tone-positive {

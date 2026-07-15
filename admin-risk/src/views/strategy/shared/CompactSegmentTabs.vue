@@ -1,5 +1,5 @@
 <template>
-  <div class="segment-tabs">
+  <div class="segment-tabs compact-segment-tabs">
     <button
       v-for="item in items"
       :key="item.key"
@@ -27,31 +27,32 @@
   .segment-tabs {
     display: inline-flex;
     align-items: center;
-    gap: 7px;
+    gap: 6px;
     padding: 5px;
     border: 1px solid var(--strategy-border);
-    border-radius: 12px;
-    background: rgba(255, 255, 255, 0.97);
+    border-radius: var(--strategy-radius-card);
+    background: var(--strategy-surface);
     box-shadow: var(--strategy-shadow);
   }
 
   .segment-tabs button {
-    min-width: 94px;
-    height: 38px;
-    padding: 0 18px;
+    min-width: 88px;
+    height: var(--strategy-tab-height);
+    padding: 0 16px;
     border: none;
-    border-radius: 10px;
+    border-radius: var(--strategy-radius-control);
     background: transparent;
     color: var(--strategy-text-3);
-    font-size: 13px;
-    font-weight: 800;
+    font-size: var(--strategy-font-base);
+    font-weight: 700;
     cursor: pointer;
     transition: all 0.2s ease;
+    white-space: nowrap;
   }
 
   .segment-tabs button.is-active {
     background: var(--strategy-accent-soft);
     color: var(--strategy-accent-strong);
-    box-shadow: inset 0 0 0 1px rgba(201, 72, 72, 0.12);
+    box-shadow: inset 0 0 0 1px var(--strategy-accent-ring);
   }
 </style>

@@ -1,6 +1,8 @@
 .spread-page,
 .funding-page,
-.strategy-management-page {
+.platform-page,
+.strategy-management-page,
+.hedge-board {
   --strategy-font-sans:
     'Segoe UI Variable Text',
     'PingFang SC',
@@ -25,8 +27,10 @@
   --strategy-surface-soft: #fdfefe;
   --strategy-surface-muted: #f5f8fc;
   --strategy-surface-selected: #f4f7fb;
+  --strategy-table-head-bg: #f7f9fc;
   --strategy-border: #e5ebf3;
   --strategy-border-strong: #d7e0ec;
+  --strategy-border-soft: #edf2f7;
   --strategy-text-1: #13243d;
   --strategy-text-2: #2f3e52;
   --strategy-text-3: #485667;
@@ -34,6 +38,7 @@
   --strategy-accent: #da5b5b;
   --strategy-accent-strong: #c94848;
   --strategy-accent-soft: #fbf2f2;
+  --strategy-accent-ring: rgba(201, 72, 72, 0.14);
   --strategy-success: #189b50;
   --strategy-success-soft: #ecf8f0;
   --strategy-danger: #df4d4d;
@@ -41,29 +46,102 @@
   --strategy-warning: #b9802f;
   --strategy-warning-soft: #f8f4ec;
   --strategy-shadow: 0 10px 24px rgba(17, 34, 68, 0.045);
+  --strategy-shadow-soft: 0 1px 2px rgba(148, 163, 184, 0.08);
+  --strategy-shadow-card: 0 8px 24px rgba(15, 23, 42, 0.04);
+  --strategy-radius-control: 10px;
+  --strategy-radius-card: 16px;
+  --strategy-radius-panel: 20px;
+  --strategy-space-1: 8px;
+  --strategy-space-2: 12px;
+  --strategy-space-3: 16px;
+  --strategy-space-4: 20px;
+  --strategy-space-5: 24px;
+  --strategy-font-xs: 12px;
+  --strategy-font-sm: 13px;
+  --strategy-font-base: 14px;
+  --strategy-font-card-title: 15px;
+  --strategy-font-section-title: 18px;
+  --strategy-font-page-title: 20px;
+  --strategy-control-height: 34px;
+  --strategy-tab-height: 34px;
+}
+
+.strategy-top-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 12px;
+  border: 1px solid var(--strategy-border);
+  border-radius: var(--strategy-radius-panel);
+  background: var(--strategy-surface);
+  box-shadow: var(--strategy-shadow-card);
+}
+
+.strategy-top-toolbar__left {
+  display: flex;
+  align-items: center;
+}
+
+.strategy-top-toolbar__meta {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.strategy-control-button {
+  height: var(--strategy-control-height);
+  padding: 0 var(--strategy-space-2);
+  border: 1px solid var(--strategy-border-strong);
+  border-radius: var(--strategy-radius-control);
+  background: var(--strategy-surface);
+  color: var(--strategy-text-2);
+  font-size: var(--strategy-font-base);
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: var(--strategy-shadow-soft);
+}
+
+.strategy-card-title {
+  color: var(--strategy-text-1);
+  font-size: var(--strategy-font-card-title);
+  font-weight: 800;
 }
 
 .spread-page,
 .funding-page,
+.platform-page,
 .strategy-management-page,
+.hedge-board,
 .spread-page button,
 .funding-page button,
+.platform-page button,
 .strategy-management-page button,
+.hedge-board button,
 .spread-page input,
 .funding-page input,
+.platform-page input,
 .strategy-management-page input,
+.hedge-board input,
 .spread-page select,
 .funding-page select,
+.platform-page select,
 .strategy-management-page select,
+.hedge-board select,
 .spread-page textarea,
 .funding-page textarea,
-.strategy-management-page textarea {
+.platform-page textarea,
+.strategy-management-page textarea,
+.hedge-board textarea {
   font-family: var(--strategy-font-sans);
 }
 
 .spread-page,
 .funding-page,
-.strategy-management-page {
+.platform-page,
+.strategy-management-page,
+.hedge-board {
   color: var(--strategy-text-1);
   font-size: 14px;
   line-height: 1.55;
@@ -71,4 +149,58 @@
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   font-feature-settings: 'kern' 1, 'tnum' 1;
+}
+
+.spread-page select,
+.funding-page select,
+.platform-page select,
+.strategy-management-page select,
+.hedge-board select,
+.spread-page input[type='date'],
+.funding-page input[type='date'],
+.platform-page input[type='date'],
+.strategy-management-page input[type='date'],
+.hedge-board input[type='date'],
+.spread-page input[type='text'],
+.funding-page input[type='text'],
+.platform-page input[type='text'],
+.strategy-management-page input[type='text'],
+.hedge-board input[type='text'] {
+  border: 1px solid var(--strategy-border-strong);
+  border-radius: var(--strategy-radius-control);
+  background: var(--strategy-surface);
+  color: var(--strategy-text-1);
+  font-size: var(--strategy-font-base);
+  font-weight: 700;
+  outline: none;
+  box-shadow: var(--strategy-shadow-soft);
+}
+
+.spread-page select,
+.funding-page select,
+.platform-page select,
+.strategy-management-page select,
+.hedge-board select {
+  min-height: var(--strategy-control-height);
+  cursor: pointer;
+}
+
+.spread-page input[type='date'],
+.funding-page input[type='date'],
+.platform-page input[type='date'],
+.strategy-management-page input[type='date'],
+.hedge-board input[type='date'] {
+  min-height: var(--strategy-control-height);
+  padding: 0 var(--strategy-space-2);
+}
+
+@media (max-width: 980px) {
+  .strategy-top-toolbar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .strategy-top-toolbar__meta {
+    justify-content: flex-start;
+  }
 }

@@ -295,14 +295,14 @@
 
   async function renderChart() {
     if (!selectedRow.value) return;
-    const series = [];
+    const series: any[] = [];
     if (visibleSeries.value.includes('funding')) {
       series.push({
         name: '持仓加权费率',
         type: 'bar',
         barWidth: 14,
         itemStyle: {
-          color: (params) => (params.data >= 0 ? '#34d399' : '#fb7185'),
+          color: (params: any) => (Number(params?.data ?? params?.value ?? 0) >= 0 ? '#34d399' : '#fb7185'),
         },
         data: selectedRow.value.chart.funding,
       });

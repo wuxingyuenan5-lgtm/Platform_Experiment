@@ -15,7 +15,7 @@
   .curve-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
-    gap: 16px;
+    gap: var(--strategy-space-2);
     align-items: stretch;
   }
   @media (max-width: 1320px) {

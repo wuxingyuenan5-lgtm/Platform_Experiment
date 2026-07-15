@@ -163,7 +163,7 @@
           barWidth: 14,
           itemStyle: {
             borderRadius: [4, 4, 0, 0],
-            color: (params: { value: number }) => (params.value >= 0 ? '#5cc548' : '#ee6f70'),
+            color: (params: any) => (Number(params?.value ?? params?.data ?? 0) >= 0 ? '#5cc548' : '#ee6f70'),
           },
           data: profile.value.dailyReturns,
         },
@@ -177,7 +177,7 @@
           areaStyle: { color: 'rgba(90, 167, 239, 0.08)' },
           data: profile.value.netValues,
         },
-      ],
+      ] as any,
     });
     await nextTick();
     resize();
@@ -250,7 +250,7 @@
 <style scoped lang="less">
   .pnl-panel {
     display: grid;
-    gap: 12px;
+    gap: var(--strategy-space-2);
   }
 
   .pnl-overview-card,
@@ -259,14 +259,14 @@
   .detail-curve-card,
   .breakdown-curve-card,
   .leg-snapshot-card {
-    background: linear-gradient(180deg, var(--strategy-surface) 0%, var(--strategy-surface-soft) 100%);
+    background: var(--strategy-surface);
     border: 1px solid var(--strategy-border);
-    box-shadow: var(--strategy-shadow);
+    box-shadow: var(--strategy-shadow-card);
   }
 
   .pnl-overview-card {
     padding: 18px 20px 12px;
-    border-radius: 8px;
+    border-radius: var(--strategy-radius-panel);
   }
 
   .pnl-overview-header {
@@ -279,7 +279,7 @@
   .pnl-overview-header h3 {
     margin: 0;
     color: var(--strategy-text-1);
-    font-size: 18px;
+    font-size: var(--strategy-font-section-title);
     font-weight: 800;
   }
 
@@ -289,12 +289,12 @@
     gap: 12px;
     margin-top: 10px;
     color: var(--strategy-text-2);
-    font-size: 12px;
+    font-size: var(--strategy-font-xs);
     font-weight: 700;
   }
 
   .pnl-meta em {
-    color: #b1782d;
+    color: var(--strategy-accent-strong);
     font-style: normal;
   }
 
@@ -306,30 +306,35 @@
   }
 
   .period-tabs {
-    display: flex;
-    overflow: hidden;
+    display: inline-flex;
+    gap: 6px;
+    padding: 5px;
     border: 1px solid var(--strategy-border);
-    border-radius: 8px;
+    border-radius: var(--strategy-radius-card);
+    background: var(--strategy-surface);
+    box-shadow: var(--strategy-shadow-soft);
   }
 
   .period-tabs button,
   .legend-pill {
-    height: 36px;
-    border: 0;
-    background: var(--strategy-surface);
-    color: var(--strategy-text-2);
-    font-size: 13px;
+    height: var(--strategy-control-height);
+    border: none;
+    background: transparent;
+    color: var(--strategy-text-3);
+    font-size: var(--strategy-font-base);
     font-weight: 700;
   }
 
   .period-tabs button {
     min-width: 58px;
     padding: 0 14px;
+    border-radius: var(--strategy-radius-control);
   }
 
   .period-tabs button.is-active {
-    background: rgba(207, 63, 79, 0.08);
-    color: var(--strategy-danger);
+    background: var(--strategy-accent-soft);
+    color: var(--strategy-accent-strong);
+    box-shadow: inset 0 0 0 1px var(--strategy-accent-ring);
   }
 
   .legend-pill {
@@ -338,7 +343,9 @@
     gap: 8px;
     padding: 0 12px;
     border: 1px solid var(--strategy-border);
-    border-radius: 8px;
+    border-radius: var(--strategy-radius-control);
+    background: var(--strategy-surface);
+    box-shadow: var(--strategy-shadow-soft);
   }
 
   .legend-pill span {
@@ -365,7 +372,7 @@
   .detail-curve-grid {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 12px;
+    gap: var(--strategy-space-2);
   }
 
   .metric-grid {
@@ -383,7 +390,7 @@
   .metric-card,
   .attribution-card,
   .detail-curve-card {
-    border-radius: 8px;
+    border-radius: var(--strategy-radius-card);
   }
 
   .metric-card,
@@ -391,12 +398,13 @@
     display: grid;
     gap: 10px;
     padding: 16px;
+    box-shadow: var(--strategy-shadow-soft);
   }
 
   .metric-card label,
   .attribution-card label {
     color: var(--strategy-text-3);
-    font-size: 12px;
+    font-size: var(--strategy-font-xs);
     font-weight: 700;
   }
 
@@ -409,7 +417,7 @@
 
   .metric-card span,
   .attribution-card span {
-    font-size: 13px;
+    font-size: var(--strategy-font-base);
     font-weight: 800;
   }
 
@@ -427,13 +435,13 @@
 
   .breakdown-curve-card {
     padding: 16px 16px 8px;
-    border-radius: 8px;
+    border-radius: var(--strategy-radius-panel);
   }
 
   .breakdown-curve-header h3 {
     margin: 0 0 8px;
     color: var(--strategy-text-1);
-    font-size: 18px;
+    font-size: var(--strategy-font-card-title);
     font-weight: 800;
   }
 
@@ -444,13 +452,13 @@
   .leg-snapshot-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 12px;
+    gap: var(--strategy-space-2);
   }
 
   .leg-snapshot-card {
     display: grid;
     padding: 16px;
-    border-radius: 8px;
+    border-radius: var(--strategy-radius-panel);
     gap: 12px;
   }
 
@@ -464,19 +472,19 @@
   .leg-snapshot-card h3 {
     margin: 0;
     color: var(--strategy-text-1);
-    font-size: 18px;
+    font-size: var(--strategy-font-card-title);
     font-weight: 800;
   }
 
   .leg-snapshot-card span,
   .leg-snapshot-card strong {
     color: var(--strategy-text-3);
-    font-size: 12px;
+    font-size: var(--strategy-font-xs);
     font-weight: 700;
   }
 
   .leg-snapshot-card strong {
-    color: #5a98f2;
+    color: var(--strategy-accent-strong);
   }
 
   .leg-snapshot-card dl {
@@ -489,7 +497,7 @@
     justify-content: space-between;
     gap: 16px;
     padding: 12px 0;
-    border-bottom: 1px solid var(--strategy-border);
+    border-bottom: 1px solid var(--strategy-border-soft);
   }
 
   .leg-snapshot-card dt {

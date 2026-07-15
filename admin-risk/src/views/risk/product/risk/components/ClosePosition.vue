@@ -12,7 +12,7 @@
         <div
           v-for="item in symbolOptions"
           :key="item.value"
-          class="flex justify-between leading-10 hover:bg-#fafafa"
+          class="flex justify-between leading-10 hover:bg-#f4f8fb"
         >
           <div>{{ item.label }}</div>
           <div>

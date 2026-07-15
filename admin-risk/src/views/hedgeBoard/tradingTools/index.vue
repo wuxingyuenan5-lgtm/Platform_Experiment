@@ -3,7 +3,6 @@
   import { useRoute, RouterLink } from 'vue-router';
   import { PageWrapper } from '@/components/Page';
   import ToolGroupSection from './components/ToolGroupSection.vue';
-  import { cryptoToolGroups, cryptoToolPageMeta } from './data/cryptoTools';
   import {
     tradingToolCategoryMap,
     type TradingToolCategoryId,
@@ -31,13 +30,9 @@
 
   const activeCategory = computed(() => tradingToolCategoryMap[activeCategoryId.value]);
 
-  const displayTitle = computed(() =>
-    activeCategoryId.value === 'crypto' ? cryptoToolPageMeta.title : activeCategory.value.title,
-  );
+  const displayTitle = computed(() => activeCategory.value.title);
 
-  const activeGroups = computed(() =>
-    activeCategoryId.value === 'crypto' ? cryptoToolGroups : activeCategory.value.groups,
-  );
+  const activeGroups = computed(() => activeCategory.value.groups);
 
   const pageTitle = computed(
     () => `\u5bf9\u51b2\u57fa\u91d1\u770b\u677f / ${displayTitle.value}`,

@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noUnusedLocals": false,
+    "noUnusedParameters": false
+  },
+  "include": [
+    "src/views/strategy/shared/**/*.ts",
+    "src/views/strategy/shared/**/*.vue",
+    "src/views/strategy/funding-carry/**/*.ts",
+    "src/views/strategy/funding-carry/**/*.vue",
+    "src/views/strategy/management/**/*.ts",
+    "src/views/strategy/management/**/*.vue",
+    "src/views/strategy/spread-carry/**/*.ts",
+    "src/views/strategy/spread-carry/**/*.vue",
+    "src/views/hedgeBoard/tradingTools/**/*.ts",
+    "src/views/hedgeBoard/tradingTools/**/*.vue",
+    "src/views/hedgeBoard/index.vue",
+    "src/views/platform/index.vue",
+    "src/hooks/web/useECharts.ts",
+    "types/**/*.d.ts",
+    "types/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "**/*.js",
+    "mock/**/*.ts",
+    "src/components/**/*.ts",
+    "src/components/**/*.tsx",
+    "src/components/**/*.vue",
+    "src/store/**/*.ts",
+    "src/store/**/*.tsx",
+    "src/store/**/*.vue",
+    "src/views/risk/**/*.ts",
+    "src/views/risk/**/*.tsx",
+    "src/views/risk/**/*.vue"
+  ]
+}

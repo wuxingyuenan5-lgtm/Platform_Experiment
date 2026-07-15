@@ -21,7 +21,7 @@
         :resolution="selectedResolution"
         :start-date="selectedStartDate"
         :end-date="selectedEndDate"
-        @update:exchange="selectedExchange = $event"
+        @update:exchange="handleExchangeUpdate"
         @update:symbol="handleChartSymbolUpdate"
         @update:range="selectedRange = $event"
         @update:resolution="selectedResolution = $event"
@@ -101,6 +101,10 @@
 
   function handleChartSymbolUpdate(value: string) {
     selectedSymbol.value = value as FundingSymbol;
+  }
+
+  function handleExchangeUpdate(value: FundingExchange) {
+    selectedExchange.value = value;
   }
 
   watch(

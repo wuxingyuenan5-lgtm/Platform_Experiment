@@ -58,9 +58,9 @@
     gap: 14px;
     padding: 18px;
     border: 1px solid var(--strategy-border);
-    border-radius: 18px;
-    background: #fff;
-    box-shadow: var(--strategy-shadow);
+    border-radius: var(--strategy-radius-panel);
+    background: var(--strategy-surface);
+    box-shadow: var(--strategy-shadow-card);
   }
 
   .capital-risk-overview__header {
@@ -71,35 +71,35 @@
     h3 {
       margin: 0;
       color: var(--strategy-text-1);
-      font-size: 18px;
-      font-weight: 750;
+      font-size: var(--strategy-font-card-title);
+      font-weight: 800;
     }
   }
 
   .capital-risk-overview__table {
     overflow-x: auto;
     border: 1px solid var(--strategy-border);
-    border-radius: 14px;
+    border-radius: var(--strategy-radius-card);
 
     table {
       width: 100%;
       min-width: 1080px;
       border-collapse: collapse;
       color: var(--strategy-text-1);
-      font-size: 13px;
+      font-size: var(--strategy-font-base);
     }
 
     th,
     td {
       padding: 14px 16px;
-      border-bottom: 1px solid var(--strategy-border);
+      border-bottom: 1px solid var(--strategy-border-soft);
       text-align: left;
       white-space: nowrap;
     }
 
     th {
-      background: #f8fafc;
-      color: var(--strategy-text-2);
+      background: var(--strategy-table-head-bg);
+      color: var(--strategy-text-3);
       font-weight: 700;
     }
 

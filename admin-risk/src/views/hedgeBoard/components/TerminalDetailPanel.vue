@@ -1274,6 +1274,7 @@
     justify-content: center;
     min-height: min(calc(78vh - 140px), 720px);
     padding: 24px;
+    background: linear-gradient(180deg, rgba(251, 253, 255, 0.98), rgba(243, 248, 252, 0.98));
     color: #73879a;
     font-size: 14px;
     font-weight: 600;

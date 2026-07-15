@@ -93,16 +93,16 @@
     gap: 24px;
     padding: 28px 30px;
     background:
-      linear-gradient(135deg, rgba(22, 60, 52, 0.06), rgba(205, 167, 87, 0.08)),
-      linear-gradient(180deg, #fffdf8, #f7f4ed);
-    border: 1px solid rgba(128, 101, 42, 0.12);
+      linear-gradient(135deg, rgba(22, 60, 52, 0.06), rgba(122, 154, 192, 0.08)),
+      linear-gradient(180deg, #ffffff, #f3f7fb);
+    border: 1px solid rgba(196, 207, 221, 0.2);
     border-radius: 18px;
-    box-shadow: 0 18px 40px rgba(70, 60, 34, 0.08);
+    box-shadow: 0 18px 40px rgba(113, 137, 165, 0.08);
   }
 
   .eyebrow {
     margin-bottom: 10px;
-    color: #7c6840;
+    color: #6d8198;
     font-size: 12px;
     font-weight: 700;
     letter-spacing: 0.18em;

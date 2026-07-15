@@ -9,8 +9,8 @@ body,
     "Segoe UI",
     sans-serif;
   background:
-    radial-gradient(circle at top left, rgba(201, 164, 95, 0.12), transparent 28%),
-    linear-gradient(180deg, #faf6ee 0%, #f4efe4 100%);
+    radial-gradient(circle at top left, rgba(150, 176, 210, 0.1), transparent 28%),
+    linear-gradient(180deg, #f7fafd 0%, #eef4f9 100%);
 }
 
 body {

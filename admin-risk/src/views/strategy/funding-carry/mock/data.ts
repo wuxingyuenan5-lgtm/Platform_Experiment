@@ -9,6 +9,12 @@ import type {
   FundingViewMode,
 } from '../types';
 
+type FundingMetricTone = 'positive' | 'negative' | 'neutral';
+type FundingMetricInput =
+  | [label: string, value: string]
+  | [label: string, value: string, unit: string]
+  | [label: string, value: string, unit: string, tone: FundingMetricTone];
+
 export const fundingViewLabels: Record<FundingViewMode, string> = {
   basis: '期现价差',
   funding: '资金费率',
@@ -101,9 +107,22 @@ function makeResearch(
   };
 }
 
+function parseMetric(metric: FundingMetricInput) {
+  if (metric.length === 2) {
+    const [label, value] = metric;
+    return { label, value };
+  }
+  if (metric.length === 3) {
+    const [label, value, unit] = metric;
+    return { label, value, unit };
+  }
+  const [label, value, unit, tone] = metric;
+  return { label, value, unit, tone };
+}
+
 function makeProfile(
   exchange: FundingExchange,
-  metrics: Array<[string, string, string?, 'positive' | 'negative' | 'neutral'?]>,
+  metrics: FundingMetricInput[],
   rows: Array<[FundingSymbol, number, number, number, number, number, number, string]>,
 ): FundingExchangeProfile {
   const snapshots = rows.map(([symbol, fundingRate, netCarry, basisDrag, borrowCost, stability, capacity]) => ({
@@ -126,7 +145,7 @@ function makeProfile(
     updatedAt: '2026-06-24 16:09:05',
     overviewTitle: '资金费率套利总览',
     overviewDescription: '先判断是否值得研究，再决定是否值得进入正式策略池。',
-    metrics: metrics.map(([label, value, unit, tone]) => ({ label, value, unit, tone })),
+    metrics: metrics.map(parseMetric),
     snapshots,
     research,
   };

@@ -337,7 +337,9 @@ export const strategyPnlProfiles = {
     breakdownSeries: [],
     detailCurves: [],
   },
-} as Record<StrategyDeskKey, StrategyPnlProfile>;
+} as unknown as Record<StrategyDeskKey, StrategyPnlProfile> & {
+  shortLineTraderW: StrategyPnlProfile;
+};
 
 strategyPnlProfiles.shortLineTraderW = JSON.parse(
   JSON.stringify(strategyPnlProfiles.shortLineTraderL),

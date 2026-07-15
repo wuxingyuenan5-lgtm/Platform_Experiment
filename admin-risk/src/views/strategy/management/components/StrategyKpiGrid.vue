@@ -19,18 +19,19 @@
   .kpi-grid {
     display: grid;
     grid-template-columns: repeat(6, minmax(0, 1fr));
-    gap: 10px;
+    gap: var(--strategy-space-2);
   }
   .kpi-card {
     padding: 14px 16px 12px;
-    border-radius: 14px;
-    background: rgba(255, 255, 255, 0.88);
-    box-shadow: inset 0 0 0 1px rgba(229, 235, 243, 0.92);
+    border: 1px solid var(--strategy-border);
+    border-radius: var(--strategy-radius-card);
+    background: var(--strategy-surface);
+    box-shadow: var(--strategy-shadow-soft);
   }
   .kpi-card label {
     display: block;
     color: var(--strategy-text-3);
-    font-size: 11px;
+    font-size: var(--strategy-font-xs);
     font-weight: 700;
   }
   .kpi-card strong {
@@ -38,10 +39,11 @@
     margin: 8px 0 0;
     font-size: 24px;
     line-height: 1.1;
+    font-weight: 800;
   }
   .kpi-card strong span {
     margin-left: 4px;
-    font-size: 11px;
+    font-size: var(--strategy-font-xs);
     font-weight: 600;
     color: var(--strategy-text-3);
   }

@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <section class="chart-panel">
     <div class="chart-panel__header">
       <div>
@@ -70,11 +70,11 @@
   import type { Ref } from 'vue';
   import { computed, nextTick, onMounted, ref, watch } from 'vue';
   import { useECharts } from '@/hooks/web/useECharts';
-  import type { FundingChartPanelData, FundingMarketRange } from '../types';
+  import type { FundingChartPanelData, FundingExchange, FundingMarketRange } from '../types';
 
   const props = defineProps<{
     data: FundingChartPanelData;
-    exchange: string;
+    exchange: FundingExchange;
     symbol: string;
     range: FundingMarketRange;
     resolution: string;
@@ -83,7 +83,7 @@
   }>();
 
   const emit = defineEmits<{
-    (e: 'update:exchange', value: string): void;
+    (e: 'update:exchange', value: FundingExchange): void;
     (e: 'update:symbol', value: string): void;
     (e: 'update:range', value: FundingMarketRange): void;
     (e: 'update:resolution', value: string): void;
@@ -93,24 +93,25 @@
 
   const chartRef = ref<HTMLDivElement | null>(null);
   const { setOptions, resize } = useECharts(chartRef as Ref<HTMLDivElement>);
-  const rangeOptions = ['当前', '7日', '30日'];
-  const exchangeOptions = ['Binance', 'Bybit', 'OKX'];
-  const rangeToLabelMap: Record<FundingMarketRange, string> = {
+  type FundingRangeLabel = '当前' | '7日' | '30日';
+  const rangeOptions: FundingRangeLabel[] = ['当前', '7日', '30日'];
+  const exchangeOptions: FundingExchange[] = ['Binance', 'Bybit', 'OKX'];
+  const rangeToLabelMap: Record<FundingMarketRange, FundingRangeLabel> = {
     current: '当前',
     '1d': '当前',
     '7d': '7日',
     '30d': '30日',
     '1y': '30日',
   };
-  const labelToRangeMap: Record<string, FundingMarketRange> = {
+  const labelToRangeMap: Record<FundingRangeLabel, FundingMarketRange> = {
     当前: 'current',
     '7日': '7d',
     '30日': '30d',
   };
   const symbolOptions = ['BTC', 'ETH', 'SOL', 'DOGE', 'XRP', 'XAUT'];
   const resolutionOptions = ['15分钟', '30分钟', '1小时', '4小时'];
-  const selectedRange = ref(props.range);
-  const selectedExchange = ref(props.exchange);
+  const selectedRange = ref<FundingRangeLabel>(rangeToLabelMap[props.range] ?? '当前');
+  const selectedExchange = ref<FundingExchange>(props.exchange);
   const selectedSymbol = ref(props.symbol);
   const selectedResolution = ref(props.resolution);
   const startDate = ref(props.startDate || props.data.points[0]?.date || '2026-05-28');
@@ -246,7 +247,7 @@
         ...(showFunding.value
           ? [{
               name: props.data.legendFunding,
-              type: 'bar',
+              type: 'bar' as const,
               barWidth: 16,
               itemStyle: {
                 borderRadius: [4, 4, 0, 0],
@@ -258,7 +259,7 @@
         ...(showPrice.value
           ? [{
               name: props.data.legendPrice,
-              type: 'line',
+              type: 'line' as const,
               yAxisIndex: 1,
               smooth: true,
               symbol: 'none',
@@ -266,7 +267,7 @@
               data: filteredPoints.value.map((point) => point.price),
             }]
           : []),
-      ],
+      ] as any,
     });
     await nextTick();
     resize();
@@ -278,11 +279,11 @@
 
 <style scoped lang="less">
   .chart-panel {
-    padding: 20px;
-    border: 1px solid rgba(134, 115, 87, 0.12);
-    border-radius: 18px;
-    background: rgba(255, 255, 255, 0.9);
-    box-shadow: 0 16px 36px rgba(94, 76, 52, 0.06);
+    padding: var(--strategy-space-4);
+    border: 1px solid var(--strategy-border);
+    border-radius: var(--strategy-radius-panel);
+    background: var(--strategy-surface);
+    box-shadow: var(--strategy-shadow-card);
   }
 
   .eyebrow {
@@ -300,8 +301,8 @@
     margin: 0;
     color: var(--strategy-text-1);
     font-family: var(--strategy-font-sans);
-    font-size: 24px;
-    font-weight: 900;
+    font-size: var(--strategy-font-section-title);
+    font-weight: 800;
   }
 
   .toolbar {
@@ -309,16 +310,17 @@
     flex-wrap: nowrap;
     align-items: end;
     justify-content: flex-end;
-    gap: 10px;
+    gap: var(--strategy-space-2);
     width: 100%;
   }
 
   .toolbar-group {
     display: inline-flex;
-    padding: 3px;
+    padding: 4px;
     border: 1px solid var(--strategy-border);
-    border-radius: 8px;
-    background: #fff;
+    border-radius: var(--strategy-radius-card);
+    background: var(--strategy-surface);
+    box-shadow: var(--strategy-shadow-soft);
   }
 
   .toolbar-legend {
@@ -337,27 +339,28 @@
   .legend-pill,
   .toolbar select,
   .toolbar input {
-    height: 32px;
+    height: var(--strategy-control-height);
     padding: 0 12px;
     border: 1px solid var(--strategy-border-strong);
-    border-radius: 8px;
+    border-radius: var(--strategy-radius-control);
     background: var(--strategy-surface);
     color: var(--strategy-text-2);
-    font-size: 12px;
+    font-size: var(--strategy-font-base);
     font-weight: 700;
+    box-shadow: var(--strategy-shadow-soft);
   }
 
   .toolbar-field {
     display: inline-flex;
     align-items: center;
     gap: 8px;
-    height: 32px;
+    height: var(--strategy-control-height);
     padding: 0 10px 0 12px;
     border: 1px solid var(--strategy-border-strong);
-    border-radius: 8px;
+    border-radius: var(--strategy-radius-control);
     background: var(--strategy-surface);
     color: var(--strategy-text-2);
-    font-size: 12px;
+    font-size: var(--strategy-font-base);
     font-weight: 700;
   }
 
@@ -377,6 +380,7 @@
 
   .toolbar-group button {
     border: none;
+    box-shadow: none;
     cursor: pointer;
   }
 
@@ -390,12 +394,14 @@
   .toolbar-group .is-active {
     color: var(--strategy-accent-strong);
     background: var(--strategy-accent-soft);
+    box-shadow: inset 0 0 0 1px var(--strategy-accent-ring);
   }
 
   .legend-pill.is-active {
-    border-color: rgba(201, 72, 72, 0.14);
-    background: var(--strategy-surface-selected);
-    color: var(--strategy-text-1);
+    border-color: var(--strategy-accent-soft);
+    background: var(--strategy-accent-soft);
+    color: var(--strategy-accent-strong);
+    box-shadow: inset 0 0 0 1px var(--strategy-accent-ring);
   }
 
   .dot {
@@ -406,11 +412,11 @@
   }
 
   .dot-funding {
-    background: #cf3f4f;
+    background: var(--strategy-accent-strong);
   }
 
   .dot-price {
-    background: #d79a1e;
+    background: #4aa3df;
   }
 
   .chart-wrap {
@@ -429,3 +435,4 @@
     }
   }
 </style>
+

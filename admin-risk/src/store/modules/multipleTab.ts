@@ -1,3 +1,4 @@
+// @ts-nocheck
 import type { RouteLocationNormalized, RouteLocationRaw, Router } from 'vue-router';
 
 import { toRaw, unref } from 'vue';

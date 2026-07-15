@@ -1,4 +1,5 @@
-import { resolve } from 'node:path';
+import { readFileSync } from 'node:fs';
+import { dirname, extname, resolve } from 'node:path';
 
 import { generate } from '@ant-design/colors';
 // @ts-ignore: typo
@@ -12,6 +13,34 @@ const primaryColor = '#1890FF';
 function generateAntColors(color: string, theme: 'default' | 'dark' = 'default') {
   return generate(color, {
     theme,
+  });
+}
+
+function resolveLessImport(baseDir: string, requestPath: string) {
+  if (/^[a-z]+:/i.test(requestPath)) {
+    return requestPath;
+  }
+  if (extname(requestPath)) {
+    return resolve(baseDir, requestPath);
+  }
+  return resolve(baseDir, `${requestPath}.less`);
+}
+
+function inlineLessReferences(entryPath: string, seen = new Set<string>()) {
+  const absolutePath = resolve(entryPath);
+  if (seen.has(absolutePath)) {
+    return '';
+  }
+  seen.add(absolutePath);
+
+  const source = readFileSync(absolutePath, 'utf-8');
+  const currentDir = dirname(absolutePath);
+
+  return source.replace(/@import(?:\s+\(reference\))?\s+['"]([^'"]+)['"];?/g, (_match, importPath) => {
+    if (importPath.startsWith('~')) {
+      return '';
+    }
+    return inlineLessReferences(resolveLessImport(currentDir, importPath), seen);
   });
 }
 
@@ -31,8 +60,6 @@ export function generateModifyVars() {
   const v3Token = convertLegacyToken(mapToken);
   return {
     ...v3Token,
-    // reference:  Avoid repeated references
-    hack: `true; @import (reference) "${resolve('src/design/config.less')}";`,
     'primary-color': primary,
     ...primaryColorObj,
     'info-color': primary,
@@ -44,4 +71,8 @@ export function generateModifyVars() {
     'border-radius-base': '2px', //  Component/float fillet
     'link-color': primary, //   Link color
   };
+}
+
+export function getSharedLessSource() {
+  return inlineLessReferences(resolve('src/design/config.less'));
 }

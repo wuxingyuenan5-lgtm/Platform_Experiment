@@ -16,13 +16,13 @@
     position: relative;
     min-height: 160px;
     overflow: hidden;
-    border: 1px solid rgba(134, 115, 87, 0.12);
+    border: 1px solid rgba(193, 206, 220, 0.18);
     border-radius: 26px;
     background:
       radial-gradient(circle at 28% 32%, rgba(94, 133, 122, 0.08), transparent 22%),
-      radial-gradient(circle at 72% 70%, rgba(212, 189, 146, 0.12), transparent 22%),
-      linear-gradient(135deg, rgba(255, 255, 255, 0.96), rgba(250, 245, 237, 0.92));
-    box-shadow: 0 18px 42px rgba(94, 76, 52, 0.06);
+      radial-gradient(circle at 72% 70%, rgba(165, 188, 214, 0.12), transparent 22%),
+      linear-gradient(135deg, rgba(255, 255, 255, 0.96), rgba(243, 248, 252, 0.94));
+    box-shadow: 0 18px 42px rgba(113, 137, 165, 0.06);
   }
 
   .node,
@@ -57,14 +57,14 @@
   .node-d {
     top: 70%;
     left: 84%;
-    background: #d4bd92;
-    box-shadow: 0 0 0 8px rgba(212, 189, 146, 0.12);
+    background: #88a7cb;
+    box-shadow: 0 0 0 8px rgba(136, 167, 203, 0.12);
   }
 
   .line {
     height: 1px;
     transform-origin: left center;
-    background: linear-gradient(90deg, rgba(31, 92, 82, 0.24), rgba(212, 189, 146, 0.3));
+    background: linear-gradient(90deg, rgba(31, 92, 82, 0.24), rgba(136, 167, 203, 0.3));
   }
 
   .line-a {

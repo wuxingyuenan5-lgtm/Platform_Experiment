@@ -147,12 +147,12 @@
 <style scoped lang="less">
   .capital-net-value-board {
     display: grid;
-    gap: 12px;
+    gap: var(--strategy-space-2);
     padding: 18px 20px 14px;
-    border-radius: 22px;
-    background: linear-gradient(180deg, var(--strategy-surface) 0%, var(--strategy-surface-soft) 100%);
+    border-radius: var(--strategy-radius-panel);
+    background: var(--strategy-surface);
     border: 1px solid var(--strategy-border);
-    box-shadow: var(--strategy-shadow);
+    box-shadow: var(--strategy-shadow-card);
   }
 
   .board-header {
@@ -164,8 +164,8 @@
 
   .board-header h3 {
     margin: 0;
-    font-size: 20px;
-    font-weight: 700;
+    font-size: var(--strategy-font-section-title);
+    font-weight: 800;
     color: var(--strategy-text-1);
   }
 
@@ -173,19 +173,20 @@
     display: flex;
     flex-wrap: wrap;
     justify-content: flex-end;
-    gap: 10px;
+    gap: 8px;
   }
 
   .board-controls select,
   .mode-button {
-    height: 36px;
+    height: var(--strategy-control-height);
     padding: 0 14px;
     border: 1px solid var(--strategy-border);
-    border-radius: 12px;
+    border-radius: var(--strategy-radius-control);
     background: var(--strategy-surface);
-    color: var(--strategy-text-2);
-    font-size: 13px;
+    color: var(--strategy-text-3);
+    font-size: var(--strategy-font-base);
     font-weight: 600;
+    box-shadow: var(--strategy-shadow-soft);
   }
 
   .mode-button {
@@ -193,23 +194,25 @@
   }
 
   .mode-button.is-active {
-    border-color: rgba(74, 124, 255, 0.22);
-    background: rgba(74, 124, 255, 0.08);
-    color: #355eea;
+    border-color: transparent;
+    background: var(--strategy-accent-soft);
+    color: var(--strategy-accent-strong);
+    box-shadow: inset 0 0 0 1px var(--strategy-accent-ring);
   }
 
   .curve-summary {
     display: flex;
     flex-wrap: wrap;
-    gap: 10px;
+    gap: var(--strategy-space-2);
   }
 
   .summary-pill {
     min-width: 180px;
     padding: 10px 12px;
-    border-radius: 14px;
+    border-radius: var(--strategy-radius-card);
     background: var(--strategy-surface-muted);
-    border: 1px solid rgba(221, 229, 241, 0.92);
+    border: 1px solid var(--strategy-border-strong);
+    box-shadow: var(--strategy-shadow-soft);
   }
 
   .summary-pill label,
@@ -219,7 +222,7 @@
 
   .summary-pill label {
     color: var(--strategy-text-3);
-    font-size: 11px;
+    font-size: var(--strategy-font-xs);
     font-weight: 700;
   }
 

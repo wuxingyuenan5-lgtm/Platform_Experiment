@@ -57,9 +57,9 @@
         <section class="landing-stage">
           <section class="hero-panel">
             <div class="hero-panel__copy">
-              <span>娆㈣繋鏉ュ埌</span>
-              <h1>鍏ㄧ悆鍙橀噺</h1>
-              <p>椤哄簲鏃朵唬澶у娍锛屾礊鎮夋姇璧勫厛鏈?/p>
+              <span>欢迎来到</span>
+              <h1>全球变量</h1>
+              <p>顺应时代大势，洞察投资先机</p>
             </div>
 
             <button class="hero-panel__anchor" type="button">
@@ -73,8 +73,8 @@
             <article class="hero-card hero-card--market">
               <header class="hero-card__head">
                 <div>
-                  <strong>鍏ㄧ悆甯傚満姒傝</strong>
-                  <span>鏇存柊浜?18:02 UTC+8</span>
+                  <strong>全球市场概览</strong>
+                  <span>更新于 18:02 UTC+8</span>
                 </div>
                 <button type="button" @click="go('/hedge-board/global')">
                   <RightOutlined />
@@ -102,7 +102,7 @@
             <article class="hero-card hero-card--portfolio">
               <header class="hero-card__head">
                 <div>
-                  <strong>鎶曡祫缁勫悎鎬昏</strong>
+                  <strong>投资组合总览</strong>
                 </div>
                 <button type="button" @click="go('/strategy/index')">
                   <RightOutlined />
@@ -111,13 +111,13 @@
 
               <div class="portfolio-card__body">
                 <div class="portfolio-card__metric">
-                  <span>鎬昏祫浜э紙浼板€硷級</span>
+                  <span>总资产（估值）</span>
                   <strong>--</strong>
                 </div>
 
                 <div class="portfolio-card__metric">
-                  <span>浠婃棩鏀剁泭</span>
-                  <strong>--锛?-锛?/strong>
+                  <span>今日收益</span>
+                  <strong>-- / --</strong>
                 </div>
 
                 <div class="portfolio-card__ring"></div>
@@ -129,8 +129,8 @@
         <section class="dashboard-grid">
           <article class="dashboard-card">
             <header class="dashboard-card__head">
-              <strong>甯傚満鑴夋悘</strong>
-              <p>鎹曟崏鍏ㄧ悆鎶曡祫鏈轰細鐨勬俯搴︿俊鍙?/p>
+              <strong>市场脉搏</strong>
+              <p>捕捉全球投资机会的温度信号</p>
             </header>
 
             <div class="dashboard-tabs">
@@ -234,7 +234,7 @@
 
                 <div class="strategy-row__copy">
                   <strong>{{ item.title }}</strong>
-                  <p>--锛?-锛?/p>
+                  <p>-- / --</p>
                 </div>
 
                 <svg viewBox="0 0 90 22" preserveAspectRatio="none">
@@ -251,14 +251,15 @@
             </div>
 
             <button class="dashboard-link" type="button" @click="go('/strategy/index')">
-              鏌ョ湅鎵€鏈夌瓥鐣?              <RightOutlined />
+              查看所有策略
+              <RightOutlined />
             </button>
           </article>
 
           <article class="dashboard-card">
             <header class="dashboard-card__head">
-              <strong>閲嶈鏃ュ巻</strong>
-              <p>鎶婃彙鍏抽敭浜嬩欢涓庡競鍦鸿剦鎼?/p>
+              <strong>重要日历</strong>
+              <p>把握关键事件与市场脉动</p>
             </header>
 
             <div class="calendar-strip">
@@ -356,8 +357,8 @@
     { label: '棣栭〉', path: '/', active: true },
     { label: '瀹忚', path: '/hedge-board/macro' },
     { label: '璧勯噾', path: '/hedge-board/gold' },
-    { label: '鍔犻€?, path: '/hedge-board/crypto' },
-    { label: '鏂伴椈鏃ュ巻涓庣悊璐?, path: '/news-calendar/macro' },
+    { label: '加密', path: '/hedge-board/crypto' },
+    { label: '新闻日历与理财', path: '/news-calendar/macro' },
     { label: '绛栫暐', path: '/strategy/index' },
     { label: '鐢ㄦ埛绠＄悊', path: '/users/index' },
     { label: '椋庢帶', path: '/risk/detail' },
@@ -376,45 +377,45 @@
   ];
 
   const marketOverviewItems = [
-    { label: '鍏ㄧ悆鑲＄エ', color: '#e0aa4f', spark: '0,17 12,12 24,13 36,8 48,11 60,7 72,10 78,6' },
-    { label: '澶у畻鍟嗗搧', color: '#66a3f2', spark: '0,12 12,9 24,13 36,7 48,12 60,9 72,12 78,8' },
-    { label: '缇庡厓鎸囨暟', color: '#e0aa4f', spark: '0,14 12,11 24,12 36,9 48,13 60,10 72,12 78,9' },
-    { label: '椋庨櫓鏀剁泭鐜?, color: '#bdc4cf', spark: '0,12 12,10 24,11 36,8 48,10 60,9 72,10 78,8' },
+    { label: '全球股票', color: '#e0aa4f', spark: '0,17 12,12 24,13 36,8 48,11 60,7 72,10 78,6' },
+    { label: '大宗商品', color: '#66a3f2', spark: '0,12 12,9 24,13 36,7 48,12 60,9 72,12 78,8' },
+    { label: '美元指数', color: '#e0aa4f', spark: '0,14 12,11 24,12 36,9 48,13 60,10 72,12 78,9' },
+    { label: '风险收益比', color: '#bdc4cf', spark: '0,12 12,10 24,11 36,8 48,10 60,9 72,10 78,8' },
   ];
 
-  const pulseTabs = ['澧為暱涓荤嚎', '璧勪骇浼犲', '璧勯噾娴佸悜'];
+  const pulseTabs = ['增长主线', '资产传导', '资金流向'];
 
   const pulseRowsByTab: Record<string, PulseRow[]> = {
-    澧為暱涓荤嚎: [
+    增长主线: [
       {
-        title: 'AI + 鐢熶骇鍔?,
-        desc: '绉戞妧鎴愰暱椹卞姩鏂板懆鏈?,
+        title: 'AI 与生产力',
+        desc: '科技成长驱动新一轮风险偏好',
         path: '/hedge-board/us',
         color: '#dfa349',
         spark: '0,16 12,13 24,14 36,10 48,12 60,8 72,10 84,7',
         icon: DatabaseOutlined,
       },
       {
-        title: 'Breakwaves vs Gold',
-        desc: '閫氳儉瀵瑰啿涓庨粍閲戣疆鍔?,
+        title: '黄金与通胀对冲',
+        desc: '实际利率与贵金属重新定价',
         path: '/hedge-board/gold',
         color: '#69a5f4',
         spark: '0,12 12,14 24,10 36,15 48,11 60,13 72,9 84,12',
         icon: ClusterOutlined,
       },
       {
-        title: 'DXY vs US10Y',
-        desc: '缇庡厓鍒╃巼涓庢敹鐩婄巼鑱斿姩',
+        title: 'DXY 与美债利率',
+        desc: '美元与收益率联动仍是核心变量',
         path: '/hedge-board/macro',
         color: '#b8bfc9',
         spark: '0,10 12,11 24,9 36,12 48,11 60,10 72,11 84,9',
         icon: LineChartOutlined,
       },
     ],
-    璧勪骇浼犲: [
+    资产传导: [
       {
-        title: '榛勯噾 vs 瀹為檯鍒╃巼',
-        desc: '閫氳儉棰勬湡涓庤吹閲戝睘瀹氫环',
+        title: '黄金 vs 实际利率',
+        desc: '通胀预期向贵金属的传导',
         path: '/hedge-board/gold',
         color: '#dfa349',
         spark: '0,15 12,10 24,12 36,8 48,10 60,7 72,9 84,6',
@@ -422,41 +423,41 @@
       },
       {
         title: 'BTC vs Nasdaq',
-        desc: '椋庨櫓鍋忓ソ鍒板姞瀵嗚祫浜?,
+        desc: '风险偏好向加密资产的映射',
         path: '/hedge-board/crypto',
         color: '#69a5f4',
         spark: '0,10 12,12 24,9 36,14 48,10 60,13 72,11 84,14',
         icon: LineChartOutlined,
       },
       {
-        title: '缇庡厓 vs 鍘熸补',
-        desc: '澶栨眹涓庡晢鍝佸弽棣堝洖璺?,
+        title: '美元 vs 原油',
+        desc: '外汇与商品价格的反馈链条',
         path: '/hedge-board/macro',
         color: '#b8bfc9',
         spark: '0,11 12,9 24,10 36,11 48,9 60,10 72,9 84,8',
         icon: DeploymentUnitOutlined,
       },
     ],
-    璧勯噾娴佸悜: [
+    资金流向: [
       {
-        title: '榛勯噾ETF娴佸悜',
-        desc: '閬块櫓璧勯噾涓庤秼鍔跨‘璁?,
+        title: '黄金 ETF 流向',
+        desc: '避险资金是否继续确认趋势',
         path: '/hedge-board/gold',
         color: '#dfa349',
         spark: '0,14 12,12 24,13 36,9 48,11 60,8 72,9 84,7',
         icon: ClusterOutlined,
       },
       {
-        title: 'BTC ETF娴侀噺',
-        desc: '鐜拌揣璧勯噾杩涘叆鑺傚',
+        title: 'BTC ETF 流量',
+        desc: '现货资金进入节奏仍是关键',
         path: '/hedge-board/crypto',
         color: '#69a5f4',
         spark: '0,11 12,13 24,12 36,16 48,13 60,15 72,12 84,14',
         icon: DatabaseOutlined,
       },
       {
-        title: '缇庡厓娴佸姩鎬?,
-        desc: '娴佸姩鎬ц剦鍐蹭笌椋庨櫓璧勪骇',
+        title: '美元流动性',
+        desc: '流动性脉冲仍主导风险资产定价',
         path: '/hedge-board/macro',
         color: '#b8bfc9',
         spark: '0,8 12,9 24,8 36,10 48,9 60,8 72,9 84,8',
@@ -468,32 +469,32 @@
   const activePulseRows = computed(() => pulseRowsByTab[activePulseTab.value] || []);
 
   const allocationLegend = [
-    { label: '鏉冪泭绫?, color: '#e2c48c' },
-    { label: '鍥烘敹绫?, color: '#8fb1d8' },
-    { label: '澶у畻鍟嗗搧', color: '#efdfc0' },
-    { label: '鍔犲瘑璧勪骇', color: '#d9e4f0' },
-    { label: '鐜伴噾鍙婂叾浠?, color: '#eceff3' },
+    { label: '权益类', color: '#e2c48c' },
+    { label: '固收类', color: '#8fb1d8' },
+    { label: '大宗商品', color: '#efdfc0' },
+    { label: '加密资产', color: '#d9e4f0' },
+    { label: '现金及等价物', color: '#eceff3' },
   ];
 
-  const allocationStats = ['缁勫悎娉㈠姩鐜囷紙骞村寲锛?, '鏈€澶у洖鎾?, '澶忔櫘姣旂巼', 'VaR锛?5%锛?];
+  const allocationStats = ['组合波动率（年化）', '最大回撤', '夏普比率', 'VaR（95%）'];
 
   const strategyRows = [
     {
-      title: '瀹忚瀵瑰啿绛栫暐',
+      title: '宏观对冲策略',
       path: '/strategy/index',
       color: '#dfa349',
       spark: '0,15 12,11 24,14 36,10 48,12 60,9 72,13 84,10',
       icon: DatabaseOutlined,
     },
     {
-      title: '璺ㄨ祫浜ч厤缃瓥鐣?,
+      title: '跨资产配置策略',
       path: '/strategy/index',
       color: '#69a5f4',
       spark: '0,11 12,14 24,10 36,15 48,11 60,14 72,10 84,13',
       icon: DeploymentUnitOutlined,
     },
     {
-      title: '浜嬩欢椹卞姩绛栫暐',
+      title: '事件驱动策略',
       path: '/strategy/index',
       color: '#bcc3cc',
       spark: '0,10 12,11 24,9 36,11 48,10 60,9 72,10 84,9',
@@ -503,23 +504,23 @@
 
   const calendarSets: CalendarSet[] = [
     {
-      title: '2025骞?鏈?7鏃?,
-      weekday: '鏄熸湡鍏?,
+      title: '2026年07月17日',
+      weekday: '星期五',
       items: [
-        { time: '09:30', region: '涓浗', title: '4鏈堣妯′互涓婂伐涓氬鍔犲€? },
-        { time: '17:00', region: '娆у厓鍖?, title: '3鏈圕PI缁堝€硷紙骞寸巼锛? },
-        { time: '20:30', region: '缇庡浗', title: '4鏈堥浂鍞攢鍞湀鐜? },
-        { time: '22:00', region: '缇庡浗', title: '5鏈堝瘑姝囨牴澶у娑堣垂鑰呬俊蹇冩寚鏁板垵鍊? },
+        { time: '09:30', region: '中国', title: '规模以上工业增加值' },
+        { time: '17:00', region: '欧元区', title: 'CPI 终值（同比）' },
+        { time: '20:30', region: '美国', title: '零售销售月率' },
+        { time: '22:00', region: '美国', title: '密歇根大学消费者信心指数初值' },
       ],
     },
     {
-      title: '2025骞?鏈?8鏃?,
-      weekday: '鏄熸湡鏃?,
+      title: '2026年07月18日',
+      weekday: '星期六',
       items: [
-        { time: '08:30', region: '鏃ユ湰', title: '涓€瀛ｅ害GDP淇鍊? },
-        { time: '15:00', region: '鑻卞浗', title: '4鏈堝け涓氱巼' },
-        { time: '20:30', region: '缇庡浗', title: '鏂板眿寮€宸ユ€绘暟骞村寲' },
-        { time: '23:00', region: '缇庡浗', title: 'EIA鐭湡鑳芥簮灞曟湜' },
+        { time: '08:30', region: '日本', title: 'GDP 修正值' },
+        { time: '15:00', region: '英国', title: '失业率' },
+        { time: '20:30', region: '美国', title: '新屋开工总数年化' },
+        { time: '23:00', region: '美国', title: 'EIA 短期能源展望' },
       ],
     },
   ];
@@ -540,7 +541,7 @@
   .landing-page {
     min-height: 100vh;
     background:
-      radial-gradient(circle at 20% 0%, rgba(227, 211, 181, 0.18) 0%, rgba(227, 211, 181, 0) 26%),
+      radial-gradient(circle at 20% 0%, rgba(214, 226, 240, 0.2) 0%, rgba(214, 226, 240, 0) 26%),
       radial-gradient(circle at 86% 10%, rgba(214, 225, 241, 0.26) 0%, rgba(214, 225, 241, 0) 32%),
       linear-gradient(180deg, #f9fafc 0%, #eef3f7 100%);
   }
@@ -680,7 +681,7 @@
     height: 42px;
     border: none;
     border-radius: 50%;
-    background: linear-gradient(180deg, #d9c38a 0%, #b5914d 100%);
+    background: linear-gradient(180deg, #8ea9c8 0%, #58779c 100%);
     color: #fff;
     font-size: 15px;
     font-weight: 700;

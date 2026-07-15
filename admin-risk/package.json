@@ -17,13 +17,13 @@
   },
   "scripts": {
     "bootstrap": "pnpm install",
-    "build": "cross-env NODE_ENV=production NODE_OPTIONS=--max-old-space-size=8192 pnpm vite build",
-    "build:analyze": "cross-env NODE_OPTIONS=--max-old-space-size=8192 pnpm vite build --mode analyze",
-    "build:docker": "vite build --mode docker",
+    "build": "pnpm sync:trading-tools && cross-env NODE_ENV=production NODE_OPTIONS=--max-old-space-size=8192 pnpm vite build",
+    "build:analyze": "pnpm sync:trading-tools && cross-env NODE_OPTIONS=--max-old-space-size=8192 pnpm vite build --mode analyze",
+    "build:docker": "pnpm sync:trading-tools && vite build --mode docker",
     "build:no-cache": "pnpm store prune && npm run build",
-    "build:test": "cross-env NODE_OPTIONS=--max-old-space-size=8192 pnpm vite build --mode test",
+    "build:test": "pnpm sync:trading-tools && cross-env NODE_OPTIONS=--max-old-space-size=8192 pnpm vite build --mode test",
     "commit": "czg",
-    "dev": "pnpm vite",
+    "dev": "pnpm sync:trading-tools && pnpm vite",
     "preinstall": "npx only-allow pnpm",
     "postinstall": "turbo run stub",
     "lint": "turbo run lint",
@@ -34,8 +34,10 @@
     "preview": "npm run build && vite preview",
     "reinstall": "rimraf pnpm-lock.yaml && rimraf package.lock.json && rimraf node_modules && npm run bootstrap",
     "serve": "npm run dev",
+    "sync:trading-tools": "node scripts/sync-trading-tools-from-md.cjs",
     "test:gzip": "npx http-server dist --cors --gzip -c-1",
-    "type:check": "vue-tsc --noEmit --skipLibCheck"
+    "type:check": "vue-tsc -p tsconfig.strategy.json --noEmit --skipLibCheck",
+    "type:check:full": "vue-tsc -p tsconfig.full.json --noEmit --skipLibCheck"
   },
   "lint-staged": {
     "*.{js,jsx,ts,tsx}": [

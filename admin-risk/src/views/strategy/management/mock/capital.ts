@@ -406,7 +406,9 @@ export const strategyCapitalProfiles = {
       ],
     },
   },
-} as Record<StrategyDeskKey, StrategyCapitalProfile>;
+} as unknown as Record<StrategyDeskKey, StrategyCapitalProfile> & {
+  shortLineTraderW: StrategyCapitalProfile;
+};
 
 strategyCapitalProfiles.spread = strategyCapitalProfiles.crossSpread;
 strategyCapitalProfiles.shortLineTraderW = JSON.parse(

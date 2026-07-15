@@ -22,7 +22,6 @@
           <section class="panel-card">
             <header class="section-head">
               <div>
-                <div class="eyebrow">NEWS DIGEST</div>
                 <h2>新闻整理</h2>
               </div>
             </header>
@@ -599,8 +598,8 @@
   }
 
   .event-tag.medium {
-    color: #886439;
-    background: rgba(255, 245, 226, 0.92);
+    color: #64748b;
+    background: rgba(238, 244, 250, 0.94);
   }
 
   .news-asset-tabs {
@@ -879,8 +878,8 @@
   }
 
   .wealth-chip.orange {
-    background: #fff0d8;
-    color: #f0a934;
+    background: #eef5fb;
+    color: #5e83a8;
   }
 
   .wealth-expiry {

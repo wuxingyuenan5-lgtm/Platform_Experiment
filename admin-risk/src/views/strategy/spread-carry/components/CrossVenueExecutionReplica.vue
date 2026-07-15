@@ -97,9 +97,9 @@
             <label>做空价差 <small>(BY Bid - MT5 Ask)</small></label>
             <strong class="red">-2.26 <em>USDT</em></strong>
           </article>
-          <article class="summary-item">
+          <article class="summary-item summary-item--compact">
             <label>资费 | 买方库存费 | 卖方库存费</label>
-            <strong>0.010% | 0.043% | 0.021%</strong>
+            <strong class="summary-inline">0.010% | -42 | +24</strong>
           </article>
           <article class="summary-item">
             <label>USDT/USD Basis</label>
@@ -346,23 +346,44 @@
           </div>
           <div class="analysis-group analysis-group--row">
             <span>数据范围</span>
-            <div class="analysis-tabs">
+            <div class="analysis-tabs analysis-tabs--range">
               <button
                 v-for="range in analysisDataRanges"
                 :key="range"
                 :class="{ active: selectedAnalysisDataRange === range }"
-                @click="selectedAnalysisDataRange = range"
+                @click="selectedAnalysisDataRange = range; customRangeOpen = false"
               >
                 {{ range }}
+              </button>
+              <button
+                type="button"
+                class="analysis-custom-toggle"
+                :class="{ active: selectedAnalysisDataRange === '自定义' }"
+                title="Custom range"
+                aria-label="Custom range"
+                @click="selectedAnalysisDataRange = '自定义'; customRangeOpen = true"
+              >
+                <span>◫</span>
               </button>
             </div>
           </div>
         </div>
 
+        <div v-if="customRangeOpen" class="analysis-custom-panel">
+          <label>
+            <span>开始</span>
+            <input v-model="customRangeStart" type="date" />
+          </label>
+          <label>
+            <span>结束</span>
+            <input v-model="customRangeEnd" type="date" />
+          </label>
+        </div>
+
         <div class="stats-list">
           <div><span>90%分位</span><strong>0.82 USDT</strong></div>
           <div><span>75%分位</span><strong>0.18 USDT</strong></div>
-          <div><span>50%分位（中位数）</span><strong class="green">-0.06 USDT</strong></div>
+          <div><span>50%分位</span><strong class="green">-0.06 USDT</strong></div>
           <div><span>25%分位</span><strong class="green">-0.34 USDT</strong></div>
           <div><span>10%分位</span><strong class="green">-0.92 USDT</strong></div>
         </div>
@@ -382,8 +403,8 @@
           <div class="monitor-grid">
             <label class="field-block">
               <span>触发条件</span>
-              <div class="input-row input-row--select">
-                <select v-model="alertOperator">
+                <div class="input-row input-row--condition">
+                  <select v-model="alertOperator">
                   <option value="<=">&lt;=</option>
                   <option value=">=">&gt;=</option>
                 </select>
@@ -407,8 +428,8 @@
             </label>
             <label class="field-block">
               <span>预警渠道</span>
-              <div class="input-row input-row--select">
-                <select v-model="alertChannel">
+                <div class="input-row input-row--single-select">
+                  <select v-model="alertChannel">
                   <option value="全部渠道">全部渠道</option>
                   <option value="页面">页面</option>
                   <option value="声音">声音</option>
@@ -617,12 +638,14 @@
 
   const ranges = ['1m', '5m', '15m', '1h', '4h', '1D'];
   const analysisPeriods = ['1m', '5m', '15m', '1h'];
-  const analysisDataRanges = ['500', '1000', '自定义'];
+  const analysisDataRanges = ['500', '1000'];
   const selectedPair = ref('XAUTUSDT.P-XAUUSD');
   const selectedRange = ref('15m');
   const selectedAnalysisPeriod = ref('1m');
   const selectedAnalysisDataRange = ref('500');
-  const latencyMs = ref(18);
+  const customRangeOpen = ref(false);
+  const customRangeStart = ref('2026-06-01');
+  const customRangeEnd = ref('2026-06-30');
   const executionStage = ref<'open' | 'close'>('open');
   const executionMode = ref<'market' | 'limit'>('market');
   const closeExecutionMode = ref<'market' | 'limit'>('market');
@@ -1102,8 +1125,8 @@
   .card-head h3 {
     margin: 0;
     font-family: var(--strategy-font-heading);
-    font-size: 18px;
-    font-weight: 700;
+    font-size: 21px;
+    font-weight: 800;
     letter-spacing: -0.012em;
     color: #162845;
   }
@@ -1112,8 +1135,12 @@
     margin-top: 4px;
     display: inline-block;
     color: #2f3640;
-    font-size: 12px;
+    font-size: 13px;
     font-weight: 700;
+  }
+
+  .cross-top-grid > .cross-card:first-child .card-head span {
+    display: none;
   }
 
   .quote-grid,
@@ -1143,14 +1170,14 @@
 
   .rule-list__label {
     color: #2f3640;
-    font-size: 12px;
+    font-size: 13px;
     font-weight: 700;
   }
 
   .rule-list__value {
     color: #475467;
-    font-size: 12px;
-    font-weight: 700;
+    font-size: 13px;
+    font-weight: 800;
     text-align: right;
   }
 
@@ -1166,8 +1193,8 @@
 
   .status-mini-log__head strong {
     color: #111827;
-    font-size: 15px;
-    font-weight: 700;
+    font-size: 16px;
+    font-weight: 800;
   }
 
   .status-mini-log__list {
@@ -1181,7 +1208,7 @@
     gap: 8px;
     margin: 0;
     color: #475467;
-    font-size: 12px;
+    font-size: 13px;
     line-height: 1.55;
   }
 
@@ -1219,19 +1246,23 @@
   .quote-card {
     display: flex;
     flex-direction: column;
-    padding: 16px 18px 18px;
-    min-height: 214px;
+    padding: 18px 18px 14px;
+    min-height: 208px;
   }
 
   .quote-card__head {
+    display: flex;
+    align-items: center;
     justify-content: space-between;
-    margin-bottom: 18px;
+    gap: 10px 14px;
+    flex-wrap: wrap;
+    margin-bottom: 14px;
     color: #1a2b4a;
   }
 
   .quote-card__head strong {
-    font-size: 16px;
-    font-weight: 700;
+    font-size: 18px;
+    font-weight: 800;
   }
 
   .live-tag {
@@ -1240,14 +1271,15 @@
     gap: 8px;
     color: #19a04d;
     font-size: 12px;
-    font-weight: 600;
+    font-weight: 700;
   }
 
   .quote-stats {
     display: grid;
-    grid-template-columns: repeat(4, minmax(78px, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 8px;
     flex: 1;
+    align-items: stretch;
   }
 
   .quote-stat {
@@ -1255,7 +1287,8 @@
     flex-direction: column;
     justify-content: space-between;
     gap: 8px;
-    min-height: 126px;
+    min-height: 92px;
+    min-width: 0;
   }
 
   .quote-stat span,
@@ -1266,22 +1299,22 @@
   .monitor-status span {
     color: #2f3640;
     font-size: 13px;
-    font-weight: 700;
+    font-weight: 800;
   }
 
   .quote-stat strong {
     font-family: var(--strategy-font-data);
-    font-size: clamp(15px, 0.96vw, 26px);
+    font-size: clamp(14px, 0.82vw, 18px);
     line-height: 1.08;
-    font-weight: 700;
+    font-weight: 600;
     letter-spacing: -0.02em;
     white-space: nowrap;
   }
 
   .quote-stat small {
     color: #2f3640;
-    font-size: 11px;
-    font-weight: 700;
+    font-size: 12px;
+    font-weight: 600;
   }
 
   .summary-grid {
@@ -1316,13 +1349,13 @@
     color: #1d2e4d;
     font-family: var(--strategy-font-heading);
     font-size: 16px;
-    font-weight: 700;
+    font-weight: 800;
   }
 
   .summary-item label small {
     color: #2f3640;
-    font-size: 12px;
-    font-weight: 700;
+    font-size: 13px;
+    font-weight: 600;
   }
 
   .summary-item strong {
@@ -1332,12 +1365,30 @@
     margin-top: 18px;
     color: #10203f;
     font-family: var(--strategy-font-data);
-    font-size: 17px;
+    font-size: 16px;
     font-weight: 700;
+    line-height: 1.2;
+  }
+
+  .summary-item--compact label {
+    font-size: 14px;
+  }
+
+  .summary-item--compact strong {
+    margin-top: 14px;
+    font-size: 16px;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    line-height: 1.3;
+  }
+
+  .summary-inline {
+    white-space: nowrap;
   }
 
   .summary-item strong em {
     font-size: 14px;
+    font-weight: 700;
     font-style: normal;
   }
 
@@ -1363,7 +1414,7 @@
     background: #fff;
     color: #47617f;
     font-size: 14px;
-    font-weight: 600;
+    font-weight: 700;
     cursor: pointer;
   }
 
@@ -1463,8 +1514,9 @@
     width: 100%;
     padding: 0 14px;
     font-family: var(--strategy-font-data);
-    font-size: 14px;
-    font-weight: 600;
+    font-size: 15px;
+    font-weight: 700;
+    min-width: 0;
   }
 
   .input-row em {
@@ -1472,9 +1524,9 @@
     align-items: center;
     justify-content: center;
     border-left: 1px solid #e7ebf0;
-    background: #fffaf4;
-    color: #856746;
-    font-size: 14px;
+    background: #fff;
+    color: #152646;
+    font-size: 13px;
     font-style: normal;
     font-weight: 700;
   }
@@ -1484,21 +1536,45 @@
   }
 
   .input-row--select {
-    grid-template-columns: 1fr 66px 88px;
+    grid-template-columns: minmax(0, 1fr) 60px 76px;
   }
 
   .input-row--select select {
     border-left: 1px solid #e7ebf0;
   }
 
+  .input-row--condition {
+    grid-template-columns: 58px minmax(0, 1fr) 64px;
+  }
+
+  .input-row--condition select {
+    border-right: 1px solid #e7ebf0;
+    border-left: none;
+    padding: 0 18px 0 10px;
+    text-align: center;
+    text-align-last: center;
+  }
+
+  .input-row--condition input {
+    padding-right: 8px;
+  }
+
+  .input-row--single-select {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .input-row--single-select select {
+    padding-right: 30px;
+  }
+
   .input-row--qty button,
   .unit-btn {
     border: none;
     border-left: 1px solid #e7ebf0;
-    background: #fffaf4;
-    color: #856746;
-    font-size: 14px;
-    font-weight: 600;
+    background: #fff;
+    color: #152646;
+    font-size: 13px;
+    font-weight: 700;
     cursor: pointer;
   }
 
@@ -1513,8 +1589,8 @@
     display: block;
     margin-bottom: 10px;
     color: #2f3640;
-    font-size: 13px;
-    font-weight: 700;
+    font-size: 15px;
+    font-weight: 800;
   }
 
   .mini-grid {
@@ -1534,8 +1610,8 @@
     margin-top: 8px;
     color: #172947;
     font-family: var(--strategy-font-data);
-    font-size: 17px;
-    font-weight: 700;
+    font-size: 16px;
+    font-weight: 500;
   }
 
   .submit-row {
@@ -1554,8 +1630,8 @@
     border: none;
     border-radius: 12px;
     color: #fff;
-    font-size: 16px;
-    font-weight: 700;
+    font-size: 18px;
+    font-weight: 800;
     letter-spacing: 0.01em;
     cursor: pointer;
   }
@@ -1596,7 +1672,7 @@
   .overview-table th,
   .overview-table td {
     padding: 13px 10px;
-    border-bottom: 1px solid #efe7dc;
+    border-bottom: 1px solid #d8e2ec;
     font-size: 13px;
     text-align: left;
     white-space: nowrap;
@@ -1605,15 +1681,20 @@
   .basic-table th,
   .overview-table th {
     color: #2f3640;
-    font-size: 12px;
-    font-weight: 700;
+    font-size: 14px;
+    font-weight: 800;
   }
 
   .basic-table td,
   .overview-table td {
     color: #22324d;
     font-family: var(--strategy-font-data);
-    font-weight: 600;
+    font-size: 13px;
+    font-weight: 700;
+  }
+
+  .overview-table td {
+    font-weight: 500;
   }
 
   .row-btn {
@@ -1649,6 +1730,61 @@
     min-width: 0;
   }
 
+  .analysis-tabs--range {
+    align-items: center;
+  }
+
+  .analysis-custom-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 42px;
+    height: 32px;
+    padding: 0 10px;
+    border: 1px solid #d7e2ef;
+    border-radius: 10px;
+    background: #fff;
+    color: #556a87;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  .analysis-custom-toggle.active {
+    border-color: rgba(220, 82, 82, 0.38);
+    background: linear-gradient(180deg, #ff6868 0%, #ef4343 100%);
+    color: #fff;
+  }
+
+  .analysis-custom-panel {
+    display: flex;
+    gap: 10px;
+    margin: 2px 0 14px;
+  }
+
+  .analysis-custom-panel label {
+    display: grid;
+    gap: 6px;
+    min-width: 170px;
+  }
+
+  .analysis-custom-panel span {
+    color: #556a87;
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  .analysis-custom-panel input {
+    height: 32px;
+    padding: 0 10px;
+    border: 1px solid #d7e2ef;
+    border-radius: 10px;
+    background: #fff;
+    color: #152646;
+    font-size: 13px;
+    font-weight: 600;
+  }
+
   .analysis-group--row {
     flex-direction: row;
     align-items: center;
@@ -1671,9 +1807,9 @@
     gap: 10px;
     margin-bottom: 14px;
     padding: 12px 14px 10px;
-    border: 1px solid #efe7dc;
+    border: 1px solid #d8e2ec;
     border-radius: 16px;
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(253, 249, 243, 0.98) 100%);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(243, 248, 252, 0.98) 100%);
   }
 
   .stats-list div,
@@ -1687,22 +1823,30 @@
   .stats-list strong,
   .monitor-status strong {
     color: #152646;
-    font-size: 14px;
+    font-size: 16px;
     font-weight: 800;
   }
 
   .monitor-box {
     margin-bottom: 14px;
     padding: 14px 16px 16px;
-    border: 1px solid #efe7dc;
+    border: 1px solid #d8e2ec;
     border-radius: 16px;
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(253, 249, 243, 0.98) 100%);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(243, 248, 252, 0.98) 100%);
+  }
+
+  .monitor-box > .field-block {
+    max-width: 100%;
   }
 
   .monitor-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 12px;
     margin-top: 12px;
+  }
+
+  .monitor-grid .field-block {
+    max-width: 100%;
   }
 
   .monitor-footer {
@@ -1726,7 +1870,11 @@
   }
 
   .monitor-status strong {
-    font-size: 16px;
+    font-size: 18px;
+  }
+
+  .monitor-status--row strong {
+    font-weight: 500;
   }
 
   .cross-card--overview {
@@ -1790,14 +1938,15 @@
 
   .overview-summary__item span {
     color: #61728e;
-    font-size: 15px;
-    font-weight: 700;
+    font-size: 24px;
+    font-weight: 600;
+    line-height: 1.1;
     white-space: nowrap;
   }
 
   .overview-summary__item strong {
-    font-size: 19px;
-    font-weight: 800;
+    font-size: 24px;
+    font-weight: 600;
     line-height: 1.1;
     white-space: nowrap;
   }
@@ -1861,7 +2010,8 @@
   .trade-modal__header h3 {
     margin: 0;
     color: #172947;
-    font-size: 18px;
+    font-size: 20px;
+    font-weight: 800;
   }
 
   .trade-modal__close {
@@ -1892,11 +2042,12 @@
     margin-bottom: 8px;
     color: #7b8aa5;
     font-size: 12px;
+    font-weight: 700;
   }
 
   .confirm-grid strong {
     color: #172947;
-    font-size: 14px;
+    font-size: 15px;
     font-weight: 800;
   }
 
@@ -1906,7 +2057,7 @@
     border-radius: 10px;
     border: 1px solid #dfe7f4;
     font-size: 14px;
-    font-weight: 700;
+    font-weight: 800;
     cursor: pointer;
   }
 
@@ -1949,6 +2100,11 @@
   .monitor-status strong,
   .overview-title h3 {
     color: var(--strategy-text-1);
+  }
+
+  .cross-card--summary .summary-item .red,
+  .cross-card--summary .summary-item .green {
+    color: var(--strategy-text-1) !important;
   }
 
   .card-head span,
@@ -1997,12 +2153,46 @@
     color: var(--strategy-text-1);
   }
 
+  .cross-card--execution .input-row input,
+  .cross-card--execution .input-row select,
+  .cross-card--execution .metric-card strong {
+    font-weight: 500;
+  }
+
+  .cross-card--execution .input-row--select {
+    grid-template-columns: minmax(0, 1fr) 60px 90px;
+  }
+
+  .cross-card--execution .input-row--select select {
+    padding-right: 26px;
+  }
+
   .input-row em,
   .input-row--qty button,
   .unit-btn {
     border-left-color: var(--strategy-border);
     background: var(--strategy-surface-muted);
     color: var(--strategy-text-2);
+  }
+
+  .cross-card--execution .input-row em,
+  .cross-card--execution .input-row--qty button,
+  .cross-card--execution .unit-btn,
+  .cross-card--monitor .input-row em {
+    background: var(--strategy-surface);
+    color: var(--strategy-text-1);
+  }
+
+  .cross-card--execution .input-row--select em,
+  .cross-card--monitor .input-row--condition em {
+    background: var(--strategy-surface);
+  }
+
+  .cross-card--monitor .input-row--select select,
+  .cross-card--monitor .input-row--single-select select {
+    width: 100%;
+    min-width: 0;
+    padding-right: 28px;
   }
 
   @media (max-width: 1480px) {

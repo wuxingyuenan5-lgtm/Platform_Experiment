@@ -101,24 +101,24 @@
   .curve-card {
     min-width: 0;
     padding: 18px 18px 14px;
-    border-radius: 16px;
-    background: linear-gradient(180deg, rgba(255,255,255,.99), rgba(248,250,252,.98));
-    box-shadow: 0 14px 34px rgba(28,35,40,.04);
-    border: 1px solid rgba(223,230,240,.92);
+    border-radius: var(--strategy-radius-panel);
+    background: var(--strategy-surface);
+    box-shadow: var(--strategy-shadow-card);
+    border: 1px solid var(--strategy-border);
   }
 
   .curve-card h3 {
     margin: 0;
-    color: #17222d;
-    font-size: 18px;
+    color: var(--strategy-text-1);
+    font-size: var(--strategy-font-card-title);
     font-weight: 800;
     letter-spacing: 0.01em;
   }
 
   .curve-card p {
     margin: 6px 0 0;
-    color: #52606f;
-    font-size: 13px;
+    color: var(--strategy-text-2);
+    font-size: var(--strategy-font-base);
     font-weight: 600;
   }
 
