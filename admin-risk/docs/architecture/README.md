@@ -8,14 +8,15 @@
 
 ## 1. 文档定位
 
-本目录定义 Variable-Global 的技术架构。
+本目录定义 Variable-Global 技术架构。
 
-- 产品功能由 `docs/modules/` 和 `docs/strategies/` 管理。
-- 视觉要求由 `docs/design/` 管理。
-- 术语和文档状态由 `docs/governance/` 管理。
-- 本目录说明系统如何组织、各层如何协作、业务对象由谁负责以及安全可靠性要求。
+- 产品需求：`docs/modules/`。
+- 策略专项需求：`docs/strategies/`。
+- 技术架构：本目录。
+- 视觉要求：`docs/design/`。
+- 术语和文档治理：`docs/governance/`。
 
-总体目标架构以 `platform-target-architecture.md` 为当前 active 唯一入口。
+总体目标架构以 `platform-target-architecture.md` 为 active 入口。
 
 ## 2. 四个不同维度
 
@@ -30,11 +31,11 @@
 5. 风险管理。
 6. 金融AI分析，当前冻结。
 
-产品模块决定用户入口，不直接决定技术服务、数据库和代码包。
+产品模块决定用户入口，不直接决定服务、数据库和代码包。
 
 ### 2.2 四类架构文档视角
 
-ADR-005 继续有效：
+ADR-005 定义：
 
 1. 前端架构。
 2. 后端架构。
@@ -42,8 +43,6 @@ ADR-005 继续有效：
 4. 公共领域模型。
 
 ### 2.3 六层逻辑职责
-
-总体目标架构采用：
 
 1. 产品与交互层。
 2. 平台应用与控制层。
@@ -91,31 +90,22 @@ Execution Runtime
 External Trading Systems
 ```
 
-关键原则：
+核心结论：
 
 - Platform Backend 采用模块化单体。
-- Execution Runtime 必须独立于 Platform API 进程。
-- 开发和初期部署可以同机，但不得合并为同一进程。
+- Execution Runtime 独立于 Platform API 进程。
+- 开发和初期部署可以同机，但不得合并进程和故障边界。
 - Platform Backend 不直接导入 Broker、Exchange、MetaTrader5 和 CTP SDK。
-- Runtime OMS 不是永久业务数据库。
-- Read Model 不是业务写入权威。
+- Runtime OMS 和 Local Journal 不形成平台永久业务权威。
+- Read Model 不形成业务写入权威。
 - 外部组件通过 Adapter／Port 接入。
 
 ## 4. 总体架构
 
-核心文档：
-
-- `platform-target-architecture.md`
-- `module-ownership-matrix.md`
-- `security-observability-and-operations.md`
-- `2026-07-17-开源与外部能力采用矩阵-DRAFT.md`
-
-总体架构负责：
-
-- 产品模块、架构视角、逻辑分层和工程主体的关系。
-- Platform Backend 与 Execution Runtime 的边界。
-- Command、Event、数据权威、恢复和对账原则。
-- 外部组件采用边界。
+- `platform-target-architecture.md`：总体逻辑分层、工程主体、数据权威和演进原则。
+- `module-ownership-matrix.md`：产品归属、技术领域和数据权威。
+- `security-observability-and-operations.md`：跨层安全和运行治理。
+- `2026-07-17-开源与外部能力采用矩阵-DRAFT.md`：外部能力候选和 PoC 边界。
 
 ## 5. 前端架构
 
@@ -136,19 +126,7 @@ External Trading Systems
 - DeploymentEnvironment、TradingMode 和 TradingPermissionState 分开。
 - 权限展示不替代后端校验。
 - Domain Model、View Model 和请求状态分开。
-- 实时 Event 不是页面恢复的唯一来源。
-
-前端内部：
-
-```text
-Router
-→ Module Shell
-→ Page Orchestrator
-→ Use Case / Composable
-→ Domain Model / View Model
-→ Repository Interface
-→ Mock Adapter / API Adapter
-```
+- 实时 Event 不是恢复的唯一来源。
 
 ## 6. 后端架构
 
@@ -157,41 +135,47 @@ Router
 - `backend/backend-overview.md`
 - `backend/service-boundaries.md`
 - `backend/trading-execution-reliability.md`
+- `backend/execution-runtime-and-gateway.md`
 - `backend/storage-ledger-and-audit.md`
 - `backend/query-and-read-models.md`
 - `backend/research-data-and-content-boundaries.md`
 
 核心原则：
 
-- Platform Backend 采用模块化单体。
-- 每个对象具有唯一主责模块。
+- 每个对象只有一个主责模块。
 - StrategyAccountBinding 归 Strategy，Account 主档归 Account。
-- Execution Market Data、Research Data 和 Content and Calendar Data 分开。
-- Strategy Economic Ledger 不等于完整财务会计总账。
-- Backend Read Model 不形成第二套数据权威。
-- Broker SDK 和 Runtime 内部实现不进入 Domain 层。
+- Trading 不直接连接外部交易系统。
+- Execution Runtime 不拥有平台 ExecutionBatch、Risk 和 PnL。
+- Execution Market Data、Research Data 和 Content Data 分开。
+- Strategy Economic Ledger 不等于财务总账。
+- 同库部署不允许跨模块任意写入。
 
-## 7. Execution Runtime 与外部接入
+## 7. Execution Runtime 与 Gateway
 
-总体边界已经由 ADR-008 接受。
+专项文档：
 
-后续专项文档需要继续形成：
+- `backend/execution-runtime-and-gateway.md`
+- `backend/trading-execution-reliability.md`
 
-- Runtime Definition、Instance、Session 和 Worker。
-- Gateway Definition、Runtime 和 Capability。
-- Runtime Command／Event Envelope。
-- Runtime Local Journal。
-- MT5 Worker 和 Terminal 管理。
-- Crypto Gateway 和账户模式。
-- 后续 CTP Gateway、平今平昨和交易日。
-- 启动同步、对账、恢复和 READY。
-- 外部手工订单和结果未知。
+已确认：
 
-当前已确认：
-
-- Crypto 与 MT5 属于初期目标接入。
+- Runtime Main 与 Worker 分层。
+- MT5 和 Crypto 属于初期目标能力。
 - CTP 可以延后。
-- Runtime 独立进程不等于立即采用微服务或多机部署。
+- Port 和 GatewayCapability 按能力设计。
+- platformOrderId 在外部提交前存在。
+- Runtime 需要本地可靠 Journal。
+- 采用至少一次传输、幂等和结果未知语义。
+- 外部手工订单和未归属对象必须如实摄取。
+
+待专项确认：
+
+- Runtime 语言和进程框架。
+- Command／Event 传输产品。
+- Local Journal 技术。
+- MT5 Worker 和 Terminal 资源模型。
+- Crypto 使用 CCXT、官方 SDK 或组合 Adapter。
+- 正式 Envelope Schema 和部署拓扑。
 
 ## 8. 前后端协作架构
 
@@ -204,13 +188,13 @@ Router
 核心原则：
 
 - Query、Command 和 Event 分开。
-- 命令已受理不等于交易已完成。
-- API 具备稳定错误码、幂等和版本策略。
+- Command accepted 不等于外部执行完成。
+- API 具备稳定错误码、幂等和版本。
 - 实时通道不是唯一数据来源。
-- 断线后通过权威 Query 恢复状态。
-- 外部操作结果未知时不得盲目重复执行。
+- 断线后通过权威 Query 恢复。
+- 结果未知时不得盲目重复操作。
 
-交易链路：
+统一交易链：
 
 ```text
 TradeIntent
@@ -236,17 +220,17 @@ TradeIntent
 
 核心原则：
 
-- DTO、Domain Model、ORM Model、Backend Read Model、API DTO 和 View Model 分开。
+- DTO、Domain Model、ORM Model、Read Model 和 View Model 分开。
 - TradeCommand 表达命令受理，ExecutionBatch 表达执行过程。
 - Order、Fill、Position、Exposure、PnL 和 Risk 分开。
-- ExecutionBalanceStatus 不表示账户余额。
 - 权限、审批、风险和审计不能互相替代。
 
-下一批需要正式补充：
+下一批需要补充：
 
 - ExecutionPlan。
 - RuntimeDefinition／RuntimeInstance／RuntimeSession。
 - GatewayDefinition／GatewayRuntime／GatewayCapability。
+- WorkerDefinition／WorkerInstance。
 - RecoveryRun。
 - RuntimeCommandEnvelope／RuntimeEventEnvelope。
 - ExternalOrderReference。
@@ -257,16 +241,16 @@ TradeIntent
 
 | 内容 | 主责 |
 |---|---|
-| 用户、角色、Capability 和 Data Scope | IAM |
+| 用户、Capability 和 Data Scope | IAM |
 | 策略定义、版本、实例和账户绑定 | Strategy |
-| 平台交易命令、批次、腿和平台订单 | Trading and Execution |
+| 平台命令、批次、腿和平台订单 | Trading and Execution |
 | 外部订单、成交、余额和持仓事实 | 外部交易系统；平台标准化并持久化 |
 | 账户主档、余额、保证金和持仓 | Account and Position |
 | 风险规则、判断和事件 | Risk |
 | 对账和数据质量 | Reconciliation and Data Quality |
 | EconomicEvent、策略账本和 PnL | PnL and Strategy Economic Ledger |
 | Runtime、Gateway 和 Worker 实时状态 | Execution Runtime |
-| 查询聚合 | Query and Read Models，非写入权威 |
+| 页面聚合 | Query and Read Models，非写入权威 |
 | 审计证据 | Audit |
 
 ## 11. 外部组件
@@ -278,18 +262,17 @@ TradeIntent
 当前原则：
 
 - 按能力采用，不整体采用某一仓库。
-- 平台自建业务领域模型和数据权威。
-- vn.py 可优先 PoC EventEngine、OmsEngine、CTP、Spread、Algo 和底层 Risk 能力。
-- CCXT 可优先 PoC Crypto 公共行情、元数据和部分私有接口。
-- MetaTrader5 官方包作为 MT5 基础访问候选。
-- aiomql、NautilusTrader、rotki 和 Freqtrade 主要提供局部实现或设计参考。
-- 所有正式采用需要 PoC、许可证、安全、恢复、对账和必要 ADR。
+- 平台自建业务模型和数据权威。
+- vn.py 可 PoC EventEngine、OmsEngine、CTP、Spread、Algo 和底层 Risk。
+- CCXT 可 PoC Crypto 公共行情、元数据和部分私有接口。
+- MetaTrader5 官方包是 MT5 基础访问候选。
+- aiomql、NautilusTrader、rotki 和 Freqtrade 提供局部实现或设计参考。
+- 正式采用需要 PoC、许可证、安全、恢复、对账和必要 ADR。
 
 ## 12. 产品需求与策略文档
 
-产品架构入口：
+产品需求：
 
-- `../modules/一级模块定位总表.md`
 - `../modules/首页-需求文档.md`
 - `../modules/对冲基金看板-需求文档.md`
 - `../modules/新闻日历与理财-需求文档.md`
@@ -298,7 +281,7 @@ TradeIntent
 - `../modules/策略管理-需求文档.md`
 - `../modules/风控管理-需求文档.md`
 
-策略文档：
+策略专项：
 
 - `../strategies/资费套利.md`
 - `../strategies/跨所价差.md`
@@ -307,9 +290,7 @@ TradeIntent
 - `../strategies/短线交易员L.md`
 - `../strategies/短线交易员W.md`
 
-技术设计必须以对应产品和策略需求为前置输入。
-
-金融AI分析继续保留一级产品模块，但当前冻结专项需求、架构、领域对象和开发安排。
+金融AI分析保留一级产品模块，但当前冻结专项需求、架构、领域对象和开发安排。
 
 ## 13. 架构决策
 
@@ -322,32 +303,31 @@ TradeIntent
 - `decisions/ADR-007-部署环境与交易模式分离.md`
 - `decisions/ADR-008-总体逻辑分层与独立交易Runtime.md`
 
-历史 ADR 不直接覆盖修改；新的 accepted ADR 通过说明补充或替代关系生效。
-
 ## 14. 当前成熟度
 
 | 层级 | 当前状态 |
 |---|---|
-| 产品架构 | 当前推进的五个模块和六份策略需求已完成第一轮深化；金融AI冻结 |
-| 总体架构 | 六层逻辑职责、三个工程主体和独立 Runtime 已形成 active 基线 |
+| 产品架构 | 当前推进五个模块与六份策略已完成第一轮深化；金融AI冻结 |
+| 总体架构 | 六层逻辑职责、三个工程主体和独立 Runtime 已 active |
 | 前端架构 | 规范已形成，代码仍需逐步接入 |
-| 后端架构 | 模块化单体和领域边界已形成，需同步独立 Runtime 契约 |
-| 公共领域模型 | 主要业务对象已形成，Runtime／Gateway 对象待正式补充 |
-| 前后端协作 | 基础契约已形成，具体 OpenAPI 和 Runtime Envelope 尚未建立 |
+| 后端架构 | 模块化单体、模块边界、交易可靠性和 Runtime 专项已形成 |
+| 公共领域模型 | 业务对象已形成，Runtime／Gateway 对象待同步 |
+| 协作契约 | 基础 API 和前端实时规范已形成，Runtime Envelope 待正式 Schema |
+| 数据架构 | 现有专题已形成，下一步需要统一数据架构收敛 |
 | 实盘能力 | 尚未接入，不具备真实交易条件 |
 
 ## 15. 文档读取顺序
 
-### 页面与前端任务
+### 页面与前端
 
 1. 对应模块需求。
-2. 对应策略文档，适用时。
+2. 对应策略文档。
 3. `platform-target-architecture.md`。
-4. 前端架构文档。
+4. 前端架构。
 5. 协作契约。
-6. 相关代码。
+6. 代码。
 
-### 后端领域任务
+### 后端领域
 
 1. 对应模块和策略需求。
 2. `platform-target-architecture.md`。
@@ -356,18 +336,18 @@ TradeIntent
 5. 对应后端专题。
 6. 协作契约和 ADR。
 
-### Runtime 与 Gateway 任务
+### Runtime 与 Gateway
 
 1. 对应策略需求。
 2. `platform-target-architecture.md`。
 3. ADR-008。
-4. 开源与外部能力采用矩阵。
-5. Runtime 与 Gateway 专项架构。
+4. `backend/execution-runtime-and-gateway.md`。
+5. 开源与外部能力采用矩阵。
 6. PoC 和采用 ADR。
 
 ## 16. Draft 与暂缓内容
 
-以下内容为 draft，不自动覆盖 active 架构：
+以下 draft 不自动覆盖 active 架构：
 
 - `implementation-roadmap.md`
 - `2026-07-17-Variable-Global交易平台总体架构方案-DRAFT.md`
@@ -375,12 +355,12 @@ TradeIntent
 - `2026-07-17-开源与外部能力采用矩阵-DRAFT.md`
 - `2026-07-16-平台新增功能初步方案-DRAFT.md`
 
-其中总体架构讨论稿中已经确认的部分，已通过 `platform-target-architecture.md` 和 ADR-008 进入 active 架构；未确认技术选型仍保留为 draft。
+总体架构讨论稿中已确认部分已经通过 `platform-target-architecture.md` 和 ADR-008 进入 active；未确认技术选型继续保留为 draft。
 
-以下文件为 superseded：
+Superseded：
 
 - `2026-07-16-vnpy平台架构初步方案-DRAFT.md`
 
-金融AI分析暂缓范围见：
+金融AI暂缓：
 
 - `2026-07-17-金融AI分析暂缓说明-DRAFT.md`
