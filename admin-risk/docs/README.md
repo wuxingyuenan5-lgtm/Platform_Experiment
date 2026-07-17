@@ -3,7 +3,8 @@
 状态：`active`  
 产品基线：Platform V5  
 架构版本：Platform V6  
-适用分支：`refactor/frontend-architecture-v6`
+适用分支：`refactor/frontend-architecture-v6`  
+文档层级：统一文档入口
 
 ## 1. 文档定位
 
@@ -11,23 +12,23 @@
 
 项目讨论、需求调整和开发任务以本文件列出的 active 文档为准。Draft、历史交接和 archive 不作为默认实施依据。
 
-## 2. 产品架构
+## 2. 一级产品架构
 
-Platform V5 的用户可见产品结构保持六个一级模块：
+平台固定包含六个一级模块：
 
 1. 首页。
 2. 对冲基金看板。
 3. 新闻日历与理财。
 4. 策略。
 5. 风险管理。
-6. 金融 AI。
+6. 金融AI分析。
 
 产品层级和职责：
 
 - `modules/一级模块定位总表.md`
 - `architecture/module-ownership-matrix.md`
 
-产品菜单位置不等于后端服务、数据库表和数据权威归属。
+正式模块名称以 `governance/glossary.md` 为唯一来源。产品菜单位置不等于后端服务、数据库表和数据权威归属。
 
 ## 3. 技术架构
 
@@ -54,23 +55,49 @@ Platform V6 技术架构分为：
 
 ## 4. Active 产品文档
 
-### 4.1 模块定位与需求
+### 4.1 一级模块总表
 
 - `modules/一级模块定位总表.md`
+
+### 4.2 首页
+
 - `modules/首页-模块定位.md`
+- `modules/首页-需求文档.md`
+
+### 4.3 对冲基金看板
+
 - `modules/对冲基金看板-模块定位.md`
+- `modules/对冲基金看板-需求文档.md`
+
+### 4.4 新闻日历与理财
+
 - `modules/新闻日历与理财-模块定位.md`
+- `modules/新闻日历与理财-需求文档.md`
+
+### 4.5 策略
+
 - `modules/策略-模块定位.md`
+- `modules/策略-需求文档.md`
 - `modules/交易平台-模块定位.md`
 - `modules/交易平台-需求文档.md`
 - `modules/策略管理-模块定位.md`
 - `modules/策略管理-需求文档.md`
+
+### 4.6 风险管理
+
 - `modules/风控管理-模块定位.md`
+- `modules/风控管理-需求文档.md`
+
+文件名中的“风控管理”暂时保留历史路径兼容，正文正式名称统一使用“风险管理”。
+
+### 4.7 金融AI分析
+
 - `modules/金融AI分析-模块定位.md`
+- `modules/金融AI分析-需求文档.md`
 
-现有文件名暂时保留兼容；正式一级模块名称以术语表中的“风险管理”和“金融 AI”为准。
+六个一级模块均已具备“模块定位 + 需求文档”。
 
-### 4.2 策略定义
+### 4.8 策略定义
 
 - `strategies/资费套利.md`
 - `strategies/跨所价差.md`
@@ -79,7 +106,7 @@ Platform V6 技术架构分为：
 - `strategies/短线交易员L.md`
 - `strategies/短线交易员W.md`
 
-### 4.3 UI 设计
+### 4.9 UI 设计
 
 - `design/platform-ui-guidelines.md`
 
@@ -138,16 +165,15 @@ Platform V6 技术架构分为：
 
 架构决策变化时新增替代 ADR，并保留历史决策。
 
-## 6. 文档治理和术语
+## 6. 文档治理和唯一来源
 
 - `governance/document-rules.md`
 - `governance/glossary.md`
 
-重要唯一来源：
-
 | 内容 | 主文档 |
 |---|---|
-| 中文术语 | `governance/glossary.md` |
+| 正式中文术语 | `governance/glossary.md` |
+| 一级模块和完整性 | `modules/一级模块定位总表.md` |
 | 公共对象 | `architecture/domain-model-boundaries.md` |
 | 状态枚举 | `architecture/domain/status-enums-and-lifecycles.md` |
 | 后端模块所有权 | `architecture/backend/service-boundaries.md` |
@@ -167,6 +193,8 @@ Platform V6 技术架构分为：
 - `quality/release-gate.md`
 - `quality/smoke-checklist.md`
 
+当前实现、具体文件、Mock 位置和技术债务进入 audit 或实施盘点，不写入正式模块定位和需求。
+
 特殊人工维护源：
 
 - `trading-tools-bookmarks-review.md`
@@ -175,88 +203,72 @@ Platform V6 技术架构分为：
 
 ## 8. Draft 文档
 
-以下文件只用于后续讨论，不是当前开发和实施依据：
+以下文件只用于讨论，不是当前实施依据：
 
 - `architecture/implementation-roadmap.md`
 - `architecture/2026-07-16-vnpy平台架构初步方案-DRAFT.md`
 - `architecture/2026-07-16-平台新增功能初步方案-DRAFT.md`
 
-Draft 中的阶段、技术选型和新增功能，只有在用户确认并合并进 active 文档或 ADR 后才生效。
+Draft 中的阶段、技术选型和新增功能，只有确认并合并进 active 文档或 ADR 后才生效。
 
 ## 9. 文档读取顺序
 
-### 9.1 产品或模块任务
+### 产品或模块任务
 
 1. `docs/README.md`
 2. `modules/一级模块定位总表.md`
 3. 对应模块定位和需求
 4. `design/platform-ui-guidelines.md`
 5. `architecture/module-ownership-matrix.md`
-6. 相关代码
+6. 相关架构文档和代码
 
-### 9.2 策略任务
+### 策略任务
 
-1. `docs/README.md`
-2. `modules/策略-模块定位.md`
+1. `modules/策略-模块定位.md`
+2. `modules/策略-需求文档.md`
 3. 交易平台或策略管理需求
 4. 对应 `strategies/*.md`
-5. `architecture/strategy-capability-matrix.md`
-6. `architecture/strategy-registry.md`
-7. `architecture/domain-model-boundaries.md`
-8. 相关代码
-
-### 9.3 前端任务
-
-1. 对应模块和策略文档
-2. `architecture/frontend/frontend-overview.md`
-3. `architecture/frontend/routing-permission-and-environment.md`
-4. `architecture/frontend/data-adapter-and-view-model.md`
-5. `architecture/frontend-state-ownership.md`
-6. `architecture/shared-ui-governance.md`
+5. 策略能力和注册表规范
+6. 公共领域模型
 7. 相关代码
 
-### 9.4 后端领域任务
+### 前端任务
 
-1. 对应模块和策略需求
-2. `architecture/domain-model-boundaries.md`
-3. `architecture/domain/status-enums-and-lifecycles.md`
-4. `architecture/backend/service-boundaries.md`
-5. 对应后端专题文档
-6. `architecture/integration/frontend-backend-integration.md`
-7. 专项技术方案和 ADR
+1. 对应产品和策略文档
+2. 前端总览
+3. 路由、权限与运行上下文
+4. 数据适配与 View Model
+5. 状态归属
+6. 共享 UI
+7. 相关代码
 
-### 9.5 API 和实时任务
+### 后端领域任务
 
-1. 对应业务需求
-2. `architecture/domain-model-boundaries.md`
-3. `architecture/integration/frontend-backend-integration.md`
-4. `architecture/integration/api-contract-and-versioning.md`
-5. `architecture/integration/realtime-events-and-recovery.md`
-6. 具体 OpenAPI 和事件契约
+1. 对应产品和策略需求
+2. 公共领域对象和状态
+3. 服务边界
+4. 对应后端专题
+5. 协作契约
+6. 专项方案和 ADR
 
-### 9.6 规划任务
+### 规划任务
 
-1. 完成全部相关 active 架构审阅。
+1. 完成相关 active 架构和产品文档审阅。
 2. 阅读 `architecture/implementation-roadmap.md` 作为讨论输入。
 3. 确认目标、优先级、人员、依赖和约束。
 4. 另行形成正式 planning 文档、issue 或 milestone。
 
-## 10. 文档状态
+## 10. 文档状态和维护
 
 - `active`：当前有效。
 - `draft`：讨论稿，不替代 active 文档。
 - `superseded`：已被新文档替代。
 - `archived`：仅供历史追溯。
 
-详细规则见 `governance/document-rules.md`。
+维护原则：
 
-## 11. 维护原则
-
-- 产品边界变化时先更新模块或策略文档。
-- 公共对象变化时先更新领域模型和状态唯一来源。
-- 前端变化更新前端规范。
-- 后端所有权变化更新服务边界并形成 ADR，适用时。
-- API 和事件变化更新协作主文档。
-- 具体技术选型通过专项方案和 ADR 确认。
-- 实施阶段和任务安排在正式规划中确认，不写入 active 架构。
-- 当前对话过程不写入正式产品文档。
+- 产品边界变化先更新模块或策略文档。
+- 公共对象变化先更新领域模型和状态唯一来源。
+- 前端、后端和协作变化更新对应架构文档。
+- 技术选型通过专项方案和 ADR 确认。
+- 实施阶段和任务安排在正式规划中确认。
