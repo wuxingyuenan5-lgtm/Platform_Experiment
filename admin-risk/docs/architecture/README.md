@@ -18,6 +18,8 @@ V6 技术架构分为：
 4. 公共领域模型。
 5. 跨层安全、可观测性和治理。
 
+当前还在通过交易平台总体架构 DRAFT 讨论执行基础设施、Runtime、Gateway、外部组件采用和现有 active 架构的潜在调整。讨论稿不会自动覆盖 active 架构，但 active 架构也不是不可修改；确认结论后通过 ADR 和正式文档更新生效。
+
 ## 2. 产品架构与技术架构
 
 平台保持六个一级产品模块：
@@ -42,7 +44,7 @@ V6 技术架构分为：
 | 领域归属 | Strategy、Order、PnL 等对象的共同语义 | `domain/`、`domain-model-boundaries.md` |
 | 跨层治理 | 安全、监控、发布、恢复和文档治理 | 本目录跨层文档、`docs/governance/` |
 
-## 3. 当前目标结构
+## 3. 当前 active 目标结构
 
 ```text
 Vue Frontend
@@ -92,6 +94,8 @@ Order
 Execution / Fill
 ```
 
+交易平台总体架构 DRAFT 正在讨论是否进一步增加 ExecutionPlan、Execution Infrastructure、Runtime Control Plane 和更明确的外部系统权威分层。
+
 ## 4. 前端架构
 
 核心文档：
@@ -132,6 +136,12 @@ Execution / Fill
 - Strategy Economic Ledger 不等于完整财务会计总账。
 - Backend Read Model 不形成第二套数据权威。
 
+交易平台总体架构 DRAFT 将进一步检验：
+
+- Application、Domain 和 Execution Infrastructure 是否需要更明确分层。
+- Runtime、Gateway、Worker 和平台业务领域如何协作。
+- 外部项目按能力复用时是否需要新增 Port、Adapter 和运行控制面。
+
 ## 6. 前后端协作架构
 
 核心文档：
@@ -165,6 +175,17 @@ Execution / Fill
 - ExecutionBalanceStatus 不表示账户余额。
 - 权限、审批、风险和审计不能相互替代。
 
+待讨论候选对象包括：
+
+- ExecutionPlan。
+- RuntimeDefinition／RuntimeInstance。
+- GatewayDefinition／GatewayRuntime。
+- RecoveryRun。
+- RuntimeEventEnvelope。
+- ExternalOrderReference 和 ExternalPositionSnapshot。
+
+这些对象当前只存在于 DRAFT，不属于 active 公共领域模型。
+
 ## 8. 产品模块文档完整性
 
 产品架构入口：
@@ -184,6 +205,8 @@ Execution / Fill
 
 架构文档不重新定义具体页面功能；技术设计必须以对应产品需求为前置输入。
 
+金融AI分析当前只补充信息、权限和只读数据边界，不进入交易系统开发范围。
+
 ## 9. 跨层规范
 
 - `module-ownership-matrix.md`：产品归属、技术领域和数据权威。
@@ -201,6 +224,8 @@ Execution / Fill
 - `decisions/ADR-005-技术架构分层.md`
 - `decisions/ADR-006-后端优先采用模块化单体.md`
 - `decisions/ADR-007-部署环境与交易模式分离.md`
+
+交易平台总体架构讨论可能形成新的 ADR，或替代现有 ADR 的部分技术结论。历史 ADR 保留，不直接覆盖修改。
 
 ## 11. 唯一事实来源速查
 
@@ -225,9 +250,9 @@ Execution / Fill
 |---|---|
 | 产品架构 | 六个一级模块定位和需求已形成正式基线 |
 | 前端架构 | 规范已形成，代码仍需逐步接入 |
-| 公共领域模型 | 主要对象、状态和审批边界已形成 |
-| 前后端协作 | 基础契约已形成，具体 OpenAPI 尚未建立 |
-| 后端架构 | 逻辑边界已形成，真实服务和存储尚未建设 |
+| 公共领域模型 | 主要对象、状态和审批边界已形成，执行基础设施对象仍在讨论 |
+| 前后端协作 | 基础契约已形成，具体 OpenAPI 和 Runtime 契约尚未建立 |
+| 后端架构 | 逻辑边界已形成，Execution Infrastructure 和 Runtime 架构正在讨论 |
 | 实盘能力 | 尚未接入，不具备真实交易条件 |
 
 ## 13. 文档读取顺序
@@ -259,10 +284,28 @@ Execution / Fill
 5. 实时事件与恢复
 6. 具体 OpenAPI 和事件契约
 
+### 交易平台总体架构讨论
+
+1. `2026-07-17-Variable-Global交易平台总体架构方案-DRAFT.md`
+2. `2026-07-17-开源与外部能力采用矩阵-DRAFT.md`
+3. 对照本入口列出的 active 架构
+4. 逐项确认保留、修改、新增或删除
+5. 形成 ADR 和 active 文档更新
+6. 最后进入规划和实施
+
 ## 14. 暂不生效内容
 
 以下文档为 draft，不进入 active 架构：
 
 - `implementation-roadmap.md`
-- `2026-07-16-vnpy平台架构初步方案-DRAFT.md`
+- `2026-07-17-Variable-Global交易平台总体架构方案-DRAFT.md`
+- `2026-07-17-开源与外部能力采用矩阵-DRAFT.md`
 - `2026-07-16-平台新增功能初步方案-DRAFT.md`
+
+当前优先讨论交易平台总体架构和能力采用方式，暂不讨论新增功能清单和实施排期。
+
+以下文件为 superseded：
+
+- `2026-07-16-vnpy平台架构初步方案-DRAFT.md`
+
+该文件仅作为历史跳转和 Git 追溯入口。
