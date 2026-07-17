@@ -1,205 +1,511 @@
-# Platform V6 后端架构总览
+# Platform V6+ 后端架构总览
 
 状态：`active`  
 产品基线：Platform V5  
-架构版本：Platform V6  
+架构版本：Platform V6+  
 适用分支：`refactor/frontend-architecture-v6`  
 文档层级：后端架构
 
+上位约束：
+
+- `../platform-target-architecture.md`
+- `../decisions/ADR-006-后端优先采用模块化单体.md`
+- `../decisions/ADR-008-总体逻辑分层与独立交易Runtime.md`
+- `service-boundaries.md`
+
 ## 1. 文档定位
 
-本文档定义 Platform V6 后端的目标职责、逻辑边界和建设原则。当前尚未确定具体交易内核、数据库、消息队列或部署拓扑，因此本文不作为具体技术选型方案。
+本文定义 Platform Backend 的目标职责、内部形态、与 Execution Runtime 的边界、逻辑领域、数据权威、Command／Query／Event 原则和安全可靠性要求。
 
-后端负责业务事实、规则执行、数据持久化和系统可靠性；前端负责交互、展示和用户输入。订单、成交、账户、持仓、损益、风险和审计的最终权威不得存在于浏览器本地状态中。
+本文所称“后端”主要指 `platform-backend`，不把 `execution-runtime` 误认为模块化单体内部普通模块。
 
-## 2. 目标架构形态
-
-当前阶段采用模块化单体后端，并为交易执行、行情接入、Gateway 和重型异步任务保留独立进程边界。
+平台总体工程主体为：
 
 ```text
-Web / Client
-    ↓
-Platform API / BFF
-    ↓
-Application Services
-    ↓
-Domain Services
-    ↓
-Repositories / Event Publishers
-    ↓
-Database / Cache / External Gateways
+admin-risk
++
+platform-backend
++
+execution-runtime
 ```
 
-不在业务边界尚未稳定前直接拆成大量微服务。
+其中：
 
-## 3. 逻辑领域
+- Platform Backend 负责业务规则、业务状态、平台持久化和查询。
+- Execution Runtime 负责外部交易连接、订单执行、实时 OMS 和运行恢复。
+- 两者使用平台自有 Command／Event／Port 契约协作。
 
-### Identity and Access Management
+## 2. 目标形态
 
-负责用户、角色、能力权限、数据范围、会话和安全策略。
+Platform Backend 初期采用模块化单体：
 
-### Execution Market Data
+```text
+Platform API / BFF
+        ↓
+Application Modules
+        ↓
+Domain Modules
+        ↓
+Repository / Query / Event / Runtime Ports
+        ↓
+Infrastructure Adapters
+        ├─ Platform Database
+        ├─ Cache / Async Tasks
+        ├─ Read Model Storage
+        └─ Runtime Command / Event Adapter
+```
 
-负责交易执行所需行情、标的、合约规则、报价、资金费率、汇率和数据新鲜度。
+Execution Runtime 独立运行：
 
-### Research Data
+```text
+Runtime Main
+├─ Command Consumer
+├─ Event Publisher
+├─ Runtime Journal
+├─ Worker Registry
+├─ Crypto Worker(s)
+├─ MT5 Worker(s)
+└─ CTP Worker(s)，后续
+```
 
-负责宏观、资产、公司、行业、ETF、流动性和研究衍生数据及其版本、修订和质量。
+禁止：
 
-### Content and Calendar
+- 在 Platform API 进程中直接加载 MetaTrader5、Broker 或 Exchange SDK。
+- 在业务边界尚未稳定前拆分大量微服务。
+- 让 Runtime 直接修改 Platform Backend 内部业务表。
+- 让浏览器、Runtime OMS 或外部组件数据库成为平台最终业务权威。
 
-负责新闻、摘要、宏观事件、财报事件和理财信息等内容数据。
+## 3. Platform Backend 分层
 
-### Strategy
+### 3.1 API／BFF 层
 
-负责 StrategyDefinition、StrategyVersion、StrategyInstance、参数和 StrategyAccountBinding。
+负责：
 
-### Trading and Execution
+- HTTP、WebSocket 或 SSE 接入。
+- 请求和响应 DTO。
+- 身份和会话解析。
+- 请求级校验、错误映射和追踪上下文。
+- 页面需要的 Query 和 Command 入口。
 
-负责 TradeIntent、TradeCommand、ExecutionBatch、LegInstruction、Order、Fill、执行配平、暴露、幂等和异常恢复。
+不负责：
 
-### Account and Position
+- 直接编写交易业务规则。
+- 直接调用 Broker SDK。
+- 在请求中等待外部订单最终成交。
+- 返回“已受理”时表示“已成交”。
 
-负责 Account 主档、余额、权益、保证金、Position 和快照。
+### 3.2 Application 层
 
-### PnL and Strategy Economic Ledger
+负责：
 
-负责 EconomicEvent、实际损益、策略归因、估值、重算和 AdjustmentEntry，不等于完整财务会计总账。
+- 用例编排。
+- Capability、Data Scope、Environment 和 TradingMode 校验。
+- 幂等、对象版本和并发控制。
+- ApprovalGrant 和 RiskDecision 协调。
+- TradeCommand、ExecutionBatch、人工干预和数据修正流程。
+- 跨领域 Query 聚合请求。
+- 审计和事件上下文。
 
-### Risk
+Application 层可以协调多个领域，但不得直接修改其他模块内部表。
 
-负责风险指标、规则、判断、事件、处置和 GlobalTradingBlock。
+### 3.3 Domain 层
 
-### Reconciliation and Data Quality
+负责：
 
-负责订单、成交、持仓、余额、费用和损益对账，以及数据完整、延迟、重复、冲突和修正记录。
+- 业务对象、规则、不变量和生命周期。
+- 领域 Command、Decision 和 Event。
+- 稳定业务 ID 和对象关系。
+- 领域服务和策略专项口径。
 
-### Approval and Control
+Domain 层不得依赖：
+
+- FastAPI 等 Web 框架。
+- ORM 具体实现。
+- Redis、消息队列和数据库客户端。
+- vn.py、CCXT、MetaTrader5、aiomql 和交易所 SDK。
+- Runtime 进程内部类。
+
+### 3.4 Infrastructure 层
+
+负责：
+
+- Repository 实现。
+- ORM、数据库、缓存和任务系统。
+- 外部数据源和内容接口 Adapter。
+- Runtime Command／Event 传输 Adapter。
+- 文件、报表和对象存储。
+- Secret 引用和基础设施配置。
+
+基础设施实现不得反向定义领域对象和业务状态。
+
+### 3.5 Query and Read Model
+
+负责：
+
+- 聚合多个领域的只读结果。
+- 为页面和报表形成稳定投影。
+- 缓存、失效、重建和数据截止时间。
+- 数据质量、来源和计算版本展示。
+
+Read Model：
+
+- 不接受业务写入。
+- 不替代领域 Repository。
+- 不作为恢复和对账的最终权威。
+- 必须能通过稳定 ID 穿透至源对象。
+
+## 4. 逻辑领域
+
+### 4.1 IAM and Permission
+
+负责 User、Role、Capability、DataScope、EnvironmentScope、TradingModeScope、Session 和安全策略。
+
+### 4.2 Strategy
+
+负责：
+
+- StrategyDefinition。
+- StrategyVersion。
+- StrategyInstance。
+- StrategyParameterSet。
+- StrategyAccountBinding。
+- ExternalExecutionProfile。
+- SignalRecord 的策略身份和版本关系，适用时。
+
+### 4.3 Trading and Execution
+
+负责：
+
+- TradeIntent。
+- TradeCommand。
+- ExecutionBatch。
+- 版本化 ExecutionPlan。
+- LegInstruction。
+- 平台 Order 身份和状态。
+- Fill 标准化记录。
+- ExecutionBalanceStatus、ExposureStatus 和 ManualIntervention。
+- 结果未知、幂等和业务恢复状态。
+
+Trading 不直接连接外部系统，而是通过 Runtime Port 发出命令。
+
+### 4.4 Account and Position
+
+负责：
+
+- Account 主档和状态。
+- AccountCapability。
+- BalanceSnapshot。
+- MarginSnapshot。
+- Position 和 PositionSnapshot。
+- CapitalAllocation，范围确认后。
+
+StrategyAccountBinding 不归 Account。
+
+### 4.5 Execution Market Data
+
+负责：
+
+- Venue、Instrument 和 ContractSpecification。
+- Symbol Mapping。
+- Quote、Depth、Kline 和 MarketStatus。
+- FundingRate、FxRate 和交易时段。
+- 数据来源、新鲜度和 MarketDataQuality。
+
+执行行情不能由页面图表数据或 Research Data 无提示替代。
+
+### 4.6 Research Data
+
+负责宏观、资产、行业、公司和研究衍生数据及其版本、修订、血缘和质量。
+
+### 4.7 Content and Calendar
+
+负责新闻、StoryCluster、CalendarEvent、WealthOpportunity、内容版本、来源和审核状态。
+
+### 4.8 Risk
+
+负责：
+
+- RiskMetric。
+- RiskRule。
+- RiskLimit。
+- RiskSnapshot。
+- RiskDecision。
+- RiskEvent 和 RiskResolution。
+- GlobalTradingBlock。
+- ViolationRecord 的风险判断，适用时。
+
+Risk 可以读取 Trading、Account、Position 和 PnL，但不拥有这些事实。
+
+### 4.9 Approval and Control
 
 负责 ApprovalPolicy、ApprovalRequest、ApprovalDecision、ApprovalGrant 和 Maker／Checker。
 
-### Audit and Notification
+审批通过不等于目标 Command 已执行成功。
 
-负责关键操作审计、配置和修正追踪，以及通知投递和阅读状态。
+### 4.10 Reconciliation and Data Quality
 
-### Reporting
+负责：
 
-负责正式报表定义、生成任务、版本和导出。
+- ReconciliationRun／Job。
+- ReconciliationResult。
+- ReconciliationDifference。
+- DataQualityStatus。
+- DataCorrectionRecord。
+- 对订单、成交、持仓、余额、费用、EconomicEvent 和 PnL 的核对。
 
-### AI Support
+不得无痕覆盖其他领域的原始事实。
 
-为金融AI分析提供受权限控制、可追溯的查询、任务和结果支持，不拥有原始业务事实。
+### 4.11 PnL and Strategy Economic Ledger
 
-## 4. 产品模块与后端领域
+负责：
 
-| 产品入口 | 主要后端领域 |
-|---|---|
-| 首页 | Query Read Model、各领域摘要 |
-| 对冲基金看板 | Research Data、部分 Execution Market Data |
-| 新闻日历与理财 | Content and Calendar |
-| 交易平台 | Strategy、Trading、Market Data、Account、Risk |
-| 策略管理 | PnL、Account、Position、Trading、Reconciliation、Read Model |
-| 风险管理 | Risk、Account、IAM、Approval、Audit、Notification、Reporting、Observability |
-| 金融AI分析 | AI Support、Research Data、Content、Permission、Read Model |
+- EconomicEvent。
+- LedgerEntry。
+- PnLResult 和 PnLAttributionItem。
+- ValuationSnapshot。
+- AdjustmentEntry。
+- 版本化重算和数据完整度。
 
-前端菜单不等于后端服务边界。同一后端领域可以被多个页面读取，但只维护一套权威规则和事实。
+Strategy Economic Ledger 不等于完整财务会计总账。
 
-## 5. 命令与查询
+### 4.12 Finance and Treasury
 
-### Query
+在正式业务范围确认后负责公司经营资金、资金任务、划拨、收支和财务协作。
+
+不得用策略 PnL 或交易账户余额拼接替代法定财务总账。
+
+### 4.13 Reporting
+
+负责 ReportDefinition、ReportRun、ReportVersion、ReportArtifact 和访问记录。
+
+### 4.14 Audit
+
+负责 AuditEvent、OperatorContext、ChangeRecord 和 SecurityEvent。
+
+### 4.15 Notification
+
+负责 Notification、DeliveryAttempt、ReadState 和 NotificationPreference。
+
+通知不重新判断源事件的业务严重度。
+
+### 4.16 Configuration
+
+负责 ConfigDefinition、ConfigVersion、FeatureFlag、SecretReference 和激活记录。
+
+系统设置页面不形成万能配置模型。
+
+### 4.17 Query and Read Models
+
+负责跨领域只读聚合，不拥有源业务事实。
+
+### 4.18 金融AI分析
+
+金融AI分析当前冻结：
+
+- 不建立当前专项 AI Orchestration 模块。
+- 不完善 AI 专属领域对象和部署。
+- 不作为其他领域的前置依赖。
+- 继续保留禁止交易、风险、账户、审批和数据修正写入的通用边界。
+
+## 5. Platform Backend 与 Execution Runtime
+
+### 5.1 Platform Backend 对 Runtime 提供
+
+- Runtime Command Envelope。
+- 稳定 commandId、requestId、correlationId 和 idempotencyKey。
+- StrategyInstance、ExecutionBatch、LegInstruction 和 platformOrderId 引用。
+- 已通过权限、风险和审批校验的执行参数。
+- Command 过期时间和 payloadVersion。
+
+### 5.2 Runtime 向 Platform Backend 提供
+
+- Runtime Event Envelope。
+- 外部订单、成交、账户、持仓和费用更新。
+- Gateway、Runtime 和 Worker 状态。
+- 外部 ID、原始状态和错误映射。
+- 同步、恢复和对账输入。
+- 结果未知和人工处理所需证据。
+
+### 5.3 禁止依赖
+
+Platform Backend 不得：
+
+- 直接引用 Runtime 内部 Worker 类。
+- 直接访问 Runtime Local Journal。
+- 通过共享内存控制外部交易 Session。
+- 把 Runtime 日志当作业务数据库。
+
+Runtime 不得：
+
+- 直接调用 Platform Domain 内部 Repository。
+- 直接修改 Strategy、Risk、PnL 和 Approval 数据。
+- 自行创建第二套 ExecutionBatch。
+- 自行决定策略损益归因。
+
+## 6. Command、Query 和 Event
+
+### 6.1 Query
 
 - 可以重复调用。
 - 可以缓存。
-- 返回数据时间、来源和质量。
 - 不改变核心业务事实。
+- 返回数据时间、来源、质量和版本。
+- 支持稳定分页、筛选和权限范围。
 
-### Command
+### 6.2 Command
 
 - 请求改变业务状态。
-- 需要权限、数据范围、风险、审批和幂等检查，适用时。
-- 返回受理或拒绝结果，不把“已受理”等同于“已完成”。
-- 形成审计和追踪上下文。
+- 需要权限、范围、对象版本、风险、审批和幂等检查，适用时。
+- 返回 accepted、rejected 或当前业务状态。
+- accepted 不等于外部执行完成。
+- 高风险 Command 形成审计和追踪上下文。
 
-提交双腿交易后，后端返回 TradeCommand 或 ExecutionBatch 标识，不直接返回“交易成功”。
+### 6.3 Event
 
-## 6. 数据权威
+- 表达已经发生的事实或状态变化。
+- 可以重复、延迟、乱序和补发。
+- 消费者必须幂等。
+- Event 不是跨模块任意修改对象的命令。
+- 实时 Event 不是页面恢复的唯一来源。
 
-| 数据 | 权威来源 |
+## 7. 交易可靠性
+
+交易链路：
+
+```text
+TradeIntent
+→ TradeCommand
+→ ExecutionBatch
+→ ExecutionPlan
+→ LegInstruction
+→ pre-created platform Order
+→ Runtime Command
+→ External Order
+→ Runtime Event
+→ platform Order / Fill / Position
+```
+
+正式原则：
+
+- platformOrderId 在外部提交前创建。
+- 采用至少一次传输和幂等消费。
+- 网络超时不等于外部失败。
+- `result_unknown` 不是可直接重试的失败终态。
+- 外部结果通过 clientOrderId、externalOrderId、历史查询和对账确认。
+- Platform API、Runtime 和 Gateway 重启后都必须能够恢复。
+
+## 8. 数据权威
+
+| 数据 | 主责／权威 |
 |---|---|
-| 用户、角色和权限 | IAM |
-| 交易标的、合约和执行行情 | Execution Market Data |
+| 用户、角色、权限和范围 | IAM |
+| 标的、合约和执行行情 | Execution Market Data |
 | 宏观和研究数据 | Research Data |
 | 新闻、日历和理财内容 | Content and Calendar |
 | 策略版本、实例和账户绑定 | Strategy |
-| 交易命令、执行批次、订单和成交 | Trading and Execution |
-| 账户、余额、保证金和持仓 | Account and Position |
+| 平台命令、执行批次、腿和平台订单 | Trading and Execution |
+| 外部订单、成交、余额和持仓事实 | 外部交易系统；平台标准化并持久化 |
+| 账户、余额、保证金和持仓视图 | Account and Position |
 | 实际损益和策略经济记录 | PnL and Strategy Economic Ledger |
 | 风险规则、判断和事件 | Risk |
 | 对账和数据质量 | Reconciliation and Data Quality |
 | 审批 | Approval and Control |
 | 审计 | Audit |
-| AI 任务和结果 | AI Support；输入事实仍归源领域 |
+| Runtime、Gateway 和 Worker 实时状态 | Execution Runtime |
+| 页面聚合 | Query and Read Models，非写入权威 |
 
-前端缓存、Mock、Read Model、页面表格和导入文件均不是最终权威来源。
+前端缓存、Mock、Runtime OMS、页面表格和原始导入文件均不是平台最终业务权威。
 
-## 7. 数据存储原则
+## 9. 数据存储原则
 
-- 核心对象使用稳定业务 ID。
+- 核心对象使用稳定平台业务 ID。
 - 外部 ID 与平台 ID 分开。
-- 订单和成交分开。
-- 当前状态与历史事件分开。
+- Order 与 Fill 分开。
+- 当前状态、历史 Event 和审计记录分开。
 - 金额保留币种、单位和精度。
 - 时间保留业务时间、外部时间、接收时间和更新时间。
-- 汇率记录来源和时间。
-- 人工修正不覆盖原始事实。
-- 审计和对账记录不可被普通操作无痕修改。
-- 敏感凭证与普通业务数据分离。
+- 汇率记录来源、价格类型和时间。
+- 原始事实与 AdjustmentEntry 分开。
+- DataQualityStatus 与 ReconciliationStatus 分开。
+- Secret 与普通业务数据分开。
+- Runtime Local Journal 与平台业务数据库分开。
 
-## 8. 实时与异步处理
+## 10. 实时与异步
 
-适合实时：
+适合实时更新：
 
-- 报价和行情质量。
-- 命令、执行批次、订单和成交状态。
-- 账户、持仓、暴露和风险状态。
-- Gateway 和服务健康。
+- Quote 和 MarketDataQuality。
+- TradeCommand、ExecutionBatch、Order 和 Fill 状态。
+- Account、Position、Exposure 和 Risk 状态。
+- Gateway、Runtime 和 Worker 状态。
 
-适合异步：
+适合后台异步：
 
 - 历史数据同步。
-- 损益重算。
-- 对账。
+- PnL 重算。
+- Reconciliation。
 - 报表生成。
-- 大批量导入。
-- 金融AI分析任务。
+- 大批量导入和修正。
+- Read Model 重建。
 
-实时连接断开不应导致后台交易或异步任务停止。
+实时通道断开不能终止后台交易和任务。
 
-## 9. 安全与可靠性
+## 11. 安全与可靠性
 
-后端至少具备：
+Platform Backend 至少具备：
 
-- 服务端权限和数据范围校验。
-- 敏感凭证加密与隔离。
-- 命令幂等。
-- 超时、重试和结果未知边界。
-- Gateway 异常隔离。
-- 高风险审批和双人复核。
+- 服务端 Capability 和 Data Scope 校验。
+- DeploymentEnvironment、TradingMode 和 TradingPermissionState 分离。
+- Sensitive Field 最小返回。
+- Secret 加密、隔离和引用管理。
+- Command 幂等和对象版本控制。
+- 结果未知、重试和人工处理边界。
+- Gateway 和账户故障隔离。
+- 高风险审批和 Maker／Checker。
 - 关键操作审计。
-- 数据备份、恢复和对账。
-- 未完成执行和未知结果的人工处理。
+- 数据备份、恢复和 Reconciliation。
+- 未完成 ExecutionBatch 和未知订单恢复。
 
-前端禁用按钮不能替代后端安全控制。
+前端禁用按钮、Runtime connected 和 Gateway heartbeat 不能替代后端安全控制。
 
-## 10. 待专项确认事项
+## 12. 模块化单体演进原则
 
-以下内容不得由本文直接决定：
+初期：
 
-- 是否采用 vn.py 或其他交易内核。
-- MT5、加密交易所和国内期货接入方式。
-- 数据库、时序库、缓存和消息队列选型。
-- 单体与独立进程的具体部署拓扑。
-- 高可用、灾备和生产规模。
-- 金融AI分析的模型供应商和推理部署方案。
+- 领域模块共同部署。
+- 通过代码、Repository、Command、Query 和 Event 保持边界。
+- 不因同库部署而跨模块任意写入。
+- Execution Runtime 独立进程。
 
-上述事项分别形成技术验证、专项方案和 ADR。
+只有出现以下证据时评审模块拆分：
+
+- 明显独立扩缩容。
+- 严格安全、合规或故障隔离。
+- 发布生命周期显著不同。
+- 单体成为真实性能或可用性瓶颈。
+- 团队已经形成独立维护责任。
+
+## 13. 待专项确认
+
+- 后端语言和 Web 框架。
+- ORM、数据库、缓存和消息传输。
+- Platform Backend 与 Runtime 的 Envelope 字段。
+- Outbox／Inbox 和 Runtime Journal 技术。
+- MT5、Crypto 和后续 CTP Adapter 实现。
+- 数据库 Schema 和迁移策略。
+- 历史行情和时序数据存储。
+- 数据保存、归档、RPO 和 RTO。
+- 正式部署拓扑和 Live 安全方案。
+
+上述事项分别进入专项架构、PoC 和 ADR，不由页面或临时代码决定。
+
+## 14. 验收标准
+
+- Platform Backend 与 Execution Runtime 的职责和依赖方向明确。
+- Broker、Exchange、MetaTrader5 和 CTP SDK 不进入 Domain 层。
+- 每个核心对象只有一个主责领域。
+- Platform Backend 保持模块化单体，不提前拆分大量微服务。
+- Runtime 独立进程不会形成第二套 Order、Position、Risk 和 PnL 权威。
+- Query、Command 和 Event 语义分开。
+- 交易链路支持预创建平台订单、幂等、结果未知、恢复和对账。
+- 金融AI分析冻结不会阻塞当前后端架构完整性。
