@@ -8,7 +8,7 @@
 
 ## 1. 文档定位
 
-本目录定义 Platform V6 技术架构。产品功能和视觉要求分别由 `docs/modules/`、`docs/strategies/` 和 `docs/design/` 管理；本目录说明系统如何组织、各层如何协作、业务对象由谁负责以及安全可靠性要求。
+本目录定义 Platform V6 技术架构。产品功能由 `docs/modules/` 和 `docs/strategies/` 管理，视觉要求由 `docs/design/` 管理；本目录说明系统如何组织、各层如何协作、业务对象由谁负责以及安全可靠性要求。
 
 V6 技术架构分为：
 
@@ -20,25 +20,25 @@ V6 技术架构分为：
 
 ## 2. 产品架构与技术架构
 
-平台继续保持六个一级产品模块：
+平台保持六个一级产品模块：
 
 - 首页。
 - 对冲基金看板。
 - 新闻日历与理财。
 - 策略。
 - 风险管理。
-- 金融 AI。
+- 金融AI分析。
+
+正式模块名称以 `docs/governance/glossary.md` 为唯一来源。
 
 一级模块决定用户从哪里进入功能，不直接决定后端服务、数据库表或代码包归属。
-
-必须区分：
 
 | 维度 | 回答的问题 | 主要文档 |
 |---|---|---|
 | 产品归属 | 用户从哪里进入、页面服务什么任务 | `docs/modules/`、`module-ownership-matrix.md` |
 | 前端归属 | 路由、页面、组件和状态如何组织 | `frontend/` |
 | 后端归属 | 规则、模块、存储和可靠性由谁负责 | `backend/` |
-| 协作契约 | API、命令、查询、事件和错误如何交换 | `integration/` |
+| 协作契约 | API、Command、Query、Event 和错误如何交换 | `integration/` |
 | 领域归属 | Strategy、Order、PnL 等对象的共同语义 | `domain/`、`domain-model-boundaries.md` |
 | 跨层治理 | 安全、监控、发布、恢复和文档治理 | 本目录跨层文档、`docs/governance/` |
 
@@ -127,8 +127,8 @@ Execution / Fill
 核心原则：
 
 - 每个对象具有唯一主责模块。
-- StrategyAccountBinding 归属 Strategy，Account 主档归属 Account。
-- Execution Market Data、Research Data 和 Content／Calendar Data 分开。
+- StrategyAccountBinding 归 Strategy，Account 主档归 Account。
+- Execution Market Data、Research Data 和 Content and Calendar Data 分开。
 - Strategy Economic Ledger 不等于完整财务会计总账。
 - Backend Read Model 不形成第二套数据权威。
 
@@ -165,7 +165,26 @@ Execution / Fill
 - ExecutionBalanceStatus 不表示账户余额。
 - 权限、审批、风险和审计不能相互替代。
 
-## 8. 跨层规范
+## 8. 产品模块文档完整性
+
+产品架构入口：
+
+- `../modules/一级模块定位总表.md`
+
+六个一级模块均已具备定位和需求文档：
+
+- 首页。
+- 对冲基金看板。
+- 新闻日历与理财。
+- 策略。
+- 风险管理。
+- 金融AI分析。
+
+策略下的交易平台和策略管理继续具有独立完整定位和需求文档。
+
+架构文档不重新定义具体页面功能；技术设计必须以对应产品需求为前置输入。
+
+## 9. 跨层规范
 
 - `module-ownership-matrix.md`：产品归属、技术领域和数据权威。
 - `strategy-capability-matrix.md`：策略页面能力。
@@ -173,7 +192,7 @@ Execution / Fill
 - `../governance/document-rules.md`：文档状态、元数据和唯一来源。
 - `../governance/glossary.md`：统一术语。
 
-## 9. 架构决策
+## 10. 架构决策
 
 - `decisions/ADR-001-一级架构保持不变.md`
 - `decisions/ADR-002-交易平台与策略管理策略范围不同.md`
@@ -183,10 +202,11 @@ Execution / Fill
 - `decisions/ADR-006-后端优先采用模块化单体.md`
 - `decisions/ADR-007-部署环境与交易模式分离.md`
 
-## 10. 唯一事实来源速查
+## 11. 唯一事实来源速查
 
 | 内容 | 主文档 |
 |---|---|
+| 产品模块完整性 | `../modules/一级模块定位总表.md` |
 | 公共对象 | `domain-model-boundaries.md` |
 | 状态枚举和生命周期 | `domain/status-enums-and-lifecycles.md` |
 | 模块所有权 | `backend/service-boundaries.md` |
@@ -199,71 +219,50 @@ Execution / Fill
 | Backend Read Model | `backend/query-and-read-models.md` |
 | 中文术语 | `../governance/glossary.md` |
 
-## 11. 当前成熟度
+## 12. 当前成熟度
 
 | 层级 | 当前状态 |
 |---|---|
-| 产品架构 | 已形成正式基线 |
+| 产品架构 | 六个一级模块定位和需求已形成正式基线 |
 | 前端架构 | 规范已形成，代码仍需逐步接入 |
-| 公共领域模型 | 已形成主要对象、状态和审批边界 |
-| 前后端协作 | 已形成基础契约，尚未建立具体 OpenAPI |
-| 后端架构 | 逻辑边界已形成，尚未建设真实服务和存储 |
+| 公共领域模型 | 主要对象、状态和审批边界已形成 |
+| 前后端协作 | 基础契约已形成，具体 OpenAPI 尚未建立 |
+| 后端架构 | 逻辑边界已形成，真实服务和存储尚未建设 |
 | 实盘能力 | 尚未接入，不具备真实交易条件 |
 
-## 12. 文档读取顺序
+## 13. 文档读取顺序
 
 ### 前端页面任务
 
 1. `docs/README.md`
-2. 对应模块和策略文档
-3. `frontend/frontend-overview.md`
-4. `frontend/routing-permission-and-environment.md`
-5. `frontend/data-adapter-and-view-model.md`
-6. `frontend-state-ownership.md`
-7. `shared-ui-governance.md`
-8. 相关代码
+2. 对应模块定位和需求
+3. 对应策略文档，适用时
+4. 前端架构文档
+5. 共享 UI 规范
+6. 相关代码
 
 ### 后端领域任务
 
 1. 对应模块和策略需求
-2. `domain-model-boundaries.md`
-3. `domain/status-enums-and-lifecycles.md`
-4. `backend/service-boundaries.md`
-5. 对应后端专题文档
-6. `integration/frontend-backend-integration.md`
-7. 专项技术方案和 ADR
+2. 公共领域对象和状态
+3. 服务边界
+4. 对应后端专题
+5. 协作契约
+6. 专项技术方案和 ADR
 
 ### API 和实时任务
 
-1. 对应业务需求
-2. `domain-model-boundaries.md`
-3. `integration/frontend-backend-integration.md`
-4. `integration/api-contract-and-versioning.md`
-5. `integration/realtime-events-and-recovery.md`
+1. 对应产品需求
+2. 公共领域模型
+3. 前后端协作总览
+4. API 契约
+5. 实时事件与恢复
 6. 具体 OpenAPI 和事件契约
 
-### 高风险操作任务
+## 14. 暂不生效内容
 
-1. 对应业务需求
-2. `domain/approval-and-dual-control.md`
-3. 权限、风险和审计文档
-4. 具体审批策略和命令契约
-
-## 13. Draft 文档
-
-以下文件只用于后续讨论，不是当前实施依据：
+以下文档为 draft，不进入 active 架构：
 
 - `implementation-roadmap.md`
 - `2026-07-16-vnpy平台架构初步方案-DRAFT.md`
 - `2026-07-16-平台新增功能初步方案-DRAFT.md`
-
-正式规划和技术选型确认后，应将结论合并进 active 文档或形成 ADR。
-
-## 14. 治理原则
-
-- 产品导航、技术模块、数据库设计和实施计划是不同决策。
-- 前端不得成为交易、账户、损益和风险最终数据权威。
-- 后端不得通过 API 字段直接控制页面布局。
-- Read Model 和报表不得形成第二套业务事实。
-- 具体技术选型通过专项方案和 ADR 确认。
-- Draft 不替代 active 规范。
