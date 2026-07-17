@@ -206,10 +206,19 @@ Platform V6 技术架构分为：
 以下文件只用于讨论，不是当前实施依据：
 
 - `architecture/implementation-roadmap.md`
-- `architecture/2026-07-16-vnpy平台架构初步方案-DRAFT.md`
+- `architecture/2026-07-17-Variable-Global交易平台总体架构方案-DRAFT.md`
+- `architecture/2026-07-17-开源与外部能力采用矩阵-DRAFT.md`
 - `architecture/2026-07-16-平台新增功能初步方案-DRAFT.md`
 
-Draft 中的阶段、技术选型和新增功能，只有确认并合并进 active 文档或 ADR 后才生效。
+当前优先讨论交易平台总体架构和能力采用方式；新增功能 DRAFT 暂不进入本轮讨论。
+
+Draft 中的架构调整、技术选型、阶段和新增功能，只有确认并合并进 active 文档或 ADR 后才生效。
+
+### 8.1 Superseded 文档
+
+- `architecture/2026-07-16-vnpy平台架构初步方案-DRAFT.md`
+
+该文件仅作为历史跳转和 Git 追溯入口，不再作为讨论依据。
 
 ## 9. 文档读取顺序
 
@@ -250,6 +259,14 @@ Draft 中的阶段、技术选型和新增功能，只有确认并合并进 acti
 4. 对应后端专题
 5. 协作契约
 6. 专项方案和 ADR
+
+### 交易平台总体架构讨论
+
+1. `architecture/2026-07-17-Variable-Global交易平台总体架构方案-DRAFT.md`
+2. `architecture/2026-07-17-开源与外部能力采用矩阵-DRAFT.md`
+3. 对照现有 active 架构文档，识别保留、修改和新增边界
+4. 确认结论后形成 ADR 并更新 active 架构
+5. 最后进入正式规划
 
 ### 规划任务
 
