@@ -1,0 +1,1 @@
+"""Variable-Global platform backend."""
