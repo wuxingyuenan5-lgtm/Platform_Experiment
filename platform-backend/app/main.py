@@ -2,6 +2,7 @@ from contextlib import asynccontextmanager
 from decimal import Decimal
 
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
 from app.database import connection, initialize_database
@@ -17,7 +18,14 @@ async def lifespan(_: FastAPI):
     yield
 
 
-app = FastAPI(title=settings.app_name, version="0.2.0", lifespan=lifespan)
+app = FastAPI(title=settings.app_name, version="0.3.0", lifespan=lifespan)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.allowed_cors_origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 @app.get("/health", tags=["system"])
@@ -33,7 +41,7 @@ def health() -> dict[str, str]:
 def system_info() -> dict[str, str]:
     return {
         "service": "platform-backend",
-        "version": "0.2.0",
+        "version": "0.3.0",
         "apiVersion": "v1",
     }
 
