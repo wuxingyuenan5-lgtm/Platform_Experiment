@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Literal
 from uuid import UUID
@@ -26,5 +26,5 @@ class ExecutionEvent(BaseModel):
     external_order_id: str | None = None
     fill_price: Decimal | None = None
     fill_quantity: Decimal | None = None
-    occurred_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    occurred_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     reason: str | None = None
