@@ -10,6 +10,18 @@ $RuntimePath = Join-Path $RepoRoot 'execution-runtime'
 $BackendPath = Join-Path $RepoRoot 'platform-backend'
 $FrontendPath = Join-Path $RepoRoot 'admin-risk'
 
+function Invoke-CheckedNative {
+  param(
+    [Parameter(Mandatory = $true)][string]$FilePath,
+    [Parameter(Mandatory = $true)][string[]]$Arguments
+  )
+
+  & $FilePath @Arguments | Out-Host
+  if ($LASTEXITCODE -ne 0) {
+    throw "Command failed with exit code $LASTEXITCODE: $FilePath $($Arguments -join ' ')"
+  }
+}
+
 function Get-ProjectPython {
   param([Parameter(Mandatory = $true)][string]$ProjectPath)
 
@@ -18,10 +30,10 @@ function Get-ProjectPython {
 
   if (-not (Test-Path $PythonPath)) {
     if (Get-Command py -ErrorAction SilentlyContinue) {
-      & py -3.12 -m venv $VenvPath
+      Invoke-CheckedNative -FilePath 'py' -Arguments @('-3.12', '-m', 'venv', $VenvPath)
     }
     elseif (Get-Command python -ErrorAction SilentlyContinue) {
-      & python -m venv $VenvPath
+      Invoke-CheckedNative -FilePath 'python' -Arguments @('-m', 'venv', $VenvPath)
     }
     else {
       throw 'Python was not found. Install Python 3.12 first.'
@@ -31,8 +43,8 @@ function Get-ProjectPython {
   if (-not $SkipInstall) {
     Push-Location $ProjectPath
     try {
-      & $PythonPath -m pip install --upgrade pip
-      & $PythonPath -m pip install -e '.[dev]'
+      Invoke-CheckedNative -FilePath $PythonPath -Arguments @('-m', 'pip', 'install', '--upgrade', 'pip')
+      Invoke-CheckedNative -FilePath $PythonPath -Arguments @('-m', 'pip', 'install', '-e', '.[dev]')
     }
     finally {
       Pop-Location
@@ -52,8 +64,8 @@ function Test-PythonProject {
   $PythonPath = Get-ProjectPython -ProjectPath $ProjectPath
   Push-Location $ProjectPath
   try {
-    & $PythonPath -m ruff check app tests
-    & $PythonPath -m pytest
+    Invoke-CheckedNative -FilePath $PythonPath -Arguments @('-m', 'ruff', 'check', 'app', 'tests')
+    Invoke-CheckedNative -FilePath $PythonPath -Arguments @('-m', 'pytest')
   }
   finally {
     Pop-Location
@@ -74,12 +86,12 @@ if (-not $SkipFrontend) {
 
   Push-Location $FrontendPath
   try {
-    & corepack enable
-    & corepack prepare pnpm@8.1.0 --activate
+    Invoke-CheckedNative -FilePath 'corepack' -Arguments @('enable')
+    Invoke-CheckedNative -FilePath 'corepack' -Arguments @('prepare', 'pnpm@8.1.0', '--activate')
     if (-not $SkipInstall) {
-      & pnpm install --frozen-lockfile
+      Invoke-CheckedNative -FilePath 'pnpm' -Arguments @('install', '--frozen-lockfile')
     }
-    & pnpm type:check
+    Invoke-CheckedNative -FilePath 'pnpm' -Arguments @('type:check')
   }
   finally {
     Pop-Location
