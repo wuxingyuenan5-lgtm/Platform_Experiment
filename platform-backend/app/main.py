@@ -6,7 +6,15 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
 from app.database import connection, initialize_database
-from app.schemas import CreateOrderRequest, OrderResponse, PnlResponse, PositionResponse
+from app.execution_batches import create_execution_batch, get_execution_batch
+from app.schemas import (
+    CreateExecutionBatchRequest,
+    CreateOrderRequest,
+    ExecutionBatchResponse,
+    OrderResponse,
+    PnlResponse,
+    PositionResponse,
+)
 from app.trading import submit_order
 
 settings = get_settings()
@@ -18,7 +26,7 @@ async def lifespan(_: FastAPI):
     yield
 
 
-app = FastAPI(title=settings.app_name, version="0.3.0", lifespan=lifespan)
+app = FastAPI(title=settings.app_name, version="0.4.0", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.allowed_cors_origins,
@@ -41,7 +49,7 @@ def health() -> dict[str, str]:
 def system_info() -> dict[str, str]:
     return {
         "service": "platform-backend",
-        "version": "0.3.0",
+        "version": "0.4.0",
         "apiVersion": "v1",
     }
 
@@ -53,6 +61,24 @@ def system_info() -> dict[str, str]:
 )
 def create_order(request: CreateOrderRequest) -> OrderResponse:
     return submit_order(request)
+
+
+@app.post(
+    f"{settings.api_prefix}/trading/execution-batches",
+    response_model=ExecutionBatchResponse,
+    tags=["trading"],
+)
+def create_batch(request: CreateExecutionBatchRequest) -> ExecutionBatchResponse:
+    return create_execution_batch(request)
+
+
+@app.get(
+    f"{settings.api_prefix}/trading/execution-batches/{{batch_id}}",
+    response_model=ExecutionBatchResponse,
+    tags=["trading"],
+)
+def get_batch(batch_id: str) -> ExecutionBatchResponse:
+    return get_execution_batch(batch_id)
 
 
 @app.get(
