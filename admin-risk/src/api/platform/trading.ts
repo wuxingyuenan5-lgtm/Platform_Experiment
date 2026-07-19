@@ -1,7 +1,9 @@
 import axios, { type AxiosInstance } from 'axios';
 
 import type {
+  CreateExecutionBatchInput,
   CreateOrderInput,
+  ExecutionBatchResult,
   OrderResult,
   PnlResult,
   PositionResult,
@@ -25,6 +27,23 @@ function isNotFound(error: unknown): boolean {
 
 export async function createTradingOrder(input: CreateOrderInput): Promise<OrderResult> {
   const response = await client.post<OrderResult>('/trading/orders', input);
+  return response.data;
+}
+
+export async function createExecutionBatch(
+  input: CreateExecutionBatchInput,
+): Promise<ExecutionBatchResult> {
+  const response = await client.post<ExecutionBatchResult>(
+    '/trading/execution-batches',
+    input,
+  );
+  return response.data;
+}
+
+export async function getExecutionBatch(batchId: string): Promise<ExecutionBatchResult> {
+  const response = await client.get<ExecutionBatchResult>(
+    `/trading/execution-batches/${encodeURIComponent(batchId)}`,
+  );
   return response.data;
 }
 
