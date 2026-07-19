@@ -10,6 +10,18 @@ from app.config import get_settings
 SCHEMA_SQL = """
 PRAGMA foreign_keys = ON;
 
+CREATE TABLE IF NOT EXISTS execution_batches (
+    id TEXT PRIMARY KEY,
+    account_id TEXT NOT NULL,
+    strategy_key TEXT NOT NULL,
+    direction TEXT NOT NULL,
+    status TEXT NOT NULL,
+    requires_manual_intervention INTEGER NOT NULL DEFAULT 0,
+    failure_reason TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS orders (
     id TEXT PRIMARY KEY,
     command_id TEXT NOT NULL UNIQUE,
@@ -24,6 +36,28 @@ CREATE TABLE IF NOT EXISTS orders (
     external_order_id TEXT,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS execution_batch_legs (
+    id TEXT PRIMARY KEY,
+    batch_id TEXT NOT NULL,
+    sequence INTEGER NOT NULL,
+    role TEXT NOT NULL,
+    instrument_id TEXT NOT NULL,
+    symbol TEXT NOT NULL,
+    side TEXT NOT NULL,
+    order_type TEXT NOT NULL,
+    quantity TEXT NOT NULL,
+    price TEXT,
+    order_id TEXT,
+    status TEXT NOT NULL,
+    failure_reason TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    UNIQUE(batch_id, role),
+    UNIQUE(batch_id, sequence),
+    FOREIGN KEY(batch_id) REFERENCES execution_batches(id),
+    FOREIGN KEY(order_id) REFERENCES orders(id)
 );
 
 CREATE TABLE IF NOT EXISTS fills (
@@ -68,6 +102,12 @@ CREATE TABLE IF NOT EXISTS pnl_results (
     updated_at TEXT NOT NULL,
     PRIMARY KEY(account_id, instrument_id)
 );
+
+CREATE INDEX IF NOT EXISTS idx_execution_batches_account
+ON execution_batches(account_id, created_at);
+
+CREATE INDEX IF NOT EXISTS idx_execution_batch_legs_batch
+ON execution_batch_legs(batch_id, sequence);
 """
 
 
