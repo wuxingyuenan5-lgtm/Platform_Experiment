@@ -16,6 +16,11 @@ class Settings(BaseSettings):
     database_path: str = "./data/platform.db"
     runtime_base_url: str = "http://127.0.0.1:8100"
     runtime_timeout_seconds: float = 5.0
+    cors_origins: str = "http://127.0.0.1:5173,http://localhost:5173"
+
+    @property
+    def allowed_cors_origins(self) -> list[str]:
+        return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
 
 
 @lru_cache
