@@ -41,6 +41,7 @@
     </template>
 
     <template v-else>
+      <FundingPlatformTradingPanel :exchange="selectedExchange" :symbol="selectedSymbol" />
       <FundingOrderPanel :data="profileOrderPanel" />
     </template>
   </div>
@@ -52,6 +53,7 @@
   import FundingDetailPanel from './components/FundingDetailPanel.vue';
   import FundingMarketBoard from './components/FundingMarketBoard.vue';
   import FundingOrderPanel from './components/FundingOrderPanel.vue';
+  import FundingPlatformTradingPanel from './components/FundingPlatformTradingPanel.vue';
   import {
     defaultSymbol,
     fundingChartPanel,
