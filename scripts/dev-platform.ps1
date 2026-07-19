@@ -10,6 +10,18 @@ $RuntimePath = Join-Path $RepoRoot 'execution-runtime'
 $BackendPath = Join-Path $RepoRoot 'platform-backend'
 $FrontendPath = Join-Path $RepoRoot 'admin-risk'
 
+function Invoke-CheckedNative {
+  param(
+    [Parameter(Mandatory = $true)][string]$FilePath,
+    [Parameter(Mandatory = $true)][string[]]$Arguments
+  )
+
+  & $FilePath @Arguments | Out-Host
+  if ($LASTEXITCODE -ne 0) {
+    throw "Command failed with exit code $LASTEXITCODE: $FilePath $($Arguments -join ' ')"
+  }
+}
+
 function New-PythonEnvironment {
   param([Parameter(Mandatory = $true)][string]$ProjectPath)
 
@@ -19,10 +31,10 @@ function New-PythonEnvironment {
   if (-not (Test-Path $PythonPath)) {
     Write-Host "Creating Python 3.12 environment: $ProjectPath" -ForegroundColor Cyan
     if (Get-Command py -ErrorAction SilentlyContinue) {
-      & py -3.12 -m venv $VenvPath
+      Invoke-CheckedNative -FilePath 'py' -Arguments @('-3.12', '-m', 'venv', $VenvPath)
     }
     elseif (Get-Command python -ErrorAction SilentlyContinue) {
-      & python -m venv $VenvPath
+      Invoke-CheckedNative -FilePath 'python' -Arguments @('-m', 'venv', $VenvPath)
     }
     else {
       throw 'Python was not found. Install Python 3.12 first.'
@@ -33,8 +45,8 @@ function New-PythonEnvironment {
     Write-Host "Installing dependencies: $ProjectPath" -ForegroundColor Cyan
     Push-Location $ProjectPath
     try {
-      & $PythonPath -m pip install --upgrade pip
-      & $PythonPath -m pip install -e '.[dev]'
+      Invoke-CheckedNative -FilePath $PythonPath -Arguments @('-m', 'pip', 'install', '--upgrade', 'pip')
+      Invoke-CheckedNative -FilePath $PythonPath -Arguments @('-m', 'pip', 'install', '-e', '.[dev]')
     }
     finally {
       Pop-Location
@@ -97,9 +109,9 @@ if (-not $SkipFrontend) {
   if (-not $SkipInstall) {
     Push-Location $FrontendPath
     try {
-      & corepack enable
-      & corepack prepare pnpm@8.1.0 --activate
-      & pnpm install --frozen-lockfile
+      Invoke-CheckedNative -FilePath 'corepack' -Arguments @('enable')
+      Invoke-CheckedNative -FilePath 'corepack' -Arguments @('prepare', 'pnpm@8.1.0', '--activate')
+      Invoke-CheckedNative -FilePath 'pnpm' -Arguments @('install', '--frozen-lockfile')
     }
     finally {
       Pop-Location
