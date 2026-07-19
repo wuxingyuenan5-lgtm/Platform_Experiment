@@ -73,13 +73,18 @@ def submit_order(request: CreateOrderRequest) -> OrderResponse:
         )
         response.raise_for_status()
         events = response.json()
-    except httpx.HTTPError as exc:
+    except httpx.HTTPError:
         with connection() as db:
             db.execute(
                 "UPDATE orders SET status = ?, updated_at = ? WHERE id = ?",
                 ("result_unknown", now_iso(), order_id),
             )
-        raise HTTPException(status_code=503, detail="Execution runtime unavailable") from exc
+        return OrderResponse(
+            orderId=order_id,
+            commandId=command_id,
+            status="result_unknown",
+            externalOrderId=None,
+        )
 
     apply_execution_events(order_id, request, events)
 
