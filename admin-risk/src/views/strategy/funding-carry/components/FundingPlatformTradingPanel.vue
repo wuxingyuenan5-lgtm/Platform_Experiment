@@ -214,7 +214,7 @@
     const limitPrice = orderType.value === 'limit' ? price.value : undefined;
 
     try {
-      lastBatch.value = await createExecutionBatch({
+      const batch = await createExecutionBatch({
         accountId,
         strategyKey: 'funding_carry',
         direction: direction.value,
@@ -239,18 +239,17 @@
           },
         ],
       });
+      lastBatch.value = batch;
       await refreshSnapshots();
 
-      if (lastBatch.value.status === 'hedged') {
+      if (batch.status === 'hedged') {
         successMessage.value = '双腿均已成交，批次已进入已对冲状态。';
-      } else if (lastBatch.value.requiresManualIntervention) {
+      } else if (batch.requiresManualIntervention) {
         localError.value = `批次未完整对冲，需要人工干预：${
-          lastBatch.value.failureReason || '请检查两腿状态'
+          batch.failureReason || '请检查两腿状态'
         }`;
       } else {
-        localError.value = `批次执行失败：${
-          lastBatch.value.failureReason || lastBatch.value.status
-        }`;
+        localError.value = `批次执行失败：${batch.failureReason || batch.status}`;
       }
     } catch {
       localError.value = '批次请求失败，请确认 Platform Backend 已启动。';
