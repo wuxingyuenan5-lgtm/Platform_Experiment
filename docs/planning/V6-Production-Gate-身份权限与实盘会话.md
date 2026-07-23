@@ -1,10 +1,12 @@
 # V6 Production Gate：身份权限与双人实盘会话
 
-状态：`implementation complete / final CI and merge pending`  
+状态：`engineering accepted / merge pending`  
 实施分支：`hardening/v6-production-gate-auth-live-sessions`  
 Pull Request：`#23 Add production authentication and two-person live sessions`  
 跟踪 Issue：`#22 V6 Production Gate：身份权限、双人审批、密钥托管、监控与恢复`  
 前置阶段：Phase 4D 已通过 PR `#21` 合入 main  
+最终工程验收：`Platform CI #372 / run 30022778922`  
+独立 Secret Scan：`run 30022778960`  
 更新时间：`2026-07-23`
 
 ## 1. 目标
@@ -191,9 +193,13 @@ python .\scripts\scan-secrets.py
 - [x] Session Claim 使用 Command ID 幂等。
 - [x] 并发累计额度认领使用 SQLite `BEGIN IMMEDIATE` 并具备并发金样本。
 - [x] Secret Scan 已进入 Platform CI 和独立可诊断 workflow。
-- [x] Secret Scan 独立 workflow run `30022271523` 通过。
-- [ ] Platform CI 最终全部通过并记录 Run ID。
-- [ ] README、START-HERE、API Spec、Release Gate、总计划和 Changelog 最终同步。
+- [x] Secret Scan 独立 workflow run `30022778960` 通过。
+- [x] Platform Backend strict/full Ruff 与 Pytest 通过。
+- [x] Execution Runtime strict/full Ruff 与 Pytest 通过。
+- [x] Frontend frozen install、type-check 与 production build 通过。
+- [x] Repository Safety 通过。
+- [x] Platform CI `#372 / run 30022778922` 全部通过。
+- [x] README、START-HERE、API Spec、Release Gate、总计划和 Changelog 已同步。
 
 ## 10. 运营验收
 
