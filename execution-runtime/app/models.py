@@ -169,10 +169,14 @@ class RuntimeStatusResponse(BaseModel):
 
 class CredentialInspection(BaseModel):
     credential_ref: str = Field(alias="credentialRef")
-    env_prefix: str = Field(alias="envPrefix")
+    provider: str
+    secret_name: str = Field(alias="secretName")
+    version: str
     configured: bool
     available_fields: list[str] = Field(alias="availableFields")
     missing_fields: list[str] = Field(alias="missingFields")
+    env_prefix: str | None = Field(default=None, alias="envPrefix")
+    legacy_reference: bool = Field(default=False, alias="legacyReference")
 
 
 class GatewayConnectivityResponse(BaseModel):

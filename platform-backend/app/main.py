@@ -1,6 +1,7 @@
-from app import eod_reconciliation, execution_risk
+from app import auth, eod_reconciliation, execution_risk
 from app.application import app
 from app.auth import AuthenticationMiddleware
+from app.credential_security import router as credential_security_router
 from app.eod_policy import apply_outstanding_difference_gate, list_strategy_orders_for_eod
 from app.eod_reconciliation import router as eod_reconciliation_router
 from app.execution_exposure import calculate_residual_exposure
@@ -34,12 +35,27 @@ def _create_eod_report_with_policy(request):
 
 eod_reconciliation.create_eod_report = _create_eod_report_with_policy
 
+# Rotation metadata exposes no values but is still security/audit information.
+_original_permission_for_request = auth.permission_for_request
+
+
+def _permission_for_request(method: str, path: str) -> str:
+    if method.upper() in {"GET", "HEAD"} and path.endswith(
+        "/security/credential-rotations"
+    ):
+        return "audit:read"
+    return _original_permission_for_request(method, path)
+
+
+auth.permission_for_request = _permission_for_request
+
 app.include_router(financial_facts_router)
 app.include_router(execution_risk_router)
 app.include_router(venue_reconciliation_router)
 app.include_router(live_venue_accounting_router)
 app.include_router(eod_reconciliation_router)
 app.include_router(live_trading_sessions_router)
+app.include_router(credential_security_router)
 
 # Authentication is added at the composition root so every legacy and modular
 # route passes through one default-deny production authorization boundary.

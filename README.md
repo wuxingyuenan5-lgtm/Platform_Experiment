@@ -1,86 +1,79 @@
 # Variable-Global 本地工作台
 
-这是当前正在开发的交易研究与策略平台工作区。核心目标不是“堆功能”，而是把策略研究、账户资金、执行链路、风控状态和投研看板组织成一个可以长期迭代的内部平台。
+这是一个面向内部投研、策略执行、风险控制和账务核对的交易平台。当前工程原则是：先建立交易安全、执行恢复、正式账务和生产门禁，再扩展新策略与页面。
 
 ## 当前权威基线
 
 - 正式分支：`main`
-- Phase 3 代码发布提交：`77bf4223c2059d5a56fc08a2d49214351c396abc`
-- Phase 4A 代码发布提交：`08096d7e72f4f365dc1c27d8e7f1c80ac648c1d2`
-- Phase 4B 代码发布提交：`b86a2aa10ec1c39fe974cc6bf6d8dfbdd2475b19`
-- Phase 4C 代码发布提交：`0badab7522ce5b5d11c6ba47cf85c949c68958ca`
-- Phase 4D：Issue `#20`、PR `#21`，已完成
-- 当前实施：Production Gate 5A/5B——身份认证、RBAC 与双人实盘会话
-- Production Gate：Issue `#22`、PR `#23`
-- 总跟踪：GitHub Issue `#2`
-- 总计划：`docs/planning/V6-交易安全加固实施计划.md`
-- 当前计划：`docs/planning/V6-Production-Gate-身份权限与实盘会话.md`
-- 当前技术合同：`docs/technical/AUTH_RBAC_LIVE_SESSIONS.md`
+- Phase 1–4D：已完成工程验收
+- Production Gate 5A/5B：身份认证、RBAC、双人 `LiveTradingSession`，已通过 PR `#23`
+- 当前实施：Production Gate 5C——SecretProvider、密钥轮换元数据与全链路脱敏
+- 当前 Issue：`#24`
+- 当前 PR：`#25`
+- 总 Production Gate：Issue `#22`
+- 总跟踪：Issue `#2`
+- 当前计划：`docs/planning/V6-Production-Gate-密钥托管与脱敏.md`
+- 当前技术合同：`docs/technical/SECRET_PROVIDER_AND_REDACTION.md`
 - 小资金实盘验收：`docs/operations/V6-小资金实盘验收手册.md`
 
-`main` 的最新分支指针以 GitHub 为准。由于 Bybit 与 MT5 模拟环境不能充分复现实盘账户、成交、Funding 和 Swap，运营验收优先使用真实账户的小资金和最小允许仓位。自动实盘写入仍默认关闭；除原有 Runtime Live Gate、allowlist、限额、Kill Switch 和 EOD 门禁外，Live 环境还必须具备生产认证与有效的双人审批 `LiveTradingSession`。
+Bybit 与 MT5 的最终运营验收优先使用真实账户、小资金和最小允许仓位。工程验收、真实账户存在或 Secret 可解析都不等于自动实盘获批；Platform 与 Runtime Live Write 仍默认关闭。
 
 ## 先看这里
 
-| 你要做什么 | 入口 |
+| 主题 | 文档 |
 |---|---|
-| 看总体工程计划 | `docs/planning/V6-交易安全加固实施计划.md` |
-| 看当前 Production Gate | `docs/planning/V6-Production-Gate-身份权限与实盘会话.md` |
-| 看认证、RBAC 与 LiveTradingSession 合同 | `docs/technical/AUTH_RBAC_LIVE_SESSIONS.md` |
-| 看 Phase 4D | `docs/planning/V6-Phase4D-实盘日终对账与运营门禁.md` |
-| 看日终技术合同 | `docs/technical/EOD_RECONCILIATION.md` |
-| 看小资金实盘验收步骤 | `docs/operations/V6-小资金实盘验收手册.md` |
-| 看 Phase 4C | `docs/planning/V6-Phase4C-受控实盘适配器.md` |
-| 看 Live Adapter 技术设计 | `docs/technical/LIVE_VENUE_ADAPTERS.md` |
-| 看 Phase 4B | `docs/planning/V6-Phase4B-外部查询与对账差异.md` |
-| 看 Venue Query 与差异设计 | `docs/technical/VENUE_RECONCILIATION.md` |
-| 看 Phase 4A | `docs/planning/V6-Phase4A-执行风险与Kill-Switch.md` |
-| 看执行风险技术设计 | `docs/technical/EXECUTION_RISK_CONTROLS.md` |
-| 看 FinancialFact 与正式账务设计 | `docs/technical/FINANCIAL_FACTS.md` |
-| 看正式 API 口径 | `docs/technical/API_SPEC.md` |
-| 改前端界面 | `admin-risk/src/views` |
-| 看策略平台页面 | `http://127.0.0.1:5173/index.html#/strategy/platform` |
-| 看策略管理页面 | `http://127.0.0.1:5173/index.html#/strategy/management` |
-| 改平台后端 | `platform-backend/app` |
-| 改执行网关 | `execution-runtime/app` |
-| 查产品/架构文档 | `docs/README.md` 和 `admin-risk/docs` |
-| 放临时输出 | `outputs/temp` |
+| 总体路线 | `docs/planning/V6-交易安全加固实施计划.md` |
+| 当前 5C 计划 | `docs/planning/V6-Production-Gate-密钥托管与脱敏.md` |
+| SecretProvider 与脱敏 | `docs/technical/SECRET_PROVIDER_AND_REDACTION.md` |
+| 认证与双人审批 | `docs/technical/AUTH_RBAC_LIVE_SESSIONS.md` |
+| 实盘 EOD | `docs/technical/EOD_RECONCILIATION.md` |
+| Live Adapter | `docs/technical/LIVE_VENUE_ADAPTERS.md` |
+| Venue 对账 | `docs/technical/VENUE_RECONCILIATION.md` |
+| 执行风险 | `docs/technical/EXECUTION_RISK_CONTROLS.md` |
+| 正式账务 | `docs/technical/FINANCIAL_FACTS.md` |
+| API 总表 | `docs/technical/API_SPEC.md` |
+| 发布门槛 | `admin-risk/docs/quality/release-gate.md` |
+| 人工入口 | `admin-risk/docs/START-HERE.md` |
 
-## 当前运行口径
+## 服务与默认模式
 
-- 前端主入口：`5173`
-- Platform Backend：`http://127.0.0.1:8000/api/v1`
-- Execution Runtime：`http://127.0.0.1:8100`
-- 默认 TradingMode：`simulation`
-- 默认 Gateway：`fake`
-- Live Runtime 必须使用独立 Environment、Journal、Account、Credential Ref 和 Platform Database。
-- Live 配置模板：`execution-runtime/.env.live.example`。
-- 非 Live 本地开发允许显式 development identity。
-- Live 环境必须使用 `VG_AUTH_MODE=api_key`；匿名和 development auth 均 fail-closed。
-- API Token 只以 SHA-256 哈希配置，原始 Token 不进入代码、数据库、日志或响应。
+| 服务 | 默认地址 | 职责 |
+|---|---|---|
+| Frontend | `http://127.0.0.1:5173` | 产品交互，不持有 Venue Secret |
+| Platform Backend | `http://127.0.0.1:8000` | Auth、RBAC、Session、Command、Risk、Fact、PnL、EOD |
+| Execution Runtime | `http://127.0.0.1:8100` | Journal、Gateway、Secret Resolution、Venue Query 与外部副作用 |
+
+默认：
+
+```text
+TradingMode=simulation
+Gateway=fake
+Platform Live Write=false
+Runtime Live Write=false
+```
+
+Live Runtime 必须使用独立 Environment、Journal、Account、Credential Ref 和 Platform Database。
 
 ## Production Gate 5A/5B
 
-认证与权限：
+Live API 使用：
 
-```text
-Bearer Token
-→ SHA-256 credential match
-→ Principal(userId, roles)
-→ default-deny RBAC
-→ Audit actor binding
+```http
+Authorization: Bearer <host-injected-token>
 ```
 
-最小角色：
+- Live 环境只允许 `api_key` 认证模式。
+- Token 只配置 SHA-256 哈希，不保存原始值。
+- 最小角色：viewer、researcher、trader、risk_officer、operations、admin。
+- 权限默认拒绝。
+- actor、reviewer 等身份必须匹配认证 Principal。
+- trader/admin 申请实盘会话，独立 risk_officer/admin 批准。
+- admin 也不能自批。
+- 会话固定 Strategy、Account、Symbol、Side、Order Type、时间和额度。
+- Kill Switch、历史差异、不合格 EOD、重叠会话和超限阻断批准。
+- Live Command 在进入 Runtime 前原子认领会话额度。
 
-- `viewer`
-- `researcher`
-- `trader`
-- `risk_officer`
-- `operations`
-- `admin`
-
-实盘会话入口：
+实盘会话 API：
 
 ```http
 POST /api/v1/live-trading/sessions
@@ -89,210 +82,130 @@ POST /api/v1/live-trading/sessions/{sessionId}/approve
 POST /api/v1/live-trading/sessions/{sessionId}/revoke
 ```
 
-会话规则：
+## Production Gate 5C
 
-- trader/admin 申请，risk_officer/admin 批准。
-- 申请人与批准人必须是不同用户；admin 也不能自批。
-- Scope 固定 StrategyInstance、Account、Symbol、Side、Order Type、时间窗口、单笔和单日限额。
-- Kill Switch、Open/Accepted Difference、重叠会话、不合格 EOD 或超过平台绝对限额都会阻断批准或后续认领。
-- 每条 Live Command 在进入 Runtime 前必须原子认领一个且仅一个有效会话。
-- SQLite 使用 `BEGIN IMMEDIATE` 串行化并发额度认领，避免两个命令同时穿透单日上限。
-- 请求体中的 `actor` 必须与认证用户一致，不能冒充其他操作人。
+正式 Secret Reference：
 
-仓库凭证扫描：
+```text
+secret://environment/<secret-name>
+secret://windows-credential-manager/<secret-name>
+```
+
+旧 `secret://<secret-name>` 仅保留迁移兼容，并标记为 legacy。新配置必须显式指定 Provider。
+
+### Environment Provider
+
+示例：
+
+```text
+secret://environment/bybit-live-001
+VG_SECRET_BYBIT_LIVE_001_API_KEY
+VG_SECRET_BYBIT_LIVE_001_SECRET
+VG_SECRET_BYBIT_LIVE_001_VERSION
+```
+
+### Windows Credential Manager Provider
+
+示例：
+
+```text
+secret://windows-credential-manager/bybit-live-001
+VariableGlobal/bybit-live-001/API_KEY
+VariableGlobal/bybit-live-001/SECRET
+VariableGlobal/bybit-live-001/VERSION
+```
+
+- `inspect` 只返回 Provider、Version、字段存在性和缺失字段。
+- `resolve` 仅在 Runtime Gateway 内部调用。
+- 未知 Provider、非 Windows 调用 Windows Provider、依赖缺失和字段缺失全部 fail-closed。
+- Secret 值不得进入 API、日志、AuditEvent、数据库、Markdown、截图或对话。
+
+Rotation Metadata API：
+
+```http
+POST /api/v1/security/credential-rotations
+GET  /api/v1/security/credential-rotations
+```
+
+Rotation 只记录 Reference、Provider、Version、时间、操作人、原因和幂等哈希，不保存旧值或新值。
+
+Repository Secret Scan：
 
 ```powershell
 python .\scripts\scan-secrets.py
 ```
 
-CI 会拒绝私钥、常见平台 Token、受控字段中的高熵明文秘密以及被跟踪的非模板 `.env` 文件。
-
-## 正式交易写入口
+## 正式交易与风险入口
 
 ```http
 POST /api/v1/trading/commands
 POST /api/v1/trading/execution-batches
 POST /api/v1/trading/orders/{orderId}/reconcile
-```
-
-规则：
-
-- TradeCommand 和 ExecutionBatch 必须提供 `idempotencyKey`。
-- ExecutionBatch 必须提供 `strategyInstanceId`。
-- 每条 Batch Leg 都必须生成 TradeCommand。
-- `/api/v1/trading/orders` 仅作为 deprecated 兼容入口。
-- `result_unknown` 只能查询恢复，不能直接重下。
-- 正式 TradeCommand 必须把 StrategyInstance 身份传递到 Runtime。
-- Live Command 还必须经过认证、RBAC、双人 LiveTradingSession、原子额度认领以及原有全部风险门禁。
-
-## Phase 4A 执行风险入口
-
-```http
-GET /api/v1/risk/kill-switches/{scopeType}/{scopeId}
-PUT /api/v1/risk/kill-switches/{scopeType}/{scopeId}
-GET /api/v1/strategies/instances/{strategyInstanceId}/execution-risk-policy
-PUT /api/v1/strategies/instances/{strategyInstanceId}/execution-risk-policy
-GET  /api/v1/trading/execution-batches/{batchId}/risk
-GET  /api/v1/trading/execution-batches/{batchId}/risk-actions
+POST /api/v1/trading/orders/{orderId}/venue-reconcile
+GET  /api/v1/risk/kill-switches/{scopeType}/{scopeId}
+PUT  /api/v1/risk/kill-switches/{scopeType}/{scopeId}
 POST /api/v1/trading/execution-batches/{batchId}/risk-actions
 ```
 
-- Batch 在认领前和每条腿执行前检查 global、strategy、account Kill Switch。
-- 每个 Batch 固化腿间延迟、残留名义敞口和失败处置策略。
-- 自动平仓和替代对冲必须通过 TradeCommand。
-- 风险动作必须幂等并写入 AuditEvent。
+底线：
 
-## Phase 4B Venue Query 与对账入口
+- 正式交易只经过 TradeCommand 或 ExecutionBatch。
+- `result_unknown` 只查询恢复，不重下。
+- 每条 Batch Leg 生成独立 TradeCommand。
+- Kill Switch 在会话批准、Command Claim、Batch 和每腿执行前检查。
+- Bybit ACK 与 MT5 Order 结果不等同于 Fill/Deal。
+- 外部与本地冲突形成 Reconciliation Difference，不无痕覆盖。
 
-Runtime：
+## 外部查询、事实和 EOD
+
+Runtime Query：
 
 ```http
-GET  /venue/orders/by-platform/{platformOrderId}
-GET  /venue/orders/{externalOrderId}
-GET  /venue/fills
-GET  /venue/positions
-GET  /venue/balances
-POST /venue/orders/{externalOrderId}/cancel
+GET /gateway/capabilities
+GET /venue/orders/by-platform/{platformOrderId}
+GET /venue/orders/{externalOrderId}
+GET /venue/fills
+GET /venue/positions
+GET /venue/balances
+GET /venue/economic-events
+```
+
+Platform：
+
+```http
+POST /api/v1/ops/live-economic-events/import
+POST /api/v1/ops/venue-reconciliation/runs
+POST /api/v1/ops/eod-reconciliation/reports
+POST /api/v1/ops/eod-reconciliation/reports/{reportId}/review
+```
+
+- External Order、Fill/Deal、Position、Balance、Funding、Swap、Fee 进入不可变 FinancialFact。
+- Formal Position/PnL 可以从事实重建。
+- Formal NAV 使用统一估值时点。
+- Open/Accepted Difference、Skipped Event、Missing Account、Incomplete PnL 或 Runtime Error 阻断扩大实盘。
+- EOD Review 不自动提高限额或开启 Live Write。
+
+## 本地运行
+
+前端：
+
+```powershell
+cd admin-risk
+$env:VITE_PLATFORM_API_BASE_URL="http://127.0.0.1:8000/api/v1"
+pnpm vite --host 127.0.0.1 --port 5173
 ```
 
 Platform Backend：
 
-```http
-POST /api/v1/trading/orders/{orderId}/venue-reconcile
-POST /api/v1/ops/venue-reconciliation/runs
-GET  /api/v1/ops/venue-reconciliation/runs/{runId}
-GET  /api/v1/ops/venue-reconciliation/runs/{runId}/differences
-POST /api/v1/ops/venue-reconciliation/differences/{differenceId}/resolve
-```
-
-- Query 不能重发订单或改变外部仓位。
-- `result_unknown` 先查询 Runtime Journal，再查询外部 Order 和 Fill。
-- External Order、Fill、Position、Balance 导入不可变 FinancialFact。
-- 外部与本地不一致时创建 Reconciliation Difference，不无痕覆盖。
-
-## Phase 4C 受控实盘入口
-
-Runtime 能力与经济事件：
-
-```http
-GET /gateway/capabilities
-GET /venue/economic-events?accountId=...&instrumentId=...&eventType=...
-```
-
-Platform 导入：
-
-```http
-POST /api/v1/ops/live-economic-events/import
-```
-
-受控实盘顺序：
-
-```text
-只读实盘
-→ 影子核对
-→ 双重写开关与 allowlist
-→ 单笔/单日限额
-→ Kill Switch
-→ 双人 LiveTradingSession
-→ 最小仓位运营验收
-```
-
-只读预检：
-
 ```powershell
-.\scripts\live-readonly-preflight.ps1
-```
-
-该脚本只检查 Live Environment、Gateway、Credential Ref、Write Gate 和 Venue Readiness，不会下单、撤单或改变持仓。
-
-Runtime Live Write 默认关闭，并独立检查：
-
-- `environment=live`。
-- `liveWriteEnabled=true`。
-- Account、StrategyInstance、Symbol allowlist。
-- 单笔最大名义金额。
-- 单日最大累计名义金额。
-- 确定性的 Bybit orderLinkId 或 MT5 Magic/Comment/Ticket。
-- Credential Ref 完整且不进入日志和响应。
-
-Bybit 下单 ACK 不等于成交；MT5 没有可确认 Deal 时也不能伪造 Fill。任何无法确认的写入结果进入 `result_unknown`，随后使用 Venue Reconcile。
-
-## Phase 4D 实盘日终入口
-
-```http
-POST /api/v1/ops/eod-reconciliation/reports
-GET  /api/v1/ops/eod-reconciliation/reports
-GET  /api/v1/ops/eod-reconciliation/reports/{reportId}
-POST /api/v1/ops/eod-reconciliation/reports/{reportId}/review
-```
-
-日终编排覆盖：
-
-- 当日订单以及仍未终结的历史订单。
-- External Order、Execution/Deal、Position、Balance。
-- Bybit Funding/Fee 与 MT5 Swap/Commission/Fee。
-- FinancialFact、Formal Position、Formal PnL 和统一估值时点 Formal NAV。
-- Open、Resolved、Accepted Reconciliation Difference。
-- 未映射外部事件、缺失账户、运行错误和 SLA。
-
-实盘日终命令：
-
-```powershell
-.\scripts\run-live-eod-reconciliation.ps1 `
-  -StrategyInstanceId "<strategy-instance-id>" `
-  -AccountId "<account-id>" `
-  -BusinessDate "2026-07-23" `
-  -TimeZone "Asia/Shanghai" `
-  -ValuationTime "2026-07-23T23:59:00+08:00" `
-  -DueAt "2026-07-24T10:00:00+08:00" `
-  -Actor "eod-runner" `
-  -Owner "operations-owner"
-```
-
-报告只有在查询、事实、正式账务、NAV 和差异均完整时才为 `complete`。Open 或 Accepted Difference、未映射事件、缺失账户、不完整 PnL 或运行错误全部阻断扩大实盘。人工复核最多批准 `approved_same_limits`，不会自动提高限额或开启写入。
-
-## Phase 3 正式金融核对入口
-
-```http
-POST /api/v1/financial-facts
-GET  /api/v1/financial-facts
-POST /api/v1/strategies/instances/{strategyInstanceId}/financials/rebuild
-GET  /api/v1/strategies/instances/{strategyInstanceId}/formal-positions
-GET  /api/v1/strategies/instances/{strategyInstanceId}/formal-pnl
-GET  /api/v1/strategies/instances/{strategyInstanceId}/formal-nav-snapshots
-POST /api/v1/strategies/instances/{strategyInstanceId}/formal-nav-snapshots/run
-```
-
-- FinancialFact 只新增。
-- Quantity Unit、Settlement Currency 和 Contract Multiplier 来自 Backend Catalog。
-- Formal PnL 分为 Trading、Funding、Swap、Fee、FX 和 Total。
-- Formal NAV 对全部 active binding 使用同一 valuationTime。
-- 缺失账户、Instrument 映射或 FX 显式标记 partial／incomplete，不补零。
-
-## 根目录分工
-
-| 目录 | 定位 | 当前策略 |
-|---|---|---|
-| `admin-risk/` | 正式前端工程 | Catalog 驱动，不硬编码账户和标的 ID |
-| `platform-backend/` | 业务权威后端 | Auth、RBAC、Strategy、Command、Order、Risk、FinancialFact、Reconciliation、EOD、Formal Accounting 权威 |
-| `execution-runtime/` | 执行隔离网关 | Journal、Gateway、Live Safety、Venue Query、外部执行隔离 |
-| `docs/` | 根级导航和执行计划 | 权威入口、计划和运行口径 |
-| `admin-risk/docs/` | 详细产品和架构文档 | 与代码同步维护 |
-| `tasks/` | 任务拆分与验收 | 每批改动独立留痕 |
-| `outputs/` | 生成物和临时预览 | 不放源码 |
-| `scripts/` | 启动、测试、Secret Scan 和运维脚本 | 跟随正式 API 更新 |
-
-## 常用命令
-
-```powershell
-cd C:\Users\jiuxi\Desktop\codex\平台后端测试\admin-risk
-$env:VITE_PLATFORM_API_BASE_URL="http://127.0.0.1:8000/api/v1"
-pnpm vite --host 127.0.0.1 --port 5173
-
-cd ..\platform-backend
+cd platform-backend
 python -m uvicorn app.main:app --reload --port 8000
+```
 
-cd ..\execution-runtime
+Execution Runtime：
+
+```powershell
+cd execution-runtime
 python -m uvicorn app.main:app --reload --port 8100
 ```
 
@@ -314,31 +227,22 @@ python -m ruff check app tests
 python -m pytest
 ```
 
-详细要求见 `admin-risk/docs/quality/release-gate.md`。
-
 ## 工程原则
 
-1. 交易、权限、数据库、PnL、风险和部署变更必须独立审批并留痕。
-2. Live 环境禁止匿名访问和 development identity；权限全部默认拒绝。
-3. 请求中的操作人身份来自认证上下文，不能由请求体冒充。
-4. 申请实盘窗口与批准实盘窗口必须由不同用户完成。
-5. 未知账户、标的、绑定、状态或执行结果必须 fail-closed。
-6. 所有外部副作用必须在幂等认领之后发生。
-7. Live Session 的单笔与单日额度必须在进入 Runtime 前原子认领。
-8. Kill Switch 必须在新增风险前生效。
-9. Runtime Live Gate 必须独立于 Platform Live Gate，默认关闭。
-10. Query 与 Command 分离；同步 ACK 不等于成交。
-11. 外部与本地差异不得无痕覆盖，必须形成 Difference。
-12. 凭证只通过引用或哈希读取，不进入代码、数据库响应、日志和审计内容。
-13. 产品页面只展示完成业务任务所需的信息、操作和状态；开发说明进入 Markdown。
-14. 缺失持仓、PnL、行情、汇率和账户事实不得伪装为零。
-15. `result_unknown` 必须先恢复和对账，不得重新提交。
-16. 正式 Position、PnL 和 NAV 必须能追溯到不可变事实并支持重建。
-17. Accepted Difference 不等于数据一致，仍然阻断扩大实盘。
-18. 每个真实交易测试日必须形成 EOD Report。
-19. 每批工程改动同步更新计划、测试、API Spec、Release Gate 和 Changelog。
-20. 未通过 CI 的 PR 不得合入 main。
+1. Live 环境匿名、development auth、未知权限和未知 Provider 全部 fail-closed。
+2. Applicant 与 Approver 必须分离。
+3. Platform 与 Runtime Live Gate 独立且默认关闭。
+4. 所有外部副作用在幂等认领之后发生。
+5. Session、Runtime 和平台限额同时生效。
+6. Query 与 Command 分离；ACK 与 Fill 分离。
+7. Secret 值只在 Runtime Gateway 内部短暂使用。
+8. Rotation 只记录元数据，不保存历史明文。
+9. 外部差异不得无痕覆盖。
+10. 缺失数据不得伪装为零。
+11. 每个真实测试日必须形成 EOD Report。
+12. 代码、测试、CI、计划、技术合同、API Spec、Release Gate 和 Changelog 同批留痕。
+13. 未通过 CI 的 PR 不得合入 main。
 
 ## 当前发布边界
 
-Production Gate 5A/5B 工程验收不等于真实账户运营验收。后续测试优先采用真实账户的小资金和最小允许仓位；每次测试都必须由独立用户完成申请与风险批准，并保留只读预检证据、Kill Switch 操作人、有效 LiveTradingSession、最小仓位命令和 EOD Report。在生产 SecretProvider、监控告警、备份恢复演练和连续日终零未解释差异完成前，不得提高资金、仓位、品种范围或自动化频率。
+5C 工程完成后仍不自动开启实盘。受控 Windows 主机必须另行完成 Credential Manager 配置、只读连接、一次版本轮换、Runtime 重启、最小仓位双人审批测试和 EOD。Production Gate 5D 的监控、告警、调度、备份与恢复尚未完成前，不得扩大资金、仓位、品种或自动化频率。
