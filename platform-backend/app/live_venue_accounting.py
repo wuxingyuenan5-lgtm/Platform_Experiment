@@ -83,7 +83,10 @@ def import_live_economic_events(
             if existing["payload_hash"] != payload_hash:
                 raise HTTPException(
                     status_code=409,
-                    detail="Economic-event import idempotency key was reused with a different payload",
+                    detail=(
+                        "Economic-event import idempotency key was reused "
+                        "with a different payload"
+                    ),
                 )
             return response_from_row(existing)
 
