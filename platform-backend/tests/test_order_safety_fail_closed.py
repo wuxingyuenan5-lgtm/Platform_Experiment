@@ -6,7 +6,12 @@ from app.config import get_settings
 from app.main import app
 
 
-def order_payload(*, account_id: str, instrument_id: str, quantity: str = "0.01") -> dict[str, str]:
+def order_payload(
+    *,
+    account_id: str,
+    instrument_id: str,
+    quantity: str = "0.01",
+) -> dict[str, str]:
     return {
         "accountId": account_id,
         "instrumentId": instrument_id,
