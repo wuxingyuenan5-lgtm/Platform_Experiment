@@ -77,7 +77,7 @@
               gridTemplateColumns: `repeat(${data.usdtExchanges.length}, minmax(74px, 1fr))`,
             }"
           >
-            <span v-for="exchange in data.usdtExchanges" :key="exchange">{{ exchange }}</span>
+            <span v-for="venue in data.usdtExchanges" :key="venue">{{ venue }}</span>
           </div>
           <div
             class="group-header group-header--inverse"
@@ -85,7 +85,7 @@
               gridTemplateColumns: `repeat(${data.inverseExchanges.length}, minmax(74px, 1fr))`,
             }"
           >
-            <span v-for="exchange in data.inverseExchanges" :key="exchange">{{ exchange }}</span>
+            <span v-for="venue in data.inverseExchanges" :key="venue">{{ venue }}</span>
           </div>
         </div>
 
@@ -98,11 +98,11 @@
             }"
           >
             <span
-              v-for="exchange in data.usdtExchanges"
-              :key="`${row.symbol}-${exchange}`"
-              :class="rateClass(row.usdtPerps[exchange])"
+              v-for="venue in data.usdtExchanges"
+              :key="`${row.symbol}-${venue}`"
+              :class="rateClass(row.usdtPerps[venue])"
             >
-              {{ displayRate(row.usdtPerps[exchange]) }}
+              {{ displayRate(row.usdtPerps[venue]) }}
             </span>
           </div>
           <div
@@ -112,11 +112,11 @@
             }"
           >
             <span
-              v-for="exchange in data.inverseExchanges"
-              :key="`${row.symbol}-inverse-${exchange}`"
-              :class="rateClass(row.inversePerps[exchange])"
+              v-for="venue in data.inverseExchanges"
+              :key="`${row.symbol}-inverse-${venue}`"
+              :class="rateClass(row.inversePerps[venue])"
             >
-              {{ displayRate(row.inversePerps[exchange]) }}
+              {{ displayRate(row.inversePerps[venue]) }}
             </span>
           </div>
         </div>
