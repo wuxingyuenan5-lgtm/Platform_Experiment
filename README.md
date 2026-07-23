@@ -60,6 +60,7 @@ outputs/             临时产物
 - 具体模块修改只加载对应模块文档，不默认扫描整个仓库。
 - 不提交密钥、Token 或 `.env`。
 - 未通过测试和 CI 的改动不得进入正式分支。
+- `platform-backend/app/main.py` 仅负责 Router 与 Middleware 装配，不得通过运行时赋值修改领域模块。
 
 ## 常用命令
 

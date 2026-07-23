@@ -81,7 +81,9 @@ def load_api_credentials(settings: Settings) -> list[dict[str, object]]:
     try:
         payload = json.loads(settings.auth_credentials_json)
     except json.JSONDecodeError as exc:
-        raise AuthenticationError(503, "Authentication credential configuration is invalid") from exc
+        raise AuthenticationError(
+            503, "Authentication credential configuration is invalid"
+        ) from exc
     if not isinstance(payload, list):
         raise AuthenticationError(503, "Authentication credential configuration must be a list")
     credentials: list[dict[str, object]] = []
@@ -98,7 +100,9 @@ def load_api_credentials(settings: Settings) -> list[dict[str, object]]:
         if unknown_roles:
             raise AuthenticationError(503, "Authentication credential contains unknown roles")
         token_digest = str(item["tokenSha256"]).lower()
-        if len(token_digest) != 64 or any(character not in "0123456789abcdef" for character in token_digest):
+        if len(token_digest) != 64 or any(
+            character not in "0123456789abcdef" for character in token_digest
+        ):
             raise AuthenticationError(503, "Authentication credential token hash is invalid")
         credentials.append(item)
     return credentials
@@ -145,7 +149,17 @@ def authenticate_request(request: Request, settings: Settings) -> Principal:
 def permission_for_request(method: str, path: str) -> str:
     normalized_method = method.upper()
     if normalized_method in {"GET", "HEAD"}:
-        if path.endswith("/security/credential-references") or path.endswith("/ops/audit-events"):
+        audit_read_suffixes = (
+            "/security/credential-references",
+            "/security/credential-rotations",
+            "/ops/audit-events",
+            "/ops/production-status",
+            "/ops/alerts",
+            "/ops/backups",
+            "/ops/restore-drills",
+            "/ops/controlled-operations",
+        )
+        if any(path.endswith(suffix) for suffix in audit_read_suffixes):
             return "audit:read"
         return "platform:read"
 
@@ -172,6 +186,19 @@ def permission_for_request(method: str, path: str) -> str:
         return "reconciliation:review"
     if "/eod-reconciliation/reports/" in path and path.endswith("/review"):
         return "eod:review"
+    if "/ops/alerts/" in path and (path.endswith("/acknowledge") or path.endswith("/close")):
+        return "reconciliation:review"
+
+    production_write_suffixes = (
+        "/ops/alerts/scan",
+        "/ops/backups",
+        "/ops/restore-drills",
+        "/ops/controlled-operations",
+    )
+    if normalized_method == "POST" and any(
+        path.endswith(suffix) for suffix in production_write_suffixes
+    ):
+        return "operations:run"
 
     operations_paths = (
         "/financial-facts",
