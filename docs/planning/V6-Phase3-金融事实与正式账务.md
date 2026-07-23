@@ -1,13 +1,16 @@
 # V6 Phase 3：金融事实与正式账务
 
 状态：`completed / merged`  
-正式 main：`77bf4223c2059d5a56fc08a2d49214351c396abc`  
+代码发布提交：`77bf4223c2059d5a56fc08a2d49214351c396abc`  
+文档最终化：PR `#10`  
 实施分支：`hardening/v6-financial-facts-phase3`  
 Pull Request：`#9 Complete V6 Phase 3 financial facts and formal accounting`  
 跟踪 Issue：`#7 V6 Phase 3：不可变金融事实、正式 PnL 与统一估值 NAV`  
 总计划：`V6-交易安全加固实施计划.md`  
 最终验收：`Platform CI #127 / run 29993137286`  
 更新时间：`2026-07-23`
+
+这里记录的是 Phase 3 代码发布提交。`main` 的最新 tip 会随后续文档和工程提交变化，以 GitHub 分支指针为准。
 
 ## 1. 本阶段目标
 
