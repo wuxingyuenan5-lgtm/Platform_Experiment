@@ -1,11 +1,12 @@
 # V6 Phase 2：命令入口与结果恢复
 
-状态：`implementation complete / acceptance pending`  
+状态：`completed`  
 代码基线：`main@27b9c19aa2a213ab00b53d736508670dd0d09db4`  
 实施分支：`hardening/v6-command-recovery-phase2`  
 Pull Request：`#5 Unify V6 trade commands and recover uncertain orders`  
 跟踪 Issue：`#4 V6 Phase 2：统一 TradeCommand、恢复 result_unknown、前端动态 Catalog`  
 总计划：`#2 V6 main：交易安全、可靠执行与账务正确性落地计划`  
+验收 CI：`Platform CI #98 / run 29986397987`  
 更新时间：`2026-07-23`
 
 ## 1. 目标
@@ -20,7 +21,7 @@ Phase 1 已解决交易输入 fail-closed 和 Runtime command 原子抢占。Pha
 前端必须使用后端权威 Catalog
 ```
 
-本阶段仍只允许 Simulation / Fake Gateway，不开放 Paper 或 Live。
+本阶段完成后仍只允许 Simulation / Fake Gateway，不开放 Paper 或 Live。
 
 ## 2. 权威交易链路
 
@@ -67,7 +68,7 @@ Frontend
 - Instrument 与 ContractSpecification 存在。
 - 订单继续通过 Phase 1 的数量、价格、凭证与 Live 门禁校验。
 
-TradeCommand 使用数据库唯一 `idempotency_key` 原子认领。重复请求返回已存在命令，不创建第二个 Order。
+TradeCommand 使用数据库唯一 `idempotency_key` 原子认领。重复请求仅在业务载荷完全一致时返回已存在命令；同一幂等键携带不同 Strategy、Account、Instrument、方向、订单类型、数量或价格时返回 409，不创建第二个 Order。
 
 ### 3.2 ExecutionBatch
 
@@ -77,6 +78,7 @@ TradeCommand 使用数据库唯一 `idempotency_key` 原子认领。重复请求
 - 两条腿在创建 Batch 前完成全部 Catalog 预校验，避免第一腿成交后才发现第二腿基础配置无效。
 - Batch 通过数据库唯一键原子认领。
 - 每条腿必须经过 TradeCommand，不允许直接生成随机 command 调用 Runtime。
+- 重复 Batch 仅在 Batch 和所有 Leg 载荷完全一致时返回已有结果；同一幂等键对应不同方向、账户、标的、数量、价格或 Leg 配置时返回 409。
 
 ## 4. result_unknown 恢复
 
@@ -136,8 +138,10 @@ Catalog 缺失时显示明确错误并禁止提交；缺失持仓和 PnL 显示 
 - Runtime 无事件时保持未知测试。
 - ExecutionBatch 生成两条 TradeCommand 测试。
 - Batch 重复请求不产生额外 Runtime 调用测试。
+- TradeCommand 和 ExecutionBatch 幂等键载荷冲突测试。
 - Smoke Script 改为使用权威 Strategy、Account、Instrument 与 TradeCommand。
 - CI 严格覆盖 Phase 2 后端文件、全量 Pytest、前端 Type Check 和 Production Build。
+- 权威 Markdown 变化纳入 CI 触发范围，确保代码和工程口径一起验收。
 
 ## 7. 明确延期
 
@@ -150,19 +154,23 @@ Phase 2 不处理：
 - 双腿失败后的自动反向平仓、临时对冲和 Kill Switch。
 - 用户认证、RBAC 和双人审批。
 
-## 8. 验收清单
+## 8. 验收记录
 
-- [x] Batch 每条腿均通过 TradeCommand。
-- [x] TradeCommand 和 Batch 均具备幂等键。
-- [x] `result_unknown` 可从 Runtime Journal 恢复。
-- [x] 重放相同 Fill 不重复更新 Position/PnL。
-- [x] 前端动态读取 Catalog。
-- [x] 不支持的资产明确禁用。
-- [x] 兼容订单入口标记 deprecated。
-- [ ] Platform Backend CI 通过。
-- [ ] Execution Runtime CI 通过。
-- [ ] Frontend Type Check 与 Production Build 通过。
-- [ ] Markdown、PR 和 Issue 验收记录完成。
+验收 CI：`Platform CI #98 / run 29986397987`
+
+| 检查 | 结果 |
+|---|---|
+| Platform Backend Phase 2 strict Ruff Gate | 通过 |
+| Platform Backend 全量 Ruff | 通过 |
+| Platform Backend 全量 Pytest | 通过 |
+| Execution Runtime strict Ruff Gate | 通过 |
+| Execution Runtime 全量 Ruff 与 Pytest | 通过 |
+| Frontend frozen-lockfile install | 通过 |
+| Frontend strategy type-check | 通过 |
+| Frontend production build | 通过 |
+| TradeCommand / Batch 载荷一致性和冲突测试 | 通过 |
+| Runtime Journal 恢复与 Fill 重放幂等测试 | 通过 |
+| 代码、测试、API Spec、Release Gate、README、START-HERE、Changelog 一致性 | 通过 |
 
 ## 9. 下一阶段
 
