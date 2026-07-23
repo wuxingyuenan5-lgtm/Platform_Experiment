@@ -1,0 +1,57 @@
+name: Phase 4B Format
+
+on:
+  push:
+    branches:
+      - hardening/v6-phase4b-venue-reconciliation
+    paths:
+      - '.github/workflows/phase4b-format.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: hardening/v6-phase4b-venue-reconciliation
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install formatters
+        run: python -m pip install 'ruff>=0.12,<1.0'
+      - name: Format and fix Phase 4B files
+        run: |
+          python -m ruff format \
+            execution-runtime/app/models.py \
+            execution-runtime/app/gateway.py \
+            execution-runtime/app/fake_gateway.py \
+            execution-runtime/app/bybit_mt5_gateway.py \
+            execution-runtime/app/main.py \
+            execution-runtime/app/venue_store.py \
+            execution-runtime/tests/test_venue_query.py \
+            platform-backend/app/main.py \
+            platform-backend/app/venue_reconciliation.py \
+            platform-backend/tests/test_venue_reconciliation.py
+          python -m ruff check --fix \
+            execution-runtime/app/models.py \
+            execution-runtime/app/gateway.py \
+            execution-runtime/app/fake_gateway.py \
+            execution-runtime/app/bybit_mt5_gateway.py \
+            execution-runtime/app/main.py \
+            execution-runtime/app/venue_store.py \
+            execution-runtime/tests/test_venue_query.py \
+            platform-backend/app/main.py \
+            platform-backend/app/venue_reconciliation.py \
+            platform-backend/tests/test_venue_reconciliation.py
+      - name: Commit formatted implementation
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/phase4b-format.yml
+          git add execution-runtime platform-backend
+          git commit -m "chore: format Phase 4B venue reconciliation"
+          git push origin HEAD:hardening/v6-phase4b-venue-reconciliation
