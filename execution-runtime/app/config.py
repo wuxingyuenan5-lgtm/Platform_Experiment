@@ -15,7 +15,10 @@ class Settings(BaseSettings):
     environment: str = "development"
     journal_path: str = "./data/runtime_journal.db"
     gateway_name: str = "fake"
-    credential_refs: str = "secret://bybit-live-001,secret://mt5-live-001"
+    credential_refs: str = (
+        "secret://environment/bybit-live-001,"
+        "secret://environment/mt5-live-001"
+    )
 
     live_write_enabled: bool = False
     live_account_allowlist: str = ""
@@ -24,7 +27,7 @@ class Settings(BaseSettings):
     live_max_order_notional: Decimal = Decimal("0")
     live_max_daily_notional: Decimal = Decimal("0")
 
-    bybit_credential_ref: str = "secret://bybit-live-001"
+    bybit_credential_ref: str = "secret://environment/bybit-live-001"
     bybit_account_ids: str = ""
     bybit_instrument_map: str = ""
     bybit_category: str = "linear"
@@ -34,13 +37,14 @@ class Settings(BaseSettings):
     bybit_recv_window: int = 20000
     bybit_check_timeout_seconds: float = 8.0
 
-    mt5_credential_ref: str = "secret://mt5-live-001"
+    mt5_credential_ref: str = "secret://environment/mt5-live-001"
     mt5_account_ids: str = ""
     mt5_instrument_map: str = ""
     mt5_symbol: str = "XAUUSD+"
     mt5_terminal_path: str | None = None
     mt5_bridge_file_path: str = (
-        "C:\\Users\\jiuxi\\AppData\\Roaming\\MetaQuotes\\Terminal\\Common\\Files\\variable_global_mt5_bridge.json"
+        "C:\\Users\\jiuxi\\AppData\\Roaming\\MetaQuotes\\Terminal\\Common\\Files\\"
+        "variable_global_mt5_bridge.json"
     )
     mt5_check_timeout_seconds: float = 5.0
     mt5_magic_number: int = 5604001
