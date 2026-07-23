@@ -31,10 +31,26 @@ FORBIDDEN_WORKFLOW_NAME = re.compile(
     re.IGNORECASE,
 )
 ALLOWED_COMPOSITION_CALLS = {"add_middleware", "include_router"}
+EXECUTION_SCHEMA_NAMES = {
+    "BatchLegRequest",
+    "BatchLegResponse",
+    "CreateExecutionBatchRequest",
+    "CreateOrderRequest",
+    "CreateStrategyRunRequest",
+    "ExecutionBatchResponse",
+    "OrderResponse",
+    "PnlResponse",
+    "PositionResponse",
+    "StrategyRunResponse",
+}
+
+
+def parsed_module(path: Path) -> ast.Module:
+    return ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
 
 
 def imported_top_levels(path: Path) -> set[str]:
-    tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+    tree = parsed_module(path)
     imports: set[str] = set()
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
@@ -71,7 +87,7 @@ def is_allowed_composition_call(node: ast.Expr) -> bool:
 
 def check_composition_root(errors: list[str]) -> None:
     path = BACKEND_APP / "main.py"
-    tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+    tree = parsed_module(path)
     for node in tree.body:
         if isinstance(node, (ast.Import, ast.ImportFrom)):
             continue
@@ -87,6 +103,32 @@ def check_composition_root(errors: list[str]) -> None:
             "wire routers/middleware, and define __all__"
         )
         break
+
+
+def check_execution_schema_boundary(errors: list[str]) -> None:
+    compatibility_path = BACKEND_APP / "schemas.py"
+    compatibility_tree = parsed_module(compatibility_path)
+    duplicate_types = {
+        node.name
+        for node in compatibility_tree.body
+        if isinstance(node, ast.ClassDef) and node.name in EXECUTION_SCHEMA_NAMES
+    }
+    if duplicate_types:
+        errors.append(
+            "platform-backend/app/schemas.py: execution API schemas must be re-exported "
+            f"from execution_schemas.py, not redefined: {sorted(duplicate_types)}"
+        )
+
+    import_names: set[str] = set()
+    for node in compatibility_tree.body:
+        if isinstance(node, ast.ImportFrom) and node.module == "app.execution_schemas":
+            import_names.update(alias.name for alias in node.names)
+    missing_exports = EXECUTION_SCHEMA_NAMES - import_names
+    if missing_exports:
+        errors.append(
+            "platform-backend/app/schemas.py: missing compatibility exports from "
+            f"execution_schemas.py: {sorted(missing_exports)}"
+        )
 
 
 def check_test_names(errors: list[str]) -> None:
@@ -111,6 +153,7 @@ def main() -> int:
     errors: list[str] = []
     check_backend_venue_boundary(errors)
     check_composition_root(errors)
+    check_execution_schema_boundary(errors)
     check_test_names(errors)
     check_workflow_names(errors)
     if errors:
