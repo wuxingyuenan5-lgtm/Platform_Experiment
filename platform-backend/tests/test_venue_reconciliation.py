@@ -62,11 +62,6 @@ def test_result_unknown_recovers_from_venue_and_imports_facts_once(
         command_id = command["tradeCommandId"]
         assert command["status"] == "result_unknown"
 
-        def trading_get(*args, **kwargs):
-            return FakeResponse({}, 404)
-
-        monkeypatch.setattr("app.trading.httpx.get", trading_get)
-
         external_order = {
             "source": "fake",
             "externalOrderId": f"FAKE-{order_id}",
@@ -104,14 +99,16 @@ def test_result_unknown_recovers_from_venue_and_imports_facts_once(
             "dataQualityState": "complete",
         }
 
-        def venue_get(url, *args, **kwargs):
+        def runtime_get(url, *args, **kwargs):
+            if "/commands/" in url and url.endswith("/events"):
+                return FakeResponse({}, 404)
             if url.endswith(f"/venue/orders/by-platform/{order_id}"):
                 return FakeResponse(external_order)
             if url.endswith("/venue/fills"):
                 return FakeResponse([external_fill])
             raise AssertionError(f"unexpected runtime url: {url}")
 
-        monkeypatch.setattr("app.venue_reconciliation.httpx.get", venue_get)
+        monkeypatch.setattr("app.trading.httpx.get", runtime_get)
         first = client.post(f"/api/v1/trading/orders/{order_id}/venue-reconcile")
         second = client.post(f"/api/v1/trading/orders/{order_id}/venue-reconcile")
 
