@@ -48,6 +48,12 @@ select = ["E", "F", "I", "UP", "B"]
 [tool.ruff.lint.per-file-ignores]
 # FastAPI Query metadata is intentionally declared in route signatures.
 "app/main.py" = ["B008"]
-# SQL and immutable snapshot identifiers are kept visibly auditable in the persistent fake store.
+# SQL and immutable snapshot identifiers are kept visibly auditable in persistent stores.
 "app/venue_store.py" = ["E501"]
+"app/live_route_store.py" = ["E501"]
+# External venue field mappings are intentionally explicit and auditable.
+"app/bybit_live_adapter.py" = ["E501"]
+"app/mt5_live_adapter.py" = ["E501"]
 "tests/test_venue_query.py" = ["E501"]
+"tests/test_bybit_live_adapter.py" = ["E501"]
+"tests/test_mt5_live_adapter.py" = ["E501"]
