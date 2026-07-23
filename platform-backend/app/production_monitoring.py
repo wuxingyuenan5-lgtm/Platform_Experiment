@@ -14,7 +14,8 @@ from app import eod_reconciliation
 from app.auth import require_principal
 from app.config import get_settings
 from app.database import connection
-from app.disaster_recovery import CreateBackupRequest, create_backup, ensure_schema as ensure_dr_schema
+from app.disaster_recovery import CreateBackupRequest, create_backup
+from app.disaster_recovery import ensure_schema as ensure_dr_schema
 from app.redaction import redact_sensitive
 
 AlertSeverity = Literal["info", "warning", "critical"]
