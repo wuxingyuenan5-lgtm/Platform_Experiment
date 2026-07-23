@@ -71,11 +71,21 @@
           <span>{{ spotSymbol }}</span>
         </div>
         <dl>
-          <div><dt>净持仓</dt><dd>{{ spot.snapshot.value.position?.netQuantity ?? '—' }}</dd></div>
-          <div><dt>持仓均价</dt><dd>{{ spot.snapshot.value.position?.averagePrice ?? '—' }}</dd></div>
-          <div><dt>已实现 PnL</dt><dd>{{ spot.snapshot.value.pnl?.realizedPnl ?? '—' }}</dd></div>
-          <div><dt>订单状态</dt><dd>{{ batchLegStatus('spot') }}</dd></div>
-          <div><dt>订单 ID</dt><dd class="order-id">{{ batchLegOrderId('spot') }}</dd></div>
+          <div
+            ><dt>净持仓</dt><dd>{{ spot.snapshot.value.position?.netQuantity ?? '—' }}</dd></div
+          >
+          <div
+            ><dt>持仓均价</dt><dd>{{ spot.snapshot.value.position?.averagePrice ?? '—' }}</dd></div
+          >
+          <div
+            ><dt>已实现 PnL</dt><dd>{{ spot.snapshot.value.pnl?.realizedPnl ?? '—' }}</dd></div
+          >
+          <div
+            ><dt>订单状态</dt><dd>{{ batchLegStatus('spot') }}</dd></div
+          >
+          <div
+            ><dt>订单 ID</dt><dd class="order-id">{{ batchLegOrderId('spot') }}</dd></div
+          >
         </dl>
       </article>
 
@@ -85,11 +95,21 @@
           <span>{{ perpSymbol }}</span>
         </div>
         <dl>
-          <div><dt>净持仓</dt><dd>{{ perp.snapshot.value.position?.netQuantity ?? '—' }}</dd></div>
-          <div><dt>持仓均价</dt><dd>{{ perp.snapshot.value.position?.averagePrice ?? '—' }}</dd></div>
-          <div><dt>已实现 PnL</dt><dd>{{ perp.snapshot.value.pnl?.realizedPnl ?? '—' }}</dd></div>
-          <div><dt>订单状态</dt><dd>{{ batchLegStatus('perp') }}</dd></div>
-          <div><dt>订单 ID</dt><dd class="order-id">{{ batchLegOrderId('perp') }}</dd></div>
+          <div
+            ><dt>净持仓</dt><dd>{{ perp.snapshot.value.position?.netQuantity ?? '—' }}</dd></div
+          >
+          <div
+            ><dt>持仓均价</dt><dd>{{ perp.snapshot.value.position?.averagePrice ?? '—' }}</dd></div
+          >
+          <div
+            ><dt>已实现 PnL</dt><dd>{{ perp.snapshot.value.pnl?.realizedPnl ?? '—' }}</dd></div
+          >
+          <div
+            ><dt>订单状态</dt><dd>{{ batchLegStatus('perp') }}</dd></div
+          >
+          <div
+            ><dt>订单 ID</dt><dd class="order-id">{{ batchLegOrderId('perp') }}</dd></div
+          >
         </dl>
       </article>
     </div>
@@ -138,9 +158,7 @@
   const spot = usePlatformTrading();
   const perp = usePlatformTrading();
 
-  const spotSymbol = computed(
-    () => spotInstrument.value?.instrumentCode ?? `${props.symbol}USDT`,
-  );
+  const spotSymbol = computed(() => spotInstrument.value?.instrumentCode ?? `${props.symbol}USDT`);
   const perpSymbol = computed(
     () => perpInstrument.value?.instrumentCode ?? `${props.symbol}USDT-PERP`,
   );
@@ -155,10 +173,7 @@
   );
   const overallBusy = computed(
     () =>
-      catalogLoading.value ||
-      submitting.value ||
-      spot.refreshing.value ||
-      perp.refreshing.value,
+      catalogLoading.value || submitting.value || spot.refreshing.value || perp.refreshing.value,
   );
   const errorMessage = computed(
     () =>
@@ -268,9 +283,7 @@
         (item) => item.instrumentCode === perpCode && Boolean(item.contract),
       );
       if (!spotMatch || !perpMatch) {
-        throw new Error(
-          `${props.symbol} 尚未在后端 Catalog 同时配置现货与永续合约，已禁止提交。`,
-        );
+        throw new Error(`${props.symbol} 尚未在后端 Catalog 同时配置现货与永续合约，已禁止提交。`);
       }
 
       strategyInstance.value = strategy;

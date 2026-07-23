@@ -1,13 +1,14 @@
 from __future__ import annotations
 
-import os
 import json
+import os
 import subprocess
 import sys
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, TimeoutError
-from typing import Any, Callable
+from typing import Any
 
-from app.models import VenueReadinessResult, VenueReadinessResponse
+from app.models import VenueReadinessResponse, VenueReadinessResult
 from app.secret_resolver import env_prefix_for_secret_ref
 
 
@@ -289,11 +290,27 @@ try:
         kwargs["path"] = terminal_path
     ok = mt5.initialize(**kwargs)
     if not ok:
-        print(json.dumps({"status": "unavailable", "checks": [], "reason": "MT5 initialize failed"}))
+        print(
+            json.dumps(
+                {
+                    "status": "unavailable",
+                    "checks": [],
+                    "reason": "MT5 initialize failed",
+                }
+            )
+        )
         raise SystemExit(0)
     info = mt5.symbol_info(symbol)
     if info is None:
-        print(json.dumps({"status": "unavailable", "checks": ["login"], "reason": f"MT5 symbol not found: {symbol}"}))
+        print(
+            json.dumps(
+                {
+                    "status": "unavailable",
+                    "checks": ["login"],
+                    "reason": f"MT5 symbol not found: {symbol}",
+                }
+            )
+        )
     else:
         print(json.dumps({"status": "available", "checks": ["login", "symbol"], "reason": None}))
 finally:

@@ -71,32 +71,52 @@
       <div class="heatmap-table">
         <div class="heatmap-table__header">
           <div class="symbol-cell">币种</div>
-          <div class="group-header" :style="{ gridTemplateColumns: `repeat(${data.usdtExchanges.length}, minmax(74px, 1fr))` }">
-            <span v-for="exchange in data.usdtExchanges" :key="exchange">{{ exchange }}</span>
+          <div
+            class="group-header"
+            :style="{
+              gridTemplateColumns: `repeat(${data.usdtExchanges.length}, minmax(74px, 1fr))`,
+            }"
+          >
+            <span v-for="venue in data.usdtExchanges" :key="venue">{{ venue }}</span>
           </div>
-          <div class="group-header group-header--inverse" :style="{ gridTemplateColumns: `repeat(${data.inverseExchanges.length}, minmax(74px, 1fr))` }">
-            <span v-for="exchange in data.inverseExchanges" :key="exchange">{{ exchange }}</span>
+          <div
+            class="group-header group-header--inverse"
+            :style="{
+              gridTemplateColumns: `repeat(${data.inverseExchanges.length}, minmax(74px, 1fr))`,
+            }"
+          >
+            <span v-for="venue in data.inverseExchanges" :key="venue">{{ venue }}</span>
           </div>
         </div>
 
         <div v-for="row in data.rows" :key="row.symbol" class="heatmap-table__row">
           <div class="symbol-cell symbol-cell--row">{{ row.symbol }}</div>
-          <div class="group-row" :style="{ gridTemplateColumns: `repeat(${data.usdtExchanges.length}, minmax(74px, 1fr))` }">
+          <div
+            class="group-row"
+            :style="{
+              gridTemplateColumns: `repeat(${data.usdtExchanges.length}, minmax(74px, 1fr))`,
+            }"
+          >
             <span
-              v-for="exchange in data.usdtExchanges"
-              :key="`${row.symbol}-${exchange}`"
-              :class="rateClass(row.usdtPerps[exchange])"
+              v-for="venue in data.usdtExchanges"
+              :key="`${row.symbol}-${venue}`"
+              :class="rateClass(row.usdtPerps[venue])"
             >
-              {{ displayRate(row.usdtPerps[exchange]) }}
+              {{ displayRate(row.usdtPerps[venue]) }}
             </span>
           </div>
-          <div class="group-row group-row--inverse" :style="{ gridTemplateColumns: `repeat(${data.inverseExchanges.length}, minmax(74px, 1fr))` }">
+          <div
+            class="group-row group-row--inverse"
+            :style="{
+              gridTemplateColumns: `repeat(${data.inverseExchanges.length}, minmax(74px, 1fr))`,
+            }"
+          >
             <span
-              v-for="exchange in data.inverseExchanges"
-              :key="`${row.symbol}-inverse-${exchange}`"
-              :class="rateClass(row.inversePerps[exchange])"
+              v-for="venue in data.inverseExchanges"
+              :key="`${row.symbol}-inverse-${venue}`"
+              :class="rateClass(row.inversePerps[venue])"
             >
-              {{ displayRate(row.inversePerps[exchange]) }}
+              {{ displayRate(row.inversePerps[venue]) }}
             </span>
           </div>
         </div>

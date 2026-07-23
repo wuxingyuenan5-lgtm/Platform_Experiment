@@ -84,8 +84,12 @@
   const selectedStartDate = ref('2026-05-28');
   const selectedEndDate = ref('2026-06-24');
 
-  const profile = computed(() => fundingCarryProfiles[selectedExchange.value] ?? fundingCarryProfiles.Bybit);
-  const currentResearch = computed(() => profile.value.research[selectedSymbol.value] ?? profile.value.research[defaultSymbol]);
+  const profile = computed(
+    () => fundingCarryProfiles[selectedExchange.value] ?? fundingCarryProfiles.Bybit,
+  );
+  const currentResearch = computed(
+    () => profile.value.research[selectedSymbol.value] ?? profile.value.research[defaultSymbol],
+  );
 
   const rangeOptions = computed(() =>
     (Object.keys(fundingRangeLabels) as FundingMarketRange[]).map((value) => ({

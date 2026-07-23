@@ -131,7 +131,10 @@ def _load_cross_spread_sizing() -> dict[str, Decimal]:
         ).fetchall()
     specs = {row["instrument_id"]: row for row in rows}
     if BYBIT_INSTRUMENT_ID not in specs or MT5_INSTRUMENT_ID not in specs:
-        raise HTTPException(status_code=422, detail="Cross-spread contract specification is missing")
+        raise HTTPException(
+            status_code=422,
+            detail="Cross-spread contract specification is missing",
+        )
     bybit = specs[BYBIT_INSTRUMENT_ID]
     mt5 = specs[MT5_INSTRUMENT_ID]
     return {
@@ -154,4 +157,7 @@ def _validate_leg_quantity(
         raise HTTPException(status_code=422, detail=f"{label} quantity is below contract minimum")
     steps = (quantity - minimum) / step
     if steps != steps.to_integral_value():
-        raise HTTPException(status_code=422, detail=f"{label} quantity does not match contract step")
+        raise HTTPException(
+            status_code=422,
+            detail=f"{label} quantity does not match contract step",
+        )

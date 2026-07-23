@@ -210,11 +210,7 @@ export interface CrossSpreadHistoryPointResult {
   mt5Mid?: string | null;
 }
 
-export type CrossSpreadMarketAction =
-  | 'OPEN_LONG'
-  | 'CLOSE_LONG'
-  | 'OPEN_SHORT'
-  | 'CLOSE_SHORT';
+export type CrossSpreadMarketAction = 'OPEN_LONG' | 'CLOSE_LONG' | 'OPEN_SHORT' | 'CLOSE_SHORT';
 
 export interface CrossSpreadMarketCommandInput {
   action: CrossSpreadMarketAction;
