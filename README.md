@@ -5,8 +5,8 @@
 ## 当前权威基线
 
 - 正式分支：`main`
-- 当前 main：`27b9c19aa2a213ab00b53d736508670dd0d09db4`
-- 当前实施：Phase 2 命令入口与结果恢复
+- 当前 main：`b3fc45e4e03ab16af1cce155106ea972cc22f331`
+- 当前状态：Phase 2 已完成，下一阶段为金融事实与账务正确性
 - 总跟踪：GitHub Issue `#2`
 - Phase 2：Issue `#4`、PR `#5`
 - 总计划：`docs/planning/V6-交易安全加固实施计划.md`
@@ -19,7 +19,7 @@
 | 你要做什么 | 入口 |
 |---|---|
 | 看总体工程计划 | `docs/planning/V6-交易安全加固实施计划.md` |
-| 看当前 Phase 2 | `docs/planning/V6-Phase2-命令入口与结果恢复.md` |
+| 看已完成 Phase 2 | `docs/planning/V6-Phase2-命令入口与结果恢复.md` |
 | 改前端界面 | `admin-risk/src/views` |
 | 看策略平台页面 | `http://127.0.0.1:5173/index.html#/strategy/platform` |
 | 看策略管理页面 | `http://127.0.0.1:5173/index.html#/strategy/management` |
@@ -140,10 +140,12 @@ python -m pytest
 2. 未知账户、标的、绑定、状态或执行结果必须 fail-closed。
 3. 所有外部副作用必须在幂等认领之后发生。
 4. 前端不得硬编码正式账户、策略实例和 Instrument ID。
-5. 缺失持仓、PnL 和行情不得伪装为零。
-6. `result_unknown` 必须先恢复和对账，不得重新提交。
-7. 每批工程改动同步更新计划、测试、API Spec、Release Gate 和 Changelog。
-8. 未通过 CI 的 PR 不得合入 main。
+5. 产品页面只展示用户完成业务任务所需的信息、操作和状态；开发说明、实现解释、跳转机制和联调备注不得进入正式界面。
+6. 必要提示应短、准、就近呈现；完整解释进入 Markdown 文档，不在页面主要视觉层堆叠辅助文案。
+7. 缺失持仓、PnL 和行情不得伪装为零。
+8. `result_unknown` 必须先恢复和对账，不得重新提交。
+9. 每批工程改动同步更新计划、测试、API Spec、Release Gate 和 Changelog。
+10. 未通过 CI 的 PR 不得合入 main。
 
 ## Codex 降噪
 
