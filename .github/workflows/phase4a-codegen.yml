@@ -30,9 +30,26 @@ jobs:
         run: python -m pip install -e '.[dev]'
       - name: Validate backend
         working-directory: platform-backend
+        shell: bash
         run: |
-          python -m ruff check app tests
-          python -m pytest
+          set +e
+          python -m ruff check app tests > /tmp/phase4a-ruff.log 2>&1
+          RUFF_STATUS=$?
+          python -m pytest > /tmp/phase4a-pytest.log 2>&1
+          PYTEST_STATUS=$?
+          cat /tmp/phase4a-ruff.log
+          cat /tmp/phase4a-pytest.log
+          if [ $RUFF_STATUS -ne 0 ] || [ $PYTEST_STATUS -ne 0 ]; then exit 1; fi
+      - name: Upload diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase4a-validation
+          path: |
+            /tmp/phase4a-ruff.log
+            /tmp/phase4a-pytest.log
+          if-no-files-found: ignore
+          retention-days: 3
       - name: Commit implementation
         run: |
           git config user.name "github-actions[bot]"
