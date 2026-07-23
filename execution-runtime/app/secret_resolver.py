@@ -103,7 +103,10 @@ class WindowsCredentialManagerProvider:
         known_fields: tuple[str, ...],
     ) -> CredentialInspection:
         reader = self._credential_reader()
-        values = {field: reader(self._target(reference.secret_name, field)) for field in known_fields}
+        values = {
+            field: reader(self._target(reference.secret_name, field))
+            for field in known_fields
+        }
         available_fields = [field for field, value in values.items() if value]
         missing_fields = [field for field in required_fields if field not in available_fields]
         version = reader(self._target(reference.secret_name, "VERSION")) or "unversioned"
@@ -126,7 +129,10 @@ class WindowsCredentialManagerProvider:
         known_fields: tuple[str, ...],
     ) -> dict[str, str]:
         reader = self._credential_reader()
-        values = {field: reader(self._target(reference.secret_name, field)) for field in known_fields}
+        values = {
+            field: reader(self._target(reference.secret_name, field))
+            for field in known_fields
+        }
         missing_fields = [field for field in required_fields if not values.get(field)]
         if missing_fields:
             raise ValueError(
