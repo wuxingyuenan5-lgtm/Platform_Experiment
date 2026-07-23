@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 class SubmitOrderCommand(BaseModel):
     command_id: str
     platform_order_id: str
+    strategy_instance_id: str | None = None
     account_id: str
     instrument_id: str
     symbol: str = Field(min_length=1)
@@ -16,6 +17,7 @@ class SubmitOrderCommand(BaseModel):
     order_type: Literal["market", "limit"] = "market"
     quantity: Decimal = Field(gt=0)
     price: Decimal | None = Field(default=None, gt=0)
+    reduce_only: bool = False
     received_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
@@ -100,6 +102,42 @@ class VenueBalanceSnapshot(BaseModel):
     data_quality_state: str = Field(default="complete", alias="dataQualityState")
 
 
+class VenueEconomicEventSnapshot(BaseModel):
+    source: str
+    external_event_id: str = Field(alias="externalEventId")
+    event_type: Literal["funding", "swap", "fee"] = Field(alias="eventType")
+    account_id: str = Field(alias="accountId")
+    instrument_id: str | None = Field(default=None, alias="instrumentId")
+    symbol: str | None = None
+    amount: Decimal
+    currency: str
+    occurred_at: datetime = Field(alias="occurredAt")
+    data_quality_state: str = Field(default="complete", alias="dataQualityState")
+    payload: dict[str, object] = Field(default_factory=dict)
+
+
+class GatewayAdapterCapability(BaseModel):
+    adapter: str
+    environment: str
+    configured: bool
+    operational: bool
+    write_enabled: bool = Field(alias="writeEnabled")
+    account_ids: list[str] = Field(default_factory=list, alias="accountIds")
+    capabilities: list[str] = Field(default_factory=list)
+    missing_requirements: list[str] = Field(
+        default_factory=list,
+        alias="missingRequirements",
+    )
+    checked_at: datetime = Field(default_factory=lambda: datetime.now(UTC), alias="checkedAt")
+
+
+class GatewayCapabilitiesResponse(BaseModel):
+    gateway: str
+    environment: str
+    live_write_enabled: bool = Field(alias="liveWriteEnabled")
+    adapters: list[GatewayAdapterCapability]
+
+
 class CancelOrderRequest(BaseModel):
     idempotency_key: str = Field(alias="idempotencyKey", min_length=1, max_length=128)
     reason: str | None = Field(default=None, max_length=512)
@@ -109,7 +147,14 @@ class CancelOrderResponse(BaseModel):
     source: str
     external_order_id: str = Field(alias="externalOrderId")
     platform_order_id: str = Field(alias="platformOrderId")
-    status: Literal["canceled", "already_final", "not_found", "unsupported", "unknown"]
+    status: Literal[
+        "canceled",
+        "already_final",
+        "not_found",
+        "unsupported",
+        "blocked",
+        "unknown",
+    ]
     reason: str | None = None
     as_of: datetime = Field(alias="asOf")
 
