@@ -99,12 +99,15 @@ jobs:
             app/mt5_live_adapter.py \
             app/bybit_mt5_gateway.py \
             app/secret_resolver.py \
+            app/redaction.py \
             tests/test_atomic_command_claim.py \
             tests/test_runtime_journal.py \
             tests/test_venue_query.py \
             tests/test_live_safety.py \
             tests/test_bybit_live_adapter.py \
             tests/test_mt5_live_adapter.py \
+            tests/test_secret_resolver.py \
+            tests/test_redaction.py \
             > /tmp/runtime-ruff.log 2>&1; then
             cat /tmp/runtime-ruff.log
             exit 1
@@ -124,7 +127,7 @@ jobs:
         shell: bash
         run: |
           if ! python -m pytest > /tmp/runtime-pytest.log 2>&1; then
-            tail -n 220 /tmp/runtime-pytest.log
+            tail -n 260 /tmp/runtime-pytest.log
             exit 1
           fi
       - name: Upload runtime pytest diagnostics
@@ -158,6 +161,8 @@ jobs:
             app/application.py \
             app/auth.py \
             app/security.py \
+            app/redaction.py \
+            app/credential_security.py \
             app/trading.py \
             app/trade_commands.py \
             app/trade_command_execution.py \
@@ -173,6 +178,7 @@ jobs:
             app/live_session_claims.py \
             tests/test_order_safety_fail_closed.py \
             tests/test_secret_safety.py \
+            tests/test_credential_security.py \
             tests/test_trading_flow.py \
             tests/test_order_recovery.py \
             tests/test_idempotency_conflicts.py \
@@ -208,7 +214,7 @@ jobs:
         shell: bash
         run: |
           if ! python -m pytest > /tmp/backend-pytest.log 2>&1; then
-            tail -n 360 /tmp/backend-pytest.log
+            tail -n 420 /tmp/backend-pytest.log
             exit 1
           fi
       - name: Upload backend pytest diagnostics
