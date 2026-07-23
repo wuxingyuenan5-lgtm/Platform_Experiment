@@ -34,7 +34,8 @@ def test_residual_exposure_has_one_authoritative_implementation() -> None:
 def test_eod_policy_is_an_explicit_dependency() -> None:
     source = (BACKEND_ROOT / "app/eod_reconciliation.py").read_text(encoding="utf-8")
     assert "from app.eod_policy import" in source
-    assert "list_strategy_orders_for_eod(" in source
+    assert "list_strategy_orders = list_strategy_orders_for_eod" in source
+    assert "for order_id in list_strategy_orders(" in source
     assert "def list_strategy_orders(" not in source
 
 
