@@ -40,6 +40,11 @@ def submit_trade_command_order(
         request.instrument_id,
         request.quantity,
         request.price,
+        strategy_instance_id=strategy_instance_id,
+        symbol=request.symbol,
+        side=request.side,
+        order_type=request.order_type,
+        command_id=command_id,
     )
 
     with connection() as db:

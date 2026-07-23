@@ -9,22 +9,25 @@
 - Phase 4A 代码发布提交：`08096d7e72f4f365dc1c27d8e7f1c80ac648c1d2`
 - Phase 4B 代码发布提交：`b86a2aa10ec1c39fe974cc6bf6d8dfbdd2475b19`
 - Phase 4C 代码发布提交：`0badab7522ce5b5d11c6ba47cf85c949c68958ca`
-- 当前实施：Phase 4D 实盘日终对账、报告与运营门禁
+- Phase 4D：Issue `#20`、PR `#21`，已完成
+- 当前实施：Production Gate 5A/5B——身份认证、RBAC 与双人实盘会话
+- Production Gate：Issue `#22`、PR `#23`
 - 总跟踪：GitHub Issue `#2`
-- Phase 4 总计划：Issue `#12`
-- Phase 4D：Issue `#20`、PR `#21`
 - 总计划：`docs/planning/V6-交易安全加固实施计划.md`
-- Phase 4D 计划：`docs/planning/V6-Phase4D-实盘日终对账与运营门禁.md`
+- 当前计划：`docs/planning/V6-Production-Gate-身份权限与实盘会话.md`
+- 当前技术合同：`docs/technical/AUTH_RBAC_LIVE_SESSIONS.md`
 - 小资金实盘验收：`docs/operations/V6-小资金实盘验收手册.md`
 
-`main` 的最新分支指针以 GitHub 为准。由于 Bybit 与 MT5 模拟环境不能充分复现实盘账户、成交、Funding 和 Swap，运营验收优先使用真实账户的小资金和最小允许仓位。自动实盘写入仍默认关闭，必须先完成只读核对、影子对账、限额、Kill Switch 和日终报告验收。
+`main` 的最新分支指针以 GitHub 为准。由于 Bybit 与 MT5 模拟环境不能充分复现实盘账户、成交、Funding 和 Swap，运营验收优先使用真实账户的小资金和最小允许仓位。自动实盘写入仍默认关闭；除原有 Runtime Live Gate、allowlist、限额、Kill Switch 和 EOD 门禁外，Live 环境还必须具备生产认证与有效的双人审批 `LiveTradingSession`。
 
 ## 先看这里
 
 | 你要做什么 | 入口 |
 |---|---|
 | 看总体工程计划 | `docs/planning/V6-交易安全加固实施计划.md` |
-| 看当前 Phase 4D | `docs/planning/V6-Phase4D-实盘日终对账与运营门禁.md` |
+| 看当前 Production Gate | `docs/planning/V6-Production-Gate-身份权限与实盘会话.md` |
+| 看认证、RBAC 与 LiveTradingSession 合同 | `docs/technical/AUTH_RBAC_LIVE_SESSIONS.md` |
+| 看 Phase 4D | `docs/planning/V6-Phase4D-实盘日终对账与运营门禁.md` |
 | 看日终技术合同 | `docs/technical/EOD_RECONCILIATION.md` |
 | 看小资金实盘验收步骤 | `docs/operations/V6-小资金实盘验收手册.md` |
 | 看 Phase 4C | `docs/planning/V6-Phase4C-受控实盘适配器.md` |
@@ -52,6 +55,57 @@
 - 默认 Gateway：`fake`
 - Live Runtime 必须使用独立 Environment、Journal、Account、Credential Ref 和 Platform Database。
 - Live 配置模板：`execution-runtime/.env.live.example`。
+- 非 Live 本地开发允许显式 development identity。
+- Live 环境必须使用 `VG_AUTH_MODE=api_key`；匿名和 development auth 均 fail-closed。
+- API Token 只以 SHA-256 哈希配置，原始 Token 不进入代码、数据库、日志或响应。
+
+## Production Gate 5A/5B
+
+认证与权限：
+
+```text
+Bearer Token
+→ SHA-256 credential match
+→ Principal(userId, roles)
+→ default-deny RBAC
+→ Audit actor binding
+```
+
+最小角色：
+
+- `viewer`
+- `researcher`
+- `trader`
+- `risk_officer`
+- `operations`
+- `admin`
+
+实盘会话入口：
+
+```http
+POST /api/v1/live-trading/sessions
+GET  /api/v1/live-trading/sessions
+POST /api/v1/live-trading/sessions/{sessionId}/approve
+POST /api/v1/live-trading/sessions/{sessionId}/revoke
+```
+
+会话规则：
+
+- trader/admin 申请，risk_officer/admin 批准。
+- 申请人与批准人必须是不同用户；admin 也不能自批。
+- Scope 固定 StrategyInstance、Account、Symbol、Side、Order Type、时间窗口、单笔和单日限额。
+- Kill Switch、Open/Accepted Difference、重叠会话、不合格 EOD 或超过平台绝对限额都会阻断批准或后续认领。
+- 每条 Live Command 在进入 Runtime 前必须原子认领一个且仅一个有效会话。
+- SQLite 使用 `BEGIN IMMEDIATE` 串行化并发额度认领，避免两个命令同时穿透单日上限。
+- 请求体中的 `actor` 必须与认证用户一致，不能冒充其他操作人。
+
+仓库凭证扫描：
+
+```powershell
+python .\scripts\scan-secrets.py
+```
+
+CI 会拒绝私钥、常见平台 Token、受控字段中的高熵明文秘密以及被跟踪的非模板 `.env` 文件。
 
 ## 正式交易写入口
 
@@ -69,6 +123,7 @@ POST /api/v1/trading/orders/{orderId}/reconcile
 - `/api/v1/trading/orders` 仅作为 deprecated 兼容入口。
 - `result_unknown` 只能查询恢复，不能直接重下。
 - 正式 TradeCommand 必须把 StrategyInstance 身份传递到 Runtime。
+- Live Command 还必须经过认证、RBAC、双人 LiveTradingSession、原子额度认领以及原有全部风险门禁。
 
 ## Phase 4A 执行风险入口
 
@@ -138,6 +193,7 @@ POST /api/v1/ops/live-economic-events/import
 → 双重写开关与 allowlist
 → 单笔/单日限额
 → Kill Switch
+→ 双人 LiveTradingSession
 → 最小仓位运营验收
 ```
 
@@ -218,13 +274,13 @@ POST /api/v1/strategies/instances/{strategyInstanceId}/formal-nav-snapshots/run
 | 目录 | 定位 | 当前策略 |
 |---|---|---|
 | `admin-risk/` | 正式前端工程 | Catalog 驱动，不硬编码账户和标的 ID |
-| `platform-backend/` | 业务权威后端 | Strategy、Command、Order、Risk、FinancialFact、Reconciliation、EOD、Formal Accounting 权威 |
+| `platform-backend/` | 业务权威后端 | Auth、RBAC、Strategy、Command、Order、Risk、FinancialFact、Reconciliation、EOD、Formal Accounting 权威 |
 | `execution-runtime/` | 执行隔离网关 | Journal、Gateway、Live Safety、Venue Query、外部执行隔离 |
 | `docs/` | 根级导航和执行计划 | 权威入口、计划和运行口径 |
 | `admin-risk/docs/` | 详细产品和架构文档 | 与代码同步维护 |
 | `tasks/` | 任务拆分与验收 | 每批改动独立留痕 |
 | `outputs/` | 生成物和临时预览 | 不放源码 |
-| `scripts/` | 启动、测试和运维脚本 | 跟随正式 API 更新 |
+| `scripts/` | 启动、测试、Secret Scan 和运维脚本 | 跟随正式 API 更新 |
 
 ## 常用命令
 
@@ -243,6 +299,8 @@ python -m uvicorn app.main:app --reload --port 8100
 ## 稳定提交门槛
 
 ```powershell
+python .\scripts\scan-secrets.py
+
 cd admin-risk
 pnpm type:check
 pnpm build
@@ -261,22 +319,26 @@ python -m pytest
 ## 工程原则
 
 1. 交易、权限、数据库、PnL、风险和部署变更必须独立审批并留痕。
-2. 未知账户、标的、绑定、状态或执行结果必须 fail-closed。
-3. 所有外部副作用必须在幂等认领之后发生。
-4. Kill Switch 必须在新增风险前生效。
-5. Runtime Live Gate 必须独立于 Platform Live Gate，默认关闭。
-6. Query 与 Command 分离；同步 ACK 不等于成交。
-7. 外部与本地差异不得无痕覆盖，必须形成 Difference。
-8. 凭证只通过引用读取，不进入代码、数据库响应、日志和审计内容。
-9. 产品页面只展示完成业务任务所需的信息、操作和状态；开发说明进入 Markdown。
-10. 缺失持仓、PnL、行情、汇率和账户事实不得伪装为零。
-11. `result_unknown` 必须先恢复和对账，不得重新提交。
-12. 正式 Position、PnL 和 NAV 必须能追溯到不可变事实并支持重建。
-13. Accepted Difference 不等于数据一致，仍然阻断扩大实盘。
-14. 每个真实交易测试日必须形成 EOD Report。
-15. 每批工程改动同步更新计划、测试、API Spec、Release Gate 和 Changelog。
-16. 未通过 CI 的 PR 不得合入 main。
+2. Live 环境禁止匿名访问和 development identity；权限全部默认拒绝。
+3. 请求中的操作人身份来自认证上下文，不能由请求体冒充。
+4. 申请实盘窗口与批准实盘窗口必须由不同用户完成。
+5. 未知账户、标的、绑定、状态或执行结果必须 fail-closed。
+6. 所有外部副作用必须在幂等认领之后发生。
+7. Live Session 的单笔与单日额度必须在进入 Runtime 前原子认领。
+8. Kill Switch 必须在新增风险前生效。
+9. Runtime Live Gate 必须独立于 Platform Live Gate，默认关闭。
+10. Query 与 Command 分离；同步 ACK 不等于成交。
+11. 外部与本地差异不得无痕覆盖，必须形成 Difference。
+12. 凭证只通过引用或哈希读取，不进入代码、数据库响应、日志和审计内容。
+13. 产品页面只展示完成业务任务所需的信息、操作和状态；开发说明进入 Markdown。
+14. 缺失持仓、PnL、行情、汇率和账户事实不得伪装为零。
+15. `result_unknown` 必须先恢复和对账，不得重新提交。
+16. 正式 Position、PnL 和 NAV 必须能追溯到不可变事实并支持重建。
+17. Accepted Difference 不等于数据一致，仍然阻断扩大实盘。
+18. 每个真实交易测试日必须形成 EOD Report。
+19. 每批工程改动同步更新计划、测试、API Spec、Release Gate 和 Changelog。
+20. 未通过 CI 的 PR 不得合入 main。
 
 ## 当前发布边界
 
-Phase 4D 工程验收不等于真实账户运营验收。后续测试优先采用真实账户的小资金和最小允许仓位；在真实只读核对、连续日终对账、最小仓位测试、Kill Switch 演练以及生产权限与密钥治理完成前，不得提高资金、仓位、品种范围或自动化频率。
+Production Gate 5A/5B 工程验收不等于真实账户运营验收。后续测试优先采用真实账户的小资金和最小允许仓位；每次测试都必须由独立用户完成申请与风险批准，并保留只读预检证据、Kill Switch 操作人、有效 LiveTradingSession、最小仓位命令和 EOD Report。在生产 SecretProvider、监控告警、备份恢复演练和连续日终零未解释差异完成前，不得提高资金、仓位、品种范围或自动化频率。
