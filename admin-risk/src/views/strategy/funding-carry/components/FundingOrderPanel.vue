@@ -26,13 +26,27 @@
             </div>
 
             <div class="exchange-stats">
-              <div><span>最新价格</span><strong>{{ item.price }}</strong></div>
-              <div><span>资金费率</span><strong class="green">{{ item.rate }}</strong></div>
-              <div><span>预期年化</span><strong class="green">{{ item.apr }}</strong></div>
-              <div><span>下次结算</span><strong>{{ item.window }}</strong></div>
-              <div><span>标记价格</span><strong>{{ item.markPrice }}</strong></div>
-              <div><span>24H成交量</span><strong>{{ item.volume }}</strong></div>
-              <div><span>持仓量</span><strong>{{ item.oi }}</strong></div>
+              <div
+                ><span>最新价格</span><strong>{{ item.price }}</strong></div
+              >
+              <div
+                ><span>资金费率</span><strong class="green">{{ item.rate }}</strong></div
+              >
+              <div
+                ><span>预期年化</span><strong class="green">{{ item.apr }}</strong></div
+              >
+              <div
+                ><span>下次结算</span><strong>{{ item.window }}</strong></div
+              >
+              <div
+                ><span>标记价格</span><strong>{{ item.markPrice }}</strong></div
+              >
+              <div
+                ><span>24H成交量</span><strong>{{ item.volume }}</strong></div
+              >
+              <div
+                ><span>持仓量</span><strong>{{ item.oi }}</strong></div
+              >
             </div>
           </article>
         </div>
@@ -110,8 +124,18 @@
         </div>
 
         <div class="stage-tabs funding-stage-tabs">
-          <button type="button" :class="{ active: fundingExecutionStage === 'open' }" @click="fundingExecutionStage = 'open'">开仓</button>
-          <button type="button" :class="{ active: fundingExecutionStage === 'close' }" @click="fundingExecutionStage = 'close'">平仓</button>
+          <button
+            type="button"
+            :class="{ active: fundingExecutionStage === 'open' }"
+            @click="fundingExecutionStage = 'open'"
+            >开仓</button
+          >
+          <button
+            type="button"
+            :class="{ active: fundingExecutionStage === 'close' }"
+            @click="fundingExecutionStage = 'close'"
+            >平仓</button
+          >
         </div>
 
         <template v-if="fundingExecutionStage === 'open'">
@@ -262,8 +286,18 @@
           </div>
 
           <div class="funding-action-row">
-            <button class="submit-btn submit-btn--green" type="button" @click="submitFundingOrder('collect')">提交正套开仓</button>
-            <button class="submit-btn submit-btn--red" type="button" @click="submitFundingOrder('pay')">提交反套开仓</button>
+            <button
+              class="submit-btn submit-btn--green"
+              type="button"
+              @click="submitFundingOrder('collect')"
+              >提交正套开仓</button
+            >
+            <button
+              class="submit-btn submit-btn--red"
+              type="button"
+              @click="submitFundingOrder('pay')"
+              >提交反套开仓</button
+            >
           </div>
         </template>
 
@@ -271,8 +305,18 @@
           <div class="funding-close-shell">
             <div class="funding-close-head">
               <div class="funding-mode-tabs funding-mode-tabs--close">
-                <button type="button" :class="{ active: fundingCloseMode === 'market' }" @click="fundingCloseMode = 'market'">市价平仓</button>
-                <button type="button" :class="{ active: fundingCloseMode === 'limit' }" @click="fundingCloseMode = 'limit'">限价平仓</button>
+                <button
+                  type="button"
+                  :class="{ active: fundingCloseMode === 'market' }"
+                  @click="fundingCloseMode = 'market'"
+                  >市价平仓</button
+                >
+                <button
+                  type="button"
+                  :class="{ active: fundingCloseMode === 'limit' }"
+                  @click="fundingCloseMode = 'limit'"
+                  >限价平仓</button
+                >
               </div>
 
               <label class="field field--compact funding-close-limit">
@@ -307,7 +351,11 @@
                     <td>{{ row.basis }}</td>
                     <td :class="row.pnl.startsWith('-') ? 'red' : 'green'">{{ row.pnl }}</td>
                     <td class="green">{{ row.status }}</td>
-                    <td><button class="flat-action" type="button" @click="submitFundingClose(row)">执行平仓</button></td>
+                    <td
+                      ><button class="flat-action" type="button" @click="submitFundingClose(row)"
+                        >执行平仓</button
+                      ></td
+                    >
                   </tr>
                 </tbody>
               </table>
@@ -346,7 +394,10 @@
               <td>{{ row.label }}</td>
               <td :class="row.rate.startsWith('-') ? 'red' : 'green'">{{ row.rate }}</td>
               <td :class="row.basis.startsWith('-') ? 'red' : 'green'">{{ row.basis }}</td>
-              <td :class="row.state.includes('高') ? 'green' : row.state.includes('低') ? 'red' : ''">{{ row.state }}</td>
+              <td
+                :class="row.state.includes('高') ? 'green' : row.state.includes('低') ? 'red' : ''"
+                >{{ row.state }}</td
+              >
             </tr>
           </tbody>
         </table>
@@ -359,12 +410,23 @@
       </div>
 
       <div class="positions-metrics">
-        <div class="positions-metric"><span>累计资金费收益</span><strong class="green">+1,156.60 USDT</strong></div>
-        <div class="positions-metric"><span>未实现盈亏</span><strong class="green">+1,036.20 USDT</strong></div>
-        <div class="positions-metric"><span>当前基差 (现货-永续)</span><strong class="green">+10.5 USDT (+0.0102%)</strong></div>
-        <div class="positions-metric"><span>保证金率</span><strong class="green">35.00%</strong></div>
+        <div class="positions-metric"
+          ><span>累计资金费收益</span><strong class="green">+1,156.60 USDT</strong></div
+        >
+        <div class="positions-metric"
+          ><span>未实现盈亏</span><strong class="green">+1,036.20 USDT</strong></div
+        >
+        <div class="positions-metric"
+          ><span>当前基差 (现货-永续)</span
+          ><strong class="green">+10.5 USDT (+0.0102%)</strong></div
+        >
+        <div class="positions-metric"
+          ><span>保证金率</span><strong class="green">35.00%</strong></div
+        >
         <div class="positions-metric"><span>Delta 偏离</span><strong>0.00%</strong></div>
-        <div class="positions-metric"><span>强平距离</span><strong class="green">28.00%</strong></div>
+        <div class="positions-metric"
+          ><span>强平距离</span><strong class="green">28.00%</strong></div
+        >
       </div>
 
       <div class="positions-table-wrap">
@@ -602,10 +664,30 @@
   ]);
 
   const executionFeedback = ref([
-    { id: 'feedback-1', tone: 'is-success', time: '2026-03-18 15:44:45', text: '正套开仓成功，现货腿与永续腿已同步成交。' },
-    { id: 'feedback-2', tone: 'is-success', time: '2026-03-18 15:44:45', text: '对冲腿下单完成，成交均价与预估偏差可控。' },
-    { id: 'feedback-3', tone: 'is-success', time: '2026-03-18 15:44:43', text: '执行引擎已完成风控校验，保证金占用正常。' },
-    { id: 'feedback-4', tone: 'is-info', time: '2026-03-18 15:44:42', text: '已发起套利执行请求，等待交易所返回最终回报。' },
+    {
+      id: 'feedback-1',
+      tone: 'is-success',
+      time: '2026-03-18 15:44:45',
+      text: '正套开仓成功，现货腿与永续腿已同步成交。',
+    },
+    {
+      id: 'feedback-2',
+      tone: 'is-success',
+      time: '2026-03-18 15:44:45',
+      text: '对冲腿下单完成，成交均价与预估偏差可控。',
+    },
+    {
+      id: 'feedback-3',
+      tone: 'is-success',
+      time: '2026-03-18 15:44:43',
+      text: '执行引擎已完成风控校验，保证金占用正常。',
+    },
+    {
+      id: 'feedback-4',
+      tone: 'is-info',
+      time: '2026-03-18 15:44:42',
+      text: '已发起套利执行请求，等待交易所返回最终回报。',
+    },
   ]);
 
   const fundingLegs = computed(() => {
@@ -633,11 +715,16 @@
   function submitFundingOrder(direction: 'collect' | 'pay') {
     fundingOpenDirection.value = direction;
     const sideLabel = direction === 'collect' ? '正套' : '反套';
-    pushExecutionFeedback(`${sideLabel}开仓已提交，${selectedVenue.value} ${selectedSymbol.value} 名义本金 ${notionalValue.value} USDT。`);
+    pushExecutionFeedback(
+      `${sideLabel}开仓已提交，${selectedVenue.value} ${selectedSymbol.value} 名义本金 ${notionalValue.value} USDT。`,
+    );
   }
 
   function submitFundingClose(row: (typeof fundingCloseRows.value)[number]) {
-    pushExecutionFeedback(`${row.name} 已发起${fundingCloseMode.value === 'market' ? '市价' : '限价'}平仓。`, 'is-info');
+    pushExecutionFeedback(
+      `${row.name} 已发起${fundingCloseMode.value === 'market' ? '市价' : '限价'}平仓。`,
+      'is-info',
+    );
   }
 
   async function renderChart() {
@@ -1426,7 +1513,11 @@
   .analysis-card,
   .positions-table-wrap {
     border-color: var(--strategy-border);
-    background: linear-gradient(180deg, var(--strategy-surface) 0%, var(--strategy-surface-soft) 100%);
+    background: linear-gradient(
+      180deg,
+      var(--strategy-surface) 0%,
+      var(--strategy-surface-soft) 100%
+    );
     box-shadow: var(--strategy-shadow);
   }
 
@@ -1537,7 +1628,6 @@
       flex-direction: column;
       align-items: flex-start;
     }
-
   }
 
   @media (max-width: 1024px) {

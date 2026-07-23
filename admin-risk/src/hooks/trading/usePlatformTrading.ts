@@ -1,14 +1,7 @@
 import { computed, ref } from 'vue';
 
-import {
-  createTradingOrder,
-  getTradingSnapshot,
-} from '/@/api/platform/trading';
-import type {
-  CreateOrderInput,
-  OrderResult,
-  TradingSnapshot,
-} from '/@/api/platform/trading.types';
+import { createTradingOrder, getTradingSnapshot } from '/@/api/platform/trading';
+import type { CreateOrderInput, OrderResult, TradingSnapshot } from '/@/api/platform/trading.types';
 
 function normalizeError(error: unknown): string {
   if (error instanceof Error) return error.message;

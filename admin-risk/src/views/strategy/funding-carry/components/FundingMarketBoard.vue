@@ -71,17 +71,32 @@
       <div class="heatmap-table">
         <div class="heatmap-table__header">
           <div class="symbol-cell">币种</div>
-          <div class="group-header" :style="{ gridTemplateColumns: `repeat(${data.usdtExchanges.length}, minmax(74px, 1fr))` }">
+          <div
+            class="group-header"
+            :style="{
+              gridTemplateColumns: `repeat(${data.usdtExchanges.length}, minmax(74px, 1fr))`,
+            }"
+          >
             <span v-for="exchange in data.usdtExchanges" :key="exchange">{{ exchange }}</span>
           </div>
-          <div class="group-header group-header--inverse" :style="{ gridTemplateColumns: `repeat(${data.inverseExchanges.length}, minmax(74px, 1fr))` }">
+          <div
+            class="group-header group-header--inverse"
+            :style="{
+              gridTemplateColumns: `repeat(${data.inverseExchanges.length}, minmax(74px, 1fr))`,
+            }"
+          >
             <span v-for="exchange in data.inverseExchanges" :key="exchange">{{ exchange }}</span>
           </div>
         </div>
 
         <div v-for="row in data.rows" :key="row.symbol" class="heatmap-table__row">
           <div class="symbol-cell symbol-cell--row">{{ row.symbol }}</div>
-          <div class="group-row" :style="{ gridTemplateColumns: `repeat(${data.usdtExchanges.length}, minmax(74px, 1fr))` }">
+          <div
+            class="group-row"
+            :style="{
+              gridTemplateColumns: `repeat(${data.usdtExchanges.length}, minmax(74px, 1fr))`,
+            }"
+          >
             <span
               v-for="exchange in data.usdtExchanges"
               :key="`${row.symbol}-${exchange}`"
@@ -90,7 +105,12 @@
               {{ displayRate(row.usdtPerps[exchange]) }}
             </span>
           </div>
-          <div class="group-row group-row--inverse" :style="{ gridTemplateColumns: `repeat(${data.inverseExchanges.length}, minmax(74px, 1fr))` }">
+          <div
+            class="group-row group-row--inverse"
+            :style="{
+              gridTemplateColumns: `repeat(${data.inverseExchanges.length}, minmax(74px, 1fr))`,
+            }"
+          >
             <span
               v-for="exchange in data.inverseExchanges"
               :key="`${row.symbol}-inverse-${exchange}`"

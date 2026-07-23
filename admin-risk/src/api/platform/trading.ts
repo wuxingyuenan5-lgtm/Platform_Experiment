@@ -28,8 +28,7 @@ import type {
   TradingSnapshot,
 } from './trading.types';
 
-const apiBaseUrl =
-  import.meta.env.VITE_PLATFORM_API_BASE_URL || 'http://127.0.0.1:8000/api/v1';
+const apiBaseUrl = import.meta.env.VITE_PLATFORM_API_BASE_URL || 'http://127.0.0.1:8000/api/v1';
 
 const client: AxiosInstance = axios.create({
   baseURL: apiBaseUrl,
@@ -58,10 +57,7 @@ export async function reconcileTradingOrder(orderId: string): Promise<OrderResul
 export async function createExecutionBatch(
   input: CreateExecutionBatchInput,
 ): Promise<ExecutionBatchResult> {
-  const response = await client.post<ExecutionBatchResult>(
-    '/trading/execution-batches',
-    input,
-  );
+  const response = await client.post<ExecutionBatchResult>('/trading/execution-batches', input);
   return response.data;
 }
 
@@ -128,9 +124,7 @@ export async function getRuntimeReadiness(): Promise<RuntimeReadinessResult> {
 }
 
 export async function getReconciliationSummary(): Promise<ReconciliationSummaryResult> {
-  const response = await client.get<ReconciliationSummaryResult>(
-    '/ops/reconciliation-summary',
-  );
+  const response = await client.get<ReconciliationSummaryResult>('/ops/reconciliation-summary');
   return response.data;
 }
 
@@ -140,23 +134,17 @@ export async function getTradingSafety(): Promise<TradingSafetyResult> {
 }
 
 export async function getCredentialReferences(): Promise<CredentialReferenceResult[]> {
-  const response = await client.get<CredentialReferenceResult[]>(
-    '/security/credential-references',
-  );
+  const response = await client.get<CredentialReferenceResult[]>('/security/credential-references');
   return response.data;
 }
 
 export async function getExchangeConnectivity(): Promise<ExchangeConnectivityResult> {
-  const response = await client.get<ExchangeConnectivityResult>(
-    '/security/exchange-connectivity',
-  );
+  const response = await client.get<ExchangeConnectivityResult>('/security/exchange-connectivity');
   return response.data;
 }
 
 export async function getCrossSpreadSnapshot(): Promise<CrossSpreadSnapshotResult> {
-  const response = await client.get<CrossSpreadSnapshotResult>(
-    '/trading/cross-spread/snapshot',
-  );
+  const response = await client.get<CrossSpreadSnapshotResult>('/trading/cross-spread/snapshot');
   return response.data;
 }
 

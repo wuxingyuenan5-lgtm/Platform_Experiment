@@ -51,7 +51,8 @@ function makeResearch(
   note: string,
 ) {
   const decisionTone = netCarry >= 14 ? 'bull' : netCarry >= 9 ? 'flat' : 'bear';
-  const decisionLabel = decisionTone === 'bull' ? '值得做' : decisionTone === 'flat' ? '继续观察' : '暂不建议';
+  const decisionLabel =
+    decisionTone === 'bull' ? '值得做' : decisionTone === 'flat' ? '继续观察' : '暂不建议';
 
   return {
     symbol,
@@ -64,9 +65,21 @@ function makeResearch(
     },
     chips: ['现货多头', '永续空头', '单交易所内对冲', '研究优先页'],
     breakdownRows: [
-      { label: 'Funding 收益年化', value: formatPercent(netCarry + basisDrag + borrowCost), note: '永续空头侧的毛收益口径' },
-      { label: '期现价差拖累', value: `-${Math.abs(basisDrag).toFixed(2)}%`, note: '基差与对冲效率折损' },
-      { label: '借贷利率', value: `-${Math.abs(borrowCost).toFixed(2)}%`, note: '现货资金占用与融资成本' },
+      {
+        label: 'Funding 收益年化',
+        value: formatPercent(netCarry + basisDrag + borrowCost),
+        note: '永续空头侧的毛收益口径',
+      },
+      {
+        label: '期现价差拖累',
+        value: `-${Math.abs(basisDrag).toFixed(2)}%`,
+        note: '基差与对冲效率折损',
+      },
+      {
+        label: '借贷利率',
+        value: `-${Math.abs(borrowCost).toFixed(2)}%`,
+        note: '现货资金占用与融资成本',
+      },
       { label: '净 Carry 年化', value: formatPercent(netCarry), note: '研究排序主口径' },
     ],
     insightBlocks: [
@@ -74,8 +87,14 @@ function makeResearch(
         title: '收益拆解',
         badge: formatPercent(netCarry),
         tone: 'bull',
-        description: `Funding ${fundingRate >= 0 ? '为正' : '承压'}，但真正决定优先级的是净 carry。当前 ${symbol} 在扣除期现价差与借贷成本后，仍保留可研究的收益厚度。`,
-        meta: [`Funding ${formatPercent(fundingRate, 4)}`, `Basis ${formatPercent(basisDrag)}`, `Borrow ${formatPercent(borrowCost)}`],
+        description: `Funding ${
+          fundingRate >= 0 ? '为正' : '承压'
+        }，但真正决定优先级的是净 carry。当前 ${symbol} 在扣除期现价差与借贷成本后，仍保留可研究的收益厚度。`,
+        meta: [
+          `Funding ${formatPercent(fundingRate, 4)}`,
+          `Basis ${formatPercent(basisDrag)}`,
+          `Borrow ${formatPercent(borrowCost)}`,
+        ],
       },
       {
         title: '稳定性',
@@ -92,8 +111,8 @@ function makeResearch(
           capacity >= 82
             ? '容量较厚，适合中等规模持续跟踪。'
             : capacity >= 65
-              ? '容量尚可，但更适合分批执行与限额约束。'
-              : '容量偏薄，更适合作为机会观察而非大规模部署对象。',
+            ? '容量尚可，但更适合分批执行与限额约束。'
+            : '容量偏薄，更适合作为机会观察而非大规模部署对象。',
         meta: ['Spot / Perp 流动性观察', '滑点需要单列', '执行窗口应限时'],
       },
       {
@@ -125,20 +144,34 @@ function makeProfile(
   metrics: FundingMetricInput[],
   rows: Array<[FundingSymbol, number, number, number, number, number, number, string]>,
 ): FundingExchangeProfile {
-  const snapshots = rows.map(([symbol, fundingRate, netCarry, basisDrag, borrowCost, stability, capacity]) => ({
-    symbol,
-    fundingRate,
-    netCarry,
-    basisDrag,
-    borrowCost,
-    stability,
-    capacity,
-  }));
-  const research = Object.fromEntries(
-    rows.map(([symbol, fundingRate, netCarry, basisDrag, borrowCost, stability, capacity, note]) => [
+  const snapshots = rows.map(
+    ([symbol, fundingRate, netCarry, basisDrag, borrowCost, stability, capacity]) => ({
       symbol,
-      makeResearch(exchange, symbol, netCarry, basisDrag, borrowCost, fundingRate, stability, capacity, note),
-    ]),
+      fundingRate,
+      netCarry,
+      basisDrag,
+      borrowCost,
+      stability,
+      capacity,
+    }),
+  );
+  const research = Object.fromEntries(
+    rows.map(
+      ([symbol, fundingRate, netCarry, basisDrag, borrowCost, stability, capacity, note]) => [
+        symbol,
+        makeResearch(
+          exchange,
+          symbol,
+          netCarry,
+          basisDrag,
+          borrowCost,
+          fundingRate,
+          stability,
+          capacity,
+          note,
+        ),
+      ],
+    ),
   ) as Record<FundingSymbol, FundingExchangeProfile['research'][FundingSymbol]>;
   return {
     exchange,
@@ -152,9 +185,69 @@ function makeProfile(
 }
 
 export const fundingCarryProfiles: Record<FundingExchange, FundingExchangeProfile> = {
-  Binance: makeProfile('Binance', [['账户净值', '450,525.47', 'USD'], ['策略类型', '资金套利', 'Mode'], ['保证金余额', '413,860.97', 'USD'], ['收益率', '11.37', '%', 'positive'], ['过去24h盈亏', '-32.16', 'USD', 'negative'], ['累计收益', '51,198.61', 'USD'], ['当前净 Carry', '+12.40', '%', 'positive'], ['稳定度评分', '84', '0-100']], [['BTC', 0.008, 12.4, 4.2, 2.1, 84, 97, '主流大币，适合中等规模与滚动跟踪。'], ['ETH', -0.0041, 9.1, 3.6, 2.4, 79, 90, '收益不差，但 funding 与基差波动更明显。'], ['SOL', 0.0132, 18.7, 7.9, 3.5, 68, 74, '弹性高，但更容易从结构机会变成情绪机会。'], ['DOGE', -0.0006, 13.3, 5.8, 2.9, 58, 70, '零售驱动更强，适合观察，不适合盲目放大。'], ['XRP', -0.0056, 11.8, 4.9, 2.6, 66, 78, '资金费率与政策敏感度共振，需要看 regime。'], ['XAUT', 0.0021, 7.5, 1.4, 1.8, 73, 42, '标的特殊，容量与交易便利性是主要约束。']]),
-  OKX: makeProfile('OKX', [['账户净值', '391,842.22', 'USD'], ['策略类型', '资金套利', 'Mode'], ['保证金余额', '346,001.13', 'USD'], ['收益率', '9.82', '%', 'positive'], ['过去24h盈亏', '+118.52', 'USD', 'positive'], ['累计收益', '43,772.43', 'USD'], ['当前净 Carry', '+10.60', '%', 'positive'], ['稳定度评分', '81', '0-100']], [['BTC', 0.0062, 10.6, 3.9, 1.8, 81, 94, '深度稳，执行体验平衡，适合作为标准观察样本。'], ['ETH', -0.0034, 8.4, 3.3, 2.1, 75, 86, '相对平稳，但收益厚度略弱于 Binance。'], ['SOL', 0.0111, 16.1, 6.7, 3.0, 66, 69, '机会仍在，但要更严控成交成本。'], ['DOGE', -0.0004, 11.5, 4.8, 2.5, 57, 65, '容量一般，适合事件窗口而非长时间挂着。'], ['XRP', -0.0042, 10.2, 4.2, 2.2, 64, 71, '可观察，但不宜作为高权重品种。'], ['XAUT', 0.0017, 6.8, 1.2, 1.5, 72, 40, '更像补充型机会，不应主打。']]),
-  Bybit: makeProfile('Bybit', [['账户净值', '278,560.91', 'USD'], ['策略类型', '资金套利', 'Mode'], ['保证金余额', '242,170.28', 'USD'], ['收益率', '8.44', '%', 'positive'], ['过去24h盈亏', '-86.70', 'USD', 'negative'], ['累计收益', '31,890.20', 'USD'], ['当前净 Carry', '+9.40', '%', 'positive'], ['稳定度评分', '76', '0-100']], [['BTC', 0.0054, 9.4, 3.4, 1.7, 76, 88, '结构仍可看，但厚度和稳定性略次于前两家。'], ['ETH', -0.0028, 7.6, 3.0, 1.9, 72, 81, '比较适合做比较样本，不一定是最优执行地。'], ['SOL', 0.0102, 14.8, 6.0, 2.8, 63, 64, '收益有吸引力，但更吃风格与时机。'], ['DOGE', -0.0003, 10.1, 4.3, 2.1, 54, 61, '适合小规模、短窗口。'], ['XRP', -0.0038, 9.5, 3.9, 2.0, 61, 67, '边际可看，但更适合作为备选。'], ['XAUT', 0.0012, 5.4, 1.0, 1.4, 69, 35, '容量偏小，优先级较低。']]),
+  Binance: makeProfile(
+    'Binance',
+    [
+      ['账户净值', '450,525.47', 'USD'],
+      ['策略类型', '资金套利', 'Mode'],
+      ['保证金余额', '413,860.97', 'USD'],
+      ['收益率', '11.37', '%', 'positive'],
+      ['过去24h盈亏', '-32.16', 'USD', 'negative'],
+      ['累计收益', '51,198.61', 'USD'],
+      ['当前净 Carry', '+12.40', '%', 'positive'],
+      ['稳定度评分', '84', '0-100'],
+    ],
+    [
+      ['BTC', 0.008, 12.4, 4.2, 2.1, 84, 97, '主流大币，适合中等规模与滚动跟踪。'],
+      ['ETH', -0.0041, 9.1, 3.6, 2.4, 79, 90, '收益不差，但 funding 与基差波动更明显。'],
+      ['SOL', 0.0132, 18.7, 7.9, 3.5, 68, 74, '弹性高，但更容易从结构机会变成情绪机会。'],
+      ['DOGE', -0.0006, 13.3, 5.8, 2.9, 58, 70, '零售驱动更强，适合观察，不适合盲目放大。'],
+      ['XRP', -0.0056, 11.8, 4.9, 2.6, 66, 78, '资金费率与政策敏感度共振，需要看 regime。'],
+      ['XAUT', 0.0021, 7.5, 1.4, 1.8, 73, 42, '标的特殊，容量与交易便利性是主要约束。'],
+    ],
+  ),
+  OKX: makeProfile(
+    'OKX',
+    [
+      ['账户净值', '391,842.22', 'USD'],
+      ['策略类型', '资金套利', 'Mode'],
+      ['保证金余额', '346,001.13', 'USD'],
+      ['收益率', '9.82', '%', 'positive'],
+      ['过去24h盈亏', '+118.52', 'USD', 'positive'],
+      ['累计收益', '43,772.43', 'USD'],
+      ['当前净 Carry', '+10.60', '%', 'positive'],
+      ['稳定度评分', '81', '0-100'],
+    ],
+    [
+      ['BTC', 0.0062, 10.6, 3.9, 1.8, 81, 94, '深度稳，执行体验平衡，适合作为标准观察样本。'],
+      ['ETH', -0.0034, 8.4, 3.3, 2.1, 75, 86, '相对平稳，但收益厚度略弱于 Binance。'],
+      ['SOL', 0.0111, 16.1, 6.7, 3.0, 66, 69, '机会仍在，但要更严控成交成本。'],
+      ['DOGE', -0.0004, 11.5, 4.8, 2.5, 57, 65, '容量一般，适合事件窗口而非长时间挂着。'],
+      ['XRP', -0.0042, 10.2, 4.2, 2.2, 64, 71, '可观察，但不宜作为高权重品种。'],
+      ['XAUT', 0.0017, 6.8, 1.2, 1.5, 72, 40, '更像补充型机会，不应主打。'],
+    ],
+  ),
+  Bybit: makeProfile(
+    'Bybit',
+    [
+      ['账户净值', '278,560.91', 'USD'],
+      ['策略类型', '资金套利', 'Mode'],
+      ['保证金余额', '242,170.28', 'USD'],
+      ['收益率', '8.44', '%', 'positive'],
+      ['过去24h盈亏', '-86.70', 'USD', 'negative'],
+      ['累计收益', '31,890.20', 'USD'],
+      ['当前净 Carry', '+9.40', '%', 'positive'],
+      ['稳定度评分', '76', '0-100'],
+    ],
+    [
+      ['BTC', 0.0054, 9.4, 3.4, 1.7, 76, 88, '结构仍可看，但厚度和稳定性略次于前两家。'],
+      ['ETH', -0.0028, 7.6, 3.0, 1.9, 72, 81, '比较适合做比较样本，不一定是最优执行地。'],
+      ['SOL', 0.0102, 14.8, 6.0, 2.8, 63, 64, '收益有吸引力，但更吃风格与时机。'],
+      ['DOGE', -0.0003, 10.1, 4.3, 2.1, 54, 61, '适合小规模、短窗口。'],
+      ['XRP', -0.0038, 9.5, 3.9, 2.0, 61, 67, '边际可看，但更适合作为备选。'],
+      ['XAUT', 0.0012, 5.4, 1.0, 1.4, 69, 35, '容量偏小，优先级较低。'],
+    ],
+  ),
 };
 
 export const fundingMarketBoard: FundingMarketBoardData = {
@@ -163,22 +256,140 @@ export const fundingMarketBoard: FundingMarketBoardData = {
   resolutionOptions: ['30分钟', '1小时', '4小时', '8小时'],
   summaryCards: [
     { title: '资金费率套利', value: '0.0015%', subtitle: 'BTC 持仓加权资金费率', tone: 'positive' },
-    { title: '累计资金费率', value: '-0.0008%', subtitle: 'ETH 持仓加权资金费率', tone: 'negative' },
-    { title: '成交额加权费率', value: '0.0015%', subtitle: 'BTC 成交额加权资金费率', tone: 'positive' },
-    { title: '净资金费率', value: '-0.0008%', subtitle: 'ETH 成交额加权资金费率', tone: 'negative' },
+    {
+      title: '累计资金费率',
+      value: '-0.0008%',
+      subtitle: 'ETH 持仓加权资金费率',
+      tone: 'negative',
+    },
+    {
+      title: '成交额加权费率',
+      value: '0.0015%',
+      subtitle: 'BTC 成交额加权资金费率',
+      tone: 'positive',
+    },
+    {
+      title: '净资金费率',
+      value: '-0.0008%',
+      subtitle: 'ETH 成交额加权资金费率',
+      tone: 'negative',
+    },
   ],
-  highest: [{ market: 'Gate POWER/USDT', value: 0.3395 }, { market: 'Binance KORU/USDT', value: 0.323 }, { market: 'Bybit SIREN/USDT', value: 0.2514 }, { market: 'Gate HANA/USDT', value: 0.2325 }, { market: 'Bitget SIREN/USDT', value: 0.2057 }],
-  lowest: [{ market: 'Gate VIC/USDT', value: -1.6972 }, { market: 'Bybit LRC/USDT', value: -1.599 }, { market: 'Gate T/USDT', value: -1.4208 }, { market: 'Bybit T/USDT', value: -1.2247 }, { market: 'Bybit TAIKO/USDT', value: -1.1714 }],
+  highest: [
+    { market: 'Gate POWER/USDT', value: 0.3395 },
+    { market: 'Binance KORU/USDT', value: 0.323 },
+    { market: 'Bybit SIREN/USDT', value: 0.2514 },
+    { market: 'Gate HANA/USDT', value: 0.2325 },
+    { market: 'Bitget SIREN/USDT', value: 0.2057 },
+  ],
+  lowest: [
+    { market: 'Gate VIC/USDT', value: -1.6972 },
+    { market: 'Bybit LRC/USDT', value: -1.599 },
+    { market: 'Gate T/USDT', value: -1.4208 },
+    { market: 'Bybit T/USDT', value: -1.2247 },
+    { market: 'Bybit TAIKO/USDT', value: -1.1714 },
+  ],
   usdtExchanges: ['Binance', 'OKX', 'Bybit', 'KuCoin', 'Gate', 'Bitget', 'MEXC', 'WhiteBIT'],
   inverseExchanges: ['Binance', 'OKX', 'Bybit'],
   rows: [
-    { symbol: 'BTC', usdtPerps: { Binance: 0.0003, OKX: 0.0033, Bybit: -0.0021, KuCoin: -0.0012, Gate: -0.0003, Bitget: -0.0004, MEXC: 0.0002, WhiteBIT: 0.0158 }, inversePerps: { Binance: 0.0095, OKX: 0.0041, Bybit: 0.0051 } },
-    { symbol: 'ETH', usdtPerps: { Binance: -0.0017, OKX: -0.0029, Bybit: 0.0014, KuCoin: 0.0071, Gate: 0.0029, Bitget: 0.0039, MEXC: -0.0017, WhiteBIT: -0.002 }, inversePerps: { Binance: -0.0122, OKX: -0.0059, Bybit: -0.003 } },
-    { symbol: 'SOL', usdtPerps: { Binance: -0.0189, OKX: -0.0096, Bybit: -0.0187, KuCoin: 0.01, Gate: -0.0175, Bitget: -0.0187, MEXC: -0.0189, WhiteBIT: -0.0273 }, inversePerps: { Binance: -0.0129, OKX: -0.0099, Bybit: -0.0087 } },
-    { symbol: 'XRP', usdtPerps: { Binance: -0.0075, OKX: -0.0059, Bybit: -0.0016, KuCoin: 0.006, Gate: 0.0006, Bitget: -0.0036, MEXC: -0.0075, WhiteBIT: 0.01 }, inversePerps: { Binance: -0.0114, OKX: 0.0064, Bybit: -0.0164 } },
-    { symbol: 'DOGE', usdtPerps: { Binance: -0.0033, OKX: 0.0007, Bybit: -0.0214, KuCoin: 0.01, Gate: 0.01, Bitget: -0.0023, MEXC: -0.0032, WhiteBIT: -0.0101 }, inversePerps: { Binance: -0.0006, OKX: 0.01, Bybit: 0.01 } },
-    { symbol: 'BNB', usdtPerps: { Binance: 0.0, OKX: -0.0056, Bybit: -0.0258, KuCoin: 0.0009, Gate: -0.0112, Bitget: -0.0186, MEXC: 0.0, WhiteBIT: 0.01 }, inversePerps: { Binance: 0.0476, OKX: null, Bybit: null } },
-    { symbol: 'XAUT', usdtPerps: { Binance: -0.0067, OKX: -0.0022, Bybit: 0.0094, KuCoin: null, Gate: -0.0044, Bitget: 0.005, MEXC: -0.0066, WhiteBIT: 0.01 }, inversePerps: { Binance: null, OKX: null, Bybit: null } },
+    {
+      symbol: 'BTC',
+      usdtPerps: {
+        Binance: 0.0003,
+        OKX: 0.0033,
+        Bybit: -0.0021,
+        KuCoin: -0.0012,
+        Gate: -0.0003,
+        Bitget: -0.0004,
+        MEXC: 0.0002,
+        WhiteBIT: 0.0158,
+      },
+      inversePerps: { Binance: 0.0095, OKX: 0.0041, Bybit: 0.0051 },
+    },
+    {
+      symbol: 'ETH',
+      usdtPerps: {
+        Binance: -0.0017,
+        OKX: -0.0029,
+        Bybit: 0.0014,
+        KuCoin: 0.0071,
+        Gate: 0.0029,
+        Bitget: 0.0039,
+        MEXC: -0.0017,
+        WhiteBIT: -0.002,
+      },
+      inversePerps: { Binance: -0.0122, OKX: -0.0059, Bybit: -0.003 },
+    },
+    {
+      symbol: 'SOL',
+      usdtPerps: {
+        Binance: -0.0189,
+        OKX: -0.0096,
+        Bybit: -0.0187,
+        KuCoin: 0.01,
+        Gate: -0.0175,
+        Bitget: -0.0187,
+        MEXC: -0.0189,
+        WhiteBIT: -0.0273,
+      },
+      inversePerps: { Binance: -0.0129, OKX: -0.0099, Bybit: -0.0087 },
+    },
+    {
+      symbol: 'XRP',
+      usdtPerps: {
+        Binance: -0.0075,
+        OKX: -0.0059,
+        Bybit: -0.0016,
+        KuCoin: 0.006,
+        Gate: 0.0006,
+        Bitget: -0.0036,
+        MEXC: -0.0075,
+        WhiteBIT: 0.01,
+      },
+      inversePerps: { Binance: -0.0114, OKX: 0.0064, Bybit: -0.0164 },
+    },
+    {
+      symbol: 'DOGE',
+      usdtPerps: {
+        Binance: -0.0033,
+        OKX: 0.0007,
+        Bybit: -0.0214,
+        KuCoin: 0.01,
+        Gate: 0.01,
+        Bitget: -0.0023,
+        MEXC: -0.0032,
+        WhiteBIT: -0.0101,
+      },
+      inversePerps: { Binance: -0.0006, OKX: 0.01, Bybit: 0.01 },
+    },
+    {
+      symbol: 'BNB',
+      usdtPerps: {
+        Binance: 0.0,
+        OKX: -0.0056,
+        Bybit: -0.0258,
+        KuCoin: 0.0009,
+        Gate: -0.0112,
+        Bitget: -0.0186,
+        MEXC: 0.0,
+        WhiteBIT: 0.01,
+      },
+      inversePerps: { Binance: 0.0476, OKX: null, Bybit: null },
+    },
+    {
+      symbol: 'XAUT',
+      usdtPerps: {
+        Binance: -0.0067,
+        OKX: -0.0022,
+        Bybit: 0.0094,
+        KuCoin: null,
+        Gate: -0.0044,
+        Bitget: 0.005,
+        MEXC: -0.0066,
+        WhiteBIT: 0.01,
+      },
+      inversePerps: { Binance: null, OKX: null, Bybit: null },
+    },
   ],
 };
 

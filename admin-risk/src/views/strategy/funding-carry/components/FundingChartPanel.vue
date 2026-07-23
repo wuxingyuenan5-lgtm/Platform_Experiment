@@ -115,7 +115,9 @@
   const selectedSymbol = ref(props.symbol);
   const selectedResolution = ref(props.resolution);
   const startDate = ref(props.startDate || props.data.points[0]?.date || '2026-05-28');
-  const endDate = ref(props.endDate || props.data.points[props.data.points.length - 1]?.date || '2026-06-24');
+  const endDate = ref(
+    props.endDate || props.data.points[props.data.points.length - 1]?.date || '2026-06-24',
+  );
   const showFunding = ref(true);
   const showPrice = ref(true);
 
@@ -245,27 +247,31 @@
       ],
       series: [
         ...(showFunding.value
-          ? [{
-              name: props.data.legendFunding,
-              type: 'bar' as const,
-              barWidth: 16,
-              itemStyle: {
-                borderRadius: [4, 4, 0, 0],
-                color: (params: { value: number }) => (params.value >= 0 ? '#cf3f4f' : '#2db87c'),
+          ? [
+              {
+                name: props.data.legendFunding,
+                type: 'bar' as const,
+                barWidth: 16,
+                itemStyle: {
+                  borderRadius: [4, 4, 0, 0],
+                  color: (params: { value: number }) => (params.value >= 0 ? '#cf3f4f' : '#2db87c'),
+                },
+                data: filteredPoints.value.map((point) => point.funding),
               },
-              data: filteredPoints.value.map((point) => point.funding),
-            }]
+            ]
           : []),
         ...(showPrice.value
-          ? [{
-              name: props.data.legendPrice,
-              type: 'line' as const,
-              yAxisIndex: 1,
-              smooth: true,
-              symbol: 'none',
-              lineStyle: { width: 3, color: '#d79a1e' },
-              data: filteredPoints.value.map((point) => point.price),
-            }]
+          ? [
+              {
+                name: props.data.legendPrice,
+                type: 'line' as const,
+                yAxisIndex: 1,
+                smooth: true,
+                symbol: 'none',
+                lineStyle: { width: 3, color: '#d79a1e' },
+                data: filteredPoints.value.map((point) => point.price),
+              },
+            ]
           : []),
       ] as any,
     });
@@ -435,4 +441,3 @@
     }
   }
 </style>
-

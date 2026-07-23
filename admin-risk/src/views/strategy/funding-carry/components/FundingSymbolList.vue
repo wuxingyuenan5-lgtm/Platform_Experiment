@@ -19,7 +19,9 @@
           <strong>{{ item.symbol }}</strong>
           <small>净 Carry {{ signed(item.netCarry) }}</small>
         </div>
-        <em :class="item.fundingRate >= 0 ? 'is-positive' : 'is-negative'">{{ signed(item.fundingRate, 4) }}</em>
+        <em :class="item.fundingRate >= 0 ? 'is-positive' : 'is-negative'">{{
+          signed(item.fundingRate, 4)
+        }}</em>
       </button>
     </div>
   </article>
