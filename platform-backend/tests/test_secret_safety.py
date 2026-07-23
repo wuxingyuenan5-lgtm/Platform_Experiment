@@ -7,7 +7,9 @@ from app.database import connection, initialize_database
 from app.main import app
 
 
-def test_credential_references_expose_metadata_without_secret_material(tmp_path: Path) -> None:
+def test_credential_references_expose_metadata_without_secret_material(
+    tmp_path: Path,
+) -> None:
     get_settings().database_path = str(tmp_path / "credentials.db")
 
     with TestClient(app) as client:
@@ -27,7 +29,9 @@ def test_credential_references_expose_metadata_without_secret_material(tmp_path:
         assert "passphrase" not in serialized
 
 
-def test_live_account_order_is_blocked_when_global_live_switch_is_disabled(tmp_path: Path) -> None:
+def test_live_account_order_is_blocked_when_global_live_switch_is_disabled(
+    tmp_path: Path,
+) -> None:
     settings = get_settings()
     settings.database_path = str(tmp_path / "live-guard.db")
     settings.live_trading_enabled = False
@@ -49,12 +53,12 @@ def test_live_account_order_is_blocked_when_global_live_switch_is_disabled(tmp_p
         )
 
         assert response.status_code == 403
-        assert response.json()["detail"] == "Live trading is disabled by global safety switch"
+        assert response.json()["detail"] == (
+            "Live trading is disabled by global safety switch"
+        )
 
 
-def test_live_account_order_requires_active_account_even_when_global_switch_enabled(
-    tmp_path: Path,
-) -> None:
+def test_all_accounts_must_be_active_before_order_submission(tmp_path: Path) -> None:
     settings = get_settings()
     settings.database_path = str(tmp_path / "live-account-status.db")
     settings.live_trading_enabled = True
@@ -76,7 +80,7 @@ def test_live_account_order_requires_active_account_even_when_global_switch_enab
         )
 
         assert response.status_code == 403
-        assert response.json()["detail"] == "Live account is not active"
+        assert response.json()["detail"] == "Account is not active"
 
 
 def seed_live_account_for_test(status: str = "active") -> None:

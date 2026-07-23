@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from decimal import Decimal
+
 import httpx
 from fastapi import HTTPException
 
@@ -13,6 +15,7 @@ from app.schemas import (
 )
 
 LIVE_ENVIRONMENT = "live"
+ACTIVE_STATUS = "active"
 
 
 def get_trading_safety() -> TradingSafetyResponse:
@@ -21,7 +24,7 @@ def get_trading_safety() -> TradingSafetyResponse:
         liveTradingEnabled=settings.live_trading_enabled,
         defaultTradingEnvironment=settings.default_trading_environment,
         secretStoragePolicy="database_stores_references_only",
-        liveGuardPolicy="live_accounts_require_global_switch_and_active_account",
+        liveGuardPolicy="all_accounts_fail_closed_and_live_requires_global_switch",
     )
 
 
@@ -83,15 +86,48 @@ def get_exchange_venue_readiness() -> ExchangeVenueReadinessResponse:
     return ExchangeVenueReadinessResponse(**payload)
 
 
-def enforce_order_safety(account_id: str) -> None:
+def enforce_order_safety(
+    account_id: str,
+    instrument_id: str,
+    quantity: Decimal,
+    price: Decimal | None,
+) -> None:
     account = get_account_security_row(account_id)
     if account is None:
-        return
+        raise HTTPException(status_code=404, detail="Account not found")
 
-    if account["credential_ref"] is not None and not str(account["credential_ref"]).startswith(
-        "secret://"
-    ):
+    if account["status"] != ACTIVE_STATUS:
+        raise HTTPException(status_code=403, detail="Account is not active")
+
+    credential_ref = account["credential_ref"]
+    if credential_ref is not None and not str(credential_ref).startswith("secret://"):
         raise HTTPException(status_code=403, detail="Account credential reference is unsafe")
+
+    instrument = get_instrument_security_row(instrument_id)
+    if instrument is None:
+        raise HTTPException(status_code=404, detail="Instrument not found")
+    if instrument["contract_version"] is None:
+        raise HTTPException(
+            status_code=422,
+            detail="Instrument has no active contract specification",
+        )
+
+    min_order_quantity = Decimal(instrument["min_order_quantity"])
+    quantity_step = Decimal(instrument["quantity_step"])
+    price_tick = Decimal(instrument["price_tick"])
+
+    if quantity < min_order_quantity:
+        raise HTTPException(status_code=422, detail="Order quantity is below minimum")
+    if quantity_step <= 0 or quantity % quantity_step != 0:
+        raise HTTPException(
+            status_code=422,
+            detail="Order quantity is not aligned to quantity step",
+        )
+    if price is not None and (price_tick <= 0 or price % price_tick != 0):
+        raise HTTPException(
+            status_code=422,
+            detail="Order price is not aligned to price tick",
+        )
 
     if account["environment"] != LIVE_ENVIRONMENT:
         return
@@ -102,8 +138,6 @@ def enforce_order_safety(account_id: str) -> None:
             status_code=403,
             detail="Live trading is disabled by global safety switch",
         )
-    if account["status"] != "active":
-        raise HTTPException(status_code=403, detail="Live account is not active")
 
 
 def get_account_security_row(account_id: str):
@@ -115,4 +149,23 @@ def get_account_security_row(account_id: str):
             WHERE id = ?
             """,
             (account_id,),
+        ).fetchone()
+
+
+def get_instrument_security_row(instrument_id: str):
+    with connection() as db:
+        return db.execute(
+            """
+            SELECT i.id,
+                   cs.version AS contract_version,
+                   cs.price_tick,
+                   cs.min_order_quantity,
+                   cs.quantity_step
+            FROM instruments i
+            LEFT JOIN contract_specifications cs ON cs.instrument_id = i.id
+            WHERE i.id = ?
+            ORDER BY cs.effective_from DESC
+            LIMIT 1
+            """,
+            (instrument_id,),
         ).fetchone()

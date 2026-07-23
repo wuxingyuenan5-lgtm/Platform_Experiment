@@ -87,11 +87,18 @@ def command_exists(command_id: str) -> bool:
     return row is not None
 
 
-def save_command_started(command: SubmitOrderCommand) -> None:
+def claim_command(command: SubmitOrderCommand) -> bool:
+    """Atomically claim a command before any external gateway side effect.
+
+    Exactly one caller can insert the command row. Other callers must not call the
+    gateway and should either return persisted events or report that the first
+    execution is still processing.
+    """
+
     now = command.received_at.isoformat()
     payload = command.model_dump_json(by_alias=True)
     with connection() as db:
-        db.execute(
+        cursor = db.execute(
             """
             INSERT OR IGNORE INTO runtime_commands (
                 command_id, platform_order_id, command_type, payload_json,
@@ -108,6 +115,13 @@ def save_command_started(command: SubmitOrderCommand) -> None:
                 now,
             ),
         )
+        return cursor.rowcount == 1
+
+
+def save_command_started(command: SubmitOrderCommand) -> None:
+    """Backward-compatible wrapper for callers that do not need claim ownership."""
+
+    claim_command(command)
 
 
 def save_command_events(command: SubmitOrderCommand, events: list[ExecutionEvent]) -> None:
@@ -148,8 +162,12 @@ def save_command_events(command: SubmitOrderCommand, events: list[ExecutionEvent
 
 def journal_status() -> dict[str, object]:
     with connection() as db:
-        command_count = db.execute("SELECT COUNT(*) AS count FROM runtime_commands").fetchone()
-        event_count = db.execute("SELECT COUNT(*) AS count FROM runtime_events").fetchone()
+        command_count = db.execute(
+            "SELECT COUNT(*) AS count FROM runtime_commands"
+        ).fetchone()
+        event_count = db.execute(
+            "SELECT COUNT(*) AS count FROM runtime_events"
+        ).fetchone()
         latest = db.execute(
             """
             SELECT command_id, status, updated_at

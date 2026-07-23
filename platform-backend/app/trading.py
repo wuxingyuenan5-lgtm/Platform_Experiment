@@ -30,7 +30,12 @@ def submit_order(request: CreateOrderRequest, command_id: str | None = None) -> 
     if request.order_type == "limit" and request.price is None:
         raise HTTPException(status_code=422, detail="Limit orders require price")
 
-    enforce_order_safety(request.account_id)
+    enforce_order_safety(
+        request.account_id,
+        request.instrument_id,
+        request.quantity,
+        request.price,
+    )
 
     with connection() as db:
         db.execute(
