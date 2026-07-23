@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     runtime_timeout_seconds: float = 5.0
     cors_origins: str = "http://127.0.0.1:5173,http://localhost:5173"
     live_trading_enabled: bool = False
+    demo_trading_enabled: bool = False
     default_trading_environment: str = "simulation"
 
     @property

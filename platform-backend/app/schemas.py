@@ -13,6 +13,12 @@ class CreateOrderRequest(BaseModel):
     order_type: Literal["market", "limit"] = Field(alias="orderType")
     quantity: Decimal = Field(gt=0)
     price: Decimal | None = Field(default=None, gt=0)
+    time_in_force: Literal["GTC", "IOC", "FOK"] = Field(default="GTC", alias="timeInForce")
+    reduce_only: bool = Field(default=False, alias="reduceOnly")
+    position_idx: int = Field(default=0, alias="positionIdx", ge=0, le=2)
+    max_deviation: int | None = Field(default=None, alias="maxDeviation", ge=0)
+    allow_partial_fill: bool = Field(default=True, alias="allowPartialFill")
+    max_slippage_bps: Decimal | None = Field(default=None, alias="maxSlippageBps", ge=0)
 
 
 class OrderResponse(BaseModel):
@@ -31,6 +37,12 @@ class BatchLegRequest(BaseModel):
     order_type: Literal["market", "limit"] = Field(alias="orderType")
     quantity: Decimal = Field(gt=0)
     price: Decimal | None = Field(default=None, gt=0)
+    time_in_force: Literal["GTC", "IOC", "FOK"] = Field(default="GTC", alias="timeInForce")
+    reduce_only: bool = Field(default=False, alias="reduceOnly")
+    position_idx: int = Field(default=0, alias="positionIdx", ge=0, le=2)
+    max_deviation: int | None = Field(default=None, alias="maxDeviation", ge=0)
+    allow_partial_fill: bool = Field(default=True, alias="allowPartialFill")
+    max_slippage_bps: Decimal | None = Field(default=None, alias="maxSlippageBps", ge=0)
 
     @model_validator(mode="after")
     def validate_limit_price(self) -> "BatchLegRequest":
@@ -47,6 +59,13 @@ class CreateExecutionBatchRequest(BaseModel):
     account_id: str | None = Field(default=None, alias="accountId")
     strategy_key: str = Field(alias="strategyKey", min_length=1, max_length=64)
     direction: str = Field(min_length=1, max_length=32)
+    max_leg_delay_ms: int = Field(default=3000, alias="maxLegDelayMs", ge=1, le=60000)
+    max_residual_notional: Decimal = Field(default=Decimal("0"), alias="maxResidualNotional", ge=0)
+    allow_partial_fill: bool = Field(default=False, alias="allowPartialFill")
+    emergency_flatten: bool = Field(default=True, alias="emergencyFlatten")
+    disposition_policy: Literal["flatten_filled_legs", "hold_and_escalate"] = Field(
+        default="flatten_filled_legs", alias="dispositionPolicy"
+    )
     legs: list[BatchLegRequest] = Field(min_length=2, max_length=2)
 
     @model_validator(mode="after")
@@ -65,6 +84,10 @@ class BatchLegResponse(BaseModel):
     order_id: str | None = Field(default=None, alias="orderId")
     status: str
     failure_reason: str | None = Field(default=None, alias="failureReason")
+    filled_quantity: Decimal | None = Field(default=None, alias="filledQuantity")
+    average_fill_price: Decimal | None = Field(default=None, alias="averageFillPrice")
+    repair_order_id: str | None = Field(default=None, alias="repairOrderId")
+    repair_status: str | None = Field(default=None, alias="repairStatus")
 
 
 class ExecutionBatchResponse(BaseModel):
@@ -81,8 +104,20 @@ class ExecutionBatchResponse(BaseModel):
         "hedged",
         "failed",
         "manual_intervention",
+        "compensating",
+        "compensated",
+        "risk_unresolved",
+        "kill_switch_blocked",
     ]
     requires_manual_intervention: bool = Field(alias="requiresManualIntervention")
+    risk_state: str = Field(default="none", alias="riskState")
+    residual_notional: Decimal = Field(default=Decimal("0"), alias="residualNotional")
+    disposition_status: str | None = Field(default=None, alias="dispositionStatus")
+    kill_switch_engaged: bool = Field(default=False, alias="killSwitchEngaged")
+    max_leg_delay_ms: int = Field(default=3000, alias="maxLegDelayMs")
+    max_residual_notional: Decimal = Field(default=Decimal("0"), alias="maxResidualNotional")
+    allow_partial_fill: bool = Field(default=False, alias="allowPartialFill")
+    emergency_flatten: bool = Field(default=True, alias="emergencyFlatten")
     failure_reason: str | None = Field(default=None, alias="failureReason")
     legs: list[BatchLegResponse]
     created_at: datetime = Field(alias="createdAt")
@@ -183,9 +218,7 @@ class ExchangeConnectivityResponse(BaseModel):
     status: str
     gateway: str | None = None
     credential_count: int = Field(default=0, alias="credentialCount")
-    configured_credential_count: int = Field(
-        default=0, alias="configuredCredentialCount"
-    )
+    configured_credential_count: int = Field(default=0, alias="configuredCredentialCount")
     credentials: list[ExchangeCredentialInspectionResponse] = []
 
 
@@ -350,6 +383,12 @@ class CreateTradeCommandRequest(BaseModel):
     order_type: Literal["market", "limit"] = Field(alias="orderType")
     quantity: Decimal = Field(gt=0)
     price: Decimal | None = Field(default=None, gt=0)
+    time_in_force: Literal["GTC", "IOC", "FOK"] = Field(default="GTC", alias="timeInForce")
+    reduce_only: bool = Field(default=False, alias="reduceOnly")
+    position_idx: int = Field(default=0, alias="positionIdx", ge=0, le=2)
+    max_deviation: int | None = Field(default=None, alias="maxDeviation", ge=0)
+    allow_partial_fill: bool = Field(default=True, alias="allowPartialFill")
+    max_slippage_bps: Decimal | None = Field(default=None, alias="maxSlippageBps", ge=0)
 
     @model_validator(mode="after")
     def validate_limit_price(self) -> "CreateTradeCommandRequest":
@@ -437,3 +476,33 @@ class AuditEventResponse(BaseModel):
     subject_id: str = Field(alias="subjectId")
     details_json: str = Field(alias="detailsJson")
     created_at: datetime = Field(alias="createdAt")
+
+
+class KillSwitchRequest(BaseModel):
+    engaged: bool
+    reason: str = Field(min_length=1, max_length=512)
+
+
+class KillSwitchResponse(BaseModel):
+    scope_type: Literal["global", "strategy", "account"] = Field(alias="scopeType")
+    scope_id: str = Field(alias="scopeId")
+    engaged: bool
+    reason: str | None = None
+    updated_at: datetime = Field(alias="updatedAt")
+
+
+class ExecutionDispositionRequest(BaseModel):
+    idempotency_key: str = Field(alias="idempotencyKey", min_length=1, max_length=128)
+    action: Literal["flatten_filled_legs", "hold_and_escalate", "mark_resolved"]
+    reason: str = Field(min_length=1, max_length=512)
+
+
+class ExecutionDispositionResponse(BaseModel):
+    disposition_id: str = Field(alias="dispositionId")
+    idempotency_key: str = Field(alias="idempotencyKey")
+    batch_id: str = Field(alias="batchId")
+    action: str
+    status: str
+    details_json: str = Field(alias="detailsJson")
+    created_at: datetime = Field(alias="createdAt")
+    updated_at: datetime = Field(alias="updatedAt")

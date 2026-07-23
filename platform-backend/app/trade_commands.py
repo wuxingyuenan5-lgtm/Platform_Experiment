@@ -67,6 +67,7 @@ def validate_trade_command_catalog(request: CreateTradeCommandRequest) -> None:
 
 
 def create_trade_command(request: CreateTradeCommandRequest) -> TradeCommandResponse:
+    ensure_execution_option_schema()
     existing = find_trade_command_by_idempotency_key(request.idempotency_key)
     if existing is not None:
         assert_trade_command_request_matches(existing, request)
@@ -111,6 +112,25 @@ def create_trade_command(request: CreateTradeCommandRequest) -> TradeCommandResp
 
         db.execute(
             """
+            INSERT INTO trade_command_execution_options (
+                trade_command_id, time_in_force, reduce_only, position_idx,
+                max_deviation, allow_partial_fill, max_slippage_bps
+            ) VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                trade_command_id,
+                request.time_in_force,
+                int(request.reduce_only),
+                request.position_idx,
+                request.max_deviation,
+                int(request.allow_partial_fill),
+                decimal_text(request.max_slippage_bps)
+                if request.max_slippage_bps is not None
+                else None,
+            ),
+        )
+        db.execute(
+            """
             INSERT INTO risk_decisions (id, subject_type, subject_id, decision, reason, created_at)
             VALUES (?, ?, ?, ?, ?, ?)
             """,
@@ -149,6 +169,12 @@ def create_trade_command(request: CreateTradeCommandRequest) -> TradeCommandResp
                 orderType=request.order_type,
                 quantity=request.quantity,
                 price=request.price,
+                timeInForce=request.time_in_force,
+                reduceOnly=request.reduce_only,
+                positionIdx=request.position_idx,
+                maxDeviation=request.max_deviation,
+                allowPartialFill=request.allow_partial_fill,
+                maxSlippageBps=request.max_slippage_bps,
             ),
             command_id=trade_command_id,
         )
@@ -235,3 +261,21 @@ def trade_command_from_row(row) -> TradeCommandResponse:
         createdAt=row["created_at"],
         updatedAt=row["updated_at"],
     )
+
+
+def ensure_execution_option_schema() -> None:
+    with connection() as db:
+        db.executescript(
+            """
+            CREATE TABLE IF NOT EXISTS trade_command_execution_options (
+                trade_command_id TEXT PRIMARY KEY,
+                time_in_force TEXT NOT NULL,
+                reduce_only INTEGER NOT NULL,
+                position_idx INTEGER NOT NULL,
+                max_deviation INTEGER,
+                allow_partial_fill INTEGER NOT NULL,
+                max_slippage_bps TEXT,
+                FOREIGN KEY(trade_command_id) REFERENCES trade_commands(id)
+            );
+            """
+        )

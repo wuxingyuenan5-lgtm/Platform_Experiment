@@ -55,13 +55,13 @@ def test_reconciliation_summary_reports_unknown_orders_and_manual_batches(
     with TestClient(app) as client:
         batch = client.post("/api/v1/trading/execution-batches", json=payload)
         assert batch.status_code == 200
-        assert batch.json()["status"] == "manual_intervention"
+        assert batch.json()["status"] == "risk_unresolved"
 
         summary = client.get("/api/v1/ops/reconciliation-summary")
         assert summary.status_code == 200
         body = summary.json()
         assert body["manualInterventionBatchCount"] == 1
-        assert body["resultUnknownOrderCount"] == 1
+        assert body["resultUnknownOrderCount"] == 2
         assert body["status"] == "action_required"
         assert body["issues"][0]["issueType"] == "manual_intervention_batch"
 

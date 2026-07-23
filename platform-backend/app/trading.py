@@ -61,6 +61,7 @@ def submit_order(request: CreateOrderRequest, command_id: str | None = None) -> 
             ),
         )
 
+    context = load_execution_context(request.account_id, request.instrument_id)
     command = {
         "command_id": command_id,
         "platform_order_id": order_id,
@@ -71,6 +72,15 @@ def submit_order(request: CreateOrderRequest, command_id: str | None = None) -> 
         "order_type": request.order_type,
         "quantity": decimal_text(request.quantity),
         "price": decimal_text(request.price) if request.price is not None else None,
+        **context,
+        "time_in_force": request.time_in_force,
+        "reduce_only": request.reduce_only,
+        "position_idx": request.position_idx,
+        "max_deviation": request.max_deviation,
+        "allow_partial_fill": request.allow_partial_fill,
+        "max_slippage_bps": (
+            decimal_text(request.max_slippage_bps) if request.max_slippage_bps is not None else None
+        ),
     }
 
     try:
@@ -406,3 +416,25 @@ def calculate_position_update(
     if old_quantity * new_quantity > 0:
         return new_quantity, old_average, realized_pnl
     return new_quantity, fill_price, realized_pnl
+
+
+def load_execution_context(account_id: str, instrument_id: str) -> dict[str, object]:
+    with connection() as db:
+        row = db.execute(
+            """
+            SELECT v.venue_code, a.environment, a.credential_ref, i.instrument_type
+            FROM accounts a
+            JOIN venues v ON v.id = a.venue_id
+            JOIN instruments i ON i.id = ?
+            WHERE a.id = ?
+            """,
+            (instrument_id, account_id),
+        ).fetchone()
+    if row is None:
+        raise HTTPException(status_code=422, detail="Execution context is unavailable")
+    return {
+        "venue_code": row["venue_code"],
+        "environment": row["environment"],
+        "credential_ref": row["credential_ref"],
+        "instrument_type": row["instrument_type"],
+    }

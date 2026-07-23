@@ -6,7 +6,7 @@ from uuid import uuid4
 from fastapi import HTTPException
 
 from app.database import connection
-from app.execution_batches import create_execution_batch, get_execution_batch
+from app.phase4_risk import create_execution_batch, get_execution_batch
 from app.schemas import (
     CreateExecutionBatchRequest,
     CreateStrategyRunRequest,

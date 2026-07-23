@@ -129,10 +129,14 @@ def enforce_order_safety(
             detail="Order price is not aligned to price tick",
         )
 
+    settings = get_settings()
+    if account["environment"] in {"demo", "testnet"}:
+        if not settings.demo_trading_enabled:
+            raise HTTPException(status_code=403, detail="Demo trading is disabled")
+        return
     if account["environment"] != LIVE_ENVIRONMENT:
         return
 
-    settings = get_settings()
     if not settings.live_trading_enabled:
         raise HTTPException(
             status_code=403,

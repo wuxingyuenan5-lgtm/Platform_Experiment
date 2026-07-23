@@ -176,7 +176,7 @@ def test_second_leg_unknown_requires_manual_intervention(
 
         assert response.status_code == 200
         batch = response.json()
-        assert batch["status"] == "manual_intervention"
+        assert batch["status"] == "risk_unresolved"
         assert batch["requiresManualIntervention"] is True
         assert batch["legs"][0]["status"] == "filled"
         assert batch["legs"][1]["status"] == "result_unknown"

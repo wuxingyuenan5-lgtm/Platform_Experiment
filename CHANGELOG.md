@@ -85,3 +85,12 @@
 - Added `.ignore` and expanded `.gitignore` to reduce Codex/search noise from dependencies, virtual environments, build outputs, generated files, and large reference code.
 - Moved root SQL reference files into `references/database/` without deleting source material.
 - Moved the large `参考代码/` reference-code directory out of the project root to `C:\Users\jiuxi\Desktop\codex\平台设计其他辅助内容\平台移动文件夹，例如参考代码等\参考代码`.
+
+### Phase 4A execution risk control
+
+- Added global, strategy, and account Kill Switches.
+- Added risk-managed ExecutionBatch parameters and explicit residual-exposure states.
+- Added automatic actual-fill reverse compensation using FOK and reduce-only commands.
+- Added idempotent manual disposition records and automatic strategy stop on unresolved repair.
+- Added a separate Demo safety gate while keeping Live disabled.
+- Added Phase 4A golden tests and synchronized the Phase 4 implementation plan.
