@@ -23,6 +23,14 @@
 
 - `platform-target-architecture.md`
 
+参考代码采用规则：
+
+- `reference-code-adoption-matrix.md`
+
+V1 开发路线：
+
+- `../planning/V1-开发路线图.md`
+
 复杂度控制决策：
 
 - `decisions/ADR-012-初期架构简化与复杂度控制.md`
@@ -232,11 +240,13 @@ Runtime 本地 Journal
 ## 11. 近期开发阅读顺序
 
 1. `platform-target-architecture.md`
-2. `decisions/ADR-012-初期架构简化与复杂度控制.md`
-3. `domain/instrument-minimum-model.md`
-4. `domain/account-position-minimum-model.md`
-5. `domain/economic-event-pnl-minimum-model.md`
-6. `integration/runtime-command-event-contract.md`
+2. `reference-code-adoption-matrix.md`
+3. `../planning/V1-开发路线图.md`
+4. `decisions/ADR-012-初期架构简化与复杂度控制.md`
+5. `domain/instrument-minimum-model.md`
+6. `domain/account-position-minimum-model.md`
+7. `domain/economic-event-pnl-minimum-model.md`
+8. `integration/runtime-command-event-contract.md`
 
 其余完整领域、状态、数据和安全文档作为查询资料，不代表首期必须全部实现。
 
@@ -244,12 +254,12 @@ Runtime 本地 Journal
 
 简化架构现已具备进入工程阶段的条件。
 
-下一步不再继续扩展总体架构，而是开始：
+参考代码采用矩阵和 V1 路线图统一后，下一步按 `../planning/V1-开发路线图.md` 从 P1 开始：
 
 ```text
-platform-backend skeleton
-+
-execution-runtime skeleton
-+
-Fake Gateway
+P1 Platform Backend 最小骨架
+→
+P2 Runtime + Fake Gateway
+→
+P3 策略管理最小查询
 ```

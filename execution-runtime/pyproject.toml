@@ -5,7 +5,9 @@ description = "Variable-Global execution runtime"
 requires-python = ">=3.12"
 dependencies = [
   "fastapi>=0.116,<1.0",
+  "MetaTrader5>=5.0,<6.0",
   "pydantic-settings>=2.10,<3.0",
+  "pybit>=5.17,<6.0",
   "uvicorn[standard]>=0.35,<1.0",
 ]
 

@@ -10,6 +10,7 @@ from fastapi import HTTPException
 from app.config import get_settings
 from app.database import connection
 from app.schemas import CreateOrderRequest, OrderResponse
+from app.security import enforce_order_safety
 
 
 def now_iso() -> str:
@@ -20,14 +21,16 @@ def decimal_text(value: Decimal) -> str:
     return format(value, "f")
 
 
-def submit_order(request: CreateOrderRequest) -> OrderResponse:
+def submit_order(request: CreateOrderRequest, command_id: str | None = None) -> OrderResponse:
     settings = get_settings()
     order_id = str(uuid4())
-    command_id = str(uuid4())
+    command_id = command_id or str(uuid4())
     created_at = now_iso()
 
     if request.order_type == "limit" and request.price is None:
         raise HTTPException(status_code=422, detail="Limit orders require price")
+
+    enforce_order_safety(request.account_id)
 
     with connection() as db:
         db.execute(
@@ -194,7 +197,9 @@ def record_fill_and_update_projections(
 
         db.execute(
             """
-            INSERT INTO positions (account_id, instrument_id, net_quantity, average_price, updated_at)
+            INSERT INTO positions (
+                account_id, instrument_id, net_quantity, average_price, updated_at
+            )
             VALUES (?, ?, ?, ?, ?)
             ON CONFLICT(account_id, instrument_id) DO UPDATE SET
                 net_quantity = excluded.net_quantity,

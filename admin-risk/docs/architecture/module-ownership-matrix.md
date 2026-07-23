@@ -65,10 +65,11 @@
 | 交易机会分析 | 策略／交易平台／行情分析 | 看板提供研究输入 | Market Data／Research Data／Strategy Analysis | 行情和分析数据服务 |
 | TradeIntent 和执行参数 | 策略／交易平台／交易执行 | 风险管理提供规则和限制 | Trading／Execution | 前端表单发起，后端 TradeCommand 受理 |
 | TradeCommand 和 ExecutionBatch | 策略／交易平台／交易执行 | 策略管理查询；风险管理读取异常 | Trading／Execution | 后端交易执行服务 |
-| Order 和 Fill | 策略管理完整查询；交易平台展示当前批次 | 风险管理和报表只读 | Trading／Execution | 订单和成交服务／Gateway 同步 |
+| Order、Fill 和 Deal | 策略管理完整查询；交易平台展示当前批次 | 风险管理和报表只读 | Trading／Execution | 订单、成交和 MT5 Deal 服务／Gateway 同步 |
 | 执行配平与暴露 | 策略／交易平台 | 策略管理复盘；风险管理监控 | Trading／Execution／Exposure | ExecutionBatch 和暴露计算 |
 | Position | 策略管理完整查询；交易平台执行视图 | 风险管理和报表读取 | Account／Position | Position 服务或外部核对结果 |
 | 策略损益和归因 | 策略／策略管理／策略损益 | 交易平台展示预计值；风险管理读取摘要 | PnL／Strategy Economic Ledger | PnL 和策略经济账本服务 |
+| 固定时间策略净值 | 策略／策略管理 | 首页和风险管理读取摘要；客户侧展示后续再设计 | PnL／Strategy Economic Ledger | StrategyNavSnapshot，不等于正式 Fund NAV |
 | 策略账户资金视图 | 策略／策略管理／账户资金 | 交易平台读取执行摘要 | Account／Capital／Backend Read Model | Account 事实与策略绑定组合查询 |
 | 账户主档和资产结构 | 风险管理／账户与资产 | 策略页面按权限读取 | Account／Asset | Account 服务，不属于 Risk 内部模型 |
 | 公司财务与经营资金 | 风险管理／财务与资金 | 报表汇总；策略管理仅展示策略经济结果 | Finance／Treasury | 后续财务服务，不与 Strategy Economic Ledger 混同 |
@@ -86,7 +87,7 @@
 | DeploymentEnvironment 配置 | 风险管理／系统设置或运维入口 | 所有模块读取 | Configuration／Operations | 受信任配置服务 |
 | TradingMode 和交易能力 | 交易平台持续展示；风险管理监控 | 策略管理只读状态 | Trading／Risk／IAM／Configuration | 服务端综合 TradingPermissionState |
 | 消息和阅读状态 | 风险管理／消息通知 | 各模块提供业务上下文 | Notification | Notification 服务 |
-| AI 分析任务和结果 | 金融AI分析 | 看板、新闻和策略提供授权数据 | AI Orchestration／Research Data | AI 任务和结果服务 |
+| AI 分析任务和结果 | 金融AI分析 | 看板、新闻和策略提供授权数据 | AI Orchestration／Research Data | 当前暂缓研发；未来由 AI 任务和结果服务维护 |
 
 ## 6. 信息镜像规则
 

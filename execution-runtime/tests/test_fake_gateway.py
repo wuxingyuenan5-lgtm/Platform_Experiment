@@ -1,5 +1,4 @@
 from decimal import Decimal
-from uuid import uuid4
 
 from app.fake_gateway import FakeGateway
 from app.models import SubmitOrderCommand
@@ -7,10 +6,10 @@ from app.models import SubmitOrderCommand
 
 def test_fake_gateway_acknowledges_and_fills() -> None:
     command = SubmitOrderCommand(
-        command_id=uuid4(),
-        platform_order_id=uuid4(),
-        account_id=uuid4(),
-        instrument_id=uuid4(),
+        command_id="command-1",
+        platform_order_id="order-1",
+        account_id="account-1",
+        instrument_id="instrument-1",
         symbol="BTCUSDT",
         side="buy",
         quantity=Decimal("0.01"),

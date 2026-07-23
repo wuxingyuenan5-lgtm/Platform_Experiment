@@ -29,9 +29,11 @@ Frontend Domain Model / View Model
 由主责领域维护的权威事实，例如：
 
 - Order 和 Fill。
+- MT5 Deal 和账户历史摘要。
 - Account 和 BalanceSnapshot。
 - Position。
 - PnLResult。
+- StrategyNavSnapshot。
 - RiskDecision。
 - ReconciliationResult。
 
@@ -145,8 +147,10 @@ Read Model 必须表达：
 - TradeCommandAccepted。
 - ExecutionBatchStatusChanged。
 - Order 或 Fill 更新。
+- MT5 Deal 更新。
 - BalanceSnapshotUpdated。
 - PositionUpdated。
+- StrategyNavSnapshotUpdated。
 - RiskDecisionChanged。
 - Gateway 状态变化。
 - 权限、TradingMode 或账户绑定变化。
@@ -202,6 +206,7 @@ Read Model 应记录：
 - 不在读模型中无痕修正权威事实。
 - 不用一个“万能 dashboard 接口”承载所有页面且无法版本管理。
 - 不让前端直接拼接多个相互矛盾的权威结果完成交易判断。
+- 不让前端把 Funding Rate、MT5 Order 或 Mock 数据加工成正式收益、成交或净值。
 
 ## 13. 验收标准
 
@@ -211,3 +216,4 @@ Read Model 应记录：
 - Read Model 可以失效、重建和版本化。
 - 写入后通过权威对象或事件恢复页面状态。
 - 部分失败和数据过期可以明确表达。
+- 策略管理读模型能区分真实 API 模拟/测试/Demo、Fake、Simulation 和未来 Live 的来源状态。

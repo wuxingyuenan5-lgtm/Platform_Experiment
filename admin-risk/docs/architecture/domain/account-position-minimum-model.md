@@ -32,12 +32,25 @@ tradingMode
 enabled
 ```
 
+V1 为资费套利和跨所价差至少需要支持 Crypto 与 MT5 账户。Account 应能表达账户来源和基础模式：
+
+```text
+sourceType        // crypto_exchange, mt5, fake_gateway, manual_source
+accountMode       // spot, margin, perpetual, hedging, netting，按来源适用
+tradingMode       // demo, simulation, paper, live
+brokerOrVenueName
+```
+
+这些字段用于展示、权限和 Adapter 路由，不保存 API Key、密码、Token 或完整登录凭证。
+
 规则：
 
 - Account 不等于 Fund、Portfolio、Book 或 StrategyInstance。
 - StrategyInstance 通过 StrategyAccountBinding 使用 Account。
 - 密钥、密码和 Token 不存放在普通 Account 主档中。
+- 真实 API Key、密码、Token 和 MT5 登录凭证必须进入独立 Secret／Credential 管理边界，Account 只保存非敏感标识和路由信息。
 - 同一个外部账户只建立一个平台 Account 主档。
+- V1 中一个自营账户在同一 tradingMode 下优先绑定一个主 StrategyInstance；多策略共享同一账户需要显式分摊和归属规则，默认暂缓。
 
 ## 3. BalanceSnapshot
 
@@ -56,7 +69,28 @@ occurredAt
 receivedAt
 source
 qualityStatus
+externalSnapshotId
+rawReference
 ```
+
+V1 对 Crypto 与 MT5 的账户资金展示至少需要在 Adapter 可获得时补充：
+
+```text
+equity
+marginUsed
+freeMargin
+marginLevel
+unrealizedPnl
+pnlCurrency
+snapshotType      // balance, account_equity, margin
+```
+
+规则：
+
+- Crypto 账户可能只有 balance、available、locked，也可能有 equity 和 margin 字段。
+- MT5 账户至少应尽量映射 Balance、Equity、Margin、Free Margin 和 Margin Level。
+- 不同来源缺失的字段保持缺失，不自动按零处理。
+- 页面展示合并资金时必须显示 dataAsOf、source 和 qualityStatus。
 
 规则：
 
@@ -86,7 +120,29 @@ occurredAt
 receivedAt
 source
 qualityStatus
+externalSnapshotId
+rawReference
 ```
+
+V1 对跨所价差必须支持 MT5 Position 语义，Adapter 可获得时补充：
+
+```text
+externalPositionId
+positionMode      // one_way, hedge, netting
+externalSide
+notionalValue
+notionalCurrency
+marginUsed
+liquidationPrice
+sourcePositionType // external_snapshot, platform_derived
+```
+
+MT5 场景必须明确：
+
+- Order、Deal 和 Position 是不同对象。
+- Hedging 账户可能同一 Instrument 多个方向或多张 Position。
+- Netting 账户通常同一 Instrument 只有净持仓。
+- PositionSnapshot 只是时间点事实，不替代 Fill、Deal 和平台推导持仓。
 
 规则：
 
@@ -122,6 +178,9 @@ qualityStatus
 - 按 instrumentId 查询账户持仓。
 - 显示 dataAsOf、source 和 qualityStatus。
 - 标识持仓是否存在对账差异。
+- 查询 StrategyInstance 绑定账户的最新资金和持仓摘要。
+- 支持资费套利的现货腿／永续腿账户展示。
+- 支持跨所价差的 Crypto 腿／MT5 腿账户展示。
 
 ## 7. 暂不建设
 

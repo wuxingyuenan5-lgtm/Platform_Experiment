@@ -29,6 +29,8 @@
 - 具体 SDK 版本和许可证接受。
 - Live 部署、账户规模和资金规模。
 
+但 V1 必须明确完成两条受控外部接口验收：资费套利至少完成首家 Crypto 交易所真实 API 的模拟盘、测试盘或等价受控账户链路；跨所价差至少完成 Crypto 真实 API 模拟盘／测试盘 + MT5 Demo／Worker 跨 Runtime 链路。Fake Gateway 只是工程验证，不替代真实外部接口验收。
+
 ## 2. 核心原则
 
 1. Execution Runtime 独立于 Platform API 进程。
@@ -41,6 +43,7 @@
 8. MT5、Crypto 和 CTP 可以使用不同 Worker 和依赖，但对上遵守统一契约。
 9. 不假设所有 Gateway 支持相同订单、账户、Funding、Transfer 和恢复能力。
 10. Runtime 内任何缓存、Journal 和外部框架数据库都不是平台永久业务权威。
+11. 真实资金 Live 下单必须在真实 API 模拟盘／测试盘、MT5 Demo、恢复、对账、风控和人工处理验收完成后单独开放。
 
 ## 3. 目标结构
 
@@ -68,6 +71,8 @@ Exchange / Broker / Trading System
 ```
 
 Runtime Main 可以与 Worker 部署于同一节点，但必须允许 Worker 独立重启和故障隔离。
+
+V1 实施前必须确定首家 Crypto Venue 和首家 MT5 Demo Broker／Account。未确定前，不并行扩展多家 Crypto 私有交易 Worker 或多家 MT5 经纪商适配。
 
 ## 4. Runtime 对象模型
 
@@ -224,6 +229,8 @@ MT5 Worker 负责：
 - Commission、Swap 和历史补查询。
 - Terminal 重启后的重新同步。
 
+V1 MT5 Worker 验收重点是最小闭环和恢复，不是封装高级策略框架。必须能稳定完成初始化、登录、账户读取、SymbolInfo、下单、撤单、Order／Deal／Position 历史查询、Commission／Swap 读取、断线重连、Terminal 重启恢复和错误映射。
+
 ### 6.3 Crypto Worker
 
 Crypto Worker 可以按以下方式组织，最终由 PoC 决定：
@@ -244,6 +251,8 @@ Crypto Worker 负责：
 - 交易所限频、时间同步和重连。
 
 公共行情和私有交易能力可以使用不同 Adapter 或连接，不强制同一 SDK。
+
+V1 Crypto Worker 必须优先服务首家交易所私有链路：行情、Instrument、账户、下单、撤单、订单查询、成交去重、余额／持仓同步、FundingSettlement 或账户账本同步、WebSocket 断线补查询和限频处理。是否使用 CCXT、官方 SDK 或组合 Adapter，以恢复和对账可靠性为第一标准。
 
 ### 6.4 CTP Worker
 
@@ -844,11 +853,13 @@ Binance、OKX 和 Bybit 可以采用 CCXT＋官方 SDK 的组合 Adapter，不�
 ### 25.4 发布前测试
 
 - Fake Gateway 完整链路。
-- Crypto 测试环境或小额受控账户。
-- MT5 Demo。
+- 首家 Crypto 真实 API 模拟盘、测试盘或等价受控账户。
+- MT5 Demo／Worker。
 - 重启和对账演练。
 - 结果未知人工处理。
 - 权限、审批、Live Block 和 Kill Switch。
+
+V1 发布前测试必须覆盖三类链路：Fake Gateway、Crypto 真实 API 模拟盘／测试盘、MT5 Demo／Worker。只通过 Fake Gateway 不得视为交易平台 V1 完成。
 
 ## 26. 当前已确认与待确认
 
@@ -864,6 +875,9 @@ Binance、OKX 和 Bybit 可以采用 CCXT＋官方 SDK 的组合 Adapter，不�
 - 至少一次传输、幂等和结果未知是正式语义。
 - Runtime OMS 和 Journal 不成为平台业务权威。
 - vn.py、CCXT 和其他组件通过 Adapter 接入。
+- V1 必须跑通首家 Crypto 真实 API 模拟盘／测试盘链路。
+- V1 跨所价差必须跑通 MT5 Demo／Worker 跨 Runtime 链路。
+- CTP 延后，不阻塞资费套利和跨所价差 V1。
 
 ### 26.2 待确认
 
@@ -878,6 +892,8 @@ Binance、OKX 和 Bybit 可以采用 CCXT＋官方 SDK 的组合 Adapter，不�
 - Command／Event Envelope 正式 Schema。
 - Live 节点网络、安全和 Secret 管理。
 
+其中首家 Crypto Venue、首家 MT5 Demo Broker／Account、私有链路 Adapter 方案和 Runtime 恢复验收样板是 V1 前置决策，不应长期停留在普通待确认状态。
+
 ## 27. 验收标准
 
 - Runtime、Gateway、Worker 和 Session 对象边界清晰。
@@ -891,3 +907,4 @@ Binance、OKX 和 Bybit 可以采用 CCXT＋官方 SDK 的组合 Adapter，不�
 - 外部手工订单和未归属对象不会被丢弃。
 - vn.py、CCXT 和外部 SDK 不形成第二套平台领域和数据权威。
 - PoC 覆盖下单、部分成交、重启、对账、结果未知和故障隔离。
+- V1 PoC 覆盖 Fake Gateway、首家 Crypto 真实 API 模拟盘／测试盘和 MT5 Demo／Worker，而不是只覆盖本地模拟。

@@ -28,7 +28,7 @@ DTO 描述某一数据来源的传输格式，可以随接口、供应商或版�
 
 ### Domain Model
 
-Domain Model 表达稳定业务语义，例如 Order、ExecutionBatch、Position 和 PnLResult。
+Domain Model 表达稳定业务语义，例如 Order、Fill、Deal、ExecutionBatch、Position、PnLResult 和 StrategyNavSnapshot。
 
 ### View Model
 
@@ -205,6 +205,8 @@ Mock 数据必须：
 2. 新增 API DTO 和 Adapter。
 3. 切换 Repository 实现。
 4. 通过契约测试验证 Mock 和 API 语义一致。
+
+Mock 不得伪装成真实成交、真实资金费入账、MT5 Deal 或正式净值。V1 中，资费套利和跨所价差的真实 API 模拟/测试/Demo 数据必须通过 API Adapter 进入页面，并保留 source、tradingMode、qualityStatus 和 isEstimated。
 5. 页面不直接感知数据来源变化。
 
 ## 12. View Model 组织
@@ -237,6 +239,7 @@ Adapter 错误至少区分：
 
 - 页面不直接依赖完整 API 响应。
 - Mock 和 API 通过同一 Repository 接口接入。
+- View Model 可以格式化展示净值、收益和成交，但不得在前端生成正式 PnLResult、FundingSettlement 或 StrategyNavSnapshot。
 - 金额、数量、比例和状态不是纯展示字符串。
 - View Model 与 Domain Model 明确分离。
 - 数据质量、更新时间和来源可展示。

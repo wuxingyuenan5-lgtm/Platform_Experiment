@@ -1,0 +1,13 @@
+admin-risk/node_modules/
+admin-risk/dist/
+admin-risk/project_structure.txt
+admin-risk/CHANGELOG*.md
+execution-runtime/.venv/
+platform-backend/.venv/
+参考代码/
+outputs/
+**/__pycache__/
+**/*.py[cod]
+**/.vite/
+**/.cache/
+**/.turbo/

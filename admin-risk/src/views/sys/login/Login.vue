@@ -38,7 +38,7 @@
       left: 0;
       width: 100%;
       height: 100%;
-      background-image: url('@/assets/images/home-global-map.png');
+      background-image: url('@/assets/images/home-butterfly-topology.png');
       background-repeat: no-repeat;
       background-position: center 12%;
       background-size: 72%;

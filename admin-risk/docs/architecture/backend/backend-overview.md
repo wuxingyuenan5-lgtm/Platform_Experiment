@@ -19,6 +19,8 @@
 
 本文所称“后端”主要指 `platform-backend`，不把 `execution-runtime` 误认为模块化单体内部普通模块。
 
+V1 后端目标不是只支撑 Mock 或 Fake Gateway，而是支撑真实外部接口的受控验证：资费套利至少跑通一条 Crypto 真实 API 模拟盘／测试盘链路，跨所价差跑通 Crypto 真实 API 模拟盘／测试盘 + MT5 Demo／Worker 跨 Runtime 链路。真实资金 Live 下单、CTP、客户侧权限体系和金融AI分析后端均暂缓。
+
 平台总体工程主体为：
 
 ```text
@@ -262,11 +264,16 @@ Risk 可以读取 Trading、Account、Position 和 PnL，但不拥有这些事�
 - EconomicEvent。
 - LedgerEntry。
 - PnLResult 和 PnLAttributionItem。
+- StrategyNavSnapshot。
 - ValuationSnapshot。
 - AdjustmentEntry。
 - 版本化重算和数据完整度。
 
 Strategy Economic Ledger 不等于完整财务会计总账。
+
+V1 中，PnL 领域优先承接资费套利和跨所价差两条完整闭环，至少支持 PnLResult、PnLAttributionItem 和固定时间 StrategyNavSnapshot。海内外价差复杂四层 PnL、抄底 TradeCycle、短线交易员违规归因和正式 Fund NAV 均延后。
+
+StrategyNavSnapshot 的 V1 默认口径为 `nav = equity / capitalBase`，当前以 USDT 为主要计价口径。它是策略运营净值，不是正式 Fund NAV。
 
 ### 4.12 Finance and Treasury
 
@@ -393,6 +400,7 @@ TradeIntent
 - `result_unknown` 不是可直接重试的失败终态。
 - 外部结果通过 clientOrderId、externalOrderId、历史查询和对账确认。
 - Platform API、Runtime 和 Gateway 重启后都必须能够恢复。
+- V1 的恢复验收必须覆盖 Fake Gateway、首家 Crypto 真实 API 模拟盘／测试盘和 MT5 Demo／Worker；不能只验证本地 Fake Gateway。
 
 ## 8. 数据权威
 
@@ -492,6 +500,7 @@ Platform Backend 至少具备：
 - Platform Backend 与 Runtime 的 Envelope 字段。
 - Outbox／Inbox 和 Runtime Journal 技术。
 - MT5、Crypto 和后续 CTP Adapter 实现。
+- 首家 Crypto 真实 API 模拟盘／测试盘 Adapter 和首个 MT5 Demo／Worker Adapter 的验收样板。
 - 数据库 Schema 和迁移策略。
 - 历史行情和时序数据存储。
 - 数据保存、归档、RPO 和 RTO。

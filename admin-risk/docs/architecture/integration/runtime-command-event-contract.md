@@ -39,6 +39,8 @@
 
 任何传输实现必须满足本文契约，不得反向改变领域语义。
 
+V1 契约验收必须覆盖真实外部接口的受控链路：首家 Crypto 交易所真实 API 模拟盘／测试盘，以及 MT5 Demo／Worker。Fake Gateway 可以作为第一套测试夹具，但不能替代真实外部订单、Deal、账户、持仓、费用和恢复语义的契约验证。
+
 ## 2. 核心原则
 
 1. Command 表达请求发生某项动作，Event 表达已经发生的事实。
@@ -53,6 +55,7 @@
 10. 外部原始 ID、状态、错误和时间必须保留。
 11. Secret、密码、API Key 和完整凭证不得进入 Command／Event payload。
 12. 不兼容契约版本必须结构化拒绝，不能静默降级。
+13. 真实资金 Live 下单必须依赖独立 TradingMode、GatewayCapability、账户白名单、风控和发布门禁，不能由契约字段默认开启。
 
 ## 3. 协作边界
 
@@ -298,6 +301,7 @@ interface SubmitOrderPayload {
 - Runtime 必须再次检查数量、精度、最小名义价值和当前 GatewayCapability。
 - 防御性校验失败形成结构化 Event，不替代 Platform RiskDecision。
 - platformOrderId 必须在 Command 发送前已存在。
+- V1 真实 API 模拟盘／测试盘和 MT5 Demo 中，SubmitOrderCommand 必须验证外部幂等或等价恢复证据：Crypto 优先使用 clientOrderId；MT5 使用 Magic Number、Comment、Order ticket、Deal history 和账户时间综合恢复。
 
 ## 9. RuntimeEventEnvelope
 
@@ -410,6 +414,8 @@ interface ExternalReference {
 - `ExternalFillReversed`，仅上游存在正式冲销时。
 
 Fill 去重优先使用稳定 externalFillId／DealId；没有稳定 ID 时使用正式替代去重键并记录可靠等级。
+
+MT5 场景中，Deal 是成交事实的核心来源。MT5 Order 不能直接等同于成交，不能单独用于增加 Fill、Position、EconomicEvent 或 PnL。
 
 ### 10.4 账户和持仓
 
@@ -631,6 +637,8 @@ Event 通道不可用时先持久化，恢复后补发。
 
 未知状态持续期间，Platform 可以按风险规则阻断对应策略、账户或 Gateway 新增风险。
 
+V1 中，`result_unknown` 恢复必须至少覆盖：Crypto clientOrderId／externalOrderId 查询、Crypto trades／positions 补查询、MT5 orders／deals／positions／history 查询、Runtime Journal 映射恢复和 Platform Event Inbox 幂等重放。
+
 ## 17. 启动与恢复契约
 
 Runtime／Gateway 启动不直接进入 READY。
@@ -801,6 +809,12 @@ interface RuntimeError {
 18. MT5 Magic／Comment 映射。
 19. Crypto clientOrderId 恢复。
 20. CTP 平今／平昨字段兼容，后续。
+21. Crypto 真实 API 模拟盘／测试盘 SubmitOrder、CancelOrder、Order Query、Fill 去重和账户同步。
+22. Crypto WebSocket 断线后 REST 补查询恢复。
+23. Crypto FundingSettlement 或账户账本同步进入 EconomicEvent。
+24. MT5 Demo SubmitOrder、CancelOrder、Order／Deal／Position 查询。
+25. MT5 Terminal 重启后通过 Deal history 和 Position 恢复。
+26. Platform Backend、Crypto Runtime 和 MT5 Worker 任一端重启后，ExecutionBatch 不重复下单且状态可恢复。
 
 应通过机器可读 Schema 和契约测试验证，不只依赖文档阅读。
 
@@ -816,6 +830,8 @@ interface RuntimeError {
 - Platform Producer／Consumer 契约测试。
 - Runtime Producer／Consumer 契约测试。
 - Fake Gateway 故障注入测试。
+- Crypto 真实 API 模拟盘／测试盘契约测试夹具。
+- MT5 Demo／Worker 契约测试夹具。
 - 示例消息和脱敏测试夹具。
 
 生成代码可以用于 DTO，但不得替代 Domain Model。
@@ -834,3 +850,4 @@ interface RuntimeError {
 - Runtime Journal、Platform Outbox 和 Inbox 各自边界明确。
 - 外部手工订单和未知归属不会被丢弃。
 - 契约可通过机器可读 Schema 和自动测试验证。
+- V1 契约验收同时覆盖 Fake Gateway、首家 Crypto 真实 API 模拟盘／测试盘和 MT5 Demo／Worker。

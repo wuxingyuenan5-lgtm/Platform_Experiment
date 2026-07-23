@@ -78,6 +78,8 @@ Execution Runtime 独立包括：
 
 金融AI分析当前冻结，不建立当前专项后端模块。
 
+V1 后端服务边界以资费套利和跨所价差闭环为优先：Crypto 真实 API 模拟盘／测试盘和 MT5 Demo／Worker 必须通过 Execution Runtime 接入；Platform Backend 只处理业务规则、持久化、查询、风险、对账和 PnL。真实资金 Live、CTP、客户侧权限体系和金融AI分析后端暂缓。
+
 ## 3. 模块边界原则
 
 - 每个核心对象只有一个主责模块。
@@ -409,6 +411,7 @@ Execution Runtime 独立包括：
 - LedgerEntry。
 - PnLResult。
 - PnLAttributionItem。
+- StrategyNavSnapshot。
 - ValuationSnapshot。
 - AdjustmentEntry。
 - PnL 计算定义和版本。
@@ -426,6 +429,8 @@ Execution Runtime 独立包括：
 - 缺失数据不能静默当零。
 - 新计算版本不无痕覆盖旧版本。
 - Strategy Economic Ledger 不等于完整财务会计总账。
+- V1 优先支持资费套利和跨所价差的 PnLResult、最小归因和固定时间 StrategyNavSnapshot。
+- 海内外价差复杂四层 PnL、抄底 TradeCycle、短线交易员违规归因和正式 Fund NAV 不属于 V1。
 
 ## 15. Finance and Treasury
 
@@ -699,6 +704,7 @@ Execution Runtime 已经因外部连接和恢复需求独立进程，但不意�
 
 - 每个核心对象只有一个主责模块。
 - Platform Backend 与 Execution Runtime 的边界明确。
+- Crypto 真实 API 模拟盘／测试盘和 MT5 Demo／Worker 的接入均通过 Execution Runtime，不由 Platform Backend 或前端直接连接。
 - Integration 不再被误解为 Platform Backend 直接连接 Broker SDK。
 - StrategyAccountBinding 归 Strategy，Account 主档归 Account。
 - Trading 不直接连接外部交易系统。
@@ -707,3 +713,4 @@ Execution Runtime 已经因外部连接和恢复需求独立进程，但不意�
 - Finance、Account、Strategy Ledger 和 PnL 不混为一体。
 - 同库部署不会导致跨模块任意写入。
 - 金融AI冻结不阻塞当前模块边界完整性。
+- 客户侧权限和客户门户不作为当前服务边界验收项，等用户系统完成后再展开。

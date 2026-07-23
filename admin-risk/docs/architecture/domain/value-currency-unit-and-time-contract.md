@@ -263,6 +263,8 @@ USDT、USDC 等不自动等同于 USD。
 - 数据质量。
 - 是否使用固定值或市场值。
 
+V1 默认以 USDT 作为策略运行净值和主要绩效展示币种。跨所价差在 Crypto/MT5 Demo 或测试链路中可以临时按 USD/USDT = 1 展示，但必须标记为 `estimated` 或 `provisional`，并记录使用固定值、dataAsOf 和质量状态；该口径不能直接用于正式 Live、客户展示或 Fund NAV。
+
 ## 6. FX Rate
 
 标准结构：
@@ -560,6 +562,8 @@ Swap／库存费归属至少保留：
 - 平台 receivedAt。
 - Settlement businessDate。
 
+跨所价差 V1 使用 MT5 Demo/Worker 时，Deal 时间、Broker server time、平台 receivedAt 和 Strategy businessDate 必须同时可追溯。页面不能只按浏览器本地日期归属成交和库存费。
+
 ## 15. Crypto 时间
 
 Crypto 24／7 交易不代表所有经济事件没有业务边界。
@@ -586,7 +590,27 @@ FundingRate Snapshot 和 FundingSettlement 使用不同时间语义。
 
 Adapter 必须保留外部原始字段，并映射为平台 occurredAt、tradingDay 和 settlementDate。
 
-## 17. 时间同步和可信度
+CTP、国内期货平今/平昨、夜盘结算和人民币正式 FX PnL 不进入 V1 完整闭环验收。海内外价差 V1 只保留分析、模拟、字段和管理入口；这些时间口径作为后续扩展标准保留。
+
+## 17. 固定时间净值快照
+
+V1 策略净值按固定时间生成 StrategyNavSnapshot，默认计价 USDT。
+
+最低要求：
+
+- snapshotTime：本次快照时间点。
+- valuationDate：快照归属日期。
+- dataAsOf：纳入计算的数据截止时间。
+- generatedAt：计算完成时间。
+- equity：账户权益或策略归属权益。
+- capitalBase：策略净值基准资金。
+- nav：`equity / capitalBase`。
+- status：见 StrategyNavSnapshotStatus。
+- source 和 qualityStatus。
+
+StrategyNavSnapshot 是策略运行观察指标，不是正式 Fund NAV。数据未接入或未核对时，不得用前端估算替代正式快照。
+
+## 18. 时间同步和可信度
 
 Platform Backend、Runtime 和 Worker 节点需要时间同步。
 
@@ -599,7 +623,7 @@ Platform Backend、Runtime 和 Worker 节点需要时间同步。
 
 时间偏差超过阈值时，可以降级行情质量或阻断时间敏感交易。
 
-## 18. API 和 Event 规则
+## 19. API 和 Event 规则
 
 - 时间点使用带偏移 ISO 8601。
 - 自然日期使用 `YYYY-MM-DD`。
@@ -609,9 +633,10 @@ Platform Backend、Runtime 和 Worker 节点需要时间同步。
 - API 不传格式化金额。
 - Event 保留 occurredAt、receivedAt 和 publishedAt。
 - 派生结果保留 dataAsOf 和 generatedAt。
+- StrategyNavSnapshot 同时保留 snapshotTime、valuationDate、dataAsOf 和 generatedAt。
 - 未知新 Unit、Currency 或 RateType 由消费者降级处理，不得自动解释。
 
-## 19. 前端规则
+## 20. 前端规则
 
 前端负责：
 
@@ -628,8 +653,9 @@ Platform Backend、Runtime 和 Worker 节点需要时间同步。
 - 自行推导 businessDate 和 tradingDay。
 - 无来源地将 USDT 当 USD。
 - 在缺少 FX Rate 时展示伪精确折算结果。
+- 用浏览器时间自行生成正式净值快照。
 
-## 20. 数据库和导入规则
+## 21. 数据库和导入规则
 
 数据库实现需要：
 
@@ -642,7 +668,7 @@ Platform Backend、Runtime 和 Worker 节点需要时间同步。
 
 CSV／Excel 导入不得依赖本地千位符、小数点和日期格式猜测；格式必须在 ImportDefinition 中声明。
 
-## 21. 核心不变量
+## 22. 核心不变量
 
 1. Money 必须包含 Currency。
 2. Quantity 必须包含 Unit。
@@ -658,8 +684,9 @@ CSV／Excel 导入不得依赖本地千位符、小数点和日期格式猜测�
 12. dataAsOf 不等于 generatedAt。
 13. 展示字符串不进入领域计算。
 14. 外部原始数值和时间可追溯。
+15. StrategyNavSnapshot 的 snapshotTime、valuationDate、dataAsOf 和 generatedAt 不得混用。
 
-## 22. 验收标准
+## 23. 验收标准
 
 - API 和 Runtime 契约不使用浮点承载正式金融值。
 - Money、Price、Quantity 和 Rate 具有明确结构和语义。
@@ -669,3 +696,5 @@ CSV／Excel 导入不得依赖本地千位符、小数点和日期格式猜测�
 - 交易、结算和估值业务日期可以区分。
 - MT5、Crypto 和 CTP 时间可以映射且保留原始语义。
 - 前端只负责格式化，不重新定义精度和业务日。
+- V1 固定时间策略净值快照具备 USDT 计价、数据截止时间、生成时间和质量状态。
+- USD/USDT 临时 1:1 口径只用于标记清楚的 Demo/Test/Simulation，不作为正式 Live 或客户展示口径。

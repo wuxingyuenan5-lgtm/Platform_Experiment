@@ -78,7 +78,7 @@
       venueLabel: '主交易所',
       venueOptions: ['Bybit', 'Binance', 'OKX'],
       mainLegOptions: ['XAUTUSDT.P'],
-      hedgeLegOptions: ['XAUUSD'],
+      hedgeLegOptions: ['XAUUSD+'],
     },
     {
       key: 'domesticOverseas',
@@ -99,7 +99,7 @@
   const selectedVenue = ref('Bybit');
   const selectedFundingSymbol = ref('BTC');
   const selectedMainLeg = ref('XAUTUSDT.P');
-  const selectedHedgeLeg = ref('XAUUSD');
+  const selectedHedgeLeg = ref('XAUUSD+');
   const selectedResolution = ref('30分钟');
   const activeSection = ref<'analysis' | 'execution'>('analysis');
 

@@ -12,6 +12,8 @@
 
 实时连接用于提高及时性，不是唯一数据来源。关键页面必须能够通过查询重新获得权威状态。
 
+V1 实时事件只从 Platform API 对前端推送。浏览器不得直接连接交易所 API、MT5 Worker、Runtime 私有通道或保存任何交易凭证；前端看到的是平台整理后的状态投影，权威事实仍来自后端查询、Runtime Journal、交易所/MT5 历史查询和对账结果。
+
 ## 2. 适用数据
 
 适合实时推送：
@@ -19,9 +21,11 @@
 - 报价和行情质量。
 - 订单状态变化。
 - 新增成交。
+- MT5 Deal、Position 和账户历史摘要。
 - ExecutionBatch 状态。
 - ExecutionBalanceStatus 和 ExposureStatus。
 - 账户余额、保证金和持仓摘要。
+- StrategyNavSnapshot 和 PnL 计算状态，适用时。
 - 风险状态和阻断状态。
 - Gateway、数据源和服务健康。
 - 对账差异、审批和人工处理状态。
@@ -113,11 +117,14 @@ DeploymentEnvironment 和 TradingMode 分开传递，不使用单一 `environmen
 - `OrderPartiallyFilled`
 - `OrderFilled`
 - `FillReceived`
+- `DealReceived`
+- `PositionSnapshotUpdated`
 - `ExecutionBatchCreated`
 - `ExecutionBatchStatusChanged`
 - `ExecutionBalanceStatusChanged`
 - `ExposureStatusChanged`
 - `BalanceSnapshotUpdated`
+- `StrategyNavSnapshotUpdated`
 - `RiskDecisionChanged`
 - `GatewayDisconnected`
 - `ApprovalRequestApproved`
@@ -135,6 +142,7 @@ DeploymentEnvironment 和 TradingMode 分开传递，不使用单一 `environmen
 - 已处理事件不重复产生通知和副作用。
 - 当前状态更新具有幂等性。
 - Fill 以稳定成交 ID 去重。
+- MT5 Deal 以 DealId、Account、Gateway 和成交时间范围去重。
 - 不仅凭显示时间去重。
 - 重复事件仍可以计入可观测性指标。
 
@@ -169,10 +177,12 @@ DeploymentEnvironment 和 TradingMode 分开传递，不使用单一 `environmen
 
 - TradeCommand 当前受理状态。
 - ExecutionBatch 当前状态。
-- 关联 Order 和 Fill。
+- 关联 Order、Fill 和 MT5 Deal。
 - 当前 ExecutionBalanceStatus 和 ExposureStatus。
 - 当前账户、持仓和保证金。
+- 当前 BalanceSnapshot、PositionSnapshot 和必要的账户历史摘要。
 - 当前 RiskDecision、全局阻断和 TradingPermissionState。
+- 当前 result_unknown、ManualIntervention 和 ReconciliationDifference。
 
 恢复完成前：
 
@@ -180,6 +190,9 @@ DeploymentEnvironment 和 TradingMode 分开传递，不使用单一 `environmen
 - 对 unknown 状态显示明确提示。
 - 不将本地最后一条事件视为最终结果。
 - 不因实时连接恢复就自动重新开放交易。
+- 不因页面刷新、浏览器重连或订阅恢复而重新下发 Runtime Command。
+
+资费套利页面恢复时，还必须查询 FundingSettlement 或账户账本的最新入账状态，不能用断线前 Funding Rate 推算收益。跨所价差页面恢复时，必须同时查询 Crypto Runtime 与 MT5 Worker 经平台汇总后的订单、Deal、持仓和账户状态，不能只凭一侧事件判断组合完成。
 
 ## 12. 行情恢复
 
@@ -269,6 +282,10 @@ Notification 模块决定渠道、阅读状态和聚合方式，不改变业务�
 - Gateway 中断和恢复。
 - Fill 与订单状态事件乱序到达。
 - 实时恢复期间风险阻断。
+- Crypto 真实 API 模拟/测试链路 WebSocket 中断后，平台通过 REST 回补并重新推送权威快照。
+- MT5 Demo/Worker 重启后，平台通过 Deal 历史和 Position 恢复并重新推送权威快照。
+- 前端刷新、断线和重连都不会重复提交 TradeCommand 或 Runtime Command。
+- result_unknown 期间收到迟到事件后，页面以权威查询结果覆盖本地状态。
 
 ## 19. 唯一来源
 
@@ -286,3 +303,5 @@ Notification 模块决定渠道、阅读状态和聚合方式，不改变业务�
 - 交易页面恢复前不会重复提交命令。
 - 行情、订单、成交、风险和系统事件具有独立优先级和质量状态。
 - 实时订阅执行服务端权限校验。
+- V1 资费套利和跨所价差的实时恢复测试覆盖 Fake Gateway、首个 Crypto 真实 API 模拟/测试链路和首个 MT5 Demo/Worker 链路。
+- 前端不直接连接交易所、MT5 Worker 或 Runtime 私有接口。

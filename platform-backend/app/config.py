@@ -17,6 +17,8 @@ class Settings(BaseSettings):
     runtime_base_url: str = "http://127.0.0.1:8100"
     runtime_timeout_seconds: float = 5.0
     cors_origins: str = "http://127.0.0.1:5173,http://localhost:5173"
+    live_trading_enabled: bool = False
+    default_trading_environment: str = "simulation"
 
     @property
     def allowed_cors_origins(self) -> list[str]:

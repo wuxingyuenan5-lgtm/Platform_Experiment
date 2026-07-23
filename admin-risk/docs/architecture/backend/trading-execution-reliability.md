@@ -18,7 +18,9 @@
 
 ## 1. 文档定位
 
-本文定义真实交易接入前必须具备的交易命令、执行批次、ExecutionPlan、交易腿、平台订单身份、成交、配平、暴露、Runtime 协作、幂等、结果未知、异常恢复、对账和人工处理边界。
+本文定义 V1 交易接入必须具备的交易命令、执行批次、ExecutionPlan、交易腿、平台订单身份、成交、配平、暴露、Runtime 协作、幂等、结果未知、异常恢复、对账和人工处理边界。
+
+V1 不以 Fake Gateway 作为最终验收。Fake Gateway 只用于本地工程验证；资费套利必须覆盖首个 Crypto 交易所真实 API 的模拟盘、测试网或受控账户链路，跨所价差必须覆盖首个 Crypto 交易所真实 API 模拟/测试链路和首个 MT5 Demo/Worker 链路。Live 实盘开关必须在这些链路的恢复、对账、风控和人工接管通过后单独开启。
 
 本文不指定具体数据库、消息中间件、交易内核和 Gateway SDK。状态码和生命周期以公共状态文档为唯一来源。
 
@@ -50,7 +52,7 @@ TradeIntent
 → Runtime Command
 → External Order
 → Runtime Event
-→ platform Order / Fill
+→ platform Order / Fill / Deal
 → Position / Exposure / EconomicEvent / PnL
 ```
 
@@ -290,6 +292,8 @@ Platform Event Inbox：
 - externalOrderId、externalFillId／DealId 按 Venue、Account 和 Gateway 范围唯一。
 - 重复和乱序回报由 Event Inbox 和对象版本处理。
 
+MT5 场景下，Deal 是成交事实的核心来源。Order 只表达委托生命周期，不能单独生成最终 Fill、Position、EconomicEvent 或 PnL；必须通过 Deal 历史、Position 和账户记录确认。
+
 ## 12. 配平与暴露
 
 ExecutionBatch 独立计算：
@@ -321,6 +325,8 @@ ExecutionBatch 可以已经完成订单提交，但仍然：
 
 - Spot 和 Perpetual 双腿。
 - Funding Rate 和实际 FundingSettlement 分开。
+- V1 必须选定首个 Crypto Venue，跑通真实 API 模拟盘、测试网或受控账户的市场、账户、下单、撤单、成交、余额、持仓和恢复链路。
+- 资金费收入只按实际 FundingSettlement、账户账本或交易所结算记录入账，不用预估 Funding Rate 当作已实现收益。
 - 两腿名义价值。
 - 单腿暴露和 Funding 反转。
 - 不设置配平误差一级 PnL。
@@ -330,9 +336,12 @@ ExecutionBatch 可以已经完成订单提交，但仍然：
 关注：
 
 - Crypto 与 MT5 跨 Runtime／Worker。
+- V1 必须跑通首个 Crypto Venue 真实 API 模拟/测试链路和首个 MT5 Demo/Worker 链路。
 - XAUTUSDT.P 和 XAUUSD 单位、币种和合约规格。
 - USDT／USD。
 - 主动腿、被动腿和最大裸露时间。
+- MT5 侧以 Deal、Position 和账户历史作为成交、持仓和费用事实来源。
+- Platform API、Crypto Runtime 和 MT5 Worker 任一重启后，都必须能恢复未完成 ExecutionBatch、单腿暴露和结果未知状态。
 - 不设置配平误差一级 PnL。
 
 ### 13.3 海内外价差
@@ -344,6 +353,8 @@ ExecutionBatch 可以已经完成订单提交，但仍然：
 - MT5、后续 CTP 和外部记录模式。
 - 理论配平、实际持仓和正式配平误差 PnL。
 - 平今／平昨和换月，接入 CTP 后。
+
+海内外价差不是 V1 完整闭环验收对象。V1 只保留分析、模拟、字段和管理入口，不接入 CTP，不做正式人民币汇率 PnL、平今/平昨、换月和结算级对账。
 
 策略专项口径以 `docs/strategies/` 为唯一来源。
 
@@ -573,8 +584,13 @@ Kill Switch 触发不等于所有外部动作成功，撤单和平仓结果仍�
 - Account、Position 和 Balance 对账差异。
 - Risk 或 Approval 在执行中变化。
 - GlobalTradingBlock 和 Kill Switch。
+- Crypto 测试网或受控账户 WebSocket 中断后通过 REST 回补订单、成交、余额和持仓。
+- Crypto FundingSettlement 或账户账本进入 EconomicEvent 和 PnL。
+- MT5 Demo 下单、撤单、Order、Deal、Position、Commission、Swap 和账户历史查询。
+- MT5 Terminal 或 Worker 重启后通过 Deal 历史和 Position 恢复。
+- Platform API、Crypto Runtime 和 MT5 Worker 同时或分别重启后不重复下单。
 
-真实接入前必须经过 Fake Gateway；Crypto 使用测试或小额受控环境，MT5 使用 Demo。
+V1 验收必须同时覆盖 Fake Gateway、首个 Crypto 真实 API 模拟/测试链路和首个 MT5 Demo/Worker 链路。Fake-only 不构成 V1 交易能力完成。
 
 ## 24. 分阶段启用原则
 
@@ -582,12 +598,13 @@ Kill Switch 触发不等于所有外部动作成功，撤单和平仓结果仍�
 
 1. Fake Gateway。
 2. 后端 Simulation。
-3. Demo／Testnet。
-4. 只读真实账户同步。
-5. 小资金、单账户、单策略受控 Live。
-6. 扩展策略、账户和 Gateway。
+3. 首个 Crypto Venue 模拟盘／测试网／受控账户。
+4. 首个 MT5 Demo／Worker。
+5. 只读真实账户同步。
+6. 小资金、单账户、单策略受控 Live。
+7. 扩展策略、账户和 Gateway。
 
-具体 V1 顺序和排期后续另行确定。
+V1 排期必须先确定首个 Crypto Venue、首个 MT5 Demo Broker/Account 和对应适配方案；不在早期并行铺开多个交易所和多个券商。
 
 ## 25. 唯一来源
 
@@ -608,9 +625,12 @@ Kill Switch 触发不等于所有外部动作成功，撤单和平仓结果仍�
 - Platform Backend 不在业务事务中调用外部 SDK。
 - Runtime Command 和 Event 支持至少一次、幂等和补发。
 - Order 和 Fill 分开保存。
+- MT5 场景下 Order、Deal 和 Position 分开保存，Deal 作为成交事实。
 - ExecutionBatchStatus、ExecutionBalanceStatus、ExposureStatus 和 ReconciliationStatus 分开。
 - 结果未知不会被误判为失败并重复下单。
 - Platform API、Runtime 和 Worker 重启后可以恢复。
 - 外部手工订单和未归属事实不会被丢弃。
 - 对账差异、人工处理和高风险审批可审计。
 - 前端断线不会中止后台执行。
+- 资费套利完成首个 Crypto 真实 API 模拟/测试链路闭环，资金费按实际结算或账户账本入账。
+- 跨所价差完成首个 Crypto 真实 API 模拟/测试链路和首个 MT5 Demo/Worker 链路闭环。

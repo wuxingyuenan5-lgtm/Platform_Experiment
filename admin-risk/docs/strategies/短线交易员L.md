@@ -23,6 +23,8 @@
 
 短线交易员 L 当前不通过平台交易模块下单。平台只接收和管理其外部执行事实、账户状态、风险记录和统计结果。
 
+V1 只做策略管理入口和外部来源占位，不建设完整外部同步、TradeCycle、ViolationRecord、风险额度计算和正式 PnL 体系。没有真实外部数据或人工确认来源时，页面只能显示 `missing`、`not_connected`、`unverified` 或等价状态。
+
 本文必须保证：
 
 - L 与 W 使用独立 StrategyId、StrategyVersion、StrategyInstance 和 Account。
@@ -58,6 +60,10 @@
 | 风险与违规记录 | 是 |
 | 外部数据导入 | 是 |
 | 自动下单／复制交易 | 否 |
+
+V1 阶段，短线交易员 L 只要求进入策略管理并保留外部数据占位：展示独立 StrategyInstance、账户绑定、外部来源状态、最近数据时间、基础账户／持仓／订单占位和 DataQualityStatus。完整外部同步、TradeCycle、ViolationRecord、风险额度计算、订单自动归属和正式 PnL 归因不作为 V1 必做项。
+
+V1 不展示正式 PnL、胜率、盈亏比、TradeCycle、ViolationRecord、风险额度和是否允许继续交易的正式判断，除非底层账户、订单、Deal／Fill、持仓、费用、资金流和风险规则已经接入并完成最小质量标记。不得使用 Mock、样例或前端静态数据包装成真实表现。
 
 ## 4. 核心用户问题
 
@@ -379,6 +385,8 @@ TradeCycle 是派生分析对象，不修改底层 Order、Fill 和 Position 事
 - 当前账户状态和是否允许继续交易。
 - 数据时间、质量和对账状态。
 
+V1 如需展示净值，只能显示 `estimated`、`missing`、`not_connected` 或 `unverified` 状态，不作为正式收益表现。未接入真实外部数据前，不计算或展示正式策略净值。
+
 ## 12. 风险、限制与违规
 
 ### 12.1 主要风险
@@ -609,6 +617,7 @@ aiomql 的 Bot、Strategy、RAM 和 SQLite 结果库不默认成为平台策略�
 - 交易平台行情分析和交易执行。
 - 自动下单、复制交易和账户跟单。
 - 未经确认的风险阈值。
+- 未接入真实外部数据时展示正式 PnL、胜率、盈亏比、TradeCycle、ViolationRecord 和风险额度。
 - 将 L 与 W 合并为同一策略实例或 PnL。
 - 仅依据姓名、symbol 或时间接近归属订单。
 - 将 Deposit／Withdrawal 当作交易收益。
@@ -670,3 +679,5 @@ aiomql 的 Bot、Strategy、RAM 和 SQLite 结果库不默认成为平台策略�
 13. MT5、vn.py 或其他 Adapter 的 PoC 范围。
 
 上述关键差异未确认前，不得通过复制 W 的配置并只修改展示名称形成正式 L 策略版本。
+
+以上未决事项不阻塞资费套利和跨所价差 V1。短线交易员 L 进入完整管理闭环前，必须先确认外部执行来源、账户归属证据、日界线、资金流调整、风险规则和违规口径。

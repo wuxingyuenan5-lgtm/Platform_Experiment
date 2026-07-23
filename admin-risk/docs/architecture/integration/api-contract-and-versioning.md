@@ -34,9 +34,12 @@ Platform API 不负责重新实现各领域业务规则。
 /api/v1/accounts
 /api/v1/positions
 /api/v1/orders
+/api/v1/fills
+/api/v1/deals
 /api/v1/executions
 /api/v1/execution-batches
 /api/v1/pnl-results
+/api/v1/strategy-nav-snapshots
 /api/v1/risk-snapshots
 /api/v1/reconciliations
 ```
@@ -130,6 +133,8 @@ interface CommandRequest<T> {
 
 操作人、角色、能力和环境由受信任会话上下文确定，不接受前端任意伪造。
 
+交易命令 payload 必须显式包含目标 `strategyInstanceId`、`accountId`、`tradingMode`、目标标的和操作意图。V1 中，`paper` 可对应交易所测试网、模拟盘或 MT5 Demo；`live` 只能由服务端根据账户白名单、GatewayCapability、TradingPermissionState、风控和审批共同决定，前端不能通过字段切换成实盘。
+
 ## 7. 命令响应
 
 建议：
@@ -152,6 +157,7 @@ interface CommandResponse {
 - 下单命令通常返回 `tradeCommandId` 或 `executionBatchId`。
 - 最终订单和成交状态通过查询或实时事件获得。
 - `result_unknown` 不允许前端直接重复提交。
+- 交易命令返回成功受理后，前端必须通过查询或实时事件读取 TradeCommand、ExecutionBatch、Order、Fill、Deal 和 Reconciliation 状态，不能把命令响应当作成交结果。
 
 ## 8. HTTP 状态码
 
@@ -221,6 +227,8 @@ interface ApiError {
 - 部分失败如何重试。
 
 交易类批量命令不得用一个模糊成功状态隐藏部分失败。
+
+V1 不建议开放跨账户、跨策略的大批量交易命令。资费套利和跨所价差如需多腿执行，应通过 ExecutionBatch 表达，不通过前端批量下单接口拼装。
 
 ## 13. 文件导入导出
 
@@ -293,17 +301,22 @@ interface ApiError {
 ## 17. 安全
 
 - 不在 URL query 传递密钥和敏感凭证。
+- 不通过 Platform API 明文传递交易所 API Key、Secret、Passphrase、MT5 登录密码或服务器地址；这些信息进入独立 Secret/Credential 边界。
 - 写操作执行 CSRF、令牌或会话安全控制。
 - 导出接口检查数据范围权限。
 - 高风险命令支持二次认证或短期操作授权。
 - 错误响应不泄露密钥、内部堆栈和敏感配置。
+
+客户/投资者侧 API 权限待用户系统完成后再设计。当前 V1 只要求内部接口的数据范围、交易模式和实盘门禁清晰，不提前设计客户侧细粒度授权。
 
 ## 18. 验收标准
 
 - API 以业务资源和命令组织，不以页面组件组织。
 - 查询、命令和事件语义分开。
 - 命令具备幂等和结构化结果。
+- 交易查询能区分 Order、Fill、MT5 Deal、Position、Balance、PnL 和 StrategyNavSnapshot。
 - 错误码稳定且不依赖文本解析。
 - 金额、时间、分页和状态约定统一。
 - 契约可通过机器可读文件和测试验证。
 - 版本变化具有兼容和弃用策略。
+- API 不允许前端绕过服务端门禁切换 Live 交易。

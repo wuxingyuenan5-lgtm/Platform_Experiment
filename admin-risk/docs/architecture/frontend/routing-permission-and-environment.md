@@ -204,10 +204,13 @@ TradingMode 表示交易执行模式：
 - `paper`：模拟账户、测试网、沙盒或仿真实盘。
 - `live`：真实资金和真实订单。
 
+V1 中，交易所真实 API 模拟盘、测试网、受控非 Live 账户和 MT5 Demo 均按 `paper` 或受限测试配置展示；不能因为使用真实 SDK 就展示为 `live`。
+
 规则：
 
 - 由服务端受信任上下文返回。
 - 交易平台顶部持续展示 TradingMode。
+- 交易执行页必须同时展示 source／Gateway、TradingMode 和 TradingPermissionState，避免用户把 Fake、Simulation、Paper 和 Live 混淆。
 - 非 `live` 模式不得使用容易误认为实盘成交的文案。
 - `live` 模式需要明显但不过度干扰的实盘标识。
 - TradingMode 变化时清理未提交交易参数和不兼容订阅。

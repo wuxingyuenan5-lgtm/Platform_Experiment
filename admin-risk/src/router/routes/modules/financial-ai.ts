@@ -9,6 +9,7 @@ const financialAi: AppRouteModule = {
   redirect: '/financial-ai/index',
   meta: {
     title: '金融AI分析',
+    icon: 'ant-design:robot-outlined',
     orderNo: 61,
     roles: [RoleEnum.ADMIN, RoleEnum.EMPLOYEE, RoleEnum.GUEST],
   },

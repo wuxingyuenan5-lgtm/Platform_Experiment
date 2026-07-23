@@ -29,22 +29,22 @@
             <div class="quote-stats">
               <div class="quote-stat">
                 <span>Bid</span>
-                <strong class="green">2,331.12</strong>
+                <strong class="green">{{ formatNullablePrice(bybitQuote?.bid) }}</strong>
                 <small>USDT</small>
               </div>
               <div class="quote-stat">
                 <span>Mid</span>
-                <strong>2,331.17</strong>
+                <strong>{{ formatNullablePrice(bybitQuote?.mid) }}</strong>
                 <small>USDT</small>
               </div>
               <div class="quote-stat">
                 <span class="red-text">Ask</span>
-                <strong class="red">2,331.22</strong>
+                <strong class="red">{{ formatNullablePrice(bybitQuote?.ask) }}</strong>
                 <small>USDT</small>
               </div>
               <div class="quote-stat">
                 <span>延迟</span>
-                <strong>18 ms</strong>
+                <strong>{{ venueStatusLabel(snapshot?.bybit.status) }}</strong>
                 <small>&nbsp;</small>
               </div>
             </div>
@@ -58,22 +58,22 @@
             <div class="quote-stats">
               <div class="quote-stat">
                 <span>Bid</span>
-                <strong class="green">2,333.28</strong>
+                <strong class="green">{{ formatNullablePrice(mt5Quote?.bid) }}</strong>
                 <small>USD</small>
               </div>
               <div class="quote-stat">
                 <span>Mid</span>
-                <strong>2,333.33</strong>
+                <strong>{{ formatNullablePrice(mt5Quote?.mid) }}</strong>
                 <small>USD</small>
               </div>
               <div class="quote-stat">
                 <span class="red-text">Ask</span>
-                <strong class="red">2,333.38</strong>
+                <strong class="red">{{ formatNullablePrice(mt5Quote?.ask) }}</strong>
                 <small>USD</small>
               </div>
               <div class="quote-stat">
                 <span>延迟</span>
-                <strong>22 ms</strong>
+                <strong>{{ venueStatusLabel(snapshot?.mt5.status) }}</strong>
                 <small>&nbsp;</small>
               </div>
             </div>
@@ -91,19 +91,19 @@
         <div class="summary-grid">
           <article class="summary-item">
             <label>做多价差 <small>(BY Ask - MT5 Bid)</small></label>
-            <strong class="red">-2.06 <em>USDT</em></strong>
+            <strong :class="spreadTone(longSpread)">{{ formatNullableSigned(longSpread) }} <em>USDT</em></strong>
           </article>
           <article class="summary-item">
             <label>做空价差 <small>(BY Bid - MT5 Ask)</small></label>
-            <strong class="red">-2.26 <em>USDT</em></strong>
+            <strong :class="spreadTone(shortSpread)">{{ formatNullableSigned(shortSpread) }} <em>USDT</em></strong>
           </article>
           <article class="summary-item summary-item--compact">
             <label>资费 | 买方库存费 | 卖方库存费</label>
-            <strong class="summary-inline">0.010% | -42 | +24</strong>
+            <strong class="summary-inline">{{ fundingInventoryText }}</strong>
           </article>
           <article class="summary-item">
-            <label>USDT/USD Basis</label>
-            <strong class="green">-0.0002 (-0.02%)</strong>
+            <label>USDT/USD</label>
+            <strong>{{ usdtUsdText }}</strong>
           </article>
         </div>
       </section>
@@ -177,7 +177,7 @@
               <label class="field-block">
                 <span>下单数量</span>
                 <div class="input-row input-row--qty">
-                  <input :value="qtyOz.toFixed(2)" @input="handleQtyInput" />
+                  <input v-model="qtyInput" inputmode="decimal" @input="handleQtyInput" @blur="commitQtyInput" />
                   <button type="button" class="unit-btn">盎司</button>
                   <button type="button" @click="nudgeQty(-10)">-</button>
                   <button type="button" @click="nudgeQty(10)">+</button>
@@ -194,7 +194,7 @@
                   </article>
                   <article class="metric-card">
                     <small>MT5 手数</small>
-                    <strong>{{ formatNumber(mt5Lot, 2) }}</strong>
+                    <strong>{{ formatNullablePrice(mt5Lot, 2) }}</strong>
                   </article>
                 </div>
               </div>
@@ -517,6 +517,27 @@
           </tr>
         </thead>
         <tbody>
+          <tr v-if="overviewRows.length === 0">
+            <td colspan="14">{{ snapshotError || '暂无真实持仓' }}</td>
+          </tr>
+          <tr v-for="row in overviewRows" :key="row.id">
+            <td :class="row.direction === '多头' ? 'green' : 'red'">{{ row.direction }}</td>
+            <td>{{ formatNumber(row.qty, 2) }}</td>
+            <td>{{ row.entrySpread }}</td>
+            <td :class="spreadTone(longSpread)">{{ row.currentSpread }}</td>
+            <td>{{ row.detail }}</td>
+            <td>{{ row.pnl }}</td>
+            <td>{{ row.legPnl }}</td>
+            <td>{{ row.takeProfit }}</td>
+            <td>{{ row.stopLoss }}</td>
+            <td>{{ row.liquidation }}</td>
+            <td>{{ row.margin }}</td>
+            <td>{{ row.openTime }}</td>
+            <td>{{ row.holdingTime }}</td>
+            <td>{{ row.status }}</td>
+          </tr>
+        </tbody>
+        <tbody v-if="false">
           <tr>
             <td class="green">多头</td>
             <td>150.00</td>
@@ -605,8 +626,20 @@
 </template>
 
 <script setup lang="ts">
-  import { computed, nextTick, onMounted, ref, watch, type Ref } from 'vue';
+  import { computed, nextTick, onMounted, onUnmounted, ref, watch, type Ref } from 'vue';
   import { useECharts } from '@/hooks/web/useECharts';
+  import {
+    getCrossSpreadHistory,
+    getCrossSpreadSnapshot,
+    getInstruments,
+    submitCrossSpreadMarketCommand,
+  } from '@/api/platform/trading';
+  import type {
+    CrossSpreadMarketAction,
+    CrossSpreadSnapshotResult,
+    InstrumentResult,
+    MarketQuoteResult,
+  } from '@/api/platform/trading.types';
 
   interface CloseOrder {
     id: string;
@@ -631,15 +664,36 @@
     channel: string;
   }
 
+  interface OverviewRow {
+    id: string;
+    direction: string;
+    qty: number;
+    entrySpread: string;
+    currentSpread: string;
+    detail: string;
+    pnl: string;
+    legPnl: string;
+    takeProfit: string;
+    stopLoss: string;
+    liquidation: string;
+    margin: string;
+    openTime: string;
+    holdingTime: string;
+    status: string;
+  }
+
   defineProps<{
     leftLegSymbol: string;
     rightLegSymbol: string;
   }>();
 
+  const BYBIT_INSTRUMENT_ID = 'instrument_xau_usdt_perp';
+  const MT5_INSTRUMENT_ID = 'instrument_xau_usd';
+
   const ranges = ['1m', '5m', '15m', '1h', '4h', '1D'];
   const analysisPeriods = ['1m', '5m', '15m', '1h'];
   const analysisDataRanges = ['500', '1000'];
-  const selectedPair = ref('XAUTUSDT.P-XAUUSD');
+  const selectedPair = ref('XAUTUSDT.P-XAUUSD+');
   const selectedRange = ref('15m');
   const selectedAnalysisPeriod = ref('1m');
   const selectedAnalysisDataRange = ref('500');
@@ -650,6 +704,8 @@
   const executionMode = ref<'market' | 'limit'>('market');
   const closeExecutionMode = ref<'market' | 'limit'>('market');
   const qtyOz = ref(100);
+  const qtyInput = ref('100');
+  const instruments = ref<InstrumentResult[]>([]);
   const leverage = ref(10);
   const triggerSpread = ref(-1);
   const acceptableSpread = ref(-1.1);
@@ -686,6 +742,55 @@
   const alertSeconds = ref(1);
   const alertDelay = ref(30);
   const alertChannel = ref('全部渠道');
+  const snapshot = ref<CrossSpreadSnapshotResult | null>(null);
+  const snapshotLoading = ref(false);
+  const snapshotError = ref('');
+  const spreadHistory = ref<{ label: string; value: number }[]>([]);
+  let snapshotTimer: number | undefined;
+
+  const bybitQuote = computed<MarketQuoteResult | null>(() => snapshot.value?.bybit.quote || null);
+  const mt5Quote = computed<MarketQuoteResult | null>(() => snapshot.value?.mt5.quote || null);
+  const bybitInstrument = computed(() =>
+    instruments.value.find((instrument) => instrument.instrumentId === BYBIT_INSTRUMENT_ID),
+  );
+  const mt5Instrument = computed(() =>
+    instruments.value.find((instrument) => instrument.instrumentId === MT5_INSTRUMENT_ID),
+  );
+  const quantityRules = computed(() => {
+    const bybitContract = bybitInstrument.value?.contract;
+    const mt5Contract = mt5Instrument.value?.contract;
+    if (!bybitContract || !mt5Contract) return null;
+    const bybitMinOz = parseOptionalNumber(bybitContract.minOrderQuantity);
+    const bybitStepOz = parseOptionalNumber(bybitContract.quantityStep);
+    const mt5MinLot = parseOptionalNumber(mt5Contract.minOrderQuantity);
+    const mt5StepLot = parseOptionalNumber(mt5Contract.quantityStep);
+    const mt5Multiplier = parseOptionalNumber(mt5Contract.contractMultiplier);
+    if (
+      bybitMinOz === null ||
+      bybitStepOz === null ||
+      mt5MinLot === null ||
+      mt5StepLot === null ||
+      mt5Multiplier === null ||
+      mt5Multiplier <= 0
+    ) {
+      return null;
+    }
+    return {
+      minOz: Math.max(bybitMinOz, mt5MinLot * mt5Multiplier),
+      stepOz: Math.max(bybitStepOz, mt5StepLot * mt5Multiplier),
+      mt5Multiplier,
+    };
+  });
+  const longSpread = computed(() => parseOptionalNumber(snapshot.value?.longSpread));
+  const shortSpread = computed(() => parseOptionalNumber(snapshot.value?.shortSpread));
+  const snapshotStatusText = computed(() => {
+    if (snapshotLoading.value && !snapshot.value) return '加载中';
+    if (snapshotError.value) return '接口异常';
+    if (!snapshot.value) return '等待行情';
+    if (snapshot.value.status === 'available') return '双边真实行情';
+    if (snapshot.value.status === 'partial') return '单边行情可用';
+    return '行情不可用';
+  });
 
   watch([triggerSpread, acceptableSpread, takeProfitSpread, stopLossSpread, closeLimitSpread], syncSpreadInputs);
 
@@ -719,10 +824,65 @@
   ]);
 
   const bybitQty = computed(() => qtyOz.value);
-  const mt5Lot = computed(() => qtyOz.value * 0.01);
+  const mt5Lot = computed(() => {
+    const rules = quantityRules.value;
+    return rules ? qtyOz.value / rules.mt5Multiplier : null;
+  });
+  const fundingInventoryText = computed(() => {
+    const metrics = snapshot.value?.metrics;
+    return [
+      formatNullableRate(metrics?.fundingRate),
+      formatNullableSigned(metrics?.buyerInventoryFee),
+      formatNullableSigned(metrics?.sellerInventoryFee),
+    ].join(' | ');
+  });
+  const usdtUsdText = computed(() => {
+    const parsed = parseOptionalNumber(snapshot.value?.metrics?.usdtUsd);
+    return parsed === null ? '--' : formatNumber(parsed, 4);
+  });
+  const overviewRows = computed<OverviewRow[]>(() => {
+    if (!snapshot.value) return [];
+    const rows: OverviewRow[] = [];
+    const bybitPositions = snapshot.value.bybit.positions || [];
+    const mt5Positions = snapshot.value.mt5.positions || [];
+    const rowCount = Math.max(bybitPositions.length, mt5Positions.length);
+    for (let index = 0; index < rowCount; index += 1) {
+      const bybit = bybitPositions[index];
+      const mt5 = mt5Positions[index];
+      const bybitQtyValue = Math.abs(parseOptionalNumber(bybit?.quantity) || 0);
+      const mt5QtyValue =
+        Math.abs(parseOptionalNumber(mt5?.quantity) || 0) * (quantityRules.value?.mt5Multiplier || 0);
+      const qty = bybitQtyValue || mt5QtyValue;
+      const direction = (parseOptionalNumber(bybit?.quantity) || 0) >= 0 ? '多头' : '空头';
+      rows.push({
+        id: `${bybit?.externalId || bybit?.symbol || 'bybit'}-${mt5?.externalId || mt5?.symbol || 'mt5'}-${index}`,
+        direction,
+        qty,
+        entrySpread: '--',
+        currentSpread: formatNullableSigned(direction === '多头' ? longSpread.value : shortSpread.value),
+        detail: `BY: ${formatNullablePrice(bybit?.averagePrice)} | MT5: ${formatNullablePrice(mt5?.averagePrice)}`,
+        pnl: formatNullableSigned((parseOptionalNumber(bybit?.unrealizedPnl) || 0) + (parseOptionalNumber(mt5?.unrealizedPnl) || 0)),
+        legPnl: `BY: ${formatNullableSigned(parseOptionalNumber(bybit?.unrealizedPnl))} | MT5: ${formatNullableSigned(parseOptionalNumber(mt5?.unrealizedPnl))}`,
+        takeProfit: '--',
+        stopLoss: '--',
+        liquidation: '--',
+        margin: '--',
+        openTime: '--',
+        holdingTime: '--',
+        status: snapshot.value.status === 'available' ? '正常' : snapshotStatusText.value,
+      });
+    }
+    return rows;
+  });
   const qtyError = computed(() => {
     if (qtyOz.value <= 0) return '数量需大于 0';
-    if (qtyOz.value < 10) return '当前数量过低，无法完成 MT5 对冲换算';
+    const rules = quantityRules.value;
+    if (!rules) return '合约规格加载中';
+    if (qtyOz.value < rules.minOz) return `当前合约最小下单数量为 ${formatNumber(rules.minOz, 2)} 盎司`;
+    const steps = (qtyOz.value - rules.minOz) / rules.stepOz;
+    if (Math.abs(steps - Math.round(steps)) > 1e-8) {
+      return `当前合约下单步长为 ${formatNumber(rules.stepOz, 2)} 盎司`;
+    }
     return '';
   });
 
@@ -744,7 +904,7 @@
       return {
         action: target?.direction === 'LONG_SPREAD' ? '平多价差' : '平空价差',
         qty: `${formatNumber(target?.qtyOz ?? 0, 2)} 盎司`,
-        legs: `${formatNumber(target?.qtyOz ?? 0, 2)} / ${formatNumber((target?.qtyOz ?? 0) * 0.01, 2)}`,
+        legs: `${formatNumber(target?.qtyOz ?? 0, 2)} / ${formatNullablePrice(convertOzToMt5Lot(target?.qtyOz ?? 0), 2)}`,
         mode: closeExecutionMode.value === 'market' ? '市价平仓' : '限价平仓',
         spreadRange: `${closeLimitSpread.value.toFixed(2)} USDT`,
         takeProfit: `${formatSigned(target?.takeProfit ?? 0)} USDT`,
@@ -755,7 +915,7 @@
     return {
       action: openDirection.value === 'long' ? '开多价差' : '开空价差',
       qty: `${formatNumber(qtyOz.value, 2)} 盎司`,
-      legs: `${formatNumber(bybitQty.value, 2)} / ${formatNumber(mt5Lot.value, 2)}`,
+      legs: `${formatNumber(bybitQty.value, 2)} / ${formatNullablePrice(mt5Lot.value, 2)}`,
       mode: executionMode.value === 'market' ? '市价开仓' : '限价开仓',
       spreadRange: `${triggerSpread.value.toFixed(2)} / ${acceptableSpread.value.toFixed(2)} USDT`,
       takeProfit: `${takeProfitSpread.value.toFixed(2)} USDT / ${takeProfitExecution.value === 'limit' ? '限价' : '市价'}`,
@@ -766,10 +926,9 @@
   const chartRef = ref<HTMLDivElement | null>(null);
   const chart = useECharts(chartRef as Ref<HTMLDivElement>);
 
-  const chartSeries = [-2.3, -1.7, -1.1, -0.8, -0.9, -1.5, -2.1, -1.8, -0.4, 1.2, 0.6, -0.2, -1.4, -2.06];
-  const chartLabels = ['05-28 06:00', '07:00', '08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00', '18:00', '18:30'];
-
   function renderChart() {
+    const chartSeries = spreadHistory.value.map((item) => item.value);
+    const chartLabels = spreadHistory.value.map((item) => item.label);
     nextTick(() => {
       chart?.setOptions({
         grid: { left: 56, right: 20, top: 30, bottom: 76 },
@@ -783,8 +942,8 @@
         },
         yAxis: {
           type: 'value',
-          min: -4,
-          max: 2,
+          min: chartSeries.length ? undefined : -4,
+          max: chartSeries.length ? undefined : 2,
           splitNumber: 3,
           axisLine: { show: false },
           axisTick: { show: false },
@@ -831,6 +990,93 @@
         ],
       });
     });
+  }
+
+  function parseOptionalNumber(value: string | number | null | undefined) {
+    if (value === null || value === undefined || value === '') return null;
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  function formatNullablePrice(value: string | number | null | undefined, digits = 2) {
+    const parsed = parseOptionalNumber(value);
+    return parsed === null ? '--' : formatNumber(parsed, digits);
+  }
+
+  function formatNullableSigned(value: string | number | null | undefined) {
+    const parsed = parseOptionalNumber(value);
+    if (parsed === null) return '--';
+    return formatSigned(parsed);
+  }
+
+  function formatNullableRate(value: string | number | null | undefined) {
+    const parsed = parseOptionalNumber(value);
+    if (parsed === null) return '--';
+    return `${(parsed * 100).toFixed(4)}%`;
+  }
+
+  function spreadTone(value: string | number | null | undefined) {
+    const parsed = parseOptionalNumber(value);
+    if (parsed === null) return '';
+    return parsed <= 0 ? 'green' : 'red';
+  }
+
+  function venueStatusLabel(status: string | null | undefined) {
+    if (status === 'available') return '可用';
+    if (status === 'timeout') return '超时';
+    if (status === 'unavailable') return '不可用';
+    return '等待';
+  }
+
+  async function refreshSnapshot() {
+    snapshotLoading.value = true;
+    try {
+      const nextSnapshot = await getCrossSpreadSnapshot();
+      snapshot.value = nextSnapshot;
+      snapshotError.value = '';
+      const nextSpread = parseOptionalNumber(nextSnapshot.longSpread);
+      if (nextSpread !== null) {
+        spreadHistory.value = [
+          ...spreadHistory.value.slice(-59),
+          {
+            label: new Date(nextSnapshot.asOf).toLocaleTimeString('zh-CN', { hour12: false }),
+            value: nextSpread,
+          },
+        ];
+        renderChart();
+      }
+    } catch (error: any) {
+      snapshotError.value = error?.response?.data?.detail || error?.message || '跨所行情接口异常';
+    } finally {
+      snapshotLoading.value = false;
+    }
+  }
+
+  async function refreshHistory() {
+    try {
+      const points = await getCrossSpreadHistory(200);
+      spreadHistory.value = points
+        .map((point) => {
+          const value = parseOptionalNumber(point.longSpread);
+          if (value === null) return null;
+          return {
+            label: new Date(point.asOf).toLocaleTimeString('zh-CN', { hour12: false }),
+            value,
+          };
+        })
+        .filter((item): item is { label: string; value: number } => item !== null);
+      renderChart();
+    } catch {
+      renderChart();
+    }
+  }
+
+  async function refreshInstruments() {
+    try {
+      instruments.value = await getInstruments();
+    } catch {
+      instruments.value = [];
+    }
   }
 
   function formatNumber(value: number, digits = 2) {
@@ -888,9 +1134,24 @@
     inputMap[field].value = formatEditableNumber(parsed);
   }
 
+  function convertOzToMt5Lot(value: number) {
+    const multiplier = quantityRules.value?.mt5Multiplier;
+    return multiplier ? value / multiplier : null;
+  }
+
   function handleQtyInput(event: Event) {
-    const value = Number((event.target as HTMLInputElement).value);
-    qtyOz.value = Number.isFinite(value) ? Math.max(0, value) : 0;
+    const parsed = parseEditableNumber((event.target as HTMLInputElement).value);
+    if (parsed !== null) qtyOz.value = Math.max(0, parsed);
+  }
+
+  function commitQtyInput() {
+    const parsed = parseEditableNumber(qtyInput.value);
+    if (parsed === null) {
+      qtyInput.value = formatEditableNumber(qtyOz.value);
+      return;
+    }
+    qtyOz.value = Math.max(0, parsed);
+    qtyInput.value = formatEditableNumber(qtyOz.value);
   }
 
   function handleLeverageInput(event: Event) {
@@ -912,10 +1173,26 @@
   }
 
   function nudgeQty(delta: number) {
-    qtyOz.value = Math.max(0, qtyOz.value + delta);
+    const step = quantityRules.value?.stepOz || Math.abs(delta);
+    const direction = delta >= 0 ? 1 : -1;
+    qtyOz.value = Math.max(0, qtyOz.value + direction * step);
+    qtyInput.value = formatEditableNumber(qtyOz.value);
   }
 
   function prepareOpenDraft(direction: 'long' | 'short') {
+    if (qtyError.value) {
+      appendLog({
+        time: nowTime(),
+        direction: direction === 'long' ? 'OPEN_LONG' : 'OPEN_SHORT',
+        type: 'quantity_validation',
+        qty: qtyInput.value,
+        trigger: '--',
+        fill: qtyError.value,
+        status: 'rejected',
+        channel: 'CONTRACT_SPEC',
+      });
+      return;
+    }
     openDirection.value = direction;
     openConfirm(direction === 'long' ? 'OPEN_LONG' : 'OPEN_SHORT');
   }
@@ -936,7 +1213,7 @@
     return new Date().toLocaleTimeString('zh-CN', { hour12: false });
   }
 
-  function confirmOrder() {
+  function confirmOrderLegacy() {
     submitLoading.value = true;
     setTimeout(() => {
       if (confirmAction.value === 'CLOSE_ALL') {
@@ -961,13 +1238,82 @@
     }, 560);
   }
 
+  async function confirmOrder() {
+    submitLoading.value = true;
+    try {
+      const action = resolveMarketAction();
+      const result = await submitCrossSpreadMarketCommand({
+        action,
+        quantityOz: String(resolveOrderQuantityOz()),
+      });
+      appendLog({
+        time: nowTime(),
+        direction: confirmSummary.value.action,
+        type: confirmSummary.value.mode,
+        qty: confirmSummary.value.qty,
+        trigger: confirmSummary.value.spreadRange,
+        fill: result.failureReason || result.status,
+        status: result.status === 'hedged' ? '成功' : '待确认',
+        channel: result.batchId,
+      });
+      confirmVisible.value = false;
+      await refreshSnapshot();
+    } catch (error: any) {
+      appendLog({
+        time: nowTime(),
+        direction: confirmSummary.value.action,
+        type: confirmSummary.value.mode,
+        qty: confirmSummary.value.qty,
+        trigger: confirmSummary.value.spreadRange,
+        fill: error?.response?.data?.detail || error?.message || '执行失败',
+        status: '拒绝',
+        channel: 'RISK_GATE',
+      });
+    } finally {
+      submitLoading.value = false;
+    }
+  }
+
+  function resolveMarketAction(): CrossSpreadMarketAction {
+    if (confirmAction.value === 'OPEN_LONG' || confirmAction.value === 'OPEN_SHORT') {
+      return confirmAction.value;
+    }
+    if (confirmAction.value === 'CLOSE_ALL') {
+      const first = overviewRows.value[0];
+      return first?.direction === '空头' ? 'CLOSE_SHORT' : 'CLOSE_LONG';
+    }
+    const target = closeOrders.value.find((item) => `CLOSE:${item.id}` === confirmAction.value);
+    return target?.direction === 'SHORT_SPREAD' ? 'CLOSE_SHORT' : 'CLOSE_LONG';
+  }
+
+  function resolveOrderQuantityOz() {
+    if (confirmAction.value === 'CLOSE_ALL') {
+      const totalQty = overviewRows.value.reduce((sum, item) => sum + item.qty, 0);
+      return totalQty || qtyOz.value;
+    }
+    if (confirmAction.value.startsWith('CLOSE:')) {
+      const target = closeOrders.value.find((item) => `CLOSE:${item.id}` === confirmAction.value);
+      return target?.qtyOz || qtyOz.value;
+    }
+    return qtyOz.value;
+  }
+
   function toggleMonitor(nextState: boolean) {
     monitorRunning.value = nextState;
     lastTriggerTime.value = nextState ? '15:34:01' : '--';
   }
 
-  onMounted(() => {
+  onMounted(async () => {
+    closeOrders.value = [];
+    await refreshInstruments();
+    await refreshHistory();
+    await refreshSnapshot();
+    snapshotTimer = window.setInterval(refreshSnapshot, 15_000);
     renderChart();
+  });
+
+  onUnmounted(() => {
+    if (snapshotTimer) window.clearInterval(snapshotTimer);
   });
 </script>
 

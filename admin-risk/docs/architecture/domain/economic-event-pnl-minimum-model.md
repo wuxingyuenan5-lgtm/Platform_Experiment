@@ -12,6 +12,7 @@
 - EconomicEvent。
 - PnLResult。
 - PnLAttributionItem。
+- StrategyNavSnapshot。
 
 不建设完整财务总账、基金 NAV 和复杂会计科目体系。
 
@@ -138,6 +139,41 @@ status = failed 或 provisional
 
 不得静默按零处理。
 
+## 5A. StrategyNavSnapshot
+
+StrategyNavSnapshot 表示某个 StrategyInstance 在固定时间生成的运营净值快照。
+
+它用于策略管理、运营观察、复盘和授权展示，不是正式 Fund NAV，不涉及投资人份额、申赎、管理费、业绩报酬和基金会计。
+
+最小字段：
+
+```text
+strategyNavSnapshotId
+strategyInstanceId
+businessDate
+snapshotTime
+reportingCurrency
+nav
+capitalBase
+pnlResultId
+status
+dataAsOf
+generatedAt
+calculationVersion
+qualityStatus
+```
+
+V1 规则：
+
+- 按固定时间生成快照。
+- reportingCurrency 当前以 USDT 为主。
+- status 初期使用 estimated、provisional、verified、superseded、failed。
+- nav 可以由 capitalBase、PnLResult 和资金流调整计算，但公式需在实现计划中确认。
+- V1 默认使用 `nav = equity / capitalBase`；equity 来自固定时间 StrategyInstance 绑定账户的 USDT 口径权益，capitalBase 为策略实例初始或指定资金基数。
+- 缺失资金、持仓、费用或 PnL 输入时，快照必须标记 provisional、failed 或 insufficient_data，不得静默按零。
+- 资费套利和跨所价差必须优先支持 StrategyNavSnapshot，并能区分 Fake Gateway、真实 API 模拟盘／测试盘、MT5 Demo 和未来 Live 的来源状态。
+- 海内外价差、抄底、短线交易员 L 和短线交易员 W 可以先保留字段和占位状态。
+
 ## 6. 对账与修正
 
 出现外部费用补录、成交修正或结算变化时：
@@ -166,6 +202,8 @@ status = failed 或 provisional
 - 实际成交、费用、Funding 和 Swap 可以形成可追溯经济事件。
 - PnL 可以按 StrategyInstance 和时间区间计算。
 - PnLResult 可版本化并可重算。
+- StrategyNavSnapshot 可以按 StrategyInstance 和固定时间生成。
 - 缺失输入不被当作零。
 - 策略归因可以保留差异，但共享最小公共分类。
 - 策略 PnL 不被称为正式 Fund NAV。
+- StrategyNavSnapshot 不被称为正式 Fund NAV。

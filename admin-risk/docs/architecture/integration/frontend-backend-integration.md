@@ -17,6 +17,7 @@
 - 让 Mock 和真实 API 可以通过 Adapter 替换。
 - 避免前端补造业务事实。
 - 保持 DeploymentEnvironment、TradingMode 和 TradingPermissionState 分开。
+- 支持 V1 从 Fake Gateway 迁移到真实 API 模拟盘、测试网和 MT5 Demo，而不重写页面业务逻辑。
 
 ## 2. 职责边界
 
@@ -36,10 +37,13 @@
 - DeploymentEnvironment、TradingMode 和交易能力上下文。
 - 业务规则、风险和审批校验。
 - TradeCommand、ExecutionBatch、Order、Fill、Account、Position、PnL 和 Risk 事实。
+- MT5 Deal、EconomicEvent、StrategyNavSnapshot、ReconciliationDifference 和 ManualIntervention 事实。
 - 幂等、审计、持久化和恢复。
 - 与外部交易和数据系统通信。
 
 前端校验用于改善体验，不替代后端校验。
+
+前端不得直接连接交易所 API、MT5 Worker、Runtime 私有通道或保存交易凭证。所有交易、账户、持仓、成交、Deal 和净值状态都通过 Platform API 或 Platform 实时事件获得。
 
 ## 3. Query
 
@@ -50,6 +54,7 @@ Query 用于读取数据，不改变核心业务事实。
 - 查询策略和策略实例。
 - 查询行情、研究数据和数据质量。
 - 查询账户、持仓、订单、成交和执行批次。
+- 查询 MT5 Deal、账户账本、资金费结算、StrategyNavSnapshot 和对账差异。
 - 查询损益、风险、对账和审批状态。
 - 查询页面 Backend Read Model。
 
@@ -107,6 +112,8 @@ Event 通知已经发生的事实，例如：
 - ExecutionBatchStatusChanged。
 - OrderAcknowledged。
 - FillReceived。
+- DealReceived。
+- StrategyNavSnapshotUpdated。
 - RiskDecisionChanged。
 - ApprovalRequestApproved。
 - GatewayDisconnected。
@@ -143,6 +150,7 @@ Event 通知已经发生的事实，例如：
 
 - 行情更新。
 - 订单、Fill 和 ExecutionBatch 状态。
+- MT5 Deal、StrategyNavSnapshot、对账差异和人工处理状态。
 - 账户、保证金、持仓和风险状态。
 - Gateway 和数据质量告警。
 - 审批和人工处理状态。
@@ -292,6 +300,8 @@ Repository Interface
 - Demo 和 Simulation 明确标识。
 - 接入 API 时主要替换 DTO、Adapter 和 Repository 实现。
 
+Fake Gateway、前端 Mock 和真实 API 模拟/测试链路必须区分：Mock 服务页面开发，Fake Gateway 服务本地执行验证，真实 API 模拟/测试链路服务 V1 交易接入验收。
+
 ## 14. 双腿交易协作
 
 ```text
@@ -305,7 +315,7 @@ POST TradeCommand
   ↓
 后端执行 LegInstruction 和 Order
   ↓
-Event 推送 Order、Fill、配平和暴露变化
+Event 推送 Order、Fill／Deal、配平和暴露变化
   ↓
 前端按 ExecutionBatch 聚合展示
   ↓
@@ -313,6 +323,8 @@ Event 推送 Order、Fill、配平和暴露变化
 ```
 
 前端不得将两次独立 Order 请求自行拼接成可靠双腿执行批次。
+
+资费套利和跨所价差的 V1 页面必须按 ExecutionBatch 展示组合状态；订单、成交、Deal、持仓、费用、资金费、PnL 和净值都从后端聚合，不由前端临时计算成正式结果。
 
 ## 15. 唯一来源
 
@@ -331,3 +343,5 @@ Event 推送 Order、Fill、配平和暴露变化
 - 错误、状态、币种、时间和分页规则统一。
 - 实时连接断开后可以重新获取权威状态。
 - 页面不通过自然语言字符串推断核心业务状态。
+- 页面不会绕过 Platform API 直连交易所、MT5 Worker 或 Runtime。
+- Fake Gateway、Mock、Simulation、Paper 和 Live 在页面和接口语义上可区分。

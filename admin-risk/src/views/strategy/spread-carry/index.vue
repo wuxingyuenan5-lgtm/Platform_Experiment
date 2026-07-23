@@ -32,7 +32,7 @@
         <label class="workspace-control">
           <span>对冲腿</span>
           <select v-model="rightLegSymbol">
-            <option value="XAUUSD">XAUUSD</option>
+            <option value="XAUUSD+">XAUUSD+</option>
             <option value="SHFE.au2606">SHFE.au2606</option>
             <option value="SHFE.ag2512">SHFE.ag2512</option>
           </select>
@@ -329,7 +329,7 @@
       activeSection: 'analysis',
       selectedVenue: 'Bybit',
       leftLegSymbol: 'XAUTUSDT.P',
-      rightLegSymbol: 'XAUUSD',
+      rightLegSymbol: 'XAUUSD+',
       selectedResolution: '30分钟',
       variant: 'crossVenue',
     },

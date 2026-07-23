@@ -8,9 +8,37 @@ deploy/.env
 projects/risk-control/**/bin/*.exe
 projects/risk-control/data-service/bin/
 projects/risk-control/auth-service/bin/
+**/node_modules/
+**/dist/
 admin-risk/.vite/
+**/.vite/
+**/.cache/
+**/.turbo/
 admin-risk/docs/superpowers/
 docs/superpowers/
+**/.venv/
+**/__pycache__/
+**/*.py[cod]
+**/*.egg-info/
+execution-runtime/data/
+platform-backend/data/
+
+# Local generated outputs
+outputs/
+
+# Large local/reference material
+参考代码/
+
+# Generated structure/history dumps
+**/project_structure.txt
+admin-risk/CHANGELOG*.md
+
+# Binary/data artifacts
+**/*.zip
+**/*.whl
+**/*.feather
+**/*.parquet
+outputs/**/*.csv
 
 # Logs and OS files
 *.log

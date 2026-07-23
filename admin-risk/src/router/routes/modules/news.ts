@@ -9,6 +9,7 @@ const news: AppRouteModule = {
   redirect: '/news-calendar/macro',
   meta: {
     title: '新闻日历与理财',
+    icon: 'ant-design:calendar-outlined',
     orderNo: 40,
     roles: [RoleEnum.ADMIN, RoleEnum.EMPLOYEE],
   },

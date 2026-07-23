@@ -102,7 +102,7 @@
 - Execution Market Data 和 Research Data。
 - Account、BalanceSnapshot 和 MarginSnapshot。
 - Position 和 ExposureSnapshot。
-- TradeCommand、ExecutionBatch、Order 和 Fill。
+- TradeCommand、ExecutionBatch、Order、Fill、Deal 和 StrategyNavSnapshot。
 - PnLResult 和策略经济账本摘要。
 - RiskDecision 和 GlobalTradingBlock。
 - ApprovalRequest 和 ApprovalGrant。
@@ -128,7 +128,7 @@
 
 同一页面中区分：
 
-- 业务数据：Order、Position、PnL、Account、Risk、Approval。
+- 业务数据：Order、Fill、Deal、Position、PnL、StrategyNavSnapshot、Account、Risk、Approval。
 - 请求状态：加载、刷新、错误和更新时间。
 - 界面状态：页签、筛选、折叠和选中项。
 - 命令受理状态：received、validating、accepted、rejected、result_unknown。
@@ -146,7 +146,7 @@
 - 交易所、标的和时间粒度：页面或模块状态；需要分享时再进入 query。
 - 未提交参数：页面本地状态。
 - 当前 ExecutionBatch 引用：模块共享状态；权威状态来自服务端。
-- Order、Fill、配平、暴露和风险：服务端数据状态。
+- Order、Fill、Deal、StrategyNavSnapshot、配平、暴露和风险：服务端数据状态。
 - DeploymentEnvironment、TradingMode 和 TradingPermissionState：全局受信任上下文。
 
 切换策略时：
@@ -161,7 +161,7 @@
 - 切换策略时保留当前管理视角。
 - 日期、订单状态和分页：页面本地状态；需要链接复现时可以进入 query。
 - 策略基础信息：从注册表或后端 StrategyDefinition 读取。
-- PnL、Account、Order、Fill 和 Reconciliation：服务端数据状态。
+- PnL、StrategyNavSnapshot、Account、Order、Fill、Deal 和 Reconciliation：服务端数据状态。
 
 ### 4.3 对冲基金看板
 
@@ -189,7 +189,7 @@
 
 - 权限和数据范围。
 - DeploymentEnvironment、TradingMode 和 TradingPermissionState。
-- TradeCommand、ExecutionBatch、Order 和 Fill 状态。
+- TradeCommand、ExecutionBatch、Order、Fill、Deal 和 StrategyNavSnapshot 状态。
 - Account 余额和 Position。
 - Risk 阻断和 ApprovalGrant。
 

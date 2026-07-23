@@ -70,7 +70,7 @@ TradeIntent
 → platform Order
 → Fill
 → Position / EconomicEvent
-→ LedgerEntry / PnLResult
+→ PnLResult / StrategyNavSnapshot
 ```
 
 Runtime 链路：
@@ -104,6 +104,8 @@ RuntimeDefinition
 - Strategy PnL 不等于正式 Fund NAV。
 
 完整投资人、份额、申赎和法定基金会计当前延后。
+
+V1 可以由系统自动创建默认 LegalEntity、Fund、Portfolio 和 Book，普通用户无需理解或操作这些层级。它们只用于未来扩展和数据归属，不应把当前自营账户管理复杂化为正式基金行政系统。
 
 ## 5. Strategy
 
@@ -294,6 +296,7 @@ IAM 和治理对象：
 - ValuationSnapshot。
 - PnLResult。
 - PnLAttributionItem。
+- StrategyNavSnapshot。
 - AdjustmentEntry。
 - RecalculationRun。
 
@@ -303,6 +306,7 @@ IAM 和治理对象：
 - Strategy Economic Ledger 用于策略收益、成本、资金变化和对账。
 - Strategy Economic Ledger 不等于完整 Finance Ledger。
 - PnLResult 是版本化派生结果，必须可重现。
+- StrategyNavSnapshot 是策略实例固定时间运营净值快照，不是正式 Fund NAV。
 - 三类套利可以具有不同归因树，但统一归入 PnLResult。
 - 未建立估值政策、费用、现金、份额和复核流程前，不产生正式 Fund NAV。
 
@@ -426,6 +430,7 @@ Position
 BalanceSnapshot
 EconomicEvent
 PnLResult
+StrategyNavSnapshot
 RiskDecision
 ReconciliationResult
 RuntimeInstance
@@ -433,6 +438,13 @@ GatewayRuntime
 WorkerInstance
 AuditEvent
 ```
+
+V1 完整闭环优先覆盖：
+
+- 资费套利：Crypto 现货／永续、真实 API 模拟盘／测试盘、Funding、费用、持仓、PnL 和 StrategyNavSnapshot。
+- 跨所价差：Crypto 真实 API 模拟盘／测试盘、MT5 Demo／Worker、Order／Deal 映射、Swap／费用、持仓、PnL 和 StrategyNavSnapshot。
+
+海内外价差、抄底、短线交易员 L 和短线交易员 W 第一阶段只保留管理入口、字段和占位状态，不要求完整交易闭环和完整 PnL。
 
 当前延后：
 

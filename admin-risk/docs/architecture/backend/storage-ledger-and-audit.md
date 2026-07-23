@@ -33,6 +33,7 @@
 - LegInstruction。
 - Order。
 - Execution／Fill。
+- MT5 Deal。
 - 人工干预。
 
 ### 2.3 经济事实
@@ -64,12 +65,13 @@
 - ExposureSnapshot。
 - RiskSnapshot。
 - ValuationSnapshot。
+- StrategyNavSnapshot。
 
 ### 2.6 派生结果
 
 - PnLResult。
 - PnLAttribution。
-- 策略净值和回撤。
+- StrategyNavSnapshot、策略净值和回撤。
 - 风险指标。
 - 报表汇总。
 - Backend Read Model。
@@ -87,6 +89,7 @@
 - 所有核心对象使用稳定平台业务 ID。
 - 外部 ID 与平台 ID 分开保存。
 - Order 和 Fill 分开存储。
+- MT5 场景下 Order、Deal 和 Position 分开存储，Deal 作为成交事实来源。
 - TradeCommand 和 ExecutionBatch 分开存储。
 - 当前状态和历史状态变化分开。
 - 金额和数量保留精度、币种和单位。
@@ -148,15 +151,16 @@ Order 至少保存：
 - 当前平台状态和外部原始状态。
 - 创建、提交和更新时间。
 
-Fill 至少保存：
+Fill／Deal 至少保存：
 
 - 平台和外部成交 ID。
 - Order ID。
 - 价格、数量和费用。
 - 成交时间和接收时间。
 - 原始币种和费用币种。
+- 来源系统、账户、Gateway、原始状态和原始记录引用。
 
-Fill 原则上追加保存，不因订单状态变化被覆盖。
+Fill／Deal 原则上追加保存，不因订单状态变化被覆盖。MT5 Order 不能单独形成最终成交、持仓、费用或 PnL，必须通过 Deal、Position 和账户历史确认。
 
 ## 7. 持仓与暴露
 
@@ -225,6 +229,8 @@ PnLResult 属于派生结果，应记录：
 - 最近重算时间。
 
 规则变化后可以按新版本重算，但历史正式报表保留原版本。
+
+StrategyNavSnapshot 属于固定时间策略运行净值快照，V1 公式为 `nav = equity / capitalBase`，默认计价 USDT。它不是正式 Fund NAV；未接入或未核对数据不得用前端估算静默替代。
 
 ## 10. 调整与修正
 
@@ -299,7 +305,7 @@ PnLResult 属于派生结果，应记录：
 
 缓存不得成为以下数据的唯一来源：
 
-- TradeCommand、ExecutionBatch、Order 和 Fill。
+- TradeCommand、ExecutionBatch、Order、Fill、Deal、EconomicEvent、StrategyNavSnapshot 和 PnLResult。
 - 账户余额和 Position。
 - 风险规则和审批授权。
 - 权限和审计记录。
@@ -369,6 +375,8 @@ Read Model 规则参见 `query-and-read-models.md`。
 
 - 原始事实、当前状态、快照、Read Model 和派生结果明确分开。
 - TradeCommand、ExecutionBatch、Order、Fill 和策略经济账本可追溯。
+- MT5 Deal、资金费结算、费用、Swap 和账户账本可追溯。
+- 固定时间 StrategyNavSnapshot 可追溯来源、截止时间和质量状态。
 - 损益可以基于稳定事实重算。
 - 人工修正不会覆盖原始数据。
 - Strategy Economic Ledger 不与完整财务会计总账混淆。

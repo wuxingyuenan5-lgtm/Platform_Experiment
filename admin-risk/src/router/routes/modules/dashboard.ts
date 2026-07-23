@@ -9,6 +9,7 @@ const dashboard: AppRouteModule = {
   redirect: '/home/index',
   meta: {
     title: '首页',
+    icon: 'ant-design:home-outlined',
     orderNo: 0,
     roles: [RoleEnum.ADMIN, RoleEnum.EMPLOYEE, RoleEnum.GUEST],
   },

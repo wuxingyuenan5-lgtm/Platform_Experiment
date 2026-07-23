@@ -52,6 +52,7 @@ export interface StrategyManifest {
     enabled: boolean;
     analysis: boolean;
     execution: boolean;
+    v1ExecutionScope?: 'complete' | 'simulation_only' | 'none';
   };
 
   management: {
@@ -79,7 +80,7 @@ export interface StrategyManifest {
 | `shortLineTraderL` | 短线交易员 L | 日内 | 否 | 是 | 单腿 | 单账户 |
 | `shortLineTraderW` | 短线交易员 W | 日内 | 否 | 是 | 单腿 | 单账户 |
 
-结构属性以当前已确认业务为准。若后续确认策略存在多账户、多腿或新的执行能力，应同时更新策略文档、能力矩阵和注册表。
+结构属性以当前已确认业务为准。V1 执行范围另行区分：`funding` 和 `crossSpread` 为 `complete`；`domesticOverseas` 为 `simulation_only`；`dip`、`shortLineTraderL`、`shortLineTraderW` 为 `none`。若后续确认策略存在多账户、多腿或新的执行能力，应同时更新策略文档、能力矩阵和注册表。
 
 ## 6. 模块使用规则
 
@@ -121,6 +122,8 @@ export const managementStrategies = strategyRegistry
 - 权限和风险配置。
 
 前端不得通过注册表推断策略当前是否运行、是否允许交易或实际绑定了哪些账户。
+
+注册表中的 `platform.enabled = true` 只代表交易平台存在入口，不代表 V1 可提交真实执行命令。真实交易能力由后端 TradingPermissionState、GatewayCapability、StrategyInstance、账户绑定、风控和审批共同决定。
 
 ## 8. 注册表与策略配置的边界
 

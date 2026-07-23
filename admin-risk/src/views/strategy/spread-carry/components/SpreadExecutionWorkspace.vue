@@ -32,7 +32,7 @@
       variant: 'crossVenue',
       selectedVenue: 'Bybit',
       leftLegSymbol: 'XAUTUSDT.P',
-      rightLegSymbol: 'XAUUSD',
+      rightLegSymbol: 'XAUUSD+',
       selectedResolution: '30分钟',
     },
   );

@@ -120,7 +120,7 @@ Authoritative Domain Facts
 | Strategy | StrategyDefinition、StrategyVersion、StrategyInstance、StrategyAllocation、StrategyAccountBinding | Strategy Domain |
 | Market and Instrument | Venue、Instrument、ContractSpecification、InstrumentMapping、QuoteSnapshot、FxRateSnapshot | Execution Market Data |
 | Account and Position | Account、AccountOwnership、AccountPurpose、BalanceSnapshot、MarginSnapshot、Position、PositionSnapshot | Account and Position |
-| Trading and Execution | TradeIntent、TradeCommand、ExecutionBatch、ExecutionPlan、LegInstruction、Order、Fill、ManualIntervention | Trading and Execution |
+| Trading and Execution | TradeIntent、TradeCommand、ExecutionBatch、ExecutionPlan、LegInstruction、Order、Fill、Deal、ManualIntervention | Trading and Execution |
 | Runtime and Gateway | RuntimeDefinition、RuntimeInstance、RuntimeSession、GatewayDefinition、GatewayRuntime、WorkerInstance | Execution Runtime／Runtime Coordination |
 | Risk | RiskRule、RiskLimit、RiskSnapshot、RiskDecision、RiskEvent、GlobalTradingBlock | Risk |
 | Approval | ApprovalPolicy、ApprovalRequest、ApprovalDecision、ApprovalGrant | Approval and Control |
@@ -542,6 +542,7 @@ ExecutionPlan 是业务执行计划，不是 Runtime 算法进程。
 - 平台 OrderStatus 与外部状态分开。
 - 一张 Order 可以产生多笔 Fill。
 - 结果未知不能被直接标记失败后重新下单。
+- MT5 场景下 Order 不等于 Deal，不能单独形成成交、持仓和 PnL。
 
 ### 8.8 ExternalOrderReference
 
@@ -562,12 +563,14 @@ platformOrderId
 稳定身份：
 
 - `fillId`。
+- `dealId`，适用于 MT5 或其他以 Deal 为核心事实的外部系统。
 
 规则：
 
 - 原则上追加保存。
 - 不因 Order 状态变化而覆盖。
 - 保留外部成交 ID、价格、数量、费用、发生时间和接收时间。
+- MT5 Deal 必须保留 Broker server time、Account、Gateway、Position 关联、Commission、Swap 和原始记录引用。
 
 ### 8.10 ManualIntervention
 
@@ -694,6 +697,7 @@ ApprovalGrant 不替代 Capability、RiskDecision 或 AuditEvent。
 
 - Order。
 - Fill。
+- Deal。
 - Position。
 - Balance。
 - Margin。
@@ -716,6 +720,8 @@ ApprovalGrant 不替代 Capability、RiskDecision 或 AuditEvent。
 - delayed。
 - stale。
 - conflicting。
+- missing。
+- not_connected。
 - unavailable。
 - unverified。
 
@@ -806,6 +812,24 @@ ApprovalGrant 不替代 Capability、RiskDecision 或 AuditEvent。
 
 当前 Strategy PnL、Book PnL 和 Portfolio Performance 不能自动视为 Fund NAV。
 
+### 13.8 StrategyNavSnapshot
+
+表示 StrategyInstance 在固定时间生成的策略运行净值快照。
+
+V1 默认公式：
+
+```text
+nav = equity / capitalBase
+```
+
+规则：
+
+- 默认计价 USDT。
+- 必须保留 snapshotTime、valuationDate、dataAsOf、generatedAt、source 和 DataQualityState。
+- 资费套利和跨所价差优先落地。
+- 海内外价差、抄底、短线交易员 L/W 在数据未接入或未核对时只显示 estimated、missing、not_connected 或 unverified。
+- StrategyNavSnapshot 不等于正式 Fund NAV。
+
 ## 14. Query、Read Model 与 Report
 
 ### 14.1 Backend Read Model
@@ -884,14 +908,14 @@ period / interval，适用时
 | LegalEntity、Fund、Portfolio、Book | Fund／Portfolio Domain |
 | StrategyDefinition、Version、Instance、Allocation、Binding | Strategy Domain |
 | Instrument、ContractSpecification、Mapping | Execution Market Data |
-| 平台 TradeCommand、ExecutionBatch、Plan、Order、Fill | Trading and Execution |
+| 平台 TradeCommand、ExecutionBatch、Plan、Order、Fill、Deal | Trading and Execution |
 | 外部订单、成交、余额和持仓原始事实 | External System；平台保存标准化事实 |
 | Runtime、Gateway、Worker 实时状态 | Execution Runtime；平台保存控制面投影 |
 | Account 主档、Balance、Margin、Position | Account and Position |
 | RiskRule、Decision、Event、Block | Risk |
 | Approval | Approval and Control |
 | Reconciliation 和 Data Quality | Reconciliation and Data Quality |
-| EconomicEvent、LedgerEntry、PnLResult | PnL and Strategy Economic Ledger |
+| EconomicEvent、LedgerEntry、PnLResult、StrategyNavSnapshot | PnL and Strategy Economic Ledger |
 | AuditEvent | Audit |
 | Backend Read Model | Query and Read Models，可重建 |
 | Frontend State | 非权威 |
@@ -907,8 +931,8 @@ period / interval，适用时
 6. TradeCommand accepted 不等于交易完成。
 7. ExecutionBatchStatus、ExecutionBalanceStatus 和 ExposureStatus 分开。
 8. platformOrderId 在外部提交前创建。
-9. 一张 Order 可以有多笔 Fill。
-10. Fill、FundingSettlement 和 Swap 等事实原则上追加保存。
+9. 一张 Order 可以有多笔 Fill；MT5 Order 不等于 Deal。
+10. Fill、Deal、FundingSettlement 和 Swap 等事实原则上追加保存。
 11. Runtime OMS 和 Journal 不成为平台永久权威。
 12. 外部 DTO 不进入核心领域。
 13. 缺失数据不静默当零。
@@ -920,7 +944,7 @@ period / interval，适用时
 
 ## 18. 初期最小实现集
 
-第一阶段后端和 Fake Gateway 只需要实现以下对象即可验证主链路：
+V1 最小实现集需要支持 Fake Gateway、首个 Crypto 真实 API 模拟/测试链路，以及首个 MT5 Demo/Worker 链路。以下对象用于验证资费套利和跨所价差主链路：
 
 ```text
 LegalEntity
@@ -942,12 +966,17 @@ ExecutionPlan
 LegInstruction
 Order
 Fill
+Deal
 Position
 BalanceSnapshot
+PositionSnapshot
 EconomicEvent
 PnLResult
+StrategyNavSnapshot
 RiskDecision
-ReconciliationResult
+ReconciliationRun
+ReconciliationDifference
+RecoveryRun
 RuntimeInstance
 GatewayRuntime
 WorkerInstance
@@ -962,7 +991,8 @@ AuditEvent
 - 完整 Fund NAV。
 - 完整 Finance Ledger。
 - 复杂多 Book 管理。
-- CTP 实盘。
+- CTP、国内真实交易、平今/平昨、换月和结算级对账。
+- 客户/投资者权限、客户门户和份额系统。
 - 金融AI分析专项对象。
 
 ## 19. 从领域模型到工程

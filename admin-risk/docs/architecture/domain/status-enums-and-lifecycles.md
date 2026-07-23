@@ -57,6 +57,7 @@
 | `duplicated` | 存在重复记录 |
 | `conflicted` | 来源或结果冲突 |
 | `unverified` | 尚未核对 |
+| `not_connected` | 外部数据源、账户或接口尚未接入 |
 | `invalid` | 格式或业务规则无效 |
 | `unavailable` | 来源当前不可用 |
 
@@ -241,7 +242,54 @@ Fill 原则上是不可变事实，但修正和冲销需要显式状态。
 | `reversed` | 已被外部或平台确认冲销 |
 | `unallocated` | 无法归属 Order／Strategy |
 
-## 15. ExecutionBalanceStatus
+## 15. DealStatus
+
+Deal 主要用于 MT5 等以成交记录为核心事实来源的外部系统。Crypto 场景可继续使用 Fill，但如果外部也提供独立成交/账本事实，应保留原始外部 ID。
+
+| 状态码 | 含义 |
+|---|---|
+| `received` | 已从外部系统摄取 |
+| `verified` | 已完成账户、订单、持仓和费用核对 |
+| `unverified` | 尚未完成核对 |
+| `corrected` | 已通过修正记录替代或调整 |
+| `reversed` | 已被外部或平台确认冲销 |
+| `unallocated` | 无法归属 Order／StrategyInstance |
+
+MT5 Order 不等于 Deal；PnL、Position 和费用必须以 Deal、Position、账户历史和对账结果确认。
+
+## 16. EconomicEventStatus
+
+适用于 FundingSettlement、Commission、Swap、Fee、CashFlow、Transfer 和其他会影响 PnL/净值的经济事实。
+
+| 状态码 | 含义 |
+|---|---|
+| `received` | 已摄取外部事实 |
+| `estimated` | 来自估算或预测，不可作为已实现收益 |
+| `provisional` | 初步入账，等待核对 |
+| `verified` | 已完成必要核对 |
+| `corrected` | 已通过修正记录调整 |
+| `reversed` | 已被冲销 |
+| `unallocated` | 无法归属 StrategyInstance、Account 或 ExecutionBatch |
+
+资费套利的资金费收入必须以 `verified` 或明确标记的 `provisional` FundingSettlement/账户账本记录进入 PnL；Funding Rate 本身不能直接形成已实现收益。
+
+## 17. StrategyNavSnapshotStatus
+
+V1 净值是策略运行净值，不是正式 Fund NAV。
+
+| 状态码 | 含义 |
+|---|---|
+| `scheduled` | 固定时间快照已计划 |
+| `calculating` | 正在计算 |
+| `estimated` | 依赖估算或未完整核对数据 |
+| `provisional` | 初步结果，可继续修订 |
+| `verified` | 已完成必要核对 |
+| `failed` | 计算失败 |
+| `superseded` | 被后续快照或重算版本替代 |
+
+V1 默认公式为 `nav = equity / capitalBase`，计价以 USDT 为主。海内外价差、抄底和短线交易员 L/W 若数据未接入，只能展示 `estimated`、`missing`、`not_connected` 或 `unverified` 口径，不展示正式净值。
+
+## 18. ExecutionBalanceStatus
 
 | 状态码 | 含义 |
 |---|---|
@@ -253,7 +301,7 @@ Fill 原则上是不可变事实，但修正和冲销需要显式状态。
 | `manual_override` | 经授权接受当前偏差 |
 | `unknown` | 无法可靠计算 |
 
-## 16. ExposureStatus
+## 19. ExposureStatus
 
 | 状态码 | 含义 |
 |---|---|
@@ -265,7 +313,7 @@ Fill 原则上是不可变事实，但修正和冲销需要显式状态。
 | `outside_limit` | 暴露超出限制 |
 | `unknown` | 无法确认 |
 
-## 17. PositionQualityStatus
+## 20. PositionQualityStatus
 
 Position 自身不使用简单“正常／异常”代替来源质量。
 
@@ -278,7 +326,7 @@ Position 自身不使用简单“正常／异常”代替来源质量。
 | `unverified` | 尚未核对 |
 | `unknown` | 来源或状态未知 |
 
-## 18. ReconciliationStatus
+## 21. ReconciliationStatus
 
 | 状态码 | 含义 |
 |---|---|
@@ -292,7 +340,7 @@ Position 自身不使用简单“正常／异常”代替来源质量。
 | `accepted_difference` | 经授权接受差异 |
 | `failed` | 核对任务失败 |
 
-## 19. RiskStatus
+## 22. RiskStatus
 
 | 状态码 | 含义 |
 |---|---|
@@ -305,7 +353,7 @@ Position 自身不使用简单“正常／异常”代替来源质量。
 | `insufficient_data` | 数据不足 |
 | `unknown` | 状态未知 |
 
-## 20. ApprovalStatus
+## 23. ApprovalStatus
 
 | 状态码 | 含义 |
 |---|---|
@@ -320,7 +368,7 @@ Position 自身不使用简单“正常／异常”代替来源质量。
 
 审批状态不替代目标对象状态。
 
-## 21. DeploymentEnvironment
+## 24. DeploymentEnvironment
 
 | 状态码 | 含义 |
 |---|---|
@@ -331,16 +379,18 @@ Position 自身不使用简单“正常／异常”代替来源质量。
 
 DeploymentEnvironment 不表示是否产生真实订单。
 
-## 22. TradingMode
+## 25. TradingMode
 
 | 状态码 | 含义 |
 |---|---|
-| `demo` | 前端演示或静态 Mock |
+| `demo` | 前端演示、静态 Mock 或纯产品演示，不代表外部交易链路 |
 | `simulation` | 平台模拟执行 |
-| `paper` | 外部模拟账户或测试交易通道 |
+| `paper` | 外部模拟账户、测试网、交易所 Paper Trading、MT5 Demo 或受控非 Live 交易通道 |
 | `live` | 真实资金和真实订单 |
 
-## 23. TradingPermissionState
+V1 的真实 API 模拟盘、测试网、受控账户和 MT5 Demo 应归入 `paper` 或受限测试配置；不得因为连接了真实 SDK 就自动视为 `live`。
+
+## 26. TradingPermissionState
 
 | 状态码 | 含义 |
 |---|---|
@@ -353,7 +403,7 @@ DeploymentEnvironment 不表示是否产生真实订单。
 
 由服务端综合权限、环境、模式、审批、风险、账户、行情和 Runtime 状态形成。
 
-## 24. RuntimeStatus
+## 27. RuntimeStatus
 
 | 状态码 | 含义 |
 |---|---|
@@ -373,7 +423,7 @@ DeploymentEnvironment 不表示是否产生真实订单。
 
 Runtime `ready` 不表示所有 Gateway 都可 Live 交易。
 
-## 25. WorkerStatus
+## 28. WorkerStatus
 
 | 状态码 | 含义 |
 |---|---|
@@ -388,7 +438,7 @@ Runtime `ready` 不表示所有 Gateway 都可 Live 交易。
 | `crashed` | 非正常退出 |
 | `failed` | 无法自动恢复 |
 
-## 26. GatewayConnectivityStatus
+## 29. GatewayConnectivityStatus
 
 只表达网络或 Session 连通性。
 
@@ -403,7 +453,7 @@ Runtime `ready` 不表示所有 Gateway 都可 Live 交易。
 | `failed` | 连接失败 |
 | `unknown` | 无法确认 |
 
-## 27. GatewayAuthenticationStatus
+## 30. GatewayAuthenticationStatus
 
 | 状态码 | 含义 |
 |---|---|
@@ -414,7 +464,7 @@ Runtime `ready` 不表示所有 Gateway 都可 Live 交易。
 | `expired` | 会话或凭证过期 |
 | `unknown` | 无法确认 |
 
-## 28. GatewaySynchronizationStatus
+## 31. GatewaySynchronizationStatus
 
 | 状态码 | 含义 |
 |---|---|
@@ -427,7 +477,7 @@ Runtime `ready` 不表示所有 Gateway 都可 Live 交易。
 | `failed` | 同步失败 |
 | `unknown` | 无法确认 |
 
-## 29. GatewayReadinessStatus
+## 32. GatewayReadinessStatus
 
 综合表达 Gateway 是否可以接受当前类别命令。
 
@@ -441,7 +491,7 @@ Runtime `ready` 不表示所有 Gateway 都可 Live 交易。
 | `blocked` | 被平台或运行状态阻断 |
 | `unknown` | 无法可靠判断 |
 
-## 30. TradingCapabilityStatus
+## 33. TradingCapabilityStatus
 
 | 状态码 | 含义 |
 |---|---|
@@ -456,7 +506,7 @@ Runtime `ready` 不表示所有 Gateway 都可 Live 交易。
 
 `connected`、`authenticated`、`in_sync` 和 `live_enabled` 是不同维度。
 
-## 31. MarketDataCapabilityStatus
+## 34. MarketDataCapabilityStatus
 
 | 状态码 | 含义 |
 |---|---|
@@ -468,7 +518,7 @@ Runtime `ready` 不表示所有 Gateway 都可 Live 交易。
 | `degraded` | 部分行情能力异常 |
 | `unavailable` | 当前不可用 |
 
-## 32. RecoveryStatus
+## 35. RecoveryStatus
 
 | 状态码 | 含义 |
 |---|---|
@@ -482,7 +532,7 @@ Runtime `ready` 不表示所有 Gateway 都可 Live 交易。
 | `completed_with_differences` | 恢复完成但保留已知差异 |
 | `failed` | 恢复失败 |
 
-## 33. PnLResultStatus
+## 36. PnLResultStatus
 
 | 状态码 | 含义 |
 |---|---|
@@ -497,7 +547,7 @@ Runtime `ready` 不表示所有 Gateway 都可 Live 交易。
 
 `final` 仅对特定 PnLResult／ReportVersion 有效，不代表正式 Fund NAV。
 
-## 34. ImportStatus
+## 37. ImportStatus
 
 | 状态码 | 含义 |
 |---|---|
@@ -512,7 +562,7 @@ Runtime `ready` 不表示所有 Gateway 都可 Live 交易。
 | `failed` | 失败 |
 | `cancelled` | 已取消 |
 
-## 35. 状态变化记录
+## 38. 状态变化记录
 
 至少记录：
 
@@ -527,7 +577,7 @@ Runtime `ready` 不表示所有 Gateway 都可 Live 交易。
 - 操作人，适用时。
 - version。
 
-## 36. 前端展示映射
+## 39. 前端展示映射
 
 前端可以映射中文文案、颜色、图标、操作建议和按钮状态，但不得改变语义。
 
@@ -538,8 +588,11 @@ Runtime `ready` 不表示所有 Gateway 都可 Live 交易。
 - 将 `connected` 展示为“实盘可交易”。
 - 将 `production` 展示为“Live 已启用”。
 - 将 `estimated` PnL 展示为正式锁定结果。
+- 将 `paper` 展示为“实盘”。
+- 将 MT5 `Order` 展示为“已成交”。
+- 将 Funding Rate 展示为“已入账收益”。
 
-## 37. 新增和兼容规则
+## 40. 新增和兼容规则
 
 新增状态前必须确认：
 
@@ -557,10 +610,11 @@ Runtime `ready` 不表示所有 Gateway 都可 Live 交易。
 - 默认不得扩大交易风险。
 - 记录兼容性指标和告警。
 
-## 38. 验收标准
+## 41. 验收标准
 
 - 同一状态码跨系统语义一致。
 - TradeCommand、RuntimeCommand、ExecutionBatch、LegInstruction 和 Order 生命周期分开。
+- Order、Fill、Deal、EconomicEvent 和 StrategyNavSnapshot 生命周期分开。
 - 配平、暴露、风险、数据质量和持仓来源状态分开。
 - Runtime、Worker 和 Gateway 状态分开。
 - Gateway 连通、认证、同步、就绪和交易能力分开。

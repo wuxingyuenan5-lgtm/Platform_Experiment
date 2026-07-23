@@ -38,7 +38,7 @@
 本文不负责：
 
 - 定义具体策略公式，策略公式以六份策略文档为准。
-- 确定 V1 范围和开发排期。
+- 取代已确认的 V1 范围和开发排期。当前 V1 范围以资费套利、跨所价差完整闭环，海内外价差分析/模拟/预留，金融AI分析暂缓为准。
 - 设计完整投资人、份额和法定基金会计系统。
 - 选择数据库、云厂商和数据供应商。
 - 决定金融AI分析数据产品。
@@ -403,6 +403,7 @@ StrategyInstance
 - LedgerEntry。
 - AdjustmentEntry。
 - ValuationSnapshot。
+- StrategyNavSnapshot。
 - PnLResult。
 - PnLAttribution。
 - TradeCycle 等派生分析对象。
@@ -636,7 +637,7 @@ USDT／USD 不默认永久固定 1:1，策略可以配置简化口径，但必�
 
 - PnLResult。
 - PnLAttribution。
-- Strategy NAV／NetValue。
+- StrategyNavSnapshot／Strategy NetValue。
 - Risk Metrics。
 - Research Indicator。
 - Report Artifact。
@@ -648,7 +649,7 @@ USDT／USD 不默认永久固定 1:1，策略可以配置简化口径，但必�
 
 | 数据 | 事实来源 | 平台主责 | 说明 |
 |---|---|---|---|
-| 外部订单和成交 | Exchange／Broker／MT5／CTP | Trading 标准化并持久化 | 外部事实与平台状态均保留 |
+| 外部订单和成交 | Exchange／Broker／MT5／后续 CTP | Trading 标准化并持久化 | 外部事实与平台状态均保留；MT5 Deal 是成交事实 |
 | 账户余额和持仓 | 外部账户 | Account | 平台可推导，但必须对账 |
 | TradeCommand 和 ExecutionBatch | Platform | Trading | 外部组件不拥有 |
 | StrategyVersion 和绑定 | Platform | Strategy | 版本不可无痕修改历史 |
@@ -763,7 +764,7 @@ EconomicEvent
 
 - Strategy PnLResult 不自动等于 Fund NAV。
 - Fund NAV 还可能包含基金费用、现金、应收应付、估值调整和份额变动。
-- 当前可以提供内部 Strategy／Portfolio NetValue，但必须标记口径和非正式 NAV 属性。
+- 当前可以提供内部 StrategyNavSnapshot／Portfolio NetValue，但必须标记口径和非正式 NAV 属性。V1 策略净值默认 `nav = equity / capitalBase`，以 USDT 为主。
 
 ## 12. 对账架构
 
@@ -827,6 +828,7 @@ ReconciliationDifference 至少表达：
 - `conflicted`。
 - `unverified`。
 - `missing`。
+- `not_connected`。
 - `invalid`。
 - `reconciling`。
 - `corrected`。
@@ -891,7 +893,7 @@ ReconciliationDifference 至少表达：
 保存：
 
 - Fund、Portfolio、Book、Strategy 和 Account 主数据。
-- TradeCommand、ExecutionBatch、Order、Fill。
+- TradeCommand、ExecutionBatch、Order、Fill、Deal。
 - Risk、Approval、Reconciliation。
 - EconomicEvent、LedgerEntry 和 PnL 元数据。
 - Audit、Configuration、Outbox 和 Inbox。
@@ -1060,7 +1062,7 @@ ImportBatch 至少记录：
 
 | 数据类型 | 推荐方向 |
 |---|---|
-| Order、Fill、EconomicEvent、PnL、Approval、Audit | 长期保留 |
+| Order、Fill、Deal、EconomicEvent、PnL、StrategyNavSnapshot、Approval、Audit | 长期保留 |
 | Account／Position Snapshot | 按频率和业务价值分层保留 |
 | Tick／OrderBook | 按策略、合规和成本决定 |
 | Kline 和 Research Data | 长期或可重建保存 |
@@ -1086,7 +1088,7 @@ ImportBatch 至少记录：
 - 配置和 SecretReference 恢复。
 - Schema 和迁移版本恢复。
 - Outbox／Inbox 恢复。
-- 恢复后的 Order、Fill、Position、Account、EconomicEvent、PnL、Approval 和 Audit 对账。
+- 恢复后的 Order、Fill、Deal、Position、Account、EconomicEvent、StrategyNavSnapshot、PnL、Approval 和 Audit 对账。
 
 恢复完成不等于服务启动成功；需要数据一致性和交易风险确认。
 
@@ -1122,6 +1124,7 @@ ImportBatch 至少记录：
 - LegInstruction。
 - Order。
 - Fill。
+- Deal。
 - Position。
 - Balance／Margin／Position Snapshot。
 
@@ -1142,6 +1145,7 @@ ImportBatch 至少记录：
 - AdjustmentEntry。
 - PnLResult。
 - PnLAttribution。
+- StrategyNavSnapshot。
 - RecalculationRun。
 
 ## 22. 不建议初期建设
@@ -1149,6 +1153,8 @@ ImportBatch 至少记录：
 - 完整 Investor 和 ShareClass 系统。
 - 完整 Subscription／Redemption 工作流。
 - 完整 Fund Accounting 总账。
+- 完整客户/投资者、份额、申赎和客户门户权限体系。
+- CTP、国内真实交易、平今/平昨、换月和结算级对账。
 - 复杂数据湖和实时流计算平台。
 - 全量永久 Tick／OrderBook 保存。
 - 多数据库强行按领域拆分。
@@ -1180,6 +1186,8 @@ ImportBatch 至少记录：
 - 时间、businessDate、tradingDay、settlementDate 和 valuationDate 分开。
 - 外部事实、Runtime 状态、平台事实和 Read Model 权威清楚。
 - FundingRate 与 FundingSettlement 分开。
+- MT5 Order、Deal 和 Position 分开。
+- StrategyNavSnapshot 与正式 Fund NAV 分开。
 - Capital Flow 与 PnL 分开。
 - Strategy PnL 与 Fund NAV 分开。
 - 修正、调整、重算和对账不会无痕覆盖事实。
@@ -1206,7 +1214,7 @@ LegalEntity
 - 一个 Fund 是否只需要一个默认 Portfolio。
 - Book 是否作为第一阶段正式对象，还是先由 StrategyInstance 承担。
 - 账户是否存在跨 Fund 或跨 Portfolio 共享。
-- 当前内部净值是否需要命名为 Portfolio NetValue，而避免称为正式 Fund NAV。
+- 当前内部净值命名优先使用 StrategyNavSnapshot／Strategy NetValue，避免称为正式 Fund NAV。
 - Finance and Treasury 的业务范围。
 
 在这些问题确认前，本文保持 draft；其余已确定的数据分类、精度、时间、事实不可覆盖、对账和修正规则可以逐步同步到 active 文档。

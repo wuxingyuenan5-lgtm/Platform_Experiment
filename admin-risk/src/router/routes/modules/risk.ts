@@ -9,6 +9,7 @@ const risk: AppRouteModule = {
   redirect: '/risk/detail',
   meta: {
     title: '风控管理',
+    icon: 'ant-design:safety-certificate-outlined',
     orderNo: 60,
     roles: [RoleEnum.ADMIN, RoleEnum.EMPLOYEE, RoleEnum.GUEST],
   },
