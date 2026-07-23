@@ -1,10 +1,11 @@
 # V6 Phase 4A：执行风险与 Kill Switch
 
-状态：`implementation complete / acceptance pending`  
+状态：`completed / merge pending`  
 实施分支：`hardening/v6-phase4a-execution-risk`  
 跟踪 Issue：`#14 V6 Phase 4A：ExecutionBatch 风险状态机、Kill Switch 与残腿处置`  
 Pull Request：`#15 Implement V6 Phase 4A execution risk controls`  
 上级计划：Issue `#12`、`V6-交易安全加固实施计划.md`  
+最终验收：`Platform CI #185 / run 30002639120`  
 更新时间：`2026-07-23`
 
 ## 1. 阶段目标
@@ -39,9 +40,9 @@ ExecutionBatch
 1. ExecutionBatch 创建和认领之前。
 2. 每条 Leg 调用 TradeCommand 之前。
 
-任何命中的 Kill Switch 都返回 `423 Locked`，且不得创建新的 TradeCommand 或产生 Runtime/Gateway 副作用。
+命中时返回 `423 Locked`，且不得创建新的 TradeCommand 或产生 Runtime/Gateway 副作用。
 
-Kill Switch 用于阻止新增风险。风险降低型的自动平仓使用单独、可审计的 RiskAction，不被普通 Batch 写入口替代。
+Kill Switch 用于阻止新增风险。风险降低型平仓使用单独、可审计的 RiskAction，避免系统在已有裸敞口时被锁死。
 
 ## 3. 风险策略
 
@@ -56,7 +57,7 @@ Kill Switch 用于阻止新增风险。风险降低型的自动平仓使用单�
 - `hold_and_escalate`
 - `auto_flatten`
 
-ExecutionBatch 创建后将策略快照写入 `execution_batch_risk`。后续策略修改不反向改变已创建 Batch 的风险边界。
+ExecutionBatch 创建后将策略快照写入 `execution_batch_risk`。后续策略修改不反向改变已创建 Batch。
 
 默认值：
 
@@ -70,25 +71,40 @@ failureAction = hold_and_escalate
 
 | riskStatus | 含义 |
 |---|---|
-| `clear` | 当前没有可识别的残留敞口 |
-| `residual_exposure` | 存在未对冲敞口或无法可靠换算的混合币种敞口 |
+| `clear` | 当前没有可识别的残留方向敞口 |
+| `residual_exposure` | 存在未对冲敞口或不可可靠换算的混合币种敞口 |
 | `disposition_in_progress` | 正在执行平仓、替代对冲或其他风险动作 |
 | `resolved` | 风险动作已完成，残留风险已解除 |
 | `escalated` | 需要人工接管或外部 Venue 能力尚不完整 |
 
-Batch 业务状态与风险状态分离。`hedged` 不应仅凭两条命令提交成功判断，而应同时满足残留敞口为零且数据质量完整。
+Batch 业务状态与风险状态分离。`failed` 不代表无风险；`hedged` 也不能只凭两条命令提交成功判断。
 
 ## 5. 残留敞口
 
-残留敞口优先使用实际 Fill：
+Phase 4A 最终采用“先净合约 Delta，再折算未匹配名义金额”的口径：
 
 ```text
-Fill Quantity × Fill Price × Contract Multiplier
+signed contract delta
+= side sign × fill quantity × contract multiplier
 ```
 
-没有 Fill 但存在限价时，使用请求数量和价格作为保守回退。市场单既无 Fill 又无价格时，数据质量为 `incomplete`。
+同一 Base Currency 与 Quantity Unit 的多条腿先净额：
 
-同一结算币种按买入为正、卖出为负净额计算。多结算币种在没有正式风险 FX 快照时使用保守绝对值合计，币种标记为 `MIXED`、数据质量标记为 `incomplete`，不得伪装成已完全对冲。
+```text
+unmatched delta = sum(signed contract delta)
+residual notional = abs(unmatched delta) × conservative reference price
+```
+
+因此，两条数量与 Contract Multiplier 完全匹配、方向相反的腿，即使成交价格不同，也属于已对冲方向风险；价格差进入策略收益，不应被误判为残留方向敞口。
+
+数据来源：
+
+- 优先使用实际 Fill Quantity 与 Fill Price。
+- 没有 Fill 但存在限价时，使用请求数量和价格作为保守回退。
+- 市场单既无 Fill 又无价格时，状态为 `incomplete`。
+- 多 Base／Quantity Unit 或多结算币种无法可靠比较时，返回 `MIXED / incomplete` 和保守绝对值合计。
+
+正式算法位于 `platform-backend/app/execution_exposure.py`，由组合入口注入 Execution Risk 模块，便于 Phase 4 后续继续拆分过大的风险模块。
 
 ## 6. 风险处置动作
 
@@ -114,7 +130,7 @@ Fill Quantity × Fill Price × Contract Multiplier
 
 ### 6.4 substitute_hedge
 
-调用方提供完整替代 Leg，经正式 TradeCommand 提交。替代命令成交后可以将 Batch 风险标记为 resolved；失败或未知时继续升级人工处理。
+调用方提供完整替代 Leg，经正式 TradeCommand 提交。替代命令成交后可标记 resolved；失败或未知时继续升级人工处理。
 
 ## 7. API
 
@@ -132,8 +148,6 @@ POST /api/v1/trading/execution-batches/{batchId}/risk-actions
 
 ## 8. 审计事件
 
-至少记录：
-
 - `kill_switch_changed`
 - `execution_risk_policy_changed`
 - `execution_batch_risk_state_changed`
@@ -144,24 +158,29 @@ POST /api/v1/trading/execution-batches/{batchId}/risk-actions
 ## 9. 金样本
 
 1. Global Kill Switch 开启后 Batch 在认领前返回 423，数据库中没有 Batch 和 TradeCommand。
-2. 第一腿名义敞口为 100，策略阈值为 50 时，第二腿不提交并进入 escalated。
-3. 第一腿成交、第二腿 result_unknown，failureAction=auto_flatten 时，生成一条反向 TradeCommand，最终 Position 回到零。
+2. 第一腿方向名义敞口为 100、策略阈值为 50 时，第二腿不提交并进入 escalated。
+3. 第一腿成交、第二腿 result_unknown，failureAction=auto_flatten 时生成反向 TradeCommand，最终 Position 回到零。
 4. 同一 RiskAction 幂等键重复提交只返回原动作，不产生第二次平仓。
 5. 同一幂等键使用不同动作载荷返回 409。
 6. firstFillAt 到下一腿超过 maxLegDelaySeconds 时阻止继续执行。
+7. 两条反向腿数量相同但成交价格不同，Batch 仍正确标记 hedged，而不是把价差误判为方向敞口。
 
-## 10. 验收清单
+## 10. 验收记录
 
-- [x] Kill Switch 具备 global、strategy、account 作用域。
-- [x] Kill Switch 写入幂等且载荷冲突返回 409。
-- [x] Batch 创建前与每腿执行前均检查 Kill Switch。
-- [x] 风险策略按 Batch 快照固定。
-- [x] 实际 Fill、Contract Multiplier 和结算币种进入残留敞口。
-- [x] 自动平仓经过 TradeCommand。
-- [x] RiskAction 幂等且有审计记录。
-- [x] Kill Switch、超限、自动平仓、重复动作和腿间超时有测试。
-- [ ] Platform CI 全部通过并记录最终 Run ID。
-- [ ] PR、Issue、README、START-HERE、API Spec、Release Gate 和 Changelog 完成最终留痕。
+最终验收：`Platform CI #185 / run 30002639120`
+
+| 检查 | 结果 |
+|---|---|
+| Platform Backend Phase 4 strict Ruff Gate | 通过 |
+| Platform Backend 全量 Ruff 与 Pytest | 通过，45 项测试 |
+| Execution Runtime strict Ruff、全量 Ruff 与 Pytest | 通过 |
+| Frontend frozen install、type-check、production build | 通过 |
+| Kill Switch 创建前阻断 | 通过 |
+| 残留敞口阈值与腿间时间 | 通过 |
+| 自动平仓与 Position 回零 | 通过 |
+| RiskAction 幂等与载荷冲突 | 通过 |
+| 价差与方向敞口正确区分 | 通过 |
+| README、START-HERE、API Spec、技术设计、Release Gate、Changelog | 已同步 |
 
 ## 11. 明确延期
 
