@@ -1,3 +1,7 @@
+[build-system]
+requires = ["setuptools>=75", "wheel"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "variable-global-execution-runtime"
 version = "0.1.1"
@@ -25,6 +29,10 @@ all-gateways = [
   "pybit>=5.17,<6.0",
   "MetaTrader5>=5.0,<6.0",
 ]
+
+[tool.setuptools.packages.find]
+include = ["app*"]
+exclude = ["tests*", "mt5*"]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
