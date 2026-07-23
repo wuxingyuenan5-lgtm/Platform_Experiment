@@ -28,7 +28,9 @@ def validate_live_write(
     if command.symbol.upper() not in settings.allowed_live_symbols:
         raise GatewayConfigurationError("Symbol is not in the live allowlist")
     if reference_price <= 0:
-        raise GatewayConfigurationError("A positive reference price is required for live risk checks")
+        raise GatewayConfigurationError(
+            "A positive reference price is required for live risk checks"
+        )
     if settings.live_max_order_notional <= 0:
         raise GatewayConfigurationError("Live maximum order notional is not configured")
     if settings.live_max_daily_notional <= 0:
