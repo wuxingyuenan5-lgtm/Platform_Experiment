@@ -1,36 +1,66 @@
 # Project Agent Rules
 
-## Safety
+## Project Identity
 
-- 禁止批量删除文件或目录。
-- 不要使用 `del /s`, `rd /s`, `rmdir /s`, `Remove-Item -Recurse`, or `rm -rf`.
-- 需要删除文件时，只能一次删除一个明确路径的文件。
-- 不得提交真实密钥、密码、Token 或 `.env` 内容。
-- 不得自行修改交易、权限、部署、数据库结构等高风险逻辑。
+This is an internal quantitative research and trading infrastructure platform.
 
-## Working Project
+Primary objective:
 
-- Main project root: `C:\Users\jiuxi\Desktop\codex\平台后端测试`
-- Preferred frontend URL: `http://127.0.0.1:5173/index.html#/strategy/platform`
-- Preferred backend API: `http://127.0.0.1:8000/api/v1`
+- Maintain a reliable path from research, strategy execution, risk control to accounting verification.
+- Prefer correctness, auditability and small safe changes over rapid feature expansion.
 
-## Path Ownership
+## Architecture Map
 
-- `admin-risk/`: frontend application. Do not move in Phase 1.
-- `platform-backend/`: platform backend. Do not move in Phase 1.
-- `execution-runtime/`: execution gateway. Do not move in Phase 1.
-- `references/`: external material and imported reference code.
-- `outputs/`: generated deliverables and temporary artifacts.
-- `tasks/`: scoped work packets.
+```text
+admin-risk/          Frontend product application
+platform-backend/    Business APIs, strategy, risk, accounting
+execution-runtime/   External execution gateway and runtime journal
+docs/                Architecture and operational documentation
+```
 
-## Search Hygiene
+## Safety Rules
 
-- Prefer `rg` for project search.
-- Do not search `node_modules`, `.venv`, `dist`, or `outputs` unless the user explicitly asks for dependency/generated-output inspection.
-- Large external reference code now lives outside the project root at `C:\Users\jiuxi\Desktop\codex\平台设计其他辅助内容\平台移动文件夹，例如参考代码等\参考代码`; inspect only explicit subprojects when requested.
-- Use `5173` as the frontend reference port unless the user asks about another running instance.
+- Never commit secrets, passwords, tokens or `.env` contents.
+- Never enable real trading by code change alone.
+- Do not bypass tests, CI, approval or risk controls.
+- Do not modify trading, permission, database or deployment boundaries without explicit task scope.
+- Do not perform recursive deletion.
 
-## UI Policy
+## Development Rules
 
-- Do not add backend test panels, debug dashboards, or implementation-explanation cards to production-facing pages unless explicitly requested.
-- Product screens should prioritize dense, operational workflows over decorative marketing layouts.
+- Make the smallest complete change.
+- Keep code, tests and relevant Markdown documentation synchronized.
+- Prefer existing architecture patterns over introducing new frameworks.
+- Use `rg` for search.
+- Ignore `node_modules`, `.venv`, `dist`, generated outputs and external references unless explicitly required.
+
+## Task Context Rules
+
+Before editing:
+
+1. Read this file.
+2. Read only the target module documentation.
+3. Do not load the entire repository unless architecture work requires it.
+
+Module context:
+
+- Frontend tasks → `admin-risk/` + frontend docs.
+- Backend tasks → `platform-backend/` + backend docs.
+- Runtime tasks → `execution-runtime/` + execution docs.
+- Operations tasks → `docs/operations/`.
+
+## Product UI
+
+- Production pages show user workflows only.
+- Do not add debug panels, implementation explanations or engineering notes to product interfaces.
+
+## Current Default Runtime
+
+```text
+TradingMode=simulation
+Gateway=fake
+Platform Live Write=false
+Runtime Live Write=false
+```
+
+Live execution requires existing approval, risk and operational gates.
