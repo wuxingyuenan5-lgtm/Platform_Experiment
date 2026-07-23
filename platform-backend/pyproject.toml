@@ -31,3 +31,6 @@ select = ["E", "F", "I", "UP", "B"]
 # FastAPI route metadata is intentionally declared in the function signature.
 # The quoted self-return annotation keeps the validator compatible with Pydantic's runtime model build.
 "app/financial_facts.py" = ["B008", "UP037"]
+# Phase 4A keeps the complete risk state machine in one auditable module; long SQL/error lines
+# and Pydantic's quoted self annotation are accepted until the Phase 4 module split.
+"app/execution_risk.py" = ["E501", "UP037"]
