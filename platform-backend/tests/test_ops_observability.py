@@ -25,6 +25,7 @@ def test_reconciliation_summary_reports_unknown_orders_and_manual_batches(
     monkeypatch.setattr("app.trading.httpx.post", runtime_post)
 
     payload = {
+        "idempotencyKey": "ops-manual-batch-001",
         "strategyInstanceId": "strategy_funding_arbitrage_instance_default",
         "strategyKey": "funding_arbitrage",
         "direction": "manual_intervention_case",
