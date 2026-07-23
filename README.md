@@ -60,6 +60,7 @@ outputs/             临时产物
 - 具体模块修改只加载对应模块文档，不默认扫描整个仓库。
 - 不提交密钥、Token 或 `.env`。
 - 未通过测试和 CI 的改动不得进入正式分支。
+- Backend 与 Runtime 的 Ruff、依赖完整性和测试按完整维护目录执行，不以文件白名单豁免新增代码。
 - `platform-backend/app/main.py` 仅负责 Router 与 Middleware 装配，不得通过运行时赋值修改领域模块。
 
 ## 常用命令
@@ -76,6 +77,8 @@ pnpm build
 
 ```powershell
 cd platform-backend
+python -m ruff check app tests
+python -m pip check
 python -m pytest
 ```
 
@@ -83,5 +86,7 @@ Runtime：
 
 ```powershell
 cd execution-runtime
+python -m ruff check app tests
+python -m pip check
 python -m pytest
 ```
