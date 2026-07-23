@@ -5,20 +5,25 @@
 ## 当前权威基线
 
 - 正式分支：`main`
-- 当前 main：`b3fc45e4e03ab16af1cce155106ea972cc22f331`
-- 当前状态：Phase 2 已完成，下一阶段为金融事实与账务正确性
+- 当前 main：`17066f39254314a421ffb91b05520d2a972129ec`
+- 当前实施：Phase 3 不可变金融事实、正式 PnL 与统一估值 NAV
 - 总跟踪：GitHub Issue `#2`
-- Phase 2：Issue `#4`、PR `#5`
+- Phase 1：PR `#3`，已完成
+- Phase 2：Issue `#4`、PR `#5`，已完成
+- Phase 3：Issue `#7`、PR `#8`
 - 总计划：`docs/planning/V6-交易安全加固实施计划.md`
-- Phase 2 记录：`docs/planning/V6-Phase2-命令入口与结果恢复.md`
+- Phase 3 计划：`docs/planning/V6-Phase3-金融事实与正式账务.md`
 
-当前系统只允许 Simulation / Fake Gateway，不开放 Paper 或真实资金 Live。
+当前系统只允许 Simulation / Fake Gateway，不开放 Paper、Demo 或真实资金 Live。
 
 ## 先看这里
 
 | 你要做什么 | 入口 |
 |---|---|
 | 看总体工程计划 | `docs/planning/V6-交易安全加固实施计划.md` |
+| 看当前 Phase 3 | `docs/planning/V6-Phase3-金融事实与正式账务.md` |
+| 看 FinancialFact 与正式账务设计 | `docs/technical/FINANCIAL_FACTS.md` |
+| 看正式 API 口径 | `docs/technical/API_SPEC.md` |
 | 看已完成 Phase 2 | `docs/planning/V6-Phase2-命令入口与结果恢复.md` |
 | 改前端界面 | `admin-risk/src/views` |
 | 看策略平台页面 | `http://127.0.0.1:5173/index.html#/strategy/platform` |
@@ -70,12 +75,46 @@ POST /api/v1/trading/orders/{orderId}/reconcile
 - `/api/v1/trading/orders` 仅作为 deprecated 兼容入口，禁止新业务继续依赖。
 - `result_unknown` 只能查询恢复，不能直接重下。
 
+## Phase 3 正式金融核对入口
+
+不可变事实：
+
+```http
+POST /api/v1/financial-facts
+GET  /api/v1/financial-facts
+```
+
+可重建投影：
+
+```http
+POST /api/v1/strategies/instances/{strategyInstanceId}/financials/rebuild
+GET  /api/v1/strategies/instances/{strategyInstanceId}/formal-positions
+GET  /api/v1/strategies/instances/{strategyInstanceId}/formal-pnl
+```
+
+统一估值时点 NAV：
+
+```http
+GET  /api/v1/strategies/instances/{strategyInstanceId}/formal-nav-snapshots
+POST /api/v1/strategies/instances/{strategyInstanceId}/formal-nav-snapshots/run
+```
+
+口径：
+
+- FinancialFact 只新增，不提供修改或删除业务 API。
+- 重复事实只有在规范化载荷一致时才返回原记录；载荷冲突返回 409。
+- Quantity Unit、Settlement Currency 和 Contract Multiplier 来自后端 Catalog。
+- Formal PnL 分为 Trading、Funding、Swap、Fee、FX 和 Total。
+- Formal NAV 对全部 active binding 账户使用同一 valuationTime。
+- 缺失账户、汇率或事实时显式标记 partial／incomplete，不补零。
+- 旧 `/pnl` 与 `/nav-snapshots` 仅为工程兼容口径。
+
 ## 根目录分工
 
 | 目录 | 定位 | 当前策略 |
 |---|---|---|
 | `admin-risk/` | 正式前端工程 | Catalog 驱动，不硬编码账户和标的 ID |
-| `platform-backend/` | 业务权威后端 | Strategy、Command、Order、Fill、Position、PnL 权威 |
+| `platform-backend/` | 业务权威后端 | Strategy、Command、Order、FinancialFact、Formal Position/PnL/NAV 权威 |
 | `execution-runtime/` | 执行隔离网关 | 独立进程、Journal、命令原子抢占 |
 | `docs/` | 根级导航和执行计划 | 只放权威入口、计划和运行口径 |
 | `admin-risk/docs/` | 详细产品和架构文档 | 与代码变更同步维护 |
@@ -142,10 +181,11 @@ python -m pytest
 4. 前端不得硬编码正式账户、策略实例和 Instrument ID。
 5. 产品页面只展示用户完成业务任务所需的信息、操作和状态；开发说明、实现解释、跳转机制和联调备注不得进入正式界面。
 6. 必要提示应短、准、就近呈现；完整解释进入 Markdown 文档，不在页面主要视觉层堆叠辅助文案。
-7. 缺失持仓、PnL 和行情不得伪装为零。
+7. 缺失持仓、PnL、行情、汇率和账户事实不得伪装为零。
 8. `result_unknown` 必须先恢复和对账，不得重新提交。
-9. 每批工程改动同步更新计划、测试、API Spec、Release Gate 和 Changelog。
-10. 未通过 CI 的 PR 不得合入 main。
+9. 正式 Position、PnL 和 NAV 必须能追溯到不可变事实并支持重建。
+10. 每批工程改动同步更新计划、测试、API Spec、Release Gate 和 Changelog。
+11. 未通过 CI 的 PR 不得合入 main。
 
 ## Codex 降噪
 
