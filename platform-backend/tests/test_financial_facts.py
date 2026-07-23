@@ -39,7 +39,11 @@ def test_financial_facts_are_idempotent_rebuildable_and_componentized(
     with TestClient(app) as client:
         with connection() as db:
             db.execute(
-                "UPDATE contract_specifications SET contract_multiplier = '10' WHERE instrument_id = ?",
+                """
+                UPDATE contract_specifications
+                SET contract_multiplier = '10'
+                WHERE instrument_id = ?
+                """,
                 (INSTRUMENT_ID,),
             )
 
