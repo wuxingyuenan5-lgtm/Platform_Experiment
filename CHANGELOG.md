@@ -2,6 +2,27 @@
 
 ## Unreleased
 
+### Venue query, fact ingestion, and reconciliation differences — Phase 4B
+
+- Extended the ExecutionGateway contract with external Order, Fill, Position, Balance, and Cancel Order operations while keeping read queries separate from execution commands.
+- Added Runtime APIs for Order lookup by Platform or external ID, Fill listing, Position listing, Balance listing, and idempotent cancellation.
+- Added a persistent deterministic Fake Venue store in the Runtime Journal SQLite for Orders, Fills, Positions, Balances, and Cancel commands.
+- Derived stable Fake external identities from Platform Order IDs so repeated commands, queries, and Runtime restarts do not create duplicate external facts.
+- Added explicit unsupported query and cancel behavior for the Bybit/MT5 shell until real Demo adapters are delivered in Phase 4C.
+- Added `POST /api/v1/trading/orders/{orderId}/venue-reconcile`: Runtime Journal is checked first, then the external Order and Fills are queried without resubmitting the original order.
+- Imported external Order, Fill, Position, and Balance snapshots into the immutable Phase 3 FinancialFact layer.
+- Reused External Fill ID as the local Fill event identity so repeated Venue reconciliation does not duplicate execution or accounting projections.
+- Added account-level Venue Reconciliation Runs with idempotency keys, source, snapshot counts, fact counts, difference counts, and explicit completion status.
+- Added auditable Reconciliation Differences for missing local/external state, quantity, price, currency, and status mismatches.
+- Added immutable first-resolution semantics for Differences with `open`, `resolved`, and `accepted` statuses plus actor, reason, and time.
+- Added audit events for Venue Order reconciliation, account reconciliation completion, and Difference resolution.
+- Added Runtime tests for persistent Fake Venue state across restarts and idempotent terminal-order cancellation.
+- Added Backend tests for external recovery of `result_unknown`, non-duplicating fact replay, Formal Position reconstruction, account snapshot import, Difference resolution, and reconciliation payload conflicts.
+- Expanded Platform CI strict gates and retained Runtime/Backend pytest diagnostics as short-lived artifacts.
+- Added `docs/planning/V6-Phase4B-外部查询与对账差异.md` and `docs/technical/VENUE_RECONCILIATION.md`.
+- Synchronized the V6 plan, API Specification, Release Gate, README, START-HERE, Issue #16, PR #17, and this Changelog.
+- Retained Simulation / Fake Gateway only; real Bybit Demo, MT5 Demo, scheduled end-of-day reconciliation, continuous-run acceptance, authentication, and Live remain deferred.
+
 ### Execution risk controls and Kill Switch — Phase 4A
 
 - Added global, strategy, and account Kill Switches with idempotent writes, payload-conflict detection, versioning, actor/reason metadata, and AuditEvent records.
