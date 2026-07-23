@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from decimal import Decimal
 from uuid import uuid4
 
 from fastapi import HTTPException
@@ -89,6 +90,7 @@ def create_execution_batch(request: CreateExecutionBatchRequest) -> ExecutionBat
 
     existing_batch_id = find_batch_by_idempotency_key(request.idempotency_key)
     if existing_batch_id is not None:
+        assert_batch_request_matches(existing_batch_id, request)
         return get_execution_batch(existing_batch_id)
 
     strategy_key = resolve_strategy_key(request)
@@ -178,6 +180,7 @@ def create_execution_batch(request: CreateExecutionBatchRequest) -> ExecutionBat
                 )
 
     if existing_id is not None:
+        assert_batch_request_matches(existing_id, request)
         return get_execution_batch(existing_id)
 
     update_batch_status(batch_id, "executing")
@@ -232,6 +235,68 @@ def create_execution_batch(request: CreateExecutionBatchRequest) -> ExecutionBat
 
     update_batch_status(batch_id, "hedged")
     return get_execution_batch(batch_id)
+
+
+def assert_batch_request_matches(
+    batch_id: str,
+    request: CreateExecutionBatchRequest,
+) -> None:
+    with connection() as db:
+        batch = db.execute(
+            """
+            SELECT strategy_instance_id, account_id, strategy_key, direction
+            FROM execution_batches
+            WHERE id = ?
+            """,
+            (batch_id,),
+        ).fetchone()
+        legs = db.execute(
+            """
+            SELECT role, account_id, instrument_id, symbol, side,
+                   order_type, quantity, price
+            FROM execution_batch_legs
+            WHERE batch_id = ?
+            """,
+            (batch_id,),
+        ).fetchall()
+
+    if batch is None:
+        raise HTTPException(status_code=409, detail="Existing execution batch is unavailable")
+
+    default_account_id = request.account_id or request.legs[0].account_id
+    batch_matches = (
+        batch["strategy_instance_id"] == request.strategy_instance_id
+        and batch["account_id"] == default_account_id
+        and batch["strategy_key"] == request.strategy_key
+        and batch["direction"] == request.direction
+    )
+    stored_legs = {row["role"]: row for row in legs}
+    requested_roles = {leg.role for leg in request.legs}
+    if not batch_matches or set(stored_legs) != requested_roles:
+        raise_batch_idempotency_conflict()
+
+    for leg in request.legs:
+        row = stored_legs[leg.role]
+        requested_account_id = leg.account_id or default_account_id
+        stored_price = Decimal(row["price"]) if row["price"] is not None else None
+        leg_matches = (
+            row["account_id"] == requested_account_id
+            and row["instrument_id"] == leg.instrument_id
+            and row["symbol"] == leg.symbol
+            and row["side"] == leg.side
+            and row["order_type"] == leg.order_type
+            and Decimal(row["quantity"]) == leg.quantity
+            and stored_price == leg.price
+        )
+        if not leg_matches:
+            raise_batch_idempotency_conflict()
+
+
+def raise_batch_idempotency_conflict() -> None:
+    raise HTTPException(
+        status_code=409,
+        detail="Idempotency key is already used by a different execution batch payload",
+    )
 
 
 def update_batch_status(
