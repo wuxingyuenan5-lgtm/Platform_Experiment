@@ -1,7 +1,8 @@
 # V6 Production Gate：身份权限与双人实盘会话
 
-状态：`implementation in progress / engineering acceptance pending`  
+状态：`implementation complete / final CI and merge pending`  
 实施分支：`hardening/v6-production-gate-auth-live-sessions`  
+Pull Request：`#23 Add production authentication and two-person live sessions`  
 跟踪 Issue：`#22 V6 Production Gate：身份权限、双人审批、密钥托管、监控与恢复`  
 前置阶段：Phase 4D 已通过 PR `#21` 合入 main  
 更新时间：`2026-07-23`
@@ -14,6 +15,8 @@ Phase 4 已经形成受控实盘适配器、风险处置、外部查询和日终
 Authenticated Principal + Default-deny RBAC
 +
 Two-person approved LiveTradingSession
++
+Atomic session notional claim
 +
 Platform Live Gate + Runtime Live Gate + Kill Switch
 ```
@@ -108,10 +111,10 @@ Live Order 在写入 Order 表和调用 Runtime 之前必须：
 5. 确认 Symbol、Side、Order Type 位于范围内。
 6. 使用明确 Price 计算名义金额；当前 Live Market Order 缺价格时 fail-closed。
 7. 检查会话单笔和累计日限额。
-8. 以 Command ID 原子认领会话额度。
+8. 使用 SQLite `BEGIN IMMEDIATE` 在强事务中读取累计值并以 Command ID 写入 Claim。
 9. 再进入 Runtime Live Gate、Runtime Allowlist 和 Runtime Notional Limit。
 
-重复 Command ID 与相同载荷返回原 Claim；载荷冲突返回 409。
+重复 Command ID 与相同载荷返回原 Claim；载荷冲突返回 409。并发命令不能同时读取相同的剩余额度后共同穿透单日上限。
 
 ## 6. API
 
@@ -159,7 +162,22 @@ VG_LIVE_SESSION_ABSOLUTE_MAX_DAILY_NOTIONAL=0
 
 默认零上限和关闭 Live Trading 使系统 fail-closed。真实 Token 只在本地主机生成和注入，不进入 Git、Markdown、截图或对话。
 
-## 8. 工程验收
+## 8. Repository Secret Scan
+
+```powershell
+python .\scripts\scan-secrets.py
+```
+
+扫描范围：Git tracked files。阻断项：
+
+- 私钥块。
+- GitHub、AWS、OpenAI、Slack 等常见 Token 形式。
+- 受控字段中的高熵明文 Secret。
+- 非模板、非审核公共 Vite 配置的 tracked `.env*` 文件。
+
+审核过的 `admin-risk/.env*` 只包含公开 `VITE_*` 浏览器配置，仍继续接受 Token 和高熵内容扫描。扫描器自身 regex 源文件被单独跳过，避免确定性自匹配。
+
+## 9. 工程验收
 
 - [x] Live 匿名和错误 Credential 被拒绝。
 - [x] Development Auth 不能在 Live 使用。
@@ -171,23 +189,24 @@ VG_LIVE_SESSION_ABSOLUTE_MAX_DAILY_NOTIONAL=0
 - [x] Live Order 在 Runtime 之前认领 Approved Session。
 - [x] 无 Approved Session 的 Live Order 被拒绝。
 - [x] Session Claim 使用 Command ID 幂等。
-- [ ] 并发累计额度认领使用 SQLite 强事务并完成并发金样本。
-- [ ] CI Secret Scan 和 Secret Provider 增强完成。
-- [ ] Platform CI 全部通过并记录 Run ID。
+- [x] 并发累计额度认领使用 SQLite `BEGIN IMMEDIATE` 并具备并发金样本。
+- [x] Secret Scan 已进入 Platform CI 和独立可诊断 workflow。
+- [x] Secret Scan 独立 workflow run `30022271523` 通过。
+- [ ] Platform CI 最终全部通过并记录 Run ID。
 - [ ] README、START-HERE、API Spec、Release Gate、总计划和 Changelog 最终同步。
 
-## 9. 运营验收
+## 10. 运营验收
 
-- 真实账户只读 Preflight 通过。
-- trader 申请最小仓位窗口，risk_officer 使用不同身份批准。
-- Session 范围与 Runtime Allowlist/Limit 一致。
-- 完成限价单、撤单、最小成交和 `result_unknown` 演练。
-- 会话结束后撤销或过期，Runtime Write Gate 和限额强制复位。
-- 当日 EOD Report 为 Clean 或明确进入 Remediation。
+- [ ] 真实账户只读 Preflight 通过。
+- [ ] trader 申请最小仓位窗口，risk_officer 使用不同身份批准。
+- [ ] Session 范围与 Runtime Allowlist/Limit 一致。
+- [ ] 完成限价单、撤单、最小成交和 `result_unknown` 演练。
+- [ ] 会话结束后撤销或过期，Runtime Write Gate 和限额强制复位。
+- [ ] 当日 EOD Report 为 Clean 或明确进入 Remediation。
 
-## 10. 明确延期
+## 11. 明确延期
 
-- 密钥托管、Secret Scan 完整实现属于本 Production Gate 下一批。
-- 告警、调度、备份和恢复属于后续 Production Gate 批次。
+- SecretProvider、密钥轮换和全链路脱敏属于 Production Gate 5C。
+- 告警、调度、备份和恢复属于 Production Gate 5D。
 - Web 前端用户管理和审批界面在 API 安全边界稳定后实施。
 - 不因本批工程完成自动打开 Live Write 或扩大实盘规模。
