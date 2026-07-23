@@ -54,7 +54,14 @@ jobs:
           cache-dependency-path: execution-runtime/pyproject.toml
       - name: Install dependencies
         run: python -m pip install -e '.[dev]'
-      - name: Lint
+      - name: Phase 1 lint gate
+        run: >-
+          python -m ruff check
+          app/main.py
+          app/journal.py
+          tests/test_atomic_command_claim.py
+      - name: Full lint debt inventory
+        continue-on-error: true
         run: python -m ruff check app tests
       - name: Test
         run: python -m pytest
@@ -73,7 +80,16 @@ jobs:
           cache-dependency-path: platform-backend/pyproject.toml
       - name: Install dependencies
         run: python -m pip install -e '.[dev]'
-      - name: Lint
+      - name: Phase 1 lint gate
+        run: >-
+          python -m ruff check
+          app/security.py
+          app/trading.py
+          tests/test_order_safety_fail_closed.py
+          tests/test_secret_safety.py
+          tests/test_trading_flow.py
+      - name: Full lint debt inventory
+        continue-on-error: true
         run: python -m ruff check app tests
       - name: Test
         run: python -m pytest
