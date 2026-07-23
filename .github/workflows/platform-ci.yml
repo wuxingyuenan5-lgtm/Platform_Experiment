@@ -117,6 +117,14 @@ jobs:
             tail -n 80 /tmp/pnpm-install.log
             exit 1
           fi
+      - name: Upload install diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-install-log
+          path: /tmp/pnpm-install.log
+          if-no-files-found: ignore
+          retention-days: 3
       - name: Type check strategy frontend
         run: pnpm type:check
       - name: Build frontend
