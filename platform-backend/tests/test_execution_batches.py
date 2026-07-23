@@ -77,9 +77,9 @@ def test_execution_batch_becomes_hedged(monkeypatch, tmp_path: Path) -> None:
         lambda *args, **kwargs: filled_runtime_response(kwargs["json"]),
     )
 
-    account_id = str(uuid4())
-    spot_id = str(uuid4())
-    perp_id = str(uuid4())
+    account_id = "account_sim_usdt"
+    spot_id = "instrument_btc_usdt"
+    perp_id = "instrument_btc_usdt_perp"
 
     with TestClient(app) as client:
         response = client.post(
@@ -98,9 +98,7 @@ def test_execution_batch_becomes_hedged(monkeypatch, tmp_path: Path) -> None:
         assert spot.json()["netQuantity"] == "1"
         assert perp.json()["netQuantity"] == "-1"
 
-        stored = client.get(
-            f"/api/v1/trading/execution-batches/{batch['batchId']}"
-        )
+        stored = client.get(f"/api/v1/trading/execution-batches/{batch['batchId']}")
         assert stored.status_code == 200
         assert stored.json()["status"] == "hedged"
 
@@ -121,9 +119,9 @@ def test_second_leg_unknown_requires_manual_intervention(
 
     monkeypatch.setattr("app.trading.httpx.post", runtime_post)
 
-    account_id = str(uuid4())
-    spot_id = str(uuid4())
-    perp_id = str(uuid4())
+    account_id = "account_sim_usdt"
+    spot_id = "instrument_btc_usdt"
+    perp_id = "instrument_btc_usdt_perp"
 
     with TestClient(app) as client:
         response = client.post(
