@@ -1,0 +1,49 @@
+name: Fix Phase 2 Runtime Lint
+
+on:
+  push:
+    branches:
+      - hardening/phase2-ci-coverage-and-structure
+    paths:
+      - '.github/workflows/fix-phase2-runtime-lint.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: hardening/phase2-ci-coverage-and-structure
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install runtime tooling
+        working-directory: execution-runtime
+        run: python -m pip install -e '.[dev]'
+      - name: Apply and verify Ruff fixes
+        working-directory: execution-runtime
+        run: |
+          python -m ruff check \
+            app/cross_spread_market.py \
+            app/venue_readiness.py \
+            tests/test_gateway_factory.py \
+            --fix
+          python -m ruff format \
+            app/cross_spread_market.py \
+            app/venue_readiness.py \
+            tests/test_gateway_factory.py
+          python -m ruff check app tests
+      - name: Commit corrected runtime sources
+        shell: bash
+        run: |
+          rm .github/workflows/fix-phase2-runtime-lint.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add execution-runtime
+          git add -u .github/workflows/fix-phase2-runtime-lint.yml
+          git commit -m 'style: clear runtime Ruff debt'
+          git push origin HEAD:hardening/phase2-ci-coverage-and-structure
