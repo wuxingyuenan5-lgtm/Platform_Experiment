@@ -1,0 +1,82 @@
+name: Remove Frontend Template Shadowing
+
+on:
+  push:
+    branches:
+      - hardening/phase2-ci-coverage-and-structure
+    paths:
+      - '.github/workflows/apply-phase1-capture.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: hardening/phase2-ci-coverage-and-structure
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.9
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: pnpm
+          cache-dependency-path: admin-risk/pnpm-lock.yaml
+      - name: Rename shadowed template variables
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('admin-risk/src/views/strategy/funding-carry/components/FundingMarketBoard.vue')
+          source = path.read_text(encoding='utf-8')
+          replacements = {
+              '<span v-for="exchange in data.usdtExchanges" :key="exchange">{{ exchange }}</span>':
+                  '<span v-for="venue in data.usdtExchanges" :key="venue">{{ venue }}</span>',
+              '<span v-for="exchange in data.inverseExchanges" :key="exchange">{{ exchange }}</span>':
+                  '<span v-for="venue in data.inverseExchanges" :key="venue">{{ venue }}</span>',
+              'v-for="exchange in data.usdtExchanges"\n              :key="`${row.symbol}-${exchange}`"\n              :class="rateClass(row.usdtPerps[exchange])"':
+                  'v-for="venue in data.usdtExchanges"\n              :key="`${row.symbol}-${venue}`"\n              :class="rateClass(row.usdtPerps[venue])"',
+              '{{ displayRate(row.usdtPerps[exchange]) }}':
+                  '{{ displayRate(row.usdtPerps[venue]) }}',
+              'v-for="exchange in data.inverseExchanges"\n              :key="`${row.symbol}-inverse-${exchange}`"\n              :class="rateClass(row.inversePerps[exchange])"':
+                  'v-for="venue in data.inverseExchanges"\n              :key="`${row.symbol}-inverse-${venue}`"\n              :class="rateClass(row.inversePerps[venue])"',
+              '{{ displayRate(row.inversePerps[exchange]) }}':
+                  '{{ displayRate(row.inversePerps[venue]) }}',
+          }
+          for old, new in replacements.items():
+              if old not in source:
+                  raise RuntimeError(f'Expected template fragment not found: {old[:60]}')
+              source = source.replace(old, new, 1)
+          path.write_text(source, encoding='utf-8')
+          PY
+      - name: Install frontend dependencies
+        working-directory: admin-risk
+        env:
+          HUSKY: '0'
+        run: pnpm install --frozen-lockfile
+      - name: Validate frontend
+        working-directory: admin-risk
+        shell: bash
+        run: |
+          pnpm exec eslint --max-warnings 0 \
+            "src/api/platform/**/*.{ts,tsx}" \
+            "src/hooks/trading/**/*.{ts,tsx}" \
+            "src/views/strategy/funding-carry/**/*.{vue,ts,tsx}"
+          pnpm type:check
+          pnpm build
+      - name: Commit validated template cleanup
+        shell: bash
+        run: |
+          rm .github/workflows/apply-phase1-capture.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add admin-risk/src/views/strategy/funding-carry/components/FundingMarketBoard.vue
+          git add -u .github/workflows/apply-phase1-capture.yml
+          git commit -m 'refactor: remove funding board template shadowing'
+          git push origin HEAD:hardening/phase2-ci-coverage-and-structure
