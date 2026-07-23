@@ -107,6 +107,7 @@ jobs:
             tests/test_secret_safety.py \
             tests/test_trading_flow.py \
             tests/test_order_recovery.py \
+            tests/test_idempotency_conflicts.py \
             tests/test_execution_batches.py \
             tests/test_execution_batches_v1.py \
             tests/test_ops_observability.py \
