@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+### Trading safety hardening — Phase 1
+
+- Established `main@76effbff6391533db7b9954965aaf1b09051081f` as the V6 engineering baseline.
+- Added `docs/planning/V6-交易安全加固实施计划.md` and GitHub Issue #2 as the authoritative delivery trail.
+- Changed order validation to fail closed for unknown accounts, inactive accounts, unknown instruments, missing contract specifications, invalid quantity steps, and invalid price ticks.
+- Preserved the global Live trading switch and strengthened the safety policy to require every account to be active before submission.
+- Replaced the Runtime check-then-insert command flow with an atomic database claim before any Gateway side effect.
+- Added tests proving duplicate Runtime commands reuse persisted events and do not call the Gateway twice.
+- Added backend tests for unknown accounts, unknown instruments, and contract quantity validation.
+- Expanded GitHub Actions to cover `main`, hardening branches, and pull requests into `main`.
+- Upgraded frontend CI from type checking only to type checking plus a production build.
+- Updated the root README and V6 release gate so code, tests, operational limits, and Markdown documentation use the same baseline.
+
+### Previous V6 workspace changes
+
 - Standardized local development around frontend port `5173` and platform backend `/api/v1`.
 - Removed backend/debug UI panels from strategy product pages.
 - Restored the start page to the dark star-map Variable Global landing screen, removed legacy top-right labels `平台入口` / `研究框架` / `新闻日历`, renamed `金融AI` to `金融AI分析`, and routed protected start-page clicks through `/login?redirect=...`.
