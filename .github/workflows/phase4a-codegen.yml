@@ -35,7 +35,7 @@ jobs:
         working-directory: platform-backend
         shell: bash
         run: |
-          python -m ruff check app tests --fix
+          python -m ruff check app tests --fix || true
           python -m ruff format app tests
           set +e
           python -m ruff check app tests > /tmp/phase4a-ruff.log 2>&1
