@@ -1,7 +1,7 @@
+from decimal import Decimal
 from pathlib import Path
 
 import httpx
-from decimal import Decimal
 from fastapi.testclient import TestClient
 
 from app.config import get_settings
