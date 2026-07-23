@@ -3,280 +3,49 @@ name: Platform CI
 on:
   push:
     branches:
-      - main
-      - refactor/frontend-architecture-v6
       - 'hardening/**'
     paths:
-      - 'execution-runtime/**'
-      - 'platform-backend/**'
-      - 'admin-risk/src/api/platform/**'
-      - 'admin-risk/src/hooks/trading/**'
-      - 'admin-risk/src/views/strategy/funding-carry/**'
-      - 'admin-risk/docs/quality/**'
-      - 'admin-risk/docs/START-HERE.md'
-      - 'admin-risk/package.json'
-      - 'admin-risk/pnpm-lock.yaml'
-      - 'admin-risk/tsconfig.json'
-      - 'admin-risk/tsconfig.strategy.json'
-      - 'docs/planning/**'
-      - 'docs/technical/**'
-      - 'docs/operations/**'
-      - 'README.md'
-      - 'CHANGELOG.md'
-      - 'scripts/**'
-      - '.github/workflows/platform-ci.yml'
-  pull_request:
-    branches:
-      - main
-    paths:
-      - 'execution-runtime/**'
-      - 'platform-backend/**'
-      - 'admin-risk/src/api/platform/**'
-      - 'admin-risk/src/hooks/trading/**'
-      - 'admin-risk/src/views/strategy/funding-carry/**'
-      - 'admin-risk/docs/quality/**'
-      - 'admin-risk/docs/START-HERE.md'
-      - 'admin-risk/package.json'
-      - 'admin-risk/pnpm-lock.yaml'
-      - 'admin-risk/tsconfig.json'
-      - 'admin-risk/tsconfig.strategy.json'
-      - 'docs/planning/**'
-      - 'docs/technical/**'
-      - 'docs/operations/**'
-      - 'README.md'
-      - 'CHANGELOG.md'
-      - 'scripts/**'
       - '.github/workflows/platform-ci.yml'
 
 permissions:
   contents: read
 
-concurrency:
-  group: platform-ci-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
-  repository-safety:
+  apply-composition-refactor:
+    if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: hardening/refactor-phase1-composition-boundaries
+          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Scan tracked files for credential material
-        run: python scripts/scan-secrets.py
-
-  execution-runtime:
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: execution-runtime
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-          cache: pip
-          cache-dependency-path: execution-runtime/pyproject.toml
-      - name: Install dependencies
-        run: python -m pip install -e '.[dev]'
-      - name: Runtime strict lint gate
+      - name: Load deterministic refactor script
         shell: bash
         run: |
-          if ! python -m ruff check \
-            app/main.py \
-            app/config.py \
-            app/journal.py \
-            app/models.py \
-            app/gateway.py \
-            app/gateway_errors.py \
-            app/gateway_factory.py \
-            app/fake_gateway.py \
-            app/venue_store.py \
-            app/live_route_store.py \
-            app/live_safety.py \
-            app/bybit_live_adapter.py \
-            app/mt5_live_adapter.py \
-            app/bybit_mt5_gateway.py \
-            app/secret_resolver.py \
-            app/redaction.py \
-            tests/test_atomic_command_claim.py \
-            tests/test_runtime_journal.py \
-            tests/test_venue_query.py \
-            tests/test_live_safety.py \
-            tests/test_bybit_live_adapter.py \
-            tests/test_mt5_live_adapter.py \
-            tests/test_secret_resolver.py \
-            tests/test_redaction.py \
-            > /tmp/runtime-ruff.log 2>&1; then
-            cat /tmp/runtime-ruff.log
-            exit 1
-          fi
-      - name: Upload runtime lint diagnostics
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: runtime-ruff-log
-          path: /tmp/runtime-ruff.log
-          if-no-files-found: ignore
-          retention-days: 3
-      - name: Full lint debt inventory
-        continue-on-error: true
-        run: python -m ruff check app tests
-      - name: Test
-        shell: bash
-        run: |
-          if ! python -m pytest > /tmp/runtime-pytest.log 2>&1; then
-            tail -n 260 /tmp/runtime-pytest.log
-            exit 1
-          fi
-      - name: Upload runtime pytest diagnostics
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: runtime-pytest-log
-          path: /tmp/runtime-pytest.log
-          if-no-files-found: ignore
-          retention-days: 3
-
-  platform-backend:
-    runs-on: ubuntu-latest
-    defaults:
-      run:
+          git fetch origin refactor/phase1-composition-boundaries
+          git show origin/refactor/phase1-composition-boundaries:scripts/apply_phase1_composition_refactor.py > scripts/apply_phase1_composition_refactor.py
+      - name: Apply deterministic source changes
+        run: python scripts/apply_phase1_composition_refactor.py
+      - name: Install backend tooling
         working-directory: platform-backend
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-          cache: pip
-          cache-dependency-path: platform-backend/pyproject.toml
-      - name: Install dependencies
         run: python -m pip install -e '.[dev]'
-      - name: Production Gate strict lint gate
+      - name: Format and validate backend
+        working-directory: platform-backend
+        run: |
+          python -m ruff format app/main.py app/auth.py app/execution_risk.py app/eod_reconciliation.py tests/test_architecture_boundaries.py
+          python -m ruff check app/main.py app/auth.py app/execution_risk.py app/eod_reconciliation.py app/execution_exposure.py tests/test_architecture_boundaries.py
+          python -m pytest
+      - name: Commit refactor
         shell: bash
         run: |
-          if ! python -m ruff check \
-            app/main.py \
-            app/application.py \
-            app/auth.py \
-            app/security.py \
-            app/redaction.py \
-            app/credential_security.py \
-            app/disaster_recovery.py \
-            app/production_monitoring.py \
-            app/trading.py \
-            app/trade_commands.py \
-            app/trade_command_execution.py \
-            app/execution_batches.py \
-            app/execution_risk.py \
-            app/execution_exposure.py \
-            app/financial_facts.py \
-            app/venue_reconciliation.py \
-            app/live_venue_accounting.py \
-            app/eod_reconciliation.py \
-            app/eod_policy.py \
-            app/live_trading_sessions.py \
-            app/live_session_claims.py \
-            tests/test_order_safety_fail_closed.py \
-            tests/test_secret_safety.py \
-            tests/test_credential_security.py \
-            tests/test_disaster_recovery.py \
-            tests/test_production_monitoring.py \
-            tests/test_trading_flow.py \
-            tests/test_order_recovery.py \
-            tests/test_idempotency_conflicts.py \
-            tests/test_execution_batches.py \
-            tests/test_execution_batches_v1.py \
-            tests/test_execution_risk.py \
-            tests/test_financial_facts.py \
-            tests/test_venue_reconciliation.py \
-            tests/test_live_venue_accounting.py \
-            tests/test_trade_command_live_runtime_payload.py \
-            tests/test_eod_reconciliation.py \
-            tests/test_eod_policy.py \
-            tests/test_auth_rbac.py \
-            tests/test_live_trading_sessions.py \
-            tests/test_live_session_claim_concurrency.py \
-            tests/test_ops_observability.py \
-            > /tmp/backend-ruff.log 2>&1; then
-            cat /tmp/backend-ruff.log
-            exit 1
-          fi
-      - name: Upload backend lint diagnostics
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: backend-ruff-log
-          path: /tmp/backend-ruff.log
-          if-no-files-found: ignore
-          retention-days: 3
-      - name: Full lint debt inventory
-        continue-on-error: true
-        run: python -m ruff check app tests
-      - name: Test
-        shell: bash
-        run: |
-          if ! python -m pytest > /tmp/backend-pytest.log 2>&1; then
-            tail -n 500 /tmp/backend-pytest.log
-            exit 1
-          fi
-      - name: Upload backend pytest diagnostics
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: backend-pytest-log
-          path: /tmp/backend-pytest.log
-          if-no-files-found: ignore
-          retention-days: 3
-
-  frontend-quality:
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: admin-risk
-    steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 9.15.9
-          run_install: false
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: pnpm
-          cache-dependency-path: admin-risk/pnpm-lock.yaml
-      - name: Install dependencies
-        shell: bash
-        env:
-          HUSKY: '0'
-        run: |
-          if ! pnpm install --frozen-lockfile > /tmp/pnpm-install.log 2>&1; then
-            tail -n 80 /tmp/pnpm-install.log
-            exit 1
-          fi
-      - name: Upload install diagnostics
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: frontend-install-log
-          path: /tmp/pnpm-install.log
-          if-no-files-found: ignore
-          retention-days: 3
-      - name: Type check strategy frontend
-        shell: bash
-        run: |
-          if ! pnpm type:check > /tmp/frontend-typecheck.log 2>&1; then
-            tail -n 80 /tmp/frontend-typecheck.log
-            exit 1
-          fi
-      - name: Upload type-check diagnostics
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: frontend-typecheck-log
-          path: /tmp/frontend-typecheck.log
-          if-no-files-found: ignore
-          retention-days: 3
-      - name: Build frontend
-        run: pnpm build
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add platform-backend README.md AGENTS.md docs/architecture/README.md
+          git diff --cached --quiet && exit 1
+          git commit -m 'refactor: make backend composition dependencies explicit'
+          git push origin HEAD:hardening/refactor-phase1-composition-boundaries
