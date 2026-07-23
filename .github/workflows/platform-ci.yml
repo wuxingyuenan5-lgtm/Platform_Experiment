@@ -94,7 +94,7 @@ jobs:
           cache-dependency-path: platform-backend/pyproject.toml
       - name: Install dependencies
         run: python -m pip install -e '.[dev]'
-      - name: Phase 3 strict lint gate
+      - name: Phase 4 strict lint gate
         shell: bash
         run: |
           if ! python -m ruff check \
@@ -104,6 +104,7 @@ jobs:
             app/trading.py \
             app/trade_commands.py \
             app/execution_batches.py \
+            app/execution_risk.py \
             app/financial_facts.py \
             tests/test_order_safety_fail_closed.py \
             tests/test_secret_safety.py \
@@ -112,6 +113,7 @@ jobs:
             tests/test_idempotency_conflicts.py \
             tests/test_execution_batches.py \
             tests/test_execution_batches_v1.py \
+            tests/test_execution_risk.py \
             tests/test_financial_facts.py \
             tests/test_ops_observability.py \
             > /tmp/backend-ruff.log 2>&1; then
