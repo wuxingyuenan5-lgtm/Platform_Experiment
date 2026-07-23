@@ -32,6 +32,7 @@ docs/                Architecture and operational documentation
 - Keep code, tests and relevant Markdown documentation synchronized.
 - Prefer existing architecture patterns over introducing new frameworks.
 - Keep composition roots declarative: wire routers and middleware only; import domain policies explicitly and never monkey-patch modules.
+- Keep one authoritative implementation for each domain calculation; compatibility wiring must not replace functions at runtime.
 - Use `rg` for search.
 - Ignore `node_modules`, `.venv`, `dist`, generated outputs and external references unless explicitly required.
 
