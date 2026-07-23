@@ -4,7 +4,7 @@
 产品基线：Platform V6  
 架构版本：Platform V6 Simplified  
 适用分支：`main`  
-当前实施：Phase 3 不可变金融事实、正式 PnL 与统一估值 NAV  
+当前状态：Phase 3 已完成；Phase 4 待实施  
 文档层级：人工阅读入口
 
 找文档先看项目根目录 `00-人工可读目录/README.md`。  
@@ -22,7 +22,7 @@ Phase 1：交易输入 fail-closed + Runtime command 原子抢占，已完成
 +
 Phase 2：TradeCommand 正式入口 + result_unknown 恢复 + 动态 Catalog，已完成
 +
-Phase 3：不可变事实 + 可重建 Position/PnL + 统一估值 NAV，正在验收
+Phase 3：不可变事实 + 可重建 Position/PnL + 统一估值 NAV，已完成
 +
 Phase 4：双腿风险处置、Bybit Demo、MT5 Demo 和日终对账，尚未开始
 ```
@@ -50,7 +50,7 @@ Phase 4：双腿风险处置、Bybit Demo、MT5 Demo 和日终对账，尚未开
 |---|---|---|
 | 1 | Fail-closed、Runtime 幂等、CI、文档留痕 | 已完成 |
 | 2 | TradeCommand、ExecutionBatch 幂等、`result_unknown` 恢复、动态 Catalog | 已完成 |
-| 3 | 不可变事实、ContractSpecification、正式 PnL 与统一估值 NAV | 实现完成，验收中 |
+| 3 | 不可变事实、ContractSpecification、正式 PnL 与统一估值 NAV | 已完成 |
 | 4 | 残腿处置、Bybit Demo、MT5 Demo、日终对账 | 待实施 |
 | 5 | 新策略和新功能扩展 | 暂缓 |
 
