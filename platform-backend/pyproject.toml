@@ -7,6 +7,7 @@ dependencies = [
   "fastapi>=0.116,<1.0",
   "httpx>=0.28,<1.0",
   "pydantic-settings>=2.10,<3.0",
+  "tzdata>=2025.2",
   "uvicorn[standard]>=0.35,<1.0",
 ]
 
@@ -38,3 +39,6 @@ select = ["E", "F", "I", "UP", "B"]
 # are split in Phase 4C; the unused compatibility import and two long SQL/error lines are tracked debt.
 "app/venue_reconciliation.py" = ["E501", "F401"]
 "tests/test_venue_reconciliation.py" = ["E501"]
+# Phase 4D keeps the synchronous EOD orchestration and API contract together for auditability.
+"app/eod_reconciliation.py" = ["B008", "E501", "UP037"]
+"tests/test_eod_reconciliation.py" = ["E501"]
