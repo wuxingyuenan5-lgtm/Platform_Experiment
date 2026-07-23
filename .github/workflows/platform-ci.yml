@@ -157,6 +157,7 @@ jobs:
             app/venue_reconciliation.py \
             app/live_venue_accounting.py \
             app/eod_reconciliation.py \
+            app/eod_policy.py \
             tests/test_order_safety_fail_closed.py \
             tests/test_secret_safety.py \
             tests/test_trading_flow.py \
@@ -170,6 +171,7 @@ jobs:
             tests/test_live_venue_accounting.py \
             tests/test_trade_command_live_runtime_payload.py \
             tests/test_eod_reconciliation.py \
+            tests/test_eod_policy.py \
             tests/test_ops_observability.py \
             > /tmp/backend-ruff.log 2>&1; then
             cat /tmp/backend-ruff.log
@@ -190,7 +192,7 @@ jobs:
         shell: bash
         run: |
           if ! python -m pytest > /tmp/backend-pytest.log 2>&1; then
-            tail -n 280 /tmp/backend-pytest.log
+            tail -n 320 /tmp/backend-pytest.log
             exit 1
           fi
       - name: Upload backend pytest diagnostics
