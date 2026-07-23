@@ -163,9 +163,9 @@ def enforce_order_safety(
             detail="Live order lacks an approved-session identity boundary",
         )
 
-    from app.live_trading_sessions import validate_and_claim_live_session
+    from app.live_session_claims import validate_and_claim_live_session_atomic
 
-    validate_and_claim_live_session(
+    validate_and_claim_live_session_atomic(
         command_id=str(command_id),
         strategy_instance_id=str(strategy_instance_id),
         account_id=account_id,
