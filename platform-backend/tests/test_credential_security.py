@@ -112,13 +112,20 @@ def test_rotation_records_metadata_only_and_is_idempotent(monkeypatch, tmp_path:
                 "created_at",
             }
             audit = db.execute(
-                "SELECT details_json FROM audit_events WHERE event_type = 'credential_rotation_recorded'"
+                """
+                SELECT details_json
+                FROM audit_events
+                WHERE event_type = 'credential_rotation_recorded'
+                """
             ).fetchone()
         assert audit is not None
         assert "admin-1" in audit["details_json"]
 
 
-def test_rotation_rejects_provider_mismatch_and_non_admin_write(monkeypatch, tmp_path: Path) -> None:
+def test_rotation_rejects_provider_mismatch_and_non_admin_write(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
     configure_live(monkeypatch, tmp_path)
     with TestClient(app) as client:
         mismatch = client.post(
