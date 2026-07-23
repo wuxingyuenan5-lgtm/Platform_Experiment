@@ -26,27 +26,31 @@ jobs:
         run: |
           python - <<'PY'
           from pathlib import Path
+          from textwrap import dedent
 
           root = Path('.')
           schemas_path = root / 'platform-backend/app/schemas.py'
           source = schemas_path.read_text(encoding='utf-8')
           start = source.index('class CreateOrderRequest(BaseModel):\n')
           end = source.index('class RuntimeReadinessResponse(BaseModel):\n', start)
-          compatibility_import = '''from app.execution_schemas import (
-              BatchLegRequest,
-              BatchLegResponse,
-              CreateExecutionBatchRequest,
-              CreateOrderRequest,
-              CreateStrategyRunRequest,
-              ExecutionBatchResponse,
-              OrderResponse,
-              PnlResponse,
-              PositionResponse,
-              StrategyRunResponse,
+          compatibility_import = dedent(
+              '''\
+              from app.execution_schemas import (
+                  BatchLegRequest,
+                  BatchLegResponse,
+                  CreateExecutionBatchRequest,
+                  CreateOrderRequest,
+                  CreateStrategyRunRequest,
+                  ExecutionBatchResponse,
+                  OrderResponse,
+                  PnlResponse,
+                  PositionResponse,
+                  StrategyRunResponse,
+              )
+
+
+              '''
           )
-
-
-          '''
           schemas_path.write_text(
               source[:start] + compatibility_import + source[end:],
               encoding='utf-8',
@@ -54,41 +58,44 @@ jobs:
 
           test_path = root / 'platform-backend/tests/test_schema_boundaries.py'
           test_path.write_text(
-              '''from __future__ import annotations
+              dedent(
+                  '''\
+                  from __future__ import annotations
 
-          import ast
-          from pathlib import Path
+                  import ast
+                  from pathlib import Path
 
-          from app import execution_schemas, schemas
+                  from app import execution_schemas, schemas
 
-          BACKEND_ROOT = Path(__file__).resolve().parents[1]
-          EXECUTION_SCHEMA_NAMES = (
-              "BatchLegRequest",
-              "BatchLegResponse",
-              "CreateExecutionBatchRequest",
-              "CreateOrderRequest",
-              "CreateStrategyRunRequest",
-              "ExecutionBatchResponse",
-              "OrderResponse",
-              "PnlResponse",
-              "PositionResponse",
-              "StrategyRunResponse",
-          )
-
-
-          def test_legacy_schema_imports_reexport_execution_types() -> None:
-              for name in EXECUTION_SCHEMA_NAMES:
-                  assert getattr(schemas, name) is getattr(execution_schemas, name)
+                  BACKEND_ROOT = Path(__file__).resolve().parents[1]
+                  EXECUTION_SCHEMA_NAMES = (
+                      "BatchLegRequest",
+                      "BatchLegResponse",
+                      "CreateExecutionBatchRequest",
+                      "CreateOrderRequest",
+                      "CreateStrategyRunRequest",
+                      "ExecutionBatchResponse",
+                      "OrderResponse",
+                      "PnlResponse",
+                      "PositionResponse",
+                      "StrategyRunResponse",
+                  )
 
 
-          def test_cross_domain_schema_module_does_not_redefine_execution_types() -> None:
-              path = BACKEND_ROOT / "app/schemas.py"
-              tree = ast.parse(path.read_text(encoding="utf-8"))
-              defined_classes = {
-                  node.name for node in tree.body if isinstance(node, ast.ClassDef)
-              }
-              assert defined_classes.isdisjoint(EXECUTION_SCHEMA_NAMES)
-          ''',
+                  def test_legacy_schema_imports_reexport_execution_types() -> None:
+                      for name in EXECUTION_SCHEMA_NAMES:
+                          assert getattr(schemas, name) is getattr(execution_schemas, name)
+
+
+                  def test_cross_domain_schema_module_does_not_redefine_execution_types() -> None:
+                      path = BACKEND_ROOT / "app/schemas.py"
+                      tree = ast.parse(path.read_text(encoding="utf-8"))
+                      defined_classes = {
+                          node.name for node in tree.body if isinstance(node, ast.ClassDef)
+                      }
+                      assert defined_classes.isdisjoint(EXECUTION_SCHEMA_NAMES)
+                  '''
+              ),
               encoding='utf-8',
           )
 
@@ -116,14 +123,16 @@ jobs:
 
           architecture_path = root / 'docs/architecture/README.md'
           architecture = architecture_path.read_text(encoding='utf-8')
-          section = '''
+          section = dedent(
+              '''
 
-          ## Domain Schema 边界
+              ## Domain Schema 边界
 
-          - 执行、订单、批次、策略运行、持仓和 PnL API DTO 由 `platform-backend/app/execution_schemas.py` 统一维护。
-          - `platform-backend/app/schemas.py` 作为迁移期兼容入口，只允许重导出，不得重复定义执行域类型。
-          - `tests/test_schema_boundaries.py` 校验兼容导出的对象身份和单一所有权。
-          '''
+              - 执行、订单、批次、策略运行、持仓和 PnL API DTO 由 `platform-backend/app/execution_schemas.py` 统一维护。
+              - `platform-backend/app/schemas.py` 作为迁移期兼容入口，只允许重导出，不得重复定义执行域类型。
+              - `tests/test_schema_boundaries.py` 校验兼容导出的对象身份和单一所有权。
+              '''
+          )
           if '## Domain Schema 边界' not in architecture:
               architecture = architecture.rstrip() + section + '\n'
           architecture_path.write_text(architecture, encoding='utf-8')
