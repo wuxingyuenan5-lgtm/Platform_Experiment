@@ -82,39 +82,73 @@ def submit_order(request: CreateOrderRequest, command_id: str | None = None) -> 
         response.raise_for_status()
         events = response.json()
     except httpx.HTTPError:
-        with connection() as db:
-            db.execute(
-                "UPDATE orders SET status = ?, updated_at = ? WHERE id = ?",
-                ("result_unknown", now_iso(), order_id),
-            )
-        return OrderResponse(
-            orderId=order_id,
-            commandId=command_id,
-            status="result_unknown",
-            externalOrderId=None,
-        )
+        mark_order_result_unknown(order_id)
+        return get_order_response(order_id)
 
-    apply_execution_events(order_id, request, events)
-
-    with connection() as db:
-        row = db.execute(
-            "SELECT status, external_order_id FROM orders WHERE id = ?", (order_id,)
-        ).fetchone()
-
-    return OrderResponse(
-        orderId=order_id,
-        commandId=command_id,
-        status=row["status"],
-        externalOrderId=row["external_order_id"],
+    apply_execution_events(
+        order_id,
+        request,
+        events,
+        expected_command_id=command_id,
     )
+    return get_order_response(order_id)
+
+
+def reconcile_order(order_id: str) -> OrderResponse:
+    """Recover an uncertain order from Runtime Journal without resubmitting it."""
+
+    row = get_order_row(order_id)
+    if row["status"] != "result_unknown":
+        return order_response_from_row(row)
+
+    settings = get_settings()
+    try:
+        response = httpx.get(
+            f"{settings.runtime_base_url}/commands/{row['command_id']}/events",
+            timeout=settings.runtime_timeout_seconds,
+        )
+        if response.status_code == 404:
+            return order_response_from_row(row)
+        response.raise_for_status()
+        events = response.json()
+    except httpx.HTTPError:
+        return order_response_from_row(row)
+
+    if not events:
+        return order_response_from_row(row)
+
+    request = request_from_order_row(row)
+    apply_execution_events(
+        order_id,
+        request,
+        events,
+        expected_command_id=row["command_id"],
+    )
+    synchronize_trade_command_status(row["command_id"], order_id)
+    return get_order_response(order_id)
+
+
+def mark_order_result_unknown(order_id: str) -> None:
+    with connection() as db:
+        db.execute(
+            "UPDATE orders SET status = ?, updated_at = ? WHERE id = ?",
+            ("result_unknown", now_iso(), order_id),
+        )
 
 
 def apply_execution_events(
     order_id: str,
     request: CreateOrderRequest,
     events: list[dict[str, object]],
+    *,
+    expected_command_id: str,
 ) -> None:
     for event in events:
+        validate_execution_event(
+            event,
+            expected_command_id=expected_command_id,
+            expected_order_id=order_id,
+        )
         event_type = str(event["event_type"])
         occurred_at = str(event["occurred_at"])
         external_order_id = event.get("external_order_id")
@@ -125,14 +159,17 @@ def apply_execution_events(
                     """
                     UPDATE orders
                     SET status = ?, external_order_id = ?, updated_at = ?
-                    WHERE id = ?
+                    WHERE id = ? AND status != 'filled'
                     """,
                     ("acknowledged", external_order_id, occurred_at, order_id),
                 )
         elif event_type == "order_rejected":
             with connection() as db:
                 db.execute(
-                    "UPDATE orders SET status = ?, updated_at = ? WHERE id = ?",
+                    """
+                    UPDATE orders SET status = ?, updated_at = ?
+                    WHERE id = ? AND status != 'filled'
+                    """,
                     ("rejected", occurred_at, order_id),
                 )
         elif event_type == "order_filled":
@@ -149,6 +186,20 @@ def apply_execution_events(
             )
 
 
+def validate_execution_event(
+    event: dict[str, object],
+    *,
+    expected_command_id: str,
+    expected_order_id: str,
+) -> None:
+    if str(event.get("command_id")) != expected_command_id:
+        raise HTTPException(status_code=502, detail="Runtime event command mismatch")
+    if str(event.get("platform_order_id")) != expected_order_id:
+        raise HTTPException(status_code=502, detail="Runtime event order mismatch")
+    if event.get("event_id") is None or event.get("occurred_at") is None:
+        raise HTTPException(status_code=502, detail="Runtime event is incomplete")
+
+
 def record_fill_and_update_projections(
     *,
     fill_id: str,
@@ -157,11 +208,11 @@ def record_fill_and_update_projections(
     fill_price: Decimal,
     fill_quantity: Decimal,
     occurred_at: str,
-) -> None:
+) -> bool:
     signed_fill = fill_quantity if request.side == "buy" else -fill_quantity
 
     with connection() as db:
-        db.execute(
+        cursor = db.execute(
             """
             INSERT OR IGNORE INTO fills (
                 id, order_id, account_id, instrument_id, side, quantity, price, occurred_at
@@ -178,6 +229,8 @@ def record_fill_and_update_projections(
                 occurred_at,
             ),
         )
+        if cursor.rowcount == 0:
+            return False
 
         current = db.execute(
             """
@@ -233,7 +286,7 @@ def record_fill_and_update_projections(
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
-                str(uuid4()),
+                f"trade-fill:{fill_id}",
                 "trade_fill",
                 request.account_id,
                 request.instrument_id,
@@ -275,6 +328,58 @@ def record_fill_and_update_projections(
                 occurred_at,
             ),
         )
+    return True
+
+
+def get_order_row(order_id: str):
+    with connection() as db:
+        row = db.execute(
+            """
+            SELECT id, command_id, account_id, instrument_id, symbol, side,
+                   order_type, quantity, price, status, external_order_id
+            FROM orders
+            WHERE id = ?
+            """,
+            (order_id,),
+        ).fetchone()
+    if row is None:
+        raise HTTPException(status_code=404, detail="Order not found")
+    return row
+
+
+def request_from_order_row(row) -> CreateOrderRequest:
+    return CreateOrderRequest(
+        accountId=row["account_id"],
+        instrumentId=row["instrument_id"],
+        symbol=row["symbol"],
+        side=row["side"],
+        orderType=row["order_type"],
+        quantity=Decimal(row["quantity"]),
+        price=Decimal(row["price"]) if row["price"] is not None else None,
+    )
+
+
+def get_order_response(order_id: str) -> OrderResponse:
+    return order_response_from_row(get_order_row(order_id))
+
+
+def order_response_from_row(row) -> OrderResponse:
+    return OrderResponse(
+        orderId=row["id"],
+        commandId=row["command_id"],
+        status=row["status"],
+        externalOrderId=row["external_order_id"],
+    )
+
+
+def synchronize_trade_command_status(command_id: str, order_id: str) -> None:
+    with connection() as db:
+        row = db.execute("SELECT status FROM orders WHERE id = ?", (order_id,)).fetchone()
+        if row is not None:
+            db.execute(
+                "UPDATE trade_commands SET status = ?, updated_at = ? WHERE id = ?",
+                (row["status"], now_iso(), command_id),
+            )
 
 
 def calculate_position_update(
