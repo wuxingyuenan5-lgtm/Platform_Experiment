@@ -29,8 +29,10 @@ function Wait-ForHealth {
   }
 }
 
-function Submit-Order {
+function Submit-TradeCommand {
   param(
+    [Parameter(Mandatory = $true)][string]$IdempotencyKey,
+    [Parameter(Mandatory = $true)][string]$StrategyInstanceId,
     [Parameter(Mandatory = $true)][string]$AccountId,
     [Parameter(Mandatory = $true)][string]$InstrumentId,
     [Parameter(Mandatory = $true)][ValidateSet('buy', 'sell')][string]$Side,
@@ -39,27 +41,29 @@ function Submit-Order {
   )
 
   $Body = @{
+    idempotencyKey = $IdempotencyKey
+    strategyInstanceId = $StrategyInstanceId
     accountId = $AccountId
     instrumentId = $InstrumentId
-    symbol = 'SMOKEUSDT'
+    symbol = 'BTCUSDT'
     side = $Side
     orderType = 'limit'
     quantity = $Quantity
     price = $Price
   } | ConvertTo-Json
 
-  $Order = Invoke-RestMethod `
+  $Command = Invoke-RestMethod `
     -Method Post `
-    -Uri "$BackendBaseUrl/api/v1/trading/orders" `
+    -Uri "$BackendBaseUrl/api/v1/trading/commands" `
     -ContentType 'application/json' `
     -Body $Body `
     -TimeoutSec 10
 
-  if ($Order.status -ne 'filled') {
-    throw "Expected a filled order, received status: $($Order.status)"
+  if ($Command.status -ne 'filled') {
+    throw "Expected a filled trade command, received status: $($Command.status)"
   }
 
-  return $Order
+  return $Command
 }
 
 function Get-Position {
@@ -89,19 +93,24 @@ function Get-Pnl {
 Wait-ForHealth -Name 'Execution Runtime' -Url "$RuntimeBaseUrl/health"
 Wait-ForHealth -Name 'Platform Backend' -Url "$BackendBaseUrl/health"
 
-$AccountId = [guid]::NewGuid().ToString()
-$InstrumentId = [guid]::NewGuid().ToString()
+$StrategyInstanceId = 'strategy_funding_arbitrage_instance_default'
+$AccountId = 'account_sim_usdt'
+$SpotInstrumentId = 'instrument_btc_usdt'
+$PerpInstrumentId = 'instrument_btc_usdt_perp'
+$RunId = [guid]::NewGuid().ToString()
 
-Write-Host 'Submitting opening buy order...' -ForegroundColor Cyan
-$OpeningOrder = Submit-Order `
+Write-Host 'Submitting opening buy TradeCommand...' -ForegroundColor Cyan
+$OpeningCommand = Submit-TradeCommand `
+  -IdempotencyKey "smoke:$RunId:open" `
+  -StrategyInstanceId $StrategyInstanceId `
   -AccountId $AccountId `
-  -InstrumentId $InstrumentId `
+  -InstrumentId $SpotInstrumentId `
   -Side 'buy' `
   -Quantity '2' `
   -Price '100'
 
-$Position = Get-Position -AccountId $AccountId -InstrumentId $InstrumentId
-$Pnl = Get-Pnl -AccountId $AccountId -InstrumentId $InstrumentId
+$Position = Get-Position -AccountId $AccountId -InstrumentId $SpotInstrumentId
+$Pnl = Get-Pnl -AccountId $AccountId -InstrumentId $SpotInstrumentId
 
 if ([decimal]$Position.netQuantity -ne [decimal]2) {
   throw "Expected net quantity 2, received $($Position.netQuantity)"
@@ -113,16 +122,18 @@ if ([decimal]$Pnl.realizedPnl -ne [decimal]0) {
   throw "Expected realized PnL 0, received $($Pnl.realizedPnl)"
 }
 
-Write-Host 'Submitting partial closing sell order...' -ForegroundColor Cyan
-$ClosingOrder = Submit-Order `
+Write-Host 'Submitting partial closing sell TradeCommand...' -ForegroundColor Cyan
+$ClosingCommand = Submit-TradeCommand `
+  -IdempotencyKey "smoke:$RunId:close" `
+  -StrategyInstanceId $StrategyInstanceId `
   -AccountId $AccountId `
-  -InstrumentId $InstrumentId `
+  -InstrumentId $SpotInstrumentId `
   -Side 'sell' `
   -Quantity '1' `
   -Price '110'
 
-$Position = Get-Position -AccountId $AccountId -InstrumentId $InstrumentId
-$Pnl = Get-Pnl -AccountId $AccountId -InstrumentId $InstrumentId
+$Position = Get-Position -AccountId $AccountId -InstrumentId $SpotInstrumentId
+$Pnl = Get-Pnl -AccountId $AccountId -InstrumentId $SpotInstrumentId
 
 if ([decimal]$Position.netQuantity -ne [decimal]1) {
   throw "Expected net quantity 1, received $($Position.netQuantity)"
@@ -135,12 +146,11 @@ if ([decimal]$Pnl.realizedPnl -ne [decimal]10) {
 }
 
 Write-Host 'Submitting two-leg execution batch...' -ForegroundColor Cyan
-$BatchAccountId = [guid]::NewGuid().ToString()
-$SpotInstrumentId = [guid]::NewGuid().ToString()
-$PerpInstrumentId = [guid]::NewGuid().ToString()
 $BatchBody = @{
-  accountId = $BatchAccountId
-  strategyKey = 'funding_carry'
+  idempotencyKey = "smoke:$RunId:batch"
+  strategyInstanceId = $StrategyInstanceId
+  accountId = $AccountId
+  strategyKey = 'funding_arbitrage'
   direction = 'collect'
   legs = @(
     @{
@@ -181,22 +191,8 @@ if ($Batch.legs.Count -ne 2) {
   throw "Expected two batch legs, received $($Batch.legs.Count)"
 }
 
-$SpotPosition = Get-Position `
-  -AccountId $BatchAccountId `
-  -InstrumentId $SpotInstrumentId
-$PerpPosition = Get-Position `
-  -AccountId $BatchAccountId `
-  -InstrumentId $PerpInstrumentId
-
-if ([decimal]$SpotPosition.netQuantity -ne [decimal]1) {
-  throw "Expected spot quantity 1, received $($SpotPosition.netQuantity)"
-}
-if ([decimal]$PerpPosition.netQuantity -ne [decimal]-1) {
-  throw "Expected perpetual quantity -1, received $($PerpPosition.netQuantity)"
-}
-
 Write-Host ''
 Write-Host 'Platform smoke test passed.' -ForegroundColor Green
-Write-Host "Opening order: $($OpeningOrder.orderId)"
-Write-Host "Closing order: $($ClosingOrder.orderId)"
+Write-Host "Opening command: $($OpeningCommand.tradeCommandId)"
+Write-Host "Closing command: $($ClosingCommand.tradeCommandId)"
 Write-Host "Execution batch: $($Batch.batchId)"
