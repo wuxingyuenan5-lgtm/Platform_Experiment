@@ -11,6 +11,18 @@ ROOT = Path(__file__).resolve().parents[1]
 SELF_PATH = Path("scripts/scan-secrets.py")
 ALLOW_MARKER = "secret-scan: allow"
 ALLOWED_ENV_NAMES = {".env.example", ".env.live.example"}
+# These tracked frontend manifests were reviewed: they contain only VITE_* public
+# build/runtime values. Vite exposes such values to the browser, so no credential
+# is permitted there; known-token and entropy checks still scan their contents.
+ALLOWED_PUBLIC_ENV_PATHS = {
+    Path("admin-risk/.env"),
+    Path("admin-risk/.env.analyze"),
+    Path("admin-risk/.env.development"),
+    Path("admin-risk/.env.docker"),
+    Path("admin-risk/.env.platform.example"),
+    Path("admin-risk/.env.production"),
+    Path("admin-risk/.env.test"),
+}
 SKIP_SUFFIXES = {
     ".png",
     ".jpg",
@@ -63,6 +75,9 @@ def tracked_files() -> list[Path]:
 
 
 def forbidden_env_file(path: Path) -> bool:
+    relative = path.relative_to(ROOT)
+    if relative in ALLOWED_PUBLIC_ENV_PATHS:
+        return False
     name = path.name.lower()
     return (name == ".env" or name.startswith(".env.")) and name not in ALLOWED_ENV_NAMES
 
