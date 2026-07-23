@@ -3,14 +3,14 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException
 
 from app.config import get_settings
+from app.cross_spread_market import build_cross_spread_snapshot
 from app.gateway_factory import create_gateway
 from app.journal import (
-    command_exists,
+    claim_command,
     get_events,
     initialize_journal,
     journal_status,
     save_command_events,
-    save_command_started,
 )
 from app.models import (
     CrossSpreadSnapshotResponse,
@@ -20,7 +20,6 @@ from app.models import (
     SubmitOrderCommand,
     VenueReadinessResponse,
 )
-from app.cross_spread_market import build_cross_spread_snapshot
 from app.secret_resolver import inspect_credential_reference
 from app.venue_readiness import get_venue_readiness
 
@@ -33,7 +32,7 @@ async def lifespan(_: FastAPI):
     yield
 
 
-app = FastAPI(title=settings.app_name, version="0.3.0", lifespan=lifespan)
+app = FastAPI(title=settings.app_name, version="0.3.1", lifespan=lifespan)
 gateway = create_gateway(settings.gateway_name)
 
 
@@ -110,7 +109,7 @@ def cross_spread_snapshot() -> CrossSpreadSnapshotResponse:
 
 @app.post("/commands/orders", response_model=list[ExecutionEvent], tags=["commands"])
 def submit_order(command: SubmitOrderCommand) -> list[ExecutionEvent]:
-    if command_exists(command.command_id):
+    if not claim_command(command):
         events = get_events(command.command_id)
         if not events:
             raise HTTPException(
@@ -119,7 +118,6 @@ def submit_order(command: SubmitOrderCommand) -> list[ExecutionEvent]:
             )
         return events
 
-    save_command_started(command)
     events = gateway.submit_order(command)
     save_command_events(command, events)
     return events
