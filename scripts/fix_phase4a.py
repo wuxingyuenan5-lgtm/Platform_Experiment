@@ -11,8 +11,8 @@ def replace_once(path: str, old: str, new: str) -> None:
     file.write_text(text.replace(old, new, 1), encoding="utf-8")
 
 
-# Persist the complete batch request boundary so idempotent replays can detect
-# payload conflicts rather than silently returning an unrelated execution.
+# Store every risk-relevant request field so an idempotency key cannot be
+# replayed with a different execution policy.
 replace_once(
     "platform-backend/app/phase4_risk.py",
     """    average_fill_price TEXT,
@@ -44,15 +44,15 @@ replace_once(
 )
 replace_once(
     "platform-backend/app/phase4_risk.py",
-    """                INSERT INTO execution_batch_leg_metrics (
+    '''                INSERT INTO execution_batch_leg_metrics (
                     batch_id, role, filled_quantity, average_fill_price,
                     contract_multiplier, base_exposure, notional,
                     repair_order_id, repair_status
                 ) VALUES (?, ?, NULL, NULL, ?, '0', '0', NULL, NULL)
                 """,
                 (batch_id, leg.role, decimal_text(contract_multiplier)),
-""",
-    """                INSERT INTO execution_batch_leg_metrics (
+''',
+    '''                INSERT INTO execution_batch_leg_metrics (
                     batch_id, role, filled_quantity, average_fill_price,
                     contract_multiplier, time_in_force, reduce_only,
                     position_idx, max_deviation, allow_partial_fill,
@@ -73,13 +73,12 @@ replace_once(
                     if leg.max_slippage_bps is not None
                     else None,
                 ),
-""",
+''',
 )
 replace_once(
     "platform-backend/app/phase4_risk.py",
-    """def find_batch(key: str) -> str | None:
-""",
-    """def assert_batch_request_matches(
+    "def find_batch(key: str) -> str | None:\n",
+    '''def assert_batch_request_matches(
     batch_id: str,
     request: CreateExecutionBatchRequest,
 ) -> None:
@@ -164,11 +163,11 @@ def raise_batch_conflict() -> None:
 
 
 def find_batch(key: str) -> str | None:
-""",
+''',
 )
 
-# Phase 4 replaces the ambiguous manual state with an explicit unresolved-risk
-# state. Existing observability tests continue to require manual intervention.
+# Phase 4 uses an explicit unresolved-risk state. It still sets the manual
+# intervention flag, so observability remains backward compatible.
 for path in (
     "platform-backend/tests/test_execution_batches.py",
     "platform-backend/tests/test_ops_observability.py",
@@ -182,21 +181,21 @@ for path in (
         encoding="utf-8",
     )
 
-# The legacy testnet execution test must explicitly opt into the independent
-# Demo gate. The monkeypatch restores the default after the test.
+# Existing testnet coverage must explicitly opt into the separate Demo gate.
 replace_once(
     "platform-backend/tests/test_execution_batches_v1.py",
-    """    get_settings().database_path = str(tmp_path / "batch-idempotency.db")
+    '''    get_settings().database_path = str(tmp_path / "batch-idempotency.db")
     monkeypatch.setattr(
-""",
-    """    get_settings().database_path = str(tmp_path / "batch-idempotency.db")
+''',
+    '''    get_settings().database_path = str(tmp_path / "batch-idempotency.db")
     monkeypatch.setattr(get_settings(), "demo_trading_enabled", True)
     monkeypatch.setattr(
-""",
+''',
 )
 
-# Keep the new goldens independent of a locally running Runtime and avoid
-# assigning a nonexistent rejected order through a foreign key.
+# The new goldens must not depend on a locally running Runtime. A rejected
+# fake command has no platform order, avoiding a foreign-key reference to an
+# order that was never persisted.
 path = "platform-backend/tests/test_phase4_risk.py"
 text = Path(path).read_text(encoding="utf-8")
 text = text.replace(
@@ -206,7 +205,7 @@ text = text.replace(
 )
 text = text.replace(
     'STRATEGY = "strategy_funding_arbitrage_instance_default"\n',
-    '''STRATEGY = "strategy_funding_arbitrage_instance_default"
+    """STRATEGY = "strategy_funding_arbitrage_instance_default"
 
 
 def filled_runtime_response(command: dict[str, object]) -> object:
@@ -237,7 +236,7 @@ def filled_runtime_response(command: dict[str, object]) -> object:
             ]
 
     return FakeResponse()
-''',
+""",
     1,
 )
 text = text.replace(
@@ -251,12 +250,12 @@ text = text.replace(
 )
 text = text.replace(
     '    get_settings().database_path = str(tmp_path / "hedged.db")\n',
-    '''    get_settings().database_path = str(tmp_path / "hedged.db")
+    """    get_settings().database_path = str(tmp_path / "hedged.db")
     monkeypatch.setattr(
         "app.trading.httpx.post",
         lambda *args, **kwargs: filled_runtime_response(kwargs["json"]),
     )
-''',
+""",
     1,
 )
 text = text.replace(
