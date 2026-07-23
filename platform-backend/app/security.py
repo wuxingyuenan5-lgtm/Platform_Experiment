@@ -107,7 +107,10 @@ def enforce_order_safety(
     if instrument is None:
         raise HTTPException(status_code=404, detail="Instrument not found")
     if instrument["contract_version"] is None:
-        raise HTTPException(status_code=422, detail="Instrument has no active contract specification")
+        raise HTTPException(
+            status_code=422,
+            detail="Instrument has no active contract specification",
+        )
 
     min_order_quantity = Decimal(instrument["min_order_quantity"])
     quantity_step = Decimal(instrument["quantity_step"])
@@ -116,9 +119,15 @@ def enforce_order_safety(
     if quantity < min_order_quantity:
         raise HTTPException(status_code=422, detail="Order quantity is below minimum")
     if quantity_step <= 0 or quantity % quantity_step != 0:
-        raise HTTPException(status_code=422, detail="Order quantity is not aligned to quantity step")
+        raise HTTPException(
+            status_code=422,
+            detail="Order quantity is not aligned to quantity step",
+        )
     if price is not None and (price_tick <= 0 or price % price_tick != 0):
-        raise HTTPException(status_code=422, detail="Order price is not aligned to price tick")
+        raise HTTPException(
+            status_code=422,
+            detail="Order price is not aligned to price tick",
+        )
 
     if account["environment"] != LIVE_ENVIRONMENT:
         return
