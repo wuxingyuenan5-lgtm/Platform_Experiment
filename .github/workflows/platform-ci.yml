@@ -30,7 +30,33 @@ jobs:
           git fetch origin refactor/phase1-composition-boundaries
           git show origin/refactor/phase1-composition-boundaries:scripts/apply_phase1_composition_refactor.py > scripts/apply_phase1_composition_refactor.py
       - name: Apply deterministic source changes
-        run: python scripts/apply_phase1_composition_refactor.py
+        run: |
+          python scripts/apply_phase1_composition_refactor.py
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('platform-backend/app/eod_reconciliation.py')
+          source = path.read_text(encoding='utf-8')
+          malformed = '''\
+          apply_outstanding_difference_gate(
+              report_id,
+              request.strategy_instance_id,
+              request.account_id,
+          )
+          return get_eod_report(report_id)
+          '''
+          corrected = '''\
+              apply_outstanding_difference_gate(
+                  report_id,
+                  request.strategy_instance_id,
+                  request.account_id,
+              )
+              return get_eod_report(report_id)
+          '''
+          if malformed not in source:
+              raise RuntimeError('Generated EOD policy block was not found')
+          path.write_text(source.replace(malformed, corrected, 1), encoding='utf-8')
+          PY
       - name: Install backend tooling
         working-directory: platform-backend
         run: python -m pip install -e '.[dev]'
