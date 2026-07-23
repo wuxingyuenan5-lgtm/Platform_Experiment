@@ -26,3 +26,8 @@ line-length = 100
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
+
+[tool.ruff.lint.per-file-ignores]
+# FastAPI route metadata is intentionally declared in the function signature.
+# The quoted self-return annotation keeps the validator compatible with Pydantic's runtime model build.
+"app/financial_facts.py" = ["B008", "UP037"]
