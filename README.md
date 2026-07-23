@@ -5,14 +5,14 @@
 ## 当前权威基线
 
 - 正式分支：`main`
-- 当前 main：`17066f39254314a421ffb91b05520d2a972129ec`
-- 当前实施：Phase 3 不可变金融事实、正式 PnL 与统一估值 NAV
+- 当前 main：`77bf4223c2059d5a56fc08a2d49214351c396abc`
+- 当前状态：Phase 3 已完成，下一阶段为执行风险与 Demo 闭环
 - 总跟踪：GitHub Issue `#2`
 - Phase 1：PR `#3`，已完成
 - Phase 2：Issue `#4`、PR `#5`，已完成
-- Phase 3：Issue `#7`、PR `#8`
+- Phase 3：Issue `#7`、PR `#9`，已完成
 - 总计划：`docs/planning/V6-交易安全加固实施计划.md`
-- Phase 3 计划：`docs/planning/V6-Phase3-金融事实与正式账务.md`
+- Phase 3 记录：`docs/planning/V6-Phase3-金融事实与正式账务.md`
 
 当前系统只允许 Simulation / Fake Gateway，不开放 Paper、Demo 或真实资金 Live。
 
@@ -21,7 +21,7 @@
 | 你要做什么 | 入口 |
 |---|---|
 | 看总体工程计划 | `docs/planning/V6-交易安全加固实施计划.md` |
-| 看当前 Phase 3 | `docs/planning/V6-Phase3-金融事实与正式账务.md` |
+| 看 Phase 3 验收记录 | `docs/planning/V6-Phase3-金融事实与正式账务.md` |
 | 看 FinancialFact 与正式账务设计 | `docs/technical/FINANCIAL_FACTS.md` |
 | 看正式 API 口径 | `docs/technical/API_SPEC.md` |
 | 看已完成 Phase 2 | `docs/planning/V6-Phase2-命令入口与结果恢复.md` |
