@@ -24,7 +24,10 @@ def get_trading_safety() -> TradingSafetyResponse:
         liveTradingEnabled=settings.live_trading_enabled,
         defaultTradingEnvironment=settings.default_trading_environment,
         secretStoragePolicy="database_stores_references_only",
-        liveGuardPolicy="all_accounts_fail_closed_and_live_requires_global_switch",
+        liveGuardPolicy=(
+            "all_accounts_fail_closed_live_requires_global_switch_authentication_"
+            "and_two_person_session"
+        ),
     )
 
 
@@ -91,6 +94,12 @@ def enforce_order_safety(
     instrument_id: str,
     quantity: Decimal,
     price: Decimal | None,
+    *,
+    strategy_instance_id: str | None = None,
+    symbol: str | None = None,
+    side: str | None = None,
+    order_type: str | None = None,
+    command_id: str | None = None,
 ) -> None:
     account = get_account_security_row(account_id)
     if account is None:
@@ -138,6 +147,34 @@ def enforce_order_safety(
             status_code=403,
             detail="Live trading is disabled by global safety switch",
         )
+    if settings.auth_mode.lower() != "api_key":
+        raise HTTPException(
+            status_code=503,
+            detail="Live trading requires production authentication",
+        )
+    if not settings.require_live_trading_session:
+        raise HTTPException(
+            status_code=503,
+            detail="LiveTradingSession enforcement cannot be disabled in live trading",
+        )
+    if None in {strategy_instance_id, symbol, side, order_type, command_id}:
+        raise HTTPException(
+            status_code=403,
+            detail="Live order lacks an approved-session identity boundary",
+        )
+
+    from app.live_trading_sessions import validate_and_claim_live_session
+
+    validate_and_claim_live_session(
+        command_id=str(command_id),
+        strategy_instance_id=str(strategy_instance_id),
+        account_id=account_id,
+        symbol=str(symbol),
+        side=str(side),
+        order_type=str(order_type),
+        quantity=quantity,
+        price=price,
+    )
 
 
 def get_account_security_row(account_id: str):
