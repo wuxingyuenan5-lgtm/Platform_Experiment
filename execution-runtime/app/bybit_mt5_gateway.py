@@ -21,7 +21,9 @@ from app.mt5_live_adapter import Mt5LiveAdapter
 class BybitMt5Gateway:
     """Account-routed live gateway with independent Bybit and MT5 adapters."""
 
-    name = "bybit_mt5_live"
+    # Keep the registered gateway identity stable for configuration and API compatibility.
+    # Whether external writes are allowed is governed by the independent live safety gates.
+    name = "bybit_mt5"
 
     def __init__(
         self,
