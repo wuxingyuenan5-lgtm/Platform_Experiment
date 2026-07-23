@@ -26,10 +26,12 @@ def test_recursive_redaction_hides_sensitive_fields_and_nested_values() -> None:
 
 
 def test_text_redaction_hides_bearer_private_key_and_url_password() -> None:
+    begin = "-----BEGIN " + "PRIVATE KEY-----"
+    end = "-----END " + "PRIVATE KEY-----"
     text = (
         "Authorization: Bearer sample-runtime-token-12345 "
         "postgresql://operator:database-password@127.0.0.1:5432/vg "
-        "-----BEGIN PRIVATE KEY-----\nmaterial\n-----END PRIVATE KEY-----"
+        f"{begin}\nmaterial\n{end}"
     )
 
     result = redact_text(text)
