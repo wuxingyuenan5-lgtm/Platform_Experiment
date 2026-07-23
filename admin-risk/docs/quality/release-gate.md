@@ -3,15 +3,22 @@
 状态：`active`  
 适用基线：`main / Platform V6`  
 总体计划：`../../../docs/planning/V6-交易安全加固实施计划.md`  
-当前阶段：`../../../docs/planning/V6-Phase4B-外部查询与对账差异.md`
+当前阶段：`../../../docs/planning/V6-Phase4C-受控实盘适配器.md`
 
 ## 1. 目的
 
-建立低成本、可重复、可审计的工程门槛。涉及交易、账户、执行、风险、FinancialFact、PnL、NAV、Venue Query、Reconciliation 或部署的变更，不能只凭页面效果判断完成。
+建立可重复、可审计的工程与运营门槛。涉及交易、账户、执行、风险、Live Adapter、FinancialFact、PnL、NAV、Venue Query、Reconciliation 或部署的变更，不能只凭页面效果或“接口能调用”判断完成。
+
+Phase 4C 区分：
+
+- 工程验收：代码、离线 Provider Contract Tests、CI 和文档。
+- 运营验收：真实账户只读、连续对账、最小仓位写入和 Kill Switch 演练。
+
+工程验收通过不自动授予实盘写入权限。
 
 ## 2. 自动检查
 
-### 前端
+### Frontend
 
 ```bash
 cd admin-risk
@@ -28,20 +35,18 @@ python -m ruff check app tests
 python -m pytest
 ```
 
-Phase 4B 严格 Gate 至少覆盖：
+严格 Gate 至少覆盖：
 
-- `app/main.py`
-- `app/trading.py`
 - `app/trade_commands.py`
+- `app/trade_command_execution.py`
 - `app/execution_batches.py`
 - `app/execution_risk.py`
-- `app/execution_exposure.py`
 - `app/financial_facts.py`
 - `app/venue_reconciliation.py`
-- `tests/test_execution_risk.py`
-- `tests/test_financial_facts.py`
-- `tests/test_venue_reconciliation.py`
-- Phase 1–3 全部安全、恢复和账务测试
+- `app/live_venue_accounting.py`
+- `tests/test_trade_command_live_runtime_payload.py`
+- `tests/test_live_venue_accounting.py`
+- Phase 1–4B 全部安全、恢复、账务和对账测试
 
 ### Execution Runtime
 
@@ -54,70 +59,139 @@ python -m pytest
 严格 Gate 至少覆盖：
 
 - `app/main.py`
-- `app/journal.py`
 - `app/models.py`
 - `app/gateway.py`
-- `app/fake_gateway.py`
-- `app/venue_store.py`
-- `tests/test_atomic_command_claim.py`
-- `tests/test_runtime_journal.py`
-- `tests/test_venue_query.py`
+- `app/gateway_factory.py`
+- `app/gateway_errors.py`
+- `app/bybit_mt5_gateway.py`
+- `app/bybit_live_adapter.py`
+- `app/mt5_live_adapter.py`
+- `app/live_safety.py`
+- `app/live_route_store.py`
+- `app/secret_resolver.py`
+- `tests/test_live_safety.py`
+- `tests/test_bybit_live_adapter.py`
+- `tests/test_mt5_live_adapter.py`
+- Phase 1–4B Runtime 回归测试
 
 ### GitHub Actions
 
 - `main`、`hardening/**` 和面向 `main` 的 PR 必须触发 Platform CI。
 - Backend、Runtime、Frontend 全部通过后才允许合并。
-- 失败日志必须保留为短期 Artifact。
+- 失败日志保留短期 Artifact。
 - README、START-HERE、Release Gate、Planning、Technical、API Spec 和 Changelog 变化必须触发 CI。
-- 不允许强推 `main` 绕过检查。
+- 不允许强推 main 绕过检查。
 
 ## 3. TradeCommand 与 ExecutionBatch
 
 - 正式写入口只有 TradeCommand 和 ExecutionBatch。
-- 两者都必须有业务级幂等键。
+- 业务级幂等键必填。
 - Strategy、active Binding、Account、Instrument、ContractSpecification 必须有效。
-- 数量、数量步长、价格步长合法。
-- Live 默认关闭。
-- 每个 Batch Leg 都生成独立 TradeCommand。
-- Batch 第一腿前完成全部 Catalog 预校验。
+- 数量、价格和步长合法。
+- Platform Live Gate 默认关闭。
+- 每个 Batch Leg 生成独立 TradeCommand。
+- StrategyInstance 身份必须传递到 Runtime。
 - 相同幂等键不同载荷返回 409。
-- Deprecated `/trading/orders` 不得被新代码依赖。
+- Deprecated `/trading/orders` 不得作为 Live 写入口。
 
-## 4. Runtime 命令幂等
+## 4. Runtime Command 幂等
 
 - Runtime 在 Gateway 副作用前原子抢占 command_id。
 - 重复 Command 返回持久化事件。
-- 已认领但尚无事件时返回 409，不重复调用 Gateway。
-- Runtime 重启后 Journal 仍可恢复事件。
-- 任何 Query API 不得调用 `submit_order`。
+- 已认领但无事件时不重复调用 Gateway。
+- Runtime 重启后 Journal 可恢复。
+- LiveWriteClaim 在 SQLite 原子事务中认领。
+- Command 载荷冲突拒绝。
+- Query API 不得调用 submit_order。
 
-## 5. result_unknown 恢复
+## 5. Result Unknown
 
-- `result_unknown` 不得直接重试原订单。
-- 第一层恢复查询 Runtime Journal。
-- 第二层恢复查询 Venue Order 与 External Fill。
-- Runtime Journal 无事件时保持未知，直到外部查询给出证据。
-- External Fill ID 必须作为稳定本地 Fill Event ID。
-- External Fill 重放不得重复改变 Position、FinancialFact、PnL 或 NAV。
-- 恢复后同步 Order 与 TradeCommand。
-- 外部仍查不到时创建 `missing_external` Difference，不伪装为失败或取消。
+- 同步 ACK 不等于成交。
+- Venue 明确拒绝与结果未知分开处理。
+- 可能已到 Venue但无法确认时返回 502，使 Platform 标记 `result_unknown`。
+- `result_unknown` 不得直接重下。
+- 第一层查 Runtime Journal，第二层查 Venue Order 与 Fill/Deal。
+- 外部仍查不到时生成 Difference。
+- External Fill/Deal ID 必须作为稳定事实身份。
 
 ## 6. Kill Switch 与 Execution Risk
 
-- 支持 global、strategy、account Kill Switch。
-- Batch 认领前与每条 Leg 执行前检查。
-- 命中返回 423，且不能产生新 TradeCommand 或 Runtime 副作用。
-- Batch 固化最大腿间延迟、最大残留名义敞口和失败处置策略。
-- 残留风险先净 Contract Delta，再折算未匹配名义金额。
-- 多单位或多币种不可比较时标记 `MIXED / incomplete`。
+- Global、Strategy、Account Kill Switch 在 Batch 认领前和每腿执行前检查。
+- 命中后不能产生新增风险。
+- Batch 固化腿间延迟、残留名义敞口和失败处置策略。
 - `failed` 不等于风险解除。
-- 正常 Batch 只有 residual=0 且 quality=complete 才能标记 `hedged`。
 - 自动平仓和替代对冲必须通过 TradeCommand。
 - RiskAction 重放不得重复下单。
+- 风险状态、动作、操作人和原因进入 AuditEvent。
 
-## 7. Runtime Venue Query
+## 7. Live Runtime 双重门禁
 
-必须提供明确、无副作用的：
+写入必须同时满足：
+
+1. Runtime `environment=live`。
+2. Runtime `liveWriteEnabled=true`；默认 false。
+3. Account 位于 allowlist。
+4. StrategyInstance 位于 allowlist。
+5. Symbol 位于 allowlist。
+6. 正数 Reference Price 可用。
+7. 单笔 Notional 不超限。
+8. 单日累计 Notional 不超限。
+9. Platform Live Gate、Kill Switch 和 Execution Risk 已通过。
+10. Credential Ref、Account Route 和 Instrument Map 完整。
+
+任一条件无法确认时 fail-closed。不得自动回退 Fake Gateway。
+
+## 8. Account 与 Instrument 路由
+
+- 一个 Account 只能映射一个 Live Adapter。
+- 未映射 Account 拒绝 Query 和 Command。
+- Bybit Symbol 和 MT5 Symbol 必须显式映射到 Backend Instrument ID。
+- 未映射 Instrument 的 Position、Deal、Funding、Swap 或 Fee 不得标记 complete。
+- Query 不得把未映射数据静默丢弃后声称完整；Import 响应必须列出 skippedExternalIds。
+
+## 9. Bybit Live Adapter
+
+必须确认：
+
+- 使用 V5 Unified Trading API。
+- `orderLinkId` 由 Platform Order ID 确定性派生且符合长度限制。
+- place-order ACK 只生成 acknowledged，不生成虚假 Fill。
+- Open Orders、Order History 和 Executions 可以恢复最终状态。
+- Execution `execId` 用作 Fill 自然身份。
+- Position、Wallet 和 Transaction Log 查询失败不返回伪造零值。
+- Funding 与 Fee 分项映射，Fee 使用带符号负贡献。
+- API Key 和 Secret 不进入响应、日志和审计。
+
+## 10. MT5 Live Adapter
+
+必须确认：
+
+- 非 Windows 或无可用 Terminal 时 fail-closed。
+- 使用配置的真实登录账号，account_info login 必须匹配。
+- 下单前执行 `order_check`。
+- 写入使用 `order_send`。
+- Order、Deal、Position 和 Account 查询使用官方接口。
+- Magic Number、Comment、Order/Deal/Position Ticket 可追溯。
+- Deal Ticket 用作 Fill、Swap 和 Fee 自然身份。
+- Swap、Commission 和 Fee 从外部字段导入，不倒推。
+- Password 和 Server 不进入响应、日志和审计。
+
+## 11. Runtime Capability
+
+```http
+GET /gateway/capabilities
+```
+
+必须返回：
+
+- Gateway 与 Environment。
+- 全局 Live Write 是否开启。
+- 每个 Adapter 的 configured、operational、writeEnabled。
+- Account IDs、Capabilities、Missing Requirements。
+
+不得返回任何 Secret 值。configured 与 operational 必须区分；依赖或环境不可用时不能标记 operational。
+
+## 12. Venue Query 与 Economic Event
 
 ```http
 GET /venue/orders/by-platform/{platformOrderId}
@@ -125,159 +199,106 @@ GET /venue/orders/{externalOrderId}
 GET /venue/fills
 GET /venue/positions
 GET /venue/balances
+GET /venue/economic-events
 POST /venue/orders/{externalOrderId}/cancel
 ```
 
 检查项：
 
-- Snapshot 有 source、外部身份、Account、Instrument、时间和质量状态。
-- Query 404 与网络错误不同。
-- 空列表表示查询成功但无结果，不等于 Runtime 不可用。
-- Cancel 使用独立幂等键。
-- 已终态 Order 返回 `already_final`，不得称为新取消成功。
-- unsupported 必须显式返回，不能包装为空仓或零余额。
-- Fake Gateway 外部 ID 确定性并持久化到 Journal SQLite。
-- Runtime TestClient 重启后 Fake Order、Fill、Position、Balance 仍可查询。
+- Query 与 Command 分离。
+- 404、空结果、网络错误、配置错误和结果未知含义不同。
+- Snapshot 有 source、外部 ID、Account、Instrument、时间和质量状态。
+- Cancel 也受 Runtime Live Gate 和 allowlist 约束。
+- Bybit Funding/Fee 与 MT5 Swap/Fee 使用稳定 External Event ID。
 
-## 8. FinancialFact 导入
-
-- External Order Snapshot → `external_order` Fact。
-- External Fill → `trade_fill` Fact。
-- External Position Snapshot → `position` Fact。
-- External Balance Snapshot → `balance` Fact。
-- Order/Position 时点快照身份必须包含 asOf。
-- Fill 使用自然 External Fill ID。
-- 同一事实重复导入返回原 Fact。
-- 同一身份不同载荷返回 409。
-- Position Snapshot 不得直接覆盖由 Fill 重建的 Formal Position。
-- 缺少必要身份、时间、币种或 Instrument 时不得标记 complete。
-
-## 9. Venue Reconciliation Run
+## 13. FinancialFact 与 Economic Event Import
 
 ```http
-POST /api/v1/ops/venue-reconciliation/runs
-GET  /api/v1/ops/venue-reconciliation/runs/{runId}
-GET  /api/v1/ops/venue-reconciliation/runs/{runId}/differences
+POST /api/v1/ops/live-economic-events/import
 ```
 
-必须确认：
-
-- 请求包含 `idempotencyKey`、StrategyInstance、Account、actor。
-- Account 与 StrategyInstance active binding 有效。
-- 相同幂等键同载荷返回原 Run。
+- 请求有 idempotencyKey、StrategyInstance、Account、actor。
+- 同一导入幂等键同载荷返回原结果。
 - 相同幂等键不同载荷返回 409。
-- Run 记录 source、status、各类 Snapshot Count、Fact Count、Difference Count 和时间。
-- 查询或导入失败不能将 Run 标记 completed。
-- 重复 Run 不重复记账。
+- Funding、Swap、Fee 写入不可变 FinancialFact。
+- External Event ID 用作事实自然身份。
+- 未映射 Instrument 进入 skippedExternalIds。
+- 重复导入不重复改变 Formal PnL。
+- 导入动作写入 AuditEvent。
 
-## 10. Reconciliation Difference
+## 14. Venue Reconciliation
 
-支持：
+- External Order、Fill/Deal、Position 和 Balance 进入 FinancialFact 或 Difference。
+- Position Snapshot 不直接覆盖由 Fill 重建的 Formal Position。
+- 外部与本地差异不得无痕覆盖。
+- Difference 保存 local/external value、状态、操作人、原因和时间。
+- 首次处置记录不可被重复请求改写。
 
-- `missing_local`
-- `missing_external`
-- `quantity_mismatch`
-- `price_mismatch`
-- `currency_mismatch`
-- `status_mismatch`
+## 15. Formal Accounting
 
-每个 Difference 必须保存：
-
-- run_id 和稳定 difference_key。
-- entity_type。
-- local/external reference。
-- local/external value JSON。
-- `open / resolved / accepted`。
-- resolution actor、reason、time。
-
-约束：
-
-- 差异不得通过无痕覆盖本地或外部值消失。
-- 首次非 open 处置后，后续重复请求返回原结果。
-- 处置动作写入 AuditEvent。
-- `accepted` 表示已解释，不表示数值相等。
-
-## 11. Formal Accounting
-
-- FinancialFact 只新增，不提供业务更新和删除。
-- Formal Position/PnL 能从事实完整重建。
-- Trading PnL 使用 Quantity、Price、Direction、Contract Multiplier 和 FX。
-- Funding、Swap、Fee、FX 与 Trading PnL 分项保存。
+- FinancialFact 只新增。
+- Formal Position/PnL 可从事实重建。
+- Trading、Funding、Swap、Fee、FX 分项。
+- Contract Multiplier、Currency、Unit 和 FX 显式。
 - Stablecoin 不自动等同法币。
-- 缺失 FX 标记 incomplete。
-- Formal NAV 对全部 active binding 使用同一 valuationTime。
-- 缺失账户返回 missingAccountIds，不补零。
-- 旧 PnL/NAV 兼容接口不得标记为正式账务。
+- Formal NAV 使用统一 valuationTime。
+- 缺失 Account、FX 或 Instrument Map 不补零。
 
-## 12. 前端与产品界面
+## 16. 前端与产品界面
 
-- 从 Backend 获取 Strategy、Binding、Account、Instrument 和 ContractSpecification。
-- Catalog 不完整时禁用提交。
-- Simulation、Demo、Live 明确区分。
-- 缺失 Position、PnL、Risk、Venue 和 Difference 数据展示 `—` 或未知。
-- 不展示无业务必要的开发说明、跳转机制、实现解释和联调备注。
-- 必要提示短、准、就近；完整解释进入 Markdown。
+- Simulation 与 Live 明确区分。
+- Catalog 或 Gateway Capability 不完整时禁用提交。
+- Live Write 关闭时不得显示为可执行。
+- 缺失 Position、PnL、Risk、Venue 和 Difference 展示 `—` 或未知。
+- 产品页面不展示开发说明、实现解释或联调备注。
 
-## 13. 金样本
+## 17. 工程金样本
 
-Phase 4B 至少保留：
+至少保留：
 
-1. Runtime timeout → result_unknown。
-2. Journal 404 → Venue Order/Fill 恢复。
-3. 恢复过程不调用 submit_order。
-4. 重复 Venue Reconcile 不增加 Fill 与 FinancialFact。
-5. Formal Position 由 External Fill 形成。
-6. Position/Balance Snapshot 导入 Fact。
-7. missing_local Difference。
-8. Difference accepted 后重复处置不覆盖。
-9. Run 幂等键载荷冲突返回 409。
-10. Fake Venue 跨 Runtime 重启保持状态。
-11. Fake Cancel 重复幂等，终态返回 already_final。
+1. LiveWrite 默认关闭。
+2. Account、Strategy、Symbol allowlist 拒绝。
+3. 单笔和单日名义金额限额。
+4. 重复 Live Command 不重复累计 Notional。
+5. Bybit ACK 不生成虚假 Fill。
+6. Bybit orderLinkId、Execution、Funding 和 Fee 映射。
+7. MT5 order_check/order_send、Magic/Comment/Ticket 映射。
+8. MT5 Deal、Swap 和 Fee 映射。
+9. StrategyInstance 跨 Platform/Runtime 边界保留。
+10. Economic Event 重复导入不重复记账。
+11. 既有 Phase 1–4B 金样本全部通过。
 
-Phase 4A、Phase 3 和 Phase 1–2 金样本必须继续通过。
+## 18. 运营验收
 
-## 14. 审计
+必须在真实账户上完成并人工留痕：
 
-必须记录：
+- Bybit 只读订单、成交、持仓、余额、Funding。
+- MT5 只读 Order、Deal、Position、Balance、Swap。
+- 连续多个日终周期无未解释差异。
+- 最小允许仓位受控下单、撤单、查询和事实导入。
+- Kill Switch 和人工接管演练。
 
-- TradeCommand、恢复和 Runtime identity 校验。
-- Kill Switch、Risk Policy、Risk State、RiskAction。
-- FinancialFact 入库、投影重建、Formal NAV。
-- `venue_order_reconciled`。
-- `venue_reconciliation_completed`。
-- `reconciliation_difference_resolved`。
+运营验收前 `liveWriteEnabled=false`。
 
-日志和响应不得泄露真实凭证。
+## 19. 阻断条件
 
-## 15. 阻断条件
-
-存在任一情况不得合并或发布：
+任一情况存在，不得合并、开启 Live Write 或扩大实盘：
 
 - 任一 CI Job 失败或未执行。
-- Query API 可能重新提交订单。
-- result_unknown 恢复会重下原订单。
-- External Fill 重放重复记账。
-- External Snapshot 缺少身份或时间仍标记 complete。
-- 外部与本地差异被无痕覆盖。
-- Difference 没有 actor、reason 或处置时间。
-- 已处置 Difference 可被重复请求改写。
-- Runtime 不可用被解释为空仓或零余额。
-- Cancel unsupported 被解释为成功。
-- Kill Switch 命中后仍能创建新增风险。
-- 自动平仓绕过 TradeCommand。
-- Formal PnL/NAV 不能从事实核对。
+- Live Write 默认开启。
+- Platform 或 Runtime 任一道门禁可被绕过。
+- Account、Strategy、Symbol 或 Notional 未 fail-closed。
+- 同步 ACK 被视为成交。
+- `result_unknown` 会重下原订单。
+- Query 失败被解释为空仓或零余额。
+- 一个 Account 映射多个 Adapter。
+- Secret 出现在响应、日志、审计或仓库。
+- Funding、Swap、Fee 重复记账。
+- 未映射 Instrument 被静默当作完整数据。
+- Difference 被无痕覆盖。
 - active Markdown 与实现冲突。
-- Bybit/MT5 未真实完成 Demo 却被标记可用。
-- Live 开关、凭证、权限或回滚方案不清楚。
+- 未完成真实账户运营验收却标记 Live Operational。
 
-## 16. 后续升级
+## 20. 后续升级
 
-Phase 4C–4D 加入：
-
-- Bybit Demo 真实下单、撤单、查询、Funding。
-- MT5 Demo Order/Deal、持仓、余额、Swap。
-- Demo、Simulation、Live 账户与 Runtime 隔离。
-- 日终调度、差异严重度、责任人、SLA 和报告。
-- 断网、超时、Runtime 重启和单腿失败演练。
-- 连续运行和零未解释差异验收。
-- 认证、RBAC、双人审批和生产密钥托管。
+Phase 4D：日终自动调度、Difference 严重度、责任人、SLA、报告、断网/重启演练和连续运行验收。认证、RBAC、双人审批与生产密钥托管仍需独立建设。
