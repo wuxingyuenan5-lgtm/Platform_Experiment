@@ -4,6 +4,7 @@ from uuid import uuid4
 from fastapi.testclient import TestClient
 
 from app.config import get_settings
+from app.database import connection
 from app.main import app
 
 
@@ -78,6 +79,12 @@ def test_execution_batch_is_idempotent(monkeypatch, tmp_path: Path) -> None:
     }
 
     with TestClient(app) as client:
+        with connection() as db:
+            db.execute(
+                "UPDATE accounts SET status = 'active' WHERE id IN (?, ?)",
+                ("account_crypto_test", "account_crypto_test_b"),
+            )
+
         first = client.post("/api/v1/trading/execution-batches", json=payload)
         second = client.post("/api/v1/trading/execution-batches", json=payload)
 
@@ -85,7 +92,9 @@ def test_execution_batch_is_idempotent(monkeypatch, tmp_path: Path) -> None:
         assert second.status_code == 200
         assert second.json() == first.json()
         assert first.json()["status"] == "hedged"
-        assert first.json()["strategyInstanceId"] == "strategy_cross_venue_spread_instance_default"
+        assert first.json()["strategyInstanceId"] == (
+            "strategy_cross_venue_spread_instance_default"
+        )
         assert {leg["accountId"] for leg in first.json()["legs"]} == {
             "account_crypto_test",
             "account_crypto_test_b",
