@@ -2,6 +2,28 @@
 
 ## Unreleased
 
+### Production authentication, RBAC, and two-person live sessions — Production Gate 5A/5B
+
+- Added live-environment Bearer authentication with SHA-256 credential matching; raw tokens are not stored in source, database rows, logs, audit details, or responses.
+- Rejected anonymous, invalid, inactive, and development-mode authentication in the Live environment while retaining an explicit non-Live development identity for Simulation and CI.
+- Added default-deny RBAC for viewer, researcher, trader, risk_officer, operations, and admin roles.
+- Bound actor/reviewer fields to the authenticated Principal so a request body cannot impersonate another user.
+- Added request identity metadata and security rejection handling without exposing credential values.
+- Added idempotent `LiveTradingSession` requests scoped to StrategyInstance, Account, Symbol, Side, Order Type, time window, per-order notional, daily notional, read-only evidence, and immutable payload hash.
+- Required a trader/admin Applicant and a different risk_officer/admin Approver; admin self-approval is explicitly rejected.
+- Blocked session approval when platform absolute limits are missing/exceeded, a Kill Switch is enabled, open/accepted reconciliation differences exist, an approved session overlaps, or the required EOD/scale gate is not clean.
+- Required every Live Command to claim exactly one active approved session before inserting the Order or calling Runtime.
+- Added Command-ID idempotency and payload-conflict detection for session claims.
+- Added SQLite `BEGIN IMMEDIATE` claim serialization so concurrent commands cannot jointly exceed the approved daily notional.
+- Added authentication, RBAC, actor binding, two-person approval, no-session rejection, Kill Switch, absolute-limit, replay, and concurrent-claim golden tests.
+- Added repository Secret Scan for private keys, common platform tokens, high-entropy literal secrets, and unreviewed tracked `.env*` files.
+- Added an independent diagnosable Secret Scan workflow and a blocking Repository Safety job in Platform CI.
+- Reviewed tracked `admin-risk/.env*` files as public browser `VITE_*` manifests; their contents remain subject to known-token and high-entropy scanning.
+- Added `docs/planning/V6-Production-Gate-身份权限与实盘会话.md` and `docs/technical/AUTH_RBAC_LIVE_SESSIONS.md`.
+- Synchronized Issue #22, PR #23, README, START-HERE, API Specification, Release Gate, overall V6 plan, CI, and this Changelog.
+- Kept Platform and Runtime Live Write disabled by default; engineering completion does not configure real credentials or authorize real-money writes.
+- Deferred production SecretProvider/rotation, alerting, backup, restore drills, and user-management UI to Production Gate 5C/5D.
+
 ### Live end-of-day reconciliation and scale gates — Phase 4D
 
 - Added idempotent EOD reconciliation reports keyed by business date, StrategyInstance, Account, IANA timezone, valuation time, and request payload hash.
@@ -78,9 +100,3 @@
 - Added rebuildable Formal Position/PnL and one-valuation-time multi-account Formal NAV.
 - Separated Trading, Funding, Swap, Fee, FX, and Total PnL.
 - Added audit events and golden tests.
-- Completed Platform CI `#127 / run 29993137286` and merged through PR #9.
-
-### Product surface cleanup
-
-- Removed the explanatory redirect paragraph from the login card so the page contains only identity, authentication, and registration actions required by the user.
-- Removed the unused login subhead styles and preserved the existing redirect behavior in code.
