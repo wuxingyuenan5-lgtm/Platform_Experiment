@@ -72,14 +72,26 @@ jobs:
         run: >-
           python -m ruff check
           app/main.py
+          app/config.py
           app/journal.py
           app/models.py
           app/gateway.py
+          app/gateway_errors.py
+          app/gateway_factory.py
           app/fake_gateway.py
           app/venue_store.py
+          app/live_route_store.py
+          app/live_safety.py
+          app/bybit_live_adapter.py
+          app/mt5_live_adapter.py
+          app/bybit_mt5_gateway.py
+          app/secret_resolver.py
           tests/test_atomic_command_claim.py
           tests/test_runtime_journal.py
           tests/test_venue_query.py
+          tests/test_live_safety.py
+          tests/test_bybit_live_adapter.py
+          tests/test_mt5_live_adapter.py
       - name: Full lint debt inventory
         continue-on-error: true
         run: python -m ruff check app tests
@@ -87,7 +99,7 @@ jobs:
         shell: bash
         run: |
           if ! python -m pytest > /tmp/runtime-pytest.log 2>&1; then
-            tail -n 160 /tmp/runtime-pytest.log
+            tail -n 220 /tmp/runtime-pytest.log
             exit 1
           fi
       - name: Upload runtime pytest diagnostics
@@ -122,11 +134,13 @@ jobs:
             app/security.py \
             app/trading.py \
             app/trade_commands.py \
+            app/trade_command_execution.py \
             app/execution_batches.py \
             app/execution_risk.py \
             app/execution_exposure.py \
             app/financial_facts.py \
             app/venue_reconciliation.py \
+            app/live_venue_accounting.py \
             tests/test_order_safety_fail_closed.py \
             tests/test_secret_safety.py \
             tests/test_trading_flow.py \
@@ -137,6 +151,8 @@ jobs:
             tests/test_execution_risk.py \
             tests/test_financial_facts.py \
             tests/test_venue_reconciliation.py \
+            tests/test_live_venue_accounting.py \
+            tests/test_trade_command_live_runtime_payload.py \
             tests/test_ops_observability.py \
             > /tmp/backend-ruff.log 2>&1; then
             cat /tmp/backend-ruff.log
@@ -157,7 +173,7 @@ jobs:
         shell: bash
         run: |
           if ! python -m pytest > /tmp/backend-pytest.log 2>&1; then
-            tail -n 200 /tmp/backend-pytest.log
+            tail -n 240 /tmp/backend-pytest.log
             exit 1
           fi
       - name: Upload backend pytest diagnostics
