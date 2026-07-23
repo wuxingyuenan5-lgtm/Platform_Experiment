@@ -33,6 +33,7 @@ docs/                Architecture and operational documentation
 - Prefer existing architecture patterns over introducing new frameworks.
 - Keep composition roots declarative: wire routers and middleware only; import domain policies explicitly and never monkey-patch modules.
 - Keep one authoritative implementation for each domain calculation; compatibility wiring must not replace functions at runtime.
+- Keep API schemas owned by their domain module; cross-domain compatibility modules may use explicit public aliases to re-export but must not redefine them.
 - CI quality gates must cover complete maintained directories; do not use file allowlists that let new code bypass lint or dependency validation.
 - Use `rg` for search.
 - Ignore `node_modules`, `.venv`, `dist`, generated outputs and external references unless explicitly required.
