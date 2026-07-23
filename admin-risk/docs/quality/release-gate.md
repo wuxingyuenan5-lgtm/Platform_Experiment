@@ -3,19 +3,19 @@
 状态：`active`  
 适用基线：`main / Platform V6`  
 总体计划：`../../../docs/planning/V6-交易安全加固实施计划.md`  
-当前阶段：`../../../docs/planning/V6-Phase3-金融事实与正式账务.md`
+当前阶段：`../../../docs/planning/V6-Phase4A-执行风险与Kill-Switch.md`
 
 ## 1. 目的
 
-为以 Vibe Coding 为主的开发方式建立低成本、可重复、可审计的质量门槛。任何涉及交易、账户、持仓、PnL、Runtime、权限或部署的变更，不能只凭页面效果判断完成。
+为以 Vibe Coding 为主的开发方式建立低成本、可重复、可审计的质量门槛。任何涉及交易、账户、持仓、PnL、Runtime、权限、风险或部署的变更，不能只凭页面效果判断完成。
 
-本规范是所有稳定提交和 Pull Request 的最低门槛，不等于完整生产测试体系。
+本规范是稳定提交和 Pull Request 的最低门槛，不等于完整生产测试体系。
 
 ## 2. 自动检查
 
 ### 2.1 前端
 
-在 `admin-risk` 目录执行：
+在 `admin-risk` 执行：
 
 ```bash
 pnpm sync:trading-tools
@@ -27,32 +27,36 @@ pnpm build
 
 - Markdown 交易工具源与生成数据一致。
 - 本次范围无 TypeScript 类型错误。
-- 模板、导入、路由、静态资源和正式打包无阻断错误。
-- 交易页面不得依赖硬编码的正式账户、策略实例或 Instrument ID。
-- 产品页面只展示用户完成业务任务所需的信息、操作和状态。
-- 开发说明、实现解释、跳转机制、联调备注和大段辅助文案不得进入正式页面主要视觉层。
-- 必要提示应短、准、就近呈现；完整解释进入对应 Markdown 文档。
+- 正式构建无阻断错误。
+- 交易页面不得硬编码正式账户、策略实例或 Instrument ID。
+- 产品页面只展示完成业务任务需要的信息、操作和状态。
+- 开发说明、实现解释、跳转机制和联调备注进入 Markdown，不进入正式界面主要视觉层。
 
 ### 2.2 Platform Backend
 
-在 `platform-backend` 目录执行：
+在 `platform-backend` 执行：
 
 ```bash
 python -m ruff check app tests
 python -m pytest
 ```
 
-Phase 3 严格 Gate 至少覆盖：
+Phase 4A 严格 Gate 至少覆盖：
 
 - `app/main.py`
 - `app/application.py`
+- `app/trade_commands.py`
+- `app/execution_batches.py`
+- `app/execution_risk.py`
 - `app/financial_facts.py`
-- `tests/test_financial_facts.py`
-- Phase 1–2 交易安全与恢复测试
+- `tests/test_execution_batches.py`
+- `tests/test_execution_batches_v1.py`
+- `tests/test_execution_risk.py`
+- Phase 1–3 安全、恢复和账务测试
 
 ### 2.3 Execution Runtime
 
-在 `execution-runtime` 目录执行：
+在 `execution-runtime` 执行：
 
 ```bash
 python -m ruff check app tests
@@ -61,35 +65,29 @@ python -m pytest
 
 ### 2.4 GitHub Actions
 
-- `main` push 必须触发 CI。
-- `hardening/**` push 必须触发 CI。
-- 面向 `main` 的 Pull Request 必须触发 CI。
-- 后端、Runtime、前端检查全部通过后才允许合并。
-- 不允许通过强制更新 `main` 绕过失败检查。
-- 本批次修改文件必须通过严格 Ruff Gate；历史债务可以单独盘点，但不得隐藏。
+- `main` push、`hardening/**` push 和面向 `main` 的 PR 必须触发 CI。
+- Backend、Runtime、Frontend 全部通过后才允许合并。
+- 不允许强制更新 `main` 绕过检查。
+- 本批次修改文件必须通过严格 Ruff Gate；历史债务可以盘点，但不得隐藏。
 - `docs/planning/**`、`docs/technical/**`、README、START-HERE、Release Gate 和 Changelog 变化必须触发 CI。
 
 ## 3. 交易安全检查
 
-涉及交易写路径时，必须确认：
-
-- 未知账户 fail-closed。
-- 未知标的或缺失 ContractSpecification fail-closed。
-- 非 `active` 账户禁止下单。
-- Account 必须与 StrategyInstance 存在 active binding。
-- StrategyInstance 必须 active，且当前策略在 V1 中允许闭环执行。
-- 数量满足最小下单量和数量步长。
-- 限价满足价格步长。
-- Live 账户受全局开关保护，默认关闭。
-- 凭证只保存引用，不进入数据库、响应、日志和代码。
-- Runtime 在任何外部副作用前原子抢占 command。
-- 重复 command 不会产生第二次 Gateway 调用。
+- 未知或非 active Account fail-closed。
+- Account 与 StrategyInstance 必须存在 active binding。
+- StrategyInstance 必须 active 且属于 closed-loop。
+- Instrument 与 ContractSpecification 必须存在。
+- 数量、数量步长和价格步长必须合法。
+- Live 默认关闭。
+- 凭证只保存引用，不进入数据库响应、日志和代码。
+- Runtime 在外部副作用前原子抢占 Command。
+- 重复 Command 不产生第二次 Gateway 调用。
 
 任何一项无法确认，不能标记为可交易版本。
 
 ## 4. 命令入口与幂等检查
 
-正式业务写入口只有：
+正式业务写入口：
 
 ```http
 POST /api/v1/trading/commands
@@ -100,227 +98,255 @@ POST /api/v1/trading/execution-batches
 
 - TradeCommand 强制提供 `idempotencyKey`。
 - ExecutionBatch 强制提供 `idempotencyKey` 与 `strategyInstanceId`。
-- 每条 ExecutionBatch Leg 都生成独立 TradeCommand。
+- 每条 Batch Leg 都生成独立 TradeCommand。
 - Leg 幂等键由 Batch 幂等键和 Leg Role 确定性派生。
-- Batch 在执行第一条腿之前完成全部腿的 Catalog 预校验。
-- 并发相同幂等键只允许一个调用者取得执行权。
-- 重复 Batch 不会生成新的 TradeCommand、Order 或 Runtime 调用。
-- 相同幂等键对应不同业务载荷时返回 409。
-- `POST /api/v1/trading/orders` 仅为 deprecated 兼容入口，新业务不得依赖。
+- Batch 在第一腿前完成全部 Catalog 预校验。
+- 重复 Batch 不生成新的 Command、Order 或 Runtime 调用。
+- 相同幂等键不同业务载荷返回 409。
+- `POST /api/v1/trading/orders` 仅为 deprecated 兼容入口。
 
 ## 5. result_unknown 与事件重放检查
 
-涉及未知结果和恢复时，必须确认：
-
 - `result_unknown` 不得被当作失败后直接重试。
 - 恢复接口只能查询 Runtime／外部系统，不能重新提交原订单。
-- Runtime 无事件或不可用时继续保持 `result_unknown`。
-- Runtime event 的 `command_id` 与 `platform_order_id` 必须匹配本地记录。
-- 事件缺失必要身份或时间字段时不得写入投影。
-- Fill 只有在去重插入成功后才能更新 Phase 2 Position、EconomicEvent 和 PnL。
+- Runtime 无事件或不可用时继续保持未知。
+- Runtime event 的 `command_id` 与 `platform_order_id` 必须匹配。
+- Fill 只有去重插入成功后才能更新投影。
 - 相同 Fill event 重放不得重复改变持仓和损益。
 - 恢复后同步 TradeCommand 与 Order 状态。
-- 人工处理和恢复动作必须有审计记录或明确后续任务。
+- 人工处理和恢复动作必须留痕。
 
-当前仍只支持从 Runtime Journal 恢复；外部 Venue 查单恢复未完成前，不允许真实资金 Live。
+外部 Venue 主动查询尚未完成前，不允许真实资金 Live。
 
-## 6. 前端 Catalog 与产品界面检查
+## 6. Phase 4A Kill Switch 检查
 
-交易界面必须：
+接口：
 
-- 从 Backend 获取 StrategyInstance、StrategyAccountBinding、Account、Instrument 与 ContractSpecification。
-- 只允许 active 且符合当前 TradingMode 的策略和账户。
-- 不存在完整现货／永续或双腿 Catalog 时禁用提交。
-- 明确显示当前 Strategy、Account 与 TradingMode。
-- 缺失 Position、PnL、行情或费用显示 `—` 或未知，不自动显示零。
-- 不允许通过环境变量或代码内 UUID 绕过后端 Catalog。
-- 不展示开发说明、实现解释、跳转机制、联调备注或无业务必要的大段辅助文案。
+```http
+GET /api/v1/risk/kill-switches/{scopeType}/{scopeId}
+PUT /api/v1/risk/kill-switches/{scopeType}/{scopeId}
+```
 
-## 7. Phase 3 FinancialFact 检查
+必须确认：
 
-事实入口：
+- 支持 global、strategy、account 三级作用域。
+- Global 作用域固定使用 `scopeId=*`。
+- 写操作必须提供 `idempotencyKey`、`actor`、`enabled` 和可选原因。
+- 同一幂等键同载荷返回原结果，不增加版本。
+- 同一幂等键不同载荷返回 409。
+- Batch 原子认领之前检查 Kill Switch。
+- 每条 Leg 调用 TradeCommand 之前再次检查。
+- 命中时返回 423，且没有新增 Batch／TradeCommand／Runtime 副作用。
+- 开关变化记录版本、操作人、原因和 AuditEvent。
+- Kill Switch 用于阻止新增风险，不得删除或改写历史事实。
+
+## 7. Phase 4A 风险策略与快照检查
+
+接口：
+
+```http
+GET /api/v1/strategies/instances/{strategyInstanceId}/execution-risk-policy
+PUT /api/v1/strategies/instances/{strategyInstanceId}/execution-risk-policy
+```
+
+必须确认：
+
+- 策略包含 `maxLegDelaySeconds`、`maxResidualNotional` 和 `failureAction`。
+- 数值边界经过模型校验。
+- 策略写入幂等且载荷冲突返回 409。
+- Batch 创建时将策略复制到 `execution_batch_risk`。
+- 修改 Strategy Risk Policy 不反向改变历史 Batch。
+- 缺少显式配置时使用文档化默认值，不使用空值或隐式零。
+
+## 8. Phase 4A 残留敞口检查
+
+接口：
+
+```http
+GET /api/v1/trading/execution-batches/{batchId}/risk
+```
+
+必须确认：
+
+- 第一腿成交后保存 `firstFillAt`。
+- 后续腿在提交前检查最大腿间延迟。
+- 残留敞口优先使用实际 Fill Quantity 和 Fill Price。
+- Contract Multiplier 进入名义敞口。
+- Settlement Currency 明确保存。
+- 同币种按买入正、卖出负计算净敞口。
+- 多币种没有风险 FX 快照时使用保守绝对值合计，并标记 `MIXED / incomplete`。
+- 无 Fill 且市场单无价格时标记 incomplete，不伪造零风险。
+- 超过 `maxResidualNotional` 后禁止继续增加风险。
+- Batch `failed` 不得被解释为风险已经解除。
+- `hedged` 必须同时满足两腿完成、残留敞口为零且数据质量完整。
+
+## 9. Phase 4A 风险动作检查
+
+接口：
+
+```http
+GET  /api/v1/trading/execution-batches/{batchId}/risk-actions
+POST /api/v1/trading/execution-batches/{batchId}/risk-actions
+```
+
+必须确认：
+
+- 每个 RiskAction 强制提供 `idempotencyKey` 和 `actor`。
+- 同一动作重复提交不产生第二次订单副作用。
+- 同一幂等键不同载荷返回 409。
+- `hold_and_escalate` 进入 `manual_intervention / escalated`。
+- `flatten_filled_legs` 对每个已成交 Leg 生成反向 TradeCommand。
+- 自动平仓不直接插入 orders 表。
+- 全部反向命令 filled 后才能标记 resolved。
+- 任一平仓命令失败或未知时继续 escalated。
+- `cancel_open_legs` 不能把已有外部 Order 伪装为取消成功。
+- `substitute_hedge` 必须提供完整替代 Leg 并经过 TradeCommand 安全校验。
+- 风险状态变化和动作结果写入 AuditEvent。
+
+## 10. Phase 3 FinancialFact 检查
 
 ```http
 POST /api/v1/financial-facts
 GET  /api/v1/financial-facts
 ```
 
-必须确认：
-
-- FinancialFact 只允许新增，不提供修改和删除业务 API。
-- 客户端 `idempotencyKey` 唯一。
-- 外部身份 `source + externalId + factType + strategyInstanceId` 唯一。
-- 重复身份必须比较规范化载荷内容哈希。
-- 身份相同且载荷一致时返回原事实。
-- 身份相同但载荷不同必须返回 409。
-- StrategyInstance 必须 active 且属于 closed-loop。
-- Account 必须 active 且与 StrategyInstance 存在 active binding。
-- Instrument 与 ContractSpecification 必须存在。
-- Quantity Unit、Settlement Currency 和 Contract Multiplier 必须由后端 Catalog 快照确定。
-- 事实必须保存 occurredAt、createdAt、source、externalId 和数据质量状态。
+- FinancialFact 只允许新增。
+- 客户端幂等键和外部身份双重唯一。
+- 身份相同载荷不同返回 409。
+- Account、Instrument、ContractSpecification 和 Strategy 归属必须有效。
+- Quantity Unit、Settlement Currency 和 Contract Multiplier 来自 Catalog。
+- 事实保存 occurredAt、createdAt、source、externalId 和数据质量。
 - 重复导入不得重复改变 Position、PnL 或 NAV。
 
-## 8. Phase 3 Formal Position 与 PnL 检查
-
-正式核对入口：
+## 11. Formal Position、PnL 与 NAV 检查
 
 ```http
 POST /api/v1/strategies/instances/{strategyInstanceId}/financials/rebuild
 GET  /api/v1/strategies/instances/{strategyInstanceId}/formal-positions
 GET  /api/v1/strategies/instances/{strategyInstanceId}/formal-pnl
-```
-
-必须确认：
-
-- Formal Position 与 PnL 只由 FinancialFact 生成。
-- 投影清空后可以从事实完整重建。
-- 重建不得修改或删除事实。
-- Trade PnL 使用数量、价格、仓位方向和 Contract Multiplier。
-- 非基础币种使用事实快照的 FX Rate。
-- Stablecoin 不自动等同 USD。
-- 缺失 FX 时保留事实但投影标记 `incomplete`。
-- PnL 分项保存 Trading、Funding、Swap、Fee、FX 和 Total。
-- Fee 使用带符号经济贡献，不与 Trading PnL 混写。
-- 重建前后 Position、分项 PnL、Total PnL 和 factCount 一致。
-- 旧 `/pnl` 接口不得被产品或文档标记为正式账务。
-
-## 9. Phase 3 Formal NAV 检查
-
-```http
 GET  /api/v1/strategies/instances/{strategyInstanceId}/formal-nav-snapshots
 POST /api/v1/strategies/instances/{strategyInstanceId}/formal-nav-snapshots/run
 ```
 
-必须确认：
+- Position 和 PnL 只由 FinancialFact 生成并可完整重建。
+- Trading PnL 使用数量、价格、方向和 Contract Multiplier。
+- PnL 分项保存 Trading、Funding、Swap、Fee、FX 和 Total。
+- Stablecoin 不自动等同 USD。
+- 缺失 FX 时标记 incomplete。
+- NAV 对全部 active binding 使用同一 valuationTime。
+- 缺失账户返回 missingAccountIds，不静默补零。
+- 旧 PnL／NAV 接口不得标记为正式账务。
 
-- 调用方明确提供带时区 `valuationTime`，或服务端记录明确的当前 UTC 时间。
-- 全部 active StrategyAccountBinding 使用同一 valuationTime。
-- 每个账户只使用 `occurredAt <= valuationTime` 的最新 Balance Fact。
-- 返回 `requiredAccountCount`、`includedAccountCount` 和 `missingAccountIds`。
-- 全覆盖为 `complete`，部分覆盖为 `partial`，无有效覆盖为 `incomplete`。
-- 无有效余额时 equity 和 nav 返回空值，不返回零。
-- 跨币种余额缺失 FX 时该账户不能被视为有效覆盖。
-- 旧 `/nav-snapshots` 接口不得被标记为正式账务。
+## 12. 前端 Catalog 与产品界面检查
 
-## 10. 金样本检查
+- 从 Backend 获取 Strategy、Binding、Account、Instrument 和 ContractSpecification。
+- Catalog 不完整时禁用提交。
+- 明确显示 TradingMode；不得把 Simulation 展示为 Demo 或 Live。
+- 缺失 Position、PnL、风险和账务数据展示 `—` 或未知。
+- 不允许通过环境变量或代码内 UUID 绕过 Catalog。
+- 不展示无业务必要的开发说明、实现解释和联调备注。
 
-Phase 3 至少保留：
+## 13. 金样本检查
 
-- 一套资费套利成交、Funding、Fee 和 PnL 重建样本。
-- 一套包含 Contract Multiplier 的已实现损益样本。
-- 一套非基础币种缺失 FX 的 incomplete 样本。
-- 一套多账户同一 valuationTime 的 partial／complete NAV 样本。
-- 重复事实和载荷冲突样本。
+Phase 4A 至少保留：
 
-金样本预期值必须写在测试和实施文档中，不依赖人工口头解释。
+- Global Kill Switch 在 Batch 认领前阻断的样本。
+- 第一腿残留名义敞口超过阈值、第二腿不提交的样本。
+- 第一腿成交、第二腿未知、自动反向平仓的样本。
+- 自动平仓 Position 回到零的样本。
+- RiskAction 重复提交不重复下单的样本。
+- RiskAction 幂等键载荷冲突的样本。
+- maxLegDelaySeconds 超时样本。
 
-## 11. 文档一致性
+Phase 3 金样本继续保留：Contract Multiplier PnL、分项 PnL、重建、缺失 FX、多账户 NAV 和事实冲突。
 
-涉及以下变化时，必须同步更新 Markdown：
+预期值必须写入测试和实施文档，不依赖口头解释。
 
-- 模块职责或架构边界。
-- 策略能力和发布范围。
-- 交易模式、Gateway 或账户安全规则。
-- 状态机、幂等、恢复和对账语义。
-- FinancialFact、损益、币种、单位、合约规格、FX 或风险口径。
-- API、CI、部署和运行命令。
+## 14. 文档一致性
 
-Phase 3 至少更新：
+涉及架构、状态机、幂等、恢复、Kill Switch、残留敞口、RiskAction、FinancialFact、PnL、NAV、API 或发布范围时，必须同步更新：
 
-1. `docs/planning/V6-Phase3-金融事实与正式账务.md`。
-2. `docs/technical/FINANCIAL_FACTS.md`。
+1. 当前阶段实施计划。
+2. 对应技术设计。
 3. `docs/technical/API_SPEC.md`。
 4. `docs/planning/V6-交易安全加固实施计划.md`。
-5. `CHANGELOG.md`。
+5. README 与 START-HERE。
 6. 本 Release Gate。
-7. README 和 START-HERE。
-8. Pull Request、Issue 和验收记录。
+7. CHANGELOG。
+8. Issue、PR 和 CI 验收记录。
 
-普通样式微调可以不更新需求文档，但仍应有清晰提交记录。
+普通样式微调可以不改需求文档，但仍须有清晰提交记录。
 
-## 12. 变更范围检查
+## 15. 变更范围检查
 
-提交前确认：
-
-- 没有意外修改一级架构和路由。
+- 没有意外修改一级架构和无关路由。
 - 没有误改归档文档。
-- 没有直接修改生成文件作为唯一修改。
+- 没有把真实凭证、`.env`、数据库或日志提交到仓库。
 - 没有因局部问题重写公共主题。
-- 没有顺手删除未确认引用的文件。
-- 没有将页面本地状态无理由放入全局 Store。
-- 没有将真实凭证、`.env`、数据库文件或运行日志提交到仓库。
-- 大规模自动生成变更有来源和验收说明。
-- 新增组合入口或文件拆分不改变既有 API 路由和应用生命周期。
+- 没有直接修改生成文件作为唯一修改。
+- 大规模自动变更有来源、测试和验收说明。
+- 新增组合入口不改变既有应用生命周期。
+- 临时 Ruff 例外有具体文件、具体规则和后续拆分说明，不能全局关闭检查。
 
-## 13. 人工冒烟检查
+## 16. 人工冒烟检查
 
-执行 `smoke-checklist.md` 和根目录 `scripts/smoke-platform.ps1`，并额外检查：
-
-- 后端和 Runtime 健康接口可用。
-- Simulation/Fake Gateway 模式明确显示。
-- 订单提交前能看到策略、账户、标的和交易模式。
-- TradeCommand 与 ExecutionBatch 均返回可查询的幂等标识。
-- 失败、处理中、结果未知和需要人工干预不会被展示为成功。
-- Catalog 缺失时提交按钮不可用且原因清晰。
-- FinancialFact、formal-positions、formal-pnl、formal-nav 路由可访问。
-- 重复事实和重建结果符合金样本。
-- 正式页面不存在无业务必要性的开发说明、实现解释或联调备注。
+- Backend 和 Runtime 健康接口可用。
+- Simulation / Fake Gateway 模式明确。
+- TradeCommand、ExecutionBatch、FinancialFact 和 RiskAction 返回可查询幂等标识。
+- Global Kill Switch 开启后 Batch 返回 423。
+- Kill Switch 关闭后 Simulation Batch 可恢复执行。
+- Batch Risk、RiskAction、Formal PnL 和 Formal NAV 路由可访问。
+- 失败、未知、残留敞口、escalated 和 resolved 不会被展示为同一状态。
+- Catalog 缺失时提交按钮不可用且原因准确。
+- 正式页面不存在无业务必要的大段辅助文案。
 - 受影响页面无持续控制台错误。
 
-本次未涉及的模块可以标记为“不适用”，但所有受影响路径必须检查。
+## 17. Pull Request 要求
 
-## 14. 提交与 Pull Request 要求
-
-一个稳定提交应当：
-
-- 只表达一个清晰主题。
-- 不混入无关重构。
-- 提交信息说明改了什么。
-- 代码、测试、文档在同一批次闭环。
-
-Pull Request 必须写明：
+PR 必须写明：
 
 - 基线 commit。
 - 风险与影响范围。
 - 自动检查结果和 CI Run ID。
-- 人工验收结果。
+- 金样本和人工验收结果。
 - 回滚方式。
 - 未完成和延期内容。
 
-## 15. 阻断条件
+一个稳定提交只表达一个清晰主题，代码、测试和文档同批闭环。
 
-存在以下任一情况时，不应合并或发布：
+## 18. 阻断条件
+
+存在以下任一情况，不得合并或发布：
 
 - 任一 CI Job 失败或未执行。
-- 构建失败或本次范围类型检查失败。
-- 未知账户、标的、绑定或状态可以继续下单或记账。
-- 相同 command、batch 或 FinancialFact 可能重复产生外部副作用或重复记账。
-- Batch Leg 绕过 TradeCommand。
-- `result_unknown` 恢复会重新提交订单。
-- 重放 Fill 或 FinancialFact 会重复更新 Position 或 PnL。
-- FinancialFact 身份冲突没有返回 409。
-- Trading PnL 未使用 Contract Multiplier。
-- Stablecoin 被自动当成法币或缺失 FX 被默认按 1:1。
-- Funding、Swap、Fee、FX 与 Trading PnL 混为一项。
-- Formal Position/PnL 无法从事实重建。
-- NAV 使用不同估值时点或缺失账户被静默补零。
-- 交易页面继续使用硬编码账户或 Instrument ID。
-- 正式产品页面存在无业务必要性的开发说明或大段辅助文案。
-- 主要路由无法进入。
-- 控制台出现持续性运行错误。
+- Kill Switch 命中后仍能创建新增风险订单。
+- Kill Switch 写入没有幂等冲突检测或审计记录。
+- 第一腿成交后没有显式残留敞口和腿间时间。
+- 残留敞口未使用 Contract Multiplier。
+- 多币种敞口被无依据净额抵消。
+- 超过残留阈值后继续提交第二腿。
+- RiskAction 重放会重复下单。
+- 自动平仓绕过 TradeCommand。
+- 平仓结果未知却标记 resolved。
+- Batch failed 被误当作无风险。
+- `result_unknown` 恢复重新提交原订单。
+- FinancialFact 重放重复更新账务。
+- Formal Position／PnL 无法重建。
+- NAV 使用不同估值时点或缺失账户被补零。
+- Stablecoin 被自动当作法币。
+- 正式产品页面存在无业务必要的说明文案。
 - active 文档与实现存在重大冲突。
-- 旧 PnL/NAV 被误标为正式账务。
-- Live 开关、凭证或回滚方案不清楚。
+- Live 开关、凭证、权限或回滚方案不清楚。
 
-## 16. 后续升级
+## 19. 后续升级
 
-Phase 4 及以后逐步加入：
+Phase 4B–4D 继续加入：
 
-- 外部 Venue 主动查单、查成交、查持仓和事实自动导入。
-- 外部账单解析与逐笔核对。
-- Alembic 或等价数据库迁移体系。
-- Vitest 纯函数和适配器测试。
-- Playwright 核心交易路径自动化。
+- 外部 Venue 主动查单、查成交、查持仓和查余额。
+- 外部撤单与结果未知恢复。
+- FinancialFact 自动导入和 Reconciliation Difference。
 - Bybit Demo 与 MT5 Demo 端到端测试。
-- 双腿残留敞口处置和 Kill Switch。
-- 认证、RBAC、CODEOWNERS、分支保护和审批规则。
+- 日终订单、成交、持仓、余额、PnL 和 NAV 对账。
+- 断网、超时、Runtime 重启和单腿失败演练。
+- Alembic 或等价迁移体系。
+- 认证、RBAC、双人审批、CODEOWNERS 和生产密钥托管。
