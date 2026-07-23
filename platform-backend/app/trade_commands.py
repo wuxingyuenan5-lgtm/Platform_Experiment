@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from decimal import Decimal
 from uuid import uuid4
 
 from fastapi import HTTPException
@@ -66,11 +67,12 @@ def validate_trade_command_catalog(request: CreateTradeCommandRequest) -> None:
 
 
 def create_trade_command(request: CreateTradeCommandRequest) -> TradeCommandResponse:
-    validate_trade_command_catalog(request)
     existing = find_trade_command_by_idempotency_key(request.idempotency_key)
     if existing is not None:
+        assert_trade_command_request_matches(existing, request)
         return trade_command_from_row(existing)
 
+    validate_trade_command_catalog(request)
     trade_command_id = str(uuid4())
     created_at = now_iso()
     with connection() as db:
@@ -104,6 +106,7 @@ def create_trade_command(request: CreateTradeCommandRequest) -> TradeCommandResp
             )
             if row is None:
                 raise HTTPException(status_code=409, detail="Trade command claim failed")
+            assert_trade_command_request_matches(row, request)
             return trade_command_from_row(row)
 
         db.execute(
@@ -160,6 +163,24 @@ def create_trade_command(request: CreateTradeCommandRequest) -> TradeCommandResp
     return get_trade_command(trade_command_id)
 
 
+def assert_trade_command_request_matches(row, request: CreateTradeCommandRequest) -> None:
+    stored_price = Decimal(row["price"]) if row["price"] is not None else None
+    matches = (
+        row["strategy_instance_id"] == request.strategy_instance_id
+        and row["account_id"] == request.account_id
+        and row["instrument_id"] == request.instrument_id
+        and row["side"] == request.side
+        and row["order_type"] == request.order_type
+        and Decimal(row["quantity"]) == request.quantity
+        and stored_price == request.price
+    )
+    if not matches:
+        raise HTTPException(
+            status_code=409,
+            detail="Idempotency key is already used by a different trade command payload",
+        )
+
+
 def get_trade_command(trade_command_id: str) -> TradeCommandResponse:
     row = find_trade_command(trade_command_id)
     if row is None:
@@ -170,29 +191,28 @@ def get_trade_command(trade_command_id: str) -> TradeCommandResponse:
 def find_trade_command(trade_command_id: str):
     with connection() as db:
         return db.execute(
-            """
-            SELECT tc.id, tc.idempotency_key, tc.strategy_instance_id, tc.account_id,
-                   tc.instrument_id, tc.status, tc.created_at, tc.updated_at, o.id AS order_id
-            FROM trade_commands tc
-            LEFT JOIN orders o ON o.command_id = tc.id
-            WHERE tc.id = ?
-            """,
+            trade_command_query("tc.id = ?"),
             (trade_command_id,),
         ).fetchone()
 
 
 def find_trade_command_by_idempotency_key(idempotency_key: str, *, db=None):
-    query = """
-        SELECT tc.id, tc.idempotency_key, tc.strategy_instance_id, tc.account_id,
-               tc.instrument_id, tc.status, tc.created_at, tc.updated_at, o.id AS order_id
-        FROM trade_commands tc
-        LEFT JOIN orders o ON o.command_id = tc.id
-        WHERE tc.idempotency_key = ?
-    """
+    query = trade_command_query("tc.idempotency_key = ?")
     if db is not None:
         return db.execute(query, (idempotency_key,)).fetchone()
     with connection() as local_db:
         return local_db.execute(query, (idempotency_key,)).fetchone()
+
+
+def trade_command_query(where_clause: str) -> str:
+    return f"""
+        SELECT tc.id, tc.idempotency_key, tc.strategy_instance_id, tc.account_id,
+               tc.instrument_id, tc.side, tc.order_type, tc.quantity, tc.price,
+               tc.status, tc.created_at, tc.updated_at, o.id AS order_id
+        FROM trade_commands tc
+        LEFT JOIN orders o ON o.command_id = tc.id
+        WHERE {where_clause}
+    """
 
 
 def update_trade_command_status(trade_command_id: str, status: str) -> None:
