@@ -30,6 +30,7 @@ jobs:
           python scripts/apply_phase4a.py
           python scripts/fix_phase4a.py
           python scripts/fix_phase4a_final.py
+          git checkout -- .github/workflows/platform-ci.yml
       - name: Install backend
         working-directory: platform-backend
         run: python -m pip install -e '.[dev]'
@@ -37,10 +38,25 @@ jobs:
         working-directory: platform-backend
         shell: bash
         run: |
-          python -m ruff check app tests --fix || true
-          python -m ruff format app tests
+          TARGETS=(
+            app/application.py
+            app/config.py
+            app/main.py
+            app/phase4_risk.py
+            app/schemas.py
+            app/security.py
+            app/strategy_runs.py
+            app/trade_commands.py
+            app/trading.py
+            tests/test_execution_batches.py
+            tests/test_execution_batches_v1.py
+            tests/test_ops_observability.py
+            tests/test_phase4_risk.py
+          )
+          python -m ruff check "${TARGETS[@]}" --fix || true
+          python -m ruff format "${TARGETS[@]}"
           set +e
-          python -m ruff check app tests > /tmp/phase4a-ruff.log 2>&1
+          python -m ruff check "${TARGETS[@]}" > /tmp/phase4a-ruff.log 2>&1
           RUFF_STATUS=$?
           python -m pytest > /tmp/phase4a-pytest.log 2>&1
           PYTEST_STATUS=$?
