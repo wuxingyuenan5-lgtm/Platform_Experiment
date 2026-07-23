@@ -34,6 +34,9 @@ from app.execution_schemas import (
 from app.execution_schemas import (
     StrategyRunResponse as StrategyRunResponse,
 )
+from app.execution_schemas import (
+    StrategyV1ReadinessResponse as StrategyV1ReadinessResponse,
+)
 
 
 class RuntimeReadinessResponse(BaseModel):
