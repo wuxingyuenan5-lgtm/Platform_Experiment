@@ -73,12 +73,31 @@ jobs:
           python -m ruff check
           app/main.py
           app/journal.py
+          app/models.py
+          app/gateway.py
+          app/fake_gateway.py
+          app/venue_store.py
           tests/test_atomic_command_claim.py
+          tests/test_runtime_journal.py
+          tests/test_venue_query.py
       - name: Full lint debt inventory
         continue-on-error: true
         run: python -m ruff check app tests
       - name: Test
-        run: python -m pytest
+        shell: bash
+        run: |
+          if ! python -m pytest > /tmp/runtime-pytest.log 2>&1; then
+            tail -n 160 /tmp/runtime-pytest.log
+            exit 1
+          fi
+      - name: Upload runtime pytest diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: runtime-pytest-log
+          path: /tmp/runtime-pytest.log
+          if-no-files-found: ignore
+          retention-days: 3
 
   platform-backend:
     runs-on: ubuntu-latest
@@ -107,6 +126,7 @@ jobs:
             app/execution_risk.py \
             app/execution_exposure.py \
             app/financial_facts.py \
+            app/venue_reconciliation.py \
             tests/test_order_safety_fail_closed.py \
             tests/test_secret_safety.py \
             tests/test_trading_flow.py \
@@ -116,6 +136,7 @@ jobs:
             tests/test_execution_batches_v1.py \
             tests/test_execution_risk.py \
             tests/test_financial_facts.py \
+            tests/test_venue_reconciliation.py \
             tests/test_ops_observability.py \
             > /tmp/backend-ruff.log 2>&1; then
             cat /tmp/backend-ruff.log
@@ -136,7 +157,7 @@ jobs:
         shell: bash
         run: |
           if ! python -m pytest > /tmp/backend-pytest.log 2>&1; then
-            tail -n 160 /tmp/backend-pytest.log
+            tail -n 200 /tmp/backend-pytest.log
             exit 1
           fi
       - name: Upload backend pytest diagnostics
