@@ -3,10 +3,6 @@
     <div class="login-form py-20">
       <div class="title">欢迎登录</div>
       <div class="title title-platform pt-2 text-xl">全球变量金融平台</div>
-      <div class="login-form__subhead">
-        登录后会自动跳转到你刚刚点击的目标页面；首页、研究框架、新闻日历、金融 AI
-        等入口都支持先登录再直达。
-      </div>
 
       <Form
         ref="formRef"
@@ -261,14 +257,6 @@
       }
     }
 
-    .login-form__subhead {
-      padding: 10px 52px 0;
-      color: #64748b;
-      font-size: 14px;
-      line-height: 1.8;
-      text-align: center;
-    }
-
     .ant-form {
       padding-top: 34px !important;
     }
@@ -312,7 +300,6 @@
       max-width: 420px;
     }
 
-    .login-box .login-form__subhead,
     .login-box .ant-form {
       padding-right: 28px !important;
       padding-left: 28px !important;
