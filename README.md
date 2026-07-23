@@ -5,7 +5,8 @@
 ## 当前权威基线
 
 - 正式分支：`main`
-- 当前 main：`77bf4223c2059d5a56fc08a2d49214351c396abc`
+- Phase 3 代码发布提交：`77bf4223c2059d5a56fc08a2d49214351c396abc`
+- 文档最终化：PR `#10`
 - 当前状态：Phase 3 已完成，下一阶段为执行风险与 Demo 闭环
 - 总跟踪：GitHub Issue `#2`
 - Phase 1：PR `#3`，已完成
@@ -14,7 +15,7 @@
 - 总计划：`docs/planning/V6-交易安全加固实施计划.md`
 - Phase 3 记录：`docs/planning/V6-Phase3-金融事实与正式账务.md`
 
-当前系统只允许 Simulation / Fake Gateway，不开放 Paper、Demo 或真实资金 Live。
+`main` 的最新分支指针以 GitHub 为准，不在文档中硬编码会随文档提交变化的 tip SHA。当前系统只允许 Simulation / Fake Gateway，不开放 Paper、Demo 或真实资金 Live。
 
 ## 先看这里
 
