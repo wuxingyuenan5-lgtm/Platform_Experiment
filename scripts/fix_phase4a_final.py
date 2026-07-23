@@ -11,13 +11,16 @@ def replace_once(path: str, old: str, new: str) -> None:
 
 path = "platform-backend/tests/test_ops_observability.py"
 file = Path(path)
-file.write_text(
-    file.read_text(encoding="utf-8").replace(
-        'assert batch.json()["status"] == "manual_intervention"',
-        'assert batch.json()["status"] == "risk_unresolved"',
-    ),
-    encoding="utf-8",
+text = file.read_text(encoding="utf-8")
+text = text.replace(
+    'assert batch.json()["status"] == "manual_intervention"',
+    'assert batch.json()["status"] == "risk_unresolved"',
 )
+text = text.replace(
+    'assert body["resultUnknownOrderCount"] == 1',
+    'assert body["resultUnknownOrderCount"] == 2',
+)
+file.write_text(text, encoding="utf-8")
 
 replace_once(
     "platform-backend/app/phase4_risk.py",
