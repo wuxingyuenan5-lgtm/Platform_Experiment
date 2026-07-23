@@ -42,6 +42,7 @@ EXECUTION_SCHEMA_NAMES = {
     "PnlResponse",
     "PositionResponse",
     "StrategyRunResponse",
+    "StrategyV1ReadinessResponse",
 }
 
 
