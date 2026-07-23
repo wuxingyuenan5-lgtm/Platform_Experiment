@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from decimal import Decimal
 from uuid import uuid4
 
 from fastapi import HTTPException
@@ -9,10 +10,10 @@ from app.database import connection
 from app.schemas import (
     BatchLegResponse,
     CreateExecutionBatchRequest,
-    CreateOrderRequest,
+    CreateTradeCommandRequest,
     ExecutionBatchResponse,
 )
-from app.trading import submit_order
+from app.trade_commands import create_trade_command, validate_trade_command_catalog
 
 
 def now_iso() -> str:
@@ -52,7 +53,10 @@ def list_execution_batches(
 
 def resolve_strategy_key(request: CreateExecutionBatchRequest) -> str:
     if request.strategy_instance_id is None:
-        return request.strategy_key
+        raise HTTPException(
+            status_code=422,
+            detail="Execution batch requires strategyInstanceId",
+        )
 
     with connection() as db:
         row = db.execute(
@@ -72,47 +76,53 @@ def resolve_strategy_key(request: CreateExecutionBatchRequest) -> str:
     return row["strategy_key"]
 
 
-def validate_account(account_id: str) -> None:
-    with connection() as db:
-        row = db.execute("SELECT id FROM accounts WHERE id = ?", (account_id,)).fetchone()
-    if row is None:
-        raise HTTPException(status_code=404, detail=f"Account not found: {account_id}")
-
-
-def validate_instrument(instrument_id: str) -> None:
-    with connection() as db:
-        row = db.execute("SELECT id FROM instruments WHERE id = ?", (instrument_id,)).fetchone()
-    if row is None:
-        raise HTTPException(status_code=404, detail=f"Instrument not found: {instrument_id}")
-
-
 def create_execution_batch(request: CreateExecutionBatchRequest) -> ExecutionBatchResponse:
-    if request.idempotency_key is not None:
-        existing_batch_id = find_batch_by_idempotency_key(request.idempotency_key)
-        if existing_batch_id is not None:
-            return get_execution_batch(existing_batch_id)
+    if request.idempotency_key is None:
+        raise HTTPException(
+            status_code=422,
+            detail="Execution batch requires idempotencyKey",
+        )
+    if request.strategy_instance_id is None:
+        raise HTTPException(
+            status_code=422,
+            detail="Execution batch requires strategyInstanceId",
+        )
+
+    existing_batch_id = find_batch_by_idempotency_key(request.idempotency_key)
+    if existing_batch_id is not None:
+        assert_batch_request_matches(existing_batch_id, request)
+        return get_execution_batch(existing_batch_id)
 
     strategy_key = resolve_strategy_key(request)
     default_account_id = request.account_id or request.legs[0].account_id
     if default_account_id is None:
         raise HTTPException(status_code=422, detail="Execution batch account is required")
 
-    should_validate_catalog = request.strategy_instance_id is not None
-    if should_validate_catalog:
-        validate_account(default_account_id)
-        for leg in request.legs:
-            validate_account(leg.account_id or default_account_id)
-            validate_instrument(leg.instrument_id)
+    command_requests: list[tuple[str, CreateTradeCommandRequest]] = []
+    for leg in request.legs:
+        leg_account_id = leg.account_id or default_account_id
+        command_request = CreateTradeCommandRequest(
+            idempotencyKey=f"{request.idempotency_key}:{leg.role}",
+            strategyInstanceId=request.strategy_instance_id,
+            accountId=leg_account_id,
+            instrumentId=leg.instrument_id,
+            symbol=leg.symbol,
+            side=leg.side,
+            orderType=leg.order_type,
+            quantity=leg.quantity,
+            price=leg.price,
+        )
+        validate_trade_command_catalog(command_request)
+        command_requests.append((leg.role, command_request))
 
     batch_id = str(uuid4())
     created_at = now_iso()
-
     with connection() as db:
-        db.execute(
+        cursor = db.execute(
             """
-            INSERT INTO execution_batches (
-                    id, idempotency_key, strategy_instance_id, account_id,
-                    strategy_key, direction, status,
+            INSERT OR IGNORE INTO execution_batches (
+                id, idempotency_key, strategy_instance_id, account_id,
+                strategy_key, direction, status,
                 requires_manual_intervention, failure_reason, created_at, updated_at
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
@@ -130,57 +140,60 @@ def create_execution_batch(request: CreateExecutionBatchRequest) -> ExecutionBat
                 created_at,
             ),
         )
-        for sequence, leg in enumerate(request.legs, start=1):
-            db.execute(
-                """
-                INSERT INTO execution_batch_legs (
-                    id, batch_id, sequence, role, account_id, instrument_id, symbol, side,
-                    order_type, quantity, price, order_id, status,
-                    failure_reason, created_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    str(uuid4()),
-                    batch_id,
-                    sequence,
-                    leg.role,
-                    (leg.account_id or default_account_id) if should_validate_catalog else None,
-                    leg.instrument_id,
-                    leg.symbol,
-                    leg.side,
-                    leg.order_type,
-                    format(leg.quantity, "f"),
-                    format(leg.price, "f") if leg.price is not None else None,
-                    None,
-                    "pending",
-                    None,
-                    created_at,
-                    created_at,
-                ),
-            )
+        if cursor.rowcount == 0:
+            row = db.execute(
+                "SELECT id FROM execution_batches WHERE idempotency_key = ?",
+                (request.idempotency_key,),
+            ).fetchone()
+            if row is None:
+                raise HTTPException(status_code=409, detail="Execution batch claim failed")
+            existing_id = row["id"]
+        else:
+            existing_id = None
+            for sequence, leg in enumerate(request.legs, start=1):
+                db.execute(
+                    """
+                    INSERT INTO execution_batch_legs (
+                        id, batch_id, sequence, role, account_id, instrument_id, symbol, side,
+                        order_type, quantity, price, order_id, status,
+                        failure_reason, created_at, updated_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        str(uuid4()),
+                        batch_id,
+                        sequence,
+                        leg.role,
+                        leg.account_id or default_account_id,
+                        leg.instrument_id,
+                        leg.symbol,
+                        leg.side,
+                        leg.order_type,
+                        format(leg.quantity, "f"),
+                        format(leg.price, "f") if leg.price is not None else None,
+                        None,
+                        "pending",
+                        None,
+                        created_at,
+                        created_at,
+                    ),
+                )
+
+    if existing_id is not None:
+        assert_batch_request_matches(existing_id, request)
+        return get_execution_batch(existing_id)
 
     update_batch_status(batch_id, "executing")
     filled_count = 0
 
-    for leg in request.legs:
-        update_leg_status(batch_id, leg.role, "submitting")
-        leg_account_id = leg.account_id or default_account_id
+    for role, command_request in command_requests:
+        update_leg_status(batch_id, role, "submitting")
         try:
-            order = submit_order(
-                CreateOrderRequest(
-                    accountId=leg_account_id,
-                    instrumentId=leg.instrument_id,
-                    symbol=leg.symbol,
-                    side=leg.side,
-                    orderType=leg.order_type,
-                    quantity=leg.quantity,
-                    price=leg.price,
-                )
-            )
+            command = create_trade_command(command_request)
         except HTTPException as exc:
             reason = str(exc.detail)
             status = "manual_intervention" if filled_count else "failed"
-            update_leg_status(batch_id, leg.role, "failed", failure_reason=reason)
+            update_leg_status(batch_id, role, "failed", failure_reason=reason)
             update_batch_status(
                 batch_id,
                 status,
@@ -191,25 +204,25 @@ def create_execution_batch(request: CreateExecutionBatchRequest) -> ExecutionBat
 
         update_leg_status(
             batch_id,
-            leg.role,
-            order.status,
-            order_id=order.order_id,
+            role,
+            command.status,
+            order_id=command.platform_order_id,
         )
 
-        if order.status == "filled":
+        if command.status == "filled":
             filled_count += 1
-            if filled_count < len(request.legs):
+            if filled_count < len(command_requests):
                 update_batch_status(batch_id, "partially_executed")
             continue
 
-        reason = f"Leg {leg.role} completed with order status {order.status}"
-        uncertain = order.status in {"processing", "acknowledged", "result_unknown"}
+        reason = f"Leg {role} completed with command status {command.status}"
+        uncertain = command.status in {"accepted", "processing", "acknowledged", "result_unknown"}
         status = "manual_intervention" if filled_count or uncertain else "failed"
         update_leg_status(
             batch_id,
-            leg.role,
-            order.status,
-            order_id=order.order_id,
+            role,
+            command.status,
+            order_id=command.platform_order_id,
             failure_reason=reason,
         )
         update_batch_status(
@@ -222,6 +235,68 @@ def create_execution_batch(request: CreateExecutionBatchRequest) -> ExecutionBat
 
     update_batch_status(batch_id, "hedged")
     return get_execution_batch(batch_id)
+
+
+def assert_batch_request_matches(
+    batch_id: str,
+    request: CreateExecutionBatchRequest,
+) -> None:
+    with connection() as db:
+        batch = db.execute(
+            """
+            SELECT strategy_instance_id, account_id, strategy_key, direction
+            FROM execution_batches
+            WHERE id = ?
+            """,
+            (batch_id,),
+        ).fetchone()
+        legs = db.execute(
+            """
+            SELECT role, account_id, instrument_id, symbol, side,
+                   order_type, quantity, price
+            FROM execution_batch_legs
+            WHERE batch_id = ?
+            """,
+            (batch_id,),
+        ).fetchall()
+
+    if batch is None:
+        raise HTTPException(status_code=409, detail="Existing execution batch is unavailable")
+
+    default_account_id = request.account_id or request.legs[0].account_id
+    batch_matches = (
+        batch["strategy_instance_id"] == request.strategy_instance_id
+        and batch["account_id"] == default_account_id
+        and batch["strategy_key"] == request.strategy_key
+        and batch["direction"] == request.direction
+    )
+    stored_legs = {row["role"]: row for row in legs}
+    requested_roles = {leg.role for leg in request.legs}
+    if not batch_matches or set(stored_legs) != requested_roles:
+        raise_batch_idempotency_conflict()
+
+    for leg in request.legs:
+        row = stored_legs[leg.role]
+        requested_account_id = leg.account_id or default_account_id
+        stored_price = Decimal(row["price"]) if row["price"] is not None else None
+        leg_matches = (
+            row["account_id"] == requested_account_id
+            and row["instrument_id"] == leg.instrument_id
+            and row["symbol"] == leg.symbol
+            and row["side"] == leg.side
+            and row["order_type"] == leg.order_type
+            and Decimal(row["quantity"]) == leg.quantity
+            and stored_price == leg.price
+        )
+        if not leg_matches:
+            raise_batch_idempotency_conflict()
+
+
+def raise_batch_idempotency_conflict() -> None:
+    raise HTTPException(
+        status_code=409,
+        detail="Idempotency key is already used by a different execution batch payload",
+    )
 
 
 def update_batch_status(

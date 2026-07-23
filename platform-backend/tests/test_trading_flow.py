@@ -15,6 +15,9 @@ def test_order_fill_updates_position_and_pnl(monkeypatch, tmp_path: Path) -> Non
     instrument_id = "instrument_btc_usdt"
 
     class FakeResponse:
+        def __init__(self, command: dict[str, object]) -> None:
+            self.command = command
+
         def raise_for_status(self) -> None:
             return None
 
@@ -22,8 +25,8 @@ def test_order_fill_updates_position_and_pnl(monkeypatch, tmp_path: Path) -> Non
             return [
                 {
                     "event_id": str(uuid4()),
-                    "command_id": str(uuid4()),
-                    "platform_order_id": str(uuid4()),
+                    "command_id": self.command["command_id"],
+                    "platform_order_id": self.command["platform_order_id"],
                     "event_type": "order_acknowledged",
                     "external_order_id": "fake-1",
                     "fill_price": None,
@@ -33,8 +36,8 @@ def test_order_fill_updates_position_and_pnl(monkeypatch, tmp_path: Path) -> Non
                 },
                 {
                     "event_id": str(uuid4()),
-                    "command_id": str(uuid4()),
-                    "platform_order_id": str(uuid4()),
+                    "command_id": self.command["command_id"],
+                    "platform_order_id": self.command["platform_order_id"],
                     "event_type": "order_filled",
                     "external_order_id": "fake-1",
                     "fill_price": "100",
@@ -44,7 +47,10 @@ def test_order_fill_updates_position_and_pnl(monkeypatch, tmp_path: Path) -> Non
                 },
             ]
 
-    monkeypatch.setattr("app.trading.httpx.post", lambda *args, **kwargs: FakeResponse())
+    monkeypatch.setattr(
+        "app.trading.httpx.post",
+        lambda *args, **kwargs: FakeResponse(kwargs["json"]),
+    )
 
     with TestClient(app) as client:
         order_response = client.post(

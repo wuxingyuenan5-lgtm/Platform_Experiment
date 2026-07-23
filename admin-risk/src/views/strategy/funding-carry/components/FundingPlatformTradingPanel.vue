@@ -3,11 +3,18 @@
     <div class="panel-head">
       <div>
         <h3>平台批次执行</h3>
-        <p>双腿由 Platform Backend 统一编排，外部交易接口仍由 Runtime Gateway 隔离。</p>
+        <p>账户、策略实例与标的均来自 Platform Backend Catalog；执行仍由 Runtime 隔离。</p>
       </div>
       <span :class="['status', statusTone]">
         {{ batchStatusLabel }}
       </span>
+    </div>
+
+    <div class="catalog-meta">
+      <span>研究筛选：{{ exchange }} / {{ symbol }}</span>
+      <span>策略：{{ strategyInstance?.name ?? '未配置' }}</span>
+      <span>账户：{{ selectedAccount?.accountCode ?? '未配置' }}</span>
+      <span>模式：{{ strategyInstance?.tradingMode ?? '未知' }}</span>
     </div>
 
     <div class="order-grid">
@@ -40,7 +47,7 @@
 
     <div class="actions">
       <button type="button" :disabled="overallBusy || !canSubmit" @click="submitPair">
-        {{ overallBusy ? '正在执行...' : `提交 ${exchange} ${symbol} 执行批次` }}
+        {{ overallBusy ? '正在处理...' : `提交 ${symbol} 执行批次` }}
       </button>
       <button class="secondary" type="button" :disabled="overallBusy" @click="refreshBoth">
         刷新持仓与 PnL
@@ -52,6 +59,7 @@
 
     <div v-if="lastBatch" class="batch-meta">
       <span>批次 ID：{{ lastBatch.batchId }}</span>
+      <span>幂等键：{{ lastBatch.idempotencyKey }}</span>
       <span>状态：{{ lastBatch.status }}</span>
       <strong v-if="lastBatch.requiresManualIntervention">需要人工干预</strong>
     </div>
@@ -63,9 +71,9 @@
           <span>{{ spotSymbol }}</span>
         </div>
         <dl>
-          <div><dt>净持仓</dt><dd>{{ spot.snapshot.value.position?.netQuantity ?? '0' }}</dd></div>
+          <div><dt>净持仓</dt><dd>{{ spot.snapshot.value.position?.netQuantity ?? '—' }}</dd></div>
           <div><dt>持仓均价</dt><dd>{{ spot.snapshot.value.position?.averagePrice ?? '—' }}</dd></div>
-          <div><dt>已实现 PnL</dt><dd>{{ spot.snapshot.value.pnl?.realizedPnl ?? '0' }}</dd></div>
+          <div><dt>已实现 PnL</dt><dd>{{ spot.snapshot.value.pnl?.realizedPnl ?? '—' }}</dd></div>
           <div><dt>订单状态</dt><dd>{{ batchLegStatus('spot') }}</dd></div>
           <div><dt>订单 ID</dt><dd class="order-id">{{ batchLegOrderId('spot') }}</dd></div>
         </dl>
@@ -77,9 +85,9 @@
           <span>{{ perpSymbol }}</span>
         </div>
         <dl>
-          <div><dt>净持仓</dt><dd>{{ perp.snapshot.value.position?.netQuantity ?? '0' }}</dd></div>
+          <div><dt>净持仓</dt><dd>{{ perp.snapshot.value.position?.netQuantity ?? '—' }}</dd></div>
           <div><dt>持仓均价</dt><dd>{{ perp.snapshot.value.position?.averagePrice ?? '—' }}</dd></div>
-          <div><dt>已实现 PnL</dt><dd>{{ perp.snapshot.value.pnl?.realizedPnl ?? '0' }}</dd></div>
+          <div><dt>已实现 PnL</dt><dd>{{ perp.snapshot.value.pnl?.realizedPnl ?? '—' }}</dd></div>
           <div><dt>订单状态</dt><dd>{{ batchLegStatus('perp') }}</dd></div>
           <div><dt>订单 ID</dt><dd class="order-id">{{ batchLegOrderId('perp') }}</dd></div>
         </dl>
@@ -91,8 +99,19 @@
 <script setup lang="ts">
   import { computed, ref, watch } from 'vue';
 
-  import { createExecutionBatch } from '/@/api/platform/trading';
-  import type { ExecutionBatchResult } from '/@/api/platform/trading.types';
+  import {
+    createExecutionBatch,
+    getAccounts,
+    getInstruments,
+    getStrategyAccountBindings,
+    getStrategyInstances,
+  } from '/@/api/platform/trading';
+  import type {
+    AccountResult,
+    ExecutionBatchResult,
+    InstrumentResult,
+    StrategyInstanceResult,
+  } from '/@/api/platform/trading.types';
   import { usePlatformTrading } from '/@/hooks/trading/usePlatformTrading';
   import type { FundingExchange, FundingSymbol } from '../types';
 
@@ -101,74 +120,77 @@
     symbol: FundingSymbol;
   }>();
 
-  const accountId =
-    import.meta.env.VITE_PLATFORM_DEMO_ACCOUNT_ID ||
-    '10000000-0000-4000-8000-000000000001';
-
-  const instrumentIds: Record<FundingSymbol, { spot: string; perp: string }> = {
-    BTC: {
-      spot: '20000000-0000-4000-8000-000000000001',
-      perp: '30000000-0000-4000-8000-000000000001',
-    },
-    ETH: {
-      spot: '20000000-0000-4000-8000-000000000002',
-      perp: '30000000-0000-4000-8000-000000000002',
-    },
-    SOL: {
-      spot: '20000000-0000-4000-8000-000000000003',
-      perp: '30000000-0000-4000-8000-000000000003',
-    },
-    DOGE: {
-      spot: '20000000-0000-4000-8000-000000000004',
-      perp: '30000000-0000-4000-8000-000000000004',
-    },
-    XRP: {
-      spot: '20000000-0000-4000-8000-000000000005',
-      perp: '30000000-0000-4000-8000-000000000005',
-    },
-    XAUT: {
-      spot: '20000000-0000-4000-8000-000000000006',
-      perp: '30000000-0000-4000-8000-000000000006',
-    },
-  };
-
   const direction = ref<'collect' | 'pay'>('collect');
   const orderType = ref<'market' | 'limit'>('market');
   const quantity = ref('0.01');
   const price = ref('100');
   const successMessage = ref('');
   const localError = ref('');
+  const catalogLoading = ref(false);
+  const catalogError = ref('');
   const submitting = ref(false);
   const lastBatch = ref<ExecutionBatchResult | null>(null);
+  const strategyInstance = ref<StrategyInstanceResult | null>(null);
+  const selectedAccount = ref<AccountResult | null>(null);
+  const spotInstrument = ref<InstrumentResult | null>(null);
+  const perpInstrument = ref<InstrumentResult | null>(null);
 
   const spot = usePlatformTrading();
   const perp = usePlatformTrading();
 
-  const spotSymbol = computed(() => `${props.symbol}USDT`);
-  const perpSymbol = computed(() => `${props.symbol}USDT-PERP`);
-  const instruments = computed(() => instrumentIds[props.symbol]);
+  const spotSymbol = computed(
+    () => spotInstrument.value?.instrumentCode ?? `${props.symbol}USDT`,
+  );
+  const perpSymbol = computed(
+    () => perpInstrument.value?.instrumentCode ?? `${props.symbol}USDT-PERP`,
+  );
+  const catalogReady = computed(
+    () =>
+      strategyInstance.value?.status === 'active' &&
+      strategyInstance.value.tradingMode === 'simulation' &&
+      selectedAccount.value?.status === 'active' &&
+      selectedAccount.value.environment === 'simulation' &&
+      Boolean(spotInstrument.value?.contract) &&
+      Boolean(perpInstrument.value?.contract),
+  );
   const overallBusy = computed(
-    () => submitting.value || spot.refreshing.value || perp.refreshing.value,
+    () =>
+      catalogLoading.value ||
+      submitting.value ||
+      spot.refreshing.value ||
+      perp.refreshing.value,
   );
   const errorMessage = computed(
-    () => localError.value || spot.errorMessage.value || perp.errorMessage.value || '',
+    () =>
+      catalogError.value ||
+      localError.value ||
+      spot.errorMessage.value ||
+      perp.errorMessage.value ||
+      '',
   );
   const canSubmit = computed(
     () =>
+      catalogReady.value &&
       Number(quantity.value) > 0 &&
       (orderType.value === 'market' || Number(price.value) > 0),
   );
   const batchStatusLabel = computed(() => {
+    if (catalogLoading.value) return '加载 Catalog';
+    if (!catalogReady.value) return 'Catalog 未配置';
     if (overallBusy.value) return '处理中';
-    if (!lastBatch.value) return '可执行';
+    if (!lastBatch.value) return 'Simulation 可执行';
     if (lastBatch.value.status === 'hedged') return '已对冲';
     if (lastBatch.value.status === 'manual_intervention') return '需人工干预';
     if (lastBatch.value.status === 'failed') return '执行失败';
     return lastBatch.value.status;
   });
   const statusTone = computed(() => {
-    if (overallBusy.value) return 'is-busy';
-    if (lastBatch.value?.requiresManualIntervention || lastBatch.value?.status === 'failed') {
+    if (catalogLoading.value || submitting.value) return 'is-busy';
+    if (
+      !catalogReady.value ||
+      lastBatch.value?.requiresManualIntervention ||
+      lastBatch.value?.status === 'failed'
+    ) {
       return 'is-danger';
     }
     return 'is-ready';
@@ -186,16 +208,98 @@
     return batchLeg(role)?.orderId ?? '—';
   }
 
-  async function refreshSnapshots() {
+  function buildIdempotencyKey(): string {
+    const entropy =
+      typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+        ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    return `funding:${strategyInstance.value?.strategyInstanceId}:${props.symbol}:${direction.value}:${entropy}`.slice(
+      0,
+      128,
+    );
+  }
+
+  async function loadCatalog(): Promise<void> {
+    catalogLoading.value = true;
+    catalogError.value = '';
+    localError.value = '';
+    lastBatch.value = null;
+    strategyInstance.value = null;
+    selectedAccount.value = null;
+    spotInstrument.value = null;
+    perpInstrument.value = null;
+
+    try {
+      const [instances, accounts, instruments] = await Promise.all([
+        getStrategyInstances(),
+        getAccounts(),
+        getInstruments(),
+      ]);
+      const strategy = instances.find(
+        (item) =>
+          item.strategyKey === 'funding_arbitrage' &&
+          item.status === 'active' &&
+          item.tradingMode === 'simulation',
+      );
+      if (!strategy) {
+        throw new Error('未找到可用的资费套利 Simulation 策略实例。');
+      }
+
+      const bindings = await getStrategyAccountBindings(strategy.strategyInstanceId);
+      const activeBindingIds = new Set(
+        bindings.filter((item) => item.status === 'active').map((item) => item.accountId),
+      );
+      const account = accounts.find(
+        (item) =>
+          activeBindingIds.has(item.accountId) &&
+          item.status === 'active' &&
+          item.environment === 'simulation',
+      );
+      if (!account) {
+        throw new Error('资费套利策略没有绑定 active Simulation 账户。');
+      }
+
+      const spotCode = `${props.symbol}USDT`;
+      const perpCode = `${props.symbol}USDT-PERP`;
+      const spotMatch = instruments.find(
+        (item) => item.instrumentCode === spotCode && Boolean(item.contract),
+      );
+      const perpMatch = instruments.find(
+        (item) => item.instrumentCode === perpCode && Boolean(item.contract),
+      );
+      if (!spotMatch || !perpMatch) {
+        throw new Error(
+          `${props.symbol} 尚未在后端 Catalog 同时配置现货与永续合约，已禁止提交。`,
+        );
+      }
+
+      strategyInstance.value = strategy;
+      selectedAccount.value = account;
+      spotInstrument.value = spotMatch;
+      perpInstrument.value = perpMatch;
+      await refreshSnapshots();
+    } catch (error) {
+      catalogError.value = error instanceof Error ? error.message : 'Catalog 加载失败。';
+    } finally {
+      catalogLoading.value = false;
+    }
+  }
+
+  async function refreshSnapshots(): Promise<void> {
+    if (!selectedAccount.value || !spotInstrument.value || !perpInstrument.value) return;
     await Promise.all([
-      spot.refresh(accountId, instruments.value.spot),
-      perp.refresh(accountId, instruments.value.perp),
+      spot.refresh(selectedAccount.value.accountId, spotInstrument.value.instrumentId),
+      perp.refresh(selectedAccount.value.accountId, perpInstrument.value.instrumentId),
     ]);
   }
 
-  async function refreshBoth() {
+  async function refreshBoth(): Promise<void> {
     localError.value = '';
     successMessage.value = '';
+    if (!catalogReady.value) {
+      await loadCatalog();
+      return;
+    }
     try {
       await refreshSnapshots();
     } catch {
@@ -203,8 +307,16 @@
     }
   }
 
-  async function submitPair() {
-    if (!canSubmit.value) return;
+  async function submitPair(): Promise<void> {
+    if (
+      !canSubmit.value ||
+      !strategyInstance.value ||
+      !selectedAccount.value ||
+      !spotInstrument.value ||
+      !perpInstrument.value
+    ) {
+      return;
+    }
 
     localError.value = '';
     successMessage.value = '';
@@ -215,14 +327,16 @@
 
     try {
       const batch = await createExecutionBatch({
-        accountId,
-        strategyKey: 'funding_carry',
+        idempotencyKey: buildIdempotencyKey(),
+        strategyInstanceId: strategyInstance.value.strategyInstanceId,
+        accountId: selectedAccount.value.accountId,
+        strategyKey: strategyInstance.value.strategyKey,
         direction: direction.value,
         legs: [
           {
             role: 'spot',
-            instrumentId: instruments.value.spot,
-            symbol: spotSymbol.value,
+            instrumentId: spotInstrument.value.instrumentId,
+            symbol: spotInstrument.value.instrumentCode,
             side: spotSide,
             orderType: orderType.value,
             quantity: quantity.value,
@@ -230,8 +344,8 @@
           },
           {
             role: 'perp',
-            instrumentId: instruments.value.perp,
-            symbol: perpSymbol.value,
+            instrumentId: perpInstrument.value.instrumentId,
+            symbol: perpInstrument.value.instrumentCode,
             side: perpSide,
             orderType: orderType.value,
             quantity: quantity.value,
@@ -251,8 +365,9 @@
       } else {
         localError.value = `批次执行失败：${batch.failureReason || batch.status}`;
       }
-    } catch {
-      localError.value = '批次请求失败，请确认 Platform Backend 已启动。';
+    } catch (error) {
+      localError.value =
+        error instanceof Error ? error.message : '批次请求失败，请确认 Platform Backend 已启动。';
     } finally {
       submitting.value = false;
     }
@@ -261,8 +376,7 @@
   watch(
     () => [props.exchange, props.symbol],
     () => {
-      lastBatch.value = null;
-      void refreshBoth();
+      void loadCatalog();
     },
     { immediate: true },
   );
@@ -303,6 +417,18 @@
     margin-top: 4px;
     color: #718096;
     font-size: 13px;
+  }
+
+  .catalog-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 16px;
+    margin-top: 12px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    background: #f6f8fb;
+    color: #5d6d80;
+    font-size: 12px;
   }
 
   .status {

@@ -5,7 +5,10 @@ import httpx
 from fastapi.testclient import TestClient
 
 from app.config import get_settings
+from app.database import connection
 from app.main import app
+
+STRATEGY_INSTANCE_ID = "strategy_funding_arbitrage_instance_default"
 
 
 def filled_runtime_response(command: dict[str, object]) -> object:
@@ -42,10 +45,18 @@ def filled_runtime_response(command: dict[str, object]) -> object:
     return FakeResponse()
 
 
-def batch_payload(account_id: str, spot_id: str, perp_id: str) -> dict[str, object]:
+def batch_payload(
+    account_id: str,
+    spot_id: str,
+    perp_id: str,
+    *,
+    idempotency_key: str,
+) -> dict[str, object]:
     return {
+        "idempotencyKey": idempotency_key,
+        "strategyInstanceId": STRATEGY_INSTANCE_ID,
         "accountId": account_id,
-        "strategyKey": "funding_carry",
+        "strategyKey": "funding_arbitrage",
         "direction": "collect",
         "legs": [
             {
@@ -70,28 +81,57 @@ def batch_payload(account_id: str, spot_id: str, perp_id: str) -> dict[str, obje
     }
 
 
-def test_execution_batch_becomes_hedged(monkeypatch, tmp_path: Path) -> None:
+def test_execution_batch_becomes_hedged_and_creates_two_commands(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
     get_settings().database_path = str(tmp_path / "hedged.db")
-    monkeypatch.setattr(
-        "app.trading.httpx.post",
-        lambda *args, **kwargs: filled_runtime_response(kwargs["json"]),
-    )
+    runtime_calls = 0
+
+    def runtime_post(*args, **kwargs):
+        nonlocal runtime_calls
+        runtime_calls += 1
+        return filled_runtime_response(kwargs["json"])
+
+    monkeypatch.setattr("app.trading.httpx.post", runtime_post)
 
     account_id = "account_sim_usdt"
     spot_id = "instrument_btc_usdt"
     perp_id = "instrument_btc_usdt_perp"
+    payload = batch_payload(
+        account_id,
+        spot_id,
+        perp_id,
+        idempotency_key="funding-batch-hedged-001",
+    )
 
     with TestClient(app) as client:
-        response = client.post(
-            "/api/v1/trading/execution-batches",
-            json=batch_payload(account_id, spot_id, perp_id),
-        )
+        first = client.post("/api/v1/trading/execution-batches", json=payload)
+        second = client.post("/api/v1/trading/execution-batches", json=payload)
 
-        assert response.status_code == 200
-        batch = response.json()
+        assert first.status_code == 200
+        assert second.status_code == 200
+        assert second.json() == first.json()
+        batch = first.json()
         assert batch["status"] == "hedged"
         assert batch["requiresManualIntervention"] is False
         assert [leg["status"] for leg in batch["legs"]] == ["filled", "filled"]
+        assert runtime_calls == 2
+
+        with connection() as db:
+            command_rows = db.execute(
+                """
+                SELECT idempotency_key
+                FROM trade_commands
+                WHERE strategy_instance_id = ?
+                ORDER BY idempotency_key
+                """,
+                (STRATEGY_INSTANCE_ID,),
+            ).fetchall()
+        assert [row["idempotency_key"] for row in command_rows] == [
+            "funding-batch-hedged-001:perp",
+            "funding-batch-hedged-001:spot",
+        ]
 
         spot = client.get(f"/api/v1/accounts/{account_id}/positions/{spot_id}")
         perp = client.get(f"/api/v1/accounts/{account_id}/positions/{perp_id}")
@@ -126,7 +166,12 @@ def test_second_leg_unknown_requires_manual_intervention(
     with TestClient(app) as client:
         response = client.post(
             "/api/v1/trading/execution-batches",
-            json=batch_payload(account_id, spot_id, perp_id),
+            json=batch_payload(
+                account_id,
+                spot_id,
+                perp_id,
+                idempotency_key="funding-batch-manual-001",
+            ),
         )
 
         assert response.status_code == 200

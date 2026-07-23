@@ -1,22 +1,23 @@
 import axios, { type AxiosInstance } from 'axios';
 
 import type {
+  AccountResult,
   CreateExecutionBatchInput,
+  CreateOrderInput,
+  CredentialReferenceResult,
   CrossSpreadHistoryPointResult,
   CrossSpreadMarketCommandInput,
   CrossSpreadSnapshotResult,
-  CreateOrderInput,
-  ExecutionBatchResult,
-  AccountResult,
-  CredentialReferenceResult,
   ExchangeConnectivityResult,
+  ExecutionBatchResult,
   InstrumentResult,
-  OrderResult,
   OrderDetailResult,
+  OrderResult,
   PnlResult,
   PositionResult,
   ReconciliationSummaryResult,
   RuntimeReadinessResult,
+  StrategyAccountBindingResult,
   StrategyDefinitionResult,
   StrategyInstanceResult,
   StrategyNavSnapshotResult,
@@ -44,6 +45,13 @@ function isNotFound(error: unknown): boolean {
 
 export async function createTradingOrder(input: CreateOrderInput): Promise<OrderResult> {
   const response = await client.post<OrderResult>('/trading/orders', input);
+  return response.data;
+}
+
+export async function reconcileTradingOrder(orderId: string): Promise<OrderResult> {
+  const response = await client.post<OrderResult>(
+    `/trading/orders/${encodeURIComponent(orderId)}/reconcile`,
+  );
   return response.data;
 }
 
@@ -177,6 +185,15 @@ export async function getStrategyDefinitions(): Promise<StrategyDefinitionResult
 
 export async function getStrategyInstances(): Promise<StrategyInstanceResult[]> {
   const response = await client.get<StrategyInstanceResult[]>('/strategies/instances');
+  return response.data;
+}
+
+export async function getStrategyAccountBindings(
+  strategyInstanceId: string,
+): Promise<StrategyAccountBindingResult[]> {
+  const response = await client.get<StrategyAccountBindingResult[]>(
+    `/strategies/instances/${encodeURIComponent(strategyInstanceId)}/accounts`,
+  );
   return response.data;
 }
 
