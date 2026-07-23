@@ -1,10 +1,11 @@
 # V6 Phase 4B：外部查询、事实导入与对账差异
 
-状态：`implementation complete / acceptance pending`  
+状态：`completed / merge pending`  
 实施分支：`hardening/v6-phase4b-venue-reconciliation`  
 跟踪 Issue：`#16 V6 Phase 4B：外部 Venue 查询、事实导入与对账差异`  
 Pull Request：`#17 Implement V6 Phase 4B venue reconciliation`  
 上级计划：Issue `#12`、`V6-交易安全加固实施计划.md`  
+最终验收：`Platform CI #228 / run 30005369314`  
 更新时间：`2026-07-23`
 
 ## 1. 阶段目标
@@ -189,19 +190,23 @@ Phase 4B 复用 Phase 3 不可变事实层：
 11. Fake Venue 状态跨 Runtime TestClient 重启仍可查询。
 12. filled Fake Order 的 cancel 返回 `already_final`，重复取消幂等。
 
-## 10. 验收清单
+## 10. 验收记录
 
-- [x] Runtime Query Contract 覆盖 Order、Fill、Position、Balance、Cancel。
-- [x] Fake Venue 状态持久化且外部 ID 确定性。
-- [x] Runtime 重启后外部状态仍可查询。
-- [x] result_unknown 可以通过 Venue Query 恢复，且不重下原订单。
-- [x] External Order / Fill / Position / Balance 转换为 FinancialFact。
-- [x] 重复查询不重复改变 Formal Position/PnL/NAV。
-- [x] 本地与外部冲突形成 Difference，不无痕覆盖。
-- [x] Difference 处置保留操作人、原因和审计记录。
-- [x] Runtime 与 Backend 自动测试已覆盖关键金样本。
-- [ ] 最终 Platform CI 全部通过并记录 Run ID。
-- [ ] PR、Issue、README、START-HERE、API Spec、Release Gate、Changelog 完成最终留痕。
+最终验收：`Platform CI #228 / run 30005369314`
+
+| 检查 | 结果 |
+|---|---|
+| Platform Backend Phase 4 strict Ruff Gate | 通过 |
+| Platform Backend 全量 Ruff 与 Pytest | 通过，49 项测试 |
+| Execution Runtime strict Ruff、全量 Ruff 与 Pytest | 通过 |
+| Frontend frozen install、type-check、production build | 通过 |
+| result_unknown Journal + Venue 两级恢复 | 通过 |
+| External Fill 重放与 FinancialFact 导入幂等 | 通过 |
+| Formal Position 由 External Fill 形成 | 通过 |
+| Position / Balance Snapshot 导入 | 通过 |
+| Reconciliation Difference 创建与首次处置固定 | 通过 |
+| Fake Venue 持久化与取消幂等 | 通过 |
+| README、START-HERE、API Spec、技术设计、Release Gate、Changelog | 已同步 |
 
 ## 11. 明确延期
 
