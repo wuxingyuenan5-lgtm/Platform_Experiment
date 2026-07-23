@@ -1,3 +1,4 @@
+from datetime import datetime
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -103,7 +104,7 @@ def test_order_window_includes_business_day_and_older_nonterminal_orders(tmp_pat
         selected = list_strategy_orders(
             STRATEGY_ID,
             ACCOUNT_ID,
-            __import__("datetime").datetime.fromisoformat("2026-07-23T23:59:00+08:00"),
+            datetime.fromisoformat("2026-07-23T23:59:00+08:00"),
         )
         assert selected == [prior_nonterminal, same_day_terminal]
 
