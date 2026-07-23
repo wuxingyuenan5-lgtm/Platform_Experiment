@@ -4,11 +4,14 @@
 实施分支：`hardening/v6-phase4c-live-adapters`  
 跟踪 Issue：`#18 V6 Phase 4C：Bybit 与 MT5 受控实盘适配器`  
 上级计划：Issue `#12`、`V6-交易安全加固实施计划.md`  
+运营验收手册：`../operations/V6-小资金实盘验收手册.md`  
 更新时间：`2026-07-23`
 
 ## 1. 变更背景
 
 Bybit 与 MT5 模拟环境不能充分复现实盘账户、成交、Funding、Swap 和券商终端行为，因此本阶段不再建设“伪真的 Demo 壳”，而是建设真实账户的受控接入。
+
+后续实际验收以真实账户的小资金、最小允许仓位为主，不把模拟盘通过视为最终验收。
 
 实施顺序固定为：
 
@@ -103,6 +106,8 @@ Simulation 与 Live 必须使用不同：
 - Platform database。
 - Credential reference。
 
+Live Runtime 配置模板：`execution-runtime/.env.live.example`。
+
 建议 Live Runtime 仅绑定本机或受控内网地址，不直接暴露公网。
 
 ## 8. 工程验收
@@ -118,22 +123,35 @@ Simulation 与 Live 必须使用不同：
 - [x] StrategyInstance 身份跨 Platform/Runtime 边界保留。
 - [x] Funding、Swap 和 Fee 可幂等导入 FinancialFact。
 - [x] 离线 Provider Contract Tests 已加入。
+- [x] Live Runtime 安全配置模板已加入。
+- [x] 只读实盘 Preflight 脚本已加入。
 - [ ] Platform CI 全部通过并记录 Run ID。
 - [ ] PR、Issue、README、API Spec、Release Gate、START-HERE 和 Changelog 完成最终留痕。
 
 ## 9. 运营验收
 
-以下验收依赖真实账户、凭证、账户映射、Instrument 映射和人工确认，不能由 CI 替代：
+运营验收依赖真实账户、凭证、账户映射、Instrument 映射和人工确认，不能由 CI 替代。执行标准以 `docs/operations/V6-小资金实盘验收手册.md` 为准。
+
+目标不是长时间停留在模拟盘，而是在只读与影子核对通过后，使用真实账户的小资金和最小允许仓位完成受控验收：
 
 - [ ] Bybit 真实账户完成只读订单、成交、持仓、余额和 Funding 核对。
 - [ ] MT5 真实账户完成只读 Order、Deal、Position、Balance 和 Swap 核对。
-- [ ] 连续多个日终周期不存在未解释差异。
-- [ ] 使用最小允许仓位完成受控下单、撤单、查询和事实导入。
+- [ ] 连续多个核对周期不存在未解释差异。
+- [ ] 使用最小允许仓位完成受控限价单、撤单、成交、查询和事实导入。
 - [ ] Kill Switch 与人工接管演练通过。
+- [ ] 测试完成后写开关、名义金额上限和临时 allowlist 完成强制复位。
 
 运营验收未完成前，`liveWriteEnabled` 必须保持 false。
 
-## 10. 明确延期
+## 10. 只读验收入口
+
+```powershell
+.\scripts\live-readonly-preflight.ps1
+```
+
+该脚本检查 Live Environment、Gateway、Write Gate、Credential Ref 和 Venue Readiness，不会提交、撤销订单或改变持仓。
+
+## 11. 明确延期
 
 - 日终自动调度、SLA、责任人和报告属于 Phase 4D。
 - WebSocket 持续状态流可在轮询查询稳定后补充。
