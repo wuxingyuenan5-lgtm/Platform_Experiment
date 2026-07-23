@@ -6,14 +6,12 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.catalog import (
-    create_trade_command,
     get_account,
     get_instrument,
     get_latest_balance,
     get_order,
     get_strategy_instance,
     get_strategy_pnl,
-    get_trade_command,
     list_accounts,
     list_fills,
     list_instruments,
@@ -26,6 +24,11 @@ from app.catalog import (
     run_nav_snapshot,
 )
 from app.config import get_settings
+from app.cross_spread import (
+    get_cross_spread_history,
+    get_cross_spread_snapshot,
+    submit_cross_spread_market_command,
+)
 from app.database import connection, initialize_database
 from app.execution_batches import (
     create_execution_batch,
@@ -66,11 +69,6 @@ from app.schemas import (
     TradeCommandResponse,
     TradingSafetyResponse,
 )
-from app.cross_spread import (
-    get_cross_spread_history,
-    get_cross_spread_snapshot,
-    submit_cross_spread_market_command,
-)
 from app.security import (
     get_exchange_connectivity,
     get_exchange_venue_readiness,
@@ -78,7 +76,8 @@ from app.security import (
     list_credential_references,
 )
 from app.strategy_runs import create_strategy_run, list_strategy_runs
-from app.trading import submit_order
+from app.trade_commands import create_trade_command, get_trade_command
+from app.trading import reconcile_order, submit_order
 from app.v1_readiness import get_strategy_v1_readiness
 
 settings = get_settings()
@@ -90,7 +89,7 @@ async def lifespan(_: FastAPI):
     yield
 
 
-app = FastAPI(title=settings.app_name, version="0.5.0", lifespan=lifespan)
+app = FastAPI(title=settings.app_name, version="0.6.0", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.allowed_cors_origins,
@@ -113,7 +112,7 @@ def health() -> dict[str, str]:
 def system_info() -> dict[str, str]:
     return {
         "service": "platform-backend",
-        "version": "0.5.0",
+        "version": "0.6.0",
         "apiVersion": "v1",
     }
 
@@ -334,9 +333,21 @@ def instrument(instrument_id: str) -> InstrumentResponse:
     f"{settings.api_prefix}/trading/orders",
     response_model=OrderResponse,
     tags=["trading"],
+    deprecated=True,
+    summary="Compatibility order endpoint; use TradeCommand or ExecutionBatch",
 )
 def create_order(request: CreateOrderRequest) -> OrderResponse:
     return submit_order(request)
+
+
+@app.post(
+    f"{settings.api_prefix}/trading/orders/{{order_id}}/reconcile",
+    response_model=OrderResponse,
+    tags=["trading"],
+    summary="Recover an uncertain order from Runtime Journal",
+)
+def reconcile_trading_order(order_id: str) -> OrderResponse:
+    return reconcile_order(order_id)
 
 
 @app.post(
@@ -362,7 +373,9 @@ def cross_spread_snapshot() -> CrossSpreadSnapshotResponse:
     response_model=list[CrossSpreadHistoryPointResponse],
     tags=["trading"],
 )
-def cross_spread_history(limit: int = Query(default=200, ge=1, le=1000)) -> list[CrossSpreadHistoryPointResponse]:
+def cross_spread_history(
+    limit: int = Query(default=200, ge=1, le=1000),
+) -> list[CrossSpreadHistoryPointResponse]:
     return get_cross_spread_history(limit)
 
 
