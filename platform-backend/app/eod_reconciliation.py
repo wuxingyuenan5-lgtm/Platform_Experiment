@@ -26,6 +26,9 @@ from app.venue_reconciliation import (
     validate_strategy_account,
 )
 
+# Stable orchestration port backed by the single policy implementation.
+list_strategy_orders = list_strategy_orders_for_eod
+
 ReportStatus = Literal[
     "complete",
     "completed_with_differences",
@@ -276,7 +279,7 @@ def create_eod_report(
     errors: list[str] = []
     difference_ids: set[str] = set()
 
-    for order_id in list_strategy_orders_for_eod(
+    for order_id in list_strategy_orders(
         request.strategy_instance_id,
         request.account_id,
         request.valuation_time,
