@@ -34,3 +34,7 @@ select = ["E", "F", "I", "UP", "B"]
 # Phase 4A keeps the complete risk state machine in one auditable module; long SQL/error lines
 # and Pydantic's quoted self annotation are accepted until the Phase 4 module split.
 "app/execution_risk.py" = ["E501", "UP037"]
+# Phase 4B keeps one auditable orchestration module while the query/import/difference services
+# are split in Phase 4C; the unused compatibility import and two long SQL/error lines are tracked debt.
+"app/venue_reconciliation.py" = ["E501", "F401"]
+"tests/test_venue_reconciliation.py" = ["E501"]
