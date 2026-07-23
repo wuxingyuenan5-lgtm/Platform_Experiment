@@ -111,7 +111,12 @@ jobs:
           cache: pnpm
           cache-dependency-path: admin-risk/pnpm-lock.yaml
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        shell: bash
+        run: |
+          if ! pnpm install --frozen-lockfile > /tmp/pnpm-install.log 2>&1; then
+            tail -n 80 /tmp/pnpm-install.log
+            exit 1
+          fi
       - name: Type check strategy frontend
         run: pnpm type:check
       - name: Build frontend
