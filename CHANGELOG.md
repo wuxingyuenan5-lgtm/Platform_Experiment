@@ -19,7 +19,9 @@
 - Split the Platform Backend composition root from the existing business routes so the Phase 3 router can be added without rewriting the established Phase 1–2 endpoints.
 - Expanded Platform CI strict gates to include the Phase 3 module, tests, composition root, and `docs/technical/**`.
 - Added `docs/planning/V6-Phase3-金融事实与正式账务.md` and `docs/technical/FINANCIAL_FACTS.md`.
-- Synchronized the overall V6 plan, API Specification, Release Gate, README, START-HERE, Issue #7, PR #8, and this Changelog.
+- Synchronized the overall V6 plan, API Specification, Release Gate, README, START-HERE, Issue #7, PR #9, and this Changelog.
+- Completed Platform CI `#127 / run 29993137286`: Platform Backend, Execution Runtime, frontend type-check, and production build all passed.
+- Merged Phase 3 to `main@77bf4223c2059d5a56fc08a2d49214351c396abc` through PR #9.
 - Retained Simulation / Fake Gateway only; external venue ingestion, residual-leg risk handling, authentication, and Live remain deferred.
 
 ### Product surface cleanup
