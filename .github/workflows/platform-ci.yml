@@ -11,7 +11,7 @@ permissions:
   contents: write
 
 jobs:
-  restore-readiness-export:
+  restore-strategy-readiness-export:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
