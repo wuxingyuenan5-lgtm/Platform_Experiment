@@ -19,7 +19,7 @@ on:
       - 'admin-risk/tsconfig.json'
       - 'admin-risk/tsconfig.strategy.json'
       - 'docs/planning/**'
-      - 'docs/technical/API_SPEC.md'
+      - 'docs/technical/**'
       - 'README.md'
       - 'CHANGELOG.md'
       - 'scripts/**'
@@ -40,7 +40,7 @@ on:
       - 'admin-risk/tsconfig.json'
       - 'admin-risk/tsconfig.strategy.json'
       - 'docs/planning/**'
-      - 'docs/technical/API_SPEC.md'
+      - 'docs/technical/**'
       - 'README.md'
       - 'CHANGELOG.md'
       - 'scripts/**'
@@ -94,15 +94,17 @@ jobs:
           cache-dependency-path: platform-backend/pyproject.toml
       - name: Install dependencies
         run: python -m pip install -e '.[dev]'
-      - name: Phase 2 strict lint gate
+      - name: Phase 3 strict lint gate
         shell: bash
         run: |
           if ! python -m ruff check \
             app/main.py \
+            app/application.py \
             app/security.py \
             app/trading.py \
             app/trade_commands.py \
             app/execution_batches.py \
+            app/financial_facts.py \
             tests/test_order_safety_fail_closed.py \
             tests/test_secret_safety.py \
             tests/test_trading_flow.py \
@@ -110,6 +112,7 @@ jobs:
             tests/test_idempotency_conflicts.py \
             tests/test_execution_batches.py \
             tests/test_execution_batches_v1.py \
+            tests/test_financial_facts.py \
             tests/test_ops_observability.py \
             > /tmp/backend-ruff.log 2>&1; then
             cat /tmp/backend-ruff.log
