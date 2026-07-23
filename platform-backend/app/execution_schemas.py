@@ -120,6 +120,17 @@ class StrategyRunResponse(BaseModel):
     updated_at: datetime = Field(alias="updatedAt")
 
 
+class StrategyV1ReadinessResponse(BaseModel):
+    strategy_instance_id: str = Field(alias="strategyInstanceId")
+    strategy_key: str = Field(alias="strategyKey")
+    runnable: bool
+    blockers: list[str]
+    warnings: list[str]
+    latest_run_status: str | None = Field(default=None, alias="latestRunStatus")
+    manual_intervention_count: int = Field(alias="manualInterventionCount")
+    result_unknown_order_count: int = Field(alias="resultUnknownOrderCount")
+
+
 class PositionResponse(BaseModel):
     account_id: str = Field(alias="accountId")
     instrument_id: str = Field(alias="instrumentId")
@@ -146,4 +157,5 @@ __all__ = [
     "PnlResponse",
     "PositionResponse",
     "StrategyRunResponse",
+    "StrategyV1ReadinessResponse",
 ]
