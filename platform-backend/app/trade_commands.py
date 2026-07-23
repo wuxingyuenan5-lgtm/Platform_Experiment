@@ -8,7 +8,8 @@ from fastapi import HTTPException
 
 from app.database import connection
 from app.schemas import CreateOrderRequest, CreateTradeCommandRequest, TradeCommandResponse
-from app.trading import decimal_text, submit_order
+from app.trade_command_execution import submit_trade_command_order
+from app.trading import decimal_text
 
 
 def now_iso() -> str:
@@ -140,7 +141,7 @@ def create_trade_command(request: CreateTradeCommandRequest) -> TradeCommandResp
         )
 
     try:
-        order = submit_order(
+        order = submit_trade_command_order(
             CreateOrderRequest(
                 accountId=request.account_id,
                 instrumentId=request.instrument_id,
@@ -150,6 +151,7 @@ def create_trade_command(request: CreateTradeCommandRequest) -> TradeCommandResp
                 quantity=request.quantity,
                 price=request.price,
             ),
+            strategy_instance_id=request.strategy_instance_id,
             command_id=trade_command_id,
         )
     except HTTPException:
