@@ -1,0 +1,51 @@
+name: Capture Phase 1 Composition Refactor
+
+on:
+  push:
+    branches:
+      - hardening/refactor-phase1-composition-boundaries
+    paths:
+      - '.github/workflows/apply-phase1-capture.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: hardening/refactor-phase1-composition-boundaries
+          fetch-depth: 0
+      - name: Remove redundant EOD query and clean scaffolding
+        shell: bash
+        run: |
+          set +e
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          path = Path('platform-backend/app/eod_reconciliation.py')
+          source = path.read_text(encoding='utf-8')
+          pattern = re.compile(
+              r'^        row = db\.execute\(\r?\n'
+              r'            "SELECT \* FROM eod_reconciliation_reports WHERE id = \?",\r?\n'
+              r'            \(report_id,\),\r?\n'
+              r'        \)\.fetchone\(\)\r?\n',
+              re.MULTILINE,
+          )
+          updated, count = pattern.subn('', source, count=1)
+          print(f'match_count={count}')
+          if count == 1:
+              path.write_text(updated, encoding='utf-8')
+          PY
+          rm -f \
+            .github/workflows/apply-phase1-capture.yml \
+            .github/workflows/fix-phase1-ruff-regex.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add platform-backend/app/eod_reconciliation.py
+          git add -u .github/workflows
+          git commit -m 'fix: remove redundant EOD report query' || true
+          git push origin HEAD:hardening/refactor-phase1-composition-boundaries
