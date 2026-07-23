@@ -31,6 +31,89 @@ class ExecutionEvent(BaseModel):
     reason: str | None = None
 
 
+class VenueOrderSnapshot(BaseModel):
+    source: str
+    external_order_id: str = Field(alias="externalOrderId")
+    platform_order_id: str = Field(alias="platformOrderId")
+    command_id: str = Field(alias="commandId")
+    account_id: str = Field(alias="accountId")
+    instrument_id: str = Field(alias="instrumentId")
+    symbol: str
+    side: Literal["buy", "sell"]
+    order_type: Literal["market", "limit"] = Field(alias="orderType")
+    quantity: Decimal
+    price: Decimal | None = None
+    status: Literal[
+        "accepted",
+        "partially_filled",
+        "filled",
+        "canceled",
+        "rejected",
+        "unknown",
+    ]
+    filled_quantity: Decimal = Field(alias="filledQuantity")
+    average_fill_price: Decimal | None = Field(default=None, alias="averageFillPrice")
+    occurred_at: datetime = Field(alias="occurredAt")
+    as_of: datetime = Field(alias="asOf")
+    data_quality_state: str = Field(default="complete", alias="dataQualityState")
+
+
+class VenueFillSnapshot(BaseModel):
+    source: str
+    external_fill_id: str = Field(alias="externalFillId")
+    external_order_id: str = Field(alias="externalOrderId")
+    platform_order_id: str = Field(alias="platformOrderId")
+    command_id: str = Field(alias="commandId")
+    account_id: str = Field(alias="accountId")
+    instrument_id: str = Field(alias="instrumentId")
+    symbol: str
+    side: Literal["buy", "sell"]
+    quantity: Decimal
+    price: Decimal
+    fee: Decimal = Decimal("0")
+    currency: str
+    occurred_at: datetime = Field(alias="occurredAt")
+    data_quality_state: str = Field(default="complete", alias="dataQualityState")
+
+
+class VenuePositionSnapshot(BaseModel):
+    source: str
+    external_position_id: str = Field(alias="externalPositionId")
+    account_id: str = Field(alias="accountId")
+    instrument_id: str = Field(alias="instrumentId")
+    symbol: str
+    net_quantity: Decimal = Field(alias="netQuantity")
+    average_price: Decimal | None = Field(default=None, alias="averagePrice")
+    currency: str
+    as_of: datetime = Field(alias="asOf")
+    data_quality_state: str = Field(default="complete", alias="dataQualityState")
+
+
+class VenueBalanceSnapshot(BaseModel):
+    source: str
+    external_balance_id: str = Field(alias="externalBalanceId")
+    account_id: str = Field(alias="accountId")
+    equity: Decimal
+    available_balance: Decimal = Field(alias="availableBalance")
+    currency: str
+    as_of: datetime = Field(alias="asOf")
+    data_quality_state: str = Field(default="complete", alias="dataQualityState")
+
+
+class CancelOrderRequest(BaseModel):
+    idempotency_key: str = Field(alias="idempotencyKey", min_length=1, max_length=128)
+    reason: str | None = Field(default=None, max_length=512)
+
+
+class CancelOrderResponse(BaseModel):
+    source: str
+    external_order_id: str = Field(alias="externalOrderId")
+    platform_order_id: str = Field(alias="platformOrderId")
+    status: Literal["canceled", "already_final", "not_found", "unsupported", "unknown"]
+    reason: str | None = None
+    as_of: datetime = Field(alias="asOf")
+
+
 class RuntimeStatusResponse(BaseModel):
     status: str
     service: str
