@@ -1,10 +1,12 @@
 # V6 Phase 4D：实盘日终对账、报告与运营门禁
 
-状态：`implementation in progress / engineering acceptance pending`  
+状态：`engineering completed / merge pending / operational acceptance pending`  
 实施分支：`hardening/v6-phase4d-eod-reconciliation`  
+Pull Request：`#21 Build V6 Phase 4D live end-of-day reconciliation and scale gates`  
 跟踪 Issue：`#20 V6 Phase 4D：实盘日终对账、报告与运营门禁`  
 上级计划：Issue `#12`、`V6-交易安全加固实施计划.md`  
 运营手册：`../operations/V6-小资金实盘验收手册.md`  
+工程验收：`Platform CI #327 / run 30018515755`  
 更新时间：`2026-07-23`
 
 ## 1. 目标
@@ -47,12 +49,12 @@ Order / Fill / Deal
 
 按固定顺序执行：
 
-1. 对当日及仍未终结的 Platform Order 执行 Venue Reconcile。
+1. 对业务日期窗口内的 Platform Order，以及估值时点仍未终结的历史 Order 执行 Venue Reconcile。
 2. 查询并导入外部 Position 与 Balance。
 3. 查询并导入 Bybit Funding/Fee、MT5 Swap/Commission/Fee。
 4. 从 FinancialFact 重建 Formal Position 与 Formal PnL。
 5. 在统一 `valuationTime` 生成 Formal NAV。
-6. 汇总 Reconciliation Difference、未映射事件、缺失账户和数据质量。
+6. 汇总当日及历史 Open/Accepted Reconciliation Difference、未映射事件、缺失账户和数据质量。
 7. 生成 EOD Report，不自动解决或接受任何差异。
 
 ## 4. 报告状态
@@ -122,7 +124,7 @@ POST /api/v1/ops/eod-reconciliation/reports/{reportId}/review
   -Owner "operations-owner"
 ```
 
-默认先执行只读 Runtime Preflight。脚本不会自动提高实盘限额，也不会自动接受差异。
+默认先执行只读 Runtime Preflight。脚本不会提交订单、提高实盘限额或自动接受差异。非 clean 报告返回非零退出码并保留 JSON 输出。
 
 ## 8. 金样本
 
@@ -146,7 +148,14 @@ POST /api/v1/ops/eod-reconciliation/reports/{reportId}/review
 - 不允许 `approved_same_limits`。
 - 可以不可变地标记 `needs_remediation`。
 
-### 8.3 外部故障
+### 8.3 历史差异与订单窗口
+
+- 历史 Accepted Difference 即使当日无新差异，也保持 `blocked`。
+- 当日终结订单进入核对。
+- 历史非终结订单继续进入核对。
+- 历史已终结订单和估值时点之后订单不进入当日报告。
+
+### 8.4 外部故障
 
 - Venue Position、Balance、Economic Event 与 NAV 链路失败。
 - 报告必须为 `failed` 或 `partial`。
@@ -154,15 +163,20 @@ POST /api/v1/ops/eod-reconciliation/reports/{reportId}/review
 
 ## 9. 工程验收
 
-- [x] EOD Report 表、API、幂等和不可变复核已实现。
-- [x] IANA 时区、业务日期、估值时点和 SLA 已显式建模。
-- [x] Order、Position、Balance、Economic Event、Formal PnL/NAV 编排已实现。
-- [x] Clean、Differences、External Failure 金样本已加入。
-- [x] PowerShell 实盘日终入口已加入。
-- [ ] 历史未解决或 Accepted Difference 纳入扩大实盘阻断。
-- [ ] 当日订单窗口与未终结历史订单筛选完成。
-- [ ] Platform CI 全部通过并记录 Run ID。
-- [ ] README、START-HERE、API Spec、Release Gate、总计划和 Changelog 最终同步。
+最终工程验收：`Platform CI #327 / run 30018515755`
+
+| 检查 | 结果 |
+|---|---|
+| Execution Runtime strict Ruff、full Ruff、Pytest | 通过 |
+| Platform Backend strict Ruff、full Ruff、Pytest | 通过 |
+| Frontend frozen install、type-check、production build | 通过 |
+| EOD Report 表、API、幂等、SLA 和不可变复核 | 通过 |
+| Order、Position、Balance、Economic Event、Formal PnL/NAV 编排 | 通过 |
+| 历史 Open/Accepted Difference 扩大实盘阻断 | 通过 |
+| 业务日期窗口与历史未终结订单 | 通过 |
+| Clean、Difference、Historical Accepted、Order Window、External Failure 金样本 | 通过 |
+| PowerShell 实盘日终入口 | 已加入 |
+| README、START-HERE、API Spec、Release Gate、总计划和 Changelog | 已同步 |
 
 ## 10. 运营验收
 
