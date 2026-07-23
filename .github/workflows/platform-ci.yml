@@ -54,14 +54,14 @@ jobs:
           python-version: '3.12'
           cache: pip
           cache-dependency-path: execution-runtime/pyproject.toml
-      - name: Install dependencies
-        run: python -m pip install -e '.[dev]'
-      - name: Phase 1 lint gate
+      - name: Runtime strict lint gate
         run: >-
           python -m ruff check
           app/main.py
           app/journal.py
           tests/test_atomic_command_claim.py
+      - name: Install dependencies
+        run: python -m pip install -e '.[dev]'
       - name: Full lint debt inventory
         continue-on-error: true
         run: python -m ruff check app tests
@@ -82,14 +82,21 @@ jobs:
           cache-dependency-path: platform-backend/pyproject.toml
       - name: Install dependencies
         run: python -m pip install -e '.[dev]'
-      - name: Phase 1 lint gate
+      - name: Phase 2 strict lint gate
         run: >-
           python -m ruff check
+          app/main.py
           app/security.py
           app/trading.py
+          app/trade_commands.py
+          app/execution_batches.py
           tests/test_order_safety_fail_closed.py
           tests/test_secret_safety.py
           tests/test_trading_flow.py
+          tests/test_order_recovery.py
+          tests/test_execution_batches.py
+          tests/test_execution_batches_v1.py
+          tests/test_ops_observability.py
       - name: Full lint debt inventory
         continue-on-error: true
         run: python -m ruff check app tests
