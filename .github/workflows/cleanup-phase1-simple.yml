@@ -1,0 +1,35 @@
+name: Cleanup Phase 1 Refactor Scaffolding Simple
+
+on:
+  push:
+    branches:
+      - hardening/refactor-phase1-composition-boundaries
+    paths:
+      - '.github/workflows/cleanup-phase1-simple.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: hardening/refactor-phase1-composition-boundaries
+          fetch-depth: 0
+      - name: Restore canonical CI and remove temporary workflows
+        shell: bash
+        run: |
+          git fetch origin main
+          git checkout origin/main -- .github/workflows/platform-ci.yml
+          rm -f \
+            .github/workflows/apply-phase1-once.yml \
+            .github/workflows/apply-phase1-capture.yml \
+            .github/workflows/cleanup-phase1-once.yml \
+            .github/workflows/cleanup-phase1-simple.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A .github/workflows
+          git commit -m 'chore: restore canonical CI after composition refactor'
+          git push origin HEAD:hardening/refactor-phase1-composition-boundaries
