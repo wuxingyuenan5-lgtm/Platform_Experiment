@@ -2,6 +2,26 @@
 
 ## Unreleased
 
+### Command authority and recovery — Phase 2
+
+- Added `platform-backend/app/trade_commands.py` as the authoritative TradeCommand service.
+- Required active closed-loop StrategyInstance, active StrategyAccountBinding, active Account, Instrument, and ContractSpecification before creating a TradeCommand.
+- Made TradeCommand creation atomically idempotent through the unique client-provided `idempotencyKey`.
+- Required every ExecutionBatch to provide `strategyInstanceId` and `idempotencyKey`.
+- Changed ExecutionBatch legs to create deterministic TradeCommands using `<batch-key>:<role>` rather than bypassing the command layer.
+- Added full-leg Catalog validation before the first leg executes, reducing preventable residual-exposure failures.
+- Marked direct `POST /api/v1/trading/orders` as a deprecated compatibility endpoint.
+- Added `POST /api/v1/trading/orders/{orderId}/reconcile` to recover `result_unknown` orders from Runtime Journal without resubmitting the order.
+- Added Runtime event identity validation for `command_id` and `platform_order_id`.
+- Made Fill replay idempotent: duplicate event IDs no longer update Position, EconomicEvent, or PnL twice.
+- Added tests for successful unknown-result recovery, unavailable-Runtime behavior, fill replay, authoritative per-leg commands, and repeated batch requests.
+- Replaced funding execution panel demo UUID mappings with dynamic Strategy, Binding, Account, Instrument, and ContractSpecification Catalog queries.
+- Disabled unsupported assets and incomplete Catalog configurations with explicit frontend messages; missing Position/PnL now displays unknown rather than zero.
+- Updated the platform smoke script to use TradeCommand, ExecutionBatch idempotency, StrategyInstance, and authoritative Catalog IDs.
+- Added `docs/planning/V6-Phase2-命令入口与结果恢复.md` and Issue #4 / PR #5 as the Phase 2 delivery trail.
+- Updated README, START-HERE, API Specification, Release Gate, overall V6 plan, CI strict gates, and this Changelog.
+- Explicitly retained Simulation / Fake Gateway as the only allowed execution mode; real Bybit/MT5, formal PnL/NAV, and automatic residual-leg risk handling remain deferred.
+
 ### Trading safety hardening — Phase 1
 
 - Established `main@76effbff6391533db7b9954965aaf1b09051081f` as the V6 engineering baseline.
