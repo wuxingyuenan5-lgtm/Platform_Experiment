@@ -25,6 +25,6 @@
 
 - `platform-backend/app/main.py` 只装配 Router 与 Middleware，不承载业务规则。
 - 风险敞口、EOD 策略和权限映射由各自模块显式导入，禁止运行时 monkey patch。
+- 领域模块之间通过普通 import 建立可静态分析的依赖，不依赖启动顺序改变函数实现。
 - 同一业务事实只能有一个权威实现；残余敞口计算统一由 `execution_exposure.py` 提供。
 - `tests/test_architecture_boundaries.py` 对上述边界进行静态回归检查。
-
