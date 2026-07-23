@@ -5,6 +5,7 @@
 ### Controlled Bybit and MT5 live adapters — Phase 4C
 
 - Replaced the planned Demo-adapter scope with controlled real-account integration because Bybit and MT5 simulation environments do not sufficiently reproduce live account, execution, Funding, Swap, and terminal behavior.
+- Defined small-capital real-account testing with the venue or broker minimum order size as the primary operational acceptance path after read-only and shadow reconciliation; passing a simulated environment is not treated as final acceptance.
 - Added a deterministic account router that maps each Platform Account to exactly one Bybit or MT5 live adapter and rejects ambiguous or missing routes.
 - Added a second Runtime live-write gate, independent of the Platform live gate and Kill Switch, with `liveWriteEnabled=false` by default.
 - Added Account, StrategyInstance, and Symbol allowlists plus per-order and per-day notional limits.
@@ -20,6 +21,9 @@
 - Added `POST /api/v1/ops/live-economic-events/import` to idempotently ingest live Funding, Swap, and Fee into immutable FinancialFact; unmapped instruments are explicitly returned in `skippedExternalIds`.
 - Preserved StrategyInstance identity across the Platform-to-Runtime TradeCommand boundary for Runtime strategy allowlists.
 - Added offline Provider Contract Tests for Bybit and MT5 mappings, live-write gates, allowlists, notional limits, external identities, and economic-event imports.
+- Added `execution-runtime/.env.live.example` with write gates closed, empty allowlists, zero notional limits, and credential references only.
+- Added `scripts/live-readonly-preflight.ps1` to verify Live Environment, Gateway, write-gate state, credential completeness, and Venue Readiness without submitting or canceling orders.
+- Added `docs/operations/V6-小资金实盘验收手册.md` covering read-only verification, shadow reconciliation, minimum-size order/cancel/fill testing, Kill Switch drills, end-of-day checks, and mandatory gate reset.
 - Expanded Platform CI strict gates for all Phase 4C Runtime and Backend files and tests.
 - Added `docs/planning/V6-Phase4C-受控实盘适配器.md` and `docs/technical/LIVE_VENUE_ADAPTERS.md`.
 - Synchronized Issue #18, Issue #12, README, START-HERE, API Specification, Release Gate, overall V6 plan, and this Changelog.
@@ -78,30 +82,3 @@
 
 - Removed the explanatory redirect paragraph from the login card so the page contains only identity, authentication, and registration actions required by the user.
 - Removed the unused login subhead styles and preserved the existing redirect behavior in code.
-- Restored the product-surface rule that implementation explanations and integration notes belong in Markdown rather than the primary product interface.
-
-### Command authority and recovery — Phase 2
-
-- Added the authoritative TradeCommand service and business-level idempotency.
-- Required active StrategyInstance, Binding, Account, Instrument, and ContractSpecification.
-- Required ExecutionBatch idempotency and deterministic per-leg TradeCommands.
-- Added Runtime Journal recovery without resubmitting uncertain orders.
-- Added Runtime identity validation and idempotent Fill replay.
-- Replaced frontend demo UUID mappings with Backend Catalog queries.
-- Completed Platform CI run `29986397987`.
-
-### Trading safety hardening — Phase 1
-
-- Established the V6 engineering baseline.
-- Changed order validation to fail closed for unknown or inactive Accounts, Instruments, and ContractSpecifications.
-- Preserved the global Live trading switch and added Runtime atomic command claims.
-- Added Backend, Runtime, and Frontend CI, type-check, build, and tests.
-- Completed Platform CI run `29983926790`.
-
-### Previous V6 workspace changes
-
-- Standardized local development around frontend port `5173` and Platform Backend `/api/v1`.
-- Removed backend/debug panels from product pages.
-- Restored the Variable Global start page and logged-in Home Dashboard.
-- Added `.ignore` and expanded `.gitignore` to reduce dependency, build, output, and reference-code noise.
-- Moved SQL references under `references/database/` and large external reference code out of the project root.
