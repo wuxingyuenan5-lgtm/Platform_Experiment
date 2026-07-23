@@ -163,6 +163,8 @@ jobs:
             app/security.py \
             app/redaction.py \
             app/credential_security.py \
+            app/disaster_recovery.py \
+            app/production_monitoring.py \
             app/trading.py \
             app/trade_commands.py \
             app/trade_command_execution.py \
@@ -179,6 +181,8 @@ jobs:
             tests/test_order_safety_fail_closed.py \
             tests/test_secret_safety.py \
             tests/test_credential_security.py \
+            tests/test_disaster_recovery.py \
+            tests/test_production_monitoring.py \
             tests/test_trading_flow.py \
             tests/test_order_recovery.py \
             tests/test_idempotency_conflicts.py \
@@ -214,7 +218,7 @@ jobs:
         shell: bash
         run: |
           if ! python -m pytest > /tmp/backend-pytest.log 2>&1; then
-            tail -n 420 /tmp/backend-pytest.log
+            tail -n 500 /tmp/backend-pytest.log
             exit 1
           fi
       - name: Upload backend pytest diagnostics
