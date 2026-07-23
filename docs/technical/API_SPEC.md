@@ -65,7 +65,8 @@ POST /api/v1/trading/commands
 - Account active。
 - Instrument 和 ContractSpecification 存在。
 - 数量、数量步长、价格步长和 Live 门禁通过。
-- `idempotencyKey` 唯一；重复请求返回已有 TradeCommand，不创建第二个外部订单。
+- `idempotencyKey` 唯一；重复且载荷一致时返回已有 TradeCommand，不创建第二个外部订单。
+- 相同 `idempotencyKey` 携带不同 Strategy、Account、Instrument、side、orderType、quantity 或 price 时返回 `409 Conflict`。
 
 响应核心字段：
 
@@ -130,7 +131,8 @@ POST /api/v1/trading/execution-batches
 - 所有 Leg 在第一条腿执行前完成 Catalog 预校验。
 - 每条 Leg 创建独立 TradeCommand。
 - Leg 幂等键为 `<batch-idempotency-key>:<role>`。
-- 重复 Batch 请求返回已有 Batch，不生成新的 Command、Order 或 Runtime 调用。
+- 重复且载荷一致的 Batch 请求返回已有 Batch，不生成新的 Command、Order 或 Runtime 调用。
+- 相同 Batch `idempotencyKey` 对应不同方向、账户、Strategy、Leg、Instrument、数量或价格时返回 `409 Conflict`。
 
 查询：
 
