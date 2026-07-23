@@ -176,7 +176,7 @@ def apply_execution_events(
             fill_price = Decimal(str(event["fill_price"]))
             fill_quantity = Decimal(str(event["fill_quantity"]))
             fill_id = str(event["event_id"])
-            record_fill_and_update_projections(
+            record_fill_and_update_operational_projections(
                 fill_id=fill_id,
                 order_id=order_id,
                 request=request,
@@ -200,7 +200,7 @@ def validate_execution_event(
         raise HTTPException(status_code=502, detail="Runtime event is incomplete")
 
 
-def record_fill_and_update_projections(
+def record_fill_and_update_operational_projections(
     *,
     fill_id: str,
     order_id: str,
