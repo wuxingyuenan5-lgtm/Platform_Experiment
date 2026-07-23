@@ -6,14 +6,12 @@
 
 - 正式分支：`main`
 - Phase 3 代码发布提交：`77bf4223c2059d5a56fc08a2d49214351c396abc`
-- 文档最终化：PR `#10`
-- 当前状态：Phase 3 已完成，下一阶段为执行风险与 Demo 闭环
+- 当前实施：Phase 4A 双腿执行风险、Kill Switch 与残腿处置
 - 总跟踪：GitHub Issue `#2`
-- Phase 1：PR `#3`，已完成
-- Phase 2：Issue `#4`、PR `#5`，已完成
-- Phase 3：Issue `#7`、PR `#9`，已完成
+- Phase 4 总计划：Issue `#12`
+- Phase 4A：Issue `#14`、PR `#15`
 - 总计划：`docs/planning/V6-交易安全加固实施计划.md`
-- Phase 3 记录：`docs/planning/V6-Phase3-金融事实与正式账务.md`
+- Phase 4A 计划：`docs/planning/V6-Phase4A-执行风险与Kill-Switch.md`
 
 `main` 的最新分支指针以 GitHub 为准，不在文档中硬编码会随文档提交变化的 tip SHA。当前系统只允许 Simulation / Fake Gateway，不开放 Paper、Demo 或真实资金 Live。
 
@@ -22,10 +20,11 @@
 | 你要做什么 | 入口 |
 |---|---|
 | 看总体工程计划 | `docs/planning/V6-交易安全加固实施计划.md` |
+| 看当前 Phase 4A | `docs/planning/V6-Phase4A-执行风险与Kill-Switch.md` |
+| 看执行风险技术设计 | `docs/technical/EXECUTION_RISK_CONTROLS.md` |
 | 看 Phase 3 验收记录 | `docs/planning/V6-Phase3-金融事实与正式账务.md` |
 | 看 FinancialFact 与正式账务设计 | `docs/technical/FINANCIAL_FACTS.md` |
 | 看正式 API 口径 | `docs/technical/API_SPEC.md` |
-| 看已完成 Phase 2 | `docs/planning/V6-Phase2-命令入口与结果恢复.md` |
 | 改前端界面 | `admin-risk/src/views` |
 | 看策略平台页面 | `http://127.0.0.1:5173/index.html#/strategy/platform` |
 | 看策略管理页面 | `http://127.0.0.1:5173/index.html#/strategy/management` |
@@ -76,6 +75,40 @@ POST /api/v1/trading/orders/{orderId}/reconcile
 - `/api/v1/trading/orders` 仅作为 deprecated 兼容入口，禁止新业务继续依赖。
 - `result_unknown` 只能查询恢复，不能直接重下。
 
+## Phase 4A 执行风险入口
+
+Kill Switch：
+
+```http
+GET /api/v1/risk/kill-switches/{scopeType}/{scopeId}
+PUT /api/v1/risk/kill-switches/{scopeType}/{scopeId}
+```
+
+风险策略：
+
+```http
+GET /api/v1/strategies/instances/{strategyInstanceId}/execution-risk-policy
+PUT /api/v1/strategies/instances/{strategyInstanceId}/execution-risk-policy
+```
+
+Batch 风险与处置：
+
+```http
+GET  /api/v1/trading/execution-batches/{batchId}/risk
+GET  /api/v1/trading/execution-batches/{batchId}/risk-actions
+POST /api/v1/trading/execution-batches/{batchId}/risk-actions
+```
+
+规则：
+
+- Batch 在认领前和每条腿执行前检查 global、strategy、account Kill Switch。
+- Kill Switch 命中返回 423，且不得产生新的 TradeCommand 或 Runtime 副作用。
+- 每个 Batch 固化最大腿间延迟、最大残留名义敞口和失败处置策略。
+- 残留敞口优先使用 Fill、Contract Multiplier 和 Settlement Currency。
+- 自动平仓必须通过反向 TradeCommand，禁止直接插入 Order。
+- 风险动作必须幂等，并记录操作人、原因、结果和 AuditEvent。
+- 外部撤单、Venue 主动查询、Bybit/MT5 Demo 和日终对账仍属于 Phase 4B–4D。
+
 ## Phase 3 正式金融核对入口
 
 不可变事实：
@@ -115,7 +148,7 @@ POST /api/v1/strategies/instances/{strategyInstanceId}/formal-nav-snapshots/run
 | 目录 | 定位 | 当前策略 |
 |---|---|---|
 | `admin-risk/` | 正式前端工程 | Catalog 驱动，不硬编码账户和标的 ID |
-| `platform-backend/` | 业务权威后端 | Strategy、Command、Order、FinancialFact、Formal Position/PnL/NAV 权威 |
+| `platform-backend/` | 业务权威后端 | Strategy、Command、Order、Execution Risk、FinancialFact、Formal Position/PnL/NAV 权威 |
 | `execution-runtime/` | 执行隔离网关 | 独立进程、Journal、命令原子抢占 |
 | `docs/` | 根级导航和执行计划 | 只放权威入口、计划和运行口径 |
 | `admin-risk/docs/` | 详细产品和架构文档 | 与代码变更同步维护 |
@@ -179,14 +212,15 @@ python -m pytest
 1. 交易、权限、数据库、PnL 和部署变更必须单独审批和留痕。
 2. 未知账户、标的、绑定、状态或执行结果必须 fail-closed。
 3. 所有外部副作用必须在幂等认领之后发生。
-4. 前端不得硬编码正式账户、策略实例和 Instrument ID。
-5. 产品页面只展示用户完成业务任务所需的信息、操作和状态；开发说明、实现解释、跳转机制和联调备注不得进入正式界面。
-6. 必要提示应短、准、就近呈现；完整解释进入 Markdown 文档，不在页面主要视觉层堆叠辅助文案。
-7. 缺失持仓、PnL、行情、汇率和账户事实不得伪装为零。
-8. `result_unknown` 必须先恢复和对账，不得重新提交。
-9. 正式 Position、PnL 和 NAV 必须能追溯到不可变事实并支持重建。
-10. 每批工程改动同步更新计划、测试、API Spec、Release Gate 和 Changelog。
-11. 未通过 CI 的 PR 不得合入 main。
+4. Kill Switch 必须在产生新增风险前生效，风险降低动作必须独立审计。
+5. 前端不得硬编码正式账户、策略实例和 Instrument ID。
+6. 产品页面只展示用户完成业务任务所需的信息、操作和状态；开发说明、实现解释、跳转机制和联调备注不得进入正式界面。
+7. 必要提示应短、准、就近呈现；完整解释进入 Markdown 文档，不在页面主要视觉层堆叠辅助文案。
+8. 缺失持仓、PnL、行情、汇率和账户事实不得伪装为零。
+9. `result_unknown` 必须先恢复和对账，不得重新提交。
+10. 正式 Position、PnL 和 NAV 必须能追溯到不可变事实并支持重建。
+11. 每批工程改动同步更新计划、测试、API Spec、Release Gate 和 Changelog。
+12. 未通过 CI 的 PR 不得合入 main。
 
 ## Codex 降噪
 

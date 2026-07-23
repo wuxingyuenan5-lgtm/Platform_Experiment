@@ -7,6 +7,14 @@ from uuid import uuid4
 from fastapi import HTTPException
 
 from app.database import connection
+from app.execution_risk import (
+    assert_execution_allowed,
+    check_leg_deadline,
+    complete_batch_risk,
+    handle_batch_failure,
+    initialize_batch_risk,
+    record_filled_leg,
+)
 from app.schemas import (
     BatchLegResponse,
     CreateExecutionBatchRequest,
@@ -99,6 +107,7 @@ def create_execution_batch(request: CreateExecutionBatchRequest) -> ExecutionBat
         raise HTTPException(status_code=422, detail="Execution batch account is required")
 
     command_requests: list[tuple[str, CreateTradeCommandRequest]] = []
+    account_ids: list[str] = []
     for leg in request.legs:
         leg_account_id = leg.account_id or default_account_id
         command_request = CreateTradeCommandRequest(
@@ -114,6 +123,9 @@ def create_execution_batch(request: CreateExecutionBatchRequest) -> ExecutionBat
         )
         validate_trade_command_catalog(command_request)
         command_requests.append((leg.role, command_request))
+        account_ids.append(leg_account_id)
+
+    assert_execution_allowed(request.strategy_instance_id, account_ids)
 
     batch_id = str(uuid4())
     created_at = now_iso()
@@ -183,10 +195,40 @@ def create_execution_batch(request: CreateExecutionBatchRequest) -> ExecutionBat
         assert_batch_request_matches(existing_id, request)
         return get_execution_batch(existing_id)
 
+    initialize_batch_risk(batch_id, request.strategy_instance_id)
     update_batch_status(batch_id, "executing")
     filled_count = 0
 
     for role, command_request in command_requests:
+        if filled_count:
+            deadline_ok, deadline_reason = check_leg_deadline(batch_id)
+            if not deadline_ok:
+                reason = deadline_reason or "Execution leg deadline exceeded"
+                update_leg_status(batch_id, role, "blocked", failure_reason=reason)
+                update_batch_status(
+                    batch_id,
+                    "manual_intervention",
+                    failure_reason=reason,
+                    requires_manual_intervention=True,
+                )
+                handle_batch_failure(batch_id, reason)
+                return get_execution_batch(batch_id)
+
+        try:
+            assert_execution_allowed(request.strategy_instance_id, account_ids)
+        except HTTPException as exc:
+            reason = str(exc.detail)
+            status = "manual_intervention" if filled_count else "failed"
+            update_leg_status(batch_id, role, "blocked", failure_reason=reason)
+            update_batch_status(
+                batch_id,
+                status,
+                failure_reason=reason,
+                requires_manual_intervention=status == "manual_intervention",
+            )
+            handle_batch_failure(batch_id, reason)
+            return get_execution_batch(batch_id)
+
         update_leg_status(batch_id, role, "submitting")
         try:
             command = create_trade_command(command_request)
@@ -200,6 +242,7 @@ def create_execution_batch(request: CreateExecutionBatchRequest) -> ExecutionBat
                 failure_reason=reason,
                 requires_manual_intervention=status == "manual_intervention",
             )
+            handle_batch_failure(batch_id, reason)
             return get_execution_batch(batch_id)
 
         update_leg_status(
@@ -211,6 +254,17 @@ def create_execution_batch(request: CreateExecutionBatchRequest) -> ExecutionBat
 
         if command.status == "filled":
             filled_count += 1
+            risk_ok, risk_reason = record_filled_leg(batch_id)
+            if not risk_ok and filled_count < len(command_requests):
+                reason = risk_reason or "Residual exposure policy blocked the next leg"
+                update_batch_status(
+                    batch_id,
+                    "manual_intervention",
+                    failure_reason=reason,
+                    requires_manual_intervention=True,
+                )
+                handle_batch_failure(batch_id, reason)
+                return get_execution_batch(batch_id)
             if filled_count < len(command_requests):
                 update_batch_status(batch_id, "partially_executed")
             continue
@@ -231,9 +285,21 @@ def create_execution_batch(request: CreateExecutionBatchRequest) -> ExecutionBat
             failure_reason=reason,
             requires_manual_intervention=status == "manual_intervention",
         )
+        handle_batch_failure(batch_id, reason)
         return get_execution_batch(batch_id)
 
-    update_batch_status(batch_id, "hedged")
+    risk = complete_batch_risk(batch_id)
+    if risk.risk_status == "clear":
+        update_batch_status(batch_id, "hedged")
+    else:
+        reason = risk.risk_reason or "Batch finished with unresolved residual exposure"
+        update_batch_status(
+            batch_id,
+            "manual_intervention",
+            failure_reason=reason,
+            requires_manual_intervention=True,
+        )
+        handle_batch_failure(batch_id, reason)
     return get_execution_batch(batch_id)
 
 
