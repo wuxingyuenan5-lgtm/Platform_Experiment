@@ -1,2 +1,0 @@
-exit_code=1
-E           sqlite3.OperationalError: table eod_reconciliation_reports has no column named period_start 
