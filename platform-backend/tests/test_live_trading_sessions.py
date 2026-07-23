@@ -102,11 +102,12 @@ def test_two_person_approval_and_live_order_claim(monkeypatch, tmp_path: Path) -
     configure_live(monkeypatch, tmp_path)
     with TestClient(app) as client:
         make_account_live()
+        payload = session_payload()
 
         requested = client.post(
             "/api/v1/live-trading/sessions",
             headers=headers("trader-token"),
-            json=session_payload(),
+            json=payload,
         )
         assert requested.status_code == 200
         session = requested.json()
@@ -116,7 +117,7 @@ def test_two_person_approval_and_live_order_claim(monkeypatch, tmp_path: Path) -
         replay = client.post(
             "/api/v1/live-trading/sessions",
             headers=headers("trader-token"),
-            json=session_payload(),
+            json=payload,
         )
         assert replay.status_code == 200
         assert replay.json()["sessionId"] == session["sessionId"]
