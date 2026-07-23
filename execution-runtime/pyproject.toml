@@ -44,3 +44,10 @@ line-length = 100
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
+
+[tool.ruff.lint.per-file-ignores]
+# FastAPI Query metadata is intentionally declared in route signatures.
+"app/main.py" = ["B008"]
+# SQL and immutable snapshot identifiers are kept visibly auditable in the persistent fake store.
+"app/venue_store.py" = ["E501"]
+"tests/test_venue_query.py" = ["E501"]
