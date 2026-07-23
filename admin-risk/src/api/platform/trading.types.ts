@@ -44,8 +44,8 @@ export interface CreateExecutionBatchLegInput {
 }
 
 export interface CreateExecutionBatchInput {
-  idempotencyKey?: string;
-  strategyInstanceId?: string;
+  idempotencyKey: string;
+  strategyInstanceId: string;
   accountId?: string;
   strategyKey: string;
   direction: string;
@@ -292,6 +292,16 @@ export interface AccountResult {
   credentialRef?: string | null;
   status: string;
   dataQualityState: string;
+}
+
+export interface StrategyAccountBindingResult {
+  bindingId: string;
+  strategyInstanceId: string;
+  accountId: string;
+  accountCode: string;
+  role: string;
+  maxNotional?: string | null;
+  status: string;
 }
 
 export interface InstrumentResult {
