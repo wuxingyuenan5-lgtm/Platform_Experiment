@@ -1,5 +1,6 @@
 from app import execution_risk
 from app.application import app
+from app.eod_reconciliation import router as eod_reconciliation_router
 from app.execution_exposure import calculate_residual_exposure
 from app.execution_risk import router as execution_risk_router
 from app.financial_facts import router as financial_facts_router
@@ -14,5 +15,6 @@ app.include_router(financial_facts_router)
 app.include_router(execution_risk_router)
 app.include_router(venue_reconciliation_router)
 app.include_router(live_venue_accounting_router)
+app.include_router(eod_reconciliation_router)
 
 __all__ = ["app"]
