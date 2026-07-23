@@ -143,7 +143,7 @@ class VenueReadinessResult(BaseModel):
     credential_ref: str = Field(alias="credentialRef")
     symbol: str
     market_type: str | None = Field(default=None, alias="marketType")
-    checks: list[str] = []
+    checks: list[str] = Field(default_factory=list)
     reason: str | None = None
 
 
@@ -174,7 +174,7 @@ class CrossSpreadVenueSnapshot(BaseModel):
     symbol: str
     status: str
     quote: MarketQuote | None = None
-    positions: list[VenuePosition] = []
+    positions: list[VenuePosition] = Field(default_factory=list)
     reason: str | None = None
 
 
