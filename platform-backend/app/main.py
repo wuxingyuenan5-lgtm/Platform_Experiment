@@ -1,4 +1,4 @@
-from app import eod_reconciliation, execution_risk
+from app import auth, eod_reconciliation, execution_risk
 from app.application import app
 from app.auth import AuthenticationMiddleware
 from app.credential_security import router as credential_security_router
@@ -34,6 +34,20 @@ def _create_eod_report_with_policy(request):
 
 
 eod_reconciliation.create_eod_report = _create_eod_report_with_policy
+
+# Rotation metadata exposes no values but is still security/audit information.
+_original_permission_for_request = auth.permission_for_request
+
+
+def _permission_for_request(method: str, path: str) -> str:
+    if method.upper() in {"GET", "HEAD"} and path.endswith(
+        "/security/credential-rotations"
+    ):
+        return "audit:read"
+    return _original_permission_for_request(method, path)
+
+
+auth.permission_for_request = _permission_for_request
 
 app.include_router(financial_facts_router)
 app.include_router(execution_risk_router)
