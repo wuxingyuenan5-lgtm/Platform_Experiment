@@ -3,6 +3,7 @@ import json
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
+import httpx
 from fastapi.testclient import TestClient
 
 from app.config import get_settings
@@ -28,22 +29,26 @@ def headers(token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
 
 
-def configure_live(tmp_path: Path) -> None:
+def configure_live(monkeypatch, tmp_path: Path) -> None:
     settings = get_settings()
-    settings.database_path = str(tmp_path / "live-sessions.db")
-    settings.environment = "live"
-    settings.auth_mode = "api_key"
-    settings.auth_credentials_json = json.dumps(
-        [
-            credential("trader-1", "trader-token", ["trader"]),
-            credential("risk-1", "risk-token", ["risk_officer"]),
-            credential("admin-1", "admin-token", ["admin"]),
-        ]
+    monkeypatch.setattr(settings, "database_path", str(tmp_path / "live-sessions.db"))
+    monkeypatch.setattr(settings, "environment", "live")
+    monkeypatch.setattr(settings, "auth_mode", "api_key")
+    monkeypatch.setattr(
+        settings,
+        "auth_credentials_json",
+        json.dumps(
+            [
+                credential("trader-1", "trader-token", ["trader"]),
+                credential("risk-1", "risk-token", ["risk_officer"]),
+                credential("admin-1", "admin-token", ["admin"]),
+            ]
+        ),
     )
-    settings.live_trading_enabled = True
-    settings.require_live_trading_session = True
-    settings.live_session_absolute_max_order_notional = 1000
-    settings.live_session_absolute_max_daily_notional = 2000
+    monkeypatch.setattr(settings, "live_trading_enabled", True)
+    monkeypatch.setattr(settings, "require_live_trading_session", True)
+    monkeypatch.setattr(settings, "live_session_absolute_max_order_notional", 1000)
+    monkeypatch.setattr(settings, "live_session_absolute_max_daily_notional", 2000)
 
 
 def make_account_live() -> None:
@@ -94,7 +99,7 @@ def order_payload(key: str) -> dict[str, str]:
 
 
 def test_two_person_approval_and_live_order_claim(monkeypatch, tmp_path: Path) -> None:
-    configure_live(tmp_path)
+    configure_live(monkeypatch, tmp_path)
     with TestClient(app) as client:
         make_account_live()
 
@@ -126,14 +131,10 @@ def test_two_person_approval_and_live_order_claim(monkeypatch, tmp_path: Path) -
         assert approved.json()["approverUserId"] == "risk-1"
         assert approved.json()["applicantUserId"] != approved.json()["approverUserId"]
 
-        class RuntimeUnavailable:
-            def raise_for_status(self) -> None:
-                raise __import__("httpx").ConnectError("runtime unavailable")
+        def runtime_unavailable(*args, **kwargs):
+            raise httpx.ConnectError("runtime unavailable")
 
-        monkeypatch.setattr(
-            "app.trade_command_execution.httpx.post",
-            lambda *args, **kwargs: RuntimeUnavailable(),
-        )
+        monkeypatch.setattr("app.trade_command_execution.httpx.post", runtime_unavailable)
         order = client.post(
             "/api/v1/trading/commands",
             headers=headers("trader-token"),
@@ -149,8 +150,8 @@ def test_two_person_approval_and_live_order_claim(monkeypatch, tmp_path: Path) -
         assert claims == 1
 
 
-def test_applicant_cannot_self_approve_even_with_admin_role(tmp_path: Path) -> None:
-    configure_live(tmp_path)
+def test_applicant_cannot_self_approve_even_with_admin_role(monkeypatch, tmp_path: Path) -> None:
+    configure_live(monkeypatch, tmp_path)
     with TestClient(app) as client:
         make_account_live()
         requested = client.post(
@@ -168,8 +169,8 @@ def test_applicant_cannot_self_approve_even_with_admin_role(tmp_path: Path) -> N
         assert "cannot approve" in response.json()["detail"]
 
 
-def test_live_order_without_approved_session_is_rejected(tmp_path: Path) -> None:
-    configure_live(tmp_path)
+def test_live_order_without_approved_session_is_rejected(monkeypatch, tmp_path: Path) -> None:
+    configure_live(monkeypatch, tmp_path)
     with TestClient(app) as client:
         make_account_live()
         response = client.post(
@@ -181,10 +182,10 @@ def test_live_order_without_approved_session_is_rejected(tmp_path: Path) -> None
         assert "LiveTradingSession" in response.json()["detail"]
 
 
-def test_limit_and_kill_switch_block_session_approval(tmp_path: Path) -> None:
-    configure_live(tmp_path)
+def test_limit_and_kill_switch_block_session_approval(monkeypatch, tmp_path: Path) -> None:
+    configure_live(monkeypatch, tmp_path)
     settings = get_settings()
-    settings.live_session_absolute_max_order_notional = 50
+    monkeypatch.setattr(settings, "live_session_absolute_max_order_notional", 50)
     with TestClient(app) as client:
         make_account_live()
         requested = client.post(
@@ -200,7 +201,7 @@ def test_limit_and_kill_switch_block_session_approval(tmp_path: Path) -> None:
         assert approval.status_code == 422
         assert "absolute limit" in str(approval.json()["detail"])
 
-        settings.live_session_absolute_max_order_notional = 1000
+        monkeypatch.setattr(settings, "live_session_absolute_max_order_notional", 1000)
         kill_switch = client.put(
             "/api/v1/risk/kill-switches/global/*",
             headers=headers("risk-token"),
