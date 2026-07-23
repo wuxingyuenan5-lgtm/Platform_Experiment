@@ -1,10 +1,15 @@
+from datetime import UTC, datetime
 from decimal import Decimal
 
+from app.config import get_settings
 from app.models import (
     CancelOrderResponse,
     ExecutionEvent,
+    GatewayAdapterCapability,
+    GatewayCapabilitiesResponse,
     SubmitOrderCommand,
     VenueBalanceSnapshot,
+    VenueEconomicEventSnapshot,
     VenueFillSnapshot,
     VenueOrderSnapshot,
     VenuePositionSnapshot,
@@ -78,6 +83,15 @@ class FakeGateway:
     def list_balances(self, account_id: str | None = None) -> list[VenueBalanceSnapshot]:
         return list_balances(account_id)
 
+    def list_economic_events(
+        self,
+        *,
+        account_id: str | None = None,
+        instrument_id: str | None = None,
+        event_type: str | None = None,
+    ) -> list[VenueEconomicEventSnapshot]:
+        return []
+
     def cancel_order(
         self,
         external_order_id: str,
@@ -85,3 +99,31 @@ class FakeGateway:
         reason: str | None,
     ) -> CancelOrderResponse:
         return cancel_order(external_order_id, idempotency_key, reason)
+
+    def capabilities(self) -> GatewayCapabilitiesResponse:
+        settings = get_settings()
+        return GatewayCapabilitiesResponse(
+            gateway=self.name,
+            environment=settings.environment,
+            liveWriteEnabled=False,
+            adapters=[
+                GatewayAdapterCapability(
+                    adapter=self.name,
+                    environment="simulation",
+                    configured=True,
+                    operational=True,
+                    writeEnabled=True,
+                    accountIds=[],
+                    capabilities=[
+                        "submit_order",
+                        "cancel_order",
+                        "order_query",
+                        "fill_query",
+                        "position_query",
+                        "balance_query",
+                    ],
+                    missingRequirements=[],
+                    checkedAt=datetime.now(UTC),
+                )
+            ],
+        )

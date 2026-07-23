@@ -3,8 +3,10 @@ from typing import Protocol
 from app.models import (
     CancelOrderResponse,
     ExecutionEvent,
+    GatewayCapabilitiesResponse,
     SubmitOrderCommand,
     VenueBalanceSnapshot,
+    VenueEconomicEventSnapshot,
     VenueFillSnapshot,
     VenueOrderSnapshot,
     VenuePositionSnapshot,
@@ -40,6 +42,15 @@ class ExecutionGateway(Protocol):
     def list_balances(self, account_id: str | None = None) -> list[VenueBalanceSnapshot]:
         """Return current external balance snapshots."""
 
+    def list_economic_events(
+        self,
+        *,
+        account_id: str | None = None,
+        instrument_id: str | None = None,
+        event_type: str | None = None,
+    ) -> list[VenueEconomicEventSnapshot]:
+        """Return Funding, Swap, and Fee facts from the external venue."""
+
     def cancel_order(
         self,
         external_order_id: str,
@@ -47,3 +58,6 @@ class ExecutionGateway(Protocol):
         reason: str | None,
     ) -> CancelOrderResponse:
         """Cancel an external order idempotently when the venue supports it."""
+
+    def capabilities(self) -> GatewayCapabilitiesResponse:
+        """Return fail-closed adapter readiness without exposing secrets."""
