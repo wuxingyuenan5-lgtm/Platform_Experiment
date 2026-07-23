@@ -5,7 +5,7 @@
 跟踪 Issue：`#16 V6 Phase 4B：外部 Venue 查询、事实导入与对账差异`  
 Pull Request：`#17 Implement V6 Phase 4B venue reconciliation`  
 上级计划：Issue `#12`、`V6-交易安全加固实施计划.md`  
-最终验收：`Platform CI #228 / run 30005369314`  
+验收基准：`Platform CI #230 / run 30005519615`  
 更新时间：`2026-07-23`
 
 ## 1. 阶段目标
@@ -192,7 +192,7 @@ Phase 4B 复用 Phase 3 不可变事实层：
 
 ## 10. 验收记录
 
-最终验收：`Platform CI #228 / run 30005369314`
+验收基准：`Platform CI #230 / run 30005519615`
 
 | 检查 | 结果 |
 |---|---|
