@@ -1,0 +1,127 @@
+name: Phase 4A Exposure Patch
+
+on:
+  push:
+    branches:
+      - hardening/v6-phase4a-execution-risk
+    paths:
+      - '.github/workflows/phase4a-exposure-patch.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: hardening/v6-phase4a-execution-risk
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Correct residual exposure model
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('platform-backend/app/execution_risk.py')
+          text = path.read_text(encoding='utf-8')
+          start = text.index('def calculate_residual_exposure(')
+          end = text.index('\ndef execute_risk_action(', start)
+          replacement = '''def calculate_residual_exposure(batch_id: str) -> tuple[Decimal, str, str]:
+              ensure_schema()
+              with connection() as db:
+                  legs = db.execute(
+                      """
+                      SELECT l.role, l.side, l.quantity, l.price, l.order_id,
+                             i.base_currency, i.quantity_unit, i.settle_currency,
+                             cs.contract_multiplier
+                      FROM execution_batch_legs l
+                      JOIN instruments i ON i.id = l.instrument_id
+                      JOIN contract_specifications cs ON cs.instrument_id = l.instrument_id
+                      WHERE l.batch_id = ? AND l.status = 'filled'
+                        AND cs.effective_from = (
+                            SELECT MAX(cs2.effective_from)
+                            FROM contract_specifications cs2
+                            WHERE cs2.instrument_id = l.instrument_id
+                        )
+                      ORDER BY l.sequence
+                      """,
+                      (batch_id,),
+                  ).fetchall()
+                  exposure_by_unit: dict[tuple[str, str], Decimal] = {}
+                  reference_price_by_unit: dict[tuple[str, str], Decimal] = {}
+                  settlement_currencies: set[str] = set()
+                  for leg in legs:
+                      fill_rows = []
+                      if leg["order_id"] is not None:
+                          fill_rows = db.execute(
+                              "SELECT quantity, price FROM fills WHERE order_id = ? ORDER BY occurred_at",
+                              (leg["order_id"],),
+                          ).fetchall()
+                      multiplier = Decimal(leg["contract_multiplier"])
+                      if fill_rows:
+                          exposure_quantity = sum(
+                              Decimal(fill["quantity"]) * multiplier for fill in fill_rows
+                          )
+                          reference_price = max(Decimal(fill["price"]) for fill in fill_rows)
+                      elif leg["price"] is not None:
+                          exposure_quantity = Decimal(leg["quantity"]) * multiplier
+                          reference_price = Decimal(leg["price"])
+                      else:
+                          return Decimal("0"), "UNKNOWN", "incomplete"
+
+                      if leg["side"] == "sell":
+                          exposure_quantity = -exposure_quantity
+                      unit_key = (leg["base_currency"], leg["quantity_unit"])
+                      exposure_by_unit[unit_key] = (
+                          exposure_by_unit.get(unit_key, Decimal("0")) + exposure_quantity
+                      )
+                      reference_price_by_unit[unit_key] = max(
+                          reference_price_by_unit.get(unit_key, Decimal("0")),
+                          reference_price,
+                      )
+                      settlement_currencies.add(leg["settle_currency"])
+
+              nonzero_exposures = {
+                  unit_key: exposure
+                  for unit_key, exposure in exposure_by_unit.items()
+                  if exposure != 0
+              }
+              if not nonzero_exposures:
+                  currency = next(iter(settlement_currencies), "UNKNOWN")
+                  return Decimal("0"), currency, "complete"
+
+              residual_by_unit = {
+                  unit_key: abs(exposure) * reference_price_by_unit[unit_key]
+                  for unit_key, exposure in nonzero_exposures.items()
+              }
+              residual = sum(residual_by_unit.values())
+              if len(nonzero_exposures) == 1 and len(settlement_currencies) == 1:
+                  return residual, next(iter(settlement_currencies)), "complete"
+              return residual, "MIXED", "incomplete"
+
+
+          '''
+          path.write_text(text[:start] + replacement + text[end + 1 :], encoding='utf-8')
+          PY
+      - name: Install backend dependencies
+        working-directory: platform-backend
+        run: python -m pip install -e '.[dev]'
+      - name: Validate patch
+        working-directory: platform-backend
+        run: |
+          python -m ruff check app tests
+          python -m pytest
+      - name: Commit patch
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/phase4a-exposure-patch.yml
+          git add platform-backend/app/execution_risk.py
+          git commit -m "fix: measure residual exposure by unmatched contract delta"
+          git push origin HEAD:hardening/v6-phase4a-execution-risk
