@@ -1,6 +1,7 @@
 from app import eod_reconciliation, execution_risk
 from app.application import app
 from app.auth import AuthenticationMiddleware
+from app.credential_security import router as credential_security_router
 from app.eod_policy import apply_outstanding_difference_gate, list_strategy_orders_for_eod
 from app.eod_reconciliation import router as eod_reconciliation_router
 from app.execution_exposure import calculate_residual_exposure
@@ -40,6 +41,7 @@ app.include_router(venue_reconciliation_router)
 app.include_router(live_venue_accounting_router)
 app.include_router(eod_reconciliation_router)
 app.include_router(live_trading_sessions_router)
+app.include_router(credential_security_router)
 
 # Authentication is added at the composition root so every legacy and modular
 # route passes through one default-deny production authorization boundary.
