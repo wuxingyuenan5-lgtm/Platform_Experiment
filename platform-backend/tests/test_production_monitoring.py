@@ -181,61 +181,49 @@ def seed_blocking_conditions() -> None:
         db.execute(
             """
             INSERT INTO eod_reconciliation_reports (
-                id, idempotency_key, payload_hash, strategy_instance_id,
-                account_id, business_date, timezone, period_start, period_end,
-                valuation_time, due_at, owner, actor, status, scale_gate_status,
-                order_count, reconciled_order_count, recovered_order_count,
-                unresolved_order_count, position_fact_count, balance_fact_count,
-                economic_event_fact_count, formal_position_count, formal_pnl_count,
-                incomplete_formal_pnl_count, nav_snapshot_id,
-                required_account_count, included_account_count,
-                missing_account_ids_json, open_difference_count,
+                id, idempotency_key, natural_key, payload_hash,
+                business_date, timezone, valuation_time,
+                strategy_instance_id, account_id, actor, owner, due_at,
+                status, scale_gate_status, order_reconciliation_count,
+                account_reconciliation_run_id, economic_event_import_id,
+                nav_snapshot_id, formal_pnl_count,
+                formal_pnl_incomplete_count, open_difference_count,
                 resolved_difference_count, accepted_difference_count,
-                skipped_external_event_count, error_count, errors_json,
-                started_at, completed_at, created_at
+                skipped_external_ids_json, missing_account_ids_json,
+                errors_json, review_payload_hash, reviewer, review_decision,
+                review_reason, reviewed_at, created_at, completed_at
             ) VALUES (
-                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-                ?, ?, ?, ?, ?, ?, NULL, ?
+                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL, NULL, NULL, ?, NULL
             )
             """,
             (
                 "eod-overdue-1",
                 "eod-overdue-key-1",
+                "eod-overdue-natural-key-1",
                 "hash",
-                STRATEGY_ID,
-                ACCOUNT_ID,
                 now.date().isoformat(),
                 "UTC",
-                (now - timedelta(days=1)).isoformat(),
                 now.isoformat(),
-                now.isoformat(),
+                STRATEGY_ID,
+                ACCOUNT_ID,
+                "operations-1",
+                "operations-1",
                 (now - timedelta(minutes=30)).isoformat(),
-                "operations-1",
-                "operations-1",
                 "partial",
                 "blocked",
                 1,
-                0,
-                0,
-                1,
-                0,
-                0,
-                0,
-                0,
-                0,
-                0,
+                "reconciliation-run-1",
                 None,
+                None,
+                0,
+                0,
                 1,
                 0,
+                0,
+                json.dumps([]),
                 json.dumps([ACCOUNT_ID]),
-                1,
-                0,
-                0,
-                0,
-                1,
                 json.dumps(["runtime query incomplete"]),
-                now.isoformat(),
                 now.isoformat(),
             ),
         )
@@ -329,13 +317,14 @@ def test_controlled_scheduler_accepts_only_fixed_operations(monkeypatch, tmp_pat
     configure_live(monkeypatch, tmp_path)
     monkeypatch.setattr("app.production_monitoring.httpx.get", fake_runtime_get)
     with TestClient(app) as client:
+        scheduled_for = datetime.now(UTC).isoformat()
         scheduled = client.post(
             "/api/v1/ops/controlled-operations",
             headers=headers("operations-token"),
             json={
                 "idempotencyKey": "controlled-health-001",
                 "taskType": "health_scan",
-                "scheduledFor": datetime.now(UTC).isoformat(),
+                "scheduledFor": scheduled_for,
                 "payload": {"owner": "operations-1"},
             },
         )
@@ -349,7 +338,7 @@ def test_controlled_scheduler_accepts_only_fixed_operations(monkeypatch, tmp_pat
             json={
                 "idempotencyKey": "controlled-health-001",
                 "taskType": "health_scan",
-                "scheduledFor": scheduled.json()["scheduledFor"],
+                "scheduledFor": scheduled_for,
                 "payload": {"owner": "operations-1"},
             },
         )
