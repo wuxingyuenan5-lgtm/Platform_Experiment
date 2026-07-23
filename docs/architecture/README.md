@@ -33,5 +33,5 @@
 
 - Backend 与 Runtime 的 Ruff 检查覆盖完整 `app/` 与 `tests/`，新增文件不能绕过门禁。
 - Python 安装完成后必须通过 `pip check`，避免声明依赖与实际环境不一致。
-- Frontend 活跃交易界面必须通过无修改 ESLint、类型检查和生产构建。
+- Frontend 活跃交易界面必须通过无修改、零警告 ESLint、类型检查和生产构建。
 - `scripts/check-repository-structure.py` 阻止 Backend 引入交易场所 SDK、Composition Root 混入业务逻辑、临时测试命名和诊断工作流残留。
