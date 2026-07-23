@@ -6,6 +6,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+SELF_PATH = Path("scripts/scan-secrets.py")
 ALLOW_MARKER = "secret-scan: allow"
 ALLOWED_ENV_NAMES = {".env.example", ".env.live.example"}
 SKIP_SUFFIXES = {
@@ -58,6 +59,11 @@ def forbidden_env_file(path: Path) -> bool:
 
 def scan_file(path: Path) -> list[str]:
     relative = path.relative_to(ROOT)
+    # The scanner contains its own detection regexes as source text. Skipping only
+    # this implementation file avoids deterministic self-matches while every
+    # other tracked file remains within the scan boundary.
+    if relative == SELF_PATH:
+        return []
     if forbidden_env_file(path):
         return [f"{relative}: tracked environment file is forbidden"]
     if path.suffix.lower() in SKIP_SUFFIXES:
