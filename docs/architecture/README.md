@@ -35,3 +35,10 @@
 - Python 安装完成后必须通过 `pip check`，避免声明依赖与实际环境不一致。
 - Frontend 活跃交易界面必须通过无修改、零警告 ESLint、类型检查和生产构建。
 - `scripts/check-repository-structure.py` 阻止 Backend 引入交易场所 SDK、Composition Root 混入业务逻辑、临时测试命名和诊断工作流残留。
+
+## Domain Schema 边界
+
+- 执行、订单、批次、策略运行、持仓和 PnL API DTO 由 `platform-backend/app/execution_schemas.py` 统一维护。
+- `platform-backend/app/schemas.py` 作为迁移期兼容入口，只允许重导出，不得重复定义执行域类型。
+- `tests/test_schema_boundaries.py` 校验兼容导出的对象身份和单一所有权。
+

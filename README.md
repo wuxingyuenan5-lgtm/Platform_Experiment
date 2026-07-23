@@ -62,6 +62,7 @@ outputs/             临时产物
 - 未通过测试和 CI 的改动不得进入正式分支。
 - Backend 与 Runtime 的 Ruff、依赖完整性和测试按完整维护目录执行，不以文件白名单豁免新增代码。
 - `platform-backend/app/main.py` 仅负责 Router 与 Middleware 装配，不得通过运行时赋值修改领域模块。
+- 执行域 API DTO 由 `platform-backend/app/execution_schemas.py` 统一维护，`app/schemas.py` 仅保留兼容导出。
 
 ## 常用命令
 
