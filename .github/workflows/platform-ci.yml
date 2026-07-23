@@ -3,62 +3,231 @@ name: Platform CI
 on:
   push:
     branches:
-      - hardening/phase3-execution-schema-boundary
+      - main
+      - refactor/frontend-architecture-v6
+      - 'hardening/**'
     paths:
+      - 'execution-runtime/**'
+      - 'platform-backend/**'
+      - 'admin-risk/src/api/platform/**'
+      - 'admin-risk/src/hooks/trading/**'
+      - 'admin-risk/src/views/strategy/funding-carry/**'
+      - 'admin-risk/docs/quality/**'
+      - 'admin-risk/docs/START-HERE.md'
+      - 'admin-risk/package.json'
+      - 'admin-risk/pnpm-lock.yaml'
+      - 'admin-risk/tsconfig.json'
+      - 'admin-risk/tsconfig.strategy.json'
+      - 'docs/planning/**'
+      - 'docs/technical/**'
+      - 'docs/operations/**'
+      - 'README.md'
+      - 'CHANGELOG.md'
+      - 'scripts/**'
+      - '.github/workflows/platform-ci.yml'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'execution-runtime/**'
+      - 'platform-backend/**'
+      - 'admin-risk/src/api/platform/**'
+      - 'admin-risk/src/hooks/trading/**'
+      - 'admin-risk/src/views/strategy/funding-carry/**'
+      - 'admin-risk/docs/quality/**'
+      - 'admin-risk/docs/START-HERE.md'
+      - 'admin-risk/package.json'
+      - 'admin-risk/pnpm-lock.yaml'
+      - 'admin-risk/tsconfig.json'
+      - 'admin-risk/tsconfig.strategy.json'
+      - 'docs/planning/**'
+      - 'docs/technical/**'
+      - 'docs/operations/**'
+      - 'README.md'
+      - 'CHANGELOG.md'
+      - 'scripts/**'
       - '.github/workflows/platform-ci.yml'
 
 permissions:
-  contents: write
+  contents: read
+
+concurrency:
+  group: platform-ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  materialize:
+  repository-safety:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
-          ref: hardening/phase3-execution-schema-boundary
-          fetch-depth: 0
-      - name: Mark explicit compatibility exports
-        shell: bash
-        run: |
-          python - <<'PY'
-          from pathlib import Path
+          python-version: '3.12'
+      - name: Scan tracked files for credential material
+        run: python scripts/scan-secrets.py
+      - name: Check repository structure and architecture boundaries
+        run: python scripts/check-repository-structure.py
 
-          path = Path('platform-backend/app/schemas.py')
-          source = path.read_text(encoding='utf-8')
-          names = (
-              'BatchLegRequest',
-              'BatchLegResponse',
-              'CreateExecutionBatchRequest',
-              'CreateOrderRequest',
-              'CreateStrategyRunRequest',
-              'ExecutionBatchResponse',
-              'OrderResponse',
-              'PnlResponse',
-              'PositionResponse',
-              'StrategyRunResponse',
-          )
-          for name in names:
-              plain = f'    {name},\n'
-              explicit = f'    {name} as {name},\n'
-              if explicit in source:
-                  continue
-              if plain not in source:
-                  raise RuntimeError(f'Compatibility export not found: {name}')
-              source = source.replace(plain, explicit, 1)
-          path.write_text(source, encoding='utf-8')
-          PY
-      - name: Restore canonical CI and commit source
+  execution-runtime:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: execution-runtime
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: execution-runtime/pyproject.toml
+      - name: Install dependencies
+        run: python -m pip install -e '.[dev]'
+      - name: Validate installed dependency graph
+        run: python -m pip check
+      - name: Runtime full lint gate
         shell: bash
         run: |
-          git fetch origin main
-          git checkout origin/main -- .github/workflows/platform-ci.yml
-          rm -f \
-            .github/workflows/apply-phase1-capture.yml \
-            .github/workflows/fix-pr27-lint-once.yml
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add platform-backend/app/schemas.py
-          git add -A .github/workflows
-          git commit -m 'fix: mark execution schema compatibility exports'
-          git push origin HEAD:hardening/phase3-execution-schema-boundary
+          if ! python -m ruff check app tests > /tmp/runtime-ruff.log 2>&1; then
+            cat /tmp/runtime-ruff.log
+            exit 1
+          fi
+      - name: Upload runtime lint diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: runtime-ruff-log
+          path: /tmp/runtime-ruff.log
+          if-no-files-found: ignore
+          retention-days: 3
+      - name: Test
+        shell: bash
+        run: |
+          if ! python -m pytest > /tmp/runtime-pytest.log 2>&1; then
+            tail -n 260 /tmp/runtime-pytest.log
+            exit 1
+          fi
+      - name: Upload runtime pytest diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: runtime-pytest-log
+          path: /tmp/runtime-pytest.log
+          if-no-files-found: ignore
+          retention-days: 3
+
+  platform-backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: platform-backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: platform-backend/pyproject.toml
+      - name: Install dependencies
+        run: python -m pip install -e '.[dev]'
+      - name: Validate installed dependency graph
+        run: python -m pip check
+      - name: Backend full lint gate
+        shell: bash
+        run: |
+          if ! python -m ruff check app tests > /tmp/backend-ruff.log 2>&1; then
+            cat /tmp/backend-ruff.log
+            exit 1
+          fi
+      - name: Upload backend lint diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-ruff-log
+          path: /tmp/backend-ruff.log
+          if-no-files-found: ignore
+          retention-days: 3
+      - name: Test
+        shell: bash
+        run: |
+          if ! python -m pytest > /tmp/backend-pytest.log 2>&1; then
+            tail -n 500 /tmp/backend-pytest.log
+            exit 1
+          fi
+      - name: Upload backend pytest diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-pytest-log
+          path: /tmp/backend-pytest.log
+          if-no-files-found: ignore
+          retention-days: 3
+
+  frontend-quality:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: admin-risk
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.9
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: pnpm
+          cache-dependency-path: admin-risk/pnpm-lock.yaml
+      - name: Install dependencies
+        shell: bash
+        env:
+          HUSKY: '0'
+        run: |
+          if ! pnpm install --frozen-lockfile > /tmp/pnpm-install.log 2>&1; then
+            tail -n 80 /tmp/pnpm-install.log
+            exit 1
+          fi
+      - name: Upload install diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-install-log
+          path: /tmp/pnpm-install.log
+          if-no-files-found: ignore
+          retention-days: 3
+      - name: Lint strategy frontend
+        shell: bash
+        run: |
+          if ! pnpm exec eslint --max-warnings 0 \
+            "src/api/platform/**/*.{ts,tsx}" \
+            "src/hooks/trading/**/*.{ts,tsx}" \
+            "src/views/strategy/funding-carry/**/*.{vue,ts,tsx}" \
+            > /tmp/frontend-eslint.log 2>&1; then
+            tail -n 120 /tmp/frontend-eslint.log
+            exit 1
+          fi
+      - name: Upload frontend lint diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-eslint-log
+          path: /tmp/frontend-eslint.log
+          if-no-files-found: ignore
+          retention-days: 3
+      - name: Type check strategy frontend
+        shell: bash
+        run: |
+          if ! pnpm type:check > /tmp/frontend-typecheck.log 2>&1; then
+            tail -n 80 /tmp/frontend-typecheck.log
+            exit 1
+          fi
+      - name: Upload type-check diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-typecheck-log
+          path: /tmp/frontend-typecheck.log
+          if-no-files-found: ignore
+          retention-days: 3
+      - name: Build frontend
+        run: pnpm build
