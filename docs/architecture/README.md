@@ -39,6 +39,6 @@
 ## Domain Schema 边界
 
 - 执行、订单、批次、策略运行、持仓和 PnL API DTO 由 `platform-backend/app/execution_schemas.py` 统一维护。
-- `platform-backend/app/schemas.py` 作为迁移期兼容入口，只允许重导出，不得重复定义执行域类型。
+- `platform-backend/app/schemas.py` 作为迁移期兼容入口，只允许使用显式公共别名重导出，不得重复定义执行域类型。
 - `tests/test_schema_boundaries.py` 校验兼容导出的对象身份和单一所有权。
-
+- `scripts/check-repository-structure.py` 在测试前阻止执行域 DTO 被重新复制回跨域 Schema 模块。
