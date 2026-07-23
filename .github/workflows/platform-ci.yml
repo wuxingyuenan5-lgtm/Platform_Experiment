@@ -105,6 +105,7 @@ jobs:
             app/trade_commands.py \
             app/execution_batches.py \
             app/execution_risk.py \
+            app/execution_exposure.py \
             app/financial_facts.py \
             tests/test_order_safety_fail_closed.py \
             tests/test_secret_safety.py \
