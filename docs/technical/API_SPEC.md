@@ -4,13 +4,13 @@
 Platform API Prefix：`/api/v1`  
 Platform 组合入口：`platform-backend/app/main.py`  
 Runtime 根地址：`http://127.0.0.1:8100`  
-当前阶段：`docs/planning/V6-Phase4C-受控实盘适配器.md`
+当前阶段：`docs/planning/V6-Phase4D-实盘日终对账与运营门禁.md`
 
 ## 1. 服务边界
 
 | 服务 | 默认地址 | 权威职责 |
 |---|---|---|
-| Platform Backend | `http://127.0.0.1:8000` | Strategy、Account、Command、Order、Risk、FinancialFact、Reconciliation、Formal Accounting |
+| Platform Backend | `http://127.0.0.1:8000` | Strategy、Account、Command、Order、Risk、FinancialFact、Reconciliation、EOD Report、Formal Accounting |
 | Execution Runtime | `http://127.0.0.1:8100` | Journal、Live Safety、Account Router、Venue Query、外部副作用隔离 |
 | Frontend | `http://127.0.0.1:5173` | 查询、交互和命令发起 |
 
@@ -34,7 +34,7 @@ GET /api/v1/instruments
 GET /api/v1/instruments/{instrumentId}
 ```
 
-TradeCommand、ExecutionBatch、RiskAction、FinancialFact 和 Live Adapter 映射必须使用 Backend Catalog。客户端不得覆盖 Quantity Unit、Settlement Currency 和 Contract Multiplier。
+TradeCommand、ExecutionBatch、RiskAction、FinancialFact、Live Adapter 映射和 EOD Report 必须使用 Backend Catalog。客户端不得覆盖 Quantity Unit、Settlement Currency 和 Contract Multiplier。
 
 ## 3. TradeCommand
 
@@ -46,9 +46,9 @@ GET  /api/v1/trading/commands/{tradeCommandId}
 ```json
 {
   "idempotencyKey": "client-command-001",
-  "strategyInstanceId": "strategy_funding_arbitrage_instance_default",
-  "accountId": "account_live_bybit",
-  "instrumentId": "instrument_xaut_usdt",
+  "strategyInstanceId": "strategy-funding-live",
+  "accountId": "account-live-bybit",
+  "instrumentId": "instrument-xaut-usdt",
   "symbol": "XAUTUSDT",
   "side": "buy",
   "orderType": "limit",
@@ -57,14 +57,17 @@ GET  /api/v1/trading/commands/{tradeCommandId}
 }
 ```
 
-服务端校验 Strategy、active Binding、Account、Instrument、ContractSpecification、数量、价格步长、Platform Live Gate 和 Kill Switch。正式 TradeCommand 将 `strategy_instance_id` 传到 Runtime，以便 Runtime 独立执行 Strategy allowlist。
+服务端校验 Strategy、active Binding、Account、Instrument、ContractSpecification、数量、价格步长、Platform Live Gate 和 Kill Switch。正式 TradeCommand 将 StrategyInstance 身份传到 Runtime，以便 Runtime 独立执行 Strategy allowlist。
 
-## 4. ExecutionBatch
+## 4. ExecutionBatch 与风险处置
 
 ```http
 POST /api/v1/trading/execution-batches
 GET  /api/v1/trading/execution-batches
 GET  /api/v1/trading/execution-batches/{batchId}
+GET  /api/v1/trading/execution-batches/{batchId}/risk
+GET  /api/v1/trading/execution-batches/{batchId}/risk-actions
+POST /api/v1/trading/execution-batches/{batchId}/risk-actions
 ```
 
 执行顺序：Catalog → Kill Switch → Batch 原子认领 → Risk Policy 快照 → 每腿 TradeCommand → 腿间延迟与残留风险检查 → RiskAction。
@@ -92,9 +95,6 @@ GET /api/v1/risk/kill-switches/{scopeType}/{scopeId}
 PUT /api/v1/risk/kill-switches/{scopeType}/{scopeId}
 GET /api/v1/strategies/instances/{strategyInstanceId}/execution-risk-policy
 PUT /api/v1/strategies/instances/{strategyInstanceId}/execution-risk-policy
-GET  /api/v1/trading/execution-batches/{batchId}/risk
-GET  /api/v1/trading/execution-batches/{batchId}/risk-actions
-POST /api/v1/trading/execution-batches/{batchId}/risk-actions
 ```
 
 Scope：`global/*`、`strategy/{strategyInstanceId}`、`account/{accountId}`。自动平仓和替代对冲必须经过 TradeCommand。
@@ -109,7 +109,7 @@ GET /gateway/capabilities
 
 ```json
 {
-  "gateway": "bybit_mt5_live",
+  "gateway": "bybit_mt5",
   "environment": "live",
   "liveWriteEnabled": false,
   "adapters": [
@@ -119,7 +119,7 @@ GET /gateway/capabilities
       "configured": true,
       "operational": true,
       "writeEnabled": false,
-      "accountIds": ["account_live_bybit"],
+      "accountIds": ["account-live-bybit"],
       "capabilities": ["order_query", "fill_query", "funding_query"],
       "missingRequirements": [],
       "checkedAt": "2026-07-23T12:00:00+00:00"
@@ -128,7 +128,7 @@ GET /gateway/capabilities
 }
 ```
 
-Capability 不返回任何 Secret 值。`configured=true` 只表示必需配置完整；`operational=true` 还要求依赖和运行环境可用；`writeEnabled=true` 还要求 Runtime Live Write 显式打开。
+Capability 不返回 Secret 值。`configured=true` 只表示必需配置完整；`operational=true` 还要求依赖和运行环境可用；`writeEnabled=true` 还要求 Runtime Live Write 显式打开。
 
 ## 8. Runtime Venue Query
 
@@ -139,35 +139,16 @@ GET /venue/fills?accountId=...&externalOrderId=...&platformOrderId=...
 GET /venue/positions?accountId=...
 GET /venue/balances?accountId=...
 GET /venue/economic-events?accountId=...&instrumentId=...&eventType=...
+POST /venue/orders/{externalOrderId}/cancel
 ```
 
 Snapshot 必须包含 source、外部身份、Account、Instrument（适用时）、时间和数据质量。查询失败与空结果不同；Runtime 不可用不得被解释为空仓或零余额。
-
-Economic Event：
-
-```json
-{
-  "source": "mt5_live",
-  "externalEventId": "swap:123456",
-  "eventType": "swap",
-  "accountId": "account_live_mt5",
-  "instrumentId": "instrument_xauusd_mt5",
-  "symbol": "XAUUSD+",
-  "amount": "-12.5",
-  "currency": "USD",
-  "occurredAt": "2026-07-23T00:00:00+00:00",
-  "dataQualityState": "complete",
-  "payload": {}
-}
-```
 
 ## 9. Runtime Command Contract
 
 ```http
 POST /commands/orders
 ```
-
-内部请求：
 
 ```json
 {
@@ -187,69 +168,58 @@ POST /commands/orders
 
 Runtime 在调用 Venue 前检查 Command Journal 和 Live Safety。确定性门禁或 Venue 拒绝返回 `order_rejected`；可能已到 Venue 但无法确认时返回 502，使 Platform 进入 `result_unknown`。
 
-## 10. Runtime 受控 Cancel
+## 10. Runtime Live Safety 配置
 
-```http
-POST /venue/orders/{externalOrderId}/cancel
-```
-
-```json
-{
-  "idempotencyKey": "cancel-001",
-  "reason": "risk action"
-}
-```
-
-Live Cancel 同样要求 Runtime environment、Live Write、Account/Strategy/Symbol allowlist。响应状态：`canceled`、`already_final`、`not_found`、`unsupported`、`blocked`、`unknown`。
-
-## 11. Runtime Live Safety 配置
+正式模板：`execution-runtime/.env.live.example`
 
 ```text
 VG_RUNTIME_ENVIRONMENT=live
-VG_RUNTIME_GATEWAY_NAME=bybit_mt5_live
-VG_RUNTIME_JOURNAL_PATH=...live-runtime.db
+VG_RUNTIME_GATEWAY_NAME=bybit_mt5
+VG_RUNTIME_JOURNAL_PATH=./data/live_runtime_journal.db
 VG_RUNTIME_LIVE_WRITE_ENABLED=false
-VG_RUNTIME_LIVE_ACCOUNT_ALLOWLIST=...
-VG_RUNTIME_LIVE_STRATEGY_ALLOWLIST=...
-VG_RUNTIME_LIVE_SYMBOL_ALLOWLIST=...
-VG_RUNTIME_LIVE_MAX_ORDER_NOTIONAL=...
-VG_RUNTIME_LIVE_MAX_DAILY_NOTIONAL=...
+VG_RUNTIME_LIVE_ACCOUNT_ALLOWLIST=
+VG_RUNTIME_LIVE_STRATEGY_ALLOWLIST=
+VG_RUNTIME_LIVE_SYMBOL_ALLOWLIST=
+VG_RUNTIME_LIVE_MAX_ORDER_NOTIONAL=0
+VG_RUNTIME_LIVE_MAX_DAILY_NOTIONAL=0
 ```
 
 Bybit：
 
 ```text
 VG_RUNTIME_BYBIT_CREDENTIAL_REF=secret://bybit-live-001
-VG_RUNTIME_BYBIT_ACCOUNT_IDS=account_live_bybit
-VG_RUNTIME_BYBIT_INSTRUMENT_MAP=XAUTUSDT=instrument_xaut_usdt
+VG_RUNTIME_BYBIT_ACCOUNT_IDS=
+VG_RUNTIME_BYBIT_INSTRUMENT_MAP=
+VG_RUNTIME_BYBIT_DEMO_MODE=false
 VG_SECRET_BYBIT_LIVE_001_API_KEY=...
-VG_SECRET_BYBIT_LIVE_001_SECRET=...
+VG_SECRET_BYBIT_LIVE_001_API_SECRET=...
 ```
 
 MT5：
 
 ```text
 VG_RUNTIME_MT5_CREDENTIAL_REF=secret://mt5-live-001
-VG_RUNTIME_MT5_ACCOUNT_IDS=account_live_mt5
-VG_RUNTIME_MT5_INSTRUMENT_MAP=XAUUSD+=instrument_xauusd_mt5
+VG_RUNTIME_MT5_ACCOUNT_IDS=
+VG_RUNTIME_MT5_INSTRUMENT_MAP=
+VG_RUNTIME_MT5_TERMINAL_PATH=
 VG_SECRET_MT5_LIVE_001_LOGIN=...
 VG_SECRET_MT5_LIVE_001_PASSWORD=...
 VG_SECRET_MT5_LIVE_001_SERVER=...
 ```
 
-Secret 值不得写入仓库、日志、审计或 API 响应。
+Secret 值不得写入仓库、日志、审计、Markdown、截图或 API 响应。
 
-## 12. Bybit Live 语义
+## 11. Bybit Live 语义
 
 - V5 Unified Trading API。
 - Platform Order ID 确定性派生唯一 `orderLinkId`。
-- place-order ACK 只生成 `order_acknowledged`，不直接生成 Fill。
+- Place-order ACK 只生成 `order_acknowledged`，不直接生成 Fill。
 - 最终状态通过 Open Orders、Order History 和 Executions 查询。
-- Executions `execId` 用作 Fill 自然身份。
+- Execution `execId` 用作 Fill 自然身份。
 - Transaction Log 映射 Funding 和 Fee。
 - Account、Category、Symbol、Instrument 映射必须显式。
 
-## 13. MT5 Live 语义
+## 12. MT5 Live 语义
 
 - 仅支持 Windows Terminal 或测试注入 Provider。
 - 下单前 `order_check`，写入使用 `order_send`。
@@ -258,7 +228,7 @@ Secret 值不得写入仓库、日志、审计或 API 响应。
 - Deal 中 Swap、Commission 和 Fee 进入 Economic Event。
 - Terminal 未连接、登录账号不匹配或权限不足时 fail-closed。
 
-## 14. Live Economic Event Import
+## 13. Live Economic Event Import
 
 ```http
 POST /api/v1/ops/live-economic-events/import
@@ -267,8 +237,8 @@ POST /api/v1/ops/live-economic-events/import
 ```json
 {
   "idempotencyKey": "economic-import-20260723",
-  "strategyInstanceId": "strategy_funding_arbitrage_instance_default",
-  "accountId": "account_live_bybit",
+  "strategyInstanceId": "strategy-funding-live",
+  "accountId": "account-live-bybit",
   "eventType": "funding",
   "actor": "operations"
 }
@@ -279,9 +249,8 @@ POST /api/v1/ops/live-economic-events/import
 - 重复 Import 返回原结果。
 - 相同 Import 幂等键不同载荷返回 409。
 - 缺 Instrument 映射的事件进入 `skippedExternalIds`，不伪装为完整导入。
-- 完成后写入 AuditEvent。
 
-## 15. Venue Reconciliation
+## 14. Venue Reconciliation
 
 ```http
 POST /api/v1/ops/venue-reconciliation/runs
@@ -291,6 +260,59 @@ POST /api/v1/ops/venue-reconciliation/differences/{differenceId}/resolve
 ```
 
 Difference Type：`missing_local`、`missing_external`、`quantity_mismatch`、`price_mismatch`、`currency_mismatch`、`status_mismatch`。差异不得无痕覆盖，首次处置记录不可被重复请求改写。
+
+`accepted` 只表示风险被人工接受，不表示数据已经一致。Open 与 Accepted Difference 均阻断扩大实盘。
+
+## 15. EOD Reconciliation
+
+```http
+POST /api/v1/ops/eod-reconciliation/reports
+GET  /api/v1/ops/eod-reconciliation/reports
+GET  /api/v1/ops/eod-reconciliation/reports/{reportId}
+POST /api/v1/ops/eod-reconciliation/reports/{reportId}/review
+```
+
+创建请求：
+
+```json
+{
+  "idempotencyKey": "eod-20260723-strategy-account",
+  "businessDate": "2026-07-23",
+  "timezone": "Asia/Shanghai",
+  "valuationTime": "2026-07-23T23:59:00+08:00",
+  "strategyInstanceId": "strategy-funding-live",
+  "accountId": "account-live-bybit",
+  "actor": "eod-runner",
+  "owner": "operations-owner",
+  "dueAt": "2026-07-24T10:00:00+08:00"
+}
+```
+
+约束：
+
+- `timezone` 必须为有效 IANA 时区。
+- `businessDate` 必须与 `valuationTime` 的本地日期一致。
+- 相同幂等键或自然身份、相同载荷返回原报告。
+- 相同身份不同载荷返回 409。
+- 订单范围为业务日期窗口，加上估值时点仍未终结的历史订单。
+- 编排 Position、Balance、Funding、Swap、Fee、FinancialFact、Formal PnL 和 Formal NAV。
+- 外部失败进入 errors，不能生成虚假 complete。
+- 报告状态：`complete`、`completed_with_differences`、`partial`、`failed`。
+- SLA：`pending`、`met`、`breached`、`overdue`。
+- Scale Gate：`blocked`、`eligible_for_review`、`approved_same_limits`、`needs_remediation`、`rejected`。
+- `approved_same_limits` 只允许继续现有小资金限额，不自动提高限额或启用写入。
+
+人工复核：
+
+```json
+{
+  "decision": "needs_remediation",
+  "reviewer": "risk-reviewer",
+  "reason": "resolve position mismatch before the next live session"
+}
+```
+
+复核使用不可变首写语义。只有清洁报告才能被标记 `approved_same_limits`。
 
 ## 16. FinancialFact 与 Formal Accounting
 
@@ -308,7 +330,14 @@ FinancialFact 支持 `external_order`、`trade_fill`、`deal`、`funding`、`swa
 
 ## 17. 审计与通用规则
 
-Phase 4C 新增审计：`live_economic_events_imported`。
+Phase 4 新增审计：
+
+- `live_economic_events_imported`
+- `venue_order_reconciled`
+- `venue_reconciliation_completed`
+- `reconciliation_difference_resolved`
+- `eod_reconciliation_completed`
+- `eod_reconciliation_reviewed`
 
 通用规则：
 
@@ -321,4 +350,5 @@ Phase 4C 新增审计：`live_economic_events_imported`。
 - Stablecoin 不自动等同法币。
 - 外部与本地冲突形成 Difference。
 - Runtime Live Write 默认关闭。
+- EOD Report 不自动修改外部仓位、解决差异、提高限额或开启写入。
 - 工程验收不等于真实账户运营验收。
