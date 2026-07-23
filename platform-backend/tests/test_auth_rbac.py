@@ -18,17 +18,21 @@ def credential(user_id: str, token: str, roles: list[str]) -> dict[str, object]:
     }
 
 
-def configure_live_auth(tmp_path: Path) -> None:
+def configure_live_auth(monkeypatch, tmp_path: Path) -> None:
     settings = get_settings()
-    settings.database_path = str(tmp_path / "auth-rbac.db")
-    settings.environment = "live"
-    settings.auth_mode = "api_key"
-    settings.auth_credentials_json = json.dumps(
-        [
-            credential("viewer-1", "viewer-token", ["viewer"]),
-            credential("risk-1", "risk-token", ["risk_officer"]),
-            credential("admin-1", "admin-token", ["admin"]),
-        ]
+    monkeypatch.setattr(settings, "database_path", str(tmp_path / "auth-rbac.db"))
+    monkeypatch.setattr(settings, "environment", "live")
+    monkeypatch.setattr(settings, "auth_mode", "api_key")
+    monkeypatch.setattr(
+        settings,
+        "auth_credentials_json",
+        json.dumps(
+            [
+                credential("viewer-1", "viewer-token", ["viewer"]),
+                credential("risk-1", "risk-token", ["risk_officer"]),
+                credential("admin-1", "admin-token", ["admin"]),
+            ]
+        ),
     )
 
 
@@ -36,8 +40,11 @@ def auth_headers(token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}", "X-Request-ID": "test-request-id"}
 
 
-def test_live_environment_rejects_anonymous_and_invalid_credentials(tmp_path: Path) -> None:
-    configure_live_auth(tmp_path)
+def test_live_environment_rejects_anonymous_and_invalid_credentials(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    configure_live_auth(monkeypatch, tmp_path)
     with TestClient(app) as client:
         assert client.get("/health").status_code == 200
 
@@ -61,8 +68,8 @@ def test_live_environment_rejects_anonymous_and_invalid_credentials(tmp_path: Pa
         assert valid.headers["x-request-id"] == "test-request-id"
 
 
-def test_rbac_is_default_deny_for_trading_and_audit(tmp_path: Path) -> None:
-    configure_live_auth(tmp_path)
+def test_rbac_is_default_deny_for_trading_and_audit(monkeypatch, tmp_path: Path) -> None:
+    configure_live_auth(monkeypatch, tmp_path)
     with TestClient(app) as client:
         trading = client.post(
             "/api/v1/trading/commands",
@@ -94,8 +101,11 @@ def test_rbac_is_default_deny_for_trading_and_audit(tmp_path: Path) -> None:
         assert admin_audit.status_code == 200
 
 
-def test_live_actor_field_cannot_impersonate_another_user(tmp_path: Path) -> None:
-    configure_live_auth(tmp_path)
+def test_live_actor_field_cannot_impersonate_another_user(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    configure_live_auth(monkeypatch, tmp_path)
     with TestClient(app) as client:
         mismatch = client.put(
             "/api/v1/risk/kill-switches/global/*",
@@ -123,12 +133,12 @@ def test_live_actor_field_cannot_impersonate_another_user(tmp_path: Path) -> Non
         assert matching.status_code == 200
 
 
-def test_live_environment_refuses_development_auth_mode(tmp_path: Path) -> None:
+def test_live_environment_refuses_development_auth_mode(monkeypatch, tmp_path: Path) -> None:
     settings = get_settings()
-    settings.database_path = str(tmp_path / "unsafe-auth-mode.db")
-    settings.environment = "live"
-    settings.auth_mode = "development"
-    settings.auth_credentials_json = "[]"
+    monkeypatch.setattr(settings, "database_path", str(tmp_path / "unsafe-auth-mode.db"))
+    monkeypatch.setattr(settings, "environment", "live")
+    monkeypatch.setattr(settings, "auth_mode", "development")
+    monkeypatch.setattr(settings, "auth_credentials_json", "[]")
     with TestClient(app) as client:
         response = client.get("/api/v1/system/info")
         assert response.status_code == 503
