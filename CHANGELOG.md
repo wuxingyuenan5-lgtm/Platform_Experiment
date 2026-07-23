@@ -2,6 +2,26 @@
 
 ## Unreleased
 
+### Immutable financial facts and formal accounting — Phase 3
+
+- Added immutable `financial_facts` with client idempotency keys, external fact identities, normalized payload hashes, event time, source metadata, and explicit data quality.
+- Rejected reuse of a FinancialFact identity with a different normalized payload using `409 Conflict`.
+- Derived Trade Fact settlement currency, quantity unit, and contract multiplier from the backend Instrument Catalog rather than accepting client overrides.
+- Added rebuildable `formal_positions` and `formal_pnl_results` projections.
+- Separated Trading, Funding, Swap, Fee, FX, and Total PnL.
+- Included Contract Multiplier and explicit FX conversion in the formal Trading PnL boundary.
+- Preserved cross-currency facts with `incomplete` quality when FX is missing instead of silently using a 1:1 rate.
+- Added `formal_strategy_nav_snapshots` using one valuation time across all active strategy-account bindings.
+- Added required/included account counts and `missingAccountIds` so incomplete NAV coverage cannot be presented as complete.
+- Added FinancialFact ingestion/listing, formal projection rebuild, formal Position/PnL, and formal NAV APIs.
+- Added audit events for fact ingestion, projection rebuild, and formal NAV creation.
+- Added golden tests for duplicate facts, payload conflicts, Contract Multiplier PnL, component attribution, projection rebuild, missing FX, and multi-account NAV completeness.
+- Split the Platform Backend composition root from the existing business routes so the Phase 3 router can be added without rewriting the established Phase 1–2 endpoints.
+- Expanded Platform CI strict gates to include the Phase 3 module, tests, composition root, and `docs/technical/**`.
+- Added `docs/planning/V6-Phase3-金融事实与正式账务.md` and `docs/technical/FINANCIAL_FACTS.md`.
+- Synchronized the overall V6 plan, API Specification, Release Gate, README, START-HERE, Issue #7, PR #8, and this Changelog.
+- Retained Simulation / Fake Gateway only; external venue ingestion, residual-leg risk handling, authentication, and Live remain deferred.
+
 ### Product surface cleanup
 
 - Removed the explanatory redirect paragraph from the login card so the page contains only identity, authentication, and registration actions required by the user.
