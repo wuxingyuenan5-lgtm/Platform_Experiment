@@ -112,6 +112,8 @@ jobs:
           cache-dependency-path: admin-risk/pnpm-lock.yaml
       - name: Install dependencies
         shell: bash
+        env:
+          HUSKY: '0'
         run: |
           if ! pnpm install --frozen-lockfile > /tmp/pnpm-install.log 2>&1; then
             tail -n 80 /tmp/pnpm-install.log
