@@ -8,23 +8,26 @@
 - Phase 3 代码发布提交：`77bf4223c2059d5a56fc08a2d49214351c396abc`
 - Phase 4A 代码发布提交：`08096d7e72f4f365dc1c27d8e7f1c80ac648c1d2`
 - Phase 4B 代码发布提交：`b86a2aa10ec1c39fe974cc6bf6d8dfbdd2475b19`
-- 当前实施：Phase 4C Bybit 与 MT5 受控实盘适配器
+- Phase 4C 代码发布提交：`0badab7522ce5b5d11c6ba47cf85c949c68958ca`
+- 当前实施：Phase 4D 实盘日终对账、报告与运营门禁
 - 总跟踪：GitHub Issue `#2`
 - Phase 4 总计划：Issue `#12`
-- Phase 4C：Issue `#18`，分支 `hardening/v6-phase4c-live-adapters`
+- Phase 4D：Issue `#20`、PR `#21`
 - 总计划：`docs/planning/V6-交易安全加固实施计划.md`
-- Phase 4C 计划：`docs/planning/V6-Phase4C-受控实盘适配器.md`
+- Phase 4D 计划：`docs/planning/V6-Phase4D-实盘日终对账与运营门禁.md`
 - 小资金实盘验收：`docs/operations/V6-小资金实盘验收手册.md`
 
-`main` 的最新分支指针以 GitHub 为准。由于 Bybit 与 MT5 模拟环境不能充分复现实盘账户、成交、Funding 和 Swap，本阶段建设真实账户接入；最终运营验收以真实账户的小资金、最小允许仓位为主，但自动实盘写入仍默认关闭，必须先完成只读核对、影子对账、限额和 Kill Switch 验收。
+`main` 的最新分支指针以 GitHub 为准。由于 Bybit 与 MT5 模拟环境不能充分复现实盘账户、成交、Funding 和 Swap，运营验收优先使用真实账户的小资金和最小允许仓位。自动实盘写入仍默认关闭，必须先完成只读核对、影子对账、限额、Kill Switch 和日终报告验收。
 
 ## 先看这里
 
 | 你要做什么 | 入口 |
 |---|---|
 | 看总体工程计划 | `docs/planning/V6-交易安全加固实施计划.md` |
-| 看当前 Phase 4C | `docs/planning/V6-Phase4C-受控实盘适配器.md` |
+| 看当前 Phase 4D | `docs/planning/V6-Phase4D-实盘日终对账与运营门禁.md` |
+| 看日终技术合同 | `docs/technical/EOD_RECONCILIATION.md` |
 | 看小资金实盘验收步骤 | `docs/operations/V6-小资金实盘验收手册.md` |
+| 看 Phase 4C | `docs/planning/V6-Phase4C-受控实盘适配器.md` |
 | 看 Live Adapter 技术设计 | `docs/technical/LIVE_VENUE_ADAPTERS.md` |
 | 看 Phase 4B | `docs/planning/V6-Phase4B-外部查询与对账差异.md` |
 | 看 Venue Query 与差异设计 | `docs/technical/VENUE_RECONCILIATION.md` |
@@ -158,6 +161,40 @@ Runtime Live Write 默认关闭，并独立检查：
 
 Bybit 下单 ACK 不等于成交；MT5 没有可确认 Deal 时也不能伪造 Fill。任何无法确认的写入结果进入 `result_unknown`，随后使用 Venue Reconcile。
 
+## Phase 4D 实盘日终入口
+
+```http
+POST /api/v1/ops/eod-reconciliation/reports
+GET  /api/v1/ops/eod-reconciliation/reports
+GET  /api/v1/ops/eod-reconciliation/reports/{reportId}
+POST /api/v1/ops/eod-reconciliation/reports/{reportId}/review
+```
+
+日终编排覆盖：
+
+- 当日订单以及仍未终结的历史订单。
+- External Order、Execution/Deal、Position、Balance。
+- Bybit Funding/Fee 与 MT5 Swap/Commission/Fee。
+- FinancialFact、Formal Position、Formal PnL 和统一估值时点 Formal NAV。
+- Open、Resolved、Accepted Reconciliation Difference。
+- 未映射外部事件、缺失账户、运行错误和 SLA。
+
+实盘日终命令：
+
+```powershell
+.\scripts\run-live-eod-reconciliation.ps1 `
+  -StrategyInstanceId "<strategy-instance-id>" `
+  -AccountId "<account-id>" `
+  -BusinessDate "2026-07-23" `
+  -TimeZone "Asia/Shanghai" `
+  -ValuationTime "2026-07-23T23:59:00+08:00" `
+  -DueAt "2026-07-24T10:00:00+08:00" `
+  -Actor "eod-runner" `
+  -Owner "operations-owner"
+```
+
+报告只有在查询、事实、正式账务、NAV 和差异均完整时才为 `complete`。Open 或 Accepted Difference、未映射事件、缺失账户、不完整 PnL 或运行错误全部阻断扩大实盘。人工复核最多批准 `approved_same_limits`，不会自动提高限额或开启写入。
+
 ## Phase 3 正式金融核对入口
 
 ```http
@@ -181,7 +218,7 @@ POST /api/v1/strategies/instances/{strategyInstanceId}/formal-nav-snapshots/run
 | 目录 | 定位 | 当前策略 |
 |---|---|---|
 | `admin-risk/` | 正式前端工程 | Catalog 驱动，不硬编码账户和标的 ID |
-| `platform-backend/` | 业务权威后端 | Strategy、Command、Order、Risk、FinancialFact、Reconciliation、Formal Accounting 权威 |
+| `platform-backend/` | 业务权威后端 | Strategy、Command、Order、Risk、FinancialFact、Reconciliation、EOD、Formal Accounting 权威 |
 | `execution-runtime/` | 执行隔离网关 | Journal、Gateway、Live Safety、Venue Query、外部执行隔离 |
 | `docs/` | 根级导航和执行计划 | 权威入口、计划和运行口径 |
 | `admin-risk/docs/` | 详细产品和架构文档 | 与代码同步维护 |
@@ -235,9 +272,11 @@ python -m pytest
 10. 缺失持仓、PnL、行情、汇率和账户事实不得伪装为零。
 11. `result_unknown` 必须先恢复和对账，不得重新提交。
 12. 正式 Position、PnL 和 NAV 必须能追溯到不可变事实并支持重建。
-13. 每批工程改动同步更新计划、测试、API Spec、Release Gate 和 Changelog。
-14. 未通过 CI 的 PR 不得合入 main。
+13. Accepted Difference 不等于数据一致，仍然阻断扩大实盘。
+14. 每个真实交易测试日必须形成 EOD Report。
+15. 每批工程改动同步更新计划、测试、API Spec、Release Gate 和 Changelog。
+16. 未通过 CI 的 PR 不得合入 main。
 
 ## 当前发布边界
 
-Phase 4C 的工程实现可以通过离线 Provider Contract Tests 验收，但真实账户运营验收必须单独完成。后续测试优先采用真实账户的小资金和最小允许仓位；在真实只读核对、连续日终对账、最小仓位测试和 Kill Switch 演练完成前，`liveWriteEnabled` 必须保持 false。
+Phase 4D 工程验收不等于真实账户运营验收。后续测试优先采用真实账户的小资金和最小允许仓位；在真实只读核对、连续日终对账、最小仓位测试、Kill Switch 演练以及生产权限与密钥治理完成前，不得提高资金、仓位、品种范围或自动化频率。
