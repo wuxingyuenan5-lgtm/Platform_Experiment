@@ -14,8 +14,9 @@
 - Phase 4C：Issue `#18`，分支 `hardening/v6-phase4c-live-adapters`
 - 总计划：`docs/planning/V6-交易安全加固实施计划.md`
 - Phase 4C 计划：`docs/planning/V6-Phase4C-受控实盘适配器.md`
+- 小资金实盘验收：`docs/operations/V6-小资金实盘验收手册.md`
 
-`main` 的最新分支指针以 GitHub 为准。由于 Bybit 与 MT5 模拟环境不能充分复现实盘账户、成交、Funding 和 Swap，本阶段建设真实账户接入；但自动实盘写入仍默认关闭，必须先完成只读核对、影子对账、限额和 Kill Switch 验收。
+`main` 的最新分支指针以 GitHub 为准。由于 Bybit 与 MT5 模拟环境不能充分复现实盘账户、成交、Funding 和 Swap，本阶段建设真实账户接入；最终运营验收以真实账户的小资金、最小允许仓位为主，但自动实盘写入仍默认关闭，必须先完成只读核对、影子对账、限额和 Kill Switch 验收。
 
 ## 先看这里
 
@@ -23,6 +24,7 @@
 |---|---|
 | 看总体工程计划 | `docs/planning/V6-交易安全加固实施计划.md` |
 | 看当前 Phase 4C | `docs/planning/V6-Phase4C-受控实盘适配器.md` |
+| 看小资金实盘验收步骤 | `docs/operations/V6-小资金实盘验收手册.md` |
 | 看 Live Adapter 技术设计 | `docs/technical/LIVE_VENUE_ADAPTERS.md` |
 | 看 Phase 4B | `docs/planning/V6-Phase4B-外部查询与对账差异.md` |
 | 看 Venue Query 与差异设计 | `docs/technical/VENUE_RECONCILIATION.md` |
@@ -46,6 +48,7 @@
 - 默认 TradingMode：`simulation`
 - 默认 Gateway：`fake`
 - Live Runtime 必须使用独立 Environment、Journal、Account、Credential Ref 和 Platform Database。
+- Live 配置模板：`execution-runtime/.env.live.example`。
 
 ## 正式交易写入口
 
@@ -134,6 +137,14 @@ POST /api/v1/ops/live-economic-events/import
 → Kill Switch
 → 最小仓位运营验收
 ```
+
+只读预检：
+
+```powershell
+.\scripts\live-readonly-preflight.ps1
+```
+
+该脚本只检查 Live Environment、Gateway、Credential Ref、Write Gate 和 Venue Readiness，不会下单、撤单或改变持仓。
 
 Runtime Live Write 默认关闭，并独立检查：
 
@@ -229,4 +240,4 @@ python -m pytest
 
 ## 当前发布边界
 
-Phase 4C 的工程实现可以通过离线 Provider Contract Tests 验收，但真实账户运营验收必须单独完成。在真实只读核对、连续日终对账、最小仓位测试和 Kill Switch 演练完成前，`liveWriteEnabled` 必须保持 false。
+Phase 4C 的工程实现可以通过离线 Provider Contract Tests 验收，但真实账户运营验收必须单独完成。后续测试优先采用真实账户的小资金和最小允许仓位；在真实只读核对、连续日终对账、最小仓位测试和 Kill Switch 演练完成前，`liveWriteEnabled` 必须保持 false。
