@@ -3,7 +3,9 @@ name: Platform CI
 on:
   push:
     branches:
+      - main
       - refactor/frontend-architecture-v6
+      - 'hardening/**'
     paths:
       - 'execution-runtime/**'
       - 'platform-backend/**'
@@ -16,6 +18,8 @@ on:
       - 'scripts/**'
       - '.github/workflows/platform-ci.yml'
   pull_request:
+    branches:
+      - main
     paths:
       - 'execution-runtime/**'
       - 'platform-backend/**'
@@ -74,7 +78,7 @@ jobs:
       - name: Test
         run: python -m pytest
 
-  frontend-type-check:
+  frontend-quality:
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -94,3 +98,5 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Type check strategy frontend
         run: pnpm type:check
+      - name: Build frontend
+        run: pnpm build
