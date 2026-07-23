@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Product surface cleanup
+
+- Removed the explanatory redirect paragraph from the login card so the page contains only identity, authentication, and registration actions required by the user.
+- Removed the now-unused login subhead styles and preserved the existing redirect behavior in code.
+- Restored the product-surface rule in the root README: implementation explanations, redirect mechanics, integration notes, and other nonessential auxiliary copy belong in Markdown rather than the primary product interface.
+
 ### Command authority and recovery — Phase 2
 
 - Added `platform-backend/app/trade_commands.py` as the authoritative TradeCommand service.
