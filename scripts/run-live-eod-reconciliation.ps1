@@ -21,9 +21,12 @@ function Assert-IsoDateTime {
         [Parameter(Mandatory = $true)][string]$Name
     )
 
+    if ($Value -notmatch '(Z|[+-]\d{2}:\d{2})$') {
+        throw "$Name must include an explicit UTC offset or Z suffix."
+    }
     $parsed = [DateTimeOffset]::MinValue
     if (-not [DateTimeOffset]::TryParse($Value, [ref]$parsed)) {
-        throw "$Name must be an ISO 8601 datetime with an explicit UTC offset."
+        throw "$Name must be a valid ISO 8601 datetime."
     }
 }
 
@@ -72,13 +75,15 @@ $uri = "$($PlatformBaseUrl.TrimEnd('/'))/ops/eod-reconciliation/reports"
 Write-Host "Running EOD reconciliation for $BusinessDate / $AccountId"
 Write-Host "Idempotency key: $idempotencyKey"
 
+$requestParameters = @{
+    Method = "Post"
+    Uri = $uri
+    ContentType = "application/json"
+    Body = $body
+    TimeoutSec = 120
+}
 try {
-    $report = Invoke-RestMethod \
-        -Method Post \
-        -Uri $uri \
-        -ContentType "application/json" \
-        -Body $body \
-        -TimeoutSec 120
+    $report = Invoke-RestMethod @requestParameters
 }
 catch {
     throw "EOD reconciliation request failed: $uri`n$($_.Exception.Message)"
