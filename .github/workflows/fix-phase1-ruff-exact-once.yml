@@ -1,0 +1,47 @@
+name: Fix Phase 1 Ruff Exact Once
+
+on:
+  push:
+    branches:
+      - hardening/refactor-phase1-composition-boundaries
+    paths:
+      - '.github/workflows/fix-phase1-ruff-exact-once.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: hardening/refactor-phase1-composition-boundaries
+          fetch-depth: 0
+      - name: Remove redundant EOD row query
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('platform-backend/app/eod_reconciliation.py')
+          source = path.read_text(encoding='utf-8')
+          redundant = (
+              '        row = db.execute(\n'
+              '            "SELECT * FROM eod_reconciliation_reports WHERE id = ?",\n'
+              '            (report_id,),\n'
+              '        ).fetchone()\n'
+          )
+          if source.count(redundant) != 1:
+              raise RuntimeError(f'Expected one redundant EOD query, found {source.count(redundant)}')
+          path.write_text(source.replace(redundant, '', 1), encoding='utf-8')
+          PY
+          rm -f \
+            .github/workflows/fix-phase1-ruff-once.yml \
+            .github/workflows/fix-phase1-ruff-exact-once.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add platform-backend/app/eod_reconciliation.py
+          git add -u .github/workflows
+          git commit -m 'fix: remove redundant EOD report query'
+          git push origin HEAD:hardening/refactor-phase1-composition-boundaries
