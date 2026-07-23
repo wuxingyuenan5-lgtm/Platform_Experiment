@@ -4,6 +4,12 @@ from fastapi import FastAPI, HTTPException, Query
 
 from app.config import get_settings
 from app.cross_spread_market import build_cross_spread_snapshot
+from app.gateway_errors import (
+    GatewayConfigurationError,
+    GatewayQueryUnsupportedError,
+    GatewayRequestRejectedError,
+    GatewayResultUnknownError,
+)
 from app.gateway_factory import create_gateway
 from app.journal import (
     claim_command,
@@ -12,15 +18,18 @@ from app.journal import (
     journal_status,
     save_command_events,
 )
+from app.live_route_store import ensure_live_store
 from app.models import (
     CancelOrderRequest,
     CancelOrderResponse,
     CrossSpreadSnapshotResponse,
     ExecutionEvent,
+    GatewayCapabilitiesResponse,
     GatewayConnectivityResponse,
     RuntimeStatusResponse,
     SubmitOrderCommand,
     VenueBalanceSnapshot,
+    VenueEconomicEventSnapshot,
     VenueFillSnapshot,
     VenueOrderSnapshot,
     VenuePositionSnapshot,
@@ -37,10 +46,11 @@ settings = get_settings()
 async def lifespan(_: FastAPI):
     initialize_journal()
     ensure_store()
+    ensure_live_store()
     yield
 
 
-app = FastAPI(title=settings.app_name, version="0.4.0", lifespan=lifespan)
+app = FastAPI(title=settings.app_name, version="0.5.0", lifespan=lifespan)
 gateway = create_gateway(settings.gateway_name)
 
 
@@ -62,6 +72,15 @@ def status() -> RuntimeStatusResponse:
         gateway=gateway.name,
         journal=journal_status(),
     )
+
+
+@app.get(
+    "/gateway/capabilities",
+    response_model=GatewayCapabilitiesResponse,
+    tags=["gateway"],
+)
+def gateway_capabilities() -> GatewayCapabilitiesResponse:
+    return gateway.capabilities()
 
 
 @app.get(
@@ -126,7 +145,19 @@ def submit_order(command: SubmitOrderCommand) -> list[ExecutionEvent]:
             )
         return events
 
-    events = gateway.submit_order(command)
+    try:
+        events = gateway.submit_order(command)
+    except (GatewayConfigurationError, GatewayRequestRejectedError) as exc:
+        events = [
+            ExecutionEvent(
+                command_id=command.command_id,
+                platform_order_id=command.platform_order_id,
+                event_type="order_rejected",
+                reason=str(exc),
+            )
+        ]
+    except GatewayResultUnknownError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
     save_command_events(command, events)
     return events
 
@@ -149,7 +180,7 @@ def command_events(command_id: str) -> list[ExecutionEvent]:
     tags=["venue-query"],
 )
 def venue_order_by_platform(platform_order_id: str) -> VenueOrderSnapshot:
-    snapshot = gateway.get_order(platform_order_id=platform_order_id)
+    snapshot = _query(lambda: gateway.get_order(platform_order_id=platform_order_id))
     if snapshot is None:
         raise HTTPException(status_code=404, detail="External order not found")
     return snapshot
@@ -161,7 +192,7 @@ def venue_order_by_platform(platform_order_id: str) -> VenueOrderSnapshot:
     tags=["venue-query"],
 )
 def venue_order(external_order_id: str) -> VenueOrderSnapshot:
-    snapshot = gateway.get_order(external_order_id=external_order_id)
+    snapshot = _query(lambda: gateway.get_order(external_order_id=external_order_id))
     if snapshot is None:
         raise HTTPException(status_code=404, detail="External order not found")
     return snapshot
@@ -177,10 +208,12 @@ def venue_fills(
     external_order_id: str | None = Query(default=None, alias="externalOrderId"),
     platform_order_id: str | None = Query(default=None, alias="platformOrderId"),
 ) -> list[VenueFillSnapshot]:
-    return gateway.list_fills(
-        account_id=account_id,
-        external_order_id=external_order_id,
-        platform_order_id=platform_order_id,
+    return _query(
+        lambda: gateway.list_fills(
+            account_id=account_id,
+            external_order_id=external_order_id,
+            platform_order_id=platform_order_id,
+        )
     )
 
 
@@ -192,7 +225,7 @@ def venue_fills(
 def venue_positions(
     account_id: str | None = Query(default=None, alias="accountId"),
 ) -> list[VenuePositionSnapshot]:
-    return gateway.list_positions(account_id)
+    return _query(lambda: gateway.list_positions(account_id))
 
 
 @app.get(
@@ -203,7 +236,26 @@ def venue_positions(
 def venue_balances(
     account_id: str | None = Query(default=None, alias="accountId"),
 ) -> list[VenueBalanceSnapshot]:
-    return gateway.list_balances(account_id)
+    return _query(lambda: gateway.list_balances(account_id))
+
+
+@app.get(
+    "/venue/economic-events",
+    response_model=list[VenueEconomicEventSnapshot],
+    tags=["venue-query"],
+)
+def venue_economic_events(
+    account_id: str | None = Query(default=None, alias="accountId"),
+    instrument_id: str | None = Query(default=None, alias="instrumentId"),
+    event_type: str | None = Query(default=None, alias="eventType"),
+) -> list[VenueEconomicEventSnapshot]:
+    return _query(
+        lambda: gateway.list_economic_events(
+            account_id=account_id,
+            instrument_id=instrument_id,
+            event_type=event_type,
+        )
+    )
 
 
 @app.post(
@@ -221,5 +273,24 @@ def cancel_venue_order(
             request.idempotency_key,
             request.reason,
         )
+    except GatewayConfigurationError as exc:
+        raise HTTPException(status_code=423, detail=str(exc)) from exc
+    except GatewayRequestRejectedError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except GatewayResultUnknownError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+def _query(callback):
+    try:
+        return callback()
+    except GatewayConfigurationError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except GatewayQueryUnsupportedError as exc:
+        raise HTTPException(status_code=501, detail=str(exc)) from exc
+    except GatewayRequestRejectedError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except GatewayResultUnknownError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
