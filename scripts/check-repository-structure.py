@@ -1,3 +1,5 @@
+"""Fail CI when repository structure or architectural safety boundaries regress."""
+
 from __future__ import annotations
 
 import ast
@@ -28,6 +30,7 @@ FORBIDDEN_WORKFLOW_NAME = re.compile(
     r"(?:^|[-_])(?:capture|debug|fix-once|one-time|once)(?:[-_]|\.)",
     re.IGNORECASE,
 )
+ALLOWED_COMPOSITION_CALLS = {"add_middleware", "include_router"}
 
 
 def imported_top_levels(path: Path) -> set[str]:
@@ -52,15 +55,33 @@ def check_backend_venue_boundary(errors: list[str]) -> None:
             )
 
 
+def is_allowed_composition_call(node: ast.Expr) -> bool:
+    if isinstance(node.value, ast.Constant) and isinstance(node.value.value, str):
+        return True
+    if not isinstance(node.value, ast.Call):
+        return False
+    function = node.value.func
+    return (
+        isinstance(function, ast.Attribute)
+        and isinstance(function.value, ast.Name)
+        and function.value.id == "app"
+        and function.attr in ALLOWED_COMPOSITION_CALLS
+    )
+
+
 def check_composition_root(errors: list[str]) -> None:
     path = BACKEND_APP / "main.py"
     tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
     for node in tree.body:
-        if isinstance(node, (ast.Import, ast.ImportFrom, ast.Expr)):
+        if isinstance(node, (ast.Import, ast.ImportFrom)):
             continue
-        if isinstance(node, ast.Assign):
-            if all(isinstance(target, ast.Name) and target.id == "__all__" for target in node.targets):
-                continue
+        if isinstance(node, ast.Expr) and is_allowed_composition_call(node):
+            continue
+        if isinstance(node, ast.Assign) and all(
+            isinstance(target, ast.Name) and target.id == "__all__"
+            for target in node.targets
+        ):
+            continue
         errors.append(
             "platform-backend/app/main.py: composition root may only import, "
             "wire routers/middleware, and define __all__"
