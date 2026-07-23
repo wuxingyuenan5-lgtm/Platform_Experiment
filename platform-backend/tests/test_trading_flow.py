@@ -11,8 +11,8 @@ def test_order_fill_updates_position_and_pnl(monkeypatch, tmp_path: Path) -> Non
     settings = get_settings()
     settings.database_path = str(tmp_path / "platform.db")
 
-    account_id = str(uuid4())
-    instrument_id = str(uuid4())
+    account_id = "account_sim_usdt"
+    instrument_id = "instrument_btc_usdt"
 
     class FakeResponse:
         def raise_for_status(self) -> None:
