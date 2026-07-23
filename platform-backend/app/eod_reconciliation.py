@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field, model_validator
 
 from app.config import get_settings
 from app.database import connection
+from app.eod_policy import apply_outstanding_difference_gate, list_strategy_orders_for_eod
 from app.financial_facts import rebuild_strategy_financials, run_formal_nav_snapshot
 from app.live_venue_accounting import (
     LiveEconomicEventImportRequest,
@@ -24,6 +25,9 @@ from app.venue_reconciliation import (
     run_account_reconciliation,
     validate_strategy_account,
 )
+
+# Stable orchestration port backed by the single policy implementation.
+list_strategy_orders = list_strategy_orders_for_eod
 
 ReportStatus = Literal[
     "complete",
@@ -181,31 +185,6 @@ def natural_key(request: EodReconciliationReportRequest) -> str:
             request.account_id,
         ]
     )
-
-
-def list_strategy_orders(
-    strategy_instance_id: str,
-    account_id: str,
-    valuation_time: datetime,
-) -> list[str]:
-    with connection() as db:
-        rows = db.execute(
-            """
-            SELECT o.id
-            FROM orders o
-            JOIN trade_commands tc ON tc.id = o.command_id
-            WHERE tc.strategy_instance_id = ?
-              AND o.account_id = ?
-              AND o.created_at <= ?
-            ORDER BY o.created_at, o.id
-            """,
-            (
-                strategy_instance_id,
-                account_id,
-                valuation_time.astimezone(UTC).isoformat(),
-            ),
-        ).fetchall()
-    return [row["id"] for row in rows]
 
 
 def create_eod_report(
@@ -412,10 +391,6 @@ def create_eod_report(
                 report_id,
             ),
         )
-        row = db.execute(
-            "SELECT * FROM eod_reconciliation_reports WHERE id = ?",
-            (report_id,),
-        ).fetchone()
 
     audit(
         "eod_reconciliation_completed",
@@ -438,7 +413,12 @@ def create_eod_report(
             "owner": request.owner,
         },
     )
-    return report_from_row(row)
+    apply_outstanding_difference_gate(
+        report_id,
+        request.strategy_instance_id,
+        request.account_id,
+    )
+    return get_eod_report(report_id)
 
 
 def formal_pnl_counts(strategy_instance_id: str, account_id: str) -> tuple[int, int]:
@@ -581,9 +561,7 @@ def review_eod_report(
 def sla_status(row) -> str:
     due_at = datetime.fromisoformat(row["due_at"])
     completed_at = (
-        datetime.fromisoformat(row["completed_at"])
-        if row["completed_at"] is not None
-        else None
+        datetime.fromisoformat(row["completed_at"]) if row["completed_at"] is not None else None
     )
     if completed_at is not None:
         return "met" if completed_at <= due_at else "breached"

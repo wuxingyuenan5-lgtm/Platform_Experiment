@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field, model_validator
 
 from app.config import get_settings
 from app.database import connection
+from app.execution_exposure import calculate_residual_exposure
 from app.schemas import CreateTradeCommandRequest
 from app.trade_commands import create_trade_command
 
@@ -173,12 +174,8 @@ class RiskActionRequest(BaseModel):
     replacement_account_id: str | None = Field(default=None, alias="replacementAccountId")
     replacement_instrument_id: str | None = Field(default=None, alias="replacementInstrumentId")
     replacement_symbol: str | None = Field(default=None, alias="replacementSymbol")
-    replacement_side: Literal["buy", "sell"] | None = Field(
-        default=None, alias="replacementSide"
-    )
-    replacement_quantity: Decimal | None = Field(
-        default=None, alias="replacementQuantity", gt=0
-    )
+    replacement_side: Literal["buy", "sell"] | None = Field(default=None, alias="replacementSide")
+    replacement_quantity: Decimal | None = Field(default=None, alias="replacementQuantity", gt=0)
     replacement_price: Decimal | None = Field(default=None, alias="replacementPrice", gt=0)
 
     @model_validator(mode="after")
@@ -323,7 +320,9 @@ def set_kill_switch(
                 (validated_scope, scope_id),
             ).fetchone()
             if row is None:
-                raise HTTPException(status_code=409, detail="Kill-switch command result is unavailable")
+                raise HTTPException(
+                    status_code=409, detail="Kill-switch command result is unavailable"
+                )
             return kill_switch_from_row(row)
 
         previous = db.execute(
@@ -467,7 +466,9 @@ def set_execution_risk_policy(
                 (strategy_instance_id,),
             ).fetchone()
             if row is None:
-                raise HTTPException(status_code=409, detail="Risk-policy command result is unavailable")
+                raise HTTPException(
+                    status_code=409, detail="Risk-policy command result is unavailable"
+                )
             return policy_from_row(row, source="configured")
 
         db.execute(
@@ -575,10 +576,7 @@ def check_leg_deadline(batch_id: str, at: datetime | None = None) -> tuple[bool,
     elapsed = (current.astimezone(UTC) - first_fill.astimezone(UTC)).total_seconds()
     if elapsed <= risk.max_leg_delay_seconds:
         return True, None
-    reason = (
-        f"Leg delay {elapsed:.3f}s exceeded policy limit "
-        f"{risk.max_leg_delay_seconds}s"
-    )
+    reason = f"Leg delay {elapsed:.3f}s exceeded policy limit {risk.max_leg_delay_seconds}s"
     set_batch_risk_state(batch_id, "residual_exposure", reason=reason)
     return False, reason
 
@@ -729,57 +727,6 @@ def set_batch_risk_state(
             "reason": reason,
         },
     )
-
-
-def calculate_residual_exposure(batch_id: str) -> tuple[Decimal, str, str]:
-    ensure_schema()
-    with connection() as db:
-        legs = db.execute(
-            """
-            SELECT l.role, l.side, l.quantity, l.price, l.order_id,
-                   i.settle_currency, cs.contract_multiplier
-            FROM execution_batch_legs l
-            JOIN instruments i ON i.id = l.instrument_id
-            JOIN contract_specifications cs ON cs.instrument_id = l.instrument_id
-            WHERE l.batch_id = ? AND l.status = 'filled'
-              AND cs.effective_from = (
-                  SELECT MAX(cs2.effective_from)
-                  FROM contract_specifications cs2
-                  WHERE cs2.instrument_id = l.instrument_id
-              )
-            ORDER BY l.sequence
-            """,
-            (batch_id,),
-        ).fetchall()
-        exposure_by_currency: dict[str, Decimal] = {}
-        for leg in legs:
-            fill_rows = []
-            if leg["order_id"] is not None:
-                fill_rows = db.execute(
-                    "SELECT quantity, price FROM fills WHERE order_id = ? ORDER BY occurred_at",
-                    (leg["order_id"],),
-                ).fetchall()
-            multiplier = Decimal(leg["contract_multiplier"])
-            if fill_rows:
-                notional = sum(
-                    Decimal(fill["quantity"]) * Decimal(fill["price"]) * multiplier
-                    for fill in fill_rows
-                )
-            elif leg["price"] is not None:
-                notional = Decimal(leg["quantity"]) * Decimal(leg["price"]) * multiplier
-            else:
-                return Decimal("0"), "UNKNOWN", "incomplete"
-            signed = notional if leg["side"] == "buy" else -notional
-            currency = leg["settle_currency"]
-            exposure_by_currency[currency] = exposure_by_currency.get(currency, Decimal("0")) + signed
-
-    if not exposure_by_currency:
-        return Decimal("0"), "UNKNOWN", "complete"
-    if len(exposure_by_currency) == 1:
-        currency, signed_exposure = next(iter(exposure_by_currency.items()))
-        return abs(signed_exposure), currency, "complete"
-    conservative = sum(abs(value) for value in exposure_by_currency.values())
-    return conservative, "MIXED", "incomplete"
 
 
 def execute_risk_action(batch_id: str, request: RiskActionRequest) -> RiskActionResponse:
@@ -1068,7 +1015,9 @@ def kill_switch_from_row(row) -> KillSwitchResponse:
     )
 
 
-def policy_from_row(row, *, source: Literal["default", "configured"]) -> ExecutionRiskPolicyResponse:
+def policy_from_row(
+    row, *, source: Literal["default", "configured"]
+) -> ExecutionRiskPolicyResponse:
     return ExecutionRiskPolicyResponse(
         strategyInstanceId=row["strategy_instance_id"],
         maxLegDelaySeconds=row["max_leg_delay_seconds"],
