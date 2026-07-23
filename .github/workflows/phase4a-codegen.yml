@@ -47,7 +47,7 @@ jobs:
           cat /tmp/phase4a-ruff.log
           cat /tmp/phase4a-pytest.log
           if [ $RUFF_STATUS -ne 0 ] || [ $PYTEST_STATUS -ne 0 ]; then exit 1; fi
-      - name: Upload diagnostics
+      - name: Upload validation diagnostics
         if: failure()
         uses: actions/upload-artifact@v4
         with:
@@ -63,9 +63,35 @@ jobs:
           if-no-files-found: ignore
           retention-days: 3
       - name: Commit implementation
+        id: commit_implementation
+        shell: bash
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add .
-          git commit -m "feat: add Phase 4A execution risk controls"
-          git push origin HEAD:${{ github.event.pull_request.head.ref }}
+          set +e
+          {
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git status --short
+            git add .
+            git commit -m "feat: add Phase 4A execution risk controls"
+            COMMIT_STATUS=$?
+            echo "commit_status=${COMMIT_STATUS}"
+            if [ ${COMMIT_STATUS} -eq 0 ]; then
+              git push origin HEAD:${{ github.event.pull_request.head.ref }}
+              PUSH_STATUS=$?
+            else
+              PUSH_STATUS=99
+            fi
+            echo "push_status=${PUSH_STATUS}"
+            git status --short
+            git log -3 --oneline
+            if [ ${COMMIT_STATUS} -ne 0 ] || [ ${PUSH_STATUS} -ne 0 ]; then exit 1; fi
+          } 2>&1 | tee /tmp/phase4a-commit.log
+          exit ${PIPESTATUS[0]}
+      - name: Upload commit diagnostics
+        if: failure() && steps.commit_implementation.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase4a-commit
+          path: /tmp/phase4a-commit.log
+          if-no-files-found: error
+          retention-days: 3
