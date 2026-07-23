@@ -2,6 +2,26 @@
 
 ## Unreleased
 
+### Execution risk controls and Kill Switch — Phase 4A
+
+- Added global, strategy, and account Kill Switches with idempotent writes, payload-conflict detection, versioning, actor/reason metadata, and AuditEvent records.
+- Added Kill Switch checks before ExecutionBatch claim and before every Batch Leg, returning `423 Locked` before new TradeCommand or Runtime side effects.
+- Added per-Strategy execution-risk policies for maximum leg delay, maximum residual notional, and failure action.
+- Added immutable per-Batch risk-policy snapshots so later policy changes do not rewrite historical execution boundaries.
+- Added Batch risk states: `clear`, `residual_exposure`, `disposition_in_progress`, `resolved`, and `escalated`.
+- Added first-fill and last-leg timestamps and enforced maximum leg delay before the next Leg is submitted.
+- Added residual-exposure calculation using Fill Quantity, Fill Price, Contract Multiplier, side, and Settlement Currency.
+- Added conservative `MIXED / incomplete` handling for multi-currency exposure without a risk FX snapshot.
+- Changed normal Batch completion so `hedged` requires both Legs completed and a complete zero-residual risk result.
+- Added idempotent RiskActions: `hold_and_escalate`, `flatten_filled_legs`, `cancel_open_legs`, and `substitute_hedge`.
+- Routed automatic flattening and substitute hedges through authoritative TradeCommand rather than direct Order insertion.
+- Preserved `action_required` for external Orders that cannot yet be canceled through Venue APIs; Phase 4A does not pretend local state changes canceled an external Order.
+- Added golden tests for pre-claim Kill Switch blocking, residual-notional limits, automatic flattening, Position returning to zero, RiskAction replay/conflict, and leg-deadline enforcement.
+- Expanded Platform CI strict gates to include `execution_risk.py` and `test_execution_risk.py`.
+- Added `docs/planning/V6-Phase4A-执行风险与Kill-Switch.md` and `docs/technical/EXECUTION_RISK_CONTROLS.md`.
+- Synchronized the V6 plan, API Specification, Release Gate, README, START-HERE, Issue #14, PR #15, and this Changelog.
+- Retained Simulation / Fake Gateway only; external Venue query/cancel, Bybit Demo, MT5 Demo, daily reconciliation, authentication, and Live remain deferred to Phase 4B–4D or later review.
+
 ### Immutable financial facts and formal accounting — Phase 3
 
 - Added immutable `financial_facts` with client idempotency keys, external fact identities, normalized payload hashes, event time, source metadata, and explicit data quality.
@@ -22,7 +42,7 @@
 - Synchronized the overall V6 plan, API Specification, Release Gate, README, START-HERE, Issue #7, PR #9, and this Changelog.
 - Completed Platform CI `#127 / run 29993137286`: Platform Backend, Execution Runtime, frontend type-check, and production build all passed.
 - Merged Phase 3 to `main@77bf4223c2059d5a56fc08a2d49214351c396abc` through PR #9.
-- Retained Simulation / Fake Gateway only; external venue ingestion, residual-leg risk handling, authentication, and Live remain deferred.
+- Retained Simulation / Fake Gateway only; external venue ingestion, residual-leg risk handling, authentication, and Live remained deferred.
 
 ### Product surface cleanup
 
@@ -52,7 +72,7 @@
 - Updated README, START-HERE, API Specification, Release Gate, overall V6 plan, CI strict gates, and this Changelog.
 - Added authoritative Markdown paths to Platform CI so engineering documentation changes are validated with the codebase.
 - Completed Platform CI run `29986397987`: Platform Backend, Execution Runtime, frontend strategy type-check, and production build all passed.
-- Explicitly retained Simulation / Fake Gateway as the only allowed execution mode; real Bybit/MT5, formal PnL/NAV, and automatic residual-leg risk handling remain deferred.
+- Explicitly retained Simulation / Fake Gateway as the only allowed execution mode; real Bybit/MT5, formal PnL/NAV, and automatic residual-leg risk handling remained deferred.
 
 ### Trading safety hardening — Phase 1
 
