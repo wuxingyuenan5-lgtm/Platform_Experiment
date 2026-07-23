@@ -69,29 +69,42 @@ jobs:
       - name: Install dependencies
         run: python -m pip install -e '.[dev]'
       - name: Runtime strict lint gate
-        run: >-
-          python -m ruff check
-          app/main.py
-          app/config.py
-          app/journal.py
-          app/models.py
-          app/gateway.py
-          app/gateway_errors.py
-          app/gateway_factory.py
-          app/fake_gateway.py
-          app/venue_store.py
-          app/live_route_store.py
-          app/live_safety.py
-          app/bybit_live_adapter.py
-          app/mt5_live_adapter.py
-          app/bybit_mt5_gateway.py
-          app/secret_resolver.py
-          tests/test_atomic_command_claim.py
-          tests/test_runtime_journal.py
-          tests/test_venue_query.py
-          tests/test_live_safety.py
-          tests/test_bybit_live_adapter.py
-          tests/test_mt5_live_adapter.py
+        shell: bash
+        run: |
+          if ! python -m ruff check \
+            app/main.py \
+            app/config.py \
+            app/journal.py \
+            app/models.py \
+            app/gateway.py \
+            app/gateway_errors.py \
+            app/gateway_factory.py \
+            app/fake_gateway.py \
+            app/venue_store.py \
+            app/live_route_store.py \
+            app/live_safety.py \
+            app/bybit_live_adapter.py \
+            app/mt5_live_adapter.py \
+            app/bybit_mt5_gateway.py \
+            app/secret_resolver.py \
+            tests/test_atomic_command_claim.py \
+            tests/test_runtime_journal.py \
+            tests/test_venue_query.py \
+            tests/test_live_safety.py \
+            tests/test_bybit_live_adapter.py \
+            tests/test_mt5_live_adapter.py \
+            > /tmp/runtime-ruff.log 2>&1; then
+            cat /tmp/runtime-ruff.log
+            exit 1
+          fi
+      - name: Upload runtime lint diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: runtime-ruff-log
+          path: /tmp/runtime-ruff.log
+          if-no-files-found: ignore
+          retention-days: 3
       - name: Full lint debt inventory
         continue-on-error: true
         run: python -m ruff check app tests
