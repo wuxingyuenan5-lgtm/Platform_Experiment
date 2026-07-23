@@ -1,3 +1,4 @@
+from decimal import Decimal
 from functools import lru_cache
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -27,7 +28,12 @@ class Settings(BaseSettings):
     auth_credentials_json: str = "[]"
     development_user_id: str = "development-user"
     development_roles: str = "admin"
+
+    # Platform LiveTradingSession is a separate authorization boundary from the
+    # Runtime live-write gate. Zero absolute limits keep all live sessions blocked.
     require_live_trading_session: bool = True
+    live_session_absolute_max_order_notional: Decimal = Decimal("0")
+    live_session_absolute_max_daily_notional: Decimal = Decimal("0")
 
     @property
     def allowed_cors_origins(self) -> list[str]:
