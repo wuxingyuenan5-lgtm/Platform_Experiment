@@ -48,6 +48,11 @@ jobs:
           path: |
             /tmp/phase4a-ruff.log
             /tmp/phase4a-pytest.log
+            platform-backend/app/phase4_risk.py
+            platform-backend/app/trade_commands.py
+            platform-backend/app/trading.py
+            platform-backend/app/schemas.py
+            platform-backend/tests/test_phase4_risk.py
           if-no-files-found: ignore
           retention-days: 3
       - name: Commit implementation
