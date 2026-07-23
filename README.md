@@ -69,6 +69,7 @@ outputs/             临时产物
 
 ```powershell
 cd admin-risk
+pnpm exec eslint --max-warnings 0 "src/api/platform/**/*.{ts,tsx}" "src/hooks/trading/**/*.{ts,tsx}" "src/views/strategy/funding-carry/**/*.{vue,ts,tsx}"
 pnpm type:check
 pnpm build
 ```
