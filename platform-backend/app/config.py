@@ -35,6 +35,14 @@ class Settings(BaseSettings):
     live_session_absolute_max_order_notional: Decimal = Decimal("0")
     live_session_absolute_max_daily_notional: Decimal = Decimal("0")
 
+    # Production operations use local, explicit filesystem roots. The backup and
+    # restore roots must never point at the active Platform or Runtime data paths.
+    runtime_journal_path: str = "../execution-runtime/data/runtime_journal.db"
+    operations_backup_root: str = "./data/backups"
+    operations_restore_root: str = "./data/restore-drills"
+    operations_alert_default_owner: str = "operations"
+    operations_eod_overdue_grace_minutes: int = 0
+
     @property
     def allowed_cors_origins(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
