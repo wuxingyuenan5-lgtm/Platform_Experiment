@@ -13,7 +13,6 @@ from app.models import (
 from app.mt5_file_bridge import read_mt5_bridge_snapshot
 from app.secret_resolver import resolve_secret_reference
 
-
 BYBIT_CREDENTIAL_REF = "secret://crypto-test-001"
 MT5_CREDENTIAL_REF = "secret://mt5-demo-001"
 
@@ -102,10 +101,7 @@ def _build_bybit_snapshot(
         quote = MarketQuote(
             bid=Decimal(str(ticker_row["bid1Price"])),
             ask=Decimal(str(ticker_row["ask1Price"])),
-            mid=(
-                Decimal(str(ticker_row["bid1Price"]))
-                + Decimal(str(ticker_row["ask1Price"]))
-            )
+            mid=(Decimal(str(ticker_row["bid1Price"])) + Decimal(str(ticker_row["ask1Price"])))
             / Decimal("2"),
             last=Decimal(str(ticker_row.get("lastPrice") or ticker_row["bid1Price"])),
             currency="USDT",
@@ -172,7 +168,10 @@ def _build_mt5_snapshot(
             return _unavailable(
                 "mt5",
                 symbol,
-                "MT5 Python bridge is not responding in the web runtime; keep terminal open and verify terminal bridge separately",
+                (
+                    "MT5 Python bridge is not responding in the web runtime; "
+                    "keep terminal open and verify terminal bridge separately"
+                ),
             )
 
         login = int(credentials["API_KEY"])

@@ -1,8 +1,8 @@
 import pytest
 
+from app.bybit_mt5_gateway import BybitMt5Gateway
 from app.fake_gateway import FakeGateway
 from app.gateway_factory import create_gateway
-from app.bybit_mt5_gateway import BybitMt5Gateway
 
 
 def test_gateway_factory_creates_fake_gateway() -> None:
