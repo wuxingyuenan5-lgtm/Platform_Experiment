@@ -388,10 +388,6 @@ def create_eod_report(
                 report_id,
             ),
         )
-        row = db.execute(
-            "SELECT * FROM eod_reconciliation_reports WHERE id = ?",
-            (report_id,),
-        ).fetchone()
 
     audit(
         "eod_reconciliation_completed",
