@@ -14,39 +14,37 @@ This file records intentionally deferred engineering work. It is not a backlog o
 
 ## TD-001 — Database module decomposition
 
-Status: active; connection extraction completed in Issue #48
+Status: active; connection and Bootstrap extraction completed through Issues #48 and #50
 Owner: Platform Backend / persistence
 
-Problem: `app/database.py` still combines core Schema/compatibility DDL, initializer orchestration and reference-data seeding. Shared path and transaction-managed connection handling are isolated in `app/database_connection.py`.
+Problem: `app/database.py` still combines initializer orchestration and fixed reference-data seeding. Shared connections are isolated in `app/database_connection.py`; core Schema and legacy compatibility DDL are isolated in `app/database_bootstrap.py`.
 
-Risk: the remaining large module has a broad review surface, and careless movement could change fresh/existing database or fixed Seed behavior.
+Risk: the remaining fixed Seed block is large, and careless movement could change reference identifiers, statuses, credentials references, trading modes or contract defaults.
 
-Completed prerequisite and evidence:
+Completed evidence:
 
 - DDL Owner inventory and additive migration ledger;
-- ordered versions and immutable checksums;
-- existing-schema V1 baseline;
-- FinancialFact domain separated from the core database module;
-- dynamic path, parent creation, Row Factory, Foreign Key, Commit/Rollback/Close connection tests;
-- exact compatibility identity for existing `app.database` imports;
-- fresh Schema/table/index and Seed count snapshot;
+- dynamic path, Row Factory, Foreign Key and transaction-boundary tests;
+- exact compatibility identities for existing `app.database` imports;
+- core Schema SHA-256 `421f0625ffe3a8a26ca48bc827e64bd6aa6b2e49d95faef0b17313e808375801`;
+- fresh table/index and Seed-count snapshot;
 - repeated-initialization idempotency;
-- existing legacy database compatibility-column/index test.
+- existing legacy database compatibility-column/index test;
+- explicit initialization-order test: Connection → Bootstrap → Seed;
+- Repository Safety DDL ownership transferred to `app/database_bootstrap.py`.
 
-Deferred because: core DDL/bootstrap and fixed Seeds must be reviewed separately; combining both would obscure whether a regression came from Schema or Seed movement.
+Deferred because: fixed Seed ownership requires its own exhaustive value snapshot and review; combining it with Schema movement would obscure regressions.
 
-Trigger: complete dedicated Bootstrap/Schema extraction, then dedicated Seed extraction.
+Trigger: complete the dedicated fixed reference Seed extraction.
 
-Protected semantics: existing tables, indexes, compatibility columns, seed identifiers, live defaults and financial/trading behavior.
+Protected semantics: every Seed ID/value, existing tables/indexes/compatibility columns, simulation/live defaults and financial/trading behavior.
 
-Safe approach: connection completed → bootstrap/schema → seeds. Preserve `app.database` compatibility aliases, require fresh/existing/repeated-initialization equivalence and never mix structural movement with business Schema or Seed changes.
+Safe approach: extract `seed_reference_data` and all fixed vectors into `app/database_seeds.py`, preserve `app.database` compatibility identity and initialization order, and require exhaustive Seed plus fresh/existing/repeated startup equivalence.
 
 ## TD-002 — Financial facts module concentration
 
 Status: completed through Issues #40, #42, #44 and #46
 Owner: Platform Backend / formal accounting
-
-Original problem: `app/financial_facts.py` combined public DTOs, normalization/content hashing, direct persistence, formal Position/PnL/NAV calculations, rebuild orchestration and API behavior.
 
 Resolved ownership:
 
@@ -104,7 +102,7 @@ Safe approach: module-by-module cleanup until full `src/` can replace the change
 
 ## TD-005 — Progressive Python typing
 
-Status: active; critical execution, FinancialFact and SQLite connection boundaries selected
+Status: active; critical execution, FinancialFact and SQLite Connection/Bootstrap boundaries selected
 Owner: Platform Backend and Execution Runtime
 
 Problem: much of the legacy code remains outside static type checking.
@@ -114,7 +112,7 @@ Risk: untyped database rows, arbitrary payloads and large orchestration modules 
 Completed prerequisite:
 
 - Pyright is installed and blocking in CI;
-- Platform execution DTOs, FinancialFact DTOs/Normalization/Repository/Projection Service, SQLite Connection, Runtime contracts, schema migrations, schema governance and authoritative order submission are selected;
+- Platform execution DTOs, FinancialFact DTOs/Normalization/Repository/Projection Service, SQLite Connection/Bootstrap, Runtime contracts, schema migrations, schema governance and authoritative order submission are selected;
 - Runtime models, contracts and Gateway Protocol are selected.
 
 Deferred because: strict whole-project typing would create noisy changes unrelated to current risk boundaries.
