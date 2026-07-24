@@ -1,0 +1,33 @@
+name: Issue 69 One-Time Patch
+
+on:
+  push:
+    branches:
+      - refactor/issue-69-venue-reconciliation-repository
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: refactor/issue-69-venue-reconciliation-repository
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install Backend dependencies for DDL snapshot
+        run: python -m pip install -e "platform-backend[dev]"
+      - name: Apply Venue Reconciliation repository extraction
+        run: python scripts/issue-69-apply.py
+      - name: Commit patched files
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Extract Venue Reconciliation repository"
+          git push origin HEAD:refactor/issue-69-venue-reconciliation-repository
