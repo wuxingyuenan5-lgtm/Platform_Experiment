@@ -1,0 +1,37 @@
+from __future__ import annotations
+
+import importlib.util
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[2]
+SCRIPT = ROOT / "scripts" / "frontend-no-new-debt.py"
+SPEC = importlib.util.spec_from_file_location("frontend_no_new_debt", SCRIPT)
+assert SPEC is not None and SPEC.loader is not None
+frontend_no_new_debt = importlib.util.module_from_spec(SPEC)
+SPEC.loader.exec_module(frontend_no_new_debt)
+
+
+def test_changed_frontend_source_selection_is_bounded_and_unique() -> None:
+    selected = frontend_no_new_debt.select_frontend_files(
+        [
+            "admin-risk/src/views/platform/index.vue",
+            "admin-risk/src/views/platform/index.vue",
+            "admin-risk/docs/START-HERE.md",
+            "platform-backend/app/main.py",
+            "admin-risk/package.json",
+        ]
+    )
+
+    assert selected == ["src/views/platform/index.vue"]
+
+
+def test_pull_request_base_uses_merge_base_comparison() -> None:
+    sha = "a" * 40
+    event = {"pull_request": {"base": {"sha": sha}}}
+    assert frontend_no_new_debt.event_base_sha(event) == (sha, True)
+
+
+def test_push_base_uses_direct_comparison() -> None:
+    sha = "b" * 40
+    event = {"before": sha}
+    assert frontend_no_new_debt.event_base_sha(event) == (sha, False)
