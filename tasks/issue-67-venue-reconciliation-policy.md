@@ -1,7 +1,7 @@
 # Issue #67 — Extract Venue Reconciliation difference policy
 
 Issue: #67
-Status: active
+Status: done
 Branch: `refactor/issue-67-venue-reconciliation-policy`
 Base commit: `f8161116885a9263f0e0094b4826add6568b7136`
 
@@ -89,16 +89,16 @@ Risk: medium-low.
 
 ## Progress
 
-- Done: pure policy, status mappings, Order/Position/Balance drafts, thin persistence wrappers, Golden and architecture tests.
-- Current: standard full CI and final Diff review.
-- Next: freeze evidence, mark ready, squash merge and close Issue.
+- Done: pure policy, exact Golden drafts, thin persistence wrappers, Ownership/Pyright and complete pre-freeze CI.
+- Current: final frozen-head verification and squash merge.
+- Next: close Issue and begin Venue Reconciliation Repository extraction.
 - Blocked by: nothing.
 
 ## Completion
 
 - PR: #68
-- Merge commit:
+- Merge commit: recorded by the final squash merge on PR #68.
 - Behavior changed: decision ownership only.
 - Behavior intentionally unchanged: every persisted difference and external behavior.
-- Tests/CI: pending standard final-head runs.
+- Tests/CI: Platform CI `30114207137` success; Secret Scan `30114207142` success. Final frozen-head runs must also pass before merge.
 - Follow-up debt: Venue Reconciliation Repository extraction remains the next stage.
