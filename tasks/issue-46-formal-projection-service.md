@@ -1,7 +1,7 @@
 # Task: Formal projection service extraction
 
 Issue: #46
-Status: active
+Status: ready for merge
 Branch: `refactor/issue-46-formal-projection-service`
 Base commit: `0e1e0f2599346aa80e0e663ce0c397e8c58c1e23`
 
@@ -40,18 +40,19 @@ Extract formal Position/PnL/NAV calculations and rebuild orchestration into `app
 
 ## Acceptance criteria
 
-- [ ] One Issue, one task packet, one branch and one PR.
-- [ ] `financial_projection_service.py` owns all formal projection calculations and orchestration.
-- [ ] `financial_facts.py` contains no projection formula implementation.
-- [ ] Existing projection compatibility functions remain callable.
-- [ ] Exact calculation and orchestration golden tests pass.
-- [ ] Existing accounting, normalization and repository rollback suites pass unchanged.
-- [ ] Projection ownership is machine-checked.
-- [ ] Projection service is included in progressive Pyright.
-- [ ] Backend dependency, Ruff, Pyright and all classified tests pass.
-- [ ] Runtime and frontend regression gates pass.
-- [ ] Secret Scan passes.
-- [ ] Documentation matches the final implementation.
+- [x] One Issue, one task packet, one branch and one PR.
+- [x] `financial_projection_service.py` owns all formal projection calculations and orchestration.
+- [x] `financial_facts.py` contains no projection formula implementation.
+- [x] Existing projection compatibility functions remain callable.
+- [x] Exact calculation and orchestration golden tests pass.
+- [x] Existing accounting, normalization and repository rollback suites pass unchanged.
+- [x] Projection ownership is machine-checked.
+- [x] Projection service is included in progressive Pyright.
+- [x] Backend dependency, Ruff, Pyright and all classified tests pass on implementation heads.
+- [x] Runtime regression gates pass on implementation heads.
+- [x] Secret Scan passes on implementation heads.
+- [x] Documentation matches the final implementation.
+- [ ] Final frozen-head frontend regression and complete Platform CI; evidence is recorded in PR #47 before merge.
 
 ## Risk and rollback
 
@@ -63,15 +64,15 @@ Rollback: revert the final squash commit. No migration or external state is intr
 
 ## Progress
 
-- Done: verified `main@0e1e0f25...`, no open PRs, created Issue #46 and its unique branch.
-- Current: extract projection calculations and orchestration behind compatibility wrappers.
-- Next: add ownership/equivalence tests and progressive typing.
+- Done: extracted Projection Service, preserved API compatibility, added formula/orchestration goldens, architecture ownership checks and progressive Pyright, and synchronized documentation.
+- Current: final frozen-head Platform CI and independent Secret Scan.
+- Next: update PR evidence and squash merge after every required job is green.
 - Blocked by: none.
 
 ## Completion
 
-- PR: pending.
-- Merge commit: pending.
-- Behavior changed: none intended; projection ownership only.
-- Tests/CI: pending.
+- PR: #47.
+- Merge commit: pending squash merge.
+- Behavior changed: none; formal projection ownership only.
+- Tests/CI: Backend and Runtime gates, Repository Safety and Secret Scan passed during implementation; final frozen-head evidence will be recorded in PR #47.
 - Follow-up: database module decomposition remains separate work.
