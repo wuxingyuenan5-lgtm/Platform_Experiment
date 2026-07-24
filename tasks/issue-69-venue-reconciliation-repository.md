@@ -91,14 +91,14 @@ Risk: medium.
 
 ## Progress
 
-- Done: persistence inventory, Issue and branch.
-- Current: repository API and transaction design.
-- Next: implementation, direct verification and full CI.
+- Done: persistence inventory, Issue/branch/PR and repository API design.
+- Current: DDL/SQL/row-mapping extraction and transaction tests.
+- Next: full CI, final review and merge.
 - Blocked by: nothing.
 
 ## Completion
 
-- PR:
+- PR: #70
 - Merge commit:
 - Behavior changed: persistence ownership only.
 - Behavior intentionally unchanged: every SQL result, API and external effect.

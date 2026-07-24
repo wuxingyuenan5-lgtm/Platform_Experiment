@@ -63,6 +63,7 @@
 - `platform-backend/app/trading.py::submit_order` 只保留 deprecated 兼容入口；legacy raw payload 与 TradeCommand V1 payload 由 Owner 显式区分。
 - `platform-backend/app/venue_reconciliation_schemas.py` 是 Venue Reconciliation 公开 DTO 和差异状态类型的唯一 Owner；原模块只做兼容导出。
 - `platform-backend/app/venue_reconciliation_policy.py` 是外部订单状态映射与 Order/Position/Balance 差异草稿判定的纯 Policy Owner；它不得读取数据库、调用 Runtime 或写入 Difference。
+- `platform-backend/app/venue_reconciliation_repository.py` 是 Reconciliation DDL、SQL、Row Mapping 与受保护事务的唯一 Owner；原模块不得直接访问数据库。
 - 不兼容变更必须提升版本并提供迁移/兼容测试。
 
 ## Persistence 边界
