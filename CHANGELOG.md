@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+### FinancialFact public schema ownership — Issue #40 / PR #41
+
+- Extracted FinancialFact, formal Position, formal PnL, NAV and projection-rebuild Pydantic DTOs into `platform-backend/app/financial_fact_schemas.py`.
+- Preserved `app.financial_facts` compatibility exports as the same Python class objects.
+- Added JSON Schema snapshots for public field aliases and required-field sets.
+- Added validator compatibility coverage for trade-fact shape requirements.
+- Added the schema module to progressive Pyright and moved the Pydantic-specific Ruff exception to the new owner.
+- Retained all FinancialFact SQL, normalization, content hashing, FX conversion, average-cost, PnL attribution, rebuild and API routing implementation unchanged.
+- Kept database schema, trading behavior, credentials and both Live Write defaults unchanged.
+
 ### Project operating system and engineering hardening — Issue #36 / PR #37
 
 - Consolidated human and Agent entrypoints around `00-人工可读目录/README.md`, `docs/codex/context-map.md`, `docs/codex/current-state.md`, and one canonical task template.
