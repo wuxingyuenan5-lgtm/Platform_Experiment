@@ -12,22 +12,30 @@ This file records intentionally deferred engineering work. It is not a backlog o
 - protected semantics;
 - proposed safe approach.
 
-## TD-001 — Database bootstrap concentration
+## TD-001 — Database module decomposition
 
-Status: active
+Status: active; inventory and migration-ledger prerequisites completed
 Owner: Platform Backend / persistence
 
-Problem: `app/database.py` combines connection handling, core DDL, incremental migration and reference-data seeding. Additional schema fragments also exist in domain modules.
+Problem: `app/database.py` still combines connection handling, core DDL, incremental compatibility changes and reference-data seeding. Additional DDL remains owned by domain modules.
 
-Risk: schema ownership becomes difficult to audit and startup order can become an implicit migration mechanism.
+Risk: large review surface and implicit startup ordering if future schema changes bypass the migration ledger.
 
-Deferred because: table movement or migration changes can affect persistent state and require explicit inventory and compatibility tests first.
+Completed prerequisite:
 
-Trigger: the schema inventory and migration ledger are in place, or a schema-changing feature is approved.
+- DDL Owner inventory in `docs/database/README.md`;
+- additive `schema_migrations` ledger;
+- ordered version and checksum validation;
+- existing-schema V1 baseline;
+- repeated-startup and mutation-detection tests.
+
+Deferred because: physically moving DDL or seed logic can affect fresh and existing databases even when SQL text looks unchanged.
+
+Trigger: a dedicated Issue proves fresh-database and existing-database behavior before/after extraction.
 
 Protected semantics: existing tables, indexes, seed identifiers, live defaults and financial/trading behavior.
 
-Safe approach: inventory → ownership map → version ledger → extract migration files → only then move DDL.
+Safe approach: extract connection → bootstrap → migrations → seeds in small PRs; do not combine with a business schema change.
 
 ## TD-002 — Financial facts module concentration
 
@@ -38,9 +46,16 @@ Problem: `app/financial_facts.py` contains API models, normalization, persistenc
 
 Risk: large review surface around auditable financial logic.
 
-Deferred because: splitting code before contract and data-ownership tests can obscure semantic changes.
+Completed prerequisite:
 
-Trigger: contract snapshots and static type boundaries cover its public API and projection inputs.
+- operational/formal projection ownership is machine-checked;
+- database authority is documented;
+- cross-service execution contracts are versioned;
+- selected boundary modules now have Pyright.
+
+Deferred because: splitting financial logic still requires golden equivalence tests around hashing, FX, average cost, PnL and rebuild behavior.
+
+Trigger: a dedicated Issue adds API-schema/repository/service ownership tests before moving implementations.
 
 Protected semantics: fact idempotency, content hashing, currency conversion, position average cost and PnL formulas.
 
@@ -65,37 +80,49 @@ Safe approach: usage telemetry and consumer inventory before any deprecation.
 
 ## TD-004 — Frontend inherited lint debt
 
-Status: active
+Status: active; no-new-debt gate completed
 Owner: Frontend
 
-Problem: zero-warning lint currently protects the active trading surface, while inherited template code outside that surface is not yet held to the same standard.
+Problem: inherited template code outside the maintained trading surface is not yet clean enough for a whole-`src/` zero-warning gate.
 
-Risk: unrelated legacy warnings make full-repository lint noisy and encourage broad formatting diffs.
+Risk: legacy warnings still exist in untouched modules.
+
+Completed prerequisite:
+
+- active trading paths remain fully linted with zero warnings;
+- every added or modified `admin-risk/src` and `admin-risk/mock` source file is now checked with zero warnings;
+- no mass formatting was introduced.
 
 Deferred because: a one-shot cleanup would create an unreviewable change.
 
-Trigger: no-new-debt baseline is executable and changed files are gated.
+Trigger: clean one product module when that module receives real work; expand the maintained full-directory set after it is clean.
 
 Protected semantics: no mass formatting and no product behavior change.
 
-Safe approach: changed-file gate plus module-by-module cleanup until full `src/` is clean.
+Safe approach: module-by-module cleanup until full `src/` can replace the changed-file gate.
 
 ## TD-005 — Progressive Python typing
 
-Status: active
+Status: active; first boundary baseline completed
 Owner: Platform Backend and Execution Runtime
 
-Problem: Ruff catches syntax and lint defects but does not verify cross-module type contracts.
+Problem: much of the legacy code remains outside static type checking.
 
-Risk: DTO, database row and event shape drift can survive static checks.
+Risk: untyped database rows, arbitrary payloads and large orchestration modules can still drift.
 
-Deferred because: strict whole-project typing would create noisy debt unrelated to risk boundaries.
+Completed prerequisite:
 
-Trigger: Pyright baseline exists for selected execution, risk and financial boundaries.
+- Pyright is installed and blocking in CI;
+- Platform execution DTOs, Runtime contracts, schema migrations, schema governance and authoritative order submission are selected;
+- Runtime models, Runtime contracts and Gateway Protocol are selected.
 
-Protected semantics: no runtime behavior or dependency injection changes solely to satisfy typing.
+Deferred because: strict whole-project typing would create noisy changes unrelated to current risk boundaries.
 
-Safe approach: strict selected modules, then expand only when each new module is clean.
+Trigger: when a module is materially modified, add it to Pyright after making its public boundary explicit.
+
+Protected semantics: no runtime behavior or dependency-injection change solely to satisfy typing.
+
+Safe approach: expand by domain boundary, never through a single repository-wide suppression baseline.
 
 ## TD-006 — Live production evidence
 
@@ -106,10 +133,39 @@ Problem: offline tests cannot prove broker-specific timing, partial-fill and rec
 
 Risk: production assumptions may differ from controlled test doubles.
 
+Completed prerequisite:
+
+- automated failure-injection matrix covers incompatible versions, result unknown, duplicate and out-of-order events;
+- controlled acceptance order and stop conditions are documented in `docs/operations/FAILURE_INJECTION_ACCEPTANCE.md`.
+
 Deferred because: real-account validation requires explicit operational approval and bounded funds exposure.
 
 Trigger: controlled host, approved account, minimum order size and observation checklist are ready.
 
 Protected semantics: Live Write remains disabled by default.
 
-Safe approach: simulation → broker demo where representative → real account with smallest size and pre-defined stop conditions.
+Safe approach: simulation → read-only live → shadow reconciliation → minimum-size real order → multiple clean EOD cycles.
+
+## TD-007 — GitHub repository-level branch protection
+
+Status: operational setting pending verification
+Owner: Repository administration
+
+Problem: repository CI and workstream rules are stored in code, but repository-level protection must also require those checks and restrict direct pushes to `main`.
+
+Risk: an administrator could bypass the intended PR path if GitHub branch protection/rulesets are not configured.
+
+Completed prerequisite:
+
+- one-Issue/one-branch/one-PR machine check;
+- PR and Issue templates;
+- all engineering branch patterns run Platform CI;
+- duplicate historical work branches were reviewed and returned to the stable baseline.
+
+Deferred because: the available repository connector does not expose branch-protection or ruleset mutation.
+
+Trigger: repository administrator opens Settings → Rules/Branches and verifies the rule against the actual required check names.
+
+Protected semantics: administrators must not routinely bypass safety gates.
+
+Safe approach: protect `main`, require Platform CI and Secret Scan, require conversation resolution and current branch state, disallow force push/deletion, and enable automatic deletion of merged head branches.
