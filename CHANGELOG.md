@@ -129,3 +129,68 @@
 - Added Environment, Windows, legacy, invalid-provider, missing-field, rotation, RBAC, idempotency, and redaction golden tests.
 - Expanded Platform CI strict gates for Provider, Rotation, Redaction, tests, and Repository Secret Scan.
 - Added `docs/planning/V6-Production-Gate-密钥托管与脱敏.md` and `docs/technical/SECRET_PROVIDER_AND_REDACTION.md`.
+- Synchronized Issue #24, PR #25, README, START-HERE, API Specification, Release Gate, overall plan, live template, and this Changelog.
+- Kept Platform and Runtime Live Write disabled; controlled-host Provider setup, real-account read-only verification, version rotation, Runtime restart, minimum-size trading, and EOD remain operational acceptance items.
+- Deferred monitoring, alerting, scheduling, backup, and restore drills to Production Gate 5D.
+
+### Production authentication and two-person live sessions — Production Gate 5A/5B
+
+- Added live-environment Bearer authentication with SHA-256 credential matching.
+- Added default-deny RBAC for viewer, researcher, trader, risk_officer, operations, and admin.
+- Bound actor/reviewer fields to authenticated Principals.
+- Added idempotent, bounded `LiveTradingSession` requests and two-person approval.
+- Rejected Applicant self-approval, including admin self-approval.
+- Blocked approval on Kill Switch, open/accepted differences, overlapping sessions, invalid limits, and EOD/scale-gate failures.
+- Required Live Commands to atomically claim one approved session before Order insertion and Runtime submission.
+- Added SQLite `BEGIN IMMEDIATE` serialization for concurrent daily-notional claims.
+- Added Repository Secret Scan and synchronized Production Gate documentation.
+- Completed Platform CI and merged through PR #23.
+
+### Live end-of-day reconciliation — Phase 4D
+
+- Added EOD Reports with Business Date, IANA Timezone, Valuation Time, Due At, SLA, owner, and immutable review.
+- Reconciled business-day orders plus unresolved historical orders.
+- Imported Position, Balance, Funding, Swap, Commission, and Fee.
+- Rebuilt Formal Position/PnL and generated point-in-time Formal NAV.
+- Blocked scale review on open/accepted differences, skipped events, missing accounts, incomplete PnL, or errors.
+- Limited approval to `approved_same_limits`; EOD never raises limits or enables Live Write.
+- Merged through PR #21.
+
+### Controlled Bybit and MT5 live adapters — Phase 4C
+
+- Implemented Bybit V5 Order, Execution, Position, Wallet, Funding, and Fee mappings.
+- Implemented MT5 Order, Deal, Position, Account, Swap, Commission, and Fee mappings.
+- Added deterministic external identities, Account Routing, Runtime Live Gate, allowlists, and notional limits.
+- Added Live Economic Event import into immutable FinancialFact.
+- Added live configuration template, read-only preflight, and small-capital acceptance handbook.
+- Merged through PR #19.
+
+### Venue query and reconciliation differences — Phase 4B
+
+- Added Runtime Query APIs for Order, Fill, Position, Balance, and cancellation.
+- Added Journal-first and Venue-second unknown-result recovery.
+- Imported external snapshots into FinancialFact.
+- Added Reconciliation Runs, immutable Differences, and explicit resolution states.
+
+### Execution risk controls — Phase 4A
+
+- Added global, strategy, and account Kill Switches.
+- Added maximum leg delay, residual-notional thresholds, and failure-action policies.
+- Added idempotent RiskActions for hold/escalate, cancel, flatten, and substitute hedge.
+
+### Immutable financial facts and formal accounting — Phase 3
+
+- Added immutable FinancialFact with dual identities, payload hashes, Catalog-derived units and multipliers, explicit FX, and quality states.
+- Added rebuildable Formal Position/PnL and one-valuation-time multi-account NAV.
+- Separated Trading, Funding, Swap, Fee, FX, and Total PnL.
+
+### Command authority and recovery — Phase 2
+
+- Unified single- and multi-leg execution through TradeCommand and ExecutionBatch.
+- Added business idempotency, payload-conflict detection, dynamic Catalog, and `result_unknown` recovery without resubmission.
+
+### Trading safety foundation — Phase 1
+
+- Added fail-closed Account/Instrument/Contract validation.
+- Added Runtime atomic command claims before Gateway side effects.
+- Added Live global switch, secret-reference-only storage, CI, and engineering documentation governance.
