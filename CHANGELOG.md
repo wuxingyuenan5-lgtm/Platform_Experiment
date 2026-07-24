@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Venue Reconciliation Difference Policy ownership — Issue #67 / PR #68
+
+- Added `platform-backend/app/venue_reconciliation_policy.py` as the pure status-mapping and Order/Position/Balance difference-draft owner.
+- Kept all SQLite reads, Runtime calls, FinancialFact imports, Difference persistence, audit and routes in the existing orchestration module.
+- Added exact Golden drafts for status/quantity, missing/mismatched positions and missing/currency/equity balance cases.
+- Added sole-owner, dependency-purity, Ownership and progressive Pyright checks.
+- Preserved every Difference key/type/value/order, SQL statement, transaction, API and both Live Write defaults.
+
 ### Venue Reconciliation public-schema ownership — Issue #65 / PR #66
 
 - Added `platform-backend/app/venue_reconciliation_schemas.py` as the sole owner of reconciliation public DTOs and status Literal types.
