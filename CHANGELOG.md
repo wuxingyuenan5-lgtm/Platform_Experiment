@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+### Lightweight task packet and Markdown link hardening — Issue #57 / PR #58
+
+- Added `Expected changed files`, `Required verification` and `Stop conditions` to the canonical task packet template.
+- Applied the lightweight controls to the Issue #57 task packet without introducing task-state automation or another metadata source.
+- Extended `scripts/check-documentation-consistency.py` to validate local file and directory targets in active Markdown.
+- Excluded external URLs, fragment-only links, placeholders, fenced examples and historical/generated directories from the local check.
+- Added direct architecture tests for valid, missing, ignored and excluded link cases.
+- Verified the existing active Markdown set passes without unrelated cleanup.
+- Retained all application and Runtime behavior, API, SQL, Schema, Seed, accounting formulas, trading controls and both Live Write defaults unchanged.
+
 ### Machine-checked architecture ownership documentation — Issue #55 / PR #56
 
 - Added `docs/architecture/OWNERSHIP.md` as the canonical major module ownership catalog.
@@ -54,7 +64,7 @@
 - Moved strategy rebuild pair orchestration, counts and audit-payload generation into the Projection Service.
 - Moved formal NAV account coverage, missing-account ordering, equity, quality and capital-base division into the Projection Service.
 - Preserved `app.financial_facts` compatibility callables while keeping catalog resolution, immutable fact recording, HTTP error mapping and API routes in the API module.
-- Kept SQL, DDL, row mapping and protected transaction units in `app.financial_fact_repository.py`.
+- Kept SQL, DDL, row mapping and protected transaction units in `app/financial_fact_repository.py`.
 - Added exact average-cost, component attribution, incomplete-quality, rebuild-audit and NAV calculation golden tests.
 - Added architecture checks preventing projection formulas or Repository orchestration from returning to the API layer and preventing FastAPI/config dependencies in the Projection Service.
 - Added the Projection Service to progressive Pyright.
