@@ -23,7 +23,7 @@ SEED_TABLES = (
     "contract_specifications",
     "instrument_mappings",
 )
-EXPECTED_SEED_SHA256 = "CAPTURE_SEED_SHA256"
+EXPECTED_SEED_SHA256 = "d42f7e4f95a6efa9044b1e91b4e603f1d87f515923a57d941ee16e75109e6183"
 
 
 def canonical_seed_snapshot(database_file: Path) -> tuple[str, dict[str, list[dict[str, object]]]]:
