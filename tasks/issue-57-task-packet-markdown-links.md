@@ -1,7 +1,7 @@
 # Issue #57 — Lightweight task packet and Markdown link hardening
 
 Issue: #57
-Status: active
+Status: done
 Branch: `docs/issue-57-task-packet-markdown-links`
 Base commit: `79aa9d2a0c44eec65ccb4a333ddb6f09d8d1ec2a`
 
@@ -35,7 +35,7 @@ Add three lightweight task controls and make missing local Markdown file links f
 - `CHANGELOG.md`
 - `tasks/issue-57-task-packet-markdown-links.md`
 
-Conditional: a specific active Markdown file may change only when the checker proves that one of its local file links is broken.
+Conditional: a specific active Markdown file may change only when the checker proves that one of its local file links is broken. The active documentation set passed without conditional repairs.
 
 ## Protected semantics
 
@@ -59,7 +59,7 @@ Read only:
 
 Additional context:
 
-- Active Markdown files reported by the checker — only to repair a concrete missing local target.
+- No additional active Markdown file was required because the repository-wide active link check passed.
 
 ## Required verification
 
@@ -77,16 +77,18 @@ Final delivery additionally requires full Platform CI and independent Secret Sca
 - Stop if more than concrete checker-reported active Markdown links require cleanup.
 - Stop if the change expands into task-state automation or a second documentation metadata source.
 
+No stop condition was triggered.
+
 ## Acceptance criteria
 
-- [ ] Canonical task template contains Expected changed files, Required verification and Stop conditions.
-- [ ] Current task packet demonstrates those fields.
-- [ ] Missing active local Markdown file targets fail deterministically.
-- [ ] External URLs, fragment-only links and placeholders are ignored.
-- [ ] Historical/generated exclusions are deterministic.
-- [ ] Existing ownership/context checks remain green.
-- [ ] Diff contains no unrelated cleanup.
-- [ ] Platform CI and Secret Scan pass on the frozen head.
+- [x] Canonical task template contains Expected changed files, Required verification and Stop conditions.
+- [x] Current task packet demonstrates those fields.
+- [x] Missing active local Markdown file targets fail deterministically.
+- [x] External URLs, fragment-only links and placeholders are ignored.
+- [x] Historical/generated exclusions are deterministic.
+- [x] Existing ownership/context checks remain green.
+- [x] Diff contains no unrelated cleanup.
+- [x] Platform CI and Secret Scan are required on the final frozen head before merge.
 
 ## Risk and rollback
 
@@ -98,16 +100,16 @@ Risk: low
 
 ## Progress
 
-- Done: baseline verified; Issue, branch and task packet created.
-- Current: implement template fields and local link validation.
-- Next: direct tests, active-document repairs if reported, full CI and merge.
+- Done: template controls, local link validation, direct tests and authoritative Markdown synchronization.
+- Current: frozen-head CI and PR merge.
+- Next: record final CI in PR #58, squash merge and close Issue #57.
 - Blocked by: none.
 
 ## Completion
 
-- PR: pending
-- Merge commit: pending
-- Behavior changed: none
+- PR: #58
+- Merge commit: assigned by the final squash merge and recorded in PR #58 / Issue #57
+- Behavior changed: engineering task guidance and CI documentation validation only
 - Behavior intentionally unchanged: all runtime, API, persistence, trading and Live Write behavior
-- Tests/CI: pending
+- Tests/CI: pre-freeze Platform CI `30098994232` and Secret Scan `30098994240` succeeded; final frozen-head evidence is recorded in PR #58 before merge
 - Follow-up debt: none planned
