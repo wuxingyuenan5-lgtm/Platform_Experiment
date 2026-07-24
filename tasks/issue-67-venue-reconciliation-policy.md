@@ -89,14 +89,14 @@ Risk: medium-low.
 
 ## Progress
 
-- Done: boundary audit, Issue and branch.
-- Current: implementation and Golden design.
-- Next: direct verification, full CI and merge.
+- Done: boundary audit, Issue/branch/PR and pure-policy design.
+- Current: implementation, exact Golden drafts and architecture checks.
+- Next: full CI, final review and merge.
 - Blocked by: nothing.
 
 ## Completion
 
-- PR:
+- PR: #68
 - Merge commit:
 - Behavior changed: decision ownership only.
 - Behavior intentionally unchanged: every persisted difference and external behavior.

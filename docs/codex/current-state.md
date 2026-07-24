@@ -72,7 +72,7 @@ Real-account acceptance remains controlled-host, small-capital and minimum-size.
 
 ## Active work
 
-No engineering code workstream is active by default after PR #66 merges.
+Issue #67 / Draft PR #68 is the only active engineering workstream: Venue Reconciliation Difference Policy extraction.
 
 Before starting another code change:
 

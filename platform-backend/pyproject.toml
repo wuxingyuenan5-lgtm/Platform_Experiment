@@ -46,6 +46,7 @@ include = [
   "app/schema_migrations.py",
   "app/schema_governance.py",
   "app/trade_command_execution.py",
+  "app/venue_reconciliation_policy.py",
   "app/venue_reconciliation_schemas.py",
 ]
 exclude = ["tests"]

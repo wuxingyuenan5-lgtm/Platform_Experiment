@@ -3,7 +3,6 @@ from __future__ import annotations
 import hashlib
 import json
 from datetime import UTC, datetime
-from decimal import Decimal
 from uuid import uuid4
 
 import httpx
@@ -19,6 +18,14 @@ from app.trading import (
     reconcile_order,
     request_from_order_row,
     synchronize_trade_command_status,
+)
+from app.venue_reconciliation_policy import (
+    DifferenceDraft,
+    balance_difference_drafts,
+    external_order_update_status,
+    order_difference_draft,
+    order_difference_drafts,
+    position_difference_drafts,
 )
 from app.venue_reconciliation_schemas import (
     DifferenceStatus,
@@ -284,13 +291,7 @@ def reconcile_order_with_venue(order_id: str) -> OrderVenueReconciliationRespons
 
 
 def update_order_from_external(row, external_order: dict[str, object]) -> None:
-    mapping = {
-        "accepted": "acknowledged",
-        "rejected": "rejected",
-        "canceled": "canceled",
-        "unknown": "result_unknown",
-    }
-    local_status = mapping.get(str(external_order["status"]))
+    local_status = external_order_update_status(external_order["status"])
     if local_status is None:
         return
     with connection() as db:
@@ -315,43 +316,19 @@ def compare_order(
     external_order: dict[str, object],
     fills: list[dict[str, object]],
 ) -> list[str]:
-    difference_ids: list[str] = []
-    expected_status = {
-        "accepted": "acknowledged",
-        "filled": "filled",
-        "rejected": "rejected",
-        "canceled": "canceled",
-        "unknown": "result_unknown",
-    }.get(str(external_order["status"]), "result_unknown")
-    if local_row["status"] != expected_status:
-        difference_ids.append(
-            standalone_order_difference(
-                order_id,
-                "status_mismatch",
-                {"status": local_row["status"]},
-                {"status": external_order["status"]},
-            )
-        )
-    external_quantity = sum(Decimal(str(fill["quantity"])) for fill in fills)
     with connection() as db:
         local_fill_rows = db.execute(
             "SELECT quantity FROM fills WHERE order_id = ?",
             (order_id,),
         ).fetchall()
-    local_quantity = sum(
-        (Decimal(row["quantity"]) for row in local_fill_rows),
-        Decimal("0"),
+    drafts = order_difference_drafts(
+        order_id=order_id,
+        local_status=local_row["status"],
+        local_fill_quantities=[row["quantity"] for row in local_fill_rows],
+        external_order=external_order,
+        fills=fills,
     )
-    if local_quantity != external_quantity:
-        difference_ids.append(
-            standalone_order_difference(
-                order_id,
-                "quantity_mismatch",
-                {"filledQuantity": format(local_quantity, "f")},
-                {"filledQuantity": format(external_quantity, "f")},
-            )
-        )
-    return difference_ids
+    return [persist_standalone_order_difference(order_id, draft) for draft in drafts]
 
 
 def standalone_order_difference(
@@ -360,6 +337,13 @@ def standalone_order_difference(
     local_value: dict[str, object],
     external_value: dict[str, object],
 ) -> str:
+    return persist_standalone_order_difference(
+        order_id,
+        order_difference_draft(order_id, difference_type, local_value, external_value),
+    )
+
+
+def persist_standalone_order_difference(order_id: str, draft: DifferenceDraft) -> str:
     ensure_schema()
     run_id = f"order-reconcile:{order_id}"
     at = now_iso()
@@ -393,16 +377,7 @@ def standalone_order_difference(
                 order_id,
             ),
         )
-    return create_difference(
-        run_id,
-        f"order:{order_id}:{difference_type}",
-        difference_type,
-        "order",
-        order_id,
-        None,
-        local_value,
-        external_value,
-    )
+    return persist_difference_draft(run_id, draft)
 
 
 def run_account_reconciliation(
@@ -566,7 +541,7 @@ def compare_position(
     fact_id: str,
 ) -> list[str]:
     with connection() as db:
-        local = db.execute(
+        local_row = db.execute(
             """
             SELECT net_quantity, average_price
             FROM formal_positions
@@ -578,8 +553,8 @@ def compare_position(
                 external["instrumentId"],
             ),
         ).fetchone()
-        if local is None:
-            local = db.execute(
+        if local_row is None:
+            local_row = db.execute(
                 """
                 SELECT net_quantity, average_price
                 FROM positions
@@ -587,33 +562,14 @@ def compare_position(
                 """,
                 (request.account_id, external["instrumentId"]),
             ).fetchone()
-    if local is None:
-        return [
-            create_difference(
-                run_id,
-                f"position:{external['instrumentId']}:missing_local",
-                "missing_local",
-                "position",
-                None,
-                str(external["externalPositionId"]),
-                {},
-                external,
-            )
-        ]
-    if Decimal(local["net_quantity"]) != Decimal(str(external["netQuantity"])):
-        return [
-            create_difference(
-                run_id,
-                f"position:{external['instrumentId']}:quantity_mismatch",
-                "quantity_mismatch",
-                "position",
-                f"{request.account_id}:{external['instrumentId']}",
-                str(external["externalPositionId"]),
-                {"netQuantity": local["net_quantity"]},
-                {"netQuantity": external["netQuantity"], "factId": fact_id},
-            )
-        ]
-    return []
+    local = dict(local_row) if local_row is not None else None
+    drafts = position_difference_drafts(
+        account_id=request.account_id,
+        local=local,
+        external=external,
+        fact_id=fact_id,
+    )
+    return [persist_difference_draft(run_id, draft) for draft in drafts]
 
 
 def compare_balance(
@@ -622,7 +578,7 @@ def compare_balance(
     external: dict[str, object],
 ) -> list[str]:
     with connection() as db:
-        local = db.execute(
+        local_row = db.execute(
             """
             SELECT equity, available_balance, currency
             FROM balance_snapshots
@@ -632,46 +588,26 @@ def compare_balance(
             """,
             (request.account_id,),
         ).fetchone()
-    if local is None:
-        return [
-            create_difference(
-                run_id,
-                f"balance:{external['currency']}:missing_local",
-                "missing_local",
-                "balance",
-                request.account_id,
-                str(external["externalBalanceId"]),
-                {},
-                external,
-            )
-        ]
-    if local["currency"] != external["currency"]:
-        return [
-            create_difference(
-                run_id,
-                f"balance:{external['currency']}:currency_mismatch",
-                "currency_mismatch",
-                "balance",
-                request.account_id,
-                str(external["externalBalanceId"]),
-                {"currency": local["currency"]},
-                {"currency": external["currency"]},
-            )
-        ]
-    if Decimal(local["equity"]) != Decimal(str(external["equity"])):
-        return [
-            create_difference(
-                run_id,
-                f"balance:{external['currency']}:quantity_mismatch",
-                "quantity_mismatch",
-                "balance",
-                request.account_id,
-                str(external["externalBalanceId"]),
-                {"equity": local["equity"]},
-                {"equity": external["equity"]},
-            )
-        ]
-    return []
+    local = dict(local_row) if local_row is not None else None
+    drafts = balance_difference_drafts(
+        account_id=request.account_id,
+        local=local,
+        external=external,
+    )
+    return [persist_difference_draft(run_id, draft) for draft in drafts]
+
+
+def persist_difference_draft(run_id: str, draft: DifferenceDraft) -> str:
+    return create_difference(
+        run_id,
+        draft.difference_key,
+        draft.difference_type,
+        draft.entity_type,
+        draft.local_reference,
+        draft.external_reference,
+        draft.local_value,
+        draft.external_value,
+    )
 
 
 def create_difference(
