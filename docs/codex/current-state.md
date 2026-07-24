@@ -2,7 +2,7 @@
 
 Last updated: 2026-07-24
 Stable branch: `main`
-Latest completed engineering scope: Issue #48 / PR #49
+Latest completed engineering scope: Issue #50 / PR #51
 
 This file is the compact cross-session handoff. It records current truth, not a PR diary. Read the actual open Issues and PRs before assuming that work is active.
 
@@ -33,9 +33,10 @@ Real-account acceptance remains controlled-host, small-capital and minimum-size.
 - FinancialFact canonicalization, FX/data-quality policy and normalized-content hashing are owned by `platform-backend/app/financial_fact_normalization.py`.
 - FinancialFact/formal-accounting SQL, row mapping and transaction units are owned by `platform-backend/app/financial_fact_repository.py`.
 - Formal Position/PnL/NAV calculations and rebuild orchestration are owned by `platform-backend/app/financial_projection_service.py`.
-- `platform-backend/app/financial_facts.py` owns catalog resolution, FinancialFact recording, HTTP error mapping and API routes without direct SQL, normalization or projection formulas.
-- Shared SQLite path and transaction-managed connections are owned by `platform-backend/app/database_connection.py`; `app/database.py` preserves the existing import surface.
-- Core Schema/compatibility DDL and fixed reference seeds remain in `app/database.py` pending separate equivalence-safe extraction.
+- `platform-backend/app/financial_facts.py` owns catalog resolution, FinancialFact recording, HTTP error mapping and API routes.
+- Shared SQLite path and transaction-managed connections are owned by `platform-backend/app/database_connection.py`.
+- Core Platform Schema and legacy compatibility DDL are owned by `platform-backend/app/database_bootstrap.py` and pinned by an exact SHA-256 snapshot.
+- `platform-backend/app/database.py` is the compatibility facade and startup orchestrator; fixed reference Seeds remain there pending the final extraction.
 - Platform–Runtime Command/Event traffic uses explicit V1.0 contracts and snapshots.
 - `positions` and `pnl_results` are operational projections.
 - `financial_facts`, `formal_positions` and `formal_pnl_results` are the formal accounting authority.
@@ -60,18 +61,19 @@ Real-account acceptance remains controlled-host, small-capital and minimum-size.
 14. FinancialFact persistence ownership extraction with transaction rollback evidence.
 15. FinancialFact normalization and immutable-content hash ownership extraction.
 16. Formal Position/PnL/NAV projection-service extraction.
-17. SQLite connection/path transaction boundary extraction with fresh/existing database snapshots.
+17. SQLite connection/path transaction boundary extraction.
+18. Core database Bootstrap/Schema ownership extraction with exact checksum and fresh/existing/repeated initialization evidence.
 
 ## Active work
 
-No engineering code workstream is active by default after PR #49 merges.
+No engineering code workstream is active by default after PR #51 merges.
 
-Before starting another code change:
+The final authorized structural code step is fixed reference Seed extraction:
 
 1. search open Issues and PRs;
 2. create one concrete Issue, task packet and Issue-numbered branch;
-3. extract core Schema/bootstrap before fixed reference seeds;
-4. require fresh-database, existing-database and repeated-initialization equivalence on every step.
+3. preserve every Seed ID/value and startup order;
+4. require exhaustive Seed snapshot plus fresh/existing/repeated initialization equivalence.
 
 Separate non-code follow-ups remain:
 
@@ -80,10 +82,10 @@ Separate non-code follow-ups remain:
 
 ## Known constraints
 
-- Existing table structures, seed identifiers, financial formulas and trading state transitions are protected semantics.
+- Existing table structures, Seed identifiers, financial formulas and trading state transitions are protected semantics.
 - Operational projections remain supported and must not become formal-accounting inputs.
 - Compatibility surfaces require usage evidence and a dedicated migration before removal.
-- `app/database.py` still combines core Schema/compatibility DDL, initializer orchestration and fixed reference seeds; connection ownership is already isolated.
+- `app/database.py` still owns initializer orchestration and fixed reference Seeds; connection and core Bootstrap ownership are isolated.
 - The FinancialFact domain is separated into API/schema, normalization, persistence and projection owners.
 - Inherited frontend lint debt remains outside untouched modules; new and changed files cannot add debt.
 - Pyright coverage is progressive rather than whole-repository strict.
