@@ -13,6 +13,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
+  "pyright>=1.1,<2.0",
   "pytest>=8.4,<9.0",
   "ruff>=0.12,<1.0",
 ]
@@ -27,6 +28,19 @@ markers = [
   "integration: API, persistence, orchestration, and component collaboration",
   "live_safety: fail-closed controls, production operations, and live-write safety",
 ]
+
+[tool.pyright]
+pythonVersion = "3.12"
+typeCheckingMode = "standard"
+include = [
+  "app/execution_schemas.py",
+  "app/runtime_contracts.py",
+  "app/schema_migrations.py",
+  "app/schema_governance.py",
+  "app/trade_command_execution.py",
+]
+exclude = ["tests"]
+reportMissingTypeStubs = false
 
 [tool.ruff]
 target-version = "py312"
