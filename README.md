@@ -1,38 +1,47 @@
-# Variable-Global 本地工作台
+# Variable-Global 交易基础设施平台
 
-这是面向内部投研、策略执行、风险控制和账务核对的交易平台工程。
-
-当前目标：建立可靠的交易基础设施，包括执行安全、风险控制、正式账务和生产门禁，再扩展策略与产品能力。
+这是面向内部投研、策略执行、风险控制和账务核对的工程。当前原则是先保证执行安全、可恢复、可审计和可持续维护，再扩展策略与产品能力。
 
 ## 快速入口
 
-| 主题 | 文档 |
+| 目的 | 文档 |
 |---|---|
-| 总体路线 | `docs/planning/V6-交易安全加固实施计划.md` |
-| 系统架构 | `docs/architecture/` |
-| Codex 工作方式 | `docs/codex/` |
-| API 规范 | `docs/technical/API_SPEC.md` |
+| 人工理解项目 | `00-人工可读目录/README.md` |
+| Agent/Codex 最小上下文 | `docs/codex/context-map.md` |
+| 当前工程状态 | `docs/codex/current-state.md` |
+| 系统结构 | `docs/architecture/SYSTEM_MAP.md` |
+| Git 与版本规则 | `docs/engineering/GIT_WORKFLOW.md` |
+| 当前技术债务 | `docs/engineering/TECHNICAL_DEBT.md` |
+| 数据库与迁移 | `docs/database/README.md` |
+| Platform–Runtime V1 契约 | `docs/contracts/runtime-v1.json` |
 | 正式账务 | `docs/technical/FINANCIAL_FACTS.md` |
-| 实盘运营 | `docs/operations/` |
+| 故障注入与实盘验收 | `docs/operations/FAILURE_INJECTION_ACCEPTANCE.md` |
 | 发布门槛 | `admin-risk/docs/quality/release-gate.md` |
 | 前端入口 | `admin-risk/docs/START-HERE.md` |
 
-## 当前工程状态
+## 当前工程原则
 
-- Phase 1–4D：已完成。
-- Production Gate 持续建设中。
-- 实盘方向优先采用真实账户、小资金、最小仓位验收。
-- Platform 与 Runtime Live Write 默认关闭。
+- `main` 是唯一正式代码基线。
+- 非简单工作采用“一个 Issue、一个任务包、一个分支、一个 PR”。
+- 新任务只加载目标模块上下文，不默认扫描整个仓库。
+- Platform Backend 不直接导入交易场所 SDK；外部副作用属于 Execution Runtime。
+- Platform 与 Runtime 通信使用显式版本契约。
+- `positions`、`pnl_results` 是运营投影，不是正式账务权威。
+- 正式账务由不可变 `financial_facts` 重建。
+- 数据库变化必须进入有版本和校验和的迁移账本。
+- Live Write 默认关闭，工程合并不能自行开启实盘。
+
+精确基线、活动 Issue 和受保护语义见 `docs/codex/current-state.md`。
 
 ## 服务入口
 
-| 服务 | 地址 | 职责 |
+| 服务 | 默认地址 | 职责 |
 |---|---|---|
-| Frontend | `http://127.0.0.1:5173` | 产品交互 |
-| Platform Backend | `http://127.0.0.1:8000` | 业务、权限、账务、风险 |
-| Execution Runtime | `http://127.0.0.1:8100` | 执行、Gateway、外部副作用 |
+| Frontend | `http://127.0.0.1:5173` | 产品交互和状态展示 |
+| Platform Backend | `http://127.0.0.1:8000` | 业务、权限、风险、编排、账务和运营 API |
+| Execution Runtime | `http://127.0.0.1:8100` | 命令 Journal、Gateway、外部查询和副作用 |
 
-## 默认模式
+## 默认安全状态
 
 ```text
 TradingMode=simulation
@@ -41,55 +50,87 @@ Platform Live Write=false
 Runtime Live Write=false
 ```
 
+实盘验收必须使用受控主机、小资金、最小允许仓位和明确停止条件。
+
 ## 目录结构
 
 ```text
-admin-risk/          前端应用
-platform-backend/    平台后端
-execution-runtime/   执行网关
-docs/                架构、设计、运营和计划文档
-tests/               测试
-tasks/               工作任务
-outputs/             临时产物
+00-人工可读目录/  给人看的总入口
+admin-risk/       Vue 前端产品
+platform-backend/ Platform 业务、风险与账务后端
+execution-runtime/独立执行 Runtime 与外部适配
+docs/             当前状态、架构、合同、数据库、运维和工程规则
+tasks/            一个 Issue 对应一个跨会话任务包
+outputs/          可丢弃产物，不是事实来源
+scripts/          仓库和质量门禁脚本
 ```
 
-## 开发规则
+## Git 工作流
 
-- 永久规则见 `AGENTS.md`。
-- 架构决策见 `docs/architecture/` 和 `docs/decisions/`。
-- 具体模块修改只加载对应模块文档，不默认扫描整个仓库。
-- 不提交密钥、Token 或 `.env`。
-- 未通过测试和 CI 的改动不得进入正式分支。
-- Backend 与 Runtime 的 Ruff、依赖完整性和测试按完整维护目录执行，不以文件白名单豁免新增代码。
-- `platform-backend/app/main.py` 仅负责 Router 与 Middleware 装配，不得通过运行时赋值修改领域模块。
-- 执行域 API DTO 由 `platform-backend/app/execution_schemas.py` 统一维护，`app/schemas.py` 仅保留兼容导出。
-- `positions`、`pnl_results` 是成交链路的运营投影；正式账务只由 `financial_facts`、`formal_positions`、`formal_pnl_results` 提供，禁止跨边界混写或将运营投影作为正式账务依据。
+```text
+Issue
+→ tasks/issue-<number>-<slug>.md
+→ <type>/issue-<number>-<slug>
+→ 一个开放 PR
+→ CI/审查通过
+→ squash merge main
+```
 
-## 常用命令
+PR 第一行必须声明 `Issue: #<number>`。详细规则见 `docs/engineering/GIT_WORKFLOW.md`。
 
-前端：
+## 常用验证命令
+
+仓库治理：
+
+```powershell
+python scripts/check-workstream.py
+python scripts/scan-secrets.py
+python scripts/check-repository-structure.py
+```
+
+Platform Backend：
+
+```powershell
+cd platform-backend
+python -m pip install -e ".[dev]"
+python -m pip check
+python -m ruff check app tests
+python -m pyright
+python -m pytest
+```
+
+Execution Runtime：
+
+```powershell
+cd execution-runtime
+python -m pip install -e ".[dev]"
+python -m pip check
+python -m ruff check app tests
+python -m pyright
+python -m pytest
+```
+
+Frontend：
 
 ```powershell
 cd admin-risk
+pnpm install --frozen-lockfile
 pnpm exec eslint --max-warnings 0 "src/api/platform/**/*.{ts,tsx}" "src/hooks/trading/**/*.{ts,tsx}" "src/views/strategy/funding-carry/**/*.{vue,ts,tsx}"
 pnpm type:check
 pnpm build
 ```
 
-后端：
+CI 还会对本次新增或修改的所有 `admin-risk/src`、`admin-risk/mock` 源文件执行零警告 ESLint，防止新增历史债务。
 
-```powershell
-cd platform-backend
-python -m ruff check app tests
-python -m pip check
-python -m pytest
-```
+## 文档维护规则
 
-Runtime：
+- 永久硬规则：`AGENTS.md`。
+- 当前事实：`docs/codex/current-state.md`。
+- 单次任务进度：`tasks/issue-*.md`。
+- 稳定边界：`docs/architecture/`。
+- 关键决策：`docs/decisions/`。
+- 领域合同：`docs/technical/` 与 `docs/contracts/`。
+- 生产流程：`docs/operations/`。
+- 暂缓债务：`docs/engineering/TECHNICAL_DEBT.md`。
 
-```powershell
-cd execution-runtime
-python -m ruff check app tests
-python -m pip check
-python -m pytest
-```
+不要把聊天记录、PR 日志和临时调试过程复制进架构文档。
