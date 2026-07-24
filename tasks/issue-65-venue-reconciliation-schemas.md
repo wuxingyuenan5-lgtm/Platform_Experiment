@@ -89,8 +89,8 @@ Risk: low-medium.
 
 ## Progress
 
-- Done: dedicated schema owner, compatibility exports, pre-extraction contract hashes, architecture checks, Ownership and Pyright registration.
-- Current: standard full CI and final Diff review.
+- Done: dedicated schema owner, compatibility exports, pre-extraction contract hashes, architecture checks, Ownership/Pyright and Ruff formatting fixes.
+- Current: rerun standard full CI on the repaired branch head.
 - Next: freeze evidence, mark ready, squash merge and close Issue.
 - Blocked by: nothing.
 
@@ -100,5 +100,5 @@ Risk: low-medium.
 - Merge commit:
 - Behavior changed: schema ownership only.
 - Behavior intentionally unchanged: every public contract and all reconciliation behavior.
-- Tests/CI: pending standard final-head runs.
+- Tests/CI: first standard run found only import grouping and generated-constant line-length diagnostics; repaired-head run pending.
 - Follow-up debt: Difference Policy extraction is the next independent Venue Reconciliation stage.
