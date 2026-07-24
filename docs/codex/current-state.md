@@ -66,7 +66,7 @@ Real-account acceptance remains controlled-host, small-capital and minimum-size.
 
 ## Active work
 
-No engineering code workstream is active by default after PR #60 merges.
+Issue #61 / Draft PR #62 is the only active engineering workstream: shared Position Math ownership extraction.
 
 Before starting another code change:
 

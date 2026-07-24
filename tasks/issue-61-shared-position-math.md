@@ -31,12 +31,13 @@ Make one pure function the authoritative per-fill position quantity, average pri
 - `platform-backend/app/position_math.py`
 - `platform-backend/app/trading.py`
 - `platform-backend/app/financial_projection_service.py`
-- `platform-backend/tests/test_position_math.py`
+- `platform-backend/tests/test_position_calculation.py`
 - `platform-backend/tests/test_architecture_position_math.py`
+- `platform-backend/tests/test_architecture_financial_projection_service.py`
 - `platform-backend/pyproject.toml`
 - `docs/architecture/OWNERSHIP.md`
+- `docs/architecture/README.md`
 - `scripts/check-documentation-consistency.py`
-- `platform-backend/tests/test_architecture_documentation_consistency.py`
 - `docs/engineering/TECHNICAL_DEBT.md`
 - `docs/codex/current-state.md`
 - `CHANGELOG.md`
@@ -87,14 +88,14 @@ Risk: medium-low.
 
 ## Progress
 
-- Done: Issue and branch created.
-- Current: implementation design and source/test inspection.
-- Next: code extraction and direct verification.
+- Done: Issue/branch/PR and implementation design.
+- Current: code extraction, golden tests and architecture checks.
+- Next: full CI, Diff review and merge.
 - Blocked by: nothing.
 
 ## Completion
 
-- PR:
+- PR: #62
 - Merge commit:
 - Behavior changed: ownership only; two copies become one pure implementation.
 - Behavior intentionally unchanged: every calculation result and all external/persistence behavior.

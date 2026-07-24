@@ -2,7 +2,7 @@ from decimal import Decimal
 
 import pytest
 
-from app.trading import calculate_position_update
+from app.position_math import calculate_position_update
 
 
 @pytest.mark.parametrize(
@@ -32,9 +32,30 @@ from app.trading import calculate_position_update
         (
             Decimal("2"),
             Decimal("100"),
+            Decimal("-2"),
+            Decimal("110"),
+            (Decimal("0"), None, Decimal("20")),
+        ),
+        (
+            Decimal("2"),
+            Decimal("100"),
             Decimal("-3"),
             Decimal("90"),
             (Decimal("-1"), Decimal("90"), Decimal("-20")),
+        ),
+        (
+            Decimal("0"),
+            None,
+            Decimal("-2"),
+            Decimal("100"),
+            (Decimal("-2"), Decimal("100"), Decimal("0")),
+        ),
+        (
+            Decimal("-2"),
+            Decimal("100"),
+            Decimal("-1"),
+            Decimal("70"),
+            (Decimal("-3"), Decimal("90"), Decimal("0")),
         ),
         (
             Decimal("-2"),
@@ -49,6 +70,13 @@ from app.trading import calculate_position_update
             Decimal("2"),
             Decimal("110"),
             (Decimal("0"), None, Decimal("-20")),
+        ),
+        (
+            Decimal("-2"),
+            Decimal("100"),
+            Decimal("3"),
+            Decimal("90"),
+            (Decimal("1"), Decimal("90"), Decimal("20")),
         ),
     ],
 )
