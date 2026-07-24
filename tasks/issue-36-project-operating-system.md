@@ -1,7 +1,7 @@
 # Task: Project operating system and engineering hardening
 
 Issue: #36
-Status: active
+Status: done
 Branch: `hardening/issue-36-project-operating-system`
 Base commit: `e826c9e4808a0b76c3265bfd5da5b8e65c133b77`
 
@@ -22,7 +22,7 @@ Complete the agreed safe-scope engineering hardening while establishing a low-to
 - `AGENTS.md`, `README.md`, `00-人工可读目录/README.md`.
 - `docs/codex/`, `docs/architecture/`, `docs/database/`, `docs/contracts/`, `docs/engineering/`.
 - `.github/`, `scripts/`, `tasks/`, `outputs/README.md`.
-- Selected Platform, Runtime and frontend configuration/test files required for the six hardening items.
+- Selected Platform, Runtime and frontend configuration/test files required for the hardening items.
 
 ## Protected semantics
 
@@ -47,29 +47,31 @@ Primary:
 
 Additional context:
 
-- PR #28 — verify and extend the already-merged Codex context optimization rather than duplicating it.
-- Closed unmerged PRs #8, #13 and #30 — confirm they were superseded before reusing any work.
+- PR #28 — verified as already merged and extended instead of duplicated.
+- Closed unmerged PRs #8, #13 and #30 — verified as superseded.
+- Duplicate/superseded branch refs — compared against `main` before returning them to the stable baseline.
 
 ## Acceptance criteria
 
-- [ ] One Issue, one active branch and one PR for this workstream.
-- [ ] Context documentation has one canonical map and one task template.
-- [ ] Duplicate-Issue PRs and invalid branch/task linkage fail CI.
-- [ ] Database schema inventory and additive migration ledger exist without changing business tables.
-- [ ] Platform–Runtime contracts are versioned and compatibility-tested.
-- [ ] Progressive Python type checks run for critical boundary modules.
-- [ ] Frontend changed-file/no-new-debt lint gate is executable.
-- [ ] Failure-injection and production-acceptance tests cover critical uncertain-result and recovery scenarios.
-- [ ] All existing CI suites and Secret Scan pass.
-- [ ] No unrelated production behavior changes.
+- [x] One Issue, one active branch and one PR for this workstream.
+- [x] Context documentation has one canonical map and one task template.
+- [x] Duplicate-Issue PRs and invalid branch/task linkage fail CI.
+- [x] Database schema inventory and additive migration ledger exist without changing business tables.
+- [x] Platform–Runtime contracts are versioned and compatibility-tested.
+- [x] Progressive Python type checks run for critical boundary modules.
+- [x] Frontend changed-file/no-new-debt lint gate is executable.
+- [x] Failure-injection and production-acceptance tests cover critical uncertain-result and recovery scenarios.
+- [x] All existing CI suites and Secret Scan pass.
+- [x] No unrelated production behavior changes.
 
 ## Verification commands
 
 ```text
-python scripts/check-repository-structure.py
 python scripts/check-workstream.py
-cd platform-backend && python -m ruff check app tests && python -m pip check && python -m pytest
-cd execution-runtime && python -m ruff check app tests && python -m pip check && python -m pytest
+python scripts/scan-secrets.py
+python scripts/check-repository-structure.py
+cd platform-backend && python -m pip check && python -m ruff check app tests && python -m pyright && python -m pytest
+cd execution-runtime && python -m pip check && python -m ruff check app tests && python -m pyright && python -m pytest
 cd admin-risk && pnpm exec eslint --max-warnings 0 <maintained paths> && pnpm type:check && pnpm build
 ```
 
@@ -77,22 +79,22 @@ cd admin-risk && pnpm exec eslint --max-warnings 0 <maintained paths> && pnpm ty
 
 Risk: medium
 
-- Failure modes: false-positive governance gate, contract snapshot drift, migration ledger startup regression, type-check noise.
+- Failure modes: false-positive governance gate, contract snapshot drift, migration-ledger startup regression, type-check noise.
 - Detection: focused tests followed by full Platform CI and Secret Scan.
-- Rollback: squash-revert the PR; all schema work is additive and Live Write remains disabled.
+- Rollback: squash-revert PR #37; all schema work is additive and Live Write remains disabled.
 
 ## Progress
 
-- Done: verified PR #28 was already merged; created Issue #36; moved active changes to one Issue-numbered branch; reset the pre-policy duplicate branch to `main`; started canonical documentation consolidation.
-- Current: Git/workstream governance and context operating system.
-- Next: database inventory/migration ledger, contracts, typing, frontend debt gate and failure injection.
-- Blocked by: none.
+- Done: all planned safe-scope implementation, tests, documentation, branch review and CI verification.
+- Current: PR #37 final merge.
+- Next: no default engineering workstream; future work begins from an Issue and bounded task packet.
+- Blocked by: repository-level branch protection/ruleset must be verified manually because the available connector cannot mutate it.
 
 ## Completion
 
-- PR: pending.
-- Merge commit: pending.
-- Behavior changed: engineering workflow and non-destructive hardening only.
-- Behavior intentionally unchanged: trading, funds safety, API semantics, existing business schema and Live Write defaults.
-- Tests/CI: pending.
-- Follow-up debt: real-account operational acceptance remains manual and bounded.
+- PR: #37.
+- Merge commit: recorded by GitHub on PR #37 after squash merge; do not hardcode it as a perpetually current `main` tip.
+- Behavior changed: engineering workflow, schema governance, contract validation, type/lint gates and failure-injection evidence.
+- Behavior intentionally unchanged: trading, funds safety, API field meaning, existing business schema, credentials and Live Write defaults.
+- Tests/CI: Platform CI run `30072939611` passed all four jobs; Secret Scan run `30072939641` passed.
+- Follow-up debt: real-account operational acceptance remains manual and bounded; branch protection/ruleset verification remains an administrator setting.
