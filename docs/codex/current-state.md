@@ -2,7 +2,7 @@
 
 Last updated: 2026-07-24
 Stable branch: `main`
-Latest completed engineering scope: Issue #65 / PR #66
+Latest completed engineering scope: Issue #67 / PR #68
 
 This file is the compact cross-session handoff. It records current truth, not a PR diary. Read the actual open Issues and PRs before assuming that work is active.
 
@@ -31,6 +31,7 @@ Real-account acceptance remains controlled-host, small-capital and minimum-size.
 - `platform-backend/app/main.py` is a composition root only.
 - `platform-backend/app/trade_command_execution.py` is the single local Order creation, Safety and Runtime submission owner; `trading.submit_order` remains a deprecated legacy compatibility delegate.
 - Venue Reconciliation public DTOs and difference status types are owned only by `venue_reconciliation_schemas.py`; the legacy module re-exports identical objects.
+- Venue Reconciliation external-status mapping and Order/Position/Balance difference decisions are owned only by the pure `venue_reconciliation_policy.py` module.
 - Operational `positions` and `pnl_results` remain separate from FinancialFact-based formal accounting.
 - Formal accounting is reconstructed from immutable facts and does not read operational projections as inputs.
 - Operational and formal projections share the exact `position_math.calculate_position_update` callable for per-fill quantity, average price and realized PnL.
@@ -69,10 +70,11 @@ Real-account acceptance remains controlled-host, small-capital and minimum-size.
 23. Shared Position Math ownership with ten long/short golden cases and compatibility-identity evidence.
 24. Unified Platform order submission with exact legacy/V1 payload, Safety and unknown-result regression evidence.
 25. Venue Reconciliation public-schema ownership with exact pre-extraction JSON Schema/OpenAPI and compatibility-identity evidence.
+26. Venue Reconciliation Difference Policy ownership with exact status, key, value and precedence Goldens.
 
 ## Active work
 
-Issue #67 / Draft PR #68 is the only active engineering workstream: Venue Reconciliation Difference Policy extraction.
+No engineering code workstream is active by default after PR #68 merges.
 
 Before starting another code change:
 
