@@ -122,13 +122,26 @@ jobs:
             exit 1
           fi
       - name: Runtime progressive type gate
-        run: python -m pyright
+        shell: bash
+        run: |
+          if ! python -m pyright > /tmp/runtime-pyright.log 2>&1; then
+            cat /tmp/runtime-pyright.log
+            exit 1
+          fi
       - name: Upload runtime lint diagnostics
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: runtime-ruff-log
           path: /tmp/runtime-ruff.log
+          if-no-files-found: ignore
+          retention-days: 3
+      - name: Upload runtime type diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: runtime-pyright-log
+          path: /tmp/runtime-pyright.log
           if-no-files-found: ignore
           retention-days: 3
       - name: Test classified runtime suites
@@ -175,13 +188,26 @@ jobs:
             exit 1
           fi
       - name: Backend progressive type gate
-        run: python -m pyright
+        shell: bash
+        run: |
+          if ! python -m pyright > /tmp/backend-pyright.log 2>&1; then
+            cat /tmp/backend-pyright.log
+            exit 1
+          fi
       - name: Upload backend lint diagnostics
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: backend-ruff-log
           path: /tmp/backend-ruff.log
+          if-no-files-found: ignore
+          retention-days: 3
+      - name: Upload backend type diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-pyright-log
+          path: /tmp/backend-pyright.log
           if-no-files-found: ignore
           retention-days: 3
       - name: Test classified backend suites
