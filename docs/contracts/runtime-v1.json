@@ -1,0 +1,43 @@
+{
+  "command": {
+    "contractName": "runtime-command",
+    "contractVersion": "1.0",
+    "payloadVersion": "1.0",
+    "fields": [
+      "contract_name",
+      "contract_version",
+      "payload_version",
+      "command_id",
+      "platform_order_id",
+      "strategy_instance_id",
+      "account_id",
+      "instrument_id",
+      "symbol",
+      "side",
+      "order_type",
+      "quantity",
+      "price",
+      "reduce_only",
+      "received_at"
+    ]
+  },
+  "event": {
+    "contractName": "runtime-event",
+    "contractVersion": "1.0",
+    "payloadVersion": "1.0",
+    "fields": [
+      "contract_name",
+      "contract_version",
+      "payload_version",
+      "event_id",
+      "command_id",
+      "platform_order_id",
+      "event_type",
+      "external_order_id",
+      "fill_price",
+      "fill_quantity",
+      "occurred_at",
+      "reason"
+    ]
+  }
+}
