@@ -2,8 +2,7 @@
 
 Last updated: 2026-07-24
 Stable branch: `main`
-Latest completed engineering scope: Issue #53 / PR #54
-Active engineering scope: Issue #55 / PR #56
+Latest completed engineering scope: Issue #55 / PR #56
 
 This file is the compact cross-session handoff. It records current truth, not a PR diary. Read the actual open Issues and PRs before assuming that work is active.
 
@@ -36,6 +35,7 @@ Real-account acceptance remains controlled-host, small-capital and minimum-size.
 - Database changes use an ordered migration ledger with immutable checksums.
 - Backend and Runtime tests have exactly one primary taxonomy marker.
 - Ownership or compatibility-boundary changes must update `docs/architecture/OWNERSHIP.md` in the same PR.
+- Repository Safety validates canonical documentation entrypoints, protected Owner mappings and referenced Owner paths.
 
 ## Completed engineering baseline
 
@@ -58,10 +58,11 @@ Real-account acceptance remains controlled-host, small-capital and minimum-size.
 17. SQLite connection/path transaction boundary extraction.
 18. Core database Bootstrap/Schema ownership extraction with exact checksum.
 19. Fixed database Seed ownership extraction with exhaustive all-value snapshot and repeated-startup equivalence.
+20. Canonical architecture ownership catalog with blocking documentation-consistency checks.
 
 ## Active work
 
-Issue #55 / PR #56 establishes one canonical architecture ownership catalog and a blocking documentation-consistency check. It corrects stale Agent context without changing runtime behavior, SQL, formulas, trading or Live Write.
+No engineering code workstream is active by default after PR #56 merges.
 
 Before starting another code change:
 
