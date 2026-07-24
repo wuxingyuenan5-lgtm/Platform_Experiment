@@ -34,6 +34,7 @@ pythonVersion = "3.12"
 typeCheckingMode = "standard"
 include = [
   "app/execution_schemas.py",
+  "app/financial_fact_normalization.py",
   "app/financial_fact_repository.py",
   "app/financial_fact_schemas.py",
   "app/runtime_contracts.py",
