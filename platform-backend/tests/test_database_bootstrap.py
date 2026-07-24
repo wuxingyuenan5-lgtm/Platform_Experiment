@@ -5,7 +5,7 @@ from pathlib import Path
 from app import database, database_bootstrap
 from app.config import get_settings
 
-EXPECTED_SCHEMA_SHA256 = "CAPTURE_BASELINE_SHA256"
+EXPECTED_SCHEMA_SHA256 = "421f0625ffe3a8a26ca48bc827e64bd6aa6b2e49d95faef0b17313e808375801"
 
 
 def test_schema_sql_checksum_and_compatibility_identity() -> None:
