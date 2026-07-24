@@ -11,7 +11,7 @@ Move Venue Reconciliation public request/response DTOs and status Literal types 
 
 ## Background
 
-`app.venue_reconciliation` currently owns public Pydantic models together with DDL, SQL, Runtime queries, FinancialFact import, comparison policy, audit, persistence and routes. Schema ownership is the safest first decomposition stage.
+`app.venue_reconciliation` previously owned public Pydantic models together with DDL, SQL, Runtime queries, FinancialFact import, comparison policy, audit, persistence and routes. Schema ownership is the safest first decomposition stage.
 
 ## Non-goals
 
@@ -89,9 +89,9 @@ Risk: low-medium.
 
 ## Progress
 
-- Done: Issue/branch/PR, model inventory and pre-extraction contract snapshots.
-- Current: schema extraction, compatibility and architecture tests.
-- Next: full CI, final review and merge.
+- Done: dedicated schema owner, compatibility exports, pre-extraction contract hashes, architecture checks, Ownership and Pyright registration.
+- Current: standard full CI and final Diff review.
+- Next: freeze evidence, mark ready, squash merge and close Issue.
 - Blocked by: nothing.
 
 ## Completion
@@ -100,5 +100,5 @@ Risk: low-medium.
 - Merge commit:
 - Behavior changed: schema ownership only.
 - Behavior intentionally unchanged: every public contract and all reconciliation behavior.
-- Tests/CI:
+- Tests/CI: pending standard final-head runs.
 - Follow-up debt: Difference Policy extraction is the next independent Venue Reconciliation stage.
