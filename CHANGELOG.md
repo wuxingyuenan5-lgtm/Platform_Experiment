@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+### SQLite connection ownership — Issue #48 / PR #49
+
+- Extracted configured database path resolution and transaction-managed SQLite connections into `platform-backend/app/database_connection.py`.
+- Preserved `app.database.connection` and `app.database.database_path` as identical compatibility exports for all existing callers.
+- Preserved dynamic settings lookup, parent-directory creation, `sqlite3.Row`, Foreign Keys, successful Commit, exceptional Rollback/re-raise and unconditional Close behavior.
+- Removed `sqlite3.connect` and Context Manager implementation from `app/database.py` while leaving core Schema SQL, compatibility DDL and fixed Seeds in place.
+- Added direct connection/path/commit/rollback/foreign-key tests and architecture ownership checks.
+- Added fresh-database table/index/Seed snapshots, repeated-initialization idempotency and existing legacy database compatibility-column/index coverage.
+- Added the connection boundary to progressive Pyright.
+- Retained every table, index, compatibility column, Seed identifier, API/trading/accounting behavior and both Live Write defaults unchanged.
+
 ### Formal projection service ownership — Issue #46 / PR #47
 
 - Extracted average-cost and realized-PnL position updates into `platform-backend/app/financial_projection_service.py`.

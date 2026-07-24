@@ -14,29 +14,32 @@ This file records intentionally deferred engineering work. It is not a backlog o
 
 ## TD-001 — Database module decomposition
 
-Status: active; inventory and migration-ledger prerequisites completed
+Status: active; connection extraction completed in Issue #48
 Owner: Platform Backend / persistence
 
-Problem: `app/database.py` still combines connection handling, core DDL, incremental compatibility changes and reference-data seeding. Additional DDL remains owned by domain modules.
+Problem: `app/database.py` still combines core Schema/compatibility DDL, initializer orchestration and reference-data seeding. Shared path and transaction-managed connection handling are isolated in `app/database_connection.py`.
 
-Risk: large review surface and implicit startup ordering if future schema changes bypass the migration ledger.
+Risk: the remaining large module has a broad review surface, and careless movement could change fresh/existing database or fixed Seed behavior.
 
-Completed prerequisite:
+Completed prerequisite and evidence:
 
-- DDL Owner inventory in `docs/database/README.md`;
-- additive `schema_migrations` ledger;
-- ordered version and checksum validation;
+- DDL Owner inventory and additive migration ledger;
+- ordered versions and immutable checksums;
 - existing-schema V1 baseline;
-- repeated-startup and mutation-detection tests;
-- FinancialFact schemas, normalization, persistence and projection services are separated from the core database module.
+- FinancialFact domain separated from the core database module;
+- dynamic path, parent creation, Row Factory, Foreign Key, Commit/Rollback/Close connection tests;
+- exact compatibility identity for existing `app.database` imports;
+- fresh Schema/table/index and Seed count snapshot;
+- repeated-initialization idempotency;
+- existing legacy database compatibility-column/index test.
 
-Deferred because: physically moving connection, DDL or seed logic can affect fresh and existing databases even when SQL text looks unchanged.
+Deferred because: core DDL/bootstrap and fixed Seeds must be reviewed separately; combining both would obscure whether a regression came from Schema or Seed movement.
 
-Trigger: dedicated Issues prove fresh-database and existing-database behavior before and after each extraction.
+Trigger: complete dedicated Bootstrap/Schema extraction, then dedicated Seed extraction.
 
-Protected semantics: existing tables, indexes, seed identifiers, live defaults and financial/trading behavior.
+Protected semantics: existing tables, indexes, compatibility columns, seed identifiers, live defaults and financial/trading behavior.
 
-Safe approach: extract connection → bootstrap → seeds in small PRs; keep the migration ledger authoritative and do not combine a structural extraction with a business schema change.
+Safe approach: connection completed → bootstrap/schema → seeds. Preserve `app.database` compatibility aliases, require fresh/existing/repeated-initialization equivalence and never mix structural movement with business Schema or Seed changes.
 
 ## TD-002 — Financial facts module concentration
 
@@ -47,25 +50,17 @@ Original problem: `app/financial_facts.py` combined public DTOs, normalization/c
 
 Resolved ownership:
 
-- `app/financial_fact_schemas.py`: public FinancialFact/formal-accounting DTOs;
-- `app/financial_fact_normalization.py`: canonicalization, FX/data-quality policy and normalized-content hash;
-- `app/financial_fact_repository.py`: SQL, DDL, row mapping and protected transaction units;
-- `app/financial_projection_service.py`: average cost, realized and component PnL, formal projection rebuild and NAV calculation;
-- `app/financial_facts.py`: catalog/context resolution, immutable fact recording, validation/HTTP mapping, compatibility wrappers and API routes.
+- `app/financial_fact_schemas.py`: public DTOs;
+- `app/financial_fact_normalization.py`: canonicalization and immutable-content hash;
+- `app/financial_fact_repository.py`: SQL, DDL, row mapping and protected transactions;
+- `app/financial_projection_service.py`: formal Position/PnL/NAV calculations and rebuild;
+- `app/financial_facts.py`: context resolution, recording, HTTP mapping and API.
 
-Evidence:
+Evidence includes public schema snapshots, exact hash goldens, API equivalence, forced rollback tests, formula/orchestration goldens, architecture checks and progressive Pyright.
 
-- public schema identity and JSON Schema snapshots;
-- exact normalized-dictionary and SHA-256 golden vectors;
-- API status and persisted-value equivalence;
-- fact+audit, Position+PnL, rebuild-clear and NAV+audit forced-rollback tests;
-- average-cost, component attribution, incomplete quality, rebuild audit and NAV calculation goldens;
-- architecture ownership checks and progressive Pyright coverage;
-- unchanged end-to-end accounting, normalization and repository transaction suites.
+Protected semantics: fact identity, normalized content, FX, multiplier, average cost, component PnL, rebuild/NAV results and transaction atomicity.
 
-Protected semantics: fact identity, normalized content hashing, currency conversion, contract multiplier, position average cost, component PnL, rebuild results, NAV results and transaction atomicity.
-
-Future rule: changes must stay within the established owner and require explicit compatibility evidence when immutable fact identity or accounting formulas change. Do not recombine these modules for convenience.
+Future rule: changes stay within the established owner and require explicit compatibility evidence when immutable identity or accounting formulas change.
 
 ## TD-003 — Operational projection retirement criteria
 
@@ -76,13 +71,13 @@ Problem: operational `positions` and `pnl_results` coexist with formal accountin
 
 Risk: consumers may accidentally treat low-latency operational values as auditable truth.
 
-Deferred because: the operational views remain useful for immediate monitoring.
+Deferred because: operational views remain useful for immediate monitoring.
 
 Trigger: every consumer is classified and a replacement latency/SLA is proven.
 
 Protected semantics: formal accounting never reads operational projections as inputs.
 
-Safe approach: usage telemetry and consumer inventory before any deprecation.
+Safe approach: usage telemetry and consumer inventory before deprecation.
 
 ## TD-004 — Frontend inherited lint debt
 
@@ -96,12 +91,12 @@ Risk: legacy warnings still exist in untouched modules.
 Completed prerequisite:
 
 - active trading paths remain fully linted with zero warnings;
-- every added or modified `admin-risk/src` and `admin-risk/mock` source file is checked with zero warnings;
+- every added or modified source file is checked with zero warnings;
 - no mass formatting was introduced.
 
 Deferred because: a one-shot cleanup would create an unreviewable change.
 
-Trigger: clean one product module when that module receives real work; expand the maintained full-directory set after it is clean.
+Trigger: clean one product module when that module receives real work.
 
 Protected semantics: no mass formatting and no product behavior change.
 
@@ -109,7 +104,7 @@ Safe approach: module-by-module cleanup until full `src/` can replace the change
 
 ## TD-005 — Progressive Python typing
 
-Status: active; critical execution, FinancialFact and persistence boundaries selected
+Status: active; critical execution, FinancialFact and SQLite connection boundaries selected
 Owner: Platform Backend and Execution Runtime
 
 Problem: much of the legacy code remains outside static type checking.
@@ -119,16 +114,16 @@ Risk: untyped database rows, arbitrary payloads and large orchestration modules 
 Completed prerequisite:
 
 - Pyright is installed and blocking in CI;
-- Platform execution DTOs, FinancialFact DTOs/Normalization/Repository/Projection Service, Runtime contracts, schema migrations, schema governance and authoritative order submission are selected;
-- Runtime models, Runtime contracts and Gateway Protocol are selected.
+- Platform execution DTOs, FinancialFact DTOs/Normalization/Repository/Projection Service, SQLite Connection, Runtime contracts, schema migrations, schema governance and authoritative order submission are selected;
+- Runtime models, contracts and Gateway Protocol are selected.
 
 Deferred because: strict whole-project typing would create noisy changes unrelated to current risk boundaries.
 
-Trigger: when a module is materially modified, add it to Pyright after making its public boundary explicit.
+Trigger: when a module is materially modified, add it after making its public boundary explicit.
 
 Protected semantics: no runtime behavior or dependency-injection change solely to satisfy typing.
 
-Safe approach: expand by domain boundary, never through a single repository-wide suppression baseline.
+Safe approach: expand by domain boundary, never through a repository-wide suppression baseline.
 
 ## TD-006 — Live production evidence
 
@@ -141,8 +136,8 @@ Risk: production assumptions may differ from controlled test doubles.
 
 Completed prerequisite:
 
-- automated failure-injection matrix covers incompatible versions, result unknown, duplicate and out-of-order events;
-- controlled acceptance order and stop conditions are documented in `docs/operations/FAILURE_INJECTION_ACCEPTANCE.md`;
+- automated failure-injection matrix;
+- controlled acceptance order and stop conditions;
 - Issue #39 separates operational evidence from engineering refactors.
 
 Deferred because: real-account validation requires explicit operational approval and bounded funds exposure.
@@ -166,14 +161,13 @@ Completed prerequisite:
 
 - one-Issue/one-branch/one-PR machine check;
 - PR and Issue templates;
-- all engineering branch patterns run Platform CI;
-- duplicate historical work branches were reviewed and returned to the stable baseline;
-- Issue #38 records the exact settings and evidence required from an administrator.
+- all engineering branches run Platform CI;
+- Issue #38 records required settings and evidence.
 
-Deferred because: the available repository connector does not expose branch-protection or ruleset mutation.
+Deferred because: the available connector does not expose branch-protection or ruleset mutation.
 
-Trigger: repository administrator opens Settings → Rules/Branches and verifies the rule against the actual required check names.
+Trigger: repository administrator verifies the rule in GitHub Settings.
 
 Protected semantics: administrators must not routinely bypass safety gates.
 
-Safe approach: protect `main`, require Platform CI and Secret Scan, require conversation resolution and current branch state, disallow force push/deletion, prefer squash-only delivery, and enable automatic deletion of merged head branches.
+Safe approach: protect `main`, require Platform CI and Secret Scan, current branch state and conversation resolution, disallow force push/deletion, prefer squash-only delivery, and auto-delete merged branches.
