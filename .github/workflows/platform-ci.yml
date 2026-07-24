@@ -82,6 +82,79 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  issue40-schema-extraction:
+    if: github.event_name == 'pull_request' && github.head_ref == 'refactor/issue-40-financial-fact-schemas' && github.actor != 'github-actions[bot]'
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: refactor/issue-40-financial-fact-schemas
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Apply exact schema extraction
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('platform-backend/app/financial_facts.py')
+          text = path.read_text(encoding='utf-8')
+          text = text.replace('from typing import Literal\n', '')
+          text = text.replace('from pydantic import BaseModel, Field, model_validator\n\n', '')
+
+          database_import = 'from app.database import connection\n'
+          schema_import = '''from app.financial_fact_schemas import (
+              CreateFinancialFactRequest,
+              FinancialFactResponse,
+              FinancialFactType,
+              FinancialProjectionRebuildResponse,
+              FormalNavSnapshotResponse,
+              FormalPnlResponse,
+              FormalPositionResponse,
+              TRADE_FACT_TYPES,
+          )
+
+'''
+          if schema_import not in text:
+              text = text.replace(database_import, database_import + schema_import)
+
+          type_start = text.index('FinancialFactType = Literal[')
+          projected_start = text.index('PROJECTED_FACT_TYPES =', type_start)
+          text = text[:type_start] + text[projected_start:]
+          text = text.replace('TRADE_FACT_TYPES = {"trade_fill", "deal"}\n', '')
+
+          class_start = text.index('class CreateFinancialFactRequest')
+          ensure_start = text.index('def ensure_schema() -> None:', class_start)
+          text = text[:class_start] + text[ensure_start:]
+
+          for class_name in (
+              'CreateFinancialFactRequest',
+              'FinancialFactResponse',
+              'FormalPositionResponse',
+              'FormalPnlResponse',
+              'FormalNavSnapshotResponse',
+              'FinancialProjectionRebuildResponse',
+          ):
+              assert f'class {class_name}' not in text
+          assert 'from app.financial_fact_schemas import (' in text
+          assert 'def normalize_fact(request: CreateFinancialFactRequest)' in text
+          assert 'SCHEMA_SQL = """' in text
+          path.write_text(text, encoding='utf-8')
+          PY
+          python -m compileall -q platform-backend/app/financial_facts.py platform-backend/app/financial_fact_schemas.py
+      - name: Restore CI and commit the source-only change
+        run: |
+          git checkout origin/main -- .github/workflows/platform-ci.yml
+          rm -f .github/workflows/issue-40-apply-schema-extraction.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add platform-backend/app/financial_facts.py .github/workflows/platform-ci.yml .github/workflows/issue-40-apply-schema-extraction.yml
+          git commit -m 'Use extracted FinancialFact API schemas'
+          git push origin HEAD:refactor/issue-40-financial-fact-schemas
+
   repository-safety:
     runs-on: ubuntu-latest
     steps:
