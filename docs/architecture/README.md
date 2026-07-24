@@ -31,7 +31,7 @@
 
 - Backend 与 Runtime 的 Ruff 检查覆盖完整 `app/` 与 `tests/`，新增文件不能绕过门禁。
 - Python 安装完成后必须通过 `pip check`。
-- Pyright 覆盖执行 DTO、FinancialFact DTO/Normalization/Repository/Projection Service、SQLite Connection/Bootstrap/Seeds、Runtime 契约、迁移账本和权威下单边界。
+- Pyright 覆盖执行 DTO、FinancialFact DTO/Normalization/Repository/Projection Service、共享 Position Math、SQLite Connection/Bootstrap/Seeds、Runtime 契约、迁移账本和权威下单边界。
 - Frontend 活跃交易界面持续执行零警告 ESLint、类型检查和生产构建；其他新增/修改源文件执行 no-new-debt gate。
 - `scripts/check-repository-structure.py` 阻止代码所有权和依赖方向漂移。
 - `scripts/check-documentation-consistency.py` 阻止 canonical 文档入口、Owner 路径和 Agent context 表述漂移。
@@ -86,7 +86,8 @@
 
 - `platform-backend/app/trading.py` 负责成交后近实时运营投影，只写入 `positions` 与 `pnl_results`。
 - `platform-backend/app/financial_fact_repository.py` 负责正式账务持久化和事务。
-- `platform-backend/app/financial_projection_service.py` 负责平均成本、已实现与分项 PnL、正式重建和 NAV 计算。
+- `platform-backend/app/position_math.py` 是运营与正式投影共享的逐成交净数量、平均成本和已实现 PnL 纯计算唯一 Owner。
+- `platform-backend/app/financial_projection_service.py` 负责 FinancialFact 回放、Multiplier/FX、分项 PnL、正式重建和 NAV 编排。
 - Projection Service 不依赖 FastAPI、配置模块或外部交易场所；数据库操作通过 Repository 完成。
 - 运营投影不构成正式会计权威；正式账务必须从不可变事实重建。
 

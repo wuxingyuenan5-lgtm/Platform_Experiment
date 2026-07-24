@@ -41,6 +41,7 @@ include = [
   "app/financial_fact_repository.py",
   "app/financial_fact_schemas.py",
   "app/financial_projection_service.py",
+  "app/position_math.py",
   "app/runtime_contracts.py",
   "app/schema_migrations.py",
   "app/schema_governance.py",

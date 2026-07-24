@@ -2,7 +2,7 @@
 
 Last updated: 2026-07-24
 Stable branch: `main`
-Latest completed engineering scope: Issue #59 / PR #60
+Latest completed engineering scope: Issue #61 / PR #62
 
 This file is the compact cross-session handoff. It records current truth, not a PR diary. Read the actual open Issues and PRs before assuming that work is active.
 
@@ -31,6 +31,7 @@ Real-account acceptance remains controlled-host, small-capital and minimum-size.
 - `platform-backend/app/main.py` is a composition root only.
 - Operational `positions` and `pnl_results` remain separate from FinancialFact-based formal accounting.
 - Formal accounting is reconstructed from immutable facts and does not read operational projections as inputs.
+- Operational and formal projections share the exact `position_math.calculate_position_update` callable for per-fill quantity, average price and realized PnL.
 - Platform–Runtime Command/Event traffic uses explicit V1.0 contracts and snapshots.
 - Database changes use an ordered migration ledger with immutable checksums.
 - Backend and Runtime tests have exactly one primary taxonomy marker.
@@ -63,10 +64,11 @@ Real-account acceptance remains controlled-host, small-capital and minimum-size.
 20. Canonical architecture ownership catalog with blocking documentation-consistency checks.
 21. Lightweight task-packet controls and active local Markdown-link validation.
 22. Exact Decimal venue fill reconciliation with fractional/high-precision regression evidence.
+23. Shared Position Math ownership with ten long/short golden cases and compatibility-identity evidence.
 
 ## Active work
 
-No engineering code workstream is active by default after PR #60 merges.
+No engineering code workstream is active by default after PR #62 merges.
 
 Before starting another code change:
 

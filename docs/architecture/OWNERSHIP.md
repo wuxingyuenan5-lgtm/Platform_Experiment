@@ -23,10 +23,11 @@ This document is the canonical human-readable catalog of major code ownership bo
 | Boundary | Authoritative owner | Responsibility | Must not own |
 |---|---|---|---|
 | Operational fill projection | `platform-backend/app/trading.py` | Low-latency `positions` and `pnl_results` updates | Formal accounting authority |
+| Position calculation policy | `platform-backend/app/position_math.py` | Pure per-fill net quantity, average price and realized PnL calculation shared by operational and formal projections | SQL, HTTP, FX, multiplier application or projection persistence |
 | FinancialFact public DTOs | `platform-backend/app/financial_fact_schemas.py` | FinancialFact, formal Position/PnL/NAV and rebuild API models | Normalization, SQL or calculations |
 | FinancialFact normalization | `platform-backend/app/financial_fact_normalization.py` | Canonical currency, Decimal, UTC, JSON, FX/data-quality and immutable content hash | Repository access, FastAPI or venue SDKs |
 | FinancialFact persistence | `platform-backend/app/financial_fact_repository.py` | FinancialFact/formal projection SQL, row mapping and protected transaction units | HTTP routing or accounting formulas |
-| Formal projection calculations | `platform-backend/app/financial_projection_service.py` | Average cost, realized/component PnL, formal rebuild and NAV calculations | FastAPI, configuration or direct SQL |
+| Formal projection calculations | `platform-backend/app/financial_projection_service.py` | FinancialFact replay, multiplier/FX application, component PnL, formal rebuild and NAV orchestration | FastAPI, configuration, direct SQL or duplicate position math |
 | FinancialFact API orchestration | `platform-backend/app/financial_facts.py` | Catalog resolution, immutable fact recording, domain-error mapping, compatibility wrappers and routes | DTO definitions, normalization rules, direct SQL or projection formulas |
 
 Operational projections are monitoring views. Formal accounting is reconstructed from immutable FinancialFacts and may not read operational projections as calculation inputs.

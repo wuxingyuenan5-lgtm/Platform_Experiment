@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Shared Position Math ownership — Issue #61 / PR #62
+
+- Added `platform-backend/app/position_math.py` as the pure per-fill quantity, average-price and realized-PnL calculation owner.
+- Made operational, formal and FinancialFact compatibility paths reference the identical callable.
+- Expanded golden cases across long/short opens, increases, partial/full closes and both flip directions.
+- Added sole-definition, purity and compatibility-identity architecture checks and progressive Pyright coverage.
+- Preserved every formula result, multiplier/FX treatment, persistence transaction, API, Runtime contract and both Live Write defaults.
+
 ### Exact Decimal venue fill reconciliation — Issue #59 / PR #60
 
 - Replaced SQLite `REAL` aggregation of stored fill quantities with exact Python `Decimal` accumulation.
