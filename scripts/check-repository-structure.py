@@ -61,6 +61,21 @@ OPERATIONAL_PROJECTION_READS = {
     "FROM positions",
     "FROM pnl_results",
 }
+FINANCIAL_REPOSITORY_SQL_ANCHORS = {
+    "CREATE TABLE IF NOT EXISTS financial_facts",
+    "INSERT INTO financial_facts",
+    "INSERT INTO formal_positions",
+    "INSERT INTO formal_pnl_results",
+    "INSERT INTO formal_strategy_nav_snapshots",
+}
+FINANCIAL_SERVICE_SQL_PREFIXES = (
+    "CREATE TABLE",
+    "CREATE INDEX",
+    "SELECT ",
+    "INSERT INTO",
+    "UPDATE ",
+    "DELETE FROM",
+)
 CANONICAL_CONTEXT_FILES = (
     ROOT / "docs" / "codex" / "context-map.md",
     ROOT / "docs" / "codex" / "current-state.md",
@@ -79,7 +94,7 @@ DDL_OWNER_PATHS = (
     "platform-backend/app/disaster_recovery.py",
     "platform-backend/app/eod_reconciliation.py",
     "platform-backend/app/execution_risk.py",
-    "platform-backend/app/financial_facts.py",
+    "platform-backend/app/financial_fact_repository.py",
     "platform-backend/app/live_trading_sessions.py",
     "platform-backend/app/live_venue_accounting.py",
     "platform-backend/app/production_monitoring.py",
@@ -136,6 +151,14 @@ def imported_top_levels(path: Path) -> set[str]:
         elif isinstance(node, ast.ImportFrom) and node.module:
             imports.add(node.module.split(".", 1)[0])
     return imports
+
+
+def string_literals(path: Path) -> list[str]:
+    return [
+        node.value
+        for node in ast.walk(parsed_module(path))
+        if isinstance(node, ast.Constant) and isinstance(node.value, str)
+    ]
 
 
 def check_backend_venue_boundary(errors: list[str]) -> None:
@@ -209,6 +232,49 @@ def check_execution_schema_boundary(errors: list[str]) -> None:
         )
 
 
+def check_financial_fact_repository_boundary(errors: list[str]) -> None:
+    service_path = BACKEND_APP / "financial_facts.py"
+    repository_path = BACKEND_APP / "financial_fact_repository.py"
+    if not repository_path.is_file():
+        errors.append(
+            "platform-backend/app/financial_fact_repository.py: FinancialFact persistence owner is missing"
+        )
+        return
+
+    service_source = service_path.read_text(encoding="utf-8")
+    service_tree = parsed_module(service_path)
+    direct_database_import = any(
+        isinstance(node, ast.ImportFrom) and node.module == "app.database"
+        for node in ast.walk(service_tree)
+    )
+    if direct_database_import or "connection()" in service_source:
+        errors.append(
+            "platform-backend/app/financial_facts.py: service must not access the database directly"
+        )
+
+    forbidden_sql = {
+        prefix
+        for literal in string_literals(service_path)
+        for prefix in FINANCIAL_SERVICE_SQL_PREFIXES
+        if prefix in literal.upper()
+    }
+    if forbidden_sql:
+        errors.append(
+            "platform-backend/app/financial_facts.py: SQL belongs in financial_fact_repository.py: "
+            f"{sorted(forbidden_sql)}"
+        )
+
+    repository_source = repository_path.read_text(encoding="utf-8")
+    missing_sql = {
+        anchor for anchor in FINANCIAL_REPOSITORY_SQL_ANCHORS if anchor not in repository_source
+    }
+    if missing_sql:
+        errors.append(
+            "platform-backend/app/financial_fact_repository.py: required persistence anchors missing: "
+            f"{sorted(missing_sql)}"
+        )
+
+
 def check_projection_boundaries(errors: list[str]) -> None:
     trading_path = BACKEND_APP / "trading.py"
     trading_source = trading_path.read_text(encoding="utf-8")
@@ -246,13 +312,16 @@ def check_projection_boundaries(errors: list[str]) -> None:
         )
 
     financial_source = (BACKEND_APP / "financial_facts.py").read_text(encoding="utf-8")
+    repository_source = (BACKEND_APP / "financial_fact_repository.py").read_text(encoding="utf-8")
     forbidden_operational_reads = {
-        statement for statement in OPERATIONAL_PROJECTION_READS if statement in financial_source
+        statement
+        for statement in OPERATIONAL_PROJECTION_READS
+        if statement in financial_source or statement in repository_source
     }
     if forbidden_operational_reads:
         errors.append(
-            "platform-backend/app/financial_facts.py: formal accounting must not read "
-            f"operational projection tables: {sorted(forbidden_operational_reads)}"
+            "formal accounting must not read operational projection tables: "
+            f"{sorted(forbidden_operational_reads)}"
         )
 
 
@@ -292,7 +361,10 @@ def check_persistence_governance(errors: list[str]) -> None:
         path = ROOT / owner
         if not path.is_file():
             errors.append(f"{owner}: registered DDL owner does not exist")
-        if f"`{owner.removeprefix('platform-backend/').removeprefix('execution-runtime/')}`" not in guide_source:
+        documented_owner = owner.removeprefix("platform-backend/").removeprefix(
+            "execution-runtime/"
+        )
+        if f"`{documented_owner}`" not in guide_source:
             errors.append(f"docs/database/README.md: missing DDL owner {owner}")
 
     if migration_module.is_file():
@@ -358,6 +430,7 @@ def main() -> int:
     check_backend_venue_boundary(errors)
     check_composition_root(errors)
     check_execution_schema_boundary(errors)
+    check_financial_fact_repository_boundary(errors)
     check_projection_boundaries(errors)
     check_context_governance(errors)
     check_persistence_governance(errors)
