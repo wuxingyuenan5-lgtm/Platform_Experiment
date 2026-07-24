@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+### Fixed database Seed ownership — Issue #53 / PR #54
+
+- Extracted every fixed reference-data Seed vector and insertion statement into `platform-backend/app/database_seeds.py`.
+- Preserved `app.database.seed_reference_data` as an identical compatibility export.
+- Reduced `app/database.py` to explicit Connection/Bootstrap/Seed compatibility exports and `Connection → Bootstrap → Seed` initialization orchestration.
+- Added an exhaustive all-row/all-field snapshot across the 15 fixed Seed tables, pinned by SHA-256 `d42f7e4f95a6efa9044b1e91b4e603f1d87f515923a57d941ee16e75109e6183`.
+- Added explicit checks for simulation/active/paused safety defaults and the existing XAUUSD contract specification.
+- Added repeated-initialization full-snapshot equivalence and static Seed ownership checks.
+- Added the Seed boundary to progressive Pyright.
+- Retained every Seed ID/value/order, Schema checksum, compatibility DDL, migration-ledger entry, API/trading/accounting behavior and both Live Write defaults unchanged.
+
 ### Core database Bootstrap ownership — Issue #50 / PR #51
 
 - Extracted the complete ordered core `SCHEMA_SQL` and legacy compatibility DDL into `platform-backend/app/database_bootstrap.py`.
