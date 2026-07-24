@@ -24,6 +24,11 @@ One measurable outcome.
 - Directories/files that may change.
 - Required tests and documentation.
 
+## Expected changed files
+
+- List the files expected to change before editing.
+- Mark any conditional file explicitly and state what evidence permits it.
+
 ## Protected semantics
 
 List behavior that must remain unchanged, especially trading calculations, order states, risk/funds controls, API field meaning, database schema behavior and live-write defaults.
@@ -42,6 +47,20 @@ Additional context:
 
 - `<path>` — `<reason>`
 
+## Required verification
+
+```text
+<exact commands>
+```
+
+State whether final delivery also requires full CI, a Secret Scan, golden evidence or another repository-level gate.
+
+## Stop conditions
+
+- Stop when the change would exceed Allowed scope or Expected changed files without new evidence.
+- Stop when a Protected semantic would need to change.
+- Add task-specific conditions that require a dedicated Issue or explicit approval.
+
 ## Acceptance criteria
 
 - [ ] Outcome completed.
@@ -49,12 +68,6 @@ Additional context:
 - [ ] Repository and architecture checks pass.
 - [ ] Authoritative documentation matches implementation.
 - [ ] Diff contains no unrelated cleanup.
-
-## Verification commands
-
-```text
-<exact commands>
-```
 
 ## Risk and rollback
 

@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
-"""Validate canonical architecture ownership and Agent-context consistency."""
+"""Validate canonical architecture ownership and active Markdown links."""
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+import re
+from collections.abc import Iterable, Mapping
 from pathlib import Path
+from urllib.parse import unquote, urlsplit
 
 REQUIRED_ENTRYPOINTS = (
     "AGENTS.md",
@@ -52,6 +54,25 @@ STALE_CONTEXT_SNIPPETS = (
     "Formal accounting authority: platform-backend/app/financial_facts.py",
 )
 
+EXCLUDED_MARKDOWN_PARTS = frozenset(
+    {
+        ".git",
+        ".venv",
+        "archive",
+        "audit",
+        "dist",
+        "node_modules",
+        "outputs",
+        "vendor",
+    }
+)
+EXTERNAL_LINK_SCHEMES = frozenset(
+    {"data", "http", "https", "javascript", "mailto", "tel"}
+)
+MARKDOWN_LINK_PATTERN = re.compile(r"!?\[[^\]\n]*\]\((?P<target>[^)\n]+)\)")
+FENCED_CODE_PATTERN = re.compile(r"```.*?```|~~~.*?~~~", re.DOTALL)
+HTML_COMMENT_PATTERN = re.compile(r"<!--.*?-->", re.DOTALL)
+
 
 def validate_owner_catalog(
     root: Path,
@@ -80,6 +101,84 @@ def validate_context_map(context: str) -> list[str]:
     ]
 
 
+def active_markdown_paths(root: Path) -> list[Path]:
+    """Return active Markdown files while excluding history and generated trees."""
+
+    return [
+        path
+        for path in sorted(root.rglob("*.md"))
+        if not (set(path.relative_to(root).parts) & EXCLUDED_MARKDOWN_PARTS)
+    ]
+
+
+def markdown_link_target(raw_target: str) -> str | None:
+    """Return a local link target or ``None`` when the link is intentionally ignored."""
+
+    target = raw_target.strip()
+    if not target:
+        return None
+    if target.startswith("<"):
+        closing = target.find(">")
+        if closing == -1:
+            return None
+        target = target[1:closing].strip()
+    else:
+        target = target.split(maxsplit=1)[0]
+
+    if not target or target.startswith(("#", "//")):
+        return None
+    if any(marker in target for marker in ("<", ">", "{", "}")):
+        return None
+    if urlsplit(target).scheme.lower() in EXTERNAL_LINK_SCHEMES:
+        return None
+    return target
+
+
+def validate_markdown_links(
+    root: Path,
+    markdown_paths: Iterable[Path] | None = None,
+) -> list[str]:
+    """Validate local file/directory targets in active Markdown documents."""
+
+    root = root.resolve()
+    paths = active_markdown_paths(root) if markdown_paths is None else sorted(markdown_paths)
+    errors: list[str] = []
+
+    for source in paths:
+        if not source.is_file():
+            continue
+        relative_source = source.resolve().relative_to(root).as_posix()
+        content = source.read_text(encoding="utf-8")
+        content = FENCED_CODE_PATTERN.sub("", content)
+        content = HTML_COMMENT_PATTERN.sub("", content)
+
+        for match in MARKDOWN_LINK_PATTERN.finditer(content):
+            target = markdown_link_target(match.group("target"))
+            if target is None:
+                continue
+            link_path = unquote(urlsplit(target).path)
+            if not link_path:
+                continue
+            candidate = (
+                root / link_path.lstrip("/")
+                if link_path.startswith("/")
+                else source.parent / link_path
+            ).resolve()
+            try:
+                candidate.relative_to(root)
+            except ValueError:
+                errors.append(
+                    f"{relative_source}: local Markdown target escapes repository: {target}"
+                )
+                continue
+            if not candidate.exists():
+                errors.append(
+                    f"{relative_source}: local Markdown target does not exist: {target}"
+                )
+
+    return sorted(errors)
+
+
 def validate_repository(root: Path) -> list[str]:
     """Return deterministic documentation-consistency errors for ``root``."""
 
@@ -103,6 +202,7 @@ def validate_repository(root: Path) -> list[str]:
     if context_path.is_file():
         errors.extend(validate_context_map(context_path.read_text(encoding="utf-8")))
 
+    errors.extend(validate_markdown_links(root))
     return sorted(errors)
 
 

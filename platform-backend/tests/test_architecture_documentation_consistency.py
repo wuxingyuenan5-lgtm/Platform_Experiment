@@ -52,3 +52,51 @@ def test_context_map_rejects_obsolete_financial_facts_shortcut() -> None:
         "stale Agent context ownership statement: "
         "Formal accounting authority: `platform-backend/app/financial_facts.py`"
     ]
+
+
+def test_markdown_links_accept_existing_local_target(tmp_path: Path) -> None:
+    guide = tmp_path / "docs/guide.md"
+    guide.parent.mkdir(parents=True)
+    guide.write_text("# Guide\n", encoding="utf-8")
+    readme = tmp_path / "README.md"
+    readme.write_text("[Guide](docs/guide.md)\n", encoding="utf-8")
+
+    assert DOCUMENTATION_CONSISTENCY.validate_markdown_links(tmp_path, [readme]) == []
+
+
+def test_markdown_links_reject_missing_local_target(tmp_path: Path) -> None:
+    readme = tmp_path / "README.md"
+    readme.write_text("[Missing](docs/missing.md)\n", encoding="utf-8")
+
+    assert DOCUMENTATION_CONSISTENCY.validate_markdown_links(tmp_path, [readme]) == [
+        "README.md: local Markdown target does not exist: docs/missing.md"
+    ]
+
+
+def test_markdown_links_ignore_external_fragment_and_placeholder_targets(
+    tmp_path: Path,
+) -> None:
+    readme = tmp_path / "README.md"
+    readme.write_text(
+        "[External](https://example.com/docs)\n"
+        "[Anchor](#section)\n"
+        "[Template](tasks/issue-<number>-<slug>.md)\n",
+        encoding="utf-8",
+    )
+
+    assert DOCUMENTATION_CONSISTENCY.validate_markdown_links(tmp_path, [readme]) == []
+
+
+def test_markdown_links_ignore_excluded_historical_directories(tmp_path: Path) -> None:
+    archived = tmp_path / "docs/archive/old.md"
+    archived.parent.mkdir(parents=True)
+    archived.write_text("[Missing](gone.md)\n", encoding="utf-8")
+
+    assert DOCUMENTATION_CONSISTENCY.validate_markdown_links(tmp_path) == []
+
+
+def test_markdown_links_ignore_examples_inside_fenced_code(tmp_path: Path) -> None:
+    readme = tmp_path / "README.md"
+    readme.write_text("```markdown\n[Example](not-real.md)\n```\n", encoding="utf-8")
+
+    assert DOCUMENTATION_CONSISTENCY.validate_markdown_links(tmp_path, [readme]) == []
