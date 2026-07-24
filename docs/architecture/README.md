@@ -1,10 +1,11 @@
 # Architecture Documentation
 
-本目录保存长期稳定的系统架构说明。最简拓扑和依赖方向见 `SYSTEM_MAP.md`。
+本目录保存长期稳定的系统架构说明。最简拓扑和依赖方向见 `SYSTEM_MAP.md`，主要模块的唯一 Owner 见 `docs/architecture/OWNERSHIP.md`。
 
 ## 文档职责
 
 - 架构说明：解释系统边界和模块关系。
+- `docs/architecture/OWNERSHIP.md`：记录主要代码边界的唯一 Owner、职责和禁止责任。
 - `docs/decisions/`：记录关键技术决策。
 - `docs/operations/`：记录运行和生产流程。
 - `docs/technical/`：记录接口和领域设计。
@@ -16,6 +17,8 @@
 不要把历史执行过程、PR 记录和临时任务放入架构文档。
 
 架构文档回答系统为何这样设计、模块如何协作、哪些边界不能突破、数据/契约由谁负责，以及故障时必须保持哪些不变量。具体实施记录进入对应 Issue、任务包、PR 或 Changelog。
+
+模块权威发生变化时，必须在同一个 PR 更新 `docs/architecture/OWNERSHIP.md`；`docs/codex/context-map.md` 只负责选择上下文，不重复维护完整 Owner 表。
 
 ## Composition Root 边界
 
@@ -30,7 +33,8 @@
 - Python 安装完成后必须通过 `pip check`。
 - Pyright 覆盖执行 DTO、FinancialFact DTO/Normalization/Repository/Projection Service、SQLite Connection/Bootstrap/Seeds、Runtime 契约、迁移账本和权威下单边界。
 - Frontend 活跃交易界面持续执行零警告 ESLint、类型检查和生产构建；其他新增/修改源文件执行 no-new-debt gate。
-- `scripts/check-repository-structure.py` 阻止 Backend 引入交易场所 SDK、Composition Root 混入业务逻辑、正式账务边界漂移、平行上下文入口、临时测试命名和诊断工作流残留。
+- `scripts/check-repository-structure.py` 阻止代码所有权和依赖方向漂移。
+- `scripts/check-documentation-consistency.py` 阻止 canonical 文档入口、Owner 路径和 Agent context 表述漂移。
 - FinancialFact Schema/Normalization/Repository/Projection Service 与 SQLite Connection/Bootstrap/Seeds 各自有静态所有权测试。
 
 ## 工作流与上下文边界
@@ -38,6 +42,7 @@
 - 人工入口唯一为 `00-人工可读目录/README.md`。
 - Agent 入口唯一为 `docs/codex/context-map.md`。
 - 当前工程事实唯一由 `docs/codex/current-state.md` 维护。
+- 主要模块所有权唯一由 `docs/architecture/OWNERSHIP.md` 维护。
 - 每个非简单工作通过一个 Issue、一个任务包、一个 Issue 编号分支和一个开放 PR 推进。
 - `scripts/check-workstream.py` 校验 Issue、分支、任务包和 PR 一致性，并阻止同一 Issue 出现第二个开放 PR。
 

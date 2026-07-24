@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+### Machine-checked architecture ownership documentation — Issue #55 / PR #56
+
+- Added `docs/architecture/OWNERSHIP.md` as the canonical major module ownership catalog.
+- Corrected stale Agent context that attributed formal accounting authority solely to `app/financial_facts.py`.
+- Reduced `docs/codex/context-map.md` to context selection and linked it to the canonical ownership catalog.
+- Kept `docs/codex/current-state.md` focused on current invariants and active work rather than duplicating the full Owner registry.
+- Added `scripts/check-documentation-consistency.py` to validate canonical entrypoints, protected Owner mappings and repository paths.
+- Added architecture tests for current-repository consistency, missing Owner paths, wrong mappings and obsolete context statements.
+- Added the documentation consistency check to the Platform CI Repository Safety job.
+- Retained all runtime behavior, API, SQL, Schema, Seed, accounting formulas, trading controls and both Live Write defaults unchanged.
+
 ### Fixed database Seed ownership — Issue #53 / PR #54
 
 - Extracted every fixed reference-data Seed vector and insertion statement into `platform-backend/app/database_seeds.py`.

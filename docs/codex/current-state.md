@@ -2,7 +2,7 @@
 
 Last updated: 2026-07-24
 Stable branch: `main`
-Latest completed engineering scope: Issue #53 / PR #54
+Latest completed engineering scope: Issue #55 / PR #56
 
 This file is the compact cross-session handoff. It records current truth, not a PR diary. Read the actual open Issues and PRs before assuming that work is active.
 
@@ -12,6 +12,7 @@ This file is the compact cross-session handoff. It records current truth, not a 
 - `platform-backend/`: modular-monolith business, risk, execution orchestration and accounting API.
 - `execution-runtime/`: isolated venue/Gateway process and runtime journal.
 - SQLite remains the approved persistence technology for the current stage.
+- Canonical major module ownership is recorded in `docs/architecture/OWNERSHIP.md`.
 
 ## Safety defaults
 
@@ -24,25 +25,17 @@ Runtime Live Write=false
 
 Real-account acceptance remains controlled-host, small-capital and minimum-size.
 
-## Authoritative boundaries
+## Current invariants
 
-- Platform Backend must not import venue SDKs.
-- `app/main.py` is a composition root only.
-- Execution API DTOs are owned by `platform-backend/app/execution_schemas.py`.
-- Public FinancialFact/formal-accounting DTOs are owned by `platform-backend/app/financial_fact_schemas.py`.
-- FinancialFact canonicalization, FX/data-quality policy and normalized-content hashing are owned by `platform-backend/app/financial_fact_normalization.py`.
-- FinancialFact/formal-accounting SQL, row mapping and transaction units are owned by `platform-backend/app/financial_fact_repository.py`.
-- Formal Position/PnL/NAV calculations and rebuild orchestration are owned by `platform-backend/app/financial_projection_service.py`.
-- `platform-backend/app/financial_facts.py` owns catalog resolution, FinancialFact recording, HTTP error mapping and API routes.
-- Shared SQLite path and transaction-managed connections are owned by `platform-backend/app/database_connection.py`.
-- Core Platform Schema and legacy compatibility DDL are owned by `platform-backend/app/database_bootstrap.py`.
-- Fixed reference-data Seeds are owned by `platform-backend/app/database_seeds.py` and pinned by an exhaustive all-row/all-field SHA-256 snapshot.
-- `platform-backend/app/database.py` is a compatibility facade and preserves only `Connection → Bootstrap → Seed` initialization orchestration.
+- Platform Backend does not import venue SDKs; external execution remains inside `execution-runtime/`.
+- `platform-backend/app/main.py` is a composition root only.
+- Operational `positions` and `pnl_results` remain separate from FinancialFact-based formal accounting.
+- Formal accounting is reconstructed from immutable facts and does not read operational projections as inputs.
 - Platform–Runtime Command/Event traffic uses explicit V1.0 contracts and snapshots.
-- `positions` and `pnl_results` are operational projections.
-- `financial_facts`, `formal_positions` and `formal_pnl_results` are the formal accounting authority.
 - Database changes use an ordered migration ledger with immutable checksums.
 - Backend and Runtime tests have exactly one primary taxonomy marker.
+- Ownership or compatibility-boundary changes must update `docs/architecture/OWNERSHIP.md` in the same PR.
+- Repository Safety validates canonical documentation entrypoints, protected Owner mappings and referenced Owner paths.
 
 ## Completed engineering baseline
 
@@ -65,17 +58,18 @@ Real-account acceptance remains controlled-host, small-capital and minimum-size.
 17. SQLite connection/path transaction boundary extraction.
 18. Core database Bootstrap/Schema ownership extraction with exact checksum.
 19. Fixed database Seed ownership extraction with exhaustive all-value snapshot and repeated-startup equivalence.
+20. Canonical architecture ownership catalog with blocking documentation-consistency checks.
 
 ## Active work
 
-No engineering code workstream is active by default after PR #54 merges.
+No engineering code workstream is active by default after PR #56 merges.
 
-Before starting any future code change:
+Before starting another code change:
 
 1. verify current `main`, open Issues and open PRs;
 2. reuse an Issue only when the outcome exactly matches;
 3. create one matching task packet, Issue-numbered branch and open PR;
-4. preserve the established Schema/Normalization/Repository/Projection and Connection/Bootstrap/Seed ownership boundaries.
+4. preserve the ownership boundaries recorded in `docs/architecture/OWNERSHIP.md`.
 
 Separate non-code follow-ups remain:
 
@@ -87,7 +81,6 @@ Separate non-code follow-ups remain:
 - Existing table structures, Seed identifiers, financial formulas and trading state transitions are protected semantics.
 - Operational projections remain supported and must not become formal-accounting inputs.
 - Compatibility surfaces require usage evidence and a dedicated migration before removal.
-- The FinancialFact domain and shared database infrastructure now have explicit single owners; future changes must not recombine them.
 - Inherited frontend lint debt remains outside untouched modules; new and changed files cannot add debt.
 - Pyright coverage is progressive rather than whole-repository strict.
 - Live Write cannot be enabled by an engineering refactor or test result.

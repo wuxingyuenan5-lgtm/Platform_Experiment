@@ -18,7 +18,7 @@ execution-runtime/   External execution gateway and runtime journal
 docs/                Architecture and operational documentation
 ```
 
-Human orientation starts at `00-人工可读目录/README.md`. Agent orientation starts at `docs/codex/context-map.md`.
+Human orientation starts at `00-人工可读目录/README.md`. Agent orientation starts at `docs/codex/context-map.md`. Canonical major module ownership is recorded in `docs/architecture/OWNERSHIP.md`.
 
 ## Safety Rules
 
@@ -39,6 +39,7 @@ Human orientation starts at `00-人工可读目录/README.md`. Agent orientation
 - Keep operational trading projections (`positions`, `pnl_results`) separate from FinancialFact-based formal accounting projections.
 - Assign every Backend and Runtime test exactly one primary layer (`architecture`, `unit`, `integration`, or `live_safety`) and keep classified suites independently executable.
 - CI gates must cover complete maintained directories or an explicit no-new-debt mechanism; new files may not bypass validation.
+- Update `docs/architecture/OWNERSHIP.md` in the same PR whenever module authority or a compatibility boundary changes.
 - Use `rg` for search.
 - Ignore `node_modules`, `.venv`, `dist`, generated outputs, archives and external references unless explicitly required.
 
@@ -63,7 +64,8 @@ Before editing:
 2. Read `docs/codex/current-state.md`.
 3. For cross-session, cross-module, migration or production work, create/update `tasks/issue-<number>-<slug>.md` from `docs/codex/task-template.md`.
 4. Read only the target module documentation and paths listed in that task packet.
-5. Do not load the entire repository unless the task is explicitly architecture-wide.
+5. Read `docs/architecture/OWNERSHIP.md` when the task changes ownership, compatibility exports or cross-module dependency direction.
+6. Do not load the entire repository unless the task is explicitly architecture-wide.
 
 Default context budget:
 
@@ -79,8 +81,9 @@ Do not repeat repository history in prompts. Use current-state, task packets, co
 
 - `AGENTS.md`: durable hard rules only.
 - `docs/codex/current-state.md`: compact current truth and active workstream.
-- `docs/codex/context-map.md`: context-loading map.
+- `docs/codex/context-map.md`: context-loading map, not an ownership registry.
 - `docs/codex/task-template.md`: the single task template.
+- `docs/architecture/OWNERSHIP.md`: canonical major module ownership.
 - `docs/architecture/`: stable structure and boundaries, not PR diaries.
 - `docs/decisions/`: important decisions and rejected alternatives.
 - `docs/technical/`: protocols and domain implementation contracts.
