@@ -16,6 +16,7 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
   "httpx>=0.28,<1.0",
+  "pyright>=1.1,<2.0",
   "pytest>=8.4,<9.0",
   "ruff>=0.12,<1.0",
 ]
@@ -43,6 +44,17 @@ markers = [
   "integration: gateway, journal, bridge, and venue component collaboration",
   "live_safety: credential handling, connectivity, claims, and live-write safety",
 ]
+
+[tool.pyright]
+pythonVersion = "3.12"
+typeCheckingMode = "standard"
+include = [
+  "app/models.py",
+  "app/runtime_contracts.py",
+  "app/gateway.py",
+]
+exclude = ["tests"]
+reportMissingTypeStubs = false
 
 [tool.ruff]
 target-version = "py312"
