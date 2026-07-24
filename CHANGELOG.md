@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+### Core database Bootstrap ownership — Issue #50 / PR #51
+
+- Extracted the complete ordered core `SCHEMA_SQL` and legacy compatibility DDL into `platform-backend/app/database_bootstrap.py`.
+- Preserved `app.database.SCHEMA_SQL`, `migrate_schema` and `ensure_column` as identical compatibility exports.
+- Kept startup order unchanged: shared Connection → core Bootstrap → fixed reference Seeds.
+- Transferred the machine-checked core DDL Owner from `app/database.py` to `app/database_bootstrap.py`.
+- Pinned the complete Schema text with SHA-256 `421f0625ffe3a8a26ca48bc827e64bd6aa6b2e49d95faef0b17313e808375801`.
+- Added Bootstrap ownership and initialization-order architecture tests.
+- Reused fresh-database table/index/Seed snapshots, legacy compatibility-column/index tests and repeated-initialization idempotency to prove equivalent startup behavior.
+- Added the Bootstrap boundary to progressive Pyright.
+- Retained every table, index, compatibility column, fixed Seed, migration-ledger entry, API/trading/accounting behavior and both Live Write defaults unchanged.
+
 ### SQLite connection ownership — Issue #48 / PR #49
 
 - Extracted configured database path resolution and transaction-managed SQLite connections into `platform-backend/app/database_connection.py`.

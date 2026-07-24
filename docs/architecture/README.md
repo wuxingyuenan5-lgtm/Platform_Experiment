@@ -15,15 +15,7 @@
 
 不要把历史执行过程、PR 记录和临时任务放入架构文档。
 
-架构文档回答：
-
-- 系统为什么这样设计；
-- 模块如何协作；
-- 哪些边界不能突破；
-- 数据和契约由谁负责；
-- 发生故障时应保持什么不变量。
-
-具体实施记录进入对应 Issue、任务包、PR 或 Changelog。
+架构文档回答系统为何这样设计、模块如何协作、哪些边界不能突破、数据/契约由谁负责，以及故障时必须保持哪些不变量。具体实施记录进入对应 Issue、任务包、PR 或 Changelog。
 
 ## Composition Root 边界
 
@@ -31,17 +23,15 @@
 - 风险敞口、EOD 策略和权限映射由各自模块显式导入，禁止运行时 monkey patch。
 - 领域模块之间通过普通 import 建立可静态分析的依赖，不依赖启动顺序改变函数实现。
 - 同一业务事实只能有一个权威实现；残余敞口计算统一由 `execution_exposure.py` 提供。
-- `tests/test_architecture_boundaries.py` 对上述边界进行静态回归检查。
 
 ## 工程门禁边界
 
 - Backend 与 Runtime 的 Ruff 检查覆盖完整 `app/` 与 `tests/`，新增文件不能绕过门禁。
 - Python 安装完成后必须通过 `pip check`。
-- Pyright 覆盖执行 DTO、FinancialFact DTO/Normalization/Repository/Projection Service、SQLite Connection、Runtime 契约、迁移账本和权威下单边界。
-- Frontend 活跃交易界面持续执行完整零警告 ESLint、类型检查和生产构建。
-- 活跃范围之外的新增或修改前端源文件通过 changed-file no-new-debt gate，禁止增加旧债。
-- `scripts/check-repository-structure.py` 阻止 Backend 引入交易场所 SDK、Composition Root 混入业务逻辑、FinancialFact 服务层重新出现 SQL、平行上下文入口、临时测试命名和诊断工作流残留。
-- FinancialFact Schema、Normalization、Repository、Projection Service 与 SQLite Connection 各自有静态所有权测试。
+- Pyright 覆盖执行 DTO、FinancialFact DTO/Normalization/Repository/Projection Service、SQLite Connection/Bootstrap、Runtime 契约、迁移账本和权威下单边界。
+- Frontend 活跃交易界面持续执行零警告 ESLint、类型检查和生产构建；其他新增/修改源文件执行 no-new-debt gate。
+- `scripts/check-repository-structure.py` 阻止 Backend 引入交易场所 SDK、Composition Root 混入业务逻辑、正式账务边界漂移、平行上下文入口、临时测试命名和诊断工作流残留。
+- FinancialFact Schema/Normalization/Repository/Projection Service 与 SQLite Connection/Bootstrap 各自有静态所有权测试。
 
 ## 工作流与上下文边界
 
@@ -49,44 +39,41 @@
 - Agent 入口唯一为 `docs/codex/context-map.md`。
 - 当前工程事实唯一由 `docs/codex/current-state.md` 维护。
 - 每个非简单工作通过一个 Issue、一个任务包、一个 Issue 编号分支和一个开放 PR 推进。
-- `scripts/check-workstream.py` 校验 Issue、分支、任务包和 PR 的一致性，并阻止同一 Issue 出现第二个开放 PR。
-- Agent 默认只读取任务包、一个模块入口、3–8 个直接源文件和直接测试。
+- `scripts/check-workstream.py` 校验 Issue、分支、任务包和 PR 一致性，并阻止同一 Issue 出现第二个开放 PR。
 
 ## Domain Schema 边界
 
-- 执行、订单、批次、策略运行、持仓和运营 PnL API DTO 由 `platform-backend/app/execution_schemas.py` 统一维护。
-- `platform-backend/app/schemas.py` 作为迁移期兼容入口，只允许显式公共别名重导出，不得重复定义执行域类型。
+- 执行域 API DTO 由 `platform-backend/app/execution_schemas.py` 统一维护。
+- `platform-backend/app/schemas.py` 只允许显式兼容重导出，不得重复定义执行域类型。
 - FinancialFact、正式持仓、正式 PnL、NAV 和重建响应 DTO 由 `platform-backend/app/financial_fact_schemas.py` 统一维护。
 - `platform-backend/app/financial_facts.py` 只保留兼容重导出、目录解析、FinancialFact 写入编排和 API，不得重新定义公开 DTO。
-- Schema 所有权迁移不得顺带改变 API 字段、SQL、哈希、FX、平均成本或 PnL 公式。
 
 ## Platform–Runtime 契约边界
 
 - 当前执行 Command/Event 使用 `runtime-command` / `runtime-event` V1.0。
 - 双端模型分别位于 Platform 和 Runtime 的 `app/runtime_contracts.py`。
 - `docs/contracts/runtime-v1.json` 是字段顺序、名称和版本的可执行快照。
-- Platform 发送显式 `contract_version` 和 `payload_version`；Runtime 对未知版本结构化拒绝。
 - Platform 收到无法验证的 Event 时保留 `result_unknown`，不得解释为确定失败或自动重下。
-- 契约不兼容变更必须提升版本并提供迁移/兼容测试，不能静默改变 V1。
+- 不兼容变更必须提升版本并提供迁移/兼容测试。
 
 ## Persistence 边界
 
 - SQLite 仍是当前批准的数据库技术。
-- `platform-backend/app/database_connection.py` 是共享数据库路径、连接创建、Row Factory、Foreign Key、Commit/Rollback/Close 的唯一 Owner。
-- `platform-backend/app/database.py` 显式重导出 `connection` 与 `database_path`，现有调用者不需要迁移；该文件不得重新实现 `sqlite3.connect` 或事务 Context Manager。
-- 核心 Schema/兼容 DDL 和固定 Seed 当前仍由 `database.py` 负责，并按 Bootstrap → Seed 的顺序继续拆分。
+- `platform-backend/app/database_connection.py` 是共享数据库路径、连接创建、 Row Factory、Foreign Key、Commit/Rollback/Close 的唯一 Owner。
+- `platform-backend/app/database_bootstrap.py` 是完整核心 `SCHEMA_SQL`、新库 Schema 执行、兼容补列与部分唯一索引的唯一 Owner。
+- `platform-backend/app/database.py` 显式重导出 Connection/Bootstrap 兼容接口，并只负责初始化顺序与暂存固定 Seed；它不得实现 `sqlite3.connect`、`CREATE/ALTER` 或 `executescript`。
+- 初始化顺序固定为：Connection → Bootstrap（Schema + 兼容 DDL）→ Seed。
+- Bootstrap Schema 文本由 SHA-256 `421f0625ffe3a8a26ca48bc827e64bd6aa6b2e49d95faef0b17313e808375801` 固定。
 - 所有 DDL Owner、数据权威分类和迁移规则记录在 `docs/database/README.md`。
 - `platform-backend/app/schema_migrations.py` 维护单调递增、带校验和的迁移账本。
 - `platform-backend/app/financial_fact_repository.py` 是 FinancialFact 与正式 Position/PnL/NAV 的唯一 SQL、行映射和事务单元 Owner。
-- 事实写入与审计、Position 与 PnL 写入、重建清理、NAV 与审计必须分别保持单事务原子性。
-- 连接层拆分由动态路径、Row、Foreign Key、成功 Commit、异常 Rollback 以及新库/旧库初始化快照证明等价。
-- 已应用迁移不可修改；校验和漂移必须启动失败。
-- 删除表/列、改变字段语义、转移账务权威或替换数据库属于专门高风险迁移。
+- 连接/Bootstrap 拆分由动态路径、事务行为、Schema Checksum、新库/旧库及重复启动快照共同证明等价。
+- 已应用迁移不可修改；删除表/列、改变字段语义、转移账务权威或替换数据库属于专门高风险迁移。
 
 ## FinancialFact Normalization 边界
 
 - `platform-backend/app/financial_fact_normalization.py` 是标准化结构、币种、结算校验、目录派生值、FX、质量状态、Decimal/UTC/JSON 和内容哈希的唯一 Owner。
-- Policy 只接收已解析的 Context，不得访问 Repository、数据库或外部交易场所。
+- Policy 只接收已解析 Context，不得访问 Repository、数据库或外部交易场所。
 - 标准化键集合、文本值和内容哈希属于不可变事实身份。
 
 ## Financial Projection 边界
@@ -101,8 +88,7 @@
 
 - Platform Backend 测试按 `architecture`、`unit`、`integration`、`live_safety` 四层执行。
 - Execution Runtime 测试按 `unit`、`integration`、`live_safety` 三层执行。
-- 每个测试在 collection 阶段必须获得且只能获得一个主标记；未知标记通过 `--strict-markers` 失败。
-- CI 分层运行各套件，测试不得依赖其他层执行顺序或残留状态。
+- 每个测试在 collection 阶段必须且只能获得一个主标记；CI 分层运行且不得依赖其他层残留状态。
 
 ## Failure/Recovery 边界
 

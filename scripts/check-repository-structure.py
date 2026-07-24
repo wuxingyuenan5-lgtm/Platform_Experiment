@@ -89,7 +89,7 @@ FORBIDDEN_PARALLEL_CONTEXT_PATHS = (
     ROOT / "tasks" / "TASK_TEMPLATE.md",
 )
 DDL_OWNER_PATHS = (
-    "platform-backend/app/database.py",
+    "platform-backend/app/database_bootstrap.py",
     "platform-backend/app/credential_security.py",
     "platform-backend/app/disaster_recovery.py",
     "platform-backend/app/eod_reconciliation.py",
