@@ -388,11 +388,14 @@ def compare_order(
         )
     external_quantity = sum(Decimal(str(fill["quantity"])) for fill in fills)
     with connection() as db:
-        local_fill = db.execute(
-            "SELECT COALESCE(SUM(CAST(quantity AS REAL)), 0) AS quantity FROM fills WHERE order_id = ?",
+        local_fill_rows = db.execute(
+            "SELECT quantity FROM fills WHERE order_id = ?",
             (order_id,),
-        ).fetchone()
-    local_quantity = Decimal(str(local_fill["quantity"]))
+        ).fetchall()
+    local_quantity = sum(
+        (Decimal(row["quantity"]) for row in local_fill_rows),
+        Decimal("0"),
+    )
     if local_quantity != external_quantity:
         difference_ids.append(
             standalone_order_difference(

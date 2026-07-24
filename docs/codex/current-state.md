@@ -64,7 +64,7 @@ Real-account acceptance remains controlled-host, small-capital and minimum-size.
 
 ## Active work
 
-No engineering code workstream is active by default after PR #58 merges.
+Issue #59 / Draft PR #60 is the only active engineering workstream: exact Decimal venue fill reconciliation.
 
 Before starting another code change:
 
