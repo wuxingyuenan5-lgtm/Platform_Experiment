@@ -1,8 +1,7 @@
 import ast
 from pathlib import Path
 
-from app import database
-from app import database_connection
+from app import database, database_connection
 
 APP_ROOT = Path(__file__).resolve().parents[1] / "app"
 DATABASE_PATH = APP_ROOT / "database.py"
