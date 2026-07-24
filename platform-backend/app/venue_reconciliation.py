@@ -8,8 +8,8 @@ from uuid import uuid4
 import httpx
 from fastapi import APIRouter, HTTPException
 
-from app.config import get_settings
 from app import venue_reconciliation_repository as repository
+from app.config import get_settings
 from app.financial_facts import CreateFinancialFactRequest, record_financial_fact
 from app.trading import (
     apply_execution_events,
