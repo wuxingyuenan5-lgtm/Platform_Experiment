@@ -42,3 +42,11 @@
 - `platform-backend/app/schemas.py` 作为迁移期兼容入口，只允许使用显式公共别名重导出，不得重复定义执行域类型。
 - `tests/test_schema_boundaries.py` 校验兼容导出的对象身份和单一所有权。
 - `scripts/check-repository-structure.py` 在测试前阻止执行域 DTO 被重新复制回跨域 Schema 模块。
+
+## Financial Projection 边界
+
+- `platform-backend/app/trading.py` 负责成交后近实时运营投影，并且只写入 `positions` 与 `pnl_results`。
+- `platform-backend/app/financial_facts.py` 负责不可变财务事实的摄取与正式投影重建，并维护 `financial_facts`、`formal_positions` 与 `formal_pnl_results`。
+- 运营投影服务于交易监控和即时展示，不构成正式会计权威；正式账务必须从不可变事实重建。
+- 交易链路不得写入正式投影，正式账务链路不得读取运营投影作为计算输入。
+- `tests/test_projection_boundaries.py` 与 `scripts/check-repository-structure.py` 对命名、表读写方向和跨边界依赖执行静态回归检查。
