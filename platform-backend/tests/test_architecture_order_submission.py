@@ -32,7 +32,10 @@ def test_legacy_and_v1_entry_points_delegate_to_the_owner() -> None:
 
     assert "submit_order_through_runtime" in owner_functions
     assert "submit_trade_command_order" in owner_functions
-    assert "from app.trade_command_execution import submit_order_through_runtime" in compatibility_source
+    assert (
+        "from app.trade_command_execution import submit_order_through_runtime"
+        in compatibility_source
+    )
     assert 'mode="legacy"' in compatibility_source
 
 
