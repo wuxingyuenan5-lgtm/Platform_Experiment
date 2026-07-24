@@ -20,6 +20,13 @@ dev = [
 [tool.pytest.ini_options]
 pythonpath = ["."]
 testpaths = ["tests"]
+addopts = ["--strict-markers"]
+markers = [
+  "architecture: static architecture and ownership boundary checks",
+  "unit: deterministic domain calculations and isolated policies",
+  "integration: API, persistence, orchestration, and component collaboration",
+  "live_safety: fail-closed controls, production operations, and live-write safety",
+]
 
 [tool.ruff]
 target-version = "py312"

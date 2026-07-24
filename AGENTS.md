@@ -35,6 +35,7 @@ docs/                Architecture and operational documentation
 - Keep one authoritative implementation for each domain calculation; compatibility wiring must not replace functions at runtime.
 - Keep API schemas owned by their domain module; cross-domain compatibility modules may use explicit public aliases to re-export but must not redefine them.
 - Keep operational trading projections (`positions`, `pnl_results`) separate from FinancialFact-based formal accounting projections.
+- Assign every Backend and Runtime test exactly one primary layer (`architecture`, `unit`, `integration`, or `live_safety`) and keep classified suites independently executable.
 - CI quality gates must cover complete maintained directories; do not use file allowlists that let new code bypass lint or dependency validation.
 - Use `rg` for search.
 - Ignore `node_modules`, `.venv`, `dist`, generated outputs and external references unless explicitly required.

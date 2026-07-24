@@ -99,10 +99,14 @@ jobs:
           path: /tmp/runtime-ruff.log
           if-no-files-found: ignore
           retention-days: 3
-      - name: Test
+      - name: Test classified runtime suites
         shell: bash
         run: |
-          if ! python -m pytest > /tmp/runtime-pytest.log 2>&1; then
+          if ! (
+            python -m pytest -m unit &&
+            python -m pytest -m integration &&
+            python -m pytest -m live_safety
+          ) > /tmp/runtime-pytest.log 2>&1; then
             tail -n 260 /tmp/runtime-pytest.log
             exit 1
           fi
@@ -146,10 +150,15 @@ jobs:
           path: /tmp/backend-ruff.log
           if-no-files-found: ignore
           retention-days: 3
-      - name: Test
+      - name: Test classified backend suites
         shell: bash
         run: |
-          if ! python -m pytest > /tmp/backend-pytest.log 2>&1; then
+          if ! (
+            python -m pytest -m architecture &&
+            python -m pytest -m unit &&
+            python -m pytest -m integration &&
+            python -m pytest -m live_safety
+          ) > /tmp/backend-pytest.log 2>&1; then
             tail -n 500 /tmp/backend-pytest.log
             exit 1
           fi

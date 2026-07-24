@@ -50,3 +50,11 @@
 - 运营投影服务于交易监控和即时展示，不构成正式会计权威；正式账务必须从不可变事实重建。
 - 交易链路不得写入正式投影，正式账务链路不得读取运营投影作为计算输入。
 - `tests/test_projection_boundaries.py` 与 `scripts/check-repository-structure.py` 对命名、表读写方向和跨边界依赖执行静态回归检查。
+
+## Test Taxonomy 边界
+
+- Platform Backend 测试按 `architecture`、`unit`、`integration`、`live_safety` 四层执行。
+- Execution Runtime 测试按 `unit`、`integration`、`live_safety` 三层执行。
+- 每个测试在 collection 阶段必须获得且只能获得一个主标记；未知标记通过 `--strict-markers` 直接失败。
+- CI 分层运行各套件，测试不得依赖其他层的执行顺序或残留状态。
+- 具体分类规则分别记录在 `platform-backend/tests/README.md` 与 `execution-runtime/tests/README.md`。
