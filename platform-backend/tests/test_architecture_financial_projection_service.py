@@ -1,9 +1,8 @@
 import ast
 from pathlib import Path
 
-from app import financial_facts
+from app import financial_facts, position_math
 from app import financial_projection_service as service
-from app import position_math
 
 APP_ROOT = Path(__file__).resolve().parents[1] / "app"
 SERVICE_PATH = APP_ROOT / "financial_projection_service.py"

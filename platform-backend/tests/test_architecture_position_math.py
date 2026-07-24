@@ -1,10 +1,8 @@
 import ast
 from pathlib import Path
 
-from app import financial_facts
+from app import financial_facts, position_math, trading
 from app import financial_projection_service as formal_projection
-from app import position_math
-from app import trading
 
 APP_ROOT = Path(__file__).resolve().parents[1] / "app"
 OWNER_PATH = APP_ROOT / "position_math.py"

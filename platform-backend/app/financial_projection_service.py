@@ -8,12 +8,12 @@ from uuid import uuid4
 
 from app import financial_fact_repository as repository
 from app.financial_fact_normalization import decimal_text, utc_iso
-from app.position_math import calculate_position_update
 from app.financial_fact_schemas import (
     TRADE_FACT_TYPES,
     FinancialProjectionRebuildResponse,
     FormalNavSnapshotResponse,
 )
+from app.position_math import calculate_position_update
 
 
 class InvalidCapitalBaseError(ValueError):
