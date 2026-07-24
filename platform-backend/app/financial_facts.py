@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import hashlib
 import json
 from datetime import UTC, datetime
 from decimal import Decimal
@@ -8,6 +7,7 @@ from uuid import uuid4
 
 from fastapi import APIRouter, HTTPException, Query
 
+from app import financial_fact_normalization as normalization
 from app import financial_fact_repository as repository
 from app.config import get_settings
 from app.financial_fact_schemas import (
@@ -32,29 +32,19 @@ __all__ = [
 ]
 
 PROJECTED_FACT_TYPES = {"trade_fill", "deal", "funding", "swap", "fee", "fx"}
-MONETARY_FACT_TYPES = {"funding", "swap", "fee", "balance", "fx"}
 
-# Compatibility aliases for callers that previously imported persistence helpers from this module.
+# Compatibility aliases for callers that previously imported helpers from this module.
 ensure_schema = repository.ensure_schema
 financial_fact_from_row = repository.financial_fact_from_row
 formal_pnl_from_row = repository.formal_pnl_from_row
 formal_position_from_row = repository.formal_position_from_row
 formal_nav_from_row = repository.formal_nav_from_row
+utc_iso = normalization.utc_iso
+decimal_text = normalization.decimal_text
 
 
 def now_iso() -> str:
     return datetime.now(UTC).isoformat()
-
-
-def utc_iso(value: datetime | None) -> str:
-    moment = value or datetime.now(UTC)
-    if moment.tzinfo is None:
-        moment = moment.replace(tzinfo=UTC)
-    return moment.astimezone(UTC).isoformat()
-
-
-def decimal_text(value: Decimal) -> str:
-    return format(value, "f")
 
 
 def optional_decimal(value: object) -> Decimal | None:
@@ -85,86 +75,31 @@ def load_instrument(instrument_id: str):
     return row
 
 
-def normalize_fact(request: CreateFinancialFactRequest) -> dict[str, str | None]:
+def normalize_fact(
+    request: CreateFinancialFactRequest,
+) -> normalization.NormalizedFinancialFact:
     strategy = load_strategy(request.strategy_instance_id)
-    base_currency = strategy["base_currency"]
     instrument = None
     if request.account_id is not None:
         validate_account_binding(request.strategy_instance_id, request.account_id)
     if request.instrument_id is not None:
         instrument = load_instrument(request.instrument_id)
 
-    currency = request.currency.upper() if request.currency else None
-    quantity_unit = None
-    contract_multiplier = None
-    if request.fact_type in TRADE_FACT_TYPES:
-        if instrument is None:
-            raise HTTPException(status_code=422, detail="Trade fact instrument is unavailable")
-        settle_currency = instrument["settle_currency"]
-        if currency is not None and currency != settle_currency:
-            raise HTTPException(
-                status_code=422,
-                detail="Trade fact currency must match instrument settlement currency",
-            )
-        currency = settle_currency
-        quantity_unit = instrument["quantity_unit"]
-        contract_multiplier = Decimal(instrument["contract_multiplier"])
-
-    amount = request.amount
-    fx_rate = request.fx_rate_to_base
-    converted_amount = None
-    data_quality_state = "complete"
-    if request.fact_type in MONETARY_FACT_TYPES:
-        if amount is None or currency is None:
-            raise HTTPException(status_code=422, detail="Monetary fact is incomplete")
-        if currency == base_currency:
-            fx_rate = Decimal("1")
-            converted_amount = amount
-        elif fx_rate is not None:
-            converted_amount = amount * fx_rate
-        else:
-            data_quality_state = "incomplete"
-    elif request.fact_type in TRADE_FACT_TYPES and currency != base_currency and fx_rate is None:
-        data_quality_state = "incomplete"
-
-    return {
-        "fact_type": request.fact_type,
-        "source": request.source,
-        "external_id": request.external_id,
-        "strategy_instance_id": request.strategy_instance_id,
-        "account_id": request.account_id,
-        "instrument_id": request.instrument_id,
-        "side": request.side,
-        "quantity": decimal_text(request.quantity) if request.quantity is not None else None,
-        "quantity_unit": quantity_unit,
-        "price": decimal_text(request.price) if request.price is not None else None,
-        "contract_multiplier": (
-            decimal_text(contract_multiplier) if contract_multiplier is not None else None
+    context = normalization.FinancialFactNormalizationContext(
+        base_currency=strategy["base_currency"],
+        settle_currency=instrument["settle_currency"] if instrument is not None else None,
+        quantity_unit=instrument["quantity_unit"] if instrument is not None else None,
+        contract_multiplier=(
+            Decimal(instrument["contract_multiplier"]) if instrument is not None else None
         ),
-        "amount": decimal_text(amount) if amount is not None else None,
-        "currency": currency,
-        "base_currency": base_currency,
-        "fx_rate_to_base": decimal_text(fx_rate) if fx_rate is not None else None,
-        "converted_amount": (
-            decimal_text(converted_amount) if converted_amount is not None else None
-        ),
-        "available_balance": (
-            decimal_text(request.available_balance)
-            if request.available_balance is not None
-            else None
-        ),
-        "occurred_at": utc_iso(request.occurred_at),
-        "payload_json": json.dumps(request.payload, ensure_ascii=False, sort_keys=True),
-        "data_quality_state": data_quality_state,
-    }
+    )
+    return normalization.normalize_financial_fact(request, context)
 
 
 def record_financial_fact(request: CreateFinancialFactRequest) -> FinancialFactResponse:
     repository.ensure_schema()
     normalized = normalize_fact(request)
-    content_hash = hashlib.sha256(
-        json.dumps(normalized, sort_keys=True, separators=(",", ":")).encode("utf-8")
-    ).hexdigest()
+    content_hash = normalization.normalized_content_hash(normalized)
     fact_id = str(uuid4())
     created_at = now_iso()
     status, response = repository.store_financial_fact(
