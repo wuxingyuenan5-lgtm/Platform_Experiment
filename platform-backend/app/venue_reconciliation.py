@@ -8,6 +8,7 @@ from uuid import uuid4
 
 import httpx
 from fastapi import APIRouter, HTTPException
+
 from app.config import get_settings
 from app.database import connection
 from app.financial_facts import CreateFinancialFactRequest, record_financial_fact
