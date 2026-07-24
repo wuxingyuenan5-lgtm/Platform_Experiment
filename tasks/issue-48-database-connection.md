@@ -1,7 +1,7 @@
 # Task: SQLite connection boundary extraction
 
 Issue: #48
-Status: active
+Status: ready for merge
 Branch: `refactor/issue-48-database-connection`
 Base commit: `1d37bedf9bb917c532f2a1aa00eb162e20a96f56`
 
@@ -27,15 +27,18 @@ Extract configured SQLite path resolution and transaction-managed connection cre
 
 ## Acceptance criteria
 
-- [ ] One Issue, task packet, branch and PR.
-- [ ] New module owns path/connection transaction behavior.
-- [ ] `app.database` re-exports identical compatibility objects.
-- [ ] `database.py` contains no `sqlite3.connect` or connection context implementation.
-- [ ] Direct commit/rollback/foreign-key/path tests pass.
-- [ ] Existing classified Backend suites pass unchanged.
-- [ ] Connection boundary is in progressive Pyright and machine-checked.
-- [ ] Runtime/frontend regressions, Repository Safety and Secret Scan pass.
-- [ ] Documentation matches the final implementation.
+- [x] One Issue, task packet, branch and PR.
+- [x] New module owns path/connection transaction behavior.
+- [x] `app.database` re-exports identical compatibility objects.
+- [x] `database.py` contains no `sqlite3.connect` or connection context implementation.
+- [x] Direct commit/rollback/foreign-key/path tests pass.
+- [x] Fresh Schema/index/Seed snapshot, repeated initialization and legacy DB compatibility tests pass.
+- [x] Existing classified Backend suites pass unchanged on implementation heads.
+- [x] Connection boundary is in progressive Pyright and machine-checked.
+- [x] Runtime and Repository Safety pass on implementation heads.
+- [x] Secret Scan passes on implementation heads.
+- [x] Documentation matches the final implementation.
+- [ ] Final frozen-head Platform CI and independent Secret Scan; evidence recorded in PR #49.
 
 ## Risk and rollback
 
@@ -45,15 +48,15 @@ Rollback: revert the final squash commit. No migration or external state is intr
 
 ## Progress
 
-- Done: audited `database.py` responsibilities and existing callers; created Issue #48 and unique branch.
-- Current: extract connection implementation behind compatibility aliases.
-- Next: add direct transaction equivalence and architecture tests.
+- Done: extracted the connection owner, preserved compatibility identity, added direct transaction tests plus fresh/existing/repeated initialization snapshots, Pyright and architecture checks, and synchronized documentation.
+- Current: final frozen-head CI and PR evidence.
+- Next: squash merge, then extract core Bootstrap/Schema in a separate Issue.
 - Blocked by: none.
 
 ## Completion
 
-- PR: pending.
-- Merge commit: pending.
-- Behavior changed: none intended; connection ownership only.
-- Tests/CI: pending.
+- PR: #49.
+- Merge commit: pending squash merge.
+- Behavior changed: none; connection ownership only.
+- Tests/CI: implementation-head Backend, Runtime, Repository Safety and Secret Scan passed; final evidence will be recorded in PR #49.
 - Follow-up: core bootstrap/schema and reference seed extraction remain separate Issues.
