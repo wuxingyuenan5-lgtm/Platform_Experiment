@@ -15,12 +15,14 @@ LIVE_SAFETY_PATTERNS = (
     "redaction",
     "secret",
 )
+UNIT_PATTERNS = (
+    "cross_spread_market",
+    "gateway_factory",
+)
 INTEGRATION_PATTERNS = (
     "bridge",
-    "factory",
     "gateway",
     "journal",
-    "market",
     "query",
     "readiness",
     "venue",
@@ -34,6 +36,8 @@ def classify_test_file(path: Path) -> str:
     name = path.stem.lower()
     if any(pattern in name for pattern in LIVE_SAFETY_PATTERNS):
         return "live_safety"
+    if any(pattern in name for pattern in UNIT_PATTERNS):
+        return "unit"
     if any(pattern in name for pattern in INTEGRATION_PATTERNS):
         return "integration"
     return "unit"
