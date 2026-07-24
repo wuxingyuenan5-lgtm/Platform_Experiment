@@ -11,7 +11,7 @@ Make one pure function the authoritative per-fill position quantity, average pri
 
 ## Background
 
-`app.trading` and `app.financial_projection_service` currently contain equivalent copies of `calculate_position_update`. Maintaining two accounting formulas creates a future drift risk even though current results are identical.
+`app.trading` and `app.financial_projection_service` contained equivalent copies of `calculate_position_update`. Maintaining two accounting formulas created a future drift risk even though their results were identical.
 
 ## Non-goals
 
@@ -88,9 +88,9 @@ Risk: medium-low.
 
 ## Progress
 
-- Done: Issue/branch/PR and implementation design.
-- Current: code extraction, golden tests and architecture checks.
-- Next: full CI, Diff review and merge.
+- Done: one pure Owner, compatibility imports, ten golden cases, sole-definition/purity checks, Ownership and Pyright registration.
+- Current: full CI and final Diff review.
+- Next: freeze evidence, mark ready, squash merge and close Issue.
 - Blocked by: nothing.
 
 ## Completion
@@ -99,5 +99,5 @@ Risk: medium-low.
 - Merge commit:
 - Behavior changed: ownership only; two copies become one pure implementation.
 - Behavior intentionally unchanged: every calculation result and all external/persistence behavior.
-- Tests/CI:
+- Tests/CI: pending standard final-head runs.
 - Follow-up debt: order submission unification remains the next independent workstream.
