@@ -16,13 +16,28 @@ This is the canonical persistence entrypoint. SQLite remains the approved databa
 
 A table must have one owning module and one authority class.
 
-## 2. Current DDL owners
+## 2. Connection and transaction owner
+
+`app/database_connection.py` is the single owner of the shared SQLite connection boundary:
+
+- resolve the configured path dynamically;
+- create parent directories;
+- open SQLite;
+- install `sqlite3.Row`;
+- enable Foreign Keys;
+- commit on successful context exit;
+- rollback and re-raise on exceptions;
+- close in all cases.
+
+`app/database.py` explicitly re-exports `connection` and `database_path` so existing callers remain compatible. It must not reimplement `sqlite3.connect` or the transaction context.
+
+## 3. Current DDL owners
 
 ### Platform Backend
 
 | Owner module | Primary responsibility |
 |---|---|
-| `app/database.py` | core reference data, commands, orders, fills, operational projections and initial seed data |
+| `app/database.py` | core Schema/compatibility DDL plus initial reference-data seeds; connection ownership has moved to `app/database_connection.py` |
 | `app/financial_fact_repository.py` | immutable financial facts, formal Position/PnL/NAV persistence and transaction boundaries |
 | `app/execution_risk.py` | Kill Switch, batch risk snapshots and residual-risk actions |
 | `app/venue_reconciliation.py` | venue reconciliation runs and differences |
@@ -34,7 +49,7 @@ A table must have one owning module and one authority class.
 | `app/disaster_recovery.py` | backup and restore manifests/drill records |
 | `app/schema_migrations.py` | migration ledger and ordered additive migrations |
 
-`app/financial_facts.py` owns normalization, hashing, formal-accounting calculations, rebuild orchestration and API routes. It does not own DDL or direct SQL. Fact+audit, Position+PnL, rebuild-clear and NAV+audit transaction units are owned by `app/financial_fact_repository.py`.
+FinancialFact responsibilities are separated into Schema, Normalization, Repository, Projection Service and API modules. Only `app/financial_fact_repository.py` owns its direct SQL and protected transaction units.
 
 ### Execution Runtime
 
@@ -46,7 +61,7 @@ A table must have one owning module and one authority class.
 
 Runtime storage is not the permanent financial ledger and must not be written directly by Platform modules.
 
-## 3. Migration ledger
+## 4. Migration ledger
 
 Platform migrations are declared in `platform-backend/app/schema_migrations.py`.
 
@@ -57,7 +72,7 @@ The `schema_migrations` table records:
 - SHA-256 checksum of version, name and statements;
 - application time.
 
-Version 1 is `existing-platform-schema-baseline`. It intentionally records the already-existing schema without moving tables or changing business data.
+Version 1 is `existing-platform-schema-baseline`. It records the already-existing schema without moving tables or changing business data.
 
 At application startup, the schema-governance router applies pending migrations. Reapplying the same migration is idempotent. Changing an already-applied migration name or checksum fails closed.
 
@@ -67,7 +82,7 @@ Status endpoint:
 GET /api/v1/ops/schema-migrations
 ```
 
-## 4. Rules for a new migration
+## 5. Rules for a new migration
 
 1. Never edit an applied migration.
 2. Add one new version after the current highest version.
@@ -77,7 +92,7 @@ GET /api/v1/ops/schema-migrations
 6. Add tests for fresh database, existing database, repeated startup and checksum drift.
 7. Do not combine a schema migration with unrelated refactoring.
 
-## 5. High-risk changes requiring explicit review
+## 6. High-risk changes requiring explicit review
 
 - table or column deletion;
 - column type or meaning change;
@@ -89,16 +104,15 @@ GET /api/v1/ops/schema-migrations
 
 These require a dedicated Issue, migration task packet, backup/restore evidence and an explicit rollback or forward-fix strategy.
 
-## 6. Planned decomposition
+## 7. Decomposition sequence
 
-The next safe decomposition is not a table rewrite. It is:
+The safe decomposition is structural, not a table rewrite:
 
 ```text
-platform-backend/app/database/
-  connection.py
-  bootstrap.py
-  migrations/
-  seeds/
+app/database_connection.py  # completed
+app/database_bootstrap.py   # core Schema and compatibility DDL
+app/database_seeds.py       # fixed reference-data seeds
+app/database.py             # compatibility facade / initializer
 ```
 
-That move should happen only after all current DDL owners are registered in the ledger and compatibility tests prove identical fresh/existing database behavior.
+Every step requires fresh-database, existing-database and repeated-initialization equivalence. No structural extraction may be combined with business Schema or seed changes.
