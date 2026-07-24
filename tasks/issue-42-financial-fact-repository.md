@@ -1,7 +1,7 @@
 # Task: FinancialFact persistence repository extraction
 
 Issue: #42
-Status: active
+Status: ready for merge
 Branch: `refactor/issue-42-financial-fact-repository`
 Base commit: `052cb1ddb678197eee2f81ef81542c0f8f063304`
 
@@ -53,18 +53,19 @@ Do not modify unrelated Runtime, frontend or trading modules unless a proven reg
 
 ## Acceptance criteria
 
-- [ ] One Issue, one task packet, one branch and one PR.
-- [ ] Repository module owns all FinancialFact/formal-accounting direct SQL access.
-- [ ] `financial_facts.py` contains no `connection()` call or SQL statement.
-- [ ] Schema compatibility exports and service function imports remain unchanged.
-- [ ] Existing accounting golden tests pass unchanged.
-- [ ] Transaction-boundary tests cover fact+audit and NAV+audit atomicity and formal projection atomicity.
-- [ ] Repository ownership is machine-checked.
-- [ ] Repository module is included in progressive Pyright.
-- [ ] Backend dependency, Ruff, Pyright and all classified tests pass.
-- [ ] Runtime and frontend regression gates pass.
-- [ ] Secret Scan passes.
-- [ ] Documentation matches the final implementation.
+- [x] One Issue, one task packet, one branch and one PR.
+- [x] Repository module owns all FinancialFact/formal-accounting direct SQL access.
+- [x] `financial_facts.py` contains no `connection()` call or SQL statement.
+- [x] Schema compatibility exports and service function imports remain unchanged.
+- [x] Existing accounting golden tests pass unchanged.
+- [x] Transaction-boundary tests cover fact+audit, Position+PnL, rebuild-clear and NAV+audit atomicity.
+- [x] Repository ownership is machine-checked.
+- [x] Repository module is included in progressive Pyright.
+- [x] Backend dependency, Ruff, Pyright and all classified tests pass.
+- [x] Runtime regression gates pass.
+- [x] Secret Scan passes.
+- [x] Documentation matches the final implementation.
+- [ ] Final frontend regression build and squash merge; evidence is recorded in PR #43.
 
 ## Verification commands
 
@@ -92,15 +93,15 @@ Rollback: revert the final squash commit. No migration or external state is intr
 
 ## Progress
 
-- Done: verified `main@052cb1dd...`, no open PRs, created Issue #42 and its unique branch.
-- Current: inventory SQL responsibilities and exact transaction units.
-- Next: add repository boundary and transaction tests, then move SQL without changing calculations.
+- Done: extracted SQL/row mapping/transaction units, preserved compatibility aliases, added forced-rollback tests, Pyright and machine ownership checks, and synchronized documentation.
+- Current: final Platform CI and PR review evidence.
+- Next: squash merge after every required job is green.
 - Blocked by: none.
 
 ## Completion
 
-- PR: pending.
-- Merge commit: pending.
-- Behavior changed: none intended; persistence ownership only.
-- Tests/CI: pending.
+- PR: #43.
+- Merge commit: pending squash merge.
+- Behavior changed: none; persistence ownership only.
+- Tests/CI: Backend and Runtime gates plus Repository Safety and Secret Scan passed during implementation; final head evidence is recorded in PR #43.
 - Follow-up: normalization-policy and projection-service extraction require separate Issues and PRs.
