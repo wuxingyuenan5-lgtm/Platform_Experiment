@@ -213,7 +213,7 @@ def test_financial_fact_request_validation_is_preserved() -> None:
         "source": "schema-golden",
         "externalId": "external-schema-golden-1",
         "strategyInstanceId": "strategy_funding_arbitrage_instance_default",
-        "occurredAt": "2026-07-24T00:00:00+00:00",
+        "occurredAt": "2026-07-24T00:00:00Z",
     }
 
     with pytest.raises(ValidationError, match="Trade facts require"):
