@@ -21,6 +21,7 @@ UNIT_PATTERNS = (
 )
 INTEGRATION_PATTERNS = (
     "bridge",
+    "contract",
     "gateway",
     "journal",
     "query",
