@@ -93,7 +93,7 @@ Risk: medium.
 ## Progress
 
 - Done: compatibility audit, single-owner implementation, legacy/V1 payload preservation and architecture tests.
-- Current: standard full CI and final Diff review.
+- Current: apply the two Ruff-only formatting diagnostics, then rerun full CI.
 - Next: freeze evidence, mark ready, squash merge and close Issue.
 - Blocked by: nothing.
 
@@ -103,5 +103,5 @@ Risk: medium.
 - Merge commit:
 - Behavior changed: internal ownership only; duplicate orchestration becomes one implementation.
 - Behavior intentionally unchanged: both public paths, payload modes, Safety, persistence, Runtime and Event behavior.
-- Tests/CI: pending standard final-head runs.
+- Tests/CI: first standard run found only two Ruff formatting diagnostics.
 - Follow-up debt: broader Venue Reconciliation decomposition remains next after this workstream.
