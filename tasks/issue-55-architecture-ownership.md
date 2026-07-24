@@ -2,28 +2,27 @@
 
 Issue: #55
 Branch: `docs/issue-55-architecture-ownership`
+Status: complete pending final PR merge
 
 ## Objective
 
 Create one canonical architecture ownership catalog and a blocking consistency check so Agent context and architecture Markdown cannot silently drift behind implemented module boundaries.
 
-## Scope
+## Delivered
 
-### Included
+- Added `docs/architecture/OWNERSHIP.md` as the canonical major module ownership catalog.
+- Corrected stale FinancialFact ownership in `docs/codex/context-map.md`.
+- Reduced context-map to context selection and kept current-state focused on current invariants.
+- Added `scripts/check-documentation-consistency.py` with deterministic validation units.
+- Added architecture tests for current-repository consistency, missing Owner paths, wrong mappings and obsolete context statements.
+- Added the checker to the Platform CI Repository Safety job.
+- Synchronized durable Agent rules, architecture entrypoint, current-state and Changelog.
 
-- `docs/architecture/OWNERSHIP.md` canonical ownership catalog.
-- Correct stale ownership in `docs/codex/context-map.md`.
-- Keep current-state compact and link to the canonical catalog.
-- Add `scripts/check-documentation-consistency.py`.
-- Add direct tests for missing files and stale ownership mappings.
-- Run the check in Repository Safety.
-- Update directly authoritative Markdown and Changelog.
+## Excluded and unchanged
 
-### Excluded
-
-- Runtime behavior, API, SQL, Schema, Seed or formula changes.
-- Trading, credentials, deployment, Release, Staging, SLO or Live Write changes.
-- Mass Markdown formatting or historical documentation cleanup.
+- Runtime behavior, API, SQL, Schema, Seed and formulas.
+- Trading, credentials, deployment, Release, Staging, SLO and Live Write.
+- Historical Markdown content outside the directly affected ownership/context surfaces.
 
 ## Protected semantics
 
@@ -39,18 +38,22 @@ Create one canonical architecture ownership catalog and a blocking consistency c
 - `docs/codex/context-map.md`
 - `docs/codex/current-state.md`
 - `docs/architecture/README.md`
-- `scripts/check-repository-structure.py`
+- `docs/architecture/OWNERSHIP.md`
+- `scripts/check-documentation-consistency.py`
 - `.github/workflows/platform-ci.yml`
-- direct script tests
+- `platform-backend/tests/test_architecture_documentation_consistency.py`
 
 ## Acceptance evidence
 
-- Canonical ownership document exists and all listed repository paths resolve.
-- Context map reflects separated FinancialFact ownership.
-- Consistency checker fails for a missing canonical owner path.
-- Consistency checker fails for a stale context ownership statement.
-- Repository Safety invokes the checker.
-- Full Platform CI and independent Secret Scan pass on the frozen PR head.
+- [x] Canonical ownership document exists and protected Owner paths resolve.
+- [x] Context map reflects separated FinancialFact ownership.
+- [x] Consistency checker rejects a missing canonical Owner path.
+- [x] Consistency checker rejects a wrong Owner mapping.
+- [x] Consistency checker rejects the obsolete `financial_facts.py` shortcut.
+- [x] Repository Safety invokes and passes the checker.
+- [x] Backend architecture suite executes the direct tests.
+- [x] No business or runtime source file changed.
+- [ ] Final frozen-head Platform CI and independent Secret Scan evidence is recorded in PR #56.
 
 ## Rollback
 
