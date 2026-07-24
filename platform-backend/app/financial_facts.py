@@ -11,6 +11,7 @@ from fastapi import APIRouter, HTTPException, Query
 from app.config import get_settings
 from app.database import connection
 from app.financial_fact_schemas import (
+    TRADE_FACT_TYPES,
     CreateFinancialFactRequest,
     FinancialFactResponse,
     FinancialFactType,
@@ -18,7 +19,6 @@ from app.financial_fact_schemas import (
     FormalNavSnapshotResponse,
     FormalPnlResponse,
     FormalPositionResponse,
-    TRADE_FACT_TYPES,
 )
 
 __all__ = [
