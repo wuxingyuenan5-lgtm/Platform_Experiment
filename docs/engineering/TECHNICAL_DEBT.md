@@ -27,45 +27,45 @@ Completed prerequisite:
 - additive `schema_migrations` ledger;
 - ordered version and checksum validation;
 - existing-schema V1 baseline;
-- repeated-startup and mutation-detection tests.
+- repeated-startup and mutation-detection tests;
+- FinancialFact schemas, normalization, persistence and projection services are separated from the core database module.
 
-Deferred because: physically moving DDL or seed logic can affect fresh and existing databases even when SQL text looks unchanged.
+Deferred because: physically moving connection, DDL or seed logic can affect fresh and existing databases even when SQL text looks unchanged.
 
-Trigger: a dedicated Issue proves fresh-database and existing-database behavior before/after extraction.
+Trigger: dedicated Issues prove fresh-database and existing-database behavior before and after each extraction.
 
 Protected semantics: existing tables, indexes, seed identifiers, live defaults and financial/trading behavior.
 
-Safe approach: extract connection → bootstrap → migrations → seeds in small PRs; do not combine with a business schema change.
+Safe approach: extract connection → bootstrap → seeds in small PRs; keep the migration ledger authoritative and do not combine a structural extraction with a business schema change.
 
 ## TD-002 — Financial facts module concentration
 
-Status: active; schema, persistence and normalization boundaries extracted in Issues #40, #42 and #44
+Status: completed through Issues #40, #42, #44 and #46
 Owner: Platform Backend / formal accounting
 
-Problem: `app/financial_facts.py` still contains catalog-context resolution, formal Position/PnL calculations, NAV calculation, rebuild orchestration and API behavior. Public DTOs, normalization/hash policy and direct persistence are now isolated in dedicated modules.
+Original problem: `app/financial_facts.py` combined public DTOs, normalization/content hashing, direct persistence, formal Position/PnL/NAV calculations, rebuild orchestration and API behavior.
 
-Risk: formal projection calculations and orchestration still share one review surface.
+Resolved ownership:
 
-Completed prerequisite:
+- `app/financial_fact_schemas.py`: public FinancialFact/formal-accounting DTOs;
+- `app/financial_fact_normalization.py`: canonicalization, FX/data-quality policy and normalized-content hash;
+- `app/financial_fact_repository.py`: SQL, DDL, row mapping and protected transaction units;
+- `app/financial_projection_service.py`: average cost, realized and component PnL, formal projection rebuild and NAV calculation;
+- `app/financial_facts.py`: catalog/context resolution, immutable fact recording, validation/HTTP mapping, compatibility wrappers and API routes.
 
-- operational/formal projection ownership is machine-checked;
-- database authority is documented;
-- cross-service execution contracts are versioned;
-- existing golden tests cover idempotency, content conflicts, FX completeness, contract multiplier, average cost, component PnL, rebuild and NAV coverage;
-- Issue #40 establishes `app/financial_fact_schemas.py` as the authoritative public DTO owner while preserving `app.financial_facts` compatibility exports;
-- Issue #42 establishes `app/financial_fact_repository.py` as the direct SQL, row-mapping and DDL owner;
-- fact+audit, Position+PnL, rebuild-clear and NAV+audit transaction units have forced-rollback tests;
-- Issue #44 establishes `app/financial_fact_normalization.py` as the canonicalization, FX/data-quality and normalized-content hash owner;
-- exact normalized-dictionary/SHA-256 golden vectors and API status/persistence equivalence tests protect immutable fact identity;
-- all three extracted boundaries are included in progressive Pyright or explicit architecture checks.
+Evidence:
 
-Deferred because: formal Position/PnL/NAV calculations and rebuild orchestration still require one dedicated projection-service boundary with before/after equivalence evidence.
+- public schema identity and JSON Schema snapshots;
+- exact normalized-dictionary and SHA-256 golden vectors;
+- API status and persisted-value equivalence;
+- fact+audit, Position+PnL, rebuild-clear and NAV+audit forced-rollback tests;
+- average-cost, component attribution, incomplete quality, rebuild audit and NAV calculation goldens;
+- architecture ownership checks and progressive Pyright coverage;
+- unchanged end-to-end accounting, normalization and repository transaction suites.
 
-Trigger: create one separate Issue for projection-service extraction after Issue #44 merges.
+Protected semantics: fact identity, normalized content hashing, currency conversion, contract multiplier, position average cost, component PnL, rebuild results, NAV results and transaction atomicity.
 
-Protected semantics: fact idempotency, normalized content hashing, currency conversion, contract multiplier, position average cost, component PnL, rebuild results, NAV results and transaction atomicity.
-
-Safe approach: move only calculation/rebuild orchestration in the next PR; preserve formulas byte-for-byte where possible, keep compatibility imports, and require normalization, accounting golden and repository transaction suites.
+Future rule: changes must stay within the established owner and require explicit compatibility evidence when immutable fact identity or accounting formulas change. Do not recombine these modules for convenience.
 
 ## TD-003 — Operational projection retirement criteria
 
@@ -96,7 +96,7 @@ Risk: legacy warnings still exist in untouched modules.
 Completed prerequisite:
 
 - active trading paths remain fully linted with zero warnings;
-- every added or modified `admin-risk/src` and `admin-risk/mock` source file is now checked with zero warnings;
+- every added or modified `admin-risk/src` and `admin-risk/mock` source file is checked with zero warnings;
 - no mass formatting was introduced.
 
 Deferred because: a one-shot cleanup would create an unreviewable change.
@@ -109,7 +109,7 @@ Safe approach: module-by-module cleanup until full `src/` can replace the change
 
 ## TD-005 — Progressive Python typing
 
-Status: active; first boundary baseline completed
+Status: active; critical execution, FinancialFact and persistence boundaries selected
 Owner: Platform Backend and Execution Runtime
 
 Problem: much of the legacy code remains outside static type checking.
@@ -119,7 +119,7 @@ Risk: untyped database rows, arbitrary payloads and large orchestration modules 
 Completed prerequisite:
 
 - Pyright is installed and blocking in CI;
-- Platform execution DTOs, FinancialFact DTOs/Normalization/Repository, Runtime contracts, schema migrations, schema governance and authoritative order submission are selected;
+- Platform execution DTOs, FinancialFact DTOs/Normalization/Repository/Projection Service, Runtime contracts, schema migrations, schema governance and authoritative order submission are selected;
 - Runtime models, Runtime contracts and Gateway Protocol are selected.
 
 Deferred because: strict whole-project typing would create noisy changes unrelated to current risk boundaries.
