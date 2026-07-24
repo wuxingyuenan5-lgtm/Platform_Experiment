@@ -1,25 +1,29 @@
 # Architecture Documentation
 
-本目录保存长期稳定的系统架构说明。
+本目录保存长期稳定的系统架构说明。最简拓扑和依赖方向见 `SYSTEM_MAP.md`。
 
 ## 文档职责
 
 - 架构说明：解释系统边界和模块关系。
-- decisions：记录关键技术决策。
-- operations：记录运行和生产流程。
-- technical：记录接口和领域设计。
+- `docs/decisions/`：记录关键技术决策。
+- `docs/operations/`：记录运行和生产流程。
+- `docs/technical/`：记录接口和领域设计。
+- `docs/contracts/`：保存可执行的跨服务版本快照。
+- `docs/database/`：记录数据权威、DDL Owner 和迁移纪律。
 
 ## 原则
 
-不要把历史执行过程、PR记录和临时任务放入架构文档。
+不要把历史执行过程、PR 记录和临时任务放入架构文档。
 
 架构文档回答：
 
-- 系统为什么这样设计。
-- 模块如何协作。
-- 哪些边界不能突破。
+- 系统为什么这样设计；
+- 模块如何协作；
+- 哪些边界不能突破；
+- 数据和契约由谁负责；
+- 发生故障时应保持什么不变量。
 
-具体实施记录进入对应 Issue、PR 或 Changelog。
+具体实施记录进入对应 Issue、任务包、PR 或 Changelog。
 
 ## Composition Root 边界
 
@@ -32,29 +36,66 @@
 ## 工程门禁边界
 
 - Backend 与 Runtime 的 Ruff 检查覆盖完整 `app/` 与 `tests/`，新增文件不能绕过门禁。
-- Python 安装完成后必须通过 `pip check`，避免声明依赖与实际环境不一致。
-- Frontend 活跃交易界面必须通过无修改、零警告 ESLint、类型检查和生产构建。
-- `scripts/check-repository-structure.py` 阻止 Backend 引入交易场所 SDK、Composition Root 混入业务逻辑、临时测试命名和诊断工作流残留。
+- Python 安装完成后必须通过 `pip check`。
+- Pyright 先覆盖执行 DTO、Runtime 契约、迁移账本和权威下单边界；每次扩展必须保持所选模块清洁。
+- Frontend 活跃交易界面持续执行完整零警告 ESLint、类型检查和生产构建。
+- 活跃范围之外的新增或修改前端源文件通过 changed-file no-new-debt gate，禁止增加旧债。
+- `scripts/check-repository-structure.py` 阻止 Backend 引入交易场所 SDK、Composition Root 混入业务逻辑、平行上下文入口、临时测试命名和诊断工作流残留。
+
+## 工作流与上下文边界
+
+- 人工入口唯一为 `00-人工可读目录/README.md`。
+- Agent 入口唯一为 `docs/codex/context-map.md`。
+- 当前工程事实唯一由 `docs/codex/current-state.md` 维护。
+- 每个非简单工作通过一个 Issue、一个任务包、一个 Issue 编号分支和一个开放 PR 推进。
+- `scripts/check-workstream.py` 校验 Issue、分支、任务包和 PR 的一致性，并阻止同一 Issue 出现第二个开放 PR。
+- Agent 默认只读取任务包、一个模块入口、3–8 个直接源文件和直接测试。
 
 ## Domain Schema 边界
 
 - 执行、订单、批次、策略运行、持仓和 PnL API DTO 由 `platform-backend/app/execution_schemas.py` 统一维护。
-- `platform-backend/app/schemas.py` 作为迁移期兼容入口，只允许使用显式公共别名重导出，不得重复定义执行域类型。
+- `platform-backend/app/schemas.py` 作为迁移期兼容入口，只允许显式公共别名重导出，不得重复定义执行域类型。
 - `tests/test_schema_boundaries.py` 校验兼容导出的对象身份和单一所有权。
-- `scripts/check-repository-structure.py` 在测试前阻止执行域 DTO 被重新复制回跨域 Schema 模块。
+- `scripts/check-repository-structure.py` 阻止执行域 DTO 被复制回跨域 Schema 模块。
+
+## Platform–Runtime 契约边界
+
+- 当前执行 Command/Event 使用 `runtime-command` / `runtime-event` V1.0。
+- 双端模型分别位于 Platform 和 Runtime 的 `app/runtime_contracts.py`。
+- `docs/contracts/runtime-v1.json` 是字段顺序、名称和版本的可执行快照。
+- Platform 发送显式 `contract_version` 和 `payload_version`；Runtime 对未知版本结构化拒绝。
+- Platform 收到无法验证的 Event 时保留 `result_unknown`，不得解释为确定失败或自动重下。
+- 契约不兼容变更必须提升版本并提供迁移/兼容测试，不能静默改变 V1。
+
+## Persistence 边界
+
+- SQLite 仍是当前批准的数据库技术。
+- 所有 DDL Owner、数据权威分类和迁移规则记录在 `docs/database/README.md`。
+- `platform-backend/app/schema_migrations.py` 维护单调递增、带校验和的迁移账本。
+- Version 1 只登记既有 Schema 基线，不移动或改写现有业务表。
+- 已应用迁移不可修改；校验和漂移必须启动失败。
+- 删除表/列、改变字段语义、转移账务权威或替换数据库属于专门高风险迁移。
 
 ## Financial Projection 边界
 
 - `platform-backend/app/trading.py` 负责成交后近实时运营投影，并且只写入 `positions` 与 `pnl_results`。
-- `platform-backend/app/financial_facts.py` 负责不可变财务事实的摄取与正式投影重建，并维护 `financial_facts`、`formal_positions` 与 `formal_pnl_results`。
+- `platform-backend/app/financial_facts.py` 负责不可变财务事实摄取与正式投影重建，并维护 `financial_facts`、`formal_positions` 与 `formal_pnl_results`。
 - 运营投影服务于交易监控和即时展示，不构成正式会计权威；正式账务必须从不可变事实重建。
 - 交易链路不得写入正式投影，正式账务链路不得读取运营投影作为计算输入。
-- `tests/test_projection_boundaries.py` 与 `scripts/check-repository-structure.py` 对命名、表读写方向和跨边界依赖执行静态回归检查。
+- `tests/test_projection_boundaries.py` 与结构脚本对表读写方向和跨边界依赖执行静态回归检查。
 
 ## Test Taxonomy 边界
 
 - Platform Backend 测试按 `architecture`、`unit`、`integration`、`live_safety` 四层执行。
 - Execution Runtime 测试按 `unit`、`integration`、`live_safety` 三层执行。
-- 每个测试在 collection 阶段必须获得且只能获得一个主标记；未知标记通过 `--strict-markers` 直接失败。
-- CI 分层运行各套件，测试不得依赖其他层的执行顺序或残留状态。
-- 具体分类规则分别记录在 `platform-backend/tests/README.md` 与 `execution-runtime/tests/README.md`。
+- 每个测试在 collection 阶段必须获得且只能获得一个主标记；未知标记通过 `--strict-markers` 失败。
+- CI 分层运行各套件，测试不得依赖其他层执行顺序或残留状态。
+- 具体分类规则记录在各自 `tests/README.md`。
+
+## Failure/Recovery 边界
+
+- 网络超时、外部 ACK 丢失和 Gateway result unknown 都不能自动解释为外部失败。
+- 已认领命令在结果未知后重复请求不得再次调用 Gateway。
+- Fill 身份必须幂等；重复和乱序事件不能重复投影或把 `filled` 降级。
+- 不可恢复事件、对账差异、EOD 不完整、备份/恢复失败必须 fail closed。
+- 自动化故障矩阵和受控实盘验收顺序见 `docs/operations/FAILURE_INJECTION_ACCEPTANCE.md`。
