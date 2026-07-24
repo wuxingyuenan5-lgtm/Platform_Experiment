@@ -92,7 +92,7 @@ Risk: medium.
 ## Progress
 
 - Done: repository implementation, compatibility aliases, exact DDL checksum, idempotency/rollback tests and sole-SQL-owner checks.
-- Current: standard full CI and final Diff review.
+- Current: apply the single Ruff import-order diagnostic, then rerun full CI.
 - Next: freeze evidence, mark ready, squash merge and close Issue.
 - Blocked by: nothing.
 
@@ -102,5 +102,5 @@ Risk: medium.
 - Merge commit:
 - Behavior changed: persistence ownership only.
 - Behavior intentionally unchanged: every SQL result, API and external effect.
-- Tests/CI: pending standard final-head runs.
+- Tests/CI: first standard run found one Ruff import-order diagnostic.
 - Follow-up debt: Runtime Client extraction remains next.
