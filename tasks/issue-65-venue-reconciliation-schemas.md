@@ -89,14 +89,14 @@ Risk: low-medium.
 
 ## Progress
 
-- Done: Issue and branch created.
-- Current: model inventory and extraction design.
-- Next: implementation, direct verification and full CI.
+- Done: Issue/branch/PR, model inventory and pre-extraction contract snapshots.
+- Current: schema extraction, compatibility and architecture tests.
+- Next: full CI, final review and merge.
 - Blocked by: nothing.
 
 ## Completion
 
-- PR:
+- PR: #66
 - Merge commit:
 - Behavior changed: schema ownership only.
 - Behavior intentionally unchanged: every public contract and all reconciliation behavior.

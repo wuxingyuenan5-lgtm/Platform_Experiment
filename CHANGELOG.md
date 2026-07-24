@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Venue Reconciliation public-schema ownership — Issue #65 / PR #66
+
+- Added `platform-backend/app/venue_reconciliation_schemas.py` as the sole owner of reconciliation public DTOs and status Literal types.
+- Preserved exact object identity through the existing `app.venue_reconciliation` imports.
+- Added pre-extraction JSON Schema and Reconciliation OpenAPI fragment hashes plus sole-definition/purity checks.
+- Added progressive Pyright and canonical Ownership coverage.
+- Preserved every route, field, alias, validation, SQL statement, reconciliation identity, transaction, Runtime call and both Live Write defaults.
+
 ### Unified Platform order submission orchestration — Issue #63 / PR #64
 
 - Made `platform-backend/app/trade_command_execution.py` the single local Order/Safety/Runtime submission implementation.
