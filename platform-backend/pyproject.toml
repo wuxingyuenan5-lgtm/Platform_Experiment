@@ -35,6 +35,7 @@ typeCheckingMode = "standard"
 include = [
   "app/database_bootstrap.py",
   "app/database_connection.py",
+  "app/database_seeds.py",
   "app/execution_schemas.py",
   "app/financial_fact_normalization.py",
   "app/financial_fact_repository.py",
