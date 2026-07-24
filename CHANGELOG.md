@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Exact Decimal venue fill reconciliation — Issue #59 / PR #60
+
+- Replaced SQLite `REAL` aggregation of stored fill quantities with exact Python `Decimal` accumulation.
+- Added regression coverage for fractional and high-precision quantities that would otherwise create false reconciliation differences.
+- Preserved reconciliation APIs, difference identities, persistence, accounting formulas, Runtime contracts and both Live Write defaults.
+
 ### Lightweight task packet and Markdown link hardening — Issue #57 / PR #58
 
 - Added `Expected changed files`, `Required verification` and `Stop conditions` to the canonical task packet template.
