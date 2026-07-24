@@ -11,7 +11,7 @@ Make one repository the sole owner of Venue Reconciliation DDL, direct SQL, row 
 
 ## Background
 
-After Schema and Difference Policy extraction, `app.venue_reconciliation` still combines external orchestration with all reconciliation persistence. Moving persistence next keeps the remaining service boundary explicit and testable.
+After Schema and Difference Policy extraction, `app.venue_reconciliation` still combined external orchestration with all reconciliation persistence. Moving persistence next keeps the remaining service boundary explicit and testable.
 
 ## Non-goals
 
@@ -91,9 +91,9 @@ Risk: medium.
 
 ## Progress
 
-- Done: persistence inventory, Issue/branch/PR and repository API design.
-- Current: DDL/SQL/row-mapping extraction and transaction tests.
-- Next: full CI, final review and merge.
+- Done: repository implementation, compatibility aliases, exact DDL checksum, idempotency/rollback tests and sole-SQL-owner checks.
+- Current: standard full CI and final Diff review.
+- Next: freeze evidence, mark ready, squash merge and close Issue.
 - Blocked by: nothing.
 
 ## Completion
@@ -102,5 +102,5 @@ Risk: medium.
 - Merge commit:
 - Behavior changed: persistence ownership only.
 - Behavior intentionally unchanged: every SQL result, API and external effect.
-- Tests/CI:
+- Tests/CI: pending standard final-head runs.
 - Follow-up debt: Runtime Client extraction remains next.
