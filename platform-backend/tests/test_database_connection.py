@@ -3,8 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from app import database
-from app import database_connection
+from app import database, database_connection
 from app.config import get_settings
 
 
