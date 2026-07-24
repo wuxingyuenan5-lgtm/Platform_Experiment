@@ -89,7 +89,7 @@ Risk: medium-low.
 ## Progress
 
 - Done: one pure Owner, compatibility imports, ten golden cases, sole-definition/purity checks, Ownership and Pyright registration.
-- Current: full CI and final Diff review.
+- Current: apply the three Ruff import-order diagnostics, then rerun full CI.
 - Next: freeze evidence, mark ready, squash merge and close Issue.
 - Blocked by: nothing.
 
@@ -99,5 +99,5 @@ Risk: medium-low.
 - Merge commit:
 - Behavior changed: ownership only; two copies become one pure implementation.
 - Behavior intentionally unchanged: every calculation result and all external/persistence behavior.
-- Tests/CI: pending standard final-head runs.
+- Tests/CI: first standard run found only three Ruff import-order diagnostics.
 - Follow-up debt: order submission unification remains the next independent workstream.
