@@ -19,6 +19,7 @@ INTEGRATION_PATTERNS = (
     "batch",
     "catalog",
     "command",
+    "contract",
     "financial_facts",
     "flow",
     "health",
