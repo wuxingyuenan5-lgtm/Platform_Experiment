@@ -11,7 +11,7 @@ Make one pure module the authoritative owner of Venue Reconciliation status mapp
 
 ## Background
 
-`app.venue_reconciliation` still combines Runtime/SQLite orchestration with pure mappings and comparison rules. Moving only the decision policy creates an independently testable boundary without changing persistence or external effects.
+`app.venue_reconciliation` previously combined Runtime/SQLite orchestration with pure mappings and comparison rules. Moving only the decision policy creates an independently testable boundary without changing persistence or external effects.
 
 ## Non-goals
 
@@ -89,9 +89,9 @@ Risk: medium-low.
 
 ## Progress
 
-- Done: boundary audit, Issue/branch/PR and pure-policy design.
-- Current: implementation, exact Golden drafts and architecture checks.
-- Next: full CI, final review and merge.
+- Done: pure policy, status mappings, Order/Position/Balance drafts, thin persistence wrappers, Golden and architecture tests.
+- Current: standard full CI and final Diff review.
+- Next: freeze evidence, mark ready, squash merge and close Issue.
 - Blocked by: nothing.
 
 ## Completion
@@ -100,5 +100,5 @@ Risk: medium-low.
 - Merge commit:
 - Behavior changed: decision ownership only.
 - Behavior intentionally unchanged: every persisted difference and external behavior.
-- Tests/CI:
+- Tests/CI: pending standard final-head runs.
 - Follow-up debt: Venue Reconciliation Repository extraction remains the next stage.
