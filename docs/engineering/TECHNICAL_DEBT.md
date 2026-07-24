@@ -14,32 +14,34 @@ This file records intentionally deferred engineering work. It is not a backlog o
 
 ## TD-001 — Database module decomposition
 
-Status: active; connection and Bootstrap extraction completed through Issues #48 and #50
+Status: completed through Issues #48, #50 and #53
 Owner: Platform Backend / persistence
 
-Problem: `app/database.py` still combines initializer orchestration and fixed reference-data seeding. Shared connections are isolated in `app/database_connection.py`; core Schema and legacy compatibility DDL are isolated in `app/database_bootstrap.py`.
+Original problem: `app/database.py` combined configured path/connection management, core Schema, legacy compatibility DDL, initializer orchestration and all fixed reference-data Seeds.
 
-Risk: the remaining fixed Seed block is large, and careless movement could change reference identifiers, statuses, credentials references, trading modes or contract defaults.
+Resolved ownership:
 
-Completed evidence:
+- `app/database_connection.py`: dynamic path, parent creation, SQLite connection, Row Factory, Foreign Keys and Commit/Rollback/Close;
+- `app/database_bootstrap.py`: complete core Schema and legacy compatibility DDL;
+- `app/database_seeds.py`: every fixed Seed vector and insertion statement;
+- `app/database.py`: compatibility exports and `Connection → Bootstrap → Seed` initialization orchestration only.
 
-- DDL Owner inventory and additive migration ledger;
-- dynamic path, Row Factory, Foreign Key and transaction-boundary tests;
+Evidence:
+
+- connection behavior and rollback tests;
 - exact compatibility identities for existing `app.database` imports;
 - core Schema SHA-256 `421f0625ffe3a8a26ca48bc827e64bd6aa6b2e49d95faef0b17313e808375801`;
-- fresh table/index and Seed-count snapshot;
+- exhaustive all-row/all-field Seed SHA-256 `d42f7e4f95a6efa9044b1e91b4e603f1d87f515923a57d941ee16e75109e6183`;
+- fresh table/index snapshot;
+- legacy compatibility-column/index coverage;
 - repeated-initialization idempotency;
-- existing legacy database compatibility-column/index test;
-- explicit initialization-order test: Connection → Bootstrap → Seed;
-- Repository Safety DDL ownership transferred to `app/database_bootstrap.py`.
+- explicit initialization-order test;
+- static ownership checks and progressive Pyright;
+- Repository Safety DDL ownership assigned to `app/database_bootstrap.py`.
 
-Deferred because: fixed Seed ownership requires its own exhaustive value snapshot and review; combining it with Schema movement would obscure regressions.
+Protected semantics: every table/index/compatibility column, every Seed ID/value, simulation/live defaults and all financial/trading behavior.
 
-Trigger: complete the dedicated fixed reference Seed extraction.
-
-Protected semantics: every Seed ID/value, existing tables/indexes/compatibility columns, simulation/live defaults and financial/trading behavior.
-
-Safe approach: extract `seed_reference_data` and all fixed vectors into `app/database_seeds.py`, preserve `app.database` compatibility identity and initialization order, and require exhaustive Seed plus fresh/existing/repeated startup equivalence.
+Future rule: Connection, Schema or Seed changes must stay within their established Owner. Schema and Seed changes are explicit persistence/business-data changes and may not be hidden inside structural refactors.
 
 ## TD-002 — Financial facts module concentration
 
@@ -102,7 +104,7 @@ Safe approach: module-by-module cleanup until full `src/` can replace the change
 
 ## TD-005 — Progressive Python typing
 
-Status: active; critical execution, FinancialFact and SQLite Connection/Bootstrap boundaries selected
+Status: active; critical execution, FinancialFact and SQLite Connection/Bootstrap/Seeds boundaries selected
 Owner: Platform Backend and Execution Runtime
 
 Problem: much of the legacy code remains outside static type checking.
@@ -112,7 +114,7 @@ Risk: untyped database rows, arbitrary payloads and large orchestration modules 
 Completed prerequisite:
 
 - Pyright is installed and blocking in CI;
-- Platform execution DTOs, FinancialFact DTOs/Normalization/Repository/Projection Service, SQLite Connection/Bootstrap, Runtime contracts, schema migrations, schema governance and authoritative order submission are selected;
+- Platform execution DTOs, FinancialFact DTOs/Normalization/Repository/Projection Service, SQLite Connection/Bootstrap/Seeds, Runtime contracts, schema migrations, schema governance and authoritative order submission are selected;
 - Runtime models, contracts and Gateway Protocol are selected.
 
 Deferred because: strict whole-project typing would create noisy changes unrelated to current risk boundaries.

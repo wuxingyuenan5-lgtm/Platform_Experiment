@@ -16,7 +16,7 @@ This is the canonical persistence entrypoint. SQLite remains the approved databa
 
 A table must have one owning module and one authority class.
 
-## 2. Shared connection and core bootstrap
+## 2. Shared database infrastructure
 
 `app/database_connection.py` is the single owner of the shared SQLite connection boundary:
 
@@ -36,7 +36,13 @@ A table must have one owning module and one authority class.
 - compatibility-column detection and additive `ALTER TABLE` statements;
 - the partial unique execution-batch idempotency index.
 
-`app/database.py` explicitly re-exports the connection and Bootstrap compatibility surfaces. It currently owns initializer ordering and fixed reference-data seeds, but it must not reimplement connection or core DDL behavior.
+`app/database_seeds.py` is the single owner of all fixed reference-data Seed vectors and insertion ordering.
+
+`app/database.py` is now a compatibility facade and initializer only. It explicitly re-exports Connection, Bootstrap and Seed compatibility surfaces and preserves the order:
+
+```text
+Connection → Bootstrap → Seed
+```
 
 ## 3. Current DDL owners
 
@@ -56,7 +62,7 @@ A table must have one owning module and one authority class.
 | `app/disaster_recovery.py` | backup and restore manifests/drill records |
 | `app/schema_migrations.py` | migration ledger and ordered additive migrations |
 
-`app/database.py` is a compatibility facade and initializer, not a core DDL Owner. Fixed reference-data Seed ownership remains there only until the dedicated Seed extraction.
+`app/database.py` is not a DDL or Seed Owner.
 
 FinancialFact responsibilities are separated into Schema, Normalization, Repository, Projection Service and API modules. Only `app/financial_fact_repository.py` owns its direct SQL and protected transaction units.
 
@@ -70,20 +76,25 @@ FinancialFact responsibilities are separated into Schema, Normalization, Reposit
 
 Runtime storage is not the permanent financial ledger and must not be written directly by Platform modules.
 
-## 4. Migration ledger
+## 4. Fixed Seed authority
+
+`app/database_seeds.py` owns the fixed organization, strategy, venue, account, balance, binding, instrument, contract-specification and mapping Seeds.
+
+The complete values across all 15 Seed tables are pinned by SHA-256:
+
+```text
+d42f7e4f95a6efa9044b1e91b4e603f1d87f515923a57d941ee16e75109e6183
+```
+
+Changing a Seed identifier, status, default, mapping or contract value is a business-data change, not a structural refactor. It requires a dedicated Issue and explicit compatibility review.
+
+## 5. Migration ledger
 
 Platform migrations are declared in `platform-backend/app/schema_migrations.py`.
 
-The `schema_migrations` table records:
+The `schema_migrations` table records monotonic version, unique name, SHA-256 checksum and application time. Version 1 is `existing-platform-schema-baseline` and records the existing Schema without moving tables or changing business data.
 
-- monotonic integer version;
-- unique migration name;
-- SHA-256 checksum of version, name and statements;
-- application time.
-
-Version 1 is `existing-platform-schema-baseline`. It records the already-existing schema without moving tables or changing business data.
-
-At application startup, the schema-governance router applies pending migrations. Reapplying the same migration is idempotent. Changing an already-applied migration name or checksum fails closed.
+At startup, pending migrations are applied in order. Reapplication is idempotent; changing an applied migration name or checksum fails closed.
 
 Status endpoint:
 
@@ -91,37 +102,35 @@ Status endpoint:
 GET /api/v1/ops/schema-migrations
 ```
 
-## 5. Rules for a new migration
+## 6. Rules for a new migration
 
 1. Never edit an applied migration.
 2. Add one new version after the current highest version.
-3. Use additive SQL by default: new table, new nullable column, new index or new compatibility view.
-4. Put data backfills in a separately testable step; do not hide a large backfill in service startup.
-5. Record owner, authority class, compatibility window and rollback behavior in the task packet.
-6. Add tests for fresh database, existing database, repeated startup and checksum drift.
-7. Do not combine a schema migration with unrelated refactoring.
+3. Use additive SQL by default.
+4. Put data backfills in a separately testable step.
+5. Record owner, authority class, compatibility window and rollback behavior.
+6. Add fresh, existing, repeated-startup and checksum-drift tests.
+7. Do not combine a migration with unrelated refactoring.
 
-## 6. High-risk changes requiring explicit review
+## 7. High-risk changes requiring explicit review
 
 - table or column deletion;
 - column type or meaning change;
 - authority transfer between operational and formal data;
-- identifier or seed replacement;
+- identifier or Seed replacement;
 - PnL, position or order-state backfill;
 - encryption/credential storage changes;
 - switching away from SQLite.
 
-These require a dedicated Issue, migration task packet, backup/restore evidence and an explicit rollback or forward-fix strategy.
+These require a dedicated Issue, backup/restore evidence and an explicit rollback or forward-fix strategy.
 
-## 7. Decomposition sequence
-
-The safe decomposition is structural, not a table rewrite:
+## 8. Completed decomposition
 
 ```text
-app/database_connection.py  # completed
-app/database_bootstrap.py   # completed: core Schema and compatibility DDL
-app/database_seeds.py       # pending: fixed reference-data seeds
+app/database_connection.py  # shared path and transaction-managed connection
+app/database_bootstrap.py   # core Schema and compatibility DDL
+app/database_seeds.py       # fixed reference-data Seeds
 app/database.py             # compatibility facade / initializer
 ```
 
-Every step requires fresh-database, existing-database and repeated-initialization equivalence. The Bootstrap Schema text is pinned by SHA-256 `421f0625ffe3a8a26ca48bc827e64bd6aa6b2e49d95faef0b17313e808375801`. No structural extraction may be combined with business Schema or Seed changes.
+The Bootstrap Schema is pinned by SHA-256 `421f0625ffe3a8a26ca48bc827e64bd6aa6b2e49d95faef0b17313e808375801`. Fresh-database, legacy-database, repeated-initialization and exhaustive Seed snapshots prove structural equivalence.
