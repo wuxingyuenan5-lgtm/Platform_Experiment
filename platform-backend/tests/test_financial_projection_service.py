@@ -13,12 +13,48 @@ INSTRUMENT_ID = "instrument_btc_usdt"
 @pytest.mark.parametrize(
     ("old_quantity", "old_average", "signed_fill", "fill_price", "expected"),
     [
-        (Decimal("0"), None, Decimal("2"), Decimal("100"), (Decimal("2"), Decimal("100"), Decimal("0"))),
-        (Decimal("2"), Decimal("100"), Decimal("1"), Decimal("130"), (Decimal("3"), Decimal("110"), Decimal("0"))),
-        (Decimal("2"), Decimal("100"), Decimal("-1"), Decimal("110"), (Decimal("1"), Decimal("100"), Decimal("10"))),
-        (Decimal("2"), Decimal("100"), Decimal("-3"), Decimal("90"), (Decimal("-1"), Decimal("90"), Decimal("-20"))),
-        (Decimal("-2"), Decimal("100"), Decimal("1"), Decimal("90"), (Decimal("-1"), Decimal("100"), Decimal("10"))),
-        (Decimal("-2"), Decimal("100"), Decimal("2"), Decimal("110"), (Decimal("0"), None, Decimal("-20"))),
+        (
+            Decimal("0"),
+            None,
+            Decimal("2"),
+            Decimal("100"),
+            (Decimal("2"), Decimal("100"), Decimal("0")),
+        ),
+        (
+            Decimal("2"),
+            Decimal("100"),
+            Decimal("1"),
+            Decimal("130"),
+            (Decimal("3"), Decimal("110"), Decimal("0")),
+        ),
+        (
+            Decimal("2"),
+            Decimal("100"),
+            Decimal("-1"),
+            Decimal("110"),
+            (Decimal("1"), Decimal("100"), Decimal("10")),
+        ),
+        (
+            Decimal("2"),
+            Decimal("100"),
+            Decimal("-3"),
+            Decimal("90"),
+            (Decimal("-1"), Decimal("90"), Decimal("-20")),
+        ),
+        (
+            Decimal("-2"),
+            Decimal("100"),
+            Decimal("1"),
+            Decimal("90"),
+            (Decimal("-1"), Decimal("100"), Decimal("10")),
+        ),
+        (
+            Decimal("-2"),
+            Decimal("100"),
+            Decimal("2"),
+            Decimal("110"),
+            (Decimal("0"), None, Decimal("-20")),
+        ),
     ],
 )
 def test_calculate_position_update_golden_vectors(
@@ -36,7 +72,9 @@ def test_calculate_position_update_golden_vectors(
     ) == expected
 
 
-def test_projection_rebuild_preserves_component_attribution(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_projection_rebuild_preserves_component_attribution(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     facts = [
         {
             "fact_type": "trade_fill",
@@ -125,7 +163,9 @@ def test_projection_rebuild_preserves_component_attribution(monkeypatch: pytest.
     }
 
 
-def test_projection_rebuild_propagates_incomplete_quality(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_projection_rebuild_propagates_incomplete_quality(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     facts = [
         {
             "fact_type": "trade_fill",
@@ -178,7 +218,9 @@ def test_projection_rebuild_propagates_incomplete_quality(monkeypatch: pytest.Mo
     assert captured["data_quality_state"] == "incomplete"
 
 
-def test_strategy_rebuild_preserves_pair_order_counts_and_audit(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_strategy_rebuild_preserves_pair_order_counts_and_audit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     pairs = [
         {"account_id": "account-b", "instrument_id": "instrument-2"},
         {"account_id": "account-a", "instrument_id": "instrument-1"},
@@ -186,7 +228,11 @@ def test_strategy_rebuild_preserves_pair_order_counts_and_audit(monkeypatch: pyt
     rebuilt: list[tuple[str, str, str]] = []
     audit: dict[str, object] = {}
     monkeypatch.setattr(service.repository, "ensure_schema", lambda: None)
-    monkeypatch.setattr(service.repository, "prepare_strategy_rebuild", lambda *_: (7, pairs))
+    monkeypatch.setattr(
+        service.repository,
+        "prepare_strategy_rebuild",
+        lambda *_: (7, pairs),
+    )
     monkeypatch.setattr(
         service,
         "rebuild_account_instrument_projection",
@@ -222,7 +268,9 @@ def test_strategy_rebuild_preserves_pair_order_counts_and_audit(monkeypatch: pyt
     }
 
 
-def test_nav_calculation_preserves_coverage_and_audit(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_nav_calculation_preserves_coverage_and_audit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     captured: dict[str, object] = {}
     sentinel = object()
     monkeypatch.setattr(service.repository, "ensure_schema", lambda: None)
@@ -278,7 +326,9 @@ def test_nav_calculation_preserves_coverage_and_audit(monkeypatch: pytest.Monkey
     }
 
 
-def test_nav_rejects_invalid_capital_and_missing_accounts(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_nav_rejects_invalid_capital_and_missing_accounts(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     monkeypatch.setattr(service.repository, "ensure_schema", lambda: None)
     with pytest.raises(service.InvalidCapitalBaseError, match="no valid capital base"):
         service.run_formal_nav_snapshot(
@@ -288,7 +338,10 @@ def test_nav_rejects_invalid_capital_and_missing_accounts(monkeypatch: pytest.Mo
         )
 
     monkeypatch.setattr(service.repository, "list_active_account_rows", lambda *_: [])
-    with pytest.raises(service.NoActiveAccountBindingsError, match="no active account bindings"):
+    with pytest.raises(
+        service.NoActiveAccountBindingsError,
+        match="no active account bindings",
+    ):
         service.run_formal_nav_snapshot(
             STRATEGY_ID,
             capital_base=Decimal("100000"),
