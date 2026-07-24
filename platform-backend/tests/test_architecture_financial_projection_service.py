@@ -48,9 +48,14 @@ def imported_modules(path: Path) -> set[str]:
 def test_projection_service_is_the_formula_owner() -> None:
     service_functions = function_names(SERVICE_PATH)
     api_functions = function_names(API_PATH)
+    compatibility_helpers = {
+        "calculate_position_update",
+        "conversion_rate",
+        "optional_decimal",
+    }
 
     assert PROJECTION_FUNCTIONS <= service_functions
-    assert not ({"calculate_position_update", "conversion_rate", "optional_decimal"} & api_functions)
+    assert not (compatibility_helpers & api_functions)
 
 
 def test_api_module_keeps_compatibility_callables() -> None:
@@ -73,10 +78,16 @@ def test_projection_service_has_no_fastapi_or_config_dependency() -> None:
 def test_repository_projection_orchestration_is_not_in_api_module() -> None:
     api_source = API_PATH.read_text(encoding="utf-8")
     service_source = SERVICE_PATH.read_text(encoding="utf-8")
+    api_calls = {
+        call
+        for call in REPOSITORY_ORCHESTRATION_CALLS
+        if f"repository.{call}" in api_source
+    }
+    missing_service_calls = {
+        call
+        for call in REPOSITORY_ORCHESTRATION_CALLS
+        if f"repository.{call}" not in service_source
+    }
 
-    assert not {
-        call for call in REPOSITORY_ORCHESTRATION_CALLS if f"repository.{call}" in api_source
-    }
-    assert not {
-        call for call in REPOSITORY_ORCHESTRATION_CALLS if f"repository.{call}" not in service_source
-    }
+    assert not api_calls
+    assert not missing_service_calls
