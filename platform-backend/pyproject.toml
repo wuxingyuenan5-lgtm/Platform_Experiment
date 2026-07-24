@@ -34,6 +34,7 @@ pythonVersion = "3.12"
 typeCheckingMode = "standard"
 include = [
   "app/execution_schemas.py",
+  "app/financial_fact_schemas.py",
   "app/runtime_contracts.py",
   "app/schema_migrations.py",
   "app/schema_governance.py",
@@ -51,8 +52,9 @@ select = ["E", "F", "I", "UP", "B"]
 
 [tool.ruff.lint.per-file-ignores]
 # FastAPI route metadata is intentionally declared in the function signature.
-# The quoted self-return annotation keeps the validator compatible with Pydantic's runtime model build.
-"app/financial_facts.py" = ["B008", "UP037"]
+"app/financial_facts.py" = ["B008"]
+# Pydantic's quoted self-return annotation is required while the validator builds the model.
+"app/financial_fact_schemas.py" = ["UP037"]
 # Phase 4A keeps the complete risk state machine in one auditable module; long SQL/error lines
 # and Pydantic's quoted self annotation are accepted until the Phase 4 module split.
 "app/execution_risk.py" = ["E501", "UP037"]

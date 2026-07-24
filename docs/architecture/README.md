@@ -37,7 +37,7 @@
 
 - Backend 与 Runtime 的 Ruff 检查覆盖完整 `app/` 与 `tests/`，新增文件不能绕过门禁。
 - Python 安装完成后必须通过 `pip check`。
-- Pyright 先覆盖执行 DTO、Runtime 契约、迁移账本和权威下单边界；每次扩展必须保持所选模块清洁。
+- Pyright 先覆盖执行 DTO、FinancialFact DTO、Runtime 契约、迁移账本和权威下单边界；每次扩展必须保持所选模块清洁。
 - Frontend 活跃交易界面持续执行完整零警告 ESLint、类型检查和生产构建。
 - 活跃范围之外的新增或修改前端源文件通过 changed-file no-new-debt gate，禁止增加旧债。
 - `scripts/check-repository-structure.py` 阻止 Backend 引入交易场所 SDK、Composition Root 混入业务逻辑、平行上下文入口、临时测试命名和诊断工作流残留。
@@ -53,10 +53,12 @@
 
 ## Domain Schema 边界
 
-- 执行、订单、批次、策略运行、持仓和 PnL API DTO 由 `platform-backend/app/execution_schemas.py` 统一维护。
+- 执行、订单、批次、策略运行、持仓和运营 PnL API DTO 由 `platform-backend/app/execution_schemas.py` 统一维护。
 - `platform-backend/app/schemas.py` 作为迁移期兼容入口，只允许显式公共别名重导出，不得重复定义执行域类型。
-- `tests/test_schema_boundaries.py` 校验兼容导出的对象身份和单一所有权。
-- `scripts/check-repository-structure.py` 阻止执行域 DTO 被复制回跨域 Schema 模块。
+- FinancialFact、正式持仓、正式 PnL、NAV 和重建响应 DTO 由 `platform-backend/app/financial_fact_schemas.py` 统一维护。
+- `platform-backend/app/financial_facts.py` 只保留兼容重导出与正式账务实现，不得重新定义这些公开 DTO。
+- `tests/test_schema_boundaries.py` 与 `tests/test_architecture_financial_fact_schemas.py` 校验兼容导出的对象身份、字段快照和单一所有权。
+- Schema 所有权迁移不得顺带改变 API 字段、SQL、哈希、FX、平均成本或 PnL 公式。
 
 ## Platform–Runtime 契约边界
 
@@ -79,7 +81,7 @@
 ## Financial Projection 边界
 
 - `platform-backend/app/trading.py` 负责成交后近实时运营投影，并且只写入 `positions` 与 `pnl_results`。
-- `platform-backend/app/financial_facts.py` 负责不可变财务事实摄取与正式投影重建，并维护 `financial_facts`、`formal_positions` 与 `formal_pnl_results`。
+- `platform-backend/app/financial_fact_schemas.py` 负责正式账务公开 DTO；`platform-backend/app/financial_facts.py` 负责不可变财务事实摄取与正式投影重建，并维护 `financial_facts`、`formal_positions` 与 `formal_pnl_results`。
 - 运营投影服务于交易监控和即时展示，不构成正式会计权威；正式账务必须从不可变事实重建。
 - 交易链路不得写入正式投影，正式账务链路不得读取运营投影作为计算输入。
 - `tests/test_projection_boundaries.py` 与结构脚本对表读写方向和跨边界依赖执行静态回归检查。
