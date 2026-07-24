@@ -16,7 +16,7 @@ This is the canonical persistence entrypoint. SQLite remains the approved databa
 
 A table must have one owning module and one authority class.
 
-## 2. Connection and transaction owner
+## 2. Shared connection and core bootstrap
 
 `app/database_connection.py` is the single owner of the shared SQLite connection boundary:
 
@@ -29,7 +29,14 @@ A table must have one owning module and one authority class.
 - rollback and re-raise on exceptions;
 - close in all cases.
 
-`app/database.py` explicitly re-exports `connection` and `database_path` so existing callers remain compatible. It must not reimplement `sqlite3.connect` or the transaction context.
+`app/database_bootstrap.py` is the single owner of the core Platform Schema and legacy compatibility DDL:
+
+- the complete ordered `SCHEMA_SQL`;
+- fresh-database Schema execution;
+- compatibility-column detection and additive `ALTER TABLE` statements;
+- the partial unique execution-batch idempotency index.
+
+`app/database.py` explicitly re-exports the connection and Bootstrap compatibility surfaces. It currently owns initializer ordering and fixed reference-data seeds, but it must not reimplement connection or core DDL behavior.
 
 ## 3. Current DDL owners
 
@@ -37,7 +44,7 @@ A table must have one owning module and one authority class.
 
 | Owner module | Primary responsibility |
 |---|---|
-| `app/database.py` | core Schema/compatibility DDL plus initial reference-data seeds; connection ownership has moved to `app/database_connection.py` |
+| `app/database_bootstrap.py` | core Platform Schema and legacy compatibility DDL |
 | `app/financial_fact_repository.py` | immutable financial facts, formal Position/PnL/NAV persistence and transaction boundaries |
 | `app/execution_risk.py` | Kill Switch, batch risk snapshots and residual-risk actions |
 | `app/venue_reconciliation.py` | venue reconciliation runs and differences |
@@ -48,6 +55,8 @@ A table must have one owning module and one authority class.
 | `app/production_monitoring.py` | alerts, scans and controlled operation runs |
 | `app/disaster_recovery.py` | backup and restore manifests/drill records |
 | `app/schema_migrations.py` | migration ledger and ordered additive migrations |
+
+`app/database.py` is a compatibility facade and initializer, not a core DDL Owner. Fixed reference-data Seed ownership remains there only until the dedicated Seed extraction.
 
 FinancialFact responsibilities are separated into Schema, Normalization, Repository, Projection Service and API modules. Only `app/financial_fact_repository.py` owns its direct SQL and protected transaction units.
 
@@ -110,9 +119,9 @@ The safe decomposition is structural, not a table rewrite:
 
 ```text
 app/database_connection.py  # completed
-app/database_bootstrap.py   # core Schema and compatibility DDL
-app/database_seeds.py       # fixed reference-data seeds
+app/database_bootstrap.py   # completed: core Schema and compatibility DDL
+app/database_seeds.py       # pending: fixed reference-data seeds
 app/database.py             # compatibility facade / initializer
 ```
 
-Every step requires fresh-database, existing-database and repeated-initialization equivalence. No structural extraction may be combined with business Schema or seed changes.
+Every step requires fresh-database, existing-database and repeated-initialization equivalence. The Bootstrap Schema text is pinned by SHA-256 `421f0625ffe3a8a26ca48bc827e64bd6aa6b2e49d95faef0b17313e808375801`. No structural extraction may be combined with business Schema or Seed changes.
