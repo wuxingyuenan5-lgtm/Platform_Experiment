@@ -24,6 +24,7 @@ INTEGRATION_PATTERNS = (
     "health",
     "idempotency",
     "journal",
+    "migration",
     "monitoring",
     "readiness",
     "reconciliation",
