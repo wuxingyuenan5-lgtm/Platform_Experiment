@@ -28,7 +28,7 @@ Remove SQLite binary floating-point aggregation from venue fill quantity reconci
 ## Expected changed files
 
 - `platform-backend/app/venue_reconciliation.py`
-- `platform-backend/tests/test_venue_reconciliation.py`
+- `platform-backend/tests/test_venue_reconciliation_decimal.py`
 - `docs/codex/current-state.md`
 - `CHANGELOG.md`
 - `tasks/issue-59-decimal-venue-fill-reconciliation.md`
@@ -69,16 +69,16 @@ Risk: low.
 
 ## Progress
 
-- Done: Issue and branch created.
-- Current: implementation and direct regression tests.
-- Next: full CI and merge.
+- Done: Issue/branch/PR, exact Decimal implementation and direct regression test.
+- Current: final-head CI and Diff review.
+- Next: mark ready, squash merge and close Issue.
 - Blocked by: nothing.
 
 ## Completion
 
-- PR:
+- PR: #60
 - Merge commit:
 - Behavior changed: exact Decimal aggregation replaces SQLite REAL aggregation.
 - Behavior intentionally unchanged: all APIs, identities, statuses, persistence and accounting.
-- Tests/CI:
+- Tests/CI: pending final-head runs.
 - Follow-up debt: broader Venue Reconciliation decomposition remains separate.
