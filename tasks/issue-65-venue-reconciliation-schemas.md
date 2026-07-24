@@ -1,7 +1,7 @@
 # Issue #65 — Extract Venue Reconciliation public schemas
 
 Issue: #65
-Status: active
+Status: done
 Branch: `refactor/issue-65-venue-reconciliation-schemas`
 Base commit: `2a410aff8110502a54b862d7a6aa6d959c8efdf5`
 
@@ -89,16 +89,16 @@ Risk: low-medium.
 
 ## Progress
 
-- Done: dedicated schema owner, compatibility exports, pre-extraction contract hashes, architecture checks, Ownership/Pyright and Ruff formatting fixes.
-- Current: rerun standard full CI on the repaired branch head.
-- Next: freeze evidence, mark ready, squash merge and close Issue.
+- Done: schema extraction, compatibility identity, pre-extraction JSON Schema/OpenAPI goldens, architecture checks, Ownership/Pyright and complete pre-freeze CI.
+- Current: final frozen-head verification and squash merge.
+- Next: close Issue and begin Difference Policy extraction.
 - Blocked by: nothing.
 
 ## Completion
 
 - PR: #66
-- Merge commit:
+- Merge commit: recorded by the final squash merge on PR #66.
 - Behavior changed: schema ownership only.
 - Behavior intentionally unchanged: every public contract and all reconciliation behavior.
-- Tests/CI: first standard run found only import grouping and generated-constant line-length diagnostics; repaired-head run pending.
+- Tests/CI: Platform CI `30113220562` success; Secret Scan `30113220576` success. Final frozen-head runs must also pass before merge.
 - Follow-up debt: Difference Policy extraction is the next independent Venue Reconciliation stage.
