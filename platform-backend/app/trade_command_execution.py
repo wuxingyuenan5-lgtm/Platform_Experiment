@@ -5,9 +5,11 @@ from uuid import uuid4
 
 import httpx
 from fastapi import HTTPException
+from pydantic import ValidationError
 
 from app.config import get_settings
 from app.database import connection
+from app.runtime_contracts import RuntimeExecutionEventV1, RuntimeSubmitOrderCommandV1
 from app.schemas import CreateOrderRequest, OrderResponse
 from app.security import enforce_order_safety
 from app.trading import (
@@ -71,36 +73,39 @@ def submit_trade_command_order(
             ),
         )
 
-    command = {
-        "command_id": command_id,
-        "platform_order_id": order_id,
-        "strategy_instance_id": strategy_instance_id,
-        "account_id": request.account_id,
-        "instrument_id": request.instrument_id,
-        "symbol": request.symbol,
-        "side": request.side,
-        "order_type": request.order_type,
-        "quantity": decimal_text(request.quantity),
-        "price": decimal_text(request.price) if request.price is not None else None,
-        "reduce_only": reduce_only,
-    }
+    command = RuntimeSubmitOrderCommandV1(
+        command_id=command_id,
+        platform_order_id=order_id,
+        strategy_instance_id=strategy_instance_id,
+        account_id=request.account_id,
+        instrument_id=request.instrument_id,
+        symbol=request.symbol,
+        side=request.side,
+        order_type=request.order_type,
+        quantity=request.quantity,
+        price=request.price,
+        reduce_only=reduce_only,
+    )
 
     try:
         response = httpx.post(
             f"{settings.runtime_base_url}/commands/orders",
-            json=command,
+            json=command.model_dump(mode="json"),
             timeout=settings.runtime_timeout_seconds,
         )
         response.raise_for_status()
-        events = response.json()
-    except httpx.HTTPError:
+        events = [
+            RuntimeExecutionEventV1.model_validate(item)
+            for item in response.json()
+        ]
+    except (httpx.HTTPError, ValidationError, TypeError):
         mark_order_result_unknown(order_id)
         return get_order_response(order_id)
 
     apply_execution_events(
         order_id,
         request,
-        events,
+        [event.model_dump(mode="json") for event in events],
         expected_command_id=command_id,
     )
     return get_order_response(order_id)

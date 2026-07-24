@@ -18,6 +18,8 @@ execution-runtime/   External execution gateway and runtime journal
 docs/                Architecture and operational documentation
 ```
 
+Human orientation starts at `00-人工可读目录/README.md`. Agent orientation starts at `docs/codex/context-map.md`.
+
 ## Safety Rules
 
 - Never commit secrets, passwords, tokens or `.env` contents.
@@ -29,31 +31,63 @@ docs/                Architecture and operational documentation
 ## Development Rules
 
 - Make the smallest complete change.
-- Keep code, tests and relevant Markdown documentation synchronized.
+- Keep code, tests and directly authoritative Markdown synchronized.
 - Prefer existing architecture patterns over introducing new frameworks.
 - Keep composition roots declarative: wire routers and middleware only; import domain policies explicitly and never monkey-patch modules.
 - Keep one authoritative implementation for each domain calculation; compatibility wiring must not replace functions at runtime.
-- Keep API schemas owned by their domain module; cross-domain compatibility modules may use explicit public aliases to re-export but must not redefine them.
+- Keep API schemas owned by their domain module; compatibility modules may use explicit aliases but must not redefine them.
 - Keep operational trading projections (`positions`, `pnl_results`) separate from FinancialFact-based formal accounting projections.
 - Assign every Backend and Runtime test exactly one primary layer (`architecture`, `unit`, `integration`, or `live_safety`) and keep classified suites independently executable.
-- CI quality gates must cover complete maintained directories; do not use file allowlists that let new code bypass lint or dependency validation.
+- CI gates must cover complete maintained directories or an explicit no-new-debt mechanism; new files may not bypass validation.
 - Use `rg` for search.
-- Ignore `node_modules`, `.venv`, `dist`, generated outputs and external references unless explicitly required.
+- Ignore `node_modules`, `.venv`, `dist`, generated outputs, archives and external references unless explicitly required.
+
+## One Issue, One Branch, One PR
+
+For non-trivial engineering work:
+
+1. Search existing open Issues and PRs for the same outcome.
+2. Reuse or create exactly one GitHub Issue.
+3. Create one branch named `<type>/issue-<number>-<slug>`.
+4. Use one PR that references the same Issue.
+5. Do not start a replacement branch until the previous PR is closed and marked `Superseded by #<new-pr>`.
+6. After merge, delete or reset the head branch; never keep two branches carrying the same unique work.
+
+The CI workstream check enforces branch/Issue/PR linkage and rejects duplicate open PRs for one Issue.
 
 ## Task Context Rules
 
 Before editing:
 
 1. Read this file.
-2. Read only the target module documentation.
-3. Do not load the entire repository unless architecture work requires it.
+2. Read `docs/codex/current-state.md`.
+3. For cross-session, cross-module, migration or production work, create/update `tasks/issue-<number>-<slug>.md` from `docs/codex/task-template.md`.
+4. Read only the target module documentation and paths listed in that task packet.
+5. Do not load the entire repository unless the task is explicitly architecture-wide.
 
-Module context:
+Default context budget:
 
-- Frontend tasks → `admin-risk/` + frontend docs.
-- Backend tasks → `platform-backend/` + backend docs.
-- Runtime tasks → `execution-runtime/` + execution docs.
-- Operations tasks → `docs/operations/`.
+- one task packet;
+- one module entry document;
+- three to eight direct source files;
+- their direct tests;
+- zero to two additional architecture/contract documents unless justified in the task packet.
+
+Do not repeat repository history in prompts. Use current-state, task packets, commits, Issues and PRs as durable handoff.
+
+## Documentation Rules
+
+- `AGENTS.md`: durable hard rules only.
+- `docs/codex/current-state.md`: compact current truth and active workstream.
+- `docs/codex/context-map.md`: context-loading map.
+- `docs/codex/task-template.md`: the single task template.
+- `docs/architecture/`: stable structure and boundaries, not PR diaries.
+- `docs/decisions/`: important decisions and rejected alternatives.
+- `docs/technical/`: protocols and domain implementation contracts.
+- `docs/operations/`: deployment, monitoring, incidents and recovery.
+- `docs/engineering/TECHNICAL_DEBT.md`: intentionally deferred work with triggers.
+- `tasks/`: one active packet per Issue; progress is replaced, not appended as chat history.
+- `outputs/`: disposable artifacts, never a source of truth.
 
 ## Product UI
 

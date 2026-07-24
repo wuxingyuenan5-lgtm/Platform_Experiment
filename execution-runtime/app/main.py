@@ -27,13 +27,17 @@ from app.models import (
     GatewayCapabilitiesResponse,
     GatewayConnectivityResponse,
     RuntimeStatusResponse,
-    SubmitOrderCommand,
     VenueBalanceSnapshot,
     VenueEconomicEventSnapshot,
     VenueFillSnapshot,
     VenueOrderSnapshot,
     VenuePositionSnapshot,
     VenueReadinessResponse,
+)
+from app.runtime_contracts import (
+    RuntimeExecutionEventV1,
+    RuntimeSubmitOrderCommandV1,
+    version_execution_events,
 )
 from app.secret_resolver import inspect_credential_reference
 from app.venue_readiness import get_venue_readiness
@@ -134,8 +138,12 @@ def cross_spread_snapshot() -> CrossSpreadSnapshotResponse:
     )
 
 
-@app.post("/commands/orders", response_model=list[ExecutionEvent], tags=["commands"])
-def submit_order(command: SubmitOrderCommand) -> list[ExecutionEvent]:
+@app.post(
+    "/commands/orders",
+    response_model=list[RuntimeExecutionEventV1],
+    tags=["commands"],
+)
+def submit_order(command: RuntimeSubmitOrderCommandV1) -> list[RuntimeExecutionEventV1]:
     if not claim_command(command):
         events = get_events(command.command_id)
         if not events:
@@ -143,7 +151,7 @@ def submit_order(command: SubmitOrderCommand) -> list[ExecutionEvent]:
                 status_code=409,
                 detail="Command is already processing and has no persisted events yet",
             )
-        return events
+        return version_execution_events(events)
 
     try:
         events = gateway.submit_order(command)
@@ -159,19 +167,19 @@ def submit_order(command: SubmitOrderCommand) -> list[ExecutionEvent]:
     except GatewayResultUnknownError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
     save_command_events(command, events)
-    return events
+    return version_execution_events(events)
 
 
 @app.get(
     "/commands/{command_id}/events",
-    response_model=list[ExecutionEvent],
+    response_model=list[RuntimeExecutionEventV1],
     tags=["commands"],
 )
-def command_events(command_id: str) -> list[ExecutionEvent]:
+def command_events(command_id: str) -> list[RuntimeExecutionEventV1]:
     events = get_events(command_id)
     if not events:
         raise HTTPException(status_code=404, detail="Command events not found")
-    return events
+    return version_execution_events(events)
 
 
 @app.get(

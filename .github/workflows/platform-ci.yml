@@ -4,26 +4,40 @@ on:
   push:
     branches:
       - main
-      - refactor/frontend-architecture-v6
+      - 'feature/**'
+      - 'fix/**'
+      - 'refactor/**'
       - 'hardening/**'
+      - 'docs/**'
+      - 'chore/**'
     paths:
       - 'execution-runtime/**'
       - 'platform-backend/**'
-      - 'admin-risk/src/api/platform/**'
-      - 'admin-risk/src/hooks/trading/**'
-      - 'admin-risk/src/views/strategy/funding-carry/**'
+      - 'admin-risk/src/**'
+      - 'admin-risk/mock/**'
       - 'admin-risk/docs/quality/**'
       - 'admin-risk/docs/START-HERE.md'
       - 'admin-risk/package.json'
       - 'admin-risk/pnpm-lock.yaml'
       - 'admin-risk/tsconfig.json'
       - 'admin-risk/tsconfig.strategy.json'
+      - '00-人工可读目录/**'
+      - 'docs/architecture/**'
+      - 'docs/codex/**'
+      - 'docs/contracts/**'
+      - 'docs/database/**'
+      - 'docs/engineering/**'
       - 'docs/planning/**'
       - 'docs/technical/**'
       - 'docs/operations/**'
+      - 'tasks/**'
+      - 'outputs/README.md'
+      - 'AGENTS.md'
       - 'README.md'
       - 'CHANGELOG.md'
       - 'scripts/**'
+      - '.github/ISSUE_TEMPLATE/**'
+      - '.github/pull_request_template.md'
       - '.github/workflows/platform-ci.yml'
   pull_request:
     branches:
@@ -31,25 +45,37 @@ on:
     paths:
       - 'execution-runtime/**'
       - 'platform-backend/**'
-      - 'admin-risk/src/api/platform/**'
-      - 'admin-risk/src/hooks/trading/**'
-      - 'admin-risk/src/views/strategy/funding-carry/**'
+      - 'admin-risk/src/**'
+      - 'admin-risk/mock/**'
       - 'admin-risk/docs/quality/**'
       - 'admin-risk/docs/START-HERE.md'
       - 'admin-risk/package.json'
       - 'admin-risk/pnpm-lock.yaml'
       - 'admin-risk/tsconfig.json'
       - 'admin-risk/tsconfig.strategy.json'
+      - '00-人工可读目录/**'
+      - 'docs/architecture/**'
+      - 'docs/codex/**'
+      - 'docs/contracts/**'
+      - 'docs/database/**'
+      - 'docs/engineering/**'
       - 'docs/planning/**'
       - 'docs/technical/**'
       - 'docs/operations/**'
+      - 'tasks/**'
+      - 'outputs/README.md'
+      - 'AGENTS.md'
       - 'README.md'
       - 'CHANGELOG.md'
       - 'scripts/**'
+      - '.github/ISSUE_TEMPLATE/**'
+      - '.github/pull_request_template.md'
       - '.github/workflows/platform-ci.yml'
 
 permissions:
   contents: read
+  issues: read
+  pull-requests: read
 
 concurrency:
   group: platform-ci-${{ github.ref }}
@@ -63,6 +89,10 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: Validate Issue branch task and PR uniqueness
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python scripts/check-workstream.py
       - name: Scan tracked files for credential material
         run: python scripts/scan-secrets.py
       - name: Check repository structure and architecture boundaries
@@ -91,12 +121,27 @@ jobs:
             cat /tmp/runtime-ruff.log
             exit 1
           fi
+      - name: Runtime progressive type gate
+        shell: bash
+        run: |
+          if ! python -m pyright > /tmp/runtime-pyright.log 2>&1; then
+            cat /tmp/runtime-pyright.log
+            exit 1
+          fi
       - name: Upload runtime lint diagnostics
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: runtime-ruff-log
           path: /tmp/runtime-ruff.log
+          if-no-files-found: ignore
+          retention-days: 3
+      - name: Upload runtime type diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: runtime-pyright-log
+          path: /tmp/runtime-pyright.log
           if-no-files-found: ignore
           retention-days: 3
       - name: Test classified runtime suites
@@ -107,7 +152,7 @@ jobs:
             python -m pytest -m integration &&
             python -m pytest -m live_safety
           ) > /tmp/runtime-pytest.log 2>&1; then
-            tail -n 260 /tmp/runtime-pytest.log
+            tail -n 320 /tmp/runtime-pytest.log
             exit 1
           fi
       - name: Upload runtime pytest diagnostics
@@ -142,12 +187,27 @@ jobs:
             cat /tmp/backend-ruff.log
             exit 1
           fi
+      - name: Backend progressive type gate
+        shell: bash
+        run: |
+          if ! python -m pyright > /tmp/backend-pyright.log 2>&1; then
+            cat /tmp/backend-pyright.log
+            exit 1
+          fi
       - name: Upload backend lint diagnostics
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: backend-ruff-log
           path: /tmp/backend-ruff.log
+          if-no-files-found: ignore
+          retention-days: 3
+      - name: Upload backend type diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-pyright-log
+          path: /tmp/backend-pyright.log
           if-no-files-found: ignore
           retention-days: 3
       - name: Test classified backend suites
@@ -159,7 +219,7 @@ jobs:
             python -m pytest -m integration &&
             python -m pytest -m live_safety
           ) > /tmp/backend-pytest.log 2>&1; then
-            tail -n 500 /tmp/backend-pytest.log
+            tail -n 620 /tmp/backend-pytest.log
             exit 1
           fi
       - name: Upload backend pytest diagnostics
@@ -178,6 +238,8 @@ jobs:
         working-directory: admin-risk
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: pnpm/action-setup@v4
         with:
           version: 9.15.9
@@ -187,6 +249,9 @@ jobs:
           node-version: '20'
           cache: pnpm
           cache-dependency-path: admin-risk/pnpm-lock.yaml
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
       - name: Install dependencies
         shell: bash
         env:
@@ -204,7 +269,7 @@ jobs:
           path: /tmp/pnpm-install.log
           if-no-files-found: ignore
           retention-days: 3
-      - name: Lint strategy frontend
+      - name: Lint maintained trading frontend
         shell: bash
         run: |
           if ! pnpm exec eslint --max-warnings 0 \
@@ -215,6 +280,8 @@ jobs:
             tail -n 120 /tmp/frontend-eslint.log
             exit 1
           fi
+      - name: Enforce frontend no-new-debt gate
+        run: python ../scripts/frontend-no-new-debt.py
       - name: Upload frontend lint diagnostics
         if: failure()
         uses: actions/upload-artifact@v4

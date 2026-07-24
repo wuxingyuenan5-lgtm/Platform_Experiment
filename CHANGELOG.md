@@ -2,6 +2,24 @@
 
 ## Unreleased
 
+### Project operating system and engineering hardening — Issue #36 / PR #37
+
+- Consolidated human and Agent entrypoints around `00-人工可读目录/README.md`, `docs/codex/context-map.md`, `docs/codex/current-state.md`, and one canonical task template.
+- Added bounded `tasks/issue-<number>-<slug>.md` packets so new conversations load only the active task, target module and direct tests.
+- Enforced one Issue, one Issue-numbered branch, one task packet and one open PR through `scripts/check-workstream.py` and Platform CI.
+- Added engineering Issue/PR templates and documented the complete Git/version workflow.
+- Verified PR #28 was already merged, identified closed PRs #8/#13/#30 as superseded, and returned reviewed duplicate/superseded branch refs to the stable `main` baseline.
+- Added a non-destructive `schema_migrations` ledger with monotonic versions, immutable checksums, startup application, status API and repeated-startup/mutation tests.
+- Added a complete DDL Owner and data-authority inventory without moving or changing existing business tables.
+- Added explicit Platform–Runtime `runtime-command` / `runtime-event` V1.0 contracts, dual-side models and executable JSON snapshots.
+- Made incompatible Runtime events fail closed as `result_unknown` instead of deterministic failure or automatic resubmission.
+- Added blocking progressive Pyright gates for critical Backend and Runtime execution/persistence boundaries.
+- Added frontend changed-file zero-warning ESLint enforcement while retaining full lint for the maintained trading surface.
+- Added failure injection for unsupported versions, Fill-before-ACK, duplicate Fill and unknown external outcomes without Gateway replay.
+- Added the controlled production-acceptance matrix and mandatory stop conditions.
+- Synchronized README, architecture, database, operations, technical-debt and current-state documentation.
+- Final verified engineering behavior keeps existing trading formulas, order semantics, business schema, credentials, risk gates and both Live Write defaults unchanged.
+
 ### SecretProvider, rotation metadata, and redaction — Production Gate 5C
 
 - Added explicit Secret References: `secret://environment/<name>` and `secret://windows-credential-manager/<name>`.

@@ -1,0 +1,51 @@
+name: Engineering task
+description: Create one tracked engineering workstream before opening a branch
+title: "[Engineering] "
+labels: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Search existing open Issues and PRs first. Reuse an existing Issue when the outcome is already tracked.
+  - type: textarea
+    id: objective
+    attributes:
+      label: Objective
+      description: One measurable outcome.
+    validations:
+      required: true
+  - type: textarea
+    id: non_goals
+    attributes:
+      label: Non-goals
+      description: Adjacent work and refactors explicitly excluded.
+    validations:
+      required: true
+  - type: textarea
+    id: protected_semantics
+    attributes:
+      label: Protected semantics
+      description: Trading, order-state, funds-safety, API, schema or Live Write behavior that must remain unchanged.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: Concrete checks required before merge.
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Minimal context packet
+      description: List the module entry document, direct source files and direct tests needed.
+    validations:
+      required: true
+  - type: textarea
+    id: rollback
+    attributes:
+      label: Risk and rollback
+      description: Failure modes, detection and safe rollback.
+    validations:
+      required: true
