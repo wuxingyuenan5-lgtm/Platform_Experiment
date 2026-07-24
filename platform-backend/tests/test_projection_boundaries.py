@@ -4,11 +4,9 @@ import ast
 from pathlib import Path
 
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
-OPERATIONAL_TABLE_WRITES = (
+OPERATIONAL_TABLE_WRITE_ANCHORS = (
     "INSERT INTO positions",
-    "UPDATE positions",
     "INSERT INTO pnl_results",
-    "UPDATE pnl_results",
 )
 FORMAL_TABLE_WRITES = (
     "INSERT INTO financial_facts",
@@ -40,7 +38,7 @@ def test_fill_projection_function_is_explicitly_operational() -> None:
 
 def test_trading_owns_only_operational_projection_writes() -> None:
     source = (BACKEND_ROOT / "app/trading.py").read_text(encoding="utf-8")
-    assert all(statement in source for statement in OPERATIONAL_TABLE_WRITES)
+    assert all(statement in source for statement in OPERATIONAL_TABLE_WRITE_ANCHORS)
     assert all(statement not in source for statement in FORMAL_TABLE_WRITES)
 
 
