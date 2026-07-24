@@ -39,27 +39,29 @@ Safe approach: extract connection → bootstrap → migrations → seeds in smal
 
 ## TD-002 — Financial facts module concentration
 
-Status: active
+Status: active; public schema extraction in Issue #40
 Owner: Platform Backend / formal accounting
 
-Problem: `app/financial_facts.py` contains API models, normalization, persistence, projection rebuild and query behavior.
+Problem: `app/financial_facts.py` still contains normalization, persistence, projection rebuild and query behavior in one auditable but concentrated module.
 
-Risk: large review surface around auditable financial logic.
+Risk: large review surface around immutable facts and formal accounting calculations.
 
 Completed prerequisite:
 
 - operational/formal projection ownership is machine-checked;
 - database authority is documented;
 - cross-service execution contracts are versioned;
-- selected boundary modules now have Pyright.
+- existing golden tests cover idempotency, content conflicts, FX completeness, contract multiplier, average cost, component PnL, rebuild and NAV coverage;
+- Issue #40 establishes `app/financial_fact_schemas.py` as the authoritative public DTO owner while preserving `app.financial_facts` compatibility exports;
+- the extracted schema boundary is included in progressive Pyright and protected by JSON Schema/identity tests.
 
-Deferred because: splitting financial logic still requires golden equivalence tests around hashing, FX, average cost, PnL and rebuild behavior.
+Deferred because: moving SQL, normalization or projection implementation still requires separate repository/service boundaries and before/after equivalence evidence.
 
-Trigger: a dedicated Issue adds API-schema/repository/service ownership tests before moving implementations.
+Trigger: after Issue #40 merges, create separate Issues in this order: repository extraction → normalization policy extraction → projection service extraction.
 
-Protected semantics: fact idempotency, content hashing, currency conversion, position average cost and PnL formulas.
+Protected semantics: fact idempotency, normalized content hashing, currency conversion, contract multiplier, position average cost, component PnL and rebuild results.
 
-Safe approach: extract API schemas, repository, normalization policy and projection service without changing SQL or calculations.
+Safe approach: one concern per PR; preserve SQL and formulas byte-for-byte where possible, keep compatibility imports, and require the existing financial golden suite on every step.
 
 ## TD-003 — Operational projection retirement criteria
 
@@ -113,7 +115,7 @@ Risk: untyped database rows, arbitrary payloads and large orchestration modules 
 Completed prerequisite:
 
 - Pyright is installed and blocking in CI;
-- Platform execution DTOs, Runtime contracts, schema migrations, schema governance and authoritative order submission are selected;
+- Platform execution DTOs, FinancialFact DTOs, Runtime contracts, schema migrations, schema governance and authoritative order submission are selected;
 - Runtime models, Runtime contracts and Gateway Protocol are selected.
 
 Deferred because: strict whole-project typing would create noisy changes unrelated to current risk boundaries.
@@ -126,7 +128,7 @@ Safe approach: expand by domain boundary, never through a single repository-wide
 
 ## TD-006 — Live production evidence
 
-Status: active
+Status: active; tracked by Issue #39
 Owner: Operations
 
 Problem: offline tests cannot prove broker-specific timing, partial-fill and recovery behavior in a real account.
@@ -136,7 +138,8 @@ Risk: production assumptions may differ from controlled test doubles.
 Completed prerequisite:
 
 - automated failure-injection matrix covers incompatible versions, result unknown, duplicate and out-of-order events;
-- controlled acceptance order and stop conditions are documented in `docs/operations/FAILURE_INJECTION_ACCEPTANCE.md`.
+- controlled acceptance order and stop conditions are documented in `docs/operations/FAILURE_INJECTION_ACCEPTANCE.md`;
+- Issue #39 separates operational evidence from engineering refactors.
 
 Deferred because: real-account validation requires explicit operational approval and bounded funds exposure.
 
@@ -148,7 +151,7 @@ Safe approach: simulation → read-only live → shadow reconciliation → minim
 
 ## TD-007 — GitHub repository-level branch protection
 
-Status: operational setting pending verification
+Status: operational setting pending verification; tracked by Issue #38
 Owner: Repository administration
 
 Problem: repository CI and workstream rules are stored in code, but repository-level protection must also require those checks and restrict direct pushes to `main`.
@@ -160,7 +163,8 @@ Completed prerequisite:
 - one-Issue/one-branch/one-PR machine check;
 - PR and Issue templates;
 - all engineering branch patterns run Platform CI;
-- duplicate historical work branches were reviewed and returned to the stable baseline.
+- duplicate historical work branches were reviewed and returned to the stable baseline;
+- Issue #38 records the exact settings and evidence required from an administrator.
 
 Deferred because: the available repository connector does not expose branch-protection or ruleset mutation.
 
@@ -168,4 +172,4 @@ Trigger: repository administrator opens Settings → Rules/Branches and verifies
 
 Protected semantics: administrators must not routinely bypass safety gates.
 
-Safe approach: protect `main`, require Platform CI and Secret Scan, require conversation resolution and current branch state, disallow force push/deletion, and enable automatic deletion of merged head branches.
+Safe approach: protect `main`, require Platform CI and Secret Scan, require conversation resolution and current branch state, disallow force push/deletion, prefer squash-only delivery, and enable automatic deletion of merged head branches.
