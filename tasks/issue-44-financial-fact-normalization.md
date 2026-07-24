@@ -1,7 +1,7 @@
 # Task: FinancialFact normalization policy extraction
 
 Issue: #44
-Status: active
+Status: ready for merge
 Branch: `refactor/issue-44-financial-fact-normalization`
 Base commit: `c892f2db16d6b22d94976966e472142e184037b0`
 
@@ -57,19 +57,20 @@ Do not modify unrelated Runtime, frontend, SQL or trading modules unless a prove
 
 ## Acceptance criteria
 
-- [ ] One Issue, one task packet, one branch and one PR.
-- [ ] `financial_fact_normalization.py` owns canonicalization, FX/quality policy and normalized-content hashing.
-- [ ] `financial_facts.py` contains no normalization implementation or direct SHA-256 construction.
-- [ ] `app.financial_facts.normalize_fact` remains callable with the same behavior.
-- [ ] Exact normalized-output and content-hash golden tests pass.
-- [ ] API validation and persisted-value equivalence tests pass.
-- [ ] Existing accounting and repository transaction tests pass unchanged.
-- [ ] Normalization ownership is machine-checked.
-- [ ] Policy module is included in progressive Pyright.
-- [ ] Backend dependency, Ruff, Pyright and all classified tests pass.
-- [ ] Runtime and frontend regression gates pass.
-- [ ] Secret Scan passes.
-- [ ] Documentation matches the final implementation.
+- [x] One Issue, one task packet, one branch and one PR.
+- [x] `financial_fact_normalization.py` owns canonicalization, FX/quality policy and normalized-content hashing.
+- [x] `financial_facts.py` contains no normalization implementation or direct SHA-256 construction.
+- [x] `app.financial_facts.normalize_fact` remains callable with the same behavior.
+- [x] Exact normalized-output and content-hash golden tests pass.
+- [x] API validation and persisted-value equivalence tests pass.
+- [x] Existing accounting and repository transaction tests pass unchanged.
+- [x] Normalization ownership is machine-checked.
+- [x] Policy module is included in progressive Pyright.
+- [x] Backend dependency, Ruff, Pyright and all classified tests pass during implementation.
+- [x] Runtime regression gates pass during implementation.
+- [x] Secret Scan passes during implementation.
+- [x] Documentation matches the final implementation.
+- [ ] Final frozen-head Platform CI, frontend build and squash merge; evidence is recorded in PR #45.
 
 ## Verification commands
 
@@ -97,15 +98,15 @@ Rollback: revert the final squash commit. No migration or external state is intr
 
 ## Progress
 
-- Done: verified `main@c892f2db...`, no open PRs, created Issue #44 and its unique branch.
-- Current: define pure normalization context and exact golden vectors.
-- Next: extract policy and hash, preserve service compatibility wrapper, then enforce ownership.
+- Done: extracted pure context-driven Policy and exact hash ownership, preserved service compatibility, added golden/API/architecture tests, Pyright and synchronized documentation.
+- Current: final frozen-head CI and PR evidence review.
+- Next: squash merge after every required job is green.
 - Blocked by: none.
 
 ## Completion
 
-- PR: pending.
-- Merge commit: pending.
-- Behavior changed: none intended; normalization ownership only.
-- Tests/CI: pending.
+- PR: #45.
+- Merge commit: pending squash merge.
+- Behavior changed: none; normalization ownership only.
+- Tests/CI: Backend, Runtime, Repository Safety and Secret Scan passed during implementation; final head evidence is recorded in PR #45.
 - Follow-up: formal projection-service extraction requires a separate Issue and PR.
