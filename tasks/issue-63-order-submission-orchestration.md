@@ -11,7 +11,7 @@ Use one implementation for local Order creation, Safety enforcement, Runtime sub
 
 ## Background
 
-`app.trading.submit_order` and `app.trade_command_execution.submit_trade_command_order` independently implement nearly the same submission workflow. The duplicate paths can drift on Order fields, Safety arguments, Runtime error handling and Event validation.
+`app.trading.submit_order` and `app.trade_command_execution.submit_trade_command_order` independently implemented nearly the same submission workflow. The duplicate paths could drift on Order fields, Safety arguments, Runtime error handling and Event validation.
 
 ## Non-goals
 
@@ -92,9 +92,9 @@ Risk: medium.
 
 ## Progress
 
-- Done: compatibility audit, Issue/branch/PR and implementation design.
-- Current: single-owner implementation, payload tests and architecture checks.
-- Next: full CI, final review and merge.
+- Done: compatibility audit, single-owner implementation, legacy/V1 payload preservation and architecture tests.
+- Current: standard full CI and final Diff review.
+- Next: freeze evidence, mark ready, squash merge and close Issue.
 - Blocked by: nothing.
 
 ## Completion
@@ -103,5 +103,5 @@ Risk: medium.
 - Merge commit:
 - Behavior changed: internal ownership only; duplicate orchestration becomes one implementation.
 - Behavior intentionally unchanged: both public paths, payload modes, Safety, persistence, Runtime and Event behavior.
-- Tests/CI:
+- Tests/CI: pending standard final-head runs.
 - Follow-up debt: broader Venue Reconciliation decomposition remains next after this workstream.
