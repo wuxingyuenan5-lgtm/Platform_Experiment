@@ -1,16 +1,16 @@
 name: Issue 40 schema extraction
 
 on:
-  push:
+  pull_request:
     branches:
-      - refactor/issue-40-financial-fact-schemas
+      - main
 
 permissions:
   contents: write
 
 jobs:
   apply:
-    if: github.actor != 'github-actions[bot]'
+    if: github.head_ref == 'refactor/issue-40-financial-fact-schemas' && github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
