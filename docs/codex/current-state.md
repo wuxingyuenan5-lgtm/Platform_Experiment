@@ -2,7 +2,7 @@
 
 Last updated: 2026-07-24
 Stable branch: `main`
-Latest completed engineering scope: Issue #55 / PR #56
+Latest completed engineering scope: Issue #57 / PR #58
 
 This file is the compact cross-session handoff. It records current truth, not a PR diary. Read the actual open Issues and PRs before assuming that work is active.
 
@@ -35,7 +35,8 @@ Real-account acceptance remains controlled-host, small-capital and minimum-size.
 - Database changes use an ordered migration ledger with immutable checksums.
 - Backend and Runtime tests have exactly one primary taxonomy marker.
 - Ownership or compatibility-boundary changes must update `docs/architecture/OWNERSHIP.md` in the same PR.
-- Repository Safety validates canonical documentation entrypoints, protected Owner mappings and referenced Owner paths.
+- Repository Safety validates canonical entrypoints, protected Owner mappings and active local Markdown file targets.
+- Non-trivial task packets identify expected changed files, required verification and task-specific stop conditions.
 
 ## Completed engineering baseline
 
@@ -59,17 +60,19 @@ Real-account acceptance remains controlled-host, small-capital and minimum-size.
 18. Core database Bootstrap/Schema ownership extraction with exact checksum.
 19. Fixed database Seed ownership extraction with exhaustive all-value snapshot and repeated-startup equivalence.
 20. Canonical architecture ownership catalog with blocking documentation-consistency checks.
+21. Lightweight task-packet controls and active local Markdown-link validation.
 
 ## Active work
 
-No engineering code workstream is active by default after PR #56 merges.
+No engineering code workstream is active by default after PR #58 merges.
 
 Before starting another code change:
 
 1. verify current `main`, open Issues and open PRs;
 2. reuse an Issue only when the outcome exactly matches;
 3. create one matching task packet, Issue-numbered branch and open PR;
-4. preserve the ownership boundaries recorded in `docs/architecture/OWNERSHIP.md`.
+4. preserve the ownership boundaries recorded in `docs/architecture/OWNERSHIP.md`;
+5. stop when the required change exceeds the task packet's expected files or protected semantics.
 
 Separate non-code follow-ups remain:
 
