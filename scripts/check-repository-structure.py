@@ -44,6 +44,21 @@ EXECUTION_SCHEMA_NAMES = {
     "StrategyRunResponse",
     "StrategyV1ReadinessResponse",
 }
+OPERATIONAL_PROJECTION_WRITE_ANCHORS = {
+    "INSERT INTO positions",
+    "INSERT INTO pnl_results",
+}
+FORMAL_PROJECTION_WRITES = {
+    "INSERT INTO financial_facts",
+    "INSERT INTO formal_positions",
+    "UPDATE formal_positions",
+    "INSERT INTO formal_pnl_results",
+    "UPDATE formal_pnl_results",
+}
+OPERATIONAL_PROJECTION_READS = {
+    "FROM positions",
+    "FROM pnl_results",
+}
 
 
 def parsed_module(path: Path) -> ast.Module:
@@ -132,6 +147,53 @@ def check_execution_schema_boundary(errors: list[str]) -> None:
         )
 
 
+def check_projection_boundaries(errors: list[str]) -> None:
+    trading_path = BACKEND_APP / "trading.py"
+    trading_source = trading_path.read_text(encoding="utf-8")
+    trading_functions = {
+        node.name
+        for node in parsed_module(trading_path).body
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+    }
+    if "record_fill_and_update_operational_projections" not in trading_functions:
+        errors.append(
+            "platform-backend/app/trading.py: fill projection function must be named "
+            "record_fill_and_update_operational_projections"
+        )
+    if "record_fill_and_update_projections" in trading_functions:
+        errors.append(
+            "platform-backend/app/trading.py: ambiguous projection function name is forbidden"
+        )
+    missing_operational_writes = OPERATIONAL_PROJECTION_WRITE_ANCHORS - {
+        statement
+        for statement in OPERATIONAL_PROJECTION_WRITE_ANCHORS
+        if statement in trading_source
+    }
+    if missing_operational_writes:
+        errors.append(
+            "platform-backend/app/trading.py: expected operational projection writes are missing: "
+            f"{sorted(missing_operational_writes)}"
+        )
+    forbidden_formal_writes = {
+        statement for statement in FORMAL_PROJECTION_WRITES if statement in trading_source
+    }
+    if forbidden_formal_writes:
+        errors.append(
+            "platform-backend/app/trading.py: trading flow must not write formal accounting tables: "
+            f"{sorted(forbidden_formal_writes)}"
+        )
+
+    financial_source = (BACKEND_APP / "financial_facts.py").read_text(encoding="utf-8")
+    forbidden_operational_reads = {
+        statement for statement in OPERATIONAL_PROJECTION_READS if statement in financial_source
+    }
+    if forbidden_operational_reads:
+        errors.append(
+            "platform-backend/app/financial_facts.py: formal accounting must not read "
+            f"operational projection tables: {sorted(forbidden_operational_reads)}"
+        )
+
+
 def check_test_names(errors: list[str]) -> None:
     for root in TEST_ROOTS:
         for path in sorted(root.rglob("*.py")):
@@ -155,6 +217,7 @@ def main() -> int:
     check_backend_venue_boundary(errors)
     check_composition_root(errors)
     check_execution_schema_boundary(errors)
+    check_projection_boundaries(errors)
     check_test_names(errors)
     check_workflow_names(errors)
     if errors:

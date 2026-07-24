@@ -63,6 +63,7 @@ outputs/             临时产物
 - Backend 与 Runtime 的 Ruff、依赖完整性和测试按完整维护目录执行，不以文件白名单豁免新增代码。
 - `platform-backend/app/main.py` 仅负责 Router 与 Middleware 装配，不得通过运行时赋值修改领域模块。
 - 执行域 API DTO 由 `platform-backend/app/execution_schemas.py` 统一维护，`app/schemas.py` 仅保留兼容导出。
+- `positions`、`pnl_results` 是成交链路的运营投影；正式账务只由 `financial_facts`、`formal_positions`、`formal_pnl_results` 提供，禁止跨边界混写或将运营投影作为正式账务依据。
 
 ## 常用命令
 
