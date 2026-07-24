@@ -23,6 +23,8 @@ This document is the canonical human-readable catalog of major code ownership bo
 | Boundary | Authoritative owner | Responsibility | Must not own |
 |---|---|---|---|
 | Platform order submission orchestration | `platform-backend/app/trade_command_execution.py` | Single local Order creation, Safety enforcement, legacy/V1 Runtime dispatch, unknown-result handling and Event handoff | Event projection, reconciliation or formal accounting |
+| Venue Reconciliation public DTOs | `platform-backend/app/venue_reconciliation_schemas.py` | Reconciliation run, difference-resolution and order-reconciliation request/response models plus public status types | SQL, Runtime queries, comparison or route orchestration |
+| Venue Reconciliation orchestration | `platform-backend/app/venue_reconciliation.py` | Compatibility exports, Runtime queries, FinancialFact import, comparison, difference persistence, audit and routes pending staged extraction | Duplicate public DTO definitions |
 | Operational fill projection | `platform-backend/app/trading.py` | Low-latency `positions` and `pnl_results` updates plus explicit legacy submission compatibility export | Authoritative order submission or formal accounting |
 | Position calculation policy | `platform-backend/app/position_math.py` | Pure per-fill net quantity, average price and realized PnL calculation shared by operational and formal projections | SQL, HTTP, FX, multiplier application or projection persistence |
 | FinancialFact public DTOs | `platform-backend/app/financial_fact_schemas.py` | FinancialFact, formal Position/PnL/NAV and rebuild API models | Normalization, SQL or calculations |

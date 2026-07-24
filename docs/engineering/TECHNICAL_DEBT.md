@@ -114,7 +114,7 @@ Risk: untyped database rows, arbitrary payloads and large orchestration modules 
 Completed prerequisite:
 
 - Pyright is installed and blocking in CI;
-- Platform execution DTOs, FinancialFact DTOs/Normalization/Repository/Projection Service, shared Position Math, SQLite Connection/Bootstrap/Seeds, Runtime contracts, schema migrations, schema governance and authoritative order submission are selected;
+- Platform execution DTOs, FinancialFact DTOs/Normalization/Repository/Projection Service, shared Position Math, Venue Reconciliation DTOs, SQLite Connection/Bootstrap/Seeds, Runtime contracts, schema migrations, schema governance and authoritative order submission are selected;
 - Runtime models, contracts and Gateway Protocol are selected.
 
 Deferred because: strict whole-project typing would create noisy changes unrelated to current risk boundaries.
