@@ -1,7 +1,7 @@
 # Issue #63 — Unify platform order submission orchestration
 
 Issue: #63
-Status: active
+Status: done
 Branch: `refactor/issue-63-order-submission-orchestration`
 Base commit: `216225ecc3a2b1b2bc0e1737b0c69a5f78adc470`
 
@@ -92,16 +92,16 @@ Risk: medium.
 
 ## Progress
 
-- Done: compatibility audit, single-owner implementation, legacy/V1 payload preservation, architecture tests and Ruff formatting fixes.
-- Current: rerun full CI on the repaired branch head.
-- Next: freeze evidence, mark ready, squash merge and close Issue.
+- Done: compatibility audit, single-owner implementation, payload preservation, architecture tests, Ruff/Pyright and complete pre-freeze CI.
+- Current: final frozen-head verification and squash merge.
+- Next: close Issue and begin Venue Reconciliation schema ownership extraction.
 - Blocked by: nothing.
 
 ## Completion
 
 - PR: #64
-- Merge commit:
+- Merge commit: recorded by the final squash merge on PR #64.
 - Behavior changed: internal ownership only; duplicate orchestration becomes one implementation.
 - Behavior intentionally unchanged: both public paths, payload modes, Safety, persistence, Runtime and Event behavior.
-- Tests/CI: first standard run found only two Ruff formatting diagnostics; repaired-head run pending.
+- Tests/CI: Platform CI `30112163956` success; Secret Scan `30112163974` success. Final frozen-head runs must also pass before merge.
 - Follow-up debt: broader Venue Reconciliation decomposition remains next after this workstream.
