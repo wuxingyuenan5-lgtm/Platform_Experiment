@@ -5,6 +5,7 @@ import json
 import sqlite3
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from typing import TypedDict
 
 from app.database import connection
 
@@ -16,6 +17,13 @@ CREATE TABLE IF NOT EXISTS schema_migrations (
     applied_at TEXT NOT NULL
 );
 """
+
+
+class AppliedMigration(TypedDict):
+    version: int
+    name: str
+    checksum: str
+    appliedAt: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -96,7 +104,7 @@ def apply_platform_migrations() -> None:
         apply_migrations(db)
 
 
-def list_applied_migrations() -> list[dict[str, object]]:
+def list_applied_migrations() -> list[AppliedMigration]:
     with connection() as db:
         db.executescript(LEDGER_SQL)
         rows = db.execute(
@@ -107,11 +115,11 @@ def list_applied_migrations() -> list[dict[str, object]]:
             """
         ).fetchall()
     return [
-        {
-            "version": int(row["version"]),
-            "name": row["name"],
-            "checksum": row["checksum"],
-            "appliedAt": row["applied_at"],
-        }
+        AppliedMigration(
+            version=int(row["version"]),
+            name=str(row["name"]),
+            checksum=str(row["checksum"]),
+            appliedAt=str(row["applied_at"]),
+        )
         for row in rows
     ]
