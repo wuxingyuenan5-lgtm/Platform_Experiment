@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from decimal import Decimal
+from typing import Literal
 from uuid import uuid4
 
 import httpx
@@ -20,15 +21,25 @@ from app.trading import (
     now_iso,
 )
 
+SubmissionMode = Literal["legacy", "v1"]
 
-def submit_trade_command_order(
+
+def submit_order_through_runtime(
     request: CreateOrderRequest,
     *,
-    strategy_instance_id: str,
-    command_id: str,
+    mode: SubmissionMode,
+    strategy_instance_id: str | None = None,
+    command_id: str | None = None,
     reduce_only: bool = False,
 ) -> OrderResponse:
-    """Create an Order and preserve Strategy identity across the Runtime boundary."""
+    """Create one local Order and submit it through the selected Runtime contract mode."""
+
+    if mode == "v1":
+        if strategy_instance_id is None or command_id is None:
+            raise ValueError("V1 order submission requires Strategy and Command identity")
+        resolved_command_id = command_id
+    else:
+        resolved_command_id = command_id or str(uuid4())
 
     settings = get_settings()
     order_id = str(uuid4())
@@ -37,17 +48,25 @@ def submit_trade_command_order(
     if request.order_type == "limit" and request.price is None:
         raise HTTPException(status_code=422, detail="Limit orders require price")
 
-    enforce_order_safety(
-        request.account_id,
-        request.instrument_id,
-        request.quantity,
-        request.price,
-        strategy_instance_id=strategy_instance_id,
-        symbol=request.symbol,
-        side=request.side,
-        order_type=request.order_type,
-        command_id=command_id,
-    )
+    if mode == "v1":
+        enforce_order_safety(
+            request.account_id,
+            request.instrument_id,
+            request.quantity,
+            request.price,
+            strategy_instance_id=strategy_instance_id,
+            symbol=request.symbol,
+            side=request.side,
+            order_type=request.order_type,
+            command_id=resolved_command_id,
+        )
+    else:
+        enforce_order_safety(
+            request.account_id,
+            request.instrument_id,
+            request.quantity,
+            request.price,
+        )
 
     with connection() as db:
         db.execute(
@@ -59,7 +78,7 @@ def submit_trade_command_order(
             """,
             (
                 order_id,
-                command_id,
+                resolved_command_id,
                 request.account_id,
                 request.instrument_id,
                 request.symbol,
@@ -73,42 +92,84 @@ def submit_trade_command_order(
             ),
         )
 
-    command = RuntimeSubmitOrderCommandV1(
-        command_id=command_id,
-        platform_order_id=order_id,
-        strategy_instance_id=strategy_instance_id,
-        account_id=request.account_id,
-        instrument_id=request.instrument_id,
-        symbol=request.symbol,
-        side=request.side,
-        order_type=request.order_type,
-        quantity=request.quantity,
-        price=request.price,
-        reduce_only=reduce_only,
-    )
+    if mode == "v1":
+        command_payload = RuntimeSubmitOrderCommandV1(
+            command_id=resolved_command_id,
+            platform_order_id=order_id,
+            strategy_instance_id=strategy_instance_id,
+            account_id=request.account_id,
+            instrument_id=request.instrument_id,
+            symbol=request.symbol,
+            side=request.side,
+            order_type=request.order_type,
+            quantity=request.quantity,
+            price=request.price,
+            reduce_only=reduce_only,
+        ).model_dump(mode="json")
+    else:
+        command_payload = {
+            "command_id": resolved_command_id,
+            "platform_order_id": order_id,
+            "account_id": request.account_id,
+            "instrument_id": request.instrument_id,
+            "symbol": request.symbol,
+            "side": request.side,
+            "order_type": request.order_type,
+            "quantity": decimal_text(request.quantity),
+            "price": decimal_text(request.price) if request.price is not None else None,
+        }
 
     try:
         response = httpx.post(
             f"{settings.runtime_base_url}/commands/orders",
-            json=command.model_dump(mode="json"),
+            json=command_payload,
             timeout=settings.runtime_timeout_seconds,
         )
         response.raise_for_status()
-        events = [
-            RuntimeExecutionEventV1.model_validate(item)
-            for item in response.json()
-        ]
-    except (httpx.HTTPError, ValidationError, TypeError):
+        if mode == "v1":
+            events = [
+                event.model_dump(mode="json")
+                for event in (
+                    RuntimeExecutionEventV1.model_validate(item)
+                    for item in response.json()
+                )
+            ]
+        else:
+            events = response.json()
+    except httpx.HTTPError:
+        mark_order_result_unknown(order_id)
+        return get_order_response(order_id)
+    except (ValidationError, TypeError):
+        if mode != "v1":
+            raise
         mark_order_result_unknown(order_id)
         return get_order_response(order_id)
 
     apply_execution_events(
         order_id,
         request,
-        [event.model_dump(mode="json") for event in events],
-        expected_command_id=command_id,
+        events,
+        expected_command_id=resolved_command_id,
     )
     return get_order_response(order_id)
+
+
+def submit_trade_command_order(
+    request: CreateOrderRequest,
+    *,
+    strategy_instance_id: str,
+    command_id: str,
+    reduce_only: bool = False,
+) -> OrderResponse:
+    """Submit through the authoritative versioned Runtime contract."""
+
+    return submit_order_through_runtime(
+        request,
+        mode="v1",
+        strategy_instance_id=strategy_instance_id,
+        command_id=command_id,
+        reduce_only=reduce_only,
+    )
 
 
 def estimated_order_notional(request: CreateOrderRequest) -> Decimal | None:

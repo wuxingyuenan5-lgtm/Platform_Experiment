@@ -22,6 +22,7 @@ REQUIRED_ENTRYPOINTS = (
 REQUIRED_OWNERS = {
     "Platform composition root": "platform-backend/app/main.py",
     "Execution API DTOs": "platform-backend/app/execution_schemas.py",
+    "Platform order submission orchestration": "platform-backend/app/trade_command_execution.py",
     "Operational fill projection": "platform-backend/app/trading.py",
     "Position calculation policy": "platform-backend/app/position_math.py",
     "FinancialFact public DTOs": "platform-backend/app/financial_fact_schemas.py",

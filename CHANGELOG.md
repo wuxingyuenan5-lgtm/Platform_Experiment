@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Unified Platform order submission orchestration — Issue #63 / PR #64
+
+- Made `platform-backend/app/trade_command_execution.py` the single local Order/Safety/Runtime submission implementation.
+- Reduced `platform-backend/app/trading.py::submit_order` to a deprecated compatibility delegate.
+- Preserved the exact legacy raw payload keys and the typed TradeCommand V1 Strategy/version/`reduceOnly` payload.
+- Added payload-equivalence, invalid-V1-event `result_unknown` and sole-owner architecture checks.
+- Preserved APIs, Order/Fill persistence, Event application, operational projections, Runtime contracts and both Live Write defaults.
+
 ### Shared Position Math ownership — Issue #61 / PR #62
 
 - Added `platform-backend/app/position_math.py` as the pure per-fill quantity, average-price and realized-PnL calculation owner.
