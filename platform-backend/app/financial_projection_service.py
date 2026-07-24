@@ -164,7 +164,8 @@ def rebuild_strategy_financials(
             pair["instrument_id"],
         )
 
-    completed_at = now_iso()
+    completed_at_text = now_iso()
+    completed_at = datetime.fromisoformat(completed_at_text)
     repository.record_projection_rebuild_audit(
         audit_event_id=str(uuid4()),
         strategy_instance_id=strategy_instance_id,
@@ -172,7 +173,7 @@ def rebuild_strategy_financials(
             {"rebuiltPairCount": len(pairs), "factCount": fact_count},
             sort_keys=True,
         ),
-        created_at=completed_at,
+        created_at=completed_at_text,
     )
     return FinancialProjectionRebuildResponse(
         strategyInstanceId=strategy_instance_id,
