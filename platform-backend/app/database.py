@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import sqlite3
 
-from app.database_connection import connection, database_path
+from app.database_connection import connection as connection
+from app.database_connection import database_path as database_path
 
 SCHEMA_SQL = """
 PRAGMA foreign_keys = ON;
