@@ -33,6 +33,7 @@ markers = [
 pythonVersion = "3.12"
 typeCheckingMode = "standard"
 include = [
+  "app/database_connection.py",
   "app/execution_schemas.py",
   "app/financial_fact_normalization.py",
   "app/financial_fact_repository.py",
