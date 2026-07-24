@@ -28,10 +28,10 @@
 
 - Backend 与 Runtime 的 Ruff 检查覆盖完整 `app/` 与 `tests/`，新增文件不能绕过门禁。
 - Python 安装完成后必须通过 `pip check`。
-- Pyright 覆盖执行 DTO、FinancialFact DTO/Normalization/Repository/Projection Service、SQLite Connection/Bootstrap、Runtime 契约、迁移账本和权威下单边界。
+- Pyright 覆盖执行 DTO、FinancialFact DTO/Normalization/Repository/Projection Service、SQLite Connection/Bootstrap/Seeds、Runtime 契约、迁移账本和权威下单边界。
 - Frontend 活跃交易界面持续执行零警告 ESLint、类型检查和生产构建；其他新增/修改源文件执行 no-new-debt gate。
 - `scripts/check-repository-structure.py` 阻止 Backend 引入交易场所 SDK、Composition Root 混入业务逻辑、正式账务边界漂移、平行上下文入口、临时测试命名和诊断工作流残留。
-- FinancialFact Schema/Normalization/Repository/Projection Service 与 SQLite Connection/Bootstrap 各自有静态所有权测试。
+- FinancialFact Schema/Normalization/Repository/Projection Service 与 SQLite Connection/Bootstrap/Seeds 各自有静态所有权测试。
 
 ## 工作流与上下文边界
 
@@ -59,16 +59,17 @@
 ## Persistence 边界
 
 - SQLite 仍是当前批准的数据库技术。
-- `platform-backend/app/database_connection.py` 是共享数据库路径、连接创建、 Row Factory、Foreign Key、Commit/Rollback/Close 的唯一 Owner。
+- `platform-backend/app/database_connection.py` 是共享数据库路径、连接创建、Row Factory、Foreign Key、Commit/Rollback/Close 的唯一 Owner。
 - `platform-backend/app/database_bootstrap.py` 是完整核心 `SCHEMA_SQL`、新库 Schema 执行、兼容补列与部分唯一索引的唯一 Owner。
-- `platform-backend/app/database.py` 显式重导出 Connection/Bootstrap 兼容接口，并只负责初始化顺序与暂存固定 Seed；它不得实现 `sqlite3.connect`、`CREATE/ALTER` 或 `executescript`。
-- 初始化顺序固定为：Connection → Bootstrap（Schema + 兼容 DDL）→ Seed。
+- `platform-backend/app/database_seeds.py` 是固定 Reference Seed 向量、插入顺序与现有 XAUUSD 合约默认更新的唯一 Owner。
+- `platform-backend/app/database.py` 只显式重导出 Connection/Bootstrap/Seed 兼容接口，并负责 `Connection → Bootstrap → Seed` 初始化编排；它不得实现连接、Schema 或 Seed 内容。
 - Bootstrap Schema 文本由 SHA-256 `421f0625ffe3a8a26ca48bc827e64bd6aa6b2e49d95faef0b17313e808375801` 固定。
-- 所有 DDL Owner、数据权威分类和迁移规则记录在 `docs/database/README.md`。
+- 15 张 Seed 表的全部行/字段由 SHA-256 `d42f7e4f95a6efa9044b1e91b4e603f1d87f515923a57d941ee16e75109e6183` 固定。
+- 所有 DDL Owner、数据权威分类、Seed Authority 和迁移规则记录在 `docs/database/README.md`。
 - `platform-backend/app/schema_migrations.py` 维护单调递增、带校验和的迁移账本。
 - `platform-backend/app/financial_fact_repository.py` 是 FinancialFact 与正式 Position/PnL/NAV 的唯一 SQL、行映射和事务单元 Owner。
-- 连接/Bootstrap 拆分由动态路径、事务行为、Schema Checksum、新库/旧库及重复启动快照共同证明等价。
-- 已应用迁移不可修改；删除表/列、改变字段语义、转移账务权威或替换数据库属于专门高风险迁移。
+- 数据库拆分由动态路径、事务行为、Schema Checksum、全量 Seed Checksum、新库/旧库及重复启动快照共同证明等价。
+- 已应用迁移不可修改；删除表/列、改变字段语义、替换 Seed、转移账务权威或替换数据库属于专门高风险变更。
 
 ## FinancialFact Normalization 边界
 
