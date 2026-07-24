@@ -37,10 +37,11 @@
 
 - Backend 与 Runtime 的 Ruff 检查覆盖完整 `app/` 与 `tests/`，新增文件不能绕过门禁。
 - Python 安装完成后必须通过 `pip check`。
-- Pyright 先覆盖执行 DTO、FinancialFact DTO/Repository、Runtime 契约、迁移账本和权威下单边界；每次扩展必须保持所选模块清洁。
+- Pyright 先覆盖执行 DTO、FinancialFact DTO/Normalization/Repository、Runtime 契约、迁移账本和权威下单边界；每次扩展必须保持所选模块清洁。
 - Frontend 活跃交易界面持续执行完整零警告 ESLint、类型检查和生产构建。
 - 活跃范围之外的新增或修改前端源文件通过 changed-file no-new-debt gate，禁止增加旧债。
 - `scripts/check-repository-structure.py` 阻止 Backend 引入交易场所 SDK、Composition Root 混入业务逻辑、FinancialFact 服务层重新出现 SQL、平行上下文入口、临时测试命名和诊断工作流残留。
+- `tests/test_architecture_financial_fact_normalization.py` 阻止标准化规则、错误契约或内容哈希重新回流到服务层，并阻止 Policy 依赖 Repository。
 
 ## 工作流与上下文边界
 
@@ -75,21 +76,30 @@
 - 所有 DDL Owner、数据权威分类和迁移规则记录在 `docs/database/README.md`。
 - `platform-backend/app/schema_migrations.py` 维护单调递增、带校验和的迁移账本。
 - `platform-backend/app/financial_fact_repository.py` 是 FinancialFact 与正式 Position/PnL/NAV 的唯一 SQL、行映射和事务单元 Owner。
-- `platform-backend/app/financial_facts.py` 不得直接导入数据库连接或包含 SQL；它只负责标准化、哈希、计算、重建编排和 API。
+- `platform-backend/app/financial_facts.py` 不得直接导入数据库连接或包含 SQL。
 - 事实写入与审计、Position 与 PnL 写入、重建清理、NAV 与审计必须分别保持单事务原子性。
 - Version 1 只登记既有 Schema 基线，不移动或改写现有业务表。
 - 已应用迁移不可修改；校验和漂移必须启动失败。
 - 删除表/列、改变字段语义、转移账务权威或替换数据库属于专门高风险迁移。
 
+## FinancialFact Normalization 边界
+
+- `platform-backend/app/financial_fact_normalization.py` 是标准化结果结构、币种规范化、结算币种校验、目录派生数量单位/合约乘数、FX 转换、质量状态、Decimal/UTC/JSON 规范化和 SHA-256 内容哈希的唯一 Owner。
+- Policy 只接收已解析的 `FinancialFactNormalizationContext`，不得访问 Repository、数据库或外部交易场所。
+- `platform-backend/app/financial_facts.py` 负责解析策略、账户绑定和 Instrument 上下文，并保留 `normalize_fact(request)` 兼容包装器。
+- 标准化键集合、文本值和内容哈希属于不可变事实身份；改变任一规则必须作为显式兼容性迁移，而不是普通重构。
+- 纯 Policy Golden 固定完整标准化字典和精确 SHA-256；API 等价测试固定错误状态、持久化值和幂等冲突行为。
+
 ## Financial Projection 边界
 
 - `platform-backend/app/trading.py` 负责成交后近实时运营投影，并且只写入 `positions` 与 `pnl_results`。
 - `platform-backend/app/financial_fact_schemas.py` 负责正式账务公开 DTO。
+- `platform-backend/app/financial_fact_normalization.py` 负责不可变事实标准化与内容哈希。
 - `platform-backend/app/financial_fact_repository.py` 维护 `financial_facts`、`formal_positions`、`formal_pnl_results` 与正式 NAV 的持久化。
-- `platform-backend/app/financial_facts.py` 负责不可变事实标准化、内容哈希、平均成本、PnL 分项、重建编排和 API 路由。
+- `platform-backend/app/financial_facts.py` 负责目录上下文解析、平均成本、PnL 分项、重建编排和 API 路由。
 - 运营投影服务于交易监控和即时展示，不构成正式会计权威；正式账务必须从不可变事实重建。
 - 交易链路不得写入正式投影，正式账务链路不得读取运营投影作为计算输入。
-- `tests/test_projection_boundaries.py`、FinancialFact Repository 架构/事务测试与结构脚本共同执行静态和原子性回归检查。
+- `tests/test_projection_boundaries.py`、FinancialFact Schema/Normalization/Repository 架构测试、Repository 事务测试与结构脚本共同执行回归检查。
 
 ## Test Taxonomy 边界
 

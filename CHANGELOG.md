@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+### FinancialFact normalization ownership — Issue #44 / PR #45
+
+- Extracted currency, quantity-unit, contract-multiplier, FX/data-quality, Decimal, UTC timestamp and payload JSON canonicalization into `platform-backend/app/financial_fact_normalization.py`.
+- Added an explicit `FinancialFactNormalizationContext` so the Policy consumes resolved catalog values without depending on Repository or database access.
+- Moved normalized-content SHA-256 ownership into the Policy while preserving the exact JSON serialization parameters and immutable fact identity.
+- Preserved `app.financial_facts.normalize_fact(request)`, `utc_iso` and `decimal_text` compatibility surfaces.
+- Added full normalized-dictionary and exact hash golden vectors plus API status, persisted-value and currency/FX equivalence tests.
+- Added architecture checks preventing normalization/error/hash implementation from returning to the service layer or gaining a persistence dependency.
+- Added the Policy to progressive Pyright.
+- Retained repository SQL/transactions, API schemas/routes, average-cost and PnL formulas, migrations, trading behavior and both Live Write defaults unchanged.
+
 ### FinancialFact persistence ownership — Issue #42 / PR #43
 
 - Extracted FinancialFact and formal-accounting direct SQLite access into `platform-backend/app/financial_fact_repository.py`.

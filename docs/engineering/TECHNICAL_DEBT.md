@@ -39,12 +39,12 @@ Safe approach: extract connection → bootstrap → migrations → seeds in smal
 
 ## TD-002 — Financial facts module concentration
 
-Status: active; public schema extraction in Issue #40 and persistence extraction in Issue #42
+Status: active; schema, persistence and normalization boundaries extracted in Issues #40, #42 and #44
 Owner: Platform Backend / formal accounting
 
-Problem: `app/financial_facts.py` still contains normalization, content hashing, projection calculations, rebuild orchestration and API behavior. Direct SQL and row mapping are isolated in `app/financial_fact_repository.py`.
+Problem: `app/financial_facts.py` still contains catalog-context resolution, formal Position/PnL calculations, NAV calculation, rebuild orchestration and API behavior. Public DTOs, normalization/hash policy and direct persistence are now isolated in dedicated modules.
 
-Risk: remaining normalization and formal-projection calculations still share one review surface.
+Risk: formal projection calculations and orchestration still share one review surface.
 
 Completed prerequisite:
 
@@ -55,15 +55,17 @@ Completed prerequisite:
 - Issue #40 establishes `app/financial_fact_schemas.py` as the authoritative public DTO owner while preserving `app.financial_facts` compatibility exports;
 - Issue #42 establishes `app/financial_fact_repository.py` as the direct SQL, row-mapping and DDL owner;
 - fact+audit, Position+PnL, rebuild-clear and NAV+audit transaction units have forced-rollback tests;
-- both extracted boundaries are included in progressive Pyright and protected by machine checks.
+- Issue #44 establishes `app/financial_fact_normalization.py` as the canonicalization, FX/data-quality and normalized-content hash owner;
+- exact normalized-dictionary/SHA-256 golden vectors and API status/persistence equivalence tests protect immutable fact identity;
+- all three extracted boundaries are included in progressive Pyright or explicit architecture checks.
 
-Deferred because: normalization policy and projection calculations require separate ownership boundaries and equivalence evidence; combining them with persistence movement would make review unsafe.
+Deferred because: formal Position/PnL/NAV calculations and rebuild orchestration still require one dedicated projection-service boundary with before/after equivalence evidence.
 
-Trigger: after Issue #42 merges, create separate Issues in this order: normalization policy extraction → projection service extraction.
+Trigger: create one separate Issue for projection-service extraction after Issue #44 merges.
 
-Protected semantics: fact idempotency, normalized content hashing, currency conversion, contract multiplier, position average cost, component PnL, rebuild results and transaction atomicity.
+Protected semantics: fact idempotency, normalized content hashing, currency conversion, contract multiplier, position average cost, component PnL, rebuild results, NAV results and transaction atomicity.
 
-Safe approach: one concern per PR; preserve formulas byte-for-byte where possible, keep compatibility imports, and require the existing financial golden suite plus repository transaction suite on every step.
+Safe approach: move only calculation/rebuild orchestration in the next PR; preserve formulas byte-for-byte where possible, keep compatibility imports, and require normalization, accounting golden and repository transaction suites.
 
 ## TD-003 — Operational projection retirement criteria
 
@@ -117,7 +119,7 @@ Risk: untyped database rows, arbitrary payloads and large orchestration modules 
 Completed prerequisite:
 
 - Pyright is installed and blocking in CI;
-- Platform execution DTOs, FinancialFact DTOs and Repository, Runtime contracts, schema migrations, schema governance and authoritative order submission are selected;
+- Platform execution DTOs, FinancialFact DTOs/Normalization/Repository, Runtime contracts, schema migrations, schema governance and authoritative order submission are selected;
 - Runtime models, Runtime contracts and Gateway Protocol are selected.
 
 Deferred because: strict whole-project typing would create noisy changes unrelated to current risk boundaries.
