@@ -59,6 +59,8 @@
 - 双端模型分别位于 Platform 和 Runtime 的 `app/runtime_contracts.py`。
 - `docs/contracts/runtime-v1.json` 是字段顺序、名称和版本的可执行快照。
 - Platform 收到无法验证的 Event 时保留 `result_unknown`，不得解释为确定失败或自动重下。
+- `platform-backend/app/trade_command_execution.py` 是本地 Order 创建、Safety、Runtime 提交和未知结果处理的唯一编排 Owner。
+- `platform-backend/app/trading.py::submit_order` 只保留 deprecated 兼容入口；legacy raw payload 与 TradeCommand V1 payload 由 Owner 显式区分。
 - 不兼容变更必须提升版本并提供迁移/兼容测试。
 
 ## Persistence 边界

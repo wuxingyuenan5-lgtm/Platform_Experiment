@@ -68,7 +68,7 @@ Real-account acceptance remains controlled-host, small-capital and minimum-size.
 
 ## Active work
 
-No engineering code workstream is active by default after PR #62 merges.
+Issue #63 / Draft PR #64 is the only active engineering workstream: Platform order-submission orchestration unification.
 
 Before starting another code change:
 

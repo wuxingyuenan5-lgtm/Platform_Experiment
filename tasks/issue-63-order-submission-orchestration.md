@@ -92,14 +92,14 @@ Risk: medium.
 
 ## Progress
 
-- Done: compatibility audit, Issue and branch.
-- Current: implementation and direct tests.
+- Done: compatibility audit, Issue/branch/PR and implementation design.
+- Current: single-owner implementation, payload tests and architecture checks.
 - Next: full CI, final review and merge.
 - Blocked by: nothing.
 
 ## Completion
 
-- PR:
+- PR: #64
 - Merge commit:
 - Behavior changed: internal ownership only; duplicate orchestration becomes one implementation.
 - Behavior intentionally unchanged: both public paths, payload modes, Safety, persistence, Runtime and Event behavior.

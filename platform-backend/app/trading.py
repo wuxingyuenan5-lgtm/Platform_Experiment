@@ -2,8 +2,6 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from decimal import Decimal
-from uuid import uuid4
-
 import httpx
 from fastapi import HTTPException
 
@@ -11,7 +9,6 @@ from app.config import get_settings
 from app.database import connection
 from app.position_math import calculate_position_update
 from app.schemas import CreateOrderRequest, OrderResponse
-from app.security import enforce_order_safety
 
 
 def now_iso() -> str:
@@ -23,76 +20,15 @@ def decimal_text(value: Decimal) -> str:
 
 
 def submit_order(request: CreateOrderRequest, command_id: str | None = None) -> OrderResponse:
-    settings = get_settings()
-    order_id = str(uuid4())
-    command_id = command_id or str(uuid4())
-    created_at = now_iso()
+    """Compatibility entry point for the deprecated raw order endpoint."""
 
-    if request.order_type == "limit" and request.price is None:
-        raise HTTPException(status_code=422, detail="Limit orders require price")
+    from app.trade_command_execution import submit_order_through_runtime
 
-    enforce_order_safety(
-        request.account_id,
-        request.instrument_id,
-        request.quantity,
-        request.price,
-    )
-
-    with connection() as db:
-        db.execute(
-            """
-            INSERT INTO orders (
-                id, command_id, account_id, instrument_id, symbol, side,
-                order_type, quantity, price, status, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                order_id,
-                command_id,
-                request.account_id,
-                request.instrument_id,
-                request.symbol,
-                request.side,
-                request.order_type,
-                decimal_text(request.quantity),
-                decimal_text(request.price) if request.price is not None else None,
-                "processing",
-                created_at,
-                created_at,
-            ),
-        )
-
-    command = {
-        "command_id": command_id,
-        "platform_order_id": order_id,
-        "account_id": request.account_id,
-        "instrument_id": request.instrument_id,
-        "symbol": request.symbol,
-        "side": request.side,
-        "order_type": request.order_type,
-        "quantity": decimal_text(request.quantity),
-        "price": decimal_text(request.price) if request.price is not None else None,
-    }
-
-    try:
-        response = httpx.post(
-            f"{settings.runtime_base_url}/commands/orders",
-            json=command,
-            timeout=settings.runtime_timeout_seconds,
-        )
-        response.raise_for_status()
-        events = response.json()
-    except httpx.HTTPError:
-        mark_order_result_unknown(order_id)
-        return get_order_response(order_id)
-
-    apply_execution_events(
-        order_id,
+    return submit_order_through_runtime(
         request,
-        events,
-        expected_command_id=command_id,
+        mode="legacy",
+        command_id=command_id,
     )
-    return get_order_response(order_id)
 
 
 def reconcile_order(order_id: str) -> OrderResponse:

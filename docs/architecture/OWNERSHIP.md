@@ -22,7 +22,8 @@ This document is the canonical human-readable catalog of major code ownership bo
 
 | Boundary | Authoritative owner | Responsibility | Must not own |
 |---|---|---|---|
-| Operational fill projection | `platform-backend/app/trading.py` | Low-latency `positions` and `pnl_results` updates | Formal accounting authority |
+| Platform order submission orchestration | `platform-backend/app/trade_command_execution.py` | Single local Order creation, Safety enforcement, legacy/V1 Runtime dispatch, unknown-result handling and Event handoff | Event projection, reconciliation or formal accounting |
+| Operational fill projection | `platform-backend/app/trading.py` | Low-latency `positions` and `pnl_results` updates plus explicit legacy submission compatibility export | Authoritative order submission or formal accounting |
 | Position calculation policy | `platform-backend/app/position_math.py` | Pure per-fill net quantity, average price and realized PnL calculation shared by operational and formal projections | SQL, HTTP, FX, multiplier application or projection persistence |
 | FinancialFact public DTOs | `platform-backend/app/financial_fact_schemas.py` | FinancialFact, formal Position/PnL/NAV and rebuild API models | Normalization, SQL or calculations |
 | FinancialFact normalization | `platform-backend/app/financial_fact_normalization.py` | Canonical currency, Decimal, UTC, JSON, FX/data-quality and immutable content hash | Repository access, FastAPI or venue SDKs |
