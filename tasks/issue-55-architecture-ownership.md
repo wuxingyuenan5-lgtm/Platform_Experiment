@@ -1,5 +1,8 @@
 # Issue #55 — Machine-checked architecture ownership documentation
 
+Issue: #55
+Branch: `docs/issue-55-architecture-ownership`
+
 ## Objective
 
 Create one canonical architecture ownership catalog and a blocking consistency check so Agent context and architecture Markdown cannot silently drift behind implemented module boundaries.
