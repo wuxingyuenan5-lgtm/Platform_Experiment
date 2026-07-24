@@ -23,7 +23,7 @@ A table must have one owning module and one authority class.
 | Owner module | Primary responsibility |
 |---|---|
 | `app/database.py` | core reference data, commands, orders, fills, operational projections and initial seed data |
-| `app/financial_facts.py` | immutable financial facts and formal accounting projections |
+| `app/financial_fact_repository.py` | immutable financial facts, formal Position/PnL/NAV persistence and transaction boundaries |
 | `app/execution_risk.py` | Kill Switch, batch risk snapshots and residual-risk actions |
 | `app/venue_reconciliation.py` | venue reconciliation runs and differences |
 | `app/live_venue_accounting.py` | imported live economic-event accounting records |
@@ -33,6 +33,8 @@ A table must have one owning module and one authority class.
 | `app/production_monitoring.py` | alerts, scans and controlled operation runs |
 | `app/disaster_recovery.py` | backup and restore manifests/drill records |
 | `app/schema_migrations.py` | migration ledger and ordered additive migrations |
+
+`app/financial_facts.py` owns normalization, hashing, formal-accounting calculations, rebuild orchestration and API routes. It does not own DDL or direct SQL. Fact+audit, Position+PnL, rebuild-clear and NAV+audit transaction units are owned by `app/financial_fact_repository.py`.
 
 ### Execution Runtime
 
