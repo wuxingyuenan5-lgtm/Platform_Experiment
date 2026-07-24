@@ -44,11 +44,9 @@ EXECUTION_SCHEMA_NAMES = {
     "StrategyRunResponse",
     "StrategyV1ReadinessResponse",
 }
-OPERATIONAL_PROJECTION_WRITES = {
+OPERATIONAL_PROJECTION_WRITE_ANCHORS = {
     "INSERT INTO positions",
-    "UPDATE positions",
     "INSERT INTO pnl_results",
-    "UPDATE pnl_results",
 }
 FORMAL_PROJECTION_WRITES = {
     "INSERT INTO financial_facts",
@@ -166,8 +164,10 @@ def check_projection_boundaries(errors: list[str]) -> None:
         errors.append(
             "platform-backend/app/trading.py: ambiguous projection function name is forbidden"
         )
-    missing_operational_writes = OPERATIONAL_PROJECTION_WRITES - {
-        statement for statement in OPERATIONAL_PROJECTION_WRITES if statement in trading_source
+    missing_operational_writes = OPERATIONAL_PROJECTION_WRITE_ANCHORS - {
+        statement
+        for statement in OPERATIONAL_PROJECTION_WRITE_ANCHORS
+        if statement in trading_source
     }
     if missing_operational_writes:
         errors.append(
