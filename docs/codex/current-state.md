@@ -29,7 +29,9 @@ Real-account acceptance remains controlled-host, small-capital and minimum-size.
 - Platform Backend must not import venue SDKs.
 - `app/main.py` is a composition root only.
 - Execution API DTOs are owned by `platform-backend/app/execution_schemas.py`.
-- Public FinancialFact/formal-accounting DTOs are owned by `platform-backend/app/financial_fact_schemas.py`; `app.financial_facts` preserves compatibility exports while retaining persistence, normalization and projection implementation.
+- Public FinancialFact/formal-accounting DTOs are owned by `platform-backend/app/financial_fact_schemas.py`.
+- FinancialFact/formal-accounting SQL, row mapping and transaction units are owned by `platform-backend/app/financial_fact_repository.py`.
+- `platform-backend/app/financial_facts.py` preserves compatibility exports and owns normalization, hashing, calculations, rebuild orchestration and API routes without direct SQL.
 - Platform–Runtime Command/Event traffic uses explicit V1.0 contracts and snapshots.
 - `positions` and `pnl_results` are operational projections.
 - `financial_facts`, `formal_positions` and `formal_pnl_results` are the formal accounting authority.
@@ -54,14 +56,13 @@ Real-account acceptance remains controlled-host, small-capital and minimum-size.
 
 ## Active work
 
-No engineering code workstream is active by default after PR #41 merges.
+Issue #42 / PR #43 is the only active code workstream.
 
-Before starting another code change:
-
-1. search open Issues and PRs;
-2. create or reuse one concrete Issue;
-3. create one matching task packet and one Issue-numbered branch;
-4. do not combine the remaining FinancialFact repository, normalization and projection-service extractions in one PR.
+- Objective: extract FinancialFact/formal-accounting direct SQLite access into one repository module.
+- Branch: `refactor/issue-42-financial-fact-repository`.
+- Task packet: `tasks/issue-42-financial-fact-repository.md`.
+- Protected: normalization, hashes, FX, multipliers, average cost, PnL formulas, API shapes, schema migrations and both Live Write gates.
+- Required evidence: existing accounting golden tests plus forced-rollback tests for fact+audit, Position+PnL, rebuild clearing and NAV+audit.
 
 Separate non-code follow-ups remain:
 
@@ -74,7 +75,7 @@ Separate non-code follow-ups remain:
 - Operational projections remain supported and must not become formal-accounting inputs.
 - Compatibility surfaces require usage evidence and a dedicated migration before removal.
 - `app/database.py` remains intentionally concentrated pending a dedicated fresh/existing-database equivalence-safe decomposition.
-- `app/financial_facts.py` still contains persistence, normalization and projection implementation; only public schemas have been extracted.
+- After Issue #42, `app/financial_facts.py` will still contain normalization and projection orchestration; those require separate Issues in that order.
 - Inherited frontend lint debt remains outside untouched modules; new and changed files cannot add debt.
 - Pyright coverage is progressive rather than whole-repository strict.
 - Live Write cannot be enabled by an engineering refactor or test result.
