@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from pathlib import Path
 
 REQUIRED_ENTRYPOINTS = (
@@ -52,8 +53,31 @@ STALE_CONTEXT_SNIPPETS = (
 )
 
 
-def read_text(root: Path, relative_path: str) -> str:
-    return (root / relative_path).read_text(encoding="utf-8")
+def validate_owner_catalog(
+    root: Path,
+    ownership: str,
+    required_owners: Mapping[str, str] = REQUIRED_OWNERS,
+) -> list[str]:
+    """Validate canonical owner rows and the repository paths they name."""
+
+    errors: list[str] = []
+    for boundary, owner_path in required_owners.items():
+        expected_row = f"| {boundary} | `{owner_path}` |"
+        if expected_row not in ownership:
+            errors.append(f"ownership catalog missing canonical mapping: {boundary} -> {owner_path}")
+        if not (root / owner_path).exists():
+            errors.append(f"canonical owner path does not exist: {owner_path}")
+    return errors
+
+
+def validate_context_map(context: str) -> list[str]:
+    """Reject obsolete Agent-context ownership shortcuts."""
+
+    return [
+        f"stale Agent context ownership statement: {stale}"
+        for stale in STALE_CONTEXT_SNIPPETS
+        if stale in context
+    ]
 
 
 def validate_repository(root: Path) -> list[str]:
@@ -67,15 +91,7 @@ def validate_repository(root: Path) -> list[str]:
 
     ownership_path = root / "docs/architecture/OWNERSHIP.md"
     if ownership_path.is_file():
-        ownership = ownership_path.read_text(encoding="utf-8")
-        for boundary, owner_path in REQUIRED_OWNERS.items():
-            expected_row = f"| {boundary} | `{owner_path}` |"
-            if expected_row not in ownership:
-                errors.append(
-                    f"ownership catalog missing canonical mapping: {boundary} -> {owner_path}"
-                )
-            if not (root / owner_path).exists():
-                errors.append(f"canonical owner path does not exist: {owner_path}")
+        errors.extend(validate_owner_catalog(root, ownership_path.read_text(encoding="utf-8")))
 
     catalog_reference = "docs/architecture/OWNERSHIP.md"
     for relative_path in DOCUMENT_CATALOG_REFERENCES:
@@ -85,10 +101,7 @@ def validate_repository(root: Path) -> list[str]:
 
     context_path = root / "docs/codex/context-map.md"
     if context_path.is_file():
-        context = context_path.read_text(encoding="utf-8")
-        for stale in STALE_CONTEXT_SNIPPETS:
-            if stale in context:
-                errors.append(f"stale Agent context ownership statement: {stale}")
+        errors.extend(validate_context_map(context_path.read_text(encoding="utf-8")))
 
     return sorted(errors)
 
