@@ -44,17 +44,22 @@ router = APIRouter(
 @router.get("", response_model=SchemaMigrationStatusResponse, tags=["ops"])
 def schema_migration_status() -> SchemaMigrationStatusResponse:
     applied_by_version = {
-        int(item["version"]): item for item in list_applied_migrations()
+        item["version"]: item for item in list_applied_migrations()
     }
     statuses: list[SchemaMigrationStatus] = []
     for migration in PLATFORM_MIGRATIONS:
         applied = applied_by_version.get(migration.version)
+        applied_at = (
+            datetime.fromisoformat(applied["appliedAt"])
+            if applied is not None
+            else None
+        )
         statuses.append(
             SchemaMigrationStatus(
                 version=migration.version,
                 name=migration.name,
                 checksum=migration.checksum,
-                appliedAt=applied["appliedAt"] if applied is not None else None,
+                appliedAt=applied_at,
                 status="applied" if applied is not None else "pending",
             )
         )
