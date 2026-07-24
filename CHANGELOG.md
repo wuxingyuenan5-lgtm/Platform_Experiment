@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+### FinancialFact persistence ownership — Issue #42 / PR #43
+
+- Extracted FinancialFact and formal-accounting direct SQLite access into `platform-backend/app/financial_fact_repository.py`.
+- Preserved `app.financial_facts` as the compatibility, normalization, hashing, calculation, rebuild-orchestration and API surface.
+- Moved existing DDL, queries and row mapping without changing table, index, migration or API semantics.
+- Preserved fact+audit, Position+PnL, rebuild-clear and NAV+audit transaction boundaries.
+- Added forced-rollback integration tests proving those transaction units leave no partial state.
+- Added repository ownership checks that forbid SQL or direct database access from `app/financial_facts.py`.
+- Added the repository boundary to progressive Pyright and registered it as the formal-accounting DDL Owner.
+- Retained idempotency, content hashing, FX conversion, contract multipliers, average cost, PnL attribution, rebuild results, trading behavior and both Live Write defaults unchanged.
+
 ### FinancialFact public schema ownership — Issue #40 / PR #41
 
 - Extracted FinancialFact, formal Position, formal PnL, NAV and projection-rebuild Pydantic DTOs into `platform-backend/app/financial_fact_schemas.py`.

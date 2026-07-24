@@ -39,12 +39,12 @@ Safe approach: extract connection → bootstrap → migrations → seeds in smal
 
 ## TD-002 — Financial facts module concentration
 
-Status: active; public schema extraction in Issue #40
+Status: active; public schema extraction in Issue #40 and persistence extraction in Issue #42
 Owner: Platform Backend / formal accounting
 
-Problem: `app/financial_facts.py` still contains normalization, persistence, projection rebuild and query behavior in one auditable but concentrated module.
+Problem: `app/financial_facts.py` still contains normalization, content hashing, projection calculations, rebuild orchestration and API behavior. Direct SQL and row mapping are isolated in `app/financial_fact_repository.py`.
 
-Risk: large review surface around immutable facts and formal accounting calculations.
+Risk: remaining normalization and formal-projection calculations still share one review surface.
 
 Completed prerequisite:
 
@@ -53,15 +53,17 @@ Completed prerequisite:
 - cross-service execution contracts are versioned;
 - existing golden tests cover idempotency, content conflicts, FX completeness, contract multiplier, average cost, component PnL, rebuild and NAV coverage;
 - Issue #40 establishes `app/financial_fact_schemas.py` as the authoritative public DTO owner while preserving `app.financial_facts` compatibility exports;
-- the extracted schema boundary is included in progressive Pyright and protected by JSON Schema/identity tests.
+- Issue #42 establishes `app/financial_fact_repository.py` as the direct SQL, row-mapping and DDL owner;
+- fact+audit, Position+PnL, rebuild-clear and NAV+audit transaction units have forced-rollback tests;
+- both extracted boundaries are included in progressive Pyright and protected by machine checks.
 
-Deferred because: moving SQL, normalization or projection implementation still requires separate repository/service boundaries and before/after equivalence evidence.
+Deferred because: normalization policy and projection calculations require separate ownership boundaries and equivalence evidence; combining them with persistence movement would make review unsafe.
 
-Trigger: after Issue #40 merges, create separate Issues in this order: repository extraction → normalization policy extraction → projection service extraction.
+Trigger: after Issue #42 merges, create separate Issues in this order: normalization policy extraction → projection service extraction.
 
-Protected semantics: fact idempotency, normalized content hashing, currency conversion, contract multiplier, position average cost, component PnL and rebuild results.
+Protected semantics: fact idempotency, normalized content hashing, currency conversion, contract multiplier, position average cost, component PnL, rebuild results and transaction atomicity.
 
-Safe approach: one concern per PR; preserve SQL and formulas byte-for-byte where possible, keep compatibility imports, and require the existing financial golden suite on every step.
+Safe approach: one concern per PR; preserve formulas byte-for-byte where possible, keep compatibility imports, and require the existing financial golden suite plus repository transaction suite on every step.
 
 ## TD-003 — Operational projection retirement criteria
 
@@ -115,7 +117,7 @@ Risk: untyped database rows, arbitrary payloads and large orchestration modules 
 Completed prerequisite:
 
 - Pyright is installed and blocking in CI;
-- Platform execution DTOs, FinancialFact DTOs, Runtime contracts, schema migrations, schema governance and authoritative order submission are selected;
+- Platform execution DTOs, FinancialFact DTOs and Repository, Runtime contracts, schema migrations, schema governance and authoritative order submission are selected;
 - Runtime models, Runtime contracts and Gateway Protocol are selected.
 
 Deferred because: strict whole-project typing would create noisy changes unrelated to current risk boundaries.
