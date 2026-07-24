@@ -46,6 +46,13 @@ class RuntimeExecutionEventV1(BaseModel):
     reason: str | None = None
 
 
+def version_execution_events(events: list[BaseModel]) -> list[RuntimeExecutionEventV1]:
+    return [
+        RuntimeExecutionEventV1.model_validate(event.model_dump())
+        for event in events
+    ]
+
+
 def runtime_contract_signature() -> dict[str, dict[str, object]]:
     return {
         "command": {
