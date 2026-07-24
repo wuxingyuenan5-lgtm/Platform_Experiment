@@ -1,7 +1,7 @@
 # Issue #61 — Extract shared position calculation policy
 
 Issue: #61
-Status: active
+Status: done
 Branch: `refactor/issue-61-shared-position-math`
 Base commit: `a762692096f3960106cf492c7f3142479f815779`
 
@@ -88,16 +88,16 @@ Risk: medium-low.
 
 ## Progress
 
-- Done: one pure Owner, compatibility imports, ten golden cases, sole-definition/purity checks, Ownership and Pyright registration.
-- Current: apply the three Ruff import-order diagnostics, then rerun full CI.
-- Next: freeze evidence, mark ready, squash merge and close Issue.
+- Done: implementation, ten Golden cases, compatibility identity, sole-definition/purity checks, Ownership, Pyright and complete pre-freeze CI.
+- Current: final frozen-head verification and squash merge.
+- Next: close Issue and begin order-submission unification as a separate workstream.
 - Blocked by: nothing.
 
 ## Completion
 
 - PR: #62
-- Merge commit:
+- Merge commit: recorded by the final squash merge on PR #62.
 - Behavior changed: ownership only; two copies become one pure implementation.
 - Behavior intentionally unchanged: every calculation result and all external/persistence behavior.
-- Tests/CI: first standard run found only three Ruff import-order diagnostics.
+- Tests/CI: Platform CI `30110735275` success; Secret Scan `30110735238` success. Final frozen-head runs must also pass before merge.
 - Follow-up debt: order submission unification remains the next independent workstream.
