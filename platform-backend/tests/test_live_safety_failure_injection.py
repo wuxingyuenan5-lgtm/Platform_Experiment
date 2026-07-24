@@ -45,7 +45,9 @@ def test_incompatible_runtime_event_keeps_order_result_unknown(
 ) -> None:
     get_settings().database_path = str(tmp_path / "contract-failure.db")
 
-    def fake_post(_url, json, _timeout):
+    def fake_post(url, json, timeout):
+        assert url.endswith("/commands/orders")
+        assert timeout > 0
         return FakeResponse(
             [
                 {
@@ -79,7 +81,9 @@ def test_fill_before_ack_remains_filled_and_projects_once(
 ) -> None:
     get_settings().database_path = str(tmp_path / "out-of-order.db")
 
-    def fake_post(_url, json, _timeout):
+    def fake_post(url, json, timeout):
+        assert url.endswith("/commands/orders")
+        assert timeout > 0
         shared = {
             "contract_name": "runtime-event",
             "contract_version": "1.0",
