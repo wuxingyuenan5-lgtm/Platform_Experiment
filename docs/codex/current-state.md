@@ -2,7 +2,7 @@
 
 Last updated: 2026-07-24
 Stable branch: `main`
-Latest completed engineering scope: Issue #61 / PR #62
+Latest completed engineering scope: Issue #63 / PR #64
 
 This file is the compact cross-session handoff. It records current truth, not a PR diary. Read the actual open Issues and PRs before assuming that work is active.
 
@@ -29,6 +29,7 @@ Real-account acceptance remains controlled-host, small-capital and minimum-size.
 
 - Platform Backend does not import venue SDKs; external execution remains inside `execution-runtime/`.
 - `platform-backend/app/main.py` is a composition root only.
+- `platform-backend/app/trade_command_execution.py` is the single local Order creation, Safety and Runtime submission owner; `trading.submit_order` remains a deprecated legacy compatibility delegate.
 - Operational `positions` and `pnl_results` remain separate from FinancialFact-based formal accounting.
 - Formal accounting is reconstructed from immutable facts and does not read operational projections as inputs.
 - Operational and formal projections share the exact `position_math.calculate_position_update` callable for per-fill quantity, average price and realized PnL.
@@ -65,10 +66,11 @@ Real-account acceptance remains controlled-host, small-capital and minimum-size.
 21. Lightweight task-packet controls and active local Markdown-link validation.
 22. Exact Decimal venue fill reconciliation with fractional/high-precision regression evidence.
 23. Shared Position Math ownership with ten long/short golden cases and compatibility-identity evidence.
+24. Unified Platform order submission with exact legacy/V1 payload, Safety and unknown-result regression evidence.
 
 ## Active work
 
-Issue #63 / Draft PR #64 is the only active engineering workstream: Platform order-submission orchestration unification.
+No engineering code workstream is active by default after PR #64 merges.
 
 Before starting another code change:
 
