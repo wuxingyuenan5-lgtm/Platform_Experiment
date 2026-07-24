@@ -1,11 +1,8 @@
 from __future__ import annotations
 
 import sqlite3
-from collections.abc import Iterator
-from contextlib import contextmanager
-from pathlib import Path
 
-from app.config import get_settings
+from app.database_connection import connection, database_path
 
 SCHEMA_SQL = """
 PRAGMA foreign_keys = ON;
@@ -419,27 +416,6 @@ ON strategy_nav_snapshots(strategy_instance_id, valuation_time);
 CREATE INDEX IF NOT EXISTS idx_strategy_runs_instance
 ON strategy_runs(strategy_instance_id, created_at);
 """
-
-
-def database_path() -> Path:
-    path = Path(get_settings().database_path)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    return path
-
-
-@contextmanager
-def connection() -> Iterator[sqlite3.Connection]:
-    db = sqlite3.connect(database_path())
-    db.row_factory = sqlite3.Row
-    db.execute("PRAGMA foreign_keys = ON")
-    try:
-        yield db
-        db.commit()
-    except Exception:
-        db.rollback()
-        raise
-    finally:
-        db.close()
 
 
 def initialize_database() -> None:
