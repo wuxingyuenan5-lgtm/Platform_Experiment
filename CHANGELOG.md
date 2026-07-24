@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+### Formal projection service ownership — Issue #46 / PR #47
+
+- Extracted average-cost and realized-PnL position updates into `platform-backend/app/financial_projection_service.py`.
+- Moved Trading/Funding/Swap/Fee/FX component aggregation, incomplete-quality propagation and formal Position/PnL writes behind the Projection Service.
+- Moved strategy rebuild pair orchestration, counts and audit-payload generation into the Projection Service.
+- Moved formal NAV account coverage, missing-account ordering, equity, quality and capital-base division into the Projection Service.
+- Preserved `app.financial_facts` compatibility callables while keeping catalog resolution, immutable fact recording, HTTP error mapping and API routes in the API module.
+- Kept SQL, DDL, row mapping and protected transaction units in `app.financial_fact_repository.py`.
+- Added exact average-cost, component attribution, incomplete-quality, rebuild-audit and NAV calculation golden tests.
+- Added architecture checks preventing projection formulas or Repository orchestration from returning to the API layer and preventing FastAPI/config dependencies in the Projection Service.
+- Added the Projection Service to progressive Pyright.
+- Retained FinancialFact normalization/hash identity, repository transactions, API schemas/routes, database migrations, trading behavior and both Live Write defaults unchanged.
+
 ### FinancialFact normalization ownership — Issue #44 / PR #45
 
 - Extracted currency, quantity-unit, contract-multiplier, FX/data-quality, Decimal, UTC timestamp and payload JSON canonicalization into `platform-backend/app/financial_fact_normalization.py`.
