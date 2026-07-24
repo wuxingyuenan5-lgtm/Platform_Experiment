@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import ast
+import json
 import re
 import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 BACKEND_APP = ROOT / "platform-backend" / "app"
+RUNTIME_APP = ROOT / "execution-runtime" / "app"
 TEST_ROOTS = (
     ROOT / "platform-backend" / "tests",
     ROOT / "execution-runtime" / "tests",
@@ -58,6 +60,66 @@ FORMAL_PROJECTION_WRITES = {
 OPERATIONAL_PROJECTION_READS = {
     "FROM positions",
     "FROM pnl_results",
+}
+CANONICAL_CONTEXT_FILES = (
+    ROOT / "docs" / "codex" / "context-map.md",
+    ROOT / "docs" / "codex" / "current-state.md",
+    ROOT / "docs" / "codex" / "task-template.md",
+    ROOT / "docs" / "architecture" / "SYSTEM_MAP.md",
+    ROOT / "docs" / "engineering" / "TECHNICAL_DEBT.md",
+)
+FORBIDDEN_PARALLEL_CONTEXT_PATHS = (
+    ROOT / "docs" / "START-HERE.md",
+    ROOT / "docs" / "context",
+    ROOT / "tasks" / "TASK_TEMPLATE.md",
+)
+DDL_OWNER_PATHS = (
+    "platform-backend/app/database.py",
+    "platform-backend/app/credential_security.py",
+    "platform-backend/app/disaster_recovery.py",
+    "platform-backend/app/eod_reconciliation.py",
+    "platform-backend/app/execution_risk.py",
+    "platform-backend/app/financial_facts.py",
+    "platform-backend/app/live_trading_sessions.py",
+    "platform-backend/app/live_venue_accounting.py",
+    "platform-backend/app/production_monitoring.py",
+    "platform-backend/app/venue_reconciliation.py",
+    "execution-runtime/app/journal.py",
+    "execution-runtime/app/live_route_store.py",
+    "execution-runtime/app/venue_store.py",
+)
+RUNTIME_CONTRACT_FIELDS = {
+    "command": [
+        "contract_name",
+        "contract_version",
+        "payload_version",
+        "command_id",
+        "platform_order_id",
+        "strategy_instance_id",
+        "account_id",
+        "instrument_id",
+        "symbol",
+        "side",
+        "order_type",
+        "quantity",
+        "price",
+        "reduce_only",
+        "received_at",
+    ],
+    "event": [
+        "contract_name",
+        "contract_version",
+        "payload_version",
+        "event_id",
+        "command_id",
+        "platform_order_id",
+        "event_type",
+        "external_order_id",
+        "fill_price",
+        "fill_quantity",
+        "occurred_at",
+        "reason",
+    ],
 }
 
 
@@ -194,6 +256,85 @@ def check_projection_boundaries(errors: list[str]) -> None:
         )
 
 
+def check_context_governance(errors: list[str]) -> None:
+    for path in CANONICAL_CONTEXT_FILES:
+        if not path.is_file():
+            errors.append(f"{path.relative_to(ROOT)}: canonical context document is missing")
+    for path in FORBIDDEN_PARALLEL_CONTEXT_PATHS:
+        if path.exists():
+            errors.append(
+                f"{path.relative_to(ROOT)}: parallel project entry/context/template is forbidden; "
+                "update docs/codex instead"
+            )
+
+    task_files = sorted((ROOT / "tasks").glob("issue-*.md"))
+    invalid = [
+        str(path.relative_to(ROOT))
+        for path in task_files
+        if re.fullmatch(r"issue-\d+-[a-z0-9][a-z0-9-]*\.md", path.name) is None
+    ]
+    if invalid:
+        errors.append(f"Task packets must use issue-<number>-<slug>.md: {invalid}")
+
+
+def check_persistence_governance(errors: list[str]) -> None:
+    guide = ROOT / "docs" / "database" / "README.md"
+    migration_module = BACKEND_APP / "schema_migrations.py"
+    governance_module = BACKEND_APP / "schema_governance.py"
+    for path in (guide, migration_module, governance_module):
+        if not path.is_file():
+            errors.append(f"{path.relative_to(ROOT)}: persistence governance file is missing")
+    if not guide.is_file():
+        return
+
+    guide_source = guide.read_text(encoding="utf-8")
+    for owner in DDL_OWNER_PATHS:
+        path = ROOT / owner
+        if not path.is_file():
+            errors.append(f"{owner}: registered DDL owner does not exist")
+        if f"`{owner.removeprefix('platform-backend/').removeprefix('execution-runtime/')}`" not in guide_source:
+            errors.append(f"docs/database/README.md: missing DDL owner {owner}")
+
+    if migration_module.is_file():
+        source = migration_module.read_text(encoding="utf-8")
+        required = ("schema_migrations", "existing-platform-schema-baseline", "checksum")
+        missing = [anchor for anchor in required if anchor not in source]
+        if missing:
+            errors.append(
+                "platform-backend/app/schema_migrations.py: migration ledger anchors missing: "
+                f"{missing}"
+            )
+
+
+def check_runtime_contract_governance(errors: list[str]) -> None:
+    snapshot_path = ROOT / "docs" / "contracts" / "runtime-v1.json"
+    platform_contract = BACKEND_APP / "runtime_contracts.py"
+    runtime_contract = RUNTIME_APP / "runtime_contracts.py"
+    for path in (snapshot_path, platform_contract, runtime_contract):
+        if not path.is_file():
+            errors.append(f"{path.relative_to(ROOT)}: runtime contract governance file is missing")
+    if not snapshot_path.is_file():
+        return
+
+    try:
+        snapshot = json.loads(snapshot_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        errors.append(f"docs/contracts/runtime-v1.json: invalid JSON: {exc}")
+        return
+    for kind, fields in RUNTIME_CONTRACT_FIELDS.items():
+        contract = snapshot.get(kind)
+        if not isinstance(contract, dict):
+            errors.append(f"docs/contracts/runtime-v1.json: missing {kind} contract")
+            continue
+        if contract.get("contractVersion") != "1.0" or contract.get("payloadVersion") != "1.0":
+            errors.append(f"docs/contracts/runtime-v1.json: {kind} must remain explicit V1")
+        if contract.get("fields") != fields:
+            errors.append(
+                f"docs/contracts/runtime-v1.json: {kind} field snapshot drifted; "
+                "change the version and compatibility tests intentionally"
+            )
+
+
 def check_test_names(errors: list[str]) -> None:
     for root in TEST_ROOTS:
         for path in sorted(root.rglob("*.py")):
@@ -218,6 +359,9 @@ def main() -> int:
     check_composition_root(errors)
     check_execution_schema_boundary(errors)
     check_projection_boundaries(errors)
+    check_context_governance(errors)
+    check_persistence_governance(errors)
+    check_runtime_contract_governance(errors)
     check_test_names(errors)
     check_workflow_names(errors)
     if errors:
