@@ -1,7 +1,7 @@
 # Issue #59 — Preserve Decimal precision in venue fill reconciliation
 
 Issue: #59
-Status: active
+Status: done
 Branch: `fix/issue-59-decimal-venue-fill-reconciliation`
 Base commit: `9f93c83eb662c889b3109d27df52e0588250df3d`
 
@@ -11,7 +11,7 @@ Remove SQLite binary floating-point aggregation from venue fill quantity reconci
 
 ## Background
 
-`venue_reconciliation.compare_order` currently aggregates stored text quantities with `SUM(CAST(quantity AS REAL))`. SQLite REAL uses binary floating point and can manufacture a mismatch for exact decimal quantities.
+`venue_reconciliation.compare_order` aggregated stored text quantities with `SUM(CAST(quantity AS REAL))`. SQLite REAL uses binary floating point and can manufacture a mismatch for exact decimal quantities.
 
 ## Non-goals
 
@@ -69,16 +69,16 @@ Risk: low.
 
 ## Progress
 
-- Done: Issue/branch/PR, exact Decimal implementation and direct regression test.
-- Current: final-head CI and Diff review.
-- Next: mark ready, squash merge and close Issue.
+- Done: exact Decimal implementation, focused regression test, documentation and full pre-freeze CI.
+- Current: final frozen-head verification and squash merge.
+- Next: close Issue and begin the next independent optimization.
 - Blocked by: nothing.
 
 ## Completion
 
 - PR: #60
-- Merge commit:
+- Merge commit: recorded by the final squash merge on PR #60.
 - Behavior changed: exact Decimal aggregation replaces SQLite REAL aggregation.
 - Behavior intentionally unchanged: all APIs, identities, statuses, persistence and accounting.
-- Tests/CI: pending final-head runs.
+- Tests/CI: Platform CI `30109481940` success; Secret Scan `30109482006` success. Final frozen-head runs must also pass before merge.
 - Follow-up debt: broader Venue Reconciliation decomposition remains separate.
