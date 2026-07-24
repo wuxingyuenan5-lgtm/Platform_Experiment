@@ -2,7 +2,7 @@
 
 Last updated: 2026-07-24
 Stable branch: `main`
-Latest completed engineering scope: Issue #57 / PR #58
+Latest completed engineering scope: Issue #59 / PR #60
 
 This file is the compact cross-session handoff. It records current truth, not a PR diary. Read the actual open Issues and PRs before assuming that work is active.
 
@@ -37,6 +37,7 @@ Real-account acceptance remains controlled-host, small-capital and minimum-size.
 - Ownership or compatibility-boundary changes must update `docs/architecture/OWNERSHIP.md` in the same PR.
 - Repository Safety validates canonical entrypoints, protected Owner mappings and active local Markdown file targets.
 - Non-trivial task packets identify expected changed files, required verification and task-specific stop conditions.
+- Venue fill reconciliation sums persisted text quantities with exact `Decimal` arithmetic and does not coerce them through SQLite `REAL`.
 
 ## Completed engineering baseline
 
@@ -61,10 +62,11 @@ Real-account acceptance remains controlled-host, small-capital and minimum-size.
 19. Fixed database Seed ownership extraction with exhaustive all-value snapshot and repeated-startup equivalence.
 20. Canonical architecture ownership catalog with blocking documentation-consistency checks.
 21. Lightweight task-packet controls and active local Markdown-link validation.
+22. Exact Decimal venue fill reconciliation with fractional/high-precision regression evidence.
 
 ## Active work
 
-Issue #59 / Draft PR #60 is the only active engineering workstream: exact Decimal venue fill reconciliation.
+No engineering code workstream is active by default after PR #60 merges.
 
 Before starting another code change:
 
