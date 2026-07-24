@@ -2,7 +2,7 @@
 
 Last updated: 2026-07-24
 Stable branch: `main`
-Latest completed engineering program: Issue #36 / PR #37
+Latest completed engineering scope: Issue #40 / PR #41
 
 This file is the compact cross-session handoff. It records current truth, not a PR diary. Read the actual open Issues and PRs before assuming that work is active.
 
@@ -29,7 +29,7 @@ Real-account acceptance remains controlled-host, small-capital and minimum-size.
 - Platform Backend must not import venue SDKs.
 - `app/main.py` is a composition root only.
 - Execution API DTOs are owned by `platform-backend/app/execution_schemas.py`.
-- Public FinancialFact/formal-accounting DTOs are owned by `platform-backend/app/financial_fact_schemas.py`; `app.financial_facts` preserves compatibility exports while retaining persistence and projection implementation.
+- Public FinancialFact/formal-accounting DTOs are owned by `platform-backend/app/financial_fact_schemas.py`; `app.financial_facts` preserves compatibility exports while retaining persistence, normalization and projection implementation.
 - Platform–Runtime Command/Event traffic uses explicit V1.0 contracts and snapshots.
 - `positions` and `pnl_results` are operational projections.
 - `financial_facts`, `formal_positions` and `formal_pnl_results` are the formal accounting authority.
@@ -50,17 +50,20 @@ Real-account acceptance remains controlled-host, small-capital and minimum-size.
 10. Progressive Pyright gates for critical Backend/Runtime boundaries.
 11. Frontend changed-file no-new-debt lint enforcement.
 12. Failure-injection tests and controlled production-acceptance matrix.
+13. FinancialFact/formal-accounting public schema ownership extraction with compatibility identity and JSON Schema snapshots.
 
 ## Active work
 
-Issue #40 is the only active code workstream.
+No engineering code workstream is active by default after PR #41 merges.
 
-- Objective: add FinancialFact golden equivalence and extract public API schemas only.
-- Branch: `refactor/issue-40-financial-fact-schemas`.
-- Task packet: `tasks/issue-40-financial-fact-schemas.md`.
-- Protected: SQL, hashing, FX, average cost, PnL formulas, rebuild behavior, database schema and Live Write.
+Before starting another code change:
 
-Separate non-code follow-ups:
+1. search open Issues and PRs;
+2. create or reuse one concrete Issue;
+3. create one matching task packet and one Issue-numbered branch;
+4. do not combine the remaining FinancialFact repository, normalization and projection-service extractions in one PR.
+
+Separate non-code follow-ups remain:
 
 - Issue #38: repository administrator verifies GitHub protection and merge settings.
 - Issue #39: controlled real-environment operational acceptance; it is not an engineering refactor and does not run in CI.
@@ -71,7 +74,7 @@ Separate non-code follow-ups:
 - Operational projections remain supported and must not become formal-accounting inputs.
 - Compatibility surfaces require usage evidence and a dedicated migration before removal.
 - `app/database.py` remains intentionally concentrated pending a dedicated fresh/existing-database equivalence-safe decomposition.
-- `app/financial_facts.py` still contains persistence, normalization and projection implementation; Issue #40 extracts public schemas only.
+- `app/financial_facts.py` still contains persistence, normalization and projection implementation; only public schemas have been extracted.
 - Inherited frontend lint debt remains outside untouched modules; new and changed files cannot add debt.
 - Pyright coverage is progressive rather than whole-repository strict.
 - Live Write cannot be enabled by an engineering refactor or test result.
