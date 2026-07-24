@@ -97,6 +97,8 @@ jobs:
         run: python scripts/scan-secrets.py
       - name: Check repository structure and architecture boundaries
         run: python scripts/check-repository-structure.py
+      - name: Check architecture ownership documentation consistency
+        run: python scripts/check-documentation-consistency.py
 
   execution-runtime:
     runs-on: ubuntu-latest
