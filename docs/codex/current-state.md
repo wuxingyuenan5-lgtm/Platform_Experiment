@@ -2,7 +2,7 @@
 
 Last updated: 2026-07-24
 Stable branch: `main`
-Latest completed engineering scope: Issue #40 / PR #41
+Latest completed engineering scope: Issue #42 / PR #43
 
 This file is the compact cross-session handoff. It records current truth, not a PR diary. Read the actual open Issues and PRs before assuming that work is active.
 
@@ -53,16 +53,18 @@ Real-account acceptance remains controlled-host, small-capital and minimum-size.
 11. Frontend changed-file no-new-debt lint enforcement.
 12. Failure-injection tests and controlled production-acceptance matrix.
 13. FinancialFact/formal-accounting public schema ownership extraction with compatibility identity and JSON Schema snapshots.
+14. FinancialFact/formal-accounting persistence ownership extraction with transaction rollback evidence.
 
 ## Active work
 
-Issue #42 / PR #43 is the only active code workstream.
+No engineering code workstream is active by default after PR #43 merges.
 
-- Objective: extract FinancialFact/formal-accounting direct SQLite access into one repository module.
-- Branch: `refactor/issue-42-financial-fact-repository`.
-- Task packet: `tasks/issue-42-financial-fact-repository.md`.
-- Protected: normalization, hashes, FX, multipliers, average cost, PnL formulas, API shapes, schema migrations and both Live Write gates.
-- Required evidence: existing accounting golden tests plus forced-rollback tests for fact+audit, Position+PnL, rebuild clearing and NAV+audit.
+Before starting another code change:
+
+1. search open Issues and PRs;
+2. create or reuse one concrete Issue;
+3. create one matching task packet and one Issue-numbered branch;
+4. keep the remaining FinancialFact normalization-policy and projection-service extractions in separate PRs.
 
 Separate non-code follow-ups remain:
 
@@ -75,7 +77,7 @@ Separate non-code follow-ups remain:
 - Operational projections remain supported and must not become formal-accounting inputs.
 - Compatibility surfaces require usage evidence and a dedicated migration before removal.
 - `app/database.py` remains intentionally concentrated pending a dedicated fresh/existing-database equivalence-safe decomposition.
-- After Issue #42, `app/financial_facts.py` will still contain normalization and projection orchestration; those require separate Issues in that order.
+- `app/financial_facts.py` still contains normalization, hashing, calculations and rebuild orchestration; normalization policy must be extracted before the projection service.
 - Inherited frontend lint debt remains outside untouched modules; new and changed files cannot add debt.
 - Pyright coverage is progressive rather than whole-repository strict.
 - Live Write cannot be enabled by an engineering refactor or test result.
