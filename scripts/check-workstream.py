@@ -32,6 +32,13 @@ class WorkstreamError(RuntimeError):
     """A repository workstream rule was violated."""
 
 
+def display_path(path: Path) -> str:
+    try:
+        return str(path.relative_to(ROOT))
+    except ValueError:
+        return str(path)
+
+
 def read_event() -> dict[str, Any]:
     event_path = os.getenv("GITHUB_EVENT_PATH")
     if not event_path:
@@ -64,7 +71,7 @@ def branch_issue(branch: str) -> int:
 def find_task_packet(issue_number: int) -> Path:
     matches = sorted(TASKS.glob(f"issue-{issue_number}-*.md"))
     if len(matches) != 1:
-        relative = [str(path.relative_to(ROOT)) for path in matches]
+        relative = [display_path(path) for path in matches]
         raise WorkstreamError(
             f"Issue #{issue_number} must have exactly one task packet; found {relative}"
         )
@@ -76,12 +83,12 @@ def validate_task_packet(path: Path, issue_number: int, branch: str) -> None:
     issue_match = ISSUE_LINE_PATTERN.search(content)
     if issue_match is None or int(issue_match.group("issue")) != issue_number:
         raise WorkstreamError(
-            f"{path.relative_to(ROOT)} must declare exactly 'Issue: #{issue_number}'"
+            f"{display_path(path)} must declare exactly 'Issue: #{issue_number}'"
         )
     expected_branch = f"Branch: `{branch}`"
     if expected_branch not in content:
         raise WorkstreamError(
-            f"{path.relative_to(ROOT)} must declare {expected_branch!r}"
+            f"{display_path(path)} must declare {expected_branch!r}"
         )
 
 
@@ -171,7 +178,7 @@ def main() -> int:
 
     print(
         f"Workstream check passed: Issue #{issue_number}, branch {branch}, "
-        f"packet {packet.relative_to(ROOT)}"
+        f"packet {display_path(packet)}"
     )
     return 0
 
