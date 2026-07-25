@@ -1,17 +1,25 @@
 # Task: Version Consolidation and Dead Code Cleanup
 
 Issue: #83
-Status: active
+Status: review
 Branch: `chore/issue-83-version-and-dead-code-cleanup`
 Base commit: `7da3b89fc7841b093f016a1d03cd8f70c74f13e6`
 
 ## Objective
 
-Publish maintained platform version `0.7.0` consistently and remove only frontend legacy order-submission code proven unused by current application pages.
+Publish product release version `0.7.0` consistently and remove only frontend legacy order-submission code proven unused by current application pages.
+
+## Version boundary
+
+- Root `VERSION` is the product release source of truth.
+- Platform Backend and Execution Runtime package versions follow it.
+- Frontend displayed version follows it.
+- FastAPI metadata and Platform–Runtime contract versions describe component/API compatibility and remain independent.
 
 ## Non-goals
 
 - Do not remove Backend `POST /trading/orders` or `trading.submit_order` in this task.
+- Do not change FastAPI metadata or Platform–Runtime contract versions solely to match the product release.
 - No route/module refactor, database/schema change, Runtime contract change or trading behavior change.
 - No broad deletion of historical documents, completed task packets or compatibility exports.
 
@@ -19,17 +27,15 @@ Publish maintained platform version `0.7.0` consistently and remove only fronten
 
 - `VERSION`
 - `platform-backend/pyproject.toml`
-- `platform-backend/app/application.py`
 - `execution-runtime/pyproject.toml`
-- `execution-runtime/app/main.py`
 - `admin-risk/.env`
 - `admin-risk/src/api/platform/trading.ts`
 - `admin-risk/src/api/platform/trading.types.ts`
 - `admin-risk/src/hooks/trading/usePlatformTrading.ts`
-- version consistency check and direct tests
-- `CHANGELOG.md`
-- `docs/codex/current-state.md`
+- `scripts/check-version-consistency.py`
+- direct version-consistency test/workflow
 - `docs/engineering/GIT_WORKFLOW.md`
+- `docs/releases/0.7.0.md`
 - this task packet
 
 ## Protected semantics
@@ -52,10 +58,10 @@ python -m ruff check app tests
 python -m pyright
 python -m pytest
 cd ../admin-risk
-pnpm lint
 pnpm type:check
 pnpm build
 cd ..
+python scripts/check-version-consistency.py
 python scripts/check-repository-structure.py
 python scripts/check-documentation-consistency.py
 ```
@@ -64,31 +70,31 @@ Final delivery requires Platform CI and Secret Scan on the final PR head.
 
 ## Stop conditions
 
-- Stop if the removed frontend functions have an active import or page call.
+- Stop if removed frontend functions have an active import or page call.
 - Stop if version synchronization requires changing a public Runtime contract version.
 - Stop if Backend compatibility API removal becomes necessary.
 
 ## Acceptance criteria
 
-- [ ] Root `VERSION`, Backend package/API, Runtime package/API and frontend displayed version equal `0.7.0`.
-- [ ] A machine check prevents maintained version drift.
-- [ ] Unused `createTradingOrder`, CreateOrderInput/OrderResult frontend types and submit-state hook code are absent.
-- [ ] Funding execution remains ExecutionBatch-based and snapshot refresh remains unchanged.
-- [ ] Backend compatibility endpoint remains intact and documented as retained.
-- [ ] Full CI and Secret Scan pass.
+- [x] Root `VERSION`, Backend package, Runtime package and frontend display equal `0.7.0`.
+- [x] A machine check prevents maintained product-release version drift.
+- [x] Unused `createTradingOrder`, `CreateOrderInput` and submit-state hook code are absent.
+- [x] `OrderResult`, order reads/recovery and the Backend compatibility endpoint remain intact.
+- [x] Funding execution remains ExecutionBatch-based and snapshot refresh remains unchanged.
+- [ ] Full CI and Secret Scan pass on the final head.
 
 ## Progress
 
-- Done: usage audit, scope, Issue and branch.
-- Current: implement version synchronization and verified dead-code deletion.
-- Next: focused checks, full CI, review and squash merge.
+- Done: usage audit, product/API version boundary, direct changes, release notes and removal of temporary helpers.
+- Current: validate the helper-free final diff through CI.
+- Next: record verification, review and squash merge.
 - Blocked by: none.
 
 ## Completion
 
-- PR:
+- PR: #84
 - Merge commit:
 - Behavior changed: none.
-- Behavior intentionally unchanged: Backend compatibility endpoint, all execution/recovery/safety and Live Write behavior.
-- Tests/CI:
+- Behavior intentionally unchanged: Backend compatibility endpoint, order reads/recovery, all execution/safety and Live Write behavior.
+- Tests/CI: pending final head.
 - Follow-up debt: remove Backend compatibility order endpoint only after external usage evidence and a dedicated migration.
