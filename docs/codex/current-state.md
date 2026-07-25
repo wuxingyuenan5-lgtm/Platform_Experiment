@@ -3,9 +3,8 @@
 Last updated: 2026-07-25
 Stable branch: `main`
 Product release: `0.7.0`
-Latest completed engineering scope: Issue #92 / PR #93
-Latest completed documentation scope: Issue #94 / PR #95
-Current engineering workstream: Issue #96 / PR #97
+Latest completed engineering scope: Issue #96 / PR #97
+Latest completed documentation scope: Issue #96 / PR #97
 
 This file is the compact cross-session handoff. It records current truth, not a PR diary. Read the actual open Issues and PRs before assuming that work is active.
 
@@ -56,7 +55,8 @@ Real-account acceptance remains controlled-host, small-capital and minimum-size.
 - At most one non-closed cross-spread exit plan is allowed during the acceptance phase. Any unresolved or manual-intervention batch blocks a new open.
 - A successfully hedged cross-spread OPEN is healthy only after exact external Bybit and MT5 Position verification, then creates one persistent operational exit plan with one mapped MT5 Position Ticket.
 - A cross-spread CLOSE is closed only after both external target positions are verified flat.
-- If Bybit is terminally filled and MT5 definitively rejects or fails, the Platform may submit one idempotent Bybit reduce-only rollback for the confirmed fill quantity.
+- If Bybit is terminally filled and MT5 definitively rejects or fails, the Platform may submit one idempotent Bybit reduce-only rollback only after current external positions prove the expected first-leg exposure and no MT5 exposure.
+- If external positions are already flat, the rollback path does not create a duplicate reverse order.
 - MT5 `accepted`, `processing`, `acknowledged` or `result_unknown` must not trigger automatic rollback or duplicate execution.
 - LONG_SPREAD exit thresholds observe `shortSpread`; SHORT_SPREAD exit thresholds observe `longSpread`. TP/SL submits a market close only after an atomic plan claim.
 - The automatic exit monitor is a separate disabled-by-default capability gate; unknown or manual-intervention plans are not automatically retried.
@@ -131,21 +131,13 @@ Real-account acceptance remains controlled-host, small-capital and minimum-size.
 36. Homepage-first responsive remediation with deterministic Hero reflow, stable desktop dashboard density and type-aware changed-file lint coverage.
 37. Cross-spread market-order minimum loop with terminal Bybit fill confirmation, actual-fill-proportional MT5 hedge sizing, fail-closed unresolved states and direct MT5 swap reads.
 38. Cross-spread market-only lifecycle with venue-safe reduce-only close semantics, MT5 Position Ticket binding, persistent exit plans and executable-spread TP/SL market exits.
+39. Route-independent live Order/Fill reads, current Venue specification checks, temporary 1 oz/single-lifecycle controls, external position verification and definitive-failure-safe Bybit rollback.
 
 ## Active work
 
-Issue #96 / PR #97 is the only active engineering workstream. Its bounded outcome is:
+No engineering code workstream is active by default after PR #97 merges.
 
-1. repair Bybit/MT5 Order and Fill reads that previously depended on Runtime Route state;
-2. resolve MT5 market executions through correct Order/Deal/Position Ticket semantics;
-3. require current Venue specifications and access evidence before real cross-spread writes;
-4. enforce temporary 1 oz and one-lifecycle acceptance limits at Platform and Runtime boundaries;
-5. verify external positions after open and close;
-6. perform one idempotent Bybit reduce-only rollback only after a definitive MT5 hedge failure;
-7. preserve fail-closed behavior for `result_unknown` and keep all Live Write gates disabled by default;
-8. document explicit evidence required before temporary limits may be removed.
-
-The next cross-spread scopes must remain separately bounded after Issue #96:
+The next cross-spread scopes must remain separately bounded:
 
 1. run controlled real-environment minimum-size acceptance under Issue #39, including Windows MT5 Terminal supervision and Venue permissions;
 2. replace bounded Bybit fill polling with private WebSocket order/execution confirmation after operational acceptance;
