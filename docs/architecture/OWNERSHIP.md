@@ -17,7 +17,7 @@ This document is the canonical human-readable catalog of major code ownership bo
 | Execution API DTOs | `platform-backend/app/execution_schemas.py` | Public execution-domain request/response models | Trading execution or persistence |
 | Execution compatibility DTO exports | `platform-backend/app/schemas.py` | Explicit aliases to execution DTO owners | Duplicate DTO definitions |
 | Platform–Runtime contracts | `platform-backend/app/runtime_contracts.py`, `execution-runtime/app/runtime_contracts.py`, `docs/contracts/runtime-v1.json` | Versioned command/event models and executable field snapshot | Silent incompatible V1 changes |
-| Cross-spread lifecycle DTOs | `platform-backend/app/cross_spread_exit_schemas.py` | Market-open, market-close, exit-plan and evaluation request/response models | Threshold policy, SQL or venue execution |
+| Cross-spread lifecycle DTOs | `platform-backend/app/cross_spread_exit_schemas.py` | Market-open, market-close, normalized synthetic-intent, exit-plan and evaluation request/response models | Threshold policy, SQL or venue execution |
 | Cross-spread observability DTOs | `platform-backend/app/cross_spread_observability_schemas.py` | Read-only aggregate status, section-state and venue evidence response models | Runtime HTTP, venue mapping or execution decisions |
 
 ## Trading and formal accounting
@@ -26,14 +26,16 @@ This document is the canonical human-readable catalog of major code ownership bo
 |---|---|---|---|
 | Platform order submission orchestration | `platform-backend/app/trade_command_execution.py` | Single local Order creation, Safety enforcement, legacy/V1 Runtime dispatch, unknown-result handling and Event handoff | Event projection, reconciliation or formal accounting |
 | Venue order execution intent | `platform-backend/app/order_execution_intents.py` | Idempotent reduce-only and venue-position target lookup for a TradeCommand | Batch sequencing, venue SDK calls or exit-threshold policy |
+| Cross-spread synthetic order intent | `platform-backend/app/cross_spread_order_intent.py` | Authoritative four business actions, Market/Limit execution type, trigger reason and deterministic existing-Market-command mapping | Venue submission, persistence, quote formulas or exit-plan claims |
 | Cross-spread market command and live sizing | `platform-backend/app/cross_spread.py` | Nominal spread command mapping, live venue specification validation, exact ounce-to-lot sizing and deterministic Bybit rollback intent | Venue SDK calls, exit-plan SQL or automatic monitor loops |
 | Cross-spread live read transport | `platform-backend/app/cross_spread_live_read_client.py` | Configured Runtime transport and validated Instrument, Position, Account Risk and paged Order/Fill reads | FastAPI routes, SQL, venue SDKs or execution decisions |
 | Cross-spread observability service | `platform-backend/app/cross_spread_observability_service.py` | Independent section reads, partial/unavailable semantics and two-venue read-only aggregation | Venue SDKs, order submission, SQL or secret access |
 | Cross-spread observability routes | `platform-backend/app/cross_spread_observability_routes.py` | Bounded read-only history query parameters and aggregate API routing | Venue mapping, execution or persistence |
 | Cross-spread exit threshold policy | `platform-backend/app/cross_spread_exit_policy.py` | Pure executable-close-spread selection and TP/SL inequality decisions | SQL, HTTP, background tasks or order submission |
 | Cross-spread exit-plan persistence | `platform-backend/app/cross_spread_exit_repository.py` | Exact-Decimal fill summary, exit-plan SQL, row mapping, atomic trigger claims and unresolved-lifecycle counts | Venue HTTP, threshold formulas, background loops or routes |
-| Cross-spread market lifecycle service | `platform-backend/app/cross_spread_exit_service.py` | Single-lifecycle admission, external position verification, hedged-open plan creation, definitive-failure rollback coordination, MT5 ticket mapping and market close orchestration | Direct SQL, venue SDKs, route definitions or limit execution |
-| Cross-spread lifecycle routes | `platform-backend/app/cross_spread_exit_routes.py` | API routing and disabled-by-default monitor lifespan | SQL, threshold formulas or venue execution logic |
+| Cross-spread Market safety helpers | `platform-backend/app/cross_spread_exit_service.py` | Existing admission, external-position verification, hedged-open plan creation, definitive-failure rollback coordination, MT5 ticket mapping and flat-position verification reused without semantic change | New Limit policy, public synthetic-intent ownership or venue SDKs |
+| Cross-spread synthetic lifecycle service | `platform-backend/app/cross_spread_synthetic_service.py` | Public Market open/manual-close/TP-SL-close orchestration through normalized intent, existing Market-command mapping and additive intent response metadata | Direct SQL, venue SDKs, Limit submission or replacement of Market safety helpers |
+| Cross-spread lifecycle routes | `platform-backend/app/cross_spread_exit_routes.py` | API routing and disabled-by-default monitor lifespan through the synthetic lifecycle service | SQL, threshold formulas or venue execution logic |
 | EOD Reconciliation public DTOs | `platform-backend/app/eod_reconciliation_schemas.py` | EOD report/review request-response models and public status types | DDL, SQL, report orchestration, review policy or routes |
 | EOD report and review policy | `platform-backend/app/eod_reconciliation_policy.py` | Pure report status, scale-gate, historical-Difference and immutable-review decisions | FastAPI, database/repository access, HTTP or cross-domain orchestration |
 | EOD Reconciliation persistence | `platform-backend/app/eod_reconciliation_repository.py` | EOD report DDL, direct SQL, row mapping, report identity, review transactions and policy persistence reads/writes | FastAPI, cross-domain orchestration, status formulas or routes |
@@ -94,7 +96,7 @@ The Platform Backend must not import venue SDKs. Unknown external results remain
 | Task handoff | `docs/codex/task-template.md`, `tasks/` | One bounded packet per non-trivial Issue | Repository-wide permanent rules |
 | Architecture ownership | `docs/architecture/OWNERSHIP.md` | This canonical ownership catalog | Task progress or operational runbooks |
 | Architecture enforcement | `scripts/check-repository-structure.py`, `scripts/check-documentation-consistency.py` | Machine checks for code and documentation boundaries | Runtime application behavior |
-| Workstream enforcement | `scripts/check-workstream.py` | One Issue, one task packet, one branch and one open PR | Product behavior |
+| Workstream enforcement | `scripts/check-workstream.py` | Full engineering and bounded lightweight-maintenance workflow enforcement | Product behavior |
 
 ## Change protocol
 
