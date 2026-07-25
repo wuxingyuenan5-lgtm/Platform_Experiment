@@ -36,6 +36,7 @@ include = [
   "app/database_bootstrap.py",
   "app/database_connection.py",
   "app/database_seeds.py",
+  "app/eod_reconciliation_policy.py",
   "app/eod_reconciliation_repository.py",
   "app/eod_reconciliation_schemas.py",
   "app/execution_schemas.py",

@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 
 from app import eod_reconciliation_repository as repository
+from app.eod_reconciliation_policy import historical_difference_disposition
 
 TERMINAL_ORDER_STATUSES = ("filled", "rejected", "canceled")
 
@@ -37,16 +38,15 @@ def apply_outstanding_difference_gate(
     if status is None:
         raise LookupError("EOD report not found while applying scale gate")
 
-    scale_gate_status = "eligible_for_review" if status == "complete" else "blocked"
-    if open_count or accepted_count:
-        if status == "complete":
-            status = "completed_with_differences"
-        scale_gate_status = "blocked"
-
+    disposition = historical_difference_disposition(
+        status=status,
+        open_difference_count=open_count,
+        accepted_difference_count=accepted_count,
+    )
     repository.update_report_gate(
         report_id=report_id,
-        status=status,
-        scale_gate_status=scale_gate_status,
+        status=disposition.status,
+        scale_gate_status=disposition.scale_gate_status,
         open_difference_count=open_count,
         resolved_difference_count=resolved_count,
         accepted_difference_count=accepted_count,

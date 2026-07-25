@@ -2,7 +2,7 @@
 
 Last updated: 2026-07-25
 Stable branch: `main`
-Latest completed engineering scope: Issue #77 / PR #78
+Latest completed engineering scope: Issue #79 / PR #80
 
 This file is the compact cross-session handoff. It records current truth, not a PR diary. Read the actual open Issues and PRs before assuming that work is active.
 
@@ -31,8 +31,9 @@ Real-account acceptance remains controlled-host, small-capital and minimum-size.
 - `platform-backend/app/main.py` is a composition root only.
 - `platform-backend/app/trade_command_execution.py` is the single local Order creation, Safety and Runtime submission owner; `trading.submit_order` remains a deprecated legacy compatibility delegate.
 - EOD Reconciliation public status types and request/response DTOs are owned only by `eod_reconciliation_schemas.py`; `eod_reconciliation.py` imports identical compatibility objects.
-- EOD Reconciliation DDL, direct SQL, report row mapping, report identity, review transactions and policy persistence reads/writes are owned only by `eod_reconciliation_repository.py`.
-- `eod_reconciliation.py` retains EOD use-case sequencing, compatibility aliases, exact HTTP mapping and routes; `eod_policy.py` retains order-window and outstanding-Difference scale-gate decisions without direct database access.
+- EOD report status, scale-gate, historical-Difference and immutable-review decisions are owned only by the pure `eod_reconciliation_policy.py` module.
+- EOD Reconciliation DDL, direct SQL, report row mapping, report identity and atomic review persistence are owned only by `eod_reconciliation_repository.py`.
+- `eod_reconciliation.py` retains EOD use-case sequencing, compatibility aliases, exact HTTP mapping and routes; `eod_policy.py` coordinates order-window and historical-Difference persistence without duplicating decisions.
 - Venue Reconciliation public DTOs and difference status types are owned only by `venue_reconciliation_schemas.py`; the facade re-exports identical objects.
 - Venue Reconciliation external-status mapping and Order/Position/Balance difference decisions are owned only by the pure `venue_reconciliation_policy.py` module.
 - Venue Reconciliation DDL, direct SQL, row mapping and protected persistence transactions are owned only by `venue_reconciliation_repository.py`.
@@ -82,10 +83,11 @@ Real-account acceptance remains controlled-host, small-capital and minimum-size.
 29. Venue Reconciliation Service ownership with exact domain-error/HTTP compatibility and EOD/API regression evidence.
 30. EOD Reconciliation public-schema ownership with exact object-identity, JSON Schema and validation-message evidence.
 31. EOD Reconciliation Repository ownership with exact DDL, report identity, immutable-review transaction and rollback evidence.
+32. Pure EOD report/review Policy ownership with exhaustive status, gate, replay, conflict and approval Goldens.
 
 ## Active work
 
-No engineering code workstream is active by default after PR #78 merges.
+No engineering code workstream is active by default after PR #80 merges.
 
 Before starting another code change:
 

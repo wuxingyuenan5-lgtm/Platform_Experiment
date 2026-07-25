@@ -10,6 +10,7 @@ from fastapi import APIRouter, HTTPException, Query
 from app import eod_reconciliation_repository as repository
 from app.config import get_settings
 from app.eod_policy import apply_outstanding_difference_gate, list_strategy_orders_for_eod
+from app.eod_reconciliation_policy import report_disposition
 from app.eod_reconciliation_schemas import (
     EodReconciliationReportRequest,
     EodReconciliationReportResponse,
@@ -167,19 +168,19 @@ def create_eod_report(
     )
     open_count, resolved_count, accepted_count = difference_status_counts(difference_ids)
 
-    status: ReportStatus
-    if errors and not any([account_run_id, economic_import_id, nav_snapshot_id, order_count]):
-        status = "failed"
-    elif errors:
-        status = "partial"
-    elif open_count or skipped_external_ids or missing_account_ids or formal_pnl_incomplete_count:
-        status = "completed_with_differences"
-    else:
-        status = "complete"
-
-    scale_gate_status: ScaleGateStatus = (
-        "eligible_for_review" if status == "complete" else "blocked"
+    disposition = report_disposition(
+        errors=errors,
+        account_reconciliation_run_id=account_run_id,
+        economic_event_import_id=economic_import_id,
+        nav_snapshot_id=nav_snapshot_id,
+        order_reconciliation_count=order_count,
+        open_difference_count=open_count,
+        skipped_external_ids=skipped_external_ids,
+        missing_account_ids=missing_account_ids,
+        formal_pnl_incomplete_count=formal_pnl_incomplete_count,
     )
+    status = disposition.status
+    scale_gate_status = disposition.scale_gate_status
     completed_at = now_iso()
     repository.complete_report(
         report_id=report_id,
