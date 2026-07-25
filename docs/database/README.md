@@ -7,8 +7,8 @@ This is the canonical persistence entrypoint. SQLite remains the approved databa
 | Class | Purpose | Examples |
 |---|---|---|
 | Reference/master data | stable business identity and configuration | legal entity, fund, portfolio, book, strategy, venue, account, instrument |
-| Command/execution journal | accepted intent and execution lifecycle | trade command, order, execution batch, Runtime command/events |
-| Operational projection | low-latency monitoring, not formal accounting | `positions`, `pnl_results` |
+| Command/execution journal | accepted intent and execution lifecycle | trade command, order, execution batch, Runtime command/events, venue execution intent |
+| Operational projection | low-latency monitoring, not formal accounting | `positions`, `pnl_results`, cross-spread exit plans |
 | Immutable financial fact | auditable economic truth | `financial_facts` |
 | Formal projection | rebuildable position, PnL and NAV | `formal_positions`, `formal_pnl_results`, formal NAV |
 | Risk/approval | safety state and bounded authorization | Kill Switch, execution risk, LiveTradingSession |
@@ -60,7 +60,9 @@ Connection → Bootstrap → Seed
 | `app/credential_security.py` | credential-rotation metadata only |
 | `app/production_monitoring.py` | alerts, scans and controlled operation runs |
 | `app/disaster_recovery.py` | backup and restore manifests/drill records |
-| `app/schema_migrations.py` | migration ledger and ordered additive migrations |
+| `app/schema_migrations.py` | migration ledger, `order_execution_intents`, `cross_spread_exit_plans` and ordered additive migrations |
+
+`app/cross_spread_exit_repository.py` owns direct SQL and row mapping for the migrated cross-spread exit-plan tables after creation. `app/order_execution_intents.py` owns the idempotent intent reads and writes. Table creation remains owned by `app/schema_migrations.py`.
 
 `app/database.py` is not a DDL or Seed Owner.
 
@@ -93,6 +95,14 @@ Changing a Seed identifier, status, default, mapping or contract value is a busi
 Platform migrations are declared in `platform-backend/app/schema_migrations.py`.
 
 The `schema_migrations` table records monotonic version, unique name, SHA-256 checksum and application time. Version 1 is `existing-platform-schema-baseline` and records the existing Schema without moving tables or changing business data.
+
+Version 2 is `cross-spread-market-exit-plans`. It additively creates:
+
+- `order_execution_intents`, which records reduce-only and venue position-target intent by immutable TradeCommand idempotency key;
+- `cross_spread_exit_plans`, which records one exit lifecycle for each successfully hedged market open, including exact text Decimals, MT5 Position Ticket, TP/SL thresholds and atomic trigger state;
+- the status/creation-time lookup index used by the bounded exit monitor.
+
+The exit-plan tables are operational execution state, not formal financial accounting inputs.
 
 At startup, pending migrations are applied in order. Reapplication is idempotent; changing an applied migration name or checksum fails closed.
 
