@@ -40,13 +40,15 @@ def test_difference_policy_is_the_only_decision_function_owner() -> None:
     assert not (POLICY_FUNCTIONS & orchestration_functions)
 
 
-def test_orchestration_imports_policy_and_delegates_persistence_effects() -> None:
+def test_orchestration_imports_policy_and_delegates_external_effects() -> None:
     source = ORCHESTRATION_PATH.read_text(encoding="utf-8")
 
     assert "from app.venue_reconciliation_policy import (" in source
     assert "persist_difference_draft" in source
     assert "from app import venue_reconciliation_repository as repository" in source
-    assert "httpx.get(" in source
+    assert "from app import venue_reconciliation_runtime_client as runtime_client" in source
+    assert "runtime_client.get(" in source
+    assert "httpx.get(" not in source
     assert "connection()" not in source
     assert "INSERT OR IGNORE INTO reconciliation_differences" not in source
 
