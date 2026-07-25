@@ -26,6 +26,11 @@ class Settings(BaseSettings):
     cross_spread_exit_monitor_enabled: bool = False
     cross_spread_exit_monitor_interval_seconds: float = 1.0
 
+    # Synthetic FOK pricing reserves a fixed MT5 price amount before deriving the
+    # Bybit limit. Zero is the safe default until the controlled host sets evidence-based
+    # broker slippage. The value must remain non-negative.
+    cross_spread_limit_hedge_reserve_price: Decimal = Decimal("0")
+
     # Temporary real-money acceptance controls. They remain enforced until a
     # separate Issue/PR reviews evidence from Issue #39 and explicitly changes them.
     cross_spread_acceptance_max_quantity_oz: Decimal = Decimal("1")
