@@ -12,7 +12,7 @@ from app.database import connection, initialize_database
 
 STRATEGY_ID = "strategy_funding_arbitrage_instance_default"
 ACCOUNT_ID = "account_sim_usdt"
-DDL_SHA256 = "7d3c23f5935900766245b76542bf56615e62cd5b60aa70ff38962544a3a73b82"
+DDL_SHA256 = "4cc299bbf57dd2dfa4db7c8092055eebc2e4862c5e4c9ecfe26be813d93f12b1"
 
 
 def configure_database(tmp_path: Path) -> None:
