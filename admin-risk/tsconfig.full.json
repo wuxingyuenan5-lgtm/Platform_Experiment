@@ -17,6 +17,8 @@
     "src/components/Loading/**/*.vue",
     "src/components/SimpleMenu/**/*.vue",
     "src/components/SimpleMenu/**/*.ts",
+    "src/views/dashboard/**/*.ts",
+    "src/views/dashboard/**/*.vue",
     "src/views/hedgeBoard/**/*.ts",
     "src/views/hedgeBoard/**/*.vue",
     "src/views/landing/**/*.ts",
