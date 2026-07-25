@@ -87,7 +87,15 @@ The 1 oz, one-lifecycle, Market-only and disabled-monitor values are temporary a
 - Platform–Runtime command/event traffic uses explicit V1 contracts and snapshots.
 - Every Backend and Runtime test has exactly one primary taxonomy marker.
 - Ownership changes update `docs/architecture/OWNERSHIP.md` in the same PR.
-- Non-trivial work uses one Issue, task packet, Issue-numbered branch and open PR.
+
+## Workstream governance
+
+- Behavioral, safety-sensitive, cross-module or otherwise ambiguous work uses the full engineering track: one Issue, one task packet, one Issue-numbered branch and one linked PR.
+- Bounded non-behavioral Markdown and synchronized product-version maintenance may use one lightweight PR with `Maintenance: true`, `Behavior change: none` and `Safety change: none`.
+- Maintenance mode is machine-limited to Markdown and the four maintained version declarations; source, runtime configuration, workflows, database, contracts, migrations, credentials and safety defaults require the full engineering track.
+- CI and Secret Scan remain mandatory in both tracks.
+- GitHub PR/main history owns merge identity. Do not create a second Issue or PR solely to record a merge SHA.
+- The canonical workflow is `docs/engineering/GIT_WORKFLOW.md`.
 
 ## Completed engineering baseline
 
@@ -143,4 +151,4 @@ The Windows-host phase is expected to require environment-specific configuration
 
 ## Update rule
 
-Replace stale facts when architecture, authority, safety defaults, product release or a genuine active workstream changes. Do not append chat transcripts or speculative plans. Detailed progress belongs in the matching task packet, Issue and PR.
+Replace stale facts when architecture, authority, safety defaults, product release or genuine workflow governance changes. Do not append chat transcripts or speculative plans. Detailed engineering progress belongs in the matching task packet, Issue and PR; lightweight maintenance has no task packet.

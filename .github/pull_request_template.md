@@ -1,4 +1,15 @@
-Issue: #<number>
+<!-- Choose exactly one mode and replace this instruction block.
+
+Engineering PR first line:
+Issue: #123
+
+Lightweight maintenance PR first three lines:
+Maintenance: true
+Behavior change: none
+Safety change: none
+
+Do not include both modes.
+-->
 
 ## Objective
 
@@ -19,7 +30,9 @@ State what this PR intentionally does not change, especially trading calculation
 - [ ] Relevant classified tests passed.
 - [ ] Repository structure and workstream checks passed.
 - [ ] Documentation matches implementation.
-- [ ] No unrelated diff or duplicate active PR exists for this Issue.
+- [ ] No unrelated diff exists.
+- [ ] Engineering mode: no duplicate active PR exists for this Issue.
+- [ ] Maintenance mode: changed files stay inside the machine-checked maintenance boundary.
 
 ## Risk and rollback
 
