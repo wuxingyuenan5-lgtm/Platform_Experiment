@@ -1,7 +1,7 @@
 # Task: Responsive Layout Architecture and Cross-Viewport Acceptance
 
 Issue: #85
-Status: active
+Status: review
 Branch: `docs/issue-85-responsive-layout-architecture`
 Base commit: `9b0617c2f4339234e4dde06282450c41dc8be84b`
 
@@ -17,15 +17,13 @@ Define one canonical responsive-layout architecture for the `admin-risk` fronten
 - No claim that existing pages already meet the new standard.
 - No resolution-specific CSS patches or page-by-page repair in this documentation task.
 
-## Expected changed files
+## Changed files
 
 - `admin-risk/docs/architecture/frontend/responsive-layout-architecture.md`
 - `admin-risk/docs/architecture/decisions/ADR-013-响应式布局体系与页面壳层治理.md`
 - `admin-risk/docs/quality/responsive-layout-acceptance.md`
 - `admin-risk/docs/architecture/frontend/frontend-overview.md`
-- `admin-risk/docs/architecture/shared-ui-governance.md`
-- `admin-risk/docs/design/platform-ui-guidelines.md`
-- `admin-risk/docs/README.md`
+- `admin-risk/docs/architecture/frontend/README.md`
 - `docs/codex/current-state.md`
 - this task packet
 
@@ -36,6 +34,7 @@ Define one canonical responsive-layout architecture for the `admin-risk` fronten
 - Test cases, defect severity and release acceptance: `admin-risk/docs/quality/responsive-layout-acceptance.md`.
 - Visual language and design tokens remain owned by `admin-risk/docs/design/platform-ui-guidelines.md`.
 - Shared-component extraction and theme boundaries remain owned by `admin-risk/docs/architecture/shared-ui-governance.md`.
+- The new `admin-risk/docs/architecture/frontend/README.md` is the frontend architecture reading-order and authority index.
 
 ## Protected semantics
 
@@ -65,28 +64,29 @@ Final delivery requires Platform CI and Secret Scan on the final PR head.
 
 ## Acceptance criteria
 
-- [ ] One canonical responsive-layout architecture document exists.
-- [ ] Width, height, browser zoom and OS scaling are included in the support matrix.
-- [ ] Page-shell, scroll, overflow, fixed/sticky and overlay ownership are explicit.
-- [ ] Component reflow behavior is defined by component category.
-- [ ] Prohibited patch patterns and exceptions are documented.
-- [ ] A phased implementation sequence separates shell, shared primitives and page remediation.
-- [ ] A measurable acceptance checklist and defect severity model exist.
-- [ ] Existing active frontend/design docs link to the canonical owner without duplicating conflicting rules.
-- [ ] Documentation checks, Platform CI and Secret Scan pass.
+- [x] One canonical responsive-layout architecture document exists.
+- [x] Width, height, browser zoom and OS scaling are included in the support matrix.
+- [x] Page-shell, scroll, overflow, fixed/sticky and overlay ownership are explicit.
+- [x] Component reflow behavior is defined by component category.
+- [x] Prohibited patch patterns and controlled exceptions are documented.
+- [x] A phased implementation sequence separates baseline, shell, shared primitives, page remediation and visual regression.
+- [x] A measurable acceptance checklist and S0–S3 defect severity model exist.
+- [x] The active frontend architecture overview and new frontend document index link to the canonical owner without duplicating another responsive standard.
+- [x] Existing visual-token and shared-component authorities remain separate and are linked from the canonical document.
+- [ ] Documentation checks, Platform CI and Secret Scan pass on the final head.
 
 ## Progress
 
-- Done: baseline verification, duplicate-Issue search, existing frontend/design document audit, Issue and branch creation.
-- Current: write canonical architecture, ADR and acceptance plan.
-- Next: update document entrypoints and cross-session state, validate and merge.
+- Done: baseline verification, duplicate-Issue search, existing frontend/design document audit, canonical architecture, ADR, acceptance standard, frontend overview integration, document index and cross-session state.
+- Current: validate the final documentation-only diff.
+- Next: record CI evidence, update PR, squash merge and close Issue.
 - Blocked by: none.
 
 ## Completion
 
-- PR:
+- PR: #86
 - Merge commit:
 - Application behavior changed: none.
-- Documentation authority changed: responsive layout rules become explicit and canonical.
-- Tests/CI:
-- Follow-up: implementation must be split into later Issues, beginning with application shell and page container governance.
+- Documentation authority changed: responsive layout rules are explicit and canonical; existing visual and shared-component authorities remain unchanged.
+- Tests/CI: pending final head.
+- Follow-up: implementation must be split into later Issues, beginning with viewport/screenshot baseline and Application Shell scroll ownership.
