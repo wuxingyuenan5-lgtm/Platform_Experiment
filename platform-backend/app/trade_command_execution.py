@@ -10,6 +10,7 @@ from pydantic import ValidationError
 
 from app.config import get_settings
 from app.database import connection
+from app.order_execution_intents import ExecutionPolicy
 from app.runtime_contracts import RuntimeExecutionEventV1, RuntimeSubmitOrderCommandV1
 from app.schemas import CreateOrderRequest, OrderResponse
 from app.security import enforce_order_safety
@@ -32,6 +33,7 @@ def submit_order_through_runtime(
     command_id: str | None = None,
     reduce_only: bool = False,
     position_id: str | None = None,
+    execution_policy: ExecutionPolicy = "default",
 ) -> OrderResponse:
     """Create one local Order and submit it through the selected Runtime contract mode."""
 
@@ -44,6 +46,8 @@ def submit_order_through_runtime(
 
     if position_id is not None and not reduce_only:
         raise ValueError("A close position target requires reduce-only execution")
+    if execution_policy != "default" and request.order_type != "limit":
+        raise ValueError("FOK and PostOnly Chase policies require a limit order")
 
     settings = get_settings()
     order_id = str(uuid4())
@@ -106,6 +110,7 @@ def submit_order_through_runtime(
             symbol=request.symbol,
             side=request.side,
             order_type=request.order_type,
+            execution_policy=execution_policy,
             quantity=request.quantity,
             price=request.price,
             reduce_only=reduce_only,
@@ -166,6 +171,7 @@ def submit_trade_command_order(
     command_id: str,
     reduce_only: bool = False,
     position_id: str | None = None,
+    execution_policy: ExecutionPolicy = "default",
 ) -> OrderResponse:
     """Submit through the authoritative versioned Runtime contract."""
 
@@ -176,6 +182,7 @@ def submit_trade_command_order(
         command_id=command_id,
         reduce_only=reduce_only,
         position_id=position_id,
+        execution_policy=execution_policy,
     )
 
 
