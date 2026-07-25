@@ -1,6 +1,8 @@
 # Codex Task Packet Template
 
-Use one packet for every cross-session, cross-module, migration, production or otherwise non-trivial task. Copy it to `tasks/issue-<number>-<slug>.md`.
+Use one packet for every cross-session, cross-module, migration, production or otherwise non-trivial **engineering** task. Copy it to `tasks/issue-<number>-<slug>.md`.
+
+A bounded lightweight maintenance PR does not use this template. It must satisfy `docs/engineering/GIT_WORKFLOW.md`, declare `Maintenance: true`, `Behavior change: none` and `Safety change: none`, and stay inside the machine-checked Markdown/version-file boundary.
 
 ```markdown
 # Task: <short name>
@@ -98,7 +100,7 @@ Replace stale detail; do not append a chat transcript.
 
 ## Task uniqueness rule
 
-Before creating a branch:
+Before creating an engineering branch:
 
 1. Search open Issues and PRs for the same outcome.
 2. Reuse the existing Issue when one exists.
@@ -106,3 +108,5 @@ Before creating a branch:
 4. Create exactly one branch named with that Issue number.
 
 If a branch must be replaced, close the old PR first and record `Superseded by #<new-pr>` before starting the replacement. Do not keep two active branches implementing the same Issue.
+
+Do not create a second task packet or Issue solely to record a merge SHA or other metadata already authoritative in GitHub history.
