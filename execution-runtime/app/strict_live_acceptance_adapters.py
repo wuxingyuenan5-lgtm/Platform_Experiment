@@ -1,11 +1,26 @@
 from __future__ import annotations
 
+from datetime import datetime
 from decimal import Decimal
+from typing import Literal
 
 from app.bybit_acceptance_adapter import BybitAcceptanceAdapter
 from app.bybit_fill_confirming_adapter import BybitFillConfirmingAdapter
 from app.gateway_errors import GatewayRequestRejectedError
-from app.models import SubmitOrderCommand
+from app.live_observability import (
+    bybit_positions,
+    mt5_account_risk,
+    mt5_fill_history,
+    mt5_order_history,
+    mt5_positions,
+)
+from app.models import (
+    SubmitOrderCommand,
+    VenueAccountRiskSnapshot,
+    VenueFillHistoryPage,
+    VenueOrderHistoryPage,
+    VenuePositionSnapshot,
+)
 from app.mt5_acceptance_adapter import Mt5AcceptanceAdapter
 from app.mt5_position_closing_adapter import Mt5PositionClosingAdapter
 
@@ -47,6 +62,11 @@ class StrictBybitAcceptanceAdapter(BybitAcceptanceAdapter):
             self._assert_no_existing_position(command.symbol)
         return BybitFillConfirmingAdapter.submit_order(self, command)
 
+    def list_positions(
+        self, account_id: str | None = None
+    ) -> list[VenuePositionSnapshot]:
+        return bybit_positions(self, account_id)
+
 
 class StrictMt5AcceptanceAdapter(Mt5AcceptanceAdapter):
     """Convert MT5 lots to ounces before applying the temporary live cap."""
@@ -81,6 +101,56 @@ class StrictMt5AcceptanceAdapter(Mt5AcceptanceAdapter):
         if not command.reduce_only:
             self._assert_no_existing_position(command.symbol)
         return Mt5PositionClosingAdapter.submit_order(self, command)
+
+    def list_positions(
+        self, account_id: str | None = None
+    ) -> list[VenuePositionSnapshot]:
+        return mt5_positions(self, account_id)
+
+    def get_account_risk(self, account_id: str) -> VenueAccountRiskSnapshot:
+        return mt5_account_risk(self, account_id)
+
+    def query_order_history(
+        self,
+        *,
+        account_id: str,
+        symbol: str | None,
+        start_time: datetime,
+        end_time: datetime,
+        cursor: str | None,
+        limit: int,
+        scope: Literal["active", "closed"],
+    ) -> VenueOrderHistoryPage:
+        return mt5_order_history(
+            self,
+            account_id=account_id,
+            symbol=symbol,
+            start_time=start_time,
+            end_time=end_time,
+            cursor=cursor,
+            limit=limit,
+            scope=scope,
+        )
+
+    def query_fill_history(
+        self,
+        *,
+        account_id: str,
+        symbol: str | None,
+        start_time: datetime,
+        end_time: datetime,
+        cursor: str | None,
+        limit: int,
+    ) -> VenueFillHistoryPage:
+        return mt5_fill_history(
+            self,
+            account_id=account_id,
+            symbol=symbol,
+            start_time=start_time,
+            end_time=end_time,
+            cursor=cursor,
+            limit=limit,
+        )
 
 
 def _validate_step(
