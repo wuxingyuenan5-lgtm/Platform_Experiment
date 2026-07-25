@@ -36,6 +36,8 @@ class Settings(BaseSettings):
     bybit_demo_mode: bool = False
     bybit_recv_window: int = 20000
     bybit_check_timeout_seconds: float = 8.0
+    bybit_fill_confirmation_timeout_seconds: float = 5.0
+    bybit_fill_confirmation_poll_seconds: float = 0.1
 
     mt5_credential_ref: str = "secret://environment/mt5-live-001"
     mt5_account_ids: str = ""

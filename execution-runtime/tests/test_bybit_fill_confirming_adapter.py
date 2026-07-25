@@ -1,0 +1,137 @@
+from __future__ import annotations
+
+from decimal import Decimal
+
+from app.bybit_fill_confirming_adapter import BybitFillConfirmingAdapter
+from app.config import Settings, get_settings
+from app.journal import initialize_journal
+from app.models import SubmitOrderCommand
+
+
+class FakeBybitConfirmationClient:
+    def __init__(self, order_rows: list[dict[str, object]]) -> None:
+        self.order_rows = order_rows
+        self.query_index = 0
+        self.place_calls: list[dict[str, object]] = []
+
+    def get_tickers(self, **kwargs):
+        return {"retCode": 0, "result": {"list": [{"markPrice": "1000"}]}}
+
+    def place_order(self, **kwargs):
+        self.place_calls.append(kwargs)
+        return {
+            "retCode": 0,
+            "result": {"orderId": "BYBIT-ORDER-CONFIRM", "orderLinkId": kwargs["orderLinkId"]},
+        }
+
+    def get_open_orders(self, **kwargs):
+        row = self.order_rows[min(self.query_index, len(self.order_rows) - 1)]
+        self.query_index += 1
+        return {"retCode": 0, "result": {"list": [row]}}
+
+    def get_order_history(self, **kwargs):
+        return {"retCode": 0, "result": {"list": []}}
+
+
+def runtime_settings() -> Settings:
+    return Settings(
+        environment="live",
+        live_write_enabled=True,
+        live_account_allowlist="account-bybit",
+        live_strategy_allowlist="strategy-live",
+        live_symbol_allowlist="XAUTUSDT",
+        live_max_order_notional="200000",
+        live_max_daily_notional="500000",
+        bybit_account_ids="account-bybit",
+        bybit_instrument_map="XAUTUSDT=instrument-xaut",
+        bybit_fill_confirmation_timeout_seconds=0.02,
+        bybit_fill_confirmation_poll_seconds=0,
+    )
+
+
+def order_command(suffix: str) -> SubmitOrderCommand:
+    return SubmitOrderCommand(
+        command_id=f"command-bybit-confirm-{suffix}",
+        platform_order_id=f"platform-order-bybit-confirm-{suffix}",
+        strategy_instance_id="strategy-live",
+        account_id="account-bybit",
+        instrument_id="instrument-xaut",
+        symbol="XAUTUSDT",
+        side="buy",
+        order_type="market",
+        quantity="100",
+    )
+
+
+def order_row(
+    status: str,
+    *,
+    filled_quantity: str,
+    average_price: str,
+) -> dict[str, object]:
+    return {
+        "orderId": "BYBIT-ORDER-CONFIRM",
+        "symbol": "XAUTUSDT",
+        "side": "Buy",
+        "orderType": "Market",
+        "qty": "100",
+        "price": "0",
+        "orderStatus": status,
+        "cumExecQty": filled_quantity,
+        "avgPrice": average_price,
+        "createdTime": "1784800000000",
+        "updatedTime": "1784800001000",
+    }
+
+
+def initialize_runtime_store(tmp_path, name: str) -> None:
+    get_settings().journal_path = str(tmp_path / name)
+    initialize_journal()
+
+
+def test_market_order_emits_fill_only_after_confirmed_terminal_fill(tmp_path) -> None:
+    initialize_runtime_store(tmp_path, "bybit-confirmed-fill.db")
+    client = FakeBybitConfirmationClient(
+        [
+            order_row("New", filled_quantity="0", average_price=""),
+            order_row("Filled", filled_quantity="100", average_price="1001.25"),
+        ]
+    )
+    adapter = BybitFillConfirmingAdapter(runtime_settings(), client)
+
+    events = adapter.submit_order(order_command("full"))
+
+    assert [event.event_type for event in events] == ["order_acknowledged", "order_filled"]
+    assert events[1].event_id == "BYBIT-FILL-BYBIT-ORDER-CONFIRM"
+    assert events[1].fill_quantity == Decimal("100")
+    assert events[1].fill_price == Decimal("1001.25")
+
+
+def test_terminal_partial_fill_emits_only_confirmed_quantity(tmp_path) -> None:
+    initialize_runtime_store(tmp_path, "bybit-terminal-partial.db")
+    client = FakeBybitConfirmationClient(
+        [order_row("Canceled", filled_quantity="40", average_price="1002")]
+    )
+    adapter = BybitFillConfirmingAdapter(runtime_settings(), client)
+
+    events = adapter.submit_order(order_command("partial"))
+
+    assert [event.event_type for event in events] == ["order_acknowledged", "order_filled"]
+    assert events[1].fill_quantity == Decimal("40")
+    assert events[1].reason is not None
+    assert "terminal partial fill" in events[1].reason
+
+
+def test_unresolved_market_order_times_out_without_a_fill_event(tmp_path) -> None:
+    initialize_runtime_store(tmp_path, "bybit-confirm-timeout.db")
+    client = FakeBybitConfirmationClient(
+        [order_row("New", filled_quantity="0", average_price="")]
+    )
+    settings = runtime_settings()
+    settings.bybit_fill_confirmation_timeout_seconds = 0
+    adapter = BybitFillConfirmingAdapter(settings, client)
+
+    events = adapter.submit_order(order_command("timeout"))
+
+    assert [event.event_type for event in events] == ["order_acknowledged"]
+    assert events[0].reason == "Bybit market-order fill confirmation timed out"
