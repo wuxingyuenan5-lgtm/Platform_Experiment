@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import ParamSpec, TypeVar
 
 from fastapi import APIRouter, HTTPException
 
@@ -40,11 +39,12 @@ difference_from_row = repository.difference_from_row
 now_iso = service.now_iso
 canonical_hash = service.canonical_hash
 
-P = ParamSpec("P")
-R = TypeVar("R")
 
-
-def _call_service(operation: Callable[P, R], *args: P.args, **kwargs: P.kwargs) -> R:
+def _call_service[**P, R](
+    operation: Callable[P, R],
+    *args: P.args,
+    **kwargs: P.kwargs,
+) -> R:
     try:
         return operation(*args, **kwargs)
     except runtime_client.RuntimeQueryError as exc:
