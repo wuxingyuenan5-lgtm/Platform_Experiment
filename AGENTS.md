@@ -35,6 +35,7 @@ Human orientation starts at `00-人工可读目录/README.md`. Agent orientation
 - Prefer existing architecture patterns over introducing new frameworks.
 - Keep composition roots declarative: wire routers and middleware only; import domain policies explicitly and never monkey-patch modules.
 - Keep one authoritative implementation for each domain calculation; compatibility wiring must not replace functions at runtime.
+- Keep external HTTP transport in explicit client boundaries; orchestration may coordinate responses and map errors but must not duplicate configured URL/timeout calls.
 - Keep API schemas owned by their domain module; compatibility modules may use explicit aliases but must not redefine them.
 - Keep operational trading projections (`positions`, `pnl_results`) separate from FinancialFact-based formal accounting projections.
 - Assign every Backend and Runtime test exactly one primary layer (`architecture`, `unit`, `integration`, or `live_safety`) and keep classified suites independently executable.
