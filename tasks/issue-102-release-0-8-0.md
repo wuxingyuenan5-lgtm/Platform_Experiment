@@ -1,7 +1,7 @@
 # Task: Release Platform 0.8.0
 
 Issue: #102
-Status: in_progress
+Status: completed
 Branch: `chore/issue-102-release-0-8-0`
 PR: #104
 Base commit: `489427c03ac4b0dca43b2d81c696a7b903b8d133`
@@ -71,7 +71,17 @@ The release adds substantial user-visible and API capabilities while retaining m
 - [x] `README.md` links the current release notes.
 - [x] `docs/codex/current-state.md` records Product release `0.8.0`.
 - [x] Release notes accurately distinguish engineering completion from Windows-host operational acceptance.
-- [ ] Required CI and Secret Scan checks pass.
+- [x] Required CI and Secret Scan checks pass.
+
+## Verification
+
+- Platform CI #1466: passed.
+- Version Consistency #22: passed.
+- Secret Scan #803: passed.
+- Repository workstream, structure, architecture and documentation consistency: passed.
+- Backend lint, progressive type gate and classified tests: passed.
+- Runtime lint, progressive type gate and classified tests: passed.
+- Frontend lint, no-new-debt, type check and production build: passed.
 
 ## Stop conditions
 
@@ -79,3 +89,8 @@ The release adds substantial user-visible and API capabilities while retaining m
 - Stop if release notes claim real Bybit/MT5 operational acceptance.
 - Stop if any maintained version declaration diverges from root `VERSION`.
 - Stop if scope expands into tagging, deployment, private WebSocket or Limit execution.
+
+## Completion
+
+- Current: release declarations and Markdown are complete; ready for squash merge after the final metadata-head gate.
+- Operational acceptance: not proven. Issue #39 remains the Windows-host evidence workstream.
