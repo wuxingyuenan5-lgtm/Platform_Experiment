@@ -3,6 +3,7 @@
 Issue: #102
 Status: in_progress
 Branch: `chore/issue-102-release-0.8.0`
+PR: #103
 Base commit: `489427c03ac4b0dca43b2d81c696a7b903b8d133`
 
 ## Objective
@@ -65,11 +66,11 @@ The release adds substantial user-visible and API capabilities while retaining m
 
 ## Acceptance criteria
 
-- [ ] Root and all maintained release declarations equal `0.8.0`.
-- [ ] Frontend displays `0.8.0`.
-- [ ] `README.md` links the current release notes.
-- [ ] `docs/codex/current-state.md` records Product release `0.8.0`.
-- [ ] Release notes accurately distinguish engineering completion from Windows-host operational acceptance.
+- [x] Root and all maintained release declarations equal `0.8.0`.
+- [x] Frontend displays `0.8.0`.
+- [x] `README.md` links the current release notes.
+- [x] `docs/codex/current-state.md` records Product release `0.8.0`.
+- [x] Release notes accurately distinguish engineering completion from Windows-host operational acceptance.
 - [ ] Required CI and Secret Scan checks pass.
 
 ## Stop conditions
