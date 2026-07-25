@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### EOD Reconciliation Service ownership — Issue #81 / PR #82
+
+- Added `platform-backend/app/eod_reconciliation_service.py` as the framework-independent report creation/read/list/review sequencing owner.
+- Reduced `app.eod_reconciliation` to per-call dependency wiring, compatibility delegates, exact service-error-to-HTTP mapping and existing routes.
+- Preserved all existing `app.eod_reconciliation.*` monkeypatch targets by rebuilding Service dependencies on every facade call.
+- Added exact utility/exception identities, dynamic dependency injection, partial-failure ownership and 404/409/422 mapping evidence.
+- Preserved every report identity, cross-domain call order, partial-failure string, persistence transaction, API and both Live Write defaults.
+
 ### Pure EOD report/review Policy ownership — Issue #79 / PR #80
 
 - Added `platform-backend/app/eod_reconciliation_policy.py` as the sole pure report-status, scale-gate, historical-Difference and immutable-review decision owner.

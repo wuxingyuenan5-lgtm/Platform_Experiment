@@ -31,12 +31,18 @@ def test_residual_exposure_has_one_authoritative_implementation() -> None:
     assert exposure_functions.count("calculate_residual_exposure") == 1
 
 
-def test_eod_policy_is_an_explicit_dependency() -> None:
-    source = (BACKEND_ROOT / "app/eod_reconciliation.py").read_text(encoding="utf-8")
-    assert "from app.eod_policy import" in source
-    assert "list_strategy_orders = list_strategy_orders_for_eod" in source
-    assert "for order_id in list_strategy_orders(" in source
-    assert "def list_strategy_orders(" not in source
+def test_eod_policy_is_an_explicit_service_dependency() -> None:
+    facade_source = (BACKEND_ROOT / "app/eod_reconciliation.py").read_text(encoding="utf-8")
+    service_source = (BACKEND_ROOT / "app/eod_reconciliation_service.py").read_text(
+        encoding="utf-8"
+    )
+
+    assert "from app.eod_policy import" in facade_source
+    assert "list_strategy_orders = list_strategy_orders_for_eod" in facade_source
+    assert "list_strategy_orders=list_strategy_orders" in facade_source
+    assert "for order_id in dependencies.list_strategy_orders(" in service_source
+    assert "def list_strategy_orders(" not in facade_source
+    assert "def list_strategy_orders(" not in service_source
 
 
 def test_production_operations_permissions_live_in_auth_policy() -> None:

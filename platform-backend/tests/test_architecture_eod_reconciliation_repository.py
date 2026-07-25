@@ -3,7 +3,8 @@ from pathlib import Path
 
 APP_ROOT = Path(__file__).resolve().parents[1] / "app"
 REPOSITORY_PATH = APP_ROOT / "eod_reconciliation_repository.py"
-ORCHESTRATION_PATH = APP_ROOT / "eod_reconciliation.py"
+FACADE_PATH = APP_ROOT / "eod_reconciliation.py"
+SERVICE_PATH = APP_ROOT / "eod_reconciliation_service.py"
 POLICY_PATH = APP_ROOT / "eod_policy.py"
 
 
@@ -19,13 +20,14 @@ def imported_modules(path: Path) -> set[str]:
 
 def test_repository_is_the_only_eod_ddl_and_direct_sql_owner() -> None:
     repository_source = REPOSITORY_PATH.read_text(encoding="utf-8")
-    orchestration_source = ORCHESTRATION_PATH.read_text(encoding="utf-8")
+    facade_source = FACADE_PATH.read_text(encoding="utf-8")
+    service_source = SERVICE_PATH.read_text(encoding="utf-8")
     policy_source = POLICY_PATH.read_text(encoding="utf-8")
 
     assert "CREATE TABLE IF NOT EXISTS eod_reconciliation_reports" in repository_source
     assert "db.execute(" in repository_source
     assert "connection()" in repository_source
-    for source in (orchestration_source, policy_source):
+    for source in (facade_source, service_source, policy_source):
         assert "CREATE TABLE" not in source
         assert "db.execute(" not in source
         assert "connection()" not in source
@@ -34,14 +36,18 @@ def test_repository_is_the_only_eod_ddl_and_direct_sql_owner() -> None:
         assert "UPDATE " not in source
 
 
-def test_orchestration_and_policy_delegate_to_repository() -> None:
-    orchestration_source = ORCHESTRATION_PATH.read_text(encoding="utf-8")
+def test_service_and_policy_delegate_to_repository() -> None:
+    facade_source = FACADE_PATH.read_text(encoding="utf-8")
+    service_source = SERVICE_PATH.read_text(encoding="utf-8")
     policy_source = POLICY_PATH.read_text(encoding="utf-8")
 
-    assert "from app import eod_reconciliation_repository as repository" in orchestration_source
-    assert "repository.insert_initial_report(" in orchestration_source
-    assert "repository.complete_report(" in orchestration_source
-    assert "repository.review_report(" in orchestration_source
+    assert "from app import eod_reconciliation_repository as repository" in facade_source
+    assert "from app import eod_reconciliation_repository as repository" in service_source
+    assert "repository.insert_initial_report(" in service_source
+    assert "repository.complete_report(" in service_source
+    assert "repository.review_report(" in service_source
+    assert "repository.insert_initial_report(" not in facade_source
+    assert "repository.review_report(" not in facade_source
     assert "from app import eod_reconciliation_repository as repository" in policy_source
     assert "repository.list_strategy_order_ids(" in policy_source
     assert "repository.historical_difference_counts(" in policy_source

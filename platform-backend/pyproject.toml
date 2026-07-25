@@ -39,6 +39,7 @@ include = [
   "app/eod_reconciliation_policy.py",
   "app/eod_reconciliation_repository.py",
   "app/eod_reconciliation_schemas.py",
+  "app/eod_reconciliation_service.py",
   "app/execution_schemas.py",
   "app/financial_fact_normalization.py",
   "app/financial_fact_repository.py",
@@ -77,7 +78,7 @@ select = ["E", "F", "I", "UP", "B"]
 # Venue Reconciliation facade preserves a legacy compatibility import pending usage migration.
 "app/venue_reconciliation.py" = ["F401"]
 "tests/test_venue_reconciliation.py" = ["E501"]
-# EOD facade keeps FastAPI Query defaults and public ReviewDecision compatibility export.
+# EOD facade keeps FastAPI Query defaults and public status compatibility exports.
 "app/eod_reconciliation.py" = ["B008", "E501", "F401"]
 "tests/test_eod_reconciliation.py" = ["E501"]
 # Production Gate keeps authentication policy and two-person live-session state explicit.
