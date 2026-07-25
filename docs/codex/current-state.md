@@ -3,9 +3,8 @@
 Last updated: 2026-07-25
 Stable branch: `main`
 Product release: `0.7.0`
-Latest completed engineering scope: Issue #90 / PR #91
+Latest completed engineering scope: Issue #92 / PR #93
 Latest completed documentation scope: Issue #85 / PR #86
-Active engineering scope: Issue #92 / PR #93
 
 This file is the compact cross-session handoff. It records current truth, not a PR diary. Read the actual open Issues and PRs before assuming that work is active.
 
@@ -51,7 +50,7 @@ Real-account acceptance remains controlled-host, small-capital and minimum-size.
 - LONG_SPREAD exit thresholds observe `shortSpread`; SHORT_SPREAD exit thresholds observe `longSpread`. TP/SL submits a market close only after an atomic plan claim.
 - The automatic exit monitor is a separate disabled-by-default capability gate; unknown or manual-intervention plans are not automatically retried.
 - Direct MT5 market-data access reads raw swap long/short and related symbol metadata through `symbol_info()` when available; the file bridge remains a fallback/diagnostic read path rather than the authoritative execution path.
-- The original market/limit frontend design remains visible. During Issue #92 the legacy execution card is read-only and a bounded real market-lifecycle panel owns actual market open/close actions so limit choices cannot misroute.
+- The original market/limit frontend design remains visible. The legacy execution card is read-only and a bounded real market-lifecycle panel owns actual market open/close actions so limit choices cannot misroute.
 - Frontend responsive remediation is page-shell-first: defect baseline → Application Shell → Page Shell/layout primitives → shared components → core pages → visual regression.
 - Application Shell owns top navigation, sidebar, main content sizing, the primary vertical scroll context and global overlay base.
 - Page Shell owns page header, toolbar, summary, main/secondary regions, responsive reflow and fixed-bottom-action content reservation.
@@ -120,18 +119,18 @@ Real-account acceptance remains controlled-host, small-capital and minimum-size.
 35. Canonical responsive-layout, Page Shell and cross-viewport acceptance architecture with an explicit phased remediation sequence.
 36. Homepage-first responsive remediation with deterministic Hero reflow, stable desktop dashboard density and type-aware changed-file lint coverage.
 37. Cross-spread market-order minimum loop with terminal Bybit fill confirmation, actual-fill-proportional MT5 hedge sizing, fail-closed unresolved states and direct MT5 swap reads.
+38. Cross-spread market-only lifecycle with venue-safe reduce-only close semantics, MT5 Position Ticket binding, persistent exit plans and executable-spread TP/SL market exits.
 
 ## Active work
 
-Issue #92 / PR #93 completes the market-only cross-spread lifecycle:
+No engineering code workstream is active by default after PR #93 merges.
 
-1. true Bybit reduce-only and MT5 Position Ticket close semantics;
-2. exact-Decimal exit-plan persistence and atomic TP/SL claim;
-3. market TP/SL using the executable opposite-side close spread;
-4. a disabled-by-default server-side monitor;
-5. a real market lifecycle frontend panel while retaining the original limit design as read-only.
+The next cross-spread scopes must remain separately bounded:
 
-Before merging, the final PR head must pass Repository Safety, Backend, Runtime, frontend production build and Secret Scan. Real-environment execution remains Issue #39 and is not proven by CI.
+1. run controlled Demo/real-environment minimum-size acceptance under Issue #39, including Windows MT5 Terminal supervision and venue permissions;
+2. replace bounded Bybit fill polling with private WebSocket order/execution confirmation after operational acceptance;
+3. implement real spread-limit entry, exit and limit TP/SL as a separate execution-engine scope;
+4. integrate or refactor the retained large visual execution component only after the bounded lifecycle panel is operationally accepted.
 
 Remaining responsive work must be evidence-driven rather than a full-platform CSS rewrite:
 
