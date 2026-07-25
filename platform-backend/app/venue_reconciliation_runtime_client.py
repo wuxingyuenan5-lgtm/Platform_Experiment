@@ -1,0 +1,23 @@
+from __future__ import annotations
+
+import httpx
+
+from app.config import get_settings
+
+
+class RuntimeQueryError(RuntimeError):
+    """Raised when the Execution Runtime cannot be reached for a reconciliation query."""
+
+
+def get(path: str, params: dict[str, str] | None = None) -> httpx.Response:
+    """Issue one configured GET request to the Execution Runtime."""
+
+    settings = get_settings()
+    try:
+        return httpx.get(
+            f"{settings.runtime_base_url}{path}",
+            params=params,
+            timeout=settings.runtime_timeout_seconds,
+        )
+    except httpx.HTTPError as exc:
+        raise RuntimeQueryError("Execution Runtime query failed") from exc
