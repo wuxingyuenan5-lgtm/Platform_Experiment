@@ -53,9 +53,9 @@ Connection → Bootstrap → Seed
 | `app/database_bootstrap.py` | core Platform Schema and legacy compatibility DDL |
 | `app/financial_fact_repository.py` | immutable financial facts, formal Position/PnL/NAV persistence and transaction boundaries |
 | `app/execution_risk.py` | Kill Switch, batch risk snapshots and residual-risk actions |
-| `app/venue_reconciliation.py` | venue reconciliation runs and differences |
+| `app/venue_reconciliation_repository.py` | venue reconciliation runs and differences |
 | `app/live_venue_accounting.py` | imported live economic-event accounting records |
-| `app/eod_reconciliation.py` | EOD reports, reviews and scale-gate evidence |
+| `app/eod_reconciliation_repository.py` | EOD reports, reviews and scale-gate persistence evidence |
 | `app/live_trading_sessions.py` | two-person live-session state |
 | `app/credential_security.py` | credential-rotation metadata only |
 | `app/production_monitoring.py` | alerts, scans and controlled operation runs |
