@@ -4,6 +4,7 @@ Last updated: 2026-07-25
 Stable branch: `main`
 Product release: `0.7.0`
 Latest completed engineering scope: Issue #83 / PR #84
+Latest completed documentation scope: Issue #85 / PR #86
 
 This file is the compact cross-session handoff. It records current truth, not a PR diary. Read the actual open Issues and PRs before assuming that work is active.
 
@@ -14,6 +15,8 @@ This file is the compact cross-session handoff. It records current truth, not a 
 - `execution-runtime/`: isolated venue/Gateway process and runtime journal.
 - SQLite remains the approved persistence technology for the current stage.
 - Canonical major module ownership is recorded in `docs/architecture/OWNERSHIP.md`.
+- Frontend responsive layout, viewport support, page-shell, scroll, overflow and fixed-position governance are canonically defined in `admin-risk/docs/architecture/frontend/responsive-layout-architecture.md`.
+- Cross-viewport test matrices, layout defect severity and release acceptance are canonically defined in `admin-risk/docs/quality/responsive-layout-acceptance.md`.
 
 ## Safety defaults
 
@@ -35,6 +38,11 @@ Real-account acceptance remains controlled-host, small-capital and minimum-size.
 - `platform-backend/app/trade_command_execution.py` is the single local Order creation, Safety and Runtime submission owner; `trading.submit_order` remains a deprecated legacy compatibility delegate.
 - The Backend deprecated `POST /api/v1/trading/orders` compatibility endpoint remains available until external usage evidence and a dedicated migration support removal.
 - Maintained funding execution uses ExecutionBatch; the unused frontend legacy single-order submit client and submit-state hook path have been removed.
+- Frontend responsive remediation is page-shell-first: defect baseline → Application Shell → Page Shell/layout primitives → shared components → core pages → visual regression.
+- Application Shell owns top navigation, sidebar, main content sizing, the primary vertical scroll context and global overlay base.
+- Page Shell owns page header, toolbar, summary, main/secondary regions, responsive reflow and fixed-bottom-action content reservation.
+- Business blocks own their minimum usable size, internal reflow and explicitly bounded local scrolling; page main layout must not use absolute positioning or resolution-specific coordinates.
+- Existing pages are not assumed to comply with the responsive standard merely because the architecture documentation exists.
 - EOD Reconciliation public status types and request/response DTOs are owned only by `eod_reconciliation_schemas.py`; `eod_reconciliation.py` imports identical compatibility objects.
 - EOD report status, scale-gate, historical-Difference and immutable-review decisions are owned only by the pure `eod_reconciliation_policy.py` module.
 - EOD Reconciliation DDL, direct SQL, report row mapping, report identity and atomic review persistence are owned only by `eod_reconciliation_repository.py`.
@@ -92,17 +100,27 @@ Real-account acceptance remains controlled-host, small-capital and minimum-size.
 32. Pure EOD report/review Policy ownership with exhaustive status, gate, replay, conflict and approval Goldens.
 33. EOD Reconciliation Service ownership with per-call compatibility injection, exact partial-failure and HTTP-mapping evidence.
 34. Platform 0.7.0 product-version consolidation with blocking drift checks and verified frontend dead-code removal.
+35. Canonical responsive-layout, Page Shell and cross-viewport acceptance architecture with an explicit phased remediation sequence.
 
 ## Active work
 
-No engineering code workstream is active by default after PR #84 merges.
+No engineering code workstream is active by default after PR #86 merges.
+
+The next responsive implementation work must not start as a full-platform CSS rewrite. Recommended sequence:
+
+1. audit representative routes and record the viewport/screenshot defect baseline;
+2. repair Application Shell sizing and the primary vertical scroll owner;
+3. introduce a bounded Page Shell and small layout primitives;
+4. migrate shared toolbar/card/chart/table/overlay behavior;
+5. remediate core trading, strategy and risk pages in separate Issues;
+6. add Playwright viewport screenshots and overflow/occlusion checks.
 
 Before starting another code change:
 
 1. verify current `main`, open Issues and open PRs;
 2. reuse an Issue only when the outcome exactly matches;
 3. create one matching task packet, Issue-numbered branch and open PR;
-4. preserve the ownership boundaries recorded in `docs/architecture/OWNERSHIP.md`;
+4. preserve the ownership boundaries recorded in `docs/architecture/OWNERSHIP.md` and the responsive architecture;
 5. stop when the required change exceeds the task packet's expected files or protected semantics.
 
 Separate non-code follow-ups remain:
@@ -116,6 +134,8 @@ Separate non-code follow-ups remain:
 - Operational projections remain supported and must not become formal-accounting inputs.
 - Compatibility surfaces require usage evidence and a dedicated migration before removal.
 - Inherited frontend lint debt remains outside untouched modules; new and changed files cannot add debt.
+- Existing frontend pages contain unverified layout debt across viewport widths, heights and zoom levels; compliance requires later implementation and evidence.
+- Desktop workstation use remains the primary target; mobile-first redesign is not part of the current responsive architecture.
 - Pyright coverage is progressive rather than whole-repository strict.
 - Live Write cannot be enabled by an engineering refactor or test result.
 - GitHub repository-level branch protection/ruleset configuration must be verified by an administrator because it is not mutable through the available connector.
