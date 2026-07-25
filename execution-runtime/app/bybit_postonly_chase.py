@@ -90,6 +90,8 @@ class ChaseState:
     last_mutation_at: datetime | None = None
     last_sequence: int | None = None
     seen_event_ids: frozenset[str] = frozenset()
+    repost_after_cancel: bool = False
+    planned_repost_price: Decimal | None = None
 
     @property
     def average_fill_price(self) -> Decimal | None:
@@ -142,7 +144,12 @@ def next_quote_action(
     if state.status != ChaseStatus.ACTIVE:
         return ChaseTransition(state, ())
     if _elapsed_seconds(state.started_at, now) >= policy.ttl_seconds:
-        next_state = replace(state, status=ChaseStatus.CANCEL_PENDING)
+        next_state = replace(
+            state,
+            status=ChaseStatus.CANCEL_PENDING,
+            repost_after_cancel=False,
+            planned_repost_price=None,
+        )
         return ChaseTransition(
             next_state,
             (ChaseAction(ChaseActionType.CANCEL, reason="PostOnly Chase TTL expired"),),
@@ -154,16 +161,21 @@ def next_quote_action(
         hard_limit_price=state.hard_limit_price,
         tick_size=state.tick_size,
     )
-    if state.active_price is None:
+    if state.active_price is None or state.active_order_id is None:
         return ChaseTransition(
             replace(state, active_price=target),
-            (ChaseAction(ChaseActionType.REPOST, price=target, reason="Initial PostOnly order"),),
+            (ChaseAction(ChaseActionType.REPOST, price=target, reason="PostOnly order"),),
         )
     distance_ticks = abs(target - state.active_price) / state.tick_size
     if distance_ticks < policy.min_amend_ticks:
         return ChaseTransition(state, ())
     if state.mutation_count >= policy.max_mutations:
-        next_state = replace(state, status=ChaseStatus.CANCEL_PENDING)
+        next_state = replace(
+            state,
+            status=ChaseStatus.CANCEL_PENDING,
+            repost_after_cancel=False,
+            planned_repost_price=None,
+        )
         return ChaseTransition(
             next_state,
             (
@@ -186,6 +198,51 @@ def next_quote_action(
     return ChaseTransition(
         next_state,
         (ChaseAction(ChaseActionType.AMEND, price=target),),
+    )
+
+
+def request_cancel_repost(
+    state: ChaseState,
+    policy: ChasePolicy,
+    *,
+    replacement_price: Decimal,
+    now: datetime,
+) -> ChaseTransition:
+    policy.validate()
+    if state.status != ChaseStatus.ACTIVE or state.active_order_id is None:
+        raise ValueError("Cancel/repost requires one active PostOnly order")
+    if state.cumulative_fill > 0:
+        return _reconcile(
+            state,
+            state.seen_event_ids,
+            "Cancel/repost is blocked after a partial fill",
+        )
+    if state.mutation_count >= policy.max_mutations:
+        return ChaseTransition(
+            replace(state, status=ChaseStatus.CANCEL_PENDING),
+            (ChaseAction(ChaseActionType.CANCEL, reason="Mutation limit reached"),),
+        )
+    if state.last_mutation_at is not None and (
+        _elapsed_seconds(state.last_mutation_at, now) < policy.cooldown_seconds
+    ):
+        return ChaseTransition(state, ())
+    _validate_bound(state, replacement_price)
+    next_state = replace(
+        state,
+        status=ChaseStatus.CANCEL_PENDING,
+        repost_after_cancel=True,
+        planned_repost_price=replacement_price,
+        mutation_count=state.mutation_count + 1,
+        last_mutation_at=now,
+    )
+    return ChaseTransition(
+        next_state,
+        (
+            ChaseAction(
+                ChaseActionType.CANCEL,
+                reason="Terminal cancel required before PostOnly repost",
+            ),
+        ),
     )
 
 
@@ -256,7 +313,11 @@ def _apply_order(state: ChaseState, event: PrivateChaseEvent) -> ChaseTransition
         None,
         event.external_order_id,
     }:
-        return _reconcile(state, state.seen_event_ids, "Private order identity changed unexpectedly")
+        return _reconcile(
+            state,
+            state.seen_event_ids,
+            "Private order identity changed unexpectedly",
+        )
     updated = replace(
         state,
         active_order_id=event.external_order_id or state.active_order_id,
@@ -285,6 +346,26 @@ def _apply_order(state: ChaseState, event: PrivateChaseEvent) -> ChaseTransition
                 updated.seen_event_ids,
                 "PostOnly order canceled after a partial fill",
             )
+        if updated.repost_after_cancel and updated.planned_repost_price is not None:
+            repost_price = updated.planned_repost_price
+            ready = replace(
+                updated,
+                status=ChaseStatus.ACTIVE,
+                active_order_id=None,
+                active_price=repost_price,
+                repost_after_cancel=False,
+                planned_repost_price=None,
+            )
+            return ChaseTransition(
+                ready,
+                (
+                    ChaseAction(
+                        ChaseActionType.REPOST,
+                        price=repost_price,
+                        reason="Terminal cancel confirmed",
+                    ),
+                ),
+            )
         return ChaseTransition(
             replace(updated, status=ChaseStatus.UNFILLED),
             (ChaseAction(ChaseActionType.STOP, reason="PostOnly order canceled unfilled"),),
@@ -306,6 +387,18 @@ def _reconcile(
         next_state,
         (ChaseAction(ChaseActionType.RECONCILE, reason=reason),),
     )
+
+
+def _validate_bound(state: ChaseState, price: Decimal) -> None:
+    if price <= 0:
+        raise ValueError("PostOnly replacement price must be positive")
+    if state.side == "buy" and price > state.hard_limit_price:
+        raise ValueError("PostOnly buy replacement exceeds the hard price bound")
+    if state.side == "sell" and price < state.hard_limit_price:
+        raise ValueError("PostOnly sell replacement is below the hard price bound")
+    steps = price / state.tick_size
+    if steps != steps.to_integral_value():
+        raise ValueError("PostOnly replacement price does not match Tick Size")
 
 
 def _round_down(value: Decimal, tick_size: Decimal) -> Decimal:
