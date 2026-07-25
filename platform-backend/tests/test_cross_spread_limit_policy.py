@@ -23,7 +23,10 @@ def test_buy_bybit_direction_uses_maximum_spread_and_rounds_down(action) -> None
     assert result.raw_bybit_limit_price == Decimal("2500.22")
     assert result.bybit_limit_price == Decimal("2500.20")
     assert result.currently_executable is True
-    assert result.bybit_limit_price - (result.mt5_reference_price - result.hedge_reserve) <= Decimal("-0.73")
+    protected_spread = result.bybit_limit_price - (
+        result.mt5_reference_price - result.hedge_reserve
+    )
+    assert protected_spread <= Decimal("-0.73")
 
 
 @pytest.mark.parametrize("action", ["OPEN_SHORT", "CLOSE_LONG"])
@@ -44,7 +47,10 @@ def test_sell_bybit_direction_uses_minimum_spread_and_rounds_up(action) -> None:
     assert result.raw_bybit_limit_price == Decimal("2500.12")
     assert result.bybit_limit_price == Decimal("2500.20")
     assert result.currently_executable is True
-    assert result.bybit_limit_price - (result.mt5_reference_price + result.hedge_reserve) >= Decimal("-1.03")
+    protected_spread = result.bybit_limit_price - (
+        result.mt5_reference_price + result.hedge_reserve
+    )
+    assert protected_spread >= Decimal("-1.03")
 
 
 def test_non_executable_spread_is_reported_without_weakening_limit() -> None:
