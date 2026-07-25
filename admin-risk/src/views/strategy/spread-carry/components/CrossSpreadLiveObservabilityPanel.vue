@@ -1,12 +1,12 @@
 <template>
   <section class="live-observability">
-    <header class="live-observability__header">
+    <header class="panel-header">
       <div>
         <p>LIVE OBSERVABILITY</p>
         <h3>实盘账户只读验收面板</h3>
-        <span>不包含任何下单、撤单或修改持仓操作</span>
+        <span>不包含下单、撤单或持仓修改操作</span>
       </div>
-      <div class="live-observability__controls">
+      <div class="panel-controls">
         <label>
           <span>历史范围</span>
           <select v-model.number="historyHours" :disabled="loading" @change="refresh">
@@ -21,35 +21,37 @@
       </div>
     </header>
 
-    <div v-if="errorMessage" class="live-observability__alert is-error">
+    <div v-if="errorMessage" class="panel-alert is-error">
       {{ errorMessage }}
     </div>
-    <div v-else-if="result?.warnings.length" class="live-observability__alert is-warn">
+    <div v-else-if="result?.warnings.length" class="panel-alert is-warn">
       <strong>部分数据不可用</strong>
       <span v-for="warning in result.warnings" :key="warning">{{ warning }}</span>
     </div>
 
-    <div v-if="result" class="live-observability__venues">
+    <div v-if="result" class="venue-grid">
       <article v-for="venue in venues" :key="venue.accountId" class="venue-card">
-        <header class="venue-card__header">
+        <header class="venue-header">
           <div>
             <p>{{ venue.venue }}</p>
             <h4>{{ venue.symbol }}</h4>
             <span>{{ venue.accountId }}</span>
           </div>
-          <strong :class="statusClass(venue.status)">{{ statusLabel(venue.status) }}</strong>
+          <strong :class="statusClass(venue.status)">
+            {{ statusLabel(venue.status) }}
+          </strong>
         </header>
 
         <div class="risk-grid">
-          <div v-for="metric in riskMetrics(venue)" :key="metric.label" class="risk-metric">
+          <div v-for="metric in riskMetrics(venue)" :key="metric.label" class="risk-item">
             <span>{{ metric.label }}</span>
             <strong>{{ metric.value }}</strong>
             <small v-if="metric.hint">{{ metric.hint }}</small>
           </div>
         </div>
 
-        <section class="venue-section">
-          <div class="venue-section__title">
+        <section class="data-section">
+          <div class="section-title">
             <h5>当前持仓</h5>
             <span :class="sectionClass(venue.sectionStates.positions)">
               {{ sectionLabel(venue.sectionStates.positions) }}
@@ -68,11 +70,17 @@
               </thead>
               <tbody>
                 <tr v-if="venue.positions.length === 0">
-                  <td colspan="5">{{ emptyLabel(venue.sectionStates.positions, '当前无持仓') }}</td>
+                  <td colspan="5">
+                    {{ emptyLabel(venue.sectionStates.positions, '当前无持仓') }}
+                  </td>
                 </tr>
                 <tr v-for="position in venue.positions" :key="position.externalPositionId">
                   <td>
-                    <strong :class="numberValue(position.netQuantity) >= 0 ? 'is-long' : 'is-short'">
+                    <strong
+                      :class="
+                        numberValue(position.netQuantity) >= 0 ? 'is-long' : 'is-short'
+                      "
+                    >
                       {{ numberValue(position.netQuantity) >= 0 ? '多' : '空' }}
                       {{ formatNumber(absValue(position.netQuantity), 4) }}
                     </strong>
@@ -94,8 +102,8 @@
           </div>
         </section>
 
-        <section class="venue-section">
-          <div class="venue-section__title">
+        <section class="data-section">
+          <div class="section-title">
             <h5>活动订单</h5>
             <span>{{ venue.activeOrders.length }} 笔</span>
           </div>
@@ -104,14 +112,15 @@
               {{ emptyLabel(venue.sectionStates.activeOrders, '当前无活动订单') }}
             </span>
             <span v-for="order in venue.activeOrders" :key="order.externalOrderId">
-              {{ order.side === 'buy' ? '买' : '卖' }} {{ formatNumber(order.remainingQuantity, 4) }}
-              · {{ order.status }} · {{ order.externalOrderId }}
+              {{ order.side === 'buy' ? '买' : '卖' }}
+              {{ formatNumber(order.remainingQuantity, 4) }} · {{ order.status }} ·
+              {{ order.externalOrderId }}
             </span>
           </div>
         </section>
 
-        <section class="venue-section">
-          <div class="venue-section__title">
+        <section class="data-section">
+          <div class="section-title">
             <h5>最近订单</h5>
             <span>{{ venue.recentOrders.length }} 笔</span>
           </div>
@@ -129,7 +138,11 @@
               </thead>
               <tbody>
                 <tr v-if="venue.recentOrders.length === 0">
-                  <td colspan="6">{{ emptyLabel(venue.sectionStates.recentOrders, '历史范围内无订单') }}</td>
+                  <td colspan="6">
+                    {{
+                      emptyLabel(venue.sectionStates.recentOrders, '历史范围内无订单')
+                    }}
+                  </td>
                 </tr>
                 <tr v-for="order in venue.recentOrders" :key="order.externalOrderId">
                   <td>{{ formatTime(order.asOf) }}</td>
@@ -152,8 +165,8 @@
           </div>
         </section>
 
-        <section class="venue-section">
-          <div class="venue-section__title">
+        <section class="data-section">
+          <div class="section-title">
             <h5>最近成交</h5>
             <span>{{ venue.recentFills.length }} 笔</span>
           </div>
@@ -171,7 +184,11 @@
               </thead>
               <tbody>
                 <tr v-if="venue.recentFills.length === 0">
-                  <td colspan="6">{{ emptyLabel(venue.sectionStates.recentFills, '历史范围内无成交') }}</td>
+                  <td colspan="6">
+                    {{
+                      emptyLabel(venue.sectionStates.recentFills, '历史范围内无成交')
+                    }}
+                  </td>
                 </tr>
                 <tr v-for="fill in venue.recentFills" :key="fill.externalFillId">
                   <td>{{ formatTime(fill.occurredAt) }}</td>
@@ -188,8 +205,11 @@
       </article>
     </div>
 
-    <footer class="live-observability__footer">
-      <span>Bybit 强平价仅展示交易所返回值；MT5 不提供可靠的单仓强平价，使用账户 Margin Call / Stop Out 监控。</span>
+    <footer class="panel-footer">
+      <span>
+        Bybit 强平价仅展示交易所返回值；MT5 不提供可靠的单仓强平价，使用账户
+        Margin Call / Stop Out 监控。
+      </span>
       <strong v-if="result">更新时间：{{ formatTime(result.asOf) }}</strong>
     </footer>
   </section>
@@ -235,7 +255,13 @@
   function riskMetrics(venue: CrossSpreadVenueObservability): RiskMetric[] {
     const risk = venue.accountRisk;
     if (!risk) {
-      return [{ label: '账户风险', value: '读取不可用', hint: venue.sectionStates.accountRisk }];
+      return [
+        {
+          label: '账户风险',
+          value: '读取不可用',
+          hint: venue.sectionStates.accountRisk,
+        },
+      ];
     }
     if (venue.venue === 'Bybit') {
       return [
@@ -252,8 +278,14 @@
       { label: '可用保证金', value: money(risk.availableBalance, risk.currency) },
       { label: '已用保证金', value: money(risk.initialMargin, risk.currency) },
       { label: '保证金水平', value: formatPercent(risk.marginLevel, false) },
-      { label: 'Margin Call', value: thresholdValue(risk.marginCallLevel, risk.marginThresholdMode) },
-      { label: 'Stop Out', value: thresholdValue(risk.stopOutLevel, risk.marginThresholdMode) },
+      {
+        label: 'Margin Call',
+        value: thresholdValue(risk.marginCallLevel, risk.marginThresholdMode),
+      },
+      {
+        label: 'Stop Out',
+        value: thresholdValue(risk.stopOutLevel, risk.marginThresholdMode),
+      },
     ];
   }
 
@@ -331,7 +363,9 @@
 
   function formatTime(value: string) {
     const date = new Date(value);
-    return Number.isNaN(date.getTime()) ? '--' : date.toLocaleString('zh-CN', { hour12: false });
+    return Number.isNaN(date.getTime())
+      ? '--'
+      : date.toLocaleString('zh-CN', { hour12: false });
   }
 
   function resolveError(error: unknown) {
@@ -358,18 +392,18 @@
     color: #172946;
   }
 
-  .live-observability__header,
-  .venue-card__header,
-  .venue-section__title,
-  .live-observability__footer {
+  .panel-header,
+  .venue-header,
+  .section-title,
+  .panel-footer {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 16px;
   }
 
-  .live-observability__header p,
-  .venue-card__header p {
+  .panel-header p,
+  .venue-header p {
     margin: 0;
     color: #71819b;
     font-size: 11px;
@@ -377,25 +411,25 @@
     letter-spacing: 0.08em;
   }
 
-  .live-observability__header h3,
-  .venue-card__header h4 {
+  .panel-header h3,
+  .venue-header h4 {
     margin: 4px 0;
   }
 
-  .live-observability__header span,
-  .venue-card__header span,
-  .live-observability__footer {
+  .panel-header span,
+  .venue-header span,
+  .panel-footer {
     color: #71819b;
     font-size: 12px;
   }
 
-  .live-observability__controls {
+  .panel-controls {
     display: flex;
     align-items: end;
     gap: 10px;
   }
 
-  .live-observability__controls label {
+  .panel-controls label {
     display: flex;
     flex-direction: column;
     gap: 4px;
@@ -423,7 +457,7 @@
     opacity: 0.55;
   }
 
-  .live-observability__alert {
+  .panel-alert {
     display: flex;
     flex-direction: column;
     gap: 4px;
@@ -433,17 +467,17 @@
     font-size: 12px;
   }
 
-  .live-observability__alert.is-error {
+  .panel-alert.is-error {
     background: #fff2f2;
     color: #b23b3b;
   }
 
-  .live-observability__alert.is-warn {
+  .panel-alert.is-warn {
     background: #fff8e9;
     color: #966013;
   }
 
-  .live-observability__venues {
+  .venue-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 14px;
@@ -458,8 +492,8 @@
     background: #ffffff;
   }
 
-  .venue-card__header > strong,
-  .venue-section__title span {
+  .venue-header > strong,
+  .section-title span {
     padding: 5px 8px;
     border-radius: 999px;
     font-size: 11px;
@@ -488,7 +522,7 @@
     margin-top: 12px;
   }
 
-  .risk-metric {
+  .risk-item {
     display: flex;
     min-width: 0;
     flex-direction: column;
@@ -498,28 +532,28 @@
     background: #f4f7fb;
   }
 
-  .risk-metric span,
-  .risk-metric small {
+  .risk-item span,
+  .risk-item small {
     color: #71819b;
     font-size: 11px;
   }
 
-  .risk-metric strong {
+  .risk-item strong {
     overflow: hidden;
     font-size: 13px;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
-  .venue-section {
+  .data-section {
     margin-top: 14px;
   }
 
-  .venue-section__title {
+  .section-title {
     margin-bottom: 7px;
   }
 
-  .venue-section__title h5 {
+  .section-title h5 {
     margin: 0;
   }
 
@@ -568,19 +602,19 @@
     font-size: 11px;
   }
 
-  .live-observability__footer {
+  .panel-footer {
     margin-top: 12px;
   }
 
   @media (max-width: 1500px) {
-    .live-observability__venues {
+    .venue-grid {
       grid-template-columns: 1fr;
     }
   }
 
   @media (max-width: 900px) {
-    .live-observability__header,
-    .live-observability__footer {
+    .panel-header,
+    .panel-footer {
       align-items: flex-start;
       flex-direction: column;
     }
