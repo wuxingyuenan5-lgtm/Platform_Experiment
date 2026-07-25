@@ -11,6 +11,7 @@ import type {
   ExecutionBatchResult,
   InstrumentResult,
   OrderDetailResult,
+  OrderResult,
   PnlResult,
   PositionResult,
   ReconciliationSummaryResult,
@@ -40,8 +41,8 @@ function isNotFound(error: unknown): boolean {
   return axios.isAxiosError(error) && error.response?.status === 404;
 }
 
-export async function reconcileTradingOrder(orderId: string) {
-  const response = await client.post(
+export async function reconcileTradingOrder(orderId: string): Promise<OrderResult> {
+  const response = await client.post<OrderResult>(
     `/trading/orders/${encodeURIComponent(orderId)}/reconcile`,
   );
   return response.data;
