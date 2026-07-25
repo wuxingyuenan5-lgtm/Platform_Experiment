@@ -79,13 +79,19 @@ class CrossSpreadExitPlanResponse(BaseModel):
 
 class CrossSpreadOpenResult(BaseModel):
     execution_batch: ExecutionBatchResponse = Field(alias="executionBatch")
-    order_intent: CrossSpreadOrderIntentResponse = Field(alias="orderIntent")
+    order_intent: CrossSpreadOrderIntentResponse | None = Field(
+        default=None,
+        alias="orderIntent",
+    )
     exit_plan: CrossSpreadExitPlanResponse | None = Field(default=None, alias="exitPlan")
 
 
 class CrossSpreadCloseResult(BaseModel):
     execution_batch: ExecutionBatchResponse = Field(alias="executionBatch")
-    order_intent: CrossSpreadOrderIntentResponse = Field(alias="orderIntent")
+    order_intent: CrossSpreadOrderIntentResponse | None = Field(
+        default=None,
+        alias="orderIntent",
+    )
     exit_plan: CrossSpreadExitPlanResponse = Field(alias="exitPlan")
 
 
