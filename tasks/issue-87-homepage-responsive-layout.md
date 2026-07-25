@@ -89,13 +89,13 @@ Final delivery also requires:
 - [x] Inner rows have compact fallbacks and `min-width: 0` where needed.
 - [x] Existing content, routes and placeholder values are preserved.
 - [x] Homepage is included in the full TypeScript project used by type-aware ESLint.
-- [ ] Required CI passes on the exact final head after documentation and diagnostic cleanup.
+- [x] Platform CI and Secret Scan passed on the complete five-file implementation head.
 
 ## Progress
 
-- Done: repository verification, Issue creation, homepage and PageWrapper audit, layout standard, homepage refactor, TypeScript project inclusion, zero-debt lint correction, temporary diagnostic cleanup and current-state update.
-- Current: validate the exact final five-file diff.
-- Next: record final CI evidence, update PR, squash merge and close Issue.
+- Done: repository verification, Issue creation, homepage and PageWrapper audit, layout standard, homepage refactor, TypeScript project inclusion, zero-debt lint correction, temporary diagnostic cleanup, current-state update and complete implementation-head validation.
+- Current: final task-record-only validation and merge.
+- Next: update PR, squash merge and close Issue.
 - Blocked by: none.
 
 ## Completion
@@ -105,5 +105,5 @@ Final delivery also requires:
 - Merge commit:
 - Application behavior changed: responsive placement and visual hierarchy only.
 - Business behavior changed: none.
-- Tests/CI: final head pending; implementation head passed Repository Safety, Backend, Runtime, frontend lint/no-new-debt/type-check/build and Secret Scan.
+- Tests/CI: implementation head `d82d6a3d8a21269d0450dae3a80abbc8855f274a`; Platform CI #1232 passed; Secret Scan #672 passed; Repository Safety, Backend, Runtime, frontend maintained lint, no-new-debt lint, type-check and production build all passed.
 - Follow-up: remaining pages should be handled only from concrete S0/S1 defects or shared-shell evidence; automated viewport screenshots remain a separate scope.
