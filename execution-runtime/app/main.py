@@ -1,4 +1,6 @@
 from contextlib import asynccontextmanager
+from datetime import UTC, datetime, timedelta
+from typing import Literal
 
 from fastapi import FastAPI, HTTPException, Query
 
@@ -27,10 +29,13 @@ from app.models import (
     GatewayCapabilitiesResponse,
     GatewayConnectivityResponse,
     RuntimeStatusResponse,
+    VenueAccountRiskSnapshot,
     VenueBalanceSnapshot,
     VenueEconomicEventSnapshot,
+    VenueFillHistoryPage,
     VenueFillSnapshot,
     VenueInstrumentSpecification,
+    VenueOrderHistoryPage,
     VenueOrderSnapshot,
     VenuePositionSnapshot,
     VenueReadinessResponse,
@@ -203,6 +208,34 @@ def venue_orders(
 
 
 @app.get(
+    "/venue/order-history",
+    response_model=VenueOrderHistoryPage,
+    tags=["venue-query"],
+)
+def venue_order_history(
+    account_id: str = Query(alias="accountId"),
+    symbol: str | None = None,
+    start_time: datetime | None = Query(default=None, alias="startTime"),
+    end_time: datetime | None = Query(default=None, alias="endTime"),
+    cursor: str | None = None,
+    limit: int = Query(default=50, ge=1, le=100),
+    scope: Literal["active", "closed"] = "closed",
+) -> VenueOrderHistoryPage:
+    bounded_start, bounded_end = _history_window(start_time, end_time)
+    return _query(
+        lambda: gateway.query_order_history(
+            account_id=account_id,
+            symbol=symbol,
+            start_time=bounded_start,
+            end_time=bounded_end,
+            cursor=cursor,
+            limit=limit,
+            scope=scope,
+        )
+    )
+
+
+@app.get(
     "/venue/orders/by-platform/{platform_order_id}",
     response_model=VenueOrderSnapshot,
     tags=["venue-query"],
@@ -246,6 +279,32 @@ def venue_fills(
 
 
 @app.get(
+    "/venue/fill-history",
+    response_model=VenueFillHistoryPage,
+    tags=["venue-query"],
+)
+def venue_fill_history(
+    account_id: str = Query(alias="accountId"),
+    symbol: str | None = None,
+    start_time: datetime | None = Query(default=None, alias="startTime"),
+    end_time: datetime | None = Query(default=None, alias="endTime"),
+    cursor: str | None = None,
+    limit: int = Query(default=50, ge=1, le=100),
+) -> VenueFillHistoryPage:
+    bounded_start, bounded_end = _history_window(start_time, end_time)
+    return _query(
+        lambda: gateway.query_fill_history(
+            account_id=account_id,
+            symbol=symbol,
+            start_time=bounded_start,
+            end_time=bounded_end,
+            cursor=cursor,
+            limit=limit,
+        )
+    )
+
+
+@app.get(
     "/venue/positions",
     response_model=list[VenuePositionSnapshot],
     tags=["venue-query"],
@@ -265,6 +324,17 @@ def venue_balances(
     account_id: str | None = Query(default=None, alias="accountId"),
 ) -> list[VenueBalanceSnapshot]:
     return _query(lambda: gateway.list_balances(account_id))
+
+
+@app.get(
+    "/venue/account-risk",
+    response_model=VenueAccountRiskSnapshot,
+    tags=["venue-query"],
+)
+def venue_account_risk(
+    account_id: str = Query(alias="accountId"),
+) -> VenueAccountRiskSnapshot:
+    return _query(lambda: gateway.get_account_risk(account_id))
 
 
 @app.get(
@@ -326,6 +396,28 @@ def cancel_venue_order(
         raise HTTPException(status_code=502, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+def _history_window(
+    start_time: datetime | None,
+    end_time: datetime | None,
+) -> tuple[datetime, datetime]:
+    end = _as_utc(end_time or datetime.now(UTC))
+    start = _as_utc(start_time or end - timedelta(days=7))
+    if end <= start:
+        raise HTTPException(status_code=422, detail="History endTime must be after startTime")
+    if end - start > timedelta(days=7):
+        raise HTTPException(
+            status_code=422,
+            detail="History query window cannot exceed 7 days",
+        )
+    return start, end
+
+
+def _as_utc(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        return value.replace(tzinfo=UTC)
+    return value.astimezone(UTC)
 
 
 def _query(callback):

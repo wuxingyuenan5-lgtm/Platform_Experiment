@@ -140,7 +140,7 @@
   }>();
 
   const direction = ref<CrossSpreadDirection>('LONG_SPREAD');
-  const quantityOz = ref('100');
+  const quantityOz = ref('1');
   const takeProfitSpread = ref('0');
   const stopLossSpread = ref('-3');
   const plans = ref<CrossSpreadExitPlanResult[]>([]);
@@ -189,7 +189,7 @@
     try {
       plans.value = await getCrossSpreadExitPlans();
       setMessage('退出计划已刷新', 'is-success');
-    } catch (error: any) {
+    } catch (error: unknown) {
       setMessage(resolveError(error, '退出计划读取失败'), 'is-error');
     } finally {
       loading.value = false;
@@ -216,7 +216,7 @@
         );
       }
       await loadPlansSilently();
-    } catch (error: any) {
+    } catch (error: unknown) {
       setMessage(resolveError(error, '市价开仓失败'), 'is-error');
     } finally {
       loading.value = false;
@@ -236,7 +236,7 @@
         );
       }
       await loadPlansSilently();
-    } catch (error: any) {
+    } catch (error: unknown) {
       setMessage(resolveError(error, '市价平仓失败'), 'is-error');
       await loadPlansSilently();
     } finally {
@@ -257,8 +257,15 @@
     messageTone.value = nextTone;
   }
 
-  function resolveError(error: any, fallback: string) {
-    return error?.response?.data?.detail || error?.message || fallback;
+  function resolveError(error: unknown, fallback: string) {
+    if (typeof error === 'object' && error !== null) {
+      const candidate = error as {
+        message?: string;
+        response?: { data?: { detail?: string } };
+      };
+      return candidate.response?.data?.detail || candidate.message || fallback;
+    }
+    return fallback;
   }
 
   function formatNumber(value: string) {

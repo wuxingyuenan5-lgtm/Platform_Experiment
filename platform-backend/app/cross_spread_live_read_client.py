@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 from decimal import Decimal
 
 import httpx
@@ -99,13 +100,9 @@ def get_instrument_specification(
 
 
 def list_positions(account_id: str) -> list[LivePosition]:
-    payload = runtime_get("/venue/positions", params={"accountId": account_id})
-    if not isinstance(payload, list):
-        raise CrossSpreadLiveReadError("Runtime position response is malformed")
+    rows = list_position_rows(account_id)
     positions: list[LivePosition] = []
-    for row in payload:
-        if not isinstance(row, dict):
-            raise CrossSpreadLiveReadError("Runtime position row is malformed")
+    for row in rows:
         try:
             positions.append(
                 LivePosition(
@@ -122,6 +119,18 @@ def list_positions(account_id: str) -> list[LivePosition]:
     return positions
 
 
+def list_position_rows(account_id: str) -> list[dict[str, object]]:
+    payload = runtime_get("/venue/positions", params={"accountId": account_id})
+    return _object_list(payload, "Runtime position response")
+
+
+def get_account_risk(account_id: str) -> dict[str, object]:
+    payload = runtime_get("/venue/account-risk", params={"accountId": account_id})
+    if not isinstance(payload, dict):
+        raise CrossSpreadLiveReadError("Runtime account-risk response is malformed")
+    return dict(payload)
+
+
 def list_orders(
     *,
     account_id: str,
@@ -132,9 +141,70 @@ def list_orders(
     if symbol is not None:
         params["symbol"] = symbol
     payload = runtime_get("/venue/orders", params=params)
+    return _object_list(payload, "Runtime order-list response")
+
+
+def query_order_history(
+    *,
+    account_id: str,
+    symbol: str | None,
+    start_time: datetime,
+    end_time: datetime,
+    limit: int,
+    scope: str,
+    cursor: str | None = None,
+) -> dict[str, object]:
+    params = {
+        "accountId": account_id,
+        "startTime": start_time.isoformat(),
+        "endTime": end_time.isoformat(),
+        "limit": str(limit),
+        "scope": scope,
+    }
+    if symbol is not None:
+        params["symbol"] = symbol
+    if cursor is not None:
+        params["cursor"] = cursor
+    payload = runtime_get("/venue/order-history", params=params)
+    return _history_page(payload, "Runtime order-history response")
+
+
+def query_fill_history(
+    *,
+    account_id: str,
+    symbol: str | None,
+    start_time: datetime,
+    end_time: datetime,
+    limit: int,
+    cursor: str | None = None,
+) -> dict[str, object]:
+    params = {
+        "accountId": account_id,
+        "startTime": start_time.isoformat(),
+        "endTime": end_time.isoformat(),
+        "limit": str(limit),
+    }
+    if symbol is not None:
+        params["symbol"] = symbol
+    if cursor is not None:
+        params["cursor"] = cursor
+    payload = runtime_get("/venue/fill-history", params=params)
+    return _history_page(payload, "Runtime fill-history response")
+
+
+def _object_list(payload: object, label: str) -> list[dict[str, object]]:
     if not isinstance(payload, list) or any(not isinstance(row, dict) for row in payload):
-        raise CrossSpreadLiveReadError("Runtime order-list response is malformed")
+        raise CrossSpreadLiveReadError(f"{label} is malformed")
     return [dict(row) for row in payload]
+
+
+def _history_page(payload: object, label: str) -> dict[str, object]:
+    if not isinstance(payload, dict):
+        raise CrossSpreadLiveReadError(f"{label} is malformed")
+    items = payload.get("items")
+    if not isinstance(items, list) or any(not isinstance(row, dict) for row in items):
+        raise CrossSpreadLiveReadError(f"{label} items are malformed")
+    return dict(payload)
 
 
 def _response_detail(response: httpx.Response) -> str:

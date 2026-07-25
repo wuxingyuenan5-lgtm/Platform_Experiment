@@ -2,6 +2,7 @@ from app.application import app
 from app.auth import AuthenticationMiddleware
 from app.credential_security import router as credential_security_router
 from app.cross_spread_exit_routes import router as cross_spread_exit_router
+from app.cross_spread_observability_routes import router as cross_spread_observability_router
 from app.disaster_recovery import router as disaster_recovery_router
 from app.eod_reconciliation import router as eod_reconciliation_router
 from app.execution_risk import router as execution_risk_router
@@ -23,6 +24,7 @@ app.include_router(production_monitoring_router)
 app.include_router(disaster_recovery_router)
 app.include_router(schema_governance_router)
 app.include_router(cross_spread_exit_router)
+app.include_router(cross_spread_observability_router)
 
 # Authentication is added at the composition root so every legacy and modular
 # route passes through one default-deny production authorization boundary.

@@ -8,6 +8,7 @@
         :selected-resolution="selectedResolution"
       />
     </div>
+    <CrossSpreadLiveObservabilityPanel />
     <CrossSpreadMarketLifecyclePanel
       :left-leg-symbol="leftLegSymbol"
       :right-leg-symbol="rightLegSymbol"
@@ -23,6 +24,7 @@
 </template>
 
 <script setup lang="ts">
+  import CrossSpreadLiveObservabilityPanel from './CrossSpreadLiveObservabilityPanel.vue';
   import CrossSpreadMarketLifecyclePanel from './CrossSpreadMarketLifecyclePanel.vue';
   import CrossVenueExecutionReplica from './CrossVenueExecutionReplica.vue';
   import DomesticOverseasExecutionReplica from './DomesticOverseasExecutionReplica.vue';
