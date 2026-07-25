@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from decimal import Decimal
+from typing import Literal
 from uuid import uuid4
 
 from fastapi import HTTPException
@@ -24,13 +25,18 @@ from app.cross_spread import (
     _validate_leg_quantity,
 )
 from app.execution_batches import create_execution_batch
-from app.order_execution_intents import register_order_execution_intent
+from app.order_execution_intents import (
+    ExecutionPolicy,
+    register_order_execution_intent,
+)
 from app.schemas import (
     BatchLegRequest,
     CreateExecutionBatchRequest,
     CrossSpreadMarketCommandRequest,
     ExecutionBatchResponse,
 )
+
+LimitStrategy = Literal["fok", "post_only_chase"]
 
 
 def get_bybit_catalog_tick_size() -> Decimal:
@@ -43,10 +49,11 @@ def get_bybit_catalog_tick_size() -> Decimal:
     return instrument.contract.price_tick
 
 
-def submit_cross_spread_fok_command(
+def submit_cross_spread_limit_command(
     request: CrossSpreadMarketCommandRequest,
     *,
     bybit_limit_price: Decimal,
+    limit_strategy: LimitStrategy,
     idempotency_key: str | None = None,
     bybit_reduce_only: bool = False,
     mt5_reduce_only: bool = False,
@@ -59,7 +66,9 @@ def submit_cross_spread_fok_command(
             detail="Live cross-spread execution is disabled",
         )
     if bybit_limit_price <= 0:
-        raise HTTPException(status_code=422, detail="Bybit FOK limit price must be positive")
+        raise HTTPException(status_code=422, detail="Bybit Limit price must be positive")
+    if limit_strategy not in {"fok", "post_only_chase"}:
+        raise HTTPException(status_code=422, detail="Unsupported cross-spread Limit strategy")
 
     is_close = request.action.startswith("CLOSE_")
     if is_close and not (
@@ -105,17 +114,20 @@ def submit_cross_spread_fok_command(
         )
 
     batch_key = idempotency_key or (
-        f"cross-spread-fok:{request.action}:{request.quantity_oz}:"
+        f"cross-spread-{limit_strategy}:{request.action}:{request.quantity_oz}:"
         f"{bybit_limit_price}:{uuid4()}"
     )
+    execution_policy: ExecutionPolicy = limit_strategy
     register_order_execution_intent(
         f"{batch_key}:{BYBIT_LEG_ROLE}",
         reduce_only=bybit_reduce_only,
+        execution_policy=execution_policy,
     )
     register_order_execution_intent(
         f"{batch_key}:{MT5_LEG_ROLE}",
         reduce_only=mt5_reduce_only,
         position_id=mt5_position_id,
+        execution_policy="default",
     )
 
     return create_execution_batch(
@@ -147,4 +159,44 @@ def submit_cross_spread_fok_command(
                 ),
             ],
         )
+    )
+
+
+def submit_cross_spread_fok_command(
+    request: CrossSpreadMarketCommandRequest,
+    *,
+    bybit_limit_price: Decimal,
+    idempotency_key: str | None = None,
+    bybit_reduce_only: bool = False,
+    mt5_reduce_only: bool = False,
+    mt5_position_id: str | None = None,
+) -> ExecutionBatchResponse:
+    return submit_cross_spread_limit_command(
+        request,
+        bybit_limit_price=bybit_limit_price,
+        limit_strategy="fok",
+        idempotency_key=idempotency_key,
+        bybit_reduce_only=bybit_reduce_only,
+        mt5_reduce_only=mt5_reduce_only,
+        mt5_position_id=mt5_position_id,
+    )
+
+
+def submit_cross_spread_postonly_command(
+    request: CrossSpreadMarketCommandRequest,
+    *,
+    bybit_limit_price: Decimal,
+    idempotency_key: str | None = None,
+    bybit_reduce_only: bool = False,
+    mt5_reduce_only: bool = False,
+    mt5_position_id: str | None = None,
+) -> ExecutionBatchResponse:
+    return submit_cross_spread_limit_command(
+        request,
+        bybit_limit_price=bybit_limit_price,
+        limit_strategy="post_only_chase",
+        idempotency_key=idempotency_key,
+        bybit_reduce_only=bybit_reduce_only,
+        mt5_reduce_only=mt5_reduce_only,
+        mt5_position_id=mt5_position_id,
     )
