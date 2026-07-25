@@ -1,7 +1,7 @@
 # Task: Cross-Spread Market Close and Spread-Triggered Exits
 
 Issue: #92
-Status: review
+Status: completed
 Branch: `feature/issue-92-cross-spread-market-exits`
 Base commit: `d5375de356fe411fa4922b68189fc17fbf6f5fcd`
 
@@ -117,16 +117,16 @@ Final delivery also requires:
 
 ## Progress
 
-- Done: Issue, branch, task packet, venue-safe close semantics, exit-plan persistence, TP/SL policy and monitor, lifecycle APIs, real market UI panel, focused tests and PR #93.
-- Current: final frontend/documentation CI and correction of any reported defects.
-- Next: merge only after the final head passes Platform CI and Secret Scan.
+- Done: Issue, branch, task packet, venue-safe close semantics, exit-plan persistence, TP/SL policy and monitor, lifecycle APIs, real market UI panel, focused tests, documentation synchronization and PR #93.
+- Current: complete and ready for squash merge.
+- Next: controlled Demo/real-environment acceptance under Issue #39; real limit execution and private Bybit WebSocket remain separately bounded scopes.
 - Blocked by: none.
 
 ## Completion
 
 - PR: #93
-- Merge commit:
+- Merge commit: pending squash merge
 - Application behavior changed: market opens create persistent exit plans; market closes are reduce-only and ticket-bound; TP/SL can trigger one idempotent market close when the controlled monitor is enabled.
 - Business behavior changed: LONG and SHORT exits monitor the executable opposite-side spread rather than the opening-side spread.
-- Tests/CI: final head pending.
-- Follow-up: real limit entry/exit and private Bybit WebSocket remain separate scopes.
+- Tests/CI: Platform CI #1319 and Secret Scan #700 passed on the final code head before documentation completion.
+- Follow-up: controlled operational acceptance, real limit entry/exit and private Bybit WebSocket remain separate scopes.
