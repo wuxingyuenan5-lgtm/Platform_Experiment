@@ -15,6 +15,7 @@ from app.cross_spread_order_intent import (
 from app.execution_schemas import ExecutionBatchResponse
 
 ExecutionMode = Literal["market", "limit"]
+LimitStrategy = Literal["fok", "post_only_chase"]
 ExitPlanStatus = Literal[
     "active",
     "triggered",
@@ -31,6 +32,7 @@ class CrossSpreadMarketOpenRequest(BaseModel):
     stop_loss_spread: Decimal = Field(alias="stopLossSpread")
     execution_mode: ExecutionMode = Field(default="market", alias="executionMode")
     limit_spread: Decimal | None = Field(default=None, alias="limitSpread")
+    limit_strategy: LimitStrategy = Field(default="fok", alias="limitStrategy")
     take_profit_execution_mode: ExecutionMode = Field(
         default="market",
         alias="takeProfitExecutionMode",
@@ -38,6 +40,14 @@ class CrossSpreadMarketOpenRequest(BaseModel):
     stop_loss_execution_mode: ExecutionMode = Field(
         default="market",
         alias="stopLossExecutionMode",
+    )
+    take_profit_limit_strategy: LimitStrategy = Field(
+        default="fok",
+        alias="takeProfitLimitStrategy",
+    )
+    stop_loss_limit_strategy: LimitStrategy = Field(
+        default="fok",
+        alias="stopLossLimitStrategy",
     )
 
     @model_validator(mode="after")
@@ -58,6 +68,7 @@ class CrossSpreadMarketOpenRequest(BaseModel):
 class CrossSpreadMarketCloseRequest(BaseModel):
     execution_mode: ExecutionMode = Field(default="market", alias="executionMode")
     limit_spread: Decimal | None = Field(default=None, alias="limitSpread")
+    limit_strategy: LimitStrategy = Field(default="fok", alias="limitStrategy")
 
     @model_validator(mode="after")
     def validate_request(self) -> CrossSpreadMarketCloseRequest:
@@ -75,6 +86,7 @@ class CrossSpreadOrderIntentResponse(BaseModel):
 
 class CrossSpreadLimitExecutionResponse(BaseModel):
     direction: Literal["BUY_BYBIT_SELL_MT5", "SELL_BYBIT_BUY_MT5"]
+    limit_strategy: LimitStrategy = Field(alias="limitStrategy")
     limit_spread: Decimal = Field(alias="limitSpread")
     executable_spread: Decimal = Field(alias="executableSpread")
     mt5_reference_price: Decimal = Field(alias="mt5ReferencePrice")
@@ -83,7 +95,7 @@ class CrossSpreadLimitExecutionResponse(BaseModel):
     raw_bybit_limit_price: Decimal = Field(alias="rawBybitLimitPrice")
     bybit_limit_price: Decimal = Field(alias="bybitLimitPrice")
     currently_executable: bool = Field(alias="currentlyExecutable")
-    time_in_force: Literal["FOK"] = Field(default="FOK", alias="timeInForce")
+    time_in_force: Literal["FOK", "PostOnly"] = Field(alias="timeInForce")
 
 
 class CrossSpreadExitPlanResponse(BaseModel):
@@ -104,6 +116,14 @@ class CrossSpreadExitPlanResponse(BaseModel):
     stop_loss_execution_mode: ExecutionMode = Field(
         default="market",
         alias="stopLossExecutionMode",
+    )
+    take_profit_limit_strategy: LimitStrategy = Field(
+        default="fok",
+        alias="takeProfitLimitStrategy",
+    )
+    stop_loss_limit_strategy: LimitStrategy = Field(
+        default="fok",
+        alias="stopLossLimitStrategy",
     )
     status: ExitPlanStatus
     trigger_reason: str | None = Field(default=None, alias="triggerReason")
