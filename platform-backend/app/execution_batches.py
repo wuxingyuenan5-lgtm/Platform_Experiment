@@ -382,12 +382,11 @@ def resize_cross_spread_mt5_hedge(
         label=mt5_request.symbol,
     )
 
-    resized = list(command_requests)
-    resized[mt5_index] = (
+    command_requests[mt5_index] = (
         mt5_role,
         mt5_request.model_copy(update={"quantity": adjusted_quantity}),
     )
-    return resized
+    return command_requests
 
 
 def validate_contract_quantity(
