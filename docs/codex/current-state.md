@@ -30,6 +30,7 @@ Real-account acceptance remains controlled-host, small-capital and minimum-size.
 - Platform Backend does not import venue SDKs; external execution remains inside `execution-runtime/`.
 - `platform-backend/app/main.py` is a composition root only.
 - `platform-backend/app/trade_command_execution.py` is the single local Order creation, Safety and Runtime submission owner; `trading.submit_order` remains a deprecated legacy compatibility delegate.
+- EOD Reconciliation public status types and request/response DTOs are owned only by `eod_reconciliation_schemas.py`; `eod_reconciliation.py` imports identical compatibility objects while retaining its existing persistence, orchestration, review and route behavior.
 - Venue Reconciliation public DTOs and difference status types are owned only by `venue_reconciliation_schemas.py`; the facade re-exports identical objects.
 - Venue Reconciliation external-status mapping and Order/Position/Balance difference decisions are owned only by the pure `venue_reconciliation_policy.py` module.
 - Venue Reconciliation DDL, direct SQL, row mapping and protected persistence transactions are owned only by `venue_reconciliation_repository.py`.
@@ -80,7 +81,7 @@ Real-account acceptance remains controlled-host, small-capital and minimum-size.
 
 ## Active work
 
-No engineering code workstream is active by default after PR #74 merges.
+Issue #75 / Draft PR #76 is the only active engineering workstream: EOD Reconciliation public-schema extraction.
 
 Before starting another code change:
 
