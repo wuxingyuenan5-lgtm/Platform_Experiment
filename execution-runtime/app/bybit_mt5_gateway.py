@@ -61,12 +61,9 @@ class BybitMt5Gateway:
             return self._adapter_by_name(route.adapter).get_order(
                 external_order_id=external_order_id,
             )
-        bybit_snapshot = self.bybit.get_order(external_order_id=external_order_id)
-        if bybit_snapshot is not None:
-            return bybit_snapshot
         if external_order_id.isdigit():
             return self.mt5.get_order(external_order_id=external_order_id)
-        return None
+        return self.bybit.get_order(external_order_id=external_order_id)
 
     def list_orders(
         self,
