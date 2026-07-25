@@ -7,6 +7,7 @@ from fastapi.testclient import TestClient
 
 import app.cross_spread_exit_service as exit_service
 from app.config import get_settings
+from app.cross_spread_live_read_client import LivePosition
 from app.database import connection
 from app.execution_schemas import ExecutionBatchResponse
 from app.main import app
@@ -187,12 +188,24 @@ def unknown_batch() -> ExecutionBatchResponse:
     )
 
 
+def live_bybit_position() -> LivePosition:
+    return LivePosition(
+        source="bybit_live",
+        external_position_id="bybit-position-1",
+        account_id="account_crypto_test",
+        instrument_id="instrument_xau_usdt_perp",
+        symbol="XAUTUSDT",
+        net_quantity=Decimal("1"),
+    )
+
+
 def test_definitive_mt5_failure_submits_one_reduce_only_bybit_rollback(
     monkeypatch,
     tmp_path: Path,
 ) -> None:
     configure_platform(tmp_path)
     calls: list[dict[str, object]] = []
+    position_reads = iter([([live_bybit_position()], []), ([], [])])
     with TestClient(app):
         insert_definitive_failure_batch("failed-open-batch")
 
@@ -218,7 +231,7 @@ def test_definitive_mt5_failure_submits_one_reduce_only_bybit_rollback(
         monkeypatch.setattr(
             exit_service,
             "_load_live_positions",
-            lambda: ([], []),
+            lambda: next(position_reads),
         )
 
         result = exit_service._handle_definitive_open_failure(
@@ -235,6 +248,41 @@ def test_definitive_mt5_failure_submits_one_reduce_only_bybit_rollback(
     assert result.status == "failed"
     assert result.requires_manual_intervention is False
     assert "rollback-platform-order-id" in str(result.failure_reason)
+
+
+def test_already_flat_external_positions_do_not_submit_duplicate_rollback(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    configure_platform(tmp_path)
+    called = False
+    with TestClient(app):
+        insert_definitive_failure_batch("already-flat-batch")
+
+        def forbidden_rollback(**kwargs):
+            nonlocal called
+            called = True
+            raise AssertionError("already-flat exposure must not be rolled back again")
+
+        monkeypatch.setattr(
+            exit_service,
+            "submit_bybit_definitive_failure_rollback",
+            forbidden_rollback,
+        )
+        monkeypatch.setattr(
+            exit_service,
+            "_load_live_positions",
+            lambda: ([], []),
+        )
+
+        result = exit_service._handle_definitive_open_failure(
+            failed_batch("already-flat-batch")
+        )
+
+    assert called is False
+    assert result.status == "failed"
+    assert result.requires_manual_intervention is False
+    assert "already flat" in str(result.failure_reason)
 
 
 def test_mt5_result_unknown_never_triggers_automatic_rollback(monkeypatch) -> None:
