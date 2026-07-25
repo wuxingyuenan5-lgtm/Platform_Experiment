@@ -92,7 +92,7 @@ DDL_OWNER_PATHS = (
     "platform-backend/app/database_bootstrap.py",
     "platform-backend/app/credential_security.py",
     "platform-backend/app/disaster_recovery.py",
-    "platform-backend/app/eod_reconciliation.py",
+    "platform-backend/app/eod_reconciliation_repository.py",
     "platform-backend/app/execution_risk.py",
     "platform-backend/app/financial_fact_repository.py",
     "platform-backend/app/live_trading_sessions.py",
