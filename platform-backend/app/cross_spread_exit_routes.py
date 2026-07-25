@@ -80,6 +80,7 @@ def close_market_lifecycle(
     return close_cross_spread_market(
         plan_id,
         execution_mode=request.execution_mode,
+        limit_spread=request.limit_spread,
     )
 
 
