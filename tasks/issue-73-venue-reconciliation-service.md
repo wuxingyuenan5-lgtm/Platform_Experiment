@@ -1,7 +1,7 @@
 # Task: Venue Reconciliation Service
 
 Issue: #73
-Status: active
+Status: review
 Branch: `refactor/issue-73-venue-reconciliation-service`
 Base commit: `7f8224a7b88f58caaeb08e3b4f48d5da5153e267`
 
@@ -27,6 +27,8 @@ Make one framework-independent Service the sole owner of Venue Reconciliation us
 - `docs/engineering/TECHNICAL_DEBT.md`
 - `scripts/check-documentation-consistency.py`
 - `CHANGELOG.md`
+- `AGENTS.md`
+- `README.md`
 - this task packet
 
 Conditional only when existing compatibility assertions require synchronization:
@@ -65,25 +67,26 @@ Final delivery also requires full Platform CI and independent Secret Scan on the
 
 ## Acceptance criteria
 
-- [ ] Service is the sole use-case sequencing owner.
-- [ ] Service has no FastAPI, APIRouter, configured HTTP or direct SQL dependency.
-- [ ] Facade owns exact domain-error-to-HTTP mapping, compatibility delegates and routes.
-- [ ] Existing APIs and EOD callers pass unchanged.
-- [ ] Ruff, Pyright, tests, Repository Safety, Runtime, Frontend and Secret Scan pass.
-- [ ] Diff contains no unrelated cleanup.
+- [x] Service is the sole use-case sequencing owner.
+- [x] Service has no FastAPI, APIRouter, configured HTTP or direct SQL dependency.
+- [x] Facade owns exact domain-error-to-HTTP mapping, compatibility delegates and routes.
+- [x] Existing APIs and EOD callers pass unchanged.
+- [x] Ruff, Pyright, Backend tests, Repository Safety and Runtime tests pass on the implementation head.
+- [ ] Frontend and Secret Scan pass on the final documentation head.
+- [x] Diff contains no unrelated cleanup.
 
 ## Progress
 
-- Done: main baseline, Issue, branch and protected semantics verified.
-- Current: extract Service and compatibility facade.
-- Next: final-head CI, review and squash merge.
+- Done: Service/facade extraction, domain errors, compatibility mappings, architecture enforcement, progressive typing and Backend/EOD regressions are complete.
+- Current: final PR-head Platform CI and Secret Scan.
+- Next: mark PR ready and squash merge when every final-head check is green.
 - Blocked by: none.
 
 ## Completion
 
-- PR:
-- Merge commit:
-- Behavior changed: none intended.
-- Behavior intentionally unchanged: all public, EOD, Runtime, FinancialFact, Difference, persistence and Live Write semantics.
-- Tests/CI:
-- Follow-up debt: dedicated route facade module remains a separate Issue.
+- PR: #74
+- Merge commit: recorded by the final squash merge of PR #74.
+- Behavior changed: Venue Reconciliation use-case ownership moved from the FastAPI facade to `venue_reconciliation_service.py`.
+- Behavior intentionally unchanged: all public, EOD, Runtime, FinancialFact, Difference, persistence, order-state and Live Write semantics.
+- Tests/CI: focused Service/domain-error tests plus full Backend/Runtime/Frontend/Repository Safety and Secret Scan required on final head.
+- Follow-up debt: dedicated route-module extraction is optional and requires separate usage/value evidence; it is not required for the current maintenance boundary.
