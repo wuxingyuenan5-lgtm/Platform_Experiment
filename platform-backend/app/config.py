@@ -26,6 +26,13 @@ class Settings(BaseSettings):
     cross_spread_exit_monitor_enabled: bool = False
     cross_spread_exit_monitor_interval_seconds: float = 1.0
 
+    # Temporary real-money acceptance controls. They remain enforced until a
+    # separate Issue/PR reviews evidence from Issue #39 and explicitly changes them.
+    cross_spread_acceptance_max_quantity_oz: Decimal = Decimal("1")
+    cross_spread_acceptance_max_active_plans: int = 1
+    cross_spread_definitive_failure_rollback_enabled: bool = True
+    cross_spread_position_verification_required: bool = True
+
     # Authentication is permissive only in non-live development. A live process
     # must use api_key mode with SHA-256 token hashes; raw tokens never belong in
     # settings, source control, logs, database rows, or API responses.
