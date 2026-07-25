@@ -56,14 +56,15 @@ def test_any_quality_gap_completes_with_differences(field: str, value: object) -
     ],
 )
 def test_errors_with_any_result_are_partial(field: str, value: object) -> None:
-    result = disposition(
-        errors=["failure"],
-        account_reconciliation_run_id=None,
-        economic_event_import_id=None,
-        nav_snapshot_id=None,
-        order_reconciliation_count=0,
-        **{field: value},
-    )
+    values = {
+        "errors": ["failure"],
+        "account_reconciliation_run_id": None,
+        "economic_event_import_id": None,
+        "nav_snapshot_id": None,
+        "order_reconciliation_count": 0,
+    }
+    values[field] = value
+    result = disposition(**values)
     assert result.status == "partial"
     assert result.scale_gate_status == "blocked"
 
