@@ -114,7 +114,7 @@ Risk: untyped database rows, arbitrary payloads and large orchestration modules 
 Completed prerequisite:
 
 - Pyright is installed and blocking in CI;
-- Platform execution DTOs, FinancialFact DTOs/Normalization/Repository/Projection Service, shared Position Math, Venue Reconciliation DTOs/Difference Policy/Repository/Runtime Client, SQLite Connection/Bootstrap/Seeds, Runtime contracts, schema migrations, schema governance and authoritative order submission are selected;
+- Platform execution DTOs, FinancialFact DTOs/Normalization/Repository/Projection Service, shared Position Math, Venue Reconciliation DTOs/Difference Policy/Repository/Runtime Client/Service, SQLite Connection/Bootstrap/Seeds, Runtime contracts, schema migrations, schema governance and authoritative order submission are selected;
 - Runtime models, contracts and Gateway Protocol are selected.
 
 Deferred because: strict whole-project typing would create noisy changes unrelated to current risk boundaries.
@@ -174,17 +174,22 @@ Safe approach: protect `main`, require Platform CI and Secret Scan, current bran
 
 ## TD-008 — Venue Reconciliation orchestration concentration
 
-Status: active; Schemas, Difference Policy, Repository and Runtime Client completed through Issue #71
+Status: completed through Issues #65, #67, #69, #71 and #73
 Owner: Platform Backend / Venue Reconciliation
 
-Problem: `app/venue_reconciliation.py` still combines FinancialFact import, reconciliation-use-case sequencing, FastAPI error mapping and route declarations.
+Original problem: `app/venue_reconciliation.py` combined public DTOs, Difference decisions, DDL/SQL, configured Runtime HTTP, FinancialFact import, use-case sequencing, FastAPI error mapping and routes.
 
-Risk: service behavior and API concerns remain coupled inside one large module, increasing change surface and limiting strict typing.
+Resolved ownership:
 
-Deferred because: the Runtime Client extraction intentionally moved only the external transport boundary and preserved all use-case and route behavior.
+- `app/venue_reconciliation_schemas.py`: public DTOs and public status types;
+- `app/venue_reconciliation_policy.py`: pure Difference decisions;
+- `app/venue_reconciliation_repository.py`: DDL, SQL, row mapping and protected persistence transactions;
+- `app/venue_reconciliation_runtime_client.py`: configured Runtime GET transport;
+- `app/venue_reconciliation_service.py`: framework-independent use-case sequencing and explicit domain failures;
+- `app/venue_reconciliation.py`: compatibility delegates, exact HTTP translation and route facade.
 
-Trigger: open a dedicated Issue for one behavior-preserving Reconciliation Service extraction after reassessing the current orchestration and its direct EOD callers.
+Evidence includes exact Schema/OpenAPI compatibility, Difference Goldens, DDL checksum/idempotency/rollback tests, Runtime URL/parameter/timeout/error tests, domain-error HTTP mapping, EOD/API regressions, ownership checks and progressive Pyright.
 
-Protected semantics: Runtime endpoints and payloads, FinancialFact identity, Difference identity/precedence, order recovery, database transactions, API schemas/status codes and both Live Write defaults.
+Protected semantics: Runtime endpoints and payloads, FinancialFact identity, Difference identity/precedence, order recovery, database transactions, API schemas/status codes, EOD callers and both Live Write defaults.
 
-Safe approach: extract one Reconciliation Service next, then reduce `app.venue_reconciliation.py` to compatibility exports, FastAPI error translation and route facade in a separate Issue.
+Future rule: changes must remain inside the established Owner. Compatibility delegates may be removed only with explicit usage evidence and a dedicated migration.
