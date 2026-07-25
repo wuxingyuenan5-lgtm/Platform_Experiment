@@ -29,6 +29,7 @@ jobs:
       - name: Commit generated updates
         shell: bash
         run: |
+          # This workflow exists only to apply the bounded Issue #83 patch once.
           if git diff --quiet; then
             echo "No generated updates required."
             exit 0
