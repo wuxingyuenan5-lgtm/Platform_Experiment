@@ -97,8 +97,14 @@ class CrossSpreadExitPlanResponse(BaseModel):
     entry_spread: Decimal = Field(alias="entrySpread")
     take_profit_spread: Decimal = Field(alias="takeProfitSpread")
     stop_loss_spread: Decimal = Field(alias="stopLossSpread")
-    take_profit_execution_mode: ExecutionMode = Field(alias="takeProfitExecutionMode")
-    stop_loss_execution_mode: ExecutionMode = Field(alias="stopLossExecutionMode")
+    take_profit_execution_mode: ExecutionMode = Field(
+        default="market",
+        alias="takeProfitExecutionMode",
+    )
+    stop_loss_execution_mode: ExecutionMode = Field(
+        default="market",
+        alias="stopLossExecutionMode",
+    )
     status: ExitPlanStatus
     trigger_reason: str | None = Field(default=None, alias="triggerReason")
     trigger_spread: Decimal | None = Field(default=None, alias="triggerSpread")
