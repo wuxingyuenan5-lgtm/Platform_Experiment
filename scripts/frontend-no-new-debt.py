@@ -20,6 +20,7 @@ FRONTEND_ROOT = ROOT / "admin-risk"
 SOURCE_PREFIXES = ("admin-risk/src/", "admin-risk/mock/")
 SOURCE_SUFFIXES = (".js", ".jsx", ".ts", ".tsx", ".vue")
 ZERO_SHA = "0" * 40
+DIAGNOSTIC_PATH = Path("/tmp/frontend-eslint.log")
 
 
 class FrontendDebtError(RuntimeError):
@@ -92,7 +93,21 @@ def run_eslint(files: list[str]) -> int:
     print("Frontend no-new-debt files:")
     for path in files:
         print(f"- {path}")
-    return subprocess.run(command, cwd=FRONTEND_ROOT, check=False).returncode
+    result = subprocess.run(
+        command,
+        cwd=FRONTEND_ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    output = f"{result.stdout}{result.stderr}"
+    if output:
+        print(output, end="" if output.endswith("\n") else "\n")
+        with DIAGNOSTIC_PATH.open("a", encoding="utf-8") as diagnostic:
+            diagnostic.write(output)
+            if not output.endswith("\n"):
+                diagnostic.write("\n")
+    return result.returncode
 
 
 def parse_args() -> argparse.Namespace:
