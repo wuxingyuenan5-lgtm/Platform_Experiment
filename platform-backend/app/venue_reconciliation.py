@@ -8,8 +8,8 @@ from uuid import uuid4
 import httpx
 from fastapi import APIRouter, HTTPException
 
+from app import venue_reconciliation_repository as repository
 from app.config import get_settings
-from app.database import connection
 from app.financial_facts import CreateFinancialFactRequest, record_financial_fact
 from app.trading import (
     apply_execution_events,
@@ -47,62 +47,16 @@ __all__ = [
     "VenueReconciliationRunResponse",
 ]
 
-SCHEMA_SQL = """
-CREATE TABLE IF NOT EXISTS venue_reconciliation_runs (
-    id TEXT PRIMARY KEY,
-    idempotency_key TEXT NOT NULL UNIQUE,
-    payload_hash TEXT NOT NULL,
-    strategy_instance_id TEXT NOT NULL,
-    account_id TEXT NOT NULL,
-    run_type TEXT NOT NULL,
-    source TEXT NOT NULL,
-    status TEXT NOT NULL,
-    order_count INTEGER NOT NULL,
-    fill_count INTEGER NOT NULL,
-    position_count INTEGER NOT NULL,
-    balance_count INTEGER NOT NULL,
-    fact_count INTEGER NOT NULL,
-    difference_count INTEGER NOT NULL,
-    started_at TEXT NOT NULL,
-    completed_at TEXT,
-    FOREIGN KEY(strategy_instance_id) REFERENCES strategy_instances(id),
-    FOREIGN KEY(account_id) REFERENCES accounts(id)
-);
-
-CREATE TABLE IF NOT EXISTS reconciliation_differences (
-    id TEXT PRIMARY KEY,
-    run_id TEXT NOT NULL,
-    difference_key TEXT NOT NULL,
-    difference_type TEXT NOT NULL,
-    entity_type TEXT NOT NULL,
-    local_reference TEXT,
-    external_reference TEXT,
-    local_value_json TEXT NOT NULL,
-    external_value_json TEXT NOT NULL,
-    status TEXT NOT NULL,
-    resolution_actor TEXT,
-    resolution_reason TEXT,
-    resolved_at TEXT,
-    created_at TEXT NOT NULL,
-    UNIQUE(run_id, difference_key),
-    FOREIGN KEY(run_id) REFERENCES venue_reconciliation_runs(id)
-);
-
-CREATE INDEX IF NOT EXISTS idx_reconciliation_runs_account
-ON venue_reconciliation_runs(account_id, started_at);
-
-CREATE INDEX IF NOT EXISTS idx_reconciliation_differences_run
-ON reconciliation_differences(run_id, status, difference_type);
-"""
+SCHEMA_SQL = repository.SCHEMA_SQL
+ensure_schema = repository.ensure_schema
+audit = repository.audit
+create_difference = repository.store_difference
+run_from_row = repository.run_from_row
+difference_from_row = repository.difference_from_row
 
 
 def now_iso() -> str:
     return datetime.now(UTC).isoformat()
-
-
-def ensure_schema() -> None:
-    with connection() as db:
-        db.executescript(SCHEMA_SQL)
 
 
 def canonical_hash(payload: dict[str, object]) -> str:
@@ -124,37 +78,16 @@ def runtime_get(path: str, params: dict[str, str] | None = None):
         raise HTTPException(status_code=503, detail="Execution Runtime query failed") from exc
 
 
-def audit(event_type: str, subject_type: str, subject_id: str, details: dict[str, object]) -> None:
-    with connection() as db:
-        db.execute(
-            """
-            INSERT INTO audit_events (
-                id, event_type, subject_type, subject_id, details_json, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?)
-            """,
-            (
-                str(uuid4()),
-                event_type,
-                subject_type,
-                subject_id,
-                json.dumps(details, ensure_ascii=False, sort_keys=True, default=str),
-                now_iso(),
-            ),
-        )
-
-
 def strategy_for_order(order_row) -> str:
-    with connection() as db:
-        row = db.execute(
-            "SELECT strategy_instance_id FROM trade_commands WHERE id = ?",
-            (order_row["command_id"],),
-        ).fetchone()
-    if row is None:
+    strategy_instance_id = repository.load_strategy_instance_id_for_command(
+        order_row["command_id"]
+    )
+    if strategy_instance_id is None:
         raise HTTPException(
             status_code=422,
             detail="Order has no authoritative StrategyInstance and cannot enter formal reconciliation",
         )
-    return row["strategy_instance_id"]
+    return strategy_instance_id
 
 
 def reconcile_order_with_venue(order_id: str) -> OrderVenueReconciliationResponse:
@@ -294,20 +227,12 @@ def update_order_from_external(row, external_order: dict[str, object]) -> None:
     local_status = external_order_update_status(external_order["status"])
     if local_status is None:
         return
-    with connection() as db:
-        db.execute(
-            """
-            UPDATE orders
-            SET status = ?, external_order_id = ?, updated_at = ?
-            WHERE id = ? AND status != 'filled'
-            """,
-            (
-                local_status,
-                external_order["externalOrderId"],
-                external_order["asOf"],
-                row["id"],
-            ),
-        )
+    repository.update_order_from_external(
+        row["id"],
+        local_status,
+        external_order["externalOrderId"],
+        external_order["asOf"],
+    )
 
 
 def compare_order(
@@ -316,15 +241,10 @@ def compare_order(
     external_order: dict[str, object],
     fills: list[dict[str, object]],
 ) -> list[str]:
-    with connection() as db:
-        local_fill_rows = db.execute(
-            "SELECT quantity FROM fills WHERE order_id = ?",
-            (order_id,),
-        ).fetchall()
     drafts = order_difference_drafts(
         order_id=order_id,
         local_status=local_row["status"],
-        local_fill_quantities=[row["quantity"] for row in local_fill_rows],
+        local_fill_quantities=repository.list_fill_quantities(order_id),
         external_order=external_order,
         fills=fills,
     )
@@ -347,36 +267,13 @@ def persist_standalone_order_difference(order_id: str, draft: DifferenceDraft) -
     ensure_schema()
     run_id = f"order-reconcile:{order_id}"
     at = now_iso()
-    with connection() as db:
-        db.execute(
-            """
-            INSERT OR IGNORE INTO venue_reconciliation_runs (
-                id, idempotency_key, payload_hash, strategy_instance_id, account_id,
-                run_type, source, status, order_count, fill_count, position_count,
-                balance_count, fact_count, difference_count, started_at, completed_at
-            )
-            SELECT ?, ?, ?, tc.strategy_instance_id, o.account_id, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
-            FROM orders o JOIN trade_commands tc ON tc.id = o.command_id
-            WHERE o.id = ?
-            """,
-            (
-                run_id,
-                run_id,
-                canonical_hash({"orderId": order_id}),
-                "order",
-                "runtime",
-                "completed_with_differences",
-                1,
-                0,
-                0,
-                0,
-                0,
-                1,
-                at,
-                at,
-                order_id,
-            ),
-        )
+    repository.ensure_standalone_order_run(
+        order_id=order_id,
+        run_id=run_id,
+        payload_hash=canonical_hash({"orderId": order_id}),
+        started_at=at,
+        completed_at=at,
+    )
     return persist_difference_draft(run_id, draft)
 
 
@@ -387,18 +284,14 @@ def run_account_reconciliation(
     validate_strategy_account(request.strategy_instance_id, request.account_id)
     payload = request.model_dump(by_alias=True, mode="json")
     payload_hash = canonical_hash(payload)
-    with connection() as db:
-        existing = db.execute(
-            "SELECT * FROM venue_reconciliation_runs WHERE idempotency_key = ?",
-            (request.idempotency_key,),
-        ).fetchone()
-        if existing is not None:
-            if existing["payload_hash"] != payload_hash:
-                raise HTTPException(
-                    status_code=409,
-                    detail="Reconciliation idempotency key was reused with a different payload",
-                )
-            return run_from_row(existing)
+    existing = repository.load_run_by_idempotency_key(request.idempotency_key)
+    if existing is not None:
+        if existing["payload_hash"] != payload_hash:
+            raise HTTPException(
+                status_code=409,
+                detail="Reconciliation idempotency key was reused with a different payload",
+            )
+        return run_from_row(existing)
 
     positions_response = runtime_get(
         "/venue/positions",
@@ -416,34 +309,17 @@ def run_account_reconciliation(
 
     run_id = str(uuid4())
     started_at = now_iso()
-    with connection() as db:
-        db.execute(
-            """
-            INSERT INTO venue_reconciliation_runs (
-                id, idempotency_key, payload_hash, strategy_instance_id, account_id,
-                run_type, source, status, order_count, fill_count, position_count,
-                balance_count, fact_count, difference_count, started_at, completed_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                run_id,
-                request.idempotency_key,
-                payload_hash,
-                request.strategy_instance_id,
-                request.account_id,
-                "account_snapshot",
-                source,
-                "processing",
-                0,
-                0,
-                len(positions),
-                len(balances),
-                0,
-                0,
-                started_at,
-                None,
-            ),
-        )
+    repository.create_account_snapshot_run(
+        run_id=run_id,
+        idempotency_key=request.idempotency_key,
+        payload_hash=payload_hash,
+        strategy_instance_id=request.strategy_instance_id,
+        account_id=request.account_id,
+        source=source,
+        position_count=len(positions),
+        balance_count=len(balances),
+        started_at=started_at,
+    )
 
     fact_count = 0
     difference_ids: list[str] = []
@@ -488,19 +364,13 @@ def run_account_reconciliation(
 
     completed_at = now_iso()
     status = "completed" if not difference_ids else "completed_with_differences"
-    with connection() as db:
-        db.execute(
-            """
-            UPDATE venue_reconciliation_runs
-            SET status = ?, fact_count = ?, difference_count = ?, completed_at = ?
-            WHERE id = ?
-            """,
-            (status, fact_count, len(difference_ids), completed_at, run_id),
-        )
-        row = db.execute(
-            "SELECT * FROM venue_reconciliation_runs WHERE id = ?",
-            (run_id,),
-        ).fetchone()
+    row = repository.complete_account_snapshot_run(
+        run_id=run_id,
+        status=status,
+        fact_count=fact_count,
+        difference_count=len(difference_ids),
+        completed_at=completed_at,
+    )
     audit(
         "venue_reconciliation_completed",
         "venue_reconciliation_run",
@@ -518,19 +388,7 @@ def run_account_reconciliation(
 
 
 def validate_strategy_account(strategy_instance_id: str, account_id: str) -> None:
-    with connection() as db:
-        row = db.execute(
-            """
-            SELECT sab.id
-            FROM strategy_account_bindings sab
-            JOIN strategy_instances si ON si.id = sab.strategy_instance_id
-            JOIN accounts a ON a.id = sab.account_id
-            WHERE sab.strategy_instance_id = ? AND sab.account_id = ?
-              AND sab.status = 'active' AND si.status = 'active' AND a.status = 'active'
-            """,
-            (strategy_instance_id, account_id),
-        ).fetchone()
-    if row is None:
+    if not repository.has_active_strategy_account(strategy_instance_id, account_id):
         raise HTTPException(status_code=403, detail="Account is not actively bound to strategy")
 
 
@@ -540,29 +398,11 @@ def compare_position(
     external: dict[str, object],
     fact_id: str,
 ) -> list[str]:
-    with connection() as db:
-        local_row = db.execute(
-            """
-            SELECT net_quantity, average_price
-            FROM formal_positions
-            WHERE strategy_instance_id = ? AND account_id = ? AND instrument_id = ?
-            """,
-            (
-                request.strategy_instance_id,
-                request.account_id,
-                external["instrumentId"],
-            ),
-        ).fetchone()
-        if local_row is None:
-            local_row = db.execute(
-                """
-                SELECT net_quantity, average_price
-                FROM positions
-                WHERE account_id = ? AND instrument_id = ?
-                """,
-                (request.account_id, external["instrumentId"]),
-            ).fetchone()
-    local = dict(local_row) if local_row is not None else None
+    local = repository.load_comparison_position(
+        request.strategy_instance_id,
+        request.account_id,
+        external["instrumentId"],
+    )
     drafts = position_difference_drafts(
         account_id=request.account_id,
         local=local,
@@ -577,18 +417,7 @@ def compare_balance(
     request: VenueReconciliationRunRequest,
     external: dict[str, object],
 ) -> list[str]:
-    with connection() as db:
-        local_row = db.execute(
-            """
-            SELECT equity, available_balance, currency
-            FROM balance_snapshots
-            WHERE account_id = ?
-            ORDER BY as_of DESC, created_at DESC
-            LIMIT 1
-            """,
-            (request.account_id,),
-        ).fetchone()
-    local = dict(local_row) if local_row is not None else None
+    local = repository.load_latest_balance(request.account_id)
     drafts = balance_difference_drafts(
         account_id=request.account_id,
         local=local,
@@ -610,61 +439,9 @@ def persist_difference_draft(run_id: str, draft: DifferenceDraft) -> str:
     )
 
 
-def create_difference(
-    run_id: str,
-    difference_key: str,
-    difference_type: DifferenceType,
-    entity_type: str,
-    local_reference: str | None,
-    external_reference: str | None,
-    local_value: dict[str, object],
-    external_value: dict[str, object],
-) -> str:
-    difference_id = str(uuid4())
-    with connection() as db:
-        db.execute(
-            """
-            INSERT OR IGNORE INTO reconciliation_differences (
-                id, run_id, difference_key, difference_type, entity_type,
-                local_reference, external_reference, local_value_json,
-                external_value_json, status, resolution_actor, resolution_reason,
-                resolved_at, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                difference_id,
-                run_id,
-                difference_key,
-                difference_type,
-                entity_type,
-                local_reference,
-                external_reference,
-                json.dumps(local_value, sort_keys=True, default=str),
-                json.dumps(external_value, sort_keys=True, default=str),
-                "open",
-                None,
-                None,
-                None,
-                now_iso(),
-            ),
-        )
-        row = db.execute(
-            """
-            SELECT id FROM reconciliation_differences
-            WHERE run_id = ? AND difference_key = ?
-            """,
-            (run_id, difference_key),
-        ).fetchone()
-    return row["id"]
-
-
 def get_run(run_id: str) -> VenueReconciliationRunResponse:
     ensure_schema()
-    with connection() as db:
-        row = db.execute(
-            "SELECT * FROM venue_reconciliation_runs WHERE id = ?",
-            (run_id,),
-        ).fetchone()
+    row = repository.load_run(run_id)
     if row is None:
         raise HTTPException(status_code=404, detail="Reconciliation run not found")
     return run_from_row(row)
@@ -673,15 +450,10 @@ def get_run(run_id: str) -> VenueReconciliationRunResponse:
 def list_differences(run_id: str) -> list[ReconciliationDifferenceResponse]:
     ensure_schema()
     get_run(run_id)
-    with connection() as db:
-        rows = db.execute(
-            """
-            SELECT * FROM reconciliation_differences
-            WHERE run_id = ? ORDER BY created_at, difference_key
-            """,
-            (run_id,),
-        ).fetchall()
-    return [difference_from_row(row) for row in rows]
+    return [
+        difference_from_row(row)
+        for row in repository.list_difference_rows(run_id)
+    ]
 
 
 def resolve_difference(
@@ -689,28 +461,17 @@ def resolve_difference(
     request: ResolveDifferenceRequest,
 ) -> ReconciliationDifferenceResponse:
     ensure_schema()
-    at = now_iso()
-    with connection() as db:
-        row = db.execute(
-            "SELECT * FROM reconciliation_differences WHERE id = ?",
-            (difference_id,),
-        ).fetchone()
-        if row is None:
-            raise HTTPException(status_code=404, detail="Reconciliation difference not found")
-        if row["status"] != "open":
-            return difference_from_row(row)
-        db.execute(
-            """
-            UPDATE reconciliation_differences
-            SET status = ?, resolution_actor = ?, resolution_reason = ?, resolved_at = ?
-            WHERE id = ?
-            """,
-            (request.status, request.actor, request.reason, at, difference_id),
-        )
-        row = db.execute(
-            "SELECT * FROM reconciliation_differences WHERE id = ?",
-            (difference_id,),
-        ).fetchone()
+    row, changed = repository.resolve_difference_row(
+        difference_id=difference_id,
+        status=request.status,
+        actor=request.actor,
+        reason=request.reason,
+        resolved_at=now_iso(),
+    )
+    if row is None:
+        raise HTTPException(status_code=404, detail="Reconciliation difference not found")
+    if not changed:
+        return difference_from_row(row)
     audit(
         "reconciliation_difference_resolved",
         "reconciliation_difference",
@@ -723,44 +484,6 @@ def resolve_difference(
     )
     return difference_from_row(row)
 
-
-def run_from_row(row) -> VenueReconciliationRunResponse:
-    return VenueReconciliationRunResponse(
-        runId=row["id"],
-        idempotencyKey=row["idempotency_key"],
-        strategyInstanceId=row["strategy_instance_id"],
-        accountId=row["account_id"],
-        runType=row["run_type"],
-        source=row["source"],
-        status=row["status"],
-        orderCount=row["order_count"],
-        fillCount=row["fill_count"],
-        positionCount=row["position_count"],
-        balanceCount=row["balance_count"],
-        factCount=row["fact_count"],
-        differenceCount=row["difference_count"],
-        startedAt=row["started_at"],
-        completedAt=row["completed_at"],
-    )
-
-
-def difference_from_row(row) -> ReconciliationDifferenceResponse:
-    return ReconciliationDifferenceResponse(
-        differenceId=row["id"],
-        runId=row["run_id"],
-        differenceKey=row["difference_key"],
-        differenceType=row["difference_type"],
-        entityType=row["entity_type"],
-        localReference=row["local_reference"],
-        externalReference=row["external_reference"],
-        localValue=json.loads(row["local_value_json"]),
-        externalValue=json.loads(row["external_value_json"]),
-        status=row["status"],
-        resolutionActor=row["resolution_actor"],
-        resolutionReason=row["resolution_reason"],
-        resolvedAt=row["resolved_at"],
-        createdAt=row["created_at"],
-    )
 
 
 router = APIRouter(prefix=get_settings().api_prefix)

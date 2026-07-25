@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Venue Reconciliation Repository ownership — Issue #69 / PR #70
+
+- Added `platform-backend/app/venue_reconciliation_repository.py` as the sole Reconciliation DDL, direct-SQL, row-mapping and persistence-transaction owner.
+- Preserved compatibility identities for Schema, audit, Difference persistence and row mappers.
+- Added exact pre-extraction DDL SHA-256, Difference idempotency and forced rollback evidence for Difference insertion and Run completion.
+- Removed direct database access from the orchestration module while retaining HTTP errors, Runtime, FinancialFact and Policy sequencing.
+- Preserved every DDL byte, query predicate/order, ID, API, transaction and both Live Write defaults.
+
 ### Venue Reconciliation Difference Policy ownership — Issue #67 / PR #68
 
 - Added `platform-backend/app/venue_reconciliation_policy.py` as the pure status-mapping and Order/Position/Balance difference-draft owner.
