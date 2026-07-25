@@ -27,7 +27,7 @@ class CrossSpreadMarketOpenRequest(BaseModel):
     execution_mode: ExecutionMode = Field(default="market", alias="executionMode")
 
     @model_validator(mode="after")
-    def validate_threshold_order(self) -> "CrossSpreadMarketOpenRequest":
+    def validate_threshold_order(self) -> CrossSpreadMarketOpenRequest:
         if self.direction == "LONG_SPREAD":
             if self.take_profit_spread <= self.stop_loss_spread:
                 raise ValueError(
