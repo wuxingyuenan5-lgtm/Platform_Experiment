@@ -69,10 +69,6 @@ class StrictMt5AcceptanceAdapter(Mt5AcceptanceAdapter):
             maximum=specification.max_market_quantity,
             label="MT5",
         )
-        if requested_ounces != maximum_ounces:
-            raise GatewayRequestRejectedError(
-                "MT5 acceptance write must map exactly to the configured one-ounce quantity"
-            )
         checks = specification.access_checks
         if checks.get("accountLoginMatched") is not True:
             raise GatewayRequestRejectedError(
