@@ -3,7 +3,8 @@ from pathlib import Path
 
 APP_ROOT = Path(__file__).resolve().parents[1] / "app"
 POLICY_PATH = APP_ROOT / "eod_reconciliation_policy.py"
-ORCHESTRATION_PATH = APP_ROOT / "eod_reconciliation.py"
+FACADE_PATH = APP_ROOT / "eod_reconciliation.py"
+SERVICE_PATH = APP_ROOT / "eod_reconciliation_service.py"
 REPOSITORY_PATH = APP_ROOT / "eod_reconciliation_repository.py"
 OPERATIONAL_POLICY_PATH = APP_ROOT / "eod_policy.py"
 DECISION_FUNCTIONS = {
@@ -33,7 +34,7 @@ def imported_modules(path: Path) -> set[str]:
 
 def test_policy_is_the_only_decision_function_owner() -> None:
     assert DECISION_FUNCTIONS <= function_names(POLICY_PATH)
-    for path in (ORCHESTRATION_PATH, REPOSITORY_PATH, OPERATIONAL_POLICY_PATH):
+    for path in (FACADE_PATH, SERVICE_PATH, REPOSITORY_PATH, OPERATIONAL_POLICY_PATH):
         assert not (DECISION_FUNCTIONS & function_names(path))
 
 
@@ -57,13 +58,15 @@ def test_policy_has_no_framework_persistence_or_network_dependency() -> None:
 
 
 def test_existing_layers_delegate_to_policy_without_duplicate_decisions() -> None:
-    orchestration = ORCHESTRATION_PATH.read_text(encoding="utf-8")
+    facade = FACADE_PATH.read_text(encoding="utf-8")
+    service = SERVICE_PATH.read_text(encoding="utf-8")
     repository = REPOSITORY_PATH.read_text(encoding="utf-8")
     operational_policy = OPERATIONAL_POLICY_PATH.read_text(encoding="utf-8")
 
-    assert "report_disposition(" in orchestration
+    assert "policy.report_disposition(" in service
     assert "review_disposition(" in repository
     assert "historical_difference_disposition(" in operational_policy
-    assert 'if errors and not any(' not in orchestration
+    assert "report_disposition(" not in facade
+    assert 'if errors and not any(' not in service
     assert 'decision == "approved_same_limits"' not in repository
     assert 'if open_count or accepted_count:' not in operational_policy
