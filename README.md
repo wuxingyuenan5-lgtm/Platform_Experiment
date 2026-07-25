@@ -26,6 +26,7 @@
 - 新任务只加载目标模块上下文，不默认扫描整个仓库。
 - Platform Backend 不直接导入交易场所 SDK；外部副作用属于 Execution Runtime。
 - Platform 与 Runtime 通信使用显式版本契约。
+- 关键边界采用单一 Owner；领域编排不重复持有计算、持久化或配置化外部 HTTP 实现。
 - `positions`、`pnl_results` 是运营投影，不是正式账务权威。
 - 正式账务由不可变 `financial_facts` 重建。
 - 数据库变化必须进入有版本和校验和的迁移账本。

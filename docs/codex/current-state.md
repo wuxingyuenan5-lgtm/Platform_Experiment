@@ -1,8 +1,8 @@
 # Current Project State
 
-Last updated: 2026-07-24
+Last updated: 2026-07-25
 Stable branch: `main`
-Latest completed engineering scope: Issue #67 / PR #68
+Latest completed engineering scope: Issue #71 / PR #72
 
 This file is the compact cross-session handoff. It records current truth, not a PR diary. Read the actual open Issues and PRs before assuming that work is active.
 
@@ -32,6 +32,8 @@ Real-account acceptance remains controlled-host, small-capital and minimum-size.
 - `platform-backend/app/trade_command_execution.py` is the single local Order creation, Safety and Runtime submission owner; `trading.submit_order` remains a deprecated legacy compatibility delegate.
 - Venue Reconciliation public DTOs and difference status types are owned only by `venue_reconciliation_schemas.py`; the legacy module re-exports identical objects.
 - Venue Reconciliation external-status mapping and Order/Position/Balance difference decisions are owned only by the pure `venue_reconciliation_policy.py` module.
+- Venue Reconciliation DDL, direct SQL, row mapping and protected persistence transactions are owned only by `venue_reconciliation_repository.py`.
+- Venue Reconciliation configured Runtime GET transport is owned only by `venue_reconciliation_runtime_client.py`; FastAPI error mapping remains in orchestration.
 - Operational `positions` and `pnl_results` remain separate from FinancialFact-based formal accounting.
 - Formal accounting is reconstructed from immutable facts and does not read operational projections as inputs.
 - Operational and formal projections share the exact `position_math.calculate_position_update` callable for per-fill quantity, average price and realized PnL.
@@ -71,10 +73,12 @@ Real-account acceptance remains controlled-host, small-capital and minimum-size.
 24. Unified Platform order submission with exact legacy/V1 payload, Safety and unknown-result regression evidence.
 25. Venue Reconciliation public-schema ownership with exact pre-extraction JSON Schema/OpenAPI and compatibility-identity evidence.
 26. Venue Reconciliation Difference Policy ownership with exact status, key, value and precedence Goldens.
+27. Venue Reconciliation Repository ownership with exact DDL, SQL, idempotency and rollback evidence.
+28. Venue Reconciliation Runtime Client ownership with configured URL/parameter/timeout and transport-error equivalence evidence.
 
 ## Active work
 
-Issue #69 / Draft PR #70 is the only active engineering workstream: Venue Reconciliation Repository extraction.
+No engineering code workstream is active by default after PR #72 merges.
 
 Before starting another code change:
 

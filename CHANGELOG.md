@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Venue Reconciliation Runtime Client ownership — Issue #71 / PR #72
+
+- Added `platform-backend/app/venue_reconciliation_runtime_client.py` as the sole owner of configured Runtime GET transport, URL/parameter/timeout application and transport failures.
+- Preserved `app.venue_reconciliation.runtime_get` as the compatibility delegate with the exact existing Platform HTTP 503 mapping.
+- Removed direct `httpx.get` ownership from reconciliation orchestration while retaining response-status handling, FinancialFact import, Repository/Policy coordination and routes.
+- Added focused URL/parameter/timeout/error tests, sole-owner architecture checks and progressive Pyright coverage.
+- Preserved every Runtime endpoint and payload, reconciliation identity, API, transaction, order-state transition and both Live Write defaults.
+
 ### Venue Reconciliation Repository ownership — Issue #69 / PR #70
 
 - Added `platform-backend/app/venue_reconciliation_repository.py` as the sole Reconciliation DDL, direct-SQL, row-mapping and persistence-transaction owner.

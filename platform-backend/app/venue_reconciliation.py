@@ -5,10 +5,10 @@ import json
 from datetime import UTC, datetime
 from uuid import uuid4
 
-import httpx
 from fastapi import APIRouter, HTTPException
 
 from app import venue_reconciliation_repository as repository
+from app import venue_reconciliation_runtime_client as runtime_client
 from app.config import get_settings
 from app.financial_facts import CreateFinancialFactRequest, record_financial_fact
 from app.trading import (
@@ -66,15 +66,9 @@ def canonical_hash(payload: dict[str, object]) -> str:
 
 
 def runtime_get(path: str, params: dict[str, str] | None = None):
-    settings = get_settings()
     try:
-        response = httpx.get(
-            f"{settings.runtime_base_url}{path}",
-            params=params,
-            timeout=settings.runtime_timeout_seconds,
-        )
-        return response
-    except httpx.HTTPError as exc:
+        return runtime_client.get(path, params=params)
+    except runtime_client.RuntimeQueryError as exc:
         raise HTTPException(status_code=503, detail="Execution Runtime query failed") from exc
 
 
@@ -483,7 +477,6 @@ def resolve_difference(
         },
     )
     return difference_from_row(row)
-
 
 
 router = APIRouter(prefix=get_settings().api_prefix)
