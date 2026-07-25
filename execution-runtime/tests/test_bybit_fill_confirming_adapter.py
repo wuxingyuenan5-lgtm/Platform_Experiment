@@ -2,7 +2,10 @@ from __future__ import annotations
 
 from decimal import Decimal
 
-from app.bybit_fill_confirming_adapter import BybitFillConfirmingAdapter
+from app.bybit_fill_confirming_adapter import (
+    CROSS_SPREAD_STRATEGY_INSTANCE_ID,
+    BybitFillConfirmingAdapter,
+)
 from app.config import Settings, get_settings
 from app.journal import initialize_journal
 from app.models import SubmitOrderCommand
@@ -38,7 +41,9 @@ def runtime_settings() -> Settings:
         environment="live",
         live_write_enabled=True,
         live_account_allowlist="account-bybit",
-        live_strategy_allowlist="strategy-live",
+        live_strategy_allowlist=(
+            f"strategy-live,{CROSS_SPREAD_STRATEGY_INSTANCE_ID}"
+        ),
         live_symbol_allowlist="XAUTUSDT",
         live_max_order_notional="200000",
         live_max_daily_notional="500000",
@@ -63,19 +68,35 @@ def order_command(suffix: str) -> SubmitOrderCommand:
     )
 
 
+def fok_order_command(suffix: str) -> SubmitOrderCommand:
+    return SubmitOrderCommand(
+        command_id=f"command-bybit-fok-{suffix}",
+        platform_order_id=f"platform-order-bybit-fok-{suffix}",
+        strategy_instance_id=CROSS_SPREAD_STRATEGY_INSTANCE_ID,
+        account_id="account-bybit",
+        instrument_id="instrument-xaut",
+        symbol="XAUTUSDT",
+        side="buy",
+        order_type="limit",
+        quantity="100",
+        price="1001.5",
+    )
+
+
 def order_row(
     status: str,
     *,
     filled_quantity: str,
     average_price: str,
+    order_type: str = "Market",
 ) -> dict[str, object]:
     return {
         "orderId": "BYBIT-ORDER-CONFIRM",
         "symbol": "XAUTUSDT",
         "side": "Buy",
-        "orderType": "Market",
+        "orderType": order_type,
         "qty": "100",
-        "price": "0",
+        "price": "1001.5" if order_type == "Limit" else "0",
         "orderStatus": status,
         "cumExecQty": filled_quantity,
         "avgPrice": average_price,
@@ -135,3 +156,49 @@ def test_unresolved_market_order_times_out_without_a_fill_event(tmp_path) -> Non
 
     assert [event.event_type for event in events] == ["order_acknowledged"]
     assert events[0].reason == "Bybit market-order fill confirmation timed out"
+
+
+def test_cross_spread_limit_uses_fok_and_emits_only_full_fill(tmp_path) -> None:
+    initialize_runtime_store(tmp_path, "bybit-fok-full.db")
+    client = FakeBybitConfirmationClient(
+        [order_row("Filled", filled_quantity="100", average_price="1001.4", order_type="Limit")]
+    )
+    adapter = BybitFillConfirmingAdapter(runtime_settings(), client)
+
+    events = adapter.submit_order(fok_order_command("full"))
+
+    assert client.place_calls[0]["timeInForce"] == "FOK"
+    assert client.place_calls[0]["price"] == "1001.5"
+    assert [event.event_type for event in events] == ["order_acknowledged", "order_filled"]
+    assert events[1].fill_quantity == Decimal("100")
+
+
+def test_cross_spread_fok_no_fill_rejects_without_fill_event(tmp_path) -> None:
+    initialize_runtime_store(tmp_path, "bybit-fok-no-fill.db")
+    client = FakeBybitConfirmationClient(
+        [order_row("Canceled", filled_quantity="0", average_price="", order_type="Limit")]
+    )
+    adapter = BybitFillConfirmingAdapter(runtime_settings(), client)
+
+    events = adapter.submit_order(fok_order_command("no-fill"))
+
+    assert [event.event_type for event in events] == [
+        "order_acknowledged",
+        "order_rejected",
+    ]
+    assert events[1].reason == "Bybit FOK limit order was not filled"
+
+
+def test_cross_spread_fok_partial_fill_never_emits_fill_event(tmp_path) -> None:
+    initialize_runtime_store(tmp_path, "bybit-fok-partial.db")
+    client = FakeBybitConfirmationClient(
+        [order_row("Canceled", filled_quantity="40", average_price="1001.4", order_type="Limit")]
+    )
+    adapter = BybitFillConfirmingAdapter(runtime_settings(), client)
+
+    events = adapter.submit_order(fok_order_command("partial"))
+
+    assert [event.event_type for event in events] == ["order_acknowledged"]
+    assert events[0].reason is not None
+    assert "terminal partial fill" in events[0].reason
+    assert "MT5 hedge was not submitted" in events[0].reason
