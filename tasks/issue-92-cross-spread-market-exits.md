@@ -1,7 +1,7 @@
 # Task: Cross-Spread Market Close and Spread-Triggered Exits
 
 Issue: #92
-Status: active
+Status: review
 Branch: `feature/issue-92-cross-spread-market-exits`
 Base commit: `d5375de356fe411fa4922b68189fc17fbf6f5fcd`
 
@@ -18,31 +18,48 @@ Complete the market-only cross-spread lifecycle: true reduce-only market close o
 - LONG_SPREAD exits observe `shortSpread`; SHORT_SPREAD exits observe `longSpread`.
 - Keep Platform and Runtime Live Write disabled by default.
 
-## Expected changed files
+## Changed files
 
-- `platform-backend/app/execution_schemas.py`
-- `platform-backend/app/runtime_contracts.py`
-- `platform-backend/app/trade_commands.py`
-- `platform-backend/app/trade_command_execution.py`
-- `platform-backend/app/execution_batches.py`
+### Platform Backend
+
+- `platform-backend/app/config.py`
 - `platform-backend/app/cross_spread.py`
-- `platform-backend/app/cross_spread_exit_schemas.py`
 - `platform-backend/app/cross_spread_exit_policy.py`
 - `platform-backend/app/cross_spread_exit_repository.py`
+- `platform-backend/app/cross_spread_exit_routes.py`
+- `platform-backend/app/cross_spread_exit_schemas.py`
 - `platform-backend/app/cross_spread_exit_service.py`
+- `platform-backend/app/main.py`
+- `platform-backend/app/order_execution_intents.py`
+- `platform-backend/app/runtime_contracts.py`
 - `platform-backend/app/schema_migrations.py`
-- `platform-backend/app/config.py`
-- `platform-backend/app/application.py`
-- `platform-backend/app/schemas.py`
+- `platform-backend/app/trade_command_execution.py`
+- `platform-backend/app/trade_commands.py`
+- focused Backend tests
+
+### Execution Runtime
+
+- `execution-runtime/app/bybit_fill_confirming_adapter.py`
+- `execution-runtime/app/bybit_mt5_gateway.py`
 - `execution-runtime/app/models.py`
+- `execution-runtime/app/mt5_position_closing_adapter.py`
 - `execution-runtime/app/runtime_contracts.py`
-- `execution-runtime/app/bybit_live_adapter.py`
-- `execution-runtime/app/mt5_live_adapter.py`
+- focused Runtime tests
+
+### Frontend
+
+- `admin-risk/src/api/platform/crossSpreadLifecycle.ts`
+- `admin-risk/src/views/strategy/spread-carry/components/CrossSpreadMarketLifecyclePanel.vue`
+- `admin-risk/src/views/strategy/spread-carry/components/SpreadExecutionWorkspace.vue`
+- `admin-risk/tsconfig.strategy.json`
+
+### Governance and documentation
+
 - `docs/contracts/runtime-v1.json`
 - `docs/architecture/OWNERSHIP.md`
+- `docs/database/README.md`
 - `docs/codex/current-state.md`
-- focused Backend, Runtime and frontend tests
-- existing cross-spread frontend/API files only as needed for minimal market wiring
+- `scripts/check-repository-structure.py`
 - this task packet
 
 ## Implementation decisions
@@ -55,6 +72,7 @@ Complete the market-only cross-spread lifecycle: true reduce-only market close o
 - Threshold evaluation is a pure policy; SQL ownership is isolated in a repository; orchestration and market-close submission are isolated in a service.
 - The automatic monitor is disabled by default and must atomically claim a plan before submitting a close.
 - Unknown results and manual-intervention batches are never retried automatically.
+- Keep the 2600-line legacy visual component unchanged. Mount a bounded real market-lifecycle panel in the same workspace and make the legacy execution card read-only so its retained limit design cannot misroute to the market endpoint.
 
 ## Required verification
 
@@ -84,31 +102,31 @@ Final delivery also requires:
 
 ## Acceptance criteria
 
-- [ ] CLOSE commands persist and transmit reduce-only intent.
-- [ ] Bybit close uses reduce-only and correct position index.
-- [ ] MT5 close uses the intended Position Ticket.
-- [ ] Ambiguous/wrong-side/oversized close requests are rejected.
-- [ ] Hedged OPEN batches create active exit plans from actual fills.
-- [ ] LONG_SPREAD TP/SL evaluates `shortSpread` with correct inequalities.
-- [ ] SHORT_SPREAD TP/SL evaluates `longSpread` with correct inequalities.
-- [ ] Threshold claim and close submission are idempotent.
-- [ ] Result unknown never auto-retries.
-- [ ] Market UI uses real plans and market close actions.
-- [ ] Limit UI remains visible but cannot misroute into market execution.
-- [ ] Existing spread formulas and safe defaults remain unchanged.
+- [x] CLOSE commands persist and transmit reduce-only intent.
+- [x] Bybit close uses reduce-only and correct position index.
+- [x] MT5 close uses the intended Position Ticket.
+- [x] Ambiguous/wrong-side/oversized close requests are rejected.
+- [x] Hedged OPEN batches create active exit plans from actual fills.
+- [x] LONG_SPREAD TP/SL evaluates `shortSpread` with correct inequalities.
+- [x] SHORT_SPREAD TP/SL evaluates `longSpread` with correct inequalities.
+- [x] Threshold claim and close submission are idempotent.
+- [x] Result unknown never auto-retries.
+- [x] Market UI uses real plans and market close actions.
+- [x] Limit UI remains visible but cannot misroute into market execution.
+- [x] Existing spread formulas and safe defaults remain unchanged.
 
 ## Progress
 
-- Done: Issue #92, issue-numbered branch and bounded task packet.
-- Current: command-contract and venue-close implementation.
-- Next: exit-plan persistence, trigger service, frontend wiring and CI.
+- Done: Issue, branch, task packet, venue-safe close semantics, exit-plan persistence, TP/SL policy and monitor, lifecycle APIs, real market UI panel, focused tests and PR #93.
+- Current: final frontend/documentation CI and correction of any reported defects.
+- Next: merge only after the final head passes Platform CI and Secret Scan.
 - Blocked by: none.
 
 ## Completion
 
-- PR:
+- PR: #93
 - Merge commit:
-- Application behavior changed:
-- Business behavior changed:
-- Tests/CI:
+- Application behavior changed: market opens create persistent exit plans; market closes are reduce-only and ticket-bound; TP/SL can trigger one idempotent market close when the controlled monitor is enabled.
+- Business behavior changed: LONG and SHORT exits monitor the executable opposite-side spread rather than the opening-side spread.
+- Tests/CI: final head pending.
 - Follow-up: real limit entry/exit and private Bybit WebSocket remain separate scopes.
