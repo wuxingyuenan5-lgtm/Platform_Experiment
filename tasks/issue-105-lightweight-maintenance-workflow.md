@@ -1,8 +1,9 @@
 # Task: Lightweight maintenance workflow
 
 Issue: #105
-Status: active
+Status: done
 Branch: `hardening/issue-105-lightweight-maintenance-workflow`
+PR: #106
 Base commit: `b0bff37fbd56b05fc0057cd4eee348ae62714d1c`
 
 ## Objective
@@ -50,12 +51,12 @@ Only the files listed in Allowed scope.
 
 ## Acceptance criteria
 
-- [ ] Maintenance PRs can omit Issue/task packet only with explicit declarations.
-- [ ] Markdown and synchronized version declarations are allowed.
-- [ ] Source/config/contract/safety changes are rejected.
-- [ ] Full engineering workflow remains unchanged.
-- [ ] Documentation forbids post-merge metadata-only PRs.
-- [ ] Required CI and Secret Scan pass.
+- [x] Maintenance PRs can omit Issue/task packet only with explicit declarations.
+- [x] Markdown and synchronized version declarations are allowed.
+- [x] Source/config/contract/safety changes are rejected.
+- [x] Full engineering workflow remains unchanged.
+- [x] Documentation forbids post-merge metadata-only PRs.
+- [x] Required CI and Secret Scan pass.
 
 ## Risk and rollback
 
@@ -67,16 +68,16 @@ Risk: medium
 
 ## Progress
 
-- Done: issue repurposed, two-track design fixed, checker/tests/docs implementation drafted.
-- Current: open PR and run full repository gates.
-- Next: correct any CI findings and merge after all checks pass.
+- Done: two-track design, machine validator, focused tests, PR template and canonical documentation completed.
+- Current: final metadata-head verification and squash merge.
+- Next: use lightweight mode for the next bounded version/Markdown maintenance PR.
 - Blocked by: none.
 
 ## Completion
 
-- PR:
-- Merge commit:
+- PR: #106
+- Merge commit: authoritative in PR #106 and `main` history; no metadata-only follow-up PR required.
 - Behavior changed: repository governance only.
 - Behavior intentionally unchanged: all product/runtime/trading/safety behavior.
-- Tests/CI:
+- Tests/CI: Platform CI #1477 and Secret Scan #814 passed on the implementation head; final metadata head must remain green.
 - Follow-up debt: none expected.
