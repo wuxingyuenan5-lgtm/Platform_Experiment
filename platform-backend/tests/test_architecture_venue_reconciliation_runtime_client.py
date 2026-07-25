@@ -1,0 +1,48 @@
+import ast
+from pathlib import Path
+
+APP_ROOT = Path(__file__).resolve().parents[1] / "app"
+CLIENT_PATH = APP_ROOT / "venue_reconciliation_runtime_client.py"
+ORCHESTRATION_PATH = APP_ROOT / "venue_reconciliation.py"
+
+
+def imported_modules(path: Path) -> set[str]:
+    modules: set[str] = set()
+    for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
+        if isinstance(node, ast.Import):
+            modules.update(alias.name for alias in node.names)
+        elif isinstance(node, ast.ImportFrom) and node.module:
+            modules.add(node.module)
+    return modules
+
+
+def test_runtime_client_is_the_only_reconciliation_http_transport_owner() -> None:
+    client_source = CLIENT_PATH.read_text(encoding="utf-8")
+    orchestration_source = ORCHESTRATION_PATH.read_text(encoding="utf-8")
+
+    assert "httpx.get(" in client_source
+    assert "settings.runtime_base_url" in client_source
+    assert "settings.runtime_timeout_seconds" in client_source
+    assert "httpx.get(" not in orchestration_source
+    assert "import httpx" not in orchestration_source
+    assert "runtime_client.get(" in orchestration_source
+
+
+def test_runtime_client_has_only_transport_configuration_dependencies() -> None:
+    imports = imported_modules(CLIENT_PATH)
+    source = CLIENT_PATH.read_text(encoding="utf-8")
+
+    assert imports <= {"__future__", "httpx", "app.config"}
+    assert "fastapi" not in imports
+    assert "app.database" not in imports
+    assert "app.financial_facts" not in imports
+    assert "venue_reconciliation_repository" not in source
+    assert "venue_reconciliation_policy" not in source
+
+
+def test_orchestration_retains_http_error_mapping_compatibility_delegate() -> None:
+    source = ORCHESTRATION_PATH.read_text(encoding="utf-8")
+
+    assert "def runtime_get(" in source
+    assert "except runtime_client.RuntimeQueryError as exc:" in source
+    assert 'HTTPException(status_code=503, detail="Execution Runtime query failed")' in source
