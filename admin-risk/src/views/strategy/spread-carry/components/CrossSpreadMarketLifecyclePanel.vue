@@ -55,7 +55,9 @@
           :disabled="loading || Boolean(validationError)"
           @click="submitOpen"
         >
-          {{ loading ? '执行中...' : direction === 'LONG_SPREAD' ? '市价开多价差' : '市价开空价差' }}
+          {{
+            loading ? '执行中...' : direction === 'LONG_SPREAD' ? '市价开多价差' : '市价开空价差'
+          }}
         </button>
         <p v-if="validationError" class="market-lifecycle__error">{{ validationError }}</p>
       </section>
@@ -250,10 +252,7 @@
     }
   }
 
-  function setMessage(
-    nextMessage: string,
-    nextTone: 'is-success' | 'is-error' | 'is-warn',
-  ) {
+  function setMessage(nextMessage: string, nextTone: 'is-success' | 'is-error' | 'is-warn') {
     message.value = nextMessage;
     messageTone.value = nextTone;
   }
