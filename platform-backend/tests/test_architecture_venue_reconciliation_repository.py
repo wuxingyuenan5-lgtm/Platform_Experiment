@@ -32,13 +32,15 @@ def test_repository_is_the_only_ddl_and_direct_sql_owner() -> None:
     assert "UPDATE " not in orchestration_source
 
 
-def test_orchestration_keeps_http_and_external_effect_mapping() -> None:
+def test_orchestration_keeps_external_effect_and_http_error_mapping() -> None:
     source = ORCHESTRATION_PATH.read_text(encoding="utf-8")
 
-    assert "httpx.get(" in source
+    assert "runtime_client.get(" in source
+    assert "httpx.get(" not in source
     assert "record_financial_fact(" in source
     assert "HTTPException(" in source
     assert "from app import venue_reconciliation_repository as repository" in source
+    assert "from app import venue_reconciliation_runtime_client as runtime_client" in source
 
 
 def test_repository_has_no_fastapi_httpx_config_or_financial_fact_dependency() -> None:
