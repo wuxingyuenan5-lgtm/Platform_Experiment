@@ -1,7 +1,7 @@
 # Task: FOK spread-limit execution
 
 Issue: #109
-Status: active
+Status: done
 Branch: `feature/issue-109-fok-spread-limit`
 Base commit: `b79b911e4a4fe736a2f2cf7641b1abe7d812d282`
 
@@ -18,15 +18,18 @@ Implement real synthetic `LIMIT` execution for all four cross-spread actions usi
 - MT5 close remains bound to the intended Position Ticket.
 - Existing position verification, rollback, reconciliation and manual-intervention rules remain authoritative.
 
-## Limit contract
+## Implemented Limit contract
 
 - User input is a spread limit, not a fixed Bybit price.
 - Buy Bybit/sell MT5 uses `Bybit Ask - MT5 Bid` and a maximum allowed spread.
 - Sell Bybit/buy MT5 uses `Bybit Bid - MT5 Ask` and a minimum allowed spread.
-- Derived Bybit price uses current MT5 executable quote, current Bybit Tick Size, a bounded hedge reserve and conservative rounding.
-- Bybit FOK full fill is required before any MT5 command.
-- FOK no-fill ends without an MT5 order.
-- Partial or unknown Bybit outcome enters reconciliation/manual intervention; it is not treated as normal FOK completion.
+- Derived Bybit price uses current executable quotes, Platform Contract Tick, a configured non-negative hedge reserve and conservative rounding.
+- A non-executable current spread is rejected before Batch creation.
+- Cross-spread Limit submits Bybit `timeInForce=FOK`.
+- Only terminal exact full fill emits a normal Fill that permits MT5 submission.
+- Zero fill rejects without MT5; clean manual-close zero fill restores the Exit Plan to `active`.
+- Partial, quantity-mismatch, timeout or unknown outcome does not emit a hedge-driving Fill and requires reconciliation/manual intervention.
+- A successful full fill reuses actual-fill MT5 sizing, reduce-only/ticket-bound close, external-position verification and existing rollback rules.
 
 ## Non-goals
 
@@ -35,18 +38,23 @@ Implement real synthetic `LIMIT` execution for all four cross-spread actions usi
 - No IOC.
 - No automatic TP/SL Market-vs-Limit selection.
 - No safety-default relaxation.
-- No database migration unless evidence proves it unavoidable.
+- No database migration.
 
-## Expected scope
+## Actual scope
 
-- Pure spread-limit pricing policy.
-- Lifecycle request/response schema additions.
-- Synthetic lifecycle Limit orchestration.
-- Runtime command and Bybit FOK support.
-- Existing close intent/reduce-only/ticket rules.
-- Frontend execution-mode and spread-limit controls.
-- Focused Backend/Runtime/frontend tests.
-- API, ownership, current-state and execution-contract documentation.
+- `platform-backend/app/cross_spread_limit_policy.py` (new)
+- `platform-backend/app/cross_spread_limit_execution.py` (new)
+- `platform-backend/app/cross_spread_order_intent.py`
+- `platform-backend/app/cross_spread_synthetic_service.py`
+- `platform-backend/app/cross_spread_exit_repository.py`
+- `platform-backend/app/cross_spread_exit_schemas.py`
+- `platform-backend/app/cross_spread_exit_routes.py`
+- `platform-backend/app/config.py`
+- focused Backend policy/lifecycle tests and existing Market regression updates
+- `execution-runtime/app/bybit_fill_confirming_adapter.py`
+- Runtime FOK terminal-state tests
+- frontend lifecycle API types and Market/FOK execution controls
+- synthetic execution, API, ownership, current-state and operational acceptance documentation
 
 ## Required verification
 
@@ -57,37 +65,39 @@ Implement real synthetic `LIMIT` execution for all four cross-spread actions usi
 - Frontend lint, no-new-debt, type check and build.
 - Repository Safety and Secret Scan.
 
-## Stop conditions
-
-- Stop if FOK cannot be distinguished from partial/unknown Venue outcomes.
-- Stop if implementing Limit requires weakening existing Market or Live safety gates.
-- Stop if a database migration becomes necessary; split it explicitly.
-- Stop if automatic TP/SL selection or PostOnly behavior begins leaking into this batch.
-
 ## Acceptance criteria
 
-- [ ] Four actions share two deterministic executable-direction formulas.
-- [ ] Derived Bybit prices are conservative after reserve and tick rounding.
-- [ ] Full Bybit FOK fill submits exactly one MT5 market hedge.
-- [ ] No-fill submits no MT5 command.
-- [ ] Partial/unknown fails closed into reconciliation/manual intervention.
-- [ ] Open and close external-position verification remain mandatory.
-- [ ] Market behavior is unchanged.
-- [ ] Frontend supports selecting Market/Limit and entering a spread limit.
-- [ ] Required CI and Secret Scan pass.
+- [x] Four actions share two deterministic executable-direction formulas.
+- [x] Derived Bybit prices are conservative after reserve and tick rounding.
+- [x] Full Bybit FOK fill permits exactly one existing MT5 market hedge path.
+- [x] No-fill submits no MT5 command.
+- [x] Partial/unknown fails closed into reconciliation/manual intervention.
+- [x] Open and close external-position verification remain mandatory.
+- [x] Market behavior is unchanged.
+- [x] Frontend supports selecting Market/Limit and entering a spread limit.
+- [x] Required CI and Secret Scan pass.
+
+## Risk and rollback
+
+Risk: high
+
+- Primary failure modes: permissive Tick rounding, partial FOK interpreted as a full Fill, MT5 submission after no-fill/unknown, or Market regression.
+- Detection: pure pricing tests, Runtime terminal-state tests, Platform lifecycle/state tests and full existing suites.
+- Rollback: revert the squash merge; no database migration or mandatory external-state transition is introduced.
 
 ## Progress
 
-- Done: baseline audited; Issue and branch created.
-- Current: inspect current command contracts and Bybit adapter before choosing the minimal safe implementation seam.
-- Next: implement pricing policy, Runtime FOK support, Platform orchestration and tests.
+- Done: pricing, Platform orchestration, Runtime FOK confirmation, plan-state handling, UI, tests and authoritative documentation completed.
+- Current: final task-metadata-head verification before squash merge.
+- Next: a separate batch will persist TP/SL execution methods and route automatic exits through the same Market/FOK Close Action.
 - Blocked by: none.
 
 ## Completion
 
-- PR:
-- Merge commit:
-- Behavior changed:
-- Behavior intentionally unchanged:
-- Tests/CI:
-- Follow-up debt: TP/SL execution selection, PostOnly/WebSocket and execution-quality protections remain separate batches.
+- PR: #110
+- Merge commit: GitHub PR/main history is authoritative; no post-merge metadata PR will be created.
+- Behavior changed: manual Open/Close can use synthetic FOK spread-limit execution with additive pricing evidence.
+- Behavior intentionally unchanged: existing Market execution, automatic TP/SL Market behavior, Live Write defaults, exit-monitor default, 1 oz/single-lifecycle controls and all permanent safety invariants.
+- Tests/CI: Platform CI #1545 and Secret Scan #843 passed on the completed code/documentation head; the final task-metadata head must repeat the same repository gates.
+- Operational evidence not produced: no real Bybit/MT5 order, real Tick check, Broker Hedge Reserve validation or Windows-host execution occurred.
+- Follow-up debt: TP/SL execution selection, PostOnly/private WebSocket, IOC and execution-quality protections remain separate batches.
