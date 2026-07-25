@@ -81,7 +81,10 @@ def submit_cross_spread_market_command(
     ):
         raise HTTPException(
             status_code=422,
-            detail="Cross-spread close requires reduce-only venue intents and an MT5 Position Ticket",
+            detail=(
+                "Cross-spread close requires reduce-only venue intents "
+                "and an MT5 Position Ticket"
+            ),
         )
     if not is_close and (bybit_reduce_only or mt5_reduce_only or mt5_position_id is not None):
         raise HTTPException(
