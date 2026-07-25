@@ -67,6 +67,23 @@ class VenueOrderSnapshot(BaseModel):
     data_quality_state: str = Field(default="complete", alias="dataQualityState")
 
 
+class VenueInstrumentSpecification(BaseModel):
+    source: str
+    account_id: str = Field(alias="accountId")
+    instrument_id: str = Field(alias="instrumentId")
+    symbol: str
+    status: str
+    min_quantity: Decimal = Field(alias="minQuantity")
+    quantity_step: Decimal = Field(alias="quantityStep")
+    max_market_quantity: Decimal | None = Field(default=None, alias="maxMarketQuantity")
+    contract_size: Decimal = Field(alias="contractSize")
+    trade_mode: str
+    filling_mode: str
+    access_checks: dict[str, object] = Field(default_factory=dict, alias="accessChecks")
+    as_of: datetime = Field(alias="asOf")
+    data_quality_state: str = Field(default="complete", alias="dataQualityState")
+
+
 class VenueFillSnapshot(BaseModel):
     source: str
     external_fill_id: str = Field(alias="externalFillId")

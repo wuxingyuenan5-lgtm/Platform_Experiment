@@ -13,6 +13,7 @@ from app.cross_spread_exit_repository import (
     get_exit_plan,
 )
 from app.cross_spread_exit_schemas import CrossSpreadMarketOpenRequest
+from app.cross_spread_live_read_client import LivePosition
 from app.database import connection
 from app.execution_schemas import ExecutionBatchResponse
 from app.main import app
@@ -51,7 +52,7 @@ def insert_batch_with_fills(batch_id: str, *, direction: str = "OPEN_LONG") -> N
                 "instrument_xau_usdt_perp",
                 "XAUTUSDT",
                 "buy",
-                "100",
+                "1",
                 "bybit-order-id",
             ),
             (
@@ -62,7 +63,7 @@ def insert_batch_with_fills(batch_id: str, *, direction: str = "OPEN_LONG") -> N
                 "instrument_xau_usd",
                 "XAUUSD+",
                 "sell",
-                "1",
+                "0.01",
                 "mt5-order-id",
             ),
         )
@@ -117,7 +118,7 @@ def insert_batch_with_fills(batch_id: str, *, direction: str = "OPEN_LONG") -> N
                 quantity, price, occurred_at
             )
             VALUES ('fill-bybit', 'bybit-order-id', 'account_crypto_test',
-                    'instrument_xau_usdt_perp', 'buy', '100', '2499', ?)
+                    'instrument_xau_usdt_perp', 'buy', '1', '2499', ?)
             """,
             (NOW,),
         )
@@ -128,7 +129,7 @@ def insert_batch_with_fills(batch_id: str, *, direction: str = "OPEN_LONG") -> N
                 quantity, price, occurred_at
             )
             VALUES ('fill-mt5', 'mt5-order-id', 'account_mt5_demo',
-                    'instrument_xau_usd', 'sell', '1', '2501', ?)
+                    'instrument_xau_usd', 'sell', '0.01', '2501', ?)
             """,
             (NOW,),
         )
@@ -186,7 +187,7 @@ def available_snapshot() -> CrossSpreadSnapshotResponse:
                     {
                         "symbol": "XAUUSD+",
                         "side": "sell",
-                        "quantity": "-1",
+                        "quantity": "-0.01",
                         "averagePrice": "2501",
                         "externalId": "778899",
                     }
@@ -200,15 +201,47 @@ def available_snapshot() -> CrossSpreadSnapshotResponse:
     )
 
 
+def live_open_positions() -> tuple[list[LivePosition], list[LivePosition]]:
+    return (
+        [
+            LivePosition(
+                source="bybit_live",
+                external_position_id="bybit-position-1",
+                account_id="account_crypto_test",
+                instrument_id="instrument_xau_usdt_perp",
+                symbol="XAUTUSDT",
+                net_quantity=Decimal("1"),
+            )
+        ],
+        [
+            LivePosition(
+                source="mt5_live",
+                external_position_id="778899",
+                account_id="account_mt5_demo",
+                instrument_id="instrument_xau_usd",
+                symbol="XAUUSD+",
+                net_quantity=Decimal("-0.01"),
+            )
+        ],
+    )
+
+
 def configure_platform(tmp_path: Path) -> None:
     settings = get_settings()
     settings.database_path = str(tmp_path / "cross-spread-lifecycle.db")
     settings.live_trading_enabled = True
     settings.cross_spread_exit_monitor_enabled = False
+    settings.cross_spread_acceptance_max_quantity_oz = Decimal("1")
+    settings.cross_spread_acceptance_max_active_plans = 1
+    settings.cross_spread_position_verification_required = True
 
 
-def test_hedged_market_open_creates_plan_from_actual_fills(monkeypatch, tmp_path: Path) -> None:
+def test_hedged_market_open_creates_plan_from_actual_fills(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
     configure_platform(tmp_path)
+    position_reads = iter([( [], []), live_open_positions()])
     with TestClient(app):
         insert_batch_with_fills("open-batch-1")
         monkeypatch.setattr(
@@ -216,12 +249,16 @@ def test_hedged_market_open_creates_plan_from_actual_fills(monkeypatch, tmp_path
             "submit_cross_spread_market_command",
             lambda request: batch_response("open-batch-1", direction=request.action),
         )
-        monkeypatch.setattr(exit_service, "get_cross_spread_snapshot", available_snapshot)
+        monkeypatch.setattr(
+            exit_service,
+            "_load_live_positions",
+            lambda: next(position_reads),
+        )
 
         result = exit_service.open_cross_spread_market(
             CrossSpreadMarketOpenRequest(
                 direction="LONG_SPREAD",
-                quantityOz="100",
+                quantityOz="1",
                 takeProfitSpread="0",
                 stopLossSpread="-3",
                 executionMode="market",
@@ -230,7 +267,7 @@ def test_hedged_market_open_creates_plan_from_actual_fills(monkeypatch, tmp_path
 
     assert result.execution_batch.status == "hedged"
     assert result.exit_plan is not None
-    assert result.exit_plan.quantity_oz == Decimal("100")
+    assert result.exit_plan.quantity_oz == Decimal("1")
     assert result.exit_plan.entry_spread == Decimal("-2")
     assert result.exit_plan.mt5_position_id == "778899"
 
@@ -243,7 +280,7 @@ def test_exit_plan_claim_is_atomic(tmp_path: Path) -> None:
             strategy_instance_id="strategy_cross_venue_spread_instance_default",
             open_batch_id="open-batch-claim",
             direction="LONG_SPREAD",
-            quantity_oz=Decimal("100"),
+            quantity_oz=Decimal("1"),
             mt5_position_id="778899",
             entry_spread=Decimal("-2"),
             take_profit_spread=Decimal("0"),
@@ -264,7 +301,10 @@ def test_exit_plan_claim_is_atomic(tmp_path: Path) -> None:
     assert second is None
 
 
-def test_market_close_registers_reduce_only_and_mt5_ticket(monkeypatch, tmp_path: Path) -> None:
+def test_market_close_registers_reduce_only_and_mt5_ticket(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
     configure_platform(tmp_path)
     captured = {}
     with TestClient(app):
@@ -273,7 +313,7 @@ def test_market_close_registers_reduce_only_and_mt5_ticket(monkeypatch, tmp_path
             strategy_instance_id="strategy_cross_venue_spread_instance_default",
             open_batch_id="open-batch-close",
             direction="LONG_SPREAD",
-            quantity_oz=Decimal("100"),
+            quantity_oz=Decimal("1"),
             mt5_position_id="778899",
             entry_spread=Decimal("-2"),
             take_profit_spread=Decimal("0"),
@@ -306,7 +346,16 @@ def test_market_close_registers_reduce_only_and_mt5_ticket(monkeypatch, tmp_path
                 )
             return batch_response(close_batch_id, direction=request.action)
 
-        monkeypatch.setattr(exit_service, "submit_cross_spread_market_command", fake_submit)
+        monkeypatch.setattr(
+            exit_service,
+            "submit_cross_spread_market_command",
+            fake_submit,
+        )
+        monkeypatch.setattr(
+            exit_service,
+            "_load_live_positions",
+            lambda: ([], []),
+        )
         result = exit_service.close_cross_spread_market(
             plan.plan_id,
             execution_mode="market",
@@ -316,7 +365,9 @@ def test_market_close_registers_reduce_only_and_mt5_ticket(monkeypatch, tmp_path
     assert captured["kwargs"]["bybit_reduce_only"] is True
     assert captured["kwargs"]["mt5_reduce_only"] is True
     assert captured["kwargs"]["mt5_position_id"] == "778899"
-    assert captured["kwargs"]["idempotency_key"] == f"cross-spread-exit:{plan.plan_id}"
+    assert captured["kwargs"]["idempotency_key"] == (
+        f"cross-spread-exit:{plan.plan_id}"
+    )
     assert result.exit_plan.status == "closed"
     assert get_exit_plan(plan.plan_id).status == "closed"
 
@@ -330,7 +381,7 @@ def test_limit_selection_is_explicitly_unavailable_and_old_close_fails_closed(
             "/api/v1/trading/cross-spread/lifecycle/open",
             json={
                 "direction": "LONG_SPREAD",
-                "quantityOz": "100",
+                "quantityOz": "1",
                 "takeProfitSpread": "0",
                 "stopLossSpread": "-3",
                 "executionMode": "limit",
@@ -338,7 +389,7 @@ def test_limit_selection_is_explicitly_unavailable_and_old_close_fails_closed(
         )
         legacy_close = client.post(
             "/api/v1/trading/cross-spread/market-command",
-            json={"action": "CLOSE_LONG", "quantityOz": "100"},
+            json={"action": "CLOSE_LONG", "quantityOz": "1"},
         )
 
     assert limit_response.status_code == 422

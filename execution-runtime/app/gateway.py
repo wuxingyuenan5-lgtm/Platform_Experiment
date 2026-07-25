@@ -8,6 +8,7 @@ from app.models import (
     VenueBalanceSnapshot,
     VenueEconomicEventSnapshot,
     VenueFillSnapshot,
+    VenueInstrumentSpecification,
     VenueOrderSnapshot,
     VenuePositionSnapshot,
 )
@@ -29,6 +30,16 @@ class ExecutionGateway(Protocol):
         """Query one external order without creating a new side effect."""
         ...
 
+    def list_orders(
+        self,
+        *,
+        account_id: str | None = None,
+        symbol: str | None = None,
+        limit: int = 50,
+    ) -> list[VenueOrderSnapshot]:
+        """Return bounded current and recent external orders."""
+        ...
+
     def list_fills(
         self,
         *,
@@ -45,6 +56,15 @@ class ExecutionGateway(Protocol):
 
     def list_balances(self, account_id: str | None = None) -> list[VenueBalanceSnapshot]:
         """Return current external balance snapshots."""
+        ...
+
+    def get_instrument_specification(
+        self,
+        *,
+        account_id: str,
+        symbol: str,
+    ) -> VenueInstrumentSpecification:
+        """Return current venue sizing and access evidence for one symbol."""
         ...
 
     def list_economic_events(

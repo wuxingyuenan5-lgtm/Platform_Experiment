@@ -27,6 +27,11 @@ class Settings(BaseSettings):
     live_max_order_notional: Decimal = Decimal("0")
     live_max_daily_notional: Decimal = Decimal("0")
 
+    # Temporary real-money acceptance controls. They do not authorize writes;
+    # the independent live-write gate and allowlists remain mandatory.
+    live_acceptance_max_order_quantity: Decimal = Decimal("1")
+    live_acceptance_max_positions_per_symbol: int = 1
+
     bybit_credential_ref: str = "secret://environment/bybit-live-001"
     bybit_account_ids: str = ""
     bybit_instrument_map: str = ""

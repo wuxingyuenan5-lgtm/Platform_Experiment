@@ -2,6 +2,7 @@ from datetime import UTC, datetime
 from decimal import Decimal
 
 from app.config import get_settings
+from app.journal import connection
 from app.models import (
     CancelOrderResponse,
     ExecutionEvent,
@@ -11,15 +12,18 @@ from app.models import (
     VenueBalanceSnapshot,
     VenueEconomicEventSnapshot,
     VenueFillSnapshot,
+    VenueInstrumentSpecification,
     VenueOrderSnapshot,
     VenuePositionSnapshot,
 )
 from app.venue_store import (
     cancel_order,
+    ensure_store,
     get_order,
     list_balances,
     list_fills,
     list_positions,
+    order_from_row,
     persist_filled_order,
 )
 
@@ -64,6 +68,36 @@ class FakeGateway:
             external_id=external_order_id,
         )
 
+    def list_orders(
+        self,
+        *,
+        account_id: str | None = None,
+        symbol: str | None = None,
+        limit: int = 50,
+    ) -> list[VenueOrderSnapshot]:
+        ensure_store()
+        clauses: list[str] = []
+        parameters: list[object] = []
+        if account_id is not None:
+            clauses.append("account_id = ?")
+            parameters.append(account_id)
+        if symbol is not None:
+            clauses.append("UPPER(symbol) = ?")
+            parameters.append(symbol.upper())
+        where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+        bounded_limit = max(1, min(limit, 100))
+        with connection() as db:
+            rows = db.execute(
+                f"""
+                SELECT * FROM fake_venue_orders
+                {where}
+                ORDER BY updated_at DESC, external_order_id DESC
+                LIMIT ?
+                """,
+                (*parameters, bounded_limit),
+            ).fetchall()
+        return [order_from_row(row) for row in rows]
+
     def list_fills(
         self,
         *,
@@ -82,6 +116,31 @@ class FakeGateway:
 
     def list_balances(self, account_id: str | None = None) -> list[VenueBalanceSnapshot]:
         return list_balances(account_id)
+
+    def get_instrument_specification(
+        self,
+        *,
+        account_id: str,
+        symbol: str,
+    ) -> VenueInstrumentSpecification:
+        normalized = symbol.upper()
+        contract_size = Decimal("100") if normalized.startswith("XAUUSD") else Decimal("1")
+        minimum = Decimal("0.01") if contract_size == Decimal("100") else Decimal("0.001")
+        return VenueInstrumentSpecification(
+            source=self.name,
+            accountId=account_id,
+            instrumentId=f"fake:{normalized}",
+            symbol=normalized,
+            status="available",
+            minQuantity=minimum,
+            quantityStep=minimum,
+            maxMarketQuantity=Decimal("100"),
+            contractSize=contract_size,
+            trade_mode="simulation",
+            filling_mode="deterministic",
+            accessChecks={"simulation": True},
+            asOf=datetime.now(UTC),
+        )
 
     def list_economic_events(
         self,
@@ -118,9 +177,11 @@ class FakeGateway:
                         "submit_order",
                         "cancel_order",
                         "order_query",
+                        "order_list",
                         "fill_query",
                         "position_query",
                         "balance_query",
+                        "instrument_specification_query",
                     ],
                     missingRequirements=[],
                     checkedAt=datetime.now(UTC),

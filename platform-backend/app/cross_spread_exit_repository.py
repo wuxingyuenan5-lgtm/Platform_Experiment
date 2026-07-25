@@ -65,6 +65,31 @@ def load_batch_fill_summaries(batch_id: str) -> dict[str, BatchFillSummary]:
     return summaries
 
 
+def count_non_closed_exit_plans() -> int:
+    with connection() as db:
+        row = db.execute(
+            """
+            SELECT COUNT(*) AS count
+            FROM cross_spread_exit_plans
+            WHERE status != 'closed'
+            """
+        ).fetchone()
+    return int(row["count"])
+
+
+def count_unresolved_cross_spread_batches() -> int:
+    with connection() as db:
+        row = db.execute(
+            """
+            SELECT COUNT(*) AS count
+            FROM execution_batches
+            WHERE strategy_key = 'cross_venue_spread'
+              AND status IN ('pending', 'executing', 'partially_executed', 'manual_intervention')
+            """
+        ).fetchone()
+    return int(row["count"])
+
+
 def create_exit_plan(
     *,
     strategy_instance_id: str,
