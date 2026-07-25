@@ -189,7 +189,8 @@ def _build_mt5_snapshot(
             tick = mt5_module.symbol_info_tick(symbol)
             if tick is None:
                 return _unavailable("mt5", symbol, "MT5 symbol tick unavailable")
-            symbol_info = mt5_module.symbol_info(symbol)
+            symbol_info_getter = getattr(mt5_module, "symbol_info", None)
+            symbol_info = symbol_info_getter(symbol) if callable(symbol_info_getter) else None
             bid = Decimal(str(tick.bid))
             ask = Decimal(str(tick.ask))
             quote = MarketQuote(
