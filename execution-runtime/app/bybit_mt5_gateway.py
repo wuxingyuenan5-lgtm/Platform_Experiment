@@ -17,6 +17,7 @@ from app.models import (
     VenuePositionSnapshot,
 )
 from app.mt5_live_adapter import Mt5LiveAdapter
+from app.mt5_position_closing_adapter import Mt5PositionClosingAdapter
 
 
 class BybitMt5Gateway:
@@ -34,7 +35,7 @@ class BybitMt5Gateway:
     ) -> None:
         self.settings = settings or get_settings()
         self.bybit = bybit or BybitFillConfirmingAdapter(self.settings)
-        self.mt5 = mt5 or Mt5LiveAdapter(self.settings)
+        self.mt5 = mt5 or Mt5PositionClosingAdapter(self.settings)
 
     def submit_order(self, command: SubmitOrderCommand) -> list[ExecutionEvent]:
         return self._adapter_for_account(command.account_id).submit_order(command)
