@@ -5,6 +5,7 @@ Stable branch: `main`
 Product release: `0.7.0`
 Latest completed engineering scope: Issue #90 / PR #91
 Latest completed documentation scope: Issue #85 / PR #86
+Active engineering scope: Issue #92 / PR #93
 
 This file is the compact cross-session handoff. It records current truth, not a PR diary. Read the actual open Issues and PRs before assuming that work is active.
 
@@ -26,6 +27,7 @@ TradingMode=simulation
 Gateway=fake
 Platform Live Write=false
 Runtime Live Write=false
+Cross-spread Exit Monitor=false
 ```
 
 Real-account acceptance remains controlled-host, small-capital and minimum-size.
@@ -42,7 +44,14 @@ Real-account acceptance remains controlled-host, small-capital and minimum-size.
 - Cross-spread trading continues to use the nominal `Bybit Ask - MT5 Bid` and `Bybit Bid - MT5 Ask` formulas; USDT/USD normalization is not part of order triggering.
 - Cross-spread market execution submits Bybit first, requires a terminal confirmed fill and sizes the MT5 hedge from the actual filled quantity; an acknowledgement or unresolved status cannot trigger the hedge.
 - A terminal Bybit partial fill may be hedged only when its confirmed quantity maps exactly to the MT5 contract minimum and step; otherwise the batch fails closed into manual intervention.
+- Cross-spread CLOSE intent is persisted by TradeCommand idempotency key and transmitted through the versioned Runtime command contract.
+- Bybit market close requires one matching live position, submits `reduceOnly=true` with its `positionIdx` and rejects wrong-side or oversized close requests.
+- MT5 market close requires the intended live Position Ticket and rejects symbol, side, quantity or ticket ambiguity before `order_send`.
+- A successfully hedged cross-spread OPEN creates one persistent operational exit plan from exact Fill evidence and one mapped MT5 Position Ticket.
+- LONG_SPREAD exit thresholds observe `shortSpread`; SHORT_SPREAD exit thresholds observe `longSpread`. TP/SL submits a market close only after an atomic plan claim.
+- The automatic exit monitor is a separate disabled-by-default capability gate; unknown or manual-intervention plans are not automatically retried.
 - Direct MT5 market-data access reads raw swap long/short and related symbol metadata through `symbol_info()` when available; the file bridge remains a fallback/diagnostic read path rather than the authoritative execution path.
+- The original market/limit frontend design remains visible. During Issue #92 the legacy execution card is read-only and a bounded real market-lifecycle panel owns actual market open/close actions so limit choices cannot misroute.
 - Frontend responsive remediation is page-shell-first: defect baseline → Application Shell → Page Shell/layout primitives → shared components → core pages → visual regression.
 - Application Shell owns top navigation, sidebar, main content sizing, the primary vertical scroll context and global overlay base.
 - Page Shell owns page header, toolbar, summary, main/secondary regions, responsive reflow and fixed-bottom-action content reservation.
@@ -114,14 +123,15 @@ Real-account acceptance remains controlled-host, small-capital and minimum-size.
 
 ## Active work
 
-No engineering code workstream is active by default after PR #91 merges.
+Issue #92 / PR #93 completes the market-only cross-spread lifecycle:
 
-The next cross-spread scopes must remain separately bounded:
+1. true Bybit reduce-only and MT5 Position Ticket close semantics;
+2. exact-Decimal exit-plan persistence and atomic TP/SL claim;
+3. market TP/SL using the executable opposite-side close spread;
+4. a disabled-by-default server-side monitor;
+5. a real market lifecycle frontend panel while retaining the original limit design as read-only.
 
-1. implement real close semantics with Bybit `reduceOnly`/position mode and MT5 Position Ticket ownership;
-2. replace bounded Bybit fill polling with private WebSocket order/execution confirmation after the minimum loop is operationally accepted;
-3. validate Windows MT5 Terminal supervision, real symbol capabilities and minimum-size Demo execution under the controlled operational-acceptance process;
-4. defer spread-limit execution, automated TP/SL and multi-position HedgeGroup behavior until market open/close semantics are complete.
+Before merging, the final PR head must pass Repository Safety, Backend, Runtime, frontend production build and Secret Scan. Real-environment execution remains Issue #39 and is not proven by CI.
 
 Remaining responsive work must be evidence-driven rather than a full-platform CSS rewrite:
 
@@ -149,7 +159,9 @@ Separate non-code follow-ups remain:
 - Operational projections remain supported and must not become formal-accounting inputs.
 - Compatibility surfaces require usage evidence and a dedicated migration before removal.
 - The current Bybit fill-confirmation loop is a bounded synchronous minimum implementation, not the final private-WebSocket architecture.
-- Cross-spread close commands still lack authoritative reduce-only and MT5 Position Ticket semantics and are not accepted as a real close loop.
+- One market open must map to exactly one MT5 Position Ticket; multiple matching hedging positions fail closed into manual intervention in this phase.
+- The automatic TP/SL monitor is code-complete but disabled by default and still requires controlled-host operational enablement and observation.
+- The retained legacy market/limit execution card is intentionally read-only during this phase; real market actions use the bounded lifecycle panel until the large component is safely refactored in a later scope.
 - CI proves provider mapping, state transitions and safety behavior; it does not prove real Bybit/MT5 permissions, broker execution modes, Terminal stability or live liquidity.
 - Inherited frontend lint debt remains outside untouched modules; new and changed files cannot add debt.
 - The homepage responsive implementation is linted, type-checked and production-built, but automated multi-viewport screenshots are not yet part of CI.
