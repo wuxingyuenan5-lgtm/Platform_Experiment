@@ -9,15 +9,24 @@
 | 人工理解项目 | `00-人工可读目录/README.md` |
 | Agent/Codex 最小上下文 | `docs/codex/context-map.md` |
 | 当前工程状态 | `docs/codex/current-state.md` |
+| 当前产品发布 | `docs/releases/0.8.0.md` |
 | 系统结构 | `docs/architecture/SYSTEM_MAP.md` |
 | Git 与版本规则 | `docs/engineering/GIT_WORKFLOW.md` |
 | 当前技术债务 | `docs/engineering/TECHNICAL_DEBT.md` |
 | 数据库与迁移 | `docs/database/README.md` |
 | Platform–Runtime V1 契约 | `docs/contracts/runtime-v1.json` |
 | 正式账务 | `docs/technical/FINANCIAL_FACTS.md` |
+| 实盘账户可观测性 | `docs/technical/LIVE_ACCOUNT_OBSERVABILITY.md` |
+| 小资金实盘验收 | `docs/operations/V6-小资金实盘验收手册.md` |
 | 故障注入与实盘验收 | `docs/operations/FAILURE_INJECTION_ACCEPTANCE.md` |
 | 发布门槛 | `admin-risk/docs/quality/release-gate.md` |
 | 前端入口 | `admin-risk/docs/START-HERE.md` |
+
+## 当前产品发布
+
+当前产品版本为 `0.8.0`。根目录 `VERSION` 是唯一版本声明源，Platform Backend、Execution Runtime 和前端展示版本必须与其一致。
+
+`0.8.0` 包含跨所市价生命周期、真实减仓平仓语义、1 盎司受控验收、历史订单/成交读取、Bybit 强平证据、MT5 Margin Call/Stop Out 证据和只读实盘验收面板。该版本表示工程能力完成，不代表真实 Windows 主机与交易账户已经通过运营验收。
 
 ## 当前工程原则
 
@@ -50,9 +59,12 @@ TradingMode=simulation
 Gateway=fake
 Platform Live Write=false
 Runtime Live Write=false
+Cross-spread Exit Monitor=false
+Cross-spread acceptance max quantity=1 oz
+Cross-spread non-closed lifecycle max=1
 ```
 
-实盘验收必须使用受控主机、小资金、最小允许仓位和明确停止条件。
+实盘验收必须使用受控主机、小资金、最小允许仓位和明确停止条件。版本升级不会自动开启写入、监控或扩大验收限制。
 
 ## 目录结构
 
@@ -88,6 +100,8 @@ PR 第一行必须声明 `Issue: #<number>`。详细规则见 `docs/engineering/
 python scripts/check-workstream.py
 python scripts/scan-secrets.py
 python scripts/check-repository-structure.py
+python scripts/check-documentation-consistency.py
+python scripts/check-version-consistency.py
 ```
 
 Platform Backend：
@@ -128,6 +142,7 @@ CI 还会对本次新增或修改的所有 `admin-risk/src`、`admin-risk/mock` 
 
 - 永久硬规则：`AGENTS.md`。
 - 当前事实：`docs/codex/current-state.md`。
+- 产品发布说明：`docs/releases/`。
 - 单次任务进度：`tasks/issue-*.md`。
 - 稳定边界：`docs/architecture/`。
 - 关键决策：`docs/decisions/`。
