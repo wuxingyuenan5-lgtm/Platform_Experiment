@@ -275,9 +275,7 @@
   });
   const closeValidationError = computed(() => {
     if (closeExecutionMode.value !== 'limit') return '';
-    return Number.isFinite(Number(closeLimitSpread.value))
-      ? ''
-      : 'FOK 平仓限制价差必须是有效数字';
+    return Number.isFinite(Number(closeLimitSpread.value)) ? '' : 'FOK 平仓限制价差必须是有效数字';
   });
 
   function applyDirectionDefaults() {
@@ -317,9 +315,7 @@
         executionMode: openExecutionMode.value,
         takeProfitExecutionMode: takeProfitExecutionMode.value,
         stopLossExecutionMode: stopLossExecutionMode.value,
-        ...(openExecutionMode.value === 'limit'
-          ? { limitSpread: openLimitSpread.value }
-          : {}),
+        ...(openExecutionMode.value === 'limit' ? { limitSpread: openLimitSpread.value } : {}),
       });
       limitEvidence.value = result.limitExecution || null;
       if (result.executionBatch.status === 'hedged' && result.exitPlan) {
