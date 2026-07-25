@@ -359,7 +359,9 @@ def resize_cross_spread_mt5_hedge(
     if bybit_role != BYBIT_LEG_ROLE:
         raise ValueError("Cross-spread execution order must place the Bybit leg first")
     if bybit_filled_quantity > bybit_request.quantity:
-        raise ValueError("Confirmed Bybit fill exceeds the requested quantity; MT5 hedge is blocked")
+        raise ValueError(
+            "Confirmed Bybit fill exceeds the requested quantity; MT5 hedge is blocked"
+        )
 
     mt5_index = next(
         (
