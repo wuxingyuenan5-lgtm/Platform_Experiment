@@ -1,7 +1,7 @@
 # Task: Version Consolidation and Dead Code Cleanup
 
 Issue: #83
-Status: review
+Status: complete
 Branch: `chore/issue-83-version-and-dead-code-cleanup`
 Base commit: `7da3b89fc7841b093f016a1d03cd8f70c74f13e6`
 
@@ -36,6 +36,7 @@ Publish product release version `0.7.0` consistently and remove only frontend le
 - direct version-consistency test/workflow
 - `docs/engineering/GIT_WORKFLOW.md`
 - `docs/releases/0.7.0.md`
+- `docs/codex/current-state.md`
 - this task packet
 
 ## Protected semantics
@@ -81,20 +82,20 @@ Final delivery requires Platform CI and Secret Scan on the final PR head.
 - [x] Unused `createTradingOrder`, `CreateOrderInput` and submit-state hook code are absent.
 - [x] `OrderResult`, order reads/recovery and the Backend compatibility endpoint remain intact.
 - [x] Funding execution remains ExecutionBatch-based and snapshot refresh remains unchanged.
-- [ ] Full CI and Secret Scan pass on the final head.
+- [x] Platform CI, Version Consistency and Secret Scan passed on the validated helper-free head.
 
 ## Progress
 
-- Done: usage audit, product/API version boundary, direct changes, release notes and removal of temporary helpers.
-- Current: validate the helper-free final diff through CI.
-- Next: record verification, review and squash merge.
+- Done: usage audit, product/API version boundary, direct changes, release notes, version guard, complete CI and removal of temporary helpers.
+- Current: ready for review and squash merge.
+- Next: merge PR #84 and close Issue #83.
 - Blocked by: none.
 
 ## Completion
 
 - PR: #84
-- Merge commit:
+- Merge commit: pending squash merge.
 - Behavior changed: none.
 - Behavior intentionally unchanged: Backend compatibility endpoint, order reads/recovery, all execution/safety and Live Write behavior.
-- Tests/CI: pending final head.
+- Tests/CI: Platform CI #1196 pass; Version Consistency #7 pass; Secret Scan #649 pass.
 - Follow-up debt: remove Backend compatibility order endpoint only after external usage evidence and a dedicated migration.
