@@ -1,7 +1,7 @@
 # Platform V6 前端架构总览
 
 状态：`active`  
-适用分支：`refactor/frontend-architecture-v6`
+适用分支：`main`
 
 ## 1. 架构目标
 
@@ -9,12 +9,16 @@
 
 V6 前端以现有 Vue 工程为基础，采用模块化单体结构，不进行无业务收益的大规模目录迁移或微前端拆分。
 
+前端架构同时要求页面在约定的桌面视口、浏览器缩放和系统缩放组合下保持稳定、可读、可操作。响应式治理不得通过逐页面分辨率补丁替代统一页面壳层和布局约束。
+
 ## 2. 总体分层
 
 ```text
 Router
   ↓
-Module Shell
+Application / Module Shell
+  ↓
+Page Shell
   ↓
 Page Orchestrator
   ↓
@@ -41,16 +45,30 @@ Mock Adapter / API Adapter
 - 大型 Mock 数据。
 - 订单和账户状态存储。
 
-### 2.2 Module Shell
+### 2.2 Application／Module Shell
 
 负责：
 
+- 应用顶部导航、侧边栏和主内容区的尺寸关系。
 - 模块标题和顶部导航。
 - 策略、分类或管理视角切换。
-- 页面组件装配。
 - 模块级加载和错误边界。
+- 主要纵向滚动、页面外边距和全局 Overlay 层级基座。
 
-### 2.3 Page Orchestrator
+Application Shell 不决定具体业务页的列数或卡片固定坐标。Module Shell 不得为单个页面重建独立滚动和高度体系。
+
+### 2.3 Page Shell
+
+负责：
+
+- 页面标题、主要操作、筛选工具栏和摘要区的标准排列。
+- 页面主体、次级记录区和可选底部操作区的结构。
+- 页面级间距、降列、换行、局部滚动和固定底栏正文预留。
+- 加载、空数据、错误和权限不足状态下的结构稳定性。
+
+Page Shell 是响应式页面治理的主要边界。完整规则参见 `responsive-layout-architecture.md`。
+
+### 2.4 Page Orchestrator
 
 负责：
 
@@ -59,7 +77,9 @@ Mock Adapter / API Adapter
 - 调用应用用例。
 - 将领域数据转换为页面需要的 View Model。
 
-### 2.4 Use Case／Composable
+Page Orchestrator 决定业务区块顺序和业务协作，不自行承担 Application Shell 的高度计算和全局滚动责任。
+
+### 2.5 Use Case／Composable
 
 负责明确用户任务，例如：
 
@@ -70,15 +90,17 @@ Mock Adapter / API Adapter
 - 查询账户资金。
 - 筛选订单记录。
 
-组合式函数不得演变为跨模块无边界的全局工具箱。
+组合式函数不得演变为跨模块无边界的全局工具箱，也不得通过监听窗口宽度承担普通 CSS 布局职责。
 
-### 2.5 Domain Model／View Model
+### 2.6 Domain Model／View Model
 
 - Domain Model 表达平台稳定业务语义。
 - View Model 表达某个页面的展示结构。
 - API DTO 和 Mock DTO 必须通过适配器转换，不直接长期进入组件。
 
-### 2.6 Repository／Adapter
+响应式布局不得改变业务字段语义。内容降级只能调整排列、折叠或展示优先级，不能静默丢失关键交易、风险或状态字段。
+
+### 2.7 Repository／Adapter
 
 Repository 定义前端需要的数据能力；Adapter 负责连接具体来源。
 
@@ -130,6 +152,7 @@ Repository Interface
 - 当前执行批次可以进入策略模块共享状态。
 - 用户、权限、全局阻断和界面偏好才进入全局 Store。
 - 订单、账户、持仓和损益等服务端数据不与普通界面状态混在同一对象中。
+- 视口宽度不是业务状态；普通响应式布局不进入 Pinia 或页面业务 Store。
 
 ## 5. 策略扩展机制
 
@@ -149,6 +172,7 @@ Repository Interface
 - 风险阈值。
 - 损益结果。
 - 后端接口地址。
+- 页面断点和视口布局。
 
 当后端未来提供策略主数据时，前端注册表保留为稳定 ID、页面能力和默认展示配置的适配层。
 
@@ -188,6 +212,8 @@ Repository Interface
 
 前端不得仅通过向本地数组加入“成功”文案来模拟真实命令完成。
 
+响应式布局中，关键命令不得因为宽度不足而直接隐藏。次要操作可以进入明确的更多菜单，主要操作和风险提示必须保持可访问。
+
 ## 7. 权限架构
 
 前端权限分为：
@@ -214,21 +240,35 @@ risk.rule.manage
 
 前端只消费后端或权限服务返回的能力结果，不自行决定最终授权。
 
-## 8. UI 和组件
+## 8. UI、布局和组件
 
 视觉和交互遵循：
 
 - `../../design/platform-ui-guidelines.md`
 - `../shared-ui-governance.md`
 
+响应式布局、视口支持、页面壳层、滚动、溢出、固定定位和组件重排遵循：
+
+- `responsive-layout-architecture.md`
+- `../../quality/responsive-layout-acceptance.md`
+
 组件分为：
 
-- 模块入口层。
+- 应用／模块壳层。
+- 页面壳层。
 - 页面编排层。
 - 业务区块层。
 - 基础组件层。
 
 基础组件不得包含具体策略名称或交易规则。
+
+布局责任必须遵守：
+
+- Application Shell 负责顶部栏、侧边栏、主内容区和主要纵向滚动。
+- Page Shell 负责页面结构、区块降列和固定底栏正文预留。
+- 业务区块负责自身最小宽高、内部重排和明确的局部滚动。
+- 表格横向滚动由表格容器负责。
+- 页面主布局不得使用绝对定位或固定坐标。
 
 ## 9. 错误、加载和数据质量
 
@@ -252,6 +292,8 @@ risk.rule.manage
 - 结果未知。
 - 需要人工确认。
 
+正常、加载、空、错误和权限状态必须共用稳定的外层布局边界，不能在某个状态下突然改变页面滚动所有者或导致相邻组件跳位。
+
 ## 10. 测试和发布
 
 最低门槛：
@@ -260,6 +302,7 @@ risk.rule.manage
 - 类型检查。
 - 构建。
 - 关键路由和策略切换冒烟检查。
+- 响应式架构文档和验收规范要求的核心视口人工验证。
 
 后续逐步增加：
 
@@ -267,12 +310,19 @@ risk.rule.manage
 - 路由状态测试。
 - 交易命令交互测试。
 - Playwright 核心路径。
+- 关键视口截图基线和视觉差异产物。
+- 横向溢出、关键元素碰撞和底栏遮挡检查。
 - 仓库根目录 GitHub Actions。
+
+Application Shell、Page Shell 或共享布局组件变更必须按 `../../quality/responsive-layout-acceptance.md` 提供视口、缩放、侧边栏状态和数据状态证据。
 
 ## 11. 当前演进原则
 
 - 先让现有架构规范接入代码，再增加大量新功能。
 - 优先统一策略注册表、路由状态和数据类型。
+- 响应式治理优先顺序为缺陷基线、Application Shell、Page Shell、共享组件、核心页面和视觉回归。
 - 大型页面采用向内拆分，不先改路由和用户可见结构。
 - Mock 和真实 API 必须通过相同 Repository 接口提供数据。
 - 在真实交易接入前，交易页面必须明确标识演示或模拟环境。
+- 不通过单分辨率 CSS、负 margin、任意高 z-index 或多层 `100vh` 修复结构性布局问题。
+- 每个响应式实施阶段使用独立 Issue 和 PR，避免全平台一次性重写。
