@@ -6,6 +6,7 @@
     "noUnusedParameters": false
   },
   "include": [
+    "src/api/platform/crossSpreadLifecycle.ts",
     "src/views/strategy/shared/**/*.ts",
     "src/views/strategy/shared/**/*.vue",
     "src/views/strategy/funding-carry/**/*.ts",

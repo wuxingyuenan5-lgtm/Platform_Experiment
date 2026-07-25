@@ -21,6 +21,11 @@ class Settings(BaseSettings):
     live_trading_enabled: bool = False
     default_trading_environment: str = "simulation"
 
+    # The market-exit monitor is a separate capability gate. It remains off unless
+    # operations explicitly enables it on a controlled host; Live Write gates still apply.
+    cross_spread_exit_monitor_enabled: bool = False
+    cross_spread_exit_monitor_interval_seconds: float = 1.0
+
     # Authentication is permissive only in non-live development. A live process
     # must use api_key mode with SHA-256 token hashes; raw tokens never belong in
     # settings, source control, logs, database rows, or API responses.

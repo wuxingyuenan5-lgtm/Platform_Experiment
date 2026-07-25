@@ -5,7 +5,7 @@ from decimal import Decimal
 from typing import Literal
 from uuid import uuid4
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 RUNTIME_COMMAND_CONTRACT_NAME = "runtime-command"
 RUNTIME_EVENT_CONTRACT_NAME = "runtime-event"
@@ -28,7 +28,14 @@ class RuntimeSubmitOrderCommandV1(BaseModel):
     quantity: Decimal = Field(gt=0)
     price: Decimal | None = Field(default=None, gt=0)
     reduce_only: bool = False
+    position_id: str | None = None
     received_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+    @model_validator(mode="after")
+    def validate_position_target(self) -> RuntimeSubmitOrderCommandV1:
+        if self.position_id is not None and not self.reduce_only:
+            raise ValueError("position_id requires reduce_only")
+        return self
 
 
 class RuntimeExecutionEventV1(BaseModel):

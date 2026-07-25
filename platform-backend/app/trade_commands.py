@@ -7,6 +7,7 @@ from uuid import uuid4
 from fastapi import HTTPException
 
 from app.database import connection
+from app.order_execution_intents import get_order_execution_intent
 from app.schemas import CreateOrderRequest, CreateTradeCommandRequest, TradeCommandResponse
 from app.trade_command_execution import submit_trade_command_order
 from app.trading import decimal_text
@@ -74,6 +75,7 @@ def create_trade_command(request: CreateTradeCommandRequest) -> TradeCommandResp
         return trade_command_from_row(existing)
 
     validate_trade_command_catalog(request)
+    intent = get_order_execution_intent(request.idempotency_key)
     trade_command_id = str(uuid4())
     created_at = now_iso()
     with connection() as db:
@@ -153,6 +155,8 @@ def create_trade_command(request: CreateTradeCommandRequest) -> TradeCommandResp
             ),
             strategy_instance_id=request.strategy_instance_id,
             command_id=trade_command_id,
+            reduce_only=intent.reduce_only,
+            position_id=intent.position_id,
         )
     except HTTPException:
         update_trade_command_status(trade_command_id, "rejected")

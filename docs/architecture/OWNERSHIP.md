@@ -17,12 +17,18 @@ This document is the canonical human-readable catalog of major code ownership bo
 | Execution API DTOs | `platform-backend/app/execution_schemas.py` | Public execution-domain request/response models | Trading execution or persistence |
 | Execution compatibility DTO exports | `platform-backend/app/schemas.py` | Explicit aliases to execution DTO owners | Duplicate DTO definitions |
 | Platform–Runtime contracts | `platform-backend/app/runtime_contracts.py`, `execution-runtime/app/runtime_contracts.py`, `docs/contracts/runtime-v1.json` | Versioned command/event models and executable field snapshot | Silent incompatible V1 changes |
+| Cross-spread lifecycle DTOs | `platform-backend/app/cross_spread_exit_schemas.py` | Market-open, market-close, exit-plan and evaluation request/response models | Threshold policy, SQL or venue execution |
 
 ## Trading and formal accounting
 
 | Boundary | Authoritative owner | Responsibility | Must not own |
 |---|---|---|---|
 | Platform order submission orchestration | `platform-backend/app/trade_command_execution.py` | Single local Order creation, Safety enforcement, legacy/V1 Runtime dispatch, unknown-result handling and Event handoff | Event projection, reconciliation or formal accounting |
+| Venue order execution intent | `platform-backend/app/order_execution_intents.py` | Idempotent reduce-only and venue-position target lookup for a TradeCommand | Batch sequencing, venue SDK calls or exit-threshold policy |
+| Cross-spread exit threshold policy | `platform-backend/app/cross_spread_exit_policy.py` | Pure executable-close-spread selection and TP/SL inequality decisions | SQL, HTTP, background tasks or order submission |
+| Cross-spread exit-plan persistence | `platform-backend/app/cross_spread_exit_repository.py` | Exact-Decimal fill summary, exit-plan SQL, row mapping and atomic trigger claims | Venue HTTP, threshold formulas, background loops or routes |
+| Cross-spread market lifecycle service | `platform-backend/app/cross_spread_exit_service.py` | Hedged-open plan creation, MT5 ticket mapping, manual/automatic market close orchestration and fail-closed monitor iteration | Direct SQL, venue SDKs, route definitions or limit execution |
+| Cross-spread lifecycle routes | `platform-backend/app/cross_spread_exit_routes.py` | API routing and disabled-by-default monitor lifespan | SQL, threshold formulas or venue execution logic |
 | EOD Reconciliation public DTOs | `platform-backend/app/eod_reconciliation_schemas.py` | EOD report/review request-response models and public status types | DDL, SQL, report orchestration, review policy or routes |
 | EOD report and review policy | `platform-backend/app/eod_reconciliation_policy.py` | Pure report status, scale-gate, historical-Difference and immutable-review decisions | FastAPI, database/repository access, HTTP or cross-domain orchestration |
 | EOD Reconciliation persistence | `platform-backend/app/eod_reconciliation_repository.py` | EOD report DDL, direct SQL, row mapping, report identity, review transactions and policy persistence reads/writes | FastAPI, cross-domain orchestration, status formulas or routes |
@@ -31,7 +37,7 @@ This document is the canonical human-readable catalog of major code ownership bo
 | EOD operational gate coordination | `platform-backend/app/eod_policy.py` | Business-day order selection and repository coordination for the historical-Difference gate | Direct SQL/DDL, report row mapping, duplicate status/review decisions or routes |
 | Venue Reconciliation public DTOs | `platform-backend/app/venue_reconciliation_schemas.py` | Reconciliation run, difference-resolution and order-reconciliation request/response models plus public status types | SQL, Runtime queries, comparison or route orchestration |
 | Venue Reconciliation difference policy | `platform-backend/app/venue_reconciliation_policy.py` | Pure external-status mapping and immutable Order/Position/Balance difference-draft decisions | SQL, Runtime queries, persistence, audit or routes |
-| Venue Reconciliation persistence | `platform-backend/app/venue_reconciliation_repository.py` | Reconciliation DDL, direct SQL, audit/run/difference persistence, comparison reads, row mapping and protected transactions | FastAPI, Runtime HTTP, FinancialFact import or difference rules |
+| Venue Reconciliation persistence | `platform-backend/app/venue_reconciliation_repository.py` | Reconciliation DDL, direct SQL, audit/run/difference persistence, comparison reads, row mapping and protected transactions | FastAPI, Runtime queries, FinancialFact import or difference rules |
 | Venue Reconciliation Runtime client | `platform-backend/app/venue_reconciliation_runtime_client.py` | Configured Runtime GET transport, URL/parameter/timeout application and transport-error boundary | FastAPI error responses, persistence, FinancialFact import, difference rules or use-case orchestration |
 | Venue Reconciliation Service | `platform-backend/app/venue_reconciliation_service.py` | Order/account reconciliation sequencing, FinancialFact import, policy/repository/client coordination and explicit domain failures | FastAPI/APIRouter, configured HTTP implementation, direct SQL/DDL or public DTO definitions |
 | Venue Reconciliation facade | `platform-backend/app/venue_reconciliation.py` | Compatibility exports/delegates, exact domain/transport-error-to-HTTP mapping and routes pending dedicated route-module extraction | FinancialFact import, reconciliation sequencing, direct Runtime HTTP, SQL/DDL or duplicate DTO/policy definitions |
@@ -63,6 +69,8 @@ Operational projections are monitoring views. Formal accounting is reconstructed
 | Venue SDKs and external execution | `execution-runtime/` | Gateway adapters, external side effects and runtime journal | Platform business API or formal accounting |
 | Runtime journal | `execution-runtime/app/journal.py` | Durable runtime Command/Event evidence | Permanent financial ledger authority |
 | Platform execution exposure | `platform-backend/app/execution_exposure.py` | Canonical residual exposure calculation | Parallel exposure formulas |
+| Bybit confirmed market execution | `execution-runtime/app/bybit_fill_confirming_adapter.py` | REST submission, reduce-only position validation, positionIdx mapping and bounded terminal-fill confirmation | Platform exit plans or MT5 ticket policy |
+| MT5 ticket-bound close execution | `execution-runtime/app/mt5_position_closing_adapter.py` | Reduce-only Position Ticket, side and quantity validation before MT5 deal submission | Platform plan selection or threshold evaluation |
 
 The Platform Backend must not import venue SDKs. Unknown external results remain unknown until reconciled and must never trigger an automatic duplicate submission.
 
