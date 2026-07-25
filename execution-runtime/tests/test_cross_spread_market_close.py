@@ -77,7 +77,12 @@ def initialize_runtime_store(tmp_path, name: str) -> None:
     initialize_journal()
 
 
-def close_command(*, side: str, quantity: str, position_id: str | None = None) -> SubmitOrderCommand:
+def close_command(
+    *,
+    side: str,
+    quantity: str,
+    position_id: str | None = None,
+) -> SubmitOrderCommand:
     return SubmitOrderCommand(
         command_id=f"command-{side}-{quantity}",
         platform_order_id=f"platform-{side}-{quantity}",
