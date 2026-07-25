@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from decimal import Decimal
 
 import pytest
-from fastapi import HTTPException
+from pydantic import ValidationError
 
 import app.cross_spread_synthetic_service as synthetic_service
 from app.cross_spread_exit_schemas import (
@@ -11,6 +12,7 @@ from app.cross_spread_exit_schemas import (
     CrossSpreadMarketOpenRequest,
     ExitPlanStatus,
 )
+from app.cross_spread_limit_policy import CrossSpreadFokPrice
 from app.cross_spread_order_intent import (
     LegacyMarketAction,
     SpreadDirection,
@@ -25,7 +27,12 @@ from app.execution_schemas import ExecutionBatchResponse
 NOW = datetime(2026, 7, 25, tzinfo=UTC)
 
 
-def batch_response(batch_id: str, *, direction: str) -> ExecutionBatchResponse:
+def batch_response(
+    batch_id: str,
+    *,
+    direction: str,
+    status: str = "hedged",
+) -> ExecutionBatchResponse:
     return ExecutionBatchResponse(
         batchId=batch_id,
         idempotencyKey=f"key:{batch_id}",
@@ -33,8 +40,8 @@ def batch_response(batch_id: str, *, direction: str) -> ExecutionBatchResponse:
         accountId="account_crypto_test",
         strategyKey="cross_venue_spread",
         direction=direction,
-        status="hedged",
-        requiresManualIntervention=False,
+        status=status,
+        requiresManualIntervention=status == "manual_intervention",
         failureReason=None,
         legs=[],
         createdAt=NOW,
@@ -66,6 +73,20 @@ def exit_plan(
         updatedAt=NOW,
         triggeredAt=None,
         closedAt=None,
+    )
+
+
+def fok_price() -> CrossSpreadFokPrice:
+    return CrossSpreadFokPrice(
+        direction="BUY_BYBIT_SELL_MT5",
+        limit_spread=Decimal("-0.7"),
+        executable_spread=Decimal("-0.8"),
+        mt5_reference_price=Decimal("2501"),
+        hedge_reserve=Decimal("0"),
+        bybit_tick_size=Decimal("0.1"),
+        raw_bybit_limit_price=Decimal("2500.3"),
+        bybit_limit_price=Decimal("2500.3"),
+        currently_executable=True,
     )
 
 
@@ -165,6 +186,7 @@ def test_market_open_uses_normalized_intent_without_changing_legacy_action(
     assert result.order_intent.action == "OPEN_LONG_SPREAD"
     assert result.order_intent.execution_type == "MARKET"
     assert result.order_intent.trigger_reason == "MANUAL"
+    assert result.limit_execution is None
     assert result.exit_plan == plan
 
 
@@ -224,25 +246,63 @@ def test_manual_close_and_take_profit_close_share_close_action(monkeypatch) -> N
     assert take_profit_result.order_intent.action == "CLOSE_LONG_SPREAD"
 
 
-def test_limit_intent_fails_closed_before_any_market_submission(monkeypatch) -> None:
+def test_limit_open_routes_only_to_fok_executor(monkeypatch) -> None:
+    captured = {}
+    plan = exit_plan()
+    pricing = fok_price()
+    monkeypatch.setattr(
+        synthetic_service.market_helpers,
+        "_assert_acceptance_open_allowed",
+        lambda: None,
+    )
+    monkeypatch.setattr(
+        synthetic_service,
+        "_prepare_limit_execution",
+        lambda *_args, **_kwargs: pricing,
+    )
     monkeypatch.setattr(
         synthetic_service,
         "submit_cross_spread_market_command",
-        lambda *_args, **_kwargs: pytest.fail(
-            "Limit intent must not submit a Market command"
-        ),
+        lambda *_args, **_kwargs: pytest.fail("Limit must not submit Market"),
+    )
+    monkeypatch.setattr(
+        synthetic_service.market_helpers,
+        "_create_exit_plan_for_open_batch",
+        lambda *_args, **_kwargs: plan,
     )
 
-    with pytest.raises(HTTPException) as exc_info:
-        synthetic_service.open_cross_spread_market(
-            CrossSpreadMarketOpenRequest(
-                direction="LONG_SPREAD",
-                quantityOz="1",
-                takeProfitSpread="0",
-                stopLossSpread="-3",
-                executionMode="limit",
-            )
-        )
+    def fake_fok(request, **kwargs):
+        captured["request"] = request
+        captured["kwargs"] = kwargs
+        return batch_response("fok-open-1", direction=request.action)
 
-    assert exc_info.value.status_code == 422
-    assert "not implemented" in str(exc_info.value.detail)
+    monkeypatch.setattr(synthetic_service, "submit_cross_spread_fok_command", fake_fok)
+
+    result = synthetic_service.open_cross_spread_market(
+        CrossSpreadMarketOpenRequest(
+            direction="LONG_SPREAD",
+            quantityOz="1",
+            takeProfitSpread="0",
+            stopLossSpread="-3",
+            executionMode="limit",
+            limitSpread="-0.7",
+        )
+    )
+
+    assert captured["request"].action == "OPEN_LONG"
+    assert captured["kwargs"]["bybit_limit_price"] == Decimal("2500.3")
+    assert result.order_intent is not None
+    assert result.order_intent.execution_type == "LIMIT"
+    assert result.limit_execution is not None
+    assert result.limit_execution.time_in_force == "FOK"
+
+
+def test_limit_request_requires_explicit_spread() -> None:
+    with pytest.raises(ValidationError, match="limitSpread"):
+        CrossSpreadMarketOpenRequest(
+            direction="LONG_SPREAD",
+            quantityOz="1",
+            takeProfitSpread="0",
+            stopLossSpread="-3",
+            executionMode="limit",
+        )
