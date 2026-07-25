@@ -2,7 +2,8 @@
 
 Last updated: 2026-07-25
 Stable branch: `main`
-Latest completed engineering scope: Issue #81 / PR #82
+Product release: `0.7.0`
+Latest completed engineering scope: Issue #83 / PR #84
 
 This file is the compact cross-session handoff. It records current truth, not a PR diary. Read the actual open Issues and PRs before assuming that work is active.
 
@@ -27,9 +28,13 @@ Real-account acceptance remains controlled-host, small-capital and minimum-size.
 
 ## Current invariants
 
+- Root `VERSION` is the product release source of truth; maintained Backend/Runtime package versions and frontend display follow it.
+- FastAPI metadata and Platform–Runtime contract versions describe component/API compatibility and are independent from the product release number.
 - Platform Backend does not import venue SDKs; external execution remains inside `execution-runtime/`.
 - `platform-backend/app/main.py` is a composition root only.
 - `platform-backend/app/trade_command_execution.py` is the single local Order creation, Safety and Runtime submission owner; `trading.submit_order` remains a deprecated legacy compatibility delegate.
+- The Backend deprecated `POST /api/v1/trading/orders` compatibility endpoint remains available until external usage evidence and a dedicated migration support removal.
+- Maintained funding execution uses ExecutionBatch; the unused frontend legacy single-order submit client and submit-state hook path have been removed.
 - EOD Reconciliation public status types and request/response DTOs are owned only by `eod_reconciliation_schemas.py`; `eod_reconciliation.py` imports identical compatibility objects.
 - EOD report status, scale-gate, historical-Difference and immutable-review decisions are owned only by the pure `eod_reconciliation_policy.py` module.
 - EOD Reconciliation DDL, direct SQL, report row mapping, report identity and atomic review persistence are owned only by `eod_reconciliation_repository.py`.
@@ -86,10 +91,11 @@ Real-account acceptance remains controlled-host, small-capital and minimum-size.
 31. EOD Reconciliation Repository ownership with exact DDL, report identity, immutable-review transaction and rollback evidence.
 32. Pure EOD report/review Policy ownership with exhaustive status, gate, replay, conflict and approval Goldens.
 33. EOD Reconciliation Service ownership with per-call compatibility injection, exact partial-failure and HTTP-mapping evidence.
+34. Platform 0.7.0 product-version consolidation with blocking drift checks and verified frontend dead-code removal.
 
 ## Active work
 
-No engineering code workstream is active by default after PR #82 merges.
+No engineering code workstream is active by default after PR #84 merges.
 
 Before starting another code change:
 
