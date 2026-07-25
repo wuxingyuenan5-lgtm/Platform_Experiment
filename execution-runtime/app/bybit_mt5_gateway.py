@@ -3,7 +3,6 @@ from __future__ import annotations
 from app.bybit_live_adapter import BybitLiveAdapter
 from app.config import Settings, get_settings
 from app.gateway_errors import GatewayConfigurationError
-from app.live_acceptance_adapters import BybitAcceptanceAdapter, Mt5AcceptanceAdapter
 from app.live_route_store import get_order_route
 from app.models import (
     CancelOrderResponse,
@@ -18,6 +17,10 @@ from app.models import (
     VenuePositionSnapshot,
 )
 from app.mt5_live_adapter import Mt5LiveAdapter
+from app.strict_live_acceptance_adapters import (
+    StrictBybitAcceptanceAdapter,
+    StrictMt5AcceptanceAdapter,
+)
 
 
 class BybitMt5Gateway:
@@ -32,8 +35,8 @@ class BybitMt5Gateway:
         mt5: Mt5LiveAdapter | None = None,
     ) -> None:
         self.settings = settings or get_settings()
-        self.bybit = bybit or BybitAcceptanceAdapter(self.settings)
-        self.mt5 = mt5 or Mt5AcceptanceAdapter(self.settings)
+        self.bybit = bybit or StrictBybitAcceptanceAdapter(self.settings)
+        self.mt5 = mt5 or StrictMt5AcceptanceAdapter(self.settings)
 
     def submit_order(self, command: SubmitOrderCommand) -> list[ExecutionEvent]:
         return self._adapter_for_account(command.account_id).submit_order(command)
@@ -58,14 +61,12 @@ class BybitMt5Gateway:
             return self._adapter_by_name(route.adapter).get_order(
                 external_order_id=external_order_id,
             )
-        matches = [
-            snapshot
-            for adapter in (self.bybit, self.mt5)
-            if (snapshot := adapter.get_order(external_order_id=external_order_id)) is not None
-        ]
-        if len(matches) > 1:
-            raise GatewayConfigurationError("External order identity is ambiguous across adapters")
-        return matches[0] if matches else None
+        bybit_snapshot = self.bybit.get_order(external_order_id=external_order_id)
+        if bybit_snapshot is not None:
+            return bybit_snapshot
+        if external_order_id.isdigit():
+            return self.mt5.get_order(external_order_id=external_order_id)
+        return None
 
     def list_orders(
         self,
@@ -113,10 +114,9 @@ class BybitMt5Gateway:
                 return self._adapter_by_name(route.adapter).list_fills(
                     external_order_id=external_order_id,
                 )
-            return [
-                *self.bybit.list_fills(external_order_id=external_order_id),
-                *self.mt5.list_fills(external_order_id=external_order_id),
-            ]
+            if external_order_id.isdigit():
+                return self.mt5.list_fills(external_order_id=external_order_id)
+            return self.bybit.list_fills(external_order_id=external_order_id)
         return [*self.bybit.list_fills(), *self.mt5.list_fills()]
 
     def list_positions(self, account_id: str | None = None) -> list[VenuePositionSnapshot]:
