@@ -92,6 +92,22 @@ PLATFORM_MIGRATIONS: tuple[Migration, ...] = (
             """,
         ),
     ),
+    Migration(
+        version=3,
+        name="cross-spread-exit-execution-modes",
+        statements=(
+            """
+            ALTER TABLE cross_spread_exit_plans
+            ADD COLUMN take_profit_execution_mode TEXT NOT NULL DEFAULT 'market'
+            CHECK (take_profit_execution_mode IN ('market', 'limit'))
+            """,
+            """
+            ALTER TABLE cross_spread_exit_plans
+            ADD COLUMN stop_loss_execution_mode TEXT NOT NULL DEFAULT 'market'
+            CHECK (stop_loss_execution_mode IN ('market', 'limit'))
+            """,
+        ),
+    ),
 )
 
 
