@@ -1,7 +1,7 @@
 # Task: Synthetic cross-spread order intent
 
 Issue: #107
-Status: active
+Status: done
 Branch: `feature/issue-107-synthetic-order-intent`
 Base commit: `1947728b4b7eb8590e21720690fd294b54c7a47b`
 
@@ -20,22 +20,22 @@ Introduce one authoritative synthetic-order intent model for all four cross-spre
 
 - Cross-spread lifecycle schemas, service and route adapters.
 - A focused shared intent/policy module.
-- Cross-spread lifecycle frontend API/component labels needed to expose the normalized intent.
-- Direct Backend/frontend tests.
-- API/current-state/strategy documentation.
+- Cross-spread lifecycle frontend API types needed to expose the normalized intent.
+- Direct Backend tests.
+- API, ownership, current-state and synthetic-execution documentation.
 
-## Expected changed files
+## Actual changed files
 
 - `platform-backend/app/cross_spread_order_intent.py` (new)
+- `platform-backend/app/cross_spread_synthetic_service.py` (new)
 - `platform-backend/app/cross_spread_exit_schemas.py`
-- `platform-backend/app/cross_spread_exit_service.py`
-- `platform-backend/tests/test_cross_spread_market_lifecycle.py`
-- `platform-backend/tests/test_cross_spread_exit_policy.py` or a focused new test file if needed
+- `platform-backend/app/cross_spread_exit_routes.py`
+- `platform-backend/tests/test_cross_spread_synthetic_intent.py` (new)
 - `admin-risk/src/api/platform/crossSpreadLifecycle.ts`
-- `admin-risk/src/views/strategy/spread-carry/components/CrossSpreadMarketLifecyclePanel.vue`
+- `docs/technical/CROSS_SPREAD_SYNTHETIC_EXECUTION.md` (new)
 - `docs/technical/API_SPEC.md`
+- `docs/architecture/OWNERSHIP.md`
 - `docs/codex/current-state.md`
-- `admin-risk/docs/strategies/跨所价差.md`
 - this task packet
 
 ## Protected semantics
@@ -63,13 +63,13 @@ Introduce one authoritative synthetic-order intent model for all four cross-spre
 
 ## Acceptance criteria
 
-- [ ] Four actions map deterministically to existing Market commands and leg directions.
-- [ ] Open/manual close/TP/SL close use the same normalized command model.
-- [ ] Existing public Market endpoints remain compatible.
-- [ ] Trigger reason is explicit for manual and automatic closes.
-- [ ] Limit remains rejected with no side effect.
-- [ ] Documentation records the five-batch roadmap and Batch 1 boundary.
-- [ ] Required CI and Secret Scan pass.
+- [x] Four actions map deterministically to existing Market commands and leg directions.
+- [x] Open/manual close/TP/SL close use the same normalized command model.
+- [x] Existing public Market endpoints remain compatible.
+- [x] Trigger reason is explicit for manual and automatic closes.
+- [x] Limit remains rejected with no side effect.
+- [x] Documentation records the five-batch roadmap and Batch 1 boundary.
+- [x] Required CI and Secret Scan pass.
 
 ## Risk and rollback
 
@@ -81,16 +81,16 @@ Risk: medium
 
 ## Progress
 
-- Done: Issue and branch created; current Market lifecycle entry points identified.
-- Current: implement shared intent model and compatibility adapters.
-- Next: add tests, frontend verification fields and documentation; open PR and run full gates.
+- Done: authoritative intent model, public synthetic lifecycle adapter, response metadata, focused tests, frontend API types and documentation completed.
+- Current: final metadata-head verification before squash merge.
+- Next: Batch 2 will implement FOK spread-limit execution in a separate Issue and PR.
 - Blocked by: none.
 
 ## Completion
 
-- PR:
-- Merge commit:
-- Behavior changed: normalized internal intent/metadata only.
-- Behavior intentionally unchanged: all Market/Venue/risk behavior.
-- Tests/CI:
+- PR: #108
+- Merge commit: GitHub PR/main history is authoritative; no post-merge metadata PR will be created.
+- Behavior changed: normalized internal intent and additive response metadata only.
+- Behavior intentionally unchanged: all Market/Venue/risk behavior, safety defaults and operational gates.
+- Tests/CI: Platform CI #1502 and Secret Scan #826 passed on the completed code/documentation head; final task-metadata head must repeat the same repository gates.
 - Follow-up debt: FOK Limit, shared TP/SL Limit selection, PostOnly/WebSocket and execution protections remain separate batches.
