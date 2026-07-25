@@ -1,7 +1,7 @@
 # Task: Homepage Responsive Layout and Visual Hierarchy
 
 Issue: #87
-Status: active
+Status: review
 Branch: `fix/issue-87-homepage-responsive-layout`
 Base commit: `8f9afae0d8991468624d88853ec0585e575da03e`
 
@@ -18,36 +18,40 @@ Stabilize the homepage across supported desktop viewports by replacing resolutio
 - No Playwright dependency addition.
 - No trading, risk or Live Write behavior changes.
 
-## Expected changed files
+## Changed files
 
 - `admin-risk/src/views/dashboard/index.vue`
 - `admin-risk/docs/design/homepage-layout-standard.md`
+- `admin-risk/tsconfig.full.json`
 - `docs/codex/current-state.md`
 - this task packet
 
-Additional files require a concrete defect and must remain within frontend layout/documentation scope.
+Temporary diagnostic workflow changes were removed before final validation and are not part of the formal diff.
 
 ## Existing defects confirmed
 
-1. At `max-width: 1500px`, `.home-hero` becomes one column while `.hero-side--market` and `.hero-side--portfolio` remain assigned to grid column 2.
-2. The hero copy remains assigned to rows 1–3 after the responsive transition, allowing implicit grid tracks and unpredictable placement.
-3. The main panel grid uses four heterogeneous columns above 1500px, producing large density changes between adjacent widths.
-4. The main panel grid overlaps the hero through a negative top margin.
-5. The page assumes a 64px header through `min-height: calc(100vh - 64px)`.
-6. Several inner rows use fixed tracks without compact fallback, increasing overflow risk.
+1. At `max-width: 1500px`, `.home-hero` became one column while the two Hero summary cards remained assigned to grid column 2.
+2. The Hero copy remained assigned to rows 1–3 after the responsive transition, allowing implicit grid tracks and unpredictable placement.
+3. The main panel grid used four heterogeneous columns above 1500px, producing large density changes between adjacent widths.
+4. The main panel grid overlapped the Hero through a negative top margin.
+5. The page assumed a 64px header through `min-height: calc(100vh - 64px)`.
+6. Several inner rows used fixed tracks without compact fallback, increasing overflow risk.
+7. Changed-file type-aware ESLint could not parse the homepage because it was absent from both maintained TypeScript project scopes.
 
-## Layout decisions
+## Implemented layout decisions
 
-- Homepage content is bounded by a wide desktop frame instead of stretching indefinitely.
+- Homepage content is bounded by a wide `1840px` desktop frame instead of stretching indefinitely.
 - Hero is two regions: brand copy and a summary stack.
 - Large desktop: brand copy + vertical summary stack.
 - Standard desktop: brand copy followed by two summary cards in a row.
-- Compact fallback: all hero regions become one column.
+- Compact fallback: all Hero regions become one column.
 - Main dashboard remains two columns throughout the supported 1280–2560px range.
 - Main dashboard becomes one column only below the formal desktop support range.
-- No negative-margin overlap is used.
+- No negative-margin overlap or viewport-height subtraction is used.
 - Width, spacing and typography use bounded `clamp()` values.
+- Inner rows use `min-width: 0`, flexible tracks and explicit compact fallbacks.
 - Existing routes, labels and placeholder data remain unchanged.
+- Dashboard Vue files are now included in `tsconfig.full.json` so changed-file type-aware ESLint can protect the page.
 
 ## Required verification
 
@@ -77,27 +81,29 @@ Final delivery also requires:
 
 ## Acceptance criteria
 
-- [ ] Homepage-specific layout standard exists.
-- [ ] The 1500px implicit-grid defect is removed.
-- [ ] Hero order is deterministic at every breakpoint.
-- [ ] Main cards use a stable two-column desktop grid.
-- [ ] No viewport-height subtraction or negative panel overlap remains.
-- [ ] Inner rows have compact fallbacks and `min-width: 0` where needed.
-- [ ] Existing content, routes and placeholder values are preserved.
-- [ ] Required CI passes on the final head.
+- [x] Homepage-specific layout standard exists.
+- [x] The 1500px implicit-grid defect is removed.
+- [x] Hero order is deterministic at every breakpoint.
+- [x] Main cards use a stable two-column desktop grid.
+- [x] No viewport-height subtraction or negative panel overlap remains.
+- [x] Inner rows have compact fallbacks and `min-width: 0` where needed.
+- [x] Existing content, routes and placeholder values are preserved.
+- [x] Homepage is included in the full TypeScript project used by type-aware ESLint.
+- [ ] Required CI passes on the exact final head after documentation and diagnostic cleanup.
 
 ## Progress
 
-- Done: main/open-PR verification, Issue creation, current homepage and PageWrapper audit, first implementation draft.
-- Current: validate the governed branch and frontend build.
-- Next: review the final diff, update current state, merge and close Issue.
+- Done: repository verification, Issue creation, homepage and PageWrapper audit, layout standard, homepage refactor, TypeScript project inclusion, zero-debt lint correction, temporary diagnostic cleanup and current-state update.
+- Current: validate the exact final five-file diff.
+- Next: record final CI evidence, update PR, squash merge and close Issue.
 - Blocked by: none.
 
 ## Completion
 
-- PR:
+- PR: #89
+- Superseded PR: #88, closed before review because its branch prefix was not permitted by repository governance.
 - Merge commit:
 - Application behavior changed: responsive placement and visual hierarchy only.
 - Business behavior changed: none.
-- Tests/CI:
-- Follow-up: remaining pages should be handled only from concrete S0/S1 defects or shared-shell evidence.
+- Tests/CI: final head pending; implementation head passed Repository Safety, Backend, Runtime, frontend lint/no-new-debt/type-check/build and Secret Scan.
+- Follow-up: remaining pages should be handled only from concrete S0/S1 defects or shared-shell evidence; automated viewport screenshots remain a separate scope.
