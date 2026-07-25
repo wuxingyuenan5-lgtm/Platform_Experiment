@@ -1,7 +1,7 @@
 # Task: EOD Reconciliation Repository
 
 Issue: #77
-Status: active
+Status: review
 Branch: `refactor/issue-77-eod-reconciliation-repository`
 Base commit: `1b12d048a2de3c01a9e74a02ff2fc11fd6eb1ae5`
 
@@ -23,12 +23,18 @@ Make one repository module the sole owner of EOD Reconciliation DDL, direct SQL,
 - direct EOD repository/architecture tests
 - existing EOD integration/policy tests only when compatibility assertions require synchronization
 - `platform-backend/pyproject.toml`
+- `README.md`
+- `AGENTS.md`
 - `docs/architecture/OWNERSHIP.md`
 - `docs/codex/current-state.md`
+- `docs/database/README.md`
 - `docs/engineering/TECHNICAL_DEBT.md`
+- `scripts/check-repository-structure.py`
 - `scripts/check-documentation-consistency.py`
 - `CHANGELOG.md`
 - this task packet
+
+Temporary patch helper/workflow were permitted only to update large governance files through a bounded path and must be absent from the final diff.
 
 ## Protected semantics
 
@@ -62,25 +68,25 @@ Final delivery also requires full Platform CI and independent Secret Scan on the
 
 ## Acceptance criteria
 
-- [ ] Repository is the sole EOD DDL/direct-SQL/row-mapping owner.
-- [ ] `eod_reconciliation.py` and `eod_policy.py` contain no direct database access.
-- [ ] DDL checksum, report identity, review immutability and rollback evidence are exact.
-- [ ] Existing EOD integration and policy tests pass.
-- [ ] Ruff, Pyright, tests, Repository Safety, Runtime, Frontend and Secret Scan pass.
-- [ ] Diff contains no unrelated cleanup.
+- [x] Repository is the sole EOD DDL/direct-SQL/row-mapping owner.
+- [x] `eod_reconciliation.py` and `eod_policy.py` contain no direct database access.
+- [x] DDL checksum, report identity, review immutability and rollback evidence are exact.
+- [x] Existing EOD integration and policy tests pass.
+- [ ] Ruff, Pyright, tests, Repository Safety, Runtime, Frontend and Secret Scan pass on the final helper-free head.
+- [x] Diff contains no unrelated cleanup.
 
 ## Progress
 
-- Done: baseline, Issue, branch and protected persistence semantics verified.
-- Current: extract Repository and preserve compatibility delegates.
-- Next: final-head CI, review and squash merge.
+- Done: Repository extraction, orchestration/policy delegation, compatibility aliases, focused regression evidence, progressive typing and authoritative documentation.
+- Current: remove the bounded temporary patch helper/workflow and validate the final helper-free PR head.
+- Next: mark PR ready and squash merge when all checks are green.
 - Blocked by: none.
 
 ## Completion
 
-- PR:
-- Merge commit:
-- Behavior changed: none intended.
-- Behavior intentionally unchanged: all EOD identity, SQL, report, review, scale-gate, orchestration, route and Live Write semantics.
-- Tests/CI:
+- PR: #78
+- Merge commit: pending final squash merge.
+- Behavior changed: persistence ownership moved to `eod_reconciliation_repository.py`; no public or business behavior changed.
+- Behavior intentionally unchanged: all EOD identity, SQL semantics, report, review, scale-gate, orchestration, route and Live Write semantics.
+- Tests/CI: Backend Ruff/Pyright/classified tests and focused EOD suites pass; final Repository Safety, Runtime, Frontend and Secret Scan required after temporary-file removal.
 - Follow-up debt: EOD status/review Policy and Service remain separate staged Issues.
