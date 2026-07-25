@@ -189,6 +189,7 @@ def _build_mt5_snapshot(
             tick = mt5_module.symbol_info_tick(symbol)
             if tick is None:
                 return _unavailable("mt5", symbol, "MT5 symbol tick unavailable")
+            symbol_info = mt5_module.symbol_info(symbol)
             bid = Decimal(str(tick.bid))
             ask = Decimal(str(tick.ask))
             quote = MarketQuote(
@@ -220,6 +221,7 @@ def _build_mt5_snapshot(
                 status="available",
                 quote=quote,
                 positions=positions,
+                reason=_mt5_symbol_reason(symbol_info),
             )
         finally:
             mt5_module.shutdown()
@@ -239,6 +241,24 @@ def _join_reason(position_reason: str | None, funding_rate: Decimal | None) -> s
         parts.append(position_reason)
     if funding_rate is not None:
         parts.append(f"fundingRate={funding_rate}")
+    return ";".join(parts) if parts else None
+
+
+def _mt5_symbol_reason(symbol_info: object | None) -> str | None:
+    if symbol_info is None:
+        return None
+    fields = (
+        ("swapLong", "swap_long"),
+        ("swapShort", "swap_short"),
+        ("swapMode", "swap_mode"),
+        ("swapRollover3Days", "swap_rollover3days"),
+        ("contractSize", "trade_contract_size"),
+    )
+    parts = []
+    for key, attribute in fields:
+        value = getattr(symbol_info, attribute, None)
+        if value is not None:
+            parts.append(f"{key}={value}")
     return ";".join(parts) if parts else None
 
 
