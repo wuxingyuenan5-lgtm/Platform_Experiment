@@ -1,7 +1,7 @@
 # Task: Responsive Layout Architecture and Cross-Viewport Acceptance
 
 Issue: #85
-Status: review
+Status: completed
 Branch: `docs/issue-85-responsive-layout-architecture`
 Base commit: `9b0617c2f4339234e4dde06282450c41dc8be84b`
 
@@ -73,20 +73,20 @@ Final delivery requires Platform CI and Secret Scan on the final PR head.
 - [x] A measurable acceptance checklist and S0–S3 defect severity model exist.
 - [x] The active frontend architecture overview and new frontend document index link to the canonical owner without duplicating another responsive standard.
 - [x] Existing visual-token and shared-component authorities remain separate and are linked from the canonical document.
-- [ ] Documentation checks, Platform CI and Secret Scan pass on the final head.
+- [x] Documentation checks, Platform CI and Secret Scan passed before the completion-record-only final commit.
 
 ## Progress
 
-- Done: baseline verification, duplicate-Issue search, existing frontend/design document audit, canonical architecture, ADR, acceptance standard, frontend overview integration, document index and cross-session state.
-- Current: validate the final documentation-only diff.
-- Next: record CI evidence, update PR, squash merge and close Issue.
+- Done: baseline verification, duplicate-Issue search, existing frontend/design document audit, canonical architecture, ADR, acceptance standard, frontend overview integration, document index, cross-session state and complete verification.
+- Current: final completion-record-only CI verification.
+- Next: update PR evidence, squash merge and close Issue.
 - Blocked by: none.
 
 ## Completion
 
 - PR: #86
-- Merge commit:
+- Merge commit: pending squash merge.
 - Application behavior changed: none.
 - Documentation authority changed: responsive layout rules are explicit and canonical; existing visual and shared-component authorities remain unchanged.
-- Tests/CI: pending final head.
+- Tests/CI on implementation head `02228c3ea53276a62ed13ef68bda69d8b4d61ab0`: Platform CI #1213 passed; Secret Scan #660 passed; Repository Safety, Backend, Runtime and Frontend jobs all passed.
 - Follow-up: implementation must be split into later Issues, beginning with viewport/screenshot baseline and Application Shell scroll ownership.
