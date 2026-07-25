@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from decimal import Decimal
 from uuid import uuid4
 
@@ -39,6 +40,17 @@ BYBIT_LEG_ROLE = "bybit_leg"
 MT5_LEG_ROLE = "mt5_leg"
 
 
+@dataclass(frozen=True, slots=True)
+class CrossSpreadLiveSizing:
+    bybit_min: Decimal
+    bybit_step: Decimal
+    bybit_max: Decimal | None
+    mt5_min: Decimal
+    mt5_step: Decimal
+    mt5_max: Decimal | None
+    mt5_multiplier: Decimal
+
+
 def get_cross_spread_snapshot() -> CrossSpreadSnapshotResponse:
     settings = get_settings()
     try:
@@ -53,7 +65,10 @@ def get_cross_spread_snapshot() -> CrossSpreadSnapshotResponse:
                 response=response,
             )
     except httpx.HTTPError as exc:
-        raise HTTPException(status_code=502, detail="Execution runtime is unavailable") from exc
+        raise HTTPException(
+            status_code=502,
+            detail="Execution runtime is unavailable",
+        ) from exc
     snapshot = CrossSpreadSnapshotResponse.model_validate(response.json())
     save_cross_spread_market_snapshot(
         snapshot,
@@ -93,7 +108,9 @@ def submit_cross_spread_market_command(
                 "and an MT5 Position Ticket"
             ),
         )
-    if not is_close and (bybit_reduce_only or mt5_reduce_only or mt5_position_id is not None):
+    if not is_close and (
+        bybit_reduce_only or mt5_reduce_only or mt5_position_id is not None
+    ):
         raise HTTPException(
             status_code=422,
             detail="Open cross-spread commands cannot carry close-position intent",
@@ -104,20 +121,20 @@ def submit_cross_spread_market_command(
     sizing = _load_live_cross_spread_sizing()
     _validate_leg_quantity(
         request.quantity_oz,
-        minimum=sizing["bybit_min"],
-        step=sizing["bybit_step"],
-        maximum=sizing["bybit_max"],
+        minimum=sizing.bybit_min,
+        step=sizing.bybit_step,
+        maximum=sizing.bybit_max,
         label=BYBIT_SYMBOL,
     )
-    mt5_lot = request.quantity_oz / sizing["mt5_multiplier"]
+    mt5_lot = request.quantity_oz / sizing.mt5_multiplier
     _validate_leg_quantity(
         mt5_lot,
-        minimum=sizing["mt5_min"],
-        step=sizing["mt5_step"],
-        maximum=sizing["mt5_max"],
+        minimum=sizing.mt5_min,
+        step=sizing.mt5_step,
+        maximum=sizing.mt5_max,
         label=MT5_SYMBOL,
     )
-    if mt5_lot * sizing["mt5_multiplier"] != request.quantity_oz:
+    if mt5_lot * sizing.mt5_multiplier != request.quantity_oz:
         raise HTTPException(
             status_code=422,
             detail="Requested ounces do not map exactly to the current MT5 contract size",
@@ -175,14 +192,17 @@ def submit_bybit_definitive_failure_rollback(
 ) -> TradeCommandResponse:
     settings = get_settings()
     if not settings.cross_spread_definitive_failure_rollback_enabled:
-        raise HTTPException(status_code=423, detail="Cross-spread rollback capability is disabled")
+        raise HTTPException(
+            status_code=423,
+            detail="Cross-spread rollback capability is disabled",
+        )
     _validate_acceptance_quantity(quantity_oz)
     sizing = _load_live_cross_spread_sizing()
     _validate_leg_quantity(
         quantity_oz,
-        minimum=sizing["bybit_min"],
-        step=sizing["bybit_step"],
-        maximum=sizing["bybit_max"],
+        minimum=sizing.bybit_min,
+        step=sizing.bybit_step,
+        maximum=sizing.bybit_max,
         label=BYBIT_SYMBOL,
     )
     idempotency_key = f"cross-spread-rollback:{open_batch_id}:bybit"
@@ -218,11 +238,14 @@ def _validate_acceptance_quantity(quantity_oz: Decimal) -> None:
     if quantity_oz > maximum:
         raise HTTPException(
             status_code=422,
-            detail=f"Cross-spread acceptance quantity is temporarily capped at {maximum} oz",
+            detail=(
+                "Cross-spread acceptance quantity is temporarily capped at "
+                f"{maximum} oz"
+            ),
         )
 
 
-def _load_live_cross_spread_sizing() -> dict[str, Decimal | None]:
+def _load_live_cross_spread_sizing() -> CrossSpreadLiveSizing:
     try:
         bybit = get_instrument_specification(
             account_id=BYBIT_ACCOUNT_ID,
@@ -236,41 +259,69 @@ def _load_live_cross_spread_sizing() -> dict[str, Decimal | None]:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     _validate_bybit_live_specification(bybit)
     _validate_mt5_live_specification(mt5)
-    return {
-        "bybit_min": bybit.min_quantity,
-        "bybit_step": bybit.quantity_step,
-        "bybit_max": bybit.max_market_quantity,
-        "mt5_min": mt5.min_quantity,
-        "mt5_step": mt5.quantity_step,
-        "mt5_max": mt5.max_market_quantity,
-        "mt5_multiplier": mt5.contract_size,
-    }
+    return CrossSpreadLiveSizing(
+        bybit_min=bybit.min_quantity,
+        bybit_step=bybit.quantity_step,
+        bybit_max=bybit.max_market_quantity,
+        mt5_min=mt5.min_quantity,
+        mt5_step=mt5.quantity_step,
+        mt5_max=mt5.max_market_quantity,
+        mt5_multiplier=mt5.contract_size,
+    )
 
 
-def _validate_bybit_live_specification(specification: LiveInstrumentSpecification) -> None:
+def _validate_bybit_live_specification(
+    specification: LiveInstrumentSpecification,
+) -> None:
     checks = specification.access_checks
     if specification.status.lower() not in {"trading", "available"}:
-        raise HTTPException(status_code=423, detail="Bybit instrument is not currently trading")
+        raise HTTPException(
+            status_code=423,
+            detail="Bybit instrument is not currently trading",
+        )
     if checks.get("readOnly") is True:
         raise HTTPException(status_code=423, detail="Bybit API key is read-only")
     if checks.get("ipBound") is not True:
-        raise HTTPException(status_code=423, detail="Bybit API key must be bound to a fixed IP")
+        raise HTTPException(
+            status_code=423,
+            detail="Bybit API key must be bound to a fixed IP",
+        )
     if checks.get("orderPermission") is not True:
-        raise HTTPException(status_code=423, detail="Bybit API key lacks Order permission")
+        raise HTTPException(
+            status_code=423,
+            detail="Bybit API key lacks Order permission",
+        )
     if checks.get("positionPermission") is not True:
-        raise HTTPException(status_code=423, detail="Bybit API key lacks Position permission")
+        raise HTTPException(
+            status_code=423,
+            detail="Bybit API key lacks Position permission",
+        )
 
 
-def _validate_mt5_live_specification(specification: LiveInstrumentSpecification) -> None:
+def _validate_mt5_live_specification(
+    specification: LiveInstrumentSpecification,
+) -> None:
     checks = specification.access_checks
     if specification.status not in {"available", "selected"}:
-        raise HTTPException(status_code=423, detail="MT5 symbol is not available for trading")
+        raise HTTPException(
+            status_code=423,
+            detail="MT5 symbol is not available for trading",
+        )
     if checks.get("accountLoginMatched") is not True:
-        raise HTTPException(status_code=423, detail="MT5 connected login does not match configuration")
+        raise HTTPException(
+            status_code=423,
+            detail="MT5 connected login does not match configuration",
+        )
     if checks.get("accountTradeAllowed") is not True:
-        raise HTTPException(status_code=423, detail="MT5 account does not allow trading")
+        raise HTTPException(
+            status_code=423,
+            detail="MT5 account does not allow trading",
+        )
     if checks.get("terminalTradeAllowed") is not True:
-        raise HTTPException(status_code=423, detail="MT5 Terminal does not allow trading")
+        raise HTTPException(
+            status_code=423,
+            detail="MT5 Terminal does not allow trading",
+        )
 
 
 def _validate_leg_quantity(
@@ -282,11 +333,20 @@ def _validate_leg_quantity(
     label: str,
 ) -> None:
     if minimum <= 0 or step <= 0:
-        raise HTTPException(status_code=422, detail=f"{label} contract specification is invalid")
+        raise HTTPException(
+            status_code=422,
+            detail=f"{label} contract specification is invalid",
+        )
     if quantity < minimum:
-        raise HTTPException(status_code=422, detail=f"{label} quantity is below contract minimum")
+        raise HTTPException(
+            status_code=422,
+            detail=f"{label} quantity is below contract minimum",
+        )
     if maximum is not None and maximum > 0 and quantity > maximum:
-        raise HTTPException(status_code=422, detail=f"{label} quantity exceeds market maximum")
+        raise HTTPException(
+            status_code=422,
+            detail=f"{label} quantity exceeds market maximum",
+        )
     steps = (quantity - minimum) / step
     if steps != steps.to_integral_value():
         raise HTTPException(
