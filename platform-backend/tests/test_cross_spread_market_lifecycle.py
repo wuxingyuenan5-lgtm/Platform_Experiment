@@ -241,7 +241,7 @@ def test_hedged_market_open_creates_plan_from_actual_fills(
     tmp_path: Path,
 ) -> None:
     configure_platform(tmp_path)
-    position_reads = iter([( [], []), live_open_positions()])
+    position_reads = iter([([], []), live_open_positions()])
     with TestClient(app):
         insert_batch_with_fills("open-batch-1")
         monkeypatch.setattr(
@@ -372,9 +372,7 @@ def test_market_close_registers_reduce_only_and_mt5_ticket(
     assert get_exit_plan(plan.plan_id).status == "closed"
 
 
-def test_limit_selection_is_explicitly_unavailable_and_old_close_fails_closed(
-    tmp_path: Path,
-) -> None:
+def test_limit_requires_spread_and_legacy_close_fails_closed(tmp_path: Path) -> None:
     configure_platform(tmp_path)
     with TestClient(app) as client:
         limit_response = client.post(
@@ -393,6 +391,7 @@ def test_limit_selection_is_explicitly_unavailable_and_old_close_fails_closed(
         )
 
     assert limit_response.status_code == 422
-    assert "not implemented" in limit_response.json()["detail"]
+    details = limit_response.json()["detail"]
+    assert any("limitSpread" in item["msg"] for item in details)
     assert legacy_close.status_code == 422
     assert "requires reduce-only" in legacy_close.json()["detail"]
