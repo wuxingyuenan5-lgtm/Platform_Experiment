@@ -1,7 +1,7 @@
 # Task: EOD Reconciliation Public Schemas
 
 Issue: #75
-Status: active
+Status: review
 Branch: `refactor/issue-75-eod-reconciliation-schemas`
 Base commit: `13189a9262fefe654e708b1f706a27948f69d64f`
 
@@ -58,25 +58,26 @@ Final delivery also requires full Platform CI and independent Secret Scan on the
 
 ## Acceptance criteria
 
-- [ ] EOD public schemas/types have one authoritative owner.
-- [ ] Compatibility imports are identical Python objects.
-- [ ] JSON Schema/OpenAPI and validation behavior remain exact.
-- [ ] Existing EOD integration tests pass.
-- [ ] Ruff, Pyright, tests, Repository Safety, Runtime, Frontend and Secret Scan pass.
-- [ ] Diff contains no unrelated cleanup.
+- [x] EOD public schemas/types have one authoritative owner.
+- [x] Compatibility imports are identical Python objects.
+- [x] JSON Schema/OpenAPI and validation behavior remain exact.
+- [x] Existing EOD integration tests pass.
+- [x] Ruff, Pyright, tests, Repository Safety, Runtime, Frontend and Secret Scan pass on the implementation head.
+- [ ] All checks pass on the final documentation head.
+- [x] Diff contains no unrelated cleanup.
 
 ## Progress
 
-- Done: baseline, Issue, branch and protected schema surface verified.
-- Current: extract schemas and add equivalence evidence.
-- Next: final-head CI, review and squash merge.
+- Done: schema owner, compatibility imports, exact schema/validation evidence, architecture enforcement, progressive typing and existing EOD regressions are complete.
+- Current: final PR-head Platform CI and Secret Scan.
+- Next: mark PR ready and squash merge when every final-head check is green.
 - Blocked by: none.
 
 ## Completion
 
-- PR:
-- Merge commit:
-- Behavior changed: none intended.
+- PR: #76
+- Merge commit: recorded by the final squash merge of PR #76.
+- Behavior changed: EOD public schema/type ownership moved to `eod_reconciliation_schemas.py`.
 - Behavior intentionally unchanged: all EOD public, persistence, orchestration, review, scale-gate and Live Write semantics.
-- Tests/CI:
+- Tests/CI: exact schema/validation tests plus full Backend/Runtime/Frontend/Repository Safety and Secret Scan required on final head.
 - Follow-up debt: EOD Repository/Policy/Service remain separate staged Issues.
