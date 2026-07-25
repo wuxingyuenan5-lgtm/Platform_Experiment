@@ -95,12 +95,20 @@ PR 必须写明：
 
 ## 7. 版本标记
 
+根目录 `VERSION` 是整个平台产品发布版本的唯一声明源。以下 maintained release 声明必须与其一致：
+
+- `platform-backend/pyproject.toml` 的包版本；
+- `execution-runtime/pyproject.toml` 的包版本；
+- `admin-risk/.env` 的前端展示版本。
+
+FastAPI 应用元数据和 Platform–Runtime 合约版本描述的是组件/API 兼容性，不随每个产品发布版本机械递增。`scripts/check-version-consistency.py` 与 CI 会阻止产品发布版本漂移。
+
 Tag 只用于经过验收、需要明确回滚或部署识别的稳定点，例如：
 
 ```text
 engineering-baseline-2026-07
-v0.6.0-rc1
-v0.6.0
+v0.7.0-rc1
+v0.7.0
 ```
 
 不要为每次提交打 Tag。普通工作通过 Issue、PR、squash commit 追踪。
@@ -140,6 +148,7 @@ Agent 默认读取：
 
 - `scripts/check-workstream.py`：Issue、分支、任务包、PR 唯一关系。
 - `scripts/check-repository-structure.py`：架构、上下文、数据库和契约结构。
+- `scripts/check-version-consistency.py`：产品发布版本一致性。
 - Platform CI：Ruff、Pyright、Pytest、Frontend ESLint/type/build。
 - Secret Scan：阻止凭证材料进入仓库。
 
