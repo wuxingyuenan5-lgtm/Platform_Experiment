@@ -86,6 +86,7 @@ Complete the read-only live Venue, account and risk evidence required before the
 - [x] Focused Runtime and Backend regression tests cover liquidation, Stop Out, paging and partial reads.
 - [x] Platform CI #1431 and Secret Scan #784 passed on the final code head.
 - [x] Platform CI #1437 and Secret Scan #787 passed on the final documentation head.
+- [x] Platform CI #1439 and Secret Scan #788 passed on the final metadata head.
 
 ## Stop conditions
 
@@ -98,6 +99,7 @@ Complete the read-only live Venue, account and risk evidence required before the
 ## Completion
 
 - PR: #99
-- Current: implementation and documentation complete; ready for squash merge after the final metadata-head gate.
+- Squash merge: `0ac3e6ce248c8768a7c9ed9c7a61c5100baf6ef9`
+- Outcome: merged to `main`; read-only live observability design and implementation are complete.
 - Live external behavior proven: no. Real Bybit/MT5 field availability and Windows-host execution remain Issue #39 operational evidence.
 - Follow-up: controlled local/Windows acceptance, private WebSocket confirmation and real Limit execution remain separately bounded scopes.
