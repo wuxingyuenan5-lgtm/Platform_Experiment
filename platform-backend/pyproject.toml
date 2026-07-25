@@ -50,6 +50,7 @@ include = [
   "app/venue_reconciliation_repository.py",
   "app/venue_reconciliation_runtime_client.py",
   "app/venue_reconciliation_schemas.py",
+  "app/venue_reconciliation_service.py",
 ]
 exclude = ["tests"]
 reportMissingTypeStubs = false
@@ -69,9 +70,8 @@ select = ["E", "F", "I", "UP", "B"]
 # Phase 4A keeps the complete risk state machine in one auditable module; long SQL/error lines
 # and Pydantic's quoted self annotation are accepted until the Phase 4 module split.
 "app/execution_risk.py" = ["E501", "UP037"]
-# Venue Reconciliation still keeps service and route orchestration together while staged
-# extraction proceeds; the compatibility import and long HTTP/domain error are tracked debt.
-"app/venue_reconciliation.py" = ["E501", "F401"]
+# Venue Reconciliation facade preserves a legacy compatibility import pending usage migration.
+"app/venue_reconciliation.py" = ["F401"]
 "tests/test_venue_reconciliation.py" = ["E501"]
 # Phase 4D keeps the synchronous EOD orchestration and API contract together for auditability.
 "app/eod_reconciliation.py" = ["B008", "E501", "UP037"]

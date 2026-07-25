@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Venue Reconciliation Service ownership — Issue #73 / PR #74
+
+- Added `platform-backend/app/venue_reconciliation_service.py` as the sole order/account reconciliation use-case sequencing owner.
+- Replaced explicit Service HTTP failures with small domain errors and preserved the exact existing FastAPI status/detail mapping in `app.venue_reconciliation`.
+- Reduced `app.venue_reconciliation` to compatibility exports/delegates, transport/domain error translation and route facade responsibilities.
+- Preserved existing EOD imports, public routes, Runtime behavior, FinancialFact and Difference identities, persistence transactions and order-state transitions.
+- Added Service/domain-error compatibility tests, sole-owner architecture checks and progressive Pyright coverage.
+- Preserved both Platform and Runtime Live Write defaults.
+
 ### Venue Reconciliation Runtime Client ownership — Issue #71 / PR #72
 
 - Added `platform-backend/app/venue_reconciliation_runtime_client.py` as the sole owner of configured Runtime GET transport, URL/parameter/timeout application and transport failures.
@@ -81,7 +90,7 @@
 
 - Extracted every fixed reference-data Seed vector and insertion statement into `platform-backend/app/database_seeds.py`.
 - Preserved `app.database.seed_reference_data` as an identical compatibility export.
-- Reduced `app/database.py` to explicit Connection/Bootstrap/Seed compatibility exports and `Connection → Bootstrap → Seed` initialization orchestration.
+- Reduced `app/database.py` to explicit Connection/Bootstrap/Seed compatibility exports and `Connection → Bootstrap → Seed` initialization orchestration only.
 - Added an exhaustive all-row/all-field snapshot across the 15 fixed Seed tables, pinned by SHA-256 `d42f7e4f95a6efa9044b1e91b4e603f1d87f515923a57d941ee16e75109e6183`.
 - Added explicit checks for simulation/active/paused safety defaults and the existing XAUUSD contract specification.
 - Added repeated-initialization full-snapshot equivalence and static Seed ownership checks.
