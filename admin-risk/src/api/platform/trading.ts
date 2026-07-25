@@ -3,7 +3,6 @@ import axios, { type AxiosInstance } from 'axios';
 import type {
   AccountResult,
   CreateExecutionBatchInput,
-  CreateOrderInput,
   CredentialReferenceResult,
   CrossSpreadHistoryPointResult,
   CrossSpreadMarketCommandInput,
@@ -12,7 +11,6 @@ import type {
   ExecutionBatchResult,
   InstrumentResult,
   OrderDetailResult,
-  OrderResult,
   PnlResult,
   PositionResult,
   ReconciliationSummaryResult,
@@ -42,13 +40,8 @@ function isNotFound(error: unknown): boolean {
   return axios.isAxiosError(error) && error.response?.status === 404;
 }
 
-export async function createTradingOrder(input: CreateOrderInput): Promise<OrderResult> {
-  const response = await client.post<OrderResult>('/trading/orders', input);
-  return response.data;
-}
-
-export async function reconcileTradingOrder(orderId: string): Promise<OrderResult> {
-  const response = await client.post<OrderResult>(
+export async function reconcileTradingOrder(orderId: string) {
+  const response = await client.post(
     `/trading/orders/${encodeURIComponent(orderId)}/reconcile`,
   );
   return response.data;
