@@ -1,7 +1,7 @@
 # Task: Venue Reconciliation Runtime Client
 
 Issue: #71
-Status: active
+Status: review
 Branch: `refactor/issue-71-venue-reconciliation-runtime-client`
 Base commit: `79367060c023e3f14af649ea9538b53cadaf4873`
 
@@ -85,12 +85,12 @@ Final delivery also requires full Platform CI and independent Secret Scan on the
 
 ## Acceptance criteria
 
-- [ ] Runtime transport has one authoritative owner.
-- [ ] Compatibility delegate and external behavior are preserved.
-- [ ] Focused unit, architecture and existing integration tests pass.
-- [ ] Ruff, Pyright, repository and documentation checks pass.
-- [ ] Full Platform CI and Secret Scan pass.
-- [ ] Diff contains no unrelated cleanup.
+- [x] Runtime transport has one authoritative owner.
+- [x] Compatibility delegate and external behavior are preserved.
+- [x] Focused unit, architecture and existing integration tests pass.
+- [x] Ruff, Pyright, repository and documentation checks pass.
+- [ ] Full Platform CI and Secret Scan pass on the final documentation head.
+- [x] Diff contains no unrelated cleanup.
 
 ## Risk and rollback
 
@@ -102,16 +102,16 @@ Risk: low-to-medium
 
 ## Progress
 
-- Done: baseline verified; Issue and branch created; protected semantics fixed.
-- Current: implement Runtime Client and compatibility delegation.
-- Next: run final-head CI, review and merge.
+- Done: Runtime Client, compatibility delegate, integration/architecture tests, progressive typing and authoritative documentation are complete.
+- Current: final PR-head Platform CI and Secret Scan.
+- Next: mark PR ready and squash merge when all checks are green.
 - Blocked by: none.
 
 ## Completion
 
-- PR:
-- Merge commit:
-- Behavior changed: none intended.
-- Behavior intentionally unchanged: all Runtime query and reconciliation behavior.
-- Tests/CI:
-- Follow-up debt: Service and route facade remain separate future Issues.
+- PR: #72
+- Merge commit: recorded by the final squash merge of PR #72.
+- Behavior changed: Runtime GET transport ownership moved to `venue_reconciliation_runtime_client.py`.
+- Behavior intentionally unchanged: every Runtime query, response-status path, reconciliation identity, API, transaction, order state and Live Write default.
+- Tests/CI: focused Runtime Client tests plus Backend/Runtime/Frontend/Repository Safety and Secret Scan required on final head.
+- Follow-up debt: Reconciliation Service and route facade remain separate future Issues.
