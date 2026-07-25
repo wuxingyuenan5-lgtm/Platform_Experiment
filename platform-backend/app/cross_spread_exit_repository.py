@@ -198,7 +198,10 @@ def configure_exit_plan_execution_modes(
             ),
         )
     if cursor.rowcount != 1:
-        raise HTTPException(status_code=409, detail="Exit plan execution modes changed concurrently")
+        raise HTTPException(
+            status_code=409,
+            detail="Exit plan execution modes changed concurrently",
+        )
     return get_exit_plan(plan_id)
 
 
