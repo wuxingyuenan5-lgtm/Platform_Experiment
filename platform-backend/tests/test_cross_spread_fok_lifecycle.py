@@ -53,7 +53,7 @@ def plan(status: str, *, trigger_reason: str | None = None) -> CrossSpreadExitPl
         triggerSpread=None,
         createdAt=NOW,
         updatedAt=NOW,
-        triggeredAt=None,
+        triggeredAt=NOW if status == "triggered" else None,
         closedAt=None,
     )
 
@@ -202,6 +202,9 @@ def test_clean_fok_close_no_fill_releases_plan_back_to_active(monkeypatch) -> No
     assert captured["kwargs"]["bybit_reduce_only"] is True
     assert captured["kwargs"]["mt5_reduce_only"] is True
     assert captured["kwargs"]["mt5_position_id"] == "778899"
+    assert captured["kwargs"]["idempotency_key"].startswith(
+        "cross-spread-fok-exit:plan-fok-1:"
+    )
     assert result.execution_batch.status == "failed"
     assert result.exit_plan.status == "active"
 
