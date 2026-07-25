@@ -38,6 +38,7 @@ Human orientation starts at `00-人工可读目录/README.md`. Agent orientation
 - Keep external HTTP transport in explicit client boundaries; orchestration may coordinate responses and map errors but must not duplicate configured URL/timeout calls.
 - Keep use-case sequencing in framework-independent Service modules; route facades may preserve compatibility and translate errors but must not duplicate use-case implementation.
 - Keep API schemas owned by their domain module; compatibility modules may use explicit aliases but must not redefine them.
+- Keep DDL, direct SQL, row mapping and protected persistence transactions in explicit Repository owners; Policy, Service and route facades must not access the database directly.
 - Keep operational trading projections (`positions`, `pnl_results`) separate from FinancialFact-based formal accounting projections.
 - Assign every Backend and Runtime test exactly one primary layer (`architecture`, `unit`, `integration`, or `live_safety`) and keep classified suites independently executable.
 - CI gates must cover complete maintained directories or an explicit no-new-debt mechanism; new files may not bypass validation.

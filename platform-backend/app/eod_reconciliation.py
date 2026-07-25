@@ -7,8 +7,8 @@ from uuid import uuid4
 
 from fastapi import APIRouter, HTTPException, Query
 
+from app import eod_reconciliation_repository as repository
 from app.config import get_settings
-from app.database import connection
 from app.eod_policy import apply_outstanding_difference_gate, list_strategy_orders_for_eod
 from app.eod_reconciliation_schemas import (
     EodReconciliationReportRequest,
@@ -31,59 +31,14 @@ from app.venue_reconciliation import (
     validate_strategy_account,
 )
 
-# Stable orchestration port backed by the single policy implementation.
+# Stable compatibility ports backed by the authoritative owners.
 list_strategy_orders = list_strategy_orders_for_eod
-
-SCHEMA_SQL = """
-CREATE TABLE IF NOT EXISTS eod_reconciliation_reports (
-    id TEXT PRIMARY KEY,
-    idempotency_key TEXT NOT NULL UNIQUE,
-    natural_key TEXT NOT NULL UNIQUE,
-    payload_hash TEXT NOT NULL,
-    business_date TEXT NOT NULL,
-    timezone TEXT NOT NULL,
-    valuation_time TEXT NOT NULL,
-    strategy_instance_id TEXT NOT NULL,
-    account_id TEXT NOT NULL,
-    actor TEXT NOT NULL,
-    owner TEXT NOT NULL,
-    due_at TEXT NOT NULL,
-    status TEXT NOT NULL,
-    scale_gate_status TEXT NOT NULL,
-    order_reconciliation_count INTEGER NOT NULL,
-    account_reconciliation_run_id TEXT,
-    economic_event_import_id TEXT,
-    nav_snapshot_id TEXT,
-    formal_pnl_count INTEGER NOT NULL,
-    formal_pnl_incomplete_count INTEGER NOT NULL,
-    open_difference_count INTEGER NOT NULL,
-    resolved_difference_count INTEGER NOT NULL,
-    accepted_difference_count INTEGER NOT NULL,
-    skipped_external_ids_json TEXT NOT NULL,
-    missing_account_ids_json TEXT NOT NULL,
-    errors_json TEXT NOT NULL,
-    review_payload_hash TEXT,
-    reviewer TEXT,
-    review_decision TEXT,
-    review_reason TEXT,
-    reviewed_at TEXT,
-    created_at TEXT NOT NULL,
-    completed_at TEXT,
-    FOREIGN KEY(strategy_instance_id) REFERENCES strategy_instances(id),
-    FOREIGN KEY(account_id) REFERENCES accounts(id)
-);
-
-CREATE INDEX IF NOT EXISTS idx_eod_reports_business_date
-ON eod_reconciliation_reports(business_date, strategy_instance_id, account_id);
-
-CREATE INDEX IF NOT EXISTS idx_eod_reports_status
-ON eod_reconciliation_reports(status, scale_gate_status, due_at);
-"""
-
-
-def ensure_schema() -> None:
-    with connection() as db:
-        db.executescript(SCHEMA_SQL)
+SCHEMA_SQL = repository.SCHEMA_SQL
+ensure_schema = repository.ensure_schema
+formal_pnl_counts = repository.formal_pnl_counts
+difference_status_counts = repository.difference_status_counts
+sla_status = repository.sla_status
+report_from_row = repository.report_from_row
 
 
 def now_iso() -> str:
@@ -115,16 +70,7 @@ def create_eod_report(
     payload_hash = canonical_hash(payload)
     report_natural_key = natural_key(request)
 
-    with connection() as db:
-        existing = db.execute(
-            """
-            SELECT * FROM eod_reconciliation_reports
-            WHERE idempotency_key = ? OR natural_key = ?
-            ORDER BY created_at
-            LIMIT 1
-            """,
-            (request.idempotency_key, report_natural_key),
-        ).fetchone()
+    existing = repository.load_report_by_identity(request.idempotency_key, report_natural_key)
     if existing is not None:
         if existing["payload_hash"] != payload_hash:
             raise HTTPException(
@@ -135,59 +81,21 @@ def create_eod_report(
 
     report_id = str(uuid4())
     created_at = now_iso()
-    with connection() as db:
-        db.execute(
-            """
-            INSERT INTO eod_reconciliation_reports (
-                id, idempotency_key, natural_key, payload_hash, business_date,
-                timezone, valuation_time, strategy_instance_id, account_id,
-                actor, owner, due_at, status, scale_gate_status,
-                order_reconciliation_count, account_reconciliation_run_id,
-                economic_event_import_id, nav_snapshot_id, formal_pnl_count,
-                formal_pnl_incomplete_count, open_difference_count,
-                resolved_difference_count, accepted_difference_count,
-                skipped_external_ids_json, missing_account_ids_json, errors_json,
-                review_payload_hash, reviewer, review_decision, review_reason,
-                reviewed_at, created_at, completed_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-                      ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                report_id,
-                request.idempotency_key,
-                report_natural_key,
-                payload_hash,
-                request.business_date.isoformat(),
-                request.timezone,
-                request.valuation_time.astimezone(UTC).isoformat(),
-                request.strategy_instance_id,
-                request.account_id,
-                request.actor,
-                request.owner,
-                request.due_at.astimezone(UTC).isoformat(),
-                "partial",
-                "blocked",
-                0,
-                None,
-                None,
-                None,
-                0,
-                0,
-                0,
-                0,
-                0,
-                "[]",
-                "[]",
-                "[]",
-                None,
-                None,
-                None,
-                None,
-                None,
-                created_at,
-                None,
-            ),
-        )
+    repository.insert_initial_report(
+        report_id=report_id,
+        idempotency_key=request.idempotency_key,
+        natural_key=report_natural_key,
+        payload_hash=payload_hash,
+        business_date=request.business_date.isoformat(),
+        timezone=request.timezone,
+        valuation_time=request.valuation_time.astimezone(UTC).isoformat(),
+        strategy_instance_id=request.strategy_instance_id,
+        account_id=request.account_id,
+        actor=request.actor,
+        owner=request.owner,
+        due_at=request.due_at.astimezone(UTC).isoformat(),
+        created_at=created_at,
+    )
 
     order_count = 0
     account_run_id: str | None = None
@@ -220,12 +128,7 @@ def create_eod_report(
             )
         )
         account_run_id = account_run.run_id
-        with connection() as db:
-            rows = db.execute(
-                "SELECT id FROM reconciliation_differences WHERE run_id = ?",
-                (account_run_id,),
-            ).fetchall()
-        difference_ids.update(row["id"] for row in rows)
+        difference_ids.update(repository.list_difference_ids_for_run(account_run_id))
     except Exception as exc:  # noqa: BLE001 - report must preserve partial failures
         errors.append(f"account-reconciliation:{type(exc).__name__}:{exc}")
 
@@ -278,38 +181,24 @@ def create_eod_report(
         "eligible_for_review" if status == "complete" else "blocked"
     )
     completed_at = now_iso()
-    with connection() as db:
-        db.execute(
-            """
-            UPDATE eod_reconciliation_reports
-            SET status = ?, scale_gate_status = ?, order_reconciliation_count = ?,
-                account_reconciliation_run_id = ?, economic_event_import_id = ?,
-                nav_snapshot_id = ?, formal_pnl_count = ?,
-                formal_pnl_incomplete_count = ?, open_difference_count = ?,
-                resolved_difference_count = ?, accepted_difference_count = ?,
-                skipped_external_ids_json = ?, missing_account_ids_json = ?,
-                errors_json = ?, completed_at = ?
-            WHERE id = ?
-            """,
-            (
-                status,
-                scale_gate_status,
-                order_count,
-                account_run_id,
-                economic_import_id,
-                nav_snapshot_id,
-                formal_pnl_count,
-                formal_pnl_incomplete_count,
-                open_count,
-                resolved_count,
-                accepted_count,
-                json.dumps(skipped_external_ids, sort_keys=True),
-                json.dumps(missing_account_ids, sort_keys=True),
-                json.dumps(errors, ensure_ascii=False, sort_keys=True),
-                completed_at,
-                report_id,
-            ),
-        )
+    repository.complete_report(
+        report_id=report_id,
+        status=status,
+        scale_gate_status=scale_gate_status,
+        order_reconciliation_count=order_count,
+        account_reconciliation_run_id=account_run_id,
+        economic_event_import_id=economic_import_id,
+        nav_snapshot_id=nav_snapshot_id,
+        formal_pnl_count=formal_pnl_count,
+        formal_pnl_incomplete_count=formal_pnl_incomplete_count,
+        open_difference_count=open_count,
+        resolved_difference_count=resolved_count,
+        accepted_difference_count=accepted_count,
+        skipped_external_ids=skipped_external_ids,
+        missing_account_ids=missing_account_ids,
+        errors=errors,
+        completed_at=completed_at,
+    )
 
     audit(
         "eod_reconciliation_completed",
@@ -340,46 +229,9 @@ def create_eod_report(
     return get_eod_report(report_id)
 
 
-def formal_pnl_counts(strategy_instance_id: str, account_id: str) -> tuple[int, int]:
-    with connection() as db:
-        row = db.execute(
-            """
-            SELECT COUNT(*) AS total,
-                   SUM(CASE WHEN data_quality_state != 'complete' THEN 1 ELSE 0 END)
-                       AS incomplete
-            FROM formal_pnl_results
-            WHERE strategy_instance_id = ? AND account_id = ?
-            """,
-            (strategy_instance_id, account_id),
-        ).fetchone()
-    return int(row["total"] or 0), int(row["incomplete"] or 0)
-
-
-def difference_status_counts(difference_ids: set[str]) -> tuple[int, int, int]:
-    if not difference_ids:
-        return 0, 0, 0
-    placeholders = ",".join("?" for _ in difference_ids)
-    with connection() as db:
-        rows = db.execute(
-            f"""
-            SELECT status, COUNT(*) AS count
-            FROM reconciliation_differences
-            WHERE id IN ({placeholders})
-            GROUP BY status
-            """,
-            tuple(sorted(difference_ids)),
-        ).fetchall()
-    counts = {row["status"]: int(row["count"]) for row in rows}
-    return counts.get("open", 0), counts.get("resolved", 0), counts.get("accepted", 0)
-
-
 def get_eod_report(report_id: str) -> EodReconciliationReportResponse:
     ensure_schema()
-    with connection() as db:
-        row = db.execute(
-            "SELECT * FROM eod_reconciliation_reports WHERE id = ?",
-            (report_id,),
-        ).fetchone()
+    row = repository.load_report(report_id)
     if row is None:
         raise HTTPException(status_code=404, detail="EOD reconciliation report not found")
     return report_from_row(row)
@@ -391,28 +243,14 @@ def list_eod_reports(
     business_date: date | None = None,
 ) -> list[EodReconciliationReportResponse]:
     ensure_schema()
-    clauses: list[str] = []
-    parameters: list[object] = []
-    if strategy_instance_id is not None:
-        clauses.append("strategy_instance_id = ?")
-        parameters.append(strategy_instance_id)
-    if account_id is not None:
-        clauses.append("account_id = ?")
-        parameters.append(account_id)
-    if business_date is not None:
-        clauses.append("business_date = ?")
-        parameters.append(business_date.isoformat())
-    where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
-    with connection() as db:
-        rows = db.execute(
-            f"""
-            SELECT * FROM eod_reconciliation_reports
-            {where}
-            ORDER BY business_date DESC, created_at DESC
-            """,
-            tuple(parameters),
-        ).fetchall()
-    return [report_from_row(row) for row in rows]
+    return [
+        report_from_row(row)
+        for row in repository.list_report_rows(
+            strategy_instance_id=strategy_instance_id,
+            account_id=account_id,
+            business_date=business_date,
+        )
+    ]
 
 
 def review_eod_report(
@@ -421,106 +259,40 @@ def review_eod_report(
 ) -> EodReconciliationReportResponse:
     ensure_schema()
     payload_hash = canonical_hash(request.model_dump(mode="json"))
-    with connection() as db:
-        row = db.execute(
-            "SELECT * FROM eod_reconciliation_reports WHERE id = ?",
-            (report_id,),
-        ).fetchone()
-        if row is None:
-            raise HTTPException(status_code=404, detail="EOD reconciliation report not found")
-        if row["review_payload_hash"] is not None:
-            if row["review_payload_hash"] != payload_hash:
-                raise HTTPException(
-                    status_code=409,
-                    detail="EOD report review is immutable and already has a different decision",
-                )
-            return report_from_row(row)
-        if request.decision == "approved_same_limits" and row["scale_gate_status"] != (
-            "eligible_for_review"
-        ):
-            raise HTTPException(
-                status_code=422,
-                detail="Only a clean EOD report can be approved for the existing live limits",
-            )
-        reviewed_at = now_iso()
-        db.execute(
-            """
-            UPDATE eod_reconciliation_reports
-            SET review_payload_hash = ?, reviewer = ?, review_decision = ?,
-                review_reason = ?, reviewed_at = ?, scale_gate_status = ?
-            WHERE id = ?
-            """,
-            (
-                payload_hash,
-                request.reviewer,
-                request.decision,
-                request.reason,
-                reviewed_at,
-                request.decision,
-                report_id,
-            ),
+    try:
+        result = repository.review_report(
+            report_id=report_id,
+            payload_hash=payload_hash,
+            decision=request.decision,
+            reviewer=request.reviewer,
+            reason=request.reason,
+            reviewed_at=now_iso(),
         )
-        row = db.execute(
-            "SELECT * FROM eod_reconciliation_reports WHERE id = ?",
-            (report_id,),
-        ).fetchone()
-    audit(
-        "eod_reconciliation_reviewed",
-        "eod_reconciliation_report",
-        report_id,
-        {
-            "decision": request.decision,
-            "reviewer": request.reviewer,
-            "reason": request.reason,
-        },
-    )
-    return report_from_row(row)
+    except repository.EodReportNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="EOD reconciliation report not found") from exc
+    except repository.EodReviewConflictError as exc:
+        raise HTTPException(
+            status_code=409,
+            detail="EOD report review is immutable and already has a different decision",
+        ) from exc
+    except repository.EodReviewNotEligibleError as exc:
+        raise HTTPException(
+            status_code=422,
+            detail="Only a clean EOD report can be approved for the existing live limits",
+        ) from exc
 
-
-def sla_status(row) -> str:
-    due_at = datetime.fromisoformat(row["due_at"])
-    completed_at = (
-        datetime.fromisoformat(row["completed_at"]) if row["completed_at"] is not None else None
-    )
-    if completed_at is not None:
-        return "met" if completed_at <= due_at else "breached"
-    return "overdue" if datetime.now(UTC) > due_at else "pending"
-
-
-def report_from_row(row) -> EodReconciliationReportResponse:
-    return EodReconciliationReportResponse(
-        reportId=row["id"],
-        idempotencyKey=row["idempotency_key"],
-        businessDate=row["business_date"],
-        timezone=row["timezone"],
-        valuationTime=row["valuation_time"],
-        strategyInstanceId=row["strategy_instance_id"],
-        accountId=row["account_id"],
-        actor=row["actor"],
-        owner=row["owner"],
-        dueAt=row["due_at"],
-        status=row["status"],
-        slaStatus=sla_status(row),
-        scaleGateStatus=row["scale_gate_status"],
-        orderReconciliationCount=row["order_reconciliation_count"],
-        accountReconciliationRunId=row["account_reconciliation_run_id"],
-        economicEventImportId=row["economic_event_import_id"],
-        navSnapshotId=row["nav_snapshot_id"],
-        formalPnlCount=row["formal_pnl_count"],
-        formalPnlIncompleteCount=row["formal_pnl_incomplete_count"],
-        openDifferenceCount=row["open_difference_count"],
-        resolvedDifferenceCount=row["resolved_difference_count"],
-        acceptedDifferenceCount=row["accepted_difference_count"],
-        skippedExternalIds=json.loads(row["skipped_external_ids_json"]),
-        missingAccountIds=json.loads(row["missing_account_ids_json"]),
-        errors=json.loads(row["errors_json"]),
-        reviewer=row["reviewer"],
-        reviewDecision=row["review_decision"],
-        reviewReason=row["review_reason"],
-        reviewedAt=row["reviewed_at"],
-        createdAt=row["created_at"],
-        completedAt=row["completed_at"],
-    )
+    if result.changed:
+        audit(
+            "eod_reconciliation_reviewed",
+            "eod_reconciliation_report",
+            report_id,
+            {
+                "decision": request.decision,
+                "reviewer": request.reviewer,
+                "reason": request.reason,
+            },
+        )
+    return report_from_row(result.row)
 
 
 router = APIRouter(prefix=get_settings().api_prefix)

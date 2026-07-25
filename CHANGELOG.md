@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### EOD Reconciliation Repository ownership — Issue #77 / PR #78
+
+- Added `platform-backend/app/eod_reconciliation_repository.py` as the sole EOD DDL, direct-SQL, row-mapping and persistence-transaction owner.
+- Removed direct database access from `app.eod_reconciliation` and `app.eod_policy` while preserving explicit compatibility aliases.
+- Added exact DDL SHA-256, report identity/unique-constraint, immutable-review and forced-rollback evidence.
+- Registered EOD and Venue reconciliation Repository owners in progressive Pyright, Architecture Ownership, database authority and Repository Safety checks.
+- Preserved every report/status/scale-gate rule, partial-failure string, API, cross-domain orchestration, transaction and both Live Write defaults.
+
 ### EOD Reconciliation public-schema ownership — Issue #75 / PR #76
 
 - Added `platform-backend/app/eod_reconciliation_schemas.py` as the sole owner of EOD public status types and report/review request-response DTOs.
