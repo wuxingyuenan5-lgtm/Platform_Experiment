@@ -4,7 +4,7 @@ Last updated: 2026-07-25
 Stable branch: `main`
 Product release: `0.7.0`
 Latest completed engineering scope: Issue #92 / PR #93
-Latest completed documentation scope: Issue #85 / PR #86
+Latest completed documentation scope: Issue #94 / PR #95
 
 This file is the compact cross-session handoff. It records current truth, not a PR diary. Read the actual open Issues and PRs before assuming that work is active.
 
