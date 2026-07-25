@@ -104,7 +104,7 @@ Safe approach: module-by-module cleanup until full `src/` can replace the change
 
 ## TD-005 — Progressive Python typing
 
-Status: active; critical execution, FinancialFact, Venue Reconciliation and SQLite boundaries selected
+Status: active; critical execution, FinancialFact, Venue Reconciliation, EOD schemas and SQLite boundaries selected
 Owner: Platform Backend and Execution Runtime
 
 Problem: much of the legacy code remains outside static type checking.
@@ -114,7 +114,7 @@ Risk: untyped database rows, arbitrary payloads and large orchestration modules 
 Completed prerequisite:
 
 - Pyright is installed and blocking in CI;
-- Platform execution DTOs, FinancialFact DTOs/Normalization/Repository/Projection Service, shared Position Math, Venue Reconciliation DTOs/Difference Policy/Repository/Runtime Client/Service, SQLite Connection/Bootstrap/Seeds, Runtime contracts, schema migrations, schema governance and authoritative order submission are selected;
+- Platform execution DTOs, FinancialFact DTOs/Normalization/Repository/Projection Service, shared Position Math, Venue Reconciliation DTOs/Difference Policy/Repository/Runtime Client/Service, EOD Reconciliation DTOs, SQLite Connection/Bootstrap/Seeds, Runtime contracts, schema migrations, schema governance and authoritative order submission are selected;
 - Runtime models, contracts and Gateway Protocol are selected.
 
 Deferred because: strict whole-project typing would create noisy changes unrelated to current risk boundaries.
@@ -193,3 +193,27 @@ Evidence includes exact Schema/OpenAPI compatibility, Difference Goldens, DDL ch
 Protected semantics: Runtime endpoints and payloads, FinancialFact identity, Difference identity/precedence, order recovery, database transactions, API schemas/status codes, EOD callers and both Live Write defaults.
 
 Future rule: changes must remain inside the established Owner. Compatibility delegates may be removed only with explicit usage evidence and a dedicated migration.
+
+## TD-009 — EOD Reconciliation module concentration
+
+Status: active; public schemas extracted in Issue #75
+Owner: Platform Backend / EOD Reconciliation
+
+Problem: `app/eod_reconciliation.py` still combines EOD DDL/direct SQL, row mapping, report orchestration, partial-failure capture, status/scale-gate decisions, immutable review handling and FastAPI routes.
+
+Risk: persistence, review policy and cross-domain orchestration remain coupled in one large module, so a change to one concern has a broad regression surface.
+
+Completed prerequisite:
+
+- `app/eod_reconciliation_schemas.py` owns public status types and request/response DTOs;
+- `app.eod_reconciliation` preserves identical compatibility objects;
+- exact JSON Schema, validation-message and existing API integration evidence protect the public boundary;
+- the schema owner is selected for progressive Pyright.
+
+Deferred because: Issue #75 is intentionally limited to the low-risk public-schema boundary. Moving SQL, review rules and orchestration together would create an oversized refactor and could cross the real-funds safety boundary.
+
+Trigger: merge Issue #75 with final-head CI, then open a separate Issue for the EOD persistence Repository after pinning DDL, query, row-mapping, idempotency and rollback behavior.
+
+Protected semantics: report natural/idempotency identity, business-date/timezone validation, DDL and query order, partial-failure strings, report/scale-gate status rules, immutable review rules, EOD/Venue/FinancialFact coordination and both Live Write defaults.
+
+Safe approach: Repository → pure review/status Policy → framework-independent Service → thin route facade, with one small PR and exact behavioral evidence per boundary.

@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### EOD Reconciliation public-schema ownership — Issue #75 / PR #76
+
+- Added `platform-backend/app/eod_reconciliation_schemas.py` as the sole owner of EOD public status types and report/review request-response DTOs.
+- Preserved exact Python object identity through the existing `app.eod_reconciliation` compatibility imports.
+- Added a combined public JSON Schema SHA-256, exact timezone/business-date validation-message tests and review-decision validation evidence.
+- Added sole-definition/dependency-purity architecture checks and progressive Pyright coverage.
+- Preserved every route, DDL/SQL statement, report identity, partial-failure string, status/scale-gate decision, immutable review rule and both Live Write defaults.
+
 ### Venue Reconciliation Service ownership — Issue #73 / PR #74
 
 - Added `platform-backend/app/venue_reconciliation_service.py` as the sole order/account reconciliation use-case sequencing owner.

@@ -36,6 +36,7 @@ include = [
   "app/database_bootstrap.py",
   "app/database_connection.py",
   "app/database_seeds.py",
+  "app/eod_reconciliation_schemas.py",
   "app/execution_schemas.py",
   "app/financial_fact_normalization.py",
   "app/financial_fact_repository.py",
@@ -67,14 +68,16 @@ select = ["E", "F", "I", "UP", "B"]
 "app/financial_facts.py" = ["B008"]
 # Pydantic's quoted self-return annotation is required while the validator builds the model.
 "app/financial_fact_schemas.py" = ["UP037"]
+"app/eod_reconciliation_schemas.py" = ["UP037"]
 # Phase 4A keeps the complete risk state machine in one auditable module; long SQL/error lines
 # and Pydantic's quoted self annotation are accepted until the Phase 4 module split.
 "app/execution_risk.py" = ["E501", "UP037"]
 # Venue Reconciliation facade preserves a legacy compatibility import pending usage migration.
 "app/venue_reconciliation.py" = ["F401"]
 "tests/test_venue_reconciliation.py" = ["E501"]
-# Phase 4D keeps the synchronous EOD orchestration and API contract together for auditability.
-"app/eod_reconciliation.py" = ["B008", "E501", "UP037"]
+# Phase 4D keeps the synchronous EOD orchestration and API contract together for auditability;
+# the public ReviewDecision import is an explicit compatibility export.
+"app/eod_reconciliation.py" = ["B008", "E501", "F401"]
 "tests/test_eod_reconciliation.py" = ["E501"]
 # Production Gate keeps authentication policy and two-person live-session state explicit.
 "app/auth.py" = ["E501"]

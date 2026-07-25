@@ -23,6 +23,7 @@ REQUIRED_OWNERS = {
     "Platform composition root": "platform-backend/app/main.py",
     "Execution API DTOs": "platform-backend/app/execution_schemas.py",
     "Platform order submission orchestration": "platform-backend/app/trade_command_execution.py",
+    "EOD Reconciliation public DTOs": "platform-backend/app/eod_reconciliation_schemas.py",
     "Venue Reconciliation public DTOs": "platform-backend/app/venue_reconciliation_schemas.py",
     "Venue Reconciliation difference policy": "platform-backend/app/venue_reconciliation_policy.py",
     "Venue Reconciliation persistence": "platform-backend/app/venue_reconciliation_repository.py",
