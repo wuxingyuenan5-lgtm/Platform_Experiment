@@ -7,7 +7,7 @@
       </div>
       <div class="market-lifecycle__status">
         <span>{{ leftLegSymbol }} / {{ rightLegSymbol }}</span>
-        <strong>市价 / FOK 限价</strong>
+        <strong>市价 / FOK / PostOnly</strong>
       </div>
     </header>
 
@@ -16,7 +16,7 @@
         <div class="market-lifecycle__card-head">
           <div>
             <h4>合成开仓</h4>
-            <p>Bybit 确认成交后，MT5 按实际数量对冲</p>
+            <p>Bybit 确认精确成交后，MT5 按实际数量对冲</p>
           </div>
           <button type="button" :disabled="loading" @click="refreshPlans">刷新</button>
         </div>
@@ -33,7 +33,14 @@
             <span>执行方式</span>
             <select v-model="openExecutionMode">
               <option value="market">市价</option>
-              <option value="limit">FOK 限价</option>
+              <option value="limit">限价</option>
+            </select>
+          </label>
+          <label v-if="openExecutionMode === 'limit'">
+            <span>限价策略</span>
+            <select v-model="openLimitStrategy">
+              <option value="fok">FOK 全成全撤</option>
+              <option value="post_only_chase">PostOnly 追单</option>
             </select>
           </label>
           <label>
@@ -52,7 +59,14 @@
             <span>止盈执行</span>
             <select v-model="takeProfitExecutionMode">
               <option value="market">市价</option>
-              <option value="limit">FOK 限价</option>
+              <option value="limit">限价</option>
+            </select>
+          </label>
+          <label v-if="takeProfitExecutionMode === 'limit'">
+            <span>止盈限价策略</span>
+            <select v-model="takeProfitLimitStrategy">
+              <option value="fok">FOK 全成全撤</option>
+              <option value="post_only_chase">PostOnly 追单</option>
             </select>
           </label>
           <label>
@@ -63,7 +77,14 @@
             <span>止损执行</span>
             <select v-model="stopLossExecutionMode">
               <option value="market">市价（默认）</option>
-              <option value="limit">FOK 限价</option>
+              <option value="limit">限价</option>
+            </select>
+          </label>
+          <label v-if="stopLossExecutionMode === 'limit'">
+            <span>止损限价策略</span>
+            <select v-model="stopLossLimitStrategy">
+              <option value="fok">FOK 全成全撤</option>
+              <option value="post_only_chase">PostOnly 追单</option>
             </select>
           </label>
         </div>
@@ -73,8 +94,11 @@
           <strong>{{ executableSpreadLabel }}</strong>
           <small>{{ thresholdRuleLabel }}</small>
           <small v-if="openExecutionMode === 'limit'">{{ limitRuleLabel }}</small>
+          <small v-if="usesPostOnly" class="is-warn">
+            PostOnly Chase 默认关闭，必须在受控 Runtime 主机显式启用；断线或事件不一致将停止追单。
+          </small>
           <small v-if="stopLossExecutionMode === 'limit'" class="is-warn">
-            FOK 止损可能零成交并保持计划活动；风险降低优先时应使用市价。
+            限价止损可能未成交并保持计划活动；风险降低优先时应使用市价。
           </small>
         </div>
 
@@ -93,7 +117,7 @@
         <div class="market-lifecycle__card-head">
           <div>
             <h4>真实退出计划</h4>
-            <p>自动止盈止损按计划保存的市价或 FOK 执行；人工平仓可独立选择</p>
+            <p>人工、止盈和止损复用同一 Close Action，并保存各自限价策略</p>
           </div>
           <span>{{ activePlans.length }} 笔活动计划</span>
         </div>
@@ -103,7 +127,14 @@
             <span>人工平仓方式</span>
             <select v-model="closeExecutionMode">
               <option value="market">市价</option>
-              <option value="limit">FOK 限价</option>
+              <option value="limit">限价</option>
+            </select>
+          </label>
+          <label v-if="closeExecutionMode === 'limit'">
+            <span>人工限价策略</span>
+            <select v-model="closeLimitStrategy">
+              <option value="fok">FOK 全成全撤</option>
+              <option value="post_only_chase">PostOnly 追单</option>
             </select>
           </label>
           <label v-if="closeExecutionMode === 'limit'">
@@ -142,8 +173,19 @@
                   {{ formatSigned(plan.stopLossSpread) }}
                 </td>
                 <td>
-                  {{ executionModeLabel(plan.takeProfitExecutionMode) }} /
-                  {{ executionModeLabel(plan.stopLossExecutionMode) }}
+                  {{
+                    executionSelectionLabel(
+                      plan.takeProfitExecutionMode,
+                      plan.takeProfitLimitStrategy,
+                    )
+                  }}
+                  /
+                  {{
+                    executionSelectionLabel(
+                      plan.stopLossExecutionMode,
+                      plan.stopLossLimitStrategy,
+                    )
+                  }}
                 </td>
                 <td>{{ plan.mt5PositionId }}</td>
                 <td>{{ planStatusLabel(plan.status) }}</td>
@@ -154,7 +196,7 @@
                     :disabled="loading || plan.status !== 'active' || Boolean(closeValidationError)"
                     @click="submitClose(plan)"
                   >
-                    {{ closeExecutionMode === 'limit' ? 'FOK 平仓' : '市价平仓' }}
+                    {{ closeButtonLabel }}
                   </button>
                 </td>
               </tr>
@@ -166,7 +208,14 @@
 
     <section v-if="limitEvidence" class="market-lifecycle__evidence">
       <div>
-        <span>FOK 方向</span>
+        <span>限价策略 / TIF</span>
+        <strong>
+          {{ limitStrategyLabel(limitEvidence.limitStrategy) }} /
+          {{ limitEvidence.timeInForce }}
+        </strong>
+      </div>
+      <div>
+        <span>限价方向</span>
         <strong>{{ limitDirectionLabel(limitEvidence.direction) }}</strong>
       </div>
       <div>
@@ -177,16 +226,13 @@
         </strong>
       </div>
       <div>
-        <span>Bybit FOK 限价</span>
+        <span>Bybit 硬价格边界</span>
         <strong>{{ formatNumber(limitEvidence.bybitLimitPrice) }}</strong>
       </div>
       <div>
-        <span>MT5 参考价</span>
-        <strong>{{ formatNumber(limitEvidence.mt5ReferencePrice) }}</strong>
-      </div>
-      <div>
-        <span>Tick / 对冲预留</span>
+        <span>MT5 参考 / Tick / 预留</span>
         <strong>
+          {{ formatNumber(limitEvidence.mt5ReferencePrice) }} /
           {{ formatNumber(limitEvidence.bybitTickSize) }} /
           {{ formatNumber(limitEvidence.hedgeReserve) }}
         </strong>
@@ -194,7 +240,7 @@
     </section>
 
     <footer class="market-lifecycle__footer">
-      <span>TP/SL 与人工平仓复用同一 Close Action；PostOnly、追单和 IOC 尚未接入。</span>
+      <span>PostOnly 仅在精确全成后放行 MT5；IOC 和第五批执行质量功能均未接入。</span>
       <strong v-if="message" :class="messageTone">{{ message }}</strong>
     </footer>
   </section>
@@ -210,6 +256,7 @@
     type CrossSpreadExecutionMode,
     type CrossSpreadExitPlanResult,
     type CrossSpreadLimitExecutionResult,
+    type CrossSpreadLimitStrategy,
   } from '@/api/platform/crossSpreadLifecycle';
 
   defineProps<{
@@ -219,9 +266,13 @@
 
   const direction = ref<CrossSpreadDirection>('LONG_SPREAD');
   const openExecutionMode = ref<CrossSpreadExecutionMode>('market');
+  const openLimitStrategy = ref<CrossSpreadLimitStrategy>('fok');
   const takeProfitExecutionMode = ref<CrossSpreadExecutionMode>('market');
+  const takeProfitLimitStrategy = ref<CrossSpreadLimitStrategy>('fok');
   const stopLossExecutionMode = ref<CrossSpreadExecutionMode>('market');
+  const stopLossLimitStrategy = ref<CrossSpreadLimitStrategy>('fok');
   const closeExecutionMode = ref<CrossSpreadExecutionMode>('market');
+  const closeLimitStrategy = ref<CrossSpreadLimitStrategy>('fok');
   const quantityOz = ref('1');
   const openLimitSpread = ref('-0.8');
   const closeLimitSpread = ref('-1.2');
@@ -234,6 +285,14 @@
   const messageTone = ref<'is-success' | 'is-error' | 'is-warn'>('is-success');
 
   const activePlans = computed(() => plans.value.filter((plan) => plan.status === 'active'));
+  const usesPostOnly = computed(
+    () =>
+      (openExecutionMode.value === 'limit' && openLimitStrategy.value === 'post_only_chase') ||
+      (takeProfitExecutionMode.value === 'limit' &&
+        takeProfitLimitStrategy.value === 'post_only_chase') ||
+      (stopLossExecutionMode.value === 'limit' &&
+        stopLossLimitStrategy.value === 'post_only_chase'),
+  );
   const executableSpreadLabel = computed(() =>
     direction.value === 'LONG_SPREAD'
       ? '买 Bybit / 卖 MT5：BY Ask - MT5 Bid'
@@ -244,16 +303,24 @@
       ? '止盈：平仓价差 ≥ 止盈值；止损：平仓价差 ≤ 止损值'
       : '止盈：平仓价差 ≤ 止盈值；止损：平仓价差 ≥ 止损值',
   );
-  const limitRuleLabel = computed(() =>
-    direction.value === 'LONG_SPREAD'
-      ? 'FOK 仅在当前买入价差不高于限制值时提交'
-      : 'FOK 仅在当前卖出价差不低于限制值时提交',
-  );
+  const limitRuleLabel = computed(() => {
+    const strategy = limitStrategyLabel(openLimitStrategy.value);
+    return direction.value === 'LONG_SPREAD'
+      ? `${strategy} 不能突破买入价差最大限制`
+      : `${strategy} 不能突破卖出价差最小限制`;
+  });
   const openButtonLabel = computed(() => {
     if (loading.value) return '执行中...';
     const action = direction.value === 'LONG_SPREAD' ? '开多价差' : '开空价差';
-    return openExecutionMode.value === 'limit' ? `FOK ${action}` : `市价${action}`;
+    return openExecutionMode.value === 'limit'
+      ? `${limitStrategyLabel(openLimitStrategy.value)} ${action}`
+      : `市价${action}`;
   });
+  const closeButtonLabel = computed(() =>
+    closeExecutionMode.value === 'limit'
+      ? `${limitStrategyLabel(closeLimitStrategy.value)} 平仓`
+      : '市价平仓',
+  );
   const validationError = computed(() => {
     const quantity = Number(quantityOz.value);
     const takeProfit = Number(takeProfitSpread.value);
@@ -263,7 +330,7 @@
       return '止盈止损必须是有效数字';
     }
     if (openExecutionMode.value === 'limit' && !Number.isFinite(Number(openLimitSpread.value))) {
-      return 'FOK 限制价差必须是有效数字';
+      return '限价限制价差必须是有效数字';
     }
     if (direction.value === 'LONG_SPREAD' && takeProfit <= stopLoss) {
       return '多价差的止盈平仓价差必须高于止损平仓价差';
@@ -275,7 +342,9 @@
   });
   const closeValidationError = computed(() => {
     if (closeExecutionMode.value !== 'limit') return '';
-    return Number.isFinite(Number(closeLimitSpread.value)) ? '' : 'FOK 平仓限制价差必须是有效数字';
+    return Number.isFinite(Number(closeLimitSpread.value))
+      ? ''
+      : '限价平仓限制价差必须是有效数字';
   });
 
   function applyDirectionDefaults() {
@@ -313,8 +382,11 @@
         takeProfitSpread: takeProfitSpread.value,
         stopLossSpread: stopLossSpread.value,
         executionMode: openExecutionMode.value,
+        limitStrategy: openLimitStrategy.value,
         takeProfitExecutionMode: takeProfitExecutionMode.value,
         stopLossExecutionMode: stopLossExecutionMode.value,
+        takeProfitLimitStrategy: takeProfitLimitStrategy.value,
+        stopLossLimitStrategy: stopLossLimitStrategy.value,
         ...(openExecutionMode.value === 'limit' ? { limitSpread: openLimitSpread.value } : {}),
       });
       limitEvidence.value = result.limitExecution || null;
@@ -343,12 +415,13 @@
         plan.planId,
         closeExecutionMode.value,
         closeExecutionMode.value === 'limit' ? closeLimitSpread.value : undefined,
+        closeLimitStrategy.value,
       );
       limitEvidence.value = result.limitExecution || null;
       if (result.executionBatch.status === 'hedged' && result.exitPlan.status === 'closed') {
         setMessage(`退出计划 ${plan.planId} 已完成平仓`, 'is-success');
       } else if (result.exitPlan.status === 'active') {
-        setMessage('FOK 未成交，退出计划仍保持活动状态', 'is-warn');
+        setMessage('限价未成交，退出计划仍保持活动状态', 'is-warn');
       } else {
         setMessage(
           result.executionBatch.failureReason || '平仓未完全对冲，已进入人工介入',
@@ -412,8 +485,15 @@
     return directionValue === 'BUY_BYBIT_SELL_MT5' ? '买 Bybit / 卖 MT5' : '卖 Bybit / 买 MT5';
   }
 
-  function executionModeLabel(mode: CrossSpreadExecutionMode) {
-    return mode === 'limit' ? 'FOK' : '市价';
+  function limitStrategyLabel(strategy: CrossSpreadLimitStrategy) {
+    return strategy === 'post_only_chase' ? 'PostOnly Chase' : 'FOK';
+  }
+
+  function executionSelectionLabel(
+    mode: CrossSpreadExecutionMode,
+    strategy: CrossSpreadLimitStrategy,
+  ) {
+    return mode === 'market' ? '市价' : limitStrategyLabel(strategy);
   }
 
   function planStatusLabel(status: CrossSpreadExitPlanResult['status']) {
