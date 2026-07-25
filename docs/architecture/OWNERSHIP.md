@@ -17,7 +17,7 @@ This document is the canonical human-readable catalog of major code ownership bo
 | Execution API DTOs | `platform-backend/app/execution_schemas.py` | Public execution-domain request/response models | Trading execution or persistence |
 | Execution compatibility DTO exports | `platform-backend/app/schemas.py` | Explicit aliases to execution DTO owners | Duplicate DTO definitions |
 | Platform–Runtime contracts | `platform-backend/app/runtime_contracts.py`, `execution-runtime/app/runtime_contracts.py`, `docs/contracts/runtime-v1.json` | Versioned command/event models and executable field snapshot | Silent incompatible V1 changes |
-| Cross-spread lifecycle DTOs | `platform-backend/app/cross_spread_exit_schemas.py` | Market/FOK lifecycle requests, normalized intent, FOK pricing evidence, exit-plan and evaluation response models | Pricing formulas, SQL or venue execution |
+| Cross-spread lifecycle DTOs | `platform-backend/app/cross_spread_exit_schemas.py` | Market/FOK lifecycle requests, TP/SL execution selections, normalized intent, pricing evidence, exit-plan and evaluation responses | Pricing formulas, SQL or venue execution |
 | Cross-spread observability DTOs | `platform-backend/app/cross_spread_observability_schemas.py` | Read-only aggregate status, section-state and venue evidence response models | Runtime HTTP, venue mapping or execution decisions |
 
 ## Trading and formal accounting
@@ -34,9 +34,9 @@ This document is the canonical human-readable catalog of major code ownership bo
 | Cross-spread observability service | `platform-backend/app/cross_spread_observability_service.py` | Independent section reads, partial/unavailable semantics and two-venue read-only aggregation | Venue SDKs, order submission, SQL or secret access |
 | Cross-spread observability routes | `platform-backend/app/cross_spread_observability_routes.py` | Bounded read-only history query parameters and aggregate API routing | Venue mapping, execution or persistence |
 | Cross-spread exit threshold policy | `platform-backend/app/cross_spread_exit_policy.py` | Pure executable-close-spread selection and TP/SL inequality decisions | SQL, HTTP, background tasks or order submission |
-| Cross-spread exit-plan persistence | `platform-backend/app/cross_spread_exit_repository.py` | Exact-Decimal fill summary, exit-plan SQL, row mapping, atomic trigger claims, clean FOK no-fill claim release and unresolved-lifecycle counts | Venue HTTP, threshold formulas, background loops or routes |
+| Cross-spread exit-plan persistence | `platform-backend/app/cross_spread_exit_repository.py` | Exact-Decimal fill summary, Exit Plan SQL, TP/SL execution-mode persistence, atomic claims, clean FOK Claim release and unresolved-lifecycle counts | Venue HTTP, threshold formulas, background loops or routes |
 | Cross-spread Market safety helpers | `platform-backend/app/cross_spread_exit_service.py` | Existing admission, external-position verification, hedged-open plan creation, definitive-failure rollback coordination, MT5 ticket mapping and flat-position verification reused without semantic change | Limit pricing, public synthetic-intent ownership or venue SDKs |
-| Cross-spread synthetic lifecycle service | `platform-backend/app/cross_spread_synthetic_service.py` | Public Market/FOK manual open and close orchestration, pre-submit executable-spread gate, intent mapping, plan-state coordination and additive pricing evidence; automatic TP/SL remains Market | Direct SQL, venue SDKs, PostOnly/IOC or private WebSocket behavior |
+| Cross-spread synthetic lifecycle service | `platform-backend/app/cross_spread_synthetic_service.py` | Public Market/FOK Open/Close orchestration, TP/SL stored-mode selection, automatic claimed trigger-spread FOK pricing, shared Close Action, plan-state coordination and pricing evidence | Direct SQL, venue SDKs, PostOnly/IOC or private WebSocket behavior |
 | Cross-spread lifecycle routes | `platform-backend/app/cross_spread_exit_routes.py` | API routing and disabled-by-default monitor lifespan through the synthetic lifecycle service | SQL, threshold formulas or venue execution logic |
 | EOD Reconciliation public DTOs | `platform-backend/app/eod_reconciliation_schemas.py` | EOD report/review request-response models and public status types | DDL, SQL, report orchestration, review policy or routes |
 | EOD report and review policy | `platform-backend/app/eod_reconciliation_policy.py` | Pure report status, scale-gate, historical-Difference and immutable-review decisions | FastAPI, database/repository access, HTTP or cross-domain orchestration |
@@ -68,7 +68,7 @@ Operational projections are monitoring views. Formal accounting is reconstructed
 | Core database bootstrap | `platform-backend/app/database_bootstrap.py` | Ordered core Schema and legacy compatibility DDL | Seed vectors or business services |
 | Fixed reference Seeds | `platform-backend/app/database_seeds.py` | Fixed Seed vectors, insertion order and approved default updates | Connection or Schema implementation |
 | Database compatibility facade | `platform-backend/app/database.py` | Explicit compatibility exports and `Connection → Bootstrap → Seed` initialization | Connection, Schema or Seed implementation |
-| Migration ledger | `platform-backend/app/schema_migrations.py` | Ordered additive migrations and immutable checksums | Editing an applied migration |
+| Migration ledger | `platform-backend/app/schema_migrations.py` | Ordered additive migrations, including Exit Plan execution-mode migration, with immutable checksums | Editing an applied migration |
 | Database authority documentation | `docs/database/README.md` | Table authority, DDL owners, Seed authority and migration discipline | Runtime implementation |
 
 ## Runtime and external effects
@@ -78,15 +78,15 @@ Operational projections are monitoring views. Formal accounting is reconstructed
 | Venue SDKs and external execution | `execution-runtime/` | Gateway adapters, external side effects and runtime journal | Platform business API or formal accounting |
 | Runtime journal | `execution-runtime/app/journal.py` | Durable runtime Command/Event evidence | Permanent financial ledger authority |
 | Platform execution exposure | `platform-backend/app/execution_exposure.py` | Canonical residual exposure calculation | Parallel exposure formulas |
-| Bybit confirmed Market/FOK execution | `execution-runtime/app/bybit_fill_confirming_adapter.py` | REST submission, reduce-only position validation, positionIdx mapping, Market terminal-fill confirmation and cross-spread FOK exact-full-fill/no-fill/abnormal-outcome mapping | Platform pricing, exit plans, live specification policy or MT5 ticket policy |
-| Bybit acceptance reads | `execution-runtime/app/bybit_acceptance_adapter.py` | Route-independent Order/Fill reads, paged venue history, account risk, live instrument specification and API-key readiness mapping | Platform business rules, write authorization or MT5 behavior |
+| Bybit confirmed Market/FOK execution | `execution-runtime/app/bybit_fill_confirming_adapter.py` | REST submission, reduce-only position validation, positionIdx mapping, Market terminal-fill confirmation and cross-spread FOK exact-full-fill/no-fill/abnormal-outcome mapping | Platform pricing, Exit Plans, live specification policy or MT5 ticket policy |
+| Bybit acceptance reads | `execution-runtime/app/bybit_acceptance_adapter.py` | Route-independent Order/Fill reads, paged Venue history, account risk, live instrument specification and API-key readiness mapping | Platform business rules, write authorization or MT5 behavior |
 | MT5 ticket-bound close execution | `execution-runtime/app/mt5_position_closing_adapter.py` | Reduce-only Position Ticket, side and quantity validation before MT5 deal submission | Platform plan selection, live Order/Deal discovery or threshold evaluation |
 | MT5 acceptance reads | `execution-runtime/app/mt5_acceptance_adapter.py` | Route-independent Order/Deal reads, Order/Deal Ticket resolution, live Symbol and Terminal specification mapping | Platform business rules, write authorization or Bybit behavior |
 | Live risk and history mapping | `execution-runtime/app/live_observability.py` | Bybit position liquidation mapping, MT5 explicit unavailable liquidation semantics, account Stop Out mapping and deterministic MT5 history continuation | Platform aggregation, estimated liquidation prices or external writes |
-| Strict live acceptance write gate | `execution-runtime/app/strict_live_acceptance_adapters.py` | Runtime-independent ounce cap, venue step/contract-size/access validation and one-position admission rule | Platform lifecycle persistence, credential values or limit execution |
+| Strict live acceptance write gate | `execution-runtime/app/strict_live_acceptance_adapters.py` | Runtime-independent ounce cap, Venue step/contract-size/access validation and one-position admission rule | Platform lifecycle persistence, credential values or limit execution |
 | Live adapter routing | `execution-runtime/app/bybit_mt5_gateway.py` | Account-routed adapter selection and deterministic route-independent external-ID lookup | Venue-specific mapping rules or Platform persistence |
 
-The Platform Backend must not import venue SDKs. Unknown external results remain unknown until reconciled and must never trigger an automatic duplicate submission.
+The Platform Backend must not import Venue SDKs. Unknown external results remain unknown until reconciled and must never trigger an automatic duplicate submission.
 
 ## Engineering and context governance
 
