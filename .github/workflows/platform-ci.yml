@@ -283,12 +283,7 @@ jobs:
             exit 1
           fi
       - name: Enforce frontend no-new-debt gate
-        shell: bash
-        run: |
-          if ! python ../scripts/frontend-no-new-debt.py > /tmp/frontend-eslint.log 2>&1; then
-            cat /tmp/frontend-eslint.log
-            exit 1
-          fi
+        run: python ../scripts/frontend-no-new-debt.py
       - name: Upload frontend lint diagnostics
         if: failure()
         uses: actions/upload-artifact@v4
