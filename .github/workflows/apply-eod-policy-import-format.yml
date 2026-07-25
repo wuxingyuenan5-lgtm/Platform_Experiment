@@ -1,0 +1,40 @@
+name: Apply EOD Policy Import Format
+
+on:
+  push:
+    branches:
+      - refactor/issue-79-eod-report-review-policy
+    paths:
+      - scripts/apply_eod_policy_import_format.py
+      - .github/workflows/apply-eod-policy-import-format.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: refactor/issue-79-eod-report-review-policy
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Apply import formatting fix
+        run: python scripts/apply_eod_policy_import_format.py
+      - name: Validate patch
+        run: git diff --check
+      - name: Commit generated update
+        shell: bash
+        run: |
+          if git diff --quiet; then
+            echo "No generated update required."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add platform-backend/app/eod_reconciliation_repository.py
+          git commit -m "Format EOD review compatibility re-exports"
+          git push origin HEAD:refactor/issue-79-eod-report-review-policy
