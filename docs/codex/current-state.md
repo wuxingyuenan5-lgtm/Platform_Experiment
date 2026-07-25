@@ -2,7 +2,7 @@
 
 Last updated: 2026-07-25
 Stable branch: `main`
-Latest completed engineering scope: Issue #73 / PR #74
+Latest completed engineering scope: Issue #75 / PR #76
 
 This file is the compact cross-session handoff. It records current truth, not a PR diary. Read the actual open Issues and PRs before assuming that work is active.
 
@@ -78,10 +78,11 @@ Real-account acceptance remains controlled-host, small-capital and minimum-size.
 27. Venue Reconciliation Repository ownership with exact DDL, SQL, idempotency and rollback evidence.
 28. Venue Reconciliation Runtime Client ownership with configured URL/parameter/timeout and transport-error equivalence evidence.
 29. Venue Reconciliation Service ownership with exact domain-error/HTTP compatibility and EOD/API regression evidence.
+30. EOD Reconciliation public-schema ownership with exact object-identity, JSON Schema and validation-message evidence.
 
 ## Active work
 
-Issue #75 / Draft PR #76 is the only active engineering workstream: EOD Reconciliation public-schema extraction.
+No engineering code workstream is active by default after PR #76 merges.
 
 Before starting another code change:
 
