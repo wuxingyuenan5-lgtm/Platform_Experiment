@@ -81,6 +81,7 @@ def close_market_lifecycle(
         plan_id,
         execution_mode=request.execution_mode,
         limit_spread=request.limit_spread,
+        limit_strategy=request.limit_strategy,
     )
 
 
