@@ -7,10 +7,15 @@ from fastapi import HTTPException
 
 from app.config import get_settings
 from app.cross_spread import (
+    BYBIT_ACCOUNT_ID,
     BYBIT_LEG_ROLE,
+    BYBIT_SYMBOL,
+    MT5_ACCOUNT_ID,
     MT5_LEG_ROLE,
+    MT5_SYMBOL,
     STRATEGY_INSTANCE_ID,
     get_cross_spread_snapshot,
+    submit_bybit_definitive_failure_rollback,
     submit_cross_spread_market_command,
 )
 from app.cross_spread_exit_policy import (
@@ -19,6 +24,8 @@ from app.cross_spread_exit_policy import (
 )
 from app.cross_spread_exit_repository import (
     claim_exit_plan,
+    count_non_closed_exit_plans,
+    count_unresolved_cross_spread_batches,
     create_exit_plan,
     get_exit_plan,
     list_exit_plans,
@@ -35,12 +42,18 @@ from app.cross_spread_exit_schemas import (
     CrossSpreadOpenResult,
     SpreadDirection,
 )
+from app.cross_spread_live_read_client import (
+    CrossSpreadLiveReadError,
+    LivePosition,
+    list_positions,
+)
 from app.execution_batches import get_execution_batch, update_batch_status
-from app.schemas import CrossSpreadMarketCommandRequest
+from app.schemas import CrossSpreadMarketCommandRequest, ExecutionBatchResponse
 
 
 def open_cross_spread_market(request: CrossSpreadMarketOpenRequest) -> CrossSpreadOpenResult:
     _require_market_mode(request.execution_mode)
+    _assert_acceptance_open_allowed()
     action = "OPEN_LONG" if request.direction == "LONG_SPREAD" else "OPEN_SHORT"
     batch = submit_cross_spread_market_command(
         CrossSpreadMarketCommandRequest(
@@ -49,7 +62,8 @@ def open_cross_spread_market(request: CrossSpreadMarketOpenRequest) -> CrossSpre
         )
     )
     if batch.status != "hedged":
-        return CrossSpreadOpenResult(executionBatch=batch, exitPlan=None)
+        handled = _handle_definitive_open_failure(batch)
+        return CrossSpreadOpenResult(executionBatch=handled, exitPlan=None)
 
     try:
         plan = _create_exit_plan_for_open_batch(
@@ -168,6 +182,110 @@ async def run_cross_spread_exit_monitor() -> None:
         await asyncio.sleep(settings.cross_spread_exit_monitor_interval_seconds)
 
 
+def _assert_acceptance_open_allowed() -> None:
+    settings = get_settings()
+    maximum = settings.cross_spread_acceptance_max_active_plans
+    if maximum <= 0:
+        raise HTTPException(
+            status_code=423,
+            detail="Cross-spread acceptance active-plan limit is not configured",
+        )
+    if count_non_closed_exit_plans() >= maximum:
+        raise HTTPException(
+            status_code=409,
+            detail="A non-closed cross-spread lifecycle already exists",
+        )
+    if count_unresolved_cross_spread_batches() > 0:
+        raise HTTPException(
+            status_code=409,
+            detail="An unresolved cross-spread execution batch blocks new opens",
+        )
+    if settings.cross_spread_position_verification_required:
+        bybit_positions, mt5_positions = _load_live_positions()
+        if _target_positions(bybit_positions, BYBIT_SYMBOL):
+            raise HTTPException(
+                status_code=409,
+                detail="A live Bybit gold position already exists",
+            )
+        if _target_positions(mt5_positions, MT5_SYMBOL):
+            raise HTTPException(
+                status_code=409,
+                detail="A live MT5 gold position already exists",
+            )
+
+
+def _handle_definitive_open_failure(batch: ExecutionBatchResponse) -> ExecutionBatchResponse:
+    if not _is_definitive_second_leg_failure(batch):
+        return batch
+    summaries = load_batch_fill_summaries(batch.batch_id)
+    bybit = summaries.get(BYBIT_LEG_ROLE)
+    mt5 = summaries.get(MT5_LEG_ROLE)
+    if bybit is None or mt5 is not None:
+        return batch
+
+    original_reason = batch.failure_reason or "MT5 hedge failed after confirmed Bybit fill"
+    try:
+        rollback = submit_bybit_definitive_failure_rollback(
+            open_batch_id=batch.batch_id,
+            open_action=batch.direction,
+            quantity_oz=bybit.quantity,
+        )
+    except Exception as exc:
+        update_batch_status(
+            batch.batch_id,
+            "manual_intervention",
+            failure_reason=f"{original_reason}; Bybit rollback submission failed: {exc}",
+            requires_manual_intervention=True,
+        )
+        return get_execution_batch(batch.batch_id)
+
+    if rollback.status != "filled":
+        update_batch_status(
+            batch.batch_id,
+            "manual_intervention",
+            failure_reason=(
+                f"{original_reason}; Bybit rollback ended with status {rollback.status}; "
+                "do not retry blindly"
+            ),
+            requires_manual_intervention=True,
+        )
+        return get_execution_batch(batch.batch_id)
+
+    try:
+        _verify_flat_positions(mt5_position_id=None)
+    except HTTPException as exc:
+        update_batch_status(
+            batch.batch_id,
+            "manual_intervention",
+            failure_reason=(
+                f"{original_reason}; rollback order {rollback.platform_order_id} filled, "
+                f"but flat-position verification failed: {exc.detail}"
+            ),
+            requires_manual_intervention=True,
+        )
+        return get_execution_batch(batch.batch_id)
+
+    update_batch_status(
+        batch.batch_id,
+        "failed",
+        failure_reason=(
+            f"{original_reason}; Bybit exposure was reduced by rollback order "
+            f"{rollback.platform_order_id}"
+        ),
+        requires_manual_intervention=False,
+    )
+    return get_execution_batch(batch.batch_id)
+
+
+def _is_definitive_second_leg_failure(batch: ExecutionBatchResponse) -> bool:
+    legs = {leg.role: leg for leg in batch.legs}
+    bybit = legs.get(BYBIT_LEG_ROLE)
+    mt5 = legs.get(MT5_LEG_ROLE)
+    if bybit is None or mt5 is None or bybit.status != "filled":
+        return False
+    return mt5.status in {"failed", "rejected", "blocked"}
+
+
 def _create_exit_plan_for_open_batch(
     batch_id: str,
     *,
@@ -181,29 +299,17 @@ def _create_exit_plan_for_open_batch(
     if bybit is None or mt5 is None:
         raise HTTPException(status_code=409, detail="Hedged batch fill evidence is incomplete")
 
-    snapshot = get_cross_spread_snapshot()
-    if snapshot.mt5.status != "available":
-        raise HTTPException(status_code=409, detail="MT5 positions are unavailable after open")
-    expected_mt5_side = "sell" if direction == "LONG_SPREAD" else "buy"
-    candidates = [
-        position
-        for position in snapshot.mt5.positions
-        if position.side == expected_mt5_side
-        and position.external_id is not None
-        and abs(position.quantity) >= mt5.quantity
-    ]
-    if len(candidates) != 1:
-        raise HTTPException(
-            status_code=409,
-            detail="MT5 open position cannot be mapped to exactly one Position Ticket",
-        )
-
+    mt5_position_id = _verify_open_positions(
+        direction=direction,
+        bybit_quantity=bybit.quantity,
+        mt5_quantity=mt5.quantity,
+    )
     return create_exit_plan(
         strategy_instance_id=STRATEGY_INSTANCE_ID,
         open_batch_id=batch_id,
         direction=direction,
         quantity_oz=bybit.quantity,
-        mt5_position_id=str(candidates[0].external_id),
+        mt5_position_id=mt5_position_id,
         entry_spread=bybit.average_price - mt5.average_price,
         take_profit_spread=take_profit_spread,
         stop_loss_spread=stop_loss_spread,
@@ -229,13 +335,90 @@ def _close_claimed_plan(plan: CrossSpreadExitPlanResponse) -> CrossSpreadCloseRe
 
     mark_plan_closing(plan.plan_id, batch.batch_id)
     if batch.status == "hedged":
-        updated = mark_plan_closed(plan.plan_id, batch.batch_id)
+        try:
+            _verify_flat_positions(mt5_position_id=plan.mt5_position_id)
+        except HTTPException:
+            updated = mark_plan_manual_intervention(
+                plan.plan_id,
+                close_batch_id=batch.batch_id,
+            )
+        else:
+            updated = mark_plan_closed(plan.plan_id, batch.batch_id)
     else:
         updated = mark_plan_manual_intervention(
             plan.plan_id,
             close_batch_id=batch.batch_id,
         )
     return CrossSpreadCloseResult(executionBatch=batch, exitPlan=updated)
+
+
+def _verify_open_positions(
+    *,
+    direction: SpreadDirection,
+    bybit_quantity: Decimal,
+    mt5_quantity: Decimal,
+) -> str:
+    bybit_positions, mt5_positions = _load_live_positions()
+    bybit_expected_positive = direction == "LONG_SPREAD"
+    mt5_expected_positive = direction == "SHORT_SPREAD"
+    bybit_matches = [
+        position
+        for position in _target_positions(bybit_positions, BYBIT_SYMBOL)
+        if _sign_matches(position.net_quantity, bybit_expected_positive)
+        and abs(position.net_quantity) == bybit_quantity
+    ]
+    mt5_matches = [
+        position
+        for position in _target_positions(mt5_positions, MT5_SYMBOL)
+        if _sign_matches(position.net_quantity, mt5_expected_positive)
+        and abs(position.net_quantity) == mt5_quantity
+    ]
+    if len(bybit_matches) != 1:
+        raise HTTPException(
+            status_code=409,
+            detail="Confirmed Bybit fill does not match exactly one live position",
+        )
+    if len(mt5_matches) != 1:
+        raise HTTPException(
+            status_code=409,
+            detail="Confirmed MT5 fill does not match exactly one live Position Ticket",
+        )
+    return mt5_matches[0].external_position_id
+
+
+def _verify_flat_positions(*, mt5_position_id: str | None) -> None:
+    bybit_positions, mt5_positions = _load_live_positions()
+    if _target_positions(bybit_positions, BYBIT_SYMBOL):
+        raise HTTPException(status_code=409, detail="Bybit gold exposure remains after close")
+    target_mt5 = _target_positions(mt5_positions, MT5_SYMBOL)
+    if mt5_position_id is not None:
+        target_mt5 = [
+            position
+            for position in target_mt5
+            if position.external_position_id == mt5_position_id
+        ]
+    if target_mt5:
+        raise HTTPException(status_code=409, detail="MT5 gold exposure remains after close")
+
+
+def _load_live_positions() -> tuple[list[LivePosition], list[LivePosition]]:
+    try:
+        return list_positions(BYBIT_ACCOUNT_ID), list_positions(MT5_ACCOUNT_ID)
+    except CrossSpreadLiveReadError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+def _target_positions(positions: list[LivePosition], symbol: str) -> list[LivePosition]:
+    normalized = symbol.upper()
+    return [
+        position
+        for position in positions
+        if position.symbol == normalized and position.net_quantity != 0
+    ]
+
+
+def _sign_matches(quantity: Decimal, expected_positive: bool) -> bool:
+    return quantity > 0 if expected_positive else quantity < 0
 
 
 def _require_market_mode(execution_mode: str) -> None:
