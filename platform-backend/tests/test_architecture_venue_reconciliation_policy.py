@@ -3,7 +3,8 @@ from pathlib import Path
 
 APP_ROOT = Path(__file__).resolve().parents[1] / "app"
 OWNER_PATH = APP_ROOT / "venue_reconciliation_policy.py"
-ORCHESTRATION_PATH = APP_ROOT / "venue_reconciliation.py"
+SERVICE_PATH = APP_ROOT / "venue_reconciliation_service.py"
+FACADE_PATH = APP_ROOT / "venue_reconciliation.py"
 POLICY_FUNCTIONS = {
     "balance_difference_drafts",
     "expected_order_status",
@@ -34,23 +35,29 @@ def imported_modules(path: Path) -> set[str]:
 
 def test_difference_policy_is_the_only_decision_function_owner() -> None:
     owner_functions = function_names(OWNER_PATH)
-    orchestration_functions = function_names(ORCHESTRATION_PATH)
+    service_functions = function_names(SERVICE_PATH)
+    facade_functions = function_names(FACADE_PATH)
 
     assert POLICY_FUNCTIONS <= owner_functions
-    assert not (POLICY_FUNCTIONS & orchestration_functions)
+    assert not (POLICY_FUNCTIONS & service_functions)
+    assert not (POLICY_FUNCTIONS & facade_functions)
 
 
-def test_orchestration_imports_policy_and_delegates_external_effects() -> None:
-    source = ORCHESTRATION_PATH.read_text(encoding="utf-8")
+def test_service_imports_policy_and_facade_delegates_use_cases() -> None:
+    service_source = SERVICE_PATH.read_text(encoding="utf-8")
+    facade_source = FACADE_PATH.read_text(encoding="utf-8")
 
-    assert "from app.venue_reconciliation_policy import (" in source
-    assert "persist_difference_draft" in source
-    assert "from app import venue_reconciliation_repository as repository" in source
-    assert "from app import venue_reconciliation_runtime_client as runtime_client" in source
-    assert "runtime_client.get(" in source
-    assert "httpx.get(" not in source
-    assert "connection()" not in source
-    assert "INSERT OR IGNORE INTO reconciliation_differences" not in source
+    assert "from app.venue_reconciliation_policy import (" in service_source
+    assert "persist_difference_draft" in service_source
+    assert "from app import venue_reconciliation_repository as repository" in service_source
+    assert "from app import venue_reconciliation_runtime_client as runtime_client" in service_source
+    assert "runtime_client.get(" in service_source
+    assert "from app import venue_reconciliation_service as service" in facade_source
+    assert "record_financial_fact(" not in facade_source
+    assert "connection()" not in service_source
+    assert "connection()" not in facade_source
+    assert "INSERT OR IGNORE INTO reconciliation_differences" not in service_source
+    assert "INSERT OR IGNORE INTO reconciliation_differences" not in facade_source
 
 
 def test_policy_has_no_framework_database_or_network_dependency() -> None:
