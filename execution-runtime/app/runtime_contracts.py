@@ -32,7 +32,7 @@ class RuntimeSubmitOrderCommandV1(BaseModel):
     received_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     @model_validator(mode="after")
-    def validate_position_target(self) -> "RuntimeSubmitOrderCommandV1":
+    def validate_position_target(self) -> RuntimeSubmitOrderCommandV1:
         if self.position_id is not None and not self.reduce_only:
             raise ValueError("position_id requires reduce_only")
         return self
