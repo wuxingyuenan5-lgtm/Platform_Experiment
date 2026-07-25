@@ -174,7 +174,7 @@ def test_account_snapshot_import_is_idempotent_and_difference_is_auditable(
             return FakeResponse([balance])
         raise AssertionError(f"unexpected runtime url: {url}")
 
-    monkeypatch.setattr("app.venue_reconciliation.httpx.get", venue_get)
+    monkeypatch.setattr("app.venue_reconciliation_runtime_client.httpx.get", venue_get)
 
     with TestClient(app) as client:
         payload = {
@@ -248,7 +248,7 @@ def test_reconciliation_idempotency_payload_conflict_returns_409(
 ) -> None:
     get_settings().database_path = str(tmp_path / "venue-conflict.db")
     monkeypatch.setattr(
-        "app.venue_reconciliation.httpx.get",
+        "app.venue_reconciliation_runtime_client.httpx.get",
         lambda url, *args, **kwargs: FakeResponse([]),
     )
     with TestClient(app) as client:
