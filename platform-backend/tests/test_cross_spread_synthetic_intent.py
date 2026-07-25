@@ -160,6 +160,11 @@ def test_market_open_uses_normalized_intent_without_changing_legacy_action(
         "_create_exit_plan_for_open_batch",
         lambda *_args, **_kwargs: plan,
     )
+    monkeypatch.setattr(
+        synthetic_service,
+        "configure_exit_plan_execution_modes",
+        lambda *_args, **_kwargs: plan,
+    )
 
     def fake_submit(request):
         captured["request"] = request
@@ -268,6 +273,11 @@ def test_limit_open_routes_only_to_fok_executor(monkeypatch) -> None:
     monkeypatch.setattr(
         synthetic_service.market_helpers,
         "_create_exit_plan_for_open_batch",
+        lambda *_args, **_kwargs: plan,
+    )
+    monkeypatch.setattr(
+        synthetic_service,
+        "configure_exit_plan_execution_modes",
         lambda *_args, **_kwargs: plan,
     )
 

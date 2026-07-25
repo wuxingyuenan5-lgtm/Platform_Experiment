@@ -14,6 +14,7 @@ from app.cross_spread_exit_policy import (
 )
 from app.cross_spread_exit_repository import (
     claim_exit_plan,
+    configure_exit_plan_execution_modes,
     get_exit_plan,
     list_exit_plans,
     load_batch_fill_summaries,
@@ -85,6 +86,11 @@ def open_cross_spread_market(request: CrossSpreadMarketOpenRequest) -> CrossSpre
             direction=request.direction,
             take_profit_spread=request.take_profit_spread,
             stop_loss_spread=request.stop_loss_spread,
+        )
+        plan = configure_exit_plan_execution_modes(
+            plan.plan_id,
+            take_profit_execution_mode=request.take_profit_execution_mode,
+            stop_loss_execution_mode=request.stop_loss_execution_mode,
         )
     except HTTPException as exc:
         market_helpers.update_batch_status(
@@ -198,9 +204,11 @@ def evaluate_cross_spread_exit_plans() -> CrossSpreadExitEvaluationResponse:
             continue
         triggered_count += 1
         try:
-            _close_claimed_plan(claimed, execution_mode="market")
+            _close_claimed_plan_for_trigger(claimed)
         except Exception:
-            mark_plan_manual_intervention(plan.plan_id, close_batch_id=None)
+            current = get_exit_plan(plan.plan_id)
+            if current.status != "active":
+                mark_plan_manual_intervention(plan.plan_id, close_batch_id=None)
 
     return CrossSpreadExitEvaluationResponse(
         evaluatedCount=len(active),
@@ -219,6 +227,38 @@ async def run_cross_spread_exit_monitor() -> None:
             # never retried because its state no longer matches the atomic claim.
             pass
         await asyncio.sleep(settings.cross_spread_exit_monitor_interval_seconds)
+
+
+def _close_claimed_plan_for_trigger(
+    plan: CrossSpreadExitPlanResponse,
+) -> CrossSpreadCloseResult:
+    trigger_reason = (plan.trigger_reason or "").strip().lower()
+    if trigger_reason == "take_profit":
+        execution_mode = plan.take_profit_execution_mode
+    elif trigger_reason == "stop_loss":
+        execution_mode = plan.stop_loss_execution_mode
+    else:
+        raise HTTPException(status_code=409, detail="Claimed exit plan has no TP/SL trigger")
+
+    intent = build_close_intent(
+        plan.direction,
+        execution_mode,
+        trigger_reason=trigger_reason,
+    )
+    try:
+        limit_execution = _prepare_limit_execution(
+            intent,
+            plan.trigger_spread if execution_mode == "limit" else None,
+        )
+    except Exception:
+        if execution_mode == "limit":
+            release_exit_plan_claim(plan.plan_id)
+        raise
+    return _close_claimed_plan(
+        plan,
+        execution_mode=execution_mode,
+        limit_execution=limit_execution,
+    )
 
 
 def _close_claimed_plan(
@@ -252,7 +292,7 @@ def _close_claimed_plan(
             batch = submit_cross_spread_fok_command(
                 command_request,
                 bybit_limit_price=limit_execution.bybit_limit_price,
-                idempotency_key=f"cross-spread-fok-exit:{plan.plan_id}",
+                idempotency_key=_fok_exit_idempotency_key(plan),
                 bybit_reduce_only=True,
                 mt5_reduce_only=True,
                 mt5_position_id=plan.mt5_position_id,
@@ -298,6 +338,12 @@ def _close_claimed_plan(
         limitExecution=_limit_response(limit_execution),
         exitPlan=updated,
     )
+
+
+def _fok_exit_idempotency_key(plan: CrossSpreadExitPlanResponse) -> str:
+    if plan.triggered_at is None:
+        raise HTTPException(status_code=409, detail="FOK exit claim timestamp is unavailable")
+    return f"cross-spread-fok-exit:{plan.plan_id}:{plan.triggered_at.isoformat()}"
 
 
 def _prepare_limit_execution(
