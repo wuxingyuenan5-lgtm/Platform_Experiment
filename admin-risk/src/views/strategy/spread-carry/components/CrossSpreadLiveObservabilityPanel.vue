@@ -77,9 +77,7 @@
                 <tr v-for="position in venue.positions" :key="position.externalPositionId">
                   <td>
                     <strong
-                      :class="
-                        numberValue(position.netQuantity) >= 0 ? 'is-long' : 'is-short'
-                      "
+                      :class="numberValue(position.netQuantity) >= 0 ? 'is-long' : 'is-short'"
                     >
                       {{ numberValue(position.netQuantity) >= 0 ? '多' : '空' }}
                       {{ formatNumber(absValue(position.netQuantity), 4) }}
@@ -139,9 +137,7 @@
               <tbody>
                 <tr v-if="venue.recentOrders.length === 0">
                   <td colspan="6">
-                    {{
-                      emptyLabel(venue.sectionStates.recentOrders, '历史范围内无订单')
-                    }}
+                    {{ emptyLabel(venue.sectionStates.recentOrders, '历史范围内无订单') }}
                   </td>
                 </tr>
                 <tr v-for="order in venue.recentOrders" :key="order.externalOrderId">
@@ -185,9 +181,7 @@
               <tbody>
                 <tr v-if="venue.recentFills.length === 0">
                   <td colspan="6">
-                    {{
-                      emptyLabel(venue.sectionStates.recentFills, '历史范围内无成交')
-                    }}
+                    {{ emptyLabel(venue.sectionStates.recentFills, '历史范围内无成交') }}
                   </td>
                 </tr>
                 <tr v-for="fill in venue.recentFills" :key="fill.externalFillId">
@@ -207,8 +201,8 @@
 
     <footer class="panel-footer">
       <span>
-        Bybit 强平价仅展示交易所返回值；MT5 不提供可靠的单仓强平价，使用账户
-        Margin Call / Stop Out 监控。
+        Bybit 强平价仅展示交易所返回值；MT5 不提供可靠的单仓强平价，使用账户 Margin Call / Stop Out
+        监控。
       </span>
       <strong v-if="result">更新时间：{{ formatTime(result.asOf) }}</strong>
     </footer>
@@ -289,10 +283,7 @@
     ];
   }
 
-  function liquidationLabel(
-    venue: CrossSpreadVenueObservability,
-    position: VenuePositionSnapshot,
-  ) {
+  function liquidationLabel(venue: CrossSpreadVenueObservability, position: VenuePositionSnapshot) {
     if (position.liquidationPrice != null) return formatNumber(position.liquidationPrice);
     if (venue.venue === 'MT5') {
       return `单仓不提供；Stop Out ${thresholdValue(
@@ -363,9 +354,7 @@
 
   function formatTime(value: string) {
     const date = new Date(value);
-    return Number.isNaN(date.getTime())
-      ? '--'
-      : date.toLocaleString('zh-CN', { hour12: false });
+    return Number.isNaN(date.getTime()) ? '--' : date.toLocaleString('zh-CN', { hour12: false });
   }
 
   function resolveError(error: unknown) {
