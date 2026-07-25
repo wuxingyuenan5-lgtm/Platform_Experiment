@@ -56,6 +56,8 @@ export interface CrossSpreadExitPlanResult {
   entrySpread: string;
   takeProfitSpread: string;
   stopLossSpread: string;
+  takeProfitExecutionMode: CrossSpreadExecutionMode;
+  stopLossExecutionMode: CrossSpreadExecutionMode;
   status: CrossSpreadExitPlanStatus;
   triggerReason?: string | null;
   triggerSpread?: string | null;
@@ -72,6 +74,8 @@ export interface CrossSpreadMarketOpenInput {
   stopLossSpread: string;
   executionMode: CrossSpreadExecutionMode;
   limitSpread?: string;
+  takeProfitExecutionMode: CrossSpreadExecutionMode;
+  stopLossExecutionMode: CrossSpreadExecutionMode;
 }
 
 export interface CrossSpreadMarketOpenResult {
