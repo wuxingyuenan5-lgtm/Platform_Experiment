@@ -79,8 +79,8 @@ def test_facade_owns_http_mapping_compatibility_and_routes() -> None:
     source = FACADE_PATH.read_text(encoding="utf-8")
 
     assert "fastapi" in imports
-    assert "app.venue_reconciliation_service" in imports
-    assert "def _call_service(" in source
+    assert "from app import venue_reconciliation_service as service" in source
+    assert "def _call_service" in source
     assert "HTTPException(status_code=503" in source
     assert "status_code=422" in source
     assert "status_code=409" in source
