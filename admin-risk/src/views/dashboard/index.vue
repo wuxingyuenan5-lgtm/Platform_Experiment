@@ -314,8 +314,7 @@
     --home-section-gap: clamp(20px, 1.5vw, 28px);
 
     min-height: 100%;
-    background:
-      linear-gradient(180deg, rgba(247, 250, 252, 0.34), rgba(239, 245, 250, 0.98) 62%),
+    background: linear-gradient(180deg, rgba(247, 250, 252, 0.34), rgba(239, 245, 250, 0.98) 62%),
       #f4f8fb;
   }
 
