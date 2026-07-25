@@ -5,6 +5,7 @@ Stable branch: `main`
 Product release: `0.7.0`
 Latest completed engineering scope: Issue #92 / PR #93
 Latest completed documentation scope: Issue #94 / PR #95
+Current engineering workstream: Issue #96 / PR #97
 
 This file is the compact cross-session handoff. It records current truth, not a PR diary. Read the actual open Issues and PRs before assuming that work is active.
 
@@ -27,9 +28,11 @@ Gateway=fake
 Platform Live Write=false
 Runtime Live Write=false
 Cross-spread Exit Monitor=false
+Cross-spread acceptance max quantity=1 oz
+Cross-spread non-closed lifecycle max=1
 ```
 
-Real-account acceptance remains controlled-host, small-capital and minimum-size.
+Real-account acceptance remains controlled-host, small-capital and minimum-size. The 1 oz and single-lifecycle values are temporary acceptance restrictions, not permanent product limits. Their removal criteria are canonical in `docs/operations/V6-小资金实盘验收手册.md`.
 
 ## Current invariants
 
@@ -42,11 +45,19 @@ Real-account acceptance remains controlled-host, small-capital and minimum-size.
 - Maintained funding execution uses ExecutionBatch; the unused frontend legacy single-order submit client and submit-state hook path have been removed.
 - Cross-spread trading continues to use the nominal `Bybit Ask - MT5 Bid` and `Bybit Bid - MT5 Ask` formulas; USDT/USD normalization is not part of order triggering.
 - Cross-spread market execution submits Bybit first, requires a terminal confirmed fill and sizes the MT5 hedge from the actual filled quantity; an acknowledgement or unresolved status cannot trigger the hedge.
-- A terminal Bybit partial fill may be hedged only when its confirmed quantity maps exactly to the MT5 contract minimum and step; otherwise the batch fails closed into manual intervention.
+- A terminal Bybit partial fill may be hedged only when its confirmed quantity maps exactly to the MT5 contract minimum, step and current contract size; otherwise the batch fails closed.
+- Live cross-spread sizing reads current Bybit and MT5 instrument specifications through Runtime immediately before submission; database Seed specifications are not authoritative for real writes.
+- Runtime independently converts MT5 lots through the current contract size before enforcing the temporary 1 oz cap; `1 lot` is never assumed to equal `1 oz`.
+- Runtime Order/Fill reads do not require a local Route. Orders created before Runtime startup, externally, or after Route loss remain readable and are marked `external_only` until Platform identity is proven.
+- MT5 Order Ticket, Deal Ticket and Position Ticket remain separate identities. A Deal Ticket may resolve its Order Ticket but cannot be used as a Position Ticket.
 - Cross-spread CLOSE intent is persisted by TradeCommand idempotency key and transmitted through the versioned Runtime command contract.
 - Bybit market close requires one matching live position, submits `reduceOnly=true` with its `positionIdx` and rejects wrong-side or oversized close requests.
 - MT5 market close requires the intended live Position Ticket and rejects symbol, side, quantity or ticket ambiguity before `order_send`.
-- A successfully hedged cross-spread OPEN creates one persistent operational exit plan from exact Fill evidence and one mapped MT5 Position Ticket.
+- At most one non-closed cross-spread exit plan is allowed during the acceptance phase. Any unresolved or manual-intervention batch blocks a new open.
+- A successfully hedged cross-spread OPEN is healthy only after exact external Bybit and MT5 Position verification, then creates one persistent operational exit plan with one mapped MT5 Position Ticket.
+- A cross-spread CLOSE is closed only after both external target positions are verified flat.
+- If Bybit is terminally filled and MT5 definitively rejects or fails, the Platform may submit one idempotent Bybit reduce-only rollback for the confirmed fill quantity.
+- MT5 `accepted`, `processing`, `acknowledged` or `result_unknown` must not trigger automatic rollback or duplicate execution.
 - LONG_SPREAD exit thresholds observe `shortSpread`; SHORT_SPREAD exit thresholds observe `longSpread`. TP/SL submits a market close only after an atomic plan claim.
 - The automatic exit monitor is a separate disabled-by-default capability gate; unknown or manual-intervention plans are not automatically retried.
 - Direct MT5 market-data access reads raw swap long/short and related symbol metadata through `symbol_info()` when available; the file bridge remains a fallback/diagnostic read path rather than the authoritative execution path.
@@ -123,11 +134,20 @@ Real-account acceptance remains controlled-host, small-capital and minimum-size.
 
 ## Active work
 
-No engineering code workstream is active by default after PR #93 merges.
+Issue #96 / PR #97 is the only active engineering workstream. Its bounded outcome is:
 
-The next cross-spread scopes must remain separately bounded:
+1. repair Bybit/MT5 Order and Fill reads that previously depended on Runtime Route state;
+2. resolve MT5 market executions through correct Order/Deal/Position Ticket semantics;
+3. require current Venue specifications and access evidence before real cross-spread writes;
+4. enforce temporary 1 oz and one-lifecycle acceptance limits at Platform and Runtime boundaries;
+5. verify external positions after open and close;
+6. perform one idempotent Bybit reduce-only rollback only after a definitive MT5 hedge failure;
+7. preserve fail-closed behavior for `result_unknown` and keep all Live Write gates disabled by default;
+8. document explicit evidence required before temporary limits may be removed.
 
-1. run controlled Demo/real-environment minimum-size acceptance under Issue #39, including Windows MT5 Terminal supervision and venue permissions;
+The next cross-spread scopes must remain separately bounded after Issue #96:
+
+1. run controlled real-environment minimum-size acceptance under Issue #39, including Windows MT5 Terminal supervision and Venue permissions;
 2. replace bounded Bybit fill polling with private WebSocket order/execution confirmation after operational acceptance;
 3. implement real spread-limit entry, exit and limit TP/SL as a separate execution-engine scope;
 4. integrate or refactor the retained large visual execution component only after the bounded lifecycle panel is operationally accepted.
@@ -151,6 +171,7 @@ Separate non-code follow-ups remain:
 
 - Issue #38: repository administrator verifies GitHub protection and merge settings.
 - Issue #39: controlled real-environment operational acceptance; it is not an engineering refactor and does not run in CI.
+- After Issue #39 contains mature repeated evidence, create a separate “temporary live restriction review” Issue before changing 1 oz, concurrency, Market-only or monitor defaults.
 
 ## Known constraints
 
@@ -162,6 +183,8 @@ Separate non-code follow-ups remain:
 - The automatic TP/SL monitor is code-complete but disabled by default and still requires controlled-host operational enablement and observation.
 - The retained legacy market/limit execution card is intentionally read-only during this phase; real market actions use the bounded lifecycle panel until the large component is safely refactored in a later scope.
 - CI proves provider mapping, state transitions and safety behavior; it does not prove real Bybit/MT5 permissions, broker execution modes, Terminal stability or live liquidity.
+- 1 oz, one non-closed lifecycle, Market-only execution and disabled automatic monitor are temporary acceptance restrictions; they may be reviewed only through the evidence and process in `docs/operations/V6-小资金实盘验收手册.md`.
+- ACK/Fill separation, result-unknown no-blind-retry, independent Platform/Runtime write gates, exact close identity and secret isolation are permanent safety principles and must not be deleted with temporary limits.
 - Inherited frontend lint debt remains outside untouched modules; new and changed files cannot add debt.
 - The homepage responsive implementation is linted, type-checked and production-built, but automated multi-viewport screenshots are not yet part of CI.
 - Existing non-homepage pages still contain unverified layout debt across viewport widths, heights and zoom levels.
