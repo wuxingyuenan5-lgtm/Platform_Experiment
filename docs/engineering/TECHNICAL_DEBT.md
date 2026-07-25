@@ -174,17 +174,17 @@ Safe approach: protect `main`, require Platform CI and Secret Scan, current bran
 
 ## TD-008 — Venue Reconciliation orchestration concentration
 
-Status: active; Schemas, Difference Policy and Repository completed, Runtime Client active in Issue #71
+Status: active; Schemas, Difference Policy, Repository and Runtime Client completed through Issue #71
 Owner: Platform Backend / Venue Reconciliation
 
 Problem: `app/venue_reconciliation.py` still combines FinancialFact import, reconciliation-use-case sequencing, FastAPI error mapping and route declarations.
 
-Risk: service behavior, transport errors and API concerns remain coupled inside one large module, increasing change surface and limiting strict typing.
+Risk: service behavior and API concerns remain coupled inside one large module, increasing change surface and limiting strict typing.
 
-Deferred because: Issue #71 intentionally moves only the Runtime transport boundary and must not expand into a Service/route rewrite.
+Deferred because: the Runtime Client extraction intentionally moved only the external transport boundary and preserved all use-case and route behavior.
 
-Trigger: merge the Runtime Client with full equivalence evidence.
+Trigger: open a dedicated Issue for one behavior-preserving Reconciliation Service extraction after reassessing the current orchestration and its direct EOD callers.
 
 Protected semantics: Runtime endpoints and payloads, FinancialFact identity, Difference identity/precedence, order recovery, database transactions, API schemas/status codes and both Live Write defaults.
 
-Safe approach: extract one behavior-preserving Reconciliation Service next, then reduce `app.venue_reconciliation.py` to compatibility exports, FastAPI error translation and route facade in a separate Issue.
+Safe approach: extract one Reconciliation Service next, then reduce `app.venue_reconciliation.py` to compatibility exports, FastAPI error translation and route facade in a separate Issue.
