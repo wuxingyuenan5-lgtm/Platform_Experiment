@@ -51,6 +51,47 @@ class Migration:
 # remain owned by their current modules until a dedicated migration is reviewed.
 PLATFORM_MIGRATIONS: tuple[Migration, ...] = (
     Migration(version=1, name="existing-platform-schema-baseline"),
+    Migration(
+        version=2,
+        name="cross-spread-market-exit-plans",
+        statements=(
+            """
+            CREATE TABLE IF NOT EXISTS order_execution_intents (
+                idempotency_key TEXT PRIMARY KEY,
+                reduce_only INTEGER NOT NULL DEFAULT 0,
+                position_id TEXT
+            )
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS cross_spread_exit_plans (
+                id TEXT PRIMARY KEY,
+                strategy_instance_id TEXT NOT NULL,
+                open_batch_id TEXT NOT NULL UNIQUE,
+                close_batch_id TEXT,
+                direction TEXT NOT NULL,
+                quantity_oz TEXT NOT NULL,
+                mt5_position_id TEXT NOT NULL,
+                entry_spread TEXT NOT NULL,
+                take_profit_spread TEXT NOT NULL,
+                stop_loss_spread TEXT NOT NULL,
+                status TEXT NOT NULL,
+                trigger_reason TEXT,
+                trigger_spread TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                triggered_at TEXT,
+                closed_at TEXT,
+                FOREIGN KEY(strategy_instance_id) REFERENCES strategy_instances(id),
+                FOREIGN KEY(open_batch_id) REFERENCES execution_batches(id),
+                FOREIGN KEY(close_batch_id) REFERENCES execution_batches(id)
+            )
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_cross_spread_exit_plans_status
+            ON cross_spread_exit_plans(status, created_at)
+            """,
+        ),
+    ),
 )
 
 
