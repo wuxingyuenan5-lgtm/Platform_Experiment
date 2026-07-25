@@ -1,11 +1,13 @@
 <template>
   <template v-if="variant === 'crossVenue'">
-    <CrossVenueExecutionReplica
-      :selected-venue="selectedVenue"
-      :left-leg-symbol="leftLegSymbol"
-      :right-leg-symbol="rightLegSymbol"
-      :selected-resolution="selectedResolution"
-    />
+    <div class="spread-workspace__legacy-design">
+      <CrossVenueExecutionReplica
+        :selected-venue="selectedVenue"
+        :left-leg-symbol="leftLegSymbol"
+        :right-leg-symbol="rightLegSymbol"
+        :selected-resolution="selectedResolution"
+      />
+    </div>
     <CrossSpreadMarketLifecyclePanel
       :left-leg-symbol="leftLegSymbol"
       :right-leg-symbol="rightLegSymbol"
@@ -43,3 +45,30 @@
     },
   );
 </script>
+
+<style scoped lang="less">
+  .spread-workspace__legacy-design {
+    position: relative;
+  }
+
+  .spread-workspace__legacy-design :deep(.cross-card--execution) {
+    position: relative;
+    pointer-events: none;
+  }
+
+  .spread-workspace__legacy-design :deep(.cross-card--execution::after) {
+    position: absolute;
+    inset: 0;
+    z-index: 4;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding-top: 10px;
+    border-radius: 18px;
+    background: rgba(255, 255, 255, 0.18);
+    color: #526885;
+    content: '原市价 / 限价设计保留；真实市价执行请使用下方运行区';
+    font-size: 12px;
+    font-weight: 700;
+  }
+</style>
