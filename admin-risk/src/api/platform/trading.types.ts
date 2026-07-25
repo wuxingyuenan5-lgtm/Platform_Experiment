@@ -15,16 +15,6 @@ export type ExecutionBatchStatus =
   | 'failed'
   | 'manual_intervention';
 
-export interface CreateOrderInput {
-  accountId: string;
-  instrumentId: string;
-  symbol: string;
-  side: TradingSide;
-  orderType: TradingOrderType;
-  quantity: string;
-  price?: string;
-}
-
 export interface OrderResult {
   orderId: string;
   commandId: string;
