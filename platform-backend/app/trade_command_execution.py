@@ -31,6 +31,7 @@ def submit_order_through_runtime(
     strategy_instance_id: str | None = None,
     command_id: str | None = None,
     reduce_only: bool = False,
+    position_id: str | None = None,
 ) -> OrderResponse:
     """Create one local Order and submit it through the selected Runtime contract mode."""
 
@@ -40,6 +41,9 @@ def submit_order_through_runtime(
         resolved_command_id = command_id
     else:
         resolved_command_id = command_id or str(uuid4())
+
+    if position_id is not None and not reduce_only:
+        raise ValueError("A close position target requires reduce-only execution")
 
     settings = get_settings()
     order_id = str(uuid4())
@@ -105,6 +109,7 @@ def submit_order_through_runtime(
             quantity=request.quantity,
             price=request.price,
             reduce_only=reduce_only,
+            position_id=position_id,
         ).model_dump(mode="json")
     else:
         command_payload = {
@@ -160,6 +165,7 @@ def submit_trade_command_order(
     strategy_instance_id: str,
     command_id: str,
     reduce_only: bool = False,
+    position_id: str | None = None,
 ) -> OrderResponse:
     """Submit through the authoritative versioned Runtime contract."""
 
@@ -169,6 +175,7 @@ def submit_trade_command_order(
         strategy_instance_id=strategy_instance_id,
         command_id=command_id,
         reduce_only=reduce_only,
+        position_id=position_id,
     )
 
 
