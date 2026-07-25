@@ -1,8 +1,9 @@
+from __future__ import annotations
+
 from datetime import UTC, datetime
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field
-
 
 ObservabilityState = Literal["complete", "partial", "unavailable"]
 SectionState = Literal["complete", "unavailable"]
