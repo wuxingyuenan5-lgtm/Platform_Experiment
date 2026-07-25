@@ -17,13 +17,16 @@ from app.live_route_store import (
 from app.live_safety import validate_live_write
 from app.models import ExecutionEvent, SubmitOrderCommand, VenueOrderSnapshot
 
+CROSS_SPREAD_STRATEGY_INSTANCE_ID = "strategy_cross_venue_spread_instance_default"
+
 
 class BybitFillConfirmingAdapter(BybitLiveAdapter):
-    """Bybit market adapter with bounded fill confirmation and close safeguards."""
+    """Bybit adapter with bounded terminal confirmation and close safeguards."""
 
     def submit_order(self, command: SubmitOrderCommand) -> list[ExecutionEvent]:
         events = self._submit_acknowledgement(command)
-        if command.order_type != "market":
+        is_fok = self._is_cross_spread_fok(command)
+        if command.order_type != "market" and not is_fok:
             return events
 
         acknowledgement = events[0]
@@ -48,10 +51,35 @@ class BybitFillConfirmingAdapter(BybitLiveAdapter):
 
             last_snapshot = snapshot
             if snapshot.status == "filled":
+                if is_fok and snapshot.filled_quantity != command.quantity:
+                    acknowledgement.reason = (
+                        "Bybit FOK order reported filled with a quantity mismatch; "
+                        "MT5 hedge was not submitted pending reconciliation"
+                    )
+                    return events
                 fill_event = self._fill_event(command, snapshot, partial=False)
                 return [*events, fill_event] if fill_event is not None else events
 
             if snapshot.status == "canceled":
+                if is_fok:
+                    if snapshot.filled_quantity > 0:
+                        acknowledgement.reason = (
+                            "Bybit FOK order reached a terminal partial fill; "
+                            "MT5 hedge was not submitted pending reconciliation"
+                        )
+                        return events
+                    return [
+                        *events,
+                        ExecutionEvent(
+                            event_id=f"BYBIT-REJECT-{external_order_id}",
+                            command_id=command.command_id,
+                            platform_order_id=command.platform_order_id,
+                            event_type="order_rejected",
+                            external_order_id=external_order_id,
+                            occurred_at=snapshot.as_of,
+                            reason="Bybit FOK limit order was not filled",
+                        ),
+                    ]
                 if snapshot.filled_quantity > 0:
                     fill_event = self._fill_event(command, snapshot, partial=True)
                     return [*events, fill_event] if fill_event is not None else events
@@ -69,6 +97,7 @@ class BybitFillConfirmingAdapter(BybitLiveAdapter):
                 ]
 
             if snapshot.status == "rejected":
+                order_label = "FOK limit" if is_fok else "market"
                 return [
                     *events,
                     ExecutionEvent(
@@ -78,13 +107,21 @@ class BybitFillConfirmingAdapter(BybitLiveAdapter):
                         event_type="order_rejected",
                         external_order_id=external_order_id,
                         occurred_at=snapshot.as_of,
-                        reason="Bybit rejected the market order after acknowledgement",
+                        reason=f"Bybit rejected the {order_label} order after acknowledgement",
                     ),
                 ]
 
             self._sleep_before_retry()
 
-        if last_snapshot is not None and last_snapshot.status == "partially_filled":
+        if is_fok:
+            if last_snapshot is not None and last_snapshot.filled_quantity > 0:
+                acknowledgement.reason = (
+                    "Bybit FOK order has a non-zero unresolved fill at confirmation timeout; "
+                    "MT5 hedge was not submitted pending reconciliation"
+                )
+            else:
+                acknowledgement.reason = "Bybit FOK limit-order confirmation timed out"
+        elif last_snapshot is not None and last_snapshot.status == "partially_filled":
             acknowledgement.reason = (
                 "Bybit market order remained partially filled at confirmation timeout; "
                 "MT5 hedge was not submitted because the remaining Bybit quantity is unresolved"
@@ -120,7 +157,7 @@ class BybitFillConfirmingAdapter(BybitLiveAdapter):
             if command.price is None:
                 raise GatewayRequestRejectedError("Bybit limit order requires price")
             payload["price"] = format(command.price, "f")
-            payload["timeInForce"] = "GTC"
+            payload["timeInForce"] = "FOK" if self._is_cross_spread_fok(command) else "GTC"
         try:
             response = client.place_order(**payload)
         except Exception as exc:
@@ -198,6 +235,12 @@ class BybitFillConfirmingAdapter(BybitLiveAdapter):
             fill_quantity=snapshot.filled_quantity,
             occurred_at=snapshot.as_of,
             reason=reason,
+        )
+
+    def _is_cross_spread_fok(self, command: SubmitOrderCommand) -> bool:
+        return (
+            command.order_type == "limit"
+            and command.strategy_instance_id == CROSS_SPREAD_STRATEGY_INSTANCE_ID
         )
 
     def _sleep_before_retry(self) -> None:
