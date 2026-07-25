@@ -27,6 +27,7 @@
 - Platform Backend 不直接导入交易场所 SDK；外部副作用属于 Execution Runtime。
 - Platform 与 Runtime 通信使用显式版本契约。
 - 关键边界采用单一 Owner；用例编排属于 Service，路由 facade 只保留兼容入口和错误映射，不重复计算、持久化或配置化外部 HTTP 实现。
+- 持久化 Repository 是 DDL、直接 SQL、Row Mapping 与受保护事务的唯一 Owner；Policy、Service 与路由 facade 不直接访问数据库。
 - `positions`、`pnl_results` 是运营投影，不是正式账务权威。
 - 正式账务由不可变 `financial_facts` 重建。
 - 数据库变化必须进入有版本和校验和的迁移账本。
