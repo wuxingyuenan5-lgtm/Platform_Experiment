@@ -23,6 +23,10 @@ from app.schemas import (
 )
 from app.trade_commands import create_trade_command, validate_trade_command_catalog
 
+CROSS_SPREAD_STRATEGY_KEY = "cross_venue_spread"
+BYBIT_LEG_ROLE = "bybit_leg"
+MT5_LEG_ROLE = "mt5_leg"
+
 
 def now_iso() -> str:
     return datetime.now(UTC).isoformat()
@@ -199,7 +203,7 @@ def create_execution_batch(request: CreateExecutionBatchRequest) -> ExecutionBat
     update_batch_status(batch_id, "executing")
     filled_count = 0
 
-    for role, command_request in command_requests:
+    for index, (role, command_request) in enumerate(command_requests):
         if filled_count:
             deadline_ok, deadline_reason = check_leg_deadline(batch_id)
             if not deadline_ok:
@@ -253,6 +257,36 @@ def create_execution_batch(request: CreateExecutionBatchRequest) -> ExecutionBat
         )
 
         if command.status == "filled":
+            if (
+                strategy_key == CROSS_SPREAD_STRATEGY_KEY
+                and role == BYBIT_LEG_ROLE
+                and command.platform_order_id is not None
+            ):
+                try:
+                    command_requests = resize_cross_spread_mt5_hedge(
+                        command_requests,
+                        bybit_index=index,
+                        bybit_filled_quantity=get_order_filled_quantity(
+                            command.platform_order_id
+                        ),
+                    )
+                except ValueError as exc:
+                    reason = str(exc)
+                    update_leg_status(
+                        batch_id,
+                        MT5_LEG_ROLE,
+                        "blocked",
+                        failure_reason=reason,
+                    )
+                    update_batch_status(
+                        batch_id,
+                        "manual_intervention",
+                        failure_reason=reason,
+                        requires_manual_intervention=True,
+                    )
+                    handle_batch_failure(batch_id, reason)
+                    return get_execution_batch(batch_id)
+
             filled_count += 1
             risk_ok, risk_reason = record_filled_leg(batch_id)
             if not risk_ok and filled_count < len(command_requests):
@@ -301,6 +335,85 @@ def create_execution_batch(request: CreateExecutionBatchRequest) -> ExecutionBat
         )
         handle_batch_failure(batch_id, reason)
     return get_execution_batch(batch_id)
+
+
+def get_order_filled_quantity(order_id: str) -> Decimal:
+    with connection() as db:
+        rows = db.execute(
+            "SELECT quantity FROM fills WHERE order_id = ? ORDER BY occurred_at, id",
+            (order_id,),
+        ).fetchall()
+    return sum((Decimal(row["quantity"]) for row in rows), Decimal("0"))
+
+
+def resize_cross_spread_mt5_hedge(
+    command_requests: list[tuple[str, CreateTradeCommandRequest]],
+    *,
+    bybit_index: int,
+    bybit_filled_quantity: Decimal,
+) -> list[tuple[str, CreateTradeCommandRequest]]:
+    if bybit_filled_quantity <= 0:
+        raise ValueError("Confirmed Bybit fill quantity is unavailable; MT5 hedge is blocked")
+
+    bybit_role, bybit_request = command_requests[bybit_index]
+    if bybit_role != BYBIT_LEG_ROLE:
+        raise ValueError("Cross-spread execution order must place the Bybit leg first")
+    if bybit_filled_quantity > bybit_request.quantity:
+        raise ValueError("Confirmed Bybit fill exceeds the requested quantity; MT5 hedge is blocked")
+
+    mt5_index = next(
+        (
+            index
+            for index, (role, _) in enumerate(command_requests)
+            if role == MT5_LEG_ROLE
+        ),
+        None,
+    )
+    if mt5_index is None or mt5_index <= bybit_index:
+        raise ValueError("Cross-spread MT5 hedge leg is missing or ordered before Bybit")
+
+    mt5_role, mt5_request = command_requests[mt5_index]
+    adjusted_quantity = (
+        bybit_filled_quantity * mt5_request.quantity / bybit_request.quantity
+    )
+    validate_contract_quantity(
+        adjusted_quantity,
+        instrument_id=mt5_request.instrument_id,
+        label=mt5_request.symbol,
+    )
+
+    resized = list(command_requests)
+    resized[mt5_index] = (
+        mt5_role,
+        mt5_request.model_copy(update={"quantity": adjusted_quantity}),
+    )
+    return resized
+
+
+def validate_contract_quantity(
+    quantity: Decimal,
+    *,
+    instrument_id: str,
+    label: str,
+) -> None:
+    with connection() as db:
+        row = db.execute(
+            """
+            SELECT min_order_quantity, quantity_step
+            FROM contract_specifications
+            WHERE instrument_id = ?
+            """,
+            (instrument_id,),
+        ).fetchone()
+    if row is None:
+        raise ValueError(f"{label} contract specification is unavailable")
+    minimum = Decimal(row["min_order_quantity"])
+    step = Decimal(row["quantity_step"])
+    if quantity < minimum:
+        raise ValueError(f"Confirmed Bybit fill is below the {label} hedge minimum")
+    steps = (quantity - minimum) / step
+    if steps != steps.to_integral_value():
+        raise ValueError(f"Confirmed Bybit fill does not map to the {label} hedge step")
 
 
 def assert_batch_request_matches(
