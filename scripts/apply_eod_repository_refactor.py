@@ -35,6 +35,18 @@ def main() -> None:
         '    "EOD Reconciliation orchestration and routes": "platform-backend/app/eod_reconciliation.py",\n'
         '    "EOD scale-gate policy": "platform-backend/app/eod_policy.py",\n',
     )
+    replace_if_present(
+        "CHANGELOG.md",
+        "## Unreleased\n\n### EOD Reconciliation public-schema ownership — Issue #75 / PR #76\n",
+        "## Unreleased\n\n"
+        "### EOD Reconciliation Repository ownership — Issue #77 / PR #78\n\n"
+        "- Added `platform-backend/app/eod_reconciliation_repository.py` as the sole EOD DDL, direct-SQL, row-mapping and persistence-transaction owner.\n"
+        "- Removed direct database access from `app.eod_reconciliation` and `app.eod_policy` while preserving explicit compatibility aliases.\n"
+        "- Added exact DDL SHA-256, report identity/unique-constraint, immutable-review and forced-rollback evidence.\n"
+        "- Registered EOD and Venue reconciliation Repository owners in progressive Pyright, Architecture Ownership, database authority and Repository Safety checks.\n"
+        "- Preserved every report/status/scale-gate rule, partial-failure string, API, cross-domain orchestration, transaction and both Live Write defaults.\n\n"
+        "### EOD Reconciliation public-schema ownership — Issue #75 / PR #76\n",
+    )
 
 
 if __name__ == "__main__":
