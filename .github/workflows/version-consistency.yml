@@ -1,0 +1,43 @@
+name: Version Consistency
+
+on:
+  push:
+    branches:
+      - main
+      - 'feature/**'
+      - 'fix/**'
+      - 'refactor/**'
+      - 'hardening/**'
+      - 'docs/**'
+      - 'chore/**'
+    paths:
+      - VERSION
+      - platform-backend/pyproject.toml
+      - execution-runtime/pyproject.toml
+      - admin-risk/.env
+      - scripts/check-version-consistency.py
+      - .github/workflows/version-consistency.yml
+  pull_request:
+    branches:
+      - main
+    paths:
+      - VERSION
+      - platform-backend/pyproject.toml
+      - execution-runtime/pyproject.toml
+      - admin-risk/.env
+      - scripts/check-version-consistency.py
+      - .github/workflows/version-consistency.yml
+
+permissions:
+  contents: read
+
+jobs:
+  version-consistency:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Check maintained release versions
+        run: python scripts/check-version-consistency.py
