@@ -41,7 +41,7 @@ class SyntheticOrderIntent:
         return not self.is_open
 
 
-_ACTION_TO_MARKET_COMMAND: dict[SyntheticAction, LegacyMarketAction] = {
+_ACTION_TO_COMMAND: dict[SyntheticAction, LegacyMarketAction] = {
     "OPEN_LONG_SPREAD": "OPEN_LONG",
     "CLOSE_LONG_SPREAD": "CLOSE_LONG",
     "OPEN_SHORT_SPREAD": "OPEN_SHORT",
@@ -125,7 +125,13 @@ def normalize_trigger_reason(value: str | None) -> SyntheticTriggerReason:
     return cast(SyntheticTriggerReason, normalized)
 
 
+def command_action(intent: SyntheticOrderIntent) -> LegacyMarketAction:
+    """Map a business action to the existing four-action execution command vocabulary."""
+
+    return _ACTION_TO_COMMAND[intent.action]
+
+
 def market_command_action(intent: SyntheticOrderIntent) -> LegacyMarketAction:
     if intent.execution_type != "MARKET":
         raise ValueError("Only MARKET synthetic intents map to the existing Market executor")
-    return _ACTION_TO_MARKET_COMMAND[intent.action]
+    return command_action(intent)
