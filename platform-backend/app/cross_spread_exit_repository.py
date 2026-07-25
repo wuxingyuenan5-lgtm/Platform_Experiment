@@ -116,8 +116,6 @@ def create_exit_plan(
             and existing.entry_spread == entry_spread
             and existing.take_profit_spread == take_profit_spread
             and existing.stop_loss_spread == stop_loss_spread
-            and existing.take_profit_execution_mode == take_profit_execution_mode
-            and existing.stop_loss_execution_mode == stop_loss_execution_mode
         )
         if not matches:
             raise HTTPException(
@@ -158,6 +156,49 @@ def create_exit_plan(
                 created_at,
             ),
         )
+    return get_exit_plan(plan_id)
+
+
+def configure_exit_plan_execution_modes(
+    plan_id: str,
+    *,
+    take_profit_execution_mode: ExecutionMode,
+    stop_loss_execution_mode: ExecutionMode,
+) -> CrossSpreadExitPlanResponse:
+    current = get_exit_plan(plan_id)
+    requested = (take_profit_execution_mode, stop_loss_execution_mode)
+    existing = (
+        current.take_profit_execution_mode,
+        current.stop_loss_execution_mode,
+    )
+    if existing == requested:
+        return current
+    if existing != ("market", "market") or current.status != "active":
+        raise HTTPException(
+            status_code=409,
+            detail="Exit plan execution modes are already configured differently",
+        )
+
+    updated_at = now_iso()
+    with connection() as db:
+        cursor = db.execute(
+            """
+            UPDATE cross_spread_exit_plans
+            SET take_profit_execution_mode = ?, stop_loss_execution_mode = ?,
+                updated_at = ?
+            WHERE id = ? AND status = 'active'
+              AND take_profit_execution_mode = 'market'
+              AND stop_loss_execution_mode = 'market'
+            """,
+            (
+                take_profit_execution_mode,
+                stop_loss_execution_mode,
+                updated_at,
+                plan_id,
+            ),
+        )
+    if cursor.rowcount != 1:
+        raise HTTPException(status_code=409, detail="Exit plan execution modes changed concurrently")
     return get_exit_plan(plan_id)
 
 
