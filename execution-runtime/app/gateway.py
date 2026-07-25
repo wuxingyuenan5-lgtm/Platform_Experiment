@@ -1,14 +1,18 @@
-from typing import Protocol
+from datetime import datetime
+from typing import Literal, Protocol
 
 from app.models import (
     CancelOrderResponse,
     ExecutionEvent,
     GatewayCapabilitiesResponse,
     SubmitOrderCommand,
+    VenueAccountRiskSnapshot,
     VenueBalanceSnapshot,
     VenueEconomicEventSnapshot,
+    VenueFillHistoryPage,
     VenueFillSnapshot,
     VenueInstrumentSpecification,
+    VenueOrderHistoryPage,
     VenueOrderSnapshot,
     VenuePositionSnapshot,
 )
@@ -40,6 +44,20 @@ class ExecutionGateway(Protocol):
         """Return bounded current and recent external orders."""
         ...
 
+    def query_order_history(
+        self,
+        *,
+        account_id: str,
+        symbol: str | None,
+        start_time: datetime,
+        end_time: datetime,
+        cursor: str | None,
+        limit: int,
+        scope: Literal["active", "closed"],
+    ) -> VenueOrderHistoryPage:
+        """Return one bounded page of active or historical orders."""
+        ...
+
     def list_fills(
         self,
         *,
@@ -50,12 +68,29 @@ class ExecutionGateway(Protocol):
         """Return external fills matching the supplied filters."""
         ...
 
+    def query_fill_history(
+        self,
+        *,
+        account_id: str,
+        symbol: str | None,
+        start_time: datetime,
+        end_time: datetime,
+        cursor: str | None,
+        limit: int,
+    ) -> VenueFillHistoryPage:
+        """Return one bounded page of Fill or Deal history."""
+        ...
+
     def list_positions(self, account_id: str | None = None) -> list[VenuePositionSnapshot]:
         """Return current external position snapshots."""
         ...
 
     def list_balances(self, account_id: str | None = None) -> list[VenueBalanceSnapshot]:
         """Return current external balance snapshots."""
+        ...
+
+    def get_account_risk(self, account_id: str) -> VenueAccountRiskSnapshot:
+        """Return account-level authoritative margin and stop-out evidence."""
         ...
 
     def get_instrument_specification(
