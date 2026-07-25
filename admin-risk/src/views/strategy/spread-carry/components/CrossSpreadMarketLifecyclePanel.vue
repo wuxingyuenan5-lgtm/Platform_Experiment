@@ -129,11 +129,7 @@
                   <button
                     type="button"
                     class="market-lifecycle__close"
-                    :disabled="
-                      loading ||
-                      plan.status !== 'active' ||
-                      Boolean(closeValidationError)
-                    "
+                    :disabled="loading || plan.status !== 'active' || Boolean(closeValidationError)"
                     @click="submitClose(plan)"
                   >
                     {{ closeExecutionMode === 'limit' ? 'FOK 平仓' : '市价平仓' }}
@@ -255,9 +251,7 @@
   });
   const closeValidationError = computed(() => {
     if (closeExecutionMode.value !== 'limit') return '';
-    return Number.isFinite(Number(closeLimitSpread.value))
-      ? ''
-      : 'FOK 平仓限制价差必须是有效数字';
+    return Number.isFinite(Number(closeLimitSpread.value)) ? '' : 'FOK 平仓限制价差必须是有效数字';
   });
 
   function applyDirectionDefaults() {
@@ -295,9 +289,7 @@
         takeProfitSpread: takeProfitSpread.value,
         stopLossSpread: stopLossSpread.value,
         executionMode: openExecutionMode.value,
-        ...(openExecutionMode.value === 'limit'
-          ? { limitSpread: openLimitSpread.value }
-          : {}),
+        ...(openExecutionMode.value === 'limit' ? { limitSpread: openLimitSpread.value } : {}),
       });
       limitEvidence.value = result.limitExecution || null;
       if (result.executionBatch.status === 'hedged' && result.exitPlan) {
@@ -367,7 +359,12 @@
       };
       const detail = candidate.response?.data?.detail;
       if (Array.isArray(detail)) {
-        return detail.map((item) => item.msg).filter(Boolean).join('；') || fallback;
+        return (
+          detail
+            .map((item) => item.msg)
+            .filter(Boolean)
+            .join('；') || fallback
+        );
       }
       return detail || candidate.message || fallback;
     }
@@ -386,9 +383,7 @@
   }
 
   function limitDirectionLabel(directionValue: CrossSpreadLimitExecutionResult['direction']) {
-    return directionValue === 'BUY_BYBIT_SELL_MT5'
-      ? '买 Bybit / 卖 MT5'
-      : '卖 Bybit / 买 MT5';
+    return directionValue === 'BUY_BYBIT_SELL_MT5' ? '买 Bybit / 卖 MT5' : '卖 Bybit / 买 MT5';
   }
 
   function planStatusLabel(status: CrossSpreadExitPlanResult['status']) {
