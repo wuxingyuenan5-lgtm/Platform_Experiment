@@ -225,6 +225,65 @@ def _handle_definitive_open_failure(batch: ExecutionBatchResponse) -> ExecutionB
 
     original_reason = batch.failure_reason or "MT5 hedge failed after confirmed Bybit fill"
     try:
+        bybit_positions, mt5_positions = _load_live_positions()
+    except HTTPException as exc:
+        update_batch_status(
+            batch.batch_id,
+            "manual_intervention",
+            failure_reason=(
+                f"{original_reason}; pre-rollback position verification failed: "
+                f"{exc.detail}"
+            ),
+            requires_manual_intervention=True,
+        )
+        return get_execution_batch(batch.batch_id)
+
+    live_mt5 = _target_positions(mt5_positions, MT5_SYMBOL)
+    if live_mt5:
+        update_batch_status(
+            batch.batch_id,
+            "manual_intervention",
+            failure_reason=(
+                f"{original_reason}; live MT5 exposure exists despite the definitive "
+                "failure state, so automatic Bybit rollback is blocked"
+            ),
+            requires_manual_intervention=True,
+        )
+        return get_execution_batch(batch.batch_id)
+
+    live_bybit = _target_positions(bybit_positions, BYBIT_SYMBOL)
+    if not live_bybit:
+        update_batch_status(
+            batch.batch_id,
+            "failed",
+            failure_reason=(
+                f"{original_reason}; external positions were already flat before rollback, "
+                "so no duplicate rollback was submitted"
+            ),
+            requires_manual_intervention=False,
+        )
+        return get_execution_batch(batch.batch_id)
+
+    expected_positive = batch.direction == "OPEN_LONG"
+    matching_bybit = [
+        position
+        for position in live_bybit
+        if _sign_matches(position.net_quantity, expected_positive)
+        and abs(position.net_quantity) == bybit.quantity
+    ]
+    if len(live_bybit) != 1 or len(matching_bybit) != 1:
+        update_batch_status(
+            batch.batch_id,
+            "manual_intervention",
+            failure_reason=(
+                f"{original_reason}; live Bybit exposure does not match exactly one "
+                "confirmed first-leg position, so automatic rollback is blocked"
+            ),
+            requires_manual_intervention=True,
+        )
+        return get_execution_batch(batch.batch_id)
+
+    try:
         rollback = submit_bybit_definitive_failure_rollback(
             open_batch_id=batch.batch_id,
             open_action=batch.direction,
@@ -252,7 +311,7 @@ def _handle_definitive_open_failure(batch: ExecutionBatchResponse) -> ExecutionB
         return get_execution_batch(batch.batch_id)
 
     try:
-        _verify_flat_positions(mt5_position_id=None)
+        _verify_flat_positions()
     except HTTPException as exc:
         update_batch_status(
             batch.batch_id,
@@ -336,7 +395,7 @@ def _close_claimed_plan(plan: CrossSpreadExitPlanResponse) -> CrossSpreadCloseRe
     mark_plan_closing(plan.plan_id, batch.batch_id)
     if batch.status == "hedged":
         try:
-            _verify_flat_positions(mt5_position_id=plan.mt5_position_id)
+            _verify_flat_positions(expected_mt5_position_id=plan.mt5_position_id)
         except HTTPException:
             updated = mark_plan_manual_intervention(
                 plan.plan_id,
@@ -386,19 +445,21 @@ def _verify_open_positions(
     return mt5_matches[0].external_position_id
 
 
-def _verify_flat_positions(*, mt5_position_id: str | None) -> None:
+def _verify_flat_positions(*, expected_mt5_position_id: str | None = None) -> None:
     bybit_positions, mt5_positions = _load_live_positions()
     if _target_positions(bybit_positions, BYBIT_SYMBOL):
         raise HTTPException(status_code=409, detail="Bybit gold exposure remains after close")
     target_mt5 = _target_positions(mt5_positions, MT5_SYMBOL)
-    if mt5_position_id is not None:
-        target_mt5 = [
-            position
-            for position in target_mt5
-            if position.external_position_id == mt5_position_id
-        ]
     if target_mt5:
-        raise HTTPException(status_code=409, detail="MT5 gold exposure remains after close")
+        expected = (
+            f"; expected closed Position Ticket {expected_mt5_position_id}"
+            if expected_mt5_position_id is not None
+            else ""
+        )
+        raise HTTPException(
+            status_code=409,
+            detail=f"MT5 gold exposure remains after close{expected}",
+        )
 
 
 def _load_live_positions() -> tuple[list[LivePosition], list[LivePosition]]:
