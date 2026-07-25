@@ -132,8 +132,11 @@ def create_eod_report(
                 actor=request.actor,
             )
         )
-        account_run_id = account_run.run_id
-        difference_ids.update(repository.list_difference_ids_for_run(account_run_id))
+        resolved_account_run_id: str = account_run.run_id
+        account_run_id = resolved_account_run_id
+        difference_ids.update(
+            repository.list_difference_ids_for_run(resolved_account_run_id)
+        )
     except Exception as exc:  # noqa: BLE001 - report must preserve partial failures
         errors.append(f"account-reconciliation:{type(exc).__name__}:{exc}")
 

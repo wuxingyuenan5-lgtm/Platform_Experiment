@@ -104,7 +104,7 @@ Safe approach: module-by-module cleanup until full `src/` can replace the change
 
 ## TD-005 — Progressive Python typing
 
-Status: active; critical execution, FinancialFact, Venue Reconciliation, EOD schemas/policy/repository and SQLite boundaries selected
+Status: active; critical execution, FinancialFact, Venue Reconciliation, EOD schemas/policy/repository/service and SQLite boundaries selected
 Owner: Platform Backend and Execution Runtime
 
 Problem: much of the legacy code remains outside static type checking.
@@ -114,7 +114,7 @@ Risk: untyped database rows, arbitrary payloads and large orchestration modules 
 Completed prerequisite:
 
 - Pyright is installed and blocking in CI;
-- Platform execution DTOs, FinancialFact DTOs/Normalization/Repository/Projection Service, shared Position Math, Venue Reconciliation DTOs/Difference Policy/Repository/Runtime Client/Service, EOD Reconciliation DTOs/Policy/Repository, SQLite Connection/Bootstrap/Seeds, Runtime contracts, schema migrations, schema governance and authoritative order submission are selected;
+- Platform execution DTOs, FinancialFact DTOs/Normalization/Repository/Projection Service, shared Position Math, Venue Reconciliation DTOs/Difference Policy/Repository/Runtime Client/Service, EOD Reconciliation DTOs/Policy/Repository/Service, SQLite Connection/Bootstrap/Seeds, Runtime contracts, schema migrations, schema governance and authoritative order submission are selected;
 - Runtime models, contracts and Gateway Protocol are selected.
 
 Deferred because: strict whole-project typing would create noisy changes unrelated to current risk boundaries.
@@ -196,7 +196,7 @@ Future rule: changes must remain inside the established Owner. Compatibility del
 
 ## TD-009 — EOD Reconciliation module concentration
 
-Status: active; public schemas, pure decision Policy and persistence repository extracted through Issues #75, #77 and #79
+Status: active; public schemas, pure decision Policy, persistence Repository and Service extracted through Issues #75, #77, #79 and #81
 Owner: Platform Backend / EOD Reconciliation
 
 Original problem: `app/eod_reconciliation.py` combined EOD DDL/direct SQL, row mapping, report orchestration, partial-failure capture, status/scale-gate decisions, immutable review handling and FastAPI routes.
@@ -207,14 +207,15 @@ Resolved ownership:
 - `app/eod_reconciliation_policy.py`: pure report status, scale-gate, historical-Difference and immutable-review decisions;
 - `app/eod_reconciliation_repository.py`: EOD DDL, direct SQL, report identity, row mapping, report persistence and atomic review transactions;
 - `app/eod_policy.py`: business-day order selection and repository coordination for historical Difference gates without duplicate decisions;
-- `app/eod_reconciliation.py`: compatibility aliases, cross-domain orchestration, exact HTTP mapping and routes.
+- `app/eod_reconciliation_service.py`: framework-independent report creation/read/list/review sequencing, cross-domain coordination and exact partial-failure capture;
+- `app/eod_reconciliation.py`: per-call dependency wiring, compatibility delegates, exact HTTP mapping and routes.
 
 Evidence includes exact object identity, JSON Schema and validation messages, DDL SHA-256 `4cc299bbf57dd2dfa4db7c8092055eebc2e4862c5e4c9ecfe26be813d93f12b1`, report identity/unique constraints, immutable-review idempotency and rollback, architecture checks, EOD integration/policy regressions and progressive Pyright.
 
-Remaining risk: cross-domain orchestration, partial-failure capture and FastAPI routes still share one module. Splitting Service and routes together would recreate an oversized refactor.
+Remaining risk: FastAPI route declarations still share the compatibility facade with dependency wiring and HTTP translation. This is now a thin boundary rather than a mixed business module.
 
-Trigger: extract one framework-independent EOD Service, then a thin route facade in a later bounded Issue.
+Trigger: extract a dedicated EOD route module only when route ownership or API assembly receives material work.
 
 Protected semantics: report natural/idempotency identity, business-date/timezone validation, DDL and query order, partial-failure strings, report/scale-gate status rules, immutable review rules, EOD/Venue/FinancialFact coordination and both Live Write defaults.
 
-Safe approach: framework-independent Service → thin route facade, with one small PR and exact behavioral evidence per boundary.
+Safe approach: dedicated route module only, preserving facade compatibility delegates until usage evidence supports removal.
