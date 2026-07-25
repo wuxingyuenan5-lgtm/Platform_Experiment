@@ -10,6 +10,7 @@ from app.config import get_settings
 from app.database import connection
 from app.execution_batches import create_execution_batch
 from app.market_data import list_cross_spread_market_history, save_cross_spread_market_snapshot
+from app.order_execution_intents import register_order_execution_intent
 from app.schemas import (
     BatchLegRequest,
     CreateExecutionBatchRequest,
@@ -27,6 +28,8 @@ BYBIT_INSTRUMENT_ID = "instrument_xau_usdt_perp"
 MT5_INSTRUMENT_ID = "instrument_xau_usd"
 BYBIT_SYMBOL = "XAUTUSDT"
 MT5_SYMBOL = "XAUUSD+"
+BYBIT_LEG_ROLE = "bybit_leg"
+MT5_LEG_ROLE = "mt5_leg"
 
 
 def get_cross_spread_snapshot() -> CrossSpreadSnapshotResponse:
@@ -59,12 +62,31 @@ def get_cross_spread_history(limit: int = 200) -> list[CrossSpreadHistoryPointRe
 
 def submit_cross_spread_market_command(
     request: CrossSpreadMarketCommandRequest,
+    *,
+    idempotency_key: str | None = None,
+    bybit_reduce_only: bool = False,
+    mt5_reduce_only: bool = False,
+    mt5_position_id: str | None = None,
 ) -> ExecutionBatchResponse:
     settings = get_settings()
     if not settings.live_trading_enabled:
         raise HTTPException(
             status_code=403,
             detail="Live cross-spread execution is disabled",
+        )
+
+    is_close = request.action.startswith("CLOSE_")
+    if is_close and not (
+        bybit_reduce_only and mt5_reduce_only and mt5_position_id is not None
+    ):
+        raise HTTPException(
+            status_code=422,
+            detail="Cross-spread close requires reduce-only venue intents and an MT5 Position Ticket",
+        )
+    if not is_close and (bybit_reduce_only or mt5_reduce_only or mt5_position_id is not None):
+        raise HTTPException(
+            status_code=422,
+            detail="Open cross-spread commands cannot carry close-position intent",
         )
 
     bybit_side, mt5_side = _sides_for_action(request.action)
@@ -82,16 +104,30 @@ def submit_cross_spread_market_command(
         step=sizing["mt5_step"],
         label=MT5_SYMBOL,
     )
+
+    batch_key = idempotency_key or (
+        f"cross-spread:{request.action}:{request.quantity_oz}:{uuid4()}"
+    )
+    register_order_execution_intent(
+        f"{batch_key}:{BYBIT_LEG_ROLE}",
+        reduce_only=bybit_reduce_only,
+    )
+    register_order_execution_intent(
+        f"{batch_key}:{MT5_LEG_ROLE}",
+        reduce_only=mt5_reduce_only,
+        position_id=mt5_position_id,
+    )
+
     return create_execution_batch(
         CreateExecutionBatchRequest(
-            idempotencyKey=f"cross-spread:{request.action}:{request.quantity_oz}:{uuid4()}",
+            idempotencyKey=batch_key,
             strategyInstanceId=STRATEGY_INSTANCE_ID,
             accountId=BYBIT_ACCOUNT_ID,
             strategyKey=STRATEGY_KEY,
             direction=request.action,
             legs=[
                 BatchLegRequest(
-                    role="bybit_leg",
+                    role=BYBIT_LEG_ROLE,
                     accountId=BYBIT_ACCOUNT_ID,
                     instrumentId=BYBIT_INSTRUMENT_ID,
                     symbol=BYBIT_SYMBOL,
@@ -100,7 +136,7 @@ def submit_cross_spread_market_command(
                     quantity=request.quantity_oz,
                 ),
                 BatchLegRequest(
-                    role="mt5_leg",
+                    role=MT5_LEG_ROLE,
                     accountId=MT5_ACCOUNT_ID,
                     instrumentId=MT5_INSTRUMENT_ID,
                     symbol=MT5_SYMBOL,
