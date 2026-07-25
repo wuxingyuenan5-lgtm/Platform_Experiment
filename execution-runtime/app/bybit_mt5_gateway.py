@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from datetime import datetime
+from typing import Literal
+
 from app.bybit_live_adapter import BybitLiveAdapter
 from app.config import Settings, get_settings
 from app.gateway_errors import GatewayConfigurationError
@@ -9,10 +12,13 @@ from app.models import (
     ExecutionEvent,
     GatewayCapabilitiesResponse,
     SubmitOrderCommand,
+    VenueAccountRiskSnapshot,
     VenueBalanceSnapshot,
     VenueEconomicEventSnapshot,
+    VenueFillHistoryPage,
     VenueFillSnapshot,
     VenueInstrumentSpecification,
+    VenueOrderHistoryPage,
     VenueOrderSnapshot,
     VenuePositionSnapshot,
 )
@@ -85,6 +91,27 @@ class BybitMt5Gateway:
         snapshots.sort(key=lambda item: item.as_of, reverse=True)
         return snapshots[: max(1, limit)]
 
+    def query_order_history(
+        self,
+        *,
+        account_id: str,
+        symbol: str | None,
+        start_time: datetime,
+        end_time: datetime,
+        cursor: str | None,
+        limit: int,
+        scope: Literal["active", "closed"],
+    ) -> VenueOrderHistoryPage:
+        return self._adapter_for_account(account_id).query_order_history(
+            account_id=account_id,
+            symbol=symbol,
+            start_time=start_time,
+            end_time=end_time,
+            cursor=cursor,
+            limit=limit,
+            scope=scope,
+        )
+
     def list_fills(
         self,
         *,
@@ -116,6 +143,25 @@ class BybitMt5Gateway:
             return self.bybit.list_fills(external_order_id=external_order_id)
         return [*self.bybit.list_fills(), *self.mt5.list_fills()]
 
+    def query_fill_history(
+        self,
+        *,
+        account_id: str,
+        symbol: str | None,
+        start_time: datetime,
+        end_time: datetime,
+        cursor: str | None,
+        limit: int,
+    ) -> VenueFillHistoryPage:
+        return self._adapter_for_account(account_id).query_fill_history(
+            account_id=account_id,
+            symbol=symbol,
+            start_time=start_time,
+            end_time=end_time,
+            cursor=cursor,
+            limit=limit,
+        )
+
     def list_positions(self, account_id: str | None = None) -> list[VenuePositionSnapshot]:
         if account_id is not None:
             return self._adapter_for_account(account_id).list_positions(account_id)
@@ -125,6 +171,9 @@ class BybitMt5Gateway:
         if account_id is not None:
             return self._adapter_for_account(account_id).list_balances(account_id)
         return [*self.bybit.list_balances(), *self.mt5.list_balances()]
+
+    def get_account_risk(self, account_id: str) -> VenueAccountRiskSnapshot:
+        return self._adapter_for_account(account_id).get_account_risk(account_id)
 
     def get_instrument_specification(
         self,
