@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from decimal import Decimal
 
 from fastapi import HTTPException
 
@@ -15,17 +16,28 @@ from app.cross_spread_exit_repository import (
     claim_exit_plan,
     get_exit_plan,
     list_exit_plans,
+    load_batch_fill_summaries,
     mark_plan_closed,
     mark_plan_closing,
     mark_plan_manual_intervention,
+    release_exit_plan_claim,
 )
 from app.cross_spread_exit_schemas import (
     CrossSpreadCloseResult,
     CrossSpreadExitEvaluationResponse,
     CrossSpreadExitPlanResponse,
+    CrossSpreadLimitExecutionResponse,
     CrossSpreadMarketOpenRequest,
     CrossSpreadOpenResult,
     CrossSpreadOrderIntentResponse,
+)
+from app.cross_spread_limit_execution import (
+    get_bybit_catalog_tick_size,
+    submit_cross_spread_fok_command,
+)
+from app.cross_spread_limit_policy import (
+    CrossSpreadFokPrice,
+    derive_cross_spread_fok_price,
 )
 from app.cross_spread_order_intent import (
     SyntheticOrderIntent,
@@ -43,19 +55,27 @@ def open_cross_spread_market(request: CrossSpreadMarketOpenRequest) -> CrossSpre
         request.execution_mode,
         trigger_reason="MANUAL",
     )
-    _require_market_intent(intent)
     market_helpers._assert_acceptance_open_allowed()
-    batch = submit_cross_spread_market_command(
-        CrossSpreadMarketCommandRequest(
-            action=market_command_action(intent),
-            quantityOz=request.quantity_oz,
-        )
+    limit_execution = _prepare_limit_execution(intent, request.limit_spread)
+    command_request = CrossSpreadMarketCommandRequest(
+        action=market_command_action(intent),
+        quantityOz=request.quantity_oz,
     )
+    if intent.execution_type == "MARKET":
+        batch = submit_cross_spread_market_command(command_request)
+    else:
+        assert limit_execution is not None
+        batch = submit_cross_spread_fok_command(
+            command_request,
+            bybit_limit_price=limit_execution.bybit_limit_price,
+        )
+
     if batch.status != "hedged":
         handled = market_helpers._handle_definitive_open_failure(batch)
         return CrossSpreadOpenResult(
             executionBatch=handled,
             orderIntent=_intent_response(intent),
+            limitExecution=_limit_response(limit_execution),
             exitPlan=None,
         )
 
@@ -76,11 +96,13 @@ def open_cross_spread_market(request: CrossSpreadMarketOpenRequest) -> CrossSpre
         return CrossSpreadOpenResult(
             executionBatch=get_execution_batch(batch.batch_id),
             orderIntent=_intent_response(intent),
+            limitExecution=_limit_response(limit_execution),
             exitPlan=None,
         )
     return CrossSpreadOpenResult(
         executionBatch=batch,
         orderIntent=_intent_response(intent),
+        limitExecution=_limit_response(limit_execution),
         exitPlan=plan,
     )
 
@@ -89,13 +111,15 @@ def close_cross_spread_market(
     plan_id: str,
     *,
     execution_mode: str,
+    limit_spread: Decimal | None = None,
 ) -> CrossSpreadCloseResult:
+    current_plan = get_exit_plan(plan_id)
     intent = build_close_intent(
-        get_exit_plan(plan_id).direction,
+        current_plan.direction,
         execution_mode,
         trigger_reason="MANUAL",
     )
-    _require_market_intent(intent)
+    limit_execution = _prepare_limit_execution(intent, limit_spread)
     claimed = claim_exit_plan(
         plan_id,
         trigger_reason="manual",
@@ -112,10 +136,15 @@ def close_cross_spread_market(
             return CrossSpreadCloseResult(
                 executionBatch=get_execution_batch(current.close_batch_id),
                 orderIntent=_intent_response(completed_intent),
+                limitExecution=_limit_response(limit_execution),
                 exitPlan=current,
             )
         raise HTTPException(status_code=409, detail="Exit plan is not active")
-    return _close_claimed_plan(claimed, execution_mode=execution_mode)
+    return _close_claimed_plan(
+        claimed,
+        execution_mode=execution_mode,
+        limit_execution=limit_execution,
+    )
 
 
 def evaluate_cross_spread_exit_plans() -> CrossSpreadExitEvaluationResponse:
@@ -196,27 +225,54 @@ def _close_claimed_plan(
     plan: CrossSpreadExitPlanResponse,
     *,
     execution_mode: str,
+    limit_execution: CrossSpreadFokPrice | None = None,
 ) -> CrossSpreadCloseResult:
     intent = build_close_intent(
         plan.direction,
         execution_mode,
         trigger_reason=plan.trigger_reason or "MANUAL",
     )
-    _require_market_intent(intent)
+    if intent.execution_type == "LIMIT" and limit_execution is None:
+        raise HTTPException(status_code=422, detail="Limit close requires prepared pricing")
+    command_request = CrossSpreadMarketCommandRequest(
+        action=market_command_action(intent),
+        quantityOz=plan.quantity_oz,
+    )
     try:
-        batch = submit_cross_spread_market_command(
-            CrossSpreadMarketCommandRequest(
-                action=market_command_action(intent),
-                quantityOz=plan.quantity_oz,
-            ),
-            idempotency_key=f"cross-spread-exit:{plan.plan_id}",
-            bybit_reduce_only=True,
-            mt5_reduce_only=True,
-            mt5_position_id=plan.mt5_position_id,
-        )
+        if intent.execution_type == "MARKET":
+            batch = submit_cross_spread_market_command(
+                command_request,
+                idempotency_key=f"cross-spread-exit:{plan.plan_id}",
+                bybit_reduce_only=True,
+                mt5_reduce_only=True,
+                mt5_position_id=plan.mt5_position_id,
+            )
+        else:
+            assert limit_execution is not None
+            batch = submit_cross_spread_fok_command(
+                command_request,
+                bybit_limit_price=limit_execution.bybit_limit_price,
+                idempotency_key=f"cross-spread-fok-exit:{plan.plan_id}",
+                bybit_reduce_only=True,
+                mt5_reduce_only=True,
+                mt5_position_id=plan.mt5_position_id,
+            )
     except Exception:
         mark_plan_manual_intervention(plan.plan_id, close_batch_id=None)
         raise
+
+    if (
+        intent.execution_type == "LIMIT"
+        and batch.status == "failed"
+        and not load_batch_fill_summaries(batch.batch_id)
+    ):
+        updated = release_exit_plan_claim(plan.plan_id)
+        return CrossSpreadCloseResult(
+            executionBatch=batch,
+            orderIntent=_intent_response(intent),
+            limitExecution=_limit_response(limit_execution),
+            exitPlan=updated,
+        )
 
     mark_plan_closing(plan.plan_id, batch.batch_id)
     if batch.status == "hedged":
@@ -239,8 +295,57 @@ def _close_claimed_plan(
     return CrossSpreadCloseResult(
         executionBatch=batch,
         orderIntent=_intent_response(intent),
+        limitExecution=_limit_response(limit_execution),
         exitPlan=updated,
     )
+
+
+def _prepare_limit_execution(
+    intent: SyntheticOrderIntent,
+    limit_spread: Decimal | None,
+) -> CrossSpreadFokPrice | None:
+    if intent.execution_type == "MARKET":
+        return None
+    if limit_spread is None:
+        raise HTTPException(status_code=422, detail="Limit execution requires limitSpread")
+    snapshot = get_cross_spread_snapshot()
+    if (
+        snapshot.status != "available"
+        or snapshot.bybit.quote is None
+        or snapshot.mt5.quote is None
+    ):
+        raise HTTPException(
+            status_code=503,
+            detail="Executable cross-spread quotes are unavailable",
+        )
+    reserve = get_settings().cross_spread_limit_hedge_reserve_price
+    if reserve < 0:
+        raise HTTPException(
+            status_code=423,
+            detail="Cross-spread FOK hedge reserve is invalid",
+        )
+    try:
+        pricing = derive_cross_spread_fok_price(
+            market_command_action(intent),
+            limit_spread=limit_spread,
+            bybit_bid=snapshot.bybit.quote.bid,
+            bybit_ask=snapshot.bybit.quote.ask,
+            mt5_bid=snapshot.mt5.quote.bid,
+            mt5_ask=snapshot.mt5.quote.ask,
+            bybit_tick_size=get_bybit_catalog_tick_size(),
+            hedge_reserve=reserve,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    if not pricing.currently_executable:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "Current executable spread does not satisfy the requested FOK limit; "
+                "no order was submitted"
+            ),
+        )
+    return pricing
 
 
 def _intent_response(intent: SyntheticOrderIntent) -> CrossSpreadOrderIntentResponse:
@@ -253,9 +358,20 @@ def _intent_response(intent: SyntheticOrderIntent) -> CrossSpreadOrderIntentResp
     )
 
 
-def _require_market_intent(intent: SyntheticOrderIntent) -> None:
-    if intent.execution_type != "MARKET":
-        raise HTTPException(
-            status_code=422,
-            detail="Limit cross-spread execution is designed but not implemented yet",
-        )
+def _limit_response(
+    pricing: CrossSpreadFokPrice | None,
+) -> CrossSpreadLimitExecutionResponse | None:
+    if pricing is None:
+        return None
+    return CrossSpreadLimitExecutionResponse(
+        direction=pricing.direction,
+        limitSpread=pricing.limit_spread,
+        executableSpread=pricing.executable_spread,
+        mt5ReferencePrice=pricing.mt5_reference_price,
+        hedgeReserve=pricing.hedge_reserve,
+        bybitTickSize=pricing.bybit_tick_size,
+        rawBybitLimitPrice=pricing.raw_bybit_limit_price,
+        bybitLimitPrice=pricing.bybit_limit_price,
+        currentlyExecutable=pricing.currently_executable,
+        timeInForce="FOK",
+    )
