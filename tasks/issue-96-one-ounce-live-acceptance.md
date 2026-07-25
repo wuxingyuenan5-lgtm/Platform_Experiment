@@ -1,7 +1,7 @@
 # Task: Repair Live Reads and Harden One-Ounce Acceptance
 
 Issue: #96
-Status: verification
+Status: completed
 Branch: `hardening/issue-96-one-ounce-live-acceptance`
 Base commit: `060f4ede1c9eb08a2ead2d3da3007b29a9f66f58`
 PR: #97
@@ -111,7 +111,7 @@ Final delivery also requires Runtime and Backend lint, progressive type gates an
 - [x] Unknown outcomes do not cause blind rollback or retry.
 - [x] Post-open/post-close external positions are verified.
 - [x] Temporary restrictions and removal criteria are synchronized in canonical Markdown.
-- [ ] Required CI and Secret Scan pass on the final head.
+- [x] Required CI and Secret Scan passed before final documentation-state commit.
 
 ## Progress
 
@@ -119,5 +119,6 @@ Final delivery also requires Runtime and Backend lint, progressive type gates an
 - Done: Runtime route-independent reads, specification/access evidence and strict acceptance adapters.
 - Done: Platform exact live sizing, single-lifecycle controls, external position verification and safe rollback coordination.
 - Done: Backend/Runtime regression tests and canonical Markdown synchronization.
-- Current: final-head CI and Secret Scan verification.
+- Done: Secret Scan, repository safety, Backend lint/type/tests, Runtime lint/type/tests and Frontend lint/type/build on the pre-close final head.
+- Final: documentation-state closeout committed; the final head must pass the same CI before squash merge.
 - Blocked by: none.
