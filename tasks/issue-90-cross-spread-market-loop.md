@@ -37,6 +37,7 @@ Complete the smallest verifiable market-order execution loop for the cross-venue
 - `execution-runtime/tests/test_cross_spread_mt5_swap.py`
 - `platform-backend/app/execution_batches.py`
 - `platform-backend/tests/test_cross_spread_execution_quantity.py`
+- `docs/codex/current-state.md`
 - this task packet
 
 ## Implementation decisions
@@ -85,9 +86,9 @@ Final delivery also requires:
 
 ## Progress
 
-- Done: Issue, issue-numbered branch, Bybit fill confirmation adapter, dynamic MT5 hedge sizing, direct MT5 swap read, focused tests and PR creation.
-- Current: CI validation and correction of any reported defects.
-- Next: merge only after all required checks pass; create a separate bounded issue for close/reduce-only semantics.
+- Done: Issue, issue-numbered branch, implementation, focused tests, PR creation, repository-governance correction and complete implementation-head CI.
+- Current: final documentation synchronization and merge.
+- Next: squash merge after the documentation-only head passes; create a separate bounded issue for close/reduce-only semantics.
 - Blocked by: none.
 
 ## Completion
@@ -96,5 +97,5 @@ Final delivery also requires:
 - Merge commit:
 - Application behavior changed: market-order execution waits for confirmed Bybit fill before MT5 hedge; direct MT5 swap values are exposed.
 - Business behavior changed: requested MT5 hedge quantity is replaced by actual-fill-proportional quantity for this strategy.
-- Tests/CI: pending.
+- Tests/CI: implementation head `1e9ef1c84bc6491a3f79e43a791b68499fabe0fe`; Platform CI #1250 passed; Secret Scan #677 passed; Repository Safety, Backend, Runtime and frontend quality all passed.
 - Follow-up: real close semantics and private WebSocket confirmation remain separate scopes.
