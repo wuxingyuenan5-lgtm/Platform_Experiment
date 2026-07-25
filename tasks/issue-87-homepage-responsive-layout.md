@@ -2,7 +2,7 @@
 
 Issue: #87
 Status: active
-Branch: `frontend/issue-87-homepage-responsive-layout`
+Branch: `fix/issue-87-homepage-responsive-layout`
 Base commit: `8f9afae0d8991468624d88853ec0585e575da03e`
 
 ## Objective
@@ -88,9 +88,9 @@ Final delivery also requires:
 
 ## Progress
 
-- Done: main/open-PR verification, Issue creation, current homepage and PageWrapper audit.
-- Current: define the layout standard and refactor the homepage.
-- Next: validate, review the final diff, merge and close Issue.
+- Done: main/open-PR verification, Issue creation, current homepage and PageWrapper audit, first implementation draft.
+- Current: validate the governed branch and frontend build.
+- Next: review the final diff, update current state, merge and close Issue.
 - Blocked by: none.
 
 ## Completion
