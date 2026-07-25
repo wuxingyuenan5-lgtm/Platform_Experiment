@@ -197,12 +197,12 @@ def submit_bybit_definitive_failure_rollback(
             detail="Cross-spread rollback capability is disabled",
         )
     _validate_acceptance_quantity(quantity_oz)
-    sizing = _load_live_cross_spread_sizing()
+    bybit = _load_live_bybit_specification()
     _validate_leg_quantity(
         quantity_oz,
-        minimum=sizing.bybit_min,
-        step=sizing.bybit_step,
-        maximum=sizing.bybit_max,
+        minimum=bybit.min_quantity,
+        step=bybit.quantity_step,
+        maximum=bybit.max_market_quantity,
         label=BYBIT_SYMBOL,
     )
     idempotency_key = f"cross-spread-rollback:{open_batch_id}:bybit"
@@ -245,19 +245,27 @@ def _validate_acceptance_quantity(quantity_oz: Decimal) -> None:
         )
 
 
-def _load_live_cross_spread_sizing() -> CrossSpreadLiveSizing:
+def _load_live_bybit_specification() -> LiveInstrumentSpecification:
     try:
         bybit = get_instrument_specification(
             account_id=BYBIT_ACCOUNT_ID,
             symbol=BYBIT_SYMBOL,
         )
+    except CrossSpreadLiveReadError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    _validate_bybit_live_specification(bybit)
+    return bybit
+
+
+def _load_live_cross_spread_sizing() -> CrossSpreadLiveSizing:
+    bybit = _load_live_bybit_specification()
+    try:
         mt5 = get_instrument_specification(
             account_id=MT5_ACCOUNT_ID,
             symbol=MT5_SYMBOL,
         )
     except CrossSpreadLiveReadError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
-    _validate_bybit_live_specification(bybit)
     _validate_mt5_live_specification(mt5)
     return CrossSpreadLiveSizing(
         bybit_min=bybit.min_quantity,
