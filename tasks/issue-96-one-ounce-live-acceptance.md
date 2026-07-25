@@ -1,9 +1,10 @@
 # Task: Repair Live Reads and Harden One-Ounce Acceptance
 
 Issue: #96
-Status: active
+Status: verification
 Branch: `hardening/issue-96-one-ounce-live-acceptance`
 Base commit: `060f4ede1c9eb08a2ead2d3da3007b29a9f66f58`
+PR: #97
 
 ## Objective
 
@@ -12,42 +13,34 @@ Repair the real Bybit/MT5 order-read path and add the temporary P0 controls requ
 ## Confirmed operating boundary
 
 - The acceptance account may contain about 1000 USDT.
-- Maximum requested and confirmed Bybit quantity is temporarily 1 oz.
+- Maximum requested Bybit quantity is temporarily 1 oz.
+- A terminal Bybit partial fill may be hedged below 1 oz only when it maps exactly to the current MT5 contract minimum and step.
 - At most one non-closed cross-spread lifecycle may exist.
 - Market open, market close and spread-triggered market TP/SL are the only connected execution modes.
 - Limit execution remains out of scope.
 - Platform Live Write, Runtime Live Write and the automatic exit monitor remain disabled by default.
 
-## Expected changed files
+## Changed ownership and modules
 
 ### Execution Runtime
 
-- `execution-runtime/app/models.py`
-- `execution-runtime/app/gateway.py`
-- `execution-runtime/app/main.py`
-- `execution-runtime/app/bybit_live_adapter.py`
-- `execution-runtime/app/bybit_mt5_gateway.py`
-- `execution-runtime/app/mt5_live_adapter.py`
-- `execution-runtime/app/mt5_position_closing_adapter.py`
-- `execution-runtime/app/live_route_store.py`
-- `execution-runtime/app/live_safety.py`
-- `execution-runtime/app/config.py`
-- focused Runtime tests
+- `bybit_acceptance_adapter.py`: route-independent Order/Fill reads, bounded order list, current instrument and API-key readiness evidence.
+- `mt5_acceptance_adapter.py`: route-independent Order/Deal reads, explicit Order/Deal Ticket resolution, current Symbol/Terminal evidence.
+- `strict_live_acceptance_adapters.py`: independent 1 oz cap, current quantity-step/contract-size/access checks and one-position admission.
+- `bybit_mt5_gateway.py`: account-routed reads and deterministic route-independent external-ID dispatch.
+- `gateway.py`, `main.py`, `models.py`: public order-list and instrument-specification query contracts.
+- `fake_gateway.py`: compatibility implementation for the expanded read contract.
+- `config.py` and `.env.live.example`: safe acceptance defaults.
+- focused Runtime tests.
 
 ### Platform Backend
 
-- `platform-backend/app/config.py`
-- `platform-backend/app/cross_spread.py`
-- `platform-backend/app/cross_spread_exit_service.py`
-- `platform-backend/app/cross_spread_exit_repository.py`
-- `platform-backend/app/execution_batches.py`
-- bounded live-read/preflight client or schema modules as required
-- focused Backend tests
-
-### Frontend / operational surfaces
-
-- Existing lifecycle/API files only if required to expose read/preflight state.
-- Do not redesign the spread workspace or connect limit execution.
+- `cross_spread_live_read_client.py`: typed Runtime live reads.
+- `cross_spread.py`: current-spec exact sizing and Bybit-only emergency rollback validation.
+- `cross_spread_exit_service.py`: single-lifecycle admission, external position verification and definitive-failure rollback coordination.
+- `cross_spread_exit_repository.py`: non-closed lifecycle and unresolved-batch counts.
+- `config.py` and `.env.example`: temporary acceptance defaults.
+- focused Backend tests.
 
 ### Documentation and governance
 
@@ -55,21 +48,25 @@ Repair the real Bybit/MT5 order-read path and add the temporary P0 controls requ
 - `docs/technical/LIVE_VENUE_ADAPTERS.md`
 - `docs/technical/VENUE_RECONCILIATION.md`
 - `docs/codex/current-state.md`
-- `docs/architecture/OWNERSHIP.md` if ownership changes
+- `docs/architecture/OWNERSHIP.md`
 - this task packet
 
 ## Implementation decisions
 
-- Add route-independent bounded order listing and direct venue lookup. Route metadata enriches a result but is not a prerequisite for reading it.
-- Distinguish MT5 Order Ticket, Deal Ticket and Position Ticket; do not reuse one identity as another.
-- Query current venue contract specifications before live acceptance and require exact quantity mapping.
-- Treat the 1 oz limit and single-active-plan rule as temporary acceptance controls with explicit removal evidence.
-- Definitive MT5 hedge rejection/failure after a confirmed Bybit fill may initiate one idempotent Bybit reduce-only rollback. An unknown MT5 outcome must not trigger a blind rollback or duplicate write.
-- Verify live positions after open and after close; lifecycle success requires external position evidence, not command status alone.
+- Route metadata enriches a read result but is not a prerequisite for reading a real order.
+- MT5 Order Ticket, Deal Ticket and Position Ticket remain distinct identities.
+- Current venue contract specifications and access evidence are required before live writes.
+- Database Seed specifications are not authoritative for real execution.
+- The 1 oz limit and single-active-plan rule are temporary acceptance controls with explicit removal evidence.
+- A definitive MT5 hedge rejection/failure after a confirmed Bybit fill may initiate one idempotent Bybit reduce-only rollback only after live positions prove the expected first-leg exposure and no MT5 exposure.
+- An unknown MT5 outcome must not trigger a blind rollback or duplicate write.
+- If external positions are already flat, no duplicate rollback is submitted.
+- Open and close success require external position evidence, not command status alone.
+- Flat verification checks every target-symbol position, not only the expected MT5 ticket.
 
 ## Temporary restriction removal criteria
 
-These restrictions are not permanent product requirements. Review them only in a separate Issue/PR after Issue #39 records repeated real-money evidence for:
+Review temporary restrictions only in a separate Issue/PR after Issue #39 records repeated real-money evidence for:
 
 1. reliable Order, Fill/Deal, Position and Balance reads without route dependence;
 2. exact post-open and post-close external position reconciliation;
@@ -90,35 +87,37 @@ python scripts/check-repository-structure.py
 python scripts/check-documentation-consistency.py
 ```
 
-Final delivery also requires Runtime and Backend lint, progressive type gates and classified tests; frontend checks if frontend files change; Platform CI; and Secret Scan.
+Final delivery also requires Runtime and Backend lint, progressive type gates and classified tests; frontend checks; Platform CI; and Secret Scan.
 
 ## Stop conditions
 
 - Stop if implementation requires enabling either Live Write default or the exit monitor default.
 - Stop if an unknown venue result would cause automatic duplicate execution.
-- Stop if a rollback can increase or reverse exposure.
-- Stop if current venue specifications cannot prove exact 1 oz mapping.
+- Stop if a rollback can increase, reverse or duplicate exposure.
+- Stop if current venue specifications cannot prove exact quantity mapping.
 - Stop if the scope expands into limit execution, WebSocket migration, increased quantity or concurrent positions.
 - Stop if credentials or account secrets would enter Git, Markdown, logs or tests.
 
 ## Acceptance criteria
 
-- [ ] Bybit and MT5 current/recent orders can be listed without local route state.
-- [ ] Direct order reads work for external and Platform-created orders.
-- [ ] MT5 Order/Deal/Position ticket semantics are separated.
-- [ ] Current Bybit and MT5 specifications are exposed read-only.
-- [ ] Exactly 1 oz maps to a valid MT5 volume using current contract size and step.
-- [ ] Quantity above 1 oz is blocked at Platform and Runtime boundaries.
-- [ ] A second active or unresolved cross-spread open is blocked.
-- [ ] Definitive second-leg failure causes at most one safe rollback attempt.
-- [ ] Unknown outcomes do not cause blind rollback or retry.
-- [ ] Post-open/post-close external positions are verified.
-- [ ] Temporary restrictions and removal criteria are synchronized in canonical Markdown.
-- [ ] Required CI and Secret Scan pass.
+- [x] Bybit and MT5 current/recent orders can be listed without local route state.
+- [x] Direct order reads work for external and Platform-created orders.
+- [x] MT5 Order/Deal/Position ticket semantics are separated.
+- [x] Current Bybit and MT5 specifications are exposed read-only.
+- [x] Exactly 1 oz maps to a valid MT5 volume using current contract size and step.
+- [x] Quantity above 1 oz is blocked at Platform and Runtime boundaries.
+- [x] A second active or unresolved cross-spread open is blocked.
+- [x] Definitive second-leg failure causes at most one safe rollback attempt.
+- [x] Unknown outcomes do not cause blind rollback or retry.
+- [x] Post-open/post-close external positions are verified.
+- [x] Temporary restrictions and removal criteria are synchronized in canonical Markdown.
+- [ ] Required CI and Secret Scan pass on the final head.
 
 ## Progress
 
-- Done: root-cause audit, Issue #96, branch and task packet.
-- Current: Runtime read/specification contract implementation.
-- Next: Platform one-ounce controls, rollback and position verification.
+- Done: root-cause audit, Issue #96, branch, task packet and PR #97.
+- Done: Runtime route-independent reads, specification/access evidence and strict acceptance adapters.
+- Done: Platform exact live sizing, single-lifecycle controls, external position verification and safe rollback coordination.
+- Done: Backend/Runtime regression tests and canonical Markdown synchronization.
+- Current: final-head CI and Secret Scan verification.
 - Blocked by: none.
