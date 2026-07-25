@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from app.bybit_fill_confirming_adapter import BybitFillConfirmingAdapter
 from app.bybit_live_adapter import BybitLiveAdapter
 from app.config import Settings, get_settings
 from app.gateway_errors import GatewayConfigurationError
@@ -32,7 +33,7 @@ class BybitMt5Gateway:
         mt5: Mt5LiveAdapter | None = None,
     ) -> None:
         self.settings = settings or get_settings()
-        self.bybit = bybit or BybitLiveAdapter(self.settings)
+        self.bybit = bybit or BybitFillConfirmingAdapter(self.settings)
         self.mt5 = mt5 or Mt5LiveAdapter(self.settings)
 
     def submit_order(self, command: SubmitOrderCommand) -> list[ExecutionEvent]:
