@@ -49,8 +49,22 @@
             <input v-model="takeProfitSpread" inputmode="decimal" />
           </label>
           <label>
+            <span>止盈执行</span>
+            <select v-model="takeProfitExecutionMode">
+              <option value="market">市价</option>
+              <option value="limit">FOK 限价</option>
+            </select>
+          </label>
+          <label>
             <span>止损平仓价差</span>
             <input v-model="stopLossSpread" inputmode="decimal" />
+          </label>
+          <label>
+            <span>止损执行</span>
+            <select v-model="stopLossExecutionMode">
+              <option value="market">市价（默认）</option>
+              <option value="limit">FOK 限价</option>
+            </select>
           </label>
         </div>
 
@@ -59,6 +73,9 @@
           <strong>{{ executableSpreadLabel }}</strong>
           <small>{{ thresholdRuleLabel }}</small>
           <small v-if="openExecutionMode === 'limit'">{{ limitRuleLabel }}</small>
+          <small v-if="stopLossExecutionMode === 'limit'" class="is-warn">
+            FOK 止损可能零成交并保持计划活动；风险降低优先时应使用市价。
+          </small>
         </div>
 
         <button
@@ -76,7 +93,7 @@
         <div class="market-lifecycle__card-head">
           <div>
             <h4>真实退出计划</h4>
-            <p>自动止盈止损仍按市价；人工平仓可选市价或 FOK</p>
+            <p>自动止盈止损按计划保存的市价或 FOK 执行；人工平仓可独立选择</p>
           </div>
           <span>{{ activePlans.length }} 笔活动计划</span>
         </div>
@@ -104,6 +121,7 @@
                 <th>盎司</th>
                 <th>开仓价差</th>
                 <th>止盈 / 止损</th>
+                <th>TP / SL 执行</th>
                 <th>MT5 Ticket</th>
                 <th>状态</th>
                 <th>操作</th>
@@ -111,7 +129,7 @@
             </thead>
             <tbody>
               <tr v-if="plans.length === 0">
-                <td colspan="7">暂无真实退出计划</td>
+                <td colspan="8">暂无真实退出计划</td>
               </tr>
               <tr v-for="plan in plans" :key="plan.planId">
                 <td :class="plan.direction === 'LONG_SPREAD' ? 'is-long' : 'is-short'">
@@ -122,6 +140,10 @@
                 <td>
                   {{ formatSigned(plan.takeProfitSpread) }} /
                   {{ formatSigned(plan.stopLossSpread) }}
+                </td>
+                <td>
+                  {{ executionModeLabel(plan.takeProfitExecutionMode) }} /
+                  {{ executionModeLabel(plan.stopLossExecutionMode) }}
                 </td>
                 <td>{{ plan.mt5PositionId }}</td>
                 <td>{{ planStatusLabel(plan.status) }}</td>
@@ -172,7 +194,7 @@
     </section>
 
     <footer class="market-lifecycle__footer">
-      <span>FOK 要求 Bybit 全部成交后才提交 MT5；PostOnly、追单和 IOC 尚未接入。</span>
+      <span>TP/SL 与人工平仓复用同一 Close Action；PostOnly、追单和 IOC 尚未接入。</span>
       <strong v-if="message" :class="messageTone">{{ message }}</strong>
     </footer>
   </section>
@@ -197,6 +219,8 @@
 
   const direction = ref<CrossSpreadDirection>('LONG_SPREAD');
   const openExecutionMode = ref<CrossSpreadExecutionMode>('market');
+  const takeProfitExecutionMode = ref<CrossSpreadExecutionMode>('market');
+  const stopLossExecutionMode = ref<CrossSpreadExecutionMode>('market');
   const closeExecutionMode = ref<CrossSpreadExecutionMode>('market');
   const quantityOz = ref('1');
   const openLimitSpread = ref('-0.8');
@@ -251,7 +275,9 @@
   });
   const closeValidationError = computed(() => {
     if (closeExecutionMode.value !== 'limit') return '';
-    return Number.isFinite(Number(closeLimitSpread.value)) ? '' : 'FOK 平仓限制价差必须是有效数字';
+    return Number.isFinite(Number(closeLimitSpread.value))
+      ? ''
+      : 'FOK 平仓限制价差必须是有效数字';
   });
 
   function applyDirectionDefaults() {
@@ -289,7 +315,11 @@
         takeProfitSpread: takeProfitSpread.value,
         stopLossSpread: stopLossSpread.value,
         executionMode: openExecutionMode.value,
-        ...(openExecutionMode.value === 'limit' ? { limitSpread: openLimitSpread.value } : {}),
+        takeProfitExecutionMode: takeProfitExecutionMode.value,
+        stopLossExecutionMode: stopLossExecutionMode.value,
+        ...(openExecutionMode.value === 'limit'
+          ? { limitSpread: openLimitSpread.value }
+          : {}),
       });
       limitEvidence.value = result.limitExecution || null;
       if (result.executionBatch.status === 'hedged' && result.exitPlan) {
@@ -384,6 +414,10 @@
 
   function limitDirectionLabel(directionValue: CrossSpreadLimitExecutionResult['direction']) {
     return directionValue === 'BUY_BYBIT_SELL_MT5' ? '买 Bybit / 卖 MT5' : '卖 Bybit / 买 MT5';
+  }
+
+  function executionModeLabel(mode: CrossSpreadExecutionMode) {
+    return mode === 'limit' ? 'FOK' : '市价';
   }
 
   function planStatusLabel(status: CrossSpreadExitPlanResult['status']) {
