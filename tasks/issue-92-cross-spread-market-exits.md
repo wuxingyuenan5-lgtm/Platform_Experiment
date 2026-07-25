@@ -118,15 +118,15 @@ Final delivery also requires:
 ## Progress
 
 - Done: Issue, branch, task packet, venue-safe close semantics, exit-plan persistence, TP/SL policy and monitor, lifecycle APIs, real market UI panel, focused tests, documentation synchronization and PR #93.
-- Current: complete and ready for squash merge.
+- Current: completed and merged to `main`.
 - Next: controlled Demo/real-environment acceptance under Issue #39; real limit execution and private Bybit WebSocket remain separately bounded scopes.
 - Blocked by: none.
 
 ## Completion
 
 - PR: #93
-- Merge commit: pending squash merge
+- Merge commit: `3524372de521c03d70d3f79bdb56b3eca6aac62d`
 - Application behavior changed: market opens create persistent exit plans; market closes are reduce-only and ticket-bound; TP/SL can trigger one idempotent market close when the controlled monitor is enabled.
 - Business behavior changed: LONG and SHORT exits monitor the executable opposite-side spread rather than the opening-side spread.
-- Tests/CI: Platform CI #1319 and Secret Scan #700 passed on the final code head before documentation completion.
+- Tests/CI: Platform CI #1323 and Secret Scan #702 passed on the final documentation head before merge.
 - Follow-up: controlled operational acceptance, real limit entry/exit and private Bybit WebSocket remain separate scopes.
