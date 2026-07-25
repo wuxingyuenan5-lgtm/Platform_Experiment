@@ -8,22 +8,26 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def replace_once(path: str, old: str, new: str) -> None:
+def replace_if_present(path: str, old: str, new: str) -> None:
     target = ROOT / path
     content = target.read_text(encoding="utf-8")
     if old not in content:
-        raise RuntimeError(f"expected snippet missing from {path}: {old!r}")
-    updated = content.replace(old, new, 1)
-    target.write_text(updated, encoding="utf-8")
+        return
+    target.write_text(content.replace(old, new, 1), encoding="utf-8")
 
 
 def main() -> None:
-    replace_once(
+    replace_if_present(
         "scripts/check-repository-structure.py",
         '    "platform-backend/app/eod_reconciliation.py",\n',
         '    "platform-backend/app/eod_reconciliation_repository.py",\n',
     )
-    replace_once(
+    replace_if_present(
+        "scripts/check-repository-structure.py",
+        '    "platform-backend/app/venue_reconciliation.py",\n',
+        '    "platform-backend/app/venue_reconciliation_repository.py",\n',
+    )
+    replace_if_present(
         "scripts/check-documentation-consistency.py",
         '    "EOD Reconciliation public DTOs": "platform-backend/app/eod_reconciliation_schemas.py",\n',
         '    "EOD Reconciliation public DTOs": "platform-backend/app/eod_reconciliation_schemas.py",\n'
