@@ -98,7 +98,7 @@ DDL_OWNER_PATHS = (
     "platform-backend/app/live_trading_sessions.py",
     "platform-backend/app/live_venue_accounting.py",
     "platform-backend/app/production_monitoring.py",
-    "platform-backend/app/venue_reconciliation.py",
+    "platform-backend/app/venue_reconciliation_repository.py",
     "execution-runtime/app/journal.py",
     "execution-runtime/app/live_route_store.py",
     "execution-runtime/app/venue_store.py",
