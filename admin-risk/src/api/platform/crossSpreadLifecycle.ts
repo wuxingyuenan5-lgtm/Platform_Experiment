@@ -1,0 +1,91 @@
+import axios, { type AxiosInstance } from 'axios';
+
+import type { ExecutionBatchResult } from './trading.types';
+
+export type CrossSpreadDirection = 'LONG_SPREAD' | 'SHORT_SPREAD';
+export type CrossSpreadExecutionMode = 'market' | 'limit';
+export type CrossSpreadExitPlanStatus =
+  | 'active'
+  | 'triggered'
+  | 'closing'
+  | 'closed'
+  | 'manual_intervention';
+
+export interface CrossSpreadExitPlanResult {
+  planId: string;
+  strategyInstanceId: string;
+  openBatchId: string;
+  closeBatchId?: string | null;
+  direction: CrossSpreadDirection;
+  quantityOz: string;
+  mt5PositionId: string;
+  entrySpread: string;
+  takeProfitSpread: string;
+  stopLossSpread: string;
+  status: CrossSpreadExitPlanStatus;
+  triggerReason?: string | null;
+  triggerSpread?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  triggeredAt?: string | null;
+  closedAt?: string | null;
+}
+
+export interface CrossSpreadMarketOpenInput {
+  direction: CrossSpreadDirection;
+  quantityOz: string;
+  takeProfitSpread: string;
+  stopLossSpread: string;
+  executionMode: CrossSpreadExecutionMode;
+}
+
+export interface CrossSpreadMarketOpenResult {
+  executionBatch: ExecutionBatchResult;
+  exitPlan?: CrossSpreadExitPlanResult | null;
+}
+
+export interface CrossSpreadMarketCloseResult {
+  executionBatch: ExecutionBatchResult;
+  exitPlan: CrossSpreadExitPlanResult;
+}
+
+const apiBaseUrl = import.meta.env.VITE_PLATFORM_API_BASE_URL || 'http://127.0.0.1:8000/api/v1';
+
+const client: AxiosInstance = axios.create({
+  baseURL: apiBaseUrl,
+  timeout: 30_000,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
+
+export async function openCrossSpreadMarket(
+  input: CrossSpreadMarketOpenInput,
+): Promise<CrossSpreadMarketOpenResult> {
+  const response = await client.post<CrossSpreadMarketOpenResult>(
+    '/trading/cross-spread/lifecycle/open',
+    input,
+  );
+  return response.data;
+}
+
+export async function getCrossSpreadExitPlans(
+  status?: CrossSpreadExitPlanStatus,
+): Promise<CrossSpreadExitPlanResult[]> {
+  const response = await client.get<CrossSpreadExitPlanResult[]>(
+    '/trading/cross-spread/exit-plans',
+    { params: status ? { status } : undefined },
+  );
+  return response.data;
+}
+
+export async function closeCrossSpreadMarket(
+  planId: string,
+  executionMode: CrossSpreadExecutionMode,
+): Promise<CrossSpreadMarketCloseResult> {
+  const response = await client.post<CrossSpreadMarketCloseResult>(
+    `/trading/cross-spread/exit-plans/${encodeURIComponent(planId)}/close`,
+    { executionMode },
+  );
+  return response.data;
+}
