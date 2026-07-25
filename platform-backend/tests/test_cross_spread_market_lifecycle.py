@@ -112,7 +112,10 @@ def insert_batch_with_fills(batch_id: str, *, direction: str = "OPEN_LONG") -> N
             )
         db.execute(
             """
-            INSERT INTO fills (id, order_id, account_id, instrument_id, side, quantity, price, occurred_at)
+            INSERT INTO fills (
+                id, order_id, account_id, instrument_id, side,
+                quantity, price, occurred_at
+            )
             VALUES ('fill-bybit', 'bybit-order-id', 'account_crypto_test',
                     'instrument_xau_usdt_perp', 'buy', '100', '2499', ?)
             """,
@@ -120,7 +123,10 @@ def insert_batch_with_fills(batch_id: str, *, direction: str = "OPEN_LONG") -> N
         )
         db.execute(
             """
-            INSERT INTO fills (id, order_id, account_id, instrument_id, side, quantity, price, occurred_at)
+            INSERT INTO fills (
+                id, order_id, account_id, instrument_id, side,
+                quantity, price, occurred_at
+            )
             VALUES ('fill-mt5', 'mt5-order-id', 'account_mt5_demo',
                     'instrument_xau_usd', 'sell', '1', '2501', ?)
             """,
@@ -128,7 +134,12 @@ def insert_batch_with_fills(batch_id: str, *, direction: str = "OPEN_LONG") -> N
         )
 
 
-def batch_response(batch_id: str, *, direction: str, status: str = "hedged") -> ExecutionBatchResponse:
+def batch_response(
+    batch_id: str,
+    *,
+    direction: str,
+    status: str = "hedged",
+) -> ExecutionBatchResponse:
     return ExecutionBatchResponse(
         batchId=batch_id,
         idempotencyKey=f"key:{batch_id}",
