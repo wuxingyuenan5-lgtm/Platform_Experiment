@@ -7,8 +7,8 @@ from sqlite3 import Row
 
 from app.database import connection
 from app.eod_reconciliation_policy import (
-    EodReviewConflictError,
-    EodReviewNotEligibleError,
+    EodReviewConflictError as EodReviewConflictError,
+    EodReviewNotEligibleError as EodReviewNotEligibleError,
     review_disposition,
 )
 from app.eod_reconciliation_schemas import (
