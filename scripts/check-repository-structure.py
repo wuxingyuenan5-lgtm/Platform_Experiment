@@ -119,6 +119,7 @@ RUNTIME_CONTRACT_FIELDS = {
         "quantity",
         "price",
         "reduce_only",
+        "position_id",
         "received_at",
     ],
     "event": [
