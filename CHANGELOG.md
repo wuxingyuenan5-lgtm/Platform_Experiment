@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Pure EOD report/review Policy ownership — Issue #79 / PR #80
+
+- Added `platform-backend/app/eod_reconciliation_policy.py` as the sole pure report-status, scale-gate, historical-Difference and immutable-review decision owner.
+- Kept Repository review read/decision/write handling inside one protected transaction and preserved compatibility exception identities.
+- Added exhaustive report, gate, replay, conflict and approval-eligibility Goldens plus framework/persistence purity checks.
+- Removed duplicate decision branches from EOD orchestration, Repository and operational gate coordination without changing any result or API.
+- Consolidated duplicated EOD machine-owner mappings and registered the Policy in progressive Pyright and Architecture Ownership.
+
 ### EOD Reconciliation Repository ownership — Issue #77 / PR #78
 
 - Added `platform-backend/app/eod_reconciliation_repository.py` as the sole EOD DDL, direct-SQL, row-mapping and persistence-transaction owner.

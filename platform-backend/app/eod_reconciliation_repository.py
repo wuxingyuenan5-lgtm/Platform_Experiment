@@ -6,6 +6,11 @@ from datetime import UTC, date, datetime
 from sqlite3 import Row
 
 from app.database import connection
+from app.eod_reconciliation_policy import (
+    EodReviewConflictError,
+    EodReviewNotEligibleError,
+    review_disposition,
+)
 from app.eod_reconciliation_schemas import (
     EodReconciliationReportResponse,
     ReviewDecision,
@@ -59,14 +64,6 @@ ON eod_reconciliation_reports(status, scale_gate_status, due_at);
 
 
 class EodReportNotFoundError(LookupError):
-    pass
-
-
-class EodReviewConflictError(RuntimeError):
-    pass
-
-
-class EodReviewNotEligibleError(RuntimeError):
     pass
 
 
@@ -312,18 +309,14 @@ def review_report(
         ).fetchone()
         if row is None:
             raise EodReportNotFoundError("EOD reconciliation report not found")
-        if row["review_payload_hash"] is not None:
-            if row["review_payload_hash"] != payload_hash:
-                raise EodReviewConflictError(
-                    "EOD report review is immutable and already has a different decision"
-                )
+        disposition = review_disposition(
+            existing_payload_hash=row["review_payload_hash"],
+            requested_payload_hash=payload_hash,
+            decision=decision,
+            current_scale_gate_status=row["scale_gate_status"],
+        )
+        if not disposition.changed:
             return ReviewWriteResult(row=row, changed=False)
-        if decision == "approved_same_limits" and row["scale_gate_status"] != (
-            "eligible_for_review"
-        ):
-            raise EodReviewNotEligibleError(
-                "Only a clean EOD report can be approved for the existing live limits"
-            )
         db.execute(
             """
             UPDATE eod_reconciliation_reports
@@ -337,7 +330,7 @@ def review_report(
                 decision,
                 reason,
                 reviewed_at,
-                decision,
+                disposition.scale_gate_status,
                 report_id,
             ),
         )
