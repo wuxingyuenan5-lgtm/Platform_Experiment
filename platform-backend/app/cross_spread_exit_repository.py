@@ -201,6 +201,23 @@ def claim_exit_plan(
     return get_exit_plan(plan_id) if cursor.rowcount == 1 else None
 
 
+def release_exit_plan_claim(plan_id: str) -> CrossSpreadExitPlanResponse:
+    updated_at = now_iso()
+    with connection() as db:
+        cursor = db.execute(
+            """
+            UPDATE cross_spread_exit_plans
+            SET status = 'active', trigger_reason = NULL, trigger_spread = NULL,
+                triggered_at = NULL, updated_at = ?
+            WHERE id = ? AND status = 'triggered' AND close_batch_id IS NULL
+            """,
+            (updated_at, plan_id),
+        )
+    if cursor.rowcount != 1:
+        raise HTTPException(status_code=409, detail="Exit plan claim cannot be released")
+    return get_exit_plan(plan_id)
+
+
 def mark_plan_closing(plan_id: str, close_batch_id: str) -> CrossSpreadExitPlanResponse:
     updated_at = now_iso()
     with connection() as db:

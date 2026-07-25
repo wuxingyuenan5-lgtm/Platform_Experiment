@@ -32,6 +32,19 @@ export interface CrossSpreadOrderIntentResult {
   isOpen: boolean;
 }
 
+export interface CrossSpreadLimitExecutionResult {
+  direction: 'BUY_BYBIT_SELL_MT5' | 'SELL_BYBIT_BUY_MT5';
+  limitSpread: string;
+  executableSpread: string;
+  mt5ReferencePrice: string;
+  hedgeReserve: string;
+  bybitTickSize: string;
+  rawBybitLimitPrice: string;
+  bybitLimitPrice: string;
+  currentlyExecutable: boolean;
+  timeInForce: 'FOK';
+}
+
 export interface CrossSpreadExitPlanResult {
   planId: string;
   strategyInstanceId: string;
@@ -58,17 +71,20 @@ export interface CrossSpreadMarketOpenInput {
   takeProfitSpread: string;
   stopLossSpread: string;
   executionMode: CrossSpreadExecutionMode;
+  limitSpread?: string;
 }
 
 export interface CrossSpreadMarketOpenResult {
   executionBatch: ExecutionBatchResult;
   orderIntent: CrossSpreadOrderIntentResult;
+  limitExecution?: CrossSpreadLimitExecutionResult | null;
   exitPlan?: CrossSpreadExitPlanResult | null;
 }
 
 export interface CrossSpreadMarketCloseResult {
   executionBatch: ExecutionBatchResult;
   orderIntent: CrossSpreadOrderIntentResult;
+  limitExecution?: CrossSpreadLimitExecutionResult | null;
   exitPlan: CrossSpreadExitPlanResult;
 }
 
@@ -105,10 +121,11 @@ export async function getCrossSpreadExitPlans(
 export async function closeCrossSpreadMarket(
   planId: string,
   executionMode: CrossSpreadExecutionMode,
+  limitSpread?: string,
 ): Promise<CrossSpreadMarketCloseResult> {
   const response = await client.post<CrossSpreadMarketCloseResult>(
     `/trading/cross-spread/exit-plans/${encodeURIComponent(planId)}/close`,
-    { executionMode },
+    { executionMode, ...(limitSpread === undefined ? {} : { limitSpread }) },
   );
   return response.data;
 }

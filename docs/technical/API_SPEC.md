@@ -237,18 +237,76 @@ GET  /api/v1/trading/cross-spread/exit-plans
 POST /api/v1/trading/cross-spread/exit-plans/evaluate
 ```
 
-现有 Market 请求字段保持兼容。Open 仍提交 `direction / quantityOz / takeProfitSpread / stopLossSpread / executionMode`；Close 仍提交 `executionMode`。
+Market Open 请求：
 
-Open 和 Close 响应附加：
+```json
+{
+  "direction": "LONG_SPREAD",
+  "quantityOz": "1",
+  "takeProfitSpread": "0",
+  "stopLossSpread": "-3",
+  "executionMode": "market"
+}
+```
+
+FOK Limit Open 请求：
+
+```json
+{
+  "direction": "LONG_SPREAD",
+  "quantityOz": "1",
+  "takeProfitSpread": "0",
+  "stopLossSpread": "-3",
+  "executionMode": "limit",
+  "limitSpread": "-0.8"
+}
+```
+
+人工 Close 请求：
+
+```json
+{
+  "executionMode": "limit",
+  "limitSpread": "-1.1"
+}
+```
+
+请求约束：
+
+- `executionMode=limit` 必须提供 `limitSpread`。
+- `executionMode=market` 不得提供 `limitSpread`。
+- 当前自动 TP/SL 仍提交 `market` Close，不读取人工 `limitSpread`。
+- Limit 请求先校验当前可成交价差；不满足限制时返回 `409`，不创建 Batch。
+
+Open 和 Close 响应包含标准化意图：
 
 ```json
 {
   "orderIntent": {
     "action": "OPEN_LONG_SPREAD",
-    "executionType": "MARKET",
+    "executionType": "LIMIT",
     "triggerReason": "MANUAL",
     "direction": "LONG_SPREAD",
     "isOpen": true
+  }
+}
+```
+
+Limit 响应同时附加定价证据：
+
+```json
+{
+  "limitExecution": {
+    "direction": "BUY_BYBIT_SELL_MT5",
+    "limitSpread": "-0.8",
+    "executableSpread": "-0.9",
+    "mt5ReferencePrice": "2501.0",
+    "hedgeReserve": "0",
+    "bybitTickSize": "0.1",
+    "rawBybitLimitPrice": "2500.2",
+    "bybitLimitPrice": "2500.2",
+    "currentlyExecutable": true,
+    "timeInForce": "FOK"
   }
 }
 ```
@@ -259,9 +317,13 @@ Open 和 Close 响应附加：
 - `executionType` 只表示 `MARKET` 或 `LIMIT`。
 - `triggerReason` 表示人工、策略、止盈、止损、Kill Switch 或风险降低来源。
 - TP/SL 不是独立订单类型，而是触发普通 Close Action。
-- 当前 Market 映射仍为 `OPEN_LONG / CLOSE_LONG / OPEN_SHORT / CLOSE_SHORT`。
-- 当前 `LIMIT` 在任何 Market 副作用前返回 422，不允许静默回退。
-- 详细分批计划和两类可成交价差方向见 `CROSS_SPREAD_SYNTHETIC_EXECUTION.md`。
+- 四类动作继续映射为 `OPEN_LONG / CLOSE_LONG / OPEN_SHORT / CLOSE_SHORT`。
+- 跨所价差 Limit 的 Bybit 主腿使用 `FOK`；普通非跨所价差 Limit 不因此改变。
+- 只有 Bybit 终态且累计成交量等于请求量时，MT5 才能提交。
+- FOK 零成交失败不提交 MT5；人工 Close 的计划恢复 `active`。
+- FOK 部分成交、数量不一致或未知结果不得解释为零成交，进入对账／人工介入。
+- `limitExecution` 是 Platform 定价证据，不等于 Venue 成交证据。
+- 详细定价公式和状态语义见 `CROSS_SPREAD_SYNTHETIC_EXECUTION.md`。
 
 ## 12. Runtime Command
 
@@ -286,6 +348,8 @@ Runtime 在 Gateway 副作用前原子抢占 Command，并独立检查：
 - V5 Unified Trading API。
 - Platform Order ID 确定性派生 orderLinkId。
 - Place ACK 不生成虚假 Fill。
+- Market Order 使用有界终态成交确认。
+- 跨所价差 Limit 使用 `timeInForce=FOK`，并要求终态精确全成交。
 - Execution ID、Funding ID、Fee ID 作为稳定外部身份。
 - Position 强平价只使用交易所返回的有限 `liqPrice`。
 

@@ -1,8 +1,8 @@
 # Cross-Spread Synthetic Execution Contract
 
 状态：`active`  
-当前实现批次：Issue #107 / PR #108  
-产品目标：跑通“跨所价差 → 交易执行”页面的核心交易闭环，并在工程完成后进入 Issue #39 的 Windows 本地实盘验收。
+当前工程批次：Issue #109 / PR #110  
+产品目标：跑通“跨所价差 → 交易执行”页面的核心交易闭环，并在核心工程完成后进入 Issue #39 的 Windows 本地实盘验收。
 
 ## 1. 核心分层
 
@@ -23,8 +23,8 @@
 
 ### 1.2 执行方式
 
-- `MARKET`：使用已经完成的保护型市价生命周期。
-- `LIMIT`：统一限价入口；当前仍 fail-closed，下一批首先实现 FOK 价差限价。
+- `MARKET`：保护型市价生命周期。
+- `LIMIT`：统一限价入口；当前实现的第一种内部策略是 Bybit `FOK` 主腿加 MT5 市价对冲腿。
 
 FOK、PostOnly Chase 和未来 IOC 是 `LIMIT` 的内部执行策略，不是与市价、限价并列的业务动作。
 
@@ -44,9 +44,11 @@ TAKE_PROFIT + CLOSE_LONG_SPREAD + LIMIT
 STOP_LOSS   + CLOSE_LONG_SPREAD + MARKET
 ```
 
+Issue #109 只接入人工开仓和人工平仓的 FOK Limit。自动止盈止损仍固定使用 Market，直到后续批次为退出计划保存执行方式。
+
 ## 2. 两类可成交方向
 
-四个业务动作在报价与定价层归并为两类：
+四个业务动作在报价与定价层归并为两类。
 
 ### 2.1 买 Bybit、卖 MT5
 
@@ -61,7 +63,19 @@ STOP_LOSS   + CLOSE_LONG_SPREAD + MARKET
 Bybit Ask - MT5 Bid
 ```
 
-该方向的价差限制是“不能高于最大允许值”。
+该方向的用户限制是“价差不能高于最大允许值”。
+
+FOK Bybit 最大买入价：
+
+```text
+Raw Bybit Buy Limit
+= MT5 Bid + Limit Spread - Hedge Reserve
+
+Submitted Bybit Buy Limit
+= floor(Raw Price / Tick Size) × Tick Size
+```
+
+向下取 Tick，不能因价格舍入放宽用户的最大价差限制。
 
 ### 2.2 卖 Bybit、买 MT5
 
@@ -76,13 +90,23 @@ Bybit Ask - MT5 Bid
 Bybit Bid - MT5 Ask
 ```
 
-该方向的价差限制是“不能低于最小允许值”。
+该方向的用户限制是“价差不能低于最小允许值”。
+
+FOK Bybit 最低卖出价：
+
+```text
+Raw Bybit Sell Limit
+= MT5 Ask + Limit Spread + Hedge Reserve
+
+Submitted Bybit Sell Limit
+= ceil(Raw Price / Tick Size) × Tick Size
+```
+
+向上取 Tick，不能因价格舍入放宽用户的最小价差限制。
 
 信号可以额外观察中间价差，但成交判断、止盈止损触发和限价换算必须使用对应可成交 Bid/Ask。
 
-## 3. 已完成的 Market 语义保持不变
-
-Issue #107 只增加统一意图模型，不重新设计市价执行：
+## 3. Market 语义保持不变
 
 ```text
 生成 SyntheticOrderIntent
@@ -93,7 +117,7 @@ Issue #107 只增加统一意图模型，不重新设计市价执行：
 → 明确失败时按既有规则补偿；未知结果不盲目重试
 ```
 
-以下永久语义不因统一模型改变：
+以下永久语义不因 FOK 接入而改变：
 
 - Bybit 是第一腿／主腿。
 - MT5 是跟随对冲腿。
@@ -102,25 +126,121 @@ Issue #107 只增加统一意图模型，不重新设计市价执行：
 - 第二腿明确失败、未知、已受理和外部持仓不一致使用既有不同处置。
 - 开仓后必须验证双边目标持仓；平仓后必须验证双边归零。
 - Live Write、自动退出监控和临时 1 oz／单生命周期限制保持原状态。
+- Market 请求不携带 `limitSpread`，并继续走原 Market executor。
 
-## 4. Limit 分批计划
+## 4. FOK Limit 执行合同
 
-### Batch 1：统一合成指令模型
+### 4.1 提交前定价
+
+Limit 请求必须显式提供 `limitSpread`。Platform 在创建 ExecutionBatch 前：
+
+1. 读取 Bybit 与 MT5 当前 Bid/Ask；
+2. 计算对应方向的当前可成交价差；
+3. 验证当前价差已经满足用户限制；
+4. 读取 Platform 版本化 Contract Specification 的 Bybit `priceTick`；
+5. 应用 `VG_CROSS_SPREAD_LIMIT_HEDGE_RESERVE_PRICE`；
+6. 按方向进行保守 Tick 舍入；
+7. 生成 Bybit FOK Limit 价格。
+
+若当前可成交价差不满足限制，返回 `409`，不创建 Batch，不提交任何 Venue 订单。
+
+Hedge Reserve 默认是 `0`。受控主机必须依据真实 MT5 Broker 的滑点证据配置非负值；工程代码不猜测经纪商滑点。
+
+当前提交价格使用 Platform 版本化 `ContractSpecification.priceTick`。真实 Bybit Instrument Tick 与 Platform 合同一致性仍必须在 Issue #39 的只读验收中核对；CI 不证明真实交易所规格。
+
+### 4.2 Bybit 终态
+
+跨所价差 Limit 主腿提交：
+
+```text
+orderType=Limit
+timeInForce=FOK
+```
+
+只有同时满足以下条件才产生 Platform Fill 并允许 MT5：
+
+- Bybit Order 达到终态 `Filled`；
+- 累计成交量等于请求量；
+- 平均成交价格有效。
+
+### 4.3 零成交
+
+Bybit FOK 被取消且累计成交量为零：
+
+- 生成明确拒单事件；
+- ExecutionBatch 结束为失败；
+- 不提交 MT5；
+- FOK 开仓不创建退出计划；
+- FOK 人工平仓释放原子 Claim，退出计划恢复 `active`，允许用户重新报价。
+
+### 4.4 部分成交、数量不一致或未知结果
+
+以下结果不能按正常 FOK 处理：
+
+- 取消时累计成交量大于零；
+- Bybit 报告 `Filled`，但累计成交量与请求量不一致；
+- 终态确认超时；
+- Query 或 Place 结果未知。
+
+处理原则：
+
+- 不生成可驱动 MT5 的正常 Fill 事件；
+- 不自动提交 MT5；
+- ExecutionBatch／退出计划进入对账或人工介入；
+- 不把未知结果解释为零成交；
+- 不自动重试原业务意图。
+
+### 4.5 全部成交
+
+Bybit FOK 全部成交后：
+
+- ExecutionBatch 读取实际 Bybit Fill 数量；
+- 按当前 MT5 Contract Size、最小量和 Step 重新计算 MT5 lot；
+- 提交一笔 MT5 Market 对冲；
+- 开仓完成后验证双边目标持仓；
+- 平仓完成后验证双边目标持仓归零；
+- 第二腿明确失败时继续使用既有补偿／人工接管规则。
+
+## 5. API 定价证据
+
+Limit Open/Close 响应附加 `limitExecution`：
+
+```json
+{
+  "direction": "BUY_BYBIT_SELL_MT5",
+  "limitSpread": "-0.8",
+  "executableSpread": "-0.9",
+  "mt5ReferencePrice": "2501.0",
+  "hedgeReserve": "0",
+  "bybitTickSize": "0.1",
+  "rawBybitLimitPrice": "2500.2",
+  "bybitLimitPrice": "2500.2",
+  "currentlyExecutable": true,
+  "timeInForce": "FOK"
+}
+```
+
+该证据说明 Platform 如何得到提交价，不代表真实 Venue 已成交。真实 Order、Execution、Deal 和 Position 仍以 Runtime/Venue 证据为准。
+
+## 6. 分批状态
+
+### Batch 1：统一合成指令模型——已完成
 
 - 权威 `action / executionType / triggerReason`。
-- 现有人工开仓、人工平仓、止盈和止损触发路径统一生成该模型。
-- 公开 Market API 保持兼容，并附加标准化 `orderIntent`。
-- `LIMIT` 在任何 Market 副作用前明确返回不可用。
+- 人工开仓、人工平仓、止盈和止损触发路径统一生成该模型。
+- Market API 附加标准化 `orderIntent`。
 
-### Batch 2：FOK 价差限价
+### Batch 2：FOK 价差限价——Issue #109
 
 - 用户输入价差限制，而不是固定 Bybit 单边价格。
-- 根据 MT5 当前可成交报价、Bybit Tick Size 和滑点预留动态换算 Bybit FOK Limit。
-- Bybit 全部成交后，MT5 按实际成交量市价对冲。
-- 未全部成交则结束，不提交 MT5。
-- 覆盖四个业务动作，但底层复用两类价格方向。
+- 两类可成交方向与保守 Tick 换算。
+- Bybit FOK 终态全成交确认。
+- 全成交后按实际数量执行 MT5 Market。
+- 零成交、部分成交和未知结果使用不同状态语义。
+- 人工开仓和平仓支持 Market / FOK Limit。
+- 自动 TP/SL 仍使用 Market。
 
-### Batch 3：止盈止损与人工平仓复用统一执行入口
+### Batch 3：止盈止损复用执行选择
 
 - 退出计划保存止盈执行方式和止损执行方式。
 - 人工平仓、止盈、止损调用同一个 Close Action。
@@ -149,49 +269,40 @@ IOC 只保留为后续接口，不在当前 1 oz 阶段默认开放。
 - Bybit Maker/Taker、真实手续费、MT5 Commission、Swap、Funding 和执行成本拆分。
 - 开仓 Fail Closed；平仓按风险降低原则使用独立、更宽但有限的保护阈值。
 
-## 5. 最终交易执行页面目标
+## 7. 交易执行页面
 
-页面核心输入：
+当前页面支持：
 
 ```text
-动作：开多 / 平多 / 开空 / 平空
-执行：市价 / 限价
+开仓动作：开多 / 开空
+人工平仓：平多 / 平空
+执行方式：市价 / FOK 限价
 数量：oz
+限制价差：Limit 时必填
 ```
 
-选择限价后展示：
+FOK 返回后展示：
 
-- 限制价差。
-- 当前可成交价差。
-- 动态换算后的 Bybit 限价。
-- 限价策略及有效期。
-- 追单状态（后续批次）。
+- 两类执行方向；
+- 限制价差与下单时可成交价差；
+- Bybit FOK 提交价；
+- MT5 参考价；
+- Bybit Tick Size；
+- MT5 Hedge Reserve。
 
-退出计划展示：
+PostOnly 追单、改单状态、真实成交价差、两腿延迟和费用复盘属于后续批次。
 
-- 止盈价差与执行方式。
-- 止损价差与执行方式。
-- Trigger Reason。
-- 真实 MT5 Position Ticket。
+## 8. 本地实盘边界
 
-执行结果统一展示：
+CI 只能证明类型、映射、状态和安全分支，不能证明真实 Bybit／MT5 权限、Broker 字段、Terminal 稳定性、流动性、Tick 一致性和成交质量。
 
-- Synthetic Action。
-- Execution Type。
-- Trigger Reason。
-- Bybit 与 MT5 外部订单／成交身份。
-- 预期价差与真实价差。
-- 两腿延迟、未对冲时间、滑点、费用和最终核对状态。
-
-## 6. 本地实盘边界
-
-CI 只能证明类型、映射、状态和安全分支，不能证明真实 Bybit／MT5 权限、Broker 字段、Terminal 稳定性、流动性和成交质量。
-
-所有批次工程完成后，Issue #39 仍按以下顺序执行：
+所有核心批次工程完成后，Issue #39 仍按以下顺序执行：
 
 1. Live Write 全部关闭的只读核对。
 2. 当前订单、历史订单、Fill／Deal、Position 和 Account Risk 核对。
-3. 受控 1 oz Market 测试。
-4. 受控 1 oz FOK Limit 测试。
-5. PostOnly／追单只在 WebSocket、部分成交和补偿证据成熟后测试。
-6. 多轮干净 EOD 和无未解释 Difference 后，才复审临时限制。
+3. 核对真实 Bybit Tick、数量 Step 与 Platform Contract Specification。
+4. 配置并记录 MT5 Hedge Reserve 证据。
+5. 受控 1 oz Market 测试。
+6. 受控 1 oz FOK Limit 测试，包括全成交、零成交和异常结果演练。
+7. PostOnly／追单只在 WebSocket、部分成交和补偿证据成熟后测试。
+8. 多轮干净 EOD 和无未解释 Difference 后，才复审临时限制。

@@ -30,9 +30,10 @@ class CrossSpreadMarketOpenRequest(BaseModel):
     take_profit_spread: Decimal = Field(alias="takeProfitSpread")
     stop_loss_spread: Decimal = Field(alias="stopLossSpread")
     execution_mode: ExecutionMode = Field(default="market", alias="executionMode")
+    limit_spread: Decimal | None = Field(default=None, alias="limitSpread")
 
     @model_validator(mode="after")
-    def validate_threshold_order(self) -> CrossSpreadMarketOpenRequest:
+    def validate_request(self) -> CrossSpreadMarketOpenRequest:
         if self.direction == "LONG_SPREAD":
             if self.take_profit_spread <= self.stop_loss_spread:
                 raise ValueError(
@@ -42,11 +43,18 @@ class CrossSpreadMarketOpenRequest(BaseModel):
             raise ValueError(
                 "SHORT_SPREAD take-profit exit spread must be below stop-loss exit spread"
             )
+        _validate_limit_selection(self.execution_mode, self.limit_spread)
         return self
 
 
 class CrossSpreadMarketCloseRequest(BaseModel):
     execution_mode: ExecutionMode = Field(default="market", alias="executionMode")
+    limit_spread: Decimal | None = Field(default=None, alias="limitSpread")
+
+    @model_validator(mode="after")
+    def validate_request(self) -> CrossSpreadMarketCloseRequest:
+        _validate_limit_selection(self.execution_mode, self.limit_spread)
+        return self
 
 
 class CrossSpreadOrderIntentResponse(BaseModel):
@@ -55,6 +63,19 @@ class CrossSpreadOrderIntentResponse(BaseModel):
     trigger_reason: SyntheticTriggerReason = Field(alias="triggerReason")
     direction: SpreadDirection
     is_open: bool = Field(alias="isOpen")
+
+
+class CrossSpreadLimitExecutionResponse(BaseModel):
+    direction: Literal["BUY_BYBIT_SELL_MT5", "SELL_BYBIT_BUY_MT5"]
+    limit_spread: Decimal = Field(alias="limitSpread")
+    executable_spread: Decimal = Field(alias="executableSpread")
+    mt5_reference_price: Decimal = Field(alias="mt5ReferencePrice")
+    hedge_reserve: Decimal = Field(alias="hedgeReserve")
+    bybit_tick_size: Decimal = Field(alias="bybitTickSize")
+    raw_bybit_limit_price: Decimal = Field(alias="rawBybitLimitPrice")
+    bybit_limit_price: Decimal = Field(alias="bybitLimitPrice")
+    currently_executable: bool = Field(alias="currentlyExecutable")
+    time_in_force: Literal["FOK"] = Field(default="FOK", alias="timeInForce")
 
 
 class CrossSpreadExitPlanResponse(BaseModel):
@@ -83,6 +104,10 @@ class CrossSpreadOpenResult(BaseModel):
         default=None,
         alias="orderIntent",
     )
+    limit_execution: CrossSpreadLimitExecutionResponse | None = Field(
+        default=None,
+        alias="limitExecution",
+    )
     exit_plan: CrossSpreadExitPlanResponse | None = Field(default=None, alias="exitPlan")
 
 
@@ -92,6 +117,10 @@ class CrossSpreadCloseResult(BaseModel):
         default=None,
         alias="orderIntent",
     )
+    limit_execution: CrossSpreadLimitExecutionResponse | None = Field(
+        default=None,
+        alias="limitExecution",
+    )
     exit_plan: CrossSpreadExitPlanResponse = Field(alias="exitPlan")
 
 
@@ -99,3 +128,13 @@ class CrossSpreadExitEvaluationResponse(BaseModel):
     evaluated_count: int = Field(alias="evaluatedCount")
     triggered_count: int = Field(alias="triggeredCount")
     skipped_reason: str | None = Field(default=None, alias="skippedReason")
+
+
+def _validate_limit_selection(
+    execution_mode: ExecutionMode,
+    limit_spread: Decimal | None,
+) -> None:
+    if execution_mode == "limit" and limit_spread is None:
+        raise ValueError("Limit execution requires limitSpread")
+    if execution_mode == "market" and limit_spread is not None:
+        raise ValueError("Market execution cannot include limitSpread")

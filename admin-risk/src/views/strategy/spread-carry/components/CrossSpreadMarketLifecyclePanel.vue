@@ -2,12 +2,12 @@
   <section class="market-lifecycle">
     <header class="market-lifecycle__header">
       <div>
-        <p>MARKET LIFECYCLE</p>
-        <h3>市价生命周期运行区</h3>
+        <p>SYNTHETIC LIFECYCLE</p>
+        <h3>跨所价差交易执行区</h3>
       </div>
       <div class="market-lifecycle__status">
         <span>{{ leftLegSymbol }} / {{ rightLegSymbol }}</span>
-        <strong>仅市价已接入</strong>
+        <strong>市价 / FOK 限价</strong>
       </div>
     </header>
 
@@ -15,7 +15,7 @@
       <section class="market-lifecycle__card">
         <div class="market-lifecycle__card-head">
           <div>
-            <h4>市价开仓</h4>
+            <h4>合成开仓</h4>
             <p>Bybit 确认成交后，MT5 按实际数量对冲</p>
           </div>
           <button type="button" :disabled="loading" @click="refreshPlans">刷新</button>
@@ -30,8 +30,19 @@
             </select>
           </label>
           <label>
+            <span>执行方式</span>
+            <select v-model="openExecutionMode">
+              <option value="market">市价</option>
+              <option value="limit">FOK 限价</option>
+            </select>
+          </label>
+          <label>
             <span>数量（盎司）</span>
             <input v-model="quantityOz" inputmode="decimal" />
+          </label>
+          <label v-if="openExecutionMode === 'limit'">
+            <span>限制价差</span>
+            <input v-model="openLimitSpread" inputmode="decimal" />
           </label>
           <label>
             <span>止盈平仓价差</span>
@@ -44,9 +55,10 @@
         </div>
 
         <div class="market-lifecycle__formula">
-          <span>触发观察</span>
+          <span>可成交价差方向</span>
           <strong>{{ executableSpreadLabel }}</strong>
           <small>{{ thresholdRuleLabel }}</small>
+          <small v-if="openExecutionMode === 'limit'">{{ limitRuleLabel }}</small>
         </div>
 
         <button
@@ -55,9 +67,7 @@
           :disabled="loading || Boolean(validationError)"
           @click="submitOpen"
         >
-          {{
-            loading ? '执行中...' : direction === 'LONG_SPREAD' ? '市价开多价差' : '市价开空价差'
-          }}
+          {{ openButtonLabel }}
         </button>
         <p v-if="validationError" class="market-lifecycle__error">{{ validationError }}</p>
       </section>
@@ -66,9 +76,24 @@
         <div class="market-lifecycle__card-head">
           <div>
             <h4>真实退出计划</h4>
-            <p>止盈止损达到指定可执行平仓价差后，按市价平仓</p>
+            <p>自动止盈止损仍按市价；人工平仓可选市价或 FOK</p>
           </div>
           <span>{{ activePlans.length }} 笔活动计划</span>
+        </div>
+
+        <div class="market-lifecycle__close-controls">
+          <label>
+            <span>人工平仓方式</span>
+            <select v-model="closeExecutionMode">
+              <option value="market">市价</option>
+              <option value="limit">FOK 限价</option>
+            </select>
+          </label>
+          <label v-if="closeExecutionMode === 'limit'">
+            <span>平仓限制价差</span>
+            <input v-model="closeLimitSpread" inputmode="decimal" />
+          </label>
+          <small v-if="closeValidationError">{{ closeValidationError }}</small>
         </div>
 
         <div class="market-lifecycle__table-wrap">
@@ -104,10 +129,10 @@
                   <button
                     type="button"
                     class="market-lifecycle__close"
-                    :disabled="loading || plan.status !== 'active'"
+                    :disabled="loading || plan.status !== 'active' || Boolean(closeValidationError)"
                     @click="submitClose(plan)"
                   >
-                    市价平仓
+                    {{ closeExecutionMode === 'limit' ? 'FOK 平仓' : '市价平仓' }}
                   </button>
                 </td>
               </tr>
@@ -117,8 +142,37 @@
       </section>
     </div>
 
+    <section v-if="limitEvidence" class="market-lifecycle__evidence">
+      <div>
+        <span>FOK 方向</span>
+        <strong>{{ limitDirectionLabel(limitEvidence.direction) }}</strong>
+      </div>
+      <div>
+        <span>限制 / 可成交价差</span>
+        <strong>
+          {{ formatSigned(limitEvidence.limitSpread) }} /
+          {{ formatSigned(limitEvidence.executableSpread) }}
+        </strong>
+      </div>
+      <div>
+        <span>Bybit FOK 限价</span>
+        <strong>{{ formatNumber(limitEvidence.bybitLimitPrice) }}</strong>
+      </div>
+      <div>
+        <span>MT5 参考价</span>
+        <strong>{{ formatNumber(limitEvidence.mt5ReferencePrice) }}</strong>
+      </div>
+      <div>
+        <span>Tick / 对冲预留</span>
+        <strong>
+          {{ formatNumber(limitEvidence.bybitTickSize) }} /
+          {{ formatNumber(limitEvidence.hedgeReserve) }}
+        </strong>
+      </div>
+    </section>
+
     <footer class="market-lifecycle__footer">
-      <span>限价开仓、限价平仓及限价止盈止损继续保留在原设计中，本阶段尚未接入。</span>
+      <span>FOK 要求 Bybit 全部成交后才提交 MT5；PostOnly、追单和 IOC 尚未接入。</span>
       <strong v-if="message" :class="messageTone">{{ message }}</strong>
     </footer>
   </section>
@@ -131,7 +185,9 @@
     getCrossSpreadExitPlans,
     openCrossSpreadMarket,
     type CrossSpreadDirection,
+    type CrossSpreadExecutionMode,
     type CrossSpreadExitPlanResult,
+    type CrossSpreadLimitExecutionResult,
   } from '@/api/platform/crossSpreadLifecycle';
 
   defineProps<{
@@ -140,10 +196,15 @@
   }>();
 
   const direction = ref<CrossSpreadDirection>('LONG_SPREAD');
+  const openExecutionMode = ref<CrossSpreadExecutionMode>('market');
+  const closeExecutionMode = ref<CrossSpreadExecutionMode>('market');
   const quantityOz = ref('1');
+  const openLimitSpread = ref('-0.8');
+  const closeLimitSpread = ref('-1.2');
   const takeProfitSpread = ref('0');
   const stopLossSpread = ref('-3');
   const plans = ref<CrossSpreadExitPlanResult[]>([]);
+  const limitEvidence = ref<CrossSpreadLimitExecutionResult | null>(null);
   const loading = ref(false);
   const message = ref('');
   const messageTone = ref<'is-success' | 'is-error' | 'is-warn'>('is-success');
@@ -151,20 +212,35 @@
   const activePlans = computed(() => plans.value.filter((plan) => plan.status === 'active'));
   const executableSpreadLabel = computed(() =>
     direction.value === 'LONG_SPREAD'
-      ? '做空价差（BY Bid - MT5 Ask）'
-      : '做多价差（BY Ask - MT5 Bid）',
+      ? '买 Bybit / 卖 MT5：BY Ask - MT5 Bid'
+      : '卖 Bybit / 买 MT5：BY Bid - MT5 Ask',
   );
   const thresholdRuleLabel = computed(() =>
     direction.value === 'LONG_SPREAD'
       ? '止盈：平仓价差 ≥ 止盈值；止损：平仓价差 ≤ 止损值'
       : '止盈：平仓价差 ≤ 止盈值；止损：平仓价差 ≥ 止损值',
   );
+  const limitRuleLabel = computed(() =>
+    direction.value === 'LONG_SPREAD'
+      ? 'FOK 仅在当前买入价差不高于限制值时提交'
+      : 'FOK 仅在当前卖出价差不低于限制值时提交',
+  );
+  const openButtonLabel = computed(() => {
+    if (loading.value) return '执行中...';
+    const action = direction.value === 'LONG_SPREAD' ? '开多价差' : '开空价差';
+    return openExecutionMode.value === 'limit' ? `FOK ${action}` : `市价${action}`;
+  });
   const validationError = computed(() => {
     const quantity = Number(quantityOz.value);
     const takeProfit = Number(takeProfitSpread.value);
     const stopLoss = Number(stopLossSpread.value);
     if (!Number.isFinite(quantity) || quantity <= 0) return '数量必须大于 0';
-    if (!Number.isFinite(takeProfit) || !Number.isFinite(stopLoss)) return '止盈止损必须是有效数字';
+    if (!Number.isFinite(takeProfit) || !Number.isFinite(stopLoss)) {
+      return '止盈止损必须是有效数字';
+    }
+    if (openExecutionMode.value === 'limit' && !Number.isFinite(Number(openLimitSpread.value))) {
+      return 'FOK 限制价差必须是有效数字';
+    }
     if (direction.value === 'LONG_SPREAD' && takeProfit <= stopLoss) {
       return '多价差的止盈平仓价差必须高于止损平仓价差';
     }
@@ -173,14 +249,20 @@
     }
     return '';
   });
+  const closeValidationError = computed(() => {
+    if (closeExecutionMode.value !== 'limit') return '';
+    return Number.isFinite(Number(closeLimitSpread.value)) ? '' : 'FOK 平仓限制价差必须是有效数字';
+  });
 
   function applyDirectionDefaults() {
     if (direction.value === 'LONG_SPREAD') {
       takeProfitSpread.value = '0';
       stopLossSpread.value = '-3';
+      openLimitSpread.value = '-0.8';
     } else {
       takeProfitSpread.value = '-3';
       stopLossSpread.value = '0';
+      openLimitSpread.value = '-1.2';
     }
   }
 
@@ -199,14 +281,17 @@
   async function submitOpen() {
     if (validationError.value) return;
     loading.value = true;
+    limitEvidence.value = null;
     try {
       const result = await openCrossSpreadMarket({
         direction: direction.value,
         quantityOz: quantityOz.value,
         takeProfitSpread: takeProfitSpread.value,
         stopLossSpread: stopLossSpread.value,
-        executionMode: 'market',
+        executionMode: openExecutionMode.value,
+        ...(openExecutionMode.value === 'limit' ? { limitSpread: openLimitSpread.value } : {}),
       });
+      limitEvidence.value = result.limitExecution || null;
       if (result.executionBatch.status === 'hedged' && result.exitPlan) {
         setMessage(`开仓与退出计划已建立：${result.exitPlan.planId}`, 'is-success');
       } else {
@@ -217,18 +302,27 @@
       }
       await loadPlansSilently();
     } catch (error: unknown) {
-      setMessage(resolveError(error, '市价开仓失败'), 'is-error');
+      setMessage(resolveError(error, '合成开仓失败'), 'is-error');
     } finally {
       loading.value = false;
     }
   }
 
   async function submitClose(plan: CrossSpreadExitPlanResult) {
+    if (closeValidationError.value) return;
     loading.value = true;
+    limitEvidence.value = null;
     try {
-      const result = await closeCrossSpreadMarket(plan.planId, 'market');
+      const result = await closeCrossSpreadMarket(
+        plan.planId,
+        closeExecutionMode.value,
+        closeExecutionMode.value === 'limit' ? closeLimitSpread.value : undefined,
+      );
+      limitEvidence.value = result.limitExecution || null;
       if (result.executionBatch.status === 'hedged' && result.exitPlan.status === 'closed') {
-        setMessage(`退出计划 ${plan.planId} 已市价平仓`, 'is-success');
+        setMessage(`退出计划 ${plan.planId} 已完成平仓`, 'is-success');
+      } else if (result.exitPlan.status === 'active') {
+        setMessage('FOK 未成交，退出计划仍保持活动状态', 'is-warn');
       } else {
         setMessage(
           result.executionBatch.failureReason || '平仓未完全对冲，已进入人工介入',
@@ -237,7 +331,7 @@
       }
       await loadPlansSilently();
     } catch (error: unknown) {
-      setMessage(resolveError(error, '市价平仓失败'), 'is-error');
+      setMessage(resolveError(error, '合成平仓失败'), 'is-error');
       await loadPlansSilently();
     } finally {
       loading.value = false;
@@ -248,7 +342,7 @@
     try {
       plans.value = await getCrossSpreadExitPlans();
     } catch {
-      // Preserve the last known plan list; the visible action already reports the primary result.
+      // Preserve the last known plan list; the visible action reports the primary result.
     }
   }
 
@@ -261,9 +355,18 @@
     if (typeof error === 'object' && error !== null) {
       const candidate = error as {
         message?: string;
-        response?: { data?: { detail?: string } };
+        response?: { data?: { detail?: string | Array<{ msg?: string }> } };
       };
-      return candidate.response?.data?.detail || candidate.message || fallback;
+      const detail = candidate.response?.data?.detail;
+      if (Array.isArray(detail)) {
+        return (
+          detail
+            .map((item) => item.msg)
+            .filter(Boolean)
+            .join('；') || fallback
+        );
+      }
+      return detail || candidate.message || fallback;
     }
     return fallback;
   }
@@ -277,6 +380,10 @@
     const parsed = Number(value);
     if (!Number.isFinite(parsed)) return '--';
     return `${parsed > 0 ? '+' : ''}${parsed.toFixed(2)}`;
+  }
+
+  function limitDirectionLabel(directionValue: CrossSpreadLimitExecutionResult['direction']) {
+    return directionValue === 'BUY_BYBIT_SELL_MT5' ? '买 Bybit / 卖 MT5' : '卖 Bybit / 买 MT5';
   }
 
   function planStatusLabel(status: CrossSpreadExitPlanResult['status']) {
@@ -378,13 +485,15 @@
     padding: 7px 11px;
   }
 
-  .market-lifecycle__form {
+  .market-lifecycle__form,
+  .market-lifecycle__close-controls {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 10px;
   }
 
-  .market-lifecycle__form label {
+  .market-lifecycle__form label,
+  .market-lifecycle__close-controls label {
     display: flex;
     flex-direction: column;
     gap: 6px;
@@ -393,7 +502,9 @@
   }
 
   .market-lifecycle__form input,
-  .market-lifecycle__form select {
+  .market-lifecycle__form select,
+  .market-lifecycle__close-controls input,
+  .market-lifecycle__close-controls select {
     height: 38px;
     padding: 0 10px;
     border: 1px solid #e1e7f0;
@@ -401,6 +512,18 @@
     background: #fbfcfe;
     color: #172946;
     outline: none;
+  }
+
+  .market-lifecycle__close-controls {
+    margin-bottom: 10px;
+    padding: 10px;
+    border-radius: 10px;
+    background: #f8fafc;
+  }
+
+  .market-lifecycle__close-controls small {
+    align-self: end;
+    color: #c83c3c;
   }
 
   .market-lifecycle__formula {
@@ -476,6 +599,33 @@
     padding: 6px 9px;
   }
 
+  .market-lifecycle__evidence {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 10px;
+    margin-top: 12px;
+    padding: 12px;
+    border: 1px solid #dfe7f2;
+    border-radius: 12px;
+    background: #f7faff;
+  }
+
+  .market-lifecycle__evidence div {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .market-lifecycle__evidence span {
+    color: #71819b;
+    font-size: 11px;
+  }
+
+  .market-lifecycle__evidence strong {
+    color: #1b3f72;
+    font-size: 12px;
+  }
+
   .market-lifecycle__footer {
     margin-top: 12px;
     color: #7787a1;
@@ -499,7 +649,8 @@
   }
 
   @media (max-width: 1180px) {
-    .market-lifecycle__grid {
+    .market-lifecycle__grid,
+    .market-lifecycle__evidence {
       grid-template-columns: 1fr;
     }
   }
