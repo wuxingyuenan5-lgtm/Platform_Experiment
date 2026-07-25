@@ -5,6 +5,7 @@ import httpx
 from fastapi.testclient import TestClient
 
 from app.config import get_settings
+from app.cross_spread import CrossSpreadLiveSizing
 from app.database import connection
 from app.main import app
 
@@ -105,6 +106,7 @@ def test_cross_spread_market_command_maps_open_long_to_two_market_legs(
     settings.database_path = str(tmp_path / "cross-spread-command.db")
     settings.runtime_base_url = "http://runtime.local"
     settings.live_trading_enabled = True
+    settings.cross_spread_acceptance_max_quantity_oz = Decimal("1")
     captured = {}
 
     def fake_create_execution_batch(request):
@@ -140,6 +142,18 @@ def test_cross_spread_market_command_maps_open_long_to_two_market_legs(
         }
 
     monkeypatch.setattr("app.cross_spread.create_execution_batch", fake_create_execution_batch)
+    monkeypatch.setattr(
+        "app.cross_spread._load_live_cross_spread_sizing",
+        lambda: CrossSpreadLiveSizing(
+            bybit_min=Decimal("0.001"),
+            bybit_step=Decimal("0.001"),
+            bybit_max=Decimal("10"),
+            mt5_min=Decimal("0.01"),
+            mt5_step=Decimal("0.01"),
+            mt5_max=Decimal("100"),
+            mt5_multiplier=Decimal("100"),
+        ),
+    )
 
     with TestClient(app) as client:
         response = client.post(
@@ -162,20 +176,22 @@ def test_cross_spread_market_command_maps_open_long_to_two_market_legs(
     assert request.legs[1].quantity == Decimal("0.01")
 
 
-def test_cross_spread_market_command_rejects_quantity_outside_contract_specs(
+def test_cross_spread_market_command_rejects_quantity_above_acceptance_cap(
     tmp_path: Path,
 ) -> None:
     settings = get_settings()
     settings.database_path = str(tmp_path / "cross-spread-command-invalid-qty.db")
     settings.live_trading_enabled = True
+    settings.cross_spread_acceptance_max_quantity_oz = Decimal("1")
 
     with TestClient(app) as client:
         response = client.post(
             "/api/v1/trading/cross-spread/market-command",
-            json={"action": "OPEN_LONG", "quantityOz": "0.5"},
+            json={"action": "OPEN_LONG", "quantityOz": "1.001"},
         )
 
     assert response.status_code == 422
+    assert "temporarily capped" in response.json()["detail"]
 
 
 def test_cross_spread_market_command_rejects_when_live_trading_disabled(
