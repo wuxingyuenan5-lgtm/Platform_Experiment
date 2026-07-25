@@ -1,7 +1,7 @@
 # Task: Complete Live Account Observability
 
 Issue: #98
-Status: review
+Status: completed
 Branch: `feature/issue-98-live-account-observability`
 Base commit: `6eb92ded8bfd439ad30654219597023cc91db7e9`
 
@@ -85,7 +85,7 @@ Complete the read-only live Venue, account and risk evidence required before the
 - [x] Canonical Markdown documents fields, availability and local acceptance procedure.
 - [x] Focused Runtime and Backend regression tests cover liquidation, Stop Out, paging and partial reads.
 - [x] Platform CI #1431 and Secret Scan #784 passed on the final code head.
-- [ ] Final documentation head passes Platform CI and Secret Scan.
+- [x] Platform CI #1437 and Secret Scan #787 passed on the final documentation head.
 
 ## Stop conditions
 
@@ -98,6 +98,6 @@ Complete the read-only live Venue, account and risk evidence required before the
 ## Completion
 
 - PR: #99
-- Current: implementation complete; final documentation-head verification in progress.
+- Current: implementation and documentation complete; ready for squash merge after the final metadata-head gate.
 - Live external behavior proven: no. Real Bybit/MT5 field availability and Windows-host execution remain Issue #39 operational evidence.
 - Follow-up: controlled local/Windows acceptance, private WebSocket confirmation and real Limit execution remain separately bounded scopes.
