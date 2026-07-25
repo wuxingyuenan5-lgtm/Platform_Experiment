@@ -1,12 +1,19 @@
 # Current Project State
 
-Last updated: 2026-07-25  
+Last updated: 2026-07-26  
 Stable branch: `main`  
-Product release: `0.7.0`  
+Product release: `0.8.0`  
 Latest completed engineering scope: Issue #98 / PR #99  
-Latest completed documentation scope: Issue #100 / PR #101
+Latest completed documentation scope: Issue #100 / PR #101  
+Latest product release scope: Issue #102 / PR #103
 
 This file is the compact cross-session handoff. It records current operating truth, not a PR diary. Read the actual open Issues and PRs before assuming a workstream is active.
+
+## Current release
+
+Platform `0.8.0` is the current coherent product release. Root `VERSION` is authoritative; Platform Backend, Execution Runtime and the frontend displayed version must match it. Release notes are in `docs/releases/0.8.0.md`.
+
+The release records engineering completion through live account observability. It does not prove real Windows-host Bybit/MT5 credentials, permissions, broker fields, Terminal stability, history retention or execution behavior; those remain Issue #39 operational evidence.
 
 ## Current architecture
 
@@ -95,7 +102,8 @@ Completed scopes include:
 7. Bybit terminal-fill-confirmed market execution with actual-fill MT5 hedge sizing;
 8. market-only cross-spread lifecycle, reduce-only/ticket-bound close and executable-spread TP/SL;
 9. route-independent Order/Fill reads, current Venue specification checks, temporary 1 oz/single-lifecycle controls, external position verification and definitive-failure-safe Bybit rollback;
-10. bounded Order/Fill history, rich Order diagnostics, Bybit liquidation evidence, MT5 Margin Call/Stop Out evidence, section-aware two-Venue aggregation and a read-only acceptance dashboard.
+10. bounded Order/Fill history, rich Order diagnostics, Bybit liquidation evidence, MT5 Margin Call/Stop Out evidence, section-aware two-Venue aggregation and a read-only acceptance dashboard;
+11. coherent Platform `0.8.0` release declarations and release documentation.
 
 Detailed implementation history belongs in merged Issues, PRs and task packets rather than this file.
 
@@ -131,8 +139,8 @@ The Windows-host phase is expected to require environment-specific configuration
 - Inherited frontend debt remains outside untouched modules; changed files may not add debt.
 - Desktop workstation use remains the primary frontend target.
 - Pyright coverage remains progressive rather than whole-repository strict.
-- Live Write cannot be enabled by an engineering refactor or test result.
+- Live Write cannot be enabled by an engineering refactor, version bump or test result.
 
 ## Update rule
 
-Replace stale facts when architecture, authority, safety defaults or a genuine active workstream changes. Do not append chat transcripts or speculative plans. Detailed progress belongs in the matching task packet, Issue and PR.
+Replace stale facts when architecture, authority, safety defaults, product release or a genuine active workstream changes. Do not append chat transcripts or speculative plans. Detailed progress belongs in the matching task packet, Issue and PR.
