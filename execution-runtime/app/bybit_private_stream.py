@@ -21,9 +21,11 @@ class PrivateEventSource(Protocol):
 
 
 class BybitPrivateEventParser:
-    def __init__(self, *, symbol: str, order_link_id: str) -> None:
+    def __init__(self, *, symbol: str, order_link_prefix: str) -> None:
+        if not order_link_prefix:
+            raise ValueError("Bybit private stream Order Link prefix is required")
         self.symbol = symbol.upper()
-        self.order_link_id = order_link_id
+        self.order_link_prefix = order_link_prefix
         self._sequence = 0
         self._lock = Lock()
 
@@ -39,7 +41,8 @@ class BybitPrivateEventParser:
             row = {str(key): value for key, value in raw.items()}
             if str(row.get("symbol") or "").upper() != self.symbol:
                 continue
-            if str(row.get("orderLinkId") or "") != self.order_link_id:
+            order_link_id = str(row.get("orderLinkId") or "")
+            if not order_link_id.startswith(self.order_link_prefix):
                 continue
             if topic == "execution":
                 events.append(self._execution_event(row))
@@ -111,13 +114,13 @@ class BybitPrivateEventSource:
         settings: Settings,
         *,
         symbol: str,
-        order_link_id: str,
+        order_link_prefix: str,
         websocket_factory: Callable[..., Any] | None = None,
     ) -> None:
         self.settings = settings
         self.parser = BybitPrivateEventParser(
             symbol=symbol,
-            order_link_id=order_link_id,
+            order_link_prefix=order_link_prefix,
         )
         self._queue: Queue[PrivateChaseEvent] = Queue()
         self._websocket_factory = websocket_factory
