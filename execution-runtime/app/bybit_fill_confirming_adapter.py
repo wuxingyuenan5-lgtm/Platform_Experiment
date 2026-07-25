@@ -1,22 +1,28 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime
+from decimal import Decimal
 from time import monotonic, sleep
 
 from app.bybit_live_adapter import BybitLiveAdapter
-from app.gateway_errors import GatewayResultUnknownError
+from app.gateway_errors import (
+    GatewayRequestRejectedError,
+    GatewayResultUnknownError,
+)
+from app.live_route_store import (
+    record_order_route,
+    stable_external_client_id,
+    update_external_order_id,
+)
+from app.live_safety import validate_live_write
 from app.models import ExecutionEvent, SubmitOrderCommand, VenueOrderSnapshot
 
 
 class BybitFillConfirmingAdapter(BybitLiveAdapter):
-    """Bybit adapter that turns a terminal market-order fill into Runtime fill events.
-
-    REST acknowledgement alone is never treated as a fill. The adapter performs a
-    bounded confirmation loop so the cross-spread batch can submit the MT5 hedge
-    only after Bybit exposes a terminal filled quantity.
-    """
+    """Bybit market adapter with bounded fill confirmation and close safeguards."""
 
     def submit_order(self, command: SubmitOrderCommand) -> list[ExecutionEvent]:
-        events = super().submit_order(command)
+        events = self._submit_acknowledgement(command)
         if command.order_type != "market":
             return events
 
@@ -86,6 +92,86 @@ class BybitFillConfirmingAdapter(BybitLiveAdapter):
         else:
             acknowledgement.reason = "Bybit market-order fill confirmation timed out"
         return events
+
+    def _submit_acknowledgement(self, command: SubmitOrderCommand) -> list[ExecutionEvent]:
+        self._assert_account(command.account_id)
+        client = self._client()
+        reference_price = command.price or self._market_reference_price(client, command)
+        validate_live_write(
+            command,
+            adapter=self.name,
+            reference_price=reference_price,
+            settings=self.settings,
+        )
+        client_id = stable_external_client_id("VG", command.platform_order_id, length=36)
+        record_order_route(command, self.name, client_id)
+        payload: dict[str, object] = {
+            "category": self.settings.bybit_category,
+            "symbol": command.symbol.upper(),
+            "side": "Buy" if command.side == "buy" else "Sell",
+            "orderType": "Market" if command.order_type == "market" else "Limit",
+            "qty": format(command.quantity, "f"),
+            "orderLinkId": client_id,
+            "reduceOnly": command.reduce_only,
+        }
+        if command.reduce_only:
+            payload["positionIdx"] = self._resolve_reduce_position_idx(client, command)
+        if command.order_type == "limit":
+            if command.price is None:
+                raise GatewayRequestRejectedError("Bybit limit order requires price")
+            payload["price"] = format(command.price, "f")
+            payload["timeInForce"] = "GTC"
+        try:
+            response = client.place_order(**payload)
+        except Exception as exc:
+            raise GatewayResultUnknownError("Bybit place_order result is unknown") from exc
+        self._require_success(response, "Bybit rejected order")
+        result = response.get("result") or {}
+        external_order_id = str(result.get("orderId") or "")
+        if not external_order_id:
+            raise GatewayResultUnknownError("Bybit accepted order without orderId")
+        update_external_order_id(command.platform_order_id, external_order_id)
+        return [
+            ExecutionEvent(
+                command_id=command.command_id,
+                platform_order_id=command.platform_order_id,
+                event_type="order_acknowledged",
+                external_order_id=external_order_id,
+                occurred_at=datetime.now(UTC),
+            )
+        ]
+
+    def _resolve_reduce_position_idx(self, client, command: SubmitOrderCommand) -> int:
+        try:
+            response = client.get_positions(
+                category=self.settings.bybit_category,
+                symbol=command.symbol.upper(),
+            )
+            self._require_success(response, "Bybit position query failed before close")
+        except GatewayRequestRejectedError:
+            raise
+        except Exception as exc:
+            raise GatewayResultUnknownError(
+                "Bybit close-position query result is unknown"
+            ) from exc
+
+        required_side = "Buy" if command.side == "sell" else "Sell"
+        matches = []
+        for row in self._result_list(response):
+            size = Decimal(str(row.get("size") or "0"))
+            if size <= 0 or str(row.get("side") or "") != required_side:
+                continue
+            matches.append((row, size))
+        if len(matches) != 1:
+            raise GatewayRequestRejectedError(
+                "Bybit reduce-only close requires exactly one matching live position"
+            )
+        row, size = matches[0]
+        if command.quantity > size:
+            raise GatewayRequestRejectedError(
+                "Bybit reduce-only close quantity exceeds the matching live position"
+            )
+        return int(row.get("positionIdx") or 0)
 
     def _fill_event(
         self,
