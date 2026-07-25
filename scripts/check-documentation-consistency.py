@@ -26,6 +26,7 @@ REQUIRED_OWNERS = {
     "Venue Reconciliation public DTOs": "platform-backend/app/venue_reconciliation_schemas.py",
     "Venue Reconciliation difference policy": "platform-backend/app/venue_reconciliation_policy.py",
     "Venue Reconciliation persistence": "platform-backend/app/venue_reconciliation_repository.py",
+    "Venue Reconciliation Runtime client": "platform-backend/app/venue_reconciliation_runtime_client.py",
     "Venue Reconciliation orchestration": "platform-backend/app/venue_reconciliation.py",
     "Operational fill projection": "platform-backend/app/trading.py",
     "Position calculation policy": "platform-backend/app/position_math.py",
