@@ -61,7 +61,15 @@ class VenueOrderSnapshot(BaseModel):
         "unknown",
     ]
     filled_quantity: Decimal = Field(alias="filledQuantity")
+    remaining_quantity: Decimal = Field(default=Decimal("0"), alias="remainingQuantity")
     average_fill_price: Decimal | None = Field(default=None, alias="averageFillPrice")
+    external_client_id: str | None = Field(default=None, alias="externalClientId")
+    reduce_only: bool | None = Field(default=None, alias="reduceOnly")
+    position_index: int | None = Field(default=None, alias="positionIndex")
+    position_id: str | None = Field(default=None, alias="positionId")
+    time_in_force: str | None = Field(default=None, alias="timeInForce")
+    reject_reason: str | None = Field(default=None, alias="rejectReason")
+    cancel_reason: str | None = Field(default=None, alias="cancelReason")
     occurred_at: datetime = Field(alias="occurredAt")
     as_of: datetime = Field(alias="asOf")
     data_quality_state: str = Field(default="complete", alias="dataQualityState")
@@ -102,6 +110,28 @@ class VenueFillSnapshot(BaseModel):
     data_quality_state: str = Field(default="complete", alias="dataQualityState")
 
 
+class VenueOrderHistoryPage(BaseModel):
+    source: str
+    account_id: str = Field(alias="accountId")
+    items: list[VenueOrderSnapshot]
+    next_cursor: str | None = Field(default=None, alias="nextCursor")
+    start_time: datetime = Field(alias="startTime")
+    end_time: datetime = Field(alias="endTime")
+    as_of: datetime = Field(default_factory=lambda: datetime.now(UTC), alias="asOf")
+    data_quality_state: str = Field(default="complete", alias="dataQualityState")
+
+
+class VenueFillHistoryPage(BaseModel):
+    source: str
+    account_id: str = Field(alias="accountId")
+    items: list[VenueFillSnapshot]
+    next_cursor: str | None = Field(default=None, alias="nextCursor")
+    start_time: datetime = Field(alias="startTime")
+    end_time: datetime = Field(alias="endTime")
+    as_of: datetime = Field(default_factory=lambda: datetime.now(UTC), alias="asOf")
+    data_quality_state: str = Field(default="complete", alias="dataQualityState")
+
+
 class VenuePositionSnapshot(BaseModel):
     source: str
     external_position_id: str = Field(alias="externalPositionId")
@@ -110,8 +140,29 @@ class VenuePositionSnapshot(BaseModel):
     symbol: str
     net_quantity: Decimal = Field(alias="netQuantity")
     average_price: Decimal | None = Field(default=None, alias="averagePrice")
+    current_price: Decimal | None = Field(default=None, alias="currentPrice")
+    mark_price: Decimal | None = Field(default=None, alias="markPrice")
+    break_even_price: Decimal | None = Field(default=None, alias="breakEvenPrice")
+    liquidation_price: Decimal | None = Field(default=None, alias="liquidationPrice")
+    liquidation_price_source: str = Field(
+        default="unavailable", alias="liquidationPriceSource"
+    )
+    position_value: Decimal | None = Field(default=None, alias="positionValue")
+    leverage: Decimal | None = None
+    initial_margin: Decimal | None = Field(default=None, alias="initialMargin")
+    maintenance_margin: Decimal | None = Field(default=None, alias="maintenanceMargin")
+    unrealized_pnl: Decimal | None = Field(default=None, alias="unrealizedPnl")
+    realized_pnl: Decimal | None = Field(default=None, alias="realizedPnl")
+    stop_loss_price: Decimal | None = Field(default=None, alias="stopLossPrice")
+    take_profit_price: Decimal | None = Field(default=None, alias="takeProfitPrice")
+    swap: Decimal | None = None
+    position_status: str | None = Field(default=None, alias="positionStatus")
+    risk_limit_value: Decimal | None = Field(default=None, alias="riskLimitValue")
+    reduce_only_restricted: bool | None = Field(default=None, alias="reduceOnlyRestricted")
+    auto_add_margin: bool | None = Field(default=None, alias="autoAddMargin")
     currency: str
     as_of: datetime = Field(alias="asOf")
+    field_availability: dict[str, str] = Field(default_factory=dict, alias="fieldAvailability")
     data_quality_state: str = Field(default="complete", alias="dataQualityState")
 
 
@@ -123,6 +174,32 @@ class VenueBalanceSnapshot(BaseModel):
     available_balance: Decimal = Field(alias="availableBalance")
     currency: str
     as_of: datetime = Field(alias="asOf")
+    data_quality_state: str = Field(default="complete", alias="dataQualityState")
+
+
+class VenueAccountRiskSnapshot(BaseModel):
+    source: str
+    account_id: str = Field(alias="accountId")
+    currency: str
+    equity: Decimal | None = None
+    wallet_balance: Decimal | None = Field(default=None, alias="walletBalance")
+    margin_balance: Decimal | None = Field(default=None, alias="marginBalance")
+    available_balance: Decimal | None = Field(default=None, alias="availableBalance")
+    initial_margin: Decimal | None = Field(default=None, alias="initialMargin")
+    maintenance_margin: Decimal | None = Field(default=None, alias="maintenanceMargin")
+    unrealized_pnl: Decimal | None = Field(default=None, alias="unrealizedPnl")
+    account_im_rate: Decimal | None = Field(default=None, alias="accountImRate")
+    account_mm_rate: Decimal | None = Field(default=None, alias="accountMmRate")
+    margin_level: Decimal | None = Field(default=None, alias="marginLevel")
+    margin_call_level: Decimal | None = Field(default=None, alias="marginCallLevel")
+    stop_out_level: Decimal | None = Field(default=None, alias="stopOutLevel")
+    margin_threshold_mode: str | None = Field(default=None, alias="marginThresholdMode")
+    leverage: Decimal | None = None
+    margin_mode: str | None = Field(default=None, alias="marginMode")
+    trade_allowed: bool | None = Field(default=None, alias="tradeAllowed")
+    expert_trading_allowed: bool | None = Field(default=None, alias="expertTradingAllowed")
+    field_availability: dict[str, str] = Field(default_factory=dict, alias="fieldAvailability")
+    as_of: datetime = Field(default_factory=lambda: datetime.now(UTC), alias="asOf")
     data_quality_state: str = Field(default="complete", alias="dataQualityState")
 
 
