@@ -3,7 +3,7 @@
 Last updated: 2026-07-26  
 Stable branch: `main`  
 Product release: `0.8.0`  
-Latest completed engineering scope: Issue #98 / PR #99  
+Latest completed engineering scope: Issue #107 / PR #108  
 Latest completed documentation scope: Issue #100 / PR #101  
 Latest product release scope: Issue #102 / PR #104
 
@@ -23,6 +23,7 @@ The release records engineering completion through live account observability. I
 - SQLite remains the approved persistence technology for the current stage.
 - Major authority boundaries are canonical in `docs/architecture/OWNERSHIP.md`.
 - Runtime/Platform APIs are documented in `docs/technical/API_SPEC.md`.
+- Synthetic cross-spread action/execution/trigger semantics and phased Limit roadmap are canonical in `docs/technical/CROSS_SPREAD_SYNTHETIC_EXECUTION.md`.
 - Live Venue and account observability semantics are canonical in `docs/technical/LIVE_ACCOUNT_OBSERVABILITY.md`.
 - Small-capital operational acceptance is canonical in `docs/operations/V6-小资金实盘验收手册.md`.
 
@@ -48,6 +49,10 @@ The 1 oz, one-lifecycle, Market-only and disabled-monitor values are temporary a
 - ACK does not equal Fill.
 - `result_unknown` never authorizes blind retry, rollback or a second business intent.
 - Platform Order, Bybit Order/Execution and MT5 Order/Deal/Position identities remain distinct and traceable.
+- Synthetic business action, execution type and trigger reason are separate concepts.
+- Business actions are `OPEN_LONG_SPREAD`, `CLOSE_LONG_SPREAD`, `OPEN_SHORT_SPREAD` and `CLOSE_SHORT_SPREAD`.
+- Execution types are `MARKET` and `LIMIT`; TP/SL are trigger reasons that submit ordinary close actions.
+- A Limit request never silently falls through to Market.
 - Bybit market execution is terminal-fill confirmed before MT5 hedge submission.
 - MT5 hedge quantity derives from actual Bybit fill and current MT5 contract size/minimum/step.
 - Bybit Close uses `reduceOnly=true` and the matching live `positionIdx`.
@@ -111,28 +116,41 @@ Completed scopes include:
 8. market-only cross-spread lifecycle, reduce-only/ticket-bound close and executable-spread TP/SL;
 9. route-independent Order/Fill reads, current Venue specification checks, temporary 1 oz/single-lifecycle controls, external position verification and definitive-failure-safe Bybit rollback;
 10. bounded Order/Fill history, rich Order diagnostics, Bybit liquidation evidence, MT5 Margin Call/Stop Out evidence, section-aware two-Venue aggregation and a read-only acceptance dashboard;
-11. coherent Platform `0.8.0` release declarations and release documentation.
+11. coherent Platform `0.8.0` release declarations and release documentation;
+12. normalized cross-spread synthetic action/execution/trigger intent with unchanged Market execution and explicit Limit fail-closed behavior.
 
 Detailed implementation history belongs in merged Issues, PRs and task packets rather than this file.
 
-## Next operational work
+## Next engineering work before local live acceptance
 
-Issue #39 remains the controlled Windows-host real-environment acceptance workstream. The next phase must validate:
+The transaction page still needs the remaining bounded batches from `CROSS_SPREAD_SYNTHETIC_EXECUTION.md`:
+
+1. FOK spread-limit execution for all four actions using the two executable Bid/Ask directions;
+2. manual close and TP/SL selecting Market or Limit through the same Close Action;
+3. Bybit private Order/Execution WebSocket plus PostOnly chase, amend/cancel race handling and partial-fill repair;
+4. quote-age, bid/ask-width, MT5 deviation, unhedged-duration, realized-spread and fee-quality protections/analytics;
+5. final transaction-page consolidation so action, execution method, trigger, external identities and execution quality are visible in one workflow.
+
+Each batch must remain independently testable. Existing Market semantics are not redesigned by later Limit work.
+
+## Operational work after the core execution batches
+
+Issue #39 remains the controlled Windows-host real-environment acceptance workstream. After the core execution batches are code-complete, it must validate:
 
 1. real Bybit and MT5 credentials, permissions, account IDs and symbol mappings;
 2. current and historical Order/Fill/Deal reads against native Venue interfaces;
 3. real Bybit liquidation fields and MT5 Margin Call/Stop Out fields;
 4. Runtime and Terminal restart, Route Store loss, timeout and network interruption behavior;
-5. repeated supervised 1 oz Open/Close cycles in both directions;
-6. external Position verification, rollback/manual takeover and Kill Switch behavior;
-7. Funding, Swap, fee and end-of-day reconciliation without unexplained Differences.
+5. repeated supervised 1 oz Market Open/Close cycles in both directions;
+6. supervised 1 oz FOK Limit cycles before any PostOnly chase test;
+7. external Position verification, rollback/manual takeover and Kill Switch behavior;
+8. Funding, Swap, fee and end-of-day reconciliation without unexplained Differences.
 
-The Windows-host phase is expected to require environment-specific configuration and bounded defect correction, not redesign of the history, risk or observability contracts.
+The Windows-host phase is expected to require environment-specific configuration and bounded defect correction, not redesign of the synthetic action model, history, risk or observability contracts.
 
 ## Separately bounded future work
 
-- Private Bybit order/execution WebSocket after operational evidence.
-- Real spread-limit entry/exit and limit TP/SL as a separate execution-engine scope.
+- Real IOC partial-fill execution after minimum-unit evidence.
 - Retained large execution-component refactor only after the bounded panels are operationally accepted.
 - Temporary restriction review only after Issue #39 contains mature repeated evidence.
 - Repository branch-protection/ruleset verification by an administrator.

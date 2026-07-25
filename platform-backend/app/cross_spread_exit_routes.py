@@ -16,7 +16,7 @@ from app.cross_spread_exit_schemas import (
     CrossSpreadMarketOpenRequest,
     CrossSpreadOpenResult,
 )
-from app.cross_spread_exit_service import (
+from app.cross_spread_synthetic_service import (
     close_cross_spread_market,
     evaluate_cross_spread_exit_plans,
     open_cross_spread_market,

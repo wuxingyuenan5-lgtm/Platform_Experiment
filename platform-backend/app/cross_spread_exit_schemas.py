@@ -6,9 +6,14 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, model_validator
 
+from app.cross_spread_order_intent import (
+    SpreadDirection,
+    SyntheticAction,
+    SyntheticExecutionType,
+    SyntheticTriggerReason,
+)
 from app.execution_schemas import ExecutionBatchResponse
 
-SpreadDirection = Literal["LONG_SPREAD", "SHORT_SPREAD"]
 ExecutionMode = Literal["market", "limit"]
 ExitPlanStatus = Literal[
     "active",
@@ -44,6 +49,14 @@ class CrossSpreadMarketCloseRequest(BaseModel):
     execution_mode: ExecutionMode = Field(default="market", alias="executionMode")
 
 
+class CrossSpreadOrderIntentResponse(BaseModel):
+    action: SyntheticAction
+    execution_type: SyntheticExecutionType = Field(alias="executionType")
+    trigger_reason: SyntheticTriggerReason = Field(alias="triggerReason")
+    direction: SpreadDirection
+    is_open: bool = Field(alias="isOpen")
+
+
 class CrossSpreadExitPlanResponse(BaseModel):
     plan_id: str = Field(alias="planId")
     strategy_instance_id: str = Field(alias="strategyInstanceId")
@@ -66,11 +79,19 @@ class CrossSpreadExitPlanResponse(BaseModel):
 
 class CrossSpreadOpenResult(BaseModel):
     execution_batch: ExecutionBatchResponse = Field(alias="executionBatch")
+    order_intent: CrossSpreadOrderIntentResponse | None = Field(
+        default=None,
+        alias="orderIntent",
+    )
     exit_plan: CrossSpreadExitPlanResponse | None = Field(default=None, alias="exitPlan")
 
 
 class CrossSpreadCloseResult(BaseModel):
     execution_batch: ExecutionBatchResponse = Field(alias="executionBatch")
+    order_intent: CrossSpreadOrderIntentResponse | None = Field(
+        default=None,
+        alias="orderIntent",
+    )
     exit_plan: CrossSpreadExitPlanResponse = Field(alias="exitPlan")
 
 

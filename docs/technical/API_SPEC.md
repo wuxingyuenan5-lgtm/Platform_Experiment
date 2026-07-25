@@ -228,6 +228,41 @@ GET /api/v1/trading/cross-spread/observability?historyHours=24&limit=20
 
 完整字段和数据质量语义见 `LIVE_ACCOUNT_OBSERVABILITY.md`。
 
+### 11.1 Cross-spread synthetic lifecycle
+
+```http
+POST /api/v1/trading/cross-spread/lifecycle/open
+POST /api/v1/trading/cross-spread/exit-plans/{planId}/close
+GET  /api/v1/trading/cross-spread/exit-plans
+POST /api/v1/trading/cross-spread/exit-plans/evaluate
+```
+
+现有 Market 请求字段保持兼容。Open 仍提交 `direction / quantityOz / takeProfitSpread / stopLossSpread / executionMode`；Close 仍提交 `executionMode`。
+
+Open 和 Close 响应附加：
+
+```json
+{
+  "orderIntent": {
+    "action": "OPEN_LONG_SPREAD",
+    "executionType": "MARKET",
+    "triggerReason": "MANUAL",
+    "direction": "LONG_SPREAD",
+    "isOpen": true
+  }
+}
+```
+
+权威语义：
+
+- `action` 只表示开多、平多、开空或平空。
+- `executionType` 只表示 `MARKET` 或 `LIMIT`。
+- `triggerReason` 表示人工、策略、止盈、止损、Kill Switch 或风险降低来源。
+- TP/SL 不是独立订单类型，而是触发普通 Close Action。
+- 当前 Market 映射仍为 `OPEN_LONG / CLOSE_LONG / OPEN_SHORT / CLOSE_SHORT`。
+- 当前 `LIMIT` 在任何 Market 副作用前返回 422，不允许静默回退。
+- 详细分批计划和两类可成交价差方向见 `CROSS_SPREAD_SYNTHETIC_EXECUTION.md`。
+
 ## 12. Runtime Command
 
 ```http
