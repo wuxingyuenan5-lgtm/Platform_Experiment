@@ -30,10 +30,11 @@ Real-account acceptance remains controlled-host, small-capital and minimum-size.
 - Platform Backend does not import venue SDKs; external execution remains inside `execution-runtime/`.
 - `platform-backend/app/main.py` is a composition root only.
 - `platform-backend/app/trade_command_execution.py` is the single local Order creation, Safety and Runtime submission owner; `trading.submit_order` remains a deprecated legacy compatibility delegate.
-- Venue Reconciliation public DTOs and difference status types are owned only by `venue_reconciliation_schemas.py`; the legacy module re-exports identical objects.
+- Venue Reconciliation public DTOs and difference status types are owned only by `venue_reconciliation_schemas.py`; the facade re-exports identical objects.
 - Venue Reconciliation external-status mapping and Order/Position/Balance difference decisions are owned only by the pure `venue_reconciliation_policy.py` module.
 - Venue Reconciliation DDL, direct SQL, row mapping and protected persistence transactions are owned only by `venue_reconciliation_repository.py`.
-- Venue Reconciliation configured Runtime GET transport is owned only by `venue_reconciliation_runtime_client.py`; FastAPI error mapping remains in orchestration.
+- Venue Reconciliation configured Runtime GET transport is owned only by `venue_reconciliation_runtime_client.py`.
+- Venue Reconciliation use-case sequencing and explicit domain failures are owned only by `venue_reconciliation_service.py`; `venue_reconciliation.py` retains compatibility delegates, exact HTTP mapping and routes.
 - Operational `positions` and `pnl_results` remain separate from FinancialFact-based formal accounting.
 - Formal accounting is reconstructed from immutable facts and does not read operational projections as inputs.
 - Operational and formal projections share the exact `position_math.calculate_position_update` callable for per-fill quantity, average price and realized PnL.
@@ -78,7 +79,7 @@ Real-account acceptance remains controlled-host, small-capital and minimum-size.
 
 ## Active work
 
-No engineering code workstream is active by default after PR #72 merges.
+Issue #73 / Draft PR #74 is the only active engineering workstream: Venue Reconciliation Service extraction.
 
 Before starting another code change:
 
