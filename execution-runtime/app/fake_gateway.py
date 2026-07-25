@@ -1,5 +1,6 @@
 from datetime import UTC, datetime
 from decimal import Decimal
+from typing import Literal
 
 from app.config import get_settings
 from app.journal import connection
@@ -9,10 +10,13 @@ from app.models import (
     GatewayAdapterCapability,
     GatewayCapabilitiesResponse,
     SubmitOrderCommand,
+    VenueAccountRiskSnapshot,
     VenueBalanceSnapshot,
     VenueEconomicEventSnapshot,
+    VenueFillHistoryPage,
     VenueFillSnapshot,
     VenueInstrumentSpecification,
+    VenueOrderHistoryPage,
     VenueOrderSnapshot,
     VenuePositionSnapshot,
 )
@@ -98,6 +102,35 @@ class FakeGateway:
             ).fetchall()
         return [order_from_row(row) for row in rows]
 
+    def query_order_history(
+        self,
+        *,
+        account_id: str,
+        symbol: str | None,
+        start_time: datetime,
+        end_time: datetime,
+        cursor: str | None,
+        limit: int,
+        scope: Literal["active", "closed"],
+    ) -> VenueOrderHistoryPage:
+        items = [
+            item
+            for item in self.list_orders(account_id=account_id, symbol=symbol, limit=100)
+            if start_time <= item.as_of <= end_time
+        ]
+        offset = _cursor_offset(cursor)
+        page_size = max(1, min(limit, 100))
+        page_items = items[offset : offset + page_size]
+        next_offset = offset + len(page_items)
+        return VenueOrderHistoryPage(
+            source=self.name,
+            accountId=account_id,
+            items=page_items,
+            nextCursor=str(next_offset) if next_offset < len(items) else None,
+            startTime=start_time,
+            endTime=end_time,
+        )
+
     def list_fills(
         self,
         *,
@@ -111,11 +144,65 @@ class FakeGateway:
             platform_order_id=platform_order_id,
         )
 
+    def query_fill_history(
+        self,
+        *,
+        account_id: str,
+        symbol: str | None,
+        start_time: datetime,
+        end_time: datetime,
+        cursor: str | None,
+        limit: int,
+    ) -> VenueFillHistoryPage:
+        items = [
+            item
+            for item in self.list_fills(account_id=account_id)
+            if start_time <= item.occurred_at <= end_time
+            and (symbol is None or item.symbol == symbol.upper())
+        ]
+        items.sort(key=lambda item: item.occurred_at, reverse=True)
+        offset = _cursor_offset(cursor)
+        page_size = max(1, min(limit, 100))
+        page_items = items[offset : offset + page_size]
+        next_offset = offset + len(page_items)
+        return VenueFillHistoryPage(
+            source=self.name,
+            accountId=account_id,
+            items=page_items,
+            nextCursor=str(next_offset) if next_offset < len(items) else None,
+            startTime=start_time,
+            endTime=end_time,
+        )
+
     def list_positions(self, account_id: str | None = None) -> list[VenuePositionSnapshot]:
         return list_positions(account_id)
 
     def list_balances(self, account_id: str | None = None) -> list[VenueBalanceSnapshot]:
         return list_balances(account_id)
+
+    def get_account_risk(self, account_id: str) -> VenueAccountRiskSnapshot:
+        balances = self.list_balances(account_id)
+        balance = balances[0] if balances else None
+        return VenueAccountRiskSnapshot(
+            source=self.name,
+            accountId=account_id,
+            currency=balance.currency if balance else "USD",
+            equity=balance.equity if balance else Decimal("0"),
+            walletBalance=balance.equity if balance else Decimal("0"),
+            marginBalance=balance.equity if balance else Decimal("0"),
+            availableBalance=(balance.available_balance if balance else Decimal("0")),
+            initialMargin=Decimal("0"),
+            maintenanceMargin=Decimal("0"),
+            unrealizedPnl=Decimal("0"),
+            marginLevel=None,
+            marginCallLevel=None,
+            stopOutLevel=None,
+            marginMode="simulation",
+            tradeAllowed=False,
+            expertTradingAllowed=False,
+            fieldAvailability={"simulation": "deterministic"},
+            asOf=datetime.now(UTC),
+        )
 
     def get_instrument_specification(
         self,
@@ -178,9 +265,12 @@ class FakeGateway:
                         "cancel_order",
                         "order_query",
                         "order_list",
+                        "paged_order_history",
                         "fill_query",
+                        "paged_fill_history",
                         "position_query",
                         "balance_query",
+                        "account_risk_query",
                         "instrument_specification_query",
                     ],
                     missingRequirements=[],
@@ -188,3 +278,9 @@ class FakeGateway:
                 )
             ],
         )
+
+
+def _cursor_offset(cursor: str | None) -> int:
+    if not cursor:
+        return 0
+    return max(0, int(cursor))
