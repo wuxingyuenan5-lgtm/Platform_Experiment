@@ -2,8 +2,8 @@
 
 Issue: #102
 Status: in_progress
-Branch: `chore/issue-102-release-0.8.0`
-PR: #103
+Branch: `chore/issue-102-release-0-8-0`
+PR: pending
 Base commit: `489427c03ac4b0dca43b2d81c696a7b903b8d133`
 
 ## Objective
