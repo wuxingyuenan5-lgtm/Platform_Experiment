@@ -184,22 +184,49 @@ PUT /api/v1/strategies/instances/{strategyInstanceId}/execution-risk-policy
 
 Scope：global、strategy、account。修改需要 risk_officer/admin，Body Actor 必须匹配 Principal。
 
-## 11. Runtime Capability 与 Query
+## 11. Runtime Capability、History 与 Account Risk
 
 ```http
 GET /gateway/capabilities
 GET /gateway/connectivity
 GET /gateway/venue-readiness
+GET /venue/orders
+GET /venue/order-history
 GET /venue/orders/by-platform/{platformOrderId}
 GET /venue/orders/{externalOrderId}
 GET /venue/fills
+GET /venue/fill-history
 GET /venue/positions
 GET /venue/balances
+GET /venue/account-risk
+GET /venue/instruments/{symbol}
 GET /venue/economic-events
 POST /venue/orders/{externalOrderId}/cancel
 ```
 
-Capability 和 Inspection 不返回凭证内容。Query 失败不得解释为空仓或零余额。Query API 不得隐式执行订单。
+History Query：
+
+```http
+GET /venue/order-history?accountId=...&symbol=...&startTime=...&endTime=...&limit=50&scope=closed&cursor=...
+GET /venue/fill-history?accountId=...&symbol=...&startTime=...&endTime=...&limit=50&cursor=...
+```
+
+- 单次历史窗口不超过七天。
+- 单页不超过 100 条。
+- Bybit 使用交易所 `nextPageCursor`。
+- MT5 在固定窗口内使用确定性整数偏移续页。
+- Query 失败不得解释为空仓、零余额或“没有历史”。
+- Query API 不得隐式执行订单。
+
+Cross-spread 聚合只读接口：
+
+```http
+GET /api/v1/trading/cross-spread/observability?historyHours=24&limit=20
+```
+
+该接口分别读取 Bybit 与 MT5 的 Account Risk、Position、Active Order、Recent Order 和 Recent Fill。每个区块都有独立状态，部分失败返回 `partial`，不伪造零值。
+
+完整字段和数据质量语义见 `LIVE_ACCOUNT_OBSERVABILITY.md`。
 
 ## 12. Runtime Command
 
@@ -225,6 +252,7 @@ Runtime 在 Gateway 副作用前原子抢占 Command，并独立检查：
 - Platform Order ID 确定性派生 orderLinkId。
 - Place ACK 不生成虚假 Fill。
 - Execution ID、Funding ID、Fee ID 作为稳定外部身份。
+- Position 强平价只使用交易所返回的有限 `liqPrice`。
 
 ### MT5
 
@@ -232,6 +260,7 @@ Runtime 在 Gateway 副作用前原子抢占 Command，并独立检查：
 - 下单前 `order_check`，写入使用 `order_send`。
 - Magic、Comment、Order/Deal/Position Ticket 可追溯。
 - Swap、Commission、Fee 来自外部 Deal。
+- Python Position API 不提供权威单仓强平价；风险使用 Account Margin Level、Margin Call 与 Stop Out。
 
 ## 14. Venue Reconciliation
 
