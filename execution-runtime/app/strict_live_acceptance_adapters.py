@@ -2,10 +2,11 @@ from __future__ import annotations
 
 from decimal import Decimal
 
+from app.bybit_acceptance_adapter import BybitAcceptanceAdapter
 from app.bybit_fill_confirming_adapter import BybitFillConfirmingAdapter
 from app.gateway_errors import GatewayRequestRejectedError
-from app.live_acceptance_adapters import BybitAcceptanceAdapter, Mt5AcceptanceAdapter
 from app.models import SubmitOrderCommand
+from app.mt5_acceptance_adapter import Mt5AcceptanceAdapter
 from app.mt5_position_closing_adapter import Mt5PositionClosingAdapter
 
 
@@ -35,7 +36,9 @@ class StrictBybitAcceptanceAdapter(BybitAcceptanceAdapter):
         if checks.get("readOnly") is True:
             raise GatewayRequestRejectedError("Bybit API key is read-only")
         if checks.get("ipBound") is not True:
-            raise GatewayRequestRejectedError("Bybit API key is not bound to a fixed IP")
+            raise GatewayRequestRejectedError(
+                "Bybit API key is not bound to a fixed IP"
+            )
         if checks.get("orderPermission") is not True:
             raise GatewayRequestRejectedError("Bybit API key lacks Order permission")
         if checks.get("positionPermission") is not True:
@@ -72,7 +75,9 @@ class StrictMt5AcceptanceAdapter(Mt5AcceptanceAdapter):
             )
         checks = specification.access_checks
         if checks.get("accountLoginMatched") is not True:
-            raise GatewayRequestRejectedError("MT5 connected login does not match configuration")
+            raise GatewayRequestRejectedError(
+                "MT5 connected login does not match configuration"
+            )
         if checks.get("accountTradeAllowed") is not True:
             raise GatewayRequestRejectedError("MT5 account does not allow trading")
         if checks.get("terminalTradeAllowed") is not True:
@@ -91,11 +96,19 @@ def _validate_step(
     label: str,
 ) -> None:
     if minimum <= 0 or step <= 0:
-        raise GatewayRequestRejectedError(f"{label} quantity specification is invalid")
+        raise GatewayRequestRejectedError(
+            f"{label} quantity specification is invalid"
+        )
     if quantity < minimum:
-        raise GatewayRequestRejectedError(f"{label} quantity is below the venue minimum")
+        raise GatewayRequestRejectedError(
+            f"{label} quantity is below the venue minimum"
+        )
     if maximum is not None and maximum > 0 and quantity > maximum:
-        raise GatewayRequestRejectedError(f"{label} quantity exceeds the venue maximum")
+        raise GatewayRequestRejectedError(
+            f"{label} quantity exceeds the venue maximum"
+        )
     steps = (quantity - minimum) / step
     if steps != steps.to_integral_value():
-        raise GatewayRequestRejectedError(f"{label} quantity does not match the venue step")
+        raise GatewayRequestRejectedError(
+            f"{label} quantity does not match the venue step"
+        )
