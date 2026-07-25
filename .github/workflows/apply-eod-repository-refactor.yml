@@ -1,0 +1,40 @@
+name: Apply EOD Repository Refactor
+
+on:
+  push:
+    branches:
+      - refactor/issue-77-eod-reconciliation-repository
+    paths:
+      - scripts/apply_eod_repository_refactor.py
+      - .github/workflows/apply-eod-repository-refactor.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: refactor/issue-77-eod-reconciliation-repository
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Apply bounded ownership updates
+        run: python scripts/apply_eod_repository_refactor.py
+      - name: Validate patch
+        run: git diff --check
+      - name: Commit generated updates
+        shell: bash
+        run: |
+          if git diff --quiet; then
+            echo "No generated updates required."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add scripts/check-repository-structure.py scripts/check-documentation-consistency.py
+          git commit -m "Register EOD repository in machine ownership checks"
+          git push origin HEAD:refactor/issue-77-eod-reconciliation-repository
