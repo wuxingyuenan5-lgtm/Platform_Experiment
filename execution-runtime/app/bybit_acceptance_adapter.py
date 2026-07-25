@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from decimal import Decimal
+from typing import Literal
 
 from app.bybit_fill_confirming_adapter import BybitFillConfirmingAdapter
 from app.gateway_errors import (
@@ -12,8 +13,11 @@ from app.gateway_errors import (
 from app.live_route_store import get_order_route
 from app.models import (
     GatewayAdapterCapability,
+    VenueAccountRiskSnapshot,
+    VenueFillHistoryPage,
     VenueFillSnapshot,
     VenueInstrumentSpecification,
+    VenueOrderHistoryPage,
     VenueOrderSnapshot,
 )
 
@@ -24,7 +28,14 @@ class BybitAcceptanceAdapter(BybitFillConfirmingAdapter):
     def capability(self) -> GatewayAdapterCapability:
         capability = super().capability()
         capability.capabilities.extend(
-            ["order_list", "instrument_specification_query", "api_key_readiness_query"]
+            [
+                "order_list",
+                "paged_order_history",
+                "paged_fill_history",
+                "account_risk_query",
+                "instrument_specification_query",
+                "api_key_readiness_query",
+            ]
         )
         capability.capabilities = sorted(set(capability.capabilities))
         return capability
@@ -98,6 +109,56 @@ class BybitAcceptanceAdapter(BybitFillConfirmingAdapter):
         snapshots.sort(key=lambda item: item.as_of, reverse=True)
         return snapshots[:bounded_limit]
 
+    def query_order_history(
+        self,
+        *,
+        account_id: str,
+        symbol: str | None,
+        start_time: datetime,
+        end_time: datetime,
+        cursor: str | None,
+        limit: int,
+        scope: Literal["active", "closed"],
+    ) -> VenueOrderHistoryPage:
+        self._assert_account(account_id)
+        bounded_limit = max(1, min(limit, 50))
+        query: dict[str, object] = {
+            "category": self.settings.bybit_category,
+            "limit": bounded_limit,
+        }
+        if symbol:
+            query["symbol"] = symbol.upper()
+        if cursor:
+            query["cursor"] = cursor
+        try:
+            if scope == "active":
+                response = self._client().get_open_orders(openOnly=0, **query)
+                quality = "complete"
+            else:
+                query["startTime"] = int(start_time.timestamp() * 1000)
+                query["endTime"] = int(end_time.timestamp() * 1000)
+                response = self._client().get_order_history(**query)
+                quality = "venue_windowed"
+            self._require_success(response, "Bybit paged order query failed")
+        except GatewayRequestRejectedError:
+            raise
+        except Exception as exc:
+            raise GatewayResultUnknownError("Bybit paged order result is unknown") from exc
+        items = [
+            snapshot
+            for row in self._result_list(response)
+            if (snapshot := self._snapshot(row, account_id)) is not None
+        ]
+        return VenueOrderHistoryPage(
+            source=self.name,
+            accountId=account_id,
+            items=items,
+            nextCursor=self._next_cursor(response),
+            startTime=start_time,
+            endTime=end_time,
+            dataQualityState=quality,
+        )
+
     def list_fills(
         self,
         *,
@@ -141,6 +202,93 @@ class BybitAcceptanceAdapter(BybitFillConfirmingAdapter):
             if snapshot is not None:
                 snapshots.append(snapshot)
         return snapshots
+
+    def query_fill_history(
+        self,
+        *,
+        account_id: str,
+        symbol: str | None,
+        start_time: datetime,
+        end_time: datetime,
+        cursor: str | None,
+        limit: int,
+    ) -> VenueFillHistoryPage:
+        self._assert_account(account_id)
+        query: dict[str, object] = {
+            "category": self.settings.bybit_category,
+            "limit": max(1, min(limit, 100)),
+            "startTime": int(start_time.timestamp() * 1000),
+            "endTime": int(end_time.timestamp() * 1000),
+        }
+        if symbol:
+            query["symbol"] = symbol.upper()
+        if cursor:
+            query["cursor"] = cursor
+        try:
+            response = self._client().get_executions(**query)
+            self._require_success(response, "Bybit paged execution query failed")
+        except GatewayRequestRejectedError:
+            raise
+        except Exception as exc:
+            raise GatewayResultUnknownError("Bybit paged execution result is unknown") from exc
+        items = [
+            snapshot
+            for row in self._result_list(response)
+            if (snapshot := self._fill_snapshot(row, account_id)) is not None
+        ]
+        return VenueFillHistoryPage(
+            source=self.name,
+            accountId=account_id,
+            items=items,
+            nextCursor=self._next_cursor(response),
+            startTime=start_time,
+            endTime=end_time,
+            dataQualityState="venue_windowed",
+        )
+
+    def get_account_risk(self, account_id: str) -> VenueAccountRiskSnapshot:
+        self._assert_account(account_id)
+        try:
+            response = self._client().get_wallet_balance(accountType="UNIFIED")
+            self._require_success(response, "Bybit account-risk query failed")
+            rows = self._result_list(response)
+            if not rows:
+                raise GatewayConfigurationError("Bybit account-risk query returned no data")
+            account_method = getattr(self._client(), "get_account_info", None)
+            account_response = account_method() if callable(account_method) else {}
+            if account_response:
+                self._require_success(account_response, "Bybit margin-mode query failed")
+        except (GatewayConfigurationError, GatewayRequestRejectedError):
+            raise
+        except Exception as exc:
+            raise GatewayResultUnknownError("Bybit account-risk result is unknown") from exc
+        row = rows[0]
+        account_result = account_response.get("result") if account_response else {}
+        if not isinstance(account_result, dict):
+            account_result = {}
+        return VenueAccountRiskSnapshot(
+            source=self.name,
+            accountId=account_id,
+            currency="USD",
+            equity=self._optional_decimal(row.get("totalEquity")),
+            walletBalance=self._optional_decimal(row.get("totalWalletBalance")),
+            marginBalance=self._optional_decimal(row.get("totalMarginBalance")),
+            availableBalance=self._optional_decimal(row.get("totalAvailableBalance")),
+            initialMargin=self._optional_decimal(row.get("totalInitialMargin")),
+            maintenanceMargin=self._optional_decimal(row.get("totalMaintenanceMargin")),
+            unrealizedPnl=self._optional_decimal(row.get("totalPerpUPL")),
+            accountImRate=self._optional_decimal(row.get("accountIMRate")),
+            accountMmRate=self._optional_decimal(row.get("accountMMRate")),
+            marginMode=str(account_result.get("marginMode") or "UNIFIED"),
+            tradeAllowed=True,
+            expertTradingAllowed=True,
+            fieldAvailability={
+                "marginCallLevel": "not_reported_by_bybit_uta",
+                "stopOutLevel": "not_reported_by_bybit_uta",
+                "liquidationPrice": "reported_per_position_when_finite",
+            },
+            asOf=datetime.now(UTC),
+        )
 
     def get_instrument_specification(
         self,
@@ -250,8 +398,13 @@ class BybitAcceptanceAdapter(BybitFillConfirmingAdapter):
             "Cancelled": "canceled",
             "Canceled": "canceled",
             "Rejected": "rejected",
+            "Deactivated": "canceled",
         }
         external_identity = f"external:{self.name}:{order_id}"
+        quantity = Decimal(str(row.get("qty") or "0"))
+        filled = Decimal(str(row.get("cumExecQty") or "0"))
+        remaining = max(Decimal("0"), quantity - filled)
+        position_index = row.get("positionIdx")
         return VenueOrderSnapshot(
             source=self.name,
             externalOrderId=order_id,
@@ -266,11 +419,18 @@ class BybitAcceptanceAdapter(BybitFillConfirmingAdapter):
             orderType=(
                 "market" if str(row.get("orderType")) == "Market" else "limit"
             ),
-            quantity=Decimal(str(row.get("qty") or "0")),
+            quantity=quantity,
             price=self._optional_decimal(row.get("price")),
             status=status_map.get(str(row.get("orderStatus")), "unknown"),
-            filledQuantity=Decimal(str(row.get("cumExecQty") or "0")),
+            filledQuantity=filled,
+            remainingQuantity=remaining,
             averageFillPrice=self._optional_decimal(row.get("avgPrice")),
+            externalClientId=str(row.get("orderLinkId") or "") or None,
+            reduceOnly=(bool(row.get("reduceOnly")) if "reduceOnly" in row else None),
+            positionIndex=(int(position_index) if position_index is not None else None),
+            timeInForce=str(row.get("timeInForce") or "") or None,
+            rejectReason=str(row.get("rejectReason") or "") or None,
+            cancelReason=str(row.get("cancelType") or "") or None,
             occurredAt=self._millis(row.get("createdTime")),
             asOf=self._millis(row.get("updatedTime")),
             dataQualityState="complete" if route is not None else "external_only",
@@ -317,6 +477,14 @@ class BybitAcceptanceAdapter(BybitFillConfirmingAdapter):
             occurredAt=self._millis(row.get("execTime")),
             dataQualityState="complete" if route is not None else "external_only",
         )
+
+    @staticmethod
+    def _next_cursor(response: dict[str, object]) -> str | None:
+        result = response.get("result") or {}
+        if not isinstance(result, dict):
+            return None
+        cursor = str(result.get("nextPageCursor") or "")
+        return cursor or None
 
     def _assert_no_existing_position(self, symbol: str) -> None:
         maximum = self.settings.live_acceptance_max_positions_per_symbol
