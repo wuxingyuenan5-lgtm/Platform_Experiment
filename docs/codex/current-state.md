@@ -3,11 +3,10 @@
 Last updated: 2026-07-25  
 Stable branch: `main`  
 Product release: `0.7.0`  
-Latest completed engineering scope: Issue #96 / PR #97  
-Latest completed documentation scope: Issue #96 / PR #97  
-Active engineering scope: Issue #98 / PR #99
+Latest completed engineering scope: Issue #98 / PR #99  
+Latest completed documentation scope: Issue #100 / PR #101
 
-This file is the compact cross-session handoff. It records current operating truth, not a PR diary. Read the actual open Issues and PRs before assuming a workstream is complete.
+This file is the compact cross-session handoff. It records current operating truth, not a PR diary. Read the actual open Issues and PRs before assuming a workstream is active.
 
 ## Current architecture
 
@@ -95,29 +94,27 @@ Completed scopes include:
 6. responsive-layout architecture and homepage-first remediation;
 7. Bybit terminal-fill-confirmed market execution with actual-fill MT5 hedge sizing;
 8. market-only cross-spread lifecycle, reduce-only/ticket-bound close and executable-spread TP/SL;
-9. route-independent Order/Fill reads, current Venue specification checks, temporary 1 oz/single-lifecycle controls, external position verification and definitive-failure-safe Bybit rollback.
+9. route-independent Order/Fill reads, current Venue specification checks, temporary 1 oz/single-lifecycle controls, external position verification and definitive-failure-safe Bybit rollback;
+10. bounded Order/Fill history, rich Order diagnostics, Bybit liquidation evidence, MT5 Margin Call/Stop Out evidence, section-aware two-Venue aggregation and a read-only acceptance dashboard.
 
-Detailed history belongs in merged Issues, PRs and task packets rather than this file.
+Detailed implementation history belongs in merged Issues, PRs and task packets rather than this file.
 
-## Active work
+## Next operational work
 
-Issue #98 / PR #99 completes read-only live account observability before local real-money acceptance:
+Issue #39 remains the controlled Windows-host real-environment acceptance workstream. The next phase must validate:
 
-1. bounded and pageable current/historical Order and Fill/Deal reads;
-2. richer Order diagnostics and external-only identity semantics;
-3. Bybit position liquidation/margin/risk fields from Venue evidence;
-4. MT5 Account Margin Call/Stop Out evidence without fabricated position liquidation prices;
-5. a Platform two-venue aggregate with independent section failure states;
-6. a read-only frontend acceptance panel;
-7. synchronized API, ownership, operations and acceptance documentation.
+1. real Bybit and MT5 credentials, permissions, account IDs and symbol mappings;
+2. current and historical Order/Fill/Deal reads against native Venue interfaces;
+3. real Bybit liquidation fields and MT5 Margin Call/Stop Out fields;
+4. Runtime and Terminal restart, Route Store loss, timeout and network interruption behavior;
+5. repeated supervised 1 oz Open/Close cycles in both directions;
+6. external Position verification, rollback/manual takeover and Kill Switch behavior;
+7. Funding, Swap, fee and end-of-day reconciliation without unexplained Differences.
 
-This scope does not enable Live Write, the automatic exit monitor, limit execution, private WebSocket confirmation or larger acceptance limits.
-
-After Issue #98 merges, Issue #39 remains the operational evidence workstream. The Windows-host phase must validate real credentials, permissions, account/symbol mapping, Terminal behavior, history retention, real risk fields and minimum-size execution. CI does not prove those external facts.
+The Windows-host phase is expected to require environment-specific configuration and bounded defect correction, not redesign of the history, risk or observability contracts.
 
 ## Separately bounded future work
 
-- Issue #39: controlled Windows-host real-environment acceptance.
 - Private Bybit order/execution WebSocket after operational evidence.
 - Real spread-limit entry/exit and limit TP/SL as a separate execution-engine scope.
 - Retained large execution-component refactor only after the bounded panels are operationally accepted.
@@ -130,7 +127,7 @@ After Issue #98 merges, Issue #39 remains the operational evidence workstream. T
 - One market Open currently maps to one MT5 Position Ticket; ambiguous multi-position cases fail closed.
 - The Bybit fill confirmation loop is bounded REST polling, not the final private-WebSocket architecture.
 - The automatic TP/SL monitor is code-complete but disabled until controlled-host enablement and observation.
-- CI proves contracts, mappings, state transitions and safety behavior; it does not prove real Bybit/MT5 permissions, broker execution mode, Terminal stability, liquidity or final field availability.
+- CI proves contracts, mappings, state transitions and safety behavior; it does not prove real Bybit/MT5 permissions, broker execution mode, Terminal stability, liquidity, history retention or final field availability.
 - Inherited frontend debt remains outside untouched modules; changed files may not add debt.
 - Desktop workstation use remains the primary frontend target.
 - Pyright coverage remains progressive rather than whole-repository strict.
