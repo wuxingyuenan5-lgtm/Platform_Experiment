@@ -33,6 +33,7 @@ from app.cross_spread_exit_schemas import (
     CrossSpreadExitPlanResponse,
     CrossSpreadMarketOpenRequest,
     CrossSpreadOpenResult,
+    SpreadDirection,
 )
 from app.execution_batches import get_execution_batch, update_batch_status
 from app.schemas import CrossSpreadMarketCommandRequest
@@ -161,7 +162,8 @@ async def run_cross_spread_exit_monitor() -> None:
         try:
             await asyncio.to_thread(evaluate_cross_spread_exit_plans)
         except Exception:
-            # The next interval may evaluate other active plans, but a claimed plan is never retried.
+            # A later interval may evaluate other active plans. A claimed plan is
+            # never retried because its state no longer matches the atomic claim.
             pass
         await asyncio.sleep(settings.cross_spread_exit_monitor_interval_seconds)
 
@@ -169,7 +171,7 @@ async def run_cross_spread_exit_monitor() -> None:
 def _create_exit_plan_for_open_batch(
     batch_id: str,
     *,
-    direction: str,
+    direction: SpreadDirection,
     take_profit_spread: Decimal,
     stop_loss_spread: Decimal,
 ) -> CrossSpreadExitPlanResponse:
