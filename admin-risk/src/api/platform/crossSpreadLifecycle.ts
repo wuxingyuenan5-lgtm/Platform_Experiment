@@ -4,12 +4,33 @@ import type { ExecutionBatchResult } from './trading.types';
 
 export type CrossSpreadDirection = 'LONG_SPREAD' | 'SHORT_SPREAD';
 export type CrossSpreadExecutionMode = 'market' | 'limit';
+export type CrossSpreadSyntheticAction =
+  | 'OPEN_LONG_SPREAD'
+  | 'CLOSE_LONG_SPREAD'
+  | 'OPEN_SHORT_SPREAD'
+  | 'CLOSE_SHORT_SPREAD';
+export type CrossSpreadSyntheticExecutionType = 'MARKET' | 'LIMIT';
+export type CrossSpreadTriggerReason =
+  | 'MANUAL'
+  | 'STRATEGY'
+  | 'TAKE_PROFIT'
+  | 'STOP_LOSS'
+  | 'KILL_SWITCH'
+  | 'RISK_REDUCTION';
 export type CrossSpreadExitPlanStatus =
   | 'active'
   | 'triggered'
   | 'closing'
   | 'closed'
   | 'manual_intervention';
+
+export interface CrossSpreadOrderIntentResult {
+  action: CrossSpreadSyntheticAction;
+  executionType: CrossSpreadSyntheticExecutionType;
+  triggerReason: CrossSpreadTriggerReason;
+  direction: CrossSpreadDirection;
+  isOpen: boolean;
+}
 
 export interface CrossSpreadExitPlanResult {
   planId: string;
@@ -41,11 +62,13 @@ export interface CrossSpreadMarketOpenInput {
 
 export interface CrossSpreadMarketOpenResult {
   executionBatch: ExecutionBatchResult;
+  orderIntent: CrossSpreadOrderIntentResult;
   exitPlan?: CrossSpreadExitPlanResult | null;
 }
 
 export interface CrossSpreadMarketCloseResult {
   executionBatch: ExecutionBatchResult;
+  orderIntent: CrossSpreadOrderIntentResult;
   exitPlan: CrossSpreadExitPlanResult;
 }
 
