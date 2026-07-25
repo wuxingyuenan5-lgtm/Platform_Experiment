@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from decimal import Decimal
 
 import pytest
 from fastapi import HTTPException
@@ -10,8 +9,12 @@ import app.cross_spread_synthetic_service as synthetic_service
 from app.cross_spread_exit_schemas import (
     CrossSpreadExitPlanResponse,
     CrossSpreadMarketOpenRequest,
+    ExitPlanStatus,
 )
 from app.cross_spread_order_intent import (
+    LegacyMarketAction,
+    SpreadDirection,
+    SyntheticAction,
     build_close_intent,
     build_intent,
     build_open_intent,
@@ -22,7 +25,7 @@ from app.execution_schemas import ExecutionBatchResponse
 NOW = datetime(2026, 7, 25, tzinfo=UTC)
 
 
-def batch_response(batch_id: str, *, direction: str, status: str = "hedged") -> ExecutionBatchResponse:
+def batch_response(batch_id: str, *, direction: str) -> ExecutionBatchResponse:
     return ExecutionBatchResponse(
         batchId=batch_id,
         idempotencyKey=f"key:{batch_id}",
@@ -30,7 +33,7 @@ def batch_response(batch_id: str, *, direction: str, status: str = "hedged") -> 
         accountId="account_crypto_test",
         strategyKey="cross_venue_spread",
         direction=direction,
-        status=status,
+        status="hedged",
         requiresManualIntervention=False,
         failureReason=None,
         legs=[],
@@ -41,9 +44,9 @@ def batch_response(batch_id: str, *, direction: str, status: str = "hedged") -> 
 
 def exit_plan(
     *,
-    direction: str = "LONG_SPREAD",
+    direction: SpreadDirection = "LONG_SPREAD",
     trigger_reason: str | None = None,
-    status: str = "active",
+    status: ExitPlanStatus = "active",
 ) -> CrossSpreadExitPlanResponse:
     return CrossSpreadExitPlanResponse(
         planId="plan-1",
@@ -76,10 +79,10 @@ def exit_plan(
     ],
 )
 def test_all_four_business_actions_map_to_existing_market_commands(
-    action,
-    market_action,
-    direction,
-    is_open,
+    action: SyntheticAction,
+    market_action: LegacyMarketAction,
+    direction: SpreadDirection,
+    is_open: bool,
 ) -> None:
     intent = build_intent(
         action,
@@ -121,7 +124,9 @@ def test_open_action_rejects_exit_only_trigger_reason() -> None:
         )
 
 
-def test_market_open_uses_normalized_intent_without_changing_legacy_action(monkeypatch) -> None:
+def test_market_open_uses_normalized_intent_without_changing_legacy_action(
+    monkeypatch,
+) -> None:
     captured = {}
     plan = exit_plan()
     monkeypatch.setattr(
@@ -139,7 +144,11 @@ def test_market_open_uses_normalized_intent_without_changing_legacy_action(monke
         captured["request"] = request
         return batch_response("open-batch-1", direction=request.action)
 
-    monkeypatch.setattr(synthetic_service, "submit_cross_spread_market_command", fake_submit)
+    monkeypatch.setattr(
+        synthetic_service,
+        "submit_cross_spread_market_command",
+        fake_submit,
+    )
 
     result = synthetic_service.open_cross_spread_market(
         CrossSpreadMarketOpenRequest(
@@ -152,6 +161,7 @@ def test_market_open_uses_normalized_intent_without_changing_legacy_action(monke
     )
 
     assert captured["request"].action == "OPEN_LONG"
+    assert result.order_intent is not None
     assert result.order_intent.action == "OPEN_LONG_SPREAD"
     assert result.order_intent.execution_type == "MARKET"
     assert result.order_intent.trigger_reason == "MANUAL"
@@ -167,8 +177,16 @@ def test_manual_close_and_take_profit_close_share_close_action(monkeypatch) -> N
         submitted.append((request, kwargs))
         return batch_response(f"close-batch-{len(submitted)}", direction=request.action)
 
-    monkeypatch.setattr(synthetic_service, "submit_cross_spread_market_command", fake_submit)
-    monkeypatch.setattr(synthetic_service.market_helpers, "_verify_flat_positions", lambda **_: None)
+    monkeypatch.setattr(
+        synthetic_service,
+        "submit_cross_spread_market_command",
+        fake_submit,
+    )
+    monkeypatch.setattr(
+        synthetic_service.market_helpers,
+        "_verify_flat_positions",
+        lambda **_: None,
+    )
     monkeypatch.setattr(synthetic_service, "mark_plan_closing", lambda *_args: None)
     monkeypatch.setattr(
         synthetic_service,
@@ -179,7 +197,10 @@ def test_manual_close_and_take_profit_close_share_close_action(monkeypatch) -> N
     monkeypatch.setattr(
         synthetic_service,
         "claim_exit_plan",
-        lambda *_args, **_kwargs: exit_plan(trigger_reason="manual", status="triggered"),
+        lambda *_args, **_kwargs: exit_plan(
+            trigger_reason="manual",
+            status="triggered",
+        ),
     )
 
     manual_result = synthetic_service.close_cross_spread_market(
@@ -191,17 +212,25 @@ def test_manual_close_and_take_profit_close_share_close_action(monkeypatch) -> N
         execution_mode="market",
     )
 
-    assert [request.action for request, _kwargs in submitted] == ["CLOSE_LONG", "CLOSE_LONG"]
+    assert [request.action for request, _kwargs in submitted] == [
+        "CLOSE_LONG",
+        "CLOSE_LONG",
+    ]
+    assert manual_result.order_intent is not None
+    assert take_profit_result.order_intent is not None
     assert manual_result.order_intent.trigger_reason == "MANUAL"
     assert take_profit_result.order_intent.trigger_reason == "TAKE_PROFIT"
-    assert all(result.order_intent.action == "CLOSE_LONG_SPREAD" for result in [manual_result, take_profit_result])
+    assert manual_result.order_intent.action == "CLOSE_LONG_SPREAD"
+    assert take_profit_result.order_intent.action == "CLOSE_LONG_SPREAD"
 
 
 def test_limit_intent_fails_closed_before_any_market_submission(monkeypatch) -> None:
     monkeypatch.setattr(
         synthetic_service,
         "submit_cross_spread_market_command",
-        lambda *_args, **_kwargs: pytest.fail("Limit intent must not submit a Market command"),
+        lambda *_args, **_kwargs: pytest.fail(
+            "Limit intent must not submit a Market command"
+        ),
     )
 
     with pytest.raises(HTTPException) as exc_info:
