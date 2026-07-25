@@ -3,7 +3,7 @@
 Last updated: 2026-07-25
 Stable branch: `main`
 Product release: `0.7.0`
-Latest completed engineering scope: Issue #87 / PR #89
+Latest completed engineering scope: Issue #90 / PR #91
 Latest completed documentation scope: Issue #85 / PR #86
 
 This file is the compact cross-session handoff. It records current truth, not a PR diary. Read the actual open Issues and PRs before assuming that work is active.
@@ -39,6 +39,10 @@ Real-account acceptance remains controlled-host, small-capital and minimum-size.
 - `platform-backend/app/trade_command_execution.py` is the single local Order creation, Safety and Runtime submission owner; `trading.submit_order` remains a deprecated legacy compatibility delegate.
 - The Backend deprecated `POST /api/v1/trading/orders` compatibility endpoint remains available until external usage evidence and a dedicated migration support removal.
 - Maintained funding execution uses ExecutionBatch; the unused frontend legacy single-order submit client and submit-state hook path have been removed.
+- Cross-spread trading continues to use the nominal `Bybit Ask - MT5 Bid` and `Bybit Bid - MT5 Ask` formulas; USDT/USD normalization is not part of order triggering.
+- Cross-spread market execution submits Bybit first, requires a terminal confirmed fill and sizes the MT5 hedge from the actual filled quantity; an acknowledgement or unresolved status cannot trigger the hedge.
+- A terminal Bybit partial fill may be hedged only when its confirmed quantity maps exactly to the MT5 contract minimum and step; otherwise the batch fails closed into manual intervention.
+- Direct MT5 market-data access reads raw swap long/short and related symbol metadata through `symbol_info()` when available; the file bridge remains a fallback/diagnostic read path rather than the authoritative execution path.
 - Frontend responsive remediation is page-shell-first: defect baseline → Application Shell → Page Shell/layout primitives → shared components → core pages → visual regression.
 - Application Shell owns top navigation, sidebar, main content sizing, the primary vertical scroll context and global overlay base.
 - Page Shell owns page header, toolbar, summary, main/secondary regions, responsive reflow and fixed-bottom-action content reservation.
@@ -106,10 +110,18 @@ Real-account acceptance remains controlled-host, small-capital and minimum-size.
 34. Platform 0.7.0 product-version consolidation with blocking drift checks and verified frontend dead-code removal.
 35. Canonical responsive-layout, Page Shell and cross-viewport acceptance architecture with an explicit phased remediation sequence.
 36. Homepage-first responsive remediation with deterministic Hero reflow, stable desktop dashboard density and type-aware changed-file lint coverage.
+37. Cross-spread market-order minimum loop with terminal Bybit fill confirmation, actual-fill-proportional MT5 hedge sizing, fail-closed unresolved states and direct MT5 swap reads.
 
 ## Active work
 
-No engineering code workstream is active by default after PR #89 merges.
+No engineering code workstream is active by default after PR #91 merges.
+
+The next cross-spread scopes must remain separately bounded:
+
+1. implement real close semantics with Bybit `reduceOnly`/position mode and MT5 Position Ticket ownership;
+2. replace bounded Bybit fill polling with private WebSocket order/execution confirmation after the minimum loop is operationally accepted;
+3. validate Windows MT5 Terminal supervision, real symbol capabilities and minimum-size Demo execution under the controlled operational-acceptance process;
+4. defer spread-limit execution, automated TP/SL and multi-position HedgeGroup behavior until market open/close semantics are complete.
 
 Remaining responsive work must be evidence-driven rather than a full-platform CSS rewrite:
 
@@ -136,6 +148,9 @@ Separate non-code follow-ups remain:
 - Existing table structures, Seed identifiers, financial formulas and trading state transitions are protected semantics.
 - Operational projections remain supported and must not become formal-accounting inputs.
 - Compatibility surfaces require usage evidence and a dedicated migration before removal.
+- The current Bybit fill-confirmation loop is a bounded synchronous minimum implementation, not the final private-WebSocket architecture.
+- Cross-spread close commands still lack authoritative reduce-only and MT5 Position Ticket semantics and are not accepted as a real close loop.
+- CI proves provider mapping, state transitions and safety behavior; it does not prove real Bybit/MT5 permissions, broker execution modes, Terminal stability or live liquidity.
 - Inherited frontend lint debt remains outside untouched modules; new and changed files cannot add debt.
 - The homepage responsive implementation is linted, type-checked and production-built, but automated multi-viewport screenshots are not yet part of CI.
 - Existing non-homepage pages still contain unverified layout debt across viewport widths, heights and zoom levels.
