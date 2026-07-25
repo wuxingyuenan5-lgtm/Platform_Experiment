@@ -30,6 +30,7 @@ from app.models import (
     VenueBalanceSnapshot,
     VenueEconomicEventSnapshot,
     VenueFillSnapshot,
+    VenueInstrumentSpecification,
     VenueOrderSnapshot,
     VenuePositionSnapshot,
     VenueReadinessResponse,
@@ -183,6 +184,25 @@ def command_events(command_id: str) -> list[RuntimeExecutionEventV1]:
 
 
 @app.get(
+    "/venue/orders",
+    response_model=list[VenueOrderSnapshot],
+    tags=["venue-query"],
+)
+def venue_orders(
+    account_id: str | None = Query(default=None, alias="accountId"),
+    symbol: str | None = None,
+    limit: int = Query(default=50, ge=1, le=100),
+) -> list[VenueOrderSnapshot]:
+    return _query(
+        lambda: gateway.list_orders(
+            account_id=account_id,
+            symbol=symbol,
+            limit=limit,
+        )
+    )
+
+
+@app.get(
     "/venue/orders/by-platform/{platform_order_id}",
     response_model=VenueOrderSnapshot,
     tags=["venue-query"],
@@ -245,6 +265,23 @@ def venue_balances(
     account_id: str | None = Query(default=None, alias="accountId"),
 ) -> list[VenueBalanceSnapshot]:
     return _query(lambda: gateway.list_balances(account_id))
+
+
+@app.get(
+    "/venue/instruments/{symbol}",
+    response_model=VenueInstrumentSpecification,
+    tags=["venue-query"],
+)
+def venue_instrument_specification(
+    symbol: str,
+    account_id: str = Query(alias="accountId"),
+) -> VenueInstrumentSpecification:
+    return _query(
+        lambda: gateway.get_instrument_specification(
+            account_id=account_id,
+            symbol=symbol,
+        )
+    )
 
 
 @app.get(
