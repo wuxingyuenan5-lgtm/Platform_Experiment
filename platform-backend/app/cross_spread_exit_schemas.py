@@ -66,7 +66,7 @@ class CrossSpreadExitPlanResponse(BaseModel):
 
 class CrossSpreadOpenResult(BaseModel):
     execution_batch: ExecutionBatchResponse = Field(alias="executionBatch")
-    exit_plan: CrossSpreadExitPlanResponse = Field(alias="exitPlan")
+    exit_plan: CrossSpreadExitPlanResponse | None = Field(default=None, alias="exitPlan")
 
 
 class CrossSpreadCloseResult(BaseModel):
