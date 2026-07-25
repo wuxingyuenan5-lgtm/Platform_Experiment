@@ -30,7 +30,10 @@ def register_order_execution_intent(
             (idempotency_key,),
         ).fetchone()
         if existing is not None:
-            matches = bool(existing["reduce_only"]) == reduce_only and existing["position_id"] == position_id
+            matches = (
+                bool(existing["reduce_only"]) == reduce_only
+                and existing["position_id"] == position_id
+            )
             if not matches:
                 raise HTTPException(
                     status_code=409,
