@@ -5,7 +5,7 @@ Stable branch: `main`
 Product release: `0.8.0`  
 Latest completed engineering scope: Issue #98 / PR #99  
 Latest completed documentation scope: Issue #100 / PR #101  
-Latest product release scope: Issue #102 / PR #103
+Latest product release scope: Issue #102 / PR #104
 
 This file is the compact cross-session handoff. It records current operating truth, not a PR diary. Read the actual open Issues and PRs before assuming a workstream is active.
 
