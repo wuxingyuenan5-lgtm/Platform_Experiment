@@ -75,8 +75,9 @@ select = ["E", "F", "I", "UP", "B"]
 # Venue Reconciliation facade preserves a legacy compatibility import pending usage migration.
 "app/venue_reconciliation.py" = ["F401"]
 "tests/test_venue_reconciliation.py" = ["E501"]
-# Phase 4D keeps the synchronous EOD orchestration and API contract together for auditability.
-"app/eod_reconciliation.py" = ["B008", "E501"]
+# Phase 4D keeps the synchronous EOD orchestration and API contract together for auditability;
+# the public ReviewDecision import is an explicit compatibility export.
+"app/eod_reconciliation.py" = ["B008", "E501", "F401"]
 "tests/test_eod_reconciliation.py" = ["E501"]
 # Production Gate keeps authentication policy and two-person live-session state explicit.
 "app/auth.py" = ["E501"]
