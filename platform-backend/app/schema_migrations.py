@@ -108,6 +108,27 @@ PLATFORM_MIGRATIONS: tuple[Migration, ...] = (
             """,
         ),
     ),
+    Migration(
+        version=4,
+        name="cross-spread-limit-execution-policies",
+        statements=(
+            """
+            ALTER TABLE order_execution_intents
+            ADD COLUMN execution_policy TEXT NOT NULL DEFAULT 'default'
+            CHECK (execution_policy IN ('default', 'fok', 'post_only_chase'))
+            """,
+            """
+            ALTER TABLE cross_spread_exit_plans
+            ADD COLUMN take_profit_limit_strategy TEXT NOT NULL DEFAULT 'fok'
+            CHECK (take_profit_limit_strategy IN ('fok', 'post_only_chase'))
+            """,
+            """
+            ALTER TABLE cross_spread_exit_plans
+            ADD COLUMN stop_loss_limit_strategy TEXT NOT NULL DEFAULT 'fok'
+            CHECK (stop_loss_limit_strategy IN ('fok', 'post_only_chase'))
+            """,
+        ),
+    ),
 )
 
 
