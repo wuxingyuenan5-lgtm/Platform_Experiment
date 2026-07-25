@@ -43,7 +43,7 @@ from app.cross_spread_order_intent import (
     SyntheticOrderIntent,
     build_close_intent,
     build_open_intent,
-    market_command_action,
+    command_action,
 )
 from app.execution_batches import get_execution_batch
 from app.schemas import CrossSpreadMarketCommandRequest
@@ -58,7 +58,7 @@ def open_cross_spread_market(request: CrossSpreadMarketOpenRequest) -> CrossSpre
     market_helpers._assert_acceptance_open_allowed()
     limit_execution = _prepare_limit_execution(intent, request.limit_spread)
     command_request = CrossSpreadMarketCommandRequest(
-        action=market_command_action(intent),
+        action=command_action(intent),
         quantityOz=request.quantity_oz,
     )
     if intent.execution_type == "MARKET":
@@ -235,7 +235,7 @@ def _close_claimed_plan(
     if intent.execution_type == "LIMIT" and limit_execution is None:
         raise HTTPException(status_code=422, detail="Limit close requires prepared pricing")
     command_request = CrossSpreadMarketCommandRequest(
-        action=market_command_action(intent),
+        action=command_action(intent),
         quantityOz=plan.quantity_oz,
     )
     try:
@@ -326,7 +326,7 @@ def _prepare_limit_execution(
         )
     try:
         pricing = derive_cross_spread_fok_price(
-            market_command_action(intent),
+            command_action(intent),
             limit_spread=limit_spread,
             bybit_bid=snapshot.bybit.quote.bid,
             bybit_ask=snapshot.bybit.quote.ask,
