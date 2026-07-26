@@ -132,7 +132,13 @@ def test_browser_session_profile_devices_and_password_change(
         second_csrf = hydrated.json()["csrfToken"]
         assert second_csrf != first_csrf
         assert hydrated.json()["user"]["role"] == "ceo"
-        assert "*" in hydrated.json()["permissions"]
+        permissions = set(hydrated.json()["permissions"])
+        assert "*" not in permissions
+        assert "profile.read_self" in permissions
+        assert "user.assign_role" in permissions
+        assert "member.holding.update" in permissions
+        assert "trade:submit" not in permissions
+        assert "risk:manage" not in permissions
 
         profile = client.get("/api/v1/me")
         assert profile.status_code == 200
