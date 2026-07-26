@@ -30,8 +30,39 @@ API_KEY_ROLE_PERMISSIONS: dict[str, frozenset[str]] = {
     "admin": frozenset({"*"}),
 }
 
+CEO_PERMISSIONS = frozenset(
+    {
+        "platform:read",
+        "audit:read",
+        "system.read",
+        "system.manage",
+        "risk.read",
+        "trade.read",
+        "user.read",
+        "user.sensitive.read",
+        "user.create",
+        "user.update",
+        "user.disable",
+        "user.reset_password",
+        "user.assign_role",
+        "user.session.revoke",
+        "user.audit.read",
+        "profile.read_self",
+        "profile.update_self",
+        "profile.avatar.update_self",
+        "profile.password.change_self",
+        "session.read_self",
+        "session.revoke_self",
+        "member.read_self",
+        "member.read_all",
+        "member.holding.read_self",
+        "member.holding.read_all",
+        "member.holding.update",
+    }
+)
+
 HUMAN_ROLE_PERMISSIONS: dict[str, frozenset[str]] = {
-    "ceo": frozenset({"*"}),
+    "ceo": CEO_PERMISSIONS,
     "tech_lead": frozenset(
         {
             "platform:read",
