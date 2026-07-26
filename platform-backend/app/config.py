@@ -75,6 +75,10 @@ class Settings(BaseSettings):
     avatar_max_pixels: int = 20_000_000
     avatar_output_size: int = 512
 
+    # Member holdings are a customer-reporting read model, not formal accounting.
+    # A missing available NAV remains unavailable; an older NAV is explicitly stale.
+    fund_nav_stale_after_hours: int = 36
+
     # Platform LiveTradingSession is a separate authorization boundary from the
     # Runtime live-write gate. Zero absolute limits keep all live sessions blocked.
     require_live_trading_session: bool = True
