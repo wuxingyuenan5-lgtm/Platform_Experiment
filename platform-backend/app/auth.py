@@ -13,30 +13,7 @@ from starlette.responses import JSONResponse, Response
 
 from app.config import Settings, get_settings
 from app.database import connection
-
-ROLE_PERMISSIONS: dict[str, set[str]] = {
-    "viewer": {"platform:read"},
-    "researcher": {"platform:read", "strategy:run"},
-    "trader": {"platform:read", "trade:submit", "live_session:request"},
-    "risk_officer": {
-        "platform:read",
-        "audit:read",
-        "risk:manage",
-        "reconciliation:review",
-        "eod:review",
-        "live_session:approve",
-        "live_session:revoke",
-    },
-    "operations": {
-        "platform:read",
-        "audit:read",
-        "operations:run",
-        "reconciliation:review",
-        "eod:run",
-        "live_session:operate",
-    },
-    "admin": {"*"},
-}
+from app.user_permissions import ROLE_PERMISSIONS, are_known_roles, has_permission
 
 PUBLIC_PATHS = {"/health"}
 IDENTITY_FIELDS = {
@@ -53,13 +30,11 @@ class Principal:
     user_id: str
     roles: tuple[str, ...]
     auth_method: str
+    session_id: str | None = None
     credential_id: str | None = None
 
     def has_permission(self, permission: str) -> bool:
-        permissions: set[str] = set()
-        for role in self.roles:
-            permissions.update(ROLE_PERMISSIONS.get(role, set()))
-        return "*" in permissions or permission in permissions
+        return has_permission(self.roles, permission)
 
 
 class AuthenticationError(Exception):
@@ -94,11 +69,8 @@ def load_api_credentials(settings: Settings) -> list[dict[str, object]]:
         if not required.issubset(item):
             raise AuthenticationError(503, "Authentication credential entry is incomplete")
         roles = item["roles"]
-        if not isinstance(roles, list) or not roles:
+        if not isinstance(roles, list) or not are_known_roles(str(role) for role in roles):
             raise AuthenticationError(503, "Authentication credential roles are invalid")
-        unknown_roles = [role for role in roles if role not in ROLE_PERMISSIONS]
-        if unknown_roles:
-            raise AuthenticationError(503, "Authentication credential contains unknown roles")
         token_digest = str(item["tokenSha256"]).lower()
         if len(token_digest) != 64 or any(
             character not in "0123456789abcdef" for character in token_digest
@@ -136,7 +108,7 @@ def authenticate_request(request: Request, settings: Settings) -> Principal:
         return authenticate_bearer(request, settings)
     if mode == "development" and settings.environment.lower() != "live":
         roles = tuple(settings.development_role_list)
-        if not roles or any(role not in ROLE_PERMISSIONS for role in roles):
+        if not are_known_roles(roles):
             raise AuthenticationError(503, "Development identity roles are invalid")
         return Principal(
             user_id=settings.development_user_id,
@@ -329,3 +301,15 @@ def require_principal(request: Request) -> Principal:
     if not isinstance(principal, Principal):
         raise HTTPException(status_code=401, detail="Authenticated principal is unavailable")
     return principal
+
+
+__all__ = [
+    "AuthenticationError",
+    "AuthenticationMiddleware",
+    "Principal",
+    "ROLE_PERMISSIONS",
+    "authenticate_request",
+    "permission_for_request",
+    "require_principal",
+    "token_hash",
+]
