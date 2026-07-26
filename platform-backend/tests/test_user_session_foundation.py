@@ -162,6 +162,13 @@ def test_browser_session_uses_hashes_expiry_and_csrf(
             settings,
             now=now + timedelta(hours=13),
         )
+    with connection() as db:
+        revoked = db.execute(
+            "SELECT revoked_at, revoke_reason FROM user_sessions WHERE id = ?",
+            (issued.session_id,),
+        ).fetchone()
+    assert revoked["revoked_at"] is not None
+    assert revoked["revoke_reason"] == "expired"
 
 
 @pytest.mark.integration
