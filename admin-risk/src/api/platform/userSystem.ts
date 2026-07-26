@@ -3,6 +3,9 @@ import axios, { AxiosError, type AxiosInstance, type AxiosRequestConfig } from '
 export type HumanRole = 'ceo' | 'tech_lead' | 'employee' | 'member';
 export type PublicRegistrationRole = 'employee' | 'member';
 export type UserLifecycleStatus = 'pending' | 'active' | 'disabled' | 'rejected';
+export type ManagedLifecycleStatus = 'active' | 'disabled';
+export type UserSortField = 'username' | 'registered_at' | 'last_login_at' | 'updated_at';
+export type SortDirection = 'asc' | 'desc';
 
 export interface UserSelf {
   userId: string;
@@ -81,6 +84,97 @@ export interface ActionResult {
 export interface AvatarMutationResult {
   avatarKey?: string;
   rowVersion: number;
+}
+
+export interface AdminUserSummary {
+  userId: string;
+  username: string;
+  displayName?: string;
+  realName?: string;
+  avatarKey?: string;
+  phone?: string;
+  email?: string;
+  contactMasked: boolean;
+  role?: HumanRole;
+  requestedRole?: PublicRegistrationRole;
+  department?: string;
+  memberType?: string;
+  status: UserLifecycleStatus;
+  registeredAt: string;
+  lastLoginAt?: string;
+  activeSessionCount: number;
+  rowVersion: number;
+}
+
+export interface AdminUserDetail extends AdminUserSummary {
+  applicationNote?: string;
+  rejectionReason?: string;
+  permissions: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AdminUserPage {
+  items: AdminUserSummary[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+export interface AdminUserListParams {
+  search?: string;
+  role?: HumanRole;
+  status?: UserLifecycleStatus;
+  createdFrom?: string;
+  createdTo?: string;
+  sortBy?: UserSortField;
+  sortDirection?: SortDirection;
+  page?: number;
+  pageSize?: number;
+}
+
+export interface CreateAdminUserPayload {
+  username: string;
+  displayName?: string;
+  realName: string;
+  email?: string;
+  phone?: string;
+  role: HumanRole;
+  department?: string;
+  memberType?: string;
+}
+
+export interface CreateAdminUserResult {
+  user: AdminUserDetail;
+  resetTicket: string;
+  resetTicketExpiresAt: string;
+}
+
+export interface UpdateAdminUserPayload {
+  displayName?: string;
+  realName?: string;
+  email?: string;
+  phone?: string;
+  department?: string;
+  memberType?: string;
+  expectedVersion: number;
+}
+
+export interface PasswordResetTicketResult {
+  resetTicket: string;
+  expiresAt: string;
+  revokedSessionCount: number;
+}
+
+export interface UserAuditEvent {
+  eventId: string;
+  eventType: string;
+  actorUserId?: string;
+  result?: string;
+  authMethod?: string;
+  requestId?: string;
+  details: Record<string, unknown>;
+  createdAt: string;
 }
 
 export interface UserSystemErrorBody {
@@ -190,6 +284,19 @@ export async function reauthenticateUser(password: string): Promise<void> {
   await request<ActionResult>({ method: 'POST', url: '/auth/reauth', data: { password } });
 }
 
+export async function resetPasswordWithTicket(payload: {
+  username: string;
+  resetTicket: string;
+  newPassword: string;
+  newPasswordConfirmation: string;
+}): Promise<ActionResult> {
+  try {
+    return await request({ method: 'POST', url: '/auth/reset-password', data: payload });
+  } finally {
+    clearUserSystemSessionMemory();
+  }
+}
+
 export async function getSelfProfile(): Promise<UserSelf> {
   return request({ method: 'GET', url: '/me' });
 }
@@ -248,7 +355,6 @@ export async function uploadSelfAvatar(
     method: 'POST',
     url: '/me/avatar',
     data: form,
-    headers: { 'Content-Type': 'multipart/form-data' },
   });
 }
 
@@ -262,4 +368,107 @@ export async function deleteSelfAvatar(expectedVersion: number): Promise<AvatarM
 
 export function selfAvatarUrl(avatarKey?: string): string {
   return avatarKey ? '/api/v1/me/avatar' : '/logo.png';
+}
+
+export async function listAdminUsers(params: AdminUserListParams = {}): Promise<AdminUserPage> {
+  return request({ method: 'GET', url: '/users', params });
+}
+
+export async function getAdminUser(userId: string): Promise<AdminUserDetail> {
+  return request({ method: 'GET', url: `/users/${encodeURIComponent(userId)}` });
+}
+
+export async function createAdminUser(
+  payload: CreateAdminUserPayload,
+): Promise<CreateAdminUserResult> {
+  return request({ method: 'POST', url: '/users', data: payload });
+}
+
+export async function updateAdminUser(
+  userId: string,
+  payload: UpdateAdminUserPayload,
+): Promise<AdminUserDetail> {
+  return request({
+    method: 'PATCH',
+    url: `/users/${encodeURIComponent(userId)}`,
+    data: payload,
+  });
+}
+
+export async function approveAdminUser(
+  userId: string,
+  finalRole: PublicRegistrationRole,
+  expectedVersion: number,
+): Promise<AdminUserDetail> {
+  return request({
+    method: 'POST',
+    url: `/users/${encodeURIComponent(userId)}/approve`,
+    data: { finalRole, expectedVersion },
+  });
+}
+
+export async function rejectAdminUser(
+  userId: string,
+  reason: string,
+  expectedVersion: number,
+): Promise<AdminUserDetail> {
+  return request({
+    method: 'POST',
+    url: `/users/${encodeURIComponent(userId)}/reject`,
+    data: { reason, expectedVersion },
+  });
+}
+
+export async function changeAdminUserRole(
+  userId: string,
+  role: HumanRole,
+  expectedVersion: number,
+): Promise<AdminUserDetail> {
+  return request({
+    method: 'POST',
+    url: `/users/${encodeURIComponent(userId)}/role`,
+    data: { role, expectedVersion },
+  });
+}
+
+export async function changeAdminUserStatus(
+  userId: string,
+  status: ManagedLifecycleStatus,
+  reason: string,
+  expectedVersion: number,
+): Promise<AdminUserDetail> {
+  return request({
+    method: 'POST',
+    url: `/users/${encodeURIComponent(userId)}/status`,
+    data: { status, reason, expectedVersion },
+  });
+}
+
+export async function issueAdminPasswordResetTicket(
+  userId: string,
+): Promise<PasswordResetTicketResult> {
+  return request({
+    method: 'POST',
+    url: `/users/${encodeURIComponent(userId)}/password-reset-tickets`,
+  });
+}
+
+export async function revokeAdminUserSessions(userId: string): Promise<number> {
+  const result = await request<ActionResult>({
+    method: 'POST',
+    url: `/users/${encodeURIComponent(userId)}/sessions/revoke`,
+  });
+  return result.revokedSessionCount || 0;
+}
+
+export async function getAdminUserAudit(
+  userId: string,
+  limit = 50,
+): Promise<UserAuditEvent[]> {
+  const result = await request<{ items: UserAuditEvent[] }>({
+    method: 'GET',
+    url: `/users/${encodeURIComponent(userId)}/audit`,
+    params: { limit },
+  });
+  return result.items;
 }
