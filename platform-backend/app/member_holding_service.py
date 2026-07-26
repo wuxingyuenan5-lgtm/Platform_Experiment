@@ -40,7 +40,12 @@ from app.member_holding_schemas import (
 )
 from app.user_admin_policy import UserAdminPolicyError, assert_recent_reauthentication
 from app.user_admin_service import AdminRequestContext
-from app.user_repository import get_user_by_id, insert_audit_event, list_active_user_sessions
+from app.user_repository import (
+    SessionSummaryRecord,
+    get_user_by_id,
+    insert_audit_event,
+    list_active_user_sessions,
+)
 
 
 class MemberHoldingServiceError(RuntimeError):
@@ -64,7 +69,10 @@ def _fund_response(fund: FundRecord) -> FundSummaryResponse:
     )
 
 
-def _current_session(db: sqlite3.Connection, context: AdminRequestContext):
+def _current_session(
+    db: sqlite3.Connection,
+    context: AdminRequestContext,
+) -> SessionSummaryRecord | None:
     return next(
         (
             session
@@ -138,6 +146,18 @@ def _holding_response(
         except HoldingDecimalError as exc:
             raise MemberHoldingServiceError(503, "fund_nav_decimal_invalid", str(exc)) from exc
         nav_valuation_time = _parse_aware(nav.valuation_time, field="valuationTime")
+        if nav_valuation_time > current + timedelta(minutes=5):
+            raise MemberHoldingServiceError(
+                503,
+                "fund_nav_timestamp_invalid",
+                "Fund NAV valuation time is unexpectedly in the future",
+            )
+        if nav.currency != fund.base_currency:
+            raise MemberHoldingServiceError(
+                503,
+                "fund_nav_currency_mismatch",
+                "Fund NAV currency does not match fund base currency",
+            )
         stale_after = timedelta(hours=get_settings().fund_nav_stale_after_hours)
         nav_status = "stale" if current - nav_valuation_time > stale_after else "available"
         currency = nav.currency
@@ -296,13 +316,16 @@ def put_member_holding(
 ) -> MemberHoldingResponse:
     current = _now(now)
     timestamp = current.isoformat()
-    _validate_business_times(request, current)
-    share_quantity = parse_non_negative_decimal(request.share_quantity, field="shareQuantity")
-    cumulative_invested = parse_non_negative_decimal(
-        request.cumulative_invested,
-        field="cumulativeInvested",
-    )
     try:
+        _validate_business_times(request, current)
+        share_quantity = parse_non_negative_decimal(
+            request.share_quantity,
+            field="shareQuantity",
+        )
+        cumulative_invested = parse_non_negative_decimal(
+            request.cumulative_invested,
+            field="cumulativeInvested",
+        )
         with connection() as db:
             if not db.in_transaction:
                 db.execute("BEGIN IMMEDIATE")
@@ -368,21 +391,27 @@ def put_fund_nav(
 ) -> FundNavMutationResponse:
     current = _now(now)
     timestamp = current.isoformat()
-    valuation_time = request.valuation_time.astimezone(UTC)
-    if valuation_time > current + timedelta(minutes=5):
-        raise MemberHoldingServiceError(
-            422,
-            "valuation_time_in_future",
-            "净值估值时间不能位于未来",
-        )
-    unit_nav = parse_non_negative_decimal(request.unit_nav, field="unitNav")
     try:
+        valuation_time = request.valuation_time.astimezone(UTC)
+        if valuation_time > current + timedelta(minutes=5):
+            raise MemberHoldingServiceError(
+                422,
+                "valuation_time_in_future",
+                "净值估值时间不能位于未来",
+            )
+        unit_nav = parse_non_negative_decimal(request.unit_nav, field="unitNav")
         with connection() as db:
             if not db.in_transaction:
                 db.execute("BEGIN IMMEDIATE")
             fund = get_fund(db, fund_id)
             if fund is None:
                 raise FundNotFoundError("Fund does not exist")
+            if request.currency != fund.base_currency:
+                raise MemberHoldingServiceError(
+                    422,
+                    "fund_nav_currency_mismatch",
+                    "净值币种必须与基金基础币种一致",
+                )
             _require_recent(db, context, current)
             if request.fund_code is not None and request.fund_code != fund.fund_code:
                 fund = update_fund_code(
