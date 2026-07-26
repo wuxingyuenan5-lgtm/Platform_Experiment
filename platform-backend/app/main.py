@@ -14,6 +14,7 @@ from app.production_monitoring import router as production_monitoring_router
 from app.schema_governance import router as schema_governance_router
 from app.user_admin_routes import router as user_admin_router
 from app.user_avatar_routes import router as user_avatar_router
+from app.user_cache_control import UserNoStoreMiddleware
 from app.user_routes import router as user_router
 from app.venue_reconciliation import router as venue_reconciliation_router
 
@@ -37,5 +38,8 @@ app.include_router(member_holding_router)
 # Authentication is added at the composition root so every legacy and modular
 # route passes through one default-deny production authorization boundary.
 app.add_middleware(AuthenticationMiddleware)
+# Added after AuthenticationMiddleware so it wraps authentication failures as
+# well as successful identity/customer responses.
+app.add_middleware(UserNoStoreMiddleware)
 
 __all__ = ["app"]
