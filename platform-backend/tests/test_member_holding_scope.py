@@ -8,13 +8,13 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
+from app.auth import token_hash
 from app.config import get_settings
 from app.database_bootstrap import bootstrap_database
 from app.database_seeds import seed_reference_data
 from app.main import app
 from app.schema_migrations import PLATFORM_MIGRATIONS, apply_migrations
 from app.user_rate_limit import get_public_auth_rate_limiter
-from app.user_security import token_hash
 from app.user_service import create_initial_ceo
 
 ORIGIN = "https://testserver"
@@ -245,7 +245,7 @@ def test_holding_write_requires_recent_reauthentication(
     tmp_path: Path,
 ) -> None:
     database_path = prepare_database(monkeypatch, tmp_path)
-    owner = create_initial_ceo(
+    create_initial_ceo(
         username="reauth-owner",
         password=OWNER_PASSWORD,
         real_name="Reauth Owner",
@@ -310,4 +310,3 @@ def test_holding_write_requires_recent_reauthentication(
         )
         assert allowed.status_code == 200
         assert allowed.json()["memberUserId"] == member_id
-        assert owner.id
