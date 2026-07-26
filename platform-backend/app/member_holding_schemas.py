@@ -6,6 +6,7 @@ from typing import Literal
 from pydantic import BaseModel, Field, field_validator
 
 HoldingSource = Literal["manual_admin", "migration", "external_import"]
+ManualHoldingSource = Literal["manual_admin"]
 HoldingStatus = Literal["active", "closed"]
 NavStatus = Literal["available", "stale", "unavailable"]
 
@@ -53,7 +54,7 @@ class UpsertMemberHoldingRequest(BaseModel):
     cumulative_invested: str = Field(alias="cumulativeInvested", min_length=1, max_length=64)
     confirmed_at: datetime | None = Field(default=None, alias="confirmedAt")
     as_of: datetime = Field(alias="asOf")
-    source: HoldingSource = "manual_admin"
+    source: ManualHoldingSource = "manual_admin"
     status: HoldingStatus = "active"
     expected_version: int | None = Field(default=None, alias="expectedVersion", ge=1)
 
@@ -69,7 +70,7 @@ class UpsertFundNavRequest(BaseModel):
     unit_nav: str = Field(alias="unitNav", min_length=1, max_length=64)
     valuation_time: datetime = Field(alias="valuationTime")
     currency: str = Field(min_length=3, max_length=8)
-    source: HoldingSource = "manual_admin"
+    source: ManualHoldingSource = "manual_admin"
     fund_code: str | None = Field(default=None, alias="fundCode", max_length=64)
 
     @field_validator("valuation_time")
