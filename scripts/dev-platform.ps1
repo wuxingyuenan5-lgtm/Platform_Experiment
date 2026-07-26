@@ -1,7 +1,9 @@
 [CmdletBinding()]
 param(
   [switch]$SkipInstall,
-  [switch]$SkipFrontend
+  [switch]$ForceInstall,
+  [switch]$SkipFrontend,
+  [int]$HealthTimeoutSeconds = 90
 )
 
 $ErrorActionPreference = 'Stop'
@@ -18,15 +20,17 @@ function Invoke-CheckedNative {
 
   & $FilePath @Arguments | Out-Host
   if ($LASTEXITCODE -ne 0) {
-    throw "Command failed with exit code $LASTEXITCODE: $FilePath $($Arguments -join ' ')"
+    throw "Command failed with exit code ${LASTEXITCODE}: $FilePath $($Arguments -join ' ')"
   }
 }
 
-function New-PythonEnvironment {
+function Initialize-PythonProject {
   param([Parameter(Mandatory = $true)][string]$ProjectPath)
 
   $VenvPath = Join-Path $ProjectPath '.venv'
   $PythonPath = Join-Path $VenvPath 'Scripts\python.exe'
+  $InstallMarker = Join-Path $VenvPath '.variable-global-installed'
+  $Created = $false
 
   if (-not (Test-Path $PythonPath)) {
     Write-Host "Creating Python 3.12 environment: $ProjectPath" -ForegroundColor Cyan
@@ -39,14 +43,17 @@ function New-PythonEnvironment {
     else {
       throw 'Python was not found. Install Python 3.12 first.'
     }
+    $Created = $true
   }
 
-  if (-not $SkipInstall) {
-    Write-Host "Installing dependencies: $ProjectPath" -ForegroundColor Cyan
+  $NeedsInstall = -not $SkipInstall -and ($ForceInstall -or $Created -or -not (Test-Path $InstallMarker))
+  if ($NeedsInstall) {
+    Write-Host "Installing Python dependencies: $ProjectPath" -ForegroundColor Cyan
     Push-Location $ProjectPath
     try {
       Invoke-CheckedNative -FilePath $PythonPath -Arguments @('-m', 'pip', 'install', '--upgrade', 'pip')
       Invoke-CheckedNative -FilePath $PythonPath -Arguments @('-m', 'pip', 'install', '-e', '.[dev]')
+      New-Item -ItemType File -Path $InstallMarker -Force | Out-Null
     }
     finally {
       Pop-Location
@@ -71,8 +78,32 @@ function Start-ServiceWindow {
   ) | Out-Null
 }
 
-$RuntimePython = New-PythonEnvironment -ProjectPath $RuntimePath
-$BackendPython = New-PythonEnvironment -ProjectPath $BackendPath
+function Wait-ForHttp {
+  param(
+    [Parameter(Mandatory = $true)][string]$Name,
+    [Parameter(Mandatory = $true)][string]$Url,
+    [Parameter(Mandatory = $true)][int]$TimeoutSeconds
+  )
+
+  $Deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+  do {
+    try {
+      $Response = Invoke-WebRequest -Uri $Url -UseBasicParsing -TimeoutSec 3
+      if ($Response.StatusCode -ge 200 -and $Response.StatusCode -lt 500) {
+        Write-Host "$Name ready: $Url" -ForegroundColor Green
+        return
+      }
+    }
+    catch {
+      Start-Sleep -Seconds 1
+    }
+  } while ((Get-Date) -lt $Deadline)
+
+  throw "$Name did not become ready within $TimeoutSeconds seconds: $Url"
+}
+
+$RuntimePython = Initialize-PythonProject -ProjectPath $RuntimePath
+$BackendPython = Initialize-PythonProject -ProjectPath $BackendPath
 
 $BackendEnv = Join-Path $BackendPath '.env'
 $BackendEnvExample = Join-Path $BackendPath '.env.example'
@@ -99,6 +130,11 @@ if (-not $SkipFrontend) {
     throw 'Corepack was not found. Use a Node.js installation that includes Corepack.'
   }
 
+  $Package = Get-Content (Join-Path $FrontendPath 'package.json') -Raw | ConvertFrom-Json
+  $PnpmVersion = ($Package.packageManager -split '@')[-1]
+  Invoke-CheckedNative -FilePath 'corepack' -Arguments @('enable')
+  Invoke-CheckedNative -FilePath 'corepack' -Arguments @('prepare', "pnpm@$PnpmVersion", '--activate')
+
   $FrontendEnv = Join-Path $FrontendPath '.env.local'
   $FrontendEnvExample = Join-Path $FrontendPath '.env.platform.example'
   if (-not (Test-Path $FrontendEnv) -and (Test-Path $FrontendEnvExample)) {
@@ -106,11 +142,10 @@ if (-not $SkipFrontend) {
     Write-Host 'Created admin-risk/.env.local from .env.platform.example.' -ForegroundColor DarkGray
   }
 
-  if (-not $SkipInstall) {
+  $NodeModules = Join-Path $FrontendPath 'node_modules'
+  if (-not $SkipInstall -and ($ForceInstall -or -not (Test-Path $NodeModules))) {
     Push-Location $FrontendPath
     try {
-      Invoke-CheckedNative -FilePath 'corepack' -Arguments @('enable')
-      Invoke-CheckedNative -FilePath 'corepack' -Arguments @('prepare', 'pnpm@8.1.0', '--activate')
       Invoke-CheckedNative -FilePath 'pnpm' -Arguments @('install', '--frozen-lockfile')
     }
     finally {
@@ -121,13 +156,20 @@ if (-not $SkipFrontend) {
   Start-ServiceWindow `
     -Title 'Variable-Global Frontend :5173' `
     -WorkingDirectory $FrontendPath `
-    -Command 'corepack pnpm dev -- --host 127.0.0.1 --port 5173'
+    -Command 'pnpm dev -- --host 127.0.0.1 --port 5173'
+}
+
+Wait-ForHttp -Name 'Execution Runtime' -Url 'http://127.0.0.1:8100/health' -TimeoutSeconds $HealthTimeoutSeconds
+Wait-ForHttp -Name 'Platform Backend' -Url 'http://127.0.0.1:8000/health' -TimeoutSeconds $HealthTimeoutSeconds
+if (-not $SkipFrontend) {
+  Wait-ForHttp -Name 'Frontend' -Url 'http://127.0.0.1:5173' -TimeoutSeconds $HealthTimeoutSeconds
 }
 
 Write-Host ''
-Write-Host 'Development services were opened in separate PowerShell windows.' -ForegroundColor Green
+Write-Host 'Variable-Global local services are ready.' -ForegroundColor Green
 Write-Host 'Runtime:  http://127.0.0.1:8100/health'
 Write-Host 'Backend:  http://127.0.0.1:8000/health'
 if (-not $SkipFrontend) {
   Write-Host 'Frontend: http://127.0.0.1:5173'
 }
+Write-Host 'Safety defaults remain Simulation + Fake Gateway + Live Write disabled.' -ForegroundColor Yellow

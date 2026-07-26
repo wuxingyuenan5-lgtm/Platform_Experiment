@@ -1,112 +1,70 @@
 # Project Agent Rules
 
-## Project Identity
+## Purpose
 
-This is an internal quantitative research and trading infrastructure platform.
+Internal quantitative research and trading infrastructure. Prefer safe, complete changes over speculative architecture work.
 
-Primary objective:
-
-- Maintain a reliable path from research, strategy execution, risk control to accounting verification.
-- Prefer correctness, auditability and small safe changes over rapid feature expansion.
-
-## Architecture Map
+## Service boundaries
 
 ```text
-admin-risk/          Frontend product application
-platform-backend/    Business APIs, strategy, risk, accounting
-execution-runtime/   External execution gateway and runtime journal
-docs/                Architecture and operational documentation
+admin-risk/          Vue product frontend
+platform-backend/    Business, risk, orchestration and accounting API
+execution-runtime/   Venue/Broker SDKs, external side effects and Runtime Journal
 ```
 
-Human orientation starts at `00-人工可读目录/README.md`. Agent orientation starts at `docs/codex/context-map.md`. Canonical major module ownership is recorded in `docs/architecture/OWNERSHIP.md`.
+Canonical major ownership is recorded in `docs/architecture/OWNERSHIP.md`.
 
-## Safety Rules
+## Permanent safety rules
 
-- Never commit secrets, passwords, tokens or `.env` contents.
-- Never enable real trading by code change alone.
-- Do not bypass tests, CI, approval or risk controls.
-- Do not modify trading, permission, database or deployment boundaries without explicit task scope.
+- Never commit credentials, tokens, passwords or real `.env` values.
+- Never enable real trading, Live Write or automatic exit monitoring through an unrelated change.
+- Platform Backend must not import Venue SDKs.
+- ACK is not Fill; unknown external results must not be blindly retried.
+- Database, execution contract, trading, risk, permission and reconciliation semantics require explicit Critical scope.
+- Do not bypass CI, safety checks or approval controls.
 - Do not perform recursive deletion.
 
-## Development Rules
+## Workstream choice
+
+Choose the smallest valid track:
+
+- **Fast** — Markdown and synchronized release-version maintenance; no behavior change.
+- **Standard** — bounded single-module product work without Critical paths; no Issue or task packet required.
+- **Critical** — trading/execution, Runtime, risk, auth, credentials, database/migration, contracts, CI governance, Live behavior, cross-service or cross-session work; one Issue, one task packet and one Issue-numbered branch.
+
+Rules and branch formats: `docs/engineering/GIT_WORKFLOW.md`.
+
+## Context loading
+
+Read only:
+
+1. this file;
+2. `docs/codex/current-state.md`;
+3. the nearest module `AGENTS.md`;
+4. directly affected source files and tests;
+5. a task packet only for an active Critical cross-session task.
+
+Do not load closed PR history, all task packets, the full Technical Debt register or the entire repository by default. The compact map is `docs/codex/context-map.md`.
+
+## Change discipline
 
 - Make the smallest complete change.
-- Keep code, tests and directly authoritative Markdown synchronized.
-- Prefer existing architecture patterns over introducing new frameworks.
-- Keep composition roots declarative: wire routers and middleware only; import domain policies explicitly and never monkey-patch modules.
-- Keep one authoritative implementation for each domain calculation; compatibility wiring must not replace functions at runtime.
-- Keep external HTTP transport in explicit client boundaries; orchestration may coordinate responses and map errors but must not duplicate configured URL/timeout calls.
-- Keep use-case sequencing in framework-independent Service modules; route facades may preserve compatibility and translate errors but must not duplicate use-case implementation.
-- Keep API schemas owned by their domain module; compatibility modules may use explicit aliases but must not redefine them.
-- Keep DDL, direct SQL, row mapping and protected persistence transactions in explicit Repository owners; Policy, Service and route facades must not access the database directly.
-- Keep operational trading projections (`positions`, `pnl_results`) separate from FinancialFact-based formal accounting projections.
-- Assign every Backend and Runtime test exactly one primary layer (`architecture`, `unit`, `integration`, or `live_safety`) and keep classified suites independently executable.
-- CI gates must cover complete maintained directories or an explicit no-new-debt mechanism; new files may not bypass validation.
-- Update `docs/architecture/OWNERSHIP.md` in the same PR whenever module authority or a compatibility boundary changes.
-- Use `rg` for search.
-- Ignore `node_modules`, `.venv`, `dist`, generated outputs, archives and external references unless explicitly required.
+- Prefer existing patterns; do not add a framework for one feature.
+- Do not split modules merely to match a theoretical layer pattern.
+- Refactor only after a real maintenance, reuse, testability or safety problem appears.
+- Update only directly authoritative documentation.
+- Form the complete patch and run local checks before pushing; normal PRs should use roughly one to three logical commits, not one commit per file.
+- Product pages show user workflows, not debug or engineering notes.
 
-## One Issue, One Branch, One PR
-
-For non-trivial engineering work:
-
-1. Search existing open Issues and PRs for the same outcome.
-2. Reuse or create exactly one GitHub Issue.
-3. Create one branch named `<type>/issue-<number>-<slug>`.
-4. Use one PR that references the same Issue.
-5. Do not start a replacement branch until the previous PR is closed and marked `Superseded by #<new-pr>`.
-6. After merge, delete or reset the head branch; never keep two branches carrying the same unique work.
-
-The CI workstream check enforces branch/Issue/PR linkage and rejects duplicate open PRs for one Issue.
-
-## Task Context Rules
-
-Before editing:
-
-1. Read this file.
-2. Read `docs/codex/current-state.md`.
-3. For cross-session, cross-module, migration or production work, create/update `tasks/issue-<number>-<slug>.md` from `docs/codex/task-template.md`.
-4. Read only the target module documentation and paths listed in that task packet.
-5. Read `docs/architecture/OWNERSHIP.md` when the task changes ownership, compatibility exports or cross-module dependency direction.
-6. Do not load the entire repository unless the task is explicitly architecture-wide.
-
-Default context budget:
-
-- one task packet;
-- one module entry document;
-- three to eight direct source files;
-- their direct tests;
-- zero to two additional architecture/contract documents unless justified in the task packet.
-
-Do not repeat repository history in prompts. Use current-state, task packets, commits, Issues and PRs as durable handoff.
-
-## Documentation Rules
-
-- `AGENTS.md`: durable hard rules only.
-- `docs/codex/current-state.md`: compact current truth and active workstream.
-- `docs/codex/context-map.md`: context-loading map, not an ownership registry.
-- `docs/codex/task-template.md`: the single task template.
-- `docs/architecture/OWNERSHIP.md`: canonical major module ownership.
-- `docs/architecture/`: stable structure and boundaries, not PR diaries.
-- `docs/decisions/`: important decisions and rejected alternatives.
-- `docs/technical/`: protocols and domain implementation contracts.
-- `docs/operations/`: deployment, monitoring, incidents and recovery.
-- `docs/engineering/TECHNICAL_DEBT.md`: intentionally deferred work with triggers.
-- `tasks/`: one active packet per Issue; progress is replaced, not appended as chat history.
-- `outputs/`: disposable artifacts, never a source of truth.
-
-## Product UI
-
-- Production pages show user workflows only.
-- Do not add debug panels, implementation explanations or engineering notes to product interfaces.
-
-## Current Default Runtime
+## Default runtime safety
 
 ```text
 TradingMode=simulation
 Gateway=fake
 Platform Live Write=false
 Runtime Live Write=false
+Cross-spread Exit Monitor=false
+Bybit PostOnly Chase=false
 ```
 
-Live execution requires existing approval, risk and operational gates.
+Local startup: `powershell -ExecutionPolicy Bypass -File .\scripts\dev-platform.ps1`.

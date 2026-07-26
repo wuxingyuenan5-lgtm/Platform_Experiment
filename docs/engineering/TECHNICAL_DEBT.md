@@ -1,221 +1,37 @@
-# Technical Debt Register
+# Active Technical Debt
 
-This file records intentionally deferred engineering work. It is not a backlog of ideas. Add an item only when the current implementation is understood and deferral has a reason.
+This register contains only unresolved work with a concrete risk and trigger. Completed refactor history belongs in GitHub.
 
-## Required fields
+## TD-003 — Operational projection retirement
 
-- ID and status;
-- problem and risk;
-- affected owner/module;
-- reason for deferral;
-- trigger for action;
-- protected semantics;
-- proposed safe approach.
-
-## TD-001 — Database module decomposition
-
-Status: completed through Issues #48, #50 and #53
-Owner: Platform Backend / persistence
-
-Original problem: `app/database.py` combined configured path/connection management, core Schema, legacy compatibility DDL, initializer orchestration and all fixed reference-data Seeds.
-
-Resolved ownership:
-
-- `app/database_connection.py`: dynamic path, parent creation, SQLite connection, Row Factory, Foreign Keys and Commit/Rollback/Close;
-- `app/database_bootstrap.py`: complete core Schema and legacy compatibility DDL;
-- `app/database_seeds.py`: every fixed Seed vector and insertion statement;
-- `app/database.py`: compatibility exports and `Connection → Bootstrap → Seed` initialization orchestration only.
-
-Evidence:
-
-- connection behavior and rollback tests;
-- exact compatibility identities for existing `app.database` imports;
-- core Schema SHA-256 `421f0625ffe3a8a26ca48bc827e64bd6aa6b2e49d95faef0b17313e808375801`;
-- exhaustive all-row/all-field Seed SHA-256 `d42f7e4f95a6efa9044b1e91b4e603f1d87f515923a57d941ee16e75109e6183`;
-- fresh table/index snapshot;
-- legacy compatibility-column/index coverage;
-- repeated-initialization idempotency;
-- explicit initialization-order test;
-- static ownership checks and progressive Pyright;
-- Repository Safety DDL ownership assigned to `app/database_bootstrap.py`.
-
-Protected semantics: every table/index/compatibility column, every Seed ID/value, simulation/live defaults and all financial/trading behavior.
-
-Future rule: Connection, Schema or Seed changes must stay within their established Owner. Schema and Seed changes are explicit persistence/business-data changes and may not be hidden inside structural refactors.
-
-## TD-002 — Financial facts module concentration
-
-Status: completed through Issues #40, #42, #44 and #46
-Owner: Platform Backend / formal accounting
-
-Resolved ownership:
-
-- `app/financial_fact_schemas.py`: public DTOs;
-- `app/financial_fact_normalization.py`: canonicalization and immutable-content hash;
-- `app/financial_fact_repository.py`: SQL, DDL, row mapping and protected transactions;
-- `app/financial_projection_service.py`: formal Position/PnL/NAV calculations and rebuild;
-- `app/financial_facts.py`: context resolution, recording, HTTP mapping and API.
-
-Evidence includes public schema snapshots, exact hash goldens, API equivalence, forced rollback tests, formula/orchestration goldens, architecture checks and progressive Pyright.
-
-Protected semantics: fact identity, normalized content, FX, multiplier, average cost, component PnL, rebuild/NAV results and transaction atomicity.
-
-Future rule: changes stay within the established owner and require explicit compatibility evidence when immutable identity or accounting formulas change.
-
-## TD-003 — Operational projection retirement criteria
-
-Status: accepted
-Owner: Platform Backend / trading operations
-
-Problem: operational `positions` and `pnl_results` coexist with formal accounting projections.
-
-Risk: consumers may accidentally treat low-latency operational values as auditable truth.
-
-Deferred because: operational views remain useful for immediate monitoring.
-
-Trigger: every consumer is classified and a replacement latency/SLA is proven.
-
-Protected semantics: formal accounting never reads operational projections as inputs.
-
-Safe approach: usage telemetry and consumer inventory before deprecation.
+- **Status:** accepted
+- **Risk:** consumers may treat low-latency `positions` or `pnl_results` as formal accounting truth.
+- **Protected rule:** formal accounting never reads operational projections as inputs.
+- **Trigger:** every consumer is inventoried and a replacement latency SLA is proven.
 
 ## TD-004 — Frontend inherited lint debt
 
-Status: active; no-new-debt gate completed
-Owner: Frontend
-
-Problem: inherited template code outside the maintained trading surface is not yet clean enough for a whole-`src/` zero-warning gate.
-
-Risk: legacy warnings still exist in untouched modules.
-
-Completed prerequisite:
-
-- active trading paths remain fully linted with zero warnings;
-- every added or modified source file is checked with zero warnings;
-- no mass formatting was introduced.
-
-Deferred because: a one-shot cleanup would create an unreviewable change.
-
-Trigger: clean one product module when that module receives real work.
-
-Protected semantics: no mass formatting and no product behavior change.
-
-Safe approach: module-by-module cleanup until full `src/` can replace the changed-file gate.
+- **Status:** active, contained by no-new-debt checks.
+- **Risk:** untouched template modules still contain warnings.
+- **Trigger:** clean a module only when that module receives real product work.
+- **Protected rule:** no mass-formatting or behavior-changing cleanup PR.
 
 ## TD-005 — Progressive Python typing
 
-Status: active; critical execution, FinancialFact, Venue Reconciliation, EOD schemas/policy/repository/service and SQLite boundaries selected
-Owner: Platform Backend and Execution Runtime
+- **Status:** active.
+- **Risk:** legacy untyped rows and payloads may drift outside selected critical modules.
+- **Trigger:** add a module to Pyright when it receives material work and its public boundary is clear.
+- **Protected rule:** do not change runtime behavior solely to satisfy typing.
 
-Problem: much of the legacy code remains outside static type checking.
+## TD-006 — Real production evidence
 
-Risk: untyped database rows, arbitrary payloads and large orchestration modules can still drift.
+- **Status:** active, Issue #39.
+- **Risk:** CI cannot prove Broker timing, private-stream behavior, partial fills or recovery.
+- **Trigger:** controlled Windows host, approved accounts and minimum-size checklist are ready.
+- **Protected rule:** Live Write remains disabled by default.
 
-Completed prerequisite:
+## TD-007 — Repository branch protection
 
-- Pyright is installed and blocking in CI;
-- Platform execution DTOs, FinancialFact DTOs/Normalization/Repository/Projection Service, shared Position Math, Venue Reconciliation DTOs/Difference Policy/Repository/Runtime Client/Service, EOD Reconciliation DTOs/Policy/Repository/Service, SQLite Connection/Bootstrap/Seeds, Runtime contracts, schema migrations, schema governance and authoritative order submission are selected;
-- Runtime models, contracts and Gateway Protocol are selected.
-
-Deferred because: strict whole-project typing would create noisy changes unrelated to current risk boundaries.
-
-Trigger: when a module is materially modified, add it after making its public boundary explicit.
-
-Protected semantics: no runtime behavior or dependency-injection change solely to satisfy typing.
-
-Safe approach: expand by domain boundary, never through a repository-wide suppression baseline.
-
-## TD-006 — Live production evidence
-
-Status: active; tracked by Issue #39
-Owner: Operations
-
-Problem: offline tests cannot prove broker-specific timing, partial-fill and recovery behavior in a real account.
-
-Risk: production assumptions may differ from controlled test doubles.
-
-Completed prerequisite:
-
-- automated failure-injection matrix;
-- controlled acceptance order and stop conditions;
-- Issue #39 separates operational evidence from engineering refactors.
-
-Deferred because: real-account validation requires explicit operational approval and bounded funds exposure.
-
-Trigger: controlled host, approved account, minimum order size and observation checklist are ready.
-
-Protected semantics: Live Write remains disabled by default.
-
-Safe approach: simulation → read-only live → shadow reconciliation → minimum-size real order → multiple clean EOD cycles.
-
-## TD-007 — GitHub repository-level branch protection
-
-Status: operational setting pending verification; tracked by Issue #38
-Owner: Repository administration
-
-Problem: repository CI and workstream rules are stored in code, but repository-level protection must also require those checks and restrict direct pushes to `main`.
-
-Risk: an administrator could bypass the intended PR path if GitHub branch protection/rulesets are not configured.
-
-Completed prerequisite:
-
-- one-Issue/one-branch/one-PR machine check;
-- PR and Issue templates;
-- all engineering branches run Platform CI;
-- Issue #38 records required settings and evidence.
-
-Deferred because: the available connector does not expose branch-protection or ruleset mutation.
-
-Trigger: repository administrator verifies the rule in GitHub Settings.
-
-Protected semantics: administrators must not routinely bypass safety gates.
-
-Safe approach: protect `main`, require Platform CI and Secret Scan, current branch state and conversation resolution, disallow force push/deletion, prefer squash-only delivery, and auto-delete merged branches.
-
-## TD-008 — Venue Reconciliation orchestration concentration
-
-Status: completed through Issues #65, #67, #69, #71 and #73
-Owner: Platform Backend / Venue Reconciliation
-
-Original problem: `app/venue_reconciliation.py` combined public DTOs, Difference decisions, DDL/SQL, configured Runtime HTTP, FinancialFact import, use-case sequencing, FastAPI error mapping and routes.
-
-Resolved ownership:
-
-- `app/venue_reconciliation_schemas.py`: public DTOs and public status types;
-- `app/venue_reconciliation_policy.py`: pure Difference decisions;
-- `app/venue_reconciliation_repository.py`: DDL, SQL, row mapping and protected persistence transactions;
-- `app/venue_reconciliation_runtime_client.py`: configured Runtime GET transport;
-- `app/venue_reconciliation_service.py`: framework-independent use-case sequencing and explicit domain failures;
-- `app/venue_reconciliation.py`: compatibility delegates, exact HTTP translation and route facade.
-
-Evidence includes exact Schema/OpenAPI compatibility, Difference Goldens, DDL checksum/idempotency/rollback tests, Runtime URL/parameter/timeout/error tests, domain-error HTTP mapping, EOD/API regressions, ownership checks and progressive Pyright.
-
-Protected semantics: Runtime endpoints and payloads, FinancialFact identity, Difference identity/precedence, order recovery, database transactions, API schemas/status codes, EOD callers and both Live Write defaults.
-
-Future rule: changes must remain inside the established Owner. Compatibility delegates may be removed only with explicit usage evidence and a dedicated migration.
-
-## TD-009 — EOD Reconciliation module concentration
-
-Status: active; public schemas, pure decision Policy, persistence Repository and Service extracted through Issues #75, #77, #79 and #81
-Owner: Platform Backend / EOD Reconciliation
-
-Original problem: `app/eod_reconciliation.py` combined EOD DDL/direct SQL, row mapping, report orchestration, partial-failure capture, status/scale-gate decisions, immutable review handling and FastAPI routes.
-
-Resolved ownership:
-
-- `app/eod_reconciliation_schemas.py`: public status types and request/response DTOs;
-- `app/eod_reconciliation_policy.py`: pure report status, scale-gate, historical-Difference and immutable-review decisions;
-- `app/eod_reconciliation_repository.py`: EOD DDL, direct SQL, report identity, row mapping, report persistence and atomic review transactions;
-- `app/eod_policy.py`: business-day order selection and repository coordination for historical Difference gates without duplicate decisions;
-- `app/eod_reconciliation_service.py`: framework-independent report creation/read/list/review sequencing, cross-domain coordination and exact partial-failure capture;
-- `app/eod_reconciliation.py`: per-call dependency wiring, compatibility delegates, exact HTTP mapping and routes.
-
-Evidence includes exact object identity, JSON Schema and validation messages, DDL SHA-256 `4cc299bbf57dd2dfa4db7c8092055eebc2e4862c5e4c9ecfe26be813d93f12b1`, report identity/unique constraints, immutable-review idempotency and rollback, architecture checks, EOD integration/policy regressions and progressive Pyright.
-
-Remaining risk: FastAPI route declarations still share the compatibility facade with dependency wiring and HTTP translation. This is now a thin boundary rather than a mixed business module.
-
-Trigger: extract a dedicated EOD route module only when route ownership or API assembly receives material work.
-
-Protected semantics: report natural/idempotency identity, business-date/timezone validation, DDL and query order, partial-failure strings, report/scale-gate status rules, immutable review rules, EOD/Venue/FinancialFact coordination and both Live Write defaults.
-
-Safe approach: dedicated route module only, preserving facade compatibility delegates until usage evidence supports removal.
+- **Status:** administrator verification pending, Issue #38.
+- **Risk:** repository settings may allow bypass even when code-level checks exist.
+- **Trigger:** verify required Platform CI and Secret Scan checks, block direct/force pushes and enable merged-branch cleanup in GitHub Settings.

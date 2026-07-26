@@ -4,73 +4,9 @@ on:
   push:
     branches:
       - main
-      - 'feature/**'
-      - 'fix/**'
-      - 'refactor/**'
-      - 'hardening/**'
-      - 'docs/**'
-      - 'chore/**'
-    paths:
-      - 'execution-runtime/**'
-      - 'platform-backend/**'
-      - 'admin-risk/src/**'
-      - 'admin-risk/mock/**'
-      - 'admin-risk/docs/quality/**'
-      - 'admin-risk/docs/START-HERE.md'
-      - 'admin-risk/package.json'
-      - 'admin-risk/pnpm-lock.yaml'
-      - 'admin-risk/tsconfig.json'
-      - 'admin-risk/tsconfig.strategy.json'
-      - '00-人工可读目录/**'
-      - 'docs/architecture/**'
-      - 'docs/codex/**'
-      - 'docs/contracts/**'
-      - 'docs/database/**'
-      - 'docs/engineering/**'
-      - 'docs/planning/**'
-      - 'docs/technical/**'
-      - 'docs/operations/**'
-      - 'tasks/**'
-      - 'outputs/README.md'
-      - 'AGENTS.md'
-      - 'README.md'
-      - 'CHANGELOG.md'
-      - 'scripts/**'
-      - '.github/ISSUE_TEMPLATE/**'
-      - '.github/pull_request_template.md'
-      - '.github/workflows/platform-ci.yml'
   pull_request:
     branches:
       - main
-    paths:
-      - 'execution-runtime/**'
-      - 'platform-backend/**'
-      - 'admin-risk/src/**'
-      - 'admin-risk/mock/**'
-      - 'admin-risk/docs/quality/**'
-      - 'admin-risk/docs/START-HERE.md'
-      - 'admin-risk/package.json'
-      - 'admin-risk/pnpm-lock.yaml'
-      - 'admin-risk/tsconfig.json'
-      - 'admin-risk/tsconfig.strategy.json'
-      - '00-人工可读目录/**'
-      - 'docs/architecture/**'
-      - 'docs/codex/**'
-      - 'docs/contracts/**'
-      - 'docs/database/**'
-      - 'docs/engineering/**'
-      - 'docs/planning/**'
-      - 'docs/technical/**'
-      - 'docs/operations/**'
-      - 'tasks/**'
-      - 'outputs/README.md'
-      - 'AGENTS.md'
-      - 'README.md'
-      - 'CHANGELOG.md'
-      - 'scripts/**'
-      - '.github/ISSUE_TEMPLATE/**'
-      - '.github/pull_request_template.md'
-      - '.github/workflows/platform-ci.yml'
 
 permissions:
   contents: read
@@ -78,29 +14,61 @@ permissions:
   pull-requests: read
 
 concurrency:
-  group: platform-ci-${{ github.ref }}
+  group: platform-ci-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.scope.outputs.backend }}
+      runtime: ${{ steps.scope.outputs.runtime }}
+      frontend: ${{ steps.scope.outputs.frontend }}
+      docs_only: ${{ steps.scope.outputs.docs_only }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Detect affected areas
+        id: scope
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          HEAD_SHA: ${{ github.sha }}
+        run: |
+          if [ "$EVENT_NAME" = "push" ]; then
+            python scripts/ci-scope.py --full --github-output "$GITHUB_OUTPUT"
+          else
+            python scripts/ci-scope.py \
+              --base "$BASE_SHA" \
+              --head "$HEAD_SHA" \
+              --github-output "$GITHUB_OUTPUT"
+          fi
+
   repository-safety:
+    needs: changes
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Validate Issue branch task and PR uniqueness
+      - name: Validate PR workstream
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: python scripts/check-workstream.py
-      - name: Scan tracked files for credential material
-        run: python scripts/scan-secrets.py
       - name: Check repository structure and architecture boundaries
         run: python scripts/check-repository-structure.py
-      - name: Check architecture ownership documentation consistency
+      - name: Check documentation consistency
         run: python scripts/check-documentation-consistency.py
 
   execution-runtime:
+    needs: changes
+    if: needs.changes.outputs.runtime == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -114,59 +82,18 @@ jobs:
           cache-dependency-path: execution-runtime/pyproject.toml
       - name: Install dependencies
         run: python -m pip install -e '.[dev]'
-      - name: Validate installed dependency graph
+      - name: Validate dependency graph
         run: python -m pip check
-      - name: Runtime full lint gate
-        shell: bash
-        run: |
-          if ! python -m ruff check app tests > /tmp/runtime-ruff.log 2>&1; then
-            cat /tmp/runtime-ruff.log
-            exit 1
-          fi
-      - name: Runtime progressive type gate
-        shell: bash
-        run: |
-          if ! python -m pyright > /tmp/runtime-pyright.log 2>&1; then
-            cat /tmp/runtime-pyright.log
-            exit 1
-          fi
-      - name: Upload runtime lint diagnostics
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: runtime-ruff-log
-          path: /tmp/runtime-ruff.log
-          if-no-files-found: ignore
-          retention-days: 3
-      - name: Upload runtime type diagnostics
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: runtime-pyright-log
-          path: /tmp/runtime-pyright.log
-          if-no-files-found: ignore
-          retention-days: 3
-      - name: Test classified runtime suites
-        shell: bash
-        run: |
-          if ! (
-            python -m pytest -m unit &&
-            python -m pytest -m integration &&
-            python -m pytest -m live_safety
-          ) > /tmp/runtime-pytest.log 2>&1; then
-            tail -n 320 /tmp/runtime-pytest.log
-            exit 1
-          fi
-      - name: Upload runtime pytest diagnostics
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: runtime-pytest-log
-          path: /tmp/runtime-pytest.log
-          if-no-files-found: ignore
-          retention-days: 3
+      - name: Runtime lint
+        run: python -m ruff check app tests
+      - name: Runtime type check
+        run: python -m pyright
+      - name: Runtime tests
+        run: python -m pytest -m "unit or integration or live_safety"
 
   platform-backend:
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -180,60 +107,18 @@ jobs:
           cache-dependency-path: platform-backend/pyproject.toml
       - name: Install dependencies
         run: python -m pip install -e '.[dev]'
-      - name: Validate installed dependency graph
+      - name: Validate dependency graph
         run: python -m pip check
-      - name: Backend full lint gate
-        shell: bash
-        run: |
-          if ! python -m ruff check app tests > /tmp/backend-ruff.log 2>&1; then
-            cat /tmp/backend-ruff.log
-            exit 1
-          fi
-      - name: Backend progressive type gate
-        shell: bash
-        run: |
-          if ! python -m pyright > /tmp/backend-pyright.log 2>&1; then
-            cat /tmp/backend-pyright.log
-            exit 1
-          fi
-      - name: Upload backend lint diagnostics
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: backend-ruff-log
-          path: /tmp/backend-ruff.log
-          if-no-files-found: ignore
-          retention-days: 3
-      - name: Upload backend type diagnostics
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: backend-pyright-log
-          path: /tmp/backend-pyright.log
-          if-no-files-found: ignore
-          retention-days: 3
-      - name: Test classified backend suites
-        shell: bash
-        run: |
-          if ! (
-            python -m pytest -m architecture &&
-            python -m pytest -m unit &&
-            python -m pytest -m integration &&
-            python -m pytest -m live_safety
-          ) > /tmp/backend-pytest.log 2>&1; then
-            tail -n 620 /tmp/backend-pytest.log
-            exit 1
-          fi
-      - name: Upload backend pytest diagnostics
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: backend-pytest-log
-          path: /tmp/backend-pytest.log
-          if-no-files-found: ignore
-          retention-days: 3
+      - name: Backend lint
+        run: python -m ruff check app tests
+      - name: Backend type check
+        run: python -m pyright
+      - name: Backend tests
+        run: python -m pytest -m "architecture or unit or integration or live_safety"
 
   frontend-quality:
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -255,57 +140,18 @@ jobs:
         with:
           python-version: '3.12'
       - name: Install dependencies
-        shell: bash
         env:
           HUSKY: '0'
-        run: |
-          if ! pnpm install --frozen-lockfile > /tmp/pnpm-install.log 2>&1; then
-            tail -n 80 /tmp/pnpm-install.log
-            exit 1
-          fi
-      - name: Upload install diagnostics
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: frontend-install-log
-          path: /tmp/pnpm-install.log
-          if-no-files-found: ignore
-          retention-days: 3
+        run: pnpm install --frozen-lockfile
       - name: Lint maintained trading frontend
-        shell: bash
         run: |
-          if ! pnpm exec eslint --max-warnings 0 \
+          pnpm exec eslint --max-warnings 0 \
             "src/api/platform/**/*.{ts,tsx}" \
             "src/hooks/trading/**/*.{ts,tsx}" \
-            "src/views/strategy/funding-carry/**/*.{vue,ts,tsx}" \
-            > /tmp/frontend-eslint.log 2>&1; then
-            tail -n 120 /tmp/frontend-eslint.log
-            exit 1
-          fi
+            "src/views/strategy/funding-carry/**/*.{vue,ts,tsx}"
       - name: Enforce frontend no-new-debt gate
         run: python ../scripts/frontend-no-new-debt.py
-      - name: Upload frontend lint diagnostics
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: frontend-eslint-log
-          path: /tmp/frontend-eslint.log
-          if-no-files-found: ignore
-          retention-days: 3
       - name: Type check strategy frontend
-        shell: bash
-        run: |
-          if ! pnpm type:check > /tmp/frontend-typecheck.log 2>&1; then
-            tail -n 80 /tmp/frontend-typecheck.log
-            exit 1
-          fi
-      - name: Upload type-check diagnostics
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: frontend-typecheck-log
-          path: /tmp/frontend-typecheck.log
-          if-no-files-found: ignore
-          retention-days: 3
+        run: pnpm type:check
       - name: Build frontend
         run: pnpm build

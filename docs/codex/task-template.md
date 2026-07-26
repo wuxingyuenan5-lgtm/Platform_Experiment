@@ -1,8 +1,6 @@
-# Codex Task Packet Template
+# Critical Task Packet Template
 
-Use one packet for every cross-session, cross-module, migration, production or otherwise non-trivial **engineering** task. Copy it to `tasks/issue-<number>-<slug>.md`.
-
-A bounded lightweight maintenance PR does not use this template. It must satisfy `docs/engineering/GIT_WORKFLOW.md`, declare `Maintenance: true`, `Behavior change: none` and `Safety change: none`, and stay inside the machine-checked Markdown/version-file boundary.
+Use a task packet only for Critical work that is cross-session, cross-service, migration-related, production-related or otherwise needs durable handoff. Fast and Standard work do not require one.
 
 ```markdown
 # Task: <short name>
@@ -16,97 +14,29 @@ Base commit: `<sha>`
 
 One measurable outcome.
 
-## Non-goals
-
-- Explicitly excluded adjacent work.
-- Refactors that must not be pulled into this task.
-
-## Allowed scope
-
-- Directories/files that may change.
-- Required tests and documentation.
-
-## Expected changed files
-
-- List the files expected to change before editing.
-- Mark any conditional file explicitly and state what evidence permits it.
-
 ## Protected semantics
 
-List behavior that must remain unchanged, especially trading calculations, order states, risk/funds controls, API field meaning, database schema behavior and live-write defaults.
+Only the behavior and safety rules that must remain unchanged.
 
-## Context packet
+## Scope
 
-Read only:
+- Included paths/outcomes.
+- Explicit non-goals.
 
-1. `AGENTS.md`;
-2. `docs/codex/current-state.md`;
-3. one module entry document;
-4. three to eight direct source files;
-5. direct tests.
+## Context
 
-Additional context:
+List only additional files beyond `AGENTS.md`, `current-state.md`, the module `AGENTS.md`, direct source and direct tests.
 
-- `<path>` — `<reason>`
+## Verification
 
-## Required verification
-
-```text
-<exact commands>
-```
-
-State whether final delivery also requires full CI, a Secret Scan, golden evidence or another repository-level gate.
-
-## Stop conditions
-
-- Stop when the change would exceed Allowed scope or Expected changed files without new evidence.
-- Stop when a Protected semantic would need to change.
-- Add task-specific conditions that require a dedicated Issue or explicit approval.
-
-## Acceptance criteria
-
-- [ ] Outcome completed.
-- [ ] Relevant lint/type/test commands pass.
-- [ ] Repository and architecture checks pass.
-- [ ] Authoritative documentation matches implementation.
-- [ ] Diff contains no unrelated cleanup.
-
-## Risk and rollback
-
-Risk: low | medium | high
-
-- Failure modes:
-- Detection:
-- Rollback:
+Exact relevant commands and any final full-CI requirement.
 
 ## Progress
-
-Replace stale detail; do not append a chat transcript.
 
 - Done:
 - Current:
 - Next:
 - Blocked by:
-
-## Completion
-
-- PR:
-- Merge commit:
-- Behavior changed:
-- Behavior intentionally unchanged:
-- Tests/CI:
-- Follow-up debt:
 ```
 
-## Task uniqueness rule
-
-Before creating an engineering branch:
-
-1. Search open Issues and PRs for the same outcome.
-2. Reuse the existing Issue when one exists.
-3. Confirm no active PR already references that Issue.
-4. Create exactly one branch named with that Issue number.
-
-If a branch must be replaced, close the old PR first and record `Superseded by #<new-pr>` before starting the replacement. Do not keep two active branches implementing the same Issue.
-
-Do not create a second task packet or Issue solely to record a merge SHA or other metadata already authoritative in GitHub history.
+Replace stale progress instead of appending chat history. GitHub PR/main history owns completion and merge identity; do not create a second metadata task or PR.
