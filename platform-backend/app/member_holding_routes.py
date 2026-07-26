@@ -129,20 +129,25 @@ def update_holding(
     return result
 
 
-@router.get("/funds", response_model=FundListResponse)
+@router.get("/users/holdings/funds", response_model=FundListResponse)
 def fund_catalog(
+    request: Request,
     response: Response,
-    _: Annotated[
+    principal: Annotated[
         Principal,
         Depends(require_permission("member.holding.read_all")),
     ],
 ) -> FundListResponse:
+    _context(request, principal)
     result = get_fund_catalog()
     _no_store(response)
     return result
 
 
-@router.put("/funds/{fund_id}/nav", response_model=FundNavMutationResponse)
+@router.put(
+    "/users/holdings/funds/{fund_id}/nav",
+    response_model=FundNavMutationResponse,
+)
 def update_fund_nav(
     fund_id: str,
     request_body: UpsertFundNavRequest,
