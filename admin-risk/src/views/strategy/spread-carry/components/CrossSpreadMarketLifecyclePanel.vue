@@ -181,10 +181,7 @@
                   }}
                   /
                   {{
-                    executionSelectionLabel(
-                      plan.stopLossExecutionMode,
-                      plan.stopLossLimitStrategy,
-                    )
+                    executionSelectionLabel(plan.stopLossExecutionMode, plan.stopLossLimitStrategy)
                   }}
                 </td>
                 <td>{{ plan.mt5PositionId }}</td>
@@ -240,7 +237,7 @@
     </section>
 
     <footer class="market-lifecycle__footer">
-      <span>PostOnly 仅在精确全成后放行 MT5；IOC 和第五批执行质量功能均未接入。</span>
+      <span>PostOnly 仅在精确全成后放行 MT5；IOC 尚未接入。</span>
       <strong v-if="message" :class="messageTone">{{ message }}</strong>
     </footer>
   </section>
@@ -342,9 +339,7 @@
   });
   const closeValidationError = computed(() => {
     if (closeExecutionMode.value !== 'limit') return '';
-    return Number.isFinite(Number(closeLimitSpread.value))
-      ? ''
-      : '限价平仓限制价差必须是有效数字';
+    return Number.isFinite(Number(closeLimitSpread.value)) ? '' : '限价平仓限制价差必须是有效数字';
   });
 
   function applyDirectionDefaults() {
