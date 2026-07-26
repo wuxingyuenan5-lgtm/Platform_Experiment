@@ -3,8 +3,8 @@
 Last updated: 2026-07-26  
 Stable branch: `main`  
 Product release: `0.8.0`  
-Latest completed engineering scope: Issue #109 / PR #110  
-Active engineering scope: Issue #111 / PR #112  
+Latest completed engineering scope: Issue #111 / PR #112  
+Active engineering scope: Issue #113 / PR #114  
 Latest product release scope: Issue #102 / PR #104
 
 This file records compact operating truth. Always verify open Issues, PRs, commits and CI before assuming an active workstream is complete.
@@ -35,9 +35,10 @@ Cross-spread Exit Monitor=false
 Cross-spread acceptance max quantity=1 oz
 Cross-spread non-closed lifecycle max=1
 Cross-spread FOK hedge reserve=0 unless explicitly configured
+Bybit PostOnly Chase=false
 ```
 
-These values are not relaxed by code completion or CI. PostOnly, Chase and IOC remain unavailable until their dedicated engineering and operational evidence exist.
+These values are not relaxed by code completion or CI. IOC remains unavailable. PostOnly Chase must remain disabled until controlled Issue #39 evidence exists.
 
 ## Permanent execution invariants
 
@@ -46,14 +47,18 @@ These values are not relaxed by code completion or CI. PostOnly, Chase and IOC r
 - ACK does not equal Fill.
 - `result_unknown` never authorizes blind retry, rollback or a second business intent.
 - Platform Order, Bybit Order/Execution and MT5 Order/Deal/Position identities remain distinct.
-- Synthetic action, execution type and trigger reason remain separate.
+- Synthetic action, execution type, Limit strategy and trigger reason remain separate.
 - Limit input is a spread constraint, never an unvalidated fixed Bybit price.
 - Buy Bybit/sell MT5 uses `Bybit Ask - MT5 Bid` with a maximum spread.
 - Sell Bybit/buy MT5 uses `Bybit Bid - MT5 Ask` with a minimum spread.
-- FOK pricing applies non-negative Hedge Reserve and conservative Tick rounding.
-- Non-executable FOK is rejected before Batch creation.
-- Bybit Market/FOK must confirm real fill before MT5.
+- FOK and PostOnly hard pricing use non-negative Hedge Reserve and conservative Tick rounding.
+- Non-executable Limit is rejected before Batch creation.
+- Bybit Market/FOK/PostOnly must confirm real fill before MT5.
 - FOK requires terminal exact full fill; zero, partial, mismatch and unknown outcomes are distinct.
+- PostOnly requires exact cumulative full fill before entering the existing MT5 path.
+- Duplicate private Execution events cannot duplicate cumulative fill or MT5 quantity.
+- Private-stream disconnect, sequence fault, malformed payload or terminal disagreement stops Chase and requires reconciliation.
+- Cancel/Repost requires terminal Cancel evidence and is bounded by TTL, threshold, cooldown and maximum mutations.
 - MT5 quantity derives from actual Bybit Fill and current contract specification.
 - Bybit Close uses `reduceOnly=true` and matching `positionIdx`.
 - MT5 Close binds the intended Position Ticket.
@@ -62,30 +67,42 @@ These values are not relaxed by code completion or CI. PostOnly, Chase and IOC r
 - Existing external exposure, unresolved Batch, manual intervention or non-closed Exit Plan blocks a new Open.
 - Credentials and secrets never enter Git, Markdown, database responses, tests or logs.
 
-## Batch 3 active contract
+## Completed Batch 3 contract
 
-Issue #111 / PR #112 adds Exit Plan persistence for:
+Exit Plans persist independent TP/SL execution modes and Limit strategies. Existing plans remain Market/Market and old Limit behavior defaults to FOK. Manual close, automatic TP and automatic SL use the same claimed-plan Close Action. Automatic Limit uses the atomic Claim's `triggerSpread`; it never silently falls through to Market.
+
+The automatic exit monitor remains disabled by default.
+
+## Batch 4 active contract
+
+Issue #113 / PR #114 implements bounded Bybit PostOnly Chase as an internal Limit strategy:
 
 ```text
-takeProfitExecutionMode = market | limit
-stopLossExecutionMode   = market | limit
+limitStrategy = fok | post_only_chase
+Runtime executionPolicy = default | fok | post_only_chase
 ```
 
 Current rules:
 
-- Migration v3 adds both fields with `market / market` defaults.
-- Existing plans retain data and become Market/Market.
-- New Open requests default Market/Market when fields are omitted.
-- TP and SL can be selected independently.
-- Stop Loss remains Market by default.
-- Manual close, automatic TP and automatic SL use the same claimed-plan Close Action.
-- Automatic FOK uses the atomic Claim's `triggerSpread` as `limitSpread`.
-- Limit never falls through to Market.
-- Pre-submit quote movement or clean FOK zero-fill releases the Claim back to `active`.
-- Partial, mismatch, timeout or unknown outcomes do not release the Claim and require reconciliation/manual intervention.
-- FOK Close idempotency includes `planId + triggeredAt`, allowing a new attempt after a clean released Claim without duplicating one Claim.
+- FOK remains backward-compatible default.
+- PostOnly Chase is disabled by default.
+- Initial and amended Bybit prices remain maker-safe and inside the hard Bybit price bound.
+- Private Order and Execution events are the primary state source after acknowledgement.
+- Execution IDs are deduplicated and cumulative fill is monotonic.
+- TTL, minimum amend Tick distance, maximum mutation count and cooldown bound all Chase activity.
+- Amend is preferred; rejected Amend may enter Cancel/Repost only after terminal Cancel proof.
+- Private stream disconnection or invalid state stops further Chase.
+- Only exact cumulative full fill produces one normal Fill for the existing MT5 path.
+- Partial or uncertain Bybit exposure remains explicit and blocks MT5.
+- No IOC, no automatic safety-limit relaxation and no claim that CI proves real private-stream behavior.
 
-The automatic monitor remains disabled by default even after this code is merged.
+PostOnly's hard Bybit bound is derived from the pre-submit MT5 reference quote. Chase currently follows the Bybit maker book without dynamically recomputing MT5 reference price. This limitation keeps PostOnly disabled pending controlled operational evidence.
+
+## Frontend boundary
+
+Batch 4 only extends the existing cross-spread trading execution area with FOK/PostOnly strategy selection and risk wording. It does not redesign the page, sidebar, navigation or visual system.
+
+The former Batch 5 scope is not assigned to the trading execution page. It is now only a Markdown list of possible post-trade analysis/execution-review capabilities. The user will later decide whether to build it and where it belongs.
 
 ## Live read and observability invariants
 
@@ -109,28 +126,23 @@ The automatic monitor remains disabled by default even after this code is merged
 
 ## Completed engineering baseline
 
-Completed scopes include architecture boundaries, database governance, formal accounting, Venue/EOD reconciliation, command idempotency, live account observability, protected Market execution, route-independent Venue reads, Market lifecycle, synthetic intent, and manual FOK Open/Close with conservative pricing and exact-full-fill gating.
+Completed scopes include architecture boundaries, database governance, formal accounting, Venue/EOD reconciliation, command idempotency, live account observability, protected Market execution, route-independent Venue reads, Market lifecycle, synthetic intent, manual FOK Open/Close, and TP/SL execution-mode persistence with one unified Close Action.
 
-## Next work
+## Current work
 
-1. Complete and merge Issue #111 / PR #112.
-2. Execute Batch 4 as a separate Issue/branch/PR from the merged Batch 3 main:
-   - Bybit private Order and Execution event consumption;
-   - PostOnly create/amend/cancel race state machine;
-   - bounded automatic/manual Chase;
-   - TTL, threshold, maximum attempts and cooldown;
-   - partial-fill exact MT5 mapping or Bybit compensation.
-3. Batch 5 is explicitly deferred by the user for later discussion. Quote Age, cross-Venue time skew, bid/ask width, MT5 deviation, unhedged duration, realized-spread variance and fee-quality analytics must not be mixed into Batch 4.
+1. Complete and merge Issue #113 / PR #114.
+2. Do not start the former Batch 5. Keep its possible Quote Age, time-skew, Bid/Ask, Deviation, unhedged-duration, realized-spread and fee-review fields in Markdown only until the user decides product scope and placement.
 
 ## Operational work
 
-Issue #39 remains the controlled Windows-host acceptance workstream. It must prove real credentials, permissions, symbols, Tick/Step, Broker Hedge Reserve, REST/private-stream behavior, Terminal stability, Market/FOK/automatic-exit cycles, recovery, Kill Switch and clean EOD reconciliation.
+Issue #39 remains the controlled Windows-host acceptance workstream. It must prove real credentials, permissions, symbols, Tick/Step, Broker Hedge Reserve, REST/private-stream behavior, Terminal stability, Market/FOK/PostOnly/automatic-exit cycles, recovery, Kill Switch and clean EOD reconciliation.
 
 ## Known constraints
 
 - One successful Open maps to one MT5 Position Ticket; ambiguity fails closed.
-- Bybit Market/FOK confirmation currently uses bounded REST polling until Batch 4 is merged.
 - Real Venue Tick consistency and Hedge Reserve remain operational evidence.
+- PostOnly private WebSocket wiring and Pybit behavior require real Windows-host evidence.
+- PostOnly does not yet dynamically reprice from an updated MT5 quote during Chase.
 - CI proves contracts and state transitions, not real liquidity or broker behavior.
 - Live Write cannot be enabled by a refactor, migration, merge or test result.
 
