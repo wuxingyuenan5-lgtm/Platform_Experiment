@@ -1,7 +1,7 @@
 # Task: Complete user system
 
 Issue: #117
-Status: review
+Status: active
 Branch: `feature/issue-117-user-system`
 Base commit: `71603bcc6807284ef3a6da26ad3f43c541bc99c2`
 
@@ -48,6 +48,14 @@ Explicit phase-one non-goals:
 - Unrelated trading, execution, Runtime, risk or data-service refactoring.
 - Removal of legacy Go services in this change.
 
+## Independent branch operating mode
+
+- This branch is an intentionally long-lived development line and is not expected to merge into `main` in the short term.
+- Do not open a Pull Request until the user requests an integration/review checkpoint.
+- Re-check divergence from `main` before each major batch; do not automatically merge unrelated `main` changes into security-sensitive work.
+- Keep the branch runnable at coherent checkpoints and record unverified checks explicitly.
+- The eventual integration path remains one linked Critical PR and Squash Merge; long-lived branch status does not relax repository or safety requirements.
+
 ## Context
 
 Read in addition to standard startup context:
@@ -93,9 +101,9 @@ Read in addition to standard startup context:
 
 ## Decision gates before implementation
 
-- Confirm whether legacy Go/MySQL contains real users needing migration.
-- Confirm the initial member-holding source; default is CEO-managed `manual_admin` read-model data.
-- Confirm production remains same-origin through `/api/v1`; cross-origin deployment requires renewed security review.
+- Legacy user migration: use the safe branch default of no import while building the new isolated database boundary. Stop before login cutover if evidence shows real users must migrate.
+- Initial holding source: use the safe branch default `manual_admin`; stop before production data import if another source is required.
+- Deployment origin: develop and test for same-origin `/api/v1`; stop before production deployment if cross-origin is required.
 
 Do not silently assume a conflicting answer. Stop the affected batch if evidence differs from the safe default.
 
@@ -181,7 +189,7 @@ Risk: high
 
 ## Progress
 
-- Done: Issue #117 created; `main` verified at `71603bcc6807284ef3a6da26ad3f43c541bc99c2`; no open PR found; Critical branch created; requirements, architecture and execution plan self-reviewed and separated; major security ambiguities resolved.
-- Current: documentation review checkpoint. No business code has been modified and no PR has been opened.
-- Next: on explicit start approval, recheck GitHub state, synchronize latest `main`, resolve the three decision gates, set status to `active` and begin Batch 1.
-- Blocked by: documentation commands and PR CI have not run in this connector-only environment; no known design blocker.
+- Done: Issue #117 and Critical branch created; requirements, architecture and execution plan self-reviewed; user role permissions moved to one resolver; existing API-Key roles preserved; Principal permission checks use the shared resolver; Migration 5 adds users, sessions, reset tickets and queryable audit fields; direct permission and migration tests added.
+- Current: Batch 1 identity/session foundation. Business routes and frontend are not connected yet.
+- Next: implement the user/session repository, Argon2id password boundary, Session/CSRF authentication assurance and initial CEO bootstrap; then run the direct Backend checks in an environment with repository execution access.
+- Blocked by: this connector environment cannot resolve `github.com` for a local clone, and branch-only pushes do not trigger the repository's PR validation workflows. No design blocker is known.
