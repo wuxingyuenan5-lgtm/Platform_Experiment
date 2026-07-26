@@ -56,6 +56,8 @@ include = [
   "app/user_cli.py",
   "app/user_permissions.py",
   "app/user_repository.py",
+  "app/user_routes.py",
+  "app/user_schemas.py",
   "app/user_security.py",
   "app/user_service.py",
   "app/user_session_auth.py",
@@ -81,6 +83,7 @@ select = ["E", "F", "I", "UP", "B"]
 # Pydantic's quoted self-return annotation is required while the validator builds the model.
 "app/financial_fact_schemas.py" = ["UP037"]
 "app/eod_reconciliation_schemas.py" = ["UP037"]
+"app/user_schemas.py" = ["UP037"]
 # Phase 4A keeps the complete risk state machine in one auditable module; long SQL/error lines
 # and Pydantic's quoted self annotation are accepted until the Phase 4 module split.
 "app/execution_risk.py" = ["E501", "UP037"]
@@ -95,6 +98,9 @@ select = ["E", "F", "I", "UP", "B"]
 "app/live_trading_sessions.py" = ["E501", "UP037"]
 "tests/test_auth_rbac.py" = ["E501"]
 "tests/test_live_trading_sessions.py" = ["E501"]
+# User-system service and route files keep security sequencing explicit in the first closed loop.
+"app/user_service.py" = ["E501"]
+"app/user_routes.py" = ["B008", "E501"]
 # Production operations modules intentionally keep SQL, backup/restore validation, and the
 # alert orchestration contract together for auditability. The lambda-binding and keys-view
 # findings are non-functional and are tracked until the post-gate module split.
