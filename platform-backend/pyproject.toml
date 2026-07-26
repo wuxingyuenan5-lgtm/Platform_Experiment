@@ -69,6 +69,7 @@ include = [
   "app/user_avatar_repository.py",
   "app/user_avatar_routes.py",
   "app/user_avatar_schemas.py",
+  "app/user_cache_control.py",
   "app/user_cli.py",
   "app/user_logout.py",
   "app/user_password_reset.py",
