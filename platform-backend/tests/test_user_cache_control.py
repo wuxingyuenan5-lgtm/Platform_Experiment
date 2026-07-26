@@ -6,11 +6,12 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
+from app.auth import AuthenticationMiddleware
 from app.config import get_settings
 from app.database_bootstrap import bootstrap_database
 from app.main import app
 from app.schema_migrations import PLATFORM_MIGRATIONS, apply_migrations
-from app.user_cache_control import is_sensitive_identity_path
+from app.user_cache_control import UserNoStoreMiddleware, is_sensitive_identity_path
 from app.user_service import create_initial_ceo
 
 ORIGIN = "https://testserver"
@@ -25,6 +26,14 @@ def test_sensitive_identity_path_classifier_is_bounded() -> None:
     assert is_sensitive_identity_path("/api/v1/users/example")
     assert not is_sensitive_identity_path("/api/v1/trading/orders")
     assert not is_sensitive_identity_path("/api/v1/users-public")
+
+
+@pytest.mark.unit
+def test_no_store_middleware_wraps_authentication_middleware() -> None:
+    middleware_classes = [middleware.cls for middleware in app.user_middleware]
+    assert middleware_classes.index(UserNoStoreMiddleware) < middleware_classes.index(
+        AuthenticationMiddleware
+    )
 
 
 def prepare_database(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
