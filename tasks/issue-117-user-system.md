@@ -69,9 +69,18 @@ Read in addition to standard startup context:
 - `docs/architecture/OWNERSHIP.md`
 - `platform-backend/app/auth.py`
 - `platform-backend/app/schema_migrations.py`
-- `platform-backend/app/database_bootstrap.py`
-- `platform-backend/app/database_seeds.py`
+- `platform-backend/app/user_permissions.py`
+- `platform-backend/app/user_security.py`
+- `platform-backend/app/user_repository.py`
+- `platform-backend/app/user_session_auth.py`
+- `platform-backend/app/user_authority.py`
+- `platform-backend/app/user_service.py`
+- `platform-backend/app/user_cli.py`
 - `platform-backend/tests/test_auth_rbac.py`
+- `platform-backend/tests/test_auth_assurance.py`
+- `platform-backend/tests/test_user_permissions.py`
+- `platform-backend/tests/test_user_security.py`
+- `platform-backend/tests/test_user_session_foundation.py`
 - `admin-risk/src/api/sys/user.ts`
 - `admin-risk/src/store/modules/user.ts`
 - `admin-risk/src/store/modules/permission.ts`
@@ -187,9 +196,32 @@ Risk: high
 - Detection: assurance-class tests, target/data-scope tests, migration tests, session invalidation tests, reset-ticket tests, protected-role concurrency tests, frontend route tests and existing live-safety suite.
 - Rollback: back up Platform SQLite, avatar directory and proxy configuration before deployment; revert application and restore pre-migration data when required. Applied additive migrations are forward-fixed unless restoring the complete pre-migration backup.
 
+## Batch 1 checkpoint
+
+Implemented on the Issue branch:
+
+- centralized and separated API-key/human role permission namespaces;
+- Migration 5 for users, opaque browser Sessions, password-reset tickets and queryable audit fields;
+- Argon2id password policy and high-entropy token hashing boundary;
+- direct user and Session repository with bounded active Session count;
+- Browser Session absolute/idle expiry, `auth_version` invalidation and persistent revocation;
+- CSRF hash plus trusted-Origin validation for Cookie-authenticated writes;
+- explicit request assurance classes and Cookie+Bearer ambiguity rejection;
+- human identity routes declared Session-only and Live writes retained as API-key-only;
+- no-default-password interactive initial CEO command;
+- transactional last-active-CEO guard;
+- direct migration, permission, security, Session and assurance tests;
+- architecture, authentication and database ownership documentation synchronized.
+
+Verification evidence:
+
+- isolated equivalent Python harness compiled the new foundation modules and reported `10 passed`;
+- this is not a substitute for running the repository's Ruff, Pyright, classified Pytest suites or PR CI;
+- no frontend, execution-runtime, Venue adapter, cross-spread or Live Write code was changed in Batch 1.
+
 ## Progress
 
-- Done: Issue #117 and Critical branch created; requirements, architecture and execution plan self-reviewed; user role permissions moved to one resolver; existing API-Key roles preserved; Principal permission checks use the shared resolver; Migration 5 adds users, sessions, reset tickets and queryable audit fields; direct permission and migration tests added.
-- Current: Batch 1 identity/session foundation. Business routes and frontend are not connected yet.
-- Next: implement the user/session repository, Argon2id password boundary, Session/CSRF authentication assurance and initial CEO bootstrap; then run the direct Backend checks in an environment with repository execution access.
-- Blocked by: this connector environment cannot resolve `github.com` for a local clone, and branch-only pushes do not trigger the repository's PR validation workflows. No design blocker is known.
+- Done: requirements and architecture baseline; Migration 5; permission namespaces; password/token security; user/Session persistence; Browser Session assurance, expiry, invalidation and CSRF; initial CEO bootstrap; last-CEO guard; direct tests; ownership and database/auth documentation.
+- Current: Batch 1 implementation checkpoint and repository-level verification pending. Registration/login/user routes and frontend remain intentionally unconnected.
+- Next: run the complete Backend and repository checks in an execution-capable checkout; resolve any findings as one grouped fix; then begin Batch 2 registration, login, `/auth/me`, logout, reauthentication and personal-account workflows.
+- Blocked by: the connector-only environment cannot execute the repository checkout or trigger branch CI, and no PR should be opened before the user requests an integration checkpoint. No design or implementation blocker is currently known.
