@@ -70,7 +70,7 @@ def consume_password_reset_ticket(
             and expires_at.astimezone(UTC) > current
             and row["consumed_at"] is None
             and row["revoked_at"] is None
-            and str(row["lifecycle_status"]) == "active"
+            and str(row["lifecycle_status"]) in {"active", "disabled"}
             and str(row["username_normalized"]) == normalize_username(username)
         )
         if not valid:
