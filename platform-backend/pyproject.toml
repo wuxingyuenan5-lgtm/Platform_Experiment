@@ -52,6 +52,7 @@ include = [
   "app/schema_migrations.py",
   "app/schema_governance.py",
   "app/trade_command_execution.py",
+  "app/user_authority.py",
   "app/user_cli.py",
   "app/user_permissions.py",
   "app/user_repository.py",
