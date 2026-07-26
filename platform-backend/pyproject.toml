@@ -7,7 +7,9 @@ dependencies = [
   "argon2-cffi>=25.1,<26.0",
   "fastapi>=0.116,<1.0",
   "httpx>=0.28,<1.0",
+  "pillow>=11.3,<12.0",
   "pydantic-settings>=2.10,<3.0",
+  "python-multipart>=0.0.20,<1.0",
   "tzdata>=2025.2",
   "uvicorn[standard]>=0.35,<1.0",
 ]
@@ -53,6 +55,10 @@ include = [
   "app/schema_governance.py",
   "app/trade_command_execution.py",
   "app/user_authority.py",
+  "app/user_avatar.py",
+  "app/user_avatar_repository.py",
+  "app/user_avatar_routes.py",
+  "app/user_avatar_schemas.py",
   "app/user_cli.py",
   "app/user_permissions.py",
   "app/user_repository.py",
@@ -101,6 +107,7 @@ select = ["E", "F", "I", "UP", "B"]
 # User-system service and route files keep security sequencing explicit in the first closed loop.
 "app/user_service.py" = ["E501"]
 "app/user_routes.py" = ["B008", "E501"]
+"app/user_avatar_routes.py" = ["B008", "E501"]
 # Production operations modules intentionally keep SQL, backup/restore validation, and the
 # alert orchestration contract together for auditability. The lambda-binding and keys-view
 # findings are non-functional and are tracked until the post-gate module split.
