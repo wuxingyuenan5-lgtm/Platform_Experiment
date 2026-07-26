@@ -71,6 +71,8 @@ select = ["E", "F", "I", "UP", "B"]
 "app/live_route_store.py" = ["E501"]
 # External venue field mappings are intentionally explicit and auditable.
 "app/bybit_live_adapter.py" = ["E501"]
+# Bounded Chase branches keep action/reconciliation tuples visible in one place.
+"app/bybit_fill_confirming_adapter.py" = ["E501"]
 # MT5 constants are accessed through a runtime-injected provider in tests and production.
 "app/mt5_live_adapter.py" = ["E501", "B009"]
 "tests/test_venue_query.py" = ["E501"]
