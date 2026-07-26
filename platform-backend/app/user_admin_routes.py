@@ -7,6 +7,12 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response,
 
 from app.auth import Principal, require_permission
 from app.config import get_settings
+from app.user_admin_policy import (
+    UserAdminPolicyError,
+    assert_can_assign_role,
+    assert_can_manage_target,
+    target_role_for_policy,
+)
 from app.user_admin_schemas import (
     ApproveRegistrationRequest,
     ChangeUserRoleRequest,
@@ -75,15 +81,40 @@ def _raise_service_error(exc: UserAdminServiceError) -> NoReturn:
     ) from exc
 
 
+def _raise_policy_error(exc: UserAdminPolicyError) -> NoReturn:
+    raise HTTPException(
+        status_code=exc.status_code,
+        detail={"code": exc.code, "message": exc.detail},
+    ) from exc
+
+
 def _no_store(response: Response) -> None:
     response.headers["Cache-Control"] = "no-store"
 
 
-def _assert_role_profile_requirements(user_id: str, role: HumanRole) -> None:
+def _assert_role_profile_requirements(
+    user_id: str,
+    role: HumanRole,
+    *,
+    context: AdminRequestContext,
+) -> None:
     try:
-        detail = get_user_detail(user_id=user_id, sensitive=True)
+        assert_can_assign_role(actor_role=context.actor_role, role=role)
+        detail = get_user_detail(user_id=user_id, sensitive=False)
+        assert_can_manage_target(
+            actor_user_id=context.actor_user_id,
+            actor_role=context.actor_role,
+            target_user_id=user_id,
+            target_role=target_role_for_policy(
+                role_code=detail.role,
+                requested_role_code=detail.requested_role,
+            ),
+        )
     except UserAdminServiceError as exc:
         _raise_service_error(exc)
+    except UserAdminPolicyError as exc:
+        _raise_policy_error(exc)
+
     if role == "employee" and not detail.department:
         raise HTTPException(
             status_code=422,
@@ -194,12 +225,13 @@ def approve_registration_route(
     response: Response,
     principal: Annotated[Principal, Depends(require_permission("user.update"))],
 ) -> UserAdminDetailResponse:
-    _assert_role_profile_requirements(user_id, request_body.final_role)
+    context = _session_context(request, principal)
+    _assert_role_profile_requirements(user_id, request_body.final_role, context=context)
     try:
         result = approve_user_registration(
             user_id,
             request_body,
-            context=_session_context(request, principal),
+            context=context,
         )
     except UserAdminServiceError as exc:
         _raise_service_error(exc)
@@ -235,12 +267,13 @@ def update_role_route(
     response: Response,
     principal: Annotated[Principal, Depends(require_permission("user.assign_role"))],
 ) -> UserAdminDetailResponse:
-    _assert_role_profile_requirements(user_id, request_body.role)
+    context = _session_context(request, principal)
+    _assert_role_profile_requirements(user_id, request_body.role, context=context)
     try:
         result = change_user_role(
             user_id,
             request_body,
-            context=_session_context(request, principal),
+            context=context,
         )
     except UserAdminServiceError as exc:
         _raise_service_error(exc)
