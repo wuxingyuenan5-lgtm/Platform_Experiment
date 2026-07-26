@@ -1,4 +1,4 @@
-﻿import type { AppRouteModule } from '@/router/types';
+import type { AppRouteModule } from '@/router/types';
 import { LAYOUT } from '@/router/constant';
 import { RoleEnum } from '@/enums/roleEnum';
 
@@ -14,6 +14,7 @@ const risk: AppRouteModule = {
     icon: 'ant-design:safety-certificate-outlined',
     orderNo: 60,
     roles: internalRoles,
+    permissions: 'risk.read',
   },
   children: [
     {
@@ -24,6 +25,7 @@ const risk: AppRouteModule = {
         title: '风控详情',
         icon: 'ant-design:warning-outlined',
         roles: internalRoles,
+        permissions: 'risk.read',
       },
     },
     {
@@ -45,6 +47,8 @@ const risk: AppRouteModule = {
         title: '个人账号',
         icon: 'ant-design:user-switch-outlined',
         roles: internalRoles,
+        permissions: 'profile.read_self',
+        hideMenu: true,
       },
     },
   ],
