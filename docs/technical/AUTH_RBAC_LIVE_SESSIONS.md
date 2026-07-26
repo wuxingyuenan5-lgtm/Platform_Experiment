@@ -1,6 +1,6 @@
 # Authentication, RBAC, Browser Session, and LiveTradingSession
 
-状态：`active / user-system Batch 1 foundation`  
+状态：`active / user-system Batches 1–5 implemented, verification pending`  
 适用版本：`Platform Experiment 0.9.0`  
 用户系统架构：`USER_SYSTEM_TECHNICAL_ARCHITECTURE.md`  
 用户系统执行计划：`../planning/USER_SYSTEM_EXECUTION_PLAN.md`
@@ -65,6 +65,8 @@ admin
 
 这些角色继续服务自动化、系统调用和现有 Live 链路。配置中的 API-Key 和 Development Identity 只能使用这一命名空间。
 
+API-Key `admin` 保留 `*` 通配符兼容语义，但该通配符只能在 API-Key/Development 权限解析中生效，不能进入 Browser Session、用户管理或客户持仓域。
+
 ### 4.2 浏览器业务角色
 
 ```text
@@ -76,7 +78,9 @@ member
 
 这些角色来自 `users.role_code`，只用于人类 Browser Session。API-Key `admin` 不自动等同 CEO，`ceo` 也不是有效 API-Key 配置角色。
 
-两组角色可以解析到部分同名权限，但不能通过名称自动转换，也不能把 API-Key wildcard 用于用户、密码、Session 或客户持仓管理。
+人类 CEO 使用显式业务权限集合，不返回或依赖 `*`。其权限包括用户管理、本人账号、系统读取和会员持仓管理，但不包含 `trade:submit`、`risk:manage` 或任何可授权 Live Write 的 API-Key 权限。
+
+两组角色可以解析到部分同名权限，但不能通过名称自动转换。前端菜单和直接 URL 只做显式权限点精确匹配，不识别 API-Key wildcard。
 
 ## 5. 认证保障等级
 
@@ -158,7 +162,7 @@ X-CSRF-Token
 + trusted Origin
 ```
 
-CSRF 原始值只存在于当前浏览器内存；数据库保存哈希。API-Key 请求不使用 Browser CSRF 机制。
+CSRF 原始值只存在于当前浏览器内存；数据库保存哈希。用户系统或持仓客户端收到 401 时清除内存 CSRF。API-Key 请求不使用 Browser CSRF 机制。
 
 ## 8. Password 和初始 CEO
 
@@ -172,7 +176,7 @@ CSRF 原始值只存在于当前浏览器内存；数据库保存哈希。API-Ke
 
 ## 9. Permission Resolution
 
-现有接口权限继续按 HTTP Method 与 Route Pattern 解析并 default-deny：
+现有 API-Key 接口权限继续按 HTTP Method 与 Route Pattern 解析并 default-deny：
 
 | Permission | 典型操作 |
 |---|---|
@@ -189,6 +193,20 @@ CSRF 原始值只存在于当前浏览器内存；数据库保存哈希。API-Ke
 | `live_session:revoke` | 撤销实盘会话 |
 | `admin:write` | 未明确分类的旧管理写操作 |
 
+用户域采用显式点号权限，例如：
+
+```text
+profile.read_self
+profile.update_self
+session.read_self
+user.read
+user.update
+user.assign_role
+member.holding.read_self
+member.holding.read_all
+member.holding.update
+```
+
 新增用户域路由必须使用显式权限依赖，不依靠 URL 字符串推导完整的字段、目标和数据范围规则。
 
 授权顺序：
@@ -203,7 +221,9 @@ authentication assurance
 → domain invariant
 ```
 
-未知 Role 不产生权限。任何 wildcard 都不豁免目标范围、最后 CEO、禁止自我提权、CSRF、近期再认证或 Live 闸门。
+未知 Role 不产生权限。API-Key wildcard 不豁免目标范围、最后 CEO、禁止自我提权、CSRF、近期再认证或 Live 闸门；Browser Session 不使用 wildcard。
+
+员工账号在批准或改为 `employee` 前必须有非空部门；会员账号在批准或改为 `member` 前必须有非空会员类型。检查必须位于权限和目标角色策略之后，并由 `expectedVersion` 防止并发资料变化被静默覆盖。
 
 ## 10. Actor Binding
 
@@ -325,22 +345,20 @@ Command ID
 
 ## 18. 当前实施状态与限制
 
-已形成的用户系统 Batch 1 基础：
+Issue #117 分支已实现：
 
-- API-Key 与 human role 权限命名空间分离；
-- Browser Session Principal 集成和保障等级；
-- Cookie+Bearer 歧义拒绝；
-- Argon2id 密码边界；
-- Migration 5 用户、Session、reset ticket 和 audit 查询字段；
-- Session 哈希、绝对/空闲过期、auth-version invalidation、CSRF/Origin；
-- 初始 CEO 交互命令和最后 CEO 事务保护。
+- Batch 1：API-Key/human role 命名空间、Migration 5、Argon2id、Browser Session、CSRF/Origin、认证保障等级、初始 CEO 和最后 CEO 事务保护；
+- Batch 2：注册、登录、`/auth/me`、退出、近期再认证、本人资料、头像、改密、设备、公开重置凭证消费和前端个人账号；
+- Batch 3：用户搜索/详情/创建/审批/拒绝/角色/状态/重置凭证/强退、目标角色策略、资料字段不变量、审计事务和后台页面；
+- Batch 4：Migration 6、会员持仓、基金单位净值、Decimal 字符串、本人隔离、CEO 管理、NAV 缺失/过期语义和前端持仓面板；
+- Batch 5：同源 `/api/v1`、Cookie Session Store、精确权限菜单/直接 URL、旧个人入口重定向、显式 CEO 权限和旧 JWT/持久化 Token 隔离。
 
-尚未接入：
+仍未完成的验收证据：
 
-- 注册、登录、`/auth/me`、退出和近期再认证路由；
-- 用户资料、头像、设备管理和密码重置完整用例；
-- 后台用户管理、目标角色策略和会员持仓；
-- 前端用户系统；
-- PR CI 和真实部署验收。
+- Ruff、Pyright 和分类 Pytest 尚未执行；
+- 前端 ESLint、类型检查、单元测试和构建尚未执行；
+- 文档一致性、仓库结构、版本一致性和 Secret Scan 尚未执行；
+- 尚未创建 PR，因此没有 PR CI；
+- 真实同源反向代理、Cookie Secure、备份恢复和生产部署尚未验收。
 
 当前 API Key 配置适合单机小型私募第一阶段，不等同完整企业身份提供商。认证、审批、代码完成和 CI 均不能自动打开 Platform 或 Runtime Live Write。
