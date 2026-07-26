@@ -28,11 +28,11 @@ PUBLIC_PATHS = {
     "/health",
     "/api/v1/auth/login",
     "/api/v1/auth/register",
+    "/api/v1/auth/logout",
     "/api/v1/auth/reset-password",
 }
 HUMAN_SESSION_PATHS = {
     "/api/v1/auth/me",
-    "/api/v1/auth/logout",
     "/api/v1/auth/reauth",
 }
 HUMAN_SESSION_PREFIXES = (
