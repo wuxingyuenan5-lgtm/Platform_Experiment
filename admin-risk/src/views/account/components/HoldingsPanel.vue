@@ -237,17 +237,11 @@
 
   function multiplyDecimalByHundred(value: string) {
     const { negative, integer, fraction } = splitDecimal(value);
-    const digits = `${integer}${fraction}`.replace(/^0+(?=\d)/, '') || '0';
     const targetPosition = integer.length + 2;
-    let expanded = digits;
-    let position = targetPosition;
-    if (position > expanded.length) expanded = expanded.padEnd(position, '0');
-    if (position <= 0) {
-      expanded = `${'0'.repeat(Math.abs(position))}${expanded}`;
-      position = 0;
-    }
-    const whole = position === 0 ? '0' : expanded.slice(0, position) || '0';
-    const decimal = expanded.slice(position).replace(/0+$/, '');
+    let expanded = `${integer}${fraction}`;
+    if (targetPosition > expanded.length) expanded = expanded.padEnd(targetPosition, '0');
+    const whole = expanded.slice(0, targetPosition) || '0';
+    const decimal = expanded.slice(targetPosition).replace(/0+$/, '');
     const normalizedWhole = whole.replace(/^0+(?=\d)/, '') || '0';
     return `${negative ? '-' : ''}${normalizedWhole}${decimal ? `.${decimal}` : ''}`;
   }
