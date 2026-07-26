@@ -3,19 +3,42 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from enum import StrEnum
+from typing import Annotated
 from uuid import uuid4
 
-from fastapi import HTTPException, Request
+from fastapi import Depends, HTTPException, Request
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.responses import JSONResponse, Response
 
 from app.config import Settings, get_settings
 from app.database import connection
 from app.user_permissions import ROLE_PERMISSIONS, are_known_roles, has_permission
+from app.user_session_auth import (
+    AuthenticatedBrowserSession,
+    BrowserSessionError,
+    authenticate_browser_session,
+    validate_session_csrf,
+)
 
-PUBLIC_PATHS = {"/health"}
+PUBLIC_PATHS = {
+    "/health",
+    "/api/v1/auth/login",
+    "/api/v1/auth/register",
+    "/api/v1/auth/reset-password",
+}
+HUMAN_SESSION_PATHS = {
+    "/api/v1/auth/me",
+    "/api/v1/auth/logout",
+    "/api/v1/auth/reauth",
+}
+HUMAN_SESSION_PREFIXES = (
+    "/api/v1/me",
+    "/api/v1/users",
+)
 IDENTITY_FIELDS = {
     "actor",
     "reviewer",
@@ -23,9 +46,18 @@ IDENTITY_FIELDS = {
     "approvedBy",
     "revokedBy",
 }
+SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS", "TRACE"})
 
 
-@dataclass(frozen=True)
+class AuthenticationAssurance(StrEnum):
+    PUBLIC = "public"
+    HUMAN_SESSION = "human_session"
+    PLATFORM_READ = "platform_read"
+    SIMULATION_WRITE = "simulation_write"
+    LIVE_WRITE = "live_write"
+
+
+@dataclass(frozen=True, slots=True)
 class Principal:
     user_id: str
     roles: tuple[str, ...]
@@ -100,7 +132,44 @@ def authenticate_bearer(request: Request, settings: Settings) -> Principal:
     raise AuthenticationError(401, "Authentication credential is invalid")
 
 
+def assurance_for_request(method: str, path: str, settings: Settings) -> AuthenticationAssurance:
+    normalized_method = method.upper()
+    if path in PUBLIC_PATHS:
+        return AuthenticationAssurance.PUBLIC
+    is_human_prefix = any(
+        path == prefix or path.startswith(f"{prefix}/")
+        for prefix in HUMAN_SESSION_PREFIXES
+    )
+    if path in HUMAN_SESSION_PATHS or is_human_prefix:
+        return AuthenticationAssurance.HUMAN_SESSION
+    if normalized_method in SAFE_METHODS:
+        return AuthenticationAssurance.PLATFORM_READ
+    if settings.environment.lower() == "live":
+        return AuthenticationAssurance.LIVE_WRITE
+    return AuthenticationAssurance.SIMULATION_WRITE
+
+
 def authenticate_request(request: Request, settings: Settings) -> Principal:
+    authorization = request.headers.get("authorization", "")
+    has_bearer = bool(authorization.strip())
+    session_token = request.cookies.get(settings.session_cookie_name)
+    if has_bearer and session_token:
+        raise AuthenticationError(400, "Ambiguous authentication credentials")
+    if has_bearer:
+        return authenticate_bearer(request, settings)
+    if session_token:
+        try:
+            browser_session = authenticate_browser_session(session_token, settings)
+        except BrowserSessionError as exc:
+            raise AuthenticationError(exc.status_code, exc.detail) from exc
+        request.state.browser_session = browser_session
+        return Principal(
+            user_id=browser_session.user_id,
+            roles=(browser_session.role_code,),
+            auth_method="session",
+            session_id=browser_session.session_id,
+        )
+
     mode = settings.auth_mode.lower()
     if settings.environment.lower() == "live" and mode != "api_key":
         raise AuthenticationError(503, "Live environment requires api_key authentication mode")
@@ -116,6 +185,26 @@ def authenticate_request(request: Request, settings: Settings) -> Principal:
             auth_method="development",
         )
     raise AuthenticationError(503, "Authentication mode is not configured safely")
+
+
+def enforce_assurance(
+    request: Request,
+    principal: Principal,
+    assurance: AuthenticationAssurance,
+    settings: Settings,
+) -> None:
+    if assurance == AuthenticationAssurance.HUMAN_SESSION and principal.auth_method != "session":
+        raise AuthenticationError(403, "Human browser session authentication is required")
+    if assurance == AuthenticationAssurance.LIVE_WRITE and principal.auth_method != "api_key":
+        raise AuthenticationError(403, "Live write routes require API-key authentication")
+    if principal.auth_method == "session":
+        browser_session = getattr(request.state, "browser_session", None)
+        if not isinstance(browser_session, AuthenticatedBrowserSession):
+            raise AuthenticationError(401, "Browser session context is unavailable")
+        try:
+            validate_session_csrf(request, browser_session, settings)
+        except BrowserSessionError as exc:
+            raise AuthenticationError(exc.status_code, exc.detail) from exc
 
 
 def permission_for_request(method: str, path: str) -> str:
@@ -201,8 +290,9 @@ def audit_auth_event(
             db.execute(
                 """
                 INSERT INTO audit_events (
-                    id, event_type, subject_type, subject_id, details_json, created_at
-                ) VALUES (?, ?, ?, ?, ?, ?)
+                    id, event_type, subject_type, subject_id, details_json, created_at,
+                    actor_user_id, request_id, result, ip_address, auth_method
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     str(uuid4()),
@@ -213,18 +303,20 @@ def audit_auth_event(
                         {
                             "method": request.method,
                             "path": request.url.path,
-                            "userId": principal.user_id if principal else None,
                             "roles": list(principal.roles) if principal else [],
                             "credentialId": principal.credential_id if principal else None,
                             "permission": permission,
-                            "result": result,
                             "detail": detail,
-                            "sourceIp": request.client.host if request.client else None,
                         },
                         ensure_ascii=False,
                         sort_keys=True,
                     ),
                     now_iso(),
+                    principal.user_id if principal else None,
+                    request_id,
+                    result,
+                    request.client.host if request.client else None,
+                    principal.auth_method if principal else None,
                 ),
             )
     except Exception:
@@ -256,16 +348,28 @@ async def validate_body_identity(request: Request, principal: Principal) -> None
 
 class AuthenticationMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
-        if request.method.upper() == "OPTIONS" or request.url.path in PUBLIC_PATHS:
+        if request.method.upper() == "OPTIONS":
             return await call_next(request)
 
         request_id = request.headers.get("x-request-id") or str(uuid4())
+        request.state.request_id = request_id
         settings = get_settings()
-        permission = permission_for_request(request.method, request.url.path)
+        assurance = assurance_for_request(request.method, request.url.path, settings)
+        if assurance == AuthenticationAssurance.PUBLIC:
+            response = await call_next(request)
+            response.headers["X-Request-ID"] = request_id
+            return response
+
+        permission = (
+            None
+            if assurance == AuthenticationAssurance.HUMAN_SESSION
+            else permission_for_request(request.method, request.url.path)
+        )
         principal: Principal | None = None
         try:
             principal = authenticate_request(request, settings)
-            if not principal.has_permission(permission):
+            enforce_assurance(request, principal, assurance, settings)
+            if permission is not None and not principal.has_permission(permission):
                 raise AuthenticationError(403, "Authenticated identity lacks required permission")
             if settings.environment.lower() == "live" or settings.auth_mode.lower() == "api_key":
                 await validate_body_identity(request, principal)
@@ -280,7 +384,7 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
                 request_id=request_id,
             )
             headers = {"X-Request-ID": request_id}
-            if exc.status_code == 401:
+            if exc.status_code == 401 and not request.cookies.get(settings.session_cookie_name):
                 headers["WWW-Authenticate"] = "Bearer"
             return JSONResponse(
                 status_code=exc.status_code,
@@ -289,7 +393,6 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
             )
 
         request.state.principal = principal
-        request.state.request_id = request_id
         response = await call_next(request)
         response.headers["X-Request-ID"] = request_id
         response.headers["X-Authenticated-User"] = principal.user_id
@@ -303,13 +406,40 @@ def require_principal(request: Request) -> Principal:
     return principal
 
 
+def require_permission(permission: str) -> Callable[[Principal], Principal]:
+    def dependency(principal: Annotated[Principal, Depends(require_principal)]) -> Principal:
+        if not principal.has_permission(permission):
+            raise HTTPException(
+                status_code=403,
+                detail="Authenticated identity lacks required permission",
+            )
+        return principal
+
+    return dependency
+
+
+def require_human_session(
+    principal: Annotated[Principal, Depends(require_principal)],
+) -> Principal:
+    if principal.auth_method != "session":
+        raise HTTPException(
+            status_code=403,
+            detail="Human browser session authentication is required",
+        )
+    return principal
+
+
 __all__ = [
+    "AuthenticationAssurance",
     "AuthenticationError",
     "AuthenticationMiddleware",
     "Principal",
     "ROLE_PERMISSIONS",
+    "assurance_for_request",
     "authenticate_request",
     "permission_for_request",
+    "require_human_session",
+    "require_permission",
     "require_principal",
     "token_hash",
 ]
