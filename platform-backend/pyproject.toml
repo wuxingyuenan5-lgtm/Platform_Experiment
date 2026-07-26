@@ -4,6 +4,7 @@ version = "0.9.0"
 description = "Variable-Global modular monolith backend"
 requires-python = ">=3.12"
 dependencies = [
+  "argon2-cffi>=25.1,<26.0",
   "fastapi>=0.116,<1.0",
   "httpx>=0.28,<1.0",
   "pydantic-settings>=2.10,<3.0",
@@ -33,6 +34,7 @@ markers = [
 pythonVersion = "3.12"
 typeCheckingMode = "standard"
 include = [
+  "app/auth.py",
   "app/database_bootstrap.py",
   "app/database_connection.py",
   "app/database_seeds.py",
@@ -50,7 +52,12 @@ include = [
   "app/schema_migrations.py",
   "app/schema_governance.py",
   "app/trade_command_execution.py",
+  "app/user_cli.py",
   "app/user_permissions.py",
+  "app/user_repository.py",
+  "app/user_security.py",
+  "app/user_service.py",
+  "app/user_session_auth.py",
   "app/venue_reconciliation_policy.py",
   "app/venue_reconciliation_repository.py",
   "app/venue_reconciliation_runtime_client.py",
