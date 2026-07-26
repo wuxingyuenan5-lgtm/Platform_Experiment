@@ -116,9 +116,16 @@ def test_take_profit_limit_uses_claimed_trigger_spread(monkeypatch) -> None:
         captured["limit_spread"] = limit_spread
         return pricing()
 
-    def fake_close(claimed_plan, *, execution_mode, limit_execution):
+    def fake_close(
+        claimed_plan,
+        *,
+        execution_mode,
+        limit_strategy,
+        limit_execution,
+    ):
         captured["plan"] = claimed_plan
         captured["execution_mode"] = execution_mode
+        captured["limit_strategy"] = limit_strategy
         captured["limit_execution"] = limit_execution
         return "closed"
 
@@ -131,6 +138,7 @@ def test_take_profit_limit_uses_claimed_trigger_spread(monkeypatch) -> None:
     assert captured["execution_type"] == "LIMIT"
     assert captured["limit_spread"] == Decimal("-0.2")
     assert captured["execution_mode"] == "limit"
+    assert captured["limit_strategy"] == "fok"
     assert captured["limit_execution"] == pricing()
 
 
@@ -143,9 +151,16 @@ def test_stop_loss_market_uses_same_close_action_without_limit(monkeypatch) -> N
         captured["limit_spread"] = limit_spread
         return None
 
-    def fake_close(claimed_plan, *, execution_mode, limit_execution):
+    def fake_close(
+        claimed_plan,
+        *,
+        execution_mode,
+        limit_strategy,
+        limit_execution,
+    ):
         captured["plan"] = claimed_plan
         captured["execution_mode"] = execution_mode
+        captured["limit_strategy"] = limit_strategy
         captured["limit_execution"] = limit_execution
         return "closed"
 
@@ -158,6 +173,7 @@ def test_stop_loss_market_uses_same_close_action_without_limit(monkeypatch) -> N
     assert captured["execution_type"] == "MARKET"
     assert captured["limit_spread"] is None
     assert captured["execution_mode"] == "market"
+    assert captured["limit_strategy"] == "fok"
     assert captured["limit_execution"] is None
 
 

@@ -92,19 +92,9 @@ secret://windows-credential-manager/<secret-name>
 
 Legacy `secret://<secret-name>` 仅保留迁移兼容，并标记 `legacyReference=true`。
 
-Runtime Inspection 可返回：
+Runtime Inspection 可返回 Credential Reference、Provider、Secret Name、Version、Configured、Available/Missing Fields、Legacy 标记和 Environment Provider 的 Env Prefix；不得返回值、长度、摘要、前后缀或其他可推断信息。
 
-- credentialRef
-- provider
-- secretName
-- version
-- configured
-- availableFields
-- missingFields
-- legacyReference
-- Environment Provider 的 envPrefix
-
-不得返回值、长度、摘要、前后缀或其他可推断信息。`resolve` 不是公共 API，只在 Runtime Gateway 内部使用。
+`resolve` 不是公共 API，只在 Runtime Gateway 内部使用。
 
 ## 6. Catalog
 
@@ -245,7 +235,9 @@ Market Open 请求：
   "quantityOz": "1",
   "takeProfitSpread": "0",
   "stopLossSpread": "-3",
-  "executionMode": "market"
+  "executionMode": "market",
+  "takeProfitExecutionMode": "market",
+  "stopLossExecutionMode": "market"
 }
 ```
 
@@ -258,7 +250,28 @@ FOK Limit Open 请求：
   "takeProfitSpread": "0",
   "stopLossSpread": "-3",
   "executionMode": "limit",
-  "limitSpread": "-0.8"
+  "limitStrategy": "fok",
+  "limitSpread": "-0.8",
+  "takeProfitExecutionMode": "limit",
+  "takeProfitLimitStrategy": "fok",
+  "stopLossExecutionMode": "market",
+  "stopLossLimitStrategy": "fok"
+}
+```
+
+PostOnly Chase Open 请求使用同一 Limit 合同：
+
+```json
+{
+  "direction": "LONG_SPREAD",
+  "quantityOz": "1",
+  "takeProfitSpread": "0",
+  "stopLossSpread": "-3",
+  "executionMode": "limit",
+  "limitStrategy": "post_only_chase",
+  "limitSpread": "-0.8",
+  "takeProfitExecutionMode": "market",
+  "stopLossExecutionMode": "market"
 }
 ```
 
@@ -267,6 +280,7 @@ FOK Limit Open 请求：
 ```json
 {
   "executionMode": "limit",
+  "limitStrategy": "post_only_chase",
   "limitSpread": "-1.1"
 }
 ```
@@ -274,9 +288,13 @@ FOK Limit Open 请求：
 请求约束：
 
 - `executionMode=limit` 必须提供 `limitSpread`。
-- `executionMode=market` 不得提供 `limitSpread`。
-- 当前自动 TP/SL 仍提交 `market` Close，不读取人工 `limitSpread`。
+- `executionMode=market` 不得提供 `limitSpread`，并忽略 Limit Strategy。
+- `limitStrategy` 允许 `fok` 或 `post_only_chase`；缺省值为 `fok`。
+- TP/SL 分别持久化 Execution Mode 与 Limit Strategy。
+- 自动 TP/SL 使用 Exit Plan 保存的 Mode/Strategy，并使用原子 Claim 保存的 `triggerSpread` 作为 Limit Spread。
+- 自动 Limit 不静默回退到 Market。
 - Limit 请求先校验当前可成交价差；不满足限制时返回 `409`，不创建 Batch。
+- PostOnly Chase 还受 Runtime 独立禁用开关约束，默认关闭。
 
 Open 和 Close 响应包含标准化意图：
 
@@ -292,12 +310,13 @@ Open 和 Close 响应包含标准化意图：
 }
 ```
 
-Limit 响应同时附加定价证据：
+Limit 响应同时附加 Platform 定价证据：
 
 ```json
 {
   "limitExecution": {
     "direction": "BUY_BYBIT_SELL_MT5",
+    "limitStrategy": "post_only_chase",
     "limitSpread": "-0.8",
     "executableSpread": "-0.9",
     "mt5ReferencePrice": "2501.0",
@@ -306,7 +325,7 @@ Limit 响应同时附加定价证据：
     "rawBybitLimitPrice": "2500.2",
     "bybitLimitPrice": "2500.2",
     "currentlyExecutable": true,
-    "timeInForce": "FOK"
+    "timeInForce": "PostOnly"
   }
 }
 ```
@@ -318,12 +337,11 @@ Limit 响应同时附加定价证据：
 - `triggerReason` 表示人工、策略、止盈、止损、Kill Switch 或风险降低来源。
 - TP/SL 不是独立订单类型，而是触发普通 Close Action。
 - 四类动作继续映射为 `OPEN_LONG / CLOSE_LONG / OPEN_SHORT / CLOSE_SHORT`。
-- 跨所价差 Limit 的 Bybit 主腿使用 `FOK`；普通非跨所价差 Limit 不因此改变。
-- 只有 Bybit 终态且累计成交量等于请求量时，MT5 才能提交。
-- FOK 零成交失败不提交 MT5；人工 Close 的计划恢复 `active`。
-- FOK 部分成交、数量不一致或未知结果不得解释为零成交，进入对账／人工介入。
-- `limitExecution` 是 Platform 定价证据，不等于 Venue 成交证据。
-- 详细定价公式和状态语义见 `CROSS_SPREAD_SYNTHETIC_EXECUTION.md`。
+- FOK 只有终态精确全成交才允许 MT5；零成交失败不提交 MT5，人工 Close 可恢复 `active`。
+- PostOnly Chase 只有去重后的累计成交量精确等于请求量才允许 MT5。
+- PostOnly 部分成交、私有流断线、事件序列/身份异常或 REST 不一致不提交 MT5，并进入对账／人工介入。
+- `limitExecution` 是提交前 Platform 定价证据，不等于 Venue 成交证据。
+- 详细公式、状态机和限制见 `CROSS_SPREAD_SYNTHETIC_EXECUTION.md`。
 
 ## 12. Runtime Command
 
@@ -331,26 +349,33 @@ Limit 响应同时附加定价证据：
 POST /commands/orders
 ```
 
-Runtime 在 Gateway 副作用前原子抢占 Command，并独立检查：
+Runtime V1 Command 在原有字段上增加：
 
-- environment=live
-- liveWriteEnabled=true
-- Account/Strategy/Symbol allowlist
-- 单笔/单日 Runtime 限额
-- 明确 Credential Reference 与可用 Provider
+```text
+execution_policy = default | fok | post_only_chase
+```
 
-任一条件失败不得回退 Fake Gateway。
+约束：
+
+- `fok` 和 `post_only_chase` 仅允许 `order_type=limit`。
+- `default` 保持旧 Market 和普通 Limit 兼容行为。
+- Runtime 在 Gateway 副作用前原子抢占 Command，并独立检查 Environment、Live Write、Account/Strategy/Symbol Allowlist、单笔/单日限额和 Credential Reference。
+- 任一条件失败不得回退 Fake Gateway。
 
 ## 13. Bybit 与 MT5
 
 ### Bybit
 
 - V5 Unified Trading API。
-- Platform Order ID 确定性派生 orderLinkId。
+- Platform Order ID 确定性派生 Order Link 前缀；PostOnly 子单使用唯一子编号。
 - Place ACK 不生成虚假 Fill。
 - Market Order 使用有界终态成交确认。
-- 跨所价差 Limit 使用 `timeInForce=FOK`，并要求终态精确全成交。
-- Execution ID、Funding ID、Fee ID 作为稳定外部身份。
+- FOK 使用 `timeInForce=FOK`，并要求终态精确全成交。
+- PostOnly 使用 `timeInForce=PostOnly`，通过 disabled-by-default Private Order/Execution Stream 驱动有界 Chase。
+- PostOnly 受 TTL、最小改单 Tick、最大变更次数和冷却约束。
+- Amend 被拒绝后，只有终态 Cancel 事件确认才允许 Repost。
+- Execution ID 去重；部分成交、断线或状态不一致不放行 MT5。
+- REST 只用于有界终态恢复/对账，不授权盲目重复提交。
 - Position 强平价只使用交易所返回的有限 `liqPrice`。
 
 ### MT5
@@ -358,6 +383,7 @@ Runtime 在 Gateway 副作用前原子抢占 Command，并独立检查：
 - Windows Terminal 或注入测试 Provider。
 - 下单前 `order_check`，写入使用 `order_send`。
 - Magic、Comment、Order/Deal/Position Ticket 可追溯。
+- MT5 只在 Bybit 主腿满足对应策略的确认合同后提交。
 - Swap、Commission、Fee 来自外部 Deal。
 - Python Position API 不提供权威单仓强平价；风险使用 Account Margin Level、Margin Call 与 Stop Out。
 
@@ -398,16 +424,9 @@ POST /api/v1/strategies/instances/{strategyInstanceId}/formal-nav-snapshots/run
 
 ## 17. Redaction 与审计
 
-Backend 与 Runtime Redactor 处理：
+Backend 与 Runtime Redactor 处理嵌套敏感键、Bearer Token、私钥块、受控字段赋值、URL 认证信息和 Exception Message，统一替换为 `[REDACTED]`。
 
-- 嵌套结构中的敏感键。
-- Bearer Token。
-- 私钥块。
-- 受控字段赋值。
-- URL 中的认证信息。
-- Exception Message。
-
-统一替换为 `[REDACTED]`。Rotation、Authentication、Session、Kill Switch、RiskAction、Difference、EOD 等操作均记录非敏感审计元数据。
+Rotation、Authentication、Session、Kill Switch、RiskAction、Difference、EOD 等操作均记录非敏感审计元数据。
 
 ## 18. 通用规则
 
@@ -419,4 +438,5 @@ Backend 与 Runtime Redactor 处理：
 - 缺失值与零不同。
 - Stablecoin 不自动等同法币。
 - Platform 与 Runtime Live Write 默认关闭。
+- PostOnly Chase 默认关闭。
 - 工程验收不等于真实账户运营验收。

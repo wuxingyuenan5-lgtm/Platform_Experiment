@@ -10,6 +10,7 @@ from fastapi import HTTPException
 from app.cross_spread_exit_schemas import (
     CrossSpreadExitPlanResponse,
     ExecutionMode,
+    LimitStrategy,
     SpreadDirection,
 )
 from app.database import connection
@@ -106,6 +107,8 @@ def create_exit_plan(
     stop_loss_spread: Decimal,
     take_profit_execution_mode: ExecutionMode = "market",
     stop_loss_execution_mode: ExecutionMode = "market",
+    take_profit_limit_strategy: LimitStrategy = "fok",
+    stop_loss_limit_strategy: LimitStrategy = "fok",
 ) -> CrossSpreadExitPlanResponse:
     existing = find_plan_by_open_batch(open_batch_id)
     if existing is not None:
@@ -133,10 +136,11 @@ def create_exit_plan(
                 id, strategy_instance_id, open_batch_id, close_batch_id, direction,
                 quantity_oz, mt5_position_id, entry_spread, take_profit_spread,
                 stop_loss_spread, take_profit_execution_mode,
-                stop_loss_execution_mode, status, trigger_reason, trigger_spread,
+                stop_loss_execution_mode, take_profit_limit_strategy,
+                stop_loss_limit_strategy, status, trigger_reason, trigger_spread,
                 created_at, updated_at, triggered_at, closed_at
             ) VALUES (
-                ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?,
+                ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
                 'active', NULL, NULL, ?, ?, NULL, NULL
             )
             """,
@@ -152,6 +156,8 @@ def create_exit_plan(
                 format(stop_loss_spread, "f"),
                 take_profit_execution_mode,
                 stop_loss_execution_mode,
+                take_profit_limit_strategy,
+                stop_loss_limit_strategy,
                 created_at,
                 created_at,
             ),
@@ -164,19 +170,28 @@ def configure_exit_plan_execution_modes(
     *,
     take_profit_execution_mode: ExecutionMode,
     stop_loss_execution_mode: ExecutionMode,
+    take_profit_limit_strategy: LimitStrategy = "fok",
+    stop_loss_limit_strategy: LimitStrategy = "fok",
 ) -> CrossSpreadExitPlanResponse:
     current = get_exit_plan(plan_id)
-    requested = (take_profit_execution_mode, stop_loss_execution_mode)
+    requested = (
+        take_profit_execution_mode,
+        stop_loss_execution_mode,
+        take_profit_limit_strategy,
+        stop_loss_limit_strategy,
+    )
     existing = (
         current.take_profit_execution_mode,
         current.stop_loss_execution_mode,
+        current.take_profit_limit_strategy,
+        current.stop_loss_limit_strategy,
     )
     if existing == requested:
         return current
-    if existing != ("market", "market") or current.status != "active":
+    if existing != ("market", "market", "fok", "fok") or current.status != "active":
         raise HTTPException(
             status_code=409,
-            detail="Exit plan execution modes are already configured differently",
+            detail="Exit plan execution settings are already configured differently",
         )
 
     updated_at = now_iso()
@@ -185,14 +200,19 @@ def configure_exit_plan_execution_modes(
             """
             UPDATE cross_spread_exit_plans
             SET take_profit_execution_mode = ?, stop_loss_execution_mode = ?,
+                take_profit_limit_strategy = ?, stop_loss_limit_strategy = ?,
                 updated_at = ?
             WHERE id = ? AND status = 'active'
               AND take_profit_execution_mode = 'market'
               AND stop_loss_execution_mode = 'market'
+              AND take_profit_limit_strategy = 'fok'
+              AND stop_loss_limit_strategy = 'fok'
             """,
             (
                 take_profit_execution_mode,
                 stop_loss_execution_mode,
+                take_profit_limit_strategy,
+                stop_loss_limit_strategy,
                 updated_at,
                 plan_id,
             ),
@@ -200,7 +220,7 @@ def configure_exit_plan_execution_modes(
     if cursor.rowcount != 1:
         raise HTTPException(
             status_code=409,
-            detail="Exit plan execution modes changed concurrently",
+            detail="Exit plan execution settings changed concurrently",
         )
     return get_exit_plan(plan_id)
 
@@ -330,7 +350,8 @@ def _plan_query(where_clause: str) -> str:
         SELECT id, strategy_instance_id, open_batch_id, close_batch_id, direction,
                quantity_oz, mt5_position_id, entry_spread, take_profit_spread,
                stop_loss_spread, take_profit_execution_mode,
-               stop_loss_execution_mode, status, trigger_reason, trigger_spread,
+               stop_loss_execution_mode, take_profit_limit_strategy,
+               stop_loss_limit_strategy, status, trigger_reason, trigger_spread,
                created_at, updated_at, triggered_at, closed_at
         FROM cross_spread_exit_plans
         WHERE {where_clause}
@@ -351,6 +372,8 @@ def _plan_from_row(row) -> CrossSpreadExitPlanResponse:
         stopLossSpread=Decimal(row["stop_loss_spread"]),
         takeProfitExecutionMode=row["take_profit_execution_mode"],
         stopLossExecutionMode=row["stop_loss_execution_mode"],
+        takeProfitLimitStrategy=row["take_profit_limit_strategy"],
+        stopLossLimitStrategy=row["stop_loss_limit_strategy"],
         status=row["status"],
         triggerReason=row["trigger_reason"],
         triggerSpread=(Decimal(row["trigger_spread"]) if row["trigger_spread"] else None),

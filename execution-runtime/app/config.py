@@ -43,6 +43,13 @@ class Settings(BaseSettings):
     bybit_check_timeout_seconds: float = 8.0
     bybit_fill_confirmation_timeout_seconds: float = 5.0
     bybit_fill_confirmation_poll_seconds: float = 0.1
+    bybit_postonly_chase_enabled: bool = False
+    bybit_postonly_chase_ttl_seconds: float = 15.0
+    bybit_postonly_chase_event_timeout_seconds: float = 0.5
+    bybit_postonly_chase_min_amend_ticks: int = 2
+    bybit_postonly_chase_max_mutations: int = 5
+    bybit_postonly_chase_cooldown_seconds: float = 0.25
+    bybit_postonly_chase_rest_reconcile_seconds: float = 3.0
 
     mt5_credential_ref: str = "secret://environment/mt5-live-001"
     mt5_account_ids: str = ""

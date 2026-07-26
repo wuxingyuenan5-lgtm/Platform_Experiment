@@ -25,6 +25,7 @@ class RuntimeSubmitOrderCommandV1(BaseModel):
     symbol: str = Field(min_length=1)
     side: Literal["buy", "sell"]
     order_type: Literal["market", "limit"] = "market"
+    execution_policy: Literal["default", "fok", "post_only_chase"] = "default"
     quantity: Decimal = Field(gt=0)
     price: Decimal | None = Field(default=None, gt=0)
     reduce_only: bool = False
@@ -32,9 +33,11 @@ class RuntimeSubmitOrderCommandV1(BaseModel):
     received_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     @model_validator(mode="after")
-    def validate_position_target(self) -> RuntimeSubmitOrderCommandV1:
+    def validate_execution_contract(self) -> RuntimeSubmitOrderCommandV1:
         if self.position_id is not None and not self.reduce_only:
             raise ValueError("position_id requires reduce_only")
+        if self.execution_policy != "default" and self.order_type != "limit":
+            raise ValueError("FOK and PostOnly Chase execution policies require a limit order")
         return self
 
 

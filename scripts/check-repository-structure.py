@@ -116,6 +116,7 @@ RUNTIME_CONTRACT_FIELDS = {
         "symbol",
         "side",
         "order_type",
+        "execution_policy",
         "quantity",
         "price",
         "reduce_only",
@@ -238,7 +239,8 @@ def check_financial_fact_repository_boundary(errors: list[str]) -> None:
     repository_path = BACKEND_APP / "financial_fact_repository.py"
     if not repository_path.is_file():
         errors.append(
-            "platform-backend/app/financial_fact_repository.py: FinancialFact persistence owner is missing"
+            "platform-backend/app/financial_fact_repository.py: "
+            "FinancialFact persistence owner is missing"
         )
         return
 
@@ -271,8 +273,8 @@ def check_financial_fact_repository_boundary(errors: list[str]) -> None:
     }
     if missing_sql:
         errors.append(
-            "platform-backend/app/financial_fact_repository.py: required persistence anchors missing: "
-            f"{sorted(missing_sql)}"
+            "platform-backend/app/financial_fact_repository.py: "
+            f"required persistence anchors missing: {sorted(missing_sql)}"
         )
 
 
@@ -313,7 +315,9 @@ def check_projection_boundaries(errors: list[str]) -> None:
         )
 
     financial_source = (BACKEND_APP / "financial_facts.py").read_text(encoding="utf-8")
-    repository_source = (BACKEND_APP / "financial_fact_repository.py").read_text(encoding="utf-8")
+    repository_source = (BACKEND_APP / "financial_fact_repository.py").read_text(
+        encoding="utf-8"
+    )
     forbidden_operational_reads = {
         statement
         for statement in OPERATIONAL_PROJECTION_READS

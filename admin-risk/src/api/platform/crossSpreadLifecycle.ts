@@ -4,6 +4,7 @@ import type { ExecutionBatchResult } from './trading.types';
 
 export type CrossSpreadDirection = 'LONG_SPREAD' | 'SHORT_SPREAD';
 export type CrossSpreadExecutionMode = 'market' | 'limit';
+export type CrossSpreadLimitStrategy = 'fok' | 'post_only_chase';
 export type CrossSpreadSyntheticAction =
   | 'OPEN_LONG_SPREAD'
   | 'CLOSE_LONG_SPREAD'
@@ -34,6 +35,7 @@ export interface CrossSpreadOrderIntentResult {
 
 export interface CrossSpreadLimitExecutionResult {
   direction: 'BUY_BYBIT_SELL_MT5' | 'SELL_BYBIT_BUY_MT5';
+  limitStrategy: CrossSpreadLimitStrategy;
   limitSpread: string;
   executableSpread: string;
   mt5ReferencePrice: string;
@@ -42,7 +44,7 @@ export interface CrossSpreadLimitExecutionResult {
   rawBybitLimitPrice: string;
   bybitLimitPrice: string;
   currentlyExecutable: boolean;
-  timeInForce: 'FOK';
+  timeInForce: 'FOK' | 'PostOnly';
 }
 
 export interface CrossSpreadExitPlanResult {
@@ -58,6 +60,8 @@ export interface CrossSpreadExitPlanResult {
   stopLossSpread: string;
   takeProfitExecutionMode: CrossSpreadExecutionMode;
   stopLossExecutionMode: CrossSpreadExecutionMode;
+  takeProfitLimitStrategy: CrossSpreadLimitStrategy;
+  stopLossLimitStrategy: CrossSpreadLimitStrategy;
   status: CrossSpreadExitPlanStatus;
   triggerReason?: string | null;
   triggerSpread?: string | null;
@@ -74,8 +78,11 @@ export interface CrossSpreadMarketOpenInput {
   stopLossSpread: string;
   executionMode: CrossSpreadExecutionMode;
   limitSpread?: string;
+  limitStrategy: CrossSpreadLimitStrategy;
   takeProfitExecutionMode: CrossSpreadExecutionMode;
   stopLossExecutionMode: CrossSpreadExecutionMode;
+  takeProfitLimitStrategy: CrossSpreadLimitStrategy;
+  stopLossLimitStrategy: CrossSpreadLimitStrategy;
 }
 
 export interface CrossSpreadMarketOpenResult {
@@ -126,10 +133,15 @@ export async function closeCrossSpreadMarket(
   planId: string,
   executionMode: CrossSpreadExecutionMode,
   limitSpread?: string,
+  limitStrategy: CrossSpreadLimitStrategy = 'fok',
 ): Promise<CrossSpreadMarketCloseResult> {
   const response = await client.post<CrossSpreadMarketCloseResult>(
     `/trading/cross-spread/exit-plans/${encodeURIComponent(planId)}/close`,
-    { executionMode, ...(limitSpread === undefined ? {} : { limitSpread }) },
+    {
+      executionMode,
+      limitStrategy,
+      ...(limitSpread === undefined ? {} : { limitSpread }),
+    },
   );
   return response.data;
 }

@@ -157,6 +157,7 @@ def create_trade_command(request: CreateTradeCommandRequest) -> TradeCommandResp
             command_id=trade_command_id,
             reduce_only=intent.reduce_only,
             position_id=intent.position_id,
+            execution_policy=intent.execution_policy,
         )
     except HTTPException:
         update_trade_command_status(trade_command_id, "rejected")

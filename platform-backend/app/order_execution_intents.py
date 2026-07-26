@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Literal
 
 from fastapi import HTTPException
 
 from app.database import connection
+
+ExecutionPolicy = Literal["default", "fok", "post_only_chase"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -12,6 +15,7 @@ class OrderExecutionIntent:
     idempotency_key: str
     reduce_only: bool
     position_id: str | None
+    execution_policy: ExecutionPolicy
 
 
 def register_order_execution_intent(
@@ -19,11 +23,12 @@ def register_order_execution_intent(
     *,
     reduce_only: bool,
     position_id: str | None = None,
+    execution_policy: ExecutionPolicy = "default",
 ) -> None:
     with connection() as db:
         existing = db.execute(
             """
-            SELECT reduce_only, position_id
+            SELECT reduce_only, position_id, execution_policy
             FROM order_execution_intents
             WHERE idempotency_key = ?
             """,
@@ -33,6 +38,7 @@ def register_order_execution_intent(
             matches = (
                 bool(existing["reduce_only"]) == reduce_only
                 and existing["position_id"] == position_id
+                and existing["execution_policy"] == execution_policy
             )
             if not matches:
                 raise HTTPException(
@@ -42,10 +48,11 @@ def register_order_execution_intent(
             return
         db.execute(
             """
-            INSERT INTO order_execution_intents (idempotency_key, reduce_only, position_id)
-            VALUES (?, ?, ?)
+            INSERT INTO order_execution_intents (
+                idempotency_key, reduce_only, position_id, execution_policy
+            ) VALUES (?, ?, ?, ?)
             """,
-            (idempotency_key, int(reduce_only), position_id),
+            (idempotency_key, int(reduce_only), position_id, execution_policy),
         )
 
 
@@ -53,7 +60,7 @@ def get_order_execution_intent(idempotency_key: str) -> OrderExecutionIntent:
     with connection() as db:
         row = db.execute(
             """
-            SELECT idempotency_key, reduce_only, position_id
+            SELECT idempotency_key, reduce_only, position_id, execution_policy
             FROM order_execution_intents
             WHERE idempotency_key = ?
             """,
@@ -64,9 +71,11 @@ def get_order_execution_intent(idempotency_key: str) -> OrderExecutionIntent:
             idempotency_key=idempotency_key,
             reduce_only=False,
             position_id=None,
+            execution_policy="default",
         )
     return OrderExecutionIntent(
         idempotency_key=row["idempotency_key"],
         reduce_only=bool(row["reduce_only"]),
         position_id=row["position_id"],
+        execution_policy=row["execution_policy"],
     )
