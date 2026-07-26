@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import sqlite3
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -20,6 +21,10 @@ class UserNotFoundError(UserRepositoryError):
     pass
 
 
+class ConcurrentUserUpdateError(UserRepositoryError):
+    pass
+
+
 @dataclass(frozen=True, slots=True)
 class UserRecord:
     id: str
@@ -30,6 +35,25 @@ class UserRecord:
     auth_version: int
     failed_login_count: int
     locked_until: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class UserProfileRecord:
+    id: str
+    username: str
+    display_name: str | None
+    real_name: str | None
+    avatar_key: str | None
+    phone: str | None
+    email: str | None
+    role_code: str | None
+    requested_role_code: str | None
+    department: str | None
+    member_type: str | None
+    lifecycle_status: str
+    registered_at: str
+    last_login_at: str | None
+    row_version: int
 
 
 @dataclass(frozen=True, slots=True)
@@ -51,6 +75,18 @@ class SessionRecord:
     locked_until: str | None
 
 
+@dataclass(frozen=True, slots=True)
+class SessionSummaryRecord:
+    id: str
+    created_at: str
+    expires_at: str
+    idle_expires_at: str
+    last_seen_at: str
+    last_reauthenticated_at: str | None
+    ip_address: str | None
+    user_agent: str | None
+
+
 def utc_now_iso() -> str:
     return datetime.now(UTC).isoformat()
 
@@ -70,6 +106,32 @@ def _user_from_row(row: sqlite3.Row | None) -> UserRecord | None:
     )
 
 
+def _profile_from_row(row: sqlite3.Row | None) -> UserProfileRecord | None:
+    if row is None:
+        return None
+    return UserProfileRecord(
+        id=str(row["id"]),
+        username=str(row["username"]),
+        display_name=str(row["display_name"]) if row["display_name"] is not None else None,
+        real_name=str(row["real_name"]) if row["real_name"] is not None else None,
+        avatar_key=str(row["avatar_key"]) if row["avatar_key"] is not None else None,
+        phone=str(row["phone"]) if row["phone"] is not None else None,
+        email=str(row["email"]) if row["email"] is not None else None,
+        role_code=str(row["role_code"]) if row["role_code"] is not None else None,
+        requested_role_code=(
+            str(row["requested_role_code"])
+            if row["requested_role_code"] is not None
+            else None
+        ),
+        department=str(row["department"]) if row["department"] is not None else None,
+        member_type=str(row["member_type"]) if row["member_type"] is not None else None,
+        lifecycle_status=str(row["lifecycle_status"]),
+        registered_at=str(row["registered_at"]),
+        last_login_at=str(row["last_login_at"]) if row["last_login_at"] is not None else None,
+        row_version=int(row["row_version"]),
+    )
+
+
 def get_user_by_id(db: sqlite3.Connection, user_id: str) -> UserRecord | None:
     row = db.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
     return _user_from_row(row)
@@ -81,6 +143,11 @@ def get_user_by_username(db: sqlite3.Connection, username: str) -> UserRecord | 
         (normalize_username(username),),
     ).fetchone()
     return _user_from_row(row)
+
+
+def get_user_profile(db: sqlite3.Connection, user_id: str) -> UserProfileRecord | None:
+    row = db.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
+    return _profile_from_row(row)
 
 
 def count_active_ceos(db: sqlite3.Connection) -> int:
@@ -140,6 +207,114 @@ def create_initial_ceo(
     if created is None:
         raise UserRepositoryError("Initial CEO creation did not persist")
     return created
+
+
+def create_pending_registration(
+    db: sqlite3.Connection,
+    *,
+    username: str,
+    password_hash: str,
+    real_name: str,
+    email: str | None,
+    phone: str | None,
+    requested_role_code: str,
+    department: str | None,
+    member_type: str | None,
+    application_note: str | None,
+    now: str,
+) -> UserProfileRecord:
+    user_id = str(uuid4())
+    db.execute(
+        """
+        INSERT INTO users (
+            id, username, username_normalized, password_hash,
+            display_name, real_name, phone, phone_normalized,
+            email, email_normalized, role_code, requested_role_code,
+            department, member_type, application_note,
+            lifecycle_status, registered_at, password_changed_at,
+            created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, 'pending', ?, ?, ?, ?)
+        """,
+        (
+            user_id,
+            username.strip(),
+            normalize_username(username),
+            password_hash,
+            real_name.strip(),
+            real_name.strip(),
+            phone,
+            normalize_phone(phone),
+            email,
+            normalize_email(email),
+            requested_role_code,
+            department,
+            member_type,
+            application_note,
+            now,
+            now,
+            now,
+            now,
+        ),
+    )
+    created = get_user_profile(db, user_id)
+    if created is None:
+        raise UserRepositoryError("Registration did not persist")
+    return created
+
+
+def record_login_failure(
+    db: sqlite3.Connection,
+    *,
+    user_id: str,
+    locked_until: str | None,
+    now: str,
+) -> int:
+    cursor = db.execute(
+        """
+        UPDATE users
+        SET failed_login_count = failed_login_count + 1,
+            locked_until = COALESCE(?, locked_until),
+            updated_at = ?
+        WHERE id = ?
+        """,
+        (locked_until, now, user_id),
+    )
+    if cursor.rowcount != 1:
+        raise UserNotFoundError("User does not exist")
+    row = db.execute(
+        "SELECT failed_login_count FROM users WHERE id = ?",
+        (user_id,),
+    ).fetchone()
+    return int(row["failed_login_count"])
+
+
+def record_login_success(db: sqlite3.Connection, *, user_id: str, now: str) -> None:
+    cursor = db.execute(
+        """
+        UPDATE users
+        SET failed_login_count = 0,
+            locked_until = NULL,
+            last_login_at = ?,
+            updated_at = ?
+        WHERE id = ?
+        """,
+        (now, now, user_id),
+    )
+    if cursor.rowcount != 1:
+        raise UserNotFoundError("User does not exist")
+
+
+def upgrade_password_hash(
+    db: sqlite3.Connection,
+    *,
+    user_id: str,
+    password_hash: str,
+    now: str,
+) -> None:
+    db.execute(
+        "UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?",
+        (password_hash, now, user_id),
+    )
 
 
 def create_session(
@@ -243,6 +418,47 @@ def get_session_with_user_by_token_hash(
     )
 
 
+def get_session_owner(db: sqlite3.Connection, session_id: str) -> str | None:
+    row = db.execute(
+        "SELECT user_id FROM user_sessions WHERE id = ?",
+        (session_id,),
+    ).fetchone()
+    return str(row["user_id"]) if row is not None else None
+
+
+def list_active_user_sessions(
+    db: sqlite3.Connection,
+    user_id: str,
+) -> list[SessionSummaryRecord]:
+    rows = db.execute(
+        """
+        SELECT id, created_at, expires_at, idle_expires_at, last_seen_at,
+               last_reauthenticated_at, ip_address, user_agent
+        FROM user_sessions
+        WHERE user_id = ? AND revoked_at IS NULL
+        ORDER BY last_seen_at DESC, created_at DESC
+        """,
+        (user_id,),
+    ).fetchall()
+    return [
+        SessionSummaryRecord(
+            id=str(row["id"]),
+            created_at=str(row["created_at"]),
+            expires_at=str(row["expires_at"]),
+            idle_expires_at=str(row["idle_expires_at"]),
+            last_seen_at=str(row["last_seen_at"]),
+            last_reauthenticated_at=(
+                str(row["last_reauthenticated_at"])
+                if row["last_reauthenticated_at"] is not None
+                else None
+            ),
+            ip_address=str(row["ip_address"]) if row["ip_address"] is not None else None,
+            user_agent=str(row["user_agent"]) if row["user_agent"] is not None else None,
+        )
+        for row in rows
+    ]
+
+
 def touch_session(
     db: sqlite3.Connection,
     *,
@@ -258,6 +474,40 @@ def touch_session(
         """,
         (last_seen_at, idle_expires_at, session_id),
     )
+
+
+def rotate_session_csrf(
+    db: sqlite3.Connection,
+    *,
+    session_id: str,
+    csrf_token_hash: str,
+) -> None:
+    cursor = db.execute(
+        """
+        UPDATE user_sessions SET csrf_token_hash = ?
+        WHERE id = ? AND revoked_at IS NULL
+        """,
+        (csrf_token_hash, session_id),
+    )
+    if cursor.rowcount != 1:
+        raise UserRepositoryError("Active Session does not exist")
+
+
+def record_session_reauthentication(
+    db: sqlite3.Connection,
+    *,
+    session_id: str,
+    now: str,
+) -> None:
+    cursor = db.execute(
+        """
+        UPDATE user_sessions SET last_reauthenticated_at = ?
+        WHERE id = ? AND revoked_at IS NULL
+        """,
+        (now, session_id),
+    )
+    if cursor.rowcount != 1:
+        raise UserRepositoryError("Active Session does not exist")
 
 
 def revoke_session(
@@ -294,3 +544,131 @@ def revoke_all_user_sessions(
         (revoked_at, reason, user_id),
     )
     return cursor.rowcount
+
+
+def revoke_other_user_sessions(
+    db: sqlite3.Connection,
+    *,
+    user_id: str,
+    current_session_id: str,
+    revoked_at: str,
+    reason: str,
+) -> int:
+    cursor = db.execute(
+        """
+        UPDATE user_sessions
+        SET revoked_at = ?, revoke_reason = ?
+        WHERE user_id = ? AND id <> ? AND revoked_at IS NULL
+        """,
+        (revoked_at, reason, user_id, current_session_id),
+    )
+    return cursor.rowcount
+
+
+def update_self_profile(
+    db: sqlite3.Connection,
+    *,
+    user_id: str,
+    display_name: str | None,
+    email: str | None,
+    phone: str | None,
+    expected_version: int,
+    now: str,
+) -> UserProfileRecord:
+    cursor = db.execute(
+        """
+        UPDATE users
+        SET display_name = ?,
+            email = ?,
+            email_normalized = ?,
+            phone = ?,
+            phone_normalized = ?,
+            row_version = row_version + 1,
+            updated_at = ?
+        WHERE id = ? AND row_version = ?
+        """,
+        (
+            display_name,
+            email,
+            normalize_email(email),
+            phone,
+            normalize_phone(phone),
+            now,
+            user_id,
+            expected_version,
+        ),
+    )
+    if cursor.rowcount != 1:
+        if get_user_by_id(db, user_id) is None:
+            raise UserNotFoundError("User does not exist")
+        raise ConcurrentUserUpdateError("User profile was changed by another request")
+    updated = get_user_profile(db, user_id)
+    if updated is None:
+        raise UserNotFoundError("User does not exist")
+    return updated
+
+
+def change_password(
+    db: sqlite3.Connection,
+    *,
+    user_id: str,
+    password_hash: str,
+    now: str,
+) -> int:
+    cursor = db.execute(
+        """
+        UPDATE users
+        SET password_hash = ?,
+            auth_version = auth_version + 1,
+            row_version = row_version + 1,
+            password_changed_at = ?,
+            updated_at = ?
+        WHERE id = ?
+        """,
+        (password_hash, now, now, user_id),
+    )
+    if cursor.rowcount != 1:
+        raise UserNotFoundError("User does not exist")
+    return revoke_all_user_sessions(
+        db,
+        user_id=user_id,
+        revoked_at=now,
+        reason="password_changed",
+    )
+
+
+def insert_audit_event(
+    db: sqlite3.Connection,
+    *,
+    event_type: str,
+    subject_type: str,
+    subject_id: str,
+    actor_user_id: str | None,
+    auth_method: str | None,
+    result: str,
+    details: dict[str, object],
+    request_id: str | None,
+    ip_address: str | None,
+    now: str,
+) -> None:
+    db.execute(
+        """
+        INSERT INTO audit_events (
+            id, event_type, subject_type, subject_id, details_json, created_at,
+            actor_user_id, request_id, result, ip_address, auth_method
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            str(uuid4()),
+            event_type,
+            subject_type,
+            subject_id,
+            json.dumps(details, ensure_ascii=False, sort_keys=True),
+            now,
+            actor_user_id,
+            request_id,
+            result,
+            ip_address,
+            auth_method,
+        ),
+    )
