@@ -60,6 +60,13 @@ class Settings(BaseSettings):
     login_failure_limit: int = 5
     login_lock_minutes: int = 15
 
+    # User avatars are application data outside the repository. Uploaded bytes are
+    # decoded, bounded and re-encoded before an opaque key is stored in the database.
+    avatar_data_directory: str = "./data/avatars"
+    avatar_max_bytes: int = 2 * 1024 * 1024
+    avatar_max_pixels: int = 20_000_000
+    avatar_output_size: int = 512
+
     # Platform LiveTradingSession is a separate authorization boundary from the
     # Runtime live-write gate. Zero absolute limits keep all live sessions blocked.
     require_live_trading_session: bool = True
