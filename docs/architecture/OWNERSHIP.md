@@ -20,6 +20,19 @@ This document is the canonical human-readable catalog of major code ownership bo
 | Cross-spread lifecycle DTOs | `platform-backend/app/cross_spread_exit_schemas.py` | Market/Limit lifecycle requests, FOK/PostOnly selections, TP/SL modes and strategies, normalized intent, pricing evidence and Exit Plan responses | Pricing formulas, SQL or Venue execution |
 | Cross-spread observability DTOs | `platform-backend/app/cross_spread_observability_schemas.py` | Read-only aggregate status, section-state and Venue evidence response models | Runtime HTTP, Venue mapping or execution decisions |
 
+## Human identity, authorization and browser sessions
+
+| Boundary | Authoritative owner | Responsibility | Must not own |
+|---|---|---|---|
+| Request authentication and assurance | `platform-backend/app/auth.py` | API-key/development authentication compatibility, browser-session Principal integration, route assurance, legacy permission mapping and request-level denial audit | Password hashing, direct user SQL, target-user policy or Live gate replacement |
+| Role and permission registry | `platform-backend/app/user_permissions.py` | Separate API-key and human-role namespaces plus centralized permission resolution | Route orchestration, persistence or target-user decisions |
+| Password and opaque-token security | `platform-backend/app/user_security.py` | Argon2id hashing, password policy, identity normalization and high-entropy token hashing | User persistence, HTTP cookies or account lifecycle transitions |
+| User and Session persistence | `platform-backend/app/user_repository.py` | User lookup, first-CEO insertion, opaque Session persistence, bounded Session count and revocation SQL | HTTP, password verification, menu policy or trading authorization |
+| Human authority invariants | `platform-backend/app/user_authority.py` | Transactional protected-role invariants including the last-active-CEO guard | Authentication, SQL unrelated to user authority or frontend visibility |
+| Browser Session validation | `platform-backend/app/user_session_auth.py` | Session expiry, idle timeout, auth-version invalidation, CSRF/Origin validation and activity throttling | Login credential verification, user administration or API-key validation |
+| User-system use cases | `platform-backend/app/user_service.py` | Initial CEO creation, transactional audit and opaque Session issuance pending later user workflows | FastAPI route assembly, Venue effects or formal accounting |
+| User bootstrap command | `platform-backend/app/user_cli.py` | Interactive, no-default-password first-CEO bootstrap | Automated production account creation or secret persistence |
+
 ## Trading and formal accounting
 
 | Boundary | Authoritative owner | Responsibility | Must not own |
@@ -68,7 +81,7 @@ Operational projections are monitoring views. Formal accounting is reconstructed
 | Core database bootstrap | `platform-backend/app/database_bootstrap.py` | Ordered core Schema and legacy compatibility DDL | Seed vectors or business services |
 | Fixed reference Seeds | `platform-backend/app/database_seeds.py` | Fixed Seed vectors, insertion order and approved default updates | Connection or Schema implementation |
 | Database compatibility facade | `platform-backend/app/database.py` | Explicit compatibility exports and `Connection → Bootstrap → Seed` initialization | Connection, Schema or Seed implementation |
-| Migration ledger | `platform-backend/app/schema_migrations.py` | Ordered additive migrations, including Exit Plan execution modes/Limit strategies and Venue execution-policy persistence, with immutable checksums | Editing an applied migration |
+| Migration ledger | `platform-backend/app/schema_migrations.py` | Ordered additive migrations, including execution policy and user identity/session schema, with immutable checksums | Editing an applied migration |
 | Database authority documentation | `docs/database/README.md` | Table authority, DDL owners, Seed authority and migration discipline | Runtime implementation |
 
 ## Runtime and external effects
