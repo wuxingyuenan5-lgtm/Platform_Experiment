@@ -19,6 +19,7 @@ const account: AppRouteModule = {
     icon: 'ant-design:user-outlined',
     orderNo: 80,
     roles: browserRoles,
+    permissions: 'profile.read_self',
   },
   children: [
     {
@@ -30,6 +31,7 @@ const account: AppRouteModule = {
         icon: 'ant-design:user-outlined',
         single: true,
         roles: browserRoles,
+        permissions: 'profile.read_self',
       },
     },
   ],
