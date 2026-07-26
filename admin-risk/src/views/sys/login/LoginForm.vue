@@ -52,6 +52,15 @@
         >
           没有账号？提交注册申请
         </Button>
+        <Button
+          type="link"
+          block
+          class="reset-password-btn mt-2 enter-x"
+          html-type="button"
+          @click.prevent="goResetPassword"
+        >
+          已有一次性重置凭证？设置新密码
+        </Button>
       </Form>
     </div>
   </div>
@@ -90,6 +99,10 @@
 
   function goRegisterApply() {
     router.push('/register-apply');
+  }
+
+  function goResetPassword() {
+    router.push('/reset-password');
   }
 
   function showLoginError(error: unknown) {
@@ -203,6 +216,11 @@
       font-weight: 400;
     }
 
+    .reset-password-btn {
+      width: 320px;
+      color: #64748b;
+    }
+
     .ant-form .ant-form-item-label > label {
       font-size: 14px;
       line-height: 16px;
@@ -226,6 +244,7 @@
 
     .login-box .login-input,
     .login-box .register-apply-btn,
+    .login-box .reset-password-btn,
     .login-box .ant-btn {
       width: 100% !important;
     }
