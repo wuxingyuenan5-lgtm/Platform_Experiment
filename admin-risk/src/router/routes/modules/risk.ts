@@ -3,7 +3,6 @@ import { LAYOUT } from '@/router/constant';
 import { RoleEnum } from '@/enums/roleEnum';
 
 const internalRoles = [RoleEnum.CEO, RoleEnum.TECH_LEAD, RoleEnum.EMPLOYEE];
-const userReadRoles = [RoleEnum.CEO, RoleEnum.TECH_LEAD, RoleEnum.EMPLOYEE];
 
 const risk: AppRouteModule = {
   path: '/risk',
@@ -25,16 +24,6 @@ const risk: AppRouteModule = {
         title: '风控详情',
         icon: 'ant-design:warning-outlined',
         roles: internalRoles,
-      },
-    },
-    {
-      path: 'users',
-      name: 'RiskUserManagement',
-      component: () => import('@/views/users/index.vue'),
-      meta: {
-        title: '用户管理',
-        icon: 'ant-design:user-outlined',
-        roles: userReadRoles,
       },
     },
     {
