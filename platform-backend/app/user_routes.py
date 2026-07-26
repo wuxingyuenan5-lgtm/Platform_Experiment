@@ -7,6 +7,8 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from app.auth import Principal, require_permission
 from app.config import get_settings
 from app.user_logout import LogoutError, logout_session_idempotently
+from app.user_password_reset import PasswordResetError, consume_password_reset_ticket
+from app.user_rate_limit import get_public_auth_rate_limiter
 from app.user_schemas import (
     ActionResponse,
     AuthenticationResponse,
@@ -15,6 +17,7 @@ from app.user_schemas import (
     ReauthenticationRequest,
     RegistrationRequest,
     RegistrationResponse,
+    ResetPasswordRequest,
     UpdateSelfProfileRequest,
     UserSelfResponse,
     UserSessionListResponse,
@@ -57,6 +60,32 @@ def _require_trusted_origin(request: Request) -> None:
         )
 
 
+def _enforce_public_rate_limit(
+    request: Request,
+    *,
+    scope: str,
+    identity: str,
+    limit: int,
+) -> None:
+    source = _client_ip(request) or "unknown"
+    normalized_identity = identity.strip().casefold() or "unknown"
+    limiter = get_public_auth_rate_limiter(settings.public_rate_limit_max_keys)
+    decision = limiter.check(
+        f"{scope}:{source}:{normalized_identity}",
+        limit=limit,
+        window_seconds=settings.public_auth_rate_window_seconds,
+    )
+    if not decision.allowed:
+        raise HTTPException(
+            status_code=429,
+            detail={
+                "code": "rate_limit_exceeded",
+                "message": "请求过于频繁，请稍后重试",
+            },
+            headers={"Retry-After": str(decision.retry_after_seconds)},
+        )
+
+
 def _raise_service_error(exc: UserServiceError) -> NoReturn:
     raise HTTPException(
         status_code=exc.status_code,
@@ -65,6 +94,13 @@ def _raise_service_error(exc: UserServiceError) -> NoReturn:
 
 
 def _raise_logout_error(exc: LogoutError) -> NoReturn:
+    raise HTTPException(
+        status_code=exc.status_code,
+        detail={"code": exc.code, "message": exc.detail},
+    ) from exc
+
+
+def _raise_password_reset_error(exc: PasswordResetError) -> NoReturn:
     raise HTTPException(
         status_code=exc.status_code,
         detail={"code": exc.code, "message": exc.detail},
@@ -113,6 +149,12 @@ def _clear_session_cookie(response: Response) -> None:
 )
 def register(request_body: RegistrationRequest, request: Request) -> RegistrationResponse:
     _require_trusted_origin(request)
+    _enforce_public_rate_limit(
+        request,
+        scope="register",
+        identity="public",
+        limit=settings.public_registration_rate_limit,
+    )
     try:
         return register_user(
             request_body,
@@ -134,6 +176,12 @@ def login(
     response: Response,
 ) -> AuthenticationResponse:
     _require_trusted_origin(request)
+    _enforce_public_rate_limit(
+        request,
+        scope="login",
+        identity=request_body.username,
+        limit=settings.public_login_rate_limit,
+    )
     try:
         result = login_user(
             username=request_body.username,
@@ -147,6 +195,38 @@ def login(
     _set_session_cookie(response, result.session_token)
     response.headers["Cache-Control"] = "no-store"
     return result.response
+
+
+@router.post(
+    "/auth/reset-password",
+    response_model=ActionResponse,
+    tags=["user-auth"],
+)
+def reset_password(
+    request_body: ResetPasswordRequest,
+    request: Request,
+    response: Response,
+) -> ActionResponse:
+    _require_trusted_origin(request)
+    _enforce_public_rate_limit(
+        request,
+        scope="password-reset",
+        identity=request_body.username,
+        limit=settings.public_password_reset_rate_limit,
+    )
+    try:
+        revoked_count = consume_password_reset_ticket(
+            username=request_body.username,
+            raw_ticket=request_body.reset_ticket,
+            new_password=request_body.new_password,
+            request_id=_request_id(request),
+            ip_address=_client_ip(request),
+        )
+    except PasswordResetError as exc:
+        _raise_password_reset_error(exc)
+    _clear_session_cookie(response)
+    response.headers["Cache-Control"] = "no-store"
+    return ActionResponse(revokedSessionCount=revoked_count)
 
 
 @router.get(
