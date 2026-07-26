@@ -17,7 +17,6 @@ import { useI18n } from '@/hooks/web/useI18n';
 import { useMessage } from '@/hooks/web/useMessage';
 import { router } from '@/router';
 import { usePermissionStore } from '@/store/modules/permission';
-import type { RouteRecordRaw } from 'vue-router';
 import { h } from 'vue';
 import { message } from 'ant-design-vue';
 
@@ -169,18 +168,6 @@ export const useUserStore = defineStore({
         await this.getUserInfoAction();
       }
       if (!this.authenticated || !this.userInfo) return null;
-
-      const permissionStore = usePermissionStore();
-      if (!permissionStore.isDynamicAddedRoute) {
-        const routes = await permissionStore.buildRoutesAction();
-        routes.forEach((route) => {
-          const routeName = String(route.name || '');
-          if (!routeName || !router.hasRoute(routeName)) {
-            router.addRoute(route as unknown as RouteRecordRaw);
-          }
-        });
-        permissionStore.setDynamicAddedRoute(true);
-      }
 
       if (goHome) {
         await router.replace((this.userInfo as any).homePath || PageEnum.BASE_HOME);
