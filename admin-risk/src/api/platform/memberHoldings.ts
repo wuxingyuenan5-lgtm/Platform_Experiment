@@ -1,10 +1,12 @@
 import axios, { AxiosError, type AxiosInstance, type AxiosRequestConfig } from 'axios';
 import {
   UserSystemApiError,
+  clearUserSystemSessionMemory,
   getUserSystemCsrfToken,
 } from './userSystem';
 
 export type HoldingSource = 'manual_admin' | 'migration' | 'external_import';
+export type ManualHoldingSource = 'manual_admin';
 export type HoldingStatus = 'active' | 'closed';
 export type NavStatus = 'available' | 'stale' | 'unavailable';
 
@@ -43,7 +45,7 @@ export interface UpsertMemberHoldingPayload {
   cumulativeInvested: string;
   confirmedAt?: string;
   asOf: string;
-  source?: HoldingSource;
+  source?: ManualHoldingSource;
   status?: HoldingStatus;
   expectedVersion?: number;
 }
@@ -52,7 +54,7 @@ export interface UpsertFundNavPayload {
   unitNav: string;
   valuationTime: string;
   currency: string;
-  source?: HoldingSource;
+  source?: ManualHoldingSource;
   fundCode?: string;
 }
 
@@ -84,6 +86,9 @@ client.interceptors.request.use((config) => {
 client.interceptors.response.use(
   (response) => response,
   (error: AxiosError) => {
+    if (error.response?.status === 401) {
+      clearUserSystemSessionMemory();
+    }
     const payload = error.response?.data as
       | { detail?: { code?: string; message?: string } | string; message?: string }
       | undefined;
