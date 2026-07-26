@@ -48,7 +48,7 @@ Connection → Bootstrap → Seed
 | `app/disaster_recovery.py` | backup and restore manifests/drills |
 | `app/schema_migrations.py` | migration ledger and ordered additive migrations |
 | `app/cross_spread_exit_repository.py` | direct SQL and row mapping for migrated Exit Plans |
-| `app/order_execution_intents.py` | idempotent reduce-only and position-target intent reads/writes |
+| `app/order_execution_intents.py` | idempotent reduce-only, position-target and Runtime execution-policy intent reads/writes |
 
 Table creation and additive column migration remain owned by `app/schema_migrations.py`. `app/database.py` is not a DDL or Seed owner.
 
@@ -101,17 +101,34 @@ take_profit_execution_mode TEXT NOT NULL DEFAULT 'market'
 stop_loss_execution_mode   TEXT NOT NULL DEFAULT 'market'
 ```
 
-Both columns have a `CHECK` constraint allowing only `market` or `limit`.
+Both columns allow only `market` or `limit`. Existing rows retain all prior data and become `market / market`.
+
+### Version 4 — `cross-spread-limit-execution-policies`
+
+Additively adds:
+
+```text
+order_execution_intents.execution_policy
+    default | fok | post_only_chase
+
+cross_spread_exit_plans.take_profit_limit_strategy
+    fok | post_only_chase
+
+cross_spread_exit_plans.stop_loss_limit_strategy
+    fok | post_only_chase
+```
 
 Compatibility contract:
 
-- existing rows retain all prior data;
-- existing rows automatically become `market / market`;
-- no backfill derives values from historical thresholds;
-- the migration is additive and does not alter financial facts or formal projections;
-- reverting application code leaves harmless Market defaults in place; the applied migration itself is not edited or automatically removed.
+- existing Venue execution intents automatically become `default`;
+- existing Exit Plans automatically receive `fok / fok` Limit strategies;
+- Market execution modes ignore the stored Limit strategy;
+- old Limit requests remain FOK because API defaults and migrated rows use `fok`;
+- the migration is additive and does not alter quantities, thresholds, financial facts or formal projections;
+- the migration does not enable PostOnly Chase, Live Write or the exit monitor;
+- an applied migration is never edited or automatically removed.
 
-Exit Plans are operational execution state, not formal financial accounting inputs.
+Exit Plans and Venue execution intents are operational execution state, not formal financial accounting inputs.
 
 Status endpoint:
 
