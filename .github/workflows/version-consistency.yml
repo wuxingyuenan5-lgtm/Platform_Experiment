@@ -4,18 +4,13 @@ on:
   push:
     branches:
       - main
-      - 'feature/**'
-      - 'fix/**'
-      - 'refactor/**'
-      - 'hardening/**'
-      - 'docs/**'
-      - 'chore/**'
     paths:
       - VERSION
       - platform-backend/pyproject.toml
       - execution-runtime/pyproject.toml
       - admin-risk/.env
       - scripts/check-version-consistency.py
+      - scripts/bump-version.py
       - .github/workflows/version-consistency.yml
   pull_request:
     branches:
@@ -26,10 +21,15 @@ on:
       - execution-runtime/pyproject.toml
       - admin-risk/.env
       - scripts/check-version-consistency.py
+      - scripts/bump-version.py
       - .github/workflows/version-consistency.yml
 
 permissions:
   contents: read
+
+concurrency:
+  group: version-consistency-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   version-consistency:

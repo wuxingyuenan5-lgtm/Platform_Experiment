@@ -93,10 +93,15 @@ def test_bump_version_updates_all_maintained_declarations(tmp_path: Path) -> Non
     ).read_text(encoding="utf-8")
 
 
-def test_platform_ci_is_pr_scoped_and_secret_scan_is_not_duplicated() -> None:
-    workflow = (ROOT / ".github/workflows/platform-ci.yml").read_text(encoding="utf-8")
-    assert "- 'feature/**'" not in workflow
-    assert "python scripts/scan-secrets.py" not in workflow
-    assert "needs.changes.outputs.backend" in workflow
-    assert "needs.changes.outputs.runtime" in workflow
-    assert "needs.changes.outputs.frontend" in workflow
+def test_pr_workflows_do_not_duplicate_feature_branch_push_runs() -> None:
+    platform = (ROOT / ".github/workflows/platform-ci.yml").read_text(encoding="utf-8")
+    versions = (ROOT / ".github/workflows/version-consistency.yml").read_text(
+        encoding="utf-8"
+    )
+
+    assert "- 'feature/**'" not in platform
+    assert "- 'feature/**'" not in versions
+    assert "python scripts/scan-secrets.py" not in platform
+    assert "needs.changes.outputs.backend" in platform
+    assert "needs.changes.outputs.runtime" in platform
+    assert "needs.changes.outputs.frontend" in platform
