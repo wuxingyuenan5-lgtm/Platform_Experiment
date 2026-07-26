@@ -126,6 +126,7 @@ class BybitPrivateEventSource:
         self._websocket_factory = websocket_factory
         self._websocket: Any | None = None
         self._closed = False
+        self._healthy = False
 
     def start(self) -> None:
         if not self.settings.bybit_postonly_chase_enabled:
@@ -148,9 +149,11 @@ class BybitPrivateEventSource:
             websocket.order_stream(self._handle_message)
             websocket.execution_stream(self._handle_message)
         except Exception as exc:
+            self._healthy = False
             self._queue.put(self.parser.disconnect_event("Private stream startup failed"))
             raise RuntimeError("Bybit private stream startup failed") from exc
         self._websocket = websocket
+        self._healthy = True
 
     def next_event(self, timeout_seconds: float) -> PrivateChaseEvent | None:
         if timeout_seconds <= 0:
@@ -158,10 +161,14 @@ class BybitPrivateEventSource:
         try:
             return self._queue.get(timeout=timeout_seconds)
         except Empty:
+            if not self._connection_is_healthy():
+                self._healthy = False
+                return self.parser.disconnect_event("Private stream disconnected")
             return None
 
     def close(self) -> None:
         self._closed = True
+        self._healthy = False
         websocket = self._websocket
         self._websocket = None
         if websocket is not None and hasattr(websocket, "exit"):
@@ -173,10 +180,27 @@ class BybitPrivateEventSource:
         try:
             events = self.parser.parse(message)
         except Exception:
+            self._healthy = False
             self._queue.put(self.parser.disconnect_event("Private stream payload is invalid"))
             return
         for event in events:
             self._queue.put(event)
+
+    def _connection_is_healthy(self) -> bool:
+        if self._closed or not self._healthy or self._websocket is None:
+            return False
+        checker = getattr(self._websocket, "is_connected", None)
+        if callable(checker):
+            try:
+                return bool(checker())
+            except Exception:
+                return False
+        manager = getattr(self._websocket, "ws", None)
+        socket = getattr(manager, "sock", None)
+        connected = getattr(socket, "connected", None)
+        if connected is not None:
+            return bool(connected)
+        return True
 
 
 def _default_websocket_factory(**kwargs: object) -> Any:
