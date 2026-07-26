@@ -15,8 +15,8 @@ from app.member_holding_decimal import (
 @pytest.mark.unit
 def test_plain_decimal_parser_and_canonical_form() -> None:
     assert parse_non_negative_decimal("0", field="value") == Decimal("0")
-    assert parse_non_negative_decimal("000.1000", field="value") == Decimal("0.1000")
-    assert canonical_decimal(Decimal("000.1000")) == "0.1"
+    assert parse_non_negative_decimal("0.1000", field="value") == Decimal("0.1000")
+    assert canonical_decimal(Decimal("0.1000")) == "0.1"
     assert canonical_decimal(Decimal("100.000")) == "100"
     assert canonical_decimal(Decimal("-0")) == "0"
 
@@ -30,6 +30,7 @@ def test_plain_decimal_parser_and_canonical_form() -> None:
         "+1",
         ".1",
         "1.",
+        "00.1",
         "1e-3",
         "NaN",
         "Infinity",
@@ -83,10 +84,9 @@ def test_high_precision_vector_does_not_round_at_authority_boundary() -> None:
         cumulative_invested=Decimal("100000000.000000000000000001"),
         unit_nav=Decimal("1.234567891234567891"),
     )
-    assert calculation.market_value == (
-        Decimal("123456789.123456789123456789")
-        * Decimal("1.234567891234567891")
+    assert calculation.market_value == Decimal(
+        "152415787.806736785432098784279682996625361999"
     )
-    assert calculation.cumulative_return == (
-        calculation.market_value - Decimal("100000000.000000000000000001")
+    assert calculation.cumulative_return == Decimal(
+        "52415787.806736785432098783279682996625361999"
     )
