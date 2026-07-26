@@ -50,6 +50,7 @@ include = [
   "app/schema_migrations.py",
   "app/schema_governance.py",
   "app/trade_command_execution.py",
+  "app/user_permissions.py",
   "app/venue_reconciliation_policy.py",
   "app/venue_reconciliation_repository.py",
   "app/venue_reconciliation_runtime_client.py",
