@@ -8,6 +8,7 @@ import type { LoginParams } from '@/api/sys/model/userModel';
 import {
   clearUserSystemSessionMemory,
   getCurrentAuthentication,
+  getUserSystemCsrfToken,
   loginUser,
   logoutUser,
   selfAvatarUrl,
@@ -91,13 +92,13 @@ export const useUserStore = defineStore({
     // Kept only for legacy callers while the route guard migrates to getIsAuthenticated.
     // It is an in-memory marker, never a credential and never persisted.
     getToken(state): string {
-      return state.authenticated ? 'browser-session' : '';
+      return state.authenticated && getUserSystemCsrfToken() ? 'browser-session' : '';
     },
     getRoleList(state): string[] {
       return state.roleList;
     },
     getIsAuthenticated(state): boolean {
-      return state.authenticated;
+      return state.authenticated && Boolean(getUserSystemCsrfToken());
     },
     getHydrationAttempted(state): boolean {
       return state.hydrationAttempted;
@@ -164,10 +165,10 @@ export const useUserStore = defineStore({
       return this.afterLoginAction(goHome, false);
     },
     async afterLoginAction(goHome = true, hydrate = true): Promise<UserInfo | null> {
-      if (hydrate && !this.authenticated) {
+      if (hydrate && !this.getIsAuthenticated) {
         await this.getUserInfoAction();
       }
-      if (!this.authenticated || !this.userInfo) return null;
+      if (!this.getIsAuthenticated || !this.userInfo) return null;
 
       if (goHome) {
         await router.replace((this.userInfo as any).homePath || PageEnum.BASE_HOME);
@@ -186,11 +187,16 @@ export const useUserStore = defineStore({
       }
     },
     async hydrateSession(): Promise<boolean> {
-      if (this.authenticated) return true;
+      if (this.authenticated && getUserSystemCsrfToken()) return true;
+      if (this.authenticated) {
+        this.resetState();
+        this.hydrationAttempted = true;
+        return false;
+      }
       if (this.hydrationAttempted) return false;
       try {
         await this.getUserInfoAction();
-        return this.authenticated;
+        return this.getIsAuthenticated;
       } catch {
         return false;
       }
