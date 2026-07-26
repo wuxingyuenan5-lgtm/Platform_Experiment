@@ -9,6 +9,7 @@ from app.execution_risk import router as execution_risk_router
 from app.financial_facts import router as financial_facts_router
 from app.live_trading_sessions import router as live_trading_sessions_router
 from app.live_venue_accounting import router as live_venue_accounting_router
+from app.member_holding_routes import router as member_holding_router
 from app.production_monitoring import router as production_monitoring_router
 from app.schema_governance import router as schema_governance_router
 from app.user_admin_routes import router as user_admin_router
@@ -31,6 +32,7 @@ app.include_router(cross_spread_observability_router)
 app.include_router(user_router)
 app.include_router(user_avatar_router)
 app.include_router(user_admin_router)
+app.include_router(member_holding_router)
 
 # Authentication is added at the composition root so every legacy and modular
 # route passes through one default-deny production authorization boundary.
