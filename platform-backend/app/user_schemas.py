@@ -117,12 +117,6 @@ class UpdateSelfProfileRequest(BaseModel):
     phone: str | None = Field(default=None, max_length=32)
     expected_version: int = Field(alias="expectedVersion", ge=1)
 
-    @model_validator(mode="after")
-    def validate_contact(self) -> "UpdateSelfProfileRequest":
-        if not self.email and not self.phone:
-            raise ValueError("email or phone is required")
-        return self
-
 
 class ChangePasswordRequest(BaseModel):
     current_password: str = Field(alias="currentPassword", min_length=1, max_length=128)
