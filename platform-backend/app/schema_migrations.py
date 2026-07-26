@@ -336,7 +336,7 @@ PLATFORM_MIGRATIONS: tuple[Migration, ...] = (
                 created_at TEXT NOT NULL,
                 UNIQUE(fund_id, valuation_time),
                 CHECK (length(trim(unit_nav)) > 0),
-                CHECK (length(currency) = 3),
+                CHECK (length(currency) BETWEEN 3 AND 8),
                 CHECK (source IN ('manual_admin', 'migration', 'external_import')),
                 CHECK (status IN ('available', 'superseded', 'invalid')),
                 FOREIGN KEY(fund_id) REFERENCES funds(id)
