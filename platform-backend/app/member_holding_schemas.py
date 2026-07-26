@@ -68,7 +68,7 @@ class UpsertMemberHoldingRequest(BaseModel):
 class UpsertFundNavRequest(BaseModel):
     unit_nav: str = Field(alias="unitNav", min_length=1, max_length=64)
     valuation_time: datetime = Field(alias="valuationTime")
-    currency: str = Field(min_length=3, max_length=3)
+    currency: str = Field(min_length=3, max_length=8)
     source: HoldingSource = "manual_admin"
     fund_code: str | None = Field(default=None, alias="fundCode", max_length=64)
 
@@ -83,7 +83,7 @@ class UpsertFundNavRequest(BaseModel):
     @classmethod
     def normalize_currency(cls, value: str) -> str:
         if not value.isalpha():
-            raise ValueError("currency must contain three letters")
+            raise ValueError("currency must contain three to eight letters")
         return value.upper()
 
     @field_validator("fund_code")
