@@ -15,6 +15,7 @@
       "symbol",
       "side",
       "order_type",
+      "execution_policy",
       "quantity",
       "price",
       "reduce_only",
