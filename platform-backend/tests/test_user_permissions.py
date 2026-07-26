@@ -33,6 +33,17 @@ def test_human_roles_are_distinct_from_api_key_roles() -> None:
 
 
 @pytest.mark.unit
+def test_ceo_browser_permissions_are_explicit_and_business_scoped() -> None:
+    permissions = permissions_for_roles(("ceo",))
+    assert "*" not in permissions
+    assert "user.assign_role" in permissions
+    assert "member.holding.read_all" in permissions
+    assert "member.holding.update" in permissions
+    assert "trade:submit" not in permissions
+    assert "risk:manage" not in permissions
+
+
+@pytest.mark.unit
 def test_technical_lead_default_boundary_excludes_live_and_all_holdings() -> None:
     roles = ("tech_lead",)
     assert has_permission(roles, "user.update")
