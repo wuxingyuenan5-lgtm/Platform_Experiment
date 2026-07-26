@@ -1,176 +1,547 @@
 <template>
   <PageWrapper title="用户管理">
     <div class="users-page">
-      <Row :gutter="[16, 16]">
-        <Col :xs="24" :lg="8">
-          <Card :bordered="false" title="当前用户" class="vg-panel">
-            <Descriptions :column="1" size="small">
-              <Descriptions.Item label="用户 ID">{{ userInfo.userId || userInfo.sub || '-' }}</Descriptions.Item>
-              <Descriptions.Item label="用户名">{{ userInfo.username || userInfo.name || '-' }}</Descriptions.Item>
-              <Descriptions.Item label="角色">
-                <Tag :color="roleColor">{{ roleLabel }}</Tag>
-              </Descriptions.Item>
-              <Descriptions.Item label="首页">{{ userInfo.homePath || '/home/index' }}</Descriptions.Item>
-            </Descriptions>
-          </Card>
-        </Col>
-        <Col :xs="24" :lg="16">
-          <Card :bordered="false" title="角色权限矩阵" class="vg-panel">
-            <Table
-              row-key="key"
-              size="small"
-              :columns="permissionColumns"
-              :data-source="permissionRows"
-              :pagination="false"
-            >
-              <template #bodyCell="{ column, record }">
-                <template v-if="isRoleColumn(column.key)">
-                  <Tag :color="isAllowed(record, column.key) ? 'green' : 'default'">
-                    {{ isAllowed(record, column.key) ? '可用' : '隐藏' }}
-                  </Tag>
-                </template>
-              </template>
-            </Table>
-          </Card>
-        </Col>
-      </Row>
-
-      <Card :bordered="false" title="登录后的界面差异" class="vg-panel mt-4">
-        <div class="role-cards">
-          <div class="role-card admin">
-            <div class="role-title">管理员 admin</div>
-            <div>完整菜单、账户新增、账户同步、用户/审计/设置。</div>
-          </div>
-          <div class="role-card employee">
-            <div class="role-title">员工 employee</div>
-            <div>业务菜单、账户查看和新增、账户同步、风控和报表。</div>
-          </div>
-          <div class="role-card guest">
-            <div class="role-title">访客 guest</div>
-            <div>总览、账户、数据和财务只读视图。</div>
-          </div>
+      <Card :bordered="false" class="vg-panel filter-card">
+        <div class="filter-row">
+          <Input.Search
+            v-model:value="filters.search"
+            allow-clear
+            class="search-input"
+            placeholder="搜索用户名、姓名、邮箱或手机号"
+            @search="applyFilters"
+          />
+          <Select
+            v-model:value="filters.role"
+            allow-clear
+            class="filter-select"
+            placeholder="全部角色"
+            :options="allRoleOptions"
+          />
+          <Select
+            v-model:value="filters.status"
+            allow-clear
+            class="filter-select"
+            placeholder="全部状态"
+            :options="statusOptions"
+          />
+          <Space>
+            <Button type="primary" :loading="loading" @click="applyFilters">查询</Button>
+            <Button @click="resetFilters">重置</Button>
+          </Space>
+          <Button
+            v-if="canCreateUser"
+            type="primary"
+            class="create-button"
+            @click="openCreateModal"
+          >
+            新增用户
+          </Button>
         </div>
       </Card>
 
-      <Card v-if="isAdmin" :bordered="false" title="注册申请审核" class="vg-panel mt-4">
+      <div class="summary-grid">
+        <Card :bordered="false" class="vg-panel summary-card">
+          <span>筛选结果</span>
+          <strong>{{ pageState.total }}</strong>
+        </Card>
+        <Card :bordered="false" class="vg-panel summary-card">
+          <span>当前页正常账号</span>
+          <strong>{{ activeCount }}</strong>
+        </Card>
+        <Card :bordered="false" class="vg-panel summary-card">
+          <span>当前页待审核</span>
+          <strong>{{ pendingCount }}</strong>
+        </Card>
+        <Card :bordered="false" class="vg-panel summary-card">
+          <span>数据范围</span>
+          <strong>{{ contactScopeLabel }}</strong>
+        </Card>
+      </div>
+
+      <Card :bordered="false" class="vg-panel table-card">
         <Table
-          row-key="id"
-          size="small"
-          :columns="applicationColumns"
-          :data-source="registrationRequests"
-          :loading="loadingApplications"
-          :pagination="{ pageSize: 8 }"
+          row-key="userId"
+          size="middle"
+          :columns="columns"
+          :data-source="users"
+          :loading="loading"
+          :pagination="false"
+          :scroll="{ x: 1160 }"
         >
           <template #bodyCell="{ column, record }">
-            <template v-if="column.key === 'requested_role'">
-              <Tag :color="roleColorByValue(record.requested_role)">{{ roleName(record.requested_role) }}</Tag>
+            <template v-if="column.key === 'identity'">
+              <div class="identity-cell">
+                <div class="identity-avatar">
+                  {{ initial(record.displayName || record.realName || record.username) }}
+                </div>
+                <div>
+                  <button type="button" class="identity-name" @click="openDetail(record.userId)">
+                    {{ record.displayName || record.realName || record.username }}
+                  </button>
+                  <div class="identity-sub">{{ record.username }}</div>
+                </div>
+              </div>
             </template>
-            <template v-else-if="column.key === 'approval_status'">
-              <Tag :color="record.approval_status === 'pending' ? 'orange' : 'default'">
-                {{ record.approval_status }}
+            <template v-else-if="column.key === 'role'">
+              <Tag :color="roleColor(record.role || record.requestedRole)">
+                {{ roleLabel(record.role || record.requestedRole) }}
               </Tag>
             </template>
+            <template v-else-if="column.key === 'contact'">
+              <div>{{ record.email || '-' }}</div>
+              <div class="muted-line">{{ record.phone || '-' }}</div>
+              <Tag v-if="record.contactMasked" class="mt-1">后端脱敏</Tag>
+            </template>
+            <template v-else-if="column.key === 'status'">
+              <Tag :color="statusColor(record.status)">{{ statusLabel(record.status) }}</Tag>
+            </template>
+            <template v-else-if="column.key === 'sessions'">
+              {{ record.activeSessionCount }}
+            </template>
+            <template v-else-if="column.key === 'registeredAt'">
+              {{ formatTime(record.registeredAt) }}
+            </template>
+            <template v-else-if="column.key === 'lastLoginAt'">
+              {{ formatTime(record.lastLoginAt) }}
+            </template>
             <template v-else-if="column.key === 'action'">
-              <Space>
-                <Button type="link" size="small" @click="approve(record.id)">通过</Button>
-                <Popconfirm title="确认拒绝该申请？" @confirm="reject(record.id)">
-                  <Button danger type="link" size="small">拒绝</Button>
-                </Popconfirm>
-              </Space>
+              <Button type="link" size="small" @click="openDetail(record.userId)">查看详情</Button>
             </template>
           </template>
+          <template #emptyText>
+            <Empty description="没有符合条件的用户" />
+          </template>
         </Table>
+
+        <div class="pagination-row">
+          <Pagination
+            :current="pageState.page"
+            :page-size="pageState.pageSize"
+            :total="pageState.total"
+            :show-size-changer="true"
+            :page-size-options="['10', '20', '50', '100']"
+            show-less-items
+            @change="changePage"
+            @showSizeChange="changePageSize"
+          />
+        </div>
       </Card>
     </div>
+
+    <Modal
+      v-model:open="createOpen"
+      title="新增用户"
+      :width="680"
+      :confirm-loading="creating"
+      @ok="submitCreate"
+      @cancel="resetCreate"
+    >
+      <Alert
+        class="mb-4"
+        type="info"
+        show-icon
+        message="平台不会生成或展示临时密码"
+        description="创建成功后只返回一次性重置凭证，由用户自行设置新密码。"
+      />
+      <Form layout="vertical" :model="createDraft">
+        <div class="form-grid">
+          <Form.Item label="用户名" required>
+            <Input v-model:value="createDraft.username" maxlength="64" />
+          </Form.Item>
+          <Form.Item label="真实姓名" required>
+            <Input v-model:value="createDraft.realName" maxlength="128" />
+          </Form.Item>
+          <Form.Item label="展示名称">
+            <Input v-model:value="createDraft.displayName" maxlength="128" />
+          </Form.Item>
+          <Form.Item label="角色" required>
+            <Select v-model:value="createDraft.role" :options="createRoleOptions" />
+          </Form.Item>
+          <Form.Item label="邮箱">
+            <Input v-model:value="createDraft.email" maxlength="254" />
+          </Form.Item>
+          <Form.Item label="手机号">
+            <Input v-model:value="createDraft.phone" maxlength="32" />
+          </Form.Item>
+          <Form.Item v-if="createDraft.role === 'employee'" label="部门" required>
+            <Input v-model:value="createDraft.department" maxlength="128" />
+          </Form.Item>
+          <Form.Item v-if="createDraft.role === 'member'" label="会员类型" required>
+            <Input v-model:value="createDraft.memberType" maxlength="128" />
+          </Form.Item>
+        </div>
+      </Form>
+    </Modal>
+
+    <Modal
+      v-model:open="reauthOpen"
+      title="重新验证当前密码"
+      :confirm-loading="reauthLoading"
+      @ok="submitReauthentication"
+      @cancel="cancelReauthentication"
+    >
+      <Input.Password
+        v-model:value="reauthPassword"
+        autocomplete="current-password"
+        placeholder="请输入当前登录账号密码"
+        @press-enter="submitReauthentication"
+      />
+    </Modal>
+
+    <Modal
+      v-model:open="ticketOpen"
+      title="用户创建成功"
+      :footer="null"
+      @cancel="clearTicket"
+    >
+      <Alert
+        type="warning"
+        show-icon
+        message="一次性重置凭证只展示一次"
+        description="请立即通过安全渠道交给用户，关闭后平台不会再次显示原始凭证。"
+      />
+      <Input.TextArea class="mt-4" :value="issuedTicket" :rows="5" readonly />
+      <p class="ticket-expiry">有效期至：{{ formatTime(ticketExpiresAt) }}</p>
+      <Button type="primary" block @click="copyTicket">复制凭证</Button>
+    </Modal>
+
+    <UserDetailDrawer
+      :open="detailOpen"
+      :user-id="selectedUserId"
+      :current-user-id="currentUserId"
+      :current-role="currentRole"
+      :permissions="permissions"
+      @close="closeDetail"
+      @changed="handleDetailChanged"
+    />
   </PageWrapper>
 </template>
 
 <script setup lang="ts">
-  import { computed, onMounted, ref } from 'vue';
-  import { Button, Card, Col, Descriptions, message, Popconfirm, Row, Space, Table, Tag } from 'ant-design-vue';
+  import { computed, onMounted, reactive, ref } from 'vue';
+  import {
+    Alert,
+    Button,
+    Card,
+    Empty,
+    Form,
+    Input,
+    message,
+    Modal,
+    Pagination,
+    Select,
+    Space,
+    Table,
+    Tag,
+  } from 'ant-design-vue';
   import { PageWrapper } from '@/components/Page';
   import { useUserStore } from '@/store/modules/user';
-  import { ROLE_COLOR_MAP, ROLE_LABEL_MAP, useRoleAccess } from '@/hooks/web/useRoleAccess';
+  import { hasPermission } from '@/access/userAccess';
+  import { ROLE_COLOR_MAP, ROLE_LABEL_MAP } from '@/hooks/web/useRoleAccess';
+  import UserDetailDrawer from './components/UserDetailDrawer.vue';
   import {
-    approveRegistration,
-    getRegistrationRequests,
-    rejectRegistration,
-  } from '@/api/sys/user';
-  import type { RegistrationRequest } from '@/api/sys/model/userModel';
+    UserSystemApiError,
+    createAdminUser,
+    listAdminUsers,
+    reauthenticateUser,
+    type AdminUserSummary,
+    type HumanRole,
+    type UserLifecycleStatus,
+  } from '@/api/platform/userSystem';
 
   const userStore = useUserStore();
-  const { roleLabel, roleColor, isAdmin } = useRoleAccess();
-  const userInfo = computed(() => userStore.getUserInfo as any);
-  const loadingApplications = ref(false);
-  const registrationRequests = ref<RegistrationRequest[]>([]);
+  const loading = ref(false);
+  const users = ref<AdminUserSummary[]>([]);
+  const detailOpen = ref(false);
+  const selectedUserId = ref('');
+  const createOpen = ref(false);
+  const creating = ref(false);
+  const reauthOpen = ref(false);
+  const reauthPassword = ref('');
+  const reauthLoading = ref(false);
+  const pendingSensitiveAction = ref<(() => Promise<void>) | null>(null);
+  const ticketOpen = ref(false);
+  const issuedTicket = ref('');
+  const ticketExpiresAt = ref('');
 
-  const permissionColumns = [
-    { title: '模块', dataIndex: 'module', key: 'module' },
-    { title: 'admin', dataIndex: 'admin', key: 'admin', width: 120 },
-    { title: 'employee', dataIndex: 'employee', key: 'employee', width: 120 },
-    { title: 'guest', dataIndex: 'guest', key: 'guest', width: 120 },
+  const filters = reactive<{
+    search: string;
+    role?: HumanRole;
+    status?: UserLifecycleStatus;
+  }>({ search: '' });
+  const pageState = reactive({ page: 1, pageSize: 20, total: 0 });
+  const createDraft = reactive({
+    username: '',
+    displayName: '',
+    realName: '',
+    email: '',
+    phone: '',
+    role: 'member' as HumanRole,
+    department: '',
+    memberType: '',
+  });
+
+  const authentication = computed(() => userStore.getAuthentication);
+  const permissions = computed(() => authentication.value?.permissions || []);
+  const currentRole = computed<HumanRole>(() => authentication.value?.user.role || 'employee');
+  const currentUserId = computed(() => authentication.value?.user.userId || '');
+  const canCreateUser = computed(() => hasPermission(permissions.value, 'user.create'));
+  const activeCount = computed(() => users.value.filter((item) => item.status === 'active').length);
+  const pendingCount = computed(() => users.value.filter((item) => item.status === 'pending').length);
+  const contactScopeLabel = computed(() =>
+    hasPermission(permissions.value, 'user.sensitive.read') ? '完整' : '脱敏',
+  );
+  const createRoleOptions = computed(() => {
+    const roles: HumanRole[] =
+      currentRole.value === 'ceo'
+        ? ['ceo', 'tech_lead', 'employee', 'member']
+        : ['employee', 'member'];
+    return roles.map((value) => ({ value, label: roleLabel(value) }));
+  });
+
+  const allRoleOptions = ['ceo', 'tech_lead', 'employee', 'member'].map((value) => ({
+    value,
+    label: roleLabel(value),
+  }));
+  const statusOptions = [
+    { value: 'pending', label: '待审核' },
+    { value: 'active', label: '正常' },
+    { value: 'disabled', label: '已停用' },
+    { value: 'rejected', label: '已拒绝' },
+  ];
+  const columns = [
+    { title: '用户', key: 'identity', width: 230, fixed: 'left' },
+    { title: '角色', key: 'role', width: 110 },
+    { title: '联系方式', key: 'contact', width: 230 },
+    { title: '状态', key: 'status', width: 100 },
+    { title: '活跃设备', key: 'sessions', width: 100, align: 'center' },
+    { title: '注册时间', key: 'registeredAt', width: 170 },
+    { title: '最近登录', key: 'lastLoginAt', width: 170 },
+    { title: '操作', key: 'action', width: 100, fixed: 'right' },
   ];
 
-  const permissionRows = [
-    { key: 'home', module: '首页总览', admin: true, employee: true, guest: true },
-    { key: 'account', module: '账户查看', admin: true, employee: true, guest: true },
-    { key: 'sync', module: 'Bybit 手动同步', admin: true, employee: true, guest: false },
-    { key: 'createAccount', module: '新增账户', admin: true, employee: true, guest: false },
-    { key: 'deleteAccount', module: '删除账户', admin: true, employee: false, guest: false },
-    { key: 'risk', module: '风控/策略/报表/监控', admin: true, employee: true, guest: false },
-    { key: 'admin', module: '用户/审计/设置', admin: true, employee: false, guest: false },
-  ];
+  onMounted(loadUsers);
 
-  const applicationColumns = [
-    { title: '账号', dataIndex: 'username', key: 'username' },
-    { title: '邮箱', dataIndex: 'email', key: 'email' },
-    { title: '申请身份', dataIndex: 'requested_role', key: 'requested_role', width: 110 },
-    { title: '状态', dataIndex: 'approval_status', key: 'approval_status', width: 100 },
-    { title: '申请时间', dataIndex: 'created_at', key: 'created_at', width: 190 },
-    { title: '操作', key: 'action', width: 130 },
-  ];
-
-  function isRoleColumn(key: any) {
-    return ['admin', 'employee', 'guest'].includes(String(key));
-  }
-
-  function isAllowed(record: any, key: any) {
-    return !!record[String(key)];
-  }
-
-  function roleName(role: string) {
-    return ROLE_LABEL_MAP[role] || role;
-  }
-
-  function roleColorByValue(role: string) {
-    return ROLE_COLOR_MAP[role] || 'default';
-  }
-
-  async function loadRegistrationRequests() {
-    if (!isAdmin.value) return;
-    loadingApplications.value = true;
+  async function loadUsers() {
+    loading.value = true;
     try {
-      registrationRequests.value = await getRegistrationRequests({ status: 'pending' });
-    } catch (error: any) {
-      message.error(error?.response?.data?.message || error?.message || '注册申请加载失败');
+      const result = await listAdminUsers({
+        search: filters.search.trim() || undefined,
+        role: filters.role,
+        status: filters.status,
+        page: pageState.page,
+        pageSize: pageState.pageSize,
+        sortBy: 'registered_at',
+        sortDirection: 'desc',
+      });
+      users.value = result.items;
+      pageState.total = result.total;
+      pageState.page = result.page;
+      pageState.pageSize = result.pageSize;
+    } catch (error) {
+      message.error(errorMessage(error, '用户列表加载失败'));
     } finally {
-      loadingApplications.value = false;
+      loading.value = false;
     }
   }
 
-  async function approve(id: number) {
-    await approveRegistration(id);
-    message.success('已通过申请');
-    await loadRegistrationRequests();
+  function applyFilters() {
+    pageState.page = 1;
+    loadUsers();
   }
 
-  async function reject(id: number) {
-    await rejectRegistration(id, '管理员拒绝');
-    message.success('已拒绝申请');
-    await loadRegistrationRequests();
+  function resetFilters() {
+    filters.search = '';
+    filters.role = undefined;
+    filters.status = undefined;
+    pageState.page = 1;
+    loadUsers();
   }
 
-  onMounted(loadRegistrationRequests);
+  function changePage(page: number, pageSize: number) {
+    pageState.page = page;
+    pageState.pageSize = pageSize;
+    loadUsers();
+  }
+
+  function changePageSize(_current: number, pageSize: number) {
+    pageState.page = 1;
+    pageState.pageSize = pageSize;
+    loadUsers();
+  }
+
+  function openDetail(userId: string) {
+    selectedUserId.value = userId;
+    detailOpen.value = true;
+  }
+
+  function closeDetail() {
+    detailOpen.value = false;
+    selectedUserId.value = '';
+  }
+
+  async function handleDetailChanged() {
+    await loadUsers();
+  }
+
+  function openCreateModal() {
+    resetCreateDraft();
+    createOpen.value = true;
+  }
+
+  function resetCreate() {
+    createOpen.value = false;
+    resetCreateDraft();
+  }
+
+  function resetCreateDraft() {
+    createDraft.username = '';
+    createDraft.displayName = '';
+    createDraft.realName = '';
+    createDraft.email = '';
+    createDraft.phone = '';
+    createDraft.role = 'member';
+    createDraft.department = '';
+    createDraft.memberType = '';
+  }
+
+  async function submitCreate() {
+    if (!createDraft.username.trim() || !createDraft.realName.trim()) {
+      message.warning('请输入用户名和真实姓名');
+      return;
+    }
+    if (!createDraft.email.trim() && !createDraft.phone.trim()) {
+      message.warning('邮箱或手机号至少填写一项');
+      return;
+    }
+    if (createDraft.role === 'employee' && !createDraft.department.trim()) {
+      message.warning('员工账号必须填写部门');
+      return;
+    }
+    if (createDraft.role === 'member' && !createDraft.memberType.trim()) {
+      message.warning('会员账号必须填写会员类型');
+      return;
+    }
+
+    creating.value = true;
+    try {
+      await runSensitive(async () => {
+        const result = await createAdminUser({
+          username: createDraft.username.trim(),
+          displayName: createDraft.displayName.trim() || undefined,
+          realName: createDraft.realName.trim(),
+          email: createDraft.email.trim() || undefined,
+          phone: createDraft.phone.trim() || undefined,
+          role: createDraft.role,
+          department: createDraft.department.trim() || undefined,
+          memberType: createDraft.memberType.trim() || undefined,
+        });
+        issuedTicket.value = result.resetTicket;
+        ticketExpiresAt.value = result.resetTicketExpiresAt;
+        createOpen.value = false;
+        ticketOpen.value = true;
+        resetCreateDraft();
+        await loadUsers();
+      });
+    } catch (error) {
+      message.error(errorMessage(error, '用户创建失败'));
+    } finally {
+      creating.value = false;
+    }
+  }
+
+  async function runSensitive(action: () => Promise<void>) {
+    try {
+      await action();
+    } catch (error) {
+      if (error instanceof UserSystemApiError && error.code === 'recent_reauthentication_required') {
+        pendingSensitiveAction.value = action;
+        reauthPassword.value = '';
+        reauthOpen.value = true;
+        return;
+      }
+      throw error;
+    }
+  }
+
+  async function submitReauthentication() {
+    if (!reauthPassword.value) {
+      message.warning('请输入当前密码');
+      return;
+    }
+    reauthLoading.value = true;
+    try {
+      await reauthenticateUser(reauthPassword.value);
+      const action = pendingSensitiveAction.value;
+      cancelReauthentication();
+      if (action) await action();
+    } catch (error) {
+      message.error(errorMessage(error, '密码验证失败'));
+    } finally {
+      reauthLoading.value = false;
+    }
+  }
+
+  function cancelReauthentication() {
+    reauthOpen.value = false;
+    reauthPassword.value = '';
+    pendingSensitiveAction.value = null;
+  }
+
+  function clearTicket() {
+    ticketOpen.value = false;
+    issuedTicket.value = '';
+    ticketExpiresAt.value = '';
+  }
+
+  async function copyTicket() {
+    try {
+      await navigator.clipboard.writeText(issuedTicket.value);
+      message.success('凭证已复制，请立即通过安全渠道传递');
+    } catch {
+      message.error('复制失败，请手动复制');
+    }
+  }
+
+  function initial(value: string) {
+    return value.trim().slice(0, 1).toUpperCase() || '?';
+  }
+
+  function roleLabel(role?: string) {
+    return role ? ROLE_LABEL_MAP[role] || role : '-';
+  }
+
+  function roleColor(role?: string) {
+    return role ? ROLE_COLOR_MAP[role] || 'default' : 'default';
+  }
+
+  function statusLabel(status: string) {
+    return {
+      pending: '待审核',
+      active: '正常',
+      disabled: '已停用',
+      rejected: '已拒绝',
+    }[status] || status;
+  }
+
+  function statusColor(status: string) {
+    return {
+      pending: 'orange',
+      active: 'green',
+      disabled: 'red',
+      rejected: 'default',
+    }[status] || 'default';
+  }
+
+  function formatTime(value?: string) {
+    if (!value) return '-';
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? value : date.toLocaleString('zh-CN', { hour12: false });
+  }
+
+  function errorMessage(error: unknown, fallback: string) {
+    return error instanceof Error ? error.message : fallback;
+  }
 </script>
 
 <style scoped>
@@ -179,46 +550,133 @@
   }
 
   .vg-panel {
-    border-radius: 6px;
+    border-radius: 10px;
     box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
   }
 
-  .role-cards {
+  .filter-card,
+  .table-card {
+    margin-bottom: 16px;
+  }
+
+  .filter-row {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .search-input {
+    width: min(360px, 100%);
+  }
+
+  .filter-select {
+    width: 150px;
+  }
+
+  .create-button {
+    margin-left: auto;
+  }
+
+  .summary-grid {
     display: grid;
     gap: 12px;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    margin-bottom: 16px;
   }
 
-  .role-card {
-    border: 1px solid #e5e7eb;
-    border-left-width: 4px;
-    border-radius: 6px;
-    padding: 14px;
-    color: #364152;
-    line-height: 1.7;
+  .summary-card span,
+  .summary-card strong {
+    display: block;
   }
 
-  .role-card.admin {
-    border-left-color: #d4380d;
+  .summary-card span {
+    margin-bottom: 8px;
+    color: #64748b;
+    font-size: 12px;
   }
 
-  .role-card.employee {
-    border-left-color: #1677ff;
+  .summary-card strong {
+    color: #0f172a;
+    font-size: 22px;
   }
 
-  .role-card.guest {
-    border-left-color: #8c8c8c;
+  .identity-cell {
+    display: flex;
+    gap: 12px;
+    align-items: center;
   }
 
-  .role-title {
-    margin-bottom: 6px;
-    color: #111827;
+  .identity-avatar {
+    display: flex;
+    width: 38px;
+    height: 38px;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: #e2e8f0;
+    color: #334155;
+    font-weight: 700;
+  }
+
+  .identity-name {
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: #0f172a;
+    cursor: pointer;
     font-weight: 600;
+    text-align: left;
   }
 
-  @media (max-width: 900px) {
-    .role-cards {
+  .identity-name:hover {
+    color: #1677ff;
+  }
+
+  .identity-sub,
+  .muted-line {
+    margin-top: 3px;
+    color: #64748b;
+    font-size: 12px;
+  }
+
+  .pagination-row {
+    display: flex;
+    justify-content: flex-end;
+    padding-top: 18px;
+  }
+
+  .form-grid {
+    display: grid;
+    gap: 0 16px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .ticket-expiry {
+    margin: 12px 0;
+    color: #64748b;
+  }
+
+  @media (max-width: 960px) {
+    .summary-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .create-button {
+      margin-left: 0;
+    }
+  }
+
+  @media (max-width: 640px) {
+    .summary-grid,
+    .form-grid {
       grid-template-columns: 1fr;
+    }
+
+    .filter-select,
+    .search-input {
+      width: 100%;
     }
   }
 </style>
