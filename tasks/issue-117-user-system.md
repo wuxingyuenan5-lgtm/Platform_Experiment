@@ -65,6 +65,7 @@ Read in addition to standard startup context:
 - `docs/technical/USER_SYSTEM_TECHNICAL_ARCHITECTURE.md`
 - `docs/planning/USER_SYSTEM_EXECUTION_PLAN.md`
 - `docs/technical/AUTH_RBAC_LIVE_SESSIONS.md`
+- `docs/technical/MEMBER_HOLDINGS_READ_MODEL.md`
 - `docs/database/README.md`
 - `docs/architecture/OWNERSHIP.md`
 - `platform-backend/app/auth.py`
@@ -77,14 +78,19 @@ Read in addition to standard startup context:
 - `platform-backend/app/user_routes.py`
 - `platform-backend/app/user_avatar*.py`
 - `platform-backend/app/user_admin_*.py`
+- `platform-backend/app/member_holding_*.py`
 - `platform-backend/tests/test_user_*.py`
+- `platform-backend/tests/test_member_holding_*.py`
 - `platform-backend/tests/test_password_reset_tickets.py`
 - `platform-backend/tests/test_last_ceo_concurrency.py`
 - `admin-risk/src/api/platform/userSystem.ts`
+- `admin-risk/src/api/platform/memberHoldings.ts`
 - `admin-risk/src/store/modules/user.ts`
 - `admin-risk/src/store/modules/permission.ts`
 - `admin-risk/src/access/userAccess.ts`
+- `admin-risk/src/access/routeAccess.ts`
 - `admin-risk/src/router/routes/modules/risk.ts`
+- `admin-risk/src/router/routes/modules/account.ts`
 - `admin-risk/src/views/sys/login/`
 - `admin-risk/src/views/sys/register/index.vue`
 - `admin-risk/src/views/sys/reset-password/index.vue`
@@ -105,8 +111,11 @@ Read in addition to standard startup context:
 - Temporary login lock uses `locked_until`, not a lifecycle `locked` status.
 - Administrator password reset uses a one-time short-lived reset ticket; administrators do not set or view temporary passwords.
 - Backend returns permissions, not a menu tree; frontend menus and routes derive from one local permission registry.
+- Human CEO permissions are explicit business permissions, not `*`; API-key `admin` remains the only wildcard role.
 - Critical mutable rows use optimistic `row_version` checks.
+- Employee approval/role assignment requires a non-empty department; member approval/role assignment requires a non-empty member type.
 - Member holdings are a customer-reporting read model, not formal accounting or subscription/redemption truth.
+- Browser holding/NAV writes accept only `manual_admin`; migration and external-import sources require future dedicated importers.
 - Phase one provides no user DELETE workflow.
 
 ## Decision gates before implementation
@@ -156,7 +165,7 @@ Final PR:
 - Version Consistency.
 - No Live Write or execution-semantics regression.
 
-No repository command above has been executed in the connector-only environment. Added tests and type-check configuration are pending execution in a real checkout or PR CI.
+No repository command above has been executed in the connector-only environment. Added tests and type-check configuration are pending execution in a real checkout or requested PR CI.
 
 ## Stop conditions
 
@@ -242,20 +251,56 @@ Implemented:
 - target-role policy, self-mutation rejection, recent reauthentication and last-CEO transaction guard;
 - one-time reset ticket returned once; random bootstrap password is never shown or known;
 - sensitive writes and audit records share one database transaction;
-- direct tests for creation/reset, employee masking, protected targets, row-version conflicts, last-CEO concurrency and audit rollback;
+- employee/member role-profile requirements are rechecked before approval and role changes;
+- direct tests for creation/reset, employee masking, protected targets, role-profile requirements, row-version conflicts, last-CEO concurrency and audit rollback;
 - frontend user table, filters, pagination, create flow, detail drawer, dangerous confirmations, reset-ticket one-time display and audit view;
 - user-management route restored for internal roles and tagged with `user.read` permission metadata.
 
-Known review items before declaring Batch 3 complete:
+Verification status: implementation and tests are committed; backend and frontend executable checks remain unrun.
 
-- execute Pyright/Ruff/Pytest and resolve any type or style findings;
-- execute frontend lint/type/build and correct component-contract findings;
-- complete permission-aware route filtering in the shared permission Store rather than relying on role filtering plus page/API checks;
-- add role-specific profile invariant tests for approval and role conversion.
+## Batch 4 checkpoint — member holdings and fund NAV
+
+Implemented:
+
+- additive Migration 6 with nullable `funds.fund_code`, member holdings and unit-NAV snapshots;
+- exact Decimal parsing, canonical strings and derived market value/return calculations;
+- explicit available, stale and unavailable NAV semantics; missing NAV never becomes zero;
+- member self endpoint derives identity from Principal and accepts no user ID;
+- CEO-only all-member holding read/update and fund NAV maintenance;
+- technical lead and API-key wildcard cannot access customer holding administration;
+- optimistic holding versioning, recent reauthentication and same-transaction audit;
+- browser write DTOs accept only `manual_admin`; database source enum remains future-compatible;
+- personal holding cards and CEO holding/NAV editor use shared string-only Decimal display;
+- direct migration, Decimal, assurance, scope, architecture, audit-rollback and source-contract tests.
+
+Verification status: implementation and tests are committed; backend and frontend executable checks remain unrun.
+
+## Batch 5 checkpoint — navigation and ownership convergence
+
+Implemented:
+
+- canonical user pages use same-origin `/api/v1` Cookie Session clients and no longer depend on legacy `/api/auth` JWT state;
+- dynamic route construction is centralized in the permission guard;
+- menu trees and direct URL navigation both apply `meta.permissions` through one exact-match policy;
+- API-key-style `*` is not recognized as a browser route permission;
+- CEO receives an explicit business permission set rather than browser wildcard authority;
+- canonical personal-account route is tagged with `profile.read_self`;
+- holding client clears in-memory CSRF when the Session expires;
+- static ownership tests prevent legacy auth imports, browser token persistence and floating-point holding calculations;
+- ownership, database and holding technical documents are being synchronized.
+
+Remaining before an integration checkpoint:
+
+- run documentation consistency, structure and version checks;
+- run Ruff, Pyright and all classified backend tests;
+- run frontend ESLint, type check, unit tests and build;
+- resolve executable findings without weakening protected semantics;
+- refresh `main` divergence and requested PR/CI state;
+- only after the user requests integration review, open one linked Critical PR.
 
 ## Progress
 
-- Done in code: design baseline; Batch 1 identity/Session foundation; Batch 2 browser/personal-account flows; Batch 3 administration/audit implementation and direct tests.
-- Current: Batch 3 static review and verification checkpoint. Branch is ahead of `main` and not behind; no Pull Request exists.
-- Next: finish grouped Batch 3 review fixes, synchronize ownership/current-state documentation, then begin Batch 4 member holdings and fund NAV read model.
-- Blocked by: connector-only environment cannot execute the repository checkout or trigger branch CI, and no PR should be opened before the user requests an integration checkpoint. No product/design blocker is currently known.
+- Done in code: design baseline; Batch 1 identity/Session foundation; Batch 2 browser/personal-account flows; Batch 3 administration/audit; Batch 4 member holdings/NAV; Batch 5 navigation and ownership convergence implementation.
+- Current: static review, documentation synchronization and executable-verification preparation. Branch work remains isolated; no Pull Request exists by design.
+- Next: continue targeted static review and documentation updates, then run full checks in a real checkout or user-requested PR CI.
+- Blocked by: connector-only environment cannot clone GitHub or execute repository commands. No product/design blocker is currently known.
