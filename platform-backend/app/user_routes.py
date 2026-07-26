@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, NoReturn
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 
@@ -57,7 +57,7 @@ def _require_trusted_origin(request: Request) -> None:
         )
 
 
-def _raise_service_error(exc: UserServiceError) -> None:
+def _raise_service_error(exc: UserServiceError) -> NoReturn:
     raise HTTPException(
         status_code=exc.status_code,
         detail={"code": exc.code, "message": exc.detail},
@@ -309,10 +309,13 @@ def revoke_other_self_sessions(
     request: Request,
     principal: Annotated[Principal, Depends(require_permission("session.revoke_self"))],
 ) -> ActionResponse:
-    revoked_count = revoke_other_sessions(
-        user_id=principal.user_id,
-        current_session_id=_require_session_id(principal),
-        request_id=_request_id(request),
-        ip_address=_client_ip(request),
-    )
+    try:
+        revoked_count = revoke_other_sessions(
+            user_id=principal.user_id,
+            current_session_id=_require_session_id(principal),
+            request_id=_request_id(request),
+            ip_address=_client_ip(request),
+        )
+    except UserServiceError as exc:
+        _raise_service_error(exc)
     return ActionResponse(revokedSessionCount=revoked_count)
