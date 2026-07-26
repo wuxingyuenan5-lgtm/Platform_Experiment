@@ -12,13 +12,14 @@ import { RootRoute } from '@/router/routes';
 
 const LOGIN_PATH = PageEnum.BASE_LOGIN;
 const REGISTER_APPLY_PATH = '/register-apply';
+const RESET_PASSWORD_PATH = '/reset-password';
 
 const ROOT_PATH = RootRoute.path;
 const PAGE_NOT_FOUND_CHILD_NAME = PAGE_NOT_FOUND_NAME;
 const PAGE_NOT_FOUND_PARENT_NAME = String(PAGE_NOT_FOUND_ROUTE.name || '');
 const PAGE_NOT_FOUND_NAMES = [PAGE_NOT_FOUND_PARENT_NAME, PAGE_NOT_FOUND_CHILD_NAME].filter(Boolean);
 
-const whitePathList = [LOGIN_PATH, REGISTER_APPLY_PATH];
+const whitePathList = [LOGIN_PATH, REGISTER_APPLY_PATH, RESET_PASSWORD_PATH];
 
 export function createPermissionGuard(router: Router) {
   const userStore = useUserStoreWithOut();
