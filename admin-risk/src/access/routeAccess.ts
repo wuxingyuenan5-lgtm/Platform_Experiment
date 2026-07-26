@@ -40,3 +40,18 @@ export function canAccessRouteMeta(
     hasPermission(permissions, permission),
   );
 }
+
+export function filterPermissionTree<T extends RouteMetaCarrier & { children?: T[] }>(
+  items: readonly T[],
+  permissions: readonly string[],
+): T[] {
+  return items.flatMap((item) => {
+    if (!canAccessRouteMeta(item.meta, permissions)) return [];
+
+    const originalChildren = item.children || [];
+    const children = filterPermissionTree(originalChildren, permissions);
+    if (originalChildren.length > 0 && children.length === 0) return [];
+
+    return [{ ...item, children } as T];
+  });
+}
