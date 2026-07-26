@@ -209,6 +209,17 @@ def test_technical_lead_cannot_manage_protected_targets(
         assert forbidden.status_code == 403
         assert forbidden.json()["detail"]["code"] == "protected_user_target_forbidden"
 
+        forbidden_role = tech_client.post(
+            f"/api/v1/users/{owner.id}/role",
+            headers={"Origin": ORIGIN, "X-CSRF-Token": csrf},
+            json={
+                "role": "employee",
+                "expectedVersion": owner_detail.json()["rowVersion"],
+            },
+        )
+        assert forbidden_role.status_code == 403
+        assert forbidden_role.json()["detail"]["code"] == "protected_user_target_forbidden"
+
         ordinary = tech_client.post(
             "/api/v1/users",
             headers={"Origin": ORIGIN, "X-CSRF-Token": csrf},
