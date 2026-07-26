@@ -27,6 +27,17 @@ const risk: AppRouteModule = {
       },
     },
     {
+      path: 'users',
+      name: 'RiskUserManagement',
+      component: () => import('@/views/users/index.vue'),
+      meta: {
+        title: '用户管理',
+        icon: 'ant-design:user-outlined',
+        roles: internalRoles,
+        permissions: 'user.read',
+      },
+    },
+    {
       path: 'profile',
       name: 'RiskPersonalProfile',
       redirect: '/account/index',
