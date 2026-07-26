@@ -102,7 +102,7 @@ export class UserSystemApiError extends Error {
 
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS', 'TRACE']);
 const client: AxiosInstance = axios.create({
-  baseURL: '/api/platform/api/v1',
+  baseURL: '/api/v1',
   timeout: 15_000,
   withCredentials: true,
   headers: { 'Content-Type': 'application/json' },
@@ -261,5 +261,5 @@ export async function deleteSelfAvatar(expectedVersion: number): Promise<AvatarM
 }
 
 export function selfAvatarUrl(avatarKey?: string): string {
-  return avatarKey ? '/api/platform/api/v1/me/avatar' : '/logo.png';
+  return avatarKey ? '/api/v1/me/avatar' : '/logo.png';
 }
