@@ -61,6 +61,23 @@ class ReauthenticationRequest(BaseModel):
     password: str = Field(min_length=1, max_length=128)
 
 
+class ResetPasswordRequest(BaseModel):
+    username: str = Field(min_length=1, max_length=64)
+    reset_ticket: str = Field(alias="resetTicket", min_length=32, max_length=512)
+    new_password: str = Field(alias="newPassword", min_length=12, max_length=128)
+    new_password_confirmation: str = Field(
+        alias="newPasswordConfirmation",
+        min_length=12,
+        max_length=128,
+    )
+
+    @model_validator(mode="after")
+    def validate_confirmation(self) -> "ResetPasswordRequest":
+        if self.new_password != self.new_password_confirmation:
+            raise ValueError("newPasswordConfirmation must match newPassword")
+        return self
+
+
 class UserSelfResponse(BaseModel):
     user_id: str = Field(alias="userId")
     username: str
