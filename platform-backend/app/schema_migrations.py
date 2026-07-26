@@ -278,6 +278,76 @@ PLATFORM_MIGRATIONS: tuple[Migration, ...] = (
             """,
         ),
     ),
+    Migration(
+        version=6,
+        name="member-fund-holdings-and-unit-nav",
+        statements=(
+            """
+            ALTER TABLE funds ADD COLUMN fund_code TEXT
+            """,
+            """
+            CREATE UNIQUE INDEX idx_funds_fund_code_unique
+            ON funds(fund_code)
+            WHERE fund_code IS NOT NULL
+            """,
+            """
+            CREATE TABLE member_fund_holdings (
+                id TEXT PRIMARY KEY,
+                member_user_id TEXT NOT NULL,
+                fund_id TEXT NOT NULL,
+                share_quantity TEXT NOT NULL,
+                cumulative_invested TEXT NOT NULL,
+                confirmed_at TEXT,
+                as_of TEXT NOT NULL,
+                source TEXT NOT NULL,
+                status TEXT NOT NULL,
+                row_version INTEGER NOT NULL DEFAULT 1,
+                updated_by TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                UNIQUE(member_user_id, fund_id),
+                CHECK (length(trim(share_quantity)) > 0),
+                CHECK (length(trim(cumulative_invested)) > 0),
+                CHECK (source IN ('manual_admin', 'migration', 'external_import')),
+                CHECK (status IN ('active', 'closed')),
+                CHECK (row_version >= 1),
+                FOREIGN KEY(member_user_id) REFERENCES users(id),
+                FOREIGN KEY(fund_id) REFERENCES funds(id),
+                FOREIGN KEY(updated_by) REFERENCES users(id)
+            )
+            """,
+            """
+            CREATE INDEX idx_member_fund_holdings_member_status
+            ON member_fund_holdings(member_user_id, status, updated_at)
+            """,
+            """
+            CREATE INDEX idx_member_fund_holdings_fund_status
+            ON member_fund_holdings(fund_id, status, updated_at)
+            """,
+            """
+            CREATE TABLE fund_nav_snapshots (
+                id TEXT PRIMARY KEY,
+                fund_id TEXT NOT NULL,
+                valuation_time TEXT NOT NULL,
+                unit_nav TEXT NOT NULL,
+                currency TEXT NOT NULL,
+                source TEXT NOT NULL,
+                status TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                UNIQUE(fund_id, valuation_time),
+                CHECK (length(trim(unit_nav)) > 0),
+                CHECK (length(currency) = 3),
+                CHECK (source IN ('manual_admin', 'migration', 'external_import')),
+                CHECK (status IN ('available', 'superseded', 'invalid')),
+                FOREIGN KEY(fund_id) REFERENCES funds(id)
+            )
+            """,
+            """
+            CREATE INDEX idx_fund_nav_snapshots_latest
+            ON fund_nav_snapshots(fund_id, status, valuation_time DESC)
+            """,
+        ),
+    ),
 )
 
 
