@@ -114,13 +114,13 @@ def has_permission(roles: Iterable[str], permission: str) -> bool:
 
 
 def are_known_roles(roles: Iterable[str]) -> bool:
+    """Validate the legacy API-key/development role namespace."""
     values = tuple(roles)
-    return bool(values) and all(role in ROLE_PERMISSIONS for role in values)
+    return bool(values) and all(role in API_KEY_ROLES for role in values)
 
 
 def are_known_api_key_roles(roles: Iterable[str]) -> bool:
-    values = tuple(roles)
-    return bool(values) and all(role in API_KEY_ROLES for role in values)
+    return are_known_roles(roles)
 
 
 def are_known_human_roles(roles: Iterable[str]) -> bool:
