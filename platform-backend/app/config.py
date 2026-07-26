@@ -60,6 +60,14 @@ class Settings(BaseSettings):
     login_failure_limit: int = 5
     login_lock_minutes: int = 15
 
+    # Public endpoint limits are a bounded application safeguard. The production
+    # reverse proxy must enforce equivalent or stricter distributed limits.
+    public_auth_rate_window_seconds: int = 60
+    public_login_rate_limit: int = 20
+    public_registration_rate_limit: int = 5
+    public_password_reset_rate_limit: int = 10
+    public_rate_limit_max_keys: int = 10_000
+
     # User avatars are application data outside the repository. Uploaded bytes are
     # decoded, bounded and re-encoded before an opaque key is stored in the database.
     avatar_data_directory: str = "./data/avatars"
