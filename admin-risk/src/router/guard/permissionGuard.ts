@@ -7,14 +7,13 @@ import { useUserStoreWithOut } from '@/store/modules/user';
 
 import { PAGE_NOT_FOUND_ROUTE } from '@/router/routes/basic';
 import { PAGE_NOT_FOUND_NAME } from '@/router/constant';
-
-import { RootRoute } from '@/router/routes';
+import { canAccessMatchedRoute, filterPermissionTree } from '@/access/routeAccess';
 
 const LOGIN_PATH = PageEnum.BASE_LOGIN;
 const REGISTER_APPLY_PATH = '/register-apply';
 const RESET_PASSWORD_PATH = '/reset-password';
+const FORBIDDEN_PATH = `${PageEnum.ERROR_PAGE}/403`;
 
-const ROOT_PATH = RootRoute.path;
 const PAGE_NOT_FOUND_CHILD_NAME = PAGE_NOT_FOUND_NAME;
 const PAGE_NOT_FOUND_PARENT_NAME = String(PAGE_NOT_FOUND_ROUTE.name || '');
 const PAGE_NOT_FOUND_NAMES = [PAGE_NOT_FOUND_PARENT_NAME, PAGE_NOT_FOUND_CHILD_NAME].filter(Boolean);
@@ -26,7 +25,12 @@ export function createPermissionGuard(router: Router) {
   const permissionStore = usePermissionStoreWithOut();
 
   const ensureDynamicRoutes = async () => {
-    const routes = await permissionStore.buildRoutesAction();
+    const permissions = userStore.getAuthentication?.permissions || [];
+    const builtRoutes = await permissionStore.buildRoutesAction();
+    const routes = filterPermissionTree(builtRoutes, permissions);
+    permissionStore.setFrontMenuList(
+      filterPermissionTree(permissionStore.getFrontMenuList, permissions),
+    );
 
     routes.forEach((route) => {
       const routeName = String(route.name || '');
@@ -97,6 +101,12 @@ export function createPermissionGuard(router: Router) {
         next({ path: LOGIN_PATH, replace: true, query: { redirect: to.fullPath } });
         return;
       }
+    }
+
+    const permissions = userStore.getAuthentication?.permissions || [];
+    if (!canAccessMatchedRoute(to.matched, permissions)) {
+      next({ path: FORBIDDEN_PATH, replace: true });
+      return;
     }
 
     if (permissionStore.getIsDynamicAddedRoute) {
