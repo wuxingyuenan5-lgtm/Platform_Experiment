@@ -58,9 +58,9 @@ export interface RegistrationResult {
 }
 
 export interface UpdateSelfPayload {
-  displayName?: string;
-  email?: string;
-  phone?: string;
+  displayName?: string | null;
+  email?: string | null;
+  phone?: string | null;
   expectedVersion: number;
 }
 
@@ -227,6 +227,9 @@ client.interceptors.request.use((config) => {
 client.interceptors.response.use(
   (response) => response,
   (error: AxiosError) => {
+    if (error.response?.status === 401) {
+      clearUserSystemSessionMemory();
+    }
     const payload = error.response?.data as
       | { detail?: UserSystemErrorBody | string; message?: string }
       | undefined;
