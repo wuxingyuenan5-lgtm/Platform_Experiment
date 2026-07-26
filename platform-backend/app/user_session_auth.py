@@ -9,6 +9,7 @@ from fastapi import Request
 from app.config import Settings
 from app.database import connection
 from app.user_repository import (
+    SessionRecord,
     get_session_with_user_by_token_hash,
     revoke_session,
     touch_session,
@@ -49,48 +50,57 @@ def authenticate_browser_session(
         raise BrowserSessionError(503, "Browser sessions are disabled")
     current = (now or datetime.now(UTC)).astimezone(UTC)
     digest = hash_secret_token(raw_token)
+    record: SessionRecord | None = None
+    failure: BrowserSessionError | None = None
     with connection() as db:
         record = get_session_with_user_by_token_hash(db, digest)
         if record is None or record.revoked_at is not None:
-            raise BrowserSessionError(401, "Browser session is invalid")
-        if record.lifecycle_status != "active":
+            failure = BrowserSessionError(401, "Browser session is invalid")
+        elif record.lifecycle_status != "active":
             revoke_session(
                 db,
                 session_id=record.id,
                 revoked_at=current.isoformat(),
                 reason="user_inactive",
             )
-            raise BrowserSessionError(403, "User account is not active")
-        if record.locked_until is not None and _parse_time(record.locked_until) > current:
-            raise BrowserSessionError(423, "User account is temporarily locked")
-        if record.auth_version != record.user_auth_version:
+            failure = BrowserSessionError(403, "User account is not active")
+        elif record.locked_until is not None and _parse_time(record.locked_until) > current:
+            failure = BrowserSessionError(423, "User account is temporarily locked")
+        elif record.auth_version != record.user_auth_version:
             revoke_session(
                 db,
                 session_id=record.id,
                 revoked_at=current.isoformat(),
                 reason="auth_version_changed",
             )
-            raise BrowserSessionError(401, "Browser session is invalid")
-        absolute_expired = _parse_time(record.expires_at) <= current
-        idle_expired = _parse_time(record.idle_expires_at) <= current
-        if absolute_expired or idle_expired:
-            revoke_session(
-                db,
-                session_id=record.id,
-                revoked_at=current.isoformat(),
-                reason="expired",
-            )
-            raise BrowserSessionError(401, "Browser session is invalid")
-        last_seen = _parse_time(record.last_seen_at)
-        if current - last_seen >= timedelta(minutes=settings.session_last_seen_write_minutes):
-            touch_session(
-                db,
-                session_id=record.id,
-                last_seen_at=current.isoformat(),
-                idle_expires_at=(
-                    current + timedelta(minutes=settings.session_idle_ttl_minutes)
-                ).isoformat(),
-            )
+            failure = BrowserSessionError(401, "Browser session is invalid")
+        else:
+            absolute_expired = _parse_time(record.expires_at) <= current
+            idle_expired = _parse_time(record.idle_expires_at) <= current
+            if absolute_expired or idle_expired:
+                revoke_session(
+                    db,
+                    session_id=record.id,
+                    revoked_at=current.isoformat(),
+                    reason="expired",
+                )
+                failure = BrowserSessionError(401, "Browser session is invalid")
+            else:
+                last_seen = _parse_time(record.last_seen_at)
+                write_step = timedelta(minutes=settings.session_last_seen_write_minutes)
+                if current - last_seen >= write_step:
+                    touch_session(
+                        db,
+                        session_id=record.id,
+                        last_seen_at=current.isoformat(),
+                        idle_expires_at=(
+                            current + timedelta(minutes=settings.session_idle_ttl_minutes)
+                        ).isoformat(),
+                    )
+    if failure is not None:
+        raise failure
+    if record is None:
+        raise BrowserSessionError(401, "Browser session is invalid")
     return AuthenticatedBrowserSession(
         session_id=record.id,
         user_id=record.user_id,
