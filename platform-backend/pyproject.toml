@@ -60,6 +60,7 @@ include = [
   "app/user_avatar_routes.py",
   "app/user_avatar_schemas.py",
   "app/user_cli.py",
+  "app/user_logout.py",
   "app/user_permissions.py",
   "app/user_repository.py",
   "app/user_routes.py",
