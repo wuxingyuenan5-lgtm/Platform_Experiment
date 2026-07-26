@@ -45,6 +45,24 @@ def test_user_store_does_not_persist_browser_authentication_token() -> None:
 
 
 @pytest.mark.architecture
+def test_frontend_session_state_fails_closed_after_unauthorized_response() -> None:
+    api_source = (FRONTEND_ROOT / "api/platform/userSystem.ts").read_text(
+        encoding="utf-8-sig"
+    )
+    store_source = (FRONTEND_ROOT / "store/modules/user.ts").read_text(
+        encoding="utf-8-sig"
+    )
+
+    assert "error.response?.status === 401" in api_source
+    assert "clearUserSystemSessionMemory();" in api_source
+    assert "getUserSystemCsrfToken" in store_source
+    assert "state.authenticated && Boolean(getUserSystemCsrfToken())" in store_source
+    assert "if (this.authenticated && getUserSystemCsrfToken()) return true;" in store_source
+    assert "if (this.authenticated) {" in store_source
+    assert "this.resetState();" in store_source
+
+
+@pytest.mark.architecture
 def test_holding_frontend_keeps_decimal_business_values_as_strings() -> None:
     paths = (
         FRONTEND_ROOT / "api/platform/memberHoldings.ts",
