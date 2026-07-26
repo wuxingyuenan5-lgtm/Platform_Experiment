@@ -12,7 +12,10 @@ SENSITIVE_IDENTITY_PREFIXES = (
 
 
 def is_sensitive_identity_path(path: str) -> bool:
-    return any(path == prefix or path.startswith(f"{prefix}/") for prefix in SENSITIVE_IDENTITY_PREFIXES)
+    return any(
+        path == prefix or path.startswith(f"{prefix}/")
+        for prefix in SENSITIVE_IDENTITY_PREFIXES
+    )
 
 
 class UserNoStoreMiddleware(BaseHTTPMiddleware):
