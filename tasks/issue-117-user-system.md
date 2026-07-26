@@ -73,22 +73,23 @@ Read in addition to standard startup context:
 - `platform-backend/app/user_security.py`
 - `platform-backend/app/user_repository.py`
 - `platform-backend/app/user_session_auth.py`
-- `platform-backend/app/user_authority.py`
 - `platform-backend/app/user_service.py`
-- `platform-backend/app/user_cli.py`
-- `platform-backend/tests/test_auth_rbac.py`
-- `platform-backend/tests/test_auth_assurance.py`
-- `platform-backend/tests/test_user_permissions.py`
-- `platform-backend/tests/test_user_security.py`
-- `platform-backend/tests/test_user_session_foundation.py`
-- `admin-risk/src/api/sys/user.ts`
+- `platform-backend/app/user_routes.py`
+- `platform-backend/app/user_avatar*.py`
+- `platform-backend/app/user_admin_*.py`
+- `platform-backend/tests/test_user_*.py`
+- `platform-backend/tests/test_password_reset_tickets.py`
+- `platform-backend/tests/test_last_ceo_concurrency.py`
+- `admin-risk/src/api/platform/userSystem.ts`
 - `admin-risk/src/store/modules/user.ts`
 - `admin-risk/src/store/modules/permission.ts`
+- `admin-risk/src/access/userAccess.ts`
 - `admin-risk/src/router/routes/modules/risk.ts`
 - `admin-risk/src/views/sys/login/`
 - `admin-risk/src/views/sys/register/index.vue`
-- `admin-risk/src/views/users/index.vue`
-- `admin-risk/src/views/risk/profile/index.vue`
+- `admin-risk/src/views/sys/reset-password/index.vue`
+- `admin-risk/src/views/account/index.vue`
+- `admin-risk/src/views/users/`
 
 ## Design decisions
 
@@ -155,6 +156,8 @@ Final PR:
 - Version Consistency.
 - No Live Write or execution-semantics regression.
 
+No repository command above has been executed in the connector-only environment. Added tests and type-check configuration are pending execution in a real checkout or PR CI.
+
 ## Stop conditions
 
 - Browser Session would weaken existing API-key or Live authentication requirements.
@@ -188,6 +191,8 @@ Final PR:
 - [ ] User-system local run no longer depends on legacy auth port 8080.
 - [ ] Full CI, Secret Scan and Version Consistency pass before squash merge.
 
+Acceptance boxes remain unchecked until the required executable evidence exists, even where implementation and direct tests have already been written.
+
 ## Risk and rollback
 
 Risk: high
@@ -196,32 +201,61 @@ Risk: high
 - Detection: assurance-class tests, target/data-scope tests, migration tests, session invalidation tests, reset-ticket tests, protected-role concurrency tests, frontend route tests and existing live-safety suite.
 - Rollback: back up Platform SQLite, avatar directory and proxy configuration before deployment; revert application and restore pre-migration data when required. Applied additive migrations are forward-fixed unless restoring the complete pre-migration backup.
 
-## Batch 1 checkpoint
+## Batch 1 checkpoint — identity and Session foundation
 
-Implemented on the Issue branch:
+Implemented:
 
-- centralized and separated API-key/human role permission namespaces;
-- Migration 5 for users, opaque browser Sessions, password-reset tickets and queryable audit fields;
-- Argon2id password policy and high-entropy token hashing boundary;
-- direct user and Session repository with bounded active Session count;
-- Browser Session absolute/idle expiry, `auth_version` invalidation and persistent revocation;
-- CSRF hash plus trusted-Origin validation for Cookie-authenticated writes;
-- explicit request assurance classes and Cookie+Bearer ambiguity rejection;
-- human identity routes declared Session-only and Live writes retained as API-key-only;
-- no-default-password interactive initial CEO command;
-- transactional last-active-CEO guard;
-- direct migration, permission, security, Session and assurance tests;
-- architecture, authentication and database ownership documentation synchronized.
+- separated API-key and human-role permission namespaces;
+- Migration 5 for users, Sessions, password-reset tickets and audit query fields;
+- Argon2id password policy and high-entropy secret hashing;
+- Session absolute/idle expiry, bounded devices, `auth_version` invalidation and revocation;
+- CSRF plus trusted-Origin validation for Cookie writes;
+- request assurance classes and Cookie/Bearer ambiguity rejection;
+- no-default-password initial CEO command and transactional last-active-CEO guard;
+- direct migration, permission, security, Session and assurance tests.
 
-Verification evidence:
+Verification status: implementation and tests are committed; repository Ruff, Pyright, classified Pytest and CI remain unrun.
 
-- isolated equivalent Python harness compiled the new foundation modules and reported `10 passed`;
-- this is not a substitute for running the repository's Ruff, Pyright, classified Pytest suites or PR CI;
-- no frontend, execution-runtime, Venue adapter, cross-spread or Live Write code was changed in Batch 1.
+## Batch 2 checkpoint — browser and personal account
+
+Implemented:
+
+- public member/employee registration with pending lifecycle;
+- login failure counting, temporary lock, login audit and opaque Session Cookie;
+- `/auth/me` hydration with CSRF rotation, logout and recent reauthentication;
+- self profile, optimistic versioning, password change and Session/device management;
+- avatar byte/decode/pixel validation, WebP re-encoding and data-directory storage;
+- one-time reset-ticket consumption and public reset page;
+- bounded application-level rate limiting for public auth endpoints;
+- frontend Cookie Session state, in-memory CSRF, login/register/reset and personal-account pages;
+- direct browser-flow, reset, logout, rate-limit and avatar tests.
+
+Verification status: implementation and tests are committed; frontend lint/type/build and backend suites remain unrun.
+
+## Batch 3 checkpoint — administration and audit
+
+Implemented:
+
+- server-side paginated search, role/status filtering and deterministic sorting;
+- complete CEO/technical-lead DTOs and employee server-side masked DTOs;
+- user detail, create, edit, approve, reject, role, status, reset-ticket and Session-revoke APIs;
+- target-role policy, self-mutation rejection, recent reauthentication and last-CEO transaction guard;
+- one-time reset ticket returned once; random bootstrap password is never shown or known;
+- sensitive writes and audit records share one database transaction;
+- direct tests for creation/reset, employee masking, protected targets, row-version conflicts, last-CEO concurrency and audit rollback;
+- frontend user table, filters, pagination, create flow, detail drawer, dangerous confirmations, reset-ticket one-time display and audit view;
+- user-management route restored for internal roles and tagged with `user.read` permission metadata.
+
+Known review items before declaring Batch 3 complete:
+
+- execute Pyright/Ruff/Pytest and resolve any type or style findings;
+- execute frontend lint/type/build and correct component-contract findings;
+- complete permission-aware route filtering in the shared permission Store rather than relying on role filtering plus page/API checks;
+- add role-specific profile invariant tests for approval and role conversion.
 
 ## Progress
 
-- Done: requirements and architecture baseline; Migration 5; permission namespaces; password/token security; user/Session persistence; Browser Session assurance, expiry, invalidation and CSRF; initial CEO bootstrap; last-CEO guard; direct tests; ownership and database/auth documentation.
-- Current: Batch 1 implementation checkpoint and repository-level verification pending. Registration/login/user routes and frontend remain intentionally unconnected.
-- Next: run the complete Backend and repository checks in an execution-capable checkout; resolve any findings as one grouped fix; then begin Batch 2 registration, login, `/auth/me`, logout, reauthentication and personal-account workflows.
-- Blocked by: the connector-only environment cannot execute the repository checkout or trigger branch CI, and no PR should be opened before the user requests an integration checkpoint. No design or implementation blocker is currently known.
+- Done in code: design baseline; Batch 1 identity/Session foundation; Batch 2 browser/personal-account flows; Batch 3 administration/audit implementation and direct tests.
+- Current: Batch 3 static review and verification checkpoint. Branch is ahead of `main` and not behind; no Pull Request exists.
+- Next: finish grouped Batch 3 review fixes, synchronize ownership/current-state documentation, then begin Batch 4 member holdings and fund NAV read model.
+- Blocked by: connector-only environment cannot execute the repository checkout or trigger branch CI, and no PR should be opened before the user requests an integration checkpoint. No product/design blocker is currently known.
