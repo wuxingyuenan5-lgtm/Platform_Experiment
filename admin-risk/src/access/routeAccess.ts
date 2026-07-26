@@ -1,0 +1,42 @@
+import type { RouteMeta } from 'vue-router';
+import { hasPermission } from './userAccess';
+
+export interface RouteMetaCarrier {
+  meta?: RouteMeta;
+}
+
+export function normalizeRoutePermissions(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value.map(String).map((item) => item.trim()).filter(Boolean);
+  }
+  if (typeof value === 'string' && value.trim()) {
+    return [value.trim()];
+  }
+  return [];
+}
+
+export function matchedRoutePermissions(matched: readonly RouteMetaCarrier[]): string[] {
+  return Array.from(
+    new Set(
+      matched.flatMap((record) => normalizeRoutePermissions(record.meta?.permissions)),
+    ),
+  );
+}
+
+export function canAccessMatchedRoute(
+  matched: readonly RouteMetaCarrier[],
+  permissions: readonly string[],
+): boolean {
+  return matchedRoutePermissions(matched).every((permission) =>
+    hasPermission(permissions, permission),
+  );
+}
+
+export function canAccessRouteMeta(
+  meta: RouteMeta | undefined,
+  permissions: readonly string[],
+): boolean {
+  return normalizeRoutePermissions(meta?.permissions).every((permission) =>
+    hasPermission(permissions, permission),
+  );
+}
