@@ -6,6 +6,7 @@ from app.user_permissions import (
     API_KEY_ROLES,
     HUMAN_ROLES,
     PUBLIC_REGISTRATION_ROLES,
+    are_known_human_roles,
     are_known_roles,
     has_permission,
     permissions_for_roles,
@@ -27,6 +28,8 @@ def test_human_roles_are_distinct_from_api_key_roles() -> None:
     assert HUMAN_ROLES == frozenset({"ceo", "tech_lead", "employee", "member"})
     assert API_KEY_ROLES.isdisjoint(HUMAN_ROLES)
     assert PUBLIC_REGISTRATION_ROLES == frozenset({"employee", "member"})
+    assert are_known_human_roles(("ceo",))
+    assert not are_known_roles(("ceo",))
 
 
 @pytest.mark.unit
