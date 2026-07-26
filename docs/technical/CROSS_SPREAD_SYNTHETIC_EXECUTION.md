@@ -1,7 +1,7 @@
 # Cross-Spread Synthetic Execution Contract
 
 状态：`active`  
-当前工程批次：Issue #111 / PR #112  
+当前工程批次：Issue #113 / PR #114  
 产品目标：完成跨所价差核心交易闭环，并在工程完成后进入 Issue #39 的 Windows 本地实盘验收。
 
 ## 1. 权威模型
@@ -24,7 +24,7 @@
 执行方式：
 
 - `MARKET`：保护型市价生命周期。
-- `LIMIT`：统一限价入口；当前已实现 Bybit FOK 主腿与 MT5 Market 对冲腿。
+- `LIMIT`：统一限价入口；内部策略包括 `fok` 和 `post_only_chase`。
 
 触发来源：
 
@@ -35,12 +35,7 @@
 - `KILL_SWITCH`
 - `RISK_REDUCTION`
 
-止盈和止损不是新的订单类型。它们触发普通 Close Action：
-
-```text
-TAKE_PROFIT + CLOSE_LONG_SPREAD + LIMIT
-STOP_LOSS   + CLOSE_LONG_SPREAD + MARKET
-```
+止盈和止损不是新的订单类型。它们触发普通 Close Action。
 
 ## 2. 两类可成交方向
 
@@ -75,7 +70,7 @@ Submitted Sell Limit = ceil(Raw Price / Tick Size) × Tick Size
 - Bybit 是第一腿／主腿。
 - MT5 是跟随对冲腿。
 - ACK 不等于 Fill。
-- Bybit Market 或 FOK 必须确认真实成交后，才能提交 MT5。
+- Bybit 主腿确认真实成交后，才能提交 MT5。
 - MT5 数量依据实际 Bybit Fill 与当前 Contract Size、Minimum、Step 计算。
 - Bybit Close 使用 `reduceOnly=true` 和匹配的 `positionIdx`。
 - MT5 Close 绑定目标 Position Ticket。
@@ -86,21 +81,11 @@ Submitted Sell Limit = ceil(Raw Price / Tick Size) × Tick Size
 
 ## 4. FOK Limit 合同
 
-Limit 请求显式提供 `limitSpread`。Platform 在创建 ExecutionBatch 前：
+Limit 请求显式提供 `limitSpread`，`limitStrategy` 缺省为 `fok`。
 
-1. 读取 Bybit 与 MT5 当前 Bid/Ask；
-2. 计算当前可成交价差；
-3. 验证当前价差满足限制；
-4. 读取版本化 Bybit `priceTick`；
-5. 应用非负 Hedge Reserve；
-6. 按方向保守取 Tick；
-7. 生成 Bybit `Limit + FOK` 价格。
-
-当前价差不满足限制时返回 `409`，不创建 Batch，不提交任何 Venue 订单。
+Platform 在创建 ExecutionBatch 前读取当前双边可成交报价、应用 Hedge Reserve、按 Tick 保守取整并生成 Bybit `Limit + FOK` 价格。当前价差不满足限制时返回 `409`，不创建 Batch，不提交任何 Venue 订单。
 
 只有 Bybit 终态 `Filled`、累计成交量等于请求量且平均价格有效，才生成正常 Fill 并允许 MT5。
-
-结果语义：
 
 | Bybit FOK 结果 | MT5 | Exit Plan |
 |---|---|---|
@@ -109,115 +94,137 @@ Limit 请求显式提供 `limitSpread`。Platform 在创建 ExecutionBatch 前�
 | 部分成交／数量不一致 | 不提交 | 对账／人工介入 |
 | 超时／Query 或 Place 未知 | 不提交 | 对账／人工介入 |
 
-Hedge Reserve 默认 `0`。真实 Tick 一致性和 Broker Reserve 必须由 Issue #39 的受控主机证据确认。
-
-## 5. Exit Plan 执行方式持久化
+## 5. Exit Plan 与统一 Close Action
 
 每个 Exit Plan 持久化：
 
 ```text
 takeProfitExecutionMode = market | limit
 stopLossExecutionMode   = market | limit
+takeProfitLimitStrategy = fok | post_only_chase
+stopLossLimitStrategy   = fok | post_only_chase
 ```
 
 迁移规则：
 
-- 所有旧计划自动得到 `market / market`；
-- 新 Open 请求未提供字段时仍默认 `market / market`；
-- TP 与 SL 可独立选择；
-- Stop Loss 默认 Market；选择 FOK 必须是显式操作。
+- 旧计划保留 `market / market`；
+- 旧 Limit 策略默认 `fok`；
+- TP 与 SL 可独立选择执行方式和 Limit 策略；
+- Stop Loss 默认 Market；
+- 人工平仓、自动 TP 和自动 SL 调用同一个 claimed-plan Close Action。
 
-FOK Stop Loss 可能零成交并使计划恢复 `active`。当风险降低优先于价格约束时应继续使用 Market。
+自动 Limit 使用原子 Claim 保存的 `triggerSpread` 作为价差限制，不静默回退到 Market。干净零成交或下单前行情失效可以释放 Claim；部分成交、数量不一致、提交后超时或结果未知不能释放 Claim。
 
-## 6. 统一 Close Action
+## 6. PostOnly Chase 合同
 
-人工平仓、自动 TP 和自动 SL 都调用同一个 claimed-plan Close Action。
-
-### 6.1 人工平仓
-
-- 人工请求明确提供 `executionMode`；
-- Limit 还必须提供 `limitSpread`；
-- 原子 Claim 记录 `triggerReason=manual`。
-
-### 6.2 自动 TP/SL
+PostOnly Chase 是 `LIMIT` 的内部策略：
 
 ```text
-读取活动计划
-→ 使用可成交 Close Spread 判断阈值
-→ 原子 Claim 并保存 triggerReason / triggerSpread / triggeredAt
-→ 根据计划保存的 TP 或 SL execution mode 选择 Market/FOK
-→ 调用统一 Close Action
+executionType = LIMIT
+limitStrategy = post_only_chase
+Runtime executionPolicy = post_only_chase
 ```
 
-自动 Limit 使用原子 Claim 保存的 `triggerSpread` 作为价差限制。它不会重新使用 TP/SL 阈值，也不会静默回退到 Market。
+它不是新的业务动作，也不会改变四类合成指令。
 
-如果 Claim 后、下单前行情已经不满足该限制：
+### 6.1 默认状态
 
-- 不创建 Batch；
-- 不提交 Venue 订单；
-- 释放 Claim，计划恢复 `active`；
-- 下一轮重新观察最新报价。
+- Runtime Chase 开关默认关闭；
+- Live Write 仍由 Platform 与 Runtime 双重控制；
+- 1 oz 和单生命周期限制不变；
+- 不自动启用退出监控；
+- 不支持 IOC；
+- 不静默改成 FOK 或 Market。
 
-### 6.3 FOK 重试幂等性
+### 6.2 有界策略
 
-FOK Close 幂等键包含 `planId + triggeredAt`：
+- 明确 TTL；
+- 最小改单距离以 Tick 计；
+- 最大 Amend／Cancel-Repost 次数；
+- 变更冷却；
+- 每个子单使用同一 Chase 前缀和唯一子编号；
+- 优先 Amend；Amend 被拒绝时才进入 Cancel/Repost；
+- 只有终态 Cancel 私有事件确认后，才允许 Repost；
+- 达到 TTL、最大次数或人工取消后停止继续追价；
+- 不允许无限循环。
 
-- 同一次 Claim 的重复提交映射到同一业务尝试；
-- 干净零成交释放 Claim 后，下一次 Claim 使用新时间和新幂等键；
-- 不会永久重放第一次零成交 Batch。
+### 6.3 私有事件与竞态
 
-部分成交、数量不一致、提交后超时或结果未知不能释放 Claim，必须进入人工介入／对账。
+Private Order 和 Private Execution 是主状态来源：
+
+- Execution 使用稳定 `execId` 去重；
+- 累计成交量单调递增且不能超过请求量；
+- 重复事件不能重复增加 MT5 数量；
+- 序列回退、序列缺口、Malformed Payload、私有流失联或 REST 不一致立即停止 Chase；
+- 失联后只允许一次安全撤单尝试和有界 REST 终态对账；
+- Cancel/Fill 与 Amend/Fill 竞态依据 Execution 累计量和最终 Venue 状态处理；
+- 未确认终态时不重挂，不生成第二个业务意图。
+
+### 6.4 Fill 与 MT5
+
+当前安全口径为：
+
+- 只有累计 Bybit 成交量精确等于请求量，才产生一个正常累计 Fill 并进入现有 MT5 路径；
+- 重复 Execution 不会重复累计；
+- 部分成交、无效数量 Step、断线或终态不一致不会提交 MT5；
+- 残余 Bybit 敞口以明确人工介入／补偿证据保留，不能伪装成完整成交。
+
+增量 MT5 对冲属于后续可单独讨论的策略扩展；当前实现优先保证不会重复对冲或错误放行第二腿。
+
+### 6.5 当前限制
+
+PostOnly 的 Bybit 硬价格边界由提交前的 MT5 可成交参考价和用户 `limitSpread` 推导。Chase 期间当前只追踪 Bybit Maker 盘口，不动态重估 MT5 参考价。
+
+因此 PostOnly 继续默认关闭。真实启用必须通过 Issue #39 受控验收。跨 Venue 动态重估是否加入交易保护，留待后续单独讨论。
 
 ## 7. API 与页面
 
-Open 请求新增可选字段：
+Open、人工 Close 与 TP/SL 计划支持：
 
 ```json
 {
-  "takeProfitExecutionMode": "market",
-  "stopLossExecutionMode": "market"
+  "executionMode": "limit",
+  "limitStrategy": "post_only_chase",
+  "limitSpread": "-0.8"
 }
 ```
 
-Exit Plan 响应返回相同字段。页面支持：
+页面继续沿用现有交易执行区结构，仅增加 Limit 策略选择和清晰风险提示：
 
-- Market/FOK 开仓；
-- Market/FOK 人工平仓；
-- 独立选择 TP 和 SL 的 Market/FOK；
-- 查看计划保存的 TP/SL 执行方式；
-- 查看 FOK 定价证据；
-- 对 FOK Stop Loss 显示风险提示。
+- 市价；
+- FOK 限价；
+- PostOnly Chase；
+- TP/SL 各自的执行方式和 Limit 策略；
+- 当前限制价差和派生 Bybit 硬价格边界。
+
+本批不加入事后订单分析面板，也不改变侧边栏、页面结构或视觉体系。
 
 ## 8. 分批状态
 
 ### Batch 1：统一合成指令模型——已完成
 
-权威 `action / executionType / triggerReason`，Market 语义保持不变。
-
 ### Batch 2：FOK 价差限价——已完成
 
-人工 Open/Close 支持 Market/FOK，精确全部成交后才允许 MT5。
+### Batch 3：TP/SL 执行方式与统一 Close Action——已完成
 
-### Batch 3：TP/SL 执行方式与统一 Close Action——Issue #111
+### Batch 4：PostOnly Chase——Issue #113 / PR #114
 
-- 迁移并持久化 TP/SL 执行方式；
-- 旧数据默认 Market/Market；
-- 人工、TP、SL 复用统一 Close Action；
-- 自动 FOK 使用 claimed trigger spread；
-- 干净未成交释放 Claim；异常结果不释放。
+- 状态机、私有事件、Runtime 策略、Platform 合同、数据库迁移和页面选择已实现；
+- 当前正在完成最终回归、文档与 CI；
+- 未通过最终门禁前保持未合并状态。
 
-### Batch 4：PostOnly Chase——后续独立 Issue
+### 原 Batch 5：事后订单分析／执行复盘——仅保留待讨论项
 
-- Bybit Private Order WebSocket；
-- Bybit Private Execution WebSocket；
-- PostOnly 创建、改单、撤单和成交竞态状态机；
-- 自动／手动 Chase；
-- TTL、改单阈值、最大次数、冷却和重挂；
-- 部分成交的精确 MT5 映射或 Bybit 补偿。
+该范围当前不属于交易执行界面计划，也不预设最终产品位置。只在 Markdown 中记录候选内容：
 
-### Batch 5：执行保护与复盘——暂缓讨论
+- Quote Age 与跨 Venue 时间差；
+- Bid/Ask 宽度；
+- MT5 Deviation；
+- 未对冲时长；
+- 真实价差偏差；
+- Maker/Taker、手续费、Commission、Swap、Funding 和执行成本拆分。
 
-用户已明确要求当前不执行。Quote Age、跨 Venue 时间差、Bid/Ask 宽度、MT5 Deviation、未对冲时长、真实价差偏差和费用拆分均不得混入 Batch 3 或 Batch 4。
+用户后续将单独决定：是否开发、哪些属于下单前保护、哪些属于事后分析，以及应放在订单详情、复盘页面、风险页面或其他位置。在明确决定前，不创建 Issue，不新增前端区域，不混入交易执行界面。
 
 ## 9. 本地实盘边界
 
@@ -230,7 +237,7 @@ Issue #39 仍需依次验证：
 3. 真实 Bybit Tick、数量 Step 与 Platform Contract Specification；
 4. MT5 Hedge Reserve；
 5. 受控 1 oz Market；
-6. 受控 1 oz FOK，包括全成交、零成交和异常结果；
-7. 自动 TP/SL 的 Market/FOK Claim 与 exactly-once 行为；
-8. Batch 4 完成后再测试 PostOnly Chase；
+6. 受控 1 oz FOK；
+7. 自动 TP/SL 的 Market/FOK 行为；
+8. PostOnly Private Stream、TTL、Amend、Cancel/Repost、断线和异常结果；
 9. 多轮干净 EOD 后才复审临时限制。
