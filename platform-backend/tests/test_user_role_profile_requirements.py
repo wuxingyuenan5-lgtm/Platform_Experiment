@@ -53,7 +53,7 @@ def test_role_change_requires_role_specific_profile_fields(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
-    prepare_database(monkeypatch, tmp_path)
+    database_path = prepare_database(monkeypatch, tmp_path)
     create_initial_ceo(
         username="profile-owner",
         password=PASSWORD,
@@ -79,66 +79,85 @@ def test_role_change_requires_role_specific_profile_fields(
         )
         assert employee.status_code == 201
         employee_detail = employee.json()["user"]
+        user_id = employee_detail["userId"]
 
-        cleared = client.patch(
-            f"/api/v1/users/{employee_detail['userId']}",
-            headers={"Origin": ORIGIN, "X-CSRF-Token": csrf},
-            json={
-                "displayName": employee_detail.get("displayName"),
-                "realName": employee_detail.get("realName"),
-                "email": employee_detail.get("email"),
-                "phone": employee_detail.get("phone"),
-                "department": None,
-                "memberType": None,
-                "expectedVersion": employee_detail["rowVersion"],
-            },
-        )
-        assert cleared.status_code == 200
-        cleared_detail = cleared.json()
+        # Simulate an incomplete historical/imported row. Normal profile APIs already
+        # prevent an employee from clearing the required department field.
+        with sqlite3.connect(database_path) as db:
+            db.execute(
+                """
+                UPDATE users
+                SET department = NULL,
+                    row_version = row_version + 1,
+                    updated_at = '2026-07-26T00:00:00+00:00'
+                WHERE id = ?
+                """,
+                (user_id,),
+            )
+            db.commit()
+
+        incomplete = client.get(f"/api/v1/users/{user_id}")
+        assert incomplete.status_code == 200
+        incomplete_detail = incomplete.json()
 
         denied_member = client.post(
-            f"/api/v1/users/{employee_detail['userId']}/role",
+            f"/api/v1/users/{user_id}/role",
             headers={"Origin": ORIGIN, "X-CSRF-Token": csrf},
             json={
                 "role": "member",
-                "expectedVersion": cleared_detail["rowVersion"],
+                "expectedVersion": incomplete_detail["rowVersion"],
             },
         )
         assert denied_member.status_code == 422
         assert denied_member.json()["detail"]["code"] == "member_type_required"
 
-        member_profile = client.patch(
-            f"/api/v1/users/{employee_detail['userId']}",
+        completed = client.patch(
+            f"/api/v1/users/{user_id}",
             headers={"Origin": ORIGIN, "X-CSRF-Token": csrf},
             json={
-                "displayName": cleared_detail.get("displayName"),
-                "realName": cleared_detail.get("realName"),
-                "email": cleared_detail.get("email"),
-                "phone": cleared_detail.get("phone"),
-                "department": None,
+                "displayName": incomplete_detail.get("displayName"),
+                "realName": incomplete_detail.get("realName"),
+                "email": incomplete_detail.get("email"),
+                "phone": incomplete_detail.get("phone"),
+                "department": "operations",
                 "memberType": "individual",
-                "expectedVersion": cleared_detail["rowVersion"],
+                "expectedVersion": incomplete_detail["rowVersion"],
             },
         )
-        assert member_profile.status_code == 200
+        assert completed.status_code == 200
 
         changed = client.post(
-            f"/api/v1/users/{employee_detail['userId']}/role",
+            f"/api/v1/users/{user_id}/role",
             headers={"Origin": ORIGIN, "X-CSRF-Token": csrf},
             json={
                 "role": "member",
-                "expectedVersion": member_profile.json()["rowVersion"],
+                "expectedVersion": completed.json()["rowVersion"],
             },
         )
         assert changed.status_code == 200
         assert changed.json()["role"] == "member"
 
+        member_without_department = client.patch(
+            f"/api/v1/users/{user_id}",
+            headers={"Origin": ORIGIN, "X-CSRF-Token": csrf},
+            json={
+                "displayName": changed.json().get("displayName"),
+                "realName": changed.json().get("realName"),
+                "email": changed.json().get("email"),
+                "phone": changed.json().get("phone"),
+                "department": None,
+                "memberType": "individual",
+                "expectedVersion": changed.json()["rowVersion"],
+            },
+        )
+        assert member_without_department.status_code == 200
+
         denied_employee = client.post(
-            f"/api/v1/users/{employee_detail['userId']}/role",
+            f"/api/v1/users/{user_id}/role",
             headers={"Origin": ORIGIN, "X-CSRF-Token": csrf},
             json={
                 "role": "employee",
-                "expectedVersion": changed.json()["rowVersion"],
+                "expectedVersion": member_without_department.json()["rowVersion"],
             },
         )
         assert denied_employee.status_code == 422
