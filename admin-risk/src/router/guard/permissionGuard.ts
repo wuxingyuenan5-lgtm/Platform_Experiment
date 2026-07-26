@@ -48,49 +48,37 @@ export function createPermissionGuard(router: Router) {
       return;
     }
 
-    const token = userStore.getToken;
-    // Whitelist can be directly entered
     if (whitePathList.includes(to.path as PageEnum)) {
-      if (to.path === LOGIN_PATH && token) {
-        const isSessionTimeout = userStore.getSessionTimeout;
-        try {
-          await userStore.afterLoginAction();
-          if (!isSessionTimeout && userStore.getUserInfo?.data) {
-            next((to.query?.redirect as string) || '/');
-            return;
-          }
-        } catch {
-          //
+      if (to.path === LOGIN_PATH) {
+        const authenticated = await userStore.hydrateSession();
+        if (authenticated) {
+          next((to.query?.redirect as string) || userStore.getUserInfo.homePath || '/');
+          return;
         }
       }
       next();
       return;
     }
 
-    // token or user does not exist
-    if (!token) {
-      // You can access without permission. You need to set the routing meta.ignoreAuth to true
-      if (to.meta.ignoreAuth) {
-        next();
+    if (!userStore.getIsAuthenticated) {
+      const authenticated = await userStore.hydrateSession();
+      if (!authenticated) {
+        if (to.meta.ignoreAuth) {
+          next();
+          return;
+        }
+        const redirectData: { path: string; replace: boolean; query?: Recordable<string> } = {
+          path: LOGIN_PATH,
+          replace: true,
+        };
+        if (to.path) {
+          redirectData.query = { redirect: to.path };
+        }
+        next(redirectData);
         return;
       }
-
-      // redirect login page
-      const redirectData: { path: string; replace: boolean; query?: Recordable<string> } = {
-        path: LOGIN_PATH,
-        replace: true,
-      };
-      if (to.path) {
-        redirectData.query = {
-          ...redirectData.query,
-          redirect: to.path,
-        };
-      }
-      next(redirectData);
-      return;
     }
 
-    // Jump to the 404 page after processing the login
     if (
       from.path === LOGIN_PATH &&
       PAGE_NOT_FOUND_NAMES.includes(String(to.name || '')) &&
@@ -100,12 +88,12 @@ export function createPermissionGuard(router: Router) {
       return;
     }
 
-    // get userinfo while last fetch time is empty
     if (userStore.getLastUpdateTime === 0) {
       try {
         await userStore.getUserInfoAction();
-      } catch (err) {
-        next();
+      } catch {
+        await userStore.logout(false);
+        next({ path: LOGIN_PATH, replace: true, query: { redirect: to.fullPath } });
         return;
       }
     }
@@ -126,7 +114,6 @@ export function createPermissionGuard(router: Router) {
 
     await ensureDynamicRoutes();
     if (PAGE_NOT_FOUND_NAMES.includes(String(to.name || ''))) {
-      // 动态添加路由后，此处应当重定向到fullPath，否则会加载404页面内容
       next({ path: to.fullPath, replace: true, query: to.query });
     } else {
       const redirectPath = ((to.query?.redirect as string) || to.fullPath || to.path) as string;
