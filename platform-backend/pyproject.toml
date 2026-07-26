@@ -54,6 +54,11 @@ include = [
   "app/schema_migrations.py",
   "app/schema_governance.py",
   "app/trade_command_execution.py",
+  "app/user_admin_policy.py",
+  "app/user_admin_repository.py",
+  "app/user_admin_routes.py",
+  "app/user_admin_schemas.py",
+  "app/user_admin_service.py",
   "app/user_authority.py",
   "app/user_avatar.py",
   "app/user_avatar_repository.py",
@@ -111,6 +116,9 @@ select = ["E", "F", "I", "UP", "B"]
 "app/user_service.py" = ["E501"]
 "app/user_routes.py" = ["B008", "E501"]
 "app/user_avatar_routes.py" = ["B008", "E501"]
+"app/user_admin_repository.py" = ["E501"]
+"app/user_admin_routes.py" = ["B008", "E501"]
+"app/user_admin_service.py" = ["E501"]
 # Production operations modules intentionally keep SQL, backup/restore validation, and the
 # alert orchestration contract together for auditability. The lambda-binding and keys-view
 # findings are non-functional and are tracked until the post-gate module split.
