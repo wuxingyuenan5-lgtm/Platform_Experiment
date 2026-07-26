@@ -118,6 +118,16 @@ def are_known_roles(roles: Iterable[str]) -> bool:
     return bool(values) and all(role in ROLE_PERMISSIONS for role in values)
 
 
+def are_known_api_key_roles(roles: Iterable[str]) -> bool:
+    values = tuple(roles)
+    return bool(values) and all(role in API_KEY_ROLES for role in values)
+
+
+def are_known_human_roles(roles: Iterable[str]) -> bool:
+    values = tuple(roles)
+    return bool(values) and all(role in HUMAN_ROLES for role in values)
+
+
 def is_human_role(role: str) -> bool:
     return role in HUMAN_ROLES
 
