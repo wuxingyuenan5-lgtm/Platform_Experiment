@@ -30,11 +30,10 @@ export default defineApplicationConfig({
         usePolling: true,
       },
       proxy: {
-        // New browser identity/session routes are same-origin and authoritative in Platform Backend.
-        '/api/platform': {
+        // Canonical Platform Backend API, including browser identity and Session routes.
+        '/api/v1': {
           target: localPlatformBackend,
           changeOrigin: true,
-          rewrite: (path) => path.replace(/^\/api\/platform/, ''),
         },
         // Legacy services remain available to unrelated pages during the bounded migration.
         '/api/auth': {
