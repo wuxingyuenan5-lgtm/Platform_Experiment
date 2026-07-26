@@ -119,6 +119,28 @@ def _require_session_id(principal: Principal) -> str:
     return principal.session_id
 
 
+def _merge_self_profile_patch(
+    *,
+    user_id: str,
+    request_body: UpdateSelfProfileRequest,
+) -> UpdateSelfProfileRequest:
+    current = get_self_profile(user_id)
+    fields = request_body.model_fields_set
+    display_name = (
+        request_body.display_name if "display_name" in fields else current.display_name
+    )
+    email = request_body.email if "email" in fields else current.email
+    phone = request_body.phone if "phone" in fields else current.phone
+    if not email and not phone:
+        raise UserServiceError(422, "contact_required", "Email or phone is required")
+    return UpdateSelfProfileRequest(
+        displayName=display_name,
+        email=email,
+        phone=phone,
+        expectedVersion=request_body.expected_version,
+    )
+
+
 def _set_session_cookie(response: Response, raw_token: str) -> None:
     response.set_cookie(
         key=settings.session_cookie_name,
@@ -310,10 +332,14 @@ def patch_self_profile(
     principal: Annotated[Principal, Depends(require_permission("profile.update_self"))],
 ) -> UserSelfResponse:
     try:
+        merged_request = _merge_self_profile_patch(
+            user_id=principal.user_id,
+            request_body=request_body,
+        )
         return update_profile(
             user_id=principal.user_id,
             session_id=_require_session_id(principal),
-            request=request_body,
+            request=merged_request,
             request_id=_request_id(request),
             ip_address=_client_ip(request),
         )
