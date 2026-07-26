@@ -1,7 +1,7 @@
 <template>
   <Drawer
     :open="open"
-    :width="720"
+    :width="920"
     title="用户详情"
     destroy-on-close
     @close="emit('close')"
@@ -187,6 +187,15 @@
             />
           </TabPane>
 
+          <TabPane v-if="canReadHoldings" key="holdings" tab="基金持仓">
+            <UserHoldingsPanel
+              :user-id="detail.userId"
+              :permissions="permissions"
+              :active="activeTab === 'holdings'"
+              @changed="handleHoldingsChanged"
+            />
+          </TabPane>
+
           <TabPane v-if="canReadAudit" key="audit" tab="审计记录">
             <Spin :spinning="auditLoading">
               <List :data-source="auditEvents" item-layout="vertical">
@@ -311,6 +320,7 @@
   } from '@/api/platform/userSystem';
   import { hasPermission } from '@/access/userAccess';
   import { ROLE_COLOR_MAP, ROLE_LABEL_MAP } from '@/hooks/web/useRoleAccess';
+  import UserHoldingsPanel from './UserHoldingsPanel.vue';
 
   type ActionType = 'approve' | 'reject' | 'role' | 'disable' | 'enable' | null;
 
@@ -365,18 +375,23 @@
     reason: '',
   });
 
+  const targetRole = computed(() => detail.value?.role || detail.value?.requestedRole);
+  const canManage = computed(() => {
+    if (!detail.value || props.currentUserId === detail.value.userId) return false;
+    if (props.currentRole === 'ceo') return true;
+    return props.currentRole === 'tech_lead' && ['employee', 'member'].includes(String(targetRole.value));
+  });
   const canEdit = computed(
     () => !!detail.value && hasPermission(props.permissions, 'user.update') && canManage.value,
   );
-  const canManage = computed(() => {
-    if (!detail.value || props.currentUserId === detail.value.userId) return false;
-    const targetRole = detail.value.role || detail.value.requestedRole;
-    if (props.currentRole === 'ceo') return true;
-    return props.currentRole === 'tech_lead' && ['employee', 'member'].includes(String(targetRole));
-  });
   const canResetPassword = computed(() => hasPermission(props.permissions, 'user.reset_password'));
   const canRevokeSessions = computed(() => hasPermission(props.permissions, 'user.session.revoke'));
   const canReadAudit = computed(() => hasPermission(props.permissions, 'user.audit.read'));
+  const canReadHoldings = computed(
+    () =>
+      targetRole.value === 'member' &&
+      hasPermission(props.permissions, 'member.holding.read_all'),
+  );
   const roleOptions = computed(() => {
     const values: HumanRole[] =
       props.currentRole === 'ceo'
@@ -435,6 +450,11 @@
     } finally {
       auditLoading.value = false;
     }
+  }
+
+  async function handleHoldingsChanged() {
+    emit('changed');
+    if (canReadAudit.value) await loadAudit();
   }
 
   function syncProfileDraft() {
