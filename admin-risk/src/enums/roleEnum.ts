@@ -1,16 +1,14 @@
 export enum RoleEnum {
-  // super admin
   SUPER = 'super',
-
-  // tester
   TEST = 'test',
 
-  // risk-control admin
-  ADMIN = 'admin',
-
-  // risk-control employee
+  // Browser business roles owned by Platform Backend.
+  CEO = 'ceo',
+  TECH_LEAD = 'tech_lead',
   EMPLOYEE = 'employee',
+  MEMBER = 'member',
 
-  // risk-control guest
+  // Legacy values remain only for unrelated pages during migration.
+  ADMIN = 'admin',
   GUEST = 'guest',
 }
