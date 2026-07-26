@@ -79,6 +79,29 @@ def _no_store(response: Response) -> None:
     response.headers["Cache-Control"] = "no-store"
 
 
+def _assert_role_profile_requirements(user_id: str, role: HumanRole) -> None:
+    try:
+        detail = get_user_detail(user_id=user_id, sensitive=True)
+    except UserAdminServiceError as exc:
+        _raise_service_error(exc)
+    if role == "employee" and not detail.department:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "code": "department_required",
+                "message": "员工账号必须先填写部门",
+            },
+        )
+    if role == "member" and not detail.member_type:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "code": "member_type_required",
+                "message": "会员账号必须先填写会员类型",
+            },
+        )
+
+
 @router.get("", response_model=UserAdminPageResponse)
 def users_page(
     response: Response,
@@ -171,6 +194,7 @@ def approve_registration_route(
     response: Response,
     principal: Annotated[Principal, Depends(require_permission("user.update"))],
 ) -> UserAdminDetailResponse:
+    _assert_role_profile_requirements(user_id, request_body.final_role)
     try:
         result = approve_user_registration(
             user_id,
@@ -211,6 +235,7 @@ def update_role_route(
     response: Response,
     principal: Annotated[Principal, Depends(require_permission("user.assign_role"))],
 ) -> UserAdminDetailResponse:
+    _assert_role_profile_requirements(user_id, request_body.role)
     try:
         result = change_user_role(
             user_id,
