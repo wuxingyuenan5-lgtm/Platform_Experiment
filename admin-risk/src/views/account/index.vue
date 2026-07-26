@@ -115,14 +115,7 @@
           </TabPane>
 
           <TabPane key="holdings" tab="基金持仓">
-            <div class="holdings-placeholder">
-              <Empty description="会员基金持仓读模型将在持仓批次接入">
-                <template #image>
-                  <Icon icon="ant-design:fund-outlined" :size="72" color="#94a3b8" />
-                </template>
-              </Empty>
-              <p>本页不会使用交易账户净值或策略净值冒充客户基金单位净值。</p>
-            </div>
+            <HoldingsPanel :role="profile?.role" :active="activeTab === 'holdings'" />
           </TabPane>
 
           <TabPane key="sessions" tab="登录设备">
@@ -224,7 +217,6 @@
     Button,
     Card,
     Divider,
-    Empty,
     Form,
     Input,
     List,
@@ -241,8 +233,8 @@
   } from 'ant-design-vue';
   import type { UploadRequestOption } from 'ant-design-vue/es/vc-upload/interface';
   import { PageWrapper } from '@/components/Page';
-  import { Icon } from '@/components/Icon';
   import { useUserStore } from '@/store/modules/user';
+  import HoldingsPanel from './components/HoldingsPanel.vue';
   import {
     UserSystemApiError,
     changeSelfPassword,
@@ -545,8 +537,7 @@
   .sessions-header p,
   .security-actions p,
   .avatar-editor p,
-  .modal-note,
-  .holdings-placeholder p {
+  .modal-note {
     color: #64748b;
     font-size: 13px;
   }
@@ -632,11 +623,6 @@
 
   .security-actions p {
     margin: 5px 0 10px;
-  }
-
-  .holdings-placeholder {
-    padding: 72px 24px;
-    text-align: center;
   }
 
   .sessions-header {
