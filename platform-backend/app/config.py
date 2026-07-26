@@ -46,6 +46,20 @@ class Settings(BaseSettings):
     development_user_id: str = "development-user"
     development_roles: str = "admin"
 
+    # Browser users use opaque, server-side sessions. These are security defaults,
+    # not user-editable business settings. Production cookies are configured by the
+    # response writer and must remain Secure, HttpOnly, SameSite=Lax and host-only.
+    browser_sessions_enabled: bool = True
+    session_cookie_name: str = "vg_session"
+    session_absolute_ttl_minutes: int = 720
+    session_idle_ttl_minutes: int = 30
+    session_recent_reauth_minutes: int = 10
+    session_last_seen_write_minutes: int = 5
+    session_max_active_per_user: int = 5
+    password_reset_ticket_ttl_minutes: int = 30
+    login_failure_limit: int = 5
+    login_lock_minutes: int = 15
+
     # Platform LiveTradingSession is a separate authorization boundary from the
     # Runtime live-write gate. Zero absolute limits keep all live sessions blocked.
     require_live_trading_session: bool = True
