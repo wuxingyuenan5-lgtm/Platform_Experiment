@@ -1,7 +1,7 @@
 # Task: Complete user system
 
 Issue: #117
-Status: active
+Status: review
 Branch: `feature/issue-117-user-system`
 Base commit: `71603bcc6807284ef3a6da26ad3f43c541bc99c2`
 
@@ -150,7 +150,7 @@ Risk: high
 
 ## Progress
 
-- Done: Issue #117 created; latest `main` verified at `71603bcc6807284ef3a6da26ad3f43c541bc99c2`; no open PR found; confirmed design decisions recorded; Critical branch created.
-- Current: complete the durable architecture, security, data, API, frontend, migration, testing and phased implementation plan.
-- Next: review and approve the design documents, then begin implementation only after explicit approval.
-- Blocked by: none.
+- Done: Issue #117 created; latest `main` verified at `71603bcc6807284ef3a6da26ad3f43c541bc99c2`; no open PR found; Critical branch created; complete architecture, security, permission, data, API, frontend, migration, compatibility, rollback, testing and phased implementation plan committed.
+- Current: design review. No business code has been modified.
+- Next: after explicit approval, recheck live GitHub state, update this packet to `active`, synchronize with the latest `main` if needed and begin Batch 1 implementation.
+- Blocked by: documentation verification commands and PR CI have not yet run; no implementation blocker is known.
