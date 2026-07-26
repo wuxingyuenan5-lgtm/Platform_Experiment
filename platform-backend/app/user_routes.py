@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 
 from app.auth import Principal, require_permission
 from app.config import get_settings
+from app.user_logout import LogoutError, logout_session_idempotently
 from app.user_schemas import (
     ActionResponse,
     AuthenticationResponse,
@@ -25,7 +26,6 @@ from app.user_service import (
     get_self_profile,
     get_session_list,
     login_user,
-    logout_by_token,
     reauthenticate_user,
     register_user,
     revoke_other_sessions,
@@ -58,6 +58,13 @@ def _require_trusted_origin(request: Request) -> None:
 
 
 def _raise_service_error(exc: UserServiceError) -> NoReturn:
+    raise HTTPException(
+        status_code=exc.status_code,
+        detail={"code": exc.code, "message": exc.detail},
+    ) from exc
+
+
+def _raise_logout_error(exc: LogoutError) -> NoReturn:
     raise HTTPException(
         status_code=exc.status_code,
         detail={"code": exc.code, "message": exc.detail},
@@ -167,17 +174,17 @@ def current_authentication(
     response_model=ActionResponse,
     tags=["user-auth"],
 )
-def logout(
-    request: Request,
-    response: Response,
-    principal: Annotated[Principal, Depends(require_permission("session.revoke_self"))],
-) -> ActionResponse:
-    _require_session_id(principal)
-    logout_by_token(
-        raw_session_token=request.cookies.get(settings.session_cookie_name),
-        request_id=_request_id(request),
-        ip_address=_client_ip(request),
-    )
+def logout(request: Request, response: Response) -> ActionResponse:
+    _require_trusted_origin(request)
+    try:
+        logout_session_idempotently(
+            raw_session_token=request.cookies.get(settings.session_cookie_name),
+            supplied_csrf_token=request.headers.get("x-csrf-token"),
+            request_id=_request_id(request),
+            ip_address=_client_ip(request),
+        )
+    except LogoutError as exc:
+        _raise_logout_error(exc)
     _clear_session_cookie(response)
     response.headers["Cache-Control"] = "no-store"
     return ActionResponse()
