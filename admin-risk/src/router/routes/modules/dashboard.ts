@@ -14,6 +14,7 @@ const dashboard: AppRouteModule = {
     icon: 'ant-design:home-outlined',
     orderNo: 0,
     roles: internalRoles,
+    permissions: 'platform:read',
   },
   children: [
     {
@@ -25,6 +26,7 @@ const dashboard: AppRouteModule = {
         single: true,
         affix: true,
         roles: internalRoles,
+        permissions: 'platform:read',
       },
     },
   ],
