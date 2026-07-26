@@ -2,7 +2,7 @@ import type { RouteMeta } from 'vue-router';
 import { hasPermission } from './userAccess';
 
 export interface RouteMetaCarrier {
-  meta?: RouteMeta;
+  meta?: Partial<RouteMeta>;
 }
 
 export function normalizeRoutePermissions(value: unknown): string[] {
@@ -33,7 +33,7 @@ export function canAccessMatchedRoute(
 }
 
 export function canAccessRouteMeta(
-  meta: RouteMeta | undefined,
+  meta: Partial<RouteMeta> | undefined,
   permissions: readonly string[],
 ): boolean {
   return normalizeRoutePermissions(meta?.permissions).every((permission) =>
