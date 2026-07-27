@@ -140,13 +140,15 @@ def test_browser_session_uses_hashes_expiry_and_csrf(
         settings,
     )
 
-    with pytest.raises(BrowserSessionError, match="CSRF token"):
+    with pytest.raises(BrowserSessionError, match="CSRF token") as missing_csrf:
         validate_session_csrf(
             request("POST", origin="http://localhost:5173"),
             authenticated,
             settings,
         )
-    with pytest.raises(BrowserSessionError, match="origin"):
+    assert missing_csrf.value.code == "csrf_required"
+
+    with pytest.raises(BrowserSessionError, match="origin") as untrusted_origin:
         validate_session_csrf(
             request(
                 "POST",
@@ -156,12 +158,16 @@ def test_browser_session_uses_hashes_expiry_and_csrf(
             authenticated,
             settings,
         )
-    with pytest.raises(BrowserSessionError, match="invalid"):
+    assert untrusted_origin.value.code == "untrusted_origin"
+
+    with pytest.raises(BrowserSessionError, match="invalid") as expired_session:
         authenticate_browser_session(
             issued.session_token,
             settings,
             now=now + timedelta(hours=13),
         )
+    assert expired_session.value.code == "invalid_session"
+
     with connection() as db:
         revoked = db.execute(
             "SELECT revoked_at, revoke_reason FROM user_sessions WHERE id = ?",
