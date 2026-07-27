@@ -75,6 +75,9 @@ function loadTypeScriptModule(filePath) {
 
 const userAccess = loadTypeScriptModule(path.join(projectRoot, 'src/access/userAccess.ts'));
 const routeAccess = loadTypeScriptModule(path.join(projectRoot, 'src/access/routeAccess.ts'));
+const decimalDisplay = loadTypeScriptModule(
+  path.join(projectRoot, 'src/utils/decimalDisplay.ts'),
+);
 
 test('browser permission points match exactly without wildcard expansion', () => {
   assert.equal(userAccess.hasPermission(['user.read'], 'user.read'), true);
@@ -199,4 +202,42 @@ test('empty protected parents are removed', () => {
     },
   ];
   assert.deepEqual(routeAccess.filterPermissionTree(source, []), []);
+});
+
+test('Decimal display groups canonical strings without Number conversion', () => {
+  assert.equal(
+    decimalDisplay.formatDecimalString('123456789.123456789123456789'),
+    '123,456,789.123456789123456789',
+  );
+  assert.equal(decimalDisplay.formatDecimalString('-1000.0001'), '-1,000.0001');
+});
+
+test('Decimal display keeps unavailable values distinct from zero', () => {
+  assert.equal(decimalDisplay.formatNullableDecimalString(undefined), '不可用');
+  assert.equal(decimalDisplay.formatMoneyString(null, 'CNY'), '不可用');
+  assert.equal(decimalDisplay.formatNullableDecimalString('0'), '0');
+  assert.equal(decimalDisplay.formatMoneyString('0', 'CNY'), '0 CNY');
+});
+
+test('signed money formatting does not use floating point arithmetic', () => {
+  assert.equal(decimalDisplay.formatSignedMoneyString('0.01', 'CNY'), '+0.01 CNY');
+  assert.equal(decimalDisplay.formatSignedMoneyString('-0.01', 'CNY'), '-0.01 CNY');
+  assert.equal(decimalDisplay.formatSignedMoneyString('0.000', 'CNY'), '0.000 CNY');
+});
+
+test('ratio formatting moves the decimal point exactly', () => {
+  assert.equal(decimalDisplay.formatRatioPercentString('1'), '+100%');
+  assert.equal(
+    decimalDisplay.formatRatioPercentString('0.123456789123456789'),
+    '+12.3456789123456789%',
+  );
+  assert.equal(decimalDisplay.formatRatioPercentString('-0.0001'), '-0.01%');
+  assert.equal(decimalDisplay.formatRatioPercentString('0'), '0%');
+});
+
+test('Decimal direction comes from the canonical string', () => {
+  assert.equal(decimalDisplay.decimalDirection('100'), 'positive');
+  assert.equal(decimalDisplay.decimalDirection('-0.0001'), 'negative');
+  assert.equal(decimalDisplay.decimalDirection('0.000'), 'zero');
+  assert.equal(decimalDisplay.decimalDirection(undefined), 'zero');
 });
