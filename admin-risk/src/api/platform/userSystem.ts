@@ -231,6 +231,33 @@ function updateUserSystemCsrfToken(value: string, broadcast: boolean): void {
   }
 }
 
+function normalizeSelfProfilePatch(payload: UpdateSelfPayload): UpdateSelfPayload {
+  const normalized = { ...payload };
+  for (const field of ['displayName', 'email', 'phone'] as const) {
+    if (Object.prototype.hasOwnProperty.call(payload, field) && payload[field] === undefined) {
+      normalized[field] = null;
+    }
+  }
+  return normalized;
+}
+
+function normalizeAdminProfilePatch(payload: UpdateAdminUserPayload): UpdateAdminUserPayload {
+  const normalized = { ...payload };
+  for (const field of [
+    'displayName',
+    'realName',
+    'email',
+    'phone',
+    'department',
+    'memberType',
+  ] as const) {
+    if (Object.prototype.hasOwnProperty.call(payload, field) && payload[field] === undefined) {
+      normalized[field] = null;
+    }
+  }
+  return normalized;
+}
+
 export function setUserSystemCsrfToken(value?: string): void {
   updateUserSystemCsrfToken(value || '', true);
 }
@@ -335,7 +362,7 @@ export async function getSelfProfile(): Promise<UserSelf> {
 }
 
 export async function updateSelfProfile(payload: UpdateSelfPayload): Promise<UserSelf> {
-  return request({ method: 'PATCH', url: '/me', data: payload });
+  return request({ method: 'PATCH', url: '/me', data: normalizeSelfProfilePatch(payload) });
 }
 
 export async function changeSelfPassword(
@@ -424,7 +451,7 @@ export async function updateAdminUser(
   return request({
     method: 'PATCH',
     url: `/users/${encodeURIComponent(userId)}`,
-    data: payload,
+    data: normalizeAdminProfilePatch(payload),
   });
 }
 
