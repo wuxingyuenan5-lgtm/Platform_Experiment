@@ -129,6 +129,7 @@ pnpm exec eslint --max-warnings 0 `
   "src/router/guard/permissionGuard.ts" `
   "src/router/routes/modules/{account,dashboard,risk}.ts" `
   "src/store/modules/user.ts" `
+  "src/utils/decimalDisplay.ts" `
   "src/views/account/**/*.{vue,ts,tsx}" `
   "src/views/sys/login/**/*.{vue,ts,tsx}" `
   "src/views/sys/register/**/*.{vue,ts,tsx}" `
@@ -158,27 +159,35 @@ Final integration requires one linked Critical PR, Repository Safety, full Backe
 - Frozen frontend install, type checks and production build pass.
 - Full CI, Secret Scan and Version Consistency pass before merge.
 
-Acceptance remains unconfirmed until executable evidence exists.
+Acceptance remains unconfirmed until the complete executable evidence exists.
 
 ## Progress
 
 - Done:
   - Batches 1–6 implemented: identity/Session foundation, browser and personal account, administration/audit, member holdings/NAV, navigation/ownership convergence and stable authentication error contract.
-  - Browser Session errors, authentication middleware, RBAC tests and denial audit now use stable codes.
+  - Browser Session errors, authentication middleware, RBAC tests and denial audit use stable codes.
   - Denial audit tests verify the code is persisted and raw Bearer/Session tokens are absent.
   - Frontend Session invalidation covers invalid/inactive/locked Session and CSRF states while preserving ordinary permission and recent-reauth flows.
   - Avatar multipart boundary, multi-tab memory-only CSRF, profile explicit-clear semantics and target-scoped masking are implemented.
   - Platform CI includes focused user-system tests, ESLint, dedicated Vue type checking and build.
-  - Orphan Vitest files were removed. The dependency-free Node runner now covers access, route filtering and Decimal formatting.
-  - A same-content temporary run completed **11 tests, 0 failures**. This is direct evidence only for the three pure TypeScript modules and runner entrypoint.
+  - Orphan Vitest files were removed; the dependency-free Node runner covers access, route filtering and Decimal formatting.
+  - Targeted same-content execution evidence:
+    - frontend access/route/Decimal runner: **11 passed, 0 failed**;
+    - password/Token security module: **3 passed, 0 failed**;
+    - role-permission registry: **6 passed, 0 failed**;
+    - member-holding Decimal module: **16 passed, 0 failed**;
+    - public-auth rate limiter: **2 passed, 0 failed**.
+  - Targeted execution exposed and fixed a real password-policy defect: phone normalization preserved `+`, so a password containing the complete phone digits without `+` was not rejected. Password policy now compares normalized digit strings; the existing security test then passed.
+  - The fixed Dummy Argon2 hash was directly verified as a valid hash that returns mismatch for an incorrect password.
   - Requirements, design index, authentication error contract, Ownership Catalog and this task packet are synchronized.
 - Current:
-  - Targeted static regression review and executable-verification preparation on the isolated branch.
-  - Latest confirmed branch comparison before the most recent cleanup commits was ahead of `main` by 220 and behind by 0; merge base remained unchanged.
-  - No PR exists by explicit branch policy. The latest checked commit had no status checks or Actions runs.
+  - Targeted static regression review and isolated pure-module execution on the long-lived branch.
+  - Latest full comparison before the newest security/test commits was ahead of `main` by 224 and behind by 0; merge base remained unchanged.
+  - No PR exists by explicit branch policy. The checked branch commit had no status checks or Actions runs.
 - Next:
   - Obtain a real checkout or explicit integration PR, run the complete command matrix and fix only evidence-backed findings.
   - Perform manual browser acceptance and resolve the three deployment decision gates before cutover.
 - Blocked by:
   - The current execution environment cannot resolve `github.com`, and the connector exposes file operations but no repository archive or workflow-dispatch action.
-  - Therefore Ruff, Pyright, classified Pytest, frozen pnpm install, Vue type checks, production build, repository scripts and full Secret Scan remain unexecuted.
+  - Therefore full Ruff, Pyright, database/integration/live-safety Pytest, frozen pnpm install, Vue type checks, production build, repository scripts and full Secret Scan remain unexecuted.
+  - Isolated pytest harnesses do not load repository marker configuration, so they emit only `PytestUnknownMarkWarning`; their assertions still execute. These results are not a substitute for repository CI.
