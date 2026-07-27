@@ -74,6 +74,8 @@ def test_frontend_session_state_fails_closed_after_unauthorized_response() -> No
     assert "if (this.authenticated && getUserSystemCsrfToken()) return true;" in store_source
     assert "if (this.authenticated) {" in store_source
     assert "this.resetState();" in store_source
+    assert "this.hydrationAttempted = false;" in store_source
+    assert "await this.getUserInfoAction();" in store_source
     assert "const authenticated = await userStore.hydrateSession();" in guard_source
     assert "if (!userStore.getIsAuthenticated)" not in guard_source
 
