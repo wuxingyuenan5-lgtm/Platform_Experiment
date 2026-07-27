@@ -184,7 +184,7 @@ Acceptance remains unconfirmed until the complete executable evidence exists.
   - Requirements, design index, authentication error contract, Ownership Catalog and this task packet are synchronized.
 - Current:
   - Targeted static regression review and isolated pure/core-module execution on the long-lived branch.
-  - Latest full comparison is ahead of `main` by **227** and behind by **0**; merge base remains unchanged.
+  - Latest branch comparison remains behind `main` by **0** with the merge base unchanged; exact ahead count is recorded in the Issue checkpoint to avoid self-stale task metadata.
   - No PR exists by explicit branch policy. The checked branch commits have no status checks or Actions runs.
 - Next:
   - Obtain a real checkout or explicit integration PR, run the complete command matrix and fix only evidence-backed findings.
