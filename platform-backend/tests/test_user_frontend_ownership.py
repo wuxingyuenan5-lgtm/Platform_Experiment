@@ -46,7 +46,10 @@ def test_user_store_does_not_persist_browser_authentication_token() -> None:
 
 @pytest.mark.architecture
 def test_frontend_session_state_fails_closed_after_unauthorized_response() -> None:
-    api_source = (FRONTEND_ROOT / "api/platform/userSystem.ts").read_text(
+    user_api_source = (FRONTEND_ROOT / "api/platform/userSystem.ts").read_text(
+        encoding="utf-8-sig"
+    )
+    holding_api_source = (FRONTEND_ROOT / "api/platform/memberHoldings.ts").read_text(
         encoding="utf-8-sig"
     )
     store_source = (FRONTEND_ROOT / "store/modules/user.ts").read_text(
@@ -56,10 +59,11 @@ def test_frontend_session_state_fails_closed_after_unauthorized_response() -> No
         encoding="utf-8-sig"
     )
 
-    assert "if (status === 401" in api_source
-    assert "SESSION_INVALIDATION_CODES" in api_source
-    assert "legacyCsrfFailure" in api_source
-    assert "clearUserSystemSessionMemory();" in api_source
+    for source in (user_api_source, holding_api_source):
+        assert "if (status === 401" in source
+        assert "SESSION_INVALIDATION_CODES" in source
+        assert "legacyCsrfFailure" in source
+        assert "clearUserSystemSessionMemory();" in source
     assert "getUserSystemCsrfToken" in store_source
     assert "state.authenticated && Boolean(getUserSystemCsrfToken())" in store_source
     assert "if (this.authenticated && getUserSystemCsrfToken()) return true;" in store_source
