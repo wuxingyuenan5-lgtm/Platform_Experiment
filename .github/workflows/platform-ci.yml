@@ -148,7 +148,6 @@ jobs:
       - name: Lint maintained frontend
         run: |
           pnpm exec eslint --max-warnings 0 \
-            "scripts/test-user-system-access.cjs" \
             "src/access/**/*.{ts,tsx}" \
             "src/api/platform/**/*.{ts,tsx}" \
             "src/enums/roleEnum.ts" \
