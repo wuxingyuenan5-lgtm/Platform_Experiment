@@ -56,7 +56,9 @@ def test_frontend_session_state_fails_closed_after_unauthorized_response() -> No
         encoding="utf-8-sig"
     )
 
-    assert "error.response?.status === 401" in api_source
+    assert "if (status === 401" in api_source
+    assert "SESSION_INVALIDATION_CODES" in api_source
+    assert "legacyCsrfFailure" in api_source
     assert "clearUserSystemSessionMemory();" in api_source
     assert "getUserSystemCsrfToken" in store_source
     assert "state.authenticated && Boolean(getUserSystemCsrfToken())" in store_source
@@ -65,6 +67,15 @@ def test_frontend_session_state_fails_closed_after_unauthorized_response() -> No
     assert "this.resetState();" in store_source
     assert "const authenticated = await userStore.hydrateSession();" in guard_source
     assert "if (!userStore.getIsAuthenticated)" not in guard_source
+
+
+@pytest.mark.architecture
+def test_user_api_client_preserves_browser_generated_multipart_boundary() -> None:
+    source = (FRONTEND_ROOT / "api/platform/userSystem.ts").read_text(encoding="utf-8-sig")
+
+    assert "new FormData()" in source
+    assert "headers: { 'Content-Type': 'application/json' }" not in source
+    assert 'headers: { "Content-Type": "application/json" }' not in source
 
 
 @pytest.mark.architecture
