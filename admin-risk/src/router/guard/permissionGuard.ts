@@ -65,23 +65,24 @@ export function createPermissionGuard(router: Router) {
       return;
     }
 
-    if (!userStore.getIsAuthenticated) {
-      const authenticated = await userStore.hydrateSession();
-      if (!authenticated) {
-        if (to.meta.ignoreAuth) {
-          next();
-          return;
-        }
-        const redirectData: { path: string; replace: boolean; query?: Recordable<string> } = {
-          path: LOGIN_PATH,
-          replace: true,
-        };
-        if (to.path) {
-          redirectData.query = { redirect: to.path };
-        }
-        next(redirectData);
+    // Always execute the method rather than relying on a cached Pinia getter. The
+    // in-memory CSRF token is deliberately not persisted or reactive; a 401 clears
+    // it immediately, and hydrateSession then clears stale user/permission state.
+    const authenticated = await userStore.hydrateSession();
+    if (!authenticated) {
+      if (to.meta.ignoreAuth) {
+        next();
         return;
       }
+      const redirectData: { path: string; replace: boolean; query?: Recordable<string> } = {
+        path: LOGIN_PATH,
+        replace: true,
+      };
+      if (to.path) {
+        redirectData.query = { redirect: to.path };
+      }
+      next(redirectData);
+      return;
     }
 
     if (
