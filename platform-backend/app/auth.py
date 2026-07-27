@@ -70,9 +70,10 @@ class Principal:
 
 
 class AuthenticationError(Exception):
-    def __init__(self, status_code: int, detail: str) -> None:
+    def __init__(self, status_code: int, code: str, detail: str) -> None:
         super().__init__(detail)
         self.status_code = status_code
+        self.code = code
         self.detail = detail
 
 
@@ -89,25 +90,47 @@ def load_api_credentials(settings: Settings) -> list[dict[str, object]]:
         payload = json.loads(settings.auth_credentials_json)
     except json.JSONDecodeError as exc:
         raise AuthenticationError(
-            503, "Authentication credential configuration is invalid"
+            503,
+            "auth_configuration_invalid",
+            "Authentication credential configuration is invalid",
         ) from exc
     if not isinstance(payload, list):
-        raise AuthenticationError(503, "Authentication credential configuration must be a list")
+        raise AuthenticationError(
+            503,
+            "auth_configuration_invalid",
+            "Authentication credential configuration must be a list",
+        )
     credentials: list[dict[str, object]] = []
     for item in payload:
         if not isinstance(item, dict):
-            raise AuthenticationError(503, "Authentication credential entry is invalid")
+            raise AuthenticationError(
+                503,
+                "auth_configuration_invalid",
+                "Authentication credential entry is invalid",
+            )
         required = {"credentialId", "userId", "tokenSha256", "roles", "status"}
         if not required.issubset(item):
-            raise AuthenticationError(503, "Authentication credential entry is incomplete")
+            raise AuthenticationError(
+                503,
+                "auth_configuration_invalid",
+                "Authentication credential entry is incomplete",
+            )
         roles = item["roles"]
         if not isinstance(roles, list) or not are_known_roles(str(role) for role in roles):
-            raise AuthenticationError(503, "Authentication credential roles are invalid")
+            raise AuthenticationError(
+                503,
+                "auth_configuration_invalid",
+                "Authentication credential roles are invalid",
+            )
         token_digest = str(item["tokenSha256"]).lower()
         if len(token_digest) != 64 or any(
             character not in "0123456789abcdef" for character in token_digest
         ):
-            raise AuthenticationError(503, "Authentication credential token hash is invalid")
+            raise AuthenticationError(
+                503,
+                "auth_configuration_invalid",
+                "Authentication credential token hash is invalid",
+            )
         credentials.append(item)
     return credentials
 
@@ -116,20 +139,32 @@ def authenticate_bearer(request: Request, settings: Settings) -> Principal:
     authorization = request.headers.get("authorization", "")
     scheme, _, token = authorization.partition(" ")
     if scheme.lower() != "bearer" or not token:
-        raise AuthenticationError(401, "Bearer authentication is required")
+        raise AuthenticationError(
+            401,
+            "bearer_required",
+            "Bearer authentication is required",
+        )
     supplied_hash = token_hash(token)
     for credential in load_api_credentials(settings):
         if not hmac.compare_digest(str(credential["tokenSha256"]).lower(), supplied_hash):
             continue
         if credential["status"] != "active":
-            raise AuthenticationError(403, "Authentication credential is inactive")
+            raise AuthenticationError(
+                403,
+                "credential_inactive",
+                "Authentication credential is inactive",
+            )
         return Principal(
             user_id=str(credential["userId"]),
             roles=tuple(str(role) for role in credential["roles"]),
             auth_method="api_key",
             credential_id=str(credential["credentialId"]),
         )
-    raise AuthenticationError(401, "Authentication credential is invalid")
+    raise AuthenticationError(
+        401,
+        "credential_invalid",
+        "Authentication credential is invalid",
+    )
 
 
 def assurance_for_request(method: str, path: str, settings: Settings) -> AuthenticationAssurance:
@@ -154,14 +189,18 @@ def authenticate_request(request: Request, settings: Settings) -> Principal:
     has_bearer = bool(authorization.strip())
     session_token = request.cookies.get(settings.session_cookie_name)
     if has_bearer and session_token:
-        raise AuthenticationError(400, "Ambiguous authentication credentials")
+        raise AuthenticationError(
+            400,
+            "ambiguous_credentials",
+            "Ambiguous authentication credentials",
+        )
     if has_bearer:
         return authenticate_bearer(request, settings)
     if session_token:
         try:
             browser_session = authenticate_browser_session(session_token, settings)
         except BrowserSessionError as exc:
-            raise AuthenticationError(exc.status_code, exc.detail) from exc
+            raise AuthenticationError(exc.status_code, exc.code, exc.detail) from exc
         request.state.browser_session = browser_session
         return Principal(
             user_id=browser_session.user_id,
@@ -172,19 +211,31 @@ def authenticate_request(request: Request, settings: Settings) -> Principal:
 
     mode = settings.auth_mode.lower()
     if settings.environment.lower() == "live" and mode != "api_key":
-        raise AuthenticationError(503, "Live environment requires api_key authentication mode")
+        raise AuthenticationError(
+            503,
+            "live_auth_mode_required",
+            "Live environment requires api_key authentication mode",
+        )
     if mode == "api_key":
         return authenticate_bearer(request, settings)
     if mode == "development" and settings.environment.lower() != "live":
         roles = tuple(settings.development_role_list)
         if not are_known_roles(roles):
-            raise AuthenticationError(503, "Development identity roles are invalid")
+            raise AuthenticationError(
+                503,
+                "development_identity_invalid",
+                "Development identity roles are invalid",
+            )
         return Principal(
             user_id=settings.development_user_id,
             roles=roles,
             auth_method="development",
         )
-    raise AuthenticationError(503, "Authentication mode is not configured safely")
+    raise AuthenticationError(
+        503,
+        "auth_mode_unsafe",
+        "Authentication mode is not configured safely",
+    )
 
 
 def enforce_assurance(
@@ -194,17 +245,29 @@ def enforce_assurance(
     settings: Settings,
 ) -> None:
     if assurance == AuthenticationAssurance.HUMAN_SESSION and principal.auth_method != "session":
-        raise AuthenticationError(403, "Human browser session authentication is required")
+        raise AuthenticationError(
+            403,
+            "human_session_required",
+            "Human browser session authentication is required",
+        )
     if assurance == AuthenticationAssurance.LIVE_WRITE and principal.auth_method != "api_key":
-        raise AuthenticationError(403, "Live write routes require API-key authentication")
+        raise AuthenticationError(
+            403,
+            "live_api_key_required",
+            "Live write routes require API-key authentication",
+        )
     if principal.auth_method == "session":
         browser_session = getattr(request.state, "browser_session", None)
         if not isinstance(browser_session, AuthenticatedBrowserSession):
-            raise AuthenticationError(401, "Browser session context is unavailable")
+            raise AuthenticationError(
+                401,
+                "invalid_session",
+                "Browser session context is unavailable",
+            )
         try:
             validate_session_csrf(request, browser_session, settings)
         except BrowserSessionError as exc:
-            raise AuthenticationError(exc.status_code, exc.detail) from exc
+            raise AuthenticationError(exc.status_code, exc.code, exc.detail) from exc
 
 
 def permission_for_request(method: str, path: str) -> str:
@@ -282,6 +345,7 @@ def audit_auth_event(
     principal: Principal | None,
     permission: str | None,
     result: str,
+    code: str,
     detail: str,
     request_id: str,
 ) -> None:
@@ -306,6 +370,7 @@ def audit_auth_event(
                             "roles": list(principal.roles) if principal else [],
                             "credentialId": principal.credential_id if principal else None,
                             "permission": permission,
+                            "code": code,
                             "detail": detail,
                         },
                         ensure_ascii=False,
@@ -342,6 +407,7 @@ async def validate_body_identity(request: Request, principal: Principal) -> None
         if value is not None and str(value) != principal.user_id:
             raise AuthenticationError(
                 403,
+                "request_identity_mismatch",
                 f"Request identity field '{field}' must match the authenticated user",
             )
 
@@ -370,7 +436,11 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
             principal = authenticate_request(request, settings)
             enforce_assurance(request, principal, assurance, settings)
             if permission is not None and not principal.has_permission(permission):
-                raise AuthenticationError(403, "Authenticated identity lacks required permission")
+                raise AuthenticationError(
+                    403,
+                    "permission_denied",
+                    "Authenticated identity lacks required permission",
+                )
             if settings.environment.lower() == "live" or settings.auth_mode.lower() == "api_key":
                 await validate_body_identity(request, principal)
         except AuthenticationError as exc:
@@ -380,6 +450,7 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
                 principal=principal,
                 permission=permission,
                 result="denied",
+                code=exc.code,
                 detail=exc.detail,
                 request_id=request_id,
             )
@@ -388,7 +459,10 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
                 headers["WWW-Authenticate"] = "Bearer"
             return JSONResponse(
                 status_code=exc.status_code,
-                content={"detail": exc.detail, "requestId": request_id},
+                content={
+                    "detail": {"code": exc.code, "message": exc.detail},
+                    "requestId": request_id,
+                },
                 headers=headers,
             )
 
@@ -402,7 +476,13 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
 def require_principal(request: Request) -> Principal:
     principal = getattr(request.state, "principal", None)
     if not isinstance(principal, Principal):
-        raise HTTPException(status_code=401, detail="Authenticated principal is unavailable")
+        raise HTTPException(
+            status_code=401,
+            detail={
+                "code": "principal_unavailable",
+                "message": "Authenticated principal is unavailable",
+            },
+        )
     return principal
 
 
@@ -411,7 +491,10 @@ def require_permission(permission: str) -> Callable[[Principal], Principal]:
         if not principal.has_permission(permission):
             raise HTTPException(
                 status_code=403,
-                detail="Authenticated identity lacks required permission",
+                detail={
+                    "code": "permission_denied",
+                    "message": "Authenticated identity lacks required permission",
+                },
             )
         return principal
 
@@ -424,7 +507,10 @@ def require_human_session(
     if principal.auth_method != "session":
         raise HTTPException(
             status_code=403,
-            detail="Human browser session authentication is required",
+            detail={
+                "code": "human_session_required",
+                "message": "Human browser session authentication is required",
+            },
         )
     return principal
 
