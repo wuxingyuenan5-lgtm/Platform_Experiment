@@ -52,6 +52,9 @@ def test_frontend_session_state_fails_closed_after_unauthorized_response() -> No
     store_source = (FRONTEND_ROOT / "store/modules/user.ts").read_text(
         encoding="utf-8-sig"
     )
+    guard_source = (FRONTEND_ROOT / "router/guard/permissionGuard.ts").read_text(
+        encoding="utf-8-sig"
+    )
 
     assert "error.response?.status === 401" in api_source
     assert "clearUserSystemSessionMemory();" in api_source
@@ -60,6 +63,8 @@ def test_frontend_session_state_fails_closed_after_unauthorized_response() -> No
     assert "if (this.authenticated && getUserSystemCsrfToken()) return true;" in store_source
     assert "if (this.authenticated) {" in store_source
     assert "this.resetState();" in store_source
+    assert "const authenticated = await userStore.hydrateSession();" in guard_source
+    assert "if (!userStore.getIsAuthenticated)" not in guard_source
 
 
 @pytest.mark.architecture
