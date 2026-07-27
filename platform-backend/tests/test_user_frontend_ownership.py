@@ -79,6 +79,18 @@ def test_frontend_session_state_fails_closed_after_unauthorized_response() -> No
 
 
 @pytest.mark.architecture
+def test_profile_patch_clients_preserve_explicit_clear_semantics() -> None:
+    source = (FRONTEND_ROOT / "api/platform/userSystem.ts").read_text(encoding="utf-8-sig")
+
+    assert "normalizeSelfProfilePatch" in source
+    assert "normalizeAdminProfilePatch" in source
+    assert "Object.prototype.hasOwnProperty.call(payload, field)" in source
+    assert "normalized[field] = null;" in source
+    assert "data: normalizeSelfProfilePatch(payload)" in source
+    assert "data: normalizeAdminProfilePatch(payload)" in source
+
+
+@pytest.mark.architecture
 def test_user_api_client_preserves_browser_generated_multipart_boundary() -> None:
     source = (FRONTEND_ROOT / "api/platform/userSystem.ts").read_text(encoding="utf-8-sig")
 
