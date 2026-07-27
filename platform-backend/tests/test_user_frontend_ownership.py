@@ -6,6 +6,7 @@ import pytest
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 FRONTEND_ROOT = REPOSITORY_ROOT / "admin-risk" / "src"
+BACKEND_APP_ROOT = REPOSITORY_ROOT / "platform-backend" / "app"
 CANONICAL_USER_FILES = (
     FRONTEND_ROOT / "store/modules/user.ts",
     FRONTEND_ROOT / "views/sys/login/LoginForm.vue",
@@ -64,11 +65,23 @@ def test_frontend_session_state_fails_closed_after_unauthorized_response() -> No
         encoding="utf-8-sig"
     )
 
+    invalidation_codes = (
+        "invalid_session",
+        "human_session_required",
+        "csrf_required",
+        "csrf_invalid",
+        "account_inactive",
+        "account_temporarily_locked",
+        "browser_sessions_disabled",
+        "session_timestamp_invalid",
+    )
     for source in (user_api_source, holding_api_source):
         assert "if (status === 401" in source
         assert "SESSION_INVALIDATION_CODES" in source
         assert "legacyCsrfFailure" in source
         assert "clearUserSystemSessionMemory();" in source
+        for code in invalidation_codes:
+            assert f"'{code}'" in source
     assert "getUserSystemCsrfToken" in store_source
     assert "state.authenticated && Boolean(getUserSystemCsrfToken())" in store_source
     assert "if (this.authenticated && getUserSystemCsrfToken()) return true;" in store_source
@@ -78,6 +91,29 @@ def test_frontend_session_state_fails_closed_after_unauthorized_response() -> No
     assert "await this.getUserInfoAction();" in store_source
     assert "const authenticated = await userStore.hydrateSession();" in guard_source
     assert "if (!userStore.getIsAuthenticated)" not in guard_source
+
+
+@pytest.mark.architecture
+def test_authentication_errors_use_stable_structured_contract() -> None:
+    auth_source = (BACKEND_APP_ROOT / "auth.py").read_text(encoding="utf-8")
+    session_source = (BACKEND_APP_ROOT / "user_session_auth.py").read_text(encoding="utf-8")
+
+    assert '"detail": {"code": exc.code, "message": exc.detail}' in auth_source
+    assert '"requestId": request_id' in auth_source
+    assert '"code": code' in auth_source
+    assert "self.code = code" in auth_source
+    assert "self.code = code" in session_source
+    for code in (
+        "ambiguous_credentials",
+        "human_session_required",
+        "live_api_key_required",
+        "permission_denied",
+        "request_identity_mismatch",
+        "invalid_session",
+        "csrf_required",
+        "csrf_invalid",
+    ):
+        assert f'"{code}"' in auth_source or f'"{code}"' in session_source
 
 
 @pytest.mark.architecture
