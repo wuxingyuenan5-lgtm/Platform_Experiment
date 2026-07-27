@@ -194,6 +194,11 @@ export class UserSystemApiError extends Error {
   }
 }
 
+interface SessionMemoryMessage {
+  type: 'csrf';
+  value: string;
+}
+
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS', 'TRACE']);
 const SESSION_INVALIDATION_CODES = new Set([
   'invalid_session',
@@ -206,15 +211,32 @@ const client: AxiosInstance = axios.create({
   timeout: 15_000,
   withCredentials: true,
 });
+const sessionMemoryChannel =
+  typeof window !== 'undefined' && 'BroadcastChannel' in window
+    ? new window.BroadcastChannel('vg-user-session-memory')
+    : null;
 
 let csrfToken = '';
 
+sessionMemoryChannel?.addEventListener('message', (event: MessageEvent<SessionMemoryMessage>) => {
+  if (event.data?.type === 'csrf' && typeof event.data.value === 'string') {
+    csrfToken = event.data.value;
+  }
+});
+
+function updateUserSystemCsrfToken(value: string, broadcast: boolean): void {
+  csrfToken = value;
+  if (broadcast) {
+    sessionMemoryChannel?.postMessage({ type: 'csrf', value } satisfies SessionMemoryMessage);
+  }
+}
+
 export function setUserSystemCsrfToken(value?: string): void {
-  csrfToken = value || '';
+  updateUserSystemCsrfToken(value || '', true);
 }
 
 export function clearUserSystemSessionMemory(): void {
-  csrfToken = '';
+  updateUserSystemCsrfToken('', true);
 }
 
 export function getUserSystemCsrfToken(): string {
