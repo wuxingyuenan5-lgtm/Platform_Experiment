@@ -92,8 +92,24 @@ def assert_auth_error(response, *, status_code: int, code: str, message_fragment
     assert payload["requestId"] == response.headers["x-request-id"]
 
 
+def latest_denial_audit(database_path: Path) -> dict[str, object]:
+    with sqlite3.connect(database_path) as db:
+        db.row_factory = sqlite3.Row
+        row = db.execute(
+            """
+            SELECT details_json
+            FROM audit_events
+            WHERE event_type = 'authentication_or_authorization_denied'
+            ORDER BY created_at DESC
+            LIMIT 1
+            """
+        ).fetchone()
+    assert row is not None
+    return json.loads(str(row["details_json"]))
+
+
 @pytest.mark.live_safety
-def test_ambiguous_cookie_and_bearer_are_rejected(
+def test_ambiguous_cookie_and_bearer_are_rejected_and_audited(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
@@ -115,6 +131,13 @@ def test_ambiguous_cookie_and_bearer_are_rejected(
         code="ambiguous_credentials",
         message_fragment="Ambiguous",
     )
+    audit = latest_denial_audit(database_path)
+    assert audit["code"] == "ambiguous_credentials"
+    assert audit["path"] == "/api/v1/system/info"
+    assert audit["permission"] == "platform:read"
+    serialized = json.dumps(audit, ensure_ascii=False)
+    assert "api-token" not in serialized
+    assert session_token not in serialized
 
 
 @pytest.mark.live_safety
