@@ -190,8 +190,7 @@ export const useUserStore = defineStore({
       if (this.authenticated && getUserSystemCsrfToken()) return true;
       if (this.authenticated) {
         this.resetState();
-        this.hydrationAttempted = true;
-        return false;
+        this.hydrationAttempted = false;
       }
       if (this.hydrationAttempted) return false;
       try {
