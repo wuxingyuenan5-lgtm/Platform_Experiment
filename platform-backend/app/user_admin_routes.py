@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response,
 from app.auth import Principal, require_permission
 from app.config import get_settings
 from app.user_admin_policy import (
+    REGULAR_HUMAN_ROLES,
     UserAdminPolicyError,
     assert_can_assign_role,
     assert_can_manage_target,
@@ -56,7 +57,7 @@ def _request_id(request: Request) -> str:
     return value
 
 
-def _session_context(request: Request, principal: Principal) -> AdminRequestContext:
+def _human_role(principal: Principal) -> str:
     if principal.auth_method != "session" or principal.session_id is None or len(principal.roles) != 1:
         raise HTTPException(
             status_code=403,
@@ -65,10 +66,14 @@ def _session_context(request: Request, principal: Principal) -> AdminRequestCont
                 "message": "Human browser session authentication is required",
             },
         )
+    return principal.roles[0]
+
+
+def _session_context(request: Request, principal: Principal) -> AdminRequestContext:
     return AdminRequestContext(
         actor_user_id=principal.user_id,
-        actor_role=principal.roles[0],
-        session_id=principal.session_id,
+        actor_role=_human_role(principal),
+        session_id=principal.session_id or "",
         request_id=_request_id(request),
         ip_address=request.client.host if request.client else None,
     )
@@ -90,6 +95,40 @@ def _raise_policy_error(exc: UserAdminPolicyError) -> NoReturn:
 
 def _no_store(response: Response) -> None:
     response.headers["Cache-Control"] = "no-store"
+
+
+def _detail_target_role(detail: UserAdminDetailResponse) -> str | None:
+    return target_role_for_policy(
+        role_code=detail.role,
+        requested_role_code=detail.requested_role,
+    )
+
+
+def _read_user_detail_for_actor(
+    *,
+    user_id: str,
+    principal: Principal,
+) -> UserAdminDetailResponse:
+    actor_role = _human_role(principal)
+    may_read_sensitive = principal.has_permission("user.sensitive.read")
+    if actor_role == "ceo" and may_read_sensitive:
+        return get_user_detail(user_id=user_id, sensitive=True)
+
+    masked = get_user_detail(user_id=user_id, sensitive=False)
+    if (
+        actor_role != "tech_lead"
+        or not may_read_sensitive
+        or _detail_target_role(masked) not in REGULAR_HUMAN_ROLES
+    ):
+        return masked
+
+    full = get_user_detail(user_id=user_id, sensitive=True)
+    if (
+        full.row_version != masked.row_version
+        or _detail_target_role(full) not in REGULAR_HUMAN_ROLES
+    ):
+        return masked
+    return full
 
 
 def _assert_role_profile_requirements(
@@ -147,6 +186,7 @@ def users_page(
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, alias="pageSize", ge=1, le=200),
 ) -> UserAdminPageResponse:
+    actor_role = _human_role(principal)
     _no_store(response)
     return list_users(
         search=search,
@@ -158,7 +198,7 @@ def users_page(
         sort_direction=sort_direction,
         page=page,
         page_size=page_size,
-        sensitive=principal.has_permission("user.sensitive.read"),
+        sensitive=actor_role == "ceo" and principal.has_permission("user.sensitive.read"),
     )
 
 
@@ -187,10 +227,7 @@ def user_detail(
     principal: Annotated[Principal, Depends(require_permission("user.read"))],
 ) -> UserAdminDetailResponse:
     try:
-        result = get_user_detail(
-            user_id=user_id,
-            sensitive=principal.has_permission("user.sensitive.read"),
-        )
+        result = _read_user_detail_for_actor(user_id=user_id, principal=principal)
     except UserAdminServiceError as exc:
         _raise_service_error(exc)
     _no_store(response)
