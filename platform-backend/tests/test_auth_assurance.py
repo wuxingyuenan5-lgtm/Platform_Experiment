@@ -84,7 +84,13 @@ def seed_browser_session() -> tuple[str, str]:
     return issued.session_token, issued.csrf_token
 
 
-def assert_auth_error(response, *, status_code: int, code: str, message_fragment: str) -> None:
+def assert_auth_error(
+    response,
+    *,
+    status_code: int,
+    code: str,
+    message_fragment: str,
+) -> None:
     assert response.status_code == status_code
     payload = response.json()
     assert payload["detail"]["code"] == code
