@@ -34,6 +34,7 @@ Included outcomes:
 - Member holding and fund NAV read models with exact Decimal calculations.
 - Additive migrations, initial CEO bootstrap, compatibility and rollback.
 - Frontend permission-driven navigation and page integration using existing layout/components.
+- Stable authentication/authorization error codes and Request ID correlation.
 - Direct backend, frontend, migration, security and repository verification.
 
 Explicit phase-one non-goals:
@@ -63,6 +64,7 @@ Read in addition to standard startup context:
 - `docs/planning/USER_SYSTEM_DESIGN_AND_IMPLEMENTATION_PLAN.md`
 - `docs/planning/USER_SYSTEM_REQUIREMENTS.md`
 - `docs/technical/USER_SYSTEM_TECHNICAL_ARCHITECTURE.md`
+- `docs/technical/USER_SYSTEM_AUTH_ERROR_CONTRACT.md`
 - `docs/planning/USER_SYSTEM_EXECUTION_PLAN.md`
 - `docs/technical/AUTH_RBAC_LIVE_SESSIONS.md`
 - `docs/technical/MEMBER_HOLDINGS_READ_MODEL.md`
@@ -83,6 +85,7 @@ Read in addition to standard startup context:
 - `platform-backend/tests/test_member_holding_*.py`
 - `platform-backend/tests/test_password_reset_tickets.py`
 - `platform-backend/tests/test_last_ceo_concurrency.py`
+- `platform-backend/tests/test_auth_assurance.py`
 - `admin-risk/src/api/platform/userSystem.ts`
 - `admin-risk/src/api/platform/memberHoldings.ts`
 - `admin-risk/src/store/modules/user.ts`
@@ -96,6 +99,8 @@ Read in addition to standard startup context:
 - `admin-risk/src/views/sys/reset-password/index.vue`
 - `admin-risk/src/views/account/index.vue`
 - `admin-risk/src/views/users/`
+- `admin-risk/scripts/test-user-system-access.cjs`
+- `admin-risk/tsconfig.user-system.json`
 
 ## Design decisions
 
@@ -104,6 +109,7 @@ Read in addition to standard startup context:
 - Customer identity APIs reject API-key principals even when the API-key role has wildcard permission.
 - Current Live write routes remain API-key-only; browser Live authentication is a separate future Critical decision.
 - Technical leads cannot modify CEOs or other technical leads, cannot grant themselves greater authority, cannot view all member holdings by default and cannot execute real trades or modify core risk parameters by default.
+- Technical-lead list DTOs are masked; ordinary employee/member details may be complete, while CEO/peer technical-lead details remain masked.
 - Authorization separates authentication assurance, permission points, target-role policy, field policy and data scope.
 - Member self-holding APIs derive identity from Principal and accept no user identifier.
 - Financial values use Decimal and canonical decimal strings.
@@ -116,24 +122,28 @@ Read in addition to standard startup context:
 - Employee approval/role assignment requires a non-empty department; member approval/role assignment requires a non-empty member type.
 - Member holdings are a customer-reporting read model, not formal accounting or subscription/redemption truth.
 - Browser holding/NAV writes accept only `manual_admin`; migration and external-import sources require future dedicated importers.
+- Browser CSRF remains memory-only and uses same-origin `BroadcastChannel` for multi-tab rotation synchronization.
+- Cookie-valid/CSRF-memory-missing navigation attempts `/auth/me` rehydration before requiring login.
+- Authentication and authorization failures use stable `detail.code/detail.message`, Request ID correlation and unchanged status-code semantics.
 - Phase one provides no user DELETE workflow.
 
-## Decision gates before implementation
+## Deployment decision gates
 
 - Legacy user migration: use the safe branch default of no import while building the new isolated database boundary. Stop before login cutover if evidence shows real users must migrate.
 - Initial holding source: use the safe branch default `manual_admin`; stop before production data import if another source is required.
 - Deployment origin: develop and test for same-origin `/api/v1`; stop before production deployment if cross-origin is required.
 
-Do not silently assume a conflicting answer. Stop the affected batch if evidence differs from the safe default.
+Do not silently assume a conflicting answer. Stop the affected deployment cutover if evidence differs from the safe default.
 
 ## Verification
 
-Documentation phase:
+Documentation and repository governance:
 
 ```powershell
 python scripts/check-documentation-consistency.py
 python scripts/check-repository-structure.py
 python scripts/check-version-consistency.py
+python scripts/scan-secrets.py
 ```
 
 Implementation backend:
@@ -152,8 +162,22 @@ Implementation frontend:
 
 ```powershell
 cd admin-risk
-pnpm exec eslint --max-warnings 0 <changed-files>
+pnpm install --frozen-lockfile
+pnpm test:user-system
+pnpm exec eslint --max-warnings 0 `
+  "src/access/**/*.{ts,tsx}" `
+  "src/api/platform/userSystem.ts" `
+  "src/api/platform/memberHoldings.ts" `
+  "src/router/guard/permissionGuard.ts" `
+  "src/router/routes/modules/{account,dashboard,risk}.ts" `
+  "src/store/modules/user.ts" `
+  "src/views/account/**/*.{vue,ts,tsx}" `
+  "src/views/sys/login/**/*.{vue,ts,tsx}" `
+  "src/views/sys/register/**/*.{vue,ts,tsx}" `
+  "src/views/sys/reset-password/**/*.{vue,ts,tsx}" `
+  "src/views/users/**/*.{vue,ts,tsx}"
 pnpm type:check
+pnpm exec vue-tsc -p tsconfig.user-system.json --noEmit --skipLibCheck
 pnpm build
 ```
 
@@ -165,7 +189,7 @@ Final PR:
 - Version Consistency.
 - No Live Write or execution-semantics regression.
 
-No repository command above has been executed in the connector-only environment. Added tests and type-check configuration are pending execution in a real checkout or requested PR CI.
+No complete repository command set above has been executed in the connector-only environment. The isolated same-content Node access-policy runner completed six assertions with zero failures; this is only runner evidence and is not a substitute for a real checkout or PR CI.
 
 ## Stop conditions
 
@@ -197,6 +221,7 @@ No repository command above has been executed in the connector-only environment.
 - [ ] Sensitive operations produce audit evidence without secret/customer payloads.
 - [ ] Additive migrations pass fresh, upgrade, repeat-startup and checksum-drift tests.
 - [ ] Frontend menu, route, field and action visibility derives from one permission registry.
+- [ ] Authentication and authorization errors use stable codes and Request ID correlation.
 - [ ] User-system local run no longer depends on legacy auth port 8080.
 - [ ] Full CI, Secret Scan and Version Consistency pass before squash merge.
 
@@ -207,7 +232,7 @@ Acceptance boxes remain unchecked until the required executable evidence exists,
 Risk: high
 
 - Primary risks: authentication lockout, privilege escalation, API-key/human-domain confusion, horizontal member-data access, stale-session authority, last-CEO removal, reset-ticket leakage, migration failure and accidental Live-safety weakening.
-- Detection: assurance-class tests, target/data-scope tests, migration tests, session invalidation tests, reset-ticket tests, protected-role concurrency tests, frontend route tests and existing live-safety suite.
+- Detection: assurance-class tests, structured-error tests, target/data-scope tests, migration tests, session invalidation tests, reset-ticket tests, protected-role concurrency tests, frontend route tests and existing live-safety suite.
 - Rollback: back up Platform SQLite, avatar directory and proxy configuration before deployment; revert application and restore pre-migration data when required. Applied additive migrations are forward-fixed unless restoring the complete pre-migration backup.
 
 ## Batch 1 checkpoint — identity and Session foundation
@@ -246,13 +271,13 @@ Verification status: implementation and tests are committed; frontend lint/type/
 Implemented:
 
 - server-side paginated search, role/status filtering and deterministic sorting;
-- complete CEO/technical-lead DTOs and employee server-side masked DTOs;
+- CEO complete DTOs, technical-lead target-scoped DTOs and employee server-side masked DTOs;
 - user detail, create, edit, approve, reject, role, status, reset-ticket and Session-revoke APIs;
 - target-role policy, self-mutation rejection, recent reauthentication and last-CEO transaction guard;
 - one-time reset ticket returned once; random bootstrap password is never shown or known;
 - sensitive writes and audit records share one database transaction;
 - employee/member role-profile requirements are rechecked before approval and role changes;
-- direct tests for creation/reset, employee masking, protected targets, role-profile requirements, row-version conflicts, last-CEO concurrency and audit rollback;
+- direct tests for creation/reset, employee masking, protected target fields and writes, role-profile requirements, row-version conflicts, last-CEO concurrency and audit rollback;
 - frontend user table, filters, pagination, create flow, detail drawer, dangerous confirmations, reset-ticket one-time display and audit view;
 - user-management route restored for internal roles and tagged with `user.read` permission metadata.
 
@@ -285,22 +310,46 @@ Implemented:
 - API-key-style `*` is not recognized as a browser route permission;
 - CEO receives an explicit business permission set rather than browser wildcard authority;
 - canonical personal-account route is tagged with `profile.read_self`;
-- holding client clears in-memory CSRF when the Session expires;
+- Cookie-valid/CSRF-memory-missing state attempts `/auth/me` rehydration;
+- CSRF rotation synchronizes across same-origin tabs with memory-only `BroadcastChannel`;
+- avatar multipart upload preserves the browser-generated boundary;
+- profile PATCH preserves omitted fields and supports explicit clear semantics;
 - static ownership tests prevent legacy auth imports, browser token persistence and floating-point holding calculations;
-- ownership, database and holding technical documents are being synchronized.
+- ownership, database, holding and design documents are synchronized.
 
-Remaining before an integration checkpoint:
+Verification status: implementation and tests are committed; frontend executable checks remain unrun.
 
-- run documentation consistency, structure and version checks;
+## Batch 6 checkpoint — authentication contract and verification preparation
+
+Implemented:
+
+- Browser Session errors carry explicit stable codes instead of message-derived semantics;
+- authentication middleware returns structured `detail.code/detail.message` plus `requestId`;
+- permission dependencies use the same structured error shape;
+- authentication denial audit records the stable error code without raw credentials;
+- Live-safety assurance tests assert error codes, messages, status and Request ID correlation;
+- dedicated authentication error-contract documentation is authoritative for client handling;
+- dependency-free Node 20 user-access tests replace unavailable Vitest files;
+- `tsconfig.user-system.json` covers user Store, routes, account, administration and holdings pages;
+- Platform CI runs focused user-system tests, ESLint, type checking and build.
+
+Verification status: code, tests and CI definitions are committed; Ruff, Pyright, classified Pytest, frozen pnpm checks, documentation checks, Secret Scan and PR CI remain unrun.
+
+## Remaining before an integration checkpoint
+
+- run documentation consistency, repository structure and version checks;
 - run Ruff, Pyright and all classified backend tests;
-- run frontend ESLint, type check, unit tests and build;
+- run frozen pnpm install, user-system access tests, focused ESLint, both frontend type checks and build;
+- run Secret Scan against the full tracked tree;
 - resolve executable findings without weakening protected semantics;
+- perform manual browser acceptance for registration, login, profile clear, avatar upload, multi-tab CSRF, role navigation and holdings/NAV;
+- confirm legacy-user migration, same-origin production routing and initial holding-source evidence before deployment cutover;
 - refresh `main` divergence and requested PR/CI state;
 - only after the user requests integration review, open one linked Critical PR.
 
 ## Progress
 
-- Done in code: design baseline; Batch 1 identity/Session foundation; Batch 2 browser/personal-account flows; Batch 3 administration/audit; Batch 4 member holdings/NAV; Batch 5 navigation and ownership convergence implementation.
-- Current: static review, documentation synchronization and executable-verification preparation. Branch work remains isolated; no Pull Request exists by design.
-- Next: continue targeted static review and documentation updates, then run full checks in a real checkout or user-requested PR CI.
-- Blocked by: connector-only environment cannot clone GitHub or execute repository commands. No product/design blocker is currently known.
+- Done in code: design baseline; Batches 1–6 identity, personal account, administration, holdings, navigation and authentication-contract implementation.
+- Current: executable-verification preparation and targeted static review. Branch work remains isolated; no Pull Request exists by design.
+- Next: obtain a real checkout or requested PR CI, run the complete matrix and fix only evidence-backed findings.
+- Blocked by: connector-only environment cannot execute the repository dependency and test matrix. No product/design blocker is currently known.
