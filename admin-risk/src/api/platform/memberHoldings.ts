@@ -72,6 +72,10 @@ const SESSION_INVALIDATION_CODES = new Set([
   'human_session_required',
   'csrf_required',
   'csrf_invalid',
+  'account_inactive',
+  'account_temporarily_locked',
+  'browser_sessions_disabled',
+  'session_timestamp_invalid',
 ]);
 const client: AxiosInstance = axios.create({
   baseURL: '/api/v1',
