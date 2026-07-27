@@ -161,7 +161,7 @@ def test_employee_user_list_is_masked_by_backend(
 
 
 @pytest.mark.integration
-def test_technical_lead_cannot_manage_protected_targets(
+def test_technical_lead_sensitive_fields_follow_target_scope(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
@@ -195,8 +195,16 @@ def test_technical_lead_cannot_manage_protected_targets(
         assert signed_in.status_code == 200
         csrf = signed_in.json()["csrfToken"]
 
+        protected_list = tech_client.get("/api/v1/users", params={"search": "owner-target"})
+        assert protected_list.status_code == 200
+        protected_item = protected_list.json()["items"][0]
+        assert protected_item["contactMasked"] is True
+        assert protected_item["email"] != "owner@example.test"
+
         owner_detail = tech_client.get(f"/api/v1/users/{owner.id}")
         assert owner_detail.status_code == 200
+        assert owner_detail.json()["contactMasked"] is True
+        assert owner_detail.json()["email"] != "owner@example.test"
         forbidden = tech_client.post(
             f"/api/v1/users/{owner.id}/status",
             headers={"Origin": ORIGIN, "X-CSRF-Token": csrf},
@@ -232,3 +240,8 @@ def test_technical_lead_cannot_manage_protected_targets(
             },
         )
         assert ordinary.status_code == 201
+        ordinary_user = ordinary.json()["user"]
+        ordinary_detail = tech_client.get(f"/api/v1/users/{ordinary_user['userId']}")
+        assert ordinary_detail.status_code == 200
+        assert ordinary_detail.json()["contactMasked"] is False
+        assert ordinary_detail.json()["email"] == "member-by-tech@example.test"
