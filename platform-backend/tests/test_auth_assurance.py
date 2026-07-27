@@ -84,6 +84,14 @@ def seed_browser_session() -> tuple[str, str]:
     return issued.session_token, issued.csrf_token
 
 
+def assert_auth_error(response, *, status_code: int, code: str, message_fragment: str) -> None:
+    assert response.status_code == status_code
+    payload = response.json()
+    assert payload["detail"]["code"] == code
+    assert message_fragment in payload["detail"]["message"]
+    assert payload["requestId"] == response.headers["x-request-id"]
+
+
 @pytest.mark.live_safety
 def test_ambiguous_cookie_and_bearer_are_rejected(
     monkeypatch: pytest.MonkeyPatch,
@@ -101,8 +109,12 @@ def test_ambiguous_cookie_and_bearer_are_rejected(
             headers={"Authorization": "Bearer api-token"},
         )
 
-    assert response.status_code == 400
-    assert "Ambiguous" in response.json()["detail"]
+    assert_auth_error(
+        response,
+        status_code=400,
+        code="ambiguous_credentials",
+        message_fragment="Ambiguous",
+    )
 
 
 @pytest.mark.live_safety
@@ -120,8 +132,12 @@ def test_customer_identity_domain_rejects_api_key_wildcard(
             headers={"Authorization": "Bearer api-token"},
         )
 
-    assert response.status_code == 403
-    assert "browser session" in response.json()["detail"]
+    assert_auth_error(
+        response,
+        status_code=403,
+        code="human_session_required",
+        message_fragment="browser session",
+    )
 
 
 @pytest.mark.live_safety
@@ -146,5 +162,9 @@ def test_live_write_rejects_browser_session_but_allows_platform_read(
         )
 
     assert read_response.status_code == 200
-    assert write_response.status_code == 403
-    assert "API-key" in write_response.json()["detail"]
+    assert_auth_error(
+        write_response,
+        status_code=403,
+        code="live_api_key_required",
+        message_fragment="API-key",
+    )
