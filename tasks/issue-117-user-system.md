@@ -171,23 +171,25 @@ Acceptance remains unconfirmed until the complete executable evidence exists.
   - Avatar multipart boundary, multi-tab memory-only CSRF, profile explicit-clear semantics and target-scoped masking are implemented.
   - Platform CI includes focused user-system tests, ESLint, dedicated Vue type checking and build.
   - Orphan Vitest files were removed; the dependency-free Node runner covers access, route filtering and Decimal formatting.
-  - Targeted same-content execution evidence:
-    - frontend access/route/Decimal runner: **11 passed, 0 failed**;
-    - password/Token security module: **3 passed, 0 failed**;
-    - role-permission registry: **6 passed, 0 failed**;
-    - member-holding Decimal module: **16 passed, 0 failed**;
-    - public-auth rate limiter: **2 passed, 0 failed**.
+  - Targeted same-content execution evidence totals **48 passing cases, 0 failures**:
+    - frontend access/route/Decimal runner: **11 passed**;
+    - password/Token security module: **3 passed**;
+    - role-permission registry: **6 passed**;
+    - member-holding Decimal module: **16 passed**;
+    - public-auth rate limiter: **2 passed**;
+    - administrator target/role/recent-reauth policy: **6 passed**;
+    - last-active-CEO core transaction guard: **4 passed**.
   - Targeted execution exposed and fixed a real password-policy defect: phone normalization preserved `+`, so a password containing the complete phone digits without `+` was not rejected. Password policy now compares normalized digit strings; the existing security test then passed.
   - The fixed Dummy Argon2 hash was directly verified as a valid hash that returns mismatch for an incorrect password.
   - Requirements, design index, authentication error contract, Ownership Catalog and this task packet are synchronized.
 - Current:
-  - Targeted static regression review and isolated pure-module execution on the long-lived branch.
-  - Latest full comparison before the newest security/test commits was ahead of `main` by 224 and behind by 0; merge base remained unchanged.
-  - No PR exists by explicit branch policy. The checked branch commit had no status checks or Actions runs.
+  - Targeted static regression review and isolated pure/core-module execution on the long-lived branch.
+  - Latest full comparison is ahead of `main` by **227** and behind by **0**; merge base remains unchanged.
+  - No PR exists by explicit branch policy. The checked branch commits have no status checks or Actions runs.
 - Next:
   - Obtain a real checkout or explicit integration PR, run the complete command matrix and fix only evidence-backed findings.
   - Perform manual browser acceptance and resolve the three deployment decision gates before cutover.
 - Blocked by:
   - The current execution environment cannot resolve `github.com`, and the connector exposes file operations but no repository archive or workflow-dispatch action.
   - Therefore full Ruff, Pyright, database/integration/live-safety Pytest, frozen pnpm install, Vue type checks, production build, repository scripts and full Secret Scan remain unexecuted.
-  - Isolated pytest harnesses do not load repository marker configuration, so they emit only `PytestUnknownMarkWarning`; their assertions still execute. These results are not a substitute for repository CI.
+  - Isolated pytest harnesses do not load repository marker configuration, so they may emit `PytestUnknownMarkWarning`; their assertions still execute. These results are not a substitute for repository CI or the concurrency integration suite.
