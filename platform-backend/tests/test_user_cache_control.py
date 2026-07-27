@@ -67,6 +67,8 @@ def test_identity_success_and_failure_responses_are_not_cacheable(
     with TestClient(app, base_url=ORIGIN) as client:
         unauthorized = client.get("/api/v1/users")
         assert unauthorized.status_code == 401
+        assert unauthorized.json()["detail"]["code"] == "bearer_required"
+        assert unauthorized.json()["requestId"] == unauthorized.headers["x-request-id"]
         assert unauthorized.headers["cache-control"] == "no-store"
         assert unauthorized.headers["pragma"] == "no-cache"
 
