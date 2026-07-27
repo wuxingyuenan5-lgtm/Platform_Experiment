@@ -31,7 +31,10 @@ def test_canonical_user_frontend_does_not_import_legacy_auth_client() -> None:
 
 @pytest.mark.architecture
 def test_user_store_does_not_persist_browser_authentication_token() -> None:
-    source = (FRONTEND_ROOT / "store/modules/user.ts").read_text(encoding="utf-8-sig")
+    store_source = (FRONTEND_ROOT / "store/modules/user.ts").read_text(encoding="utf-8-sig")
+    api_source = (FRONTEND_ROOT / "api/platform/userSystem.ts").read_text(
+        encoding="utf-8-sig"
+    )
     forbidden = (
         "TOKEN_KEY",
         "setAuthCache(TOKEN_KEY",
@@ -39,9 +42,11 @@ def test_user_store_does_not_persist_browser_authentication_token() -> None:
         "localStorage.setItem",
         "sessionStorage.setItem",
     )
-    assert [token for token in forbidden if token in source] == []
-    assert "getCurrentAuthentication" in source
-    assert "loginUser" in source
+    assert [token for token in forbidden if token in store_source or token in api_source] == []
+    assert "getCurrentAuthentication" in store_source
+    assert "loginUser" in store_source
+    assert "BroadcastChannel" in api_source
+    assert "vg-user-session-memory" in api_source
 
 
 @pytest.mark.architecture
