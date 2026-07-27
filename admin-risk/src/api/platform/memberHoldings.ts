@@ -67,6 +67,12 @@ export interface FundNavMutationResult {
 }
 
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS', 'TRACE']);
+const SESSION_INVALIDATION_CODES = new Set([
+  'invalid_session',
+  'human_session_required',
+  'csrf_required',
+  'csrf_invalid',
+]);
 const client: AxiosInstance = axios.create({
   baseURL: '/api/v1',
   timeout: 15_000,
@@ -86,23 +92,26 @@ client.interceptors.request.use((config) => {
 client.interceptors.response.use(
   (response) => response,
   (error: AxiosError) => {
-    if (error.response?.status === 401) {
-      clearUserSystemSessionMemory();
-    }
     const payload = error.response?.data as
       | { detail?: { code?: string; message?: string } | string; message?: string }
       | undefined;
     const detail = payload?.detail;
     const body = typeof detail === 'object' && detail ? detail : undefined;
+    const status = error.response?.status;
     const message =
       body?.message ||
       (typeof detail === 'string' ? detail : undefined) ||
       payload?.message ||
       error.message ||
       '持仓请求失败';
-    return Promise.reject(
-      new UserSystemApiError(message, error.response?.status, body?.code),
-    );
+    const legacyCsrfFailure =
+      status === 403 &&
+      typeof detail === 'string' &&
+      (detail.includes('CSRF token') || detail.includes('browser session'));
+    if (status === 401 || SESSION_INVALIDATION_CODES.has(body?.code || '') || legacyCsrfFailure) {
+      clearUserSystemSessionMemory();
+    }
+    return Promise.reject(new UserSystemApiError(message, status, body?.code));
   },
 );
 
