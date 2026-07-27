@@ -57,6 +57,10 @@ def normalize_phone(value: str | None) -> str | None:
     return normalized or None
 
 
+def _phone_digits(value: str | None) -> str:
+    return "".join(character for character in (value or "") if character.isdigit())
+
+
 def validate_password(
     password: str,
     *,
@@ -77,9 +81,9 @@ def validate_password(
     normalized_email = normalize_email(email)
     if normalized_email and normalized_email in normalized_password:
         raise PasswordPolicyError("Password must not contain the full email address")
-    normalized_phone = normalize_phone(phone)
-    normalized_password_phone = normalize_phone(password) or ""
-    if normalized_phone and normalized_phone in normalized_password_phone:
+    normalized_phone_digits = _phone_digits(normalize_phone(phone))
+    password_phone_digits = _phone_digits(password)
+    if normalized_phone_digits and normalized_phone_digits in password_phone_digits:
         raise PasswordPolicyError("Password must not contain the full phone number")
 
 
