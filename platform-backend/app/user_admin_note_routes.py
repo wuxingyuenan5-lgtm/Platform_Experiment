@@ -6,14 +6,9 @@ from typing import Annotated, NoReturn
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, Field
 
+from app import user_admin_notes
 from app.auth import Principal, require_permission
 from app.config import get_settings
-from app.user_admin_notes import (
-    UserAdminNoteError,
-    UserAdminNoteRecord,
-    get_user_admin_note,
-    update_user_admin_note,
-)
 from app.user_admin_service import AdminRequestContext
 
 
@@ -62,7 +57,7 @@ def _session_context(request: Request, principal: Principal) -> AdminRequestCont
     )
 
 
-def _raise_service_error(exc: UserAdminNoteError) -> NoReturn:
+def _raise_service_error(exc: user_admin_notes.UserAdminNoteError) -> NoReturn:
     raise HTTPException(
         status_code=exc.status_code,
         detail={"code": exc.code, "message": exc.detail},
@@ -73,7 +68,7 @@ def _no_store(response: Response) -> None:
     response.headers["Cache-Control"] = "no-store"
 
 
-def _response(record: UserAdminNoteRecord) -> UserAdminNoteResponse:
+def _response(record: user_admin_notes.UserAdminNoteRecord) -> UserAdminNoteResponse:
     return UserAdminNoteResponse(
         userId=record.user_id,
         adminNote=record.admin_note,
@@ -90,11 +85,11 @@ def user_admin_note(
     principal: Annotated[Principal, Depends(require_permission("user.sensitive.read"))],
 ) -> UserAdminNoteResponse:
     try:
-        record = get_user_admin_note(
+        record = user_admin_notes.get_user_admin_note(
             user_id,
             context=_session_context(request, principal),
         )
-    except UserAdminNoteError as exc:
+    except user_admin_notes.UserAdminNoteError as exc:
         _raise_service_error(exc)
     _no_store(response)
     return _response(record)
@@ -109,13 +104,13 @@ def patch_user_admin_note(
     principal: Annotated[Principal, Depends(require_permission("user.update"))],
 ) -> UserAdminNoteResponse:
     try:
-        record = update_user_admin_note(
+        record = user_admin_notes.update_user_admin_note(
             user_id,
             admin_note=request_body.admin_note,
             expected_version=request_body.expected_version,
             context=_session_context(request, principal),
         )
-    except UserAdminNoteError as exc:
+    except user_admin_notes.UserAdminNoteError as exc:
         _raise_service_error(exc)
     _no_store(response)
     return _response(record)
