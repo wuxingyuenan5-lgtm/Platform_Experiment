@@ -339,7 +339,9 @@ test('completes isolated four-role browser acceptance without Live Write', async
       await sameSessionTab.goto(absoluteUrl('/account/index'));
       await expect(sameSessionTab.getByText('个人账号', { exact: true }).first()).toBeVisible();
 
-      const displayNameInput = primaryPage.getByLabel('展示名称');
+      const displayNameInput = primaryPage
+        .locator('.ant-form-item', { hasText: '展示名称' })
+        .locator('input');
       await displayNameInput.fill('E2E Display Name');
       const firstProfilePatch = primaryPage.waitForResponse(
         (response) =>
@@ -402,9 +404,10 @@ test('completes isolated four-role browser acceptance without Live Write', async
       await primaryPage.goto(absoluteUrl('/account/index'));
       await primaryPage.getByRole('button', { name: '修改密码' }).click();
       const passwordDialog = primaryPage.getByRole('dialog', { name: '修改密码' });
-      await passwordDialog.getByLabel('当前密码').fill(memberPassword);
-      await passwordDialog.getByLabel('新密码', { exact: true }).fill(memberNewPassword);
-      await passwordDialog.getByLabel('确认新密码').fill(memberNewPassword);
+      const passwordInputs = passwordDialog.locator('input');
+      await passwordInputs.nth(0).fill(memberPassword);
+      await passwordInputs.nth(1).fill(memberNewPassword);
+      await passwordInputs.nth(2).fill(memberNewPassword);
       const passwordResponse = primaryPage.waitForResponse(
         (response) =>
           response.url().endsWith('/api/v1/me/password') && response.request().method() === 'POST',
