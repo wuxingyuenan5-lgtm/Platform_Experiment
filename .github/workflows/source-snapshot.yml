@@ -1,0 +1,35 @@
+name: Source Snapshot
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: source-snapshot-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Create source archive
+        shell: bash
+        run: |
+          tar \
+            --exclude=.git \
+            --exclude='**/node_modules' \
+            --exclude='**/.venv' \
+            --exclude='**/dist' \
+            -czf "$RUNNER_TEMP/platform-experiment-source.tar.gz" .
+      - name: Upload source archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: platform-experiment-source
+          path: ${{ runner.temp }}/platform-experiment-source.tar.gz
+          if-no-files-found: error
+          retention-days: 1
