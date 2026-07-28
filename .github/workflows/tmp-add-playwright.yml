@@ -1,0 +1,43 @@
+name: Temporary Lock Playwright
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/tmp-add-playwright.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  lock-playwright:
+    if: github.event.pull_request.number == 118 && github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.9
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: pnpm
+          cache-dependency-path: admin-risk/pnpm-lock.yaml
+      - name: Add and lock Playwright
+        working-directory: admin-risk
+        env:
+          HUSKY: '0'
+        run: pnpm add --save-dev @playwright/test
+      - name: Commit dependency lock
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add admin-risk/package.json admin-risk/pnpm-lock.yaml
+          git diff --cached --check
+          git commit -m 'test(user-system): lock Playwright dependency'
+          git push
