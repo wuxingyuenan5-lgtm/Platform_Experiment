@@ -35,6 +35,7 @@ Included outcomes:
 - Permission-driven frontend navigation, account, user-management and holding/NAV pages.
 - Stable authentication/authorization error codes with Request ID correlation.
 - Additive Migrations 5 and 6, initial CEO CLI and same-origin `/api/v1` development path.
+- User-domain table counts and avatar files included in the existing fail-closed production backup/restore boundary.
 
 Explicit non-goals:
 
@@ -60,6 +61,8 @@ Authoritative requirements and design:
 - `docs/technical/MEMBER_HOLDINGS_READ_MODEL.md`
 - `docs/database/README.md`
 - `docs/architecture/OWNERSHIP.md`
+- `docs/operations/USER_SYSTEM_BROWSER_ACCEPTANCE.md`
+- `docs/operations/USER_SYSTEM_DEPLOYMENT_READINESS.md`
 
 Primary implementation owners:
 
@@ -67,9 +70,12 @@ Primary implementation owners:
 - `platform-backend/app/user_*.py`
 - `platform-backend/app/member_holding_*.py`
 - `platform-backend/app/schema_migrations.py`
+- `platform-backend/app/disaster_recovery.py`
+- `platform-backend/app/user_backup_archive.py`
 - `platform-backend/tests/test_auth_*.py`
 - `platform-backend/tests/test_user_*.py`
 - `platform-backend/tests/test_member_holding_*.py`
+- `platform-backend/tests/test_disaster_recovery.py`
 - `admin-risk/src/api/platform/userSystem.ts`
 - `admin-risk/src/api/platform/memberHoldings.ts`
 - `admin-risk/src/access/`
@@ -158,9 +164,10 @@ Final integration requires one linked Critical PR, Repository Safety, full Backe
 - Frontend menu, route and action visibility derive from one exact permission registry.
 - Authentication failures use stable `detail.code/detail.message` and Request ID correlation.
 - Frozen frontend install, type checks and production build pass.
+- Production backup includes user-domain table counts and a safe avatar archive; restore drills reject unsafe entries and never modify active paths.
 - Full CI, Secret Scan and Version Consistency pass before merge.
 
-Automated acceptance evidence is confirmed by Draft PR #118 CI. Manual browser acceptance and the three deployment decision gates remain required before review-ready status or production cutover.
+Automated acceptance evidence is confirmed by Draft PR #118 CI. Manual browser acceptance, controlled-host backup/restore rehearsal and the three deployment decision gates remain required before review-ready status or production cutover.
 
 ## Progress
 
@@ -168,18 +175,21 @@ Automated acceptance evidence is confirmed by Draft PR #118 CI. Manual browser a
   - Batches 1–6 implemented: identity/Session foundation, browser and personal account, administration/audit, member holdings/NAV, navigation/ownership convergence and stable authentication error contract.
   - Draft Critical PR #118 is linked to Issue #117 and remains unmerged.
   - Repository Safety passed: workstream, architecture/structure and documentation consistency.
-  - Platform Backend passed dependency validation, Ruff, Pyright and all **398** classified tests.
+  - Platform Backend passed dependency validation, Ruff, Pyright and all **399** classified tests after adding avatar backup/restore coverage.
   - Execution Runtime passed dependency validation, Ruff, Pyright and its full unit/integration/live-safety matrix; no Runtime or Venue behavior changed.
   - Frontend passed frozen install, **11** access/route/Decimal tests, focused ESLint, no-new-debt enforcement, strategy type check, user-system Vue type check and production build.
   - Version Consistency and full tracked-tree Secret Scan passed.
   - Authentication error contracts, target-scoped masking, Session/CSRF recovery, multipart avatar upload, explicit profile clearing and exact Decimal holding semantics are covered by executable evidence.
+  - Existing production backup/restore includes user-domain table counts plus a fail-closed avatar archive and safe restore directory.
+  - Browser acceptance and deployment/recovery runbooks define executable evidence fields without storing secrets.
 - Current:
   - Status is `review`: automated verification is complete and the PR remains Draft.
   - The branch remains isolated from `main`; no merge or Live Write enablement is authorized.
 - Next:
-  - Perform manual browser acceptance for all four roles, registration/login/logout, profile clear, avatar upload, multi-tab CSRF, password/session invalidation and holding/NAV workflows.
+  - Execute `docs/operations/USER_SYSTEM_BROWSER_ACCEPTANCE.md` for all four roles.
+  - Execute the controlled-host backup/restore and proxy/Cookie checks in `docs/operations/USER_SYSTEM_DEPLOYMENT_READINESS.md`.
   - Resolve the three deployment decision gates: legacy real-user migration, initial production holding source and same-origin production routing.
   - Re-run the latest-head checks after any further code or documentation change; use Squash Merge only after explicit approval.
 - Blocked by:
-  - This connector session has no interactive browser/deployment environment for manual acceptance, reverse-proxy/Cookie Secure validation or backup/restore rehearsal.
+  - This connector session has no interactive browser/deployment environment for manual acceptance, reverse-proxy/Cookie Secure validation or controlled-host backup/restore rehearsal.
   - No known product-code or automated-test blocker remains.
