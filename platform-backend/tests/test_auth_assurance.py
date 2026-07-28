@@ -114,7 +114,6 @@ def latest_denial_audit(database_path: Path) -> dict[str, object]:
     return json.loads(str(row["details_json"]))
 
 
-@pytest.mark.live_safety
 def test_ambiguous_cookie_and_bearer_are_rejected_and_audited(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
@@ -146,7 +145,6 @@ def test_ambiguous_cookie_and_bearer_are_rejected_and_audited(
     assert session_token not in serialized
 
 
-@pytest.mark.live_safety
 def test_customer_identity_domain_rejects_api_key_wildcard(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
@@ -169,7 +167,6 @@ def test_customer_identity_domain_rejects_api_key_wildcard(
     )
 
 
-@pytest.mark.live_safety
 def test_live_write_rejects_browser_session_but_allows_platform_read(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
