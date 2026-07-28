@@ -26,10 +26,17 @@ jobs:
 
           path = Path('admin-risk/e2e/user-system/user-system.spec.ts')
           source = path.read_text(encoding='utf-8')
-          old = "      await primaryPage.goto(absoluteUrl('/account/index'));\n"
-          if source.count(old) != 2:
-              raise SystemExit(f'Expected two redundant member reloads, found {source.count(old)}')
-          path.write_text(source.replace(old, ''), encoding='utf-8')
+          replacements = {
+              "      await loginWithUi(secondaryPage, memberUsername, memberPassword);\n\n      await primaryPage.goto(absoluteUrl('/account/index'));\n":
+                  "      await loginWithUi(secondaryPage, memberUsername, memberPassword);\n\n",
+              "      await loginWithUi(primaryPage, memberUsername, memberNewPassword);\n      await primaryPage.goto(absoluteUrl('/account/index'));\n":
+                  "      await loginWithUi(primaryPage, memberUsername, memberNewPassword);\n",
+          }
+          for old, new in replacements.items():
+              if source.count(old) != 1:
+                  raise SystemExit(f'Expected reload context not found exactly once: {old!r}')
+              source = source.replace(old, new)
+          path.write_text(source, encoding='utf-8')
           PY
           git diff --check
       - name: Commit reload fix
