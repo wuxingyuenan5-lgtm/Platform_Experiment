@@ -1,0 +1,58 @@
+name: One-time User Backup Hardening
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+concurrency:
+  group: issue117-user-backup-hardening-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  harden:
+    if: >-
+      github.actor != 'github-actions[bot]' &&
+      github.event.pull_request.number == 118 &&
+      github.event.pull_request.head.ref == 'feature/issue-117-user-system'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install backend dependencies
+        working-directory: platform-backend
+        run: python -m pip install -e '.[dev]'
+      - name: Apply bounded user backup patch
+        run: python scripts/apply-issue117-user-backup-hardening.py
+      - name: Format and validate backend
+        working-directory: platform-backend
+        run: |
+          python -m ruff format app/user_backup_archive.py app/disaster_recovery.py tests/test_disaster_recovery.py
+          python -m ruff check app tests
+          python -m pyright
+          python -m pytest
+      - name: Validate repository Markdown and structure
+        run: |
+          python scripts/check-documentation-consistency.py
+          python scripts/check-repository-structure.py
+          python scripts/check-version-consistency.py
+          git diff --check
+      - name: Commit validated hardening
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            platform-backend/app/user_backup_archive.py \
+            platform-backend/app/disaster_recovery.py \
+            platform-backend/tests/test_disaster_recovery.py
+          git -c core.hooksPath=/dev/null commit -m "feat: include user avatars in production backups"
+          git push origin "HEAD:${{ github.event.pull_request.head.ref }}"
