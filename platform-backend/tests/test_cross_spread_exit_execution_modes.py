@@ -82,7 +82,7 @@ def test_migration_defaults_existing_exit_plans_to_market_market() -> None:
         (NOW.isoformat(), NOW.isoformat()),
     )
 
-    apply_migrations(db, PLATFORM_MIGRATIONS)
+    apply_migrations(db, PLATFORM_MIGRATIONS[:3])
 
     row = db.execute(
         """

@@ -73,4 +73,7 @@ def test_stale_logout_still_clears_cookie(
         response = client.post("/api/v1/auth/logout", headers={"Origin": ORIGIN})
         assert response.status_code == 200
         assert response.headers["cache-control"] == "no-store"
-        assert get_settings().session_cookie_name not in client.cookies
+        set_cookie = response.headers["set-cookie"]
+        assert f"{get_settings().session_cookie_name}=""" in set_cookie
+        assert "Max-Age=0" in set_cookie
+        assert "Path=/" in set_cookie

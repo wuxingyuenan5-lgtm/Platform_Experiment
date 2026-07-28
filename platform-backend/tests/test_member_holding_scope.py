@@ -222,7 +222,7 @@ def test_holding_scope_is_enforced_by_backend_and_api_key_wildcard_is_rejected(
             headers={"Authorization": f"Bearer {API_TOKEN}"},
         )
         assert denied.status_code == 403
-        assert "Human browser session" in denied.json()["detail"]
+        assert "Human browser session" in denied.json()["detail"]["message"]
 
     with sqlite3.connect(database_path) as db:
         db.row_factory = sqlite3.Row

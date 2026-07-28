@@ -133,7 +133,7 @@ def test_browser_session_uses_hashes_expiry_and_csrf(
     validate_session_csrf(
         request(
             "POST",
-            origin="http://localhost:5173",
+            origin="http://localhost:4373",
             csrf_token=issued.csrf_token,
         ),
         authenticated,
@@ -142,7 +142,7 @@ def test_browser_session_uses_hashes_expiry_and_csrf(
 
     with pytest.raises(BrowserSessionError, match="CSRF token") as missing_csrf:
         validate_session_csrf(
-            request("POST", origin="http://localhost:5173"),
+            request("POST", origin="http://localhost:4373"),
             authenticated,
             settings,
         )
