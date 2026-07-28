@@ -339,6 +339,12 @@ test('completes isolated four-role browser acceptance without Live Write', async
       await sameSessionTab.goto(absoluteUrl('/account/index'));
       await expect(sameSessionTab.getByText('个人账号', { exact: true }).first()).toBeVisible();
 
+      await expect(primaryPage.getByRole('tab', { name: '基金持仓' })).toHaveAttribute(
+        'aria-selected',
+        'true',
+      );
+      await primaryPage.getByRole('tab', { name: '资料与安全' }).click();
+
       const displayNameInput = primaryPage
         .locator('.ant-form-item', { hasText: '展示名称' })
         .locator('input');
