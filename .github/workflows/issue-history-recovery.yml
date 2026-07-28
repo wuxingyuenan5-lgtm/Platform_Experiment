@@ -1,0 +1,40 @@
+name: Issue History Recovery
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+  issues: read
+
+concurrency:
+  group: issue-history-recovery-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  recover:
+    if: >-
+      github.actor != 'github-actions[bot]' &&
+      github.event.pull_request.number == 118 &&
+      github.event.pull_request.head.ref == 'feature/issue-117-user-system'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fetch Issue 117 edit history
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          curl --fail --silent --show-error \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/${{ github.repository }}/issues/117/events?per_page=100" \
+            > "$RUNNER_TEMP/issue-117-events.json"
+      - name: Upload Issue history
+        uses: actions/upload-artifact@v4
+        with:
+          name: issue-117-edit-history
+          path: ${{ runner.temp }}/issue-117-events.json
+          if-no-files-found: error
+          retention-days: 1
