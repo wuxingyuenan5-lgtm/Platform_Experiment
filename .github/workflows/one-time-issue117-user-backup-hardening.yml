@@ -32,19 +32,60 @@ jobs:
         run: python -m pip install -e '.[dev]'
       - name: Apply bounded user backup patch
         run: python scripts/apply-issue117-user-backup-hardening.py
-      - name: Format and validate backend
+      - name: Format patched files
         working-directory: platform-backend
-        run: |
-          python -m ruff format app/user_backup_archive.py app/disaster_recovery.py tests/test_disaster_recovery.py
-          python -m ruff check app tests
-          python -m pyright
-          python -m pytest
+        run: python -m ruff format app/user_backup_archive.py app/disaster_recovery.py tests/test_disaster_recovery.py
+      - name: Backend lint
+        id: lint
+        continue-on-error: true
+        working-directory: platform-backend
+        run: python -m ruff check app tests > "$RUNNER_TEMP/ruff.log" 2>&1
+      - name: Backend type check
+        id: types
+        continue-on-error: true
+        working-directory: platform-backend
+        run: python -m pyright > "$RUNNER_TEMP/pyright.log" 2>&1
+      - name: Backend tests
+        id: tests
+        continue-on-error: true
+        working-directory: platform-backend
+        run: python -m pytest > "$RUNNER_TEMP/pytest.log" 2>&1
       - name: Validate repository Markdown and structure
+        id: repository
+        continue-on-error: true
         run: |
-          python scripts/check-documentation-consistency.py
-          python scripts/check-repository-structure.py
-          python scripts/check-version-consistency.py
-          git diff --check
+          {
+            python scripts/check-documentation-consistency.py
+            python scripts/check-repository-structure.py
+            python scripts/check-version-consistency.py
+            git diff --check
+          } > "$RUNNER_TEMP/repository.log" 2>&1
+      - name: Capture patched files
+        if: always()
+        run: |
+          mkdir -p "$RUNNER_TEMP/patched/platform-backend/app" "$RUNNER_TEMP/patched/platform-backend/tests"
+          cp platform-backend/app/user_backup_archive.py "$RUNNER_TEMP/patched/platform-backend/app/"
+          cp platform-backend/app/disaster_recovery.py "$RUNNER_TEMP/patched/platform-backend/app/"
+          cp platform-backend/tests/test_disaster_recovery.py "$RUNNER_TEMP/patched/platform-backend/tests/"
+      - name: Upload diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: issue117-user-backup-hardening-diagnostics
+          path: |
+            ${{ runner.temp }}/ruff.log
+            ${{ runner.temp }}/pyright.log
+            ${{ runner.temp }}/pytest.log
+            ${{ runner.temp }}/repository.log
+            ${{ runner.temp }}/patched
+          if-no-files-found: error
+          retention-days: 3
+      - name: Enforce validation
+        run: |
+          test "${{ steps.lint.outcome }}" = success
+          test "${{ steps.types.outcome }}" = success
+          test "${{ steps.tests.outcome }}" = success
+          test "${{ steps.repository.outcome }}" = success
       - name: Commit validated hardening
         run: |
           set -euo pipefail
