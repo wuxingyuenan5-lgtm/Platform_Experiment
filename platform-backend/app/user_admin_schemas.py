@@ -59,7 +59,7 @@ class CreateManagedUserRequest(BaseModel):
     member_type: str | None = Field(default=None, alias="memberType", max_length=128)
 
     @model_validator(mode="after")
-    def validate_managed_user(self) -> "CreateManagedUserRequest":
+    def validate_managed_user(self) -> CreateManagedUserRequest:
         if not self.email and not self.phone:
             raise ValueError("email or phone is required")
         if self.role == "employee" and not self.department:
