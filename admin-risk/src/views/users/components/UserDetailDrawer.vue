@@ -20,8 +20,8 @@
           class="mb-4"
           type="info"
           show-icon
-          message="联系方式已由后端脱敏"
-          description="当前角色只能收到脱敏用户 DTO，页面未持有完整联系方式。"
+          message="联系方式已脱敏"
+          description="当前角色只能查看后端返回的脱敏信息。"
         />
 
         <Tabs v-model:active-key="activeTab">
@@ -61,6 +61,30 @@
               </Space>
             </Form>
 
+            <div v-if="canEditNote" class="note-section">
+              <div class="section-heading">
+                <div>
+                  <h4>运营备注</h4>
+                  <p>仅管理人员可见，用于记录客户来源、沟通情况和跟进重点。</p>
+                </div>
+                <Tag>不进入会员端</Tag>
+              </div>
+              <Spin :spinning="noteLoading">
+                <Input.TextArea
+                  v-model:value="noteDraft"
+                  :rows="4"
+                  :maxlength="2000"
+                  show-count
+                  placeholder="例如：朋友介绍，已完成产品说明，下周回访。"
+                />
+                <Space class="mt-3">
+                  <Button @click="syncNoteDraft">恢复</Button>
+                  <Button type="primary" :loading="savingNote" @click="saveNote">保存备注</Button>
+                </Space>
+                <p class="note-meta">最近更新：{{ formatTime(adminNote?.updatedAt) }}</p>
+              </Spin>
+            </div>
+
             <Divider />
             <Descriptions :column="1" size="small" bordered>
               <Descriptions.Item label="申请身份">
@@ -78,20 +102,13 @@
               <Descriptions.Item label="活跃 Session">
                 {{ detail.activeSessionCount }}
               </Descriptions.Item>
-              <Descriptions.Item label="数据版本">
-                {{ detail.rowVersion }}
-              </Descriptions.Item>
             </Descriptions>
           </TabPane>
 
           <TabPane key="authority" tab="角色与状态">
             <Descriptions :column="1" size="small" bordered>
-              <Descriptions.Item label="当前角色">
-                {{ roleLabel(detail.role) }}
-              </Descriptions.Item>
-              <Descriptions.Item label="账号状态">
-                {{ statusLabel(detail.status) }}
-              </Descriptions.Item>
+              <Descriptions.Item label="当前角色">{{ roleLabel(detail.role) }}</Descriptions.Item>
+              <Descriptions.Item label="账号状态">{{ statusLabel(detail.status) }}</Descriptions.Item>
               <Descriptions.Item label="权限点">
                 <Space wrap>
                   <Tag v-for="permission in detail.permissions" :key="permission">
@@ -142,7 +159,6 @@
                 <strong>{{ formatTime(detail.lastLoginAt) }}</strong>
               </div>
             </div>
-
             <Space v-if="canManage" wrap class="mt-4">
               <Button
                 v-if="canResetPassword"
@@ -165,8 +181,8 @@
               class="mt-4"
               type="warning"
               show-icon
-              message="敏感操作要求近期再认证"
-              description="重置凭证和强制退出不会显示或保存用户密码；原始重置凭证只展示一次。"
+              message="密码和 Session 操作要求近期再认证"
+              description="平台不会显示或保存用户密码；一次性重置凭证只展示一次。"
             />
           </TabPane>
 
@@ -248,7 +264,6 @@
       v-model:open="ticketOpen"
       title="一次性密码重置凭证"
       :footer="null"
-      :closable="true"
       @cancel="clearTicket"
     >
       <Alert
@@ -303,6 +318,11 @@
     type HumanRole,
     type UserAuditEvent,
   } from '@/api/platform/userSystem';
+  import {
+    getUserAdminNote,
+    updateUserAdminNote,
+    type UserAdminNote,
+  } from '@/api/platform/userAdminNotes';
   import { hasPermission } from '@/access/userAccess';
   import { ROLE_COLOR_MAP, ROLE_LABEL_MAP } from '@/hooks/web/useRoleAccess';
   import UserHoldingsPanel from './UserHoldingsPanel.vue';
@@ -323,15 +343,16 @@
     currentRole: 'employee',
     permissions: () => [],
   });
-  const emit = defineEmits<{
-    close: [];
-    changed: [];
-  }>();
+  const emit = defineEmits<{ close: []; changed: [] }>();
 
   const loading = ref(false);
   const detail = ref<AdminUserDetail | null>(null);
   const activeTab = ref('profile');
   const savingProfile = ref(false);
+  const adminNote = ref<UserAdminNote | null>(null);
+  const noteDraft = ref('');
+  const noteLoading = ref(false);
+  const savingNote = ref(false);
   const auditLoading = ref(false);
   const auditEvents = ref<UserAuditEvent[]>([]);
   const actionModalOpen = ref(false);
@@ -355,10 +376,7 @@
     department: '',
     memberType: '',
   });
-  const actionDraft = reactive({
-    role: 'member' as HumanRole,
-    reason: '',
-  });
+  const actionDraft = reactive({ role: 'member' as HumanRole, reason: '' });
 
   const targetRole = computed(() => detail.value?.role || detail.value?.requestedRole);
   const canManage = computed(() => {
@@ -370,6 +388,12 @@
   });
   const canEdit = computed(
     () => !!detail.value && hasPermission(props.permissions, 'user.update') && canManage.value,
+  );
+  const canEditNote = computed(
+    () =>
+      canManage.value &&
+      hasPermission(props.permissions, 'user.update') &&
+      hasPermission(props.permissions, 'user.sensitive.read'),
   );
   const canResetPassword = computed(() => hasPermission(props.permissions, 'user.reset_password'));
   const canRevokeSessions = computed(() => hasPermission(props.permissions, 'user.session.revoke'));
@@ -417,12 +441,32 @@
     try {
       detail.value = await getAdminUser(props.userId);
       syncProfileDraft();
+      if (canEditNote.value) await loadNote();
+      else {
+        adminNote.value = null;
+        noteDraft.value = '';
+      }
       if (activeTab.value === 'audit' && canReadAudit.value) await loadAudit();
     } catch (error) {
       detail.value = null;
       message.error(errorMessage(error, '用户详情加载失败'));
     } finally {
       loading.value = false;
+    }
+  }
+
+  async function loadNote() {
+    if (!props.userId || !canEditNote.value) return;
+    noteLoading.value = true;
+    try {
+      adminNote.value = await getUserAdminNote(props.userId);
+      syncNoteDraft();
+    } catch (error) {
+      adminNote.value = null;
+      noteDraft.value = '';
+      message.error(errorMessage(error, '运营备注加载失败'));
+    } finally {
+      noteLoading.value = false;
     }
   }
 
@@ -453,6 +497,10 @@
     profileDraft.memberType = detail.value.memberType || '';
   }
 
+  function syncNoteDraft() {
+    noteDraft.value = adminNote.value?.adminNote || '';
+  }
+
   async function saveProfile() {
     if (!detail.value || !canEdit.value) return;
     savingProfile.value = true;
@@ -468,6 +516,7 @@
           expectedVersion: detail.value!.rowVersion,
         });
         syncProfileDraft();
+        if (canEditNote.value) await loadNote();
         message.success('用户资料已更新');
         emit('changed');
       });
@@ -475,6 +524,26 @@
       message.error(errorMessage(error, '用户资料更新失败'));
     } finally {
       savingProfile.value = false;
+    }
+  }
+
+  async function saveNote() {
+    if (!detail.value || !adminNote.value || !canEditNote.value) return;
+    savingNote.value = true;
+    try {
+      adminNote.value = await updateUserAdminNote(
+        detail.value.userId,
+        noteDraft.value.trim() || null,
+        adminNote.value.rowVersion,
+      );
+      syncNoteDraft();
+      detail.value = await getAdminUser(detail.value.userId);
+      message.success('运营备注已保存');
+      emit('changed');
+    } catch (error) {
+      message.error(errorMessage(error, '运营备注保存失败'));
+    } finally {
+      savingNote.value = false;
     }
   }
 
@@ -531,9 +600,10 @@
             current.rowVersion,
           );
         }
-        message.success('用户状态已更新');
         resetAction();
         syncProfileDraft();
+        if (canEditNote.value) await loadNote();
+        message.success('用户状态已更新');
         emit('changed');
       });
     } catch (error) {
@@ -699,21 +769,31 @@
 </script>
 
 <style scoped>
-  .drawer-heading {
+  .drawer-heading,
+  .section-heading {
     display: flex;
     gap: 16px;
     align-items: flex-start;
     justify-content: space-between;
+  }
+
+  .drawer-heading {
     margin-bottom: 18px;
   }
 
-  .drawer-heading h3 {
+  .drawer-heading h3,
+  .section-heading h4 {
     margin: 0 0 4px;
     color: #0f172a;
+  }
+
+  .drawer-heading h3 {
     font-size: 20px;
   }
 
-  .drawer-heading p {
+  .drawer-heading p,
+  .section-heading p,
+  .note-meta {
     margin: 0;
     color: #64748b;
     font-size: 12px;
@@ -725,12 +805,22 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .note-section,
   .action-section {
     margin-top: 20px;
     padding: 16px;
     border: 1px solid #e2e8f0;
     border-radius: 10px;
     background: #f8fafc;
+  }
+
+  .note-section :deep(textarea) {
+    margin-top: 12px;
+    background: #fff;
+  }
+
+  .note-meta {
+    margin-top: 8px;
   }
 
   .action-section h4 {
