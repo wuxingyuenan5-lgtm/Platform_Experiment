@@ -11,6 +11,7 @@ import { PAGE_NOT_FOUND_NAME } from '@/router/constant';
 import {
   canAccessMatchedRoute,
   filterPermissionTree,
+  findRouteChainByPath,
   isKnownRouteDenied,
 } from '@/access/routeAccess';
 
@@ -122,8 +123,17 @@ export function createPermissionGuard(router: Router) {
         to.matched.length === 0 || PAGE_NOT_FOUND_NAMES.includes(String(to.name || ''));
 
       if (isUnmatchedRoute) {
-        if (isKnownRouteDenied(asyncRoutes, to.path, permissions)) {
-          next({ path: FORBIDDEN_PATH, replace: true });
+        const knownRoute = findRouteChainByPath(asyncRoutes, to.path) !== undefined;
+        if (knownRoute) {
+          if (isKnownRouteDenied(asyncRoutes, to.path, permissions)) {
+            next({ path: FORBIDDEN_PATH, replace: true });
+            return;
+          }
+          // Pinia state can survive a full browser reload while Vue Router's
+          // in-memory dynamic route table cannot. Rebuild known authorized routes
+          // before retrying the original URL instead of falling through to 404/home.
+          await ensureDynamicRoutes();
+          next({ path: to.fullPath, replace: true, query: to.query });
           return;
         }
         next();
