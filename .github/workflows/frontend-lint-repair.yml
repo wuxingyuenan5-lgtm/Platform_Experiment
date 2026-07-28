@@ -1,0 +1,65 @@
+name: One-time Frontend Lint Repair
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+concurrency:
+  group: frontend-lint-repair-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  repair:
+    if: >-
+      github.actor != 'github-actions[bot]' &&
+      github.event.pull_request.number == 118 &&
+      github.event.pull_request.head.ref == 'feature/issue-117-user-system'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: admin-risk
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.9
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: pnpm
+          cache-dependency-path: admin-risk/pnpm-lock.yaml
+      - name: Install dependencies
+        env:
+          HUSKY: '0'
+        run: pnpm install --frozen-lockfile
+      - name: Repair Vue event naming
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('src/views/users/index.vue')
+          source = path.read_text(encoding='utf-8')
+          old = '@showSizeChange="handlePageSizeChange"'
+          new = '@show-size-change="handlePageSizeChange"'
+          if source.count(old) != 1:
+              raise SystemExit('expected one showSizeChange event binding')
+          path.write_text(source.replace(old, new, 1), encoding='utf-8')
+          PY
+          pnpm exec eslint --max-warnings 0 "src/views/users/index.vue"
+          pnpm exec vue-tsc -p tsconfig.user-system.json --noEmit --skipLibCheck
+          git diff --check
+      - name: Commit validated lint repair
+        run: |
+          set -euo pipefail
+          git -C .. config user.name "github-actions[bot]"
+          git -C .. config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git -C .. add admin-risk
+          git -C .. -c core.hooksPath=/dev/null commit -m "style: normalize user pagination event name"
+          git -C .. push origin "HEAD:${{ github.event.pull_request.head.ref }}"
