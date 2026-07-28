@@ -1,0 +1,91 @@
+from __future__ import annotations
+
+from pathlib import Path
+
+VERIFIED_STATUS = (
+    "状态：`implemented / automated verification passed / manual acceptance pending`  "
+)
+STALE_STATUS = "状态：`reviewed baseline / implementation not started`  "
+
+
+def replace_once(path: Path, old: str, new: str) -> None:
+    source = path.read_text(encoding="utf-8")
+    if source.count(old) != 1:
+        raise SystemExit(f"expected one target in {path}: {old[:80]!r}")
+    path.write_text(source.replace(old, new, 1), encoding="utf-8")
+
+
+for relative in (
+    "docs/planning/USER_SYSTEM_REQUIREMENTS.md",
+    "docs/planning/USER_SYSTEM_EXECUTION_PLAN.md",
+    "docs/technical/USER_SYSTEM_TECHNICAL_ARCHITECTURE.md",
+):
+    replace_once(Path(relative), STALE_STATUS, VERIFIED_STATUS)
+
+replace_once(
+    Path("docs/technical/AUTH_RBAC_LIVE_SESSIONS.md"),
+    """仍未完成的验收证据：
+
+- Ruff、Pyright 和分类 Pytest 尚未执行；
+- 前端 ESLint、类型检查、单元测试和构建尚未执行；
+- 文档一致性、仓库结构、版本一致性和 Secret Scan 尚未执行；
+- 尚未创建 PR，因此没有 PR CI；
+- 真实同源反向代理、Cookie Secure、备份恢复和生产部署尚未验收。
+""",
+    """自动化验收证据：
+
+- Draft PR #118 的 Repository Safety、Backend、Runtime 和 Frontend 全矩阵已通过；
+- Backend Ruff、Pyright 与 398 项分类 Pytest 已通过；
+- 前端权限/Decimal 测试、ESLint、无新增债务检查、两套类型检查和生产构建已通过；
+- Version Consistency 与 Secret Scan 已通过；
+- 仍需完成真实浏览器同源验收、Cookie Secure/反向代理验证、备份恢复演练和三项生产切换决策。
+""",
+)
+
+task_path = Path("tasks/issue-117-user-system.md")
+task_source = task_path.read_text(encoding="utf-8")
+task_source = task_source.replace("Status: active", "Status: review", 1)
+old_lint = '  "src/views/account/**/*.{vue,ts,tsx}" `\n'
+new_lint = (
+    '  "src/views/account/index.vue" `\n'
+    '  "src/views/account/components/HoldingsPanel.vue" `\n'
+)
+if task_source.count(old_lint) != 1:
+    raise SystemExit("expected stale account lint boundary")
+task_source = task_source.replace(old_lint, new_lint, 1)
+old_acceptance = "Acceptance remains unconfirmed until the complete executable evidence exists."
+new_acceptance = (
+    "Automated acceptance evidence is confirmed by Draft PR #118 CI. "
+    "Manual browser acceptance and the three deployment decision gates remain "
+    "required before review-ready status or production cutover."
+)
+if task_source.count(old_acceptance) != 1:
+    raise SystemExit("expected stale acceptance statement")
+task_source = task_source.replace(old_acceptance, new_acceptance, 1)
+marker = "## Progress\n"
+if task_source.count(marker) != 1:
+    raise SystemExit("expected one task progress section")
+prefix, _ = task_source.split(marker, 1)
+progress = """## Progress
+
+- Done:
+  - Batches 1–6 implemented: identity/Session foundation, browser and personal account, administration/audit, member holdings/NAV, navigation/ownership convergence and stable authentication error contract.
+  - Draft Critical PR #118 is linked to Issue #117 and remains unmerged.
+  - Repository Safety passed: workstream, architecture/structure and documentation consistency.
+  - Platform Backend passed dependency validation, Ruff, Pyright and all **398** classified tests.
+  - Execution Runtime passed dependency validation, Ruff, Pyright and its full unit/integration/live-safety matrix; no Runtime or Venue behavior changed.
+  - Frontend passed frozen install, **11** access/route/Decimal tests, focused ESLint, no-new-debt enforcement, strategy type check, user-system Vue type check and production build.
+  - Version Consistency and full tracked-tree Secret Scan passed.
+  - Authentication error contracts, target-scoped masking, Session/CSRF recovery, multipart avatar upload, explicit profile clearing and exact Decimal holding semantics are covered by executable evidence.
+- Current:
+  - Status is `review`: automated verification is complete and the PR remains Draft.
+  - The branch remains isolated from `main`; no merge or Live Write enablement is authorized.
+- Next:
+  - Perform manual browser acceptance for all four roles, registration/login/logout, profile clear, avatar upload, multi-tab CSRF, password/session invalidation and holding/NAV workflows.
+  - Resolve the three deployment decision gates: legacy real-user migration, initial production holding source and same-origin production routing.
+  - Re-run the latest-head checks after any further code or documentation change; use Squash Merge only after explicit approval.
+- Blocked by:
+  - This connector session has no interactive browser/deployment environment for manual acceptance, reverse-proxy/Cookie Secure validation or backup/restore rehearsal.
+  - No known product-code or automated-test blocker remains.
+"""
+task_path.write_text(prefix + progress, encoding="utf-8")
