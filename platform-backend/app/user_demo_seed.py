@@ -54,9 +54,33 @@ _DEMO_ACCOUNTS: tuple[DemoAccountSpec, ...] = (
     DemoAccountSpec("employee_1", "employee_1", "演示员工一", "employee", "运营中心"),
     DemoAccountSpec("employee_2", "employee_2", "演示员工二", "employee", "行研中心"),
     DemoAccountSpec("employee_3", "employee_3", "演示员工三", "employee", "量化中心"),
-    DemoAccountSpec("vip_1", "vip_1", "演示 VIP 一", "member", member_type="vip", share_quantity="1000", cumulative_invested="90000"),
-    DemoAccountSpec("vip_2", "vip_2", "演示 VIP 二", "member", member_type="vip", share_quantity="650", cumulative_invested="70000"),
-    DemoAccountSpec("vip_3", "vip_3", "演示 VIP 三", "member", member_type="vip", share_quantity="2000", cumulative_invested="180000"),
+    DemoAccountSpec(
+        "vip_1",
+        "vip_1",
+        "演示 VIP 一",
+        "member",
+        member_type="vip",
+        share_quantity="1000",
+        cumulative_invested="90000",
+    ),
+    DemoAccountSpec(
+        "vip_2",
+        "vip_2",
+        "演示 VIP 二",
+        "member",
+        member_type="vip",
+        share_quantity="650",
+        cumulative_invested="70000",
+    ),
+    DemoAccountSpec(
+        "vip_3",
+        "vip_3",
+        "演示 VIP 三",
+        "member",
+        member_type="vip",
+        share_quantity="2000",
+        cumulative_invested="180000",
+    ),
 )
 
 
