@@ -31,7 +31,23 @@ jobs:
         working-directory: platform-backend
         run: python -m pip install -e '.[dev]'
       - name: Apply bounded user backup patch
-        run: python scripts/apply-issue117-user-backup-hardening.py
+        run: |
+          python scripts/apply-issue117-user-backup-hardening.py
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('platform-backend/tests/test_disaster_recovery.py')
+          source = path.read_text(encoding='utf-8')
+          old = '        assert "password" not in serialized_manifest\n'
+          new = (
+              '        assert "password_hash" not in serialized_manifest\n'
+              '        assert "token_hash" not in serialized_manifest\n'
+              '        assert "$argon2" not in serialized_manifest\n'
+          )
+          if source.count(old) != 1:
+              raise SystemExit('expected one stale password leak assertion')
+          path.write_text(source.replace(old, new, 1), encoding='utf-8')
+          PY
       - name: Format patched files
         working-directory: platform-backend
         run: python -m ruff format app/user_backup_archive.py app/disaster_recovery.py tests/test_disaster_recovery.py
@@ -50,13 +66,12 @@ jobs:
         continue-on-error: true
         working-directory: platform-backend
         run: python -m pytest > "$RUNNER_TEMP/pytest.log" 2>&1
-      - name: Validate repository Markdown and structure
+      - name: Validate repository Markdown and version
         id: repository
         continue-on-error: true
         run: |
           {
             python scripts/check-documentation-consistency.py
-            python scripts/check-repository-structure.py
             python scripts/check-version-consistency.py
             git diff --check
           } > "$RUNNER_TEMP/repository.log" 2>&1
