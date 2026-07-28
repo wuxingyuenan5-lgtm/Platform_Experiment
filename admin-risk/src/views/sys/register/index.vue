@@ -16,25 +16,37 @@
         >
           <div class="form-grid">
             <FormItem name="username" label="账号">
-              <Input v-model:value="formData.username" placeholder="3—64 个字符" autocomplete="username" />
+              <Input
+                v-model:value="formData.username"
+                placeholder="3—64 个字符"
+                autocomplete="username"
+              />
             </FormItem>
             <FormItem name="realName" label="姓名">
-              <Input v-model:value="formData.realName" placeholder="请输入姓名" autocomplete="name" />
+              <Input
+                v-model:value="formData.realName"
+                placeholder="请输入姓名"
+                autocomplete="name"
+              />
             </FormItem>
             <FormItem name="email" label="邮箱">
-              <Input v-model:value="formData.email" placeholder="邮箱或手机号至少填写一项" autocomplete="email" />
+              <Input
+                v-model:value="formData.email"
+                placeholder="邮箱或手机号至少填写一项"
+                autocomplete="email"
+              />
             </FormItem>
             <FormItem name="phone" label="手机号">
-              <Input v-model:value="formData.phone" placeholder="邮箱或手机号至少填写一项" autocomplete="tel" />
+              <Input
+                v-model:value="formData.phone"
+                placeholder="邮箱或手机号至少填写一项"
+                autocomplete="tel"
+              />
             </FormItem>
             <FormItem name="requestedRole" label="申请身份">
               <Select v-model:value="formData.requestedRole" :options="roleOptions" />
             </FormItem>
-            <FormItem
-              v-if="formData.requestedRole === 'employee'"
-              name="department"
-              label="部门"
-            >
+            <FormItem v-if="formData.requestedRole === 'employee'" name="department" label="部门">
               <Input v-model:value="formData.department" placeholder="请输入部门" />
             </FormItem>
             <FormItem v-else name="memberType" label="会员类型">
@@ -168,9 +180,7 @@
       { required: true, message: '请输入密码', trigger: 'change' },
       { min: 12, max: 128, message: '密码长度为 12—128 个字符', trigger: 'change' },
     ],
-    passwordConfirmation: [
-      { required: true, validator: validateConfirmation, trigger: 'change' },
-    ],
+    passwordConfirmation: [{ required: true, validator: validateConfirmation, trigger: 'change' }],
     privacyAccepted: [
       {
         validator: async () =>
@@ -192,8 +202,7 @@
         email: formData.email.trim() || undefined,
         phone: formData.phone.trim() || undefined,
         requestedRole: formData.requestedRole,
-        department:
-          formData.requestedRole === 'employee' ? formData.department.trim() : undefined,
+        department: formData.requestedRole === 'employee' ? formData.department.trim() : undefined,
         memberType: formData.requestedRole === 'member' ? formData.memberType : undefined,
         applicationNote: formData.applicationNote.trim() || undefined,
         password: formData.password,
@@ -221,8 +230,7 @@
     min-height: 100vh;
     overflow: auto;
     padding: 48px 18px;
-    background:
-      radial-gradient(circle at 20% 18%, rgba(191, 219, 254, 0.48), transparent 34%),
+    background: radial-gradient(circle at 20% 18%, rgba(191, 219, 254, 0.48), transparent 34%),
       radial-gradient(circle at 82% 75%, rgba(226, 232, 240, 0.75), transparent 38%),
       linear-gradient(145deg, #eef4f8 0%, #f8fafc 55%, #e8eef3 100%);
   }

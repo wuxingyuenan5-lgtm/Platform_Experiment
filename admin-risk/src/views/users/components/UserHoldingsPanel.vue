@@ -39,7 +39,9 @@
           </template>
           <template v-else-if="column.key === 'nav'">
             <div>{{ formatNullableDecimal(record.latestUnitNav) }}</div>
-            <Tag :color="navMeta(record.navStatus).color">{{ navMeta(record.navStatus).label }}</Tag>
+            <Tag :color="navMeta(record.navStatus).color">{{
+              navMeta(record.navStatus).label
+            }}</Tag>
           </template>
           <template v-else-if="column.key === 'marketValue'">
             {{ formatMoney(record.marketValue, record.currency) }}
@@ -411,7 +413,10 @@
     try {
       await action();
     } catch (error) {
-      if (error instanceof UserSystemApiError && error.code === 'recent_reauthentication_required') {
+      if (
+        error instanceof UserSystemApiError &&
+        error.code === 'recent_reauthentication_required'
+      ) {
         pendingSensitiveAction.value = action;
         reauthPassword.value = '';
         reauthOpen.value = true;
@@ -480,9 +485,7 @@
   }
 
   function formatMoney(value: string | undefined, currency: string) {
-    return value === undefined || value === null
-      ? '不可用'
-      : `${formatDecimal(value)} ${currency}`;
+    return value === undefined || value === null ? '不可用' : `${formatDecimal(value)} ${currency}`;
   }
 
   function formatSignedMoney(value: string | undefined, currency: string) {
@@ -507,9 +510,7 @@
   function formatTime(value?: string) {
     if (!value) return '-';
     const date = new Date(value);
-    return Number.isNaN(date.getTime())
-      ? value
-      : date.toLocaleString('zh-CN', { hour12: false });
+    return Number.isNaN(date.getTime()) ? value : date.toLocaleString('zh-CN', { hour12: false });
   }
 </script>
 

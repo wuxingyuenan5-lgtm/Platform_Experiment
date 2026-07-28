@@ -7,7 +7,10 @@ export interface RouteMetaCarrier {
 
 export function normalizeRoutePermissions(value: unknown): string[] {
   if (Array.isArray(value)) {
-    return value.map(String).map((item) => item.trim()).filter(Boolean);
+    return value
+      .map(String)
+      .map((item) => item.trim())
+      .filter(Boolean);
   }
   if (typeof value === 'string' && value.trim()) {
     return [value.trim()];
@@ -17,9 +20,7 @@ export function normalizeRoutePermissions(value: unknown): string[] {
 
 export function matchedRoutePermissions(matched: readonly RouteMetaCarrier[]): string[] {
   return Array.from(
-    new Set(
-      matched.flatMap((record) => normalizeRoutePermissions(record.meta?.permissions)),
-    ),
+    new Set(matched.flatMap((record) => normalizeRoutePermissions(record.meta?.permissions))),
   );
 }
 

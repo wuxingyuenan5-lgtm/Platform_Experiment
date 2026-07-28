@@ -44,16 +44,12 @@ export function useRoleAccess() {
   const isEmployee = computed(() => currentRole.value === 'employee');
   const isMember = computed(() => currentRole.value === 'member');
   const isGuest = computed(() => currentRole.value === 'guest');
-  const canOperateData = computed(
-    () => isAdmin.value || isTechnicalLead.value || isEmployee.value,
-  );
+  const canOperateData = computed(() => isAdmin.value || isTechnicalLead.value || isEmployee.value);
   const canManageAccounts = computed(
     () => isAdmin.value || isTechnicalLead.value || isEmployee.value,
   );
   const canDeleteAccounts = computed(() => isAdmin.value);
-  const canViewRisk = computed(
-    () => isAdmin.value || isTechnicalLead.value || isEmployee.value,
-  );
+  const canViewRisk = computed(() => isAdmin.value || isTechnicalLead.value || isEmployee.value);
 
   return {
     roles,

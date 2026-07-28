@@ -1,11 +1,5 @@
 <template>
-  <Drawer
-    :open="open"
-    :width="920"
-    title="用户详情"
-    destroy-on-close
-    @close="emit('close')"
-  >
+  <Drawer :open="open" :width="920" title="用户详情" destroy-on-close @close="emit('close')">
     <Spin :spinning="loading">
       <template v-if="detail">
         <div class="drawer-heading">
@@ -118,11 +112,7 @@
                 >
                   通过申请
                 </Button>
-                <Button
-                  v-if="detail.status === 'pending'"
-                  danger
-                  @click="openAction('reject')"
-                >
+                <Button v-if="detail.status === 'pending'" danger @click="openAction('reject')">
                   拒绝申请
                 </Button>
                 <Button
@@ -131,17 +121,10 @@
                 >
                   修改角色
                 </Button>
-                <Button
-                  v-if="detail.status === 'active'"
-                  danger
-                  @click="openAction('disable')"
-                >
+                <Button v-if="detail.status === 'active'" danger @click="openAction('disable')">
                   停用账号
                 </Button>
-                <Button
-                  v-if="detail.status === 'disabled'"
-                  @click="openAction('enable')"
-                >
+                <Button v-if="detail.status === 'disabled'" @click="openAction('enable')">
                   启用账号
                 </Button>
               </Space>
@@ -203,7 +186,9 @@
                   <ListItem>
                     <ListItemMeta
                       :title="item.eventType"
-                      :description="`${formatTime(item.createdAt)} · ${item.result || '-'} · ${item.authMethod || '-'}`"
+                      :description="`${formatTime(item.createdAt)} · ${item.result || '-'} · ${
+                        item.authMethod || '-'
+                      }`"
                     />
                     <pre class="audit-details">{{ formatAudit(item.details) }}</pre>
                   </ListItem>
@@ -379,7 +364,9 @@
   const canManage = computed(() => {
     if (!detail.value || props.currentUserId === detail.value.userId) return false;
     if (props.currentRole === 'ceo') return true;
-    return props.currentRole === 'tech_lead' && ['employee', 'member'].includes(String(targetRole.value));
+    return (
+      props.currentRole === 'tech_lead' && ['employee', 'member'].includes(String(targetRole.value))
+    );
   });
   const canEdit = computed(
     () => !!detail.value && hasPermission(props.permissions, 'user.update') && canManage.value,
@@ -389,8 +376,7 @@
   const canReadAudit = computed(() => hasPermission(props.permissions, 'user.audit.read'));
   const canReadHoldings = computed(
     () =>
-      targetRole.value === 'member' &&
-      hasPermission(props.permissions, 'member.holding.read_all'),
+      targetRole.value === 'member' && hasPermission(props.permissions, 'member.holding.read_all'),
   );
   const roleOptions = computed(() => {
     const values: HumanRole[] =
@@ -615,7 +601,10 @@
     try {
       await action();
     } catch (error) {
-      if (error instanceof UserSystemApiError && error.code === 'recent_reauthentication_required') {
+      if (
+        error instanceof UserSystemApiError &&
+        error.code === 'recent_reauthentication_required'
+      ) {
         pendingSensitiveAction.value = action;
         reauthPassword.value = '';
         reauthOpen.value = true;
@@ -673,21 +662,25 @@
   }
 
   function statusLabel(status: string) {
-    return {
-      pending: '待审核',
-      active: '正常',
-      disabled: '已停用',
-      rejected: '已拒绝',
-    }[status] || status;
+    return (
+      {
+        pending: '待审核',
+        active: '正常',
+        disabled: '已停用',
+        rejected: '已拒绝',
+      }[status] || status
+    );
   }
 
   function statusColor(status: string) {
-    return {
-      pending: 'orange',
-      active: 'green',
-      disabled: 'red',
-      rejected: 'default',
-    }[status] || 'default';
+    return (
+      {
+        pending: 'orange',
+        active: 'green',
+        disabled: 'red',
+        rejected: 'default',
+      }[status] || 'default'
+    );
   }
 
   function formatTime(value?: string) {

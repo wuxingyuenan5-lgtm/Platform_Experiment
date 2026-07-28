@@ -525,10 +525,7 @@ export async function revokeAdminUserSessions(userId: string): Promise<number> {
   return result.revokedSessionCount || 0;
 }
 
-export async function getAdminUserAudit(
-  userId: string,
-  limit = 50,
-): Promise<UserAuditEvent[]> {
+export async function getAdminUserAudit(userId: string, limit = 50): Promise<UserAuditEvent[]> {
   const result = await request<{ items: UserAuditEvent[] }>({
     method: 'GET',
     url: `/users/${encodeURIComponent(userId)}/audit`,

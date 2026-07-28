@@ -224,9 +224,7 @@
   }
 
   function formatMoney(value: string | undefined, currency: string) {
-    return value === undefined || value === null
-      ? '不可用'
-      : `${formatDecimal(value)} ${currency}`;
+    return value === undefined || value === null ? '不可用' : `${formatDecimal(value)} ${currency}`;
   }
 
   function formatSignedMoney(value: string | undefined, currency: string) {
@@ -261,9 +259,7 @@
   function formatTime(value?: string) {
     if (!value) return '-';
     const date = new Date(value);
-    return Number.isNaN(date.getTime())
-      ? value
-      : date.toLocaleString('zh-CN', { hour12: false });
+    return Number.isNaN(date.getTime()) ? value : date.toLocaleString('zh-CN', { hour12: false });
   }
 </script>
 

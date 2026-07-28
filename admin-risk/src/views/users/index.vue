@@ -188,12 +188,7 @@
       />
     </Modal>
 
-    <Modal
-      v-model:open="ticketOpen"
-      title="用户创建成功"
-      :footer="null"
-      @cancel="clearTicket"
-    >
+    <Modal v-model:open="ticketOpen" title="用户创建成功" :footer="null" @cancel="clearTicket">
       <Alert
         type="warning"
         show-icon
@@ -287,7 +282,9 @@
   const currentUserId = computed(() => authentication.value?.user.userId || '');
   const canCreateUser = computed(() => hasPermission(permissions.value, 'user.create'));
   const activeCount = computed(() => users.value.filter((item) => item.status === 'active').length);
-  const pendingCount = computed(() => users.value.filter((item) => item.status === 'pending').length);
+  const pendingCount = computed(
+    () => users.value.filter((item) => item.status === 'pending').length,
+  );
   const contactScopeLabel = computed(() =>
     hasPermission(permissions.value, 'user.sensitive.read') ? '完整' : '脱敏',
   );
@@ -454,7 +451,10 @@
     try {
       await action();
     } catch (error) {
-      if (error instanceof UserSystemApiError && error.code === 'recent_reauthentication_required') {
+      if (
+        error instanceof UserSystemApiError &&
+        error.code === 'recent_reauthentication_required'
+      ) {
         pendingSensitiveAction.value = action;
         reauthPassword.value = '';
         reauthOpen.value = true;
@@ -516,21 +516,25 @@
   }
 
   function statusLabel(status: string) {
-    return {
-      pending: '待审核',
-      active: '正常',
-      disabled: '已停用',
-      rejected: '已拒绝',
-    }[status] || status;
+    return (
+      {
+        pending: '待审核',
+        active: '正常',
+        disabled: '已停用',
+        rejected: '已拒绝',
+      }[status] || status
+    );
   }
 
   function statusColor(status: string) {
-    return {
-      pending: 'orange',
-      active: 'green',
-      disabled: 'red',
-      rejected: 'default',
-    }[status] || 'default';
+    return (
+      {
+        pending: 'orange',
+        active: 'green',
+        disabled: 'red',
+        rejected: 'default',
+      }[status] || 'default'
+    );
   }
 
   function formatTime(value?: string) {

@@ -2,12 +2,7 @@ import type { AppRouteModule } from '@/router/types';
 import { LAYOUT } from '@/router/constant';
 import { RoleEnum } from '@/enums/roleEnum';
 
-const browserRoles = [
-  RoleEnum.CEO,
-  RoleEnum.TECH_LEAD,
-  RoleEnum.EMPLOYEE,
-  RoleEnum.MEMBER,
-];
+const browserRoles = [RoleEnum.CEO, RoleEnum.TECH_LEAD, RoleEnum.EMPLOYEE, RoleEnum.MEMBER];
 
 const account: AppRouteModule = {
   path: '/account',
