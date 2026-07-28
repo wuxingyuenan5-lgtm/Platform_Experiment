@@ -223,7 +223,8 @@ jobs:
             "src/router/routes/modules/{account,dashboard,risk}.ts" \
             "src/store/modules/user.ts" \
             "src/utils/decimalDisplay.ts" \
-            "src/views/account/**/*.{vue,ts,tsx}" \
+            "src/views/account/index.vue" \
+            "src/views/account/components/HoldingsPanel.vue" \
             "src/views/sys/login/LoginForm.vue" \
             "src/views/sys/register/index.vue" \
             "src/views/sys/reset-password/index.vue" \
