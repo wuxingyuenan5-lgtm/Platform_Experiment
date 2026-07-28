@@ -167,7 +167,7 @@ Final integration requires one linked Critical PR, Repository Safety, full Backe
 - Production backup includes user-domain table counts and a safe avatar archive; restore drills reject unsafe entries and never modify active paths.
 - Full CI, Secret Scan and Version Consistency pass before merge.
 
-Automated acceptance evidence is confirmed on head `fd61d3b0e66820042644a0a00a28882d7dfc1ab4` by Platform CI `30328963347`, Secret Scan `30328963301` and Version Consistency `30328963297`. Manual browser acceptance, controlled-host backup/restore rehearsal and the three deployment decision gates remain required before review-ready status or production cutover.
+Automated acceptance evidence is confirmed by the latest clean-head Platform CI, Secret Scan and Version Consistency runs recorded in Draft PR #118. Manual browser acceptance, controlled-host backup/restore rehearsal and the three deployment decision gates remain required before review-ready status or production cutover.
 
 ## Progress
 
@@ -182,7 +182,7 @@ Automated acceptance evidence is confirmed on head `fd61d3b0e66820042644a0a00a28
   - Authentication error contracts, target-scoped masking, Session/CSRF recovery, multipart avatar upload, explicit profile clearing and exact Decimal holding semantics are covered by executable evidence.
   - Existing production backup/restore includes user-domain table counts plus a fail-closed avatar archive and safe restore directory.
   - Browser acceptance and deployment/recovery runbooks define executable evidence fields without storing secrets.
-  - Final checked branch state is ahead of `main` by **288**, behind by **0**, with the original merge base unchanged.
+  - Latest comparison remains behind `main` by **0**, with the original merge base unchanged.
 - Current:
   - Status is `review`: automated verification is complete and the PR remains Draft.
   - The branch remains isolated from `main`; no merge or Live Write enablement is authorized.
