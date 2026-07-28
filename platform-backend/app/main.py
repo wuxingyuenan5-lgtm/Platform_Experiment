@@ -12,6 +12,7 @@ from app.live_venue_accounting import router as live_venue_accounting_router
 from app.member_holding_routes import router as member_holding_router
 from app.production_monitoring import router as production_monitoring_router
 from app.schema_governance import router as schema_governance_router
+from app.user_admin_note_routes import router as user_admin_note_router
 from app.user_admin_routes import router as user_admin_router
 from app.user_avatar_routes import router as user_avatar_router
 from app.user_cache_control import UserNoStoreMiddleware
@@ -33,6 +34,7 @@ app.include_router(cross_spread_observability_router)
 app.include_router(user_router)
 app.include_router(user_avatar_router)
 app.include_router(user_admin_router)
+app.include_router(user_admin_note_router)
 app.include_router(member_holding_router)
 
 # Authentication is added at the composition root so every legacy and modular
