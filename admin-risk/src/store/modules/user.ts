@@ -127,6 +127,11 @@ export const useUserStore = defineStore({
     setSessionTimeout(flag: boolean) {
       this.sessionTimeout = flag;
     },
+    setToken(token?: string) {
+      if (token) return;
+      this.resetState();
+      this.hydrationAttempted = true;
+    },
     applyAuthentication(authentication: AuthenticationState) {
       clearAuthCache();
       this.authentication = authentication;

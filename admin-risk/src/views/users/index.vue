@@ -146,28 +146,28 @@
       <Form layout="vertical" :model="createDraft">
         <div class="form-grid">
           <Form.Item label="用户名" required>
-            <Input v-model:value="createDraft.username" maxlength="64" />
+            <Input v-model:value="createDraft.username" :maxlength="64" />
           </Form.Item>
           <Form.Item label="真实姓名" required>
-            <Input v-model:value="createDraft.realName" maxlength="128" />
+            <Input v-model:value="createDraft.realName" :maxlength="128" />
           </Form.Item>
           <Form.Item label="展示名称">
-            <Input v-model:value="createDraft.displayName" maxlength="128" />
+            <Input v-model:value="createDraft.displayName" :maxlength="128" />
           </Form.Item>
           <Form.Item label="角色" required>
             <Select v-model:value="createDraft.role" :options="createRoleOptions" />
           </Form.Item>
           <Form.Item label="邮箱">
-            <Input v-model:value="createDraft.email" maxlength="254" />
+            <Input v-model:value="createDraft.email" :maxlength="254" />
           </Form.Item>
           <Form.Item label="手机号">
-            <Input v-model:value="createDraft.phone" maxlength="32" />
+            <Input v-model:value="createDraft.phone" :maxlength="32" />
           </Form.Item>
           <Form.Item v-if="createDraft.role === 'employee'" label="部门" required>
-            <Input v-model:value="createDraft.department" maxlength="128" />
+            <Input v-model:value="createDraft.department" :maxlength="128" />
           </Form.Item>
           <Form.Item v-if="createDraft.role === 'member'" label="会员类型" required>
-            <Input v-model:value="createDraft.memberType" maxlength="128" />
+            <Input v-model:value="createDraft.memberType" :maxlength="128" />
           </Form.Item>
         </div>
       </Form>
@@ -306,7 +306,13 @@
     { value: 'disabled', label: '已停用' },
     { value: 'rejected', label: '已拒绝' },
   ];
-  const columns = [
+  const columns: Array<{
+    title: string;
+    key: string;
+    width: number;
+    fixed?: 'left' | 'right';
+    align?: 'center';
+  }> = [
     { title: '用户', key: 'identity', width: 230, fixed: 'left' },
     { title: '角色', key: 'role', width: 110 },
     { title: '联系方式', key: 'contact', width: 230 },

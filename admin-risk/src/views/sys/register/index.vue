@@ -165,7 +165,7 @@
     return Promise.resolve();
   };
 
-  const rules = {
+  const rules: Record<string, RuleObject | RuleObject[]> = {
     username: [
       { required: true, message: '请输入账号', trigger: 'change' },
       { min: 3, max: 64, message: '账号长度为 3—64 个字符', trigger: 'change' },

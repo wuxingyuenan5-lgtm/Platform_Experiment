@@ -126,7 +126,7 @@
 <script setup lang="ts">
   import { computed, onMounted, ref, watch } from 'vue';
   import { Alert, Button, Card, Empty, message, Space, Spin, Tag } from 'ant-design-vue';
-  import { Icon } from '@/components/Icon';
+  import Icon from '@/components/Icon/Icon.vue';
   import {
     getSelfMemberHoldings,
     type MemberHolding,

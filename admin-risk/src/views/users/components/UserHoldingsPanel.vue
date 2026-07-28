@@ -63,7 +63,7 @@
             </Tag>
           </template>
           <template v-else-if="column.key === 'action'">
-            <Button v-if="canUpdate" type="link" size="small" @click="openHoldingModal(record)">
+            <Button v-if="canUpdate" type="link" size="small" @click="editHolding(record)">
               编辑
             </Button>
           </template>
@@ -137,7 +137,7 @@
           />
         </Form.Item>
         <Form.Item label="基金代码">
-          <Input v-model:value="navDraft.fundCode" maxlength="64" />
+          <Input v-model:value="navDraft.fundCode" :maxlength="64" />
         </Form.Item>
         <Form.Item label="单位净值" required>
           <Input v-model:value="navDraft.unitNav" placeholder="例如：1.0235" />
@@ -252,7 +252,12 @@
       label: `${fund.fundName}${fund.fundCode ? ` · ${fund.fundCode}` : ''} · ${fund.baseCurrency}`,
     })),
   );
-  const columns = [
+  const columns: Array<{
+    title: string;
+    key: string;
+    width: number;
+    fixed?: 'left' | 'right';
+  }> = [
     { title: '基金', key: 'fund', width: 180, fixed: 'left' },
     { title: '份额', key: 'shares', width: 120 },
     { title: '单位净值', key: 'nav', width: 130 },
@@ -294,6 +299,10 @@
     } finally {
       loading.value = false;
     }
+  }
+
+  function editHolding(record: Record<string, unknown>) {
+    openHoldingModal(record as unknown as MemberHolding);
   }
 
   function openHoldingModal(holding?: MemberHolding) {
@@ -372,8 +381,9 @@
     navDraft.valuationTime = localDateTime();
   }
 
-  function syncNavFund(fundId: string) {
-    const fund = funds.value.find((item) => item.fundId === fundId);
+  function syncNavFund(fundId: unknown) {
+    const normalizedFundId = typeof fundId === 'string' ? fundId : '';
+    const fund = funds.value.find((item) => item.fundId === normalizedFundId);
     navDraft.fundCode = fund?.fundCode || '';
     navDraft.currency = fund?.baseCurrency || '';
   }

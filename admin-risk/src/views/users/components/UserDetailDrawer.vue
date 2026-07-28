@@ -218,7 +218,7 @@
           label="原因"
           required
         >
-          <Input.TextArea v-model:value="actionDraft.reason" :rows="4" maxlength="1000" />
+          <Input.TextArea v-model:value="actionDraft.reason" :rows="4" :maxlength="1000" />
         </Form.Item>
         <Alert
           v-if="actionType === 'role' || actionType === 'disable'"

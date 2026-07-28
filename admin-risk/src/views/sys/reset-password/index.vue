@@ -11,28 +11,28 @@
       />
       <Form ref="formRef" layout="vertical" :model="formData" class="form">
         <Form.Item label="账号" required>
-          <Input v-model:value="formData.username" autocomplete="username" maxlength="64" />
+          <Input v-model:value="formData.username" autocomplete="username" :maxlength="64" />
         </Form.Item>
         <Form.Item label="一次性重置凭证" required>
           <Input.TextArea
             v-model:value="formData.resetTicket"
             :rows="4"
             autocomplete="off"
-            maxlength="512"
+            :maxlength="512"
           />
         </Form.Item>
         <Form.Item label="新密码" required>
           <Input.Password
             v-model:value="formData.newPassword"
             autocomplete="new-password"
-            maxlength="128"
+            :maxlength="128"
           />
         </Form.Item>
         <Form.Item label="确认新密码" required>
           <Input.Password
             v-model:value="formData.confirmPassword"
             autocomplete="new-password"
-            maxlength="128"
+            :maxlength="128"
             @press-enter="submit"
           />
         </Form.Item>
