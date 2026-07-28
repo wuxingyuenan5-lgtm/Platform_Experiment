@@ -35,6 +35,7 @@
     "reinstall": "rimraf pnpm-lock.yaml && rimraf package.lock.json && rimraf node_modules && npm run bootstrap",
     "serve": "npm run dev",
     "sync:trading-tools": "node scripts/sync-trading-tools-from-md.cjs",
+    "test:e2e:user-system": "playwright test -c playwright.user-system.config.ts",
     "test:gzip": "npx http-server dist --cors --gzip -c-1",
     "test:user-system": "node scripts/test-user-system-access.cjs",
     "type:check": "vue-tsc -p tsconfig.strategy.json --noEmit --skipLibCheck",
