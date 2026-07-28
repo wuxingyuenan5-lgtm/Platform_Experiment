@@ -1,6 +1,6 @@
 # 用户系统执行计划
 
-状态：`reviewed baseline / implementation not started`  
+状态：`implemented / automated verification passed / manual acceptance pending`<br>
 适用版本：`Platform Experiment 0.9.0`  
 Issue：`#117`  
 任务包：`../../tasks/issue-117-user-system.md`  

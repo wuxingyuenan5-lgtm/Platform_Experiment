@@ -1,7 +1,7 @@
 # Task: Complete user system
 
 Issue: #117
-Status: active
+Status: review
 Branch: `feature/issue-117-user-system`
 Base commit: `71603bcc6807284ef3a6da26ad3f43c541bc99c2`
 
@@ -130,7 +130,8 @@ pnpm exec eslint --max-warnings 0 `
   "src/router/routes/modules/{account,dashboard,risk}.ts" `
   "src/store/modules/user.ts" `
   "src/utils/decimalDisplay.ts" `
-  "src/views/account/**/*.{vue,ts,tsx}" `
+  "src/views/account/index.vue" `
+  "src/views/account/components/HoldingsPanel.vue" `
   "src/views/sys/login/**/*.{vue,ts,tsx}" `
   "src/views/sys/register/**/*.{vue,ts,tsx}" `
   "src/views/sys/reset-password/**/*.{vue,ts,tsx}" `
@@ -159,37 +160,26 @@ Final integration requires one linked Critical PR, Repository Safety, full Backe
 - Frozen frontend install, type checks and production build pass.
 - Full CI, Secret Scan and Version Consistency pass before merge.
 
-Acceptance remains unconfirmed until the complete executable evidence exists.
+Automated acceptance evidence is confirmed by Draft PR #118 CI. Manual browser acceptance and the three deployment decision gates remain required before review-ready status or production cutover.
 
 ## Progress
 
 - Done:
   - Batches 1–6 implemented: identity/Session foundation, browser and personal account, administration/audit, member holdings/NAV, navigation/ownership convergence and stable authentication error contract.
-  - Browser Session errors, authentication middleware, RBAC tests and denial audit use stable codes.
-  - Denial audit tests verify the code is persisted and raw Bearer/Session tokens are absent.
-  - Frontend Session invalidation covers invalid/inactive/locked Session and CSRF states while preserving ordinary permission and recent-reauth flows.
-  - Avatar multipart boundary, multi-tab memory-only CSRF, profile explicit-clear semantics and target-scoped masking are implemented.
-  - Platform CI includes focused user-system tests, ESLint, dedicated Vue type checking and build.
-  - Orphan Vitest files were removed; the dependency-free Node runner covers access, route filtering and Decimal formatting.
-  - Targeted same-content execution evidence totals **48 passing cases, 0 failures**:
-    - frontend access/route/Decimal runner: **11 passed**;
-    - password/Token security module: **3 passed**;
-    - role-permission registry: **6 passed**;
-    - member-holding Decimal module: **16 passed**;
-    - public-auth rate limiter: **2 passed**;
-    - administrator target/role/recent-reauth policy: **6 passed**;
-    - last-active-CEO core transaction guard: **4 passed**.
-  - Targeted execution exposed and fixed a real password-policy defect: phone normalization preserved `+`, so a password containing the complete phone digits without `+` was not rejected. Password policy now compares normalized digit strings; the existing security test then passed.
-  - The fixed Dummy Argon2 hash was directly verified as a valid hash that returns mismatch for an incorrect password.
-  - Requirements, design index, authentication error contract, Ownership Catalog and this task packet are synchronized.
+  - Draft Critical PR #118 is linked to Issue #117 and remains unmerged.
+  - Repository Safety passed: workstream, architecture/structure and documentation consistency.
+  - Platform Backend passed dependency validation, Ruff, Pyright and all **398** classified tests.
+  - Execution Runtime passed dependency validation, Ruff, Pyright and its full unit/integration/live-safety matrix; no Runtime or Venue behavior changed.
+  - Frontend passed frozen install, **11** access/route/Decimal tests, focused ESLint, no-new-debt enforcement, strategy type check, user-system Vue type check and production build.
+  - Version Consistency and full tracked-tree Secret Scan passed.
+  - Authentication error contracts, target-scoped masking, Session/CSRF recovery, multipart avatar upload, explicit profile clearing and exact Decimal holding semantics are covered by executable evidence.
 - Current:
-  - Targeted static regression review and isolated pure/core-module execution on the long-lived branch.
-  - Latest branch comparison remains behind `main` by **0** with the merge base unchanged; exact ahead count is recorded in the Issue checkpoint to avoid self-stale task metadata.
-  - No PR exists by explicit branch policy. The checked branch commits have no status checks or Actions runs.
+  - Status is `review`: automated verification is complete and the PR remains Draft.
+  - The branch remains isolated from `main`; no merge or Live Write enablement is authorized.
 - Next:
-  - Obtain a real checkout or explicit integration PR, run the complete command matrix and fix only evidence-backed findings.
-  - Perform manual browser acceptance and resolve the three deployment decision gates before cutover.
+  - Perform manual browser acceptance for all four roles, registration/login/logout, profile clear, avatar upload, multi-tab CSRF, password/session invalidation and holding/NAV workflows.
+  - Resolve the three deployment decision gates: legacy real-user migration, initial production holding source and same-origin production routing.
+  - Re-run the latest-head checks after any further code or documentation change; use Squash Merge only after explicit approval.
 - Blocked by:
-  - The current execution environment cannot resolve `github.com`, and the connector exposes file operations but no repository archive or workflow-dispatch action.
-  - Therefore full Ruff, Pyright, database/integration/live-safety Pytest, frozen pnpm install, Vue type checks, production build, repository scripts and full Secret Scan remain unexecuted.
-  - Isolated pytest harnesses do not load repository marker configuration, so they may emit `PytestUnknownMarkWarning`; their assertions still execute. These results are not a substitute for repository CI or the concurrency integration suite.
+  - This connector session has no interactive browser/deployment environment for manual acceptance, reverse-proxy/Cookie Secure validation or backup/restore rehearsal.
+  - No known product-code or automated-test blocker remains.

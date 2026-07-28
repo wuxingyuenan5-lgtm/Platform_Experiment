@@ -353,12 +353,12 @@ Issue #117 分支已实现：
 - Batch 4：Migration 6、会员持仓、基金单位净值、Decimal 字符串、本人隔离、CEO 管理、NAV 缺失/过期语义和前端持仓面板；
 - Batch 5：同源 `/api/v1`、Cookie Session Store、精确权限菜单/直接 URL、旧个人入口重定向、显式 CEO 权限和旧 JWT/持久化 Token 隔离。
 
-仍未完成的验收证据：
+自动化验收证据：
 
-- Ruff、Pyright 和分类 Pytest 尚未执行；
-- 前端 ESLint、类型检查、单元测试和构建尚未执行；
-- 文档一致性、仓库结构、版本一致性和 Secret Scan 尚未执行；
-- 尚未创建 PR，因此没有 PR CI；
-- 真实同源反向代理、Cookie Secure、备份恢复和生产部署尚未验收。
+- Draft PR #118 的 Repository Safety、Backend、Runtime 和 Frontend 全矩阵已通过；
+- Backend Ruff、Pyright 与 398 项分类 Pytest 已通过；
+- 前端权限/Decimal 测试、ESLint、无新增债务检查、两套类型检查和生产构建已通过；
+- Version Consistency 与 Secret Scan 已通过；
+- 仍需完成真实浏览器同源验收、Cookie Secure/反向代理验证、备份恢复演练和三项生产切换决策。
 
 当前 API Key 配置适合单机小型私募第一阶段，不等同完整企业身份提供商。认证、审批、代码完成和 CI 均不能自动打开 Platform 或 Runtime Live Write。
