@@ -3,6 +3,7 @@ from __future__ import annotations
 import sqlite3
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+from typing import cast
 
 from app.config import Settings, get_settings
 from app.database import connection
@@ -13,7 +14,6 @@ from app.user_repository import (
     UserProfileRecord,
     UserRecord,
     change_password,
-    create_initial_ceo as insert_initial_ceo,
     create_pending_registration,
     create_session,
     get_session_owner,
@@ -32,12 +32,17 @@ from app.user_repository import (
     update_self_profile,
     upgrade_password_hash,
 )
+from app.user_repository import (
+    create_initial_ceo as insert_initial_ceo,
+)
 from app.user_schemas import (
     AuthenticationResponse,
     CurrentSessionResponse,
+    HumanRole,
     RegistrationRequest,
     RegistrationResponse,
     UpdateSelfProfileRequest,
+    UserLifecycleStatus,
     UserSelfResponse,
     UserSessionListResponse,
     UserSessionSummaryResponse,
@@ -110,6 +115,14 @@ def _validate_phone(value: str | None) -> None:
 def _profile_response(profile: UserProfileRecord) -> UserSelfResponse:
     if profile.role_code not in {"ceo", "tech_lead", "employee", "member"}:
         raise UserServiceError(503, "invalid_user_role", "User role configuration is invalid")
+    if profile.lifecycle_status not in {"pending", "active", "disabled", "rejected"}:
+        raise UserServiceError(
+            503,
+            "invalid_user_status",
+            "User lifecycle status configuration is invalid",
+        )
+    role = cast(HumanRole, profile.role_code)
+    lifecycle_status = cast(UserLifecycleStatus, profile.lifecycle_status)
     return UserSelfResponse(
         userId=profile.id,
         username=profile.username,
@@ -118,10 +131,10 @@ def _profile_response(profile: UserProfileRecord) -> UserSelfResponse:
         avatarKey=profile.avatar_key,
         phone=profile.phone,
         email=profile.email,
-        role=profile.role_code,
+        role=role,
         department=profile.department,
         memberType=profile.member_type,
-        status=profile.lifecycle_status,
+        status=lifecycle_status,
         registeredAt=datetime.fromisoformat(profile.registered_at),
         lastLoginAt=(
             datetime.fromisoformat(profile.last_login_at)
@@ -779,7 +792,11 @@ def revoke_own_session(
     now: datetime | None = None,
 ) -> None:
     if target_session_id == current_session_id:
-        raise UserServiceError(409, "use_logout_for_current_session", "请使用退出登录结束当前设备")
+        raise UserServiceError(
+            409,
+            "use_logout_for_current_session",
+            "请使用退出登录结束当前设备",
+        )
     timestamp = _now(now).isoformat()
     with connection() as db:
         owner = get_session_owner(db, target_session_id)

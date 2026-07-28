@@ -136,7 +136,11 @@ def replace_avatar(
     except OSError as exc:
         temporary_path.unlink(missing_ok=True)
         final_path.unlink(missing_ok=True)
-        raise AvatarServiceError(503, "avatar_storage_failed", "Avatar could not be stored") from exc
+        raise AvatarServiceError(
+            503,
+            "avatar_storage_failed",
+            "Avatar could not be stored",
+        ) from exc
 
     timestamp = datetime.now(UTC).isoformat()
     previous_key: str | None = None

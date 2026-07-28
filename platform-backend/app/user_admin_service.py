@@ -3,6 +3,7 @@ from __future__ import annotations
 import sqlite3
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+from typing import cast
 
 from app.config import get_settings
 from app.database import connection
@@ -34,6 +35,7 @@ from app.user_admin_schemas import (
     CreateManagedUserRequest,
     CreateManagedUserResponse,
     PasswordResetTicketResponse,
+    RegularHumanRole,
     RejectRegistrationRequest,
     UpdateManagedUserRequest,
     UserAdminDetailResponse,
@@ -51,7 +53,13 @@ from app.user_repository import (
     list_active_user_sessions,
     revoke_all_user_sessions,
 )
-from app.user_security import generate_secret_token, hash_password, hash_secret_token, normalize_phone
+from app.user_schemas import HumanRole, UserLifecycleStatus
+from app.user_security import (
+    generate_secret_token,
+    hash_password,
+    hash_secret_token,
+    normalize_phone,
+)
 
 
 class UserAdminServiceError(RuntimeError):
@@ -116,12 +124,19 @@ def _mask_real_name(value: str | None) -> str | None:
 
 
 def _summary(record: AdminUserRecord, *, sensitive: bool) -> UserAdminSummaryResponse:
-    role = record.role_code if record.role_code in {"ceo", "tech_lead", "employee", "member"} else None
-    requested_role = (
+    role = cast(
+        HumanRole | None,
+        record.role_code
+        if record.role_code in {"ceo", "tech_lead", "employee", "member"}
+        else None,
+    )
+    requested_role = cast(
+        RegularHumanRole | None,
         record.requested_role_code
         if record.requested_role_code in {"employee", "member"}
-        else None
+        else None,
     )
+    lifecycle_status = cast(UserLifecycleStatus, record.lifecycle_status)
     return UserAdminSummaryResponse(
         userId=record.id,
         username=record.username,
@@ -135,7 +150,7 @@ def _summary(record: AdminUserRecord, *, sensitive: bool) -> UserAdminSummaryRes
         requestedRole=requested_role,
         department=record.department,
         memberType=record.member_type,
-        status=record.lifecycle_status,
+        status=lifecycle_status,
         registeredAt=datetime.fromisoformat(record.registered_at),
         lastLoginAt=(
             datetime.fromisoformat(record.last_login_at)
@@ -149,7 +164,9 @@ def _summary(record: AdminUserRecord, *, sensitive: bool) -> UserAdminSummaryRes
 
 def _detail(record: AdminUserRecord, *, sensitive: bool) -> UserAdminDetailResponse:
     base = _summary(record, sensitive=sensitive)
-    role_permissions = permissions_for_roles((record.role_code,)) if record.role_code else frozenset()
+    role_permissions = (
+        permissions_for_roles((record.role_code,)) if record.role_code else frozenset()
+    )
     return UserAdminDetailResponse(
         **base.model_dump(by_alias=True),
         applicationNote=record.application_note if sensitive else None,
@@ -356,7 +373,9 @@ def update_user(
                 target_role=target_role,
             )
             fields = request.model_fields_set
-            display_name = request.display_name if "display_name" in fields else existing.display_name
+            display_name = (
+                request.display_name if "display_name" in fields else existing.display_name
+            )
             real_name = request.real_name if "real_name" in fields else existing.real_name
             email = request.email if "email" in fields else existing.email
             phone = request.phone if "phone" in fields else existing.phone
@@ -542,7 +561,11 @@ def change_user_role(
                 target_role=current_target_role,
             )
             if context.actor_role == "tech_lead" and request.role not in {"employee", "member"}:
-                raise UserAdminPolicyError(403, "role_assignment_forbidden", "不能授予该角色")
+                raise UserAdminPolicyError(
+                    403,
+                    "role_assignment_forbidden",
+                    "不能授予该角色",
+                )
             _require_recent(db, context, current)
             assert_active_ceo_remains(
                 db,

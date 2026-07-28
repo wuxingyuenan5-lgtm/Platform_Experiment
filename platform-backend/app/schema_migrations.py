@@ -165,8 +165,14 @@ PLATFORM_MIGRATIONS: tuple[Migration, ...] = (
                 created_by TEXT,
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL,
-                CHECK (role_code IS NULL OR role_code IN ('ceo', 'tech_lead', 'employee', 'member')),
-                CHECK (requested_role_code IS NULL OR requested_role_code IN ('employee', 'member')),
+                CHECK (
+                    role_code IS NULL
+                    OR role_code IN ('ceo', 'tech_lead', 'employee', 'member')
+                ),
+                CHECK (
+                    requested_role_code IS NULL
+                    OR requested_role_code IN ('employee', 'member')
+                ),
                 CHECK (lifecycle_status IN ('pending', 'active', 'disabled', 'rejected')),
                 CHECK (auth_version >= 1),
                 CHECK (row_version >= 1),
