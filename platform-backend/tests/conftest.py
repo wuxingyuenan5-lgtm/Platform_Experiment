@@ -38,7 +38,7 @@ PRIMARY_MARKERS = ("architecture", "unit", "integration", "live_safety")
 
 
 def classify_test_file(path: Path) -> str:
-    """Return the single primary layer for a backend test module."""
+    """Return the default primary layer for an unmarked backend test module."""
 
     name = path.stem.lower()
     if any(pattern in name for pattern in ARCHITECTURE_PATTERNS):
@@ -51,11 +51,24 @@ def classify_test_file(path: Path) -> str:
 
 
 def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
-    """Apply exactly one primary marker to every collected backend test."""
+    """Require one explicit or inferred primary marker for every backend test."""
 
     for item in items:
-        marker = classify_test_file(Path(str(item.path)))
-        item.add_marker(getattr(pytest.mark, marker))
+        explicit_markers = {
+            name for name in PRIMARY_MARKERS if item.get_closest_marker(name) is not None
+        }
+        if len(explicit_markers) > 1:
+            raise pytest.UsageError(
+                f"{item.nodeid} must have exactly one primary test marker; "
+                f"found {sorted(explicit_markers)}"
+            )
+
+        if explicit_markers:
+            marker = next(iter(explicit_markers))
+        else:
+            marker = classify_test_file(Path(str(item.path)))
+            item.add_marker(getattr(pytest.mark, marker))
+
         primary_markers = {
             name for name in PRIMARY_MARKERS if item.get_closest_marker(name) is not None
         }
