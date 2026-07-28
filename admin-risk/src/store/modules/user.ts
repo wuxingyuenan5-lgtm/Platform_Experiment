@@ -191,8 +191,16 @@ export const useUserStore = defineStore({
         throw error;
       }
     },
-    async hydrateSession(): Promise<boolean> {
-      if (this.authenticated && getUserSystemCsrfToken()) return true;
+    async hydrateSession(forceVerify = false): Promise<boolean> {
+      if (!forceVerify && this.authenticated && getUserSystemCsrfToken()) return true;
+      if (forceVerify && this.authenticated && getUserSystemCsrfToken()) {
+        try {
+          await this.getUserInfoAction();
+          return this.getIsAuthenticated;
+        } catch {
+          return false;
+        }
+      }
       if (this.authenticated) {
         this.resetState();
         this.hydrationAttempted = false;
