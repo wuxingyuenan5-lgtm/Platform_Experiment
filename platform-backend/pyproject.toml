@@ -59,6 +59,8 @@ include = [
   "app/schema_migrations.py",
   "app/schema_governance.py",
   "app/trade_command_execution.py",
+  "app/user_admin_note_routes.py",
+  "app/user_admin_notes.py",
   "app/user_admin_policy.py",
   "app/user_admin_repository.py",
   "app/user_admin_routes.py",
@@ -74,6 +76,7 @@ include = [
   "app/user_logout.py",
   "app/user_password_reset.py",
   "app/user_permissions.py",
+  "app/user_product_migrations.py",
   "app/user_rate_limit.py",
   "app/user_repository.py",
   "app/user_routes.py",
@@ -122,6 +125,7 @@ select = ["E", "F", "I", "UP", "B"]
 "app/user_service.py" = ["E501"]
 "app/user_routes.py" = ["B008", "E501"]
 "app/user_avatar_routes.py" = ["B008", "E501"]
+"app/user_admin_note_routes.py" = ["B008", "E501"]
 "app/user_admin_repository.py" = ["E501"]
 "app/user_admin_routes.py" = ["B008", "E501"]
 "app/user_admin_service.py" = ["E501"]
