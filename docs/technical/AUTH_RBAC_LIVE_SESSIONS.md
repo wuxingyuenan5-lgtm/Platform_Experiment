@@ -1,8 +1,8 @@
 # Authentication, RBAC, Browser Session, and LiveTradingSession
 
-状态：`active / user-system Batches 1–5 implemented, verification pending`  
-适用版本：`Platform Experiment 0.9.0`  
-用户系统架构：`USER_SYSTEM_TECHNICAL_ARCHITECTURE.md`  
+状态：`active / user-system Batches 1–5 implemented, verification pending`
+适用版本：`Platform Experiment 0.9.0`
+用户系统架构：`USER_SYSTEM_TECHNICAL_ARCHITECTURE.md`
 用户系统执行计划：`../planning/USER_SYSTEM_EXECUTION_PLAN.md`
 
 ## 1. 两类 Session 不是同一概念
@@ -356,9 +356,12 @@ Issue #117 分支已实现：
 自动化验收证据：
 
 - Draft PR #118 的 Repository Safety、Backend、Runtime 和 Frontend 全矩阵已通过；
-- Backend Ruff、Pyright 与 398 项分类 Pytest 已通过；
+- Backend Ruff、Pyright 与 399 项分类 Pytest 已通过；
 - 前端权限/Decimal 测试、ESLint、无新增债务检查、两套类型检查和生产构建已通过；
 - Version Consistency 与 Secret Scan 已通过；
-- 仍需完成真实浏览器同源验收、Cookie Secure/反向代理验证、备份恢复演练和三项生产切换决策。
+- 用户域 Table Count 与头像归档/恢复已纳入现有生产灾备自动化；
+- 浏览器验收入口：`../operations/USER_SYSTEM_BROWSER_ACCEPTANCE.md`；
+- 部署、SQLite/头像恢复入口：`../operations/USER_SYSTEM_DEPLOYMENT_READINESS.md`；
+- 仍需在受控主机完成浏览器同源验收、Cookie Secure/反向代理验证、备份恢复演练和三项生产切换决策。
 
 当前 API Key 配置适合单机小型私募第一阶段，不等同完整企业身份提供商。认证、审批、代码完成和 CI 均不能自动打开 Platform 或 Runtime Live Write。
