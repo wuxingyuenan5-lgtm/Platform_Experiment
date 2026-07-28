@@ -101,7 +101,9 @@
               </div>
               <div>
                 <span>累计投入</span>
-                <strong>{{ formatDetailedMoney(holding.cumulativeInvested, holding.currency) }}</strong>
+                <strong>
+                  {{ formatDetailedMoney(holding.cumulativeInvested, holding.currency) }}
+                </strong>
               </div>
             </div>
 
@@ -372,7 +374,10 @@
   }
 
   function formatDetailedMoney(value: string | undefined, currency: string) {
-    return formatMoneyString(value === undefined ? undefined : withMinimumFraction(value), currency);
+    return formatMoneyString(
+      value === undefined ? undefined : withMinimumFraction(value),
+      currency,
+    );
   }
 
   function formatDetailedSignedMoney(value: string | undefined, currency: string) {
