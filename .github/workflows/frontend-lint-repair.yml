@@ -46,8 +46,8 @@ jobs:
           from pathlib import Path
           path = Path('src/views/users/index.vue')
           source = path.read_text(encoding='utf-8')
-          old = '@showSizeChange="handlePageSizeChange"'
-          new = '@show-size-change="handlePageSizeChange"'
+          old = '@showSizeChange="changePageSize"'
+          new = '@show-size-change="changePageSize"'
           if source.count(old) != 1:
               raise SystemExit('expected one showSizeChange event binding')
           path.write_text(source.replace(old, new, 1), encoding='utf-8')
