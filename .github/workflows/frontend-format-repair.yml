@@ -76,7 +76,7 @@ jobs:
             "src/views/strategy/funding-carry/**/*.{vue,ts,tsx}"
           git diff --check
       - name: Commit formatting repair and remove temporary workflow
-        working-directory: ..
+        working-directory: ${{ github.workspace }}
         run: |
           set -euo pipefail
           rm .github/workflows/frontend-format-repair.yml
