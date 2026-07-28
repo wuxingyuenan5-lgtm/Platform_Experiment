@@ -408,6 +408,7 @@ test('completes isolated four-role browser acceptance without Live Write', async
       await expect(primaryPage).toHaveURL(/\/exception\/403$/);
 
       await primaryPage.goto(absoluteUrl('/account/index'));
+      await primaryPage.getByRole('tab', { name: '资料与安全' }).click();
       await primaryPage.getByRole('button', { name: '修改密码' }).click();
       const passwordDialog = primaryPage.getByRole('dialog', { name: '修改密码' });
       const passwordInputs = passwordDialog.locator('input');
