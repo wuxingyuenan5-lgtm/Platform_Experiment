@@ -7,8 +7,8 @@ from pathlib import Path
 from app.config import get_settings
 from app.database import initialize_database
 from app.schema_migrations import apply_platform_migrations
-from app.user_repository import InitialCeoAlreadyExistsError
-from app.user_service import create_initial_ceo
+from app.user_demo_seed import seed_demo_users
+from app.user_product_migrations import apply_user_product_migrations
 
 _REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 _E2E_ROOT = _REPOSITORY_ROOT / ".e2e" / "user-system"
@@ -52,23 +52,17 @@ def main() -> int:
 
     initialize_database()
     apply_platform_migrations()
+    apply_user_product_migrations()
 
-    username = _required_environment("E2E_CEO_USERNAME")
     password = _required_environment("E2E_CEO_PASSWORD")
-    try:
-        created = create_initial_ceo(
-            username=username,
-            password=password,
-            display_name="E2E CEO",
-            real_name="E2E CEO",
-            email="e2e-ceo@example.invalid",
-            phone=None,
-        )
-    except InitialCeoAlreadyExistsError:
-        print("User-system E2E CEO already exists")
-        return 0
-
-    print(f"Created isolated user-system E2E CEO: {created.username}")
+    accounts = seed_demo_users(
+        password=password,
+        prefix="e2e",
+        refresh_existing=True,
+    )
+    print("Seeded isolated reusable user-system accounts:")
+    for account in accounts:
+        print(f"- {account.username}: {account.role}")
     return 0
 
 
