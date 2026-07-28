@@ -48,6 +48,7 @@ function requiredEnvironment(name: string): string {
 }
 
 function absoluteUrl(path: string): string {
+  if (!path.startsWith('/api/')) return `${FRONTEND_ORIGIN}/#${path}`;
   return new URL(path, FRONTEND_ORIGIN).toString();
 }
 
