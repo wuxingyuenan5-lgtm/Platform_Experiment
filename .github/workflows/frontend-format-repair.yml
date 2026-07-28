@@ -39,21 +39,6 @@ jobs:
         env:
           HUSKY: '0'
         run: pnpm install --frozen-lockfile
-      - name: Narrow maintained account lint boundary
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-          path = Path('../.github/workflows/platform-ci.yml')
-          source = path.read_text(encoding='utf-8')
-          old = '            "src/views/account/**/*.{vue,ts,tsx}" \\\n'
-          new = (
-              '            "src/views/account/index.vue" \\\n'
-              '            "src/views/account/components/HoldingsPanel.vue" \\\n'
-          )
-          if old not in source:
-              raise SystemExit('expected frontend lint boundary was not found')
-          path.write_text(source.replace(old, new, 1), encoding='utf-8')
-          PY
       - name: Apply project frontend formatting rules
         run: |
           pnpm exec eslint --fix \
@@ -75,18 +60,17 @@ jobs:
             "src/views/users/**/*.{vue,ts,tsx}" \
             "src/views/strategy/funding-carry/**/*.{vue,ts,tsx}"
           git diff --check
-      - name: Commit formatting repair and remove temporary workflow
+      - name: Commit frontend formatting
         id: commit_repair
         continue-on-error: true
         run: |
           set -o pipefail
           {
             echo "working_directory=$(pwd)"
-            rm ../.github/workflows/frontend-format-repair.yml
             git -C .. config user.name "github-actions[bot]"
             git -C .. config user.email "41898282+github-actions[bot]@users.noreply.github.com"
             git -C .. status --short
-            git -C .. add .github admin-risk
+            git -C .. add admin-risk
             git -C .. status --short
             git -C .. -c core.hooksPath=/dev/null commit -m "style: apply frontend integration formatting"
             git -C .. push origin "HEAD:${{ github.event.pull_request.head.ref }}"
