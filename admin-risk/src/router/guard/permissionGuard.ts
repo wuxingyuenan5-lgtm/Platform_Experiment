@@ -5,9 +5,14 @@ import { usePermissionStoreWithOut } from '@/store/modules/permission';
 import { PageEnum } from '@/enums/pageEnum';
 import { useUserStoreWithOut } from '@/store/modules/user';
 
+import { asyncRoutes } from '@/router/routes';
 import { PAGE_NOT_FOUND_ROUTE } from '@/router/routes/basic';
 import { PAGE_NOT_FOUND_NAME } from '@/router/constant';
-import { canAccessMatchedRoute, filterPermissionTree } from '@/access/routeAccess';
+import {
+  canAccessMatchedRoute,
+  filterPermissionTree,
+  isKnownRouteDenied,
+} from '@/access/routeAccess';
 
 const LOGIN_PATH = PageEnum.BASE_LOGIN;
 const REGISTER_APPLY_PATH = '/register-apply';
@@ -117,8 +122,11 @@ export function createPermissionGuard(router: Router) {
         to.matched.length === 0 || PAGE_NOT_FOUND_NAMES.includes(String(to.name || ''));
 
       if (isUnmatchedRoute) {
-        await ensureDynamicRoutes();
-        next({ path: to.fullPath, replace: true, query: to.query });
+        if (isKnownRouteDenied(asyncRoutes, to.path, permissions)) {
+          next({ path: FORBIDDEN_PATH, replace: true });
+          return;
+        }
+        next();
         return;
       }
 
@@ -128,6 +136,10 @@ export function createPermissionGuard(router: Router) {
 
     await ensureDynamicRoutes();
     if (PAGE_NOT_FOUND_NAMES.includes(String(to.name || ''))) {
+      if (isKnownRouteDenied(asyncRoutes, to.path, permissions)) {
+        next({ path: FORBIDDEN_PATH, replace: true });
+        return;
+      }
       next({ path: to.fullPath, replace: true, query: to.query });
     } else {
       const redirectPath = ((to.query?.redirect as string) || to.fullPath || to.path) as string;
