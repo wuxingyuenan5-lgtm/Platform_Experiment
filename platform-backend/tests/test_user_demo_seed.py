@@ -19,10 +19,10 @@ _NOW = datetime(2026, 7, 28, 8, 0, tzinfo=UTC)
 
 
 def _prepare_database(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    monkeypatch.setenv("VG_DATABASE_PATH", str(tmp_path / "demo-users.db"))
-    monkeypatch.setenv("VG_ENVIRONMENT", "testing")
-    monkeypatch.setenv("VG_LIVE_TRADING_ENABLED", "false")
-    get_settings.cache_clear()
+    settings = get_settings()
+    monkeypatch.setattr(settings, "database_path", str(tmp_path / "demo-users.db"))
+    monkeypatch.setattr(settings, "environment", "testing")
+    monkeypatch.setattr(settings, "live_trading_enabled", False)
     initialize_database()
     apply_platform_migrations()
     apply_user_product_migrations()
