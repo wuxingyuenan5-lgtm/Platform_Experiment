@@ -8,6 +8,7 @@
   "include": [
     "src/access/**/*.ts",
     "src/api/platform/memberHoldings.ts",
+    "src/api/platform/userAdminNotes.ts",
     "src/api/platform/userSystem.ts",
     "src/enums/roleEnum.ts",
     "src/hooks/web/useRoleAccess.ts",
