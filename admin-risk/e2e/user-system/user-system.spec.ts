@@ -165,7 +165,7 @@ test('completes isolated four-role browser acceptance without Live Write', async
     await page.getByRole('button', { name: '登录', exact: true }).click();
     expect((await pendingResponse).status()).toBe(403);
     await expect(page.getByText('账号正在等待审核')).toBeVisible();
-    await page.getByRole('dialog').getByRole('button', { name: /确.*定/ }).click();
+    await page.getByRole('dialog').getByRole('button', { name: /确\s*认/ }).click();
   });
 
   let memberUserId = '';

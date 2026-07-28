@@ -31,6 +31,7 @@ export default defineConfig({
   outputDir: 'test-results/user-system',
   use: {
     ...devices['Desktop Chrome'],
+    actionTimeout: 15_000,
     baseURL: frontendOrigin,
     locale: 'zh-CN',
     timezoneId: 'Asia/Shanghai',
