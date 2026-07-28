@@ -376,7 +376,7 @@ test('completes isolated four-role browser acceptance without Live Write', async
         name: 'e2e-avatar.png',
         mimeType: 'image/png',
         buffer: Buffer.from(
-          'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9ZQmcAAAAASUVORK5CYII=',
+          'iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAFklEQVR4nGNUcEhgYGBgYmBgYGBgAAAI6gDEJfpPsQAAAABJRU5ErkJggg==',
           'base64',
         ),
       });
