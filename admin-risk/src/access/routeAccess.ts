@@ -5,6 +5,11 @@ export interface RouteMetaCarrier {
   meta?: Partial<RouteMeta>;
 }
 
+export interface RoutePathCarrier extends RouteMetaCarrier {
+  path?: string;
+  children?: RoutePathCarrier[];
+}
+
 export function normalizeRoutePermissions(value: unknown): string[] {
   if (Array.isArray(value)) {
     return value
@@ -40,6 +45,53 @@ export function canAccessRouteMeta(
   return normalizeRoutePermissions(meta?.permissions).every((permission) =>
     hasPermission(permissions, permission),
   );
+}
+
+function normalizeStaticPath(value: string): string {
+  const withoutQuery = value.split(/[?#]/, 1)[0] || '/';
+  const withLeadingSlash = withoutQuery.startsWith('/') ? withoutQuery : `/${withoutQuery}`;
+  const compact = withLeadingSlash.replace(/\/{2,}/g, '/');
+  return compact.length > 1 ? compact.replace(/\/+$/, '') : compact;
+}
+
+function resolveRoutePath(parentPath: string, routePath: string): string {
+  return routePath.startsWith('/')
+    ? normalizeStaticPath(routePath)
+    : normalizeStaticPath(`${parentPath}/${routePath}`);
+}
+
+export function findRouteChainByPath(
+  items: readonly RoutePathCarrier[],
+  targetPath: string,
+  parentPath = '',
+  parentChain: readonly RouteMetaCarrier[] = [],
+): RouteMetaCarrier[] | undefined {
+  const normalizedTarget = normalizeStaticPath(targetPath);
+  for (const item of items) {
+    if (!item.path) continue;
+
+    const currentPath = resolveRoutePath(parentPath, item.path);
+    const currentChain = [...parentChain, item];
+    if (!/[:*]/.test(currentPath) && currentPath === normalizedTarget) return currentChain;
+
+    const childMatch = findRouteChainByPath(
+      item.children || [],
+      normalizedTarget,
+      currentPath,
+      currentChain,
+    );
+    if (childMatch) return childMatch;
+  }
+  return undefined;
+}
+
+export function isKnownRouteDenied(
+  items: readonly RoutePathCarrier[],
+  targetPath: string,
+  permissions: readonly string[],
+): boolean {
+  const chain = findRouteChainByPath(items, targetPath);
+  return chain !== undefined && !canAccessMatchedRoute(chain, permissions);
 }
 
 export function filterPermissionTree<T extends RouteMetaCarrier & { children?: T[] }>(
