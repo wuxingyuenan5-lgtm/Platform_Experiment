@@ -15,6 +15,7 @@ LIVE_SAFETY_PATTERNS = (
     "secret",
 )
 INTEGRATION_PATTERNS = (
+    "audit",
     "auth",
     "batch",
     "catalog",
