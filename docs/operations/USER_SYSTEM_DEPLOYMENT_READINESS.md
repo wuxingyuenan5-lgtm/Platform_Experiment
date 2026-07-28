@@ -1,6 +1,6 @@
 # 用户系统部署、备份与恢复就绪手册
 
-状态：`automated backup coverage pending / controlled-host rehearsal pending`
+状态：`automated backup coverage passed / controlled-host rehearsal pending`
 适用版本：`Platform Experiment 0.9.0`
 Issue：`#117`
 Draft PR：`#118`
@@ -57,19 +57,16 @@ https://<production-host>/api/v1 → platform-backend
 
 ## 5. 一致性备份对象
 
-当前生产灾备已覆盖：
+`POST /api/v1/ops/backups` 已生成：
 
 1. `platform.db`：SQLite Online Backup；
 2. `runtime_journal.db`：SQLite Online Backup；
-3. `manifest.json`：脱敏的 checksum、size、integrity 与关键 table count。
+3. `avatars.zip`：仅包含安全的头像根目录 `.webp` 文件；
+4. `manifest.json`：脱敏的 checksum、size、integrity、关键 table count、头像文件数和总字节数。
 
-Issue #117 还必须把头像目录和用户域关键计数纳入同一备份边界。目标状态为：
+Platform 关键计数已包含用户、Session、密码重置凭证、基金、会员持仓和基金单位净值表。Manifest 不暴露头像文件名。备份遇到头像软链接、子目录、临时文件或异常扩展名时 fail-closed。
 
-4. `avatars.zip`：仅包含安全的根目录 `.webp` 头像文件；
-5. Platform 关键计数包含用户、Session、密码重置凭证、基金、会员持仓和基金单位净值表；
-6. Manifest 记录头像文件数与总字节数，但不暴露头像文件名。
-
-备份遇到头像软链接、子目录、临时文件或异常扩展名时必须 fail-closed。
+自动化证据：头像归档、恢复目录安全、用户域计数、checksum、integrity 和异常目录项拒绝已进入完整 Backend 测试；Ruff、Pyright 和全部 **399** 项测试通过。
 
 示例调用仅使用环境变量中的操作凭证：
 
