@@ -107,8 +107,12 @@
 
           <TabPane key="authority" tab="角色与状态">
             <Descriptions :column="1" size="small" bordered>
-              <Descriptions.Item label="当前角色">{{ roleLabel(detail.role) }}</Descriptions.Item>
-              <Descriptions.Item label="账号状态">{{ statusLabel(detail.status) }}</Descriptions.Item>
+              <Descriptions.Item label="当前角色">
+                {{ roleLabel(detail.role) }}
+              </Descriptions.Item>
+              <Descriptions.Item label="账号状态">
+                {{ statusLabel(detail.status) }}
+              </Descriptions.Item>
               <Descriptions.Item label="权限点">
                 <Space wrap>
                   <Tag v-for="permission in detail.permissions" :key="permission">
