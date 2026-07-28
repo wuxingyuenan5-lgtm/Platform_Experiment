@@ -1,4 +1,4 @@
-name: Temporary Fix User Route Denial
+name: Temporary Verify User Route Denial
 
 on:
   pull_request:
@@ -11,7 +11,7 @@ permissions:
   contents: write
 
 jobs:
-  fix-route-denial:
+  verify-route-denial:
     if: github.event.pull_request.number == 118 && github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     steps:
@@ -28,119 +28,16 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Apply exact route-denial fix
+      - name: Add exact route-denial policy test
         shell: bash
         run: |
           python - <<'PY'
           from pathlib import Path
 
-          access_path = Path('admin-risk/src/access/routeAccess.ts')
-          access = access_path.read_text(encoding='utf-8')
-          marker = '''export function filterPermissionTree<T extends RouteMetaCarrier & { children?: T[] }>(
-          '''
-          addition = '''export interface RoutePathCarrier extends RouteMetaCarrier {
-            path?: string;
-            children?: RoutePathCarrier[];
-          }
-
-          function normalizeStaticPath(value: string): string {
-            const withoutQuery = value.split(/[?#]/, 1)[0] || '/';
-            const withLeadingSlash = withoutQuery.startsWith('/') ? withoutQuery : `/${withoutQuery}`;
-            const compact = withLeadingSlash.replace(/\\/{2,}/g, '/');
-            return compact.length > 1 ? compact.replace(/\\/+$/, '') : compact;
-          }
-
-          function resolveRoutePath(parentPath: string, routePath: string): string {
-            return routePath.startsWith('/')
-              ? normalizeStaticPath(routePath)
-              : normalizeStaticPath(`${parentPath}/${routePath}`);
-          }
-
-          export function findRouteChainByPath(
-            items: readonly RoutePathCarrier[],
-            targetPath: string,
-            parentPath = '',
-            parentChain: readonly RouteMetaCarrier[] = [],
-          ): RouteMetaCarrier[] | undefined {
-            const normalizedTarget = normalizeStaticPath(targetPath);
-            for (const item of items) {
-              if (!item.path) continue;
-              const currentPath = resolveRoutePath(parentPath, item.path);
-              const currentChain = [...parentChain, item];
-              if (!/[:*]/.test(currentPath) && currentPath === normalizedTarget) return currentChain;
-
-              const childMatch = findRouteChainByPath(
-                item.children || [],
-                normalizedTarget,
-                currentPath,
-                currentChain,
-              );
-              if (childMatch) return childMatch;
-            }
-            return undefined;
-          }
-
-          export function isKnownRouteDenied(
-            items: readonly RoutePathCarrier[],
-            targetPath: string,
-            permissions: readonly string[],
-          ): boolean {
-            const chain = findRouteChainByPath(items, targetPath);
-            return chain !== undefined && !canAccessMatchedRoute(chain, permissions);
-          }
-
-          '''
-          if access.count(marker) != 1 or 'isKnownRouteDenied' in access:
-              raise SystemExit('Expected route-access insertion point was not found exactly once')
-          access_path.write_text(access.replace(marker, addition + marker), encoding='utf-8')
-
-          guard_path = Path('admin-risk/src/router/guard/permissionGuard.ts')
-          guard = guard_path.read_text(encoding='utf-8')
-          replacements = {
-              "import { PAGE_NOT_FOUND_ROUTE } from '@/router/routes/basic';\n":
-                  "import { asyncRoutes } from '@/router/routes';\nimport { PAGE_NOT_FOUND_ROUTE } from '@/router/routes/basic';\n",
-              "import { canAccessMatchedRoute, filterPermissionTree } from '@/access/routeAccess';\n":
-                  "import {\n  canAccessMatchedRoute,\n  filterPermissionTree,\n  isKnownRouteDenied,\n} from '@/access/routeAccess';\n",
-              '''      if (isUnmatchedRoute) {
-                await ensureDynamicRoutes();
-                next({ path: to.fullPath, replace: true, query: to.query });
-                return;
-              }
-          ''':
-                  '''      if (isUnmatchedRoute) {
-                if (isKnownRouteDenied(asyncRoutes, to.path, permissions)) {
-                  next({ path: FORBIDDEN_PATH, replace: true });
-                  return;
-                }
-                next();
-                return;
-              }
-          ''',
-              '''    await ensureDynamicRoutes();
-              if (PAGE_NOT_FOUND_NAMES.includes(String(to.name || ''))) {
-                next({ path: to.fullPath, replace: true, query: to.query });
-              } else {
-          ''':
-                  '''    await ensureDynamicRoutes();
-              if (PAGE_NOT_FOUND_NAMES.includes(String(to.name || ''))) {
-                if (isKnownRouteDenied(asyncRoutes, to.path, permissions)) {
-                  next({ path: FORBIDDEN_PATH, replace: true });
-                  return;
-                }
-                next({ path: to.fullPath, replace: true, query: to.query });
-              } else {
-          ''',
-          }
-          for old, new in replacements.items():
-              if guard.count(old) != 1:
-                  raise SystemExit(f'Expected guard fragment not found exactly once: {old!r}')
-              guard = guard.replace(old, new)
-          guard_path.write_text(guard, encoding='utf-8')
-
-          test_path = Path('admin-risk/scripts/test-user-system-access.cjs')
-          tests = test_path.read_text(encoding='utf-8')
-          test_marker = "test('route tree filtering removes denied branches without mutating source', () => {\n"
-          test_addition = '''test('known static routes distinguish permission denial from genuine not-found paths', () => {
+          path = Path('admin-risk/scripts/test-user-system-access.cjs')
+          source = path.read_text(encoding='utf-8')
+          marker = "test('route tree filtering removes denied branches without mutating source', () => {\n"
+          addition = """test('known static routes distinguish permission denial from genuine not-found paths', () => {
             const routes = [
               {
                 path: '/risk',
@@ -167,10 +64,10 @@ jobs:
             assert.equal(routeAccess.isKnownRouteDenied(routes, '/missing', []), false);
           });
 
-          '''
-          if tests.count(test_marker) != 1 or 'known static routes distinguish' in tests:
+          """
+          if source.count(marker) != 1 or 'known static routes distinguish' in source:
               raise SystemExit('Expected route test insertion point was not found exactly once')
-          test_path.write_text(tests.replace(test_marker, test_addition + test_marker), encoding='utf-8')
+          path.write_text(source.replace(marker, addition + marker), encoding='utf-8')
           PY
           git diff --check
 
@@ -180,18 +77,18 @@ jobs:
           HUSKY: '0'
         run: pnpm install --frozen-lockfile
 
-      - name: Verify route denial fix
+      - name: Verify direct URL denial
         working-directory: admin-risk
         run: |
           pnpm test:user-system
           pnpm exec eslint --max-warnings 0 src/access/routeAccess.ts src/router/guard/permissionGuard.ts
           pnpm exec vue-tsc -p tsconfig.user-system.json --noEmit --skipLibCheck
 
-      - name: Commit route denial fix
+      - name: Commit route-denial policy test
         shell: bash
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add admin-risk/src/access/routeAccess.ts admin-risk/src/router/guard/permissionGuard.ts admin-risk/scripts/test-user-system-access.cjs
-          git commit -m 'fix(user-system): render 403 for denied direct URLs'
+          git add admin-risk/scripts/test-user-system-access.cjs
+          git commit -m 'test(user-system): cover denied direct URLs'
           git push
