@@ -7,7 +7,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from enum import StrEnum
-from typing import Annotated
+from typing import Annotated, cast
 from uuid import uuid4
 
 from fastapi import Depends, HTTPException, Request
@@ -154,9 +154,10 @@ def authenticate_bearer(request: Request, settings: Settings) -> Principal:
                 "credential_inactive",
                 "Authentication credential is inactive",
             )
+        credential_roles = cast(list[object], credential["roles"])
         return Principal(
             user_id=str(credential["userId"]),
-            roles=tuple(str(role) for role in credential["roles"]),
+            roles=tuple(str(role) for role in credential_roles),
             auth_method="api_key",
             credential_id=str(credential["credentialId"]),
         )
