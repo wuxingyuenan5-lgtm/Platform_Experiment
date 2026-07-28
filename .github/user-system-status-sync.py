@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 VERIFIED_STATUS = (
-    "状态：`implemented / automated verification passed / manual acceptance pending`  "
+    "状态：`implemented / automated verification passed / manual acceptance pending`<br>"
 )
 STALE_STATUS = "状态：`reviewed baseline / implementation not started`  "
 
