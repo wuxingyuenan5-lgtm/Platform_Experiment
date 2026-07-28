@@ -52,9 +52,24 @@ test('reusable demo accounts cover admin notes, roles and VIP asset views', asyn
     { username: 'e2e_employee_1', role: 'employee' },
     { username: 'e2e_employee_2', role: 'employee' },
     { username: 'e2e_employee_3', role: 'employee' },
-    { username: 'e2e_vip_1', role: 'member', marketValue: '100,000 USDT', returnValue: '+10,000 USDT' },
-    { username: 'e2e_vip_2', role: 'member', marketValue: '65,000 USDT', returnValue: '-5,000 USDT' },
-    { username: 'e2e_vip_3', role: 'member', marketValue: '200,000 USDT', returnValue: '+20,000 USDT' },
+    {
+      username: 'e2e_vip_1',
+      role: 'member',
+      marketValue: '100,000 USDT',
+      returnValue: '+10,000 USDT',
+    },
+    {
+      username: 'e2e_vip_2',
+      role: 'member',
+      marketValue: '65,000 USDT',
+      returnValue: '-5,000 USDT',
+    },
+    {
+      username: 'e2e_vip_3',
+      role: 'member',
+      marketValue: '200,000 USDT',
+      returnValue: '+20,000 USDT',
+    },
   ] as const;
 
   await test.step('CEO edits a VIP operational note from the user detail drawer', async () => {
@@ -74,7 +89,8 @@ test('reusable demo accounts cover admin notes, roles and VIP asset views', asyn
       await noteInput.fill(note);
       const saveResponse = account.page.waitForResponse(
         (response) =>
-          response.url().endsWith('/api/v1/users/' + encodeURIComponent(response.url().split('/users/')[1]?.split('/')[0] || '') + '/admin-note') &&
+          response.url().includes('/api/v1/users/') &&
+          response.url().endsWith('/admin-note') &&
           response.request().method() === 'PATCH',
       );
       await account.page.getByRole('button', { name: '保存备注' }).click();
@@ -100,8 +116,12 @@ test('reusable demo accounts cover admin notes, roles and VIP asset views', asyn
         if (expected.role === 'member') {
           await account.page.goto(absoluteUrl('/account/index'));
           await expect(account.page.getByText('我的资产', { exact: true })).toBeVisible();
-          await expect(account.page.getByText(expected.marketValue, { exact: true }).first()).toBeVisible();
-          await expect(account.page.getByText(expected.returnValue, { exact: true }).first()).toBeVisible();
+          await expect(
+            account.page.getByText(expected.marketValue, { exact: true }).first(),
+          ).toBeVisible();
+          await expect(
+            account.page.getByText(expected.returnValue, { exact: true }).first(),
+          ).toBeVisible();
           await expect(account.page.getByText('DEMO-USDT · USDT', { exact: true })).toBeVisible();
         } else {
           await account.page.goto(absoluteUrl('/risk/users'));
