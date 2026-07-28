@@ -58,13 +58,42 @@ jobs:
         with:
           python-version: '3.12'
       - name: Validate PR workstream
+        id: workstream
+        continue-on-error: true
         env:
           GITHUB_TOKEN: ${{ github.token }}
-        run: python scripts/check-workstream.py
+        run: |
+          set -o pipefail
+          python scripts/check-workstream.py 2>&1 | tee "$RUNNER_TEMP/workstream.log"
       - name: Check repository structure and architecture boundaries
-        run: python scripts/check-repository-structure.py
+        id: structure
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          python scripts/check-repository-structure.py 2>&1 | tee "$RUNNER_TEMP/repository-structure.log"
       - name: Check documentation consistency
-        run: python scripts/check-documentation-consistency.py
+        id: documentation
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          python scripts/check-documentation-consistency.py 2>&1 | tee "$RUNNER_TEMP/documentation-consistency.log"
+      - name: Upload repository-safety diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: repository-safety-diagnostics
+          path: |
+            ${{ runner.temp }}/workstream.log
+            ${{ runner.temp }}/repository-structure.log
+            ${{ runner.temp }}/documentation-consistency.log
+          if-no-files-found: error
+          retention-days: 3
+      - name: Enforce repository-safety results
+        if: always()
+        run: |
+          test "${{ steps.workstream.outcome }}" = "success"
+          test "${{ steps.structure.outcome }}" = "success"
+          test "${{ steps.documentation.outcome }}" = "success"
 
   execution-runtime:
     needs: changes
@@ -110,11 +139,40 @@ jobs:
       - name: Validate dependency graph
         run: python -m pip check
       - name: Backend lint
-        run: python -m ruff check app tests
+        id: backend_lint
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          python -m ruff check app tests 2>&1 | tee "$RUNNER_TEMP/backend-ruff.log"
       - name: Backend type check
-        run: python -m pyright
+        id: backend_type
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          python -m pyright 2>&1 | tee "$RUNNER_TEMP/backend-pyright.log"
       - name: Backend tests
-        run: python -m pytest -m "architecture or unit or integration or live_safety"
+        id: backend_tests
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          python -m pytest -m "architecture or unit or integration or live_safety" 2>&1 | tee "$RUNNER_TEMP/backend-pytest.log"
+      - name: Upload backend diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: platform-backend-diagnostics
+          path: |
+            ${{ runner.temp }}/backend-ruff.log
+            ${{ runner.temp }}/backend-pyright.log
+            ${{ runner.temp }}/backend-pytest.log
+          if-no-files-found: error
+          retention-days: 3
+      - name: Enforce backend results
+        if: always()
+        run: |
+          test "${{ steps.backend_lint.outcome }}" = "success"
+          test "${{ steps.backend_type.outcome }}" = "success"
+          test "${{ steps.backend_tests.outcome }}" = "success"
 
   frontend-quality:
     needs: changes
@@ -144,9 +202,16 @@ jobs:
           HUSKY: '0'
         run: pnpm install --frozen-lockfile
       - name: Test browser access policy
-        run: pnpm test:user-system
-      - name: Lint maintained frontend
+        id: frontend_access_tests
+        continue-on-error: true
         run: |
+          set -o pipefail
+          pnpm test:user-system 2>&1 | tee "$RUNNER_TEMP/frontend-access-tests.log"
+      - name: Lint maintained frontend
+        id: frontend_lint
+        continue-on-error: true
+        run: |
+          set -o pipefail
           pnpm exec eslint --max-warnings 0 \
             "src/access/**/*.{ts,tsx}" \
             "src/api/platform/**/*.{ts,tsx}" \
@@ -163,12 +228,52 @@ jobs:
             "src/views/sys/register/index.vue" \
             "src/views/sys/reset-password/index.vue" \
             "src/views/users/**/*.{vue,ts,tsx}" \
-            "src/views/strategy/funding-carry/**/*.{vue,ts,tsx}"
+            "src/views/strategy/funding-carry/**/*.{vue,ts,tsx}" \
+            2>&1 | tee "$RUNNER_TEMP/frontend-eslint.log"
       - name: Enforce frontend no-new-debt gate
-        run: python ../scripts/frontend-no-new-debt.py
+        id: frontend_debt
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          python ../scripts/frontend-no-new-debt.py 2>&1 | tee "$RUNNER_TEMP/frontend-no-new-debt.log"
       - name: Type check strategy frontend
-        run: pnpm type:check
+        id: frontend_strategy_type
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          pnpm type:check 2>&1 | tee "$RUNNER_TEMP/frontend-strategy-typecheck.log"
       - name: Type check user-system frontend
-        run: pnpm exec vue-tsc -p tsconfig.user-system.json --noEmit --skipLibCheck
+        id: frontend_user_type
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          pnpm exec vue-tsc -p tsconfig.user-system.json --noEmit --skipLibCheck 2>&1 | tee "$RUNNER_TEMP/frontend-user-typecheck.log"
       - name: Build frontend
-        run: pnpm build
+        id: frontend_build
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          pnpm build 2>&1 | tee "$RUNNER_TEMP/frontend-build.log"
+      - name: Upload frontend diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-quality-diagnostics
+          path: |
+            ${{ runner.temp }}/frontend-access-tests.log
+            ${{ runner.temp }}/frontend-eslint.log
+            ${{ runner.temp }}/frontend-no-new-debt.log
+            ${{ runner.temp }}/frontend-strategy-typecheck.log
+            ${{ runner.temp }}/frontend-user-typecheck.log
+            ${{ runner.temp }}/frontend-build.log
+          if-no-files-found: error
+          retention-days: 3
+      - name: Enforce frontend results
+        if: always()
+        run: |
+          test "${{ steps.frontend_access_tests.outcome }}" = "success"
+          test "${{ steps.frontend_lint.outcome }}" = "success"
+          test "${{ steps.frontend_debt.outcome }}" = "success"
+          test "${{ steps.frontend_strategy_type.outcome }}" = "success"
+          test "${{ steps.frontend_user_type.outcome }}" = "success"
+          test "${{ steps.frontend_build.outcome }}" = "success"
