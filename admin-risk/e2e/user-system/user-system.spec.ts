@@ -329,7 +329,6 @@ test('completes isolated four-role browser acceptance without Live Write', async
       await loginWithUi(primaryPage, memberUsername, memberPassword);
       await loginWithUi(secondaryPage, memberUsername, memberPassword);
 
-      await primaryPage.goto(absoluteUrl('/account/index'));
       await expect(primaryPage.getByText('个人账号', { exact: true }).first()).toBeVisible();
       const sessions = await jsonResponse<{ items: unknown[] }>(
         await primaryPage.request.get(absoluteUrl('/api/v1/me/sessions')),
@@ -418,7 +417,6 @@ test('completes isolated four-role browser acceptance without Live Write', async
       await expect(secondaryPage).toHaveURL(/\/login\?redirect=/);
 
       await loginWithUi(primaryPage, memberUsername, memberNewPassword);
-      await primaryPage.goto(absoluteUrl('/account/index'));
       await expect(primaryPage.getByText(memberUsername, { exact: true })).toBeVisible();
     } finally {
       await primaryContext.close();
