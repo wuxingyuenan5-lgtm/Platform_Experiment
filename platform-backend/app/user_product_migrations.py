@@ -1,11 +1,11 @@
 from __future__ import annotations
 
+from app import schema_migrations
 from app.database import connection
-from app.schema_migrations import Migration, apply_migrations
 
 
-USER_PRODUCT_MIGRATIONS: tuple[Migration, ...] = (
-    Migration(
+USER_PRODUCT_MIGRATIONS: tuple[schema_migrations.Migration, ...] = (
+    schema_migrations.Migration(
         version=7,
         name="user-admin-operational-note",
         statements=(
@@ -19,4 +19,4 @@ USER_PRODUCT_MIGRATIONS: tuple[Migration, ...] = (
 
 def apply_user_product_migrations() -> None:
     with connection() as db:
-        apply_migrations(db, USER_PRODUCT_MIGRATIONS)
+        schema_migrations.apply_migrations(db, USER_PRODUCT_MIGRATIONS)
