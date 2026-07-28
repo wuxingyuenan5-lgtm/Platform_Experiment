@@ -1,0 +1,211 @@
+--- a/platform-backend/app/schema_migrations.py
++++ b/platform-backend/app/schema_migrations.py
+@@ -165,8 +165,14 @@
+                 created_by TEXT,
+                 created_at TEXT NOT NULL,
+                 updated_at TEXT NOT NULL,
+-                CHECK (role_code IS NULL OR role_code IN ('ceo', 'tech_lead', 'employee', 'member')),
+-                CHECK (requested_role_code IS NULL OR requested_role_code IN ('employee', 'member')),
++                CHECK (
++                    role_code IS NULL
++                    OR role_code IN ('ceo', 'tech_lead', 'employee', 'member')
++                ),
++                CHECK (
++                    requested_role_code IS NULL
++                    OR requested_role_code IN ('employee', 'member')
++                ),
+                 CHECK (lifecycle_status IN ('pending', 'active', 'disabled', 'rejected')),
+                 CHECK (auth_version >= 1),
+                 CHECK (row_version >= 1),
+--- a/platform-backend/app/user_admin_service.py
++++ b/platform-backend/app/user_admin_service.py
+@@ -3,6 +3,7 @@
+ import sqlite3
+ from dataclasses import dataclass
+ from datetime import UTC, datetime, timedelta
++from typing import cast
+ 
+ from app.config import get_settings
+ from app.database import connection
+@@ -34,6 +35,7 @@
+     CreateManagedUserRequest,
+     CreateManagedUserResponse,
+     PasswordResetTicketResponse,
++    RegularHumanRole,
+     RejectRegistrationRequest,
+     UpdateManagedUserRequest,
+     UserAdminDetailResponse,
+@@ -51,7 +53,13 @@
+     list_active_user_sessions,
+     revoke_all_user_sessions,
+ )
+-from app.user_security import generate_secret_token, hash_password, hash_secret_token, normalize_phone
++from app.user_schemas import HumanRole, UserLifecycleStatus
++from app.user_security import (
++    generate_secret_token,
++    hash_password,
++    hash_secret_token,
++    normalize_phone,
++)
+ 
+ 
+ class UserAdminServiceError(RuntimeError):
+@@ -116,12 +124,19 @@
+ 
+ 
+ def _summary(record: AdminUserRecord, *, sensitive: bool) -> UserAdminSummaryResponse:
+-    role = record.role_code if record.role_code in {"ceo", "tech_lead", "employee", "member"} else None
+-    requested_role = (
++    role = cast(
++        HumanRole | None,
++        record.role_code
++        if record.role_code in {"ceo", "tech_lead", "employee", "member"}
++        else None,
++    )
++    requested_role = cast(
++        RegularHumanRole | None,
+         record.requested_role_code
+         if record.requested_role_code in {"employee", "member"}
+-        else None
++        else None,
+     )
++    lifecycle_status = cast(UserLifecycleStatus, record.lifecycle_status)
+     return UserAdminSummaryResponse(
+         userId=record.id,
+         username=record.username,
+@@ -135,7 +150,7 @@
+         requestedRole=requested_role,
+         department=record.department,
+         memberType=record.member_type,
+-        status=record.lifecycle_status,
++        status=lifecycle_status,
+         registeredAt=datetime.fromisoformat(record.registered_at),
+         lastLoginAt=(
+             datetime.fromisoformat(record.last_login_at)
+@@ -149,7 +164,9 @@
+ 
+ def _detail(record: AdminUserRecord, *, sensitive: bool) -> UserAdminDetailResponse:
+     base = _summary(record, sensitive=sensitive)
+-    role_permissions = permissions_for_roles((record.role_code,)) if record.role_code else frozenset()
++    role_permissions = (
++        permissions_for_roles((record.role_code,)) if record.role_code else frozenset()
++    )
+     return UserAdminDetailResponse(
+         **base.model_dump(by_alias=True),
+         applicationNote=record.application_note if sensitive else None,
+@@ -356,7 +373,9 @@
+                 target_role=target_role,
+             )
+             fields = request.model_fields_set
+-            display_name = request.display_name if "display_name" in fields else existing.display_name
++            display_name = (
++                request.display_name if "display_name" in fields else existing.display_name
++            )
+             real_name = request.real_name if "real_name" in fields else existing.real_name
+             email = request.email if "email" in fields else existing.email
+             phone = request.phone if "phone" in fields else existing.phone
+@@ -542,7 +561,11 @@
+                 target_role=current_target_role,
+             )
+             if context.actor_role == "tech_lead" and request.role not in {"employee", "member"}:
+-                raise UserAdminPolicyError(403, "role_assignment_forbidden", "不能授予该角色")
++                raise UserAdminPolicyError(
++                    403,
++                    "role_assignment_forbidden",
++                    "不能授予该角色",
++                )
+             _require_recent(db, context, current)
+             assert_active_ceo_remains(
+                 db,
+--- a/platform-backend/app/user_avatar.py
++++ b/platform-backend/app/user_avatar.py
+@@ -136,7 +136,11 @@
+     except OSError as exc:
+         temporary_path.unlink(missing_ok=True)
+         final_path.unlink(missing_ok=True)
+-        raise AvatarServiceError(503, "avatar_storage_failed", "Avatar could not be stored") from exc
++        raise AvatarServiceError(
++            503,
++            "avatar_storage_failed",
++            "Avatar could not be stored",
++        ) from exc
+ 
+     timestamp = datetime.now(UTC).isoformat()
+     previous_key: str | None = None
+--- a/platform-backend/app/user_service.py
++++ b/platform-backend/app/user_service.py
+@@ -3,6 +3,7 @@
+ import sqlite3
+ from dataclasses import dataclass
+ from datetime import UTC, datetime, timedelta
++from typing import cast
+ 
+ from app.config import Settings, get_settings
+ from app.database import connection
+@@ -13,7 +14,6 @@
+     UserProfileRecord,
+     UserRecord,
+     change_password,
+-    create_initial_ceo as insert_initial_ceo,
+     create_pending_registration,
+     create_session,
+     get_session_owner,
+@@ -32,12 +32,17 @@
+     update_self_profile,
+     upgrade_password_hash,
+ )
++from app.user_repository import (
++    create_initial_ceo as insert_initial_ceo,
++)
+ from app.user_schemas import (
+     AuthenticationResponse,
+     CurrentSessionResponse,
++    HumanRole,
+     RegistrationRequest,
+     RegistrationResponse,
+     UpdateSelfProfileRequest,
++    UserLifecycleStatus,
+     UserSelfResponse,
+     UserSessionListResponse,
+     UserSessionSummaryResponse,
+@@ -110,6 +115,14 @@
+ def _profile_response(profile: UserProfileRecord) -> UserSelfResponse:
+     if profile.role_code not in {"ceo", "tech_lead", "employee", "member"}:
+         raise UserServiceError(503, "invalid_user_role", "User role configuration is invalid")
++    if profile.lifecycle_status not in {"pending", "active", "disabled", "rejected"}:
++        raise UserServiceError(
++            503,
++            "invalid_user_status",
++            "User lifecycle status configuration is invalid",
++        )
++    role = cast(HumanRole, profile.role_code)
++    lifecycle_status = cast(UserLifecycleStatus, profile.lifecycle_status)
+     return UserSelfResponse(
+         userId=profile.id,
+         username=profile.username,
+@@ -118,10 +131,10 @@
+         avatarKey=profile.avatar_key,
+         phone=profile.phone,
+         email=profile.email,
+-        role=profile.role_code,
++        role=role,
+         department=profile.department,
+         memberType=profile.member_type,
+-        status=profile.lifecycle_status,
++        status=lifecycle_status,
+         registeredAt=datetime.fromisoformat(profile.registered_at),
+         lastLoginAt=(
+             datetime.fromisoformat(profile.last_login_at)
+@@ -779,7 +792,11 @@
+     now: datetime | None = None,
+ ) -> None:
+     if target_session_id == current_session_id:
+-        raise UserServiceError(409, "use_logout_for_current_session", "请使用退出登录结束当前设备")
++        raise UserServiceError(
++            409,
++            "use_logout_for_current_session",
++            "请使用退出登录结束当前设备",
++        )
+     timestamp = _now(now).isoformat()
+     with connection() as db:
+         owner = get_session_owner(db, target_session_id)
