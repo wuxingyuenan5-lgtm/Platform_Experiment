@@ -1,160 +1,125 @@
 # 用户系统浏览器验收手册
 
-状态：`automated verification passed / manual acceptance pending`
-适用版本：`Platform Experiment 0.9.0`
-Issue：`#117`
-Draft PR：`#118`
-任务包：`../../tasks/issue-117-user-system.md`
-部署与恢复：`USER_SYSTEM_DEPLOYMENT_READINESS.md`
+状态：`automated browser acceptance passed / local visual smoke optional / production proxy validation pending`
 
-## 1. 目的
+- Issue：`#117`
+- Draft PR：`#118`
+- 交付分支：`feature/issue-117-user-system`
+- 本地交接：`USER_SYSTEM_LOCAL_INTEGRATION_HANDOFF.md`
+- 部署与恢复：`USER_SYSTEM_DEPLOYMENT_READINESS.md`
 
-本手册用于在真实同源浏览器环境中验证用户系统。自动化 CI 证明代码、类型、构建和后端合同成立，但不能代替 Cookie、反向代理、多标签页和实际页面操作证据。
+## 1. 当前结论
 
-```text
-静态配置
-→ 公共注册与登录
-→ CEO 管理
-→ 技术负责人目标范围
-→ 员工脱敏只读
-→ 会员本人持仓
-→ Session/CSRF/头像
-→ 负向权限与 Live 隔离
-→ 证据归档
-```
+GitHub Actions 的真实 Chromium 验收已经通过，覆盖注册、审批、四角色权限、固定八账号、运营备注、会员资产、头像、CSRF、修改密码和跨设备 Session 失效。
 
-任何步骤出现越权、凭证持久化、跨用户持仓、Cookie 属性错误或 Live Write 放行，立即停止验收。
+已通过的 User System Browser E2E：`30374950288`。
+
+自动化证明功能流程和浏览器合同成立，但正式生产切换前仍需在目标 HTTPS 同源代理后检查 Secure Cookie、代理 Header、真实浏览器视觉和多标签页行为。
 
 ## 2. 验收数据规则
 
 - 仅使用虚构姓名、邮箱、手机号、基金代码和持仓数值。
 - 不在截图、日志、Markdown 或 Issue 中记录密码、Cookie、CSRF、重置凭证或真实客户数据。
-- 四类测试账号：`ceo`、`tech_lead`、`employee`、`member`。
-- 测试结束后撤销全部测试 Session；是否保留测试账号由验收负责人决定。
+- 固定演示角色包括 `ceo`、`tech_lead`、`employee`、`member`。
 - Platform Live Write、Runtime Live Write、Exit Monitor 和 PostOnly Chase 全程保持关闭。
+- 生产环境不得初始化 `demo_*` 账号。
 
-## 3. 环境前置
+## 3. 已自动化通过的流程
 
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\dev-platform.ps1
-```
+### 公共注册与登录
 
-- [ ] 前端通过同一 Origin 提供，默认开发地址为 `http://localhost:4373` 或 `http://127.0.0.1:4373`。
-- [ ] 浏览器请求 `/api/v1`，不直接访问跨域 Backend 地址。
-- [ ] `VG_CORS_ORIGINS` 只包含实际受信 Origin。
-- [ ] `VG_LIVE_TRADING_ENABLED=false`。
-- [ ] Runtime Live Write 保持 `false`。
-- [ ] 使用全新或已备份的测试数据库和独立头像目录。
-- [ ] 浏览器 DevTools 已打开 Network、Application/Cookies 和 Console。
+- 注册页只允许申请会员或员工。
+- 待审批账号不能登录。
+- CEO 可审批会员申请。
+- Cookie 为 HttpOnly，前端不持久化 Session Token 或 CSRF。
+- 登录、失败、锁定和权限错误使用稳定错误合同。
 
-## 4. 公共注册与登录
+### CEO
 
-### 4.1 注册
+- 查看用户列表、搜索和详情。
+- 创建和审批用户。
+- 维护会员持仓和基金单位净值。
+- 编辑 VIP 运营备注。
+- 运营备注不进入会员端，审计详情不保存备注正文。
+- 敏感管理动作遵循重新认证和目标角色限制。
 
-- [ ] 注册页只允许申请 `member` 或 `employee`。
-- [ ] 页面与 API 均不能申请 `ceo` 或 `tech_lead`。
-- [ ] 员工申请缺少部门时被拒绝。
-- [ ] 会员申请缺少会员类型时被拒绝。
-- [ ] 注册成功后状态为待审批，不能直接登录。
-- [ ] 重复用户名、邮箱或手机号返回稳定错误码。
+### 技术负责人
 
-### 4.2 登录与锁定
+- 可查看权限范围内的用户。
+- CEO 和其他技术负责人保持受保护和脱敏。
+- 不能修改、重置或强退受保护目标。
+- 不获得 Live Write 权限。
 
-- [ ] 未审批、已拒绝、停用或锁定账号不能登录。
-- [ ] 正确密码登录后返回个人信息和显式权限集合。
-- [ ] Cookie 为 HttpOnly；前端存储中没有 Session Token、Bearer Token 或 CSRF 持久化值。
-- [ ] 连续失败达到阈值后账号临时锁定，锁定到期后可恢复。
-- [ ] 登录、失败和锁定均产生脱敏审计事件。
+### 员工
 
-## 5. CEO 验收
+- 登录后存在合法页面。
+- 用户目录按权限脱敏。
+- 不能执行管理写操作或读取任意会员持仓。
 
-- [ ] 可查看用户列表、搜索、过滤和分页。
-- [ ] 可创建 CEO、技术负责人、员工和会员；员工/会员必填字段不能绕过。
-- [ ] 可审批或拒绝注册申请。
-- [ ] 可修改普通用户角色和状态。
-- [ ] 最后一个活动 CEO 不能被停用、降级或删除权限。
-- [ ] 敏感操作要求近期重新认证。
-- [ ] 密码重置凭证只展示一次，使用后失效。
-- [ ] 可撤销指定用户 Session。
-- [ ] 可维护会员持仓和基金单位净值，写入来源固定为 `manual_admin`。
+### 会员
 
-## 6. 技术负责人验收
+- 只能读取自己的资料、设备和持仓。
+- 资产页显示账户估值、累计投入、累计收益、基金数量和持仓明细。
+- 三个固定 VIP 分别验证正收益和负收益场景。
+- NAV 缺失与过期状态不会伪造为 0。
+- 不能修改持仓或 NAV。
 
-- [ ] 能查看用户目录。
-- [ ] 员工和会员详情可按权限显示完整管理字段。
-- [ ] CEO 和其他技术负责人详情保持脱敏。
-- [ ] 不能修改 CEO 或其他技术负责人。
-- [ ] 不能重置、强退或更改受保护目标。
-- [ ] 不具备全部会员持仓读取权限。
-- [ ] 不能获得 LiveTradingSession、交易写入或核心风险配置权限。
+### 资料、头像、Session 与 CSRF
 
-## 7. 员工验收
+- 资料更新和显式清空字段通过。
+- 头像上传、读取和删除通过。
+- CSRF 轮换及同源多标签页行为通过。
+- 修改密码后其他设备 Session 失效。
+- 陈旧或撤销 Session 不能依赖前端内存状态继续访问受保护页面。
 
-- [ ] 登录后存在合法首页，不出现空白路由。
-- [ ] 用户目录仅返回脱敏字段。
-- [ ] 不能打开任意用户的完整详情或执行管理写操作。
-- [ ] 不能查看任意会员持仓。
-- [ ] 直接输入无权限 URL 返回禁止访问或安全重定向。
+### 安全负向流程
 
-## 8. 会员验收
+- API Key 不能获得人类 CEO 权限。
+- Browser Session 不能调用 Live Write 路由。
+- 会员不能读取其他会员持仓。
+- 敏感响应使用 `Cache-Control: no-store`。
+- 审计不包含密码、原始 Token、完整联系方式或完整持仓快照。
 
-- [ ] 登录后只能读取自己的资料、设备和持仓。
-- [ ] API 不接受由浏览器指定其他 `userId` 读取持仓。
-- [ ] NAV 可用时显示市值和收益；所有 Decimal 保持精确字符串语义。
-- [ ] NAV 缺失时显示 unavailable，不显示伪造的 0。
-- [ ] NAV 超过时效时显示 stale。
-- [ ] 会员不能修改持仓或 NAV。
+## 4. 本地合并后的可选视觉冒烟
 
-## 9. 资料、头像与 Session
+本地合并后建议人工打开一次常用浏览器，只检查视觉和交互，不必重复完整 API 验收：
 
-### 9.1 资料 PATCH
+- CEO 登录，进入用户管理并打开 VIP 详情。
+- 保存一条虚构运营备注。
+- 分别登录一个员工和一个 VIP。
+- 检查窄窗口下用户详情抽屉和会员资产卡片。
+- 修改 VIP 密码后确认另一个标签页回到登录页。
+- 检查控制台没有未解释错误。
 
-- [ ] 只修改展示名时，邮箱和手机号保持不变。
-- [ ] 显式清空邮箱或手机号发送 `null`，并保留至少一个联系方式。
-- [ ] 使用旧 `rowVersion` 更新时返回并发冲突。
+固定测试账号初始化方式见 `USER_SYSTEM_DEMO_ACCOUNTS.md`。
 
-### 9.2 头像
+## 5. 生产代理后必须检查
 
-- [ ] JPEG、PNG、WebP 可上传并统一输出为 WebP。
-- [ ] multipart 请求包含浏览器生成的 boundary。
-- [ ] 超字节、超像素、损坏文件或不支持格式被拒绝。
-- [ ] 替换后旧文件被清理；删除后资料中的头像引用清空。
-- [ ] URL/key 不允许路径穿越。
+以下不能由隔离 CI 代替：
 
-### 9.3 Session 与 CSRF
+- 前端与 `/api/v1` 使用相同 Scheme、Host 和 Port。
+- `Set-Cookie` 包含 `Secure; HttpOnly; SameSite=Lax; Path=/`。
+- HTTP 跳转 HTTPS。
+- 代理保留 `Host`、`Origin`、客户端 IP 和 Request ID Header。
+- 非受信 Origin 写请求被拒绝。
+- 关闭全部标签后没有持久化 CSRF。
+- 登录、注册和重置密码具有代理层限流。
 
-- [ ] `/auth/me` 轮换 CSRF 后当前页面仍可写入。
-- [ ] 第二个同源标签页通过内存 BroadcastChannel 获得最新 CSRF。
-- [ ] 关闭全部标签后不存在持久化 CSRF。
-- [ ] 401 或 CSRF 失效后前端清空旧状态；Cookie 有效时可重新水合。
-- [ ] 修改密码后其他 Session 全部失效。
-- [ ] 退出成功删除 Cookie；陈旧 Cookie 也能被浏览器清理。
+## 6. 证据状态
 
-## 10. 安全与负向验收
+| 项目 | 状态 | 证据 |
+|---|---|---|
+| 公共注册与登录 | passed | Browser E2E `30374950288` |
+| CEO 管理与运营备注 | passed | Browser E2E `30374950288` |
+| 技术负责人范围 | passed | Browser E2E `30374950288` |
+| 员工脱敏 | passed | Browser E2E `30374950288` |
+| 会员本人持仓与资产 | passed | Browser E2E `30374950288` |
+| 资料与头像 | passed | Browser E2E `30374950288` |
+| Session/CSRF | passed | Browser E2E `30374950288` |
+| 负向权限与 Live 隔离 | passed | Browser E2E 与 Platform CI |
+| 本地视觉冒烟 | optional | 本地合并后执行 |
+| 生产代理与 Secure Cookie | pending production | 目标主机执行 |
 
-- [ ] 同时携带 Bearer 与 Cookie 时请求被拒绝。
-- [ ] API-Key `admin` 不能调用人类用户和会员持仓路由。
-- [ ] Browser Session 不能调用现有 Live Write 路由。
-- [ ] 非受信 Origin 的写请求被拒绝。
-- [ ] 敏感响应包含 `Cache-Control: no-store`。
-- [ ] 错误响应包含稳定 `detail.code/detail.message` 和 Request ID。
-- [ ] 审计不包含密码、原始 Token、完整联系方式或完整持仓快照。
+## 7. 通过标准
 
-## 11. 证据记录
-
-| 项目 | 结果 | 证据位置 | 验收人 | 时间 |
-|---|---|---|---|---|
-| 公共注册与登录 | pending |  |  |  |
-| CEO 管理 | pending |  |  |  |
-| 技术负责人范围 | pending |  |  |  |
-| 员工脱敏 | pending |  |  |  |
-| 会员本人持仓 | pending |  |  |  |
-| 资料与头像 | pending |  |  |  |
-| Session/CSRF | pending |  |  |  |
-| 负向权限与 Live 隔离 | pending |  |  |  |
-
-证据可以是脱敏截图、Network Header 摘要、Request ID、审计事件 ID 和测试环境日志位置。禁止粘贴 Cookie、CSRF、密码或重置凭证。
-
-## 12. 通过标准
-
-只有全部项目通过，且不存在未解释的越权、数据泄露、Session 恢复异常或持仓水平越权，才可将 PR #118 从 Draft 改为 Ready for review。人工验收通过仍不等于允许生产切换或开启 Live Write。
+当前分支已经满足本地代码集成条件。生产代理与 Secure Cookie 验证仅在正式部署前执行；它不阻塞项目负责人把本分支合入本地更新后的项目，但未完成前不得宣称生产切换就绪或开启 Live Write。
