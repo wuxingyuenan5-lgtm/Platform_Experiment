@@ -1,0 +1,57 @@
+name: Temporary Fix User E2E Locators
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/tmp-fix-user-e2e-locators.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  fix-e2e-locators:
+    if: github.event.pull_request.number == 118 && github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+      - name: Apply exact accessible-locator fixes
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('admin-risk/e2e/user-system/user-system.spec.ts')
+          source = path.read_text(encoding='utf-8')
+          replacements = {
+              "page.getByLabel('账号').fill(memberUsername)":
+                  "page.getByRole('textbox', { name: /账号$/ }).fill(memberUsername)",
+              "page.getByLabel('姓名').fill('E2E Member')":
+                  "page.getByPlaceholder('请输入姓名').fill('E2E Member')",
+              "page.getByLabel('邮箱').fill(memberEmail)":
+                  "page.getByRole('textbox', { name: '邮箱' }).fill(memberEmail)",
+              "page.getByLabel('密码', { exact: true }).fill(memberPassword)":
+                  "page.getByPlaceholder('至少 12 个字符').fill(memberPassword)",
+              "page.getByLabel('确认密码').fill(memberPassword)":
+                  "page.getByPlaceholder('请再次输入密码').fill(memberPassword)",
+              "page.getByLabel('申请说明').fill('GitHub Actions isolated browser acceptance')":
+                  "page.getByPlaceholder('请简要说明申请用途').fill('GitHub Actions isolated browser acceptance')",
+          }
+          for old, new in replacements.items():
+              if source.count(old) != 1:
+                  raise SystemExit(f'Expected locator not found exactly once: {old}')
+              source = source.replace(old, new)
+          path.write_text(source, encoding='utf-8')
+          PY
+          git diff --check
+      - name: Commit locator fixes
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add admin-risk/e2e/user-system/user-system.spec.ts
+          git commit -m 'test(user-system): use stable accessible locators'
+          git push
