@@ -146,12 +146,12 @@ test('completes isolated four-role browser acceptance without Live Write', async
 
   await test.step('public registration is pending and cannot log in', async () => {
     await page.goto(absoluteUrl('/register-apply'));
-    await page.getByLabel('账号').fill(memberUsername);
-    await page.getByLabel('姓名').fill('E2E Member');
-    await page.getByLabel('邮箱').fill(memberEmail);
-    await page.getByLabel('密码', { exact: true }).fill(memberPassword);
-    await page.getByLabel('确认密码').fill(memberPassword);
-    await page.getByLabel('申请说明').fill('GitHub Actions isolated browser acceptance');
+    await page.getByRole('textbox', { name: /账号$/ }).fill(memberUsername);
+    await page.getByPlaceholder('请输入姓名').fill('E2E Member');
+    await page.getByRole('textbox', { name: '邮箱' }).fill(memberEmail);
+    await page.getByPlaceholder('至少 12 个字符').fill(memberPassword);
+    await page.getByPlaceholder('请再次输入密码').fill(memberPassword);
+    await page.getByPlaceholder('请简要说明申请用途').fill('GitHub Actions isolated browser acceptance');
     await page.getByRole('checkbox').check();
     await page.getByRole('button', { name: '提交申请' }).click();
     await expect(page).toHaveURL(/\/login$/);
