@@ -1,0 +1,49 @@
+name: Temporary Fix User E2E Form Fields
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/tmp-fix-user-e2e-form-fields.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  fix-e2e-fields:
+    if: github.event.pull_request.number == 118 && github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+      - name: Apply exact form-field locator fixes
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('admin-risk/e2e/user-system/user-system.spec.ts')
+          source = path.read_text(encoding='utf-8')
+          replacements = {
+              "      const displayNameInput = primaryPage.getByLabel('展示名称');\n":
+                  "      const displayNameInput = primaryPage\n        .locator('.ant-form-item', { hasText: '展示名称' })\n        .locator('input');\n",
+              "      await passwordDialog.getByLabel('当前密码').fill(memberPassword);\n      await passwordDialog.getByLabel('新密码', { exact: true }).fill(memberNewPassword);\n      await passwordDialog.getByLabel('确认新密码').fill(memberNewPassword);\n":
+                  "      const passwordInputs = passwordDialog.locator('input');\n      await passwordInputs.nth(0).fill(memberPassword);\n      await passwordInputs.nth(1).fill(memberNewPassword);\n      await passwordInputs.nth(2).fill(memberNewPassword);\n",
+          }
+          for old, new in replacements.items():
+              if source.count(old) != 1:
+                  raise SystemExit(f'Expected form locator not found exactly once: {old!r}')
+              source = source.replace(old, new)
+          path.write_text(source, encoding='utf-8')
+          PY
+          git diff --check
+      - name: Commit form-field fixes
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add admin-risk/e2e/user-system/user-system.spec.ts
+          git commit -m 'test(user-system): scope account form field locators'
+          git push
