@@ -3,7 +3,6 @@ from __future__ import annotations
 import app.schema_migrations as schema_migrations
 from app.database import connection
 
-
 USER_PRODUCT_MIGRATIONS: tuple[schema_migrations.Migration, ...] = (
     schema_migrations.Migration(
         version=7,
