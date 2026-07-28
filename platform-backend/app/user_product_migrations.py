@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from app import schema_migrations
+import app.schema_migrations as schema_migrations
 from app.database import connection
 
 
