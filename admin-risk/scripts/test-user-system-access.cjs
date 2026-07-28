@@ -138,6 +138,33 @@ test('route permissions normalize and combine parent and child requirements', ()
   assert.equal(routeAccess.canAccessMatchedRoute(matched, ['profile.read_self']), false);
 });
 
+test('known static routes distinguish permission denial from genuine not-found paths', () => {
+  const routes = [
+    {
+      path: '/risk',
+      meta: { permissions: 'risk.read' },
+      children: [
+        { path: 'users', meta: { permissions: 'user.read' } },
+        { path: 'detail', meta: { permissions: 'risk.read' } },
+      ],
+    },
+    {
+      path: '/:path(.*)*',
+      children: [{ path: '/:path(.*)*' }],
+    },
+  ];
+
+  const chain = routeAccess.findRouteChainByPath(routes, '/risk/users?from=e2e');
+  assert.equal(chain.length, 2);
+  assert.equal(routeAccess.isKnownRouteDenied(routes, '/risk/users', []), true);
+  assert.equal(
+    routeAccess.isKnownRouteDenied(routes, '/risk/users', ['risk.read', 'user.read']),
+    false,
+  );
+  assert.equal(routeAccess.findRouteChainByPath(routes, '/missing'), undefined);
+  assert.equal(routeAccess.isKnownRouteDenied(routes, '/missing', []), false);
+});
+
 test('route tree filtering removes denied branches without mutating source', () => {
   const source = [
     {
