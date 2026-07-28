@@ -73,10 +73,9 @@ export function createPermissionGuard(router: Router) {
       return;
     }
 
-    // Always execute the method rather than relying on a cached Pinia getter. The
-    // in-memory CSRF token is deliberately not persisted or reactive; a 401 clears
-    // it immediately, and hydrateSession then clears stale user/permission state.
-    const authenticated = await userStore.hydrateSession();
+    // Protected navigation must revalidate the server-side Session. Local Pinia
+    // state is presentation state only and cannot survive password or admin revocation.
+    const authenticated = await userStore.hydrateSession(true);
     if (!authenticated) {
       if (to.meta.ignoreAuth) {
         next();
