@@ -6,9 +6,9 @@ from typing import Annotated, NoReturn
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, Field
 
-from app import user_admin_notes
 from app.auth import Principal, require_permission
 from app.config import get_settings
+from app import user_admin_notes
 from app.user_admin_service import AdminRequestContext
 
 
