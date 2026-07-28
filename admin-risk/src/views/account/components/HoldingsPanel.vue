@@ -77,12 +77,12 @@
             <div class="holding-metrics">
               <div>
                 <span>当前市值</span>
-                <strong>{{ formatMoney(holding.marketValue, holding.currency) }}</strong>
+                <strong>{{ formatDetailedMoney(holding.marketValue, holding.currency) }}</strong>
               </div>
               <div>
                 <span>累计收益</span>
                 <strong :class="returnClass(holding.cumulativeReturn)">
-                  {{ formatSignedMoney(holding.cumulativeReturn, holding.currency) }}
+                  {{ formatDetailedSignedMoney(holding.cumulativeReturn, holding.currency) }}
                 </strong>
               </div>
               <div>
@@ -101,7 +101,7 @@
               </div>
               <div>
                 <span>累计投入</span>
-                <strong>{{ formatMoney(holding.cumulativeInvested, holding.currency) }}</strong>
+                <strong>{{ formatDetailedMoney(holding.cumulativeInvested, holding.currency) }}</strong>
               </div>
             </div>
 
@@ -241,6 +241,58 @@
     return value !== undefined && value !== null;
   }
 
+  function stripLeadingZeros(value: string): string {
+    return value.replace(/^0+(?=\d)/, '') || '0';
+  }
+
+  function compareUnsigned(left: string, right: string): number {
+    const normalizedLeft = stripLeadingZeros(left);
+    const normalizedRight = stripLeadingZeros(right);
+    if (normalizedLeft.length !== normalizedRight.length) {
+      return normalizedLeft.length > normalizedRight.length ? 1 : -1;
+    }
+    if (normalizedLeft === normalizedRight) return 0;
+    return normalizedLeft > normalizedRight ? 1 : -1;
+  }
+
+  function addUnsigned(left: string, right: string): string {
+    let leftIndex = left.length - 1;
+    let rightIndex = right.length - 1;
+    let carry = 0;
+    let result = '';
+    while (leftIndex >= 0 || rightIndex >= 0 || carry) {
+      const leftDigit = leftIndex >= 0 ? left.charCodeAt(leftIndex) - 48 : 0;
+      const rightDigit = rightIndex >= 0 ? right.charCodeAt(rightIndex) - 48 : 0;
+      const sum = leftDigit + rightDigit + carry;
+      result = String.fromCharCode(48 + (sum % 10)) + result;
+      carry = Math.floor(sum / 10);
+      leftIndex -= 1;
+      rightIndex -= 1;
+    }
+    return stripLeadingZeros(result);
+  }
+
+  function subtractUnsigned(left: string, right: string): string {
+    let leftIndex = left.length - 1;
+    let rightIndex = right.length - 1;
+    let borrow = 0;
+    let result = '';
+    while (leftIndex >= 0) {
+      let digit = left.charCodeAt(leftIndex) - 48 - borrow;
+      const rightDigit = rightIndex >= 0 ? right.charCodeAt(rightIndex) - 48 : 0;
+      if (digit < rightDigit) {
+        digit += 10;
+        borrow = 1;
+      } else {
+        borrow = 0;
+      }
+      result = String.fromCharCode(48 + digit - rightDigit) + result;
+      leftIndex -= 1;
+      rightIndex -= 1;
+    }
+    return stripLeadingZeros(result);
+  }
+
   function sumDecimalStrings(values: string[]): string | undefined {
     if (values.length === 0) return undefined;
     let scale = 0;
@@ -248,21 +300,49 @@
       const fractionLength = value.split('.')[1]?.length || 0;
       if (fractionLength > scale) scale = fractionLength;
     }
-    const factor = 10n ** BigInt(scale);
-    let total = 0n;
+
+    let totalDigits = '0';
+    let totalNegative = false;
     for (const value of values) {
       const negative = value.startsWith('-');
       const unsigned = negative ? value.slice(1) : value;
       const [integer = '0', fraction = ''] = unsigned.split('.');
-      const units = BigInt(integer || '0') * factor + BigInt(fraction.padEnd(scale, '0') || '0');
-      total += negative ? -units : units;
+      const digits = stripLeadingZeros(`${integer}${fraction.padEnd(scale, '0')}`);
+      if (digits === '0') continue;
+
+      if (totalDigits === '0') {
+        totalDigits = digits;
+        totalNegative = negative;
+      } else if (totalNegative === negative) {
+        totalDigits = addUnsigned(totalDigits, digits);
+      } else {
+        const comparison = compareUnsigned(totalDigits, digits);
+        if (comparison === 0) {
+          totalDigits = '0';
+          totalNegative = false;
+        } else if (comparison > 0) {
+          totalDigits = subtractUnsigned(totalDigits, digits);
+        } else {
+          totalDigits = subtractUnsigned(digits, totalDigits);
+          totalNegative = negative;
+        }
+      }
     }
-    const negative = total < 0n;
-    const absolute = negative ? -total : total;
-    const integer = absolute / factor;
-    const fraction = scale > 0 ? (absolute % factor).toString().padStart(scale, '0') : '';
-    const trimmedFraction = fraction.replace(/0+$/, '');
-    return `${negative ? '-' : ''}${integer.toString()}${trimmedFraction ? `.${trimmedFraction}` : ''}`;
+
+    const padded = totalDigits.padStart(scale + 1, '0');
+    const whole = scale ? padded.slice(0, -scale) || '0' : padded;
+    const fraction = scale ? padded.slice(-scale).replace(/0+$/, '') : '';
+    return `${totalNegative && totalDigits !== '0' ? '-' : ''}${whole}${
+      fraction ? `.${fraction}` : ''
+    }`;
+  }
+
+  function withMinimumFraction(value: string, minimum = 2): string {
+    const negative = value.startsWith('-');
+    const unsigned = negative ? value.slice(1) : value;
+    const [integer = '0', fraction = ''] = unsigned.split('.');
+    const paddedFraction = fraction.padEnd(minimum, '0');
+    return `${negative ? '-' : ''}${integer}.${paddedFraction}`;
   }
 
   function navStatusMeta(status: NavStatus) {
@@ -291,13 +371,28 @@
     return formatSignedMoneyString(value, currency);
   }
 
+  function formatDetailedMoney(value: string | undefined, currency: string) {
+    return formatMoneyString(value === undefined ? undefined : withMinimumFraction(value), currency);
+  }
+
+  function formatDetailedSignedMoney(value: string | undefined, currency: string) {
+    return formatSignedMoneyString(
+      value === undefined ? undefined : withMinimumFraction(value),
+      currency,
+    );
+  }
+
   function formatRatioAsPercent(value?: string) {
     return formatRatioPercentString(value);
   }
 
   function returnClass(value?: string) {
     const direction = decimalDirection(value);
-    return direction === 'negative' ? 'return-negative' : direction === 'positive' ? 'return-positive' : '';
+    return direction === 'negative'
+      ? 'return-negative'
+      : direction === 'positive'
+      ? 'return-positive'
+      : '';
   }
 
   function formatTime(value?: string) {
