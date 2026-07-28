@@ -1,0 +1,42 @@
+name: Temporary Fix User E2E Reload
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/tmp-fix-user-e2e-reload.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  fix-e2e-reload:
+    if: github.event.pull_request.number == 118 && github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+      - name: Remove exact redundant account reloads
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('admin-risk/e2e/user-system/user-system.spec.ts')
+          source = path.read_text(encoding='utf-8')
+          old = "      await primaryPage.goto(absoluteUrl('/account/index'));\n"
+          if source.count(old) != 2:
+              raise SystemExit(f'Expected two redundant member reloads, found {source.count(old)}')
+          path.write_text(source.replace(old, ''), encoding='utf-8')
+          PY
+          git diff --check
+      - name: Commit reload fix
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add admin-risk/e2e/user-system/user-system.spec.ts
+          git commit -m 'test(user-system): avoid redundant member page reloads'
+          git push
