@@ -5,10 +5,10 @@ import httpx
 from fastapi.testclient import TestClient
 
 from app.config import get_settings
-from app.cross_spread import CrossSpreadLiveSizing, submit_cross_spread_market_command
+from app.cross_spread import CrossSpreadLiveSizing
 from app.database import connection
 from app.main import app
-from app.schemas import CrossSpreadMarketCommandRequest
+
 
 def test_cross_spread_snapshot_proxies_runtime_market_data(monkeypatch, tmp_path: Path) -> None:
     settings = get_settings()
@@ -265,7 +265,3 @@ def test_cross_spread_market_command_still_rejects_live_environment_without_live
 
     assert response.status_code == 403
     assert response.json()["detail"] == "Live cross-spread execution is disabled"
-
-
-
-
