@@ -36,6 +36,7 @@ markers = [
 pythonVersion = "3.12"
 typeCheckingMode = "standard"
 include = [
+  "app/a_share_research_policy.py",
   "app/auth.py",
   "app/database_bootstrap.py",
   "app/database_connection.py",
@@ -55,6 +56,8 @@ include = [
   "app/member_holding_schemas.py",
   "app/member_holding_service.py",
   "app/position_math.py",
+  "app/research_cache.py",
+  "app/research_data_schemas.py",
   "app/runtime_contracts.py",
   "app/schema_migrations.py",
   "app/schema_governance.py",
