@@ -1,0 +1,49 @@
+name: Fix 0.9.1 integration lint
+
+on:
+  push:
+    branches:
+      - release/0.9.1-user-system
+    paths:
+      - .github/workflows/fix-0.9.1-integration-lint.yml
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: release/0.9.1-user-system
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Repair imported platform files
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('platform-backend/app/cross_spread.py')
+          content = path.read_text(encoding='utf-8-sig')
+          path.write_text(content, encoding='utf-8')
+          PY
+
+          python -m pip install -e './execution-runtime[dev]'
+          cd execution-runtime
+          python -m ruff check app tests --fix
+          cd ..
+
+          git rm .github/workflows/fix-0.9.1-integration-lint.yml
+          git add platform-backend/app/cross_spread.py execution-runtime/app execution-runtime/tests
+          git commit -m "fix: normalize imported platform files for 0.9.1"
+          git push origin HEAD:release/0.9.1-user-system
