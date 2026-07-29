@@ -40,6 +40,7 @@ class Settings(BaseSettings):
     bybit_contract_symbol: str = "XAUTUSDT"
     bybit_demo_mode: bool = False
     bybit_recv_window: int = 20000
+    bybit_timestamp_offset_ms: int = 0
     bybit_check_timeout_seconds: float = 8.0
     bybit_fill_confirmation_timeout_seconds: float = 5.0
     bybit_fill_confirmation_poll_seconds: float = 0.1

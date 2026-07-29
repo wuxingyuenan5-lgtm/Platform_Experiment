@@ -63,7 +63,6 @@
             <header>
               <div>
                 <h2>市场脉搏</h2>
-                <p>捕捉全球投资机会的温度信号</p>
               </div>
             </header>
 
@@ -84,7 +83,6 @@
                 <span class="row-icon"><component :is="item.icon" /></span>
                 <span class="row-copy">
                   <strong>{{ item.title }}</strong>
-                  <em>{{ item.desc }}</em>
                 </span>
                 <svg viewBox="0 0 82 22" preserveAspectRatio="none">
                   <polyline
@@ -110,7 +108,6 @@
             <header>
               <div>
                 <h2>组合概览</h2>
-                <p>全局视角掌握资产配置</p>
               </div>
             </header>
 
@@ -142,7 +139,6 @@
             <header>
               <div>
                 <h2>策略概览</h2>
-                <p>多策略协同，稳健致远</p>
               </div>
             </header>
 
@@ -182,7 +178,6 @@
             <header>
               <div>
                 <h2>重要日历</h2>
-                <p>把握关键事件与市场脉动</p>
               </div>
             </header>
 
@@ -238,7 +233,6 @@
   const pulseRows = [
     {
       title: 'AI + 生产力',
-      desc: '科技成长驱动新周期',
       path: '/hedge-board/us',
       color: '#d59b42',
       spark: '0,15 12,12 24,13 36,9 48,11 60,8 72,10 82,7',
@@ -246,7 +240,6 @@
     },
     {
       title: 'Breakevens vs Gold',
-      desc: '通胀对冲与黄金趋势',
       path: '/hedge-board/gold',
       color: '#6ca6ee',
       spark: '0,13 12,15 24,10 36,16 48,11 60,14 72,10 82,13',
@@ -254,7 +247,6 @@
     },
     {
       title: 'DXY vs US10Y',
-      desc: '美元利率与收益率联动',
       path: '/hedge-board/macro',
       color: '#b6c0ca',
       spark: '0,11 12,10 24,12 36,10 48,11 60,9 72,10 82,8',
@@ -310,7 +302,7 @@
 
 <style scoped lang="less">
   .home-dashboard {
-    --home-page-gutter: clamp(16px, 1.6vw, 30px);
+    --home-page-gutter: clamp(18px, 2vw, 42px);
     --home-section-gap: clamp(20px, 1.5vw, 28px);
 
     min-height: 100%;
@@ -319,27 +311,28 @@
   }
 
   .home-dashboard__frame {
-    width: min(100%, 1840px);
+    width: 100%;
     margin: 0 auto;
-    padding: 0 var(--home-page-gutter) clamp(28px, 3vw, 48px);
+    padding: 0 0 clamp(28px, 3vw, 48px);
   }
 
   .home-hero {
-    min-height: clamp(500px, 37vw, 620px);
-    padding: clamp(58px, 5.8vw, 96px) clamp(34px, 4vw, 70px);
+    min-height: clamp(560px, 41vw, 720px);
+    padding: clamp(64px, 5vw, 92px) var(--home-page-gutter) clamp(48px, 4vw, 72px);
     display: grid;
-    grid-template-columns: minmax(0, 1.2fr) minmax(420px, 0.8fr);
-    gap: clamp(28px, 3vw, 52px);
-    align-items: center;
+    grid-template-columns: minmax(0, 1.42fr) minmax(440px, 0.58fr);
+    gap: clamp(34px, 4.2vw, 76px);
+    align-items: start;
     overflow: hidden;
-    border-radius: 0 0 30px 30px;
-    background: url('@/assets/images/home-butterfly-topology.png') center center / cover no-repeat;
+    border-radius: 0;
+    background: url('@/assets/images/home-hero-generated-20260726.png') center center / cover no-repeat;
     box-shadow: 0 24px 60px rgba(156, 174, 195, 0.16);
   }
 
   .home-hero__copy {
     min-width: 0;
-    max-width: 650px;
+    max-width: 620px;
+    padding-top: clamp(10px, 2.6vw, 46px);
   }
 
   .home-hero__copy span {
@@ -369,24 +362,25 @@
 
   .home-hero__summaries {
     min-width: 0;
-    align-self: stretch;
+    align-self: start;
     display: grid;
-    grid-template-rows: repeat(2, minmax(0, 1fr));
+    grid-template-rows: repeat(2, minmax(170px, auto));
     gap: clamp(16px, 1.4vw, 24px);
+    padding-top: clamp(0px, 0.8vw, 14px);
   }
 
   .hero-side,
   .dashboard-panel {
     min-width: 0;
     border: 1px solid rgba(232, 237, 243, 0.95);
-    border-radius: 22px;
+    border-radius: 20px;
     background: rgba(255, 255, 255, 0.76);
     box-shadow: 0 20px 50px rgba(136, 158, 184, 0.13);
     backdrop-filter: blur(18px);
   }
 
   .hero-side {
-    padding: clamp(22px, 1.8vw, 30px);
+    padding: clamp(22px, 1.7vw, 30px);
     display: flex;
     flex-direction: column;
   }
@@ -445,7 +439,8 @@
   }
 
   .market-mini-grid svg {
-    width: min(100%, 76px);
+    width: 100%;
+    max-width: 76px;
     height: 22px;
   }
 
@@ -506,22 +501,24 @@
   }
 
   .dashboard-grid {
-    margin-top: var(--home-section-gap);
+    width: calc(100% - calc(var(--home-page-gutter) * 2));
+    max-width: 2040px;
+    margin: var(--home-section-gap) auto 0;
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: minmax(330px, 0.95fr) minmax(370px, 1.12fr) minmax(330px, 0.96fr) minmax(350px, 1fr);
     gap: var(--home-section-gap);
     align-items: stretch;
   }
 
   .dashboard-panel {
-    min-height: 440px;
-    padding: clamp(24px, 2vw, 34px);
+    min-height: 500px;
+    padding: clamp(24px, 1.7vw, 32px);
     display: flex;
     flex-direction: column;
   }
 
   .pulse-tabs {
-    margin: 26px 0 18px;
+    margin: 24px 0 20px;
     display: flex;
     gap: clamp(18px, 2vw, 30px);
     overflow-x: auto;
@@ -563,7 +560,15 @@
   .strategy-list,
   .calendar-list {
     display: grid;
-    gap: 18px;
+    gap: 16px;
+  }
+
+  .panel-strategy header {
+    margin-bottom: 28px;
+  }
+
+  .panel-strategy .strategy-list {
+    margin-top: 0;
   }
 
   .pulse-row,
@@ -572,8 +577,8 @@
     display: grid;
     grid-template-columns: 42px minmax(0, 1fr) minmax(64px, 84px) 26px;
     align-items: center;
-    gap: 14px;
-    padding: 8px;
+    gap: 12px;
+    padding: 8px 4px;
     border: none;
     border-radius: 12px;
     background: transparent;
@@ -649,15 +654,16 @@
   }
 
   .allocation-content {
-    margin-top: 30px;
+    margin-top: 28px;
     display: grid;
-    grid-template-columns: minmax(130px, 150px) minmax(0, 1fr);
+    grid-template-columns: minmax(136px, 160px) minmax(0, 1fr);
     gap: clamp(22px, 2vw, 34px);
     align-items: center;
   }
 
   .allocation-ring {
-    width: min(100%, 150px);
+    width: 100%;
+    max-width: 160px;
     aspect-ratio: 1;
   }
 
@@ -804,19 +810,40 @@
 
   @media (max-width: 1599px) {
     .home-hero {
-      min-height: auto;
-      grid-template-columns: minmax(0, 1fr);
+      min-height: clamp(520px, 45vw, 640px);
+      grid-template-columns: minmax(0, 1.08fr) minmax(390px, 0.92fr);
+      gap: clamp(24px, 3vw, 48px);
       align-items: start;
+      background-position: 42% center;
     }
 
     .home-hero__copy {
-      max-width: 720px;
-      padding: clamp(10px, 1.5vw, 24px) 0;
+      max-width: 560px;
+      padding-top: clamp(16px, 3vw, 40px);
     }
 
     .home-hero__summaries {
+      grid-template-columns: minmax(0, 1fr);
+      grid-template-rows: repeat(2, minmax(150px, auto));
+      gap: 16px;
+      padding-top: 0;
+    }
+
+    .hero-side {
+      padding: 22px;
+    }
+
+    .market-mini-grid {
       grid-template-columns: repeat(2, minmax(0, 1fr));
-      grid-template-rows: none;
+    }
+
+    .portfolio-summary {
+      grid-template-columns: repeat(2, minmax(0, 1fr)) 92px;
+    }
+
+    .portfolio-ring {
+      width: 92px;
+      height: 92px;
     }
   }
 
@@ -824,6 +851,10 @@
     .dashboard-panel {
       min-height: 420px;
       padding: 24px;
+    }
+
+    .dashboard-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
     .pulse-row,
@@ -840,10 +871,13 @@
   @media (max-width: 1199px) {
     .home-hero {
       padding: 48px 28px 32px;
+      grid-template-columns: minmax(0, 1fr);
+      background-position: 33% center;
     }
 
     .home-hero__summaries {
       grid-template-columns: minmax(0, 1fr);
+      grid-template-rows: none;
     }
   }
 

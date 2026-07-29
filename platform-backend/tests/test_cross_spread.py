@@ -1,14 +1,14 @@
-from decimal import Decimal
+﻿from decimal import Decimal
 from pathlib import Path
 
 import httpx
 from fastapi.testclient import TestClient
 
 from app.config import get_settings
-from app.cross_spread import CrossSpreadLiveSizing
+from app.cross_spread import CrossSpreadLiveSizing, submit_cross_spread_market_command
 from app.database import connection
 from app.main import app
-
+from app.schemas import CrossSpreadMarketCommandRequest
 
 def test_cross_spread_snapshot_proxies_runtime_market_data(monkeypatch, tmp_path: Path) -> None:
     settings = get_settings()
@@ -37,7 +37,7 @@ def test_cross_spread_snapshot_proxies_runtime_market_data(monkeypatch, tmp_path
                 },
                 "mt5": {
                     "venue": "mt5",
-                    "symbol": "XAUUSD+",
+                    "symbol": "XAUUSD.s",
                     "status": "available",
                     "quote": {
                         "bid": "3331.00",
@@ -79,7 +79,7 @@ def test_cross_spread_snapshot_proxies_runtime_market_data(monkeypatch, tmp_path
         ).fetchone()
     assert row["strategy_key"] == "cross_venue_spread"
     assert row["left_symbol"] == "XAUTUSDT"
-    assert row["right_symbol"] == "XAUUSD+"
+    assert row["right_symbol"] == "XAUUSD.s"
     assert row["long_spread"] == "-0.70"
     assert row["funding_rate"] == "0.0001"
     assert row["usdt_usd"] == "0.9998"
@@ -171,7 +171,7 @@ def test_cross_spread_market_command_maps_open_long_to_two_market_legs(
     assert request.legs[0].order_type == "market"
     assert request.legs[0].quantity == 1
     assert request.legs[1].account_id == "account_mt5_demo"
-    assert request.legs[1].symbol == "XAUUSD+"
+    assert request.legs[1].symbol == "XAUUSD.s"
     assert request.legs[1].side == "sell"
     assert request.legs[1].quantity == Decimal("0.01")
 
@@ -199,6 +199,8 @@ def test_cross_spread_market_command_rejects_when_live_trading_disabled(
 ) -> None:
     settings = get_settings()
     settings.database_path = str(tmp_path / "cross-spread-command-disabled.db")
+    settings.environment = "development"
+    settings.default_trading_environment = "paper"
     settings.live_trading_enabled = False
 
     with TestClient(app) as client:
@@ -209,3 +211,61 @@ def test_cross_spread_market_command_rejects_when_live_trading_disabled(
 
     assert response.status_code == 403
     assert response.json()["detail"] == "Live cross-spread execution is disabled"
+
+
+def test_cross_spread_market_command_rejects_development_simulation_without_live_flag(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    settings = get_settings()
+    settings.database_path = str(tmp_path / "cross-spread-command-simulation.db")
+    settings.environment = "development"
+    settings.default_trading_environment = "simulation"
+    settings.live_trading_enabled = False
+    settings.cross_spread_acceptance_max_quantity_oz = Decimal("1")
+    monkeypatch.setattr(
+        "app.cross_spread._load_live_cross_spread_sizing",
+        lambda: CrossSpreadLiveSizing(
+            bybit_min=Decimal("0.001"),
+            bybit_step=Decimal("0.001"),
+            bybit_max=Decimal("10"),
+            mt5_min=Decimal("0.01"),
+            mt5_step=Decimal("0.01"),
+            mt5_max=Decimal("100"),
+            mt5_multiplier=Decimal("100"),
+        ),
+    )
+
+    with TestClient(app) as client:
+        response = client.post(
+            "/api/v1/trading/cross-spread/market-command",
+            json={"action": "OPEN_LONG", "quantityOz": "1"},
+        )
+
+    assert response.status_code == 403
+    assert response.json()["detail"] == "Live cross-spread execution is disabled"
+
+
+def test_cross_spread_market_command_still_rejects_live_environment_without_live_flag(
+    tmp_path: Path,
+) -> None:
+    settings = get_settings()
+    settings.database_path = str(tmp_path / "cross-spread-command-live-disabled.db")
+    settings.environment = "live"
+    settings.default_trading_environment = "simulation"
+    settings.environment = "development"
+    settings.default_trading_environment = "paper"
+    settings.live_trading_enabled = False
+
+    with TestClient(app) as client:
+        response = client.post(
+            "/api/v1/trading/cross-spread/market-command",
+            json={"action": "OPEN_LONG", "quantityOz": "1"},
+        )
+
+    assert response.status_code == 403
+    assert response.json()["detail"] == "Live cross-spread execution is disabled"
+
+
+
+

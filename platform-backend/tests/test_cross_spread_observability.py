@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from app.cross_spread_live_read_client import CrossSpreadLiveReadError
 from app.cross_spread_observability_service import get_cross_spread_observability
@@ -87,3 +87,33 @@ def test_observability_marks_failed_section_without_faking_zero(monkeypatch) -> 
     assert result.mt5.account_risk is None
     assert result.mt5.section_states["accountRisk"] == "unavailable"
     assert any("MT5 accountRisk" in warning for warning in result.warnings)
+
+
+def test_fast_observability_skips_order_and_fill_history(monkeypatch) -> None:
+    calls: list[str] = []
+
+    monkeypatch.setattr(
+        "app.cross_spread_observability_service.runtime.get_account_risk",
+        lambda account_id: calls.append(f"risk:{account_id}") or _risk(account_id),
+    )
+    monkeypatch.setattr(
+        "app.cross_spread_observability_service.runtime.list_position_rows",
+        lambda account_id: calls.append(f"positions:{account_id}") or [],
+    )
+    monkeypatch.setattr(
+        "app.cross_spread_observability_service.runtime.query_order_history",
+        lambda **kwargs: calls.append("orders") or _history_page(kwargs["account_id"]),
+    )
+    monkeypatch.setattr(
+        "app.cross_spread_observability_service.runtime.query_fill_history",
+        lambda **kwargs: calls.append("fills") or _history_page(kwargs["account_id"]),
+    )
+
+    result = get_cross_spread_observability(history_hours=1, limit=1, mode="fast")
+
+    assert result.status == "complete"
+    assert result.bybit.active_orders == []
+    assert result.bybit.recent_orders == []
+    assert result.bybit.recent_fills == []
+    assert "orders" not in calls
+    assert "fills" not in calls

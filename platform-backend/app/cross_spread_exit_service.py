@@ -474,7 +474,7 @@ def _target_positions(positions: list[LivePosition], symbol: str) -> list[LivePo
     return [
         position
         for position in positions
-        if position.symbol == normalized and position.net_quantity != 0
+        if position.symbol.upper() == normalized and position.net_quantity != 0
     ]
 
 

@@ -49,7 +49,7 @@ Inspect explicit subprojects only when a task needs reference-code absorption.
 ## When The Machine Feels Slow
 
 1. Check duplicate dev servers.
-2. Keep only the needed frontend on `5173`.
+2. Keep only the needed frontend on `4373`.
 3. Keep `8000` backend only when frontend needs live API data.
 4. Keep `8100` Runtime only when testing execution integration.
 5. Close browser tabs with heavy TradingView/ECharts dashboards when not needed.

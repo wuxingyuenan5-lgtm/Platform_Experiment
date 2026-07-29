@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from decimal import Decimal
 from typing import Any
@@ -23,8 +23,11 @@ def build_cross_spread_snapshot(
     mt5_symbol: str,
     bybit_demo: bool = False,
     bybit_recv_window: int = 20000,
+    bybit_credential_ref: str = BYBIT_CREDENTIAL_REF,
+    mt5_credential_ref: str = MT5_CREDENTIAL_REF,
     mt5_terminal_path: str | None = None,
     mt5_bridge_file_path: str | None = None,
+    mt5_timeout_seconds: float = 5.0,
     bybit_session_factory: Any | None = None,
     mt5_module: Any | None = None,
 ) -> CrossSpreadSnapshotResponse:
@@ -32,12 +35,15 @@ def build_cross_spread_snapshot(
         symbol=bybit_symbol,
         demo=bybit_demo,
         recv_window=bybit_recv_window,
+        credential_ref=bybit_credential_ref,
         session_factory=bybit_session_factory,
     )
     mt5 = _build_mt5_snapshot(
         symbol=mt5_symbol,
+        credential_ref=mt5_credential_ref,
         terminal_path=mt5_terminal_path,
         bridge_file_path=mt5_bridge_file_path,
+        timeout_seconds=mt5_timeout_seconds,
         mt5_module=mt5_module,
     )
     metrics = CrossSpreadMetrics(
@@ -78,10 +84,14 @@ def _build_bybit_snapshot(
     symbol: str,
     demo: bool,
     recv_window: int,
+    credential_ref: str,
     session_factory: Any | None,
 ) -> CrossSpreadVenueSnapshot:
     try:
-        credentials = resolve_secret_reference(BYBIT_CREDENTIAL_REF)
+        credentials = resolve_secret_reference(
+            credential_ref,
+            required_fields=("API_KEY", "SECRET"),
+        )
         using_injected_session = session_factory is not None
         if session_factory is None:
             from pybit.unified_trading import HTTP
@@ -156,36 +166,51 @@ def _build_bybit_snapshot(
 def _build_mt5_snapshot(
     *,
     symbol: str,
+    credential_ref: str,
     terminal_path: str | None,
     bridge_file_path: str | None,
+    timeout_seconds: float,
     mt5_module: Any | None,
 ) -> CrossSpreadVenueSnapshot:
     try:
-        credentials = resolve_secret_reference(MT5_CREDENTIAL_REF)
+        credentials = resolve_secret_reference(
+            credential_ref,
+            required_fields=("LOGIN", "PASSWORD", "SERVER"),
+        )
         if mt5_module is None:
-            if bridge_file_path:
-                return read_mt5_bridge_snapshot(bridge_file_path, symbol)
-            return _unavailable(
-                "mt5",
-                symbol,
-                (
-                    "MT5 Python bridge is not responding in the web runtime; "
-                    "keep terminal open and verify terminal bridge separately"
-                ),
-            )
+            try:
+                import MetaTrader5 as mt5_module  # type: ignore[import-not-found]
+            except Exception:
+                if bridge_file_path and not terminal_path:
+                    return read_mt5_bridge_snapshot(bridge_file_path, symbol)
+                return _unavailable(
+                    "mt5",
+                    symbol,
+                    (
+                        "MT5 Python bridge is not responding in the web runtime; "
+                        "keep terminal open and verify terminal bridge separately"
+                    ),
+                )
 
-        login = int(credentials["API_KEY"])
-        initialize_kwargs = {
-            "login": login,
-            "password": credentials["SECRET"],
-            "server": credentials["PASSPHRASE"],
-        }
+        login = int(credentials["LOGIN"])
+        timeout_ms = int(timeout_seconds * 1000)
+        initialize_kwargs = {"timeout": timeout_ms}
         if terminal_path:
             initialize_kwargs["path"] = terminal_path
         if not mt5_module.initialize(**initialize_kwargs):
             return _unavailable("mt5", symbol, "MT5 initialize failed")
+        if not mt5_module.login(
+            login,
+            password=credentials["PASSWORD"],
+            server=credentials["SERVER"],
+            timeout=timeout_ms,
+        ):
+            return _unavailable("mt5", symbol, "MT5 login failed")
 
         try:
+            symbol_selector = getattr(mt5_module, "symbol_select", None)
+            if callable(symbol_selector):
+                symbol_selector(symbol, True)
             tick = mt5_module.symbol_info_tick(symbol)
             if tick is None:
                 return _unavailable("mt5", symbol, "MT5 symbol tick unavailable")
@@ -230,6 +255,27 @@ def _build_mt5_snapshot(
         return _unavailable("mt5", symbol, str(exc))
 
 
+
+def _read_mt5_terminal_swap_reason(symbol: str, terminal_path: str | None) -> str | None:
+    try:
+        import MetaTrader5 as mt5  # type: ignore[import-not-found]
+
+        initialize_attempts: list[dict[str, object]] = []
+        if terminal_path:
+            initialize_attempts.append({"path": terminal_path})
+        initialize_attempts.append({})
+        for initialize_kwargs in initialize_attempts:
+            if not mt5.initialize(**initialize_kwargs):
+                continue
+            try:
+                symbol_info = mt5.symbol_info(symbol)
+                return _mt5_symbol_reason(symbol_info)
+            finally:
+                mt5.shutdown()
+        return None
+    except Exception:
+        return None
+
 def _optional_decimal(value: object) -> Decimal | None:
     if value is None or value == "":
         return None
@@ -243,6 +289,11 @@ def _join_reason(position_reason: str | None, funding_rate: Decimal | None) -> s
     if funding_rate is not None:
         parts.append(f"fundingRate={funding_rate}")
     return ";".join(parts) if parts else None
+
+
+def _join_reason_text(*parts: str | None) -> str | None:
+    present_parts = [part for part in parts if part]
+    return ";".join(present_parts) if present_parts else None
 
 
 def _mt5_symbol_reason(symbol_info: object | None) -> str | None:
@@ -319,3 +370,4 @@ def _unavailable(venue: str, symbol: str, reason: str) -> CrossSpreadVenueSnapsh
         status="unavailable",
         reason=reason,
     )
+

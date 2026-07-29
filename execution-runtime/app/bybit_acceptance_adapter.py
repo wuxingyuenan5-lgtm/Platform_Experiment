@@ -87,9 +87,13 @@ class BybitAcceptanceAdapter(BybitFillConfirmingAdapter):
         if symbol:
             query["symbol"] = symbol.upper()
         try:
-            active = self._client().get_open_orders(openOnly=0, **query)
+            active = self._with_fresh_client_retry(
+                lambda client: client.get_open_orders(openOnly=0, **query)
+            )
             self._require_success(active, "Bybit active-order query failed")
-            history = self._client().get_order_history(**query)
+            history = self._with_fresh_client_retry(
+                lambda client: client.get_order_history(**query)
+            )
             self._require_success(history, "Bybit order-history query failed")
         except GatewayRequestRejectedError:
             raise
@@ -132,12 +136,16 @@ class BybitAcceptanceAdapter(BybitFillConfirmingAdapter):
             query["cursor"] = cursor
         try:
             if scope == "active":
-                response = self._client().get_open_orders(openOnly=0, **query)
+                response = self._with_fresh_client_retry(
+                    lambda client: client.get_open_orders(openOnly=0, **query)
+                )
                 quality = "complete"
             else:
                 query["startTime"] = int(start_time.timestamp() * 1000)
                 query["endTime"] = int(end_time.timestamp() * 1000)
-                response = self._client().get_order_history(**query)
+                response = self._with_fresh_client_retry(
+                    lambda client: client.get_order_history(**query)
+                )
                 quality = "venue_windowed"
             self._require_success(response, "Bybit paged order query failed")
         except GatewayRequestRejectedError:
@@ -189,7 +197,9 @@ class BybitAcceptanceAdapter(BybitFillConfirmingAdapter):
         elif external_order_id is not None:
             query["orderId"] = external_order_id
         try:
-            response = self._client().get_executions(**query)
+            response = self._with_fresh_client_retry(
+                lambda client: client.get_executions(**query)
+            )
             self._require_success(response, "Bybit execution query failed")
         except GatewayRequestRejectedError:
             raise
@@ -225,7 +235,9 @@ class BybitAcceptanceAdapter(BybitFillConfirmingAdapter):
         if cursor:
             query["cursor"] = cursor
         try:
-            response = self._client().get_executions(**query)
+            response = self._with_fresh_client_retry(
+                lambda client: client.get_executions(**query)
+            )
             self._require_success(response, "Bybit paged execution query failed")
         except GatewayRequestRejectedError:
             raise
@@ -249,13 +261,20 @@ class BybitAcceptanceAdapter(BybitFillConfirmingAdapter):
     def get_account_risk(self, account_id: str) -> VenueAccountRiskSnapshot:
         self._assert_account(account_id)
         try:
-            response = self._client().get_wallet_balance(accountType="UNIFIED")
+            response = self._with_fresh_client_retry(
+                lambda client: client.get_wallet_balance(accountType="UNIFIED")
+            )
             self._require_success(response, "Bybit account-risk query failed")
             rows = self._result_list(response)
             if not rows:
                 raise GatewayConfigurationError("Bybit account-risk query returned no data")
-            account_method = getattr(self._client(), "get_account_info", None)
-            account_response = account_method() if callable(account_method) else {}
+            account_response = self._with_fresh_client_retry(
+                lambda client: (
+                    client.get_account_info()
+                    if callable(getattr(client, "get_account_info", None))
+                    else {}
+                )
+            )
             if account_response:
                 self._require_success(account_response, "Bybit margin-mode query failed")
         except (GatewayConfigurationError, GatewayRequestRejectedError):
@@ -304,9 +323,11 @@ class BybitAcceptanceAdapter(BybitFillConfirmingAdapter):
                 "Bybit symbol is not mapped to a Platform instrument"
             )
         try:
-            response = self._client().get_instruments_info(
-                category=self.settings.bybit_category,
-                symbol=normalized,
+            response = self._with_fresh_client_retry(
+                lambda client: client.get_instruments_info(
+                    category=self.settings.bybit_category,
+                    symbol=normalized,
+                )
             )
             self._require_success(response, "Bybit instrument query failed")
             rows = self._result_list(response)
@@ -314,7 +335,9 @@ class BybitAcceptanceAdapter(BybitFillConfirmingAdapter):
                 raise GatewayConfigurationError(
                     "Bybit instrument query returned no data"
                 )
-            api_response = self._client().get_api_key_information()
+            api_response = self._with_fresh_client_retry(
+                lambda client: client.get_api_key_information()
+            )
             self._require_success(api_response, "Bybit API-key readiness query failed")
         except (GatewayConfigurationError, GatewayRequestRejectedError):
             raise
@@ -355,11 +378,15 @@ class BybitAcceptanceAdapter(BybitFillConfirmingAdapter):
         query: dict[str, object],
     ) -> list[dict[str, object]]:
         try:
-            realtime = self._client().get_open_orders(**query)
+            realtime = self._with_fresh_client_retry(
+                lambda client: client.get_open_orders(**query)
+            )
             self._require_success(realtime, "Bybit order query failed")
             rows = self._result_list(realtime)
             if not rows:
-                history = self._client().get_order_history(**query)
+                history = self._with_fresh_client_retry(
+                    lambda client: client.get_order_history(**query)
+                )
                 self._require_success(history, "Bybit order history query failed")
                 rows = self._result_list(history)
             return rows
@@ -493,9 +520,11 @@ class BybitAcceptanceAdapter(BybitFillConfirmingAdapter):
                 "Live acceptance position limit is not configured"
             )
         try:
-            response = self._client().get_positions(
-                category=self.settings.bybit_category,
-                symbol=symbol.upper(),
+            response = self._with_fresh_client_retry(
+                lambda client: client.get_positions(
+                    category=self.settings.bybit_category,
+                    symbol=symbol.upper(),
+                )
             )
             self._require_success(response, "Bybit pre-trade position query failed")
         except GatewayRequestRejectedError:

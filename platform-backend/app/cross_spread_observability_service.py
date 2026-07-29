@@ -1,8 +1,8 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
-from typing import Any
+from typing import Any, Literal
 
 from app import cross_spread_live_read_client as runtime
 from app.cross_spread import (
@@ -17,11 +17,14 @@ from app.cross_spread_observability_schemas import (
     CrossSpreadVenueObservabilityResponse,
 )
 
+ObservabilityMode = Literal["fast", "audit"]
+
 
 def get_cross_spread_observability(
     *,
     history_hours: int,
     limit: int,
+    mode: ObservabilityMode = "audit",
 ) -> CrossSpreadObservabilityResponse:
     end_time = datetime.now(UTC)
     start_time = end_time - timedelta(hours=history_hours)
@@ -32,6 +35,7 @@ def get_cross_spread_observability(
         start_time=start_time,
         end_time=end_time,
         limit=limit,
+        mode=mode,
     )
     mt5 = _venue_observability(
         venue="MT5",
@@ -40,6 +44,7 @@ def get_cross_spread_observability(
         start_time=start_time,
         end_time=end_time,
         limit=limit,
+        mode=mode,
     )
     warnings = [*bybit.warnings, *mt5.warnings]
     if bybit.status == "complete" and mt5.status == "complete":
@@ -66,6 +71,7 @@ def _venue_observability(
     start_time: datetime,
     end_time: datetime,
     limit: int,
+    mode: ObservabilityMode,
 ) -> CrossSpreadVenueObservabilityResponse:
     warnings: list[str] = []
     section_states: dict[str, str] = {}
@@ -86,50 +92,55 @@ def _venue_observability(
         section_states=section_states,
         warnings=warnings,
     )
-    active_page = _read_section(
-        venue=venue,
-        section="activeOrders",
-        callback=lambda: runtime.query_order_history(
-            account_id=account_id,
-            symbol=symbol,
-            start_time=start_time,
-            end_time=end_time,
-            limit=limit,
-            scope="active",
-        ),
-        fallback={"items": []},
-        section_states=section_states,
-        warnings=warnings,
-    )
-    recent_page = _read_section(
-        venue=venue,
-        section="recentOrders",
-        callback=lambda: runtime.query_order_history(
-            account_id=account_id,
-            symbol=symbol,
-            start_time=start_time,
-            end_time=end_time,
-            limit=limit,
-            scope="closed",
-        ),
-        fallback={"items": []},
-        section_states=section_states,
-        warnings=warnings,
-    )
-    fill_page = _read_section(
-        venue=venue,
-        section="recentFills",
-        callback=lambda: runtime.query_fill_history(
-            account_id=account_id,
-            symbol=symbol,
-            start_time=start_time,
-            end_time=end_time,
-            limit=limit,
-        ),
-        fallback={"items": []},
-        section_states=section_states,
-        warnings=warnings,
-    )
+
+    active_page: dict[str, Any] = {"items": []}
+    recent_page: dict[str, Any] = {"items": []}
+    fill_page: dict[str, Any] = {"items": []}
+    if mode == "audit":
+        active_page = _read_section(
+            venue=venue,
+            section="activeOrders",
+            callback=lambda: runtime.query_order_history(
+                account_id=account_id,
+                symbol=symbol,
+                start_time=start_time,
+                end_time=end_time,
+                limit=limit,
+                scope="active",
+            ),
+            fallback={"items": []},
+            section_states=section_states,
+            warnings=warnings,
+        )
+        recent_page = _read_section(
+            venue=venue,
+            section="recentOrders",
+            callback=lambda: runtime.query_order_history(
+                account_id=account_id,
+                symbol=symbol,
+                start_time=start_time,
+                end_time=end_time,
+                limit=limit,
+                scope="closed",
+            ),
+            fallback={"items": []},
+            section_states=section_states,
+            warnings=warnings,
+        )
+        fill_page = _read_section(
+            venue=venue,
+            section="recentFills",
+            callback=lambda: runtime.query_fill_history(
+                account_id=account_id,
+                symbol=symbol,
+                start_time=start_time,
+                end_time=end_time,
+                limit=limit,
+            ),
+            fallback={"items": []},
+            section_states=section_states,
+            warnings=warnings,
+        )
 
     completed = sum(1 for state in section_states.values() if state == "complete")
     if completed == len(section_states):

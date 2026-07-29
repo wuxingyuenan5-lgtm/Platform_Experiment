@@ -11,10 +11,17 @@ class FakeMt5MarketData:
 
     def __init__(self) -> None:
         self.initialize_kwargs: dict[str, object] | None = None
+        self.login_args: tuple[object, ...] | None = None
+        self.login_kwargs: dict[str, object] | None = None
         self.shutdown_called = False
 
     def initialize(self, **kwargs):
         self.initialize_kwargs = kwargs
+        return True
+
+    def login(self, *args, **kwargs):
+        self.login_args = args
+        self.login_kwargs = kwargs
         return True
 
     def symbol_info_tick(self, symbol):
@@ -37,15 +44,17 @@ class FakeMt5MarketData:
 
 
 def test_direct_mt5_snapshot_exposes_swap_values(monkeypatch) -> None:
-    monkeypatch.setenv("VG_SECRET_MT5_DEMO_001_API_KEY", "123456")
-    monkeypatch.setenv("VG_SECRET_MT5_DEMO_001_SECRET", "not-exposed")
-    monkeypatch.setenv("VG_SECRET_MT5_DEMO_001_PASSPHRASE", "Broker-Demo")
+    monkeypatch.setenv("VG_SECRET_MT5_DEMO_001_LOGIN", "123456")
+    monkeypatch.setenv("VG_SECRET_MT5_DEMO_001_PASSWORD", "not-exposed")
+    monkeypatch.setenv("VG_SECRET_MT5_DEMO_001_SERVER", "Broker-Demo")
     mt5 = FakeMt5MarketData()
 
     snapshot = _build_mt5_snapshot(
         symbol="XAUUSD+",
+        credential_ref="secret://environment/mt5-demo-001",
         terminal_path="C:/MT5/terminal64.exe",
         bridge_file_path=None,
+        timeout_seconds=8.0,
         mt5_module=mt5,
     )
 
@@ -59,9 +68,13 @@ def test_direct_mt5_snapshot_exposes_swap_values(monkeypatch) -> None:
     assert "swapRollover3Days=3" in snapshot.reason
     assert "contractSize=100.0" in snapshot.reason
     assert mt5.initialize_kwargs == {
-        "login": 123456,
+        "path": "C:/MT5/terminal64.exe",
+        "timeout": 8000,
+    }
+    assert mt5.login_args == (123456,)
+    assert mt5.login_kwargs == {
         "password": "not-exposed",
         "server": "Broker-Demo",
-        "path": "C:/MT5/terminal64.exe",
+        "timeout": 8000,
     }
     assert mt5.shutdown_called is True

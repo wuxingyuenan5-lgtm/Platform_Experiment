@@ -223,6 +223,17 @@ export interface PositionResult {
   averagePrice?: string | null;
 }
 
+export interface BalanceResult {
+  snapshotId: string;
+  accountId: string;
+  currency: string;
+  equity: string;
+  availableBalance: string;
+  source: string;
+  dataQualityState: string;
+  asOf: string;
+}
+
 export interface PnlResult {
   accountId: string;
   instrumentId: string;
@@ -322,6 +333,17 @@ export interface OrderDetailResult extends OrderResult {
   price?: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface FillResult {
+  fillId: string;
+  orderId: string;
+  accountId: string;
+  instrumentId: string;
+  side: TradingSide;
+  quantity: string;
+  price: string;
+  occurredAt: string;
 }
 
 export interface StrategyPnlResult {

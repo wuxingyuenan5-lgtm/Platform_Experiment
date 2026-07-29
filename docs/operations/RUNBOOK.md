@@ -5,7 +5,7 @@
 Frontend:
 
 ```powershell
-Invoke-WebRequest -UseBasicParsing "http://127.0.0.1:5173/index.html"
+Invoke-WebRequest -UseBasicParsing "http://127.0.0.1:4373/index.html"
 ```
 
 Platform backend:
@@ -22,16 +22,16 @@ Invoke-WebRequest -UseBasicParsing "http://127.0.0.1:8100/health"
 
 ## Notes
 
-- Prefer frontend port `5173` for current work.
+- Prefer frontend port `4373` for current work.
 - Do not use destructive cleanup commands.
 - Do not change trading or deployment behavior as part of folder organization.
 - If the machine feels slow, first check duplicate dev servers before deleting dependencies.
-- Current expected long-running local services are frontend `5173`, platform backend `8000`, and Runtime Gateway `8100` when execution integration is needed.
+- Current expected long-running local services are frontend `4373`, platform backend `8000`, and Runtime Gateway `8100` when execution integration is needed.
 
 ## Check Running Ports
 
 ```powershell
-Get-NetTCPConnection -LocalPort 5173,8000,8100 -ErrorAction SilentlyContinue |
+Get-NetTCPConnection -LocalPort 4373,8000,8100 -ErrorAction SilentlyContinue |
   Select-Object LocalAddress,LocalPort,State,OwningProcess
 ```
 

@@ -1,70 +1,34 @@
 # Project Agent Rules
 
-## Purpose
+## Baseline
 
-Internal quantitative research and trading infrastructure. Prefer safe, complete changes over speculative architecture work.
+- Current product version: `0.9.0`.
+- Current main baseline: `71603bcc6807284ef3a6da26ad3f43c541bc99c2`.
+- Frontend port: `4373`.
+- Use `npx pnpm@9.15.9 ...` for frontend commands.
 
-## Service boundaries
+## Scope Control
 
-```text
-admin-risk/          Vue product frontend
-platform-backend/    Business, risk, orchestration and accounting API
-execution-runtime/   Venue/Broker SDKs, external side effects and Runtime Journal
-```
+- For UI point fixes, read only the target component, direct parent component, and necessary styles.
+- For trading execution changes, read the execution component, lifecycle API, exit plan API, and related types.
+- For position, account, and observability changes, read the position table component, observability API, and snapshot types.
+- Do not scan the whole repository for narrow UI edits.
 
-Canonical major ownership is recorded in `docs/architecture/OWNERSHIP.md`.
+## Product UI Rules
 
-## Permanent safety rules
+- Do not add explanatory product copy such as `设计保留`, `真实执行请使用下方`, `保护口径`, `验收面板`, or similar engineering notes.
+- Do not add standalone execution, lifecycle, observability, or validation panels unless explicitly requested.
+- Reuse the user-designed product components. Trading actions belong in `价差执行指令`; account and observability state belongs in `价差持仓总览`.
+- `CrossSpreadMarketLifecyclePanel.vue` and `CrossSpreadLiveObservabilityPanel.vue` are deprecated references and must not be mounted on product pages.
 
-- Never commit credentials, tokens, passwords or real `.env` values.
-- Never enable real trading, Live Write or automatic exit monitoring through an unrelated change.
-- Platform Backend must not import Venue SDKs.
-- ACK is not Fill; unknown external results must not be blindly retried.
-- Database, execution contract, trading, risk, permission and reconciliation semantics require explicit Critical scope.
-- Do not bypass CI, safety checks or approval controls.
-- Do not perform recursive deletion.
+## Required Checks
 
-## Workstream choice
+- Strategy frontend type check: `npx pnpm@9.15.9 type:check`
+- Homepage layout guard: `npx pnpm@9.15.9 test:homepage-layout`
+- Cross-spread structure guard: `npx pnpm@9.15.9 test:cross-spread-layout`
 
-Choose the smallest valid track:
+## File Safety
 
-- **Fast** — Markdown and synchronized release-version maintenance; no behavior change.
-- **Standard** — bounded single-module product work without Critical paths; no Issue or task packet required.
-- **Critical** — trading/execution, Runtime, risk, auth, credentials, database/migration, contracts, CI governance, Live behavior, cross-service or cross-session work; one Issue, one task packet and one Issue-numbered branch.
-
-Rules and branch formats: `docs/engineering/GIT_WORKFLOW.md`.
-
-## Context loading
-
-Read only:
-
-1. this file;
-2. `docs/codex/current-state.md`;
-3. the nearest module `AGENTS.md`;
-4. directly affected source files and tests;
-5. a task packet only for an active Critical cross-session task.
-
-Do not load closed PR history, all task packets, the full Technical Debt register or the entire repository by default. The compact map is `docs/codex/context-map.md`.
-
-## Change discipline
-
-- Make the smallest complete change.
-- Prefer existing patterns; do not add a framework for one feature.
-- Do not split modules merely to match a theoretical layer pattern.
-- Refactor only after a real maintenance, reuse, testability or safety problem appears.
-- Update only directly authoritative documentation.
-- Form the complete patch and run local checks before pushing; normal PRs should use roughly one to three logical commits, not one commit per file.
-- Product pages show user workflows, not debug or engineering notes.
-
-## Default runtime safety
-
-```text
-TradingMode=simulation
-Gateway=fake
-Platform Live Write=false
-Runtime Live Write=false
-Cross-spread Exit Monitor=false
-Bybit PostOnly Chase=false
-```
-
-Local startup: `powershell -ExecutionPolicy Bypass -File .\scripts\dev-platform.ps1`.
+- Do not batch-delete files or directories.
+- Delete only one explicit file path at a time, and only when the user clearly requests deletion.
+- Prefer ASCII selectors, function names, class names, and script structure for patches because terminal Chinese output can be mojibake.

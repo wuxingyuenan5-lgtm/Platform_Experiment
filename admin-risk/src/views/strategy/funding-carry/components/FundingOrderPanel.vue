@@ -91,278 +91,33 @@
     </div>
 
     <div class="funding-lower-grid">
-      <section class="panel status-panel">
-        <div class="panel-title">
-          <h3>交易规则</h3>
-        </div>
+      <FundingStatusPanel
+        :trading-rules="tradingRuleRows"
+        :feedback-rows="executionFeedback"
+        @clear="executionFeedback = []"
+      />
 
-        <div class="rule-list">
-          <div v-for="item in tradingRuleRows" :key="item.label" class="rule-list__row">
-            <span class="rule-list__label">{{ item.label }}</span>
-            <span class="rule-list__value">{{ item.value }}</span>
-          </div>
-        </div>
-
-        <div class="status-feedback">
-          <div class="status-feedback__head">
-            <strong>执行反馈</strong>
-            <button type="button" @click="executionFeedback = []">清空</button>
-          </div>
-
-          <div class="status-feedback__list">
-            <p v-for="item in executionFeedback" :key="item.id">
-              <i :class="['status-feedback__dot', item.tone]"></i>
-              <span>{{ item.time }}: {{ item.text }}</span>
-            </p>
-          </div>
-        </div>
-      </section>
-
-      <section class="panel order-panel">
-        <div class="panel-title">
-          <h3>套利执行指令</h3>
-        </div>
-
-        <div class="stage-tabs funding-stage-tabs">
-          <button
-            type="button"
-            :class="{ active: fundingExecutionStage === 'open' }"
-            @click="fundingExecutionStage = 'open'"
-            >开仓</button
-          >
-          <button
-            type="button"
-            :class="{ active: fundingExecutionStage === 'close' }"
-            @click="fundingExecutionStage = 'close'"
-            >平仓</button
-          >
-        </div>
-
-        <template v-if="fundingExecutionStage === 'open'">
-          <div class="funding-order-grid">
-            <section class="funding-order-column">
-              <label class="field field--compact">
-                <span>标的</span>
-                <select v-model="selectedSymbol">
-                  <option>BTCUSDT</option>
-                  <option>ETHUSDT</option>
-                  <option>SOLUSDT</option>
-                </select>
-              </label>
-
-              <div class="funding-order-row">
-                <label class="field field--compact">
-                  <span>交易所</span>
-                  <select v-model="selectedVenue">
-                    <option>Binance</option>
-                    <option>Bybit</option>
-                    <option>OKX</option>
-                  </select>
-                </label>
-
-                <label class="field field--compact">
-                  <span>执行方式</span>
-                  <select v-model="fundingOpenMode">
-                    <option value="market">市价开仓</option>
-                    <option value="limit">限价开仓</option>
-                  </select>
-                </label>
-              </div>
-
-              <div class="funding-order-row">
-                <label class="field field--compact">
-                  <span>名义本金</span>
-                  <div class="input-with-unit">
-                    <input v-model="notionalValue" type="text" />
-                    <em>USDT</em>
-                  </div>
-                </label>
-
-                <label class="field field--compact">
-                  <span>数量 (BTC)</span>
-                  <input v-model="orderQty" type="text" />
-                </label>
-              </div>
-
-              <div class="funding-order-row">
-                <label class="field field--compact">
-                  <span>现货杠杆</span>
-                  <select v-model="selectedLeverage">
-                    <option>1x</option>
-                    <option>2x</option>
-                    <option>3x</option>
-                    <option>5x</option>
-                  </select>
-                </label>
-
-                <label class="field field--compact">
-                  <span>合约杠杆</span>
-                  <select v-model="fundingHedgeLeverage">
-                    <option>1x</option>
-                    <option>2x</option>
-                    <option>3x</option>
-                    <option>5x</option>
-                  </select>
-                </label>
-              </div>
-
-              <div class="funding-leg-grid">
-                <div class="funding-leg-card">
-                  <span>现货头寸</span>
-                  <strong>{{ fundingLegs.spot }}</strong>
-                </div>
-                <div class="funding-leg-card">
-                  <span>合约头寸</span>
-                  <strong>{{ fundingLegs.perp }}</strong>
-                </div>
-              </div>
-            </section>
-
-            <section class="funding-order-column">
-              <div class="funding-mode-tabs">
-                <button
-                  type="button"
-                  :class="{ active: fundingOpenDirection === 'collect' }"
-                  @click="fundingOpenDirection = 'collect'"
-                >
-                  正套开仓
-                </button>
-                <button
-                  type="button"
-                  :class="{ active: fundingOpenDirection === 'pay' }"
-                  @click="fundingOpenDirection = 'pay'"
-                >
-                  反套开仓
-                </button>
-              </div>
-
-              <div class="funding-metric-grid">
-                <div class="mini-kpi">
-                  <span>当前资金费率</span>
-                  <strong>+0.0810%</strong>
-                </div>
-                <div class="mini-kpi">
-                  <span>现货-永续价差</span>
-                  <strong>+10.5 USDT (+0.0102%)</strong>
-                </div>
-              </div>
-
-              <div class="funding-order-row">
-                <label class="field field--compact">
-                  <span>开仓阈值</span>
-                  <div class="input-with-unit">
-                    <input v-model="fundingThreshold" type="text" />
-                    <em>%</em>
-                  </div>
-                </label>
-
-                <label class="field field--compact">
-                  <span>最大可接受入场价差</span>
-                  <div class="input-with-unit">
-                    <input v-model="fundingEntryBasis" type="text" />
-                    <em>USDT</em>
-                  </div>
-                </label>
-              </div>
-
-              <div class="funding-order-row">
-                <label class="field field--compact">
-                  <span>目标回补价差</span>
-                  <div class="input-with-unit">
-                    <input v-model="fundingTakeProfit" type="text" />
-                    <em>USDT</em>
-                  </div>
-                </label>
-
-                <label class="field field--compact">
-                  <span>止损价差</span>
-                  <div class="input-with-unit">
-                    <input v-model="stopSpread" type="text" />
-                    <em>USDT</em>
-                  </div>
-                </label>
-              </div>
-            </section>
-          </div>
-
-          <div class="funding-action-row">
-            <button
-              class="submit-btn submit-btn--green"
-              type="button"
-              @click="submitFundingOrder('collect')"
-              >提交正套开仓</button
-            >
-            <button
-              class="submit-btn submit-btn--red"
-              type="button"
-              @click="submitFundingOrder('pay')"
-              >提交反套开仓</button
-            >
-          </div>
-        </template>
-
-        <template v-else>
-          <div class="funding-close-shell">
-            <div class="funding-close-head">
-              <div class="funding-mode-tabs funding-mode-tabs--close">
-                <button
-                  type="button"
-                  :class="{ active: fundingCloseMode === 'market' }"
-                  @click="fundingCloseMode = 'market'"
-                  >市价平仓</button
-                >
-                <button
-                  type="button"
-                  :class="{ active: fundingCloseMode === 'limit' }"
-                  @click="fundingCloseMode = 'limit'"
-                  >限价平仓</button
-                >
-              </div>
-
-              <label class="field field--compact funding-close-limit">
-                <span>平仓触发价差</span>
-                <div class="input-with-unit">
-                  <input v-model="fundingCloseBasis" type="text" />
-                  <em>USDT</em>
-                </div>
-              </label>
-            </div>
-
-            <div class="funding-close-table-wrap">
-              <table class="funding-close-table">
-                <thead>
-                  <tr>
-                    <th>组合</th>
-                    <th>现货头寸</th>
-                    <th>合约头寸</th>
-                    <th>当前资金费率</th>
-                    <th>当前基差</th>
-                    <th>未实现盈亏</th>
-                    <th>状态</th>
-                    <th>操作</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr v-for="row in fundingCloseRows" :key="row.id">
-                    <td>{{ row.name }}</td>
-                    <td>{{ row.spot }}</td>
-                    <td>{{ row.perp }}</td>
-                    <td>{{ row.rate }}</td>
-                    <td>{{ row.basis }}</td>
-                    <td :class="row.pnl.startsWith('-') ? 'red' : 'green'">{{ row.pnl }}</td>
-                    <td class="green">{{ row.status }}</td>
-                    <td
-                      ><button class="flat-action" type="button" @click="submitFundingClose(row)"
-                        >执行平仓</button
-                      ></td
-                    >
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </template>
-      </section>
+      <FundingExecutionPanel
+        v-model:funding-execution-stage="fundingExecutionStage"
+        v-model:funding-open-direction="fundingOpenDirection"
+        v-model:funding-open-mode="fundingOpenMode"
+        v-model:funding-close-mode="fundingCloseMode"
+        v-model:selected-symbol="selectedSymbol"
+        v-model:selected-venue="selectedVenue"
+        v-model:notional-value="notionalValue"
+        v-model:selected-leverage="selectedLeverage"
+        v-model:funding-hedge-leverage="fundingHedgeLeverage"
+        v-model:order-qty="orderQty"
+        v-model:stop-spread="stopSpread"
+        v-model:funding-threshold="fundingThreshold"
+        v-model:funding-entry-basis="fundingEntryBasis"
+        v-model:funding-take-profit="fundingTakeProfit"
+        v-model:funding-close-basis="fundingCloseBasis"
+        :funding-legs="fundingLegs"
+        :funding-close-rows="fundingCloseRows"
+        @submit-order="submitFundingOrder"
+        @submit-close="submitFundingClose"
+      />
 
       <section class="panel history-panel">
         <div class="panel-title panel-title--between">
@@ -404,90 +159,16 @@
       </section>
     </div>
 
-    <section class="panel positions-panel">
-      <div class="panel-title">
-        <h3>当前持仓总览</h3>
-      </div>
-
-      <div class="positions-metrics">
-        <div class="positions-metric"
-          ><span>累计资金费收益</span><strong class="green">+1,156.60 USDT</strong></div
-        >
-        <div class="positions-metric"
-          ><span>未实现盈亏</span><strong class="green">+1,036.20 USDT</strong></div
-        >
-        <div class="positions-metric"
-          ><span>当前基差 (现货-永续)</span
-          ><strong class="green">+10.5 USDT (+0.0102%)</strong></div
-        >
-        <div class="positions-metric"
-          ><span>保证金率</span><strong class="green">35.00%</strong></div
-        >
-        <div class="positions-metric"><span>Delta 偏离</span><strong>0.00%</strong></div>
-        <div class="positions-metric"
-          ><span>强平距离</span><strong class="green">28.00%</strong></div
-        >
-      </div>
-
-      <div class="positions-table-wrap">
-        <table class="positions-table">
-          <thead>
-            <tr>
-              <th>组合 / 方向</th>
-              <th>交易所</th>
-              <th>品种</th>
-              <th>数量 (BTC)</th>
-              <th>开仓价格 (USDT)</th>
-              <th>当前价格 (USDT)</th>
-              <th>当前资金费率</th>
-              <th>入场价差 (USDT)</th>
-              <th>当前基差 (USDT)</th>
-              <th>累计资金费收益 (USDT)</th>
-              <th>未实现盈亏 (USDT)</th>
-              <th>保证金 (USDT)</th>
-              <th>保证金率</th>
-              <th>状态</th>
-              <th>操作</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="row in positionRows" :key="row.name + row.leg">
-              <td>
-                <strong>{{ row.name }}</strong>
-                <p>{{ row.leg }}</p>
-              </td>
-              <td>{{ row.exchange }}</td>
-              <td>{{ row.symbol }}</td>
-              <td>{{ row.qty }}</td>
-              <td>{{ row.entry }}</td>
-              <td>{{ row.mark }}</td>
-              <td>{{ row.funding }}</td>
-              <td>{{ row.entryBasis }}</td>
-              <td class="green">{{ row.currentBasis }}</td>
-              <td class="green">{{ row.carry }}</td>
-              <td class="green">{{ row.pnl }}</td>
-              <td>{{ row.margin }}</td>
-              <td>{{ row.marginRatio }}</td>
-              <td class="green">{{ row.status }}</td>
-              <td><button class="flat-action" type="button">平仓</button></td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-
-      <div class="positions-footer">
-        <span>名义本金: 100,000.00 USDT</span>
-        <span>总保证金: 40,300.00 USDT</span>
-        <span>整体保证金率: 35.00%</span>
-        <span class="green">预计年化综合净收益率: +22.31%</span>
-      </div>
-    </section>
+    <FundingPositionsPanel />
   </section>
 </template>
 
 <script setup lang="ts">
   import { computed, nextTick, onMounted, ref, type Ref } from 'vue';
   import { useECharts } from '@/hooks/web/useECharts';
+  import FundingExecutionPanel from './FundingExecutionPanel.vue';
+  import FundingPositionsPanel from './FundingPositionsPanel.vue';
+  import FundingStatusPanel from './FundingStatusPanel.vue';
   import type { FundingOrderPanelData } from '../types';
 
   defineProps<{ data: FundingOrderPanelData }>();
@@ -569,78 +250,18 @@
     { label: '当前值', rate: '+0.0810%', basis: '+0.0102%', state: '处于偏高区间' },
   ];
 
-  const positionRows = [
-    {
-      name: '套利组合 #1',
-      leg: '现货买入',
-      exchange: 'Binance',
-      symbol: 'BTC/USDT',
-      qty: '0.5000',
-      entry: '102,200.0',
-      mark: '102,350.0',
-      funding: '--',
-      entryBasis: '+12.0',
-      currentBasis: '+10.5',
-      carry: '+285.40',
-      pnl: '+75.00',
-      margin: '10,250.00',
-      marginRatio: '35.10%',
-      status: '正常',
-    },
-    {
-      name: '套利组合 #1',
-      leg: '永续卖出',
-      exchange: 'Binance',
-      symbol: 'BTCUSDT 永续',
-      qty: '0.5000',
-      entry: '102,212.0',
-      mark: '102,341.2',
-      funding: '+0.0810%',
-      entryBasis: '+12.0',
-      currentBasis: '+10.5',
-      carry: '+285.40',
-      pnl: '+64.60',
-      margin: '10,250.00',
-      marginRatio: '35.10%',
-      status: '正常',
-    },
-    {
-      name: '套利组合 #2',
-      leg: '现货买入',
-      exchange: 'Binance',
-      symbol: 'BTC/USDT',
-      qty: '0.4791',
-      entry: '101,980.0',
-      mark: '102,350.0',
-      funding: '--',
-      entryBasis: '+8.5',
-      currentBasis: '+10.5',
-      carry: '+195.30',
-      pnl: '+177.30',
-      margin: '9,800.00',
-      marginRatio: '34.80%',
-      status: '正常',
-    },
-    {
-      name: '套利组合 #2',
-      leg: '永续卖出',
-      exchange: 'Binance',
-      symbol: 'BTCUSDT 永续',
-      qty: '0.4791',
-      entry: '101,988.5',
-      mark: '102,341.2',
-      funding: '+0.0810%',
-      entryBasis: '+8.5',
-      currentBasis: '+10.5',
-      carry: '+195.30',
-      pnl: '+169.30',
-      margin: '9,800.00',
-      marginRatio: '34.80%',
-      status: '正常',
-    },
-  ];
+  interface FundingCloseRow {
+    id: string;
+    name: string;
+    spot: string;
+    perp: string;
+    rate: string;
+    basis: string;
+    pnl: string;
+    status: string;
+  }
 
-  const fundingCloseRows = ref([
+  const fundingCloseRows = ref<FundingCloseRow[]>([
     {
       id: 'carry-1',
       name: '资金费组合 #1',
@@ -663,7 +284,14 @@
     },
   ]);
 
-  const executionFeedback = ref([
+  type ExecutionFeedbackRow = {
+    id: string;
+    tone: 'is-success' | 'is-info';
+    time: string;
+    text: string;
+  };
+
+  const executionFeedback = ref<ExecutionFeedbackRow[]>([
     {
       id: 'feedback-1',
       tone: 'is-success',
@@ -798,16 +426,14 @@
   .panel-title--between,
   .exchange-card__head,
   .exchange-brand,
-  .yield-item,
-  .positions-footer {
+  .yield-item {
     display: flex;
     align-items: center;
   }
 
   .funding-exec-topbar,
   .panel-title--between,
-  .exchange-card__head,
-  .positions-footer {
+  .exchange-card__head {
     justify-content: space-between;
   }
 
@@ -911,120 +537,10 @@
     font-weight: 900;
   }
 
-  .status-panel {
-    display: flex;
-    flex-direction: column;
-    height: 100%;
-    padding: 14px;
-  }
-
-  .order-panel,
   .history-panel {
     display: flex;
     flex-direction: column;
     height: 100%;
-  }
-
-  .order-panel {
-    min-height: 684px;
-  }
-
-  .order-panel .panel-title h3 {
-    font-family: var(--strategy-font-heading);
-    font-size: 21px;
-    font-weight: 800;
-    letter-spacing: -0.012em;
-    color: #162845;
-  }
-
-  .rule-list {
-    display: grid;
-    gap: 10px;
-  }
-
-  .rule-list__row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 16px;
-    min-height: 42px;
-    padding: 0 12px;
-    border: 1px solid #e6ebf2;
-    border-radius: 10px;
-    background: #fff;
-  }
-
-  .rule-list__label {
-    color: #5d6d80;
-    font-size: 13px;
-    font-weight: 700;
-  }
-
-  .rule-list__value {
-    color: #364152;
-    font-size: 12px;
-    font-weight: 700;
-    text-align: right;
-    line-height: 1.45;
-  }
-
-  .status-feedback {
-    margin-top: 14px;
-    padding-top: 12px;
-    border-top: 1px solid #eef2f7;
-  }
-
-  .status-feedback__head {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 10px;
-  }
-
-  .status-feedback__head strong {
-    color: #111827;
-    font-size: 15px;
-    font-weight: 800;
-  }
-
-  .status-feedback__head button {
-    border: none;
-    background: transparent;
-    color: #526173;
-    font-size: 12px;
-    cursor: pointer;
-    font-weight: 700;
-  }
-
-  .status-feedback__list {
-    display: grid;
-    gap: 10px;
-  }
-
-  .status-feedback__list p {
-    display: flex;
-    align-items: flex-start;
-    gap: 8px;
-    margin: 0;
-    color: #364152;
-    font-size: 12px;
-    line-height: 1.55;
-  }
-
-  .status-feedback__dot {
-    width: 8px;
-    height: 8px;
-    margin-top: 5px;
-    border-radius: 999px;
-    flex: none;
-  }
-
-  .status-feedback__dot.is-success {
-    background: #22c55e;
-  }
-
-  .status-feedback__dot.is-info {
-    background: #60a5fa;
   }
 
   .exchange-grid {
@@ -1091,8 +607,7 @@
 
   .exchange-stats div,
   .opportunity-meta div,
-  .yield-item,
-  .positions-metric {
+  .yield-item {
     display: flex;
     align-items: baseline;
     justify-content: space-between;
@@ -1101,11 +616,7 @@
 
   .exchange-stats span,
   .opportunity-meta span,
-  .mini-kpi span,
-  .field span,
-  .yield-item span,
-  .positions-metric span,
-  .funding-leg-card span {
+  .yield-item span {
     color: #566578;
     font-size: 12px;
     font-weight: 700;
@@ -1113,9 +624,7 @@
 
   .exchange-stats strong,
   .opportunity-meta strong,
-  .mini-kpi strong,
-  .yield-item strong,
-  .positions-metric strong {
+  .yield-item strong {
     font-size: 14px;
     font-weight: 700;
     color: #111827;
@@ -1140,24 +649,16 @@
     margin-top: 18px;
   }
 
-  .range-tabs,
-  .stage-tabs,
-  .funding-mode-tabs {
+  .range-tabs {
     display: inline-flex;
     gap: 8px;
   }
 
-  .range-tabs button,
-  .stage-tabs button,
-  .funding-mode-tabs button,
-  .submit-btn,
-  .flat-action {
+  .range-tabs button {
     cursor: pointer;
   }
 
-  .range-tabs button,
-  .stage-tabs button,
-  .funding-mode-tabs button {
+  .range-tabs button {
     min-width: 48px;
     height: 40px;
     padding: 0 12px;
@@ -1169,9 +670,7 @@
     font-weight: 800;
   }
 
-  .range-tabs .active,
-  .stage-tabs .active,
-  .funding-mode-tabs .active {
+  .range-tabs .active {
     border-color: rgba(220, 82, 82, 0.38);
     background: linear-gradient(180deg, #ff6868 0%, #ef4343 100%);
     color: #fff;
@@ -1186,231 +685,15 @@
     height: 100%;
   }
 
-  .funding-stage-tabs {
-    margin-bottom: 14px;
-  }
-
-  .order-panel .stage-tabs button,
-  .order-panel .funding-mode-tabs button {
-    color: #47617f;
-    font-size: 14px;
-    font-weight: 700;
-    letter-spacing: 0.01em;
-  }
-
-  .funding-order-grid {
-    display: grid;
-    grid-template-columns: 1.03fr 1fr;
-    gap: 16px;
-    min-height: 330px;
-    align-items: start;
-  }
-
-  .funding-order-column {
-    display: grid;
-    gap: 12px;
-  }
-
-  .funding-order-row {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 12px;
-  }
-
-  .field {
-    display: grid;
-    gap: 6px;
-  }
-
-  .field--compact span {
-    font-size: 13px;
-    font-weight: 700;
-    letter-spacing: 0.01em;
-    color: #2f3640;
-  }
-
-  .field select,
-  .field input {
-    width: 100%;
-    height: 48px;
-    border: 1px solid #e7ebf0;
-    border-radius: 12px;
-    background: #fff;
-    padding: 0 12px;
-    color: #13233f;
-    font-size: 14px;
-    font-weight: 700;
-    letter-spacing: -0.01em;
-  }
-
-  .input-with-unit {
-    display: grid;
-    grid-template-columns: 1fr 72px;
-    overflow: hidden;
-    border: 1px solid #e7ebf0;
-    border-radius: 12px;
-  }
-
-  .input-with-unit input {
-    border: none;
-    border-radius: 0;
-  }
-
-  .input-with-unit em {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    background: #ffffff;
-    color: #6b7280;
-    font-size: 13px;
-    font-style: normal;
-    font-weight: 800;
-    letter-spacing: 0.02em;
-  }
-
-  .funding-leg-grid {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 12px;
-  }
-
-  .funding-leg-card {
-    display: grid;
-    gap: 6px;
-    min-height: 88px;
-    padding: 12px 14px;
-    border: 1px solid #e9edf2;
-    border-radius: 14px;
-    background: linear-gradient(180deg, #ffffff 0%, #fcfdff 100%);
-  }
-
-  .funding-leg-card span {
-    color: #2f3640;
-    font-size: 13px;
-    font-weight: 700;
-    letter-spacing: 0.01em;
-  }
-
-  .funding-leg-card strong {
-    color: #111827;
-    font-size: 20px;
-    font-weight: 800;
-    letter-spacing: -0.02em;
-    font-variant-numeric: tabular-nums;
-  }
-
-  .funding-mode-tabs {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .funding-mode-tabs button {
-    height: 40px;
-    border-radius: 10px;
-  }
-
-  .funding-metric-grid {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 12px;
-  }
-
-  .mini-kpi {
-    min-height: 76px;
-    border: 1px solid #e9edf2;
-    border-radius: 14px;
-    background: linear-gradient(180deg, #ffffff 0%, #fcfdff 100%);
-    padding: 12px 14px;
-  }
-
-  .mini-kpi span {
-    color: #2f3640;
-    font-size: 13px;
-    font-weight: 700;
-    letter-spacing: 0.01em;
-  }
-
-  .mini-kpi strong {
-    color: #111827;
-    font-size: 20px;
-    font-weight: 800;
-    line-height: 1.2;
-    letter-spacing: -0.02em;
-    font-variant-numeric: tabular-nums;
-  }
-
-  .funding-action-row {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 12px;
-    margin-top: 14px;
-  }
-
-  .submit-btn {
-    width: 100%;
-    height: 52px;
-    border: none;
-    border-radius: 12px;
-    color: #fff;
-    font-size: 15px;
-    font-weight: 800;
-    letter-spacing: 0.01em;
-  }
-
-  .submit-btn--green {
-    background: linear-gradient(90deg, #119c41 0%, #0fa24c 100%);
-  }
-
-  .submit-btn--red {
-    background: linear-gradient(90deg, #df3342 0%, #f14f5c 100%);
-  }
-
-  .funding-close-shell {
-    display: grid;
-    gap: 16px;
-    min-height: 388px;
-    align-content: start;
-  }
-
-  .funding-close-head {
-    display: flex;
-    align-items: end;
-    justify-content: space-between;
-    gap: 12px;
-  }
-
-  .funding-close-limit {
-    min-width: 260px;
-  }
-
-  .funding-close-table-wrap {
-    flex: 1;
-    overflow: auto;
-    border: 1px solid #e9edf2;
-    border-radius: 14px;
-    background: rgba(255, 255, 255, 0.95);
-  }
-
-  .funding-close-table {
-    width: 100%;
-    border-collapse: collapse;
-  }
-
-  .funding-close-table th,
-  .funding-close-table td,
   .analysis-table th,
-  .analysis-table td,
-  .positions-table th,
-  .positions-table td {
+  .analysis-table td {
     padding: 12px 10px;
     border-bottom: 1px solid #edf2f7;
     text-align: left;
     font-size: 13px;
   }
 
-  .funding-close-table th,
-  .analysis-table th,
-  .positions-table th {
+  .analysis-table th {
     color: #5b6b7f;
     font-weight: 700;
     background: #fcfcfd;
@@ -1418,75 +701,13 @@
     letter-spacing: 0.01em;
   }
 
-  .positions-panel {
-    padding-bottom: 10px;
-  }
-
   .history-panel .analysis-table {
     flex: 1;
   }
 
-  .positions-metrics {
-    display: grid;
-    grid-template-columns: repeat(6, minmax(0, 1fr));
-    gap: 12px;
-    margin-bottom: 12px;
-  }
-
-  .positions-metric {
-    min-height: 64px;
-    padding: 10px 12px;
-    border: 1px solid #edf2f7;
-    border-radius: 12px;
-    background: #fff;
-    flex-direction: column;
-    align-items: flex-start;
-    justify-content: center;
-  }
-
-  .analysis-table,
-  .positions-table {
+  .analysis-table {
     width: 100%;
     border-collapse: collapse;
-  }
-
-  .positions-table-wrap {
-    overflow: auto;
-  }
-
-  .positions-table {
-    min-width: 1600px;
-  }
-
-  .positions-table td strong {
-    color: #111827;
-    font-size: 13px;
-  }
-
-  .positions-table td p {
-    margin: 4px 0 0;
-    color: #16a34a;
-    font-size: 12px;
-    font-weight: 700;
-  }
-
-  .flat-action {
-    min-width: 104px;
-    height: 40px;
-    border: 1px solid #2e61d8;
-    border-radius: 10px;
-    background: #fff;
-    color: #2e61d8;
-    font-size: 14px;
-    font-weight: 800;
-  }
-
-  .positions-footer {
-    gap: 28px;
-    margin-top: 12px;
-    color: #364152;
-    font-size: 13px;
-    font-weight: 700;
   }
 
   .green {
@@ -1506,12 +727,8 @@
   .exchange-card,
   .opportunity-card,
   .history-panel,
-  .status-panel,
   .yield-item,
-  .funding-leg-card,
-  .metric-block,
-  .analysis-card,
-  .positions-table-wrap {
+  .analysis-card {
     border-color: var(--strategy-border);
     background: linear-gradient(
       180deg,
@@ -1523,8 +740,6 @@
 
   .topbar-title h2,
   .panel-title h3,
-  .positions-table td strong,
-  .flat-action,
   .selector-chip strong {
     color: var(--strategy-text-1);
   }
@@ -1540,10 +755,7 @@
   .gear-btn,
   .ghost-btn,
   .field-input,
-  .field-select,
-  .stage-tabs button,
-  .funding-mode-tabs button,
-  .flat-action {
+  .field-select {
     border-color: var(--strategy-border-strong);
     background: var(--strategy-surface);
   }
@@ -1551,19 +763,9 @@
   .selector-chip span,
   .latency-chip,
   .field-label,
-  .rule-list__label,
   .analysis-table th,
-  .positions-table th,
-  .positions-footer,
   .exchange-card small {
     color: var(--strategy-text-3);
-  }
-
-  .stage-tabs .active,
-  .funding-mode-tabs .active {
-    background: var(--strategy-accent-soft);
-    color: var(--strategy-accent-strong);
-    box-shadow: inset 0 0 0 1px var(--strategy-accent-ring);
   }
 
   .panel-title h3 {
@@ -1571,79 +773,32 @@
     font-weight: 800;
   }
 
-  .funding-close-table th,
-  .analysis-table th,
-  .positions-table th {
+  .analysis-table th {
     color: var(--strategy-text-3);
     background: var(--strategy-table-head-bg);
     font-size: var(--strategy-font-sm);
   }
 
-  .funding-close-table td,
-  .analysis-table td,
-  .positions-table td {
+  .analysis-table td {
     border-bottom-color: var(--strategy-border-soft);
     font-size: var(--strategy-font-sm);
     font-weight: 700;
     color: var(--strategy-text-2);
   }
 
-  .positions-metric {
-    border-color: var(--strategy-border);
-    border-radius: var(--strategy-radius-card);
-    background: var(--strategy-surface);
-    box-shadow: var(--strategy-shadow-soft);
-  }
-
-  .flat-action {
-    border-color: var(--strategy-border-strong);
-    border-radius: var(--strategy-radius-control);
-    font-size: var(--strategy-font-base);
-  }
-
-  .order-panel .flat-action {
-    font-size: 14px;
-    font-weight: 700;
-    letter-spacing: 0.01em;
-  }
-
   @media (max-width: 1400px) {
     .funding-upper-grid,
     .funding-lower-grid,
-    .positions-metrics,
-    .exchange-grid,
-    .funding-order-grid,
-    .funding-order-row,
-    .funding-leg-grid,
-    .funding-metric-grid,
-    .funding-action-row {
+    .exchange-grid {
       grid-template-columns: 1fr;
     }
 
     .funding-exec-topbar,
     .topbar-controls,
-    .panel-title--between,
-    .positions-footer,
-    .funding-close-head {
+    .panel-title--between {
       flex-direction: column;
       align-items: flex-start;
     }
   }
 
-  @media (max-width: 1024px) {
-    .funding-close-head,
-    .rule-list {
-      gap: 10px;
-    }
-
-    .funding-close-limit {
-      min-width: 0;
-      width: 100%;
-    }
-
-    .positions-table-wrap,
-    .funding-close-table-wrap {
-      width: 100%;
-    }
-  }
 </style>

@@ -18,7 +18,7 @@ function Invoke-CheckedNative {
 
   & $FilePath @Arguments | Out-Host
   if ($LASTEXITCODE -ne 0) {
-    throw "Command failed with exit code $LASTEXITCODE: $FilePath $($Arguments -join ' ')"
+    throw "Command failed with exit code ${LASTEXITCODE}: $FilePath $($Arguments -join ' ')"
   }
 }
 
@@ -80,18 +80,18 @@ if (-not $SkipFrontend) {
   if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
     throw 'Node.js was not found. Install Node.js 20 or later first.'
   }
-  if (-not (Get-Command corepack -ErrorAction SilentlyContinue)) {
-    throw 'Corepack was not found.'
+  if (-not (Get-Command npx -ErrorAction SilentlyContinue)) {
+    throw 'npx was not found. Use a Node.js installation that includes npm/npx.'
   }
 
   Push-Location $FrontendPath
   try {
-    Invoke-CheckedNative -FilePath 'corepack' -Arguments @('enable')
-    Invoke-CheckedNative -FilePath 'corepack' -Arguments @('prepare', 'pnpm@8.1.0', '--activate')
+    $Package = Get-Content (Join-Path $FrontendPath 'package.json') -Raw | ConvertFrom-Json
+    $PnpmPackage = $Package.packageManager
     if (-not $SkipInstall) {
-      Invoke-CheckedNative -FilePath 'pnpm' -Arguments @('install', '--frozen-lockfile')
+      Invoke-CheckedNative -FilePath 'npx' -Arguments @($PnpmPackage, 'install', '--frozen-lockfile')
     }
-    Invoke-CheckedNative -FilePath 'pnpm' -Arguments @('type:check')
+    Invoke-CheckedNative -FilePath 'npx' -Arguments @($PnpmPackage, 'type:check')
   }
   finally {
     Pop-Location

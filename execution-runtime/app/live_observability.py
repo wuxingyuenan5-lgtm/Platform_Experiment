@@ -17,10 +17,12 @@ def bybit_positions(adapter, account_id: str | None = None) -> list[VenuePositio
     account = account_id or adapter._single_account()
     adapter._assert_account(account)
     try:
-        response = adapter._client().get_positions(
-            category=adapter.settings.bybit_category,
-            settleCoin=adapter.settings.bybit_settle_coin,
-            limit=200,
+        response = adapter._with_fresh_client_retry(
+            lambda client: client.get_positions(
+                category=adapter.settings.bybit_category,
+                settleCoin=adapter.settings.bybit_settle_coin,
+                limit=200,
+            )
         )
         adapter._require_success(response, "Bybit position-risk query failed")
     except Exception as exc:

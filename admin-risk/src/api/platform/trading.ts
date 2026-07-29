@@ -2,6 +2,7 @@ import axios, { type AxiosInstance } from 'axios';
 
 import type {
   AccountResult,
+  BalanceResult,
   CreateExecutionBatchInput,
   CredentialReferenceResult,
   CrossSpreadHistoryPointResult,
@@ -9,6 +10,7 @@ import type {
   CrossSpreadSnapshotResult,
   ExchangeConnectivityResult,
   ExecutionBatchResult,
+  FillResult,
   InstrumentResult,
   OrderDetailResult,
   OrderResult,
@@ -93,6 +95,18 @@ export async function getTradingPnl(
   try {
     const response = await client.get<PnlResult>(
       `/accounts/${encodeURIComponent(accountId)}/pnl/${encodeURIComponent(instrumentId)}`,
+    );
+    return response.data;
+  } catch (error) {
+    if (isNotFound(error)) return null;
+    throw error;
+  }
+}
+
+export async function getAccountBalanceLatest(accountId: string): Promise<BalanceResult | null> {
+  try {
+    const response = await client.get<BalanceResult>(
+      `/accounts/${encodeURIComponent(accountId)}/balances/latest`,
     );
     return response.data;
   } catch (error) {
@@ -207,6 +221,11 @@ export async function getInstruments(): Promise<InstrumentResult[]> {
 
 export async function getOrders(): Promise<OrderDetailResult[]> {
   const response = await client.get<OrderDetailResult[]>('/trading/orders');
+  return response.data;
+}
+
+export async function getFills(): Promise<FillResult[]> {
+  const response = await client.get<FillResult[]>('/trading/fills');
   return response.data;
 }
 

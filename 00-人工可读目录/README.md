@@ -30,7 +30,7 @@
 powershell -ExecutionPolicy Bypass -File .\scripts\dev-platform.ps1
 ```
 
-脚本会按需安装依赖、启动三个窗口并检查 5173、8000 和 8100 服务是否就绪。
+脚本会按需安装依赖、启动三个窗口并检查 4373、8000 和 8100 服务是否就绪。
 
 ## 开发流程
 

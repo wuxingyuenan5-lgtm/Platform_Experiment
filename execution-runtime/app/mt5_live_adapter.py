@@ -399,9 +399,14 @@ class Mt5LiveAdapter:
             import MetaTrader5 as mt5
         except ImportError as exc:
             raise GatewayConfigurationError("MetaTrader5 dependency is not installed") from exc
-        if self._connected:
+        if self._connected and mt5.account_info() is not None:
             return mt5
-        initialized = mt5.initialize(path=self.settings.mt5_terminal_path)
+        self._connected = False
+        timeout_ms = int(self.settings.mt5_check_timeout_seconds * 1000)
+        initialized = mt5.initialize(
+            path=self.settings.mt5_terminal_path,
+            timeout=timeout_ms,
+        )
         if not initialized:
             raise GatewayConfigurationError(f"MT5 initialize failed: {mt5.last_error()}")
         secret = self._secret()
@@ -409,6 +414,7 @@ class Mt5LiveAdapter:
             int(secret["LOGIN"]),
             password=secret["PASSWORD"],
             server=secret["SERVER"],
+            timeout=timeout_ms,
         )
         if not authorized:
             raise GatewayConfigurationError(f"MT5 login failed: {mt5.last_error()}")

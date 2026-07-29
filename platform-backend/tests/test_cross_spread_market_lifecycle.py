@@ -61,7 +61,7 @@ def insert_batch_with_fills(batch_id: str, *, direction: str = "OPEN_LONG") -> N
                 "mt5_leg",
                 "account_mt5_demo",
                 "instrument_xau_usd",
-                "XAUUSD+",
+                "XAUUSD.s",
                 "sell",
                 "0.01",
                 "mt5-order-id",
@@ -175,7 +175,7 @@ def available_snapshot() -> CrossSpreadSnapshotResponse:
             },
             "mt5": {
                 "venue": "mt5",
-                "symbol": "XAUUSD+",
+                "symbol": "XAUUSD.s",
                 "status": "available",
                 "quote": {
                     "bid": "2501",
@@ -185,7 +185,7 @@ def available_snapshot() -> CrossSpreadSnapshotResponse:
                 },
                 "positions": [
                     {
-                        "symbol": "XAUUSD+",
+                        "symbol": "XAUUSD.s",
                         "side": "sell",
                         "quantity": "-0.01",
                         "averagePrice": "2501",
@@ -219,7 +219,7 @@ def live_open_positions() -> tuple[list[LivePosition], list[LivePosition]]:
                 external_position_id="778899",
                 account_id="account_mt5_demo",
                 instrument_id="instrument_xau_usd",
-                symbol="XAUUSD+",
+                symbol="XAUUSD.s",
                 net_quantity=Decimal("-0.01"),
             )
         ],

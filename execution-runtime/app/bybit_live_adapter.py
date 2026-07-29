@@ -219,9 +219,11 @@ class BybitLiveAdapter:
         account = account_id or self._single_account()
         self._assert_account(account)
         try:
-            response = self._client().get_positions(
-                category=self.settings.bybit_category,
-                settleCoin=self.settings.bybit_settle_coin,
+            response = self._with_fresh_client_retry(
+                lambda client: client.get_positions(
+                    category=self.settings.bybit_category,
+                    settleCoin=self.settings.bybit_settle_coin,
+                )
             )
             self._require_success(response, "Bybit position query failed")
         except GatewayRequestRejectedError:
@@ -258,7 +260,9 @@ class BybitLiveAdapter:
         account = account_id or self._single_account()
         self._assert_account(account)
         try:
-            response = self._client().get_wallet_balance(accountType="UNIFIED")
+            response = self._with_fresh_client_retry(
+                lambda client: client.get_wallet_balance(accountType="UNIFIED")
+            )
             self._require_success(response, "Bybit wallet query failed")
         except GatewayRequestRejectedError:
             raise
@@ -269,6 +273,7 @@ class BybitLiveAdapter:
             return []
         account_row = result_rows[0]
         as_of = datetime.now(UTC)
+        account_available = self._optional_decimal(account_row.get("totalAvailableBalance"))
         snapshots: list[VenueBalanceSnapshot] = []
         for coin in account_row.get("coin") or []:
             currency = str(coin.get("coin") or "").upper()
@@ -282,8 +287,9 @@ class BybitLiveAdapter:
                     externalBalanceId=f"{account}:{currency}:{int(as_of.timestamp())}",
                     accountId=account,
                     equity=equity,
-                    availableBalance=Decimal(
-                        str(coin.get("availableToWithdraw") or coin.get("availableToBorrow") or "0")
+                    availableBalance=self._available_balance(
+                        coin,
+                        account_available=account_available,
                     ),
                     currency=currency,
                     asOf=as_of,
@@ -401,8 +407,10 @@ class BybitLiveAdapter:
             return self._resolved_client
         try:
             from pybit.unified_trading import HTTP
+            from pybit import _helpers
         except ImportError as exc:
             raise GatewayConfigurationError("pybit dependency is not installed") from exc
+        self._apply_timestamp_offset(_helpers)
         try:
             secret = resolve_secret_reference(
                 self.settings.bybit_credential_ref,
@@ -418,6 +426,25 @@ class BybitLiveAdapter:
             recv_window=self.settings.bybit_recv_window,
         )
         return self._resolved_client
+
+    def _with_fresh_client_retry(self, operation):
+        try:
+            return operation(self._client())
+        except Exception:
+            if self._injected_client is not None:
+                raise
+            self._resolved_client = None
+            return operation(self._client())
+
+    def _apply_timestamp_offset(self, helpers) -> None:
+        offset_ms = int(getattr(self.settings, "bybit_timestamp_offset_ms", 0) or 0)
+        if offset_ms == 0:
+            return
+        original = getattr(helpers, "_vg_original_generate_timestamp", None)
+        if original is None:
+            original = helpers.generate_timestamp
+            setattr(helpers, "_vg_original_generate_timestamp", original)
+        helpers.generate_timestamp = lambda: original() + offset_ms
 
     def _assert_account(self, account_id: str) -> None:
         if account_id not in self.settings.bybit_accounts:
@@ -510,6 +537,21 @@ class BybitLiveAdapter:
         if value in {None, ""}:
             return None
         return Decimal(str(value))
+
+    @staticmethod
+    def _available_balance(
+        coin: dict[str, object],
+        *,
+        account_available: Decimal | None,
+    ) -> Decimal:
+        coin_available = coin.get("availableToWithdraw") or coin.get("availableToBorrow")
+        if coin_available in {None, ""} and account_available is not None:
+            return account_available
+        coin_available = coin_available or coin.get("walletBalance") or "0"
+        parsed = Decimal(str(coin_available))
+        if parsed == 0 and account_available is not None:
+            return account_available
+        return parsed
 
     @staticmethod
     def _millis(value: object) -> datetime:

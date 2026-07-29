@@ -1,3 +1,7 @@
+<!--
+  @deprecated Product pages must use CrossVenueExecutionReplica.vue / SpreadExecutionCommand.
+  This component is kept only as a reference for lifecycle API wiring.
+-->
 <template>
   <section class="market-lifecycle">
     <header class="market-lifecycle__header">

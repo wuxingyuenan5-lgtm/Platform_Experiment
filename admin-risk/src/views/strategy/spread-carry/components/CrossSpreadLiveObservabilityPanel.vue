@@ -1,3 +1,7 @@
+<!--
+  @deprecated Product pages must show observability inside the position overview.
+  This component is kept only as a reference for read-only account data mapping.
+-->
 <template>
   <section class="live-observability">
     <header class="panel-header">

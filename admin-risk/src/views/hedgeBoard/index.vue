@@ -14,75 +14,21 @@
       />
 
       <div v-else class="terminal-content" :class="{ 'terminal-content--gold': useUnifiedResearchUi }">
-        <section class="research-module" :class="{ 'research-module--gold': useUnifiedResearchUi }" :id="activeModule.id">
-          <nav class="module-subnav" :class="{ 'module-subnav--gold': useUnifiedResearchUi }" :aria-label="`${activeModule.label} 子页导航`">
-            <button
-              v-for="(section, index) in visibleSections"
-              :key="section.id"
-              type="button"
-              @click="jumpToSection(section.id)"
-            >
-              <span class="module-subnav__title-row">
-                <span class="module-subnav__index">{{ String(index + 1).padStart(2, '0') }}</span>
-                <strong>{{ getSectionTitle(section.id, section.title) }}</strong>
-              </span>
-            </button>
-          </nav>
-
-          <div v-if="activeModule.formula" class="formula-strip">
-            <div>
-              <span>核心公式</span>
-              <strong>{{ activeModule.formula.title }}</strong>
-            </div>
-          </div>
-
-          <section
-            v-for="section in visibleSections"
-            :id="section.id"
-            :key="section.id"
-            class="chart-section"
-            :class="{ 'chart-section--gold': useUnifiedResearchUi }"
-          >
-            <div class="chart-section__heading">
-              <div>
-                <h4>{{ getSectionTitle(section.id, section.title) }}</h4>
-              </div>
-            </div>
-
-            <div class="widget-grid" :class="`widget-grid--${section.layout ?? 'three'}`">
-              <article
-                v-for="widget in section.widgets"
-                :key="`${section.id}-${widget.title}`"
-                class="widget-card"
-              >
-                <div v-if="!shouldHideWidgetHeader(section.id, widget)" class="widget-card__header">
-                  <div class="widget-card__header-main">
-                    <div class="widget-card__title-row">
-                      <h5>{{ getWidgetTitle(widget.localKey, widget.title) }}</h5>
-                    </div>
-                    <a
-                      v-if="getWidgetSourceLink(widget.localKey)"
-                      class="widget-card__link"
-                      :href="getWidgetSourceLink(widget.localKey)"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      原网址
-                    </a>
-                  </div>
-                </div>
-
-                <WidgetErrorBoundary :widget-title="widget.title">
-                  <LocalChartWidget
-                    v-if="widget.kind === 'local-chart' && widget.localKey"
-                    :widget="widget"
-                  />
-                  <TradingViewWidget v-else :widget="widget" />
-                </WidgetErrorBoundary>
-              </article>
-            </div>
-          </section>
-        </section>
+        <HedgeResearchModule
+          :module-id="activeModule.id"
+          :module-label="activeModule.label"
+          :formula="activeModule.formula"
+          :sections="visibleSections"
+          :unified="useUnifiedResearchUi"
+          :resolve-section-title="getSectionTitle"
+          :should-hide-widget-header="shouldHideWidgetHeader"
+          :resolve-widget-title="getWidgetTitle"
+          :resolve-widget-source-link="getWidgetSourceLink"
+          :local-chart-widget="LocalChartWidget"
+          :trading-view-widget="TradingViewWidget"
+          :widget-error-boundary="WidgetErrorBoundary"
+          @jump="jumpToSection"
+        />
 
         <section v-if="activeTradingToolCatalog" class="hedge-board__tool-board">
           <div class="hedge-board__tool-board-head">
@@ -119,6 +65,7 @@
   import { useRoute, useRouter } from 'vue-router';
   import { PageWrapper } from '@/components/Page';
   import CompactSegmentTabs from '@/views/strategy/shared/CompactSegmentTabs.vue';
+  import HedgeResearchModule from './components/HedgeResearchModule.vue';
   import MarketTerminalPage from './components/MarketTerminalPage.vue';
   import ToolGroupSection from './tradingTools/components/ToolGroupSection.vue';
   import TerminalDetailPanel from './components/TerminalDetailPanel.vue';
@@ -133,7 +80,11 @@
     marketTerminalConfigs,
     type TerminalMarketId,
   } from './nativeData/marketTerminal';
-  import { tradingToolBoardCatalogMap } from './tradingTools/data/catalog';
+  import {
+    loadTradingToolBoardCatalog,
+    type TradingToolCatalogSection,
+    type TradingToolBoardCatalogKey,
+  } from './tradingTools/data/catalog';
 
   type HedgeCategory = 'macro' | 'gold' | 'crypto' | 'us' | 'global' | 'aShare';
 
@@ -378,12 +329,25 @@
   const activeModule = computed<ResearchModule>(
     () => researchModules.find((module) => module.id === activeCategory.value) ?? researchModules[0],
   );
-  const activeTradingToolCatalog = computed(() => {
-    if (activeCategory.value === 'macro') return tradingToolBoardCatalogMap.macro;
-    if (activeCategory.value === 'gold') return tradingToolBoardCatalogMap.gold;
-    if (activeCategory.value === 'crypto') return tradingToolBoardCatalogMap.crypto;
-    return null;
-  });
+  const activeTradingToolCatalog = ref<TradingToolCatalogSection | null>(null);
+  let tradingToolCatalogRequestId = 0;
+
+  watch(
+    () => activeCategory.value,
+    async (category) => {
+      if (category !== 'macro' && category !== 'gold' && category !== 'crypto') {
+        activeTradingToolCatalog.value = null;
+        return;
+      }
+
+      const requestId = ++tradingToolCatalogRequestId;
+      const catalog = await loadTradingToolBoardCatalog(category as TradingToolBoardCatalogKey);
+      if (requestId === tradingToolCatalogRequestId) {
+        activeTradingToolCatalog.value = catalog;
+      }
+    },
+    { immediate: true },
+  );
   const useUnifiedResearchUi = computed(() => true);
   const visibleSections = computed(() => activeModule.value.sections);
 
@@ -454,6 +418,8 @@
   const widgetSourceLinks: Partial<Record<string, string>> = {
     'btc-etf-flow': 'https://sosovalue.com/zh/assets/etf/Total_Crypto_Spot_ETF_Fund_Flow?page=usBTC',
     'btc-treasury-flow': 'https://sosovalue.com/zh/assets/bitcoin-treasuries/weekly-net-inflow',
+    'etf-weekly-flows': ETF_REFERENCE_URL,
+    'etf-ytd-summary': ETF_REFERENCE_URL,
     'spdr-daily-flow': 'https://sc.macromicro.me/collections/45/mm-gold-price/23274/gld-fund-flow',
     'spdr-holdings-vs-price': 'https://sc.macromicro.me/collections/45/mm-gold-price/712/spdr-gold-trust-etf-gold-price',
   };
@@ -1658,36 +1624,6 @@
             },
           }, [
             h(
-              'a',
-              {
-                class: 'widget-card__link chart-shell__link-overlay etf-weekly-panel__link',
-                href: ETF_REFERENCE_URL,
-                target: '_blank',
-                rel: 'noreferrer',
-                style: {
-                  position: 'absolute',
-                  top: '8px',
-                  right: '8px',
-                  zIndex: 5,
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  minHeight: '34px',
-                  padding: '0 14px',
-                  border: '1px solid rgba(189, 206, 232, 0.96)',
-                  borderRadius: '15px',
-                  background: 'rgba(255, 255, 255, 0.98)',
-                  color: '#2b3b52',
-                  fontSize: '12px',
-                  fontWeight: 700,
-                  lineHeight: 1,
-                  textDecoration: 'none',
-                  boxShadow: '0 1px 2px rgba(148, 163, 184, 0.08)',
-                },
-              },
-              '原网址',
-            ),
-            h(
               'svg',
               {
                 viewBox: `0 0 ${CHART_WIDTH} ${panelHeight}`,
@@ -2368,7 +2304,6 @@
   .platform-topbar,
   .hero-panel,
   .strategy-strip__card,
-  .module-subnav,
   .formula-strip,
   .source-strip,
   .chart-section,
@@ -2508,7 +2443,6 @@
 
   .platform-topbar,
   .hero-panel,
-  .module-subnav,
   .formula-strip,
   .source-strip,
   .chart-section {
@@ -2517,7 +2451,6 @@
 
   .platform-topbar,
   .hero-panel,
-  .module-subnav,
   .formula-strip,
   .source-strip,
   .chart-section {
@@ -2713,51 +2646,6 @@
     font-weight: 700;
   }
 
-  .module-subnav {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 12px;
-  }
-
-  .module-subnav button {
-    flex: 1 1 180px;
-    padding: 14px 16px;
-    border: 1px solid rgba(201, 213, 226, 0.58);
-    border-radius: 18px;
-    background: rgba(242, 247, 251, 0.88);
-    text-align: left;
-    cursor: pointer;
-  }
-
-  .module-subnav__title-row {
-    display: inline-flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 8px;
-    color: var(--hedge-cool-text);
-    font-size: 14px;
-    font-weight: 700;
-    line-height: 1.4;
-  }
-
-  .module-subnav__title-row strong {
-    color: inherit;
-    font-size: inherit;
-    font-weight: inherit;
-    line-height: inherit;
-  }
-
-  .module-subnav__index {
-    display: inline-flex;
-    align-items: center;
-    color: inherit;
-    font-size: 14px;
-    font-weight: 700;
-    line-height: 1.4;
-    font-family: inherit;
-    letter-spacing: 0.01em;
-  }
-
   .formula-strip {
     display: grid;
     grid-template-columns: 280px minmax(0, 1fr);
@@ -2925,13 +2813,6 @@
     border: 1px solid rgba(201, 213, 226, 0.58);
     border-radius: 18px;
     background: #fff;
-  }
-
-  .chart-shell__link-overlay {
-    position: absolute;
-    top: 10px;
-    right: 10px;
-    z-index: 3;
   }
 
   .local-chart-svg {
@@ -3186,18 +3067,6 @@
     margin-left: auto;
   }
 
-  .etf-weekly-panel__link {
-    min-height: 34px;
-    padding: 0 14px;
-    border-color: rgba(189, 206, 232, 0.96);
-    border-radius: 15px;
-    background: rgba(255, 255, 255, 0.98);
-    color: #2b3b52;
-    font-size: 12px;
-    font-weight: 700;
-    box-shadow: 0 1px 2px rgba(148, 163, 184, 0.08);
-  }
-
   .widget-frame .tradingview-widget-container,
   .widget-frame .tradingview-widget-container__widget {
     width: 100%;
@@ -3221,11 +3090,6 @@
     border-right: none;
     border-bottom: none;
     background: transparent;
-  }
-
-  .chart-shell--etf-weekly .chart-shell__link-overlay {
-    top: 8px;
-    right: 8px;
   }
 
 .chart-legend--weekly {
@@ -3381,23 +3245,6 @@
     background: transparent;
     box-shadow: none;
     gap: 18px;
-  }
-
-  .module-subnav--gold {
-    gap: 14px;
-  }
-
-  .module-subnav--gold button {
-    flex: 1 1 220px;
-    padding: 18px 20px;
-    border: 1px solid var(--hedge-cool-border-strong);
-    border-radius: 18px;
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(243, 248, 252, 0.98));
-    box-shadow: 0 10px 28px rgba(31, 41, 55, 0.04);
-  }
-
-  .module-subnav--gold button strong {
-    font-size: 18px;
   }
 
   .chart-section--gold {
@@ -3735,7 +3582,6 @@
   .platform-topbar,
   .hero-panel,
   .strategy-strip__card,
-  .module-subnav,
   .formula-strip,
   .source-strip,
   .chart-section,
@@ -3774,7 +3620,6 @@
   }
 
   .strategy-sidebar__link,
-  .module-subnav button,
   .metric-strip article,
   .module-heading__summary,
   .chart-shell,
@@ -3811,10 +3656,6 @@
   .platform-topbar__meta span {
     background: var(--hedge-cool-pill);
     color: var(--hedge-cool-muted);
-  }
-
-  .module-subnav button {
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(245, 249, 252, 0.96));
   }
 
   .formula-strip {
@@ -3895,7 +3736,6 @@
   @media (max-width: 768px) {
     .platform-topbar,
     .hero-panel,
-    .module-subnav,
     .formula-strip,
     .source-strip,
     .chart-section {
@@ -3930,9 +3770,3 @@
     }
   }
 </style>
-
-
-
-
-
-

@@ -53,6 +53,9 @@ class FakeMt5Module:
     def initialize(self, **kwargs):
         return True
 
+    def login(self, *args, **kwargs):
+        return True
+
     def symbol_info_tick(self, symbol: str):
         assert symbol == "XAUUSD+"
         return type("Tick", (), {"bid": 3331.0, "ask": 3331.4, "last": 3331.2})()
@@ -83,9 +86,9 @@ def test_cross_spread_snapshot_uses_real_quotes_and_positions_without_secret_mat
 ) -> None:
     monkeypatch.setenv("VG_SECRET_CRYPTO_TEST_001_API_KEY", "real-key")
     monkeypatch.setenv("VG_SECRET_CRYPTO_TEST_001_SECRET", "real-secret")
-    monkeypatch.setenv("VG_SECRET_MT5_DEMO_001_API_KEY", "1234567")
-    monkeypatch.setenv("VG_SECRET_MT5_DEMO_001_SECRET", "mt5-password")
-    monkeypatch.setenv("VG_SECRET_MT5_DEMO_001_PASSPHRASE", "BrokerDemo")
+    monkeypatch.setenv("VG_SECRET_MT5_DEMO_001_LOGIN", "1234567")
+    monkeypatch.setenv("VG_SECRET_MT5_DEMO_001_PASSWORD", "mt5-password")
+    monkeypatch.setenv("VG_SECRET_MT5_DEMO_001_SERVER", "BrokerDemo")
 
     snapshot = build_cross_spread_snapshot(
         bybit_symbol="XAUTUSDT",
@@ -124,9 +127,9 @@ def test_cross_spread_snapshot_keeps_bybit_quote_when_position_endpoint_fails(
 ) -> None:
     monkeypatch.setenv("VG_SECRET_CRYPTO_TEST_001_API_KEY", "real-key")
     monkeypatch.setenv("VG_SECRET_CRYPTO_TEST_001_SECRET", "real-secret")
-    monkeypatch.setenv("VG_SECRET_MT5_DEMO_001_API_KEY", "1234567")
-    monkeypatch.setenv("VG_SECRET_MT5_DEMO_001_SECRET", "mt5-password")
-    monkeypatch.setenv("VG_SECRET_MT5_DEMO_001_PASSPHRASE", "BrokerDemo")
+    monkeypatch.setenv("VG_SECRET_MT5_DEMO_001_LOGIN", "1234567")
+    monkeypatch.setenv("VG_SECRET_MT5_DEMO_001_PASSWORD", "mt5-password")
+    monkeypatch.setenv("VG_SECRET_MT5_DEMO_001_SERVER", "BrokerDemo")
 
     snapshot = build_cross_spread_snapshot(
         bybit_symbol="XAUTUSDT",

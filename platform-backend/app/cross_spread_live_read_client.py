@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
@@ -11,6 +11,9 @@ from app.config import get_settings
 
 class CrossSpreadLiveReadError(RuntimeError):
     """Raised when authoritative live venue evidence is unavailable or invalid."""
+
+
+_RUNTIME_CLIENT = httpx.Client(trust_env=False)
 
 
 @dataclass(frozen=True)
@@ -42,7 +45,7 @@ class LivePosition:
 def runtime_get(path: str, params: dict[str, str] | None = None) -> object:
     settings = get_settings()
     try:
-        response = httpx.get(
+        response = _RUNTIME_CLIENT.get(
             f"{settings.runtime_base_url}{path}",
             params=params,
             timeout=settings.runtime_timeout_seconds,
@@ -215,3 +218,5 @@ def _response_detail(response: httpx.Response) -> str:
     if isinstance(payload, dict) and payload.get("detail"):
         return str(payload["detail"])
     return f"HTTP {response.status_code}"
+
+

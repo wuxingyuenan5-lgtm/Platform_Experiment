@@ -1,4 +1,4 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param(
   [switch]$SkipInstall,
   [switch]$ForceInstall,
@@ -11,6 +11,7 @@ $RepoRoot = Split-Path -Parent $PSScriptRoot
 $RuntimePath = Join-Path $RepoRoot 'execution-runtime'
 $BackendPath = Join-Path $RepoRoot 'platform-backend'
 $FrontendPath = Join-Path $RepoRoot 'admin-risk'
+$FrontendPort = 4373
 
 function Invoke-CheckedNative {
   param(
@@ -25,7 +26,10 @@ function Invoke-CheckedNative {
 }
 
 function Initialize-PythonProject {
-  param([Parameter(Mandatory = $true)][string]$ProjectPath)
+  param(
+    [Parameter(Mandatory = $true)][string]$ProjectPath,
+    [string]$Extras = 'dev'
+  )
 
   $VenvPath = Join-Path $ProjectPath '.venv'
   $PythonPath = Join-Path $VenvPath 'Scripts\python.exe'
@@ -52,7 +56,7 @@ function Initialize-PythonProject {
     Push-Location $ProjectPath
     try {
       Invoke-CheckedNative -FilePath $PythonPath -Arguments @('-m', 'pip', 'install', '--upgrade', 'pip')
-      Invoke-CheckedNative -FilePath $PythonPath -Arguments @('-m', 'pip', 'install', '-e', '.[dev]')
+      Invoke-CheckedNative -FilePath $PythonPath -Arguments @('-m', 'pip', 'install', '-e', ".[${Extras}]")
       New-Item -ItemType File -Path $InstallMarker -Force | Out-Null
     }
     finally {
@@ -102,8 +106,8 @@ function Wait-ForHttp {
   throw "$Name did not become ready within $TimeoutSeconds seconds: $Url"
 }
 
-$RuntimePython = Initialize-PythonProject -ProjectPath $RuntimePath
-$BackendPython = Initialize-PythonProject -ProjectPath $BackendPath
+$RuntimePython = Initialize-PythonProject -ProjectPath $RuntimePath -Extras 'dev,crypto'
+$BackendPython = Initialize-PythonProject -ProjectPath $BackendPath -Extras 'dev'
 
 $BackendEnv = Join-Path $BackendPath '.env'
 $BackendEnvExample = Join-Path $BackendPath '.env.example'
@@ -126,14 +130,13 @@ if (-not $SkipFrontend) {
   if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
     throw 'Node.js was not found. Install Node.js 20 or later first.'
   }
-  if (-not (Get-Command corepack -ErrorAction SilentlyContinue)) {
-    throw 'Corepack was not found. Use a Node.js installation that includes Corepack.'
+  if (-not (Get-Command npx -ErrorAction SilentlyContinue)) {
+    throw 'npx was not found. Use a Node.js installation that includes npm/npx.'
   }
 
   $Package = Get-Content (Join-Path $FrontendPath 'package.json') -Raw | ConvertFrom-Json
   $PnpmVersion = ($Package.packageManager -split '@')[-1]
-  Invoke-CheckedNative -FilePath 'corepack' -Arguments @('enable')
-  Invoke-CheckedNative -FilePath 'corepack' -Arguments @('prepare', "pnpm@$PnpmVersion", '--activate')
+  $PnpmPackage = "pnpm@$PnpmVersion"
 
   $FrontendEnv = Join-Path $FrontendPath '.env.local'
   $FrontendEnvExample = Join-Path $FrontendPath '.env.platform.example'
@@ -146,23 +149,28 @@ if (-not $SkipFrontend) {
   if (-not $SkipInstall -and ($ForceInstall -or -not (Test-Path $NodeModules))) {
     Push-Location $FrontendPath
     try {
-      Invoke-CheckedNative -FilePath 'pnpm' -Arguments @('install', '--frozen-lockfile')
+      Invoke-CheckedNative -FilePath 'npx' -Arguments @($PnpmPackage, 'install', '--frozen-lockfile')
     }
     finally {
       Pop-Location
     }
   }
 
+  $VitePath = Join-Path $FrontendPath 'node_modules\.bin\vite.cmd'
+  if (-not (Test-Path $VitePath)) {
+    throw "Vite executable was not found: $VitePath. Run without -SkipInstall first."
+  }
+
   Start-ServiceWindow `
-    -Title 'Variable-Global Frontend :5173' `
+    -Title "Variable-Global Frontend :$FrontendPort" `
     -WorkingDirectory $FrontendPath `
-    -Command 'pnpm dev -- --host 127.0.0.1 --port 5173'
+    -Command "& '$VitePath' --host 127.0.0.1 --port $FrontendPort"
 }
 
 Wait-ForHttp -Name 'Execution Runtime' -Url 'http://127.0.0.1:8100/health' -TimeoutSeconds $HealthTimeoutSeconds
 Wait-ForHttp -Name 'Platform Backend' -Url 'http://127.0.0.1:8000/health' -TimeoutSeconds $HealthTimeoutSeconds
 if (-not $SkipFrontend) {
-  Wait-ForHttp -Name 'Frontend' -Url 'http://127.0.0.1:5173' -TimeoutSeconds $HealthTimeoutSeconds
+  Wait-ForHttp -Name 'Frontend' -Url "http://127.0.0.1:$FrontendPort/index.html" -TimeoutSeconds $HealthTimeoutSeconds
 }
 
 Write-Host ''
@@ -170,6 +178,6 @@ Write-Host 'Variable-Global local services are ready.' -ForegroundColor Green
 Write-Host 'Runtime:  http://127.0.0.1:8100/health'
 Write-Host 'Backend:  http://127.0.0.1:8000/health'
 if (-not $SkipFrontend) {
-  Write-Host 'Frontend: http://127.0.0.1:5173'
+  Write-Host "Frontend: http://127.0.0.1:$FrontendPort/index.html"
 }
 Write-Host 'Safety defaults remain Simulation + Fake Gateway + Live Write disabled.' -ForegroundColor Yellow

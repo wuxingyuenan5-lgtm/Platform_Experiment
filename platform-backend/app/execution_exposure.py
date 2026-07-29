@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from decimal import Decimal
 
@@ -33,8 +33,8 @@ def calculate_residual_exposure(batch_id: str) -> tuple[Decimal, str, str]:
             (batch_id,),
         ).fetchall()
 
-        exposure_by_unit: dict[tuple[str, str], Decimal] = {}
-        reference_price_by_unit: dict[tuple[str, str], Decimal] = {}
+        exposure_by_unit: dict[str, Decimal] = {}
+        reference_price_by_unit: dict[str, Decimal] = {}
         settlement_currencies: set[str] = set()
 
         for leg in legs:
@@ -65,7 +65,7 @@ def calculate_residual_exposure(batch_id: str) -> tuple[Decimal, str, str]:
             if leg["side"] == "sell":
                 exposure_quantity = -exposure_quantity
 
-            unit_key = (leg["base_currency"], leg["quantity_unit"])
+            unit_key = leg["base_currency"]
             exposure_by_unit[unit_key] = (
                 exposure_by_unit.get(unit_key, Decimal("0")) + exposure_quantity
             )
@@ -90,3 +90,4 @@ def calculate_residual_exposure(batch_id: str) -> tuple[Decimal, str, str]:
     if len(nonzero_exposures) == 1 and len(settlement_currencies) == 1:
         return residual, next(iter(settlement_currencies)), "complete"
     return residual, "MIXED", "incomplete"
+

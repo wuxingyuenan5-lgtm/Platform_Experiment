@@ -2,8 +2,8 @@
 
 ## Current Global Criteria
 
-- Local frontend opens at `http://127.0.0.1:5173/index.html#/strategy/platform`.
-- Start page opens at `http://127.0.0.1:5173/#/` as the dark star-map Variable Global landing screen.
+- Local frontend opens at `http://127.0.0.1:4373/index.html#/strategy/platform`.
+- Start page opens at `http://127.0.0.1:4373/#/` as the dark star-map Variable Global landing screen.
 - Start-page navigation must not show legacy labels `平台入口`, `研究框架`, or `新闻日历`; the AI entry is named `金融AI分析`.
 - Clicking protected start-page entries routes to `/login?redirect=...`; after account login, the app redirects to the intended subpage.
 - Start-page core entry cards use large gold functional icons and serif-style titles, and point to product modules such as `对冲基金看板`, `新闻日历与理财`, `策略研究`, `风控管理`, and `金融AI分析`.

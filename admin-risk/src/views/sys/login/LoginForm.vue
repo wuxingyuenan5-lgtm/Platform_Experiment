@@ -2,7 +2,7 @@
   <div class="login-box">
     <div class="login-form py-20">
       <div class="title">欢迎登录</div>
-      <div class="title title-platform pt-2 text-xl">全球变量金融平台</div>
+      <div class="title title-platform">全球变量金融平台</div>
 
       <Form
         ref="formRef"
@@ -247,13 +247,19 @@
       backdrop-filter: blur(18px);
 
       .title {
+        font-family: Georgia, 'Times New Roman', 'Noto Serif SC', serif;
         color: #0f172a;
+        font-size: 18px;
+        font-weight: 400;
+        line-height: 30px;
         text-align: center;
       }
 
       .title-platform {
-        font-family: Georgia, 'Times New Roman', 'Noto Serif SC', serif;
+        margin-top: 10px;
         font-size: 30px;
+        font-weight: 400;
+        line-height: 40px;
       }
     }
 

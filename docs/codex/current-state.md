@@ -53,7 +53,7 @@ Code completion, version changes and CI do not relax these values.
 powershell -ExecutionPolicy Bypass -File .\scripts\dev-platform.ps1
 ```
 
-- The script reads the pnpm version from `admin-risk/package.json`, installs only when needed, starts three service windows and checks their HTTP readiness.
+- The script reads the pnpm version from `admin-risk/package.json`, installs only when needed, starts three service windows and checks frontend `4373`, backend `8000`, and runtime `8100` readiness.
 
 ## Engineering workflow
 

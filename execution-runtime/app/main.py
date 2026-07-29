@@ -137,10 +137,13 @@ def cross_spread_snapshot() -> CrossSpreadSnapshotResponse:
     return build_cross_spread_snapshot(
         bybit_symbol=settings.bybit_contract_symbol,
         mt5_symbol=settings.mt5_symbol,
+        bybit_credential_ref=settings.bybit_credential_ref,
+        mt5_credential_ref=settings.mt5_credential_ref,
         bybit_demo=settings.bybit_demo_mode,
         bybit_recv_window=settings.bybit_recv_window,
         mt5_terminal_path=settings.mt5_terminal_path,
         mt5_bridge_file_path=settings.mt5_bridge_file_path,
+        mt5_timeout_seconds=settings.mt5_check_timeout_seconds,
     )
 
 

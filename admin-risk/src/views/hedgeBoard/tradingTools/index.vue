@@ -1,12 +1,13 @@
 <script setup lang="ts">
-  import { computed } from 'vue';
+  import { computed, ref, watch } from 'vue';
   import { useRoute, RouterLink } from 'vue-router';
   import { PageWrapper } from '@/components/Page';
   import ToolGroupSection from './components/ToolGroupSection.vue';
   import {
-    tradingToolCategoryMap,
+    loadTradingToolCategory,
     type TradingToolCategoryId,
-  } from './data/marketTools';
+  } from './data/catalog';
+  import type { TradingToolCategory, TradingToolGroup } from './data/marketTools';
 
   const route = useRoute();
 
@@ -23,16 +24,38 @@
     { id: 'general', title: '\u7efc\u5408\u5de5\u5177', path: '/hedge-board/trading-tools/general' },
   ];
 
+  const categoryIds = new Set<TradingToolCategoryId>([
+    'macro',
+    'equity',
+    'crypto',
+    'metal',
+    'quant',
+    'general',
+  ]);
+
   const activeCategoryId = computed<TradingToolCategoryId>(() => {
     const categoryId = String(route.meta?.toolCategory || 'macro') as TradingToolCategoryId;
-    return tradingToolCategoryMap[categoryId] ? categoryId : 'macro';
+    return categoryIds.has(categoryId) ? categoryId : 'macro';
   });
 
-  const activeCategory = computed(() => tradingToolCategoryMap[activeCategoryId.value]);
+  const activeCategory = ref<TradingToolCategory | null>(null);
+  let categoryRequestId = 0;
 
-  const displayTitle = computed(() => activeCategory.value.title);
+  watch(
+    activeCategoryId,
+    async (categoryId) => {
+      const requestId = ++categoryRequestId;
+      const category = await loadTradingToolCategory(categoryId);
+      if (requestId === categoryRequestId) {
+        activeCategory.value = category;
+      }
+    },
+    { immediate: true },
+  );
 
-  const activeGroups = computed(() => activeCategory.value.groups);
+  const displayTitle = computed(() => activeCategory.value?.title ?? '交易工具');
+
+  const activeGroups = computed<TradingToolGroup[]>(() => activeCategory.value?.groups ?? []);
 
   const pageTitle = computed(
     () => `\u5bf9\u51b2\u57fa\u91d1\u770b\u677f / ${displayTitle.value}`,

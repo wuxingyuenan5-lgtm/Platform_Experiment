@@ -125,6 +125,28 @@ class FakeBybitClient:
         return {"retCode": 0, "result": {"orderId": kwargs["orderId"]}}
 
 
+class FakeUnifiedBalanceClient(FakeBybitClient):
+    def get_wallet_balance(self, **kwargs):
+        return {
+            "retCode": 0,
+            "result": {
+                "list": [
+                    {
+                        "totalAvailableBalance": "888.5",
+                        "coin": [
+                            {
+                                "coin": "USDT",
+                                "equity": "1000",
+                                "walletBalance": "1000",
+                                "availableToWithdraw": "",
+                            }
+                        ],
+                    }
+                ]
+            },
+        }
+
+
 def runtime_settings(write_enabled: bool = True) -> Settings:
     return Settings(
         environment="live",
@@ -163,6 +185,17 @@ def test_bybit_live_adapter_is_readable_but_write_gated(tmp_path) -> None:
     assert adapter.list_balances("account-bybit")[0].equity == Decimal("10000")
     with pytest.raises(GatewayConfigurationError, match="live write gate is disabled"):
         adapter.submit_order(order_command())
+
+
+def test_bybit_live_adapter_uses_unified_available_balance(tmp_path) -> None:
+    get_settings().journal_path = str(tmp_path / "bybit-unified-balance.db")
+    initialize_journal()
+    adapter = BybitLiveAdapter(runtime_settings(write_enabled=False), FakeUnifiedBalanceClient())
+
+    balance = adapter.list_balances("account-bybit")[0]
+
+    assert balance.equity == Decimal("1000")
+    assert balance.available_balance == Decimal("888.5")
 
 
 def test_bybit_live_adapter_maps_order_fills_and_economic_events(tmp_path) -> None:

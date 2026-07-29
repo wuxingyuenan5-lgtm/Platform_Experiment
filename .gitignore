@@ -1,4 +1,6 @@
-# Local secrets
+﻿# Local secrets
+execution-runtime/.env
+admin-risk/.env
 projects/risk-control/data-service/bitget-data-service/bybitapi.txt
 .env.local
 *.local
@@ -27,7 +29,7 @@ platform-backend/data/
 outputs/
 
 # Large local/reference material
-参考代码/
+鍙傝€冧唬鐮?
 
 # Generated structure/history dumps
 **/project_structure.txt

@@ -1,8 +1,6 @@
 <template>
   <section class="market-terminal__detail">
     <div class="market-terminal__panel-head market-terminal__panel-head--detail">
-      <h3>{{ title }}</h3>
-
       <div class="market-terminal__detail-actions">
         <button type="button" class="market-terminal__toolbar-btn" @click="toggleEditMode">
           {{ editMode ? '完成编辑' : '编辑标的' }}
@@ -839,13 +837,8 @@
   }
 
   .market-terminal__panel-head--detail {
+    justify-content: flex-end;
     margin-bottom: 12px;
-  }
-
-  .market-terminal__panel-head h3 {
-    margin: 0;
-    color: #35586e;
-    font-size: 14px;
   }
 
   .market-terminal__detail-actions,

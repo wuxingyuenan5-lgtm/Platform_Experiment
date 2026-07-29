@@ -2,7 +2,7 @@
 
 ## 当前主线
 
-1. 统一本地工作入口：以后以前端 `5173`、后端 `8000/api/v1` 为准。
+1. 统一本地工作入口：以后以前端 `4373`、后端 `8000/api/v1` 为准。
 2. 清理产品界面里的调试内容：后端快照、测试执行面板不直接出现在正式页面。
 3. 整理项目文件夹：先建立清晰归属，再决定是否移动运行目录。
 4. 把文档从“堆材料”改成“能指导下一步开发的索引体系”。
@@ -19,10 +19,10 @@
 
 ## 下一步优先级
 
-1. 给 `tasks/current` 建第一个真实任务：策略管理页面体验清理。
-2. 把 `docs/product/PRD.md` 从模块索引升级为真正的产品总口径。
-3. 评估是否需要把历史 `00-人工可读目录` 合并进 `docs/README.md`。
-4. 判断是否需要停止非主入口 dev server，只保留 `5173` 前端、`8000` 后端和必要的 `8100` Runtime。
+1. 使用 `docs/codex/CURRENT_CONTEXT.md` 作为 Codex 默认上下文入口。
+2. 用 `python scripts/check-codex-context.py` 防止版本、端口和上下文入口漂移。
+3. 按 `docs/architecture/LIGHTWEIGHT_OPTIMIZATION_PLAN.md` 继续拆高频大页面。
+4. 下一批优先处理 `strategy/spread-carry/index.vue`、`FundingOrderPanel.vue`、`hedgeBoard/index.vue`。
 5. 如需吸收外部参考代码，从外置目录按子项目逐个评估，不整目录搬回项目。
 
 ## 风险

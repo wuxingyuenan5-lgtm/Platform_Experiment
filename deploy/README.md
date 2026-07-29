@@ -14,7 +14,7 @@
 ssh root@65.49.234.98
 apt-get update
 apt-get install -y git curl ca-certificates nginx mysql-server rsync nodejs npm golang-go
-npm install -g pnpm@8.1.0
+npm install -g pnpm@9.15.9
 
 node --version   # 要求 >= 16.15
 pnpm --version

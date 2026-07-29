@@ -1,4 +1,5 @@
 from decimal import Decimal
+import sys
 from types import SimpleNamespace
 
 import pytest
@@ -127,6 +128,21 @@ class FakeMt5:
         )
 
 
+class FakeRuntimeMt5(FakeMt5):
+    def __init__(self) -> None:
+        super().__init__()
+        self.initialize_calls: list[dict[str, object]] = []
+        self.login_calls: list[dict[str, object]] = []
+
+    def initialize(self, **kwargs):
+        self.initialize_calls.append(kwargs)
+        return True
+
+    def login(self, login, **kwargs):
+        self.login_calls.append({"login": login, **kwargs})
+        return True
+
+
 def runtime_settings(write_enabled: bool = True) -> Settings:
     return Settings(
         environment="live",
@@ -138,7 +154,9 @@ def runtime_settings(write_enabled: bool = True) -> Settings:
         live_max_daily_notional="10000",
         mt5_account_ids="account-mt5",
         mt5_instrument_map="XAUUSD+=instrument-xauusd",
+        mt5_credential_ref="secret://environment/mt5-live-001",
         mt5_magic_number=5604001,
+        mt5_check_timeout_seconds=8,
     )
 
 
@@ -171,6 +189,21 @@ def test_mt5_live_adapter_is_readable_but_write_gated(tmp_path, monkeypatch) -> 
     assert adapter.list_balances("account-mt5")[0].equity == Decimal("100000.0")
     with pytest.raises(GatewayConfigurationError, match="live write gate is disabled"):
         adapter.submit_order(order_command())
+
+
+def test_mt5_live_adapter_sets_terminal_timeouts(tmp_path, monkeypatch) -> None:
+    configure_mt5_secret(monkeypatch)
+    get_settings().journal_path = str(tmp_path / "mt5-timeout.db")
+    initialize_journal()
+    fake_mt5 = FakeRuntimeMt5()
+    monkeypatch.setitem(sys.modules, "MetaTrader5", fake_mt5)
+
+    adapter = Mt5LiveAdapter(runtime_settings(write_enabled=False))
+    balance = adapter.list_balances("account-mt5")[0]
+
+    assert balance.equity == Decimal("100000.0")
+    assert fake_mt5.initialize_calls[0]["timeout"] == 8000
+    assert fake_mt5.login_calls[0]["timeout"] == 8000
 
 
 def test_mt5_live_adapter_maps_orders_deals_and_swap(tmp_path, monkeypatch) -> None:

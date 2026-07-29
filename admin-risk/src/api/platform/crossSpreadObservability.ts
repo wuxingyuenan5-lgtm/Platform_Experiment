@@ -1,8 +1,9 @@
-import axios, { type AxiosInstance } from 'axios';
+﻿import axios, { type AxiosInstance } from 'axios';
 
 export type NumericValue = string | number;
 export type ObservabilityState = 'complete' | 'partial' | 'unavailable';
 export type ObservabilitySectionState = 'complete' | 'unavailable';
+export type CrossSpreadObservabilityMode = 'fast' | 'audit';
 
 export interface VenueAccountRiskSnapshot {
   source: string;
@@ -134,10 +135,14 @@ const client: AxiosInstance = axios.create({
 export async function getCrossSpreadObservability(
   historyHours = 24,
   limit = 20,
+  mode: CrossSpreadObservabilityMode = 'audit',
 ): Promise<CrossSpreadObservabilityResult> {
   const response = await client.get<CrossSpreadObservabilityResult>(
     '/trading/cross-spread/observability',
-    { params: { historyHours, limit } },
+    { params: { historyHours, limit, mode } },
   );
   return response.data;
 }
+
+
+

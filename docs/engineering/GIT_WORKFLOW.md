@@ -2,6 +2,12 @@
 
 Use the smallest workstream that safely fits the change.
 
+Current GitHub repository for future upload:
+
+```text
+wuxingyuenan5-lgtm/Platform_Experiment
+```
+
 ## 1. Three workstreams
 
 | Workstream | Typical scope | Issue | Task packet | CI |

@@ -19,7 +19,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\dev-platform.ps1
 
 首次运行会按需创建 Python 虚拟环境、安装依赖、读取前端声明的 pnpm 版本，并启动：
 
-- Frontend: `http://127.0.0.1:5173`
+- Frontend: `http://127.0.0.1:4373/index.html`
 - Platform Backend: `http://127.0.0.1:8000/health`
 - Execution Runtime: `http://127.0.0.1:8100/health`
 
@@ -33,7 +33,9 @@ powershell -ExecutionPolicy Bypass -File .\scripts\dev-platform.ps1
 |---|---|
 | 人工理解项目 | `00-人工可读目录/README.md` |
 | Agent 规则 | `AGENTS.md` |
+| Codex 当前上下文 | `docs/codex/CURRENT_CONTEXT.md` |
 | 当前稳定状态 | `docs/codex/current-state.md` |
+| 轻量减负方案 | `docs/architecture/LIGHTWEIGHT_OPTIMIZATION_PLAN.md` |
 | 系统结构 | `docs/architecture/SYSTEM_MAP.md` |
 | 主要所有权 | `docs/architecture/OWNERSHIP.md` |
 | Git 工作流 | `docs/engineering/GIT_WORKFLOW.md` |
@@ -63,4 +65,5 @@ PR 只运行受影响模块；`main` 始终运行完整矩阵。详细规则见 
 ```powershell
 python scripts/bump-version.py 0.9.0
 python scripts/check-version-consistency.py
+python scripts/check-codex-context.py
 ```

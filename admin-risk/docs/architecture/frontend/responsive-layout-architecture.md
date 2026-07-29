@@ -240,6 +240,30 @@ Large: 24px
 
 具体实现可使用 CSS 自定义属性和 `clamp()`，但不允许各页面自行发明无规则边距。
 
+### 7.4 LESS 预处理边界
+
+当前 `admin-risk` 页面样式主要通过 LESS 编译。实现响应式宽度时必须考虑 LESS 与现代 CSS 函数的边界：
+
+- `clamp()` 和 Grid 的 `minmax()` 可作为响应式表达式使用，但修改后必须通过 Vite 实际编译验证。
+- 不在 LESS 文件中直接使用复杂 `min()` / `max()` 表达式，尤其是包含 `calc()`、百分比减法或 CSS 变量的写法。
+- 需要“最大宽度 + 可用宽度”时，优先拆成 `width: calc(...); max-width: ...`。
+- 需要“小元素不超过某宽度”时，优先拆成 `width: 100%; max-width: ...`。
+
+错误示例：
+
+```less
+width: min(100% - calc(var(--page-gutter) * 2), 2040px);
+```
+
+正确示例：
+
+```less
+width: calc(100% - calc(var(--page-gutter) * 2));
+max-width: 2040px;
+```
+
+这类错误会在 Vite dev server 中表现为 LESS 编译 overlay，不应进入后续视觉验收阶段。
+
 ### 7.3 栅格
 
 采用 CSS Grid／Flex 的内容驱动布局：
@@ -451,6 +475,7 @@ critical blocker
 - JavaScript 持续读取窗口宽度并承担普通 CSS 布局。
 - 修改全局通用选择器来修复单页问题。
 - 未验证中间宽度，只对照 1440 和 1920 两张截图。
+- 在 LESS 样式中使用未验证的现代 CSS 函数表达式后直接交付页面。
 
 例外必须在 PR 中说明：
 
