@@ -33,10 +33,30 @@
       { label: '上涨', value: value.up, note: '当日上涨家数', tone: 'is-positive' },
       { label: '下跌', value: value.down, note: '当日下跌家数', tone: 'is-negative' },
       { label: '平盘', value: value.flat, note: '当日平盘家数', tone: '' },
-      { label: '涨停 / 真实涨停', value: `${value.limitUp} / ${value.realLimitUp}`, note: '来源原始口径', tone: 'is-positive' },
-      { label: '跌停 / 真实跌停', value: `${value.limitDown} / ${value.realLimitDown}`, note: '来源原始口径', tone: 'is-negative' },
-      { label: '活跃度', value: value.activityPct == null ? '—' : `${value.activityPct}%`, note: '赚钱效应活跃度', tone: '' },
-      { label: '市场宽度', value: value.breadthState, note: value.tradeDate || '最新交易日', tone: '' },
+      {
+        label: '涨停 / 真实涨停',
+        value: `${value.limitUp} / ${value.realLimitUp}`,
+        note: '来源原始口径',
+        tone: 'is-positive',
+      },
+      {
+        label: '跌停 / 真实跌停',
+        value: `${value.limitDown} / ${value.realLimitDown}`,
+        note: '来源原始口径',
+        tone: 'is-negative',
+      },
+      {
+        label: '活跃度',
+        value: value.activityPct == null ? '—' : `${value.activityPct}%`,
+        note: '赚钱效应活跃度',
+        tone: '',
+      },
+      {
+        label: '市场宽度',
+        value: value.breadthState,
+        note: value.tradeDate || '最新交易日',
+        tone: '',
+      },
       { label: '题材投机', value: value.speculationState, note: '按真实涨停数量分类', tone: '' },
     ];
   });
@@ -101,8 +121,12 @@
     font-variant-numeric: tabular-nums;
   }
 
-  .is-positive { color: var(--strategy-up, #ef4444) !important; }
-  .is-negative { color: var(--strategy-down, #10b981) !important; }
+  .is-positive {
+    color: var(--strategy-up, #ef4444) !important;
+  }
+  .is-negative {
+    color: var(--strategy-down, #10b981) !important;
+  }
 
   .research-empty {
     padding: 30px;
@@ -111,11 +135,17 @@
   }
 
   @media (max-width: 1100px) {
-    .breadth-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .breadth-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
   }
 
   @media (max-width: 640px) {
-    .research-card__header { flex-direction: column; }
-    .breadth-grid { grid-template-columns: 1fr; }
+    .research-card__header {
+      flex-direction: column;
+    }
+    .breadth-grid {
+      grid-template-columns: 1fr;
+    }
   }
 </style>

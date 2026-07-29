@@ -26,7 +26,9 @@ function readWatchlist(): WatchlistItem[] {
     if (!Array.isArray(payload) || !payload.length) return [...DEFAULT_WATCHLIST];
     return payload.filter(
       (item): item is WatchlistItem =>
-        typeof item?.code === 'string' && /^\d{6}$/.test(item.code) && typeof item?.name === 'string',
+        typeof item?.code === 'string' &&
+        /^\d{6}$/.test(item.code) &&
+        typeof item?.name === 'string',
     );
   } catch {
     return [...DEFAULT_WATCHLIST];
@@ -125,7 +127,8 @@ export function useAShareResearch() {
 
   function applyThresholdMode() {
     const thresholds = { '50': 50, '100': 100, '200': 200 } as const;
-    const yi = thresholdMode.value === 'custom' ? customThresholdYi.value : thresholds[thresholdMode.value];
+    const yi =
+      thresholdMode.value === 'custom' ? customThresholdYi.value : thresholds[thresholdMode.value];
     thresholdYuan.value = Math.max(1, Number(yi) || 1) * 100_000_000;
     void loadDashboard();
   }

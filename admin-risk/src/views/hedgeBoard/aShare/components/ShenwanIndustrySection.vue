@@ -31,12 +31,17 @@
           <tbody>
             <tr v-for="row in data.sw2Top" :key="row.swL2Code">
               <td>{{ row.rank }}</td>
-              <td class="is-left"><strong>{{ row.swL2Name }}</strong><small>{{ row.swL2Code }}</small></td>
+              <td class="is-left"
+                ><strong>{{ row.swL2Name }}</strong
+                ><small>{{ row.swL2Code }}</small></td
+              >
               <td class="is-left">{{ row.swL1Name }}</td>
               <td :class="toneClass(row.returnPct)">{{ formatPct(row.returnPct) }}</td>
               <td class="is-right">{{ formatMoney(row.turnoverYuan) }}</td>
               <td>{{ formatPct(row.marketSharePct, false) }}</td>
-              <td class="is-right" :class="toneClass(row.netInflowYuan)">{{ formatMoney(row.netInflowYuan) }}</td>
+              <td class="is-right" :class="toneClass(row.netInflowYuan)">{{
+                formatMoney(row.netInflowYuan)
+              }}</td>
             </tr>
           </tbody>
         </table>
@@ -84,12 +89,17 @@
             <tbody>
               <tr v-for="row in filteredAllRows" :key="row.swL2Code">
                 <td>{{ row.rank }}</td>
-                <td class="is-left"><strong>{{ row.swL2Name }}</strong><small>{{ row.swL2Code }}</small></td>
+                <td class="is-left"
+                  ><strong>{{ row.swL2Name }}</strong
+                  ><small>{{ row.swL2Code }}</small></td
+                >
                 <td class="is-left">{{ row.swL1Name }}</td>
                 <td :class="toneClass(row.returnPct)">{{ formatPct(row.returnPct) }}</td>
                 <td class="is-right">{{ formatMoney(row.turnoverYuan) }}</td>
                 <td>{{ formatPct(row.marketSharePct, false) }}</td>
-                <td class="is-right" :class="toneClass(row.netInflowYuan)">{{ formatMoney(row.netInflowYuan) }}</td>
+                <td class="is-right" :class="toneClass(row.netInflowYuan)">{{
+                  formatMoney(row.netInflowYuan)
+                }}</td>
               </tr>
             </tbody>
           </table>
@@ -123,18 +133,27 @@
               min="1"
               step="1"
               :value="customThresholdYi"
-              @input="$emit('update:customThresholdYi', Number(($event.target as HTMLInputElement).value))"
+              @input="
+                $emit('update:customThresholdYi', Number(($event.target as HTMLInputElement).value))
+              "
             />
             <span>亿元</span>
           </label>
-          <button type="button" class="primary-button" @click="$emit('applyThreshold')">应用</button>
+          <button type="button" class="primary-button" @click="$emit('applyThreshold')"
+            >应用</button
+          >
         </div>
 
         <div class="threshold-summary">
-          <span>当前口径：成交额 {{ data.threshold.operator }} {{ formatMoney(data.threshold.thresholdYuan) }}</span>
+          <span
+            >当前口径：成交额 {{ data.threshold.operator }}
+            {{ formatMoney(data.threshold.thresholdYuan) }}</span
+          >
           <span>共 {{ data.threshold.stocks.length }} 只</span>
           <span>覆盖 {{ data.threshold.industries.length }} 个申万二级行业</span>
-          <span v-if="data.unmatchedSecurityCodes.length">待匹配 {{ data.unmatchedSecurityCodes.length }} 只</span>
+          <span v-if="data.unmatchedSecurityCodes.length"
+            >待匹配 {{ data.unmatchedSecurityCodes.length }} 只</span
+          >
         </div>
 
         <div class="table-shell">
@@ -150,16 +169,28 @@
               <template v-for="row in data.threshold.industries" :key="row.swL2Code">
                 <tr class="is-clickable" @click="toggleThresholdIndustry(row.swL2Code)">
                   <td class="is-left">{{ row.swL1Name }}</td>
-                  <td class="is-left"><strong>{{ row.swL2Name }}</strong></td>
-                  <td><button type="button" class="count-button">{{ row.stockCount }}</button></td>
+                  <td class="is-left"
+                    ><strong>{{ row.swL2Name }}</strong></td
+                  >
+                  <td
+                    ><button type="button" class="count-button">{{ row.stockCount }}</button></td
+                  >
                 </tr>
                 <tr v-if="expandedThresholdIndustry === row.swL2Code" class="detail-row">
                   <td colspan="3">
                     <div class="threshold-stock-grid">
-                      <article v-for="stock in thresholdStocks(row.swL2Code)" :key="stock.securityCode">
-                        <div><strong>{{ stock.securityName }}</strong><span>{{ stock.securityCode }}</span></div>
+                      <article
+                        v-for="stock in thresholdStocks(row.swL2Code)"
+                        :key="stock.securityCode"
+                      >
+                        <div
+                          ><strong>{{ stock.securityName }}</strong
+                          ><span>{{ stock.securityCode }}</span></div
+                        >
                         <b>{{ formatMoney(stock.turnoverYuan) }}</b>
-                        <em :class="toneClass(stock.returnPct)">{{ formatPct(stock.returnPct) }}</em>
+                        <em :class="toneClass(stock.returnPct)">{{
+                          formatPct(stock.returnPct)
+                        }}</em>
                       </article>
                     </div>
                   </td>
@@ -219,7 +250,9 @@
     const rows = [...(data.value?.sw2All || [])].filter((row) => {
       const matchesL1 = !l1Filter.value || row.swL1Name === l1Filter.value;
       const matchesSearch =
-        !query || row.swL2Name.toLowerCase().includes(query) || row.swL2Code.toLowerCase().includes(query);
+        !query ||
+        row.swL2Name.toLowerCase().includes(query) ||
+        row.swL2Code.toLowerCase().includes(query);
       return matchesL1 && matchesSearch;
     });
     return rows.sort((left, right) => {
@@ -248,7 +281,8 @@
   function formatMoney(value: string | number | null | undefined) {
     const result = numeric(value);
     if (result == null) return '—';
-    if (Math.abs(result) >= 1_000_000_000_000) return `${(result / 1_000_000_000_000).toFixed(2)}万亿`;
+    if (Math.abs(result) >= 1_000_000_000_000)
+      return `${(result / 1_000_000_000_000).toFixed(2)}万亿`;
     if (Math.abs(result) >= 100_000_000) return `${(result / 100_000_000).toFixed(2)}亿`;
     if (Math.abs(result) >= 10_000) return `${(result / 10_000).toFixed(2)}万`;
     return result.toLocaleString('zh-CN');
@@ -267,51 +301,254 @@
 </script>
 
 <style scoped lang="less">
-  .research-card { padding: 18px; border: 1px solid var(--strategy-border); border-radius: var(--strategy-radius-card); background: var(--strategy-surface); box-shadow: var(--strategy-shadow-soft); }
-  .research-card__header, .section-title-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
-  .research-card__header { margin-bottom: 18px; }
-  .research-card__eyebrow { margin: 0 0 3px; color: var(--strategy-text-4); font-size: 11px; font-weight: 800; letter-spacing: .12em; }
-  h2, h3, p { margin: 0; }
-  h2 { color: var(--strategy-text-1); font-size: 18px; }
-  h3 { color: var(--strategy-text-1); font-size: 15px; }
-  .section-title-row p { margin-top: 4px; color: var(--strategy-text-3); font-size: 12px; }
-  .table-shell { overflow-x: auto; margin-top: 12px; border: 1px solid var(--strategy-border); border-radius: 12px; }
-  .market-table { width: 100%; min-width: 860px; border-collapse: collapse; font-variant-numeric: tabular-nums; }
-  th, td { padding: 11px 12px; border-bottom: 1px solid var(--strategy-border); color: var(--strategy-text-2); text-align: center; }
-  th { background: var(--strategy-surface-2); color: var(--strategy-text-3); font-size: 12px; white-space: nowrap; }
-  tbody tr:last-child td { border-bottom: 0; }
-  tbody tr:not(.detail-row):hover { background: var(--strategy-accent-soft); }
-  td strong, td small { display: block; }
-  td small { margin-top: 2px; color: var(--strategy-text-4); }
-  .is-left { text-align: left; }
-  .is-right { text-align: right; }
-  .is-positive { color: var(--strategy-up, #ef4444) !important; font-weight: 700; }
-  .is-negative { color: var(--strategy-down, #10b981) !important; font-weight: 700; }
-  .collapse-button { width: 100%; margin-top: 14px; padding: 11px 14px; border: 1px solid var(--strategy-border); border-radius: 10px; background: var(--strategy-surface-2); color: var(--strategy-text-2); text-align: left; cursor: pointer; }
-  .full-panel { margin-top: 12px; }
-  .filter-row, .threshold-controls, .threshold-actions, .threshold-summary { display: flex; align-items: flex-end; gap: 10px; flex-wrap: wrap; }
-  .filter-row label { display: grid; gap: 5px; color: var(--strategy-text-3); font-size: 12px; }
-  .filter-row__search { flex: 1 1 260px; }
-  select, input { min-height: 36px; padding: 0 10px; border: 1px solid var(--strategy-border); border-radius: 8px; background: var(--strategy-surface); color: var(--strategy-text-1); }
-  .threshold-panel { margin-top: 20px; padding-top: 18px; border-top: 1px solid var(--strategy-border); }
-  .threshold-actions button, .primary-button { min-height: 34px; padding: 0 12px; border: 1px solid var(--strategy-border); border-radius: 8px; background: var(--strategy-surface-2); color: var(--strategy-text-2); cursor: pointer; }
-  .primary-button { background: var(--strategy-accent-soft); color: var(--strategy-accent-strong); font-weight: 700; }
-  .threshold-controls { margin-top: 14px; align-items: center; }
-  .radio-option { display: inline-flex; align-items: center; gap: 5px; color: var(--strategy-text-2); }
-  .radio-option input { min-height: auto; }
-  .custom-threshold { display: inline-flex; align-items: center; gap: 6px; }
-  .custom-threshold input { width: 100px; }
-  .threshold-summary { margin-top: 12px; align-items: center; }
-  .threshold-summary span { padding: 5px 9px; border-radius: 999px; background: var(--strategy-surface-2); color: var(--strategy-text-3); font-size: 12px; }
-  .is-clickable { cursor: pointer; }
-  .count-button { min-width: 40px; padding: 4px 10px; border: 0; border-radius: 999px; background: var(--strategy-accent-soft); color: var(--strategy-accent-strong); font-weight: 800; cursor: pointer; }
-  .detail-row td { padding: 14px; background: var(--strategy-surface-2); }
-  .threshold-stock-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 9px; }
-  .threshold-stock-grid article { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 10px; padding: 10px; border: 1px solid var(--strategy-border); border-radius: 9px; background: var(--strategy-surface); text-align: left; }
-  .threshold-stock-grid div strong, .threshold-stock-grid div span { display: block; }
-  .threshold-stock-grid div span { color: var(--strategy-text-4); font-size: 12px; }
-  .threshold-stock-grid b, .threshold-stock-grid em { white-space: nowrap; font-style: normal; }
-  .research-empty { padding: 30px; color: var(--strategy-text-3); text-align: center; }
-  @media (max-width: 900px) { .threshold-stock-grid { grid-template-columns: 1fr; } }
-  @media (max-width: 640px) { .research-card__header, .section-title-row { flex-direction: column; } }
+  .research-card {
+    padding: 18px;
+    border: 1px solid var(--strategy-border);
+    border-radius: var(--strategy-radius-card);
+    background: var(--strategy-surface);
+    box-shadow: var(--strategy-shadow-soft);
+  }
+  .research-card__header,
+  .section-title-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+  }
+  .research-card__header {
+    margin-bottom: 18px;
+  }
+  .research-card__eyebrow {
+    margin: 0 0 3px;
+    color: var(--strategy-text-4);
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+  }
+  h2,
+  h3,
+  p {
+    margin: 0;
+  }
+  h2 {
+    color: var(--strategy-text-1);
+    font-size: 18px;
+  }
+  h3 {
+    color: var(--strategy-text-1);
+    font-size: 15px;
+  }
+  .section-title-row p {
+    margin-top: 4px;
+    color: var(--strategy-text-3);
+    font-size: 12px;
+  }
+  .table-shell {
+    overflow-x: auto;
+    margin-top: 12px;
+    border: 1px solid var(--strategy-border);
+    border-radius: 12px;
+  }
+  .market-table {
+    width: 100%;
+    min-width: 860px;
+    border-collapse: collapse;
+    font-variant-numeric: tabular-nums;
+  }
+  th,
+  td {
+    padding: 11px 12px;
+    border-bottom: 1px solid var(--strategy-border);
+    color: var(--strategy-text-2);
+    text-align: center;
+  }
+  th {
+    background: var(--strategy-surface-2);
+    color: var(--strategy-text-3);
+    font-size: 12px;
+    white-space: nowrap;
+  }
+  tbody tr:last-child td {
+    border-bottom: 0;
+  }
+  tbody tr:not(.detail-row):hover {
+    background: var(--strategy-accent-soft);
+  }
+  td strong,
+  td small {
+    display: block;
+  }
+  td small {
+    margin-top: 2px;
+    color: var(--strategy-text-4);
+  }
+  .is-left {
+    text-align: left;
+  }
+  .is-right {
+    text-align: right;
+  }
+  .is-positive {
+    color: var(--strategy-up, #ef4444) !important;
+    font-weight: 700;
+  }
+  .is-negative {
+    color: var(--strategy-down, #10b981) !important;
+    font-weight: 700;
+  }
+  .collapse-button {
+    width: 100%;
+    margin-top: 14px;
+    padding: 11px 14px;
+    border: 1px solid var(--strategy-border);
+    border-radius: 10px;
+    background: var(--strategy-surface-2);
+    color: var(--strategy-text-2);
+    text-align: left;
+    cursor: pointer;
+  }
+  .full-panel {
+    margin-top: 12px;
+  }
+  .filter-row,
+  .threshold-controls,
+  .threshold-actions,
+  .threshold-summary {
+    display: flex;
+    align-items: flex-end;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .filter-row label {
+    display: grid;
+    gap: 5px;
+    color: var(--strategy-text-3);
+    font-size: 12px;
+  }
+  .filter-row__search {
+    flex: 1 1 260px;
+  }
+  select,
+  input {
+    min-height: 36px;
+    padding: 0 10px;
+    border: 1px solid var(--strategy-border);
+    border-radius: 8px;
+    background: var(--strategy-surface);
+    color: var(--strategy-text-1);
+  }
+  .threshold-panel {
+    margin-top: 20px;
+    padding-top: 18px;
+    border-top: 1px solid var(--strategy-border);
+  }
+  .threshold-actions button,
+  .primary-button {
+    min-height: 34px;
+    padding: 0 12px;
+    border: 1px solid var(--strategy-border);
+    border-radius: 8px;
+    background: var(--strategy-surface-2);
+    color: var(--strategy-text-2);
+    cursor: pointer;
+  }
+  .primary-button {
+    background: var(--strategy-accent-soft);
+    color: var(--strategy-accent-strong);
+    font-weight: 700;
+  }
+  .threshold-controls {
+    margin-top: 14px;
+    align-items: center;
+  }
+  .radio-option {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    color: var(--strategy-text-2);
+  }
+  .radio-option input {
+    min-height: auto;
+  }
+  .custom-threshold {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .custom-threshold input {
+    width: 100px;
+  }
+  .threshold-summary {
+    margin-top: 12px;
+    align-items: center;
+  }
+  .threshold-summary span {
+    padding: 5px 9px;
+    border-radius: 999px;
+    background: var(--strategy-surface-2);
+    color: var(--strategy-text-3);
+    font-size: 12px;
+  }
+  .is-clickable {
+    cursor: pointer;
+  }
+  .count-button {
+    min-width: 40px;
+    padding: 4px 10px;
+    border: 0;
+    border-radius: 999px;
+    background: var(--strategy-accent-soft);
+    color: var(--strategy-accent-strong);
+    font-weight: 800;
+    cursor: pointer;
+  }
+  .detail-row td {
+    padding: 14px;
+    background: var(--strategy-surface-2);
+  }
+  .threshold-stock-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 9px;
+  }
+  .threshold-stock-grid article {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    align-items: center;
+    gap: 10px;
+    padding: 10px;
+    border: 1px solid var(--strategy-border);
+    border-radius: 9px;
+    background: var(--strategy-surface);
+    text-align: left;
+  }
+  .threshold-stock-grid div strong,
+  .threshold-stock-grid div span {
+    display: block;
+  }
+  .threshold-stock-grid div span {
+    color: var(--strategy-text-4);
+    font-size: 12px;
+  }
+  .threshold-stock-grid b,
+  .threshold-stock-grid em {
+    white-space: nowrap;
+    font-style: normal;
+  }
+  .research-empty {
+    padding: 30px;
+    color: var(--strategy-text-3);
+    text-align: center;
+  }
+  @media (max-width: 900px) {
+    .threshold-stock-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+  @media (max-width: 640px) {
+    .research-card__header,
+    .section-title-row {
+      flex-direction: column;
+    }
+  }
 </style>

@@ -43,14 +43,38 @@
             </td>
             <td class="is-right">{{ formatNumber(row.close, 2) }}</td>
             <td class="is-right">{{ formatMoney(row.turnoverYuan) }}</td>
-            <td><span :class="toneClass(row.volatility20Pct, true)">{{ formatPct(row.volatility20Pct) }}</span></td>
-            <td><span :class="toneClass(row.return1dPct)">{{ formatPct(row.return1dPct) }}</span></td>
-            <td><span :class="toneClass(row.returnYtdPct)">{{ formatPct(row.returnYtdPct) }}</span></td>
-            <td><span :class="toneClass(row.returnQtdPct)">{{ formatPct(row.returnQtdPct) }}</span></td>
-            <td><span :class="toneClass(row.return1wPct)">{{ formatPct(row.return1wPct) }}</span></td>
-            <td><span :class="toneClass(row.return1mPct)">{{ formatPct(row.return1mPct) }}</span></td>
-            <td><span :class="toneClass(row.return1yPct)">{{ formatPct(row.return1yPct) }}</span></td>
-            <td><span :class="toneClass(row.distance52wHighPct)">{{ formatPct(row.distance52wHighPct) }}</span></td>
+            <td
+              ><span :class="toneClass(row.volatility20Pct, true)">{{
+                formatPct(row.volatility20Pct)
+              }}</span></td
+            >
+            <td
+              ><span :class="toneClass(row.return1dPct)">{{ formatPct(row.return1dPct) }}</span></td
+            >
+            <td
+              ><span :class="toneClass(row.returnYtdPct)">{{
+                formatPct(row.returnYtdPct)
+              }}</span></td
+            >
+            <td
+              ><span :class="toneClass(row.returnQtdPct)">{{
+                formatPct(row.returnQtdPct)
+              }}</span></td
+            >
+            <td
+              ><span :class="toneClass(row.return1wPct)">{{ formatPct(row.return1wPct) }}</span></td
+            >
+            <td
+              ><span :class="toneClass(row.return1mPct)">{{ formatPct(row.return1mPct) }}</span></td
+            >
+            <td
+              ><span :class="toneClass(row.return1yPct)">{{ formatPct(row.return1yPct) }}</span></td
+            >
+            <td
+              ><span :class="toneClass(row.distance52wHighPct)">{{
+                formatPct(row.distance52wHighPct)
+              }}</span></td
+            >
             <td :class="signalClass(row.signal1h)">{{ row.signal1h || '—' }}</td>
             <td :class="signalClass(row.signalDaily)">{{ row.signalDaily || '—' }}</td>
             <td :class="signalClass(row.signal3d)">{{ row.signal3d || '—' }}</td>
@@ -84,7 +108,8 @@
   function formatMoney(value: string | number | null | undefined) {
     const result = numeric(value);
     if (result == null) return '—';
-    if (Math.abs(result) >= 1_000_000_000_000) return `${(result / 1_000_000_000_000).toFixed(2)}万亿`;
+    if (Math.abs(result) >= 1_000_000_000_000)
+      return `${(result / 1_000_000_000_000).toFixed(2)}万亿`;
     if (Math.abs(result) >= 100_000_000) return `${(result / 100_000_000).toFixed(2)}亿`;
     if (Math.abs(result) >= 10_000) return `${(result / 10_000).toFixed(2)}万`;
     return result.toLocaleString('zh-CN');
@@ -124,28 +149,119 @@
 </script>
 
 <style scoped lang="less">
-  .research-card { padding: 18px; border: 1px solid var(--strategy-border); border-radius: var(--strategy-radius-card); background: var(--strategy-surface); box-shadow: var(--strategy-shadow-soft); }
-  .research-card__header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 16px; }
-  .research-card__eyebrow { margin: 0 0 3px; color: var(--strategy-text-4); font-size: 11px; font-weight: 800; letter-spacing: .12em; }
-  h2 { margin: 0; color: var(--strategy-text-1); font-size: 18px; }
-  .table-shell { overflow-x: auto; border: 1px solid var(--strategy-border); border-radius: 12px; }
-  .market-table { width: 100%; min-width: 1540px; border-collapse: collapse; font-variant-numeric: tabular-nums; }
-  th, td { padding: 11px 10px; border-bottom: 1px solid var(--strategy-border); color: var(--strategy-text-2); text-align: center; white-space: nowrap; }
-  th { position: sticky; top: 0; z-index: 1; background: var(--strategy-surface-2); color: var(--strategy-text-3); font-size: 12px; }
-  tbody tr:last-child td { border-bottom: 0; }
-  tbody tr:hover { background: var(--strategy-accent-soft); }
-  .is-left, .name-cell { text-align: left; }
-  .is-right { text-align: right; }
-  .name-cell strong, .name-cell span { display: block; }
-  .name-cell strong { color: var(--strategy-text-1); }
-  .name-cell span { margin-top: 3px; color: var(--strategy-text-4); font-size: 12px; }
-  .spark-cell svg { width: 96px; height: 26px; }
-  .spark-cell polyline { fill: none; stroke: #64748b; stroke-width: 2; vector-effect: non-scaling-stroke; }
-  .spark-cell polyline.is-positive { stroke: var(--strategy-up, #ef4444); }
-  .spark-cell polyline.is-negative { stroke: var(--strategy-down, #10b981); }
-  .is-positive { color: var(--strategy-up, #ef4444) !important; font-weight: 700; }
-  .is-negative { color: var(--strategy-down, #10b981) !important; font-weight: 700; }
-  .is-neutral { color: var(--strategy-text-2); }
-  .research-empty { padding: 30px; color: var(--strategy-text-3); text-align: center; }
-  @media (max-width: 640px) { .research-card__header { flex-direction: column; } }
+  .research-card {
+    padding: 18px;
+    border: 1px solid var(--strategy-border);
+    border-radius: var(--strategy-radius-card);
+    background: var(--strategy-surface);
+    box-shadow: var(--strategy-shadow-soft);
+  }
+  .research-card__header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+  .research-card__eyebrow {
+    margin: 0 0 3px;
+    color: var(--strategy-text-4);
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+  }
+  h2 {
+    margin: 0;
+    color: var(--strategy-text-1);
+    font-size: 18px;
+  }
+  .table-shell {
+    overflow-x: auto;
+    border: 1px solid var(--strategy-border);
+    border-radius: 12px;
+  }
+  .market-table {
+    width: 100%;
+    min-width: 1540px;
+    border-collapse: collapse;
+    font-variant-numeric: tabular-nums;
+  }
+  th,
+  td {
+    padding: 11px 10px;
+    border-bottom: 1px solid var(--strategy-border);
+    color: var(--strategy-text-2);
+    text-align: center;
+    white-space: nowrap;
+  }
+  th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: var(--strategy-surface-2);
+    color: var(--strategy-text-3);
+    font-size: 12px;
+  }
+  tbody tr:last-child td {
+    border-bottom: 0;
+  }
+  tbody tr:hover {
+    background: var(--strategy-accent-soft);
+  }
+  .is-left,
+  .name-cell {
+    text-align: left;
+  }
+  .is-right {
+    text-align: right;
+  }
+  .name-cell strong,
+  .name-cell span {
+    display: block;
+  }
+  .name-cell strong {
+    color: var(--strategy-text-1);
+  }
+  .name-cell span {
+    margin-top: 3px;
+    color: var(--strategy-text-4);
+    font-size: 12px;
+  }
+  .spark-cell svg {
+    width: 96px;
+    height: 26px;
+  }
+  .spark-cell polyline {
+    fill: none;
+    stroke: #64748b;
+    stroke-width: 2;
+    vector-effect: non-scaling-stroke;
+  }
+  .spark-cell polyline.is-positive {
+    stroke: var(--strategy-up, #ef4444);
+  }
+  .spark-cell polyline.is-negative {
+    stroke: var(--strategy-down, #10b981);
+  }
+  .is-positive {
+    color: var(--strategy-up, #ef4444) !important;
+    font-weight: 700;
+  }
+  .is-negative {
+    color: var(--strategy-down, #10b981) !important;
+    font-weight: 700;
+  }
+  .is-neutral {
+    color: var(--strategy-text-2);
+  }
+  .research-empty {
+    padding: 30px;
+    color: var(--strategy-text-3);
+    text-align: center;
+  }
+  @media (max-width: 640px) {
+    .research-card__header {
+      flex-direction: column;
+    }
+  }
 </style>

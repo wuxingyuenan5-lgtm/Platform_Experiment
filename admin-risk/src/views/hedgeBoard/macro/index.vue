@@ -11,5 +11,7 @@
 </script>
 
 <style scoped lang="less">
-  .macro-board-page { min-width: 0; }
+  .macro-board-page {
+    min-width: 0;
+  }
 </style>

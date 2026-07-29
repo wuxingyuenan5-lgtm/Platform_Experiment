@@ -14,7 +14,12 @@
     <form class="query-form" @submit.prevent="$emit('query', codeModel)">
       <label>
         <span>股票代码</span>
-        <input v-model.trim="codeModel" maxlength="6" inputmode="numeric" placeholder="输入6位A股代码" />
+        <input
+          v-model.trim="codeModel"
+          maxlength="6"
+          inputmode="numeric"
+          placeholder="输入6位A股代码"
+        />
       </label>
       <button type="submit" class="primary-button" :disabled="loading">
         {{ loading ? '查询中…' : '查询' }}
@@ -23,7 +28,13 @@
         v-if="snapshot"
         type="button"
         class="toolbar-button"
-        @click="$emit('addWatchlist', snapshot.securityCode, snapshot.securityName || snapshot.securityCode)"
+        @click="
+          $emit(
+            'addWatchlist',
+            snapshot.securityCode,
+            snapshot.securityName || snapshot.securityCode,
+          )
+        "
       >
         加入自选
       </button>
@@ -39,15 +50,27 @@
     </div>
 
     <div v-if="snapshot && !loading" class="module-list">
-      <article v-for="definition in orderedDefinitions" :key="definition.key" class="snapshot-module">
+      <article
+        v-for="definition in orderedDefinitions"
+        :key="definition.key"
+        class="snapshot-module"
+      >
         <button type="button" class="snapshot-module__header" @click="toggleModule(definition.key)">
           <span class="module-arrow">{{ expanded[definition.key] ? '▼' : '▶' }}</span>
-          <span class="module-title"><strong>{{ definition.label }}</strong><small>{{ summary(definition.key) }}</small></span>
+          <span class="module-title"
+            ><strong>{{ definition.label }}</strong
+            ><small>{{ summary(definition.key) }}</small></span
+          >
           <ResearchSourceState v-if="module(definition.key)" :meta="module(definition.key)!.meta" />
         </button>
         <div v-if="expanded[definition.key]" class="snapshot-module__body">
-          <ResearchDataRenderer v-if="module(definition.key)?.data" :value="module(definition.key)?.data" />
-          <div v-else class="research-empty">{{ module(definition.key)?.meta.message || '暂无数据' }}</div>
+          <ResearchDataRenderer
+            v-if="module(definition.key)?.data"
+            :value="module(definition.key)?.data"
+          />
+          <div v-else class="research-empty">{{
+            module(definition.key)?.meta.message || '暂无数据'
+          }}</div>
         </div>
       </article>
     </div>
@@ -139,10 +162,17 @@
     if (typeof data !== 'object') return String(data);
     const record = data as Record<string, unknown>;
     const candidates: Record<string, () => string> = {
-      quoteValuation: () => `${record.price ?? '—'} · PE ${record.peTtm ?? '—'} · PB ${record.pb ?? '—'}`,
-      consensus: () => `前向PE ${record.forwardPe ?? '—'} · PEG ${record.peg ?? '—'} · 覆盖 ${record.analystCount ?? 0}`,
+      quoteValuation: () =>
+        `${record.price ?? '—'} · PE ${record.peTtm ?? '—'} · PB ${record.pb ?? '—'}`,
+      consensus: () =>
+        `前向PE ${record.forwardPe ?? '—'} · PEG ${record.peg ?? '—'} · 覆盖 ${
+          record.analystCount ?? 0
+        }`,
       financials: () => `${record.period ?? '最新报告期'} · ROE ${record.roe ?? '—'}`,
-      valuationPercentile: () => `${record.period ?? '近5年'} · ${Object.keys((record.metrics as object) || {}).length}项指标`,
+      valuationPercentile: () =>
+        `${record.period ?? '近5年'} · ${
+          Object.keys((record.metrics as object) || {}).length
+        }项指标`,
       fundFlow: () => `近20日主力净流入 ${record.mainNet20d ?? '—'}`,
       dragonTiger: () => `${Array.isArray(record.records) ? record.records.length : 0}次上榜`,
       lockup: () => `未来 ${Array.isArray(record.upcoming) ? record.upcoming.length : 0}项`,
@@ -155,33 +185,189 @@
 </script>
 
 <style scoped lang="less">
-  .research-card { padding: 18px; border: 1px solid var(--strategy-border); border-radius: var(--strategy-radius-card); background: var(--strategy-surface); box-shadow: var(--strategy-shadow-soft); }
-  .research-card__header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 15px; }
-  .research-card__eyebrow { margin: 0 0 3px; color: var(--strategy-text-4); font-size: 11px; font-weight: 800; letter-spacing: .12em; }
-  h2 { margin: 0; color: var(--strategy-text-1); font-size: 18px; }
-  .snapshot-meta { display: flex; align-items: center; gap: 9px; color: var(--strategy-text-2); }
-  .snapshot-meta b { padding: 5px 9px; border-radius: 999px; background: var(--strategy-accent-soft); color: var(--strategy-accent-strong); }
-  .query-form { display: flex; align-items: flex-end; gap: 9px; flex-wrap: wrap; padding: 12px; border: 1px solid var(--strategy-border); border-radius: 11px; background: var(--strategy-surface-2); }
-  .query-form label { display: grid; gap: 5px; flex: 1 1 240px; color: var(--strategy-text-3); font-size: 12px; }
-  .query-form input { height: 38px; padding: 0 11px; border: 1px solid var(--strategy-border); border-radius: 8px; background: var(--strategy-surface); color: var(--strategy-text-1); font-size: 14px; }
-  .primary-button, .toolbar-button { height: 38px; padding: 0 14px; border: 1px solid var(--strategy-border); border-radius: 8px; background: var(--strategy-surface); color: var(--strategy-text-2); cursor: pointer; }
-  .primary-button { background: var(--strategy-accent-soft); color: var(--strategy-accent-strong); font-weight: 800; }
-  .primary-button:disabled { cursor: wait; opacity: .65; }
-  .query-error { margin-top: 10px; padding: 10px 12px; border-radius: 9px; background: rgba(239, 68, 68, .08); color: #dc2626; }
-  .query-loading { display: flex; align-items: center; justify-content: center; gap: 6px; min-height: 120px; color: var(--strategy-text-3); }
-  .loading-dot { width: 6px; height: 6px; border-radius: 999px; background: var(--strategy-accent-strong); animation: pulse 1s infinite alternate; }
-  .loading-dot:nth-child(2) { animation-delay: .2s; }
-  .loading-dot:nth-child(3) { animation-delay: .4s; margin-right: 5px; }
-  .module-list { display: grid; gap: 8px; margin-top: 12px; }
-  .snapshot-module { overflow: hidden; border: 1px solid var(--strategy-border); border-radius: 10px; }
-  .snapshot-module__header { display: grid; grid-template-columns: 20px minmax(180px, 1fr) minmax(200px, auto); align-items: center; gap: 9px; width: 100%; padding: 11px 12px; border: 0; background: var(--strategy-surface-2); color: var(--strategy-text-2); text-align: left; cursor: pointer; }
-  .module-arrow { color: var(--strategy-text-4); }
-  .module-title { min-width: 0; }
-  .module-title strong, .module-title small { display: block; }
-  .module-title strong { color: var(--strategy-text-1); }
-  .module-title small { margin-top: 3px; overflow: hidden; color: var(--strategy-text-3); text-overflow: ellipsis; white-space: nowrap; }
-  .snapshot-module__body { padding: 12px; background: var(--strategy-surface); }
-  .research-empty { padding: 30px; color: var(--strategy-text-3); text-align: center; }
-  @keyframes pulse { from { opacity: .25; transform: translateY(1px); } to { opacity: 1; transform: translateY(-1px); } }
-  @media (max-width: 760px) { .research-card__header { flex-direction: column; } .snapshot-module__header { grid-template-columns: 20px 1fr; } .snapshot-module__header :deep(.research-source-state) { grid-column: 2; } }
+  .research-card {
+    padding: 18px;
+    border: 1px solid var(--strategy-border);
+    border-radius: var(--strategy-radius-card);
+    background: var(--strategy-surface);
+    box-shadow: var(--strategy-shadow-soft);
+  }
+  .research-card__header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 15px;
+  }
+  .research-card__eyebrow {
+    margin: 0 0 3px;
+    color: var(--strategy-text-4);
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+  }
+  h2 {
+    margin: 0;
+    color: var(--strategy-text-1);
+    font-size: 18px;
+  }
+  .snapshot-meta {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    color: var(--strategy-text-2);
+  }
+  .snapshot-meta b {
+    padding: 5px 9px;
+    border-radius: 999px;
+    background: var(--strategy-accent-soft);
+    color: var(--strategy-accent-strong);
+  }
+  .query-form {
+    display: flex;
+    align-items: flex-end;
+    gap: 9px;
+    flex-wrap: wrap;
+    padding: 12px;
+    border: 1px solid var(--strategy-border);
+    border-radius: 11px;
+    background: var(--strategy-surface-2);
+  }
+  .query-form label {
+    display: grid;
+    gap: 5px;
+    flex: 1 1 240px;
+    color: var(--strategy-text-3);
+    font-size: 12px;
+  }
+  .query-form input {
+    height: 38px;
+    padding: 0 11px;
+    border: 1px solid var(--strategy-border);
+    border-radius: 8px;
+    background: var(--strategy-surface);
+    color: var(--strategy-text-1);
+    font-size: 14px;
+  }
+  .primary-button,
+  .toolbar-button {
+    height: 38px;
+    padding: 0 14px;
+    border: 1px solid var(--strategy-border);
+    border-radius: 8px;
+    background: var(--strategy-surface);
+    color: var(--strategy-text-2);
+    cursor: pointer;
+  }
+  .primary-button {
+    background: var(--strategy-accent-soft);
+    color: var(--strategy-accent-strong);
+    font-weight: 800;
+  }
+  .primary-button:disabled {
+    cursor: wait;
+    opacity: 0.65;
+  }
+  .query-error {
+    margin-top: 10px;
+    padding: 10px 12px;
+    border-radius: 9px;
+    background: rgba(239, 68, 68, 0.08);
+    color: #dc2626;
+  }
+  .query-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-height: 120px;
+    color: var(--strategy-text-3);
+  }
+  .loading-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 999px;
+    background: var(--strategy-accent-strong);
+    animation: pulse 1s infinite alternate;
+  }
+  .loading-dot:nth-child(2) {
+    animation-delay: 0.2s;
+  }
+  .loading-dot:nth-child(3) {
+    animation-delay: 0.4s;
+    margin-right: 5px;
+  }
+  .module-list {
+    display: grid;
+    gap: 8px;
+    margin-top: 12px;
+  }
+  .snapshot-module {
+    overflow: hidden;
+    border: 1px solid var(--strategy-border);
+    border-radius: 10px;
+  }
+  .snapshot-module__header {
+    display: grid;
+    grid-template-columns: 20px minmax(180px, 1fr) minmax(200px, auto);
+    align-items: center;
+    gap: 9px;
+    width: 100%;
+    padding: 11px 12px;
+    border: 0;
+    background: var(--strategy-surface-2);
+    color: var(--strategy-text-2);
+    text-align: left;
+    cursor: pointer;
+  }
+  .module-arrow {
+    color: var(--strategy-text-4);
+  }
+  .module-title {
+    min-width: 0;
+  }
+  .module-title strong,
+  .module-title small {
+    display: block;
+  }
+  .module-title strong {
+    color: var(--strategy-text-1);
+  }
+  .module-title small {
+    margin-top: 3px;
+    overflow: hidden;
+    color: var(--strategy-text-3);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .snapshot-module__body {
+    padding: 12px;
+    background: var(--strategy-surface);
+  }
+  .research-empty {
+    padding: 30px;
+    color: var(--strategy-text-3);
+    text-align: center;
+  }
+  @keyframes pulse {
+    from {
+      opacity: 0.25;
+      transform: translateY(1px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(-1px);
+    }
+  }
+  @media (max-width: 760px) {
+    .research-card__header {
+      flex-direction: column;
+    }
+    .snapshot-module__header {
+      grid-template-columns: 20px 1fr;
+    }
+    .snapshot-module__header :deep(.research-source-state) {
+      grid-column: 2;
+    }
+  }
 </style>
