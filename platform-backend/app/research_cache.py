@@ -4,18 +4,15 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from threading import RLock
-from typing import Generic, TypeVar
-
-T = TypeVar("T")
 
 
 @dataclass(frozen=True)
-class ResearchCacheEntry(Generic[T]):
+class ResearchCacheEntry[T]:
     value: T
     fetched_at: datetime
 
 
-class LastKnownGoodResearchCache(Generic[T]):
+class LastKnownGoodResearchCache[T]:
     """Small in-process cache that never replaces valid data with an empty pull.
 
     Redis or persistent snapshots may replace this implementation later without changing the
