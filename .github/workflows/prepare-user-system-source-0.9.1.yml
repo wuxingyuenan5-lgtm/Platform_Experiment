@@ -1,0 +1,38 @@
+name: Prepare 0.9.1 user-system source
+
+on:
+  push:
+    branches:
+      - integration/0.9.1-user-system-source
+    paths:
+      - .github/workflows/prepare-user-system-source-0.9.1.yml
+
+permissions:
+  contents: write
+
+jobs:
+  prepare-source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: integration/0.9.1-user-system-source
+          fetch-depth: 0
+
+      - name: Reset overlapping files to common ancestor
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git checkout 71603bcc6807284ef3a6da26ad3f43c541bc99c2 -- \
+            admin-risk/package.json \
+            admin-risk/src/views/sys/login/LoginForm.vue \
+            platform-backend/app/config.py \
+            projects/启动说明.md
+
+          git rm .github/workflows/prepare-user-system-source-0.9.1.yml
+          git commit -m "chore: isolate overlapping files for 0.9.1 integration"
+          git push origin HEAD:integration/0.9.1-user-system-source
