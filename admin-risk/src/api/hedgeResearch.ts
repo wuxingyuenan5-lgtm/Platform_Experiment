@@ -85,6 +85,7 @@ export interface TurnoverThresholdStock {
 
 export interface AShareResearchAggregation {
   sw2Top: ShenwanLevel2Aggregate[];
+  sw2All: ShenwanLevel2Aggregate[];
   threshold: {
     thresholdYuan: string | number;
     operator: '>';
