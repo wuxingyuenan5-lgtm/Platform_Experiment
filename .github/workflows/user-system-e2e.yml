@@ -7,6 +7,8 @@ on:
       - main
     paths:
       - '.github/workflows/user-system-e2e.yml'
+      - 'admin-risk/.env.development'
+      - 'admin-risk/.env.production'
       - 'admin-risk/package.json'
       - 'admin-risk/pnpm-lock.yaml'
       - 'admin-risk/playwright.user-system.config.ts'
