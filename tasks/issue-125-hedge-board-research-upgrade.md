@@ -2,10 +2,8 @@
 
 Issue: #125
 Status: active
-Branch: `feature/hedge-board-research-upgrade-0-9-1`
+Branch: `feature/issue-125-hedge-board-research-upgrade`
 Base commit: `82142c5ad97485fabfafdd6b2e7a2b0b759971c1`
-
-The delivery branch was created before Issue #125 and retains the previously agreed name.
 
 ## Objective
 
@@ -66,11 +64,11 @@ python scripts/check-documentation-consistency.py
 python scripts/check-codex-context.py
 ```
 
-A Draft pull request targeting the validated 0.9.1 handoff branch must run the repository CI, Version Consistency and Secret Scan workflows. It must remain unmerged.
+A Draft pull request targeting `main` validates the complete 0.9.1 customer-system baseline plus this research change. It must run Platform CI, User System Browser E2E, Version Consistency and Secret Scan and remain unmerged.
 
 ## Progress
 
-- Done: Issue and protected scope; data contracts; policy; cache; provider/service/routes; A-share page modules; macro probability panel; initial unit and layout tests; technical documentation.
+- Done: Issue and protected scope; compliant delivery branch; data contracts; policy; cache; provider/service/routes; A-share page modules; macro probability panel; initial unit and layout tests; technical and UI documentation.
 - Current: run validation, repair exact lint/type/build/test failures, synchronize architecture ownership and final handoff.
-- Next: create Draft validation PR, inspect all checks, apply bounded fixes, mark this packet `review` only after required checks pass.
+- Next: inspect all Draft PR checks, apply bounded fixes, mark this packet `review` only after required checks pass.
 - Blocked by: none.
