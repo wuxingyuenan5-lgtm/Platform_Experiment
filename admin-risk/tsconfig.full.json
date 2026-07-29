@@ -9,6 +9,7 @@
   "include": [
     "vite.config.ts",
     "internal/**/*.ts",
+    "src/api/hedgeResearch.ts",
     "src/design/**/*.ts",
     "src/design/**/*.d.ts",
     "src/design/**/*.vue",
@@ -17,6 +18,7 @@
     "src/components/Loading/**/*.vue",
     "src/components/SimpleMenu/**/*.vue",
     "src/components/SimpleMenu/**/*.ts",
+    "src/router/routes/modules/hedge.ts",
     "src/views/dashboard/**/*.ts",
     "src/views/dashboard/**/*.vue",
     "src/views/hedgeBoard/**/*.ts",
