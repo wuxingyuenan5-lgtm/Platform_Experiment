@@ -103,7 +103,7 @@
     "print-js": "^1.6.0",
     "qrcode": "^1.5.3",
     "qs": "^6.11.2",
-    "resize-observer-polyfill": "^5.1",
+    "resize-observer-polyfill": "^1.5.1",
     "showdown": "^2.1.0",
     "sortablejs": "^1.15.0",
     "tinymce": "^5.10.7",
