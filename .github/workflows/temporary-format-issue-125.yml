@@ -8,6 +8,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: temporary-issue-125-formatter
+  cancel-in-progress: true
+
 jobs:
   format:
     if: ${{ !startsWith(github.event.head_commit.message, 'chore(format):') }}
