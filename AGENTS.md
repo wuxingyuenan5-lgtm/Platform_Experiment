@@ -4,7 +4,7 @@
 
 - Current product version: `0.9.1`.
 - Current uploaded main baseline: `a4e22021c71cf5cd703cb0bc35676ff5adbfec36`.
-- Current integration branch: `feature/issue-117-platform-0.9.1`; do not merge it into `main` without explicit user approval.
+- Current integration branch: `feature/issue-117-platform-0-9-1`; do not merge it into `main` without explicit user approval.
 - Frontend port: `4373`.
 - Platform Backend port: `8000`.
 - Execution Runtime port: `8100`.
