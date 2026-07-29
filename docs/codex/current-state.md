@@ -1,19 +1,21 @@
 # Current Project State
 
-Last updated: 2026-07-26  
-Stable branch: `main`  
-Product release: `0.9.0`
+Last updated: 2026-07-29  
+Uploaded stable branch: `main` at `a4e22021c71cf5cd703cb0bc35676ff5adbfec36`  
+Active integration branch: `release/0.9.1-user-system`  
+Product release: `0.9.1`
 
-This file records stable operating truth. GitHub is authoritative for open Issues, PRs, branches and CI.
+This file records current operating truth. The 0.9.1 integration branch is intentionally not merged into `main`.
 
 ## Architecture
 
 - `admin-risk/`: Vue product frontend.
-- `platform-backend/`: business, risk, execution orchestration and accounting API.
+- `platform-backend/`: business, risk, browser user system, orchestration and accounting API.
 - `execution-runtime/`: isolated Venue/Gateway process and Runtime Journal.
 - SQLite remains approved for the current stage.
 - Major ownership: `docs/architecture/OWNERSHIP.md`.
 - Synthetic execution: `docs/technical/CROSS_SPREAD_SYNTHETIC_EXECUTION.md`.
+- User-system handoff: `docs/operations/USER_SYSTEM_LOCAL_INTEGRATION_HANDOFF.md`.
 - Operational acceptance: `docs/operations/V6-小资金实盘验收手册.md`.
 
 ## Safety defaults
@@ -30,7 +32,24 @@ Cross-spread FOK hedge reserve=0 unless explicitly configured
 Bybit PostOnly Chase=false
 ```
 
-Code completion, version changes and CI do not relax these values.
+Code completion, version changes, browser roles and CI do not relax these values. API-Key roles and browser business roles remain separate.
+
+## 0.9.1 integration
+
+The branch preserves all changes in the latest uploaded `main`, including hedge-fund dashboard, funding execution, cross-spread product restructuring, Runtime adapters and local startup improvements.
+
+It additionally integrates:
+
+- browser registration, login, logout and password reset;
+- Argon2id passwords, opaque server-side Sessions and CSRF/Origin validation;
+- CEO, technical lead, employee and member roles;
+- user administration, target-scoped data masking and operational notes;
+- member holdings, NAV and asset views using Decimal strings;
+- eight reusable local/test accounts;
+- user, Session, holding, NAV and avatar backup/restore boundaries;
+- browser E2E and user-system access guards.
+
+Browser CEO authority cannot replace API-Key or LiveTradingSession authorization for real trading.
 
 ## Execution baseline
 
@@ -46,14 +65,13 @@ Code completion, version changes and CI do not relax these values.
 
 ## Product and local-run baseline
 
-- Product release `0.9.0` includes Market, FOK, TP/SL execution selection and disabled-by-default PostOnly Chase.
-- One Windows command starts Runtime, Backend and Frontend:
+One Windows command starts Runtime, Backend and Frontend:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\dev-platform.ps1
 ```
 
-- The script reads the pnpm version from `admin-risk/package.json`, installs only when needed, starts three service windows and checks frontend `4373`, backend `8000`, and runtime `8100` readiness.
+The script reads pnpm from `admin-risk/package.json`, installs only when needed, starts three service windows and checks frontend `4373`, backend `8000`, and runtime `8100` readiness.
 
 ## Engineering workflow
 
@@ -65,16 +83,18 @@ powershell -ExecutionPolicy Bypass -File .\scripts\dev-platform.ps1
 
 See `docs/engineering/GIT_WORKFLOW.md`.
 
-## Deferred product decision
+## Production-only follow-up
 
-Quote age, cross-Venue time skew, Bid/Ask width, MT5 deviation, unhedged duration, realized-spread deviation and fee decomposition remain Markdown-only candidates for later post-trade analysis. No frontend placement has been chosen.
+Before production cutover:
 
-## Operational acceptance
-
-Issue #39 remains the real Windows-host acceptance workstream. It must prove credentials, permissions, symbol specifications, private-stream behavior, MT5 Terminal stability, controlled minimum-size execution, recovery and clean reconciliation. CI is not that evidence.
+- validate HTTPS same-origin proxy and Secure Cookie behavior;
+- decide whether legacy Go/MySQL contains real users requiring migration;
+- confirm initial production member-holding source;
+- execute controlled-host Backup, Restore Drill, read-only restored startup and rollback rehearsal;
+- complete real Windows/Venue/Broker acceptance under Issue #39.
 
 ## Known constraints
 
 - PostOnly currently derives its hard Bybit bound from the pre-submit MT5 reference quote and does not dynamically reprice from MT5 during Chase.
 - One successful Open maps to one MT5 Position Ticket; ambiguity fails closed.
-- Real liquidity, Broker behavior and Venue fields require operational evidence.
+- Real liquidity, Broker behavior, HTTPS proxy behavior and production data paths require operational evidence.
