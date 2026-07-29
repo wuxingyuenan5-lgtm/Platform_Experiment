@@ -145,14 +145,14 @@ def aggregate_shenwan_level2(
             threshold_counts[membership.sw_l2_code] += 1
             threshold_stocks.append(
                 TurnoverThresholdStock(
-                    securityCode=stock.security_code,
-                    securityName=stock.security_name,
-                    swL1Code=membership.sw_l1_code,
-                    swL1Name=membership.sw_l1_name,
-                    swL2Code=membership.sw_l2_code,
-                    swL2Name=membership.sw_l2_name,
-                    turnoverYuan=stock.turnover_yuan.quantize(MONEY_QUANT),
-                    returnPct=stock.return_pct,
+                    security_code=stock.security_code,
+                    security_name=stock.security_name,
+                    sw_l1_code=membership.sw_l1_code,
+                    sw_l1_name=membership.sw_l1_name,
+                    sw_l2_code=membership.sw_l2_code,
+                    sw_l2_name=membership.sw_l2_name,
+                    turnover_yuan=stock.turnover_yuan.quantize(MONEY_QUANT),
+                    return_pct=stock.return_pct,
                 )
             )
 
@@ -160,8 +160,8 @@ def aggregate_shenwan_level2(
         buckets.values(),
         key=lambda item: (-item.turnover_yuan, item.membership.sw_l2_code),
     )
-    sw2_top: list[ShenwanLevel2Aggregate] = []
-    for rank, bucket in enumerate(sorted_buckets[:top_n], start=1):
+    sw2_all: list[ShenwanLevel2Aggregate] = []
+    for rank, bucket in enumerate(sorted_buckets, start=1):
         weighted_return = None
         if bucket.weighted_return_denominator > 0:
             weighted_return = (
@@ -173,17 +173,17 @@ def aggregate_shenwan_level2(
                 PCT_QUANT,
                 rounding=ROUND_HALF_UP,
             )
-        sw2_top.append(
+        sw2_all.append(
             ShenwanLevel2Aggregate(
                 rank=rank,
-                swL1Code=bucket.membership.sw_l1_code,
-                swL1Name=bucket.membership.sw_l1_name,
-                swL2Code=bucket.membership.sw_l2_code,
-                swL2Name=bucket.membership.sw_l2_name,
-                returnPct=weighted_return,
-                turnoverYuan=bucket.turnover_yuan.quantize(MONEY_QUANT),
-                marketSharePct=market_share,
-                netInflowYuan=(
+                sw_l1_code=bucket.membership.sw_l1_code,
+                sw_l1_name=bucket.membership.sw_l1_name,
+                sw_l2_code=bucket.membership.sw_l2_code,
+                sw_l2_name=bucket.membership.sw_l2_name,
+                return_pct=weighted_return,
+                turnover_yuan=bucket.turnover_yuan.quantize(MONEY_QUANT),
+                market_share_pct=market_share,
+                net_inflow_yuan=(
                     bucket.net_inflow_yuan.quantize(MONEY_QUANT)
                     if bucket.has_net_inflow
                     else None
@@ -193,11 +193,11 @@ def aggregate_shenwan_level2(
 
     industries = [
         TurnoverThresholdIndustryCount(
-            swL1Code=buckets[sw_l2_code].membership.sw_l1_code,
-            swL1Name=buckets[sw_l2_code].membership.sw_l1_name,
-            swL2Code=sw_l2_code,
-            swL2Name=buckets[sw_l2_code].membership.sw_l2_name,
-            stockCount=count,
+            sw_l1_code=buckets[sw_l2_code].membership.sw_l1_code,
+            sw_l1_name=buckets[sw_l2_code].membership.sw_l1_name,
+            sw_l2_code=sw_l2_code,
+            sw_l2_name=buckets[sw_l2_code].membership.sw_l2_name,
+            stock_count=count,
         )
         for sw_l2_code, count in sorted(
             threshold_counts.items(),
@@ -210,15 +210,16 @@ def aggregate_shenwan_level2(
     unmatched_codes = sorted(set(unmatched))
 
     threshold_result = TurnoverThresholdResult(
-        thresholdYuan=threshold_yuan,
+        threshold_yuan=threshold_yuan,
         industries=industries,
         stocks=threshold_stocks,
-        unmatchedSecurityCodes=unmatched_codes,
+        unmatched_security_codes=unmatched_codes,
     )
     return AShareResearchAggregation(
-        sw2Top=sw2_top,
+        sw2_top=sw2_all[:top_n],
+        sw2_all=sw2_all,
         threshold=threshold_result,
-        unmatchedSecurityCodes=unmatched_codes,
+        unmatched_security_codes=unmatched_codes,
     )
 
 
