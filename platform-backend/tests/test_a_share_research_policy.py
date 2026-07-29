@@ -26,11 +26,11 @@ def _stock(
     net_inflow: str | None = None,
 ) -> AShareTurnoverStock:
     return AShareTurnoverStock(
-        securityCode=code,
-        securityName=name,
-        turnoverYuan=Decimal(turnover),
-        returnPct=Decimal(return_pct) if return_pct is not None else None,
-        netInflowYuan=Decimal(net_inflow) if net_inflow is not None else None,
+        security_code=code,
+        security_name=name,
+        turnover_yuan=Decimal(turnover),
+        return_pct=Decimal(return_pct) if return_pct is not None else None,
+        net_inflow_yuan=Decimal(net_inflow) if net_inflow is not None else None,
     )
 
 
@@ -42,13 +42,13 @@ def _membership(
     l2_name: str,
 ) -> ShenwanMembership:
     return ShenwanMembership(
-        securityCode=code,
-        swL1Code=l1_code,
-        swL1Name=l1_name,
-        swL2Code=l2_code,
-        swL2Name=l2_name,
-        classificationVersion="test-version",
-        effectiveFrom=date(2026, 1, 1),
+        security_code=code,
+        sw_l1_code=l1_code,
+        sw_l1_name=l1_name,
+        sw_l2_code=l2_code,
+        sw_l2_name=l2_name,
+        classification_version="test-version",
+        effective_from=date(2026, 1, 1),
     )
 
 
@@ -113,10 +113,11 @@ def test_shenwan_level2_aggregation_keeps_threshold_report_separate() -> None:
         stocks=stocks,
         memberships=memberships,
         threshold_yuan=threshold,
-        top_n=10,
+        top_n=1,
     )
 
-    assert [item.sw_l2_name for item in result.sw2_top] == ["半导体", "通信设备"]
+    assert [item.sw_l2_name for item in result.sw2_top] == ["半导体"]
+    assert [item.sw_l2_name for item in result.sw2_all] == ["半导体", "通信设备"]
     semi = result.sw2_top[0]
     assert semi.rank == 1
     assert semi.turnover_yuan == Decimal("22000000000.00")
