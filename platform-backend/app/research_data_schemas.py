@@ -2,21 +2,35 @@ from __future__ import annotations
 
 from datetime import date, datetime
 from decimal import Decimal
-from typing import Literal
+from typing import Any, Literal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 ResearchDataStatus = Literal["loading", "ready", "partial", "no_data", "stale", "error"]
 StrictThresholdOperator = Literal[">"]
 
 
-class ResearchSourceMeta(BaseModel):
+def _to_camel(value: str) -> str:
+    head, *tail = value.split("_")
+    return head + "".join(part[:1].upper() + part[1:] for part in tail)
+
+
+class ResearchApiModel(BaseModel):
+    model_config = ConfigDict(
+        alias_generator=_to_camel,
+        populate_by_name=True,
+        extra="ignore",
+    )
+
+
+class ResearchSourceMeta(ResearchApiModel):
     source: str = Field(min_length=1, max_length=128)
-    source_timestamp: datetime | None = Field(default=None, alias="sourceTimestamp")
-    fetched_at: datetime = Field(alias="fetchedAt")
+    source_timestamp: datetime | None = None
+    fetched_at: datetime
     status: ResearchDataStatus
-    is_stale: bool = Field(alias="isStale")
-    error_code: str | None = Field(default=None, alias="errorCode", max_length=128)
+    is_stale: bool = False
+    error_code: str | None = Field(default=None, max_length=128)
+    message: str | None = Field(default=None, max_length=512)
 
     @field_validator("source_timestamp", "fetched_at")
     @classmethod
@@ -26,65 +40,171 @@ class ResearchSourceMeta(BaseModel):
         return value
 
 
-class AShareTurnoverStock(BaseModel):
-    security_code: str = Field(alias="securityCode", pattern=r"^\d{6}$")
-    security_name: str = Field(alias="securityName", min_length=1, max_length=128)
-    turnover_yuan: Decimal = Field(alias="turnoverYuan", ge=0)
-    return_pct: Decimal | None = Field(default=None, alias="returnPct")
-    net_inflow_yuan: Decimal | None = Field(default=None, alias="netInflowYuan")
+class ResearchModuleResult(ResearchApiModel):
+    meta: ResearchSourceMeta
+    data: Any = None
 
 
-class ShenwanMembership(BaseModel):
-    security_code: str = Field(alias="securityCode", pattern=r"^\d{6}$")
-    sw_l1_code: str = Field(alias="swL1Code", min_length=1, max_length=32)
-    sw_l1_name: str = Field(alias="swL1Name", min_length=1, max_length=128)
-    sw_l2_code: str = Field(alias="swL2Code", min_length=1, max_length=32)
-    sw_l2_name: str = Field(alias="swL2Name", min_length=1, max_length=128)
-    classification_version: str = Field(alias="classificationVersion", min_length=1, max_length=64)
-    effective_from: date = Field(alias="effectiveFrom")
-    effective_to: date | None = Field(default=None, alias="effectiveTo")
+class AShareTurnoverStock(ResearchApiModel):
+    security_code: str = Field(pattern=r"^\d{6}$")
+    security_name: str = Field(min_length=1, max_length=128)
+    turnover_yuan: Decimal = Field(ge=0)
+    return_pct: Decimal | None = None
+    net_inflow_yuan: Decimal | None = None
 
 
-class ShenwanLevel2Aggregate(BaseModel):
+class ShenwanMembership(ResearchApiModel):
+    security_code: str = Field(pattern=r"^\d{6}$")
+    sw_l1_code: str = Field(min_length=1, max_length=32)
+    sw_l1_name: str = Field(min_length=1, max_length=128)
+    sw_l2_code: str = Field(min_length=1, max_length=32)
+    sw_l2_name: str = Field(min_length=1, max_length=128)
+    classification_version: str = Field(min_length=1, max_length=64)
+    effective_from: date
+    effective_to: date | None = None
+
+
+class ShenwanLevel2Aggregate(ResearchApiModel):
     rank: int = Field(ge=1)
-    sw_l1_code: str = Field(alias="swL1Code")
-    sw_l1_name: str = Field(alias="swL1Name")
-    sw_l2_code: str = Field(alias="swL2Code")
-    sw_l2_name: str = Field(alias="swL2Name")
-    return_pct: Decimal | None = Field(default=None, alias="returnPct")
-    turnover_yuan: Decimal = Field(alias="turnoverYuan", ge=0)
-    market_share_pct: Decimal = Field(alias="marketSharePct", ge=0)
-    net_inflow_yuan: Decimal | None = Field(default=None, alias="netInflowYuan")
+    sw_l1_code: str
+    sw_l1_name: str
+    sw_l2_code: str
+    sw_l2_name: str
+    return_pct: Decimal | None = None
+    turnover_yuan: Decimal = Field(ge=0)
+    market_share_pct: Decimal = Field(ge=0)
+    net_inflow_yuan: Decimal | None = None
 
 
-class TurnoverThresholdIndustryCount(BaseModel):
-    sw_l1_code: str = Field(alias="swL1Code")
-    sw_l1_name: str = Field(alias="swL1Name")
-    sw_l2_code: str = Field(alias="swL2Code")
-    sw_l2_name: str = Field(alias="swL2Name")
-    stock_count: int = Field(alias="stockCount", ge=1)
+class TurnoverThresholdIndustryCount(ResearchApiModel):
+    sw_l1_code: str
+    sw_l1_name: str
+    sw_l2_code: str
+    sw_l2_name: str
+    stock_count: int = Field(ge=1)
 
 
-class TurnoverThresholdStock(BaseModel):
-    security_code: str = Field(alias="securityCode")
-    security_name: str = Field(alias="securityName")
-    sw_l1_code: str = Field(alias="swL1Code")
-    sw_l1_name: str = Field(alias="swL1Name")
-    sw_l2_code: str = Field(alias="swL2Code")
-    sw_l2_name: str = Field(alias="swL2Name")
-    turnover_yuan: Decimal = Field(alias="turnoverYuan", ge=0)
-    return_pct: Decimal | None = Field(default=None, alias="returnPct")
+class TurnoverThresholdStock(ResearchApiModel):
+    security_code: str
+    security_name: str
+    sw_l1_code: str
+    sw_l1_name: str
+    sw_l2_code: str
+    sw_l2_name: str
+    turnover_yuan: Decimal = Field(ge=0)
+    return_pct: Decimal | None = None
 
 
-class TurnoverThresholdResult(BaseModel):
-    threshold_yuan: Decimal = Field(alias="thresholdYuan", gt=0)
+class TurnoverThresholdResult(ResearchApiModel):
+    threshold_yuan: Decimal = Field(gt=0)
     operator: StrictThresholdOperator = ">"
     industries: list[TurnoverThresholdIndustryCount]
     stocks: list[TurnoverThresholdStock]
-    unmatched_security_codes: list[str] = Field(alias="unmatchedSecurityCodes")
+    unmatched_security_codes: list[str]
 
 
-class AShareResearchAggregation(BaseModel):
-    sw2_top: list[ShenwanLevel2Aggregate] = Field(alias="sw2Top")
+class AShareResearchAggregation(ResearchApiModel):
+    sw2_top: list[ShenwanLevel2Aggregate]
     threshold: TurnoverThresholdResult
-    unmatched_security_codes: list[str] = Field(alias="unmatchedSecurityCodes")
+    unmatched_security_codes: list[str]
+
+
+class AShareIndexSnapshot(ResearchApiModel):
+    code: str
+    name: str
+    source_symbol: str
+    close: Decimal | None = None
+    turnover_yuan: Decimal | None = None
+    volatility_20_pct: Decimal | None = None
+    return_1d_pct: Decimal | None = None
+    return_ytd_pct: Decimal | None = None
+    return_qtd_pct: Decimal | None = None
+    return_1w_pct: Decimal | None = None
+    return_1m_pct: Decimal | None = None
+    return_1y_pct: Decimal | None = None
+    distance_52w_high_pct: Decimal | None = None
+    signal_1h: str | None = None
+    signal_daily: str | None = None
+    signal_3d: str | None = None
+    signal_weekly: str | None = None
+    spark: list[Decimal] = Field(default_factory=list)
+
+
+class AShareBreadthSnapshot(ResearchApiModel):
+    up: int = Field(ge=0)
+    down: int = Field(ge=0)
+    flat: int = Field(ge=0)
+    limit_up: int = Field(ge=0)
+    real_limit_up: int = Field(ge=0)
+    limit_down: int = Field(ge=0)
+    real_limit_down: int = Field(ge=0)
+    activity_pct: Decimal | None = None
+    breadth_state: str
+    speculation_state: str
+    trade_date: date | None = None
+
+
+class EmotionLadderRow(ResearchApiModel):
+    board_count: str
+    stock_count: int = Field(ge=0)
+
+
+class EmotionStockRow(ResearchApiModel):
+    security_code: str
+    security_name: str
+    board_count: int = Field(ge=1)
+    turnover_yuan: Decimal | None = None
+
+
+class ShortTermEmotionSnapshot(ResearchApiModel):
+    limit_up_count: int = Field(ge=0)
+    broken_board_count: int = Field(ge=0)
+    limit_down_count: int = Field(ge=0)
+    highest_board_count: int = Field(ge=0)
+    consecutive_board_count: int = Field(ge=0)
+    seal_rate_pct: Decimal | None = None
+    break_rate_pct: Decimal | None = None
+    promotion_rate_pct: Decimal | None = None
+    ladder: list[EmotionLadderRow]
+    leaders: list[EmotionStockRow]
+    trade_date: date | None = None
+
+
+class AShareDashboardResponse(ResearchApiModel):
+    generated_at: datetime
+    market_detail: ResearchModuleResult
+    breadth: ResearchModuleResult
+    shenwan: ResearchModuleResult
+    emotion: ResearchModuleResult
+
+
+class StockSnapshotResponse(ResearchApiModel):
+    security_code: str
+    security_name: str | None = None
+    generated_at: datetime
+    completeness_pct: Decimal = Field(ge=0, le=100)
+    modules: dict[str, ResearchModuleResult]
+
+
+class MacroProbabilityPoint(ResearchApiModel):
+    observed_at: datetime
+    probability_pct: Decimal = Field(ge=0, le=100)
+
+
+class MacroExpectationEvent(ResearchApiModel):
+    event_id: str
+    category: Literal["monetary_policy", "macro", "geopolitics", "election"]
+    title: str
+    outcome: str
+    current_probability_pct: Decimal = Field(ge=0, le=100)
+    change_1d_pct_points: Decimal | None = None
+    change_7d_pct_points: Decimal | None = None
+    liquidity_label: str | None = None
+    expiry_at: datetime | None = None
+    source_url: str | None = None
+    history: list[MacroProbabilityPoint] = Field(default_factory=list)
+
+
+class MacroExpectationResponse(ResearchApiModel):
+    generated_at: datetime
+    events: ResearchModuleResult
