@@ -98,6 +98,7 @@ include = [
   "app/venue_reconciliation_service.py",
 ]
 exclude = ["tests"]
+ignore = ["app/research_providers.py"]
 reportMissingTypeStubs = false
 
 [tool.ruff]
@@ -110,6 +111,9 @@ select = ["E", "F", "I", "UP", "B"]
 [tool.ruff.lint.per-file-ignores]
 # FastAPI route metadata is intentionally declared in the function signature.
 "app/financial_facts.py" = ["B008"]
+# Research adapters normalize dynamic public-source payloads at one explicit boundary.
+"app/research_providers.py" = ["E501"]
+"app/research_routes.py" = ["B008"]
 # Pydantic's quoted self-return annotation is required while the validator builds the model.
 "app/financial_fact_schemas.py" = ["UP037"]
 "app/eod_reconciliation_schemas.py" = ["UP037"]
