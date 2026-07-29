@@ -15,6 +15,11 @@ from app.auth import require_principal
 from app.config import get_settings
 from app.database import connection
 from app.redaction import redact_sensitive
+from app.user_backup_archive import (
+    USER_PLATFORM_TABLES,
+    avatar_archive_manifest,
+    restore_avatar_archive,
+)
 
 SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS production_backup_records (
@@ -64,6 +69,7 @@ PLATFORM_TABLES = (
     "reconciliation_differences",
     "eod_reconciliation_reports",
     "live_trading_sessions",
+    *USER_PLATFORM_TABLES,
 )
 RUNTIME_TABLES = ("runtime_commands", "runtime_events")
 SAFE_LABEL = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}")
@@ -292,6 +298,7 @@ def create_backup(request: CreateBackupRequest, *, actor: str) -> BackupResponse
         runtime_source = source_database_path(settings.runtime_journal_path, "Runtime Journal")
         platform_backup = destination / "platform.db"
         runtime_backup = destination / "runtime_journal.db"
+        avatar_backup = destination / "avatars.zip"
         online_backup(platform_source, platform_backup)
         online_backup(runtime_source, runtime_backup)
 
@@ -308,12 +315,13 @@ def create_backup(request: CreateBackupRequest, *, actor: str) -> BackupResponse
                 source_file_name=runtime_source.name,
                 tables=RUNTIME_TABLES,
             ),
+            avatar_archive_manifest(settings.avatar_data_directory, avatar_backup),
         ]
         if any(file["integrity"] != "ok" for file in files):
             raise RuntimeError("SQLite integrity check failed for a backup artifact")
 
         manifest = {
-            "schemaVersion": 1,
+            "schemaVersion": 2,
             "backupId": backup_id,
             "createdAt": created_at,
             "environment": settings.environment,
@@ -417,7 +425,9 @@ def create_restore_drill(
             )
         return restore_from_row(existing)
     if backup is None or backup["status"] != "completed" or not backup["manifest_path"]:
-        raise HTTPException(status_code=422, detail="Completed backup is required for restore drill")
+        raise HTTPException(
+            status_code=422, detail="Completed backup is required for restore drill"
+        )
 
     settings = get_settings()
     restore_id = str(uuid4())
@@ -430,8 +440,12 @@ def create_restore_drill(
         Path(settings.database_path).expanduser().resolve(),
         Path(settings.runtime_journal_path).expanduser().resolve(),
     }
-    if destination in active_paths or any(destination.is_relative_to(path.parent) and destination == path for path in active_paths):
-        raise HTTPException(status_code=422, detail="Restore drill cannot target an active data path")
+    if destination in active_paths or any(
+        destination.is_relative_to(path.parent) and destination == path for path in active_paths
+    ):
+        raise HTTPException(
+            status_code=422, detail="Restore drill cannot target an active data path"
+        )
 
     with connection() as db:
         db.execute(
@@ -461,10 +475,12 @@ def create_restore_drill(
         source_files = {file["logicalName"]: file for file in manifest["files"]}
         platform_source = backup_directory / str(source_files["platform_database"]["fileName"])
         runtime_source = backup_directory / str(source_files["runtime_journal"]["fileName"])
+        avatar_source = backup_directory / str(source_files["avatar_archive"]["fileName"])
 
         for source, logical_name in (
             (platform_source, "platform_database"),
             (runtime_source, "runtime_journal"),
+            (avatar_source, "avatar_archive"),
         ):
             expected = source_files[logical_name]["sha256"]
             if sha256_file(source) != expected:
@@ -472,12 +488,20 @@ def create_restore_drill(
 
         platform_restored = destination / "platform.restored.db"
         runtime_restored = destination / "runtime_journal.restored.db"
+        avatars_restored = destination / "avatars.restored"
         online_backup(platform_source, platform_restored)
         online_backup(runtime_source, runtime_restored)
+        avatar_integrity = restore_avatar_archive(
+            avatar_source,
+            avatars_restored,
+            expected_file_count=int(source_files["avatar_archive"]["fileCount"]),
+            expected_total_bytes=int(source_files["avatar_archive"]["totalBytes"]),
+        )
 
         integrity = {
             "platform": integrity_result(platform_restored),
             "runtime": integrity_result(runtime_restored),
+            "avatars": avatar_integrity,
             "platformCounts": database_counts(platform_restored, PLATFORM_TABLES),
             "runtimeCounts": database_counts(runtime_restored, RUNTIME_TABLES),
         }

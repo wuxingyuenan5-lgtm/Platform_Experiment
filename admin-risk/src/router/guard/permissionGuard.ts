@@ -5,27 +5,40 @@ import { usePermissionStoreWithOut } from '@/store/modules/permission';
 import { PageEnum } from '@/enums/pageEnum';
 import { useUserStoreWithOut } from '@/store/modules/user';
 
+import { asyncRoutes } from '@/router/routes';
 import { PAGE_NOT_FOUND_ROUTE } from '@/router/routes/basic';
 import { PAGE_NOT_FOUND_NAME } from '@/router/constant';
-
-import { RootRoute } from '@/router/routes';
+import {
+  canAccessMatchedRoute,
+  filterPermissionTree,
+  findRouteChainByPath,
+  isKnownRouteDenied,
+} from '@/access/routeAccess';
 
 const LOGIN_PATH = PageEnum.BASE_LOGIN;
 const REGISTER_APPLY_PATH = '/register-apply';
+const RESET_PASSWORD_PATH = '/reset-password';
+const FORBIDDEN_PATH = `${PageEnum.ERROR_PAGE}/403`;
 
-const ROOT_PATH = RootRoute.path;
 const PAGE_NOT_FOUND_CHILD_NAME = PAGE_NOT_FOUND_NAME;
 const PAGE_NOT_FOUND_PARENT_NAME = String(PAGE_NOT_FOUND_ROUTE.name || '');
-const PAGE_NOT_FOUND_NAMES = [PAGE_NOT_FOUND_PARENT_NAME, PAGE_NOT_FOUND_CHILD_NAME].filter(Boolean);
+const PAGE_NOT_FOUND_NAMES = [PAGE_NOT_FOUND_PARENT_NAME, PAGE_NOT_FOUND_CHILD_NAME].filter(
+  Boolean,
+);
 
-const whitePathList = [LOGIN_PATH, REGISTER_APPLY_PATH];
+const whitePathList = [LOGIN_PATH, REGISTER_APPLY_PATH, RESET_PASSWORD_PATH];
 
 export function createPermissionGuard(router: Router) {
   const userStore = useUserStoreWithOut();
   const permissionStore = usePermissionStoreWithOut();
 
   const ensureDynamicRoutes = async () => {
-    const routes = await permissionStore.buildRoutesAction();
+    const permissions = userStore.getAuthentication?.permissions || [];
+    const builtRoutes = await permissionStore.buildRoutesAction();
+    const routes = filterPermissionTree(builtRoutes, permissions);
+    permissionStore.setFrontMenuList(
+      filterPermissionTree(permissionStore.getFrontMenuList, permissions),
+    );
 
     routes.forEach((route) => {
       const routeName = String(route.name || '');
@@ -48,49 +61,37 @@ export function createPermissionGuard(router: Router) {
       return;
     }
 
-    const token = userStore.getToken;
-    // Whitelist can be directly entered
     if (whitePathList.includes(to.path as PageEnum)) {
-      if (to.path === LOGIN_PATH && token) {
-        const isSessionTimeout = userStore.getSessionTimeout;
-        try {
-          await userStore.afterLoginAction();
-          if (!isSessionTimeout && userStore.getUserInfo?.data) {
-            next((to.query?.redirect as string) || '/');
-            return;
-          }
-        } catch {
-          //
+      if (to.path === LOGIN_PATH) {
+        const authenticated = await userStore.hydrateSession();
+        if (authenticated) {
+          next((to.query?.redirect as string) || userStore.getUserInfo.homePath || '/');
+          return;
         }
       }
       next();
       return;
     }
 
-    // token or user does not exist
-    if (!token) {
-      // You can access without permission. You need to set the routing meta.ignoreAuth to true
+    // Protected navigation must revalidate the server-side Session. Local Pinia
+    // state is presentation state only and cannot survive password or admin revocation.
+    const authenticated = await userStore.hydrateSession(true);
+    if (!authenticated) {
       if (to.meta.ignoreAuth) {
         next();
         return;
       }
-
-      // redirect login page
       const redirectData: { path: string; replace: boolean; query?: Recordable<string> } = {
         path: LOGIN_PATH,
         replace: true,
       };
       if (to.path) {
-        redirectData.query = {
-          ...redirectData.query,
-          redirect: to.path,
-        };
+        redirectData.query = { redirect: to.path };
       }
       next(redirectData);
       return;
     }
 
-    // Jump to the 404 page after processing the login
     if (
       from.path === LOGIN_PATH &&
       PAGE_NOT_FOUND_NAMES.includes(String(to.name || '')) &&
@@ -100,14 +101,20 @@ export function createPermissionGuard(router: Router) {
       return;
     }
 
-    // get userinfo while last fetch time is empty
     if (userStore.getLastUpdateTime === 0) {
       try {
         await userStore.getUserInfoAction();
-      } catch (err) {
-        next();
+      } catch {
+        await userStore.logout(false);
+        next({ path: LOGIN_PATH, replace: true, query: { redirect: to.fullPath } });
         return;
       }
+    }
+
+    const permissions = userStore.getAuthentication?.permissions || [];
+    if (!canAccessMatchedRoute(to.matched, permissions)) {
+      next({ path: FORBIDDEN_PATH, replace: true });
+      return;
     }
 
     if (permissionStore.getIsDynamicAddedRoute) {
@@ -115,8 +122,20 @@ export function createPermissionGuard(router: Router) {
         to.matched.length === 0 || PAGE_NOT_FOUND_NAMES.includes(String(to.name || ''));
 
       if (isUnmatchedRoute) {
-        await ensureDynamicRoutes();
-        next({ path: to.fullPath, replace: true, query: to.query });
+        const knownRoute = findRouteChainByPath(asyncRoutes, to.path) !== undefined;
+        if (knownRoute) {
+          if (isKnownRouteDenied(asyncRoutes, to.path, permissions)) {
+            next({ path: FORBIDDEN_PATH, replace: true });
+            return;
+          }
+          // Pinia state can survive a full browser reload while Vue Router's
+          // in-memory dynamic route table cannot. Rebuild known authorized routes
+          // before retrying the original URL instead of falling through to 404/home.
+          await ensureDynamicRoutes();
+          next({ path: to.fullPath, replace: true, query: to.query });
+          return;
+        }
+        next();
         return;
       }
 
@@ -126,7 +145,10 @@ export function createPermissionGuard(router: Router) {
 
     await ensureDynamicRoutes();
     if (PAGE_NOT_FOUND_NAMES.includes(String(to.name || ''))) {
-      // 动态添加路由后，此处应当重定向到fullPath，否则会加载404页面内容
+      if (isKnownRouteDenied(asyncRoutes, to.path, permissions)) {
+        next({ path: FORBIDDEN_PATH, replace: true });
+        return;
+      }
       next({ path: to.fullPath, replace: true, query: to.query });
     } else {
       const redirectPath = ((to.query?.redirect as string) || to.fullPath || to.path) as string;

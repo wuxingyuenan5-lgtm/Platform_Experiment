@@ -40,6 +40,14 @@ def auth_headers(token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}", "X-Request-ID": "test-request-id"}
 
 
+def assert_auth_error(response, *, status_code: int, code: str) -> None:
+    assert response.status_code == status_code
+    payload = response.json()
+    assert payload["detail"]["code"] == code
+    assert payload["detail"]["message"]
+    assert payload["requestId"] == response.headers["x-request-id"]
+
+
 def test_live_environment_rejects_anonymous_and_invalid_credentials(
     monkeypatch,
     tmp_path: Path,
@@ -49,15 +57,14 @@ def test_live_environment_rejects_anonymous_and_invalid_credentials(
         assert client.get("/health").status_code == 200
 
         anonymous = client.get("/api/v1/system/info")
-        assert anonymous.status_code == 401
+        assert_auth_error(anonymous, status_code=401, code="bearer_required")
         assert anonymous.headers["www-authenticate"] == "Bearer"
-        assert anonymous.json()["requestId"]
 
         invalid = client.get(
             "/api/v1/system/info",
             headers=auth_headers("wrong-token"),
         )
-        assert invalid.status_code == 401
+        assert_auth_error(invalid, status_code=401, code="credential_invalid")
 
         valid = client.get(
             "/api/v1/system/info",
@@ -86,13 +93,13 @@ def test_rbac_is_default_deny_for_trading_and_audit(monkeypatch, tmp_path: Path)
                 "price": "100",
             },
         )
-        assert trading.status_code == 403
+        assert_auth_error(trading, status_code=403, code="permission_denied")
 
         audit = client.get(
             "/api/v1/ops/audit-events",
             headers=auth_headers("viewer-token"),
         )
-        assert audit.status_code == 403
+        assert_auth_error(audit, status_code=403, code="permission_denied")
 
         admin_audit = client.get(
             "/api/v1/ops/audit-events",
@@ -117,8 +124,8 @@ def test_live_actor_field_cannot_impersonate_another_user(
                 "actor": "somebody-else",
             },
         )
-        assert mismatch.status_code == 403
-        assert "must match the authenticated user" in mismatch.json()["detail"]
+        assert_auth_error(mismatch, status_code=403, code="request_identity_mismatch")
+        assert "must match the authenticated user" in mismatch.json()["detail"]["message"]
 
         matching = client.put(
             "/api/v1/risk/kill-switches/global/*",
@@ -141,5 +148,5 @@ def test_live_environment_refuses_development_auth_mode(monkeypatch, tmp_path: P
     monkeypatch.setattr(settings, "auth_credentials_json", "[]")
     with TestClient(app) as client:
         response = client.get("/api/v1/system/info")
-        assert response.status_code == 503
-        assert "requires api_key" in response.json()["detail"]
+        assert_auth_error(response, status_code=503, code="live_auth_mode_required")
+        assert "requires api_key" in response.json()["detail"]["message"]

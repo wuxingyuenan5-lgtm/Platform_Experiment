@@ -1,11 +1,11 @@
 # V6 Production Gate 5D：监控、告警、调度、备份与恢复
 
-状态：`implementation complete / acceptance pending`  
-实施分支：`hardening/v6-production-gate-observability-backup-restore`  
-Pull Request：`#27 Add production monitoring, controlled operations, backup, and restore drills`  
-跟踪 Issue：`#26 V6 Production Gate 5D：监控告警、受控调度、备份与恢复演练`  
-总 Production Gate：Issue `#22`  
-更新时间：`2026-07-24`
+状态：`implementation complete / acceptance pending`
+实施分支：`hardening/v6-production-gate-observability-backup-restore`
+Pull Request：`#27 Add production monitoring, controlled operations, backup, and restore drills`
+跟踪 Issue：`#26 V6 Production Gate 5D：监控告警、受控调度、备份与恢复演练`
+总 Production Gate：Issue `#22`
+更新时间：`2026-07-28`
 
 ## 1. 目标
 
@@ -102,6 +102,7 @@ GET  /api/v1/ops/backups
 
 - Platform SQLite Database。
 - Runtime Journal SQLite Database。
+- 用户头像安全归档 `avatars.zip`。
 - Redacted `manifest.json`。
 
 使用 SQLite Online Backup API，不直接复制活动数据库文件。Manifest 记录：
@@ -109,7 +110,8 @@ GET  /api/v1/ops/backups
 - backupId、createdAt、environment。
 - logicalName、fileName、sourceFileName。
 - SHA-256、sizeBytes、`PRAGMA integrity_check`。
-- 关键 Table Count。
+- 关键 Table Count，包括用户、Session、重置凭证、基金、持仓和 NAV。
+- 头像文件数与总字节数；不在 Manifest 暴露头像文件名。
 - Safe Restore Defaults。
 
 Backup Root 由配置指定。Label 只允许字母、数字、点、下划线和连字符。拒绝路径穿越和覆盖非空目录。
@@ -128,9 +130,10 @@ GET  /api/v1/ops/restore-drills
 3. 使用 SQLite Online Backup 创建恢复副本。
 4. 执行 `PRAGMA integrity_check`。
 5. 核对关键 Table Count。
-6. 在恢复副本中强制 Global Kill Switch enabled。
-7. 生成 `safe-startup.env`：Platform/Runtime Live Write false、allowlist 空、limit 为零。
-8. 确认 Production Paths 未被修改。
+6. 安全解压头像归档，核对文件数和总字节数，并拒绝路径穿越、软链接、重复或异常文件。
+7. 在恢复副本中强制 Global Kill Switch enabled。
+8. 生成 `safe-startup.env`：Platform/Runtime Live Write false、allowlist 空、limit 为零。
+9. 确认 Production Paths 未被修改。
 
 恢复成功不等于可以将副本直接替换生产。任何正式切换仍需停机、双人审批、重新只读核对和 EOD。
 
@@ -138,6 +141,7 @@ GET  /api/v1/ops/restore-drills
 
 ```text
 VG_RUNTIME_JOURNAL_PATH=../execution-runtime/data/runtime_journal.db
+VG_AVATAR_DATA_DIRECTORY=./data/avatars
 VG_OPERATIONS_BACKUP_ROOT=./data/backups
 VG_OPERATIONS_RESTORE_ROOT=./data/restore-drills
 VG_OPERATIONS_ALERT_DEFAULT_OWNER=operations
@@ -162,8 +166,9 @@ Backup Root 与 Restore Root 不得指向活动数据目录。
 - [x] 调度只允许 health_scan、backup、eod。
 - [x] Controlled Operation 具备幂等与失败终结状态。
 - [x] Platform/Runtime 使用 SQLite Online Backup。
-- [x] Manifest 包含 checksum、size、integrity 和关键计数。
-- [x] Restore Drill 使用新目录并核对 checksum/count/integrity。
+- [x] 用户头像使用受限根目录归档，异常目录项 fail-closed。
+- [x] Manifest 包含 checksum、size、integrity、用户域关键计数和头像统计。
+- [x] Restore Drill 使用新目录并核对 checksum/count/integrity 与头像归档。
 - [x] 恢复副本 Global Kill Switch enabled。
 - [x] Safe Startup 覆盖文件关闭两层 Live Write。
 - [x] 原生产路径不被修改。
@@ -174,10 +179,10 @@ Backup Root 与 Restore Root 不得指向活动数据目录。
 
 ## 10. 运营验收
 
-- [ ] 受控主机确认活动 Platform DB 与 Runtime Journal 路径。
+- [ ] 受控主机确认活动 Platform DB、Runtime Journal 与头像目录路径。
 - [ ] 设置独立 Backup/Restore Root。
 - [ ] 手工执行一次健康扫描、Backup 和 Restore Drill。
-- [ ] 核对 Manifest、Checksum、Integrity、Table Count。
+- [ ] 核对 Manifest、Checksum、Integrity、用户域 Table Count 和头像统计。
 - [ ] 确认恢复副本 Live Write 关闭且 Global Kill Switch 开启。
 - [ ] 将 health_scan、backup、eod 脚本登记到 Windows Task Scheduler。
 - [ ] 演练 Runtime 不可用、Venue 不可用、EOD overdue 与 Backup Failure 告警。

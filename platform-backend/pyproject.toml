@@ -4,9 +4,12 @@ version = "0.9.0"
 description = "Variable-Global modular monolith backend"
 requires-python = ">=3.12"
 dependencies = [
+  "argon2-cffi>=25.1,<26.0",
   "fastapi>=0.116,<1.0",
   "httpx>=0.28,<1.0",
+  "pillow>=11.3,<12.0",
   "pydantic-settings>=2.10,<3.0",
+  "python-multipart>=0.0.20,<1.0",
   "tzdata>=2025.2",
   "uvicorn[standard]>=0.35,<1.0",
 ]
@@ -33,6 +36,7 @@ markers = [
 pythonVersion = "3.12"
 typeCheckingMode = "standard"
 include = [
+  "app/auth.py",
   "app/database_bootstrap.py",
   "app/database_connection.py",
   "app/database_seeds.py",
@@ -45,11 +49,41 @@ include = [
   "app/financial_fact_repository.py",
   "app/financial_fact_schemas.py",
   "app/financial_projection_service.py",
+  "app/member_holding_decimal.py",
+  "app/member_holding_repository.py",
+  "app/member_holding_routes.py",
+  "app/member_holding_schemas.py",
+  "app/member_holding_service.py",
   "app/position_math.py",
   "app/runtime_contracts.py",
   "app/schema_migrations.py",
   "app/schema_governance.py",
   "app/trade_command_execution.py",
+  "app/user_admin_note_routes.py",
+  "app/user_admin_notes.py",
+  "app/user_admin_policy.py",
+  "app/user_admin_repository.py",
+  "app/user_admin_routes.py",
+  "app/user_admin_schemas.py",
+  "app/user_admin_service.py",
+  "app/user_authority.py",
+  "app/user_avatar.py",
+  "app/user_avatar_repository.py",
+  "app/user_avatar_routes.py",
+  "app/user_avatar_schemas.py",
+  "app/user_cache_control.py",
+  "app/user_cli.py",
+  "app/user_logout.py",
+  "app/user_password_reset.py",
+  "app/user_permissions.py",
+  "app/user_product_migrations.py",
+  "app/user_rate_limit.py",
+  "app/user_repository.py",
+  "app/user_routes.py",
+  "app/user_schemas.py",
+  "app/user_security.py",
+  "app/user_service.py",
+  "app/user_session_auth.py",
   "app/venue_reconciliation_policy.py",
   "app/venue_reconciliation_repository.py",
   "app/venue_reconciliation_runtime_client.py",
@@ -72,6 +106,7 @@ select = ["E", "F", "I", "UP", "B"]
 # Pydantic's quoted self-return annotation is required while the validator builds the model.
 "app/financial_fact_schemas.py" = ["UP037"]
 "app/eod_reconciliation_schemas.py" = ["UP037"]
+"app/user_schemas.py" = ["UP037"]
 # Phase 4A keeps the complete risk state machine in one auditable module; long SQL/error lines
 # and Pydantic's quoted self annotation are accepted until the Phase 4 module split.
 "app/execution_risk.py" = ["E501", "UP037"]
@@ -86,6 +121,17 @@ select = ["E", "F", "I", "UP", "B"]
 "app/live_trading_sessions.py" = ["E501", "UP037"]
 "tests/test_auth_rbac.py" = ["E501"]
 "tests/test_live_trading_sessions.py" = ["E501"]
+# User-system service and route files keep security sequencing explicit in the first closed loop.
+"app/user_service.py" = ["E501"]
+"app/user_routes.py" = ["B008", "E501"]
+"app/user_avatar_routes.py" = ["B008", "E501"]
+"app/user_admin_note_routes.py" = ["B008", "E501"]
+"app/user_admin_repository.py" = ["E501"]
+"app/user_admin_routes.py" = ["B008", "E501"]
+"app/user_admin_service.py" = ["E501"]
+"app/member_holding_repository.py" = ["E501"]
+"app/member_holding_routes.py" = ["B008", "E501"]
+"app/member_holding_service.py" = ["E501"]
 # Production operations modules intentionally keep SQL, backup/restore validation, and the
 # alert orchestration contract together for auditability. The lambda-binding and keys-view
 # findings are non-functional and are tracked until the post-gate module split.

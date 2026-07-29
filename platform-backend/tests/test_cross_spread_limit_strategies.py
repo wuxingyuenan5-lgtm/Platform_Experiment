@@ -98,7 +98,7 @@ def test_migration_defaults_existing_execution_and_exit_rows() -> None:
         (NOW.isoformat(), NOW.isoformat()),
     )
 
-    apply_migrations(db, PLATFORM_MIGRATIONS)
+    apply_migrations(db, PLATFORM_MIGRATIONS[:4])
 
     intent = db.execute(
         """

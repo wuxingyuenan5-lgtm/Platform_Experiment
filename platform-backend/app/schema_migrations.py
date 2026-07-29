@@ -129,6 +129,231 @@ PLATFORM_MIGRATIONS: tuple[Migration, ...] = (
             """,
         ),
     ),
+    Migration(
+        version=5,
+        name="user-identity-sessions-and-audit",
+        statements=(
+            """
+            CREATE TABLE users (
+                id TEXT PRIMARY KEY,
+                username TEXT NOT NULL,
+                username_normalized TEXT NOT NULL UNIQUE,
+                password_hash TEXT NOT NULL,
+                display_name TEXT,
+                real_name TEXT,
+                avatar_key TEXT,
+                phone TEXT,
+                phone_normalized TEXT,
+                email TEXT,
+                email_normalized TEXT,
+                role_code TEXT,
+                requested_role_code TEXT,
+                department TEXT,
+                member_type TEXT,
+                application_note TEXT,
+                rejection_reason TEXT,
+                lifecycle_status TEXT NOT NULL,
+                auth_version INTEGER NOT NULL DEFAULT 1,
+                row_version INTEGER NOT NULL DEFAULT 1,
+                failed_login_count INTEGER NOT NULL DEFAULT 0,
+                locked_until TEXT,
+                registered_at TEXT NOT NULL,
+                approved_at TEXT,
+                approved_by TEXT,
+                last_login_at TEXT,
+                password_changed_at TEXT,
+                created_by TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                CHECK (
+                    role_code IS NULL
+                    OR role_code IN ('ceo', 'tech_lead', 'employee', 'member')
+                ),
+                CHECK (
+                    requested_role_code IS NULL
+                    OR requested_role_code IN ('employee', 'member')
+                ),
+                CHECK (lifecycle_status IN ('pending', 'active', 'disabled', 'rejected')),
+                CHECK (auth_version >= 1),
+                CHECK (row_version >= 1),
+                CHECK (failed_login_count >= 0),
+                CHECK (
+                    (lifecycle_status IN ('pending', 'rejected') AND role_code IS NULL)
+                    OR
+                    (lifecycle_status IN ('active', 'disabled') AND role_code IS NOT NULL)
+                ),
+                FOREIGN KEY(approved_by) REFERENCES users(id),
+                FOREIGN KEY(created_by) REFERENCES users(id)
+            )
+            """,
+            """
+            CREATE UNIQUE INDEX idx_users_email_normalized_unique
+            ON users(email_normalized)
+            WHERE email_normalized IS NOT NULL
+            """,
+            """
+            CREATE UNIQUE INDEX idx_users_phone_normalized_unique
+            ON users(phone_normalized)
+            WHERE phone_normalized IS NOT NULL
+            """,
+            """
+            CREATE INDEX idx_users_lifecycle_role
+            ON users(lifecycle_status, role_code, created_at)
+            """,
+            """
+            CREATE INDEX idx_users_locked_until
+            ON users(locked_until)
+            WHERE locked_until IS NOT NULL
+            """,
+            """
+            CREATE TABLE user_sessions (
+                id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                token_hash TEXT NOT NULL UNIQUE,
+                csrf_token_hash TEXT NOT NULL,
+                auth_version INTEGER NOT NULL,
+                created_at TEXT NOT NULL,
+                expires_at TEXT NOT NULL,
+                idle_expires_at TEXT NOT NULL,
+                last_seen_at TEXT NOT NULL,
+                last_reauthenticated_at TEXT,
+                revoked_at TEXT,
+                revoke_reason TEXT,
+                ip_address TEXT,
+                user_agent TEXT,
+                CHECK (auth_version >= 1),
+                FOREIGN KEY(user_id) REFERENCES users(id)
+            )
+            """,
+            """
+            CREATE INDEX idx_user_sessions_user_active
+            ON user_sessions(user_id, revoked_at, created_at)
+            """,
+            """
+            CREATE INDEX idx_user_sessions_expiry
+            ON user_sessions(expires_at, idle_expires_at)
+            WHERE revoked_at IS NULL
+            """,
+            """
+            CREATE TABLE password_reset_tickets (
+                id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                token_hash TEXT NOT NULL UNIQUE,
+                created_by TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                expires_at TEXT NOT NULL,
+                consumed_at TEXT,
+                revoked_at TEXT,
+                FOREIGN KEY(user_id) REFERENCES users(id),
+                FOREIGN KEY(created_by) REFERENCES users(id)
+            )
+            """,
+            """
+            CREATE UNIQUE INDEX idx_password_reset_tickets_one_active
+            ON password_reset_tickets(user_id)
+            WHERE consumed_at IS NULL AND revoked_at IS NULL
+            """,
+            """
+            CREATE INDEX idx_password_reset_tickets_expiry
+            ON password_reset_tickets(expires_at)
+            WHERE consumed_at IS NULL AND revoked_at IS NULL
+            """,
+            """
+            ALTER TABLE audit_events ADD COLUMN actor_user_id TEXT
+            """,
+            """
+            ALTER TABLE audit_events ADD COLUMN request_id TEXT
+            """,
+            """
+            ALTER TABLE audit_events ADD COLUMN result TEXT
+            """,
+            """
+            ALTER TABLE audit_events ADD COLUMN ip_address TEXT
+            """,
+            """
+            ALTER TABLE audit_events ADD COLUMN auth_method TEXT
+            """,
+            """
+            CREATE INDEX idx_audit_events_actor_created
+            ON audit_events(actor_user_id, created_at)
+            """,
+            """
+            CREATE INDEX idx_audit_events_request_id
+            ON audit_events(request_id)
+            WHERE request_id IS NOT NULL
+            """,
+        ),
+    ),
+    Migration(
+        version=6,
+        name="member-fund-holdings-and-unit-nav",
+        statements=(
+            """
+            ALTER TABLE funds ADD COLUMN fund_code TEXT
+            """,
+            """
+            CREATE UNIQUE INDEX idx_funds_fund_code_unique
+            ON funds(fund_code)
+            WHERE fund_code IS NOT NULL
+            """,
+            """
+            CREATE TABLE member_fund_holdings (
+                id TEXT PRIMARY KEY,
+                member_user_id TEXT NOT NULL,
+                fund_id TEXT NOT NULL,
+                share_quantity TEXT NOT NULL,
+                cumulative_invested TEXT NOT NULL,
+                confirmed_at TEXT,
+                as_of TEXT NOT NULL,
+                source TEXT NOT NULL,
+                status TEXT NOT NULL,
+                row_version INTEGER NOT NULL DEFAULT 1,
+                updated_by TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                UNIQUE(member_user_id, fund_id),
+                CHECK (length(trim(share_quantity)) > 0),
+                CHECK (length(trim(cumulative_invested)) > 0),
+                CHECK (source IN ('manual_admin', 'migration', 'external_import')),
+                CHECK (status IN ('active', 'closed')),
+                CHECK (row_version >= 1),
+                FOREIGN KEY(member_user_id) REFERENCES users(id),
+                FOREIGN KEY(fund_id) REFERENCES funds(id),
+                FOREIGN KEY(updated_by) REFERENCES users(id)
+            )
+            """,
+            """
+            CREATE INDEX idx_member_fund_holdings_member_status
+            ON member_fund_holdings(member_user_id, status, updated_at)
+            """,
+            """
+            CREATE INDEX idx_member_fund_holdings_fund_status
+            ON member_fund_holdings(fund_id, status, updated_at)
+            """,
+            """
+            CREATE TABLE fund_nav_snapshots (
+                id TEXT PRIMARY KEY,
+                fund_id TEXT NOT NULL,
+                valuation_time TEXT NOT NULL,
+                unit_nav TEXT NOT NULL,
+                currency TEXT NOT NULL,
+                source TEXT NOT NULL,
+                status TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                UNIQUE(fund_id, valuation_time),
+                CHECK (length(trim(unit_nav)) > 0),
+                CHECK (length(currency) BETWEEN 3 AND 8),
+                CHECK (source IN ('manual_admin', 'migration', 'external_import')),
+                CHECK (status IN ('available', 'superseded', 'invalid')),
+                FOREIGN KEY(fund_id) REFERENCES funds(id)
+            )
+            """,
+            """
+            CREATE INDEX idx_fund_nav_snapshots_latest
+            ON fund_nav_snapshots(fund_id, status, valuation_time DESC)
+            """,
+        ),
+    ),
 )
 
 
