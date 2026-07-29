@@ -4,6 +4,7 @@ version = "0.9.1"
 description = "Variable-Global modular monolith backend"
 requires-python = ">=3.12"
 dependencies = [
+  "akshare>=1.18.64,<2.0",
   "argon2-cffi>=25.1,<26.0",
   "fastapi>=0.116,<1.0",
   "httpx>=0.28,<1.0",
@@ -58,6 +59,9 @@ include = [
   "app/position_math.py",
   "app/research_cache.py",
   "app/research_data_schemas.py",
+  "app/research_providers.py",
+  "app/research_routes.py",
+  "app/research_service.py",
   "app/runtime_contracts.py",
   "app/schema_migrations.py",
   "app/schema_governance.py",
