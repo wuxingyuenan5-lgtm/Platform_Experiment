@@ -2,9 +2,12 @@
 
 ## Baseline
 
-- Current product version: `0.9.0`.
-- Current main baseline: `71603bcc6807284ef3a6da26ad3f43c541bc99c2`.
+- Current product version: `0.9.1`.
+- Current uploaded main baseline: `a4e22021c71cf5cd703cb0bc35676ff5adbfec36`.
+- Current integration branch: `release/0.9.1-user-system`; do not merge it into `main` without explicit user approval.
 - Frontend port: `4373`.
+- Platform Backend port: `8000`.
+- Execution Runtime port: `8100`.
 - Use `npx pnpm@9.15.9 ...` for frontend commands.
 
 ## Scope Control
@@ -12,6 +15,7 @@
 - For UI point fixes, read only the target component, direct parent component, and necessary styles.
 - For trading execution changes, read the execution component, lifecycle API, exit plan API, and related types.
 - For position, account, and observability changes, read the position table component, observability API, and snapshot types.
+- For user-system changes, preserve Browser Session, CSRF/Origin, business-role scope, member data isolation and API-Key/Live Write separation.
 - Do not scan the whole repository for narrow UI edits.
 
 ## Product UI Rules
@@ -24,8 +28,11 @@
 ## Required Checks
 
 - Strategy frontend type check: `npx pnpm@9.15.9 type:check`
+- User-system frontend check: `npx pnpm@9.15.9 test:user-system`
 - Homepage layout guard: `npx pnpm@9.15.9 test:homepage-layout`
 - Cross-spread structure guard: `npx pnpm@9.15.9 test:cross-spread-layout`
+- Version consistency: `python scripts/check-version-consistency.py`
+- Codex context: `python scripts/check-codex-context.py`
 
 ## File Safety
 
