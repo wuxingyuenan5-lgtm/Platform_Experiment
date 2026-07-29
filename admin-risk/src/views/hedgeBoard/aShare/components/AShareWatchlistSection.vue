@@ -45,11 +45,7 @@
           ><span>{{ group.items.length }}项</span></header
         >
         <div class="watchlist-table">
-          <div
-            v-for="(item, itemIndex) in group.items"
-            :key="item.code"
-            class="watchlist-row"
-          >
+          <div v-for="(item, itemIndex) in group.items" :key="item.code" class="watchlist-row">
             <button type="button" class="stock-button" @click="$emit('query', item.code)">
               <strong>{{ item.name }}</strong
               ><span>{{ item.code }}</span>
@@ -89,7 +85,9 @@
     </div>
     <div v-else class="research-empty">
       <p>暂无自选股，空列表会被正常保留。</p>
-      <button type="button" class="toolbar-button" @click="addExpanded = true">添加第一只自选股</button>
+      <button type="button" class="toolbar-button" @click="addExpanded = true"
+        >添加第一只自选股</button
+      >
     </div>
   </section>
 </template>
