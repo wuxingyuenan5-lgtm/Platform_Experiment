@@ -19,17 +19,41 @@ const DEFAULT_WATCHLIST: WatchlistItem[] = [
   { code: '300750', name: '宁德时代', group: '核心观察' },
 ];
 
+export function normalizeStockCode(value: string) {
+  const compact = value.trim().toUpperCase().replace(/\s+/g, '');
+  const match = compact.match(/^(?:(?:SH|SZ|BJ)[.:-]?)?(\d{6})(?:[.:-]?(?:SH|SZ|BJ))?$/);
+  return match?.[1] || '';
+}
+
+function normalizeWatchlistItem(item: unknown): WatchlistItem | null {
+  if (!item || typeof item !== 'object') return null;
+  const record = item as Record<string, unknown>;
+  const code = typeof record.code === 'string' ? normalizeStockCode(record.code) : '';
+  if (!code) return null;
+  const name = typeof record.name === 'string' ? record.name.trim() : '';
+  const group = typeof record.group === 'string' ? record.group.trim() : '';
+  return {
+    code,
+    name: name || code,
+    group: group || '默认分组',
+  };
+}
+
 function readWatchlist(): WatchlistItem[] {
   if (typeof window === 'undefined') return [...DEFAULT_WATCHLIST];
   try {
-    const payload = JSON.parse(window.localStorage.getItem(WATCHLIST_STORAGE_KEY) || '[]');
-    if (!Array.isArray(payload) || !payload.length) return [...DEFAULT_WATCHLIST];
-    return payload.filter(
-      (item): item is WatchlistItem =>
-        typeof item?.code === 'string' &&
-        /^\d{6}$/.test(item.code) &&
-        typeof item?.name === 'string',
-    );
+    const stored = window.localStorage.getItem(WATCHLIST_STORAGE_KEY);
+    if (stored === null) return [...DEFAULT_WATCHLIST];
+    const payload = JSON.parse(stored);
+    if (!Array.isArray(payload)) return [...DEFAULT_WATCHLIST];
+    const seen = new Set<string>();
+    return payload.reduce<WatchlistItem[]>((items, candidate) => {
+      const normalized = normalizeWatchlistItem(candidate);
+      if (!normalized || seen.has(normalized.code)) return items;
+      seen.add(normalized.code);
+      items.push(normalized);
+      return items;
+    }, []);
   } catch {
     return [...DEFAULT_WATCHLIST];
   }
@@ -80,9 +104,9 @@ export function useAShareResearch() {
   }
 
   async function queryStock(code = stockCode.value) {
-    const normalized = code.trim();
-    if (!/^\d{6}$/.test(normalized)) {
-      stockError.value = '请输入6位A股代码';
+    const normalized = normalizeStockCode(code);
+    if (!normalized) {
+      stockError.value = '请输入6位A股代码，支持 600519、SH600519 或 600519.SH';
       return;
     }
     stockCode.value = normalized;
@@ -103,25 +127,41 @@ export function useAShareResearch() {
   }
 
   function addToWatchlist(code: string, name: string, group = '默认分组') {
-    if (!/^\d{6}$/.test(code) || watchlist.value.some((item) => item.code === code)) return;
-    watchlist.value.push({ code, name: name || code, group });
+    const normalized = normalizeStockCode(code);
+    if (!normalized || watchlist.value.some((item) => item.code === normalized)) return;
+    watchlist.value.push({
+      code: normalized,
+      name: name.trim() || normalized,
+      group: group.trim() || '默认分组',
+    });
   }
 
   function removeFromWatchlist(code: string) {
-    watchlist.value = watchlist.value.filter((item) => item.code !== code);
+    const normalized = normalizeStockCode(code);
+    watchlist.value = watchlist.value.filter((item) => item.code !== normalized);
   }
 
   function moveWatchlistItem(code: string, direction: 'up' | 'down') {
-    const index = watchlist.value.findIndex((item) => item.code === code);
-    const target = direction === 'up' ? index - 1 : index + 1;
-    if (index < 0 || target < 0 || target >= watchlist.value.length) return;
+    const normalized = normalizeStockCode(code);
+    const index = watchlist.value.findIndex((item) => item.code === normalized);
+    if (index < 0) return;
+    const group = watchlist.value[index].group || '默认分组';
+    const groupIndexes = watchlist.value.reduce<number[]>((indexes, item, itemIndex) => {
+      if ((item.group || '默认分组') === group) indexes.push(itemIndex);
+      return indexes;
+    }, []);
+    const groupPosition = groupIndexes.indexOf(index);
+    const targetPosition = direction === 'up' ? groupPosition - 1 : groupPosition + 1;
+    const targetIndex = groupIndexes[targetPosition];
+    if (targetIndex == null) return;
     const next = [...watchlist.value];
-    [next[index], next[target]] = [next[target], next[index]];
+    [next[index], next[targetIndex]] = [next[targetIndex], next[index]];
     watchlist.value = next;
   }
 
   function setWatchlistGroup(code: string, group: string) {
-    const item = watchlist.value.find((candidate) => candidate.code === code);
+    const normalized = normalizeStockCode(code);
+    const item = watchlist.value.find((candidate) => candidate.code === normalized);
     if (item) item.group = group.trim() || '默认分组';
   }
 
@@ -160,15 +200,18 @@ export function useAShareResearch() {
     const lines = thresholdIndustries.value.map(
       (item) => `${item.swL1Name} / ${item.swL2Name}：${item.stockCount}只`,
     );
-    if (!lines.length || !navigator.clipboard) return;
+    if (!lines.length || typeof navigator === 'undefined' || !navigator.clipboard) return;
     await navigator.clipboard.writeText(lines.join('\n'));
   }
 
   watch(
     watchlist,
     (value) => {
-      if (typeof window !== 'undefined') {
+      if (typeof window === 'undefined') return;
+      try {
         window.localStorage.setItem(WATCHLIST_STORAGE_KEY, JSON.stringify(value));
+      } catch {
+        // Keep the in-memory watchlist usable when browser storage is unavailable.
       }
     },
     { deep: true },
