@@ -39,6 +39,15 @@ const terminalDetailPanelPath = path.join(
   'components',
   'TerminalDetailPanel.vue',
 );
+const marketDetailCatalogPath = path.join(
+  __dirname,
+  '..',
+  'src',
+  'views',
+  'hedgeBoard',
+  'nativeData',
+  'marketDetailCatalog.ts',
+);
 const toolGroupSectionPath = path.join(
   __dirname,
   '..',
@@ -74,6 +83,7 @@ const hedgeBoardSource = fs.readFileSync(hedgeBoardPagePath, 'utf8');
 const hedgeBoardSubnavSource = fs.readFileSync(hedgeBoardSubnavPath, 'utf8');
 const hedgeResearchModuleSource = fs.readFileSync(hedgeResearchModulePath, 'utf8');
 const terminalDetailPanelSource = fs.readFileSync(terminalDetailPanelPath, 'utf8');
+const marketDetailCatalogSource = fs.readFileSync(marketDetailCatalogPath, 'utf8');
 const tradingToolCatalogSource = fs.readFileSync(tradingToolCatalogPath, 'utf8');
 const tradingToolsPageSource = fs.readFileSync(tradingToolsPagePath, 'utf8');
 const uiGuidelinesSource = fs.readFileSync(uiGuidelinesPath, 'utf8');
@@ -82,6 +92,7 @@ assert(fs.existsSync(marketTerminalPagePath), 'Expected MarketTerminalPage compo
 assert(fs.existsSync(hedgeBoardSubnavPath), 'Expected HedgeBoardSubnav component to exist.');
 assert(fs.existsSync(hedgeResearchModulePath), 'Expected HedgeResearchModule component to exist.');
 assert(fs.existsSync(terminalDetailPanelPath), 'Expected TerminalDetailPanel component to exist.');
+assert(fs.existsSync(marketDetailCatalogPath), 'Expected market detail catalog to exist.');
 assert(fs.existsSync(toolGroupSectionPath), 'Expected ToolGroupSection component to exist.');
 
 assert(
@@ -151,6 +162,12 @@ assert(
   !terminalDetailPanelSource.includes('<h3>{{ title }}</h3>') &&
     !terminalDetailPanelSource.includes('.market-terminal__panel-head h3'),
   'TerminalDetailPanel must not render a repeated market-detail title inside widgets.',
+);
+assert(
+  marketDetailCatalogSource.includes("name: '中证 2000'") &&
+    marketDetailCatalogSource.includes("label: '板块'") &&
+    !marketDetailCatalogSource.includes("label: '板块与主题'"),
+  'A-share market detail must preserve CSI 2000 and use the unified board label.',
 );
 assert(
   !hedgeBoardSource.includes('chart-shell__link-overlay') &&
