@@ -2,7 +2,7 @@
 
 Last updated: 2026-07-29  
 Uploaded stable branch: `main` at `a4e22021c71cf5cd703cb0bc35676ff5adbfec36`  
-Active integration branch: `release/0.9.1-user-system`  
+Active integration branch: `release/issue-117-0.9.1-user-system`  
 Product release: `0.9.1`
 
 This file records current operating truth. The 0.9.1 integration branch is intentionally not merged into `main`.

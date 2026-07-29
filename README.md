@@ -5,7 +5,7 @@
 ## 当前发布
 
 产品版本：`0.9.1`  
-集成分支：`release/0.9.1-user-system`  
+集成分支：`release/issue-117-0.9.1-user-system`  
 基线 `main`：`a4e22021c71cf5cd703cb0bc35676ff5adbfec36`  
 发布说明：`docs/releases/0.9.1.md`
 

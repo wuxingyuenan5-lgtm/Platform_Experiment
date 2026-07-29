@@ -6,7 +6,7 @@ Last updated: 2026-07-29
 
 - Product version: `0.9.1`
 - Uploaded main baseline: `a4e22021c71cf5cd703cb0bc35676ff5adbfec36`
-- Active integration branch: `release/0.9.1-user-system`
+- Active integration branch: `release/issue-117-0.9.1-user-system`
 - The integration branch is not merged into `main`; do not merge without explicit user approval.
 - GitHub repository: `wuxingyuenan5-lgtm/Platform_Experiment`
 - Frontend: `http://127.0.0.1:4373/index.html`
