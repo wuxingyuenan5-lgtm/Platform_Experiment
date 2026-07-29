@@ -13,6 +13,13 @@ const toolGroupSectionPath = path.join(viewRoot, 'tradingTools', 'components', '
 const tradingToolCatalogPath = path.join(viewRoot, 'tradingTools', 'data', 'catalog.ts');
 const tradingToolsPagePath = path.join(viewRoot, 'tradingTools', 'index.vue');
 const aSharePagePath = path.join(viewRoot, 'aShare', 'index.vue');
+const aShareResearchComposablePath = path.join(viewRoot, 'aShare', 'useAShareResearch.ts');
+const aShareWatchlistPath = path.join(
+  viewRoot,
+  'aShare',
+  'components',
+  'AShareWatchlistSection.vue',
+);
 const aShareMarketDetailPath = path.join(
   viewRoot,
   'aShare',
@@ -43,6 +50,8 @@ const marketDetailCatalogSource = fs.readFileSync(marketDetailCatalogPath, 'utf8
 const tradingToolCatalogSource = fs.readFileSync(tradingToolCatalogPath, 'utf8');
 const tradingToolsPageSource = fs.readFileSync(tradingToolsPagePath, 'utf8');
 const aSharePageSource = fs.readFileSync(aSharePagePath, 'utf8');
+const aShareResearchComposableSource = fs.readFileSync(aShareResearchComposablePath, 'utf8');
+const aShareWatchlistSource = fs.readFileSync(aShareWatchlistPath, 'utf8');
 const aShareMarketDetailSource = fs.readFileSync(aShareMarketDetailPath, 'utf8');
 const shenwanSectionSource = fs.readFileSync(shenwanSectionPath, 'utf8');
 const stockSnapshotSource = fs.readFileSync(stockSnapshotPath, 'utf8');
@@ -196,7 +205,21 @@ assert(
   'Shenwan section must keep the clean Top-10 table and separate threshold statistics.',
 );
 assert(
-  stockSnapshotSource.includes("expanded[item.key] = false") &&
+  aShareResearchComposableSource.includes('export function normalizeStockCode') &&
+    aShareResearchComposableSource.includes("if (stored === null) return [...DEFAULT_WATCHLIST]") &&
+    !aShareResearchComposableSource.includes('!Array.isArray(payload) || !payload.length') &&
+    aShareResearchComposableSource.includes('const groupIndexes = watchlist.value.reduce<number[]>'),
+  'A-share watchlists must preserve stored empty arrays, normalize stock codes and reorder within groups.',
+);
+assert(
+  aShareWatchlistSource.includes('空列表会被正常保留') &&
+    aShareWatchlistSource.includes('已在自选股中') &&
+    aShareWatchlistSource.includes(':disabled="itemIndex === 0"') &&
+    aShareWatchlistSource.includes(':disabled="itemIndex === group.items.length - 1"'),
+  'A-share watchlist UI must expose empty persistence, duplicate feedback and bounded move controls.',
+);
+assert(
+  stockSnapshotSource.includes('expanded[item.key] = false') &&
     stockSnapshotSource.includes("{ key: 'quoteValuation'") &&
     stockSnapshotSource.includes("{ key: 'investorQa'") &&
     !stockSnapshotSource.toLowerCase().includes('ai'),
