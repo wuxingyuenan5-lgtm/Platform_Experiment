@@ -1,0 +1,58 @@
+name: Normalize Issue 117 branch docs
+
+on:
+  push:
+    branches:
+      - feature/issue-117-platform-0-9-1
+    paths:
+      - .github/workflows/normalize-issue-117-branch-docs.yml
+
+permissions:
+  contents: write
+
+jobs:
+  normalize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/issue-117-platform-0-9-1
+          fetch-depth: 0
+
+      - name: Update temporary branch references
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          python - <<'PY'
+          from pathlib import Path
+          import subprocess
+
+          replacements = {
+              'feature/issue-117-platform-0.9.1': 'feature/issue-117-platform-0-9-1',
+              'release/issue-117-0.9.1-user-system': 'feature/issue-117-platform-0-9-1',
+              'release/0.9.1-user-system': 'feature/issue-117-platform-0-9-1',
+          }
+          tracked = subprocess.check_output(['git', 'ls-files', '-z']).decode().split('\0')
+          changed = []
+          for item in tracked:
+              if not item or Path(item).suffix.lower() not in {'.md', '.txt'}:
+                  continue
+              path = Path(item)
+              content = path.read_text(encoding='utf-8-sig')
+              updated = content
+              for old, new in replacements.items():
+                  updated = updated.replace(old, new)
+              if updated != content:
+                  path.write_text(updated, encoding='utf-8')
+                  changed.append(item)
+          print('\n'.join(changed))
+          PY
+
+          git rm .github/workflows/normalize-issue-117-branch-docs.yml
+          git add --all
+          git commit -m "docs: normalize final 0.9.1 branch references"
+          git push origin HEAD:feature/issue-117-platform-0-9-1
