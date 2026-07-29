@@ -9,6 +9,7 @@
 - Platform Backend port: `8000`.
 - Execution Runtime port: `8100`.
 - Use `npx pnpm@9.15.9 ...` for frontend commands.
+- Canonical ownership: `docs/architecture/OWNERSHIP.md`.
 
 ## Scope Control
 
