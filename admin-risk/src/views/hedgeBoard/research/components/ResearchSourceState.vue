@@ -1,9 +1,14 @@
 <template>
-  <div class="research-source-state" :class="`is-${meta.status}`">
+  <div
+    class="research-source-state"
+    :class="`is-${meta.status}`"
+    :title="detailTitle"
+    :aria-label="detailTitle"
+  >
     <span class="research-source-state__dot"></span>
     <span>{{ statusLabel }}</span>
-    <span class="research-source-state__source">{{ meta.source }}</span>
-    <span class="research-source-state__time">{{ formattedTime }}</span>
+    <span class="research-source-state__source">{{ meta.source || '未知来源' }}</span>
+    <span class="research-source-state__time">{{ displayedTime }}</span>
   </div>
 </template>
 
@@ -25,11 +30,28 @@
     return labels[props.meta.status];
   });
 
-  const formattedTime = computed(() => {
-    if (!props.meta.fetchedAt) return '—';
-    const value = new Date(props.meta.fetchedAt);
-    if (Number.isNaN(value.getTime())) return '—';
-    return value.toLocaleString('zh-CN', { hour12: false });
+  function formatTimestamp(value?: string | null) {
+    if (!value) return '—';
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return '—';
+    return parsed.toLocaleString('zh-CN', { hour12: false });
+  }
+
+  const sourceTime = computed(() => formatTimestamp(props.meta.sourceTimestamp));
+  const fetchedTime = computed(() => formatTimestamp(props.meta.fetchedAt));
+  const displayedTime = computed(() =>
+    props.meta.sourceTimestamp ? `源 ${sourceTime.value}` : `抓取 ${fetchedTime.value}`,
+  );
+  const detailTitle = computed(() => {
+    const details = [
+      `状态：${statusLabel.value}`,
+      `来源：${props.meta.source || '未知来源'}`,
+      `源数据时间：${sourceTime.value}`,
+      `平台抓取时间：${fetchedTime.value}`,
+    ];
+    if (props.meta.message) details.push(`说明：${props.meta.message}`);
+    if (props.meta.errorCode) details.push(`错误码：${props.meta.errorCode}`);
+    return details.join('；');
   });
 </script>
 
@@ -51,14 +73,22 @@
     flex: 0 0 auto;
   }
 
+  .research-source-state.is-loading .research-source-state__dot {
+    background: #3b82f6;
+    animation: source-state-pulse 1s infinite alternate;
+  }
+
   .research-source-state.is-stale .research-source-state__dot,
   .research-source-state.is-partial .research-source-state__dot {
     background: #f59e0b;
   }
 
-  .research-source-state.is-error .research-source-state__dot,
-  .research-source-state.is-no_data .research-source-state__dot {
+  .research-source-state.is-error .research-source-state__dot {
     background: #ef4444;
+  }
+
+  .research-source-state.is-no_data .research-source-state__dot {
+    background: var(--strategy-text-4);
   }
 
   .research-source-state__source,
@@ -75,6 +105,15 @@
 
   .research-source-state__time {
     color: var(--strategy-text-4);
+  }
+
+  @keyframes source-state-pulse {
+    from {
+      opacity: 0.35;
+    }
+    to {
+      opacity: 1;
+    }
   }
 
   @media (max-width: 900px) {
