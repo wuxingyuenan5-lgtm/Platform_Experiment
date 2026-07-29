@@ -1,0 +1,57 @@
+name: Integrate user system into 0.9.1
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - release/0.9.1-user-system
+    paths:
+      - .github/workflows/integrate-user-system-0.9.1.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: integrate-user-system-0.9.1
+  cancel-in-progress: false
+
+jobs:
+  merge-diagnostic:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: release/0.9.1-user-system
+          fetch-depth: 0
+
+      - name: Inspect merge conflicts
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin feature/issue-117-user-system
+
+          if git merge-base --is-ancestor origin/feature/issue-117-user-system HEAD; then
+            echo "User-system branch is already integrated."
+            exit 0
+          fi
+
+          set +e
+          git merge --no-ff --no-commit origin/feature/issue-117-user-system
+          merge_status=$?
+          set -e
+
+          if [ "$merge_status" -ne 0 ]; then
+            echo "::group::Conflicting files"
+            git diff --name-only --diff-filter=U | tee merge-conflicts.txt
+            echo "::endgroup::"
+            echo "::group::Merge status"
+            git status --short
+            echo "::endgroup::"
+            exit 1
+          fi
+
+          git commit -m "merge: integrate browser user system into 0.9.1"
+          git push origin HEAD:release/0.9.1-user-system
