@@ -143,6 +143,3 @@ export async function getCrossSpreadObservability(
   );
   return response.data;
 }
-
-
-

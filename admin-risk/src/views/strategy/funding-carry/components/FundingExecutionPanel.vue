@@ -54,7 +54,11 @@
             <label class="field field--compact">
               <span>名义本金</span>
               <div class="input-with-unit">
-                <input :value="notionalValue" type="text" @input="emitString('notionalValue', $event)" />
+                <input
+                  :value="notionalValue"
+                  type="text"
+                  @input="emitString('notionalValue', $event)"
+                />
                 <em>USDT</em>
               </div>
             </label>
@@ -78,7 +82,10 @@
 
             <label class="field field--compact">
               <span>合约杠杆</span>
-              <select :value="fundingHedgeLeverage" @change="emitString('fundingHedgeLeverage', $event)">
+              <select
+                :value="fundingHedgeLeverage"
+                @change="emitString('fundingHedgeLeverage', $event)"
+              >
                 <option>1x</option>
                 <option>2x</option>
                 <option>3x</option>
@@ -132,7 +139,11 @@
             <label class="field field--compact">
               <span>开仓阈值</span>
               <div class="input-with-unit">
-                <input :value="fundingThreshold" type="text" @input="emitString('fundingThreshold', $event)" />
+                <input
+                  :value="fundingThreshold"
+                  type="text"
+                  @input="emitString('fundingThreshold', $event)"
+                />
                 <em>%</em>
               </div>
             </label>
@@ -140,7 +151,11 @@
             <label class="field field--compact">
               <span>最大可接受入场价差</span>
               <div class="input-with-unit">
-                <input :value="fundingEntryBasis" type="text" @input="emitString('fundingEntryBasis', $event)" />
+                <input
+                  :value="fundingEntryBasis"
+                  type="text"
+                  @input="emitString('fundingEntryBasis', $event)"
+                />
                 <em>USDT</em>
               </div>
             </label>
@@ -150,7 +165,11 @@
             <label class="field field--compact">
               <span>目标回补价差</span>
               <div class="input-with-unit">
-                <input :value="fundingTakeProfit" type="text" @input="emitString('fundingTakeProfit', $event)" />
+                <input
+                  :value="fundingTakeProfit"
+                  type="text"
+                  @input="emitString('fundingTakeProfit', $event)"
+                />
                 <em>USDT</em>
               </div>
             </label>
@@ -167,10 +186,16 @@
       </div>
 
       <div class="funding-action-row">
-        <button class="submit-btn submit-btn--green" type="button" @click="$emit('submitOrder', 'collect')"
+        <button
+          class="submit-btn submit-btn--green"
+          type="button"
+          @click="$emit('submitOrder', 'collect')"
           >提交正套开仓</button
         >
-        <button class="submit-btn submit-btn--red" type="button" @click="$emit('submitOrder', 'pay')"
+        <button
+          class="submit-btn submit-btn--red"
+          type="button"
+          @click="$emit('submitOrder', 'pay')"
           >提交反套开仓</button
         >
       </div>
@@ -197,7 +222,11 @@
           <label class="field field--compact funding-close-limit">
             <span>平仓触发价差</span>
             <div class="input-with-unit">
-              <input :value="fundingCloseBasis" type="text" @input="emitString('fundingCloseBasis', $event)" />
+              <input
+                :value="fundingCloseBasis"
+                type="text"
+                @input="emitString('fundingCloseBasis', $event)"
+              />
               <em>USDT</em>
             </div>
           </label>
@@ -226,7 +255,11 @@
                 <td>{{ row.basis }}</td>
                 <td :class="row.pnl.startsWith('-') ? 'red' : 'green'">{{ row.pnl }}</td>
                 <td class="green">{{ row.status }}</td>
-                <td><button class="flat-action" type="button" @click="$emit('submitClose', row)">执行平仓</button></td>
+                <td
+                  ><button class="flat-action" type="button" @click="$emit('submitClose', row)"
+                    >执行平仓</button
+                  ></td
+                >
               </tr>
             </tbody>
           </table>

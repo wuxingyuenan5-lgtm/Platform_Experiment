@@ -5,9 +5,15 @@
     </div>
 
     <div class="positions-metrics">
-      <div class="positions-metric"><span>累计资金费收益</span><strong class="green">+1,156.60 USDT</strong></div>
-      <div class="positions-metric"><span>未实现盈亏</span><strong class="green">+1,036.20 USDT</strong></div>
-      <div class="positions-metric"><span>当前基差 (现货-永续)</span><strong class="green">+10.5 USDT (+0.0102%)</strong></div>
+      <div class="positions-metric"
+        ><span>累计资金费收益</span><strong class="green">+1,156.60 USDT</strong></div
+      >
+      <div class="positions-metric"
+        ><span>未实现盈亏</span><strong class="green">+1,036.20 USDT</strong></div
+      >
+      <div class="positions-metric"
+        ><span>当前基差 (现货-永续)</span><strong class="green">+10.5 USDT (+0.0102%)</strong></div
+      >
       <div class="positions-metric"><span>保证金率</span><strong class="green">35.00%</strong></div>
       <div class="positions-metric"><span>Delta 偏离</span><strong>0.00%</strong></div>
       <div class="positions-metric"><span>强平距离</span><strong class="green">28.00%</strong></div>
