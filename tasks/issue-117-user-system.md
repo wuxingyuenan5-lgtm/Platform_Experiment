@@ -1,13 +1,13 @@
-# Task: Complete user system
+# Task: Complete user system and integrate Platform 0.9.1
 
 Issue: #117  
-Status: `handoff_ready`  
-Branch: `feature/issue-117-user-system`  
-Base commit: `71603bcc6807284ef3a6da26ad3f43c541bc99c2`
+Status: `validation`  
+Branch: `feature/issue-117-platform-0-9-1`  
+Base commit: `a4e22021c71cf5cd703cb0bc35676ff5adbfec36`
 
 ## Objective
 
-Deliver one maintainable `platform-backend` user-system boundary for browser registration/login, server-side Sessions, four fixed business roles, personal accounts, backend user administration, operational notes, member fund holdings and auditable sensitive operations, without weakening API-key, LiveTradingSession or execution-safety controls.
+Integrate the completed browser user system into the latest uploaded Platform `main` as version `0.9.1`, while preserving the hedge-fund dashboard, funding, cross-spread, Runtime and startup changes and without weakening API-key, LiveTradingSession or execution-safety controls.
 
 ## Delivered scope
 
@@ -26,6 +26,7 @@ Deliver one maintainable `platform-backend` user-system boundary for browser reg
 - Additive Migrations 5–7, initial CEO CLI and same-origin `/api/v1` development path.
 - Eight reusable development/test accounts: one CEO, one technical lead, three employees and three VIP members.
 - User-domain table counts and avatar files included in the fail-closed production backup/restore boundary.
+- Latest uploaded Platform UI, strategy, Runtime and local-startup changes retained in the 0.9.1 branch.
 
 ## Protected semantics
 
@@ -36,62 +37,47 @@ Deliver one maintainable `platform-backend` user-system boundary for browser reg
 - Applied migrations are immutable; later corrections use additive migrations.
 - Social login, MFA, SSO, arbitrary per-user permission overrides, hard deletion, subscription/redemption/payment/settlement and browser Live trading remain explicit non-goals.
 
-## Automated acceptance
+## Integration evidence
 
-Clean handoff head before documentation finalization: `242cc03966bc437da08dd6a35b448d09ebc0c932`.
+The branch is based on the latest uploaded `main` at `a4e22021c71cf5cd703cb0bc35676ff5adbfec36` and is versioned as `0.9.1`.
 
-Passed runs:
+Integration repairs completed include:
 
-- Platform CI `30374949395`
-  - Repository Safety passed.
-  - Platform Backend dependency validation, Ruff, Pyright and **403** classified tests passed.
-  - Execution Runtime full matrix passed with no Runtime/Venue behavior change.
-  - Frontend access tests, ESLint, no-new-debt gate, type checks and production build passed.
-- User System Browser E2E `30374950288` passed.
-- Secret Scan `30374949706` passed.
-- Version Consistency `30374949357` passed.
+- manual fusion of frontend package scripts, login UI, backend settings and startup documentation;
+- frozen pnpm lockfile alignment;
+- tracked frontend version and title declarations;
+- Runtime Ruff and injected MT5 test platform handling;
+- Python UTF-8 BOM normalization;
+- repository/Codex context updates for the new main baseline;
+- user-system E2E triggering for tracked environment changes.
 
-Browser E2E includes:
+## Required final acceptance
 
-- public registration and CEO approval;
-- CEO, technical lead, employee and member role boundaries;
-- reusable eight-account login and role verification;
-- CEO operational-note editing for a VIP user;
-- three VIP asset views with positive and negative returns;
-- profile clearing, avatar upload/delete, CSRF rotation and multi-tab behavior;
-- password change invalidating other devices;
-- Browser Session denial from Live Write routes.
-
-## Handoff state
-
-The user-system code is complete for local integration. The branch remains isolated and is not authorized for GitHub merge into `main`.
-
-Local handoff instructions:
-
-- `docs/operations/USER_SYSTEM_LOCAL_INTEGRATION_HANDOFF.md`
-- `docs/operations/USER_SYSTEM_DEMO_ACCOUNTS.md`
-
-Current branch comparison at handoff preparation:
-
-- ahead of `main`: 365 commits;
-- behind `main`: 0 commits;
-- merge base unchanged: `71603bcc6807284ef3a6da26ad3f43c541bc99c2`.
+- Platform CI: Repository Safety, Platform Backend, Execution Runtime and Frontend Quality.
+- User System Browser E2E including all eight reusable accounts.
+- Secret Scan.
+- Version Consistency.
+- PR remains Draft and unmerged.
 
 ## Production-only follow-up
 
-These items do not block local code integration, but remain mandatory before a real production cutover:
+These items do not block code integration, but remain mandatory before a real production cutover:
 
 1. Confirm whether legacy Go/MySQL contains real users requiring migration.
 2. Confirm the initial production member-holding source.
 3. Confirm production remains same-origin `/api/v1`.
 4. Validate HTTPS reverse proxy and `Secure; HttpOnly; SameSite=Lax` Cookie behavior on the target host.
 5. Execute controlled-host Backup, Restore Drill, read-only restored startup and rollback rehearsal.
+6. Complete controlled Windows, Bybit and MT5 acceptance.
 
-References:
+## References
 
+- `docs/releases/0.9.1.md`
+- `docs/operations/USER_SYSTEM_LOCAL_INTEGRATION_HANDOFF.md`
+- `docs/operations/USER_SYSTEM_DEMO_ACCOUNTS.md`
 - `docs/operations/USER_SYSTEM_BROWSER_ACCEPTANCE.md`
 - `docs/operations/USER_SYSTEM_DEPLOYMENT_READINESS.md`
 
 ## Final rule
 
-Do not merge this branch into `main` from the remote repository. The project owner will fetch and merge `feature/issue-117-user-system` into the updated local project and resolve any local conflicts there.
+Do not merge this branch into GitHub `main`. The deliverable is `feature/issue-117-platform-0-9-1`, which may be fetched and used independently until the project owner explicitly authorizes a later merge.
