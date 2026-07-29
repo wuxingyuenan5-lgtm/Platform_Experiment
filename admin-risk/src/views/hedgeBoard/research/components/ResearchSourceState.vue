@@ -1,6 +1,6 @@
 <template>
   <div class="research-source-state" :class="`is-${meta.status}`">
-    <span class="research-source-state__dot" />
+    <span class="research-source-state__dot"></span>
     <span>{{ statusLabel }}</span>
     <span class="research-source-state__source">{{ meta.source }}</span>
     <span class="research-source-state__time">{{ formattedTime }}</span>

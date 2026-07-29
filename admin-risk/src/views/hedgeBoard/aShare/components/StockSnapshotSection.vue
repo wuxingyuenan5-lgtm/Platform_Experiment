@@ -45,7 +45,8 @@
 
     <div v-if="error" class="query-error">{{ error }}</div>
     <div v-if="loading" class="query-loading">
-      <span class="loading-dot" /><span class="loading-dot" /><span class="loading-dot" />
+      <span class="loading-dot"></span><span class="loading-dot"></span
+      ><span class="loading-dot"></span>
       正在并行读取行情、估值、财务、信息与筹码数据
     </div>
 

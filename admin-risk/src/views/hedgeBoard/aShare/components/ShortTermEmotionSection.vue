@@ -23,7 +23,9 @@
           <div class="ladder-list">
             <div v-for="row in data.ladder" :key="row.boardCount">
               <span>{{ row.boardCount }}</span>
-              <div class="ladder-track"><i :style="{ width: ladderWidth(row.stockCount) }" /></div>
+              <div class="ladder-track"
+                ><i :style="{ width: ladderWidth(row.stockCount) }"></i
+              ></div>
               <strong>{{ row.stockCount }}</strong>
             </div>
           </div>
