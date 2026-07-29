@@ -1,0 +1,54 @@
+name: Rename 0.9.1 handoff branch references
+
+on:
+  push:
+    branches:
+      - release/issue-117-0.9.1-user-system
+    paths:
+      - .github/workflows/rename-0.9.1-handoff-branch.yml
+
+permissions:
+  contents: write
+
+jobs:
+  rename:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: release/issue-117-0.9.1-user-system
+          fetch-depth: 0
+
+      - name: Update tracked documentation references
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          python - <<'PY'
+          from pathlib import Path
+          import subprocess
+
+          old = 'release/0.9.1-user-system'
+          new = 'release/issue-117-0.9.1-user-system'
+          tracked = subprocess.check_output(['git', 'ls-files', '-z']).decode().split('\0')
+          changed = []
+          for item in tracked:
+              if not item or Path(item).suffix.lower() not in {'.md', '.txt'}:
+                  continue
+              path = Path(item)
+              content = path.read_text(encoding='utf-8-sig')
+              if old in content:
+                  path.write_text(content.replace(old, new), encoding='utf-8')
+                  changed.append(item)
+          if not changed:
+              raise SystemExit('No old handoff branch references found')
+          print('\n'.join(changed))
+          PY
+
+          git rm .github/workflows/rename-0.9.1-handoff-branch.yml
+          git add --all
+          git commit -m "docs: point 0.9.1 handoff to governed release branch"
+          git push origin HEAD:release/issue-117-0.9.1-user-system
