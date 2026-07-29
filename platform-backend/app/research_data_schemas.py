@@ -105,6 +105,7 @@ class TurnoverThresholdResult(ResearchApiModel):
 
 class AShareResearchAggregation(ResearchApiModel):
     sw2_top: list[ShenwanLevel2Aggregate]
+    sw2_all: list[ShenwanLevel2Aggregate]
     threshold: TurnoverThresholdResult
     unmatched_security_codes: list[str]
 
