@@ -13,7 +13,12 @@
     <form v-if="addExpanded" class="add-form" @submit.prevent="submitAdd">
       <label
         ><span>股票代码</span
-        ><input v-model.trim="form.code" maxlength="6" placeholder="例如 600519"
+        ><input
+          v-model.trim="form.code"
+          maxlength="12"
+          inputmode="text"
+          autocomplete="off"
+          placeholder="600519 / SH600519"
       /></label>
       <label
         ><span>股票名称</span><input v-model.trim="form.name" placeholder="例如 贵州茅台"
@@ -22,6 +27,15 @@
         ><span>分组</span><input v-model.trim="form.group" placeholder="例如 核心观察"
       /></label>
       <button type="submit" class="primary-button">保存</button>
+      <div
+        v-if="formMessage"
+        class="form-message"
+        :class="formMessageTone === 'error' ? 'is-error' : 'is-success'"
+        role="status"
+        aria-live="polite"
+      >
+        {{ formMessage }}
+      </div>
     </form>
 
     <div v-if="groups.length" class="watchlist-groups">
@@ -31,7 +45,11 @@
           ><span>{{ group.items.length }}项</span></header
         >
         <div class="watchlist-table">
-          <div v-for="item in group.items" :key="item.code" class="watchlist-row">
+          <div
+            v-for="(item, itemIndex) in group.items"
+            :key="item.code"
+            class="watchlist-row"
+          >
             <button type="button" class="stock-button" @click="$emit('query', item.code)">
               <strong>{{ item.name }}</strong
               ><span>{{ item.code }}</span>
@@ -39,13 +57,29 @@
             <input
               :value="item.group"
               class="group-input"
-              aria-label="自选股分组"
+              :aria-label="`${item.name}的自选股分组`"
               @change="$emit('setGroup', item.code, ($event.target as HTMLInputElement).value)"
             />
             <div class="row-actions">
-              <button type="button" @click="$emit('move', item.code, 'up')">上移</button>
-              <button type="button" @click="$emit('move', item.code, 'down')">下移</button>
-              <button type="button" class="is-danger" @click="$emit('remove', item.code)"
+              <button
+                type="button"
+                :disabled="itemIndex === 0"
+                :aria-label="`上移${item.name}`"
+                @click="$emit('move', item.code, 'up')"
+                >上移</button
+              >
+              <button
+                type="button"
+                :disabled="itemIndex === group.items.length - 1"
+                :aria-label="`下移${item.name}`"
+                @click="$emit('move', item.code, 'down')"
+                >下移</button
+              >
+              <button
+                type="button"
+                class="is-danger"
+                :aria-label="`删除${item.name}`"
+                @click="$emit('remove', item.code)"
                 >删除</button
               >
             </div>
@@ -53,15 +87,19 @@
         </div>
       </article>
     </div>
-    <div v-else class="research-empty">暂无自选股</div>
+    <div v-else class="research-empty">
+      <p>暂无自选股，空列表会被正常保留。</p>
+      <button type="button" class="toolbar-button" @click="addExpanded = true">添加第一只自选股</button>
+    </div>
   </section>
 </template>
 
 <script setup lang="ts">
-  import { reactive, ref } from 'vue';
+  import { computed, reactive, ref } from 'vue';
   import type { WatchlistItem } from '../useAShareResearch';
+  import { normalizeStockCode } from '../useAShareResearch';
 
-  defineProps<{ groups: Array<{ name: string; items: WatchlistItem[] }> }>();
+  const props = defineProps<{ groups: Array<{ name: string; items: WatchlistItem[] }> }>();
   const emit = defineEmits<{
     (event: 'add', code: string, name: string, group: string): void;
     (event: 'remove', code: string): void;
@@ -72,10 +110,27 @@
 
   const addExpanded = ref(false);
   const form = reactive({ code: '', name: '', group: '默认分组' });
+  const formMessage = ref('');
+  const formMessageTone = ref<'success' | 'error'>('success');
+  const existingCodes = computed(
+    () => new Set(props.groups.flatMap((group) => group.items.map((item) => item.code))),
+  );
 
   function submitAdd() {
-    if (!/^\d{6}$/.test(form.code)) return;
-    emit('add', form.code, form.name || form.code, form.group || '默认分组');
+    const normalized = normalizeStockCode(form.code);
+    if (!normalized) {
+      formMessageTone.value = 'error';
+      formMessage.value = '请输入有效的6位A股代码，支持 600519、SH600519 或 600519.SH。';
+      return;
+    }
+    if (existingCodes.value.has(normalized)) {
+      formMessageTone.value = 'error';
+      formMessage.value = `${normalized} 已在自选股中。`;
+      return;
+    }
+    emit('add', normalized, form.name || normalized, form.group || '默认分组');
+    formMessageTone.value = 'success';
+    formMessage.value = `已添加 ${form.name || normalized}（${normalized}）。`;
     form.code = '';
     form.name = '';
   }
@@ -104,7 +159,8 @@
     letter-spacing: 0.12em;
   }
   h2,
-  h3 {
+  h3,
+  p {
     margin: 0;
     color: var(--strategy-text-1);
   }
@@ -134,7 +190,7 @@
   }
   .add-form {
     display: grid;
-    grid-template-columns: 160px minmax(180px, 1fr) minmax(160px, 1fr) auto;
+    grid-template-columns: 180px minmax(180px, 1fr) minmax(160px, 1fr) auto;
     align-items: end;
     gap: 10px;
     margin-bottom: 14px;
@@ -148,6 +204,20 @@
     gap: 5px;
     color: var(--strategy-text-3);
     font-size: 12px;
+  }
+  .form-message {
+    grid-column: 1 / -1;
+    padding: 8px 10px;
+    border-radius: 8px;
+    font-size: 12px;
+  }
+  .form-message.is-success {
+    background: rgba(16, 185, 129, 0.08);
+    color: #047857;
+  }
+  .form-message.is-error {
+    background: rgba(239, 68, 68, 0.08);
+    color: #dc2626;
   }
   input {
     min-width: 0;
@@ -213,13 +283,23 @@
     padding: 0 8px;
     font-size: 12px;
   }
+  .row-actions button:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
+  }
   .row-actions .is-danger {
     color: #dc2626;
   }
   .research-empty {
+    display: grid;
+    justify-items: center;
+    gap: 12px;
     padding: 28px;
     color: var(--strategy-text-3);
     text-align: center;
+  }
+  .research-empty p {
+    color: var(--strategy-text-3);
   }
   @media (max-width: 900px) {
     .add-form {
