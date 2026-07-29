@@ -4,9 +4,9 @@ import asyncio
 import json
 import os
 import re
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable
 from datetime import UTC, datetime, timedelta
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import ROUND_HALF_UP, Decimal
 from pathlib import Path
 from typing import Any
 
@@ -18,6 +18,7 @@ from app.research_data_schemas import (
     MacroExpectationEvent,
     MacroExpectationResponse,
     MacroProbabilityPoint,
+    ResearchDataStatus,
     ResearchModuleResult,
     ResearchSourceMeta,
     ShenwanMembership,
@@ -67,16 +68,16 @@ def _module(
     *,
     source: str,
     data: Any,
-    status: str | None = None,
+    status: ResearchDataStatus | None = None,
     error_code: str | None = None,
     message: str | None = None,
     fetched_at: datetime | None = None,
     is_stale: bool = False,
 ) -> ResearchModuleResult:
     observed_at = fetched_at or _now()
-    inferred_status = status
-    if inferred_status is None:
-        inferred_status = "ready" if _meaningful(data) else "no_data"
+    inferred_status: ResearchDataStatus = status or (
+        "ready" if _meaningful(data) else "no_data"
+    )
     return ResearchModuleResult(
         meta=ResearchSourceMeta(
             source=source,
@@ -185,10 +186,13 @@ async def get_a_share_dashboard(
                     threshold_yuan=threshold_yuan,
                     top_n=10,
                 )
-            except Exception as exc:  # one aggregation error must not break other modules
+            except Exception as exc:
                 shenwan_error = exc
         shenwan_module = (
-            _error_module("申万宏源行业分类 / 东方财富A股行情（AKShare适配）", shenwan_error)
+            _error_module(
+                "申万宏源行业分类 / 东方财富A股行情（AKShare适配）",
+                shenwan_error,
+            )
             if shenwan_error is not None
             else _module(
                 source="申万宏源行业分类 / 东方财富A股行情（AKShare适配）",
@@ -213,7 +217,12 @@ async def get_a_share_dashboard(
 def _mark_dashboard_stale(value: AShareDashboardResponse) -> AShareDashboardResponse:
     copied = value.model_copy(deep=True)
     copied.generated_at = _now()
-    for module in (copied.market_detail, copied.breadth, copied.shenwan, copied.emotion):
+    for module in (
+        copied.market_detail,
+        copied.breadth,
+        copied.shenwan,
+        copied.emotion,
+    ):
         module.meta.status = "stale"
         module.meta.is_stale = True
         module.meta.message = "当前刷新失败，展示上一份有效数据"
@@ -253,23 +262,50 @@ async def get_stock_snapshot(code: str) -> StockSnapshotResponse:
 
         price = quote.get("price")
         calls: tuple[tuple[str, str, Awaitable[Any]], ...] = (
-            ("consensus", "同花顺一致预期（AKShare适配）", _PROVIDER.stock_forecast(normalized, price)),
-            ("financials", "同花顺财务摘要（AKShare适配）", _PROVIDER.stock_financials(normalized)),
-            ("valuationPercentile", "百度股市通估值历史（AKShare适配）", _PROVIDER.stock_valuation_percentile(normalized)),
+            (
+                "consensus",
+                "同花顺一致预期（AKShare适配）",
+                _PROVIDER.stock_forecast(normalized, price),
+            ),
+            (
+                "financials",
+                "同花顺财务摘要（AKShare适配）",
+                _PROVIDER.stock_financials(normalized),
+            ),
+            (
+                "valuationPercentile",
+                "百度股市通估值历史（AKShare适配）",
+                _PROVIDER.stock_valuation_percentile(normalized),
+            ),
             ("reports", "东方财富研报中心", _PROVIDER.stock_reports(normalized)),
-            ("announcements", "东方财富公告中心", _PROVIDER.stock_announcements(normalized)),
+            (
+                "announcements",
+                "东方财富公告中心",
+                _PROVIDER.stock_announcements(normalized),
+            ),
             ("news", "东方财富个股新闻（AKShare适配）", _PROVIDER.stock_news(normalized)),
             ("margin", "东方财富数据中心", _PROVIDER.stock_margin(normalized)),
             ("holders", "东方财富数据中心", _PROVIDER.stock_holders(normalized)),
             ("fundFlow", "东方财富资金流", _PROVIDER.stock_fund_flow(normalized)),
             ("dividends", "东方财富数据中心", _PROVIDER.stock_dividends(normalized)),
-            ("blockTrades", "东方财富数据中心", _PROVIDER.stock_block_trades(normalized)),
+            (
+                "blockTrades",
+                "东方财富数据中心",
+                _PROVIDER.stock_block_trades(normalized),
+            ),
             ("dragonTiger", "东方财富龙虎榜", _PROVIDER.stock_dragon_tiger(normalized)),
             ("lockup", "东方财富限售解禁", _PROVIDER.stock_lockup(normalized)),
-            ("investorQa", "巨潮资讯互动易", _PROVIDER.stock_investor_qa(normalized)),
+            (
+                "investorQa",
+                "巨潮资讯互动易",
+                _PROVIDER.stock_investor_qa(normalized),
+            ),
             ("shenwan", "申万宏源行业分类（AKShare适配）", _stock_membership(normalized)),
         )
-        results = await asyncio.gather(*(item[2] for item in calls), return_exceptions=True)
+        results = await asyncio.gather(
+            *(item[2] for item in calls),
+            return_exceptions=True,
+        )
         modules: dict[str, ResearchModuleResult] = {
             "quoteValuation": _module(source="腾讯财经", data=quote)
         }
@@ -300,7 +336,10 @@ async def get_stock_snapshot(code: str) -> StockSnapshotResponse:
 
 async def _stock_membership(code: str) -> dict[str, Any]:
     values = await _memberships()
-    item = next((membership for membership in values if membership.security_code == code), None)
+    item = next(
+        (membership for membership in values if membership.security_code == code),
+        None,
+    )
     return item.model_dump(by_alias=True) if item is not None else {}
 
 
@@ -317,10 +356,15 @@ def _mark_stock_stale(value: StockSnapshotResponse) -> StockSnapshotResponse:
 class MacroProbabilityHistoryStore:
     def __init__(self, path: Path | None = None) -> None:
         configured = os.environ.get("RESEARCH_MACRO_HISTORY_PATH")
-        self._path = path or Path(configured or "data/research/macro_probability_history.json")
+        self._path = path or Path(
+            configured or "data/research/macro_probability_history.json"
+        )
         self._lock = asyncio.Lock()
 
-    async def update(self, events: list[MacroExpectationEvent]) -> list[MacroExpectationEvent]:
+    async def update(
+        self,
+        events: list[MacroExpectationEvent],
+    ) -> list[MacroExpectationEvent]:
         async with self._lock:
             history = await asyncio.to_thread(self._read)
             observed_at = _now()
@@ -341,7 +385,8 @@ class MacroProbabilityHistoryStore:
                     except ValueError:
                         continue
                     if parsed >= cutoff:
-                        deduplicated[parsed.replace(second=0, microsecond=0).isoformat()] = point
+                        key = parsed.replace(second=0, microsecond=0).isoformat()
+                        deduplicated[key] = point
                 history[event.event_id] = list(deduplicated.values())
                 normalized_points = [
                     MacroProbabilityPoint(
@@ -354,8 +399,14 @@ class MacroProbabilityHistoryStore:
                 ]
                 normalized_points.sort(key=lambda item: item.observed_at)
                 event.history = normalized_points
-                event.change_1d_pct_points = _history_change(normalized_points, timedelta(days=1))
-                event.change_7d_pct_points = _history_change(normalized_points, timedelta(days=7))
+                event.change_1d_pct_points = _history_change(
+                    normalized_points,
+                    timedelta(days=1),
+                )
+                event.change_7d_pct_points = _history_change(
+                    normalized_points,
+                    timedelta(days=7),
+                )
             await asyncio.to_thread(self._write, history)
             return events
 
