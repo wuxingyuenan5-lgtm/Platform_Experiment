@@ -22,7 +22,6 @@ export const marketDetailCatalog: Record<CatalogMarketId, CatalogGroup[]> = {
         { id: 'macro-walcl', name: '美联储总资产', symbol: 'WALCL', tvSymbol: 'FRED:WALCL' },
         { id: 'macro-wdtgal', name: 'TGA 余额', symbol: 'WDTGAL', tvSymbol: 'FRED:WDTGAL' },
         { id: 'macro-rrp', name: '逆回购余额', symbol: 'RRPONTTLD', tvSymbol: 'FRED:RRPONTTLD' },
-    
       ],
     },
     {
@@ -232,11 +231,12 @@ export const marketDetailCatalog: Record<CatalogMarketId, CatalogGroup[]> = {
         { id: 'ashare-399673', name: '创业板 50', symbol: '399673', tvSymbol: 'SZSE:399673' },
         { id: 'ashare-000688', name: '科创 50', symbol: '000688', tvSymbol: 'SSE:000688' },
         { id: 'ashare-000905', name: '中证 500', symbol: '000905', tvSymbol: 'SSE:000905' },
+        { id: 'ashare-932000', name: '中证 2000', symbol: '932000', tvSymbol: 'CSI:932000' },
         { id: 'ashare-930050', name: '中证 A50', symbol: '930050', tvSymbol: 'CSI:930050' },
       ],
     },
     {
-      label: '板块与主题',
+      label: '板块',
       rows: [
         { id: 'ashare-512000', name: '券商 ETF', symbol: '512000', tvSymbol: 'SSE:512000' },
         { id: 'ashare-512760', name: '芯片 ETF', symbol: '512760', tvSymbol: 'SSE:512760' },
