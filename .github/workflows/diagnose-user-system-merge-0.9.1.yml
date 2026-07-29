@@ -33,7 +33,6 @@ jobs:
           merge_status=$?
           set -e
 
-          mkdir -p outputs
           {
             echo "merge_status=$merge_status"
             echo "conflicting_files:"
@@ -44,8 +43,8 @@ jobs:
           } > /tmp/merge-conflicts-0.9.1.txt
 
           git merge --abort || true
-          cp /tmp/merge-conflicts-0.9.1.txt outputs/merge-conflicts-0.9.1.txt
+          cp /tmp/merge-conflicts-0.9.1.txt docs/operations/MERGE_CONFLICTS_0.9.1.txt
           git rm .github/workflows/diagnose-user-system-merge-0.9.1.yml
-          git add outputs/merge-conflicts-0.9.1.txt
+          git add docs/operations/MERGE_CONFLICTS_0.9.1.txt
           git commit -m "chore: record remaining 0.9.1 merge conflicts"
           git push origin HEAD:integration/0.9.1-merge-diagnostic
