@@ -7,6 +7,11 @@ import {
   type StockSnapshotResponse,
   type TurnoverThresholdStock,
 } from '@/api/hedgeResearch';
+import {
+  getAccountResearchWatchlist,
+  replaceAccountResearchWatchlist,
+} from '@/api/platform/researchWatchlist';
+import { UserSystemApiError } from '@/api/platform/userSystem';
 import { copyText } from '@/utils/copyTextToClipboard';
 
 export interface WatchlistItem {
@@ -15,7 +20,10 @@ export interface WatchlistItem {
   group: string;
 }
 
+export type WatchlistSyncState = 'local' | 'syncing' | 'synced' | 'offline';
+
 const WATCHLIST_STORAGE_KEY = 'vg_a_share_watchlist_v1';
+const WATCHLIST_DIRTY_STORAGE_KEY = 'vg_a_share_watchlist_dirty_v1';
 const DEFAULT_WATCHLIST: WatchlistItem[] = [
   { code: '600519', name: '贵州茅台', group: '核心观察' },
   { code: '300750', name: '宁德时代', group: '核心观察' },
@@ -41,6 +49,18 @@ function normalizeWatchlistItem(item: unknown): WatchlistItem | null {
   };
 }
 
+function normalizeWatchlistItems(payload: unknown): WatchlistItem[] {
+  if (!Array.isArray(payload)) return [];
+  const seen = new Set<string>();
+  return payload.reduce<WatchlistItem[]>((items, candidate) => {
+    const normalized = normalizeWatchlistItem(candidate);
+    if (!normalized || seen.has(normalized.code)) return items;
+    seen.add(normalized.code);
+    items.push(normalized);
+    return items;
+  }, []);
+}
+
 function readWatchlist(): WatchlistItem[] {
   if (typeof window === 'undefined') return [...DEFAULT_WATCHLIST];
   try {
@@ -48,16 +68,23 @@ function readWatchlist(): WatchlistItem[] {
     if (stored === null) return [...DEFAULT_WATCHLIST];
     const payload = JSON.parse(stored);
     if (!Array.isArray(payload)) return [...DEFAULT_WATCHLIST];
-    const seen = new Set<string>();
-    return payload.reduce<WatchlistItem[]>((items, candidate) => {
-      const normalized = normalizeWatchlistItem(candidate);
-      if (!normalized || seen.has(normalized.code)) return items;
-      seen.add(normalized.code);
-      items.push(normalized);
-      return items;
-    }, []);
+    return normalizeWatchlistItems(payload);
   } catch {
     return [...DEFAULT_WATCHLIST];
+  }
+}
+
+function readWatchlistDirty() {
+  if (typeof window === 'undefined') return false;
+  return window.localStorage.getItem(WATCHLIST_DIRTY_STORAGE_KEY) === '1';
+}
+
+function writeWatchlistDirty(value: boolean) {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(WATCHLIST_DIRTY_STORAGE_KEY, value ? '1' : '0');
+  } catch {
+    // The account API remains the source of truth when browser storage is unavailable.
   }
 }
 
@@ -86,9 +113,14 @@ export function useAShareResearch() {
   const stockLoading = ref(false);
   const stockError = ref('');
   const watchlist = ref<WatchlistItem[]>(readWatchlist());
+  const watchlistSyncState = ref<WatchlistSyncState>('local');
+  const watchlistLastSyncedAt = ref('');
   let dashboardRequestSequence = 0;
   let stockRequestSequence = 0;
   let activeStockCode = '';
+  let watchlistRemoteVersion = 0;
+  let watchlistMutationSequence = 0;
+  let watchlistSaveQueue: Promise<void> = Promise.resolve();
 
   const thresholdStocks = computed<TurnoverThresholdStock[]>(
     () => dashboard.value?.shenwan.data?.threshold?.stocks || [],
@@ -155,6 +187,63 @@ export function useAShareResearch() {
     }
   }
 
+  function snapshotWatchlist() {
+    return watchlist.value.map((item) => ({ ...item }));
+  }
+
+  function markWatchlistMutation() {
+    watchlistMutationSequence += 1;
+    writeWatchlistDirty(true);
+  }
+
+  async function persistWatchlistSnapshot(snapshot: WatchlistItem[]) {
+    watchlistSyncState.value = 'syncing';
+    try {
+      let result;
+      try {
+        result = await replaceAccountResearchWatchlist(snapshot, watchlistRemoteVersion);
+      } catch (error) {
+        if (!(error instanceof UserSystemApiError) || error.code !== 'watchlist_version_conflict') {
+          throw error;
+        }
+        const latest = await getAccountResearchWatchlist();
+        watchlistRemoteVersion = latest.rowVersion;
+        result = await replaceAccountResearchWatchlist(snapshot, watchlistRemoteVersion);
+      }
+      watchlistRemoteVersion = result.rowVersion;
+      watchlistLastSyncedAt.value = result.updatedAt || '';
+      writeWatchlistDirty(false);
+      watchlistSyncState.value = 'synced';
+    } catch {
+      writeWatchlistDirty(true);
+      watchlistSyncState.value = 'offline';
+    }
+  }
+
+  function queueWatchlistSync() {
+    const snapshot = snapshotWatchlist();
+    watchlistSaveQueue = watchlistSaveQueue.then(() => persistWatchlistSnapshot(snapshot));
+  }
+
+  async function hydrateWatchlistFromAccount() {
+    const mutationSequenceAtStart = watchlistMutationSequence;
+    watchlistSyncState.value = 'syncing';
+    try {
+      const result = await getAccountResearchWatchlist();
+      watchlistRemoteVersion = result.rowVersion;
+      watchlistLastSyncedAt.value = result.updatedAt || '';
+      const localChangedWhileLoading = watchlistMutationSequence !== mutationSequenceAtStart;
+      if (readWatchlistDirty() || localChangedWhileLoading || result.rowVersion === 0) {
+        queueWatchlistSync();
+        return;
+      }
+      watchlist.value = normalizeWatchlistItems(result.items);
+      watchlistSyncState.value = 'synced';
+    } catch {
+      watchlistSyncState.value = 'offline';
+    }
+  }
+
   function addToWatchlist(code: string, name: string, group = '默认分组') {
     const normalized = normalizeStockCode(code);
     if (!normalized || watchlist.value.some((item) => item.code === normalized)) return;
@@ -163,11 +252,17 @@ export function useAShareResearch() {
       name: name.trim() || normalized,
       group: group.trim() || '默认分组',
     });
+    markWatchlistMutation();
+    queueWatchlistSync();
   }
 
   function removeFromWatchlist(code: string) {
     const normalized = normalizeStockCode(code);
-    watchlist.value = watchlist.value.filter((item) => item.code !== normalized);
+    const next = watchlist.value.filter((item) => item.code !== normalized);
+    if (next.length === watchlist.value.length) return;
+    watchlist.value = next;
+    markWatchlistMutation();
+    queueWatchlistSync();
   }
 
   function moveWatchlistItem(code: string, direction: 'up' | 'down') {
@@ -186,12 +281,18 @@ export function useAShareResearch() {
     const next = [...watchlist.value];
     [next[index], next[targetIndex]] = [next[targetIndex], next[index]];
     watchlist.value = next;
+    markWatchlistMutation();
+    queueWatchlistSync();
   }
 
   function setWatchlistGroup(code: string, group: string) {
     const normalized = normalizeStockCode(code);
     const item = watchlist.value.find((candidate) => candidate.code === normalized);
-    if (item) item.group = group.trim() || '默认分组';
+    const normalizedGroup = group.trim() || '默认分组';
+    if (!item || item.group === normalizedGroup) return;
+    item.group = normalizedGroup;
+    markWatchlistMutation();
+    queueWatchlistSync();
   }
 
   async function applyThresholdMode() {
@@ -295,6 +396,7 @@ export function useAShareResearch() {
 
   onMounted(() => {
     void loadDashboard();
+    void hydrateWatchlistFromAccount();
   });
 
   return {
@@ -312,6 +414,8 @@ export function useAShareResearch() {
     stockError,
     watchlist,
     watchlistGroups,
+    watchlistSyncState,
+    watchlistLastSyncedAt,
     loadDashboard,
     queryStock,
     addToWatchlist,
