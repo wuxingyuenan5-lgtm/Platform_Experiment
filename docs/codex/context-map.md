@@ -46,7 +46,7 @@ Do not automatically load:
 ## Authority rules
 
 - `docs/codex/current-state.md` owns compact current engineering truth.
-- GitHub Issue #136 and Draft PR #138 own live HEAD, CI, review and progress evidence.
+- GitHub Issue #136 owns the live branch, Draft PR, HEAD, CI, review and progress evidence.
 - `docs/architecture/OWNERSHIP.md` owns code and data authority.
 - Domain technical documents own detailed contracts; current-state and context-map link rather than repeat them.
 - Historical plans are evidence, not current authority.
