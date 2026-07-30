@@ -39,8 +39,29 @@ function sourceMeta(source: string) {
   };
 }
 
+function shenwanRow(
+  rank: number,
+  swL1Code: string,
+  swL1Name: string,
+  swL2Code: string,
+  swL2Name: string,
+  turnoverYuan: number,
+) {
+  return {
+    rank,
+    swL1Code,
+    swL1Name,
+    swL2Code,
+    swL2Name,
+    returnPct: rank === 1 ? 2.4 : 1.2,
+    turnoverYuan,
+    marketSharePct: rank === 1 ? 8.1 : 5.4,
+    netInflowYuan: rank === 1 ? 8_000_000_000 : 3_200_000_000,
+  };
+}
+
 function dashboardFixture(thresholdYuan: number) {
-  const stocks =
+  const thresholdStocks =
     thresholdYuan < 15_000_000_000
       ? [
           {
@@ -55,6 +76,10 @@ function dashboardFixture(thresholdYuan: number) {
           },
         ]
       : [];
+  const sw2All = [
+    shenwanRow(1, '801080', '电子', '801081', '半导体', 180_000_000_000),
+    shenwanRow(2, '801780', '银行', '851911', '股份制银行Ⅱ', 120_000_000_000),
+  ];
   return {
     generatedAt: '2026-07-30T02:31:00+00:00',
     marketDetail: {
@@ -111,58 +136,12 @@ function dashboardFixture(thresholdYuan: number) {
     shenwan: {
       meta: sourceMeta('申万行业分类 + E2E聚合夹具'),
       data: {
-        sw2Top: [
-          {
-            rank: 1,
-            swL1Code: '801080',
-            swL1Name: '电子',
-            swL2Code: '801081',
-            swL2Name: '半导体',
-            returnPct: 2.4,
-            turnoverYuan: 180_000_000_000,
-            marketSharePct: 8.1,
-            netInflowYuan: 8_000_000_000,
-          },
-          {
-            rank: 2,
-            swL1Code: '801780',
-            swL1Name: '银行',
-            swL2Code: '851911',
-            swL2Name: '股份制银行Ⅱ',
-            returnPct: 1.2,
-            turnoverYuan: 120_000_000_000,
-            marketSharePct: 5.4,
-            netInflowYuan: 3_200_000_000,
-          },
-        ],
-        sw2All: [
-          {
-            rank: 1,
-            swL1Code: '801080',
-            swL1Name: '电子',
-            swL2Code: '801081',
-            swL2Name: '半导体',
-            returnPct: 2.4,
-            turnoverYuan: 180_000_000_000,
-            marketSharePct: 8.1,
-            netInflowYuan: 8_000_000_000,
-          },
-          {
-            rank: 2,
-            swL1Code: '801780',
-            swL1Name: '银行',
-            swL2Code: '851911',
-            swL2Name: '股份制银行Ⅱ',
-            returnPct: 1.2,
-            turnoverYuan: 120_000_000_000,
-            marketSharePct: 5.4,
-            netInflowYuan: 3_200_000_000,
-          },
-        ],
+        sw2Top: sw2All,
+        sw2All,
         threshold: {
           thresholdYuan,
           operator: '>',
-          industries: stocks.length
+          industries: thresholdStocks.length
             ? [
                 {
                   swL1Code: '801780',
@@ -173,7 +152,7 @@ function dashboardFixture(thresholdYuan: number) {
                 },
               ]
             : [],
-          stocks,
+          stocks: thresholdStocks,
           unmatchedSecurityCodes: [],
         },
         unmatchedSecurityCodes: [],
@@ -237,7 +216,11 @@ async function mockResearchRoutes(page: Page): Promise<void> {
   await page.route('**/api/v1/research/a-share/dashboard**', async (route: Route) => {
     const url = new URL(route.request().url());
     const thresholdYuan = Number(url.searchParams.get('thresholdYuan') || 10_000_000_000);
-    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(dashboardFixture(thresholdYuan)) });
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(dashboardFixture(thresholdYuan)),
+    });
   });
   await page.route('**/api/v1/research/a-share/stocks/*/snapshot', async (route: Route) => {
     const match = route.request().url().match(/\/stocks\/(\d{6})\/snapshot/);
@@ -272,11 +255,11 @@ test('covers A-share research workflow and account-level watchlist persistence',
   await expect(first.page.getByRole('heading', { name: '自选股' })).toBeVisible();
   await expect(first.page.getByText('账号已同步', { exact: true })).toBeVisible();
 
-  await first.page.getByRole('button', { name: '全部申万二级行业' }).click();
+  await first.page.getByRole('button', { name: /全部申万二级行业/ }).click();
   await first.page.getByLabel('搜索二级行业').fill('半导体');
   await expect(first.page.getByText('显示 1 / 2 个行业')).toBeVisible();
-  await first.page.getByRole('button', { name: '升序 ↑' }).click();
-  await expect(first.page.getByText(/当前排序：.*降序/)).toBeVisible();
+  await first.page.getByRole('button', { name: '降序 ↓' }).click();
+  await expect(first.page.getByText(/当前排序：.*升序/)).toBeVisible();
 
   await first.page.getByLabel('50亿元').check();
   const thresholdResponse = first.page.waitForResponse(
