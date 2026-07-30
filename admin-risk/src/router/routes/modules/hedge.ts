@@ -2,12 +2,7 @@ import type { AppRouteModule } from '@/router/types';
 import { LAYOUT, getParentLayout } from '@/router/constant';
 import { RoleEnum } from '@/enums/roleEnum';
 
-const HEDGE_RESEARCH_ROLES = [
-  RoleEnum.CEO,
-  RoleEnum.TECH_LEAD,
-  RoleEnum.EMPLOYEE,
-  RoleEnum.ADMIN,
-];
+const HEDGE_RESEARCH_ROLES = [RoleEnum.CEO, RoleEnum.TECH_LEAD, RoleEnum.EMPLOYEE, RoleEnum.ADMIN];
 
 const hedge: AppRouteModule = {
   path: '/hedge-board',
