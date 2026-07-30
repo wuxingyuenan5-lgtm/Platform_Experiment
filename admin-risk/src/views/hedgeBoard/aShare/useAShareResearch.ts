@@ -1,3 +1,4 @@
+import { message } from 'ant-design-vue';
 import { computed, onMounted, ref, watch } from 'vue';
 import {
   getAShareDashboard,
@@ -6,6 +7,7 @@ import {
   type StockSnapshotResponse,
   type TurnoverThresholdStock,
 } from '@/api/hedgeResearch';
+import { copyText } from '@/utils/copyTextToClipboard';
 
 export interface WatchlistItem {
   code: string;
@@ -59,6 +61,18 @@ function readWatchlist(): WatchlistItem[] {
   }
 }
 
+function shanghaiDateStamp(date = new Date()) {
+  const parts = new Intl.DateTimeFormat('zh-CN', {
+    timeZone: 'Asia/Shanghai',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(date);
+  const read = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((part) => part.type === type)?.value || '';
+  return `${read('year')}-${read('month')}-${read('day')}`;
+}
+
 export function useAShareResearch() {
   const dashboard = ref<AShareDashboardResponse | null>(null);
   const dashboardLoading = ref(false);
@@ -72,7 +86,9 @@ export function useAShareResearch() {
   const stockLoading = ref(false);
   const stockError = ref('');
   const watchlist = ref<WatchlistItem[]>(readWatchlist());
+  let dashboardRequestSequence = 0;
   let stockRequestSequence = 0;
+  let activeStockCode = '';
 
   const thresholdStocks = computed<TurnoverThresholdStock[]>(
     () => dashboard.value?.shenwan.data?.threshold?.stocks || [],
@@ -92,14 +108,21 @@ export function useAShareResearch() {
   });
 
   async function loadDashboard() {
+    const requestSequence = ++dashboardRequestSequence;
+    const requestedThreshold = thresholdYuan.value;
     dashboardLoading.value = true;
     dashboardError.value = '';
     try {
-      dashboard.value = await getAShareDashboard(thresholdYuan.value);
+      const result = await getAShareDashboard(requestedThreshold);
+      if (requestSequence !== dashboardRequestSequence) return false;
+      dashboard.value = result;
+      return true;
     } catch (error) {
+      if (requestSequence !== dashboardRequestSequence) return false;
       dashboardError.value = error instanceof Error ? error.message : 'A股投研数据加载失败';
+      return false;
     } finally {
-      dashboardLoading.value = false;
+      if (requestSequence === dashboardRequestSequence) dashboardLoading.value = false;
     }
   }
 
@@ -109,11 +132,14 @@ export function useAShareResearch() {
       stockError.value = '请输入6位A股代码，支持 600519、SH600519 或 600519.SH';
       return;
     }
+    if (stockLoading.value && activeStockCode === normalized) return;
+
     stockCode.value = normalized;
     const requestSequence = ++stockRequestSequence;
+    activeStockCode = normalized;
     stockLoading.value = true;
     stockError.value = '';
-    stockSnapshot.value = null;
+    if (stockSnapshot.value?.securityCode !== normalized) stockSnapshot.value = null;
     try {
       const result = await getStockSnapshot(normalized);
       if (requestSequence !== stockRequestSequence) return;
@@ -122,7 +148,10 @@ export function useAShareResearch() {
       if (requestSequence !== stockRequestSequence) return;
       stockError.value = error instanceof Error ? error.message : '个股数据查询失败';
     } finally {
-      if (requestSequence === stockRequestSequence) stockLoading.value = false;
+      if (requestSequence === stockRequestSequence) {
+        stockLoading.value = false;
+        activeStockCode = '';
+      }
     }
   }
 
@@ -165,43 +194,83 @@ export function useAShareResearch() {
     if (item) item.group = group.trim() || '默认分组';
   }
 
-  function applyThresholdMode() {
+  async function applyThresholdMode() {
     const thresholds = { '50': 50, '100': 100, '200': 200 } as const;
-    const yi =
+    const rawYi =
       thresholdMode.value === 'custom' ? customThresholdYi.value : thresholds[thresholdMode.value];
-    thresholdYuan.value = Math.max(1, Number(yi) || 1) * 100_000_000;
-    void loadDashboard();
+    const yi = Number(rawYi);
+    if (!Number.isFinite(yi) || yi <= 0) {
+      message.error('请输入大于0的成交额阈值。');
+      return;
+    }
+    const normalizedYi = Math.max(1, yi);
+    if (thresholdMode.value === 'custom') customThresholdYi.value = normalizedYi;
+    thresholdYuan.value = normalizedYi * 100_000_000;
+    const success = await loadDashboard();
+    if (success) {
+      message.success(
+        `已更新：成交额 > ${normalizedYi}亿元，共 ${thresholdStocks.value.length} 只股票。`,
+      );
+    } else {
+      message.error('阈值统计更新失败，已保留上一份有效数据。');
+    }
   }
 
   function exportThresholdCsv() {
     const rows = thresholdStocks.value;
-    if (!rows.length || typeof window === 'undefined') return;
-    const header = ['申万一级', '申万二级', '股票代码', '股票名称', '成交额（元）', '涨跌幅（%）'];
-    const body = rows.map((row) => [
-      row.swL1Name,
-      row.swL2Name,
-      row.securityCode,
-      row.securityName,
-      String(row.turnoverYuan),
-      row.returnPct == null ? '' : String(row.returnPct),
-    ]);
-    const csv = [header, ...body]
-      .map((row) => row.map((value) => `"${String(value).replace(/"/g, '""')}"`).join(','))
-      .join('\n');
-    const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = `A股成交额阈值统计_${new Date().toISOString().slice(0, 10)}.csv`;
-    link.click();
-    URL.revokeObjectURL(link.href);
+    if (!rows.length) {
+      message.warning('当前阈值下没有可导出的股票明细。');
+      return;
+    }
+    if (typeof window === 'undefined' || typeof document === 'undefined') {
+      message.error('当前环境不支持文件导出。');
+      return;
+    }
+    try {
+      const header = ['申万一级', '申万二级', '股票代码', '股票名称', '成交额（元）', '涨跌幅（%）'];
+      const body = rows.map((row) => [
+        row.swL1Name,
+        row.swL2Name,
+        row.securityCode,
+        row.securityName,
+        String(row.turnoverYuan),
+        row.returnPct == null ? '' : String(row.returnPct),
+      ]);
+      const csv = [header, ...body]
+        .map((row) => row.map((value) => `"${String(value).replace(/"/g, '""')}"`).join(','))
+        .join('\n');
+      const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `A股成交额阈值统计_${shanghaiDateStamp()}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      message.success(`已导出 ${rows.length} 只股票的CSV明细。`);
+    } catch (error) {
+      message.error(error instanceof Error ? error.message : '导出失败，请稍后重试。');
+    }
   }
 
   async function copyThresholdSummary() {
-    const lines = thresholdIndustries.value.map(
-      (item) => `${item.swL1Name} / ${item.swL2Name}：${item.stockCount}只`,
-    );
-    if (!lines.length || typeof navigator === 'undefined' || !navigator.clipboard) return;
-    await navigator.clipboard.writeText(lines.join('\n'));
+    const industries = thresholdIndustries.value;
+    if (!industries.length) {
+      message.warning('当前阈值下没有可复制的行业统计。');
+      return;
+    }
+    const thresholdYi = thresholdYuan.value / 100_000_000;
+    const lines = [
+      `口径：个股成交额 > ${thresholdYi}亿元`,
+      `合计：${thresholdStocks.value.length}只，覆盖${industries.length}个申万二级行业`,
+      ...industries.map((item) => `${item.swL1Name} / ${item.swL2Name}：${item.stockCount}只`),
+    ];
+    try {
+      await copyText(lines.join('\n'), `已复制 ${industries.length} 个行业的统计结果。`);
+    } catch (error) {
+      message.error(error instanceof Error ? error.message : '复制失败，请检查浏览器权限。');
+    }
   }
 
   watch(
