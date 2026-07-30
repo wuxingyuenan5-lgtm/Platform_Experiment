@@ -1,4 +1,6 @@
+import axios, { AxiosError } from 'axios';
 import { defHttp } from '@/utils/http/axios';
+import { getUserSystemCsrfToken } from '@/api/platform/userSystem';
 
 export type ResearchDataStatus = 'loading' | 'ready' | 'partial' | 'no_data' | 'stale' | 'error';
 
@@ -162,6 +164,43 @@ export interface MacroExpectationResponse {
   events: ResearchModuleResult<MacroExpectationEvent[]>;
 }
 
+export interface AccountWatchlistItem {
+  securityCode: string;
+  securityName: string;
+  group: string;
+}
+
+export interface AccountWatchlistResponse {
+  market: 'a_share';
+  version: number;
+  updatedAt?: string | null;
+  items: AccountWatchlistItem[];
+}
+
+export interface ReplaceAccountWatchlistPayload {
+  expectedVersion: number;
+  items: AccountWatchlistItem[];
+}
+
+const preferenceClient = axios.create({
+  baseURL: '/api/v1',
+  timeout: 15_000,
+  withCredentials: true,
+});
+
+function watchlistError(error: unknown): Error {
+  if (!(error instanceof AxiosError)) return error instanceof Error ? error : new Error('自选股同步失败');
+  const detail = error.response?.data?.detail as { message?: string } | string | undefined;
+  const message =
+    (typeof detail === 'object' && detail?.message) ||
+    (typeof detail === 'string' ? detail : undefined) ||
+    error.message ||
+    '自选股同步失败';
+  const result = new Error(message) as Error & { status?: number };
+  result.status = error.response?.status;
+  return result;
+}
+
 export const getAShareDashboard = (thresholdYuan = 10_000_000_000) =>
   defHttp.get<AShareDashboardResponse>({
     url: '/research/a-share/dashboard',
@@ -177,3 +216,29 @@ export const getMacroExpectations = () =>
   defHttp.get<MacroExpectationResponse>({
     url: '/research/macro/expectations',
   });
+
+export async function getAShareAccountWatchlist(): Promise<AccountWatchlistResponse> {
+  try {
+    const response = await preferenceClient.get<AccountWatchlistResponse>('/research/a-share/watchlist');
+    return response.data;
+  } catch (error) {
+    throw watchlistError(error);
+  }
+}
+
+export async function replaceAShareAccountWatchlist(
+  payload: ReplaceAccountWatchlistPayload,
+): Promise<AccountWatchlistResponse> {
+  try {
+    const response = await preferenceClient.put<AccountWatchlistResponse>(
+      '/research/a-share/watchlist',
+      payload,
+      {
+        headers: { 'X-CSRF-Token': getUserSystemCsrfToken() },
+      },
+    );
+    return response.data;
+  } catch (error) {
+    throw watchlistError(error);
+  }
+}
