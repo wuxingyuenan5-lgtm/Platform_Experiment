@@ -219,6 +219,21 @@ assert(
   'A-share watchlist UI must expose empty persistence, duplicate feedback and bounded move controls.',
 );
 assert(
+  shenwanSectionSource.includes("sortDirection = ref<'asc' | 'desc'>('desc')") &&
+    shenwanSectionSource.includes('没有匹配的申万二级行业') &&
+    shenwanSectionSource.includes('当前序号') &&
+    shenwanSectionSource.includes('重置筛选'),
+  'Shenwan complete-industry view must expose sort direction, current result order and empty-filter recovery.',
+);
+assert(
+  aShareResearchComposableSource.includes('let dashboardRequestSequence = 0') &&
+    aShareResearchComposableSource.includes('let activeStockCode =') &&
+    aShareResearchComposableSource.includes('shanghaiDateStamp') &&
+    aShareResearchComposableSource.includes("import { message } from 'ant-design-vue'") &&
+    aShareResearchComposableSource.includes("import { copyText } from '@/utils/copyTextToClipboard'"),
+  'A-share interactions must guard stale requests and use platform feedback/copy utilities with China-market dates.',
+);
+assert(
   stockSnapshotSource.includes('expanded[item.key] = false') &&
     stockSnapshotSource.includes("{ key: 'quoteValuation'") &&
     stockSnapshotSource.includes("{ key: 'investorQa'") &&
