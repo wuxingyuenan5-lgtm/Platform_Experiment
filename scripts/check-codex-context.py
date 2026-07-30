@@ -20,6 +20,15 @@ STALE_BRANCHES = (
     "feature/issue-117-platform-0-9-1",
     "feature/issue-117-platform-0.9.1",
 )
+CONTEXT_PACKS = (
+    "hedge-style",
+    "research-field",
+    "identity-permission",
+    "member-contract",
+    "trading-display",
+    "research-provider",
+    "user-e2e",
+)
 
 
 def read_text(relative_path: str) -> str:
@@ -51,6 +60,7 @@ def main() -> None:
         "docs/codex/context-map.md",
         "docs/codex/CURRENT_CONTEXT.md",
         "docs/architecture/OWNERSHIP.md",
+        "scripts/context-for.py",
     )
     for relative_path in required:
         require((ROOT / relative_path).is_file(), f"Missing context entrypoint: {relative_path}")
@@ -60,6 +70,7 @@ def main() -> None:
     current_state = read_text("docs/codex/current-state.md")
     context_map = read_text("docs/codex/context-map.md")
     compatibility = read_text("docs/codex/CURRENT_CONTEXT.md")
+    context_tool = read_text("scripts/context-for.py")
     dev_script = read_text("scripts/dev-platform.ps1")
     vite_config = read_text("admin-risk/vite.config.ts")
     package_json = json.loads(read_text("admin-risk/package.json"))
@@ -129,11 +140,20 @@ def main() -> None:
         "context-map.md must exclude CURRENT_CONTEXT.md from default context",
     )
     require(
+        "## Executable task packs" in context_map
+        and "python scripts/context-for.py --list" in context_map,
+        "context-map.md must expose the context-pack tool",
+    )
+    require(
         "## Bounded task packs" in context_map
         and "## Default exclusions" in context_map
         and "## Authority rules" in context_map,
         "context-map.md is missing bounded task-routing sections",
     )
+    for pack in CONTEXT_PACKS:
+        require(pack in context_map, f"context-map.md is missing tool key: {pack}")
+        require(f'"{pack}"' in context_tool, f"context-for.py is missing task pack: {pack}")
+
     for required_pack in (
         "A-share/Shenwan/research field",
         "Identity/permission/session",
