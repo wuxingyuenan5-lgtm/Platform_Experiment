@@ -83,6 +83,12 @@ async function dismissResponsiveNavigation(page: Page): Promise<void> {
   await expect(drawerMask).toBeHidden({ timeout: 5_000 }).catch(() => undefined);
 }
 
+async function expectTransientMessagesCleared(page: Page): Promise<void> {
+  await expect(page.getByText('网络请求错误,未找到该资源!', { exact: true })).toBeHidden({
+    timeout: 8_000,
+  });
+}
+
 async function captureSection(
   page: Page,
   headingName: string,
@@ -169,6 +175,7 @@ test('captures responsive A-share evidence without page-level horizontal overflo
     await session.page.goto(absoluteUrl('/hedge-board/a-share'));
     await expectAShareSections(session.page);
     await dismissResponsiveNavigation(session.page);
+    await expectTransientMessagesCleared(session.page);
 
     const dimensions = await session.page.evaluate(() => ({
       clientWidth: document.documentElement.clientWidth,
