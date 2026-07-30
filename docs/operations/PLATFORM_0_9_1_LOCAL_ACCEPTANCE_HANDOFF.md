@@ -33,7 +33,7 @@ Draft PR：#135
 6. E2E 研究数据夹具只证明交互和布局，不得作为真实行情验收证据。
 7. 所有日志、截图和验收结论写到仓库外的独立 evidence 目录，不得写入 Git。
 8. 发现问题时只记录复现步骤、证据和严重级别，不得顺手改代码。
-9. 结束前必须确认 git status 没有任何受跟踪文件变化。
+9. 结束前必须确认 git diff 和 git diff --cached 都为空。
 
 按本文档顺序执行：环境核对 → 自动化检查 → 浏览器 E2E → 本地真实 Provider 页面验收 → 响应式截图 → 输出验收结论。
 ```
@@ -658,18 +658,9 @@ git diff --exit-code
 git diff --cached --exit-code
 ```
 
-由于安装和测试会产生未跟踪目录，`git status --porcelain=v1`可以出现以下本地项：
+安装和测试会产生未跟踪目录，例如`.venv-acceptance/`、`node_modules/`、`dist/`和`.e2e/`。这些目录可以出现在`git status`中；通过判定要求`git diff --exit-code`和`git diff --cached --exit-code`均返回0，即没有任何受Git跟踪文件被修改或暂存。
 
-```text
-.venv-acceptance/
-node_modules/
-dist/
-.e2e/
-```
-
-判定重点是：不得出现受Git跟踪文件的修改、删除或暂存。验收报告应同时保存`git diff --exit-code`和`git diff --cached --exit-code`结果。
-
-保存证据后清理 worktree：
+保存证据后清理worktree：
 
 ```bash
 cd "$SOURCE_REPO"
