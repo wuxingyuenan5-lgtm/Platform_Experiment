@@ -134,7 +134,7 @@ jobs:
           cat > "$evidence_dir/README.md" <<EOF
           # Platform 0.9.2 full-platform visual baseline
 
-          - Git SHA: `${GITHUB_SHA}`
+          - Git SHA: ${GITHUB_SHA}
           - Viewports: 1440x900, 1024x768, 768x1024, 390x844
           - Roles: anonymous, employee, CEO, member
           - Expected captures: 56
