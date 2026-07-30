@@ -1,5 +1,4 @@
 import axios, { AxiosError } from 'axios';
-import { defHttp } from '@/utils/http/axios';
 import { getUserSystemCsrfToken } from '@/api/platform/userSystem';
 
 export type ResearchDataStatus = 'loading' | 'ready' | 'partial' | 'no_data' | 'stale' | 'error';
@@ -182,49 +181,57 @@ export interface ReplaceAccountWatchlistPayload {
   items: AccountWatchlistItem[];
 }
 
-const preferenceClient = axios.create({
+const researchClient = axios.create({
   baseURL: '/api/v1',
-  timeout: 15_000,
+  timeout: 30_000,
   withCredentials: true,
+  headers: { 'Content-Type': 'application/json' },
 });
 
-function watchlistError(error: unknown): Error {
-  if (!(error instanceof AxiosError)) return error instanceof Error ? error : new Error('自选股同步失败');
-  const detail = error.response?.data?.detail as { message?: string } | string | undefined;
-  const message =
+function researchError(error: unknown, fallback: string): Error {
+  if (!(error instanceof AxiosError)) return error instanceof Error ? error : new Error(fallback);
+  const detail = error.response?.data?.detail as
+    | { message?: string; code?: string }
+    | string
+    | undefined;
+  const responseMessage =
     (typeof detail === 'object' && detail?.message) ||
-    (typeof detail === 'string' ? detail : undefined) ||
-    error.message ||
-    '自选股同步失败';
-  const result = new Error(message) as Error & { status?: number };
+    (typeof detail === 'string' ? detail : undefined);
+  const result = new Error(responseMessage || error.message || fallback) as Error & {
+    status?: number;
+    code?: string;
+  };
   result.status = error.response?.status;
+  if (typeof detail === 'object') result.code = detail?.code;
   return result;
 }
 
+async function platformGet<T>(url: string, params?: Record<string, unknown>): Promise<T> {
+  try {
+    const response = await researchClient.get<T>(url, { params });
+    return response.data;
+  } catch (error) {
+    throw researchError(error, '投研数据请求失败');
+  }
+}
+
 export const getAShareDashboard = (thresholdYuan = 10_000_000_000) =>
-  defHttp.get<AShareDashboardResponse>({
-    url: '/research/a-share/dashboard',
-    params: { thresholdYuan },
-  });
+  platformGet<AShareDashboardResponse>('/research/a-share/dashboard', { thresholdYuan });
 
 export const getStockSnapshot = (code: string) =>
-  defHttp.get<StockSnapshotResponse>({
-    url: `/research/a-share/stocks/${code}/snapshot`,
-  });
+  platformGet<StockSnapshotResponse>(`/research/a-share/stocks/${code}/snapshot`);
 
 export const getMacroExpectations = () =>
-  defHttp.get<MacroExpectationResponse>({
-    url: '/research/macro/expectations',
-  });
+  platformGet<MacroExpectationResponse>('/research/macro/expectations');
 
 export async function getAShareAccountWatchlist(): Promise<AccountWatchlistResponse> {
   try {
-    const response = await preferenceClient.get<AccountWatchlistResponse>(
+    const response = await researchClient.get<AccountWatchlistResponse>(
       '/me/research/a-share/watchlist',
     );
     return response.data;
   } catch (error) {
-    throw watchlistError(error);
+    throw researchError(error, '自选股同步失败');
   }
 }
 
@@ -232,7 +239,7 @@ export async function replaceAShareAccountWatchlist(
   payload: ReplaceAccountWatchlistPayload,
 ): Promise<AccountWatchlistResponse> {
   try {
-    const response = await preferenceClient.put<AccountWatchlistResponse>(
+    const response = await researchClient.put<AccountWatchlistResponse>(
       '/me/research/a-share/watchlist',
       payload,
       {
@@ -241,6 +248,6 @@ export async function replaceAShareAccountWatchlist(
     );
     return response.data;
   } catch (error) {
-    throw watchlistError(error);
+    throw researchError(error, '自选股同步失败');
   }
 }
