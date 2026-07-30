@@ -74,6 +74,30 @@ async function expectAShareSections(page: Page): Promise<void> {
   await expect(page.getByText('账号已同步', { exact: true })).toBeVisible();
 }
 
+async function dismissResponsiveNavigation(page: Page): Promise<void> {
+  await page.keyboard.press('Escape');
+  const drawerMask = page.locator('.ant-drawer-mask').first();
+  if (await drawerMask.isVisible().catch(() => false)) {
+    await drawerMask.click({ force: true });
+  }
+  await expect(drawerMask).toBeHidden({ timeout: 5_000 }).catch(() => undefined);
+}
+
+async function captureSection(
+  page: Page,
+  headingName: string,
+  outputPath: string,
+): Promise<void> {
+  const heading = page.getByRole('heading', { name: headingName });
+  await heading.scrollIntoViewIfNeeded();
+  await expect(heading).toBeVisible();
+  await page.waitForTimeout(150);
+  await page.screenshot({
+    path: outputPath,
+    animations: 'disabled',
+  });
+}
+
 test('covers A-share research workflow and account-level watchlist persistence', async ({ browser }) => {
   const username = requiredEnvironment('E2E_CEO_USERNAME');
   const password = requiredEnvironment('E2E_CEO_PASSWORD');
@@ -144,6 +168,7 @@ test('captures responsive A-share evidence without page-level horizontal overflo
     const session = await openAuthenticatedPage(browser, username, password, viewport);
     await session.page.goto(absoluteUrl('/hedge-board/a-share'));
     await expectAShareSections(session.page);
+    await dismissResponsiveNavigation(session.page);
 
     const dimensions = await session.page.evaluate(() => ({
       clientWidth: document.documentElement.clientWidth,
@@ -154,11 +179,21 @@ test('captures responsive A-share evidence without page-level horizontal overflo
       `${viewport.name} produced page-level horizontal overflow`,
     ).toBeLessThanOrEqual(dimensions.clientWidth + 1);
 
-    await session.page.screenshot({
-      path: testInfo.outputPath(`a-share-${viewport.name}.png`),
-      fullPage: true,
-      animations: 'disabled',
-    });
+    await captureSection(
+      session.page,
+      '大盘表现',
+      testInfo.outputPath(`a-share-${viewport.name}-overview.png`),
+    );
+    await captureSection(
+      session.page,
+      '申万板块',
+      testInfo.outputPath(`a-share-${viewport.name}-shenwan.png`),
+    );
+    await captureSection(
+      session.page,
+      '自选股',
+      testInfo.outputPath(`a-share-${viewport.name}-watchlist.png`),
+    );
     await session.context.close();
   }
 });
