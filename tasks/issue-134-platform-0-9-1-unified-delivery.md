@@ -85,8 +85,10 @@ Status: in progress
 Completed:
 
 - trading-hours live-provider sample at `2026-07-30 14:47:41 +08:00`;
-- provider result: 5 of 8 checks passed and 3 external dependencies failed;
-- Tencent/Eastmoney 600519 cross-source quote check passed with absolute difference `0.03`;
+- trading-hours result: 5 of 8 checks passed, Tencent/Eastmoney 600519 difference `0.03`;
+- non-trading-hours live-provider sample at `2026-07-30 15:42:05 +08:00`;
+- non-trading-hours result: 5 of 8 checks passed, Tencent/Eastmoney 600519 both `1361.76`, difference `0.00`;
+- both sessions reported the same three external failures: full-market spot remote disconnect, unavailable index history and unverifiable official Shenwan TLS chain;
 - external failures recorded without TLS bypass or false healthy status;
 - responsive browser preflight covers 1440, 1024, 768 and 390 widths;
 - each viewport captures overview, Shenwan and watchlist evidence;
@@ -95,13 +97,13 @@ Completed:
 
 Pending:
 
-- final workflow validation of the current responsive-evidence head;
-- one non-trading-hours provider validation;
+- final workflow validation of the current evidence head;
+- actual running Platform review for source timestamp, fetched timestamp, `stale` and Last Known Good display;
 - owner review of 1440/1024/768/390 screenshots and actual running page;
 - Shenwan mapping spot checks;
 - report, announcement and news source-link spot checks.
 
-Automated responsive evidence is a preflight only and does not replace owner visual acceptance. Deterministic research fixtures do not count as live-provider evidence.
+Provider smoke proves upstream availability at the sampled time. It does not prove the running Platform's stale/LKG display. Automated responsive evidence is a preflight only and does not replace owner visual acceptance. Deterministic research fixtures do not count as live-provider evidence.
 
 ### Phase 5 — Platform 0.9.1 Release Candidate
 
@@ -137,7 +139,7 @@ A Draft pull request targeting `main` must run all repository workflows and rema
 
 ## Progress
 
-- Done: Phases 0–3; unified branch and Draft PR; full deterministic workflow surface; one trading-hours live-provider sample; responsive evidence implementation and initial successful screenshot artifact.
-- Current: validate the clean-state responsive screenshot head and complete the scheduled non-trading-hours sample.
-- Next: record non-trading evidence, review source links and responsive screenshots, then freeze the Platform 0.9.1 release candidate.
-- Blocked by: final visual and link acceptance require the actual running environment and owner review.
+- Done: Phases 0–3; unified branch and Draft PR; complete deterministic workflow surface; trading and non-trading provider samples; responsive evidence implementation and initial successful screenshot artifact.
+- Current: validate the final evidence head and review actual-environment source-state/link/visual behavior.
+- Next: record remaining human acceptance evidence, then freeze the Platform 0.9.1 release candidate.
+- Blocked by: final visual, source-state and link acceptance require the actual running environment and owner review.
