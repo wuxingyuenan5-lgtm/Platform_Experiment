@@ -23,9 +23,12 @@
   @countdown-prefix-cls: ~'@{namespace}-countdown-input';
   @dark-bg: #293146;
   .@{prefix-cls} {
-    min-width: 100%;
+    width: 100vw;
+    min-width: 0;
+    max-width: 100vw;
     min-height: 100vh;
     overflow: auto;
+    box-sizing: border-box;
     scrollbar-gutter: stable;
     background:
       radial-gradient(circle at top right, rgba(178, 206, 236, 0.28), transparent 30%),
