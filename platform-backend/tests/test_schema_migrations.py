@@ -152,6 +152,6 @@ def test_application_startup_applies_platform_migration_baseline(tmp_path: Path)
     assert payload["status"] == "current"
     assert payload["migrations"][0]["version"] == 1
     assert payload["migrations"][0]["status"] == "applied"
-    assert payload["migrations"][-1]["version"] == 7
-    assert payload["migrations"][-1]["name"] == "user-admin-operational-note"
+    assert payload["migrations"][-1]["version"] == 8
+    assert payload["migrations"][-1]["name"] == "user-research-watchlists"
     assert payload["migrations"][-1]["status"] == "applied"
