@@ -15,7 +15,7 @@
           <p>默认按当日行业总成交额降序。</p>
         </div>
       </div>
-      <div class="table-shell">
+      <div v-if="data.sw2Top.length" class="table-shell">
         <table class="market-table market-table--top">
           <thead>
             <tr>
@@ -31,21 +31,22 @@
           <tbody>
             <tr v-for="row in data.sw2Top" :key="row.swL2Code">
               <td>{{ row.rank }}</td>
-              <td class="is-left"
-                ><strong>{{ row.swL2Name }}</strong
-                ><small>{{ row.swL2Code }}</small></td
-              >
+              <td class="is-left">
+                <strong>{{ row.swL2Name }}</strong>
+                <small>{{ row.swL2Code }}</small>
+              </td>
               <td class="is-left">{{ row.swL1Name }}</td>
               <td :class="toneClass(row.returnPct)">{{ formatPct(row.returnPct) }}</td>
               <td class="is-right">{{ formatMoney(row.turnoverYuan) }}</td>
               <td>{{ formatPct(row.marketSharePct, false) }}</td>
-              <td class="is-right" :class="toneClass(row.netInflowYuan)">{{
-                formatMoney(row.netInflowYuan)
-              }}</td>
+              <td class="is-right" :class="toneClass(row.netInflowYuan)">
+                {{ formatMoney(row.netInflowYuan) }}
+              </td>
             </tr>
           </tbody>
         </table>
       </div>
+      <div v-else class="research-empty research-empty--compact">暂无可用的申万二级行业排行。</div>
 
       <button type="button" class="collapse-button" @click="fullExpanded = !fullExpanded">
         <span>{{ fullExpanded ? '▼' : '▶' }}</span>
@@ -65,19 +66,33 @@
             <input v-model.trim="searchText" type="search" placeholder="输入行业名称或代码" />
           </label>
           <label>
-            <span>排序</span>
+            <span>排序字段</span>
             <select v-model="sortKey">
               <option value="turnover">成交额</option>
               <option value="return">涨跌幅</option>
               <option value="share">市场占比</option>
             </select>
           </label>
+          <div class="filter-actions">
+            <button type="button" class="sort-direction-button" @click="toggleSortDirection">
+              {{ sortDirection === 'desc' ? '降序 ↓' : '升序 ↑' }}
+            </button>
+            <button v-if="hasActiveFilters" type="button" class="reset-button" @click="resetFilters">
+              重置筛选
+            </button>
+          </div>
         </div>
-        <div class="table-shell">
+
+        <div class="filter-summary" aria-live="polite">
+          <span>显示 {{ filteredAllRows.length }} / {{ data.sw2All.length }} 个行业</span>
+          <span>当前排序：{{ sortLabel }} · {{ sortDirection === 'desc' ? '降序' : '升序' }}</span>
+        </div>
+
+        <div v-if="filteredAllRows.length" class="table-shell">
           <table class="market-table">
             <thead>
               <tr>
-                <th>排名</th>
+                <th>当前序号</th>
                 <th class="is-left">申万二级</th>
                 <th class="is-left">所属一级</th>
                 <th>涨跌幅</th>
@@ -87,22 +102,27 @@
               </tr>
             </thead>
             <tbody>
-              <tr v-for="row in filteredAllRows" :key="row.swL2Code">
-                <td>{{ row.rank }}</td>
-                <td class="is-left"
-                  ><strong>{{ row.swL2Name }}</strong
-                  ><small>{{ row.swL2Code }}</small></td
-                >
+              <tr v-for="(row, index) in filteredAllRows" :key="row.swL2Code">
+                <td>{{ index + 1 }}</td>
+                <td class="is-left">
+                  <strong>{{ row.swL2Name }}</strong>
+                  <small>{{ row.swL2Code }}</small>
+                </td>
                 <td class="is-left">{{ row.swL1Name }}</td>
                 <td :class="toneClass(row.returnPct)">{{ formatPct(row.returnPct) }}</td>
                 <td class="is-right">{{ formatMoney(row.turnoverYuan) }}</td>
                 <td>{{ formatPct(row.marketSharePct, false) }}</td>
-                <td class="is-right" :class="toneClass(row.netInflowYuan)">{{
-                  formatMoney(row.netInflowYuan)
-                }}</td>
+                <td class="is-right" :class="toneClass(row.netInflowYuan)">
+                  {{ formatMoney(row.netInflowYuan) }}
+                </td>
               </tr>
             </tbody>
           </table>
+        </div>
+        <div v-else class="research-empty research-empty--filter">
+          <strong>没有匹配的申万二级行业</strong>
+          <span>请调整申万一级筛选或搜索词。</span>
+          <button type="button" class="reset-button" @click="resetFilters">清除筛选</button>
         </div>
       </div>
 
@@ -113,8 +133,20 @@
             <p>严格按个股当日成交额大于阈值统计，不含等于阈值的个股。</p>
           </div>
           <div class="threshold-actions">
-            <button type="button" @click="$emit('copy')">复制统计</button>
-            <button type="button" @click="$emit('export')">导出明细</button>
+            <button
+              type="button"
+              :disabled="!data.threshold.industries.length"
+              @click="$emit('copy')"
+            >
+              复制统计
+            </button>
+            <button
+              type="button"
+              :disabled="!data.threshold.stocks.length"
+              @click="$emit('export')"
+            >
+              导出明细
+            </button>
           </div>
         </div>
         <div class="threshold-controls">
@@ -139,24 +171,24 @@
             />
             <span>亿元</span>
           </label>
-          <button type="button" class="primary-button" @click="$emit('applyThreshold')"
-            >应用</button
-          >
+          <button type="button" class="primary-button" @click="$emit('applyThreshold')">
+            应用
+          </button>
         </div>
 
         <div class="threshold-summary">
-          <span
-            >当前口径：成交额 {{ data.threshold.operator }}
-            {{ formatMoney(data.threshold.thresholdYuan) }}</span
-          >
+          <span>
+            当前口径：成交额 {{ data.threshold.operator }}
+            {{ formatMoney(data.threshold.thresholdYuan) }}
+          </span>
           <span>共 {{ data.threshold.stocks.length }} 只</span>
           <span>覆盖 {{ data.threshold.industries.length }} 个申万二级行业</span>
-          <span v-if="data.unmatchedSecurityCodes.length"
-            >待匹配 {{ data.unmatchedSecurityCodes.length }} 只</span
-          >
+          <span v-if="data.unmatchedSecurityCodes.length">
+            待匹配 {{ data.unmatchedSecurityCodes.length }} 只
+          </span>
         </div>
 
-        <div class="table-shell">
+        <div v-if="data.threshold.industries.length" class="table-shell">
           <table class="market-table threshold-table">
             <thead>
               <tr>
@@ -169,12 +201,17 @@
               <template v-for="row in data.threshold.industries" :key="row.swL2Code">
                 <tr class="is-clickable" @click="toggleThresholdIndustry(row.swL2Code)">
                   <td class="is-left">{{ row.swL1Name }}</td>
-                  <td class="is-left"
-                    ><strong>{{ row.swL2Name }}</strong></td
-                  >
-                  <td
-                    ><button type="button" class="count-button">{{ row.stockCount }}</button></td
-                  >
+                  <td class="is-left"><strong>{{ row.swL2Name }}</strong></td>
+                  <td>
+                    <button
+                      type="button"
+                      class="count-button"
+                      :aria-expanded="expandedThresholdIndustry === row.swL2Code"
+                      @click.stop="toggleThresholdIndustry(row.swL2Code)"
+                    >
+                      {{ row.stockCount }}
+                    </button>
+                  </td>
                 </tr>
                 <tr v-if="expandedThresholdIndustry === row.swL2Code" class="detail-row">
                   <td colspan="3">
@@ -183,14 +220,14 @@
                         v-for="stock in thresholdStocks(row.swL2Code)"
                         :key="stock.securityCode"
                       >
-                        <div
-                          ><strong>{{ stock.securityName }}</strong
-                          ><span>{{ stock.securityCode }}</span></div
-                        >
+                        <div>
+                          <strong>{{ stock.securityName }}</strong>
+                          <span>{{ stock.securityCode }}</span>
+                        </div>
                         <b>{{ formatMoney(stock.turnoverYuan) }}</b>
-                        <em :class="toneClass(stock.returnPct)">{{
-                          formatPct(stock.returnPct)
-                        }}</em>
+                        <em :class="toneClass(stock.returnPct)">
+                          {{ formatPct(stock.returnPct) }}
+                        </em>
                       </article>
                     </div>
                   </td>
@@ -198,6 +235,9 @@
               </template>
             </tbody>
           </table>
+        </div>
+        <div v-else class="research-empty research-empty--compact">
+          当前阈值下没有超过条件的个股，可降低阈值后重新统计。
         </div>
       </div>
     </template>
@@ -233,6 +273,7 @@
   const l1Filter = ref('');
   const searchText = ref('');
   const sortKey = ref<'turnover' | 'return' | 'share'>('turnover');
+  const sortDirection = ref<'asc' | 'desc'>('desc');
   const expandedThresholdIndustry = ref('');
   const thresholdOptions = [
     { value: '50' as const, label: '50亿元' },
@@ -245,6 +286,13 @@
     Array.from(new Set((data.value?.sw2All || []).map((row) => row.swL1Name))).sort(),
   );
 
+  const sortLabel = computed(() => {
+    const labels = { turnover: '成交额', return: '涨跌幅', share: '市场占比' } as const;
+    return labels[sortKey.value];
+  });
+
+  const hasActiveFilters = computed(() => Boolean(l1Filter.value || searchText.value));
+
   const filteredAllRows = computed(() => {
     const query = searchText.value.toLowerCase();
     const rows = [...(data.value?.sw2All || [])].filter((row) => {
@@ -256,14 +304,31 @@
       return matchesL1 && matchesSearch;
     });
     return rows.sort((left, right) => {
-      const read = (row: ShenwanLevel2Aggregate) => {
-        if (sortKey.value === 'return') return Number(row.returnPct || 0);
-        if (sortKey.value === 'share') return Number(row.marketSharePct || 0);
-        return Number(row.turnoverYuan || 0);
-      };
-      return read(right) - read(left);
+      const leftValue = sortValue(left);
+      const rightValue = sortValue(right);
+      if (leftValue == null && rightValue == null) return left.swL2Name.localeCompare(right.swL2Name);
+      if (leftValue == null) return 1;
+      if (rightValue == null) return -1;
+      const difference = leftValue - rightValue;
+      if (difference === 0) return left.swL2Name.localeCompare(right.swL2Name);
+      return sortDirection.value === 'asc' ? difference : -difference;
     });
   });
+
+  function sortValue(row: ShenwanLevel2Aggregate) {
+    if (sortKey.value === 'return') return numeric(row.returnPct);
+    if (sortKey.value === 'share') return numeric(row.marketSharePct);
+    return numeric(row.turnoverYuan);
+  }
+
+  function toggleSortDirection() {
+    sortDirection.value = sortDirection.value === 'desc' ? 'asc' : 'desc';
+  }
+
+  function resetFilters() {
+    l1Filter.value = '';
+    searchText.value = '';
+  }
 
   function toggleThresholdIndustry(code: string) {
     expandedThresholdIndustry.value = expandedThresholdIndustry.value === code ? '' : code;
@@ -413,7 +478,9 @@
   .filter-row,
   .threshold-controls,
   .threshold-actions,
-  .threshold-summary {
+  .threshold-summary,
+  .filter-summary,
+  .filter-actions {
     display: flex;
     align-items: flex-end;
     gap: 10px;
@@ -428,6 +495,9 @@
   .filter-row__search {
     flex: 1 1 260px;
   }
+  .filter-actions {
+    align-items: center;
+  }
   select,
   input {
     min-height: 36px;
@@ -437,11 +507,8 @@
     background: var(--strategy-surface);
     color: var(--strategy-text-1);
   }
-  .threshold-panel {
-    margin-top: 20px;
-    padding-top: 18px;
-    border-top: 1px solid var(--strategy-border);
-  }
+  .sort-direction-button,
+  .reset-button,
   .threshold-actions button,
   .primary-button {
     min-height: 34px;
@@ -451,6 +518,31 @@
     background: var(--strategy-surface-2);
     color: var(--strategy-text-2);
     cursor: pointer;
+  }
+  .sort-direction-button {
+    min-height: 36px;
+    font-weight: 700;
+  }
+  .reset-button {
+    color: var(--strategy-accent-strong);
+  }
+  button:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+  .filter-summary {
+    justify-content: space-between;
+    margin-top: 10px;
+    color: var(--strategy-text-3);
+    font-size: 12px;
+  }
+  .filter-summary span {
+    padding: 4px 0;
+  }
+  .threshold-panel {
+    margin-top: 20px;
+    padding-top: 18px;
+    border-top: 1px solid var(--strategy-border);
   }
   .primary-button {
     background: var(--strategy-accent-soft);
@@ -540,6 +632,25 @@
     color: var(--strategy-text-3);
     text-align: center;
   }
+  .research-empty--compact {
+    margin-top: 12px;
+    padding: 18px;
+    border: 1px dashed var(--strategy-border);
+    border-radius: 10px;
+    background: var(--strategy-surface-2);
+  }
+  .research-empty--filter {
+    display: grid;
+    gap: 7px;
+    justify-items: center;
+    margin-top: 12px;
+    border: 1px dashed var(--strategy-border);
+    border-radius: 10px;
+    background: var(--strategy-surface-2);
+  }
+  .research-empty--filter strong {
+    color: var(--strategy-text-1);
+  }
   @media (max-width: 900px) {
     .threshold-stock-grid {
       grid-template-columns: 1fr;
@@ -549,6 +660,10 @@
     .research-card__header,
     .section-title-row {
       flex-direction: column;
+    }
+    .filter-actions,
+    .filter-actions button {
+      width: 100%;
     }
   }
 </style>
