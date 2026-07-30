@@ -19,30 +19,13 @@ from app.research_service import (
     get_macro_expectations,
     get_stock_snapshot,
 )
-from app.research_watchlist_schemas import (
-    ReplaceResearchWatchlistRequest,
-    ResearchWatchlistResponse,
-)
-from app.research_watchlist_service import (
-    ResearchWatchlistServiceError,
-    get_user_a_share_watchlist,
-    replace_user_a_share_watchlist,
-)
 
 settings = get_settings()
 router = APIRouter(prefix=f"{settings.api_prefix}/research", tags=["research"])
 ResearchPrincipal = Annotated[Principal, Depends(require_permission("platform:read"))]
-WatchlistReadPrincipal = Annotated[
-    Principal,
-    Depends(require_permission("profile.read_self")),
-]
-WatchlistWritePrincipal = Annotated[
-    Principal,
-    Depends(require_permission("profile.update_self")),
-]
 
 
-def _raise_service_error(exc: ResearchServiceError | ResearchWatchlistServiceError) -> NoReturn:
+def _raise_service_error(exc: ResearchServiceError) -> NoReturn:
     raise HTTPException(
         status_code=exc.status_code,
         detail={"code": exc.code, "message": exc.detail},
@@ -51,10 +34,6 @@ def _raise_service_error(exc: ResearchServiceError | ResearchWatchlistServiceErr
 
 def _cache_header(response: Response, seconds: int) -> None:
     response.headers["Cache-Control"] = f"private, max-age={seconds}, stale-if-error=3600"
-
-
-def _no_store(response: Response) -> None:
-    response.headers["Cache-Control"] = "no-store"
 
 
 @router.get("/a-share/dashboard", response_model=AShareDashboardResponse)
@@ -86,29 +65,6 @@ async def stock_snapshot(
     except ResearchServiceError as exc:
         _raise_service_error(exc)
     _cache_header(response, 300)
-    return result
-
-
-@router.get("/a-share/watchlist", response_model=ResearchWatchlistResponse)
-def a_share_watchlist(
-    response: Response,
-    principal: WatchlistReadPrincipal,
-) -> ResearchWatchlistResponse:
-    _no_store(response)
-    return get_user_a_share_watchlist(principal.user_id)
-
-
-@router.put("/a-share/watchlist", response_model=ResearchWatchlistResponse)
-def put_a_share_watchlist(
-    request_body: ReplaceResearchWatchlistRequest,
-    response: Response,
-    principal: WatchlistWritePrincipal,
-) -> ResearchWatchlistResponse:
-    try:
-        result = replace_user_a_share_watchlist(principal.user_id, request_body)
-    except ResearchWatchlistServiceError as exc:
-        _raise_service_error(exc)
-    _no_store(response)
     return result
 
 
