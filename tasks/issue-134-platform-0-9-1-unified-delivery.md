@@ -46,13 +46,15 @@ Status: done
 - Unified branch created from validated head `f4294eb9c781a2eb4c7150b9859f73176e8dde08`.
 - Issue #134 owns all further work.
 - Former documentation, feature and release-readiness branches are historical references only.
+- Superseded Draft PRs #124, #127, #129, #131 and #133 were closed without merge.
 
 ### Phase 1 — Engineering standard and governance
 
-Status: active
+Status: done
 
-- Add `docs/architecture/PRODUCT_PLATFORM_ENGINEERING_STANDARD.md` to this branch.
-- Keep the standard aligned with `SYSTEM_MAP.md`, `OWNERSHIP.md` and existing repository checks.
+- Added `docs/architecture/PRODUCT_PLATFORM_ENGINEERING_STANDARD.md` to this branch.
+- Set the standard to `active` for the Platform 0.9.1 baseline.
+- Kept the standard aligned with `SYSTEM_MAP.md`, `OWNERSHIP.md` and existing repository checks.
 
 ### Phase 2 — Product and account-data implementation
 
@@ -65,15 +67,17 @@ Status: done
 
 ### Phase 3 — Automated acceptance
 
-Status: done on base head; must be rerun after consolidation commits
+Status: done
 
-Required workflows:
+Validated consolidated head `ef76a8fc78a17b0ae2d3e929b3890b8a5ed55dcf`:
 
-- Platform CI;
-- User System Browser E2E;
-- Hedge Board Browser E2E;
-- Secret Scan;
-- Version Consistency.
+- Platform CI `30517462609`: passed;
+- User System Browser E2E `30517462623`: passed;
+- Hedge Board Browser E2E `30517462650`: passed;
+- Secret Scan `30517462651`: passed;
+- Version Consistency `30517462662`: passed.
+
+The documentation-only progress update that records these results must also pass the same repository workflow surface before the branch is treated as the current validated head.
 
 ### Phase 4 — Real-environment acceptance
 
@@ -86,7 +90,7 @@ Status: pending external environment
 
 ### Phase 5 — Platform 0.9.1 Release Candidate
 
-Status: pending Phase 3 rerun and Phase 4 owner acceptance
+Status: pending Phase 4 owner acceptance
 
 - freeze one candidate commit;
 - update release notes and acceptance evidence;
@@ -118,7 +122,7 @@ A Draft pull request targeting `main` must run all repository workflows and rema
 
 ## Progress
 
-- Done: Issue #134; unified branch; validated product/research/account-watchlist base; Phase 0 branch consolidation.
-- Current: Phase 1 standard integration and consolidated Draft PR creation.
-- Next: rerun Phase 3 workflows on the consolidated head; then record Phase 4 as owner-side acceptance evidence.
+- Done: Phases 0–3; one unified branch; one open Draft PR; superseded PRs closed without merge; full automated workflow surface passed on the consolidated implementation-and-standard head.
+- Current: maintain the unified branch as the only active Platform 0.9.1 delivery line and wait for Phase 4 real-environment evidence.
+- Next: record trading-hours, non-trading-hours, source-link and responsive visual acceptance; then freeze the Platform 0.9.1 release candidate.
 - Blocked by: Phase 4 requires access to the actual running environment and live external providers.
