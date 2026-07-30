@@ -64,11 +64,14 @@
       <ShortTermEmotionSection :module="dashboard?.emotion" />
       <AShareWatchlistSection
         :groups="watchlistGroups"
+        :sync-state="watchlistSyncState"
+        :sync-message="watchlistSyncMessage"
         @add="addToWatchlist"
         @remove="removeFromWatchlist"
         @move="moveWatchlistItem"
         @set-group="setWatchlistGroup"
         @query="queryStockAndJump"
+        @retry-sync="saveAccountWatchlist"
       />
       <StockSnapshotSection
         v-model:code="stockCode"
@@ -136,12 +139,15 @@
     stockLoading,
     stockError,
     watchlistGroups,
+    watchlistSyncState,
+    watchlistSyncMessage,
     loadDashboard,
     queryStock,
     addToWatchlist,
     removeFromWatchlist,
     moveWatchlistItem,
     setWatchlistGroup,
+    saveAccountWatchlist,
     applyThresholdMode,
     exportThresholdCsv,
     copyThresholdSummary,
