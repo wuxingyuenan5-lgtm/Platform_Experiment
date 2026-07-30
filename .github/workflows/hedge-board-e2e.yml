@@ -20,6 +20,8 @@ on:
       - 'admin-risk/src/router/routes/modules/hedge.ts'
       - 'admin-risk/src/store/modules/user.ts'
       - 'admin-risk/src/views/hedgeBoard/**'
+      - 'docs/operations/HEDGE_BOARD_ACCEPTANCE.md'
+      - 'tasks/issue-134-platform-0-9-1-unified-delivery.md'
       - 'platform-backend/app/auth.py'
       - 'platform-backend/app/config.py'
       - 'platform-backend/app/main.py'
