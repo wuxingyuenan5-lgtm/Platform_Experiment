@@ -124,7 +124,11 @@ export async function mockPlatformVisualRoutes(page: Page): Promise<void> {
     },
   ];
 
-  await page.route(/\/api\/v1\/accounts(?:\?.*)?$/, (route) => fulfill(route, accounts));
+  await page.route(/\/api\/v1\/accounts(?:\?.*)?$/, (route) => {
+    const url = new URL(route.request().url());
+    if (url.port === '8000') return route.continue();
+    return fulfill(route, accounts);
+  });
   await page.route(/\/api\/v1\/data\/total(?:\?.*)?$/, (route) =>
     fulfill(route, { total_asset: 1_675_400, updated_at: FIXED_TIME }),
   );
