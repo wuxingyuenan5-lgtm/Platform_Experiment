@@ -3,6 +3,12 @@ import { expect, test, type Browser, type Page } from '@playwright/test';
 import { mockResearchRoutes } from './researchFixtures';
 
 const FRONTEND_ORIGIN = 'http://127.0.0.1:4373';
+const RESPONSIVE_VIEWPORTS = [
+  { name: 'desktop-1440', width: 1440, height: 900 },
+  { name: 'laptop-1024', width: 1024, height: 768 },
+  { name: 'tablet-768', width: 768, height: 1024 },
+  { name: 'mobile-390', width: 390, height: 844 },
+] as const;
 
 function requiredEnvironment(name: string): string {
   const value = process.env[name]?.trim();
@@ -28,8 +34,17 @@ async function loginWithUi(page: Page, username: string, password: string): Prom
   await expect(page).not.toHaveURL(/\/login(?:\?|$)/, { timeout: 20_000 });
 }
 
-async function openAuthenticatedPage(browser: Browser, username: string, password: string) {
-  const context = await browser.newContext({ locale: 'zh-CN', timezoneId: 'Asia/Shanghai' });
+async function openAuthenticatedPage(
+  browser: Browser,
+  username: string,
+  password: string,
+  viewport?: { width: number; height: number },
+) {
+  const context = await browser.newContext({
+    locale: 'zh-CN',
+    timezoneId: 'Asia/Shanghai',
+    viewport,
+  });
   const page = await context.newPage();
   await mockResearchRoutes(page);
   await loginWithUi(page, username, password);
@@ -49,6 +64,16 @@ async function removeExistingTestStock(page: Page) {
   await expect(section.getByRole('button', { name: '浦发银行 600000', exact: true })).toHaveCount(0);
 }
 
+async function expectAShareSections(page: Page): Promise<void> {
+  await expect(page.getByRole('heading', { name: '大盘表现' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '大盘广度' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '市场明细' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '申万板块' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '短线情绪' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '自选股' })).toBeVisible();
+  await expect(page.getByText('账号已同步', { exact: true })).toBeVisible();
+}
+
 test('covers A-share research workflow and account-level watchlist persistence', async ({ browser }) => {
   const username = requiredEnvironment('E2E_CEO_USERNAME');
   const password = requiredEnvironment('E2E_CEO_PASSWORD');
@@ -56,13 +81,7 @@ test('covers A-share research workflow and account-level watchlist persistence',
   const first = await openAuthenticatedPage(browser, username, password);
   await first.page.goto(absoluteUrl('/hedge-board/a-share'));
 
-  await expect(first.page.getByRole('heading', { name: '大盘表现' })).toBeVisible();
-  await expect(first.page.getByRole('heading', { name: '大盘广度' })).toBeVisible();
-  await expect(first.page.getByRole('heading', { name: '市场明细' })).toBeVisible();
-  await expect(first.page.getByRole('heading', { name: '申万板块' })).toBeVisible();
-  await expect(first.page.getByRole('heading', { name: '短线情绪' })).toBeVisible();
-  await expect(first.page.getByRole('heading', { name: '自选股' })).toBeVisible();
-  await expect(first.page.getByText('账号已同步', { exact: true })).toBeVisible();
+  await expectAShareSections(first.page);
 
   await first.page.getByRole('button', { name: /全部申万二级行业/ }).click();
   await first.page.getByLabel('搜索二级行业').fill('半导体');
@@ -112,4 +131,34 @@ test('covers A-share research workflow and account-level watchlist persistence',
   await expect(restoredWatchlist.getByText('浦发银行', { exact: true })).toBeVisible();
   await expect(restoredWatchlist.locator('input[value="银行观察"]')).toBeVisible();
   await second.context.close();
+});
+
+test('captures responsive A-share evidence without page-level horizontal overflow', async (
+  { browser },
+  testInfo,
+) => {
+  const username = requiredEnvironment('E2E_CEO_USERNAME');
+  const password = requiredEnvironment('E2E_CEO_PASSWORD');
+
+  for (const viewport of RESPONSIVE_VIEWPORTS) {
+    const session = await openAuthenticatedPage(browser, username, password, viewport);
+    await session.page.goto(absoluteUrl('/hedge-board/a-share'));
+    await expectAShareSections(session.page);
+
+    const dimensions = await session.page.evaluate(() => ({
+      clientWidth: document.documentElement.clientWidth,
+      scrollWidth: document.documentElement.scrollWidth,
+    }));
+    expect(
+      dimensions.scrollWidth,
+      `${viewport.name} produced page-level horizontal overflow`,
+    ).toBeLessThanOrEqual(dimensions.clientWidth + 1);
+
+    await session.page.screenshot({
+      path: testInfo.outputPath(`a-share-${viewport.name}.png`),
+      fullPage: true,
+      animations: 'disabled',
+    });
+    await session.context.close();
+  }
 });
