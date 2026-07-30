@@ -2,6 +2,13 @@ import type { AppRouteModule } from '@/router/types';
 import { LAYOUT, getParentLayout } from '@/router/constant';
 import { RoleEnum } from '@/enums/roleEnum';
 
+const HEDGE_RESEARCH_ROLES = [
+  RoleEnum.CEO,
+  RoleEnum.TECH_LEAD,
+  RoleEnum.EMPLOYEE,
+  RoleEnum.ADMIN,
+];
+
 const hedge: AppRouteModule = {
   path: '/hedge-board',
   name: 'HedgeBoard',
@@ -11,7 +18,7 @@ const hedge: AppRouteModule = {
     title: '\u5bf9\u51b2\u57fa\u91d1\u770b\u677f',
     icon: 'ant-design:fund-projection-screen-outlined',
     orderNo: 30,
-    roles: [RoleEnum.ADMIN, RoleEnum.EMPLOYEE],
+    roles: HEDGE_RESEARCH_ROLES,
   },
   children: [
     {
@@ -21,7 +28,7 @@ const hedge: AppRouteModule = {
       meta: {
         title: '\u5b8f\u89c2',
         icon: 'ant-design:global-outlined',
-        roles: [RoleEnum.ADMIN, RoleEnum.EMPLOYEE],
+        roles: HEDGE_RESEARCH_ROLES,
         hedgeCategory: 'macro',
       },
     },
@@ -32,7 +39,7 @@ const hedge: AppRouteModule = {
       meta: {
         title: '\u5546\u54c1',
         icon: 'ant-design:gold-outlined',
-        roles: [RoleEnum.ADMIN, RoleEnum.EMPLOYEE],
+        roles: HEDGE_RESEARCH_ROLES,
         hedgeCategory: 'gold',
       },
     },
@@ -43,7 +50,7 @@ const hedge: AppRouteModule = {
       meta: {
         title: '\u52a0\u5bc6',
         icon: 'ant-design:cloud-outlined',
-        roles: [RoleEnum.ADMIN, RoleEnum.EMPLOYEE],
+        roles: HEDGE_RESEARCH_ROLES,
         hedgeCategory: 'crypto',
       },
     },
@@ -54,7 +61,7 @@ const hedge: AppRouteModule = {
       meta: {
         title: '\u7f8e\u80a1',
         icon: 'ant-design:stock-outlined',
-        roles: [RoleEnum.ADMIN, RoleEnum.EMPLOYEE],
+        roles: HEDGE_RESEARCH_ROLES,
         hedgeCategory: 'us',
       },
     },
@@ -65,7 +72,7 @@ const hedge: AppRouteModule = {
       meta: {
         title: 'A\u80a1',
         icon: 'ant-design:bar-chart-outlined',
-        roles: [RoleEnum.ADMIN, RoleEnum.EMPLOYEE],
+        roles: HEDGE_RESEARCH_ROLES,
         hedgeCategory: 'aShare',
       },
     },
@@ -76,7 +83,7 @@ const hedge: AppRouteModule = {
       meta: {
         title: '\u5168\u7403',
         icon: 'ant-design:global-outlined',
-        roles: [RoleEnum.ADMIN, RoleEnum.EMPLOYEE],
+        roles: HEDGE_RESEARCH_ROLES,
         hedgeCategory: 'global',
       },
     },
@@ -88,7 +95,7 @@ const hedge: AppRouteModule = {
       meta: {
         title: '\u4ea4\u6613\u5de5\u5177',
         icon: 'ant-design:link-outlined',
-        roles: [RoleEnum.ADMIN, RoleEnum.EMPLOYEE],
+        roles: HEDGE_RESEARCH_ROLES,
       },
       children: [
         {
@@ -97,7 +104,7 @@ const hedge: AppRouteModule = {
           component: () => import('@/views/hedgeBoard/tradingTools/index.vue'),
           meta: {
             title: '\u5b8f\u89c2\u5de5\u5177',
-            roles: [RoleEnum.ADMIN, RoleEnum.EMPLOYEE],
+            roles: HEDGE_RESEARCH_ROLES,
             toolCategory: 'macro',
           },
         },
@@ -107,7 +114,7 @@ const hedge: AppRouteModule = {
           component: () => import('@/views/hedgeBoard/tradingTools/index.vue'),
           meta: {
             title: '\u80a1\u5e02\u5de5\u5177',
-            roles: [RoleEnum.ADMIN, RoleEnum.EMPLOYEE],
+            roles: HEDGE_RESEARCH_ROLES,
             toolCategory: 'equity',
           },
         },
@@ -117,7 +124,7 @@ const hedge: AppRouteModule = {
           component: () => import('@/views/hedgeBoard/tradingTools/index.vue'),
           meta: {
             title: '\u52a0\u5bc6\u5de5\u5177',
-            roles: [RoleEnum.ADMIN, RoleEnum.EMPLOYEE],
+            roles: HEDGE_RESEARCH_ROLES,
             toolCategory: 'crypto',
           },
         },
@@ -127,7 +134,7 @@ const hedge: AppRouteModule = {
           component: () => import('@/views/hedgeBoard/tradingTools/index.vue'),
           meta: {
             title: '\u91d1\u5c5e\u5de5\u5177',
-            roles: [RoleEnum.ADMIN, RoleEnum.EMPLOYEE],
+            roles: HEDGE_RESEARCH_ROLES,
             toolCategory: 'metal',
           },
         },
@@ -137,7 +144,7 @@ const hedge: AppRouteModule = {
           component: () => import('@/views/hedgeBoard/tradingTools/index.vue'),
           meta: {
             title: '\u91cf\u5316\u5de5\u5177',
-            roles: [RoleEnum.ADMIN, RoleEnum.EMPLOYEE],
+            roles: HEDGE_RESEARCH_ROLES,
             toolCategory: 'quant',
           },
         },
@@ -147,7 +154,7 @@ const hedge: AppRouteModule = {
           component: () => import('@/views/hedgeBoard/tradingTools/index.vue'),
           meta: {
             title: '\u7efc\u5408\u5de5\u5177',
-            roles: [RoleEnum.ADMIN, RoleEnum.EMPLOYEE],
+            roles: HEDGE_RESEARCH_ROLES,
             toolCategory: 'general',
           },
         },
