@@ -1,9 +1,6 @@
 import axios, { AxiosError, type AxiosInstance, type AxiosRequestConfig } from 'axios';
 
-import {
-  clearUserSystemSessionMemory,
-  UserSystemApiError,
-} from '@/api/platform/userSystem';
+import { clearUserSystemSessionMemory, UserSystemApiError } from '@/api/platform/userSystem';
 
 export type ResearchDataStatus = 'loading' | 'ready' | 'partial' | 'no_data' | 'stale' | 'error';
 
