@@ -208,7 +208,7 @@ def main() -> int:
         "executionAuthoritative": False,
         "humanReviewRequired": True,
     }
-    print(json.dumps(summary, ensure_ascii=False, indent=2))
+    print(json.dumps(json_value(summary), ensure_ascii=False, indent=2))
     return 1 if arguments.strict and passed != len(results) else 0
 
 
