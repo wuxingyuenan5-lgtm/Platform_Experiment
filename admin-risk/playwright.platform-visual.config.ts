@@ -10,6 +10,8 @@ const e2eRoot = path.join(repositoryRoot, '.e2e', 'platform-visual');
 const frontendOrigin = 'http://127.0.0.1:4373';
 const backendOrigin = 'http://127.0.0.1:8000';
 const runtimeOrigin = 'http://127.0.0.1:8100';
+const backendPython = process.env.PLATFORM_VISUAL_BACKEND_PYTHON || 'python';
+const runtimePython = process.env.PLATFORM_VISUAL_RUNTIME_PYTHON || 'python';
 const inheritedEnvironment = Object.fromEntries(
   Object.entries(process.env).filter((entry): entry is [string, string] => typeof entry[1] === 'string'),
 );
@@ -45,7 +47,7 @@ export default defineConfig({
   },
   webServer: [
     {
-      command: 'python -m uvicorn app.main:app --host 127.0.0.1 --port 8100',
+      command: `${runtimePython} -m uvicorn app.main:app --host 127.0.0.1 --port 8100`,
       cwd: runtimeRoot,
       url: `${runtimeOrigin}/health`,
       timeout: 120_000,
@@ -62,7 +64,8 @@ export default defineConfig({
     },
     {
       command:
-        'python scripts/seed_platform_visual_e2e.py && python -m uvicorn app.main:app --host 127.0.0.1 --port 8000',
+        `${backendPython} scripts/seed_platform_visual_e2e.py && ` +
+        `${backendPython} -m uvicorn app.main:app --host 127.0.0.1 --port 8000`,
       cwd: backendRoot,
       url: `${backendOrigin}/health`,
       timeout: 120_000,
