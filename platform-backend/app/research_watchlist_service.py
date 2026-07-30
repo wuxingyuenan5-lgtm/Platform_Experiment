@@ -4,6 +4,8 @@ import json
 import re
 from datetime import UTC, datetime
 
+from pydantic import ValidationError
+
 from app.database import connection
 from app.research_watchlist_repository import (
     ResearchWatchlistConcurrentUpdateError,
@@ -84,7 +86,7 @@ def _response_from_record(record: ResearchWatchlistRecord | None) -> ResearchWat
         )
     try:
         items = [ResearchWatchlistItem.model_validate(item) for item in payload]
-    except Exception as exc:
+    except ValidationError as exc:
         raise ResearchWatchlistServiceError(
             503,
             "watchlist_payload_invalid",
