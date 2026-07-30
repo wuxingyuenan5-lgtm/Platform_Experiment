@@ -658,7 +658,7 @@ git diff --exit-code
 git diff --cached --exit-code
 ```
 
-允许存在的仅限未跟踪本地目录，例如：
+由于安装和测试会产生未跟踪目录，`git status --porcelain=v1`可以出现以下本地项：
 
 ```text
 .venv-acceptance/
@@ -667,17 +667,17 @@ dist/
 .e2e/
 ```
 
-任何受 Git 跟踪文件发生变化，均不得给出“通过”结论。
+判定重点是：不得出现受Git跟踪文件的修改、删除或暂存。验收报告应同时保存`git diff --exit-code`和`git diff --cached --exit-code`结果。
 
 保存证据后清理 worktree：
 
 ```bash
 cd "$SOURCE_REPO"
-git worktree remove "$ACCEPT_ROOT"
+git worktree remove --force "$ACCEPT_ROOT"
 git worktree prune
 ```
 
-不得使用`git clean -fd`清理。
+这里的`--force`只用于移除包含未跟踪依赖和测试产物的独立验收worktree；不得使用`git clean -fd`，也不得对现有开发目录执行强制清理。
 
 ## 13. 最终交接要求
 
