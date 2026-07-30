@@ -4,7 +4,8 @@ Issue: #128
 Status: active
 Branch: `feature/issue-128-hedge-board-ux-polish`
 Base commit: `af8ad664f30fce9a711d0d275eb00729093ac759`
-Validated HEAD: `5d125f7ab55a9e71af7a1599dc076dc734ff9eef`
+Validated code HEAD: `5d125f7ab55a9e71af7a1599dc076dc734ff9eef`
+Validation-record commit: `33d44c92b8f010558fc45a5cf08aed5957ec9da8`
 
 ## Objective
 
@@ -68,10 +69,12 @@ The Draft pull request targeting `main` must run Platform CI, User System Browse
 
 ## Validated runs
 
-- Platform CI `30502015128`: passed.
-- User System Browser E2E `30502015115`: passed.
-- Secret Scan `30502015108`: passed.
-- Version Consistency `30502015165`: passed.
+Validation-record commit `33d44c92b8f010558fc45a5cf08aed5957ec9da8` passed:
+
+- Platform CI `30502271544`.
+- User System Browser E2E `30502271540`.
+- Secret Scan `30502271576`.
+- Version Consistency `30502271558`.
 
 ## Progress
 
