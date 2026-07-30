@@ -50,7 +50,7 @@ npx pnpm@9.15.9 build
 
 ```powershell
 cd admin-risk
-$env:E2E_CEO_USERNAME="e2e_ceo"
+$env:E2E_CEO_USERNAME="e2e_employee_1"
 $env:E2E_CEO_PASSWORD="使用本地临时强密码"
 npx pnpm@9.15.9 test:e2e:hedge-board
 ```
