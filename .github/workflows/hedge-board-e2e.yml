@@ -5,6 +5,7 @@ on:
   pull_request:
     branches:
       - main
+      - feature/issue-134-platform-0-9-1-unified-delivery
     paths:
       - '.github/workflows/hedge-board-e2e.yml'
       - 'admin-risk/.env.development'
