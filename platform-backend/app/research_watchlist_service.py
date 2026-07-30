@@ -10,7 +10,11 @@ from app.database import connection
 from app.research_watchlist_repository import (
     ResearchWatchlistConcurrentUpdateError,
     ResearchWatchlistRecord,
+)
+from app.research_watchlist_repository import (
     get_research_watchlist as get_research_watchlist_record,
+)
+from app.research_watchlist_repository import (
     replace_research_watchlist as replace_research_watchlist_record,
 )
 from app.research_watchlist_schemas import (
