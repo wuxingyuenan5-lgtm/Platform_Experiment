@@ -269,7 +269,7 @@ test('covers A-share research workflow and account-level watchlist persistence',
   );
   await first.page.getByRole('button', { name: '应用' }).click();
   expect((await thresholdResponse).ok()).toBeTruthy();
-  await expect(first.page.getByText('共 1 只')).toBeVisible();
+  await expect(first.page.getByText('共 1 只', { exact: true })).toBeVisible();
 
   const watchlistSection = first.page.locator('#a-share-watchlist');
   await watchlistSection.getByRole('button', { name: '添加自选' }).click();
