@@ -36,6 +36,19 @@ async function openAuthenticatedPage(browser: Browser, username: string, passwor
   return { context, page };
 }
 
+async function removeExistingTestStock(page: Page) {
+  const section = page.locator('#a-share-watchlist');
+  const removeButton = section.getByRole('button', { name: '删除浦发银行', exact: true });
+  if ((await removeButton.count()) === 0) return;
+  const response = page.waitForResponse(
+    (item) =>
+      item.url().endsWith('/api/v1/me/research-watchlist') && item.request().method() === 'PUT',
+  );
+  await removeButton.click();
+  expect((await response).ok()).toBeTruthy();
+  await expect(section.getByRole('button', { name: '浦发银行 600000', exact: true })).toHaveCount(0);
+}
+
 test('covers A-share research workflow and account-level watchlist persistence', async ({ browser }) => {
   const username = requiredEnvironment('E2E_CEO_USERNAME');
   const password = requiredEnvironment('E2E_CEO_PASSWORD');
@@ -67,6 +80,7 @@ test('covers A-share research workflow and account-level watchlist persistence',
   expect((await thresholdResponse).ok()).toBeTruthy();
   await expect(first.page.getByText('共 1 只', { exact: true })).toBeVisible();
 
+  await removeExistingTestStock(first.page);
   const watchlistSection = first.page.locator('#a-share-watchlist');
   await watchlistSection.getByRole('button', { name: '添加自选' }).click();
   await watchlistSection.getByLabel('股票代码', { exact: true }).fill('SH600000');
@@ -85,7 +99,7 @@ test('covers A-share research workflow and account-level watchlist persistence',
   const snapshotResponse = first.page.waitForResponse(
     (response) => response.url().includes('/api/v1/research/a-share/stocks/600000/snapshot'),
   );
-  await watchlistSection.getByRole('button', { name: /浦发银行/ }).click();
+  await watchlistSection.getByRole('button', { name: '浦发银行 600000', exact: true }).click();
   expect((await snapshotResponse).ok()).toBeTruthy();
   await expect(first.page.getByText('完整度 100%')).toBeVisible();
   await expect(first.page.getByRole('button', { name: /行情与估值/ })).toBeVisible();
@@ -96,6 +110,6 @@ test('covers A-share research workflow and account-level watchlist persistence',
   const restoredWatchlist = second.page.locator('#a-share-watchlist');
   await expect(restoredWatchlist.getByText('账号已同步', { exact: true })).toBeVisible();
   await expect(restoredWatchlist.getByText('浦发银行', { exact: true })).toBeVisible();
-  await expect(restoredWatchlist.getByText('银行观察', { exact: true })).toBeVisible();
+  await expect(restoredWatchlist.getByDisplayValue('银行观察')).toBeVisible();
   await second.context.close();
 });
