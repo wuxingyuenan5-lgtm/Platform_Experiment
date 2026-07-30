@@ -1,22 +1,54 @@
-# Current Project State
+# Current Engineering State
 
-Last updated: 2026-07-29  
-Uploaded stable branch: `main` at `a4e22021c71cf5cd703cb0bc35676ff5adbfec36`  
-Active integration branch: `feature/issue-117-platform-0-9-1`  
-Product release: `0.9.1`
+Last updated: 2026-07-31
 
-This file records current operating truth. The 0.9.1 integration branch is intentionally not merged into `main`.
+This is the sole repository document for current engineering state. Durable rules live in `AGENTS.md`; ownership lives in `docs/architecture/OWNERSHIP.md`; live HEAD, CI and review state live in GitHub Issue #136 and Draft PR #138.
 
-## Architecture
+## Version and delivery line
+
+- Stable product baseline: Platform `0.9.1`.
+- Frozen baseline branch: `feature/issue-134-platform-0-9-1-unified-delivery`.
+- Frozen baseline commit: `8114fce45e46e7920f316f49d03db12dc424acf1`.
+- Active development version: Platform `0.9.2`.
+- Active delivery branch: `refactor/issue-136-platform-0.9.2-system-optimization`.
+- Master Issue: `#136`.
+- Draft PR: `#138`, based on the frozen 0.9.1 branch.
+- Final accepted candidate: Platform `0.10.1` only after all optimization and acceptance gates pass.
+- `main` remains protected and must not be modified or merged without explicit owner approval.
+
+## Current phase
+
+Phase A evidence-based audit is complete. The authoritative plan is:
+
+`docs/architecture/PLATFORM_0_9_2_SYSTEM_OPTIMIZATION_MASTER_PLAN.md`
+
+Phase B is active:
+
+1. make the full existing CI matrix cover the non-`main` 0.9.2 Draft PR;
+2. reduce current-state documents to one authority;
+3. establish bounded domain reading packs and default exclusions;
+4. measure context cost again before structural code changes.
+
+No broad product-code refactor, directory rename, database migration or trading/accounting semantic change has been approved merely by entering Phase B.
+
+## Architecture retained by audit
+
+```text
+Platform Web
+    ↓ Browser Session / REST
+Platform API (modular monolith)
+    ↓ controlled Runtime contracts
+Execution Runtime
+    ↓ Venue / Broker / MT5 / Bybit
+```
+
+Current physical paths remain unchanged until the isolated naming phase:
 
 - `admin-risk/`: Vue product frontend.
-- `platform-backend/`: business, risk, browser user system, orchestration and accounting API.
-- `execution-runtime/`: isolated Venue/Gateway process and Runtime Journal.
-- SQLite remains approved for the current stage.
-- Major ownership: `docs/architecture/OWNERSHIP.md`.
-- Synthetic execution: `docs/technical/CROSS_SPREAD_SYNTHETIC_EXECUTION.md`.
-- User-system handoff: `docs/operations/USER_SYSTEM_LOCAL_INTEGRATION_HANDOFF.md`.
-- Operational acceptance: `docs/operations/V6-小资金实盘验收手册.md`.
+- `platform-backend/`: business, identity, portfolio, research, trading, risk, accounting and operations API.
+- `execution-runtime/`: Venue/Broker adapters, external side effects and Runtime Journal.
+
+SQLite remains approved for the current stage. Do not introduce microservices, Kubernetes, Kafka, GraphQL, CQRS, Event Sourcing, micro-frontends or a second global state system.
 
 ## Safety defaults
 
@@ -32,69 +64,44 @@ Cross-spread FOK hedge reserve=0 unless explicitly configured
 Bybit PostOnly Chase=false
 ```
 
-Code completion, version changes, browser roles and CI do not relax these values. API-Key roles and browser business roles remain separate.
+Browser business roles remain separate from API-Key roles. Browser Sessions cannot authorize Live Write. Code cleanup, version changes and CI changes do not relax these defaults.
 
-## 0.9.1 integration
+## Preserved product baseline
 
-The branch preserves all changes in the latest uploaded `main`, including hedge-fund dashboard, funding execution, cross-spread product restructuring, Runtime adapters and local startup improvements.
+The 0.9.1 baseline includes the browser user system, four business roles, user administration, member holdings/NAV, A-share and Shenwan research, hedge-fund research, funding and cross-spread workflows, Runtime adapters, formal Financial Fact/accounting boundaries, reconciliation and local three-process startup.
 
-It additionally integrates:
+Detailed authority is not repeated here:
 
-- browser registration, login, logout and password reset;
-- Argon2id passwords, opaque server-side Sessions and CSRF/Origin validation;
-- CEO, technical lead, employee and member roles;
-- user administration, target-scoped data masking and operational notes;
-- member holdings, NAV and asset views using Decimal strings;
-- eight reusable local/test accounts;
-- user, Session, holding, NAV and avatar backup/restore boundaries;
-- browser E2E and user-system access guards.
+- architecture and code ownership: `docs/architecture/OWNERSHIP.md`;
+- database and migration authority: `docs/database/README.md`;
+- synthetic execution: `docs/technical/CROSS_SPREAD_SYNTHETIC_EXECUTION.md`;
+- engineering workflow: `docs/engineering/GIT_WORKFLOW.md`;
+- task routing: `docs/codex/context-map.md`.
 
-Browser CEO authority cannot replace API-Key or LiveTradingSession authorization for real trading.
-
-## Execution baseline
-
-- Four synthetic actions remain separate from `MARKET`/`LIMIT` and trigger reason.
-- Market uses confirmed Bybit Fill before MT5 hedge submission.
-- FOK requires exact terminal full fill; zero, partial, mismatch and unknown outcomes remain distinct.
-- PostOnly Chase is bounded by price limit, TTL, mutation count, cooldown and private-event evidence.
-- PostOnly exact cumulative full fill is required before the existing MT5 path is released.
-- Manual close, TP and SL reuse one Close Action with persisted Market/FOK/PostOnly selection.
-- Bybit Close remains reduce-only with matching Position Index.
-- MT5 Close remains bound to the intended Position Ticket.
-- Unknown external results never authorize blind retry.
-
-## Product and local-run baseline
-
-One Windows command starts Runtime, Backend and Frontend:
+## Local run
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\dev-platform.ps1
 ```
 
-The script reads pnpm from `admin-risk/package.json`, installs only when needed, starts three service windows and checks frontend `4373`, backend `8000`, and runtime `8100` readiness.
+- Frontend: `http://127.0.0.1:4373/index.html`
+- Platform API: `http://127.0.0.1:8000/health`
+- Execution Runtime: `http://127.0.0.1:8100/health`
+- Frontend package manager: `pnpm@9.15.9`
 
-## Engineering workflow
+## Known constraints and unresolved decisions
 
-- Fast: Markdown and synchronized version maintenance.
-- Standard: bounded single-module work without Critical paths; no mandatory Issue or task packet.
-- Critical: execution, Runtime, risk, auth, credentials, database/migration, contracts, CI governance, Live behavior, cross-service or cross-session work.
-- Pull requests run only affected application jobs; `main` runs the full matrix.
-- Secret Scan runs once in its dedicated workflow.
-
-See `docs/engineering/GIT_WORKFLOW.md`.
-
-## Production-only follow-up
-
-Before production cutover:
-
-- validate HTTPS same-origin proxy and Secure Cookie behavior;
-- decide whether legacy Go/MySQL contains real users requiring migration;
-- confirm initial production member-holding source;
-- execute controlled-host Backup, Restore Drill, read-only restored startup and rollback rehearsal;
-- complete real Windows/Venue/Broker acceptance under Issue #39.
-
-## Known constraints
-
-- PostOnly currently derives its hard Bybit bound from the pre-submit MT5 reference quote and does not dynamically reprice from MT5 during Chase.
+- Windows real local acceptance, full-platform four-width visual evidence, production HTTPS, real Venue/Broker behavior and final Provider evidence remain acceptance work, not assumed completion.
+- `projects/risk-control` may contain legacy Go/MySQL production dependencies. It must not be deleted or renamed until server, user-data and migration evidence is resolved.
+- Repository name `Platform_Experiment` and final product brand require owner approval; do not rename them automatically.
+- PostOnly currently uses the pre-submit MT5 reference quote as its hard Bybit bound and does not dynamically reprice from MT5 during Chase.
 - One successful Open maps to one MT5 Position Ticket; ambiguity fails closed.
-- Real liquidity, Broker behavior, HTTPS proxy behavior and production data paths require operational evidence.
+
+## Next gate
+
+Before low-risk domain modularization begins:
+
+- all existing CI, browser E2E, Secret Scan, Version Consistency and Provider Smoke workflows must cover Draft PR #138;
+- the current-state/context checks must reject duplicate or stale authorities;
+- the 0.9.2 version declarations must be synchronized;
+- core page visual baselines must be frozen without changing the UI.
