@@ -88,11 +88,14 @@ Completed:
 - provider result: 5 of 8 checks passed and 3 external dependencies failed;
 - Tencent/Eastmoney 600519 cross-source quote check passed with absolute difference `0.03`;
 - external failures recorded without TLS bypass or false healthy status;
-- responsive browser preflight added for 1440, 1024, 768 and 390 widths;
-- responsive screenshots are uploaded through the existing Hedge Board Browser E2E artifact.
+- responsive browser preflight covers 1440, 1024, 768 and 390 widths;
+- each viewport captures overview, Shenwan and watchlist evidence;
+- the preflight closes responsive navigation overlays, waits for transient errors to clear and rejects page-level horizontal overflow;
+- responsive screenshots are uploaded through the Hedge Board Browser E2E artifact.
 
 Pending:
 
+- final workflow validation of the current responsive-evidence head;
 - one non-trading-hours provider validation;
 - owner review of 1440/1024/768/390 screenshots and actual running page;
 - Shenwan mapping spot checks;
@@ -134,7 +137,7 @@ A Draft pull request targeting `main` must run all repository workflows and rema
 
 ## Progress
 
-- Done: Phases 0–3; unified branch and Draft PR; full deterministic workflow surface; one trading-hours live-provider sample; responsive screenshot preflight implementation.
-- Current: validate the responsive preflight commit and complete the scheduled non-trading-hours sample.
+- Done: Phases 0–3; unified branch and Draft PR; full deterministic workflow surface; one trading-hours live-provider sample; responsive evidence implementation and initial successful screenshot artifact.
+- Current: validate the clean-state responsive screenshot head and complete the scheduled non-trading-hours sample.
 - Next: record non-trading evidence, review source links and responsive screenshots, then freeze the Platform 0.9.1 release candidate.
 - Blocked by: final visual and link acceptance require the actual running environment and owner review.
