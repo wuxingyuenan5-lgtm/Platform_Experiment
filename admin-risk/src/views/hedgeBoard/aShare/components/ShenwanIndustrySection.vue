@@ -77,7 +77,12 @@
             <button type="button" class="sort-direction-button" @click="toggleSortDirection">
               {{ sortDirection === 'desc' ? '降序 ↓' : '升序 ↑' }}
             </button>
-            <button v-if="hasActiveFilters" type="button" class="reset-button" @click="resetFilters">
+            <button
+              v-if="hasActiveFilters"
+              type="button"
+              class="reset-button"
+              @click="resetFilters"
+            >
               重置筛选
             </button>
           </div>
@@ -201,7 +206,9 @@
               <template v-for="row in data.threshold.industries" :key="row.swL2Code">
                 <tr class="is-clickable" @click="toggleThresholdIndustry(row.swL2Code)">
                   <td class="is-left">{{ row.swL1Name }}</td>
-                  <td class="is-left"><strong>{{ row.swL2Name }}</strong></td>
+                  <td class="is-left"
+                    ><strong>{{ row.swL2Name }}</strong></td
+                  >
                   <td>
                     <button
                       type="button"
@@ -306,7 +313,8 @@
     return rows.sort((left, right) => {
       const leftValue = sortValue(left);
       const rightValue = sortValue(right);
-      if (leftValue == null && rightValue == null) return left.swL2Name.localeCompare(right.swL2Name);
+      if (leftValue == null && rightValue == null)
+        return left.swL2Name.localeCompare(right.swL2Name);
       if (leftValue == null) return 1;
       if (rightValue == null) return -1;
       const difference = leftValue - rightValue;
