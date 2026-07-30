@@ -5,6 +5,12 @@
 > 分支：`feature/issue-134-platform-0-9-1-unified-delivery`  
 > 状态：自动化验收、交易时段与非交易时段真实Provider样本已完成；实际环境状态展示、真实链接和人工视觉验收仍需形成证据。
 
+本地完整执行步骤、独立worktree、安全边界、日志目录和验收报告模板见：
+
+```text
+docs/operations/PLATFORM_0_9_1_LOCAL_ACCEPTANCE_HANDOFF.md
+```
+
 ## 1. 验收边界
 
 本手册覆盖：
