@@ -5,9 +5,20 @@
         <p class="research-card__eyebrow">WATCHLIST</p>
         <h2>自选股</h2>
       </div>
-      <button type="button" class="toolbar-button" @click="addExpanded = !addExpanded">
-        {{ addExpanded ? '收起添加' : '添加自选' }}
-      </button>
+      <div class="header-actions">
+        <span
+          class="sync-state"
+          :class="`is-${syncState}`"
+          :title="lastSyncedAt ? `最近同步：${lastSyncedAt}` : syncLabel"
+          role="status"
+          aria-live="polite"
+        >
+          {{ syncLabel }}
+        </span>
+        <button type="button" class="toolbar-button" @click="addExpanded = !addExpanded">
+          {{ addExpanded ? '收起添加' : '添加自选' }}
+        </button>
+      </div>
     </header>
 
     <form v-if="addExpanded" class="add-form" @submit.prevent="submitAdd">
@@ -84,7 +95,7 @@
       </article>
     </div>
     <div v-else class="research-empty">
-      <p>暂无自选股，空列表会被正常保留。</p>
+      <p>暂无自选股，空列表会被正常保留并同步到账号。</p>
       <button type="button" class="toolbar-button" @click="addExpanded = true"
         >添加第一只自选股</button
       >
@@ -94,10 +105,14 @@
 
 <script setup lang="ts">
   import { computed, reactive, ref } from 'vue';
-  import type { WatchlistItem } from '../useAShareResearch';
+  import type { WatchlistItem, WatchlistSyncState } from '../useAShareResearch';
   import { normalizeStockCode } from '../useAShareResearch';
 
-  const props = defineProps<{ groups: Array<{ name: string; items: WatchlistItem[] }> }>();
+  const props = defineProps<{
+    groups: Array<{ name: string; items: WatchlistItem[] }>;
+    syncState: WatchlistSyncState;
+    lastSyncedAt?: string;
+  }>();
   const emit = defineEmits<{
     (event: 'add', code: string, name: string, group: string): void;
     (event: 'remove', code: string): void;
@@ -113,6 +128,12 @@
   const existingCodes = computed(
     () => new Set(props.groups.flatMap((group) => group.items.map((item) => item.code))),
   );
+  const syncLabel = computed(() => {
+    if (props.syncState === 'syncing') return '账号同步中';
+    if (props.syncState === 'synced') return '账号已同步';
+    if (props.syncState === 'offline') return '本地缓存·待同步';
+    return '本地缓存';
+  });
 
   function submitAdd() {
     const normalized = normalizeStockCode(form.code);
@@ -170,6 +191,33 @@
   }
   button {
     cursor: pointer;
+  }
+  .header-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+  .sync-state {
+    padding: 5px 9px;
+    border-radius: 999px;
+    background: var(--strategy-surface-2);
+    color: var(--strategy-text-3);
+    font-size: 12px;
+    white-space: nowrap;
+  }
+  .sync-state.is-synced {
+    background: rgba(16, 185, 129, 0.08);
+    color: #047857;
+  }
+  .sync-state.is-syncing {
+    background: var(--strategy-accent-soft);
+    color: var(--strategy-accent-strong);
+  }
+  .sync-state.is-offline {
+    background: rgba(245, 158, 11, 0.1);
+    color: #b45309;
   }
   .toolbar-button,
   .primary-button,
@@ -313,6 +361,9 @@
   @media (max-width: 560px) {
     .research-card__header {
       flex-direction: column;
+    }
+    .header-actions {
+      justify-content: flex-start;
     }
     .add-form {
       grid-template-columns: 1fr;
