@@ -8,6 +8,9 @@ on:
       - '.github/workflows/platform-0-9-2-audit.yml'
       - 'scripts/audit-platform-baseline.py'
       - 'scripts/run-platform-baseline-audit.py'
+      - 'scripts/context-for.py'
+      - 'scripts/check-codex-context.py'
+      - 'docs/codex/context-map.md'
       - 'tasks/issue-136-platform-0-9-2-system-optimization.md'
   pull_request:
     branches:
@@ -16,6 +19,9 @@ on:
       - '.github/workflows/platform-0-9-2-audit.yml'
       - 'scripts/audit-platform-baseline.py'
       - 'scripts/run-platform-baseline-audit.py'
+      - 'scripts/context-for.py'
+      - 'scripts/check-codex-context.py'
+      - 'docs/codex/context-map.md'
       - 'tasks/issue-136-platform-0-9-2-system-optimization.md'
   workflow_dispatch:
 
@@ -43,10 +49,12 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Validate collector syntax
+      - name: Validate audit and context tools
         run: |
           python -m py_compile scripts/audit-platform-baseline.py
           python -m py_compile scripts/run-platform-baseline-audit.py
+          python -m py_compile scripts/context-for.py
+          python scripts/check-codex-context.py
 
       - name: Collect repository baseline
         env:
@@ -55,6 +63,40 @@ jobs:
         run: |
           python scripts/run-platform-baseline-audit.py
           cat "${PLATFORM_AUDIT_OUTPUT}/platform-0.9.2-baseline-audit.md" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Collect bounded context-pack costs
+        env:
+          PLATFORM_AUDIT_OUTPUT: ${{ runner.temp }}/platform-0-9-2-audit
+        shell: bash
+        run: |
+          mkdir -p "${PLATFORM_AUDIT_OUTPUT}/context-packs"
+          python scripts/context-for.py --list > "${PLATFORM_AUDIT_OUTPUT}/context-packs/index.txt"
+          for pack in hedge-style research-field identity-permission member-contract trading-display research-provider user-e2e; do
+            python scripts/context-for.py "$pack" --json > "${PLATFORM_AUDIT_OUTPUT}/context-packs/${pack}.json"
+          done
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          root = Path(os.environ["PLATFORM_AUDIT_OUTPUT"]) / "context-packs"
+          lines = [
+              "# Phase B bounded context costs",
+              "",
+              "| Task pack | Files | Lines | Est. tokens |",
+              "|---|---:|---:|---:|",
+          ]
+          for path in sorted(root.glob("*.json")):
+              data = json.loads(path.read_text(encoding="utf-8"))
+              lines.append(
+                  f"| `{data['task']}` | {data['file_count']} | "
+                  f"{data['line_count']} | {data['estimated_tokens']} |"
+              )
+          report = "\n".join(lines) + "\n"
+          (root / "summary.md").write_text(report, encoding="utf-8")
+          with Path(os.environ["GITHUB_STEP_SUMMARY"]).open("a", encoding="utf-8") as output:
+              output.write("\n" + report)
+          PY
 
       - name: Archive tracked source for evidence review
         env:
