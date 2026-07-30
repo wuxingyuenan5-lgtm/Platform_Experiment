@@ -1,10 +1,11 @@
 # Issue #136 — Platform 0.9.2 全平台系统性优化任务包
 
+Workstream: critical
+Issue: #136
+Branch: `refactor/issue-136-platform-0-9-2-system-optimization`
+
 ## 状态
 
-- Workstream: critical
-- Issue: #136
-- Branch: `refactor/issue-136-platform-0-9-2-system-optimization`
 - Baseline branch: `feature/issue-134-platform-0-9-1-unified-delivery`
 - Frozen baseline SHA: `8114fce45e46e7920f316f49d03db12dc424acf1`
 - Development/acceptance version: `0.9.2`
