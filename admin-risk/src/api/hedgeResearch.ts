@@ -1,4 +1,9 @@
-import { defHttp } from '@/utils/http/axios';
+import axios, { AxiosError, type AxiosInstance, type AxiosRequestConfig } from 'axios';
+
+import {
+  clearUserSystemSessionMemory,
+  UserSystemApiError,
+} from '@/api/platform/userSystem';
 
 export type ResearchDataStatus = 'loading' | 'ready' | 'partial' | 'no_data' | 'stale' | 'error';
 
@@ -162,18 +167,64 @@ export interface MacroExpectationResponse {
   events: ResearchModuleResult<MacroExpectationEvent[]>;
 }
 
+const SESSION_INVALIDATION_CODES = new Set([
+  'invalid_session',
+  'human_session_required',
+  'account_inactive',
+  'account_temporarily_locked',
+  'browser_sessions_disabled',
+  'session_timestamp_invalid',
+]);
+
+const client: AxiosInstance = axios.create({
+  baseURL: '/api/v1',
+  timeout: 30_000,
+  withCredentials: true,
+});
+
+client.interceptors.response.use(
+  (response) => response,
+  (error: AxiosError) => {
+    const payload = error.response?.data as
+      | { detail?: { code?: string; message?: string } | string; message?: string }
+      | undefined;
+    const detail = payload?.detail;
+    const body = typeof detail === 'object' && detail ? detail : undefined;
+    const status = error.response?.status;
+    const code = body?.code;
+    const message =
+      body?.message ||
+      (typeof detail === 'string' ? detail : undefined) ||
+      payload?.message ||
+      error.message ||
+      '投研数据请求失败';
+    if (status === 401 || SESSION_INVALIDATION_CODES.has(code || '')) {
+      clearUserSystemSessionMemory();
+    }
+    return Promise.reject(new UserSystemApiError(message, status, code));
+  },
+);
+
+async function request<T>(config: AxiosRequestConfig): Promise<T> {
+  const response = await client.request<T>(config);
+  return response.data;
+}
+
 export const getAShareDashboard = (thresholdYuan = 10_000_000_000) =>
-  defHttp.get<AShareDashboardResponse>({
+  request<AShareDashboardResponse>({
+    method: 'GET',
     url: '/research/a-share/dashboard',
     params: { thresholdYuan },
   });
 
 export const getStockSnapshot = (code: string) =>
-  defHttp.get<StockSnapshotResponse>({
+  request<StockSnapshotResponse>({
+    method: 'GET',
     url: `/research/a-share/stocks/${code}/snapshot`,
   });
 
 export const getMacroExpectations = () =>
-  defHttp.get<MacroExpectationResponse>({
+  request<MacroExpectationResponse>({
+    method: 'GET',
     url: '/research/macro/expectations',
   });
