@@ -15,6 +15,9 @@ from app.research_providers import FreeResearchProvider
 
 
 def json_value(value: Any) -> Any:
+    model_dump = getattr(value, "model_dump", None)
+    if callable(model_dump):
+        return json_value(model_dump(by_alias=True, mode="json"))
     if is_dataclass(value):
         return json_value(asdict(value))
     if isinstance(value, dict):
@@ -43,12 +46,13 @@ async def run_check(
         value = await asyncio.wait_for(loader(), timeout=timeout_seconds)
         elapsed_ms = round((time.perf_counter() - started) * 1000)
         size = sample_size(value)
+        sample = value[:2] if isinstance(value, list) else value
         return {
             "name": name,
             "status": "passed",
             "elapsedMs": elapsed_ms,
             "sampleSize": size,
-            "sample": json_value(value[:2] if isinstance(value, list) else value),
+            "sample": json_value(sample),
         }
     except Exception as exc:  # noqa: BLE001 - smoke output must preserve provider failures
         elapsed_ms = round((time.perf_counter() - started) * 1000)
