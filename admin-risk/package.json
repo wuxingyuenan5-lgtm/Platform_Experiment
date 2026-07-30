@@ -36,6 +36,7 @@
     "serve": "npm run dev",
     "sync:trading-tools": "node scripts/sync-trading-tools-from-md.cjs",
     "test:cross-spread-layout": "node scripts/verify-cross-spread-layout.cjs",
+    "test:e2e:hedge-board": "playwright test -c playwright.hedge-board.config.ts",
     "test:e2e:user-system": "playwright test -c playwright.user-system.config.ts",
     "test:funding-order-layout": "node scripts/verify-funding-order-layout.cjs",
     "test:gzip": "npx http-server dist --cors --gzip -c-1",
