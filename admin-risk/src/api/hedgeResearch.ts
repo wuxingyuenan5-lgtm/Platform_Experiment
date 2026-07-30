@@ -219,7 +219,9 @@ export const getMacroExpectations = () =>
 
 export async function getAShareAccountWatchlist(): Promise<AccountWatchlistResponse> {
   try {
-    const response = await preferenceClient.get<AccountWatchlistResponse>('/research/a-share/watchlist');
+    const response = await preferenceClient.get<AccountWatchlistResponse>(
+      '/me/research/a-share/watchlist',
+    );
     return response.data;
   } catch (error) {
     throw watchlistError(error);
@@ -231,7 +233,7 @@ export async function replaceAShareAccountWatchlist(
 ): Promise<AccountWatchlistResponse> {
   try {
     const response = await preferenceClient.put<AccountWatchlistResponse>(
-      '/research/a-share/watchlist',
+      '/me/research/a-share/watchlist',
       payload,
       {
         headers: { 'X-CSRF-Token': getUserSystemCsrfToken() },
