@@ -196,7 +196,11 @@ async function stabilizePage(page: Page): Promise<void> {
   await page.keyboard.press('Escape');
   const mask = page.locator('.ant-drawer-mask:visible, .ant-modal-mask:visible').first();
   if (await mask.isVisible().catch(() => false)) await mask.click({ force: true });
-  await page.locator('.ant-spin-spinning').first().waitFor({ state: 'hidden', timeout: 12_000 }).catch(() => undefined);
+  await page
+    .locator('.ant-spin-spinning')
+    .first()
+    .waitFor({ state: 'hidden', timeout: 12_000 })
+    .catch(() => undefined);
   await page.waitForTimeout(900);
   await page.evaluate(async () => {
     if ('fonts' in document) await document.fonts.ready;
@@ -238,7 +242,8 @@ async function capturePage(
         viewport,
         marker: definition.marker,
         evidenceSource: definition.evidenceSource,
-        evidenceClassification: 'deterministic visual baseline; not production or real Provider acceptance',
+        evidenceClassification:
+          'deterministic visual baseline; not production or real Provider acceptance',
         liveWrite: false,
         screenshot: screenshotName,
         layout,
@@ -268,7 +273,9 @@ for (const viewport of VIEWPORTS) {
     const session = await openAuthenticatedPage(browser, 'employee', viewport);
     try {
       for (const definition of EMPLOYEE_PAGES) {
-        await test.step(definition.key, () => capturePage(session.page, 'employee', viewport, definition));
+        await test.step(definition.key, () =>
+          capturePage(session.page, 'employee', viewport, definition),
+        );
       }
     } finally {
       await session.close();
