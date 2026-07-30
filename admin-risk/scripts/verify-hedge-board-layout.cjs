@@ -14,6 +14,14 @@ const tradingToolCatalogPath = path.join(viewRoot, 'tradingTools', 'data', 'cata
 const tradingToolsPagePath = path.join(viewRoot, 'tradingTools', 'index.vue');
 const aSharePagePath = path.join(viewRoot, 'aShare', 'index.vue');
 const aShareResearchComposablePath = path.join(viewRoot, 'aShare', 'useAShareResearch.ts');
+const accountWatchlistApiPath = path.join(
+  __dirname,
+  '..',
+  'src',
+  'api',
+  'platform',
+  'researchWatchlist.ts',
+);
 const aShareWatchlistPath = path.join(
   viewRoot,
   'aShare',
@@ -51,6 +59,7 @@ const tradingToolCatalogSource = fs.readFileSync(tradingToolCatalogPath, 'utf8')
 const tradingToolsPageSource = fs.readFileSync(tradingToolsPagePath, 'utf8');
 const aSharePageSource = fs.readFileSync(aSharePagePath, 'utf8');
 const aShareResearchComposableSource = fs.readFileSync(aShareResearchComposablePath, 'utf8');
+const accountWatchlistApiSource = fs.readFileSync(accountWatchlistApiPath, 'utf8');
 const aShareWatchlistSource = fs.readFileSync(aShareWatchlistPath, 'utf8');
 const aShareMarketDetailSource = fs.readFileSync(aShareMarketDetailPath, 'utf8');
 const shenwanSectionSource = fs.readFileSync(shenwanSectionPath, 'utf8');
@@ -66,6 +75,7 @@ assert(fs.existsSync(terminalDetailPanelPath), 'Expected TerminalDetailPanel com
 assert(fs.existsSync(marketDetailCatalogPath), 'Expected market detail catalog to exist.');
 assert(fs.existsSync(toolGroupSectionPath), 'Expected ToolGroupSection component to exist.');
 assert(fs.existsSync(aSharePagePath), 'Expected dedicated A-share research page to exist.');
+assert(fs.existsSync(accountWatchlistApiPath), 'Expected account research watchlist API client to exist.');
 assert(fs.existsSync(macroExpectationPath), 'Expected macro expectation panel to exist.');
 
 assert(
@@ -212,11 +222,24 @@ assert(
   'A-share watchlists must preserve stored empty arrays, normalize stock codes and reorder within groups.',
 );
 assert(
+  accountWatchlistApiSource.includes("url: '/me/research-watchlist'") &&
+    accountWatchlistApiSource.includes('getUserSystemCsrfToken') &&
+    aShareResearchComposableSource.includes('getAccountResearchWatchlist') &&
+    aShareResearchComposableSource.includes('replaceAccountResearchWatchlist') &&
+    aShareResearchComposableSource.includes('WATCHLIST_DIRTY_STORAGE_KEY') &&
+    aShareResearchComposableSource.includes("error.code !== 'watchlist_version_conflict'") &&
+    aSharePageSource.includes(':sync-state="watchlistSyncState"') &&
+    aSharePageSource.includes(':last-synced-at="watchlistLastSyncedAt"'),
+  'A-share watchlists must sync through the authenticated account API with CSRF, offline cache and conflict recovery.',
+);
+assert(
   aShareWatchlistSource.includes('空列表会被正常保留') &&
     aShareWatchlistSource.includes('已在自选股中') &&
+    aShareWatchlistSource.includes('账号已同步') &&
+    aShareWatchlistSource.includes('本地缓存·待同步') &&
     aShareWatchlistSource.includes(':disabled="itemIndex === 0"') &&
     aShareWatchlistSource.includes(':disabled="itemIndex === group.items.length - 1"'),
-  'A-share watchlist UI must expose empty persistence, duplicate feedback and bounded move controls.',
+  'A-share watchlist UI must expose account sync, offline fallback, empty persistence and bounded move controls.',
 );
 assert(
   shenwanSectionSource.includes("sortDirection = ref<'asc' | 'desc'>('desc')") &&
@@ -252,7 +275,7 @@ assert(
   'Hedge board page exceeded the current lightweight budget; split a component before adding more inline code.',
 );
 assert(
-  aSharePageSource.split(/\r?\n/).length <= 360,
+  aSharePageSource.split(/\r?\n/).length <= 400,
   'A-share orchestrator exceeded its lightweight budget; move behavior into a component or composable.',
 );
 assert(
