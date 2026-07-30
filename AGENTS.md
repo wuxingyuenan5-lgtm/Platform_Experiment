@@ -7,7 +7,7 @@
 - `docs/architecture/OWNERSHIP.md` is the canonical code, data and boundary ownership catalog.
 - After the root rules, read the nearest module `AGENTS.md`, then only the directly affected source files and tests.
 - `docs/codex/CURRENT_CONTEXT.md` is a compatibility pointer, not an authority.
-- GitHub Issue #136 and Draft PR #138 own live branch, HEAD, CI and review status. Do not copy live progress into new permanent documents.
+- GitHub Issue #136 owns the live branch, Draft PR, HEAD, CI and review status. Do not copy live progress into new permanent documents.
 
 ## Protected Invariants
 
