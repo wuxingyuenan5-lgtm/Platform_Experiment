@@ -114,8 +114,9 @@ def main() -> None:
         "current-state.md must link architecture ownership",
     )
     require(
-        "GitHub Issue #136 and Draft PR #138" in current_state,
-        "current-state.md must delegate live progress and CI to GitHub",
+        "GitHub Issue #136" in current_state
+        and "live branch, Draft PR, HEAD, CI and review state" in current_state,
+        "current-state.md must delegate volatile delivery state to GitHub Issue #136",
     )
 
     require(
