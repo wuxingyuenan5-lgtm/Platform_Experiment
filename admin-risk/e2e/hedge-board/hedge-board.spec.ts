@@ -80,7 +80,7 @@ async function dismissResponsiveNavigation(page: Page): Promise<void> {
   if (await drawerMask.isVisible().catch(() => false)) {
     await drawerMask.click({ force: true });
   }
-  await expect(drawerMask).toBeHidden({ timeout: 5_000 }).catch(() => undefined);
+  await expect(drawerMask).toBeHidden({ timeout: 5_000 });
 }
 
 async function expectTransientMessagesCleared(page: Page): Promise<void> {
