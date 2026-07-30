@@ -21,6 +21,7 @@ on:
       - 'admin-risk/src/store/modules/user.ts'
       - 'admin-risk/src/views/hedgeBoard/**'
       - 'docs/operations/HEDGE_BOARD_ACCEPTANCE.md'
+      - 'docs/operations/PLATFORM_0_9_1_LOCAL_ACCEPTANCE_HANDOFF.md'
       - 'tasks/issue-134-platform-0-9-1-unified-delivery.md'
       - 'platform-backend/app/auth.py'
       - 'platform-backend/app/config.py'
