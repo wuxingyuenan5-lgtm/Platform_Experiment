@@ -13,5 +13,11 @@ module.exports = {
         'vue/v-on-event-hyphenation': 'off',
       },
     },
+    {
+      files: ['playwright.platform-visual.config.ts', 'e2e/platform-visual/**/*.ts'],
+      parserOptions: {
+        project: ['./tsconfig.platform-visual.json'],
+      },
+    },
   ],
 };
