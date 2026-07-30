@@ -110,6 +110,6 @@ test('covers A-share research workflow and account-level watchlist persistence',
   const restoredWatchlist = second.page.locator('#a-share-watchlist');
   await expect(restoredWatchlist.getByText('账号已同步', { exact: true })).toBeVisible();
   await expect(restoredWatchlist.getByText('浦发银行', { exact: true })).toBeVisible();
-  await expect(restoredWatchlist.getByDisplayValue('银行观察')).toBeVisible();
+  await expect(restoredWatchlist.locator('input[value="银行观察"]')).toBeVisible();
   await second.context.close();
 });
