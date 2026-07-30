@@ -284,7 +284,7 @@ assert(
 );
 assert(
   hedgeBoardE2ESpecSource.includes('vg_a_share_watchlist_v1') &&
-    hedgeBoardE2ESpecSource.includes('/api/v1/research/a-share/watchlist') &&
+    hedgeBoardE2ESpecSource.includes('/api/v1/me/research/a-share/watchlist') &&
     hedgeBoardE2ESpecSource.includes('全部申万二级行业') &&
     hedgeBoardE2ESpecSource.includes('全部展开'),
   'Hedge-board browser E2E must cover account persistence, Shenwan interactions and stock modules.',
