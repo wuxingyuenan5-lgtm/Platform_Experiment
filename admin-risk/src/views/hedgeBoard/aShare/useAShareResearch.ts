@@ -1,8 +1,10 @@
 import { message } from 'ant-design-vue';
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import {
+  getAShareAccountWatchlist,
   getAShareDashboard,
   getStockSnapshot,
+  replaceAShareAccountWatchlist,
   type AShareDashboardResponse,
   type StockSnapshotResponse,
   type TurnoverThresholdStock,
@@ -14,6 +16,8 @@ export interface WatchlistItem {
   name: string;
   group: string;
 }
+
+export type WatchlistSyncState = 'loading' | 'saving' | 'synced' | 'local' | 'error';
 
 const WATCHLIST_STORAGE_KEY = 'vg_a_share_watchlist_v1';
 const DEFAULT_WATCHLIST: WatchlistItem[] = [
@@ -41,6 +45,17 @@ function normalizeWatchlistItem(item: unknown): WatchlistItem | null {
   };
 }
 
+function sanitizeWatchlist(items: unknown[]): WatchlistItem[] {
+  const seen = new Set<string>();
+  return items.reduce<WatchlistItem[]>((result, candidate) => {
+    const normalized = normalizeWatchlistItem(candidate);
+    if (!normalized || seen.has(normalized.code)) return result;
+    seen.add(normalized.code);
+    result.push(normalized);
+    return result;
+  }, []);
+}
+
 function readWatchlist(): WatchlistItem[] {
   if (typeof window === 'undefined') return [...DEFAULT_WATCHLIST];
   try {
@@ -48,14 +63,7 @@ function readWatchlist(): WatchlistItem[] {
     if (stored === null) return [...DEFAULT_WATCHLIST];
     const payload = JSON.parse(stored);
     if (!Array.isArray(payload)) return [...DEFAULT_WATCHLIST];
-    const seen = new Set<string>();
-    return payload.reduce<WatchlistItem[]>((items, candidate) => {
-      const normalized = normalizeWatchlistItem(candidate);
-      if (!normalized || seen.has(normalized.code)) return items;
-      seen.add(normalized.code);
-      items.push(normalized);
-      return items;
-    }, []);
+    return sanitizeWatchlist(payload);
   } catch {
     return [...DEFAULT_WATCHLIST];
   }
@@ -86,9 +94,14 @@ export function useAShareResearch() {
   const stockLoading = ref(false);
   const stockError = ref('');
   const watchlist = ref<WatchlistItem[]>(readWatchlist());
+  const watchlistVersion = ref(0);
+  const watchlistSyncState = ref<WatchlistSyncState>('loading');
+  const watchlistSyncMessage = ref('正在读取账号自选股');
   let dashboardRequestSequence = 0;
   let stockRequestSequence = 0;
+  let watchlistSaveSequence = 0;
   let activeStockCode = '';
+  let watchlistSyncTimer: number | undefined;
 
   const thresholdStocks = computed<TurnoverThresholdStock[]>(
     () => dashboard.value?.shenwan.data?.threshold?.stocks || [],
@@ -155,6 +168,94 @@ export function useAShareResearch() {
     }
   }
 
+  function accountItems() {
+    return watchlist.value.map((item) => ({
+      securityCode: item.code,
+      securityName: item.name,
+      group: item.group,
+    }));
+  }
+
+  function applyAccountWatchlist(
+    items: Array<{ securityCode: string; securityName: string; group: string }>,
+  ) {
+    watchlist.value = sanitizeWatchlist(
+      items.map((item) => ({
+        code: item.securityCode,
+        name: item.securityName,
+        group: item.group,
+      })),
+    );
+  }
+
+  async function saveAccountWatchlist(options: { silent?: boolean } = {}) {
+    const requestSequence = ++watchlistSaveSequence;
+    watchlistSyncState.value = 'saving';
+    watchlistSyncMessage.value = '正在同步到账号';
+    try {
+      const result = await replaceAShareAccountWatchlist({
+        expectedVersion: watchlistVersion.value,
+        items: accountItems(),
+      });
+      if (requestSequence !== watchlistSaveSequence) return false;
+      watchlistVersion.value = result.version;
+      applyAccountWatchlist(result.items);
+      watchlistSyncState.value = 'synced';
+      watchlistSyncMessage.value = '已同步到账号';
+      return true;
+    } catch (error) {
+      if (requestSequence !== watchlistSaveSequence) return false;
+      const status = (error as Error & { status?: number }).status;
+      if (status === 409) {
+        try {
+          const latest = await getAShareAccountWatchlist();
+          watchlistVersion.value = latest.version;
+          applyAccountWatchlist(latest.items);
+          watchlistSyncState.value = 'error';
+          watchlistSyncMessage.value = '检测到其他设备更新，已载入账号最新版本';
+          if (!options.silent) message.warning(watchlistSyncMessage.value);
+          return false;
+        } catch {
+          // Fall through to the local cache state below.
+        }
+      }
+      watchlistSyncState.value = 'local';
+      watchlistSyncMessage.value = '账号同步暂不可用，已保存在本机';
+      if (!options.silent) message.warning(watchlistSyncMessage.value);
+      return false;
+    }
+  }
+
+  function scheduleWatchlistSync() {
+    if (typeof window === 'undefined') return;
+    if (watchlistSyncTimer !== undefined) window.clearTimeout(watchlistSyncTimer);
+    watchlistSyncState.value = 'saving';
+    watchlistSyncMessage.value = '等待同步到账号';
+    watchlistSyncTimer = window.setTimeout(() => {
+      watchlistSyncTimer = undefined;
+      void saveAccountWatchlist({ silent: true });
+    }, 450);
+  }
+
+  async function loadAccountWatchlist() {
+    watchlistSyncState.value = 'loading';
+    watchlistSyncMessage.value = '正在读取账号自选股';
+    try {
+      const result = await getAShareAccountWatchlist();
+      watchlistVersion.value = result.version;
+      if (result.version === 0) {
+        await saveAccountWatchlist({ silent: true });
+        return;
+      }
+      applyAccountWatchlist(result.items);
+      watchlistSyncState.value = 'synced';
+      watchlistSyncMessage.value = '已同步到账号';
+    } catch {
+      watchlistSyncState.value = 'local';
+      watchlistSyncMessage.value = '账号同步暂不可用，当前使用本机缓存';
+    }
+  }
+
   function addToWatchlist(code: string, name: string, group = '默认分组') {
     const normalized = normalizeStockCode(code);
     if (!normalized || watchlist.value.some((item) => item.code === normalized)) return;
@@ -163,11 +264,13 @@ export function useAShareResearch() {
       name: name.trim() || normalized,
       group: group.trim() || '默认分组',
     });
+    scheduleWatchlistSync();
   }
 
   function removeFromWatchlist(code: string) {
     const normalized = normalizeStockCode(code);
     watchlist.value = watchlist.value.filter((item) => item.code !== normalized);
+    scheduleWatchlistSync();
   }
 
   function moveWatchlistItem(code: string, direction: 'up' | 'down') {
@@ -186,12 +289,16 @@ export function useAShareResearch() {
     const next = [...watchlist.value];
     [next[index], next[targetIndex]] = [next[targetIndex], next[index]];
     watchlist.value = next;
+    scheduleWatchlistSync();
   }
 
   function setWatchlistGroup(code: string, group: string) {
     const normalized = normalizeStockCode(code);
     const item = watchlist.value.find((candidate) => candidate.code === normalized);
-    if (item) item.group = group.trim() || '默认分组';
+    if (item) {
+      item.group = group.trim() || '默认分组';
+      scheduleWatchlistSync();
+    }
   }
 
   async function applyThresholdMode() {
@@ -295,6 +402,15 @@ export function useAShareResearch() {
 
   onMounted(() => {
     void loadDashboard();
+    void loadAccountWatchlist();
+  });
+
+  onBeforeUnmount(() => {
+    if (watchlistSyncTimer !== undefined && typeof window !== 'undefined') {
+      window.clearTimeout(watchlistSyncTimer);
+      watchlistSyncTimer = undefined;
+      void saveAccountWatchlist({ silent: true });
+    }
   });
 
   return {
@@ -312,12 +428,16 @@ export function useAShareResearch() {
     stockError,
     watchlist,
     watchlistGroups,
+    watchlistSyncState,
+    watchlistSyncMessage,
     loadDashboard,
     queryStock,
     addToWatchlist,
     removeFromWatchlist,
     moveWatchlistItem,
     setWatchlistGroup,
+    loadAccountWatchlist,
+    saveAccountWatchlist,
     applyThresholdMode,
     exportThresholdCsv,
     copyThresholdSummary,
