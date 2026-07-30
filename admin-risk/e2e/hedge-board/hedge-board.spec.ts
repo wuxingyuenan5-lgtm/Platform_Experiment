@@ -261,12 +261,20 @@ async function fulfillResearchRoute(route: Route): Promise<void> {
   const url = new URL(route.request().url());
   if (url.pathname.endsWith('/research/a-share/dashboard')) {
     const threshold = Number(url.searchParams.get('thresholdYuan') || 10_000_000_000);
-    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(dashboardFixture(threshold)) });
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(dashboardFixture(threshold)),
+    });
     return;
   }
   const stockMatch = url.pathname.match(/\/research\/a-share\/stocks\/(\d{6})\/snapshot$/);
   if (stockMatch) {
-    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(stockFixture(stockMatch[1])) });
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(stockFixture(stockMatch[1])),
+    });
     return;
   }
   await route.continue();
@@ -285,7 +293,7 @@ test('completes hedge-board account persistence and research interactions withou
     await page.request.get(absoluteUrl('/api/v1/auth/me')),
   );
   const cleared = await jsonResponse<AccountWatchlistResponse>(
-    await page.request.put(absoluteUrl('/api/v1/research/a-share/watchlist'), {
+    await page.request.put(absoluteUrl('/api/v1/me/research/a-share/watchlist'), {
       headers: {
         Origin: FRONTEND_ORIGIN,
         'X-CSRF-Token': authentication.csrfToken,
@@ -307,7 +315,7 @@ test('completes hedge-board account persistence and research interactions withou
   await page.getByPlaceholder('例如 核心观察').fill('核心观察');
   const accountSave = page.waitForResponse(
     (response) =>
-      response.url().endsWith('/api/v1/research/a-share/watchlist') &&
+      response.url().endsWith('/api/v1/me/research/a-share/watchlist') &&
       response.request().method() === 'PUT',
   );
   await page.getByRole('button', { name: '保存', exact: true }).click();
