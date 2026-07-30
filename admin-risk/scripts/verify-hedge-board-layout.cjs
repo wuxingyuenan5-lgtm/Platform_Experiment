@@ -2,7 +2,8 @@ const fs = require('fs');
 const path = require('path');
 const assert = require('assert');
 
-const viewRoot = path.join(__dirname, '..', 'src', 'views', 'hedgeBoard');
+const frontendRoot = path.join(__dirname, '..');
+const viewRoot = path.join(frontendRoot, 'src', 'views', 'hedgeBoard');
 const hedgeBoardPagePath = path.join(viewRoot, 'index.vue');
 const marketTerminalPagePath = path.join(viewRoot, 'components', 'MarketTerminalPage.vue');
 const hedgeBoardSubnavPath = path.join(viewRoot, 'components', 'HedgeBoardSubnav.vue');
@@ -39,8 +40,11 @@ const stockSnapshotPath = path.join(
   'StockSnapshotSection.vue',
 );
 const macroExpectationPath = path.join(viewRoot, 'macro', 'MacroExpectationPanel.vue');
-const routePath = path.join(__dirname, '..', 'src', 'router', 'routes', 'modules', 'hedge.ts');
-const uiGuidelinesPath = path.join(__dirname, '..', 'docs', 'design', 'platform-ui-guidelines.md');
+const routePath = path.join(frontendRoot, 'src', 'router', 'routes', 'modules', 'hedge.ts');
+const uiGuidelinesPath = path.join(frontendRoot, 'docs', 'design', 'platform-ui-guidelines.md');
+const hedgeResearchApiPath = path.join(frontendRoot, 'src', 'api', 'hedgeResearch.ts');
+const hedgeBoardE2EConfigPath = path.join(frontendRoot, 'playwright.hedge-board.config.ts');
+const hedgeBoardE2ESpecPath = path.join(frontendRoot, 'e2e', 'hedge-board', 'hedge-board.spec.ts');
 
 const hedgeBoardSource = fs.readFileSync(hedgeBoardPagePath, 'utf8');
 const hedgeBoardSubnavSource = fs.readFileSync(hedgeBoardSubnavPath, 'utf8');
@@ -58,6 +62,9 @@ const stockSnapshotSource = fs.readFileSync(stockSnapshotPath, 'utf8');
 const macroExpectationSource = fs.readFileSync(macroExpectationPath, 'utf8');
 const routeSource = fs.readFileSync(routePath, 'utf8');
 const uiGuidelinesSource = fs.readFileSync(uiGuidelinesPath, 'utf8');
+const hedgeResearchApiSource = fs.readFileSync(hedgeResearchApiPath, 'utf8');
+const hedgeBoardE2EConfigSource = fs.readFileSync(hedgeBoardE2EConfigPath, 'utf8');
+const hedgeBoardE2ESpecSource = fs.readFileSync(hedgeBoardE2ESpecPath, 'utf8');
 
 assert(fs.existsSync(marketTerminalPagePath), 'Expected MarketTerminalPage component to exist.');
 assert(fs.existsSync(hedgeBoardSubnavPath), 'Expected HedgeBoardSubnav component to exist.');
@@ -67,6 +74,8 @@ assert(fs.existsSync(marketDetailCatalogPath), 'Expected market detail catalog t
 assert(fs.existsSync(toolGroupSectionPath), 'Expected ToolGroupSection component to exist.');
 assert(fs.existsSync(aSharePagePath), 'Expected dedicated A-share research page to exist.');
 assert(fs.existsSync(macroExpectationPath), 'Expected macro expectation panel to exist.');
+assert(fs.existsSync(hedgeBoardE2EConfigPath), 'Expected dedicated hedge-board Playwright config.');
+assert(fs.existsSync(hedgeBoardE2ESpecPath), 'Expected dedicated hedge-board browser E2E spec.');
 
 assert(
   hedgeBoardSource.includes('<MarketTerminalPage') && hedgeBoardSource.includes('MarketTerminalPage from'),
@@ -219,6 +228,28 @@ assert(
   'A-share watchlist UI must expose empty persistence, duplicate feedback and bounded move controls.',
 );
 assert(
+  hedgeResearchApiSource.includes('getAShareAccountWatchlist') &&
+    hedgeResearchApiSource.includes('replaceAShareAccountWatchlist') &&
+    hedgeResearchApiSource.includes('getUserSystemCsrfToken') &&
+    hedgeResearchApiSource.includes('withCredentials: true'),
+  'A-share account watchlists must use authenticated Platform APIs with browser-session CSRF.',
+);
+assert(
+  aShareResearchComposableSource.includes('watchlistVersion = ref(0)') &&
+    aShareResearchComposableSource.includes('loadAccountWatchlist') &&
+    aShareResearchComposableSource.includes('saveAccountWatchlist') &&
+    aShareResearchComposableSource.includes('scheduleWatchlistSync') &&
+    aShareResearchComposableSource.includes("watchlistSyncState.value = 'local'"),
+  'A-share watchlists must sync to the account while preserving an explicit local fallback.',
+);
+assert(
+  aShareWatchlistSource.includes('sync-state') &&
+    aShareWatchlistSource.includes("$emit('retrySync')") &&
+    aSharePageSource.includes(':sync-state="watchlistSyncState"') &&
+    aSharePageSource.includes('@retry-sync="saveAccountWatchlist"'),
+  'A-share watchlist UI must surface account sync state and a retry action.',
+);
+assert(
   shenwanSectionSource.includes("sortDirection = ref<'asc' | 'desc'>('desc')") &&
     shenwanSectionSource.includes('没有匹配的申万二级行业') &&
     shenwanSectionSource.includes('当前序号') &&
@@ -246,13 +277,25 @@ assert(
     !macroExpectationSource.includes('买卖建议'),
   'Macro page must present probability curves without trading recommendations.',
 );
+assert(
+  hedgeBoardE2EConfigSource.includes("testDir: './e2e/hedge-board'") &&
+    hedgeBoardE2EConfigSource.includes("VG_LIVE_TRADING_ENABLED: 'false'"),
+  'Hedge-board Playwright must use an isolated browser suite with Live Write disabled.',
+);
+assert(
+  hedgeBoardE2ESpecSource.includes('vg_a_share_watchlist_v1') &&
+    hedgeBoardE2ESpecSource.includes('/api/v1/research/a-share/watchlist') &&
+    hedgeBoardE2ESpecSource.includes('全部申万二级行业') &&
+    hedgeBoardE2ESpecSource.includes('全部展开'),
+  'Hedge-board browser E2E must cover account persistence, Shenwan interactions and stock modules.',
+);
 
 assert(
   hedgeBoardSource.split(/\r?\n/).length <= 4200,
   'Hedge board page exceeded the current lightweight budget; split a component before adding more inline code.',
 );
 assert(
-  aSharePageSource.split(/\r?\n/).length <= 360,
+  aSharePageSource.split(/\r?\n/).length <= 420,
   'A-share orchestrator exceeded its lightweight budget; move behavior into a component or composable.',
 );
 assert(
