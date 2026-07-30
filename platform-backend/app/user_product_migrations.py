@@ -13,6 +13,27 @@ USER_PRODUCT_MIGRATIONS: tuple[schema_migrations.Migration, ...] = (
             """,
         ),
     ),
+    schema_migrations.Migration(
+        version=8,
+        name="user-research-watchlist",
+        statements=(
+            """
+            CREATE TABLE user_research_watchlists (
+                user_id TEXT PRIMARY KEY,
+                items_json TEXT NOT NULL,
+                row_version INTEGER NOT NULL DEFAULT 1,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                CHECK (row_version >= 1),
+                FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+            )
+            """,
+            """
+            CREATE INDEX idx_user_research_watchlists_updated
+            ON user_research_watchlists(updated_at DESC)
+            """,
+        ),
+    ),
 )
 
 
