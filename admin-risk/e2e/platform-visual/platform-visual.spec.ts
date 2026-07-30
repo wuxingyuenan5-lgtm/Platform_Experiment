@@ -180,7 +180,7 @@ async function waitForMarker(page: Page, definition: VisualPage): Promise<void> 
   await expect(marker).toBeVisible({ timeout: 30_000 });
 }
 
-async function stabilizePage(page: Page): Promise<void> {
+async function stabilizePage(page: Page, dismissTransientOverlays: boolean): Promise<void> {
   await page.addStyleTag({
     content: `
       *, *::before, *::after {
@@ -193,10 +193,12 @@ async function stabilizePage(page: Page): Promise<void> {
       .ant-message, .ant-notification { pointer-events: none !important; }
     `,
   });
-  await page.keyboard.press('Escape');
-  const mask = page.locator('.ant-drawer-mask:visible, .ant-modal-mask:visible').first();
-  if (await mask.isVisible().catch(() => false)) {
-    await mask.click({ force: true, timeout: 1_000 }).catch(() => undefined);
+  if (dismissTransientOverlays) {
+    await page.keyboard.press('Escape');
+    const mask = page.locator('.ant-drawer-mask:visible, .ant-modal-mask:visible').first();
+    if (await mask.isVisible().catch(() => false)) {
+      await mask.click({ force: true, timeout: 1_000 }).catch(() => undefined);
+    }
   }
   await page
     .locator('.ant-spin-spinning')
@@ -218,7 +220,7 @@ async function capturePage(
 ): Promise<void> {
   await page.goto(absoluteUrl(definition.route), { waitUntil: 'domcontentloaded' });
   await waitForMarker(page, definition);
-  await stabilizePage(page);
+  await stabilizePage(page, definition.key !== 'login');
 
   const layout = await page.evaluate(() => ({
     documentClientWidth: document.documentElement.clientWidth,
