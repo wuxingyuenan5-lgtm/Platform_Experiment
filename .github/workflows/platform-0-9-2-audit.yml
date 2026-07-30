@@ -52,6 +52,13 @@ jobs:
           python scripts/audit-platform-baseline.py
           cat "${PLATFORM_AUDIT_OUTPUT}/platform-0.9.2-baseline-audit.md" >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Archive tracked source for evidence review
+        env:
+          PLATFORM_AUDIT_OUTPUT: ${{ runner.temp }}/platform-0-9-2-audit
+        run: |
+          git archive --format=tar.gz --output="${PLATFORM_AUDIT_OUTPUT}/platform-source-snapshot.tar.gz" HEAD
+          git rev-parse HEAD > "${PLATFORM_AUDIT_OUTPUT}/platform-source-snapshot.sha"
+
       - name: Upload audit evidence
         uses: actions/upload-artifact@v4
         with:
