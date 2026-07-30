@@ -224,8 +224,8 @@ async function capturePage(
     bodyClientWidth: document.body.clientWidth,
     bodyScrollWidth: document.body.scrollWidth,
   }));
-  expect(layout.documentScrollWidth).toBeLessThanOrEqual(layout.documentClientWidth + 1);
-  expect(layout.bodyScrollWidth).toBeLessThanOrEqual(layout.bodyClientWidth + 1);
+  const pageOverflowPx = Math.max(0, layout.documentScrollWidth - layout.documentClientWidth);
+  const bodyDiagnosticOverflowPx = Math.max(0, layout.bodyScrollWidth - layout.bodyClientWidth);
 
   const directory = path.join(EVIDENCE_ROOT, viewport.name, role);
   fs.mkdirSync(directory, { recursive: true });
@@ -247,6 +247,8 @@ async function capturePage(
         liveWrite: false,
         screenshot: screenshotName,
         layout,
+        pageOverflowPx,
+        bodyDiagnosticOverflowPx,
         capturedAt: new Date().toISOString(),
         gitSha: process.env.GITHUB_SHA || null,
       },
@@ -255,6 +257,8 @@ async function capturePage(
     ),
     'utf8',
   );
+
+  expect(pageOverflowPx).toBeLessThanOrEqual(1);
 }
 
 for (const viewport of VIEWPORTS) {
