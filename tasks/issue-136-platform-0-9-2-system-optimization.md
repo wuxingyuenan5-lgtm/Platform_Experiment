@@ -4,9 +4,11 @@
 
 - Workstream: critical
 - Issue: #136
+- Draft PR: #137
 - Baseline branch: `feature/issue-134-platform-0-9-1-unified-delivery`
 - Frozen baseline SHA: `8114fce45e46e7920f316f49d03db12dc424acf1`
 - Delivery branch: `refactor/platform-0.9.2-system-optimization`
+- Current HEAD after Phase A plan: `5c16d56bf46873b47afa7d82d3a62cc513e049ed`
 - Development/acceptance version: `0.9.2`
 - Final accepted candidate: `0.10.1`
 - Merge policy: Draft only; never auto-merge; never modify `main`; owner approval required.
@@ -24,11 +26,42 @@
 - [x] Freeze baseline at `8114fce45e46e7920f316f49d03db12dc424acf1`.
 - [x] Create `refactor/platform-0.9.2-system-optimization`.
 - [x] Create master Issue #136.
-- [ ] Create and keep a Draft PR against the frozen 0.9.1 unified branch.
-- [ ] Collect repository inventory and baseline evidence.
-- [ ] Audit frontend, Platform backend, Execution Runtime, identity/security, research/providers, A-share/申万, strategy/trading/risk, member assets/NAV, Financial Fact/PnL/accounting/reconciliation, database/migrations/backup, operations, tests/CI/local run, documentation, AI context and legacy naming.
-- [ ] Quantify typical-task context cost: file count, code/doc lines, cross-service reads, repeated facts and misleading paths.
-- [ ] Produce `docs/architecture/PLATFORM_0_9_2_SYSTEM_OPTIMIZATION_MASTER_PLAN.md` from repository evidence.
+- [x] Create and keep Draft PR #137 against the frozen 0.9.1 unified branch.
+- [x] Collect repository inventory and reproducible audit evidence through a read-only GitHub Actions workflow.
+- [x] Audit frontend, Platform backend, Execution Runtime, identity/security, research/providers, A-share/申万, strategy/trading/risk, member assets/NAV, Financial Fact/PnL/accounting/reconciliation, database/migrations/backup, operations, tests/CI/local run, documentation, AI context and legacy naming.
+- [x] Quantify representative task context cost: file count, code/doc lines, cross-service reads, repeated facts and misleading paths.
+- [x] Produce `docs/architecture/PLATFORM_0_9_2_SYSTEM_OPTIMIZATION_MASTER_PLAN.md` from repository evidence.
+- [x] Run baseline Platform API and Runtime test suites: Platform API `418 passed`; Runtime `76 passed`.
+- [ ] Enable the complete governed CI matrix for PRs based on the frozen 0.9.1 unified branch.
+- [ ] Capture a durable pre-refactor visual baseline for all core pages at 1440/1024/768/390.
+
+## Phase A evidence
+
+- Corrected audit workflow run: `30560041240` — success.
+- Corrected audit evidence snapshot: `cbe4e97fb3b179608e9b95633a84d88627793d0e`.
+- Frozen product tree: approximately 1,776 text files, 276,992 lines and 2,014,104 estimated text tokens.
+- Master plan commit: `5c16d56bf46873b47afa7d82d3a62cc513e049ed`.
+- Product behavior changes in Phase A: none.
+
+## Confirmed high-level decisions
+
+1. Keep the three deployment and safety boundaries: Platform Web, Platform API modular monolith and Execution Runtime.
+2. Do not introduce microservices, Kubernetes, Kafka/RabbitMQ, GraphQL, CQRS, Event Sourcing or micro-frontends.
+3. Treat authority drift, template/history noise, flat module ownership, high-frequency large files and conflicting legacy deployment paths as the primary optimization targets.
+4. Recommend isolated directory renames: `admin-risk → platform-web`, then `platform-backend → platform-api`; keep `execution-runtime`.
+5. Do not delete or rename `projects/risk-control` until real production/MySQL/server dependencies are confirmed.
+6. Perform AI/context reduction before broad code refactoring so later phases operate with smaller, more reliable reading packages.
+7. Use Research, Identity and Portfolio as low-risk modularization pilots before touching trading, risk, accounting, reconciliation or Runtime.
+
+## Next gate
+
+Before Phase B or any broad refactor:
+
+1. Make the full CI, Secret Scan, Version Consistency, browser E2E and Provider Smoke workflows run for Draft PR #137's non-`main` base.
+2. Confirm the resulting checks remain green without weakening TLS, security, type or test gates.
+3. Freeze core-page visual baselines.
+
+After that gate, start Phase B: single authority for current state, AI context map, historical-document isolation and task-specific reading entrypoints.
 
 ## Decision categories
 
