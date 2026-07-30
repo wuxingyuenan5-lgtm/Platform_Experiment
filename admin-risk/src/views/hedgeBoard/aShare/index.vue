@@ -64,6 +64,8 @@
       <ShortTermEmotionSection :module="dashboard?.emotion" />
       <AShareWatchlistSection
         :groups="watchlistGroups"
+        :sync-state="watchlistSyncState"
+        :last-synced-at="watchlistLastSyncedAt"
         @add="addToWatchlist"
         @remove="removeFromWatchlist"
         @move="moveWatchlistItem"
@@ -136,6 +138,8 @@
     stockLoading,
     stockError,
     watchlistGroups,
+    watchlistSyncState,
+    watchlistLastSyncedAt,
     loadDashboard,
     queryStock,
     addToWatchlist,
