@@ -75,7 +75,7 @@ jobs:
         working-directory: admin-risk
         run: pnpm exec playwright install --with-deps chromium
 
-      - name: Generate isolated CEO credentials
+      - name: Generate isolated employee credentials
         shell: bash
         run: |
           python - <<'PY'
@@ -83,7 +83,7 @@ jobs:
           import secrets
 
           with open(os.environ['GITHUB_ENV'], 'a', encoding='utf-8') as output:
-              output.write('E2E_CEO_USERNAME=e2e_ceo\n')
+              output.write('E2E_CEO_USERNAME=e2e_employee_1\n')
               output.write(f"E2E_CEO_PASSWORD=Cc9!{secrets.token_urlsafe(24)}\n")
           PY
 
