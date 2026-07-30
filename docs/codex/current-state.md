@@ -2,19 +2,19 @@
 
 Last updated: 2026-07-31
 
-This is the sole repository document for current engineering state. Durable rules live in `AGENTS.md`; ownership lives in `docs/architecture/OWNERSHIP.md`; live HEAD, CI and review state live in GitHub Issue #136 and Draft PR #138.
+This is the sole repository document for current engineering state. Durable rules live in `AGENTS.md`; ownership lives in `docs/architecture/OWNERSHIP.md`; live branch, Draft PR, HEAD, CI and review state live in GitHub Issue #136.
 
-## Version and delivery line
+## Version and delivery model
 
 - Stable product baseline: Platform `0.9.1`.
 - Frozen baseline branch: `feature/issue-134-platform-0-9-1-unified-delivery`.
 - Frozen baseline commit: `8114fce45e46e7920f316f49d03db12dc424acf1`.
 - Active development version: Platform `0.9.2`.
-- Active delivery branch: `refactor/issue-136-platform-0.9.2-system-optimization`.
-- Master Issue: `#136`.
-- Draft PR: `#138`, based on the frozen 0.9.1 branch.
+- Master engineering tracker: GitHub Issue `#136`.
 - Final accepted candidate: Platform `0.10.1` only after all optimization and acceptance gates pass.
 - `main` remains protected and must not be modified or merged without explicit owner approval.
+
+The active branch and Draft PR are intentionally not copied here. Resolve them from Issue #136 so repository documents do not drift when a governed delivery line changes.
 
 ## Current phase
 
@@ -101,7 +101,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\dev-platform.ps1
 
 Before low-risk domain modularization begins:
 
-- all existing CI, browser E2E, Secret Scan, Version Consistency and Provider Smoke workflows must cover Draft PR #138;
+- all existing CI, browser E2E, Secret Scan, Version Consistency and Provider Smoke workflows must cover the active 0.9.2 Draft PR;
 - the current-state/context checks must reject duplicate or stale authorities;
 - the 0.9.2 version declarations must be synchronized;
 - core page visual baselines must be frozen without changing the UI.
