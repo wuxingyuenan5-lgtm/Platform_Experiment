@@ -4,6 +4,7 @@ Issue: #134
 Status: active
 Branch: `feature/issue-134-platform-0-9-1-unified-delivery`
 Base commit: `f4294eb9c781a2eb4c7150b9859f73176e8dde08`
+Validated functional baseline: `00574a8f10a3fc3723ae78c97aacbff075ff803b`
 
 ## Objective
 
@@ -16,6 +17,7 @@ Consolidate the Platform engineering standard, hedge-board research implementati
 - The frontend must not call third-party research sources directly.
 - Research data must not become authoritative execution, risk or accounting input.
 - Deterministic fixtures must not be represented as live-provider evidence.
+- Local acceptance must use a detached worktree and must not modify tracked files.
 
 ## Scope
 
@@ -28,6 +30,7 @@ Included:
 - research provider/cache/status contracts;
 - Platform CI, User System Browser E2E and Hedge Board Browser E2E;
 - live-provider and responsive manual-acceptance runbooks;
+- local acceptance handoff and evidence template;
 - final Platform 0.9.1 release-candidate handoff.
 
 Non-goals:
@@ -54,7 +57,7 @@ Status: done
 
 - Added `docs/architecture/PRODUCT_PLATFORM_ENGINEERING_STANDARD.md` to this branch.
 - Set the standard to `active` for the Platform 0.9.1 baseline.
-- Kept the standard aligned with `SYSTEM_MAP.md`, `OWNERSHIP.md` and existing repository checks.
+- Kept the standard aligned with repository ownership and architecture checks.
 
 ### Phase 2 — Product and account-data implementation
 
@@ -67,20 +70,22 @@ Status: done
 
 ### Phase 3 — Automated acceptance
 
-Status: done
+Status: done for functional baseline
 
-Validated consolidated head `4ef07207997dae09afe268502ee10e53cda4c3f2`:
+Validated functional baseline `00574a8f10a3fc3723ae78c97aacbff075ff803b`:
 
-- Platform CI `30520684957`: passed;
-- User System Browser E2E `30520684543`: passed;
-- Hedge Board Browser E2E `30520684631`: passed;
-- Secret Scan `30520684549`: passed;
-- Version Consistency `30520684532`: passed;
-- Research Provider Smoke workflow `30520684588`: passed with external result `partial`.
+- Platform CI `30524228159`: passed;
+- User System Browser E2E `30524228014`: passed;
+- Hedge Board Browser E2E `30524228011`: passed;
+- Secret Scan `30524228235`: passed;
+- Version Consistency `30524228121`: passed;
+- Research Provider Smoke `30524228015`: workflow passed, external result recorded as `partial`.
+
+Documentation-only handoff commits after this baseline must pass the applicable PR workflow surface before becoming the current validated head.
 
 ### Phase 4 — Real-environment acceptance
 
-Status: in progress
+Status: local handoff ready; owner-side execution pending
 
 Completed:
 
@@ -92,18 +97,32 @@ Completed:
 - external failures recorded without TLS bypass or false healthy status;
 - responsive browser preflight covers 1440, 1024, 768 and 390 widths;
 - each viewport captures overview, Shenwan and watchlist evidence;
-- the preflight closes responsive navigation overlays, waits for transient errors to clear and rejects page-level horizontal overflow;
-- responsive screenshots are uploaded through the Hedge Board Browser E2E artifact.
+- account-level watchlist browser persistence E2E;
+- complete local acceptance handoff:
+
+```text
+docs/operations/PLATFORM_0_9_1_LOCAL_ACCEPTANCE_HANDOFF.md
+```
+
+The local handoff requires:
+
+- an independent detached worktree;
+- no tracked-file modifications, commits, pushes or merges;
+- `VG_LIVE_TRADING_ENABLED=false`;
+- logs, screenshots and result files outside the repository;
+- actual Platform page checks for source time, fetched time, state and Last Known Good;
+- Shenwan and report/announcement/news original-link spot checks;
+- owner visual review at four responsive widths.
 
 Pending:
 
-- final workflow validation of the current evidence head;
+- applicable workflow validation of the documentation handoff head;
 - actual running Platform review for source timestamp, fetched timestamp, `stale` and Last Known Good display;
 - owner review of 1440/1024/768/390 screenshots and actual running page;
 - Shenwan mapping spot checks;
 - report, announcement and news source-link spot checks.
 
-Provider smoke proves upstream availability at the sampled time. It does not prove the running Platform's stale/LKG display. Automated responsive evidence is a preflight only and does not replace owner visual acceptance. Deterministic research fixtures do not count as live-provider evidence.
+Provider smoke proves upstream availability only at the sampled time. It does not prove the running Platform's stale/LKG display. Automated responsive evidence is a preflight only and does not replace owner visual acceptance. Deterministic research fixtures do not count as live-provider evidence.
 
 ### Phase 5 — Platform 0.9.1 Release Candidate
 
@@ -116,30 +135,33 @@ Status: pending Phase 4 owner acceptance
 
 ## Verification
 
-```powershell
+```bash
+python3.12 scripts/check-documentation-consistency.py
+python3.12 scripts/check-repository-structure.py
+python3.12 scripts/check-version-consistency.py
+python3.12 scripts/check-codex-context.py
+python3.12 scripts/scan-secrets.py
+
 cd platform-backend
 python -m ruff check app tests scripts
 python -m pyright
 python -m pytest
 
 cd ../admin-risk
-npx pnpm@9.15.9 test:hedge-board-layout
-npx pnpm@9.15.9 type:check
-npx pnpm@9.15.9 build
-npx pnpm@9.15.9 test:e2e:hedge-board
-npx pnpm@9.15.9 test:e2e:user-system
-
-cd ..
-python scripts/check-repository-structure.py
-python scripts/check-documentation-consistency.py
-python scripts/check-codex-context.py
+pnpm test:user-system
+pnpm test:hedge-board-layout
+pnpm exec vue-tsc -p tsconfig.user-system.json --noEmit --skipLibCheck
+pnpm type:check
+pnpm build
+pnpm test:e2e:hedge-board
+pnpm test:e2e:user-system
 ```
 
-A Draft pull request targeting `main` must run all repository workflows and remain unmerged.
+A Draft pull request targeting `main` must remain open and unmerged until explicit owner approval.
 
 ## Progress
 
-- Done: Phases 0–3; unified branch and Draft PR; complete deterministic workflow surface; trading and non-trading provider samples; responsive evidence implementation and initial successful screenshot artifact.
-- Current: validate the final evidence head and review actual-environment source-state/link/visual behavior.
-- Next: record remaining human acceptance evidence, then freeze the Platform 0.9.1 release candidate.
-- Blocked by: final visual, source-state and link acceptance require the actual running environment and owner review.
+- Done: Phases 0–3; unified branch and Draft PR; full automated workflow surface on the functional baseline; trading and non-trading provider samples; responsive evidence; local acceptance handoff.
+- Current: validate the documentation handoff head and execute local owner acceptance from a detached worktree.
+- Next single action: run `docs/operations/PLATFORM_0_9_1_LOCAL_ACCEPTANCE_HANDOFF.md`, return the evidence directory and owner conclusion, then decide whether Phase 5 can freeze.
+- Blocked by: actual local page review, original-link spot checks and owner acceptance cannot be claimed from CI or deterministic fixtures.
