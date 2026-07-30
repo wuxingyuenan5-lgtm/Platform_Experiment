@@ -12,9 +12,12 @@ from enum import Enum
 from typing import Any
 from zoneinfo import ZoneInfo
 
+import httpx
+
 from app.research_providers import FreeResearchProvider
 
 MARKET_TIMEZONE = ZoneInfo("Asia/Shanghai")
+EASTMONEY_QUOTE_URL = "https://push2.eastmoney.com/api/qt/stock/get"
 
 
 def json_value(value: Any) -> Any:
@@ -47,6 +50,46 @@ def market_session(observed_at: datetime) -> str:
     return "trading" if morning or afternoon else "non_trading"
 
 
+def eastmoney_scaled(value: Any) -> Decimal | None:
+    if value in (None, "", "-"):
+        return None
+    try:
+        return Decimal(str(value)) / Decimal("100")
+    except Exception:  # noqa: BLE001 - acceptance evidence preserves malformed upstream values
+        return None
+
+
+async def eastmoney_quote_600519(timeout_seconds: float) -> dict[str, Any]:
+    params = {
+        "secid": "1.600519",
+        "fields": "f43,f57,f58,f60,f170",
+    }
+    headers = {
+        "User-Agent": "Mozilla/5.0 Chrome/150.0 Safari/537.36",
+        "Referer": "https://quote.eastmoney.com/",
+    }
+    async with httpx.AsyncClient(timeout=timeout_seconds, follow_redirects=True) as client:
+        response = await client.get(EASTMONEY_QUOTE_URL, params=params, headers=headers)
+        response.raise_for_status()
+        payload = response.json()
+    data = payload.get("data") if isinstance(payload, dict) else None
+    if not isinstance(data, dict):
+        raise RuntimeError("eastmoney_quote_payload_missing")
+    price = eastmoney_scaled(data.get("f43"))
+    previous_close = eastmoney_scaled(data.get("f60"))
+    change_pct = eastmoney_scaled(data.get("f170"))
+    if price is None:
+        raise RuntimeError("eastmoney_quote_price_missing")
+    return {
+        "name": str(data.get("f58") or ""),
+        "code": str(data.get("f57") or ""),
+        "price": price,
+        "lastClose": previous_close,
+        "changePct": change_pct,
+        "source": "Eastmoney single-security quote",
+    }
+
+
 async def run_check(
     name: str,
     loader: Callable[[], Awaitable[Any]],
@@ -77,6 +120,47 @@ async def run_check(
         }
 
 
+def quote_cross_check(results: list[dict[str, Any]]) -> dict[str, Any]:
+    by_name = {str(item.get("name")): item for item in results}
+    tencent = by_name.get("stock_quote_600519")
+    eastmoney = by_name.get("eastmoney_quote_600519")
+    if not tencent or not eastmoney:
+        return {
+            "name": "quote_cross_source_600519",
+            "status": "failed",
+            "error": "quote_check_result_missing",
+        }
+    if tencent.get("status") != "passed" or eastmoney.get("status") != "passed":
+        return {
+            "name": "quote_cross_source_600519",
+            "status": "failed",
+            "error": "one_or_more_quote_sources_unavailable",
+        }
+    tencent_sample = tencent.get("sample")
+    eastmoney_sample = eastmoney.get("sample")
+    try:
+        tencent_price = Decimal(str(tencent_sample["price"]))
+        eastmoney_price = Decimal(str(eastmoney_sample["price"]))
+    except (KeyError, TypeError, ArithmeticError) as exc:
+        return {
+            "name": "quote_cross_source_600519",
+            "status": "failed",
+            "error": f"quote_price_parse_failed:{type(exc).__name__}",
+        }
+    difference = abs(tencent_price - eastmoney_price)
+    tolerance = max(Decimal("1.00"), tencent_price * Decimal("0.0015"))
+    return {
+        "name": "quote_cross_source_600519",
+        "status": "passed" if difference <= tolerance else "failed",
+        "sample": {
+            "tencentPrice": tencent_price,
+            "eastmoneyPrice": eastmoney_price,
+            "absoluteDifference": difference,
+            "tolerance": tolerance.quantize(Decimal("0.01")),
+        },
+    }
+
+
 async def main_async(timeout_seconds: float) -> list[dict[str, Any]]:
     provider = FreeResearchProvider(timeout_seconds=min(timeout_seconds, 30.0))
     checks: tuple[tuple[str, Callable[[], Awaitable[Any]]], ...] = (
@@ -86,11 +170,14 @@ async def main_async(timeout_seconds: float) -> list[dict[str, Any]]:
         ("shenwan_memberships", provider.shenwan_memberships),
         ("short_term_emotion", provider.short_term_emotion),
         ("stock_quote_600519", lambda: provider.stock_quote("600519")),
+        ("eastmoney_quote_600519", lambda: eastmoney_quote_600519(timeout_seconds)),
     )
-    return [
+    results = [
         await run_check(name, loader, timeout_seconds=timeout_seconds)
         for name, loader in checks
     ]
+    results.append(quote_cross_check(results))
+    return results
 
 
 def main() -> int:
