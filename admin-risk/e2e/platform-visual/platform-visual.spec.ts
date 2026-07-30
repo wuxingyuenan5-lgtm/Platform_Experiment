@@ -195,7 +195,9 @@ async function stabilizePage(page: Page): Promise<void> {
   });
   await page.keyboard.press('Escape');
   const mask = page.locator('.ant-drawer-mask:visible, .ant-modal-mask:visible').first();
-  if (await mask.isVisible().catch(() => false)) await mask.click({ force: true });
+  if (await mask.isVisible().catch(() => false)) {
+    await mask.click({ force: true, timeout: 1_000 }).catch(() => undefined);
+  }
   await page
     .locator('.ant-spin-spinning')
     .first()
