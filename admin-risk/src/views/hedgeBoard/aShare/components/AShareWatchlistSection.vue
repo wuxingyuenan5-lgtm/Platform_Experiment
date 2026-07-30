@@ -5,9 +5,22 @@
         <p class="research-card__eyebrow">WATCHLIST</p>
         <h2>自选股</h2>
       </div>
-      <button type="button" class="toolbar-button" @click="addExpanded = !addExpanded">
-        {{ addExpanded ? '收起添加' : '添加自选' }}
-      </button>
+      <div class="header-actions">
+        <span class="sync-state" :class="`is-${syncState}`" role="status" aria-live="polite">
+          {{ syncMessage }}
+        </span>
+        <button
+          v-if="syncState === 'local' || syncState === 'error'"
+          type="button"
+          class="toolbar-button"
+          @click="$emit('retrySync')"
+        >
+          重试同步
+        </button>
+        <button type="button" class="toolbar-button" @click="addExpanded = !addExpanded">
+          {{ addExpanded ? '收起添加' : '添加自选' }}
+        </button>
+      </div>
     </header>
 
     <form v-if="addExpanded" class="add-form" @submit.prevent="submitAdd">
@@ -84,7 +97,7 @@
       </article>
     </div>
     <div v-else class="research-empty">
-      <p>暂无自选股，空列表会被正常保留。</p>
+      <p>暂无自选股，空列表会被正常保留并同步到当前账号。</p>
       <button type="button" class="toolbar-button" @click="addExpanded = true"
         >添加第一只自选股</button
       >
@@ -94,16 +107,21 @@
 
 <script setup lang="ts">
   import { computed, reactive, ref } from 'vue';
-  import type { WatchlistItem } from '../useAShareResearch';
+  import type { WatchlistItem, WatchlistSyncState } from '../useAShareResearch';
   import { normalizeStockCode } from '../useAShareResearch';
 
-  const props = defineProps<{ groups: Array<{ name: string; items: WatchlistItem[] }> }>();
+  const props = defineProps<{
+    groups: Array<{ name: string; items: WatchlistItem[] }>;
+    syncState: WatchlistSyncState;
+    syncMessage: string;
+  }>();
   const emit = defineEmits<{
     (event: 'add', code: string, name: string, group: string): void;
     (event: 'remove', code: string): void;
     (event: 'move', code: string, direction: 'up' | 'down'): void;
     (event: 'setGroup', code: string, group: string): void;
     (event: 'query', code: string): void;
+    (event: 'retrySync'): void;
   }>();
 
   const addExpanded = ref(false);
@@ -155,6 +173,34 @@
     font-size: 11px;
     font-weight: 800;
     letter-spacing: 0.12em;
+  }
+  .header-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .sync-state {
+    padding: 5px 9px;
+    border-radius: 999px;
+    background: var(--strategy-surface-2);
+    color: var(--strategy-text-3);
+    font-size: 12px;
+  }
+  .sync-state.is-synced {
+    background: rgba(16, 185, 129, 0.08);
+    color: #047857;
+  }
+  .sync-state.is-saving,
+  .sync-state.is-loading {
+    background: var(--strategy-accent-soft);
+    color: var(--strategy-accent-strong);
+  }
+  .sync-state.is-local,
+  .sync-state.is-error {
+    background: rgba(245, 158, 11, 0.1);
+    color: #b45309;
   }
   h2,
   h3,
@@ -313,6 +359,9 @@
   @media (max-width: 560px) {
     .research-card__header {
       flex-direction: column;
+    }
+    .header-actions {
+      justify-content: flex-start;
     }
     .add-form {
       grid-template-columns: 1fr;
