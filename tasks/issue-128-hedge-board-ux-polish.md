@@ -4,6 +4,7 @@ Issue: #128
 Status: active
 Branch: `feature/issue-128-hedge-board-ux-polish`
 Base commit: `af8ad664f30fce9a711d0d275eb00729093ac759`
+Validated HEAD: `5d125f7ab55a9e71af7a1599dc076dc734ff9eef`
 
 ## Objective
 
@@ -27,6 +28,10 @@ Included:
 - keep watchlist ordering within the current group;
 - improve user feedback and accessibility for watchlist actions;
 - clarify research source time, platform fetch time and data-state presentation;
+- prevent stale dashboard or stock requests from overwriting newer results;
+- provide explicit threshold apply, copy and CSV-export feedback;
+- use China-market calendar dates for exported filenames;
+- expose Shenwan sort direction, current result order, result counts and empty-filter recovery;
 - add bounded regression checks and run the existing Critical validation surface.
 
 Non-goals:
@@ -41,6 +46,7 @@ Non-goals:
 - `tasks/issue-125-hedge-board-research-upgrade.md`
 - `admin-risk/src/views/hedgeBoard/aShare/useAShareResearch.ts`
 - `admin-risk/src/views/hedgeBoard/aShare/components/AShareWatchlistSection.vue`
+- `admin-risk/src/views/hedgeBoard/aShare/components/ShenwanIndustrySection.vue`
 - `admin-risk/src/views/hedgeBoard/research/components/ResearchSourceState.vue`
 - Draft PR #129
 
@@ -60,9 +66,16 @@ python scripts/check-codex-context.py
 
 The Draft pull request targeting `main` must run Platform CI, User System Browser E2E, Version Consistency and Secret Scan and remain unmerged.
 
+## Validated runs
+
+- Platform CI `30502015128`: passed.
+- User System Browser E2E `30502015115`: passed.
+- Secret Scan `30502015108`: passed.
+- Version Consistency `30502015165`: passed.
+
 ## Progress
 
-- Done: Issue #128; isolated child branch; empty-watchlist persistence; stock-code normalization; group-bounded ordering; add-form feedback; source-state clarification; validation PR.
-- Current: repair exact CI findings and add bounded regression assertions.
-- Next: complete CI, update the Draft PR handoff and leave the branch unmerged for owner acceptance.
+- Done: Issue #128; isolated child branch; empty-watchlist persistence; stock-code normalization; group-bounded ordering; add-form feedback; source-state clarification; stale-request protection; threshold feedback; Shanghai-date CSV export; Shenwan sorting and empty states; regression guards; full automated validation.
+- Current: code and automated regression work are complete; retain `active` until owner-side visual and business-use acceptance is recorded.
+- Next: owner reviews the running page and records any visual or workflow observations; no merge occurs without explicit instruction.
 - Blocked by: none.
