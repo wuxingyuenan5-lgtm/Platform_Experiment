@@ -13,7 +13,9 @@ const runtimeOrigin = 'http://127.0.0.1:8100';
 const backendPython = process.env.PLATFORM_VISUAL_BACKEND_PYTHON || 'python';
 const runtimePython = process.env.PLATFORM_VISUAL_RUNTIME_PYTHON || 'python';
 const inheritedEnvironment = Object.fromEntries(
-  Object.entries(process.env).filter((entry): entry is [string, string] => typeof entry[1] === 'string'),
+  Object.entries(process.env).filter(
+    (entry): entry is [string, string] => typeof entry[1] === 'string',
+  ),
 );
 
 export default defineConfig({
@@ -27,10 +29,7 @@ export default defineConfig({
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI
-    ? [
-        ['list'],
-        ['html', { open: 'never', outputFolder: 'playwright-report/platform-visual' }],
-      ]
+    ? [['list'], ['html', { open: 'never', outputFolder: 'playwright-report/platform-visual' }]]
     : [['list']],
   outputDir: 'test-results/platform-visual',
   use: {
