@@ -4,15 +4,14 @@
 
 - Workstream: critical
 - Issue: #136
-- Active Draft PR: #138
-- Superseded Draft PR: #137（未合并，仅保留分支治理迁移历史）
+- Branch: `refactor/issue-136-platform-0-9-2-system-optimization`
 - Baseline branch: `feature/issue-134-platform-0-9-1-unified-delivery`
 - Frozen baseline SHA: `8114fce45e46e7920f316f49d03db12dc424acf1`
-- Delivery branch: `refactor/issue-136-platform-0.9.2-system-optimization`
 - Development/acceptance version: `0.9.2`
 - Final accepted candidate: `0.10.1`
 - Merge policy: Draft only; never auto-merge; never modify `main`; owner approval required.
-- Live HEAD, CI and review status: GitHub Draft PR #138.
+- Live Draft PR, HEAD, CI and review status: GitHub Issue #136.
+- Superseded PRs #137 and #138 remain closed and unmerged as branch-governance migration history.
 
 ## Core objective
 
@@ -34,7 +33,7 @@
 - [x] Produce `docs/architecture/PLATFORM_0_9_2_SYSTEM_OPTIMIZATION_MASTER_PLAN.md` from repository evidence.
 - [x] Run baseline Platform API and Runtime test suites: Platform API `418 passed`; Runtime `76 passed`.
 - [x] Extend the existing governed CI matrix to PRs based on the frozen 0.9.1 unified branch.
-- [x] Migrate the delivery line to the repository-compliant Critical branch name containing Issue #136.
+- [x] Migrate the delivery line to the repository-compliant Critical branch syntax.
 - [ ] Capture durable pre-refactor visual baselines for all core pages at 1440/1024/768/390.
 
 ## Phase A evidence
@@ -44,18 +43,18 @@
 - Frozen product tree: approximately 1,776 text files, 276,992 lines and 2,014,104 estimated text tokens.
 - Platform API baseline: `418 passed`.
 - Execution Runtime baseline: `76 passed`.
-- Initial complete CI attachment proved Backend, Runtime, Frontend, both browser E2Es, Secret Scan, Version Consistency and Provider Smoke passed; Repository Safety correctly rejected the non-governed branch name. The branch was migrated rather than weakening the check.
+- Initial complete CI attachment proved Backend, Runtime, Frontend, both browser E2Es, Secret Scan, Version Consistency and Provider Smoke passed; Repository Safety correctly rejected non-governed branch syntax. The branch was migrated rather than weakening the check.
 - Product behavior changes in Phase A: none.
 
 ## Phase B — Authority and AI context reduction
 
-- [ ] Synchronize maintained version declarations to `0.9.2`.
-- [ ] Make `docs/codex/current-state.md` the sole current engineering-state document.
-- [ ] Convert `docs/codex/CURRENT_CONTEXT.md` into a non-authoritative compatibility pointer.
-- [ ] Remove volatile branch, commit and task progress from `AGENTS.md` and `README.md`.
-- [ ] Expand `docs/codex/context-map.md` into bounded domain reading packs and default exclusions.
-- [ ] Rewrite `scripts/check-codex-context.py` to derive repository facts instead of hardcoding version and main commit.
-- [ ] Re-run version, context, repository structure and documentation checks.
+- [x] Synchronize maintained version declarations to `0.9.2`.
+- [x] Make `docs/codex/current-state.md` the sole current engineering-state document.
+- [x] Convert `docs/codex/CURRENT_CONTEXT.md` into a non-authoritative compatibility pointer.
+- [x] Remove volatile branch, commit and task progress from `AGENTS.md` and `README.md`.
+- [x] Expand `docs/codex/context-map.md` into bounded domain reading packs and default exclusions.
+- [x] Rewrite `scripts/check-codex-context.py` to derive repository facts instead of hardcoding version and main commit.
+- [ ] Re-run version, context, repository structure and documentation checks on the final governed branch.
 - [ ] Re-run the complete PR quality matrix before beginning product-code refactoring.
 - [ ] Re-measure representative task context cost.
 
