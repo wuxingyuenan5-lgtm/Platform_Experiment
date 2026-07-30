@@ -1,6 +1,6 @@
 <template>
   <div :class="prefixCls" class="relative w-full h-full">
-    <div class="container relative h-full mx-auto">
+    <div class="login-container relative h-full mx-auto">
       <LoginForm />
     </div>
   </div>
@@ -60,7 +60,9 @@
       }
     }
 
-    .container {
+    .login-container {
+      width: 100%;
+
       .@{logo-prefix-cls} {
         display: flex;
         width: 60%;
