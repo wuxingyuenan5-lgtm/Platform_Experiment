@@ -227,7 +227,14 @@ export function useAShareResearch() {
       return;
     }
     try {
-      const header = ['申万一级', '申万二级', '股票代码', '股票名称', '成交额（元）', '涨跌幅（%）'];
+      const header = [
+        '申万一级',
+        '申万二级',
+        '股票代码',
+        '股票名称',
+        '成交额（元）',
+        '涨跌幅（%）',
+      ];
       const body = rows.map((row) => [
         row.swL1Name,
         row.swL2Name,
