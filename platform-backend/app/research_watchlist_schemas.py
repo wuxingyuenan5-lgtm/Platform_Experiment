@@ -26,7 +26,7 @@ class ReplaceResearchWatchlistRequest(BaseModel):
     items: list[ResearchWatchlistItem] = Field(max_length=200)
 
     @model_validator(mode="after")
-    def validate_unique_codes(self) -> "ReplaceResearchWatchlistRequest":
+    def validate_unique_codes(self) -> ReplaceResearchWatchlistRequest:
         codes = [item.security_code for item in self.items]
         if len(codes) != len(set(codes)):
             raise ValueError("watchlist securityCode values must be unique")
