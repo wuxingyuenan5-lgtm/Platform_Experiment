@@ -69,24 +69,36 @@ Status: done
 
 Status: done
 
-Validated consolidated head `ef76a8fc78a17b0ae2d3e929b3890b8a5ed55dcf`:
+Validated consolidated head `4ef07207997dae09afe268502ee10e53cda4c3f2`:
 
-- Platform CI `30517462609`: passed;
-- User System Browser E2E `30517462623`: passed;
-- Hedge Board Browser E2E `30517462650`: passed;
-- Secret Scan `30517462651`: passed;
-- Version Consistency `30517462662`: passed.
-
-The documentation-only progress update that records these results must also pass the same repository workflow surface before the branch is treated as the current validated head.
+- Platform CI `30520684957`: passed;
+- User System Browser E2E `30520684543`: passed;
+- Hedge Board Browser E2E `30520684631`: passed;
+- Secret Scan `30520684549`: passed;
+- Version Consistency `30520684532`: passed;
+- Research Provider Smoke workflow `30520684588`: passed with external result `partial`.
 
 ### Phase 4 — Real-environment acceptance
 
-Status: pending external environment
+Status: in progress
 
-- one A-share trading-hours live-provider validation;
-- one non-trading-hours validation;
-- market value, Shenwan mapping and source-link spot checks;
-- visual acceptance at 1440px, 1024px, 768px and 390px.
+Completed:
+
+- trading-hours live-provider sample at `2026-07-30 14:47:41 +08:00`;
+- provider result: 5 of 8 checks passed and 3 external dependencies failed;
+- Tencent/Eastmoney 600519 cross-source quote check passed with absolute difference `0.03`;
+- external failures recorded without TLS bypass or false healthy status;
+- responsive browser preflight added for 1440, 1024, 768 and 390 widths;
+- responsive screenshots are uploaded through the existing Hedge Board Browser E2E artifact.
+
+Pending:
+
+- one non-trading-hours provider validation;
+- owner review of 1440/1024/768/390 screenshots and actual running page;
+- Shenwan mapping spot checks;
+- report, announcement and news source-link spot checks.
+
+Automated responsive evidence is a preflight only and does not replace owner visual acceptance. Deterministic research fixtures do not count as live-provider evidence.
 
 ### Phase 5 — Platform 0.9.1 Release Candidate
 
@@ -122,7 +134,7 @@ A Draft pull request targeting `main` must run all repository workflows and rema
 
 ## Progress
 
-- Done: Phases 0–3; one unified branch; one open Draft PR; superseded PRs closed without merge; full automated workflow surface passed on the consolidated implementation-and-standard head.
-- Current: maintain the unified branch as the only active Platform 0.9.1 delivery line and wait for Phase 4 real-environment evidence.
-- Next: record trading-hours, non-trading-hours, source-link and responsive visual acceptance; then freeze the Platform 0.9.1 release candidate.
-- Blocked by: Phase 4 requires access to the actual running environment and live external providers.
+- Done: Phases 0–3; unified branch and Draft PR; full deterministic workflow surface; one trading-hours live-provider sample; responsive screenshot preflight implementation.
+- Current: validate the responsive preflight commit and complete the scheduled non-trading-hours sample.
+- Next: record non-trading evidence, review source links and responsive screenshots, then freeze the Platform 0.9.1 release candidate.
+- Blocked by: final visual and link acceptance require the actual running environment and owner review.
