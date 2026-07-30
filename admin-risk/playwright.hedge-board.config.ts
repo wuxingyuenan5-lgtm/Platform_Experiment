@@ -5,7 +5,7 @@ import { defineConfig, devices } from '@playwright/test';
 const frontendRoot = process.cwd();
 const repositoryRoot = path.resolve(frontendRoot, '..');
 const backendRoot = path.join(repositoryRoot, 'platform-backend');
-const e2eRoot = path.join(repositoryRoot, '.e2e', 'hedge-board');
+const e2eRoot = path.join(repositoryRoot, '.e2e', 'user-system', 'hedge-board');
 const frontendOrigin = 'http://127.0.0.1:4373';
 const backendOrigin = 'http://127.0.0.1:8000';
 const inheritedEnvironment = Object.fromEntries(
