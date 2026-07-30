@@ -1,8 +1,8 @@
-"""Validate lightweight Codex collaboration context.
+"""Validate the lightweight Agent context entrypoints.
 
-This check intentionally stays small. It verifies stable local facts that cause
-expensive re-orientation when they drift: version, ports, package manager and
-the current Codex context entrypoint.
+The check deliberately validates only repository facts and context-governance
+rules. Product UI standards, task progress and live GitHub status belong to
+their own owners and must not be duplicated here.
 """
 
 from __future__ import annotations
@@ -13,12 +13,13 @@ import tomllib
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-EXPECTED_VERSION = "0.9.1"
-EXPECTED_MAIN_BASELINE = "a4e22021c71cf5cd703cb0bc35676ff5adbfec36"
-EXPECTED_FRONTEND_PORT = "4373"
-EXPECTED_BACKEND_PORT = "8000"
-EXPECTED_RUNTIME_PORT = "8100"
-EXPECTED_PNPM = "pnpm@9.15.9"
+FRONTEND_PORT = "4373"
+BACKEND_PORT = "8000"
+RUNTIME_PORT = "8100"
+STALE_BRANCHES = (
+    "feature/issue-117-platform-0-9-1",
+    "feature/issue-117-platform-0.9.1",
+)
 
 
 def read_text(relative_path: str) -> str:
@@ -32,119 +33,131 @@ def require(condition: bool, message: str) -> None:
 
 def pyproject_version(relative_path: str) -> str:
     with (ROOT / relative_path).open("rb") as handle:
-        return tomllib.load(handle)["project"]["version"]
+        return str(tomllib.load(handle)["project"]["version"])
+
+
+def frontend_version(relative_path: str) -> str:
+    content = read_text(relative_path)
+    match = re.search(r'VITE_GLOB_APP_VERSION\s*=\s*["\']([^"\']+)["\']', content)
+    require(match is not None, f"Missing frontend version in {relative_path}")
+    return match.group(1)
 
 
 def main() -> None:
-    context_path = ROOT / "docs/codex/CURRENT_CONTEXT.md"
-    require(context_path.exists(), "Missing docs/codex/CURRENT_CONTEXT.md")
+    required = (
+        "AGENTS.md",
+        "README.md",
+        "docs/codex/current-state.md",
+        "docs/codex/context-map.md",
+        "docs/codex/CURRENT_CONTEXT.md",
+        "docs/architecture/OWNERSHIP.md",
+    )
+    for relative_path in required:
+        require((ROOT / relative_path).is_file(), f"Missing context entrypoint: {relative_path}")
 
-    context = context_path.read_text(encoding="utf-8")
-    context_map = read_text("docs/codex/context-map.md")
-    lightweight_plan = read_text("docs/architecture/LIGHTWEIGHT_OPTIMIZATION_PLAN.md")
+    agents = read_text("AGENTS.md")
     readme = read_text("README.md")
-    root_agents = read_text("AGENTS.md")
-    package_json = json.loads(read_text("admin-risk/package.json"))
-    vite_config = read_text("admin-risk/vite.config.ts")
-    frontend_env = read_text("admin-risk/.env.development")
+    current_state = read_text("docs/codex/current-state.md")
+    context_map = read_text("docs/codex/context-map.md")
+    compatibility = read_text("docs/codex/CURRENT_CONTEXT.md")
     dev_script = read_text("scripts/dev-platform.ps1")
-    ui_guidelines = read_text("admin-risk/docs/design/platform-ui-guidelines.md")
+    vite_config = read_text("admin-risk/vite.config.ts")
+    package_json = json.loads(read_text("admin-risk/package.json"))
 
-    version_files = {
-        "VERSION": read_text("VERSION").strip(),
+    expected_version = read_text("VERSION").strip()
+    actual_versions = {
         "platform-backend": pyproject_version("platform-backend/pyproject.toml"),
         "execution-runtime": pyproject_version("execution-runtime/pyproject.toml"),
+        "frontend development": frontend_version("admin-risk/.env.development"),
+        "frontend production": frontend_version("admin-risk/.env.production"),
     }
-    for name, version in version_files.items():
-        require(version == EXPECTED_VERSION, f"{name} version drifted: {version}")
-
+    drift = {name: value for name, value in actual_versions.items() if value != expected_version}
+    require(not drift, f"Version declarations drifted from VERSION={expected_version}: {drift}")
     require(
-        f'VITE_GLOB_APP_VERSION = "{EXPECTED_VERSION}"' in frontend_env,
-        "Frontend display version drifted in admin-risk/.env.development",
-    )
-    require(
-        package_json.get("packageManager") == EXPECTED_PNPM,
-        "admin-risk/package.json packageManager drifted",
-    )
-    require(
-        f"port: {EXPECTED_FRONTEND_PORT}" in vite_config,
-        "Frontend Vite port drifted",
+        f"Active development version: Platform `{expected_version}`" in current_state,
+        "current-state.md does not match root VERSION",
     )
 
-    for text_name, text in {
-        "CURRENT_CONTEXT.md": context,
-        "README.md": readme,
-        "AGENTS.md": root_agents,
-    }.items():
-        require(EXPECTED_VERSION in text, f"{text_name} is missing product version")
-        require(EXPECTED_FRONTEND_PORT in text, f"{text_name} is missing frontend port")
+    package_manager = str(package_json.get("packageManager", ""))
+    require(package_manager.startswith("pnpm@"), "Frontend packageManager is missing or invalid")
+    require(package_manager in current_state, "current-state.md is missing the package-manager authority")
 
-    require(EXPECTED_MAIN_BASELINE in root_agents, "AGENTS.md main baseline drifted")
-    require(EXPECTED_MAIN_BASELINE in context, "CURRENT_CONTEXT.md main baseline drifted")
-    require("docs/codex/CURRENT_CONTEXT.md" in readme, "README.md does not link current context")
-    require("docs/codex/CURRENT_CONTEXT.md" in context_map, "context-map does not prefer CURRENT_CONTEXT.md")
-
+    require(f"port: {FRONTEND_PORT}" in vite_config, "Frontend Vite port drifted")
     for port, label in {
-        EXPECTED_FRONTEND_PORT: "frontend",
-        EXPECTED_BACKEND_PORT: "backend",
-        EXPECTED_RUNTIME_PORT: "runtime",
+        FRONTEND_PORT: "frontend",
+        BACKEND_PORT: "Platform API",
+        RUNTIME_PORT: "Execution Runtime",
     }.items():
-        require(port in context, f"CURRENT_CONTEXT.md is missing {label} port")
-        require(port in readme, f"README.md is missing {label} port")
-        require(port in dev_script, f"dev-platform.ps1 is missing {label} port")
+        require(port in dev_script, f"dev-platform.ps1 is missing the {label} port")
+        require(port in current_state, f"current-state.md is missing the {label} port")
+        require(port in readme, f"README.md is missing the {label} port")
 
-    banned_default_context = [
-        "admin-risk/CHANGELOG.md",
-        "admin-risk/project_structure.txt",
-    ]
-    for banned in banned_default_context:
+    for path_name, text in {
+        "AGENTS.md": agents,
+        "README.md": readme,
+        "context-map.md": context_map,
+        "CURRENT_CONTEXT.md": compatibility,
+    }.items():
         require(
-            banned not in context,
-            f"CURRENT_CONTEXT.md should not promote noisy context: {banned}",
+            "docs/codex/current-state.md" in text,
+            f"{path_name} must link to the sole current-state authority",
         )
+        for stale in STALE_BRANCHES:
+            require(stale not in text, f"{path_name} contains stale branch authority: {stale}")
 
     require(
-        "admin-risk/docs/design/platform-ui-guidelines.md" in context,
-        "CURRENT_CONTEXT.md should point UI standards to platform-ui-guidelines.md",
+        "sole repository document for current engineering state" in current_state,
+        "current-state.md must declare its authority",
     )
     require(
-        "Hedge board research subnav uses same black" not in context
-        and "market-detail widgets must not repeat" not in context,
-        "CURRENT_CONTEXT.md should not own detailed UI standards",
+        "docs/architecture/OWNERSHIP.md" in current_state,
+        "current-state.md must link architecture ownership",
     )
     require(
-        "对冲基金研究子导航标准字号为 `14px`" in ui_guidelines,
-        "platform-ui-guidelines.md is missing hedge board subnav typography standard",
+        "GitHub Issue #136 and Draft PR #138" in current_state,
+        "current-state.md must delegate live progress and CI to GitHub",
+    )
+
+    require(
+        "compatibility pointer" in compatibility.lower()
+        and "not a current-state authority" in compatibility,
+        "CURRENT_CONTEXT.md must be a non-authoritative compatibility pointer",
     )
     require(
-        "内部 `TerminalDetailPanel` 不再重复显示“市场明细”" in ui_guidelines,
-        "platform-ui-guidelines.md is missing market detail duplicate-title standard",
+        "CURRENT_CONTEXT.md` is a compatibility pointer and is not part of default context" in context_map,
+        "context-map.md must exclude CURRENT_CONTEXT.md from default context",
     )
     require(
-        "Georgia, Times New Roman, Noto Serif SC, serif" in ui_guidelines
-        and "`18px`" in ui_guidelines
-        and "`30px`" in ui_guidelines,
-        "platform-ui-guidelines.md is missing login title typography standard",
+        "## Bounded task packs" in context_map
+        and "## Default exclusions" in context_map
+        and "## Authority rules" in context_map,
+        "context-map.md is missing bounded task-routing sections",
     )
-    require(
-        re.search(r"npx\.cmd pnpm@9\.15\.9 type:check", context) is not None,
-        "CURRENT_CONTEXT.md should list the Windows-safe frontend type check",
-    )
-    require(
-        "Light UI tweak" in context
-        and "Do not run the full frontend guard set for every small UI tweak" in context,
-        "CURRENT_CONTEXT.md is missing lightweight UI execution tiers",
-    )
-    require(
-        "小 UI 微调默认不更新 md、不新增守卫、不跑全量前端检查" in lightweight_plan,
-        "LIGHTWEIGHT_OPTIMIZATION_PLAN.md is missing lightweight UI token discipline",
-    )
+    for required_pack in (
+        "A-share/Shenwan/research field",
+        "Identity/permission/session",
+        "Member holdings/NAV",
+        "Trading execution/risk",
+        "Financial Fact/PnL/NAV/accounting",
+        "Runtime adapter",
+    ):
+        require(required_pack in context_map, f"context-map.md is missing task pack: {required_pack}")
+
+    for noisy in (
+        "node_modules",
+        "lock files",
+        "tasks/",
+        "projects/risk-control",
+        "src/views/demo",
+    ):
+        require(noisy in context_map, f"context-map.md is missing default exclusion: {noisy}")
+
     require(
         "Browser ambient state is evidence only" in context_map,
-        "context-map.md is missing browser ambient-state discipline",
+        "context-map.md is missing browser evidence discipline",
     )
 
-    print("Codex context checks passed.")
+    print(f"Codex context checks passed for Platform {expected_version}.")
 
 
 if __name__ == "__main__":
