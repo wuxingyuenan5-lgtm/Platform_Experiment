@@ -14,6 +14,7 @@ const widgetErrorBoundaryPath = path.join(
   'WidgetErrorBoundary.ts',
 );
 const metricStripPath = path.join(viewRoot, 'components', 'MetricStrip.ts');
+const reserveRankingPath = path.join(viewRoot, 'components', 'ReserveRanking.ts');
 const marketDetailCatalogPath = path.join(viewRoot, 'nativeData', 'marketDetailCatalog.ts');
 const toolGroupSectionPath = path.join(viewRoot, 'tradingTools', 'components', 'ToolGroupSection.vue');
 const tradingToolCatalogPath = path.join(viewRoot, 'tradingTools', 'data', 'catalog.ts');
@@ -62,6 +63,7 @@ const hedgeResearchModuleSource = fs.readFileSync(hedgeResearchModulePath, 'utf8
 const terminalDetailPanelSource = fs.readFileSync(terminalDetailPanelPath, 'utf8');
 const widgetErrorBoundarySource = fs.readFileSync(widgetErrorBoundaryPath, 'utf8');
 const metricStripSource = fs.readFileSync(metricStripPath, 'utf8');
+const reserveRankingSource = fs.readFileSync(reserveRankingPath, 'utf8');
 const marketDetailCatalogSource = fs.readFileSync(marketDetailCatalogPath, 'utf8');
 const tradingToolCatalogSource = fs.readFileSync(tradingToolCatalogPath, 'utf8');
 const tradingToolsPageSource = fs.readFileSync(tradingToolsPagePath, 'utf8');
@@ -82,6 +84,7 @@ assert(fs.existsSync(hedgeResearchModulePath), 'Expected HedgeResearchModule com
 assert(fs.existsSync(terminalDetailPanelPath), 'Expected TerminalDetailPanel component to exist.');
 assert(fs.existsSync(widgetErrorBoundaryPath), 'Expected WidgetErrorBoundary component to exist.');
 assert(fs.existsSync(metricStripPath), 'Expected MetricStrip component to exist.');
+assert(fs.existsSync(reserveRankingPath), 'Expected ReserveRanking component to exist.');
 assert(fs.existsSync(marketDetailCatalogPath), 'Expected market detail catalog to exist.');
 assert(fs.existsSync(toolGroupSectionPath), 'Expected ToolGroupSection component to exist.');
 assert(fs.existsSync(aSharePagePath), 'Expected dedicated A-share research page to exist.');
@@ -139,6 +142,22 @@ assert(
     metricStripSource.includes("h('span', label)") &&
     metricStripSource.includes("h('strong', value)"),
   'MetricStrip must preserve its prop type, root class, item hierarchy and stable key.',
+);
+assert(
+  hedgeBoardSource.includes("import ReserveRanking from './components/ReserveRanking';") &&
+    !hedgeBoardSource.includes('const ReserveRanking = defineComponent'),
+  'Hedge board must delegate reserve ranking rendering to the external component.',
+);
+assert(
+  reserveRankingSource.includes("name: 'ReserveRanking'") &&
+    reserveRankingSource.includes('type: Array as PropType<ReserveRankingRow[]>') &&
+    reserveRankingSource.includes("class: 'reserve-module'") &&
+    reserveRankingSource.includes('Math.max(...props.rows.map') &&
+    reserveRankingSource.includes('key: `${row.label}-${row.value}`') &&
+    reserveRankingSource.includes("row.value >= 0 ? '#148b6a' : '#dc2626'") &&
+    reserveRankingSource.includes("minWidth: props.diverging && row.value < 0 ? '12px' : undefined") &&
+    reserveRankingSource.includes("formatSigned(row.value) + ' 吨'"),
+  'ReserveRanking must preserve props, scaling, tones, item key and displayed value.',
 );
 assert(
   !hedgeBoardSource.includes("from './nativeData/dashboard'") &&
