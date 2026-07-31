@@ -290,9 +290,12 @@ assert(
   aShareResearchComposableSource.includes("from './aShareWatchlistLocalState'") &&
     aShareResearchComposableSource.includes('export { normalizeStockCode };') &&
     aShareResearchComposableSource.includes('export type { WatchlistItem };') &&
+    aShareResearchComposableSource.includes(
+      "export type WatchlistSyncState = 'local' | 'syncing' | 'synced' | 'offline';",
+    ) &&
     aShareResearchComposableSource.includes('const groupIndexes = watchlist.value.reduce<number[]>') &&
     !aShareResearchComposableSource.includes('window.localStorage'),
-  'A-share composable must delegate local watchlist persistence while preserving its public API and group moves.',
+  'A-share composable must delegate local watchlist persistence while preserving public types and group moves.',
 );
 assert(
   aShareWatchlistLocalStateSource.includes('export function normalizeStockCode') &&
