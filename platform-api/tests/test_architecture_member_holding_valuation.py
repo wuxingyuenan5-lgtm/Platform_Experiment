@@ -28,7 +28,6 @@ def test_member_holding_valuation_is_pure_and_service_retains_security_boundarie
     imported = imported_modules(valuation_path)
     allowed_application_imports = {
         "app.member_holding_decimal",
-        "app.member_holding_repository",
         "app.member_holding_schemas",
     }
     assert {name for name in imported if name.startswith("app.")} <= allowed_application_imports
@@ -39,6 +38,7 @@ def test_member_holding_valuation_is_pure_and_service_retains_security_boundarie
     }
 
     for forbidden_valuation_dependency in (
+        "member_holding_repository",
         "get_settings",
         "connection(",
         "insert_audit_event",
@@ -46,6 +46,13 @@ def test_member_holding_valuation_is_pure_and_service_retains_security_boundarie
         "MemberHoldingServiceError",
     ):
         assert forbidden_valuation_dependency not in valuation
+
+    for protocol_contract in (
+        "class FundValuationRecord(Protocol)",
+        "class HoldingValuationRecord(Protocol)",
+        "class NavValuationRecord(Protocol)",
+    ):
+        assert protocol_contract in valuation
 
     assert "build_holding_response" in service
     assert "HoldingValuationError" in service
