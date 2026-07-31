@@ -13,6 +13,7 @@ const widgetErrorBoundaryPath = path.join(
   'components',
   'WidgetErrorBoundary.ts',
 );
+const metricStripPath = path.join(viewRoot, 'components', 'MetricStrip.ts');
 const marketDetailCatalogPath = path.join(viewRoot, 'nativeData', 'marketDetailCatalog.ts');
 const toolGroupSectionPath = path.join(viewRoot, 'tradingTools', 'components', 'ToolGroupSection.vue');
 const tradingToolCatalogPath = path.join(viewRoot, 'tradingTools', 'data', 'catalog.ts');
@@ -60,6 +61,7 @@ const hedgeBoardSubnavSource = fs.readFileSync(hedgeBoardSubnavPath, 'utf8');
 const hedgeResearchModuleSource = fs.readFileSync(hedgeResearchModulePath, 'utf8');
 const terminalDetailPanelSource = fs.readFileSync(terminalDetailPanelPath, 'utf8');
 const widgetErrorBoundarySource = fs.readFileSync(widgetErrorBoundaryPath, 'utf8');
+const metricStripSource = fs.readFileSync(metricStripPath, 'utf8');
 const marketDetailCatalogSource = fs.readFileSync(marketDetailCatalogPath, 'utf8');
 const tradingToolCatalogSource = fs.readFileSync(tradingToolCatalogPath, 'utf8');
 const tradingToolsPageSource = fs.readFileSync(tradingToolsPagePath, 'utf8');
@@ -79,6 +81,7 @@ assert(fs.existsSync(hedgeBoardSubnavPath), 'Expected HedgeBoardSubnav component
 assert(fs.existsSync(hedgeResearchModulePath), 'Expected HedgeResearchModule component to exist.');
 assert(fs.existsSync(terminalDetailPanelPath), 'Expected TerminalDetailPanel component to exist.');
 assert(fs.existsSync(widgetErrorBoundaryPath), 'Expected WidgetErrorBoundary component to exist.');
+assert(fs.existsSync(metricStripPath), 'Expected MetricStrip component to exist.');
 assert(fs.existsSync(marketDetailCatalogPath), 'Expected market detail catalog to exist.');
 assert(fs.existsSync(toolGroupSectionPath), 'Expected ToolGroupSection component to exist.');
 assert(fs.existsSync(aSharePagePath), 'Expected dedicated A-share research page to exist.');
@@ -120,6 +123,22 @@ assert(
       '模块 "${props.widgetTitle}" 渲染失败，已自动跳过，不影响其他内容浏览。',
     ),
   'WidgetErrorBoundary must preserve the original error isolation, root class and fallback copy.',
+);
+assert(
+  hedgeBoardSource.includes("import MetricStrip from './components/MetricStrip';") &&
+    !hedgeBoardSource.includes('const MetricStrip = defineComponent'),
+  'Hedge board must delegate metric strip rendering to the external component.',
+);
+assert(
+  metricStripSource.includes("name: 'MetricStrip'") &&
+    metricStripSource.includes('type: Array as PropType<Array<[string, string]>>') &&
+    metricStripSource.includes("class: 'metric-strip'") &&
+    metricStripSource.includes('props.metrics.map') &&
+    metricStripSource.includes("h('article'") &&
+    metricStripSource.includes('key: `${label}-${value}`') &&
+    metricStripSource.includes("h('span', label)") &&
+    metricStripSource.includes("h('strong', value)"),
+  'MetricStrip must preserve its prop type, root class, item hierarchy and stable key.',
 );
 assert(
   !hedgeBoardSource.includes("from './nativeData/dashboard'") &&
