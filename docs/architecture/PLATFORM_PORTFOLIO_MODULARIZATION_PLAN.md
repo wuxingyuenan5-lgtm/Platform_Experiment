@@ -1,6 +1,6 @@
 # Platform Portfolio与正式财务低风险模块化计划
 
-状态：**P1 会员持仓纯估值层已实现，完整质量矩阵验证中**  
+状态：**P1 会员持仓纯估值层已完成并通过完整质量矩阵**  
 关联Issue：#136  
 关联Draft PR：#139  
 活动分支：`refactor/issue-136-platform-0-9-2-system-optimization`  
@@ -29,7 +29,7 @@ Portfolio与正式财务优化不得改变：
 - [x] 持仓写入、权限、近期再认证、事务、审计和Repository保持原位；
 - [x] 识别唯一低风险切口：已加载Fund/Holding/NAV记录的纯估值与响应构建。
 
-## P1 会员持仓纯估值层
+## P1 会员持仓纯估值层：完成
 
 ### 允许范围
 
@@ -40,17 +40,35 @@ Portfolio与正式财务优化不得改变：
 5. Target tests、全后端测试和九项完整矩阵全部通过；
 6. 一次性写权限工具在验证后删除。
 
-### 当前实现
+### 已完成实现
 
 - [x] 新增`platform-api/app/member_holding_valuation.py`，只接收已加载的Fund、Holding、NAV与显式时间/陈旧阈值；
+- [x] 使用只读Protocol输入，估值Owner不依赖Repository记录类型或持久化模块；
 - [x] 保留普通Decimal字符串、market value、cumulative return、return rate与零投入空收益率；
 - [x] 保留`available`、`stale`、`unavailable`以及36小时和未来5分钟边界；
 - [x] 保留基金基础币种、NAV币种一致性和全部UTC时区归一化；
 - [x] `member_holding_service.py`继续拥有数据库读取、权限、近期再认证、事务、审计和服务错误映射；
 - [x] 新增完整响应Golden、Decimal/时区/临界值测试和永久纯度架构测试；
-- [x] 将估值Owner登记到`docs/architecture/OWNERSHIP.md`并纳入Pyright；
+- [x] 将估值Owner登记到`docs/architecture/OWNERSHIP.md`、纳入Pyright并加入文档一致性守卫；
 - [x] 删除一次性写权限Workflow和迁移脚本；
-- [ ] 完整质量矩阵通过并将运行证据同步到Issue #136和Draft PR #139。
+- [x] 完整质量矩阵通过并将运行证据同步到Issue #136和Draft PR #139。
+
+### 完整矩阵证据
+
+验证HEAD：`1697345b59517d603a30377934271ba5946d4856`
+
+- Platform CI：`30626771566`
+- Platform Directory Invariants：`30626771569`
+- Version Consistency：`30626771572`
+- Secret Scan：`30626771577`
+- User System Browser E2E：`30626771578`
+- Platform 0.9.2 Baseline Audit：`30626771579`
+- Platform Visual Baseline：`30626771581`
+- Hedge Board Browser E2E：`30626771582`
+- Research Provider Smoke：`30626771610`
+
+视觉Artifact：`8791768494`  
+SHA-256：`74df3b5503ed41204719acd1d06203fcc3fa3c9479a18972a544acc2a81a7a32`
 
 ## P1停止条件
 
@@ -62,8 +80,8 @@ Portfolio与正式财务优化不得改变：
 - 估值模块依赖配置、数据库、HTTP、认证或正式投影；
 - Browser E2E、视觉基线、Provider Smoke或任一安全门禁失败。
 
-## 后续边界
+## 下一门禁：Portfolio只读复核
 
-P1通过后只读复核Fund catalog与NAV mutation响应。Financial Fact、Formal Projection和Position Math默认不再拆分；没有明确无状态切口时结束Portfolio后端代码修改。
+只读复核Fund catalog与NAV mutation响应是否存在明确、无状态、可证明收益的Presenter切口。Financial Fact、Formal Projection和Position Math默认不再拆分；没有明确切口时结束Portfolio后端代码修改。
 
 Draft PR始终保持Open、Draft、Unmerged；不得修改或合并`main`。
