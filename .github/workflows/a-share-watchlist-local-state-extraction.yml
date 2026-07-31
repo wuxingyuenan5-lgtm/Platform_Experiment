@@ -1,0 +1,83 @@
+name: A-share Watchlist Local State Extraction
+
+on:
+  pull_request:
+    branches:
+      - feature/issue-134-platform-0-9-1-unified-delivery
+    types: [synchronize]
+    paths:
+      - .github/workflows/a-share-watchlist-local-state-extraction.yml
+      - scripts/apply-a-share-watchlist-local-state-extraction.py
+      - platform-web/src/views/hedgeBoard/aShare/aShareWatchlistLocalState.ts
+
+permissions:
+  contents: write
+
+concurrency:
+  group: a-share-watchlist-local-state-extraction-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  apply:
+    if: github.event.pull_request.head.ref == 'refactor/issue-136-platform-0-9-2-system-optimization'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.9
+          run_install: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: pnpm
+          cache-dependency-path: platform-web/pnpm-lock.yaml
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install frontend dependencies
+        working-directory: platform-web
+        env:
+          HUSKY: '0'
+        run: pnpm install --frozen-lockfile
+
+      - name: Apply mechanical extraction
+        run: python scripts/apply-a-share-watchlist-local-state-extraction.py
+
+      - name: Validate local watchlist boundary
+        working-directory: platform-web
+        run: |
+          pnpm exec eslint --max-warnings 0 \
+            src/views/hedgeBoard/aShare/aShareWatchlistLocalState.ts
+          python ../scripts/frontend-no-new-debt.py
+          pnpm type:check
+          pnpm test:hedge-board-layout
+          git diff --check
+
+      - name: Push validated commits
+        run: |
+          if git diff --quiet -- \
+            platform-web/scripts/verify-hedge-board-layout.cjs \
+            platform-web/src/views/hedgeBoard/aShare/useAShareResearch.ts; then
+            echo 'A-share watchlist local state extraction is already applied.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          if ! git diff --quiet -- platform-web/scripts/verify-hedge-board-layout.cjs; then
+            git add platform-web/scripts/verify-hedge-board-layout.cjs
+            git commit -m 'test: freeze A-share local watchlist contract'
+          fi
+          if ! git diff --quiet -- platform-web/src/views/hedgeBoard/aShare/useAShareResearch.ts; then
+            git add platform-web/src/views/hedgeBoard/aShare/useAShareResearch.ts
+            git commit -m 'refactor: delegate A-share local watchlist state'
+          fi
+          git push origin HEAD:${{ github.event.pull_request.head.ref }}
