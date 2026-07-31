@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import json
 import re
 import tomllib
 from pathlib import Path
@@ -20,6 +21,11 @@ def project_version(path: str) -> str:
         return str(tomllib.load(handle)["project"]["version"])
 
 
+def package_json_version(path: str) -> str:
+    package = json.loads((ROOT / path).read_text(encoding="utf-8"))
+    return str(package["version"])
+
+
 def frontend_version(path: str) -> str:
     content = (ROOT / path).read_text(encoding="utf-8")
     match = re.search(r'VITE_GLOB_APP_VERSION\s*=\s*["\']([^"\']+)["\']', content)
@@ -32,6 +38,7 @@ def main() -> None:
     actual = {
         "platform-api package": project_version("platform-api/pyproject.toml"),
         "execution-runtime package": project_version("execution-runtime/pyproject.toml"),
+        "platform-web package": package_json_version("platform-web/package.json"),
         **{
             f"frontend display ({path})": frontend_version(path)
             for path in FRONTEND_VERSION_FILES
