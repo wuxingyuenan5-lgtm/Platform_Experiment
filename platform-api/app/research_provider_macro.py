@@ -29,7 +29,11 @@ class MacroResearchProvider:
             response.raise_for_status()
             rows = response.json()
 
-        events = [event for row in rows if (event := self._event_from_row(row)) is not None]
+        events: list[MacroExpectationEvent] = []
+        for row in rows if isinstance(rows, list) else []:
+            event = self._event_from_row(row)
+            if event is not None:
+                events.append(event)
         events.sort(key=lambda item: (item.category, -item.current_probability_pct))
         if not events:
             raise ResearchProviderError("macro_expectation_events_empty")
@@ -42,17 +46,21 @@ class MacroResearchProvider:
         if category is None:
             return None
 
-        outcomes = _decode_list(row.get("outcomes") or "[]")
-        prices = _decode_list(row.get("outcomePrices") or "[]")
-        choice_count = min(len(outcomes), len(prices))
-        if choice_count == 0:
-            return None
+        outcomes_raw = row.get("outcomes") or "[]"
+        prices_raw = row.get("outcomePrices") or "[]"
         try:
-            best_index = max(range(choice_count), key=lambda index: float(prices[index]))
-            probability = Decimal(str(float(prices[best_index]) * 100))
-        except (TypeError, ValueError):
+            outcomes = json.loads(outcomes_raw) if isinstance(outcomes_raw, str) else outcomes_raw
+            prices = json.loads(prices_raw) if isinstance(prices_raw, str) else prices_raw
+        except json.JSONDecodeError:
+            return None
+        if not outcomes or not prices:
             return None
 
+        best_index = max(
+            range(min(len(outcomes), len(prices))),
+            key=lambda index: float(prices[index]),
+        )
+        probability = Decimal(str(float(prices[best_index]) * 100))
         return MacroExpectationEvent(
             event_id=str(row.get("id") or row.get("conditionId") or title),
             category=category,
@@ -83,18 +91,6 @@ def _category_for_title(title: str) -> str | None:
         ),
         None,
     )
-
-
-def _decode_list(value: Any) -> list[Any]:
-    if isinstance(value, list):
-        return value
-    if not isinstance(value, str):
-        return []
-    try:
-        result = json.loads(value)
-    except json.JSONDecodeError:
-        return []
-    return result if isinstance(result, list) else []
 
 
 def _expiry_at(value: Any) -> datetime | None:
