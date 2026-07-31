@@ -3,9 +3,8 @@
     <template #headerContent>
       <div class="flex justify-between items-center">
         <span class="flex-1">
-          <a :href="GITHUB_URL" target="_blank">{{ name }}</a>
-          是一个基于Vue3.0、Vite、 Ant-Design-Vue 、TypeScript
-          的后台解决方案，目标是为中大型项目开发,提供现成的开箱解决方案及丰富的示例,原则上不会限制任何代码用于商用。
+          Variable-Global交易基础设施平台服务于投研、策略、交易、风控、用户、资产与账务核对。
+          前端通过Browser Session与REST连接Platform API，不持有Venue凭证，也不直接执行外部交易副作用。
         </span>
       </div>
     </template>
@@ -19,11 +18,11 @@
   import { Tag } from 'ant-design-vue';
   import { PageWrapper } from '@/components/Page';
   import { Description, DescItem, useDescription } from '@/components/Description';
-  import { GITHUB_URL, SITE_URL, DOC_URL } from '@/settings/siteSetting';
+  import { GITHUB_URL } from '@/settings/siteSetting';
 
   const { pkg, lastBuildTime } = __APP_INFO__;
 
-  const { dependencies, devDependencies, name, version } = pkg;
+  const { dependencies, devDependencies, version } = pkg;
 
   const schema: DescItem[] = [];
   const devSchema: DescItem[] = [];
@@ -43,27 +42,15 @@
       render: commonTagRender('blue'),
     },
     {
-      label: '文档地址',
-      field: 'doc',
-      render: commonLinkRender('文档地址'),
-    },
-    {
-      label: '预览地址',
-      field: 'preview',
-      render: commonLinkRender('预览地址'),
-    },
-    {
-      label: 'Github',
+      label: 'GitHub仓库',
       field: 'github',
-      render: commonLinkRender('Github'),
+      render: commonLinkRender('打开仓库'),
     },
   ];
 
   const infoData = {
     version,
     lastBuildTime,
-    doc: DOC_URL,
-    preview: SITE_URL,
     github: GITHUB_URL,
   };
 
