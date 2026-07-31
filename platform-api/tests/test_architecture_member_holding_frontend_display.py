@@ -30,3 +30,17 @@ def test_member_holding_views_share_decimal_display_owner() -> None:
     assert "export function decimalDirection" in owner
     assert "^0+(?:\\.0+)?$" in owner
     assert "decimalDirection(value) === 'zero'" in owner
+
+
+@pytest.mark.architecture
+def test_member_summary_never_silently_aggregates_partial_valuation() -> None:
+    member = MEMBER_PANEL.read_text(encoding="utf-8")
+
+    assert "const hasCompleteValuation = computed" in member
+    assert "holdings.value.every(" in member
+    assert "isDecimal(item.marketValue)" in member
+    assert "isDecimal(item.cumulativeReturn)" in member
+    assert "canAggregate.value && hasCompleteValuation.value" in member
+
+    assert ".map((item) => item.marketValue).filter(isDecimal)" not in member
+    assert ".map((item) => item.cumulativeReturn).filter(isDecimal)" not in member
