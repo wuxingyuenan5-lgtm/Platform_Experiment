@@ -47,7 +47,7 @@ When the machine feels slow, first identify duplicate dev servers and heavy brow
 
 ## Workspace noise
 
-Large generated or local directories are excluded from normal search through root`.ignore` and component `.gitignore` files:
+Large generated or local directories are excluded from normal search through root `.ignore` and component `.gitignore` files:
 
 - `platform-web/node_modules/`;
 - `platform-web/dist/`;
