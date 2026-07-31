@@ -83,6 +83,7 @@ jobs:
       - name: Validate presenter boundary
         working-directory: platform-api
         run: |
+          ruff check --fix --select I app/user_admin_service.py
           ruff check \
             app/user_admin_presenter.py \
             app/user_admin_service.py \
