@@ -45,7 +45,6 @@ from app.user_schemas import (
     UserLifecycleStatus,
     UserSelfResponse,
     UserSessionListResponse,
-    UserSessionSummaryResponse,
 )
 from app.user_security import (
     PasswordPolicyError,
@@ -55,6 +54,12 @@ from app.user_security import (
     normalize_phone,
     validate_password,
     verify_password,
+)
+from app.user_session_presenter import (
+    session_list_response as _session_list_response,
+)
+from app.user_session_presenter import (
+    summarize_user_agent as _summarize_user_agent,
 )
 
 _DUMMY_PASSWORD_HASH = (
@@ -190,26 +195,6 @@ def _is_recently_reauthenticated(
     return now - last_reauthenticated.astimezone(UTC) <= timedelta(
         minutes=settings.session_recent_reauth_minutes
     )
-
-
-def _mask_ip(value: str | None) -> str | None:
-    if value is None:
-        return None
-    if "." in value:
-        parts = value.split(".")
-        if len(parts) == 4:
-            return ".".join((*parts[:3], "*"))
-    if ":" in value:
-        parts = [part for part in value.split(":") if part]
-        return ":".join(parts[:4]) + "::*"
-    return "***"
-
-
-def _summarize_user_agent(value: str | None) -> str | None:
-    if value is None:
-        return None
-    compact = " ".join(value.split())
-    return compact[:160]
 
 
 def create_initial_ceo(
@@ -759,26 +744,9 @@ def change_self_password(
 
 
 def get_session_list(*, user_id: str, current_session_id: str) -> UserSessionListResponse:
-    sessions = list_user_sessions(user_id)
-    return UserSessionListResponse(
-        items=[
-            UserSessionSummaryResponse(
-                sessionId=session.id,
-                current=session.id == current_session_id,
-                createdAt=datetime.fromisoformat(session.created_at),
-                expiresAt=datetime.fromisoformat(session.expires_at),
-                idleExpiresAt=datetime.fromisoformat(session.idle_expires_at),
-                lastSeenAt=datetime.fromisoformat(session.last_seen_at),
-                lastReauthenticatedAt=(
-                    datetime.fromisoformat(session.last_reauthenticated_at)
-                    if session.last_reauthenticated_at is not None
-                    else None
-                ),
-                ipSummary=_mask_ip(session.ip_address),
-                userAgentSummary=_summarize_user_agent(session.user_agent),
-            )
-            for session in sessions
-        ]
+    return _session_list_response(
+        list_user_sessions(user_id),
+        current_session_id=current_session_id,
     )
 
 
