@@ -79,7 +79,6 @@
   import {
     LOCAL_MARKET_DETAIL_TABLES,
     type SnapshotTableGroup,
-    type SnapshotTableRow,
   } from './nativeData/marketSnapshotTables';
   import { marketTerminalConfigs, type TerminalMarketId } from './nativeData/marketTerminal';
   import {
