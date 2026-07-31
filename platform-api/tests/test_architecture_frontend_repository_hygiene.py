@@ -1,9 +1,12 @@
+import json
 from pathlib import Path
 
 import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
 FRONTEND_ROOT = ROOT / "platform-web"
+REPOSITORY_URL = "https://github.com/wuxingyuenan5-lgtm/Platform_Experiment"
+EXPECTED_VERSION = (ROOT / "VERSION").read_text(encoding="utf-8").strip()
 FORBIDDEN_LOCAL_ARTIFACTS = (
     FRONTEND_ROOT / "CNAME",
     FRONTEND_ROOT / ".gitpod.yml",
@@ -12,6 +15,21 @@ FORBIDDEN_LOCAL_ARTIFACTS = (
 )
 NESTED_GITHUB_ROOT = FRONTEND_ROOT / ".github"
 FRONTEND_GITIGNORE = FRONTEND_ROOT / ".gitignore"
+IDENTITY_FILES = (
+    FRONTEND_ROOT / "package.json",
+    FRONTEND_ROOT / "README.md",
+    FRONTEND_ROOT / "README.zh-CN.md",
+    FRONTEND_ROOT / "src" / "settings" / "siteSetting.ts",
+    FRONTEND_ROOT / "src" / "views" / "sys" / "about" / "index.vue",
+)
+FORBIDDEN_UPSTREAM_IDENTITY_MARKERS = (
+    "anncwb",
+    "vben.vvbin.cn",
+    "doc.vvbin.cn",
+    "vbenjs/vue-vben-admin",
+    "vben/123456",
+    "gitpod.io/#https://github.com/anncwb",
+)
 
 
 @pytest.mark.architecture
@@ -34,3 +52,36 @@ def test_frontend_local_inspection_artifacts_are_ignored() -> None:
     ignore_source = FRONTEND_GITIGNORE.read_text(encoding="utf-8")
     assert "/home-*-check.png" in ignore_source
     assert "/src/file_structure.txt" in ignore_source
+
+
+@pytest.mark.architecture
+def test_frontend_package_identity_is_platform_owned() -> None:
+    package = json.loads((FRONTEND_ROOT / "package.json").read_text(encoding="utf-8"))
+
+    assert package["name"] == "vg-platform-web"
+    assert package["version"] == EXPECTED_VERSION
+    assert package["private"] is True
+    assert package["homepage"] == REPOSITORY_URL
+    assert package["bugs"]["url"] == f"{REPOSITORY_URL}/issues"
+    assert package["repository"] == {
+        "type": "git",
+        "url": f"git+{REPOSITORY_URL}.git",
+    }
+    assert "author" not in package
+
+
+@pytest.mark.architecture
+def test_product_entry_points_do_not_claim_upstream_identity() -> None:
+    violations: list[str] = []
+    for path in IDENTITY_FILES:
+        source = path.read_text(encoding="utf-8").lower()
+        for marker in FORBIDDEN_UPSTREAM_IDENTITY_MARKERS:
+            if marker.lower() in source:
+                violations.append(f"{path.relative_to(ROOT)} contains {marker}")
+
+    assert not violations, f"Upstream identity leaked into product entry points: {violations}"
+
+    site_setting = (FRONTEND_ROOT / "src" / "settings" / "siteSetting.ts").read_text(
+        encoding="utf-8"
+    )
+    assert REPOSITORY_URL in site_setting
