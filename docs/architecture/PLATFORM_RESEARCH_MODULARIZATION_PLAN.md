@@ -1,6 +1,6 @@
 # Platform Research与主看板低风险模块化计划
 
-状态：**E4.2 MetricStrip代码与永久合同已完成，等待清理HEAD完整矩阵收口**  
+状态：**E4.3 ReserveRanking代码与永久合同已完成，等待清理HEAD完整矩阵收口**  
 关联Issue：#136  
 关联Draft PR：#139  
 活动分支：`refactor/issue-136-platform-0-9-2-system-optimization`  
@@ -33,6 +33,7 @@ research_routes
 hedgeBoard/index.vue                   # page orchestration
   -> components/WidgetErrorBoundary.ts
   -> components/MetricStrip.ts
+  -> components/ReserveRanking.ts
 ```
 
 ## 3. E0–E3：完成
@@ -67,39 +68,54 @@ LocalChartWidget
 
 - [x] 外置原Render Function；
 - [x] 保持`widgetTitle` Prop、默认插槽、错误捕获、日志、`return false`、`local-empty`、360px高度和原降级文案；
-- [x] 页面只改为显式导入；
 - [x] 永久布局门禁冻结组件合同；
-- [x] 修复任意`ai`子串误判；
-- [x] `frontend-no-new-debt.py`改为真实基线比较：新文件零告警、遗留债务不得增加、触碰行零诊断、Fatal失败关闭；
+- [x] 前端无新增债务门禁校正为真实基线比较；
 - [x] 临时写权限工具已删除；
-- [x] 完整矩阵通过：
-  - Platform CI `30612132323`
-  - Directory `30612132482`
-  - User E2E `30612132418`
-  - Hedge E2E `30612132455`
-  - Visual `30612132339`
-  - Provider Smoke `30612132362`
-  - Secret `30612132500`
-  - Version `30612132536`
-  - Audit `30612132444`
-- [x] 视觉Artifact `8785958564`，SHA-256 `01ad7db9a7495aedce8889fdd1f069c5ca07c854907863644a33cf0cc8f1a11f`。
+- [x] 完整矩阵通过；视觉Artifact `8785958564`，SHA-256 `01ad7db9a7495aedce8889fdd1f069c5ca07c854907863644a33cf0cc8f1a11f`。
 
-### E4.2 MetricStrip：代码完成，最终矩阵待收口
+### E4.2 MetricStrip：完成
 
 - [x] 外置原Render Function至`components/MetricStrip.ts`；
 - [x] 保持必填`metrics: Array<[string, string]>`；
-- [x] 保持`metric-strip`根类；
-- [x] 保持`article > span + strong`结构；
+- [x] 保持`metric-strip > article > span + strong`结构；
 - [x] 保持`${label}-${value}` Key；
 - [x] 页面只改为显式导入并删除内联定义；
 - [x] 永久布局门禁冻结外部委托与DOM合同；
+- [x] 临时写权限工具已删除；
+- [x] 完整矩阵通过：
+  - Platform CI `30613049665`
+  - Directory `30613049550`
+  - User E2E `30613049677`
+  - Hedge E2E `30613049611`
+  - Visual `30613049532`
+  - Provider Smoke `30613049535`
+  - Secret `30613049606`
+  - Version `30613049536`
+  - Audit `30613049529`
+- [x] 视觉Artifact `8786313538`，SHA-256 `14d2f2352fca0df6bf94f948d9d3e9da2cc6105abd0e1782dd006d48881dabbe`。
+
+### E4.3 ReserveRanking：代码完成，最终矩阵待收口
+
+- [x] 只读比较`ReserveRanking`、`GroupedBarChart`和`SnapshotDetailTable`后选择最低依赖候选；
+- [x] 外置原Render Function至`components/ReserveRanking.ts`；
+- [x] 保持必填`rows`和`color`、默认`diverging=false`；
+- [x] 保持最大绝对值缩放、`${row.label}-${row.value}` Key、正负色和负值12px最小宽度；
+- [x] 保持原数值格式化及“吨”显示；
+- [x] 页面只改为显式导入并删除内联定义；
+- [x] 永久布局门禁冻结外部委托、Prop、缩放、色调和显示合同；
 - [x] 新组件严格Lint、基线债务比较、策略Type Check和布局合同通过；
 - [x] 临时写权限Workflow与脚本已删除；
-- [ ] 以文档同步后的清理HEAD完成完整质量矩阵。
+- [ ] 以本计划同步后的清理HEAD完成完整质量矩阵。
 
-### E4.3 下一候选：后置
+### E4.4 候选审计：后置
 
-E4.2矩阵通过后，只读比较`ReserveRanking`、`GroupedBarChart`和`SnapshotDetailTable`。`LocalChartWidget`继续留在页面，因为其耦合市场数据、多个图表组件、Terminal配置、辅助函数和错误降级。
+E4.3矩阵通过后再决定是否继续：
+
+- `GroupedBarChart`依赖共享图表尺寸、坐标缩放、刻度、日期标签和轴格式化；
+- `SnapshotDetailTable`依赖页面级类型、Sparkline、色调与箭头辅助函数；
+- `LocalChartWidget`耦合市场数据、多个图表组件、Terminal配置、辅助函数和错误降级。
+
+没有形成单一、纯展示、低依赖且可永久冻结的切口时，停止继续机械拆分。
 
 ## 5. 每步验收
 
