@@ -25,13 +25,14 @@ This is the sole repository document for current engineering state. Durable rule
 9. H2 dedicated Venue reconciliation routes;
 10. Phase J / J0 repository classification, credential-document cleanup, strengthened Secret Scan, minimal read-only evidence collector, MySQL aggregate inventory and operator handoff;
 11. Phase J / J2 first repository-hygiene slice: local artifacts, upstream hosting metadata and nested GitHub configuration removed with permanent guards;
-12. Phase J / J2 second slice: repository identity, version tooling, documentation portability and MT5 bridge-path portability accepted at `4f945739afcff191f41bc4defc33c4661d88f327`.
+12. Phase J / J2 second slice: repository identity, version tooling, documentation portability and MT5 bridge-path portability accepted at `4f945739afcff191f41bc4defc33c4661d88f327`;
+13. Phase J / J2 third slice: shared VS Code settings and extension recommendations reduced to maintained Platform Web concerns and accepted at `2afbecddfa819a0eba60ada4c5f944ae07ddd922`.
 
 Frontend hotspot and high-risk structural governance are closed. Trading, Risk, Formal Accounting and Execution Runtime retained their existing owners. Reconciliation routing is separated without moving orchestration, persistence, policy, Financial Fact, Runtime transport, Decimal, idempotency or fail-closed behavior.
 
 J0 repository classification is complete. The external server, GitLab Runner and MySQL evidence required for J1 cannot be obtained through the current GitHub connection and is deferred by owner instruction. It remains a release acceptance item but no longer blocks GitHub-only optimization.
 
-The current engineering gate is **Phase J / J2 GitHub repository hygiene and reduction**.
+Phase J / J2 has reached its current safe stop condition: all remaining identified GitHub candidates require either a localized patch capability, a package-lock-aware change or broader static dependency evidence.
 
 ## Target physical boundaries
 
@@ -127,7 +128,7 @@ The authoritative plan is `docs/architecture/PLATFORM_LEGACY_DEPLOYMENT_AUDIT.md
 
 The authoritative audit is `docs/architecture/PLATFORM_LEGACY_GITLAB_DEPLOYMENT_AUDIT.md`. This file is frozen as Legacy production evidence and is excluded from ordinary repository cleanup.
 
-## Current gate: J2 GitHub repository hygiene
+## Phase J / J2 accepted repository hygiene
 
 ### First accepted slice
 
@@ -152,23 +153,22 @@ The authoritative audit is `docs/architecture/PLATFORM_LEGACY_GITLAB_DEPLOYMENT_
 - added permanent frontend repository-identity, version, local-launch and typecheck-coverage architecture tests;
 - passed the complete nine-workflow matrix and 56-page visual baseline at `4f945739afcff191f41bc4defc33c4661d88f327`.
 
-### Third implemented slice, pending final matrix evidence
+### Third accepted slice
 
 - simplified `platform-web/.vscode/settings.json` to maintained Platform Web concerns;
 - retained pnpm, TypeScript workspace SDK, Volar-compatible Vue editing, ESLint, Stylelint, Prettier, path aliases, Vue i18n and relevant search exclusions;
 - removed obsolete Vetur, legacy Volar TS-plugin flags, MicroPython buttons, Nuxt flags and stale Yarn/Bower/CNAME/Gitpod nesting;
 - removed the obsolete `vue.vscode-typescript-vue-plugin` recommendation while retaining `vue.volar`;
-- added permanent architecture assertions for shared editor settings and extension recommendations.
+- added permanent architecture assertions for shared editor settings and extension recommendations;
+- passed the complete nine-workflow matrix and 56-page visual baseline at `2afbecddfa819a0eba60ada4c5f944ae07ddd922`.
 
 The governing document is `docs/operations/WORKSPACE_HYGIENE.md`.
 
-J2 may continue only with high-confidence, reference-checked changes. Any candidate that affects package locks, active routes, production configuration, runtime state, historical accounting evidence or Legacy production assets must stop for a dedicated plan.
-
-## Remaining GitHub-only candidates
+## Remaining GitHub-only candidates requiring a new capability or dedicated slice
 
 - Platform API FastAPI/OpenAPI and `/system/info` still contain the historical application version `0.6.0`;
 - Execution Runtime FastAPI/OpenAPI still contains the historical application version `0.5.0`;
-- those two large application files require a safe localized patch mechanism before changing; they must not be manually rewritten wholesale;
+- those two large application files require a safe localized patch mechanism before changing and must not be manually rewritten wholesale;
 - `platform-web/apps/test-server` remains in the pnpm workspace and lockfile and is not removable without a lockfile-aware change;
 - broader unused-source deletion remains out of scope until static import, route, build and lockfile evidence is complete.
 
@@ -192,9 +192,8 @@ Until that evidence is reviewed, do not delete or rename `projects/risk-control`
 
 ### GitHub-only work
 
-- validate and close the current J2 third slice with the complete quality matrix and 56-page visual baseline;
-- continue only with bounded, high-confidence candidates listed above;
-- retain full quality evidence for every accepted slice.
+- no further high-confidence repository-cleanup candidate is executable with the current GitHub connector without crossing an explicit stop condition;
+- retain the accepted J2 evidence and reopen GitHub-only work only with localized patching, lockfile-aware tooling or complete static dependency evidence.
 
 ### Deferred external work
 
