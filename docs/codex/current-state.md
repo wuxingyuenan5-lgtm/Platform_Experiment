@@ -24,7 +24,8 @@ This is the sole repository document for current engineering state. Durable rule
 8. H1 dedicated EOD reconciliation routes;
 9. H2 dedicated Venue reconciliation routes;
 10. Phase J / J0 repository classification, credential-document cleanup, strengthened Secret Scan, minimal read-only evidence collector, MySQL aggregate inventory and operator handoff;
-11. Phase J / J2 first repository-hygiene slice: local artifacts, upstream hosting metadata and nested GitHub configuration removed with permanent guards.
+11. Phase J / J2 first repository-hygiene slice: local artifacts, upstream hosting metadata and nested GitHub configuration removed with permanent guards;
+12. Phase J / J2 second slice: repository identity, version tooling, documentation portability and MT5 bridge-path portability accepted at `4f945739afcff191f41bc4defc33c4661d88f327`.
 
 Frontend hotspot and high-risk structural governance are closed. Trading, Risk, Formal Accounting and Execution Runtime retained their existing owners. Reconciliation routing is separated without moving orchestration, persistence, policy, Financial Fact, Runtime transport, Decimal, idempotency or fail-closed behavior.
 
@@ -138,18 +139,26 @@ The authoritative audit is `docs/architecture/PLATFORM_LEGACY_GITLAB_DEPLOYMENT_
 - replaced machine-specific workspace size/path notes with durable repository hygiene rules;
 - classified and froze `.gitlab-ci.yml` rather than deleting a possible production deployment path.
 
-### Second implemented slice, pending final matrix evidence
+### Second accepted slice
 
 - aligned `platform-web/package.json` identity and version with Platform `0.9.2`, marked the package private and pointed repository metadata to this project;
 - replaced upstream Vben README content, public test credentials and product-facing About links while retaining MIT attribution;
 - aligned VS Code launch configuration with the authoritative Platform Web port `4373`;
 - extended version consistency and bump tooling to include `platform-web/package.json`;
 - refreshed root README, root PLAN, documentation catalog, deployment entry, acceptance criteria and Runbook to the current architecture and J2 phase;
-- removed named-workstation paths from shared operations documentation;
-- added documentation portability checks rejecting real Windows, macOS and Linux user-home paths while allowing placeholders and fenced examples;
+- removed named-workstation paths from maintained documentation and added Windows/macOS/Linux home-path guards;
 - replaced the hard-coded MT5 bridge path with an `APPDATA`-derived Windows default, a portable non-Windows fallback and an explicit environment override;
-- added Runtime unit tests for all three MT5 bridge-path modes;
-- added permanent frontend repository-identity and local-launch architecture tests.
+- added Runtime tests for all three MT5 bridge-path modes;
+- added permanent frontend repository-identity, version, local-launch and typecheck-coverage architecture tests;
+- passed the complete nine-workflow matrix and 56-page visual baseline at `4f945739afcff191f41bc4defc33c4661d88f327`.
+
+### Third implemented slice, pending final matrix evidence
+
+- simplified `platform-web/.vscode/settings.json` to maintained Platform Web concerns;
+- retained pnpm, TypeScript workspace SDK, Volar-compatible Vue editing, ESLint, Stylelint, Prettier, path aliases, Vue i18n and relevant search exclusions;
+- removed obsolete Vetur, legacy Volar TS-plugin flags, MicroPython buttons, Nuxt flags and stale Yarn/Bower/CNAME/Gitpod nesting;
+- removed the obsolete `vue.vscode-typescript-vue-plugin` recommendation while retaining `vue.volar`;
+- added permanent architecture assertions for shared editor settings and extension recommendations.
 
 The governing document is `docs/operations/WORKSPACE_HYGIENE.md`.
 
@@ -160,7 +169,6 @@ J2 may continue only with high-confidence, reference-checked changes. Any candid
 - Platform API FastAPI/OpenAPI and `/system/info` still contain the historical application version `0.6.0`;
 - Execution Runtime FastAPI/OpenAPI still contains the historical application version `0.5.0`;
 - those two large application files require a safe localized patch mechanism before changing; they must not be manually rewritten wholesale;
-- `platform-web/.vscode/settings.json` still contains low-risk upstream/editor noise, but its large shared configuration should be handled as a separate bounded slice;
 - `platform-web/apps/test-server` remains in the pnpm workspace and lockfile and is not removable without a lockfile-aware change;
 - broader unused-source deletion remains out of scope until static import, route, build and lockfile evidence is complete.
 
@@ -184,7 +192,7 @@ Until that evidence is reviewed, do not delete or rename `projects/risk-control`
 
 ### GitHub-only work
 
-- validate and close the current J2 second slice with the complete quality matrix and 56-page visual baseline;
+- validate and close the current J2 third slice with the complete quality matrix and 56-page visual baseline;
 - continue only with bounded, high-confidence candidates listed above;
 - retain full quality evidence for every accepted slice.
 
