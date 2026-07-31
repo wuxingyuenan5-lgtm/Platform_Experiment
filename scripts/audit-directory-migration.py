@@ -93,6 +93,8 @@ def classify(path: str) -> str:
         return "external_or_legacy_dependency"
     if normalized in {
         "scripts/audit-directory-migration.py",
+        "scripts/apply-platform-web-directory-migration.py",
+        ".github/workflows/platform-web-directory-migration.yml",
         "docs/architecture/PLATFORM_DIRECTORY_MIGRATION_PLAN.md",
     }:
         return "migration_governance"
