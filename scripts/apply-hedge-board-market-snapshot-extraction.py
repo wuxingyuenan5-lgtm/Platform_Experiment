@@ -24,6 +24,7 @@ MODULE_IMPORT = """  import {
   } from './nativeData/marketSnapshotTables';
 """
 HASH_NAME = "MARKET_SNAPSHOT_SOURCE_SHA256"
+PRESERVATION_CONTRACT = "void [LOCAL_MARKET_DETAIL_TABLES, GroupedBarChart, SnapshotDetailTable];"
 
 
 def build_test(expected_hash: str) -> str:
@@ -49,6 +50,7 @@ def test_market_snapshot_tables_have_one_static_data_owner() -> None:
     assert "interface SnapshotTableRow" not in index
     assert "interface SnapshotTableGroup" not in index
     assert "const LOCAL_MARKET_DETAIL_TABLES" not in index
+    assert "{PRESERVATION_CONTRACT}" in index
 
     assert "export interface SnapshotTableRow" in module
     assert "export interface SnapshotTableGroup" in module
@@ -92,6 +94,8 @@ def main() -> None:
             raise SystemExit("Snapshot module exists but inline owner remains")
         if MODULE_IMPORT not in source:
             raise SystemExit("Snapshot module exists but index import is missing")
+        if PRESERVATION_CONTRACT not in source:
+            raise SystemExit("Snapshot preservation contract is missing")
         print("Market snapshot extraction is already applied.")
         return
 
@@ -100,6 +104,8 @@ def main() -> None:
             raise SystemExit(f"Expected exactly one extraction marker: {marker!r}")
     if MODULE_IMPORT in source:
         raise SystemExit("Snapshot module import already exists without generated files")
+    if PRESERVATION_CONTRACT not in source:
+        raise SystemExit("Expected static snapshot preservation contract")
 
     type_start = source.index(TYPE_START)
     type_end = source.index(TYPE_END, type_start)
@@ -128,10 +134,7 @@ def main() -> None:
         1,
     )
     module_body = f"{exported_types}\n\n{exported_data}\n"
-    module_content = (
-        module_body
-        + f'\nexport const {HASH_NAME} = "{source_hash}";\n'
-    )
+    module_content = module_body + f'\nexport const {HASH_NAME} = "{source_hash}";\n'
 
     updated = without_types[:data_start] + without_types[data_end:]
     updated = updated.replace(IMPORT_ANCHOR, IMPORT_ANCHOR + MODULE_IMPORT, 1)
@@ -140,8 +143,8 @@ def main() -> None:
         raise SystemExit("Inline snapshot owner was not fully removed")
     if updated.count(MODULE_IMPORT) != 1:
         raise SystemExit("Snapshot import was not installed exactly once")
-    if "LOCAL_MARKET_DETAIL_TABLES[widget.kind]" not in updated:
-        raise SystemExit("LocalChartWidget snapshot lookup contract is missing")
+    if PRESERVATION_CONTRACT not in updated:
+        raise SystemExit("Snapshot preservation contract changed during extraction")
 
     MODULE_PATH.parent.mkdir(parents=True, exist_ok=True)
     MODULE_PATH.write_text(module_content, encoding="utf-8")
