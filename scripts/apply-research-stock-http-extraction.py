@@ -9,8 +9,10 @@ from pathlib import Path
 PROVIDER_PATH = Path("platform-api/app/research_providers.py")
 PYPROJECT_PATH = Path("platform-api/pyproject.toml")
 ADAPTER_IMPORT = "from app.research_provider_stock_http import StockHttpResearchProvider\n"
-IMPORT_MARKER = "from app.research_provider_stock_akshare import StockAkshareResearchProvider\n"
-PYRIGHT_MARKER = '  "app/research_provider_stock_akshare.py",\n'
+IMPORT_MARKER = (
+    "from app.research_provider_stock_datacenter import StockDataCenterResearchProvider\n"
+)
+PYRIGHT_MARKER = '  "app/research_provider_stock_datacenter.py",\n'
 
 DELEGATES = {
     "stock_quote": (
@@ -73,7 +75,7 @@ def main() -> None:
     provider = "".join(lines)
 
     if IMPORT_MARKER not in provider:
-        raise SystemExit("AkShare stock provider import boundary was not found")
+        raise SystemExit("Stock DataCenter provider import boundary was not found")
     provider = provider.replace(IMPORT_MARKER, IMPORT_MARKER + ADAPTER_IMPORT, 1)
     provider = provider.replace("from datetime import UTC, datetime\n", "", 1)
     provider = provider.replace("import httpx\n", "", 1)
@@ -102,7 +104,7 @@ def main() -> None:
     )
 
     if PYRIGHT_MARKER not in pyproject:
-        raise SystemExit("Pyright AkShare stock provider boundary was not found")
+        raise SystemExit("Pyright Stock DataCenter provider boundary was not found")
     pyproject = pyproject.replace(
         PYRIGHT_MARKER,
         PYRIGHT_MARKER + '  "app/research_provider_stock_http.py",\n',
