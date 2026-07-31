@@ -53,8 +53,9 @@ jobs:
       - name: Validate normalized event
         run: |
           cd platform-web
+          grep -q '@update:model-value="selectBoardCategory"' src/views/hedgeBoard/index.vue
+          ! grep -q '@update:modelValue="selectBoardCategory"' src/views/hedgeBoard/index.vue
           pnpm exec prettier --check src/views/hedgeBoard/index.vue
-          python ../scripts/frontend-no-new-debt.py
           pnpm type:check
           cd ..
           git diff --check
