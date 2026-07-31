@@ -100,3 +100,41 @@ def test_markdown_links_ignore_examples_inside_fenced_code(tmp_path: Path) -> No
     readme.write_text("```markdown\n[Example](not-real.md)\n```\n", encoding="utf-8")
 
     assert DOCUMENTATION_CONSISTENCY.validate_markdown_links(tmp_path, [readme]) == []
+
+
+def test_portable_documentation_rejects_real_user_home_paths(tmp_path: Path) -> None:
+    readme = tmp_path / "README.md"
+    readme.write_text(
+        "Windows: C:\\Users\\alice\\workspace\\repo\n"
+        "macOS: /Users/bob/workspace/repo\n"
+        "Linux: /home/carol/workspace/repo\n",
+        encoding="utf-8",
+    )
+
+    assert DOCUMENTATION_CONSISTENCY.validate_portable_documentation(
+        tmp_path,
+        [readme],
+    ) == [
+        "README.md: workstation-specific Linux user home path is forbidden: /home/carol/",
+        "README.md: workstation-specific Windows user profile path is forbidden: "
+        "C:\\Users\\alice\\",
+        "README.md: workstation-specific macOS user home path is forbidden: /Users/bob/",
+    ]
+
+
+def test_portable_documentation_allows_placeholders_and_fenced_examples(
+    tmp_path: Path,
+) -> None:
+    readme = tmp_path / "README.md"
+    readme.write_text(
+        "Use `%APPDATA%\\MetaQuotes` or `${HOME}/workspace`.\n"
+        "Use `C:\\Users\\<user>\\workspace`, `/Users/<user>/workspace`, "
+        "or `/home/<user>/workspace`.\n"
+        "```text\nC:\\Users\\example\\historical-output\n```\n",
+        encoding="utf-8",
+    )
+
+    assert DOCUMENTATION_CONSISTENCY.validate_portable_documentation(
+        tmp_path,
+        [readme],
+    ) == []
