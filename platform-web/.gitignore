@@ -31,3 +31,7 @@ pnpm-debug.log*
 package-lock.json
 
 .history
+
+# Local inspection artifacts
+/home-*-check.png
+/src/file_structure.txt
