@@ -26,6 +26,8 @@ import {
 export { normalizeStockCode };
 export type { WatchlistItem };
 
+export type WatchlistSyncState = 'local' | 'syncing' | 'synced' | 'offline';
+
 function shanghaiDateStamp(date = new Date()) {
   const parts = new Intl.DateTimeFormat('zh-CN', {
     timeZone: 'Asia/Shanghai',
