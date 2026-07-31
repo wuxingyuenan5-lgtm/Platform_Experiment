@@ -1,0 +1,74 @@
+name: Platform Web Directory Migration
+
+on:
+  push:
+    branches:
+      - refactor/issue-136-platform-0-9-2-system-optimization
+    paths:
+      - '.github/workflows/platform-web-directory-migration.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: platform-web-directory-migration
+  cancel-in-progress: false
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Apply atomic mechanical migration
+        run: python scripts/apply-platform-web-directory-migration.py
+
+      - name: Validate staged repository tree
+        shell: bash
+        run: |
+          python -m py_compile \
+            scripts/audit-directory-migration.py \
+            scripts/apply-platform-web-directory-migration.py \
+            scripts/check-repository-structure.py \
+            scripts/check-documentation-consistency.py \
+            scripts/check-version-consistency.py \
+            scripts/check-codex-context.py
+          python scripts/audit-directory-migration.py \
+            --mode post-rename \
+            --target admin-risk \
+            --fail-on-unclassified
+          python scripts/check-repository-structure.py
+          python scripts/check-documentation-consistency.py
+          python scripts/check-version-consistency.py
+          python scripts/check-codex-context.py
+          git diff --cached --check
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          package = json.loads(Path('platform-web/package.json').read_text(encoding='utf-8'))
+          if package.get('name') != 'vg-platform-web':
+              raise SystemExit('Platform Web package identity was not migrated')
+          if Path('admin-risk').exists() or not Path('platform-web').is_dir():
+              raise SystemExit('Platform Web directory migration is incomplete')
+          PY
+
+      - name: Commit one mechanical migration
+        shell: bash
+        run: |
+          if git diff --cached --quiet; then
+            echo 'No migration changes were required.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'refactor: rename Platform Web directory'
+          git push origin "HEAD:${GITHUB_REF_NAME}"
