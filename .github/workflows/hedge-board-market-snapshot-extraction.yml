@@ -1,0 +1,84 @@
+name: Hedge Board Market Snapshot Extraction
+
+on:
+  pull_request:
+    branches:
+      - feature/issue-134-platform-0-9-1-unified-delivery
+    types: [synchronize]
+    paths:
+      - .github/workflows/hedge-board-market-snapshot-extraction.yml
+      - scripts/apply-hedge-board-market-snapshot-extraction.py
+
+permissions:
+  contents: write
+
+concurrency:
+  group: hedge-board-market-snapshot-extraction-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  apply:
+    if: github.event.pull_request.head.ref == 'refactor/issue-136-platform-0-9-2-system-optimization'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: pnpm
+          cache-dependency-path: platform-web/pnpm-lock.yaml
+
+      - name: Apply static data extraction
+        run: python scripts/apply-hedge-board-market-snapshot-extraction.py
+
+      - name: Install frontend dependencies
+        working-directory: platform-web
+        env:
+          HUSKY: '0'
+        run: pnpm install --frozen-lockfile
+
+      - name: Validate extracted boundary
+        run: |
+          python -m pip install pytest
+          python -m pytest -q platform-api/tests/test_architecture_hedge_board_market_snapshot_data.py
+          cd platform-web
+          pnpm exec prettier --write \
+            src/views/hedgeBoard/index.vue \
+            src/views/hedgeBoard/nativeData/marketSnapshotTables.ts
+          pnpm exec prettier --check \
+            src/views/hedgeBoard/index.vue \
+            src/views/hedgeBoard/nativeData/marketSnapshotTables.ts
+          pnpm type:check
+          cd ..
+          git diff --check
+
+      - name: Push validated extraction
+        run: |
+          if git diff --quiet -- \
+            platform-web/src/views/hedgeBoard/index.vue \
+            platform-web/src/views/hedgeBoard/nativeData/marketSnapshotTables.ts \
+            platform-api/tests/test_architecture_hedge_board_market_snapshot_data.py; then
+            echo 'Market snapshot extraction is already applied.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add \
+            platform-web/src/views/hedgeBoard/index.vue \
+            platform-web/src/views/hedgeBoard/nativeData/marketSnapshotTables.ts \
+            platform-api/tests/test_architecture_hedge_board_market_snapshot_data.py
+          git commit -m 'refactor: extract hedge board market snapshot data'
+          git push origin HEAD:${{ github.event.pull_request.head.ref }}
