@@ -38,7 +38,12 @@ def holding(*, invested: str = "0.01") -> MemberHoldingRecord:
     )
 
 
-def nav(*, valuation_time: datetime = CURRENT, unit_nav: str = "0.2", currency: str = "USDT") -> FundNavRecord:
+def nav(
+    *,
+    valuation_time: datetime = CURRENT,
+    unit_nav: str = "0.2",
+    currency: str = "USDT",
+) -> FundNavRecord:
     return FundNavRecord(
         id="nav-1",
         fund_id="fund-1",
