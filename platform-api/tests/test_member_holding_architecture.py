@@ -12,6 +12,7 @@ HOLDING_MODULES = (
     "member_holding_routes.py",
     "member_holding_schemas.py",
     "member_holding_service.py",
+    "member_holding_valuation.py",
 )
 FORBIDDEN_PREFIXES = (
     "app.trading",

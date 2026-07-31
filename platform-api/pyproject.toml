@@ -55,6 +55,7 @@ include = [
   "app/member_holding_repository.py",
   "app/member_holding_routes.py",
   "app/member_holding_schemas.py",
+  "app/member_holding_valuation.py",
   "app/member_holding_service.py",
   "app/position_math.py",
   "app/research_cache.py",
