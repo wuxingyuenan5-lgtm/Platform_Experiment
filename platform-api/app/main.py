@@ -19,7 +19,7 @@ from app.user_admin_routes import router as user_admin_router
 from app.user_avatar_routes import router as user_avatar_router
 from app.user_cache_control import UserNoStoreMiddleware
 from app.user_routes import router as user_router
-from app.venue_reconciliation import router as venue_reconciliation_router
+from app.venue_reconciliation_routes import router as venue_reconciliation_router
 
 app.include_router(financial_facts_router)
 app.include_router(execution_risk_router)

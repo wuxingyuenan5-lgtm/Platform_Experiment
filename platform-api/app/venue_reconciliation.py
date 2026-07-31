@@ -2,12 +2,11 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
-from fastapi import APIRouter, HTTPException
+from fastapi import HTTPException
 
 from app import venue_reconciliation_repository as repository
 from app import venue_reconciliation_runtime_client as runtime_client
 from app import venue_reconciliation_service as service
-from app.config import get_settings
 from app.trading import get_order_response
 from app.venue_reconciliation_policy import DifferenceDraft
 from app.venue_reconciliation_schemas import (
@@ -180,56 +179,3 @@ def resolve_difference(
     request: ResolveDifferenceRequest,
 ) -> ReconciliationDifferenceResponse:
     return _call_service(service.resolve_difference, difference_id, request)
-
-
-router = APIRouter(prefix=get_settings().api_prefix)
-
-
-@router.post(
-    "/trading/orders/{order_id}/venue-reconcile",
-    response_model=OrderVenueReconciliationResponse,
-    tags=["venue-reconciliation"],
-)
-def reconcile_platform_order(order_id: str) -> OrderVenueReconciliationResponse:
-    return reconcile_order_with_venue(order_id)
-
-
-@router.post(
-    "/ops/venue-reconciliation/runs",
-    response_model=VenueReconciliationRunResponse,
-    tags=["venue-reconciliation"],
-)
-def create_reconciliation_run(
-    request: VenueReconciliationRunRequest,
-) -> VenueReconciliationRunResponse:
-    return run_account_reconciliation(request)
-
-
-@router.get(
-    "/ops/venue-reconciliation/runs/{run_id}",
-    response_model=VenueReconciliationRunResponse,
-    tags=["venue-reconciliation"],
-)
-def read_reconciliation_run(run_id: str) -> VenueReconciliationRunResponse:
-    return get_run(run_id)
-
-
-@router.get(
-    "/ops/venue-reconciliation/runs/{run_id}/differences",
-    response_model=list[ReconciliationDifferenceResponse],
-    tags=["venue-reconciliation"],
-)
-def read_reconciliation_differences(run_id: str) -> list[ReconciliationDifferenceResponse]:
-    return list_differences(run_id)
-
-
-@router.post(
-    "/ops/venue-reconciliation/differences/{difference_id}/resolve",
-    response_model=ReconciliationDifferenceResponse,
-    tags=["venue-reconciliation"],
-)
-def resolve_reconciliation_difference(
-    difference_id: str,
-    request: ResolveDifferenceRequest,
-) -> ReconciliationDifferenceResponse:
-    return resolve_difference(difference_id, request)
