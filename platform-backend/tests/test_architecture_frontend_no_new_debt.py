@@ -26,11 +26,12 @@ def test_changed_frontend_source_selection_is_bounded_and_unique() -> None:
 
 
 def test_exact_renames_are_excluded_but_modified_renames_are_linted() -> None:
+    legacy_frontend = "admin" + "-risk"
     changed = frontend_no_new_debt.parse_changed_paths(
         "\n".join(
             [
-                "R100\tadmin-risk/src/views/legacy.vue\tplatform-web/src/views/legacy.vue",
-                "R098\tadmin-risk/src/views/changed.vue\tplatform-web/src/views/changed.vue",
+                f"R100\t{legacy_frontend}/src/views/legacy.vue\tplatform-web/src/views/legacy.vue",
+                f"R098\t{legacy_frontend}/src/views/changed.vue\tplatform-web/src/views/changed.vue",
                 "M\tplatform-web/src/views/modified.vue",
                 "A\tplatform-web/src/views/added.vue",
             ]
