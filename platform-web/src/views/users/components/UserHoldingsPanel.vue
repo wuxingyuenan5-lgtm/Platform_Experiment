@@ -202,6 +202,13 @@
     type MemberHolding,
     type NavStatus,
   } from '@/api/platform/memberHoldings';
+  import {
+    decimalDirection,
+    formatDecimalString,
+    formatMoneyString,
+    formatNullableDecimalString,
+    formatSignedMoneyString,
+  } from '@/utils/decimalDisplay';
 
   interface Props {
     userId: string;
@@ -477,36 +484,25 @@
     return date.toISOString();
   }
 
-  function splitDecimal(value: string) {
-    const negative = value.startsWith('-');
-    const unsigned = negative ? value.slice(1) : value;
-    const [integer = '0', fraction = ''] = unsigned.split('.');
-    return { negative, integer, fraction };
-  }
-
   function formatDecimal(value: string) {
-    const { negative, integer, fraction } = splitDecimal(value);
-    const grouped = integer.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-    return `${negative ? '-' : ''}${grouped}${fraction ? `.${fraction}` : ''}`;
+    return formatDecimalString(value);
   }
 
   function formatNullableDecimal(value?: string) {
-    return value === undefined || value === null ? '不可用' : formatDecimal(value);
+    return formatNullableDecimalString(value);
   }
 
   function formatMoney(value: string | undefined, currency: string) {
-    return value === undefined || value === null ? '不可用' : `${formatDecimal(value)} ${currency}`;
+    return formatMoneyString(value, currency);
   }
 
   function formatSignedMoney(value: string | undefined, currency: string) {
-    if (value === undefined || value === null) return '不可用';
-    const prefix = value.startsWith('-') || value === '0' ? '' : '+';
-    return `${prefix}${formatDecimal(value)} ${currency}`;
+    return formatSignedMoneyString(value, currency);
   }
 
   function returnClass(value?: string) {
-    if (!value || value === '0') return '';
-    return value.startsWith('-') ? 'negative' : 'positive';
+    const direction = decimalDirection(value);
+    return direction === 'negative' ? 'negative' : direction === 'positive' ? 'positive' : '';
   }
 
   function navMeta(status: NavStatus) {
