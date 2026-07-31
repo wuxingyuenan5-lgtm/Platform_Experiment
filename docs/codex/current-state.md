@@ -28,9 +28,10 @@ The following gates are complete and evidence-backed:
 6. Research E1–E5.1 — Provider, state and bounded frontend/local-state modularization;
 7. Identity I1 — administrator response Presenter;
 8. Identity I2.1 — Browser Session response Presenter;
-9. Portfolio P1 — pure member-holding valuation owner and permanent boundary.
+9. Portfolio P1 — pure member-holding valuation owner and permanent boundary;
+10. Portfolio P2 — Fund catalog and NAV mutation response read-only review.
 
-Portfolio P1 passed the complete quality matrix on the evidence HEAD recorded in Issue #136 and Draft PR #139. The next gate is a read-only review of Fund catalog and NAV mutation response construction. No additional Portfolio backend module may be introduced unless that review proves a distinct stateless responsibility and measurable maintenance benefit.
+Portfolio P1 passed the complete quality matrix on the evidence HEAD recorded in Issue #136 and Draft PR #139. P2 found no distinct stateless responsibility or measurable benefit in extracting Fund catalog or NAV mutation Presenters, so Portfolio backend modularization is closed. The next gate is Portfolio frontend and public-display review.
 
 The current physical service boundaries are:
 
@@ -123,5 +124,5 @@ Member-holding optimization remains deliberately narrow:
 2. `member_holding_decimal.py` remains the only exact Decimal calculation owner;
 3. `member_holding_service.py` retains scope, Fund/NAV loading, recent reauthentication, transactions, audit and error translation;
 4. Repository, Routes, Schemas, Financial Fact, Position Math and Formal Projection contracts remain unchanged;
-5. only read-only evidence may justify a Fund catalog Presenter or NAV mutation response Presenter;
-6. absent a clear stateless cut, Portfolio backend modularization stops rather than mechanically splitting financial code.
+5. Fund catalog and NAV mutation response construction remain local because they contain no independent policy, calculation or cross-module duplication;
+6. Portfolio backend modularization is closed; future work is limited to frontend/public-display evidence unless a new concrete defect appears.
