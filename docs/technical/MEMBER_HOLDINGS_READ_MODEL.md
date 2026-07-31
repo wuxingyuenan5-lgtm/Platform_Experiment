@@ -1,8 +1,8 @@
 # Member Holdings and Fund Unit NAV Read Model
 
-Status: implementation checkpoint on `feature/issue-117-user-system`  
-Issue: #117  
-Owner: `platform-backend` user system  
+Status: implementation checkpoint on `feature/issue-117-user-system`
+Issue: #117
+Owner: `platform-api` user system
 Requirements: `USR-HOLD-*`, `USR-AUD-*`
 
 ## 1. Purpose and authority
@@ -23,11 +23,11 @@ The first implementation source is `manual_admin`. Future migration or external-
 
 | Boundary | Authoritative owner | Responsibility | Must not own |
 |---|---|---|---|
-| Decimal policy | `platform-backend/app/member_holding_decimal.py` | Strict plain-decimal parsing, canonical output and exact derived calculations | SQL, HTTP or float conversion |
-| Persistence | `platform-backend/app/member_holding_repository.py` | Fund lookup, holding optimistic upsert, latest available NAV and NAV supersession | Permission, audit policy or presentation |
-| Service | `platform-backend/app/member_holding_service.py` | Member target checks, exact calculation, stale/unavailable semantics, recent reauthentication and transactional audit | Formal accounting or Venue data |
-| Public DTOs | `platform-backend/app/member_holding_schemas.py` | Holding, fund and NAV request/response contracts | Calculation or persistence |
-| Routes | `platform-backend/app/member_holding_routes.py` | Session-only routing and permission dependencies | Identity supplied by the client for self reads |
+| Decimal policy | `platform-api/app/member_holding_decimal.py` | Strict plain-decimal parsing, canonical output and exact derived calculations | SQL, HTTP or float conversion |
+| Persistence | `platform-api/app/member_holding_repository.py` | Fund lookup, holding optimistic upsert, latest available NAV and NAV supersession | Permission, audit policy or presentation |
+| Service | `platform-api/app/member_holding_service.py` | Member target checks, exact calculation, stale/unavailable semantics, recent reauthentication and transactional audit | Formal accounting or Venue data |
+| Public DTOs | `platform-api/app/member_holding_schemas.py` | Holding, fund and NAV request/response contracts | Calculation or persistence |
+| Routes | `platform-api/app/member_holding_routes.py` | Session-only routing and permission dependencies | Identity supplied by the client for self reads |
 | Frontend API | `platform-web/src/api/platform/memberHoldings.ts` | Cookie Session transport and in-memory CSRF propagation | Financial calculation |
 | Decimal display | `platform-web/src/utils/decimalDisplay.ts` | Pure string grouping, signed display and ratio-to-percent shift | JavaScript `number` financial authority |
 

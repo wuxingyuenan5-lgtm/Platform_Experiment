@@ -84,7 +84,7 @@ The user system intentionally has no default CEO Seed and no committed password.
 
 ## 5. Migration ledger
 
-Platform migrations are declared in `platform-backend/app/schema_migrations.py`.
+Platform migrations are declared in `platform-api/app/schema_migrations.py`.
 
 `schema_migrations` records monotonic version, unique name, SHA-256 checksum and application time. Migrations are applied in order. Reapplication is idempotent; changing an applied name or checksum fails closed.
 

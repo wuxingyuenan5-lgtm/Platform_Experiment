@@ -1,12 +1,12 @@
 # Platform 0.9.2 全平台系统性优化总方案
 
-> Issue: #136  
-> Draft PR: #137  
-> 稳定基线分支：`feature/issue-134-platform-0-9-1-unified-delivery`  
-> 冻结基线：`8114fce45e46e7920f316f49d03db12dc424acf1`  
-> 优化分支：`refactor/platform-0.9.2-system-optimization`  
-> 开发与验收版本：`0.9.2`  
-> 全量验收后的正式候选：`0.10.1`  
+> Issue: #136
+> Draft PR: #137
+> 稳定基线分支：`feature/issue-134-platform-0-9-1-unified-delivery`
+> 冻结基线：`8114fce45e46e7920f316f49d03db12dc424acf1`
+> 优化分支：`refactor/platform-0.9.2-system-optimization`
+> 开发与验收版本：`0.9.2`
+> 全量验收后的正式候选：`0.10.1`
 > 状态：Phase A证据化审计完成，尚未进入大规模业务重构。
 
 ---
@@ -101,7 +101,7 @@ Token数据使用UTF-8文本字符数除以4的近似值，只用于前后相对
 | 顶层范围 | 文本文件 | 行数 | 估算Token |
 |---|---:|---:|---:|
 | `platform-web/` | 1,267 | 199,553 | 1,360,784 |
-| `platform-backend/` | 237 | 43,578 | 370,820 |
+| `platform-api/` | 237 | 43,578 | 370,820 |
 | `execution-runtime/` | 60 | 11,422 | 101,829 |
 | 根级`docs/` | 68 | 11,822 | 82,050 |
 | `tasks/` | 47 | 4,045 | 44,681 |
@@ -178,11 +178,11 @@ UI任务异常昂贵，主要因为`hedgeBoard/index.vue`为3,772行，UI规范�
 - `CrossVenueExecutionReplica.vue`：1,581行。
 - `DomesticOverseasExecutionReplica.vue`：1,518行。
 - `MarketTerminalPage.vue`：1,547行。
-- `platform-backend/app/execution_risk.py`：1,137行。
-- `platform-backend/app/research_providers.py`：999行，其中单一Provider类约881行。
-- `platform-backend/app/production_monitoring.py`：985行。
-- `platform-backend/app/user_service.py`：856行。
-- `platform-backend/app/user_admin_service.py`：803行。
+- `platform-api/app/execution_risk.py`：1,137行。
+- `platform-api/app/research_providers.py`：999行，其中单一Provider类约881行。
+- `platform-api/app/production_monitoring.py`：985行。
+- `platform-api/app/user_service.py`：856行。
+- `platform-api/app/user_admin_service.py`：803行。
 
 这些文件并非都应按行数拆分。`hedgeBoard/index.vue`、`research_providers.py`和`production_monitoring.py`存在明显多职责；Runtime适配器虽大，但外部字段映射保持显式对审计有价值，应更保守。
 
@@ -198,7 +198,7 @@ Platform API有108个顶层Python模块，主要都堆在`app/`根目录。Repos
 
 ```text
 platform-web
-platform-backend
+platform-api
 execution-runtime
 ```
 
@@ -327,7 +327,7 @@ src/
 | 当前 | 结论 | 理由 |
 |---|---|---|
 | `platform-web` | 0.9.2内改为`platform-web` | 与实际Vue全平台前端职责明显不符；误导Agent和脚本 |
-| `platform-backend` | 0.9.2内改为`platform-api` | 真实职责是平台业务API和模块化单体；比泛称backend更准确 |
+| `platform-api` | 0.9.2内改为`platform-api` | 真实职责是平台业务API和模块化单体；比泛称backend更准确 |
 | `execution-runtime` | 保持 | 名称与隔离Venue/Broker副作用的职责一致 |
 | `projects/risk-control` | 暂不直接改名或删除 | 旧部署脚本仍引用；先确认生产依赖，再归档为`legacy/risk-control-go` |
 | GitHub仓库`Platform_Experiment` | 0.10.1验收后再建议改 | 会影响外部链接、Actions和本地Remote；必须用户明确批准 |
@@ -960,7 +960,7 @@ projects/risk-control → legacy/risk-control-go
 2. 前端顶层目录统一为 `platform-web`；
 3. 全部脚本、CI、Playwright、PowerShell、文档和环境路径；
 4. 全量构建和浏览器验收；
-5. `platform-backend → platform-api`；
+5. `platform-api → platform-api`；
 6. 后端测试、迁移和启动验收；
 7. Runtime保持原名。
 

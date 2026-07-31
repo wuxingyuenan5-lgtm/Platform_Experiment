@@ -4,7 +4,7 @@ import { defineConfig, devices } from '@playwright/test';
 
 const frontendRoot = process.cwd();
 const repositoryRoot = path.resolve(frontendRoot, '..');
-const backendRoot = path.join(repositoryRoot, 'platform-backend');
+const backendRoot = path.join(repositoryRoot, 'platform-api');
 const runtimeRoot = path.join(repositoryRoot, 'execution-runtime');
 const e2eRoot = path.join(repositoryRoot, '.e2e', 'platform-visual');
 const frontendOrigin = 'http://127.0.0.1:4373';

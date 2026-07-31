@@ -30,7 +30,7 @@ def frontend_version(path: str) -> str:
 
 def main() -> None:
     actual = {
-        "platform-backend package": project_version("platform-backend/pyproject.toml"),
+        "platform-api package": project_version("platform-api/pyproject.toml"),
         "execution-runtime package": project_version("execution-runtime/pyproject.toml"),
         **{
             f"frontend display ({path})": frontend_version(path)

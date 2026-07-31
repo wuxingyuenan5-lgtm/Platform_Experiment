@@ -22,7 +22,7 @@
 
 ## Composition Root 边界
 
-- `platform-backend/app/main.py` 只装配 Router 与 Middleware，不承载业务规则。
+- `platform-api/app/main.py` 只装配 Router 与 Middleware，不承载业务规则。
 - 风险敞口、EOD 策略和权限映射由各自模块显式导入，禁止运行时 monkey patch。
 - 领域模块之间通过普通 import 建立可静态分析的依赖，不依赖启动顺序改变函数实现。
 - 同一业务事实只能有一个权威实现；残余敞口计算统一由 `execution_exposure.py` 提供。
@@ -48,10 +48,10 @@
 
 ## Domain Schema 边界
 
-- 执行域 API DTO 由 `platform-backend/app/execution_schemas.py` 统一维护。
-- `platform-backend/app/schemas.py` 只允许显式兼容重导出，不得重复定义执行域类型。
-- FinancialFact、正式持仓、正式 PnL、NAV 和重建响应 DTO 由 `platform-backend/app/financial_fact_schemas.py` 统一维护。
-- `platform-backend/app/financial_facts.py` 只保留兼容重导出、目录解析、FinancialFact 写入编排和 API，不得重新定义公开 DTO。
+- 执行域 API DTO 由 `platform-api/app/execution_schemas.py` 统一维护。
+- `platform-api/app/schemas.py` 只允许显式兼容重导出，不得重复定义执行域类型。
+- FinancialFact、正式持仓、正式 PnL、NAV 和重建响应 DTO 由 `platform-api/app/financial_fact_schemas.py` 统一维护。
+- `platform-api/app/financial_facts.py` 只保留兼容重导出、目录解析、FinancialFact 写入编排和 API，不得重新定义公开 DTO。
 
 ## Platform–Runtime 契约边界
 
@@ -59,40 +59,40 @@
 - 双端模型分别位于 Platform 和 Runtime 的 `app/runtime_contracts.py`。
 - `docs/contracts/runtime-v1.json` 是字段顺序、名称和版本的可执行快照。
 - Platform 收到无法验证的 Event 时保留 `result_unknown`，不得解释为确定失败或自动重下。
-- `platform-backend/app/trade_command_execution.py` 是本地 Order 创建、Safety、Runtime 提交和未知结果处理的唯一编排 Owner。
-- `platform-backend/app/trading.py::submit_order` 只保留 deprecated 兼容入口；legacy raw payload 与 TradeCommand V1 payload 由 Owner 显式区分。
-- `platform-backend/app/venue_reconciliation_schemas.py` 是 Venue Reconciliation 公开 DTO 和差异状态类型的唯一 Owner；原模块只做兼容导出。
-- `platform-backend/app/venue_reconciliation_policy.py` 是外部订单状态映射与 Order/Position/Balance 差异草稿判定的纯 Policy Owner；它不得读取数据库、调用 Runtime 或写入 Difference。
-- `platform-backend/app/venue_reconciliation_repository.py` 是 Reconciliation DDL、SQL、Row Mapping 与受保护事务的唯一 Owner；原模块不得直接访问数据库。
+- `platform-api/app/trade_command_execution.py` 是本地 Order 创建、Safety、Runtime 提交和未知结果处理的唯一编排 Owner。
+- `platform-api/app/trading.py::submit_order` 只保留 deprecated 兼容入口；legacy raw payload 与 TradeCommand V1 payload 由 Owner 显式区分。
+- `platform-api/app/venue_reconciliation_schemas.py` 是 Venue Reconciliation 公开 DTO 和差异状态类型的唯一 Owner；原模块只做兼容导出。
+- `platform-api/app/venue_reconciliation_policy.py` 是外部订单状态映射与 Order/Position/Balance 差异草稿判定的纯 Policy Owner；它不得读取数据库、调用 Runtime 或写入 Difference。
+- `platform-api/app/venue_reconciliation_repository.py` 是 Reconciliation DDL、SQL、Row Mapping 与受保护事务的唯一 Owner；原模块不得直接访问数据库。
 - 不兼容变更必须提升版本并提供迁移/兼容测试。
 
 ## Persistence 边界
 
 - SQLite 仍是当前批准的数据库技术。
-- `platform-backend/app/database_connection.py` 是共享数据库路径、连接创建、Row Factory、Foreign Key、Commit/Rollback/Close 的唯一 Owner。
-- `platform-backend/app/database_bootstrap.py` 是完整核心 `SCHEMA_SQL`、新库 Schema 执行、兼容补列与部分唯一索引的唯一 Owner。
-- `platform-backend/app/database_seeds.py` 是固定 Reference Seed 向量、插入顺序与现有 XAUUSD 合约默认更新的唯一 Owner。
-- `platform-backend/app/database.py` 只显式重导出 Connection/Bootstrap/Seed 兼容接口，并负责 `Connection → Bootstrap → Seed` 初始化编排；它不得实现连接、Schema 或 Seed 内容。
+- `platform-api/app/database_connection.py` 是共享数据库路径、连接创建、Row Factory、Foreign Key、Commit/Rollback/Close 的唯一 Owner。
+- `platform-api/app/database_bootstrap.py` 是完整核心 `SCHEMA_SQL`、新库 Schema 执行、兼容补列与部分唯一索引的唯一 Owner。
+- `platform-api/app/database_seeds.py` 是固定 Reference Seed 向量、插入顺序与现有 XAUUSD 合约默认更新的唯一 Owner。
+- `platform-api/app/database.py` 只显式重导出 Connection/Bootstrap/Seed 兼容接口，并负责 `Connection → Bootstrap → Seed` 初始化编排；它不得实现连接、Schema 或 Seed 内容。
 - Bootstrap Schema 文本由 SHA-256 `421f0625ffe3a8a26ca48bc827e64bd6aa6b2e49d95faef0b17313e808375801` 固定。
 - 15 张 Seed 表的全部行/字段由 SHA-256 `d42f7e4f95a6efa9044b1e91b4e603f1d87f515923a57d941ee16e75109e6183` 固定。
 - 所有 DDL Owner、数据权威分类、Seed Authority 和迁移规则记录在 `docs/database/README.md`。
-- `platform-backend/app/schema_migrations.py` 维护单调递增、带校验和的迁移账本。
-- `platform-backend/app/financial_fact_repository.py` 是 FinancialFact 与正式 Position/PnL/NAV 的唯一 SQL、行映射和事务单元 Owner。
+- `platform-api/app/schema_migrations.py` 维护单调递增、带校验和的迁移账本。
+- `platform-api/app/financial_fact_repository.py` 是 FinancialFact 与正式 Position/PnL/NAV 的唯一 SQL、行映射和事务单元 Owner。
 - 数据库拆分由动态路径、事务行为、Schema Checksum、全量 Seed Checksum、新库/旧库及重复启动快照共同证明等价。
 - 已应用迁移不可修改；删除表/列、改变字段语义、替换 Seed、转移账务权威或替换数据库属于专门高风险变更。
 
 ## FinancialFact Normalization 边界
 
-- `platform-backend/app/financial_fact_normalization.py` 是标准化结构、币种、结算校验、目录派生值、FX、质量状态、Decimal/UTC/JSON 和内容哈希的唯一 Owner。
+- `platform-api/app/financial_fact_normalization.py` 是标准化结构、币种、结算校验、目录派生值、FX、质量状态、Decimal/UTC/JSON 和内容哈希的唯一 Owner。
 - Policy 只接收已解析 Context，不得访问 Repository、数据库或外部交易场所。
 - 标准化键集合、文本值和内容哈希属于不可变事实身份。
 
 ## Financial Projection 边界
 
-- `platform-backend/app/trading.py` 负责成交后近实时运营投影，只写入 `positions` 与 `pnl_results`。
-- `platform-backend/app/financial_fact_repository.py` 负责正式账务持久化和事务。
-- `platform-backend/app/position_math.py` 是运营与正式投影共享的逐成交净数量、平均成本和已实现 PnL 纯计算唯一 Owner。
-- `platform-backend/app/financial_projection_service.py` 负责 FinancialFact 回放、Multiplier/FX、分项 PnL、正式重建和 NAV 编排。
+- `platform-api/app/trading.py` 负责成交后近实时运营投影，只写入 `positions` 与 `pnl_results`。
+- `platform-api/app/financial_fact_repository.py` 负责正式账务持久化和事务。
+- `platform-api/app/position_math.py` 是运营与正式投影共享的逐成交净数量、平均成本和已实现 PnL 纯计算唯一 Owner。
+- `platform-api/app/financial_projection_service.py` 负责 FinancialFact 回放、Multiplier/FX、分项 PnL、正式重建和 NAV 编排。
 - Projection Service 不依赖 FastAPI、配置模块或外部交易场所；数据库操作通过 Repository 完成。
 - 运营投影不构成正式会计权威；正式账务必须从不可变事实重建。
 

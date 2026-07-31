@@ -1,9 +1,9 @@
 # 参考代码采用矩阵
 
-状态：`active`  
-产品基线：Platform V5  
-架构版本：Platform V6 Simplified  
-文档层级：执行前参考代码吸收规则  
+状态：`active`
+产品基线：Platform V5
+架构版本：Platform V6 Simplified
+文档层级：执行前参考代码吸收规则
 更新日期：2026-07-19
 
 ## 1. 结论
@@ -15,12 +15,12 @@
 ```text
 platform-web
 +
-platform-backend
+platform-api
 +
 execution-runtime
 ```
 
-参考代码只用于吸收成熟字段、流程、状态和工程经验。订单、成交、持仓、PnL、净值、风控和对账的业务权威必须保留在 `platform-backend`。
+参考代码只用于吸收成熟字段、流程、状态和工程经验。订单、成交、持仓、PnL、净值、风控和对账的业务权威必须保留在 `platform-api`。
 
 ## 2. 采用原则
 

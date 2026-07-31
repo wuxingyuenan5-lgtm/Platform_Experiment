@@ -7,7 +7,7 @@ param(
 $ErrorActionPreference = 'Stop'
 $RepoRoot = Split-Path -Parent $PSScriptRoot
 $RuntimePath = Join-Path $RepoRoot 'execution-runtime'
-$BackendPath = Join-Path $RepoRoot 'platform-backend'
+$BackendPath = Join-Path $RepoRoot 'platform-api'
 $FrontendPath = Join-Path $RepoRoot 'platform-web'
 
 function Invoke-CheckedNative {

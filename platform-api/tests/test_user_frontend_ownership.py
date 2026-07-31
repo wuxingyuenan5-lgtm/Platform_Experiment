@@ -6,7 +6,7 @@ import pytest
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 FRONTEND_ROOT = REPOSITORY_ROOT / "platform-web" / "src"
-BACKEND_APP_ROOT = REPOSITORY_ROOT / "platform-backend" / "app"
+BACKEND_APP_ROOT = REPOSITORY_ROOT / "platform-api" / "app"
 CANONICAL_USER_FILES = (
     FRONTEND_ROOT / "store/modules/user.ts",
     FRONTEND_ROOT / "views/sys/login/LoginForm.vue",

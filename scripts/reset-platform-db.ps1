@@ -3,7 +3,7 @@ param([switch]$Force)
 
 $ErrorActionPreference = 'Stop'
 $RepoRoot = Split-Path -Parent $PSScriptRoot
-$DatabaseBasePath = Join-Path $RepoRoot 'platform-backend\data\platform.db'
+$DatabaseBasePath = Join-Path $RepoRoot 'platform-api\data\platform.db'
 $DatabaseFiles = @(
   $DatabaseBasePath,
   "$DatabaseBasePath-wal",
@@ -30,8 +30,8 @@ foreach ($File in $ExistingFiles) {
     Write-Host "Deleted: $File" -ForegroundColor DarkGray
   }
   catch {
-    throw "Could not delete $File. Stop platform-backend before resetting the database. $($_.Exception.Message)"
+    throw "Could not delete $File. Stop platform-api before resetting the database. $($_.Exception.Message)"
   }
 }
 
-Write-Host 'Platform database reset complete. It will be recreated when platform-backend starts.' -ForegroundColor Green
+Write-Host 'Platform database reset complete. It will be recreated when platform-api starts.' -ForegroundColor Green

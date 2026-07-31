@@ -1,9 +1,9 @@
 # Platform V6+ 后端架构总览
 
-状态：`active`  
-产品基线：Platform V5  
-架构版本：Platform V6+  
-适用分支：`refactor/frontend-architecture-v6`  
+状态：`active`
+产品基线：Platform V5
+架构版本：Platform V6+
+适用分支：`refactor/frontend-architecture-v6`
 文档层级：后端架构
 
 上位约束：
@@ -17,7 +17,7 @@
 
 本文定义 Platform Backend 的目标职责、内部形态、与 Execution Runtime 的边界、逻辑领域、数据权威、Command／Query／Event 原则和安全可靠性要求。
 
-本文所称“后端”主要指 `platform-backend`，不把 `execution-runtime` 误认为模块化单体内部普通模块。
+本文所称“后端”主要指 `platform-api`，不把 `execution-runtime` 误认为模块化单体内部普通模块。
 
 V1 后端目标不是只支撑 Mock 或 Fake Gateway，而是支撑真实外部接口的受控验证：资费套利至少跑通一条 Crypto 真实 API 模拟盘／测试盘链路，跨所价差跑通 Crypto 真实 API 模拟盘／测试盘 + MT5 Demo／Worker 跨 Runtime 链路。真实资金 Live 下单、CTP、客户侧权限体系和金融AI分析后端均暂缓。
 
@@ -26,7 +26,7 @@ V1 后端目标不是只支撑 Mock 或 Fake Gateway，而是支撑真实外部�
 ```text
 platform-web
 +
-platform-backend
+platform-api
 +
 execution-runtime
 ```

@@ -51,7 +51,7 @@ VG_LIVE_TRADING_ENABLED=false
 
 ```text
 https://<production-host>/        → platform-web 静态前端
-https://<production-host>/api/v1 → platform-backend
+https://<production-host>/api/v1 → platform-api
 ```
 
 必须验证：

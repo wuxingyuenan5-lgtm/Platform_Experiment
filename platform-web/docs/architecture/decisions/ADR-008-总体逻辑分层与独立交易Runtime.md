@@ -1,7 +1,7 @@
 # ADR-008：总体逻辑分层与独立交易 Runtime
 
-状态：`accepted`  
-日期：2026-07-17  
+状态：`accepted`
+日期：2026-07-17
 适用分支：`refactor/frontend-architecture-v6`
 
 ## 背景
@@ -50,7 +50,7 @@ ADR-005 定义的前端、后端、前后端协作和公共领域模型四类架
 初期工程主体为：
 
 - `platform-web`：Vue 前端。
-- `platform-backend`：模块化单体业务后端。
+- `platform-api`：模块化单体业务后端。
 - `execution-runtime`：独立交易执行、Gateway 和 Worker 运行时。
 
 三个主体可以运行于同一台机器，但不得因此合并代码、依赖、进程、凭证和故障边界。

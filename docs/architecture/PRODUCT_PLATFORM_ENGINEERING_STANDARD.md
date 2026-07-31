@@ -9,7 +9,7 @@ This document defines the durable implementation standard for product-facing res
 
 1. Preserve the three-service boundary:
    - `platform-web/`: Vue product frontend.
-   - `platform-backend/`: business, research, orchestration, persistence and API contracts.
+   - `platform-api/`: business, research, orchestration, persistence and API contracts.
    - `execution-runtime/`: venue and broker adapters plus external side effects.
 2. Product research data belongs in Platform Backend and must not be implemented in Execution Runtime.
 3. The frontend must consume Platform API contracts and must not directly call databases, venue SDKs or third-party research providers.

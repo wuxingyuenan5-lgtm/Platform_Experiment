@@ -17,7 +17,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  platform-web:
+  platform-directories:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -34,27 +34,16 @@ jobs:
           --target platform-web
           --fail-on-unclassified
 
-  platform-api-inventory:
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-
-      - name: Generate Platform API migration inventory
+      - name: Enforce Platform API directory migration
         run: >-
           python scripts/audit-directory-migration.py
-          --format json
-          --output platform-api-directory-inventory.json
+          --mode post-rename
+          --target platform-api
           --fail-on-unclassified
 
-      - name: Upload Platform API migration inventory
-        uses: actions/upload-artifact@v4
-        with:
-          name: platform-api-directory-inventory-${{ github.sha }}
-          path: platform-api-directory-inventory.json
-          if-no-files-found: error
-          retention-days: 14
+      - name: Enforce all Platform directory migrations
+        run: >-
+          python scripts/audit-directory-migration.py
+          --mode post-rename
+          --target all
+          --fail-on-unclassified

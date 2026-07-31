@@ -1,9 +1,9 @@
 # Platform V6 简化目标架构
 
-状态：`active`  
-产品基线：Platform V5  
-架构版本：Platform V6 Simplified  
-适用分支：`refactor/frontend-architecture-v6`  
+状态：`active`
+产品基线：Platform V5
+架构版本：Platform V6 Simplified
+适用分支：`refactor/frontend-architecture-v6`
 文档层级：总体技术架构唯一入口
 
 ## 1. 目标
@@ -41,7 +41,7 @@ V1 不是只做本地模拟系统。Fake Gateway 用于工程闭环和故障演�
 ```text
 platform-web
 +
-platform-backend
+platform-api
 +
 execution-runtime
 ```
@@ -62,7 +62,7 @@ Vue 前端，负责：
 - 判断订单最终结果。
 - 保存正式订单、成交和持仓事实。
 
-### 2.2 platform-backend
+### 2.2 platform-api
 
 模块化单体后端，负责：
 
@@ -102,7 +102,7 @@ Browser
   ↓ REST / WebSocket
 platform-web
   ↓
-platform-backend
+platform-api
   ├─ Strategy
   ├─ Trading
   ├─ Account & Position
@@ -118,7 +118,7 @@ execution-runtime
 External Trading Systems
 ```
 
-开发初期三个主体可以运行在同一台机器上，但 `platform-backend` 与 `execution-runtime` 必须保持独立进程。
+开发初期三个主体可以运行在同一台机器上，但 `platform-api` 与 `execution-runtime` 必须保持独立进程。
 
 ## 4. 最小业务对象
 
@@ -206,7 +206,7 @@ StrategyNavSnapshot 是策略实例固定时间运营净值快照，当前主要
 
 ```text
 前端发起 Simulation 或真实 Crypto API 模拟盘／测试盘下单
-→ platform-backend 创建 TradeCommand
+→ platform-api 创建 TradeCommand
 → 基础权限与风险检查
 → 创建 ExecutionBatch 和 Order
 → Runtime Command
@@ -222,7 +222,7 @@ StrategyNavSnapshot 是策略实例固定时间运营净值快照，当前主要
 
 ```text
 前端发起 Simulation、Crypto API 模拟盘／测试盘或 MT5 Demo 执行
-→ platform-backend 创建 TradeCommand
+→ platform-api 创建 TradeCommand
 → 创建跨 Runtime ExecutionBatch
 → Crypto 腿 Order / Fill
 → MT5 腿 Order / Deal / Position
@@ -236,7 +236,7 @@ StrategyNavSnapshot 是策略实例固定时间运营净值快照，当前主要
 
 ```text
 前端发起模拟下单
-→ platform-backend 创建 TradeCommand
+→ platform-api 创建 TradeCommand
 → 基础权限与风险检查
 → 创建 ExecutionBatch 和 Order
 → Runtime Command
@@ -344,7 +344,7 @@ Gateway 的连接、认证、同步和交易能力不能在后端语义中混为
 ## 11. 工程落地顺序
 
 ```text
-1. platform-backend 工程骨架
+1. platform-api 工程骨架
 2. execution-runtime 工程骨架
 3. 数据库最小表结构
 4. Fake Gateway

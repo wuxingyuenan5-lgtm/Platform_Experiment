@@ -28,7 +28,7 @@ Avoid loading backend implementation details unless required.
 Path:
 
 ```text
-platform-backend/
+platform-api/
 ```
 
 Load:

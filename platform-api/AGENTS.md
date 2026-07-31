@@ -1,6 +1,6 @@
 # Platform Backend Agent Rules
 
-Scope: `platform-backend/`.
+Scope: `platform-api/`.
 
 - Own business APIs, risk, orchestration, persistence coordination and accounting.
 - Never import Bybit, MT5 or other Venue SDKs; external effects belong in `execution-runtime/`.

@@ -14,7 +14,7 @@ FULL_PATHS = {
 }
 FULL_PREFIXES = (
     "docs/contracts/",
-    "platform-backend/app/runtime_contracts.py",
+    "platform-api/app/runtime_contracts.py",
     "execution-runtime/app/runtime_contracts.py",
 )
 FRONTEND_PREFIXES = (
@@ -32,7 +32,7 @@ def classify_paths(paths: Iterable[str], *, force_full: bool = False) -> dict[st
     full = force_full or any(
         path in FULL_PATHS or path.startswith(FULL_PREFIXES) for path in normalized
     )
-    backend = full or any(path.startswith("platform-backend/") for path in normalized)
+    backend = full or any(path.startswith("platform-api/") for path in normalized)
     runtime = full or any(path.startswith("execution-runtime/") for path in normalized)
     frontend = full or any(path.startswith(FRONTEND_PREFIXES) for path in normalized)
     return {

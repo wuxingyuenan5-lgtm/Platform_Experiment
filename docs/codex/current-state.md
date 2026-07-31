@@ -45,7 +45,7 @@ Execution Runtime
 Current physical paths remain unchanged until the isolated naming phase:
 
 - `platform-web/`: Vue product frontend.
-- `platform-backend/`: business, identity, portfolio, research, trading, risk, accounting and operations API.
+- `platform-api/`: business, identity, portfolio, research, trading, risk, accounting and operations API.
 - `execution-runtime/`: Venue/Broker adapters, external side effects and Runtime Journal.
 
 SQLite remains approved for the current stage. Do not introduce microservices, Kubernetes, Kafka, GraphQL, CQRS, Event Sourcing, micro-frontends or a second global state system.

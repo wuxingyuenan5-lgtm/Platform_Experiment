@@ -9,7 +9,7 @@ param(
 $ErrorActionPreference = 'Stop'
 $RepoRoot = Split-Path -Parent $PSScriptRoot
 $RuntimePath = Join-Path $RepoRoot 'execution-runtime'
-$BackendPath = Join-Path $RepoRoot 'platform-backend'
+$BackendPath = Join-Path $RepoRoot 'platform-api'
 $FrontendPath = Join-Path $RepoRoot 'platform-web'
 $FrontendPort = 4373
 
@@ -113,7 +113,7 @@ $BackendEnv = Join-Path $BackendPath '.env'
 $BackendEnvExample = Join-Path $BackendPath '.env.example'
 if (-not (Test-Path $BackendEnv) -and (Test-Path $BackendEnvExample)) {
   Copy-Item $BackendEnvExample $BackendEnv
-  Write-Host 'Created platform-backend/.env from .env.example.' -ForegroundColor DarkGray
+  Write-Host 'Created platform-api/.env from .env.example.' -ForegroundColor DarkGray
 }
 
 Start-ServiceWindow `

@@ -1,4 +1,4 @@
-# platform-backend
+# platform-api
 
 Variable-Global 的模块化单体业务后端。
 
@@ -13,7 +13,7 @@ Variable-Global 的模块化单体业务后端。
 ## 本地运行
 
 ```bash
-cd platform-backend
+cd platform-api
 python -m venv .venv
 ```
 

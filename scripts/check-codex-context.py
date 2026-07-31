@@ -77,7 +77,7 @@ def main() -> None:
 
     expected_version = read_text("VERSION").strip()
     actual_versions = {
-        "platform-backend": pyproject_version("platform-backend/pyproject.toml"),
+        "platform-api": pyproject_version("platform-api/pyproject.toml"),
         "execution-runtime": pyproject_version("execution-runtime/pyproject.toml"),
         "frontend development": frontend_version("platform-web/.env.development"),
         "frontend production": frontend_version("platform-web/.env.production"),

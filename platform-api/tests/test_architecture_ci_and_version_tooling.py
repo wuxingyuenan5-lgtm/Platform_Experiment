@@ -33,7 +33,7 @@ def test_docs_only_change_skips_application_jobs() -> None:
 
 
 def test_single_module_changes_select_only_affected_job() -> None:
-    backend = ci_scope.classify_paths(["platform-backend/app/example.py"])
+    backend = ci_scope.classify_paths(["platform-api/app/example.py"])
     runtime = ci_scope.classify_paths(["execution-runtime/app/example.py"])
     frontend = ci_scope.classify_paths(["platform-web/src/example.ts"])
 
@@ -62,11 +62,11 @@ def test_main_push_can_force_full_matrix() -> None:
 
 
 def test_bump_version_updates_all_maintained_declarations(tmp_path: Path) -> None:
-    (tmp_path / "platform-backend").mkdir()
+    (tmp_path / "platform-api").mkdir()
     (tmp_path / "execution-runtime").mkdir()
     (tmp_path / "platform-web").mkdir()
     (tmp_path / "VERSION").write_text("0.8.0\n", encoding="utf-8")
-    (tmp_path / "platform-backend/pyproject.toml").write_text(
+    (tmp_path / "platform-api/pyproject.toml").write_text(
         '[project]\nversion = "0.8.0"\n',
         encoding="utf-8",
     )
@@ -84,7 +84,7 @@ def test_bump_version_updates_all_maintained_declarations(tmp_path: Path) -> Non
 
     assert (tmp_path / "VERSION").read_text(encoding="utf-8") == "0.9.1\n"
     assert 'version = "0.9.1"' in (
-        tmp_path / "platform-backend/pyproject.toml"
+        tmp_path / "platform-api/pyproject.toml"
     ).read_text(encoding="utf-8")
     assert 'version = "0.9.1"' in (
         tmp_path / "execution-runtime/pyproject.toml"

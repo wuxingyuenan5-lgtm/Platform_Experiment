@@ -23,7 +23,7 @@ docs/superpowers/
 **/*.py[cod]
 **/*.egg-info/
 execution-runtime/data/
-platform-backend/data/
+platform-api/data/
 
 # Local generated outputs
 outputs/

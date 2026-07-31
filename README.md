@@ -43,7 +43,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\dev-platform.ps1
 
 ```text
 platform-web/          Vue产品前端，计划在独立命名阶段评估迁移为platform-web
-platform-backend/    模块化单体业务API，计划在独立命名阶段评估迁移为platform-api
+platform-api/    模块化单体业务API，计划在独立命名阶段评估迁移为platform-api
 execution-runtime/   Venue/Broker适配、外部副作用与Runtime Journal
 docs/                架构、合同、运维和工程权威文档
 scripts/             启动、版本、审计和质量工具

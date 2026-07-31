@@ -17,7 +17,7 @@ def test_changed_frontend_source_selection_is_bounded_and_unique() -> None:
             "platform-web/src/views/platform/index.vue",
             "platform-web/src/views/platform/index.vue",
             "platform-web/docs/START-HERE.md",
-            "platform-backend/app/main.py",
+            "platform-api/app/main.py",
             "platform-web/package.json",
         ]
     )

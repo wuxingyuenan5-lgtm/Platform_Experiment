@@ -27,7 +27,7 @@ def update_versions(root: Path, version: str) -> None:
     if SEMVER.fullmatch(version) is None:
         raise SystemExit(f"Invalid semantic version: {version}")
     (root / "VERSION").write_text(version + "\n", encoding="utf-8")
-    for relative in ("platform-backend/pyproject.toml", "execution-runtime/pyproject.toml"):
+    for relative in ("platform-api/pyproject.toml", "execution-runtime/pyproject.toml"):
         replace_once(
             root / relative,
             r'^version\s*=\s*"\d+\.\d+\.\d+"$',

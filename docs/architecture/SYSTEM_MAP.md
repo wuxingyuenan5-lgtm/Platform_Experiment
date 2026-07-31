@@ -9,7 +9,7 @@ User
 platform-web (Vue frontend)
   │ HTTP / Platform API contracts
   ▼
-platform-backend (modular monolith)
+platform-api (modular monolith)
   ├─ identity / authorization
   ├─ strategy / risk / approvals
   ├─ execution orchestration

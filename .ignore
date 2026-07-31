@@ -3,7 +3,7 @@ platform-web/dist/
 platform-web/project_structure.txt
 platform-web/CHANGELOG*.md
 execution-runtime/.venv/
-platform-backend/.venv/
+platform-api/.venv/
 参考代码/
 outputs/
 **/__pycache__/

@@ -1,8 +1,8 @@
 # Platform V6 最小发布门槛
 
-状态：`active`  
-适用基线：`main / Platform V6`  
-总体计划：`../../../docs/planning/V6-交易安全加固实施计划.md`  
+状态：`active`
+适用基线：`main / Platform V6`
+总体计划：`../../../docs/planning/V6-交易安全加固实施计划.md`
 当前阶段：`../../../docs/planning/V6-Production-Gate-密钥托管与脱敏.md`
 
 ## 1. 原则
@@ -19,7 +19,7 @@
 ```bash
 python scripts/scan-secrets.py
 
-cd platform-backend
+cd platform-api
 python -m ruff check app tests
 python -m pytest
 

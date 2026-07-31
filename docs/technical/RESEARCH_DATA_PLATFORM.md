@@ -23,12 +23,12 @@ The frontend never calls external market-data sources directly. `execution-runti
 
 | Responsibility | Owner |
 |---|---|
-| Public response models and data-quality metadata | `platform-backend/app/research_data_schemas.py` |
-| Deterministic A-share formulas and Shenwan aggregation | `platform-backend/app/a_share_research_policy.py` |
-| TTL and last-known-good behavior | `platform-backend/app/research_cache.py` |
-| Free-source adapters and field normalization | `platform-backend/app/research_providers.py` |
-| Concurrent orchestration and partial-failure semantics | `platform-backend/app/research_service.py` |
-| Authenticated HTTP routes | `platform-backend/app/research_routes.py` |
+| Public response models and data-quality metadata | `platform-api/app/research_data_schemas.py` |
+| Deterministic A-share formulas and Shenwan aggregation | `platform-api/app/a_share_research_policy.py` |
+| TTL and last-known-good behavior | `platform-api/app/research_cache.py` |
+| Free-source adapters and field normalization | `platform-api/app/research_providers.py` |
+| Concurrent orchestration and partial-failure semantics | `platform-api/app/research_service.py` |
+| Authenticated HTTP routes | `platform-api/app/research_routes.py` |
 | Frontend API contract | `platform-web/src/api/hedgeResearch.ts` |
 | A-share page orchestration | `platform-web/src/views/hedgeBoard/aShare/index.vue` |
 | Macro event-probability presentation | `platform-web/src/views/hedgeBoard/macro/MacroExpectationPanel.vue` |

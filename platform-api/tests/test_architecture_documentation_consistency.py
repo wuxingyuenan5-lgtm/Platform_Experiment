@@ -45,12 +45,12 @@ def test_owner_catalog_rejects_wrong_mapping(tmp_path: Path) -> None:
 
 def test_context_map_rejects_obsolete_financial_facts_shortcut() -> None:
     errors = DOCUMENTATION_CONSISTENCY.validate_context_map(
-        "- Formal accounting authority: `platform-backend/app/financial_facts.py`."
+        "- Formal accounting authority: `platform-api/app/financial_facts.py`."
     )
 
     assert errors == [
         "stale Agent context ownership statement: "
-        "Formal accounting authority: `platform-backend/app/financial_facts.py`"
+        "Formal accounting authority: `platform-api/app/financial_facts.py`"
     ]
 
 

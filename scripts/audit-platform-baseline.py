@@ -165,10 +165,10 @@ TASK_DEFINITIONS: dict[str, dict[str, list[str]]] = {
         "path": [
             "platform-web/src/views/hedgeBoard/",
             "platform-web/src/api/hedgeResearch",
-            "platform-backend/app/research_",
-            "platform-backend/app/a_share_",
-            "platform-backend/tests/test_research",
-            "platform-backend/tests/test_a_share",
+            "platform-api/app/research_",
+            "platform-api/app/a_share_",
+            "platform-api/tests/test_research",
+            "platform-api/tests/test_a_share",
             "docs/technical/RESEARCH",
         ],
         "terms": ["research", "provider", "last known good", "shenwan", "申万"],
@@ -178,13 +178,13 @@ TASK_DEFINITIONS: dict[str, dict[str, list[str]]] = {
             "platform-web/src/access/",
             "platform-web/src/router/guard/",
             "platform-web/src/store/modules/user",
-            "platform-backend/app/auth",
-            "platform-backend/app/user_authority",
-            "platform-backend/app/user_permission",
-            "platform-backend/app/user_admin_policy",
-            "platform-backend/tests/test_auth",
-            "platform-backend/tests/test_user_permission",
-            "platform-backend/tests/test_user_target_scope",
+            "platform-api/app/auth",
+            "platform-api/app/user_authority",
+            "platform-api/app/user_permission",
+            "platform-api/app/user_admin_policy",
+            "platform-api/tests/test_auth",
+            "platform-api/tests/test_user_permission",
+            "platform-api/tests/test_user_target_scope",
             "docs/technical/AUTH",
             "docs/technical/USER_SYSTEM",
         ],
@@ -193,8 +193,8 @@ TASK_DEFINITIONS: dict[str, dict[str, list[str]]] = {
     "modify_api_contract": {
         "path": [
             "platform-web/src/api/",
-            "platform-backend/app/",
-            "platform-backend/tests/",
+            "platform-api/app/",
+            "platform-api/tests/",
             "docs/technical/",
         ],
         "terms": ["route", "schema", "contract", "client"],
@@ -203,20 +203,20 @@ TASK_DEFINITIONS: dict[str, dict[str, list[str]]] = {
         "path": [
             "platform-web/src/views/strategy/",
             "platform-web/src/api/platform/crossSpread",
-            "platform-backend/app/cross_spread",
+            "platform-api/app/cross_spread",
             "execution-runtime/app/",
-            "platform-backend/tests/test_cross_spread",
+            "platform-api/tests/test_cross_spread",
         ],
         "terms": ["market", "fok", "postonly", "tp/sl", "result unknown"],
     },
     "add_research_provider": {
         "path": [
-            "platform-backend/app/research_provider",
-            "platform-backend/app/research_service",
-            "platform-backend/app/research_cache",
-            "platform-backend/app/research_data_schema",
-            "platform-backend/scripts/smoke_research",
-            "platform-backend/tests/test_research",
+            "platform-api/app/research_provider",
+            "platform-api/app/research_service",
+            "platform-api/app/research_cache",
+            "platform-api/app/research_data_schema",
+            "platform-api/scripts/smoke_research",
+            "platform-api/tests/test_research",
             "platform-web/src/api/hedgeResearch",
             "docs/technical/RESEARCH",
             ".github/workflows/research-provider",
@@ -228,7 +228,7 @@ TASK_DEFINITIONS: dict[str, dict[str, list[str]]] = {
             "platform-web/e2e/",
             "platform-web/playwright",
             "platform-web/scripts/verify",
-            "platform-backend/scripts/seed_",
+            "platform-api/scripts/seed_",
             ".github/workflows/",
             "docs/operations/",
         ],
@@ -627,7 +627,7 @@ def task_contexts(records: list[FileRecord], contents: dict[str, str]) -> list[d
             lowered_text = text.lower()
             if any(term.lower() in lowered_text for term in definition["terms"]):
                 # Term-only matches are limited to authoritative-looking code/docs to avoid whole-repo noise.
-                if path.startswith(("platform-web/", "platform-backend/", "execution-runtime/", "docs/technical/", "docs/architecture/", ".github/workflows/")):
+                if path.startswith(("platform-web/", "platform-api/", "execution-runtime/", "docs/technical/", "docs/architecture/", ".github/workflows/")):
                     selected.add(path)
         chosen = sorted(selected)
         output.append(

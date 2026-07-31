@@ -27,14 +27,14 @@ on:
       - 'platform-web/src/views/reports/**'
       - 'platform-web/src/views/users/**'
       - 'platform-web/src/views/account/**'
-      - 'platform-backend/app/auth.py'
-      - 'platform-backend/app/config.py'
-      - 'platform-backend/app/main.py'
-      - 'platform-backend/app/member_holding_*.py'
-      - 'platform-backend/app/research_*.py'
-      - 'platform-backend/app/user_*.py'
-      - 'platform-backend/scripts/seed_platform_visual_e2e.py'
-      - 'platform-backend/pyproject.toml'
+      - 'platform-api/app/auth.py'
+      - 'platform-api/app/config.py'
+      - 'platform-api/app/main.py'
+      - 'platform-api/app/member_holding_*.py'
+      - 'platform-api/app/research_*.py'
+      - 'platform-api/app/user_*.py'
+      - 'platform-api/scripts/seed_platform_visual_e2e.py'
+      - 'platform-api/pyproject.toml'
       - 'execution-runtime/app/**'
       - 'execution-runtime/pyproject.toml'
 
@@ -65,7 +65,7 @@ jobs:
           python -m venv .venv-platform-visual-runtime
           .venv-platform-visual-backend/bin/python -m pip install --upgrade pip
           .venv-platform-visual-runtime/bin/python -m pip install --upgrade pip
-          .venv-platform-visual-backend/bin/python -m pip install -e './platform-backend[dev]'
+          .venv-platform-visual-backend/bin/python -m pip install -e './platform-api[dev]'
           .venv-platform-visual-runtime/bin/python -m pip install -e './execution-runtime[dev]'
           echo "PLATFORM_VISUAL_BACKEND_PYTHON=${GITHUB_WORKSPACE}/.venv-platform-visual-backend/bin/python" >> "$GITHUB_ENV"
           echo "PLATFORM_VISUAL_RUNTIME_PYTHON=${GITHUB_WORKSPACE}/.venv-platform-visual-runtime/bin/python" >> "$GITHUB_ENV"
@@ -73,7 +73,7 @@ jobs:
       - name: Validate Python visual bootstrap
         shell: bash
         run: |
-          "$PLATFORM_VISUAL_BACKEND_PYTHON" -m py_compile platform-backend/scripts/seed_platform_visual_e2e.py
+          "$PLATFORM_VISUAL_BACKEND_PYTHON" -m py_compile platform-api/scripts/seed_platform_visual_e2e.py
           "$PLATFORM_VISUAL_BACKEND_PYTHON" -m pip check
           "$PLATFORM_VISUAL_RUNTIME_PYTHON" -m pip check
 

@@ -1,9 +1,9 @@
 # Platform V6+ 后端模块与服务边界
 
-状态：`active`  
-产品基线：Platform V5  
-架构版本：Platform V6+  
-适用分支：`refactor/frontend-architecture-v6`  
+状态：`active`
+产品基线：Platform V5
+架构版本：Platform V6+
+适用分支：`refactor/frontend-architecture-v6`
 文档层级：后端架构
 
 上位约束：
@@ -23,7 +23,7 @@
 ```text
 platform-web
 ↓
-platform-backend：模块化单体
+platform-api：模块化单体
 ↓ Runtime Command / Event Contract
 execution-runtime：独立进程
 ↓

@@ -28,7 +28,7 @@ def version_files() -> list[dict[str, str]]:
     return [
         {"filename": "VERSION", "status": "modified", "patch": "@@\n-0.8.0\n+0.9.0"},
         {
-            "filename": "platform-backend/pyproject.toml",
+            "filename": "platform-api/pyproject.toml",
             "status": "modified",
             "patch": '@@\n-version = "0.8.0"\n+version = "0.9.0"',
         },
@@ -139,7 +139,7 @@ def test_fast_rejects_source_and_partial_version_updates() -> None:
         check_workstream.validate_fast_files(
             [
                 {
-                    "filename": "platform-backend/app/main.py",
+                    "filename": "platform-api/app/main.py",
                     "status": "modified",
                     "patch": "@@\n-old\n+new",
                 }

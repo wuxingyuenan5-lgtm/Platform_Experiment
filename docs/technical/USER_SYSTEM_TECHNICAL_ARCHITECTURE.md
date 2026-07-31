@@ -1,8 +1,8 @@
 # 用户系统技术架构
 
 状态：`implemented / automated verification passed / manual acceptance pending`<br>
-适用版本：`Platform Experiment 0.9.0`  
-Issue：`#117`  
+适用版本：`Platform Experiment 0.9.0`
+Issue：`#117`
 需求基线：`../planning/USER_SYSTEM_REQUIREMENTS.md`
 
 ## 1. 架构目标
@@ -12,7 +12,7 @@ Issue：`#117`
 ```text
 platform-web
     ↓ same-origin HTTPS
-platform-backend
+platform-api
     ├─ Human Identity / Password
     ├─ Server-side Session / CSRF
     ├─ Principal / Permission / Target Scope
@@ -22,7 +22,7 @@ platform-backend
 
 API-Key / Automation / Live Client
     ↓ Bearer API Key
-platform-backend
+platform-api
     ↓ existing LiveTradingSession + risk gates
 execution-runtime
 ```
@@ -33,7 +33,7 @@ execution-runtime
 
 ### 2.1 当前冲突
 
-- `platform-backend/app/auth.py` 是现有 API-Key Principal 和 Live 安全认证边界；
+- `platform-api/app/auth.py` 是现有 API-Key Principal 和 Live 安全认证边界；
 - 前端登录仍调用旧 `/api/auth` Go/MySQL 服务；
 - 当前 `auth.py` 在 Live 环境要求全局 `api_key`；
 - 浏览器会员和员工未来必须能够在生产环境登录；

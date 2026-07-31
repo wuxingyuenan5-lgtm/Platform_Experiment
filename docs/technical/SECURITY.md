@@ -8,6 +8,6 @@ Current security posture:
 
 Relevant backend files:
 
-- `platform-backend/app/security.py`
-- `platform-backend/app/config.py`
+- `platform-api/app/security.py`
+- `platform-api/app/config.py`
 - `execution-runtime/app/secret_resolver.py`

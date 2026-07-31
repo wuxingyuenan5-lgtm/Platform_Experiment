@@ -103,7 +103,7 @@ app.add_middleware(
 def health() -> dict[str, str]:
     return {
         "status": "ok",
-        "service": "platform-backend",
+        "service": "platform-api",
         "environment": settings.environment,
     }
 
@@ -111,7 +111,7 @@ def health() -> dict[str, str]:
 @app.get(f"{settings.api_prefix}/system/info", tags=["system"])
 def system_info() -> dict[str, str]:
     return {
-        "service": "platform-backend",
+        "service": "platform-api",
         "version": "0.6.0",
         "apiVersion": "v1",
     }

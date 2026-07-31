@@ -1,10 +1,10 @@
 # 用户系统执行计划
 
 状态：`implemented / automated verification passed / manual acceptance pending`<br>
-适用版本：`Platform Experiment 0.9.0`  
-Issue：`#117`  
-任务包：`../../tasks/issue-117-user-system.md`  
-需求：`USER_SYSTEM_REQUIREMENTS.md`  
+适用版本：`Platform Experiment 0.9.0`
+Issue：`#117`
+任务包：`../../tasks/issue-117-user-system.md`
+需求：`USER_SYSTEM_REQUIREMENTS.md`
 架构：`../technical/USER_SYSTEM_TECHNICAL_ARCHITECTURE.md`
 
 ## 1. 执行目标
@@ -158,25 +158,25 @@ USR-AUDIT-002/003/004/005
 后端：
 
 ```text
-platform-backend/app/auth.py
-platform-backend/app/user_schemas.py             new
-platform-backend/app/user_repository.py          new
-platform-backend/app/user_service.py             new
-platform-backend/app/user_routes.py              new
-platform-backend/app/schema_migrations.py
-platform-backend/app/main.py
-platform-backend/app/config.py
-platform-backend/pyproject.toml
+platform-api/app/auth.py
+platform-api/app/user_schemas.py             new
+platform-api/app/user_repository.py          new
+platform-api/app/user_service.py             new
+platform-api/app/user_routes.py              new
+platform-api/app/schema_migrations.py
+platform-api/app/main.py
+platform-api/app/config.py
+platform-api/pyproject.toml
 ```
 
 测试：
 
 ```text
-platform-backend/tests/test_user_schema_migrations.py   new
-platform-backend/tests/test_user_authentication.py      new
-platform-backend/tests/test_user_sessions.py            new
-platform-backend/tests/test_user_authorization_architecture.py new
-platform-backend/tests/test_auth_rbac.py
+platform-api/tests/test_user_schema_migrations.py   new
+platform-api/tests/test_user_authentication.py      new
+platform-api/tests/test_user_sessions.py            new
+platform-api/tests/test_user_authorization_architecture.py new
+platform-api/tests/test_auth_rbac.py
 ```
 
 文档：
@@ -208,7 +208,7 @@ docs/codex/current-state.md
 ### 6.5 直接测试
 
 ```powershell
-cd platform-backend
+cd platform-api
 python -m ruff check app tests
 python -m pyright
 python -m pytest tests/test_user_schema_migrations.py -q
@@ -251,11 +251,11 @@ USR-SESSION-001..003
 后端：
 
 ```text
-platform-backend/app/user_schemas.py
-platform-backend/app/user_repository.py
-platform-backend/app/user_service.py
-platform-backend/app/user_routes.py
-platform-backend/app/config.py
+platform-api/app/user_schemas.py
+platform-api/app/user_repository.py
+platform-api/app/user_service.py
+platform-api/app/user_routes.py
+platform-api/app/config.py
 ```
 
 前端：
@@ -274,10 +274,10 @@ platform-web/src/utils/http/axios/index.ts
 测试：
 
 ```text
-platform-backend/tests/test_user_registration.py
-platform-backend/tests/test_user_profile.py
-platform-backend/tests/test_password_reset_tickets.py
-platform-backend/tests/test_user_avatar.py
+platform-api/tests/test_user_registration.py
+platform-api/tests/test_user_profile.py
+platform-api/tests/test_password_reset_tickets.py
+platform-api/tests/test_user_avatar.py
 platform-web focused tests if current harness supports them
 ```
 
@@ -297,7 +297,7 @@ platform-web focused tests if current harness supports them
 ### 7.5 直接测试
 
 ```powershell
-cd platform-backend
+cd platform-api
 python -m pytest tests/test_user_registration.py -q
 python -m pytest tests/test_user_profile.py -q
 python -m pytest tests/test_password_reset_tickets.py -q
@@ -342,10 +342,10 @@ USR-AUDIT-001..005
 后端：
 
 ```text
-platform-backend/app/user_schemas.py
-platform-backend/app/user_repository.py
-platform-backend/app/user_service.py
-platform-backend/app/user_routes.py
+platform-api/app/user_schemas.py
+platform-api/app/user_repository.py
+platform-api/app/user_service.py
+platform-api/app/user_routes.py
 ```
 
 前端：
@@ -360,10 +360,10 @@ platform-web/src/router/routes/modules/risk.ts
 测试：
 
 ```text
-platform-backend/tests/test_user_admin.py
-platform-backend/tests/test_user_target_scope.py
-platform-backend/tests/test_last_ceo_concurrency.py
-platform-backend/tests/test_user_audit_transactions.py
+platform-api/tests/test_user_admin.py
+platform-api/tests/test_user_target_scope.py
+platform-api/tests/test_last_ceo_concurrency.py
+platform-api/tests/test_user_audit_transactions.py
 ```
 
 ### 8.4 实施步骤
@@ -384,7 +384,7 @@ platform-backend/tests/test_user_audit_transactions.py
 ### 8.5 直接测试
 
 ```powershell
-cd platform-backend
+cd platform-api
 python -m pytest tests/test_user_admin.py -q
 python -m pytest tests/test_user_target_scope.py -q
 python -m pytest tests/test_last_ceo_concurrency.py -q
@@ -420,11 +420,11 @@ USR-AUDIT-001/002/004/005
 后端：
 
 ```text
-platform-backend/app/schema_migrations.py
-platform-backend/app/user_schemas.py
-platform-backend/app/user_repository.py
-platform-backend/app/user_service.py
-platform-backend/app/user_routes.py
+platform-api/app/schema_migrations.py
+platform-api/app/user_schemas.py
+platform-api/app/user_repository.py
+platform-api/app/user_service.py
+platform-api/app/user_routes.py
 ```
 
 前端：
@@ -438,10 +438,10 @@ platform-web/src/api/platform/userSystem.ts
 测试：
 
 ```text
-platform-backend/tests/test_member_holding_migrations.py
-platform-backend/tests/test_member_holdings.py
-platform-backend/tests/test_member_holding_scope.py
-platform-backend/tests/test_member_holding_decimal.py
+platform-api/tests/test_member_holding_migrations.py
+platform-api/tests/test_member_holdings.py
+platform-api/tests/test_member_holding_scope.py
+platform-api/tests/test_member_holding_decimal.py
 ```
 
 ### 9.4 实施步骤
@@ -460,7 +460,7 @@ platform-backend/tests/test_member_holding_decimal.py
 ### 9.5 直接测试
 
 ```powershell
-cd platform-backend
+cd platform-api
 python -m pytest tests/test_member_holding_migrations.py -q
 python -m pytest tests/test_member_holdings.py -q
 python -m pytest tests/test_member_holding_scope.py -q
@@ -531,7 +531,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\dev-platform.ps1
 ### 11.1 Backend
 
 ```powershell
-cd platform-backend
+cd platform-api
 python -m ruff check app tests
 python -m pyright
 python -m pytest -m architecture

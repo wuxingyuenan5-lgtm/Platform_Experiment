@@ -9,7 +9,7 @@ This project contains active code, generated dependencies, build outputs, virtua
 | `platform-web/node_modules/` | 1.09 GB | 72,456 | Ignore; do not delete unless dependencies will be reinstalled |
 | `platform-web/dist/` | 42.48 MB | 3,681 | Ignore; safe to regenerate |
 | `execution-runtime/.venv/` | 136.73 MB | 5,303 | Ignore; keep while runtime is working |
-| `platform-backend/.venv/` | 75.33 MB | 3,043 | Ignore; keep while backend is working |
+| `platform-api/.venv/` | 75.33 MB | 3,043 | Ignore; keep while backend is working |
 | `platform-web/project_structure.txt` | 0.08 MB | 1 | Ignore as generated structure dump |
 | `platform-web/CHANGELOG.md` | 0.22 MB | 1 | Ignore for routine search; it is vendor/history noise |
 
@@ -26,7 +26,7 @@ Do not delete:
 
 - `node_modules/`
 - `.venv/`
-- `platform-backend/data/`
+- `platform-api/data/`
 - `execution-runtime/data/`
 
 These may be large, but they support local development or contain runtime state. Prefer ignoring over deleting.
@@ -58,6 +58,6 @@ Inspect explicit subprojects only when a task needs reference-code absorption.
 
 ```powershell
 rg -n "StrategyBackendSnapshot" platform-web/src
-rg -n "createExecutionBatch" platform-web/src platform-backend/app execution-runtime/app
+rg -n "createExecutionBatch" platform-web/src platform-api/app execution-runtime/app
 rg --files
 ```

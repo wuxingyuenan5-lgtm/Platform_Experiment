@@ -1,9 +1,9 @@
 # Platform V6 简化架构入口
 
-状态：`active`  
-产品基线：Platform V5  
-架构版本：Platform V6 Simplified  
-适用分支：`refactor/frontend-architecture-v6`  
+状态：`active`
+产品基线：Platform V5
+架构版本：Platform V6 Simplified
+适用分支：`refactor/frontend-architecture-v6`
 文档层级：架构文档入口
 
 ## 1. 当前架构结论
@@ -40,7 +40,7 @@ V1 开发路线：
 ```text
 platform-web
 +
-platform-backend
+platform-api
 +
 execution-runtime
 ```
@@ -48,7 +48,7 @@ execution-runtime
 | 工程 | 职责 |
 |---|---|
 | `platform-web` | Vue 前端、查询展示、交易命令输入 |
-| `platform-backend` | 模块化单体、业务数据、订单成交、风险、PnL 和 API |
+| `platform-api` | 模块化单体、业务数据、订单成交、风险、PnL 和 API |
 | `execution-runtime` | Crypto／MT5 连接、外部订单执行、回报接收和本地 Journal |
 
 三个工程初期可以部署在同一台机器，但 Platform Backend 与 Execution Runtime 必须保持独立进程。
@@ -60,7 +60,7 @@ Browser
   ↓
 platform-web
   ↓ REST / WebSocket
-platform-backend
+platform-api
   ↓ Runtime Command / Event
 execution-runtime
   ↓
@@ -226,7 +226,7 @@ Runtime 本地 Journal
 ## 10. 工程实施顺序
 
 ```text
-1. platform-backend 工程骨架
+1. platform-api 工程骨架
 2. execution-runtime 工程骨架
 3. 最小数据库表
 4. Fake Gateway

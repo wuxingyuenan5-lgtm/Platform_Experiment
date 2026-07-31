@@ -42,7 +42,7 @@ Large directories are excluded from normal search through root `.ignore`:
 - `platform-web/node_modules/`
 - `platform-web/dist/`
 - `execution-runtime/.venv/`
-- `platform-backend/.venv/`
+- `platform-api/.venv/`
 - `outputs/`
 
 Do not delete these directories just to reduce Codex token use. The ignore rules already prevent routine scanning.
