@@ -11,9 +11,11 @@
 - `#/home/index` is the logged-in Home Dashboard, not the public start page; it uses the butterfly-water topology visual as the hero background and shows market, portfolio, strategy, and calendar summary modules.
 - Home Dashboard hero art must not expose baked-in legacy text from source images; the butterfly-water topology should use the high-resolution original-color asset as a controlled local visual layer behind the intended dashboard copy.
 - Home Dashboard hero should render as one continuous butterfly-water visual field, not a split left-image/right-empty background; lower dashboard modules may overlap the hero edge to match the reference layout.
-- Platform backend health check returns 200 at `http://127.0.0.1:8000/health`.
-- Product pages must not show debug-only backend panels.
+- Platform API health check returns 200 at `http://127.0.0.1:8000/health`.
+- Execution Runtime health check returns 200 at `http://127.0.0.1:8100/health` when runtime integration is enabled.
+- Product pages must not show debug-only backend or runtime panels.
 - Trading and account behavior changes require separate approval.
 - Routine code search does not scan `node_modules`, `.venv`, `dist`, or `outputs`.
 - Root SQL references live under `references/database/`.
 - Large external reference code does not live in the project root.
+- Shared documentation and default configuration must not bind the platform to a named developer workstation.
