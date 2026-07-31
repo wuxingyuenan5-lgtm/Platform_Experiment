@@ -59,6 +59,7 @@ include = [
   "app/position_math.py",
   "app/research_cache.py",
   "app/research_data_schemas.py",
+  "app/research_provider_normalization.py",
   "app/research_providers.py",
   "app/research_routes.py",
   "app/research_service.py",
