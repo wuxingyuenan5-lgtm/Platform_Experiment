@@ -30,8 +30,7 @@
     overflow: auto;
     box-sizing: border-box;
     scrollbar-gutter: stable;
-    background:
-      radial-gradient(circle at top right, rgba(178, 206, 236, 0.28), transparent 30%),
+    background: radial-gradient(circle at top right, rgba(178, 206, 236, 0.28), transparent 30%),
       linear-gradient(180deg, #f6f8fb 0%, #edf2f7 100%);
 
     &::before {
