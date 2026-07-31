@@ -1,6 +1,6 @@
 # Platform Portfolio与正式财务低风险模块化计划
 
-状态：**Portfolio后端低风险模块化已收口；下一阶段进入前端与公共展示治理**  
+状态：**Portfolio后端与前端公共展示治理已收口；下一阶段进入前端热点治理**  
 关联Issue：#136  
 关联Draft PR：#139  
 活动分支：`refactor/issue-136-platform-0-9-2-system-optimization`  
@@ -31,17 +31,6 @@ Portfolio与正式财务优化不得改变：
 
 ## P1 会员持仓纯估值层：完成
 
-### 允许范围
-
-1. 建立无数据库、无HTTP、无权限、无审计副作用的估值模块；
-2. 保持全部Decimal、NAV状态、币种、时间戳和响应别名；
-3. Service继续加载Fund/NAV并把估值错误映射为原`MemberHoldingServiceError`；
-4. 永久架构测试冻结模块依赖与Service职责；
-5. Target tests、全后端测试和九项完整矩阵全部通过；
-6. 一次性写权限工具在验证后删除。
-
-### 已完成实现
-
 - [x] 新增`platform-api/app/member_holding_valuation.py`，只接收已加载的Fund、Holding、NAV与显式时间/陈旧阈值；
 - [x] 使用只读Protocol输入，估值Owner不依赖Repository记录类型或持久化模块；
 - [x] 保留普通Decimal字符串、market value、cumulative return、return rate与零投入空收益率；
@@ -50,10 +39,9 @@ Portfolio与正式财务优化不得改变：
 - [x] `member_holding_service.py`继续拥有数据库读取、权限、近期再认证、事务、审计和服务错误映射；
 - [x] 新增完整响应Golden、Decimal/时区/临界值测试和永久纯度架构测试；
 - [x] 将估值Owner登记到`docs/architecture/OWNERSHIP.md`、纳入Pyright并加入文档一致性守卫；
-- [x] 删除一次性写权限Workflow和迁移脚本；
-- [x] 完整质量矩阵通过并将运行证据同步到Issue #136和Draft PR #139。
+- [x] 删除一次性写权限Workflow和迁移脚本。
 
-### 完整矩阵证据
+### P1完整矩阵证据
 
 验证HEAD：`1697345b59517d603a30377934271ba5946d4856`
 
@@ -69,16 +57,6 @@ Portfolio与正式财务优化不得改变：
 
 视觉Artifact：`8791768494`  
 SHA-256：`74df3b5503ed41204719acd1d06203fcc3fa3c9479a18972a544acc2a81a7a32`
-
-## P1停止条件
-
-出现以下任一情况必须停止并回滚本切口：
-
-- API字段、别名、错误码或Decimal输出发生变化；
-- NAV状态或时间边界发生变化；
-- Service失去权限、事务、审计或Repository编排职责；
-- 估值模块依赖配置、数据库、HTTP、认证或正式投影；
-- Browser E2E、视觉基线、Provider Smoke或任一安全门禁失败。
 
 ## P2 Fund catalog与NAV mutation响应只读复核：完成
 
@@ -97,8 +75,49 @@ SHA-256：`74df3b5503ed41204719acd1d06203fcc3fa3c9479a18972a544acc2a81a7a32`
 - [x] 不触碰Financial Fact、Formal Projection和Position Math；
 - [x] Portfolio后端低风险模块化在P1后正式收口。
 
-## 下一门禁：Portfolio前端与公共展示
+## P3 Portfolio前端与公共展示：完成
 
-复核会员自助与管理员视角的持仓展示，重点统一Decimal、币种、NAV三态、空收益率与零收益率表达。任何前端调整必须保持权限范围、API合同、页面布局和视觉基线。
+### 已修复问题
+
+1. 管理员持仓页原有独立Decimal格式化和方向判断，`0.0`会被误判为正收益并显示绿色与正号；
+2. 会员持仓页在部分基金缺失NAV时，会过滤缺失值后汇总其余基金，形成容易被误读为完整账户估值的部分总额。
+
+### 已完成实现
+
+- [x] 会员与管理员持仓页统一使用`platform-web/src/utils/decimalDisplay.ts`；
+- [x] 任意形式的零值均保持中性，不显示正号或正收益颜色；
+- [x] 同币种且全部持仓具备market value与cumulative return时，才显示账户总市值和总收益；
+- [x] 任一持仓缺失估值时，总市值与总收益显示不可用，不将缺失值当0，也不静默展示部分合计；
+- [x] 累计投入不依赖NAV，在同币种条件下仍可独立汇总；
+- [x] 保持API、权限、DOM层级、CSS布局和用户操作流程；
+- [x] 新增永久架构测试，冻结共享Decimal Owner和完整估值汇总规则。
+
+### P3完整矩阵证据
+
+验证HEAD：`e41267cc70b5e852b3069d71a6a8d7b1092127ad`
+
+- Platform CI：`30628817214`
+- Platform Directory Invariants：`30628817269`
+- Version Consistency：`30628817272`
+- Secret Scan：`30628817227`
+- User System Browser E2E：`30628817208`
+- Platform 0.9.2 Baseline Audit：`30628817219`
+- Platform Visual Baseline：`30628817239`
+- Hedge Board Browser E2E：`30628817237`
+- Research Provider Smoke：`30628817247`
+
+视觉Artifact：`8792572937`  
+SHA-256：`5109b685a9b0e2b9926c364f6fbadf95aae5982a6a5d77b073e5c32a6f33a7de`
+
+## Portfolio收口决策
+
+- [x] Portfolio后端低风险模块化完成；
+- [x] Portfolio前端Decimal与汇总口径治理完成；
+- [x] 不新增跨域状态、浮点计算、正式财务替代逻辑或额外Presenter；
+- [x] 后续仅在出现具体缺陷或新产品需求时重新打开Portfolio域。
+
+## 下一门禁：前端热点治理
+
+下一阶段回到证据确认的前端热点，优先审计`platform-web/src/views/hedgeBoard/index.vue`及可复用公共展示能力。仍采用一次一个视觉职责、完整质量矩阵和56页视觉验收，不进行页面重写或微前端化。
 
 Draft PR始终保持Open、Draft、Unmerged；不得修改或合并`main`。
