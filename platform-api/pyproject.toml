@@ -99,6 +99,7 @@ include = [
   "app/user_routes.py",
   "app/user_schemas.py",
   "app/user_security.py",
+  "app/user_session_presenter.py",
   "app/user_service.py",
   "app/user_session_auth.py",
   "app/venue_reconciliation_policy.py",
