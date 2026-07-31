@@ -1,7 +1,28 @@
+import os
 from decimal import Decimal
 from functools import lru_cache
+from pathlib import Path
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+MT5_BRIDGE_FILENAME = "variable_global_mt5_bridge.json"
+
+
+def default_mt5_bridge_file_path() -> str:
+    """Return a portable bridge path without binding the repository to one workstation."""
+
+    appdata = os.environ.get("APPDATA")
+    if appdata:
+        return str(
+            Path(appdata)
+            / "MetaQuotes"
+            / "Terminal"
+            / "Common"
+            / "Files"
+            / MT5_BRIDGE_FILENAME
+        )
+    return str(Path("data") / MT5_BRIDGE_FILENAME)
 
 
 class Settings(BaseSettings):
@@ -57,10 +78,7 @@ class Settings(BaseSettings):
     mt5_instrument_map: str = ""
     mt5_symbol: str = "XAUUSD+"
     mt5_terminal_path: str | None = None
-    mt5_bridge_file_path: str = (
-        "C:\\Users\\jiuxi\\AppData\\Roaming\\MetaQuotes\\Terminal\\Common\\Files\\"
-        "variable_global_mt5_bridge.json"
-    )
+    mt5_bridge_file_path: str = Field(default_factory=default_mt5_bridge_file_path)
     mt5_check_timeout_seconds: float = 5.0
     mt5_magic_number: int = 5604001
     mt5_deviation_points: int = 20
