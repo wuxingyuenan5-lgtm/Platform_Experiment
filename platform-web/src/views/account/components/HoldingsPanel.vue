@@ -180,9 +180,14 @@
     return currencies.length === 1 ? currencies[0] || '' : '多币种';
   });
   const canAggregate = computed(() => summaryCurrency.value !== '多币种');
+  const hasCompleteValuation = computed(() =>
+    holdings.value.every(
+      (item) => isDecimal(item.marketValue) && isDecimal(item.cumulativeReturn),
+    ),
+  );
   const totalMarketValue = computed(() =>
-    canAggregate.value
-      ? sumDecimalStrings(holdings.value.map((item) => item.marketValue).filter(isDecimal))
+    canAggregate.value && hasCompleteValuation.value
+      ? sumDecimalStrings(holdings.value.map((item) => item.marketValue as string))
       : undefined,
   );
   const totalInvested = computed(() =>
@@ -191,8 +196,8 @@
       : undefined,
   );
   const totalReturn = computed(() =>
-    canAggregate.value
-      ? sumDecimalStrings(holdings.value.map((item) => item.cumulativeReturn).filter(isDecimal))
+    canAggregate.value && hasCompleteValuation.value
+      ? sumDecimalStrings(holdings.value.map((item) => item.cumulativeReturn as string))
       : undefined,
   );
   const latestAsOf = computed(() =>
