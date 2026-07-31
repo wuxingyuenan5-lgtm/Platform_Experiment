@@ -39,6 +39,10 @@ jobs:
           cache: pnpm
           cache-dependency-path: platform-web/pnpm-lock.yaml
 
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
       - name: Install frontend dependencies
         working-directory: platform-web
         env:
@@ -52,8 +56,8 @@ jobs:
         working-directory: platform-web
         run: |
           pnpm exec eslint --max-warnings 0 \
-            src/views/hedgeBoard/index.vue \
             src/views/hedgeBoard/components/WidgetErrorBoundary.ts
+          python ../scripts/frontend-no-new-debt.py
           pnpm type:check
           pnpm test:hedge-board-layout
           git diff --check
