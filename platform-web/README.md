@@ -1,24 +1,48 @@
-**项目改装** | [中文](./README.zh-CN.md)
-### 1.项目基础配置和部分目录介绍
+# Variable-Global Platform Web
 
-- utils/http 使用 vueuse 封装的接口请求，axios 只是引入，未作封装
-- store 使用 pinia 做状态管理，线上对数据做了加密处理，开发环境未做处理
-- hook 如有经常使用的 hooks，可以自行封装，可以放在目录下与同事一起分享
-- unocss 原子化 css，根据个人喜好，可以自行选择是否使用
-- 项目样式使用 tailwindcss 规范，如无特殊需求建议减少使用自定义样式，如需使用，请使用原子化 css
-- components/Table/index 为项目主要表格组件，ui 无特殊需求，建议使用此组件
-- /components/google 谷歌验证码组件，
-- /utils/color getTextColor 根据数据大小，显示字体颜色
+[中文说明](./README.zh-CN.md)
 
-### 2.常用工具及部分常用函数介绍
+`platform-web/` is the Vue 3 product frontend for the Variable-Global research, trading, risk, identity, portfolio and reconciliation platform.
 
-- useApiBasic 仅进行接口调用并无特殊数据处理时，可使用此函数，函数进行简单成功，失败返回处理
-- utils/options/basicOptions.tsx 静态状态管理文件
-- utils/options/useBasicOptions.tsx 异步状态管理文件
-- /components/OptionTranslate TextTranslate 状态翻译组件，根据状态码返回对应文字，可设置对应文案颜色
+## Architecture boundary
 
-### 3.路由
+```text
+Platform Web
+    ↓ Browser Session / REST
+Platform API
+    ↓ versioned Runtime contracts
+Execution Runtime
+```
 
-- 路由通过系统管理-菜单管理进行配置，项目初始时可和后端配合提前预设默认路由，不然页面可能会出现空白
-- 不同项目-路由样式可能不同，可以根据现实需求自定义路由组件
-- 路由变化时会移除尚未加载成功的后端接口
+The browser must not hold Venue credentials or perform external execution side effects. Trading, permissions, accounting and reconciliation rules remain authoritative in Platform API and Execution Runtime.
+
+## Local development
+
+From the repository root on Windows PowerShell:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\dev-platform.ps1
+```
+
+Frontend-only commands from `platform-web/`:
+
+```bash
+pnpm install --frozen-lockfile
+pnpm dev
+pnpm type:check
+pnpm build
+```
+
+The authoritative package manager is declared in `package.json#packageManager`.
+
+## Engineering entry points
+
+- Current state: `../docs/codex/current-state.md`
+- Frontend agent rules: `AGENTS.md`
+- Product and architecture docs: `../docs/README.md`
+- Frontend design history and module detail: `docs/`
+- Git workflow: `../docs/engineering/GIT_WORKFLOW.md`
+
+## Upstream attribution
+
+The frontend retains components and build infrastructure derived from Vue Vben Admin. The applicable MIT license is preserved in `LICENSE`. Upstream history is retained only for attribution and maintenance context; this repository, its issue tracker and its release state are authoritative for the Variable-Global platform.
