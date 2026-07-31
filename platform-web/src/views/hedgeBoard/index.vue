@@ -6,7 +6,7 @@
           <CompactSegmentTabs
             :items="hedgeBoardTabs"
             :model-value="activeCategory"
-            @update:modelValue="selectBoardCategory"
+            @update:model-value="selectBoardCategory"
           />
         </div>
       </section>
