@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
+import datetime
 from decimal import Decimal
 from typing import Any
 
@@ -224,7 +224,10 @@ class StockHttpResearchProvider:
             timestamp = row.get("pubDate")
             asked_at = None
             if isinstance(timestamp, (int, float)):
-                asked_at = datetime.fromtimestamp(timestamp / 1000, tz=UTC).isoformat()
+                asked_at = datetime.datetime.fromtimestamp(
+                    timestamp / 1000,
+                    tz=datetime.UTC,
+                ).isoformat()
             output.append(
                 {
                     "company": row.get("companyShortName"),
