@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import json
 import math
 from collections.abc import Iterable
 from datetime import UTC, date, datetime, timedelta
@@ -21,6 +20,8 @@ from app.research_data_schemas import (
     ShenwanMembership,
     ShortTermEmotionSnapshot,
 )
+from app.research_provider_errors import ResearchProviderError
+from app.research_provider_macro import MacroResearchProvider
 from app.research_provider_normalization import as_date as _date
 from app.research_provider_normalization import as_decimal as _decimal
 from app.research_provider_normalization import as_non_negative_integer as _integer
@@ -36,7 +37,6 @@ USER_AGENT = (
 )
 EASTMONEY_DATACENTER_URL = "https://datacenter-web.eastmoney.com/api/data/v1/get"
 TENCENT_QUOTE_URL = "https://qt.gtimg.cn/q="
-POLYMARKET_MARKETS_URL = "https://gamma-api.polymarket.com/markets"
 
 INDEX_DEFINITIONS: tuple[tuple[str, str, str], ...] = (
     ("000001", "上证指数", "sh000001"),
@@ -48,10 +48,6 @@ INDEX_DEFINITIONS: tuple[tuple[str, str, str], ...] = (
     ("932000", "中证2000", "csi932000"),
     ("930050", "中证A50", "csi930050"),
 )
-
-
-class ResearchProviderError(RuntimeError):
-    pass
 
 
 def _akshare() -> Any:
@@ -72,6 +68,10 @@ class FreeResearchProvider:
 
     def __init__(self, *, timeout_seconds: float = 20.0) -> None:
         self._timeout_seconds = timeout_seconds
+        self._macro = MacroResearchProvider(
+            timeout_seconds=timeout_seconds,
+            user_agent=USER_AGENT,
+        )
 
     async def a_share_spot(self) -> list[AShareTurnoverStock]:
         def load() -> list[AShareTurnoverStock]:
@@ -878,69 +878,7 @@ class FreeResearchProvider:
             )
         return output
 
-    async def macro_expectation_events(self, limit: int = 12) -> list[MacroExpectationEvent]:
-        params = {"active": "true", "closed": "false", "limit": 200}
-        async with httpx.AsyncClient(timeout=self._timeout_seconds, trust_env=False) as client:
-            response = await client.get(
-                POLYMARKET_MARKETS_URL,
-                params=params,
-                headers={"User-Agent": USER_AGENT},
-            )
-            response.raise_for_status()
-            rows = response.json()
-        keywords = {
-            "monetary_policy": ("fed", "interest rate", "rate cut", "fomc"),
-            "macro": ("inflation", "cpi", "recession", "unemployment", "gdp"),
-            "geopolitics": ("war", "ceasefire", "iran", "ukraine", "taiwan"),
-            "election": ("election", "president", "senate", "congress"),
-        }
-        events: list[MacroExpectationEvent] = []
-        for row in rows if isinstance(rows, list) else []:
-            title = str(row.get("question") or row.get("title") or "").strip()
-            lowered = title.lower()
-            category = next(
-                (
-                    name
-                    for name, terms in keywords.items()
-                    if any(term in lowered for term in terms)
-                ),
-                None,
-            )
-            if category is None:
-                continue
-            outcomes_raw = row.get("outcomes") or "[]"
-            prices_raw = row.get("outcomePrices") or "[]"
-            try:
-                outcomes = json.loads(outcomes_raw) if isinstance(outcomes_raw, str) else outcomes_raw
-                prices = json.loads(prices_raw) if isinstance(prices_raw, str) else prices_raw
-            except json.JSONDecodeError:
-                continue
-            if not outcomes or not prices:
-                continue
-            best_index = max(range(min(len(outcomes), len(prices))), key=lambda idx: float(prices[idx]))
-            probability = Decimal(str(float(prices[best_index]) * 100))
-            expiry_at = None
-            end_date = row.get("endDate") or row.get("end_date_iso")
-            if end_date:
-                try:
-                    expiry_at = datetime.fromisoformat(str(end_date).replace("Z", "+00:00"))
-                except ValueError:
-                    expiry_at = None
-            events.append(
-                MacroExpectationEvent(
-                    event_id=str(row.get("id") or row.get("conditionId") or title),
-                    category=category,
-                    title=title,
-                    outcome=str(outcomes[best_index]),
-                    current_probability_pct=probability,
-                    liquidity_label=str(row.get("liquidityNum") or row.get("liquidity") or "") or None,
-                    expiry_at=expiry_at,
-                    source_url=(
-                        f"https://polymarket.com/event/{row.get('slug')}" if row.get("slug") else None
-                    ),
-                )
-            )
-        events.sort(key=lambda item: (item.category, -item.current_probability_pct))
-        if not events:
-            raise ResearchProviderError("macro_expectation_events_empty")
-        return events[:limit]
+    async def macro_expectation_events(
+        self, limit: int = 12
+    ) -> list[MacroExpectationEvent]:
+        return await self._macro.macro_expectation_events(limit=limit)
