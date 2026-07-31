@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <PageWrapper :title="pageTitle">
     <div class="hedge-board">
       <section class="strategy-top-toolbar">
@@ -55,11 +55,9 @@
     h,
     nextTick,
     onBeforeUnmount,
-    onErrorCaptured,
     onMounted,
     PropType,
     ref,
-    useSlots,
     watch,
   } from 'vue';
   import { useRoute, useRouter } from 'vue-router';
@@ -69,6 +67,7 @@
   import MarketTerminalPage from './components/MarketTerminalPage.vue';
   import ToolGroupSection from './tradingTools/components/ToolGroupSection.vue';
   import TerminalDetailPanel from './components/TerminalDetailPanel.vue';
+  import WidgetErrorBoundary from './components/WidgetErrorBoundary';
   import {
     researchModules,
     type LocalWidgetKey,
@@ -633,41 +632,6 @@
               class: 'widget-frame',
               style: { minHeight: `${props.widget.height ?? 360}px` },
             });
-    },
-  });
-
-  const WidgetErrorBoundary = defineComponent({
-    name: 'WidgetErrorBoundary',
-    props: {
-      widgetTitle: {
-        type: String,
-        required: true,
-      },
-    },
-    setup(props) {
-      const slots = useSlots();
-      const hasError = ref(false);
-
-      onErrorCaptured((error) => {
-        console.error('[hedgeBoard] Widget boundary captured:', props.widgetTitle, error);
-        hasError.value = true;
-        return false;
-      });
-
-      return () => {
-        if (hasError.value) {
-          return h(
-            'div',
-            {
-              class: 'local-empty',
-              style: { minHeight: '360px' },
-            },
-            `模块 "${props.widgetTitle}" 渲染失败，已自动跳过，不影响其他内容浏览。`,
-          );
-        }
-
-        return slots.default ? slots.default() : null;
-      };
     },
   });
 
