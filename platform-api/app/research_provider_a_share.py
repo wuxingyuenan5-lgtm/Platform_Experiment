@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Callable
 from datetime import date, datetime, timedelta
 from decimal import Decimal
-from typing import Any, Callable
+from typing import Any
 
 import httpx
 
@@ -109,7 +110,10 @@ class AShareResearchProvider:
         return await asyncio.to_thread(load)
 
     async def index_snapshots(self) -> list[AShareIndexSnapshot]:
-        tasks = [self._index_snapshot(code, name, symbol) for code, name, symbol in INDEX_DEFINITIONS]
+        tasks = [
+            self._index_snapshot(code, name, symbol)
+            for code, name, symbol in INDEX_DEFINITIONS
+        ]
         results = await asyncio.gather(*tasks, return_exceptions=True)
         snapshots = [item for item in results if isinstance(item, AShareIndexSnapshot)]
         if not snapshots:
