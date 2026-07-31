@@ -1,20 +1,17 @@
 {
   "name": "vg-platform-web",
-  "version": "2.10.1",
-  "homepage": "https://github.com/vbenjs/vue-vben-admin",
+  "version": "0.9.2",
+  "private": true,
+  "description": "Variable-Global research, trading, risk, identity, portfolio and reconciliation web platform",
+  "homepage": "https://github.com/wuxingyuenan5-lgtm/Platform_Experiment",
   "bugs": {
-    "url": "https://github.com/vbenjs/vue-vben-admin/issues"
+    "url": "https://github.com/wuxingyuenan5-lgtm/Platform_Experiment/issues"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/vbenjs/vue-vben-admin.git"
+    "url": "git+https://github.com/wuxingyuenan5-lgtm/Platform_Experiment.git"
   },
   "license": "MIT",
-  "author": {
-    "name": "vben",
-    "email": "anncwb@126.com",
-    "url": "https://github.com/anncwb"
-  },
   "scripts": {
     "bootstrap": "pnpm install",
     "build": "pnpm sync:trading-tools && cross-env NODE_ENV=production NODE_OPTIONS=--max-old-space-size=8192 pnpm vite build",
