@@ -33,6 +33,11 @@ def update_versions(root: Path, version: str) -> None:
             r'^version\s*=\s*"\d+\.\d+\.\d+"$',
             f'version = "{version}"',
         )
+    replace_once(
+        root / "platform-web/package.json",
+        r'^  "version": "\d+\.\d+\.\d+",$',
+        f'  "version": "{version}",',
+    )
     for relative in FRONTEND_VERSION_FILES:
         replace_once(
             root / relative,
