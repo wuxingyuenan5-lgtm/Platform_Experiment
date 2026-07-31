@@ -58,8 +58,8 @@ def test_legacy_production_assets_require_an_explicit_migration_gate() -> None:
     task_packet = TASK_PACKET.read_text(encoding="utf-8")
 
     assert "Phase J / J0" in audit
-    assert "禁止删除、重命名或自动切换" in audit
-    assert "不删除`projects/risk-control`" in audit
+    assert "不删除或重命名`projects/risk-control`" in audit
+    assert "不删除或改写`deploy/`执行链" in audit
     assert "不修改`.env.production`的API路由" in audit
     assert "PLATFORM_LEGACY_DEPLOYMENT_AUDIT.md" in current_state
     assert "PLATFORM_LEGACY_DEPLOYMENT_AUDIT.md" in task_packet
