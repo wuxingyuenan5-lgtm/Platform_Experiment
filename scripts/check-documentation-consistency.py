@@ -23,6 +23,7 @@ REQUIRED_OWNERS = {
     "Platform composition root": "platform-api/app/main.py",
     "Execution API DTOs": "platform-api/app/execution_schemas.py",
     "Platform order submission orchestration": "platform-api/app/trade_command_execution.py",
+    "Member holding pure valuation": "platform-api/app/member_holding_valuation.py",
     "EOD Reconciliation public DTOs": "platform-api/app/eod_reconciliation_schemas.py",
     "EOD report and review policy": "platform-api/app/eod_reconciliation_policy.py",
     "EOD Reconciliation persistence": "platform-api/app/eod_reconciliation_repository.py",
