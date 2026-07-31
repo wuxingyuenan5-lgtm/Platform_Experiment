@@ -25,7 +25,7 @@ This is the sole repository document for current engineering state. Durable rule
 
 Frontend hotspot and high-risk structural governance are closed. Trading, Risk, Formal Accounting and Execution Runtime retained their existing owners. Reconciliation routing is separated without moving orchestration, persistence, policy, Financial Fact, Runtime transport, Decimal, idempotency or fail-closed behavior.
 
-## Physical boundaries
+## Target physical boundaries
 
 ```text
 platform-web/
@@ -35,6 +35,8 @@ platform-api/                  modular monolith
 execution-runtime/
     ↓ Venue / Broker / MT5 / Bybit
 ```
+
+The authoritative local entry is `scripts/dev-platform.ps1`, which starts Platform Web on 4373, Platform API on 8000 and Execution Runtime on 8100.
 
 SQLite remains approved for the current Platform stage. Microservices, Kubernetes, Kafka, GraphQL, CQRS, Event Sourcing, micro-frontends and a second global state system remain out of scope.
 
@@ -84,8 +86,41 @@ Browser roles remain separate from API-Key roles. Browser Sessions cannot author
 - Existing direct consumers continue to use the Facade.
 - Service, Policy, Repository, Runtime Client, Financial Fact, DDL and Decimal semantics remain unchanged.
 
-## Current gate: Legacy L0 classification
+## Current gate: Phase J / J0 legacy production classification
 
-The next phase is a read-only inventory of `projects/risk-control` and its historical Go/MySQL deployment and data dependencies. It must identify active process references, configuration, database responsibilities, external dependencies and archival status before any structural action is proposed.
+A second, complete production topology remains in the repository:
 
-Known acceptance work still includes Windows local validation, production HTTPS, real Venue/Broker evidence, backup/restore and formal accounting/reconciliation acceptance.
+```text
+platform-web production build
+    ↓ /api/auth and /api/data
+Nginx
+    ├─ Go Auth Service :8080
+    └─ Go Data Service :8082
+          ↓
+        MySQL risk_control
+```
+
+Evidence includes `deploy/install-native.sh`, `deploy/README.md`, systemd units, Nginx configuration and both Go services under `projects/risk-control`.
+
+Critical facts:
+
+- `platform-web/.env.production` still directs production API traffic to `/api/auth`, `/api/data` and `/api/data/ws`;
+- the old Auth Service owns an independent MySQL user schema and JWT security model;
+- the old Data Service owns a MySQL schema, Bybit client and optional NAV scheduler;
+- deployment documentation names a fixed server and contains backup, upgrade and rollback instructions;
+- this stack cannot be treated as Demo or deleted without external evidence.
+
+The authoritative J0 plan is `docs/architecture/PLATFORM_LEGACY_DEPLOYMENT_AUDIT.md`.
+
+Before any deletion, route switch or data migration, J0 must verify the actual server processes, loaded Nginx configuration, environment-file existence and permissions, MySQL schema/data, user and credential compatibility, API consumers, TLS and rollback path. Secret values must never be copied into repository evidence.
+
+## Remaining acceptance work
+
+- legacy production deployment and data classification;
+- production migration or formal Legacy Production ownership decision;
+- Windows real local validation;
+- production HTTPS/TLS;
+- real Venue/Broker evidence;
+- database migration and backup/restore rehearsal;
+- formal accounting, EOD and reconciliation acceptance;
+- final rollback rehearsal and owner approval.
