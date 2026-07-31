@@ -129,7 +129,7 @@ def test_time_boundaries_and_offset_normalization_are_unchanged() -> None:
     )
     boundary_nav = replace(
         nav(valuation_time=CURRENT - timedelta(hours=36)),
-        valuation_time="2026-07-29T04:00:00-04:00",
+        valuation_time="2026-07-29T16:00:00-04:00",
     )
     response = build_holding_response(
         fund=fund(),
