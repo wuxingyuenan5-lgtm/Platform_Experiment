@@ -10,7 +10,7 @@ Issue：`#117`
 建立一个浏览器用户系统，同时保持现有交易与 Live 安全边界不变：
 
 ```text
-admin-risk
+platform-web
     ↓ same-origin HTTPS
 platform-backend
     ├─ Human Identity / Password
@@ -860,7 +860,7 @@ stream upload with size cap
 新增：
 
 ```text
-admin-risk/src/api/platform/userSystem.ts
+platform-web/src/api/platform/userSystem.ts
 ```
 
 使用现有 Platform API 客户端边界。浏览器 Session 依赖同源 Cookie，不设置 Bearer Token。
@@ -891,7 +891,7 @@ app bootstrap
 建议：
 
 ```text
-admin-risk/src/access/userAccess.ts
+platform-web/src/access/userAccess.ts
 ```
 
 记录：

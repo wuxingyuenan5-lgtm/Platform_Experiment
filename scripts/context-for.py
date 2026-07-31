@@ -36,18 +36,18 @@ PACKS: dict[str, Pack] = {
         (
             "AGENTS.md",
             "docs/codex/current-state.md",
-            "admin-risk/AGENTS.md",
-            "admin-risk/src/views/hedgeBoard/index.vue",
-            "admin-risk/scripts/verify-hedge-board-layout.cjs",
+            "platform-web/AGENTS.md",
+            "platform-web/src/views/hedgeBoard/index.vue",
+            "platform-web/scripts/verify-hedge-board-layout.cjs",
         ),
         (
-            "admin-risk/docs/design/platform-ui-guidelines.md",
-            "admin-risk/e2e/hedge-board/hedge-board.spec.ts",
+            "platform-web/docs/design/platform-ui-guidelines.md",
+            "platform-web/e2e/hedge-board/hedge-board.spec.ts",
         ),
         (
-            "cd admin-risk && pnpm test:hedge-board-layout",
-            "cd admin-risk && pnpm type:check",
-            "cd admin-risk && pnpm test:e2e:hedge-board",
+            "cd platform-web && pnpm test:hedge-board-layout",
+            "cd platform-web && pnpm type:check",
+            "cd platform-web && pnpm test:e2e:hedge-board",
         ),
     ),
     "research-field": Pack(
@@ -55,10 +55,10 @@ PACKS: dict[str, Pack] = {
         (
             "AGENTS.md",
             "docs/codex/current-state.md",
-            "admin-risk/AGENTS.md",
-            "admin-risk/src/views/hedgeBoard/aShare/index.vue",
-            "admin-risk/src/views/hedgeBoard/aShare/useAShareResearch.ts",
-            "admin-risk/src/api/hedgeResearch.ts",
+            "platform-web/AGENTS.md",
+            "platform-web/src/views/hedgeBoard/aShare/index.vue",
+            "platform-web/src/views/hedgeBoard/aShare/useAShareResearch.ts",
+            "platform-web/src/api/hedgeResearch.ts",
             "platform-backend/AGENTS.md",
             "platform-backend/app/research_data_schemas.py",
             "platform-backend/app/research_service.py",
@@ -71,7 +71,7 @@ PACKS: dict[str, Pack] = {
         ),
         (
             "cd platform-backend && python -m pytest tests/test_research_service.py",
-            "cd admin-risk && pnpm type:check",
+            "cd platform-web && pnpm type:check",
         ),
     ),
     "identity-permission": Pack(
@@ -79,9 +79,9 @@ PACKS: dict[str, Pack] = {
         (
             "AGENTS.md",
             "docs/codex/current-state.md",
-            "admin-risk/AGENTS.md",
-            "admin-risk/src/access/userAccess.ts",
-            "admin-risk/src/router/guard/permissionGuard.ts",
+            "platform-web/AGENTS.md",
+            "platform-web/src/access/userAccess.ts",
+            "platform-web/src/router/guard/permissionGuard.ts",
             "platform-backend/AGENTS.md",
             "platform-backend/app/auth.py",
             "platform-backend/app/user_authority.py",
@@ -91,12 +91,12 @@ PACKS: dict[str, Pack] = {
         (
             "platform-backend/app/user_session_auth.py",
             "platform-backend/tests/test_last_ceo_concurrency.py",
-            "admin-risk/e2e/user-system/user-system.spec.ts",
+            "platform-web/e2e/user-system/user-system.spec.ts",
         ),
         (
             "cd platform-backend && python -m pytest tests/test_auth_rbac.py",
-            "cd admin-risk && pnpm test:user-system",
-            "cd admin-risk && pnpm test:e2e:user-system",
+            "cd platform-web && pnpm test:user-system",
+            "cd platform-web && pnpm test:e2e:user-system",
         ),
     ),
     "member-contract": Pack(
@@ -104,8 +104,8 @@ PACKS: dict[str, Pack] = {
         (
             "AGENTS.md",
             "docs/codex/current-state.md",
-            "admin-risk/AGENTS.md",
-            "admin-risk/src/api/platform/memberHoldings.ts",
+            "platform-web/AGENTS.md",
+            "platform-web/src/api/platform/memberHoldings.ts",
             "platform-backend/AGENTS.md",
             "platform-backend/app/member_holding_routes.py",
             "platform-backend/app/member_holding_schemas.py",
@@ -119,7 +119,7 @@ PACKS: dict[str, Pack] = {
         ),
         (
             "cd platform-backend && python -m pytest tests/test_member_holdings.py",
-            "cd admin-risk && pnpm test:user-system",
+            "cd platform-web && pnpm test:user-system",
         ),
     ),
     "trading-display": Pack(
@@ -127,22 +127,22 @@ PACKS: dict[str, Pack] = {
         (
             "AGENTS.md",
             "docs/codex/current-state.md",
-            "admin-risk/AGENTS.md",
-            "admin-risk/src/views/strategy/spread-carry/components/CrossVenueExecutionReplica.vue",
-            "admin-risk/src/api/platform/crossSpreadObservability.ts",
+            "platform-web/AGENTS.md",
+            "platform-web/src/views/strategy/spread-carry/components/CrossVenueExecutionReplica.vue",
+            "platform-web/src/api/platform/crossSpreadObservability.ts",
             "platform-backend/AGENTS.md",
             "platform-backend/app/cross_spread_observability_schemas.py",
             "platform-backend/tests/test_cross_spread_observability.py",
         ),
         (
-            "admin-risk/scripts/verify-cross-spread-layout.cjs",
+            "platform-web/scripts/verify-cross-spread-layout.cjs",
             "platform-backend/app/cross_spread_observability_service.py",
             "execution-runtime/AGENTS.md",
         ),
         (
-            "cd admin-risk && pnpm test:cross-spread-layout",
+            "cd platform-web && pnpm test:cross-spread-layout",
             "cd platform-backend && python -m pytest tests/test_cross_spread_observability.py",
-            "cd admin-risk && pnpm type:check",
+            "cd platform-web && pnpm type:check",
         ),
     ),
     "research-provider": Pack(
@@ -159,7 +159,7 @@ PACKS: dict[str, Pack] = {
             "platform-backend/tests/test_research_service.py",
         ),
         (
-            "admin-risk/src/api/hedgeResearch.ts",
+            "platform-web/src/api/hedgeResearch.ts",
             "docs/technical/RESEARCH_DATA_PLATFORM.md",
         ),
         (
@@ -172,20 +172,20 @@ PACKS: dict[str, Pack] = {
         (
             "AGENTS.md",
             "docs/codex/current-state.md",
-            "admin-risk/AGENTS.md",
-            "admin-risk/e2e/user-system/user-system.spec.ts",
-            "admin-risk/playwright.user-system.config.ts",
-            "admin-risk/scripts/test-user-system-access.cjs",
+            "platform-web/AGENTS.md",
+            "platform-web/e2e/user-system/user-system.spec.ts",
+            "platform-web/playwright.user-system.config.ts",
+            "platform-web/scripts/test-user-system-access.cjs",
             "platform-backend/AGENTS.md",
             "platform-backend/scripts/seed_user_system_e2e.py",
         ),
         (
-            "admin-risk/e2e/user-system/demo-accounts.spec.ts",
+            "platform-web/e2e/user-system/demo-accounts.spec.ts",
             "platform-backend/tests/test_user_browser_flows.py",
         ),
         (
-            "cd admin-risk && pnpm test:user-system",
-            "cd admin-risk && pnpm test:e2e:user-system",
+            "cd platform-web && pnpm test:user-system",
+            "cd platform-web && pnpm test:e2e:user-system",
         ),
     ),
 }

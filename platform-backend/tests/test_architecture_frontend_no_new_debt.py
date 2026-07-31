@@ -14,11 +14,11 @@ SPEC.loader.exec_module(frontend_no_new_debt)
 def test_changed_frontend_source_selection_is_bounded_and_unique() -> None:
     selected = frontend_no_new_debt.select_frontend_files(
         [
-            "admin-risk/src/views/platform/index.vue",
-            "admin-risk/src/views/platform/index.vue",
-            "admin-risk/docs/START-HERE.md",
+            "platform-web/src/views/platform/index.vue",
+            "platform-web/src/views/platform/index.vue",
+            "platform-web/docs/START-HERE.md",
             "platform-backend/app/main.py",
-            "admin-risk/package.json",
+            "platform-web/package.json",
         ]
     )
 

@@ -15,13 +15,13 @@ ALLOWED_ENV_NAMES = {".env.example", ".env.live.example"}
 # build/runtime values. Vite exposes such values to the browser, so no credential
 # is permitted there; known-token and entropy checks still scan their contents.
 ALLOWED_PUBLIC_ENV_PATHS = {
-    Path("admin-risk/.env"),
-    Path("admin-risk/.env.analyze"),
-    Path("admin-risk/.env.development"),
-    Path("admin-risk/.env.docker"),
-    Path("admin-risk/.env.platform.example"),
-    Path("admin-risk/.env.production"),
-    Path("admin-risk/.env.test"),
+    Path("platform-web/.env"),
+    Path("platform-web/.env.analyze"),
+    Path("platform-web/.env.development"),
+    Path("platform-web/.env.docker"),
+    Path("platform-web/.env.platform.example"),
+    Path("platform-web/.env.production"),
+    Path("platform-web/.env.test"),
 }
 SKIP_SUFFIXES = {
     ".png",

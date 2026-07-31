@@ -13,7 +13,7 @@
 第一阶段继续保留：
 
 ```text
-admin-risk
+platform-web
 +
 platform-backend
 +
@@ -41,7 +41,7 @@ execution-runtime
 |---|---|---|---|
 | `数据站后端：data_center-main` | FastAPI 分层、行情任务、Redis、调度、数据查询接口、MT5 行情同步经验 | 交易权威逻辑、前端直接依赖的浮点净值、硬编码凭证、自由拼接 SQL | 作为 Market Data / Read API / Scheduler 参考 |
 | `数据站前端data-main` | Vben 后台结构、行情页面、图表、`localPreview` 预览兜底 | 把预览数据混入真实交易链路、前端计算正式净值 | 作为行情和分析页面参考 |
-| `admin-risk` 参考前端 | 风控页面、账户/产品视图、表格、弹窗、通知、权限守卫、平仓交互样式 | 前端直连交易系统、前端保存订单事实 | 作为当前前端改造的组件和页面范式 |
+| `platform-web` 参考前端 | 风控页面、账户/产品视图、表格、弹窗、通知、权限守卫、平仓交互样式 | 前端直连交易系统、前端保存订单事实 | 作为当前前端改造的组件和页面范式 |
 | `MT5-main` | 官方 MetaTrader5 Python 包封装、Order / Deal / Position / Account 字段、Magic / Comment / 历史成交查询 | 整体迁移 Django、明文存储 MT5 密码、让 MT5 服务成为 PnL 权威 | MT5 Worker PoC 的主要参考 |
 | `PyTrader...` | 远程 MT4/MT5、EA Bridge、跨机器连接思路、instrument mapping | 作为 V1 主 MT5 接入、依赖授权不清的 EA 作为核心链路 | 官方 MT5 包不可行时的备选 |
 | `risk-main` | RiskRecord、ExecutionTask、ExecutionOrder、ExecutionLog、Notification、HealthCheck、TransferRequest、风控阈值配置 | 完整用户权限系统、Django 迁移、乱码字段直接复用、浮点金额 | 风控、审计、通知、执行日志字段参考 |

@@ -1,16 +1,16 @@
 # 文档入口
 
-这个目录只放“总入口”和“权威口径”。更细的历史文档暂时仍在 `admin-risk/docs`，后续按主题逐步收敛，不一次性大搬家。
+这个目录只放“总入口”和“权威口径”。更细的历史文档暂时仍在 `platform-web/docs`，后续按主题逐步收敛，不一次性大搬家。
 
 ## 当前最有用的文档位置
 
 | 主题 | 位置 | 说明 |
 |---|---|---|
-| 产品模块需求 | `admin-risk/docs/modules` | 首页、策略、策略管理、风控、交易平台、新闻日历等 |
-| 单策略文档 | `admin-risk/docs/strategies` | 资费套利、跨所价差、海内外价差、抄底、短线交易员 |
-| 架构文档 | `admin-risk/docs/architecture` | 前后端边界、领域模型、Runtime、可靠执行 |
-| 交易工具数据源 | `admin-risk/docs/trading-tools-bookmarks-review.md` | 仍被前端脚本读取，暂不移动 |
-| 旧交接与归档 | `admin-risk/docs/archive` | 只查历史，不作为最新口径 |
+| 产品模块需求 | `platform-web/docs/modules` | 首页、策略、策略管理、风控、交易平台、新闻日历等 |
+| 单策略文档 | `platform-web/docs/strategies` | 资费套利、跨所价差、海内外价差、抄底、短线交易员 |
+| 架构文档 | `platform-web/docs/architecture` | 前后端边界、领域模型、Runtime、可靠执行 |
+| 交易工具数据源 | `platform-web/docs/trading-tools-bookmarks-review.md` | 仍被前端脚本读取，暂不移动 |
+| 旧交接与归档 | `platform-web/docs/archive` | 只查历史，不作为最新口径 |
 
 ## 根级权威文档
 

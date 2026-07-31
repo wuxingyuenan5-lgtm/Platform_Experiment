@@ -8,7 +8,7 @@ This document defines the durable implementation standard for product-facing res
 ## 1. Governing principles
 
 1. Preserve the three-service boundary:
-   - `admin-risk/`: Vue product frontend.
+   - `platform-web/`: Vue product frontend.
    - `platform-backend/`: business, research, orchestration, persistence and API contracts.
    - `execution-runtime/`: venue and broker adapters plus external side effects.
 2. Product research data belongs in Platform Backend and must not be implemented in Execution Runtime.

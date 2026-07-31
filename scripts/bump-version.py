@@ -10,8 +10,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 SEMVER = re.compile(r"\d+\.\d+\.\d+")
 FRONTEND_VERSION_FILES = (
-    "admin-risk/.env.development",
-    "admin-risk/.env.production",
+    "platform-web/.env.development",
+    "platform-web/.env.production",
 )
 
 

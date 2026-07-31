@@ -10,7 +10,7 @@ $ErrorActionPreference = 'Stop'
 $RepoRoot = Split-Path -Parent $PSScriptRoot
 $RuntimePath = Join-Path $RepoRoot 'execution-runtime'
 $BackendPath = Join-Path $RepoRoot 'platform-backend'
-$FrontendPath = Join-Path $RepoRoot 'admin-risk'
+$FrontendPath = Join-Path $RepoRoot 'platform-web'
 $FrontendPort = 4373
 
 function Invoke-CheckedNative {
@@ -142,7 +142,7 @@ if (-not $SkipFrontend) {
   $FrontendEnvExample = Join-Path $FrontendPath '.env.platform.example'
   if (-not (Test-Path $FrontendEnv) -and (Test-Path $FrontendEnvExample)) {
     Copy-Item $FrontendEnvExample $FrontendEnv
-    Write-Host 'Created admin-risk/.env.local from .env.platform.example.' -ForegroundColor DarkGray
+    Write-Host 'Created platform-web/.env.local from .env.platform.example.' -ForegroundColor DarkGray
   }
 
   $NodeModules = Join-Path $FrontendPath 'node_modules'

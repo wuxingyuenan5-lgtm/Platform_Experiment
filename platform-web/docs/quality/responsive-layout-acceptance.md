@@ -1,7 +1,7 @@
 # 响应式布局与跨视口验收规范
 
 状态：`active`  
-适用工程：`admin-risk`  
+适用工程：`platform-web`
 架构依据：`../architecture/frontend/responsive-layout-architecture.md`
 
 ## 1. 目标

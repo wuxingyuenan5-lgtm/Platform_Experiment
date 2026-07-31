@@ -245,7 +245,7 @@ if ($LASTEXITCODE -ne 0) { throw "Execution Runtime 依赖图检查失败" }
 ### 6.3 前端与 Chromium
 
 ```powershell
-$FrontendRoot = Join-Path $AcceptRoot "admin-risk"
+$FrontendRoot = Join-Path $AcceptRoot "platform-web"
 Set-Location $FrontendRoot
 
 $env:HUSKY = "0"
@@ -495,7 +495,7 @@ Write-Host "密码只保留在当前终端，不得写入截图和报告。" -Fo
 ```powershell
 $AcceptRoot = "D:\Projects\Platform_Experiment-0.9.1-acceptance"
 $EvidenceDir = "请填写第 5 节创建的 evidence 目录绝对路径"
-$FrontendRoot = Join-Path $AcceptRoot "admin-risk"
+$FrontendRoot = Join-Path $AcceptRoot "platform-web"
 
 Set-Location $FrontendRoot
 $env:HUSKY = "0"

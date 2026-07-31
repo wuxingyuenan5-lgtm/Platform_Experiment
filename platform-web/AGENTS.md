@@ -1,6 +1,6 @@
 # Frontend Agent Rules
 
-Scope: `admin-risk/`.
+Scope: `platform-web/`.
 
 - Preserve the existing navigation, visual system and user workflow unless the task explicitly changes product design.
 - Use API clients under `src/api/platform/` and keep trading logic out of Vue templates where practical.

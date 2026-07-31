@@ -29,8 +29,8 @@ The tool does not concatenate source, build a prompt, create a vector database o
 
 | Task | Tool key | Read first | Add only when needed | Exclude by default |
 |---|---|---|---|---|
-| Narrow frontend style/layout | `hedge-style` | `admin-risk/AGENTS.md`, target component, direct parent/style owner, relevant layout guard | directly used child component, Playwright spec for visual proof | backend, Runtime, unrelated UI standards, full route tree |
-| A-share/Shenwan/research field | `research-field` | target view/composable, `admin-risk/src/api/hedgeResearch.ts`, matching backend schema/service and direct tests | Provider/cache only when source semantics change | trading, Runtime, user administration |
+| Narrow frontend style/layout | `hedge-style` | `platform-web/AGENTS.md`, target component, direct parent/style owner, relevant layout guard | directly used child component, Playwright spec for visual proof | backend, Runtime, unrelated UI standards, full route tree |
+| A-share/Shenwan/research field | `research-field` | target view/composable, `platform-web/src/api/hedgeResearch.ts`, matching backend schema/service and direct tests | Provider/cache only when source semantics change | trading, Runtime, user administration |
 | Add or repair Research Provider | `research-provider` | `platform-backend/AGENTS.md`, provider boundary, research service/cache/schema, smoke script and tests | frontend mapper only when the public contract changes | unrelated Providers, trading execution, full frontend |
 | Identity/permission/session | `identity-permission` | frontend access/guard, backend auth/authority/permissions and direct tests | migration and E2E only when persistence or browser flow changes | Research, Runtime adapters, accounting |
 | Member holdings/NAV | `member-contract` | account API client, member-holding route/schema/service and direct tests | repository and formal accounting docs only when persistence or meaning changes | Runtime, unrelated user administration |

@@ -39,8 +39,8 @@ Get-NetTCPConnection -LocalPort 4373,8000,8100 -ErrorAction SilentlyContinue |
 
 Large directories are excluded from normal search through root `.ignore`:
 
-- `admin-risk/node_modules/`
-- `admin-risk/dist/`
+- `platform-web/node_modules/`
+- `platform-web/dist/`
 - `execution-runtime/.venv/`
 - `platform-backend/.venv/`
 - `outputs/`

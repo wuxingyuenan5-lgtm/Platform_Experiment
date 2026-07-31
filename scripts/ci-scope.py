@@ -18,12 +18,12 @@ FULL_PREFIXES = (
     "execution-runtime/app/runtime_contracts.py",
 )
 FRONTEND_PREFIXES = (
-    "admin-risk/src/",
-    "admin-risk/mock/",
-    "admin-risk/scripts/",
-    "admin-risk/package.json",
-    "admin-risk/pnpm-lock.yaml",
-    "admin-risk/tsconfig",
+    "platform-web/src/",
+    "platform-web/mock/",
+    "platform-web/scripts/",
+    "platform-web/package.json",
+    "platform-web/pnpm-lock.yaml",
+    "platform-web/tsconfig",
 )
 
 

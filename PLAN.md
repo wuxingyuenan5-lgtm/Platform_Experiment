@@ -1,34 +1,19 @@
 # 项目推进计划
 
-## 当前主线
+## 权威入口
 
-1. 统一本地工作入口：以后以前端 `4373`、后端 `8000/api/v1` 为准。
-2. 清理产品界面里的调试内容：后端快照、测试执行面板不直接出现在正式页面。
-3. 整理项目文件夹：先建立清晰归属，再决定是否移动运行目录。
-4. 把文档从“堆材料”改成“能指导下一步开发的索引体系”。
-5. 降低 Codex 后续简单修改时的扫描噪声，避免反复读取依赖、虚拟环境、构建产物和大型参考仓库。
+- 当前工程状态：`docs/codex/current-state.md`
+- 系统性优化主线：GitHub Issue #136
+- 总体方案：`docs/architecture/PLATFORM_0_9_2_SYSTEM_OPTIMIZATION_MASTER_PLAN.md`
+- 目录迁移方案：`docs/architecture/PLATFORM_DIRECTORY_MIGRATION_PLAN.md`
 
-## 目录重构节奏
+## 当前阶段
 
-| 阶段 | 做什么 | 不做什么 |
-|---|---|---|
-| Phase 1 | 建立 `docs/`、`references/`、`tasks/`、`outputs/`；重写根 README | 不移动 `admin-risk`、`platform-backend`、`execution-runtime` |
-| Phase 2 | 整理 SQL、截图、参考代码归属；补 `.ignore` / `.gitignore` 降噪 | 不删除旧资料 |
-| Phase 3 | 评估是否把运行模块移动到 `apps/` / `services/` | 不在未验证脚本前改路径 |
-| Phase 4 | 文档去重，把稳定口径抽到根级文档 | 不机械搬运所有长文档 |
+Phase A全仓审计、Phase B上下文减负和Phase C全平台视觉门禁均已完成。当前进入独立命名与目录治理阶段，先迁移Platform Web，再迁移Platform API；每个目录Gate均须通过完整CI、浏览器E2E和四档视觉基线。
 
-## 下一步优先级
+## 约束
 
-1. 使用 `docs/codex/CURRENT_CONTEXT.md` 作为 Codex 默认上下文入口。
-2. 用 `python scripts/check-codex-context.py` 防止版本、端口和上下文入口漂移。
-3. 按 `docs/architecture/LIGHTWEIGHT_OPTIMIZATION_PLAN.md` 继续拆高频大页面。
-4. 下一批优先处理 `strategy/spread-carry/index.vue`、`FundingOrderPanel.vue`、`hedgeBoard/index.vue`。
-5. 如需吸收外部参考代码，从外置目录按子项目逐个评估，不整目录搬回项目。
-
-## 风险
-
-- 前端脚本依赖 `admin-risk/docs/trading-tools-bookmarks-review.md`，这个文件不能随便挪。
-- 当前 git 状态已经很脏，整理动作必须小步提交或至少小步检查 diff。
-- 交易、权限、数据库、部署相关目录不能和普通 UI 整理混在一个任务里。
-- 不建议删除 `node_modules/` 或 `.venv/`，除非明确准备重新安装依赖。
-- 大型参考代码已移出项目根目录，后续只按需要读取明确子项目。
+- 目录重命名不得与业务逻辑或模块重构混在同一提交；
+- `execution-runtime`保持独立且不改名；
+- `projects/risk-control`在真实服务器、MySQL和用户数据依赖确认前不得删除或机械迁移；
+- Draft PR保持Open、Draft、Unmerged，未经所有者明确批准不得修改`main`。

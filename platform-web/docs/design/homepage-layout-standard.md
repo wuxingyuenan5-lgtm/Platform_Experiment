@@ -1,7 +1,7 @@
 # 首页布局与响应式标准
 
 状态：`active`  
-适用页面：`admin-risk/src/views/dashboard/index.vue`  
+适用页面：`platform-web/src/views/dashboard/index.vue`
 上位规范：`../architecture/frontend/responsive-layout-architecture.md`
 
 ## 1. 设计目标

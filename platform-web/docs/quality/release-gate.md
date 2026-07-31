@@ -27,7 +27,7 @@ cd ../execution-runtime
 python -m ruff check app tests
 python -m pytest
 
-cd ../admin-risk
+cd ../platform-web
 pnpm type:check
 pnpm build
 ```

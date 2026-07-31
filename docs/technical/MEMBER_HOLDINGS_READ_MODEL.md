@@ -28,8 +28,8 @@ The first implementation source is `manual_admin`. Future migration or external-
 | Service | `platform-backend/app/member_holding_service.py` | Member target checks, exact calculation, stale/unavailable semantics, recent reauthentication and transactional audit | Formal accounting or Venue data |
 | Public DTOs | `platform-backend/app/member_holding_schemas.py` | Holding, fund and NAV request/response contracts | Calculation or persistence |
 | Routes | `platform-backend/app/member_holding_routes.py` | Session-only routing and permission dependencies | Identity supplied by the client for self reads |
-| Frontend API | `admin-risk/src/api/platform/memberHoldings.ts` | Cookie Session transport and in-memory CSRF propagation | Financial calculation |
-| Decimal display | `admin-risk/src/utils/decimalDisplay.ts` | Pure string grouping, signed display and ratio-to-percent shift | JavaScript `number` financial authority |
+| Frontend API | `platform-web/src/api/platform/memberHoldings.ts` | Cookie Session transport and in-memory CSRF propagation | Financial calculation |
+| Decimal display | `platform-web/src/utils/decimalDisplay.ts` | Pure string grouping, signed display and ratio-to-percent shift | JavaScript `number` financial authority |
 
 ## 3. Migration 6
 

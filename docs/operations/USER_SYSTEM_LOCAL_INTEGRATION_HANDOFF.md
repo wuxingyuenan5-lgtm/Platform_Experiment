@@ -76,7 +76,7 @@ python -m pytest -m "architecture or unit or integration or live_safety"
 前端：
 
 ```bash
-cd ../admin-risk
+cd ../platform-web
 pnpm install --frozen-lockfile
 pnpm test:user-system
 pnpm test:homepage-layout

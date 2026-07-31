@@ -8,7 +8,7 @@ on:
       - VERSION
       - platform-backend/pyproject.toml
       - execution-runtime/pyproject.toml
-      - admin-risk/.env
+      - platform-web/.env
       - scripts/check-version-consistency.py
       - scripts/bump-version.py
       - .github/workflows/version-consistency.yml
@@ -20,7 +20,7 @@ on:
       - VERSION
       - platform-backend/pyproject.toml
       - execution-runtime/pyproject.toml
-      - admin-risk/.env
+      - platform-web/.env
       - scripts/check-version-consistency.py
       - scripts/bump-version.py
       - .github/workflows/version-consistency.yml

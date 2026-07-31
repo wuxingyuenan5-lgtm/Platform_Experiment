@@ -38,7 +38,7 @@ V1 开发路线：
 ## 2. 三个工程主体
 
 ```text
-admin-risk
+platform-web
 +
 platform-backend
 +
@@ -47,7 +47,7 @@ execution-runtime
 
 | 工程 | 职责 |
 |---|---|
-| `admin-risk` | Vue 前端、查询展示、交易命令输入 |
+| `platform-web` | Vue 前端、查询展示、交易命令输入 |
 | `platform-backend` | 模块化单体、业务数据、订单成交、风险、PnL 和 API |
 | `execution-runtime` | Crypto／MT5 连接、外部订单执行、回报接收和本地 Journal |
 
@@ -58,7 +58,7 @@ execution-runtime
 ```text
 Browser
   ↓
-admin-risk
+platform-web
   ↓ REST / WebSocket
 platform-backend
   ↓ Runtime Command / Event

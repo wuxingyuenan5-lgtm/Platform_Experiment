@@ -44,7 +44,7 @@ Execution Runtime
 
 Current physical paths remain unchanged until the isolated naming phase:
 
-- `admin-risk/`: Vue product frontend.
+- `platform-web/`: Vue product frontend.
 - `platform-backend/`: business, identity, portfolio, research, trading, risk, accounting and operations API.
 - `execution-runtime/`: Venue/Broker adapters, external side effects and Runtime Journal.
 

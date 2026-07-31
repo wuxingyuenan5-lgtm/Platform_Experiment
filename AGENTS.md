@@ -44,7 +44,7 @@ python scripts/check-repository-structure.py
 python scripts/check-documentation-consistency.py
 ```
 
-Module commands are owned by the nearest module `AGENTS.md`. Frontend package-manager authority is `admin-risk/package.json#packageManager` until the directory-renaming phase is completed.
+Module commands are owned by the nearest module `AGENTS.md`. Frontend package-manager authority is `platform-web/package.json#packageManager` until the directory-renaming phase is completed.
 
 ## File Safety
 

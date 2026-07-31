@@ -6,14 +6,14 @@ Variable-Global 当前不是单一页面项目，而是一组围绕交易研究�
 
 | 模块 | 现有文档 | 当前判断 |
 |---|---|---|
-| 首页 | `admin-risk/docs/modules/首页-需求文档.md` | 应作为平台入口，而不是营销页 |
-| 对冲基金看板 | `admin-risk/docs/modules/对冲基金看板-需求文档.md` | 重点是市场扫描、工具入口、跨资产观察 |
-| 策略 | `admin-risk/docs/modules/策略-需求文档.md` | 偏策略研究和策略工作台 |
-| 策略管理 | `admin-risk/docs/modules/策略管理-需求文档.md` | 偏账户、损益、订单、执行记录 |
-| 交易平台 | `admin-risk/docs/modules/交易平台-需求文档.md` | 需要和真实执行链路分层 |
-| 风控管理 | `admin-risk/docs/modules/风控管理-需求文档.md` | 高风险模块，改动需单独验收 |
-| 新闻日历与理财 | `admin-risk/docs/modules/新闻日历与理财-需求文档.md` | 偏信息组织和投研节奏 |
-| 金融 AI 分析 | `admin-risk/docs/modules/金融AI分析-需求文档.md` | 当前不应抢主线 |
+| 首页 | `platform-web/docs/modules/首页-需求文档.md` | 应作为平台入口，而不是营销页 |
+| 对冲基金看板 | `platform-web/docs/modules/对冲基金看板-需求文档.md` | 重点是市场扫描、工具入口、跨资产观察 |
+| 策略 | `platform-web/docs/modules/策略-需求文档.md` | 偏策略研究和策略工作台 |
+| 策略管理 | `platform-web/docs/modules/策略管理-需求文档.md` | 偏账户、损益、订单、执行记录 |
+| 交易平台 | `platform-web/docs/modules/交易平台-需求文档.md` | 需要和真实执行链路分层 |
+| 风控管理 | `platform-web/docs/modules/风控管理-需求文档.md` | 高风险模块，改动需单独验收 |
+| 新闻日历与理财 | `platform-web/docs/modules/新闻日历与理财-需求文档.md` | 偏信息组织和投研节奏 |
+| 金融 AI 分析 | `platform-web/docs/modules/金融AI分析-需求文档.md` | 当前不应抢主线 |
 
 ## 产品口径
 

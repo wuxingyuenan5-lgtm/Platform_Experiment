@@ -6,12 +6,12 @@ This project contains active code, generated dependencies, build outputs, virtua
 
 | Path | Approximate size | Files | Policy |
 |---|---:|---:|---|
-| `admin-risk/node_modules/` | 1.09 GB | 72,456 | Ignore; do not delete unless dependencies will be reinstalled |
-| `admin-risk/dist/` | 42.48 MB | 3,681 | Ignore; safe to regenerate |
+| `platform-web/node_modules/` | 1.09 GB | 72,456 | Ignore; do not delete unless dependencies will be reinstalled |
+| `platform-web/dist/` | 42.48 MB | 3,681 | Ignore; safe to regenerate |
 | `execution-runtime/.venv/` | 136.73 MB | 5,303 | Ignore; keep while runtime is working |
 | `platform-backend/.venv/` | 75.33 MB | 3,043 | Ignore; keep while backend is working |
-| `admin-risk/project_structure.txt` | 0.08 MB | 1 | Ignore as generated structure dump |
-| `admin-risk/CHANGELOG.md` | 0.22 MB | 1 | Ignore for routine search; it is vendor/history noise |
+| `platform-web/project_structure.txt` | 0.08 MB | 1 | Ignore as generated structure dump |
+| `platform-web/CHANGELOG.md` | 0.22 MB | 1 | Ignore for routine search; it is vendor/history noise |
 
 ## Ignore Strategy
 
@@ -57,7 +57,7 @@ Inspect explicit subprojects only when a task needs reference-code absorption.
 ## Safe Search Examples
 
 ```powershell
-rg -n "StrategyBackendSnapshot" admin-risk/src
-rg -n "createExecutionBatch" admin-risk/src platform-backend/app execution-runtime/app
+rg -n "StrategyBackendSnapshot" platform-web/src
+rg -n "createExecutionBatch" platform-web/src platform-backend/app execution-runtime/app
 rg --files
 ```

@@ -21,7 +21,7 @@
 当前架构：
 
 ```text
-admin-risk
+platform-web
 ↓
 platform-backend：模块化单体
 ↓ Runtime Command / Event Contract

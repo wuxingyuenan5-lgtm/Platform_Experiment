@@ -40,7 +40,7 @@ python -m ruff check app tests scripts
 python -m pyright
 python -m pytest
 
-cd ../admin-risk
+cd ../platform-web
 npx pnpm@9.15.9 test:hedge-board-layout
 npx pnpm@9.15.9 type:check
 npx pnpm@9.15.9 build
@@ -49,7 +49,7 @@ npx pnpm@9.15.9 build
 ### 2.2 对冲基金看板浏览器E2E
 
 ```powershell
-cd admin-risk
+cd platform-web
 $env:E2E_CEO_USERNAME="e2e_employee_1"
 $env:E2E_CEO_PASSWORD="使用本地临时强密码"
 npx pnpm@9.15.9 test:e2e:hedge-board

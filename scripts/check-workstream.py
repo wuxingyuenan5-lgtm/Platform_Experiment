@@ -36,7 +36,7 @@ VERSION_PATHS = {
     "VERSION",
     "platform-backend/pyproject.toml",
     "execution-runtime/pyproject.toml",
-    "admin-risk/.env",
+    "platform-web/.env",
 }
 FAST_MAX_FILES = 20
 FORBIDDEN_FAST_MARKDOWN = {"AGENTS.md"}
@@ -293,7 +293,7 @@ def validate_version_patch(path: str, patch: str | None) -> None:
             re.fullmatch(r'version\s*=\s*"\d+\.\d+\.\d+"', line.strip())
             for line in lines
         )
-    elif path == "admin-risk/.env":
+    elif path == "platform-web/.env":
         valid = bool(lines) and all(
             re.fullmatch(r'VITE_GLOB_APP_VERSION\s*=\s*"\d+\.\d+\.\d+"', line.strip())
             for line in lines

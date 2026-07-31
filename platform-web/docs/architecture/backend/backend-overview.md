@@ -24,7 +24,7 @@ V1 后端目标不是只支撑 Mock 或 Fake Gateway，而是支撑真实外部�
 平台总体工程主体为：
 
 ```text
-admin-risk
+platform-web
 +
 platform-backend
 +

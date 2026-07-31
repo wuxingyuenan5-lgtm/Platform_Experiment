@@ -105,7 +105,7 @@ LEGACY_TERMS = [
     "vben-admin",
     "vue-vben-admin",
     "anncwb",
-    "admin-risk",
+    "platform-web",
     "risk-control",
     "Platform_Experiment",
     "Variable-Global",
@@ -158,13 +158,13 @@ URL_RE = re.compile(r"https?://[^\s)>'\"]+")
 
 TASK_DEFINITIONS: dict[str, dict[str, list[str]]] = {
     "modify_page_style": {
-        "path": ["admin-risk/src/views/", "admin-risk/src/components/", "admin-risk/src/styles/"],
+        "path": ["platform-web/src/views/", "platform-web/src/components/", "platform-web/src/styles/"],
         "terms": ["style", "layout", "responsive", "design token"],
     },
     "modify_research_field": {
         "path": [
-            "admin-risk/src/views/hedgeBoard/",
-            "admin-risk/src/api/hedgeResearch",
+            "platform-web/src/views/hedgeBoard/",
+            "platform-web/src/api/hedgeResearch",
             "platform-backend/app/research_",
             "platform-backend/app/a_share_",
             "platform-backend/tests/test_research",
@@ -175,9 +175,9 @@ TASK_DEFINITIONS: dict[str, dict[str, list[str]]] = {
     },
     "modify_user_permission": {
         "path": [
-            "admin-risk/src/access/",
-            "admin-risk/src/router/guard/",
-            "admin-risk/src/store/modules/user",
+            "platform-web/src/access/",
+            "platform-web/src/router/guard/",
+            "platform-web/src/store/modules/user",
             "platform-backend/app/auth",
             "platform-backend/app/user_authority",
             "platform-backend/app/user_permission",
@@ -192,7 +192,7 @@ TASK_DEFINITIONS: dict[str, dict[str, list[str]]] = {
     },
     "modify_api_contract": {
         "path": [
-            "admin-risk/src/api/",
+            "platform-web/src/api/",
             "platform-backend/app/",
             "platform-backend/tests/",
             "docs/technical/",
@@ -201,8 +201,8 @@ TASK_DEFINITIONS: dict[str, dict[str, list[str]]] = {
     },
     "modify_trading_display": {
         "path": [
-            "admin-risk/src/views/strategy/",
-            "admin-risk/src/api/platform/crossSpread",
+            "platform-web/src/views/strategy/",
+            "platform-web/src/api/platform/crossSpread",
             "platform-backend/app/cross_spread",
             "execution-runtime/app/",
             "platform-backend/tests/test_cross_spread",
@@ -217,7 +217,7 @@ TASK_DEFINITIONS: dict[str, dict[str, list[str]]] = {
             "platform-backend/app/research_data_schema",
             "platform-backend/scripts/smoke_research",
             "platform-backend/tests/test_research",
-            "admin-risk/src/api/hedgeResearch",
+            "platform-web/src/api/hedgeResearch",
             "docs/technical/RESEARCH",
             ".github/workflows/research-provider",
         ],
@@ -225,9 +225,9 @@ TASK_DEFINITIONS: dict[str, dict[str, list[str]]] = {
     },
     "fix_browser_e2e": {
         "path": [
-            "admin-risk/e2e/",
-            "admin-risk/playwright",
-            "admin-risk/scripts/verify",
+            "platform-web/e2e/",
+            "platform-web/playwright",
+            "platform-web/scripts/verify",
             "platform-backend/scripts/seed_",
             ".github/workflows/",
             "docs/operations/",
@@ -627,7 +627,7 @@ def task_contexts(records: list[FileRecord], contents: dict[str, str]) -> list[d
             lowered_text = text.lower()
             if any(term.lower() in lowered_text for term in definition["terms"]):
                 # Term-only matches are limited to authoritative-looking code/docs to avoid whole-repo noise.
-                if path.startswith(("admin-risk/", "platform-backend/", "execution-runtime/", "docs/technical/", "docs/architecture/", ".github/workflows/")):
+                if path.startswith(("platform-web/", "platform-backend/", "execution-runtime/", "docs/technical/", "docs/architecture/", ".github/workflows/")):
                     selected.add(path)
         chosen = sorted(selected)
         output.append(

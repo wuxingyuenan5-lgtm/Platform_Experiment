@@ -38,7 +38,7 @@ def version_files() -> list[dict[str, str]]:
             "patch": '@@\n-version = "0.8.0"\n+version = "0.9.0"',
         },
         {
-            "filename": "admin-risk/.env",
+            "filename": "platform-web/.env",
             "status": "modified",
             "patch": (
                 '@@\n-VITE_GLOB_APP_VERSION = "0.8.0"\n'
@@ -153,7 +153,7 @@ def test_fast_rejects_source_and_partial_version_updates() -> None:
 def test_standard_allows_bounded_product_work_but_rejects_critical_paths() -> None:
     assert check_workstream.validate_standard_files(
         [
-            {"filename": "admin-risk/src/views/example.vue"},
+            {"filename": "platform-web/src/views/example.vue"},
             {"filename": "scripts/dev-platform.ps1"},
         ]
     )

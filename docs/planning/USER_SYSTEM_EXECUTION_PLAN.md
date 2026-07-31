@@ -261,14 +261,14 @@ platform-backend/app/config.py
 前端：
 
 ```text
-admin-risk/src/api/platform/userSystem.ts              new
-admin-risk/src/store/modules/user.ts
-admin-risk/src/router/guard/permissionGuard.ts
-admin-risk/src/views/sys/login/LoginForm.vue
-admin-risk/src/views/sys/register/index.vue
-admin-risk/src/views/account/index.vue                 new
-admin-risk/src/views/account/components/*              bounded
-admin-risk/src/utils/http/axios/index.ts
+platform-web/src/api/platform/userSystem.ts              new
+platform-web/src/store/modules/user.ts
+platform-web/src/router/guard/permissionGuard.ts
+platform-web/src/views/sys/login/LoginForm.vue
+platform-web/src/views/sys/register/index.vue
+platform-web/src/views/account/index.vue                 new
+platform-web/src/views/account/components/*              bounded
+platform-web/src/utils/http/axios/index.ts
 ```
 
 测试：
@@ -278,7 +278,7 @@ platform-backend/tests/test_user_registration.py
 platform-backend/tests/test_user_profile.py
 platform-backend/tests/test_password_reset_tickets.py
 platform-backend/tests/test_user_avatar.py
-admin-risk focused tests if current harness supports them
+platform-web focused tests if current harness supports them
 ```
 
 ### 7.4 实施步骤
@@ -304,7 +304,7 @@ python -m pytest tests/test_password_reset_tickets.py -q
 python -m pytest tests/test_user_avatar.py -q
 python -m pytest tests/test_user_sessions.py -q
 
-cd ../admin-risk
+cd ../platform-web
 pnpm exec eslint --max-warnings 0 <changed-user-system-files>
 pnpm type:check
 pnpm build
@@ -351,10 +351,10 @@ platform-backend/app/user_routes.py
 前端：
 
 ```text
-admin-risk/src/views/users/index.vue
-admin-risk/src/views/users/components/UserDetailDrawer.vue
-admin-risk/src/access/userAccess.ts
-admin-risk/src/router/routes/modules/risk.ts
+platform-web/src/views/users/index.vue
+platform-web/src/views/users/components/UserDetailDrawer.vue
+platform-web/src/access/userAccess.ts
+platform-web/src/router/routes/modules/risk.ts
 ```
 
 测试：
@@ -430,9 +430,9 @@ platform-backend/app/user_routes.py
 前端：
 
 ```text
-admin-risk/src/views/account/components/HoldingsPanel.vue
-admin-risk/src/views/users/components/UserDetailDrawer.vue
-admin-risk/src/api/platform/userSystem.ts
+platform-web/src/views/account/components/HoldingsPanel.vue
+platform-web/src/views/users/components/UserDetailDrawer.vue
+platform-web/src/api/platform/userSystem.ts
 ```
 
 测试：
@@ -506,7 +506,7 @@ USR-ACCESS-003..006
 ### 10.4 直接测试
 
 ```powershell
-cd admin-risk
+cd platform-web
 pnpm exec eslint --max-warnings 0 <all-user-system-changed-files>
 pnpm type:check
 pnpm build
@@ -554,7 +554,7 @@ python -m pytest
 ### 11.3 Frontend
 
 ```powershell
-cd admin-risk
+cd platform-web
 pnpm lint
 pnpm type:check
 pnpm build

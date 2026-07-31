@@ -1,6 +1,6 @@
 ﻿# Local secrets
 execution-runtime/.env
-admin-risk/.env
+platform-web/.env
 projects/risk-control/data-service/bitget-data-service/bybitapi.txt
 .env.local
 *.local
@@ -12,11 +12,11 @@ projects/risk-control/data-service/bin/
 projects/risk-control/auth-service/bin/
 **/node_modules/
 **/dist/
-admin-risk/.vite/
+platform-web/.vite/
 **/.vite/
 **/.cache/
 **/.turbo/
-admin-risk/docs/superpowers/
+platform-web/docs/superpowers/
 docs/superpowers/
 **/.venv/
 **/__pycache__/
@@ -33,7 +33,7 @@ outputs/
 
 # Generated structure/history dumps
 **/project_structure.txt
-admin-risk/CHANGELOG*.md
+platform-web/CHANGELOG*.md
 
 # Binary/data artifacts
 **/*.zip

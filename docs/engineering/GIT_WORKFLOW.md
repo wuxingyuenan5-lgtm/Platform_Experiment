@@ -120,7 +120,7 @@ Root `VERSION` is authoritative. Maintained declarations are:
 
 - `platform-backend/pyproject.toml`;
 - `execution-runtime/pyproject.toml`;
-- `admin-risk/.env` frontend display version.
+- `platform-web/.env` frontend display version.
 
 Update all declarations with:
 

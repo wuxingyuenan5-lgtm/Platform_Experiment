@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
-FRONTEND_ROOT = REPOSITORY_ROOT / "admin-risk" / "src"
+FRONTEND_ROOT = REPOSITORY_ROOT / "platform-web" / "src"
 BACKEND_APP_ROOT = REPOSITORY_ROOT / "platform-backend" / "app"
 CANONICAL_USER_FILES = (
     FRONTEND_ROOT / "store/modules/user.ts",

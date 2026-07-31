@@ -39,14 +39,14 @@ V1 不是只做本地模拟系统。Fake Gateway 用于工程闭环和故障演�
 初期只保留三个工程主体：
 
 ```text
-admin-risk
+platform-web
 +
 platform-backend
 +
 execution-runtime
 ```
 
-### 2.1 admin-risk
+### 2.1 platform-web
 
 Vue 前端，负责：
 
@@ -100,7 +100,7 @@ Runtime 不负责：
 ```text
 Browser
   ↓ REST / WebSocket
-admin-risk
+platform-web
   ↓
 platform-backend
   ├─ Strategy

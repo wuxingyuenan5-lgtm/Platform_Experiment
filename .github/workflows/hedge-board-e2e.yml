@@ -8,19 +8,19 @@ on:
       - feature/issue-134-platform-0-9-1-unified-delivery
     paths:
       - '.github/workflows/hedge-board-e2e.yml'
-      - 'admin-risk/.env.development'
-      - 'admin-risk/.env.production'
-      - 'admin-risk/package.json'
-      - 'admin-risk/pnpm-lock.yaml'
-      - 'admin-risk/playwright.hedge-board.config.ts'
-      - 'admin-risk/e2e/hedge-board/**'
-      - 'admin-risk/scripts/verify-hedge-board-layout.cjs'
-      - 'admin-risk/src/api/hedgeResearch.ts'
-      - 'admin-risk/src/api/platform/researchWatchlist.ts'
-      - 'admin-risk/src/api/platform/userSystem.ts'
-      - 'admin-risk/src/router/routes/modules/hedge.ts'
-      - 'admin-risk/src/store/modules/user.ts'
-      - 'admin-risk/src/views/hedgeBoard/**'
+      - 'platform-web/.env.development'
+      - 'platform-web/.env.production'
+      - 'platform-web/package.json'
+      - 'platform-web/pnpm-lock.yaml'
+      - 'platform-web/playwright.hedge-board.config.ts'
+      - 'platform-web/e2e/hedge-board/**'
+      - 'platform-web/scripts/verify-hedge-board-layout.cjs'
+      - 'platform-web/src/api/hedgeResearch.ts'
+      - 'platform-web/src/api/platform/researchWatchlist.ts'
+      - 'platform-web/src/api/platform/userSystem.ts'
+      - 'platform-web/src/router/routes/modules/hedge.ts'
+      - 'platform-web/src/store/modules/user.ts'
+      - 'platform-web/src/views/hedgeBoard/**'
       - 'docs/operations/HEDGE_BOARD_ACCEPTANCE.md'
       - 'docs/operations/PLATFORM_0_9_1_LOCAL_ACCEPTANCE_HANDOFF.md'
       - 'tasks/issue-134-platform-0-9-1-unified-delivery.md'
@@ -67,16 +67,16 @@ jobs:
         with:
           node-version: '20'
           cache: pnpm
-          cache-dependency-path: admin-risk/pnpm-lock.yaml
+          cache-dependency-path: platform-web/pnpm-lock.yaml
 
       - name: Install frontend dependencies
-        working-directory: admin-risk
+        working-directory: platform-web
         env:
           HUSKY: '0'
         run: pnpm install --frozen-lockfile
 
       - name: Install Chromium
-        working-directory: admin-risk
+        working-directory: platform-web
         run: pnpm exec playwright install --with-deps chromium
 
       - name: Generate isolated employee credentials
@@ -92,7 +92,7 @@ jobs:
           PY
 
       - name: Run hedge-board browser acceptance
-        working-directory: admin-risk
+        working-directory: platform-web
         run: pnpm test:e2e:hedge-board
 
       - name: Upload browser diagnostics
@@ -101,7 +101,7 @@ jobs:
         with:
           name: hedge-board-browser-e2e
           path: |
-            admin-risk/playwright-report/hedge-board
-            admin-risk/test-results/hedge-board
+            platform-web/playwright-report/hedge-board
+            platform-web/test-results/hedge-board
           if-no-files-found: warn
           retention-days: 3

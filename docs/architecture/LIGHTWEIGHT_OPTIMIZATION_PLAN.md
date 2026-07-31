@@ -39,8 +39,8 @@
    - fixtures 负责 mock/seed 数据。
 
 3. 核心模块守卫
-   - 首页：`admin-risk/scripts/verify-homepage-layout.cjs`
-   - 跨所价差：`admin-risk/scripts/verify-cross-spread-layout.cjs`
+   - 首页：`platform-web/scripts/verify-homepage-layout.cjs`
+   - 跨所价差：`platform-web/scripts/verify-cross-spread-layout.cjs`
    - Codex 上下文：`scripts/check-codex-context.py`
 
 ## 后续推荐顺序

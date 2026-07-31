@@ -16,8 +16,8 @@ from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
-FRONTEND_ROOT = ROOT / "admin-risk"
-SOURCE_PREFIXES = ("admin-risk/src/", "admin-risk/mock/")
+FRONTEND_ROOT = ROOT / "platform-web"
+SOURCE_PREFIXES = ("platform-web/src/", "platform-web/mock/")
 SOURCE_SUFFIXES = (".js", ".jsx", ".ts", ".tsx", ".vue")
 ZERO_SHA = "0" * 40
 DIAGNOSTIC_PATH = Path("/tmp/frontend-eslint.log")

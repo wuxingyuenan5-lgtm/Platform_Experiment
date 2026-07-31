@@ -6,7 +6,7 @@
 User
   │
   ▼
-admin-risk (Vue frontend)
+platform-web (Vue frontend)
   │ HTTP / Platform API contracts
   ▼
 platform-backend (modular monolith)

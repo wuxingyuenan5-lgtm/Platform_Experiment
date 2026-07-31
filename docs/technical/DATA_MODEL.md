@@ -6,4 +6,4 @@ The local platform backend currently stores state in SQLite:
 - Backend database code: `platform-backend/app/database.py`
 - Schema references: SQL snapshots are stored in `references/database/`.
 
-Detailed domain model notes currently live in `admin-risk/docs/architecture/domain`.
+Detailed domain model notes currently live in `platform-web/docs/architecture/domain`.

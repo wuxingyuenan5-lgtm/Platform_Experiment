@@ -29,9 +29,9 @@ The frontend never calls external market-data sources directly. `execution-runti
 | Free-source adapters and field normalization | `platform-backend/app/research_providers.py` |
 | Concurrent orchestration and partial-failure semantics | `platform-backend/app/research_service.py` |
 | Authenticated HTTP routes | `platform-backend/app/research_routes.py` |
-| Frontend API contract | `admin-risk/src/api/hedgeResearch.ts` |
-| A-share page orchestration | `admin-risk/src/views/hedgeBoard/aShare/index.vue` |
-| Macro event-probability presentation | `admin-risk/src/views/hedgeBoard/macro/MacroExpectationPanel.vue` |
+| Frontend API contract | `platform-web/src/api/hedgeResearch.ts` |
+| A-share page orchestration | `platform-web/src/views/hedgeBoard/aShare/index.vue` |
+| Macro event-probability presentation | `platform-web/src/views/hedgeBoard/macro/MacroExpectationPanel.vue` |
 
 ## Data-quality contract
 

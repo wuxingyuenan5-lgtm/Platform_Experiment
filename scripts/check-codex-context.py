@@ -72,15 +72,15 @@ def main() -> None:
     compatibility = read_text("docs/codex/CURRENT_CONTEXT.md")
     context_tool = read_text("scripts/context-for.py")
     dev_script = read_text("scripts/dev-platform.ps1")
-    vite_config = read_text("admin-risk/vite.config.ts")
-    package_json = json.loads(read_text("admin-risk/package.json"))
+    vite_config = read_text("platform-web/vite.config.ts")
+    package_json = json.loads(read_text("platform-web/package.json"))
 
     expected_version = read_text("VERSION").strip()
     actual_versions = {
         "platform-backend": pyproject_version("platform-backend/pyproject.toml"),
         "execution-runtime": pyproject_version("execution-runtime/pyproject.toml"),
-        "frontend development": frontend_version("admin-risk/.env.development"),
-        "frontend production": frontend_version("admin-risk/.env.production"),
+        "frontend development": frontend_version("platform-web/.env.development"),
+        "frontend production": frontend_version("platform-web/.env.production"),
     }
     drift = {name: value for name, value in actual_versions.items() if value != expected_version}
     require(not drift, f"Version declarations drifted from VERSION={expected_version}: {drift}")

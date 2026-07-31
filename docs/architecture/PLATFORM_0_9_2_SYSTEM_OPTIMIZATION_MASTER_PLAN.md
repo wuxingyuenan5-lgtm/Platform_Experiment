@@ -34,11 +34,11 @@ Venue / Broker / MT5 / Bybit
 1. “当前状态”存在多个权威文件，并且已经发生分支事实漂移；检查器还会把过时事实验证为正确。
 2. 前端保留了大量模板工作区、演示页面、Mock、第三方资源、旧包元数据和无关工程入口。
 3. 若干高频页面、Provider、用户服务、风险和运维模块职责过密，普通修改必须读取大文件。
-4. 根级`docs/`、`admin-risk/docs/`、`tasks/`、历史DRAFT、交接文档和规划文件共同存在，默认检索容易命中历史而非现状。
+4. 根级`docs/`、`platform-web/docs/`、`tasks/`、历史DRAFT、交接文档和规划文件共同存在，默认检索容易命中历史而非现状。
 5. 当前部署材料同时描述新的三服务架构和旧Go/MySQL `projects/risk-control`架构，真实运行入口不唯一。
 6. 0.9.2 Draft PR的Base不是`main`，而多数正式CI只监听以`main`为Base的PR，导致当前工作线不会自动获得完整质量门禁。
 7. 代码质量门禁采用“局部覆盖+不新增债务”的合理过渡策略，但类型覆盖仍明显不足，尤其是Execution Runtime。
-8. 路径和包名仍保留`admin-risk`、`vben-admin`、`Variable-Global`等模板或阶段性名称，目录与真实职责不一致。
+8. 路径和包名仍保留`platform-web`、`vben-admin`、`Variable-Global`等模板或阶段性名称，目录与真实职责不一致。
 
 因此，0.9.2的正确方向是：**先修权威与工程入口，再做命名和低风险模块化；最后才处理高风险交易、风控、会计、Runtime和删除工作。**
 
@@ -100,7 +100,7 @@ Token数据使用UTF-8文本字符数除以4的近似值，只用于前后相对
 
 | 顶层范围 | 文本文件 | 行数 | 估算Token |
 |---|---:|---:|---:|
-| `admin-risk/` | 1,267 | 199,553 | 1,360,784 |
+| `platform-web/` | 1,267 | 199,553 | 1,360,784 |
 | `platform-backend/` | 237 | 43,578 | 370,820 |
 | `execution-runtime/` | 60 | 11,422 | 101,829 |
 | 根级`docs/` | 68 | 11,822 | 82,050 |
@@ -173,7 +173,7 @@ UI任务异常昂贵，主要因为`hedgeBoard/index.vue`为3,772行，UI规范�
 
 重点文件：
 
-- `admin-risk/src/views/hedgeBoard/index.vue`：3,772行；脚本约2,235行，样式约1,486行。
+- `platform-web/src/views/hedgeBoard/index.vue`：3,772行；脚本约2,235行，样式约1,486行。
 - `marketTools.ts`：3,522行静态工具目录。
 - `CrossVenueExecutionReplica.vue`：1,581行。
 - `DomesticOverseasExecutionReplica.vue`：1,518行。
@@ -197,7 +197,7 @@ Platform API有108个顶层Python模块，主要都堆在`app/`根目录。Repos
 当前本地权威入口启动：
 
 ```text
-admin-risk
+platform-web
 platform-backend
 execution-runtime
 ```
@@ -326,7 +326,7 @@ src/
 
 | 当前 | 结论 | 理由 |
 |---|---|---|
-| `admin-risk` | 0.9.2内改为`platform-web` | 与实际Vue全平台前端职责明显不符；误导Agent和脚本 |
+| `platform-web` | 0.9.2内改为`platform-web` | 与实际Vue全平台前端职责明显不符；误导Agent和脚本 |
 | `platform-backend` | 0.9.2内改为`platform-api` | 真实职责是平台业务API和模块化单体；比泛称backend更准确 |
 | `execution-runtime` | 保持 | 名称与隔离Venue/Broker副作用的职责一致 |
 | `projects/risk-control` | 暂不直接改名或删除 | 旧部署脚本仍引用；先确认生产依赖，再归档为`legacy/risk-control-go` |
@@ -361,7 +361,7 @@ vg-execution-runtime
 THIRD_PARTY_NOTICES.md
 ```
 
-记录上游项目、许可证、保留代码范围和修改声明。`admin-risk/LICENSE`中的合法MIT归属继续保留。
+记录上游项目、许可证、保留代码范围和修改声明。`platform-web/LICENSE`中的合法MIT归属继续保留。
 
 `@vben/*`内部包名称暂不机械改名。先确认引用和发布边界；若只在单仓内部使用，可在后续低风险阶段逐步改为`@vg-platform/*`，但该工作不是0.9.2成功的必要条件。
 
@@ -821,7 +821,7 @@ docs/releases/             # 发布说明
 docs/archive/              # 历史，不进入默认上下文
 ```
 
-### 14.2 `admin-risk/docs`处理
+### 14.2 `platform-web/docs`处理
 
 当前该目录121份文档、约47,874行，是重要业务历史，但不适合作为与根级docs并列的第二权威中心。
 
@@ -957,7 +957,7 @@ projects/risk-control → legacy/risk-control-go
 顺序：
 
 1. 第三方归属文件和产品元数据；
-2. `admin-risk → platform-web`；
+2. 前端顶层目录统一为 `platform-web`；
 3. 全部脚本、CI、Playwright、PowerShell、文档和环境路径；
 4. 全量构建和浏览器验收；
 5. `platform-backend → platform-api`；

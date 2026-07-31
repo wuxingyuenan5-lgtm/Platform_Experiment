@@ -8,24 +8,24 @@ on:
       - feature/issue-134-platform-0-9-1-unified-delivery
     paths:
       - '.github/workflows/user-system-e2e.yml'
-      - 'admin-risk/.env.development'
-      - 'admin-risk/.env.production'
-      - 'admin-risk/package.json'
-      - 'admin-risk/pnpm-lock.yaml'
-      - 'admin-risk/playwright.user-system.config.ts'
-      - 'admin-risk/e2e/user-system/**'
-      - 'admin-risk/src/access/**'
-      - 'admin-risk/src/api/platform/memberHoldings.ts'
-      - 'admin-risk/src/api/platform/userSystem.ts'
-      - 'admin-risk/src/router/guard/permissionGuard.ts'
-      - 'admin-risk/src/router/routes/modules/account.ts'
-      - 'admin-risk/src/router/routes/modules/risk.ts'
-      - 'admin-risk/src/store/modules/user.ts'
-      - 'admin-risk/src/views/account/**'
-      - 'admin-risk/src/views/sys/login/**'
-      - 'admin-risk/src/views/sys/register/**'
-      - 'admin-risk/src/views/sys/reset-password/**'
-      - 'admin-risk/src/views/users/**'
+      - 'platform-web/.env.development'
+      - 'platform-web/.env.production'
+      - 'platform-web/package.json'
+      - 'platform-web/pnpm-lock.yaml'
+      - 'platform-web/playwright.user-system.config.ts'
+      - 'platform-web/e2e/user-system/**'
+      - 'platform-web/src/access/**'
+      - 'platform-web/src/api/platform/memberHoldings.ts'
+      - 'platform-web/src/api/platform/userSystem.ts'
+      - 'platform-web/src/router/guard/permissionGuard.ts'
+      - 'platform-web/src/router/routes/modules/account.ts'
+      - 'platform-web/src/router/routes/modules/risk.ts'
+      - 'platform-web/src/store/modules/user.ts'
+      - 'platform-web/src/views/account/**'
+      - 'platform-web/src/views/sys/login/**'
+      - 'platform-web/src/views/sys/register/**'
+      - 'platform-web/src/views/sys/reset-password/**'
+      - 'platform-web/src/views/users/**'
       - 'platform-backend/app/auth.py'
       - 'platform-backend/app/config.py'
       - 'platform-backend/app/member_holding_*.py'
@@ -68,16 +68,16 @@ jobs:
         with:
           node-version: '20'
           cache: pnpm
-          cache-dependency-path: admin-risk/pnpm-lock.yaml
+          cache-dependency-path: platform-web/pnpm-lock.yaml
 
       - name: Install frontend dependencies
-        working-directory: admin-risk
+        working-directory: platform-web
         env:
           HUSKY: '0'
         run: pnpm install --frozen-lockfile
 
       - name: Install Chromium
-        working-directory: admin-risk
+        working-directory: platform-web
         run: pnpm exec playwright install --with-deps chromium
 
       - name: Generate isolated CEO credentials
@@ -93,7 +93,7 @@ jobs:
           PY
 
       - name: Run user-system browser acceptance
-        working-directory: admin-risk
+        working-directory: platform-web
         run: pnpm test:e2e:user-system
 
       - name: Upload browser diagnostics
@@ -102,7 +102,7 @@ jobs:
         with:
           name: user-system-browser-e2e
           path: |
-            admin-risk/playwright-report/user-system
-            admin-risk/test-results/user-system
+            platform-web/playwright-report/user-system
+            platform-web/test-results/user-system
           if-no-files-found: warn
           retention-days: 3

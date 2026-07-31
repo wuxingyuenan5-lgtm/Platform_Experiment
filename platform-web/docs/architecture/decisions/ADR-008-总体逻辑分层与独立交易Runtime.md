@@ -49,7 +49,7 @@ ADR-005 定义的前端、后端、前后端协作和公共领域模型四类架
 
 初期工程主体为：
 
-- `admin-risk`：Vue 前端。
+- `platform-web`：Vue 前端。
 - `platform-backend`：模块化单体业务后端。
 - `execution-runtime`：独立交易执行、Gateway 和 Worker 运行时。
 
