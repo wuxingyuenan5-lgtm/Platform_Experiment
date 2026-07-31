@@ -1,6 +1,6 @@
 # Platform Research低风险模块化计划
 
-状态：**E0依赖与规模审计完成，进入E1纯归一化层抽离**  
+状态：**E1纯归一化层完成，进入E2 Provider数据域拆分审计**  
 关联Issue：#136  
 关联Draft PR：#139  
 审计分支：`refactor/issue-136-platform-0-9-2-system-optimization`  
@@ -24,6 +24,8 @@ python scripts/audit-research-modularity.py \
 
 ### 2.1 Platform API
 
+E0审计基线：
+
 | 文件 | 行数 | 当前职责 |
 |---|---:|---|
 | `platform-api/app/research_providers.py` | 999 | 第三方连接、字段归一化、A股概览、申万、情绪、个股、宏观预期 |
@@ -33,7 +35,9 @@ python scripts/audit-research-modularity.py \
 | `platform-api/app/research_cache.py` | 66 | 通用Last Known Good缓存 |
 | `platform-api/app/research_routes.py` | 78 | FastAPI路由、权限和缓存头 |
 
-`FreeResearchProvider`单个类约881行、26个方法；`research_service.py`直接调用其中21个方法。当前依赖方向为：
+`FreeResearchProvider`基线约881行、26个方法；`research_service.py`直接调用其中21个方法。E1后，无I/O归一化函数已迁移到`research_provider_normalization.py`，Provider公开方法和Service调用面保持不变。
+
+当前依赖方向为：
 
 ```text
 research_routes
@@ -43,9 +47,10 @@ research_routes
         -> research_providers
             -> a_share_research_policy
             -> research_data_schemas
+            -> research_provider_normalization
 ```
 
-该方向目前没有反向导入。问题不是边界缺失，而是Provider物理职责过密。
+该方向没有反向导入。问题不是边界缺失，而是Provider剩余采集职责仍然过密。
 
 ### 2.2 Platform Web
 
@@ -112,28 +117,20 @@ loading / ready / partial / no_data / stale / error
 - [x] 确认A股页面已有组件边界；
 - [x] 确认Provider与主看板内联组件为优先热点。
 
-### E1 — Provider纯归一化层
+### E1 — Provider纯归一化层：完成
 
-目标：把无I/O、无缓存、无状态的字段转换函数移至`research_provider_normalization.py`。
+- [x] 抽离Decimal安全转换；
+- [x] 抽离非负整数与日期转换；
+- [x] 抽离DataFrame records转换与多字段择优；
+- [x] 抽离收益率、趋势和最近历史值计算；
+- [x] 新模块纳入Pyright覆盖；
+- [x] 增加边界输入单元测试；
+- [x] `FreeResearchProvider`公开方法、第三方请求、超时、并发和异常处理保持不变；
+- [x] 一次性执行器与机械脚本已删除。
 
-范围仅包括：
+### E2 — Provider按数据域拆分：待审计
 
-- Decimal安全转换；
-- 非负整数转换；
-- 日期转换；
-- DataFrame records转换；
-- 多字段择优；
-- 收益率、趋势和最近历史值计算。
-
-要求：
-
-- `FreeResearchProvider`公开方法与调用方式不变；
-- 不改变任何第三方请求、超时、并发或异常处理；
-- 增加独立单元测试覆盖边界输入。
-
-### E2 — Provider按数据域拆分
-
-在E1通过后，将Provider内部实现按职责拆分，但保留`FreeResearchProvider`作为稳定Facade：
+在E1完整矩阵通过后，将Provider内部实现按职责拆分，但保留`FreeResearchProvider`作为稳定Facade：
 
 ```text
 research_provider_a_share.py
@@ -142,7 +139,7 @@ research_provider_macro.py
 research_providers.py        # stable facade
 ```
 
-不采用隐式多继承；优先使用显式组合和委托，避免跨Adapter共享可变状态。
+不采用隐式多继承；优先使用显式组合和委托，避免跨Adapter共享可变状态。实施前必须先量化每个方法的共享常量、HTTP Client、异常语义和测试替身依赖。
 
 ### E3 — Service状态职责
 
