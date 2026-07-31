@@ -8,6 +8,11 @@ const marketTerminalPagePath = path.join(viewRoot, 'components', 'MarketTerminal
 const hedgeBoardSubnavPath = path.join(viewRoot, 'components', 'HedgeBoardSubnav.vue');
 const hedgeResearchModulePath = path.join(viewRoot, 'components', 'HedgeResearchModule.vue');
 const terminalDetailPanelPath = path.join(viewRoot, 'components', 'TerminalDetailPanel.vue');
+const widgetErrorBoundaryPath = path.join(
+  viewRoot,
+  'components',
+  'WidgetErrorBoundary.ts',
+);
 const marketDetailCatalogPath = path.join(viewRoot, 'nativeData', 'marketDetailCatalog.ts');
 const toolGroupSectionPath = path.join(viewRoot, 'tradingTools', 'components', 'ToolGroupSection.vue');
 const tradingToolCatalogPath = path.join(viewRoot, 'tradingTools', 'data', 'catalog.ts');
@@ -54,6 +59,7 @@ const hedgeBoardSource = fs.readFileSync(hedgeBoardPagePath, 'utf8');
 const hedgeBoardSubnavSource = fs.readFileSync(hedgeBoardSubnavPath, 'utf8');
 const hedgeResearchModuleSource = fs.readFileSync(hedgeResearchModulePath, 'utf8');
 const terminalDetailPanelSource = fs.readFileSync(terminalDetailPanelPath, 'utf8');
+const widgetErrorBoundarySource = fs.readFileSync(widgetErrorBoundaryPath, 'utf8');
 const marketDetailCatalogSource = fs.readFileSync(marketDetailCatalogPath, 'utf8');
 const tradingToolCatalogSource = fs.readFileSync(tradingToolCatalogPath, 'utf8');
 const tradingToolsPageSource = fs.readFileSync(tradingToolsPagePath, 'utf8');
@@ -72,6 +78,7 @@ assert(fs.existsSync(marketTerminalPagePath), 'Expected MarketTerminalPage compo
 assert(fs.existsSync(hedgeBoardSubnavPath), 'Expected HedgeBoardSubnav component to exist.');
 assert(fs.existsSync(hedgeResearchModulePath), 'Expected HedgeResearchModule component to exist.');
 assert(fs.existsSync(terminalDetailPanelPath), 'Expected TerminalDetailPanel component to exist.');
+assert(fs.existsSync(widgetErrorBoundaryPath), 'Expected WidgetErrorBoundary component to exist.');
 assert(fs.existsSync(marketDetailCatalogPath), 'Expected market detail catalog to exist.');
 assert(fs.existsSync(toolGroupSectionPath), 'Expected ToolGroupSection component to exist.');
 assert(fs.existsSync(aSharePagePath), 'Expected dedicated A-share research page to exist.');
@@ -93,6 +100,26 @@ assert(
 assert(
   hedgeBoardSource.includes('TerminalDetailPanel') && hedgeBoardSource.includes('TerminalDetailPanel from'),
   'Hedge board local detail widgets must use TerminalDetailPanel.',
+);
+assert(
+  hedgeBoardSource.includes(
+    "import WidgetErrorBoundary from './components/WidgetErrorBoundary';",
+  ) &&
+    hedgeBoardSource.includes(':widget-error-boundary="WidgetErrorBoundary"') &&
+    !hedgeBoardSource.includes('const WidgetErrorBoundary = defineComponent'),
+  'Hedge board must delegate widget error isolation to the external component.',
+);
+assert(
+  widgetErrorBoundarySource.includes("name: 'WidgetErrorBoundary'") &&
+    widgetErrorBoundarySource.includes('widgetTitle') &&
+    widgetErrorBoundarySource.includes('onErrorCaptured') &&
+    widgetErrorBoundarySource.includes('return false') &&
+    widgetErrorBoundarySource.includes("class: 'local-empty'") &&
+    widgetErrorBoundarySource.includes("minHeight: '360px'") &&
+    widgetErrorBoundarySource.includes(
+      '模块 "${props.widgetTitle}" 渲染失败，已自动跳过，不影响其他内容浏览。',
+    ),
+  'WidgetErrorBoundary must preserve the original error isolation, root class and fallback copy.',
 );
 assert(
   !hedgeBoardSource.includes("from './nativeData/dashboard'") &&
