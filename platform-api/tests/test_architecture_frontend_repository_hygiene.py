@@ -16,6 +16,7 @@ FORBIDDEN_LOCAL_ARTIFACTS = (
 NESTED_GITHUB_ROOT = FRONTEND_ROOT / ".github"
 FRONTEND_GITIGNORE = FRONTEND_ROOT / ".gitignore"
 FRONTEND_LAUNCH_CONFIG = FRONTEND_ROOT / ".vscode" / "launch.json"
+USER_SYSTEM_TSCONFIG = FRONTEND_ROOT / "tsconfig.user-system.json"
 IDENTITY_FILES = (
     FRONTEND_ROOT / "package.json",
     FRONTEND_ROOT / "README.md",
@@ -86,6 +87,15 @@ def test_product_entry_points_do_not_claim_upstream_identity() -> None:
         encoding="utf-8"
     )
     assert REPOSITORY_URL in site_setting
+
+
+@pytest.mark.architecture
+def test_system_identity_files_remain_in_user_system_typecheck() -> None:
+    config = json.loads(USER_SYSTEM_TSCONFIG.read_text(encoding="utf-8"))
+    included = set(config["include"])
+
+    assert "src/settings/siteSetting.ts" in included
+    assert "src/views/sys/about/index.vue" in included
 
 
 @pytest.mark.architecture
