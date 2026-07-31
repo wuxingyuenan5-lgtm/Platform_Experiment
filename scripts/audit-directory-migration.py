@@ -91,6 +91,11 @@ def classify(path: str) -> str:
         return "historical_record"
     if normalized.startswith(("projects/", "references/", "00-人工可读目录/")):
         return "external_or_legacy_dependency"
+    if normalized in {
+        "scripts/audit-directory-migration.py",
+        "docs/architecture/PLATFORM_DIRECTORY_MIGRATION_PLAN.md",
+    }:
+        return "migration_governance"
     if normalized.startswith(".github/"):
         return "active_ci"
     if normalized.startswith(("scripts/", "deploy/")):
