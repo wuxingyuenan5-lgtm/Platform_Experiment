@@ -26,11 +26,26 @@ def test_member_holding_valuation_is_pure_and_service_retains_security_boundarie
     valuation = valuation_path.read_text(encoding="utf-8")
 
     imported = imported_modules(valuation_path)
+    allowed_application_imports = {
+        "app.member_holding_decimal",
+        "app.member_holding_repository",
+        "app.member_holding_schemas",
+    }
+    assert {name for name in imported if name.startswith("app.")} <= allowed_application_imports
     assert not {
         name
         for name in imported
-        if name.startswith(("sqlite3", "fastapi", "app.database", "app.auth"))
+        if name.startswith(("sqlite3", "fastapi", "httpx", "requests", "akshare"))
     }
+
+    for forbidden_valuation_dependency in (
+        "get_settings",
+        "connection(",
+        "insert_audit_event",
+        "assert_recent_reauthentication",
+        "MemberHoldingServiceError",
+    ):
+        assert forbidden_valuation_dependency not in valuation
 
     assert "build_holding_response" in service
     assert "HoldingValuationError" in service
