@@ -18,30 +18,63 @@ from app.member_holding_schemas import (
 
 
 class FundValuationRecord(Protocol):
-    id: str
-    name: str
-    fund_code: str | None
-    base_currency: str
+    @property
+    def id(self) -> str: ...
+
+    @property
+    def name(self) -> str: ...
+
+    @property
+    def fund_code(self) -> str | None: ...
+
+    @property
+    def base_currency(self) -> str: ...
 
 
 class HoldingValuationRecord(Protocol):
-    id: str
-    member_user_id: str
-    fund_id: str
-    share_quantity: str
-    cumulative_invested: str
-    confirmed_at: str | None
-    as_of: str
-    source: str
-    status: str
-    row_version: int
-    updated_at: str
+    @property
+    def id(self) -> str: ...
+
+    @property
+    def member_user_id(self) -> str: ...
+
+    @property
+    def fund_id(self) -> str: ...
+
+    @property
+    def share_quantity(self) -> str: ...
+
+    @property
+    def cumulative_invested(self) -> str: ...
+
+    @property
+    def confirmed_at(self) -> str | None: ...
+
+    @property
+    def as_of(self) -> str: ...
+
+    @property
+    def source(self) -> str: ...
+
+    @property
+    def status(self) -> str: ...
+
+    @property
+    def row_version(self) -> int: ...
+
+    @property
+    def updated_at(self) -> str: ...
 
 
 class NavValuationRecord(Protocol):
-    unit_nav: str
-    valuation_time: str
-    currency: str
+    @property
+    def unit_nav(self) -> str: ...
+
+    @property
+    def valuation_time(self) -> str: ...
+
+    @property
+    def currency(self) -> str: ...
 
 
 class HoldingValuationError(ValueError):
