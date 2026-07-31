@@ -30,6 +30,7 @@ Branch: `refactor/issue-136-platform-0-9-2-system-optimization`
 - [x] 完成Research E1–E5.1的Provider、状态、主看板低风险组件和A股观察列表职责拆分；
 - [x] 完成Identity I1管理员响应Presenter和I2.1 Session Presenter；
 - [x] 完成Portfolio P1会员持仓纯估值Owner并通过完整质量矩阵；
+- [x] 完成Portfolio P2 Fund catalog/NAV mutation响应只读复核并收口后端模块化；
 - [x] 保持Platform Web / Platform API模块化单体 / Execution Runtime三边界，无微服务化或重型基础设施扩张。
 
 ## Portfolio P1纯估值层：完成
@@ -63,9 +64,18 @@ Branch: `refactor/issue-136-platform-0-9-2-system-optimization`
 视觉Artifact：`8791768494`  
 SHA-256：`74df3b5503ed41204719acd1d06203fcc3fa3c9479a18972a544acc2a81a7a32`
 
-## 当前门禁：Portfolio只读复核
+## Portfolio P2只读复核：完成
 
-只读复核Fund catalog和NAV mutation响应是否存在明确、无状态、可证明收益的Presenter切口。没有清晰切口时结束Portfolio后端拆分，不触碰Financial Fact、Position Math或Formal Projection。
+- [x] `_fund_response`已被基金目录和NAV mutation两处局部复用，无跨模块重复；
+- [x] Fund catalog只包含Repository读取与四字段列表映射；
+- [x] NAV mutation响应依赖事务内更新后的Fund、持久化NAV和规范化估值时间；
+- [x] 两处均无独立政策、计算、错误合同或跨域复用；
+- [x] 决定不新增Fund catalog或NAV mutation Presenter；
+- [x] Portfolio后端模块化正式收口，不触碰Financial Fact、Position Math或Formal Projection。
+
+## 当前门禁：Portfolio前端与公共展示
+
+复核会员自助与管理员视角的持仓展示，重点统一Decimal、币种、NAV三态、空收益率和零收益率表达。只有存在真实重复、错误或可维护性收益时才修改组件；每一改动必须保持权限范围、API合同、DOM/样式和视觉基线。
 
 后续顺序仍为：Portfolio前端与公共展示 → 前端热点治理 → 高风险域只读审计 → Trading/Risk/Accounting/Reconciliation/Runtime逐门禁优化 → 旧Go/MySQL部署定性与仓库减负 → 真实环境验收。
 
