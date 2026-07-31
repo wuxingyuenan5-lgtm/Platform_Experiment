@@ -65,14 +65,13 @@ jobs:
           if function_start in service:
               start = service.index(function_start)
               end = service.index(function_end, start)
-              replacement = '''def get_session_list(*, user_id: str, current_session_id: str) -> UserSessionListResponse:
-              return _session_list_response(
-                  list_user_sessions(user_id),
-                  current_session_id=current_session_id,
+              replacement = (
+                  'def get_session_list(*, user_id: str, current_session_id: str) -> UserSessionListResponse:\n'
+                  '    return _session_list_response(\n'
+                  '        list_user_sessions(user_id),\n'
+                  '        current_session_id=current_session_id,\n'
+                  '    )\n\n\n'
               )
-
-
-              '''
               service = service[:start] + replacement + service[end:]
           service = service.replace('    UserSessionSummaryResponse,\n', '', 1)
           type_line = '  "app/user_session_presenter.py",\n'
