@@ -62,14 +62,22 @@ jobs:
           pnpm test:hedge-board-layout
           git diff --check
 
-      - name: Push widget boundary extraction commit
+      - name: Push validated commits
         run: |
-          if git diff --quiet -- platform-web/src/views/hedgeBoard/index.vue; then
-            echo 'Widget error boundary extraction already applied.'
+          if git diff --quiet -- \
+            platform-web/scripts/verify-hedge-board-layout.cjs \
+            platform-web/src/views/hedgeBoard/index.vue; then
+            echo 'Widget error boundary extraction is already applied.'
             exit 0
           fi
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add platform-web/src/views/hedgeBoard/index.vue
-          git commit -m 'refactor: delegate hedge widget error boundary'
+          if ! git diff --quiet -- platform-web/scripts/verify-hedge-board-layout.cjs; then
+            git add platform-web/scripts/verify-hedge-board-layout.cjs
+            git commit -m 'test: narrow stock snapshot AI layout guard'
+          fi
+          if ! git diff --quiet -- platform-web/src/views/hedgeBoard/index.vue; then
+            git add platform-web/src/views/hedgeBoard/index.vue
+            git commit -m 'refactor: delegate hedge widget error boundary'
+          fi
           git push origin HEAD:${{ github.event.pull_request.head.ref }}
