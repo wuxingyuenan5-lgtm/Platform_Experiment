@@ -12,102 +12,78 @@ Branch: `refactor/issue-136-platform-0-9-2-system-optimization`
 - Final accepted candidate: `0.10.1`
 - Merge policy: Draft only; never auto-merge; never modify `main`; owner approval required.
 - Live Draft PR, HEAD, CI and review status: GitHub Issue #136.
-- Superseded PRs #137 and #138 remain closed and unmerged as branch-governance history.
-
-## Core objective
-
-对整个基金投研交易资管平台进行证据化审计、减负、架构与代码优化、命名治理、AI上下文和Token优化，并在保持平台可运行、前端视觉和业务/安全语义稳定的前提下完成0.9.2开发验收，最终形成0.10.1正式候选。
-
-对冲基金看板只是Research业务域中的一个模块，不是本任务中心。
 
 ## 已完成门禁
 
-- [x] 冻结真实0.9.1统一交付基线并建立Issue #136、独立0.9.2分支和Draft PR；
-- [x] 完成全仓代码、目录、依赖、CI、测试、文档、Token、部署和数据库证据化审计；
-- [x] 建立单一当前状态、Context Map、模块AGENTS和按任务读取工具；
-- [x] 建立Platform API、Runtime、前端Build、Provider Smoke、两套Browser E2E、Secret、Version、Directory、Audit和56页视觉门禁；
-- [x] 完成`admin-risk → platform-web`与`platform-backend → platform-api`原子目录迁移；
-- [x] 完成Research E1–E5.1的Provider、状态、主看板低风险组件和A股观察列表职责拆分；
-- [x] 完成Identity I1管理员响应Presenter和I2.1 Session Presenter；
-- [x] 完成Portfolio P1会员持仓纯估值Owner并通过完整质量矩阵；
-- [x] 完成Portfolio P2 Fund catalog/NAV mutation响应只读复核并收口后端模块化；
-- [x] 完成Portfolio P3会员/管理员Decimal展示与完整账户估值口径治理；
-- [x] 保持Platform Web / Platform API模块化单体 / Execution Runtime三边界，无微服务化或重型基础设施扩张。
+- [x] Phase A–D：基线、全仓审计、上下文治理、完整门禁、56页视觉基线和目录迁移；
+- [x] Research E1–E5.1：Provider、状态、主看板低风险组件和A股本地观察列表；
+- [x] Identity I1/I2.1：管理员与Session响应Presenter；
+- [x] Portfolio P1–P3：纯估值、后端停止决策、共享Decimal与完整账户估值口径；
+- [x] Frontend F1：TradingView外部Widget生命周期Owner；
+- [x] 保持Platform Web / Platform API模块化单体 / Execution Runtime三边界；
+- [x] Draft PR保持Open、Draft、Unmerged，`main`未修改。
 
-## Portfolio P1纯估值层：完成
+## Portfolio P3证据
 
-- [x] 新增`platform-api/app/member_holding_valuation.py`作为无数据库、无HTTP、无权限和无审计副作用的纯估值Owner；
-- [x] 使用只读Protocol解除估值Owner对Repository记录类型的依赖；
-- [x] Service继续拥有Fund/NAV加载、会员范围、近期再认证、事务、审计和错误映射；
-- [x] 保持Decimal字符串、NAV三态、币种一致性、UTC归一化、36小时陈旧阈值和未来5分钟边界；
-- [x] 新增完整响应Golden、Decimal/时间边界测试、纯度架构测试和Pyright覆盖；
-- [x] 更新`docs/architecture/OWNERSHIP.md`、Portfolio专项计划和文档一致性守卫；
-- [x] 删除一次性写权限Workflow和迁移脚本。
-
-P1验证HEAD：`1697345b59517d603a30377934271ba5946d4856`  
-视觉Artifact：`8791768494`  
-SHA-256：`74df3b5503ed41204719acd1d06203fcc3fa3c9479a18972a544acc2a81a7a32`
-
-## Portfolio P2只读复核：完成
-
-- [x] `_fund_response`已被基金目录和NAV mutation两处局部复用，无跨模块重复；
-- [x] Fund catalog只包含Repository读取与四字段列表映射；
-- [x] NAV mutation响应依赖事务内更新后的Fund、持久化NAV和规范化估值时间；
-- [x] 两处均无独立政策、计算、错误合同或跨域复用；
-- [x] 决定不新增Fund catalog或NAV mutation Presenter；
-- [x] Portfolio后端模块化正式收口，不触碰Financial Fact、Position Math或Formal Projection。
-
-## Portfolio P3前端与公共展示：完成
-
-### 已修复
-
-- [x] 管理员持仓页改为使用共享`decimalDisplay.ts`，移除重复Decimal格式化和方向判断；
-- [x] `0`、`0.0`及其他零值表达保持中性，不显示正号或正收益颜色；
-- [x] 会员账户总市值和总收益仅在同币种且全部持仓具备完整估值时显示；
-- [x] 缺失NAV不当作0，也不从合计中静默过滤；
-- [x] 累计投入在同币种时保持独立可汇总；
-- [x] 新增永久架构测试，冻结共享Decimal Owner与完整估值汇总规则；
-- [x] API、权限、DOM、样式、用户流程和视觉保持稳定。
-
-### P3完整矩阵证据
-
-验证HEAD：`e41267cc70b5e852b3069d71a6a8d7b1092127ad`
-
-- [x] Platform CI：`30628817214`；
-- [x] Platform Directory Invariants：`30628817269`；
-- [x] Version Consistency：`30628817272`；
-- [x] Secret Scan：`30628817227`；
-- [x] User System Browser E2E：`30628817208`；
-- [x] Platform 0.9.2 Baseline Audit：`30628817219`；
-- [x] Platform Visual Baseline：`30628817239`；
-- [x] Hedge Board Browser E2E：`30628817237`；
-- [x] Research Provider Smoke：`30628817247`。
-
+验证HEAD：`e41267cc70b5e852b3069d71a6a8d7b1092127ad`  
 视觉Artifact：`8792572937`  
 SHA-256：`5109b685a9b0e2b9926c364f6fbadf95aae5982a6a5d77b073e5c32a6f33a7de`
 
-## 当前门禁：前端热点治理
+## Frontend F1 TradingViewWidget：完成
 
-从`platform-web/src/views/hedgeBoard/index.vue`开始重新审计Research E4后的剩余职责。只处理有重复证据、纯展示边界或明显维护收益的切口；一次提取一个视觉职责，保持Props、DOM层级、CSS选择器、页面布局和响应式行为。
+### 已实施
 
-每个结构切口必须重新通过Platform CI、Provider Smoke、两套Browser E2E和56页视觉基线。若剩余页面职责已内聚，或提取只会增加跳转与抽象，则停止拆分。
+- [x] 新增`platform-web/src/views/hedgeBoard/components/TradingViewWidget.ts`；
+- [x] 从`hedgeBoard/index.vue`机械迁移原内联组件；
+- [x] 保留Widget配置、外部脚本、错误文案、DOM class和最小高度；
+- [x] 保留ResizeObserver、IntersectionObserver、双rAF、四组修复定时器、三次修复上限、0.2阈值和卸载清理；
+- [x] 主页面继续通过原`HedgeResearchModule`合同传入同一组件；
+- [x] 永久架构测试禁止新Owner依赖路由、API、权限、市场数据、持久化或网络请求；
+- [x] 将被触达的Vue事件规范化为`update:model-value`以满足no-new-debt；
+- [x] 删除全部一次性写权限Workflow和迁移脚本。
 
-后续顺序仍为：前端热点治理 → 高风险域只读审计 → Trading/Risk/Accounting/Reconciliation/Runtime逐门禁优化 → 旧Go/MySQL部署定性与仓库减负 → 真实环境验收。
+### F1完整矩阵
+
+验证HEAD：`96919d31fecbfb0e99cbbbac5fff735436ecab11`
+
+- [x] Platform CI：`30631021600`；
+- [x] Platform Directory Invariants：`30631021619`；
+- [x] Version Consistency：`30631021640`；
+- [x] Secret Scan：`30631021603`；
+- [x] User System Browser E2E：`30631021630`；
+- [x] Platform 0.9.2 Baseline Audit：`30631021938`；
+- [x] Platform Visual Baseline：`30631021669`；
+- [x] Hedge Board Browser E2E：`30631021604`；
+- [x] Research Provider Smoke：`30631021624`。
+
+视觉Artifact：`8793413949`  
+SHA-256：`3fbc0b599690b97bdc59fcb9f318d74185fd5599823224cd7ffe8a24bae46da2`
+
+## 当前门禁：Frontend F2静态市场快照数据审计
+
+当前主页面内的`LOCAL_MARKET_DETAIL_TABLES`及其两项类型是纯静态本地数据，体量大且与页面编排无关，符合`nativeData/`职责。实施前必须先建立精确内容Hash和Owner测试。
+
+允许：
+
+- 将类型和静态表迁入一个独立`nativeData`模块；
+- 主页面保留显式import和原LocalChartWidget使用方式；
+- 保持每个值、字符串、分组、顺序和spark数组等价。
+
+禁止：
+
+- 不修改快照内容或UI；
+- 不合并现有`marketDetailCatalog.ts`；
+- 不同时迁移LocalChartWidget、图表数学或CSS；
+- 不接入API、Provider、Store或持久化。
+
+若无法建立精确Hash与机械迁移边界，则停止F2，转入下一业务域只读审计。
+
+## 后续顺序
+
+前端热点治理 → 高风险域只读审计 → Trading/Risk/Accounting/Reconciliation/Runtime逐门禁优化 → 旧Go/MySQL部署定性与仓库减负 → 真实环境验收。
 
 ## Protected invariants
 
-- Browser Session和API-Key权限隔离；
-- CSRF、Origin、角色、最后CEO和会员数据隔离；
-- Decimal、Financial Fact、PnL、NAV、正式会计和对账语义；
-- 不可变数据库迁移、备份和恢复；
-- Kill Switch、两人审批和Live Write默认关闭；
-- 幂等性、Market、FOK、PostOnly、TP/SL和Result Unknown；
-- EOD、Reconciliation、Last Known Good与`partial`/`stale`/`no_data`/`error`；
-- TLS验证与Platform API / Execution Runtime边界；
-- 现有用户可见布局、信息层级、主要流程和响应式行为。
+Browser Session/API-Key、CSRF/Origin、角色与会员隔离、Decimal、Financial Fact、PnL/NAV、正式会计、对账、不可变迁移、Kill Switch、双人审批、Live Write、幂等性、Market/FOK/PostOnly/TP-SL、Result Unknown、EOD/LKG、数据状态、TLS和Runtime边界均不得改变。
 
-## Stage gate and rollback
-
-每一主阶段必须具备：明确文件范围、基线与Golden、单独提交组、完整验收、可回滚点和停止条件。不得在失败门禁上继续叠加改动。
-
-出现业务、交易、会计、权限、数据库或错误合同漂移，无法保持视觉等价，暴露秘密，关闭TLS/类型/安全检查，需要修改`main`，或基线不稳定时，立即停止并报告。
+每一阶段必须具备明确文件范围、Golden、完整验收、回滚点和停止条件；不得在失败门禁上叠加改动。
