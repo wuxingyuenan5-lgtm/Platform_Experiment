@@ -1,0 +1,117 @@
+name: User Session Presenter Extraction
+
+on:
+  pull_request:
+    branches:
+      - feature/issue-134-platform-0-9-1-unified-delivery
+    types: [synchronize]
+    paths:
+      - .github/workflows/user-session-presenter-extraction.yml
+      - platform-api/app/user_session_presenter.py
+      - platform-api/tests/test_user_session_presenter.py
+      - platform-api/tests/test_architecture_user_session_presenter.py
+
+permissions:
+  contents: write
+
+concurrency:
+  group: user-session-presenter-extraction-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  apply:
+    if: github.event.pull_request.head.ref == 'refactor/issue-136-platform-0-9-2-system-optimization'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Platform API dependencies
+        working-directory: platform-api
+        run: python -m pip install -e '.[dev]'
+
+      - name: Apply session presenter delegation
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          service_path = Path('platform-api/app/user_service.py')
+          pyproject_path = Path('platform-api/pyproject.toml')
+          service = service_path.read_text(encoding='utf-8')
+          pyproject = pyproject_path.read_text(encoding='utf-8')
+          presenter_import = '''from app.user_session_presenter import (
+              session_list_response as _session_list_response,
+              summarize_user_agent as _summarize_user_agent,
+          )
+          '''
+          marker = 'from app.user_security import (\n'
+          if presenter_import not in service:
+              service = service.replace(marker, presenter_import + marker, 1)
+          block_start = 'def _mask_ip(value: str | None) -> str | None:\n'
+          block_end = 'def create_initial_ceo('
+          if block_start in service:
+              start = service.index(block_start)
+              end = service.index(block_end, start)
+              service = service[:start] + service[end:]
+          function_start = 'def get_session_list(*, user_id: str, current_session_id: str) -> UserSessionListResponse:\n'
+          function_end = 'def revoke_own_session('
+          if function_start in service:
+              start = service.index(function_start)
+              end = service.index(function_end, start)
+              replacement = '''def get_session_list(*, user_id: str, current_session_id: str) -> UserSessionListResponse:
+              return _session_list_response(
+                  list_user_sessions(user_id),
+                  current_session_id=current_session_id,
+              )
+
+
+              '''
+              service = service[:start] + replacement + service[end:]
+          service = service.replace('    UserSessionSummaryResponse,\n', '', 1)
+          type_line = '  "app/user_session_presenter.py",\n'
+          type_marker = '  "app/user_service.py",\n'
+          if type_line not in pyproject:
+              pyproject = pyproject.replace(type_marker, type_line + type_marker, 1)
+          service_path.write_text(service, encoding='utf-8')
+          pyproject_path.write_text(pyproject, encoding='utf-8')
+          PY
+
+      - name: Validate session presenter boundary
+        working-directory: platform-api
+        run: |
+          ruff check --fix --select I app/user_service.py
+          ruff check \
+            app/user_session_presenter.py \
+            app/user_service.py \
+            tests/test_user_session_presenter.py \
+            tests/test_architecture_user_session_presenter.py
+          pyright
+          pytest -q \
+            tests/test_user_session_presenter.py \
+            tests/test_architecture_user_session_presenter.py \
+            tests/test_user_browser_flows.py \
+            tests/test_user_session_foundation.py \
+            tests/test_user_logout.py \
+            tests/test_auth_assurance.py
+          git diff --check
+
+      - name: Push validated commits
+        run: |
+          if git diff --quiet -- platform-api/app/user_service.py platform-api/pyproject.toml; then
+            echo 'User session presenter delegation is already applied.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add platform-api/app/user_service.py
+          git commit -m 'refactor: delegate user session presentation'
+          git add platform-api/pyproject.toml
+          git commit -m 'chore: type-check user session presenter'
+          git push origin HEAD:${{ github.event.pull_request.head.ref }}
