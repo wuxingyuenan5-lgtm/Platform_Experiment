@@ -23,6 +23,8 @@ LOCAL_IMPORTS = """import {
 export { normalizeStockCode };
 export type { WatchlistItem };
 """
+SYNC_STATE_TYPE = "\nexport type WatchlistSyncState = 'local' | 'syncing' | 'synced' | 'offline';\n"
+SYNC_STATE_MARKER = "export type { WatchlistItem };\n"
 START_MARKER = "export interface WatchlistItem {\n"
 END_MARKER = "function shanghaiDateStamp("
 OLD_WATCH_BLOCK = """  watch(
@@ -60,7 +62,7 @@ LOCAL_EXISTS_LINE = (
     "assert(fs.existsSync(aShareWatchlistLocalStatePath), "
     "'Expected A-share watchlist local state adapter to exist.');\n"
 )
-OLD_WATCHLIST_ASSERTION = """assert(
+LEGACY_WATCHLIST_ASSERTION = """assert(
   aShareResearchComposableSource.includes('export function normalizeStockCode') &&
     aShareResearchComposableSource.includes("if (stored === null) return [...DEFAULT_WATCHLIST]") &&
     !aShareResearchComposableSource.includes('!Array.isArray(payload) || !payload.length') &&
@@ -68,13 +70,40 @@ OLD_WATCHLIST_ASSERTION = """assert(
   'A-share watchlists must preserve stored empty arrays, normalize stock codes and reorder within groups.',
 );
 """
-NEW_WATCHLIST_ASSERTION = """assert(
+CURRENT_WATCHLIST_ASSERTION = """assert(
   aShareResearchComposableSource.includes("from './aShareWatchlistLocalState'") &&
     aShareResearchComposableSource.includes('export { normalizeStockCode };') &&
     aShareResearchComposableSource.includes('export type { WatchlistItem };') &&
     aShareResearchComposableSource.includes('const groupIndexes = watchlist.value.reduce<number[]>') &&
     !aShareResearchComposableSource.includes('window.localStorage'),
   'A-share composable must delegate local watchlist persistence while preserving its public API and group moves.',
+);
+assert(
+  aShareWatchlistLocalStateSource.includes('export function normalizeStockCode') &&
+    aShareWatchlistLocalStateSource.includes("if (stored === null) return [...DEFAULT_WATCHLIST]") &&
+    !aShareWatchlistLocalStateSource.includes('!Array.isArray(payload) || !payload.length') &&
+    aShareWatchlistLocalStateSource.includes("const WATCHLIST_STORAGE_KEY = 'vg_a_share_watchlist_v1'") &&
+    aShareWatchlistLocalStateSource.includes(
+      "const WATCHLIST_DIRTY_STORAGE_KEY = 'vg_a_share_watchlist_dirty_v1'",
+    ) &&
+    aShareWatchlistLocalStateSource.includes('export function normalizeWatchlistItems') &&
+    aShareWatchlistLocalStateSource.includes('export function readWatchlist') &&
+    aShareWatchlistLocalStateSource.includes('export function writeWatchlist') &&
+    aShareWatchlistLocalStateSource.includes('export function readWatchlistDirty') &&
+    aShareWatchlistLocalStateSource.includes('export function writeWatchlistDirty'),
+  'A-share local watchlist adapter must preserve code normalization, empty persistence, storage keys and dirty state.',
+);
+"""
+UPDATED_WATCHLIST_ASSERTION = """assert(
+  aShareResearchComposableSource.includes("from './aShareWatchlistLocalState'") &&
+    aShareResearchComposableSource.includes('export { normalizeStockCode };') &&
+    aShareResearchComposableSource.includes('export type { WatchlistItem };') &&
+    aShareResearchComposableSource.includes(
+      "export type WatchlistSyncState = 'local' | 'syncing' | 'synced' | 'offline';",
+    ) &&
+    aShareResearchComposableSource.includes('const groupIndexes = watchlist.value.reduce<number[]>') &&
+    !aShareResearchComposableSource.includes('window.localStorage'),
+  'A-share composable must delegate local watchlist persistence while preserving public types and group moves.',
 );
 assert(
   aShareWatchlistLocalStateSource.includes('export function normalizeStockCode') &&
@@ -109,6 +138,11 @@ def main() -> None:
         start = source.index(START_MARKER)
         end = source.index(END_MARKER, start)
         source = source[:start] + source[end:]
+
+    if SYNC_STATE_TYPE.strip() not in source:
+        if SYNC_STATE_MARKER not in source:
+            raise SystemExit("A-share public type export boundary was not found")
+        source = source.replace(SYNC_STATE_MARKER, SYNC_STATE_MARKER + SYNC_STATE_TYPE, 1)
 
     if OLD_WATCH_BLOCK in source:
         source = source.replace(OLD_WATCH_BLOCK, NEW_WATCH_BLOCK, 1)
@@ -154,13 +188,19 @@ def main() -> None:
             1,
         )
 
-    if OLD_WATCHLIST_ASSERTION in layout:
+    if LEGACY_WATCHLIST_ASSERTION in layout:
         layout = layout.replace(
-            OLD_WATCHLIST_ASSERTION,
-            NEW_WATCHLIST_ASSERTION,
+            LEGACY_WATCHLIST_ASSERTION,
+            UPDATED_WATCHLIST_ASSERTION,
             1,
         )
-    elif NEW_WATCHLIST_ASSERTION not in layout:
+    elif CURRENT_WATCHLIST_ASSERTION in layout:
+        layout = layout.replace(
+            CURRENT_WATCHLIST_ASSERTION,
+            UPDATED_WATCHLIST_ASSERTION,
+            1,
+        )
+    elif UPDATED_WATCHLIST_ASSERTION not in layout:
         raise SystemExit("A-share watchlist layout assertion boundary was not found")
 
     layout = layout.replace(
@@ -173,6 +213,7 @@ def main() -> None:
         "from './aShareWatchlistLocalState'",
         "export { normalizeStockCode };",
         "export type { WatchlistItem };",
+        "export type WatchlistSyncState = 'local' | 'syncing' | 'synced' | 'offline';",
         "const watchlist = ref<WatchlistItem[]>(readWatchlist());",
         "readWatchlistDirty()",
         "writeWatchlistDirty(true)",
@@ -197,7 +238,7 @@ def main() -> None:
         LOCAL_PATH_LINE,
         LOCAL_SOURCE_LINE,
         LOCAL_EXISTS_LINE,
-        NEW_WATCHLIST_ASSERTION,
+        UPDATED_WATCHLIST_ASSERTION,
         "aShareWatchlistLocalStateSource.includes('WATCHLIST_DIRTY_STORAGE_KEY')",
     )
     if any(value not in layout for value in required_layout):
