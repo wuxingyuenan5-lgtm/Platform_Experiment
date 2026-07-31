@@ -23,6 +23,7 @@ Branch: `refactor/issue-136-platform-0-9-2-system-optimization`
 - [x] High-risk H2 Venue专用路由Owner；
 - [x] 前端热点与高风险结构治理按停止条件收口；
 - [x] Phase J / J0仓库证据、凭据净化、Secret Scan增强、只读采集工具、MySQL聚合清单和人工交接；
+- [x] Phase J / J2第一轮本地产物与上游托管脚手架清理；
 - [x] Platform Web / Platform API模块化单体 / Execution Runtime三边界保持不变。
 
 ## 关键历史证据
@@ -54,20 +55,11 @@ Snapshot规范化语义SHA-256：`580983d83781cb7f0731dd39837d75b16eaf24be187513
 视觉Artifact：`8797146922`  
 SHA-256：`f722456de6afce3068239a2de51ca58895133aa6cbd1eef6f0af9afc1ab00453`
 
-- `eod_reconciliation_routes.py`拥有四个端点；
-- Facade保留兼容导出、每次调用依赖装配和409/404/422映射；
-- Service、Policy、Repository、Schemas、Financial Fact、Venue、DDL、Decimal、幂等性和失败关闭语义未修改。
-
 ### H2 Venue路由Owner
 
 验证HEAD：`7c60ac24d0b728a0c5383530310752a3070ed876`  
 视觉Artifact：`8797697682`  
 SHA-256：`3898d7b32d1413c8fddfe5c024c4c1eea31b67b05561ca66a5e48dd8355f6d93`
-
-- `venue_reconciliation_routes.py`拥有五个端点；
-- Facade保留Repository别名、兼容Delegate和完整错误映射；
-- Service、Policy、Repository、Runtime Client、Schemas、Financial Fact、DDL与Decimal未修改；
-- 永久架构测试冻结Service、Facade、Routes与Main四边界。
 
 ## 高风险结构治理停止决定
 
@@ -133,16 +125,40 @@ GitLab路径权威审计：`docs/architecture/PLATFORM_LEGACY_GITLAB_DEPLOYMENT_
 
 权威规则：`docs/operations/WORKSPACE_HYGIENE.md`。
 
-### 已实施切口
+### 第一轮：已验收
 
-- [x] 删除`platform-web/home-2560-check.png`本地截图；
-- [x] 删除`platform-web/src/file_structure.txt`过时目录快照；
-- [x] 在`platform-web/.gitignore`中防止同类产物回归；
-- [x] 删除上游Vben `CNAME`和未使用的Gitpod配置；
-- [x] 删除完整的`platform-web/.github`上游元数据子树；
-- [x] 新增`test_architecture_frontend_repository_hygiene.py`永久门禁；
-- [x] 将`.gitlab-ci.yml`识别为Legacy部署证据并加入永久冻结；
-- [x] 去除Workspace Hygiene中的本机绝对路径、过时文件名和一次性容量数字。
+- [x] 删除本地首页检查截图和过时目录快照；
+- [x] 增加忽略规则防止同类产物回归；
+- [x] 删除上游Vben `CNAME`、Gitpod配置和完整嵌套`.github`；
+- [x] 新增永久前端仓库卫生门禁；
+- [x] 将`.gitlab-ci.yml`识别为Legacy部署证据并永久冻结；
+- [x] 去除Workspace Hygiene中的本机绝对路径和一次性容量数字。
+
+第一轮验证HEAD：`3b251c795826ba583c5cefb11f160b315ee7a75e`  
+视觉Artifact：`8800210265`  
+SHA-256：`49ebc0157537caa130e3f8db379dd1c7ff8aa5192c01cc7aa25ec31e2bb13aa9`
+
+### 第二轮：已实施，等待最终矩阵
+
+- [x] `platform-web/package.json`版本归一为`0.9.2`、设置`private`并指向当前仓库；
+- [x] 删除产品入口中的上游Vben身份、公开测试账号、错误文档和预览链接，同时保留MIT归属；
+- [x] About页面改为Variable-Global平台身份；
+- [x] VS Code启动入口归一为`127.0.0.1:4373/index.html`；
+- [x] 版本检查与升版工具覆盖前端`package.json`；
+- [x] 根README、PLAN、文档目录、部署入口、验收标准和Runbook同步当前架构；
+- [x] 新增产品入口仓库身份、前端版本和IDE端口永久门禁；
+- [x] 新增共享Markdown个人主目录检测，允许占位符和代码示例；
+- [x] MT5桥接默认路径改为Windows `APPDATA`派生、非Windows相对路径回退和环境变量覆盖；
+- [x] 新增三种MT5路径行为的Runtime单元测试。
+
+### 暂不处理的GitHub候选
+
+- [ ] Platform API应用层仍显示历史版本`0.6.0`；
+- [ ] Execution Runtime应用层仍显示历史版本`0.5.0`；
+- [ ] 两个应用文件体积较大，当前只允许安全局部补丁，不做整文件人工重写；
+- [ ] `platform-web/.vscode/settings.json`仍含低风险上游编辑器噪声，留待独立切口；
+- [ ] `platform-web/apps/test-server`仍进入pnpm workspace和锁文件，留待锁文件感知切口；
+- [ ] 未完成静态引用、路由、构建和锁文件证据前，不批量删除疑似未使用源码。
 
 ### J2继续规则
 
@@ -156,7 +172,7 @@ GitLab路径权威审计：`docs/architecture/PLATFORM_LEGACY_GITLAB_DEPLOYMENT_
 
 ## 后续顺序
 
-J2 GitHub仓库减负 → 其他GitHub内高置信度优化 → 延期的J1外部验收 → Windows/TLS/真实Venue与正式会计对账验收 → 所有者批准。
+完成J2第二轮矩阵 → 评估剩余GitHub高置信度切口 → 延期的J1外部验收 → Windows/TLS/真实Venue与正式会计对账验收 → 所有者批准。
 
 ## Protected invariants
 
