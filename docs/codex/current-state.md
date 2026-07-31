@@ -23,7 +23,8 @@ This is the sole repository document for current engineering state. Durable rule
 7. High-risk H0 responsibility audit;
 8. H1 dedicated EOD reconciliation routes;
 9. H2 dedicated Venue reconciliation routes;
-10. Phase J / J0 repository classification, credential-document cleanup, strengthened Secret Scan, minimal read-only evidence collector, MySQL aggregate inventory and operator handoff.
+10. Phase J / J0 repository classification, credential-document cleanup, strengthened Secret Scan, minimal read-only evidence collector, MySQL aggregate inventory and operator handoff;
+11. Phase J / J2 first repository-hygiene slice: local artifacts, upstream hosting metadata and nested GitHub configuration removed with permanent guards.
 
 Frontend hotspot and high-risk structural governance are closed. Trading, Risk, Formal Accounting and Execution Runtime retained their existing owners. Reconciliation routing is separated without moving orchestration, persistence, policy, Financial Fact, Runtime transport, Decimal, idempotency or fail-closed behavior.
 
@@ -127,7 +128,7 @@ The authoritative audit is `docs/architecture/PLATFORM_LEGACY_GITLAB_DEPLOYMENT_
 
 ## Current gate: J2 GitHub repository hygiene
 
-GitHub-only cleanup already applied in this phase:
+### First accepted slice
 
 - removed local homepage inspection screenshot and stale source-tree snapshot;
 - added ignore rules for recurring local inspection artifacts;
@@ -137,9 +138,31 @@ GitHub-only cleanup already applied in this phase:
 - replaced machine-specific workspace size/path notes with durable repository hygiene rules;
 - classified and froze `.gitlab-ci.yml` rather than deleting a possible production deployment path.
 
+### Second implemented slice, pending final matrix evidence
+
+- aligned `platform-web/package.json` identity and version with Platform `0.9.2`, marked the package private and pointed repository metadata to this project;
+- replaced upstream Vben README content, public test credentials and product-facing About links while retaining MIT attribution;
+- aligned VS Code launch configuration with the authoritative Platform Web port `4373`;
+- extended version consistency and bump tooling to include `platform-web/package.json`;
+- refreshed root README, root PLAN, documentation catalog, deployment entry, acceptance criteria and Runbook to the current architecture and J2 phase;
+- removed named-workstation paths from shared operations documentation;
+- added documentation portability checks rejecting real Windows, macOS and Linux user-home paths while allowing placeholders and fenced examples;
+- replaced the hard-coded MT5 bridge path with an `APPDATA`-derived Windows default, a portable non-Windows fallback and an explicit environment override;
+- added Runtime unit tests for all three MT5 bridge-path modes;
+- added permanent frontend repository-identity and local-launch architecture tests.
+
 The governing document is `docs/operations/WORKSPACE_HYGIENE.md`.
 
-J2 may continue only with high-confidence, reference-checked deletions. Any candidate that affects package locks, active routes, production configuration, runtime state, historical accounting evidence or Legacy production assets must stop for a dedicated plan.
+J2 may continue only with high-confidence, reference-checked changes. Any candidate that affects package locks, active routes, production configuration, runtime state, historical accounting evidence or Legacy production assets must stop for a dedicated plan.
+
+## Remaining GitHub-only candidates
+
+- Platform API FastAPI/OpenAPI and `/system/info` still contain the historical application version `0.6.0`;
+- Execution Runtime FastAPI/OpenAPI still contains the historical application version `0.5.0`;
+- those two large application files require a safe localized patch mechanism before changing; they must not be manually rewritten wholesale;
+- `platform-web/.vscode/settings.json` still contains low-risk upstream/editor noise, but its large shared configuration should be handled as a separate bounded slice;
+- `platform-web/apps/test-server` remains in the pnpm workspace and lockfile and is not removable without a lockfile-aware change;
+- broader unused-source deletion remains out of scope until static import, route, build and lockfile evidence is complete.
 
 ## Deferred external acceptance
 
@@ -161,9 +184,9 @@ Until that evidence is reviewed, do not delete or rename `projects/risk-control`
 
 ### GitHub-only work
 
-- continue J2 high-confidence repository reduction;
-- review remaining upstream scaffold metadata and unused source candidates without changing lockfiles or product contracts;
-- maintain the full quality matrix and 56-page visual baseline for each accepted slice.
+- validate and close the current J2 second slice with the complete quality matrix and 56-page visual baseline;
+- continue only with bounded, high-confidence candidates listed above;
+- retain full quality evidence for every accepted slice.
 
 ### Deferred external work
 
