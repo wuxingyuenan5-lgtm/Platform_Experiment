@@ -22,9 +22,12 @@ This is the sole repository document for current engineering state. Durable rule
 6. Frontend F1/F2;
 7. High-risk H0 responsibility audit;
 8. H1 dedicated EOD reconciliation routes;
-9. H2 dedicated Venue reconciliation routes.
+9. H2 dedicated Venue reconciliation routes;
+10. Phase J / J0 repository classification, credential-document cleanup, strengthened Secret Scan, minimal read-only evidence collector, MySQL aggregate inventory and operator handoff.
 
 Frontend hotspot and high-risk structural governance are closed. Trading, Risk, Formal Accounting and Execution Runtime retained their existing owners. Reconciliation routing is separated without moving orchestration, persistence, policy, Financial Fact, Runtime transport, Decimal, idempotency or fail-closed behavior.
+
+Phase J repository work is complete. The remaining gate is external J0 evidence collection against the historical server and MySQL instance. Repository evidence cannot establish whether those services are currently active or whether real user/account data remains.
 
 ## Target physical boundaries
 
@@ -87,7 +90,7 @@ Browser roles remain separate from API-Key roles. Browser Sessions cannot author
 - Existing direct consumers continue to use the Facade.
 - Service, Policy, Repository, Runtime Client, Financial Fact, DDL and Decimal semantics remain unchanged.
 
-## Current gate: Phase J / J0 legacy production classification
+## Legacy production classification
 
 A second, complete production topology remains in the repository:
 
@@ -101,24 +104,36 @@ Nginx
         MySQL risk_control
 ```
 
-Evidence includes `deploy/install-native.sh`, `deploy/README.md`, systemd units, Nginx configuration and both Go services under `projects/risk-control`.
-
 Critical facts:
 
 - `platform-web/.env.production` still directs production API traffic to `/api/auth`, `/api/data` and `/api/data/ws`;
 - the old Auth Service owns an independent MySQL user schema and JWT security model;
 - the old Data Service owns a MySQL schema, Bybit client and optional NAV scheduler;
-- deployment documentation names a fixed server and contains backup, upgrade and rollback instructions;
-- this stack cannot be treated as Demo or deleted without external evidence.
+- deployment documentation describes a fixed server, backup, upgrade and rollback path;
+- historical project documents contained reusable credentials and weak-password examples, so related server-side credentials must be treated as compromised and rotated;
+- this stack cannot be treated as Demo, deleted, renamed or automatically switched without external evidence and owner approval.
 
-The authoritative J0 plan is `docs/architecture/PLATFORM_LEGACY_DEPLOYMENT_AUDIT.md`.
+The authoritative plan is `docs/architecture/PLATFORM_LEGACY_DEPLOYMENT_AUDIT.md`. The operator procedure is `docs/operations/LEGACY_PRODUCTION_EVIDENCE_HANDOFF.md`.
 
-Before any deletion, route switch or data migration, J0 must verify the actual server processes, loaded Nginx configuration, environment-file existence and permissions, MySQL schema/data, user and credential compatibility, API consumers, TLS and rollback path. Secret values must never be copied into repository evidence.
+## Current gate: external J0 evidence
+
+An authorized operator must obtain redacted evidence for:
+
+1. server repository path, branch, HEAD and working-tree state;
+2. systemd state and listening ports;
+3. loaded Nginx routes, domain and TLS status;
+4. environment-file existence, permissions, key names and hashes without values;
+5. MySQL schema metadata, aggregate row counts, recent writes and sensitive-column occupancy without business rows;
+6. current `/api/auth`, `/api/data` and WebSocket consumers;
+7. backups, restore evidence and rollback path;
+8. rotation status for MySQL, JWT, account-encryption, exchange and historical administrator credentials.
+
+Until that evidence is reviewed, do not delete or rename `projects/risk-control`, alter `deploy/`, switch `.env.production`, import MySQL automatically, stop legacy services or declare the old stack retired.
 
 ## Remaining acceptance work
 
-- legacy production deployment and data classification;
-- production migration or formal Legacy Production ownership decision;
+- external legacy server and MySQL evidence;
+- J1 decision: continue Legacy Production, controlled migration or evidence-backed retirement;
 - Windows real local validation;
 - production HTTPS/TLS;
 - real Venue/Broker evidence;
