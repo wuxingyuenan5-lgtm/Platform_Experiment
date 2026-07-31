@@ -8,7 +8,7 @@ from pathlib import Path
 
 SERVICE_PATH = Path("platform-api/app/research_service.py")
 HISTORY_IMPORT = "from app.research_macro_history import MacroProbabilityHistoryStore\n"
-IMPORT_MARKER = "from app.research_cache import LastKnownGoodResearchCache\n"
+IMPORT_MARKER = "from app.research_providers import FreeResearchProvider\n"
 
 
 def main() -> None:
@@ -52,11 +52,12 @@ def main() -> None:
     service = "".join(lines)
 
     if IMPORT_MARKER not in service:
-        raise SystemExit("Research cache import boundary was not found")
-    service = service.replace(IMPORT_MARKER, IMPORT_MARKER + HISTORY_IMPORT, 1)
+        raise SystemExit("Research provider import boundary was not found")
+    service = service.replace(IMPORT_MARKER, HISTORY_IMPORT + IMPORT_MARKER, 1)
     service = service.replace("import json\n", "", 1)
     service = service.replace("import os\n", "", 1)
     service = service.replace("from pathlib import Path\n", "", 1)
+    service = service.replace("    MacroExpectationEvent,\n", "", 1)
     service = service.replace("    MacroProbabilityPoint,\n", "", 1)
 
     forbidden = (
