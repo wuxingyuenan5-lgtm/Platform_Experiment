@@ -479,7 +479,7 @@ if ($LASTEXITCODE -ne 0) { throw "演示账号初始化失败" }
 
 Write-Host "本地验收账号：demo_ceo" -ForegroundColor Cyan
 Write-Host "第二账号：demo_employee_1" -ForegroundColor Cyan
-Write-Host "本次临时密码：$DemoPassword" -ForegroundColor Yellow
+Write-Host "本次临时凭据：$DemoPassword" -ForegroundColor Yellow
 Write-Host "密码只保留在当前终端，不得写入截图和报告。" -ForegroundColor Yellow
 
 & $BackendPython -m uvicorn app.main:app `
@@ -557,7 +557,7 @@ Start-Process "http://127.0.0.1:4373/#/login"
 
 ```text
 用户名：demo_ceo
-密码：PowerShell A 中显示的本次临时密码
+临时凭据：PowerShell A 中显示的本次随机值
 ```
 
 A 股页面：
