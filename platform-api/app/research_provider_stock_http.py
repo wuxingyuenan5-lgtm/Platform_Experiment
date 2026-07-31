@@ -39,6 +39,10 @@ class StockHttpResearchProvider:
         def number(index: int) -> Decimal | None:
             return _decimal(values[index] if index < len(values) else None)
 
+        def scaled_number(index: int, multiplier: Decimal) -> Decimal | None:
+            value = number(index)
+            return value * multiplier if value is not None else None
+
         return {
             "name": values[1],
             "code": code,
@@ -49,18 +53,12 @@ class StockHttpResearchProvider:
             "changePct": number(32),
             "high": number(33),
             "low": number(34),
-            "turnoverYuan": (
-                number(37) * Decimal("10000") if number(37) is not None else None
-            ),
+            "turnoverYuan": scaled_number(37, Decimal("10000")),
             "turnoverPct": number(38),
             "peTtm": number(39),
             "amplitudePct": number(43),
-            "marketCapYuan": (
-                number(44) * Decimal("100000000") if number(44) is not None else None
-            ),
-            "floatMarketCapYuan": (
-                number(45) * Decimal("100000000") if number(45) is not None else None
-            ),
+            "marketCapYuan": scaled_number(44, Decimal("100000000")),
+            "floatMarketCapYuan": scaled_number(45, Decimal("100000000")),
             "pb": number(46),
             "limitUp": number(47),
             "limitDown": number(48),
