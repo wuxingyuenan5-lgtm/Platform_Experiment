@@ -7,6 +7,7 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
 COLLECTOR = ROOT / "scripts/collect-legacy-production-evidence.sh"
+MYSQL_INVENTORY = ROOT / "scripts/legacy-production-readonly-inventory.sql"
 
 
 @pytest.mark.architecture
@@ -68,3 +69,43 @@ def test_legacy_evidence_collector_never_reads_secret_values_or_business_rows() 
         "wget ",
     ):
         assert forbidden not in source
+
+
+@pytest.mark.architecture
+def test_legacy_mysql_inventory_is_explicitly_read_only_and_aggregate_only() -> None:
+    source = MYSQL_INVENTORY.read_text(encoding="utf-8")
+    upper = source.upper()
+
+    assert "SET SESSION TRANSACTION READ ONLY" in upper
+    assert "START TRANSACTION READ ONLY" in upper
+    assert "FROM INFORMATION_SCHEMA.TABLES" in upper
+    assert "FROM INFORMATION_SCHEMA.COLUMNS" in upper
+    assert "FROM INFORMATION_SCHEMA.STATISTICS" in upper
+    assert "FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS" in upper
+    assert "COUNT(*) AS ROW_COUNT" in upper
+    assert "SUM(PASSWORD_HASH IS NOT NULL" in upper
+    assert "SUM(API_KEY_ENCRYPTED IS NOT NULL" in upper
+    assert "SUM(API_SECRET_ENCRYPTED IS NOT NULL" in upper
+    assert upper.rstrip().endswith("COMMIT;")
+
+    for forbidden in (
+        "SELECT *",
+        "INTO OUTFILE",
+        "LOAD DATA",
+        "INSERT INTO",
+        "UPDATE RISK_CONTROL",
+        "DELETE FROM",
+        "REPLACE INTO",
+        "CREATE TABLE",
+        "ALTER TABLE",
+        "DROP TABLE",
+        "TRUNCATE TABLE",
+        "GRANT ",
+        "REVOKE ",
+        "SET GLOBAL",
+        "SELECT PASSWORD_HASH",
+        "SELECT API_KEY_ENCRYPTED",
+        "SELECT API_SECRET_ENCRYPTED",
+        "SELECT BYBIT_POSITIONS",
+    ):
+        assert forbidden not in upper
