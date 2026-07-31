@@ -29,31 +29,41 @@ Branch: `refactor/issue-136-platform-0-9-2-system-optimization`
 - [x] 完成`admin-risk → platform-web`与`platform-backend → platform-api`原子目录迁移；
 - [x] 完成Research E1–E5.1的Provider、状态、主看板低风险组件和A股观察列表职责拆分；
 - [x] 完成Identity I1管理员响应Presenter和I2.1 Session Presenter；
+- [x] 完成Portfolio P1会员持仓纯估值Owner并通过完整质量矩阵；
 - [x] 保持Platform Web / Platform API模块化单体 / Execution Runtime三边界，无微服务化或重型基础设施扩张。
 
-## 当前门禁：Portfolio P1纯估值层
+## Portfolio P1纯估值层：完成
 
 ### 已实施
 
 - [x] 新增`platform-api/app/member_holding_valuation.py`作为无数据库、无HTTP、无权限和无审计副作用的纯估值Owner；
+- [x] 使用只读Protocol解除估值Owner对Repository记录类型的依赖；
 - [x] Service继续拥有Fund/NAV加载、会员范围、近期再认证、事务、审计和错误映射；
 - [x] 保持Decimal字符串、NAV三态、币种一致性、UTC归一化、36小时陈旧阈值和未来5分钟边界；
 - [x] 新增完整响应Golden、Decimal/时间边界测试、纯度架构测试和Pyright覆盖；
-- [x] 更新`docs/architecture/OWNERSHIP.md`与Portfolio专项计划；
+- [x] 更新`docs/architecture/OWNERSHIP.md`、Portfolio专项计划和文档一致性守卫；
 - [x] 删除一次性写权限Workflow和迁移脚本。
 
-### 当前验收
+### 验收证据
 
-- [ ] Platform API Ruff、Pyright和全测试通过；
-- [ ] Execution Runtime Ruff、Pyright和全测试通过；
-- [ ] Platform Web Lint、Type Check和生产Build通过；
-- [ ] Research Provider Smoke通过；
-- [ ] User System与Hedge Board Browser E2E通过；
-- [ ] Secret Scan、Version Consistency、Directory Invariants和Baseline Audit通过；
-- [ ] 56页四档视觉基线通过；
-- [ ] 将完整运行ID和视觉Artifact同步到Issue #136与Draft PR #139。
+验证HEAD：`1697345b59517d603a30377934271ba5946d4856`
 
-## P1之后
+- [x] Platform API Ruff、Pyright和全测试：Platform CI `30626771566`；
+- [x] Execution Runtime Ruff、Pyright和全测试：Platform CI `30626771566`；
+- [x] Platform Web Lint、Type Check和生产Build：Platform CI `30626771566`；
+- [x] Research Provider Smoke：`30626771610`；
+- [x] User System Browser E2E：`30626771578`；
+- [x] Hedge Board Browser E2E：`30626771582`；
+- [x] Secret Scan：`30626771577`；
+- [x] Version Consistency：`30626771572`；
+- [x] Platform Directory Invariants：`30626771569`；
+- [x] Platform 0.9.2 Baseline Audit：`30626771579`；
+- [x] 56页四档视觉基线：`30626771581`。
+
+视觉Artifact：`8791768494`  
+SHA-256：`74df3b5503ed41204719acd1d06203fcc3fa3c9479a18972a544acc2a81a7a32`
+
+## 当前门禁：Portfolio只读复核
 
 只读复核Fund catalog和NAV mutation响应是否存在明确、无状态、可证明收益的Presenter切口。没有清晰切口时结束Portfolio后端拆分，不触碰Financial Fact、Position Math或Formal Projection。
 
