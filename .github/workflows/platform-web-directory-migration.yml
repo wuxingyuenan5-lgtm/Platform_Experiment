@@ -8,7 +8,7 @@ on:
       - '.github/workflows/platform-web-directory-migration.yml'
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: platform-web-directory-migration-${{ github.event.pull_request.number }}
@@ -62,16 +62,31 @@ jobs:
               raise SystemExit('Platform Web directory migration is incomplete')
           PY
 
-      - name: Commit one mechanical migration
+      - name: Build validated migration evidence
         shell: bash
-        env:
-          HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
         run: |
-          if git diff --cached --quiet; then
-            echo 'No migration changes were required.'
-            exit 0
-          fi
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git commit -m 'refactor: rename Platform Web directory'
-          git push origin "HEAD:${HEAD_BRANCH}"
+          mkdir -p migration-evidence
+          git rev-parse HEAD^ > migration-evidence/parent-sha.txt
+          git rev-parse HEAD > migration-evidence/local-commit-sha.txt
+          git rev-parse HEAD^{tree} > migration-evidence/root-tree-sha.txt
+          git rev-parse HEAD^:admin-risk > migration-evidence/legacy-platform-web-tree-sha.txt
+          git rev-parse HEAD:platform-web > migration-evidence/platform-web-tree-sha.txt
+          git rev-parse HEAD^:admin-risk/docs > migration-evidence/legacy-docs-tree-sha.txt
+          git rev-parse HEAD:platform-web/docs > migration-evidence/platform-web-docs-tree-sha.txt
+          git ls-tree HEAD^:admin-risk > migration-evidence/legacy-platform-web-top-level.txt
+          git ls-tree HEAD:platform-web > migration-evidence/platform-web-top-level.txt
+          git ls-tree -r HEAD:platform-web > migration-evidence/platform-web-recursive.txt
+          git diff-tree --no-commit-id --name-status -r -M HEAD > migration-evidence/changed-files.txt
+          git bundle create migration-evidence/platform-web-migration.bundle HEAD ^HEAD^
+          git bundle verify migration-evidence/platform-web-migration.bundle
+
+      - name: Upload validated migration evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: platform-web-directory-migration-${{ github.sha }}
+          path: migration-evidence
+          if-no-files-found: error
+          retention-days: 14
