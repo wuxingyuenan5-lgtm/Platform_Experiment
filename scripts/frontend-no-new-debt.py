@@ -1,8 +1,10 @@
-"""Run zero-warning ESLint on every changed frontend source file.
+"""Run zero-warning ESLint on changed frontend source content.
 
 The maintained trading surface is still linted in full by Platform CI. This gate
 extends protection to the inherited frontend without requiring a mass cleanup:
-any source file added or modified by a PR must be clean before merge.
+any source file added or content-modified by a PR must be clean before merge.
+Pure 100%-similarity renames are excluded because their content was already
+validated at the source path and directory migrations have separate structure gates.
 """
 
 from __future__ import annotations
@@ -64,12 +66,42 @@ def event_base_sha(event: dict[str, Any]) -> tuple[str | None, bool]:
     return None, False
 
 
+def parse_changed_paths(output: str) -> list[str]:
+    """Return destinations whose content requires linting.
+
+    Git reports exact renames as ``R100``. Those paths are intentionally skipped;
+    modified renames (for example ``R098``) are linted at their destination path.
+    """
+
+    paths: list[str] = []
+    for raw_line in output.splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+        fields = line.split("\t")
+        status = fields[0]
+        if status == "R100":
+            continue
+        if status.startswith("R"):
+            if len(fields) != 3:
+                raise FrontendDebtError(f"unexpected rename record: {raw_line}")
+            paths.append(fields[2])
+            continue
+        if len(fields) != 2:
+            raise FrontendDebtError(f"unexpected changed-file record: {raw_line}")
+        paths.append(fields[1])
+    return paths
+
+
 def changed_paths(base_sha: str, *, merge_base: bool) -> list[str]:
     separator = "..." if merge_base else ".."
     command = [
         "git",
+        "-c",
+        "core.quotepath=false",
         "diff",
-        "--name-only",
+        "--name-status",
+        "--find-renames=100%",
         "--diff-filter=ACMR",
         f"{base_sha}{separator}HEAD",
     ]
@@ -82,12 +114,12 @@ def changed_paths(base_sha: str, *, merge_base: bool) -> list[str]:
     )
     if result.returncode != 0:
         raise FrontendDebtError(result.stderr.strip() or "git diff failed")
-    return [line.strip() for line in result.stdout.splitlines() if line.strip()]
+    return parse_changed_paths(result.stdout)
 
 
 def run_eslint(files: list[str]) -> int:
     if not files:
-        print("Frontend no-new-debt check passed: no changed source files")
+        print("Frontend no-new-debt check passed: no changed source content")
         return 0
     command = ["pnpm", "exec", "eslint", "--max-warnings", "0", *files]
     print("Frontend no-new-debt files:")
