@@ -260,7 +260,7 @@ assert(
   stockSnapshotSource.includes('expanded[item.key] = false') &&
     stockSnapshotSource.includes("{ key: 'quoteValuation'") &&
     stockSnapshotSource.includes("{ key: 'investorQa'") &&
-    !stockSnapshotSource.toLowerCase().includes('ai'),
+    !/\bAI\b|人工智能|智能分析|AI建议|买卖建议/i.test(stockSnapshotSource),
   'Stock snapshot modules must reset collapsed and remain fixed objective-data flows without AI.',
 );
 assert(
