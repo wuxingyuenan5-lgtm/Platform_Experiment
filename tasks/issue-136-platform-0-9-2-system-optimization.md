@@ -18,52 +18,15 @@ Branch: `refactor/issue-136-platform-0-9-2-system-optimization`
 - [x] Identity I1/I2.1；
 - [x] Portfolio P1–P3；
 - [x] Frontend F1/F2；
-- [x] High-risk H0责任盘点；
-- [x] High-risk H1 EOD专用路由Owner；
-- [x] High-risk H2 Venue专用路由Owner；
-- [x] 前端热点与高风险结构治理按停止条件收口；
-- [x] Phase J / J0仓库证据、凭据净化、Secret Scan增强、只读采集工具、MySQL聚合清单和人工交接；
+- [x] High-risk H0–H2，并按停止条件保留Trading、Risk、Formal Accounting与Execution Runtime原Owner；
+- [x] Phase J / J0仓库证据、凭据净化、Secret Scan增强、只读证据工具和Legacy冻结门禁；
 - [x] Phase J / J2第一轮本地产物与上游托管脚手架清理；
+- [x] Phase J / J2第二轮仓库身份、版本、文档可移植性和MT5桥接路径治理；
 - [x] Platform Web / Platform API模块化单体 / Execution Runtime三边界保持不变。
-
-## 关键历史证据
-
-### Portfolio P3
-
-验证HEAD：`e41267cc70b5e852b3069d71a6a8d7b1092127ad`  
-视觉Artifact：`8792572937`  
-SHA-256：`5109b685a9b0e2b9926c364f6fbadf95aae5982a6a5d77b073e5c32a6f33a7de`
-
-### Frontend F1
-
-验证HEAD：`96919d31fecbfb0e99cbbbac5fff735436ecab11`  
-视觉Artifact：`8793413949`  
-SHA-256：`3fbc0b599690b97bdc59fcb9f318d74185fd5599823224cd7ffe8a24bae46da2`
-
-### Frontend F2
-
-验证HEAD：`56f53a67d8b85e2c6988da62044a2940b8eedc7e`  
-视觉Artifact：`8796528988`  
-SHA-256：`5189b39b5778ce20ae425b0879006dc7c03694f48acce57a6aa5ba77efbdc2be`
-
-Snapshot来源SHA-256：`20245f2606e15add5e97387c238532697c938677865c9d620178bbc9522b788a`  
-Snapshot规范化语义SHA-256：`580983d83781cb7f0731dd39837d75b16eaf24be18751367432aa605fa0acc92`
-
-### H1 EOD路由Owner
-
-验证HEAD：`5f992691c35921c0647cd8e7f800fca48a547359`  
-视觉Artifact：`8797146922`  
-SHA-256：`f722456de6afce3068239a2de51ca58895133aa6cbd1eef6f0af9afc1ab00453`
-
-### H2 Venue路由Owner
-
-验证HEAD：`7c60ac24d0b728a0c5383530310752a3070ed876`  
-视觉Artifact：`8797697682`  
-SHA-256：`3898d7b32d1413c8fddfe5c024c4c1eea31b67b05561ca66a5e48dd8355f6d93`
 
 ## 高风险结构治理停止决定
 
-Trading、Risk、Formal Accounting与Execution Runtime已有明确且内聚的Owner；EOD与Venue的路由混合债务已清除。没有新的纯结构切口能够在不扩大策略、SQL、外部副作用或兼容面的前提下产生明确收益，因此停止继续拆分高风险域。
+Trading、Risk、Formal Accounting与Execution Runtime已有明确且内聚的Owner；EOD与Venue路由混合债务已清除。没有新的纯结构切口能够在不扩大策略、SQL、外部副作用或兼容面的前提下产生明确收益，因此停止继续拆分高风险域。
 
 ## Phase J / J0仓库工作：完成
 
@@ -78,38 +41,13 @@ Trading、Risk、Formal Accounting与Execution Runtime已有明确且内聚的Ow
 - MySQL可能持有用户、Session、账户密钥、仓位和净值历史；
 - Legacy不能视为Demo、死代码或可直接归档目录。
 
-仓库侧安全准备：
-
-- 净化历史凭据和弱密码方案；
-- Secret Scan覆盖中文密码字段、SQL固定密码和MD5/SHA-1字面量；
-- `scripts/collect-legacy-production-evidence.sh`只采集最小服务器元数据；
-- `scripts/legacy-production-readonly-inventory.sql`只输出Schema与聚合统计；
-- `docs/operations/LEGACY_PRODUCTION_EVIDENCE_HANDOFF.md`冻结授权、脱敏和回传规则；
-- 永久架构测试禁止读取Secret值、业务行、密码Hash和交易所密钥。
-
-J0验证HEAD：`9981f7b5f7cdb60210efd3a6bba4f59477096df9`
-
-- Platform CI `30645414569`
-- Directory `30645414648`
-- Version `30645414566`
-- Secret `30645414560`
-- User E2E `30645414615`
-- Audit `30645414517`
-- Visual `30645414551`
-- Hedge E2E `30645414775`
-- Provider Smoke `30645414626`
-
+J0验证HEAD：`9981f7b5f7cdb60210efd3a6bba4f59477096df9`  
 视觉Artifact：`8799314716`  
 SHA-256：`e6916a36276e0d9877aa2c99b7ed7cbde31c03aeadc8ae9f0dce1bfb28965271`
 
 ## J1外部验收：延期，不阻塞GitHub优化
 
-当前GitHub连接无法读取旧服务器、GitLab Runner或MySQL。按所有者指示，以下验收暂时跳过，但仍保留为最终发布条件：
-
-- 服务器、systemd、Nginx、TLS与访问日志；
-- MySQL Schema、聚合数据、备份与恢复；
-- Legacy消费者、凭据轮换和回滚；
-- GitLab项目、`runner20`、`risk-web.rta-office.com`和历史Pipeline。
+当前GitHub连接无法读取旧服务器、GitLab Runner或MySQL。按所有者指示，服务器、systemd、Nginx、TLS、MySQL、Legacy消费者、凭据轮换、回滚及GitLab Pipeline证据暂时跳过，但仍保留为最终发布条件。
 
 外部证据返回前仍禁止：
 
@@ -128,41 +66,60 @@ GitLab路径权威审计：`docs/architecture/PLATFORM_LEGACY_GITLAB_DEPLOYMENT_
 ### 第一轮：已验收
 
 - [x] 删除本地首页检查截图和过时目录快照；
-- [x] 增加忽略规则防止同类产物回归；
 - [x] 删除上游Vben `CNAME`、Gitpod配置和完整嵌套`.github`；
 - [x] 新增永久前端仓库卫生门禁；
 - [x] 将`.gitlab-ci.yml`识别为Legacy部署证据并永久冻结；
 - [x] 去除Workspace Hygiene中的本机绝对路径和一次性容量数字。
 
-第一轮验证HEAD：`3b251c795826ba583c5cefb11f160b315ee7a75e`  
+验证HEAD：`3b251c795826ba583c5cefb11f160b315ee7a75e`  
 视觉Artifact：`8800210265`  
 SHA-256：`49ebc0157537caa130e3f8db379dd1c7ff8aa5192c01cc7aa25ec31e2bb13aa9`
 
-### 第二轮：已实施，等待最终矩阵
+### 第二轮：已验收
 
-- [x] `platform-web/package.json`版本归一为`0.9.2`、设置`private`并指向当前仓库；
-- [x] 删除产品入口中的上游Vben身份、公开测试账号、错误文档和预览链接，同时保留MIT归属；
-- [x] About页面改为Variable-Global平台身份；
+- [x] 前端包身份、版本、private状态和仓库链接归一；
+- [x] 删除产品入口中的上游Vben身份、公开测试账号和错误链接，保留MIT归属；
 - [x] VS Code启动入口归一为`127.0.0.1:4373/index.html`；
 - [x] 版本检查与升版工具覆盖前端`package.json`；
-- [x] 根README、PLAN、文档目录、部署入口、验收标准和Runbook同步当前架构；
-- [x] 新增产品入口仓库身份、前端版本和IDE端口永久门禁；
-- [x] 新增共享Markdown个人主目录检测，允许占位符和代码示例；
-- [x] MT5桥接默认路径改为Windows `APPDATA`派生、非Windows相对路径回退和环境变量覆盖；
+- [x] 根README、PLAN、文档目录、部署入口、验收标准、Runbook和参考资料入口同步当前架构；
+- [x] 新增仓库身份、前端版本、IDE端口、TSConfig覆盖和Markdown个人主目录永久门禁；
+- [x] MT5桥接路径改为Windows `APPDATA`派生、非Windows相对路径回退和环境变量覆盖；
 - [x] 新增三种MT5路径行为的Runtime单元测试。
+
+验证HEAD：`4f945739afcff191f41bc4defc33c4661d88f327`
+
+- Platform CI `30651097925`
+- Directory `30651097916`
+- Version `30651097942`
+- Secret `30651098013`
+- User E2E `30651098012`
+- Audit `30651097911`
+- Visual `30651098098`
+- Hedge E2E `30651097960`
+- Provider Smoke `30651098331`
+
+视觉Artifact：`8801486707`  
+SHA-256：`5a578af19799e27714ef0045544be14430b8a32c74d147e7a9af1438fa484d2d`
+
+### 第三轮：已实施，等待最终矩阵
+
+- [x] 精简`platform-web/.vscode/settings.json`为当前Platform Web维护需求；
+- [x] 保留pnpm、TypeScript SDK、Volar、ESLint、Stylelint、Prettier、Vue i18n和有效搜索排除；
+- [x] 删除Vetur、旧Volar TS插件标志、MicroPython、Nuxt、Yarn/Bower及失效托管文件嵌套；
+- [x] 删除旧`vue.vscode-typescript-vue-plugin`推荐，保留`vue.volar`；
+- [x] 新增共享编辑器配置永久架构测试。
 
 ### 暂不处理的GitHub候选
 
 - [ ] Platform API应用层仍显示历史版本`0.6.0`；
 - [ ] Execution Runtime应用层仍显示历史版本`0.5.0`；
 - [ ] 两个应用文件体积较大，当前只允许安全局部补丁，不做整文件人工重写；
-- [ ] `platform-web/.vscode/settings.json`仍含低风险上游编辑器噪声，留待独立切口；
 - [ ] `platform-web/apps/test-server`仍进入pnpm workspace和锁文件，留待锁文件感知切口；
 - [ ] 未完成静态引用、路由、构建和锁文件证据前，不批量删除疑似未使用源码。
 
 ### J2继续规则
 
-只允许高置信度、已完成引用核验的删除或归档。遇到以下情况立即停止并单独规划：
+只允许高置信度、已完成引用核验的变更。遇到以下情况立即停止并单独规划：
 
 - 需要重算pnpm锁文件；
 - 影响路由、API、权限、Financial Fact、Decimal、账务或对账；
@@ -172,7 +129,7 @@ SHA-256：`49ebc0157537caa130e3f8db379dd1c7ff8aa5192c01cc7aa25ec31e2bb13aa9`
 
 ## 后续顺序
 
-完成J2第二轮矩阵 → 评估剩余GitHub高置信度切口 → 延期的J1外部验收 → Windows/TLS/真实Venue与正式会计对账验收 → 所有者批准。
+完成J2第三轮矩阵 → 评估剩余GitHub高置信度切口 → 延期的J1外部验收 → Windows/TLS/真实Venue与正式会计对账验收 → 所有者批准。
 
 ## Protected invariants
 
