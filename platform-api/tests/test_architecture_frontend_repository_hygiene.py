@@ -11,7 +11,7 @@ FORBIDDEN_LOCAL_ARTIFACTS = (
     FRONTEND_ROOT / "home-2560-check.png",
     FRONTEND_ROOT / "src" / "file_structure.txt",
 )
-NESTED_WORKFLOW_ROOT = FRONTEND_ROOT / ".github" / "workflows"
+NESTED_GITHUB_ROOT = FRONTEND_ROOT / ".github"
 FRONTEND_GITIGNORE = FRONTEND_ROOT / ".gitignore"
 
 
@@ -24,16 +24,9 @@ def test_frontend_local_and_upstream_hosting_artifacts_do_not_return() -> None:
     ]
     assert not existing, f"Frontend local/upstream hosting artifacts returned: {existing}"
 
-    nested_workflows = []
-    if NESTED_WORKFLOW_ROOT.exists():
-        nested_workflows = sorted(
-            str(path.relative_to(ROOT))
-            for path in NESTED_WORKFLOW_ROOT.iterdir()
-            if path.is_file() and path.suffix.lower() in {".yml", ".yaml"}
-        )
-    assert not nested_workflows, (
-        "GitHub Actions workflows must live only under the repository root: "
-        f"{nested_workflows}"
+    assert not NESTED_GITHUB_ROOT.exists(), (
+        "Repository GitHub metadata must live only under the root .github directory: "
+        f"{NESTED_GITHUB_ROOT.relative_to(ROOT)}"
     )
 
 
