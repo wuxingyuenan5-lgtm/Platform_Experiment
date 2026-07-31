@@ -5,7 +5,7 @@ import json
 import math
 from collections.abc import Iterable
 from datetime import UTC, date, datetime, timedelta
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal
 from typing import Any
 
 import httpx
@@ -21,6 +21,14 @@ from app.research_data_schemas import (
     ShenwanMembership,
     ShortTermEmotionSnapshot,
 )
+from app.research_provider_normalization import as_date as _date
+from app.research_provider_normalization import as_decimal as _decimal
+from app.research_provider_normalization import as_non_negative_integer as _integer
+from app.research_provider_normalization import closest_prior_close as _closest_prior
+from app.research_provider_normalization import first_present as _pick
+from app.research_provider_normalization import frame_records as _records
+from app.research_provider_normalization import percentage_change as _pct_change
+from app.research_provider_normalization import trend_marker as _trend
 
 USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -53,67 +61,6 @@ def _akshare() -> Any:
         raise ResearchProviderError("akshare_dependency_missing") from exc
     return ak
 
-
-def _decimal(value: Any) -> Decimal | None:
-    if value is None or value is False:
-        return None
-    text = str(value).replace(",", "").strip()
-    if text in {"", "-", "--", "None", "nan", "NaN"}:
-        return None
-    try:
-        result = Decimal(text)
-    except (InvalidOperation, ValueError):
-        return None
-    if not result.is_finite():
-        return None
-    return result
-
-
-def _integer(value: Any) -> int:
-    number = _decimal(value)
-    return max(0, int(number or 0))
-
-
-def _date(value: Any) -> date | None:
-    if value in (None, "", "-"):
-        return None
-    text = str(value)[:10]
-    try:
-        return date.fromisoformat(text)
-    except ValueError:
-        return None
-
-
-def _records(frame: Any) -> list[dict[str, Any]]:
-    if frame is None or getattr(frame, "empty", True):
-        return []
-    return [dict(row) for row in frame.to_dict("records")]
-
-
-def _pick(row: dict[str, Any], *names: str) -> Any:
-    for name in names:
-        if name in row and row[name] not in (None, ""):
-            return row[name]
-    return None
-
-
-def _pct_change(current: Decimal | None, previous: Decimal | None) -> Decimal | None:
-    if current is None or previous is None or previous == 0:
-        return None
-    return ((current / previous) - Decimal("1")) * Decimal("100")
-
-
-def _trend(current: Decimal | None, previous: Decimal | None) -> str | None:
-    if current is None or previous is None:
-        return None
-    return "▲" if current >= previous else "▼"
-
-
-def _closest_prior(rows: list[dict[str, Any]], target: date) -> Decimal | None:
-    candidates = [row for row in rows if row["date"] <= target]
-    if not candidates:
-        return None
-    return candidates[-1]["close"]
 
 
 class FreeResearchProvider:
