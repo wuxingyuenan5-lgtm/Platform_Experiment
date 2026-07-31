@@ -27,9 +27,10 @@ The following gates are complete and evidence-backed:
 5. Gate D2 — Platform API directory migration;
 6. Research E1–E5.1 — Provider, state and bounded frontend/local-state modularization;
 7. Identity I1 — administrator response Presenter;
-8. Identity I2.1 — Browser Session response Presenter.
+8. Identity I2.1 — Browser Session response Presenter;
+9. Portfolio P1 — pure member-holding valuation owner and permanent boundary.
 
-The active gate is Portfolio P1: acceptance of the pure member-holding valuation owner. The implementation, Golden tests, architecture boundary and one-shot-tool cleanup are present; the complete quality matrix must pass before P1 is recorded as closed in Issue #136 and Draft PR #139.
+Portfolio P1 passed the complete quality matrix on the evidence HEAD recorded in Issue #136 and Draft PR #139. The next gate is a read-only review of Fund catalog and NAV mutation response construction. No additional Portfolio backend module may be introduced unless that review proves a distinct stateless responsibility and measurable maintenance benefit.
 
 The current physical service boundaries are:
 
@@ -114,13 +115,13 @@ Active CI, scripts, service trees and current documentation must not reintroduce
 - PostOnly currently uses the pre-submit MT5 reference quote as its hard Bybit bound and does not dynamically reprice from MT5 during Chase.
 - One successful Open maps to one MT5 Position Ticket; ambiguity fails closed.
 
-## Active Portfolio boundary
+## Portfolio boundary
 
-Member-holding optimization is deliberately narrow:
+Member-holding optimization remains deliberately narrow:
 
-1. `member_holding_valuation.py` owns pure validation, NAV state classification, UTC normalization and exact response construction from already loaded records;
+1. `member_holding_valuation.py` owns persistence-independent validation, NAV state classification, UTC normalization and exact response construction from already loaded structural inputs;
 2. `member_holding_decimal.py` remains the only exact Decimal calculation owner;
 3. `member_holding_service.py` retains scope, Fund/NAV loading, recent reauthentication, transactions, audit and error translation;
 4. Repository, Routes, Schemas, Financial Fact, Position Math and Formal Projection contracts remain unchanged;
-5. after P1 acceptance, only read-only evidence may justify a Fund catalog Presenter or NAV mutation response Presenter;
+5. only read-only evidence may justify a Fund catalog Presenter or NAV mutation response Presenter;
 6. absent a clear stateless cut, Portfolio backend modularization stops rather than mechanically splitting financial code.
