@@ -7,16 +7,14 @@ from pathlib import Path
 
 
 PROVIDER_PATH = Path("platform-api/app/research_providers.py")
-NORMALIZATION_IMPORT = """from app.research_provider_normalization import (
-    as_date as _date,
-    as_decimal as _decimal,
-    as_non_negative_integer as _integer,
-    closest_prior_close as _closest_prior,
-    first_present as _pick,
-    frame_records as _records,
-    percentage_change as _pct_change,
-    trend_marker as _trend,
-)
+NORMALIZATION_IMPORT = """from app.research_provider_normalization import as_date as _date
+from app.research_provider_normalization import as_decimal as _decimal
+from app.research_provider_normalization import as_non_negative_integer as _integer
+from app.research_provider_normalization import closest_prior_close as _closest_prior
+from app.research_provider_normalization import first_present as _pick
+from app.research_provider_normalization import frame_records as _records
+from app.research_provider_normalization import percentage_change as _pct_change
+from app.research_provider_normalization import trend_marker as _trend
 """
 
 
