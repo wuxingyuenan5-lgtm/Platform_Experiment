@@ -31,21 +31,38 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Normalize one-time AST assertion
+      - name: Normalize one-time extraction assertions
         run: |
           python - <<'PY'
           from pathlib import Path
 
           path = Path('scripts/apply-eod-reconciliation-route-extraction.py')
           source = path.read_text(encoding='utf-8')
-          old = '    assert "app.eod_reconciliation" in imports\n'
-          new = (
+
+          old_assertion = '    assert "app.eod_reconciliation" in imports\n'
+          new_assertion = (
               '    assert "app" in imports\n'
               '    assert "from app import eod_reconciliation as facade" in source\n'
           )
-          if source.count(old) != 1:
+          if source.count(old_assertion) != 1:
               raise SystemExit('Expected exactly one one-time AST assertion')
-          path.write_text(source.replace(old, new, 1), encoding='utf-8')
+          source = source.replace(old_assertion, new_assertion, 1)
+
+          query_lines = (
+              '    strategy_instance_id: str | None = Query(default=None, alias="strategyInstanceId"),\n',
+              '    account_id: str | None = Query(default=None, alias="accountId"),\n',
+              '    business_date: date | None = Query(default=None, alias="businessDate"),\n',
+          )
+          for line in query_lines:
+              if source.count(line) != 1:
+                  raise SystemExit(f'Expected exactly one query declaration: {line!r}')
+              source = source.replace(
+                  line,
+                  line.rstrip('\n') + '  # noqa: B008\n',
+                  1,
+              )
+
+          path.write_text(source, encoding='utf-8')
           PY
 
       - name: Apply EOD route extraction
