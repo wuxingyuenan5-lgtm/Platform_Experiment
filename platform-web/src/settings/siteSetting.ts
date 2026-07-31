@@ -1,8 +1,2 @@
-// github repo url
-export const GITHUB_URL = 'https://github.com/anncwb/vue-vben-admin';
-
-// vue-vben-admin-next-doc
-export const DOC_URL = 'https://doc.vvbin.cn/';
-
-// site url
-export const SITE_URL = 'https://vben.vvbin.cn/';
+// Authoritative repository for platform source, issues and release evidence.
+export const GITHUB_URL = 'https://github.com/wuxingyuenan5-lgtm/Platform_Experiment';
