@@ -8,7 +8,6 @@ from app.config import get_settings
 from app.database import connection
 from app.member_holding_decimal import (
     HoldingDecimalError,
-    calculate_holding,
     canonical_decimal,
     parse_non_negative_decimal,
 )
@@ -31,12 +30,14 @@ from app.member_holding_schemas import (
     FundNavMutationResponse,
     FundSummaryResponse,
     HoldingSource,
-    HoldingStatus,
     MemberHoldingListResponse,
     MemberHoldingResponse,
-    NavStatus,
     UpsertFundNavRequest,
     UpsertMemberHoldingRequest,
+)
+from app.member_holding_valuation import (
+    HoldingValuationError,
+    build_holding_response,
 )
 from app.user_admin_policy import UserAdminPolicyError, assert_recent_reauthentication
 from app.user_admin_service import AdminRequestContext
@@ -107,13 +108,6 @@ def _assert_member_target(db: sqlite3.Connection, user_id: str) -> None:
         )
 
 
-def _parse_aware(value: str, *, field: str) -> datetime:
-    parsed = datetime.fromisoformat(value)
-    if parsed.tzinfo is None:
-        raise MemberHoldingServiceError(503, "invalid_timestamp", f"{field} lacks timezone")
-    return parsed.astimezone(UTC)
-
-
 def _holding_response(
     db: sqlite3.Connection,
     holding: MemberHoldingRecord,
@@ -123,88 +117,17 @@ def _holding_response(
     fund = get_fund(db, holding.fund_id)
     if fund is None:
         raise MemberHoldingServiceError(503, "fund_unavailable", "Holding fund is unavailable")
-    try:
-        share_quantity = parse_non_negative_decimal(
-            holding.share_quantity,
-            field="shareQuantity",
-        )
-        cumulative_invested = parse_non_negative_decimal(
-            holding.cumulative_invested,
-            field="cumulativeInvested",
-        )
-    except HoldingDecimalError as exc:
-        raise MemberHoldingServiceError(503, "holding_decimal_invalid", str(exc)) from exc
-
     nav = get_latest_available_nav(db, holding.fund_id)
-    unit_nav = None
-    nav_status: NavStatus = "unavailable"
-    nav_valuation_time = None
-    currency = fund.base_currency
-    if nav is not None:
-        try:
-            unit_nav = parse_non_negative_decimal(nav.unit_nav, field="unitNav")
-        except HoldingDecimalError as exc:
-            raise MemberHoldingServiceError(503, "fund_nav_decimal_invalid", str(exc)) from exc
-        nav_valuation_time = _parse_aware(nav.valuation_time, field="valuationTime")
-        if nav_valuation_time > current + timedelta(minutes=5):
-            raise MemberHoldingServiceError(
-                503,
-                "fund_nav_timestamp_invalid",
-                "Fund NAV valuation time is unexpectedly in the future",
-            )
-        if nav.currency != fund.base_currency:
-            raise MemberHoldingServiceError(
-                503,
-                "fund_nav_currency_mismatch",
-                "Fund NAV currency does not match fund base currency",
-            )
-        stale_after = timedelta(hours=get_settings().fund_nav_stale_after_hours)
-        nav_status = "stale" if current - nav_valuation_time > stale_after else "available"
-        currency = nav.currency
-
-    calculation = calculate_holding(
-        share_quantity=share_quantity,
-        cumulative_invested=cumulative_invested,
-        unit_nav=unit_nav,
-    )
-    return MemberHoldingResponse(
-        holdingId=holding.id,
-        memberUserId=holding.member_user_id,
-        fundId=fund.id,
-        fundName=fund.name,
-        fundCode=fund.fund_code,
-        currency=currency,
-        shareQuantity=canonical_decimal(share_quantity),
-        latestUnitNav=canonical_decimal(unit_nav) if unit_nav is not None else None,
-        marketValue=(
-            canonical_decimal(calculation.market_value)
-            if calculation.market_value is not None
-            else None
-        ),
-        cumulativeInvested=canonical_decimal(cumulative_invested),
-        cumulativeReturn=(
-            canonical_decimal(calculation.cumulative_return)
-            if calculation.cumulative_return is not None
-            else None
-        ),
-        returnRate=(
-            canonical_decimal(calculation.return_rate)
-            if calculation.return_rate is not None
-            else None
-        ),
-        navStatus=nav_status,
-        navValuationTime=nav_valuation_time,
-        confirmedAt=(
-            _parse_aware(holding.confirmed_at, field="confirmedAt")
-            if holding.confirmed_at is not None
-            else None
-        ),
-        asOf=_parse_aware(holding.as_of, field="asOf"),
-        source=cast(HoldingSource, holding.source),
-        status=cast(HoldingStatus, holding.status),
-        rowVersion=holding.row_version,
-        updatedAt=_parse_aware(holding.updated_at, field="updatedAt"),
-    )
+    try:
+        return build_holding_response(
+            fund=fund,
+            holding=holding,
+            nav=nav,
+            current=current,
+            stale_after_hours=get_settings().fund_nav_stale_after_hours,
+        )
+    except HoldingValuationError as exc:
+        raise MemberHoldingServiceError(503, exc.code, exc.detail) from exc
 
 
 def _list_response(
