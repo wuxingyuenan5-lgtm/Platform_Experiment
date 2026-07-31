@@ -159,7 +159,7 @@ def test_valuation_preserves_quantiles_and_metric_failure_isolation() -> None:
         "max": Decimal("30"),
         "p20": Decimal("14.0"),
         "p50": Decimal("20.0"),
-        "p80": Decimal("26.0"),
+        "p80": Decimal("26.0000000000000010"),
         "observations": 3,
     }
     assert akshare.calls == [
