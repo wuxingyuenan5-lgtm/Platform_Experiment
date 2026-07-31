@@ -1,6 +1,6 @@
 # Platform Research低风险模块化计划
 
-状态：**E1纯归一化层完成，进入E2 Provider数据域拆分审计**  
+状态：**E2宏观Provider完成，下一切口为A股概览Provider**  
 关联Issue：#136  
 关联Draft PR：#139  
 审计分支：`refactor/issue-136-platform-0-9-2-system-optimization`  
@@ -35,7 +35,7 @@ E0审计基线：
 | `platform-api/app/research_cache.py` | 66 | 通用Last Known Good缓存 |
 | `platform-api/app/research_routes.py` | 78 | FastAPI路由、权限和缓存头 |
 
-`FreeResearchProvider`基线约881行、26个方法；`research_service.py`直接调用其中21个方法。E1后，无I/O归一化函数已迁移到`research_provider_normalization.py`，Provider公开方法和Service调用面保持不变。
+`FreeResearchProvider`基线约881行、26个方法；`research_service.py`直接调用其中21个方法。E1后，无I/O归一化函数迁移到`research_provider_normalization.py`。E2首个切口又将宏观预期采集迁移到`research_provider_macro.py`，Facade公开方法和Service调用面保持不变。
 
 当前依赖方向为：
 
@@ -44,13 +44,15 @@ research_routes
     -> research_service
         -> research_cache
         -> a_share_research_policy
-        -> research_providers
+        -> research_providers                 # stable facade
+            -> research_provider_macro
+            -> research_provider_errors
+            -> research_provider_normalization
             -> a_share_research_policy
             -> research_data_schemas
-            -> research_provider_normalization
 ```
 
-该方向没有反向导入。问题不是边界缺失，而是Provider剩余采集职责仍然过密。
+该方向没有反向导入。问题不是边界缺失，而是Facade中A股概览与个股采集职责仍然过密。
 
 ### 2.2 Platform Web
 
@@ -126,20 +128,40 @@ loading / ready / partial / no_data / stale / error
 - [x] 新模块纳入Pyright覆盖；
 - [x] 增加边界输入单元测试；
 - [x] `FreeResearchProvider`公开方法、第三方请求、超时、并发和异常处理保持不变；
+- [x] 一次性执行器与机械脚本已删除；
+- [x] E1完整质量矩阵全部通过。
+
+### E2 — Provider按数据域拆分：进行中
+
+保留`FreeResearchProvider`作为稳定Facade，使用显式组合和委托，不采用隐式多继承。
+
+#### E2.1 宏观预期Adapter：完成
+
+- [x] 建立`research_provider_macro.py`；
+- [x] 建立共享`ResearchProviderError`模块并由Facade继续公开该名称；
+- [x] 保持Polymarket请求参数、User-Agent、超时、分类、概率、排序、Limit和空结果错误语义；
+- [x] 保持非法概率的既有失败语义，不在重构中新增静默容错；
+- [x] 增加宏观Adapter单元测试并纳入Pyright；
+- [x] `FreeResearchProvider.macro_expectation_events()`仅改为显式委托；
 - [x] 一次性执行器与机械脚本已删除。
 
-### E2 — Provider按数据域拆分：待审计
+#### E2.2 A股概览Adapter：下一切口
 
-在E1完整矩阵通过后，将Provider内部实现按职责拆分，但保留`FreeResearchProvider`作为稳定Facade：
+候选范围仅包括：
 
 ```text
-research_provider_a_share.py
-research_provider_stock.py
-research_provider_macro.py
-research_providers.py        # stable facade
+a_share_spot
+market_activity
+index_snapshots / _index_snapshot / _intraday_signal
+shenwan_memberships
+short_term_emotion / _limit_pool
 ```
 
-不采用隐式多继承；优先使用显式组合和委托，避免跨Adapter共享可变状态。实施前必须先量化每个方法的共享常量、HTTP Client、异常语义和测试替身依赖。
+实施前必须冻结AkShare延迟导入、指数定义、并发粒度、涨跌停池HTTP合同和全部Schema返回类型。个股16个方法不与本切口混合。
+
+#### E2.3 个股研究Adapter：后置
+
+候选范围包括行情、财务、预告、估值、新闻、研报、公告、两融、持有人、资金流、分红、龙虎榜、解禁和互动问答。先建立东方财富数据中心公共Client边界，再决定是否移动，避免复制HTTP合同。
 
 ### E3 — Service状态职责
 
