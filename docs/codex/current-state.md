@@ -1,6 +1,6 @@
 # Current Engineering State
 
-Last updated: 2026-07-31
+Last updated: 2026-08-01
 
 This is the sole repository document for current engineering state. Durable rules live in `AGENTS.md`; ownership lives in `docs/architecture/OWNERSHIP.md`; live branch, Draft PR, HEAD, CI and review state live in GitHub Issue #136.
 
@@ -27,7 +27,9 @@ This is the sole repository document for current engineering state. Durable rule
 
 Frontend hotspot and high-risk structural governance are closed. Trading, Risk, Formal Accounting and Execution Runtime retained their existing owners. Reconciliation routing is separated without moving orchestration, persistence, policy, Financial Fact, Runtime transport, Decimal, idempotency or fail-closed behavior.
 
-Phase J repository work is complete. The remaining gate is external J0 evidence collection against the historical server and MySQL instance. Repository evidence cannot establish whether those services are currently active or whether real user/account data remains.
+J0 repository classification is complete. The external server, GitLab Runner and MySQL evidence required for J1 cannot be obtained through the current GitHub connection and is deferred by owner instruction. It remains a release acceptance item but no longer blocks GitHub-only optimization.
+
+The current engineering gate is **Phase J / J2 GitHub repository hygiene and reduction**.
 
 ## Target physical boundaries
 
@@ -92,7 +94,9 @@ Browser roles remain separate from API-Key roles. Browser Sessions cannot author
 
 ## Legacy production classification
 
-A second, complete production topology remains in the repository:
+The repository contains more than one historical production path.
+
+### Native Nginx / Go / MySQL path
 
 ```text
 platform-web production build
@@ -115,9 +119,31 @@ Critical facts:
 
 The authoritative plan is `docs/architecture/PLATFORM_LEGACY_DEPLOYMENT_AUDIT.md`. The operator procedure is `docs/operations/LEGACY_PRODUCTION_EVIDENCE_HANDOFF.md`.
 
-## Current gate: external J0 evidence
+### Legacy GitLab frontend deployment path
 
-An authorized operator must obtain redacted evidence for:
+`platform-web/.gitlab-ci.yml` defines test and production jobs using a dedicated `runner20`, fixed Node/npm/pnpm versions and direct copies to `/www/wwwroot/risk-web.rta-office.com/`. GitHub cannot establish whether the GitLab project, Runner or target site remains active.
+
+The authoritative audit is `docs/architecture/PLATFORM_LEGACY_GITLAB_DEPLOYMENT_AUDIT.md`. This file is frozen as Legacy production evidence and is excluded from ordinary repository cleanup.
+
+## Current gate: J2 GitHub repository hygiene
+
+GitHub-only cleanup already applied in this phase:
+
+- removed local homepage inspection screenshot and stale source-tree snapshot;
+- added ignore rules for recurring local inspection artifacts;
+- removed the upstream Vben `CNAME` and unused Gitpod configuration;
+- removed the complete inert `platform-web/.github` subtree, including upstream workflows, Issue templates, PR template and contribution documents;
+- added permanent architecture tests preventing those artifacts and nested GitHub metadata from returning;
+- replaced machine-specific workspace size/path notes with durable repository hygiene rules;
+- classified and froze `.gitlab-ci.yml` rather than deleting a possible production deployment path.
+
+The governing document is `docs/operations/WORKSPACE_HYGIENE.md`.
+
+J2 may continue only with high-confidence, reference-checked deletions. Any candidate that affects package locks, active routes, production configuration, runtime state, historical accounting evidence or Legacy production assets must stop for a dedicated plan.
+
+## Deferred external acceptance
+
+The following work remains required for release acceptance but is skipped during GitHub-only optimization:
 
 1. server repository path, branch, HEAD and working-tree state;
 2. systemd state and listening ports;
@@ -125,14 +151,23 @@ An authorized operator must obtain redacted evidence for:
 4. environment-file existence, permissions, key names and hashes without values;
 5. MySQL schema metadata, aggregate row counts, recent writes and sensitive-column occupancy without business rows;
 6. current `/api/auth`, `/api/data` and WebSocket consumers;
-7. backups, restore evidence and rollback path;
-8. rotation status for MySQL, JWT, account-encryption, exchange and historical administrator credentials.
+7. GitLab project, `runner20`, `risk-web.rta-office.com` and deployment history;
+8. backups, restore evidence and rollback path;
+9. rotation status for MySQL, JWT, account-encryption, exchange and historical administrator credentials.
 
-Until that evidence is reviewed, do not delete or rename `projects/risk-control`, alter `deploy/`, switch `.env.production`, import MySQL automatically, stop legacy services or declare the old stack retired.
+Until that evidence is reviewed, do not delete or rename `projects/risk-control`, alter `deploy/`, delete `.gitlab-ci.yml`, switch `.env.production`, import MySQL automatically, stop legacy services or declare the old stack retired.
 
 ## Remaining acceptance work
 
-- external legacy server and MySQL evidence;
+### GitHub-only work
+
+- continue J2 high-confidence repository reduction;
+- review remaining upstream scaffold metadata and unused source candidates without changing lockfiles or product contracts;
+- maintain the full quality matrix and 56-page visual baseline for each accepted slice.
+
+### Deferred external work
+
+- external legacy server, GitLab Runner and MySQL evidence;
 - J1 decision: continue Legacy Production, controlled migration or evidence-backed retirement;
 - Windows real local validation;
 - production HTTPS/TLS;
