@@ -16,6 +16,8 @@ FORBIDDEN_LOCAL_ARTIFACTS = (
 NESTED_GITHUB_ROOT = FRONTEND_ROOT / ".github"
 FRONTEND_GITIGNORE = FRONTEND_ROOT / ".gitignore"
 FRONTEND_LAUNCH_CONFIG = FRONTEND_ROOT / ".vscode" / "launch.json"
+FRONTEND_EDITOR_SETTINGS = FRONTEND_ROOT / ".vscode" / "settings.json"
+FRONTEND_EDITOR_EXTENSIONS = FRONTEND_ROOT / ".vscode" / "extensions.json"
 USER_SYSTEM_TSCONFIG = FRONTEND_ROOT / "tsconfig.user-system.json"
 IDENTITY_FILES = (
     FRONTEND_ROOT / "package.json",
@@ -32,6 +34,16 @@ FORBIDDEN_UPSTREAM_IDENTITY_MARKERS = (
     "vben/123456",
     "gitpod.io/#https://github.com/anncwb",
 )
+FORBIDDEN_EDITOR_SETTINGS = {
+    "MicroPython.executeButton",
+    "MicroPython.syncButton",
+    "nuxt.isNuxtApp",
+    "vetur.format.scriptInitialIndent",
+    "vetur.format.styleInitialIndent",
+    "vetur.validation.script",
+    "volar.tsPlugin",
+    "volar.tsPluginStatus",
+}
 
 
 @pytest.mark.architecture
@@ -107,3 +119,18 @@ def test_frontend_editor_launch_uses_the_authoritative_local_entry() -> None:
     assert configurations[0]["name"] == "Launch Platform Web"
     assert configurations[0]["url"] == "http://127.0.0.1:4373/index.html"
     assert configurations[0]["webRoot"] == "${workspaceFolder}/src"
+
+
+@pytest.mark.architecture
+def test_frontend_editor_settings_remain_platform_focused() -> None:
+    settings = json.loads(FRONTEND_EDITOR_SETTINGS.read_text(encoding="utf-8"))
+    extensions = json.loads(FRONTEND_EDITOR_EXTENSIONS.read_text(encoding="utf-8"))
+
+    assert settings["npm.packageManager"] == "pnpm"
+    assert settings["path-intellisense.mappings"] == {
+        "@/": "${workspaceFolder}/src"
+    }
+    assert settings["i18n-ally.enabledFrameworks"] == ["vue"]
+    assert not (FORBIDDEN_EDITOR_SETTINGS & settings.keys())
+    assert "vue.volar" in extensions["recommendations"]
+    assert "vue.vscode-typescript-vue-plugin" not in extensions["recommendations"]
