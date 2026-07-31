@@ -24,9 +24,14 @@ The following gates are complete and evidence-backed:
 2. Phase B — current-state and AI context reduction;
 3. Phase C — 56-page four-width visual baseline and responsive guard;
 4. Gate D1 — Platform Web directory migration;
-5. Gate D2 — Platform API directory migration.
+5. Gate D2 — Platform API directory migration;
+6. Research E1–E5.1 — Provider, state and bounded frontend/local-state modularization;
+7. Identity I1 — administrator response Presenter;
+8. Identity I2.1 — Browser Session response Presenter.
 
-The current physical service boundaries are now:
+The active gate is Portfolio P1: acceptance of the pure member-holding valuation owner. The implementation, Golden tests, architecture boundary and one-shot-tool cleanup are present; the complete quality matrix must pass before P1 is recorded as closed in Issue #136 and Draft PR #139.
+
+The current physical service boundaries are:
 
 ```text
 platform-web/
@@ -41,7 +46,7 @@ Directory migration evidence and invariants are defined in:
 
 `docs/architecture/PLATFORM_DIRECTORY_MIGRATION_PLAN.md`
 
-The next phase is low-risk modularization. The approved order is Research, Identity, then Portfolio. Trading, Risk, formal Accounting, Reconciliation and Execution Runtime remain later, conservative gates.
+The approved low-risk modularization order remains Research, Identity, then Portfolio. Trading, Risk, formal Accounting, Reconciliation and Execution Runtime remain later, conservative gates.
 
 ## Architecture retained by audit
 
@@ -109,13 +114,13 @@ Active CI, scripts, service trees and current documentation must not reintroduce
 - PostOnly currently uses the pre-submit MT5 reference quote as its hard Bybit bound and does not dynamically reprice from MT5 during Chase.
 - One successful Open maps to one MT5 Position Ticket; ambiguity fails closed.
 
-## Next gate: Research modularization
+## Active Portfolio boundary
 
-Start with evidence and boundaries, not a broad rewrite:
+Member-holding optimization is deliberately narrow:
 
-1. inventory the current Research frontend and Platform API dependency graph;
-2. separate page composition from reusable research view components;
-3. split Provider acquisition, normalization, cache/state and service orchestration without changing response contracts;
-4. preserve `ready`/`partial`/`stale`/`no_data`/`error` semantics and Last Known Good behavior;
-5. keep A-share/Shenwan, macro and hedge-fund research routes and visuals unchanged;
-6. require Platform CI, Provider Smoke, both browser E2E suites and the 56-page visual baseline after each structural step.
+1. `member_holding_valuation.py` owns pure validation, NAV state classification, UTC normalization and exact response construction from already loaded records;
+2. `member_holding_decimal.py` remains the only exact Decimal calculation owner;
+3. `member_holding_service.py` retains scope, Fund/NAV loading, recent reauthentication, transactions, audit and error translation;
+4. Repository, Routes, Schemas, Financial Fact, Position Math and Formal Projection contracts remain unchanged;
+5. after P1 acceptance, only read-only evidence may justify a Fund catalog Presenter or NAV mutation response Presenter;
+6. absent a clear stateless cut, Portfolio backend modularization stops rather than mechanically splitting financial code.
