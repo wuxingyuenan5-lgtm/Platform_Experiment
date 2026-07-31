@@ -7,8 +7,9 @@ This is the sole repository document for current engineering state. Durable rule
 ## Delivery model
 
 - Stable baseline: Platform `0.9.1` at `feature/issue-134-platform-0-9-1-unified-delivery@8114fce45e46e7920f316f49d03db12dc424acf1`.
-- Active development: Platform `0.9.2`, tracked by Issue #136 and Draft PR #139.
+- Active development version: Platform `0.9.2`, tracked by Issue #136 and Draft PR #139.
 - Final candidate: `0.10.1` only after all acceptance gates and explicit owner approval.
+- Frontend package-manager authority: `pnpm@9.15.9`.
 - `main` remains protected.
 
 ## Completed evidence-backed gates
