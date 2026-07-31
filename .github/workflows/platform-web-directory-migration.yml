@@ -80,6 +80,38 @@ jobs:
           git ls-tree HEAD:platform-web > migration-evidence/platform-web-top-level.txt
           git ls-tree -r HEAD:platform-web > migration-evidence/platform-web-recursive.txt
           git diff-tree --no-commit-id --name-status -r -M HEAD > migration-evidence/changed-files.txt
+          python - <<'PY'
+          import subprocess
+          import tarfile
+          from pathlib import Path
+
+          output = subprocess.run(
+              ['git', 'diff-tree', '--no-commit-id', '--name-status', '-r', '-M', 'HEAD'],
+              check=True,
+              capture_output=True,
+              text=True,
+          ).stdout.splitlines()
+          paths = []
+          for row in output:
+              fields = row.split('\t')
+              status = fields[0]
+              if status.startswith('R'):
+                  path = fields[2]
+              elif status.startswith('D'):
+                  continue
+              else:
+                  path = fields[1]
+              candidate = Path(path)
+              if candidate.is_file():
+                  paths.append(candidate)
+          with tarfile.open('migration-evidence/changed-content.tar.gz', 'w:gz') as archive:
+              for path in sorted(set(paths)):
+                  archive.add(path, arcname=path.as_posix(), recursive=False)
+          Path('migration-evidence/changed-content-paths.txt').write_text(
+              ''.join(f'{path.as_posix()}\n' for path in sorted(set(paths))),
+              encoding='utf-8',
+          )
+          PY
           git bundle create migration-evidence/platform-web-migration.bundle HEAD ^HEAD^
           git bundle verify migration-evidence/platform-web-migration.bundle
 
