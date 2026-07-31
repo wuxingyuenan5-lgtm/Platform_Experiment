@@ -3,11 +3,10 @@ from __future__ import annotations
 from collections.abc import Callable
 from datetime import date
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import HTTPException
 
 from app import eod_reconciliation_repository as repository
 from app import eod_reconciliation_service as service
-from app.config import get_settings
 from app.eod_policy import apply_outstanding_difference_gate, list_strategy_orders_for_eod
 from app.eod_reconciliation_schemas import (
     EodReconciliationReportRequest,
@@ -112,51 +111,3 @@ def review_eod_report(
         request,
         _service_dependencies(),
     )
-
-
-router = APIRouter(prefix=get_settings().api_prefix)
-
-
-@router.post(
-    "/ops/eod-reconciliation/reports",
-    response_model=EodReconciliationReportResponse,
-    tags=["eod-reconciliation"],
-)
-def create_report(
-    request: EodReconciliationReportRequest,
-) -> EodReconciliationReportResponse:
-    return create_eod_report(request)
-
-
-@router.get(
-    "/ops/eod-reconciliation/reports/{report_id}",
-    response_model=EodReconciliationReportResponse,
-    tags=["eod-reconciliation"],
-)
-def read_report(report_id: str) -> EodReconciliationReportResponse:
-    return get_eod_report(report_id)
-
-
-@router.get(
-    "/ops/eod-reconciliation/reports",
-    response_model=list[EodReconciliationReportResponse],
-    tags=["eod-reconciliation"],
-)
-def read_reports(
-    strategy_instance_id: str | None = Query(default=None, alias="strategyInstanceId"),
-    account_id: str | None = Query(default=None, alias="accountId"),
-    business_date: date | None = Query(default=None, alias="businessDate"),
-) -> list[EodReconciliationReportResponse]:
-    return list_eod_reports(strategy_instance_id, account_id, business_date)
-
-
-@router.post(
-    "/ops/eod-reconciliation/reports/{report_id}/review",
-    response_model=EodReconciliationReportResponse,
-    tags=["eod-reconciliation"],
-)
-def review_report(
-    report_id: str,
-    request: EodReconciliationReviewRequest,
-) -> EodReconciliationReportResponse:
-    return review_eod_report(report_id, request)

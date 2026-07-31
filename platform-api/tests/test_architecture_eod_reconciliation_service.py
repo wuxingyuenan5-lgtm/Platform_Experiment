@@ -4,6 +4,8 @@ from pathlib import Path
 APP_ROOT = Path(__file__).resolve().parents[1] / "app"
 SERVICE_PATH = APP_ROOT / "eod_reconciliation_service.py"
 FACADE_PATH = APP_ROOT / "eod_reconciliation.py"
+ROUTES_PATH = APP_ROOT / "eod_reconciliation_routes.py"
+MAIN_PATH = APP_ROOT / "main.py"
 
 
 def function_names(path: Path) -> set[str]:
@@ -59,8 +61,10 @@ def test_service_has_no_fastapi_configuration_or_route_dependency() -> None:
     assert "get_settings" not in source
 
 
-def test_facade_keeps_routes_http_mapping_and_per_call_dependency_wiring() -> None:
+def test_facade_keeps_http_mapping_compatibility_and_dependency_wiring() -> None:
+    imports = imported_modules(FACADE_PATH)
     source = FACADE_PATH.read_text(encoding="utf-8")
+    functions = function_names(FACADE_PATH)
 
     assert "from app import eod_reconciliation_service as service" in source
     assert "def _service_dependencies()" in source
@@ -70,7 +74,73 @@ def test_facade_keeps_routes_http_mapping_and_per_call_dependency_wiring() -> No
     assert "run_account_reconciliation=run_account_reconciliation" in source
     assert "import_live_economic_events=import_live_economic_events" in source
     assert "def _call_service" in source
-    assert "APIRouter(" in source
     assert "HTTPException(" in source
-    assert "@router.post(" in source
-    assert "@router.get(" in source
+    assert {
+        "create_eod_report",
+        "get_eod_report",
+        "list_eod_reports",
+        "review_eod_report",
+    } <= functions
+
+    assert "fastapi" in imports
+    assert "app.config" not in imports
+    assert "APIRouter" not in source
+    assert "Query(" not in source
+    assert "@router." not in source
+    assert "get_settings" not in source
+
+
+def test_routes_own_only_the_exact_eod_http_contract() -> None:
+    imports = imported_modules(ROUTES_PATH)
+    source = ROUTES_PATH.read_text(encoding="utf-8")
+    functions = function_names(ROUTES_PATH)
+
+    assert "fastapi" in imports
+    assert "app" in imports
+    assert "from app import eod_reconciliation as facade" in source
+    assert "app.config" in imports
+    assert {
+        "create_report",
+        "read_report",
+        "read_reports",
+        "review_report",
+    } <= functions
+    assert source.count("@router.post(") == 2
+    assert source.count("@router.get(") == 2
+    assert '"/ops/eod-reconciliation/reports"' in source
+    assert '"/ops/eod-reconciliation/reports/{report_id}"' in source
+    assert '"/ops/eod-reconciliation/reports/{report_id}/review"' in source
+    assert 'alias="strategyInstanceId"' in source
+    assert 'alias="accountId"' in source
+    assert 'alias="businessDate"' in source
+    assert source.count("response_model=EodReconciliationReportResponse") == 3
+    assert "response_model=list[EodReconciliationReportResponse]" in source
+    assert source.count('tags=["eod-reconciliation"]') == 4
+    assert "facade.create_eod_report(request)" in source
+    assert "facade.get_eod_report(report_id)" in source
+    assert "facade.list_eod_reports(" in source
+    assert "facade.review_eod_report(report_id, request)" in source
+
+    for forbidden in (
+        "eod_reconciliation_service",
+        "eod_reconciliation_repository",
+        "HTTPException",
+        "_service_dependencies",
+        "connection()",
+        "db.execute(",
+        "SELECT ",
+        "INSERT ",
+        "UPDATE ",
+    ):
+        assert forbidden not in source
+
+
+def test_composition_root_imports_the_dedicated_eod_router() -> None:
+    source = MAIN_PATH.read_text(encoding="utf-8")
+
+    assert (
+        "from app.eod_reconciliation_routes import router as eod_reconciliation_router"
+        in source
+    )
+    assert "from app.eod_reconciliation import router" not in source
+    assert source.count("app.include_router(eod_reconciliation_router)") == 1
