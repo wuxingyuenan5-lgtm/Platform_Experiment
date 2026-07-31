@@ -1,16 +1,16 @@
 # Platform Research低风险模块化计划
 
-状态：**E2.2 A股概览Provider完成，进入E2.3个股Provider依赖审计**  
+状态：**E2.3b Stock DataCenter Adapter完成，进入E2.3c AkShare个股Adapter**  
 关联Issue：#136  
 关联Draft PR：#139  
-审计分支：`refactor/issue-136-platform-0-9-2-system-optimization`  
+活动分支：`refactor/issue-136-platform-0-9-2-system-optimization`  
 开发与验收版本：Platform `0.9.2`
 
 ## 1. 目标
 
 在不改变Research API合同、权限、页面视觉、数据源语义或Last Known Good行为的前提下，降低Research域高频修改所需上下文和单文件职责密度。
 
-本阶段保留Platform Web / Platform API / Execution Runtime三大边界，不拆微服务，不引入新的框架或依赖注入容器。
+保留Platform Web / Platform API / Execution Runtime三大边界，不拆微服务，不引入新的框架或依赖注入容器。
 
 ## 2. 当前证据
 
@@ -22,66 +22,41 @@ python scripts/audit-research-modularity.py \
   --output outputs/research-modularity-inventory.md
 ```
 
-### 2.1 Platform API
+E0基线：`research_providers.py`共999行，`FreeResearchProvider`约881行、26个方法；`research_service.py`调用其中21个方法。当前已依次抽离：
 
-E0审计基线：
+```text
+research_provider_normalization.py
+research_provider_macro.py
+research_provider_a_share.py
+research_provider_datacenter.py
+research_provider_stock_datacenter.py
+research_provider_errors.py
+```
 
-| 文件 | 行数 | 当前职责 |
-|---|---:|---|
-| `platform-api/app/research_providers.py` | 999 | 第三方连接、字段归一化、A股概览、申万、情绪、个股、宏观预期 |
-| `platform-api/app/research_service.py` | 475 | 并发编排、模块隔离、缓存、锁、LKG、宏观历史状态 |
-| `platform-api/app/a_share_research_policy.py` | 232 | 无副作用的研究计算与申万聚合 |
-| `platform-api/app/research_data_schemas.py` | 211 | 对外Pydantic合同 |
-| `platform-api/app/research_cache.py` | 66 | 通用Last Known Good缓存 |
-| `platform-api/app/research_routes.py` | 78 | FastAPI路由、权限和缓存头 |
-
-`FreeResearchProvider`基线约881行、26个方法；`research_service.py`直接调用其中21个方法。当前已依次抽离纯归一化、宏观预期和A股概览职责，Facade公开方法与Service调用面保持不变。
-
-当前依赖方向为：
+当前依赖方向：
 
 ```text
 research_routes
     -> research_service
         -> research_cache
         -> a_share_research_policy
-        -> research_providers                 # stable facade / stock methods remain
+        -> research_providers                  # stable facade
             -> research_provider_a_share
             -> research_provider_macro
+            -> research_provider_datacenter
+            -> research_provider_stock_datacenter
             -> research_provider_errors
             -> research_provider_normalization
             -> research_data_schemas
 ```
 
-`research_provider_a_share`通过构造参数接收Facade现有AkShare延迟加载器，不复制加载逻辑；该加载器仍供尚未拆分的个股方法使用。当前没有反向导入。
+Facade公开方法、三条Research API与Service调用面保持不变。Adapter不持有缓存、LKG、Completeness或跨请求状态。
 
-### 2.2 Platform Web
-
-| 文件 | 行数 | 当前判断 |
-|---|---:|---|
-| `platform-web/src/views/hedgeBoard/index.vue` | 3,772 | 主热点；内联11个渲染组件，脚本约2,235行、样式约1,486行 |
-| `platform-web/src/views/hedgeBoard/aShare/index.vue` | 389 | 页面Composition已相对清晰 |
-| `platform-web/src/views/hedgeBoard/aShare/useAShareResearch.ts` | 429 | A股请求、缓存、观察列表和导出状态集中 |
-| `platform-web/src/api/hedgeResearch.ts` | 227 | 三条Research API的类型与Client合同 |
-
-A股页面已经拆为六个可见组件和一个Composable。当前前端最优先的结构性问题不是A股页面，而是`hedgeBoard/index.vue`中以下内联组件：
-
-- `TradingViewWidget`
-- `WidgetErrorBoundary`
-- `MetricStrip`
-- `DualAxisChart`
-- `TreasuryFlowChart`
-- `GroupedBarChart`
-- `EtfWeeklyFlowsPanel`
-- `YtdSummaryPanel`
-- `ReserveRanking`
-- `SnapshotDetailTable`
-- `LocalChartWidget`
+Platform Web当前主热点仍为`platform-web/src/views/hedgeBoard/index.vue`：约3,772行、11个内联渲染组件。A股页面本身已有六个可见组件和一个Composable，暂不机械拆分。
 
 ## 3. 不可改变合同
 
-### 3.1 API与权限
-
-以下路由、HTTP语义和`platform:read`权限保持不变：
+### API与权限
 
 ```text
 GET /api/v1/research/a-share/dashboard
@@ -89,22 +64,23 @@ GET /api/v1/research/a-share/stocks/{code}/snapshot
 GET /api/v1/research/macro/expectations
 ```
 
-### 3.2 数据状态
+以上路由、HTTP语义和`platform:read`权限保持不变。
 
-必须保持：
+### 数据状态与容错
 
 ```text
 loading / ready / partial / no_data / stale / error
 ```
 
-以下语义不得弱化：
+必须保持：
 
 - 单一Provider失败不得拖垮其他模块；
 - 当前刷新失败时优先返回Last Known Good并标记`stale`；
 - Fixture、Simulation和Fake Runtime不得冒充真实Provider或生产数据；
-- Decimal、时间戳、source、error_code和message字段语义保持不变。
+- Decimal、时间戳、source、error_code、message和Completeness语义不变；
+- Adapter不得自行缓存或吞掉原先向Service传播的异常。
 
-### 3.3 页面与操作
+### 页面与操作
 
 - 不改变Research页面路由、导航、信息层级和主要操作习惯；
 - 不改变四档视觉基线；
@@ -116,17 +92,14 @@ loading / ready / partial / no_data / stale / error
 
 - [x] 建立只读审计脚本；
 - [x] 量化前后端热点、Provider方法和API合同；
-- [x] 确认A股页面已有组件边界；
-- [x] 确认Provider与主看板内联组件为优先热点。
+- [x] 冻结状态词汇、LKG和页面视觉边界。
 
 ### E1 — Provider纯归一化层：完成
 
 - [x] 抽离Decimal、非负整数、日期、DataFrame records、多字段择优；
 - [x] 抽离收益率、趋势和最近历史值计算；
-- [x] 新模块纳入Pyright并增加边界输入单元测试；
-- [x] Provider公开方法、第三方请求、超时、并发和异常处理保持不变；
-- [x] 一次性执行器与机械脚本已删除；
-- [x] E1完整质量矩阵全部通过。
+- [x] 纳入Pyright并增加边界输入测试；
+- [x] 完整质量矩阵通过。
 
 ### E2 — Provider按数据域拆分：进行中
 
@@ -136,36 +109,95 @@ loading / ready / partial / no_data / stale / error
 
 - [x] 建立`research_provider_macro.py`和共享错误模块；
 - [x] 保持Polymarket请求、分类、概率、排序、Limit和失败语义；
-- [x] 增加Adapter单元测试并纳入Pyright；
-- [x] Facade仅改为显式委托；
-- [x] 一次性执行器与机械脚本已删除；
-- [x] E2.1完整质量矩阵全部通过。
+- [x] 增加Adapter测试并纳入Pyright；
+- [x] 真实Provider Smoke与完整矩阵通过。
 
 #### E2.2 A股概览Adapter：完成
 
 - [x] 建立`research_provider_a_share.py`；
-- [x] 迁移`a_share_spot`、`market_activity`、指数快照、申万和短期情绪；
-- [x] 迁移`_index_snapshot`、`_intraday_signal`和`_limit_pool`私有实现；
-- [x] 保持8个指数定义、`asyncio.gather(..., return_exceptions=True)`异常隔离和无有效指数时的错误语义；
-- [x] 保持涨跌停池Endpoint、Token、分页、Sort、Referer、User-Agent、超时和失败返回空列表语义；
-- [x] AkShare延迟加载器由Facade显式注入，不复制或提前导入AkShare；
-- [x] 新Adapter纳入Pyright；
-- [x] 增加现货归一化、指数部分成功、情绪池映射和HTTP合同测试；
-- [x] Facade的5个公开方法仅改为显式委托，21个Service调用面不变；
-- [x] 16个个股研究方法保持原地；
-- [x] 一次性执行器与机械脚本已删除。
+- [x] 迁移现货、市场宽度、八指数快照、申万和短期情绪；
+- [x] 保持AkShare延迟加载、指数异常隔离及涨跌停池完整HTTP合同；
+- [x] 增加现货、指数、情绪和HTTP合同测试；
+- [x] 完整质量矩阵通过。
 
-#### E2.3 个股研究Adapter：下一门禁
+#### E2.3a Eastmoney DataCenter Client：完成
 
-候选范围包括行情、财务、预告、估值、新闻、研报、公告、两融、大宗交易、持有人、分红、资金流、龙虎榜、解禁和互动问答。
+- [x] 建立无状态`EastmoneyDataCenterClient`；
+- [x] 保持URL、Report Name、Filter、分页、Sort、Source、Client、User-Agent、超时和JSON提取语义；
+- [x] 保持HTTP错误与畸形Payload向上抛出；
+- [x] Facade保留`datacenter_rows()`兼容委托；
+- [x] 六个派生方法暂不移动；
+- [x] 新增精确HTTP合同及异常测试并纳入Pyright；
+- [x] 完整矩阵全部通过：
+  - Platform CI `30602550119`
+  - Directory `30602550137`
+  - User E2E `30602550112`
+  - Hedge E2E `30602550136`
+  - Visual `30602550151`
+  - Provider Smoke `30602550113`
+  - Secret `30602550114`
+  - Version `30602550129`
+  - Audit `30602550118`
+- [x] 视觉Artifact ID `8782483998`，SHA-256 `d6e186466fe782dfe5b1e16b5750d808a95f929ab73b97ee2c8b5fdf7e78c890`。
 
-实施前必须先完成：
+#### E2.3b Stock DataCenter Adapter：完成
 
-1. 量化16个方法对AkShare、腾讯报价、东方财富HTTP和通用DataCenter查询的依赖；
-2. 明确`datacenter_rows()`是否应先成为独立无状态Client；
-3. 冻结所有Report Name、Filter、Sort、Referer、编码和错误语义；
-4. 保持Facade和Service调用面；
-5. 不与Service缓存、LKG、宏观历史或前端组件重构混合。
+- [x] 建立`research_provider_stock_datacenter.py`；
+- [x] 迁移融资融券、大宗交易、股东人数、分红、龙虎榜和限售解禁；
+- [x] 保持六个Report Name、Filter、分页、排序、日期窗口与字段映射；
+- [x] 保持大宗交易Decimal溢价计算；
+- [x] 保持龙虎榜买卖席位二次查询及Top 5限制；
+- [x] 保持解禁历史/未来90日双查询并发；
+- [x] Facade六个公开方法仅改为显式委托；
+- [x] `datacenter_rows()`兼容入口仍保留；
+- [x] 其余9个公开个股方法保持原地；
+- [x] 增加Report合同、字段映射、溢价、席位和解禁测试并纳入Pyright；
+- [x] 完整矩阵全部通过：
+  - Platform CI `30602935788`
+  - Directory `30602935739`
+  - User E2E `30602935780`
+  - Hedge E2E `30602935795`
+  - Visual `30602935741`
+  - Provider Smoke `30602935786`
+  - Secret `30602935746`
+  - Version `30602935770`
+  - Audit `30602935752`
+- [x] 视觉Artifact ID `8782620603`，SHA-256 `64c63a77550f6547eacf800bf82dc16c481a80069c2a1cd547a4216e00799894`。
+
+#### E2.3c AkShare个股Adapter：下一门禁
+
+候选范围仅包括：
+
+```text
+stock_financials
+stock_forecast
+stock_valuation_percentile
+stock_news
+```
+
+实施要求：
+
+1. 继续注入Facade现有AkShare延迟加载器，不复制或提前导入AkShare；
+2. 冻结全部AkShare函数名、参数、DataFrame字段择优、排序、Limit和空结果语义；
+3. Facade四个公开方法只改为委托；
+4. 不移动腾讯行情、东方财富研报/公告/资金流和巨潮互动易五个独立HTTP方法；
+5. 不改变Stock Snapshot模块隔离、Completeness、缓存、LKG或状态词汇；
+6. 增加Adapter契约测试并纳入Pyright；
+7. 完成后重跑完整质量矩阵。
+
+#### E2.3d 独立HTTP个股Adapter：后置
+
+候选范围：
+
+```text
+stock_quote
+stock_reports
+stock_announcements
+stock_fund_flow
+stock_investor_qa
+```
+
+该阶段必须按数据源冻结腾讯、东方财富和巨潮的编码、Endpoint、参数、Header、时间转换与异常语义，不与E2.3c混合。
 
 ### E3 — Service状态职责
 
@@ -175,18 +207,11 @@ loading / ready / partial / no_data / stale / error
 
 ### E4 — 主看板渲染组件
 
-优先提取无业务请求副作用的内联组件和图表数学工具：
-
-1. Error Boundary与TradingView Widget；
-2. 通用坐标轴、Range Selector和图表数学；
-3. 本地Research图表组件；
-4. 对应样式随组件迁移。
-
-每次只移动一个可视职责，保持Props、渲染DOM和CSS选择器稳定。
+优先提取无业务请求副作用的内联组件和图表数学工具，保持Props、DOM和CSS选择器稳定。
 
 ### E5 — A股Composable复核
 
-仅在E1–E4通过后评估Dashboard请求、个股快照、观察列表远端同步与CSV导出。除非证据显示变化频率或测试边界受益，否则不为追求文件数量机械拆分。
+仅在E1–E4通过后评估Dashboard请求、个股快照、观察列表远端同步与CSV导出；不为追求文件数量机械拆分。
 
 ## 5. 每步验收
 
@@ -205,7 +230,7 @@ Draft PR始终保持Open、Draft、Unmerged；不得修改或合并`main`。
 ## 6. 非目标
 
 - 不增加Research微服务；
-- 不替换AkShare、东方财富、腾讯或Polymarket数据源；
+- 不替换AkShare、东方财富、腾讯、巨潮或Polymarket数据源；
 - 不改变真实Provider验收口径；
 - 不改变Execution Runtime或Live Write边界；
 - 不在Research重构中顺带处理Identity、Portfolio、Trading、Risk、Accounting或Reconciliation；
