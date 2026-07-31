@@ -30,9 +30,10 @@ The following gates are complete and evidence-backed:
 8. Identity I2.1 — Browser Session response Presenter;
 9. Portfolio P1 — pure member-holding valuation owner and permanent boundary;
 10. Portfolio P2 — Fund catalog and NAV mutation response read-only review;
-11. Portfolio P3 — shared Decimal display and complete account-valuation semantics.
+11. Portfolio P3 — shared Decimal display and complete account-valuation semantics;
+12. Frontend hotspot F1 — independent TradingView external-widget lifecycle owner.
 
-Portfolio backend and public-display governance are closed. The next gate is frontend hotspot governance, beginning with bounded evidence around `platform-web/src/views/hedgeBoard/index.vue` and shared display capabilities. No broad page rewrite is authorized.
+F1 passed the complete matrix without changing Widget configuration, lifecycle timing, fallback behavior, page contracts or visual output. The next candidate is a bounded static-data ownership review for the large local market snapshot table currently embedded in `hedgeBoard/index.vue`; shared chart math remains deferred because it spans multiple chart implementations.
 
 The current physical service boundaries are:
 
@@ -44,10 +45,6 @@ platform-api/                  modular monolith
 execution-runtime/
     ↓ Venue / Broker / MT5 / Bybit
 ```
-
-Directory migration evidence and invariants are defined in:
-
-`docs/architecture/PLATFORM_DIRECTORY_MIGRATION_PLAN.md`
 
 Trading, Risk, formal Accounting, Reconciliation and Execution Runtime remain later, conservative gates.
 
@@ -96,19 +93,6 @@ powershell -ExecutionPolicy Bypass -File .\scripts\dev-platform.ps1
 - Execution Runtime: `http://127.0.0.1:8100/health`
 - Frontend package manager: `pnpm@9.15.9`
 
-## Permanent directory invariants
-
-The following command must remain green:
-
-```bash
-python scripts/audit-directory-migration.py \
-  --mode post-rename \
-  --target all \
-  --fail-on-unclassified
-```
-
-Active CI, scripts, service trees and current documentation must not reintroduce legacy top-level paths. Historical evidence and explicitly classified external dependencies may retain the path facts that were true when recorded.
-
 ## Known constraints and unresolved decisions
 
 - Windows real local acceptance, production HTTPS, real Venue/Broker behavior and final real-Provider evidence remain acceptance work, not assumed completion.
@@ -119,23 +103,19 @@ Active CI, scripts, service trees and current documentation must not reintroduce
 
 ## Portfolio boundary
 
-Portfolio optimization is now closed under these permanent facts:
+Portfolio optimization is closed under these permanent facts:
 
 1. `member_holding_valuation.py` owns persistence-independent validation, NAV state classification, UTC normalization and exact response construction from already loaded structural inputs;
 2. `member_holding_decimal.py` remains the only exact Decimal calculation owner;
 3. `member_holding_service.py` retains scope, Fund/NAV loading, recent reauthentication, transactions, audit and error translation;
-4. Fund catalog and NAV mutation response construction remain local because they contain no independent policy, calculation or cross-module duplication;
-5. member and administrator views share `decimalDisplay.ts`, including neutral handling of every zero representation;
-6. account market value and cumulative return are shown only when all same-currency holdings have complete valuation; missing NAV is never treated as zero or silently excluded;
-7. cumulative invested remains independently aggregatable when the currency is uniform;
-8. Repository, Routes, Schemas, Financial Fact, Position Math and Formal Projection contracts remain unchanged.
+4. member and administrator views share `decimalDisplay.ts`;
+5. account market value and cumulative return are shown only when all same-currency holdings have complete valuation;
+6. Repository, Routes, Schemas, Financial Fact, Position Math and Formal Projection contracts remain unchanged.
 
-## Next gate: frontend hotspot governance
+## Frontend hotspot boundary
 
-Proceed with evidence before extraction:
-
-1. re-inventory remaining responsibilities in `hedgeBoard/index.vue` after Research E4 work;
-2. identify duplicated pure display math, chart configuration or state rendering with at least two real consumers;
-3. extract one visual responsibility at a time while preserving Props, DOM hierarchy, selectors and responsive behavior;
-4. require Platform CI, both browser E2Es, Provider Smoke and the 56-page visual baseline for each structural cut;
-5. stop when remaining page composition is cohesive or extraction would increase indirection without measurable benefit.
+1. `components/TradingViewWidget.ts` owns external TradingView script creation, observer-driven sizing/visibility, bounded layout repair, fallback rendering and cleanup;
+2. `hedgeBoard/index.vue` remains the page composition owner and passes the component through the existing Research module contract;
+3. Widget configuration, external URLs, timers, thresholds, classes and error text remain unchanged;
+4. shared chart math is not yet an approved extraction because it spans multiple chart implementations;
+5. the next eligible review is the pure static `LOCAL_MARKET_DETAIL_TABLES` data block, provided exact content and ordering can be frozen.
