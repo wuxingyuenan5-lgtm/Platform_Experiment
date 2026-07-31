@@ -31,9 +31,12 @@ The following gates are complete and evidence-backed:
 9. Portfolio P1 — pure member-holding valuation owner and permanent boundary;
 10. Portfolio P2 — Fund catalog and NAV mutation response read-only review;
 11. Portfolio P3 — shared Decimal display and complete account-valuation semantics;
-12. Frontend hotspot F1 — independent TradingView external-widget lifecycle owner.
+12. Frontend F1 — independent TradingView external-widget lifecycle owner;
+13. Frontend F2 — static market snapshot data owner with source and canonical semantic Hash guards.
 
-F1 passed the complete matrix without changing Widget configuration, lifecycle timing, fallback behavior, page contracts or visual output. The next candidate is a bounded static-data ownership review for the large local market snapshot table currently embedded in `hedgeBoard/index.vue`; shared chart math remains deferred because it spans multiple chart implementations.
+Frontend hotspot governance is now closed. F1 and F2 passed the complete quality matrix without changing page contracts, Provider/API behavior, product flows or visual output. Remaining chart math, LocalChartWidget composition and CSS span multiple page-level implementations, so further extraction would increase indirection and test surface without a demonstrated maintenance benefit.
+
+The next gate is a high-risk-domain read-only audit covering Trading, Risk, Accounting, Reconciliation and Execution Runtime. No code migration is authorized until existing owners, Golden contracts, fail-closed behavior and duplicated responsibility are evidenced.
 
 The current physical service boundaries are:
 
@@ -45,8 +48,6 @@ platform-api/                  modular monolith
 execution-runtime/
     ↓ Venue / Broker / MT5 / Bybit
 ```
-
-Trading, Risk, formal Accounting, Reconciliation and Execution Runtime remain later, conservative gates.
 
 ## Architecture retained by audit
 
@@ -115,7 +116,22 @@ Portfolio optimization is closed under these permanent facts:
 ## Frontend hotspot boundary
 
 1. `components/TradingViewWidget.ts` owns external TradingView script creation, observer-driven sizing/visibility, bounded layout repair, fallback rendering and cleanup;
-2. `hedgeBoard/index.vue` remains the page composition owner and passes the component through the existing Research module contract;
-3. Widget configuration, external URLs, timers, thresholds, classes and error text remain unchanged;
-4. shared chart math is not yet an approved extraction because it spans multiple chart implementations;
-5. the next eligible review is the pure static `LOCAL_MARKET_DETAIL_TABLES` data block, provided exact content and ordering can be frozen.
+2. `nativeData/marketSnapshotTables.ts` owns the local static snapshot types and dataset;
+3. the snapshot source SHA-256 is `20245f2606e15add5e97387c238532697c938677865c9d620178bbc9522b788a`;
+4. the formatting-independent canonical semantic SHA-256 is `580983d83781cb7f0731dd39837d75b16eaf24be18751367432aa605fa0acc92`;
+5. `hedgeBoard/index.vue` remains the page composition, local chart assembly, shared SVG math and style owner;
+6. Widget configuration, external URLs, timers, thresholds, classes, snapshot values and ordering remain unchanged;
+7. no further Hedge Board extraction is approved without new product requirements or demonstrated duplicate implementation.
+
+## Next gate: high-risk-domain read-only audit
+
+The next phase must inventory, without modifying code:
+
+1. Trading order intent, submission orchestration, lifecycle and Result Unknown ownership;
+2. Risk limits, Kill Switch, approval and Live Write gates;
+3. Financial Fact, formal projection and accounting ownership;
+4. Venue and EOD reconciliation, Last Known Good and state classification;
+5. Platform API to Execution Runtime contracts and adapter boundaries;
+6. existing Golden tests, fail-closed behavior and any real duplicate responsibility.
+
+Only one bounded implementation cut may be proposed after the audit, and only when it preserves Decimal, idempotency, permissions, migration history, execution semantics and reconciliation evidence.
