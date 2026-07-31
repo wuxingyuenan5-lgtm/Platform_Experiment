@@ -68,6 +68,7 @@
   import ToolGroupSection from './tradingTools/components/ToolGroupSection.vue';
   import TerminalDetailPanel from './components/TerminalDetailPanel.vue';
   import WidgetErrorBoundary from './components/WidgetErrorBoundary';
+  import MetricStrip from './components/MetricStrip';
   import {
     researchModules,
     type LocalWidgetKey,
@@ -632,26 +633,6 @@
               class: 'widget-frame',
               style: { minHeight: `${props.widget.height ?? 360}px` },
             });
-    },
-  });
-
-  const MetricStrip = defineComponent({
-    name: 'MetricStrip',
-    props: {
-      metrics: {
-        type: Array as PropType<Array<[string, string]>>,
-        required: true,
-      },
-    },
-    setup(props) {
-      return () =>
-        h(
-          'div',
-          { class: 'metric-strip' },
-          props.metrics.map(([label, value]) =>
-            h('article', { key: `${label}-${value}` }, [h('span', label), h('strong', value)]),
-          ),
-        );
     },
   });
 
