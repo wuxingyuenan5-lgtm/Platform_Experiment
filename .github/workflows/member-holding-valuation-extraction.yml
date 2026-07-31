@@ -44,6 +44,7 @@ jobs:
       - name: Validate valuation boundary
         working-directory: platform-api
         run: |
+          ruff check --fix --select I app/member_holding_service.py
           ruff check \
             app/member_holding_valuation.py \
             app/member_holding_service.py \
