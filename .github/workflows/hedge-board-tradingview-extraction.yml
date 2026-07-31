@@ -55,6 +55,9 @@ jobs:
           python -m pip install pytest
           python -m pytest -q platform-api/tests/test_architecture_hedge_board_tradingview_widget.py
           cd platform-web
+          pnpm exec prettier --write \
+            src/views/hedgeBoard/index.vue \
+            src/views/hedgeBoard/components/TradingViewWidget.ts
           pnpm exec prettier --check \
             src/views/hedgeBoard/index.vue \
             src/views/hedgeBoard/components/TradingViewWidget.ts
