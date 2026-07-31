@@ -1,6 +1,6 @@
 # Platform Portfolio与正式财务低风险模块化计划
 
-状态：**P1 会员持仓纯估值层已完成并通过完整质量矩阵**  
+状态：**Portfolio后端低风险模块化已收口；下一阶段进入前端与公共展示治理**  
 关联Issue：#136  
 关联Draft PR：#139  
 活动分支：`refactor/issue-136-platform-0-9-2-system-optimization`  
@@ -80,8 +80,25 @@ SHA-256：`74df3b5503ed41204719acd1d06203fcc3fa3c9479a18972a544acc2a81a7a32`
 - 估值模块依赖配置、数据库、HTTP、认证或正式投影；
 - Browser E2E、视觉基线、Provider Smoke或任一安全门禁失败。
 
-## 下一门禁：Portfolio只读复核
+## P2 Fund catalog与NAV mutation响应只读复核：完成
 
-只读复核Fund catalog与NAV mutation响应是否存在明确、无状态、可证明收益的Presenter切口。Financial Fact、Formal Projection和Position Math默认不再拆分；没有明确切口时结束Portfolio后端代码修改。
+### 审计结论
+
+- `_fund_response`是四字段的局部映射，已由基金目录和NAV写入响应两处复用，不存在跨模块重复实现；
+- `get_fund_catalog`仅负责Repository读取与列表响应组装，职责边界清晰；
+- NAV mutation响应依赖事务内可能更新后的Fund、持久化后的NAV以及规范化后的估值时间，紧邻写入与审计顺序更易审计；
+- 两处响应构建均无独立政策、计算、错误合同或跨业务域复用需求；
+- 新建Presenter只会增加模块、Protocol和调用跳转，不能减少权限、事务、Repository或审计认知范围。
+
+### 决策
+
+- [x] 不抽取Fund catalog Presenter；
+- [x] 不抽取NAV mutation Presenter；
+- [x] 不触碰Financial Fact、Formal Projection和Position Math；
+- [x] Portfolio后端低风险模块化在P1后正式收口。
+
+## 下一门禁：Portfolio前端与公共展示
+
+复核会员自助与管理员视角的持仓展示，重点统一Decimal、币种、NAV三态、空收益率与零收益率表达。任何前端调整必须保持权限范围、API合同、页面布局和视觉基线。
 
 Draft PR始终保持Open、Draft、Unmerged；不得修改或合并`main`。
