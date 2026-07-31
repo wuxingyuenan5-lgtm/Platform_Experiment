@@ -1,6 +1,6 @@
 # Platform Research低风险模块化计划
 
-状态：**E2宏观Provider完成，下一切口为A股概览Provider**  
+状态：**E2.2 A股概览Provider完成，进入E2.3个股Provider依赖审计**  
 关联Issue：#136  
 关联Draft PR：#139  
 审计分支：`refactor/issue-136-platform-0-9-2-system-optimization`  
@@ -35,7 +35,7 @@ E0审计基线：
 | `platform-api/app/research_cache.py` | 66 | 通用Last Known Good缓存 |
 | `platform-api/app/research_routes.py` | 78 | FastAPI路由、权限和缓存头 |
 
-`FreeResearchProvider`基线约881行、26个方法；`research_service.py`直接调用其中21个方法。E1后，无I/O归一化函数迁移到`research_provider_normalization.py`。E2首个切口又将宏观预期采集迁移到`research_provider_macro.py`，Facade公开方法和Service调用面保持不变。
+`FreeResearchProvider`基线约881行、26个方法；`research_service.py`直接调用其中21个方法。当前已依次抽离纯归一化、宏观预期和A股概览职责，Facade公开方法与Service调用面保持不变。
 
 当前依赖方向为：
 
@@ -44,15 +44,15 @@ research_routes
     -> research_service
         -> research_cache
         -> a_share_research_policy
-        -> research_providers                 # stable facade
+        -> research_providers                 # stable facade / stock methods remain
+            -> research_provider_a_share
             -> research_provider_macro
             -> research_provider_errors
             -> research_provider_normalization
-            -> a_share_research_policy
             -> research_data_schemas
 ```
 
-该方向没有反向导入。问题不是边界缺失，而是Facade中A股概览与个股采集职责仍然过密。
+`research_provider_a_share`通过构造参数接收Facade现有AkShare延迟加载器，不复制加载逻辑；该加载器仍供尚未拆分的个股方法使用。当前没有反向导入。
 
 ### 2.2 Platform Web
 
@@ -121,13 +121,10 @@ loading / ready / partial / no_data / stale / error
 
 ### E1 — Provider纯归一化层：完成
 
-- [x] 抽离Decimal安全转换；
-- [x] 抽离非负整数与日期转换；
-- [x] 抽离DataFrame records转换与多字段择优；
+- [x] 抽离Decimal、非负整数、日期、DataFrame records、多字段择优；
 - [x] 抽离收益率、趋势和最近历史值计算；
-- [x] 新模块纳入Pyright覆盖；
-- [x] 增加边界输入单元测试；
-- [x] `FreeResearchProvider`公开方法、第三方请求、超时、并发和异常处理保持不变；
+- [x] 新模块纳入Pyright并增加边界输入单元测试；
+- [x] Provider公开方法、第三方请求、超时、并发和异常处理保持不变；
 - [x] 一次性执行器与机械脚本已删除；
 - [x] E1完整质量矩阵全部通过。
 
@@ -137,31 +134,38 @@ loading / ready / partial / no_data / stale / error
 
 #### E2.1 宏观预期Adapter：完成
 
-- [x] 建立`research_provider_macro.py`；
-- [x] 建立共享`ResearchProviderError`模块并由Facade继续公开该名称；
-- [x] 保持Polymarket请求参数、User-Agent、超时、分类、概率、排序、Limit和空结果错误语义；
-- [x] 保持非法概率的既有失败语义，不在重构中新增静默容错；
-- [x] 增加宏观Adapter单元测试并纳入Pyright；
-- [x] `FreeResearchProvider.macro_expectation_events()`仅改为显式委托；
+- [x] 建立`research_provider_macro.py`和共享错误模块；
+- [x] 保持Polymarket请求、分类、概率、排序、Limit和失败语义；
+- [x] 增加Adapter单元测试并纳入Pyright；
+- [x] Facade仅改为显式委托；
+- [x] 一次性执行器与机械脚本已删除；
+- [x] E2.1完整质量矩阵全部通过。
+
+#### E2.2 A股概览Adapter：完成
+
+- [x] 建立`research_provider_a_share.py`；
+- [x] 迁移`a_share_spot`、`market_activity`、指数快照、申万和短期情绪；
+- [x] 迁移`_index_snapshot`、`_intraday_signal`和`_limit_pool`私有实现；
+- [x] 保持8个指数定义、`asyncio.gather(..., return_exceptions=True)`异常隔离和无有效指数时的错误语义；
+- [x] 保持涨跌停池Endpoint、Token、分页、Sort、Referer、User-Agent、超时和失败返回空列表语义；
+- [x] AkShare延迟加载器由Facade显式注入，不复制或提前导入AkShare；
+- [x] 新Adapter纳入Pyright；
+- [x] 增加现货归一化、指数部分成功、情绪池映射和HTTP合同测试；
+- [x] Facade的5个公开方法仅改为显式委托，21个Service调用面不变；
+- [x] 16个个股研究方法保持原地；
 - [x] 一次性执行器与机械脚本已删除。
 
-#### E2.2 A股概览Adapter：下一切口
+#### E2.3 个股研究Adapter：下一门禁
 
-候选范围仅包括：
+候选范围包括行情、财务、预告、估值、新闻、研报、公告、两融、大宗交易、持有人、分红、资金流、龙虎榜、解禁和互动问答。
 
-```text
-a_share_spot
-market_activity
-index_snapshots / _index_snapshot / _intraday_signal
-shenwan_memberships
-short_term_emotion / _limit_pool
-```
+实施前必须先完成：
 
-实施前必须冻结AkShare延迟导入、指数定义、并发粒度、涨跌停池HTTP合同和全部Schema返回类型。个股16个方法不与本切口混合。
-
-#### E2.3 个股研究Adapter：后置
-
-候选范围包括行情、财务、预告、估值、新闻、研报、公告、两融、持有人、资金流、分红、龙虎榜、解禁和互动问答。先建立东方财富数据中心公共Client边界，再决定是否移动，避免复制HTTP合同。
+1. 量化16个方法对AkShare、腾讯报价、东方财富HTTP和通用DataCenter查询的依赖；
+2. 明确`datacenter_rows()`是否应先成为独立无状态Client；
+3. 冻结所有Report Name、Filter、Sort、Referer、编码和错误语义；
+4. 保持Facade和Service调用面；
+5. 不与Service缓存、LKG、宏观历史或前端组件重构混合。
 
 ### E3 — Service状态职责
 
@@ -182,14 +186,7 @@ short_term_emotion / _limit_pool
 
 ### E5 — A股Composable复核
 
-仅在E1–E4通过后评估：
-
-- Dashboard请求状态；
-- 个股快照状态；
-- 观察列表远端同步；
-- CSV导出。
-
-除非证据显示变化频率或测试边界受益，否则不为追求文件数量机械拆分。
+仅在E1–E4通过后评估Dashboard请求、个股快照、观察列表远端同步与CSV导出。除非证据显示变化频率或测试边界受益，否则不为追求文件数量机械拆分。
 
 ## 5. 每步验收
 
