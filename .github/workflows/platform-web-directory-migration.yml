@@ -8,7 +8,7 @@ on:
       - '.github/workflows/platform-web-directory-migration.yml'
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: platform-web-directory-migration-${{ github.event.pull_request.number }}
@@ -32,7 +32,7 @@ jobs:
       - name: Apply atomic mechanical migration
         run: python scripts/apply-platform-web-directory-migration.py
 
-      - name: Validate staged repository tree
+      - name: Validate complete target tree
         shell: bash
         run: |
           python -m py_compile \
@@ -62,63 +62,49 @@ jobs:
               raise SystemExit('Platform Web directory migration is incomplete')
           PY
 
-      - name: Build validated migration evidence
+      - name: Preserve final workflow content and build seed commit
         shell: bash
         run: |
+          mkdir -p migration-evidence/final-workflows
+          cp .github/workflows/hedge-board-e2e.yml migration-evidence/final-workflows/
+          cp .github/workflows/platform-ci.yml migration-evidence/final-workflows/
+          cp .github/workflows/platform-visual-baseline.yml migration-evidence/final-workflows/
+          cp .github/workflows/user-system-e2e.yml migration-evidence/final-workflows/
+          cp .github/workflows/version-consistency.yml migration-evidence/final-workflows/
+
+          git restore --source=HEAD --staged --worktree -- \
+            .github/workflows/hedge-board-e2e.yml \
+            .github/workflows/platform-ci.yml \
+            .github/workflows/platform-visual-baseline.yml \
+            .github/workflows/user-system-e2e.yml \
+            .github/workflows/version-consistency.yml
+          git add -A
+          if git diff --cached --name-only | grep -q '^.github/workflows/'; then
+            echo 'Seed commit must not modify workflow files.' >&2
+            git diff --cached --name-only | grep '^.github/workflows/' >&2
+            exit 1
+          fi
+          git diff --cached --check
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git commit -m 'refactor: rename Platform Web directory'
-          mkdir -p migration-evidence
+          git commit -m 'chore: seed Platform Web migration objects'
+
           git rev-parse HEAD^ > migration-evidence/parent-sha.txt
-          git rev-parse HEAD > migration-evidence/local-commit-sha.txt
-          git rev-parse HEAD^{tree} > migration-evidence/root-tree-sha.txt
-          git rev-parse HEAD^:admin-risk > migration-evidence/legacy-platform-web-tree-sha.txt
+          git rev-parse HEAD > migration-evidence/seed-commit-sha.txt
+          git rev-parse HEAD^{tree} > migration-evidence/seed-root-tree-sha.txt
           git rev-parse HEAD:platform-web > migration-evidence/platform-web-tree-sha.txt
-          git rev-parse HEAD^:admin-risk/docs > migration-evidence/legacy-docs-tree-sha.txt
-          git rev-parse HEAD:platform-web/docs > migration-evidence/platform-web-docs-tree-sha.txt
-          git ls-tree HEAD^:admin-risk > migration-evidence/legacy-platform-web-top-level.txt
           git ls-tree HEAD:platform-web > migration-evidence/platform-web-top-level.txt
-          git ls-tree -r HEAD:platform-web > migration-evidence/platform-web-recursive.txt
-          git diff-tree --no-commit-id --name-status -r -M HEAD > migration-evidence/changed-files.txt
-          python - <<'PY'
-          import subprocess
-          import tarfile
-          from pathlib import Path
+          git diff-tree --no-commit-id --name-status -r -M HEAD > migration-evidence/seed-changed-files.txt
 
-          output = subprocess.run(
-              ['git', 'diff-tree', '--no-commit-id', '--name-status', '-r', '-M', 'HEAD'],
-              check=True,
-              capture_output=True,
-              text=True,
-          ).stdout.splitlines()
-          paths = []
-          for row in output:
-              fields = row.split('\t')
-              status = fields[0]
-              if status.startswith('R'):
-                  path = fields[2]
-              elif status.startswith('D'):
-                  continue
-              else:
-                  path = fields[1]
-              candidate = Path(path)
-              if candidate.is_file():
-                  paths.append(candidate)
-          with tarfile.open('migration-evidence/changed-content.tar.gz', 'w:gz') as archive:
-              for path in sorted(set(paths)):
-                  archive.add(path, arcname=path.as_posix(), recursive=False)
-          Path('migration-evidence/changed-content-paths.txt').write_text(
-              ''.join(f'{path.as_posix()}\n' for path in sorted(set(paths))),
-              encoding='utf-8',
-          )
-          PY
-          git bundle create migration-evidence/platform-web-migration.bundle HEAD ^HEAD^
-          git bundle verify migration-evidence/platform-web-migration.bundle
+      - name: Push temporary object seed
+        shell: bash
+        run: |
+          git push --force origin HEAD:refs/heads/automation/issue-136-platform-web-tree-seed
 
-      - name: Upload validated migration evidence
+      - name: Upload seed evidence
         uses: actions/upload-artifact@v4
         with:
-          name: platform-web-directory-migration-${{ github.sha }}
+          name: platform-web-directory-seed-${{ github.sha }}
           path: migration-evidence
           if-no-files-found: error
           retention-days: 14
