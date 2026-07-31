@@ -181,9 +181,7 @@
   });
   const canAggregate = computed(() => summaryCurrency.value !== '多币种');
   const hasCompleteValuation = computed(() =>
-    holdings.value.every(
-      (item) => isDecimal(item.marketValue) && isDecimal(item.cumulativeReturn),
-    ),
+    holdings.value.every((item) => isDecimal(item.marketValue) && isDecimal(item.cumulativeReturn)),
   );
   const totalMarketValue = computed(() =>
     canAggregate.value && hasCompleteValuation.value
