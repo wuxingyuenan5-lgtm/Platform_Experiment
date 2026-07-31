@@ -87,6 +87,23 @@ EXTERNAL_LINK_SCHEMES = frozenset(
 MARKDOWN_LINK_PATTERN = re.compile(r"!?\[[^\]\n]*\]\((?P<target>[^)\n]+)\)")
 FENCED_CODE_PATTERN = re.compile(r"```.*?```|~~~.*?~~~", re.DOTALL)
 HTML_COMMENT_PATTERN = re.compile(r"<!--.*?-->", re.DOTALL)
+WORKSTATION_PATH_PATTERNS = (
+    (
+        "Windows user profile",
+        re.compile(
+            r"(?i)\b[A-Z]:\\Users\\(?!<user>(?:\\|$)|username(?:\\|$)|%USERNAME%(?:\\|$))"
+            r"[^\\\s`]+(?:\\|$)"
+        ),
+    ),
+    (
+        "macOS user home",
+        re.compile(r"/Users/(?!<user>(?:/|$)|username(?:/|$)|\$\{?USER\}?(?:/|$))[^/\s`]+(?:/|$)"),
+    ),
+    (
+        "Linux user home",
+        re.compile(r"/home/(?!<user>(?:/|$)|username(?:/|$)|\$\{?USER\}?(?:/|$))[^/\s`]+(?:/|$)"),
+    ),
+)
 
 
 def validate_owner_catalog(
@@ -126,6 +143,12 @@ def active_markdown_paths(root: Path) -> list[Path]:
     ]
 
 
+def markdown_without_examples(content: str) -> str:
+    """Remove fenced examples and comments before validating maintained prose."""
+
+    return HTML_COMMENT_PATTERN.sub("", FENCED_CODE_PATTERN.sub("", content))
+
+
 def markdown_link_target(raw_target: str) -> str | None:
     """Return a local link target or ``None`` when the link is intentionally ignored."""
 
@@ -163,9 +186,7 @@ def validate_markdown_links(
         if not source.is_file():
             continue
         relative_source = source.resolve().relative_to(root).as_posix()
-        content = source.read_text(encoding="utf-8")
-        content = FENCED_CODE_PATTERN.sub("", content)
-        content = HTML_COMMENT_PATTERN.sub("", content)
+        content = markdown_without_examples(source.read_text(encoding="utf-8"))
 
         for match in MARKDOWN_LINK_PATTERN.finditer(content):
             target = markdown_link_target(match.group("target"))
@@ -189,6 +210,32 @@ def validate_markdown_links(
             if not candidate.exists():
                 errors.append(
                     f"{relative_source}: local Markdown target does not exist: {target}"
+                )
+
+    return sorted(errors)
+
+
+def validate_portable_documentation(
+    root: Path,
+    markdown_paths: Iterable[Path] | None = None,
+) -> list[str]:
+    """Reject real workstation home paths from maintained Markdown prose."""
+
+    root = root.resolve()
+    paths = active_markdown_paths(root) if markdown_paths is None else sorted(markdown_paths)
+    errors: list[str] = []
+
+    for source in paths:
+        if not source.is_file():
+            continue
+        relative_source = source.resolve().relative_to(root).as_posix()
+        content = markdown_without_examples(source.read_text(encoding="utf-8"))
+        for label, pattern in WORKSTATION_PATH_PATTERNS:
+            match = pattern.search(content)
+            if match is not None:
+                errors.append(
+                    f"{relative_source}: workstation-specific {label} path is forbidden: "
+                    f"{match.group(0)}"
                 )
 
     return sorted(errors)
@@ -218,6 +265,7 @@ def validate_repository(root: Path) -> list[str]:
         errors.extend(validate_context_map(context_path.read_text(encoding="utf-8")))
 
     errors.extend(validate_markdown_links(root))
+    errors.extend(validate_portable_documentation(root))
     return sorted(errors)
 
 
