@@ -6,9 +6,11 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
 AUDIT = ROOT / "docs/architecture/PLATFORM_LEGACY_DEPLOYMENT_AUDIT.md"
+GITLAB_AUDIT = ROOT / "docs/architecture/PLATFORM_LEGACY_GITLAB_DEPLOYMENT_AUDIT.md"
 CURRENT_STATE = ROOT / "docs/codex/current-state.md"
 TASK_PACKET = ROOT / "tasks/issue-136-platform-0-9-2-system-optimization.md"
 PRODUCTION_ENV = ROOT / "platform-web/.env.production"
+GITLAB_DEPLOY = ROOT / "platform-web/.gitlab-ci.yml"
 INSTALL_SCRIPT = ROOT / "deploy/install-native.sh"
 DEPLOY_README = ROOT / "deploy/README.md"
 NGINX_CONFIG = ROOT / "deploy/nginx-variable-global.conf"
@@ -33,9 +35,11 @@ DATA_REPOSITORY = (
 
 REQUIRED_LEGACY_ASSETS = (
     AUDIT,
+    GITLAB_AUDIT,
     CURRENT_STATE,
     TASK_PACKET,
     PRODUCTION_ENV,
+    GITLAB_DEPLOY,
     INSTALL_SCRIPT,
     DEPLOY_README,
     NGINX_CONFIG,
@@ -54,6 +58,7 @@ def test_legacy_production_assets_require_an_explicit_migration_gate() -> None:
     assert not missing, f"Legacy production assets changed without migration evidence: {missing}"
 
     audit = AUDIT.read_text(encoding="utf-8")
+    gitlab_audit = GITLAB_AUDIT.read_text(encoding="utf-8")
     current_state = CURRENT_STATE.read_text(encoding="utf-8")
     task_packet = TASK_PACKET.read_text(encoding="utf-8")
 
@@ -61,6 +66,8 @@ def test_legacy_production_assets_require_an_explicit_migration_gate() -> None:
     assert "不删除或重命名`projects/risk-control`" in audit
     assert "不删除或改写`deploy/`执行链" in audit
     assert "不修改`.env.production`的API路由" in audit
+    assert "Legacy生产部署证据" in gitlab_audit
+    assert "不删除或重命名`platform-web/.gitlab-ci.yml`" in gitlab_audit
     assert "PLATFORM_LEGACY_DEPLOYMENT_AUDIT.md" in current_state
     assert "PLATFORM_LEGACY_DEPLOYMENT_AUDIT.md" in task_packet
 
@@ -79,6 +86,22 @@ def test_production_frontend_still_targets_the_declared_legacy_proxy() -> None:
         "VITE_GLOB_API_URL_FUTURE_WS=/api/data/ws",
     ):
         assert declaration in production_env
+
+
+@pytest.mark.architecture
+def test_legacy_gitlab_deployment_path_remains_explicit() -> None:
+    gitlab = GITLAB_DEPLOY.read_text(encoding="utf-8")
+
+    for marker in (
+        "build-test:",
+        "build-prod:",
+        "runner20",
+        "pnpm run build:test",
+        "pnpm run build",
+        "/www/wwwroot/risk-web.rta-office.com/",
+        "$CI_COMMIT_TAG =~ /^risk.*$/",
+    ):
+        assert marker in gitlab
 
 
 @pytest.mark.architecture
