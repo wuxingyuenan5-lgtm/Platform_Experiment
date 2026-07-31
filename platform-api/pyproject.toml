@@ -66,6 +66,7 @@ include = [
   "app/research_provider_normalization.py",
   "app/research_provider_stock_akshare.py",
   "app/research_provider_stock_datacenter.py",
+  "app/research_provider_stock_http.py",
   "app/research_providers.py",
   "app/research_routes.py",
   "app/research_service.py",
