@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from datetime import datetime
 from decimal import Decimal
-from typing import Any
+from typing import Any, Literal
 
 import httpx
 
@@ -11,6 +11,7 @@ from app.research_data_schemas import MacroExpectationEvent
 from app.research_provider_errors import ResearchProviderError
 
 POLYMARKET_MARKETS_URL = "https://gamma-api.polymarket.com/markets"
+MacroCategory = Literal["monetary_policy", "macro", "geopolitics", "election"]
 
 
 class MacroResearchProvider:
@@ -75,9 +76,9 @@ class MacroResearchProvider:
         )
 
 
-def _category_for_title(title: str) -> str | None:
+def _category_for_title(title: str) -> MacroCategory | None:
     lowered = title.lower()
-    keywords = {
+    keywords: dict[MacroCategory, tuple[str, ...]] = {
         "monetary_policy": ("fed", "interest rate", "rate cut", "fomc"),
         "macro": ("inflation", "cpi", "recession", "unemployment", "gdp"),
         "geopolitics": ("war", "ceasefire", "iran", "ukraine", "taiwan"),
