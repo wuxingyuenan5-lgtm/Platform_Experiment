@@ -106,6 +106,12 @@ def is_placeholder(value: str) -> bool:
     return value.startswith("secret://") or any(term in lowered for term in PLACEHOLDER_TERMS)
 
 
+def is_runtime_password_reference(line: str, value: str) -> bool:
+    if "本次临时密码" not in line:
+        return False
+    return value.startswith("$") or "PowerShell" in line
+
+
 def looks_like_high_entropy_secret(value: str) -> bool:
     if is_placeholder(value):
         return False
@@ -123,8 +129,10 @@ def looks_like_high_entropy_secret(value: str) -> bool:
 def documentation_findings(line: str) -> list[str]:
     findings: list[str] = []
     password = DOCUMENT_PASSWORD_ASSIGNMENT.search(line)
-    if password and not is_placeholder(password.group(1)):
-        findings.append("plaintext_document_password")
+    if password:
+        value = password.group(1)
+        if not is_placeholder(value) and not is_runtime_password_reference(line, value):
+            findings.append("plaintext_document_password")
     sql_password = SQL_IDENTIFIED_BY.search(line)
     if sql_password and not is_placeholder(sql_password.group(1)):
         findings.append("fixed_sql_password")
@@ -137,6 +145,8 @@ def documentation_findings(line: str) -> list[str]:
 def validate_detection_patterns() -> None:
     assert documentation_findings("密码：`example-secret-value`") == []
     assert documentation_findings("IDENTIFIED BY '替换为随机密码'") == []
+    assert documentation_findings("本次临时密码：$DemoPassword") == []
+    assert documentation_findings("密码：PowerShell A 中显示的本次临时密码") == []
     assert documentation_findings("密码：`12345678`") == ["plaintext_document_password"]
     assert documentation_findings("IDENTIFIED BY 'FixedPassword123!'") == [
         "fixed_sql_password"
