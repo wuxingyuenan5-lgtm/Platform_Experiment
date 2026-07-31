@@ -18,6 +18,7 @@ from app.research_data_schemas import (
     ShortTermEmotionSnapshot,
 )
 from app.research_provider_a_share import AShareResearchProvider
+from app.research_provider_datacenter import EastmoneyDataCenterClient
 from app.research_provider_errors import ResearchProviderError
 from app.research_provider_macro import MacroResearchProvider
 from app.research_provider_normalization import as_decimal as _decimal
@@ -30,7 +31,6 @@ USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
     "AppleWebKit/537.36 Chrome/150.0 Safari/537.36"
 )
-EASTMONEY_DATACENTER_URL = "https://datacenter-web.eastmoney.com/api/data/v1/get"
 TENCENT_QUOTE_URL = "https://qt.gtimg.cn/q="
 
 
@@ -57,6 +57,10 @@ class FreeResearchProvider:
             timeout_seconds=timeout_seconds,
             user_agent=USER_AGENT,
             akshare_loader=_akshare,
+        )
+        self._data_center = EastmoneyDataCenterClient(
+            timeout_seconds=timeout_seconds,
+            user_agent=USER_AGENT,
         )
         self._macro = MacroResearchProvider(
             timeout_seconds=timeout_seconds,
@@ -339,26 +343,13 @@ class FreeResearchProvider:
         sort_columns: str = "",
         sort_types: str = "-1",
     ) -> list[dict[str, Any]]:
-        params = {
-            "reportName": report_name,
-            "columns": "ALL",
-            "filter": filter_value,
-            "pageNumber": "1",
-            "pageSize": str(page_size),
-            "sortColumns": sort_columns,
-            "sortTypes": sort_types,
-            "source": "WEB",
-            "client": "WEB",
-        }
-        async with httpx.AsyncClient(timeout=self._timeout_seconds, trust_env=False) as client:
-            response = await client.get(
-                EASTMONEY_DATACENTER_URL,
-                params=params,
-                headers={"User-Agent": USER_AGENT},
-            )
-            response.raise_for_status()
-            result = response.json().get("result") or {}
-        return result.get("data") or []
+        return await self._data_center.rows(
+            report_name=report_name,
+            filter_value=filter_value,
+            page_size=page_size,
+            sort_columns=sort_columns,
+            sort_types=sort_types,
+        )
 
     async def stock_margin(self, code: str) -> list[dict[str, Any]]:
         rows = await self.datacenter_rows(
