@@ -74,6 +74,10 @@ def test_bump_version_updates_all_maintained_declarations(tmp_path: Path) -> Non
         '[project]\nversion = "0.8.0"\n',
         encoding="utf-8",
     )
+    (tmp_path / "platform-web/package.json").write_text(
+        '{\n  "name": "vg-platform-web",\n  "version": "0.8.0",\n  "private": true\n}\n',
+        encoding="utf-8",
+    )
     for filename in (".env.development", ".env.production"):
         (tmp_path / f"platform-web/{filename}").write_text(
             'VITE_GLOB_APP_VERSION = "0.8.0"\n',
@@ -88,6 +92,9 @@ def test_bump_version_updates_all_maintained_declarations(tmp_path: Path) -> Non
     ).read_text(encoding="utf-8")
     assert 'version = "0.9.1"' in (
         tmp_path / "execution-runtime/pyproject.toml"
+    ).read_text(encoding="utf-8")
+    assert '"version": "0.9.1"' in (
+        tmp_path / "platform-web/package.json"
     ).read_text(encoding="utf-8")
     for filename in (".env.development", ".env.production"):
         assert 'VITE_GLOB_APP_VERSION = "0.9.1"' in (
