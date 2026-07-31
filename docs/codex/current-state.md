@@ -16,9 +16,7 @@ This is the sole repository document for current engineering state. Durable rule
 
 The active branch, Draft PR, current HEAD and workflow run IDs are intentionally not copied here. Resolve them from Issue #136 so repository documents do not drift.
 
-## Current phase
-
-The following gates are complete and evidence-backed:
+## Completed evidence-backed gates
 
 1. Phase A — full repository audit;
 2. Phase B — current-state and AI context reduction;
@@ -28,17 +26,17 @@ The following gates are complete and evidence-backed:
 6. Research E1–E5.1 — Provider, state and bounded frontend/local-state modularization;
 7. Identity I1 — administrator response Presenter;
 8. Identity I2.1 — Browser Session response Presenter;
-9. Portfolio P1 — pure member-holding valuation owner and permanent boundary;
-10. Portfolio P2 — Fund catalog and NAV mutation response read-only review;
-11. Portfolio P3 — shared Decimal display and complete account-valuation semantics;
-12. Frontend F1 — independent TradingView external-widget lifecycle owner;
-13. Frontend F2 — static market snapshot data owner with source and canonical semantic Hash guards.
+9. Portfolio P1–P3 — valuation owner, backend stop decision and complete public valuation semantics;
+10. Frontend F1 — independent TradingView external-widget lifecycle owner;
+11. Frontend F2 — static market snapshot data owner with source and canonical semantic Hash guards;
+12. High-risk H0 — Trading/Risk/Accounting/Reconciliation/Runtime responsibility audit;
+13. High-risk H1 — dedicated EOD reconciliation route owner.
 
-Frontend hotspot governance is now closed. F1 and F2 passed the complete quality matrix without changing page contracts, Provider/API behavior, product flows or visual output. Remaining chart math, LocalChartWidget composition and CSS span multiple page-level implementations, so further extraction would increase indirection and test surface without a demonstrated maintenance benefit.
+Frontend hotspot governance is closed. Trading, Risk, Formal Accounting and Execution Runtime retained their existing owners after read-only audit. EOD routing is now separated without moving any report orchestration, persistence, policy, accounting, idempotency or fail-closed behavior.
 
-The next gate is a high-risk-domain read-only audit covering Trading, Risk, Accounting, Reconciliation and Execution Runtime. No code migration is authorized until existing owners, Golden contracts, fail-closed behavior and duplicated responsibility are evidenced.
+The current gate is H2: read-only review of the Venue Reconciliation route boundary. Venue has a much wider compatibility surface than EOD, so no implementation is authorized until all cross-domain consumers and exact HTTP contracts are frozen.
 
-The current physical service boundaries are:
+## Current physical boundaries
 
 ```text
 platform-web/
@@ -49,11 +47,7 @@ execution-runtime/
     ↓ Venue / Broker / MT5 / Bybit
 ```
 
-## Architecture retained by audit
-
 SQLite remains approved for the current stage. Do not introduce microservices, Kubernetes, Kafka, GraphQL, CQRS, Event Sourcing, micro-frontends or a second global state system.
-
-Platform API remains a modular monolith. Python imports remain under package `app`; changing the top-level service directory did not change API paths, ports, database paths, migration semantics or Runtime contracts.
 
 ## Safety defaults
 
@@ -69,15 +63,16 @@ Cross-spread FOK hedge reserve=0 unless explicitly configured
 Bybit PostOnly Chase=false
 ```
 
-Browser business roles remain separate from API-Key roles. Browser Sessions cannot authorize Live Write. Code cleanup, directory changes, version changes and CI changes do not relax these defaults.
+Browser business roles remain separate from API-Key roles. Browser Sessions cannot authorize Live Write. Code cleanup, route extraction, directory changes and CI changes do not relax these defaults.
 
 ## Preserved product baseline
 
 The preserved baseline includes the browser user system, four business roles, user administration, member holdings/NAV, A-share and Shenwan research, hedge-fund research, funding and cross-spread workflows, Runtime adapters, formal Financial Fact/accounting boundaries, reconciliation and local three-process startup.
 
-Detailed authority is not repeated here:
+Detailed authority remains in:
 
 - architecture and code ownership: `docs/architecture/OWNERSHIP.md`;
+- high-risk audit and active gate: `docs/architecture/PLATFORM_HIGH_RISK_DOMAIN_AUDIT.md`;
 - database and migration authority: `docs/database/README.md`;
 - synthetic execution: `docs/technical/CROSS_SPREAD_SYNTHETIC_EXECUTION.md`;
 - engineering workflow: `docs/engineering/GIT_WORKFLOW.md`;
@@ -102,36 +97,40 @@ powershell -ExecutionPolicy Bypass -File .\scripts\dev-platform.ps1
 - PostOnly currently uses the pre-submit MT5 reference quote as its hard Bybit bound and does not dynamically reprice from MT5 during Chase.
 - One successful Open maps to one MT5 Position Ticket; ambiguity fails closed.
 
-## Portfolio boundary
+## Permanent Portfolio boundary
 
-Portfolio optimization is closed under these permanent facts:
-
-1. `member_holding_valuation.py` owns persistence-independent validation, NAV state classification, UTC normalization and exact response construction from already loaded structural inputs;
+1. `member_holding_valuation.py` owns persistence-independent validation, NAV state classification, UTC normalization and exact response construction from loaded structural inputs;
 2. `member_holding_decimal.py` remains the only exact Decimal calculation owner;
 3. `member_holding_service.py` retains scope, Fund/NAV loading, recent reauthentication, transactions, audit and error translation;
 4. member and administrator views share `decimalDisplay.ts`;
-5. account market value and cumulative return are shown only when all same-currency holdings have complete valuation;
+5. account market value and cumulative return require complete same-currency valuation;
 6. Repository, Routes, Schemas, Financial Fact, Position Math and Formal Projection contracts remain unchanged.
 
-## Frontend hotspot boundary
+## Permanent frontend hotspot boundary
 
-1. `components/TradingViewWidget.ts` owns external TradingView script creation, observer-driven sizing/visibility, bounded layout repair, fallback rendering and cleanup;
+1. `components/TradingViewWidget.ts` owns external TradingView lifecycle, bounded layout repair, fallback and cleanup;
 2. `nativeData/marketSnapshotTables.ts` owns the local static snapshot types and dataset;
-3. the snapshot source SHA-256 is `20245f2606e15add5e97387c238532697c938677865c9d620178bbc9522b788a`;
-4. the formatting-independent canonical semantic SHA-256 is `580983d83781cb7f0731dd39837d75b16eaf24be18751367432aa605fa0acc92`;
+3. snapshot source SHA-256: `20245f2606e15add5e97387c238532697c938677865c9d620178bbc9522b788a`;
+4. canonical semantic SHA-256: `580983d83781cb7f0731dd39837d75b16eaf24be18751367432aa605fa0acc92`;
 5. `hedgeBoard/index.vue` remains the page composition, local chart assembly, shared SVG math and style owner;
-6. Widget configuration, external URLs, timers, thresholds, classes, snapshot values and ordering remain unchanged;
-7. no further Hedge Board extraction is approved without new product requirements or demonstrated duplicate implementation.
+6. no further Hedge Board extraction is approved without new product requirements or demonstrated duplicate implementation.
 
-## Next gate: high-risk-domain read-only audit
+## Permanent EOD Reconciliation boundary
 
-The next phase must inventory, without modifying code:
+1. `eod_reconciliation_routes.py` owns exactly four EOD HTTP endpoints, response models, tags and query aliases;
+2. `eod_reconciliation.py` retains stable compatibility aliases, per-call dependency wiring and exact service-error-to-HTTP translation;
+3. `eod_reconciliation_service.py` retains report creation/read/list/review sequencing and partial-failure capture;
+4. Policy, Repository, Schemas, Financial Fact, Venue Reconciliation and database semantics remain unchanged;
+5. existing Monkeypatch ports, idempotency, immutable review, `failed + blocked` reporting and Scale Gate fail-closed behavior remain frozen.
 
-1. Trading order intent, submission orchestration, lifecycle and Result Unknown ownership;
-2. Risk limits, Kill Switch, approval and Live Write gates;
-3. Financial Fact, formal projection and accounting ownership;
-4. Venue and EOD reconciliation, Last Known Good and state classification;
-5. Platform API to Execution Runtime contracts and adapter boundaries;
-6. existing Golden tests, fail-closed behavior and any real duplicate responsibility.
+## Next gate: H2 Venue route read-only review
 
-Only one bounded implementation cut may be proposed after the audit, and only when it preserves Decimal, idempotency, permissions, migration history, execution semantics and reconciliation evidence.
+Before any Venue route extraction, inventory:
+
+1. exact endpoint paths, methods, response models, Query aliases and error mappings;
+2. every compatibility export and direct cross-domain consumer;
+3. whether routes can call the facade at runtime without changing Monkeypatch behavior;
+4. Service, Policy, Repository, Runtime Client and Financial Fact Golden coverage;
+5. whether extraction reduces mixed responsibility enough to justify the wider compatibility surface.
+
+If the cut requires changing service orchestration, error mapping, Runtime transport, Financial Fact import or compatibility delegates, retain the current Venue facade and record a stop decision.
