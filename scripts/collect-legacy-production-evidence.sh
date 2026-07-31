@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+umask 077
+
 OUTPUT_DIR="${1:-legacy-production-evidence-$(date -u +%Y%m%dT%H%M%SZ)}"
 REPO_ROOT="${LEGACY_REPO_ROOT:-/opt/variable-global}"
 mkdir -p "$OUTPUT_DIR"
-umask 077
+chmod 700 "$OUTPUT_DIR"
 
 {
   printf 'collected_at_utc=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
@@ -14,11 +16,26 @@ umask 077
 } > "$OUTPUT_DIR/metadata.txt"
 
 {
-  systemctl is-active variable-global-auth variable-global-data nginx mysql mariadb 2>&1 || true
-  systemctl is-enabled variable-global-auth variable-global-data nginx mysql mariadb 2>&1 || true
+  for service in variable-global-auth variable-global-data nginx mysql mariadb; do
+    printf '## %s\n' "$service"
+    printf 'active='
+    systemctl is-active "$service" 2>&1 || true
+    printf 'enabled='
+    systemctl is-enabled "$service" 2>&1 || true
+    fragment="$(systemctl show "$service" --property=FragmentPath --value 2>/dev/null || true)"
+    printf 'fragment=%s\n' "$fragment"
+    if [[ -n "$fragment" && -f "$fragment" ]]; then
+      stat --printf='fragment_mode=%a fragment_owner=%U fragment_group=%G fragment_size=%s fragment_modified=%y\n' "$fragment" || true
+      printf 'fragment_sha256='
+      sha256sum "$fragment" | awk '{print $1}' || true
+    fi
+    printf '\n'
+  done
 } > "$OUTPUT_DIR/service-state.txt"
 
-ss -lnt 2>&1 > "$OUTPUT_DIR/listening-ports.txt" || true
+{
+  ss -lntH 2>&1 | grep -E ':(80|443|3306|4373|8000|8080|8082|8100)([[:space:]]|$)' || true
+} > "$OUTPUT_DIR/listening-ports.txt"
 
 {
   if [[ -d "$REPO_ROOT/.git" ]]; then
@@ -26,6 +43,8 @@ ss -lnt 2>&1 > "$OUTPUT_DIR/listening-ports.txt" || true
     git -C "$REPO_ROOT" status --short --branch || true
     git -C "$REPO_ROOT" rev-parse HEAD || true
     git -C "$REPO_ROOT" branch --show-current || true
+    echo 'remote_names:'
+    git -C "$REPO_ROOT" remote || true
   else
     echo 'repo_present=false'
   fi
@@ -39,14 +58,32 @@ ss -lnt 2>&1 > "$OUTPUT_DIR/listening-ports.txt" || true
       continue
     fi
     stat --printf='mode=%a owner=%U group=%G size=%s modified=%y\n' "$file" || true
-    sha256sum "$file" || true
+    printf 'sha256='
+    sha256sum "$file" | awk '{print $1}' || true
     echo 'keys:'
     awk -F= '/^[A-Za-z_][A-Za-z0-9_]*=/{print $1}' "$file" | sort -u
   done
 } > "$OUTPUT_DIR/environment-file-metadata.txt"
 
+{
+  for binary in \
+    /usr/local/lib/variable-global/auth-service \
+    /usr/local/lib/variable-global/data-service; do
+    printf '## %s\n' "$binary"
+    if [[ ! -f "$binary" ]]; then
+      echo 'missing'
+      continue
+    fi
+    stat --printf='mode=%a owner=%U group=%G size=%s modified=%y\n' "$binary" || true
+    printf 'sha256='
+    sha256sum "$binary" | awk '{print $1}' || true
+  done
+} > "$OUTPUT_DIR/binary-metadata.txt"
+
 if command -v nginx >/dev/null 2>&1; then
   nginx -t > "$OUTPUT_DIR/nginx-test.txt" 2>&1 || true
+else
+  echo 'nginx_not_installed=true' > "$OUTPUT_DIR/nginx-test.txt"
 fi
 
 if command -v mysql >/dev/null 2>&1 && \
@@ -64,8 +101,11 @@ else
   echo 'mysql_socket_auth_unavailable=true' > "$OUTPUT_DIR/mysql-status.txt"
 fi
 
-find "$OUTPUT_DIR" -type f -print0 | sort -z | xargs -0 sha256sum \
+find "$OUTPUT_DIR" -type f ! -name 'MANIFEST.sha256' -print0 \
+  | sort -z \
+  | xargs -0 -r sha256sum \
   > "$OUTPUT_DIR/MANIFEST.sha256"
+chmod 600 "$OUTPUT_DIR"/*
 
 printf 'Evidence directory: %s\n' "$OUTPUT_DIR"
 printf 'Review every file before sharing. No Secret value should be present.\n'
