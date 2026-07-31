@@ -35,10 +35,6 @@ class FrontendFileMetric:
 def _service_roots(root: Path) -> tuple[Path, Path]:
     web = root / "platform-web"
     api = root / "platform-api"
-    if not web.exists():
-        web = root / "admin-risk"
-    if not api.exists():
-        api = root / "platform-backend"
     if not web.exists() or not api.exists():
         raise SystemExit("platform-web/platform-api service roots were not found")
     return web, api
