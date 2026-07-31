@@ -21,6 +21,11 @@ const tradingToolCatalogPath = path.join(viewRoot, 'tradingTools', 'data', 'cata
 const tradingToolsPagePath = path.join(viewRoot, 'tradingTools', 'index.vue');
 const aSharePagePath = path.join(viewRoot, 'aShare', 'index.vue');
 const aShareResearchComposablePath = path.join(viewRoot, 'aShare', 'useAShareResearch.ts');
+const aShareWatchlistLocalStatePath = path.join(
+  viewRoot,
+  'aShare',
+  'aShareWatchlistLocalState.ts',
+);
 const accountWatchlistApiPath = path.join(
   __dirname,
   '..',
@@ -69,6 +74,7 @@ const tradingToolCatalogSource = fs.readFileSync(tradingToolCatalogPath, 'utf8')
 const tradingToolsPageSource = fs.readFileSync(tradingToolsPagePath, 'utf8');
 const aSharePageSource = fs.readFileSync(aSharePagePath, 'utf8');
 const aShareResearchComposableSource = fs.readFileSync(aShareResearchComposablePath, 'utf8');
+const aShareWatchlistLocalStateSource = fs.readFileSync(aShareWatchlistLocalStatePath, 'utf8');
 const accountWatchlistApiSource = fs.readFileSync(accountWatchlistApiPath, 'utf8');
 const aShareWatchlistSource = fs.readFileSync(aShareWatchlistPath, 'utf8');
 const aShareMarketDetailSource = fs.readFileSync(aShareMarketDetailPath, 'utf8');
@@ -88,6 +94,7 @@ assert(fs.existsSync(reserveRankingPath), 'Expected ReserveRanking component to 
 assert(fs.existsSync(marketDetailCatalogPath), 'Expected market detail catalog to exist.');
 assert(fs.existsSync(toolGroupSectionPath), 'Expected ToolGroupSection component to exist.');
 assert(fs.existsSync(aSharePagePath), 'Expected dedicated A-share research page to exist.');
+assert(fs.existsSync(aShareWatchlistLocalStatePath), 'Expected A-share watchlist local state adapter to exist.');
 assert(fs.existsSync(accountWatchlistApiPath), 'Expected account research watchlist API client to exist.');
 assert(fs.existsSync(macroExpectationPath), 'Expected macro expectation panel to exist.');
 
@@ -280,18 +287,34 @@ assert(
   'Shenwan section must keep the clean Top-10 table and separate threshold statistics.',
 );
 assert(
-  aShareResearchComposableSource.includes('export function normalizeStockCode') &&
-    aShareResearchComposableSource.includes("if (stored === null) return [...DEFAULT_WATCHLIST]") &&
-    !aShareResearchComposableSource.includes('!Array.isArray(payload) || !payload.length') &&
-    aShareResearchComposableSource.includes('const groupIndexes = watchlist.value.reduce<number[]>'),
-  'A-share watchlists must preserve stored empty arrays, normalize stock codes and reorder within groups.',
+  aShareResearchComposableSource.includes("from './aShareWatchlistLocalState'") &&
+    aShareResearchComposableSource.includes('export { normalizeStockCode };') &&
+    aShareResearchComposableSource.includes('export type { WatchlistItem };') &&
+    aShareResearchComposableSource.includes('const groupIndexes = watchlist.value.reduce<number[]>') &&
+    !aShareResearchComposableSource.includes('window.localStorage'),
+  'A-share composable must delegate local watchlist persistence while preserving its public API and group moves.',
+);
+assert(
+  aShareWatchlistLocalStateSource.includes('export function normalizeStockCode') &&
+    aShareWatchlistLocalStateSource.includes("if (stored === null) return [...DEFAULT_WATCHLIST]") &&
+    !aShareWatchlistLocalStateSource.includes('!Array.isArray(payload) || !payload.length') &&
+    aShareWatchlistLocalStateSource.includes("const WATCHLIST_STORAGE_KEY = 'vg_a_share_watchlist_v1'") &&
+    aShareWatchlistLocalStateSource.includes(
+      "const WATCHLIST_DIRTY_STORAGE_KEY = 'vg_a_share_watchlist_dirty_v1'",
+    ) &&
+    aShareWatchlistLocalStateSource.includes('export function normalizeWatchlistItems') &&
+    aShareWatchlistLocalStateSource.includes('export function readWatchlist') &&
+    aShareWatchlistLocalStateSource.includes('export function writeWatchlist') &&
+    aShareWatchlistLocalStateSource.includes('export function readWatchlistDirty') &&
+    aShareWatchlistLocalStateSource.includes('export function writeWatchlistDirty'),
+  'A-share local watchlist adapter must preserve code normalization, empty persistence, storage keys and dirty state.',
 );
 assert(
   accountWatchlistApiSource.includes("url: '/me/research-watchlist'") &&
     accountWatchlistApiSource.includes('getUserSystemCsrfToken') &&
     aShareResearchComposableSource.includes('getAccountResearchWatchlist') &&
     aShareResearchComposableSource.includes('replaceAccountResearchWatchlist') &&
-    aShareResearchComposableSource.includes('WATCHLIST_DIRTY_STORAGE_KEY') &&
+    aShareWatchlistLocalStateSource.includes('WATCHLIST_DIRTY_STORAGE_KEY') &&
     aShareResearchComposableSource.includes("error.code !== 'watchlist_version_conflict'") &&
     aSharePageSource.includes(':sync-state="watchlistSyncState"') &&
     aSharePageSource.includes(':last-synced-at="watchlistLastSyncedAt"'),
