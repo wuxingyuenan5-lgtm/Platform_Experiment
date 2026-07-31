@@ -15,6 +15,7 @@ FORBIDDEN_LOCAL_ARTIFACTS = (
 )
 NESTED_GITHUB_ROOT = FRONTEND_ROOT / ".github"
 FRONTEND_GITIGNORE = FRONTEND_ROOT / ".gitignore"
+FRONTEND_LAUNCH_CONFIG = FRONTEND_ROOT / ".vscode" / "launch.json"
 IDENTITY_FILES = (
     FRONTEND_ROOT / "package.json",
     FRONTEND_ROOT / "README.md",
@@ -85,3 +86,14 @@ def test_product_entry_points_do_not_claim_upstream_identity() -> None:
         encoding="utf-8"
     )
     assert REPOSITORY_URL in site_setting
+
+
+@pytest.mark.architecture
+def test_frontend_editor_launch_uses_the_authoritative_local_entry() -> None:
+    launch = json.loads(FRONTEND_LAUNCH_CONFIG.read_text(encoding="utf-8"))
+    configurations = launch["configurations"]
+
+    assert len(configurations) == 1
+    assert configurations[0]["name"] == "Launch Platform Web"
+    assert configurations[0]["url"] == "http://127.0.0.1:4373/index.html"
+    assert configurations[0]["webRoot"] == "${workspaceFolder}/src"
