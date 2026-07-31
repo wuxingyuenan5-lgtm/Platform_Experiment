@@ -1,6 +1,6 @@
 # Platform旧生产部署体系审计与迁移门禁
 
-状态：**Phase J / J0仓库证据完成；外部服务器与数据库证据待验**  
+状态：**Phase J / J0仓库证据与采集工具完成；外部服务器与数据库证据待验**  
 关联Issue：#136  
 关联Draft PR：#139  
 活动分支：`refactor/issue-136-platform-0-9-2-system-optimization`  
@@ -139,9 +139,11 @@ Data Repository会自动补列、创建索引、插入Bybit账户、读取加密
 
 当前分支已执行：
 
-1. 净化`projects/安装依赖.md`与`projects/数据库.md`中的可用凭据和弱密码方案；
-2. 扩展`scripts/scan-secrets.py`，检测Markdown中文密码字段、SQL固定密码及MD5/SHA-1密码字面量；
-3. 保留历史Schema与部署事实，但不再提供可复用登录信息。
+1. 净化历史项目文档与旧启动入口中的可用凭据和弱密码方案；
+2. 将动态验收密码说明改为不触发固定密码传播的临时凭据表述；
+3. 扩展`scripts/scan-secrets.py`，检测Markdown中文密码字段、SQL固定密码及MD5/SHA-1密码字面量；
+4. 保留历史Schema与部署事实，但不再提供可复用登录信息；
+5. 增强后的Secret Scan已在完整矩阵中通过。
 
 仍必须在服务器侧完成：
 
@@ -187,10 +189,10 @@ Data Service在环境变量为空时会读取相邻Bybit凭据文件。必须确
 ### 服务器与进程
 
 1. `systemctl is-enabled/is-active variable-global-auth variable-global-data nginx`；
-2. `systemctl cat`与Unit文件Hash；
-3. 80、443、8080、8082和3306监听进程；
+2. Unit文件路径、权限和Hash；
+3. 80、443、8080、8082和3306监听状态；
 4. Nginx实际加载配置、域名与TLS证书状态；
-5. 服务器仓库目录、分支、HEAD、远端与未提交修改；
+5. 服务器仓库目录、分支、HEAD和未提交修改；
 6. `/etc/variable-global/*.env`仅记录键名、权限和文件Hash；
 7. crontab、systemd timers、supervisor、Docker及其他进程引用；
 8. Nginx访问日志中`/api/auth`、`/api/data`和WebSocket近期请求量。
@@ -236,6 +238,51 @@ J0完成后只能三选一：
 
 受控迁移至少必须包含：密码重置方案、唯一数据Owner、禁止双写、备份恢复演练、TLS、监控、Secret Provider和所有者明确批准。
 
-## 下一步
+## 11. 仓库内J0证据工具：完成
 
-生成不读取Secret值的服务器只读采集脚本与人工交接清单。服务器侧执行必须由拥有访问权限的人员完成；Draft PR #139继续保持Open、Draft、Unmerged。
+### 服务器只读采集器
+
+`scripts/collect-legacy-production-evidence.sh`已完成并由永久架构测试约束。它只收集：
+
+- systemd启用和运行状态；
+-相关监听端口；
+- 仓库分支、HEAD和工作区状态；
+- 环境文件键名、权限、大小、修改时间和文件Hash；
+- systemd Unit与已安装二进制的权限和Hash；
+- Nginx语法检查；
+- MySQL `information_schema`元数据；
+- 证据文件SHA-256清单。
+
+采集器禁止读取环境变量值、服务环境、Journal、业务表明细、密码Hash、交易所密钥、完整远端URL或执行任何服务变更。输出目录使用`0700`，文件使用`0600`，Manifest不包含自身。
+
+### MySQL只读聚合清单
+
+`scripts/legacy-production-readonly-inventory.sql`已完成，并要求通过批准的只读MySQL账户运行。它使用显式只读事务，只输出：
+
+- 服务器只读状态；
+- 表、列、索引和约束；
+- `users`、`user_sessions`、`accounts`和`assets`的行数与最近时间；
+- 敏感列是否存在非空记录的聚合计数。
+
+脚本禁止导出用户行、密码Hash、API Key/Secret、Bybit仓位明细，也不包含任何写DDL/DML或权限变更语句。
+
+### 永久门禁
+
+- `test_architecture_legacy_production_gate.py`冻结旧生产资产、生产代理、Nginx/systemd及旧HTTP/MySQL Owner；
+- `test_architecture_legacy_evidence_collector.py`冻结采集器只读、最小输出和SQL聚合边界；
+- 增强Secret Scan冻结历史凭据净化要求；
+- 仓库层J0治理已通过Platform CI、Provider、两套Browser E2E和56页视觉矩阵。
+
+## 下一步：外部证据执行
+
+仓库内能够完成的J0工作已经结束。下一步必须由拥有旧服务器和MySQL只读权限的人员：
+
+1. 先确认并取得最新备份；
+2. 在服务器副本或批准目录运行只读采集器；
+3. 使用批准的只读MySQL账户运行聚合清单；
+4. 人工检查并脱敏全部输出；
+5. 回传不含Secret值的证据包；
+6. 完成已泄露凭据的服务器侧轮换；
+7. 再决定进入J1的继续维护、受控迁移或确认无依赖三选一。
+
+在外部证据回传前，Phase J保持阻断状态；Draft PR #139继续保持Open、Draft、Unmerged。
