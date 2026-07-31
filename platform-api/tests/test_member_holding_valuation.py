@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 
 import pytest
@@ -125,10 +126,7 @@ def test_nav_validation_preserves_error_codes(
 
 @pytest.mark.unit
 def test_holding_decimal_and_timezone_validation_preserve_error_codes() -> None:
-    invalid_decimal = holding()
-    invalid_decimal = MemberHoldingRecord(
-        **{**invalid_decimal.__dict__, "share_quantity": "1e-3"}
-    )
+    invalid_decimal = replace(holding(), share_quantity="1e-3")
     with pytest.raises(HoldingValuationError) as decimal_error:
         build_holding_response(
             fund=fund(),
@@ -139,10 +137,7 @@ def test_holding_decimal_and_timezone_validation_preserve_error_codes() -> None:
         )
     assert decimal_error.value.code == "holding_decimal_invalid"
 
-    invalid_time = holding()
-    invalid_time = MemberHoldingRecord(
-        **{**invalid_time.__dict__, "as_of": "2026-07-31T08:00:00"}
-    )
+    invalid_time = replace(holding(), as_of="2026-07-31T08:00:00")
     with pytest.raises(HoldingValuationError) as timestamp_error:
         build_holding_response(
             fund=fund(),
