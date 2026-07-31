@@ -1,6 +1,6 @@
-# Platform高风险业务域只读审计
+# Platform高风险业务域审计与边界治理
 
-状态：**H0责任盘点与H1 EOD路由Owner完成；H2 Venue路由仅只读复核**  
+状态：**H0–H2完成；高风险结构治理正式收口**  
 关联Issue：#136  
 关联Draft PR：#139  
 活动分支：`refactor/issue-136-platform-0-9-2-system-optimization`  
@@ -41,64 +41,103 @@ Execution Risk、Kill Switch、双人审批、Live Write与账户/策略约束�
 
 `execution-runtime/`继续独占Venue SDK、外部副作用与Runtime Journal。Platform API只能通过版本化Runtime合同发送命令和读取结果。
 
-### Reconciliation：存在显式路由债务
+### Reconciliation：仅存在路由混合债务
 
-Venue与EOD均已分离Schemas、Policy、Repository、Runtime Client与Service。Facade仍曾同时承担兼容导出、HTTP错误映射和FastAPI路由，Ownership目录明确标注待独立路由模块。
+Venue与EOD已拥有独立Schemas、Policy、Repository、Runtime Client与Service。H0确认剩余结构债务仅为Facade同时承担兼容端口、HTTP错误映射和FastAPI路由。
 
 ## H1 EOD路由Owner：完成
 
-### 已实施
-
 - [x] 新增`platform-api/app/eod_reconciliation_routes.py`；
-- [x] 仅迁移`APIRouter`、`Query`、router定义和四个HTTP端点；
+- [x] 仅迁移四个HTTP端点、response models、tags和Query别名；
 - [x] 路由模块运行时调用`app.eod_reconciliation` Facade；
-- [x] `main.py`改为从专用路由模块导入router；
-- [x] Facade继续拥有Repository/Service兼容别名、每次调用依赖装配和精确HTTP错误映射；
-- [x] 保留现有Monkeypatch端口与函数名；
+- [x] Facade保留兼容别名、每次调用依赖装配和精确409/404/422映射；
+- [x] Service、Policy、Repository、Schemas、Financial Fact、Venue Reconciliation、DDL、Decimal与失败关闭语义未修改；
 - [x] 更新Ownership和永久架构测试；
-- [x] 删除全部一次性写权限Workflow和迁移脚本。
-
-### 冻结HTTP合同
-
-- `POST /ops/eod-reconciliation/reports`；
-- `GET /ops/eod-reconciliation/reports/{report_id}`；
-- `GET /ops/eod-reconciliation/reports`；
-- `POST /ops/eod-reconciliation/reports/{report_id}/review`；
-- 查询别名：`strategyInstanceId`、`accountId`、`businessDate`；
-- response models、tags、409/404/422状态与文案不变。
-
-Service、Policy、Repository、Schemas、Financial Fact、Venue Reconciliation、DDL、Decimal、自然键、幂等性、Review不可变性和Scale Gate均未修改。
-
-### H1完整矩阵
+- [x] 删除全部一次性写权限工具。
 
 验证HEAD：`5f992691c35921c0647cd8e7f800fca48a547359`
 
 - Platform CI：`30640101027`
-- Platform Directory Invariants：`30640101717`
-- Version Consistency：`30640100742`
-- Secret Scan：`30640100821`
-- User System Browser E2E：`30640100255`
-- Platform 0.9.2 Baseline Audit：`30640100980`
-- Platform Visual Baseline：`30640101256`
-- Hedge Board Browser E2E：`30640101724`
-- Research Provider Smoke：`30640100623`
+- Directory：`30640101717`
+- Version：`30640100742`
+- Secret：`30640100821`
+- User E2E：`30640100255`
+- Audit：`30640100980`
+- Visual：`30640101256`
+- Hedge E2E：`30640101724`
+- Provider Smoke：`30640100623`
 
 视觉Artifact：`8797146922`  
 SHA-256：`f722456de6afce3068239a2de51ca58895133aa6cbd1eef6f0af9afc1ab00453`
 
-## H2当前门禁：Venue路由只读复核
+## H2 Venue路由Owner：完成
 
-Venue Facade暴露订单、账户、Position、Balance、Difference、Runtime查询与跨域兼容端口，消费者面显著大于EOD。H2只能读取和建模，暂不批准代码迁移。
+### 只读复核结论
 
-必须确认：
+Venue Facade拥有更广的兼容面，但直接消费者均依赖Facade函数或兼容别名，而非router对象：
 
-1. 五个Venue HTTP端点的精确路径、方法、response model、Query与错误映射；
-2. 所有跨域兼容导出和直接调用方；
-3. 路由是否能够仅通过Facade运行时调用而不改变Monkeypatch或依赖端口；
-4. `venue_reconciliation.py`是否仍有非路由FastAPI职责必须保留；
-5. 现有API、Service、Policy、Repository、Runtime Client和跨域Golden覆盖；
-6. 拆分收益是否足以抵消更广的兼容消费者面。
+- EOD使用`audit`、`reconcile_order_with_venue`、`run_account_reconciliation`和`validate_strategy_account`；
+- Live Accounting使用`audit`、`canonical_hash`、`runtime_get`和`validate_strategy_account`；
+- Live Trading Session使用`ensure_schema`；
+- API、Service与Runtime Client测试直接Monkeypatch Facade或Service端口。
 
-若必须修改Service、Repository、Policy、Runtime Client、Financial Fact、错误映射或兼容函数，立即停止Venue路由抽取并记录保留决定。
+因此只迁移router与五个端点不会改变跨域消费者。Facade必须继续作为稳定兼容边界。
+
+### 已实施
+
+- [x] 新增`platform-api/app/venue_reconciliation_routes.py`；
+- [x] 仅迁移五个HTTP端点、response models和tags；
+- [x] `main.py`改为从专用路由模块导入router；
+- [x] 路由模块运行时调用`app.venue_reconciliation` Facade；
+- [x] Facade保留全部Repository别名、Service Delegate、Runtime 503和域错误422/409/403/404映射；
+- [x] 保留现有Monkeypatch端口及所有直接跨域消费者；
+- [x] Service、Policy、Repository、Runtime Client、Schemas、Financial Fact、Operational projection、DDL与Decimal未修改；
+- [x] 永久架构测试冻结Service、Facade、Routes与Main四边界；
+- [x] 更新Ownership目录；
+- [x] 删除全部一次性写权限Workflow和迁移脚本。
+
+### 冻结HTTP合同
+
+- `POST /trading/orders/{order_id}/venue-reconcile`；
+- `POST /ops/venue-reconciliation/runs`；
+- `GET /ops/venue-reconciliation/runs/{run_id}`；
+- `GET /ops/venue-reconciliation/runs/{run_id}/differences`；
+- `POST /ops/venue-reconciliation/differences/{difference_id}/resolve`；
+- response models、tags与503/422/409/403/404错误合同不变。
+
+### H2完整矩阵
+
+验证HEAD：`7c60ac24d0b728a0c5383530310752a3070ed876`
+
+- Platform CI：`30641383890`
+- Platform Directory Invariants：`30641383425`
+- Version Consistency：`30641384052`
+- Secret Scan：`30641383524`
+- User System Browser E2E：`30641383467`
+- Platform 0.9.2 Baseline Audit：`30641383452`
+- Platform Visual Baseline：`30641383554`
+- Hedge Board Browser E2E：`30641383539`
+- Research Provider Smoke：`30641383446`
+
+视觉Artifact：`8797697682`  
+SHA-256：`3898d7b32d1413c8fddfe5c024c4c1eea31b67b05561ca66a5e48dd8355f6d93`
+
+## 高风险结构治理停止结论
+
+H0保留了已经内聚的Trading、Risk、Formal Accounting与Execution Runtime边界；H1/H2清除了Reconciliation Facade中唯一明确的FastAPI路由混合债务。
+
+剩余高风险模块没有第二套业务Owner、明确重复实现或可在不迁移策略/SQL/副作用的前提下形成的新切口。继续拆分将增加兼容层与测试面，而不会降低业务风险。
+
+因此停止高风险域代码迁移。后续只有在出现真实重复、产品变更或验收缺口时才重新开启专项审计。
+
+## 下一门禁：Legacy L0部署与数据依赖定性
+
+只读审计`projects/risk-control`及旧Go/MySQL资产，确认：
+
+1. 是否仍被服务器、定时任务、用户数据或生产流程使用；
+2. Go/MySQL依赖、环境变量、部署入口、数据库Schema与迁移责任；
+3. 与当前Platform API / Execution Runtime是否存在功能重叠或真实外部依赖；
+4. 哪些内容属于历史证据、可归档资产、仍在用系统或不可删除数据；
+5. 在完成服务器与数据证据前，不删除、不重命名、不迁移该目录。
 
 Draft PR必须保持Open、Draft、Unmerged；不得修改或合并`main`。
