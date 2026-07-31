@@ -1,21 +1,25 @@
 # Platform旧生产部署体系审计与迁移门禁
 
-状态：**Phase J / J0只读盘点进行中；禁止删除、重命名或自动切换**  
+状态：**Phase J / J0仓库证据完成；外部服务器与数据库证据待验**  
 关联Issue：#136  
 关联Draft PR：#139  
 活动分支：`refactor/issue-136-platform-0-9-2-system-optimization`  
 开发与验收版本：Platform `0.9.2`
 
-## 审计目标
+## 结论
 
-仓库当前同时保留两套可运行架构。J0阶段只建立事实、依赖和迁移边界，不执行生产切换：
+仓库同时保留两套可运行架构：
 
 1. 当前目标架构：Platform Web + Platform API模块化单体 + Execution Runtime；
 2. 旧生产架构：Nginx + Go Auth Service + Go Data Service + MySQL。
 
-旧体系不是普通Demo或未引用目录。仓库内仍存在完整构建脚本、systemd服务、Nginx路由、固定服务器操作手册、MySQL备份/回滚流程及前端生产API配置。在缺少服务器和数据证据前，不得删除或隔离到不可执行位置。
+旧体系不是Demo、空目录或可直接归档资产。仓库证据表明它仍是当前生产前端的兼容API目标，具备完整构建、systemd启动、MySQL建表、Bybit同步、备份与回滚能力，并可能持有用户、Session、交易账户密钥、仓位和净值历史。
 
-## 当前目标架构
+当前分类：**活跃兼容依赖 / 潜在生产数据系统 / 暂不可删除资产**。
+
+GitHub仓库无法证明固定服务器此刻是否仍在线，也无法证明MySQL中是否存在真实用户或交易账户。外部运行状态必须通过服务器和数据库只读检查确认，不能从文档推断为已停用。
+
+## 1. 当前目标架构
 
 本地权威入口：`scripts/dev-platform.ps1`。
 
@@ -28,37 +32,13 @@ execution-runtime   127.0.0.1:8100
     ↓ Venue / Broker / MT5 / Bybit
 ```
 
-该入口创建独立Python环境，启动Platform API和Execution Runtime，并使用前端`.env.platform.example`中的`VITE_PLATFORM_API_BASE_URL`连接Platform API。安全默认值保持Simulation、Fake Gateway和双侧Live Write关闭。
+安全默认值保持Simulation、Fake Gateway和双侧Live Write关闭。
 
-## 旧生产架构证据
+## 2. 旧生产架构证据
 
-### 构建与安装
+### 2.1 前端生产依赖
 
-`deploy/install-native.sh`会：
-
-- 构建`platform-web`生产静态文件；
-- 编译`projects/risk-control/auth-service`；
-- 编译`projects/risk-control/data-service`；
-- 安装两个Go二进制到`/usr/local/lib/variable-global/`；
-- 安装systemd与Nginx配置；
-- 读取`/etc/variable-global/auth.env`和`data.env`；
-- 验证8080、8082和Nginx健康端点。
-
-### 服务器与数据库
-
-`deploy/README.md`明确描述固定服务器`65.49.234.98`、本机MySQL数据库`risk_control`、MySQL用户`risk_app`、生产备份、升级和回滚步骤。该文档还引用历史仓库`Lucasmingyu/Variable-Global`，说明部署来源与当前仓库治理体系存在漂移。
-
-### systemd与Nginx
-
-- `variable-global-auth.service`运行Auth Service并依赖MySQL/MariaDB；
-- `variable-global-data.service`运行Data Service并依赖MySQL/MariaDB；
-- Nginx将`/api/auth`代理到`127.0.0.1:8080`；
-- Nginx将`/api/data`代理到`127.0.0.1:8082`；
-- Nginx配置仍包含固定公网IP。
-
-### 前端生产依赖
-
-`platform-web/.env.production`当前仍将生产请求指向旧服务：
+`platform-web/.env.production`仍将以下客户端指向旧服务：
 
 ```text
 VITE_GLOB_API_URL=/api/auth
@@ -70,107 +50,190 @@ VITE_GLOB_API_URL_MONITOR_WS=/api/data/ws
 VITE_GLOB_API_URL_FUTURE_WS=/api/data/ws
 ```
 
-因此，当前前端生产构建并未默认切换到Platform API / Execution Runtime。仅凭本地三进程验收，不能宣称旧生产体系已停用。
+`platform-web/vite.config.ts`在开发环境也保留：
 
-## 独立安全与数据模型
+- `/api/auth` → `127.0.0.1:8080`；
+- `/api/data` → `127.0.0.1:8082`。
 
-### 旧Auth Service
+`platform-web/src/api/data/product.ts`等旧数据客户端仍被风险首页、基金、净值和账户曲线页面调用。因此仅凭Platform本地三进程验收，不能宣称旧服务已停用。
 
-旧Auth Service：
+### 2.2 构建与安装
 
+`deploy/install-native.sh`会：
+
+- 构建`platform-web`生产静态文件；
+- 编译`projects/risk-control/auth-service`；
+- 编译`projects/risk-control/data-service`；
+- 安装两个Go二进制到`/usr/local/lib/variable-global/`；
+- 安装systemd与Nginx配置；
+- 读取`/etc/variable-global/auth.env`和`data.env`；
+- 启用并重启两个服务和Nginx；
+- 验证8080、8082与Nginx健康端点。
+
+### 2.3 systemd与Nginx
+
+- `variable-global-auth.service`运行Auth Service并依赖MySQL/MariaDB；
+- `variable-global-data.service`运行Data Service并依赖MySQL/MariaDB；
+- 两者均使用受限系统用户、环境文件与`Restart=on-failure`；
+- Nginx将`/api/auth`代理到8080、`/api/data`代理到8082；
+- 当前模板仅监听HTTP 80并包含固定公网服务器地址。
+
+`deploy/README.md`记录固定服务器、本机MySQL、`/opt/variable-global`、备份、升级、日志和Git回滚流程，并引用历史仓库来源，说明生产部署来源与当前仓库治理体系存在漂移。
+
+## 3. 旧服务责任
+
+### 3.1 Auth Service
+
+- Go 1.20；
 - 直接连接MySQL；
-- 自行维护用户Schema；
-- 自行签发JWT；
-- 支持初始化管理员；
-- 使用独立角色字段；
-- 当前CORS实现允许`Access-Control-Allow-Origin: *`。
+- 依赖JWT v5、bcrypt与UUID；
+- 必需`DB_DSN`和`JWT_SECRET`；
+- 默认监听`127.0.0.1:8080`；
+- 启动时自动确保用户与Session Schema；
+- 可通过环境变量创建初始管理员；
+- 持有独立JWT、角色、注册审批和数据库Session模型；
+- CORS允许任意Origin。
 
-这套模型不能直接等价为Platform API的Browser Session、API Key、CSRF/Origin、四角色权限和最后一名CEO保护。
+该模型不能直接等价为Platform API的Browser Session、API Key、CSRF/Origin、四角色权限和最后一名CEO保护。
 
-### 旧Data Service
+### 3.2 Data Service
 
-旧Data Service：
-
+- Go 1.20；
 - 直接连接MySQL；
-- 可自动创建Schema；
-- 持有Bybit Client；
-- 可启用账户净值定时同步；
-- 当前CORS实现允许`Access-Control-Allow-Origin: *`。
+- 持有真实Bybit REST Client；
+- 可自动建表并默认每5分钟同步账户净值；
+- 使用`ACCOUNT_ENCRYPTION_KEY`保护账户密钥；
+- 可从环境变量或相邻凭据文件加载Bybit Key/Secret；
+- 提供账户CRUD、同步、净值、产品占比和旧前端兼容Envelope；
+- CORS允许任意Origin。
 
 这套数据不能在没有字段、精度、来源、自然键和审计映射的情况下并入Financial Fact、正式持仓、NAV或Execution Runtime。
 
-## 当前停止决定
+## 4. MySQL数据责任
 
-在以下证据齐备前：
+### Auth表
 
-- 不删除`projects/risk-control`；
-- 不删除或改写`deploy/`；
+- `users`：用户名、密码哈希、角色、部门、申请角色和审批信息；
+- `user_sessions`：数据库Session、IP、User-Agent和到期时间。
+
+### Data表
+
+- `users`：与Auth共享表名，但当前建表字段版本不完全一致；
+- `accounts`：账户类型、地址、初始资本、所有者、状态和加密API Key/Secret；
+- `assets`：总资产、可用资金、Bybit仓位JSON、来源、快照类型和历史时间。
+
+Data Repository会自动补列、创建索引、插入Bybit账户、读取加密凭据并持续写入资产快照。旧设计还规划过`orders`、`risk_rules`和`risk_logs`，是否真实存在必须以服务器Schema为准。
+
+风险：
+
+- 两个服务都拥有`users`运行时建表逻辑，但字段版本不同；
+- Schema演进通过`CREATE/ALTER`完成，没有独立不可变迁移账本；
+- 删除代码前必须确认真实表结构、行数、最后写入和数据Owner；
+- `accounts`与`assets`可能包含无法从其他来源完整恢复的账户事实与净值历史。
+
+## 5. L0-S1凭据安全事件
+
+仓库历史项目文档曾保存固定数据库密码、数据库用户名、默认管理员弱密码和MD5示例。这些值必须视为永久泄露，即使当前服务器已停用。
+
+当前分支已执行：
+
+1. 净化`projects/安装依赖.md`与`projects/数据库.md`中的可用凭据和弱密码方案；
+2. 扩展`scripts/scan-secrets.py`，检测Markdown中文密码字段、SQL固定密码及MD5/SHA-1密码字面量；
+3. 保留历史Schema与部署事实，但不再提供可复用登录信息。
+
+仍必须在服务器侧完成：
+
+- 轮换MySQL用户密码；
+- 轮换JWT Secret；
+- 轮换账户加密密钥；
+- 轮换Bybit或其他交易所密钥；
+- 禁用或重置历史默认管理员；
+- 检查Git历史、备份、CI Artifact、服务器环境文件和Shell历史。
+
+仅删除Git当前文件不能使已泄露凭据重新安全。完成轮换前，不得恢复旧服务对外使用。
+
+## 6. 其他安全阻断
+
+### HTTP与Origin
+
+- Nginx模板仅监听HTTP；
+- 两个Go服务CORS允许任意Origin；
+- 正式登录和账户数据不得在未验证HTTPS、Origin、Cookie/Token边界的情况下恢复上线。
+
+### 凭据文件回退
+
+Data Service在环境变量为空时会读取相邻Bybit凭据文件。必须确认服务器上的实际路径、权限、来源和密钥有效性。
+
+## 7. 当前停止决定
+
+在真实证据齐备前：
+
+- 不删除或重命名`projects/risk-control`；
+- 不删除或改写`deploy/`执行链；
 - 不修改`.env.production`的API路由；
 - 不将MySQL数据自动导入SQLite；
 - 不关闭旧systemd服务；
 - 不修改固定服务器；
-- 不把旧JWT或密码Hash直接视为新用户系统凭据；
+- 不把旧JWT、密码Hash或角色直接视为新用户系统凭据；
 - 不将旧Bybit定时任务迁入Platform API；
 - 不宣称旧体系为Demo或已废弃。
 
-## J0必须取得的真实环境证据
+## 8. J0外部只读验收
 
-### 服务器运行状态
+所有输出必须脱敏，不得包含密码、JWT、Bybit密钥、完整DSN或可复用账户凭据。
 
-在不暴露密钥值的前提下确认：
+### 服务器与进程
 
-- `systemctl status variable-global-auth variable-global-data nginx`；
-- 8080、8082、80/443实际监听进程；
-- 当前Nginx已加载配置；
-- 服务器仓库目录、分支、HEAD及是否存在未提交修改；
-- `/etc/variable-global/auth.env`和`data.env`是否存在及权限；
-- 生产域名、TLS证书和公网入口实际状态。
+1. `systemctl is-enabled/is-active variable-global-auth variable-global-data nginx`；
+2. `systemctl cat`与Unit文件Hash；
+3. 80、443、8080、8082和3306监听进程；
+4. Nginx实际加载配置、域名与TLS证书状态；
+5. 服务器仓库目录、分支、HEAD、远端与未提交修改；
+6. `/etc/variable-global/*.env`仅记录键名、权限和文件Hash；
+7. crontab、systemd timers、supervisor、Docker及其他进程引用；
+8. Nginx访问日志中`/api/auth`、`/api/data`和WebSocket近期请求量。
 
-### MySQL与业务数据
+### MySQL与数据
 
-先备份，再只读取：
+1. 数据库、表、列、索引、外键和实际DDL；
+2. 各表行数、最近写入时间和孤儿记录；
+3. 用户、角色、审批和密码Hash格式；
+4. 账户、加密凭据列、净值和Bybit同步数据；
+5. 外部脚本或服务写入方；
+6. 最新备份、恢复测试与保留期限；
+7. 不导出密钥、密码Hash或敏感业务明细。
 
-- 数据库、表、索引和约束清单；
-- 用户、角色、审批和密码Hash格式；
-- 账户、凭据、净值和同步任务表；
-- 数据量、最后更新时间和孤儿记录；
-- 是否有外部脚本或服务写入；
-- 是否存在无法从其他来源恢复的数据。
+### API与消费者
 
-任何输出不得包含密码、JWT密钥、Bybit密钥、完整DSN或可复用账户凭据。
+1. `/api/auth`全部端点与前端调用方；
+2. `/api/data`、`/api/data/ws`全部端点与前端调用方；
+3. 旧JWT与新Browser Session合同差异；
+4. 旧角色与CEO/Administrator/Employee/Member映射；
+5. 旧账户数据与Platform正式数据合同差异；
+6. 旧WebSocket与Execution Runtime/Platform API职责差异。
 
-### API与前端消费者
+## 9. 资产分类
 
-冻结并对比：
+| 资产 | 当前分类 | 允许动作 |
+|---|---|---|
+| Auth Service | 活跃兼容依赖，运行状态待验 | 只读核验、凭据轮换、迁移规划 |
+| Data Service | 活跃数据依赖，可能含交易账户事实 | 只读核验、备份、迁移规划 |
+| MySQL `risk_control` | 潜在生产数据权威 | 备份、Schema/行数审计、禁止删除 |
+| systemd/Nginx部署 | 可执行生产部署链 | 核验实际状态，禁止假设停用 |
+| 旧前端API客户端 | 当前产品依赖 | 建立消费者清单与替代API Golden |
+| 历史开发文档 | 历史证据与安全风险混合 | 净化凭据后保留或归档 |
+| 未实现微服务规划 | 历史规划 | 证据确认后可归档 |
 
-- `/api/auth`全部端点及前端调用方；
-- `/api/data`与`/api/data/ws`全部端点及前端调用方；
-- 旧JWT登录状态与新Browser Session合同差异；
-- 旧角色与新CEO/Administrator/Employee/Member映射；
-- 旧账户数据与Platform API正式数据合同差异；
-- 旧WebSocket与Execution Runtime/Platform API职责差异。
+## 10. J1迁移门禁
 
-## 后续迁移门禁
+J0完成后只能三选一：
 
-只有完成J0证据后，才可制定J1迁移方案。J1至少必须包含：
+1. **继续生产使用**：正式标记为Legacy Production并纳入维护边界；
+2. **受控迁移**：建立身份映射、数据字典、可逆迁移、API切换、停机窗口与回滚；
+3. **确认无依赖**：服务器、数据、消费者和回滚证据证明可安全删除。
 
-1. 身份与权限迁移映射；
-2. MySQL到目标持久化层的数据字典和可逆迁移；
-3. 密码不可迁移时的重置或重新激活方案；
-4. 前端API路由和同源代理切换；
-5. 旧Bybit同步职责的保留、替代或停止决定；
-6. 双写禁止与唯一数据Owner；
-7. 灰度验证、停机窗口和回滚点；
-8. 备份恢复演练；
-9. TLS、日志、监控和Secret Provider验收；
-10. 所有者明确批准。
+受控迁移至少必须包含：密码重置方案、唯一数据Owner、禁止双写、备份恢复演练、TLS、监控、Secret Provider和所有者明确批准。
 
-## 完成定义
+## 下一步
 
-Phase J不是以“删除旧目录”为完成标准，而是以以下结果之一为准：
-
-1. **继续生产使用**：旧体系被正式标记为Legacy Production并纳入维护边界；
-2. **受控迁移**：真实数据与消费者完成可逆切换，旧体系进入只读退役窗口；
-3. **确认无依赖**：服务器、数据、调用方和回滚证据证明可安全删除。
-
-无论采用哪种结果，均必须通过完整自动化矩阵和真实环境验收；Draft PR #139继续保持Open、Draft、Unmerged。
+生成不读取Secret值的服务器只读采集脚本与人工交接清单。服务器侧执行必须由拥有访问权限的人员完成；Draft PR #139继续保持Open、Draft、Unmerged。
