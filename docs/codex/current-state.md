@@ -29,9 +29,10 @@ The following gates are complete and evidence-backed:
 7. Identity I1 — administrator response Presenter;
 8. Identity I2.1 — Browser Session response Presenter;
 9. Portfolio P1 — pure member-holding valuation owner and permanent boundary;
-10. Portfolio P2 — Fund catalog and NAV mutation response read-only review.
+10. Portfolio P2 — Fund catalog and NAV mutation response read-only review;
+11. Portfolio P3 — shared Decimal display and complete account-valuation semantics.
 
-Portfolio P1 passed the complete quality matrix on the evidence HEAD recorded in Issue #136 and Draft PR #139. P2 found no distinct stateless responsibility or measurable benefit in extracting Fund catalog or NAV mutation Presenters, so Portfolio backend modularization is closed. The next gate is Portfolio frontend and public-display review.
+Portfolio backend and public-display governance are closed. The next gate is frontend hotspot governance, beginning with bounded evidence around `platform-web/src/views/hedgeBoard/index.vue` and shared display capabilities. No broad page rewrite is authorized.
 
 The current physical service boundaries are:
 
@@ -48,7 +49,7 @@ Directory migration evidence and invariants are defined in:
 
 `docs/architecture/PLATFORM_DIRECTORY_MIGRATION_PLAN.md`
 
-The approved low-risk modularization order remains Research, Identity, then Portfolio. Trading, Risk, formal Accounting, Reconciliation and Execution Runtime remain later, conservative gates.
+Trading, Risk, formal Accounting, Reconciliation and Execution Runtime remain later, conservative gates.
 
 ## Architecture retained by audit
 
@@ -118,11 +119,23 @@ Active CI, scripts, service trees and current documentation must not reintroduce
 
 ## Portfolio boundary
 
-Member-holding optimization remains deliberately narrow:
+Portfolio optimization is now closed under these permanent facts:
 
 1. `member_holding_valuation.py` owns persistence-independent validation, NAV state classification, UTC normalization and exact response construction from already loaded structural inputs;
 2. `member_holding_decimal.py` remains the only exact Decimal calculation owner;
 3. `member_holding_service.py` retains scope, Fund/NAV loading, recent reauthentication, transactions, audit and error translation;
-4. Repository, Routes, Schemas, Financial Fact, Position Math and Formal Projection contracts remain unchanged;
-5. Fund catalog and NAV mutation response construction remain local because they contain no independent policy, calculation or cross-module duplication;
-6. Portfolio backend modularization is closed; future work is limited to frontend/public-display evidence unless a new concrete defect appears.
+4. Fund catalog and NAV mutation response construction remain local because they contain no independent policy, calculation or cross-module duplication;
+5. member and administrator views share `decimalDisplay.ts`, including neutral handling of every zero representation;
+6. account market value and cumulative return are shown only when all same-currency holdings have complete valuation; missing NAV is never treated as zero or silently excluded;
+7. cumulative invested remains independently aggregatable when the currency is uniform;
+8. Repository, Routes, Schemas, Financial Fact, Position Math and Formal Projection contracts remain unchanged.
+
+## Next gate: frontend hotspot governance
+
+Proceed with evidence before extraction:
+
+1. re-inventory remaining responsibilities in `hedgeBoard/index.vue` after Research E4 work;
+2. identify duplicated pure display math, chart configuration or state rendering with at least two real consumers;
+3. extract one visual responsibility at a time while preserving Props, DOM hierarchy, selectors and responsive behavior;
+4. require Platform CI, both browser E2Es, Provider Smoke and the 56-page visual baseline for each structural cut;
+5. stop when remaining page composition is cohesive or extraction would increase indirection without measurable benefit.
