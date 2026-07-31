@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from decimal import Decimal
 from typing import Any
 
@@ -26,7 +27,6 @@ class _Response:
 class _Client:
     def __init__(self, payload: Any, **_: Any) -> None:
         self._payload = payload
-        self.request: dict[str, Any] | None = None
 
     async def __aenter__(self) -> _Client:
         return self
@@ -34,8 +34,7 @@ class _Client:
     async def __aexit__(self, *_: Any) -> None:
         return None
 
-    async def get(self, url: str, **kwargs: Any) -> _Response:
-        self.request = {"url": url, **kwargs}
+    async def get(self, _url: str, **_kwargs: Any) -> _Response:
         return _Response(self._payload)
 
 
@@ -44,8 +43,7 @@ def _provider(monkeypatch: pytest.MonkeyPatch, payload: Any) -> MacroResearchPro
     return MacroResearchProvider(timeout_seconds=7.5, user_agent="research-test")
 
 
-@pytest.mark.asyncio
-async def test_macro_provider_preserves_category_probability_and_source(
+def test_macro_provider_preserves_category_probability_and_source(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     provider = _provider(
@@ -69,7 +67,7 @@ async def test_macro_provider_preserves_category_probability_and_source(
         ],
     )
 
-    events = await provider.macro_expectation_events()
+    events = asyncio.run(provider.macro_expectation_events())
 
     assert len(events) == 1
     event = events[0]
@@ -83,8 +81,7 @@ async def test_macro_provider_preserves_category_probability_and_source(
     assert event.expiry_at.isoformat() == "2026-09-18T00:00:00+00:00"
 
 
-@pytest.mark.asyncio
-async def test_macro_provider_ignores_malformed_json_but_keeps_empty_error(
+def test_macro_provider_ignores_malformed_json_but_keeps_empty_error(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     provider = _provider(
@@ -100,11 +97,10 @@ async def test_macro_provider_ignores_malformed_json_but_keeps_empty_error(
     )
 
     with pytest.raises(ResearchProviderError, match="macro_expectation_events_empty"):
-        await provider.macro_expectation_events()
+        asyncio.run(provider.macro_expectation_events())
 
 
-@pytest.mark.asyncio
-async def test_macro_provider_preserves_invalid_probability_failure(
+def test_macro_provider_preserves_invalid_probability_failure(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     provider = _provider(
@@ -120,4 +116,4 @@ async def test_macro_provider_preserves_invalid_probability_failure(
     )
 
     with pytest.raises(ValueError):
-        await provider.macro_expectation_events()
+        asyncio.run(provider.macro_expectation_events())
