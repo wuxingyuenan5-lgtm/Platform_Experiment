@@ -19,6 +19,10 @@ RENAMES = {
     "admin-risk": "platform-web",
     "platform-backend": "platform-api",
 }
+TARGET_ALIASES: dict[str, str | None] = {"all": None}
+for legacy_name, replacement in RENAMES.items():
+    TARGET_ALIASES[legacy_name] = legacy_name
+    TARGET_ALIASES[replacement] = legacy_name
 
 ACTIVE_ROOT_FILES = {
     ".gitignore",
@@ -62,9 +66,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--fail-on-unclassified", action="store_true")
     parser.add_argument(
         "--target",
-        choices=("all", *RENAMES),
+        choices=tuple(TARGET_ALIASES),
         default="all",
-        help="rename target enforced by post-rename mode",
+        help="legacy or replacement directory target enforced by post-rename mode",
     )
     return parser.parse_args()
 
@@ -93,8 +97,6 @@ def classify(path: str) -> str:
         return "external_or_legacy_dependency"
     if normalized in {
         "scripts/audit-directory-migration.py",
-        "scripts/apply-platform-web-directory-migration.py",
-        ".github/workflows/platform-web-directory-migration.yml",
         "docs/architecture/PLATFORM_DIRECTORY_MIGRATION_PLAN.md",
     }:
         return "migration_governance"
@@ -269,6 +271,8 @@ def main() -> int:
         return 1
 
     if args.mode == "post-rename":
+        target = TARGET_ALIASES[args.target]
+        selected = set(RENAMES) if target is None else {target}
         active_categories = {
             "active_ci",
             "active_root_contract",
@@ -276,7 +280,6 @@ def main() -> int:
             "active_tooling",
             "current_documentation",
         }
-        selected = set(RENAMES) if args.target == "all" else {args.target}
         active_legacy = [
             item
             for item in references
