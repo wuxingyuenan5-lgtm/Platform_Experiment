@@ -2,7 +2,6 @@ from pathlib import Path
 
 import pytest
 
-
 ROOT = Path(__file__).resolve().parents[2]
 FRONTEND_ROOT = ROOT / "platform-web"
 FORBIDDEN_LOCAL_ARTIFACTS = (
