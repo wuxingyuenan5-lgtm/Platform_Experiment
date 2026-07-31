@@ -98,6 +98,8 @@ Trading、Risk、Formal Accounting与Execution Runtime已有明确且内聚的Ow
 
 ## Phase J / J0仓库工作：完成
 
+权威审计：`docs/architecture/PLATFORM_LEGACY_DEPLOYMENT_AUDIT.md`。
+
 ### 已确认事实
 
 - [x] `deploy/install-native.sh`定义另一套完整生产安装路径；
