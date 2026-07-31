@@ -22,6 +22,7 @@
     "src/utils/decimalDisplay.ts",
     "src/views/account/index.vue",
     "src/views/account/components/HoldingsPanel.vue",
+    "src/views/sys/login/Login.vue",
     "src/views/sys/login/LoginForm.vue",
     "src/views/sys/register/index.vue",
     "src/views/sys/reset-password/index.vue",
