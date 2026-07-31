@@ -60,7 +60,7 @@ SHA-256：`f722456de6afce3068239a2de51ca58895133aa6cbd1eef6f0af9afc1ab00453`
 - [x] 新增`platform-api/app/venue_reconciliation_routes.py`；
 - [x] 仅迁移五个端点、APIRouter、response models和tags；
 - [x] `main.py`从专用路由模块导入router；
-- [x] Facade继续拥有Repository别名、十五个兼容Delegate及503/422/409/403/404错误映射；
+- [x] Facade继续拥有Repository别名、兼容Delegate及503/422/409/403/404错误映射；
 - [x] EOD、Live Accounting、Live Session和测试继续调用Facade兼容端口；
 - [x] Service、Policy、Repository、Runtime Client、Schemas、Financial Fact、DDL与Decimal未修改；
 - [x] 永久架构测试冻结Service、Facade、Routes与Main四边界；
@@ -88,21 +88,48 @@ SHA-256：`3898d7b32d1413c8fddfe5c024c4c1eea31b67b05561ca66a5e48dd8355f6d93`
 
 Trading、Risk、Formal Accounting与Execution Runtime已有明确且内聚的Owner；EOD与Venue的显式路由混合债务已清除。当前没有新的纯结构切口能够在不扩大策略、SQL、外部副作用或兼容面的前提下产生明确收益，因此停止继续拆分高风险域。
 
-## 当前门禁：Legacy L0只读定性
+## 当前门禁：Phase J / J0旧生产部署定性
 
-审计`projects/risk-control`及旧Go/MySQL资产，确认：
+权威计划：`docs/architecture/PLATFORM_LEGACY_DEPLOYMENT_AUDIT.md`。
 
-1. 当前服务器、进程、定时任务与部署入口；
-2. Go模块、MySQL连接、环境变量、Schema和迁移责任；
-3. 生产数据、用户数据或外部系统依赖；
-4. 与Platform API / Execution Runtime的功能重叠和真实外部依赖；
-5. 活跃资产、历史证据、归档候选和后续清理候选。
+### 已确认仓库事实
 
-完成外部部署与数据证据前，本阶段仅做读取、分类和文档化。
+- [x] `scripts/dev-platform.ps1`定义当前目标三进程：Platform Web、Platform API和Execution Runtime；
+- [x] `deploy/install-native.sh`定义另一套完整生产安装路径；
+- [x] 旧路径构建两个Go服务并安装Nginx、systemd和MySQL依赖；
+- [x] `deploy/README.md`包含固定服务器、MySQL、备份、升级和回滚步骤；
+- [x] `platform-web/.env.production`仍默认请求`/api/auth`、`/api/data`和`/api/data/ws`；
+- [x] 旧Auth Service拥有独立MySQL用户Schema、JWT和管理员初始化；
+- [x] 旧Data Service拥有独立MySQL数据、Bybit Client和NAV Scheduler；
+- [x] 旧服务CORS、安全模型、角色和数据合同不能自动等价为Platform API。
+
+### J0停止条件
+
+在服务器、Nginx、MySQL、用户、凭据、API消费者和数据证据齐备前：
+
+- [ ] 不删除或重命名`projects/risk-control`；
+- [ ] 不删除或改写`deploy/`；
+- [ ] 不修改`.env.production`API路由；
+- [ ] 不自动导入MySQL数据；
+- [ ] 不关闭旧systemd服务；
+- [ ] 不将旧JWT、密码Hash或Bybit任务直接迁入新体系；
+- [ ] 不宣称旧体系为Demo或已废弃。
+
+### J0待取得真实证据
+
+- [ ] 服务器当前仓库目录、分支、HEAD和工作区状态；
+- [ ] systemd、监听端口和实际进程；
+- [ ] Nginx加载配置、域名和TLS状态；
+- [ ] 环境文件存在性和权限，不读取或记录Secret值；
+- [ ] MySQL数据库、表、约束、数据量和最后更新时间；
+- [ ] 用户、角色、审批、密码Hash格式与新身份模型映射；
+- [ ] 账户、净值、Bybit同步和外部写入依赖；
+- [ ] `/api/auth`、`/api/data`及WebSocket的全部真实消费者；
+- [ ] 备份恢复、切换和回滚方案。
 
 ## 后续顺序
 
-Legacy L0定性 → 仓库减负候选 → Windows/TLS/真实Venue与正式会计对账验收。
+J0真实依赖定性 → J1继续维护/受控迁移/确认无依赖三选一 → 仓库减负候选 → Windows/TLS/真实Venue与正式会计对账验收。
 
 ## Protected invariants
 
