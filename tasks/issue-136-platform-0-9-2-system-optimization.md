@@ -22,6 +22,7 @@ Branch: `refactor/issue-136-platform-0-9-2-system-optimization`
 - [x] Phase J / J0仓库证据、凭据净化、Secret Scan增强、只读证据工具和Legacy冻结门禁；
 - [x] Phase J / J2第一轮本地产物与上游托管脚手架清理；
 - [x] Phase J / J2第二轮仓库身份、版本、文档可移植性和MT5桥接路径治理；
+- [x] Phase J / J2第三轮共享VS Code配置和扩展推荐治理；
 - [x] Platform Web / Platform API模块化单体 / Execution Runtime三边界保持不变。
 
 ## 高风险结构治理停止决定
@@ -59,7 +60,7 @@ SHA-256：`e6916a36276e0d9877aa2c99b7ed7cbde31c03aeadc8ae9f0dce1bfb28965271`
 
 GitLab路径权威审计：`docs/architecture/PLATFORM_LEGACY_GITLAB_DEPLOYMENT_AUDIT.md`。
 
-## 当前门禁：Phase J / J2 GitHub仓库减负
+## Phase J / J2 GitHub仓库减负：达到当前停止条件
 
 权威规则：`docs/operations/WORKSPACE_HYGIENE.md`。
 
@@ -101,7 +102,7 @@ SHA-256：`49ebc0157537caa130e3f8db379dd1c7ff8aa5192c01cc7aa25ec31e2bb13aa9`
 视觉Artifact：`8801486707`  
 SHA-256：`5a578af19799e27714ef0045544be14430b8a32c74d147e7a9af1438fa484d2d`
 
-### 第三轮：已实施，等待最终矩阵
+### 第三轮：已验收
 
 - [x] 精简`platform-web/.vscode/settings.json`为当前Platform Web维护需求；
 - [x] 保留pnpm、TypeScript SDK、Volar、ESLint、Stylelint、Prettier、Vue i18n和有效搜索排除；
@@ -109,27 +110,34 @@ SHA-256：`5a578af19799e27714ef0045544be14430b8a32c74d147e7a9af1438fa484d2d`
 - [x] 删除旧`vue.vscode-typescript-vue-plugin`推荐，保留`vue.volar`；
 - [x] 新增共享编辑器配置永久架构测试。
 
-### 暂不处理的GitHub候选
+验证HEAD：`2afbecddfa819a0eba60ada4c5f944ae07ddd922`
+
+- Platform CI `30651892610`
+- Directory `30651893427`
+- Version `30651893075`
+- Secret `30651893154`
+- User E2E `30651893615`
+- Audit `30651893407`
+- Visual `30651892973`
+- Hedge E2E `30651893689`
+- Provider Smoke `30651893126`
+
+视觉Artifact：`8801803176`  
+SHA-256：`126856ca9aa52fbdcc5f6a61a5fee6c930073866e385aa1df0b1b8a539ad3a96`
+
+### 剩余GitHub候选：当前不可安全执行
 
 - [ ] Platform API应用层仍显示历史版本`0.6.0`；
 - [ ] Execution Runtime应用层仍显示历史版本`0.5.0`；
 - [ ] 两个应用文件体积较大，当前只允许安全局部补丁，不做整文件人工重写；
-- [ ] `platform-web/apps/test-server`仍进入pnpm workspace和锁文件，留待锁文件感知切口；
+- [ ] `platform-web/apps/test-server`仍进入pnpm workspace和锁文件，必须使用锁文件感知切口；
 - [ ] 未完成静态引用、路由、构建和锁文件证据前，不批量删除疑似未使用源码。
 
-### J2继续规则
-
-只允许高置信度、已完成引用核验的变更。遇到以下情况立即停止并单独规划：
-
-- 需要重算pnpm锁文件；
-- 影响路由、API、权限、Financial Fact、Decimal、账务或对账；
-- 影响生产配置、Legacy资产或运行时数据；
-- 依赖Windows、服务器、数据库或真实Venue证据；
-- 无法通过完整质量矩阵和56页视觉基线证明无回归。
+当前GitHub连接下，没有其他同时满足“高置信度、无需锁文件、无需局部补丁、不触碰产品合同”的候选。J2按停止条件收口。
 
 ## 后续顺序
 
-完成J2第三轮矩阵 → 评估剩余GitHub高置信度切口 → 延期的J1外部验收 → Windows/TLS/真实Venue与正式会计对账验收 → 所有者批准。
+获得安全局部补丁或锁文件感知能力 → 处理剩余GitHub候选；否则转入延期的J1外部验收、Windows/TLS/真实Venue与正式会计对账验收 → 所有者批准。
 
 ## Protected invariants
 
