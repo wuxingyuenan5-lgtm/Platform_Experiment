@@ -1,6 +1,6 @@
-# Platform Research低风险模块化计划
+# Platform Research与主看板低风险模块化计划
 
-状态：**E3 Research Service宏观历史职责已完成，等待当前HEAD完整矩阵收口**  
+状态：**E4.1 WidgetErrorBoundary已完成，等待最终清理HEAD完整矩阵收口**  
 关联Issue：#136  
 关联Draft PR：#139  
 活动分支：`refactor/issue-136-platform-0-9-2-system-optimization`  
@@ -8,9 +8,9 @@
 
 ## 1. 目标
 
-在不改变Research API合同、权限、页面视觉、数据源语义、Completeness或Last Known Good行为的前提下，降低Research域高频修改所需上下文和单文件职责密度。
+在不改变Research API合同、权限、页面视觉、数据源语义、Completeness或Last Known Good行为的前提下，降低Research域和主看板高频修改所需上下文与单文件职责密度。
 
-保留Platform Web / Platform API / Execution Runtime三大边界，不拆微服务，不引入新的框架、复杂依赖注入或跨域状态容器。
+保留Platform Web / Platform API / Execution Runtime三大边界，不拆微服务，不引入新框架、复杂依赖注入或跨域状态容器。
 
 ## 2. 冻结合同
 
@@ -40,9 +40,10 @@ loading / ready / partial / no_data / stale / error
 
 ### 页面与操作
 
-- Research页面路由、导航、信息层级和主要操作习惯不变；
+- Research和Hedge Board页面路由、导航、信息层级与主要操作习惯不变；
 - 四档视觉基线不变；
-- 观察列表、CSV导出、个股快照和宏观预期交互不变。
+- 观察列表、CSV导出、个股快照和宏观预期交互不变；
+- 组件抽离不得改变DOM语义、CSS类名、Props、默认插槽或错误隔离行为。
 
 ## 3. 当前依赖方向
 
@@ -62,6 +63,9 @@ research_routes
             -> research_provider_errors
             -> research_provider_normalization
             -> research_data_schemas
+
+hedgeBoard/index.vue                             # page orchestration
+    -> components/WidgetErrorBoundary.ts         # local render error isolation only
 ```
 
 `FreeResearchProvider`公开方法、三条Research API与Service调用面保持不变。
@@ -73,7 +77,7 @@ research_routes
 - [x] 建立只读审计脚本；
 - [x] 冻结Provider方法、API合同、状态词汇、LKG和页面视觉边界；
 - [x] 确认原始`research_providers.py`为999行，`FreeResearchProvider`约881行、26个方法；
-- [x] 确认Platform Web主热点仍为约3,772行的`hedgeBoard/index.vue`。
+- [x] 确认Platform Web主热点为约3,772行的`hedgeBoard/index.vue`。
 
 ### E1 — Provider纯归一化层：完成
 
@@ -86,58 +90,18 @@ research_routes
 
 保留`FreeResearchProvider`作为稳定Facade，全部使用显式组合和委托。
 
-#### E2.1 宏观预期Adapter
+- [x] E2.1宏观预期Adapter；
+- [x] E2.2 A股概览Adapter；
+- [x] E2.3a Eastmoney DataCenter Client；
+- [x] E2.3b Stock DataCenter Adapter；
+- [x] E2.3c Stock AkShare Adapter；
+- [x] E2.3d Stock HTTP Adapter；
+- [x] 数据源Endpoint、参数、Header、编码、日期窗口、Decimal、排序、Limit、异常传播和空结果语义保持不变；
+- [x] Adapter不持有缓存、Completeness、LKG或跨请求状态；
+- [x] E2.3d完整质量矩阵通过；
+- [x] E2.3d视觉Artifact ID `8784674299`，SHA-256 `fd0b00faea120390e7ea531cfddaab72e2e931805441f70487c9bb20d50959df`。
 
-- [x] Polymarket请求、分类、概率、排序、Limit和失败语义保持不变；
-- [x] 真实Provider Smoke与完整矩阵通过。
-
-#### E2.2 A股概览Adapter
-
-- [x] 迁移现货、市场宽度、八指数快照、申万和短期情绪；
-- [x] 保持AkShare延迟加载、指数异常隔离及涨跌停池HTTP合同；
-- [x] 完整矩阵通过。
-
-#### E2.3a Eastmoney DataCenter Client
-
-- [x] 建立无状态`EastmoneyDataCenterClient`；
-- [x] 保持URL、Report Name、Filter、分页、Sort、Header、超时、JSON提取和异常传播；
-- [x] Facade保留`datacenter_rows()`兼容委托；
-- [x] 完整矩阵通过。
-
-#### E2.3b Stock DataCenter Adapter
-
-- [x] 迁移融资融券、大宗交易、股东人数、分红、龙虎榜和限售解禁；
-- [x] 保持Report、日期窗口、字段映射、Decimal溢价、席位Top 5和解禁并发；
-- [x] 完整矩阵通过。
-
-#### E2.3c Stock AkShare Adapter
-
-- [x] 迁移`stock_financials`、`stock_forecast`、`stock_valuation_percentile`和`stock_news`；
-- [x] 复用Facade现有AkShare延迟加载器；
-- [x] 保持函数名、参数、字段择优、排序、Limit和空结果语义；
-- [x] Facade四个方法仅改为显式委托；
-- [x] 完整矩阵通过。
-
-#### E2.3d Stock HTTP Adapter
-
-- [x] 迁移`stock_quote`、`stock_reports`、`stock_announcements`、`stock_fund_flow`和`stock_investor_qa`；
-- [x] 保持腾讯GBK行情、东方财富研报/公告/资金流、巨潮互动易的Endpoint、参数、Header和时间转换；
-- [x] 保持行情金额缩放、Decimal和异常传播；
-- [x] Facade五个方法仅改为显式委托；
-- [x] 临时执行器已删除；
-- [x] 完整质量矩阵通过：
-  - Platform CI `30608770712`
-  - Directory `30608770720`
-  - User E2E `30608770763`
-  - Hedge E2E `30608770689`
-  - Visual `30608770701`
-  - Provider Smoke `30608770724`
-  - Secret `30608770741`
-  - Version `30608770714`
-  - Audit `30608770688`
-- [x] 视觉Artifact ID `8784674299`，SHA-256 `fd0b00faea120390e7ea531cfddaab72e2e931805441f70487c9bb20d50959df`。
-
-### E3 — Research Service状态职责：代码完成，最终矩阵待收口
+### E3 — Research Service状态职责：完成
 
 - [x] 建立`research_macro_history.py`；
 - [x] 将宏观概率JSON读取、原子写入、90日窗口、分钟去重和1日/7日变化计算移出Service；
@@ -146,20 +110,59 @@ research_routes
 - [x] Service仅保留`_MACRO_HISTORY`组合调用；
 - [x] `_MACRO_CACHE`、15分钟TTL、`_MACRO_LOCK`、LKG及`ready/stale/error`分支仍在Service；
 - [x] 增加独立契约测试并纳入Pyright；
-- [x] 目标Ruff、Pyright和Research测试通过；
 - [x] 一次性写权限Workflow与脚本已删除；
-- [ ] 以清理和文档同步后的最终HEAD完成全质量矩阵。
+- [x] 完整质量矩阵通过：
+  - Platform CI `30609898871`
+  - Directory `30609898857`
+  - User E2E `30609898866`
+  - Hedge E2E `30609898855`
+  - Visual `30609898845`
+  - Provider Smoke `30609898846`
+  - Secret `30609898863`
+  - Version `30609898859`
+  - Audit `30609898856`
+- [x] 视觉Artifact ID `8785119449`，SHA-256 `67e925d8ef87f549863f211213619127ccbdaf26cb1369365304de7fc4eee8c4`。
 
-### E4 — 主看板渲染组件：下一门禁
+### E4 — 主看板渲染组件：进行中
 
-仅提取无业务请求副作用的内联渲染组件和纯图表数学工具：
+只读盘点确认`hedgeBoard/index.vue`包含11个内联组件：
 
-1. 先只读审计11个内联组件的Props、Emits、DOM、CSS选择器和状态依赖；
-2. 优先选择纯展示、低耦合且已有视觉覆盖的单一组件；
-3. 不移动请求、缓存、观察列表、CSV、个股快照或宏观状态；
-4. 不改变页面路由、DOM语义、CSS类名或四档视觉；
-5. 每个切口独立提交并跑完整矩阵；
-6. 不为追求文件数量机械拆分。
+```text
+TradingViewWidget
+WidgetErrorBoundary
+MetricStrip
+DualAxisChart
+TreasuryFlowChart
+GroupedBarChart
+EtfWeeklyFlowsPanel
+YtdSummaryPanel
+ReserveRanking
+SnapshotDetailTable
+LocalChartWidget
+```
+
+#### E4.1 WidgetErrorBoundary：代码完成，最终矩阵待收口
+
+- [x] 选择最低风险切口：单一字符串Prop、默认插槽、仅本地错误状态，无请求、缓存或路由依赖；
+- [x] 建立`components/WidgetErrorBoundary.ts`并保留原Render Function；
+- [x] 保留`onErrorCaptured`、`return false`、日志、`local-empty`根类、360px最小高度和原中文降级文案；
+- [x] 页面改为显式导入，内联实现与无用Vue导入已删除；
+- [x] `verify-hedge-board-layout.cjs`永久冻结外部委托和错误隔离合同；
+- [x] 将错误的任意`ai`子串门禁收窄为真实AI功能标记，避免误伤`financials`、`mainNet20d`等客观字段；
+- [x] 校正`frontend-no-new-debt.py`：
+  - 新文件继续要求零错误、零警告；
+  - 修改遗留文件按基线与当前逐规则、逐严重度比较，债务不得增加；
+  - 所有实际触碰行必须零诊断；
+  - 修改重命名保留原始基线路径，100%内容重命名继续由目录门禁负责；
+  - Fatal诊断始终失败关闭；
+- [x] 增加架构测试覆盖重命名、触碰行、规则计数、新文件和Fatal行为；
+- [x] 目标组件Lint、真实基线债务比较、策略Type Check和布局合同通过；
+- [x] 一次性写权限Workflow与脚本已删除；
+- [ ] 以文档同步和临时工具清理后的最终HEAD完成全质量矩阵。
+
+#### E4.2 下一候选：待E4.1矩阵通过后只读评估
+
+只比较`MetricStrip`与`LocalChartWidget`的Props、DOM、样式和数据依赖；E4.1未完成前不提交下一组件代码。
 
 ### E5 — A股Composable复核：后置
 
@@ -185,5 +188,6 @@ Draft PR始终保持Open、Draft、Unmerged；不得修改或合并`main`。
 - 不替换AkShare、东方财富、腾讯、巨潮或Polymarket数据源；
 - 不改变真实Provider验收口径；
 - 不改变Execution Runtime或Live Write边界；
-- 不在Research重构中顺带修改Identity、Portfolio、Trading、Risk、Accounting或Reconciliation；
-- 不因行数大而机械拆分显式数据映射。
+- 不在Research或主看板重构中顺带修改Identity、Portfolio、Trading、Risk、Accounting或Reconciliation；
+- 不因行数大而机械拆分显式数据映射；
+- 不为通过格式门禁而批量格式化整个历史热点文件。
