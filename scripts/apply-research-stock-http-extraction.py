@@ -85,6 +85,11 @@ def main() -> None:
         1,
     )
     provider = provider.replace(
+        "from typing import Any\n\n\nfrom app.research_data_schemas import",
+        "from typing import Any\n\nfrom app.research_data_schemas import",
+        1,
+    )
+    provider = provider.replace(
         'TENCENT_QUOTE_URL = "https://qt.gtimg.cn/q="\n',
         "",
         1,
