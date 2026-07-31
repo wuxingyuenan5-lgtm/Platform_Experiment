@@ -55,9 +55,15 @@ def test_market_snapshot_tables_have_one_static_data_owner() -> None:
     assert "export interface SnapshotTableRow" in module
     assert "export interface SnapshotTableGroup" in module
     assert "export const LOCAL_MARKET_DETAIL_TABLES" in module
-    assert f'export const {{HASH_NAME}} = "{{EXPECTED_SOURCE_SHA256}}";' in module
+    assert (
+        f'export const MARKET_SNAPSHOT_SOURCE_SHA256 = "{{EXPECTED_SOURCE_SHA256}}";'
+        in module
+    )
 
-    body, _ = module.split("\\nexport const {HASH_NAME}", maxsplit=1)
+    body, _ = module.split(
+        "\\nexport const MARKET_SNAPSHOT_SOURCE_SHA256",
+        maxsplit=1,
+    )
     normalized = body.replace(
         "export interface SnapshotTableRow",
         "interface SnapshotTableRow",
