@@ -8,6 +8,7 @@ from typing import Any
 
 import pytest
 
+import app.research_macro_history as macro_history
 import app.research_service as service
 from app.research_data_schemas import (
     AShareIndexSnapshot,
@@ -138,12 +139,12 @@ def test_macro_history_calculates_seven_day_change(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
-    store = service.MacroProbabilityHistoryStore(tmp_path / "macro.json")
+    store = macro_history.MacroProbabilityHistoryStore(tmp_path / "macro.json")
     observed = [
         datetime(2026, 7, 20, 8, 0, tzinfo=UTC),
         datetime(2026, 7, 29, 8, 0, tzinfo=UTC),
     ]
-    monkeypatch.setattr(service, "_now", lambda: observed.pop(0))
+    monkeypatch.setattr(macro_history, "_now", lambda: observed.pop(0))
 
     first = MacroExpectationEvent(
         event_id="fed-cut",
