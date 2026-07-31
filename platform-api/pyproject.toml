@@ -78,6 +78,7 @@ include = [
   "app/user_admin_note_routes.py",
   "app/user_admin_notes.py",
   "app/user_admin_policy.py",
+  "app/user_admin_presenter.py",
   "app/user_admin_repository.py",
   "app/user_admin_routes.py",
   "app/user_admin_schemas.py",
