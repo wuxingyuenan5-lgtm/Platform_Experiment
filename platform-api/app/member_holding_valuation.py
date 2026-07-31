@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
-from typing import cast
+from typing import Protocol, cast
 
 from app.member_holding_decimal import (
     HoldingDecimalError,
@@ -9,13 +9,39 @@ from app.member_holding_decimal import (
     canonical_decimal,
     parse_non_negative_decimal,
 )
-from app.member_holding_repository import FundNavRecord, FundRecord, MemberHoldingRecord
 from app.member_holding_schemas import (
     HoldingSource,
     HoldingStatus,
     MemberHoldingResponse,
     NavStatus,
 )
+
+
+class FundValuationRecord(Protocol):
+    id: str
+    name: str
+    fund_code: str | None
+    base_currency: str
+
+
+class HoldingValuationRecord(Protocol):
+    id: str
+    member_user_id: str
+    fund_id: str
+    share_quantity: str
+    cumulative_invested: str
+    confirmed_at: str | None
+    as_of: str
+    source: str
+    status: str
+    row_version: int
+    updated_at: str
+
+
+class NavValuationRecord(Protocol):
+    unit_nav: str
+    valuation_time: str
+    currency: str
 
 
 class HoldingValuationError(ValueError):
@@ -34,9 +60,9 @@ def _parse_aware(value: str, *, field: str) -> datetime:
 
 def build_holding_response(
     *,
-    fund: FundRecord,
-    holding: MemberHoldingRecord,
-    nav: FundNavRecord | None,
+    fund: FundValuationRecord,
+    holding: HoldingValuationRecord,
+    nav: NavValuationRecord | None,
     current: datetime,
     stale_after_hours: int,
 ) -> MemberHoldingResponse:
