@@ -3,7 +3,11 @@
     <div class="hedge-board">
       <section class="strategy-top-toolbar">
         <div class="strategy-top-toolbar__left">
-          <CompactSegmentTabs :items="hedgeBoardTabs" :model-value="activeCategory" @update:modelValue="selectBoardCategory" />
+          <CompactSegmentTabs
+            :items="hedgeBoardTabs"
+            :model-value="activeCategory"
+            @update:modelValue="selectBoardCategory"
+          />
         </div>
       </section>
 
@@ -13,7 +17,11 @@
         :market-tabs="terminalTabs"
       />
 
-      <div v-else class="terminal-content" :class="{ 'terminal-content--gold': useUnifiedResearchUi }">
+      <div
+        v-else
+        class="terminal-content"
+        :class="{ 'terminal-content--gold': useUnifiedResearchUi }"
+      >
         <HedgeResearchModule
           :module-id="activeModule.id"
           :module-label="activeModule.label"
@@ -49,17 +57,7 @@
 </template>
 
 <script setup lang="ts">
-  import {
-    computed,
-    defineComponent,
-    h,
-    nextTick,
-    onBeforeUnmount,
-    onMounted,
-    PropType,
-    ref,
-    watch,
-  } from 'vue';
+  import { computed, defineComponent, h, nextTick, onMounted, PropType, ref, watch } from 'vue';
   import { useRoute, useRouter } from 'vue-router';
   import { PageWrapper } from '@/components/Page';
   import CompactSegmentTabs from '@/views/strategy/shared/CompactSegmentTabs.vue';
@@ -67,6 +65,7 @@
   import MarketTerminalPage from './components/MarketTerminalPage.vue';
   import ToolGroupSection from './tradingTools/components/ToolGroupSection.vue';
   import TerminalDetailPanel from './components/TerminalDetailPanel.vue';
+  import TradingViewWidget from './components/TradingViewWidget';
   import WidgetErrorBoundary from './components/WidgetErrorBoundary';
   import MetricStrip from './components/MetricStrip';
   import ReserveRanking from './components/ReserveRanking';
@@ -77,10 +76,7 @@
     type WidgetConfig,
   } from './nativeData/dashboardClean';
   import { marketData } from './nativeData/generated/marketData';
-  import {
-    marketTerminalConfigs,
-    type TerminalMarketId,
-  } from './nativeData/marketTerminal';
+  import { marketTerminalConfigs, type TerminalMarketId } from './nativeData/marketTerminal';
   import {
     loadTradingToolBoardCatalog,
     type TradingToolCatalogSection,
@@ -140,37 +136,376 @@
   const CHART_PADDING = { top: 28, right: 82, bottom: 50, left: 74 };
   const ETF_REFERENCE_URL =
     'https://china.gold.org/goldhub/data/gold-etfs-holdings-and-flows#from-login=1&login-type=wechat';
-  const LOCAL_MARKET_DETAIL_TABLES: Record<'gold-market-detail-table' | 'crypto-market-detail-table', SnapshotTableGroup[]> = {
+  const LOCAL_MARKET_DETAIL_TABLES: Record<
+    'gold-market-detail-table' | 'crypto-market-detail-table',
+    SnapshotTableGroup[]
+  > = {
     'gold-market-detail-table': [
       {
         label: '贵金属',
         rows: [
-          { name: '现货黄金', symbol: 'XAUUSD', price: '2,332.4', d1: '+0.80%', ytd: '+12.80%', qtd: '+3.10%', w1: '+1.60%', m1: '+3.10%', y1: '+18.40%', high: '-2.1%', d10: '▲', d20: '▲', d50: '▲', d200: '▲', x2050: '▲', x50200: '▲', spark: [10, 11, 12, 13, 12, 11, 12, 13, 14, 15, 14, 13, 14, 15, 16, 16, 17, 18, 19, 18, 19, 20, 21, 22] },
-          { name: '白银', symbol: 'XAGUSD', price: '29.74', d1: '+1.20%', ytd: '+15.60%', qtd: '+6.40%', w1: '+2.80%', m1: '+6.40%', y1: '+23.90%', high: '-4.7%', d10: '▲', d20: '▲', d50: '▲', d200: '▲', x2050: '▲', x50200: '▲', spark: [7, 8, 9, 10, 10, 11, 12, 13, 12, 11, 12, 13, 14, 15, 15, 16, 17, 18, 18, 19, 20, 21, 22, 22] },
-          { name: 'SPDR黄金ETF', symbol: 'GLD', price: '214.8', d1: '+0.70%', ytd: '+11.70%', qtd: '+2.60%', w1: '+1.40%', m1: '+2.60%', y1: '+16.10%', high: '-2.8%', d10: '▲', d20: '▲', d50: '▲', d200: '▲', x2050: '▲', x50200: '▲', spark: [8, 9, 10, 10, 11, 11, 12, 13, 12, 12, 13, 14, 14, 15, 16, 16, 17, 17, 18, 19, 19, 20, 21, 21] },
-          { name: '金矿股ETF', symbol: 'GDX', price: '36.20', d1: '-0.40%', ytd: '+9.30%', qtd: '+4.80%', w1: '+0.90%', m1: '+4.80%', y1: '+14.70%', high: '-7.3%', d10: '▼', d20: '▲', d50: '▲', d200: '▲', x2050: '▲', x50200: '▲', spark: [14, 14, 15, 16, 15, 14, 13, 12, 13, 14, 15, 14, 13, 12, 13, 14, 15, 16, 17, 16, 15, 16, 17, 16] },
-          { name: '金银比', symbol: 'XAUXAG', price: '78.40', d1: '-0.30%', ytd: '-1.90%', qtd: '-2.40%', w1: '-1.10%', m1: '-2.40%', y1: '-4.60%', high: '-9.8%', d10: '▼', d20: '▼', d50: '▼', d200: '▲', x2050: '▼', x50200: '▲', spark: [18, 18, 17, 17, 16, 16, 15, 15, 14, 14, 13, 13, 12, 12, 11, 11, 10, 10, 9, 9, 8, 8, 8, 7] },
-          { name: '铂金', symbol: 'XPTUSD', price: '983.1', d1: '+0.30%', ytd: '+5.40%', qtd: '+1.70%', w1: '+0.50%', m1: '+1.70%', y1: '+7.60%', high: '-12.3%', d10: '▲', d20: '▲', d50: '▼', d200: '▲', x2050: '▲', x50200: '▲', spark: [8, 8, 9, 9, 10, 10, 11, 10, 10, 11, 11, 12, 12, 13, 13, 12, 12, 13, 14, 14, 15, 15, 16, 16] },
+          {
+            name: '现货黄金',
+            symbol: 'XAUUSD',
+            price: '2,332.4',
+            d1: '+0.80%',
+            ytd: '+12.80%',
+            qtd: '+3.10%',
+            w1: '+1.60%',
+            m1: '+3.10%',
+            y1: '+18.40%',
+            high: '-2.1%',
+            d10: '▲',
+            d20: '▲',
+            d50: '▲',
+            d200: '▲',
+            x2050: '▲',
+            x50200: '▲',
+            spark: [
+              10, 11, 12, 13, 12, 11, 12, 13, 14, 15, 14, 13, 14, 15, 16, 16, 17, 18, 19, 18, 19,
+              20, 21, 22,
+            ],
+          },
+          {
+            name: '白银',
+            symbol: 'XAGUSD',
+            price: '29.74',
+            d1: '+1.20%',
+            ytd: '+15.60%',
+            qtd: '+6.40%',
+            w1: '+2.80%',
+            m1: '+6.40%',
+            y1: '+23.90%',
+            high: '-4.7%',
+            d10: '▲',
+            d20: '▲',
+            d50: '▲',
+            d200: '▲',
+            x2050: '▲',
+            x50200: '▲',
+            spark: [
+              7, 8, 9, 10, 10, 11, 12, 13, 12, 11, 12, 13, 14, 15, 15, 16, 17, 18, 18, 19, 20, 21,
+              22, 22,
+            ],
+          },
+          {
+            name: 'SPDR黄金ETF',
+            symbol: 'GLD',
+            price: '214.8',
+            d1: '+0.70%',
+            ytd: '+11.70%',
+            qtd: '+2.60%',
+            w1: '+1.40%',
+            m1: '+2.60%',
+            y1: '+16.10%',
+            high: '-2.8%',
+            d10: '▲',
+            d20: '▲',
+            d50: '▲',
+            d200: '▲',
+            x2050: '▲',
+            x50200: '▲',
+            spark: [
+              8, 9, 10, 10, 11, 11, 12, 13, 12, 12, 13, 14, 14, 15, 16, 16, 17, 17, 18, 19, 19, 20,
+              21, 21,
+            ],
+          },
+          {
+            name: '金矿股ETF',
+            symbol: 'GDX',
+            price: '36.20',
+            d1: '-0.40%',
+            ytd: '+9.30%',
+            qtd: '+4.80%',
+            w1: '+0.90%',
+            m1: '+4.80%',
+            y1: '+14.70%',
+            high: '-7.3%',
+            d10: '▼',
+            d20: '▲',
+            d50: '▲',
+            d200: '▲',
+            x2050: '▲',
+            x50200: '▲',
+            spark: [
+              14, 14, 15, 16, 15, 14, 13, 12, 13, 14, 15, 14, 13, 12, 13, 14, 15, 16, 17, 16, 15,
+              16, 17, 16,
+            ],
+          },
+          {
+            name: '金银比',
+            symbol: 'XAUXAG',
+            price: '78.40',
+            d1: '-0.30%',
+            ytd: '-1.90%',
+            qtd: '-2.40%',
+            w1: '-1.10%',
+            m1: '-2.40%',
+            y1: '-4.60%',
+            high: '-9.8%',
+            d10: '▼',
+            d20: '▼',
+            d50: '▼',
+            d200: '▲',
+            x2050: '▼',
+            x50200: '▲',
+            spark: [
+              18, 18, 17, 17, 16, 16, 15, 15, 14, 14, 13, 13, 12, 12, 11, 11, 10, 10, 9, 9, 8, 8, 8,
+              7,
+            ],
+          },
+          {
+            name: '铂金',
+            symbol: 'XPTUSD',
+            price: '983.1',
+            d1: '+0.30%',
+            ytd: '+5.40%',
+            qtd: '+1.70%',
+            w1: '+0.50%',
+            m1: '+1.70%',
+            y1: '+7.60%',
+            high: '-12.3%',
+            d10: '▲',
+            d20: '▲',
+            d50: '▼',
+            d200: '▲',
+            x2050: '▲',
+            x50200: '▲',
+            spark: [
+              8, 8, 9, 9, 10, 10, 11, 10, 10, 11, 11, 12, 12, 13, 13, 12, 12, 13, 14, 14, 15, 15,
+              16, 16,
+            ],
+          },
         ],
       },
       {
         label: '商品横截面',
         rows: [
-          { name: 'WTI原油', symbol: 'USOIL', price: '81.60', d1: '-0.70%', ytd: '+13.20%', qtd: '+4.10%', w1: '+1.90%', m1: '+4.10%', y1: '+8.70%', high: '-6.4%', d10: '▼', d20: '▲', d50: '▲', d200: '▲', x2050: '▲', x50200: '▲', spark: [16, 17, 18, 18, 17, 16, 15, 14, 13, 12, 12, 13, 14, 15, 15, 16, 17, 18, 18, 19, 20, 19, 18, 17] },
-          { name: '布伦特原油', symbol: 'BRENT', price: '84.10', d1: '-0.50%', ytd: '+11.80%', qtd: '+3.90%', w1: '+1.60%', m1: '+3.70%', y1: '+7.20%', high: '-5.9%', d10: '▼', d20: '▲', d50: '▲', d200: '▲', x2050: '▲', x50200: '▲', spark: [15, 16, 16, 17, 16, 15, 14, 13, 13, 12, 12, 13, 14, 14, 15, 16, 17, 17, 18, 18, 19, 18, 17, 16] },
-          { name: '铜', symbol: 'HG1!', price: '4.46', d1: '+0.50%', ytd: '+10.40%', qtd: '+2.10%', w1: '-1.30%', m1: '+2.10%', y1: '+17.80%', high: '-8.1%', d10: '▲', d20: '▲', d50: '▲', d200: '▲', x2050: '▲', x50200: '▲', spark: [8, 8, 9, 10, 11, 12, 12, 13, 14, 15, 15, 16, 16, 17, 18, 18, 19, 20, 19, 20, 21, 22, 22, 21] },
-          { name: '天然气', symbol: 'NG1!', price: '2.81', d1: '+1.10%', ytd: '+6.90%', qtd: '-2.50%', w1: '+4.30%', m1: '-2.50%', y1: '-8.20%', high: '-18.3%', d10: '▲', d20: '▲', d50: '▼', d200: '▼', x2050: '▼', x50200: '▼', spark: [6, 6, 7, 7, 8, 9, 9, 10, 10, 11, 12, 12, 11, 10, 10, 11, 12, 13, 14, 14, 15, 15, 16, 16] },
-          { name: '彭博商品指数', symbol: 'BCOM', price: '101.3', d1: '+0.20%', ytd: '+5.80%', qtd: '+1.90%', w1: '+0.60%', m1: '+1.90%', y1: '+7.40%', high: '-3.2%', d10: '▲', d20: '▲', d50: '▲', d200: '▲', x2050: '▲', x50200: '▲', spark: [8, 9, 10, 10, 10, 11, 11, 12, 12, 13, 13, 14, 14, 15, 15, 15, 16, 16, 17, 17, 18, 18, 19, 19] },
-          { name: '白银ETF', symbol: 'SLV', price: '27.10', d1: '+1.00%', ytd: '+14.80%', qtd: '+5.50%', w1: '+2.30%', m1: '+5.50%', y1: '+21.60%', high: '-5.1%', d10: '▲', d20: '▲', d50: '▲', d200: '▲', x2050: '▲', x50200: '▲', spark: [7, 8, 8, 9, 10, 10, 11, 12, 12, 13, 13, 14, 14, 15, 16, 16, 17, 18, 18, 19, 20, 20, 21, 21] },
+          {
+            name: 'WTI原油',
+            symbol: 'USOIL',
+            price: '81.60',
+            d1: '-0.70%',
+            ytd: '+13.20%',
+            qtd: '+4.10%',
+            w1: '+1.90%',
+            m1: '+4.10%',
+            y1: '+8.70%',
+            high: '-6.4%',
+            d10: '▼',
+            d20: '▲',
+            d50: '▲',
+            d200: '▲',
+            x2050: '▲',
+            x50200: '▲',
+            spark: [
+              16, 17, 18, 18, 17, 16, 15, 14, 13, 12, 12, 13, 14, 15, 15, 16, 17, 18, 18, 19, 20,
+              19, 18, 17,
+            ],
+          },
+          {
+            name: '布伦特原油',
+            symbol: 'BRENT',
+            price: '84.10',
+            d1: '-0.50%',
+            ytd: '+11.80%',
+            qtd: '+3.90%',
+            w1: '+1.60%',
+            m1: '+3.70%',
+            y1: '+7.20%',
+            high: '-5.9%',
+            d10: '▼',
+            d20: '▲',
+            d50: '▲',
+            d200: '▲',
+            x2050: '▲',
+            x50200: '▲',
+            spark: [
+              15, 16, 16, 17, 16, 15, 14, 13, 13, 12, 12, 13, 14, 14, 15, 16, 17, 17, 18, 18, 19,
+              18, 17, 16,
+            ],
+          },
+          {
+            name: '铜',
+            symbol: 'HG1!',
+            price: '4.46',
+            d1: '+0.50%',
+            ytd: '+10.40%',
+            qtd: '+2.10%',
+            w1: '-1.30%',
+            m1: '+2.10%',
+            y1: '+17.80%',
+            high: '-8.1%',
+            d10: '▲',
+            d20: '▲',
+            d50: '▲',
+            d200: '▲',
+            x2050: '▲',
+            x50200: '▲',
+            spark: [
+              8, 8, 9, 10, 11, 12, 12, 13, 14, 15, 15, 16, 16, 17, 18, 18, 19, 20, 19, 20, 21, 22,
+              22, 21,
+            ],
+          },
+          {
+            name: '天然气',
+            symbol: 'NG1!',
+            price: '2.81',
+            d1: '+1.10%',
+            ytd: '+6.90%',
+            qtd: '-2.50%',
+            w1: '+4.30%',
+            m1: '-2.50%',
+            y1: '-8.20%',
+            high: '-18.3%',
+            d10: '▲',
+            d20: '▲',
+            d50: '▼',
+            d200: '▼',
+            x2050: '▼',
+            x50200: '▼',
+            spark: [
+              6, 6, 7, 7, 8, 9, 9, 10, 10, 11, 12, 12, 11, 10, 10, 11, 12, 13, 14, 14, 15, 15, 16,
+              16,
+            ],
+          },
+          {
+            name: '彭博商品指数',
+            symbol: 'BCOM',
+            price: '101.3',
+            d1: '+0.20%',
+            ytd: '+5.80%',
+            qtd: '+1.90%',
+            w1: '+0.60%',
+            m1: '+1.90%',
+            y1: '+7.40%',
+            high: '-3.2%',
+            d10: '▲',
+            d20: '▲',
+            d50: '▲',
+            d200: '▲',
+            x2050: '▲',
+            x50200: '▲',
+            spark: [
+              8, 9, 10, 10, 10, 11, 11, 12, 12, 13, 13, 14, 14, 15, 15, 15, 16, 16, 17, 17, 18, 18,
+              19, 19,
+            ],
+          },
+          {
+            name: '白银ETF',
+            symbol: 'SLV',
+            price: '27.10',
+            d1: '+1.00%',
+            ytd: '+14.80%',
+            qtd: '+5.50%',
+            w1: '+2.30%',
+            m1: '+5.50%',
+            y1: '+21.60%',
+            high: '-5.1%',
+            d10: '▲',
+            d20: '▲',
+            d50: '▲',
+            d200: '▲',
+            x2050: '▲',
+            x50200: '▲',
+            spark: [
+              7, 8, 8, 9, 10, 10, 11, 12, 12, 13, 13, 14, 14, 15, 16, 16, 17, 18, 18, 19, 20, 20,
+              21, 21,
+            ],
+          },
         ],
       },
       {
         label: '矿业与权益代理',
         rows: [
-          { name: '小盘金矿ETF', symbol: 'GDXJ', price: '45.87', d1: '-0.60%', ytd: '+7.80%', qtd: '+5.10%', w1: '+0.50%', m1: '+3.90%', y1: '+11.60%', high: '-8.9%', d10: '▼', d20: '▲', d50: '▲', d200: '▲', x2050: '▲', x50200: '▲', spark: [12, 13, 14, 15, 14, 13, 12, 11, 11, 12, 13, 14, 13, 12, 12, 13, 14, 15, 16, 15, 14, 15, 15, 14] },
-          { name: '巴里克黄金', symbol: 'GOLD', price: '18.46', d1: '-0.20%', ytd: '+10.10%', qtd: '+4.60%', w1: '+0.80%', m1: '+4.60%', y1: '+13.40%', high: '-9.7%', d10: '▼', d20: '▲', d50: '▲', d200: '▲', x2050: '▲', x50200: '▲', spark: [11, 11, 12, 12, 13, 13, 12, 12, 13, 13, 14, 14, 13, 13, 14, 14, 15, 15, 16, 15, 15, 16, 16, 17] },
-          { name: '纽曼矿业', symbol: 'NEM', price: '41.22', d1: '-0.50%', ytd: '+8.90%', qtd: '+3.90%', w1: '+0.70%', m1: '+3.90%', y1: '+12.80%', high: '-10.5%', d10: '▼', d20: '▲', d50: '▲', d200: '▲', x2050: '▲', x50200: '▲', spark: [12, 12, 13, 14, 13, 12, 12, 11, 12, 13, 13, 14, 13, 13, 14, 14, 15, 15, 16, 15, 15, 16, 16, 15] },
-          { name: '金矿股指数', symbol: 'HUI', price: '276.5', d1: '-0.80%', ytd: '+9.80%', qtd: '+5.30%', w1: '+0.60%', m1: '+4.20%', y1: '+15.90%', high: '-7.8%', d10: '▼', d20: '▲', d50: '▲', d200: '▲', x2050: '▲', x50200: '▲', spark: [13, 13, 14, 15, 15, 14, 13, 13, 14, 15, 15, 14, 14, 15, 15, 16, 16, 17, 18, 17, 17, 18, 18, 17] },
+          {
+            name: '小盘金矿ETF',
+            symbol: 'GDXJ',
+            price: '45.87',
+            d1: '-0.60%',
+            ytd: '+7.80%',
+            qtd: '+5.10%',
+            w1: '+0.50%',
+            m1: '+3.90%',
+            y1: '+11.60%',
+            high: '-8.9%',
+            d10: '▼',
+            d20: '▲',
+            d50: '▲',
+            d200: '▲',
+            x2050: '▲',
+            x50200: '▲',
+            spark: [
+              12, 13, 14, 15, 14, 13, 12, 11, 11, 12, 13, 14, 13, 12, 12, 13, 14, 15, 16, 15, 14,
+              15, 15, 14,
+            ],
+          },
+          {
+            name: '巴里克黄金',
+            symbol: 'GOLD',
+            price: '18.46',
+            d1: '-0.20%',
+            ytd: '+10.10%',
+            qtd: '+4.60%',
+            w1: '+0.80%',
+            m1: '+4.60%',
+            y1: '+13.40%',
+            high: '-9.7%',
+            d10: '▼',
+            d20: '▲',
+            d50: '▲',
+            d200: '▲',
+            x2050: '▲',
+            x50200: '▲',
+            spark: [
+              11, 11, 12, 12, 13, 13, 12, 12, 13, 13, 14, 14, 13, 13, 14, 14, 15, 15, 16, 15, 15,
+              16, 16, 17,
+            ],
+          },
+          {
+            name: '纽曼矿业',
+            symbol: 'NEM',
+            price: '41.22',
+            d1: '-0.50%',
+            ytd: '+8.90%',
+            qtd: '+3.90%',
+            w1: '+0.70%',
+            m1: '+3.90%',
+            y1: '+12.80%',
+            high: '-10.5%',
+            d10: '▼',
+            d20: '▲',
+            d50: '▲',
+            d200: '▲',
+            x2050: '▲',
+            x50200: '▲',
+            spark: [
+              12, 12, 13, 14, 13, 12, 12, 11, 12, 13, 13, 14, 13, 13, 14, 14, 15, 15, 16, 15, 15,
+              16, 16, 15,
+            ],
+          },
+          {
+            name: '金矿股指数',
+            symbol: 'HUI',
+            price: '276.5',
+            d1: '-0.80%',
+            ytd: '+9.80%',
+            qtd: '+5.30%',
+            w1: '+0.60%',
+            m1: '+4.20%',
+            y1: '+15.90%',
+            high: '-7.8%',
+            d10: '▼',
+            d20: '▲',
+            d50: '▲',
+            d200: '▲',
+            x2050: '▲',
+            x50200: '▲',
+            spark: [
+              13, 13, 14, 15, 15, 14, 13, 13, 14, 15, 15, 14, 14, 15, 15, 16, 16, 17, 18, 17, 17,
+              18, 18, 17,
+            ],
+          },
         ],
       },
     ],
@@ -178,34 +513,411 @@
       {
         label: '主要指数',
         rows: [
-          { name: '比特币', symbol: 'BTC', price: '62,840', d1: '+1.50%', ytd: '+46.70%', qtd: '+8.20%', w1: '+3.80%', m1: '+8.20%', y1: '+112.50%', high: '-6.1%', d10: '▲', d20: '▲', d50: '▲', d200: '▲', x2050: '▲', x50200: '▲', spark: [9, 10, 10, 11, 12, 12, 13, 14, 13, 14, 15, 16, 16, 17, 18, 18, 19, 20, 21, 21, 22, 23, 24, 24] },
-          { name: '以太坊', symbol: 'ETH', price: '3,438', d1: '+1.10%', ytd: '+39.80%', qtd: '+6.60%', w1: '+2.90%', m1: '+6.60%', y1: '+84.30%', high: '-8.7%', d10: '▲', d20: '▲', d50: '▲', d200: '▲', x2050: '▲', x50200: '▲', spark: [8, 8, 9, 10, 10, 11, 12, 12, 13, 14, 14, 15, 15, 16, 17, 17, 18, 19, 20, 20, 21, 22, 22, 23] },
-          { name: 'Solana', symbol: 'SOL', price: '146.3', d1: '+2.60%', ytd: '+43.10%', qtd: '+11.40%', w1: '+5.20%', m1: '+11.40%', y1: '+97.70%', high: '-10.9%', d10: '▲', d20: '▲', d50: '▲', d200: '▲', x2050: '▲', x50200: '▲', spark: [6, 7, 8, 9, 9, 10, 11, 12, 12, 13, 14, 15, 15, 16, 17, 18, 18, 19, 20, 21, 22, 22, 23, 24] },
-          { name: 'BNB', symbol: 'BNB', price: '581.7', d1: '+0.90%', ytd: '+27.90%', qtd: '+4.50%', w1: '+2.10%', m1: '+4.50%', y1: '+69.40%', high: '-7.4%', d10: '▲', d20: '▲', d50: '▲', d200: '▲', x2050: '▲', x50200: '▲', spark: [7, 8, 8, 9, 10, 10, 11, 12, 12, 13, 13, 14, 15, 15, 16, 16, 17, 18, 18, 19, 20, 20, 21, 21] },
-          { name: 'XRP', symbol: 'XRP', price: '0.51', d1: '-0.60%', ytd: '-18.60%', qtd: '-3.70%', w1: '+1.20%', m1: '-3.70%', y1: '+4.90%', high: '-21.6%', d10: '▼', d20: '▼', d50: '▼', d200: '▲', x2050: '▼', x50200: '▼', spark: [14, 14, 13, 13, 12, 12, 11, 11, 10, 10, 9, 9, 8, 8, 7, 7, 7, 6, 6, 6, 5, 5, 5, 5] },
-          { name: '狗狗币', symbol: 'DOGE', price: '0.124', d1: '+3.40%', ytd: '+22.30%', qtd: '+12.60%', w1: '+8.10%', m1: '+12.60%', y1: '+91.70%', high: '-15.8%', d10: '▲', d20: '▲', d50: '▲', d200: '▲', x2050: '▲', x50200: '▲', spark: [5, 6, 6, 7, 8, 9, 9, 10, 11, 12, 12, 13, 14, 14, 15, 16, 17, 18, 18, 19, 20, 21, 22, 23] },
-          { name: 'Toncoin', symbol: 'TON', price: '7.12', d1: '+0.70%', ytd: '+18.60%', qtd: '+5.40%', w1: '+1.40%', m1: '+5.40%', y1: '+66.80%', high: '-8.4%', d10: '▲', d20: '▲', d50: '▲', d200: '▲', x2050: '▲', x50200: '▲', spark: [7, 7, 8, 8, 9, 9, 10, 10, 11, 11, 12, 12, 13, 13, 14, 15, 15, 16, 17, 17, 18, 19, 19, 20] },
+          {
+            name: '比特币',
+            symbol: 'BTC',
+            price: '62,840',
+            d1: '+1.50%',
+            ytd: '+46.70%',
+            qtd: '+8.20%',
+            w1: '+3.80%',
+            m1: '+8.20%',
+            y1: '+112.50%',
+            high: '-6.1%',
+            d10: '▲',
+            d20: '▲',
+            d50: '▲',
+            d200: '▲',
+            x2050: '▲',
+            x50200: '▲',
+            spark: [
+              9, 10, 10, 11, 12, 12, 13, 14, 13, 14, 15, 16, 16, 17, 18, 18, 19, 20, 21, 21, 22, 23,
+              24, 24,
+            ],
+          },
+          {
+            name: '以太坊',
+            symbol: 'ETH',
+            price: '3,438',
+            d1: '+1.10%',
+            ytd: '+39.80%',
+            qtd: '+6.60%',
+            w1: '+2.90%',
+            m1: '+6.60%',
+            y1: '+84.30%',
+            high: '-8.7%',
+            d10: '▲',
+            d20: '▲',
+            d50: '▲',
+            d200: '▲',
+            x2050: '▲',
+            x50200: '▲',
+            spark: [
+              8, 8, 9, 10, 10, 11, 12, 12, 13, 14, 14, 15, 15, 16, 17, 17, 18, 19, 20, 20, 21, 22,
+              22, 23,
+            ],
+          },
+          {
+            name: 'Solana',
+            symbol: 'SOL',
+            price: '146.3',
+            d1: '+2.60%',
+            ytd: '+43.10%',
+            qtd: '+11.40%',
+            w1: '+5.20%',
+            m1: '+11.40%',
+            y1: '+97.70%',
+            high: '-10.9%',
+            d10: '▲',
+            d20: '▲',
+            d50: '▲',
+            d200: '▲',
+            x2050: '▲',
+            x50200: '▲',
+            spark: [
+              6, 7, 8, 9, 9, 10, 11, 12, 12, 13, 14, 15, 15, 16, 17, 18, 18, 19, 20, 21, 22, 22, 23,
+              24,
+            ],
+          },
+          {
+            name: 'BNB',
+            symbol: 'BNB',
+            price: '581.7',
+            d1: '+0.90%',
+            ytd: '+27.90%',
+            qtd: '+4.50%',
+            w1: '+2.10%',
+            m1: '+4.50%',
+            y1: '+69.40%',
+            high: '-7.4%',
+            d10: '▲',
+            d20: '▲',
+            d50: '▲',
+            d200: '▲',
+            x2050: '▲',
+            x50200: '▲',
+            spark: [
+              7, 8, 8, 9, 10, 10, 11, 12, 12, 13, 13, 14, 15, 15, 16, 16, 17, 18, 18, 19, 20, 20,
+              21, 21,
+            ],
+          },
+          {
+            name: 'XRP',
+            symbol: 'XRP',
+            price: '0.51',
+            d1: '-0.60%',
+            ytd: '-18.60%',
+            qtd: '-3.70%',
+            w1: '+1.20%',
+            m1: '-3.70%',
+            y1: '+4.90%',
+            high: '-21.6%',
+            d10: '▼',
+            d20: '▼',
+            d50: '▼',
+            d200: '▲',
+            x2050: '▼',
+            x50200: '▼',
+            spark: [
+              14, 14, 13, 13, 12, 12, 11, 11, 10, 10, 9, 9, 8, 8, 7, 7, 7, 6, 6, 6, 5, 5, 5, 5,
+            ],
+          },
+          {
+            name: '狗狗币',
+            symbol: 'DOGE',
+            price: '0.124',
+            d1: '+3.40%',
+            ytd: '+22.30%',
+            qtd: '+12.60%',
+            w1: '+8.10%',
+            m1: '+12.60%',
+            y1: '+91.70%',
+            high: '-15.8%',
+            d10: '▲',
+            d20: '▲',
+            d50: '▲',
+            d200: '▲',
+            x2050: '▲',
+            x50200: '▲',
+            spark: [
+              5, 6, 6, 7, 8, 9, 9, 10, 11, 12, 12, 13, 14, 14, 15, 16, 17, 18, 18, 19, 20, 21, 22,
+              23,
+            ],
+          },
+          {
+            name: 'Toncoin',
+            symbol: 'TON',
+            price: '7.12',
+            d1: '+0.70%',
+            ytd: '+18.60%',
+            qtd: '+5.40%',
+            w1: '+1.40%',
+            m1: '+5.40%',
+            y1: '+66.80%',
+            high: '-8.4%',
+            d10: '▲',
+            d20: '▲',
+            d50: '▲',
+            d200: '▲',
+            x2050: '▲',
+            x50200: '▲',
+            spark: [
+              7, 7, 8, 8, 9, 9, 10, 10, 11, 11, 12, 12, 13, 13, 14, 15, 15, 16, 17, 17, 18, 19, 19,
+              20,
+            ],
+          },
         ],
       },
       {
         label: '扩散与代理',
         rows: [
-          { name: '总市值', symbol: 'TOTAL', price: '2.31T', d1: '+1.20%', ytd: '+38.40%', qtd: '+6.90%', w1: '+2.70%', m1: '+6.90%', y1: '+76.20%', high: '-5.4%', d10: '▲', d20: '▲', d50: '▲', d200: '▲', x2050: '▲', x50200: '▲', spark: [7, 8, 8, 9, 10, 10, 11, 12, 13, 13, 14, 15, 15, 16, 17, 18, 18, 19, 20, 20, 21, 22, 23, 23] },
-          { name: '除BTC/ETH外', symbol: 'TOTAL3', price: '712B', d1: '+2.10%', ytd: '+34.70%', qtd: '+9.30%', w1: '+4.40%', m1: '+9.30%', y1: '+88.10%', high: '-9.2%', d10: '▲', d20: '▲', d50: '▲', d200: '▲', x2050: '▲', x50200: '▲', spark: [7, 8, 8, 9, 10, 11, 11, 12, 13, 14, 14, 15, 15, 16, 17, 18, 18, 19, 20, 20, 21, 22, 23, 23] },
-          { name: 'BTC主导率', symbol: 'BTC.D', price: '54.8%', d1: '-0.40%', ytd: '+2.30%', qtd: '-1.90%', w1: '-0.80%', m1: '-1.90%', y1: '+6.10%', high: '-4.3%', d10: '▼', d20: '▼', d50: '▼', d200: '▲', x2050: '▼', x50200: '▲', spark: [18, 18, 17, 17, 16, 16, 15, 15, 14, 14, 13, 13, 13, 12, 12, 11, 11, 10, 10, 10, 9, 9, 8, 8] },
-          { name: 'Coinbase', symbol: 'COIN', price: '224.6', d1: '+1.70%', ytd: '+31.40%', qtd: '+10.80%', w1: '+6.20%', m1: '+10.80%', y1: '+54.90%', high: '-12.6%', d10: '▲', d20: '▲', d50: '▲', d200: '▲', x2050: '▲', x50200: '▲', spark: [7, 8, 8, 9, 10, 10, 11, 12, 13, 13, 14, 15, 15, 16, 16, 17, 18, 19, 19, 20, 21, 22, 22, 23] },
-          { name: 'MicroStrategy', symbol: 'MSTR', price: '1,487', d1: '+2.20%', ytd: '+63.80%', qtd: '+15.30%', w1: '+5.70%', m1: '+15.30%', y1: '+162.20%', high: '-9.4%', d10: '▲', d20: '▲', d50: '▲', d200: '▲', x2050: '▲', x50200: '▲', spark: [6, 7, 8, 9, 9, 10, 11, 12, 13, 13, 14, 15, 16, 16, 17, 18, 19, 20, 20, 21, 22, 23, 24, 24] },
-          { name: '现货BTC ETF', symbol: 'IBIT', price: '42.8', d1: '+1.40%', ytd: '+44.20%', qtd: '+7.80%', w1: '+3.40%', m1: '+7.80%', y1: '+98.30%', high: '-6.8%', d10: '▲', d20: '▲', d50: '▲', d200: '▲', x2050: '▲', x50200: '▲', spark: [8, 9, 9, 10, 11, 11, 12, 13, 13, 14, 15, 15, 16, 17, 17, 18, 19, 20, 21, 21, 22, 22, 23, 24] },
+          {
+            name: '总市值',
+            symbol: 'TOTAL',
+            price: '2.31T',
+            d1: '+1.20%',
+            ytd: '+38.40%',
+            qtd: '+6.90%',
+            w1: '+2.70%',
+            m1: '+6.90%',
+            y1: '+76.20%',
+            high: '-5.4%',
+            d10: '▲',
+            d20: '▲',
+            d50: '▲',
+            d200: '▲',
+            x2050: '▲',
+            x50200: '▲',
+            spark: [
+              7, 8, 8, 9, 10, 10, 11, 12, 13, 13, 14, 15, 15, 16, 17, 18, 18, 19, 20, 20, 21, 22,
+              23, 23,
+            ],
+          },
+          {
+            name: '除BTC/ETH外',
+            symbol: 'TOTAL3',
+            price: '712B',
+            d1: '+2.10%',
+            ytd: '+34.70%',
+            qtd: '+9.30%',
+            w1: '+4.40%',
+            m1: '+9.30%',
+            y1: '+88.10%',
+            high: '-9.2%',
+            d10: '▲',
+            d20: '▲',
+            d50: '▲',
+            d200: '▲',
+            x2050: '▲',
+            x50200: '▲',
+            spark: [
+              7, 8, 8, 9, 10, 11, 11, 12, 13, 14, 14, 15, 15, 16, 17, 18, 18, 19, 20, 20, 21, 22,
+              23, 23,
+            ],
+          },
+          {
+            name: 'BTC主导率',
+            symbol: 'BTC.D',
+            price: '54.8%',
+            d1: '-0.40%',
+            ytd: '+2.30%',
+            qtd: '-1.90%',
+            w1: '-0.80%',
+            m1: '-1.90%',
+            y1: '+6.10%',
+            high: '-4.3%',
+            d10: '▼',
+            d20: '▼',
+            d50: '▼',
+            d200: '▲',
+            x2050: '▼',
+            x50200: '▲',
+            spark: [
+              18, 18, 17, 17, 16, 16, 15, 15, 14, 14, 13, 13, 13, 12, 12, 11, 11, 10, 10, 10, 9, 9,
+              8, 8,
+            ],
+          },
+          {
+            name: 'Coinbase',
+            symbol: 'COIN',
+            price: '224.6',
+            d1: '+1.70%',
+            ytd: '+31.40%',
+            qtd: '+10.80%',
+            w1: '+6.20%',
+            m1: '+10.80%',
+            y1: '+54.90%',
+            high: '-12.6%',
+            d10: '▲',
+            d20: '▲',
+            d50: '▲',
+            d200: '▲',
+            x2050: '▲',
+            x50200: '▲',
+            spark: [
+              7, 8, 8, 9, 10, 10, 11, 12, 13, 13, 14, 15, 15, 16, 16, 17, 18, 19, 19, 20, 21, 22,
+              22, 23,
+            ],
+          },
+          {
+            name: 'MicroStrategy',
+            symbol: 'MSTR',
+            price: '1,487',
+            d1: '+2.20%',
+            ytd: '+63.80%',
+            qtd: '+15.30%',
+            w1: '+5.70%',
+            m1: '+15.30%',
+            y1: '+162.20%',
+            high: '-9.4%',
+            d10: '▲',
+            d20: '▲',
+            d50: '▲',
+            d200: '▲',
+            x2050: '▲',
+            x50200: '▲',
+            spark: [
+              6, 7, 8, 9, 9, 10, 11, 12, 13, 13, 14, 15, 16, 16, 17, 18, 19, 20, 20, 21, 22, 23, 24,
+              24,
+            ],
+          },
+          {
+            name: '现货BTC ETF',
+            symbol: 'IBIT',
+            price: '42.8',
+            d1: '+1.40%',
+            ytd: '+44.20%',
+            qtd: '+7.80%',
+            w1: '+3.40%',
+            m1: '+7.80%',
+            y1: '+98.30%',
+            high: '-6.8%',
+            d10: '▲',
+            d20: '▲',
+            d50: '▲',
+            d200: '▲',
+            x2050: '▲',
+            x50200: '▲',
+            spark: [
+              8, 9, 9, 10, 11, 11, 12, 13, 13, 14, 15, 15, 16, 17, 17, 18, 19, 20, 21, 21, 22, 22,
+              23, 24,
+            ],
+          },
         ],
       },
       {
         label: '交易所与链上Beta',
         rows: [
-          { name: '现货ETH ETF预期', symbol: 'ETHBETA', price: '68.5', d1: '+1.80%', ytd: '+28.40%', qtd: '+9.70%', w1: '+4.10%', m1: '+9.70%', y1: '+58.20%', high: '-13.8%', d10: '▲', d20: '▲', d50: '▲', d200: '▲', x2050: '▲', x50200: '▲', spark: [7, 8, 8, 9, 10, 10, 11, 12, 12, 13, 14, 14, 15, 15, 16, 17, 17, 18, 19, 20, 20, 21, 22, 22] },
-          { name: '矿企代理', symbol: 'MARA', price: '21.8', d1: '+2.70%', ytd: '+19.80%', qtd: '+11.90%', w1: '+5.60%', m1: '+11.90%', y1: '+74.30%', high: '-18.6%', d10: '▲', d20: '▲', d50: '▲', d200: '▲', x2050: '▲', x50200: '▲', spark: [5, 6, 7, 7, 8, 8, 9, 10, 10, 11, 12, 12, 13, 14, 14, 15, 16, 17, 18, 18, 19, 20, 21, 22] },
-          { name: '矿企代理', symbol: 'RIOT', price: '11.4', d1: '+2.10%', ytd: '+14.60%', qtd: '+10.20%', w1: '+4.90%', m1: '+10.20%', y1: '+61.50%', high: '-20.9%', d10: '▲', d20: '▲', d50: '▲', d200: '▲', x2050: '▲', x50200: '▲', spark: [6, 6, 7, 7, 8, 9, 9, 10, 10, 11, 11, 12, 13, 13, 14, 15, 15, 16, 17, 17, 18, 19, 20, 21] },
-          { name: '去中心化Beta', symbol: 'UNI', price: '10.8', d1: '+1.30%', ytd: '+17.20%', qtd: '+8.80%', w1: '+3.60%', m1: '+8.80%', y1: '+42.70%', high: '-17.1%', d10: '▲', d20: '▲', d50: '▲', d200: '▲', x2050: '▲', x50200: '▲', spark: [7, 7, 8, 8, 9, 9, 10, 10, 11, 11, 12, 13, 13, 14, 14, 15, 15, 16, 17, 17, 18, 18, 19, 20] },
-          { name: '链上高Beta', symbol: 'RNDR', price: '9.24', d1: '+2.90%', ytd: '+36.50%', qtd: '+13.60%', w1: '+6.30%', m1: '+13.60%', y1: '+109.80%', high: '-16.4%', d10: '▲', d20: '▲', d50: '▲', d200: '▲', x2050: '▲', x50200: '▲', spark: [5, 6, 6, 7, 8, 8, 9, 10, 11, 11, 12, 13, 13, 14, 15, 16, 16, 17, 18, 19, 19, 20, 21, 22] },
+          {
+            name: '现货ETH ETF预期',
+            symbol: 'ETHBETA',
+            price: '68.5',
+            d1: '+1.80%',
+            ytd: '+28.40%',
+            qtd: '+9.70%',
+            w1: '+4.10%',
+            m1: '+9.70%',
+            y1: '+58.20%',
+            high: '-13.8%',
+            d10: '▲',
+            d20: '▲',
+            d50: '▲',
+            d200: '▲',
+            x2050: '▲',
+            x50200: '▲',
+            spark: [
+              7, 8, 8, 9, 10, 10, 11, 12, 12, 13, 14, 14, 15, 15, 16, 17, 17, 18, 19, 20, 20, 21,
+              22, 22,
+            ],
+          },
+          {
+            name: '矿企代理',
+            symbol: 'MARA',
+            price: '21.8',
+            d1: '+2.70%',
+            ytd: '+19.80%',
+            qtd: '+11.90%',
+            w1: '+5.60%',
+            m1: '+11.90%',
+            y1: '+74.30%',
+            high: '-18.6%',
+            d10: '▲',
+            d20: '▲',
+            d50: '▲',
+            d200: '▲',
+            x2050: '▲',
+            x50200: '▲',
+            spark: [
+              5, 6, 7, 7, 8, 8, 9, 10, 10, 11, 12, 12, 13, 14, 14, 15, 16, 17, 18, 18, 19, 20, 21,
+              22,
+            ],
+          },
+          {
+            name: '矿企代理',
+            symbol: 'RIOT',
+            price: '11.4',
+            d1: '+2.10%',
+            ytd: '+14.60%',
+            qtd: '+10.20%',
+            w1: '+4.90%',
+            m1: '+10.20%',
+            y1: '+61.50%',
+            high: '-20.9%',
+            d10: '▲',
+            d20: '▲',
+            d50: '▲',
+            d200: '▲',
+            x2050: '▲',
+            x50200: '▲',
+            spark: [
+              6, 6, 7, 7, 8, 9, 9, 10, 10, 11, 11, 12, 13, 13, 14, 15, 15, 16, 17, 17, 18, 19, 20,
+              21,
+            ],
+          },
+          {
+            name: '去中心化Beta',
+            symbol: 'UNI',
+            price: '10.8',
+            d1: '+1.30%',
+            ytd: '+17.20%',
+            qtd: '+8.80%',
+            w1: '+3.60%',
+            m1: '+8.80%',
+            y1: '+42.70%',
+            high: '-17.1%',
+            d10: '▲',
+            d20: '▲',
+            d50: '▲',
+            d200: '▲',
+            x2050: '▲',
+            x50200: '▲',
+            spark: [
+              7, 7, 8, 8, 9, 9, 10, 10, 11, 11, 12, 13, 13, 14, 14, 15, 15, 16, 17, 17, 18, 18, 19,
+              20,
+            ],
+          },
+          {
+            name: '链上高Beta',
+            symbol: 'RNDR',
+            price: '9.24',
+            d1: '+2.90%',
+            ytd: '+36.50%',
+            qtd: '+13.60%',
+            w1: '+6.30%',
+            m1: '+13.60%',
+            y1: '+109.80%',
+            high: '-16.4%',
+            d10: '▲',
+            d20: '▲',
+            d50: '▲',
+            d200: '▲',
+            x2050: '▲',
+            x50200: '▲',
+            spark: [
+              5, 6, 6, 7, 8, 8, 9, 10, 11, 11, 12, 13, 13, 14, 15, 16, 16, 17, 18, 19, 19, 20, 21,
+              22,
+            ],
+          },
         ],
       },
     ],
@@ -328,7 +1040,8 @@
     () => hedgeBoardNav.find((item) => item.id === activeCategory.value) ?? hedgeBoardNav[0],
   );
   const activeModule = computed<ResearchModule>(
-    () => researchModules.find((module) => module.id === activeCategory.value) ?? researchModules[0],
+    () =>
+      researchModules.find((module) => module.id === activeCategory.value) ?? researchModules[0],
   );
   const activeTradingToolCatalog = ref<TradingToolCatalogSection | null>(null);
   let tradingToolCatalogRequestId = 0;
@@ -417,12 +1130,14 @@
   }
 
   const widgetSourceLinks: Partial<Record<string, string>> = {
-    'btc-etf-flow': 'https://sosovalue.com/zh/assets/etf/Total_Crypto_Spot_ETF_Fund_Flow?page=usBTC',
+    'btc-etf-flow':
+      'https://sosovalue.com/zh/assets/etf/Total_Crypto_Spot_ETF_Fund_Flow?page=usBTC',
     'btc-treasury-flow': 'https://sosovalue.com/zh/assets/bitcoin-treasuries/weekly-net-inflow',
     'etf-weekly-flows': ETF_REFERENCE_URL,
     'etf-ytd-summary': ETF_REFERENCE_URL,
     'spdr-daily-flow': 'https://sc.macromicro.me/collections/45/mm-gold-price/23274/gld-fund-flow',
-    'spdr-holdings-vs-price': 'https://sc.macromicro.me/collections/45/mm-gold-price/712/spdr-gold-trust-etf-gold-price',
+    'spdr-holdings-vs-price':
+      'https://sc.macromicro.me/collections/45/mm-gold-price/712/spdr-gold-trust-etf-gold-price',
   };
   function getWidgetTitle(localKey: string | undefined, fallback: string) {
     if (!localKey) return fallback;
@@ -442,7 +1157,8 @@
   }
 
   function shouldHideWidgetHeader(sectionId: string, widget: WidgetConfig) {
-    if (sectionId === 'macro-liquidity' || sectionId === 'gold-main' || sectionId === 'crypto-main') return true;
+    if (sectionId === 'macro-liquidity' || sectionId === 'gold-main' || sectionId === 'crypto-main')
+      return true;
     return widget.kind === 'local-chart' && widget.localKey?.includes('market-detail-table');
   }
 
@@ -469,180 +1185,14 @@
     scrollPageTop();
   });
 
-  const TradingViewWidget = defineComponent({
-    name: 'TradingViewWidget',
-    props: {
-      widget: {
-        type: Object as PropType<WidgetConfig>,
-        required: true,
-      },
-    },
-    setup(props) {
-      const mountRef = ref<HTMLDivElement | null>(null);
-      const loadFailed = ref(false);
-      let resizeObserver: ResizeObserver | null = null;
-      let intersectionObserver: IntersectionObserver | null = null;
-      let renderTimer: number | null = null;
-      let verifyTimers: number[] = [];
-      let frameToken = 0;
-      let lastSizeKey = '';
-      let repairAttempts = 0;
-
-      const clearRenderTimers = () => {
-        if (renderTimer) window.clearTimeout(renderTimer);
-        verifyTimers.forEach((timer) => window.clearTimeout(timer));
-        renderTimer = null;
-        verifyTimers = [];
-      };
-
-      const verifyWidgetLayout = () => {
-        const mountNode = mountRef.value;
-        if (!mountNode) return;
-
-        const hostWidth = mountNode.clientWidth;
-        if (!hostWidth) return;
-
-        const iframe = mountNode.querySelector('iframe') as HTMLIFrameElement | null;
-        const iframeWidth = iframe?.clientWidth ?? 0;
-        if (iframe && iframeWidth > 0 && iframeWidth < hostWidth * 0.9 && repairAttempts < 3) {
-          repairAttempts += 1;
-          lastSizeKey = '';
-          scheduleRender(true);
-          return;
-        }
-
-        if (iframe && iframeWidth >= hostWidth * 0.9) repairAttempts = 0;
-      };
-
-      const scheduleLayoutHealing = () => {
-        verifyTimers.forEach((timer) => window.clearTimeout(timer));
-        verifyTimers = [180, 520, 1100, 1900].map((delay) =>
-          window.setTimeout(() => {
-            verifyWidgetLayout();
-            window.dispatchEvent(new Event('resize'));
-          }, delay),
-        );
-      };
-
-      const renderWidget = () => {
-        const mountNode = mountRef.value;
-        if (!mountNode || !props.widget.scriptSrc || !props.widget.config) return;
-
-        loadFailed.value = false;
-        mountNode.innerHTML = '';
-
-        try {
-          const container = document.createElement('div');
-          container.className = 'tradingview-widget-container';
-          container.style.width = '100%';
-          container.style.height = '100%';
-
-          const widgetNode = document.createElement('div');
-          widgetNode.className = 'tradingview-widget-container__widget';
-          widgetNode.style.width = '100%';
-          widgetNode.style.height = '100%';
-          container.appendChild(widgetNode);
-
-          const script = document.createElement('script');
-          script.src = props.widget.scriptSrc;
-          script.async = true;
-          script.type = 'text/javascript';
-          script.innerHTML = JSON.stringify(props.widget.config);
-          script.onload = () => {
-            scheduleLayoutHealing();
-          };
-          script.onerror = () => {
-            loadFailed.value = true;
-            if (mountRef.value) mountRef.value.innerHTML = '';
-          };
-
-          container.appendChild(script);
-          mountNode.appendChild(container);
-        } catch (error) {
-          console.error('[hedgeBoard] TradingView widget render failed:', props.widget.title, error);
-          loadFailed.value = true;
-          mountNode.innerHTML = '';
-        }
-      };
-
-      const scheduleRender = (force = false) => {
-        const mountNode = mountRef.value;
-        if (!mountNode) return;
-
-        const width = mountNode.clientWidth;
-        const height = mountNode.clientHeight;
-        if (!width || !height) return;
-        if (!mountNode.getClientRects().length) return;
-
-        const nextSizeKey = `${Math.round(width)}x${Math.round(height)}`;
-        if (!force && nextSizeKey === lastSizeKey && mountNode.childElementCount) return;
-        lastSizeKey = nextSizeKey;
-
-        clearRenderTimers();
-        if (force) repairAttempts = 0;
-        renderTimer = window.setTimeout(() => {
-          renderWidget();
-        }, 96);
-      };
-
-      onMounted(() => {
-        scheduleRender();
-        frameToken = window.requestAnimationFrame(() => {
-          frameToken = window.requestAnimationFrame(() => {
-            scheduleRender();
-          });
-        });
-
-        if (typeof ResizeObserver !== 'undefined' && mountRef.value) {
-          resizeObserver = new ResizeObserver(() => {
-            scheduleRender();
-          });
-          resizeObserver.observe(mountRef.value);
-        }
-
-        if (typeof IntersectionObserver !== 'undefined' && mountRef.value) {
-          intersectionObserver = new IntersectionObserver((entries) => {
-            if (entries.some((entry) => entry.isIntersecting)) {
-              scheduleRender(true);
-            }
-          }, { threshold: 0.2 });
-          intersectionObserver.observe(mountRef.value);
-        }
-      });
-
-      watch(() => props.widget, () => scheduleRender(true), { deep: true });
-      onBeforeUnmount(() => {
-        if (frameToken) window.cancelAnimationFrame(frameToken);
-        clearRenderTimers();
-        resizeObserver?.disconnect();
-        intersectionObserver?.disconnect();
-        if (mountRef.value) mountRef.value.innerHTML = '';
-      });
-
-      return () =>
-        loadFailed.value
-          ? h(
-              'div',
-              {
-                class: 'local-empty',
-                style: { minHeight: `${props.widget.height ?? 360}px` },
-              },
-              '该外部图表当前加载失败，页面主体已保留，可继续浏览其他模块。',
-            )
-          : h('div', {
-              ref: mountRef,
-              class: 'widget-frame',
-              style: { minHeight: `${props.widget.height ?? 360}px` },
-            });
-    },
-  });
-
   function buildRangeOverview(values: number[], width: number, height: number) {
     if (values.length <= 1) {
       const midY = (height / 2).toFixed(2);
       return {
         linePath: `M 0 ${midY} L ${width.toFixed(2)} ${midY}`,
-        areaPath: `M 0 ${height.toFixed(2)} L 0 ${midY} L ${width.toFixed(2)} ${midY} L ${width.toFixed(2)} ${height.toFixed(2)} Z`,
+        areaPath: `M 0 ${height.toFixed(2)} L 0 ${midY} L ${width.toFixed(
+          2,
+        )} ${midY} L ${width.toFixed(2)} ${height.toFixed(2)} Z`,
       };
     }
 
@@ -653,7 +1203,9 @@
       return { x, y };
     });
     const linePath = points
-      .map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x.toFixed(2)} ${point.y.toFixed(2)}`)
+      .map(
+        (point, index) => `${index === 0 ? 'M' : 'L'} ${point.x.toFixed(2)} ${point.y.toFixed(2)}`,
+      )
       .join(' ');
     const areaPath = [
       `M ${points[0].x.toFixed(2)} ${height.toFixed(2)}`,
@@ -682,7 +1234,8 @@
       onEndChange: (value: number) => void;
     },
   ) {
-    const { viewport, mode, maxIndex, minGap, startIndex, endIndex, onStartChange, onEndChange } = options;
+    const { viewport, mode, maxIndex, minGap, startIndex, endIndex, onStartChange, onEndChange } =
+      options;
     if (!viewport || maxIndex <= 0) return;
 
     event.preventDefault();
@@ -752,7 +1305,8 @@
     onStartChange: (value: number) => void;
     onEndChange: (value: number) => void;
   }) {
-    const { labels, values, startIndex, endIndex, minWindowSize, onStartChange, onEndChange } = options;
+    const { labels, values, startIndex, endIndex, minWindowSize, onStartChange, onEndChange } =
+      options;
     if (labels.length <= 1) return null;
 
     const maxIndex = labels.length - 1;
@@ -840,98 +1394,95 @@
 
     return h('div', { class: 'chart-range' }, [
       h('div', { class: 'chart-range__labels', style: metaStyle }, [
-        h('span', {
-          class: 'chart-range__label chart-range__label--start',
-          style: {
-            position: 'absolute',
-            left: `${startPercent}%`,
-            top: 0,
-            transform: getLabelTransform(startPercent, 'start'),
-            whiteSpace: 'nowrap',
-          },
-        }, labels[safeStart] ?? ''),
-        h('span', {
-          class: 'chart-range__label chart-range__label--end',
-          style: {
-            position: 'absolute',
-            left: `${endPercent}%`,
-            top: 0,
-            transform: getLabelTransform(endPercent, 'end'),
-            whiteSpace: 'nowrap',
-          },
-        }, labels[safeEnd] ?? ''),
-      ]),
-      h('div', {
-        class: 'chart-range__viewport',
-        style: viewportStyle,
-        onMousedown: (mouseEvent: MouseEvent) =>
-          beginChartRangeDrag(mouseEvent, {
-            mode: 'jump',
-            viewport: mouseEvent.currentTarget as HTMLElement,
-            maxIndex,
-            minGap,
-            startIndex: safeStart,
-            endIndex: safeEnd,
-            onStartChange,
-            onEndChange,
-          }),
-      }, [
         h(
-          'svg',
+          'span',
           {
-            viewBox: '0 0 100 20',
-            preserveAspectRatio: 'none',
-            class: 'chart-range__overview',
-            style: overviewStyle,
-            'aria-hidden': 'true',
+            class: 'chart-range__label chart-range__label--start',
+            style: {
+              position: 'absolute',
+              left: `${startPercent}%`,
+              top: 0,
+              transform: getLabelTransform(startPercent, 'start'),
+              whiteSpace: 'nowrap',
+            },
           },
-          [
-            h('path', {
-              d: areaPath,
-              class: 'chart-range__overview-area',
-              fill: 'rgba(197, 214, 249, 0.7)',
-            }),
-            h('path', {
-              d: linePath,
-              class: 'chart-range__overview-line',
-              fill: 'none',
-              stroke: 'rgba(137, 167, 233, 0.95)',
-              'stroke-width': 1.1,
-              'stroke-linecap': 'round',
-              'stroke-linejoin': 'round',
-            }),
-          ],
+          labels[safeStart] ?? '',
         ),
-        h('span', {
-          class: 'chart-range__rail',
-          style: railStyle,
-          'aria-hidden': 'true',
-        }),
         h(
-          'div',
+          'span',
           {
-            class: 'chart-range__selection',
-            style: selectionStyle,
-            onMousedown: (mouseEvent: MouseEvent) =>
-              beginChartRangeDrag(mouseEvent, {
-                mode: 'window',
-                viewport: (mouseEvent.currentTarget as HTMLElement).closest('.chart-range__viewport') as HTMLElement | null,
-                maxIndex,
-                minGap,
-                startIndex: safeStart,
-                endIndex: safeEnd,
-                onStartChange,
-                onEndChange,
+            class: 'chart-range__label chart-range__label--end',
+            style: {
+              position: 'absolute',
+              left: `${endPercent}%`,
+              top: 0,
+              transform: getLabelTransform(endPercent, 'end'),
+              whiteSpace: 'nowrap',
+            },
+          },
+          labels[safeEnd] ?? '',
+        ),
+      ]),
+      h(
+        'div',
+        {
+          class: 'chart-range__viewport',
+          style: viewportStyle,
+          onMousedown: (mouseEvent: MouseEvent) =>
+            beginChartRangeDrag(mouseEvent, {
+              mode: 'jump',
+              viewport: mouseEvent.currentTarget as HTMLElement,
+              maxIndex,
+              minGap,
+              startIndex: safeStart,
+              endIndex: safeEnd,
+              onStartChange,
+              onEndChange,
+            }),
+        },
+        [
+          h(
+            'svg',
+            {
+              viewBox: '0 0 100 20',
+              preserveAspectRatio: 'none',
+              class: 'chart-range__overview',
+              style: overviewStyle,
+              'aria-hidden': 'true',
+            },
+            [
+              h('path', {
+                d: areaPath,
+                class: 'chart-range__overview-area',
+                fill: 'rgba(197, 214, 249, 0.7)',
               }),
-          },
-          [
-            h('span', {
-              class: 'chart-range__handle chart-range__handle--start',
-              style: { ...handleBaseStyle, left: '-3px' },
+              h('path', {
+                d: linePath,
+                class: 'chart-range__overview-line',
+                fill: 'none',
+                stroke: 'rgba(137, 167, 233, 0.95)',
+                'stroke-width': 1.1,
+                'stroke-linecap': 'round',
+                'stroke-linejoin': 'round',
+              }),
+            ],
+          ),
+          h('span', {
+            class: 'chart-range__rail',
+            style: railStyle,
+            'aria-hidden': 'true',
+          }),
+          h(
+            'div',
+            {
+              class: 'chart-range__selection',
+              style: selectionStyle,
               onMousedown: (mouseEvent: MouseEvent) =>
                 beginChartRangeDrag(mouseEvent, {
-                  mode: 'start',
-                  viewport: (mouseEvent.currentTarget as HTMLElement).closest('.chart-range__viewport') as HTMLElement | null,
+                  mode: 'window',
+                  viewport: (mouseEvent.currentTarget as HTMLElement).closest(
+                    '.chart-range__viewport',
+                  ) as HTMLElement | null,
                   maxIndex,
                   minGap,
                   startIndex: safeStart,
@@ -939,25 +1490,46 @@
                   onStartChange,
                   onEndChange,
                 }),
-            }),
-            h('span', {
-              class: 'chart-range__handle chart-range__handle--end',
-              style: { ...handleBaseStyle, right: '-3px' },
-              onMousedown: (mouseEvent: MouseEvent) =>
-                beginChartRangeDrag(mouseEvent, {
-                  mode: 'end',
-                  viewport: (mouseEvent.currentTarget as HTMLElement).closest('.chart-range__viewport') as HTMLElement | null,
-                  maxIndex,
-                  minGap,
-                  startIndex: safeStart,
-                  endIndex: safeEnd,
-                  onStartChange,
-                  onEndChange,
-                }),
-            }),
-          ],
-        ),
-      ]),
+            },
+            [
+              h('span', {
+                class: 'chart-range__handle chart-range__handle--start',
+                style: { ...handleBaseStyle, left: '-3px' },
+                onMousedown: (mouseEvent: MouseEvent) =>
+                  beginChartRangeDrag(mouseEvent, {
+                    mode: 'start',
+                    viewport: (mouseEvent.currentTarget as HTMLElement).closest(
+                      '.chart-range__viewport',
+                    ) as HTMLElement | null,
+                    maxIndex,
+                    minGap,
+                    startIndex: safeStart,
+                    endIndex: safeEnd,
+                    onStartChange,
+                    onEndChange,
+                  }),
+              }),
+              h('span', {
+                class: 'chart-range__handle chart-range__handle--end',
+                style: { ...handleBaseStyle, right: '-3px' },
+                onMousedown: (mouseEvent: MouseEvent) =>
+                  beginChartRangeDrag(mouseEvent, {
+                    mode: 'end',
+                    viewport: (mouseEvent.currentTarget as HTMLElement).closest(
+                      '.chart-range__viewport',
+                    ) as HTMLElement | null,
+                    maxIndex,
+                    minGap,
+                    startIndex: safeStart,
+                    endIndex: safeEnd,
+                    onStartChange,
+                    onEndChange,
+                  }),
+              }),
+            ],
+          ),
+        ],
+      ),
     ]);
   }
 
@@ -1028,7 +1600,10 @@
       watch(
         () => [props.rows.length, props.windowSize, props.showRangeSlider],
         () => {
-          const minSpan = Math.max(2, Math.min(props.windowSize, props.rows.length || props.windowSize));
+          const minSpan = Math.max(
+            2,
+            Math.min(props.windowSize, props.rows.length || props.windowSize),
+          );
           const maxIndex = Math.max(0, props.rows.length - 1);
 
           if (!props.showRangeSlider) {
@@ -1096,7 +1671,10 @@
           h(MetricStrip, {
             metrics: [
               [props.leftLabel, `${formatNumber(visibleRows.at(-1)?.left ?? 0)} ${props.leftUnit}`],
-              [props.rightLabel, `${formatNumber(visibleRows.at(-1)?.right ?? 0)} ${props.rightUnit}`],
+              [
+                props.rightLabel,
+                `${formatNumber(visibleRows.at(-1)?.right ?? 0)} ${props.rightUnit}`,
+              ],
               ['更新', visibleRows.at(-1)?.date ?? '-'],
             ],
           }),
@@ -1107,7 +1685,10 @@
             ]),
             h('div', { class: 'chart-legend' }, [
               h('span', [h('i', { style: { backgroundColor: props.leftColor } }), props.leftLabel]),
-              h('span', [h('i', { style: { backgroundColor: props.rightColor } }), props.rightLabel]),
+              h('span', [
+                h('i', { style: { backgroundColor: props.rightColor } }),
+                props.rightLabel,
+              ]),
             ]),
           ]),
           h('div', { class: 'chart-shell' }, [
@@ -1245,7 +1826,10 @@
       watch(
         () => BTC_TREASURY_FLOW_ROWS.length,
         () => {
-          const minSpan = Math.max(2, Math.min(windowSize, BTC_TREASURY_FLOW_ROWS.length || windowSize));
+          const minSpan = Math.max(
+            2,
+            Math.min(windowSize, BTC_TREASURY_FLOW_ROWS.length || windowSize),
+          );
           const maxIndex = Math.max(0, BTC_TREASURY_FLOW_ROWS.length - 1);
 
           if (maxIndex < minSpan - 1) {
@@ -1269,7 +1853,10 @@
       );
 
       return () => {
-        const minSpan = Math.max(2, Math.min(windowSize, BTC_TREASURY_FLOW_ROWS.length || windowSize));
+        const minSpan = Math.max(
+          2,
+          Math.min(windowSize, BTC_TREASURY_FLOW_ROWS.length || windowSize),
+        );
         const rows =
           BTC_TREASURY_FLOW_ROWS.length > minSpan
             ? BTC_TREASURY_FLOW_ROWS.slice(startIndex.value, endIndex.value + 1)
@@ -1293,7 +1880,10 @@
             h('strong', '40.43'),
           ]),
           h('div', { class: 'chart-topline' }, [
-            h('div', { class: 'chart-axis-head' }, [h('span', '净流入（千枚 BTC）'), h('span', '')]),
+            h('div', { class: 'chart-axis-head' }, [
+              h('span', '净流入（千枚 BTC）'),
+              h('span', ''),
+            ]),
             h(
               'div',
               { class: 'chart-legend' },
@@ -1344,7 +1934,8 @@
                     const centerX = scaleX(rowIndex, rows.length, innerWidth);
                     return series.map((item, seriesIndex) => {
                       const value = Number(row[item.key]);
-                      const x = centerX - singleBarWidth * 1.45 + seriesIndex * (singleBarWidth + 4);
+                      const x =
+                        centerX - singleBarWidth * 1.45 + seriesIndex * (singleBarWidth + 4);
                       const y = scaleY(value, Math.min(0, range.min), range.max, innerHeight);
                       const height = Math.abs(baseY - y);
                       return h('rect', {
@@ -1409,7 +2000,9 @@
       return () => {
         const innerWidth = CHART_WIDTH - CHART_PADDING.left - CHART_PADDING.right;
         const innerHeight = CHART_HEIGHT - CHART_PADDING.top - CHART_PADDING.bottom;
-        const values = props.rows.flatMap((row) => props.series.map((item) => Number(row[item.key] ?? 0)));
+        const values = props.rows.flatMap((row) =>
+          props.series.map((item) => Number(row[item.key] ?? 0)),
+        );
         const range = getRange(values, true);
         const zeroY = scaleY(0, range.min, range.max, innerHeight);
         const groupWidth = innerWidth / props.rows.length;
@@ -1436,64 +2029,60 @@
                 role: 'img',
               },
               [
-                h(
-                  'g',
-                  { transform: `translate(${CHART_PADDING.left},${CHART_PADDING.top})` },
-                  [
-                    ...ticks.flatMap((tick) => {
-                      const y = scaleY(tick, range.min, range.max, innerHeight);
-                      return [
-                        h('line', {
-                          key: `tick-line-${tick}`,
-                          x1: 0,
-                          x2: innerWidth,
-                          y1: y,
-                          y2: y,
-                          class: 'chart-grid-line',
-                        }),
-                        h(
-                          'text',
-                          {
-                            key: `tick-text-${tick}`,
-                            x: -12,
-                            y: y + 4,
-                            textAnchor: 'end',
-                            class: 'chart-axis-label',
-                          },
-                          formatAxis(tick),
-                        ),
-                      ];
-                    }),
-                    ...props.rows.flatMap((row, rowIndex) =>
-                      props.series.map((item, seriesIndex) => {
-                        const raw = Number(row[item.key] ?? 0);
-                        const x = rowIndex * groupWidth + seriesIndex * barWidth + groupWidth * 0.12;
-                        const y = scaleY(raw, range.min, range.max, innerHeight);
-                        const height = Math.abs(zeroY - y);
-                        const barY = raw >= 0 ? y : zeroY;
-                        return h('rect', {
-                          key: `${String(row.date)}-${item.key}`,
-                          x,
-                          y: barY,
-                          width: barWidth,
-                          height: Math.max(height, 1),
-                          rx: 2,
-                          fill: item.color,
-                          opacity: 0.88,
-                        });
+                h('g', { transform: `translate(${CHART_PADDING.left},${CHART_PADDING.top})` }, [
+                  ...ticks.flatMap((tick) => {
+                    const y = scaleY(tick, range.min, range.max, innerHeight);
+                    return [
+                      h('line', {
+                        key: `tick-line-${tick}`,
+                        x1: 0,
+                        x2: innerWidth,
+                        y1: y,
+                        y2: y,
+                        class: 'chart-grid-line',
                       }),
-                    ),
-                    ...renderDateLabels(
-                      props.rows.map((row) => ({
-                        date: String(row.date),
-                        left: 0,
-                        right: 0,
-                      })),
-                      innerWidth,
-                      innerHeight,
-                    ),
-                  ],
-                ),
+                      h(
+                        'text',
+                        {
+                          key: `tick-text-${tick}`,
+                          x: -12,
+                          y: y + 4,
+                          textAnchor: 'end',
+                          class: 'chart-axis-label',
+                        },
+                        formatAxis(tick),
+                      ),
+                    ];
+                  }),
+                  ...props.rows.flatMap((row, rowIndex) =>
+                    props.series.map((item, seriesIndex) => {
+                      const raw = Number(row[item.key] ?? 0);
+                      const x = rowIndex * groupWidth + seriesIndex * barWidth + groupWidth * 0.12;
+                      const y = scaleY(raw, range.min, range.max, innerHeight);
+                      const height = Math.abs(zeroY - y);
+                      const barY = raw >= 0 ? y : zeroY;
+                      return h('rect', {
+                        key: `${String(row.date)}-${item.key}`,
+                        x,
+                        y: barY,
+                        width: barWidth,
+                        height: Math.max(height, 1),
+                        rx: 2,
+                        fill: item.color,
+                        opacity: 0.88,
+                      });
+                    }),
+                  ),
+                  ...renderDateLabels(
+                    props.rows.map((row) => ({
+                      date: String(row.date),
+                      left: 0,
+                      right: 0,
+                    })),
+                    innerWidth,
+                    innerHeight,
+                  ),
+                ]),
               ],
             ),
           ]),
@@ -1512,8 +2101,12 @@
         const innerWidth = CHART_WIDTH - CHART_PADDING.left - CHART_PADDING.right;
         const innerHeight = panelHeight - CHART_PADDING.top - CHART_PADDING.bottom;
         const flowValues = rows.flatMap((row) => {
-          const positive = [row.northAmerica, row.europe, row.asia, row.other].filter((value) => value > 0);
-          const negative = [row.northAmerica, row.europe, row.asia, row.other].filter((value) => value < 0);
+          const positive = [row.northAmerica, row.europe, row.asia, row.other].filter(
+            (value) => value > 0,
+          );
+          const negative = [row.northAmerica, row.europe, row.asia, row.other].filter(
+            (value) => value < 0,
+          );
           return [
             positive.reduce((sum, value) => sum + value, 0),
             negative.reduce((sum, value) => sum + value, 0),
@@ -1526,7 +2119,11 @@
         const flowTicks = makeTicks(flowRange.min, flowRange.max, 4);
         const goldTicks = makeTicks(goldRange.min, goldRange.max, 4);
         const series = [
-          { key: 'northAmerica', label: '北美', color: marketData.etf.regionColors['North America'] },
+          {
+            key: 'northAmerica',
+            label: '北美',
+            color: marketData.etf.regionColors['North America'],
+          },
           { key: 'europe', label: '欧洲', color: marketData.etf.regionColors.Europe },
           { key: 'asia', label: '亚洲', color: marketData.etf.regionColors.Asia },
           { key: 'other', label: '其他', color: marketData.etf.regionColors.Other },
@@ -1557,30 +2154,30 @@
             h('span', '需求（吨）'),
             h('span', '黄金（美元/盎司）'),
           ]),
-          h('div', {
-            class: 'chart-shell chart-shell--etf-weekly',
-            style: {
-              position: 'relative',
-              paddingTop: '8px',
-              borderRadius: 0,
-              borderLeft: 'none',
-              borderRight: 'none',
-              borderBottom: 'none',
-              background: 'transparent',
-            },
-          }, [
-            h(
-              'svg',
-              {
-                viewBox: `0 0 ${CHART_WIDTH} ${panelHeight}`,
-                class: 'local-chart-svg',
-                role: 'img',
+          h(
+            'div',
+            {
+              class: 'chart-shell chart-shell--etf-weekly',
+              style: {
+                position: 'relative',
+                paddingTop: '8px',
+                borderRadius: 0,
+                borderLeft: 'none',
+                borderRight: 'none',
+                borderBottom: 'none',
+                background: 'transparent',
               },
-              [
-                h(
-                  'g',
-                  { transform: `translate(${CHART_PADDING.left},${CHART_PADDING.top})` },
-                  [
+            },
+            [
+              h(
+                'svg',
+                {
+                  viewBox: `0 0 ${CHART_WIDTH} ${panelHeight}`,
+                  class: 'local-chart-svg',
+                  role: 'img',
+                },
+                [
+                  h('g', { transform: `translate(${CHART_PADDING.left},${CHART_PADDING.top})` }, [
                     ...flowTicks.flatMap((tick) => {
                       const y = scaleY(tick, flowRange.min, flowRange.max, innerHeight);
                       return [
@@ -1632,7 +2229,9 @@
                       const centerX = rowIndex * groupWidth + groupWidth / 2;
                       return series.map((item) => {
                         const raw = row[item.key];
-                        const barHeight = Math.abs(scaleY(raw, flowRange.min, flowRange.max, innerHeight) - zeroY);
+                        const barHeight = Math.abs(
+                          scaleY(raw, flowRange.min, flowRange.max, innerHeight) - zeroY,
+                        );
                         if (raw >= 0) {
                           positiveOffset -= barHeight;
                           return h('rect', {
@@ -1672,21 +2271,23 @@
                       innerWidth,
                       innerHeight,
                     ),
-                  ],
-                ),
-              ],
-            ),
-          ]),
-          h(
-            'div',
-            { class: 'chart-legend chart-legend--weekly etf-weekly-panel__legend' },
-            [
-              ...series.map((item) =>
-                h('span', { key: item.key }, [h('i', { style: { backgroundColor: item.color } }), item.label]),
+                  ]),
+                ],
               ),
-              h('span', { key: 'gold' }, [h('i', { style: { backgroundColor: '#d3a13a' } }), '金价（右轴）']),
             ],
           ),
+          h('div', { class: 'chart-legend chart-legend--weekly etf-weekly-panel__legend' }, [
+            ...series.map((item) =>
+              h('span', { key: item.key }, [
+                h('i', { style: { backgroundColor: item.color } }),
+                item.label,
+              ]),
+            ),
+            h('span', { key: 'gold' }, [
+              h('i', { style: { backgroundColor: '#d3a13a' } }),
+              '金价（右轴）',
+            ]),
+          ]),
         ]);
       };
     },
@@ -1701,7 +2302,10 @@
           h('div', { class: 'ytd-module__metrics' }, [
             h('article', [h('span', '统计口径'), h('strong', 'Year to Date')]),
             h('article', [h('span', '最新周度'), h('strong', marketData.etf.latestWeek)]),
-            h('article', [h('span', '亚洲需求'), h('strong', `${asia?.demandTonnes?.toFixed(2) ?? '0.00'} 吨`)]),
+            h('article', [
+              h('span', '亚洲需求'),
+              h('strong', `${asia?.demandTonnes?.toFixed(2) ?? '0.00'} 吨`),
+            ]),
           ]),
           h('div', { class: 'ytd-module__table' }, [
             h('div', { class: 'ytd-module__table-head' }, [
@@ -1775,7 +2379,11 @@
                       h('td', { class: 'is-center' }, [
                         h(
                           'svg',
-                          { class: 'snapshot-table__sparkline', viewBox: '0 0 96 24', preserveAspectRatio: 'none' },
+                          {
+                            class: 'snapshot-table__sparkline',
+                            viewBox: '0 0 96 24',
+                            preserveAspectRatio: 'none',
+                          },
                           [
                             h('polyline', {
                               points: compactSparkline(row.spark, 96, 24),
@@ -1785,12 +2393,24 @@
                         ),
                       ]),
                       h('td', { class: 'is-right' }, row.price),
-                      h('td', { class: 'is-center' }, [h('span', { class: ['snapshot-table__chip', chipTone(row.d1)] }, row.d1)]),
-                      h('td', { class: 'is-center' }, [h('span', { class: ['snapshot-table__chip', chipTone(row.ytd)] }, row.ytd)]),
-                      h('td', { class: 'is-center' }, [h('span', { class: ['snapshot-table__chip', chipTone(row.qtd)] }, row.qtd)]),
-                      h('td', { class: 'is-center' }, [h('span', { class: ['snapshot-table__chip', chipTone(row.w1)] }, row.w1)]),
-                      h('td', { class: 'is-center' }, [h('span', { class: ['snapshot-table__chip', chipTone(row.m1)] }, row.m1)]),
-                      h('td', { class: 'is-center' }, [h('span', { class: ['snapshot-table__chip', chipTone(row.y1)] }, row.y1)]),
+                      h('td', { class: 'is-center' }, [
+                        h('span', { class: ['snapshot-table__chip', chipTone(row.d1)] }, row.d1),
+                      ]),
+                      h('td', { class: 'is-center' }, [
+                        h('span', { class: ['snapshot-table__chip', chipTone(row.ytd)] }, row.ytd),
+                      ]),
+                      h('td', { class: 'is-center' }, [
+                        h('span', { class: ['snapshot-table__chip', chipTone(row.qtd)] }, row.qtd),
+                      ]),
+                      h('td', { class: 'is-center' }, [
+                        h('span', { class: ['snapshot-table__chip', chipTone(row.w1)] }, row.w1),
+                      ]),
+                      h('td', { class: 'is-center' }, [
+                        h('span', { class: ['snapshot-table__chip', chipTone(row.m1)] }, row.m1),
+                      ]),
+                      h('td', { class: 'is-center' }, [
+                        h('span', { class: ['snapshot-table__chip', chipTone(row.y1)] }, row.y1),
+                      ]),
                       h('td', { class: 'snapshot-table__high-cell-td' }, [
                         h('div', { class: 'snapshot-table__high-cell' }, [
                           h('div', { class: 'snapshot-table__high-track' }, [
@@ -1833,39 +2453,39 @@
           switch (key) {
             case 'spdr-daily-flow':
               return h(DualAxisChart, {
-                  rows: marketData.spdr.history.slice(-60).map((point) => ({
-                    date: point.date,
-                    left: point.flowTonnes ?? 0,
-                    right: point.goldPrice,
-                  })),
-                  leftLabel: 'SPDR 日流量',
-                  rightLabel: '黄金价格',
-                  leftUnit: '吨',
-                  rightUnit: '美元/盎司',
-                  leftColor: '#159a76',
-                  rightColor: '#2f63f2',
-                  barPositiveColor: '#18a17d',
-                  barNegativeColor: '#de5d56',
-                  barWidthRatio: 0.7,
-                  leftAsBars: true,
-                  divergingBars: true,
-                });
+                rows: marketData.spdr.history.slice(-60).map((point) => ({
+                  date: point.date,
+                  left: point.flowTonnes ?? 0,
+                  right: point.goldPrice,
+                })),
+                leftLabel: 'SPDR 日流量',
+                rightLabel: '黄金价格',
+                leftUnit: '吨',
+                rightUnit: '美元/盎司',
+                leftColor: '#159a76',
+                rightColor: '#2f63f2',
+                barPositiveColor: '#18a17d',
+                barNegativeColor: '#de5d56',
+                barWidthRatio: 0.7,
+                leftAsBars: true,
+                divergingBars: true,
+              });
             case 'spdr-holdings-vs-price':
               return h(DualAxisChart, {
-                  rows: marketData.spdr.history.slice(-60).map((point) => ({
-                    date: point.date,
-                    left: point.tonnes,
-                    right: point.goldPrice,
-                  })),
-                  leftLabel: 'SPDR 持仓量',
-                  rightLabel: '黄金价格',
-                  leftUnit: '吨',
-                  rightUnit: '美元/盎司',
-                  leftColor: '#d6ae4a',
-                  rightColor: '#2f63f2',
-                  barWidthRatio: 0.6,
-                  leftAsBars: true,
-                });
+                rows: marketData.spdr.history.slice(-60).map((point) => ({
+                  date: point.date,
+                  left: point.tonnes,
+                  right: point.goldPrice,
+                })),
+                leftLabel: 'SPDR 持仓量',
+                rightLabel: '黄金价格',
+                leftUnit: '吨',
+                rightUnit: '美元/盎司',
+                leftColor: '#d6ae4a',
+                rightColor: '#2f63f2',
+                barWidthRatio: 0.6,
+                leftAsBars: true,
+              });
             case 'etf-weekly-flows':
               return h(EtfWeeklyFlowsPanel);
             case 'etf-ytd-summary':
@@ -1958,21 +2578,21 @@
               });
             case 'btc-etf-flow':
               return h(DualAxisChart, {
-                  rows: BTC_ETF_FLOW_ROWS,
-                  leftLabel: 'BTC ETF 日净流量',
-                  rightLabel: 'BTC 价格',
-                  leftUnit: '百万美元',
-                  rightUnit: '美元',
-                  leftColor: '#1b9a7a',
-                  rightColor: '#2f63f2',
-                  barPositiveColor: '#1b9a7a',
-                  barNegativeColor: '#df5a55',
-                  barWidthRatio: 0.68,
-                  leftAsBars: true,
-                  divergingBars: true,
-                  showRangeSlider: true,
-                  windowSize: 8,
-                });
+                rows: BTC_ETF_FLOW_ROWS,
+                leftLabel: 'BTC ETF 日净流量',
+                rightLabel: 'BTC 价格',
+                leftUnit: '百万美元',
+                rightUnit: '美元',
+                leftColor: '#1b9a7a',
+                rightColor: '#2f63f2',
+                barPositiveColor: '#1b9a7a',
+                barNegativeColor: '#df5a55',
+                barWidthRatio: 0.68,
+                leftAsBars: true,
+                divergingBars: true,
+                showRangeSlider: true,
+                windowSize: 8,
+              });
             case 'btc-treasury-flow':
               return h(TreasuryFlowChart);
             default:
@@ -2207,9 +2827,7 @@
   .chart-section,
   .widget-card {
     border: 1px solid var(--hedge-cool-border);
-    background:
-      linear-gradient(180deg, rgba(255, 255, 255, 0.95), rgba(243, 248, 252, 0.96)),
-      #fff;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.95), rgba(243, 248, 252, 0.96)), #fff;
     box-shadow: 0 18px 45px rgba(31, 41, 55, 0.05);
   }
 
@@ -2392,8 +3010,7 @@
     display: grid;
     grid-template-columns: minmax(0, 1.4fr) minmax(280px, 0.9fr);
     gap: 18px;
-    background:
-      radial-gradient(circle at top right, rgba(163, 190, 214, 0.28), transparent 34%),
+    background: radial-gradient(circle at top right, rgba(163, 190, 214, 0.28), transparent 34%),
       linear-gradient(135deg, #14312d, #284b45);
   }
 
@@ -2729,7 +3346,7 @@
     font-size: 11px;
   }
 
-.chart-topline {
+  .chart-topline {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -2990,7 +3607,7 @@
     background: transparent;
   }
 
-.chart-legend--weekly {
+  .chart-legend--weekly {
     margin-top: 6px;
     margin-bottom: 0;
   }
@@ -3148,9 +3765,7 @@
   .chart-section--gold {
     padding: 22px 24px 24px;
     border-radius: 20px;
-    background:
-      linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(243, 248, 252, 0.98)),
-      #fff;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(243, 248, 252, 0.98)), #fff;
     box-shadow: 0 16px 36px rgba(31, 41, 55, 0.04);
   }
 
@@ -3207,9 +3822,7 @@
     border: 1px solid var(--hedge-cool-border);
     border-radius: 16px;
     overflow: hidden;
-    background:
-      linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(243, 248, 252, 0.96)),
-      #fff;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(243, 248, 252, 0.96)), #fff;
   }
 
   .market-matrix__head,
@@ -3311,9 +3924,7 @@
     overflow-x: auto;
     border: 1px solid var(--hedge-cool-border);
     border-radius: 16px;
-    background:
-      linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(243, 248, 252, 0.96)),
-      #fff;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(243, 248, 252, 0.96)), #fff;
   }
 
   .snapshot-table__table {
@@ -3467,8 +4078,16 @@
   .hedge-board {
     --hedge-cool-border: rgba(201, 213, 226, 0.72);
     --hedge-cool-border-strong: rgba(175, 190, 207, 0.82);
-    --hedge-cool-surface: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(243, 248, 252, 0.96));
-    --hedge-cool-surface-soft: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 251, 253, 0.96));
+    --hedge-cool-surface: linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.98),
+      rgba(243, 248, 252, 0.96)
+    );
+    --hedge-cool-surface-soft: linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.98),
+      rgba(248, 251, 253, 0.96)
+    );
     --hedge-cool-pill: rgba(243, 247, 250, 0.94);
     --hedge-cool-shadow: 0 18px 45px rgba(15, 23, 42, 0.05);
     --hedge-cool-text: #18313c;
