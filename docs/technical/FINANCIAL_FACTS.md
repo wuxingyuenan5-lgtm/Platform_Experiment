@@ -2,7 +2,6 @@
 
 状态：`active`  
 适用版本：`Platform V6 / Phase 3`  
-实施计划：`../planning/V6-Phase3-金融事实与正式账务.md`
 
 ## 1. 权威边界
 
@@ -17,6 +16,15 @@ External venue / imported statement
 - `formal_positions`、`formal_pnl_results`、`formal_strategy_nav_snapshots` 是可删除、可重建的投影。
 - 投影不得反向修改事实。
 - Phase 2 的 `positions`、`pnl_results` 和 `strategy_nav_snapshots` 暂时保留为工程兼容口径，不再作为正式核对口径扩展。
+
+## 2. 当前正式口径
+
+- FinancialFact 是不可变事实；正式 Position、PnL 与 NAV 是可重建投影。
+- 外部订单、成交、Funding、Swap、Fee、Balance、Position 与 FX 事实使用稳定外部身份和内容哈希去重。
+- 正式投影只能从 FinancialFact 重放，不能读取 Operational projection 作为计算输入。
+- 缺失必要 FX 或账户余额时保留可确认事实并显式标记 `partial` / `incomplete`，不得伪造 1:1 汇率或零权益。
+- 重建必须保留全部事实、按确定顺序重放并写入 AuditEvent；同一事实集合应产生稳定结果。
+- 当前正式账务可用于内部核对，但外部账单签名、生产数据导入与真实资金验收仍由生产门禁保护。
 
 ## 2. 事实身份与幂等
 

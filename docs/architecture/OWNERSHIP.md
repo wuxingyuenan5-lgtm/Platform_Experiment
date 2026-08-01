@@ -92,6 +92,15 @@ This document is the canonical human-readable catalog of major code ownership bo
 
 Operational projections are monitoring views. Formal accounting is reconstructed from immutable FinancialFacts and may not read operational projections as calculation inputs.
 
+## Frozen high-risk domain boundaries
+
+- Trading command orchestration remains in `trade_command_execution.py`; no second order-submission owner is permitted.
+- Execution Risk owns Kill Switch, residual-exposure policy and risk actions, but all order side effects still pass through TradeCommand.
+- Formal Accounting owns immutable FinancialFacts and rebuildable projections; Operational projections are never formal calculation inputs.
+- Platform Execution Runtime exclusively owns Venue SDKs, external side effects and Runtime Journal evidence.
+- Venue and EOD reconciliation keep separate policy, repository, client, service, facade and route owners; routing cleanup does not transfer business policy or SQL ownership.
+- Unknown external results remain unknown until reconciled and never authorize duplicate submission.
+
 ## Shared database infrastructure
 
 | Boundary | Authoritative owner | Responsibility | Must not own |

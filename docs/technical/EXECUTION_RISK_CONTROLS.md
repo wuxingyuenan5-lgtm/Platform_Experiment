@@ -2,7 +2,6 @@
 
 状态：`active`  
 适用版本：`Platform V6 / Phase 4A`  
-实施计划：`../planning/V6-Phase4A-执行风险与Kill-Switch.md`
 
 ## 1. 权威边界
 
@@ -55,27 +54,30 @@ RiskAction 不得直接绕过 TradeCommand 创建订单。Kill Switch 不修改�
 
 ## 4. 残留敞口算法
 
-优先读取 Batch Leg 对应 Order 的 Fill：
+风险敞口先按基础币种计算净合约数量，再对未匹配数量做保守估值；不能直接把两腿各自成交名义金额相加。
+
+对每个 Fill：
 
 ```text
-signed notional = side sign × fill quantity × fill price × contract multiplier
+signed contract delta = side sign × fill quantity × contract multiplier
 ```
 
-同一 settlement currency：
+同一基础币种与结算币种组内：
 
 ```text
-residual = abs(sum(signed notional))
+net contract delta = sum(signed contract delta)
+reference price = max(valid fill price in the group)
+residual = abs(net contract delta) × reference price
 ```
 
-不同 settlement currency 且没有风险 FX 快照：
+因此，方向相反且数量与 multiplier 完全匹配的两腿残留为零，即使两腿成交价格不同。不同币种且没有风险 FX 快照时，各币种残留绝对值保守相加，并标记：
 
 ```text
-residual = sum(abs(currency net exposure))
 currency = MIXED
 dataQualityState = incomplete
 ```
 
-该保守值不能用于正式 PnL；它只用于阻止系统把不可比较敞口误判为安全。
+该值只用于执行风险门禁，不得作为正式 PnL 或会计输入。
 
 ## 5. 风险状态与 Batch 状态
 
@@ -104,6 +106,17 @@ risk action idempotency key + leg role
 ```
 
 风险平仓命令自身仍可能 result_unknown，因此只有全部反向命令 `filled` 才能标记 resolved。
+
+## 7. 风险动作语义
+
+当前受支持动作包括：
+
+- `hold_and_escalate`：保持现状并进入人工接管；
+- `flatten_filled_legs`：仅对已成交原始 Leg 创建反向 TradeCommand；
+- `cancel_open_legs`：只记录并执行受支持的外部撤单边界，不能把未知结果宣称为已取消；
+- `substitute_hedge`：通过独立幂等 TradeCommand 创建替代对冲。
+
+任何风险动作都不能绕过 Account、Instrument、ContractSpecification、权限或 Live Write 门禁。
 
 ## 7. Kill Switch 语义
 

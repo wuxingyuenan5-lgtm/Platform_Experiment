@@ -37,6 +37,16 @@
 
 止盈和止损不是新的订单类型。它们触发普通 Close Action。
 
+## 2. 命令与结果恢复边界
+
+- 新交易意图使用 `TradeCommand`；双腿意图使用 `ExecutionBatch`，每条 Leg 仍生成独立 `TradeCommand`。
+- `idempotencyKey` 是原子业务身份；同一键载荷不同必须返回 409，不能生成第二个 Order、Batch 或 Runtime Command。
+- 创建 Batch 前完成 Strategy、Account Binding、Instrument 与 ContractSpecification 的双腿预校验。
+- 兼容订单入口不是新业务权威入口。
+- `result_unknown` 只能通过 Runtime Journal 与后续 Venue 对账恢复；恢复流程重放已持久化事件，绝不重新提交订单。
+- Runtime 事件身份不匹配、事件缺失或上游不可用时继续保持未知并阻止重复副作用。
+- 当前自动化交易写入仍限于 Simulation / Fake Gateway；外部 Venue 主动恢复与真实资金启用受独立生产门禁约束。
+
 ## 2. 两类可成交方向
 
 ### 2.1 买 Bybit、卖 MT5
