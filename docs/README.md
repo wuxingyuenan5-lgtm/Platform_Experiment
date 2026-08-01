@@ -19,8 +19,6 @@ The controlled A1 set contains ten entrypoints:
 | `contracts/README.md` | Current domain-contract index |
 | `README.md` | Documentation navigation |
 
-`codex/CURRENT_CONTEXT.md` is a compatibility pointer and is not an A1 authority.
-
 ## A2 — domain contracts
 
 `contracts/README.md` indexes the current Identity & Permission, Live Write, Trading, Execution, Risk, Accounting, Reconciliation, Member Portfolio, Research and Market Data contracts. A1 documents link to contracts and do not copy their rules.

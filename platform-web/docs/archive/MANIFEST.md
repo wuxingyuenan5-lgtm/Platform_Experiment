@@ -6,25 +6,11 @@
 
 ## 已完成归档
 
-### 历史交接
-
-- `handoff/codex-session-handoff.md`
-  - 原路径：`docs/codex-session-handoff.md`
-  - 原因：包含 V4、本地未提交状态等已经过期的信息。
-
-- `handoff/2026-07-15-项目上下文交接.md`
-  - 原路径：`docs/2026-07-15-项目上下文交接.md`
-  - 原因：属于阶段性交接，相关规则已迁移到正式模块、策略和架构文档。
-
 ### 已被替代的策略文档
 
 - `superseded/strategy-module-current-requirements.md`
   - 原路径：`docs/strategy-module-current-requirements.md`
   - 原因：旧的策略模块汇总需求，已被模块需求和六类策略文档替代。
-
-- `superseded/strategy/2026-07-09-策略模块现状需求文档.md`
-  - 原路径：`docs/strategy/2026-07-09-策略模块现状需求文档.md`
-  - 原因：阶段性现状快照，且原文件存在编码显示异常风险，因此采用 Git Blob 原样移动。
 
 - `superseded/strategy/2026-07-12-策略模块结构设计方案-A1.md`
   - 原路径：`docs/strategy/2026-07-12-策略模块结构设计方案-A1.md`

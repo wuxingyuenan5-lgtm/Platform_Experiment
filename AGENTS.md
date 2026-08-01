@@ -7,7 +7,6 @@
 - `docs/architecture/OWNERSHIP.md` is the canonical business-rule, code and data ownership catalog.
 - `docs/contracts/README.md` indexes current domain contracts; load only the contract required by the task.
 - After these root rules, read the nearest module `AGENTS.md`, then only directly affected source files and tests.
-- `docs/codex/CURRENT_CONTEXT.md` is a compatibility pointer, not an authority.
 - GitHub PR #141 owns volatile HEAD, CI and review evidence for the active Platform 0.9.3 workstream.
 
 ## Protected Invariants

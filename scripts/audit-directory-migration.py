@@ -97,7 +97,6 @@ def classify(path: str) -> str:
         return "external_or_legacy_dependency"
     if normalized in {
         "config/legacy-naming-allowlist.json",
-        "docs/architecture/PLATFORM_DIRECTORY_MIGRATION_PLAN.md",
         "platform-api/tests/test_architecture_active_naming.py",
         "scripts/audit-directory-migration.py",
         "scripts/check-active-naming-consistency.py",

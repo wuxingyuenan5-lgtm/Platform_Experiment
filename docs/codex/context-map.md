@@ -12,8 +12,6 @@ Purpose: route a task to the smallest sufficient evidence set without loading hi
 6. Read one A2 contract from `docs/contracts/README.md` only when domain semantics change.
 7. Read one active Critical task packet only for a Critical cross-session task.
 
-`docs/codex/CURRENT_CONTEXT.md` is a compatibility pointer and is not part of default context.
-
 ## Executable task packs
 
 ```powershell

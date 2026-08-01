@@ -152,8 +152,8 @@ UI任务异常昂贵，主要因为`hedgeBoard/index.vue`为3,772行，UI规范�
 当前至少存在：
 
 - `AGENTS.md`
-- `docs/codex/CURRENT_CONTEXT.md`
 - `docs/codex/current-state.md`
+- `docs/codex/context-map.md`
 - `README.md`
 
 其中多份文件仍把`feature/issue-117-platform-0-9-1`写成活动分支，而真实0.9.1统一交付线是`feature/issue-134-platform-0-9-1-unified-delivery`。
@@ -399,7 +399,7 @@ docs/ai/context-map.yaml
 - `context-map.yaml`：业务域到代码、合同、测试和权威文档的机器可读索引。
 - GitHub Issue/PR：唯一活动分支、HEAD、阶段进度和CI状态来源。
 
-删除或归档重复的`docs/codex/CURRENT_CONTEXT.md`和`docs/codex/current-state.md`之一，不保留两个同义权威。
+只保留`docs/codex/current-state.md`作为当前状态权威，任务读取由`docs/codex/context-map.md`路由。
 
 ### 7.2 防漂移机制
 

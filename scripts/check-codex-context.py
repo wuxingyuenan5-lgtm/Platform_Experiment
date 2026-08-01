@@ -58,7 +58,6 @@ def main() -> None:
         "README.md",
         "docs/codex/current-state.md",
         "docs/codex/context-map.md",
-        "docs/codex/CURRENT_CONTEXT.md",
         "docs/architecture/OWNERSHIP.md",
         "docs/contracts/README.md",
         "scripts/context-for.py",
@@ -70,7 +69,6 @@ def main() -> None:
     readme = read_text("README.md")
     current_state = read_text("docs/codex/current-state.md")
     context_map = read_text("docs/codex/context-map.md")
-    compatibility = read_text("docs/codex/CURRENT_CONTEXT.md")
     context_tool = read_text("scripts/context-for.py")
     dev_script = read_text("scripts/dev-platform.ps1")
     vite_config = read_text("platform-web/vite.config.ts")
@@ -107,7 +105,6 @@ def main() -> None:
         "AGENTS.md": agents,
         "README.md": readme,
         "context-map.md": context_map,
-        "CURRENT_CONTEXT.md": compatibility,
     }.items():
         require(
             "docs/codex/current-state.md" in text,
@@ -131,15 +128,6 @@ def main() -> None:
         "current-state.md must delegate volatile delivery state to GitHub PR #141",
     )
 
-    require(
-        "compatibility pointer" in compatibility.lower()
-        and "not a current-state authority" in compatibility,
-        "CURRENT_CONTEXT.md must be a non-authoritative compatibility pointer",
-    )
-    require(
-        "CURRENT_CONTEXT.md` is a compatibility pointer and is not part of default context" in context_map,
-        "context-map.md must exclude CURRENT_CONTEXT.md from default context",
-    )
     require(
         "## Executable task packs" in context_map
         and "python scripts/context-for.py --list" in context_map,
