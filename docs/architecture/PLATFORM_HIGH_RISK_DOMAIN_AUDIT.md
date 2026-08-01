@@ -37,7 +37,7 @@ Execution Risk、Kill Switch、双人审批、Live Write与账户/策略约束�
 - `position_math.py`是Operational与Formal共享的唯一纯仓位计算Owner；
 - Operational projection不得作为Formal calculation输入。
 
-### Execution Runtime：保留边界
+### Platform Execution Runtime：保留边界
 
 `execution-runtime/`继续独占Venue SDK、外部副作用与Runtime Journal。Platform API只能通过版本化Runtime合同发送命令和读取结果。
 
@@ -124,7 +124,7 @@ SHA-256：`3898d7b32d1413c8fddfe5c024c4c1eea31b67b05561ca66a5e48dd8355f6d93`
 
 ## 高风险结构治理停止结论
 
-H0保留了已经内聚的Trading、Risk、Formal Accounting与Execution Runtime边界；H1/H2清除了Reconciliation Facade中唯一明确的FastAPI路由混合债务。
+H0保留了已经内聚的Trading、Risk、Formal Accounting与Platform Execution Runtime边界；H1/H2清除了Reconciliation Facade中唯一明确的FastAPI路由混合债务。
 
 剩余高风险模块没有第二套业务Owner、明确重复实现或可在不迁移策略/SQL/副作用的前提下形成的新切口。继续拆分将增加兼容层与测试面，而不会降低业务风险。
 
@@ -136,7 +136,7 @@ H0保留了已经内聚的Trading、Risk、Formal Accounting与Execution Runtime
 
 1. 是否仍被服务器、定时任务、用户数据或生产流程使用；
 2. Go/MySQL依赖、环境变量、部署入口、数据库Schema与迁移责任；
-3. 与当前Platform API / Execution Runtime是否存在功能重叠或真实外部依赖；
+3. 与当前Platform API / Platform Execution Runtime是否存在功能重叠或真实外部依赖；
 4. 哪些内容属于历史证据、可归档资产、仍在用系统或不可删除数据；
 5. 在完成服务器与数据证据前，不删除、不重命名、不迁移该目录。
 

@@ -230,7 +230,10 @@ def test_formal_app_title_drives_existing_storage_and_runtime_config_chain() -> 
     assert "`${getCommonStoragePrefix()}${`__${pkg.version}`}__`" in env_source
     assert "getVariableName(import.meta.env.VITE_GLOB_APP_TITLE)" in env_source
     assert "title: VITE_GLOB_APP_TITLE" in setting_source
-    assert "shortName: VITE_GLOB_APP_TITLE.replace(/\\s/g, '_').replace(/-/g, '_')" in setting_source
+    assert (
+        "shortName: VITE_GLOB_APP_TITLE.replace(/\\s/g, '_').replace(/-/g, '_')"
+        in setting_source
+    )
     assert "_config?.env?.VITE_GLOB_APP_TITLE" in plugin_source
     assert "getVariableName(appTitle)" in plugin_source
 
