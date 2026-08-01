@@ -57,7 +57,7 @@ jobs:
             elif test "${commit_name}" = "02"; then
               git apply --index --exclude='.github/workflows/hedge-board-e2e.yml' "${commit_dir}/changes.patch"
             elif test "${commit_name}" = "03"; then
-              git apply --index --exclude='.github/workflows/platform-0-9-2-audit.yml' "${commit_dir}/changes.patch"
+              git apply --index --exclude='.github/workflows/platform-0-9-2-audit.yml' --exclude='.github/workflows/platform-ci.yml' "${commit_dir}/changes.patch"
             elif test -s "${commit_dir}/changes.patch"; then
               git apply --index "${commit_dir}/changes.patch"
             fi
