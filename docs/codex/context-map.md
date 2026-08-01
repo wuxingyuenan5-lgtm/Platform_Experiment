@@ -64,3 +64,22 @@ Do not automatically load:
 - Historical plans are evidence, not current authority.
 
 Browser ambient state is evidence only. Do not start browser automation unless visual behavior is part of acceptance or source-level checks cannot prove the result.
+
+## Context budgets
+
+Each existing task pack has separate Required and Optional token budgets in the existing `scripts/context-for.py` pack tool. The budget table stores pack names and numeric limits only; file paths remain owned by the existing pack definitions.
+
+```powershell
+python scripts/context-for.py identity-permission --json
+python scripts/context-for.py identity-permission --with-optional --json
+python scripts/context-for.py --check-budgets --json
+```
+
+Budget rules:
+
+- Required paths must exist and must remain within the Required budget.
+- Optional paths must exist, remain unloaded by default and stay within the Optional budget.
+- A new pack without an explicit budget fails the gate.
+- The default startup set is root `AGENTS.md`, `docs/codex/current-state.md` and one nearest module `AGENTS.md`; every module variant must remain below 4,000 estimated tokens.
+- Historical Plan, Handoff, Audit, Task, Draft, Superseded and Archive material must not enter a default pack.
+- Budgets are small growth guards, not permission to remove security, trading, accounting, reconciliation or recovery rules.

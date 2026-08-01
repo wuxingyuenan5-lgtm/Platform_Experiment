@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import json
 import re
+import subprocess
+import sys
 import tomllib
 from pathlib import Path
 
@@ -175,6 +177,19 @@ def main() -> None:
     require(
         "Browser ambient state is evidence only" in context_map,
         "context-map.md is missing browser evidence discipline",
+    )
+    require(
+        "## Context budgets" in context_map
+        and "python scripts/context-for.py --check-budgets --json" in context_map
+        and "4,000 estimated tokens" in context_map,
+        "context-map.md is missing executable budget governance",
+    )
+    subprocess.run(
+        [sys.executable, str(ROOT / "scripts/context-for.py"), "--check-budgets", "--json"],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
     )
 
     print(f"Codex context checks passed for Platform {expected_version}.")
