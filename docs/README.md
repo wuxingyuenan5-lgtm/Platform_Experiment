@@ -45,3 +45,6 @@ Plan, Handoff, Audit, Task, Superseded and archived materials are not current au
 - Domain-rule changes update the owning A2 contract and executable tests.
 - Startup or recovery command changes update `operations/RUNBOOK.md`.
 - Do not create a parallel document for a responsibility already owned above.
+## Process-material policy
+
+Completed plans, task packets, handoffs, drafts and superseded discussions do not remain active documentation solely for historical convenience. Current facts belong in A1/A2/B authorities; Git History owns completed process history. Production evidence, release/legal records and owner-decision materials remain protected until their explicit gates close.

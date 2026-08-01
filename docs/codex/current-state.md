@@ -19,12 +19,12 @@ GitHub PR #141 owns the active branch, Draft PR, HEAD, CI and review state.
 
 ## Current phase
 
-- Phase 2B-Inventory Gate-R1 passed at the accepted Phase 2A-R1 head `e4f12ed2da270943a15c25ae58db51bfb2315c49`.
-- Current work is Platform 0.9.3 Phase 2B-Wave 1A — removal of the frozen 25-file zero-risk process package.
-- Phase 2B-Wave 1A implementation head is this commit, the current Draft PR #141 head.
-- Phase 2B-Wave 1B, Wave 2, Wave 3 and Phase 2C have not started.
-- Historical frontend roadmaps and superseded strategy drafts are being converged into current product, strategy and frontend authorities; Financial AI remains deferred.
-- Platform architecture, data-authority and external-capability drafts are being converged into SYSTEM_MAP, OWNERSHIP, engineering standards and current technical contracts.
+- Platform 0.9.3 Phase 2 — Documentation, Repository and AI Context Convergence is implemented on the current Draft PR #141 head and awaits owner acceptance.
+- Completed internal batches: Wave 1A, Wave 1B, Wave 2 reference closure, bounded AI Context budgets, four-domain Wave 3 fact convergence and deterministic governance-residue cleanup.
+- Current facts now live in A1/A2/B authorities; completed Plan, Draft, Task, Handoff and Superseded process material is recoverable through Git History rather than active search paths.
+- Seven Context Packs have explicit Required/Optional budgets, stable machine-readable metrics and CI enforcement; default startup context remains below 4,000 estimated tokens.
+- Production-confirmation and owner-decision materials remain protected; Financial AI remains deferred.
+- Phase 3 codebase reduction and build simplification has not started.
 - Phase 8 owns cross-venue spread and funding-fee arbitrage business closure; it has not started.
 
 ## Safety and known limits

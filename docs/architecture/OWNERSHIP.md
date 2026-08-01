@@ -138,7 +138,7 @@ The Platform API must not import Venue SDKs. Unknown external results remain unk
 | Durable Agent rules | `AGENTS.md` | Safety and engineering rules that remain valid across tasks | Current task progress or PR history |
 | Agent context loading | `docs/codex/context-map.md` | Bounded context-loading order and module entrypoints | Duplicate ownership registry |
 | Current engineering truth | `docs/codex/current-state.md` | Compact current state, safety defaults and active work | Historical implementation diary |
-| Task handoff | `docs/codex/task-template.md`, `tasks/` | One bounded packet per non-trivial Issue | Repository-wide permanent rules |
+| Task handoff | `docs/codex/task-template.md` and issue-bound `tasks/*.md` packets | One bounded packet per Critical Issue; GitHub owns completed history | Repository-wide permanent rules or duplicate templates |
 | Architecture ownership | `docs/architecture/OWNERSHIP.md` | This canonical ownership catalog | Task progress or operational runbooks |
 | Architecture enforcement | `scripts/check-repository-structure.py`, `scripts/check-documentation-consistency.py` | Machine checks for code and documentation boundaries | Runtime application behavior |
 | Workstream enforcement | `scripts/check-workstream.py` | Full engineering and bounded lightweight-maintenance workflow enforcement | Product behavior |
