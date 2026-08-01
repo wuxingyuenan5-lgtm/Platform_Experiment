@@ -266,6 +266,7 @@ class CancelOrderResponse(BaseModel):
 class RuntimeStatusResponse(BaseModel):
     status: str
     service: str
+    version: str
     environment: str
     gateway: str
     journal: dict[str, object]

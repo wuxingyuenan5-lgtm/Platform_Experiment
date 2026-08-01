@@ -79,13 +79,14 @@ def main() -> None:
     actual_versions = {
         "platform-api": pyproject_version("platform-api/pyproject.toml"),
         "execution-runtime": pyproject_version("execution-runtime/pyproject.toml"),
+        "platform-web package": str(package_json.get("version", "")),
         "frontend development": frontend_version("platform-web/.env.development"),
         "frontend production": frontend_version("platform-web/.env.production"),
     }
     drift = {name: value for name, value in actual_versions.items() if value != expected_version}
     require(not drift, f"Version declarations drifted from VERSION={expected_version}: {drift}")
     require(
-        f"Active development version: Platform `{expected_version}`" in current_state,
+        f"Current target version: Platform `{expected_version}`" in current_state,
         "current-state.md does not match root VERSION",
     )
 
@@ -125,9 +126,9 @@ def main() -> None:
         "current-state.md must link architecture ownership",
     )
     require(
-        "GitHub Issue #136" in current_state
-        and "live branch, Draft PR, HEAD, CI and review state" in current_state,
-        "current-state.md must delegate volatile delivery state to GitHub Issue #136",
+        "GitHub PR #141" in current_state
+        and "active branch, Draft PR, HEAD, CI and review state" in current_state,
+        "current-state.md must delegate volatile delivery state to GitHub PR #141",
     )
 
     require(

@@ -1,20 +1,16 @@
-# Admin-Risk 文档入口
+# Platform Web 产品与专项文档入口
 
-状态：`active`  
-产品基线：Platform V5  
-架构版本：Platform V6  
-适用分支：`refactor/frontend-architecture-v6`  
-文档层级：统一文档入口
+状态：`active specialist reference`  
+当前产品：Platform  
+文档层级：Platform Web专项参考
 
 ## 1. 文档定位
 
-本目录是平台产品架构、模块需求、策略定义、UI 设计、技术架构和文档治理的统一入口。
+仓库级文档入口是`docs/README.md`。本目录只承担Platform Web产品模块、策略定义、UI设计、前端架构和历史专项参考，不与根级文档竞争当前工程事实的权威性。
 
-项目讨论、需求调整和开发任务以本文件列出的 active 文档为准。Draft、历史交接和 archive 不作为默认实施依据。
+当前工程状态以`docs/codex/current-state.md`为准；系统拓扑、Owner和运行命令分别以`docs/architecture/SYSTEM_MAP.md`、`docs/architecture/OWNERSHIP.md`和`docs/operations/RUNBOOK.md`为准。
 
-非技术或人工审阅优先从项目最外层的 `00-人工可读目录/README.md` 开始。该目录按一级模块、模块定位、需求文档、策略文档、规划和架构组织，是当前最容易找文档的入口。
-
-如果只想快速理解当前 V1 结论，再读 `START-HERE.md`。
+Draft、Handoff、Audit和Archive只在专项追溯时读取，不作为默认实施依据。非技术审阅可以从`00-人工可读目录/README.md`进入，但该目录同样不是工程事实最高权威入口。
 
 ## 2. 一级产品架构
 
@@ -36,7 +32,7 @@
 
 ## 3. 技术架构
 
-Platform V6 技术架构分为：
+Platform Web专项技术架构分为：
 
 1. 前端架构。
 2. 后端架构。

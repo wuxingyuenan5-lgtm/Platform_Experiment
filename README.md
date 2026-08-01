@@ -1,8 +1,10 @@
-# Variable-Global 交易基础设施平台
+# Platform
 
-内部基金投研、策略执行、风险控制、用户管理、资产与账务核对平台。当前采用Vue产品前端、FastAPI模块化单体Platform API和独立Execution Runtime，不引入重型分布式基础设施。
+Platform is the internal fund research, strategy execution, risk, identity, portfolio and reconciliation application. It uses a Vue product frontend, a FastAPI modular-monolith Platform API and an independent Execution Runtime without introducing heavy distributed infrastructure.
 
-当前版本、冻结基线、活动分支、优化阶段和延期验收统一由以下文件维护：
+当前目标版本：Platform `0.9.3`。
+
+Current version, baseline, active branch, phase and deferred acceptance are maintained in:
 
 `docs/codex/current-state.md`
 
@@ -32,7 +34,6 @@ powershell -ExecutionPolicy Bypass -File .\scripts\dev-platform.ps1
 | 人工理解项目 | `00-人工可读目录/README.md` |
 | 架构和代码所有权 | `docs/architecture/OWNERSHIP.md` |
 | 系统结构 | `docs/architecture/SYSTEM_MAP.md` |
-| 0.9.2系统优化总方案 | `docs/architecture/PLATFORM_0_9_2_SYSTEM_OPTIMIZATION_MASTER_PLAN.md` |
 | Git工作流 | `docs/engineering/GIT_WORKFLOW.md` |
 | 数据库、迁移与恢复 | `docs/database/README.md` |
 | 运维和验收 | `docs/operations/` |
@@ -50,19 +51,11 @@ scripts/               启动、版本、审计和质量工具
 projects/risk-control/ 外部证据完成前冻结的Legacy生产资产
 ```
 
-Platform Web、Platform API和Execution Runtime三条物理边界已经完成目录治理。`projects/risk-control`与`deploy/`在服务器、MySQL和真实消费者证据完成前不得删除、重命名或机械迁移。
+Platform Web、Platform API和Execution Runtime是当前三条物理边界。`projects/risk-control`与`deploy/`在服务器、MySQL和真实消费者证据完成前不得删除、重命名或机械迁移。
 
-## 当前优化阶段
+## 当前阶段
 
-Phase A–D、Research、Identity、Portfolio、Frontend热点和高风险路由治理已经完成。当前继续Phase J / J2 GitHub仓库减负；服务器、GitLab Runner、MySQL、TLS、Windows真实本地和真实Venue/Broker验收延期，不再阻塞仓库内安全优化。
-
-## 工作流
-
-- Fast：Markdown和同步版本维护。
-- Standard：边界清晰的单模块改动。
-- Critical：交易、执行、Runtime、风险、权限、认证、数据库、迁移、合同、Live或跨服务工作。
-
-PR按受影响范围运行检查；正式验收阶段运行完整矩阵。详细规则见`docs/engineering/GIT_WORKFLOW.md`。
+Phase 0和Phase 0.5已经完成。当前执行Platform 0.9.3 Phase 1A，只处理版本事实、当前入口、有效命令路径和候选分支CI验证；不包含Context优化、批量文档删除、产品代码清理或业务闭环。
 
 ## 版本维护
 
@@ -72,4 +65,4 @@ python scripts/check-version-consistency.py
 python scripts/check-codex-context.py
 ```
 
-根`VERSION`、两个Python包、前端显示环境和`platform-web/package.json`必须保持一致。
+根`VERSION`是版本权威。Platform Web包与显示版本、Platform API包与应用版本、Execution Runtime包与状态版本，以及当前权威文档声明必须保持一致。

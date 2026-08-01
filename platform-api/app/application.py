@@ -81,6 +81,7 @@ from app.trading import reconcile_order, submit_order
 from app.v1_readiness import get_strategy_v1_readiness
 
 settings = get_settings()
+PLATFORM_VERSION = "0.9.3"
 
 
 @asynccontextmanager
@@ -89,7 +90,7 @@ async def lifespan(_: FastAPI):
     yield
 
 
-app = FastAPI(title=settings.app_name, version="0.6.0", lifespan=lifespan)
+app = FastAPI(title=settings.app_name, version=PLATFORM_VERSION, lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.allowed_cors_origins,
@@ -112,7 +113,7 @@ def health() -> dict[str, str]:
 def system_info() -> dict[str, str]:
     return {
         "service": "platform-api",
-        "version": "0.6.0",
+        "version": PLATFORM_VERSION,
         "apiVersion": "v1",
     }
 

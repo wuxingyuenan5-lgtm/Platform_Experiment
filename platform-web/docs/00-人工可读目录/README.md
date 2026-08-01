@@ -4,6 +4,9 @@
 用途：给非技术负责人、产品负责人、业务负责人快速找到项目文档。  
 原则：先看业务模块，再看需求，再看策略和架构；不要一上来钻代码目录。
 
+> 该目录为产品和历史专项参考，不是当前工程事实的最高权威入口。  
+> 当前工程状态以`docs/codex/current-state.md`、`docs/architecture/SYSTEM_MAP.md`、`docs/architecture/OWNERSHIP.md`和`docs/operations/RUNBOOK.md`为准。
+
 ## 1. 当前最重要结论
 
 平台一级模块名称和定位不再调整，当前开发重点是把“策略”模块做实。

@@ -1,8 +1,8 @@
 {
   "name": "vg-platform-web",
-  "version": "0.9.2",
+  "version": "0.9.3",
   "private": true,
-  "description": "Variable-Global research, trading, risk, identity, portfolio and reconciliation web platform",
+  "description": "Platform research, trading, risk, identity, portfolio and reconciliation web application",
   "homepage": "https://github.com/wuxingyuenan5-lgtm/Platform_Experiment",
   "bugs": {
     "url": "https://github.com/wuxingyuenan5-lgtm/Platform_Experiment/issues"
