@@ -40,4 +40,4 @@ GitHub PR #141 owns the active branch, Draft PR, HEAD, CI and review state.
 - Database and recovery: `docs/database/README.md`.
 - Domain contracts: `docs/contracts/README.md`.
 
-Legacy production evidence remains specialist reference. Do not delete or rename `projects/risk-control`, alter `deploy/`, delete `platform-web/.gitlab-ci.yml`, migrate external names or declare the Legacy production path retired without external evidence and owner approval.
+Legacy production evidence remains specialist reference in `docs/architecture/PLATFORM_LEGACY_DEPLOYMENT_AUDIT.md` and `docs/architecture/PLATFORM_LEGACY_GITLAB_DEPLOYMENT_AUDIT.md`. Do not delete or rename `projects/risk-control`, alter `deploy/`, delete `platform-web/.gitlab-ci.yml`, migrate external names or declare the Legacy production path retired without external evidence and owner approval.

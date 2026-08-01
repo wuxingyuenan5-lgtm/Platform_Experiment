@@ -8,14 +8,14 @@
 ## 1. 权威边界
 
 ```text
-Execution Runtime
+Platform Execution Runtime
 = 外部 Venue 查询、受控撤单和执行适配边界
 
-Platform Backend
+Platform API
 = Platform Order、FinancialFact、Formal Accounting、Difference 权威
 ```
 
-Runtime 返回外部事实快照，不直接修改 Platform Backend 数据库。Backend 负责验证 Platform 身份、导入不可变事实、更新本地投影并创建差异。
+Runtime 返回外部事实快照，不直接修改 Platform API 数据库。Platform API负责验证 Platform 身份、导入不可变事实、更新本地投影并创建差异。
 
 ## 2. 查询不等于命令
 
@@ -142,7 +142,7 @@ Fake Gateway 使用 Runtime Journal SQLite 保存外部视角状态。它用于�
 - FinancialFact 重复导入测试。
 - Reconciliation Difference 金样本。
 
-Fake Store 不是正式交易账本，也不进入 Platform Backend 权威数据库。
+Fake Store 不是正式交易账本，也不进入 Platform API 权威数据库。
 
 ## 7. result_unknown 恢复顺序
 

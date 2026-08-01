@@ -10,7 +10,7 @@
 Repository / Database / API / Audit
         只保存 Reference 与 Metadata
                     ↓
-             Execution Runtime
+             Platform Execution Runtime
                     ↓
         SecretProvider.resolve（内部）
                     ↓

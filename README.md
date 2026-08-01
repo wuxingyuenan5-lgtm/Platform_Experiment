@@ -1,6 +1,6 @@
-# Platform
+# 全球变量金融平台（Variable-Global）
 
-Platform is the internal application for Research, Market Data, Strategy, Trading, Execution, Risk, Accounting, Reconciliation, User & Access, Member Portfolio and Operations.
+全球变量金融平台（Variable-Global）服务于Research、Market Data、Strategy、Trading、Execution、Risk、Accounting、Reconciliation、User & Access、Member Portfolio和Operations。`Platform`是工程与架构层通用简称，不取代正式产品品牌。
 
 The maintained services are Platform Web, Platform API and Platform Execution Runtime.
 

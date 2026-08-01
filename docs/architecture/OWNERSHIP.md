@@ -120,7 +120,7 @@ Operational projections are monitoring views. Formal accounting is reconstructed
 | Strict live acceptance write gate | `execution-runtime/app/strict_live_acceptance_adapters.py` | Runtime-independent ounce cap, Venue Step/Contract Size/access validation and one-position admission rule | Platform lifecycle persistence, credential values or Limit execution |
 | Live adapter routing | `execution-runtime/app/bybit_mt5_gateway.py` | Account-routed adapter selection and deterministic route-independent external-ID lookup | Venue-specific mapping rules or Platform persistence |
 
-The Platform Backend must not import Venue SDKs. Unknown external results remain unknown until reconciled and must never trigger an automatic duplicate submission.
+The Platform API must not import Venue SDKs. Unknown external results remain unknown until reconciled and must never trigger an automatic duplicate submission.
 
 ## Engineering and context governance
 

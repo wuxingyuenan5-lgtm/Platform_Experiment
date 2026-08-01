@@ -39,7 +39,7 @@ Load:
 
 Avoid loading frontend assets or runtime gateway internals unless required.
 
-### Execution Runtime
+### Platform Execution Runtime
 
 Path:
 

@@ -117,19 +117,19 @@ def collect_versions(root: Path) -> tuple[str, dict[str, str]]:
     require_pattern_usage(
         root,
         "execution-runtime/app/main.py",
-        "Execution Runtime OpenAPI",
+        "Platform Execution Runtime OpenAPI",
         r"FastAPI\([^)]*version=PLATFORM_VERSION",
     )
     require_pattern_usage(
         root,
         "execution-runtime/app/main.py",
-        "Execution Runtime /status",
+        "Platform Execution Runtime /status",
         r"RuntimeStatusResponse\([^)]*version=PLATFORM_VERSION",
     )
     require_pattern_usage(
         root,
         "execution-runtime/app/models.py",
-        "Execution Runtime status response",
+        "Platform Execution Runtime status response",
         r"class RuntimeStatusResponse\(BaseModel\):.*?^\s+version:\s+str\s*$",
     )
 

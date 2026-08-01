@@ -80,7 +80,7 @@ https://<production-host>/api/v1 → platform-api
 - Restore Drill 不修改活动路径；
 - 恢复副本强制关闭两层 Live Write。
 
-最终 Platform Backend **403 项测试通过**，完整 Platform CI 为 `30374949395`。
+最终 Platform API **403 项测试通过**，完整 Platform CI 为 `30374949395`。
 
 ## 6. 生产主机 Restore Drill
 

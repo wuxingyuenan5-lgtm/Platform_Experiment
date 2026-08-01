@@ -1,7 +1,7 @@
 # 用户系统技术架构
 
 状态：`implemented / automated verification passed / manual acceptance pending`<br>
-适用版本：`Platform Experiment 0.9.0`
+适用产品：`Platform`
 Issue：`#117`
 需求基线：`../planning/USER_SYSTEM_REQUIREMENTS.md`
 
@@ -1062,7 +1062,7 @@ BEGIN IMMEDIATE
 
 - 不导入旧 MySQL；
 - 使用 CEO CLI；
-- 前端认证切换到 Platform Backend；
+- 前端认证切换到 Platform API；
 - 旧 auth-service 暂时保留但不接收新用户流量；
 - 后续独立 Issue 清理。
 
@@ -1114,7 +1114,7 @@ member_nav_stale_total
 
 ## 24. 设计决策记录
 
-### ADR-US-001：Platform Backend 单一身份权威
+### ADR-US-001：Platform API 单一身份权威
 
 接受。避免旧 Go、前端本地状态和 Platform Principal 三套事实并存。
 

@@ -1,6 +1,6 @@
-# Platform Documentation
+# 全球变量金融平台（Variable-Global）文档导航
 
-This file is the documentation navigator. It does not own version, phase, service topology, business rules or operating commands. Ownership authority is `docs/architecture/OWNERSHIP.md`.
+`Platform`是工程与架构层通用简称；正式产品品牌仍为全球变量金融平台（Variable-Global）。本文件只负责文档导航，不拥有版本、阶段、服务拓扑、业务规则或运行命令；所有权权威为`docs/architecture/OWNERSHIP.md`。
 
 ## A1 — top-level authorities
 

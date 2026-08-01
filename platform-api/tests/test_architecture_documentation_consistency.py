@@ -141,7 +141,11 @@ def test_portable_documentation_allows_placeholders_and_fenced_examples(
 
 
 def test_a1_hierarchy_rejects_duplicate_substantive_paragraphs(tmp_path: Path) -> None:
-    paragraph = "This deliberately long authority paragraph repeats the same current rule across two top-level documents and therefore exceeds the minimum duplication threshold used by the documentation hierarchy gate."
+    paragraph = (
+        "This deliberately long authority paragraph repeats the same current rule "
+        "across two top-level documents and therefore exceeds the minimum duplication "
+        "threshold used by the documentation hierarchy gate."
+    )
     for relative in DOCUMENTATION_CONSISTENCY.A1_ENTRYPOINTS:
         path = tmp_path / relative
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -152,7 +156,10 @@ def test_a1_hierarchy_rejects_duplicate_substantive_paragraphs(tmp_path: Path) -
     docs_index.write_text(
         docs_index.read_text(encoding="utf-8")
         + "\n"
-        + " ".join(f"`{p.removeprefix('docs/') if p.startswith('docs/') else '../' + p}`" for p in DOCUMENTATION_CONSISTENCY.A1_ENTRYPOINTS),
+        + " ".join(
+            f"`{p.removeprefix('docs/') if p.startswith('docs/') else '../' + p}`"
+            for p in DOCUMENTATION_CONSISTENCY.A1_ENTRYPOINTS
+        ),
         encoding="utf-8",
     )
 
@@ -167,11 +174,17 @@ def test_platform_web_index_cannot_claim_repository_authority(tmp_path: Path) ->
         path.write_text("# Entry\n", encoding="utf-8")
     docs_index = tmp_path / "docs/README.md"
     docs_index.write_text(
-        " ".join(f"`{p.removeprefix('docs/') if p.startswith('docs/') else '../' + p}`" for p in DOCUMENTATION_CONSISTENCY.A1_ENTRYPOINTS),
+        " ".join(
+            f"`{p.removeprefix('docs/') if p.startswith('docs/') else '../' + p}`"
+            for p in DOCUMENTATION_CONSISTENCY.A1_ENTRYPOINTS
+        ),
         encoding="utf-8",
     )
     web = tmp_path / "platform-web/docs/README.md"
     web.parent.mkdir(parents=True, exist_ok=True)
     web.write_text("# 唯一入口\n", encoding="utf-8")
 
-    assert any("must remain specialist reference" in error for error in DOCUMENTATION_CONSISTENCY.validate_a1_hierarchy(tmp_path))
+    assert any(
+        "must remain specialist reference" in error
+        for error in DOCUMENTATION_CONSISTENCY.validate_a1_hierarchy(tmp_path)
+    )

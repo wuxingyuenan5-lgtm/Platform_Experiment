@@ -3,8 +3,8 @@
     <template #headerContent>
       <div class="flex justify-between items-center">
         <span class="flex-1">
-          Variable-Global交易基础设施平台服务于投研、策略、交易、风控、用户、资产与账务核对。
-          前端通过Browser Session与REST连接Platform
+          全球变量金融平台（Variable-Global）由Platform Web、Platform API和Platform Execution
+          Runtime组成。Platform Web通过Browser Session与REST连接Platform
           API，不持有Venue凭证，也不直接执行外部交易副作用。
         </span>
       </div>

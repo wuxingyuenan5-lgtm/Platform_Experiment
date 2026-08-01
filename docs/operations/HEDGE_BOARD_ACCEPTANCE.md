@@ -26,7 +26,7 @@ docs/operations/PLATFORM_0_9_1_LOCAL_ACCEPTANCE_HANDOFF.md
 本手册不覆盖：
 
 - 真实下单、订单、成交、持仓和会计账本；
-- Execution Runtime；
+- Platform Execution Runtime；
 - 将投研行情认定为交易执行权威行情；
 - 对第三方免费数据源的永久可用性承诺。
 

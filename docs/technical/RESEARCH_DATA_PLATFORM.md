@@ -4,7 +4,7 @@ Status: active on the Platform 0.9.1 research-upgrade branch.
 
 ## Purpose
 
-The research-data capability supports the hedge-fund dashboard with read-only public-market information. It is a Platform Backend domain and is not part of trade execution, formal accounting or Venue reconciliation.
+The research-data capability supports the hedge-fund dashboard with read-only public-market information. It is a Platform API domain and is not part of trade execution, formal accounting or Venue reconciliation.
 
 ## Runtime flow
 
@@ -79,7 +79,7 @@ The high-turnover work statistic is separate. It uses strict `stock turnover > t
 
 ## One-click stock data
 
-A stock query is fixed code orchestration, not an AI workflow. The Platform Backend reads quote/valuation, consensus, financials, valuation percentiles, reports, announcements, raw stock news, margin, holders, fund flow, dividends, block trades, dragon-tiger data, lockups, investor Q&A and Shenwan classification in parallel.
+A stock query is fixed code orchestration, not an AI workflow. The Platform API reads quote/valuation, consensus, financials, valuation percentiles, reports, announcements, raw stock news, margin, holders, fund flow, dividends, block trades, dragon-tiger data, lockups, investor Q&A and Shenwan classification in parallel.
 
 Each module fails independently. A report-source failure cannot remove the quote or financial modules. The platform does not build a full historical stock warehouse for this feature; it uses bounded cache and last-known-good snapshots.
 

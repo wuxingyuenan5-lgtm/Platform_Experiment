@@ -42,7 +42,7 @@ Trading fills → operational projections
 Forbidden directions:
 
 ```text
-Platform Backend → venue SDK
+Platform API → venue SDK
 Frontend → database or venue SDK
 Runtime → Platform internal modules
 Trading projections → formal accounting tables

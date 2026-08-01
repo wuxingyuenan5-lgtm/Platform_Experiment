@@ -59,7 +59,7 @@ jobs:
           cache: pip
           cache-dependency-path: platform-api/pyproject.toml
 
-      - name: Install Platform Backend
+      - name: Install Platform API
         run: python -m pip install -e './platform-api[dev]'
 
       - uses: pnpm/action-setup@v4

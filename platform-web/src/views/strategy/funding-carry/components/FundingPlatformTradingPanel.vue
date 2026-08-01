@@ -3,7 +3,7 @@
     <div class="panel-head">
       <div>
         <h3>平台批次执行</h3>
-        <p>账户、策略实例与标的均来自 Platform Backend Catalog；执行仍由 Runtime 隔离。</p>
+        <p>账户、策略实例与标的均来自 Platform API Catalog；执行仍由 Runtime 隔离。</p>
       </div>
       <span :class="['status', statusTone]">
         {{ batchStatusLabel }}
@@ -316,7 +316,7 @@
     try {
       await refreshSnapshots();
     } catch {
-      localError.value = '刷新失败，请确认 Platform Backend 已启动。';
+      localError.value = '刷新失败，请确认 Platform API 已启动。';
     }
   }
 
@@ -380,7 +380,7 @@
       }
     } catch (error) {
       localError.value =
-        error instanceof Error ? error.message : '批次请求失败，请确认 Platform Backend 已启动。';
+        error instanceof Error ? error.message : '批次请求失败，请确认 Platform API 已启动。';
     } finally {
       submitting.value = false;
     }

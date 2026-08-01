@@ -2,7 +2,7 @@ export enum RoleEnum {
   SUPER = 'super',
   TEST = 'test',
 
-  // Browser business roles owned by Platform Backend.
+  // Browser business roles owned by Platform API.
   CEO = 'ceo',
   TECH_LEAD = 'tech_lead',
   EMPLOYEE = 'employee',

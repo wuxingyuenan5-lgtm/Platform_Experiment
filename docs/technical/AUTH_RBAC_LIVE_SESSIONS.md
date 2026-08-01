@@ -1,7 +1,7 @@
 # Authentication, RBAC, Browser Session, and LiveTradingSession
 
 状态：`active / user-system Batches 1–5 implemented, verification pending`
-适用版本：`Platform Experiment 0.9.0`
+适用产品：`Platform`
 用户系统架构：`USER_SYSTEM_TECHNICAL_ARCHITECTURE.md`
 用户系统执行计划：`../planning/USER_SYSTEM_EXECUTION_PLAN.md`
 

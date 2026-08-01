@@ -215,7 +215,7 @@ def github_json(url: str, token: str) -> Any:
         headers={
             "Accept": "application/vnd.github+json",
             "Authorization": f"Bearer {token}",
-            "User-Agent": "variable-global-workstream-check",
+            "User-Agent": "platform-workstream-check",
             "X-GitHub-Api-Version": "2022-11-28",
         },
     )

@@ -48,3 +48,6 @@ jobs:
           --mode post-rename
           --target all
           --fail-on-unclassified
+
+      - name: Enforce active Platform naming
+        run: python scripts/check-active-naming-consistency.py

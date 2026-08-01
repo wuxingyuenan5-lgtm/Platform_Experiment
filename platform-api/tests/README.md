@@ -1,4 +1,4 @@
-# Platform Backend Test Taxonomy
+# Platform API Test Taxonomy
 
 Backend tests remain close to the modular-monolith codebase, but every collected test is assigned exactly one primary execution layer by `conftest.py`.
 

@@ -47,7 +47,10 @@ def _call_service[**P, R](
     try:
         return operation(*args, **kwargs)
     except runtime_client.RuntimeQueryError as exc:
-        raise HTTPException(status_code=503, detail="Execution Runtime query failed") from exc
+        raise HTTPException(
+            status_code=503,
+            detail="Platform Execution Runtime query failed",
+        ) from exc
     except service.MissingAuthoritativeStrategyError as exc:
         raise HTTPException(
             status_code=422,

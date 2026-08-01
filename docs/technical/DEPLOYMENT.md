@@ -6,7 +6,7 @@ The current primary workflow is local Platform development and GitHub acceptance
 
 - Platform Web: `http://127.0.0.1:4373/index.html`
 - Platform API: `http://127.0.0.1:8000`
-- Execution Runtime: `http://127.0.0.1:8100`
+- Platform Execution Runtime: `http://127.0.0.1:8100`
 
 Windows PowerShell entry:
 
@@ -23,7 +23,7 @@ Platform Web
     ↓ Browser Session / REST
 Platform API
     ↓ versioned Runtime contracts
-Execution Runtime
+Platform Execution Runtime
     ↓ Venue / Broker / MT5 / Bybit
 ```
 

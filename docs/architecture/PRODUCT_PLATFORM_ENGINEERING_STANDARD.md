@@ -3,7 +3,7 @@
 Status: `active`
 Baseline: `Platform 0.9.1`
 
-This document defines the durable implementation standard for product-facing research, data, dashboard and workflow features in Platform Experiment. It supplements `SYSTEM_MAP.md`, `OWNERSHIP.md`, `LIGHTWEIGHT_OPTIMIZATION_PLAN.md` and product-specific design standards. It does not redefine trading execution, accounting, authorization or live-write semantics.
+This document defines the durable implementation standard for product-facing research, data, dashboard and workflow features in Platform. It supplements `SYSTEM_MAP.md`, `OWNERSHIP.md`, `LIGHTWEIGHT_OPTIMIZATION_PLAN.md` and product-specific design standards. It does not redefine trading execution, accounting, authorization or live-write semantics.
 
 ## 1. Governing principles
 
@@ -11,7 +11,7 @@ This document defines the durable implementation standard for product-facing res
    - `platform-web/`: Vue product frontend.
    - `platform-api/`: business, research, orchestration, persistence and API contracts.
    - `execution-runtime/`: venue and broker adapters plus external side effects.
-2. Product research data belongs in Platform Backend and must not be implemented in Execution Runtime.
+2. Product research data belongs in Platform API and must not be implemented in Platform Execution Runtime.
 3. The frontend must consume Platform API contracts and must not directly call databases, venue SDKs or third-party research providers.
 4. Research data is decision-support data. It must never automatically become authoritative execution, risk or accounting input.
 5. Prefer the smallest coherent implementation. Do not add a framework, service, state layer or directory only to make the architecture look more formal.
@@ -77,7 +77,7 @@ Data modules should use explicit states where applicable:
 
 A parent page must allow one module to fail without blanking unrelated modules. Loading and failure states must be scoped to the smallest useful business section.
 
-## 4. Platform Backend architecture
+## 4. Platform API architecture
 
 ### 4.1 Layer responsibilities
 
@@ -128,7 +128,7 @@ Do not build a full market-data warehouse as a side effect of a dashboard featur
 
 ## 5. Research and market-data rules
 
-1. Free public sources may be used only through Platform Backend providers.
+1. Free public sources may be used only through Platform API providers.
 2. Reference repositories may inform formulas, endpoint discovery and workflow design, but the platform must own its contracts, providers, cache and domain models.
 3. The platform must not depend on a reference GitHub repository at runtime.
 4. Adapted code must retain required license notices and attribution.
@@ -159,7 +159,7 @@ npx pnpm@9.15.9 test:hedge-board-layout
 npx pnpm@9.15.9 build
 ```
 
-Platform Backend:
+Platform API:
 
 ```text
 python -m ruff check app tests
@@ -206,8 +206,8 @@ Manual acceptance is required where automation cannot prove the outcome, includi
 The following are prohibited unless separately approved as an architecture change:
 
 - frontend direct calls to third-party research providers;
-- Platform Backend imports of venue SDKs;
-- research logic in Execution Runtime;
+- Platform API imports of venue SDKs;
+- research logic in Platform Execution Runtime;
 - a second FastAPI service created only for one dashboard;
 - silent use of stale data;
 - empty provider responses overwriting valid data;

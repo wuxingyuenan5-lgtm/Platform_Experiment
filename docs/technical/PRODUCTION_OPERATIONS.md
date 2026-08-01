@@ -7,14 +7,14 @@
 ## 1. 权威边界
 
 ```text
-Platform Backend
+Platform API
 ├─ Production Status
 ├─ Operational Alerts
 ├─ Controlled Operation Journal
 ├─ Backup Metadata
 └─ Restore Drill Metadata
 
-Execution Runtime
+Platform Execution Runtime
 ├─ Runtime Status
 ├─ Venue Readiness
 ├─ Credential Inspection

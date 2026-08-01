@@ -369,7 +369,7 @@ def alert_candidates(status: ProductionStatusResponse) -> list[dict[str, object]
             "critical",
             "service",
             "execution-runtime",
-            "Execution Runtime is unavailable",
+            "Platform Execution Runtime is unavailable",
             status.runtime,
         )
     if status.venue.get("status") in {"not_connected", "invalid_response"}:

@@ -1,6 +1,6 @@
 # Data Model
 
-The local platform backend currently stores state in SQLite:
+The local Platform API currently stores state in SQLite:
 
 - Database path: `platform-api/data/platform.db`
 - Backend database code: `platform-api/app/database.py`
