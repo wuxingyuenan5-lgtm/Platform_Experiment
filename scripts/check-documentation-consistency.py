@@ -83,14 +83,28 @@ STALE_CONTEXT_SNIPPETS = (
 EXCLUDED_MARKDOWN_PARTS = frozenset(
     {
         ".git",
+        ".mypy_cache",
+        ".pytest_cache",
+        ".ruff_cache",
+        ".turbo",
         ".venv",
         "archive",
+        "artifacts",
         "audit",
+        "build",
+        "coverage",
         "dist",
         "node_modules",
         "outputs",
+        "test-results",
         "vendor",
     }
+)
+DOCUMENTATION_ENTRYPOINT_ROOTS = (
+    "docs",
+    "platform-web/docs",
+    "platform-api/docs",
+    "execution-runtime/docs",
 )
 EXTERNAL_LINK_SCHEMES = frozenset(
     {"data", "http", "https", "javascript", "mailto", "tel"}
@@ -152,6 +166,30 @@ def active_markdown_paths(root: Path) -> list[Path]:
         for path in sorted(root.rglob("*.md"))
         if not (set(path.relative_to(root).parts) & EXCLUDED_MARKDOWN_PARTS)
     ]
+
+
+def documentation_entrypoint_candidates(root: Path) -> list[Path]:
+    """Return maintained files that can act as documentation entrypoints."""
+
+    root = root.resolve()
+    candidates = [path for path in sorted(root.iterdir()) if path.is_file()]
+
+    for relative_root in DOCUMENTATION_ENTRYPOINT_ROOTS:
+        documentation_root = root / relative_root
+        if not documentation_root.is_dir():
+            continue
+
+        pending = [documentation_root]
+        while pending:
+            current = pending.pop()
+            for path in sorted(current.iterdir(), reverse=True):
+                if path.is_dir():
+                    if path.name not in EXCLUDED_MARKDOWN_PARTS:
+                        pending.append(path)
+                elif path.is_file():
+                    candidates.append(path)
+
+    return sorted(candidates)
 
 
 def markdown_without_examples(content: str) -> str:
@@ -280,7 +318,7 @@ def validate_dead_documentation_entrypoint(
     root = root.resolve()
     errors: list[str] = []
 
-    for path in sorted(root.rglob("*")):
+    for path in documentation_entrypoint_candidates(root):
         if DEAD_ENTRYPOINT_NAME_PATTERN.fullmatch(path.name):
             relative = path.resolve().relative_to(root).as_posix()
             errors.append(f"forbidden dead documentation entrypoint exists: {relative}")
@@ -325,8 +363,8 @@ def validate_current_state_entrypoint(root: Path) -> list[str]:
 
     candidates = [
         path.resolve().relative_to(root).as_posix()
-        for path in sorted(root.rglob("*"))
-        if path.is_file() and CURRENT_STATE_NAME_PATTERN.fullmatch(path.name)
+        for path in documentation_entrypoint_candidates(root)
+        if CURRENT_STATE_NAME_PATTERN.fullmatch(path.name)
     ]
     for relative in candidates:
         if relative != CURRENT_STATE_ENTRYPOINT:

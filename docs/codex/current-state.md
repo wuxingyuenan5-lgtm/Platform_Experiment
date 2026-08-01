@@ -19,7 +19,7 @@ GitHub PR #141 owns the active branch, Draft PR, HEAD, CI and review state.
 ## Current phase
 
 - Phase 1B passed acceptance at `3c5bc4f0c700129c0716765103604bc16e0335c4`.
-- Current work is Platform 0.9.3 Phase 2A — dead documentation entrypoint removal.
+- Current work is Platform 0.9.3 Phase 2A-R1 — documentation gate scope correction.
 - Phase 2B owns the approved 114-file D-class process-material cleanup; it has not started.
 - Phase 8 owns cross-venue spread and funding-fee arbitrage business closure; it has not started.
 

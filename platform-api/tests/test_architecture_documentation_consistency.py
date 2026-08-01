@@ -261,3 +261,116 @@ def test_parallel_current_state_alias_is_rejected(tmp_path: Path) -> None:
     assert DOCUMENTATION_CONSISTENCY.validate_current_state_entrypoint(tmp_path) == [
         "parallel current-state entrypoint is forbidden: docs/current_state.md"
     ]
+
+
+def test_generated_and_dependency_directories_do_not_create_entrypoints(
+    tmp_path: Path,
+) -> None:
+    current_state = tmp_path / DOCUMENTATION_CONSISTENCY.CURRENT_STATE_ENTRYPOINT
+    current_state.parent.mkdir(parents=True)
+    current_state.write_text("# Current Engineering State\n", encoding="utf-8")
+
+    generated_files = (
+        "node_modules/example/START_HERE.md",
+        ".venv/lib/example/current_state.md",
+        "dist/docs/START-HERE",
+        "vendor/package/current-state.md",
+    )
+    for relative in generated_files:
+        path = tmp_path / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("generated dependency content\n", encoding="utf-8")
+
+    assert DOCUMENTATION_CONSISTENCY.validate_dead_documentation_entrypoint(
+        tmp_path, []
+    ) == []
+    assert DOCUMENTATION_CONSISTENCY.validate_current_state_entrypoint(tmp_path) == []
+
+
+def test_product_source_files_do_not_create_documentation_entrypoints(
+    tmp_path: Path,
+) -> None:
+    current_state = tmp_path / DOCUMENTATION_CONSISTENCY.CURRENT_STATE_ENTRYPOINT
+    current_state.parent.mkdir(parents=True)
+    current_state.write_text("# Current Engineering State\n", encoding="utf-8")
+
+    source_files = (
+        "platform-web/src/example/start_here.ts",
+        "platform-api/app/current_state.py",
+    )
+    for relative in source_files:
+        path = tmp_path / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("source fixture\n", encoding="utf-8")
+
+    assert DOCUMENTATION_CONSISTENCY.validate_dead_documentation_entrypoint(
+        tmp_path, []
+    ) == []
+    assert DOCUMENTATION_CONSISTENCY.validate_current_state_entrypoint(tmp_path) == []
+
+
+def test_root_start_here_alias_is_rejected(tmp_path: Path) -> None:
+    alias = tmp_path / "START_HERE.md"
+    alias.write_text("# Illegal alias\n", encoding="utf-8")
+
+    assert DOCUMENTATION_CONSISTENCY.validate_dead_documentation_entrypoint(
+        tmp_path, []
+    ) == ["forbidden dead documentation entrypoint exists: START_HERE.md"]
+
+
+def test_root_current_state_alias_is_rejected(tmp_path: Path) -> None:
+    current_state = tmp_path / DOCUMENTATION_CONSISTENCY.CURRENT_STATE_ENTRYPOINT
+    current_state.parent.mkdir(parents=True)
+    current_state.write_text("# Current Engineering State\n", encoding="utf-8")
+    alias = tmp_path / "current_state.md"
+    alias.write_text("# Illegal alias\n", encoding="utf-8")
+
+    assert DOCUMENTATION_CONSISTENCY.validate_current_state_entrypoint(tmp_path) == [
+        "parallel current-state entrypoint is forbidden: current_state.md"
+    ]
+
+
+def test_maintained_docs_start_here_alias_is_rejected(tmp_path: Path) -> None:
+    alias = tmp_path / "docs/START_HERE.md"
+    alias.parent.mkdir(parents=True)
+    alias.write_text("# Illegal alias\n", encoding="utf-8")
+
+    assert DOCUMENTATION_CONSISTENCY.validate_dead_documentation_entrypoint(
+        tmp_path, []
+    ) == ["forbidden dead documentation entrypoint exists: docs/START_HERE.md"]
+
+
+def test_maintained_docs_current_state_alias_is_rejected(tmp_path: Path) -> None:
+    current_state = tmp_path / DOCUMENTATION_CONSISTENCY.CURRENT_STATE_ENTRYPOINT
+    current_state.parent.mkdir(parents=True)
+    current_state.write_text("# Current Engineering State\n", encoding="utf-8")
+    alias = tmp_path / "platform-web/docs/current_state.md"
+    alias.parent.mkdir(parents=True)
+    alias.write_text("# Illegal alias\n", encoding="utf-8")
+
+    assert DOCUMENTATION_CONSISTENCY.validate_current_state_entrypoint(tmp_path) == [
+        "parallel current-state entrypoint is forbidden: "
+        "platform-web/docs/current_state.md"
+    ]
+
+
+def test_historical_document_directories_do_not_create_entrypoints(
+    tmp_path: Path,
+) -> None:
+    current_state = tmp_path / DOCUMENTATION_CONSISTENCY.CURRENT_STATE_ENTRYPOINT
+    current_state.parent.mkdir(parents=True)
+    current_state.write_text("# Current Engineering State\n", encoding="utf-8")
+
+    historical_files = (
+        "docs/archive/START_HERE.md",
+        "docs/audit/current_state.md",
+    )
+    for relative in historical_files:
+        path = tmp_path / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("historical fixture\n", encoding="utf-8")
+
+    assert DOCUMENTATION_CONSISTENCY.validate_dead_documentation_entrypoint(
+        tmp_path, []
+    ) == []
+    assert DOCUMENTATION_CONSISTENCY.validate_current_state_entrypoint(tmp_path) == []
