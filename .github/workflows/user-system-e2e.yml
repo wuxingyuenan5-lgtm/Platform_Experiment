@@ -2,6 +2,9 @@ name: User System Browser E2E
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - refactor/platform-0-9-3-repository-and-context-optimization
   pull_request:
     branches:
       - main

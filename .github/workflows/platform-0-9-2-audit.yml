@@ -1,17 +1,10 @@
-name: Platform 0.9.2 Baseline Audit
+name: Platform Baseline Audit
 
 on:
   push:
     branches:
       - refactor/issue-136-platform-0-9-2-system-optimization
-    paths:
-      - '.github/workflows/platform-0-9-2-audit.yml'
-      - 'scripts/audit-platform-baseline.py'
-      - 'scripts/run-platform-baseline-audit.py'
-      - 'scripts/context-for.py'
-      - 'scripts/check-codex-context.py'
-      - 'docs/codex/context-map.md'
-      - 'tasks/issue-136-platform-0-9-2-system-optimization.md'
+      - refactor/platform-0-9-3-repository-and-context-optimization
   pull_request:
     branches:
       - feature/issue-134-platform-0-9-1-unified-delivery
@@ -29,7 +22,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: platform-0-9-2-audit-${{ github.ref }}
+  group: platform-baseline-audit-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -58,15 +51,17 @@ jobs:
 
       - name: Collect repository baseline
         env:
-          PLATFORM_AUDIT_OUTPUT: ${{ runner.temp }}/platform-0-9-2-audit
+          PLATFORM_AUDIT_OUTPUT: ${{ runner.temp }}/platform-baseline-audit
           PLATFORM_AUDIT_BASE: feature/issue-134-platform-0-9-1-unified-delivery@8114fce45e46e7920f316f49d03db12dc424acf1
         run: |
           python scripts/run-platform-baseline-audit.py
-          cat "${PLATFORM_AUDIT_OUTPUT}/platform-0.9.2-baseline-audit.md" >> "$GITHUB_STEP_SUMMARY"
+          mv "${PLATFORM_AUDIT_OUTPUT}/platform-0.9.2-baseline-audit.md" "${PLATFORM_AUDIT_OUTPUT}/platform-baseline-audit.md"
+          mv "${PLATFORM_AUDIT_OUTPUT}/platform-0.9.2-baseline-audit.json" "${PLATFORM_AUDIT_OUTPUT}/platform-baseline-audit.json"
+          cat "${PLATFORM_AUDIT_OUTPUT}/platform-baseline-audit.md" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Collect bounded context-pack costs
         env:
-          PLATFORM_AUDIT_OUTPUT: ${{ runner.temp }}/platform-0-9-2-audit
+          PLATFORM_AUDIT_OUTPUT: ${{ runner.temp }}/platform-baseline-audit
         shell: bash
         run: |
           mkdir -p "${PLATFORM_AUDIT_OUTPUT}/context-packs"
@@ -81,7 +76,7 @@ jobs:
 
           root = Path(os.environ["PLATFORM_AUDIT_OUTPUT"]) / "context-packs"
           lines = [
-              "# Phase B bounded context costs",
+              "# Bounded context costs",
               "",
               "| Task pack | Files | Lines | Est. tokens |",
               "|---|---:|---:|---:|",
@@ -100,7 +95,7 @@ jobs:
 
       - name: Archive tracked source for evidence review
         env:
-          PLATFORM_AUDIT_OUTPUT: ${{ runner.temp }}/platform-0-9-2-audit
+          PLATFORM_AUDIT_OUTPUT: ${{ runner.temp }}/platform-baseline-audit
         run: |
           git archive --format=tar.gz --output="${PLATFORM_AUDIT_OUTPUT}/platform-source-snapshot.tar.gz" HEAD
           git rev-parse HEAD > "${PLATFORM_AUDIT_OUTPUT}/platform-source-snapshot.sha"
@@ -108,7 +103,7 @@ jobs:
       - name: Upload audit evidence
         uses: actions/upload-artifact@v4
         with:
-          name: platform-0-9-2-baseline-audit-${{ github.sha }}
-          path: ${{ runner.temp }}/platform-0-9-2-audit/
+          name: platform-baseline-audit-${{ github.sha }}
+          path: ${{ runner.temp }}/platform-baseline-audit/
           if-no-files-found: error
           retention-days: 30

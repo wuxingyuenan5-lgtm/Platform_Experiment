@@ -4,14 +4,7 @@ on:
   push:
     branches:
       - main
-    paths:
-      - VERSION
-      - platform-api/pyproject.toml
-      - execution-runtime/pyproject.toml
-      - platform-web/.env
-      - scripts/check-version-consistency.py
-      - scripts/bump-version.py
-      - .github/workflows/version-consistency.yml
+      - refactor/platform-0-9-3-repository-and-context-optimization
   pull_request:
     branches:
       - main

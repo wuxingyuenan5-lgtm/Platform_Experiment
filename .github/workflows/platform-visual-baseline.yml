@@ -2,6 +2,9 @@ name: Platform Visual Baseline
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - refactor/platform-0-9-3-repository-and-context-optimization
   pull_request:
     branches:
       - main
@@ -132,7 +135,7 @@ jobs:
           screenshots=$(wc -l < "$evidence_dir/screenshot-inventory.txt")
           metadata=$(wc -l < "$evidence_dir/metadata-inventory.txt")
           cat > "$evidence_dir/README.md" <<EOF
-          # Platform 0.9.2 full-platform visual baseline
+          # Full-platform candidate visual evidence
 
           - Git SHA: ${GITHUB_SHA}
           - Viewports: 1440x900, 1024x768, 768x1024, 390x844
@@ -161,7 +164,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: platform-0-9-2-visual-baseline-${{ github.sha }}
+          name: platform-visual-evidence-${{ github.sha }}
           path: |
             platform-web/test-results/platform-visual
             platform-web/playwright-report/platform-visual
