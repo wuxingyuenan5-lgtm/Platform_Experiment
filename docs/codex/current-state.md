@@ -11,6 +11,7 @@ This is the sole repository document for current version, branch, phase and know
 - Active review: Draft PR #141, which remains Open and Unmerged until explicit owner acceptance.
 - Accepted Phase 1A head: `4e4a6b7992c332c71c90dcf5b2bc18ca18302737`.
 - Accepted Phase 1B head: `3c5bc4f0c700129c0716765103604bc16e0335c4`.
+- Accepted Phase 2A-R1 head: `e4f12ed2da270943a15c25ae58db51bfb2315c49`.
 - Frontend package-manager authority: `pnpm@9.15.9`.
 - `main` remains protected and is not modified directly.
 
@@ -18,9 +19,10 @@ GitHub PR #141 owns the active branch, Draft PR, HEAD, CI and review state.
 
 ## Current phase
 
-- Phase 1B passed acceptance at `3c5bc4f0c700129c0716765103604bc16e0335c4`.
-- Current work is Platform 0.9.3 Phase 2A-R1 — documentation gate scope correction.
-- Phase 2B owns the approved 114-file D-class process-material cleanup; it has not started.
+- Phase 2B-Inventory Gate-R1 passed at the accepted Phase 2A-R1 head `e4f12ed2da270943a15c25ae58db51bfb2315c49`.
+- Current work is Platform 0.9.3 Phase 2B-Wave 1A — removal of the frozen 25-file zero-risk process package.
+- Phase 2B-Wave 1A implementation head is this commit, the current Draft PR #141 head.
+- Phase 2B-Wave 1B, Wave 2, Wave 3 and Phase 2C have not started.
 - Phase 8 owns cross-venue spread and funding-fee arbitrage business closure; it has not started.
 
 ## Safety and known limits
