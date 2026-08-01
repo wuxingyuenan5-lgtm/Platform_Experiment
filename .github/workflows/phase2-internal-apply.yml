@@ -1,0 +1,82 @@
+name: Internal Phase 2 Apply
+
+on:
+  push:
+    branches:
+      - internal/platform-0-9-3-phase-2-apply
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Apply verified Phase 2 commits
+        env:
+          SOURCE_BRANCH: refactor/platform-0-9-3-repository-and-context-optimization
+          RESULT_BRANCH: internal/platform-0-9-3-phase-2-result
+          DIAGNOSTIC_BRANCH: internal/platform-0-9-3-phase-2-diagnostic
+          EXPECTED_BASE: 0613d47a9917fe0d8999f07a97942d783a5da5b8
+          TRANSPORT_SHA: ${{ github.sha }}
+          PAYLOAD_SHA256: 64cc465921bd7b4473b45c275bb6cbd11a337805145c0e2ac38e431ed7bed925
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          exec > >(tee /tmp/phase2-apply.log) 2>&1
+          publish_failure() {
+            status=$?
+            trap - ERR
+            printf '\nFAILED_STATUS=%s\n' "${status}" >> /tmp/phase2-apply.log
+            git reset --hard "${TRANSPORT_SHA}" || true
+            cp /tmp/phase2-apply.log .phase2-diagnostic.log
+            git add .phase2-diagnostic.log
+            git -c user.name='Platform Phase 2 Automation' -c user.email='noreply@github.com' commit -m 'chore(internal): record Phase 2 apply failure' || true
+            git push origin "HEAD:refs/heads/${DIAGNOSTIC_BRANCH}" || true
+            exit "${status}"
+          }
+          trap publish_failure ERR
+
+          remote_head="$(git ls-remote origin "refs/heads/${SOURCE_BRANCH}" | cut -f1)"
+          test "${remote_head}" = "${EXPECTED_BASE}"
+
+          cat .phase2-payload/chunk-* > /tmp/phase2-payload.b64
+          base64 --decode /tmp/phase2-payload.b64 > /tmp/phase2-payload.tar.xz
+          echo "${PAYLOAD_SHA256}  /tmp/phase2-payload.tar.xz" | sha256sum --check --strict
+          mkdir -p /tmp/phase2-payload
+          tar -xJf /tmp/phase2-payload.tar.xz -C /tmp/phase2-payload
+
+          git checkout -B phase2-result "${EXPECTED_BASE}"
+          git config user.name 'Platform Phase 2 Automation'
+          git config user.email 'noreply@github.com'
+
+          for commit_dir in /tmp/phase2-payload/phase2-patch-payload/[0-9][0-9]; do
+            if test -s "${commit_dir}/delete.txt"; then
+              while IFS= read -r path; do
+                test -n "${path}" || continue
+                git rm -- "${path}"
+              done < "${commit_dir}/delete.txt"
+            fi
+            if test -s "${commit_dir}/changes.patch"; then
+              git apply --index "${commit_dir}/changes.patch"
+            fi
+            git diff --cached --check
+            git commit -m "$(cat "${commit_dir}/message.txt")"
+          done
+
+          python scripts/check-documentation-consistency.py
+          python scripts/check-repository-structure.py
+          python scripts/check-codex-context.py
+          python scripts/check-active-naming-consistency.py
+          python scripts/check-version-consistency.py
+          python scripts/context-for.py --check-budgets --json > /tmp/context-budgets.json
+          git diff --check "${EXPECTED_BASE}..HEAD"
+          test -z "$(git status --short)"
+
+          git push origin "HEAD:refs/heads/${RESULT_BRANCH}"
+          trap - ERR
