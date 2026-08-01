@@ -46,7 +46,8 @@ permissions:
 
 concurrency:
   group: platform-visual-baseline-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  # Keep stale-run cancellation elsewhere, but allow retries for the exact 0.9.3 candidate branch.
+  cancel-in-progress: ${{ github.ref_name != 'refactor/platform-0-9-3-repository-and-context-optimization' }}
 
 jobs:
   four-width-visual-evidence:

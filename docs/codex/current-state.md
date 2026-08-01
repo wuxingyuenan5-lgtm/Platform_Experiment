@@ -64,6 +64,8 @@ Production Live Write remains closed. Browser Sessions cannot authorize Live Wri
 - Local operation and troubleshooting: `docs/operations/RUNBOOK.md`.
 - Database migration and recovery: `docs/database/README.md`.
 - Git and release governance: `docs/engineering/GIT_WORKFLOW.md`.
+- Legacy production migration gate: `docs/architecture/PLATFORM_LEGACY_DEPLOYMENT_AUDIT.md`.
+- Legacy GitLab deployment evidence: `docs/architecture/PLATFORM_LEGACY_GITLAB_DEPLOYMENT_AUDIT.md`.
 
 `docs/codex/CURRENT_CONTEXT.md` remains a compatibility pointer and is not a current-state authority.
 

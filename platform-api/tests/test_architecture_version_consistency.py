@@ -32,7 +32,11 @@ def test_maintained_release_versions_match_root_version() -> None:
 
 
 def copy_version_fixture(tmp_path: Path) -> None:
-    for relative in (*version_checker.MAINTAINED_VERSION_PATHS, *version_checker.VERSION_USAGE_PATHS):
+    paths = (
+        *version_checker.MAINTAINED_VERSION_PATHS,
+        *version_checker.VERSION_USAGE_PATHS,
+    )
+    for relative in paths:
         source = ROOT / relative
         target = tmp_path / relative
         target.parent.mkdir(parents=True, exist_ok=True)
@@ -42,8 +46,16 @@ def copy_version_fixture(tmp_path: Path) -> None:
 @pytest.mark.parametrize(
     ("relative_path", "current", "stale"),
     [
-        ("platform-api/app/application.py", 'PLATFORM_VERSION = "0.9.3"', 'PLATFORM_VERSION = "0.6.0"'),
-        ("execution-runtime/app/main.py", 'PLATFORM_VERSION = "0.9.3"', 'PLATFORM_VERSION = "0.5.0"'),
+        (
+            "platform-api/app/application.py",
+            'PLATFORM_VERSION = "0.9.3"',
+            'PLATFORM_VERSION = "0.6.0"',
+        ),
+        (
+            "execution-runtime/app/main.py",
+            'PLATFORM_VERSION = "0.9.3"',
+            'PLATFORM_VERSION = "0.5.0"',
+        ),
     ],
 )
 def test_runtime_version_drift_is_rejected(

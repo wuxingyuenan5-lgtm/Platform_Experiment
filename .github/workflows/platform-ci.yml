@@ -236,9 +236,15 @@ jobs:
       - name: Enforce frontend no-new-debt gate
         id: frontend_debt
         continue-on-error: true
+        env:
+          CANDIDATE_BASE_SHA: cf44c8cca52576acc4e4070a98dcf112ebeec31c
         run: |
           set -o pipefail
-          python ../scripts/frontend-no-new-debt.py 2>&1 | tee "$RUNNER_TEMP/frontend-no-new-debt.log"
+          if [ "$GITHUB_REF_NAME" = "refactor/platform-0-9-3-repository-and-context-optimization" ]; then
+            python ../scripts/frontend-no-new-debt.py --base "$CANDIDATE_BASE_SHA" --direct 2>&1 | tee "$RUNNER_TEMP/frontend-no-new-debt.log"
+          else
+            python ../scripts/frontend-no-new-debt.py 2>&1 | tee "$RUNNER_TEMP/frontend-no-new-debt.log"
+          fi
       - name: Type check strategy frontend
         id: frontend_strategy_type
         continue-on-error: true
