@@ -24,6 +24,7 @@ GitHub PR #141 owns the active branch, Draft PR, HEAD, CI and review state.
 - Phase 2B-Wave 1A implementation head is this commit, the current Draft PR #141 head.
 - Phase 2B-Wave 1B, Wave 2, Wave 3 and Phase 2C have not started.
 - Historical frontend roadmaps and superseded strategy drafts are being converged into current product, strategy and frontend authorities; Financial AI remains deferred.
+- Platform architecture, data-authority and external-capability drafts are being converged into SYSTEM_MAP, OWNERSHIP, engineering standards and current technical contracts.
 - Phase 8 owns cross-venue spread and funding-fee arbitrage business closure; it has not started.
 
 ## Safety and known limits

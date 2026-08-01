@@ -20,3 +20,9 @@
 - `platform-api` 有 SQLite 相对路径和测试路径。
 - `execution-runtime` 有独立虚拟环境和 uvicorn 启动方式。
 - 当前目标是先让项目可读、可维护，再考虑物理目录迁移。
+## 当前复杂度控制
+
+- `platform-api`保持模块化单体；业务领域通过明确Owner、Schema、Service、Repository和测试边界隔离，不通过提前拆微服务隔离。
+- `execution-runtime`独立是为了隔离外部SDK、副作用、凭证和Journal，不是第二个平台业务后端。
+- 跨进程通信只使用版本化Command/Event或查询合同；不得共享内部数据库表、Python对象或外部SDK DTO。
+- 新框架、消息总线、缓存层或服务拆分必须由真实吞吐、恢复、团队所有权或故障隔离证据触发。

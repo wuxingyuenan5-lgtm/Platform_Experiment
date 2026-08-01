@@ -14,7 +14,7 @@
 - `../integration/api-contract-and-versioning.md`
 - `../integration/runtime-command-event-contract.md`
 - `../backend/storage-ledger-and-audit.md`
-- `../backend/unified-data-architecture-DRAFT.md`
+- `../../../../docs/technical/DATA_MODEL.md`
 
 ## 1. 文档定位
 

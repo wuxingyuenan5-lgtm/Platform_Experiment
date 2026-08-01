@@ -17,6 +17,14 @@ This document defines the durable implementation standard for product-facing res
 5. Prefer the smallest coherent implementation. Do not add a framework, service, state layer or directory only to make the architecture look more formal.
 6. One responsibility has one authoritative owner. Compatibility modules may delegate or re-export but must not duplicate business rules.
 
+## 1A. External capability adoption
+
+- Adopt a library or external project only for a bounded capability behind a Platform-owned Port, schema and error contract.
+- Do not copy another product's navigation, domain model, persistence authority, visual system or execution state machine.
+- Official Venue/Broker SDKs belong only in Platform Execution Runtime adapters.
+- Reference repositories are design evidence and test inspiration; production code must not depend on `references/`.
+- Every adoption decision records license, maintenance state, failure behavior, replacement boundary and a targeted proof-of-concept.
+
 ## 2. Change classification and required evidence
 
 | Change class | Typical scope | Required evidence |

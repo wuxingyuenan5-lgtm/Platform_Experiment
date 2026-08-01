@@ -250,13 +250,13 @@ Platform Web专项技术架构分为：
 5. 协作契约
 6. 专项方案和 ADR
 
-### 交易平台总体架构讨论
+### 交易平台架构任务
 
-1. `architecture/2026-07-17-Variable-Global交易平台总体架构方案-DRAFT.md`
-2. `architecture/2026-07-17-开源与外部能力采用矩阵-DRAFT.md`
-3. 对照现有 active 架构文档，识别保留、修改和新增边界
-4. 确认结论后形成 ADR 并更新 active 架构
-5. 最后进入正式规划
+1. `../../docs/architecture/SYSTEM_MAP.md`
+2. `../../docs/architecture/OWNERSHIP.md`
+3. `architecture/platform-target-architecture.md`
+4. `architecture/reference-code-adoption-matrix.md`
+5. 对边界变化形成 ADR，并同步更新 active 架构和合同文档
 
 ### 规划任务
 

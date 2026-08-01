@@ -14,7 +14,7 @@
 - `../integration/realtime-events-and-recovery.md`
 - `../domain/status-enums-and-lifecycles.md`
 - `../decisions/ADR-008-总体逻辑分层与独立交易Runtime.md`
-- `../2026-07-17-开源与外部能力采用矩阵-DRAFT.md`
+- `../reference-code-adoption-matrix.md`
 
 ## 1. 文档定位
 

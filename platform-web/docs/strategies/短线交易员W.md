@@ -15,7 +15,7 @@
 - `docs/architecture/domain/status-enums-and-lifecycles.md`
 - `docs/architecture/backend/query-and-read-models.md`
 - `docs/architecture/backend/storage-ledger-and-audit.md`
-- `docs/architecture/2026-07-17-开源与外部能力采用矩阵-DRAFT.md`
+- `docs/architecture/reference-code-adoption-matrix.md`
 
 ## 1. 文档定位
 
