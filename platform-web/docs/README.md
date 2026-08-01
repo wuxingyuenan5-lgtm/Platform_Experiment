@@ -10,7 +10,7 @@
 
 当前工程状态以`docs/codex/current-state.md`为准；系统拓扑、Owner和运行命令分别以`docs/architecture/SYSTEM_MAP.md`、`docs/architecture/OWNERSHIP.md`和`docs/operations/RUNBOOK.md`为准。
 
-Draft、Handoff、Audit和Archive只在专项追溯时读取，不作为默认实施依据。非技术审阅可以从`00-人工可读目录/README.md`进入，但该目录同样不是工程事实最高权威入口。
+Draft、Handoff、Audit和Archive只在专项追溯时读取，不作为默认实施依据。非技术审阅可以从`00-人工可读目录/README.md`进入，但该目录同样不定义仓库级工程事实。
 
 ## 2. 一级产品架构
 

@@ -9,15 +9,18 @@ from pathlib import Path
 from urllib.parse import unquote, urlsplit
 
 REQUIRED_ENTRYPOINTS = (
+    "README.md",
     "AGENTS.md",
-    "00-人工可读目录/README.md",
-    "docs/architecture/README.md",
-    "docs/architecture/OWNERSHIP.md",
-    "docs/codex/context-map.md",
+    "docs/README.md",
     "docs/codex/current-state.md",
-    "docs/codex/task-template.md",
+    "docs/codex/context-map.md",
+    "docs/architecture/SYSTEM_MAP.md",
+    "docs/architecture/OWNERSHIP.md",
+    "docs/operations/RUNBOOK.md",
     "docs/database/README.md",
+    "docs/contracts/README.md",
 )
+A1_ENTRYPOINTS = REQUIRED_ENTRYPOINTS
 
 REQUIRED_OWNERS = {
     "Platform composition root": "platform-api/app/main.py",
@@ -59,9 +62,11 @@ REQUIRED_OWNERS = {
 
 DOCUMENT_CATALOG_REFERENCES = (
     "AGENTS.md",
-    "docs/architecture/README.md",
+    "README.md",
+    "docs/README.md",
     "docs/codex/context-map.md",
     "docs/codex/current-state.md",
+    "docs/contracts/README.md",
 )
 
 STALE_CONTEXT_SNIPPETS = (
@@ -241,6 +246,58 @@ def validate_portable_documentation(
     return sorted(errors)
 
 
+def normalized_paragraphs(content: str) -> set[str]:
+    """Return substantive prose paragraphs for simple exact-duplication checks."""
+
+    content = markdown_without_examples(content)
+    paragraphs: set[str] = set()
+    for raw in re.split(r"\n\s*\n", content):
+        lines = [line.strip() for line in raw.splitlines() if line.strip()]
+        if not lines or any(line.startswith(("#", "|", "- ", "* ", ">")) for line in lines):
+            continue
+        paragraph = " ".join(lines)
+        if len(paragraph) >= 160:
+            paragraphs.add(paragraph)
+    return paragraphs
+
+
+def validate_a1_hierarchy(root: Path) -> list[str]:
+    """Validate the controlled A1 set and reject obvious duplicated authority prose."""
+
+    errors: list[str] = []
+    if len(A1_ENTRYPOINTS) < 8 or len(A1_ENTRYPOINTS) > 10:
+        errors.append(f"A1 entrypoint count must remain between 8 and 10: {len(A1_ENTRYPOINTS)}")
+
+    owners: dict[str, str] = {}
+    for relative in A1_ENTRYPOINTS:
+        path = root / relative
+        if not path.is_file():
+            continue
+        for paragraph in normalized_paragraphs(path.read_text(encoding="utf-8")):
+            previous = owners.get(paragraph)
+            if previous is not None:
+                errors.append(f"A1 documents duplicate a substantive paragraph: {previous} and {relative}")
+            else:
+                owners[paragraph] = relative
+
+    docs_index = (root / "docs/README.md").read_text(encoding="utf-8")
+    for relative in A1_ENTRYPOINTS:
+        display = relative.removeprefix("docs/") if relative.startswith("docs/") else f"../{relative}"
+        if relative == "docs/README.md":
+            display = "README.md"
+        if f"`{display}`" not in docs_index:
+            errors.append(f"docs/README.md is missing A1 entry: {relative}")
+
+    web_index = root / "platform-web/docs/README.md"
+    if web_index.is_file():
+        text = web_index.read_text(encoding="utf-8")
+        for forbidden in ("最高权威", "唯一入口", "当前总架构", "统一文档入口"):
+            if forbidden in text:
+                errors.append(f"platform-web/docs/README.md must remain specialist reference: {forbidden}")
+
+    return errors
+
+
 def validate_repository(root: Path) -> list[str]:
     """Return deterministic documentation-consistency errors for ``root``."""
 
@@ -264,6 +321,7 @@ def validate_repository(root: Path) -> list[str]:
     if context_path.is_file():
         errors.extend(validate_context_map(context_path.read_text(encoding="utf-8")))
 
+    errors.extend(validate_a1_hierarchy(root))
     errors.extend(validate_markdown_links(root))
     errors.extend(validate_portable_documentation(root))
     return sorted(errors)

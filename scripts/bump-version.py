@@ -60,16 +60,6 @@ def update_versions(root: Path, version: str) -> None:
         )
 
     replace_once(
-        root / "README.md",
-        r'^当前目标版本：Platform `\d+\.\d+\.\d+`。$',
-        f'当前目标版本：Platform `{version}`。',
-    )
-    replace_once(
-        root / "docs/README.md",
-        r'^当前目标版本：Platform `\d+\.\d+\.\d+`。$',
-        f'当前目标版本：Platform `{version}`。',
-    )
-    replace_once(
         root / "docs/codex/current-state.md",
         r'^- Current target version: Platform `\d+\.\d+\.\d+`\.$',
         f'- Current target version: Platform `{version}`.',

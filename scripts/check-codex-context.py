@@ -60,6 +60,7 @@ def main() -> None:
         "docs/codex/context-map.md",
         "docs/codex/CURRENT_CONTEXT.md",
         "docs/architecture/OWNERSHIP.md",
+        "docs/contracts/README.md",
         "scripts/context-for.py",
     )
     for relative_path in required:
@@ -96,13 +97,11 @@ def main() -> None:
 
     require(f"port: {FRONTEND_PORT}" in vite_config, "Frontend Vite port drifted")
     for port, label in {
-        FRONTEND_PORT: "frontend",
+        FRONTEND_PORT: "Platform Web",
         BACKEND_PORT: "Platform API",
-        RUNTIME_PORT: "Execution Runtime",
+        RUNTIME_PORT: "Platform Execution Runtime",
     }.items():
         require(port in dev_script, f"dev-platform.ps1 is missing the {label} port")
-        require(port in current_state, f"current-state.md is missing the {label} port")
-        require(port in readme, f"README.md is missing the {label} port")
 
     for path_name, text in {
         "AGENTS.md": agents,
@@ -118,12 +117,13 @@ def main() -> None:
             require(stale not in text, f"{path_name} contains stale branch authority: {stale}")
 
     require(
-        "sole repository document for current engineering state" in current_state,
-        "current-state.md must declare its authority",
+        "sole repository document for current version, branch, phase and known limits" in current_state,
+        "current-state.md must declare its bounded authority",
     )
     require(
-        "docs/architecture/OWNERSHIP.md" in current_state,
-        "current-state.md must link architecture ownership",
+        "docs/architecture/OWNERSHIP.md" in current_state
+        and "docs/contracts/README.md" in current_state,
+        "current-state.md must link ownership and domain contracts",
     )
     require(
         "GitHub PR #141" in current_state
@@ -171,8 +171,18 @@ def main() -> None:
         "tasks/",
         "projects/risk-control",
         "src/views/demo",
+        "Plan",
+        "Handoff",
+        "Audit",
+        "Superseded",
     ):
         require(noisy in context_map, f"context-map.md is missing default exclusion: {noisy}")
+
+    for forbidden_context_path in ("PLAN.md", "HANDOFF.md", "AUDIT.md", "SUPERSEDED.md"):
+        require(
+            forbidden_context_path not in context_tool.upper(),
+            f"context-for.py must not load historical material: {forbidden_context_path}",
+        )
 
     require(
         "Browser ambient state is evidence only" in context_map,

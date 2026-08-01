@@ -90,12 +90,6 @@ def test_bump_version_updates_all_maintained_declarations(tmp_path: Path) -> Non
     (tmp_path / "execution-runtime/app/main.py").write_text(
         'PLATFORM_VERSION = "0.8.0"\n', encoding="utf-8"
     )
-    (tmp_path / "README.md").write_text(
-        '当前目标版本：Platform `0.8.0`。\n', encoding="utf-8"
-    )
-    (tmp_path / "docs/README.md").write_text(
-        '当前目标版本：Platform `0.8.0`。\n', encoding="utf-8"
-    )
     (tmp_path / "docs/codex/current-state.md").write_text(
         '- Current target version: Platform `0.8.0`.\n', encoding="utf-8"
     )
@@ -122,8 +116,6 @@ def test_bump_version_updates_all_maintained_declarations(tmp_path: Path) -> Non
     assert 'PLATFORM_VERSION = "0.9.3"' in (
         tmp_path / "execution-runtime/app/main.py"
     ).read_text(encoding="utf-8")
-    assert 'Platform `0.9.3`' in (tmp_path / "README.md").read_text(encoding="utf-8")
-    assert 'Platform `0.9.3`' in (tmp_path / "docs/README.md").read_text(encoding="utf-8")
     assert 'Platform `0.9.3`' in (
         tmp_path / "docs/codex/current-state.md"
     ).read_text(encoding="utf-8")

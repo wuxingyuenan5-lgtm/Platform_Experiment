@@ -14,8 +14,6 @@ FRONTEND_VERSION_FILES = (
     "platform-web/.env.production",
 )
 CURRENT_DOCUMENTS = {
-    "root README": ("README.md", r"当前目标版本：Platform `([^`]+)`。"),
-    "documentation index": ("docs/README.md", r"当前目标版本：Platform `([^`]+)`。"),
     "current engineering state": (
         "docs/codex/current-state.md",
         r"Current target version: Platform `([^`]+)`\.",
@@ -29,8 +27,6 @@ MAINTAINED_VERSION_PATHS = (
     "platform-api/app/application.py",
     "execution-runtime/pyproject.toml",
     "execution-runtime/app/main.py",
-    "README.md",
-    "docs/README.md",
     "docs/codex/current-state.md",
 )
 VERSION_USAGE_PATHS = (

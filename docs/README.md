@@ -1,52 +1,49 @@
-# Platform 文档入口
+# Platform Documentation
 
-当前目标版本：Platform `0.9.3`。
+This file is the documentation navigator. It does not own version, phase, service topology, business rules or operating commands. Ownership authority is `docs/architecture/OWNERSHIP.md`.
 
-本目录是仓库级权威工程文档入口。当前状态、模块Owner、合同、迁移纪律和运维规则优先从根级`docs/`读取；`platform-web/docs/`只承担Platform Web产品与专项参考，不覆盖仓库级最新口径。
+## A1 — top-level authorities
 
-## 首要入口
+The controlled A1 set contains ten entrypoints:
 
-| 主题 | 权威位置 |
+| Document | Sole responsibility |
 |---|---|
-| 当前工程状态 | `codex/current-state.md` |
-| 按任务选择上下文 | `codex/context-map.md` |
-| 系统结构 | `architecture/SYSTEM_MAP.md` |
-| 模块唯一Owner | `architecture/OWNERSHIP.md` |
-| 数据库、DDL Owner与迁移纪律 | `database/README.md` |
-| Git工作流 | `engineering/GIT_WORKFLOW.md` |
-| 运维和真实验收 | `operations/` |
+| `../README.md` | Project purpose and shortest startup entry |
+| `../AGENTS.md` | AI and engineering execution constraints |
+| `codex/current-state.md` | Current version, branch, phase and known limits |
+| `codex/context-map.md` | Minimal context selection by task |
+| `architecture/SYSTEM_MAP.md` | Services, data flow and system boundaries |
+| `architecture/OWNERSHIP.md` | Business-rule, code and data owners |
+| `operations/RUNBOOK.md` | Start, stop, troubleshooting and safe operations |
+| `database/README.md` | Database, migration, backup and recovery entry |
+| `contracts/README.md` | Current domain-contract index |
+| `README.md` | Documentation navigation |
 
-`codex/CURRENT_CONTEXT.md`只保留旧链接兼容，不是当前工程事实来源。
+`codex/CURRENT_CONTEXT.md` is a compatibility pointer and is not an A1 authority.
 
-## 产品与技术文档
+## A2 — domain contracts
 
-| 主题 | 位置 | 说明 |
+`contracts/README.md` indexes the current Identity & Permission, Live Write, Trading, Execution, Risk, Accounting, Reconciliation, Member Portfolio, Research and Market Data contracts. A1 documents link to contracts and do not copy their rules.
+
+## B — specialist references
+
+| Reference type | Location | Use |
 |---|---|---|
-| 产品总口径 | `product/PRD.md` | 跨模块产品目标与范围 |
-| 全局验收标准 | `product/ACCEPTANCE_CRITERIA.md` | 用户流程、视觉和基础运行要求 |
-| 当前技术架构 | `technical/ARCHITECTURE.md` | 技术分层与服务边界 |
-| API合同入口 | `technical/API_SPEC.md` | Platform API与Runtime接口语义 |
-| 数据模型 | `technical/DATA_MODEL.md` | 数据库与领域模型入口 |
-| 部署入口 | `technical/DEPLOYMENT.md` | 本地地址与部署引用 |
-| 安全边界 | `technical/SECURITY.md` | 凭证、权限、交易与风控约束 |
-| 运维手册 | `operations/RUNBOOK.md` | 本地运行和排障 |
-| 仓库卫生 | `operations/WORKSPACE_HYGIENE.md` | 搜索降噪、生成物和清理边界 |
+| Platform Web product and page design | `../platform-web/docs/` | Product detail and page-specific design |
+| Technical and provider references | `technical/` | Domain implementation detail beyond the A2 index |
+| Architecture discussions and standards | `architecture/` | Specialist design rationale; `SYSTEM_MAP.md` and `OWNERSHIP.md` remain the A1 authorities |
+| Acceptance and operational supplements | `operations/` | Task-specific acceptance; `RUNBOOK.md` remains the operating authority |
+| Legacy production evidence | `architecture/PLATFORM_LEGACY_DEPLOYMENT_AUDIT.md`, `architecture/PLATFORM_LEGACY_GITLAB_DEPLOYMENT_AUDIT.md` | External migration evidence only |
+| Product requirements | `product/` | Product scope and acceptance reference |
+| Release history | `releases/` | Historical release evidence only |
 
-## Platform Web专项参考
+Plan, Handoff, Audit, Task, Superseded and archived materials are not current authorities and are excluded from default context. Their cleanup belongs to Phase 2.
 
-| 主题 | 位置 | 说明 |
-|---|---|---|
-| Platform Web入口 | `../platform-web/docs/README.md` | 产品模块、前端设计和专项参考 |
-| 产品模块需求 | `../platform-web/docs/modules/` | 首页、策略、风险、交易、新闻日历等材料 |
-| 单策略文档 | `../platform-web/docs/strategies/` | 资费套利、跨所价差、海内外价差等 |
-| 交易工具数据源 | `../platform-web/docs/trading-tools-bookmarks-review.md` | 前端同步脚本的人工维护源 |
-| 历史交接与归档 | `../platform-web/docs/archive/` | 只用于追溯，不作为当前口径 |
+## Governance
 
-## 文档治理
-
-- 同一工程事实只能有一个权威来源；
-- 当前状态只更新`codex/current-state.md`和Draft PR #141；
-- 模块Owner变化必须同步`architecture/OWNERSHIP.md`；
-- API、数据库、Runtime合同或执行链路变化必须更新对应技术文档与可执行测试；
-- 历史实施过程进入Issue、任务包、PR或归档，不复制到稳定架构说明；
-- 新增大型依赖、构建产物、外部参考仓库或导出物前，先定义忽略和清理边界。
+- Current delivery state is updated only in `codex/current-state.md` and GitHub PR #141.
+- Service topology changes update `architecture/SYSTEM_MAP.md`.
+- Owner changes update `architecture/OWNERSHIP.md`.
+- Domain-rule changes update the owning A2 contract and executable tests.
+- Startup or recovery command changes update `operations/RUNBOOK.md`.
+- Do not create a parallel document for a responsibility already owned above.
