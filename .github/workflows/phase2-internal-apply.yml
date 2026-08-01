@@ -47,7 +47,19 @@ jobs:
                 git rm -- "${path}"
               done < "${commit_dir}/delete.txt"
             fi
-            if test -s "${commit_dir}/changes.patch"; then
+            if test "$(basename "${commit_dir}")" = "09"; then
+              python - <<'PYCHANGELOG'
+from pathlib import Path
+path = Path("platform-web/CHANGELOG.zh_CN.md")
+text = path.read_text(encoding="utf-8")
+old = "docs/codex/CURRENT_CONTEXT.md"
+new = "docs/codex/current-state.md"
+if old not in text:
+    raise SystemExit(f"expected retained changelog pointer not found: {old}")
+path.write_text(text.replace(old, new), encoding="utf-8")
+PYCHANGELOG
+              git add platform-web/CHANGELOG.zh_CN.md
+            elif test -s "${commit_dir}/changes.patch"; then
               git apply --index "${commit_dir}/changes.patch"
             fi
             git diff --cached --check
