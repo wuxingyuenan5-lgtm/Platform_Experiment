@@ -41,15 +41,21 @@ jobs:
           git config user.email 'noreply@github.com'
 
           for commit_dir in /tmp/phase2-payload/phase2-patch-payload/[0-9][0-9]; do
+            commit_name="$(basename "${commit_dir}")"
             if test -s "${commit_dir}/delete.txt"; then
               while IFS= read -r path; do
                 test -n "${path}" || continue
+                if test "${commit_name}" = "02" && test "${path}" = "tasks/issue-134-platform-0-9-1-unified-delivery.md"; then
+                  continue
+                fi
                 git rm -- "${path}"
               done < "${commit_dir}/delete.txt"
             fi
-            if test "$(basename "${commit_dir}")" = "09"; then
+            if test "${commit_name}" = "09"; then
               python -c 'from pathlib import Path; p=Path("platform-web/CHANGELOG.zh_CN.md"); t=p.read_text(encoding="utf-8"); old="docs/codex/CURRENT_CONTEXT.md"; new="docs/codex/current-state.md"; old in t or (_ for _ in ()).throw(SystemExit(f"expected retained changelog pointer not found: {old}")); p.write_text(t.replace(old,new),encoding="utf-8")'
               git add platform-web/CHANGELOG.zh_CN.md
+            elif test "${commit_name}" = "02"; then
+              git apply --index --exclude='.github/workflows/hedge-board-e2e.yml' "${commit_dir}/changes.patch"
             elif test -s "${commit_dir}/changes.patch"; then
               git apply --index "${commit_dir}/changes.patch"
             fi
