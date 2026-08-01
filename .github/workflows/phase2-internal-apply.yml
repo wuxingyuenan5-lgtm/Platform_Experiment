@@ -1,7 +1,7 @@
 name: Internal Phase 2 Apply
 
 on:
-  push:
+  pull_request:
     branches:
       - internal/platform-0-9-3-phase-2-apply
 
@@ -21,26 +21,11 @@ jobs:
         env:
           SOURCE_BRANCH: refactor/platform-0-9-3-repository-and-context-optimization
           RESULT_BRANCH: internal/platform-0-9-3-phase-2-result
-          DIAGNOSTIC_BRANCH: internal/platform-0-9-3-phase-2-diagnostic
           EXPECTED_BASE: 0613d47a9917fe0d8999f07a97942d783a5da5b8
-          TRANSPORT_SHA: ${{ github.sha }}
           PAYLOAD_SHA256: 64cc465921bd7b4473b45c275bb6cbd11a337805145c0e2ac38e431ed7bed925
         shell: bash
         run: |
-          set -Eeuo pipefail
-          exec > >(tee /tmp/phase2-apply.log) 2>&1
-          publish_failure() {
-            status=$?
-            trap - ERR
-            printf '\nFAILED_STATUS=%s\n' "${status}" >> /tmp/phase2-apply.log
-            git reset --hard "${TRANSPORT_SHA}" || true
-            cp /tmp/phase2-apply.log .phase2-diagnostic.log
-            git add .phase2-diagnostic.log
-            git -c user.name='Platform Phase 2 Automation' -c user.email='noreply@github.com' commit -m 'chore(internal): record Phase 2 apply failure' || true
-            git push origin "HEAD:refs/heads/${DIAGNOSTIC_BRANCH}" || true
-            exit "${status}"
-          }
-          trap publish_failure ERR
+          set -euo pipefail
 
           remote_head="$(git ls-remote origin "refs/heads/${SOURCE_BRANCH}" | cut -f1)"
           test "${remote_head}" = "${EXPECTED_BASE}"
@@ -79,4 +64,3 @@ jobs:
           test -z "$(git status --short)"
 
           git push origin "HEAD:refs/heads/${RESULT_BRANCH}"
-          trap - ERR
