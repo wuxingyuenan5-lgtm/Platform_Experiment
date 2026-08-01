@@ -14,7 +14,7 @@
   "license": "MIT",
   "scripts": {
     "bootstrap": "pnpm install",
-    "build": "pnpm sync:trading-tools && cross-env NODE_ENV=production NODE_OPTIONS=--max-old-space-size=8192 pnpm vite build",
+    "build": "pnpm sync:trading-tools && cross-env NODE_ENV=production NODE_OPTIONS=--max-old-space-size=8192 pnpm vite build && node scripts/verify-formal-brand-config.cjs",
     "build:analyze": "pnpm sync:trading-tools && cross-env NODE_OPTIONS=--max-old-space-size=8192 pnpm vite build --mode analyze",
     "build:docker": "pnpm sync:trading-tools && vite build --mode docker",
     "build:no-cache": "pnpm store prune && npm run build",
