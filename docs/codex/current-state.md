@@ -10,6 +10,7 @@ This is the sole repository document for current version, branch, phase and know
 - Active branch: `refactor/platform-0-9-3-repository-and-context-optimization`.
 - Active review: Draft PR #141, which remains Open and Unmerged until explicit owner acceptance.
 - Accepted Phase 1A head: `4e4a6b7992c332c71c90dcf5b2bc18ca18302737`.
+- Accepted Phase 1B head: `3c5bc4f0c700129c0716765103604bc16e0335c4`.
 - Frontend package-manager authority: `pnpm@9.15.9`.
 - `main` remains protected and is not modified directly.
 
@@ -17,9 +18,9 @@ GitHub PR #141 owns the active branch, Draft PR, HEAD, CI and review state.
 
 ## Current phase
 
-- Phase 1A passed acceptance at the head above.
-- Current work is Platform 0.9.3 Phase 1B: authoritative documentation hierarchy and active product naming migration.
-- Phase 2 owns historical Plan, Handoff, Audit, Task, Superseded and dead-content cleanup; it has not started.
+- Phase 1B passed acceptance at `3c5bc4f0c700129c0716765103604bc16e0335c4`.
+- Current work is Platform 0.9.3 Phase 2A — dead documentation entrypoint removal.
+- Phase 2B owns the approved 114-file D-class process-material cleanup; it has not started.
 - Phase 8 owns cross-venue spread and funding-fee arbitrage business closure; it has not started.
 
 ## Safety and known limits

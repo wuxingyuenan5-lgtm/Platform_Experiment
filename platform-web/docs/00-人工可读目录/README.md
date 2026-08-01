@@ -62,7 +62,7 @@ V1 优先级：
 
 当前规划还没有单独沉淀成一个正式 `planning` 目录，所以先按下面顺序读：
 
-1. `../START-HERE.md`
+1. `../../../docs/codex/current-state.md`
 2. `../architecture/platform-target-architecture.md`
 3. `../architecture/implementation-roadmap.md`
 4. `../architecture/2026-07-17-策略模块V1详细落地规划-DRAFT.md`

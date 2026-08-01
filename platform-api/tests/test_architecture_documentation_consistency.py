@@ -188,3 +188,76 @@ def test_platform_web_index_cannot_claim_repository_authority(tmp_path: Path) ->
         "must remain specialist reference" in error
         for error in DOCUMENTATION_CONSISTENCY.validate_a1_hierarchy(tmp_path)
     )
+
+
+def test_dead_start_here_entrypoint_cannot_be_recreated(tmp_path: Path) -> None:
+    dead = tmp_path / DOCUMENTATION_CONSISTENCY.DEAD_DOCUMENTATION_ENTRYPOINT
+    dead.parent.mkdir(parents=True)
+    dead.write_text("# Retired entrypoint\n", encoding="utf-8")
+
+    assert DOCUMENTATION_CONSISTENCY.validate_dead_documentation_entrypoint(
+        tmp_path, []
+    ) == [
+        "forbidden dead documentation entrypoint exists: "
+        "platform-web/docs/START-HERE.md"
+    ]
+
+
+def test_current_docs_index_cannot_link_to_start_here(tmp_path: Path) -> None:
+    readme = tmp_path / "docs/README.md"
+    readme.parent.mkdir(parents=True)
+    readme.write_text("[Retired](START-HERE.md)\n", encoding="utf-8")
+
+    assert DOCUMENTATION_CONSISTENCY.validate_dead_documentation_entrypoint(
+        tmp_path, [readme]
+    ) == [
+        "docs/README.md: active Markdown link targets retired documentation "
+        "entrypoint: START-HERE.md"
+    ]
+
+
+def test_start_here_aliases_cannot_bypass_the_gate(tmp_path: Path) -> None:
+    alias = tmp_path / "platform-web/docs/start_here"
+    alias.parent.mkdir(parents=True)
+    alias.write_text("legacy", encoding="utf-8")
+
+    assert DOCUMENTATION_CONSISTENCY.validate_dead_documentation_entrypoint(
+        tmp_path, []
+    ) == [
+        "forbidden dead documentation entrypoint exists: "
+        "platform-web/docs/start_here"
+    ]
+
+
+def test_historical_release_plain_text_start_here_mention_is_allowed(
+    tmp_path: Path,
+) -> None:
+    release = tmp_path / "docs/releases/v6.md"
+    release.parent.mkdir(parents=True)
+    release.write_text("Historical fact: START-HERE曾存在。\n", encoding="utf-8")
+
+    assert DOCUMENTATION_CONSISTENCY.validate_dead_documentation_entrypoint(
+        tmp_path, [release]
+    ) == []
+
+
+def test_current_state_document_remains_the_canonical_entrypoint(
+    tmp_path: Path,
+) -> None:
+    current_state = tmp_path / DOCUMENTATION_CONSISTENCY.CURRENT_STATE_ENTRYPOINT
+    current_state.parent.mkdir(parents=True)
+    current_state.write_text("# Current Engineering State\n", encoding="utf-8")
+
+    assert DOCUMENTATION_CONSISTENCY.validate_current_state_entrypoint(tmp_path) == []
+
+
+def test_parallel_current_state_alias_is_rejected(tmp_path: Path) -> None:
+    current_state = tmp_path / DOCUMENTATION_CONSISTENCY.CURRENT_STATE_ENTRYPOINT
+    current_state.parent.mkdir(parents=True)
+    current_state.write_text("# Current Engineering State\n", encoding="utf-8")
+    alias = tmp_path / "docs/current_state.md"
+    alias.write_text("# Duplicate state\n", encoding="utf-8")
+
+    assert DOCUMENTATION_CONSISTENCY.validate_current_state_entrypoint(tmp_path) == [
+        "parallel current-state entrypoint is forbidden: docs/current_state.md"
+    ]
