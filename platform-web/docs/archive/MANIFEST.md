@@ -8,14 +8,6 @@
 
 ### 已被替代的策略文档
 
-- `superseded/strategy-module-current-requirements.md`
-  - 原路径：`docs/strategy-module-current-requirements.md`
-  - 原因：旧的策略模块汇总需求，已被模块需求和六类策略文档替代。
-
-- `superseded/strategy/2026-07-12-策略模块结构设计方案-A1.md`
-  - 原路径：`docs/strategy/2026-07-12-策略模块结构设计方案-A1.md`
-  - 原因：阶段性 A1 方案，核心规则已进入正式文档。
-
 ## 暂未归档
 
 ### 需要内容复核

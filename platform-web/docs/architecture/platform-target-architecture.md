@@ -380,7 +380,7 @@ Gateway 的连接、认证、同步和交易能力不能在后端语义中混为
 
 1. `platform-target-architecture.md`。
 2. `reference-code-adoption-matrix.md`。
-3. `../planning/V1-开发路线图.md`。
+3. `../../../docs/codex/current-state.md`。
 4. `decisions/ADR-012-初期架构简化与复杂度控制.md`。
 5. `domain/instrument-minimum-model.md`。
 6. `domain/account-position-minimum-model.md`。

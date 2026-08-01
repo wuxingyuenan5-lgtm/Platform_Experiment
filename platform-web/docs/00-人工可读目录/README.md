@@ -60,16 +60,16 @@ V1 优先级：
 
 ## 5. 要看“规划”读哪些
 
-当前规划还没有单独沉淀成一个正式 `planning` 目录，所以先按下面顺序读：
+当前规划与实施状态按下面顺序读取：
 
 1. `../../../docs/codex/current-state.md`
-2. `../architecture/platform-target-architecture.md`
-3. `../architecture/implementation-roadmap.md`
-4. `../architecture/2026-07-17-策略模块V1详细落地规划-DRAFT.md`
+2. `../../../docs/architecture/SYSTEM_MAP.md`
+3. `../architecture/platform-target-architecture.md`
+4. `../architecture/strategy-registry.md`
 5. `../quality/release-gate.md`
 6. `../quality/smoke-checklist.md`
 
-注意：带 `DRAFT` 的文档是讨论稿，不是最终实施依据。确认后的内容应该进入 active 文档、ADR 或后续正式规划文档。
+历史 Draft 和阶段路线由 Git History 追溯，不再作为当前实施入口。
 
 ## 6. 要看“架构”读哪些
 

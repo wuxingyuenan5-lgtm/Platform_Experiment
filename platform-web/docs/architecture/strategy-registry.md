@@ -178,3 +178,9 @@ export const managementStrategies = strategyRegistry
 - Mock、路由和页面类型使用统一 `StrategyId`。
 - 注册表不包含动态账户、订单、持仓、损益和风险数据。
 - 后端策略主数据接入后，页面不需要重新定义策略身份。
+## 13. 当前最低闭环
+
+- 注册表稳定关联 StrategyDefinition、StrategyVersion 与 StrategyInstance，不承载账户余额、订单状态或 PnL 事实。
+- Platform执行策略必须能够关联 StrategyAccountBinding、Instrument/ContractSpecification、TradeCommand、ExecutionBatch、Order、Fill、Position、PnL/NAV、Risk 与 Reconciliation。
+- 资费套利和跨所价差是当前平台执行闭环；海内外价差、抄底和短线交易员策略保持外部执行或分析型边界，不能因注册存在而自动开放交易。
+- Crypto/MT5能力由 Runtime GatewayCapability 和生产门禁决定；策略注册不得推断 Live 可用。

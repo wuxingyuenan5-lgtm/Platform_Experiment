@@ -40,3 +40,6 @@ Exact relevant commands and any final full-CI requirement.
 ```
 
 Replace stale progress instead of appending chat history. GitHub PR/main history owns completion and merge identity; do not create a second metadata task or PR.
+## Documentation contract
+
+When a task changes product or module behavior, its authoritative document must state scope and exclusions, user/permission boundary, data authority, Query/Command/Event ownership, lifecycle and failure states, audit/recovery rules, dependencies and executable acceptance criteria. Discussion history and completed checklists stay in the task packet, not in the authority document.

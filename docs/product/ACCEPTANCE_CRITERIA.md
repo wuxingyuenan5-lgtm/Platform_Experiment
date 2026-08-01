@@ -35,3 +35,12 @@
 - Legacy user import, when required, is dry-run capable, idempotent, excludes old Sessions, never auto-promotes an old admin to CEO, and records only counts and redacted errors.
 - Schema migrations are append-only and must pass fresh-database, upgrade, repeat-initialization, checksum-drift, failed-rollback, index, and foreign-key tests without changing existing trading, accounting, reconciliation, or audit facts.
 - A failed identity or holding cutover rolls back the complete deployment unit; it must not leave mixed identity authorities or partially migrated customer data.
+## Global product and frontend criteria
+
+- Every page exposes explicit loading, empty, error, stale/delayed, partial, permission-denied, read-only and degraded states where applicable.
+- Unknown, delayed or incomplete financial data is never rendered as confirmed zero.
+- Commands are idempotent, auditable and recoverable; `result_unknown` remains unknown until authoritative reconciliation.
+- Monetary, price and quantity values use exact Decimal/string contracts, explicit currency/unit and UTC timestamps.
+- Module degradation remains bounded: a failed external widget, provider or realtime channel cannot erase unrelated page content.
+- Responsive behavior preserves the primary decision path; secondary panels may stack or collapse but critical status, risk and action context remain visible.
+- Sensitive credentials, approval evidence and unrestricted personal data never enter routes, browser persistence or client logs.

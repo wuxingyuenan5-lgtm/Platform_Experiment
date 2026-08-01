@@ -27,9 +27,9 @@
 
 - `reference-code-adoption-matrix.md`
 
-V1 开发路线：
+当前实施状态：
 
-- `../planning/V1-开发路线图.md`
+- `../../../docs/codex/current-state.md`
 
 复杂度控制决策：
 
@@ -241,7 +241,7 @@ Runtime 本地 Journal
 
 1. `platform-target-architecture.md`
 2. `reference-code-adoption-matrix.md`
-3. `../planning/V1-开发路线图.md`
+3. `../../../docs/codex/current-state.md`
 4. `decisions/ADR-012-初期架构简化与复杂度控制.md`
 5. `domain/instrument-minimum-model.md`
 6. `domain/account-position-minimum-model.md`
@@ -254,7 +254,7 @@ Runtime 本地 Journal
 
 简化架构现已具备进入工程阶段的条件。
 
-参考代码采用矩阵和 V1 路线图统一后，下一步按 `../planning/V1-开发路线图.md` 从 P1 开始：
+当前实施顺序和已完成能力以 `../../../docs/codex/current-state.md` 为准；历史 P1–P3 路线不再作为执行入口：
 
 ```text
 P1 Platform Backend 最小骨架

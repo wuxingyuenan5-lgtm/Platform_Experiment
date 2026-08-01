@@ -201,18 +201,14 @@ Platform Web专项技术架构分为：
 
 修改交易工具后执行 `pnpm sync:trading-tools`；生成后的 `marketTools.ts` 不是人工维护入口。
 
-## 8. Draft 文档
+## 8. 当前规划与架构入口
 
-以下文件只用于讨论，不是当前实施依据：
+- 当前阶段与延期范围：`../../docs/codex/current-state.md`。
+- 系统边界与责任：`../../docs/architecture/SYSTEM_MAP.md`、`../../docs/architecture/OWNERSHIP.md`。
+- Platform Web目标架构：`architecture/platform-target-architecture.md`。
+- 策略注册与能力边界：`architecture/strategy-registry.md`。
 
-- `architecture/implementation-roadmap.md`
-- `architecture/2026-07-17-Variable-Global交易平台总体架构方案-DRAFT.md`
-- `architecture/2026-07-17-开源与外部能力采用矩阵-DRAFT.md`
-- `architecture/2026-07-16-平台新增功能初步方案-DRAFT.md`
-
-当前优先讨论交易平台总体架构和能力采用方式；新增功能 DRAFT 暂不进入本轮讨论。
-
-Draft 中的架构调整、技术选型、阶段和新增功能，只有确认并合并进 active 文档或 ADR 后才生效。
+已收敛的 Draft、阶段路线和讨论过程仅由 Git History 追溯，不再参与当前实施决策。
 
 ## 9. 文档读取顺序
 
@@ -265,7 +261,7 @@ Draft 中的架构调整、技术选型、阶段和新增功能，只有确认�
 ### 规划任务
 
 1. 完成相关 active 架构和产品文档审阅。
-2. 阅读 `architecture/implementation-roadmap.md` 作为讨论输入。
+2. 阅读 `../../docs/codex/current-state.md` 与对应 active 架构文档。
 3. 确认目标、优先级、人员、依赖和约束。
 4. 另行形成正式 planning 文档、issue 或 milestone。
 

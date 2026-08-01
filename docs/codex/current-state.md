@@ -23,6 +23,7 @@ GitHub PR #141 owns the active branch, Draft PR, HEAD, CI and review state.
 - Current work is Platform 0.9.3 Phase 2B-Wave 1A — removal of the frozen 25-file zero-risk process package.
 - Phase 2B-Wave 1A implementation head is this commit, the current Draft PR #141 head.
 - Phase 2B-Wave 1B, Wave 2, Wave 3 and Phase 2C have not started.
+- Historical frontend roadmaps and superseded strategy drafts are being converged into current product, strategy and frontend authorities; Financial AI remains deferred.
 - Phase 8 owns cross-venue spread and funding-fee arbitrage business closure; it has not started.
 
 ## Safety and known limits
