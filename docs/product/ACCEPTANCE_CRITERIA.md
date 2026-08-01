@@ -19,3 +19,19 @@
 - Root SQL references live under `references/database/`.
 - Large external reference code does not live in the project root.
 - Shared documentation and default configuration must not bind the platform to a named developer workstation.
+
+## Identity, permission, and member-data criteria
+
+- Browser Cookie and Bearer API Key are mutually exclusive request credentials; ambiguous requests fail closed.
+- Browser Session uses server-side revocation, CSRF plus Origin validation, secure cookie settings in production, and immediate permission invalidation after role or status change.
+- CEO, technical lead, employee, and member permissions are enforced on the server for routes, fields, actions, and resource scope; direct URL access cannot bypass them.
+- A member can read only their own fund holdings. Administrative full-holding reads and holding changes require explicit permission, recent reauthentication, transactionally coupled audit, and Decimal-string responses.
+- The last active CEO cannot be disabled or downgraded, including concurrent requests. Passwords, raw tokens, API keys, complete contact details, and complete holding snapshots never enter Git or ordinary logs.
+- Browser identity never authorizes Platform or Runtime Live Write. LiveTradingSession, Kill Switch, absolute limits, approval, reconciliation, and data-quality gates remain independently required.
+
+## User-system deployment and rollback gates
+
+- Before production cutover, confirm whether real legacy users exist, identify the authoritative holding source, and verify same-origin TLS, reverse proxy, cookie security, backup, avatar restore, and rate limiting.
+- Legacy user import, when required, is dry-run capable, idempotent, excludes old Sessions, never auto-promotes an old admin to CEO, and records only counts and redacted errors.
+- Schema migrations are append-only and must pass fresh-database, upgrade, repeat-initialization, checksum-drift, failed-rollback, index, and foreign-key tests without changing existing trading, accounting, reconciliation, or audit facts.
+- A failed identity or holding cutover rolls back the complete deployment unit; it must not leave mixed identity authorities or partially migrated customer data.

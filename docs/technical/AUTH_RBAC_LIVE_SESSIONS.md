@@ -3,7 +3,7 @@
 状态：`active / user-system Batches 1–5 implemented, verification pending`
 适用产品：`Platform`
 用户系统架构：`USER_SYSTEM_TECHNICAL_ARCHITECTURE.md`
-用户系统执行计划：`../planning/USER_SYSTEM_EXECUTION_PLAN.md`
+产品与验收基线：`../product/PRD.md`、`../product/ACCEPTANCE_CRITERIA.md`
 
 ## 1. 两类 Session 不是同一概念
 
@@ -365,3 +365,7 @@ Issue #117 分支已实现：
 - 仍需在受控主机完成浏览器同源验收、Cookie Secure/反向代理验证、备份恢复演练和三项生产切换决策。
 
 当前 API Key 配置适合单机小型私募第一阶段，不等同完整企业身份提供商。认证、审批、代码完成和 CI 均不能自动打开 Platform 或 Runtime Live Write。
+
+## 19. Product authority and scope
+
+The current browser role set is CEO, technical lead, employee and member. Capability and resource scope are resolved centrally; UI visibility is never authorization. Any future research, trader, strategy-owner, risk, reconciliation or system-administration specialization must be introduced as reviewed Capability and Data Scope policy, not as an unreviewed page-local role.
