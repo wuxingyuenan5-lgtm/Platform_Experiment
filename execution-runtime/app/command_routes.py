@@ -8,7 +8,12 @@ from app.gateway_errors import (
     GatewayRequestRejectedError,
     GatewayResultUnknownError,
 )
-from app.journal import claim_command, get_events, save_command_events
+from app.journal import (
+    claim_command,
+    get_events,
+    mark_command_result_unknown,
+    save_command_events,
+)
 from app.models import ExecutionEvent
 from app.runtime_contracts import (
     RuntimeExecutionEventV1,
@@ -47,6 +52,7 @@ def create_command_router(*, gateway: ExecutionGateway) -> APIRouter:
                 )
             ]
         except GatewayResultUnknownError as exc:
+            mark_command_result_unknown(command.command_id)
             raise HTTPException(status_code=502, detail=str(exc)) from exc
         save_command_events(command, events)
         return version_execution_events(events)
