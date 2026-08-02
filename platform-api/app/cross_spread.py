@@ -91,7 +91,7 @@ def submit_cross_spread_market_command(
     mt5_position_id: str | None = None,
 ) -> ExecutionBatchResponse:
     settings = get_settings()
-    if not _cross_spread_execution_gate_allows_simulation(settings):
+    if not _cross_spread_live_execution_gate_allows_write(settings):
         raise HTTPException(
             status_code=403,
             detail="Live cross-spread execution is disabled",
@@ -222,7 +222,7 @@ def submit_bybit_definitive_failure_rollback(
     )
 
 
-def _cross_spread_execution_gate_allows_simulation(settings) -> bool:
+def _cross_spread_live_execution_gate_allows_write(settings) -> bool:
     return bool(settings.live_trading_enabled)
 
 
@@ -262,21 +262,6 @@ def _load_live_bybit_specification() -> LiveInstrumentSpecification:
 
 
 def _load_live_cross_spread_sizing() -> CrossSpreadLiveSizing:
-    settings = get_settings()
-    if (
-        _cross_spread_execution_gate_allows_simulation(settings)
-        and not settings.live_trading_enabled
-    ):
-        return CrossSpreadLiveSizing(
-            bybit_min=Decimal("0.001"),
-            bybit_step=Decimal("0.001"),
-            bybit_max=Decimal("10"),
-            mt5_min=Decimal("0.01"),
-            mt5_step=Decimal("0.01"),
-            mt5_max=Decimal("100"),
-            mt5_multiplier=Decimal("100"),
-        )
-
     bybit = _load_live_bybit_specification()
     try:
         mt5 = get_instrument_specification(

@@ -4,7 +4,6 @@ import json
 from pathlib import Path
 
 import pytest
-
 from fastapi.testclient import TestClient
 
 from app.config import get_settings
@@ -13,6 +12,7 @@ from app.runtime_contracts import runtime_contract_signature
 
 ROOT = Path(__file__).resolve().parents[2]
 SNAPSHOT = ROOT / "docs" / "contracts" / "runtime-v1.json"
+GOLDEN = ROOT / "docs" / "contracts" / "runtime-v1-golden.json"
 
 
 def order_payload() -> dict[str, object]:
@@ -64,7 +64,6 @@ def test_incompatible_command_version_is_rejected_before_gateway(tmp_path: Path)
 
     assert response.status_code == 422
 
-GOLDEN = ROOT / "docs" / "contracts" / "runtime-v1-golden.json"
 
 
 def test_runtime_command_and_event_match_bidirectional_golden_payloads() -> None:

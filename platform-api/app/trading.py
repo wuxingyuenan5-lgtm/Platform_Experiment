@@ -9,6 +9,12 @@ from fastapi import HTTPException
 from app.config import get_settings
 from app.database import connection
 from app.position_math import calculate_position_update
+from app.runtime_contracts import RuntimeExecutionEventV1
+from app.runtime_recovery_client import (
+    RuntimeRecoveryContractError,
+    RuntimeRecoveryUnavailableError,
+    recover_and_read_runtime_events,
+)
 from app.schemas import CreateOrderRequest, OrderResponse
 
 
@@ -33,24 +39,18 @@ def submit_order(request: CreateOrderRequest, command_id: str | None = None) -> 
 
 
 def reconcile_order(order_id: str) -> OrderResponse:
-    """Recover an uncertain order from Runtime Journal without resubmitting it."""
+    """Recover an uncertain order from venue facts without resubmitting it."""
 
     row = get_order_row(order_id)
     if row["status"] != "result_unknown":
         return order_response_from_row(row)
 
-    settings = get_settings()
     try:
-        response = httpx.get(
-            f"{settings.runtime_base_url}/commands/{row['command_id']}/events",
-            timeout=settings.runtime_timeout_seconds,
-        )
-        if response.status_code == 404:
-            return order_response_from_row(row)
-        response.raise_for_status()
-        events = response.json()
-    except httpx.HTTPError:
+        events = recover_and_read_runtime_events(row["command_id"])
+    except RuntimeRecoveryUnavailableError:
         return order_response_from_row(row)
+    except RuntimeRecoveryContractError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
 
     if not events:
         return order_response_from_row(row)
@@ -81,7 +81,13 @@ def apply_execution_events(
     *,
     expected_command_id: str,
 ) -> None:
-    for event in events:
+    for raw_event in events:
+        try:
+            event = RuntimeExecutionEventV1.model_validate(raw_event).model_dump(mode="json")
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=502, detail="Runtime event contract is incompatible"
+            ) from exc
         validate_execution_event(
             event,
             expected_command_id=expected_command_id,
