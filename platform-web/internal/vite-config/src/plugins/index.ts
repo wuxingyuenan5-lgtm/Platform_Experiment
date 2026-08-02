@@ -6,7 +6,6 @@ import purgeIcons from 'vite-plugin-purge-icons';
 import { createAppConfigPlugin } from './appConfig';
 import { configCompressPlugin } from './compress';
 import { configHtmlPlugin } from './html';
-import { configMockPlugin } from './mock';
 import { configSvgIconsPlugin } from './svgSprite';
 import { configVisualizerConfig } from './visualizer';
 
@@ -14,11 +13,10 @@ interface Options {
   isBuild: boolean;
   root: string;
   compress: string;
-  enableMock?: boolean;
   enableAnalyze?: boolean;
 }
 
-async function createPlugins({ isBuild, root, enableMock, compress, enableAnalyze }: Options) {
+async function createPlugins({ isBuild, root, compress, enableAnalyze }: Options) {
   const vitePlugins: (PluginOption | PluginOption[])[] = [vue(), vueJsx()];
 
   const appConfigPlugin = await createAppConfigPlugin({ root, isBuild });
@@ -46,11 +44,6 @@ async function createPlugins({ isBuild, root, enableMock, compress, enableAnalyz
   // rollup-plugin-visualizer
   if (enableAnalyze) {
     vitePlugins.push(configVisualizerConfig());
-  }
-
-  // vite-plugin-mock
-  if (enableMock) {
-    vitePlugins.push(configMockPlugin({ isBuild }));
   }
 
   return vitePlugins;

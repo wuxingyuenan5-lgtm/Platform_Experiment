@@ -6,7 +6,7 @@ import { useInterval } from '@vueuse/core';
 import { useApiBasic } from '@/hooks/web/useApi';
 import { Modal, Upload, message, Form, Input, Tabs, TabPane, Button } from 'ant-design-vue';
 import { loginChangepw } from '@/api/sys/user';
-import { ConfigPropType } from '../enums';
+import { ConfigPropType } from './enums';
 
 const modalFooterBtn: any = {
   class: 'w-74px !ml-4',
