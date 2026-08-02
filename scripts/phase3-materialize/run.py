@@ -12,14 +12,8 @@ apply_anchor = '''        apply_patch(patch, patches)
         if changes_dependencies:
 '''
 apply_replacement = '''        apply_patch(patch, patches)
-        if index == 4:
-            checker = WEB / "scripts/check-codebase-boundaries.cjs"
-            checker_text = checker.read_text(encoding="utf-8")
-            unstable = "execFileSync('git', ['ls-files', 'platform-web'], { cwd: root, encoding: 'utf8' })"
-            stable = "execFileSync('git', ['ls-files'], { cwd: root, encoding: 'utf8' })"
-            if checker_text.count(unstable) != 1:
-                raise RuntimeError("expected one unstable git ls-files pathspec")
-            checker.write_text(checker_text.replace(unstable, stable, 1), encoding="utf-8")
+        if index == 1:
+            shutil.rmtree(WEB / "apps" / "test-server", ignore_errors=True)
         if changes_dependencies:
 '''
 if source.count(intermediate_gate) != 1:
