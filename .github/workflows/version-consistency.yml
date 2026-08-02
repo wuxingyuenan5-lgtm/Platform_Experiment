@@ -77,6 +77,7 @@ jobs:
           python-version: '3.12'
       - name: Materialize verified Phase 3 commits
         env:
+          GH_TOKEN: ${{ github.token }}
           HUSKY: '0'
           PHASE3_EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
         run: python scripts/phase3-materialize/run.py
