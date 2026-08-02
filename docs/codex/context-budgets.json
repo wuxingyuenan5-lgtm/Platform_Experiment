@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "description": "Machine-readable Required and Optional token budgets for the existing bounded Context Packs. File paths remain owned by scripts/context-for.py.",
+  "packs": {
+    "hedge-style": {
+      "required_tokens": 34000,
+      "optional_tokens": 6000
+    },
+    "identity-permission": {
+      "required_tokens": 12000,
+      "optional_tokens": 8000
+    },
+    "member-contract": {
+      "required_tokens": 12750,
+      "optional_tokens": 7000
+    },
+    "research-field": {
+      "required_tokens": 17000,
+      "optional_tokens": 4000
+    },
+    "research-provider": {
+      "required_tokens": 13000,
+      "optional_tokens": 3500
+    },
+    "trading-display": {
+      "required_tokens": 15000,
+      "optional_tokens": 4500
+    },
+    "user-e2e": {
+      "required_tokens": 10500,
+      "optional_tokens": 4000
+    }
+  }
+}

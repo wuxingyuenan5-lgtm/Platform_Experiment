@@ -9,6 +9,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = ROOT / "scripts/context-for.py"
+BUDGET_MANIFEST = ROOT / "docs/codex/context-budgets.json"
 
 
 def load_context_tool():
@@ -18,6 +19,22 @@ def load_context_tool():
     sys.modules[spec.name] = module
     spec.loader.exec_module(module)
     return module
+
+
+def test_budget_manifest_matches_executable_budget_registry() -> None:
+    tool = load_context_tool()
+    payload = json.loads(BUDGET_MANIFEST.read_text(encoding="utf-8"))
+    expected = {
+        name: {
+            "required_tokens": budget.required_tokens,
+            "optional_tokens": budget.optional_tokens,
+        }
+        for name, budget in sorted(tool.PACK_BUDGETS.items())
+    }
+
+    assert payload["schema_version"] == 1
+    assert payload["packs"] == expected
+    assert all(set(values) == {"required_tokens", "optional_tokens"} for values in payload["packs"].values())
 
 
 def test_all_context_packs_have_bounded_existing_paths() -> None:

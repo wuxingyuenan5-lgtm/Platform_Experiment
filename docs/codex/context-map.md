@@ -67,7 +67,7 @@ Browser ambient state is evidence only. Do not start browser automation unless v
 
 ## Context budgets
 
-Each existing task pack has separate Required and Optional token budgets in the existing `scripts/context-for.py` pack tool. The budget table stores pack names and numeric limits only; file paths remain owned by the existing pack definitions.
+Each existing task pack has separate Required and Optional token budgets in the existing `scripts/context-for.py` pack tool. `docs/codex/context-budgets.json` publishes the same pack names and numeric limits as a machine-readable manifest, and an architecture test rejects drift; file paths remain owned only by the existing pack definitions.
 
 ```powershell
 python scripts/context-for.py identity-permission --json
