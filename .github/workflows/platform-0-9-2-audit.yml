@@ -124,7 +124,6 @@ jobs:
     permissions:
       actions: read
       contents: read
-      statuses: write
 
     steps:
       - name: Collect final-head workflow evidence
@@ -257,8 +256,8 @@ jobs:
               "",
               f"Final head: `{sha}`",
               "",
-              "The Baseline Audit run remains `in_progress` while this evidence job posts; "
-              "its final conclusion is verified after the run completes.",
+              "Formal workflow jobs and run conclusions are the only CI authority; "
+              "no synthetic commit status is published.",
               "",
               "| Workflow | Run ID | Event | Status | Conclusion | Jobs | Artifacts |",
               "|---|---:|---|---|---|---|---|",
@@ -278,31 +277,6 @@ jobs:
           body = "\n".join(lines) + "\n"
           (output / "candidate-workflow-runs.md").write_text(body, encoding="utf-8")
           print(body)
-
-          for item in evidence:
-              conclusion = item["conclusion"]
-              if conclusion == "success":
-                  state = "success"
-              elif conclusion in {"failure", "cancelled", "timed_out", "action_required"}:
-                  state = "failure"
-              elif conclusion in {"neutral", "skipped", "stale"}:
-                  state = "error"
-              else:
-                  state = "pending"
-              context = "phase-1a/" + item["workflow"].lower().replace(" ", "-")
-              request(
-                  f"/repos/{repository}/statuses/{sha}",
-                  method="POST",
-                  payload={
-                      "state": state,
-                      "target_url": item["url"],
-                      "description": (
-                          f"run {item['run_id']}: "
-                          f"{item['status']}/{conclusion or 'pending'}"
-                      ),
-                      "context": context,
-                  },
-              )
 
           PY
 
