@@ -10,6 +10,7 @@ on:
     branches:
       - main
       - feature/issue-134-platform-0-9-1-unified-delivery
+      - refactor/platform-0-9-3-repository-and-context-optimization
     paths:
       - VERSION
       - platform-web/package.json
@@ -50,25 +51,37 @@ jobs:
       - name: Check maintained release versions
         run: python scripts/check-version-consistency.py
 
-  phase3-pnpm-bootstrap:
+  phase3-materialize:
     if: github.event_name == 'push' && github.ref_name == 'refactor/platform-0-9-3-codebase-and-build-simplification'
+    permissions:
+      contents: write
     runs-on: ubuntu-latest
+    timeout-minutes: 90
     steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: pnpm/action-setup@v4
         with:
           version: 9.15.9
           run_install: false
-      - name: Export exact pnpm executable
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p "$RUNNER_TEMP/phase3-tool"
-          cp -L "$(command -v pnpm)" "$RUNNER_TEMP/phase3-tool/pnpm"
-          chmod +x "$RUNNER_TEMP/phase3-tool/pnpm"
-          pnpm --version > "$RUNNER_TEMP/phase3-tool/version.txt"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/setup-node@v4
         with:
-          name: phase3-pnpm-9-15-9
-          path: ${{ runner.temp }}/phase3-tool/
-          if-no-files-found: error
-          retention-days: 1
+          node-version: '20'
+          cache: pnpm
+          cache-dependency-path: platform-web/pnpm-lock.yaml
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Materialize verified Phase 3 commits
+        env:
+          HUSKY: '0'
+        run: python scripts/phase3-materialize/run.py
+      - name: Upload Phase 3 materialization evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase3-materialization-${{ github.sha }}
+          path: ${{ runner.temp }}/phase3-materialize-evidence/
+          if-no-files-found: warn
+          retention-days: 7
