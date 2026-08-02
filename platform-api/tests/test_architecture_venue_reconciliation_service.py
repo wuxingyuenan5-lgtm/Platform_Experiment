@@ -5,7 +5,7 @@ APP_ROOT = Path(__file__).resolve().parents[1] / "app"
 SERVICE_PATH = APP_ROOT / "venue_reconciliation_service.py"
 FACADE_PATH = APP_ROOT / "venue_reconciliation.py"
 ROUTES_PATH = APP_ROOT / "venue_reconciliation_routes.py"
-MAIN_PATH = APP_ROOT / "main.py"
+MAIN_PATH = APP_ROOT / "application.py"
 
 SERVICE_FUNCTIONS = {
     "compare_balance",
@@ -170,4 +170,4 @@ def test_composition_root_imports_the_dedicated_venue_router() -> None:
         in source
     )
     assert "from app.venue_reconciliation import router" not in source
-    assert source.count("app.include_router(venue_reconciliation_router)") == 1
+    assert source.count("application.include_router(venue_reconciliation_router)") == 1
