@@ -5,11 +5,7 @@ import TerminalDetailPanel from '../components/TerminalDetailPanel.vue';
 import { type LocalWidgetKey, type WidgetConfig } from '../nativeData/dashboardClean';
 import { marketData } from '../nativeData/generated/marketData';
 import { marketTerminalConfigs } from '../nativeData/marketTerminal';
-import {
-  BTC_ETF_FLOW_ROWS,
-  mergeGoldWithGvz,
-  mergeGoldWithSeries,
-} from './chartCore';
+import { BTC_ETF_FLOW_ROWS, mergeGoldWithGvz, mergeGoldWithSeries } from './chartCore';
 import DualAxisChart from './DualAxisChart';
 import { EtfWeeklyFlowsPanel, YtdSummaryPanel } from './EtfResearchPanels';
 import TreasuryFlowChart from './TreasuryFlowChart';

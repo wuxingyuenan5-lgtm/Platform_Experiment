@@ -123,7 +123,11 @@ export default defineComponent({
         h('div', { class: 'chart-shell' }, [
           h(
             'svg',
-            { viewBox: `0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`, class: 'local-chart-svg', role: 'img' },
+            {
+              viewBox: `0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`,
+              class: 'local-chart-svg',
+              role: 'img',
+            },
             [
               h('g', { transform: `translate(${CHART_PADDING.left},${CHART_PADDING.top})` }, [
                 ...leftTicks.flatMap((tick) => {
@@ -150,7 +154,13 @@ export default defineComponent({
                     ),
                   ];
                 }),
-                h('line', { x1: 0, x2: innerWidth, y1: zeroY, y2: zeroY, class: 'chart-zero-line' }),
+                h('line', {
+                  x1: 0,
+                  x2: innerWidth,
+                  y1: zeroY,
+                  y2: zeroY,
+                  class: 'chart-zero-line',
+                }),
                 ...rightTicks.map((tick) =>
                   h(
                     'text',

@@ -20,9 +20,7 @@ function buildRangeOverview(values: number[], width: number, height: number) {
     return { x, y };
   });
   const linePath = points
-    .map(
-      (point, index) => `${index === 0 ? 'M' : 'L'} ${point.x.toFixed(2)} ${point.y.toFixed(2)}`,
-    )
+    .map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x.toFixed(2)} ${point.y.toFixed(2)}`)
     .join(' ');
   const areaPath = [
     `M ${points[0].x.toFixed(2)} ${height.toFixed(2)}`,

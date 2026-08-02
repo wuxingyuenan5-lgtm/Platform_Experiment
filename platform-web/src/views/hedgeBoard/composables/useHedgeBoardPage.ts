@@ -58,8 +58,7 @@ const ETF_REFERENCE_URL =
   'https://china.gold.org/goldhub/data/gold-etfs-holdings-and-flows#from-login=1&login-type=wechat';
 
 const widgetSourceLinks: Partial<Record<string, string>> = {
-  'btc-etf-flow':
-    'https://sosovalue.com/zh/assets/etf/Total_Crypto_Spot_ETF_Fund_Flow?page=usBTC',
+  'btc-etf-flow': 'https://sosovalue.com/zh/assets/etf/Total_Crypto_Spot_ETF_Fund_Flow?page=usBTC',
   'btc-treasury-flow': 'https://sosovalue.com/zh/assets/bitcoin-treasuries/weekly-net-inflow',
   'etf-weekly-flows': ETF_REFERENCE_URL,
   'etf-ytd-summary': ETF_REFERENCE_URL,
@@ -179,11 +178,7 @@ export function useHedgeBoardPage() {
     });
   }
 
-  watch(
-    () => route.fullPath,
-    scrollPageTop,
-    { immediate: true },
-  );
+  watch(() => route.fullPath, scrollPageTop, { immediate: true });
   onMounted(() => {
     if (typeof window !== 'undefined' && 'scrollRestoration' in window.history) {
       window.history.scrollRestoration = 'manual';

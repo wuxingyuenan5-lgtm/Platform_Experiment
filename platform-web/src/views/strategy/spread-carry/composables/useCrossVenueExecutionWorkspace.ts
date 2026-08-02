@@ -15,10 +15,7 @@ import type {
   CrossSpreadLimitStrategy,
 } from '@/api/platform/crossSpreadLifecycle';
 
-import {
-  CROSS_SPREAD_RANGES,
-  CROSS_SPREAD_TRADING_RULE_ROWS,
-} from './crossSpreadFixtures';
+import { CROSS_SPREAD_RANGES, CROSS_SPREAD_TRADING_RULE_ROWS } from './crossSpreadFixtures';
 import { useCrossSpreadExecution } from './useCrossSpreadExecution';
 import { useCrossSpreadExitPlans } from './useCrossSpreadExitPlans';
 import {
@@ -79,8 +76,7 @@ export function useCrossVenueExecutionWorkspace() {
   const snapshot = ref<CrossSpreadSnapshotResult | null>(null);
   const snapshotLoading = ref(false);
   const snapshotError = ref('');
-  const { observability, observabilityError, refreshObservability } =
-    useCrossSpreadObservability();
+  const { observability, observabilityError, refreshObservability } = useCrossSpreadObservability();
   const spreadHistory = ref<{ label: string; value: number }[]>([]);
   let snapshotTimer: number | undefined;
 
