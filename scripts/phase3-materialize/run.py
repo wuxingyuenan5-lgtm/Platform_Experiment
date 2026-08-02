@@ -31,16 +31,24 @@ COMMITS = [
 ]
 
 
-def ensure_patches() -> None:
-    if all((PATCH_ROOT / name).is_file() for name, _, _ in COMMITS):
-        return
+def load_patches() -> dict[str, bytes]:
     parts = sorted(TOOL_ROOT.glob("payload.part*"))
     if not parts:
         raise FileNotFoundError("phase3 materializer payload parts")
     raw = b"".join(path.read_bytes() for path in parts)
-    PATCH_ROOT.parent.mkdir(parents=True, exist_ok=True)
+    payloads: dict[str, bytes] = {}
     with tarfile.open(fileobj=io.BytesIO(raw), mode="r:gz") as archive:
-        archive.extractall(PATCH_ROOT.parent)
+        for member in archive.getmembers():
+            if not member.isfile() or not member.name.startswith("patches/"):
+                continue
+            extracted = archive.extractfile(member)
+            if extracted is None:
+                continue
+            payloads[Path(member.name).name] = extracted.read()
+    missing = [name for name, _, _ in COMMITS if name not in payloads]
+    if missing:
+        raise FileNotFoundError(f"missing materializer patches: {missing}")
+    return payloads
 
 
 def run(*args: str, cwd: Path = ROOT, capture: bool = False, env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
@@ -173,11 +181,14 @@ def lockfile_only() -> None:
     frozen_install()
 
 
-def apply_patch(name: str) -> None:
-    path = PATCH_ROOT / name
-    if not path.is_file():
-        raise FileNotFoundError(path)
-    run("git", "apply", "--binary", "--index", str(path))
+def apply_patch(name: str, payloads: dict[str, bytes]) -> None:
+    print("+ git apply --binary --index -", name, flush=True)
+    subprocess.run(
+        ["git", "apply", "--binary", "--index", "-"],
+        cwd=ROOT,
+        input=payloads[name],
+        check=True,
+    )
 
 
 def commit(message: str) -> str:
@@ -188,7 +199,6 @@ def commit(message: str) -> str:
 
 def main() -> None:
     EVIDENCE.mkdir(parents=True, exist_ok=True)
-    ensure_patches()
     if not EXPECTED_HEAD:
         raise RuntimeError("expected Phase 3 head is required")
     if os.environ.get("GITHUB_HEAD_REF") and os.environ.get("GITHUB_HEAD_REF") != BRANCH:
@@ -206,6 +216,7 @@ def main() -> None:
     before = tracked_metrics()
     frozen_install()
     before_build = build_metrics("before")
+    patches = load_patches()
     (EVIDENCE / "before.json").write_text(
         json.dumps({"pnpm": tool_version, "node": node_version, "repository": before, "build": before_build}, ensure_ascii=False, indent=2),
         encoding="utf-8",
@@ -217,7 +228,7 @@ def main() -> None:
             git("checkout", BASE_SHA, "--", ".github/workflows/version-consistency.yml")
         if index == 6:
             git("checkout", BASE_SHA, "--", "docs/codex/current-state.md")
-        apply_patch(patch)
+        apply_patch(patch, patches)
         if changes_dependencies:
             lockfile_only()
         if index == 6:
