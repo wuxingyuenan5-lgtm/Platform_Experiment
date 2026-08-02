@@ -19,7 +19,7 @@ WEB = ROOT / "platform-web"
 EVIDENCE = Path(os.environ.get("RUNNER_TEMP", "/tmp")) / "phase3-materialize-evidence"
 BRANCH = "refactor/platform-0-9-3-codebase-and-build-simplification"
 BASE_SHA = "cd825fe6bd9ecdf42082069b2785844eda2efac8"
-EXPECTED_HEAD = os.environ.get("GITHUB_SHA", "").strip()
+EXPECTED_HEAD = os.environ.get("PHASE3_EXPECTED_HEAD", os.environ.get("GITHUB_SHA", "")).strip()
 
 COMMITS = [
     ("001.patch", "refactor(platform-0.9.3): remove unused test server workspace", True),
@@ -189,9 +189,9 @@ def main() -> None:
     EVIDENCE.mkdir(parents=True, exist_ok=True)
     ensure_patches()
     if not EXPECTED_HEAD:
-        raise RuntimeError("GITHUB_SHA is required")
-    if os.environ.get("GITHUB_REF_NAME") != BRANCH:
-        raise RuntimeError(f"unexpected branch: {os.environ.get('GITHUB_REF_NAME')}")
+        raise RuntimeError("expected Phase 3 head is required")
+    if os.environ.get("GITHUB_HEAD_REF") and os.environ.get("GITHUB_HEAD_REF") != BRANCH:
+        raise RuntimeError(f"unexpected head branch: {os.environ.get('GITHUB_HEAD_REF')}")
     assert_remote_head(EXPECTED_HEAD)
     git("status", "--short")
     git("config", "user.name", "github-actions[bot]")
