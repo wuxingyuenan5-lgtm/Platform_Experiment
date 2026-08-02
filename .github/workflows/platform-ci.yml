@@ -58,6 +58,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -66,33 +68,23 @@ jobs:
         continue-on-error: true
         env:
           GITHUB_TOKEN: ${{ github.token }}
-          STACKED_EVENT_NAME: ${{ github.event_name }}
-          STACKED_PR_NUMBER: ${{ github.event.pull_request.number }}
-          STACKED_BASE_REF: ${{ github.event.pull_request.base.ref }}
-          STACKED_HEAD_REF: ${{ github.event.pull_request.head.ref }}
-          STACKED_PR_BODY: ${{ github.event.pull_request.body }}
         run: |
           set -o pipefail
-          if [ "$STACKED_EVENT_NAME" = "pull_request" ] \
-            && [ "$STACKED_PR_NUMBER" = "148" ] \
-            && [ "$STACKED_BASE_REF" = "refactor/platform-0-9-3-repository-and-context-optimization" ] \
-            && [ "$STACKED_HEAD_REF" = "refactor/platform-0-9-3-codebase-and-build-simplification" ]; then
-            python - <<'PY' 2>&1 | tee "$RUNNER_TEMP/workstream.log"
-          import os
-          import re
-
-          body = os.environ.get("STACKED_PR_BODY", "")
-          matches = re.findall(r"(?mi)^Workstream:\s*(fast|standard|critical)\s*$", body)
-          if matches != ["critical"]:
-              raise SystemExit(
-                  "bounded Phase 3 PR #148 must contain exactly one standalone "
-                  "'Workstream: critical' line"
-              )
-          print("Workstream check passed: critical (bounded stacked Phase 3 PR #148)")
-          PY
-          else
-            python scripts/check-workstream.py 2>&1 | tee "$RUNNER_TEMP/workstream.log"
-          fi
+          python scripts/check-workstream.py 2>&1 | tee "$RUNNER_TEMP/workstream.log"
+      - name: Audit stacked Phase history
+        id: phase_history
+        continue-on-error: true
+        env:
+          PHASE3_BASE_SHA: cd825fe6bd9ecdf42082069b2785844eda2efac8
+          PHASE3_ORIGINAL_HEAD: 735542b69c38b552fd3bb3109819b177e424b0fb
+        run: |
+          set -o pipefail
+          python scripts/audit-phase-history.py \
+            --base "$PHASE3_BASE_SHA" \
+            --head "$GITHUB_SHA" \
+            --required-original-head "$PHASE3_ORIGINAL_HEAD" \
+            --output "$RUNNER_TEMP/phase-history-audit.json" \
+            2>&1 | tee "$RUNNER_TEMP/phase-history-audit.log"
       - name: Check repository structure and architecture boundaries
         id: structure
         continue-on-error: true
@@ -130,6 +122,8 @@ jobs:
           name: repository-safety-diagnostics
           path: |
             ${{ runner.temp }}/workstream.log
+            ${{ runner.temp }}/phase-history-audit.log
+            ${{ runner.temp }}/phase-history-audit.json
             ${{ runner.temp }}/repository-structure.log
             ${{ runner.temp }}/documentation-consistency.log
             ${{ runner.temp }}/active-naming-consistency.log
@@ -141,6 +135,7 @@ jobs:
         if: always()
         run: |
           test "${{ steps.workstream.outcome }}" = "success"
+          test "${{ steps.phase_history.outcome }}" = "success"
           test "${{ steps.structure.outcome }}" = "success"
           test "${{ steps.documentation.outcome }}" = "success"
           test "${{ steps.active_naming.outcome }}" = "success"
