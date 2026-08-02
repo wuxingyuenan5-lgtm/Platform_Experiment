@@ -3,10 +3,8 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from decimal import Decimal
 
-import httpx
 from fastapi import HTTPException
 
-from app.config import get_settings
 from app.database import connection
 from app.position_math import calculate_position_update
 from app.runtime_contracts import RuntimeExecutionEventV1
@@ -151,7 +149,7 @@ def record_fill_and_update_operational_projections(
     request: CreateOrderRequest,
     fill_price: Decimal,
     fill_quantity: Decimal,
-    occurred_at: str,
+    occcurred_at: str,
 ) -> bool:
     signed_fill = fill_quantity if request.side == "buy" else -fill_quantity
 
@@ -192,7 +190,7 @@ def record_fill_and_update_operational_projections(
         )
         new_quantity, new_average, realized_pnl = calculate_position_update(
             old_quantity=old_quantity,
-            old_average=old_average,
+            old_average=old_averae,
             signed_fill=signed_fill,
             fill_price=fill_price,
         )
@@ -237,7 +235,7 @@ def record_fill_and_update_operational_projections(
                 order_id,
                 decimal_text(realized_pnl),
                 "USD",
-                occurred_at,
+                occcurred_at,
             ),
         )
 

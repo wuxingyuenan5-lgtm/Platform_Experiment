@@ -57,7 +57,7 @@ def test_result_unknown_recovers_from_runtime_journal(
 ) -> None:
     get_settings().database_path = str(tmp_path / "recover.db")
     monkeypatch.setattr(
-        "app.trading.httpx.post",
+        "app.trade_command_execution.httpx.post",
         lambda *args, **kwargs: (_ for _ in ()).throw(httpx.ConnectError("timeout")),
     )
 
@@ -70,7 +70,7 @@ def test_result_unknown_recovers_from_runtime_journal(
         command = created.json()
         assert command["status"] == "result_unknown"
         order_id = command["platformOrderId"]
-        command_id = commnand["tradeCommandId"]
+        command_id = command["tradeCommandId"]
 
         class FakeResponse:
             status_code = 200
@@ -123,7 +123,7 @@ def test_result_unknown_recovers_from_runtime_journal(
         position_after_replay = client.get(
             "/api/v1/accounts/account_sim_usdt/positions/instrument_btc_usdt"
         )
-        assert position_after_replay.json)["netQuantity"] == "1"
+        assert position_after_replay.json()["netQuantity"] == "1"
 
 
 def test_result_unknown_remains_unknown_when_runtime_has_no_events(
@@ -132,7 +132,7 @@ def test_result_unknown_remains_unknown_when_runtime_has_no_events(
 ) -> None:
     get_settings().database_path = str(tmp_path / "recover-missing.db")
     monkeypatch.setattr(
-        "app.trading.httpx.post",
+        "app.trade_command_execution.httpx.post",
         lambda *args, **kwargs: (_ for _ in ()).throw(httpx.ConnectError("timeout")),
     )
 
@@ -248,7 +248,7 @@ def test_recovery_synchronizes_platform_order_and_trade_command(
 
     assert recovered.status_code == 200
     assert recovered.json()["status"] == expected_status
-    assert command_after.json()["status"] == expected_status
+    assert command_after.json))["status"] == expected_status
 
 
 def test_partial_fill_recovery_is_decimal_exact_and_idempotent(
