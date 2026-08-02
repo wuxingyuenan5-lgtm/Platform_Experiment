@@ -29,6 +29,7 @@ GitHub owns the active branch, Draft PR, HEAD, CI and review state.
 - Production-confirmation and owner-decision materials remain protected; Financial AI remains deferred.
 - Phase 4 core-code hotspot decomposition has not started.
 - Phase 8 owns cross-venue spread and funding-fee arbitrage business closure; it has not started.
+- The temporary deterministic materializer is staged on this branch and will remove itself in the final Phase 3 state commit.
 
 ## Safety and known limits
 
