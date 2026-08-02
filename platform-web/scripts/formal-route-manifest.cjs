@@ -65,7 +65,7 @@ function generateManifest(options = {}) {
   }
   return {
     schema_version: 2,
-    authority: 'src/router/routes/modules/*.ts and bounded runtime View discovery',
+    authority: 'src/router/routes/modules/*.ts and generated typed View Registry',
     runtime_source: false,
     modules,
   };

@@ -1,6 +1,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { checkManifest } = require('./formal-route-manifest.cjs');
+const { checkRegistry } = require('./formal-view-registry.cjs');
 
 const root = path.resolve(__dirname, '..');
 const read = (relative) => fs.readFileSync(path.join(root, relative), 'utf8');
@@ -41,18 +42,19 @@ for (const [name, source] of [['routes', routeIndex], ['menus', menuIndex]]) {
 }
 
 const helper = read('src/router/helper/routeHelper.ts');
-assert(!helper.includes("../../views/**/*"), 'unbounded View discovery returned');
+assert(!helper.includes('import.meta.glob'), 'runtime View Glob authority returned');
+assert(!helper.includes('@ts-nocheck'), 'routeHelper.ts returned to @ts-nocheck');
+assert(helper.includes('resolveViewComponent'), 'runtime routes do not use the typed View Registry');
 assert(helper.includes('return EXCEPTION_COMPONENT;'), 'missing dynamic View key is not fail-closed');
-const formalRoots = [
-  'account', 'audit', 'bargain', 'dashboard', 'data', 'finance', 'financialAi',
-  'hedgeBoard', 'landing', 'log', 'monitor', 'newsCalendar', 'notification',
-  'platform', 'reports', 'risk', 'settings', 'strategy', 'sys', 'users',
-];
-for (const viewRoot of formalRoots) {
-  assert(helper.includes(`'../../views/${viewRoot}/**/*.{vue,tsx}'`), `formal View root is missing: ${viewRoot}`);
-}
-for (const forbidden of ['demo', 'mock', 'test', 'example', 'template', 'archive', 'hooks']) {
-  assert(!helper.includes(`'../../views/${forbidden}/`), `non-product View root entered discovery: ${forbidden}`);
+
+const registryResult = checkRegistry({ root });
+for (const entry of registryResult.entries) {
+  for (const forbidden of ['demo', 'mock', 'test', 'example', 'template', 'archive']) {
+    assert(
+      !entry.relative.toLowerCase().split('/').includes(forbidden),
+      `non-product View entered the Registry: ${entry.relative}`,
+    );
+  }
 }
 
 const manifestResult = checkManifest({ root });
@@ -69,4 +71,4 @@ for (const module of manifest.modules) {
     }
   }
 }
-console.log(`Codebase boundaries passed: ${manifest.modules.length} formal route modules, ${formalRoots.length} bounded View roots; manifest ${manifestResult.sha256}.`);
+console.log(`Codebase boundaries passed: ${manifest.modules.length} formal route modules, ${registryResult.entries.length} View keys; manifest ${manifestResult.sha256}.`);
