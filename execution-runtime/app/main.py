@@ -14,9 +14,9 @@ from app.live_route_store import ensure_live_store
 from app.system_routes import create_system_router
 from app.venue_query_routes import create_venue_query_router
 from app.venue_store import ensure_store
+from app.version import PLATFORM_VERSION
 
 settings = get_settings()
-PLATFORM_VERSION = "0.9.3"
 
 
 @asynccontextmanager
@@ -38,7 +38,6 @@ def create_app(gateway: ExecutionGateway | None = None) -> FastAPI:
         create_system_router(
             settings=settings,
             gateway=runtime_gateway,
-            platform_version=PLATFORM_VERSION,
         )
     )
     application.include_router(

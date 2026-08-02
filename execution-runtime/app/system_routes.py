@@ -6,13 +6,13 @@ from app.config import Settings
 from app.gateway import ExecutionGateway
 from app.journal import journal_status
 from app.models import RuntimeStatusResponse
+from app.version import PLATFORM_VERSION
 
 
 def create_system_router(
     *,
     settings: Settings,
     gateway: ExecutionGateway,
-    platform_version: str,
 ) -> APIRouter:
     router = APIRouter()
 
@@ -29,7 +29,7 @@ def create_system_router(
         return RuntimeStatusResponse(
             status="available",
             service="execution-runtime",
-            version=platform_version,
+            version=PLATFORM_VERSION,
             environment=settings.environment,
             gateway=gateway.name,
             journal=journal_status(),

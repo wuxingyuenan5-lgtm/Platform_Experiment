@@ -19,6 +19,8 @@ def test_main_is_bounded_composition_root() -> None:
     assert "SELECT " not in source
     assert "RuntimeSubmitOrderCommandV1" not in source
     assert "GatewayResultUnknownError" not in source
+    assert "from app.version import PLATFORM_VERSION" in source
+    assert '\nPLATFORM_VERSION = "' not in source
     for factory in (
         "create_system_router",
         "create_gateway_router",

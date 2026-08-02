@@ -32,9 +32,11 @@ def test_maintained_release_versions_match_root_version() -> None:
 
 
 def copy_version_fixture(tmp_path: Path) -> None:
-    paths = (
-        *version_checker.MAINTAINED_VERSION_PATHS,
-        *version_checker.VERSION_USAGE_PATHS,
+    paths = dict.fromkeys(
+        (
+            *version_checker.MAINTAINED_VERSION_PATHS,
+            *version_checker.VERSION_USAGE_PATHS,
+        )
     )
     for relative in paths:
         source = ROOT / relative
@@ -52,7 +54,7 @@ def copy_version_fixture(tmp_path: Path) -> None:
             'PLATFORM_VERSION = "0.6.0"',
         ),
         (
-            "execution-runtime/app/main.py",
+            "execution-runtime/app/version.py",
             'PLATFORM_VERSION = "0.9.3"',
             'PLATFORM_VERSION = "0.5.0"',
         ),
@@ -66,7 +68,47 @@ def test_runtime_version_drift_is_rejected(
 ) -> None:
     copy_version_fixture(tmp_path)
     path = tmp_path / relative_path
-    path.write_text(path.read_text(encoding="utf-8").replace(current, stale, 1), encoding="utf-8")
+    source = path.read_text(encoding="utf-8")
+    path.write_text(source.replace(current, stale, 1), encoding="utf-8")
 
     with pytest.raises(SystemExit, match="Version drift from VERSION=0.9.3"):
+        version_checker.check_versions(tmp_path)
+
+
+@pytest.mark.parametrize(
+    "relative_path",
+    [
+        "execution-runtime/app/main.py",
+        "execution-runtime/app/system_routes.py",
+    ],
+)
+def test_runtime_version_consumers_must_use_formal_owner(
+    tmp_path: Path,
+    relative_path: str,
+) -> None:
+    copy_version_fixture(tmp_path)
+    path = tmp_path / relative_path
+    source = path.read_text(encoding="utf-8")
+    path.write_text(
+        source.replace(
+            "from app.version import PLATFORM_VERSION",
+            "# formal version owner import removed",
+            1,
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(SystemExit, match="Version source usage is missing"):
+        version_checker.check_versions(tmp_path)
+
+
+def test_runtime_rejects_duplicate_platform_version_owner(tmp_path: Path) -> None:
+    copy_version_fixture(tmp_path)
+    main_path = tmp_path / "execution-runtime/app/main.py"
+    main_path.write_text(
+        f'{main_path.read_text(encoding="utf-8")}\nPLATFORM_VERSION = "0.9.3"\n',
+        encoding="utf-8",
+    )
+
+    with pytest.raises(SystemExit, match="must have exactly one owner"):
         version_checker.check_versions(tmp_path)
