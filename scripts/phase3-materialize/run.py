@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import json
 import os
+import subprocess
 import traceback
 from pathlib import Path
 
@@ -9,67 +10,46 @@ source = implementation.read_text(encoding="utf-8")
 intermediate_gate = '''        if index >= 3:
             run("node", "scripts/check-codebase-boundaries.cjs", cwd=WEB)
 '''
-old_commit = '''def commit(message: str) -> str:
-    run("git", "diff", "--cached", "--check")
-    git("commit", "-m", message)
-    return git("rev-parse", "HEAD", capture=True).stdout.strip()
+final_gate = '''    run("node", "scripts/check-codebase-boundaries.cjs", cwd=WEB)
 '''
-new_commit = '''def commit(message: str) -> str:
-    summary = subprocess.run(
-        ["git", "diff", "--cached", "--stat"],
-        cwd=ROOT,
+replacement_gate = '''    boundary = subprocess.run(
+        ["node", "scripts/check-codebase-boundaries.cjs"],
+        cwd=WEB,
         text=True,
         capture_output=True,
     )
-    check = subprocess.run(
-        ["git", "diff", "--cached", "--check"],
-        cwd=ROOT,
-        text=True,
-        capture_output=True,
-    )
-    committed = None
-    if check.returncode == 0:
-        committed = subprocess.run(
-            ["git", "commit", "-m", message],
-            cwd=ROOT,
-            text=True,
-            capture_output=True,
-            env=os.environ.copy(),
-        )
-    diagnostic = {
-        "message": message,
-        "summary_stdout": summary.stdout,
-        "summary_stderr": summary.stderr,
-        "summary_returncode": summary.returncode,
-        "check_stdout": check.stdout,
-        "check_stderr": check.stderr,
-        "check_returncode": check.returncode,
-        "commit_stdout": None if committed is None else committed.stdout,
-        "commit_stderr": None if committed is None else committed.stderr,
-        "commit_returncode": None if committed is None else committed.returncode,
-    }
     EVIDENCE.mkdir(parents=True, exist_ok=True)
-    (EVIDENCE / "latest-commit-diagnostic.json").write_text(
-        json.dumps(diagnostic, ensure_ascii=False, indent=2),
+    (EVIDENCE / "boundary-diagnostic.json").write_text(
+        json.dumps(
+            {
+                "stdout": boundary.stdout,
+                "stderr": boundary.stderr,
+                "returncode": boundary.returncode,
+                "head": git("rev-parse", "HEAD", capture=True).stdout.strip(),
+                "status": git("status", "--porcelain", capture=True).stdout,
+                "tracked_materializer": git("ls-files", "scripts/phase3-materialize", capture=True).stdout,
+            },
+            ensure_ascii=False,
+            indent=2,
+        ),
         encoding="utf-8",
     )
-    print(summary.stdout, end="", flush=True)
-    print(check.stdout, end="", flush=True)
-    print(check.stderr, end="", file=sys.stderr, flush=True)
-    if check.returncode:
-        raise subprocess.CalledProcessError(check.returncode, check.args, check.stdout, check.stderr)
-    assert committed is not None
-    print(committed.stdout, end="", flush=True)
-    print(committed.stderr, end="", file=sys.stderr, flush=True)
-    if committed.returncode:
-        raise subprocess.CalledProcessError(committed.returncode, committed.args, committed.stdout, committed.stderr)
-    return git("rev-parse", "HEAD", capture=True).stdout.strip()
+    print(boundary.stdout, end="", flush=True)
+    print(boundary.stderr, end="", file=sys.stderr, flush=True)
+    if boundary.returncode:
+        raise subprocess.CalledProcessError(
+            boundary.returncode,
+            boundary.args,
+            boundary.stdout,
+            boundary.stderr,
+        )
 '''
 if source.count(intermediate_gate) != 1:
     raise RuntimeError("expected exactly one intermediate boundary-gate block")
-if source.count(old_commit) != 1:
-    raise RuntimeError("expected exactly one commit function")
-source = source.replace(intermediate_gate, "", 1).replace(old_commit, new_commit, 1)
+source = source.replace(intermediate_gate, "", 1)
+if source.count(final_gate) != 1:
+    raise RuntimeError("expected exactly one final boundary-gate call")
+source = source.replace(final_gate, replacement_gate, 1)
 namespace = {"__file__": str(implementation), "__name__": "__main__"}
 evidence = Path(os.environ.get("RUNNER_TEMP", "/tmp")) / "phase3-materialize-evidence"
 try:
