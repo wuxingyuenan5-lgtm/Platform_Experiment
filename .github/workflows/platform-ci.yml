@@ -182,8 +182,172 @@ jobs:
   platform-api:
     needs: changes
     if: needs.changes.outputs.backend == 'true'
-    runs-on: ubu[K[]\ÝˆY˜][Î‚ˆ[Ž‚ˆÛÜšÚ[™ËY\™XÝÜžNˆ]›Ü›KX\BˆÝ\Î‚ˆH\Ù\ÎˆXÝ[ÛœËØÚXÚÛÝ]ˆÚ]‚ˆ™]ÚY\ˆˆH\Ù\ÎˆXÝ[ÛœËÜÙ]\\]ÛBˆÚ]‚ˆ]Û‹]™\œÚ[ÛŽˆ	ÌËŒL‰ÂˆØXÚNˆ\ˆØXÚKY\[™[˜ÞK\]ˆ]›Ü›KX\KÜ\›Ú™XÝÛ[ˆH˜[YNˆ[œÝ[\[™[˜ÚY\Âˆ[Žˆ]Ûˆ[H\[œÝ[YH	Ë–Ù]—IÂˆH˜[YNˆ˜[Y]H\[™[˜ÞHÜ˜\ˆ[Žˆ]Ûˆ[H\ÚXÚÂˆH˜[YNˆ˜[Y]H]›Ü›HTH\ÝšX][ÛˆY]Y]Bˆ[Žˆ]Ûˆ[H\ÚÝÈ˜\šXX›KYÛØ˜[\]›Ü›KX\BˆH˜[YNˆ˜XÚÙ[™[ˆYˆ˜XÚÙ[™Û[ˆÛÛ[YK[Û‹Y\œ›ÜŽˆYBˆ[ŽˆˆÙ][È\Y˜Z[ˆ]Ûˆ[HY™ˆÚXÚÈ\\ÝÈ‰ŒHYH‰•S“‘T—ÕSTØ˜XÚÙ[™\Y™‹›ÙÈ‚ˆH˜[YNˆ˜XÚÙ[™\HÚXÚÂˆYˆ˜XÚÙ[™Ý\BˆÛÛ[YK[Û‹Y\œ›ÜŽˆYBˆ[ŽˆˆÙ][È\Y˜Z[ˆ]Ûˆ[H\šYÚ‰ŒHYH‰•S“‘T—ÕSTØ˜XÚÙ[™\\šYÚ›ÙÈ‚ˆH˜[YNˆ˜XÚÙ[™\ÝÂˆYˆ˜XÚÙ[™Ý\ÝÂˆÛÛ[YK[Û‹Y\œ›ÜŽˆYBˆ[ŽˆˆÙ][È\Y˜Z[ˆ]Ûˆ[H]\Ý[H˜\˜Ú]XÝ\™HÜˆ[š]Üˆ[YÜ˜][ÛˆÜˆ]™WÜØY™]Hˆ‰ŒHYH‰•S“‘T—ÕSTØ˜XÚÙ[™\]\Ý›ÙÈ‚ˆH˜[YNˆ\ØY˜XÚÙ[™XYÛ›ÜÝXÜÂˆYŽˆ[Ø^\Ê
-Bˆ\Ù\ÎˆXÝ[ÛœËÝ\ØYX\Y˜XÝˆÚ]‚ˆ˜[YNˆ]›Ü›KX\KYXYÛ›ÜÝXÜÂˆ]ˆˆ	ÞÈ[›™\‹[\_KØ˜XÚÙ[™\Y™‹›ÙÂˆ	ÞÈ[›™\‹[\_KØ˜XÚÙ[™\\šYÚ›ÙÂˆ	ÞÈ[›™\‹[\_KØ˜XÚÙ[™\]\Ý›ÙÂˆY‹[›ËYš[\ËY›Ý[™ˆ\œ›Ü‚ˆ™][[Û‹Y^\ÎˆÂˆH˜[YNˆ[™›Ü˜ÙH˜XÚÙ[™™\Ý[ÂˆYŽˆ[Ø^\Ê
-Bˆ[Žˆˆ]Ûˆ‹‹ÜØÜš\ËÙ[™›Ü˜ÙKXÚK\™\Ý[ËœHˆ˜˜XÚÙ[™Û[IÞÈÝ\Ë˜˜XÚÙ[™Û[›Ý]ÛÛYH_Hˆˆ˜˜XÚÙ[™Ý\OIÞÈÝ\Ë˜˜XÚÙ[™Ý\K›Ý]ÛÛYH_Hˆˆ˜˜XÚÙ[™Ý\ÝÏIÞÈÝ\Ë˜˜XÚÙ[™Ý\ÝË›Ý]ÛÛYH_H‚‚ˆœ›Û[™\]X[]N‚ˆ™YYÎˆÚ[™Ù\ÂˆYŽˆ™YYË˜Ú[™Ù\Ë›Ý]]Ë™œ›Û[™OH	ÝYIÂˆ[œË[ÛŽˆX[K[]\ÝˆY˜][Î‚ˆ[Ž‚ˆÛÜšÚ[™ËY\™XÝÜžNˆ]›Ü›K]ÙX‚ˆÝ\Î‚ˆH\Ù\ÎˆXÝ[ÛœËØÚXÚÛÝ]ˆÚ]‚ˆ™]ÚY\ˆˆH\Ù\ÎˆœKØXÝ[Û‹\Ù]\ˆÚ]‚ˆ™\œÚ[ÛŽˆKŒMKŽBˆ[—Ú[œÝ[ˆ˜[ÙBˆH\Ù\ÎˆXÝ[ÛœËÜÙ]\[›ÙPˆÚ]‚ˆ›ÙK]™\œÚ[ÛŽˆ	ÌŒ	ÂˆØXÚNˆœBˆØXÚKY\[™[˜ÞK\]ˆ]›Ü›K]ÙX‹ÜœK[ØÚËžX[[ˆH\Ù\ÎˆXÝ[ÛœËÜÙ]\\]ÛBˆÚ]‚ˆ]Û‹]™\œÚ[ÛŽˆ	ÌËŒL‰ÂˆH˜[YNˆ[œÝ[\[™[˜ÚY\Âˆ[Ž‚ˆTÒÖNˆ	Ì	Âˆ[Žˆ˜H[œÝ[KYœ›Þ™[‹[ØÚÙš[BˆH˜[YNˆ\Ý›Ü›X[›Ý]HX[šY™\ÝˆYˆœ›Û[™Ü›Ý]WÛX[šY™\ÝˆÛÛ[YK[Û‹Y\œ›ÜŽˆYBˆ[ŽˆˆÙ][È\Y˜Z[ˆ›ÙHØÜš\ËÝ\ÝY›Ü›X[\›Ý]K[X[šY™\Ý˜ÚœÈ‰ŒHYH‰•S“‘T—ÕSTÙœ›Û[™\›Ý]K[X[šY™\Ý›ÙÈ‚ˆH˜[YNˆ\Ýœ›ÝÜÙ\ˆXØÙ\ÜÈÛXÞBˆYˆœ›Û[™ØXØÙ\Ü×Ý\ÝÂˆÛÛ[YK[Û‹Y\œ›ÜŽˆYBˆ[ŽˆˆÙ][È\Y˜Z[ˆ˜H\Ý\Ù\‹\Þ\Ý[H‰ŒHYH‰•S“‘T—ÕSTÙœ›Û[™XXØÙ\ÜË]\ÝË›ÙÈ‚ˆH˜[YNˆ[XZ[Z[™Yœ›Û[™ˆYˆœ›Û[™Û[ˆÛÛ[YK[Û‹Y\œ›ÜŽˆYBˆ[ŽˆˆÙ][È\Y˜Z[ˆ˜H^XÈ\Û[K[X^]Ø\›š[™ÜÈˆœÜ˜ËØXØÙ\ÜËÊŠ‹Ê‹žÝËÞHˆˆœÜ˜ËØ\KÜ]›Ü›KÊŠ‹Ê‹žÝËÞHˆˆœÜ˜ËÙ[[\ËÜ›ÛQ[[KÈˆˆœÜ˜ËÚÛÚÜËÝÙX‹Ý\ÙT›ÛPXØÙ\ÜËÈˆˆœÜ˜ËÚÛÚÜËÝ˜Y[™ËÊŠ‹Ê‹žÝËÞHˆˆœÜ˜ËÜ›Ý]\‹ÙÝX\™Ü\›Z\ÜÚ[Û‘ÝX\™ÈˆˆœÜ˜ËÜ›Ý]\‹Ü›Ý]\ËÚ[™^ÈˆˆœÜ˜ËÜ›Ý]\‹Ü›Ý]\ËÛ[Ù[\ËÞØXØÛÝ[\Ú›Ø\™š\ÚßKÈˆˆœÜ˜ËÜÝÜ™KÛ[Ù[\ËÝ\Ù\‹ÈˆˆœÜ˜ËÝ][ËÙXÚ[X[\Ü^KÈˆˆœÜ˜ËÝšY]ÜËØXØÛÝ[Ú[™^YHˆˆœÜ˜ËÝšY]ÜËØXØÛÝ[ØÛÛ\Û™[ËÒÛ[™ÜÔ[™[YHˆˆœÜ˜ËÝšY]ÜËÜÞ\ËÛÙÚ[‹ÓÙÚ[‘›Ü›KYHˆˆœÜ˜ËÝšY]ÜËÜÞ\ËÜ™YÚ\Ý\‹Ú[™^YHˆˆœÜ˜ËÝšY]ÜËÜÞ\ËÜ™\Ù]\\ÜÝÛÜ™Ú[™^YHˆˆœÜ˜ËÝšY]ÜËÝ\Ù\œËÊŠ‹Ê‹žÝYK]Ë]ÞHˆˆœÜ˜ËÝšY]ÜËÜÝ˜]YÞKÙ[™[™ËXØ\œžKÊŠ‹Ê‹žÝYKËÞHˆˆ‰ŒHYH‰•S“‘T—ÕSTÙœ›Û[™Y\Û[›ÙÈ‚ˆH˜[YNˆ[™›Ü˜ÙHœ›Û[™›Ë[™]ËYXØ]BˆYˆœ›Û[™ÙXˆÛÛ[YK[Û‹Y\œ›ÜŽˆYBˆ[ŽˆˆÙ][È\Y˜Z[ˆ]Ûˆ‹‹ÜØÜš\ËÙœ›Û[™[›Ë[™]ËYXœH‰ŒHYH‰•S“‘T—ÕSTÙœ›Û[™[›Ë[™]ËYX›ÙÈ‚ˆH˜[YNˆ\HÚXÚÈÝ˜]YÞHœ›Û[™ˆYˆœ›Û[™ÜÝ˜]YÞWÝ\BˆÛÛ[YK[Û‹Y\œ›ÜŽˆYBˆ[ŽˆˆÙ][È\Y˜Z[ˆœH\N˜ÚXÚÈ‰ŒHYH‰•S“‘T—ÕSTÙœ›Û[™\Ý˜]YÞK]\XÚXÚË›ÙÈ‚ˆH˜[YNˆ\HÚXÚÈ\Ù\‹\Þ\Ý[Hœ›Û[™ˆYˆœ›Û[™Ý\Ù\—Ý\BˆÛÛ[YK[Û‹Y\œ›ÜŽˆYBˆ[ŽˆˆÙ][È\Y˜Z[ˆœH^XÈYK]ØÈ\ØÛÛ™šYË\Ù\‹\Þ\Ý[KšœÛÛˆK[›Ñ[Z]K\ÚÚ\XÚXÚÈ‰ŒHYH‰•S“‘T—ÕSTÙœ›Û[™]\Ù\‹]\XÚXÚË›ÙÈ‚ˆH˜[YNˆZ[œ›Û[™ˆYˆœ›Û[™ØZ[ˆÛÛ[YK[Û‹Y\œ›ÜŽˆYBˆ[ŽˆˆÙ][È\Y˜Z[ˆœHZ[‰ŒHYH‰•S“‘T—ÕSTÙœ›Û[™XZ[›ÙÈ‚ˆH˜[YNˆ\ØYœ›Û[™XYÛ›ÜÝXÜÂˆYŽˆ[Ø^\Ê
-Bˆ\Ù\ÎˆXÝ[ÛœËÝ\ØYX\Y˜XÝˆÚ]‚ˆ˜[YNˆœ›Û[™\]X[]KYXYÛ›ÜÝXÜÂˆ]ˆˆ	ÞÈ[›™\‹[\_KÙœ›Û[™\›Ý]K[X[šY™\Ý›ÙÂˆ	ÞÈ[›™\‹[\_KÙœ›Û[™XXØÙ\ÜË]\ÝË›ÙÂˆ	ÞÈ[›™\‹[\_KÙœ›Û[™Y\Û[›ÙÂˆ	ÞÈ[›™\‹[\_KÙœ›Û[™[›Ë[™]ËYX›ÙÂˆ	ÞÈ[›™\‹[\_KÙœ›Û[™\Ý˜]YÞK]\XÚXÚË›ÙÂˆ	ÞÈ[›™\‹[\_KÙœ›Û[™]\Ù\‹]\XÚXÚË›ÙÂˆ	ÞÈ[›™\‹[\_KÙœ›Û[™XZ[›ÙÂˆY‹[›ËYš[\ËY›Ý[™ˆ\œ›Ü‚ˆ™][[Û‹Y^\ÎˆÂˆH˜[YNˆ[™›Ü˜ÙHœ›Û[™™\Ý[ÂˆYŽˆ[Ø^\Ê
-Bˆ[Žˆˆ]Ûˆ‹‹ÜØÜš\ËÙ[™›Ü˜ÙKXÚK\™\Ý[ËœHˆ™œ›Û[™Ü›Ý]WÛX[šY™\ÝIÞÈÝ\Ë™œ›Û[™Ü›Ý]WÛX[šY™\Ý›Ý]ÛÛYH_Hˆˆ™œ›Û[™ØXØÙ\Ü×Ý\ÝÏIÞÈÝ\Ë™œ›Û[™ØXØÙ\Ü×Ý\ÝË›Ý]ÛÛYH_Hˆˆ™œ›Û[™Û[IÞÈÝ\Ë™œ›Û[™Û[›Ý]ÛÛYH_Hˆˆ™œ›Û[™ÙXIÞÈÝ\Ë™œ›Û[™ÙX›Ý]ÛÛYH_Hˆˆ™œ›Û[™ÜÝ˜]YÞWÝ\OIÞÈÝ\Ë™œ›Û[™ÜÝ˜]YÞWÝ\K›Ý]ÛÛYH_Hˆˆ™œ›Û[™Ý\Ù\—Ý\OIÞÈÝ\Ë™œ›Û[™Ý\Ù\—Ý\K›Ý]ÛÛYH_Hˆˆ™œ›Û[™ØZ[IÞÈÝ\Ë™œ›Û[™ØZ[›Ý]ÛÛYH_H‚
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: platform-api
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: platform-api/pyproject.toml
+      - name: Install dependencies
+        run: python -m pip install -e '.[dev]'
+      - name: Validate dependency graph
+        run: python -m pip check
+      - name: Validate Platform API distribution metadata
+        run: python -m pip show variable-global-platform-api
+      - name: Backend lint
+        id: backend_lint
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          python -m ruff check app tests 2>&1 | tee "$RUNNER_TEMP/backend-ruff.log"
+      - name: Backend type check
+        id: backend_type
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          python -m pyright 2>&1 | tee "$RUNNER_TEMP/backend-pyright.log"
+      - name: Backend tests
+        id: backend_tests
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          python -m pytest -m "architecture or unit or integration or live_safety" 2>&1 | tee "$RUNNER_TEMP/backend-pytest.log"
+      - name: Upload backend diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: platform-api-diagnostics
+          path: |
+            ${{ runner.temp }}/backend-ruff.log
+            ${{ runner.temp }}/backend-pyright.log
+            ${{ runner.temp }}/backend-pytest.log
+          if-no-files-found: error
+          retention-days: 3
+      - name: Enforce backend results
+        if: always()
+        run: |
+          python ../scripts/enforce-ci-results.py \
+            "backend_lint=${{ steps.backend_lint.outcome }}" \
+            "backend_type=${{ steps.backend_type.outcome }}" \
+            "backend_tests=${{ steps.backend_tests.outcome }}"
+
+  frontend-quality:
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: platform-web
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.9
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: pnpm
+          cache-dependency-path: platform-web/pnpm-lock.yaml
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        env:
+          HUSKY: '0'
+        run: pnpm install --frozen-lockfile
+      - name: Test formal route manifest
+        id: frontend_route_manifest
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          node scripts/test-formal-route-manifest.cjs 2>&1 | tee "$RUNNER_TEMP/frontend-route-manifest.log"
+      - name: Test browser access policy
+        id: frontend_access_tests
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          pnpm test:user-system 2>&1 | tee "$RUNNER_TEMP/frontend-access-tests.log"
+      - name: Lint maintained frontend
+        id: frontend_lint
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          pnpm exec eslint --max-warnings 0 \
+            "src/access/**/*.{ts,tsx}" \
+            "src/api/platform/**/*.{ts,tsx}" \
+            "src/enums/roleEnum.ts" \
+            "src/hooks/web/useRoleAccess.ts" \
+            "src/hooks/trading/**/*.{ts,tsx}" \
+            "src/router/guard/permissionGuard.ts" \
+            "src/router/routes/index.ts" \
+            "src/router/routes/modules/{account,dashboard,risk}.ts" \
+            "src/store/modules/user.ts" \
+            "src/utils/decimalDisplay.ts" \
+            "src/views/account/index.vue" \
+            "src/views/account/components/HoldingsPanel.vue" \
+            "src/views/sys/login/LoginForm.vue" \
+            "src/views/sys/register/index.vue" \
+            "src/views/sys/reset-password/index.vue" \
+            "src/views/users/**/*.{vue,ts,tsx}" \
+            "src/views/strategy/funding-carry/**/*.{vue,ts,tsx}" \
+            2>&1 | tee "$RUNNER_TEMP/frontend-eslint.log"
+      - name: Enforce frontend no-new-debt gate
+        id: frontend_debt
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          python ../scripts/frontend-no-new-debt.py 2>&1 | tee "$RUNNER_TEMP/frontend-no-new-debt.log"
+      - name: Type check strategy frontend
+        id: frontend_strategy_type
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          pnpm type:check 2>&1 | tee "$RUNNER_TEMP/frontend-strategy-typecheck.log"
+      - name: Type check user-system frontend
+        id: frontend_user_type
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          pnpm exec vue-tsc -p tsconfig.user-system.json --noEmit --skipLibCheck 2>&1 | tee "$RUNNER_TEMP/frontend-user-typecheck.log"
+      - name: Build frontend
+        id: frontend_build
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          pnpm build 2>&1 | tee "$RUNNER_TEMP/frontend-build.log"
+      - name: Upload frontend diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-quality-diagnostics
+          path: |
+            ${{ runner.temp }}/frontend-route-manifest.log
+            ${{ runner.temp }}/frontend-access-tests.log
+            ${{ runner.temp }}/frontend-eslint.log
+            ${{ runner.temp }}/frontend-no-new-debt.log
+            ${{ runner.temp }}/frontend-strategy-typecheck.log
+            ${{ runner.temp }}/frontend-user-typecheck.log
+            ${{ runner.temp }}/frontend-build.log
+          if-no-files-found: error
+          retention-days: 3
+      - name: Enforce frontend results
+        if: always()
+        run: |
+          python ../scripts/enforce-ci-results.py \
+            "frontend_route_manifest=${{ steps.frontend_route_manifest.outcome }}" \
+            "frontend_access_tests=${{ steps.frontend_access_tests.outcome }}" \
+            "frontend_lint=${{ steps.frontend_lint.outcome }}" \
+            "frontend_debt=${{ steps.frontend_debt.outcome }}" \
+            "frontend_strategy_type=${{ steps.frontend_strategy_type.outcome }}" \
+            "frontend_user_type=${{ steps.frontend_user_type.outcome }}" \
+            "frontend_build=${{ steps.frontend_build.outcome }}"
