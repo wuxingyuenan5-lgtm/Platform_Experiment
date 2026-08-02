@@ -14,7 +14,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 TOOL_ROOT = ROOT / "scripts" / "phase3-materialize"
-PATCH_ROOT = TOOL_ROOT / "patches"
+PATCH_ROOT = Path(os.environ.get("RUNNER_TEMP", "/tmp")) / "patches"
 WEB = ROOT / "platform-web"
 EVIDENCE = Path(os.environ.get("RUNNER_TEMP", "/tmp")) / "phase3-materialize-evidence"
 BRANCH = "refactor/platform-0-9-3-codebase-and-build-simplification"
@@ -38,8 +38,9 @@ def ensure_patches() -> None:
     if not parts:
         raise FileNotFoundError("phase3 materializer payload parts")
     raw = b"".join(path.read_bytes() for path in parts)
+    PATCH_ROOT.parent.mkdir(parents=True, exist_ok=True)
     with tarfile.open(fileobj=io.BytesIO(raw), mode="r:gz") as archive:
-        archive.extractall(TOOL_ROOT)
+        archive.extractall(PATCH_ROOT.parent)
 
 
 def run(*args: str, cwd: Path = ROOT, capture: bool = False, env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
