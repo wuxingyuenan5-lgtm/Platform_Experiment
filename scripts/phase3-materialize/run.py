@@ -88,30 +88,55 @@ import { commonConfig } from './common';
 '''
 push_anchor = '''    git("push", "origin", f"HEAD:{BRANCH}")
 '''
-push_replacement = '''    snapshot_root = EVIDENCE / "commit-snapshots"
-    snapshot_root.mkdir(parents=True, exist_ok=True)
-    reconstruction = {
-        "schema_version": 1,
-        "base_head": EXPECTED_HEAD,
-        "validated_final_head": final_head,
-        "commits": [],
-    }
+push_replacement = '''    import base64
+    import urllib.request
+
+    token = os.environ.get("GH_TOKEN")
+    repository = os.environ.get("GITHUB_REPOSITORY")
+    if not token or not repository:
+        raise RuntimeError("GH_TOKEN and GITHUB_REPOSITORY are required for detached Git object publication")
+
+    api_root = f"https://api.github.com/repos/{repository}/git"
+
+    def github_json(method, url, payload=None):
+        data = None if payload is None else json.dumps(payload).encode("utf-8")
+        request = urllib.request.Request(
+            url,
+            data=data,
+            method=method,
+            headers={
+                "Accept": "application/vnd.github+json",
+                "Authorization": f"Bearer {token}",
+                "X-GitHub-Api-Version": "2022-11-28",
+                "User-Agent": "platform-phase3-materializer",
+            },
+        )
+        with urllib.request.urlopen(request, timeout=120) as response:
+            return json.loads(response.read().decode("utf-8"))
+
+    remote_parent = EXPECTED_HEAD
+    remote_base_tree = git(
+        "rev-parse",
+        f"{EXPECTED_HEAD}^{{tree}}",
+        capture=True,
+    ).stdout.strip()
+    published_commits = []
+
     for commit_index, commit_record in enumerate(real_commits, start=1):
-        commit_sha = commit_record["sha"]
-        parent_sha = git("rev-parse", f"{commit_sha}^", capture=True).stdout.strip()
+        local_sha = commit_record["sha"]
+        local_parent = git("rev-parse", f"{local_sha}^", capture=True).stdout.strip()
         changed = git(
             "diff-tree",
             "--no-commit-id",
             "--name-status",
             "-r",
             "-M",
-            parent_sha,
-            commit_sha,
+            local_parent,
+            local_sha,
             capture=True,
         ).stdout
-        commit_dir = snapshot_root / f"{commit_index:02d}"
-        files_dir = commit_dir / "files"
-        entries = []
+        tree_entries = []
+
         for raw_line in changed.splitlines():
             if not raw_line.strip():
                 continue
@@ -120,55 +145,98 @@ push_replacement = '''    snapshot_root = EVIDENCE / "commit-snapshots"
             if status_code.startswith("R") or status_code.startswith("C"):
                 old_path = parts[1]
                 path = parts[2]
-                entries.append({"action": "delete", "path": old_path, "status": status_code})
+                if status_code.startswith("R"):
+                    tree_entries.append(
+                        {"path": old_path, "mode": "100644", "type": "blob", "sha": None}
+                    )
             else:
                 path = parts[1]
+
             if status_code == "D":
-                entries.append({"action": "delete", "path": path, "status": status_code})
+                tree_entries.append(
+                    {"path": path, "mode": "100644", "type": "blob", "sha": None}
+                )
                 continue
-            tree_line = git("ls-tree", commit_sha, "--", path, capture=True).stdout.strip()
+
+            tree_line = git("ls-tree", local_sha, "--", path, capture=True).stdout.strip()
             if not tree_line:
-                raise RuntimeError(f"missing tree entry for {commit_sha}:{path}")
+                raise RuntimeError(f"missing tree entry for {local_sha}:{path}")
             metadata, listed_path = tree_line.split("\\t", 1)
-            mode, object_type, object_sha = metadata.split()
-            if listed_path != path:
-                raise RuntimeError(f"unexpected tree path {listed_path} for {path}")
-            file_target = files_dir / path
-            file_target.parent.mkdir(parents=True, exist_ok=True)
+            mode, object_type, _local_blob_sha = metadata.split()
+            if listed_path != path or object_type != "blob":
+                raise RuntimeError(f"unexpected tree entry for {local_sha}:{path}")
             blob = subprocess.run(
-                ["git", "show", f"{commit_sha}:{path}"],
+                ["git", "show", f"{local_sha}:{path}"],
                 cwd=ROOT,
                 check=True,
                 capture_output=True,
             ).stdout
-            file_target.write_bytes(blob)
-            entries.append(
+            blob_response = github_json(
+                "POST",
+                f"{api_root}/blobs",
                 {
-                    "action": "upsert",
+                    "content": base64.b64encode(blob).decode("ascii"),
+                    "encoding": "base64",
+                },
+            )
+            tree_entries.append(
+                {
                     "path": path,
-                    "status": status_code,
                     "mode": mode,
                     "type": object_type,
-                    "source_blob_sha": object_sha,
-                    "artifact_file": str(file_target.relative_to(EVIDENCE)),
+                    "sha": blob_response["sha"],
                 }
             )
-        commit_manifest = {
-            "index": commit_index,
-            "source_sha": commit_sha,
-            "source_parent_sha": parent_sha,
-            "message": commit_record["message"],
-            "entries": entries,
-        }
-        (commit_dir / "manifest.json").write_text(
-            json.dumps(commit_manifest, ensure_ascii=False, indent=2),
-            encoding="utf-8",
+
+        tree_response = github_json(
+            "POST",
+            f"{api_root}/trees",
+            {"base_tree": remote_base_tree, "tree": tree_entries},
         )
-        reconstruction["commits"].append(commit_manifest)
-    (EVIDENCE / "reconstruction.json").write_text(
-        json.dumps(reconstruction, ensure_ascii=False, indent=2),
+        commit_response = github_json(
+            "POST",
+            f"{api_root}/commits",
+            {
+                "message": commit_record["message"],
+                "tree": tree_response["sha"],
+                "parents": [remote_parent],
+            },
+        )
+        published_commits.append(
+            {
+                "index": commit_index,
+                "message": commit_record["message"],
+                "validated_local_sha": local_sha,
+                "remote_sha": commit_response["sha"],
+                "tree_sha": tree_response["sha"],
+            }
+        )
+        remote_parent = commit_response["sha"]
+        remote_base_tree = tree_response["sha"]
+
+    remote_check = git(
+        "ls-remote",
+        "origin",
+        f"refs/heads/{BRANCH}",
+        capture=True,
+    ).stdout.strip().split()[0]
+    if remote_check != EXPECTED_HEAD:
+        raise RuntimeError(
+            f"remote head changed during detached publication: expected {EXPECTED_HEAD}, got {remote_check}"
+        )
+
+    publication = {
+        "schema_version": 1,
+        "base_head": EXPECTED_HEAD,
+        "validated_local_final_head": final_head,
+        "remote_final_commit": remote_parent,
+        "commits": published_commits,
+    }
+    (EVIDENCE / "remote-commit-chain.json").write_text(
+        json.dumps(publication, ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
+    print(json.dumps(publication, ensure_ascii=False, indent=2))
 '''
 if source.count(intermediate_gate) != 1:
     raise RuntimeError("expected exactly one intermediate boundary-gate block")
