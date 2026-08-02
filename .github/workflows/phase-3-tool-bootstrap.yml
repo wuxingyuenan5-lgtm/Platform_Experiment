@@ -1,0 +1,37 @@
+name: Phase 3 Tool Bootstrap
+
+on:
+  push:
+    branches:
+      - refactor/platform-0-9-3-codebase-and-build-simplification
+    paths:
+      - '.github/workflows/phase-3-tool-bootstrap.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  pnpm-tool:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.9
+          run_install: false
+      - name: Export exact pnpm executable
+        shell: bash
+        run: |
+          set -euo pipefail
+          command -v pnpm
+          pnpm --version
+          mkdir -p "$RUNNER_TEMP/phase3-tool"
+          cp -L "$(command -v pnpm)" "$RUNNER_TEMP/phase3-tool/pnpm"
+          chmod +x "$RUNNER_TEMP/phase3-tool/pnpm"
+          printf '%s\n' "$(pnpm --version)" > "$RUNNER_TEMP/phase3-tool/version.txt"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: phase3-pnpm-9-15-9
+          path: ${{ runner.temp }}/phase3-tool/
+          if-no-files-found: error
+          retention-days: 1
