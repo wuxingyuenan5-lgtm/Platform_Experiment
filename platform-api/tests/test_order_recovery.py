@@ -248,7 +248,7 @@ def test_recovery_synchronizes_platform_order_and_trade_command(
 
     assert recovered.status_code == 200
     assert recovered.json()["status"] == expected_status
-    assert command_after.json))["status"] == expected_status
+    assert command_after.json()["status"] == expected_status
 
 
 def test_partial_fill_recovery_is_decimal_exact_and_idempotent(
