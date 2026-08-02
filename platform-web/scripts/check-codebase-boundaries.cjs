@@ -6,6 +6,7 @@ const { checkRegistry } = require('./formal-view-registry.cjs');
 const root = path.resolve(__dirname, '..');
 const read = (relative) => fs.readFileSync(path.join(root, relative), 'utf8');
 const exists = (relative) => fs.existsSync(path.join(root, relative));
+const lineCount = (relative) => read(relative).split(/\r?\n/).length;
 const fail = (message) => { throw new Error(`[codebase-boundary] ${message}`); };
 const assert = (condition, message) => { if (!condition) fail(message); };
 
@@ -46,6 +47,30 @@ assert(!helper.includes('import.meta.glob'), 'runtime View Glob authority return
 assert(!helper.includes('@ts-nocheck'), 'routeHelper.ts returned to @ts-nocheck');
 assert(helper.includes('resolveViewComponent'), 'runtime routes do not use the typed View Registry');
 assert(helper.includes('return EXCEPTION_COMPONENT;'), 'missing dynamic View key is not fail-closed');
+
+const hedgeBoardShell = 'src/views/hedgeBoard/index.vue';
+const hedgeBoardOwners = [
+  'src/views/hedgeBoard/composables/useHedgeBoardPage.ts',
+  'src/views/hedgeBoard/charts/chartCore.ts',
+  'src/views/hedgeBoard/charts/chartRange.ts',
+  'src/views/hedgeBoard/charts/DualAxisChart.ts',
+  'src/views/hedgeBoard/charts/TreasuryFlowChart.ts',
+  'src/views/hedgeBoard/charts/EtfResearchPanels.ts',
+  'src/views/hedgeBoard/charts/LocalChartWidget.ts',
+  'src/views/hedgeBoard/hedgeBoard.less',
+];
+assert(lineCount(hedgeBoardShell) <= 700, 'Hedge Board page shell exceeds 700 lines');
+for (const relative of hedgeBoardOwners) {
+  assert(exists(relative), `Hedge Board owner is missing: ${relative}`);
+  assert(lineCount(relative) <= 500, `Hedge Board owner exceeds 500 lines: ${relative}`);
+}
+const hedgeBoardSource = read(hedgeBoardShell);
+assert(hedgeBoardSource.includes('useHedgeBoardPage'), 'Hedge Board page state owner is not wired');
+assert(hedgeBoardSource.includes('LocalChartWidget'), 'Hedge Board chart owner is not wired');
+assert(hedgeBoardSource.includes('src="./hedgeBoard.less"'), 'Hedge Board style owner is not wired');
+for (const legacyOwner of ['GroupedBarChart', 'SnapshotDetailTable', 'LOCAL_MARKET_DETAIL_TABLES']) {
+  assert(!hedgeBoardSource.includes(legacyOwner), `Hedge Board legacy owner remains in page shell: ${legacyOwner}`);
+}
 
 const registryResult = checkRegistry({ root });
 for (const entry of registryResult.entries) {
