@@ -99,7 +99,7 @@ def _fill_events(
         )
     if events:
         return events
-    if order.filled_quantity > 0 and order.average_fil_price is not None:
+    if order.filled_quantity > 0 and order.average_fill_price is not None:
         return [
             ExecutionEvent(
                 event_id=_event_id(record.command_id, "fill", order.external_order_id),
@@ -119,7 +119,7 @@ def _events_from_venue(
     record: RuntimeCommandRecord,
     gateway: ExecutionGateway,
     order: VenueOrderSnapshot,
-) > list[ExecutionEvent]:
+) -> list[ExecutionEvent]:
     _validate_order(record, order)
     if order.status == "unknown":
         return []
@@ -155,7 +155,7 @@ def recover_command(
     *,
     gateway: ExecutionGateway,
     now: datetime | None = None,
-) > list[ExecutionEvent]:
+) -> list[ExecutionEvent]:
     """Recover one uncertain command from venue facts without resubmitting it."""
 
     record = get_command(command_id)
