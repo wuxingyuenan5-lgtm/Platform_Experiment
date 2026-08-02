@@ -23,7 +23,6 @@ def classify(message: str, entries: list[dict[str, str]]) -> str:
 _CORE.classify = classify
 AuditError = _CORE.AuditError
 audit = _CORE.audit
-render_markdown = _CORE.render_markdown
 main = _CORE.main
 
 if __name__ == "__main__":
