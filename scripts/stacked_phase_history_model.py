@@ -20,7 +20,7 @@ CATEGORIES = {
     "unexpected",
 }
 CONVENTIONAL_SUBJECT = re.compile(
-    r"^(?P<kind>refactor|fix|test|ci|docs|chore|governance)"
+    r"^(?P<kind>refactor|fix|test|perf|ci|docs|chore|governance)"
     r"(?:\([^)]+\))?!?:\s+(?P<summary>.+)$",
     re.IGNORECASE,
 )
@@ -37,6 +37,7 @@ MIGRATION_WORDS = ("migrate", "caller", "consumer", "call site", "adopt")
 REMOVAL_WORDS = ("remove", "delete", "retire", "drop", "cleanup", "clean up", "exit")
 BASELINE_WORDS = ("architecture baseline", "hotspot", "dependency graph", "import graph")
 EVIDENCE_WORDS = ("evidence", "snapshot", "artifact", "metrics", "inventory")
+PERFORMANCE_EVIDENCE_WORDS = ("performance", "benchmark", "critical path", "baseline")
 TRANSPORT_WORDS = ("transport", "publish", "materializ", "payload", "blob", "trigger")
 
 
@@ -63,7 +64,12 @@ def is_temporary_path(path: str) -> bool:
 
 
 def is_governance_path(path: str) -> bool:
-    return path.startswith(GOVERNANCE_PREFIXES)
+    if path.startswith(GOVERNANCE_PREFIXES):
+        return True
+    return (
+        path.startswith("platform-web/scripts/verify-")
+        and path.endswith("-layout.cjs")
+    )
 
 
 def is_test_path(path: str) -> bool:
@@ -106,6 +112,10 @@ def classify(
         is_governance_path(path) for path in paths
     ):
         return "evidence"
+    if kind == "perf" and all(is_governance_path(path) for path in paths):
+        if any(word in summary for word in PERFORMANCE_EVIDENCE_WORDS):
+            return "evidence"
+        return "unexpected"
     if kind == "docs":
         return "documentation"
     if kind in {"ci", "governance"}:
