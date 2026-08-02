@@ -5,9 +5,11 @@ on:
     branches:
       - main
       - refactor/platform-0-9-3-repository-and-context-optimization
+      - refactor/platform-0-9-3-codebase-and-build-simplification
   pull_request:
     branches:
       - main
+      - refactor/platform-0-9-3-repository-and-context-optimization
       - feature/issue-134-platform-0-9-1-unified-delivery
 
 permissions:
@@ -91,6 +93,12 @@ jobs:
         run: |
           set -o pipefail
           python scripts/context-for.py --check-budgets --json 2>&1 | tee "$RUNNER_TEMP/context-budget.json"
+      - name: Check Phase 3 codebase boundaries
+        id: codebase_boundaries
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          node platform-web/scripts/check-codebase-boundaries.cjs 2>&1 | tee "$RUNNER_TEMP/codebase-boundaries.log"
       - name: Upload repository-safety diagnostics
         if: always()
         uses: actions/upload-artifact@v4
@@ -102,6 +110,7 @@ jobs:
             ${{ runner.temp }}/documentation-consistency.log
             ${{ runner.temp }}/active-naming-consistency.log
             ${{ runner.temp }}/context-budget.json
+            ${{ runner.temp }}/codebase-boundaries.log
           if-no-files-found: error
           retention-days: 3
       - name: Enforce repository-safety results
@@ -112,6 +121,7 @@ jobs:
           test "${{ steps.documentation.outcome }}" = "success"
           test "${{ steps.active_naming.outcome }}" = "success"
           test "${{ steps.context_budget.outcome }}" = "success"
+          test "${{ steps.codebase_boundaries.outcome }}" = "success"
 
   execution-runtime:
     needs: changes
