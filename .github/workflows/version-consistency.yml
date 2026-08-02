@@ -26,6 +26,7 @@ on:
       - README.md
       - docs/README.md
       - docs/codex/current-state.md
+      - scripts/phase3-materialize/**
       - scripts/check-version-consistency.py
       - scripts/bump-version.py
       - platform-api/tests/test_architecture_version_consistency.py
