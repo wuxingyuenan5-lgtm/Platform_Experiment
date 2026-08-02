@@ -14,6 +14,14 @@ apply_anchor = '''        apply_patch(patch, patches)
 apply_replacement = '''        apply_patch(patch, patches)
         if index == 1:
             shutil.rmtree(WEB / "apps" / "test-server", ignore_errors=True)
+        if index == 6:
+            state_path = ROOT / "docs" / "codex" / "current-state.md"
+            state_text = state_path.read_text(encoding="utf-8")
+            old_authority = "GitHub PR #148 owns the active Phase 3 HEAD, CI and review evidence."
+            new_authority = "GitHub PR #148 owns the active branch, Draft PR, HEAD, CI and review state."
+            if state_text.count(old_authority) != 1:
+                raise RuntimeError("expected one Phase 3 GitHub authority sentence")
+            state_path.write_text(state_text.replace(old_authority, new_authority, 1), encoding="utf-8")
         if changes_dependencies:
 '''
 if source.count(intermediate_gate) != 1:
