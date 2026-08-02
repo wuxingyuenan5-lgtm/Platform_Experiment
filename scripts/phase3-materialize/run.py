@@ -14,6 +14,64 @@ apply_anchor = '''        apply_patch(patch, patches)
 apply_replacement = '''        apply_patch(patch, patches)
         if index == 1:
             shutil.rmtree(WEB / "apps" / "test-server", ignore_errors=True)
+        if index == 2:
+            application_path = WEB / "internal" / "vite-config" / "src" / "config" / "application.ts"
+            application_text = application_path.read_text(encoding="utf-8")
+            old_application = """    const { VITE_PUBLIC_PATH, VITE_BUILD_COMPRESS, VITE_ENABLE_ANALYZE } = loadEnv(
+      mode,
+      root,
+    );
+"""
+            new_application = """    const { VITE_PUBLIC_PATH, VITE_BUILD_COMPRESS, VITE_ENABLE_ANALYZE } = loadEnv(mode, root);
+"""
+            if application_text.count(old_application) != 1:
+                raise RuntimeError("expected Phase 3 application loadEnv formatting target")
+            application_path.write_text(
+                application_text.replace(old_application, new_application, 1),
+                encoding="utf-8",
+            )
+
+            package_path = WEB / "internal" / "vite-config" / "src" / "config" / "package.ts"
+            package_text = package_path.read_text(encoding="utf-8")
+            old_package = """import { defineConfig, mergeConfig, type UserConfig } from 'vite';
+import { commonConfig } from './common';
+"""
+            new_package = """import { defineConfig, mergeConfig, type UserConfig } from 'vite';
+
+import { commonConfig } from './common';
+"""
+            if package_text.count(old_package) != 1:
+                raise RuntimeError("expected Phase 2 package import-order lint target")
+            package_path.write_text(
+                package_text.replace(old_package, new_package, 1),
+                encoding="utf-8",
+            )
+
+            modify_vars_path = WEB / "internal" / "vite-config" / "src" / "utils" / "modifyVars.ts"
+            modify_vars_text = modify_vars_path.read_text(encoding="utf-8")
+            old_modify_vars = """  return source.replace(/@import(?:\\s+\\(reference\\))?\\s+['\"]([^'\"]+)['\"];?/g, (_match, importPath) => {
+    if (importPath.startsWith('~')) {
+      return '';
+    }
+    return inlineLessReferences(resolveLessImport(currentDir, importPath), seen);
+  });
+"""
+            new_modify_vars = """  return source.replace(
+    /@import(?:\\s+\\(reference\\))?\\s+['\"]([^'\"]+)['\"];?/g,
+    (_match, importPath) => {
+      if (importPath.startsWith('~')) {
+        return '';
+      }
+      return inlineLessReferences(resolveLessImport(currentDir, importPath), seen);
+    },
+  );
+"""
+            if modify_vars_text.count(old_modify_vars) != 1:
+                raise RuntimeError("expected Phase 2 modifyVars Prettier lint target")
+            modify_vars_path.write_text(
+                modify_vars_text.replace(old_modify_vars, new_modify_vars, 1),
+                encoding="utf-8",
+            )
         if index == 6:
             state_path = ROOT / "docs" / "codex" / "current-state.md"
             state_text = state_path.read_text(encoding="utf-8")
