@@ -85,6 +85,12 @@ jobs:
         run: |
           set -o pipefail
           python scripts/check-active-naming-consistency.py 2>&1 | tee "$RUNNER_TEMP/active-naming-consistency.log"
+      - name: Check bounded AI context budgets
+        id: context_budget
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          python scripts/context-for.py --check-budgets --json 2>&1 | tee "$RUNNER_TEMP/context-budget.json"
       - name: Upload repository-safety diagnostics
         if: always()
         uses: actions/upload-artifact@v4
@@ -95,6 +101,7 @@ jobs:
             ${{ runner.temp }}/repository-structure.log
             ${{ runner.temp }}/documentation-consistency.log
             ${{ runner.temp }}/active-naming-consistency.log
+            ${{ runner.temp }}/context-budget.json
           if-no-files-found: error
           retention-days: 3
       - name: Enforce repository-safety results
@@ -104,6 +111,7 @@ jobs:
           test "${{ steps.structure.outcome }}" = "success"
           test "${{ steps.documentation.outcome }}" = "success"
           test "${{ steps.active_naming.outcome }}" = "success"
+          test "${{ steps.context_budget.outcome }}" = "success"
 
   execution-runtime:
     needs: changes

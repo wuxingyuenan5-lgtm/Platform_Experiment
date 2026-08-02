@@ -26,7 +26,6 @@ on:
       - 'platform-web/src/views/hedgeBoard/**'
       - 'docs/operations/HEDGE_BOARD_ACCEPTANCE.md'
       - 'docs/operations/PLATFORM_0_9_1_LOCAL_ACCEPTANCE_HANDOFF.md'
-      - 'tasks/issue-134-platform-0-9-1-unified-delivery.md'
       - 'platform-api/app/auth.py'
       - 'platform-api/app/config.py'
       - 'platform-api/app/main.py'

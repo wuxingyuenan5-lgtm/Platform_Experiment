@@ -66,6 +66,7 @@ jobs:
         run: |
           mkdir -p "${PLATFORM_AUDIT_OUTPUT}/context-packs"
           python scripts/context-for.py --list > "${PLATFORM_AUDIT_OUTPUT}/context-packs/index.txt"
+          python scripts/context-for.py --check-budgets --json > "${PLATFORM_AUDIT_OUTPUT}/context-packs/budgets.json"
           for pack in hedge-style research-field identity-permission member-contract trading-display research-provider user-e2e; do
             python scripts/context-for.py "$pack" --json > "${PLATFORM_AUDIT_OUTPUT}/context-packs/${pack}.json"
           done
@@ -83,6 +84,8 @@ jobs:
           ]
           for path in sorted(root.glob("*.json")):
               data = json.loads(path.read_text(encoding="utf-8"))
+              if "task" not in data:
+                  continue
               lines.append(
                   f"| `{data['task']}` | {data['file_count']} | "
                   f"{data['line_count']} | {data['estimated_tokens']} |"
