@@ -4,7 +4,7 @@ from fastapi.testclient import TestClient
 
 from app.config import get_settings
 from app.journal import claim_command, initialize_journal
-from app.main import app
+from app.main import app, create_app
 from app.models import ExecutionEvent, SubmitOrderCommand
 
 
@@ -31,7 +31,6 @@ def test_only_one_caller_can_claim_a_runtime_command(tmp_path: Path) -> None:
 
 
 def test_duplicate_http_command_reuses_events_without_second_gateway_call(
-    monkeypatch,
     tmp_path: Path,
 ) -> None:
     get_settings().journal_path = str(tmp_path / "http-claim.db")
@@ -54,10 +53,9 @@ def test_duplicate_http_command_reuses_events_without_second_gateway_call(
             ]
 
     gateway = CountingGateway()
-    monkeypatch.setattr("app.main.gateway", gateway)
     payload = build_command().model_dump(mode="json")
 
-    with TestClient(app) as client:
+    with TestClient(create_app(gateway)) as client:
         first = client.post("/commands/orders", json=payload)
         second = client.post("/commands/orders", json=payload)
 
