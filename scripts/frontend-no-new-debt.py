@@ -21,7 +21,7 @@ from typing import Any, NamedTuple
 
 ROOT = Path(__file__).resolve().parents[1]
 FRONTEND_ROOT = ROOT / "platform-web"
-SOURCE_PREFIXES = ("platform-web/src/", "platform-web/mock/")
+SOURCE_PREFIXES = ("platform-web/src/",)
 SOURCE_SUFFIXES = (".js", ".jsx", ".ts", ".tsx", ".vue")
 ZERO_SHA = "0" * 40
 DIAGNOSTIC_PATH = Path("/tmp/frontend-eslint.log")

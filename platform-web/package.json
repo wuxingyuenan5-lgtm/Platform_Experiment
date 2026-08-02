@@ -24,7 +24,7 @@
     "preinstall": "npx only-allow pnpm",
     "postinstall": "turbo run stub",
     "lint": "turbo run lint",
-    "lint:eslint": "eslint --cache --max-warnings 0  \"{src,mock}/**/*.{vue,ts,tsx}\" --fix",
+    "lint:eslint": "eslint --cache --max-warnings 0 \"src/**/*.{vue,ts,tsx}\" --fix",
     "lint:prettier": "prettier --write .",
     "lint:stylelint": "stylelint \"**/*.{vue,css,less,scss}\" --fix --cache --cache-location node_modules/.cache/stylelint/",
     "prepare": "husky install",
