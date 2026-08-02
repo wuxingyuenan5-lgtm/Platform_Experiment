@@ -8,6 +8,8 @@ const marketTerminalPagePath = path.join(viewRoot, 'components', 'MarketTerminal
 const hedgeBoardSubnavPath = path.join(viewRoot, 'components', 'HedgeBoardSubnav.vue');
 const hedgeResearchModulePath = path.join(viewRoot, 'components', 'HedgeResearchModule.vue');
 const terminalDetailPanelPath = path.join(viewRoot, 'components', 'TerminalDetailPanel.vue');
+const localChartWidgetPath = path.join(viewRoot, 'charts', 'LocalChartWidget.ts');
+const dualAxisChartPath = path.join(viewRoot, 'charts', 'DualAxisChart.ts');
 const widgetErrorBoundaryPath = path.join(
   viewRoot,
   'components',
@@ -59,6 +61,7 @@ const stockSnapshotPath = path.join(
   'StockSnapshotSection.vue',
 );
 const macroExpectationPath = path.join(viewRoot, 'macro', 'MacroExpectationPanel.vue');
+const hedgeBoardPageComposablePath = path.join(viewRoot, 'composables', 'useHedgeBoardPage.ts');
 const routePath = path.join(__dirname, '..', 'src', 'router', 'routes', 'modules', 'hedge.ts');
 const uiGuidelinesPath = path.join(__dirname, '..', 'docs', 'design', 'platform-ui-guidelines.md');
 
@@ -66,6 +69,8 @@ const hedgeBoardSource = fs.readFileSync(hedgeBoardPagePath, 'utf8');
 const hedgeBoardSubnavSource = fs.readFileSync(hedgeBoardSubnavPath, 'utf8');
 const hedgeResearchModuleSource = fs.readFileSync(hedgeResearchModulePath, 'utf8');
 const terminalDetailPanelSource = fs.readFileSync(terminalDetailPanelPath, 'utf8');
+const localChartWidgetSource = fs.readFileSync(localChartWidgetPath, 'utf8');
+const dualAxisChartSource = fs.readFileSync(dualAxisChartPath, 'utf8');
 const widgetErrorBoundarySource = fs.readFileSync(widgetErrorBoundaryPath, 'utf8');
 const metricStripSource = fs.readFileSync(metricStripPath, 'utf8');
 const reserveRankingSource = fs.readFileSync(reserveRankingPath, 'utf8');
@@ -81,6 +86,7 @@ const aShareMarketDetailSource = fs.readFileSync(aShareMarketDetailPath, 'utf8')
 const shenwanSectionSource = fs.readFileSync(shenwanSectionPath, 'utf8');
 const stockSnapshotSource = fs.readFileSync(stockSnapshotPath, 'utf8');
 const macroExpectationSource = fs.readFileSync(macroExpectationPath, 'utf8');
+const hedgeBoardPageComposableSource = fs.readFileSync(hedgeBoardPageComposablePath, 'utf8');
 const routeSource = fs.readFileSync(routePath, 'utf8');
 const uiGuidelinesSource = fs.readFileSync(uiGuidelinesPath, 'utf8');
 
@@ -88,6 +94,8 @@ assert(fs.existsSync(marketTerminalPagePath), 'Expected MarketTerminalPage compo
 assert(fs.existsSync(hedgeBoardSubnavPath), 'Expected HedgeBoardSubnav component to exist.');
 assert(fs.existsSync(hedgeResearchModulePath), 'Expected HedgeResearchModule component to exist.');
 assert(fs.existsSync(terminalDetailPanelPath), 'Expected TerminalDetailPanel component to exist.');
+assert(fs.existsSync(localChartWidgetPath), 'Expected LocalChartWidget formal owner to exist.');
+assert(fs.existsSync(dualAxisChartPath), 'Expected DualAxisChart formal owner to exist.');
 assert(fs.existsSync(widgetErrorBoundaryPath), 'Expected WidgetErrorBoundary component to exist.');
 assert(fs.existsSync(metricStripPath), 'Expected MetricStrip component to exist.');
 assert(fs.existsSync(reserveRankingPath), 'Expected ReserveRanking component to exist.');
@@ -111,8 +119,11 @@ assert(
   'Hedge board trading tools must use ToolGroupSection.',
 );
 assert(
-  hedgeBoardSource.includes('TerminalDetailPanel') && hedgeBoardSource.includes('TerminalDetailPanel from'),
-  'Hedge board local detail widgets must use TerminalDetailPanel.',
+  hedgeBoardSource.includes('LocalChartWidget from') &&
+    hedgeBoardSource.includes(':local-chart-widget="LocalChartWidget"') &&
+    localChartWidgetSource.includes("import TerminalDetailPanel from '../components/TerminalDetailPanel.vue';") &&
+    localChartWidgetSource.includes('return h(TerminalDetailPanel'),
+  'Hedge board local detail widgets must delegate through LocalChartWidget to TerminalDetailPanel.',
 );
 assert(
   hedgeBoardSource.includes(
@@ -135,9 +146,11 @@ assert(
   'WidgetErrorBoundary must preserve the original error isolation, root class and fallback copy.',
 );
 assert(
-  hedgeBoardSource.includes("import MetricStrip from './components/MetricStrip';") &&
-    !hedgeBoardSource.includes('const MetricStrip = defineComponent'),
-  'Hedge board must delegate metric strip rendering to the external component.',
+  hedgeBoardSource.includes('LocalChartWidget from') &&
+    localChartWidgetSource.includes("import DualAxisChart from './DualAxisChart';") &&
+    dualAxisChartSource.includes("import MetricStrip from '../components/MetricStrip';") &&
+    dualAxisChartSource.includes('h(MetricStrip'),
+  'Hedge board chart owners must delegate metric strip rendering to MetricStrip.',
 );
 assert(
   metricStripSource.includes("name: 'MetricStrip'") &&
@@ -151,9 +164,10 @@ assert(
   'MetricStrip must preserve its prop type, root class, item hierarchy and stable key.',
 );
 assert(
-  hedgeBoardSource.includes("import ReserveRanking from './components/ReserveRanking';") &&
-    !hedgeBoardSource.includes('const ReserveRanking = defineComponent'),
-  'Hedge board must delegate reserve ranking rendering to the external component.',
+  hedgeBoardSource.includes('LocalChartWidget from') &&
+    localChartWidgetSource.includes("import ReserveRanking from '../components/ReserveRanking';") &&
+    localChartWidgetSource.includes('return h(ReserveRanking'),
+  'Hedge board local chart owner must delegate reserve ranking rendering to ReserveRanking.',
 );
 assert(
   reserveRankingSource.includes("name: 'ReserveRanking'") &&
@@ -227,9 +241,9 @@ assert(
 assert(
   !hedgeBoardSource.includes('chart-shell__link-overlay') &&
     !hedgeBoardSource.includes('etf-weekly-panel__link') &&
-    hedgeBoardSource.includes("'etf-weekly-flows': ETF_REFERENCE_URL") &&
-    hedgeBoardSource.includes("'etf-ytd-summary': ETF_REFERENCE_URL"),
-  'ETF source links must be provided through the widget header, not overlaid inside chart shells.',
+    hedgeBoardPageComposableSource.includes("'etf-weekly-flows': ETF_REFERENCE_URL") &&
+    hedgeBoardPageComposableSource.includes("'etf-ytd-summary': ETF_REFERENCE_URL"),
+  'ETF source links must be provided through the widget header owner, not chart overlays.',
 );
 assert(
   tradingToolCatalogSource.includes("await import('./marketTools')") &&
