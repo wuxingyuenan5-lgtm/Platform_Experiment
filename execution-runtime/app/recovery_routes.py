@@ -3,6 +3,7 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException
 
 from app.gateway import ExecutionGateway
+from app.journal import JournalEventError
 from app.runtime_contracts import RuntimeExecutionEventV1, version_execution_events
 from app.runtime_recovery import (
     RecoveryCommandNotFoundError,
@@ -29,7 +30,7 @@ def create_recovery_router(*, gateway: ExecutionGateway) -> APIRouter:
             raise HTTPException(
                 status_code=409, detail="Runtime command is not recoverable yet"
             ) from exc
-        except RecoveryEvidenceMismatchError as exc:
+        except (RecoveryEvidenceMismatchError, JournalEventError) as exc:
             raise HTTPException(status_code=502, detail=str(exc)) from exc
 
     return router
