@@ -86,11 +86,101 @@ import { commonConfig } from './common';
             state_path.write_text(state_text, encoding="utf-8")
         if changes_dependencies:
 '''
+push_anchor = '''    git("push", "origin", f"HEAD:{BRANCH}")
+'''
+push_replacement = '''    snapshot_root = EVIDENCE / "commit-snapshots"
+    snapshot_root.mkdir(parents=True, exist_ok=True)
+    reconstruction = {
+        "schema_version": 1,
+        "base_head": EXPECTED_HEAD,
+        "validated_final_head": final_head,
+        "commits": [],
+    }
+    for commit_index, commit_record in enumerate(real_commits, start=1):
+        commit_sha = commit_record["sha"]
+        parent_sha = git("rev-parse", f"{commit_sha}^", capture=True).stdout.strip()
+        changed = git(
+            "diff-tree",
+            "--no-commit-id",
+            "--name-status",
+            "-r",
+            "-M",
+            parent_sha,
+            commit_sha,
+            capture=True,
+        ).stdout
+        commit_dir = snapshot_root / f"{commit_index:02d}"
+        files_dir = commit_dir / "files"
+        entries = []
+        for raw_line in changed.splitlines():
+            if not raw_line.strip():
+                continue
+            parts = raw_line.split("\\t")
+            status_code = parts[0]
+            if status_code.startswith("R") or status_code.startswith("C"):
+                old_path = parts[1]
+                path = parts[2]
+                entries.append({"action": "delete", "path": old_path, "status": status_code})
+            else:
+                path = parts[1]
+            if status_code == "D":
+                entries.append({"action": "delete", "path": path, "status": status_code})
+                continue
+            tree_line = git("ls-tree", commit_sha, "--", path, capture=True).stdout.strip()
+            if not tree_line:
+                raise RuntimeError(f"missing tree entry for {commit_sha}:{path}")
+            metadata, listed_path = tree_line.split("\\t", 1)
+            mode, object_type, object_sha = metadata.split()
+            if listed_path != path:
+                raise RuntimeError(f"unexpected tree path {listed_path} for {path}")
+            file_target = files_dir / path
+            file_target.parent.mkdir(parents=True, exist_ok=True)
+            blob = subprocess.run(
+                ["git", "show", f"{commit_sha}:{path}"],
+                cwd=ROOT,
+                check=True,
+                capture_output=True,
+            ).stdout
+            file_target.write_bytes(blob)
+            entries.append(
+                {
+                    "action": "upsert",
+                    "path": path,
+                    "status": status_code,
+                    "mode": mode,
+                    "type": object_type,
+                    "source_blob_sha": object_sha,
+                    "artifact_file": str(file_target.relative_to(EVIDENCE)),
+                }
+            )
+        commit_manifest = {
+            "index": commit_index,
+            "source_sha": commit_sha,
+            "source_parent_sha": parent_sha,
+            "message": commit_record["message"],
+            "entries": entries,
+        }
+        (commit_dir / "manifest.json").write_text(
+            json.dumps(commit_manifest, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+        reconstruction["commits"].append(commit_manifest)
+    (EVIDENCE / "reconstruction.json").write_text(
+        json.dumps(reconstruction, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+'''
 if source.count(intermediate_gate) != 1:
     raise RuntimeError("expected exactly one intermediate boundary-gate block")
 if source.count(apply_anchor) != 1:
     raise RuntimeError("expected exactly one patch application anchor")
-source = source.replace(intermediate_gate, "", 1).replace(apply_anchor, apply_replacement, 1)
+if source.count(push_anchor) != 1:
+    raise RuntimeError("expected exactly one materializer push anchor")
+source = (
+    source.replace(intermediate_gate, "", 1)
+    .replace(apply_anchor, apply_replacement, 1)
+    .replace(push_anchor, push_replacement, 1)
+)
 namespace = {"__file__": str(implementation), "__name__": "__main__"}
 evidence = Path(os.environ.get("RUNNER_TEMP", "/tmp")) / "phase3-materialize-evidence"
 try:
