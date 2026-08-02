@@ -1,0 +1,36 @@
+name: Phase 3-R1 Blob Publisher
+
+on:
+  push:
+    branches:
+      - refactor/platform-0-9-3-codebase-and-build-simplification
+    paths:
+      - '.github/workflows/phase3-r1-blob-publisher.yml'
+      - '.github/workflows/phase3-r1-publisher/**'
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Publish deterministic R1 blobs without moving refs
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: >-
+          python .github/workflows/phase3-r1-publisher/publish.py
+          --output "$RUNNER_TEMP/phase3-r1-blobs.json"
+      - name: Upload blob map
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase3-r1-blob-map
+          path: ${{ runner.temp }}/phase3-r1-blobs.json
+          if-no-files-found: error
+          retention-days: 3
