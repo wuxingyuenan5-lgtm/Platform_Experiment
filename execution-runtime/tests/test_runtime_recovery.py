@@ -223,3 +223,63 @@ def test_stale_processing_command_can_recover_without_submission(tmp_path: Path)
     assert response.status_code == 200
     assert [event["event_type"] for event in response.json()] == ["order_acknowledged"]
     assert gateway.submit_calls == 0
+
+
+def test_recovery_rejects_fill_from_different_external_order(tmp_path: Path) -> None:
+    gateway = RecoveryGateway()
+    create_unknown_command(tmp_path, gateway)
+    gateway.order = order_snapshot("filled")
+    gateway.fills = [fill_snapshot().model_copy(update={"external_order_id": "other-order"})]
+
+    with TestClient(runtime_main.create_app(gateway)) as client:
+        response = client.post(f"/commands/{COMMAND_ID}/recover")
+
+    assert response.status_code == 502
+    assert get_events(COMMAND_ID) == []
+    assert command_status() == "result_unknown"
+    assert gateway.submit_calls == 1
+
+
+def test_recovery_rejects_incomplete_fill_facts(tmp_path: Path) -> None:
+    gateway = RecoveryGateway()
+    create_unknown_command(tmp_path, gateway)
+    gateway.order = order_snapshot("filled")
+    gateway.fills = [fill_snapshot().model_copy(update={"quantity": Decimal("1.00000000")})]
+
+    with TestClient(runtime_main.create_app(gateway)) as client:
+        response = client.post(f"/commands/{COMMAND_ID}/recover")
+
+    assert response.status_code == 502
+    assert get_events(COMMAND_ID) == []
+    assert command_status() == "result_unknown"
+
+
+def test_unsupported_fill_query_remains_result_unknown(tmp_path: Path) -> None:
+    from app.gateway_errors import GatewayQueryUnsupportedError
+
+    gateway = RecoveryGateway()
+    create_unknown_command(tmp_path, gateway)
+    gateway.order = order_snapshot("filled")
+    gateway.query_error = GatewayQueryUnsupportedError("fill query is unavailable")
+
+    with TestClient(runtime_main.create_app(gateway)) as client:
+        response = client.post(f"/commands/{COMMAND_ID}/recover")
+
+    assert response.status_code == 200
+    assert response.json() == []
+    assert get_events(COMMAND_ID) == []
+    assert command_status() == "result_unknown"
+    assert gateway.submit_calls == 1
+
+
+def test_recovery_rejects_order_execution_term_mismatch(tmp_path: Path) -> None:
+    gateway = RecoveryGateway()
+    create_unknown_command(tmp_path, gateway)
+    gateway.order = order_snapshot("accepted").model_copy(update={"side": "sell"})
+
+    with TestClient(runtime_main.create_app(gateway)) as client:
+        response = client.post(f"/commands/{COMMAND_ID}/recover")
+
+    assert response.status_code == 502
+    assert get_events(COMMAND_ID) == []
+    assert command_status() == "result_unknown"
