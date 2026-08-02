@@ -19,7 +19,30 @@ let dynamicViewsModules: Record<string, () => Promise<Recordable>>;
 
 // Dynamic introduction
 function asyncImportRoute(routes: AppRouteRecordRaw[] | undefined) {
-  dynamicViewsModules = dynamicViewsModules || import.meta.glob('../../views/**/*.{vue,tsx}');
+  dynamicViewsModules =
+    dynamicViewsModules ||
+    import.meta.glob([
+    '../../views/account/**/*.{vue,tsx}',
+    '../../views/audit/**/*.{vue,tsx}',
+    '../../views/bargain/**/*.{vue,tsx}',
+    '../../views/dashboard/**/*.{vue,tsx}',
+    '../../views/data/**/*.{vue,tsx}',
+    '../../views/finance/**/*.{vue,tsx}',
+    '../../views/financialAi/**/*.{vue,tsx}',
+    '../../views/hedgeBoard/**/*.{vue,tsx}',
+    '../../views/landing/**/*.{vue,tsx}',
+    '../../views/log/**/*.{vue,tsx}',
+    '../../views/monitor/**/*.{vue,tsx}',
+    '../../views/newsCalendar/**/*.{vue,tsx}',
+    '../../views/notification/**/*.{vue,tsx}',
+    '../../views/platform/**/*.{vue,tsx}',
+    '../../views/reports/**/*.{vue,tsx}',
+    '../../views/risk/**/*.{vue,tsx}',
+    '../../views/settings/**/*.{vue,tsx}',
+    '../../views/strategy/**/*.{vue,tsx}',
+    '../../views/sys/**/*.{vue,tsx}',
+    '../../views/users/**/*.{vue,tsx}',
+    ]);
   if (!routes) return;
   routes.forEach((item) => {
     if (!item.component && item.meta?.frameSrc) {

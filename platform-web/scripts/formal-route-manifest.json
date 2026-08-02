@@ -1,0 +1,361 @@
+{
+  "schema_version": 1,
+  "phase2_head": "cd825fe6bd9ecdf42082069b2785844eda2efac8",
+  "classification": "formal product route modules; the removed nested hooks/request module was template-only",
+  "modules": [
+    {
+      "path": "src/router/routes/modules/account.ts",
+      "sha256": "c36e039c2f853c28bdd2982505e6b64a19f124fcbffd208b004f32335c7ee499",
+      "paths": [
+        "/account",
+        "index"
+      ],
+      "names": [
+        "Account",
+        "AccountIndex"
+      ],
+      "redirects": [
+        "/account/index"
+      ],
+      "view_imports": [
+        "account/index.vue"
+      ],
+      "hide_menu_count": 0,
+      "keep_alive_count": 0
+    },
+    {
+      "path": "src/router/routes/modules/audit.ts",
+      "sha256": "e47947ae27662fd050e93654b0394340343f48d34a8f36588bf8ff43a164d2f9",
+      "paths": [
+        "/audit",
+        "index"
+      ],
+      "names": [
+        "Audit",
+        "AuditIndex"
+      ],
+      "redirects": [
+        "/audit/index"
+      ],
+      "view_imports": [
+        "audit/index.vue"
+      ],
+      "hide_menu_count": 2,
+      "keep_alive_count": 0
+    },
+    {
+      "path": "src/router/routes/modules/dashboard.ts",
+      "sha256": "5a1b102e5a1710a1b00e2d376bad74953598bc553afda63613d4849faa0fe6fa",
+      "paths": [
+        "/home",
+        "index"
+      ],
+      "names": [
+        "Home",
+        "Dashboard"
+      ],
+      "redirects": [
+        "/home/index"
+      ],
+      "view_imports": [
+        "dashboard/index.vue"
+      ],
+      "hide_menu_count": 0,
+      "keep_alive_count": 0
+    },
+    {
+      "path": "src/router/routes/modules/data.ts",
+      "sha256": "117a25703e60cbb405810280ec061ba215d60784236f2d3e6efad5e997440e33",
+      "paths": [
+        "/data",
+        "index"
+      ],
+      "names": [
+        "Data",
+        "DataIndex"
+      ],
+      "redirects": [
+        "/data/index"
+      ],
+      "view_imports": [
+        "data/index.vue"
+      ],
+      "hide_menu_count": 2,
+      "keep_alive_count": 0
+    },
+    {
+      "path": "src/router/routes/modules/finance.ts",
+      "sha256": "68b1b717ddd73f2b8cf6f1963e3b115bf2d07f24935e6612140091c21bf6ce9f",
+      "paths": [
+        "/finance",
+        "index"
+      ],
+      "names": [
+        "Finance",
+        "FinanceIndex"
+      ],
+      "redirects": [
+        "/finance/index"
+      ],
+      "view_imports": [
+        "finance/index.vue"
+      ],
+      "hide_menu_count": 2,
+      "keep_alive_count": 0
+    },
+    {
+      "path": "src/router/routes/modules/financial-ai.ts",
+      "sha256": "34a246fd8a2a3627479f4126514e1c40fd7b57e33846547ebbcd2bae1082e824",
+      "paths": [
+        "/financial-ai",
+        "index"
+      ],
+      "names": [
+        "FinancialAi",
+        "FinancialAiIndex"
+      ],
+      "redirects": [
+        "/financial-ai/index"
+      ],
+      "view_imports": [
+        "financialAi/index.vue"
+      ],
+      "hide_menu_count": 0,
+      "keep_alive_count": 0
+    },
+    {
+      "path": "src/router/routes/modules/hedge.ts",
+      "sha256": "1855944a5afd2c82f198e9666928c2fd448f9c505549f6590243d76798156ff6",
+      "paths": [
+        "/hedge-board",
+        "macro",
+        "gold",
+        "crypto",
+        "us",
+        "a-share",
+        "global",
+        "trading-tools",
+        "macro",
+        "equity",
+        "crypto",
+        "metal",
+        "quant",
+        "general"
+      ],
+      "names": [
+        "HedgeBoard",
+        "HedgeMacroBoard",
+        "HedgeGoldBoard",
+        "HedgeCryptoBoard",
+        "HedgeUsBoard",
+        "HedgeAShareBoard",
+        "HedgeGlobalBoard",
+        "HedgeTradingTools",
+        "HedgeTradingToolsMacro",
+        "HedgeTradingToolsEquity",
+        "HedgeTradingToolsCrypto",
+        "HedgeTradingToolsMetal",
+        "HedgeTradingToolsQuant",
+        "HedgeTradingToolsGeneral"
+      ],
+      "redirects": [
+        "/hedge-board/macro",
+        "/hedge-board/trading-tools/macro"
+      ],
+      "view_imports": [
+        "hedgeBoard/macro/index.vue",
+        "hedgeBoard/index.vue",
+        "hedgeBoard/index.vue",
+        "hedgeBoard/index.vue",
+        "hedgeBoard/aShare/index.vue",
+        "hedgeBoard/index.vue",
+        "hedgeBoard/tradingTools/index.vue",
+        "hedgeBoard/tradingTools/index.vue",
+        "hedgeBoard/tradingTools/index.vue",
+        "hedgeBoard/tradingTools/index.vue",
+        "hedgeBoard/tradingTools/index.vue",
+        "hedgeBoard/tradingTools/index.vue"
+      ],
+      "hide_menu_count": 0,
+      "keep_alive_count": 0
+    },
+    {
+      "path": "src/router/routes/modules/monitor.ts",
+      "sha256": "9b4a1cd244ec60e4bc405b7e68e9cd805d0e6a469d98c0ad9ff1ed0b1fa4da01",
+      "paths": [
+        "/monitor",
+        "index"
+      ],
+      "names": [
+        "Monitor",
+        "MonitorIndex"
+      ],
+      "redirects": [
+        "/monitor/index"
+      ],
+      "view_imports": [
+        "monitor/index.vue"
+      ],
+      "hide_menu_count": 2,
+      "keep_alive_count": 0
+    },
+    {
+      "path": "src/router/routes/modules/news.ts",
+      "sha256": "eb893d78476aa950f5dbd20aac6f167c690d91f18a7922bd30a090ae58f46254",
+      "paths": [
+        "/news-calendar",
+        "macro",
+        "news",
+        "wealth",
+        "calendar"
+      ],
+      "names": [
+        "NewsCalendar",
+        "NewsCalendarMacro",
+        "NewsCalendarNews",
+        "NewsCalendarWealth",
+        "NewsCalendarLegacy"
+      ],
+      "redirects": [
+        "/news-calendar/macro",
+        "/news-calendar/macro"
+      ],
+      "view_imports": [
+        "newsCalendar/index.vue",
+        "newsCalendar/index.vue",
+        "newsCalendar/index.vue"
+      ],
+      "hide_menu_count": 1,
+      "keep_alive_count": 0
+    },
+    {
+      "path": "src/router/routes/modules/notification.ts",
+      "sha256": "559782fcf7e775c27c0cc1e3550f67de4c6dd51e8fbe533de3644cb288a94630",
+      "paths": [
+        "/notification",
+        "index"
+      ],
+      "names": [
+        "Notification",
+        "notificationPage"
+      ],
+      "redirects": [
+        "/notification/index"
+      ],
+      "view_imports": [
+        "notification/index.vue"
+      ],
+      "hide_menu_count": 2,
+      "keep_alive_count": 0
+    },
+    {
+      "path": "src/router/routes/modules/reports.ts",
+      "sha256": "e928b13ac219e0ed9e343649ac96b996292f30907f79014fdf6fb58c91538a8b",
+      "paths": [
+        "/reports",
+        "index"
+      ],
+      "names": [
+        "Reports",
+        "ReportsIndex"
+      ],
+      "redirects": [
+        "/reports/index"
+      ],
+      "view_imports": [
+        "reports/index.vue"
+      ],
+      "hide_menu_count": 2,
+      "keep_alive_count": 0
+    },
+    {
+      "path": "src/router/routes/modules/risk.ts",
+      "sha256": "a35d46a1f777d064c1d49f605cb55fc754cedc1619efc61ec18af27df81a753b",
+      "paths": [
+        "/risk",
+        "detail",
+        "users",
+        "profile"
+      ],
+      "names": [
+        "Risk",
+        "RiskDetail",
+        "RiskUserManagement",
+        "RiskPersonalProfile"
+      ],
+      "redirects": [
+        "/risk/detail",
+        "/account/index"
+      ],
+      "view_imports": [
+        "risk/detail/index.vue",
+        "users/index.vue"
+      ],
+      "hide_menu_count": 1,
+      "keep_alive_count": 0
+    },
+    {
+      "path": "src/router/routes/modules/settings.ts",
+      "sha256": "3efe0f97ad5b880a75a2f02026f9f194d4c0f847e32b0ebe5dd18b6c5a3ac1fa",
+      "paths": [
+        "/settings",
+        "profile"
+      ],
+      "names": [
+        "Settings",
+        "SettingsProfile"
+      ],
+      "redirects": [
+        "/settings/profile"
+      ],
+      "view_imports": [
+        "settings/index.vue"
+      ],
+      "hide_menu_count": 2,
+      "keep_alive_count": 0
+    },
+    {
+      "path": "src/router/routes/modules/strategy.ts",
+      "sha256": "11f87a75687a6d9b1049ed114cd776067764d94f4ca1d13f170dbedde010e89a",
+      "paths": [
+        "/strategy",
+        "platform",
+        "management"
+      ],
+      "names": [
+        "Strategy",
+        "StrategyPlatform",
+        "StrategyManagement"
+      ],
+      "redirects": [
+        "/strategy/platform"
+      ],
+      "view_imports": [
+        "platform/index.vue",
+        "strategy/index.vue"
+      ],
+      "hide_menu_count": 0,
+      "keep_alive_count": 0
+    },
+    {
+      "path": "src/router/routes/modules/users.ts",
+      "sha256": "a8194ea1d459633436622a07a1a67a7f1a2edc685e071d06a92ff038563bfeea",
+      "paths": [
+        "/user",
+        "list"
+      ],
+      "names": [
+        "User",
+        "UserList"
+      ],
+      "redirects": [
+        "/user/list"
+      ],
+      "view_imports": [
+        "users/index.vue"
+      ],
+      "hide_menu_count": 2,
+      "keep_alive_count": 0
+    }
+  ]
+}

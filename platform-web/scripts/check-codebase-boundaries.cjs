@@ -1,0 +1,73 @@
+const crypto = require('node:crypto');
+const fs = require('node:fs');
+const path = require('node:path');
+
+const root = path.resolve(__dirname, '..');
+const read = (relative) => fs.readFileSync(path.join(root, relative), 'utf8');
+const exists = (relative) => fs.existsSync(path.join(root, relative));
+const fail = (message) => { throw new Error(`[codebase-boundary] ${message}`); };
+const assert = (condition, message) => { if (!condition) fail(message); };
+
+const removedPaths = [
+  'apps/test-server', 'mock', 'src/api/demo', 'src/views/demo', 'src/views/hooks/request',
+  'src/router/routes/modules/hooks/request.ts',
+  'src/views/account/components/LegacyAccountDataManager.vue',
+  'internal/vite-config/src/plugins/mock.ts',
+];
+for (const relative of removedPaths) assert(!exists(relative), `removed template path returned: ${relative}`);
+
+const workspace = read('pnpm-workspace.yaml');
+assert(!workspace.includes("'apps/*'"), 'apps/* returned to the Workspace boundary');
+assert(workspace.includes("'internal/*'") && workspace.includes("'packages/*'"), 'maintained Workspace roots changed');
+
+const rootPackage = JSON.parse(read('package.json'));
+const vitePackage = JSON.parse(read('internal/vite-config/package.json'));
+for (const dependency of ['mockjs', '@types/mockjs', 'vite-plugin-mock']) {
+  assert(!rootPackage.dependencies?.[dependency], `runtime Mock dependency returned: ${dependency}`);
+  assert(!rootPackage.devDependencies?.[dependency], `development Mock dependency returned: ${dependency}`);
+  assert(!vitePackage.dependencies?.[dependency], `Vite Mock dependency returned: ${dependency}`);
+  assert(!vitePackage.devDependencies?.[dependency], `Vite Mock dependency returned: ${dependency}`);
+}
+
+for (const envFile of ['.env.analyze', '.env.development', '.env.docker', '.env.production', '.env.test']) {
+  assert(!read(envFile).includes('VITE_USE_MOCK'), `${envFile} re-enabled template Mock loading`);
+}
+
+const routeIndex = read('src/router/routes/index.ts');
+const menuIndex = read('src/router/menus/index.ts');
+for (const [name, source] of [['routes', routeIndex], ['menus', menuIndex]]) {
+  assert(source.includes("import.meta.glob('./modules/*.ts'"), `${name} module discovery is not top-level bounded`);
+  assert(!source.includes("./modules/**/*.ts"), `${name} recursive module discovery returned`);
+}
+
+const helper = read('src/router/helper/routeHelper.ts');
+assert(!helper.includes("../../views/**/*"), 'unbounded View discovery returned');
+assert(helper.includes('return EXCEPTION_COMPONENT;'), 'missing dynamic View key is not fail-closed');
+const formalRoots = [
+  'account', 'audit', 'bargain', 'dashboard', 'data', 'finance', 'financialAi',
+  'hedgeBoard', 'landing', 'log', 'monitor', 'newsCalendar', 'notification',
+  'platform', 'reports', 'risk', 'settings', 'strategy', 'sys', 'users',
+];
+for (const viewRoot of formalRoots) {
+  assert(helper.includes(`'../../views/${viewRoot}/**/*.{vue,tsx}'`), `formal View root is missing: ${viewRoot}`);
+}
+for (const forbidden of ['demo', 'mock', 'test', 'example', 'template', 'archive', 'hooks']) {
+  assert(!helper.includes(`'../../views/${forbidden}/`), `non-product View root entered discovery: ${forbidden}`);
+}
+
+const manifest = JSON.parse(read('scripts/formal-route-manifest.json'));
+for (const module of manifest.modules) {
+  const modulePath = path.join(root, module.path);
+  assert(fs.existsSync(modulePath), `formal route module is missing: ${module.path}`);
+  const raw = fs.readFileSync(modulePath);
+  const digest = crypto.createHash('sha256').update(raw).digest('hex');
+  assert(digest === module.sha256, `formal route contract changed without manifest review: ${module.path}`);
+  const source = raw.toString('utf8');
+  assert(!source.includes('/demo') && !source.includes('@/views/demo'), `formal route references Demo content: ${module.path}`);
+  for (const viewImport of module.view_imports) {
+    const target = path.join(root, 'src/views', viewImport);
+    const candidates = [target, `${target}.vue`, `${target}.tsx`, path.join(target, 'index.vue'), path.join(target, 'index.tsx')];
+    assert(candidates.some((candidate) => fs.existsSync(candidate)), `formal route View cannot resolve: ${viewImport}`);
+  }
+}
+console.log(`Codebase boundaries passed: ${manifest.modules.length} formal route modules, ${formalRoots.length} bounded View roots.`);

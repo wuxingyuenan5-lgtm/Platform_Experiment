@@ -42,7 +42,8 @@
     "test:homepage-layout": "node scripts/verify-homepage-layout.cjs",
     "test:user-system": "node scripts/test-user-system-access.cjs",
     "type:check": "vue-tsc -p tsconfig.strategy.json --noEmit --skipLibCheck",
-    "type:check:full": "vue-tsc -p tsconfig.full.json --noEmit --skipLibCheck"
+    "type:check:full": "vue-tsc -p tsconfig.full.json --noEmit --skipLibCheck",
+    "test:codebase-boundaries": "node scripts/check-codebase-boundaries.cjs"
   },
   "lint-staged": {
     "*.{js,jsx,ts,tsx}": [
