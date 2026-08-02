@@ -45,7 +45,7 @@ def filled_runtime_response(command: dict[str, object]) -> object:
 def test_execution_batch_is_idempotent(monkeypatch, tmp_path: Path) -> None:
     get_settings().database_path = str(tmp_path / "batch-idempotency.db")
     monkeypatch.setattr(
-        "app.trading.httpx.post",
+        "app.trade_command_execution.httpx.post",
         lambda *args, **kwargs: filled_runtime_response(kwargs["json"]),
     )
 

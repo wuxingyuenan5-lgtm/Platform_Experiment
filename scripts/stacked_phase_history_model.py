@@ -111,6 +111,8 @@ def classify(
     if kind in {"ci", "governance"}:
         return "governance"
     if kind == "test":
+        if all(is_governance_path(path) for path in paths):
+            return "governance"
         return "contract-test" if all(is_test_path(path) for path in paths) else "unexpected"
     if kind == "fix":
         return "bounded-correction"

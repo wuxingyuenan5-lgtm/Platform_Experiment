@@ -86,7 +86,7 @@ def test_trade_command_key_cannot_be_reused_for_different_payload(
         runtime_calls += 1
         return filled_runtime_response(kwargs["json"])
 
-    monkeypatch.setattr("app.trading.httpx.post", runtime_post)
+    monkeypatch.setattr("app.trade_command_execution.httpx.post", runtime_post)
 
     with TestClient(app) as client:
         first = client.post(
@@ -116,7 +116,7 @@ def test_execution_batch_key_cannot_be_reused_for_different_payload(
         runtime_calls += 1
         return filled_runtime_response(kwargs["json"])
 
-    monkeypatch.setattr("app.trading.httpx.post", runtime_post)
+    monkeypatch.setattr("app.trade_command_execution.httpx.post", runtime_post)
 
     with TestClient(app) as client:
         first = client.post(

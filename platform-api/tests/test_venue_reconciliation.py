@@ -47,7 +47,7 @@ def test_result_unknown_recovers_from_venue_and_imports_facts_once(
 ) -> None:
     get_settings().database_path = str(tmp_path / "venue-order-recovery.db")
     monkeypatch.setattr(
-        "app.trading.httpx.post",
+        "app.trade_command_execution.httpx.post",
         lambda *args, **kwargs: (_ for _ in ()).throw(httpx.ConnectError("timeout")),
     )
 
@@ -108,7 +108,7 @@ def test_result_unknown_recovers_from_venue_and_imports_facts_once(
                 return FakeResponse([external_fill])
             raise AssertionError(f"unexpected runtime url: {url}")
 
-        monkeypatch.setattr("app.trading.httpx.get", runtime_get)
+        monkeypatch.setattr("app.venue_reconciliation_runtime_client.httpx.get", runtime_get)
         first = client.post(f"/api/v1/trading/orders/{order_id}/venue-reconcile")
         second = client.post(f"/api/v1/trading/orders/{order_id}/venue-reconcile")
 

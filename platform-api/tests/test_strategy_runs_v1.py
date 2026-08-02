@@ -77,7 +77,7 @@ def test_strategy_run_creates_idempotent_hedged_batch(
 ) -> None:
     get_settings().database_path = str(tmp_path / "strategy-run.db")
     monkeypatch.setattr(
-        "app.trading.httpx.post",
+        "app.trade_command_execution.httpx.post",
         lambda *args, **kwargs: filled_runtime_response(kwargs["json"]),
     )
 

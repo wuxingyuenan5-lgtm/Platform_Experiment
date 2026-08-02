@@ -22,7 +22,7 @@ def test_reconciliation_summary_reports_unknown_orders_and_manual_batches(
             return filled_runtime_response(kwargs["json"])
         raise httpx.ConnectError("runtime unavailable")
 
-    monkeypatch.setattr("app.trading.httpx.post", runtime_post)
+    monkeypatch.setattr("app.trade_command_execution.httpx.post", runtime_post)
 
     payload = {
         "idempotencyKey": "ops-manual-batch-001",
