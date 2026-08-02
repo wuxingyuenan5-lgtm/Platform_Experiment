@@ -59,21 +59,48 @@ def test_all_nine_workflows_use_controlled_phase_pattern(name: str) -> None:
     assert CONTROLLED_PATTERN in text
     assert "refactor/**" not in text
     assert "      - '**'" not in text
-    assert "      - \"**\"" not in text
+    assert '      - "**"' not in text
     for branch in OLD_EXACT_BRANCHES:
         assert branch not in text
 
 
-def test_platform_ci_and_baseline_conditions_use_generic_phase_family() -> None:
+def test_platform_ci_uses_event_driven_stacked_history_and_debt_bases() -> None:
     platform_ci = workflow_text("platform-ci.yml")
+    history = platform_ci.split("- name: Audit stacked Phase history", 1)[1].split(
+        "- name: Check repository structure",
+        1,
+    )[0]
+    debt = platform_ci.split("- name: Enforce frontend no-new-debt gate", 1)[1].split(
+        "- name: Type check strategy frontend",
+        1,
+    )[0]
+
+    assert '--event "$GITHUB_EVENT_PATH"' in history
+    assert '--repository "$GITHUB_REPOSITORY"' in history
+    assert 'AUDIT_REF="$GITHUB_HEAD_REF"' in history
+    assert 'AUDIT_REF="${GITHUB_REF#refs/heads/}"' in history
+    assert "not-applicable" in history
+    assert "python ../scripts/frontend-no-new-debt.py" in debt
+    assert "--base" not in debt
+    assert "--direct" not in debt
+    assert "GITHUB_REF_NAME" not in debt
+
+    for forbidden in (
+        "PHASE3_BASE_SHA",
+        "PHASE3_ORIGINAL_HEAD",
+        "CANDIDATE_BASE_SHA",
+        "STACKED_HEAD_SHA",
+        "STACKED_PR_NUMBER",
+    ):
+        assert forbidden not in platform_ci
+
+
+def test_baseline_and_visual_conditions_use_generic_phase_family() -> None:
     audit = workflow_text("platform-0-9-2-audit.yml")
     visual = workflow_text("platform-visual-baseline.yml")
 
-    assert '[[ "$GITHUB_REF_NAME" == refactor/platform-0-9-3-* ]]' in platform_ci
     assert "startsWith(github.ref_name, 'refactor/platform-0-9-3-')" in audit
     assert "!startsWith(github.ref_name, 'refactor/platform-0-9-3-')" in visual
-    assert "PR_NUMBER" not in platform_ci
-    assert "STACKED_HEAD_REF" not in platform_ci
 
 
 def test_required_legacy_delivery_branches_remain_where_they_are_operationally_used() -> None:
