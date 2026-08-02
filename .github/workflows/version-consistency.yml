@@ -87,4 +87,5 @@ jobs:
           name: phase3-materialization-${{ github.sha }}
           path: ${{ runner.temp }}/phase3-materialize-evidence/
           if-no-files-found: warn
+          include-hidden-files: true
           retention-days: 7
