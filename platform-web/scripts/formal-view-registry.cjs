@@ -92,7 +92,10 @@ function renderRegistry(entries) {
     'export type ViewRegistryKey = keyof typeof viewRegistry;',
     '',
     'export function normalizeViewKey(value: string): string | null {',
-    "  const normalized = value.trim().replace(/\\\\/g, '/').replace(/^@\\/views\\//, '');",
+    '  const normalized = value',
+    '    .trim()',
+    "    .replace(/\\\\/g, '/')",
+    "    .replace(/^@\\/views\\//, '');",
     "  const withoutPrefix = normalized.replace(/^\\.\\.\\/\\.\\.\\/views\\//, '').replace(/^\\//, '');",
     "  const withoutExtension = withoutPrefix.replace(/\\.(?:vue|tsx)$/i, '');",
     "  if (!withoutExtension || withoutExtension.includes('..') || /[?#\\0]/.test(withoutExtension)) {",
@@ -108,7 +111,6 @@ function renderRegistry(entries) {
     '  const key = normalizeViewKey(value);',
     '  return key ? viewRegistry[key as ViewRegistryKey] : undefined;',
     '}',
-    '',
   );
   return `${lines.join('\n')}\n`;
 }

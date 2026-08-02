@@ -37,6 +37,20 @@ function testRepeatedGenerationIsByteIdentical() {
   assert.deepEqual(generatedBytes({ root }), generatedBytes({ root }));
 }
 
+function testGeneratedSourceIsFormatterStable() {
+  const source = generatedBytes({ root }).toString('utf8');
+  assert.ok(source.endsWith('\n'));
+  assert.ok(!source.endsWith('\n\n'));
+  assert.ok(
+    source.includes(
+      "  const normalized = value\n" +
+        "    .trim()\n" +
+        "    .replace(/\\\\/g, '/')\n" +
+        "    .replace(/^@\\/views\\//, '');",
+    ),
+  );
+}
+
 function testDriftAndRewrite() {
   const fixture = copyFixture();
   try {
@@ -99,6 +113,7 @@ function testRuntimeUsesRegistryWithoutGlobOrIgnore() {
 const tests = [
   testCurrentRegistry,
   testRepeatedGenerationIsByteIdentical,
+  testGeneratedSourceIsFormatterStable,
   testDriftAndRewrite,
   testMissingViewFails,
   testForbiddenViewFails,
