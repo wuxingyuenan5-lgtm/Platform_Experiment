@@ -102,33 +102,33 @@ export const EtfWeeklyFlowsPanel = defineComponent({
                     const y = scaleY(tick, flowRange.min, flowRange.max, innerHeight);
                     return [
                       h('line', {
-                      key: `flow-grid-${tick}`,
-                      x1: 0,
-                      x2: innerWidth,
-                      y1: y,
-                      y2: y,
-                      class: 'chart-grid-line',
-                    }),
-                    h(
-                      'text',
-                      {
-                        key: `flow-axis-${tick}`,
-                        x: -12,
-                        y: y + 4,
-                        textAnchor: 'end',
-                        class: 'chart-axis-label',
-                      },
-                      formatAxis(tick),
-                    ),
-                  ];
-                }),
-                h('line', {
-                  x1: 0,
-                  x2: innerWidth,
-                  y1: zeroY,
-                  y2: zeroY,
-                  class: 'chart-zero-line',
-                }),
+                        key: `flow-grid-${tick}`,
+                        x1: 0,
+                        x2: innerWidth,
+                        y1: y,
+                        y2: y,
+                        class: 'chart-grid-line',
+                      }),
+                      h(
+                        'text',
+                        {
+                          key: `flow-axis-${tick}`,
+                          x: -12,
+                          y: y + 4,
+                          textAnchor: 'end',
+                          class: 'chart-axis-label',
+                        },
+                        formatAxis(tick),
+                      ),
+                    ];
+                  }),
+                  h('line', {
+                    x1: 0,
+                    x2: innerWidth,
+                    y1: zeroY,
+                    y2: zeroY,
+                    class: 'chart-zero-line',
+                  }),
                   ...goldTicks.map((tick) =>
                     h(
                       'text',
