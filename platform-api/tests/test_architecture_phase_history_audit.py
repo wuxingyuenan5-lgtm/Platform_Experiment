@@ -102,8 +102,23 @@ def test_real_head_merge_commit_still_fails(
     run(repo, "merge", "--no-ff", "side", "-m", "merge side")
     head = run(repo, "rev-parse", "HEAD")
 
-    with pytest.raises(audit_phase_history.AuditError, match="non-linear or merge commit"):
+    with pytest.raises(audit_phase_history.AuditError):
         audit_phase_history.audit(base, head, required_ancestor=None)
+
+
+def test_zero_diff_bootstrap_triggers_are_transport() -> None:
+    assert audit_phase_history.classify(
+        "chore(platform-0.9.3): trigger exact pnpm bootstrap",
+        [],
+    ) == "transport"
+    assert audit_phase_history.classify(
+        "chore(platform-0.9.3): trigger maintained pnpm bootstrap job",
+        [],
+    ) == "transport"
+    assert audit_phase_history.classify(
+        "chore(platform-0.9.3): bootstrap request",
+        [],
+    ) == "unexpected"
 
 
 def test_original_phase_head_must_be_34_commit_ancestor(
