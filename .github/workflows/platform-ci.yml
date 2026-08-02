@@ -4,12 +4,11 @@ on:
   push:
     branches:
       - main
-      - refactor/platform-0-9-3-repository-and-context-optimization
-      - refactor/platform-0-9-3-codebase-and-build-simplification
+      - refactor/platform-0-9-3-*
   pull_request:
     branches:
       - main
-      - refactor/platform-0-9-3-repository-and-context-optimization
+      - refactor/platform-0-9-3-*
       - feature/issue-134-platform-0-9-1-unified-delivery
 
 permissions:
@@ -77,11 +76,18 @@ jobs:
         env:
           PHASE3_BASE_SHA: cd825fe6bd9ecdf42082069b2785844eda2efac8
           PHASE3_ORIGINAL_HEAD: 735542b69c38b552fd3bb3109819b177e424b0fb
+          EVENT_NAME: ${{ github.event_name }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           set -o pipefail
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            AUDIT_HEAD="$PR_HEAD_SHA"
+          else
+            AUDIT_HEAD="$GITHUB_SHA"
+          fi
           python scripts/audit-phase-history.py \
             --base "$PHASE3_BASE_SHA" \
-            --head "$GITHUB_SHA" \
+            --head "$AUDIT_HEAD" \
             --required-original-head "$PHASE3_ORIGINAL_HEAD" \
             --output "$RUNNER_TEMP/phase-history-audit.json" \
             2>&1 | tee "$RUNNER_TEMP/phase-history-audit.log"
@@ -252,6 +258,12 @@ jobs:
         env:
           HUSKY: '0'
         run: pnpm install --frozen-lockfile
+      - name: Test formal route manifest
+        id: frontend_route_manifest
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          node scripts/test-formal-route-manifest.cjs 2>&1 | tee "$RUNNER_TEMP/frontend-route-manifest.log"
       - name: Test browser access policy
         id: frontend_access_tests
         continue-on-error: true
@@ -289,7 +301,7 @@ jobs:
           CANDIDATE_BASE_SHA: cf44c8cca52576acc4e4070a98dcf112ebeec31c
         run: |
           set -o pipefail
-          if [ "$GITHUB_REF_NAME" = "refactor/platform-0-9-3-repository-and-context-optimization" ]; then
+          if [[ "$GITHUB_REF_NAME" == refactor/platform-0-9-3-* ]]; then
             python ../scripts/frontend-no-new-debt.py --base "$CANDIDATE_BASE_SHA" --direct 2>&1 | tee "$RUNNER_TEMP/frontend-no-new-debt.log"
           else
             python ../scripts/frontend-no-new-debt.py 2>&1 | tee "$RUNNER_TEMP/frontend-no-new-debt.log"
@@ -318,6 +330,7 @@ jobs:
         with:
           name: frontend-quality-diagnostics
           path: |
+            ${{ runner.temp }}/frontend-route-manifest.log
             ${{ runner.temp }}/frontend-access-tests.log
             ${{ runner.temp }}/frontend-eslint.log
             ${{ runner.temp }}/frontend-no-new-debt.log
@@ -329,6 +342,7 @@ jobs:
       - name: Enforce frontend results
         if: always()
         run: |
+          test "${{ steps.frontend_route_manifest.outcome }}" = "success"
           test "${{ steps.frontend_access_tests.outcome }}" = "success"
           test "${{ steps.frontend_lint.outcome }}" = "success"
           test "${{ steps.frontend_debt.outcome }}" = "success"

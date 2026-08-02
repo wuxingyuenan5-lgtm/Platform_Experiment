@@ -4,11 +4,10 @@ on:
   push:
     branches:
       - refactor/issue-136-platform-0-9-2-system-optimization
-      - refactor/platform-0-9-3-repository-and-context-optimization
-      - refactor/platform-0-9-3-codebase-and-build-simplification
+      - refactor/platform-0-9-3-*
   pull_request:
     branches:
-      - refactor/platform-0-9-3-repository-and-context-optimization
+      - refactor/platform-0-9-3-*
       - feature/issue-134-platform-0-9-1-unified-delivery
     paths:
       - '.github/workflows/platform-0-9-2-audit.yml'
@@ -118,8 +117,7 @@ jobs:
     name: Candidate workflow evidence
     if: >-
       ${{ always() && github.event_name == 'push' &&
-          github.ref_name == 'refactor/platform-0-9-3-repository-and-context-optimization' ||
-          github.ref_name == 'refactor/platform-0-9-3-codebase-and-build-simplification' }}
+          startsWith(github.ref_name, 'refactor/platform-0-9-3-') }}
     needs: repository-baseline
     runs-on: ubuntu-latest
     timeout-minutes: 15

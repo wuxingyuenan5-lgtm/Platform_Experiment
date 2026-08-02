@@ -70,7 +70,10 @@ def test_invalid_stacked_phase_metadata_fails(kwargs: dict, message: str) -> Non
     current = event(**kwargs)
     with pytest.raises(check.WorkstreamError, match=message):
         if kwargs.get("workstream") == "standard":
-            check.validate_stacked_workstream_selection(current["pull_request"]["head"]["ref"], "standard")
+            check.validate_stacked_workstream_selection(
+                current["pull_request"]["head"]["ref"],
+                "standard",
+            )
         else:
             check.validate_stacked_platform_critical(current)
 
@@ -80,7 +83,10 @@ def test_duplicate_workstream_fails() -> None:
         check.requested_workstream(event(extra="Workstream: critical"))
 
 
-def test_issue_critical_and_missing_packet_behavior(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_issue_critical_and_missing_packet_behavior(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
     branch = "hardening/issue-36-project-operating-system"
     packet = tmp_path / "issue-36-project-operating-system.md"
     packet.write_text(f"Issue: #36\nBranch: `{branch}`\n", encoding="utf-8")
@@ -103,7 +109,10 @@ def test_fast_and_standard_rules_remain_unchanged() -> None:
 
 def test_platform_ci_has_no_pr_specific_parser() -> None:
     workflow = (ROOT / ".github/workflows/platform-ci.yml").read_text(encoding="utf-8")
-    section = workflow.split("- name: Validate PR workstream", 1)[1].split("- name: Audit stacked Phase history", 1)[0]
+    section = workflow.split("- name: Validate PR workstream", 1)[1].split(
+        "- name: Audit stacked Phase history",
+        1,
+    )[0]
     assert "python scripts/check-workstream.py" in section
     assert "STAC" + "KED_PR_NUMBER" not in workflow
     assert "bounded Phase 3 PR #148" not in workflow

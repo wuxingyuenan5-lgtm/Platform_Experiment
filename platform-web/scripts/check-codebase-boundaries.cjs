@@ -1,6 +1,6 @@
-const crypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
+const { checkManifest } = require('./formal-route-manifest.cjs');
 
 const root = path.resolve(__dirname, '..');
 const read = (relative) => fs.readFileSync(path.join(root, relative), 'utf8');
@@ -55,19 +55,18 @@ for (const forbidden of ['demo', 'mock', 'test', 'example', 'template', 'archive
   assert(!helper.includes(`'../../views/${forbidden}/`), `non-product View root entered discovery: ${forbidden}`);
 }
 
-const manifest = JSON.parse(read('scripts/formal-route-manifest.json'));
+const manifestResult = checkManifest({ root });
+const manifest = JSON.parse(manifestResult.bytes.toString('utf8'));
 for (const module of manifest.modules) {
-  const modulePath = path.join(root, module.path);
-  assert(fs.existsSync(modulePath), `formal route module is missing: ${module.path}`);
-  const raw = fs.readFileSync(modulePath);
-  const digest = crypto.createHash('sha256').update(raw).digest('hex');
-  assert(digest === module.sha256, `formal route contract changed without manifest review: ${module.path}`);
-  const source = raw.toString('utf8');
-  assert(!source.includes('/demo') && !source.includes('@/views/demo'), `formal route references Demo content: ${module.path}`);
-  for (const viewImport of module.view_imports) {
-    const target = path.join(root, 'src/views', viewImport);
-    const candidates = [target, `${target}.vue`, `${target}.tsx`, path.join(target, 'index.vue'), path.join(target, 'index.tsx')];
-    assert(candidates.some((candidate) => fs.existsSync(candidate)), `formal route View cannot resolve: ${viewImport}`);
+  assert(!module.path.includes('/demo/'), `formal route references Demo module: ${module.path}`);
+  for (const route of module.routes) {
+    if (!route.view_import) continue;
+    for (const forbidden of ['demo', 'mock', 'test', 'example', 'template']) {
+      assert(
+        !route.view_import.toLowerCase().split('/').includes(forbidden),
+        `non-product View entered formal manifest: ${route.view_import}`,
+      );
+    }
   }
 }
-console.log(`Codebase boundaries passed: ${manifest.modules.length} formal route modules, ${formalRoots.length} bounded View roots.`);
+console.log(`Codebase boundaries passed: ${manifest.modules.length} formal route modules, ${formalRoots.length} bounded View roots; manifest ${manifestResult.sha256}.`);

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import fnmatch
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -83,3 +84,23 @@ def test_required_legacy_delivery_branches_remain_where_they_are_operationally_u
     assert "      - feature/issue-134-platform-0-9-1-unified-delivery" in platform_ci
     assert "      - refactor/issue-136-platform-0-9-2-system-optimization" in baseline
     assert "      - feature/issue-134-platform-0-9-1-unified-delivery" in baseline
+
+
+def test_formal_route_sources_are_unchanged_from_r1_start() -> None:
+    git_dir = ROOT / ".git"
+    if not git_dir.exists():
+        pytest.skip(
+            "source snapshot has no Git metadata; CI checkout provides the authoritative check"
+        )
+    subprocess.run(
+        [
+            "git",
+            "diff",
+            "--exit-code",
+            "735542b69c38b552fd3bb3109819b177e424b0fb",
+            "--",
+            "platform-web/src/router/routes/modules",
+        ],
+        cwd=ROOT,
+        check=True,
+    )
