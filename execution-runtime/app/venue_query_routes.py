@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Literal
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, HTTPException, Query
 
@@ -48,8 +48,14 @@ def create_venue_query_router(*, gateway: ExecutionGateway) -> APIRouter:
     def venue_order_history(
         account_id: str = Query(alias="accountId"),
         symbol: str | None = None,
-        start_time: datetime | None = Query(default=None, alias="startTime"),
-        end_time: datetime | None = Query(default=None, alias="endTime"),
+        start_time: Annotated[
+            datetime | None,
+            Query(alias="startTime"),
+        ] = None,
+        end_time: Annotated[
+            datetime | None,
+            Query(alias="endTime"),
+        ] = None,
         cursor: str | None = None,
         limit: int = Query(default=50, ge=1, le=100),
         scope: Literal["active", "closed"] = "closed",
@@ -111,8 +117,14 @@ def create_venue_query_router(*, gateway: ExecutionGateway) -> APIRouter:
     def venue_fill_history(
         account_id: str = Query(alias="accountId"),
         symbol: str | None = None,
-        start_time: datetime | None = Query(default=None, alias="startTime"),
-        end_time: datetime | None = Query(default=None, alias="endTime"),
+        start_time: Annotated[
+            datetime | None,
+            Query(alias="startTime"),
+        ] = None,
+        end_time: Annotated[
+            datetime | None,
+            Query(alias="endTime"),
+        ] = None,
         cursor: str | None = None,
         limit: int = Query(default=50, ge=1, le=100),
     ) -> VenueFillHistoryPage:
@@ -128,7 +140,11 @@ def create_venue_query_router(*, gateway: ExecutionGateway) -> APIRouter:
             )
         )
 
-    @router.get("/venue/positions", response_model=list[VenuePositionSnapshot], tags=["venue-query"])
+    @router.get(
+        "/venue/positions",
+        response_model=list[VenuePositionSnapshot],
+        tags=["venue-query"],
+    )
     def venue_positions(
         account_id: str | None = Query(default=None, alias="accountId"),
     ) -> list[VenuePositionSnapshot]:

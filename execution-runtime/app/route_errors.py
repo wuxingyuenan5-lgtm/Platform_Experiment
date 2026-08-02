@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
-from typing import TypeVar
 
 from fastapi import HTTPException
 
@@ -13,10 +12,8 @@ from app.gateway_errors import (
     GatewayResultUnknownError,
 )
 
-T = TypeVar("T")
 
-
-def query_gateway(callback: Callable[[], T]) -> T:
+def query_gateway[T](callback: Callable[[], T]) -> T:
     try:
         return callback()
     except GatewayConfigurationError as exc:

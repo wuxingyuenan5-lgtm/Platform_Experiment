@@ -4,7 +4,7 @@ from fastapi.testclient import TestClient
 
 from app.config import get_settings
 from app.journal import claim_command, initialize_journal
-from app.main import app, create_app
+from app.main import create_app
 from app.models import ExecutionEvent, SubmitOrderCommand
 
 
