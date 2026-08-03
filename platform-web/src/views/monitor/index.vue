@@ -23,7 +23,9 @@
                   {{ health.status || 'unavailable' }}
                 </Tag>
               </Descriptions.Item>
-              <Descriptions.Item label="服务">{{ health.service || 'data-service' }}</Descriptions.Item>
+              <Descriptions.Item label="服务">
+                {{ health.service || 'data-service' }}
+              </Descriptions.Item>
               <Descriptions.Item label="同步频率">
                 {{ health.update_frequency || '不可用' }}
               </Descriptions.Item>
@@ -54,16 +56,13 @@
 </template>
 
 <script setup lang="ts">
-  import { computed, onMounted, ref } from 'vue';
-  import { Button, Card, Col, Descriptions, Row, Space, Tag } from 'ant-design-vue';
   import { ReloadOutlined } from '@ant-design/icons-vue';
+  import { Button, Card, Col, Descriptions, Row, Space, Tag } from 'ant-design-vue';
+  import { computed, onMounted, ref } from 'vue';
+  import { type ProductDataMeta, unavailableMeta } from '@/api/platform/productDataState';
+  import { type DataServiceHealth, getDataHealth } from '@/api/riskControl';
   import { PageWrapper } from '@/components/Page';
   import ProductDataStatusAlert from '@/components/ProductDataState/ProductDataStatusAlert.vue';
-  import { type DataServiceHealth, getDataHealth } from '@/api/riskControl';
-  import {
-    unavailableMeta,
-    type ProductDataMeta,
-  } from '@/api/platform/productDataState';
   import { useRoleAccess } from '@/hooks/web/useRoleAccess';
   import { useUserStore } from '@/store/modules/user';
 
