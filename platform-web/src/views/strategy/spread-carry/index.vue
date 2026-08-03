@@ -10,7 +10,7 @@
     <ProductNotConfiguredPanel
       v-else
       title="跨所价差研究数据链尚未配置"
-      description="当前正式Owner仅覆盖Cross Venue Runtime执行Workspace。价差历史、境内外研究图表及Replica没有正式Provider，因此不展示静态曲线、模拟持仓或未经Runtime事实证明的结论。"
+      description="当前正式Owner仅覆盖Cross Venue Runtime执行Workspace。价差历史、境内外研究图表及Replica没有正式Provider，因此不展示静态曲线、静态仓位数值或未经Runtime事实证明的结论。"
       source="not-configured: spread-research-provider"
     />
   </section>
