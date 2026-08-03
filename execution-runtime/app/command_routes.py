@@ -9,6 +9,7 @@ from app.gateway_errors import (
     GatewayResultUnknownError,
 )
 from app.journal import (
+    JournalEventError,
     claim_command,
     get_events,
     mark_command_result_unknown,
@@ -54,7 +55,13 @@ def create_command_router(*, gateway: ExecutionGateway) -> APIRouter:
         except GatewayResultUnknownError as exc:
             mark_command_result_unknown(command.command_id)
             raise HTTPException(status_code=502, detail=str(exc)) from exc
-        save_command_events(command, events)
+        try:
+            save_command_events(command, events)
+        except JournalEventError as exc:
+            mark_command_result_unknown(command.command_id)
+            raise HTTPException(
+                status_code=502, detail="Runtime execution evidence is not safely persistable"
+            ) from exc
         return version_execution_events(events)
 
     @router.get(

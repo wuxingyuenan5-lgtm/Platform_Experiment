@@ -5,6 +5,7 @@ from datetime import UTC, datetime, timedelta
 from app.gateway import ExecutionGateway
 from app.gateway_errors import (
     GatewayConfigurationError,
+    GatewayQueryUnsupportedError,
     GatewayRequestRejectedError,
     GatewayResultUnknownError,
 )
@@ -53,17 +54,46 @@ def _validate_order(record: RuntimeCommandRecord, order: VenueOrderSnapshot) -> 
     )
     if actual != expected:
         raise RecoveryEvidenceMismatchError("Venue order identity does not match Runtime command")
+    command = record.command
+    if order.side != command.side or order.order_type != command.order_type:
+        raise RecoveryEvidenceMismatchError(
+            "Venue order execution terms do not match Runtime command"
+        )
+    if order.quantity != command.quantity:
+        raise RecoveryEvidenceMismatchError("Venue order quantity does not match Runtime command")
+    if command.order_type == "limit" and order.price != command.price:
+        raise RecoveryEvidenceMismatchError("Venue order price does not match Runtime command")
+    if order.reduce_only is not None and order.reduce_only != command.reduce_only:
+        raise RecoveryEvidenceMismatchError(
+            "Venue order reduce-only flag does not match Runtime command"
+        )
+    if order.position_id is not None and order.position_id != command.position_id:
+        raise RecoveryEvidenceMismatchError(
+            "Venue order position identity does not match Runtime command"
+        )
+    if order.filled_quantity < 0 or order.remaining_quantity < 0:
+        raise RecoveryEvidenceMismatchError("Venue order quantities are invalid")
+    if order.filled_quantity > order.quantity:
+        raise RecoveryEvidenceMismatchError("Venue filled quantity exceeds order quantity")
 
 
-def _validate_fill(record: RuntimeCommandRecord, fill: VenueFillSnapshot) -> None:
+def _validate_fill(
+    record: RuntimeCommandRecord,
+    order: VenueOrderSnapshot,
+    fill: VenueFillSnapshot,
+) -> None:
     if (
         fill.platform_order_id != record.platform_order_id
         or fill.command_id != record.command_id
         or fill.account_id != record.account_id
         or fill.instrument_id != record.instrument_id
         or fill.symbol.upper() != record.symbol.upper()
+        or fill.external_order_id != order.external_order_id
+        or fill.side != record.command.side
     ):
         raise RecoveryEvidenceMismatchError("Venue fill identity does not match Runtime command")
+    if fill.quantity <= 0 or fill.price <= 0:
+        raise RecoveryEvidenceMismatchError("Venue fill quantity or price is invalid")
 
 
 def _ack_event(record: RuntimeCommandRecord, order: VenueOrderSnapshot) -> ExecutionEvent:
@@ -84,7 +114,7 @@ def _fill_events(
 ) -> list[ExecutionEvent]:
     events: list[ExecutionEvent] = []
     for fill in sorted(fills, key=lambda item: (item.occurred_at, item.external_fill_id)):
-        _validate_fill(record, fill)
+        _validate_fill(record, order, fill)
         events.append(
             ExecutionEvent(
                 event_id=_event_id(record.command_id, "fill", fill.external_fill_id),
@@ -98,6 +128,11 @@ def _fill_events(
             )
         )
     if events:
+        total_quantity = sum((event.fill_quantity or 0 for event in events), start=0)
+        if total_quantity != order.filled_quantity:
+            raise RecoveryEvidenceMismatchError(
+                "Venue fill facts do not match the order filled quantity"
+            )
         return events
     if order.filled_quantity > 0 and order.average_fill_price is not None:
         return [
@@ -124,6 +159,10 @@ def _events_from_venue(
     if order.status == "unknown":
         return []
     if order.status in {"rejected", "canceled"}:
+        if order.filled_quantity > 0:
+            raise RecoveryEvidenceMismatchError(
+                "Canceled or rejected Venue order has fills that cannot be represented safely"
+            )
         reason = order.reject_reason or order.cancel_reason or f"Venue order is {order.status}"
         return [
             ExecutionEvent(
@@ -180,6 +219,7 @@ def recover_command(
         events = _events_from_venue(record, gateway, order)
     except (
         GatewayConfigurationError,
+        GatewayQueryUnsupportedError,
         GatewayRequestRejectedError,
         GatewayResultUnknownError,
         TimeoutError,

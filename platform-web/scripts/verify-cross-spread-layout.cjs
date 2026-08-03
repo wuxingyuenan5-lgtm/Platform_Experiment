@@ -10,7 +10,27 @@ const componentPath = path.join(
   'strategy',
   'spread-carry',
   'components',
+  'CrossVenueExecutionWorkspace.vue',
+);
+const retiredReplicaPath = path.join(
+  __dirname,
+  '..',
+  'src',
+  'views',
+  'strategy',
+  'spread-carry',
+  'components',
   'CrossVenueExecutionReplica.vue',
+);
+const workspaceComposablePath = path.join(
+  __dirname,
+  '..',
+  'src',
+  'views',
+  'strategy',
+  'spread-carry',
+  'composables',
+  'useCrossVenueExecutionWorkspace.ts',
 );
 const workspacePath = path.join(
   __dirname,
@@ -173,7 +193,9 @@ const pageComposables = requiredComposables.filter(
 const requiredSupportFiles = ['crossSpreadFixtures.ts'];
 const requiredMapperFiles = ['mapCrossSpreadPositions.ts'];
 
+assert(!fs.existsSync(retiredReplicaPath), 'Retired CrossVenueExecutionReplica must remain removed.');
 const source = fs.readFileSync(componentPath, 'utf8');
+const workspaceComposableSource = fs.readFileSync(workspaceComposablePath, 'utf8');
 const workspaceSource = fs.readFileSync(workspacePath, 'utf8');
 const spreadCarryPageSource = fs.readFileSync(spreadCarryPagePath, 'utf8');
 const mountedProductSources = [
@@ -216,15 +238,6 @@ const bannedMountedPanels = [
   'CrossSpreadMarketLifecyclePanel',
   'CrossSpreadLiveObservabilityPanel',
 ];
-const bannedReplicaLocalState = [
-  'selectedAnalysisPeriod',
-  'selectedAnalysisDataRange',
-  'customRangeOpen',
-  'alertThreshold',
-  'monitorRunning',
-  'toggleMonitor',
-];
-
 for (const panel of bannedMountedPanels) {
   assert(
     !workspaceSource.includes(panel),
@@ -232,12 +245,11 @@ for (const panel of bannedMountedPanels) {
   );
 }
 
-for (const localState of bannedReplicaLocalState) {
-  assert(
-    !source.includes(localState),
-    `CrossVenueExecutionReplica must not own spread analysis local state: ${localState}`,
-  );
-}
+assert(
+  source.includes("import { useCrossVenueExecutionWorkspace } from '../composables/useCrossVenueExecutionWorkspace';") &&
+    source.includes('useCrossVenueExecutionWorkspace()'),
+  'CrossVenueExecutionWorkspace must delegate state and effects to its formal composable owner.',
+);
 
 const marketQuotesSource = fs.readFileSync(marketQuotesPath, 'utf8');
 const spreadSummarySource = fs.readFileSync(spreadSummaryPath, 'utf8');
@@ -251,7 +263,7 @@ assert(
     source.includes('SpreadPositionOverview') &&
     source.includes('SpreadExecutionCommand') &&
     source.includes('SpreadExecutionConfirmModal'),
-  'Expected cross venue page to use extracted pure display components.',
+  'Expected formal cross venue workspace to use extracted pure display components.',
 );
 
 assert(
@@ -305,8 +317,8 @@ for (const fileName of requiredSupportFiles) {
   const supportPath = path.join(composablesDir, fileName);
   assert(fs.existsSync(supportPath), `Expected support file to exist: ${fileName}`);
   assert(
-    source.includes(fileName.replace(/\.ts$/, '')),
-    `Expected cross venue page to use support file: ${fileName}`,
+    workspaceComposableSource.includes(fileName.replace(/\.ts$/, '')),
+    `Expected cross venue composable to use support file: ${fileName}`,
   );
 }
 
@@ -317,8 +329,8 @@ for (const fileName of requiredMapperFiles) {
 
 for (const fileName of pageComposables) {
   assert(
-    source.includes(fileName.replace(/\.ts$/, '')),
-    `Expected cross venue page to use composable: ${fileName}`,
+    workspaceComposableSource.includes(fileName.replace(/\.ts$/, '')),
+    `Expected cross venue formal owner to compose: ${fileName}`,
   );
 }
 

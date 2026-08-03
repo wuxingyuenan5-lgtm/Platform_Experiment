@@ -155,12 +155,16 @@ def submit_order_through_runtime(
         mark_order_result_unknown(order_id)
         return get_order_response(order_id)
 
-    apply_execution_events(
-        order_id,
-        request,
-        events,
-        expected_command_id=resolved_command_id,
-    )
+    try:
+        apply_execution_events(
+            order_id,
+            request,
+            events,
+            expected_command_id=resolved_command_id,
+        )
+    except HTTPException:
+        mark_order_result_unknown(order_id)
+        raise
     return get_order_response(order_id)
 
 
