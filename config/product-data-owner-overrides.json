@@ -64,6 +64,9 @@
         "platform-web/src/api/platform/researchWatchlist.ts"
       ]
     },
+    "trading-tools": {
+      "repository_or_provider": ["platform-web/docs/trading-tools-bookmarks-review.md"]
+    },
     "monitor": {
       "frontend_services": ["platform-web/src/api/riskControl.ts"],
       "api_endpoints": ["data-service:/health", "current browser session"],
