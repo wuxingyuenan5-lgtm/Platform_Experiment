@@ -53,17 +53,14 @@
 </template>
 
 <script setup lang="ts">
-  import { computed, onMounted, ref } from 'vue';
-  import { Button, Card, Col, Descriptions, Row, Tag } from 'ant-design-vue';
   import { ReloadOutlined } from '@ant-design/icons-vue';
+  import { Button, Card, Col, Descriptions, Row, Tag } from 'ant-design-vue';
+  import { computed, onMounted, ref } from 'vue';
+  import { type ProductDataMeta, unavailableMeta } from '@/api/platform/productDataState';
+  import { type DataServiceHealth, getDataHealth } from '@/api/riskControl';
   import { PageWrapper } from '@/components/Page';
   import ProductDataStatusAlert from '@/components/ProductDataState/ProductDataStatusAlert.vue';
   import ProductNotConfiguredPanel from '@/components/ProductDataState/ProductNotConfiguredPanel.vue';
-  import { type DataServiceHealth, getDataHealth } from '@/api/riskControl';
-  import {
-    unavailableMeta,
-    type ProductDataMeta,
-  } from '@/api/platform/productDataState';
   import { useRoleAccess } from '@/hooks/web/useRoleAccess';
   import { useUserStore } from '@/store/modules/user';
 
