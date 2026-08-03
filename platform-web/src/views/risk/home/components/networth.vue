@@ -84,32 +84,53 @@
           type: 'pie',
           radius: '50%',
           center: ['50%', '55%'],
-         ÛÛÜŽˆÉÈÑMMN	Ë	ÈÍPŽ‘‰×KˆX™[ˆÂˆÚÝÎˆYKˆ›Ü›X]\Žˆ[˜Ý[Ûˆ
-\˜[\ÊHÂˆËÈÛÛœÛÛK›ÙÊ\˜[\ÊNÂˆ™]\›ˆ	Ü\˜[\ÏË™]OË›˜[Y_W‰Ù›Ü›X]S[TÝŠ\˜[\ÏË™]OË˜[YKÂˆXÚ[X[Îˆ‹ˆÙY\™\›ÎˆYKˆJ_XÂˆKˆKˆ[š[X][Û•\Nˆ	ÜØØ[IËˆ[š[X][Û‘X\Ú[™Îˆ	Ù^Û™[X[[“Ý]	Ëˆ[š[X][Û‘[^Nˆ
-[™^ˆ[X™\ŠHOˆ[™^
-ˆˆKˆKˆJNÂˆBˆ[˜Ý[ÛˆÙ]›ÙXÝ˜]”›ÙXÝ˜][Ñ›Š
-HÂˆØY[™Ë˜[YHHYNÂˆÙ]›ÙXÝ˜]”›ÙXÝ˜][Ê
-Bˆ[Š
-™\Îˆ[žJHOˆÂˆYˆ
-™\Ëœ™]ÛÙHOH
-HÂˆÛÛœÝÝÝ[H™\Ë™]Kœ™YXÙJ
-™Nˆ[žKÝ\Žˆ[žJHOˆÂˆÛÛœÝÝ˜[HÝ\•[š]˜[YHOH	ÕTÑ	ÈÈÝ\‹˜[YUTÑˆÝ\‹˜[YNÂˆ™]\›ˆ™H
-ÈÝ˜[ÂˆK
-NÂˆ™XÛÜ™˜[YHH™\Ë™]OË›X\
-
-][Nˆ[žJHOˆÂˆ]Ý˜[HÝ\•[š]˜[YHOH	ÕTÑ	ÈÈ][K˜[YUTÑˆ][K˜[YNÂˆ™]\›ˆÂˆ˜[YNˆ][K›˜[YKˆ˜[YNˆÝ˜[Ñš^Y
-ŠKˆ\˜Ù[ˆÝÝ[È
-Ý˜[ÈÝÝ[
-KÑš^Y
-
-HˆˆNÂˆJNÂˆ[š]]J
-NÂˆBˆJBˆ™š[˜[J
-
-HOˆÂˆØY[™Ë˜[YHH˜[ÙNÂˆJNÂˆBˆØ]ÚX›Ý[˜ÙY
-ˆ
-
-HOˆÝ\•[š]˜[YKˆ
-
-HOˆÂˆÙ]›ÙXÝ˜]”›ÙXÝ˜][Ñ›Š
-NÂˆKˆÈ[[YYX]NˆYHKˆ
-NÂÜØÜš\‚
+          color: ['#F55458', '#5BB86F'],
+          label: {
+            show: true,
+            formatter: function (params) {
+              // console.log(params);
+              return `${params?.data?.name}\n${formateNumStr(params?.data?.value, {
+                decimals: 2,
+                keepZero: true,
+              })}`;
+            },
+          },
+          animationType: 'scale',
+          animationEasing: 'exponentialInOut',
+          animationDelay: (index: number) => index * 40,
+        },
+      ],
+    });
+  }
+  function getProductNavProductRatioFn() {
+    loading.value = true;
+    getProductNavProductRatio()
+      .then((res: any) => {
+        if (res.retCode == 0) {
+          const _total = res.data.reduce((pre: any, cur: any) => {
+            const _val = curUnit.value == 'USD' ? cur.valueUSD : cur.value;
+            return pre + _val;
+          }, 0);
+          record.value = res.data?.map((item: any) => {
+            let _val = curUnit.value == 'USD' ? item.valueUSD : item.value;
+            return {
+              name: item.name,
+              value: _val.toFixed(2),
+              percent: _total ? (_val / _total).toFixed(4) : 0,
+            };
+          });
+          initData();
+        }
+      })
+      .finally(() => {
+        loading.value = false;
+      });
+  }
+  watchDebounced(
+    () => curUnit.value,
+    () => {
+      getProductNavProductRatioFn();
+    },
+    { immediate: true },
+  );
+</script>

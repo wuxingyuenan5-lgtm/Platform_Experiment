@@ -57,7 +57,7 @@
   // 汇率数据
   // const exchange = ref();
   const { exchange } = usdDataExchange();
-  // 当前单�ɍ
+  // 当前单位
   const curUnit = ref('USD');
   const { setOptions, getInstance } = useECharts(chartRef as Ref<HTMLDivElement>);
   let list = [];

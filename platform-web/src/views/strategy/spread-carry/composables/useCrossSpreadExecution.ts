@@ -7,7 +7,6 @@ import {
   type CrossSpreadLimitExecutionResult,
   type CrossSpreadLimitStrategy,
 } from '@/api/platform/crossSpreadLifecycle';
-import { CROSS_SPREAD_DEFAULT_EXECUTION_LOGS } from './crossSpreadFixtures';
 import type { CloseOrder } from './useCrossSpreadPositions';
 import {
   formatNullablePrice,
@@ -70,10 +69,8 @@ export function useCrossSpreadExecution(options: UseCrossSpreadExecutionOptions)
   const limitEvidence = ref<CrossSpreadLimitExecutionResult | null>(null);
   const executionMessage = ref('');
   const executionMessageTone = ref<MessageTone>('is-success');
-  const executionLogs = ref<LogEntry[]>(
-    CROSS_SPREAD_DEFAULT_EXECUTION_LOGS.map((entry) => ({ ...entry })),
-  );
-  let localLogSequence = executionLogs.value.length;
+  const executionLogs = ref<LogEntry[]>([]);
+  let localLogSequence = 0;
 
   const openValidationError = computed(() => {
     if (options.qtyOz.value <= 0) return '数量必须大于 0';
@@ -282,7 +279,7 @@ export function useCrossSpreadExecution(options: UseCrossSpreadExecutionOptions)
   }
 
   function convertOzToMt5Lot(value: number) {
-    const multiplier = options.quantityRules.value?.mt5Multiplier;
+    const multiplier = options.quantityRules.value?.mt5Lultiplier;
     return multiplier ? value / multiplier : null;
   }
 
