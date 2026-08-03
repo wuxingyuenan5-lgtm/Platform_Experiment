@@ -61,6 +61,55 @@ def test_formal_frontend_layout_gate_commits_are_governance() -> None:
         assert category == "governance"
 
 
+def test_phase5_owner_registry_foundations_are_formal_implementation() -> None:
+    for path, subject in (
+        (
+            "config/product-data-owner-matrix.json",
+            "feat(platform-0.9.3): add product data owner baseline",
+        ),
+        (
+            "config/product-data-owner-overrides.json",
+            "feat(platform-0.9.3): add reviewed product owner overrides",
+        ),
+        (
+            "platform-web/src/api/platform/productDataState.ts",
+            "feat(platform-web): add explicit product data state contract",
+        ),
+        (
+            "platform-web/src/components/ProductDataState/ProductDataStatusAlert.vue",
+            "feat(platform-web): add product data status presentation",
+        ),
+        (
+            "platform-web/src/components/ProductDataState/ProductNotConfiguredPanel.vue",
+            "feat(platform-web): add explicit not configured product state",
+        ),
+    ):
+        category = MODEL.classify(
+            subject,
+            [{"status": "A", "path": path}],
+            100,
+            0,
+        )
+        assert category == "formal-implementation"
+
+
+def test_arbitrary_feature_commit_remains_unexpected() -> None:
+    assert (
+        MODEL.classify(
+            "feat(platform-web): add new product experience",
+            [
+                {
+                    "status": "A",
+                    "path": "platform-web/src/views/product/NewFeature.vue",
+                }
+            ],
+            100,
+            0,
+        )
+        == "unexpected"
+    )
+
+
 def test_unrelated_perf_and_frontend_script_changes_remain_unexpected() -> None:
     assert (
         MODEL.classify(
