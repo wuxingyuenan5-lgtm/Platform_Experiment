@@ -3,6 +3,7 @@ import { useRoute, useRouter } from 'vue-router';
 
 import {
   researchModules,
+  type ChartSection,
   type ResearchModule,
   type WidgetConfig,
 } from '../nativeData/dashboardClean';
@@ -76,6 +77,20 @@ function resolveCategory(routeName: string, routePath: string): HedgeCategory {
   return 'macro';
 }
 
+function isStaticDesignWidget(widget: WidgetConfig) {
+  const note = widget.sourceNote?.trim() || '';
+  return widget.kind === 'local-chart' && /静态设计稿/.test(note);
+}
+
+function withoutStaticDesignWidgets(sections: ChartSection[]): ChartSection[] {
+  return sections
+    .map((section) => ({
+      ...section,
+      widgets: section.widgets.filter((widget) => !isStaticDesignWidget(widget)),
+    }))
+    .filter((section) => section.widgets.length > 0);
+}
+
 function scrollPageTop() {
   if (typeof window === 'undefined') return;
   nextTick(() => {
@@ -147,7 +162,20 @@ export function useHedgeBoardPage() {
   );
 
   const useUnifiedResearchUi = computed(() => true);
-  const visibleSections = computed(() => activeModule.value.sections);
+  const staticDesignWidgets = computed(() =>
+    activeModule.value.sections.flatMap((section) =>
+      section.widgets
+        .filter(isStaticDesignWidget)
+        .map((widget) => ({
+          sectionId: section.id,
+          title: widget.title,
+          sourceNote: widget.sourceNote || '静态设计稿',
+        })),
+    ),
+  );
+  const visibleSections = computed<ChartSection[]>(() =>
+    withoutStaticDesignWidgets(activeModule.value.sections),
+  );
   const pageTitle = computed(() => `对冲基金看板 / ${activeBoardNav.value.label}`);
 
   function getSectionTitle(sectionId: string, fallback: string) {
@@ -200,6 +228,7 @@ export function useHedgeBoardPage() {
     pageTitle,
     selectBoardCategory,
     shouldHideWidgetHeader,
+    staticDesignWidgets,
     terminalTabs,
     useUnifiedResearchUi,
     visibleSections,
