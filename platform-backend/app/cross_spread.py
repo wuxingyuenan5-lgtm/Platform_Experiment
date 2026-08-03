@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from dataclasses import dataclass
 from decimal import Decimal
@@ -222,7 +222,6 @@ def submit_bybit_definitive_failure_rollback(
     )
 
 
-
 def _cross_spread_execution_gate_allows_simulation(settings) -> bool:
     return bool(settings.live_trading_enabled)
 
@@ -264,7 +263,10 @@ def _load_live_bybit_specification() -> LiveInstrumentSpecification:
 
 def _load_live_cross_spread_sizing() -> CrossSpreadLiveSizing:
     settings = get_settings()
-    if _cross_spread_execution_gate_allows_simulation(settings) and not settings.live_trading_enabled:
+    if (
+        _cross_spread_execution_gate_allows_simulation(settings)
+        and not settings.live_trading_enabled
+    ):
         return CrossSpreadLiveSizing(
             bybit_min=Decimal("0.001"),
             bybit_step=Decimal("0.001"),
@@ -378,6 +380,3 @@ def _validate_leg_quantity(
             status_code=422,
             detail=f"{label} quantity does not match current contract step",
         )
-
-
-

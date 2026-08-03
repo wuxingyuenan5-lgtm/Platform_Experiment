@@ -16,29 +16,6 @@ Object.keys(modules).forEach((key) => {
   routeModuleList.push(...modList);
 });
 
-// // 白名单
-// const whiteList: string[] = [
-//   '/strategy',
-//   '/home',
-//   '/account',
-//   '/monitor',
-//   '/transfer',
-//   '/bargain',
-//   '/system',
-// ];
-// // const showDemo = process.env.NODE_ENV === 'development';
-// // 加入到路由集合中
-// Object.keys(modules).forEach((key) => {
-//   const mod = (modules as Recordable)[key].default || {};
-//   const modList = Array.isArray(mod) ? [...mod] : [mod];
-//   // if (showDemo || whiteList.includes(modList[0].name)) {
-//   //   routeModuleList.push(...modList);
-//   // }
-//   if (whiteList.includes(modList[0]?.path)) {
-//     routeModuleList.push(...modList);
-//   }
-// });
-
 export const asyncRoutes = [PAGE_NOT_FOUND_ROUTE, ...routeModuleList];
 
 // 根路由
@@ -71,11 +48,22 @@ export const RegisterApplyRoute: AppRouteRecordRaw = {
   },
 };
 
+export const ResetPasswordRoute: AppRouteRecordRaw = {
+  path: '/reset-password',
+  name: 'ResetPassword',
+  component: () => import('@/views/sys/reset-password/index.vue'),
+  meta: {
+    title: '设置新密码',
+    ignoreAuth: true,
+  },
+};
+
 // Basic routing without permission
 // 未经许可的基本路由
 export const basicRoutes = [
   LoginRoute,
   RegisterApplyRoute,
+  ResetPasswordRoute,
   RootRoute,
   NotificationRoute,
   REDIRECT_ROUTE,

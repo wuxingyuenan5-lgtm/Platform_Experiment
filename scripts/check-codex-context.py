@@ -13,8 +13,8 @@ import tomllib
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-EXPECTED_VERSION = "0.9.0"
-EXPECTED_MAIN_BASELINE = "71603bcc6807284ef3a6da26ad3f43c541bc99c2"
+EXPECTED_VERSION = "0.9.1"
+EXPECTED_MAIN_BASELINE = "a4e22021c71cf5cd703cb0bc35676ff5adbfec36"
 EXPECTED_FRONTEND_PORT = "4373"
 EXPECTED_BACKEND_PORT = "8000"
 EXPECTED_RUNTIME_PORT = "8100"
@@ -46,7 +46,7 @@ def main() -> None:
     root_agents = read_text("AGENTS.md")
     package_json = json.loads(read_text("admin-risk/package.json"))
     vite_config = read_text("admin-risk/vite.config.ts")
-    frontend_env = read_text("admin-risk/.env")
+    frontend_env = read_text("admin-risk/.env.development")
     dev_script = read_text("scripts/dev-platform.ps1")
     ui_guidelines = read_text("admin-risk/docs/design/platform-ui-guidelines.md")
 
@@ -60,7 +60,7 @@ def main() -> None:
 
     require(
         f'VITE_GLOB_APP_VERSION = "{EXPECTED_VERSION}"' in frontend_env,
-        "Frontend display version drifted in admin-risk/.env",
+        "Frontend display version drifted in admin-risk/.env.development",
     )
     require(
         package_json.get("packageManager") == EXPECTED_PNPM,
@@ -120,14 +120,12 @@ def main() -> None:
         "内部 `TerminalDetailPanel` 不再重复显示“市场明细”" in ui_guidelines,
         "platform-ui-guidelines.md is missing market detail duplicate-title standard",
     )
-
     require(
         "Georgia, Times New Roman, Noto Serif SC, serif" in ui_guidelines
         and "`18px`" in ui_guidelines
         and "`30px`" in ui_guidelines,
         "platform-ui-guidelines.md is missing login title typography standard",
     )
-
     require(
         re.search(r"npx\.cmd pnpm@9\.15\.9 type:check", context) is not None,
         "CURRENT_CONTEXT.md should list the Windows-safe frontend type check",

@@ -9,6 +9,10 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 EXPECTED = (ROOT / "VERSION").read_text(encoding="utf-8").strip()
+FRONTEND_VERSION_FILES = (
+    "admin-risk/.env.development",
+    "admin-risk/.env.production",
+)
 
 
 def project_version(path: str) -> str:
@@ -16,11 +20,11 @@ def project_version(path: str) -> str:
         return str(tomllib.load(handle)["project"]["version"])
 
 
-def frontend_version() -> str:
-    content = (ROOT / "admin-risk/.env").read_text(encoding="utf-8")
-    match = re.search(r'VITE_GLOB_APP_VERSION\s*=\s*"([^"]+)"', content)
+def frontend_version(path: str) -> str:
+    content = (ROOT / path).read_text(encoding="utf-8")
+    match = re.search(r'VITE_GLOB_APP_VERSION\s*=\s*["\']([^"\']+)["\']', content)
     if match is None:
-        raise SystemExit("Frontend release version declaration is missing")
+        raise SystemExit(f"Frontend release version declaration is missing from {path}")
     return match.group(1)
 
 
@@ -28,7 +32,10 @@ def main() -> None:
     actual = {
         "platform-backend package": project_version("platform-backend/pyproject.toml"),
         "execution-runtime package": project_version("execution-runtime/pyproject.toml"),
-        "frontend display": frontend_version(),
+        **{
+            f"frontend display ({path})": frontend_version(path)
+            for path in FRONTEND_VERSION_FILES
+        },
     }
     drift = {name: value for name, value in actual.items() if value != EXPECTED}
     if drift:

@@ -1,11 +1,15 @@
 #!/bin/bash
-set -e
+set -euo pipefail
+
+: "${DB_DSN:?Set DB_DSN in the process environment before starting data-service}"
+: "${JWT_SECRET:?Set JWT_SECRET in the process environment before starting data-service}"
+: "${ACCOUNT_ENCRYPTION_KEY:?Set ACCOUNT_ENCRYPTION_KEY separately before starting data-service}"
 
 export TZ="${TZ:-Asia/Shanghai}"
-export DB_DSN="${DB_DSN:-ymy:88368403@Ymy@tcp(127.0.0.1:3306)/risk_control?parseTime=true&loc=Asia%2FShanghai&time_zone=%27%2B08%3A00%27}"
+export DB_DSN
 export PORT="${PORT:-8082}"
-export JWT_SECRET="${JWT_SECRET:-88368403Ymy}"
-export ACCOUNT_ENCRYPTION_KEY="${ACCOUNT_ENCRYPTION_KEY:-$JWT_SECRET}"
+export JWT_SECRET
+export ACCOUNT_ENCRYPTION_KEY
 export SYNC_INTERVAL="${SYNC_INTERVAL:-5m}"
 export SYNC_ON_START="${SYNC_ON_START:-true}"
 export SCHEDULER_ENABLED="${SCHEDULER_ENABLED:-true}"

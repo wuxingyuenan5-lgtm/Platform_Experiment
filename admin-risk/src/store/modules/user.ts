@@ -1,201 +1,231 @@
-// @ts-nocheck
 import type { UserInfo } from '#/store';
 import type { ErrorMessageMode } from '#/axios';
 import { defineStore } from 'pinia';
 import { store } from '@/store';
-import { RoleEnum } from '@/enums/roleEnum';
 import { PageEnum } from '@/enums/pageEnum';
-import { ROLES_KEY, TOKEN_KEY, USER_INFO_KEY } from '@/enums/cacheEnum';
-import { getAuthCache, setAuthCache } from '@/utils/auth';
-import { GetUserInfoModel, LoginParams } from '@/api/sys/model/userModel';
-import { doLogout, getUserInfo, loginApi } from '@/api/sys/user';
+import { clearAuthCache } from '@/utils/auth';
+import type { LoginParams } from '@/api/sys/model/userModel';
+import {
+  clearUserSystemSessionMemory,
+  getCurrentAuthentication,
+  getUserSystemCsrfToken,
+  loginUser,
+  logoutUser,
+  selfAvatarUrl,
+  type AuthenticationState,
+} from '@/api/platform/userSystem';
 import { useI18n } from '@/hooks/web/useI18n';
 import { useMessage } from '@/hooks/web/useMessage';
 import { router } from '@/router';
 import { usePermissionStore } from '@/store/modules/permission';
-import { RouteRecordRaw } from 'vue-router';
-import { isArray } from '@/utils/is';
 import { h } from 'vue';
 import { message } from 'ant-design-vue';
 
 interface UserState {
   userInfo: Nullable<UserInfo>;
-  token?: string;
-  roleList: RoleEnum[];
-  sessionTimeout?: boolean;
+  roleList: string[];
+  sessionTimeout: boolean;
   lastUpdateTime: number;
-  optionsMap?: any;
-  account?: any;
+  hydrationAttempted: boolean;
+  authenticated: boolean;
+  authentication: AuthenticationState | null;
+  optionsMap?: Record<string, unknown> | null;
+  account?: unknown;
+}
+
+function toLegacyUserInfo(authentication: AuthenticationState): UserInfo {
+  const { user, permissions } = authentication;
+  const displayName = user.displayName || user.realName || user.username;
+  const homePath = user.role === 'member' ? '/account' : '/home/index';
+  return {
+    roles: [{ roleName: user.role, value: user.role }],
+    userId: user.userId,
+    username: user.username,
+    realName: displayName,
+    avatar: selfAvatarUrl(user.avatarKey),
+    desc: '',
+    role: user.role,
+    name: displayName,
+    homePath,
+    permissions,
+    data: {
+      userInfo: {
+        userId: user.userId,
+        username: user.username,
+        name: displayName,
+        role: user.role,
+        avatarKey: user.avatarKey,
+        status: user.status,
+      },
+      path: [],
+      product: [],
+    },
+  } as UserInfo;
 }
 
 export const useUserStore = defineStore({
   id: 'app-user',
   state: (): UserState => ({
-    // user info
     userInfo: null,
-    // token
-    token: undefined,
-    // roleList
     roleList: [],
-    // Whether the login expired
     sessionTimeout: false,
-    // Last fetch time
     lastUpdateTime: 0,
-    // 下拉数据
+    hydrationAttempted: false,
+    authenticated: false,
+    authentication: null,
     optionsMap: null,
-    // 用户拥有的可使用账户数据
     account: null,
   }),
   getters: {
-    getUserInfoInfo(state): any {
-      return (
-        state.userInfo?.data?.userInfo ||
-        getAuthCache<UserInfo>(USER_INFO_KEY)?.data?.userInfo ||
-        {}
-      );
+    getUserInfoInfo(state): Record<string, unknown> {
+      return ((state.userInfo as any)?.data?.userInfo || {}) as Record<string, unknown>;
     },
-    getUserInfoAccount(state): any {
-      return (
-        state.userInfo?.data?.product || getAuthCache<UserInfo>(USER_INFO_KEY)?.data?.product || []
-      );
+    getUserInfoAccount(state): unknown[] {
+      return ((state.userInfo as any)?.data?.product || []) as unknown[];
     },
-    getOptionsMap(state): any {
+    getOptionsMap(state): Record<string, unknown> {
       return state.optionsMap || {};
     },
     getUserInfo(state): UserInfo {
-      return state.userInfo || getAuthCache<UserInfo>(USER_INFO_KEY) || {};
+      return (state.userInfo || {}) as UserInfo;
     },
+    // Kept only for legacy callers while the route guard migrates to getIsAuthenticated.
+    // It is an in-memory marker, never a credential and never persisted.
     getToken(state): string {
-      return state.token || getAuthCache<string>(TOKEN_KEY);
+      return state.authenticated && getUserSystemCsrfToken() ? 'browser-session' : '';
     },
-    getRoleList(state): RoleEnum[] {
-      return state.roleList.length > 0 ? state.roleList : getAuthCache<RoleEnum[]>(ROLES_KEY);
+    getRoleList(state): string[] {
+      return state.roleList;
+    },
+    getIsAuthenticated(state): boolean {
+      return state.authenticated && Boolean(getUserSystemCsrfToken());
+    },
+    getHydrationAttempted(state): boolean {
+      return state.hydrationAttempted;
+    },
+    getAuthentication(state): AuthenticationState | null {
+      return state.authentication;
     },
     getSessionTimeout(state): boolean {
-      return !!state.sessionTimeout;
+      return state.sessionTimeout;
     },
     getLastUpdateTime(state): number {
       return state.lastUpdateTime;
     },
   },
   actions: {
-    setOptionsMap(optionsMap: any) {
-      this.optionsMap = optionsMap ? optionsMap : {};
-      // setAuthCache(TOKEN_KEY, optionsMap);
+    setOptionsMap(optionsMap?: Record<string, unknown> | null) {
+      this.optionsMap = optionsMap || {};
     },
-    setToken(info: string | undefined) {
-      this.token = info ? info : ''; // for null or undefined value
-      setAuthCache(TOKEN_KEY, info);
-    },
-    setRoleList(roleList: RoleEnum[]) {
+    setRoleList(roleList: string[]) {
       this.roleList = roleList;
-      setAuthCache(ROLES_KEY, roleList);
     },
     setUserInfo(info: UserInfo | null) {
       this.userInfo = info;
-      this.lastUpdateTime = new Date().getTime();
-      setAuthCache(USER_INFO_KEY, info);
+      this.lastUpdateTime = info ? Date.now() : 0;
     },
     setSessionTimeout(flag: boolean) {
       this.sessionTimeout = flag;
     },
+    setToken(token?: string) {
+      if (token) return;
+      this.resetState();
+      this.hydrationAttempted = true;
+    },
+    applyAuthentication(authentication: AuthenticationState) {
+      clearAuthCache();
+      this.authentication = authentication;
+      this.authenticated = true;
+      this.hydrationAttempted = true;
+      this.sessionTimeout = false;
+      this.setRoleList([authentication.user.role]);
+      this.setUserInfo(toLegacyUserInfo(authentication));
+      const permissionStore = usePermissionStore();
+      permissionStore.setPermCodeList(authentication.permissions);
+    },
     resetState() {
       this.userInfo = null;
       this.account = null;
-      this.token = '';
       this.roleList = [];
       this.sessionTimeout = false;
       this.optionsMap = null;
+      this.authentication = null;
+      this.authenticated = false;
+      this.lastUpdateTime = 0;
+      clearUserSystemSessionMemory();
+      clearAuthCache();
+      const permissionStore = usePermissionStore();
+      permissionStore.resetState();
     },
-    /**
-     * @description: login
-     */
     async login(
       params: LoginParams & {
         goHome?: boolean;
         mode?: ErrorMessageMode;
       },
-    ): Promise<GetUserInfoModel | null> {
-      try {
-        const { goHome = true, mode, ...loginParams } = params;
-        const data = await loginApi(loginParams, mode);
-        const { token } = data;
-
-        // save token
-        this.setToken(token);
-        return this.afterLoginAction(goHome);
-      } catch (error) {
-        return Promise.reject(error);
-      }
+    ): Promise<UserInfo | null> {
+      const { goHome = true, ...loginParams } = params;
+      const username = loginParams.username || loginParams.name || '';
+      const authentication = await loginUser(username, loginParams.password);
+      this.applyAuthentication(authentication);
+      return this.afterLoginAction(goHome, false);
     },
-    async afterLoginAction(goHome?: boolean): Promise<GetUserInfoModel | null> {
-      if (!this.getToken) return null;
-      // get user info
-      const userInfo = await this.getUserInfoAction();
-
-      const sessionTimeout = this.sessionTimeout;
-      if (sessionTimeout) {
-        this.setSessionTimeout(false);
-      } else {
-        const permissionStore = usePermissionStore();
-        if (!permissionStore.isDynamicAddedRoute) {
-          const routes = await permissionStore.buildRoutesAction();
-          routes.forEach((route) => {
-            router.addRoute(route as unknown as RouteRecordRaw);
-          });
-          permissionStore.setDynamicAddedRoute(true);
-        }
-        console.log('userInfo----------', userInfo);
-
-        goHome && (await router.replace(userInfo?.homePath || PageEnum.BASE_HOME));
+    async afterLoginAction(goHome = true, hydrate = true): Promise<UserInfo | null> {
+      if (hydrate && !this.getIsAuthenticated) {
+        await this.getUserInfoAction();
       }
-      return userInfo;
+      if (!this.getIsAuthenticated || !this.userInfo) return null;
+
+      if (goHome) {
+        await router.replace((this.userInfo as any).homePath || PageEnum.BASE_HOME);
+      }
+      return this.userInfo;
     },
     async getUserInfoAction(): Promise<UserInfo | null> {
-      console.log('getUserInfoAction====');
-
-      if (!this.getToken) return null;
-      const userInfo = await getUserInfo();
-      const { roles = [] } = userInfo;
-      if (isArray(roles)) {
-        const roleList = roles.map((item) => item.value) as RoleEnum[];
-        this.setRoleList(roleList);
-      } else {
-        userInfo.roles = [];
-        this.setRoleList([]);
+      try {
+        const authentication = await getCurrentAuthentication();
+        this.applyAuthentication(authentication);
+        return this.userInfo;
+      } catch (error) {
+        this.hydrationAttempted = true;
+        this.resetState();
+        throw error;
       }
-      const _pathArr = userInfo?.data?.path;
-      if (_pathArr?.length > 0) {
-        const defaultPath = _pathArr.reduce((prev, curr) => {
-          return (prev.sortOrder || Infinity) < (curr.sortOrder || Infinity) ? prev : curr;
-        });
-        // console.log('defaultPath', defaultPath);
-        userInfo.homePath = defaultPath.route || PageEnum.BASE_HOME;
-      }
-      this.setUserInfo(userInfo);
-      return userInfo;
     },
-    /**
-     * @description: logout
-     */
+    async hydrateSession(forceVerify = false): Promise<boolean> {
+      if (!forceVerify && this.authenticated && getUserSystemCsrfToken()) return true;
+      if (forceVerify && this.authenticated && getUserSystemCsrfToken()) {
+        try {
+          await this.getUserInfoAction();
+          return this.getIsAuthenticated;
+        } catch {
+          return false;
+        }
+      }
+      if (this.authenticated) {
+        this.resetState();
+        this.hydrationAttempted = false;
+      }
+      if (this.hydrationAttempted) return false;
+      try {
+        await this.getUserInfoAction();
+        return this.getIsAuthenticated;
+      } catch {
+        return false;
+      }
+    },
     async logout(goLogin = false) {
-      if (this.getToken) {
-        // try {
-        //   await doLogout();
-        // } catch {
-        //   console.log('注销Token失败');
-        // }
+      if (this.authenticated) {
+        try {
+          await logoutUser();
+        } catch {
+          // Local state must still clear when a server Session is already invalid.
+        }
       }
-      this.setToken(undefined);
-      this.setSessionTimeout(false);
-      this.setUserInfo(null);
+      this.resetState();
+      this.hydrationAttempted = true;
       message.destroy();
-      goLogin && router.push(PageEnum.BASE_LOGIN);
+      if (goLogin) await router.push(PageEnum.BASE_LOGIN);
     },
-
-    /**
-     * @description: Confirm before logging out
-     */
     confirmLoginOut() {
       const { createConfirm } = useMessage();
       const { t } = useI18n();
@@ -211,7 +241,6 @@ export const useUserStore = defineStore({
   },
 });
 
-// Need to be used outside the setup
 export function useUserStoreWithOut() {
   return useUserStore(store);
 }

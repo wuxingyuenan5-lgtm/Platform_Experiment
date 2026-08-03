@@ -1,16 +1,31 @@
 # Codex Current Context
 
-Last updated: 2026-07-26
+Last updated: 2026-07-29
 
 ## Stable Facts
 
-- Product version: `0.9.0`
-- Main baseline: `71603bcc6807284ef3a6da26ad3f43c541bc99c2`
-- GitHub repository for future upload: `wuxingyuenan5-lgtm/Platform_Experiment`
+- Product version: `0.9.1`
+- Uploaded main baseline: `a4e22021c71cf5cd703cb0bc35676ff5adbfec36`
+- Active integration branch: `feature/issue-117-platform-0-9-1`
+- The integration branch is not merged into `main`; do not merge without explicit user approval.
+- GitHub repository: `wuxingyuenan5-lgtm/Platform_Experiment`
 - Frontend: `http://127.0.0.1:4373/index.html`
 - Platform Backend: `http://127.0.0.1:8000/health`
 - Execution Runtime: `http://127.0.0.1:8100/health`
 - Frontend package manager: `pnpm@9.15.9`
+
+## Integrated Product Boundary
+
+`0.9.1` preserves the latest uploaded platform, hedge-fund dashboard, cross-spread, funding and Runtime changes, and adds the browser user system:
+
+- HttpOnly Cookie Sessions and memory-only CSRF;
+- CEO, technical lead, employee and member roles;
+- user administration, approval, operational notes and Session control;
+- member holdings, NAV and asset views;
+- eight reusable local/test accounts;
+- user-domain backup and restore coverage.
+
+Browser business roles remain separate from API-Key roles. Browser Sessions cannot authorize existing Live Write routes.
 
 ## Default Local Run
 
@@ -41,15 +56,18 @@ Architecture or high-risk change:
 
 - Run relevant type checks, structure guards and context checks.
 - Update architecture or ownership docs only when boundaries change.
+- For auth, permissions, migrations or Session changes, run the full user-system backend and browser matrix.
 
 Command index:
 
 ```powershell
 npx.cmd pnpm@9.15.9 type:check
+npx.cmd pnpm@9.15.9 test:user-system
 npx.cmd pnpm@9.15.9 test:homepage-layout
 npx.cmd pnpm@9.15.9 test:cross-spread-layout
 npx.cmd pnpm@9.15.9 test:funding-order-layout
 npx.cmd pnpm@9.15.9 test:hedge-board-layout
+python scripts/check-version-consistency.py
 python scripts/check-codex-context.py
 ```
 
@@ -68,17 +86,19 @@ python scripts/check-codex-context.py
 - Cross-spread page: `admin-risk/src/views/strategy/spread-carry/components/CrossVenueExecutionReplica.vue`
 - Funding execution page: `admin-risk/src/views/strategy/funding-carry/components/FundingOrderPanel.vue`
 - Hedge board page: `admin-risk/src/views/hedgeBoard/index.vue`
+- User management: `admin-risk/src/views/users/`
+- Member account: `admin-risk/src/views/account/`
 - Cross-spread guard: `admin-risk/scripts/verify-cross-spread-layout.cjs`
 - Funding order guard: `admin-risk/scripts/verify-funding-order-layout.cjs`
 - Hedge board guard: `admin-risk/scripts/verify-hedge-board-layout.cjs`
 - Homepage guard: `admin-risk/scripts/verify-homepage-layout.cjs`
-- Cross-spread plan: `admin-risk/docs/architecture/cross-spread-refactor-plan.md`
+- User-system guard: `admin-risk/scripts/test-user-system-access.cjs`
 - Lightweight optimization plan: `docs/architecture/LIGHTWEIGHT_OPTIMIZATION_PLAN.md`
 
 ## Architecture Boundary
 
 - `admin-risk/`: Vue product frontend
-- `platform-backend/`: business, risk, orchestration and accounting API
+- `platform-backend/`: business, risk, user, orchestration and accounting API
 - `execution-runtime/`: isolated Venue/Broker adapters and external side effects
 
 Keep the three-service boundary. Current optimization work should reduce frontend/document noise, not merge services or introduce a new framework.

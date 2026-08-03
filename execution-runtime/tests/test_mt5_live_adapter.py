@@ -1,5 +1,5 @@
-from decimal import Decimal
 import sys
+from decimal import Decimal
 from types import SimpleNamespace
 
 import pytest
@@ -197,6 +197,7 @@ def test_mt5_live_adapter_sets_terminal_timeouts(tmp_path, monkeypatch) -> None:
     initialize_journal()
     fake_mt5 = FakeRuntimeMt5()
     monkeypatch.setitem(sys.modules, "MetaTrader5", fake_mt5)
+    monkeypatch.setattr("app.mt5_live_adapter.platform.system", lambda: "Windows")
 
     adapter = Mt5LiveAdapter(runtime_settings(write_enabled=False))
     balance = adapter.list_balances("account-mt5")[0]

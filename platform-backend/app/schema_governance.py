@@ -13,6 +13,12 @@ from app.schema_migrations import (
     apply_platform_migrations,
     list_applied_migrations,
 )
+from app.user_product_migrations import (
+    USER_PRODUCT_MIGRATIONS,
+    apply_user_product_migrations,
+)
+
+ALL_PLATFORM_MIGRATIONS = (*PLATFORM_MIGRATIONS, *USER_PRODUCT_MIGRATIONS)
 
 
 class SchemaMigrationStatus(BaseModel):
@@ -31,6 +37,7 @@ class SchemaMigrationStatusResponse(BaseModel):
 @asynccontextmanager
 async def schema_lifespan(_: FastAPI) -> AsyncIterator[None]:
     apply_platform_migrations()
+    apply_user_product_migrations()
     yield
 
 
@@ -47,7 +54,7 @@ def schema_migration_status() -> SchemaMigrationStatusResponse:
         item["version"]: item for item in list_applied_migrations()
     }
     statuses: list[SchemaMigrationStatus] = []
-    for migration in PLATFORM_MIGRATIONS:
+    for migration in ALL_PLATFORM_MIGRATIONS:
         applied = applied_by_version.get(migration.version)
         applied_at = (
             datetime.fromisoformat(applied["appliedAt"])

@@ -17,7 +17,7 @@ const hedge: AppRouteModule = {
     {
       path: 'macro',
       name: 'HedgeMacroBoard',
-      component: () => import('@/views/hedgeBoard/index.vue'),
+      component: () => import('@/views/hedgeBoard/macro/index.vue'),
       meta: {
         title: '\u5b8f\u89c2',
         icon: 'ant-design:global-outlined',
@@ -61,7 +61,7 @@ const hedge: AppRouteModule = {
     {
       path: 'a-share',
       name: 'HedgeAShareBoard',
-      component: () => import('@/views/hedgeBoard/index.vue'),
+      component: () => import('@/views/hedgeBoard/aShare/index.vue'),
       meta: {
         title: 'A\u80a1',
         icon: 'ant-design:bar-chart-outlined',

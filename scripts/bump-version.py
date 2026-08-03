@@ -9,6 +9,10 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 SEMVER = re.compile(r"\d+\.\d+\.\d+")
+FRONTEND_VERSION_FILES = (
+    "admin-risk/.env.development",
+    "admin-risk/.env.production",
+)
 
 
 def replace_once(path: Path, pattern: str, replacement: str) -> None:
@@ -29,11 +33,12 @@ def update_versions(root: Path, version: str) -> None:
             r'^version\s*=\s*"\d+\.\d+\.\d+"$',
             f'version = "{version}"',
         )
-    replace_once(
-        root / "admin-risk/.env",
-        r'^VITE_GLOB_APP_VERSION\s*=\s*"\d+\.\d+\.\d+"$',
-        f'VITE_GLOB_APP_VERSION = "{version}"',
-    )
+    for relative in FRONTEND_VERSION_FILES:
+        replace_once(
+            root / relative,
+            r'^VITE_GLOB_APP_VERSION\s*=\s*["\']\d+\.\d+\.\d+["\']$',
+            f'VITE_GLOB_APP_VERSION = "{version}"',
+        )
 
 
 def main() -> None:

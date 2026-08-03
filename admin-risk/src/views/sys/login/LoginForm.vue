@@ -11,13 +11,14 @@
         :model="formData"
         :rules="getFormRules"
         v-show="getShow"
-        @keypress.enter="loginFirst"
+        @keypress.enter="handleLogin"
       >
         <FormItem name="name" label="账号" class="enter-x mb-8">
           <Input
             v-model:value="formData.name"
             placeholder="请输入账号"
             class="fix-auto-fill login-input"
+            autocomplete="username"
           />
         </FormItem>
 
@@ -27,6 +28,7 @@
             visibilityToggle
             v-model:value="formData.password"
             placeholder="请输入密码"
+            autocomplete="current-password"
           />
         </FormItem>
 
@@ -35,7 +37,7 @@
             style="width: 320px; height: 46px"
             type="primary"
             block
-            @click="loginFirst"
+            @click="handleLogin"
             :loading="loading"
           >
             {{ t('sys.login.loginButton') }}
@@ -50,21 +52,21 @@
         >
           没有账号？提交注册申请
         </Button>
+        <Button
+          type="link"
+          block
+          class="reset-password-btn mt-2 enter-x"
+          html-type="button"
+          @click.prevent="goResetPassword"
+        >
+          已有一次性重置凭证？设置新密码
+        </Button>
       </Form>
     </div>
-
-    <GoogleCode
-      ref="refGoogle"
-      :type="TypeGoogleCode.PASS"
-      v-model:visible="visibleGoogle"
-      @confirm="handleClickConfirm"
-    />
   </div>
 </template>
 
 <script lang="ts" setup>
-  import GoogleCode from '@/components/google/GoogleCode.vue';
-  import { TypeGoogleCode } from '@/components/google/type';
   import { reactive, ref, unref, computed, onBeforeUnmount } from 'vue';
   import { useRoute, useRouter } from 'vue-router';
   import { Form, Input, Button } from 'ant-design-vue';
@@ -73,7 +75,7 @@
   import { useUserStore } from '@/store/modules/user';
   import { LoginStateEnum, useLoginState, useFormRules, useFormValid } from './useLogin';
   import { useDesign } from '@/hooks/web/useDesign';
-  import { loginApi } from '@/api/sys/user';
+  import { UserSystemApiError } from '@/api/platform/userSystem';
 
   const FormItem = Form.Item;
   const { t } = useI18n();
@@ -92,138 +94,68 @@
     password: '',
   });
 
-  const visibleGoogle = ref(false);
-  const refGoogle = ref();
-  let curParams: any = null;
-
   const { validForm } = useFormValid(formRef);
   const getShow = computed(() => unref(getLoginState) === LoginStateEnum.LOGIN);
-
-  function handleClickConfirm(params: any) {
-    const payload = { ...curParams, ...params, action: 'verify' };
-    loginCode(payload);
-  }
 
   function goRegisterApply() {
     router.push('/register-apply');
   }
 
-  function loginCode(params: any) {
-    loading.value = true;
-    loginApi(params, 'none')
-      .then(async (res: any) => {
-        if (res && res.retCode === 0) {
-          await successLogin(res.data);
-        } else if (res && (res.token || res.access_token || res.userId)) {
-          await successLogin(res);
-        } else {
-          failLoginModal(res);
-        }
-      })
-      .catch((err) => {
-        failLoginModal(err);
-      })
-      .finally(() => {
-        refGoogle.value.loading = false;
-        loading.value = false;
-      });
+  function goResetPassword() {
+    router.push('/reset-password');
   }
 
-  async function loginFirst() {
-    curParams = await validForm();
-    if (!curParams) return;
-    loading.value = true;
-    try {
-      const payload = {
-        password: curParams.password,
-        name: curParams.name,
-        action: 'login',
-      };
-      const res: any = await loginApi(payload, 'none');
-      if (res) {
-        if (res.retCode === 0) {
-          if (res.data) {
-            await successLogin(res.data);
-          } else {
-            visibleGoogle.value = true;
-          }
-        } else if (res.token || res.access_token || res.userId) {
-          await successLogin(res);
-        } else {
-          failLoginModal(res);
-        }
-      } else {
-        failLoginModal({ msg: 'no response from server' });
-      }
-    } catch (error) {
-      failLoginModal(error);
-    } finally {
-      loading.value = false;
-    }
-  }
-
-  function failLoginModal(data: any) {
-    let errorMessage = '';
-    if (data?.response) {
-      const status = data.response.status;
-      const backendData = data.response.data;
-      if (status === 401) {
-        errorMessage =
-          backendData?.msg ||
-          backendData?.message ||
-          backendData?.error ||
-          '用户名或密码错误，请重试';
-      } else {
-        errorMessage = backendData?.msg || backendData?.message || `请求失败 (${status})`;
-      }
-    } else {
-      errorMessage = data?.msg || data?.retMsg || t('sys.api.networkExceptionMsg');
-    }
-
+  function showLoginError(error: unknown) {
+    const known = error instanceof UserSystemApiError ? error : null;
+    const messages: Record<string, string> = {
+      account_pending: '账号正在等待审核，审核通过后方可登录',
+      account_disabled: '账号已停用，请联系管理员',
+      account_rejected: '注册申请未通过',
+      account_temporarily_locked: '账号已临时锁定，请稍后重试',
+      invalid_credentials: '账号或密码错误',
+    };
     createErrorModal({
       title: t('sys.api.errorTip'),
-      content: errorMessage,
+      content: (known?.code && messages[known.code]) || known?.message || '登录失败，请稍后重试',
       getContainer: () => document.body.querySelector(`.${prefixCls}`) || document.body,
     });
   }
 
-  async function successLogin(data: any) {
+  async function handleLogin() {
+    const params = await validForm();
+    if (!params || loading.value) return;
+    loading.value = true;
     createMessage.loading({
       content: '登录中...',
-      key: 'successLogin',
+      key: 'user-system-login',
       style: { marginTop: '25vh' },
       duration: 99,
     });
-
     try {
-      const token =
-        (data && (data.token || data.access_token)) ||
-        (typeof data === 'string' ? data : undefined);
-      if (!token) throw new Error('登录响应中缺少访问令牌');
-      userStore.setToken(token);
-      const userInfo = await userStore.afterLoginAction(true);
-      if (userInfo) {
-        notification.success({
-          message: t('sys.login.loginSuccessTitle'),
-          description: `${t('sys.login.loginSuccessDesc')}: ${curParams.name}`,
-          duration: 3,
-        });
-      }
-
+      const userInfo = await userStore.login({
+        name: params.name,
+        password: params.password,
+        goHome: false,
+        mode: 'none',
+      });
+      if (!userInfo) throw new Error('登录状态初始化失败');
+      notification.success({
+        message: t('sys.login.loginSuccessTitle'),
+        description: `${t('sys.login.loginSuccessDesc')}: ${params.name}`,
+        duration: 3,
+      });
       const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : '';
-      if (redirect) {
-        router.replace(redirect);
-        return;
-      }
-
-      router.replace('/home/index');
+      await router.replace(redirect || (userInfo as any).homePath || '/home/index');
+    } catch (error) {
+      showLoginError(error);
     } finally {
-      createMessage.destroy('successLogin');
+      loading.value = false;
+      createMessage.destroy('user-system-login');
     }
   }
 
   onBeforeUnmount(() => {
-    createMessage.destroy('successLogin');
+    createMessage.destroy('user-system-login');
   });
 </script>
 
@@ -290,6 +222,11 @@
       font-weight: 400;
     }
 
+    .reset-password-btn {
+      width: 320px;
+      color: #64748b;
+    }
+
     .ant-form .ant-form-item-label > label {
       font-size: 14px;
       line-height: 16px;
@@ -313,6 +250,7 @@
 
     .login-box .login-input,
     .login-box .register-apply-btn,
+    .login-box .reset-password-btn,
     .login-box .ant-btn {
       width: 100% !important;
     }

@@ -1,0 +1,78 @@
+from __future__ import annotations
+
+from decimal import Decimal
+from typing import Annotated, NoReturn
+
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
+
+from app.auth import Principal, require_permission
+from app.config import get_settings
+from app.research_data_schemas import (
+    AShareDashboardResponse,
+    MacroExpectationResponse,
+    StockSnapshotResponse,
+)
+from app.research_service import (
+    DEFAULT_THRESHOLD_YUAN,
+    ResearchServiceError,
+    get_a_share_dashboard,
+    get_macro_expectations,
+    get_stock_snapshot,
+)
+
+settings = get_settings()
+router = APIRouter(prefix=f"{settings.api_prefix}/research", tags=["research"])
+ResearchPrincipal = Annotated[Principal, Depends(require_permission("platform:read"))]
+
+
+def _raise_service_error(exc: ResearchServiceError) -> NoReturn:
+    raise HTTPException(
+        status_code=exc.status_code,
+        detail={"code": exc.code, "message": exc.detail},
+    ) from exc
+
+
+def _cache_header(response: Response, seconds: int) -> None:
+    response.headers["Cache-Control"] = f"private, max-age={seconds}, stale-if-error=3600"
+
+
+@router.get("/a-share/dashboard", response_model=AShareDashboardResponse)
+async def a_share_dashboard(
+    response: Response,
+    _: ResearchPrincipal,
+    threshold_yuan: Decimal = Query(
+        default=DEFAULT_THRESHOLD_YUAN,
+        alias="thresholdYuan",
+        gt=0,
+    ),
+) -> AShareDashboardResponse:
+    try:
+        result = await get_a_share_dashboard(threshold_yuan=threshold_yuan)
+    except ResearchServiceError as exc:
+        _raise_service_error(exc)
+    _cache_header(response, 60)
+    return result
+
+
+@router.get("/a-share/stocks/{code}/snapshot", response_model=StockSnapshotResponse)
+async def stock_snapshot(
+    code: str,
+    response: Response,
+    _: ResearchPrincipal,
+) -> StockSnapshotResponse:
+    try:
+        result = await get_stock_snapshot(code)
+    except ResearchServiceError as exc:
+        _raise_service_error(exc)
+    _cache_header(response, 300)
+    return result
+
+
+@router.get("/macro/expectations", response_model=MacroExpectationResponse)
+async def macro_expectations(
+    response: Response,
+    _: ResearchPrincipal,
+) -> MacroExpectationResponse:
+    result = await get_macro_expectations()
+    _cache_header(response, 300)
+    return result

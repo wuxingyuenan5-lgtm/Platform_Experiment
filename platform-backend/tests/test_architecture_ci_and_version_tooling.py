@@ -74,23 +74,25 @@ def test_bump_version_updates_all_maintained_declarations(tmp_path: Path) -> Non
         '[project]\nversion = "0.8.0"\n',
         encoding="utf-8",
     )
-    (tmp_path / "admin-risk/.env").write_text(
-        'VITE_GLOB_APP_VERSION = "0.8.0"\n',
-        encoding="utf-8",
-    )
+    for filename in (".env.development", ".env.production"):
+        (tmp_path / f"admin-risk/{filename}").write_text(
+            'VITE_GLOB_APP_VERSION = "0.8.0"\n',
+            encoding="utf-8",
+        )
 
-    bump_version.update_versions(tmp_path, "0.9.0")
+    bump_version.update_versions(tmp_path, "0.9.1")
 
-    assert (tmp_path / "VERSION").read_text(encoding="utf-8") == "0.9.0\n"
-    assert 'version = "0.9.0"' in (
+    assert (tmp_path / "VERSION").read_text(encoding="utf-8") == "0.9.1\n"
+    assert 'version = "0.9.1"' in (
         tmp_path / "platform-backend/pyproject.toml"
     ).read_text(encoding="utf-8")
-    assert 'version = "0.9.0"' in (
+    assert 'version = "0.9.1"' in (
         tmp_path / "execution-runtime/pyproject.toml"
     ).read_text(encoding="utf-8")
-    assert 'VITE_GLOB_APP_VERSION = "0.9.0"' in (
-        tmp_path / "admin-risk/.env"
-    ).read_text(encoding="utf-8")
+    for filename in (".env.development", ".env.production"):
+        assert 'VITE_GLOB_APP_VERSION = "0.9.1"' in (
+            tmp_path / f"admin-risk/{filename}"
+        ).read_text(encoding="utf-8")
 
 
 def test_pr_workflows_do_not_duplicate_feature_branch_push_runs() -> None:

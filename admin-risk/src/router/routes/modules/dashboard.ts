@@ -2,6 +2,8 @@ import type { AppRouteModule } from '@/router/types';
 import { LAYOUT } from '@/router/constant';
 import { RoleEnum } from '@/enums/roleEnum';
 
+const internalRoles = [RoleEnum.CEO, RoleEnum.TECH_LEAD, RoleEnum.EMPLOYEE];
+
 const dashboard: AppRouteModule = {
   path: '/home',
   name: 'Home',
@@ -11,7 +13,8 @@ const dashboard: AppRouteModule = {
     title: '首页',
     icon: 'ant-design:home-outlined',
     orderNo: 0,
-    roles: [RoleEnum.ADMIN, RoleEnum.EMPLOYEE, RoleEnum.GUEST],
+    roles: internalRoles,
+    permissions: 'platform:read',
   },
   children: [
     {
@@ -22,7 +25,8 @@ const dashboard: AppRouteModule = {
         title: '首页',
         single: true,
         affix: true,
-        roles: [RoleEnum.ADMIN, RoleEnum.EMPLOYEE, RoleEnum.GUEST],
+        roles: internalRoles,
+        permissions: 'platform:read',
       },
     },
   ],

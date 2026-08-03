@@ -1,5 +1,6 @@
 import { defineApplicationConfig } from '@vben/vite-config';
 
+const localPlatformBackend = 'http://127.0.0.1:8000';
 const localAuthService = 'http://127.0.0.1:8080';
 const localDataService = 'http://127.0.0.1:8082';
 
@@ -29,7 +30,12 @@ export default defineApplicationConfig({
         usePolling: true,
       },
       proxy: {
-        // Development and production use the same public API contract.
+        // Canonical Platform Backend API, including browser identity and Session routes.
+        '/api/v1': {
+          target: localPlatformBackend,
+          changeOrigin: true,
+        },
+        // Legacy services remain available to unrelated pages during the bounded migration.
         '/api/auth': {
           target: localAuthService,
           changeOrigin: true,

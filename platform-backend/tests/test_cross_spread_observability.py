@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from app.cross_spread_live_read_client import CrossSpreadLiveReadError
 from app.cross_spread_observability_service import get_cross_spread_observability

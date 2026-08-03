@@ -1,6 +1,8 @@
-﻿import type { AppRouteModule } from '@/router/types';
+import type { AppRouteModule } from '@/router/types';
 import { LAYOUT } from '@/router/constant';
 import { RoleEnum } from '@/enums/roleEnum';
+
+const internalRoles = [RoleEnum.CEO, RoleEnum.TECH_LEAD, RoleEnum.EMPLOYEE];
 
 const risk: AppRouteModule = {
   path: '/risk',
@@ -11,7 +13,8 @@ const risk: AppRouteModule = {
     title: '风控管理',
     icon: 'ant-design:safety-certificate-outlined',
     orderNo: 60,
-    roles: [RoleEnum.ADMIN, RoleEnum.EMPLOYEE, RoleEnum.GUEST],
+    roles: internalRoles,
+    permissions: 'risk.read',
   },
   children: [
     {
@@ -21,7 +24,8 @@ const risk: AppRouteModule = {
       meta: {
         title: '风控详情',
         icon: 'ant-design:warning-outlined',
-        roles: [RoleEnum.ADMIN, RoleEnum.EMPLOYEE, RoleEnum.GUEST],
+        roles: internalRoles,
+        permissions: 'risk.read',
       },
     },
     {
@@ -31,17 +35,20 @@ const risk: AppRouteModule = {
       meta: {
         title: '用户管理',
         icon: 'ant-design:user-outlined',
-        roles: [RoleEnum.ADMIN],
+        roles: internalRoles,
+        permissions: 'user.read',
       },
     },
     {
       path: 'profile',
       name: 'RiskPersonalProfile',
-      component: () => import('@/views/risk/profile/index.vue'),
+      redirect: '/account/index',
       meta: {
         title: '个人账号',
         icon: 'ant-design:user-switch-outlined',
-        roles: [RoleEnum.ADMIN, RoleEnum.EMPLOYEE, RoleEnum.GUEST],
+        roles: internalRoles,
+        permissions: 'profile.read_self',
+        hideMenu: true,
       },
     },
   ],

@@ -406,8 +406,8 @@ class BybitLiveAdapter:
         if self._resolved_client is not None:
             return self._resolved_client
         try:
-            from pybit.unified_trading import HTTP
             from pybit import _helpers
+            from pybit.unified_trading import HTTP
         except ImportError as exc:
             raise GatewayConfigurationError("pybit dependency is not installed") from exc
         self._apply_timestamp_offset(_helpers)
@@ -443,7 +443,7 @@ class BybitLiveAdapter:
         original = getattr(helpers, "_vg_original_generate_timestamp", None)
         if original is None:
             original = helpers.generate_timestamp
-            setattr(helpers, "_vg_original_generate_timestamp", original)
+            helpers._vg_original_generate_timestamp = original
         helpers.generate_timestamp = lambda: original() + offset_ms
 
     def _assert_account(self, account_id: str) -> None:
