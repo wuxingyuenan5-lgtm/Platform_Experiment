@@ -56,6 +56,21 @@
     {
       "path": "platform-web/src/views/financialAi/index.vue",
       "required_markers": ["ProductNotConfiguredPanel", "not-configured: financial-ai-provider"]
+    },
+    {
+      "path": "platform-web/src/views/strategy/management/index.vue",
+      "required_markers": ["ProductNotConfiguredPanel", "not-configured: strategy-catalog-owner"]
+    },
+    {
+      "path": "platform-web/src/views/newsCalendar/index.vue",
+      "required_markers": [
+        "not-configured: news-aggregation-provider",
+        "not-configured: wealth-campaign-provider"
+      ]
+    },
+    {
+      "path": "platform-web/src/views/settings/index.vue",
+      "required_markers": ["not-configured: settings-write-owner"]
     }
   ]
 }
