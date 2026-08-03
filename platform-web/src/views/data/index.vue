@@ -61,7 +61,9 @@
               {{ formatMoney(record.initial_capital) }}
             </template>
             <template v-else-if="column.key === 'status'">
-              <Tag :color="record.status === 'active' ? 'green' : 'default'">{{ record.status }}</Tag>
+              <Tag :color="record.status === 'active' ? 'green' : 'default'">
+                {{ record.status }}
+              </Tag>
             </template>
             <template v-else-if="column.key === 'asset_updated_at'">
               {{ formatDateTime(record.asset_updated_at) }}
@@ -78,7 +80,11 @@
   import { Button, Card, message, Space, Table, Tag } from 'ant-design-vue';
   import { computed, onMounted, ref } from 'vue';
   import { useRoute } from 'vue-router';
-  import { type DecimalString, type ProductDataMeta, unavailableMeta } from '@/api/platform/productDataState';
+  import {
+    type DecimalString,
+    type ProductDataMeta,
+    unavailableMeta,
+  } from '@/api/platform/productDataState';
   import {
     type DataAccount,
     type DataServiceHealth,
