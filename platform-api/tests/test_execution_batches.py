@@ -93,7 +93,7 @@ def test_execution_batch_becomes_hedged_and_creates_two_commands(
         runtime_calls += 1
         return filled_runtime_response(kwargs["json"])
 
-    monkeypatch.setattr("app.trading.httpx.post", runtime_post)
+    monkeypatch.setattr("app.trade_command_execution.httpx.post", runtime_post)
 
     account_id = "account_sim_usdt"
     spot_id = "instrument_btc_usdt"
@@ -157,7 +157,7 @@ def test_second_leg_unknown_requires_manual_intervention(
             return filled_runtime_response(kwargs["json"])
         raise httpx.ConnectError("runtime unavailable")
 
-    monkeypatch.setattr("app.trading.httpx.post", runtime_post)
+    monkeypatch.setattr("app.trade_command_execution.httpx.post", runtime_post)
 
     account_id = "account_sim_usdt"
     spot_id = "instrument_btc_usdt"

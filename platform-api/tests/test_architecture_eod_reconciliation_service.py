@@ -5,7 +5,7 @@ APP_ROOT = Path(__file__).resolve().parents[1] / "app"
 SERVICE_PATH = APP_ROOT / "eod_reconciliation_service.py"
 FACADE_PATH = APP_ROOT / "eod_reconciliation.py"
 ROUTES_PATH = APP_ROOT / "eod_reconciliation_routes.py"
-MAIN_PATH = APP_ROOT / "main.py"
+MAIN_PATH = APP_ROOT / "application.py"
 
 
 def function_names(path: Path) -> set[str]:
@@ -143,4 +143,4 @@ def test_composition_root_imports_the_dedicated_eod_router() -> None:
         in source
     )
     assert "from app.eod_reconciliation import router" not in source
-    assert source.count("app.include_router(eod_reconciliation_router)") == 1
+    assert source.count("application.include_router(eod_reconciliation_router)") == 1

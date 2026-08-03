@@ -156,7 +156,7 @@ def test_auto_flatten_resolves_first_leg_exposure_idempotently(
             raise httpx.ConnectError("runtime unavailable")
         return filled_runtime_response(kwargs["json"])
 
-    monkeypatch.setattr("app.trading.httpx.post", runtime_post)
+    monkeypatch.setattr("app.trade_command_execution.httpx.post", runtime_post)
 
     with TestClient(app) as client:
         set_policy(
@@ -218,7 +218,7 @@ def test_residual_limit_stops_second_leg_and_manual_action_is_idempotent(
         call_count += 1
         return filled_runtime_response(kwargs["json"])
 
-    monkeypatch.setattr("app.trading.httpx.post", runtime_post)
+    monkeypatch.setattr("app.trade_command_execution.httpx.post", runtime_post)
 
     with TestClient(app) as client:
         set_policy(
@@ -280,7 +280,7 @@ def test_leg_deadline_uses_first_fill_timestamp(monkeypatch, tmp_path: Path) -> 
             raise httpx.ConnectError("runtime unavailable")
         return filled_runtime_response(kwargs["json"])
 
-    monkeypatch.setattr("app.trading.httpx.post", runtime_post)
+    monkeypatch.setattr("app.trade_command_execution.httpx.post", runtime_post)
 
     with TestClient(app) as client:
         set_policy(

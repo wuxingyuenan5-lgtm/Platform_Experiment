@@ -1,0 +1,201 @@
+{
+  "budgets": {
+    "hedge-style": [
+      34000,
+      6000
+    ],
+    "identity-permission": [
+      12000,
+      8000
+    ],
+    "member-contract": [
+      12750,
+      7000
+    ],
+    "research-field": [
+      17000,
+      4000
+    ],
+    "research-provider": [
+      13000,
+      3500
+    ],
+    "trading-display": [
+      15000,
+      4500
+    ],
+    "user-e2e": [
+      10500,
+      4000
+    ]
+  },
+  "default_startup_base": [
+    "AGENTS.md",
+    "docs/codex/current-state.md"
+  ],
+  "default_startup_budget_tokens": 4000,
+  "default_startup_modules": [
+    "platform-web/AGENTS.md",
+    "platform-api/AGENTS.md",
+    "execution-runtime/AGENTS.md"
+  ],
+  "packs": {
+    "hedge-style": {
+      "checks": [
+        "cd platform-web && pnpm test:hedge-board-layout",
+        "cd platform-web && pnpm type:check",
+        "cd platform-web && pnpm test:e2e:hedge-board"
+      ],
+      "description": "Modify hedge/research board layout or styling without changing visible behavior.",
+      "optional": [
+        "platform-web/docs/design/platform-ui-guidelines.md",
+        "platform-web/e2e/hedge-board/hedge-board.spec.ts"
+      ],
+      "required": [
+        "AGENTS.md",
+        "docs/codex/current-state.md",
+        "platform-web/AGENTS.md",
+        "platform-web/src/views/hedgeBoard/index.vue",
+        "platform-web/scripts/verify-hedge-board-layout.cjs"
+      ]
+    },
+    "identity-permission": {
+      "checks": [
+        "cd platform-api && python -m pytest tests/test_auth_rbac.py",
+        "cd platform-web && pnpm test:user-system",
+        "cd platform-web && pnpm test:e2e:user-system"
+      ],
+      "description": "Change browser role, permission or Session behavior while preserving security boundaries.",
+      "optional": [
+        "platform-api/app/user_session_auth.py",
+        "platform-api/tests/test_last_ceo_concurrency.py",
+        "platform-web/e2e/user-system/user-system.spec.ts"
+      ],
+      "required": [
+        "AGENTS.md",
+        "docs/codex/current-state.md",
+        "platform-web/AGENTS.md",
+        "platform-web/src/access/userAccess.ts",
+        "platform-web/src/router/guard/permissionGuard.ts",
+        "platform-api/AGENTS.md",
+        "platform-api/app/auth.py",
+        "platform-api/app/user_authority.py",
+        "platform-api/app/user_permissions.py",
+        "platform-api/tests/test_auth_rbac.py"
+      ]
+    },
+    "member-contract": {
+      "checks": [
+        "cd platform-api && python -m pytest tests/test_member_holdings.py",
+        "cd platform-web && pnpm test:user-system"
+      ],
+      "description": "Change the member holdings/NAV API contract without loading Runtime or unrelated user administration.",
+      "optional": [
+        "platform-api/app/member_holding_repository.py",
+        "docs/technical/MEMBER_HOLDINGS_READ_MODEL.md",
+        "platform-api/tests/test_member_holding_decimal.py"
+      ],
+      "required": [
+        "AGENTS.md",
+        "docs/codex/current-state.md",
+        "platform-web/AGENTS.md",
+        "platform-web/src/api/platform/memberHoldings.ts",
+        "platform-api/AGENTS.md",
+        "platform-api/app/member_holding_routes.py",
+        "platform-api/app/member_holding_schemas.py",
+        "platform-api/app/member_holding_service.py",
+        "platform-api/tests/test_member_holdings.py"
+      ]
+    },
+    "research-field": {
+      "checks": [
+        "cd platform-api && python -m pytest tests/test_research_service.py",
+        "cd platform-web && pnpm type:check"
+      ],
+      "description": "Change one A-share, Shenwan or research field without reading unrelated Providers.",
+      "optional": [
+        "platform-api/app/research_providers.py",
+        "platform-api/app/research_cache.py",
+        "platform-api/tests/test_a_share_research_policy.py"
+      ],
+      "required": [
+        "AGENTS.md",
+        "docs/codex/current-state.md",
+        "platform-web/AGENTS.md",
+        "platform-web/src/views/hedgeBoard/aShare/index.vue",
+        "platform-web/src/views/hedgeBoard/aShare/useAShareResearch.ts",
+        "platform-web/src/api/hedgeResearch.ts",
+        "platform-api/AGENTS.md",
+        "platform-api/app/research_data_schemas.py",
+        "platform-api/app/research_service.py",
+        "platform-api/tests/test_research_service.py"
+      ]
+    },
+    "research-provider": {
+      "checks": [
+        "cd platform-api && python -m pytest tests/test_research_service.py",
+        "cd platform-api && python scripts/smoke_research_providers.py --timeout 60"
+      ],
+      "description": "Add or repair one external Research Provider with explicit status and Last Known Good behavior.",
+      "optional": [
+        "platform-web/src/api/hedgeResearch.ts",
+        "docs/technical/RESEARCH_DATA_PLATFORM.md"
+      ],
+      "required": [
+        "AGENTS.md",
+        "docs/codex/current-state.md",
+        "platform-api/AGENTS.md",
+        "platform-api/app/research_providers.py",
+        "platform-api/app/research_service.py",
+        "platform-api/app/research_cache.py",
+        "platform-api/app/research_data_schemas.py",
+        "platform-api/scripts/smoke_research_providers.py",
+        "platform-api/tests/test_research_service.py"
+      ]
+    },
+    "trading-display": {
+      "checks": [
+        "cd platform-web && pnpm test:cross-spread-layout",
+        "cd platform-api && python -m pytest tests/test_cross_spread_observability.py",
+        "cd platform-web && pnpm type:check"
+      ],
+      "description": "Change cross-spread/funding display while keeping execution and accounting semantics unchanged.",
+      "optional": [
+        "platform-web/scripts/verify-cross-spread-layout.cjs",
+        "platform-api/app/cross_spread_observability_service.py",
+        "execution-runtime/AGENTS.md"
+      ],
+      "required": [
+        "AGENTS.md",
+        "docs/codex/current-state.md",
+        "platform-web/AGENTS.md",
+        "platform-web/src/views/strategy/spread-carry/components/CrossVenueExecutionWorkspace.vue",
+        "platform-web/src/api/platform/crossSpreadObservability.ts",
+        "platform-api/AGENTS.md",
+        "platform-api/app/cross_spread_observability_schemas.py",
+        "platform-api/tests/test_cross_spread_observability.py"
+      ]
+    },
+    "user-e2e": {
+      "checks": [
+        "cd platform-web && pnpm test:user-system",
+        "cd platform-web && pnpm test:e2e:user-system"
+      ],
+      "description": "Repair user-system browser E2E without loading unrelated product modules.",
+      "optional": [
+        "platform-web/e2e/user-system/demo-accounts.spec.ts",
+        "platform-api/tests/test_user_browser_flows.py"
+      ],
+      "required": [
+        "AGENTS.md",
+        "docs/codex/current-state.md",
+        "platform-web/AGENTS.md",
+        "platform-web/e2e/user-system/user-system.spec.ts",
+        "platform-web/playwright.user-system.config.ts",
+        "platform-web/scripts/test-user-system-access.cjs",
+        "platform-api/AGENTS.md",
+        "platform-api/scripts/seed_user_system_e2e.py"
+      ]
+    }
+  }
+}

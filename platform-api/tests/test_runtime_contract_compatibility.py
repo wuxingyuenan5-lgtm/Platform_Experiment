@@ -14,6 +14,7 @@ from app.runtime_contracts import (
 
 ROOT = Path(__file__).resolve().parents[2]
 SNAPSHOT = ROOT / "docs" / "contracts" / "runtime-v1.json"
+GOLDEN = ROOT / "docs" / "contracts" / "runtime-v1-golden.json"
 
 
 def test_platform_runtime_contract_matches_canonical_snapshot() -> None:
@@ -55,3 +56,30 @@ def test_incompatible_runtime_event_version_is_rejected() -> None:
                 "occurred_at": "2026-07-24T00:00:00+00:00",
             }
         )
+
+
+def test_platform_command_and_event_match_bidirectional_golden_payloads() -> None:
+    golden = json.loads(GOLDEN.read_text(encoding="utf-8"))
+    command = RuntimeSubmitOrderCommandV1.model_validate(golden["command"])
+    event = RuntimeExecutionEventV1.model_validate(golden["event"])
+
+    assert command.model_dump(mode="json") == golden["command"]
+    assert event.model_dump(mode="json") == golden["event"]
+    assert command.model_dump(mode="json")["quantity"] == "1.25000001"
+    assert event.model_dump(mode="json")["fill_quantity"] == "1.25000001"
+
+
+@pytest.mark.parametrize("field", ["contract_version", "payload_version"])
+def test_incompatible_platform_command_versions_are_rejected(field: str) -> None:
+    golden = json.loads(GOLDEN.read_text(encoding="utf-8"))["command"]
+    golden[field] = "2.0"
+    with pytest.raises(ValidationError):
+        RuntimeSubmitOrderCommandV1.model_validate(golden)
+
+
+@pytest.mark.parametrize("field", ["contract_version", "payload_version"])
+def test_incompatible_platform_event_versions_are_rejected(field: str) -> None:
+    golden = json.loads(GOLDEN.read_text(encoding="utf-8"))["event"]
+    golden[field] = "2.0"
+    with pytest.raises(ValidationError):
+        RuntimeExecutionEventV1.model_validate(golden)

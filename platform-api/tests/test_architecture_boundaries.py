@@ -14,7 +14,7 @@ def function_names(path: Path) -> list[str]:
 
 
 def test_composition_root_only_wires_application_components() -> None:
-    source = (BACKEND_ROOT / "app/main.py").read_text(encoding="utf-8")
+    source = (BACKEND_ROOT / "app/application.py").read_text(encoding="utf-8")
     forbidden_assignments = (
         "execution_risk.calculate_residual_exposure =",
         "eod_reconciliation.list_strategy_orders =",

@@ -48,7 +48,7 @@ def test_order_fill_updates_position_and_pnl(monkeypatch, tmp_path: Path) -> Non
             ]
 
     monkeypatch.setattr(
-        "app.trading.httpx.post",
+        "app.trade_command_execution.httpx.post",
         lambda *args, **kwargs: FakeResponse(kwargs["json"]),
     )
 

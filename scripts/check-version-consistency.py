@@ -13,6 +13,8 @@ FRONTEND_VERSION_FILES = (
     "platform-web/.env.development",
     "platform-web/.env.production",
 )
+RUNTIME_VERSION_OWNER = "execution-runtime/app/version.py"
+RUNTIME_VERSION_DIRECTORY = "execution-runtime/app"
 CURRENT_DOCUMENTS = {
     "current engineering state": (
         "docs/codex/current-state.md",
@@ -26,12 +28,14 @@ MAINTAINED_VERSION_PATHS = (
     "platform-api/pyproject.toml",
     "platform-api/app/application.py",
     "execution-runtime/pyproject.toml",
-    "execution-runtime/app/main.py",
+    RUNTIME_VERSION_OWNER,
     "docs/codex/current-state.md",
 )
 VERSION_USAGE_PATHS = (
     "platform-web/internal/vite-config/src/config/application.ts",
     "platform-web/src/views/sys/about/index.vue",
+    "execution-runtime/app/main.py",
+    "execution-runtime/app/system_routes.py",
     "execution-runtime/app/models.py",
 )
 
@@ -60,10 +64,33 @@ def frontend_version(root: Path, path: str) -> str:
 
 def source_constant(root: Path, path: str, name: str) -> str:
     content = read_text(root, path)
-    match = re.search(rf'^{re.escape(name)}\s*=\s*["\']([^"\']+)["\']$', content, re.MULTILINE)
+    match = re.search(
+        rf'^{re.escape(name)}\s*=\s*["\']([^"\']+)["\']$',
+        content,
+        re.MULTILINE,
+    )
     if match is None:
         raise SystemExit(f"{name} declaration is missing from {path}")
     return match.group(1)
+
+
+def require_single_source_owner(
+    root: Path,
+    *,
+    directory: str,
+    name: str,
+    owner: str,
+) -> None:
+    declaration = re.compile(rf"^{re.escape(name)}\s*=", re.MULTILINE)
+    declarations = [
+        path.relative_to(root).as_posix()
+        for path in sorted((root / directory).glob("*.py"))
+        if declaration.search(path.read_text(encoding="utf-8"))
+    ]
+    if declarations != [owner]:
+        raise SystemExit(
+            f"{name} must have exactly one owner at {owner}; found {declarations}"
+        )
 
 
 def require_source_usage(root: Path, path: str, *snippets: str) -> None:
@@ -109,20 +136,27 @@ def collect_versions(root: Path) -> tuple[str, dict[str, str]]:
         '"version": PLATFORM_VERSION',
     )
 
-    runtime_version = source_constant(
+    runtime_version = source_constant(root, RUNTIME_VERSION_OWNER, "PLATFORM_VERSION")
+    require_single_source_owner(
+        root,
+        directory=RUNTIME_VERSION_DIRECTORY,
+        name="PLATFORM_VERSION",
+        owner=RUNTIME_VERSION_OWNER,
+    )
+    require_source_usage(
         root,
         "execution-runtime/app/main.py",
-        "PLATFORM_VERSION",
+        "from app.version import PLATFORM_VERSION",
+        "version=PLATFORM_VERSION",
+    )
+    require_source_usage(
+        root,
+        "execution-runtime/app/system_routes.py",
+        "from app.version import PLATFORM_VERSION",
     )
     require_pattern_usage(
         root,
-        "execution-runtime/app/main.py",
-        "Platform Execution Runtime OpenAPI",
-        r"FastAPI\([^)]*version=PLATFORM_VERSION",
-    )
-    require_pattern_usage(
-        root,
-        "execution-runtime/app/main.py",
+        "execution-runtime/app/system_routes.py",
         "Platform Execution Runtime /status",
         r"RuntimeStatusResponse\([^)]*version=PLATFORM_VERSION",
     )
@@ -142,7 +176,10 @@ def collect_versions(root: Path) -> tuple[str, dict[str, str]]:
         "platform-api package": project_version(root, "platform-api/pyproject.toml"),
         "platform-api OpenAPI": api_version,
         "platform-api /system/info": api_version,
-        "execution-runtime package": project_version(root, "execution-runtime/pyproject.toml"),
+        "execution-runtime package": project_version(
+            root,
+            "execution-runtime/pyproject.toml",
+        ),
         "execution-runtime OpenAPI": runtime_version,
         "execution-runtime /status": runtime_version,
         **{

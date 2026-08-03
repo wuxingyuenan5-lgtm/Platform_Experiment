@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
 from fastapi.testclient import TestClient
 
 from app.config import get_settings
@@ -11,6 +12,7 @@ from app.runtime_contracts import runtime_contract_signature
 
 ROOT = Path(__file__).resolve().parents[2]
 SNAPSHOT = ROOT / "docs" / "contracts" / "runtime-v1.json"
+GOLDEN = ROOT / "docs" / "contracts" / "runtime-v1-golden.json"
 
 
 def order_payload() -> dict[str, object]:
@@ -54,6 +56,39 @@ def test_incompatible_command_version_is_rejected_before_gateway(tmp_path: Path)
             "contract_name": "runtime-command",
             "contract_version": "2.0",
             "payload_version": "1.0",
+        }
+    )
+
+    with TestClient(app) as client:
+        response = client.post("/commands/orders", json=payload)
+
+    assert response.status_code == 422
+
+
+
+def test_runtime_command_and_event_match_bidirectional_golden_payloads() -> None:
+    from app.runtime_contracts import RuntimeExecutionEventV1, RuntimeSubmitOrderCommandV1
+
+    golden = json.loads(GOLDEN.read_text(encoding="utf-8"))
+    command = RuntimeSubmitOrderCommandV1.model_validate(golden["command"])
+    event = RuntimeExecutionEventV1.model_validate(golden["event"])
+
+    assert command.model_dump(mode="json") == golden["command"]
+    assert event.model_dump(mode="json") == golden["event"]
+    assert isinstance(command.model_dump(mode="json")["quantity"], str)
+    assert isinstance(event.model_dump(mode="json")["fill_price"], str)
+
+
+@pytest.mark.parametrize("field", ["contract_version", "payload_version"])
+def test_incompatible_command_versions_are_rejected(field: str, tmp_path: Path) -> None:
+    get_settings().journal_path = str(tmp_path / f"rejected-{field}-journal.db")
+    payload = order_payload()
+    payload.update(
+        {
+            "contract_name": "runtime-command",
+            "contract_version": "1.0",
+            "payload_version": "1.0",
+            field: "2.0",
         }
     )
 

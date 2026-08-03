@@ -45,7 +45,7 @@ def test_trade_command_is_idempotent(monkeypatch, tmp_path: Path) -> None:
     def runtime_unavailable(*args, **kwargs):
         raise httpx.ConnectError("runtime unavailable")
 
-    monkeypatch.setattr("app.trading.httpx.post", runtime_unavailable)
+    monkeypatch.setattr("app.trade_command_execution.httpx.post", runtime_unavailable)
 
     payload = {
         "idempotencyKey": "idem-001",

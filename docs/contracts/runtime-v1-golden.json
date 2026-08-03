@@ -1,0 +1,35 @@
+{
+  "command": {
+    "contract_name": "runtime-command",
+    "contract_version": "1.0",
+    "payload_version": "1.0",
+    "command_id": "command-golden-001",
+    "platform_order_id": "order-golden-001",
+    "strategy_instance_id": "strategy-golden-001",
+    "account_id": "account-golden-001",
+    "instrument_id": "instrument-golden-001",
+    "symbol": "BTCUSDT",
+    "side": "buy",
+    "order_type": "limit",
+    "execution_policy": "default",
+    "quantity": "1.25000001",
+    "price": "100.12345678",
+    "reduce_only": false,
+    "position_id": null,
+    "received_at": "2026-08-02T12:00:00Z"
+  },
+  "event": {
+    "contract_name": "runtime-event",
+    "contract_version": "1.0",
+    "payload_version": "1.0",
+    "event_id": "event-golden-001",
+    "command_id": "command-golden-001",
+    "platform_order_id": "order-golden-001",
+    "event_type": "order_filled",
+    "external_order_id": "external-golden-001",
+    "fill_price": "100.12345678",
+    "fill_quantity": "1.25000001",
+    "occurred_at": "2026-08-02T12:00:01Z",
+    "reason": null
+  }
+}

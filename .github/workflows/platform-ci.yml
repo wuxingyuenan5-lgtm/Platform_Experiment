@@ -74,21 +74,24 @@ jobs:
         id: phase_history
         continue-on-error: true
         env:
-          PHASE3_BASE_SHA: cd825fe6bd9ecdf42082069b2785844eda2efac8
-          PHASE3_ORIGINAL_HEAD: 735542b69c38b552fd3bb3109819b177e424b0fb
-          EVENT_NAME: ${{ github.event_name }}
-          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           set -o pipefail
-          if [ "$EVENT_NAME" = "pull_request" ]; then
-            AUDIT_HEAD="$PR_HEAD_SHA"
+          if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
+            AUDIT_REF="$GITHUB_HEAD_REF"
           else
-            AUDIT_HEAD="$GITHUB_SHA"
+            AUDIT_REF="${GITHUB_REF#refs/heads/}"
+          fi
+          if [[ "$AUDIT_REF" != refactor/platform-0-9-3-* ]]; then
+            printf '%s\n' '{"schema_version":2,"status":"not-applicable"}' \
+              > "$RUNNER_TEMP/phase-history-audit.json"
+            echo "Stacked Phase history audit not applicable to $AUDIT_REF" \
+              | tee "$RUNNER_TEMP/phase-history-audit.log"
+            exit 0
           fi
           python scripts/audit-phase-history.py \
-            --base "$PHASE3_BASE_SHA" \
-            --head "$AUDIT_HEAD" \
-            --required-original-head "$PHASE3_ORIGINAL_HEAD" \
+            --event "$GITHUB_EVENT_PATH" \
+            --repository "$GITHUB_REPOSITORY" \
             --output "$RUNNER_TEMP/phase-history-audit.json" \
             2>&1 | tee "$RUNNER_TEMP/phase-history-audit.log"
       - name: Check repository structure and architecture boundaries
@@ -140,13 +143,14 @@ jobs:
       - name: Enforce repository-safety results
         if: always()
         run: |
-          test "${{ steps.workstream.outcome }}" = "success"
-          test "${{ steps.phase_history.outcome }}" = "success"
-          test "${{ steps.structure.outcome }}" = "success"
-          test "${{ steps.documentation.outcome }}" = "success"
-          test "${{ steps.active_naming.outcome }}" = "success"
-          test "${{ steps.context_budget.outcome }}" = "success"
-          test "${{ steps.codebase_boundaries.outcome }}" = "success"
+          python scripts/enforce-ci-results.py \
+            "workstream=${{ steps.workstream.outcome }}" \
+            "phase_history=${{ steps.phase_history.outcome }}" \
+            "structure=${{ steps.structure.outcome }}" \
+            "documentation=${{ steps.documentation.outcome }}" \
+            "active_naming=${{ steps.active_naming.outcome }}" \
+            "context_budget=${{ steps.context_budget.outcome }}" \
+            "codebase_boundaries=${{ steps.codebase_boundaries.outcome }}"
 
   execution-runtime:
     needs: changes
@@ -229,9 +233,10 @@ jobs:
       - name: Enforce backend results
         if: always()
         run: |
-          test "${{ steps.backend_lint.outcome }}" = "success"
-          test "${{ steps.backend_type.outcome }}" = "success"
-          test "${{ steps.backend_tests.outcome }}" = "success"
+          python ../scripts/enforce-ci-results.py \
+            "backend_lint=${{ steps.backend_lint.outcome }}" \
+            "backend_type=${{ steps.backend_type.outcome }}" \
+            "backend_tests=${{ steps.backend_tests.outcome }}"
 
   frontend-quality:
     needs: changes
@@ -299,15 +304,9 @@ jobs:
       - name: Enforce frontend no-new-debt gate
         id: frontend_debt
         continue-on-error: true
-        env:
-          CANDIDATE_BASE_SHA: cf44c8cca52576acc4e4070a98dcf112ebeec31c
         run: |
           set -o pipefail
-          if [[ "$GITHUB_REF_NAME" == refactor/platform-0-9-3-* ]]; then
-            python ../scripts/frontend-no-new-debt.py --base "$CANDIDATE_BASE_SHA" --direct 2>&1 | tee "$RUNNER_TEMP/frontend-no-new-debt.log"
-          else
-            python ../scripts/frontend-no-new-debt.py 2>&1 | tee "$RUNNER_TEMP/frontend-no-new-debt.log"
-          fi
+          python ../scripts/frontend-no-new-debt.py 2>&1 | tee "$RUNNER_TEMP/frontend-no-new-debt.log"
       - name: Type check strategy frontend
         id: frontend_strategy_type
         continue-on-error: true
@@ -344,10 +343,11 @@ jobs:
       - name: Enforce frontend results
         if: always()
         run: |
-          test "${{ steps.frontend_route_manifest.outcome }}" = "success"
-          test "${{ steps.frontend_access_tests.outcome }}" = "success"
-          test "${{ steps.frontend_lint.outcome }}" = "success"
-          test "${{ steps.frontend_debt.outcome }}" = "success"
-          test "${{ steps.frontend_strategy_type.outcome }}" = "success"
-          test "${{ steps.frontend_user_type.outcome }}" = "success"
-          test "${{ steps.frontend_build.outcome }}" = "success"
+          python ../scripts/enforce-ci-results.py \
+            "frontend_route_manifest=${{ steps.frontend_route_manifest.outcome }}" \
+            "frontend_access_tests=${{ steps.frontend_access_tests.outcome }}" \
+            "frontend_lint=${{ steps.frontend_lint.outcome }}" \
+            "frontend_debt=${{ steps.frontend_debt.outcome }}" \
+            "frontend_strategy_type=${{ steps.frontend_strategy_type.outcome }}" \
+            "frontend_user_type=${{ steps.frontend_user_type.outcome }}" \
+            "frontend_build=${{ steps.frontend_build.outcome }}"

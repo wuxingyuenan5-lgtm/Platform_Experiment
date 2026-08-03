@@ -1,7 +1,7 @@
 <template>
   <template v-if="variant === 'crossVenue'">
-    <div class="spread-workspace__legacy-design">
-      <CrossVenueExecutionReplica
+    <div class="spread-workspace__formal-design">
+      <CrossVenueExecutionWorkspace
         :selected-venue="selectedVenue"
         :left-leg-symbol="leftLegSymbol"
         :right-leg-symbol="rightLegSymbol"
@@ -19,7 +19,7 @@
 </template>
 
 <script setup lang="ts">
-  import CrossVenueExecutionReplica from './CrossVenueExecutionReplica.vue';
+  import CrossVenueExecutionWorkspace from './CrossVenueExecutionWorkspace.vue';
   import DomesticOverseasExecutionReplica from './DomesticOverseasExecutionReplica.vue';
   import type { SpreadWorkspaceVariant } from '../types';
 
@@ -42,7 +42,7 @@
 </script>
 
 <style scoped lang="less">
-  .spread-workspace__legacy-design {
+  .spread-workspace__formal-design {
     position: relative;
   }
 </style>

@@ -1,9 +1,13 @@
 from __future__ import annotations
 
+import json
 import sqlite3
 from collections.abc import Iterator
 from contextlib import contextmanager
+from datetime import UTC, datetime
 from pathlib import Path
+
+from pydantic import BaseModel
 
 from app.config import get_settings
 from app.models import ExecutionEvent, SubmitOrderCommand
@@ -36,6 +40,23 @@ CREATE TABLE IF NOT EXISTS runtime_events (
 CREATE INDEX IF NOT EXISTS idx_runtime_events_command
 ON runtime_events(command_id, sequence);
 """
+
+
+class RuntimeCommandRecord(BaseModel):
+    command_id: str
+    platform_order_id: str
+    account_id: str
+    instrument_id: str
+    symbol: str
+    status: str
+    payload: dict[str, object]
+    command: SubmitOrderCommand
+    created_at: datetime
+    updated_at: datetime
+
+
+def utc_now() -> datetime:
+    return datetime.now(UTC)
 
 
 def journal_path() -> Path:
@@ -78,22 +99,40 @@ def get_events(command_id: str) -> list[ExecutionEvent]:
     return [ExecutionEvent.model_validate_json(row["payload_json"]) for row in rows]
 
 
-def command_exists(command_id: str) -> bool:
+def get_command(command_id: str) -> RuntimeCommandRecord | None:
     with connection() as db:
         row = db.execute(
-            "SELECT command_id FROM runtime_commands WHERE command_id = ?",
+            """
+            SELECT command_id, platform_order_id, payload_json, status,
+                   created_at, updated_at
+            FROM runtime_commands
+            WHERE command_id = ?
+            """,
             (command_id,),
         ).fetchone()
-    return row is not None
+    if row is None:
+        return None
+    command = SubmitOrderCommand.model_validate_json(row["payload_json"])
+    return RuntimeCommandRecord(
+        command_id=row["command_id"],
+        platform_order_id=row["platform_order_id"],
+        account_id=command.account_id,
+        instrument_id=command.instrument_id,
+        symbol=command.symbol,
+        status=row["status"],
+        payload=json.loads(row["payload_json"]),
+        command=command,
+        created_at=datetime.fromisoformat(row["created_at"]),
+        updated_at=datetime.fromisoformat(row["updated_at"]),
+    )
+
+
+def command_exists(command_id: str) -> bool:
+    return get_command(command_id) is not None
 
 
 def claim_command(command: SubmitOrderCommand) -> bool:
-    """Atomically claim a command before any external gateway side effect.
-
-    Exactly one caller can insert the command row. Other callers must not call the
-    gateway and should either return persisted events or report that the first
-    execution is still processing.
-    """
+    """Atomically claim a command before any external gateway side effect."""
 
     now = command.received_at.isoformat()
     payload = command.model_dump_json(by_alias=True)
@@ -119,19 +158,43 @@ def claim_command(command: SubmitOrderCommand) -> bool:
 
 
 def save_command_started(command: SubmitOrderCommand) -> None:
-    """Backward-compatible wrapper for callers that do not need claim ownership."""
-
     claim_command(command)
 
 
-def save_command_events(command: SubmitOrderCommand, events: list[ExecutionEvent]) -> None:
-    now = command.received_at.isoformat()
-    status = "completed"
-    if any(event.event_type == "order_rejected" for event in events):
-        status = "rejected"
+def mark_command_result_unknown(command_id: str) -> bool:
+    """Atomically preserve an uncertain command without changing its payload."""
 
     with connection() as db:
-        for sequence, event in enumerate(events, start=1):
+        cursor = db.execute(
+            """
+            UPDATE runtime_commands
+            SET status = 'result_unknown', updated_at = ?
+            WHERE command_id = ? AND status IN ('processing', 'result_unknown')
+            """,
+            (utc_now().isoformat(), command_id),
+        )
+    return cursor.rowcount == 1
+
+
+def save_command_events(command: SubmitOrderCommand, events: list[ExecutionEvent]) -> None:
+    now = utc_now().isoformat()
+    status = (
+        "rejected"
+        if any(event.event_type == "order_rejected" for event in events)
+        else "completed"
+    )
+
+    with connection() as db:
+        next_sequence_row = db.execute(
+            """
+            SELECT COALESCE(MAX(sequence), 0) + 1 AS value
+            FROM runtime_events
+            WHERE command_id = ?
+            """,
+            (command.command_id,),
+        ).fetchone()
+        next_sequence = int(next_sequence_row["value"])
+        for offset, event in enumerate(events):
             db.execute(
                 """
                 INSERT OR IGNORE INTO runtime_events (
@@ -143,7 +206,7 @@ def save_command_events(command: SubmitOrderCommand, events: list[ExecutionEvent
                     event.event_id,
                     event.command_id,
                     event.platform_order_id,
-                    sequence,
+                    next_sequence + offset,
                     event.event_type,
                     event.model_dump_json(by_alias=True),
                     event.occurred_at.isoformat(),
@@ -162,12 +225,8 @@ def save_command_events(command: SubmitOrderCommand, events: list[ExecutionEvent
 
 def journal_status() -> dict[str, object]:
     with connection() as db:
-        command_count = db.execute(
-            "SELECT COUNT(*) AS count FROM runtime_commands"
-        ).fetchone()
-        event_count = db.execute(
-            "SELECT COUNT(*) AS count FROM runtime_events"
-        ).fetchone()
+        command_count = db.execute("SELECT COUNT(*) AS count FROM runtime_commands").fetchone()
+        event_count = db.execute("SELECT COUNT(*) AS count FROM runtime_events").fetchone()
         latest = db.execute(
             """
             SELECT command_id, status, updated_at
