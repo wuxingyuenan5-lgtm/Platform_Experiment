@@ -20,7 +20,7 @@ CATEGORIES = {
     "unexpected",
 }
 CONVENTIONAL_SUBJECT = re.compile(
-    r"^(?P<kind>refactor|fix|test|perf|ci|docs|chore|governance)"
+    r"^(?P<kind>refactor|feat|fix|test|perf|ci|docs|chore|governance|style)"
     r"(?:\([^)]+\))?!?:\s+(?P<summary>.+)$",
     re.IGNORECASE,
 )
@@ -39,6 +39,27 @@ BASELINE_WORDS = ("architecture baseline", "hotspot", "dependency graph", "impor
 EVIDENCE_WORDS = ("evidence", "snapshot", "artifact", "metrics", "inventory")
 PERFORMANCE_EVIDENCE_WORDS = ("performance", "benchmark", "critical path", "baseline")
 TRANSPORT_WORDS = ("transport", "publish", "materializ", "payload", "blob", "trigger")
+PHASE5_PRODUCT_FOUNDATION_PATHS = {
+    "config/product-data-owner-matrix.json",
+    "config/product-data-owner-overrides.json",
+    "platform-web/src/api/platform/productDataState.ts",
+}
+PHASE5_PRODUCT_FOUNDATION_PREFIXES = (
+    "platform-web/src/components/ProductDataState/",
+)
+PHASE5_PRODUCT_FORMAT_PATHS = {
+    "platform-web/src/api/riskControl.ts",
+    "platform-web/src/views/audit/index.vue",
+    "platform-web/src/views/data/components/AccountNetValueChart.vue",
+    "platform-web/src/views/data/index.vue",
+    "platform-web/src/views/finance/index.vue",
+    "platform-web/src/views/monitor/index.vue",
+    "platform-web/src/views/notification/index.vue",
+    "platform-web/src/views/reports/index.vue",
+    "platform-web/src/views/risk/detail/index.vue",
+    "platform-web/src/views/settings/index.vue",
+    "platform-web/src/views/strategy/spread-carry/composables/useCrossSpreadExecution.ts",
+}
 
 
 class AuditError(RuntimeError):
@@ -75,6 +96,16 @@ def is_governance_path(path: str) -> bool:
 def is_test_path(path: str) -> bool:
     lowered = path.lower()
     return any(marker in lowered for marker in TEST_MARKERS)
+
+
+def is_phase5_product_foundation_path(path: str) -> bool:
+    if path in PHASE5_PRODUCT_FOUNDATION_PATHS:
+        return True
+    return path.startswith(PHASE5_PRODUCT_FOUNDATION_PREFIXES)
+
+
+def is_phase5_product_format_path(path: str) -> bool:
+    return path in PHASE5_PRODUCT_FORMAT_PATHS
 
 
 def classify(
@@ -126,6 +157,16 @@ def classify(
         return "contract-test" if all(is_test_path(path) for path in paths) else "unexpected"
     if kind == "fix":
         return "bounded-correction"
+    if kind == "style":
+        if "format" in summary and all(
+            is_phase5_product_format_path(path) for path in paths
+        ):
+            return "bounded-correction"
+        return "unexpected"
+    if kind == "feat":
+        if all(is_phase5_product_foundation_path(path) for path in paths):
+            return "formal-implementation"
+        return "unexpected"
     if any(word in summary for word in MIGRATION_WORDS):
         return "caller-migration"
     if any(word in summary for word in REMOVAL_WORDS):

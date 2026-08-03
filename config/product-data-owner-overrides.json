@@ -1,0 +1,180 @@
+{
+  "schema_version": 1,
+  "authority": "Phase 5 reviewed corrections and closure decisions",
+  "overrides": {
+    "dashboard": {
+      "real_data_source": "not-configured: dashboard aggregate owners",
+      "closure_status": "explicit_unavailable",
+      "gap_reason": null
+    },
+    "audit": {
+      "frontend_services": ["platform-web/src/api/riskControl.ts"],
+      "api_endpoints": [
+        "data-service:/health",
+        "/risk/api/v1/risk-records/",
+        "/notifications/api/v1/messages/"
+      ],
+      "application_services": [
+        "external:data-service",
+        "external:risk-service",
+        "external:notification-service"
+      ],
+      "repository_or_provider": ["external:audit-source-aggregation"],
+      "real_data_source": "data-service health plus risk and notification facts",
+      "refresh": "on-mount and manual",
+      "as_of": "latest source event or provider health timestamp",
+      "closure_status": "verified",
+      "gap_reason": null
+    },
+    "data": {
+      "precision": "decimal-string",
+      "closure_status": "verified",
+      "gap_reason": null
+    },
+    "finance": {
+      "precision": "decimal-string",
+      "closure_status": "verified",
+      "gap_reason": null
+    },
+    "financial-ai": {
+      "real_data_source": "not-configured: financial-ai-provider",
+      "closure_status": "explicit_unavailable",
+      "gap_reason": null
+    },
+    "hedge-macro": {
+      "frontend_services": ["platform-web/src/api/hedgeResearch.ts"]
+    },
+    "hedge-market": {
+      "repository_or_provider": [
+        "external:tradingview-widgets",
+        "platform-web/src/views/hedgeBoard/nativeData/dashboardClean.ts"
+      ],
+      "real_data_source": "TradingView public widgets; static design widgets are isolated and disclosed",
+      "refresh": "provider widget refresh",
+      "as_of": "provider-defined",
+      "timezone": "provider-defined",
+      "precision": "provider-defined; Decimal required for Platform-owned values",
+      "unavailable_state": "provider_unavailable",
+      "closure_status": "verified",
+      "gap_reason": null
+    },
+    "hedge-a-share": {
+      "frontend_services": [
+        "platform-web/src/api/hedgeResearch.ts",
+        "platform-web/src/api/platform/researchWatchlist.ts"
+      ]
+    },
+    "trading-tools": {
+      "repository_or_provider": ["platform-web/docs/trading-tools-bookmarks-review.md"]
+    },
+    "monitor": {
+      "frontend_services": ["platform-web/src/api/riskControl.ts"],
+      "api_endpoints": ["data-service:/health", "current browser session"],
+      "application_services": [
+        "external:data-service",
+        "external:current-authenticated-session"
+      ],
+      "repository_or_provider": [
+        "external:data-service-health",
+        "external:browser-session-store"
+      ],
+      "real_data_source": "data-service health plus current authenticated session",
+      "refresh": "on-mount and manual",
+      "as_of": "provider health timestamp",
+      "unavailable_state": "provider_unavailable",
+      "closure_status": "verified",
+      "gap_reason": null
+    },
+    "news-calendar": {
+      "repository_or_provider": [
+        "external:tradingview-economic-calendar",
+        "external:barker-money-reference"
+      ],
+      "real_data_source": "TradingView macro calendar; news and wealth are explicit not-configured states",
+      "refresh": "provider widget refresh or external reference",
+      "as_of": "provider-defined",
+      "timezone": "provider-defined",
+      "closure_status": "verified",
+      "gap_reason": null
+    },
+    "notification": {
+      "roles": ["authenticated-session"],
+      "repository_or_provider": ["external:notification-service"],
+      "real_data_source": "configured notification endpoint",
+      "closure_status": "verified",
+      "gap_reason": null
+    },
+    "reports": {
+      "frontend_services": ["platform-web/src/api/riskControl.ts"],
+      "api_endpoints": [
+        "/risk/api/v1/risk-records/",
+        "/notifications/api/v1/messages/"
+      ],
+      "application_services": [
+        "external:risk-service",
+        "external:notification-service"
+      ],
+      "repository_or_provider": ["external:report-source-aggregation"],
+      "real_data_source": "risk and notification facts",
+      "refresh": "on-mount and manual",
+      "as_of": "latest source event",
+      "unavailable_state": "provider_unavailable",
+      "closure_status": "verified",
+      "gap_reason": null
+    },
+    "risk": {
+      "api_endpoints": [
+        "/risk/api/v1/risk-records/",
+        "/notifications/api/v1/messages/",
+        "data-service:/health",
+        "data-service:/api/v1/accounts",
+        "data-service:/api/v1/data/total",
+        "data-service:/product/nav/productRatio",
+        "data-service:/exchange/"
+      ],
+      "application_services": [
+        "external:risk-service",
+        "external:notification-service",
+        "external:data-service"
+      ],
+      "repository_or_provider": ["external:risk-and-account-fact-providers"],
+      "real_data_source": "risk, notification, account, finance and health facts",
+      "as_of": "latest source fact timestamp",
+      "currency": "USD",
+      "unit": "risk and account facts",
+      "precision": "decimal-string",
+      "unavailable_state": "provider_unavailable",
+      "closure_status": "verified",
+      "gap_reason": null
+    },
+    "settings": {
+      "frontend_services": ["platform-web/src/api/riskControl.ts"],
+      "api_endpoints": ["data-service:/health", "current browser session"],
+      "application_services": [
+        "external:data-service",
+        "external:current-authenticated-session"
+      ],
+      "repository_or_provider": [
+        "external:data-service-health",
+        "external:browser-session-store"
+      ],
+      "real_data_source": "current session and data-service health; settings writes explicitly not configured",
+      "refresh": "on-mount and manual",
+      "as_of": "provider health timestamp",
+      "unavailable_state": "provider_unavailable",
+      "closure_status": "verified",
+      "gap_reason": null
+    },
+    "strategy-platform": {
+      "repository_or_provider": [
+        "platform-api/app/trading.py",
+        "execution-runtime"
+      ]
+    },
+    "strategy-management": {
+      "real_data_source": "not-configured: strategy-catalog-owner",
+      "closure_status": "explicit_unavailable",
+      "gap_reason": null
+    }
+  }
+}

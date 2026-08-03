@@ -7,8 +7,8 @@ from pathlib import Path
 from app.config import get_settings
 from app.database import initialize_database
 from app.schema_migrations import apply_platform_migrations
-from app.user_demo_seed import seed_demo_users
 from app.user_product_migrations import apply_user_product_migrations
+from user_demo_seed import seed_demo_users
 
 _REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 _E2E_ROOT = _REPOSITORY_ROOT / ".e2e" / "user-system"

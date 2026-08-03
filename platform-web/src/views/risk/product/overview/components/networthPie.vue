@@ -111,9 +111,7 @@
           },
           animationType: 'scale',
           animationEasing: 'exponentialInOut',
-          animationDelay: function () {
-            return Math.random() * 400;
-          },
+          animationDelay: (index: number) => index * 40,
         },
       ],
     });

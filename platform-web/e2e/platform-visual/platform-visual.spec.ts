@@ -50,8 +50,9 @@ const EMPLOYEE_PAGES: readonly VisualPage[] = [
   {
     key: 'strategy-funding',
     route: '/strategy/platform?desk=funding',
-    marker: '资费',
-    evidenceSource: 'isolated Platform API and fake Runtime; Live Write disabled',
+    marker: '资费与资金费率套利数据链尚未配置',
+    evidenceSource:
+      'explicit not-configured product state; no Provider, Runtime or Live Write evidence',
   },
   {
     key: 'strategy-cross-spread',
@@ -63,12 +64,12 @@ const EMPLOYEE_PAGES: readonly VisualPage[] = [
     key: 'strategy-management',
     route: '/strategy/management',
     marker: '策略管理',
-    evidenceSource: 'local strategy fixtures plus isolated Platform API; Live Write disabled',
+    evidenceSource: 'explicit not-configured product state; no strategy fixture data',
   },
   {
     key: 'risk-detail',
     route: '/risk/detail',
-    marker: '风控总览',
+    marker: '风控详情',
     evidenceSource: 'deterministic operations fixture and isolated browser role',
   },
   {

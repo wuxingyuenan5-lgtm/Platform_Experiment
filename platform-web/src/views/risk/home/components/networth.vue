@@ -37,7 +37,7 @@
     // },
     // loading: {
     //   type: Boolean,
-    //   deafult: false,
+    //   default: false,
     // },
     width: {
       type: String as PropType<string>,
@@ -97,9 +97,7 @@
           },
           animationType: 'scale',
           animationEasing: 'exponentialInOut',
-          animationDelay: function () {
-            return Math.random() * 400;
-          },
+          animationDelay: (index: number) => index * 40,
         },
       ],
     });

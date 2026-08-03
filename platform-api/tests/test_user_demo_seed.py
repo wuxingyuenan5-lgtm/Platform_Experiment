@@ -9,9 +9,9 @@ from app.config import get_settings
 from app.database import connection, initialize_database
 from app.member_holding_service import get_self_holdings
 from app.schema_migrations import apply_platform_migrations
-from app.user_demo_seed import seed_demo_users
 from app.user_product_migrations import apply_user_product_migrations
 from app.user_service import UserServiceError, login_user
+from scripts.user_demo_seed import seed_demo_users
 
 _INITIAL_PASSWORD = "Demo-Accounts!2026"
 _REFRESHED_PASSWORD = "Demo-Accounts!2027"

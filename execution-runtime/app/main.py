@@ -29,7 +29,10 @@ async def lifespan(_: FastAPI):
 
 
 def create_app(gateway: ExecutionGateway | None = None) -> FastAPI:
-    runtime_gateway = gateway or create_gateway(settings.gateway_name)
+    runtime_gateway = gateway or create_gateway(
+        settings.gateway_name,
+        live_write_enabled=settings.live_write_enabled,
+    )
     application = FastAPI(
         title=settings.app_name,
         version=PLATFORM_VERSION,

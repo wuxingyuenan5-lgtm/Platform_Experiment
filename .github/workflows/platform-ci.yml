@@ -124,6 +124,24 @@ jobs:
         run: |
           set -o pipefail
           node platform-web/scripts/check-codebase-boundaries.cjs 2>&1 | tee "$RUNNER_TEMP/codebase-boundaries.log"
+      - name: Audit product and data owners
+        id: product_data_owners
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          python scripts/audit-product-data-owner-matrix.py \
+            --require-closed \
+            --output "$RUNNER_TEMP/product-data-owner-audit.json" \
+            --resolved-output "$RUNNER_TEMP/product-data-owner-resolved.json" \
+            2>&1 | tee "$RUNNER_TEMP/product-data-owner-audit.log"
+      - name: Audit production data boundaries
+        id: production_data_boundaries
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          python scripts/audit-production-data-boundaries.py \
+            --output "$RUNNER_TEMP/production-data-boundary-audit.json" \
+            2>&1 | tee "$RUNNER_TEMP/production-data-boundary-audit.log"
       - name: Upload repository-safety diagnostics
         if: always()
         uses: actions/upload-artifact@v4
@@ -138,6 +156,11 @@ jobs:
             ${{ runner.temp }}/active-naming-consistency.log
             ${{ runner.temp }}/context-budget.json
             ${{ runner.temp }}/codebase-boundaries.log
+            ${{ runner.temp }}/product-data-owner-audit.log
+            ${{ runner.temp }}/product-data-owner-audit.json
+            ${{ runner.temp }}/product-data-owner-resolved.json
+            ${{ runner.temp }}/production-data-boundary-audit.log
+            ${{ runner.temp }}/production-data-boundary-audit.json
           if-no-files-found: error
           retention-days: 3
       - name: Enforce repository-safety results
@@ -150,7 +173,9 @@ jobs:
             "documentation=${{ steps.documentation.outcome }}" \
             "active_naming=${{ steps.active_naming.outcome }}" \
             "context_budget=${{ steps.context_budget.outcome }}" \
-            "codebase_boundaries=${{ steps.codebase_boundaries.outcome }}"
+            "codebase_boundaries=${{ steps.codebase_boundaries.outcome }}" \
+            "product_data_owners=${{ steps.product_data_owners.outcome }}" \
+            "production_data_boundaries=${{ steps.production_data_boundaries.outcome }}"
 
   execution-runtime:
     needs: changes
@@ -285,6 +310,8 @@ jobs:
           pnpm exec eslint --max-warnings 0 \
             "src/access/**/*.{ts,tsx}" \
             "src/api/platform/**/*.{ts,tsx}" \
+            "src/api/riskControl.ts" \
+            "src/components/ProductDataState/**/*.{vue,ts,tsx}" \
             "src/enums/roleEnum.ts" \
             "src/hooks/web/useRoleAccess.ts" \
             "src/hooks/trading/**/*.{ts,tsx}" \
@@ -295,6 +322,22 @@ jobs:
             "src/utils/decimalDisplay.ts" \
             "src/views/account/index.vue" \
             "src/views/account/components/HoldingsPanel.vue" \
+            "src/views/audit/index.vue" \
+            "src/views/dashboard/index.vue" \
+            "src/views/data/index.vue" \
+            "src/views/data/components/AccountNetValueChart.vue" \
+            "src/views/finance/index.vue" \
+            "src/views/financialAi/index.vue" \
+            "src/views/hedgeBoard/index.vue" \
+            "src/views/hedgeBoard/composables/useHedgeBoardPage.ts" \
+            "src/views/monitor/index.vue" \
+            "src/views/newsCalendar/index.vue" \
+            "src/views/notification/index.vue" \
+            "src/views/reports/index.vue" \
+            "src/views/risk/detail/index.vue" \
+            "src/views/settings/index.vue" \
+            "src/views/strategy/index.vue" \
+            "src/views/strategy/management/index.vue" \
             "src/views/sys/login/LoginForm.vue" \
             "src/views/sys/register/index.vue" \
             "src/views/sys/reset-password/index.vue" \

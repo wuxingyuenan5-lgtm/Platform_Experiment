@@ -2,21 +2,26 @@ from __future__ import annotations
 
 import asyncio
 import re
-from collections.abc import Awaitable
+from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime, timedelta
 from decimal import ROUND_HALF_UP, Decimal
-from typing import Any
+from typing import Any, cast
 
 from app.a_share_research_policy import aggregate_shenwan_level2
 from app.research_cache import LastKnownGoodResearchCache
 from app.research_data_schemas import (
+    AShareBreadthSnapshot,
     AShareDashboardResponse,
+    AShareIndexSnapshot,
     AShareResearchAggregation,
+    AShareTurnoverStock,
+    MacroExpectationEvent,
     MacroExpectationResponse,
     ResearchDataStatus,
     ResearchModuleResult,
     ResearchSourceMeta,
     ShenwanMembership,
+    ShortTermEmotionSnapshot,
     StockSnapshotResponse,
 )
 from app.research_macro_history import MacroProbabilityHistoryStore
@@ -24,6 +29,7 @@ from app.research_providers import FreeResearchProvider
 
 DEFAULT_THRESHOLD_YUAN = Decimal("10000000000")
 PCT_QUANT = Decimal("0.01")
+PROVIDER_TIMEOUT_SECONDS = 25.0
 
 _PROVIDER = FreeResearchProvider()
 _DASHBOARD_CACHE = LastKnownGoodResearchCache[AShareDashboardResponse](
@@ -60,6 +66,62 @@ def _now() -> datetime:
     return datetime.now(UTC)
 
 
+async def _provider_call[T](awaitable: Awaitable[T]) -> T:
+    try:
+        return await asyncio.wait_for(
+            awaitable,
+            timeout=PROVIDER_TIMEOUT_SECONDS,
+        )
+    except TimeoutError as exc:
+        raise ResearchServiceError(
+            "provider_timeout",
+            f"研究数据源超过{PROVIDER_TIMEOUT_SECONDS:g}秒未返回",
+        ) from exc
+
+
+def _require_model[T](value: Any, expected: type[T], source: str) -> T:
+    if not isinstance(value, expected):
+        raise ResearchServiceError(
+            "provider_invalid_payload",
+            f"{source}返回了无效{expected.__name__}合同",
+        )
+    return value
+
+
+def _require_model_list[ModelT](
+    value: Any,
+    expected: type[ModelT],
+    source: str,
+) -> list[ModelT]:
+    if not isinstance(value, list) or any(not isinstance(item, expected) for item in value):
+        raise ResearchServiceError(
+            "provider_invalid_payload",
+            f"{source}返回了无效{expected.__name__}列表合同",
+        )
+    return cast(list[ModelT], value)
+
+
+def _require_mapping(value: Any, source: str) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        raise ResearchServiceError(
+            "provider_invalid_payload",
+            f"{source}返回了无效对象合同",
+        )
+    return cast(dict[str, Any], value)
+
+
+def _validated_result[ResultT](
+    value: Any,
+    validator: Callable[[Any], ResultT],
+) -> ResultT | BaseException:
+    if isinstance(value, BaseException):
+        return value
+    try:
+        return validator(value)
+    except BaseException as exc:
+        return exc
+
+
 def _module(
     *,
     source: str,
@@ -88,12 +150,14 @@ def _module(
 
 
 def _error_module(source: str, exc: BaseException) -> ResearchModuleResult:
+    error_code = exc.code if isinstance(exc, ResearchServiceError) else type(exc).__name__
+    message = exc.detail if isinstance(exc, ResearchServiceError) else str(exc)
     return _module(
         source=source,
         data=None,
         status="error",
-        error_code=type(exc).__name__,
-        message=str(exc)[:500] or "数据源暂时不可用",
+        error_code=error_code,
+        message=message[:500] or "数据源暂时不可用",
     )
 
 
@@ -114,7 +178,11 @@ async def _memberships() -> list[ShenwanMembership]:
         if cached is not None:
             return cached.value
         try:
-            value = await _PROVIDER.shenwan_memberships()
+            value = _require_model_list(
+                await _provider_call(_PROVIDER.shenwan_memberships()),
+                ShenwanMembership,
+                "申万行业分类",
+            )
         except Exception:
             stale = _MEMBERSHIP_CACHE.get("shenwan")
             if stale is not None:
@@ -144,14 +212,55 @@ async def get_a_share_dashboard(
         if cached is not None:
             return cached.value
         results = await asyncio.gather(
-            _PROVIDER.index_snapshots(),
-            _PROVIDER.market_activity(),
-            _PROVIDER.a_share_spot(),
+            _provider_call(_PROVIDER.index_snapshots()),
+            _provider_call(_PROVIDER.market_activity()),
+            _provider_call(_PROVIDER.a_share_spot()),
             _memberships(),
-            _PROVIDER.short_term_emotion(),
+            _provider_call(_PROVIDER.short_term_emotion()),
             return_exceptions=True,
         )
-        indices, breadth, stocks, memberships, emotion = results
+        raw_indices, raw_breadth, raw_stocks, raw_memberships, raw_emotion = results
+        indices = _validated_result(
+            raw_indices,
+            lambda value: _require_model_list(
+                value,
+                AShareIndexSnapshot,
+                "东方财富指数历史行情（AKShare适配）",
+            ),
+        )
+        breadth = _validated_result(
+            raw_breadth,
+            lambda value: _require_model(
+                value,
+                AShareBreadthSnapshot,
+                "乐咕乐股赚钱效应（AKShare适配）",
+            ),
+        )
+        stocks = _validated_result(
+            raw_stocks,
+            lambda value: _require_model_list(
+                value,
+                AShareTurnoverStock,
+                "东方财富A股行情（AKShare适配）",
+            ),
+        )
+        memberships = _validated_result(
+            raw_memberships,
+            lambda value: _require_model_list(
+                value,
+                ShenwanMembership,
+                "申万宏源行业分类",
+            ),
+        )
+        emotion = _validated_result(
+            raw_emotion,
+            lambda value: _require_model(
+                value,
+                ShortTermEmotionSnapshot,
+                "东方财富涨停板行情中心",
+            ),
+        )
+
         market_module = (
             _error_module("东方财富指数历史行情（AKShare适配）", indices)
             if isinstance(indices, BaseException)
@@ -246,7 +355,10 @@ async def get_stock_snapshot(code: str) -> StockSnapshotResponse:
         if cached is not None:
             return cached.value
         try:
-            quote = await _PROVIDER.stock_quote(normalized)
+            quote = _require_mapping(
+                await _provider_call(_PROVIDER.stock_quote(normalized)),
+                "腾讯财经",
+            )
         except Exception as exc:
             stale = _STOCK_CACHE.get(normalized)
             if stale is not None:
@@ -299,7 +411,7 @@ async def get_stock_snapshot(code: str) -> StockSnapshotResponse:
             ("shenwan", "申万宏源行业分类（AKShare适配）", _stock_membership(normalized)),
         )
         results = await asyncio.gather(
-            *(item[2] for item in calls),
+            *(_provider_call(item[2]) for item in calls),
             return_exceptions=True,
         )
         modules: dict[str, ResearchModuleResult] = {
@@ -361,7 +473,11 @@ async def get_macro_expectations() -> MacroExpectationResponse:
         if cached is not None:
             return cached.value
         try:
-            events = await _PROVIDER.macro_expectation_events()
+            events = _require_model_list(
+                await _provider_call(_PROVIDER.macro_expectation_events()),
+                MacroExpectationEvent,
+                "Polymarket公开市场接口",
+            )
             events = await _MACRO_HISTORY.update(events)
             response = MacroExpectationResponse(
                 generated_at=_now(),

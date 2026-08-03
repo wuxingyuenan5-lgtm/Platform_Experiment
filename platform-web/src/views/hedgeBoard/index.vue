@@ -11,6 +11,12 @@
         </div>
       </section>
 
+      <ProductDataStatusAlert
+        v-if="staticDesignWidgets.length"
+        :meta="staticDesignMeta"
+        class="hedge-board__data-state"
+      />
+
       <MarketTerminalPage
         v-if="isTerminalCategory && activeTerminalConfig"
         :config="activeTerminalConfig"
@@ -57,7 +63,10 @@
 </template>
 
 <script setup lang="ts">
+  import { computed } from 'vue';
   import { PageWrapper } from '@/components/Page';
+  import ProductDataStatusAlert from '@/components/ProductDataState/ProductDataStatusAlert.vue';
+  import type { ProductDataMeta } from '@/api/platform/productDataState';
   import CompactSegmentTabs from '@/views/strategy/shared/CompactSegmentTabs.vue';
   import LocalChartWidget from './charts/LocalChartWidget';
   import HedgeResearchModule from './components/HedgeResearchModule.vue';
@@ -81,10 +90,26 @@
     pageTitle,
     selectBoardCategory,
     shouldHideWidgetHeader,
+    staticDesignWidgets,
     terminalTabs,
     useUnifiedResearchUi,
     visibleSections,
   } = useHedgeBoardPage();
+
+  const staticDesignMeta = computed<ProductDataMeta>(() => ({
+    status: 'not_configured',
+    source: `hedge-board:${activeCategory.value}:static-design`,
+    timezone: 'source-defined',
+    unit: 'market research widget',
+    precision: 'decimal-string-required',
+    errorCode: 'static_design_isolated',
+    message: `${staticDesignWidgets.value.length}个仅有静态设计稿、没有Provider Owner的图表已从正式数据展示中隔离；TradingView和已注册Research Provider组件继续可用。`,
+  }));
 </script>
 
 <style lang="less" src="./hedgeBoard.less"></style>
+<style scoped>
+  .hedge-board__data-state {
+    margin: 0 0 16px;
+  }
+</style>
