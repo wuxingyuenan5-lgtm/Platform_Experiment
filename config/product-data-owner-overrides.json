@@ -19,7 +19,7 @@
         "external:risk-service",
         "external:notification-service"
       ],
-      "repository_or_provider": ["external:audit source aggregation"],
+      "repository_or_provider": ["external:audit-source-aggregation"],
       "real_data_source": "data-service health plus risk and notification facts",
       "refresh": "on-mount and manual",
       "as_of": "latest source event or provider health timestamp",
@@ -46,7 +46,7 @@
     },
     "hedge-market": {
       "repository_or_provider": [
-        "external:TradingView widgets",
+        "external:tradingview-widgets",
         "platform-web/src/views/hedgeBoard/nativeData/dashboardClean.ts"
       ],
       "real_data_source": "TradingView public widgets; static design widgets are isolated and disclosed",
@@ -72,11 +72,11 @@
       "api_endpoints": ["data-service:/health", "current browser session"],
       "application_services": [
         "external:data-service",
-        "external:current authenticated session"
+        "external:current-authenticated-session"
       ],
       "repository_or_provider": [
-        "external:data-service health",
-        "external:browser session store"
+        "external:data-service-health",
+        "external:browser-session-store"
       ],
       "real_data_source": "data-service health plus current authenticated session",
       "refresh": "on-mount and manual",
@@ -87,8 +87,8 @@
     },
     "news-calendar": {
       "repository_or_provider": [
-        "external:TradingView Economic Calendar",
-        "external:barker-money reference only"
+        "external:tradingview-economic-calendar",
+        "external:barker-money-reference"
       ],
       "real_data_source": "TradingView macro calendar; news and wealth are explicit not-configured states",
       "refresh": "provider widget refresh or external reference",
@@ -99,6 +99,7 @@
     },
     "notification": {
       "roles": ["authenticated-session"],
+      "repository_or_provider": ["external:notification-service"],
       "real_data_source": "configured notification endpoint",
       "closure_status": "verified",
       "gap_reason": null
@@ -113,7 +114,7 @@
         "external:risk-service",
         "external:notification-service"
       ],
-      "repository_or_provider": ["external:report source aggregation"],
+      "repository_or_provider": ["external:report-source-aggregation"],
       "real_data_source": "risk and notification facts",
       "refresh": "on-mount and manual",
       "as_of": "latest source event",
@@ -136,7 +137,7 @@
         "external:notification-service",
         "external:data-service"
       ],
-      "repository_or_provider": ["external:risk and account fact providers"],
+      "repository_or_provider": ["external:risk-and-account-fact-providers"],
       "real_data_source": "risk, notification, account, finance and health facts",
       "as_of": "latest source fact timestamp",
       "currency": "USD",
@@ -151,11 +152,11 @@
       "api_endpoints": ["data-service:/health", "current browser session"],
       "application_services": [
         "external:data-service",
-        "external:current authenticated session"
+        "external:current-authenticated-session"
       ],
       "repository_or_provider": [
-        "external:data-service health",
-        "external:browser session store"
+        "external:data-service-health",
+        "external:browser-session-store"
       ],
       "real_data_source": "current session and data-service health; settings writes explicitly not configured",
       "refresh": "on-mount and manual",
