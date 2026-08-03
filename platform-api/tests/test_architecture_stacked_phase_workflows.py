@@ -20,6 +20,11 @@ WORKFLOWS = (
     "hedge-board-e2e.yml",
     "research-provider-smoke.yml",
 )
+CREDENTIAL_WORKFLOWS = (
+    "platform-visual-baseline.yml",
+    "user-system-e2e.yml",
+    "hedge-board-e2e.yml",
+)
 CONTROLLED_PATTERN = "refactor/platform-0-9-3-*"
 OLD_EXACT_BRANCHES = (
     "refactor/platform-0-9-3-repository-and-context-optimization",
@@ -62,6 +67,22 @@ def test_all_nine_workflows_use_controlled_phase_pattern(name: str) -> None:
     assert '      - "**"' not in text
     for branch in OLD_EXACT_BRANCHES:
         assert branch not in text
+
+
+@pytest.mark.parametrize("name", CREDENTIAL_WORKFLOWS)
+def test_generated_e2e_passwords_are_masked_before_export(name: str) -> None:
+    text = workflow_text(name)
+    generated_credentials = text.split("- name: Generate isolated", 1)[1].split(
+        "\n      - name:",
+        1,
+    )[0]
+
+    assert 'password = f"Cc9!{secrets.token_urlsafe(24)}"' in generated_credentials
+    assert 'print(f"::add-mask::{password}")' in generated_credentials
+    assert "GITHUB_ENV" in generated_credentials
+    assert generated_credentials.index("::add-mask::") < generated_credentials.index(
+        "GITHUB_ENV"
+    )
 
 
 def test_platform_ci_uses_event_driven_stacked_history_and_debt_bases() -> None:

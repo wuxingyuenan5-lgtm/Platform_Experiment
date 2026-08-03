@@ -89,9 +89,11 @@ jobs:
           import os
           import secrets
 
+          password = f"Cc9!{secrets.token_urlsafe(24)}"
+          print(f"::add-mask::{password}")
           with open(os.environ['GITHUB_ENV'], 'a', encoding='utf-8') as output:
               output.write('E2E_CEO_USERNAME=e2e_employee_1\n')
-              output.write(f"E2E_CEO_PASSWORD=Cc9!{secrets.token_urlsafe(24)}\n")
+              output.write(f"E2E_CEO_PASSWORD={password}\n")
           PY
 
       - name: Run hedge-board browser acceptance

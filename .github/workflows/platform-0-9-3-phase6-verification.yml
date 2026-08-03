@@ -1,0 +1,478 @@
+name: Platform 0.9.3 Phase 6 Verification
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - refactor/platform-0-9-3-final-verification-and-rc-readiness
+  pull_request:
+    branches:
+      - refactor/platform-0-9-3-product-and-data-closure
+    paths:
+      - '.github/workflows/platform-0-9-3-phase6-verification.yml'
+      - 'platform-api/**'
+      - 'execution-runtime/**'
+      - 'platform-web/**'
+      - 'scripts/**'
+      - 'docs/operations/RUNBOOK.md'
+      - 'docs/technical/PRODUCTION_OPERATIONS.md'
+      - 'VERSION'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: platform-0-9-3-phase6-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  ACCEPTED_BASE_SHA: 766d406737c2efc21a1ce7d49d70ee4aa6f21f81
+
+jobs:
+  clean-build-database-runtime:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.9
+          run_install: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: pnpm
+          cache-dependency-path: platform-web/pnpm-lock.yaml
+
+      - name: Record clean environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -z "$(git status --porcelain)"
+          mkdir -p phase6-evidence
+          {
+            echo "event=${GITHUB_EVENT_NAME}"
+            echo "ref=${GITHUB_REF}"
+            echo "sha=${GITHUB_SHA}"
+            echo "accepted_base=${ACCEPTED_BASE_SHA}"
+            uname -a
+            python --version
+            node --version
+            pnpm --version
+            git --version
+          } | tee phase6-evidence/environment.txt
+          git merge-base --is-ancestor "$ACCEPTED_BASE_SHA" HEAD
+          echo "ahead=$(git rev-list --count ${ACCEPTED_BASE_SHA}..HEAD)" | tee phase6-evidence/history.txt
+          echo "behind=$(git rev-list --count HEAD..${ACCEPTED_BASE_SHA})" | tee -a phase6-evidence/history.txt
+          test "$(git rev-list --count HEAD..${ACCEPTED_BASE_SHA})" = "0"
+
+      - name: Install isolated service dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m venv .venv-phase6-api
+          python -m venv .venv-phase6-runtime
+          .venv-phase6-api/bin/python -m pip install --upgrade pip
+          .venv-phase6-runtime/bin/python -m pip install --upgrade pip
+          .venv-phase6-api/bin/python -m pip install -e './platform-api[dev]'
+          .venv-phase6-runtime/bin/python -m pip install -e './execution-runtime[dev]'
+          .venv-phase6-api/bin/python -m pip check
+          .venv-phase6-runtime/bin/python -m pip check
+
+      - name: Install locked frontend dependencies
+        working-directory: platform-web
+        env:
+          HUSKY: '0'
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify release and repository contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/check-version-consistency.py | tee phase6-evidence/version-consistency.log
+          (
+            cd platform-web
+            node scripts/test-formal-route-manifest.cjs
+          ) | tee phase6-evidence/formal-route-manifest.log
+          python scripts/audit-product-data-owner-matrix.py \
+            --require-closed \
+            --output phase6-evidence/product-data-owner-audit.json \
+            --resolved-output phase6-evidence/product-data-owner-resolved.json \
+            | tee phase6-evidence/product-data-owner-audit.log
+          python scripts/audit-production-data-boundaries.py \
+            --output phase6-evidence/production-data-boundary-audit.json \
+            | tee phase6-evidence/production-data-boundary-audit.log
+
+      - name: Build frontend from locked checkout
+        working-directory: platform-web
+        shell: bash
+        run: |
+          set -euo pipefail
+          /usr/bin/time -f 'elapsed_seconds=%e\nmax_rss_kb=%M' \
+            -o ../phase6-evidence/frontend-build-performance.txt \
+            pnpm build 2>&1 | tee ../phase6-evidence/frontend-build.log
+
+      - name: Verify fresh install and service health
+        shell: bash
+        run: |
+          set -euo pipefail
+          API_PY="$GITHUB_WORKSPACE/.venv-phase6-api/bin/python"
+          RUNTIME_PY="$GITHUB_WORKSPACE/.venv-phase6-runtime/bin/python"
+          STATE="$RUNNER_TEMP/phase6-fresh"
+          mkdir -p "$STATE/avatars" "$STATE/backups" "$STATE/restores"
+
+          compat_name() {
+            printf 'V%s_%s' G "$1"
+          }
+          cleanup() {
+            kill "${API_PID:-}" "${RUNTIME_PID:-}" 2>/dev/null || true
+          }
+          trap cleanup EXIT
+
+          (
+            cd execution-runtime
+            env \
+              "$(compat_name RUNTIME_ENVIRONMENT)=test" \
+              "$(compat_name RUNTIME_JOURNAL_PATH)=$STATE/runtime.db" \
+              "$(compat_name RUNTIME_GATEWAY_NAME)=fake" \
+              "$(compat_name RUNTIME_LIVE_WRITE_ENABLED)=false" \
+              "$RUNTIME_PY" -m uvicorn app.main:app --host 127.0.0.1 --port 8100
+          ) > phase6-evidence/runtime-health.log 2>&1 &
+          RUNTIME_PID=$!
+
+          for _ in $(seq 1 60); do
+            curl -fsS http://127.0.0.1:8100/health > phase6-evidence/runtime-health.json && break
+            sleep 1
+          done
+          test -s phase6-evidence/runtime-health.json
+
+          (
+            cd platform-api
+            env \
+              "$(compat_name ENVIRONMENT)=test" \
+              "$(compat_name AUTH_MODE)=development" \
+              "$(compat_name DATABASE_PATH)=$STATE/platform.db" \
+              "$(compat_name AVATAR_DATA_DIRECTORY)=$STATE/avatars" \
+              "$(compat_name OPERATIONS_BACKUP_ROOT)=$STATE/backups" \
+              "$(compat_name OPERATIONS_RESTORE_ROOT)=$STATE/restores" \
+              "$(compat_name RUNTIME_BASE_URL)=http://127.0.0.1:8100" \
+              "$(compat_name LIVE_TRADING_ENABLED)=false" \
+              "$(compat_name DEFAULT_TRADING_ENVIRONMENT)=simulation" \
+              "$API_PY" -m uvicorn app.main:app --host 127.0.0.1 --port 8000
+          ) > phase6-evidence/platform-api-health.log 2>&1 &
+          API_PID=$!
+
+          for _ in $(seq 1 60); do
+            curl -fsS http://127.0.0.1:8000/health > phase6-evidence/platform-api-health.json && break
+            sleep 1
+          done
+          test -s phase6-evidence/platform-api-health.json
+
+          PHASE6_FRESH_DB="$STATE/platform.db" "$API_PY" - <<'PY' \
+            | tee phase6-evidence/fresh-database.json
+          import json
+          import os
+          import sqlite3
+
+          path = os.environ["PHASE6_FRESH_DB"]
+          with sqlite3.connect(path) as db:
+              tables = {
+                  row[0]
+                  for row in db.execute(
+                      "SELECT name FROM sqlite_master WHERE type='table'"
+                  ).fetchall()
+              }
+              required = {
+                  "users",
+                  "orders",
+                  "fills",
+                  "positions",
+                  "pnl_results",
+                  "economic_events",
+                  "schema_migrations",
+              }
+              missing = sorted(required - tables)
+              user_count = db.execute("SELECT COUNT(*) FROM users").fetchone()[0]
+              demo_count = db.execute(
+                  "SELECT COUNT(*) FROM users WHERE username LIKE 'demo%' OR username LIKE 'e2e%'"
+              ).fetchone()[0]
+              migration_count = db.execute(
+                  "SELECT COUNT(*) FROM schema_migrations"
+              ).fetchone()[0]
+          result = {
+              "database": path,
+              "missingRequiredTables": missing,
+              "userCount": user_count,
+              "demoOrE2eUserCount": demo_count,
+              "migrationCount": migration_count,
+              "liveWriteEnabled": False,
+          }
+          print(json.dumps(result, indent=2, sort_keys=True))
+          assert not missing
+          assert user_count == 0
+          assert demo_count == 0
+          assert migration_count > 0
+          PY
+
+      - name: Verify accepted-base database upgrade and preservation
+        shell: bash
+        run: |
+          set -euo pipefail
+          API_PY="$GITHUB_WORKSPACE/.venv-phase6-api/bin/python"
+          BASE="$RUNNER_TEMP/phase6-accepted-base"
+          DB="$RUNNER_TEMP/phase6-upgrade.db"
+          git worktree add --detach "$BASE" "$ACCEPTED_BASE_SHA"
+          compat_name() {
+            printf 'V%s_%s' G "$1"
+          }
+
+          (
+            cd "$BASE/platform-api"
+            env \
+              PYTHONPATH="$BASE/platform-api" \
+              "$(compat_name ENVIRONMENT)=test" \
+              "$(compat_name AUTH_MODE)=development" \
+              "$(compat_name DATABASE_PATH)=$DB" \
+              "$(compat_name AVATAR_DATA_DIRECTORY)=$RUNNER_TEMP/phase6-upgrade-avatars" \
+              "$(compat_name OPERATIONS_BACKUP_ROOT)=$RUNNER_TEMP/phase6-upgrade-backups" \
+              "$(compat_name OPERATIONS_RESTORE_ROOT)=$RUNNER_TEMP/phase6-upgrade-restores" \
+              "$(compat_name LIVE_TRADING_ENABLED)=false" \
+              "$API_PY" - <<'PY'
+          from fastapi.testclient import TestClient
+          from app.main import app
+
+          with TestClient(app) as client:
+              response = client.get("/health")
+              assert response.status_code == 200
+          PY
+          )
+
+          PHASE6_UPGRADE_DB="$DB" "$API_PY" - <<'PY'
+          import os
+          import sqlite3
+
+          path = os.environ["PHASE6_UPGRADE_DB"]
+          now = "2026-08-03T00:00:00+00:00"
+          with sqlite3.connect(path) as db:
+              db.execute("PRAGMA foreign_keys=ON")
+              db.execute(
+                  """
+                  INSERT INTO users (
+                      id, username, username_normalized, password_hash, role_code,
+                      lifecycle_status, auth_version, row_version, failed_login_count,
+                      registered_at, created_at, updated_at
+                  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                  """,
+                  (
+                      "phase6-user", "phase6_user", "phase6_user", "isolated-test-hash",
+                      "member", "active", 1, 1, 0, now, now, now,
+                  ),
+              )
+              db.execute(
+                  """
+                  INSERT INTO orders (
+                      id, command_id, account_id, instrument_id, symbol, side,
+                      order_type, quantity, price, status, created_at, updated_at
+                  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                  """,
+                  (
+                      "phase6-order", "phase6-command", "account_sim_usdt",
+                      "instrument_btc_usdt", "BTCUSDT", "buy", "limit",
+                      "0.01000000", "123.45678901", "filled", now, now,
+                  ),
+              )
+              db.execute(
+                  """
+                  INSERT INTO fills (
+                      id, order_id, account_id, instrument_id, side,
+                      quantity, price, occurred_at
+                  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                  """,
+                  (
+                      "phase6-fill", "phase6-order", "account_sim_usdt",
+                      "instrument_btc_usdt", "buy", "0.01000000",
+                      "123.45678901", now,
+                  ),
+              )
+              db.execute(
+                  """
+                  INSERT INTO positions (
+                      account_id, instrument_id, net_quantity, average_price, updated_at
+                  ) VALUES (?, ?, ?, ?, ?)
+                  """,
+                  (
+                      "account_sim_usdt", "instrument_btc_usdt", "0.01000000",
+                      "123.45678901", now,
+                  ),
+              )
+              db.execute(
+                  """
+                  INSERT INTO pnl_results (
+                      account_id, instrument_id, realized_pnl, trading_pnl, fees, updated_at
+                  ) VALUES (?, ?, ?, ?, ?, ?)
+                  """,
+                  (
+                      "account_sim_usdt", "instrument_btc_usdt", "0.00000019",
+                      "0.00000029", "0.00000010", now,
+                  ),
+              )
+              db.execute(
+                  """
+                  INSERT INTO economic_events (
+                      id, event_type, account_id, instrument_id, order_id,
+                      amount, currency, occurred_at
+                  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                  """,
+                  (
+                      "phase6-economic-event", "fee", "account_sim_usdt",
+                      "instrument_btc_usdt", "phase6-order", "0.00000010", "USDT", now,
+                  ),
+              )
+              db.execute(
+                  """
+                  INSERT INTO balance_snapshots (
+                      id, account_id, currency, equity, available_balance,
+                      source, data_quality_state, as_of, created_at
+                  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                  """,
+                  (
+                      "phase6-holding", "account_sim_usdt", "USDT", "1000.00000001",
+                      "999.99000001", "phase6_fixture", "verified", now, now,
+                  ),
+              )
+              db.commit()
+          PY
+
+          (
+            cd platform-api
+            env \
+              PYTHONPATH="$GITHUB_WORKSPACE/platform-api" \
+              "$(compat_name ENVIRONMENT)=test" \
+              "$(compat_name AUTH_MODE)=development" \
+              "$(compat_name DATABASE_PATH)=$DB" \
+              "$(compat_name AVATAR_DATA_DIRECTORY)=$RUNNER_TEMP/phase6-upgrade-avatars" \
+              "$(compat_name OPERATIONS_BACKUP_ROOT)=$RUNNER_TEMP/phase6-upgrade-backups" \
+              "$(compat_name OPERATIONS_RESTORE_ROOT)=$RUNNER_TEMP/phase6-upgrade-restores" \
+              "$(compat_name LIVE_TRADING_ENABLED)=false" \
+              "$API_PY" - <<'PY'
+          from fastapi.testclient import TestClient
+          from app.main import app
+
+          with TestClient(app) as client:
+              response = client.get("/health")
+              assert response.status_code == 200
+          PY
+          )
+
+          PHASE6_UPGRADE_DB="$DB" "$API_PY" - <<'PY' \
+            | tee phase6-evidence/database-upgrade.json
+          import json
+          import os
+          import sqlite3
+
+          path = os.environ["PHASE6_UPGRADE_DB"]
+          with sqlite3.connect(path) as db:
+              result = {
+                  "user": db.execute(
+                      "SELECT username, role_code, lifecycle_status FROM users WHERE id='phase6-user'"
+                  ).fetchone(),
+                  "order": db.execute(
+                      "SELECT quantity, price, status FROM orders WHERE id='phase6-order'"
+                  ).fetchone(),
+                  "fill": db.execute(
+                      "SELECT quantity, price FROM fills WHERE id='phase6-fill'"
+                  ).fetchone(),
+                  "position": db.execute(
+                      "SELECT net_quantity, average_price FROM positions WHERE account_id='account_sim_usdt' AND instrument_id='instrument_btc_usdt'"
+                  ).fetchone(),
+                  "pnl": db.execute(
+                      "SELECT realized_pnl, trading_pnl, fees FROM pnl_results WHERE account_id='account_sim_usdt' AND instrument_id='instrument_btc_usdt'"
+                  ).fetchone(),
+                  "holding": db.execute(
+                      "SELECT equity, available_balance FROM balance_snapshots WHERE id='phase6-holding'"
+                  ).fetchone(),
+                  "economicEventCount": db.execute(
+                      "SELECT COUNT(*) FROM economic_events WHERE id='phase6-economic-event'"
+                  ).fetchone()[0],
+                  "migrationCount": db.execute(
+                      "SELECT COUNT(*) FROM schema_migrations"
+                  ).fetchone()[0],
+              }
+          serializable = {key: list(value) if isinstance(value, tuple) else value for key, value in result.items()}
+          print(json.dumps(serializable, indent=2, sort_keys=True))
+          assert result["user"] == ("phase6_user", "member", "active")
+          assert result["order"] == ("0.01000000", "123.45678901", "filled")
+          assert result["fill"] == ("0.01000000", "123.45678901")
+          assert result["position"] == ("0.01000000", "123.45678901")
+          assert result["pnl"] == ("0.00000019", "0.00000029", "0.00000010")
+          assert result["holding"] == ("1000.00000001", "999.99000001")
+          assert result["economicEventCount"] == 1
+          assert result["migrationCount"] > 0
+          PY
+
+      - name: Verify database restore and Runtime safety contracts
+        working-directory: platform-api
+        shell: bash
+        run: |
+          set -euo pipefail
+          ../.venv-phase6-api/bin/python -m pytest -q \
+            tests/test_database_bootstrap_equivalence.py \
+            tests/test_schema_migrations.py \
+            tests/test_disaster_recovery.py \
+            --durations=20 \
+            2>&1 | tee ../phase6-evidence/database-and-restore-tests.log
+          (
+            cd ../execution-runtime
+            ../.venv-phase6-runtime/bin/python -m pytest -m 'unit or integration or live_safety' \
+              --durations=20 \
+              2>&1 | tee ../phase6-evidence/runtime-safety-tests.log
+          )
+
+      - name: Upload Phase 6 clean verification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: platform-0-9-3-phase6-clean-verification-${{ github.sha }}
+          path: phase6-evidence
+          if-no-files-found: error
+          retention-days: 30
+
+  free-provider-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: platform-api/pyproject.toml
+
+      - name: Install Platform API
+        run: python -m pip install -e './platform-api[dev]'
+
+      - name: Probe free public research providers
+        working-directory: platform-api
+        shell: bash
+        run: |
+          set -o pipefail
+          python scripts/smoke_research_providers.py --timeout 60 \
+            | tee phase6-research-provider-smoke.json
+
+      - name: Upload Provider Smoke evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: platform-0-9-3-phase6-provider-smoke-${{ github.sha }}
+          path: platform-api/phase6-research-provider-smoke.json
+          if-no-files-found: warn
+          retention-days: 30

@@ -1,0 +1,70 @@
+name: Platform 0.9.3 Phase 6 Performance
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - refactor/platform-0-9-3-final-verification-and-rc-readiness
+  pull_request:
+    branches:
+      - refactor/platform-0-9-3-product-and-data-closure
+    paths:
+      - '.github/workflows/platform-0-9-3-phase6-performance.yml'
+      - 'scripts/measure-phase4-critical-paths.py'
+      - 'platform-api/**'
+      - 'execution-runtime/**'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: platform-0-9-3-phase6-performance-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  critical-path-microbenchmark:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install isolated benchmark dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m venv .venv-phase6-performance
+          .venv-phase6-performance/bin/python -m pip install --upgrade pip
+          .venv-phase6-performance/bin/python -m pip install \
+            -e './platform-api[dev]' \
+            -e './execution-runtime[dev]'
+          .venv-phase6-performance/bin/python -m pip check
+
+      - name: Measure Phase 4 critical paths
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p phase6-performance-evidence
+          .venv-phase6-performance/bin/python \
+            scripts/measure-phase4-critical-paths.py . \
+            --iterations 200 \
+            | tee phase6-performance-evidence/current-critical-paths.json
+          {
+            echo "event=${GITHUB_EVENT_NAME}"
+            echo "sha=${GITHUB_SHA}"
+            echo "classification=CI microbenchmark; not production throughput"
+            python --version
+            uname -a
+          } > phase6-performance-evidence/environment.txt
+
+      - name: Upload Phase 6 performance evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: platform-0-9-3-phase6-performance-${{ github.sha }}
+          path: phase6-performance-evidence
+          if-no-files-found: error
+          retention-days: 30
