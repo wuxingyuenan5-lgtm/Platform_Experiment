@@ -1,13 +1,15 @@
-﻿<template>
+<template>
   <PageWrapper title="风控详情">
     <div class="risk-detail-page">
+      <ProductDataStatusAlert :meta="dataMeta" class="mb-4" />
+
       <div class="toolbar">
         <Space>
           <Tag :color="roleColor">{{ roleLabel }}</Tag>
           <Tag :color="health.status === 'ok' ? 'green' : 'orange'">
-            {{ health.service || 'data-service' }} {{ health.status || 'unknown' }}
+            {{ health.service || 'data-service' }} {{ health.status || 'unavailable' }}
           </Tag>
-          <Tag>最新事件 {{ latestEventTime || '-' }}</Tag>
+          <Tag>最近事实 {{ latestEventTime || '不可用' }}</Tag>
         </Space>
         <Button :loading="loading" @click="loadAll">
           <template #icon><ReloadOutlined /></template>
@@ -38,129 +40,97 @@
         </Col>
         <Col :xs="24" :sm="12" :xl="4">
           <Card :bordered="false" class="metric-card">
-            <Statistic title="总资产 USD" :value="totalAsset" :precision="2" />
+            <span class="metric-label">总资产</span>
+            <strong class="metric-value">{{ formatMoney(totalAsset) }}</strong>
           </Card>
         </Col>
         <Col :xs="24" :sm="12" :xl="4">
           <Card :bordered="false" class="metric-card">
-            <Statistic title="可用资金 USD" :value="availableFund" :precision="2" />
+            <span class="metric-label">可用资金</span>
+            <strong class="metric-value">{{ formatMoney(availableFund) }}</strong>
           </Card>
         </Col>
       </Row>
 
-      <Card :bordered="false" title="风控总览" class="vg-panel">
-        <Table
-          row-key="id"
-          size="middle"
-          :columns="riskColumns"
-          :data-source="riskRecords"
-          :loading="loading"
-          :pagination="{ pageSize: 8 }"
-        >
-          <template #bodyCell="{ column, record, index }">
-            <template v-if="column.key === 'id'">{{ record.id || index + 1 }}</template>
-            <template v-else-if="column.key === 'severity'">
-              <Tag :color="severityColor(record.severity)">{{ record.severity || 'low' }}</Tag>
-            </template>
-            <template v-else-if="column.key === 'status'">
-              <Tag :color="record.status === 'pending' ? 'orange' : 'green'">{{ record.status || 'resolved' }}</Tag>
-            </template>
-          </template>
-        </Table>
-      </Card>
-
-      <section class="account-reports-grid">
-        <Card :bordered="false" title="账户管理" class="vg-panel account-panel">
-          <LegacyStrategyCoverage />
-        </Card>
-
-        <div class="reports-stack">
-          <Card :bordered="false" title="报表中心 - 风控记录" class="vg-panel">
+      <Row :gutter="[16, 16]">
+        <Col :xs="24" :xl="14">
+          <Card :bordered="false" title="风控记录" class="vg-panel">
             <Table
               row-key="id"
-              size="small"
-              :columns="reportRiskColumns"
+              size="middle"
+              :columns="riskColumns"
               :data-source="riskRecords"
               :loading="loading"
-              :pagination="{ pageSize: 5 }"
+              :pagination="{ pageSize: 8 }"
             >
+              <template #emptyText>
+                <span>{{ sourceStatus.risk === 'unavailable' ? '风控来源不可用' : '暂无风控记录' }}</span>
+              </template>
               <template #bodyCell="{ column, record, index }">
                 <template v-if="column.key === 'id'">{{ record.id || index + 1 }}</template>
                 <template v-else-if="column.key === 'severity'">
-                  <Tag :color="severityColor(record.severity)">{{ record.severity || 'low' }}</Tag>
+                  <Tag :color="severityColor(record.severity)">{{ record.severity || 'unknown' }}</Tag>
                 </template>
                 <template v-else-if="column.key === 'status'">
-                  <Tag :color="record.status === 'pending' ? 'orange' : 'green'">{{ record.status || 'resolved' }}</Tag>
+                  <Tag :color="record.status === 'pending' ? 'orange' : 'green'">
+                    {{ record.status || 'unknown' }}
+                  </Tag>
                 </template>
               </template>
             </Table>
           </Card>
+        </Col>
+        <Col :xs="24" :xl="10">
+          <Card :bordered="false" title="数据源状态" class="vg-panel">
+            <Table
+              row-key="key"
+              size="small"
+              :columns="sourceColumns"
+              :data-source="sourceRows"
+              :pagination="false"
+            >
+              <template #bodyCell="{ column, record }">
+                <template v-if="column.key === 'status'">
+                  <Tag :color="sourceStatusColor(record.status)">{{ record.status }}</Tag>
+                </template>
+              </template>
+            </Table>
+          </Card>
+        </Col>
+      </Row>
 
-          <Card :bordered="false" title="报表中心 - 通知消息" class="vg-panel">
+      <Row :gutter="[16, 16]" class="mt-4">
+        <Col :xs="24" :xl="12">
+          <Card :bordered="false" title="通知事实" class="vg-panel">
             <Table
               :row-key="notificationRowKey"
               size="small"
               :columns="notificationColumns"
               :data-source="notifications"
               :loading="loading"
-              :pagination="{ pageSize: 5 }"
+              :pagination="{ pageSize: 6 }"
             >
+              <template #emptyText>
+                <span>{{ sourceStatus.notification === 'unavailable' ? '通知来源不可用' : '暂无通知' }}</span>
+              </template>
               <template #bodyCell="{ column, record }">
                 <template v-if="column.key === 'title'">
-                  <div class="strong-cell">{{ record.title || record.subject || '-' }}</div>
-                  <div class="muted-cell">{{ record.content || record.message || record.description || '-' }}</div>
+                  <div class="strong-cell">{{ record.title || record.subject || '未命名消息' }}</div>
+                  <div class="muted-cell">
+                    {{ record.content || record.message || record.description || '无正文' }}
+                  </div>
                 </template>
                 <template v-else-if="column.key === 'status'">
-                  <Tag :color="notificationStatusColor(record)">{{ record.status || (record.read ? 'read' : 'unread') }}</Tag>
+                  <Tag :color="isUnread(record) ? 'orange' : 'green'">
+                    {{ isUnread(record) ? 'unread' : 'read' }}
+                  </Tag>
                 </template>
               </template>
             </Table>
           </Card>
-        </div>
-      </section>
-
-      <section class="audit-monitor-grid">
-        <Card :bordered="false" title="审计日志" class="vg-panel">
-          <Table
-            row-key="key"
-            size="middle"
-            :columns="auditColumns"
-            :data-source="auditRows"
-            :loading="loading"
-            :pagination="false"
-          >
-            <template #bodyCell="{ column, record }">
-              <template v-if="column.key === 'status'">
-                <Tag :color="record.color">{{ record.status }}</Tag>
-              </template>
-            </template>
-          </Table>
-        </Card>
-
-        <div class="monitor-stack">
-          <Card :bordered="false" title="系统监控 - data-service" class="vg-panel">
-            <Descriptions :column="1" size="small">
-              <Descriptions.Item label="状态">
-                <Tag :color="health.status === 'ok' ? 'green' : 'orange'">{{ health.status }}</Tag>
-              </Descriptions.Item>
-              <Descriptions.Item label="服务">{{ health.service || 'data-service' }}</Descriptions.Item>
-              <Descriptions.Item label="同步频率">{{ health.update_frequency || '-' }}</Descriptions.Item>
-              <Descriptions.Item label="端口">8082</Descriptions.Item>
-            </Descriptions>
-          </Card>
-
-          <Card :bordered="false" title="系统监控 - auth-service" class="vg-panel">
-            <Descriptions :column="1" size="small">
-              <Descriptions.Item label="状态">
-                <Tag color="green">已连接</Tag>
-              </Descriptions.Item>
-              <Descriptions.Item label="登录用户">{{ userInfo.username || userInfo.name || '-' }}</Descriptions.Item>
-              <Descriptions.Item label="角色">{{ roleLabel }}</Descriptions.Item>
-              <Descriptions.Item label="端口">8080</Descriptions.Item>
-            </Descriptions>
-          </Card>
-
-          <Card :bordered="false" title="资产结构快照" class="vg-panel">
+        </Col>
+        <Col :xs="24" :xl="12">
+          <Card :bordered="false" title="资产结构" class="vg-panel">
             <Table
               row-key="name"
               size="small"
@@ -169,43 +139,35 @@
               :loading="loading"
               :pagination="false"
             >
+              <template #emptyText>
+                <span>{{ sourceStatus.finance === 'unavailable' ? '财务来源不可用' : '暂无资产结构' }}</span>
+              </template>
               <template #bodyCell="{ column, record }">
                 <template v-if="column.key === 'value'">
                   {{ formatMoney(record.valueUSD ?? record.value) }}
                 </template>
                 <template v-else-if="column.key === 'percent'">
-                  <Progress :percent="percentNumber(record.percent)" size="small" />
+                  {{ formatPercent(record.percent) }}
                 </template>
               </template>
             </Table>
           </Card>
-        </div>
-      </section>
+        </Col>
+      </Row>
     </div>
   </PageWrapper>
 </template>
 
 <script setup lang="ts">
-  import { computed, onMounted, ref } from 'vue';
-  import {
-    Button,
-    Card,
-    Col,
-    Descriptions,
-    Progress,
-    Row,
-    Space,
-    Statistic,
-    Table,
-    Tag,
-  } from 'ant-design-vue';
+  import Decimal from 'decimal.js';
+  import { computed, onMounted, reactive, ref } from 'vue';
+  import { Button, Card, Col, Row, Space, Statistic, Table, Tag } from 'ant-design-vue';
   import { ReloadOutlined } from '@ant-design/icons-vue';
   import { PageWrapper } from '@/components/Page';
-  import LegacyStrategyCoverage from '@/views/strategy/components/LegacyStrategyCoverage.vue';
+  import ProductDataStatusAlert from '@/components/ProductDataState/ProductDataStatusAlert.vue';
   import {
-    DataAccount,
-    DataServiceHealth,
-    ExchangeInfo,
+    type DataAccount,
+    type DataServiceHealth,
     getAccounts,
     getDataHealth,
     getExchangeInfo,
@@ -213,14 +175,20 @@
     getProductRatio,
     getRiskRecordList,
     getTotalAssetSummary,
-    NotificationMessage,
-    ProductRatioItem,
-    RiskRecord,
-    TotalAssetSummary,
+    type ExchangeInfo,
+    type NotificationMessage,
+    type ProductRatioItem,
+    type RiskRecord,
+    type TotalAssetSummary,
   } from '@/api/riskControl';
+  import {
+    type DecimalString,
+    type ProductDataMeta,
+  } from '@/api/platform/productDataState';
   import { useRoleAccess } from '@/hooks/web/useRoleAccess';
-  import { useUserStore } from '@/store/modules/user';
-  import { formateNumStr } from '@/utils/formate';
+  import { formatMoneyString, formatRatioPercentString } from '@/utils/decimalDisplay';
+
+  type SourceStatus = 'ready' | 'no_data' | 'unavailable';
 
   const loading = ref(false);
   const riskRecords = ref<RiskRecord[]>([]);
@@ -229,108 +197,107 @@
   const ratioItems = ref<ProductRatioItem[]>([]);
   const totalSummary = ref<TotalAssetSummary>({});
   const exchangeInfo = ref<ExchangeInfo>({});
-  const health = ref<DataServiceHealth>({ status: 'unknown', service: 'data-service', update_frequency: '-' });
+  const health = ref<DataServiceHealth>({
+    status: 'unknown',
+    service: 'data-service',
+    update_frequency: 'unknown',
+  });
+  const sourceStatus = reactive<Record<string, SourceStatus>>({
+    risk: 'no_data',
+    notification: 'no_data',
+    finance: 'no_data',
+    health: 'no_data',
+  });
+  const sourceErrors = reactive<Record<string, string>>({});
+  const dataMeta = ref<ProductDataMeta>({
+    status: 'no_data',
+    source: 'risk detail aggregation',
+    timezone: 'source-defined',
+    currency: 'USD',
+    unit: 'risk and account facts',
+    precision: 'decimal-string',
+    message: '尚未加载风控事实',
+  });
 
   const { roleLabel, roleColor } = useRoleAccess();
-  const userStore = useUserStore();
-  const userInfo = computed(() => userStore.getUserInfo as any);
-
   const pendingCount = computed(() => riskRecords.value.filter((item) => item.status === 'pending').length);
   const highCount = computed(() =>
     riskRecords.value.filter((item) => ['high', 'critical'].includes(item.severity || '')).length,
   );
   const unreadCount = computed(() => notifications.value.filter(isUnread).length);
-  const latestEventTime = computed(() => {
-    const riskTimes = riskRecords.value.map((item) => item.created_at).filter(Boolean);
-    const notificationTimes = notifications.value.map((item) => item.created_at || item.createdAt).filter(Boolean);
-    const times = [...riskTimes, ...notificationTimes].sort();
-    return times[times.length - 1] || '';
-  });
-  const totalAsset = computed(() => {
-    const fromApi = totalSummary.value.total_asset ?? totalSummary.value.total;
-    if (typeof fromApi === 'number') return fromApi;
-    return accounts.value.reduce((sum, item) => sum + Number(item.total_asset || 0), 0);
-  });
-  const availableFund = computed(() =>
-    accounts.value.reduce((sum, item) => sum + Number(item.available_fund || 0), 0),
+  const latestEventTime = computed(() =>
+    [
+      ...riskRecords.value.map((item) => item.created_at),
+      ...notifications.value.map((item) => item.created_at || item.createdAt),
+      ...accounts.value.map((item) => item.asset_updated_at),
+      totalSummary.value.updated_at,
+      exchangeInfo.value.updated_at,
+      health.value.as_of,
+    ]
+      .filter((value): value is string => Boolean(value))
+      .sort()
+      .at(-1),
   );
 
+  function sumAccountField(field: 'total_asset' | 'available_fund'): DecimalString | undefined {
+    const values = accounts.value.map((item) => item[field]).filter((value): value is string => value !== undefined);
+    if (!values.length) return undefined;
+    return values.reduce((sum, value) => sum.plus(value), new Decimal(0)).toFixed();
+  }
+
+  const totalAsset = computed<DecimalString | undefined>(
+    () => totalSummary.value.total_asset ?? totalSummary.value.total ?? sumAccountField('total_asset'),
+  );
+  const availableFund = computed<DecimalString | undefined>(() => sumAccountField('available_fund'));
+
   const riskColumns = [
-    { title: 'ID', dataIndex: 'id', key: 'id', width: 80 },
+    { title: 'ID', dataIndex: 'id', key: 'id', width: 70 },
     { title: '标题', dataIndex: 'title', key: 'title' },
     { title: '内容', dataIndex: 'content', key: 'content' },
     { title: '等级', dataIndex: 'severity', key: 'severity', width: 100 },
     { title: '状态', dataIndex: 'status', key: 'status', width: 100 },
     { title: '时间', dataIndex: 'created_at', key: 'created_at', width: 180 },
   ];
-
-  const reportRiskColumns = [
-    { title: 'ID', dataIndex: 'id', key: 'id', width: 70 },
-    { title: '标题', dataIndex: 'title', key: 'title' },
-    { title: '等级', dataIndex: 'severity', key: 'severity', width: 100 },
-    { title: '状态', dataIndex: 'status', key: 'status', width: 90 },
-    { title: '时间', dataIndex: 'created_at', key: 'created_at', width: 170 },
+  const sourceColumns = [
+    { title: '来源', dataIndex: 'label', key: 'label' },
+    { title: '状态', dataIndex: 'status', key: 'status', width: 110 },
+    { title: '截至/错误', dataIndex: 'detail', key: 'detail' },
   ];
-
   const notificationColumns = [
     { title: '消息', key: 'title' },
-    { title: '状态', dataIndex: 'status', key: 'status', width: 100 },
+    { title: '状态', key: 'status', width: 100 },
     { title: '时间', dataIndex: 'created_at', key: 'created_at', width: 170 },
   ];
-
-  const auditColumns = [
-    { title: '模块', dataIndex: 'module', key: 'module' },
-    { title: '来源', dataIndex: 'source', key: 'source' },
-    { title: '状态', dataIndex: 'status', key: 'status', width: 110 },
-    { title: '最近记录', dataIndex: 'latest', key: 'latest', width: 180 },
-  ];
-
   const ratioColumns = [
     { title: '资产项', dataIndex: 'name', key: 'name' },
     { title: '金额 USD', key: 'value', align: 'right', width: 180 },
-    { title: '占比', key: 'percent', width: 180 },
+    { title: '占比', key: 'percent', width: 130 },
   ];
 
-  const auditRows = computed(() => [
-    {
-      key: 'auth',
-      module: '认证登录',
-      source: 'auth-service /login /me',
-      status: '已接入',
-      color: 'green',
-      latest: '-',
-    },
-    {
-      key: 'data',
-      module: '数据同步',
-      source: 'data-service /api/v1/data/sync',
-      status: health.value.status === 'ok' ? '已连接' : '异常',
-      color: health.value.status === 'ok' ? 'green' : 'orange',
-      latest: health.value.update_frequency || '-',
-    },
+  const sourceRows = computed(() => [
     {
       key: 'risk',
-      module: '风控记录',
-      source: '/risk/api/v1/risk-records/',
-      status: '已接入',
-      color: 'green',
-      latest: riskRecords.value[0]?.created_at || '-',
+      label: 'risk-service',
+      status: sourceStatus.risk,
+      detail: sourceErrors.risk || riskRecords.value.map((item) => item.created_at).filter(Boolean).sort().at(-1) || '不可用',
     },
     {
       key: 'notification',
-      module: '消息通知',
-      source: '/notifications/api/v1/messages/',
-      status: '已接入',
-      color: 'green',
-      latest: latestEventTime.value || '-',
+      label: 'notification-service',
+      status: sourceStatus.notification,
+      detail: sourceErrors.notification || notifications.value.map((item) => item.created_at || item.createdAt).filter(Boolean).sort().at(-1) || '不可用',
     },
     {
-      key: 'exchange',
-      module: '汇率接口',
-      source: '/exchange/',
-      status: exchangeInfo.value.rate ? '已接入' : '待检查',
-      color: exchangeInfo.value.rate ? 'green' : 'orange',
-      latest: exchangeInfo.value.updated_at || '-',
+      key: 'finance',
+      label: 'data-service finance',
+      status: sourceStatus.finance,
+      detail: sourceErrors.finance || totalSummary.value.updated_at || exchangeInfo.value.updated_at || '不可用',
+    },
+    {
+      key: 'health',
+      label: 'data-service health',
+      status: sourceStatus.health,
+      detail: sourceErrors.health || health.value.as_of || health.value.update_frequency || '不可用',
     },
   ]);
 
@@ -341,47 +308,124 @@
     return 'blue';
   }
 
-  function notificationStatusColor(record: any) {
-    if (record.status === 'unread' || record.read === false || record.isRead === false) return 'orange';
-    if (record.status === 'failed') return 'red';
-    return 'green';
-  }
-
-  function notificationRowKey(record: any, index?: number) {
-    return record.id || record.message_id || `${record.created_at || 'notification'}-${index ?? 0}`;
-  }
-
   function isUnread(record: NotificationMessage) {
     return record.status === 'unread' || record.read === false || record.isRead === false;
   }
 
-  function formatMoney(value: any) {
-    return formateNumStr(value || 0, { decimals: 2, keepZero: true });
+  function notificationRowKey(record: NotificationMessage, index?: number) {
+    return record.id || record.message_id || `${record.created_at || 'notification'}-${index ?? 0}`;
   }
 
-  function percentNumber(value: any) {
-    return Number((Number(value || 0) * 100).toFixed(2));
+  function sourceStatusColor(status: SourceStatus) {
+    if (status === 'ready') return 'green';
+    if (status === 'unavailable') return 'red';
+    return 'blue';
+  }
+
+  function formatMoney(value?: DecimalString) {
+    return formatMoneyString(value, 'USD');
+  }
+
+  function formatPercent(value: DecimalString) {
+    return formatRatioPercentString(value);
+  }
+
+  function setRejected(source: string, reason: unknown) {
+    sourceStatus[source] = 'unavailable';
+    sourceErrors[source] = reason instanceof Error ? reason.message : String(reason || 'request failed');
   }
 
   async function loadAll() {
     loading.value = true;
+    Object.keys(sourceErrors).forEach((key) => delete sourceErrors[key]);
+    const results = await Promise.allSettled([
+      getRiskRecordList(),
+      getNotificationList(),
+      getAccounts(),
+      getProductRatio(),
+      getTotalAssetSummary(),
+      getExchangeInfo(),
+      getDataHealth(),
+    ]);
     try {
-      const [riskRes, notifyRes, accountRes, ratioRes, totalRes, exchangeRes, healthRes] = await Promise.all([
-        getRiskRecordList(),
-        getNotificationList(),
-        getAccounts(),
-        getProductRatio(),
-        getTotalAssetSummary(),
-        getExchangeInfo(),
-        getDataHealth(),
-      ]);
-      riskRecords.value = riskRes;
-      notifications.value = notifyRes;
-      accounts.value = accountRes;
-      ratioItems.value = ratioRes;
-      totalSummary.value = totalRes;
-      exchangeInfo.value = exchangeRes;
-      health.value = healthRes;
+      const [riskResult, notificationResult, accountResult, ratioResult, totalResult, exchangeResult, healthResult] = results;
+
+      if (riskResult.status === 'fulfilled') {
+        riskRecords.value = riskResult.value;
+        sourceStatus.risk = riskResult.value.length ? 'ready' : 'no_data';
+      } else {
+        riskRecords.value = [];
+        setRejected('risk', riskResult.reason);
+      }
+
+      if (notificationResult.status === 'fulfilled') {
+        notifications.value = notificationResult.value;
+        sourceStatus.notification = notificationResult.value.length ? 'ready' : 'no_data';
+      } else {
+        notifications.value = [];
+        setRejected('notification', notificationResult.reason);
+      }
+
+      let financeFailures = 0;
+      if (accountResult.status === 'fulfilled') accounts.value = accountResult.value;
+      else {
+        accounts.value = [];
+        financeFailures += 1;
+        sourceErrors.finance = String(accountResult.reason?.message || accountResult.reason || 'accounts failed');
+      }
+      if (ratioResult.status === 'fulfilled') ratioItems.value = ratioResult.value;
+      else {
+        ratioItems.value = [];
+        financeFailures += 1;
+        sourceErrors.finance = `${sourceErrors.finance || ''} ratio failed`.trim();
+      }
+      if (totalResult.status === 'fulfilled') totalSummary.value = totalResult.value;
+      else {
+        totalSummary.value = {};
+        financeFailures += 1;
+        sourceErrors.finance = `${sourceErrors.finance || ''} total failed`.trim();
+      }
+      if (exchangeResult.status === 'fulfilled') exchangeInfo.value = exchangeResult.value;
+      else {
+        exchangeInfo.value = {};
+        financeFailures += 1;
+        sourceErrors.finance = `${sourceErrors.finance || ''} exchange failed`.trim();
+      }
+      sourceStatus.finance = financeFailures
+        ? 'unavailable'
+        : accounts.value.length || ratioItems.value.length || totalAsset.value !== undefined
+          ? 'ready'
+          : 'no_data';
+
+      if (healthResult.status === 'fulfilled') {
+        health.value = healthResult.value;
+        sourceStatus.health = healthResult.value.status === 'ok' ? 'ready' : 'unavailable';
+        if (healthResult.value.status !== 'ok') {
+          sourceErrors.health = `provider status=${healthResult.value.status}`;
+        }
+      } else {
+        setRejected('health', healthResult.reason);
+      }
+
+      const statuses = Object.values(sourceStatus);
+      const unavailable = statuses.filter((status) => status === 'unavailable').length;
+      const ready = statuses.filter((status) => status === 'ready').length;
+      dataMeta.value = {
+        status: unavailable ? 'unavailable' : ready ? 'ready' : 'no_data',
+        source: unavailable ? 'risk detail aggregation (partial)' : 'risk detail aggregation',
+        asOf: latestEventTime.value,
+        timezone: 'source-defined',
+        currency: 'USD',
+        unit: 'risk and account facts',
+        precision: 'decimal-string',
+        errorCode: unavailable ? 'partial_source_failure' : undefined,
+        message: unavailable
+          ? `${unavailable}个来源不可用；成功来源的事实仍单独保留`
+          : ready
+            ? undefined
+            : '所有来源成功，但没有风控或账户事实',
+        degraded: unavailable > 0,
+      };
     } finally {
       loading.value = false;
     }
@@ -413,23 +457,17 @@
     box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
   }
 
-  .account-reports-grid,
-  .audit-monitor-grid {
-    display: grid;
-    grid-template-columns: 1.35fr 1fr;
-    gap: 16px;
-    margin-top: 16px;
+  .metric-label {
+    display: block;
+    color: #59636e;
+    font-size: 13px;
   }
 
-  .account-panel :deep(.page-wrapper),
-  .account-panel :deep(.ant-page-header) {
-    display: none;
-  }
-
-  .reports-stack,
-  .monitor-stack {
-    display: grid;
-    gap: 16px;
+  .metric-value {
+    display: block;
+    margin-top: 8px;
+    font-size: 20px;
+    line-height: 1.35;
   }
 
   .strong-cell {
@@ -440,13 +478,6 @@
     margin-top: 4px;
     color: #59636e;
     font-size: 12px;
-  }
-
-  @media (max-width: 1280px) {
-    .account-reports-grid,
-    .audit-monitor-grid {
-      grid-template-columns: 1fr;
-    }
   }
 
   @media (max-width: 768px) {
