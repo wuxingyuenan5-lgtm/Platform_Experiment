@@ -56,6 +56,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          test -z "$(git status --porcelain)"
           mkdir -p phase6-evidence
           {
             echo "event=${GITHUB_EVENT_NAME}"
@@ -68,7 +69,6 @@ jobs:
             pnpm --version
             git --version
           } | tee phase6-evidence/environment.txt
-          test -z "$(git status --porcelain)"
           git merge-base --is-ancestor "$ACCEPTED_BASE_SHA" HEAD
           echo "ahead=$(git rev-list --count ${ACCEPTED_BASE_SHA}..HEAD)" | tee phase6-evidence/history.txt
           echo "behind=$(git rev-list --count HEAD..${ACCEPTED_BASE_SHA})" | tee -a phase6-evidence/history.txt
@@ -98,7 +98,10 @@ jobs:
         run: |
           set -euo pipefail
           python scripts/check-version-consistency.py | tee phase6-evidence/version-consistency.log
-          node platform-web/scripts/test-formal-route-manifest.cjs | tee phase6-evidence/formal-route-manifest.log
+          (
+            cd platform-web
+            node scripts/test-formal-route-manifest.cjs
+          ) | tee phase6-evidence/formal-route-manifest.log
           python scripts/audit-product-data-owner-matrix.py \
             --require-closed \
             --output phase6-evidence/product-data-owner-audit.json \
