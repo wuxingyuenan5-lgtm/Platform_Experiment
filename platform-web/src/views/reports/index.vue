@@ -141,7 +141,8 @@
     () => riskRecords.value.filter((item) => item.status === 'pending').length,
   );
   const highCount = computed(
-    () => riskRecords.value.filter((item) => ['high', 'critical'].includes(item.severity || '')).length,
+    () =>
+      riskRecords.value.filter((item) => ['high', 'critical'].includes(item.severity || '')).length,
   );
   const unreadCount = computed(
     () =>
@@ -230,8 +231,8 @@
         message: unavailable
           ? `${unavailable}个报表来源不可用；未用空数组冒充完整结果`
           : ready
-            ? undefined
-            : '所有来源成功，但没有报表记录',
+          ? undefined
+          : '所有来源成功，但没有报表记录',
         degraded: unavailable > 0,
       };
     } finally {
