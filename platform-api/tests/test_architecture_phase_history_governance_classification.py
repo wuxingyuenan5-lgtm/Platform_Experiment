@@ -135,6 +135,10 @@ def test_phase5_product_format_commits_are_bounded_corrections() -> None:
             "platform-web/src/views/settings/index.vue",
             "style(platform-web): format settings closure view",
         ),
+        (
+            "platform-web/src/views/strategy/spread-carry/composables/useCrossSpreadExecution.ts",
+            "style(platform-web): format spread unavailable adapter",
+        ),
     ):
         category = MODEL.classify(
             subject,
