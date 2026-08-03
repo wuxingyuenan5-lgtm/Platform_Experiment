@@ -74,12 +74,16 @@
             <Descriptions :column="1" size="small">
               <Descriptions.Item label="状态">{{ dataMeta.status }}</Descriptions.Item>
               <Descriptions.Item label="来源">{{ dataMeta.source }}</Descriptions.Item>
-              <Descriptions.Item label="汇率标的">{{ exchangeInfo.symbol || '不可用' }}</Descriptions.Item>
+              <Descriptions.Item label="汇率标的">
+                {{ exchangeInfo.symbol || '不可用' }}
+              </Descriptions.Item>
               <Descriptions.Item label="汇率">
                 {{ formatDecimal(exchangeInfo.rate) }}
               </Descriptions.Item>
               <Descriptions.Item label="截至时间">{{ latestUpdateText }}</Descriptions.Item>
-              <Descriptions.Item label="时区">{{ dataMeta.timezone || '来源定义' }}</Descriptions.Item>
+              <Descriptions.Item label="时区">
+                {{ dataMeta.timezone || '来源定义' }}
+              </Descriptions.Item>
               <Descriptions.Item label="精度">Decimal字符串</Descriptions.Item>
             </Descriptions>
           </Card>
@@ -90,12 +94,25 @@
 </template>
 
 <script setup lang="ts">
+  import { ReloadOutlined } from '@ant-design/icons-vue';
+  import {
+    Button,
+    Card,
+    Col,
+    Descriptions,
+    Progress,
+    Row,
+    Space,
+    Table,
+    Tag,
+  } from 'ant-design-vue';
   import Decimal from 'decimal.js';
   import { computed, onMounted, ref } from 'vue';
-  import { Button, Card, Col, Descriptions, Progress, Row, Space, Table, Tag } from 'ant-design-vue';
-  import { ReloadOutlined } from '@ant-design/icons-vue';
-  import { PageWrapper } from '@/components/Page';
-  import ProductDataStatusAlert from '@/components/ProductDataState/ProductDataStatusAlert.vue';
+  import {
+    type DecimalString,
+    type ProductDataMeta,
+    unavailableMeta,
+  } from '@/api/platform/productDataState';
   import {
     type DataAccount,
     type ExchangeInfo,
@@ -106,14 +123,11 @@
     type ProductRatioItem,
     type TotalAssetSummary,
   } from '@/api/riskControl';
-  import {
-    unavailableMeta,
-    type DecimalString,
-    type ProductDataMeta,
-  } from '@/api/platform/productDataState';
+  import { PageWrapper } from '@/components/Page';
+  import ProductDataStatusAlert from '@/components/ProductDataState/ProductDataStatusAlert.vue';
   import { useRoleAccess } from '@/hooks/web/useRoleAccess';
-  import { formatDecimalString, formatMoneyString } from '@/utils/decimalDisplay';
   import { formatToDateTime } from '@/utils/dateUtil';
+  import { formatDecimalString, formatMoneyString } from '@/utils/decimalDisplay';
 
   const loading = ref(false);
   const accounts = ref<DataAccount[]>([]);
@@ -132,22 +146,34 @@
   const { roleLabel, roleColor } = useRoleAccess();
 
   function sumAccountField(field: 'total_asset' | 'available_fund'): DecimalString | undefined {
-    const values = accounts.value.map((item) => item[field]).filter((value): value is string => value !== undefined);
+    const values = accounts.value
+      .map((item) => item[field])
+      .filter((value): value is string => value !== undefined);
     if (!values.length) return undefined;
     return values.reduce((sum, value) => sum.plus(value), new Decimal(0)).toFixed();
   }
 
   const totalAsset = computed<DecimalString | undefined>(
-    () => totalSummary.value.total_asset ?? totalSummary.value.total ?? sumAccountField('total_asset'),
+    () =>
+      totalSummary.value.total_asset ??
+      totalSummary.value.total ??
+      sumAccountField('total_asset'),
   );
-  const availableFund = computed<DecimalString | undefined>(() => sumAccountField('available_fund'));
+  const availableFund = computed<DecimalString | undefined>(() =>
+    sumAccountField('available_fund'),
+  );
   const usedFund = computed<DecimalString | undefined>(() => {
     if (totalAsset.value === undefined || availableFund.value === undefined) return undefined;
     return Decimal.max(new Decimal(totalAsset.value).minus(availableFund.value), 0).toFixed();
   });
   const latestUpdate = computed(() => {
-    const times = accounts.value.map((item) => item.asset_updated_at).filter((value): value is string => Boolean(value)).sort();
-    return times[times.length - 1] || totalSummary.value.updated_at || exchangeInfo.value.updated_at;
+    const times = accounts.value
+      .map((item) => item.asset_updated_at)
+      .filter((value): value is string => Boolean(value))
+      .sort();
+    return (
+      times[times.length - 1] || totalSummary.value.updated_at || exchangeInfo.value.updated_at
+    );
   });
   const latestUpdateText = computed(() =>
     latestUpdate.value ? formatToDateTime(latestUpdate.value) : '不可用',
@@ -210,14 +236,20 @@
         };
       } else {
         dataMeta.value = {
-          status: accounts.value.length || ratioItems.value.length || totalAsset.value !== undefined ? 'ready' : 'no_data',
+          status:
+            accounts.value.length || ratioItems.value.length || totalAsset.value !== undefined
+              ? 'ready'
+              : 'no_data',
           source: 'data-service',
           asOf: latestUpdate.value,
           timezone: 'source-defined',
           currency: 'USD',
           unit: 'money and ratio',
           precision: 'decimal-string',
-          message: accounts.value.length || ratioItems.value.length ? undefined : 'Provider成功返回，但没有财务记录',
+          message:
+            accounts.value.length || ratioItems.value.length
+              ? undefined
+              : 'Provider成功返回，但没有财务记录',
         };
       }
     } finally {
