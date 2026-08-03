@@ -106,12 +106,7 @@ When an execution result cannot be proven from persisted Runtime events and Venu
 
 ### Backup and restore verification
 
-Use the existing controlled Backup and Restore Drill interfaces. Restore only into an isolated directory. Validate SHA-256, SQLite integrity and critical table counts, then start the restored Platform API in safe state. A restore drill must retain:
-
-```text
-VG_LIVE_TRADING_ENABLED=false
-VG_RUNTIME_LIVE_WRITE_ENABLED=false
-```
+Use the existing controlled Backup and Restore Drill interfaces. Restore only into an isolated directory. Validate SHA-256, SQLite integrity and critical table counts, then start the restored Platform API in safe state. Preserve the Safe Startup contract defined in `docs/technical/PRODUCTION_OPERATIONS.md`, including disabled Platform and Runtime Live Write.
 
 A restore drill is not a production cutover and must not modify active Platform or Runtime data paths.
 
