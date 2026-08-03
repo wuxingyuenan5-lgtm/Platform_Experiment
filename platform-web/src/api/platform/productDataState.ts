@@ -43,11 +43,7 @@ export class ProductDataContractError extends Error {
 
 export function unwrapProductPayload(payload: unknown, source: string): unknown {
   if (payload === null || payload === undefined) {
-    throw new ProductDataContractError(
-      'provider_empty_payload',
-      `${source}未返回数据`,
-      source,
-    );
+    throw new ProductDataContractError('provider_empty_payload', `${source}未返回数据`, source);
   }
   if (typeof payload !== 'object') return payload;
 
