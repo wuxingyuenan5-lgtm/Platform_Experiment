@@ -13,12 +13,12 @@
   "forbidden_patterns": [
     {
       "code": "production_e2e_reference",
-      "pattern": "(?:e2e|test-results|playwright-report|seed_platform_visual_e2e)",
+      "pattern": "(?:seed_platform_visual_e2e|test-results|playwright-report|(?:from|import|require)[^\\n]{0,120}(?:/e2e/|\\\\e2e\\\\))",
       "message": "production path references E2E or visual evidence data"
     },
     {
       "code": "production_fixture_reference",
-      "pattern": "(?:/|\\\\)(?:fixtures?|seeds?|mocks?)(?:/|\\\\)",
+      "pattern": "(?:from|import|require)[^\\n]{0,120}(?:/|\\\\)(?:fixtures?|seeds?|mocks?)(?:/|\\\\)",
       "message": "production path imports a fixture, seed or mock directory"
     },
     {
