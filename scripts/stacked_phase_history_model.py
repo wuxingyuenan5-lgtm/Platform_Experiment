@@ -58,6 +58,7 @@ PHASE5_PRODUCT_FORMAT_PATHS = {
     "platform-web/src/views/reports/index.vue",
     "platform-web/src/views/risk/detail/index.vue",
     "platform-web/src/views/settings/index.vue",
+    "platform-web/src/views/strategy/spread-carry/composables/useCrossSpreadExecution.ts",
 }
 
 
