@@ -73,6 +73,23 @@ test('formal product surfaces disclose data gaps instead of demo values', async 
 
   await expectUnavailableSource(
     page,
+    '/strategy/platform?desk=funding',
+    '资费与资金费率套利数据链尚未配置',
+    'not-configured: funding-carry-provider-and-runtime-owner',
+  );
+  await expect(page.getByText('29.57%', { exact: false })).toHaveCount(0);
+  await expect(page.getByText('开仓成功', { exact: false })).toHaveCount(0);
+
+  await expectUnavailableSource(
+    page,
+    '/strategy/platform?desk=crossSpread',
+    '跨所价差研究数据链尚未配置',
+    'not-configured: spread-research-provider',
+  );
+  await expect(page.getByText('模拟持仓', { exact: false })).toHaveCount(0);
+
+  await expectUnavailableSource(
+    page,
     '/news-calendar/news',
     '新闻聚合Provider尚未配置',
     'not-configured: news-aggregation-provider',
