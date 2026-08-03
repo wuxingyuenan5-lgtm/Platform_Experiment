@@ -20,6 +20,7 @@
     "src/design/**/*.d.ts",
     "src/design/**/*.ts",
     "src/design/**/*.vue",
+    "src/hooks/trading/**/*.ts",
     "src/hooks/web/useECharts.ts",
     "src/layouts/default/menu/**/*.vue",
     "src/router/helper/routeHelper.ts",
