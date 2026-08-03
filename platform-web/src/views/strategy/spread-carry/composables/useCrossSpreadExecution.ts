@@ -14,8 +14,7 @@ export interface LogEntry {
 
 type MessageTone = 'is-success' | 'is-error' | 'is-warn';
 
-const UNAVAILABLE_MESSAGE =
-  '跨所价差写入尚未配置；当前页面只允许读取正式行情与Runtime状态。';
+const UNAVAILABLE_MESSAGE = '跨所价差写入尚未配置；当前页面只允许读取正式行情与Runtime状态。';
 
 export function useCrossSpreadExecution(_options: unknown) {
   const submitLoading = ref(false);
