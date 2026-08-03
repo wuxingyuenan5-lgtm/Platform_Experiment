@@ -5,7 +5,7 @@ import re
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime, timedelta
 from decimal import ROUND_HALF_UP, Decimal
-from typing import Any, TypeVar, cast
+from typing import Any, cast
 
 from app.a_share_research_policy import aggregate_shenwan_level2
 from app.research_cache import LastKnownGoodResearchCache
@@ -53,8 +53,6 @@ _MEMBERSHIP_LOCK = asyncio.Lock()
 _STOCK_LOCKS: dict[str, asyncio.Lock] = {}
 _MACRO_LOCK = asyncio.Lock()
 
-T = TypeVar("T")
-
 
 class ResearchServiceError(RuntimeError):
     def __init__(self, code: str, detail: str, *, status_code: int = 503) -> None:
@@ -68,7 +66,7 @@ def _now() -> datetime:
     return datetime.now(UTC)
 
 
-async def _provider_call(awaitable: Awaitable[T]) -> T:  # noqa: UP047
+async def _provider_call[T](awaitable: Awaitable[T]) -> T:
     try:
         return await asyncio.wait_for(
             awaitable,
@@ -81,7 +79,7 @@ async def _provider_call(awaitable: Awaitable[T]) -> T:  # noqa: UP047
         ) from exc
 
 
-def _require_model(value: Any, expected: type[T], source: str) -> T:  # noqa: UP047
+def _require_model[T](value: Any, expected: type[T], source: str) -> T:
     if not isinstance(value, expected):
         raise ResearchServiceError(
             "provider_invalid_payload",
@@ -90,17 +88,17 @@ def _require_model(value: Any, expected: type[T], source: str) -> T:  # noqa: UP
     return value
 
 
-def _require_model_list(
+def _require_model_list[ModelT](
     value: Any,
-    expected: type[T],
+    expected: type[ModelT],
     source: str,
-) -> list[T]:  # noqa: UP047
+) -> list[ModelT]:
     if not isinstance(value, list) or any(not isinstance(item, expected) for item in value):
         raise ResearchServiceError(
             "provider_invalid_payload",
             f"{source}返回了无效{expected.__name__}列表合同",
         )
-    return cast(list[T], value)
+    return cast(list[ModelT], value)
 
 
 def _require_mapping(value: Any, source: str) -> dict[str, Any]:
@@ -112,10 +110,10 @@ def _require_mapping(value: Any, source: str) -> dict[str, Any]:
     return cast(dict[str, Any], value)
 
 
-def _validated_result(
+def _validated_result[ResultT](
     value: Any,
-    validator: Callable[[Any], T],
-) -> T | BaseException:  # noqa: UP047
+    validator: Callable[[Any], ResultT],
+) -> ResultT | BaseException:
     if isinstance(value, BaseException):
         return value
     try:
