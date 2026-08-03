@@ -117,8 +117,10 @@ jobs:
           import os
           import secrets
 
+          password = f"Cc9!{secrets.token_urlsafe(24)}"
+          print(f"::add-mask::{password}")
           with open(os.environ['GITHUB_ENV'], 'a', encoding='utf-8') as output:
-              output.write(f"E2E_SHARED_PASSWORD=Cc9!{secrets.token_urlsafe(24)}\n")
+              output.write(f"E2E_SHARED_PASSWORD={password}\n")
           PY
 
       - name: Capture full-platform visual baseline
