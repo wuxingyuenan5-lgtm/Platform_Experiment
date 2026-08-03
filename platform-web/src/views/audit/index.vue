@@ -175,7 +175,9 @@
       } else {
         riskRecords.value = [];
         sourceStatus.value.risk = 'unavailable';
-        sourceErrors.value.risk = String(riskResult.reason?.message || riskResult.reason || 'request failed');
+        sourceErrors.value.risk = String(
+          riskResult.reason?.message || riskResult.reason || 'request failed',
+        );
       }
       if (notificationResult.status === 'fulfilled') {
         notifications.value = notificationResult.value;
@@ -183,7 +185,9 @@
       } else {
         notifications.value = [];
         sourceStatus.value.notification = 'unavailable';
-        sourceErrors.value.notification = String(notificationResult.reason?.message || notificationResult.reason || 'request failed');
+        sourceErrors.value.notification = String(
+          notificationResult.reason?.message || notificationResult.reason || 'request failed',
+        );
       }
       if (healthResult.status === 'fulfilled') {
         health.value = healthResult.value;
@@ -201,9 +205,7 @@
       const unavailable = Object.values(sourceStatus.value).filter(
         (status) => status === 'unavailable',
       ).length;
-      const ready = Object.values(sourceStatus.value).filter(
-        (status) => status === 'ready',
-      ).length;
+      const ready = Object.values(sourceStatus.value).filter((status) => status === 'ready').length;
       dataMeta.value = {
         status: unavailable ? 'unavailable' : ready ? 'ready' : 'no_data',
         source: unavailable ? 'audit aggregation (partial)' : 'audit aggregation',
@@ -214,8 +216,8 @@
         message: unavailable
           ? `${unavailable}个审计来源不可用；成功来源的数据未被伪装为完整结果`
           : ready
-            ? undefined
-            : '所有来源均成功，但没有审计记录',
+          ? undefined
+          : '所有来源均成功，但没有审计记录',
         degraded: unavailable > 0,
       };
     } finally {
