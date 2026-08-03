@@ -82,9 +82,7 @@
             >
               <template #emptyText>
                 <span>
-                  {{
-                    notificationStatus === 'unavailable' ? '通知来源不可用' : '暂无通知消息'
-                  }}
+                  {{ notificationStatus === 'unavailable' ? '通知来源不可用' : '暂无通知消息' }}
                 </span>
               </template>
               <template #bodyCell="{ column, record }">
@@ -234,8 +232,8 @@
         message: unavailable
           ? `${unavailable}个报表来源不可用；未用空数组冒充完整结果`
           : ready
-            ? undefined
-            : '所有来源成功，但没有报表记录',
+          ? undefined
+          : '所有来源成功，但没有报表记录',
         degraded: unavailable > 0,
       };
     } finally {
