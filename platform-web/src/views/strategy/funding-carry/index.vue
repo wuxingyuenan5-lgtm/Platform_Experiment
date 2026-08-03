@@ -1,163 +1,34 @@
 <template>
-  <div class="funding-page">
-    <template v-if="activeSection === 'analysis'">
-      <FundingMarketBoard
-        :data="fundingMarketBoard"
-        :exchange="selectedExchange"
-        :selected-range="selectedRange"
-        :selected-symbol="selectedSymbol"
-        :selected-resolution="selectedResolution"
-        :range-options="rangeOptions"
-        @update:selected-range="selectedRange = $event"
-        @update:selected-symbol="handleChartSymbolUpdate"
-        @update:selected-resolution="selectedResolution = $event"
-      />
-
-      <FundingChartPanel
-        :data="fundingChartPanel"
-        :exchange="selectedExchange"
-        :symbol="selectedSymbol"
-        :range="selectedRange"
-        :resolution="selectedResolution"
-        :start-date="selectedStartDate"
-        :end-date="selectedEndDate"
-        @update:exchange="handleExchangeUpdate"
-        @update:symbol="handleChartSymbolUpdate"
-        @update:range="selectedRange = $event"
-        @update:resolution="selectedResolution = $event"
-        @update:start-date="selectedStartDate = $event"
-        @update:end-date="selectedEndDate = $event"
-      />
-
-      <FundingDetailPanel
-        :exchange="selectedExchange"
-        :symbol="selectedSymbol"
-        :selected-range="selectedRange"
-        :resolution="selectedResolution"
-        :start-date="selectedStartDate"
-        :end-date="selectedEndDate"
-        :research="currentResearch"
-      />
-    </template>
-
-    <template v-else>
-      <FundingOrderPanel :data="profileOrderPanel" />
-    </template>
-  </div>
+  <section class="funding-carry-page">
+    <ProductNotConfiguredPanel
+      title="资金费率套利数据链尚未配置"
+      description="当前仓库没有为资金费率行情、APR、仓位、PnL或执行回报注册正式Provider与Runtime事实Owner，因此不展示静态行情、模拟收益或未经ACK/Fill证明的成功状态。"
+      source="not-configured: funding-carry-provider-and-runtime-owner"
+    />
+  </section>
 </template>
 
 <script setup lang="ts">
-  import { computed, ref, watch } from 'vue';
-  import FundingChartPanel from './components/FundingChartPanel.vue';
-  import FundingDetailPanel from './components/FundingDetailPanel.vue';
-  import FundingMarketBoard from './components/FundingMarketBoard.vue';
-  import FundingOrderPanel from './components/FundingOrderPanel.vue';
-  import {
-    defaultSymbol,
-    fundingChartPanel,
-    fundingCarryProfiles,
-    fundingMarketBoard,
-    fundingOrderPanel,
-    fundingRangeLabels,
-  } from './mock/data';
-  import type { FundingExchange, FundingMarketRange, FundingSymbol } from './types';
+  import ProductNotConfiguredPanel from '@/components/ProductDataState/ProductNotConfiguredPanel.vue';
 
-  const props = withDefaults(
+  withDefaults(
     defineProps<{
       activeSection?: 'analysis' | 'execution';
-      selectedExchange?: FundingExchange;
-      selectedSymbol?: FundingSymbol;
+      selectedExchange?: string;
+      selectedSymbol?: string;
       selectedResolution?: string;
     }>(),
     {
       activeSection: 'analysis',
-      selectedExchange: 'Bybit',
-      selectedSymbol: 'BTC',
-      selectedResolution: '30分钟',
+      selectedExchange: '',
+      selectedSymbol: '',
+      selectedResolution: '',
     },
-  );
-
-  const selectedExchange = ref<FundingExchange>(props.selectedExchange);
-  const selectedSymbol = ref<FundingSymbol>(props.selectedSymbol);
-  const selectedRange = ref<FundingMarketRange>('current');
-  const selectedResolution = ref<string>(props.selectedResolution);
-  const selectedStartDate = ref('2026-05-28');
-  const selectedEndDate = ref('2026-06-24');
-
-  const profile = computed(
-    () => fundingCarryProfiles[selectedExchange.value] ?? fundingCarryProfiles.Bybit,
-  );
-  const currentResearch = computed(
-    () => profile.value.research[selectedSymbol.value] ?? profile.value.research[defaultSymbol],
-  );
-
-  const rangeOptions = computed(() =>
-    (Object.keys(fundingRangeLabels) as FundingMarketRange[]).map((value) => ({
-      value,
-      label: fundingRangeLabels[value],
-    })),
-  );
-
-  const profileOrderPanel = computed(() => ({
-    ...fundingOrderPanel,
-    strategyLabel: `${selectedExchange.value} ${selectedSymbol.value}资金费率套利`,
-  }));
-
-  function handleChartSymbolUpdate(value: string) {
-    selectedSymbol.value = value as FundingSymbol;
-  }
-
-  function handleExchangeUpdate(value: FundingExchange) {
-    selectedExchange.value = value;
-  }
-
-  watch(
-    () => props.selectedExchange,
-    (value) => {
-      selectedExchange.value = value;
-    },
-    { immediate: true },
-  );
-
-  watch(
-    () => props.selectedSymbol,
-    (value) => {
-      selectedSymbol.value = value;
-    },
-    { immediate: true },
-  );
-
-  watch(
-    () => props.selectedResolution,
-    (value) => {
-      selectedResolution.value = value;
-    },
-    { immediate: true },
-  );
-
-  watch(
-    profile,
-    (nextProfile) => {
-      const nextSymbols = nextProfile.snapshots.map((item) => item.symbol);
-      if (!nextSymbols.includes(selectedSymbol.value)) {
-        selectedSymbol.value = nextSymbols[0] ?? defaultSymbol;
-      }
-    },
-    { immediate: true },
   );
 </script>
 
-<style lang="less">
-  @import '../shared/strategy-theme.less';
-</style>
-
-<style scoped lang="less">
-  .funding-page {
-    display: flex;
-    flex-direction: column;
-    gap: 18px;
-    padding: 0 4px 18px;
-    background: var(--strategy-bg);
-    color: var(--strategy-text-1);
+<style scoped>
+  .funding-carry-page {
+    padding: 18px;
   }
 </style>
