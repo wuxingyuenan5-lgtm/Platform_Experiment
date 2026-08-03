@@ -54,6 +54,7 @@ PHASE5_PRODUCT_FORMAT_PATHS = {
     "platform-web/src/views/data/index.vue",
     "platform-web/src/views/finance/index.vue",
     "platform-web/src/views/monitor/index.vue",
+    "platform-web/src/views/notification/index.vue",
     "platform-web/src/views/reports/index.vue",
     "platform-web/src/views/risk/detail/index.vue",
     "platform-web/src/views/settings/index.vue",
@@ -156,7 +157,7 @@ def classify(
     if kind == "fix":
         return "bounded-correction"
     if kind == "style":
-        if summary.startswith("format ") and all(
+        if "format" in summary and all(
             is_phase5_product_format_path(path) for path in paths
         ):
             return "bounded-correction"
