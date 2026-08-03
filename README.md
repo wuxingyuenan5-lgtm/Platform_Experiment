@@ -1,15 +1,10 @@
 # Variable-Global 交易基础设施平台
 
-内部投研、策略执行、风险控制、用户管理与账务核对平台。当前优先级是先完成受控本地运行和真实环境验收，再扩展产品范围。
+内部基金投研、策略执行、风险控制、用户管理、资产与账务核对平台。当前采用Vue产品前端、FastAPI模块化单体Platform API和独立Execution Runtime，不引入重型分布式基础设施。
 
-## 当前发布
+当前版本、冻结基线、活动分支、优化阶段和延期验收统一由以下文件维护：
 
-产品版本：`0.9.1`  
-集成分支：`feature/issue-117-platform-0-9-1`  
-基线 `main`：`a4e22021c71cf5cd703cb0bc35676ff5adbfec36`  
-发布说明：`docs/releases/0.9.1.md`
-
-`0.9.1` 在最新平台、对冲基金看板、跨所价差、资金费与 Runtime 更新基础上，接入浏览器用户系统、四种业务角色、用户后台、运营备注、会员持仓与资产视图。该分支不代表真实 Bybit/MT5 环境或生产 HTTPS 主机已经验收，也不会自动开启 Platform 或 Runtime Live Write。
+`docs/codex/current-state.md`
 
 ## 一键本地启动
 
@@ -19,56 +14,62 @@ Windows PowerShell，在仓库根目录运行：
 powershell -ExecutionPolicy Bypass -File .\scripts\dev-platform.ps1
 ```
 
-首次运行会按需创建 Python 虚拟环境、安装依赖、读取前端声明的 pnpm 版本，并启动：
+该命令按需准备依赖并启动：
 
-- Frontend: `http://127.0.0.1:4373/index.html`
-- Platform Backend: `http://127.0.0.1:8000/health`
-- Execution Runtime: `http://127.0.0.1:8100/health`
+- Platform Web：`http://127.0.0.1:4373/index.html`
+- Platform API：`http://127.0.0.1:8000/health`
+- Execution Runtime：`http://127.0.0.1:8100/health`
 
-后续通常不会重复安装依赖。强制重装使用 `-ForceInstall`，跳过前端使用 `-SkipFrontend`。
-
-默认仍是 Simulation + Fake Gateway，Platform/Runtime Live Write 均关闭。
+默认保持Simulation、Fake Gateway以及Platform/Runtime Live Write关闭。
 
 ## 快速入口
 
-| 目的 | 文档 |
+| 目的 | 权威入口 |
 |---|---|
+| 当前工程状态 | `docs/codex/current-state.md` |
+| Agent长期规则 | `AGENTS.md` |
+| 按任务选择阅读范围 | `docs/codex/context-map.md` |
 | 人工理解项目 | `00-人工可读目录/README.md` |
-| Agent 规则 | `AGENTS.md` |
-| Codex 当前上下文 | `docs/codex/CURRENT_CONTEXT.md` |
-| 当前稳定状态 | `docs/codex/current-state.md` |
-| 0.9.1 发布说明 | `docs/releases/0.9.1.md` |
-| 用户系统本地交接 | `docs/operations/USER_SYSTEM_LOCAL_INTEGRATION_HANDOFF.md` |
-| 用户系统部署准备 | `docs/operations/USER_SYSTEM_DEPLOYMENT_READINESS.md` |
-| 轻量减负方案 | `docs/architecture/LIGHTWEIGHT_OPTIMIZATION_PLAN.md` |
+| 架构和代码所有权 | `docs/architecture/OWNERSHIP.md` |
 | 系统结构 | `docs/architecture/SYSTEM_MAP.md` |
-| 主要所有权 | `docs/architecture/OWNERSHIP.md` |
-| Git 工作流 | `docs/engineering/GIT_WORKFLOW.md` |
-| 数据库 | `docs/database/README.md` |
-| 实盘验收 | `docs/operations/V6-小资金实盘验收手册.md` |
+| 0.9.2系统优化总方案 | `docs/architecture/PLATFORM_0_9_2_SYSTEM_OPTIMIZATION_MASTER_PLAN.md` |
+| Git工作流 | `docs/engineering/GIT_WORKFLOW.md` |
+| 数据库、迁移与恢复 | `docs/database/README.md` |
+| 运维和验收 | `docs/operations/` |
 
-## 工程结构
+`docs/codex/CURRENT_CONTEXT.md`仅是旧链接兼容指针，不应作为当前事实来源。
+
+## 当前工程结构
 
 ```text
-admin-risk/          Vue 前端
-platform-backend/    业务、风险、用户、编排和账务 API
-execution-runtime/   Venue/Broker 适配与外部副作用
-docs/                稳定架构、合同、运维与工程文档
-scripts/             启动、版本和质量工具
+platform-web/          Vue产品前端
+platform-api/          FastAPI模块化单体业务API
+execution-runtime/     Venue/Broker适配、外部副作用与Runtime Journal
+docs/                  架构、合同、运维和工程权威文档
+scripts/               启动、版本、审计和质量工具
+projects/risk-control/ 外部证据完成前冻结的Legacy生产资产
 ```
+
+Platform Web、Platform API和Execution Runtime三条物理边界已经完成目录治理。`projects/risk-control`与`deploy/`在服务器、MySQL和真实消费者证据完成前不得删除、重命名或机械迁移。
+
+## 当前优化阶段
+
+Phase A–D、Research、Identity、Portfolio、Frontend热点和高风险路由治理已经完成。当前继续Phase J / J2 GitHub仓库减负；服务器、GitLab Runner、MySQL、TLS、Windows真实本地和真实Venue/Broker验收延期，不再阻塞仓库内安全优化。
 
 ## 工作流
 
-- Fast：Markdown 和同步版本。
-- Standard：普通单模块改动，不强制 Issue 或任务包。
-- Critical：交易、执行、Runtime、风险、权限、认证、数据库、合同、Live 或跨服务工作，保留严格 Issue/任务包/PR 流程。
+- Fast：Markdown和同步版本维护。
+- Standard：边界清晰的单模块改动。
+- Critical：交易、执行、Runtime、风险、权限、认证、数据库、迁移、合同、Live或跨服务工作。
 
-PR 只运行受影响模块；`main` 始终运行完整矩阵。详细规则见 `docs/engineering/GIT_WORKFLOW.md`。
+PR按受影响范围运行检查；正式验收阶段运行完整矩阵。详细规则见`docs/engineering/GIT_WORKFLOW.md`。
 
-## 版本更新
+## 版本维护
 
 ```powershell
-python scripts/bump-version.py 0.9.1
+python scripts/bump-version.py <major.minor.patch>
 python scripts/check-version-consistency.py
 python scripts/check-codex-context.py
 ```
+
+根`VERSION`、两个Python包、前端显示环境和`platform-web/package.json`必须保持一致。

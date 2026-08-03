@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noUnusedLocals": false,
+    "noUnusedParameters": false
+  },
+  "include": [
+    "src/access/**/*.ts",
+    "src/api/platform/memberHoldings.ts",
+    "src/api/platform/userAdminNotes.ts",
+    "src/api/platform/userSystem.ts",
+    "src/enums/roleEnum.ts",
+    "src/hooks/web/useRoleAccess.ts",
+    "src/router/guard/permissionGuard.ts",
+    "src/router/routes/index.ts",
+    "src/router/routes/modules/account.ts",
+    "src/router/routes/modules/dashboard.ts",
+    "src/router/routes/modules/risk.ts",
+    "src/settings/siteSetting.ts",
+    "src/store/modules/user.ts",
+    "src/typings/user-system-route-meta.d.ts",
+    "src/utils/decimalDisplay.ts",
+    "src/views/account/index.vue",
+    "src/views/account/components/HoldingsPanel.vue",
+    "src/views/sys/about/index.vue",
+    "src/views/sys/login/Login.vue",
+    "src/views/sys/login/LoginForm.vue",
+    "src/views/sys/register/index.vue",
+    "src/views/sys/reset-password/index.vue",
+    "src/views/users/**/*.vue",
+    "types/**/*.d.ts",
+    "types/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "mock/**/*.ts"
+  ]
+}

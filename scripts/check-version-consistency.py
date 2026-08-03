@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import json
 import re
 import tomllib
 from pathlib import Path
@@ -10,14 +11,19 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 EXPECTED = (ROOT / "VERSION").read_text(encoding="utf-8").strip()
 FRONTEND_VERSION_FILES = (
-    "admin-risk/.env.development",
-    "admin-risk/.env.production",
+    "platform-web/.env.development",
+    "platform-web/.env.production",
 )
 
 
 def project_version(path: str) -> str:
     with (ROOT / path).open("rb") as handle:
         return str(tomllib.load(handle)["project"]["version"])
+
+
+def package_json_version(path: str) -> str:
+    package = json.loads((ROOT / path).read_text(encoding="utf-8"))
+    return str(package["version"])
 
 
 def frontend_version(path: str) -> str:
@@ -30,8 +36,9 @@ def frontend_version(path: str) -> str:
 
 def main() -> None:
     actual = {
-        "platform-backend package": project_version("platform-backend/pyproject.toml"),
+        "platform-api package": project_version("platform-api/pyproject.toml"),
         "execution-runtime package": project_version("execution-runtime/pyproject.toml"),
+        "platform-web package": package_json_version("platform-web/package.json"),
         **{
             f"frontend display ({path})": frontend_version(path)
             for path in FRONTEND_VERSION_FILES

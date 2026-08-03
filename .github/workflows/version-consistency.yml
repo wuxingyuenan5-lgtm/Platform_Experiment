@@ -6,20 +6,21 @@ on:
       - main
     paths:
       - VERSION
-      - platform-backend/pyproject.toml
+      - platform-api/pyproject.toml
       - execution-runtime/pyproject.toml
-      - admin-risk/.env
+      - platform-web/.env
       - scripts/check-version-consistency.py
       - scripts/bump-version.py
       - .github/workflows/version-consistency.yml
   pull_request:
     branches:
       - main
+      - feature/issue-134-platform-0-9-1-unified-delivery
     paths:
       - VERSION
-      - platform-backend/pyproject.toml
+      - platform-api/pyproject.toml
       - execution-runtime/pyproject.toml
-      - admin-risk/.env
+      - platform-web/.env
       - scripts/check-version-consistency.py
       - scripts/bump-version.py
       - .github/workflows/version-consistency.yml

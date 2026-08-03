@@ -1,0 +1,49 @@
+name: Platform Directory Invariants
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+      - feature/issue-134-platform-0-9-1-unified-delivery
+
+permissions:
+  contents: read
+
+concurrency:
+  group: platform-directory-invariants-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  platform-directories:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Enforce Platform Web directory migration
+        run: >-
+          python scripts/audit-directory-migration.py
+          --mode post-rename
+          --target platform-web
+          --fail-on-unclassified
+
+      - name: Enforce Platform API directory migration
+        run: >-
+          python scripts/audit-directory-migration.py
+          --mode post-rename
+          --target platform-api
+          --fail-on-unclassified
+
+      - name: Enforce all Platform directory migrations
+        run: >-
+          python scripts/audit-directory-migration.py
+          --mode post-rename
+          --target all
+          --fail-on-unclassified

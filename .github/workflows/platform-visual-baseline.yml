@@ -1,0 +1,169 @@
+name: Platform Visual Baseline
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - main
+      - feature/issue-134-platform-0-9-1-unified-delivery
+    paths:
+      - '.github/workflows/platform-visual-baseline.yml'
+      - 'platform-web/package.json'
+      - 'platform-web/pnpm-lock.yaml'
+      - 'platform-web/playwright.platform-visual.config.ts'
+      - 'platform-web/e2e/platform-visual/**'
+      - 'platform-web/e2e/hedge-board/researchFixtures.ts'
+      - 'platform-web/src/access/**'
+      - 'platform-web/src/router/**'
+      - 'platform-web/src/store/modules/user.ts'
+      - 'platform-web/src/views/dashboard/**'
+      - 'platform-web/src/views/hedgeBoard/**'
+      - 'platform-web/src/views/platform/**'
+      - 'platform-web/src/views/strategy/**'
+      - 'platform-web/src/views/risk/**'
+      - 'platform-web/src/views/monitor/**'
+      - 'platform-web/src/views/finance/**'
+      - 'platform-web/src/views/data/**'
+      - 'platform-web/src/views/reports/**'
+      - 'platform-web/src/views/users/**'
+      - 'platform-web/src/views/account/**'
+      - 'platform-api/app/auth.py'
+      - 'platform-api/app/config.py'
+      - 'platform-api/app/main.py'
+      - 'platform-api/app/member_holding_*.py'
+      - 'platform-api/app/research_*.py'
+      - 'platform-api/app/user_*.py'
+      - 'platform-api/scripts/seed_platform_visual_e2e.py'
+      - 'platform-api/pyproject.toml'
+      - 'execution-runtime/app/**'
+      - 'execution-runtime/pyproject.toml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: platform-visual-baseline-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  four-width-visual-evidence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      CI: 'true'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Create isolated Python environments
+        shell: bash
+        run: |
+          python -m venv .venv-platform-visual-backend
+          python -m venv .venv-platform-visual-runtime
+          .venv-platform-visual-backend/bin/python -m pip install --upgrade pip
+          .venv-platform-visual-runtime/bin/python -m pip install --upgrade pip
+          .venv-platform-visual-backend/bin/python -m pip install -e './platform-api[dev]'
+          .venv-platform-visual-runtime/bin/python -m pip install -e './execution-runtime[dev]'
+          echo "PLATFORM_VISUAL_BACKEND_PYTHON=${GITHUB_WORKSPACE}/.venv-platform-visual-backend/bin/python" >> "$GITHUB_ENV"
+          echo "PLATFORM_VISUAL_RUNTIME_PYTHON=${GITHUB_WORKSPACE}/.venv-platform-visual-runtime/bin/python" >> "$GITHUB_ENV"
+
+      - name: Validate Python visual bootstrap
+        shell: bash
+        run: |
+          "$PLATFORM_VISUAL_BACKEND_PYTHON" -m py_compile platform-api/scripts/seed_platform_visual_e2e.py
+          "$PLATFORM_VISUAL_BACKEND_PYTHON" -m pip check
+          "$PLATFORM_VISUAL_RUNTIME_PYTHON" -m pip check
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.9
+          run_install: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: pnpm
+          cache-dependency-path: platform-web/pnpm-lock.yaml
+
+      - name: Install frontend dependencies
+        working-directory: platform-web
+        env:
+          HUSKY: '0'
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Chromium
+        working-directory: platform-web
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Lint visual evidence code
+        working-directory: platform-web
+        run: >-
+          pnpm exec eslint --max-warnings 0
+          "playwright.platform-visual.config.ts"
+          "e2e/platform-visual/**/*.ts"
+
+      - name: Generate isolated shared password
+        shell: bash
+        run: |
+          python - <<'PY'
+          import os
+          import secrets
+
+          with open(os.environ['GITHUB_ENV'], 'a', encoding='utf-8') as output:
+              output.write(f"E2E_SHARED_PASSWORD=Cc9!{secrets.token_urlsafe(24)}\n")
+          PY
+
+      - name: Capture full-platform visual baseline
+        working-directory: platform-web
+        run: pnpm test:e2e:platform-visual
+
+      - name: Validate and describe evidence
+        if: always()
+        working-directory: platform-web
+        shell: bash
+        run: |
+          evidence_dir="test-results/platform-visual/evidence"
+          mkdir -p "$evidence_dir"
+          find "$evidence_dir" -type f -name '*.png' | sort > "$evidence_dir/screenshot-inventory.txt"
+          find "$evidence_dir" -type f -name '*.json' | sort > "$evidence_dir/metadata-inventory.txt"
+          screenshots=$(wc -l < "$evidence_dir/screenshot-inventory.txt")
+          metadata=$(wc -l < "$evidence_dir/metadata-inventory.txt")
+          cat > "$evidence_dir/README.md" <<EOF
+          # Platform 0.9.2 full-platform visual baseline
+
+          - Git SHA: ${GITHUB_SHA}
+          - Viewports: 1440x900, 1024x768, 768x1024, 390x844
+          - Roles: anonymous, employee, CEO, member
+          - Expected captures: 56
+          - Screenshot count: ${screenshots}
+          - Metadata count: ${metadata}
+          - Data classification: deterministic E2E fixtures and isolated simulation/fake Runtime only
+          - This artifact is not real Provider, production, Venue/Broker or Live Write acceptance evidence.
+          EOF
+          if [ "${screenshots}" -ne 56 ] || [ "${metadata}" -ne 56 ]; then
+            echo "Expected 56 screenshots and metadata files; got screenshots=${screenshots}, metadata=${metadata}" >&2
+            exit 1
+          fi
+
+      - name: Publish evidence summary
+        if: always()
+        working-directory: platform-web
+        shell: bash
+        run: |
+          if [ -f test-results/platform-visual/evidence/README.md ]; then
+            cat test-results/platform-visual/evidence/README.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload visual evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: platform-0-9-2-visual-baseline-${{ github.sha }}
+          path: |
+            platform-web/test-results/platform-visual
+            platform-web/playwright-report/platform-visual
+          if-no-files-found: error
+          retention-days: 30

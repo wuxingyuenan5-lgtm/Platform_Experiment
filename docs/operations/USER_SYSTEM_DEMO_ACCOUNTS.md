@@ -19,7 +19,7 @@
 
 ## 初始化
 
-在 `platform-backend` 目录设置环境变量后运行：
+在 `platform-api` 目录设置环境变量后运行：
 
 ```bash
 export VG_ENVIRONMENT=development

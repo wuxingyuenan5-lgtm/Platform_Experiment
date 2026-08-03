@@ -20,35 +20,36 @@ REQUIRED_ENTRYPOINTS = (
 )
 
 REQUIRED_OWNERS = {
-    "Platform composition root": "platform-backend/app/main.py",
-    "Execution API DTOs": "platform-backend/app/execution_schemas.py",
-    "Platform order submission orchestration": "platform-backend/app/trade_command_execution.py",
-    "EOD Reconciliation public DTOs": "platform-backend/app/eod_reconciliation_schemas.py",
-    "EOD report and review policy": "platform-backend/app/eod_reconciliation_policy.py",
-    "EOD Reconciliation persistence": "platform-backend/app/eod_reconciliation_repository.py",
-    "EOD Reconciliation Service": "platform-backend/app/eod_reconciliation_service.py",
-    "EOD Reconciliation facade": "platform-backend/app/eod_reconciliation.py",
-    "EOD operational gate coordination": "platform-backend/app/eod_policy.py",
-    "Venue Reconciliation public DTOs": "platform-backend/app/venue_reconciliation_schemas.py",
-    "Venue Reconciliation difference policy": "platform-backend/app/venue_reconciliation_policy.py",
-    "Venue Reconciliation persistence": "platform-backend/app/venue_reconciliation_repository.py",
-    "Venue Reconciliation Runtime client": "platform-backend/app/venue_reconciliation_runtime_client.py",
-    "Venue Reconciliation Service": "platform-backend/app/venue_reconciliation_service.py",
-    "Venue Reconciliation facade": "platform-backend/app/venue_reconciliation.py",
-    "Operational fill projection": "platform-backend/app/trading.py",
-    "Position calculation policy": "platform-backend/app/position_math.py",
-    "FinancialFact public DTOs": "platform-backend/app/financial_fact_schemas.py",
-    "FinancialFact normalization": "platform-backend/app/financial_fact_normalization.py",
-    "FinancialFact persistence": "platform-backend/app/financial_fact_repository.py",
-    "Formal projection calculations": "platform-backend/app/financial_projection_service.py",
-    "FinancialFact API orchestration": "platform-backend/app/financial_facts.py",
-    "SQLite connection": "platform-backend/app/database_connection.py",
-    "Core database bootstrap": "platform-backend/app/database_bootstrap.py",
-    "Fixed reference Seeds": "platform-backend/app/database_seeds.py",
-    "Database compatibility facade": "platform-backend/app/database.py",
-    "Migration ledger": "platform-backend/app/schema_migrations.py",
+    "Platform composition root": "platform-api/app/main.py",
+    "Execution API DTOs": "platform-api/app/execution_schemas.py",
+    "Platform order submission orchestration": "platform-api/app/trade_command_execution.py",
+    "Member holding pure valuation": "platform-api/app/member_holding_valuation.py",
+    "EOD Reconciliation public DTOs": "platform-api/app/eod_reconciliation_schemas.py",
+    "EOD report and review policy": "platform-api/app/eod_reconciliation_policy.py",
+    "EOD Reconciliation persistence": "platform-api/app/eod_reconciliation_repository.py",
+    "EOD Reconciliation Service": "platform-api/app/eod_reconciliation_service.py",
+    "EOD Reconciliation facade": "platform-api/app/eod_reconciliation.py",
+    "EOD operational gate coordination": "platform-api/app/eod_policy.py",
+    "Venue Reconciliation public DTOs": "platform-api/app/venue_reconciliation_schemas.py",
+    "Venue Reconciliation difference policy": "platform-api/app/venue_reconciliation_policy.py",
+    "Venue Reconciliation persistence": "platform-api/app/venue_reconciliation_repository.py",
+    "Venue Reconciliation Runtime client": "platform-api/app/venue_reconciliation_runtime_client.py",
+    "Venue Reconciliation Service": "platform-api/app/venue_reconciliation_service.py",
+    "Venue Reconciliation facade": "platform-api/app/venue_reconciliation.py",
+    "Operational fill projection": "platform-api/app/trading.py",
+    "Position calculation policy": "platform-api/app/position_math.py",
+    "FinancialFact public DTOs": "platform-api/app/financial_fact_schemas.py",
+    "FinancialFact normalization": "platform-api/app/financial_fact_normalization.py",
+    "FinancialFact persistence": "platform-api/app/financial_fact_repository.py",
+    "Formal projection calculations": "platform-api/app/financial_projection_service.py",
+    "FinancialFact API orchestration": "platform-api/app/financial_facts.py",
+    "SQLite connection": "platform-api/app/database_connection.py",
+    "Core database bootstrap": "platform-api/app/database_bootstrap.py",
+    "Fixed reference Seeds": "platform-api/app/database_seeds.py",
+    "Database compatibility facade": "platform-api/app/database.py",
+    "Migration ledger": "platform-api/app/schema_migrations.py",
     "Runtime journal": "execution-runtime/app/journal.py",
-    "Platform execution exposure": "platform-backend/app/execution_exposure.py",
+    "Platform execution exposure": "platform-api/app/execution_exposure.py",
     "Durable Agent rules": "AGENTS.md",
     "Agent context loading": "docs/codex/context-map.md",
     "Current engineering truth": "docs/codex/current-state.md",
@@ -64,8 +65,8 @@ DOCUMENT_CATALOG_REFERENCES = (
 )
 
 STALE_CONTEXT_SNIPPETS = (
-    "Formal accounting authority: `platform-backend/app/financial_facts.py`",
-    "Formal accounting authority: platform-backend/app/financial_facts.py",
+    "Formal accounting authority: `platform-api/app/financial_facts.py`",
+    "Formal accounting authority: platform-api/app/financial_facts.py",
 )
 
 EXCLUDED_MARKDOWN_PARTS = frozenset(
@@ -86,6 +87,23 @@ EXTERNAL_LINK_SCHEMES = frozenset(
 MARKDOWN_LINK_PATTERN = re.compile(r"!?\[[^\]\n]*\]\((?P<target>[^)\n]+)\)")
 FENCED_CODE_PATTERN = re.compile(r"```.*?```|~~~.*?~~~", re.DOTALL)
 HTML_COMMENT_PATTERN = re.compile(r"<!--.*?-->", re.DOTALL)
+WORKSTATION_PATH_PATTERNS = (
+    (
+        "Windows user profile",
+        re.compile(
+            r"(?i)\b[A-Z]:\\Users\\(?!<user>(?:\\|$)|username(?:\\|$)|%USERNAME%(?:\\|$))"
+            r"[^\\\s`]+(?:\\|$)"
+        ),
+    ),
+    (
+        "macOS user home",
+        re.compile(r"/Users/(?!<user>(?:/|$)|username(?:/|$)|\$\{?USER\}?(?:/|$))[^/\s`]+(?:/|$)"),
+    ),
+    (
+        "Linux user home",
+        re.compile(r"/home/(?!<user>(?:/|$)|username(?:/|$)|\$\{?USER\}?(?:/|$))[^/\s`]+(?:/|$)"),
+    ),
+)
 
 
 def validate_owner_catalog(
@@ -125,6 +143,12 @@ def active_markdown_paths(root: Path) -> list[Path]:
     ]
 
 
+def markdown_without_examples(content: str) -> str:
+    """Remove fenced examples and comments before validating maintained prose."""
+
+    return HTML_COMMENT_PATTERN.sub("", FENCED_CODE_PATTERN.sub("", content))
+
+
 def markdown_link_target(raw_target: str) -> str | None:
     """Return a local link target or ``None`` when the link is intentionally ignored."""
 
@@ -162,9 +186,7 @@ def validate_markdown_links(
         if not source.is_file():
             continue
         relative_source = source.resolve().relative_to(root).as_posix()
-        content = source.read_text(encoding="utf-8")
-        content = FENCED_CODE_PATTERN.sub("", content)
-        content = HTML_COMMENT_PATTERN.sub("", content)
+        content = markdown_without_examples(source.read_text(encoding="utf-8"))
 
         for match in MARKDOWN_LINK_PATTERN.finditer(content):
             target = markdown_link_target(match.group("target"))
@@ -188,6 +210,32 @@ def validate_markdown_links(
             if not candidate.exists():
                 errors.append(
                     f"{relative_source}: local Markdown target does not exist: {target}"
+                )
+
+    return sorted(errors)
+
+
+def validate_portable_documentation(
+    root: Path,
+    markdown_paths: Iterable[Path] | None = None,
+) -> list[str]:
+    """Reject real workstation home paths from maintained Markdown prose."""
+
+    root = root.resolve()
+    paths = active_markdown_paths(root) if markdown_paths is None else sorted(markdown_paths)
+    errors: list[str] = []
+
+    for source in paths:
+        if not source.is_file():
+            continue
+        relative_source = source.resolve().relative_to(root).as_posix()
+        content = markdown_without_examples(source.read_text(encoding="utf-8"))
+        for label, pattern in WORKSTATION_PATH_PATTERNS:
+            match = pattern.search(content)
+            if match is not None:
+                errors.append(
+                    f"{relative_source}: workstation-specific {label} path is forbidden: "
+                    f"{match.group(0)}"
                 )
 
     return sorted(errors)
@@ -217,6 +265,7 @@ def validate_repository(root: Path) -> list[str]:
         errors.extend(validate_context_map(context_path.read_text(encoding="utf-8")))
 
     errors.extend(validate_markdown_links(root))
+    errors.extend(validate_portable_documentation(root))
     return sorted(errors)
 
 

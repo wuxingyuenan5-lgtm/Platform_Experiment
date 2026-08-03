@@ -29,7 +29,7 @@ id variable-global >/dev/null 2>&1 || \
 install -d -o variable-global -g variable-global -m 0750 /var/lib/variable-global
 
 echo "[1/5] 构建前端"
-cd "${PROJECT_ROOT}/admin-risk"
+cd "${PROJECT_ROOT}/platform-web"
 HUSKY=0 pnpm install --frozen-lockfile
 pnpm build
 
@@ -45,7 +45,7 @@ rm -f /tmp/variable-global-auth /tmp/variable-global-data
 
 echo "[3/5] 安装静态文件与服务配置"
 install -d -o www-data -g www-data -m 0755 /var/www/variable-global
-rsync -a --delete "${PROJECT_ROOT}/admin-risk/dist/" /var/www/variable-global/
+rsync -a --delete "${PROJECT_ROOT}/platform-web/dist/" /var/www/variable-global/
 chown -R www-data:www-data /var/www/variable-global
 install -m 0644 "${PROJECT_ROOT}/deploy/systemd/variable-global-auth.service" /etc/systemd/system/
 install -m 0644 "${PROJECT_ROOT}/deploy/systemd/variable-global-data.service" /etc/systemd/system/

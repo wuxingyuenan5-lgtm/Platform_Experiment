@@ -50,8 +50,8 @@ VG_LIVE_TRADING_ENABLED=false
 推荐模型：
 
 ```text
-https://<production-host>/        → admin-risk 静态前端
-https://<production-host>/api/v1 → platform-backend
+https://<production-host>/        → platform-web 静态前端
+https://<production-host>/api/v1 → platform-api
 ```
 
 必须验证：

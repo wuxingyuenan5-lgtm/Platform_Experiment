@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "types": ["node", "@playwright/test"]
+  },
+  "include": [
+    "playwright.platform-visual.config.ts",
+    "e2e/platform-visual/**/*.ts",
+    "e2e/hedge-board/researchFixtures.ts",
+    "types/**/*.d.ts",
+    "types/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist"
+  ]
+}

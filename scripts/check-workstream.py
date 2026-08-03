@@ -34,9 +34,9 @@ SEMVER_PATTERN = re.compile(r"\d+\.\d+\.\d+")
 
 VERSION_PATHS = {
     "VERSION",
-    "platform-backend/pyproject.toml",
+    "platform-api/pyproject.toml",
     "execution-runtime/pyproject.toml",
-    "admin-risk/.env",
+    "platform-web/.env",
 }
 FAST_MAX_FILES = 20
 FORBIDDEN_FAST_MARKDOWN = {"AGENTS.md"}
@@ -45,13 +45,13 @@ FORBIDDEN_FAST_PREFIXES = (".github/", "tasks/")
 CRITICAL_EXACT_PATHS = {
     "AGENTS.md",
     ".github/pull_request_template.md",
-    "platform-backend/app/auth.py",
-    "platform-backend/app/live_trading_sessions.py",
-    "platform-backend/app/runtime_contracts.py",
-    "platform-backend/app/schema_governance.py",
-    "platform-backend/app/schema_migrations.py",
-    "platform-backend/app/trade_command_execution.py",
-    "platform-backend/app/order_execution_intents.py",
+    "platform-api/app/auth.py",
+    "platform-api/app/live_trading_sessions.py",
+    "platform-api/app/runtime_contracts.py",
+    "platform-api/app/schema_governance.py",
+    "platform-api/app/schema_migrations.py",
+    "platform-api/app/trade_command_execution.py",
+    "platform-api/app/order_execution_intents.py",
     "scripts/check-workstream.py",
     "scripts/check-repository-structure.py",
     "scripts/check-documentation-consistency.py",
@@ -62,13 +62,13 @@ CRITICAL_PREFIXES = (
     "tasks/",
     "execution-runtime/",
     "docs/contracts/",
-    "platform-backend/app/cross_spread",
-    "platform-backend/app/database",
-    "platform-backend/app/eod_",
-    "platform-backend/app/execution_",
-    "platform-backend/app/financial_",
-    "platform-backend/app/risk",
-    "platform-backend/app/venue_reconciliation",
+    "platform-api/app/cross_spread",
+    "platform-api/app/database",
+    "platform-api/app/eod_",
+    "platform-api/app/execution_",
+    "platform-api/app/financial_",
+    "platform-api/app/risk",
+    "platform-api/app/venue_reconciliation",
 )
 
 
@@ -288,12 +288,12 @@ def validate_version_patch(path: str, patch: str | None) -> None:
     lines = changed_patch_lines(patch)
     if path == "VERSION":
         valid = bool(lines) and all(SEMVER_PATTERN.fullmatch(line.strip()) for line in lines)
-    elif path in {"platform-backend/pyproject.toml", "execution-runtime/pyproject.toml"}:
+    elif path in {"platform-api/pyproject.toml", "execution-runtime/pyproject.toml"}:
         valid = bool(lines) and all(
             re.fullmatch(r'version\s*=\s*"\d+\.\d+\.\d+"', line.strip())
             for line in lines
         )
-    elif path == "admin-risk/.env":
+    elif path == "platform-web/.env":
         valid = bool(lines) and all(
             re.fullmatch(r'VITE_GLOB_APP_VERSION\s*=\s*"\d+\.\d+\.\d+"', line.strip())
             for line in lines

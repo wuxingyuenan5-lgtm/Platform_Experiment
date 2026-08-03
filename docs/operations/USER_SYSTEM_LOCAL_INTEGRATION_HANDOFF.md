@@ -54,7 +54,7 @@ python scripts/scan-secrets.py
 后端：
 
 ```bash
-cd platform-backend
+cd platform-api
 python -m pip install -e '.[dev]'
 python -m pip check
 python -m ruff check app tests
@@ -76,7 +76,7 @@ python -m pytest -m "architecture or unit or integration or live_safety"
 前端：
 
 ```bash
-cd ../admin-risk
+cd ../platform-web
 pnpm install --frozen-lockfile
 pnpm test:user-system
 pnpm test:homepage-layout
@@ -94,7 +94,7 @@ pnpm test:e2e:user-system
 固定账号只允许在本地、开发或测试环境初始化。密码通过环境变量提供，不写入仓库。
 
 ```bash
-cd platform-backend
+cd platform-api
 export VG_ENVIRONMENT=development
 export VG_LIVE_TRADING_ENABLED=false
 export USER_SYSTEM_DEMO_SEED=1

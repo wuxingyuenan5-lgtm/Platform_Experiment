@@ -1,11 +1,11 @@
 # V6 Phase 4A：执行风险与 Kill Switch
 
-状态：`completed / merge pending`  
-实施分支：`hardening/v6-phase4a-execution-risk`  
-跟踪 Issue：`#14 V6 Phase 4A：ExecutionBatch 风险状态机、Kill Switch 与残腿处置`  
-Pull Request：`#15 Implement V6 Phase 4A execution risk controls`  
-上级计划：Issue `#12`、`V6-交易安全加固实施计划.md`  
-最终验收：`Platform CI #185 / run 30002639120`  
+状态：`completed / merge pending`
+实施分支：`hardening/v6-phase4a-execution-risk`
+跟踪 Issue：`#14 V6 Phase 4A：ExecutionBatch 风险状态机、Kill Switch 与残腿处置`
+Pull Request：`#15 Implement V6 Phase 4A execution risk controls`
+上级计划：Issue `#12`、`V6-交易安全加固实施计划.md`
+最终验收：`Platform CI #185 / run 30002639120`
 更新时间：`2026-07-23`
 
 ## 1. 阶段目标
@@ -104,7 +104,7 @@ residual notional = abs(unmatched delta) × conservative reference price
 - 市场单既无 Fill 又无价格时，状态为 `incomplete`。
 - 多 Base／Quantity Unit 或多结算币种无法可靠比较时，返回 `MIXED / incomplete` 和保守绝对值合计。
 
-正式算法位于 `platform-backend/app/execution_exposure.py`，由组合入口注入 Execution Risk 模块，便于 Phase 4 后续继续拆分过大的风险模块。
+正式算法位于 `platform-api/app/execution_exposure.py`，由组合入口注入 Execution Risk 模块，便于 Phase 4 后续继续拆分过大的风险模块。
 
 ## 6. 风险处置动作
 

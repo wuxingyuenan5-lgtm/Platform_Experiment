@@ -1,8 +1,8 @@
 # 对冲基金看板验收手册
 
-> 适用基线：Platform 0.9.1 候选版本  
-> 任务：Issue #134  
-> 分支：`feature/issue-134-platform-0-9-1-unified-delivery`  
+> 适用基线：Platform 0.9.1 候选版本
+> 任务：Issue #134
+> 分支：`feature/issue-134-platform-0-9-1-unified-delivery`
 > 状态：自动化验收、交易时段与非交易时段真实Provider样本已完成；实际环境状态展示、真实链接和人工视觉验收仍需形成证据。
 
 本地完整执行步骤、独立worktree、安全边界、日志目录和验收报告模板见：
@@ -35,12 +35,12 @@ docs/operations/PLATFORM_0_9_1_LOCAL_ACCEPTANCE_HANDOFF.md
 ### 2.1 后端与结构检查
 
 ```powershell
-cd platform-backend
+cd platform-api
 python -m ruff check app tests scripts
 python -m pyright
 python -m pytest
 
-cd ../admin-risk
+cd ../platform-web
 npx pnpm@9.15.9 test:hedge-board-layout
 npx pnpm@9.15.9 type:check
 npx pnpm@9.15.9 build
@@ -49,7 +49,7 @@ npx pnpm@9.15.9 build
 ### 2.2 对冲基金看板浏览器E2E
 
 ```powershell
-cd admin-risk
+cd platform-web
 $env:E2E_CEO_USERNAME="e2e_employee_1"
 $env:E2E_CEO_PASSWORD="使用本地临时强密码"
 npx pnpm@9.15.9 test:e2e:hedge-board
@@ -73,7 +73,7 @@ npx pnpm@9.15.9 test:e2e:hedge-board
 先启动Platform Backend，再执行：
 
 ```powershell
-cd platform-backend
+cd platform-api
 python scripts/validate_research_sources.py `
   --base-url http://127.0.0.1:8000 `
   --stock-code 600519 `
@@ -106,7 +106,7 @@ python scripts/validate_research_sources.py --session-token "<临时会话Token>
 ### 3.2 免费Provider独立探测
 
 ```powershell
-cd platform-backend
+cd platform-api
 python scripts/smoke_research_providers.py --timeout 60
 ```
 

@@ -177,7 +177,7 @@ python .\scripts\scan-secrets.py
 - 受控字段中的高熵明文 Secret。
 - 非模板、非审核公共 Vite 配置的 tracked `.env*` 文件。
 
-审核过的 `admin-risk/.env*` 只包含公开 `VITE_*` 浏览器配置，仍继续接受 Token 和高熵内容扫描。扫描器自身 regex 源文件被单独跳过，避免确定性自匹配。
+审核过的 `platform-web/.env*` 只包含公开 `VITE_*` 浏览器配置，仍继续接受 Token 和高熵内容扫描。扫描器自身 regex 源文件被单独跳过，避免确定性自匹配。
 
 ## 9. 工程验收
 

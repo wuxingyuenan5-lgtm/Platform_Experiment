@@ -9,10 +9,10 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-BACKEND_APP = ROOT / "platform-backend" / "app"
+BACKEND_APP = ROOT / "platform-api" / "app"
 RUNTIME_APP = ROOT / "execution-runtime" / "app"
 TEST_ROOTS = (
-    ROOT / "platform-backend" / "tests",
+    ROOT / "platform-api" / "tests",
     ROOT / "execution-runtime" / "tests",
 )
 WORKFLOW_ROOT = ROOT / ".github" / "workflows"
@@ -89,16 +89,16 @@ FORBIDDEN_PARALLEL_CONTEXT_PATHS = (
     ROOT / "tasks" / "TASK_TEMPLATE.md",
 )
 DDL_OWNER_PATHS = (
-    "platform-backend/app/database_bootstrap.py",
-    "platform-backend/app/credential_security.py",
-    "platform-backend/app/disaster_recovery.py",
-    "platform-backend/app/eod_reconciliation_repository.py",
-    "platform-backend/app/execution_risk.py",
-    "platform-backend/app/financial_fact_repository.py",
-    "platform-backend/app/live_trading_sessions.py",
-    "platform-backend/app/live_venue_accounting.py",
-    "platform-backend/app/production_monitoring.py",
-    "platform-backend/app/venue_reconciliation_repository.py",
+    "platform-api/app/database_bootstrap.py",
+    "platform-api/app/credential_security.py",
+    "platform-api/app/disaster_recovery.py",
+    "platform-api/app/eod_reconciliation_repository.py",
+    "platform-api/app/execution_risk.py",
+    "platform-api/app/financial_fact_repository.py",
+    "platform-api/app/live_trading_sessions.py",
+    "platform-api/app/live_venue_accounting.py",
+    "platform-api/app/production_monitoring.py",
+    "platform-api/app/venue_reconciliation_repository.py",
     "execution-runtime/app/journal.py",
     "execution-runtime/app/live_route_store.py",
     "execution-runtime/app/venue_store.py",
@@ -202,7 +202,7 @@ def check_composition_root(errors: list[str]) -> None:
         ):
             continue
         errors.append(
-            "platform-backend/app/main.py: composition root may only import, "
+            "platform-api/app/main.py: composition root may only import, "
             "wire routers/middleware, and define __all__"
         )
         break
@@ -218,7 +218,7 @@ def check_execution_schema_boundary(errors: list[str]) -> None:
     }
     if duplicate_types:
         errors.append(
-            "platform-backend/app/schemas.py: execution API schemas must be re-exported "
+            "platform-api/app/schemas.py: execution API schemas must be re-exported "
             f"from execution_schemas.py, not redefined: {sorted(duplicate_types)}"
         )
 
@@ -229,7 +229,7 @@ def check_execution_schema_boundary(errors: list[str]) -> None:
     missing_exports = EXECUTION_SCHEMA_NAMES - import_names
     if missing_exports:
         errors.append(
-            "platform-backend/app/schemas.py: missing compatibility exports from "
+            "platform-api/app/schemas.py: missing compatibility exports from "
             f"execution_schemas.py: {sorted(missing_exports)}"
         )
 
@@ -239,7 +239,7 @@ def check_financial_fact_repository_boundary(errors: list[str]) -> None:
     repository_path = BACKEND_APP / "financial_fact_repository.py"
     if not repository_path.is_file():
         errors.append(
-            "platform-backend/app/financial_fact_repository.py: "
+            "platform-api/app/financial_fact_repository.py: "
             "FinancialFact persistence owner is missing"
         )
         return
@@ -252,7 +252,7 @@ def check_financial_fact_repository_boundary(errors: list[str]) -> None:
     )
     if direct_database_import or "connection()" in service_source:
         errors.append(
-            "platform-backend/app/financial_facts.py: service must not access the database directly"
+            "platform-api/app/financial_facts.py: service must not access the database directly"
         )
 
     forbidden_sql = {
@@ -263,7 +263,7 @@ def check_financial_fact_repository_boundary(errors: list[str]) -> None:
     }
     if forbidden_sql:
         errors.append(
-            "platform-backend/app/financial_facts.py: SQL belongs in financial_fact_repository.py: "
+            "platform-api/app/financial_facts.py: SQL belongs in financial_fact_repository.py: "
             f"{sorted(forbidden_sql)}"
         )
 
@@ -273,7 +273,7 @@ def check_financial_fact_repository_boundary(errors: list[str]) -> None:
     }
     if missing_sql:
         errors.append(
-            "platform-backend/app/financial_fact_repository.py: "
+            "platform-api/app/financial_fact_repository.py: "
             f"required persistence anchors missing: {sorted(missing_sql)}"
         )
 
@@ -288,12 +288,12 @@ def check_projection_boundaries(errors: list[str]) -> None:
     }
     if "record_fill_and_update_operational_projections" not in trading_functions:
         errors.append(
-            "platform-backend/app/trading.py: fill projection function must be named "
+            "platform-api/app/trading.py: fill projection function must be named "
             "record_fill_and_update_operational_projections"
         )
     if "record_fill_and_update_projections" in trading_functions:
         errors.append(
-            "platform-backend/app/trading.py: ambiguous projection function name is forbidden"
+            "platform-api/app/trading.py: ambiguous projection function name is forbidden"
         )
     missing_operational_writes = OPERATIONAL_PROJECTION_WRITE_ANCHORS - {
         statement
@@ -302,7 +302,7 @@ def check_projection_boundaries(errors: list[str]) -> None:
     }
     if missing_operational_writes:
         errors.append(
-            "platform-backend/app/trading.py: expected operational projection writes are missing: "
+            "platform-api/app/trading.py: expected operational projection writes are missing: "
             f"{sorted(missing_operational_writes)}"
         )
     forbidden_formal_writes = {
@@ -310,7 +310,7 @@ def check_projection_boundaries(errors: list[str]) -> None:
     }
     if forbidden_formal_writes:
         errors.append(
-            "platform-backend/app/trading.py: trading flow must not write formal accounting tables: "
+            "platform-api/app/trading.py: trading flow must not write formal accounting tables: "
             f"{sorted(forbidden_formal_writes)}"
         )
 
@@ -366,7 +366,7 @@ def check_persistence_governance(errors: list[str]) -> None:
         path = ROOT / owner
         if not path.is_file():
             errors.append(f"{owner}: registered DDL owner does not exist")
-        documented_owner = owner.removeprefix("platform-backend/").removeprefix(
+        documented_owner = owner.removeprefix("platform-api/").removeprefix(
             "execution-runtime/"
         )
         if f"`{documented_owner}`" not in guide_source:
@@ -378,7 +378,7 @@ def check_persistence_governance(errors: list[str]) -> None:
         missing = [anchor for anchor in required if anchor not in source]
         if missing:
             errors.append(
-                "platform-backend/app/schema_migrations.py: migration ledger anchors missing: "
+                "platform-api/app/schema_migrations.py: migration ledger anchors missing: "
                 f"{missing}"
             )
 

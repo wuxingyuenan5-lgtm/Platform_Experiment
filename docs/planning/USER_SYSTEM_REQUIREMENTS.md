@@ -1,8 +1,8 @@
 # 用户系统产品需求与验收标准
 
 状态：`implemented / automated verification passed / manual acceptance pending`<br>
-适用版本：`Platform Experiment 0.9.0`  
-Issue：`#117`  
+适用版本：`Platform Experiment 0.9.0`
+Issue：`#117`
 分支：`feature/issue-117-user-system`
 
 ## 1. 文档定位
@@ -25,7 +25,7 @@ Issue：`#117`
 
 ## 2. 产品原则
 
-1. `platform-backend` 是浏览器用户、Session、业务角色、权限、会员持仓和用户审计的唯一权威。
+1. `platform-api` 是浏览器用户、Session、业务角色、权限、会员持仓和用户审计的唯一权威。
 2. 前端隐藏不构成授权；所有权限和数据范围必须由后端再次校验。
 3. 未知角色、未知权限、异常状态和无法确认的数据范围均默认拒绝。
 4. API-Key `admin` 不自动等同于业务 CEO，也不能自动读取或修改客户身份和持仓数据。

@@ -12,12 +12,12 @@ The default rule is: load the smallest relevant module context first.
 Path:
 
 ```text
-admin-risk/
+platform-web/
 ```
 
 Load:
 
-- `admin-risk/`
+- `platform-web/`
 - frontend documentation
 - API contract only when UI integration changes
 
@@ -28,7 +28,7 @@ Avoid loading backend implementation details unless required.
 Path:
 
 ```text
-platform-backend/
+platform-api/
 ```
 
 Load:

@@ -1,34 +1,50 @@
 # 项目推进计划
 
-## 当前主线
+## 权威入口
 
-1. 统一本地工作入口：以后以前端 `4373`、后端 `8000/api/v1` 为准。
-2. 清理产品界面里的调试内容：后端快照、测试执行面板不直接出现在正式页面。
-3. 整理项目文件夹：先建立清晰归属，再决定是否移动运行目录。
-4. 把文档从“堆材料”改成“能指导下一步开发的索引体系”。
-5. 降低 Codex 后续简单修改时的扫描噪声，避免反复读取依赖、虚拟环境、构建产物和大型参考仓库。
+- 当前工程状态：`docs/codex/current-state.md`
+- 系统性优化主线：GitHub Issue #136
+- 总体方案：`docs/architecture/PLATFORM_0_9_2_SYSTEM_OPTIMIZATION_MASTER_PLAN.md`
+- 当前任务包：`tasks/issue-136-platform-0-9-2-system-optimization.md`
 
-## 目录重构节奏
+## 已完成阶段
 
-| 阶段 | 做什么 | 不做什么 |
-|---|---|---|
-| Phase 1 | 建立 `docs/`、`references/`、`tasks/`、`outputs/`；重写根 README | 不移动 `admin-risk`、`platform-backend`、`execution-runtime` |
-| Phase 2 | 整理 SQL、截图、参考代码归属；补 `.ignore` / `.gitignore` 降噪 | 不删除旧资料 |
-| Phase 3 | 评估是否把运行模块移动到 `apps/` / `services/` | 不在未验证脚本前改路径 |
-| Phase 4 | 文档去重，把稳定口径抽到根级文档 | 不机械搬运所有长文档 |
+- Phase A–D：全仓审计、上下文治理、完整质量门禁、56页视觉基线和目录治理；
+- Research E1–E5.1；
+- Identity I1/I2.1；
+- Portfolio P1–P3；
+- Frontend F1/F2；
+- High-risk H0–H2，并按停止条件保留Trading、Risk、Formal Accounting与Execution Runtime原Owner；
+- Phase J / J0仓库证据、安全净化、Legacy冻结门禁和外部证据工具；
+- Phase J / J2第一轮本地产物及上游托管脚手架清理。
 
-## 下一步优先级
+## 当前阶段
 
-1. 使用 `docs/codex/CURRENT_CONTEXT.md` 作为 Codex 默认上下文入口。
-2. 用 `python scripts/check-codex-context.py` 防止版本、端口和上下文入口漂移。
-3. 按 `docs/architecture/LIGHTWEIGHT_OPTIMIZATION_PLAN.md` 继续拆高频大页面。
-4. 下一批优先处理 `strategy/spread-carry/index.vue`、`FundingOrderPanel.vue`、`hedgeBoard/index.vue`。
-5. 如需吸收外部参考代码，从外置目录按子项目逐个评估，不整目录搬回项目。
+继续Phase J / J2 GitHub仓库减负。只处理满足以下全部条件的候选：
 
-## 风险
+1. 已完成当前分支引用核验；
+2. 无需服务器、数据库、Windows、GitLab Runner或真实Venue权限；
+3. 无需重算pnpm锁文件；
+4. 不改变路由、API、权限、Financial Fact、Decimal、正式账务、对账或执行安全合同；
+5. 能通过永久测试或静态门禁防止回归。
 
-- 前端脚本依赖 `admin-risk/docs/trading-tools-bookmarks-review.md`，这个文件不能随便挪。
-- 当前 git 状态已经很脏，整理动作必须小步提交或至少小步检查 diff。
-- 交易、权限、数据库、部署相关目录不能和普通 UI 整理混在一个任务里。
-- 不建议删除 `node_modules/` 或 `.venv/`，除非明确准备重新安装依赖。
-- 大型参考代码已移出项目根目录，后续只按需要读取明确子项目。
+当前子目标是收口仓库身份、文档入口、无效生成物和明确失效的脚手架元数据。
+
+## 延期验收
+
+以下项目暂不阻塞GitHub内优化，但在0.10.1正式验收前仍必须完成：
+
+- 旧服务器、Nginx、systemd与GitLab Runner证据；
+- MySQL数据、备份、恢复和凭据轮换；
+- Windows真实本地运行；
+- HTTPS/TLS；
+- 真实Venue/Broker；
+- 正式会计、EOD、对账和最终回滚演练。
+
+## 约束
+
+- `execution-runtime`保持独立且不改名；
+- `projects/risk-control`、`deploy/`、`platform-web/.gitlab-ci.yml`和生产API路由在外部证据完成前保持冻结；
+- Draft PR保持Open、Draft、Unmerged；
+- 未经所有者明确批准不得修改或合并`main`；
+- `0.10.1`只在完整验收与所有者批准后进入。

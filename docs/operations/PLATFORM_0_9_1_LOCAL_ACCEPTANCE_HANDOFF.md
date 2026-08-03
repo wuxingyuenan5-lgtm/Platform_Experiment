@@ -1,12 +1,12 @@
 # Platform 0.9.1 本地验收交接（Windows）
 
-> 适用系统：Windows 10/11 + PowerShell，本地只读验收  
-> 仓库：`wuxingyuenan5-lgtm/Platform_Experiment`  
-> Issue：`#134`  
-> Draft PR：`#135`  
-> 统一交付分支：`feature/issue-134-platform-0-9-1-unified-delivery`  
-> 已完成全套自动化验证的最低功能基线：`00574a8f10a3fc3723ae78c97aacbff075ff803b`  
-> 状态：`ready for local acceptance`  
+> 适用系统：Windows 10/11 + PowerShell，本地只读验收
+> 仓库：`wuxingyuenan5-lgtm/Platform_Experiment`
+> Issue：`#134`
+> Draft PR：`#135`
+> 统一交付分支：`feature/issue-134-platform-0-9-1-unified-delivery`
+> 已完成全套自动化验证的最低功能基线：`00574a8f10a3fc3723ae78c97aacbff075ff803b`
+> 状态：`ready for local acceptance`
 > 强制约束：只验收，不改代码、不提交、不推送、不合并 `main`
 
 ## 1. 文档用途
@@ -203,7 +203,7 @@ if ($Version -ne "0.9.1") {
 ### 6.1 Platform Backend
 
 ```powershell
-$BackendRoot = Join-Path $AcceptRoot "platform-backend"
+$BackendRoot = Join-Path $AcceptRoot "platform-api"
 $BackendVenv = Join-Path $BackendRoot ".venv-acceptance"
 $BackendPython = Join-Path $BackendVenv "Scripts\python.exe"
 
@@ -245,7 +245,7 @@ if ($LASTEXITCODE -ne 0) { throw "Execution Runtime 依赖图检查失败" }
 ### 6.3 前端与 Chromium
 
 ```powershell
-$FrontendRoot = Join-Path $AcceptRoot "admin-risk"
+$FrontendRoot = Join-Path $AcceptRoot "platform-web"
 Set-Location $FrontendRoot
 
 $env:HUSKY = "0"
@@ -455,7 +455,7 @@ $env:Path = $OriginalPath
 ```powershell
 $AcceptRoot = "D:\Projects\Platform_Experiment-0.9.1-acceptance"
 $EvidenceDir = "请填写第 5 节创建的 evidence 目录绝对路径"
-$BackendRoot = Join-Path $AcceptRoot "platform-backend"
+$BackendRoot = Join-Path $AcceptRoot "platform-api"
 $BackendPython = Join-Path $BackendRoot ".venv-acceptance\Scripts\python.exe"
 
 Set-Location $BackendRoot
@@ -479,13 +479,13 @@ if ($LASTEXITCODE -ne 0) { throw "演示账号初始化失败" }
 
 Write-Host "本地验收账号：demo_ceo" -ForegroundColor Cyan
 Write-Host "第二账号：demo_employee_1" -ForegroundColor Cyan
-Write-Host "本次临时密码：$DemoPassword" -ForegroundColor Yellow
+Write-Host "本次临时凭据：$DemoPassword" -ForegroundColor Yellow
 Write-Host "密码只保留在当前终端，不得写入截图和报告。" -ForegroundColor Yellow
 
 & $BackendPython -m uvicorn app.main:app `
   --host 127.0.0.1 `
   --port 8000 `
-  2>&1 | Tee-Object -FilePath (Join-Path $EvidenceDir "platform-backend-runtime.log")
+  2>&1 | Tee-Object -FilePath (Join-Path $EvidenceDir "platform-api-runtime.log")
 ```
 
 确认日志中没有启用 Live Trading。
@@ -495,7 +495,7 @@ Write-Host "密码只保留在当前终端，不得写入截图和报告。" -Fo
 ```powershell
 $AcceptRoot = "D:\Projects\Platform_Experiment-0.9.1-acceptance"
 $EvidenceDir = "请填写第 5 节创建的 evidence 目录绝对路径"
-$FrontendRoot = Join-Path $AcceptRoot "admin-risk"
+$FrontendRoot = Join-Path $AcceptRoot "platform-web"
 
 Set-Location $FrontendRoot
 $env:HUSKY = "0"
@@ -523,7 +523,7 @@ http://127.0.0.1:4373/
 ```powershell
 $AcceptRoot = "D:\Projects\Platform_Experiment-0.9.1-acceptance"
 $EvidenceDir = "请填写第 5 节创建的 evidence 目录绝对路径"
-$BackendRoot = Join-Path $AcceptRoot "platform-backend"
+$BackendRoot = Join-Path $AcceptRoot "platform-api"
 $BackendPython = Join-Path $BackendRoot ".venv-acceptance\Scripts\python.exe"
 
 $Health = Invoke-RestMethod "http://127.0.0.1:8000/health"
@@ -557,7 +557,7 @@ Start-Process "http://127.0.0.1:4373/#/login"
 
 ```text
 用户名：demo_ceo
-密码：PowerShell A 中显示的本次临时密码
+临时凭据：PowerShell A 中显示的本次随机值
 ```
 
 A 股页面：

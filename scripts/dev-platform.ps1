@@ -9,8 +9,8 @@ param(
 $ErrorActionPreference = 'Stop'
 $RepoRoot = Split-Path -Parent $PSScriptRoot
 $RuntimePath = Join-Path $RepoRoot 'execution-runtime'
-$BackendPath = Join-Path $RepoRoot 'platform-backend'
-$FrontendPath = Join-Path $RepoRoot 'admin-risk'
+$BackendPath = Join-Path $RepoRoot 'platform-api'
+$FrontendPath = Join-Path $RepoRoot 'platform-web'
 $FrontendPort = 4373
 
 function Invoke-CheckedNative {
@@ -113,7 +113,7 @@ $BackendEnv = Join-Path $BackendPath '.env'
 $BackendEnvExample = Join-Path $BackendPath '.env.example'
 if (-not (Test-Path $BackendEnv) -and (Test-Path $BackendEnvExample)) {
   Copy-Item $BackendEnvExample $BackendEnv
-  Write-Host 'Created platform-backend/.env from .env.example.' -ForegroundColor DarkGray
+  Write-Host 'Created platform-api/.env from .env.example.' -ForegroundColor DarkGray
 }
 
 Start-ServiceWindow `
@@ -142,7 +142,7 @@ if (-not $SkipFrontend) {
   $FrontendEnvExample = Join-Path $FrontendPath '.env.platform.example'
   if (-not (Test-Path $FrontendEnv) -and (Test-Path $FrontendEnvExample)) {
     Copy-Item $FrontendEnvExample $FrontendEnv
-    Write-Host 'Created admin-risk/.env.local from .env.platform.example.' -ForegroundColor DarkGray
+    Write-Host 'Created platform-web/.env.local from .env.platform.example.' -ForegroundColor DarkGray
   }
 
   $NodeModules = Join-Path $FrontendPath 'node_modules'

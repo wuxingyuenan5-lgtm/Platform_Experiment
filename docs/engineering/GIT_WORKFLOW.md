@@ -118,9 +118,9 @@ Do not reproduce the task packet, commit log or repository history in the PR bod
 
 Root `VERSION` is authoritative. Maintained declarations are:
 
-- `platform-backend/pyproject.toml`;
+- `platform-api/pyproject.toml`;
 - `execution-runtime/pyproject.toml`;
-- `admin-risk/.env` frontend display version.
+- `platform-web/.env` frontend display version.
 
 Update all declarations with:
 

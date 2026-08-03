@@ -10,8 +10,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 SEMVER = re.compile(r"\d+\.\d+\.\d+")
 FRONTEND_VERSION_FILES = (
-    "admin-risk/.env.development",
-    "admin-risk/.env.production",
+    "platform-web/.env.development",
+    "platform-web/.env.production",
 )
 
 
@@ -27,12 +27,17 @@ def update_versions(root: Path, version: str) -> None:
     if SEMVER.fullmatch(version) is None:
         raise SystemExit(f"Invalid semantic version: {version}")
     (root / "VERSION").write_text(version + "\n", encoding="utf-8")
-    for relative in ("platform-backend/pyproject.toml", "execution-runtime/pyproject.toml"):
+    for relative in ("platform-api/pyproject.toml", "execution-runtime/pyproject.toml"):
         replace_once(
             root / relative,
             r'^version\s*=\s*"\d+\.\d+\.\d+"$',
             f'version = "{version}"',
         )
+    replace_once(
+        root / "platform-web/package.json",
+        r'^  "version": "\d+\.\d+\.\d+",$',
+        f'  "version": "{version}",',
+    )
     for relative in FRONTEND_VERSION_FILES:
         replace_once(
             root / relative,

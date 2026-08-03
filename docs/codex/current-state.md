@@ -1,22 +1,53 @@
-# Current Project State
+# Current Engineering State
 
-Last updated: 2026-07-29  
-Uploaded stable branch: `main` at `a4e22021c71cf5cd703cb0bc35676ff5adbfec36`  
-Active integration branch: `feature/issue-117-platform-0-9-1`  
-Product release: `0.9.1`
+Last updated: 2026-08-01
 
-This file records current operating truth. The 0.9.1 integration branch is intentionally not merged into `main`.
+This is the sole repository document for current engineering state. Durable rules live in `AGENTS.md`; ownership lives in `docs/architecture/OWNERSHIP.md`; live branch, Draft PR, HEAD, CI and review state live in GitHub Issue #136.
 
-## Architecture
+## Delivery model
 
-- `admin-risk/`: Vue product frontend.
-- `platform-backend/`: business, risk, browser user system, orchestration and accounting API.
-- `execution-runtime/`: isolated Venue/Gateway process and Runtime Journal.
-- SQLite remains approved for the current stage.
-- Major ownership: `docs/architecture/OWNERSHIP.md`.
-- Synthetic execution: `docs/technical/CROSS_SPREAD_SYNTHETIC_EXECUTION.md`.
-- User-system handoff: `docs/operations/USER_SYSTEM_LOCAL_INTEGRATION_HANDOFF.md`.
-- Operational acceptance: `docs/operations/V6-小资金实盘验收手册.md`.
+- Stable baseline: Platform `0.9.1` at `feature/issue-134-platform-0-9-1-unified-delivery@8114fce45e46e7920f316f49d03db12dc424acf1`.
+- Active development version: Platform `0.9.2`, tracked by Issue #136 and Draft PR #139.
+- Final candidate: `0.10.1` only after all acceptance gates and explicit owner approval.
+- Frontend package-manager authority: `pnpm@9.15.9`.
+- `main` remains protected.
+
+## Completed evidence-backed gates
+
+1. Full repository audit, context reduction and 56-page visual baseline;
+2. Platform Web and Platform API directory migrations;
+3. Research E1–E5.1;
+4. Identity I1/I2.1;
+5. Portfolio P1–P3;
+6. Frontend F1/F2;
+7. High-risk H0 responsibility audit;
+8. H1 dedicated EOD reconciliation routes;
+9. H2 dedicated Venue reconciliation routes;
+10. Phase J / J0 repository classification, credential-document cleanup, strengthened Secret Scan, minimal read-only evidence collector, MySQL aggregate inventory and operator handoff;
+11. Phase J / J2 first repository-hygiene slice: local artifacts, upstream hosting metadata and nested GitHub configuration removed with permanent guards;
+12. Phase J / J2 second slice: repository identity, version tooling, documentation portability and MT5 bridge-path portability accepted at `4f945739afcff191f41bc4defc33c4661d88f327`;
+13. Phase J / J2 third slice: shared VS Code settings and extension recommendations reduced to maintained Platform Web concerns and accepted at `2afbecddfa819a0eba60ada4c5f944ae07ddd922`.
+
+Frontend hotspot and high-risk structural governance are closed. Trading, Risk, Formal Accounting and Execution Runtime retained their existing owners. Reconciliation routing is separated without moving orchestration, persistence, policy, Financial Fact, Runtime transport, Decimal, idempotency or fail-closed behavior.
+
+J0 repository classification is complete. The external server, GitLab Runner and MySQL evidence required for J1 cannot be obtained through the current GitHub connection and is deferred by owner instruction. It remains a release acceptance item but no longer blocks GitHub-only optimization.
+
+Phase J / J2 has reached its current safe stop condition: all remaining identified GitHub candidates require either a localized patch capability, a package-lock-aware change or broader static dependency evidence.
+
+## Target physical boundaries
+
+```text
+platform-web/
+    ↓ Browser Session / REST
+platform-api/                  modular monolith
+    ↓ versioned Runtime contracts
+execution-runtime/
+    ↓ Venue / Broker / MT5 / Bybit
+```
+
+The authoritative local entry is `scripts/dev-platform.ps1`, which starts Platform Web on 4373, Platform API on 8000 and Execution Runtime on 8100.
+
+SQLite remains approved for the current Platform stage. Microservices, Kubernetes, Kafka, GraphQL, CQRS, Event Sourcing, micro-frontends and a second global state system remain out of scope.
 
 ## Safety defaults
 
@@ -32,69 +63,145 @@ Cross-spread FOK hedge reserve=0 unless explicitly configured
 Bybit PostOnly Chase=false
 ```
 
-Code completion, version changes, browser roles and CI do not relax these values. API-Key roles and browser business roles remain separate.
+Browser roles remain separate from API-Key roles. Browser Sessions cannot authorize Live Write.
 
-## 0.9.1 integration
+## Permanent boundaries
 
-The branch preserves all changes in the latest uploaded `main`, including hedge-fund dashboard, funding execution, cross-spread product restructuring, Runtime adapters and local startup improvements.
+### Portfolio
 
-It additionally integrates:
+- `member_holding_valuation.py` owns pure valuation and NAV state classification.
+- `member_holding_decimal.py` is the exact Decimal owner.
+- `member_holding_service.py` retains scope, loading, reauthentication, transactions, audit and error translation.
+- Public totals require complete same-currency valuation.
 
-- browser registration, login, logout and password reset;
-- Argon2id passwords, opaque server-side Sessions and CSRF/Origin validation;
-- CEO, technical lead, employee and member roles;
-- user administration, target-scoped data masking and operational notes;
-- member holdings, NAV and asset views using Decimal strings;
-- eight reusable local/test accounts;
-- user, Session, holding, NAV and avatar backup/restore boundaries;
-- browser E2E and user-system access guards.
+### Frontend hotspot
 
-Browser CEO authority cannot replace API-Key or LiveTradingSession authorization for real trading.
+- `components/TradingViewWidget.ts` owns external TradingView lifecycle and cleanup.
+- `nativeData/marketSnapshotTables.ts` owns static snapshot types and data.
+- Source SHA-256: `20245f2606e15add5e97387c238532697c938677865c9d620178bbc9522b788a`.
+- Canonical semantic SHA-256: `580983d83781cb7f0731dd39837d75b16eaf24be18751367432aa605fa0acc92`.
+- `hedgeBoard/index.vue` remains page composition, local chart assembly, shared SVG math and style owner.
 
-## Execution baseline
+### EOD Reconciliation
 
-- Four synthetic actions remain separate from `MARKET`/`LIMIT` and trigger reason.
-- Market uses confirmed Bybit Fill before MT5 hedge submission.
-- FOK requires exact terminal full fill; zero, partial, mismatch and unknown outcomes remain distinct.
-- PostOnly Chase is bounded by price limit, TTL, mutation count, cooldown and private-event evidence.
-- PostOnly exact cumulative full fill is required before the existing MT5 path is released.
-- Manual close, TP and SL reuse one Close Action with persisted Market/FOK/PostOnly selection.
-- Bybit Close remains reduce-only with matching Position Index.
-- MT5 Close remains bound to the intended Position Ticket.
-- Unknown external results never authorize blind retry.
+- `eod_reconciliation_routes.py` owns four EOD HTTP endpoints and query aliases.
+- `eod_reconciliation.py` retains compatibility aliases, per-call dependency wiring and exact HTTP mapping.
+- Service, Policy, Repository, Financial Fact and fail-closed report semantics remain unchanged.
 
-## Product and local-run baseline
+### Venue Reconciliation
 
-One Windows command starts Runtime, Backend and Frontend:
+- `venue_reconciliation_routes.py` owns five Venue HTTP endpoints, response models and tags.
+- `venue_reconciliation.py` retains Repository aliases, Service delegates and exact Runtime/domain error mapping.
+- Existing direct consumers continue to use the Facade.
+- Service, Policy, Repository, Runtime Client, Financial Fact, DDL and Decimal semantics remain unchanged.
 
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\dev-platform.ps1
+## Legacy production classification
+
+The repository contains more than one historical production path.
+
+### Native Nginx / Go / MySQL path
+
+```text
+platform-web production build
+    ↓ /api/auth and /api/data
+Nginx
+    ├─ Go Auth Service :8080
+    └─ Go Data Service :8082
+          ↓
+        MySQL risk_control
 ```
 
-The script reads pnpm from `admin-risk/package.json`, installs only when needed, starts three service windows and checks frontend `4373`, backend `8000`, and runtime `8100` readiness.
+Critical facts:
 
-## Engineering workflow
+- `platform-web/.env.production` still directs production API traffic to `/api/auth`, `/api/data` and `/api/data/ws`;
+- the old Auth Service owns an independent MySQL user schema and JWT security model;
+- the old Data Service owns a MySQL schema, Bybit client and optional NAV scheduler;
+- deployment documentation describes a fixed server, backup, upgrade and rollback path;
+- historical project documents contained reusable credentials and weak-password examples, so related server-side credentials must be treated as compromised and rotated;
+- this stack cannot be treated as Demo, deleted, renamed or automatically switched without external evidence and owner approval.
 
-- Fast: Markdown and synchronized version maintenance.
-- Standard: bounded single-module work without Critical paths; no mandatory Issue or task packet.
-- Critical: execution, Runtime, risk, auth, credentials, database/migration, contracts, CI governance, Live behavior, cross-service or cross-session work.
-- Pull requests run only affected application jobs; `main` runs the full matrix.
-- Secret Scan runs once in its dedicated workflow.
+The authoritative plan is `docs/architecture/PLATFORM_LEGACY_DEPLOYMENT_AUDIT.md`. The operator procedure is `docs/operations/LEGACY_PRODUCTION_EVIDENCE_HANDOFF.md`.
 
-See `docs/engineering/GIT_WORKFLOW.md`.
+### Legacy GitLab frontend deployment path
 
-## Production-only follow-up
+`platform-web/.gitlab-ci.yml` defines test and production jobs using a dedicated `runner20`, fixed Node/npm/pnpm versions and direct copies to `/www/wwwroot/risk-web.rta-office.com/`. GitHub cannot establish whether the GitLab project, Runner or target site remains active.
 
-Before production cutover:
+The authoritative audit is `docs/architecture/PLATFORM_LEGACY_GITLAB_DEPLOYMENT_AUDIT.md`. This file is frozen as Legacy production evidence and is excluded from ordinary repository cleanup.
 
-- validate HTTPS same-origin proxy and Secure Cookie behavior;
-- decide whether legacy Go/MySQL contains real users requiring migration;
-- confirm initial production member-holding source;
-- execute controlled-host Backup, Restore Drill, read-only restored startup and rollback rehearsal;
-- complete real Windows/Venue/Broker acceptance under Issue #39.
+## Phase J / J2 accepted repository hygiene
 
-## Known constraints
+### First accepted slice
 
-- PostOnly currently derives its hard Bybit bound from the pre-submit MT5 reference quote and does not dynamically reprice from MT5 during Chase.
-- One successful Open maps to one MT5 Position Ticket; ambiguity fails closed.
-- Real liquidity, Broker behavior, HTTPS proxy behavior and production data paths require operational evidence.
+- removed local homepage inspection screenshot and stale source-tree snapshot;
+- added ignore rules for recurring local inspection artifacts;
+- removed the upstream Vben `CNAME` and unused Gitpod configuration;
+- removed the complete inert `platform-web/.github` subtree, including upstream workflows, Issue templates, PR template and contribution documents;
+- added permanent architecture tests preventing those artifacts and nested GitHub metadata from returning;
+- replaced machine-specific workspace size/path notes with durable repository hygiene rules;
+- classified and froze `.gitlab-ci.yml` rather than deleting a possible production deployment path.
+
+### Second accepted slice
+
+- aligned `platform-web/package.json` identity and version with Platform `0.9.2`, marked the package private and pointed repository metadata to this project;
+- replaced upstream Vben README content, public test credentials and product-facing About links while retaining MIT attribution;
+- aligned VS Code launch configuration with the authoritative Platform Web port `4373`;
+- extended version consistency and bump tooling to include `platform-web/package.json`;
+- refreshed root README, root PLAN, documentation catalog, deployment entry, acceptance criteria and Runbook to the current architecture and J2 phase;
+- removed named-workstation paths from maintained documentation and added Windows/macOS/Linux home-path guards;
+- replaced the hard-coded MT5 bridge path with an `APPDATA`-derived Windows default, a portable non-Windows fallback and an explicit environment override;
+- added Runtime tests for all three MT5 bridge-path modes;
+- added permanent frontend repository-identity, version, local-launch and typecheck-coverage architecture tests;
+- passed the complete nine-workflow matrix and 56-page visual baseline at `4f945739afcff191f41bc4defc33c4661d88f327`.
+
+### Third accepted slice
+
+- simplified `platform-web/.vscode/settings.json` to maintained Platform Web concerns;
+- retained pnpm, TypeScript workspace SDK, Volar-compatible Vue editing, ESLint, Stylelint, Prettier, path aliases, Vue i18n and relevant search exclusions;
+- removed obsolete Vetur, legacy Volar TS-plugin flags, MicroPython buttons, Nuxt flags and stale Yarn/Bower/CNAME/Gitpod nesting;
+- removed the obsolete `vue.vscode-typescript-vue-plugin` recommendation while retaining `vue.volar`;
+- added permanent architecture assertions for shared editor settings and extension recommendations;
+- passed the complete nine-workflow matrix and 56-page visual baseline at `2afbecddfa819a0eba60ada4c5f944ae07ddd922`.
+
+The governing document is `docs/operations/WORKSPACE_HYGIENE.md`.
+
+## Remaining GitHub-only candidates requiring a new capability or dedicated slice
+
+- Platform API FastAPI/OpenAPI and `/system/info` still contain the historical application version `0.6.0`;
+- Execution Runtime FastAPI/OpenAPI still contains the historical application version `0.5.0`;
+- those two large application files require a safe localized patch mechanism before changing and must not be manually rewritten wholesale;
+- `platform-web/apps/test-server` remains in the pnpm workspace and lockfile and is not removable without a lockfile-aware change;
+- broader unused-source deletion remains out of scope until static import, route, build and lockfile evidence is complete.
+
+## Deferred external acceptance
+
+The following work remains required for release acceptance but is skipped during GitHub-only optimization:
+
+1. server repository path, branch, HEAD and working-tree state;
+2. systemd state and listening ports;
+3. loaded Nginx routes, domain and TLS status;
+4. environment-file existence, permissions, key names and hashes without values;
+5. MySQL schema metadata, aggregate row counts, recent writes and sensitive-column occupancy without business rows;
+6. current `/api/auth`, `/api/data` and WebSocket consumers;
+7. GitLab project, `runner20`, `risk-web.rta-office.com` and deployment history;
+8. backups, restore evidence and rollback path;
+9. rotation status for MySQL, JWT, account-encryption, exchange and historical administrator credentials.
+
+Until that evidence is reviewed, do not delete or rename `projects/risk-control`, alter `deploy/`, delete `.gitlab-ci.yml`, switch `.env.production`, import MySQL automatically, stop legacy services or declare the old stack retired.
+
+## Remaining acceptance work
+
+### GitHub-only work
+
+- no further high-confidence repository-cleanup candidate is executable with the current GitHub connector without crossing an explicit stop condition;
+- retain the accepted J2 evidence and reopen GitHub-only work only with localized patching, lockfile-aware tooling or complete static dependency evidence.
+
+### Deferred external work
+
+- external legacy server, GitLab Runner and MySQL evidence;
+- J1 decision: continue Legacy Production, controlled migration or evidence-backed retirement;
+- Windows real local validation;
+- production HTTPS/TLS;
+- real Venue/Broker evidence;
+- database migration and backup/restore rehearsal;
+- formal accounting, EOD and reconciliation acceptance;
+- final rollback rehearsal and owner approval.

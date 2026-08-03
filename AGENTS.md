@@ -1,42 +1,54 @@
 # Project Agent Rules
 
-## Baseline
+## Start Here
 
-- Current product version: `0.9.1`.
-- Current uploaded main baseline: `a4e22021c71cf5cd703cb0bc35676ff5adbfec36`.
-- Current integration branch: `feature/issue-117-platform-0-9-1`; do not merge it into `main` without explicit user approval.
-- Frontend port: `4373`.
-- Platform Backend port: `8000`.
-- Execution Runtime port: `8100`.
-- Use `npx pnpm@9.15.9 ...` for frontend commands.
-- Canonical ownership: `docs/architecture/OWNERSHIP.md`.
+- `docs/codex/current-state.md` is the sole repository document for current engineering state.
+- `docs/codex/context-map.md` routes a task to a bounded reading pack; use it when the target domain is not already obvious.
+- `docs/architecture/OWNERSHIP.md` is the canonical code, data and boundary ownership catalog.
+- After the root rules, read the nearest module `AGENTS.md`, then only the directly affected source files and tests.
+- `docs/codex/CURRENT_CONTEXT.md` is a compatibility pointer, not an authority.
+- GitHub Issue #136 owns the live branch, Draft PR, HEAD, CI and review status. Do not copy live progress into new permanent documents.
+
+## Protected Invariants
+
+- Keep Browser Session authority separate from API-Key and Live Write authority.
+- Preserve CSRF and Origin validation, role scope, last-CEO protection and member-data isolation.
+- Preserve Decimal money, Financial Fact, PnL, NAV, formal accounting, reconciliation and immutable migration semantics.
+- Preserve Kill Switch, two-person approval, Live Write disabled by default, idempotency, Market/FOK/PostOnly/TP-SL, Result Unknown, EOD and Last Known Good behavior.
+- Do not disable TLS, security checks, type checks or critical tests to make a change pass.
+- Keep Platform API and Execution Runtime as separate safety boundaries.
+- Do not modify or merge `main` without explicit owner approval.
 
 ## Scope Control
 
-- For UI point fixes, read only the target component, direct parent component, and necessary styles.
-- For trading execution changes, read the execution component, lifecycle API, exit plan API, and related types.
-- For position, account, and observability changes, read the position table component, observability API, and snapshot types.
-- For user-system changes, preserve Browser Session, CSRF/Origin, business-role scope, member data isolation and API-Key/Live Write separation.
-- Do not scan the whole repository for narrow UI edits.
+- For a narrow UI fix, read the target component, its direct owner and necessary styles; do not scan the repository.
+- For a business-domain change, start from the domain route/service/schema or composable/API client and its direct tests.
+- For trading execution, risk, accounting, authentication, migrations, Runtime contracts or Live behavior, use the Critical workstream and the active task packet.
+- Historical plans, closed task packets, changelogs, generated files, lock files and unrelated modules are excluded by default.
+- Do not create a new abstraction, interface, factory or permanent document unless it removes a demonstrated second responsibility or repeated fact.
 
-## Product UI Rules
+## Product UI Boundary
 
-- Do not add explanatory product copy such as `设计保留`, `真实执行请使用下方`, `保护口径`, `验收面板`, or similar engineering notes.
-- Do not add standalone execution, lifecycle, observability, or validation panels unless explicitly requested.
-- Reuse the user-designed product components. Trading actions belong in `价差执行指令`; account and observability state belongs in `价差持仓总览`.
-- `CrossSpreadMarketLifecyclePanel.vue` and `CrossSpreadLiveObservabilityPanel.vue` are deprecated references and must not be mounted on product pages.
+- Preserve the existing navigation, layout, information hierarchy, main workflows, typography, spacing, colors and responsive behavior unless an explicit defect or product change is approved.
+- Do not add engineering explanations, validation panels or debug state to product pages.
+- Reuse the user-designed product components and existing visual language.
 
-## Required Checks
+## Default Checks
 
-- Strategy frontend type check: `npx pnpm@9.15.9 type:check`
-- User-system frontend check: `npx pnpm@9.15.9 test:user-system`
-- Homepage layout guard: `npx pnpm@9.15.9 test:homepage-layout`
-- Cross-spread structure guard: `npx pnpm@9.15.9 test:cross-spread-layout`
-- Version consistency: `python scripts/check-version-consistency.py`
-- Codex context: `python scripts/check-codex-context.py`
+Use the smallest check set that proves the change, then expand for cross-domain or safety-sensitive work.
+
+```powershell
+python scripts/check-version-consistency.py
+python scripts/check-codex-context.py
+python scripts/check-repository-structure.py
+python scripts/check-documentation-consistency.py
+```
+
+Module commands are owned by the nearest module `AGENTS.md`. Frontend package-manager authority is `platform-web/package.json#packageManager` until the directory-renaming phase is completed.
 
 ## File Safety
 
 - Do not batch-delete files or directories.
-- Delete only one explicit file path at a time, and only when the user clearly requests deletion.
-- Prefer ASCII selectors, function names, class names, and script structure for patches because terminal Chinese output can be mojibake.
+- Delete only reviewed, explicit paths after proving they are unused and recording rollback evidence.
+- Keep directory renames separate from behavioral refactors.
+- Preserve third-party licenses, attribution and legitimate fixtures or historical records.

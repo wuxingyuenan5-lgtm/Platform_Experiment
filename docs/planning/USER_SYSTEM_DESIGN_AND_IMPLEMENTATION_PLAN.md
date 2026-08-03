@@ -1,10 +1,10 @@
 # 用户系统设计索引与决策摘要
 
-状态：`active / Batches 1–6 implemented, executable verification pending`  
-适用版本：`Platform Experiment 0.9.0`  
-Issue：`#117`  
-任务包：`tasks/issue-117-user-system.md`  
-分支：`feature/issue-117-user-system`  
+状态：`active / Batches 1–6 implemented, executable verification pending`
+适用版本：`Platform Experiment 0.9.0`
+Issue：`#117`
+任务包：`tasks/issue-117-user-system.md`
+分支：`feature/issue-117-user-system`
 基线提交：`71603bcc6807284ef3a6da26ad3f43c541bc99c2`
 
 ## 1. 文档结构
@@ -33,7 +33,7 @@ Issue：`#117`
 
 ### 2.1 单一身份权威
 
-`platform-backend` 是浏览器用户、密码、Session、业务角色、会员持仓和用户审计的唯一权威。旧 Go `auth-service` 暂不删除，但停止扩展且不再承载新用户系统。
+`platform-api` 是浏览器用户、密码、Session、业务角色、会员持仓和用户审计的唯一权威。旧 Go `auth-service` 暂不删除，但停止扩展且不再承载新用户系统。
 
 ### 2.2 两种凭证，一个 Principal 边界
 

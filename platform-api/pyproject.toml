@@ -1,0 +1,164 @@
+[project]
+name = "variable-global-platform-api"
+version = "0.9.2"
+description = "Variable-Global Platform API modular monolith"
+requires-python = ">=3.12"
+dependencies = [
+  "akshare>=1.18.64,<2.0",
+  "argon2-cffi>=25.1,<26.0",
+  "fastapi>=0.116,<1.0",
+  "httpx>=0.28,<1.0",
+  "pillow>=11.3,<12.0",
+  "pydantic-settings>=2.10,<3.0",
+  "python-multipart>=0.0.20,<1.0",
+  "tzdata>=2025.2",
+  "uvicorn[standard]>=0.35,<1.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pyright>=1.1,<2.0",
+  "pytest>=8.4,<9.0",
+  "ruff>=0.12,<1.0",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+addopts = ["--strict-markers"]
+markers = [
+  "architecture: static architecture and ownership boundary checks",
+  "unit: deterministic domain calculations and isolated policies",
+  "integration: API, persistence, orchestration, and component collaboration",
+  "live_safety: fail-closed controls, production operations, and live-write safety",
+]
+
+[tool.pyright]
+pythonVersion = "3.12"
+typeCheckingMode = "standard"
+include = [
+  "app/a_share_research_policy.py",
+  "app/auth.py",
+  "app/database_bootstrap.py",
+  "app/database_connection.py",
+  "app/database_seeds.py",
+  "app/eod_reconciliation_policy.py",
+  "app/eod_reconciliation_repository.py",
+  "app/eod_reconciliation_schemas.py",
+  "app/eod_reconciliation_service.py",
+  "app/execution_schemas.py",
+  "app/financial_fact_normalization.py",
+  "app/financial_fact_repository.py",
+  "app/financial_fact_schemas.py",
+  "app/financial_projection_service.py",
+  "app/member_holding_decimal.py",
+  "app/member_holding_repository.py",
+  "app/member_holding_routes.py",
+  "app/member_holding_schemas.py",
+  "app/member_holding_valuation.py",
+  "app/member_holding_service.py",
+  "app/position_math.py",
+  "app/research_cache.py",
+  "app/research_data_schemas.py",
+  "app/research_macro_history.py",
+  "app/research_provider_a_share.py",
+  "app/research_provider_datacenter.py",
+  "app/research_provider_errors.py",
+  "app/research_provider_macro.py",
+  "app/research_provider_normalization.py",
+  "app/research_provider_stock_akshare.py",
+  "app/research_provider_stock_datacenter.py",
+  "app/research_provider_stock_http.py",
+  "app/research_providers.py",
+  "app/research_routes.py",
+  "app/research_service.py",
+  "app/runtime_contracts.py",
+  "app/schema_migrations.py",
+  "app/schema_governance.py",
+  "app/trade_command_execution.py",
+  "app/user_admin_note_routes.py",
+  "app/user_admin_notes.py",
+  "app/user_admin_policy.py",
+  "app/user_admin_presenter.py",
+  "app/user_admin_repository.py",
+  "app/user_admin_routes.py",
+  "app/user_admin_schemas.py",
+  "app/user_admin_service.py",
+  "app/user_authority.py",
+  "app/user_avatar.py",
+  "app/user_avatar_repository.py",
+  "app/user_avatar_routes.py",
+  "app/user_avatar_schemas.py",
+  "app/user_cache_control.py",
+  "app/user_cli.py",
+  "app/user_logout.py",
+  "app/user_password_reset.py",
+  "app/user_permissions.py",
+  "app/user_product_migrations.py",
+  "app/user_rate_limit.py",
+  "app/user_repository.py",
+  "app/user_routes.py",
+  "app/user_schemas.py",
+  "app/user_security.py",
+  "app/user_session_presenter.py",
+  "app/user_service.py",
+  "app/user_session_auth.py",
+  "app/venue_reconciliation_policy.py",
+  "app/venue_reconciliation_repository.py",
+  "app/venue_reconciliation_runtime_client.py",
+  "app/venue_reconciliation_schemas.py",
+  "app/venue_reconciliation_service.py",
+]
+exclude = ["tests"]
+ignore = ["app/research_providers.py"]
+reportMissingTypeStubs = false
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.ruff.lint.per-file-ignores]
+# FastAPI route metadata is intentionally declared in the function signature.
+"app/financial_facts.py" = ["B008"]
+# Research adapters normalize dynamic public-source payloads at one explicit boundary.
+"app/research_providers.py" = ["E501"]
+"app/research_routes.py" = ["B008"]
+# Pydantic's quoted self-return annotation is required while the validator builds the model.
+"app/financial_fact_schemas.py" = ["UP037"]
+"app/eod_reconciliation_schemas.py" = ["UP037"]
+"app/user_schemas.py" = ["UP037"]
+# Phase 4A keeps the complete risk state machine in one auditable module; long SQL/error lines
+# and Pydantic's quoted self annotation are accepted until the Phase 4 module split.
+"app/execution_risk.py" = ["E501", "UP037"]
+# Venue Reconciliation facade preserves a legacy compatibility import pending usage migration.
+"app/venue_reconciliation.py" = ["F401"]
+"tests/test_venue_reconciliation.py" = ["E501"]
+# EOD facade keeps FastAPI Query defaults and public status compatibility exports.
+"app/eod_reconciliation.py" = ["B008", "E501", "F401"]
+"tests/test_eod_reconciliation.py" = ["E501"]
+# Production Gate keeps authentication policy and two-person live-session state explicit.
+"app/auth.py" = ["E501"]
+"app/live_trading_sessions.py" = ["E501", "UP037"]
+"tests/test_auth_rbac.py" = ["E501"]
+"tests/test_live_trading_sessions.py" = ["E501"]
+# User-system service and route files keep security sequencing explicit in the first closed loop.
+"app/user_service.py" = ["E501"]
+"app/user_routes.py" = ["B008", "E501"]
+"app/user_avatar_routes.py" = ["B008", "E501"]
+"app/user_admin_note_routes.py" = ["B008", "E501"]
+"app/user_admin_repository.py" = ["E501"]
+"app/user_admin_routes.py" = ["B008", "E501"]
+"app/user_admin_service.py" = ["E501"]
+"app/member_holding_repository.py" = ["E501"]
+"app/member_holding_routes.py" = ["B008", "E501"]
+"app/member_holding_service.py" = ["E501"]
+# Production operations modules intentionally keep SQL, backup/restore validation, and the
+# alert orchestration contract together for auditability. The lambda-binding and keys-view
+# findings are non-functional and are tracked until the post-gate module split.
+"app/disaster_recovery.py" = ["B023", "E501"]
+"app/production_monitoring.py" = ["B008", "E501", "SIM118"]
+"tests/test_disaster_recovery.py" = ["E501"]
+"tests/test_production_monitoring.py" = ["E501"]
