@@ -53,19 +53,19 @@
 </template>
 
 <script setup lang="ts">
-  import Decimal from 'decimal.js';
-  import type { PropType, Ref } from 'vue';
-  import { computed, onMounted, ref, watch } from 'vue';
-  import { Alert, Button, Card, Empty, Radio, Select, Space, Spin } from 'ant-design-vue';
   import { LineChartOutlined, ReloadOutlined } from '@ant-design/icons-vue';
-  import { useECharts } from '@/hooks/web/useECharts';
-  import { formatDecimalString } from '@/utils/decimalDisplay';
+  import { Alert, Button, Card, Empty, Radio, Select, Space, Spin } from 'ant-design-vue';
+  import Decimal from 'decimal.js';
+  import { computed, onMounted, ref, watch } from 'vue';
+  import type { PropType, Ref } from 'vue';
   import {
     type DataAccount,
     getAccounts,
     getNetValueHistory,
     type NetValuePoint,
   } from '@/api/riskControl';
+  import { useECharts } from '@/hooks/web/useECharts';
+  import { formatDecimalString } from '@/utils/decimalDisplay';
 
   const props = defineProps({
     title: { type: String, default: '账户净值曲线' },
@@ -122,7 +122,9 @@
 
   function pickDefaultAccount(accounts: DataAccount[]) {
     if (!accounts.length || selectedAccountId.value) return;
-    selectedAccountId.value = (accounts.find((item) => item.account_type === 'bybit') || accounts[0])?.id;
+    selectedAccountId.value = (
+      accounts.find((item) => item.account_type === 'bybit') || accounts[0]
+    )?.id;
   }
 
   async function ensureAccounts() {
@@ -183,7 +185,10 @@
           symbol: points.value.length > 1 ? 'none' : 'circle',
           lineStyle: { width: 2 },
           areaStyle: { opacity: 0.08 },
-          data: points.value.map((item) => ({ value: chartNumber(item.unit_net_worth), raw: item })),
+          data: points.value.map((item) => ({
+            value: chartNumber(item.unit_net_worth),
+            raw: item,
+          })),
         },
         {
           name: '总资产',
@@ -191,7 +196,10 @@
           smooth: true,
           symbol: 'none',
           lineStyle: { width: 2 },
-          data: points.value.map((item) => ({ value: chartNumber(item.total_asset), raw: item })),
+          data: points.value.map((item) => ({
+            value: chartNumber(item.total_asset),
+            raw: item,
+          })),
         },
         {
           name: '当前回撤',
