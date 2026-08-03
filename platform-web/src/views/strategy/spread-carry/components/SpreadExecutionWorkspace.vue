@@ -9,18 +9,17 @@
       />
     </div>
   </template>
-  <DomesticOverseasExecutionReplica
+  <ProductNotConfiguredPanel
     v-else
-    :selected-venue="selectedVenue"
-    :left-leg-symbol="leftLegSymbol"
-    :right-leg-symbol="rightLegSymbol"
-    :selected-resolution="selectedResolution"
+    title="境内外价差执行链尚未配置"
+    description="当前正式Owner仅覆盖Cross Venue Workspace。境内外执行Replica已退役，不展示静态成交、随机日志或未经Runtime ACK/Fill证明的成功状态。"
+    source="not-configured: domestic-overseas-runtime-owner"
   />
 </template>
 
 <script setup lang="ts">
+  import ProductNotConfiguredPanel from '@/components/ProductDataState/ProductNotConfiguredPanel.vue';
   import CrossVenueExecutionWorkspace from './CrossVenueExecutionWorkspace.vue';
-  import DomesticOverseasExecutionReplica from './DomesticOverseasExecutionReplica.vue';
   import type { SpreadWorkspaceVariant } from '../types';
 
   withDefaults(

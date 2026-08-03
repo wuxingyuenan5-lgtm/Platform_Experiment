@@ -1,4 +1,4 @@
-﻿import { computed, ref, type ComputedRef, type Ref } from 'vue';
+import { computed, ref, type ComputedRef, type Ref } from 'vue';
 import {
   closeCrossSpreadMarket,
   openCrossSpreadMarket,
@@ -73,6 +73,7 @@ export function useCrossSpreadExecution(options: UseCrossSpreadExecutionOptions)
   const executionLogs = ref<LogEntry[]>(
     CROSS_SPREAD_DEFAULT_EXECUTION_LOGS.map((entry) => ({ ...entry })),
   );
+  let localLogSequence = executionLogs.value.length;
 
   const openValidationError = computed(() => {
     if (options.qtyOz.value <= 0) return '数量必须大于 0';
@@ -255,8 +256,9 @@ export function useCrossSpreadExecution(options: UseCrossSpreadExecutionOptions)
   }
 
   function appendLog(entry: Omit<LogEntry, 'id'>) {
+    localLogSequence += 1;
     executionLogs.value.unshift({
-      id: `${Date.now()}-${Math.random()}`,
+      id: `local-log-${localLogSequence}`,
       ...entry,
     });
   }
