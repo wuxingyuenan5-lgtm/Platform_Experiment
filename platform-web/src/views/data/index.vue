@@ -74,13 +74,15 @@
 </template>
 
 <script setup lang="ts">
+  import { ReloadOutlined, SyncOutlined } from '@ant-design/icons-vue';
+  import { Button, Card, message, Space, Table, Tag } from 'ant-design-vue';
   import { computed, onMounted, ref } from 'vue';
   import { useRoute } from 'vue-router';
-  import { Button, Card, message, Space, Table, Tag } from 'ant-design-vue';
-  import { ReloadOutlined, SyncOutlined } from '@ant-design/icons-vue';
-  import { PageWrapper } from '@/components/Page';
-  import ProductDataStatusAlert from '@/components/ProductDataState/ProductDataStatusAlert.vue';
-  import AccountNetValueChart from './components/AccountNetValueChart.vue';
+  import {
+    type DecimalString,
+    type ProductDataMeta,
+    unavailableMeta,
+  } from '@/api/platform/productDataState';
   import {
     type DataAccount,
     type DataServiceHealth,
@@ -88,14 +90,12 @@
     getDataHealth,
     triggerAccountSync,
   } from '@/api/riskControl';
-  import {
-    unavailableMeta,
-    type DecimalString,
-    type ProductDataMeta,
-  } from '@/api/platform/productDataState';
+  import { PageWrapper } from '@/components/Page';
+  import ProductDataStatusAlert from '@/components/ProductDataState/ProductDataStatusAlert.vue';
   import { useRoleAccess } from '@/hooks/web/useRoleAccess';
-  import { formatMoneyString } from '@/utils/decimalDisplay';
   import { formatToDateTime } from '@/utils/dateUtil';
+  import { formatMoneyString } from '@/utils/decimalDisplay';
+  import AccountNetValueChart from './components/AccountNetValueChart.vue';
 
   const loading = ref(false);
   const syncing = ref(false);
@@ -150,7 +150,13 @@
       dataMeta.value = {
         status: accountRes.length ? 'ready' : 'no_data',
         source: healthRes.service || 'data-service',
-        asOf: healthRes.as_of || accountRes.map((item) => item.asset_updated_at).filter(Boolean).sort().at(-1),
+        asOf:
+          healthRes.as_of ||
+          accountRes
+            .map((item) => item.asset_updated_at)
+            .filter(Boolean)
+            .sort()
+            .at(-1),
         timezone: 'source-defined',
         currency: 'USD',
         unit: 'account facts',
@@ -175,7 +181,9 @@
     syncing.value = true;
     try {
       const result = await triggerAccountSync();
-      message.success(`账户同步完成：成功 ${result.synced}，失败 ${result.failed}，跳过 ${result.skipped}`);
+      message.success(
+        `账户同步完成：成功 ${result.synced}，失败 ${result.failed}，跳过 ${result.skipped}`,
+      );
       await loadData();
       await chartRef.value?.reload();
     } catch (error) {
