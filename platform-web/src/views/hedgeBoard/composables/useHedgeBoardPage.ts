@@ -164,13 +164,11 @@ export function useHedgeBoardPage() {
   const useUnifiedResearchUi = computed(() => true);
   const staticDesignWidgets = computed(() =>
     activeModule.value.sections.flatMap((section) =>
-      section.widgets
-        .filter(isStaticDesignWidget)
-        .map((widget) => ({
-          sectionId: section.id,
-          title: widget.title,
-          sourceNote: widget.sourceNote || '静态设计稿',
-        })),
+      section.widgets.filter(isStaticDesignWidget).map((widget) => ({
+        sectionId: section.id,
+        title: widget.title,
+        sourceNote: widget.sourceNote || '静态设计稿',
+      })),
     ),
   );
   const visibleSections = computed<ChartSection[]>(() =>
