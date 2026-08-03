@@ -64,12 +64,18 @@
               :pagination="{ pageSize: 8 }"
             >
               <template #emptyText>
-                <span>{{ sourceStatus.risk === 'unavailable' ? '风控来源不可用' : '暂无风控记录' }}</span>
+                <span>
+                  {{
+                    sourceStatus.risk === 'unavailable' ? '风控来源不可用' : '暂无风控记录'
+                  }}
+                </span>
               </template>
               <template #bodyCell="{ column, record, index }">
                 <template v-if="column.key === 'id'">{{ record.id || index + 1 }}</template>
                 <template v-else-if="column.key === 'severity'">
-                  <Tag :color="severityColor(record.severity)">{{ record.severity || 'unknown' }}</Tag>
+                  <Tag :color="severityColor(record.severity)">
+                    {{ record.severity || 'unknown' }}
+                  </Tag>
                 </template>
                 <template v-else-if="column.key === 'status'">
                   <Tag :color="record.status === 'pending' ? 'orange' : 'green'">
@@ -111,11 +117,19 @@
               :pagination="{ pageSize: 6 }"
             >
               <template #emptyText>
-                <span>{{ sourceStatus.notification === 'unavailable' ? '通知来源不可用' : '暂无通知' }}</span>
+                <span>
+                  {{
+                    sourceStatus.notification === 'unavailable'
+                      ? '通知来源不可用'
+                      : '暂无通知'
+                  }}
+                </span>
               </template>
               <template #bodyCell="{ column, record }">
                 <template v-if="column.key === 'title'">
-                  <div class="strong-cell">{{ record.title || record.subject || '未命名消息' }}</div>
+                  <div class="strong-cell">
+                    {{ record.title || record.subject || '未命名消息' }}
+                  </div>
                   <div class="muted-cell">
                     {{ record.content || record.message || record.description || '无正文' }}
                   </div>
@@ -140,7 +154,13 @@
               :pagination="false"
             >
               <template #emptyText>
-                <span>{{ sourceStatus.finance === 'unavailable' ? '财务来源不可用' : '暂无资产结构' }}</span>
+                <span>
+                  {{
+                    sourceStatus.finance === 'unavailable'
+                      ? '财务来源不可用'
+                      : '暂无资产结构'
+                  }}
+                </span>
               </template>
               <template #bodyCell="{ column, record }">
                 <template v-if="column.key === 'value'">
@@ -159,15 +179,15 @@
 </template>
 
 <script setup lang="ts">
+  import { ReloadOutlined } from '@ant-design/icons-vue';
+  import { Button, Card, Col, Row, Space, Statistic, Table, Tag } from 'ant-design-vue';
   import Decimal from 'decimal.js';
   import { computed, onMounted, reactive, ref } from 'vue';
-  import { Button, Card, Col, Row, Space, Statistic, Table, Tag } from 'ant-design-vue';
-  import { ReloadOutlined } from '@ant-design/icons-vue';
-  import { PageWrapper } from '@/components/Page';
-  import ProductDataStatusAlert from '@/components/ProductDataState/ProductDataStatusAlert.vue';
+  import type { DecimalString, ProductDataMeta } from '@/api/platform/productDataState';
   import {
     type DataAccount,
     type DataServiceHealth,
+    type ExchangeInfo,
     getAccounts,
     getDataHealth,
     getExchangeInfo,
@@ -175,16 +195,13 @@
     getProductRatio,
     getRiskRecordList,
     getTotalAssetSummary,
-    type ExchangeInfo,
     type NotificationMessage,
     type ProductRatioItem,
     type RiskRecord,
     type TotalAssetSummary,
   } from '@/api/riskControl';
-  import {
-    type DecimalString,
-    type ProductDataMeta,
-  } from '@/api/platform/productDataState';
+  import { PageWrapper } from '@/components/Page';
+  import ProductDataStatusAlert from '@/components/ProductDataState/ProductDataStatusAlert.vue';
   import { useRoleAccess } from '@/hooks/web/useRoleAccess';
   import { formatMoneyString, formatRatioPercentString } from '@/utils/decimalDisplay';
 
@@ -220,9 +237,13 @@
   });
 
   const { roleLabel, roleColor } = useRoleAccess();
-  const pendingCount = computed(() => riskRecords.value.filter((item) => item.status === 'pending').length);
-  const highCount = computed(() =>
-    riskRecords.value.filter((item) => ['high', 'critical'].includes(item.severity || '')).length,
+  const pendingCount = computed(
+    () => riskRecords.value.filter((item) => item.status === 'pending').length,
+  );
+  const highCount = computed(
+    () =>
+      riskRecords.value.filter((item) => ['high', 'critical'].includes(item.severity || ''))
+        .length,
   );
   const unreadCount = computed(() => notifications.value.filter(isUnread).length);
   const latestEventTime = computed(() =>
@@ -240,15 +261,22 @@
   );
 
   function sumAccountField(field: 'total_asset' | 'available_fund'): DecimalString | undefined {
-    const values = accounts.value.map((item) => item[field]).filter((value): value is string => value !== undefined);
+    const values = accounts.value
+      .map((item) => item[field])
+      .filter((value): value is string => value !== undefined);
     if (!values.length) return undefined;
     return values.reduce((sum, value) => sum.plus(value), new Decimal(0)).toFixed();
   }
 
   const totalAsset = computed<DecimalString | undefined>(
-    () => totalSummary.value.total_asset ?? totalSummary.value.total ?? sumAccountField('total_asset'),
+    () =>
+      totalSummary.value.total_asset ??
+      totalSummary.value.total ??
+      sumAccountField('total_asset'),
   );
-  const availableFund = computed<DecimalString | undefined>(() => sumAccountField('available_fund'));
+  const availableFund = computed<DecimalString | undefined>(() =>
+    sumAccountField('available_fund'),
+  );
 
   const riskColumns = [
     { title: 'ID', dataIndex: 'id', key: 'id', width: 70 },
@@ -279,25 +307,44 @@
       key: 'risk',
       label: 'risk-service',
       status: sourceStatus.risk,
-      detail: sourceErrors.risk || riskRecords.value.map((item) => item.created_at).filter(Boolean).sort().at(-1) || '不可用',
+      detail:
+        sourceErrors.risk ||
+        riskRecords.value
+          .map((item) => item.created_at)
+          .filter(Boolean)
+          .sort()
+          .at(-1) ||
+        '不可用',
     },
     {
       key: 'notification',
       label: 'notification-service',
       status: sourceStatus.notification,
-      detail: sourceErrors.notification || notifications.value.map((item) => item.created_at || item.createdAt).filter(Boolean).sort().at(-1) || '不可用',
+      detail:
+        sourceErrors.notification ||
+        notifications.value
+          .map((item) => item.created_at || item.createdAt)
+          .filter(Boolean)
+          .sort()
+          .at(-1) ||
+        '不可用',
     },
     {
       key: 'finance',
       label: 'data-service finance',
       status: sourceStatus.finance,
-      detail: sourceErrors.finance || totalSummary.value.updated_at || exchangeInfo.value.updated_at || '不可用',
+      detail:
+        sourceErrors.finance ||
+        totalSummary.value.updated_at ||
+        exchangeInfo.value.updated_at ||
+        '不可用',
     },
     {
       key: 'health',
       label: 'data-service health',
       status: sourceStatus.health,
-      detail: sourceErrors.health || health.value.as_of || health.value.update_frequency || '不可用',
+      detail:
+        sourceErrors.health || health.value.as_of || health.value.update_frequency || '不可用',
     },
   ]);
 
@@ -332,7 +379,8 @@
 
   function setRejected(source: string, reason: unknown) {
     sourceStatus[source] = 'unavailable';
-    sourceErrors[source] = reason instanceof Error ? reason.message : String(reason || 'request failed');
+    sourceErrors[source] =
+      reason instanceof Error ? reason.message : String(reason || 'request failed');
   }
 
   async function loadAll() {
@@ -348,7 +396,15 @@
       getDataHealth(),
     ]);
     try {
-      const [riskResult, notificationResult, accountResult, ratioResult, totalResult, exchangeResult, healthResult] = results;
+      const [
+        riskResult,
+        notificationResult,
+        accountResult,
+        ratioResult,
+        totalResult,
+        exchangeResult,
+        healthResult,
+      ] = results;
 
       if (riskResult.status === 'fulfilled') {
         riskRecords.value = riskResult.value;
@@ -367,26 +423,32 @@
       }
 
       let financeFailures = 0;
-      if (accountResult.status === 'fulfilled') accounts.value = accountResult.value;
-      else {
+      if (accountResult.status === 'fulfilled') {
+        accounts.value = accountResult.value;
+      } else {
         accounts.value = [];
         financeFailures += 1;
-        sourceErrors.finance = String(accountResult.reason?.message || accountResult.reason || 'accounts failed');
+        sourceErrors.finance = String(
+          accountResult.reason?.message || accountResult.reason || 'accounts failed',
+        );
       }
-      if (ratioResult.status === 'fulfilled') ratioItems.value = ratioResult.value;
-      else {
+      if (ratioResult.status === 'fulfilled') {
+        ratioItems.value = ratioResult.value;
+      } else {
         ratioItems.value = [];
         financeFailures += 1;
         sourceErrors.finance = `${sourceErrors.finance || ''} ratio failed`.trim();
       }
-      if (totalResult.status === 'fulfilled') totalSummary.value = totalResult.value;
-      else {
+      if (totalResult.status === 'fulfilled') {
+        totalSummary.value = totalResult.value;
+      } else {
         totalSummary.value = {};
         financeFailures += 1;
         sourceErrors.finance = `${sourceErrors.finance || ''} total failed`.trim();
       }
-      if (exchangeResult.status === 'fulfilled') exchangeInfo.value = exchangeResult.value;
-      else {
+      if (exchangeResult.status === 'fulfilled') {
+        exchangeInfo.value = exchangeResult.value;
+      } else {
         exchangeInfo.value = {};
         financeFailures += 1;
         sourceErrors.finance = `${sourceErrors.finance || ''} exchange failed`.trim();
