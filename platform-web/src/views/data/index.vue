@@ -1,33 +1,40 @@
 <template>
   <PageWrapper title="数据管理">
     <div class="data-page">
+      <ProductDataStatusAlert :meta="dataMeta" class="mb-4" />
+
       <div class="toolbar">
         <Space>
           <Tag :color="roleColor">{{ roleLabel }}</Tag>
-          <Tag :color="health.status === 'ok' ? 'green' : 'orange'">{{ health.service || 'data-service' }}</Tag>
-          <Tag>同步频率 {{ health.update_frequency || '-' }}</Tag>
+          <Tag :color="health.status === 'ok' ? 'green' : 'orange'">
+            {{ health.service || 'data-service' }}
+          </Tag>
+          <Tag>同步频率 {{ health.update_frequency || '不可用' }}</Tag>
         </Space>
         <Space>
           <Button :loading="loading" @click="loadData">
             <template #icon><ReloadOutlined /></template>
             刷新
           </Button>
-          <Button type="primary" :disabled="!canOperateData" :loading="syncing" @click="syncAccounts">
+          <Button
+            type="primary"
+            :disabled="!canOperateData || dataMeta.status === 'unavailable'"
+            :loading="syncing"
+            @click="syncAccounts"
+          >
             <template #icon><SyncOutlined /></template>
             同步账户
           </Button>
         </Space>
       </div>
 
-      <div>
-        <AccountNetValueChart
-          ref="chartRef"
-          :accounts="accounts"
-          :account-id="selectedAccountId"
-          title="账户净值统计"
-          height="420px"
-        />
-      </div>
+      <AccountNetValueChart
+        ref="chartRef"
+        :accounts="accounts"
+        :account-id="selectedAccountId"
+        title="账户净值统计"
+        height="420px"
+      />
 
       <Card :bordered="false" title="账户数据快照" class="vg-panel mt-4">
         <Table
@@ -38,14 +45,20 @@
           :loading="loading"
           :pagination="{ pageSize: 8 }"
         >
+          <template #emptyText>
+            <span>{{ dataMeta.status === 'ready' ? '暂无账户数据' : '账户数据不可用' }}</span>
+          </template>
           <template #bodyCell="{ column, record }">
             <template v-if="column.key === 'name'">
               <div class="strong-cell">{{ record.name }}</div>
-              <div class="muted-cell">{{ record.account_address }}</div>
+              <div class="muted-cell">{{ record.account_address || '未配置地址' }}</div>
             </template>
             <template v-else-if="column.key === 'asset'">
-              <div>{{ formatMoney(record.total_asset) }} USD</div>
+              <div>{{ formatMoney(record.total_asset) }}</div>
               <div class="muted-cell">可用 {{ formatMoney(record.available_fund) }}</div>
+            </template>
+            <template v-else-if="column.key === 'initial_capital'">
+              {{ formatMoney(record.initial_capital) }}
             </template>
             <template v-else-if="column.key === 'status'">
               <Tag :color="record.status === 'active' ? 'green' : 'default'">{{ record.status }}</Tag>
@@ -63,32 +76,44 @@
 <script setup lang="ts">
   import { computed, onMounted, ref } from 'vue';
   import { useRoute } from 'vue-router';
-  import {
-    Button,
-    Card,
-    message,
-    Space,
-    Table,
-    Tag,
-  } from 'ant-design-vue';
+  import { Button, Card, message, Space, Table, Tag } from 'ant-design-vue';
   import { ReloadOutlined, SyncOutlined } from '@ant-design/icons-vue';
   import { PageWrapper } from '@/components/Page';
+  import ProductDataStatusAlert from '@/components/ProductDataState/ProductDataStatusAlert.vue';
   import AccountNetValueChart from './components/AccountNetValueChart.vue';
   import {
-    DataAccount,
-    DataServiceHealth,
+    type DataAccount,
+    type DataServiceHealth,
     getAccounts,
     getDataHealth,
     triggerAccountSync,
   } from '@/api/riskControl';
+  import {
+    unavailableMeta,
+    type DecimalString,
+    type ProductDataMeta,
+  } from '@/api/platform/productDataState';
   import { useRoleAccess } from '@/hooks/web/useRoleAccess';
-  import { formateNumStr } from '@/utils/formate';
+  import { formatMoneyString } from '@/utils/decimalDisplay';
   import { formatToDateTime } from '@/utils/dateUtil';
 
   const loading = ref(false);
   const syncing = ref(false);
   const accounts = ref<DataAccount[]>([]);
-  const health = ref<DataServiceHealth>({ status: 'unknown', service: 'data-service', update_frequency: '-' });
+  const health = ref<DataServiceHealth>({
+    status: 'unknown',
+    service: 'data-service',
+    update_frequency: 'unknown',
+  });
+  const dataMeta = ref<ProductDataMeta>({
+    status: 'no_data',
+    source: 'data-service',
+    timezone: 'source-defined',
+    currency: 'USD',
+    unit: 'account facts',
+    precision: 'decimal-string',
+    message: '尚未加载账户数据',
+  });
   const chartRef = ref<InstanceType<typeof AccountNetValueChart> | null>(null);
   const route = useRoute();
   const { roleLabel, roleColor, canOperateData } = useRoleAccess();
@@ -108,37 +133,53 @@
     { title: '更新时间', dataIndex: 'asset_updated_at', key: 'asset_updated_at', width: 190 },
   ];
 
-  function formatMoney(value: any) {
-    return formateNumStr(value || 0, { decimals: 2, keepZero: true });
+  function formatMoney(value?: DecimalString) {
+    return formatMoneyString(value, 'USD');
   }
 
   function formatDateTime(value?: string) {
-    return value ? formatToDateTime(value) : '-';
+    return value ? formatToDateTime(value) : '不可用';
   }
 
   async function loadData() {
     loading.value = true;
     try {
-      const [accountRes, healthRes] = await Promise.all([
-        getAccounts(),
-        getDataHealth(),
-      ]);
+      const [accountRes, healthRes] = await Promise.all([getAccounts(), getDataHealth()]);
       accounts.value = accountRes;
       health.value = healthRes;
+      dataMeta.value = {
+        status: accountRes.length ? 'ready' : 'no_data',
+        source: healthRes.service || 'data-service',
+        asOf: healthRes.as_of || accountRes.map((item) => item.asset_updated_at).filter(Boolean).sort().at(-1),
+        timezone: 'source-defined',
+        currency: 'USD',
+        unit: 'account facts',
+        precision: 'decimal-string',
+        message: accountRes.length ? undefined : 'Provider成功返回，但没有账户记录',
+      };
+    } catch (error) {
+      accounts.value = [];
+      dataMeta.value = unavailableMeta('data-service', error, {
+        timezone: 'source-defined',
+        currency: 'USD',
+        unit: 'account facts',
+        precision: 'decimal-string',
+      });
     } finally {
       loading.value = false;
     }
   }
 
   async function syncAccounts() {
-    if (!canOperateData.value) return;
+    if (!canOperateData.value || syncing.value) return;
     syncing.value = true;
     try {
-      const res = await triggerAccountSync();
-      message.success(`账户同步完成：成功 ${res.synced || 0}，失败 ${res.failed || 0}，跳过 ${res.skipped || 0}`);
+      const result = await triggerAccountSync();
+      message.success(`账户同步完成：成功 ${result.synced}，失败 ${result.failed}，跳过 ${result.skipped}`);
       await loadData();
-    } catch (error: any) {
-      message.error(error?.response?.data?.message || error?.message || '同步失败');
+      await chartRef.value?.reload();
+    } catch (error) {
+      message.error(error instanceof Error ? error.message : '同步失败');
     } finally {
       syncing.value = false;
     }
