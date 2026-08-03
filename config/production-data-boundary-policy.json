@@ -62,6 +62,17 @@
       "required_markers": ["ProductNotConfiguredPanel", "not-configured: strategy-catalog-owner"]
     },
     {
+      "path": "platform-web/src/views/strategy/funding-carry/index.vue",
+      "required_markers": [
+        "ProductNotConfiguredPanel",
+        "not-configured: funding-carry-provider-and-runtime-owner"
+      ]
+    },
+    {
+      "path": "platform-web/src/views/strategy/spread-carry/index.vue",
+      "required_markers": ["ProductNotConfiguredPanel", "not-configured: spread-research-provider"]
+    },
+    {
       "path": "platform-web/src/views/newsCalendar/index.vue",
       "required_markers": [
         "not-configured: news-aggregation-provider",
