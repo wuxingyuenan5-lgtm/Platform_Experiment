@@ -63,12 +63,12 @@ const EMPLOYEE_PAGES: readonly VisualPage[] = [
     key: 'strategy-management',
     route: '/strategy/management',
     marker: '策略管理',
-    evidenceSource: 'local strategy fixtures plus isolated Platform API; Live Write disabled',
+    evidenceSource: 'explicit not-configured product state; no strategy fixture data',
   },
   {
     key: 'risk-detail',
     route: '/risk/detail',
-    marker: '风控总览',
+    marker: '风控详情',
     evidenceSource: 'deterministic operations fixture and isolated browser role',
   },
   {
