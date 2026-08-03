@@ -20,7 +20,7 @@ CATEGORIES = {
     "unexpected",
 }
 CONVENTIONAL_SUBJECT = re.compile(
-    r"^(?P<kind>refactor|feat|fix|test|perf|ci|docs|chore|governance)"
+    r"^(?P<kind>refactor|feat|fix|test|perf|ci|docs|chore|governance|style)"
     r"(?:\([^)]+\))?!?:\s+(?P<summary>.+)$",
     re.IGNORECASE,
 )
@@ -47,6 +47,17 @@ PHASE5_PRODUCT_FOUNDATION_PATHS = {
 PHASE5_PRODUCT_FOUNDATION_PREFIXES = (
     "platform-web/src/components/ProductDataState/",
 )
+PHASE5_PRODUCT_FORMAT_PATHS = {
+    "platform-web/src/api/riskControl.ts",
+    "platform-web/src/views/audit/index.vue",
+    "platform-web/src/views/data/components/AccountNetValueChart.vue",
+    "platform-web/src/views/data/index.vue",
+    "platform-web/src/views/finance/index.vue",
+    "platform-web/src/views/monitor/index.vue",
+    "platform-web/src/views/reports/index.vue",
+    "platform-web/src/views/risk/detail/index.vue",
+    "platform-web/src/views/settings/index.vue",
+}
 
 
 class AuditError(RuntimeError):
@@ -89,6 +100,10 @@ def is_phase5_product_foundation_path(path: str) -> bool:
     if path in PHASE5_PRODUCT_FOUNDATION_PATHS:
         return True
     return path.startswith(PHASE5_PRODUCT_FOUNDATION_PREFIXES)
+
+
+def is_phase5_product_format_path(path: str) -> bool:
+    return path in PHASE5_PRODUCT_FORMAT_PATHS
 
 
 def classify(
@@ -140,6 +155,12 @@ def classify(
         return "contract-test" if all(is_test_path(path) for path in paths) else "unexpected"
     if kind == "fix":
         return "bounded-correction"
+    if kind == "style":
+        if summary.startswith("format ") and all(
+            is_phase5_product_format_path(path) for path in paths
+        ):
+            return "bounded-correction"
+        return "unexpected"
     if kind == "feat":
         if all(is_phase5_product_foundation_path(path) for path in paths):
             return "formal-implementation"
