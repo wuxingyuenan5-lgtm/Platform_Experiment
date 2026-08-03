@@ -38,7 +38,7 @@
       "owner": "isolated Fake Runtime",
       "required_markers": ["FakeGateway"],
       "consumer_path": "execution-runtime/app/gateway_factory.py",
-      "consumer_required_markers": ["fake", "live_trading_enabled"]
+      "consumer_required_markers": ["fake", "live_write_enabled"]
     },
     {
       "path": "platform-web/src/views/hedgeBoard/nativeData/dashboardClean.ts",
