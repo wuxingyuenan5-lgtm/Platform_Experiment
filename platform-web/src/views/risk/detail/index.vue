@@ -65,9 +65,7 @@
             >
               <template #emptyText>
                 <span>
-                  {{
-                    sourceStatus.risk === 'unavailable' ? '风控来源不可用' : '暂无风控记录'
-                  }}
+                  {{ sourceStatus.risk === 'unavailable' ? '风控来源不可用' : '暂无风控记录' }}
                 </span>
               </template>
               <template #bodyCell="{ column, record, index }">
@@ -118,11 +116,7 @@
             >
               <template #emptyText>
                 <span>
-                  {{
-                    sourceStatus.notification === 'unavailable'
-                      ? '通知来源不可用'
-                      : '暂无通知'
-                  }}
+                  {{ sourceStatus.notification === 'unavailable' ? '通知来源不可用' : '暂无通知' }}
                 </span>
               </template>
               <template #bodyCell="{ column, record }">
@@ -155,11 +149,7 @@
             >
               <template #emptyText>
                 <span>
-                  {{
-                    sourceStatus.finance === 'unavailable'
-                      ? '财务来源不可用'
-                      : '暂无资产结构'
-                  }}
+                  {{ sourceStatus.finance === 'unavailable' ? '财务来源不可用' : '暂无资产结构' }}
                 </span>
               </template>
               <template #bodyCell="{ column, record }">
@@ -241,9 +231,7 @@
     () => riskRecords.value.filter((item) => item.status === 'pending').length,
   );
   const highCount = computed(
-    () =>
-      riskRecords.value.filter((item) => ['high', 'critical'].includes(item.severity || ''))
-        .length,
+    () => riskRecords.value.filter((item) => ['high', 'critical'].includes(item.severity || '')).length,
   );
   const unreadCount = computed(() => notifications.value.filter(isUnread).length);
   const latestEventTime = computed(() =>
@@ -269,10 +257,7 @@
   }
 
   const totalAsset = computed<DecimalString | undefined>(
-    () =>
-      totalSummary.value.total_asset ??
-      totalSummary.value.total ??
-      sumAccountField('total_asset'),
+    () => totalSummary.value.total_asset ?? totalSummary.value.total ?? sumAccountField('total_asset'),
   );
   const availableFund = computed<DecimalString | undefined>(() =>
     sumAccountField('available_fund'),
