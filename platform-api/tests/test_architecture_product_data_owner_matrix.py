@@ -1,0 +1,78 @@
+from __future__ import annotations
+
+import importlib.util
+import json
+from pathlib import Path
+
+import pytest
+
+pytestmark = pytest.mark.architecture
+
+ROOT = Path(__file__).resolve().parents[2]
+SCRIPT = ROOT / "scripts" / "audit-product-data-owner-matrix.py"
+MATRIX = ROOT / "config" / "product-data-owner-matrix.json"
+
+
+def _load_audit_module():
+    spec = importlib.util.spec_from_file_location("product_data_owner_audit", SCRIPT)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def _write_matrix(tmp_path: Path, mutate) -> Path:
+    payload = json.loads(MATRIX.read_text(encoding="utf-8"))
+    mutate(payload)
+    target = tmp_path / "matrix.json"
+    target.write_text(json.dumps(payload), encoding="utf-8")
+    return target
+
+
+def test_current_product_data_owner_matrix_covers_formal_views() -> None:
+    audit = _load_audit_module()
+    result = audit.audit(MATRIX, require_closed=False)
+    assert result["status"] == "ok"
+    assert result["formal_routes"] == 30
+    assert result["route_names"] == 30
+    assert result["entries"] == 19
+    assert result["unique_views"] == 19
+    assert result["evidence_debt"] == {
+        "pr_149": "pending",
+        "pr_150": "pending",
+        "blocks_final_rc": True,
+    }
+
+
+def test_missing_formal_route_is_rejected(tmp_path: Path) -> None:
+    audit = _load_audit_module()
+    target = _write_matrix(tmp_path, lambda value: value["entries"][0]["routes"].clear())
+    with pytest.raises(audit.AuditError, match="routes must be a non-empty list"):
+        audit.audit(target, require_closed=False)
+
+
+def test_phase5_registry_cannot_enable_live_write(tmp_path: Path) -> None:
+    audit = _load_audit_module()
+    target = _write_matrix(
+        tmp_path,
+        lambda value: value["entries"][0].__setitem__("live_write", True),
+    )
+    with pytest.raises(audit.AuditError, match="must not enable Live Write"):
+        audit.audit(target, require_closed=False)
+
+
+def test_require_closed_rejects_unresolved_product_gap(tmp_path: Path) -> None:
+    audit = _load_audit_module()
+    target = _write_matrix(tmp_path, lambda value: None)
+    with pytest.raises(audit.AuditError, match="unresolved product/data gap"):
+        audit.audit(target, require_closed=True)
+
+
+def test_phase4_evidence_head_drift_is_rejected(tmp_path: Path) -> None:
+    audit = _load_audit_module()
+    target = _write_matrix(
+        tmp_path,
+        lambda value: value["evidence_debt"]["pr_150"].__setitem__("head", "deadbeef"),
+    )
+    with pytest.raises(audit.AuditError, match="head drifted"):
+        audit.audit(target, require_closed=False)
