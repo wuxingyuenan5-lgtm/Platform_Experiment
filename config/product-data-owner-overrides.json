@@ -70,8 +70,14 @@
     "monitor": {
       "frontend_services": ["platform-web/src/api/riskControl.ts"],
       "api_endpoints": ["data-service:/health", "current browser session"],
-      "application_services": ["external:data-service", "current authenticated session"],
-      "repository_or_provider": ["external:data-service health", "browser session store"],
+      "application_services": [
+        "external:data-service",
+        "external:current authenticated session"
+      ],
+      "repository_or_provider": [
+        "external:data-service health",
+        "external:browser session store"
+      ],
       "real_data_source": "data-service health plus current authenticated session",
       "refresh": "on-mount and manual",
       "as_of": "provider health timestamp",
@@ -103,7 +109,10 @@
         "/risk/api/v1/risk-records/",
         "/notifications/api/v1/messages/"
       ],
-      "application_services": ["external:risk-service", "external:notification-service"],
+      "application_services": [
+        "external:risk-service",
+        "external:notification-service"
+      ],
       "repository_or_provider": ["external:report source aggregation"],
       "real_data_source": "risk and notification facts",
       "refresh": "on-mount and manual",
@@ -140,8 +149,14 @@
     "settings": {
       "frontend_services": ["platform-web/src/api/riskControl.ts"],
       "api_endpoints": ["data-service:/health", "current browser session"],
-      "application_services": ["external:data-service", "current authenticated session"],
-      "repository_or_provider": ["external:data-service health", "browser session store"],
+      "application_services": [
+        "external:data-service",
+        "external:current authenticated session"
+      ],
+      "repository_or_provider": [
+        "external:data-service health",
+        "external:browser session store"
+      ],
       "real_data_source": "current session and data-service health; settings writes explicitly not configured",
       "refresh": "on-mount and manual",
       "as_of": "provider health timestamp",
