@@ -9,15 +9,24 @@ from pathlib import Path
 from urllib.parse import unquote, urlsplit
 
 REQUIRED_ENTRYPOINTS = (
+    "README.md",
     "AGENTS.md",
-    "00-人工可读目录/README.md",
-    "docs/architecture/README.md",
-    "docs/architecture/OWNERSHIP.md",
-    "docs/codex/context-map.md",
+    "docs/README.md",
     "docs/codex/current-state.md",
-    "docs/codex/task-template.md",
+    "docs/codex/context-map.md",
+    "docs/architecture/SYSTEM_MAP.md",
+    "docs/architecture/OWNERSHIP.md",
+    "docs/operations/RUNBOOK.md",
     "docs/database/README.md",
+    "docs/contracts/README.md",
 )
+A1_ENTRYPOINTS = REQUIRED_ENTRYPOINTS
+CURRENT_STATE_ENTRYPOINT = "docs/codex/current-state.md"
+DEAD_DOCUMENTATION_ENTRYPOINT = "platform-web/docs/START-HERE.md"
+DEAD_ENTRYPOINT_NAME_PATTERN = re.compile(
+    r"^start[-_]here(?:\.md)?$", re.IGNORECASE
+)
+CURRENT_STATE_NAME_PATTERN = re.compile(r"^current[-_]state\.md$", re.IGNORECASE)
 
 REQUIRED_OWNERS = {
     "Platform composition root": "platform-api/app/main.py",
@@ -59,9 +68,11 @@ REQUIRED_OWNERS = {
 
 DOCUMENT_CATALOG_REFERENCES = (
     "AGENTS.md",
-    "docs/architecture/README.md",
+    "README.md",
+    "docs/README.md",
     "docs/codex/context-map.md",
     "docs/codex/current-state.md",
+    "docs/contracts/README.md",
 )
 
 STALE_CONTEXT_SNIPPETS = (
@@ -72,14 +83,28 @@ STALE_CONTEXT_SNIPPETS = (
 EXCLUDED_MARKDOWN_PARTS = frozenset(
     {
         ".git",
+        ".mypy_cache",
+        ".pytest_cache",
+        ".ruff_cache",
+        ".turbo",
         ".venv",
         "archive",
+        "artifacts",
         "audit",
+        "build",
+        "coverage",
         "dist",
         "node_modules",
         "outputs",
+        "test-results",
         "vendor",
     }
+)
+DOCUMENTATION_ENTRYPOINT_ROOTS = (
+    "docs",
+    "platform-web/docs",
+    "platform-api/docs",
+    "execution-runtime/docs",
 )
 EXTERNAL_LINK_SCHEMES = frozenset(
     {"data", "http", "https", "javascript", "mailto", "tel"}
@@ -143,6 +168,30 @@ def active_markdown_paths(root: Path) -> list[Path]:
     ]
 
 
+def documentation_entrypoint_candidates(root: Path) -> list[Path]:
+    """Return maintained files that can act as documentation entrypoints."""
+
+    root = root.resolve()
+    candidates = [path for path in sorted(root.iterdir()) if path.is_file()]
+
+    for relative_root in DOCUMENTATION_ENTRYPOINT_ROOTS:
+        documentation_root = root / relative_root
+        if not documentation_root.is_dir():
+            continue
+
+        pending = [documentation_root]
+        while pending:
+            current = pending.pop()
+            for path in sorted(current.iterdir(), reverse=True):
+                if path.is_dir():
+                    if path.name not in EXCLUDED_MARKDOWN_PARTS:
+                        pending.append(path)
+                elif path.is_file():
+                    candidates.append(path)
+
+    return sorted(candidates)
+
+
 def markdown_without_examples(content: str) -> str:
     """Remove fenced examples and comments before validating maintained prose."""
 
@@ -179,7 +228,11 @@ def validate_markdown_links(
     """Validate local file/directory targets in active Markdown documents."""
 
     root = root.resolve()
-    paths = active_markdown_paths(root) if markdown_paths is None else sorted(markdown_paths)
+    paths = (
+        active_markdown_paths(root)
+        if markdown_paths is None
+        else sorted(markdown_paths)
+    )
     errors: list[str] = []
 
     for source in paths:
@@ -241,6 +294,128 @@ def validate_portable_documentation(
     return sorted(errors)
 
 
+def normalized_paragraphs(content: str) -> set[str]:
+    """Return substantive prose paragraphs for simple exact-duplication checks."""
+
+    content = markdown_without_examples(content)
+    paragraphs: set[str] = set()
+    for raw in re.split(r"\n\s*\n", content):
+        lines = [line.strip() for line in raw.splitlines() if line.strip()]
+        if not lines or any(line.startswith(("#", "|", "- ", "* ", ">")) for line in lines):
+            continue
+        paragraph = " ".join(lines)
+        if len(paragraph) >= 160:
+            paragraphs.add(paragraph)
+    return paragraphs
+
+
+def validate_dead_documentation_entrypoint(
+    root: Path,
+    markdown_paths: Iterable[Path] | None = None,
+) -> list[str]:
+    """Reject the retired START-HERE entrypoint, aliases and active links."""
+
+    root = root.resolve()
+    errors: list[str] = []
+
+    for path in documentation_entrypoint_candidates(root):
+        if DEAD_ENTRYPOINT_NAME_PATTERN.fullmatch(path.name):
+            relative = path.resolve().relative_to(root).as_posix()
+            errors.append(f"forbidden dead documentation entrypoint exists: {relative}")
+
+    paths = (
+        active_markdown_paths(root)
+        if markdown_paths is None
+        else sorted(markdown_paths)
+    )
+    for source in paths:
+        if not source.is_file():
+            continue
+        relative_source = source.resolve().relative_to(root).as_posix()
+        content = markdown_without_examples(source.read_text(encoding="utf-8"))
+        for match in MARKDOWN_LINK_PATTERN.finditer(content):
+            target = markdown_link_target(match.group("target"))
+            if target is None:
+                continue
+            link_path = unquote(urlsplit(target).path)
+            if not link_path:
+                continue
+            candidate_name = Path(link_path).name
+            if DEAD_ENTRYPOINT_NAME_PATTERN.fullmatch(candidate_name):
+                errors.append(
+                    f"{relative_source}: active Markdown link targets retired "
+                    f"documentation entrypoint: {target}"
+                )
+
+    return sorted(errors)
+
+
+def validate_current_state_entrypoint(root: Path) -> list[str]:
+    """Require one canonical current-state document and reject naming aliases."""
+
+    root = root.resolve()
+    canonical = root / CURRENT_STATE_ENTRYPOINT
+    errors: list[str] = []
+    if not canonical.is_file():
+        errors.append(
+            f"missing canonical current-state entrypoint: {CURRENT_STATE_ENTRYPOINT}"
+        )
+
+    candidates = [
+        path.resolve().relative_to(root).as_posix()
+        for path in documentation_entrypoint_candidates(root)
+        if CURRENT_STATE_NAME_PATTERN.fullmatch(path.name)
+    ]
+    for relative in candidates:
+        if relative != CURRENT_STATE_ENTRYPOINT:
+            errors.append(f"parallel current-state entrypoint is forbidden: {relative}")
+
+    return sorted(errors)
+
+
+def validate_a1_hierarchy(root: Path) -> list[str]:
+    """Validate the controlled A1 set and reject obvious duplicated authority prose."""
+
+    errors: list[str] = []
+    if len(A1_ENTRYPOINTS) < 8 or len(A1_ENTRYPOINTS) > 10:
+        errors.append(f"A1 entrypoint count must remain between 8 and 10: {len(A1_ENTRYPOINTS)}")
+
+    owners: dict[str, str] = {}
+    for relative in A1_ENTRYPOINTS:
+        path = root / relative
+        if not path.is_file():
+            continue
+        for paragraph in normalized_paragraphs(path.read_text(encoding="utf-8")):
+            previous = owners.get(paragraph)
+            if previous is not None:
+                errors.append(f"A1 documents duplicate a substantive paragraph: {previous} and {relative}")
+            else:
+                owners[paragraph] = relative
+
+    docs_index = (root / "docs/README.md").read_text(encoding="utf-8")
+    for relative in A1_ENTRYPOINTS:
+        display = relative.removeprefix("docs/") if relative.startswith("docs/") else f"../{relative}"
+        if relative == "docs/README.md":
+            display = "README.md"
+        if f"`{display}`" not in docs_index:
+            errors.append(f"docs/README.md is missing A1 entry: {relative}")
+
+    web_index = root / "platform-web/docs/README.md"
+    if web_index.is_file():
+        text = web_index.read_text(encoding="utf-8")
+        for required in ("Platform Web专项参考", CURRENT_STATE_ENTRYPOINT):
+            if required not in text:
+                errors.append(
+                    "platform-web/docs/README.md must identify its specialist-reference "
+                    f"role: missing {required}"
+                )
+        for forbidden in ("最高权威", "唯一入口", "当前总架构", "统一文档入口"):
+            if forbidden in text:
+                errors.append(f"platform-web/docs/README.md must remain specialist reference: {forbidden}")
+
+    return errors
+
+
 def validate_repository(root: Path) -> list[str]:
     """Return deterministic documentation-consistency errors for ``root``."""
 
@@ -264,6 +439,9 @@ def validate_repository(root: Path) -> list[str]:
     if context_path.is_file():
         errors.extend(validate_context_map(context_path.read_text(encoding="utf-8")))
 
+    errors.extend(validate_a1_hierarchy(root))
+    errors.extend(validate_dead_documentation_entrypoint(root))
+    errors.extend(validate_current_state_entrypoint(root))
     errors.extend(validate_markdown_links(root))
     errors.extend(validate_portable_documentation(root))
     return sorted(errors)

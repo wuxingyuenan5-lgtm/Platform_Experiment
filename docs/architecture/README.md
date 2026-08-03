@@ -98,8 +98,8 @@
 
 ## Test Taxonomy 边界
 
-- Platform Backend 测试按 `architecture`、`unit`、`integration`、`live_safety` 四层执行。
-- Execution Runtime 测试按 `unit`、`integration`、`live_safety` 三层执行。
+- Platform API 测试按 `architecture`、`unit`、`integration`、`live_safety` 四层执行。
+- Platform Execution Runtime 测试按 `unit`、`integration`、`live_safety` 三层执行。
 - 每个测试在 collection 阶段必须且只能获得一个主标记；CI 分层运行且不得依赖其他层残留状态。
 
 ## Failure/Recovery 边界

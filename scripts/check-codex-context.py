@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import json
 import re
+import subprocess
+import sys
 import tomllib
 from pathlib import Path
 
@@ -58,8 +60,8 @@ def main() -> None:
         "README.md",
         "docs/codex/current-state.md",
         "docs/codex/context-map.md",
-        "docs/codex/CURRENT_CONTEXT.md",
         "docs/architecture/OWNERSHIP.md",
+        "docs/contracts/README.md",
         "scripts/context-for.py",
     )
     for relative_path in required:
@@ -69,7 +71,6 @@ def main() -> None:
     readme = read_text("README.md")
     current_state = read_text("docs/codex/current-state.md")
     context_map = read_text("docs/codex/context-map.md")
-    compatibility = read_text("docs/codex/CURRENT_CONTEXT.md")
     context_tool = read_text("scripts/context-for.py")
     dev_script = read_text("scripts/dev-platform.ps1")
     vite_config = read_text("platform-web/vite.config.ts")
@@ -79,13 +80,14 @@ def main() -> None:
     actual_versions = {
         "platform-api": pyproject_version("platform-api/pyproject.toml"),
         "execution-runtime": pyproject_version("execution-runtime/pyproject.toml"),
+        "platform-web package": str(package_json.get("version", "")),
         "frontend development": frontend_version("platform-web/.env.development"),
         "frontend production": frontend_version("platform-web/.env.production"),
     }
     drift = {name: value for name, value in actual_versions.items() if value != expected_version}
     require(not drift, f"Version declarations drifted from VERSION={expected_version}: {drift}")
     require(
-        f"Active development version: Platform `{expected_version}`" in current_state,
+        f"Current target version: Platform `{expected_version}`" in current_state,
         "current-state.md does not match root VERSION",
     )
 
@@ -95,19 +97,16 @@ def main() -> None:
 
     require(f"port: {FRONTEND_PORT}" in vite_config, "Frontend Vite port drifted")
     for port, label in {
-        FRONTEND_PORT: "frontend",
+        FRONTEND_PORT: "Platform Web",
         BACKEND_PORT: "Platform API",
-        RUNTIME_PORT: "Execution Runtime",
+        RUNTIME_PORT: "Platform Execution Runtime",
     }.items():
         require(port in dev_script, f"dev-platform.ps1 is missing the {label} port")
-        require(port in current_state, f"current-state.md is missing the {label} port")
-        require(port in readme, f"README.md is missing the {label} port")
 
     for path_name, text in {
         "AGENTS.md": agents,
         "README.md": readme,
         "context-map.md": context_map,
-        "CURRENT_CONTEXT.md": compatibility,
     }.items():
         require(
             "docs/codex/current-state.md" in text,
@@ -117,28 +116,20 @@ def main() -> None:
             require(stale not in text, f"{path_name} contains stale branch authority: {stale}")
 
     require(
-        "sole repository document for current engineering state" in current_state,
-        "current-state.md must declare its authority",
+        "sole repository document for current version, branch, phase and known limits" in current_state,
+        "current-state.md must declare its bounded authority",
     )
     require(
-        "docs/architecture/OWNERSHIP.md" in current_state,
-        "current-state.md must link architecture ownership",
+        "docs/architecture/OWNERSHIP.md" in current_state
+        and "docs/contracts/README.md" in current_state,
+        "current-state.md must link ownership and domain contracts",
     )
     require(
-        "GitHub Issue #136" in current_state
-        and "live branch, Draft PR, HEAD, CI and review state" in current_state,
-        "current-state.md must delegate volatile delivery state to GitHub Issue #136",
+        "GitHub PR #141" in current_state
+        and "active branch, Draft PR, HEAD, CI and review state" in current_state,
+        "current-state.md must delegate volatile delivery state to GitHub PR #141",
     )
 
-    require(
-        "compatibility pointer" in compatibility.lower()
-        and "not a current-state authority" in compatibility,
-        "CURRENT_CONTEXT.md must be a non-authoritative compatibility pointer",
-    )
-    require(
-        "CURRENT_CONTEXT.md` is a compatibility pointer and is not part of default context" in context_map,
-        "context-map.md must exclude CURRENT_CONTEXT.md from default context",
-    )
     require(
         "## Executable task packs" in context_map
         and "python scripts/context-for.py --list" in context_map,
@@ -170,12 +161,35 @@ def main() -> None:
         "tasks/",
         "projects/risk-control",
         "src/views/demo",
+        "Plan",
+        "Handoff",
+        "Audit",
+        "Superseded",
     ):
         require(noisy in context_map, f"context-map.md is missing default exclusion: {noisy}")
+
+    for forbidden_context_path in ("PLAN.md", "HANDOFF.md", "AUDIT.md", "SUPERSEDED.md"):
+        require(
+            forbidden_context_path not in context_tool.upper(),
+            f"context-for.py must not load historical material: {forbidden_context_path}",
+        )
 
     require(
         "Browser ambient state is evidence only" in context_map,
         "context-map.md is missing browser evidence discipline",
+    )
+    require(
+        "## Context budgets" in context_map
+        and "python scripts/context-for.py --check-budgets --json" in context_map
+        and "4,000 estimated tokens" in context_map,
+        "context-map.md is missing executable budget governance",
+    )
+    subprocess.run(
+        [sys.executable, str(ROOT / "scripts/context-for.py"), "--check-budgets", "--json"],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
     )
 
     print(f"Codex context checks passed for Platform {expected_version}.")

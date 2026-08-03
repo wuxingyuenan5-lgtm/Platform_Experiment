@@ -42,7 +42,7 @@ Trading fills → operational projections
 Forbidden directions:
 
 ```text
-Platform Backend → venue SDK
+Platform API → venue SDK
 Frontend → database or venue SDK
 Runtime → Platform internal modules
 Trading projections → formal accounting tables
@@ -69,3 +69,10 @@ Composition root → domain implementation
 - Production: deployment, live-write, credentials, monitoring or recovery.
 
 Boundary, migration and production changes require a dedicated task packet and explicit protected semantics.
+## Architecture convergence rules
+
+- The repository remains three deployable engineering subjects: Platform Web, modular-monolith Platform API and isolated Platform Execution Runtime. Do not split services without measured ownership, scaling or failure-isolation evidence.
+- SQLite remains the current local Platform database; schema authority is additive migrations plus documented DDL owners, not ad-hoc table creation.
+- External projects and libraries are adopted by capability behind Platform contracts. Runtime code must not import an external product's domain model as Platform authority.
+- Source facts are immutable or append-only where required; caches, read models, operational positions and reports are derived and rebuildable.
+- Production topology, Legacy services and real Venue activation are evidence-gated and are not inferred from repository files alone.

@@ -39,3 +39,10 @@
 历史决策参见：
 
 - `../decisions/ADR-013-响应式布局体系与页面壳层治理.md`
+## 路由、上下文与状态恢复
+
+- 路由只表达可恢复主上下文：模块、稳定实体 ID、时间范围、筛选与视角。短期交互状态、凭证、审批材料和敏感自由文本不得进入 URL。
+- Deployment Environment、Trading Mode 与 Trading Permission State 必须分别展示和校验；任一项不能替代另一项。
+- 跨模块跳转只传稳定 ID，目标模块重新读取权威数据并重新鉴权；摘要页面不拥有目标领域事实。
+- 页面刷新后重建路由上下文并重新查询服务端状态；断线恢复不能重放 Command 或把 `result_unknown` 推断为成功。
+- 统一状态语义以 `../../../docs/product/ACCEPTANCE_CRITERIA.md` 为准，组件局部状态不得升级为第二套业务状态机。

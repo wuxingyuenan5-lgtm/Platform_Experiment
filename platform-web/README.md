@@ -1,8 +1,8 @@
-# Variable-Global Platform Web
+# Platform Web
 
 [中文说明](./README.zh-CN.md)
 
-`platform-web/` is the Vue 3 product frontend for the Variable-Global research, trading, risk, identity, portfolio and reconciliation platform.
+Platform Web is the Vue 3 product frontend of Variable-Global (全球变量金融平台), covering research, market data, strategy, trading, execution, risk, accounting, reconciliation, user access and member portfolio workflows.
 
 ## Architecture boundary
 
@@ -11,10 +11,10 @@ Platform Web
     ↓ Browser Session / REST
 Platform API
     ↓ versioned Runtime contracts
-Execution Runtime
+Platform Execution Runtime
 ```
 
-The browser must not hold Venue credentials or perform external execution side effects. Trading, permissions, accounting and reconciliation rules remain authoritative in Platform API and Execution Runtime.
+The browser must not hold Venue credentials or perform external execution side effects. Trading, permissions, accounting and reconciliation rules remain authoritative in Platform API and Platform Execution Runtime.
 
 ## Local development
 
@@ -45,4 +45,4 @@ The authoritative package manager is declared in `package.json#packageManager`.
 
 ## Upstream attribution
 
-The frontend retains components and build infrastructure derived from Vue Vben Admin. The applicable MIT license is preserved in `LICENSE`. Upstream history is retained only for attribution and maintenance context; this repository, its issue tracker and its release state are authoritative for the Variable-Global platform.
+The frontend retains components and build infrastructure derived from Vue Vben Admin. The applicable MIT license is preserved in `LICENSE`. Upstream history is retained only for attribution and maintenance context; this repository, its issue tracker and its release state are authoritative for Variable-Global.

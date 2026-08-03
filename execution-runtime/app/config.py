@@ -32,7 +32,7 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    app_name: str = "Variable-Global Execution Runtime"
+    app_name: str = "Platform Execution Runtime"
     environment: str = "development"
     journal_path: str = "./data/runtime_journal.db"
     gateway_name: str = "fake"

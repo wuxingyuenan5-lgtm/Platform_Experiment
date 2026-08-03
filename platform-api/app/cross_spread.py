@@ -60,14 +60,14 @@ def get_cross_spread_snapshot() -> CrossSpreadSnapshotResponse:
         )
         if response.status_code >= 400:
             raise httpx.HTTPStatusError(
-                "Execution runtime returned an error",
+                "Platform Execution Runtime returned an error",
                 request=response.request,
                 response=response,
             )
     except httpx.HTTPError as exc:
         raise HTTPException(
             status_code=502,
-            detail="Execution runtime is unavailable",
+            detail="Platform Execution Runtime is unavailable",
         ) from exc
     snapshot = CrossSpreadSnapshotResponse.model_validate(response.json())
     save_cross_spread_market_snapshot(

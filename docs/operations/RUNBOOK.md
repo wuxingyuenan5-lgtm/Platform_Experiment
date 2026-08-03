@@ -14,7 +14,7 @@ Platform API:
 Invoke-WebRequest -UseBasicParsing "http://127.0.0.1:8000/health"
 ```
 
-Execution Runtime:
+Platform Execution Runtime:
 
 ```powershell
 Invoke-WebRequest -UseBasicParsing "http://127.0.0.1:8100/health"
@@ -32,7 +32,7 @@ Expected long-running services:
 
 - Platform Web on `4373`;
 - Platform API on `8000`;
-- Execution Runtime on `8100` only when execution integration is required.
+- Platform Execution Runtime on `8100` only when execution integration is required.
 
 Default safety state remains Simulation, Fake Gateway and Platform/Runtime Live Write disabled.
 

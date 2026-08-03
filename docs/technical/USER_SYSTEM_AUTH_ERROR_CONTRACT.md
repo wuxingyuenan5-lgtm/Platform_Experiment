@@ -1,8 +1,8 @@
 # 用户系统认证与授权错误合同
 
-状态：`active / implemented, executable verification pending`  
-适用版本：`Platform Experiment 0.9.0`  
-Issue：`#117`  
+状态：`active / implemented, executable verification pending`
+适用产品：`Platform`
+Issue：`#117`
 架构基线：`USER_SYSTEM_TECHNICAL_ARCHITECTURE.md`
 
 ## 1. 目的

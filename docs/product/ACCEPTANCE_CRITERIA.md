@@ -12,10 +12,35 @@
 - Home Dashboard hero art must not expose baked-in legacy text from source images; the butterfly-water topology should use the high-resolution original-color asset as a controlled local visual layer behind the intended dashboard copy.
 - Home Dashboard hero should render as one continuous butterfly-water visual field, not a split left-image/right-empty background; lower dashboard modules may overlap the hero edge to match the reference layout.
 - Platform API health check returns 200 at `http://127.0.0.1:8000/health`.
-- Execution Runtime health check returns 200 at `http://127.0.0.1:8100/health` when runtime integration is enabled.
+- Platform Execution Runtime health check returns 200 at `http://127.0.0.1:8100/health` when runtime integration is enabled.
 - Product pages must not show debug-only backend or runtime panels.
 - Trading and account behavior changes require separate approval.
 - Routine code search does not scan `node_modules`, `.venv`, `dist`, or `outputs`.
 - Root SQL references live under `references/database/`.
 - Large external reference code does not live in the project root.
 - Shared documentation and default configuration must not bind the platform to a named developer workstation.
+
+## Identity, permission, and member-data criteria
+
+- Browser Cookie and Bearer API Key are mutually exclusive request credentials; ambiguous requests fail closed.
+- Browser Session uses server-side revocation, CSRF plus Origin validation, secure cookie settings in production, and immediate permission invalidation after role or status change.
+- CEO, technical lead, employee, and member permissions are enforced on the server for routes, fields, actions, and resource scope; direct URL access cannot bypass them.
+- A member can read only their own fund holdings. Administrative full-holding reads and holding changes require explicit permission, recent reauthentication, transactionally coupled audit, and Decimal-string responses.
+- The last active CEO cannot be disabled or downgraded, including concurrent requests. Passwords, raw tokens, API keys, complete contact details, and complete holding snapshots never enter Git or ordinary logs.
+- Browser identity never authorizes Platform or Runtime Live Write. LiveTradingSession, Kill Switch, absolute limits, approval, reconciliation, and data-quality gates remain independently required.
+
+## User-system deployment and rollback gates
+
+- Before production cutover, confirm whether real legacy users exist, identify the authoritative holding source, and verify same-origin TLS, reverse proxy, cookie security, backup, avatar restore, and rate limiting.
+- Legacy user import, when required, is dry-run capable, idempotent, excludes old Sessions, never auto-promotes an old admin to CEO, and records only counts and redacted errors.
+- Schema migrations are append-only and must pass fresh-database, upgrade, repeat-initialization, checksum-drift, failed-rollback, index, and foreign-key tests without changing existing trading, accounting, reconciliation, or audit facts.
+- A failed identity or holding cutover rolls back the complete deployment unit; it must not leave mixed identity authorities or partially migrated customer data.
+## Global product and frontend criteria
+
+- Every page exposes explicit loading, empty, error, stale/delayed, partial, permission-denied, read-only and degraded states where applicable.
+- Unknown, delayed or incomplete financial data is never rendered as confirmed zero.
+- Commands are idempotent, auditable and recoverable; `result_unknown` remains unknown until authoritative reconciliation.
+- Monetary, price and quantity values use exact Decimal/string contracts, explicit currency/unit and UTC timestamps.
+- Module degradation remains bounded: a failed external widget, provider or realtime channel cannot erase unrelated page content.
+- Responsive behavior preserves the primary decision path; secondary panels may stack or collapse but critical status, risk and action context remain visible.
+- Sensitive credentials, approval evidence and unrestricted personal data never enter routes, browser persistence or client logs.

@@ -1,1 +1,1 @@
-"""Variable-Global execution runtime."""
+"""Platform Execution Runtime."""

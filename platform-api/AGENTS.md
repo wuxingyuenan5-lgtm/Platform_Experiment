@@ -1,4 +1,4 @@
-# Platform Backend Agent Rules
+# Platform API Agent Rules
 
 Scope: `platform-api/`.
 

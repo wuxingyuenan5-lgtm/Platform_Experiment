@@ -26,23 +26,64 @@ def pr_event(workstream: str, extra: str = "") -> dict:
 
 def version_files() -> list[dict[str, str]]:
     return [
-        {"filename": "VERSION", "status": "modified", "patch": "@@\n-0.8.0\n+0.9.0"},
+        {"filename": "VERSION", "status": "modified", "patch": "@@\n-0.9.2\n+0.9.3"},
+        {
+            "filename": "platform-web/package.json",
+            "status": "modified",
+            "patch": '@@\n-  "version": "0.9.2",\n+  "version": "0.9.3",',
+        },
+        {
+            "filename": "platform-web/.env.development",
+            "status": "modified",
+            "patch": (
+                '@@\n-VITE_GLOB_APP_VERSION = "0.9.2"\n'
+                '+VITE_GLOB_APP_VERSION = "0.9.3"'
+            ),
+        },
+        {
+            "filename": "platform-web/.env.production",
+            "status": "modified",
+            "patch": (
+                '@@\n-VITE_GLOB_APP_VERSION = "0.9.2"\n'
+                '+VITE_GLOB_APP_VERSION = "0.9.3"'
+            ),
+        },
         {
             "filename": "platform-api/pyproject.toml",
             "status": "modified",
-            "patch": '@@\n-version = "0.8.0"\n+version = "0.9.0"',
+            "patch": '@@\n-version = "0.9.2"\n+version = "0.9.3"',
+        },
+        {
+            "filename": "platform-api/app/application.py",
+            "status": "modified",
+            "patch": '@@\n-PLATFORM_VERSION = "0.9.2"\n+PLATFORM_VERSION = "0.9.3"',
         },
         {
             "filename": "execution-runtime/pyproject.toml",
             "status": "modified",
-            "patch": '@@\n-version = "0.8.0"\n+version = "0.9.0"',
+            "patch": '@@\n-version = "0.9.2"\n+version = "0.9.3"',
         },
         {
-            "filename": "platform-web/.env",
+            "filename": "execution-runtime/app/main.py",
+            "status": "modified",
+            "patch": '@@\n-PLATFORM_VERSION = "0.9.2"\n+PLATFORM_VERSION = "0.9.3"',
+        },
+        {
+            "filename": "README.md",
+            "status": "modified",
+            "patch": '@@\n-当前目标版本：Platform `0.9.2`。\n+当前目标版本：Platform `0.9.3`。',
+        },
+        {
+            "filename": "docs/README.md",
+            "status": "modified",
+            "patch": '@@\n-当前目标版本：Platform `0.9.2`。\n+当前目标版本：Platform `0.9.3`。',
+        },
+        {
+            "filename": "docs/codex/current-state.md",
             "status": "modified",
             "patch": (
-                '@@\n-VITE_GLOB_APP_VERSION = "0.8.0"\n'
-                '+VITE_GLOB_APP_VERSION = "0.9.0"'
+                '@@\n-- Current target version: Platform `0.9.2`.\n'
+                '+- Current target version: Platform `0.9.3`.'
             ),
         },
     ]
@@ -122,11 +163,6 @@ def test_fast_files_allow_markdown_and_synchronized_versions() -> None:
             "filename": "docs/releases/0.9.0.md",
             "status": "added",
             "patch": "@@\n+# Platform 0.9.0",
-        },
-        {
-            "filename": "README.md",
-            "status": "modified",
-            "patch": "@@\n-old\n+new",
         },
     ]
     assert check_workstream.validate_fast_files(files) == [

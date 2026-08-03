@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fail when maintained release declarations drift from root VERSION."""
+"""Fail when current Platform release declarations drift from root VERSION."""
 
 from __future__ import annotations
 
@@ -9,46 +9,161 @@ import tomllib
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-EXPECTED = (ROOT / "VERSION").read_text(encoding="utf-8").strip()
 FRONTEND_VERSION_FILES = (
     "platform-web/.env.development",
     "platform-web/.env.production",
 )
+CURRENT_DOCUMENTS = {
+    "current engineering state": (
+        "docs/codex/current-state.md",
+        r"Current target version: Platform `([^`]+)`\.",
+    ),
+}
+MAINTAINED_VERSION_PATHS = (
+    "VERSION",
+    "platform-web/package.json",
+    *FRONTEND_VERSION_FILES,
+    "platform-api/pyproject.toml",
+    "platform-api/app/application.py",
+    "execution-runtime/pyproject.toml",
+    "execution-runtime/app/main.py",
+    "docs/codex/current-state.md",
+)
+VERSION_USAGE_PATHS = (
+    "platform-web/internal/vite-config/src/config/application.ts",
+    "platform-web/src/views/sys/about/index.vue",
+    "execution-runtime/app/models.py",
+)
 
 
-def project_version(path: str) -> str:
-    with (ROOT / path).open("rb") as handle:
+def read_text(root: Path, path: str) -> str:
+    return (root / path).read_text(encoding="utf-8")
+
+
+def project_version(root: Path, path: str) -> str:
+    with (root / path).open("rb") as handle:
         return str(tomllib.load(handle)["project"]["version"])
 
 
-def package_json_version(path: str) -> str:
-    package = json.loads((ROOT / path).read_text(encoding="utf-8"))
+def package_json_version(root: Path, path: str) -> str:
+    package = json.loads(read_text(root, path))
     return str(package["version"])
 
 
-def frontend_version(path: str) -> str:
-    content = (ROOT / path).read_text(encoding="utf-8")
+def frontend_version(root: Path, path: str) -> str:
+    content = read_text(root, path)
     match = re.search(r'VITE_GLOB_APP_VERSION\s*=\s*["\']([^"\']+)["\']', content)
     if match is None:
         raise SystemExit(f"Frontend release version declaration is missing from {path}")
     return match.group(1)
 
 
-def main() -> None:
+def source_constant(root: Path, path: str, name: str) -> str:
+    content = read_text(root, path)
+    match = re.search(rf'^{re.escape(name)}\s*=\s*["\']([^"\']+)["\']$', content, re.MULTILINE)
+    if match is None:
+        raise SystemExit(f"{name} declaration is missing from {path}")
+    return match.group(1)
+
+
+def require_source_usage(root: Path, path: str, *snippets: str) -> None:
+    content = read_text(root, path)
+    missing = [snippet for snippet in snippets if snippet not in content]
+    if missing:
+        raise SystemExit(f"Version source usage is missing from {path}: {missing}")
+
+
+def require_pattern_usage(root: Path, path: str, label: str, pattern: str) -> None:
+    if re.search(pattern, read_text(root, path), re.MULTILINE | re.DOTALL) is None:
+        raise SystemExit(f"{label} version source usage is missing from {path}")
+
+
+def document_version(root: Path, path: str, pattern: str) -> str:
+    match = re.search(pattern, read_text(root, path))
+    if match is None:
+        raise SystemExit(f"Current version declaration is missing from {path}")
+    return match.group(1)
+
+
+def collect_versions(root: Path) -> tuple[str, dict[str, str]]:
+    expected = read_text(root, "VERSION").strip()
+
+    require_source_usage(
+        root,
+        "platform-web/internal/vite-config/src/config/application.ts",
+        "const { dependencies, devDependencies, name, version } = pkgJson;",
+        "pkg: { dependencies, devDependencies, name, version },",
+    )
+    require_source_usage(
+        root,
+        "platform-web/src/views/sys/about/index.vue",
+        "const { dependencies, devDependencies, version } = pkg;",
+        "version,",
+    )
+
+    api_version = source_constant(root, "platform-api/app/application.py", "PLATFORM_VERSION")
+    require_source_usage(
+        root,
+        "platform-api/app/application.py",
+        "version=PLATFORM_VERSION",
+        '"version": PLATFORM_VERSION',
+    )
+
+    runtime_version = source_constant(
+        root,
+        "execution-runtime/app/main.py",
+        "PLATFORM_VERSION",
+    )
+    require_pattern_usage(
+        root,
+        "execution-runtime/app/main.py",
+        "Platform Execution Runtime OpenAPI",
+        r"FastAPI\([^)]*version=PLATFORM_VERSION",
+    )
+    require_pattern_usage(
+        root,
+        "execution-runtime/app/main.py",
+        "Platform Execution Runtime /status",
+        r"RuntimeStatusResponse\([^)]*version=PLATFORM_VERSION",
+    )
+    require_pattern_usage(
+        root,
+        "execution-runtime/app/models.py",
+        "Platform Execution Runtime status response",
+        r"class RuntimeStatusResponse\(BaseModel\):.*?^\s+version:\s+str\s*$",
+    )
+
     actual = {
-        "platform-api package": project_version("platform-api/pyproject.toml"),
-        "execution-runtime package": project_version("execution-runtime/pyproject.toml"),
-        "platform-web package": package_json_version("platform-web/package.json"),
+        "platform-web package": package_json_version(root, "platform-web/package.json"),
         **{
-            f"frontend display ({path})": frontend_version(path)
+            f"platform-web display ({path})": frontend_version(root, path)
             for path in FRONTEND_VERSION_FILES
         },
+        "platform-api package": project_version(root, "platform-api/pyproject.toml"),
+        "platform-api OpenAPI": api_version,
+        "platform-api /system/info": api_version,
+        "execution-runtime package": project_version(root, "execution-runtime/pyproject.toml"),
+        "execution-runtime OpenAPI": runtime_version,
+        "execution-runtime /status": runtime_version,
+        **{
+            name: document_version(root, path, pattern)
+            for name, (path, pattern) in CURRENT_DOCUMENTS.items()
+        },
     }
-    drift = {name: value for name, value in actual.items() if value != EXPECTED}
+    return expected, actual
+
+
+def check_versions(root: Path = ROOT) -> None:
+    expected, actual = collect_versions(root)
+    drift = {name: value for name, value in actual.items() if value != expected}
     if drift:
         details = ", ".join(f"{name}={value}" for name, value in sorted(drift.items()))
-        raise SystemExit(f"Version drift from VERSION={EXPECTED}: {details}")
-    print(f"Maintained release versions are consistent: {EXPECTED}")
+        raise SystemExit(f"Version drift from VERSION={expected}: {details}")
+    print(f"Maintained Platform release versions are consistent: {expected}")
+
+
+def main() -> None:
+    check_versions(ROOT)
 
 
 if __name__ == "__main__":

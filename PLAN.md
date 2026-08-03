@@ -4,7 +4,7 @@
 
 - 当前工程状态：`docs/codex/current-state.md`
 - 系统性优化主线：GitHub Issue #136
-- 总体方案：`docs/architecture/PLATFORM_0_9_2_SYSTEM_OPTIMIZATION_MASTER_PLAN.md`
+- 当前架构与收敛状态：`docs/codex/current-state.md`、`docs/architecture/SYSTEM_MAP.md`
 - 当前任务包：`tasks/issue-136-platform-0-9-2-system-optimization.md`
 
 ## 已完成阶段

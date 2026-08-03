@@ -33,7 +33,7 @@ function Initialize-PythonProject {
 
   $VenvPath = Join-Path $ProjectPath '.venv'
   $PythonPath = Join-Path $VenvPath 'Scripts\python.exe'
-  $InstallMarker = Join-Path $VenvPath '.variable-global-installed'
+  $InstallMarker = Join-Path $VenvPath '.platform-installed'
   $Created = $false
 
   if (-not (Test-Path $PythonPath)) {
@@ -117,12 +117,12 @@ if (-not (Test-Path $BackendEnv) -and (Test-Path $BackendEnvExample)) {
 }
 
 Start-ServiceWindow `
-  -Title 'Variable-Global Execution Runtime :8100' `
+  -Title 'Platform Execution Runtime :8100' `
   -WorkingDirectory $RuntimePath `
   -Command "& '$RuntimePython' -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8100"
 
 Start-ServiceWindow `
-  -Title 'Variable-Global Platform Backend :8000' `
+  -Title 'Platform API :8000' `
   -WorkingDirectory $BackendPath `
   -Command "& '$BackendPython' -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000"
 
@@ -162,22 +162,22 @@ if (-not $SkipFrontend) {
   }
 
   Start-ServiceWindow `
-    -Title "Variable-Global Frontend :$FrontendPort" `
+    -Title "Platform Web :$FrontendPort" `
     -WorkingDirectory $FrontendPath `
     -Command "& '$VitePath' --host 127.0.0.1 --port $FrontendPort"
 }
 
-Wait-ForHttp -Name 'Execution Runtime' -Url 'http://127.0.0.1:8100/health' -TimeoutSeconds $HealthTimeoutSeconds
-Wait-ForHttp -Name 'Platform Backend' -Url 'http://127.0.0.1:8000/health' -TimeoutSeconds $HealthTimeoutSeconds
+Wait-ForHttp -Name 'Platform Execution Runtime' -Url 'http://127.0.0.1:8100/health' -TimeoutSeconds $HealthTimeoutSeconds
+Wait-ForHttp -Name 'Platform API' -Url 'http://127.0.0.1:8000/health' -TimeoutSeconds $HealthTimeoutSeconds
 if (-not $SkipFrontend) {
-  Wait-ForHttp -Name 'Frontend' -Url "http://127.0.0.1:$FrontendPort/index.html" -TimeoutSeconds $HealthTimeoutSeconds
+  Wait-ForHttp -Name 'Platform Web' -Url "http://127.0.0.1:$FrontendPort/index.html" -TimeoutSeconds $HealthTimeoutSeconds
 }
 
 Write-Host ''
-Write-Host 'Variable-Global local services are ready.' -ForegroundColor Green
-Write-Host 'Runtime:  http://127.0.0.1:8100/health'
-Write-Host 'Backend:  http://127.0.0.1:8000/health'
+Write-Host 'Platform local services are ready.' -ForegroundColor Green
+Write-Host 'Platform Execution Runtime: http://127.0.0.1:8100/health'
+Write-Host 'Platform API:               http://127.0.0.1:8000/health'
 if (-not $SkipFrontend) {
-  Write-Host "Frontend: http://127.0.0.1:$FrontendPort/index.html"
+  Write-Host "Platform Web:               http://127.0.0.1:$FrontendPort/index.html"
 }
 Write-Host 'Safety defaults remain Simulation + Fake Gateway + Live Write disabled.' -ForegroundColor Yellow

@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - refactor/platform-0-9-3-repository-and-context-optimization
   pull_request:
     branches:
       - main
@@ -47,3 +48,6 @@ jobs:
           --mode post-rename
           --target all
           --fail-on-unclassified
+
+      - name: Enforce active Platform naming
+        run: python scripts/check-active-naming-consistency.py

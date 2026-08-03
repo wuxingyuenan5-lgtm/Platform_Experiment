@@ -90,8 +90,8 @@ function Get-Pnl {
     -TimeoutSec 5
 }
 
-Wait-ForHealth -Name 'Execution Runtime' -Url "$RuntimeBaseUrl/health"
-Wait-ForHealth -Name 'Platform Backend' -Url "$BackendBaseUrl/health"
+Wait-ForHealth -Name 'Platform Execution Runtime' -Url "$RuntimeBaseUrl/health"
+Wait-ForHealth -Name 'Platform API' -Url "$BackendBaseUrl/health"
 
 $StrategyInstanceId = 'strategy_funding_arbitrage_instance_default'
 $AccountId = 'account_sim_usdt'

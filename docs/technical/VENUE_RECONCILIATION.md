@@ -2,20 +2,28 @@
 
 状态：`active`  
 适用版本：`Platform V6 / Phase 4B–4C`  
-实施计划：`../planning/V6-Phase4B-外部查询与对账差异.md`  
 当前扩展：`Issue #96 / PR #97`
 
 ## 1. 权威边界
 
 ```text
-Execution Runtime
+Platform Execution Runtime
 = 外部 Venue 查询、受控撤单和执行适配边界
 
-Platform Backend
+Platform API
 = Platform Order、FinancialFact、Formal Accounting、Difference 权威
 ```
 
-Runtime 返回外部事实快照，不直接修改 Platform Backend 数据库。Backend 负责验证 Platform 身份、导入不可变事实、更新本地投影并创建差异。
+Runtime 返回外部事实快照，不直接修改 Platform API 数据库。Platform API负责验证 Platform 身份、导入不可变事实、更新本地投影并创建差异。
+
+## 2. 当前恢复与对账合同
+
+- 查询、导入事实、投影更新与 Difference 创建必须保持分层；只读查询不得产生外部副作用。
+- `result_unknown` 先读 Runtime Journal，再读外部 Venue；任何恢复路径都不得重新提交原命令。
+- 外部 Order / Fill / Deal / Position / Balance 使用稳定身份导入不可变 FinancialFact；重复导入必须幂等。
+- 本地与外部状态、数量、价格、币种或身份不一致时创建显式 Difference，不静默覆盖任一权威视角。
+- Fake Venue 的持久化 ID 与查询行为用于 CI 和恢复演练，不是正式交易账本。
+- 当前外部恢复、撤单和 Live Write 仍受 Runtime 能力、权限、生产配置及受控实盘门禁约束。
 
 ## 2. 查询不等于命令
 
@@ -142,7 +150,7 @@ Fake Gateway 使用 Runtime Journal SQLite 保存外部视角状态。它用于�
 - FinancialFact 重复导入测试。
 - Reconciliation Difference 金样本。
 
-Fake Store 不是正式交易账本，也不进入 Platform Backend 权威数据库。
+Fake Store 不是正式交易账本，也不进入 Platform API 权威数据库。
 
 ## 7. result_unknown 恢复顺序
 

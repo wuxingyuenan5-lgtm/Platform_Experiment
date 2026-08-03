@@ -40,14 +40,14 @@ def test_facade_preserves_runtime_error_mapping(monkeypatch) -> None:
     monkeypatch.setattr(
         service,
         "runtime_get",
-        raise_error(runtime_client.RuntimeQueryError("Execution Runtime query failed")),
+        raise_error(runtime_client.RuntimeQueryError("Platform Execution Runtime query failed")),
     )
 
     with pytest.raises(HTTPException) as exc_info:
         venue_reconciliation.runtime_get("/venue/positions")
 
     assert exc_info.value.status_code == 503
-    assert exc_info.value.detail == "Execution Runtime query failed"
+    assert exc_info.value.detail == "Platform Execution Runtime query failed"
     assert isinstance(exc_info.value.__cause__, runtime_client.RuntimeQueryError)
 
 

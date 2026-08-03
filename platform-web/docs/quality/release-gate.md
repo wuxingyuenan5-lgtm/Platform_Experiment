@@ -187,8 +187,8 @@ Backend 与 Runtime 必须覆盖：
 - 实施计划。
 - 技术合同。
 - API Spec。
-- README。
-- START-HERE。
+- 仓库文档入口（`docs/README.md`）。
+- 当前状态文档（`docs/codex/current-state.md`）。
 - Release Gate。
 - Changelog。
 - Issue 与 PR。

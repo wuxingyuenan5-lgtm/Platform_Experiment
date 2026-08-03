@@ -50,6 +50,7 @@ from app.venue_readiness import get_venue_readiness
 from app.venue_store import ensure_store
 
 settings = get_settings()
+PLATFORM_VERSION = "0.9.3"
 
 
 @asynccontextmanager
@@ -60,7 +61,7 @@ async def lifespan(_: FastAPI):
     yield
 
 
-app = FastAPI(title=settings.app_name, version="0.5.0", lifespan=lifespan)
+app = FastAPI(title=settings.app_name, version=PLATFORM_VERSION, lifespan=lifespan)
 gateway = create_gateway(settings.gateway_name)
 
 
@@ -78,6 +79,7 @@ def status() -> RuntimeStatusResponse:
     return RuntimeStatusResponse(
         status="available",
         service="execution-runtime",
+        version=PLATFORM_VERSION,
         environment=settings.environment,
         gateway=gateway.name,
         journal=journal_status(),

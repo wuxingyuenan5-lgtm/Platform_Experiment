@@ -19,14 +19,15 @@
 
 ## 初始化
 
-在 `platform-api` 目录设置环境变量后运行：
+在仓库根目录设置环境变量后运行；脚本真实路径为`platform-api/scripts/seed_user_system_demo.py`：
 
 ```bash
 export VG_ENVIRONMENT=development
 export VG_LIVE_TRADING_ENABLED=false
 export USER_SYSTEM_DEMO_SEED=1
 export USER_SYSTEM_DEMO_PASSWORD='自行设置的统一临时密码'
-python scripts/seed_user_system_demo.py
+export PYTHONPATH="$PWD/platform-api"
+python platform-api/scripts/seed_user_system_demo.py
 ```
 
 密码只从 `USER_SYSTEM_DEMO_PASSWORD` 读取，不写入代码、数据库日志或文档。
@@ -36,10 +37,14 @@ python scripts/seed_user_system_demo.py
 默认重复运行只补齐缺失数据，不覆盖已经人工修改的账号。需要统一更新时：
 
 ```bash
+export VG_ENVIRONMENT=development
+export VG_LIVE_TRADING_ENABLED=false
+export USER_SYSTEM_DEMO_SEED=1
 export USER_SYSTEM_DEMO_PREFIX=pilot
 export USER_SYSTEM_DEMO_PASSWORD='新的统一临时密码'
 export USER_SYSTEM_DEMO_REFRESH=1
-python scripts/seed_user_system_demo.py
+export PYTHONPATH="$PWD/platform-api"
+python platform-api/scripts/seed_user_system_demo.py
 ```
 
 上述示例会把账号前缀由 `demo` 改为 `pilot`，并统一更新密码，同时撤销这些账号的旧 Session。

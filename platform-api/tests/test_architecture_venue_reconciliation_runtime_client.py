@@ -50,4 +50,4 @@ def test_facade_retains_http_error_mapping_compatibility_delegate() -> None:
 
     assert "def runtime_get(" in source
     assert "except runtime_client.RuntimeQueryError as exc:" in source
-    assert 'HTTPException(status_code=503, detail="Execution Runtime query failed")' in source
+    assert 'detail="Platform Execution Runtime query failed"' in source

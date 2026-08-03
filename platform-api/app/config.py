@@ -11,7 +11,7 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    app_name: str = "Variable-Global Platform Backend"
+    app_name: str = "Platform API"
     environment: str = "development"
     api_prefix: str = "/api/v1"
     database_path: str = "./data/platform.db"

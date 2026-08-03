@@ -1,6 +1,6 @@
 # platform-api
 
-Variable-Global 的模块化单体业务后端。
+Platform API是Platform的模块化单体业务服务。
 
 ## 当前范围
 

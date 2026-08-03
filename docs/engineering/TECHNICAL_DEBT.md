@@ -35,3 +35,9 @@ This register contains only unresolved work with a concrete risk and trigger. Co
 - **Status:** administrator verification pending, Issue #38.
 - **Risk:** repository settings may allow bypass even when code-level checks exist.
 - **Trigger:** verify required Platform CI and Secret Scan checks, block direct/force pushes and enable merged-branch cleanup in GitHub Settings.
+## TD-008 — Deferred production and external capability closure
+
+- **Status:** active and protected.
+- **Risk:** repository-level contracts may be mistaken for proven server, broker, database or recovery readiness.
+- **Trigger:** approved production evidence for hosts, TLS, Runner, MySQL, backup/restore, credentials and minimum-size Venue execution.
+- **Protected rule:** do not delete Legacy evidence, enable Live Write or replace external routes before owner acceptance.

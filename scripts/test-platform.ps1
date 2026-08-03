@@ -72,8 +72,8 @@ function Test-PythonProject {
   }
 }
 
-Test-PythonProject -Name 'Execution Runtime' -ProjectPath $RuntimePath
-Test-PythonProject -Name 'Platform Backend' -ProjectPath $BackendPath
+Test-PythonProject -Name 'Platform Execution Runtime' -ProjectPath $RuntimePath
+Test-PythonProject -Name 'Platform API' -ProjectPath $BackendPath
 
 if (-not $SkipFrontend) {
   Write-Host "`n[Frontend Type Check]" -ForegroundColor Cyan

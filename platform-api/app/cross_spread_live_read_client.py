@@ -54,11 +54,11 @@ def runtime_get(path: str, params: dict[str, str] | None = None) -> object:
     except httpx.HTTPStatusError as exc:
         detail = _response_detail(exc.response)
         raise CrossSpreadLiveReadError(
-            f"Execution Runtime rejected live read {path}: {detail}"
+            f"Platform Execution Runtime rejected live read {path}: {detail}"
         ) from exc
     except httpx.HTTPError as exc:
         raise CrossSpreadLiveReadError(
-            f"Execution Runtime live read is unavailable: {path}"
+            f"Platform Execution Runtime live read is unavailable: {path}"
         ) from exc
     return response.json()
 

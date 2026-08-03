@@ -26,7 +26,7 @@ docs/operations/PLATFORM_0_9_1_LOCAL_ACCEPTANCE_HANDOFF.md
 本手册不覆盖：
 
 - 真实下单、订单、成交、持仓和会计账本；
-- Execution Runtime；
+- Platform Execution Runtime；
 - 将投研行情认定为交易执行权威行情；
 - 对第三方免费数据源的永久可用性承诺。
 
@@ -70,27 +70,30 @@ npx pnpm@9.15.9 test:e2e:hedge-board
 
 ### 3.1 运行中的Platform API
 
-先启动Platform Backend，再执行：
+先启动Platform API。然后在仓库根目录执行；脚本真实路径为`platform-api/scripts/validate_research_sources.py`：
 
 ```powershell
-cd platform-api
-python scripts/validate_research_sources.py `
+$env:PYTHONPATH = (Resolve-Path .\platform-api).Path
+New-Item -ItemType Directory -Force .\artifacts | Out-Null
+python .\platform-api\scripts\validate_research_sources.py `
   --base-url http://127.0.0.1:8000 `
   --stock-code 600519 `
   --threshold-yuan 10000000000 `
-  --output ../artifacts/hedge-board-live-source-check.json
+  --output .\artifacts\hedge-board-live-source-check.json
 ```
 
 启用生产API Key时使用：
 
 ```powershell
-python scripts/validate_research_sources.py --api-key "<临时注入，不写入仓库>"
+$env:PYTHONPATH = (Resolve-Path .\platform-api).Path
+python .\platform-api\scripts\validate_research_sources.py --api-key "<临时注入，不写入仓库>"
 ```
 
 使用浏览器会话时，可传入临时会话Token：
 
 ```powershell
-python scripts/validate_research_sources.py --session-token "<临时会话Token>"
+$env:PYTHONPATH = (Resolve-Path .\platform-api).Path
+python .\platform-api\scripts\validate_research_sources.py --session-token "<临时会话Token>"
 ```
 
 该脚本只通过Platform API检查：
@@ -105,9 +108,11 @@ python scripts/validate_research_sources.py --session-token "<临时会话Token>
 
 ### 3.2 免费Provider独立探测
 
+在仓库根目录执行；脚本真实路径为`platform-api/scripts/smoke_research_providers.py`：
+
 ```powershell
-cd platform-api
-python scripts/smoke_research_providers.py --timeout 60
+$env:PYTHONPATH = (Resolve-Path .\platform-api).Path
+python .\platform-api\scripts\smoke_research_providers.py --timeout 60
 ```
 
 该探针记录上海市场时间、交易状态、每项Provider结果、响应耗时和贵州茅台腾讯/东方财富双源报价。外部失败为非阻塞证据，但必须准确标记为`partial`，不得描述为全部健康。

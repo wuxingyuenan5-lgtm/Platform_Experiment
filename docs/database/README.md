@@ -37,7 +37,7 @@ Ordered additive migrations are applied separately by `app/schema_migrations.py`
 
 ## 3. DDL and SQL owners
 
-### Platform Backend
+### Platform API
 
 | Owner module | Primary responsibility |
 |---|---|
@@ -58,7 +58,7 @@ Ordered additive migrations are applied separately by `app/schema_migrations.py`
 
 Table creation and additive column migration remain owned by `app/schema_migrations.py`. `app/database.py` is not a DDL or Seed owner. `app/user_repository.py` may read and write user-system rows but may not create or alter their schema.
 
-### Execution Runtime
+### Platform Execution Runtime
 
 | Owner module | Primary responsibility |
 |---|---|

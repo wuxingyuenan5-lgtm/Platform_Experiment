@@ -1,0 +1,284 @@
+{
+  "entries": [
+    {
+      "pattern": "\\bVG_[A-Z0-9_]+\\b",
+      "path": ".env.example",
+      "category": "external-production-compatibility",
+      "reason": "Existing environment contract consumed by deployed or operator-facing configuration.",
+      "owner": "Operations",
+      "removalCondition": "Remove only after external consumers migrate and deployment evidence confirms the old variable is unused."
+    },
+    {
+      "pattern": "\\bVG_[A-Z0-9_]+\\b",
+      "path": "docs/operations/USER_SYSTEM_DEMO_ACCOUNTS.md",
+      "category": "external-production-compatibility",
+      "reason": "Existing environment contract consumed by deployed or operator-facing configuration.",
+      "owner": "Operations",
+      "removalCondition": "Remove only after external consumers migrate and deployment evidence confirms the old variable is unused."
+    },
+    {
+      "pattern": "\\bVG_[A-Z0-9_]+\\b",
+      "path": "docs/operations/USER_SYSTEM_DEPLOYMENT_READINESS.md",
+      "category": "external-production-compatibility",
+      "reason": "Existing environment contract consumed by deployed or operator-facing configuration.",
+      "owner": "Operations",
+      "removalCondition": "Remove only after external consumers migrate and deployment evidence confirms the old variable is unused."
+    },
+    {
+      "pattern": "\\bVG_[A-Z0-9_]+\\b",
+      "path": "docs/operations/V6-小资金实盘验收手册.md",
+      "category": "external-production-compatibility",
+      "reason": "Existing environment contract consumed by deployed or operator-facing configuration.",
+      "owner": "Operations",
+      "removalCondition": "Remove only after external consumers migrate and deployment evidence confirms the old variable is unused."
+    },
+    {
+      "pattern": "\\bVG_[A-Z0-9_]+\\b",
+      "path": "docs/technical/LIVE_VENUE_ADAPTERS.md",
+      "category": "external-production-compatibility",
+      "reason": "Existing environment contract consumed by deployed or operator-facing configuration.",
+      "owner": "Operations",
+      "removalCondition": "Remove only after external consumers migrate and deployment evidence confirms the old variable is unused."
+    },
+    {
+      "pattern": "\\bVG_[A-Z0-9_]+\\b",
+      "path": "docs/technical/MEMBER_HOLDINGS_READ_MODEL.md",
+      "category": "external-production-compatibility",
+      "reason": "Existing environment contract consumed by deployed or operator-facing configuration.",
+      "owner": "Operations",
+      "removalCondition": "Remove only after external consumers migrate and deployment evidence confirms the old variable is unused."
+    },
+    {
+      "pattern": "\\bVG_[A-Z0-9_]+\\b",
+      "path": "docs/technical/PRODUCTION_OPERATIONS.md",
+      "category": "external-production-compatibility",
+      "reason": "Existing environment contract consumed by deployed or operator-facing configuration.",
+      "owner": "Operations",
+      "removalCondition": "Remove only after external consumers migrate and deployment evidence confirms the old variable is unused."
+    },
+    {
+      "pattern": "\\bVG_[A-Z0-9_]+\\b",
+      "path": "docs/technical/SECRET_PROVIDER_AND_REDACTION.md",
+      "category": "external-production-compatibility",
+      "reason": "Existing environment contract consumed by deployed or operator-facing configuration.",
+      "owner": "Operations",
+      "removalCondition": "Remove only after external consumers migrate and deployment evidence confirms the old variable is unused."
+    },
+    {
+      "pattern": "\\bVG_[A-Z0-9_]+\\b",
+      "path": "execution-runtime/.env.live.example",
+      "category": "external-production-compatibility",
+      "reason": "Existing environment contract consumed by deployed or operator-facing configuration.",
+      "owner": "Operations",
+      "removalCondition": "Remove only after external consumers migrate and deployment evidence confirms the old variable is unused."
+    },
+    {
+      "pattern": "\\bVG_[A-Z0-9_]+\\b",
+      "path": "execution-runtime/app/config.py",
+      "category": "external-production-compatibility",
+      "reason": "Existing environment contract consumed by deployed or operator-facing configuration.",
+      "owner": "Operations",
+      "removalCondition": "Remove only after external consumers migrate and deployment evidence confirms the old variable is unused."
+    },
+    {
+      "pattern": "\\bVG_[A-Z0-9_]+\\b",
+      "path": "execution-runtime/app/secret_resolver.py",
+      "category": "external-production-compatibility",
+      "reason": "Existing environment contract consumed by deployed or operator-facing configuration.",
+      "owner": "Operations",
+      "removalCondition": "Remove only after external consumers migrate and deployment evidence confirms the old variable is unused."
+    },
+    {
+      "pattern": "\\bVG_[A-Z0-9_]+\\b",
+      "path": "platform-api/.env.example",
+      "category": "external-production-compatibility",
+      "reason": "Existing environment contract consumed by deployed or operator-facing configuration.",
+      "owner": "Operations",
+      "removalCondition": "Remove only after external consumers migrate and deployment evidence confirms the old variable is unused."
+    },
+    {
+      "pattern": "\\bVG_[A-Z0-9_]+\\b",
+      "path": "platform-api/app/disaster_recovery.py",
+      "category": "external-production-compatibility",
+      "reason": "Existing environment contract consumed by deployed or operator-facing configuration.",
+      "owner": "Operations",
+      "removalCondition": "Remove only after external consumers migrate and deployment evidence confirms the old variable is unused."
+    },
+    {
+      "pattern": "\\bVG_[A-Z0-9_]+\\b",
+      "path": "platform-api/scripts/seed_hedge_board_e2e.py",
+      "category": "external-production-compatibility",
+      "reason": "Existing environment contract consumed by deployed or operator-facing configuration.",
+      "owner": "Operations",
+      "removalCondition": "Remove only after external consumers migrate and deployment evidence confirms the old variable is unused."
+    },
+    {
+      "pattern": "\\bVG_[A-Z0-9_]+\\b",
+      "path": "platform-api/scripts/seed_platform_visual_e2e.py",
+      "category": "external-production-compatibility",
+      "reason": "Existing environment contract consumed by deployed or operator-facing configuration.",
+      "owner": "Operations",
+      "removalCondition": "Remove only after external consumers migrate and deployment evidence confirms the old variable is unused."
+    },
+    {
+      "pattern": "\\bVG_[A-Z0-9_]+\\b",
+      "path": "platform-api/scripts/seed_user_system_e2e.py",
+      "category": "external-production-compatibility",
+      "reason": "Existing environment contract consumed by deployed or operator-facing configuration.",
+      "owner": "Operations",
+      "removalCondition": "Remove only after external consumers migrate and deployment evidence confirms the old variable is unused."
+    },
+    {
+      "pattern": "\\bVG_[A-Z0-9_]+\\b",
+      "path": "platform-web/playwright.hedge-board.config.ts",
+      "category": "external-production-compatibility",
+      "reason": "Existing environment contract consumed by deployed or operator-facing configuration.",
+      "owner": "Operations",
+      "removalCondition": "Remove only after external consumers migrate and deployment evidence confirms the old variable is unused."
+    },
+    {
+      "pattern": "\\bVG_[A-Z0-9_]+\\b",
+      "path": "platform-web/playwright.platform-visual.config.ts",
+      "category": "external-production-compatibility",
+      "reason": "Existing environment contract consumed by deployed or operator-facing configuration.",
+      "owner": "Operations",
+      "removalCondition": "Remove only after external consumers migrate and deployment evidence confirms the old variable is unused."
+    },
+    {
+      "pattern": "\\bVG_[A-Z0-9_]+\\b",
+      "path": "platform-web/playwright.user-system.config.ts",
+      "category": "external-production-compatibility",
+      "reason": "Existing environment contract consumed by deployed or operator-facing configuration.",
+      "owner": "Operations",
+      "removalCondition": "Remove only after external consumers migrate and deployment evidence confirms the old variable is unused."
+    },
+    {
+      "pattern": "\\bVG_[A-Z0-9_]+\\b",
+      "path": "scripts/run-controlled-operation.ps1",
+      "category": "external-production-compatibility",
+      "reason": "Existing environment contract consumed by deployed or operator-facing configuration.",
+      "owner": "Operations",
+      "removalCondition": "Remove only after external consumers migrate and deployment evidence confirms the old variable is unused."
+    },
+    {
+      "pattern": "\\bVG_[A-Z0-9_]+\\b",
+      "path": "execution-runtime/tests/test_config.py",
+      "category": "compatibility-test",
+      "reason": "Test fixture verifies the existing external environment contract.",
+      "owner": "Quality Engineering",
+      "removalCondition": "Remove with the tested compatibility contract after production migration is accepted."
+    },
+    {
+      "pattern": "\\bVG_[A-Z0-9_]+\\b",
+      "path": "execution-runtime/tests/test_connectivity.py",
+      "category": "compatibility-test",
+      "reason": "Test fixture verifies the existing external environment contract.",
+      "owner": "Quality Engineering",
+      "removalCondition": "Remove with the tested compatibility contract after production migration is accepted."
+    },
+    {
+      "pattern": "\\bVG_[A-Z0-9_]+\\b",
+      "path": "execution-runtime/tests/test_cross_spread_market.py",
+      "category": "compatibility-test",
+      "reason": "Test fixture verifies the existing external environment contract.",
+      "owner": "Quality Engineering",
+      "removalCondition": "Remove with the tested compatibility contract after production migration is accepted."
+    },
+    {
+      "pattern": "\\bVG_[A-Z0-9_]+\\b",
+      "path": "execution-runtime/tests/test_cross_spread_mt5_swap.py",
+      "category": "compatibility-test",
+      "reason": "Test fixture verifies the existing external environment contract.",
+      "owner": "Quality Engineering",
+      "removalCondition": "Remove with the tested compatibility contract after production migration is accepted."
+    },
+    {
+      "pattern": "\\bVG_[A-Z0-9_]+\\b",
+      "path": "execution-runtime/tests/test_live_acceptance_reads.py",
+      "category": "compatibility-test",
+      "reason": "Test fixture verifies the existing external environment contract.",
+      "owner": "Quality Engineering",
+      "removalCondition": "Remove with the tested compatibility contract after production migration is accepted."
+    },
+    {
+      "pattern": "\\bVG_[A-Z0-9_]+\\b",
+      "path": "execution-runtime/tests/test_live_observability.py",
+      "category": "compatibility-test",
+      "reason": "Test fixture verifies the existing external environment contract.",
+      "owner": "Quality Engineering",
+      "removalCondition": "Remove with the tested compatibility contract after production migration is accepted."
+    },
+    {
+      "pattern": "\\bVG_[A-Z0-9_]+\\b",
+      "path": "execution-runtime/tests/test_mt5_live_adapter.py",
+      "category": "compatibility-test",
+      "reason": "Test fixture verifies the existing external environment contract.",
+      "owner": "Quality Engineering",
+      "removalCondition": "Remove with the tested compatibility contract after production migration is accepted."
+    },
+    {
+      "pattern": "\\bVG_[A-Z0-9_]+\\b",
+      "path": "execution-runtime/tests/test_secret_resolver.py",
+      "category": "compatibility-test",
+      "reason": "Test fixture verifies the existing external environment contract.",
+      "owner": "Quality Engineering",
+      "removalCondition": "Remove with the tested compatibility contract after production migration is accepted."
+    },
+    {
+      "pattern": "\\bVG_[A-Z0-9_]+\\b",
+      "path": "execution-runtime/tests/test_venue_readiness.py",
+      "category": "compatibility-test",
+      "reason": "Test fixture verifies the existing external environment contract.",
+      "owner": "Quality Engineering",
+      "removalCondition": "Remove with the tested compatibility contract after production migration is accepted."
+    },
+    {
+      "pattern": "\\bVG_[A-Z0-9_]+\\b",
+      "path": "platform-api/tests/test_disaster_recovery.py",
+      "category": "compatibility-test",
+      "reason": "Test fixture verifies the existing external environment contract.",
+      "owner": "Quality Engineering",
+      "removalCondition": "Remove with the tested compatibility contract after production migration is accepted."
+    },
+    {
+      "pattern": "\\bVG_[A-Z0-9_]+\\b",
+      "path": "platform-api/tests/test_exchange_connectivity.py",
+      "category": "compatibility-test",
+      "reason": "Test fixture verifies the existing external environment contract.",
+      "owner": "Quality Engineering",
+      "removalCondition": "Remove with the tested compatibility contract after production migration is accepted."
+    },
+    {
+      "pattern": "(?:risk-web|rta|rta-office|rta-)",
+      "path": "platform-api/tests/test_architecture_legacy_production_gate.py",
+      "category": "compatibility-test",
+      "reason": "Assertions freeze externally coupled domain, directory, service and environment identities.",
+      "owner": "Quality Engineering",
+      "removalCondition": "Remove only after the corresponding external production migration is accepted."
+    },
+    {
+      "pattern": "(?:admin-risk|platform-backend)",
+      "path": "scripts/audit-directory-migration.py",
+      "category": "compatibility-test",
+      "reason": "Migration audit detects the former repository directories and prevents their return.",
+      "owner": "Platform Engineering",
+      "removalCondition": "Remove after Phase 2 history cleanup and a replacement invariant no longer needs old-directory literals."
+    },
+    {
+      "pattern": "RTA",
+      "path": "scripts/audit-platform-baseline.py",
+      "category": "compatibility-test",
+      "reason": "Baseline audit inventories historical naming residue for governance evidence.",
+      "owner": "Platform Engineering",
+      "removalCondition": "Remove when the baseline audit no longer reports historical naming categories."
+    },
+    {
+      "pattern": "(?:RTA|rta_|admin-risk|risk-web|私募交易风控平台|私募风控平台)",
+      "path": "platform-api/tests/test_architecture_active_naming.py",
+      "category": "compatibility-test",
+      "reason": "Negative fixtures prove that active naming violations are rejected.",
+      "owner": "Quality Engineering",
+      "removalCondition": "Retain while the active naming gate exists."
+    }
+  ]
+}

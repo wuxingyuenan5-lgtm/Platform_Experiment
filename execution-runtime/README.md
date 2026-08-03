@@ -1,6 +1,6 @@
 # execution-runtime
 
-Variable-Global 的独立交易执行运行时。
+Platform Execution Runtime是Platform的独立交易执行运行时。
 
 ## 当前范围
 

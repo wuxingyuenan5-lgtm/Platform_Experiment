@@ -44,13 +44,13 @@ def test_runtime_get_wraps_http_transport_errors(monkeypatch) -> None:
     with pytest.raises(runtime_client.RuntimeQueryError) as exc_info:
         runtime_client.get("/venue/balances")
 
-    assert str(exc_info.value) == "Execution Runtime query failed"
+    assert str(exc_info.value) == "Platform Execution Runtime query failed"
     assert isinstance(exc_info.value.__cause__, httpx.ConnectError)
 
 
 def test_compatibility_runtime_get_preserves_platform_503_mapping(monkeypatch) -> None:
     def fail(path: str, params: dict[str, str] | None = None) -> httpx.Response:
-        raise runtime_client.RuntimeQueryError("Execution Runtime query failed")
+        raise runtime_client.RuntimeQueryError("Platform Execution Runtime query failed")
 
     monkeypatch.setattr(runtime_client, "get", fail)
 
@@ -58,5 +58,5 @@ def test_compatibility_runtime_get_preserves_platform_503_mapping(monkeypatch) -
         venue_reconciliation.runtime_get("/venue/orders/by-platform/order-1")
 
     assert exc_info.value.status_code == 503
-    assert exc_info.value.detail == "Execution Runtime query failed"
+    assert exc_info.value.detail == "Platform Execution Runtime query failed"
     assert isinstance(exc_info.value.__cause__, runtime_client.RuntimeQueryError)

@@ -25,8 +25,8 @@
 ## 当前主要减负点
 
 1. Codex 入口
-   - 默认读 `AGENTS.md` 和 `docs/codex/CURRENT_CONTEXT.md`。
-   - 长状态只在需要时读 `docs/codex/current-state.md`。
+   - 默认读 `AGENTS.md`、`docs/codex/current-state.md` 和最近模块的 `AGENTS.md`。
+   - 其他长文档只在任务语义需要时读取。
    - 不默认读取 changelog、archive、outputs、生成结构文件、依赖目录和虚拟环境。
    - 小 UI 微调默认不更新 md、不新增守卫、不跑全量前端检查；只有用户明确要求“更新 md / 同类型同步 / 以后按此标准”时才升级为标准类调整。
    - 浏览器验证以一次目标页只读检查为主，不为同一事实反复读取 DOM、截图和 computed style。

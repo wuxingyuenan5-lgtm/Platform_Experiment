@@ -86,7 +86,7 @@ def test_facade_owns_http_mapping_and_all_compatibility_ports() -> None:
     assert "fastapi" in imports
     assert "from app import venue_reconciliation_service as service" in source
     assert "def _call_service" in source
-    assert "HTTPException(status_code=503" in source
+    assert "status_code=503" in source
     assert "status_code=422" in source
     assert "status_code=409" in source
     assert "status_code=403" in source

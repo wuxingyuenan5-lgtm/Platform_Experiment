@@ -8,21 +8,16 @@
 |---|---|
 | 直接本地运行 | 仓库根目录执行 `.\scripts\dev-platform.ps1` |
 | 当前已经做到哪里 | `../docs/codex/current-state.md` |
-| 产品模块 | `../admin-risk/docs/modules/` |
+| 产品模块 | `../platform-web/docs/modules/` |
 | 系统如何连接 | `../docs/architecture/SYSTEM_MAP.md` |
 | Git 与版本规则 | `../docs/engineering/GIT_WORKFLOW.md` |
 | 数据库 | `../docs/database/README.md` |
 | 实盘验收 | `../docs/operations/V6-小资金实盘验收手册.md` |
 | 当前技术债 | `../docs/engineering/TECHNICAL_DEBT.md` |
 
-## 当前结论
+## 当前状态
 
-- `main` 是唯一正式代码基线。
-- 当前产品版本是 `0.9.0`。
-- 系统由 Frontend、Platform Backend 和 Execution Runtime 组成。
-- 默认是 Simulation + Fake Gateway，两个 Live Write 开关均关闭。
-- Market、FOK、TP/SL 执行选择和 PostOnly Chase 已工程实现；PostOnly 默认关闭。
-- 真正实盘前仍要完成 Issue #39 的 Windows 受控验收。
+当前版本、分支、阶段和已知限制只从`../docs/codex/current-state.md`读取；服务边界只从`../docs/architecture/SYSTEM_MAP.md`读取。本目录不维护平行状态。
 
 ## 本地启动
 
@@ -51,4 +46,4 @@ powershell -ExecutionPolicy Bypass -File .\scripts\dev-platform.ps1
 | 风险管理 | 账户、资金、权限、审计和监控 |
 | 金融 AI 分析 | 授权数据的归纳和结构化分析 |
 
-策略文档位于 `../admin-risk/docs/strategies/`。
+策略文档位于 `../platform-web/docs/strategies/`。

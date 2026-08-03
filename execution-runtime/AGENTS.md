@@ -1,4 +1,4 @@
-# Execution Runtime Agent Rules
+# Platform Execution Runtime Agent Rules
 
 Scope: `execution-runtime/`.
 

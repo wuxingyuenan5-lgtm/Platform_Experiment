@@ -108,7 +108,6 @@ LEGACY_TERMS = [
     "platform-web",
     "risk-control",
     "Platform_Experiment",
-    "Variable-Global",
 ]
 
 GENERIC_TEMPLATE_TERMS = ["template", "demo", "example"]

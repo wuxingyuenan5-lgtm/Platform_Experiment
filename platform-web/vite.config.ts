@@ -30,7 +30,7 @@ export default defineApplicationConfig({
         usePolling: true,
       },
       proxy: {
-        // Canonical Platform Backend API, including browser identity and Session routes.
+        // Canonical Platform API, including browser identity and Session routes.
         '/api/v1': {
           target: localPlatformBackend,
           changeOrigin: true,

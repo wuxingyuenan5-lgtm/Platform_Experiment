@@ -92,6 +92,15 @@ This document is the canonical human-readable catalog of major code ownership bo
 
 Operational projections are monitoring views. Formal accounting is reconstructed from immutable FinancialFacts and may not read operational projections as calculation inputs.
 
+## Frozen high-risk domain boundaries
+
+- Trading command orchestration remains in `trade_command_execution.py`; no second order-submission owner is permitted.
+- Execution Risk owns Kill Switch, residual-exposure policy and risk actions, but all order side effects still pass through TradeCommand.
+- Formal Accounting owns immutable FinancialFacts and rebuildable projections; Operational projections are never formal calculation inputs.
+- Platform Execution Runtime exclusively owns Venue SDKs, external side effects and Runtime Journal evidence.
+- Venue and EOD reconciliation keep separate policy, repository, client, service, facade and route owners; routing cleanup does not transfer business policy or SQL ownership.
+- Unknown external results remain unknown until reconciled and never authorize duplicate submission.
+
 ## Shared database infrastructure
 
 | Boundary | Authoritative owner | Responsibility | Must not own |
@@ -120,7 +129,7 @@ Operational projections are monitoring views. Formal accounting is reconstructed
 | Strict live acceptance write gate | `execution-runtime/app/strict_live_acceptance_adapters.py` | Runtime-independent ounce cap, Venue Step/Contract Size/access validation and one-position admission rule | Platform lifecycle persistence, credential values or Limit execution |
 | Live adapter routing | `execution-runtime/app/bybit_mt5_gateway.py` | Account-routed adapter selection and deterministic route-independent external-ID lookup | Venue-specific mapping rules or Platform persistence |
 
-The Platform Backend must not import Venue SDKs. Unknown external results remain unknown until reconciled and must never trigger an automatic duplicate submission.
+The Platform API must not import Venue SDKs. Unknown external results remain unknown until reconciled and must never trigger an automatic duplicate submission.
 
 ## Engineering and context governance
 
@@ -129,7 +138,7 @@ The Platform Backend must not import Venue SDKs. Unknown external results remain
 | Durable Agent rules | `AGENTS.md` | Safety and engineering rules that remain valid across tasks | Current task progress or PR history |
 | Agent context loading | `docs/codex/context-map.md` | Bounded context-loading order and module entrypoints | Duplicate ownership registry |
 | Current engineering truth | `docs/codex/current-state.md` | Compact current state, safety defaults and active work | Historical implementation diary |
-| Task handoff | `docs/codex/task-template.md`, `tasks/` | One bounded packet per non-trivial Issue | Repository-wide permanent rules |
+| Task handoff | `docs/codex/task-template.md` and issue-bound `tasks/*.md` packets | One bounded packet per Critical Issue; GitHub owns completed history | Repository-wide permanent rules or duplicate templates |
 | Architecture ownership | `docs/architecture/OWNERSHIP.md` | This canonical ownership catalog | Task progress or operational runbooks |
 | Architecture enforcement | `scripts/check-repository-structure.py`, `scripts/check-documentation-consistency.py` | Machine checks for code and documentation boundaries | Runtime application behavior |
 | Workstream enforcement | `scripts/check-workstream.py` | Full engineering and bounded lightweight-maintenance workflow enforcement | Product behavior |

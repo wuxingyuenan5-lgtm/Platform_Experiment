@@ -35,7 +35,7 @@ Behavior change: none
 Safety change: none
 ```
 
-Allowed files are machine-limited to Markdown and the four maintained product-version declarations. A version update must change all four declarations together.
+Allowed files are machine-limited to Markdown and the maintained Platform version declarations. A version update must change every governed package, display, runtime and current-document declaration together.
 
 ## 3. Standard
 
@@ -96,7 +96,8 @@ Critical PRs keep the existing uniqueness, open-Issue and task-packet checks.
 
 ## 6. CI behavior
 
-- Feature branches are not tested separately by `push`; PRs are the branch validation surface.
+- Feature branches normally use PRs as the branch validation surface.
+- During Platform 0.9.3 candidate work, `refactor/platform-0-9-3-repository-and-context-optimization` has a temporary no-Path-Filter `push` trigger across the nine candidate workflows because PR #141 targets a Base branch outside their maintained PR branch lists.
 - `main` always runs the full Backend, Runtime and Frontend matrix.
 - PRs run Repository Safety plus only affected application jobs.
 - Contract/shared CI changes force the full matrix.
@@ -114,22 +115,27 @@ A PR needs only:
 
 Do not reproduce the task packet, commit log or repository history in the PR body.
 
-## 8. Product version
+## 8. Platform version
 
-Root `VERSION` is authoritative. Maintained declarations are:
+Root `VERSION` is authoritative. Maintained declarations include:
 
+- `platform-web/package.json`;
+- `platform-web/.env.development`;
+- `platform-web/.env.production`;
 - `platform-api/pyproject.toml`;
+- `platform-api/app/application.py` for OpenAPI and `/api/v1/system/info`;
 - `execution-runtime/pyproject.toml`;
-- `platform-web/.env` frontend display version.
+- `execution-runtime/app/main.py` and `/status`;
+- `README.md`, `docs/README.md` and `docs/codex/current-state.md`.
 
-Update all declarations with:
+Update the governed declarations with:
 
 ```powershell
-python scripts/bump-version.py 0.9.0
+python scripts/bump-version.py 0.9.3
 python scripts/check-version-consistency.py
 ```
 
-Normal releases use Fast when they contain only the synchronized declarations and release Markdown. Product version does not automatically change API/contract versions or enable Live behavior.
+The product version does not change Runtime contract versions, database schema versions or Live Write gates. Historical Release Notes, Legacy production evidence and compatibility fixtures keep their original versions.
 
 ## 9. Cross-session continuation
 

@@ -4,25 +4,31 @@ on:
   push:
     branches:
       - main
-    paths:
-      - VERSION
-      - platform-api/pyproject.toml
-      - execution-runtime/pyproject.toml
-      - platform-web/.env
-      - scripts/check-version-consistency.py
-      - scripts/bump-version.py
-      - .github/workflows/version-consistency.yml
+      - refactor/platform-0-9-3-repository-and-context-optimization
   pull_request:
     branches:
       - main
       - feature/issue-134-platform-0-9-1-unified-delivery
     paths:
       - VERSION
+      - platform-web/package.json
+      - platform-web/internal/vite-config/src/config/application.ts
+      - platform-web/src/views/sys/about/index.vue
+      - platform-web/.env.development
+      - platform-web/.env.production
       - platform-api/pyproject.toml
+      - platform-api/app/application.py
       - execution-runtime/pyproject.toml
-      - platform-web/.env
+      - execution-runtime/app/main.py
+      - execution-runtime/app/models.py
+      - README.md
+      - docs/README.md
+      - docs/codex/current-state.md
       - scripts/check-version-consistency.py
       - scripts/bump-version.py
+      - platform-api/tests/test_architecture_version_consistency.py
+      - platform-api/tests/test_architecture_ci_and_version_tooling.py
+      - execution-runtime/tests/test_runtime_journal.py
       - .github/workflows/version-consistency.yml
 
 permissions:

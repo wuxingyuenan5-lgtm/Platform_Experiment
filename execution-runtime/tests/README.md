@@ -1,4 +1,4 @@
-# Execution Runtime Test Taxonomy
+# Platform Execution Runtime Test Taxonomy
 
 Runtime tests are classified during collection by `conftest.py` and every test receives exactly one primary execution layer.
 

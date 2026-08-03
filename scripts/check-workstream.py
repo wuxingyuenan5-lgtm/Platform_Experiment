@@ -34,9 +34,16 @@ SEMVER_PATTERN = re.compile(r"\d+\.\d+\.\d+")
 
 VERSION_PATHS = {
     "VERSION",
+    "platform-web/package.json",
+    "platform-web/.env.development",
+    "platform-web/.env.production",
     "platform-api/pyproject.toml",
+    "platform-api/app/application.py",
     "execution-runtime/pyproject.toml",
-    "platform-web/.env",
+    "execution-runtime/app/main.py",
+    "README.md",
+    "docs/README.md",
+    "docs/codex/current-state.md",
 }
 FAST_MAX_FILES = 20
 FORBIDDEN_FAST_MARKDOWN = {"AGENTS.md"}
@@ -208,7 +215,7 @@ def github_json(url: str, token: str) -> Any:
         headers={
             "Accept": "application/vnd.github+json",
             "Authorization": f"Bearer {token}",
-            "User-Agent": "variable-global-workstream-check",
+            "User-Agent": "platform-workstream-check",
             "X-GitHub-Api-Version": "2022-11-28",
         },
     )
@@ -293,9 +300,32 @@ def validate_version_patch(path: str, patch: str | None) -> None:
             re.fullmatch(r'version\s*=\s*"\d+\.\d+\.\d+"', line.strip())
             for line in lines
         )
-    elif path == "platform-web/.env":
+    elif path == "platform-web/package.json":
+        valid = bool(lines) and all(
+            re.fullmatch(r'"version":\s*"\d+\.\d+\.\d+",?', line.strip())
+            for line in lines
+        )
+    elif path in {"platform-web/.env.development", "platform-web/.env.production"}:
         valid = bool(lines) and all(
             re.fullmatch(r'VITE_GLOB_APP_VERSION\s*=\s*"\d+\.\d+\.\d+"', line.strip())
+            for line in lines
+        )
+    elif path in {"platform-api/app/application.py", "execution-runtime/app/main.py"}:
+        valid = bool(lines) and all(
+            re.fullmatch(r'PLATFORM_VERSION\s*=\s*"\d+\.\d+\.\d+"', line.strip())
+            for line in lines
+        )
+    elif path in {"README.md", "docs/README.md"}:
+        valid = bool(lines) and all(
+            re.fullmatch(r'当前目标版本：Platform `\d+\.\d+\.\d+`。', line.strip())
+            for line in lines
+        )
+    elif path == "docs/codex/current-state.md":
+        valid = bool(lines) and all(
+            re.fullmatch(
+                r'- Current target version: Platform `\d+\.\d+\.\d+`\.',
+                line.strip(),
+            )
             for line in lines
         )
     else:

@@ -10,8 +10,8 @@ Runtime 根地址：`http://127.0.0.1:8100`
 
 | 服务 | 默认地址 | 权威职责 |
 |---|---|---|
-| Platform Backend | `http://127.0.0.1:8000` | Auth、RBAC、Session、Command、Risk、Fact、Accounting、Reconciliation、EOD、Rotation Metadata |
-| Execution Runtime | `http://127.0.0.1:8100` | Journal、Live Safety、SecretProvider、Gateway、Venue Query、外部副作用 |
+| Platform API | `http://127.0.0.1:8000` | Auth、RBAC、Session、Command、Risk、Fact、Accounting、Reconciliation、EOD、Rotation Metadata |
+| Platform Execution Runtime | `http://127.0.0.1:8100` | Journal、Live Safety、SecretProvider、Gateway、Venue Query、外部副作用 |
 | Frontend | `http://127.0.0.1:4373` | 产品交互，不持有 Venue 凭证内容 |
 
 公开健康探针：
