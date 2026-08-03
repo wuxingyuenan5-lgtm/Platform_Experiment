@@ -1,6 +1,7 @@
 <template>
-  <PageWrapper title="消息通知">
+  <PageWrapper>
     <div class="notification-page">
+      <h1 class="page-heading">消息通知</h1>
       <ProductDataStatusAlert :meta="dataMeta" class="mb-4" />
 
       <div class="toolbar">
@@ -65,16 +66,16 @@
 </template>
 
 <script setup lang="ts">
-  import { computed, onMounted, ref } from 'vue';
-  import { Button, Card, Col, Row, Space, Statistic, Table, Tag } from 'ant-design-vue';
   import { ReloadOutlined } from '@ant-design/icons-vue';
-  import { PageWrapper } from '@/components/Page';
-  import ProductDataStatusAlert from '@/components/ProductDataState/ProductDataStatusAlert.vue';
+  import { Button, Card, Col, Row, Space, Statistic, Table, Tag } from 'ant-design-vue';
+  import { computed, onMounted, ref } from 'vue';
   import { getNotificationList, type NotificationMessage } from '@/api/riskControl';
   import {
-    unavailableMeta,
     type ProductDataMeta,
+    unavailableMeta,
   } from '@/api/platform/productDataState';
+  import { PageWrapper } from '@/components/Page';
+  import ProductDataStatusAlert from '@/components/ProductDataState/ProductDataStatusAlert.vue';
 
   const loading = ref(false);
   const messages = ref<NotificationMessage[]>([]);
@@ -138,6 +139,13 @@
 <style scoped>
   .notification-page {
     padding: 16px;
+  }
+
+  .page-heading {
+    margin: 0 0 16px;
+    color: #172126;
+    font-size: 24px;
+    line-height: 1.3;
   }
 
   .toolbar {
