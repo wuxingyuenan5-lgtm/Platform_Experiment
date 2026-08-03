@@ -3,9 +3,15 @@ from app.fake_gateway import FakeGateway
 from app.gateway import ExecutionGateway
 
 
-def create_gateway(gateway_name: str) -> ExecutionGateway:
+def create_gateway(
+    gateway_name: str,
+    *,
+    live_write_enabled: bool = False,
+) -> ExecutionGateway:
     normalized_name = gateway_name.strip().lower()
     if normalized_name in {"fake", "simulation"}:
+        if live_write_enabled:
+            raise ValueError("Fake execution gateway cannot be used with Live Write enabled")
         return FakeGateway()
     if normalized_name in {
         "bybit_mt5",
