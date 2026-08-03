@@ -22,8 +22,8 @@ def _assert_safe_environment() -> None:
         raise RuntimeError("Set USER_SYSTEM_DEMO_SEED=1 to confirm demo account creation")
     if settings.environment.casefold() not in {"development", "local", "test", "testing"}:
         raise RuntimeError("Demo accounts may only be seeded in development or test environments")
-    if settings.live_write_enabled:
-        raise RuntimeError("Refusing to seed demo accounts while Platform Live Write is enabled")
+    if settings.live_trading_enabled:
+        raise RuntimeError("Refusing to seed demo accounts while Platform Live Trading is enabled")
 
 
 def main() -> int:
