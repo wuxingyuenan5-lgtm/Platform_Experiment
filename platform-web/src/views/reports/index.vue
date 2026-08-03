@@ -50,12 +50,16 @@
               :pagination="{ pageSize: 8 }"
             >
               <template #emptyText>
-                <span>{{ riskStatus === 'unavailable' ? '风控来源不可用' : '暂无风控记录' }}</span>
+                <span>
+                  {{ riskStatus === 'unavailable' ? '风控来源不可用' : '暂无风控记录' }}
+                </span>
               </template>
               <template #bodyCell="{ column, record, index }">
                 <template v-if="column.key === 'id'">{{ record.id || index + 1 }}</template>
                 <template v-else-if="column.key === 'severity'">
-                  <Tag :color="severityColor(record.severity)">{{ record.severity || 'unknown' }}</Tag>
+                  <Tag :color="severityColor(record.severity)">
+                    {{ record.severity || 'unknown' }}
+                  </Tag>
                 </template>
                 <template v-else-if="column.key === 'status'">
                   <Tag :color="record.status === 'pending' ? 'orange' : 'green'">
@@ -77,11 +81,17 @@
               :pagination="{ pageSize: 8 }"
             >
               <template #emptyText>
-                <span>{{ notificationStatus === 'unavailable' ? '通知来源不可用' : '暂无通知消息' }}</span>
+                <span>
+                  {{
+                    notificationStatus === 'unavailable' ? '通知来源不可用' : '暂无通知消息'
+                  }}
+                </span>
               </template>
               <template #bodyCell="{ column, record }">
                 <template v-if="column.key === 'title'">
-                  <div class="strong-cell">{{ record.title || record.subject || '未命名消息' }}</div>
+                  <div class="strong-cell">
+                    {{ record.title || record.subject || '未命名消息' }}
+                  </div>
                   <div class="muted-cell">
                     {{ record.content || record.message || record.description || '无正文' }}
                   </div>
@@ -101,18 +111,18 @@
 </template>
 
 <script setup lang="ts">
-  import { computed, onMounted, ref } from 'vue';
-  import { Button, Card, Col, Row, Space, Statistic, Table, Tag } from 'ant-design-vue';
   import { ReloadOutlined } from '@ant-design/icons-vue';
-  import { PageWrapper } from '@/components/Page';
-  import ProductDataStatusAlert from '@/components/ProductDataState/ProductDataStatusAlert.vue';
+  import { Button, Card, Col, Row, Space, Statistic, Table, Tag } from 'ant-design-vue';
+  import { computed, onMounted, ref } from 'vue';
+  import type { ProductDataMeta } from '@/api/platform/productDataState';
   import {
     getNotificationList,
     getRiskRecordList,
     type NotificationMessage,
     type RiskRecord,
   } from '@/api/riskControl';
-  import type { ProductDataMeta } from '@/api/platform/productDataState';
+  import { PageWrapper } from '@/components/Page';
+  import ProductDataStatusAlert from '@/components/ProductDataState/ProductDataStatusAlert.vue';
 
   type SourceStatus = 'ready' | 'no_data' | 'unavailable';
 
@@ -129,14 +139,19 @@
     message: '尚未加载报表数据',
   });
 
-  const pendingCount = computed(() => riskRecords.value.filter((item) => item.status === 'pending').length);
-  const highCount = computed(() =>
-    riskRecords.value.filter((item) => ['high', 'critical'].includes(item.severity || '')).length,
+  const pendingCount = computed(
+    () => riskRecords.value.filter((item) => item.status === 'pending').length,
   );
-  const unreadCount = computed(() =>
-    notifications.value.filter(
-      (item) => item.status === 'unread' || item.read === false || item.isRead === false,
-    ).length,
+  const highCount = computed(
+    () =>
+      riskRecords.value.filter((item) => ['high', 'critical'].includes(item.severity || ''))
+        .length,
+  );
+  const unreadCount = computed(
+    () =>
+      notifications.value.filter(
+        (item) => item.status === 'unread' || item.read === false || item.isRead === false,
+      ).length,
   );
   const latestUpdate = computed(() =>
     [
@@ -170,7 +185,9 @@
   }
 
   function notificationStatusColor(record: NotificationMessage) {
-    if (record.status === 'unread' || record.read === false || record.isRead === false) return 'orange';
+    if (record.status === 'unread' || record.read === false || record.isRead === false) {
+      return 'orange';
+    }
     if (record.status === 'failed') return 'red';
     return 'green';
   }
