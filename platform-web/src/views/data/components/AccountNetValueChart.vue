@@ -28,60 +28,51 @@
       </Space>
     </template>
 
-    <Alert v-if="errorText" class="mb-3" type="warning" show-icon :message="errorText" />
+    <Alert v-if="errorText" class="mb-3" type="error" show-icon :message="errorText" />
 
     <Spin :spinning="loading">
       <div class="chart-shell" :style="{ height }">
         <div ref="chartRef" class="chart-view"></div>
         <div v-if="!loading && !hasData" class="empty-layer">
-          <Empty :image="Empty.PRESENTED_IMAGE_SIMPLE" description="暂无净值数据" />
+          <Empty
+            :image="Empty.PRESENTED_IMAGE_SIMPLE"
+            :description="errorText ? '净值数据源不可用' : '暂无净值数据'"
+          />
         </div>
       </div>
     </Spin>
 
     <div class="chart-foot">
       <span>{{ currentAccount?.name || '未选择账户' }}</span>
-      <span v-if="latestPoint">最近净值 {{ formatNumber(latestPoint.unit_net_worth, 4) }}</span>
+      <span v-if="latestPoint">最近净值 {{ formatDecimal(latestPoint.unit_net_worth) }}</span>
       <span v-if="latestPoint">更新时间 {{ latestPoint.created_at }}</span>
+      <span>来源：data-service</span>
+      <span>精度：Decimal字符串</span>
     </div>
   </Card>
 </template>
 
 <script setup lang="ts">
-  import type { Ref, PropType } from 'vue';
+  import Decimal from 'decimal.js';
+  import type { PropType, Ref } from 'vue';
   import { computed, onMounted, ref, watch } from 'vue';
   import { Alert, Button, Card, Empty, Radio, Select, Space, Spin } from 'ant-design-vue';
   import { LineChartOutlined, ReloadOutlined } from '@ant-design/icons-vue';
   import { useECharts } from '@/hooks/web/useECharts';
-  import { formateNumStr } from '@/utils/formate';
+  import { formatDecimalString } from '@/utils/decimalDisplay';
   import {
-    DataAccount,
+    type DataAccount,
     getAccounts,
     getNetValueHistory,
-    NetValuePoint,
+    type NetValuePoint,
   } from '@/api/riskControl';
 
   const props = defineProps({
-    title: {
-      type: String,
-      default: '账户净值曲线',
-    },
-    height: {
-      type: String,
-      default: '360px',
-    },
-    accounts: {
-      type: Array as PropType<DataAccount[]>,
-      default: () => [],
-    },
-    accountId: {
-      type: Number as PropType<number | undefined>,
-      default: undefined,
-    },
-    showControls: {
-      type: Boolean,
-      default: true,
-    },
+    title: { type: String, default: '账户净值曲线' },
+    height: { type: String, default: '360px' },
+    accounts: { type: Array as PropType<DataAccount[]>, default: () => [] },
+    accountId: { type: Number as PropType<number | undefined>, default: undefined },
+    showControls: { type: Boolean, default: true },
   });
 
   const loading = ref(false);
@@ -96,12 +87,14 @@
   const RadioButton = Radio.Button;
 
   const rangeOptions = {
-    '1d': { label: '过去一天', hours: 24, sampleMinutes: 5, limit: 1000 },
-    '1w': { label: '过去一周', hours: 24 * 7, sampleMinutes: 30, limit: 10000 },
-    '1m': { label: '过去一月', hours: 24 * 30, sampleMinutes: 120, limit: 20000 },
+    '1d': { hours: 24, sampleMinutes: 5, limit: 1000 },
+    '1w': { hours: 24 * 7, sampleMinutes: 30, limit: 10000 },
+    '1m': { hours: 24 * 30, sampleMinutes: 120, limit: 20000 },
   };
 
-  const accountSource = computed(() => (props.accounts.length ? props.accounts : localAccounts.value));
+  const accountSource = computed(() =>
+    props.accounts.length ? props.accounts : localAccounts.value,
+  );
   const accountOptions = computed(() =>
     accountSource.value.map((item) => ({
       label: `${item.name} · ${item.account_type}`,
@@ -111,18 +104,25 @@
   const currentAccount = computed(() =>
     accountSource.value.find((item) => item.id === selectedAccountId.value),
   );
-  const latestPoint = computed(() => points.value[points.value.length - 1]);
+  const latestPoint = computed(() => points.value.at(-1));
   const hasData = computed(() => points.value.length > 0);
   const currentRange = computed(() => rangeOptions[rangeKey.value]);
 
-  function formatNumber(value: any, decimals = 2) {
-    return formateNumStr(value || 0, { decimals, keepZero: true });
+  function formatDecimal(value: string) {
+    return formatDecimalString(value);
+  }
+
+  function chartNumber(value: string) {
+    return new Decimal(value).toNumber();
+  }
+
+  function percentText(value: string) {
+    return `${new Decimal(value).mul(100).toFixed(2)}%`;
   }
 
   function pickDefaultAccount(accounts: DataAccount[]) {
     if (!accounts.length || selectedAccountId.value) return;
-    const bybit = accounts.find((item) => item.account_type === 'bybit');
-    selectedAccountId.value = (bybit || accounts[0])?.id;
+    selectedAccountId.value = (accounts.find((item) => item.account_type === 'bybit') || accounts[0])?.id;
   }
 
   async function ensureAccounts() {
@@ -135,9 +135,7 @@
   }
 
   function drawChart() {
-    const xAxis = points.value.map((item) => item.created_at);
     setOptions({
-      color: ['#1677ff', '#22a06b', '#d4380d'],
       tooltip: {
         trigger: 'axis',
         formatter: (params: any[]) => {
@@ -146,34 +144,21 @@
           return `
             <div>
               <div>${row.created_at}</div>
-              <div>单位净值：${formatNumber(row.unit_net_worth, 4)}</div>
-              <div>总资产：${formatNumber(row.total_asset, 2)} USD</div>
-              <div>可用资金：${formatNumber(row.available_fund, 2)} USD</div>
-              <div>当前回撤：${formatNumber(row.current_drawdown * 100, 2)}%</div>
+              <div>单位净值：${formatDecimal(row.unit_net_worth)}</div>
+              <div>总资产：${formatDecimal(row.total_asset)} USD</div>
+              <div>可用资金：${formatDecimal(row.available_fund)} USD</div>
+              <div>当前回撤：${percentText(row.current_drawdown)}</div>
             </div>
           `;
         },
       },
-      legend: {
-        top: 0,
-        itemWidth: 12,
-        itemHeight: 2,
-      },
-      grid: {
-        left: 16,
-        right: 20,
-        top: 46,
-        bottom: 42,
-        containLabel: true,
-      },
+      legend: { top: 0, itemWidth: 12, itemHeight: 2 },
+      grid: { left: 16, right: 20, top: 46, bottom: 42, containLabel: true },
       xAxis: {
         type: 'category',
-        data: xAxis,
+        data: points.value.map((item) => item.created_at),
         axisTick: { show: false },
-        axisLabel: {
-          color: '#59636e',
-          hideOverlap: true,
-        },
+        axisLabel: { color: '#59636e', hideOverlap: true },
       },
       yAxis: [
         {
@@ -186,9 +171,7 @@
           type: 'value',
           name: '回撤',
           scale: true,
-          axisLabel: {
-            formatter: (value: number) => `${value}%`,
-          },
+          axisLabel: { formatter: (value: number) => `${value}%` },
           splitLine: { show: false },
         },
       ],
@@ -200,10 +183,7 @@
           symbol: points.value.length > 1 ? 'none' : 'circle',
           lineStyle: { width: 2 },
           areaStyle: { opacity: 0.08 },
-          data: points.value.map((item) => ({
-            value: Number(item.unit_net_worth || 0).toFixed(6),
-            raw: item,
-          })),
+          data: points.value.map((item) => ({ value: chartNumber(item.unit_net_worth), raw: item })),
         },
         {
           name: '总资产',
@@ -211,10 +191,7 @@
           smooth: true,
           symbol: 'none',
           lineStyle: { width: 2 },
-          data: points.value.map((item) => ({
-            value: Number(item.total_asset || 0).toFixed(2),
-            raw: item,
-          })),
+          data: points.value.map((item) => ({ value: chartNumber(item.total_asset), raw: item })),
         },
         {
           name: '当前回撤',
@@ -224,7 +201,7 @@
           yAxisIndex: 1,
           lineStyle: { width: 2 },
           data: points.value.map((item) => ({
-            value: Number((item.current_drawdown || 0) * 100).toFixed(2),
+            value: new Decimal(item.current_drawdown).mul(100).toNumber(),
             raw: item,
           })),
         },
@@ -237,6 +214,11 @@
     errorText.value = '';
     try {
       await ensureAccounts();
+      if (!selectedAccountId.value) {
+        points.value = [];
+        drawChart();
+        return;
+      }
       const range = currentRange.value;
       const from = new Date(Date.now() - range.hours * 60 * 60 * 1000).toISOString();
       points.value = await getNetValueHistory({
@@ -247,8 +229,8 @@
       });
       drawChart();
       resize();
-    } catch (error: any) {
-      errorText.value = error?.message || '净值数据加载失败';
+    } catch (error) {
+      errorText.value = error instanceof Error ? error.message : '净值数据加载失败';
       points.value = [];
       drawChart();
     } finally {
@@ -258,29 +240,17 @@
 
   watch(
     () => props.accounts,
-    (accounts) => {
-      if (accounts?.length) {
-        pickDefaultAccount(accounts);
-      }
-    },
+    (accounts) => accounts?.length && pickDefaultAccount(accounts),
     { immediate: true },
   );
-
   watch(
     () => props.accountId,
     (accountId) => {
       if (accountId) selectedAccountId.value = accountId;
     },
   );
-
-  watch(selectedAccountId, () => {
-    reload();
-  });
-
-  watch(rangeKey, () => {
-    reload();
-  });
-
+  watch(selectedAccountId, reload);
+  watch(rangeKey, reload);
   onMounted(reload);
 
   defineExpose({ reload });
