@@ -70,10 +70,7 @@
   import { Button, Card, Col, Row, Space, Statistic, Table, Tag } from 'ant-design-vue';
   import { computed, onMounted, ref } from 'vue';
   import { getNotificationList, type NotificationMessage } from '@/api/riskControl';
-  import {
-    type ProductDataMeta,
-    unavailableMeta,
-  } from '@/api/platform/productDataState';
+  import { type ProductDataMeta, unavailableMeta } from '@/api/platform/productDataState';
   import { PageWrapper } from '@/components/Page';
   import ProductDataStatusAlert from '@/components/ProductDataState/ProductDataStatusAlert.vue';
 
