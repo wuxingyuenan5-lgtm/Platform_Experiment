@@ -78,11 +78,7 @@
   import { Button, Card, message, Space, Table, Tag } from 'ant-design-vue';
   import { computed, onMounted, ref } from 'vue';
   import { useRoute } from 'vue-router';
-  import {
-    type DecimalString,
-    type ProductDataMeta,
-    unavailableMeta,
-  } from '@/api/platform/productDataState';
+  import { type DecimalString, type ProductDataMeta, unavailableMeta } from '@/api/platform/productDataState';
   import {
     type DataAccount,
     type DataServiceHealth,
