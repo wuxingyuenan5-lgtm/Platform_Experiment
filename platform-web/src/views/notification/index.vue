@@ -88,13 +88,13 @@
   });
 
   const unreadCount = computed(() => messages.value.filter(isUnread).length);
-  const latestTime = computed(() =>
-    messages.value
+  const latestTime = computed(() => {
+    const times = messages.value
       .map((item) => item.created_at || item.createdAt)
       .filter((value): value is string => Boolean(value))
-      .sort()
-      .at(-1),
-  );
+      .sort();
+    return times.at(-1);
+  });
 
   const columns = [
     { title: '消息', key: 'title' },
