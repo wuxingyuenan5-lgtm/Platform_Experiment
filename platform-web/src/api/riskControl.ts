@@ -119,7 +119,11 @@ export interface ExchangeInfo {
   updated_at?: string;
 }
 
-function recordList(payload: unknown, source: string, aliases: string[] = []): Record<string, unknown>[] {
+function recordList(
+  payload: unknown,
+  source: string,
+  aliases: string[] = [],
+): Record<string, unknown>[] {
   const unwrapped = unwrapProductPayload(payload, source);
   if (Array.isArray(unwrapped)) {
     return unwrapped.map((item, index) => {
@@ -176,7 +180,11 @@ function normalizeAccount(value: Record<string, unknown>): DataAccount {
     name: stringValue(value.name, 'name', DATA_SERVICE),
     account_type: stringValue(value.account_type, 'account_type', DATA_SERVICE),
     account_address: optionalString(value.account_address) || '',
-    initial_capital: canonicalDecimalString(value.initial_capital ?? '0', 'initial_capital', DATA_SERVICE),
+    initial_capital: canonicalDecimalString(
+      value.initial_capital ?? '0',
+      'initial_capital',
+      DATA_SERVICE,
+    ),
     parent_id: typeof value.parent_id === 'number' ? value.parent_id : undefined,
     arbitrary_flag: booleanValue(value.arbitrary_flag),
     owner_id: typeof value.owner_id === 'number' ? value.owner_id : undefined,
@@ -201,7 +209,11 @@ function normalizeNetValue(value: Record<string, unknown>): NetValuePoint {
     total_asset: canonicalDecimalString(value.total_asset, 'total_asset', DATA_SERVICE),
     available_fund: canonicalDecimalString(value.available_fund, 'available_fund', DATA_SERVICE),
     unit_net_worth: canonicalDecimalString(value.unit_net_worth, 'unit_net_worth', DATA_SERVICE),
-    current_drawdown: canonicalDecimalString(value.current_drawdown, 'current_drawdown', DATA_SERVICE),
+    current_drawdown: canonicalDecimalString(
+      value.current_drawdown,
+      'current_drawdown',
+      DATA_SERVICE,
+    ),
   };
 }
 
@@ -239,15 +251,15 @@ export function getAccounts() {
 }
 
 export function createAccount(data: Partial<DataAccount>) {
-  return dataHttp.post({ url: '/api/v1/accounts', data }).then((payload) =>
-    normalizeAccount(requireProductRecord(payload, DATA_SERVICE)),
-  );
+  return dataHttp
+    .post({ url: '/api/v1/accounts', data })
+    .then((payload) => normalizeAccount(requireProductRecord(payload, DATA_SERVICE)));
 }
 
 export function deleteAccount(id: number) {
-  return dataHttp.delete({ url: `/api/v1/accounts/${id}` }).then((payload) =>
-    requireProductRecord(payload, DATA_SERVICE),
-  );
+  return dataHttp
+    .delete({ url: `/api/v1/accounts/${id}` })
+    .then((payload) => requireProductRecord(payload, DATA_SERVICE));
 }
 
 export function triggerAccountSync() {
@@ -332,7 +344,9 @@ export function getNotificationList(params?: Record<string, unknown>) {
   return defHttp.get({ url: '/notifications/api/v1/messages/', params }).then((payload) =>
     recordList(payload, NOTIFICATION_SERVICE, ['items', 'list']).map((value) => ({
       id:
-        typeof value.id === 'number' || typeof value.id === 'string' ? value.id : undefined,
+        typeof value.id === 'number' || typeof value.id === 'string'
+          ? value.id
+          : undefined,
       message_id:
         typeof value.message_id === 'number' || typeof value.message_id === 'string'
           ? value.message_id
