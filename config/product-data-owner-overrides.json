@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "authority": "Phase 5 reviewed corrections and closure decisions",
+  "overrides": {
+    "strategy-platform": {
+      "repository_or_provider": [
+        "platform-api/app/trading.py",
+        "execution-runtime"
+      ]
+    }
+  }
+}
