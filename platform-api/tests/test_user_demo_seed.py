@@ -22,7 +22,7 @@ def _prepare_database(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     settings = get_settings()
     monkeypatch.setattr(settings, "database_path", str(tmp_path / "demo-users.db"))
     monkeypatch.setattr(settings, "environment", "testing")
-    monkeypatch.setattr(settings, "live_write_enabled", False)
+    monkeypatch.setattr(settings, "live_trading_enabled", False)
     initialize_database()
     apply_platform_migrations()
     apply_user_product_migrations()
