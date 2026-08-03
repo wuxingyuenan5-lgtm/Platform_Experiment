@@ -5,7 +5,7 @@ import re
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime, timedelta
 from decimal import ROUND_HALF_UP, Decimal
-from typing import Any, TypeVar, cast
+from typing import Any, cast
 
 from app.a_share_research_policy import aggregate_shenwan_level2
 from app.research_cache import LastKnownGoodResearchCache
@@ -53,8 +53,6 @@ _MEMBERSHIP_LOCK = asyncio.Lock()
 _STOCK_LOCKS: dict[str, asyncio.Lock] = {}
 _MACRO_LOCK = asyncio.Lock()
 
-T = TypeVar("T")
-
 
 class ResearchServiceError(RuntimeError):
     def __init__(self, code: str, detail: str, *, status_code: int = 503) -> None:
@@ -68,7 +66,7 @@ def _now() -> datetime:
     return datetime.now(UTC)
 
 
-async def _provider_call(awaitable: Awaitable[T]) -> T:
+async def _provider_call[T](awaitable: Awaitable[T]) -> T:
     try:
         return await asyncio.wait_for(
             awaitable,
@@ -81,7 +79,7 @@ async def _provider_call(awaitable: Awaitable[T]) -> T:
         ) from exc
 
 
-def _require_model(value: Any, expected: type[T], source: str) -> T:
+def _require_model[T](value: Any, expected: type[T], source: str) -> T:
     if not isinstance(value, expected):
         raise ResearchServiceError(
             "provider_invalid_payload",
@@ -90,7 +88,7 @@ def _require_model(value: Any, expected: type[T], source: str) -> T:
     return value
 
 
-def _require_model_list(value: Any, expected: type[T], source: str) -> list[T]:
+def _require_model_list[T](value: Any, expected: type[T], source: str) -> list[T]:
     if not isinstance(value, list) or any(not isinstance(item, expected) for item in value):
         raise ResearchServiceError(
             "provider_invalid_payload",
@@ -108,7 +106,7 @@ def _require_mapping(value: Any, source: str) -> dict[str, Any]:
     return cast(dict[str, Any], value)
 
 
-def _validated_result(
+def _validated_result[T](
     value: Any,
     validator: Callable[[Any], T],
 ) -> T | BaseException:
