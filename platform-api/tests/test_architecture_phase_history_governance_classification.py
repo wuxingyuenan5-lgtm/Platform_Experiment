@@ -93,6 +93,54 @@ def test_phase5_owner_registry_foundations_are_formal_implementation() -> None:
         assert category == "formal-implementation"
 
 
+def test_phase5_product_format_commits_are_bounded_corrections() -> None:
+    for path, subject in (
+        (
+            "platform-web/src/api/riskControl.ts",
+            "style(platform-web): format product data contracts",
+        ),
+        (
+            "platform-web/src/views/audit/index.vue",
+            "style(platform-web): format audit product closure",
+        ),
+        (
+            "platform-web/src/views/data/components/AccountNetValueChart.vue",
+            "style(platform-web): format account net value chart",
+        ),
+        (
+            "platform-web/src/views/data/index.vue",
+            "style(platform-web): format data closure view",
+        ),
+        (
+            "platform-web/src/views/finance/index.vue",
+            "style(platform-web): format finance closure view",
+        ),
+        (
+            "platform-web/src/views/monitor/index.vue",
+            "style(platform-web): format monitor closure view",
+        ),
+        (
+            "platform-web/src/views/reports/index.vue",
+            "style(platform-web): format reports closure view",
+        ),
+        (
+            "platform-web/src/views/risk/detail/index.vue",
+            "style(platform-web): format risk detail closure view",
+        ),
+        (
+            "platform-web/src/views/settings/index.vue",
+            "style(platform-web): format settings closure view",
+        ),
+    ):
+        category = MODEL.classify(
+            subject,
+            [{"status": "M", "path": path}],
+            5,
+            5,
+        )
+        assert category == "bounded-correction"
+
+
 def test_arbitrary_feature_commit_remains_unexpected() -> None:
     assert (
         MODEL.classify(
@@ -110,7 +158,7 @@ def test_arbitrary_feature_commit_remains_unexpected() -> None:
     )
 
 
-def test_unrelated_perf_and_frontend_script_changes_remain_unexpected() -> None:
+def test_unrelated_perf_frontend_script_and_style_changes_remain_unexpected() -> None:
     assert (
         MODEL.classify(
             "perf(platform-web): tune product rendering",
@@ -124,6 +172,15 @@ def test_unrelated_perf_and_frontend_script_changes_remain_unexpected() -> None:
         MODEL.classify(
             "test(platform-web): update helper",
             [{"status": "M", "path": "platform-web/scripts/helper.cjs"}],
+            2,
+            2,
+        )
+        == "unexpected"
+    )
+    assert (
+        MODEL.classify(
+            "style(platform-web): format unrelated product page",
+            [{"status": "M", "path": "platform-web/src/views/product/Unrelated.vue"}],
             2,
             2,
         )
