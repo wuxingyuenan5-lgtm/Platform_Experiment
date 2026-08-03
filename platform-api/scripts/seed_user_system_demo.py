@@ -5,8 +5,8 @@ import os
 from app.config import get_settings
 from app.database import initialize_database
 from app.schema_migrations import apply_platform_migrations
-from app.user_demo_seed import seed_demo_users
 from app.user_product_migrations import apply_user_product_migrations
+from user_demo_seed import seed_demo_users
 
 
 def _required_environment(name: str) -> str:
@@ -22,7 +22,7 @@ def _assert_safe_environment() -> None:
         raise RuntimeError("Set USER_SYSTEM_DEMO_SEED=1 to confirm demo account creation")
     if settings.environment.casefold() not in {"development", "local", "test", "testing"}:
         raise RuntimeError("Demo accounts may only be seeded in development or test environments")
-    if settings.live_trading_enabled:
+    if settings.live_write_enabled:
         raise RuntimeError("Refusing to seed demo accounts while Platform Live Write is enabled")
 
 

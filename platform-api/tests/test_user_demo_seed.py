@@ -9,9 +9,9 @@ from app.config import get_settings
 from app.database import connection, initialize_database
 from app.member_holding_service import get_self_holdings
 from app.schema_migrations import apply_platform_migrations
-from app.user_demo_seed import seed_demo_users
 from app.user_product_migrations import apply_user_product_migrations
 from app.user_service import UserServiceError, login_user
+from scripts.user_demo_seed import seed_demo_users
 
 _INITIAL_PASSWORD = "Demo-Accounts!2026"
 _REFRESHED_PASSWORD = "Demo-Accounts!2027"
@@ -22,7 +22,7 @@ def _prepare_database(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     settings = get_settings()
     monkeypatch.setattr(settings, "database_path", str(tmp_path / "demo-users.db"))
     monkeypatch.setattr(settings, "environment", "testing")
-    monkeypatch.setattr(settings, "live_trading_enabled", False)
+    monkeypatch.setattr(settings, "live_write_enabled", False)
     initialize_database()
     apply_platform_migrations()
     apply_user_product_migrations()
