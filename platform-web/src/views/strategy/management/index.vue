@@ -2,7 +2,7 @@
   <div class="strategy-management-page">
     <ProductNotConfiguredPanel
       title="策略管理目录尚未配置"
-      description="当前没有正式的策略目录Service、Repository或权限写入合同。为避免把Mock持仓、演示账户和静态PnL误认为真实策略事实，本页不展示模拟策略数据。Cross Venue正式Workspace与Runtime事实继续由交易平台页面承载。"
+      description="当前没有正式的策略目录Service、Repository或权限写入合同。为避免把测试持仓、隔离身份和静态PnL误认为真实策略事实，本页不展示模拟策略数据。Cross Venue正式Workspace与Runtime事实继续由交易平台页面承载。"
       source="not-configured: strategy-catalog-owner"
     />
   </div>
