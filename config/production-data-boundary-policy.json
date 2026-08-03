@@ -1,0 +1,61 @@
+{
+  "schema_version": 1,
+  "scan_roots": [
+    "platform-web/src/api",
+    "platform-web/src/views",
+    "platform-api/app",
+    "execution-runtime/app"
+  ],
+  "extensions": [".py", ".ts", ".tsx", ".vue", ".js", ".cjs"],
+  "excluded_paths": [
+    "execution-runtime/app/fake_gateway.py"
+  ],
+  "forbidden_patterns": [
+    {
+      "code": "production_e2e_reference",
+      "pattern": "(?:e2e|test-results|playwright-report|seed_platform_visual_e2e)",
+      "message": "production path references E2E or visual evidence data"
+    },
+    {
+      "code": "production_fixture_reference",
+      "pattern": "(?:/|\\\\)(?:fixtures?|seeds?|mocks?)(?:/|\\\\)",
+      "message": "production path imports a fixture, seed or mock directory"
+    },
+    {
+      "code": "production_random_value",
+      "pattern": "(?:Math\\.random\\s*\\(|random\\.random\\s*\\(|randint\\s*\\(|faker\\.)",
+      "message": "production path generates a random value"
+    },
+    {
+      "code": "production_demo_account",
+      "pattern": "(?:demo[_-]?account|示例账户|演示账户)",
+      "message": "production path contains an unqualified demo account"
+    }
+  ],
+  "quarantines": [
+    {
+      "path": "execution-runtime/app/fake_gateway.py",
+      "owner": "isolated Fake Runtime",
+      "required_markers": ["FakeGateway"],
+      "consumer_path": "execution-runtime/app/gateway_factory.py",
+      "consumer_required_markers": ["fake", "live_trading_enabled"]
+    },
+    {
+      "path": "platform-web/src/views/hedgeBoard/nativeData/dashboardClean.ts",
+      "owner": "Hedge Board static design registry",
+      "required_markers": ["静态设计稿"],
+      "consumer_path": "platform-web/src/views/hedgeBoard/composables/useHedgeBoardPage.ts",
+      "consumer_required_markers": ["isStaticDesignWidget", "withoutStaticDesignWidgets"]
+    }
+  ],
+  "explicit_unavailable_views": [
+    {
+      "path": "platform-web/src/views/dashboard/index.vue",
+      "required_markers": ["ProductNotConfiguredPanel", "not-configured: dashboard-market-aggregate"]
+    },
+    {
+      "path": "platform-web/src/views/financialAi/index.vue",
+      "required_markers": ["ProductNotConfiguredPanel", "not-configured: financial-ai-provider"]
+    }
+  ]
+}
