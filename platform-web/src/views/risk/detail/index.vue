@@ -231,7 +231,8 @@
     () => riskRecords.value.filter((item) => item.status === 'pending').length,
   );
   const highCount = computed(
-    () => riskRecords.value.filter((item) => ['high', 'critical'].includes(item.severity || '')).length,
+    () =>
+      riskRecords.value.filter((item) => ['high', 'critical'].includes(item.severity || '')).length,
   );
   const unreadCount = computed(() => notifications.value.filter(isUnread).length);
   const latestEventTime = computed(() =>
@@ -257,7 +258,8 @@
   }
 
   const totalAsset = computed<DecimalString | undefined>(
-    () => totalSummary.value.total_asset ?? totalSummary.value.total ?? sumAccountField('total_asset'),
+    () =>
+      totalSummary.value.total_asset ?? totalSummary.value.total ?? sumAccountField('total_asset'),
   );
   const availableFund = computed<DecimalString | undefined>(() =>
     sumAccountField('available_fund'),
@@ -441,8 +443,8 @@
       sourceStatus.finance = financeFailures
         ? 'unavailable'
         : accounts.value.length || ratioItems.value.length || totalAsset.value !== undefined
-          ? 'ready'
-          : 'no_data';
+        ? 'ready'
+        : 'no_data';
 
       if (healthResult.status === 'fulfilled') {
         health.value = healthResult.value;
@@ -469,8 +471,8 @@
         message: unavailable
           ? `${unavailable}个来源不可用；成功来源的事实仍单独保留`
           : ready
-            ? undefined
-            : '所有来源成功，但没有风控或账户事实',
+          ? undefined
+          : '所有来源成功，但没有风控或账户事实',
         degraded: unavailable > 0,
       };
     } finally {
