@@ -101,7 +101,7 @@ def test_phase5_product_format_commits_are_bounded_corrections() -> None:
         ),
         (
             "platform-web/src/views/audit/index.vue",
-            "style(platform-web): format audit product closure",
+            "style(platform-web): finish audit formatting",
         ),
         (
             "platform-web/src/views/data/components/AccountNetValueChart.vue",
@@ -118,6 +118,10 @@ def test_phase5_product_format_commits_are_bounded_corrections() -> None:
         (
             "platform-web/src/views/monitor/index.vue",
             "style(platform-web): format monitor closure view",
+        ),
+        (
+            "platform-web/src/views/notification/index.vue",
+            "style(platform-web): format notification view",
         ),
         (
             "platform-web/src/views/reports/index.vue",
