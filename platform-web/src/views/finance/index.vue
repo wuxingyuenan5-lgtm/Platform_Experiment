@@ -154,7 +154,8 @@
   }
 
   const totalAsset = computed<DecimalString | undefined>(
-    () => totalSummary.value.total_asset ?? totalSummary.value.total ?? sumAccountField('total_asset'),
+    () =>
+      totalSummary.value.total_asset ?? totalSummary.value.total ?? sumAccountField('total_asset'),
   );
   const availableFund = computed<DecimalString | undefined>(() =>
     sumAccountField('available_fund'),
