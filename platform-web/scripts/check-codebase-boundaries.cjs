@@ -24,6 +24,8 @@ const removedPaths = [
   'src/views/account/components/LegacyAccountDataManager.vue',
   'src/views/hedgeBoard/nativeData/marketSnapshotTables.ts',
   'src/views/strategy/spread-carry/components/CrossVenueExecutionReplica.vue',
+  'src/views/strategy/spread-carry/components/DomesticOverseasExecutionReplica.vue',
+  'src/views/strategy/spread-carry/components/SpreadExecutionWorkspace.vue',
   'internal/vite-config/src/plugins/mock.ts',
 ];
 for (const relative of removedPaths) {
@@ -122,17 +124,19 @@ for (const relative of crossVenueOwners) {
   assert(exists(relative), `Cross Venue owner is missing: ${relative}`);
   assert(lineCount(relative) <= 500, `Cross Venue owner exceeds 500 lines: ${relative}`);
 }
-const spreadWorkspace = read(
-  'src/views/strategy/spread-carry/components/SpreadExecutionWorkspace.vue',
+const spreadEntry = read('src/views/strategy/spread-carry/index.vue');
+assert(
+  spreadEntry.includes('CrossVenueExecutionWorkspace'),
+  'Spread entry does not use the formal Cross Venue owner',
 );
 assert(
-  spreadWorkspace.includes('CrossVenueExecutionWorkspace'),
-  'Spread workspace does not use the formal Cross Venue owner',
+  spreadEntry.includes('ProductNotConfiguredPanel') &&
+    spreadEntry.includes('not-configured: spread-research-provider'),
+  'Spread research path is not fail-closed when no Provider owner exists',
 );
-assert(
-  !spreadWorkspace.includes('CrossVenueExecutionReplica'),
-  'Spread workspace still imports the Replica owner',
-);
+for (const replicaOwner of ['CrossVenueExecutionReplica', 'DomesticOverseasExecutionReplica']) {
+  assert(!spreadEntry.includes(replicaOwner), `Spread entry still imports Replica owner: ${replicaOwner}`);
+}
 const crossVenueSource = read(crossVenueShell);
 assert(
   crossVenueSource.includes('useCrossVenueExecutionWorkspace'),
