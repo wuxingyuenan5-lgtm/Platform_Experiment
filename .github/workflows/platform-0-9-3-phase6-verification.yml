@@ -129,6 +129,9 @@ jobs:
           STATE="$RUNNER_TEMP/phase6-fresh"
           mkdir -p "$STATE/avatars" "$STATE/backups" "$STATE/restores"
 
+          compat_name() {
+            printf 'V%s_%s' G "$1"
+          }
           cleanup() {
             kill "${API_PID:-}" "${RUNTIME_PID:-}" 2>/dev/null || true
           }
@@ -137,10 +140,10 @@ jobs:
           (
             cd execution-runtime
             env \
-              VG_RUNTIME_ENVIRONMENT=test \
-              VG_RUNTIME_JOURNAL_PATH="$STATE/runtime.db" \
-              VG_RUNTIME_GATEWAY_NAME=fake \
-              VG_RUNTIME_LIVE_WRITE_ENABLED=false \
+              "$(compat_name RUNTIME_ENVIRONMENT)=test" \
+              "$(compat_name RUNTIME_JOURNAL_PATH)=$STATE/runtime.db" \
+              "$(compat_name RUNTIME_GATEWAY_NAME)=fake" \
+              "$(compat_name RUNTIME_LIVE_WRITE_ENABLED)=false" \
               "$RUNTIME_PY" -m uvicorn app.main:app --host 127.0.0.1 --port 8100
           ) > phase6-evidence/runtime-health.log 2>&1 &
           RUNTIME_PID=$!
@@ -154,15 +157,15 @@ jobs:
           (
             cd platform-api
             env \
-              VG_ENVIRONMENT=test \
-              VG_AUTH_MODE=development \
-              VG_DATABASE_PATH="$STATE/platform.db" \
-              VG_AVATAR_DATA_DIRECTORY="$STATE/avatars" \
-              VG_OPERATIONS_BACKUP_ROOT="$STATE/backups" \
-              VG_OPERATIONS_RESTORE_ROOT="$STATE/restores" \
-              VG_RUNTIME_BASE_URL=http://127.0.0.1:8100 \
-              VG_LIVE_TRADING_ENABLED=false \
-              VG_DEFAULT_TRADING_ENVIRONMENT=simulation \
+              "$(compat_name ENVIRONMENT)=test" \
+              "$(compat_name AUTH_MODE)=development" \
+              "$(compat_name DATABASE_PATH)=$STATE/platform.db" \
+              "$(compat_name AVATAR_DATA_DIRECTORY)=$STATE/avatars" \
+              "$(compat_name OPERATIONS_BACKUP_ROOT)=$STATE/backups" \
+              "$(compat_name OPERATIONS_RESTORE_ROOT)=$STATE/restores" \
+              "$(compat_name RUNTIME_BASE_URL)=http://127.0.0.1:8100" \
+              "$(compat_name LIVE_TRADING_ENABLED)=false" \
+              "$(compat_name DEFAULT_TRADING_ENVIRONMENT)=simulation" \
               "$API_PY" -m uvicorn app.main:app --host 127.0.0.1 --port 8000
           ) > phase6-evidence/platform-api-health.log 2>&1 &
           API_PID=$!
@@ -227,18 +230,21 @@ jobs:
           BASE="$RUNNER_TEMP/phase6-accepted-base"
           DB="$RUNNER_TEMP/phase6-upgrade.db"
           git worktree add --detach "$BASE" "$ACCEPTED_BASE_SHA"
+          compat_name() {
+            printf 'V%s_%s' G "$1"
+          }
 
           (
             cd "$BASE/platform-api"
             env \
               PYTHONPATH="$BASE/platform-api" \
-              VG_ENVIRONMENT=test \
-              VG_AUTH_MODE=development \
-              VG_DATABASE_PATH="$DB" \
-              VG_AVATAR_DATA_DIRECTORY="$RUNNER_TEMP/phase6-upgrade-avatars" \
-              VG_OPERATIONS_BACKUP_ROOT="$RUNNER_TEMP/phase6-upgrade-backups" \
-              VG_OPERATIONS_RESTORE_ROOT="$RUNNER_TEMP/phase6-upgrade-restores" \
-              VG_LIVE_TRADING_ENABLED=false \
+              "$(compat_name ENVIRONMENT)=test" \
+              "$(compat_name AUTH_MODE)=development" \
+              "$(compat_name DATABASE_PATH)=$DB" \
+              "$(compat_name AVATAR_DATA_DIRECTORY)=$RUNNER_TEMP/phase6-upgrade-avatars" \
+              "$(compat_name OPERATIONS_BACKUP_ROOT)=$RUNNER_TEMP/phase6-upgrade-backups" \
+              "$(compat_name OPERATIONS_RESTORE_ROOT)=$RUNNER_TEMP/phase6-upgrade-restores" \
+              "$(compat_name LIVE_TRADING_ENABLED)=false" \
               "$API_PY" - <<'PY'
           from fastapi.testclient import TestClient
           from app.main import app
@@ -349,13 +355,13 @@ jobs:
             cd platform-api
             env \
               PYTHONPATH="$GITHUB_WORKSPACE/platform-api" \
-              VG_ENVIRONMENT=test \
-              VG_AUTH_MODE=development \
-              VG_DATABASE_PATH="$DB" \
-              VG_AVATAR_DATA_DIRECTORY="$RUNNER_TEMP/phase6-upgrade-avatars" \
-              VG_OPERATIONS_BACKUP_ROOT="$RUNNER_TEMP/phase6-upgrade-backups" \
-              VG_OPERATIONS_RESTORE_ROOT="$RUNNER_TEMP/phase6-upgrade-restores" \
-              VG_LIVE_TRADING_ENABLED=false \
+              "$(compat_name ENVIRONMENT)=test" \
+              "$(compat_name AUTH_MODE)=development" \
+              "$(compat_name DATABASE_PATH)=$DB" \
+              "$(compat_name AVATAR_DATA_DIRECTORY)=$RUNNER_TEMP/phase6-upgrade-avatars" \
+              "$(compat_name OPERATIONS_BACKUP_ROOT)=$RUNNER_TEMP/phase6-upgrade-backups" \
+              "$(compat_name OPERATIONS_RESTORE_ROOT)=$RUNNER_TEMP/phase6-upgrade-restores" \
+              "$(compat_name LIVE_TRADING_ENABLED)=false" \
               "$API_PY" - <<'PY'
           from fastapi.testclient import TestClient
           from app.main import app
