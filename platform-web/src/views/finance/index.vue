@@ -1,10 +1,15 @@
 <template>
   <PageWrapper title="财务概览">
     <div class="finance-page">
+      <ProductDataStatusAlert :meta="dataMeta" class="mb-4" />
+
       <div class="toolbar">
         <Space>
           <Tag :color="roleColor">{{ roleLabel }}</Tag>
-          <Tag :color="exchangeInfo.rate ? 'green' : 'orange'">exchange {{ exchangeInfo.symbol || '-' }}</Tag>
+          <Tag :color="dataMeta.status === 'ready' ? 'green' : 'orange'">
+            {{ dataMeta.source }}
+          </Tag>
+          <Tag>{{ exchangeInfo.symbol || 'USD' }}</Tag>
         </Space>
         <Button :loading="loading" @click="loadData">
           <template #icon><ReloadOutlined /></template>
@@ -15,22 +20,26 @@
       <Row :gutter="[16, 16]">
         <Col :xs="24" :sm="12" :lg="6">
           <Card :bordered="false" class="metric-card">
-            <Statistic title="总资产 USD" :value="totalAsset" :precision="2" />
+            <span class="metric-label">总资产</span>
+            <strong class="metric-value">{{ formatMoney(totalAsset) }}</strong>
           </Card>
         </Col>
         <Col :xs="24" :sm="12" :lg="6">
           <Card :bordered="false" class="metric-card">
-            <Statistic title="可用资金 USD" :value="availableFund" :precision="2" />
+            <span class="metric-label">可用资金</span>
+            <strong class="metric-value">{{ formatMoney(availableFund) }}</strong>
           </Card>
         </Col>
         <Col :xs="24" :sm="12" :lg="6">
           <Card :bordered="false" class="metric-card">
-            <Statistic title="资金占用 USD" :value="usedFund" :precision="2" />
+            <span class="metric-label">资金占用</span>
+            <strong class="metric-value">{{ formatMoney(usedFund) }}</strong>
           </Card>
         </Col>
         <Col :xs="24" :sm="12" :lg="6">
           <Card :bordered="false" class="metric-card">
-            <Statistic title="资产项" :value="ratioItems.length" />
+            <span class="metric-label">资产项</span>
+            <strong class="metric-value">{{ ratioItems.length }}</strong>
           </Card>
         </Col>
       </Row>
@@ -46,6 +55,9 @@
               :loading="loading"
               :pagination="false"
             >
+              <template #emptyText>
+                <span>{{ dataMeta.status === 'ready' ? '暂无资产占比数据' : '数据源不可用' }}</span>
+              </template>
               <template #bodyCell="{ column, record }">
                 <template v-if="column.key === 'value'">
                   {{ formatMoney(record.valueUSD ?? record.value) }}
@@ -58,12 +70,17 @@
           </Card>
         </Col>
         <Col :xs="24" :xl="9">
-          <Card :bordered="false" title="财务接口状态" class="vg-panel">
+          <Card :bordered="false" title="财务数据状态" class="vg-panel">
             <Descriptions :column="1" size="small">
-              <Descriptions.Item label="汇率标的">{{ exchangeInfo.symbol || 'USD' }}</Descriptions.Item>
-              <Descriptions.Item label="汇率">{{ exchangeInfo.rate ?? '-' }}</Descriptions.Item>
-              <Descriptions.Item label="更新时间">{{ latestUpdateText }}</Descriptions.Item>
-              <Descriptions.Item label="数据来源">data-service</Descriptions.Item>
+              <Descriptions.Item label="状态">{{ dataMeta.status }}</Descriptions.Item>
+              <Descriptions.Item label="来源">{{ dataMeta.source }}</Descriptions.Item>
+              <Descriptions.Item label="汇率标的">{{ exchangeInfo.symbol || '不可用' }}</Descriptions.Item>
+              <Descriptions.Item label="汇率">
+                {{ formatDecimal(exchangeInfo.rate) }}
+              </Descriptions.Item>
+              <Descriptions.Item label="截至时间">{{ latestUpdateText }}</Descriptions.Item>
+              <Descriptions.Item label="时区">{{ dataMeta.timezone || '来源定义' }}</Descriptions.Item>
+              <Descriptions.Item label="精度">Decimal字符串</Descriptions.Item>
             </Descriptions>
           </Card>
         </Col>
@@ -73,22 +90,29 @@
 </template>
 
 <script setup lang="ts">
+  import Decimal from 'decimal.js';
   import { computed, onMounted, ref } from 'vue';
-  import { Button, Card, Col, Descriptions, Progress, Row, Space, Statistic, Table, Tag } from 'ant-design-vue';
+  import { Button, Card, Col, Descriptions, Progress, Row, Space, Table, Tag } from 'ant-design-vue';
   import { ReloadOutlined } from '@ant-design/icons-vue';
   import { PageWrapper } from '@/components/Page';
+  import ProductDataStatusAlert from '@/components/ProductDataState/ProductDataStatusAlert.vue';
   import {
-    DataAccount,
-    ExchangeInfo,
+    type DataAccount,
+    type ExchangeInfo,
     getAccounts,
     getExchangeInfo,
     getProductRatio,
     getTotalAssetSummary,
-    ProductRatioItem,
-    TotalAssetSummary,
+    type ProductRatioItem,
+    type TotalAssetSummary,
   } from '@/api/riskControl';
+  import {
+    unavailableMeta,
+    type DecimalString,
+    type ProductDataMeta,
+  } from '@/api/platform/productDataState';
   import { useRoleAccess } from '@/hooks/web/useRoleAccess';
-  import { formateNumStr } from '@/utils/formate';
+  import { formatDecimalString, formatMoneyString } from '@/utils/decimalDisplay';
   import { formatToDateTime } from '@/utils/dateUtil';
 
   const loading = ref(false);
@@ -96,25 +120,38 @@
   const ratioItems = ref<ProductRatioItem[]>([]);
   const totalSummary = ref<TotalAssetSummary>({});
   const exchangeInfo = ref<ExchangeInfo>({});
+  const dataMeta = ref<ProductDataMeta>({
+    status: 'no_data',
+    source: 'data-service',
+    timezone: 'source-defined',
+    currency: 'USD',
+    unit: 'money and ratio',
+    precision: 'decimal-string',
+    message: '尚未加载财务数据',
+  });
   const { roleLabel, roleColor } = useRoleAccess();
 
-  const totalAsset = computed(() => {
-    const fromApi = totalSummary.value.total_asset ?? totalSummary.value.total;
-    if (typeof fromApi === 'number') return fromApi;
-    return accounts.value.reduce((sum, item) => sum + Number(item.total_asset || 0), 0);
-  });
-  const availableFund = computed(() =>
-    accounts.value.reduce((sum, item) => sum + Number(item.available_fund || 0), 0),
+  function sumAccountField(field: 'total_asset' | 'available_fund'): DecimalString | undefined {
+    const values = accounts.value.map((item) => item[field]).filter((value): value is string => value !== undefined);
+    if (!values.length) return undefined;
+    return values.reduce((sum, value) => sum.plus(value), new Decimal(0)).toFixed();
+  }
+
+  const totalAsset = computed<DecimalString | undefined>(
+    () => totalSummary.value.total_asset ?? totalSummary.value.total ?? sumAccountField('total_asset'),
   );
-  const usedFund = computed(() => Math.max(totalAsset.value - availableFund.value, 0));
+  const availableFund = computed<DecimalString | undefined>(() => sumAccountField('available_fund'));
+  const usedFund = computed<DecimalString | undefined>(() => {
+    if (totalAsset.value === undefined || availableFund.value === undefined) return undefined;
+    return Decimal.max(new Decimal(totalAsset.value).minus(availableFund.value), 0).toFixed();
+  });
   const latestUpdate = computed(() => {
-    const times = accounts.value.map((item) => item.asset_updated_at).filter(Boolean).sort();
-    return times[times.length - 1] || totalSummary.value.updated_at || '';
+    const times = accounts.value.map((item) => item.asset_updated_at).filter((value): value is string => Boolean(value)).sort();
+    return times[times.length - 1] || totalSummary.value.updated_at || exchangeInfo.value.updated_at;
   });
-  const latestUpdateText = computed(() => {
-    const value = latestUpdate.value || exchangeInfo.value.updated_at;
-    return value ? formatToDateTime(value) : '-';
-  });
+  const latestUpdateText = computed(() =>
+    latestUpdate.value ? formatToDateTime(latestUpdate.value) : '不可用',
+  );
 
   const ratioColumns = [
     { title: '资产项', dataIndex: 'name', key: 'name' },
@@ -122,27 +159,67 @@
     { title: '占比', key: 'percent', width: 180 },
   ];
 
-  function formatMoney(value: any) {
-    return formateNumStr(value || 0, { decimals: 2, keepZero: true });
+  function formatMoney(value?: DecimalString) {
+    return formatMoneyString(value, 'USD');
   }
 
-  function percentNumber(value: any) {
-    return Number((Number(value || 0) * 100).toFixed(2));
+  function formatDecimal(value?: DecimalString) {
+    return value === undefined ? '不可用' : formatDecimalString(value);
+  }
+
+  function percentNumber(value: DecimalString) {
+    return new Decimal(value).mul(100).toDecimalPlaces(2).toNumber();
   }
 
   async function loadData() {
     loading.value = true;
+    const results = await Promise.allSettled([
+      getAccounts(),
+      getProductRatio(),
+      getTotalAssetSummary(),
+      getExchangeInfo(),
+    ]);
     try {
-      const [accountRes, ratioRes, totalRes, exchangeRes] = await Promise.all([
-        getAccounts(),
-        getProductRatio(),
-        getTotalAssetSummary(),
-        getExchangeInfo(),
-      ]);
-      accounts.value = accountRes;
-      ratioItems.value = ratioRes;
-      totalSummary.value = totalRes;
-      exchangeInfo.value = exchangeRes;
+      const failures = results.filter((item) => item.status === 'rejected');
+      const [accountResult, ratioResult, totalResult, exchangeResult] = results;
+      if (accountResult.status === 'fulfilled') accounts.value = accountResult.value;
+      if (ratioResult.status === 'fulfilled') ratioItems.value = ratioResult.value;
+      if (totalResult.status === 'fulfilled') totalSummary.value = totalResult.value;
+      if (exchangeResult.status === 'fulfilled') exchangeInfo.value = exchangeResult.value;
+
+      if (failures.length === results.length) {
+        const first = failures[0] as PromiseRejectedResult;
+        dataMeta.value = unavailableMeta('data-service', first.reason, {
+          timezone: 'source-defined',
+          currency: 'USD',
+          unit: 'money and ratio',
+          precision: 'decimal-string',
+        });
+      } else if (failures.length) {
+        dataMeta.value = {
+          status: 'unavailable',
+          source: 'data-service (partial)',
+          asOf: latestUpdate.value,
+          timezone: 'source-defined',
+          currency: 'USD',
+          unit: 'money and ratio',
+          precision: 'decimal-string',
+          errorCode: 'partial_provider_failure',
+          message: `${failures.length}个财务数据端点不可用；已成功数据未被替换为0`,
+          degraded: true,
+        };
+      } else {
+        dataMeta.value = {
+          status: accounts.value.length || ratioItems.value.length || totalAsset.value !== undefined ? 'ready' : 'no_data',
+          source: 'data-service',
+          asOf: latestUpdate.value,
+          timezone: 'source-defined',
+          currency: 'USD',
+          unit: 'money and ratio',
+          precision: 'decimal-string',
+          message: accounts.value.length || ratioItems.value.length ? undefined : 'Provider成功返回，但没有财务记录',
+        };
+      }
     } finally {
       loading.value = false;
     }
@@ -168,6 +245,19 @@
   .vg-panel {
     border-radius: 6px;
     box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+  }
+
+  .metric-label {
+    display: block;
+    color: #59636e;
+    font-size: 13px;
+  }
+
+  .metric-value {
+    display: block;
+    margin-top: 8px;
+    font-size: 22px;
+    line-height: 1.35;
   }
 
   @media (max-width: 768px) {
