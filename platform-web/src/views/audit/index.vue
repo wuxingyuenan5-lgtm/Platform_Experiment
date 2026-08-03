@@ -58,11 +58,10 @@
 </template>
 
 <script setup lang="ts">
-  import { computed, onMounted, ref } from 'vue';
-  import { Button, Card, Col, Row, Space, Statistic, Table, Tag } from 'ant-design-vue';
   import { ReloadOutlined } from '@ant-design/icons-vue';
-  import { PageWrapper } from '@/components/Page';
-  import ProductDataStatusAlert from '@/components/ProductDataState/ProductDataStatusAlert.vue';
+  import { Button, Card, Col, Row, Space, Statistic, Table, Tag } from 'ant-design-vue';
+  import { computed, onMounted, ref } from 'vue';
+  import type { ProductDataMeta } from '@/api/platform/productDataState';
   import {
     type DataServiceHealth,
     getDataHealth,
@@ -71,9 +70,8 @@
     type NotificationMessage,
     type RiskRecord,
   } from '@/api/riskControl';
-  import {
-    type ProductDataMeta,
-  } from '@/api/platform/productDataState';
+  import { PageWrapper } from '@/components/Page';
+  import ProductDataStatusAlert from '@/components/ProductDataState/ProductDataStatusAlert.vue';
   import { useRoleAccess } from '@/hooks/web/useRoleAccess';
 
   type SourceStatus = 'ready' | 'no_data' | 'unavailable';
@@ -125,7 +123,12 @@
       module: '风控记录',
       source: 'risk-service /risk/api/v1/risk-records/',
       status: sourceStatus.value.risk,
-      latest: riskRecords.value.map((item) => item.created_at).filter(Boolean).sort().at(-1) || '不可用',
+      latest:
+        riskRecords.value
+          .map((item) => item.created_at)
+          .filter(Boolean)
+          .sort()
+          .at(-1) || '不可用',
       error: sourceErrors.value.risk,
     },
     {
@@ -172,7 +175,9 @@
       } else {
         riskRecords.value = [];
         sourceStatus.value.risk = 'unavailable';
-        sourceErrors.value.risk = String(riskResult.reason?.message || riskResult.reason || 'request failed');
+        sourceErrors.value.risk = String(
+          riskResult.reason?.message || riskResult.reason || 'request failed',
+        );
       }
       if (notificationResult.status === 'fulfilled') {
         notifications.value = notificationResult.value;
@@ -192,11 +197,17 @@
         }
       } else {
         sourceStatus.value.data = 'unavailable';
-        sourceErrors.value.data = String(healthResult.reason?.message || healthResult.reason || 'request failed');
+        sourceErrors.value.data = String(
+          healthResult.reason?.message || healthResult.reason || 'request failed',
+        );
       }
 
-      const unavailable = Object.values(sourceStatus.value).filter((status) => status === 'unavailable').length;
-      const ready = Object.values(sourceStatus.value).filter((status) => status === 'ready').length;
+      const unavailable = Object.values(sourceStatus.value).filter(
+        (status) => status === 'unavailable',
+      ).length;
+      const ready = Object.values(sourceStatus.value).filter(
+        (status) => status === 'ready',
+      ).length;
       dataMeta.value = {
         status: unavailable ? 'unavailable' : ready ? 'ready' : 'no_data',
         source: unavailable ? 'audit aggregation (partial)' : 'audit aggregation',
