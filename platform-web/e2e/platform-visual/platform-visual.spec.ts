@@ -50,8 +50,8 @@ const EMPLOYEE_PAGES: readonly VisualPage[] = [
   {
     key: 'strategy-funding',
     route: '/strategy/platform?desk=funding',
-    marker: '资费',
-    evidenceSource: 'isolated Platform API and fake Runtime; Live Write disabled',
+    marker: '资费与资金费率套利数据链尚未配置',
+    evidenceSource: 'explicit not-configured product state; no Provider, Runtime or Live Write evidence',
   },
   {
     key: 'strategy-cross-spread',
