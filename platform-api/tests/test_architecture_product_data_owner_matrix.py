@@ -63,7 +63,13 @@ def test_phase5_registry_cannot_enable_live_write(tmp_path: Path) -> None:
 
 def test_require_closed_rejects_unresolved_product_gap(tmp_path: Path) -> None:
     audit = _load_audit_module()
-    target = _write_matrix(tmp_path, lambda value: None)
+
+    def add_unresolved_gap(value: dict) -> None:
+        account = next(entry for entry in value["entries"] if entry["module"] == "account")
+        account["closure_status"] = "gap"
+        account["gap_reason"] = "test unresolved account owner"
+
+    target = _write_matrix(tmp_path, add_unresolved_gap)
     with pytest.raises(audit.AuditError, match="unresolved product/data gap"):
         audit.audit(target, require_closed=True)
 
