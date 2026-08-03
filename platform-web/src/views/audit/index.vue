@@ -175,9 +175,7 @@
       } else {
         riskRecords.value = [];
         sourceStatus.value.risk = 'unavailable';
-        sourceErrors.value.risk = String(
-          riskResult.reason?.message || riskResult.reason || 'request failed',
-        );
+        sourceErrors.value.risk = String(riskResult.reason?.message || riskResult.reason || 'request failed');
       }
       if (notificationResult.status === 'fulfilled') {
         notifications.value = notificationResult.value;
@@ -185,9 +183,7 @@
       } else {
         notifications.value = [];
         sourceStatus.value.notification = 'unavailable';
-        sourceErrors.value.notification = String(
-          notificationResult.reason?.message || notificationResult.reason || 'request failed',
-        );
+        sourceErrors.value.notification = String(notificationResult.reason?.message || notificationResult.reason || 'request failed');
       }
       if (healthResult.status === 'fulfilled') {
         health.value = healthResult.value;
