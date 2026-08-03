@@ -41,6 +41,11 @@ def test_current_production_data_boundaries_are_clean() -> None:
     } == {
         "platform-web/src/views/dashboard/index.vue",
         "platform-web/src/views/financialAi/index.vue",
+        "platform-web/src/views/strategy/management/index.vue",
+        "platform-web/src/views/strategy/funding-carry/index.vue",
+        "platform-web/src/views/strategy/spread-carry/index.vue",
+        "platform-web/src/views/newsCalendar/index.vue",
+        "platform-web/src/views/settings/index.vue",
     }
 
 
