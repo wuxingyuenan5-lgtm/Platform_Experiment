@@ -19,7 +19,6 @@ FULL_PREFIXES = (
 )
 FRONTEND_PREFIXES = (
     "platform-web/src/",
-    "platform-web/mock/",
     "platform-web/scripts/",
     "platform-web/package.json",
     "platform-web/pnpm-lock.yaml",

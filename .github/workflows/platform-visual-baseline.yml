@@ -4,10 +4,11 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - refactor/platform-0-9-3-repository-and-context-optimization
+      - refactor/platform-0-9-3-*
   pull_request:
     branches:
       - main
+      - refactor/platform-0-9-3-*
       - feature/issue-134-platform-0-9-1-unified-delivery
     paths:
       - '.github/workflows/platform-visual-baseline.yml'
@@ -46,8 +47,8 @@ permissions:
 
 concurrency:
   group: platform-visual-baseline-${{ github.event.pull_request.number || github.ref }}
-  # Keep stale-run cancellation elsewhere, but allow retries for the exact 0.9.3 candidate branch.
-  cancel-in-progress: ${{ github.ref_name != 'refactor/platform-0-9-3-repository-and-context-optimization' }}
+  # Keep stale-run cancellation elsewhere, but allow retries for controlled Platform 0.9.3 phase branches.
+  cancel-in-progress: ${{ !startsWith(github.ref_name, 'refactor/platform-0-9-3-') }}
 
 jobs:
   four-width-visual-evidence:

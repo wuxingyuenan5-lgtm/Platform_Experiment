@@ -4,10 +4,11 @@ on:
   push:
     branches:
       - main
-      - refactor/platform-0-9-3-repository-and-context-optimization
+      - refactor/platform-0-9-3-*
   pull_request:
     branches:
       - main
+      - refactor/platform-0-9-3-*
       - feature/issue-134-platform-0-9-1-unified-delivery
 
 permissions:
@@ -56,6 +57,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -67,6 +70,27 @@ jobs:
         run: |
           set -o pipefail
           python scripts/check-workstream.py 2>&1 | tee "$RUNNER_TEMP/workstream.log"
+      - name: Audit stacked Phase history
+        id: phase_history
+        continue-on-error: true
+        env:
+          PHASE3_BASE_SHA: cd825fe6bd9ecdf42082069b2785844eda2efac8
+          PHASE3_ORIGINAL_HEAD: 735542b69c38b552fd3bb3109819b177e424b0fb
+          EVENT_NAME: ${{ github.event_name }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -o pipefail
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            AUDIT_HEAD="$PR_HEAD_SHA"
+          else
+            AUDIT_HEAD="$GITHUB_SHA"
+          fi
+          python scripts/audit-phase-history.py \
+            --base "$PHASE3_BASE_SHA" \
+            --head "$AUDIT_HEAD" \
+            --required-original-head "$PHASE3_ORIGINAL_HEAD" \
+            --output "$RUNNER_TEMP/phase-history-audit.json" \
+            2>&1 | tee "$RUNNER_TEMP/phase-history-audit.log"
       - name: Check repository structure and architecture boundaries
         id: structure
         continue-on-error: true
@@ -91,6 +115,12 @@ jobs:
         run: |
           set -o pipefail
           python scripts/context-for.py --check-budgets --json 2>&1 | tee "$RUNNER_TEMP/context-budget.json"
+      - name: Check Phase 3 codebase boundaries
+        id: codebase_boundaries
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          node platform-web/scripts/check-codebase-boundaries.cjs 2>&1 | tee "$RUNNER_TEMP/codebase-boundaries.log"
       - name: Upload repository-safety diagnostics
         if: always()
         uses: actions/upload-artifact@v4
@@ -98,20 +128,25 @@ jobs:
           name: repository-safety-diagnostics
           path: |
             ${{ runner.temp }}/workstream.log
+            ${{ runner.temp }}/phase-history-audit.log
+            ${{ runner.temp }}/phase-history-audit.json
             ${{ runner.temp }}/repository-structure.log
             ${{ runner.temp }}/documentation-consistency.log
             ${{ runner.temp }}/active-naming-consistency.log
             ${{ runner.temp }}/context-budget.json
+            ${{ runner.temp }}/codebase-boundaries.log
           if-no-files-found: error
           retention-days: 3
       - name: Enforce repository-safety results
         if: always()
         run: |
           test "${{ steps.workstream.outcome }}" = "success"
+          test "${{ steps.phase_history.outcome }}" = "success"
           test "${{ steps.structure.outcome }}" = "success"
           test "${{ steps.documentation.outcome }}" = "success"
           test "${{ steps.active_naming.outcome }}" = "success"
           test "${{ steps.context_budget.outcome }}" = "success"
+          test "${{ steps.codebase_boundaries.outcome }}" = "success"
 
   execution-runtime:
     needs: changes
@@ -149,6 +184,8 @@ jobs:
         working-directory: platform-api
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -223,6 +260,12 @@ jobs:
         env:
           HUSKY: '0'
         run: pnpm install --frozen-lockfile
+      - name: Test formal route manifest
+        id: frontend_route_manifest
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          node scripts/test-formal-route-manifest.cjs 2>&1 | tee "$RUNNER_TEMP/frontend-route-manifest.log"
       - name: Test browser access policy
         id: frontend_access_tests
         continue-on-error: true
@@ -260,7 +303,7 @@ jobs:
           CANDIDATE_BASE_SHA: cf44c8cca52576acc4e4070a98dcf112ebeec31c
         run: |
           set -o pipefail
-          if [ "$GITHUB_REF_NAME" = "refactor/platform-0-9-3-repository-and-context-optimization" ]; then
+          if [[ "$GITHUB_REF_NAME" == refactor/platform-0-9-3-* ]]; then
             python ../scripts/frontend-no-new-debt.py --base "$CANDIDATE_BASE_SHA" --direct 2>&1 | tee "$RUNNER_TEMP/frontend-no-new-debt.log"
           else
             python ../scripts/frontend-no-new-debt.py 2>&1 | tee "$RUNNER_TEMP/frontend-no-new-debt.log"
@@ -289,6 +332,7 @@ jobs:
         with:
           name: frontend-quality-diagnostics
           path: |
+            ${{ runner.temp }}/frontend-route-manifest.log
             ${{ runner.temp }}/frontend-access-tests.log
             ${{ runner.temp }}/frontend-eslint.log
             ${{ runner.temp }}/frontend-no-new-debt.log
@@ -300,6 +344,7 @@ jobs:
       - name: Enforce frontend results
         if: always()
         run: |
+          test "${{ steps.frontend_route_manifest.outcome }}" = "success"
           test "${{ steps.frontend_access_tests.outcome }}" = "success"
           test "${{ steps.frontend_lint.outcome }}" = "success"
           test "${{ steps.frontend_debt.outcome }}" = "success"

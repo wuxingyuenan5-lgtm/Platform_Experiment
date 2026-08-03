@@ -11,7 +11,7 @@ import {
 import { formatToDateTime } from '@/utils/dateUtil';
 import { formateNumStr, formatNumberWithCommas } from '@/utils/formate';
 import { TextTranslate } from '@/components/OptionTranslate';
-import { getAccountList } from '@/api/demo/system';
+import { getAccountList } from '@/api/sys/accountDirectory';
 
 const { t } = useI18n();
 

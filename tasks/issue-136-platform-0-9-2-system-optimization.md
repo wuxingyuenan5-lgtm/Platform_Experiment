@@ -130,8 +130,8 @@ SHA-256：`126856ca9aa52fbdcc5f6a61a5fee6c930073866e385aa1df0b1b8a539ad3a96`
 - [ ] Platform API应用层仍显示历史版本`0.6.0`；
 - [ ] Execution Runtime应用层仍显示历史版本`0.5.0`；
 - [ ] 两个应用文件体积较大，当前只允许安全局部补丁，不做整文件人工重写；
-- [ ] `platform-web/apps/test-server`仍进入pnpm workspace和锁文件，必须使用锁文件感知切口；
-- [ ] 未完成静态引用、路由、构建和锁文件证据前，不批量删除疑似未使用源码。
+- [x] Phase 3 Draft PR #148已使用`pnpm@9.15.9`完成`platform-web/apps/test-server`、Workspace和锁文件的同批清理；
+- [x] Phase 3 Draft PR #148已建立静态/动态引用、正式路由Manifest、构建、E2E和锁文件证据；不确定候选继续保留。
 
 当前GitHub连接下，没有其他同时满足“高置信度、无需锁文件、无需局部补丁、不触碰产品合同”的候选。J2按停止条件收口。
 

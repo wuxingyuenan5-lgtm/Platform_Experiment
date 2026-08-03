@@ -36,12 +36,15 @@ function inlineLessReferences(entryPath: string, seen = new Set<string>()) {
   const source = readFileSync(absolutePath, 'utf-8');
   const currentDir = dirname(absolutePath);
 
-  return source.replace(/@import(?:\s+\(reference\))?\s+['"]([^'"]+)['"];?/g, (_match, importPath) => {
-    if (importPath.startsWith('~')) {
-      return '';
-    }
-    return inlineLessReferences(resolveLessImport(currentDir, importPath), seen);
-  });
+  return source.replace(
+    /@import(?:\s+\(reference\))?\s+['"]([^'"]+)['"];?/g,
+    (_match, importPath) => {
+      if (importPath.startsWith('~')) {
+        return '';
+      }
+      return inlineLessReferences(resolveLessImport(currentDir, importPath), seen);
+    },
+  );
 }
 
 /**

@@ -27,7 +27,6 @@
     "node_modules",
     "dist",
     "**/*.js",
-    "mock/**/*.ts",
     "src/components/**/*.ts",
     "src/components/**/*.tsx",
     "src/components/**/*.vue",

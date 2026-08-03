@@ -132,7 +132,7 @@
   import { createAsyncComponent } from '@/utils/factory/createAsyncComponent';
   import { useUserStore } from '@/store/modules/user';
   import { loginQrcode } from '@/api/sys/user';
-  import { Password } from '@/views/demo/system/save/components/modules';
+  import { Password } from '@/views/risk/profile/security/modules';
   import AccountNetValueChart from '@/views/data/components/AccountNetValueChart.vue';
 
   type LocalProfile = {

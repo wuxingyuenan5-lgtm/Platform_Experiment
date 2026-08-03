@@ -24,7 +24,7 @@
     "preinstall": "npx only-allow pnpm",
     "postinstall": "turbo run stub",
     "lint": "turbo run lint",
-    "lint:eslint": "eslint --cache --max-warnings 0  \"{src,mock}/**/*.{vue,ts,tsx}\" --fix",
+    "lint:eslint": "eslint --cache --max-warnings 0 \"src/**/*.{vue,ts,tsx}\" --fix",
     "lint:prettier": "prettier --write .",
     "lint:stylelint": "stylelint \"**/*.{vue,css,less,scss}\" --fix --cache --cache-location node_modules/.cache/stylelint/",
     "prepare": "husky install",
@@ -42,7 +42,8 @@
     "test:homepage-layout": "node scripts/verify-homepage-layout.cjs",
     "test:user-system": "node scripts/test-user-system-access.cjs",
     "type:check": "vue-tsc -p tsconfig.strategy.json --noEmit --skipLibCheck",
-    "type:check:full": "vue-tsc -p tsconfig.full.json --noEmit --skipLibCheck"
+    "type:check:full": "vue-tsc -p tsconfig.full.json --noEmit --skipLibCheck",
+    "test:codebase-boundaries": "node scripts/check-codebase-boundaries.cjs"
   },
   "lint-staged": {
     "*.{js,jsx,ts,tsx}": [
@@ -94,7 +95,6 @@
     "echarts": "^5.4.2",
     "exceljs": "^4.3.0",
     "lodash-es": "^4.17.21",
-    "mockjs": "^1.1.0",
     "nprogress": "^0.2.0",
     "path-to-regexp": "^6.2.1",
     "pinia": "2.1.4",
@@ -129,7 +129,6 @@
     "@types/codemirror": "^5.60.8",
     "@types/crypto-js": "^4.1.1",
     "@types/lodash-es": "^4.17.7",
-    "@types/mockjs": "^1.0.7",
     "@types/nprogress": "^0.2.0",
     "@types/qrcode": "^1.5.1",
     "@types/qs": "^6.9.7",
@@ -154,7 +153,6 @@
     "typescript": "^5.2.2",
     "unbuild": "^1.2.1",
     "vite": "^4.4.0",
-    "vite-plugin-mock": "^2.9.6",
     "vue-tsc": "^1.8.4"
   },
   "packageManager": "pnpm@9.15.9",

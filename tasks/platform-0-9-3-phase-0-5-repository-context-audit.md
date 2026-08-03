@@ -62,6 +62,20 @@ Production evidence is excluded from deletion recommendations even when its name
 | Runtime V1 contract and V1 readiness | enforced by tests and architecture checks | retain |
 | `projects/risk-control`, `deploy/`, `.gitlab-ci.yml` | possible live Go/MySQL/Nginx/GitLab production path | production confirmation required |
 
+## Phase 3 resolution
+
+Draft PR #148 resolved the high-confidence frontend/template candidates from this audit:
+
+- removed `platform-web/apps/test-server` with its Workspace importer and generated lockfile closure;
+- moved the formal password and account/error API consumers to product-owned paths, then removed the upstream Demo View/API/locale trees;
+- removed the root template Mock plugin, environment switch and dependencies while retaining strategy-local and browser-test fixtures;
+- removed `LegacyAccountDataManager.vue` after exact static, dynamic-route, test and build-reference checks;
+- removed the hidden useRequest template route and bounded route/View discovery;
+- retained both Deprecated cross-spread panels because maintained layout verification still records their reference responsibility;
+- retained duplicate risk-log pages because an external backend dynamic-menu component consumer cannot be disproved from repository evidence alone.
+
+The permanent `platform-web/scripts/check-codebase-boundaries.cjs` gate rejects reintroduction of the removed roots, broad route/View scanning and template Mock build loading.
+
 ## Duplicate-content findings
 
 The 14 exact duplicate-file groups are classified as:

@@ -1,5 +1,6 @@
 import { readPackageJSON } from 'pkg-types';
 import { defineConfig, mergeConfig, type UserConfig } from 'vite';
+
 import { commonConfig } from './common';
 
 interface DefineOptions {

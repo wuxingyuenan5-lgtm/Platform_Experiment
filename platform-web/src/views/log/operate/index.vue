@@ -87,7 +87,7 @@
   import { useMessage } from '@/hooks/web/useMessage';
   import { useI18n } from '@/hooks/web/useI18n';
   import { downloadFile } from '@/utils/file/download';
-  import { getAccountList } from '@/api/demo/system';
+  import { getAccountList } from '@/api/sys/accountDirectory';
   import { logStatusOptions } from '@/utils/options/basicOptions';
 
   const { createMessage } = useMessage();

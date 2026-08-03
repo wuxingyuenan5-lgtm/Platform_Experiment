@@ -4,10 +4,11 @@ on:
   push:
     branches:
       - main
-      - refactor/platform-0-9-3-repository-and-context-optimization
+      - refactor/platform-0-9-3-*
   pull_request:
     branches:
       - main
+      - refactor/platform-0-9-3-*
       - feature/issue-134-platform-0-9-1-unified-delivery
     paths:
       - VERSION

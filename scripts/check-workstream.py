@@ -19,11 +19,19 @@ CRITICAL_BRANCH_PATTERN = re.compile(
     r"^(?:feature|fix|refactor|hardening|docs|chore)/issue-(?P<issue>\d+)-"
     r"(?P<slug>[a-z0-9][a-z0-9-]*)$"
 )
+STACKED_PLATFORM_BRANCH_PATTERN = re.compile(
+    r"^refactor/platform-(?P<major>\d+)-(?P<minor>\d+)-(?P<patch>\d+)-"
+    r"(?P<slug>[a-z0-9][a-z0-9-]*)$"
+)
 FAST_BRANCH_PATTERN = re.compile(r"^(?:docs|chore)/(?P<slug>[a-z0-9][a-z0-9-]*)$")
 STANDARD_BRANCH_PATTERN = re.compile(
     r"^(?:feature|fix|refactor|chore)/(?P<slug>[a-z0-9][a-z0-9-]*)$"
 )
 WORKSTREAM_PATTERN = re.compile(r"(?mi)^Workstream:\s*(fast|standard|critical)\s*$")
+STACKED_PHASE_PATTERN = re.compile(r"(?mi)^Stacked phase:\s*(?P<phase>[1-9]\d*)\s*$")
+ACCEPTED_BASE_SHA_PATTERN = re.compile(
+    r"(?mi)^Accepted base SHA:\s*(?P<sha>[0-9a-f]{40})\s*$"
+)
 ISSUE_LINE_PATTERN = re.compile(r"(?mi)^Issue:\s*#(?P<issue>\d+)\s*$")
 PR_ISSUE_PATTERN = re.compile(
     r"(?mi)^(?:Issue|Closes|Fixes|Resolves):?\s*#(?P<issue>\d+)\s*$"
@@ -60,6 +68,7 @@ CRITICAL_EXACT_PATHS = {
     "platform-api/app/trade_command_execution.py",
     "platform-api/app/order_execution_intents.py",
     "scripts/check-workstream.py",
+    "scripts/audit-phase-history.py",
     "scripts/check-repository-structure.py",
     "scripts/check-documentation-consistency.py",
     "scripts/scan-secrets.py",
@@ -109,6 +118,32 @@ def current_branch(event: dict[str, Any]) -> str | None:
     return os.getenv("GITHUB_HEAD_REF") or os.getenv("GITHUB_REF_NAME")
 
 
+def pull_request_ref(event: dict[str, Any], side: str) -> str:
+    pull_request = event.get("pull_request")
+    if not isinstance(pull_request, dict):
+        raise WorkstreamError("stacked Platform phase requires pull-request context")
+    ref_data = pull_request.get(side)
+    if not isinstance(ref_data, dict) or not isinstance(ref_data.get("ref"), str):
+        raise WorkstreamError(f"pull request is missing {side} ref")
+    return ref_data["ref"]
+
+
+def pull_request_sha(event: dict[str, Any], side: str) -> str:
+    pull_request = event.get("pull_request")
+    if not isinstance(pull_request, dict):
+        raise WorkstreamError("stacked Platform phase requires pull-request context")
+    ref_data = pull_request.get(side)
+    sha = ref_data.get("sha") if isinstance(ref_data, dict) else None
+    if not isinstance(sha, str) or re.fullmatch(r"[0-9a-f]{40}", sha) is None:
+        raise WorkstreamError(f"pull request is missing a valid {side} SHA")
+    return sha
+
+
+def pull_request_is_draft(event: dict[str, Any]) -> bool:
+    pull_request = event.get("pull_request")
+    return isinstance(pull_request, dict) and pull_request.get("draft") is True
+
+
 def pull_request_body(event: dict[str, Any]) -> str:
     pull_request = event.get("pull_request")
     if not isinstance(pull_request, dict):
@@ -129,6 +164,61 @@ def requested_workstream(event: dict[str, Any]) -> str:
     return matches[0]
 
 
+def stacked_platform_branch_version(branch: str) -> tuple[int, int, int]:
+    match = STACKED_PLATFORM_BRANCH_PATTERN.fullmatch(branch)
+    if match is None:
+        raise WorkstreamError(
+            "stacked Platform phase branch must use "
+            "refactor/platform-<major>-<minor>-<patch>-<phase-slug>; "
+            f"received {branch!r}"
+        )
+    return tuple(int(match.group(part)) for part in ("major", "minor", "patch"))
+
+
+def standalone_match(pattern: re.Pattern[str], body: str, label: str) -> re.Match[str]:
+    matches = list(pattern.finditer(body))
+    if len(matches) != 1:
+        raise WorkstreamError(f"stacked Platform phase PR must contain exactly one '{label}' line")
+    return matches[0]
+
+
+def validate_stacked_platform_critical(event: dict[str, Any]) -> None:
+    body = pull_request_body(event)
+    head = pull_request_ref(event, "head")
+    base = pull_request_ref(event, "base")
+    head_version = stacked_platform_branch_version(head)
+    base_version = stacked_platform_branch_version(base)
+    if head == base:
+        raise WorkstreamError("stacked Platform phase head must differ from base")
+    if base == "main":
+        raise WorkstreamError("stacked Platform phase base must not be main")
+    if head_version != base_version:
+        raise WorkstreamError(
+            "stacked Platform phase head/base versions must match; "
+            f"received head={head_version}, base={base_version}"
+        )
+    if not pull_request_is_draft(event):
+        raise WorkstreamError("stacked Platform phase PR must remain Draft")
+
+    phase_match = standalone_match(STACKED_PHASE_PATTERN, body, "Stacked phase: <number>")
+    phase = int(phase_match.group("phase"))
+    if phase <= 0:
+        raise WorkstreamError("stacked Platform phase number must be positive")
+
+    accepted_match = standalone_match(
+        ACCEPTED_BASE_SHA_PATTERN,
+        body,
+        "Accepted base SHA: <40-hex-sha>",
+    )
+    accepted_sha = accepted_match.group("sha")
+    actual_base_sha = pull_request_sha(event, "base")
+    if accepted_sha != actual_base_sha:
+        raise WorkstreamError(
+            "Accepted base SHA declaration does not match pull-request base SHA: "
+            f"declared={accepted_sha}, actual={actual_base_sha}"
+        )
+
+
 def critical_branch_issue(branch: str) -> int:
     match = CRITICAL_BRANCH_PATTERN.fullmatch(branch)
     if match is None:
@@ -137,6 +227,11 @@ def critical_branch_issue(branch: str) -> int:
             f"received {branch!r}"
         )
     return int(match.group("issue"))
+
+
+def validate_stacked_workstream_selection(branch: str, workstream: str) -> None:
+    if STACKED_PLATFORM_BRANCH_PATTERN.fullmatch(branch) and workstream != "critical":
+        raise WorkstreamError("stacked Platform phase PR must use Workstream: critical")
 
 
 def validate_fast_branch(branch: str) -> None:
@@ -406,6 +501,7 @@ def main() -> int:
         return 0
 
     workstream = requested_workstream(event)
+    validate_stacked_workstream_selection(branch, workstream)
     pr_number = int(event["pull_request"].get("number", 0))
     files = pull_request_files(pr_number)
 
@@ -417,11 +513,14 @@ def main() -> int:
         validate_standard_branch(branch)
         validate_standard_files(files)
     else:
-        issue = critical_branch_issue(branch)
-        packet = find_task_packet(issue)
-        validate_task_packet(packet, issue, branch)
-        current_pr = pull_request_issue(event, issue)
-        validate_issue_and_unique_pr(issue, current_pr)
+        if STACKED_PLATFORM_BRANCH_PATTERN.fullmatch(branch):
+            validate_stacked_platform_critical(event)
+        else:
+            issue = critical_branch_issue(branch)
+            packet = find_task_packet(issue)
+            validate_task_packet(packet, issue, branch)
+            current_pr = pull_request_issue(event, issue)
+            validate_issue_and_unique_pr(issue, current_pr)
 
     print(f"Workstream check passed: {workstream}")
     return 0
