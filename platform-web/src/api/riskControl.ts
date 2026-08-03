@@ -343,10 +343,7 @@ export function getRiskRecordList(params?: Record<string, unknown>) {
 export function getNotificationList(params?: Record<string, unknown>) {
   return defHttp.get({ url: '/notifications/api/v1/messages/', params }).then((payload) =>
     recordList(payload, NOTIFICATION_SERVICE, ['items', 'list']).map((value) => ({
-      id:
-        typeof value.id === 'number' || typeof value.id === 'string'
-          ? value.id
-          : undefined,
+      id: typeof value.id === 'number' || typeof value.id === 'string' ? value.id : undefined,
       message_id:
         typeof value.message_id === 'number' || typeof value.message_id === 'string'
           ? value.message_id
