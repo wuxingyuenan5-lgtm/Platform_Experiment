@@ -41,6 +41,9 @@
       "closure_status": "explicit_unavailable",
       "gap_reason": null
     },
+    "hedge-macro": {
+      "frontend_services": ["platform-web/src/api/hedgeResearch.ts"]
+    },
     "hedge-market": {
       "repository_or_provider": [
         "external:TradingView widgets",
@@ -54,6 +57,12 @@
       "unavailable_state": "provider_unavailable",
       "closure_status": "verified",
       "gap_reason": null
+    },
+    "hedge-a-share": {
+      "frontend_services": [
+        "platform-web/src/api/hedgeResearch.ts",
+        "platform-web/src/api/platform/researchWatchlist.ts"
+      ]
     },
     "monitor": {
       "frontend_services": ["platform-web/src/api/riskControl.ts"],
