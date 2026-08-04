@@ -37,6 +37,9 @@ RELEASE_SUPPORT_PATHS = {
     "scripts/check-workstream.py": "modified",
     "scripts/check-workstream-core.py": "added",
     "execution-runtime/tests/test_runtime_journal.py": "modified",
+    "platform-api/tests/test_architecture_active_naming.py": "modified",
+    "platform-api/tests/test_architecture_ci_and_version_tooling.py": "modified",
+    "platform-api/tests/test_architecture_version_consistency.py": "modified",
 }
 
 
