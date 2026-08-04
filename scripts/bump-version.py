@@ -51,7 +51,7 @@ def update_versions(root: Path, version: str) -> None:
 
     for relative in (
         "platform-api/app/application.py",
-        "execution-runtime/app/main.py",
+        "execution-runtime/app/version.py",
     ):
         replace_once(
             root / relative,

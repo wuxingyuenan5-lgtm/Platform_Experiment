@@ -1,6 +1,6 @@
 [project]
 name = "variable-global-platform-api"
-version = "0.9.3"
+version = "0.10.0"
 description = "Platform API modular monolith"
 requires-python = ">=3.12"
 dependencies = [
