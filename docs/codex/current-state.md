@@ -6,7 +6,7 @@ This is the sole repository document for current version, default branch, active
 
 ## Delivery
 
-- Current repository version: Platform `0.10.0`.
+- Current target version: Platform `0.10.0`.
 - Active/default branch: `main`.
 - Final Platform 0.10.0 release-promotion PR: #153, merged by Merge Commit `cf6030d53b3e9a759263455569503b6c7242174e`.
 - The complete delivery chain is merged: PR #135, #139, #141, #148, #149, #150, #151, #152 and #153.
