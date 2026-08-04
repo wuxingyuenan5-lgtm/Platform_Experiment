@@ -8,14 +8,14 @@ import sys
 from pathlib import Path
 
 _CORE_PATH = Path(__file__).with_name("check-workstream-core.py")
-_CORE_ENTRYPOINT = '\nif __name__ == "__main__":\n    sys.exit(main())\n'
+_CORE_ENTRYPOINT_MARKER = '\n\nif __name__ == "__main__":\n'
 _core_source = _CORE_PATH.read_text(encoding="utf-8")
-if not _core_source.endswith(_CORE_ENTRYPOINT):
-    raise RuntimeError("check-workstream core entrypoint changed unexpectedly")
-exec(
-    compile(_core_source.removesuffix(_CORE_ENTRYPOINT), str(_CORE_PATH), "exec"),
-    globals(),
+_core_body, _core_marker, _core_entrypoint = _core_source.rpartition(
+    _CORE_ENTRYPOINT_MARKER
 )
+if not _core_marker or not _core_body or not _core_entrypoint:
+    raise RuntimeError("check-workstream core entrypoint changed unexpectedly")
+exec(compile(_core_body, str(_CORE_PATH), "exec"), globals())
 _CORE_MAIN = main
 
 RELEASE_BRANCH_PATTERN = re.compile(
