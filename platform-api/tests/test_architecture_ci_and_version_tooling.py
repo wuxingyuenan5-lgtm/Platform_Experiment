@@ -87,7 +87,7 @@ def test_bump_version_updates_all_maintained_declarations(tmp_path: Path) -> Non
     (tmp_path / "platform-api/app/application.py").write_text(
         'PLATFORM_VERSION = "0.8.0"\n', encoding="utf-8"
     )
-    (tmp_path / "execution-runtime/app/main.py").write_text(
+    (tmp_path / "execution-runtime/app/version.py").write_text(
         'PLATFORM_VERSION = "0.8.0"\n', encoding="utf-8"
     )
     (tmp_path / "docs/codex/current-state.md").write_text(
@@ -114,7 +114,7 @@ def test_bump_version_updates_all_maintained_declarations(tmp_path: Path) -> Non
         tmp_path / "platform-api/app/application.py"
     ).read_text(encoding="utf-8")
     assert 'PLATFORM_VERSION = "0.9.3"' in (
-        tmp_path / "execution-runtime/app/main.py"
+        tmp_path / "execution-runtime/app/version.py"
     ).read_text(encoding="utf-8")
     assert 'Platform `0.9.3`' in (
         tmp_path / "docs/codex/current-state.md"

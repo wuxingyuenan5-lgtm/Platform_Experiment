@@ -209,9 +209,10 @@ def test_current_formal_brand_counts_are_positive() -> None:
 
 
 def test_formal_app_title_is_exact_in_both_environments() -> None:
+    expected_version = (ROOT / "VERSION").read_text(encoding="utf-8").strip()
     for path in APP_ENV_PATHS:
         assert read_env_value(path, "VITE_GLOB_APP_TITLE") == FORMAL_APP_TITLE
-        assert read_env_value(path, "VITE_GLOB_APP_VERSION") == "0.9.3"
+        assert read_env_value(path, "VITE_GLOB_APP_VERSION") == expected_version
         source = path.read_text(encoding="utf-8")
         assert source.count("VITE_GLOB_APP_TITLE") == 1
 

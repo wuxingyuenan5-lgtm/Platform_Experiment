@@ -6,7 +6,7 @@ This is the sole repository document for current version, branch, phase and know
 
 ## Delivery
 
-- Current target version: Platform `0.9.3`.
+- Current target version: Platform `0.10.0`.
 - Active branch: `refactor/platform-0-9-3-codebase-and-build-simplification`.
 - Active review: stacked Draft PR #148, based on `refactor/platform-0-9-3-repository-and-context-optimization`; it remains Open and Unmerged until explicit owner acceptance.
 - Accepted Phase 1A head: `4e4a6b7992c332c71c90dcf5b2bc18ca18302737`.

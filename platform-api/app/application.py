@@ -31,7 +31,7 @@ from app.user_cache_control import UserNoStoreMiddleware
 from app.user_routes import router as user_router
 from app.venue_reconciliation_routes import router as venue_reconciliation_router
 
-PLATFORM_VERSION = "0.9.3"
+PLATFORM_VERSION = "0.10.0"
 
 
 @asynccontextmanager

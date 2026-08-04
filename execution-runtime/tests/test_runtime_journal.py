@@ -4,6 +4,7 @@ from fastapi.testclient import TestClient
 
 from app.config import get_settings
 from app.main import app
+from app.version import PLATFORM_VERSION
 
 
 def test_runtime_persists_events_and_replays_duplicate_command(tmp_path: Path) -> None:
@@ -39,7 +40,7 @@ def test_runtime_persists_events_and_replays_duplicate_command(tmp_path: Path) -
 
         status = client.get("/status")
         assert status.status_code == 200
-        assert status.json()["version"] == "0.9.3"
+        assert status.json()["version"] == PLATFORM_VERSION
         journal = status.json()["journal"]
         assert journal["status"] == "available"
         assert journal["commandCount"] == 1
