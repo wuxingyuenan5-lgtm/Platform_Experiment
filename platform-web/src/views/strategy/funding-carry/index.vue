@@ -1,140 +1,87 @@
 <template>
   <RestoredProductSurface
-    state="sample"
-    source="sample:funding-carry-research"
-    as-of="2026-08-05 · 非实时"
-    :actionable="false"
-    message="真实资金费率 Provider 尚未配置；行情、机会与订单结构均为不可执行的样例展示。"
+    :state="fundingSampleMeta.state"
+    :source="fundingSampleMeta.source"
+    :as-of="fundingSampleMeta.asOf"
+    :actionable="fundingSampleMeta.actionable"
+    message="原市场板、图表、详情与订单结构已选择性恢复；真实资金费率 Provider 尚未配置，全部样例不可执行。"
   >
-    <main class="funding-page">
-      <header class="desk-head">
+    <main class="funding-page" data-testid="funding-original-structure">
+      <header class="funding-toolbar">
         <div>
           <span>FUNDING CARRY</span>
-          <h2>资金费率套利</h2>
-          <p>{{ selectedExchange }} · {{ selectedSymbol }} · {{ selectedResolution }}</p>
+          <h1>资金费率套利</h1>
         </div>
-        <div v-if="canWrite" class="write-actions">
-          <button disabled>创建组合</button>
-          <button disabled>执行（Live Write关闭）</button>
-        </div>
-        <b v-else>只读权限</b>
+        <nav aria-label="资金费率页面视角">
+          <button type="button" :class="{ active: localSection === 'analysis' }" @click="localSection = 'analysis'">分析</button>
+          <button type="button" :class="{ active: localSection === 'execution' }" @click="localSection = 'execution'">执行</button>
+        </nav>
       </header>
 
-      <section class="summary-grid">
-        <article v-for="item in summary" :key="item.label">
-          <span>{{ item.label }}</span>
-          <strong>{{ item.value }}</strong>
-          <small>{{ item.note }}</small>
-        </article>
-      </section>
-
-      <template v-if="activeSection === 'analysis'">
-        <section class="analysis-grid">
-          <article class="panel panel--wide">
-            <div class="panel-head">
-              <h3>交易所资金费率比较</h3>
-              <span>Sample</span>
-            </div>
-            <div class="bars">
-              <div v-for="item in exchanges" :key="item.name">
-                <span>{{ item.name }}</span>
-                <div><i :style="{ width: item.width }"></i></div>
-                <strong>{{ item.rate }}</strong>
-              </div>
-            </div>
-          </article>
-          <article class="panel">
-            <div class="panel-head">
-              <h3>候选组合</h3>
-              <span>不可执行</span>
-            </div>
-            <ul>
-              <li v-for="item in opportunities" :key="item.pair">
-                <div>
-                  <strong>{{ item.pair }}</strong>
-                  <small>{{ item.route }}</small>
-                </div>
-                <b>{{ item.apr }}</b>
-              </li>
-            </ul>
-          </article>
-        </section>
+      <template v-if="localSection === 'analysis'">
+        <FundingMarketBoard
+          :rows="fundingMarketRows"
+          :selected-range="selectedRange"
+          :selected-symbol="selectedSymbol"
+          :selected-resolution="selectedResolution"
+          :range-options="fundingRangeOptions"
+          @update:selected-range="selectedRange = $event"
+          @update:selected-symbol="selectedSymbol = $event"
+          @update:selected-resolution="selectedResolution = $event"
+        />
+        <FundingChartPanel
+          :series="fundingChartSeries"
+          :exchange="selectedExchange"
+          :symbol="selectedSymbol"
+          :range="selectedRange"
+          :resolution="selectedResolution"
+          :start-date="selectedStartDate"
+          :end-date="selectedEndDate"
+          @update:start-date="selectedStartDate = $event"
+          @update:end-date="selectedEndDate = $event"
+        />
+        <FundingDetailPanel
+          :exchange="selectedExchange"
+          :symbol="selectedSymbol"
+          :selected-range="selectedRange"
+          :resolution="selectedResolution"
+          :start-date="selectedStartDate"
+          :end-date="selectedEndDate"
+          :research="fundingResearch"
+        />
       </template>
 
       <template v-else>
-        <section class="execution-grid">
-          <article class="panel order-panel">
-            <div class="panel-head">
-              <h3>组合订单</h3>
-              <span>Live Write关闭</span>
-            </div>
-            <label>
-              名义金额
-              <input value="10,000 USDT" disabled />
-            </label>
-            <label>
-              开仓方式
-              <select disabled>
-                <option>双腿同步限价</option>
-              </select>
-            </label>
-            <label>
-              最大滑点
-              <input value="0.05%" disabled />
-            </label>
-            <button v-if="canWrite" disabled>提交组合订单</button>
-            <div v-else class="readonly-box">员工与会员仅可查看研究和状态。</div>
-          </article>
-          <article class="panel panel--wide">
-            <div class="panel-head">
-              <h3>执行预览</h3>
-              <span>ACK ≠ Fill</span>
-            </div>
-            <table>
-              <thead>
-                <tr>
-                  <th>腿</th>
-                  <th>场所</th>
-                  <th>方向</th>
-                  <th>数量</th>
-                  <th>状态</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td>现货</td>
-                  <td>Bybit</td>
-                  <td>买入</td>
-                  <td>0.16 BTC</td>
-                  <td>未提交</td>
-                </tr>
-                <tr>
-                  <td>永续</td>
-                  <td>OKX</td>
-                  <td>卖出</td>
-                  <td>0.16 BTC</td>
-                  <td>未提交</td>
-                </tr>
-              </tbody>
-            </table>
-          </article>
-        </section>
+        <FundingOrderPanel :data="fundingOrderPreview" />
       </template>
     </main>
   </RestoredProductSurface>
 </template>
 
 <script setup lang="ts">
-  import { computed } from 'vue';
+  import { ref, watch } from 'vue';
   import RestoredProductSurface from '@/components/ProductDataState/RestoredProductSurface.vue';
-  import { hasPermission } from '@/access/userAccess';
-  import { useUserStore } from '@/store/modules/user';
+  import {
+    fundingChartSeries,
+    fundingMarketRows,
+    fundingOrderPreview,
+    fundingRangeOptions,
+    fundingResearch,
+    fundingSampleMeta,
+    type FundingExchange,
+    type FundingRange,
+    type FundingSymbol,
+  } from '@/data/sample/funding';
+  import FundingChartPanel from './components/FundingChartPanel.vue';
+  import FundingDetailPanel from './components/FundingDetailPanel.vue';
+  import FundingMarketBoard from './components/FundingMarketBoard.vue';
+  import FundingOrderPanel from './components/FundingOrderPanel.vue';
 
-  withDefaults(
+  const props = withDefaults(
     defineProps<{
       activeSection?: 'analysis' | 'execution';
-      selectedExchange?: string;
-      selectedSymbol?: string;
+      selectedExchange?: FundingExchange;
+      selectedSymbol?: FundingSymbol;
       selectedResolution?: string;
     }>(),
     {
@@ -145,38 +92,32 @@
     },
   );
 
-  const userStore = useUserStore();
-  const canWrite = computed(() =>
-    hasPermission(userStore.getAuthentication?.permissions || [], 'trading.write'),
-  );
-  const summary = [
-    { label: '当前费率差', value: '0.021%', note: '8小时口径' },
-    { label: '样例年化', value: '18.4%', note: '未扣成本' },
-    { label: '基差', value: '-0.14%', note: '现货/永续' },
-    { label: '风险等级', value: '中', note: '非实时评估' },
-  ];
-  const exchanges = [
-    { name: 'Bybit', rate: '+0.0100%', width: '48%' },
-    { name: 'Binance', rate: '+0.0068%', width: '34%' },
-    { name: 'OKX', rate: '-0.0112%', width: '58%' },
-  ];
-  const opportunities = [
-    { pair: 'BTC/USDT', route: 'Bybit Spot → OKX Perp', apr: '18.4%' },
-    { pair: 'ETH/USDT', route: 'Binance Spot → Bybit Perp', apr: '12.7%' },
-    { pair: 'SOL/USDT', route: 'OKX Spot → Binance Perp', apr: '9.8%' },
-  ];
+  const localSection = ref(props.activeSection);
+  const selectedExchange = ref<FundingExchange>(props.selectedExchange);
+  const selectedSymbol = ref<string>(props.selectedSymbol);
+  const selectedRange = ref<FundingRange>('current');
+  const selectedResolution = ref(props.selectedResolution);
+  const selectedStartDate = ref('2026-05-28');
+  const selectedEndDate = ref('2026-06-24');
+
+  watch(() => props.activeSection, (value) => (localSection.value = value));
+  watch(() => props.selectedExchange, (value) => (selectedExchange.value = value));
+  watch(() => props.selectedSymbol, (value) => (selectedSymbol.value = value));
+  watch(() => props.selectedResolution, (value) => (selectedResolution.value = value));
 </script>
 
-<style scoped>
+<style scoped lang="less">
   .funding-page {
-    display: grid;
-    gap: 12px;
-    color: #172033;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    padding: 0 4px 18px;
+    color: #1d2b3a;
   }
 
-  .desk-head {
+  .funding-toolbar {
     display: flex;
-    align-items: end;
+    align-items: flex-end;
     justify-content: space-between;
     gap: 16px;
     padding: 18px;
@@ -185,224 +126,44 @@
     background: #fff;
   }
 
-  .desk-head span {
-    color: #63739b;
+  .funding-toolbar span {
+    color: #65749a;
     font-size: 11px;
     letter-spacing: 0.16em;
   }
 
-  .desk-head h2 {
-    margin: 4px 0;
-    font-size: 24px;
+  h1 {
+    margin: 4px 0 0;
+    font-size: 25px;
   }
 
-  .desk-head p {
-    margin: 0;
-    color: #6c778a;
-  }
-
-  .desk-head b {
-    padding: 6px 10px;
-    border-radius: 999px;
-    background: #eef1f5;
-    color: #687386;
-    font-size: 12px;
-  }
-
-  .write-actions {
+  nav {
     display: flex;
-    gap: 8px;
+    gap: 6px;
+    padding: 5px;
+    border: 1px solid #e1e7ef;
+    border-radius: 11px;
   }
 
-  .write-actions button,
-  .order-panel button {
-    padding: 9px 12px;
+  nav button {
+    padding: 8px 14px;
     border: 0;
     border-radius: 8px;
-    background: #dfe7f2;
-    color: #657188;
+    background: transparent;
+    color: #697589;
+    cursor: pointer;
   }
 
-  .summary-grid {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 10px;
+  nav button.active {
+    background: #edf3f8;
+    color: #294a67;
+    font-weight: 700;
   }
 
-  .summary-grid article,
-  .panel {
-    border: 1px solid #e1e7ef;
-    border-radius: 13px;
-    background: #fff;
-  }
-
-  .summary-grid article {
-    display: grid;
-    gap: 5px;
-    padding: 15px;
-  }
-
-  .summary-grid span,
-  .summary-grid small {
-    color: #6d788b;
-  }
-
-  .summary-grid strong {
-    font-size: 22px;
-  }
-
-  .analysis-grid,
-  .execution-grid {
-    display: grid;
-    grid-template-columns: 1.5fr 1fr;
-    gap: 10px;
-  }
-
-  .execution-grid {
-    grid-template-columns: 0.8fr 1.4fr;
-  }
-
-  .panel {
-    padding: 16px;
-  }
-
-  .panel-head {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 14px;
-  }
-
-  .panel-head h3 {
-    margin: 0;
-    font-size: 16px;
-  }
-
-  .panel-head span {
-    padding: 4px 8px;
-    border-radius: 999px;
-    background: #fff6dc;
-    color: #8a6414;
-    font-size: 11px;
-  }
-
-  .bars {
-    display: grid;
-    gap: 16px;
-  }
-
-  .bars > div {
-    display: grid;
-    grid-template-columns: 70px 1fr 80px;
-    align-items: center;
-    gap: 10px;
-  }
-
-  .bars > div > div {
-    height: 8px;
-    overflow: hidden;
-    border-radius: 999px;
-    background: #edf1f5;
-  }
-
-  .bars i {
-    display: block;
-    height: 100%;
-    background: linear-gradient(90deg, #557ed0, #34a57b);
-  }
-
-  ul {
-    display: grid;
-    gap: 12px;
-    padding: 0;
-    margin: 0;
-    list-style: none;
-  }
-
-  li {
-    display: flex;
-    justify-content: space-between;
-    gap: 10px;
-    padding-bottom: 10px;
-    border-bottom: 1px solid #edf1f5;
-  }
-
-  li div {
-    display: grid;
-    gap: 3px;
-  }
-
-  li small {
-    color: #7a8595;
-  }
-
-  li b {
-    color: #087a55;
-  }
-
-  .order-panel {
-    display: grid;
-    gap: 12px;
-  }
-
-  .order-panel label {
-    display: grid;
-    gap: 6px;
-    color: #667085;
-  }
-
-  .order-panel input,
-  .order-panel select {
-    height: 38px;
-    padding: 0 10px;
-    border: 1px solid #dde3eb;
-    border-radius: 8px;
-    background: #f7f9fb;
-  }
-
-  .readonly-box {
-    padding: 12px;
-    border-radius: 9px;
-    background: #f1f4f8;
-    color: #667085;
-  }
-
-  table {
-    width: 100%;
-    border-collapse: collapse;
-  }
-
-  th,
-  td {
-    padding: 12px;
-    border-bottom: 1px solid #edf1f5;
-    text-align: left;
-  }
-
-  th {
-    color: #758094;
-    font-size: 12px;
-  }
-
-  @media (max-width: 900px) {
-    .summary-grid {
-      grid-template-columns: repeat(2, 1fr);
-    }
-
-    .analysis-grid,
-    .execution-grid {
-      grid-template-columns: 1fr;
-    }
-  }
-
-  @media (max-width: 540px) {
-    .summary-grid {
-      grid-template-columns: 1fr;
-    }
-
-    .desk-head {
+  @media (max-width: 620px) {
+    .funding-toolbar {
+      align-items: stretch;
       flex-direction: column;
-      align-items: start;
     }
   }
 </style>
