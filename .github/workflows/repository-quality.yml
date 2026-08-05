@@ -28,6 +28,32 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
+      - name: Detect changed frontend source
+        id: frontend-source
+        shell: bash
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
+            base="${{ github.event.pull_request.base.sha }}"
+            range="$base...HEAD"
+          else
+            range="HEAD^..HEAD"
+          fi
+          if git diff --name-only "$range" | grep -Eq '^platform-web/src/.*\.(js|jsx|ts|tsx|vue)$'; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: pnpm/action-setup@v4
+        if: steps.frontend-source.outputs.changed == 'true'
+        with:
+          version: 9.15.9
+          run_install: false
+      - name: Install frontend lint dependencies when needed
+        if: steps.frontend-source.outputs.changed == 'true'
+        working-directory: platform-web
+        env:
+          HUSKY: '0'
+        run: pnpm install --frozen-lockfile
       - name: Check Git patch formatting
         shell: bash
         run: |
@@ -44,5 +70,11 @@ jobs:
         run: python scripts/check-repository-structure.py
       - name: Check active documentation and links
         run: python scripts/check-documentation-consistency.py
+      - name: Check closed product data ownership
+        run: python scripts/audit-product-data-owner-matrix.py --require-closed
+      - name: Check production data boundaries
+        run: python scripts/audit-production-data-boundaries.py
+      - name: Check frontend no-new-debt
+        run: python scripts/frontend-no-new-debt.py
       - name: Check frontend codebase boundaries
         run: node platform-web/scripts/check-codebase-boundaries.cjs
