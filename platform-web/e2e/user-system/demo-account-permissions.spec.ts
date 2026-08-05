@@ -64,29 +64,25 @@ test('all eight reusable accounts obey menu URL API and personal-account boundar
         await account.page.goto(absoluteUrl('/home/index'));
         if (expected.role === 'member') {
           await expect(account.page.getByText(/个人账号|我的资产/).first()).toBeVisible();
-          await account.page.goto(absoluteUrl('/strategy/management'));
-          await expect(account.page).toHaveURL(/\/exception\/403|\/403/, {
-            timeout: 20_000,
-          });
         } else {
           await expect(account.page.getByRole('heading', { name: '全球变量' })).toBeVisible();
+        }
 
-          await account.page.goto(absoluteUrl('/strategy/management'));
+        await account.page.goto(absoluteUrl('/strategy/management'));
+        await expect(
+          account.page.getByTestId('strategy-management-original-structure'),
+        ).toBeVisible();
+        await expect(
+          account.page.getByText('示例策略不可启停、部署或下单', { exact: true }),
+        ).toBeVisible();
+        if (expected.write) {
+          await expect(account.page.getByRole('button', { name: '启停策略' })).toBeDisabled();
+          await expect(account.page.getByRole('button', { name: '部署策略' })).toBeDisabled();
+        } else {
           await expect(
-            account.page.getByTestId('strategy-management-original-structure'),
+            account.page.getByText('当前账号为只读权限', { exact: true }),
           ).toBeVisible();
-          await expect(
-            account.page.getByText('示例策略不可启停、部署或下单', { exact: true }),
-          ).toBeVisible();
-          if (expected.write) {
-            await expect(account.page.getByRole('button', { name: '启停策略' })).toBeDisabled();
-            await expect(account.page.getByRole('button', { name: '部署策略' })).toBeDisabled();
-          } else {
-            await expect(
-              account.page.getByText('当前账号为只读权限', { exact: true }),
-            ).toBeVisible();
-            await expect(account.page.locator('[data-write-action="true"]')).toHaveCount(0);
-          }
+          await expect(account.page.locator('[data-write-action="true"]')).toHaveCount(0);
         }
 
         await account.page.goto(absoluteUrl('/account/index'));
