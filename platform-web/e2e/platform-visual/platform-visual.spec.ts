@@ -86,8 +86,8 @@ const EMPLOYEE_PAGES: readonly VisualPage[] = [
   {
     key: 'settings',
     route: '/settings/index',
-    marker: '系统设置',
-    markerKind: 'heading',
+    marker: 'settings-original-structure',
+    markerKind: 'testid',
     evidenceSource:
       'reference settings layout; Session and health are live reads, writes unavailable',
   },
