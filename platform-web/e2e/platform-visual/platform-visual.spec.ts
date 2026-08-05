@@ -21,7 +21,7 @@ interface VisualPage {
   key: string;
   route: string;
   marker: string;
-  markerKind?: 'heading' | 'text';
+  markerKind?: 'heading' | 'text' | 'testid';
   evidenceSource: string;
 }
 
@@ -31,7 +31,7 @@ const EMPLOYEE_PAGES: readonly VisualPage[] = [
     route: '/home/index',
     marker: '全球变量',
     markerKind: 'heading',
-    evidenceSource: 'restored dashboard structure with disclosed non-actionable sample state',
+    evidenceSource: 'reference dashboard structure with disclosed non-actionable sample state',
   },
   {
     key: 'research-macro',
@@ -50,43 +50,44 @@ const EMPLOYEE_PAGES: readonly VisualPage[] = [
   {
     key: 'strategy-funding',
     route: '/strategy/platform?desk=funding',
-    marker: '示例数据 · 非实时 · 不可执行',
-    evidenceSource: 'restored funding research sample; write controls remain non-actionable',
+    marker: 'funding-original-structure',
+    markerKind: 'testid',
+    evidenceSource: 'reference funding market/chart/detail structure; sample writes disabled',
   },
   {
     key: 'strategy-cross-spread',
     route: '/strategy/platform?desk=crossSpread',
     marker: '跨所价差研究',
     markerKind: 'heading',
-    evidenceSource: 'restored spread analysis with current CrossVenue execution workspace retained',
+    evidenceSource: 'reference spread research with current CrossVenue execution workspace retained',
   },
   {
     key: 'strategy-management',
     route: '/strategy/management',
-    marker: '策略管理',
-    markerKind: 'heading',
-    evidenceSource: 'restored strategy catalog sample; employee write controls hidden',
+    marker: 'strategy-management-original-structure',
+    markerKind: 'testid',
+    evidenceSource: 'reference strategy component system with employee write controls disabled',
   },
   {
     key: 'financial-ai',
     route: '/financial-ai/index',
-    marker: '金融 AI',
+    marker: '研究辅助与情景推演中枢',
     markerKind: 'heading',
-    evidenceSource: 'financial AI Provider unavailable; no generated answer',
+    evidenceSource: 'reference financial AI layout; Provider unavailable and no generated answer',
   },
   {
     key: 'news-digest',
     route: '/news-calendar/news',
     marker: '新闻日历与理财',
     markerKind: 'heading',
-    evidenceSource: 'restored news digest sample with visible source state',
+    evidenceSource: 'reference news digest hierarchy with visible non-real-time sample state',
   },
   {
     key: 'settings',
     route: '/settings/index',
     marker: '系统设置',
     markerKind: 'heading',
-    evidenceSource: 'session is live; settings writes remain disabled',
+    evidenceSource: 'reference settings layout; Session and health are live reads, writes unavailable',
   },
   {
     key: 'risk-detail',
@@ -181,7 +182,9 @@ async function waitForMarker(page: Page, definition: VisualPage): Promise<void> 
   const marker =
     definition.markerKind === 'heading'
       ? page.getByRole('heading', { name: definition.marker }).first()
-      : page.getByText(definition.marker, { exact: false }).first();
+      : definition.markerKind === 'testid'
+        ? page.getByTestId(definition.marker).first()
+        : page.getByText(definition.marker, { exact: false }).first();
   await expect(marker).toBeVisible({ timeout: 30_000 });
 }
 
@@ -241,10 +244,7 @@ async function capturePage(
   const directory = path.join(EVIDENCE_ROOT, viewport.name, role);
   fs.mkdirSync(directory, { recursive: true });
   const screenshotName = `${definition.key}.png`;
-  await page.screenshot({
-    path: path.join(directory, screenshotName),
-    animations: 'disabled',
-  });
+  await page.screenshot({ path: path.join(directory, screenshotName), animations: 'disabled' });
   fs.writeFileSync(
     path.join(directory, `${definition.key}.json`),
     JSON.stringify(
@@ -255,8 +255,7 @@ async function capturePage(
         viewport,
         marker: definition.marker,
         evidenceSource: definition.evidenceSource,
-        evidenceClassification:
-          'deterministic visual baseline; not production or real Provider acceptance',
+        evidenceClassification: 'deterministic visual baseline; not production or real Provider acceptance',
         liveWrite: false,
         screenshot: screenshotName,
         layout,
