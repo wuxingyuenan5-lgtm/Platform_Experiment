@@ -13,8 +13,20 @@
           <h1>资金费率套利</h1>
         </div>
         <nav aria-label="资金费率页面视角">
-          <button type="button" :class="{ active: localSection === 'analysis' }" @click="localSection = 'analysis'">分析</button>
-          <button type="button" :class="{ active: localSection === 'execution' }" @click="localSection = 'execution'">执行</button>
+          <button
+            type="button"
+            :class="{ active: localSection === 'analysis' }"
+            @click="localSection = 'analysis'"
+          >
+            分析
+          </button>
+          <button
+            type="button"
+            :class="{ active: localSection === 'execution' }"
+            @click="localSection = 'execution'"
+          >
+            执行
+          </button>
         </nav>
       </header>
 
@@ -25,9 +37,9 @@
           :selected-symbol="selectedSymbol"
           :selected-resolution="selectedResolution"
           :range-options="fundingRangeOptions"
-          @update:selected-range="selectedRange = $event"
-          @update:selected-symbol="selectedSymbol = $event"
-          @update:selected-resolution="selectedResolution = $event"
+          @update:selected-range="handleRangeChange"
+          @update:selected-symbol="handleSymbolChange"
+          @update:selected-resolution="handleResolutionChange"
         />
         <FundingChartPanel
           :series="fundingChartSeries"
@@ -100,10 +112,34 @@
   const selectedStartDate = ref('2026-05-28');
   const selectedEndDate = ref('2026-06-24');
 
-  watch(() => props.activeSection, (value) => (localSection.value = value));
-  watch(() => props.selectedExchange, (value) => (selectedExchange.value = value));
-  watch(() => props.selectedSymbol, (value) => (selectedSymbol.value = value));
-  watch(() => props.selectedResolution, (value) => (selectedResolution.value = value));
+  function handleRangeChange(value: FundingRange) {
+    selectedRange.value = value;
+  }
+
+  function handleSymbolChange(value: string) {
+    selectedSymbol.value = value;
+  }
+
+  function handleResolutionChange(value: string) {
+    selectedResolution.value = value;
+  }
+
+  watch(
+    () => props.activeSection,
+    (value) => (localSection.value = value),
+  );
+  watch(
+    () => props.selectedExchange,
+    (value) => (selectedExchange.value = value),
+  );
+  watch(
+    () => props.selectedSymbol,
+    (value) => (selectedSymbol.value = value),
+  );
+  watch(
+    () => props.selectedResolution,
+    (value) => (selectedResolution.value = value),
+  );
 </script>
 
 <style scoped lang="less">
