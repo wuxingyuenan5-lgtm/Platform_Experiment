@@ -78,6 +78,7 @@
 <script setup lang="ts">
   import { ReloadOutlined, SyncOutlined } from '@ant-design/icons-vue';
   import { Button, Card, message, Space, Table, Tag } from 'ant-design-vue';
+  import type { ColumnsType } from 'ant-design-vue/es/table/interface';
   import { computed, onMounted, ref } from 'vue';
   import { useRoute } from 'vue-router';
   import {
@@ -126,7 +127,7 @@
     return Number.isFinite(id) && id > 0 ? id : undefined;
   });
 
-  const columns = [
+  const columns: ColumnsType<DataAccount> = [
     { title: '账户', dataIndex: 'name', key: 'name' },
     { title: '类型', dataIndex: 'account_type', key: 'account_type', width: 110 },
     { title: '资产', key: 'asset', align: 'right' },
