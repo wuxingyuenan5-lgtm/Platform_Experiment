@@ -1,326 +1,606 @@
 <template>
   <RestoredProductSurface
-    state="sample"
-    source="sample:dashboard-restoration"
-    as-of="2026-08-05 · 非实时"
-    :actionable="false"
-    message="首页聚合数据 Owner 尚未配置；当前恢复信息架构和观察面板，数值仅用于界面验收。"
+    :state="dashboardSampleMeta.state"
+    :source="dashboardSampleMeta.source"
+    :as-of="dashboardSampleMeta.asOf"
+    :actionable="dashboardSampleMeta.actionable"
+    message="原首页产品结构已按参考提交选择性恢复；当前数值为明确标识的非实时样例。"
   >
-    <main class="dashboard-restored">
-      <header class="hero">
-        <div>
-          <p class="eyebrow">GLOBAL VARIABLE · RESEARCH DESK</p>
-          <h1>全球变量</h1>
-          <p>把宏观、权益、商品、加密与风险状态集中到同一观察入口。</p>
-        </div>
-        <div class="hero__status">
-          <span>市场状态</span>
-          <strong>观察模式</strong>
-          <small>样例快照，不构成交易信号</small>
-        </div>
-      </header>
-
-      <section class="metric-grid">
-        <article v-for="item in metrics" :key="item.label" class="metric-card">
-          <span>{{ item.label }}</span>
-          <strong>{{ item.value }}</strong>
-          <small>{{ item.note }}</small>
-        </article>
-      </section>
-
-      <section class="content-grid">
-        <article class="panel panel--wide">
-          <div class="panel__head">
-            <div>
-              <span>跨资产观察</span>
-              <h2>风险偏好温度</h2>
+    <PageWrapper dense :content-style="{ overflow: 'visible' }">
+      <main
+        class="home-dashboard"
+        data-testid="dashboard-original-structure"
+        aria-label="全球变量首页"
+      >
+        <div class="home-dashboard__frame">
+          <section class="home-hero">
+            <div class="home-hero__copy">
+              <span>欢迎来到</span>
+              <h1>全球变量</h1>
+              <p>顺应时代大势，洞悉投资先机</p>
             </div>
-            <em>Sample</em>
-          </div>
-          <div v-for="item in heat" :key="item.name" class="heat-row">
-            <span>{{ item.name }}</span>
-            <div class="heat-track">
-              <i :style="{ width: `${item.score}%` }"></i>
-            </div>
-            <strong>{{ item.view }}</strong>
-          </div>
-        </article>
 
-        <article class="panel">
-          <div class="panel__head">
-            <h2>今日关注</h2>
-            <em>只读</em>
-          </div>
-          <ul class="focus-list">
-            <li v-for="item in focus" :key="item.title">
-              <span>{{ item.time }}</span>
-              <div>
-                <strong>{{ item.title }}</strong>
-                <small>{{ item.note }}</small>
+            <div class="home-hero__summaries">
+              <aside class="hero-side hero-side--market">
+                <header>
+                  <div>
+                    <strong>全球市场概览</strong>
+                    <span>非实时样例</span>
+                  </div>
+                  <RightOutlined />
+                </header>
+
+                <div class="market-mini-grid">
+                  <article v-for="item in marketOverviewItems" :key="item.label">
+                    <span>{{ item.label }}</span>
+                    <svg viewBox="0 0 78 22" preserveAspectRatio="none" aria-hidden="true">
+                      <polyline
+                        :points="item.spark"
+                        fill="none"
+                        :stroke="item.color"
+                        stroke-width="2.2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      />
+                    </svg>
+                    <strong>--</strong>
+                  </article>
+                </div>
+              </aside>
+
+              <aside class="hero-side hero-side--portfolio">
+                <header>
+                  <strong>投资组合总览</strong>
+                  <RightOutlined />
+                </header>
+
+                <div class="portfolio-summary">
+                  <div>
+                    <span>总资产（估值）</span>
+                    <strong>--</strong>
+                  </div>
+                  <div>
+                    <span>今日收益</span>
+                    <strong>--（--）</strong>
+                  </div>
+                  <div class="portfolio-ring" aria-label="组合配置样例图"></div>
+                </div>
+              </aside>
+            </div>
+          </section>
+
+          <section class="dashboard-grid" aria-label="首页工作台">
+            <article class="dashboard-panel panel-market">
+              <header><h2>市场脉搏</h2></header>
+              <div class="pulse-tabs" aria-label="市场脉搏视角">
+                <button type="button" class="is-active">增长主线</button>
+                <button type="button">资产传导</button>
+                <button type="button">资金流向</button>
               </div>
-            </li>
-          </ul>
-        </article>
 
-        <article class="panel">
-          <div class="panel__head">
-            <h2>组合风险</h2>
-            <em>只读</em>
-          </div>
-          <dl class="risk-list">
-            <div v-for="item in risks" :key="item.label">
-              <dt>{{ item.label }}</dt>
-              <dd>{{ item.value }}</dd>
-            </div>
-          </dl>
-        </article>
-      </section>
-    </main>
+              <div class="pulse-list">
+                <button
+                  v-for="item in pulseRows"
+                  :key="item.title"
+                  type="button"
+                  class="pulse-row"
+                  @click="goPath(item.path)"
+                >
+                  <span class="row-icon"><component :is="iconMap[item.icon]" /></span>
+                  <span class="row-copy"><strong>{{ item.title }}</strong></span>
+                  <svg viewBox="0 0 82 22" preserveAspectRatio="none" aria-hidden="true">
+                    <polyline
+                      :points="item.spark"
+                      fill="none"
+                      :stroke="item.color"
+                      stroke-width="2.2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    />
+                  </svg>
+                  <span class="row-value">--</span>
+                </button>
+              </div>
+
+              <button class="panel-link" type="button" @click="goPath('/hedge-board/macro')">
+                查看全部市场分析
+                <RightOutlined />
+              </button>
+            </article>
+
+            <article class="dashboard-panel panel-portfolio">
+              <header><h2>组合概览</h2></header>
+              <div class="allocation-content">
+                <div class="allocation-ring" aria-label="资产配置样例图"></div>
+                <div class="allocation-legend">
+                  <div v-for="item in allocationLegend" :key="item.label">
+                    <i :style="{ background: item.color }"></i>
+                    <span>{{ item.label }}</span>
+                    <strong>--</strong>
+                  </div>
+                </div>
+              </div>
+
+              <div class="risk-metrics">
+                <article v-for="item in allocationStats" :key="item">
+                  <span>{{ item }}</span>
+                  <strong>--</strong>
+                </article>
+              </div>
+
+              <button class="panel-link" type="button" @click="goPath('/strategy/management')">
+                查看组合详情
+                <RightOutlined />
+              </button>
+            </article>
+
+            <article class="dashboard-panel panel-strategy">
+              <header><h2>策略概览</h2></header>
+              <div class="strategy-list">
+                <button
+                  v-for="item in strategyRows"
+                  :key="item.title"
+                  type="button"
+                  class="strategy-row"
+                  @click="goPath(item.path)"
+                >
+                  <span class="row-icon"><component :is="iconMap[item.icon]" /></span>
+                  <span class="row-copy">
+                    <strong>{{ item.title }}</strong>
+                    <em>--（--）</em>
+                  </span>
+                  <svg viewBox="0 0 82 22" preserveAspectRatio="none" aria-hidden="true">
+                    <polyline
+                      :points="item.spark"
+                      fill="none"
+                      :stroke="item.color"
+                      stroke-width="2.2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    />
+                  </svg>
+                </button>
+              </div>
+
+              <button class="panel-link" type="button" @click="goPath('/strategy/index')">
+                查看所有策略
+                <RightOutlined />
+              </button>
+            </article>
+
+            <article class="dashboard-panel panel-calendar">
+              <header><h2>重要日历</h2></header>
+              <div class="calendar-strip">
+                <LeftOutlined />
+                <strong>非实时日历样例</strong>
+                <span>Sample</span>
+                <RightOutlined />
+              </div>
+
+              <div class="calendar-list">
+                <article v-for="item in calendarRows" :key="`${item.time}-${item.title}`">
+                  <span class="calendar-time"><i></i>{{ item.time }}</span>
+                  <strong>{{ item.region }}</strong>
+                  <p>{{ item.title }}</p>
+                  <em>预期：--<br />前值：--</em>
+                </article>
+              </div>
+
+              <button class="panel-link" type="button" @click="goPath('/news-calendar/macro')">
+                查看完整日历
+                <RightOutlined />
+              </button>
+            </article>
+          </section>
+        </div>
+      </main>
+    </PageWrapper>
   </RestoredProductSurface>
 </template>
 
 <script setup lang="ts">
+  import { useRouter } from 'vue-router';
+  import {
+    CalendarOutlined,
+    ClusterOutlined,
+    DatabaseOutlined,
+    FundProjectionScreenOutlined,
+    LeftOutlined,
+    LineChartOutlined,
+    RightOutlined,
+  } from '@ant-design/icons-vue';
+  import { PageWrapper } from '@/components/Page';
   import RestoredProductSurface from '@/components/ProductDataState/RestoredProductSurface.vue';
+  import {
+    allocationLegend,
+    allocationStats,
+    calendarRows,
+    dashboardSampleMeta,
+    marketOverviewItems,
+    pulseRows,
+    strategyRows,
+  } from '@/data/sample/dashboard';
 
-  const metrics = [
-    { label: 'A股风险偏好', value: '62', note: '中性偏进攻' },
-    { label: '美元流动性', value: '48', note: '边际收敛' },
-    { label: '商品趋势', value: '71', note: '有色相对占优' },
-    { label: '波动率状态', value: '36', note: '未进入压力区' },
-  ];
+  const router = useRouter();
+  const iconMap = {
+    calendar: CalendarOutlined,
+    cluster: ClusterOutlined,
+    database: DatabaseOutlined,
+    line: LineChartOutlined,
+    projection: FundProjectionScreenOutlined,
+  } as const;
 
-  const heat = [
-    { name: '中国权益', score: 66, view: '偏强' },
-    { name: '美国权益', score: 55, view: '中性' },
-    { name: '贵金属', score: 73, view: '偏强' },
-    { name: '工业金属', score: 69, view: '偏强' },
-    { name: '加密资产', score: 47, view: '震荡' },
-  ];
-
-  const focus = [
-    {
-      time: '09:30',
-      title: 'A股开盘结构',
-      note: '观察成交扩散与大小盘同步性',
-    },
-    {
-      time: '15:00',
-      title: '商品日盘收市',
-      note: '关注铜、金与碳酸锂趋势持续性',
-    },
-    {
-      time: '21:30',
-      title: '美股开盘窗口',
-      note: '核对美元、利率与风险资产联动',
-    },
-  ];
-
-  const risks = [
-    { label: '集中度', value: '可控' },
-    { label: '流动性', value: '正常' },
-    { label: '跨市场敞口', value: '待复核' },
-    { label: 'Live Write', value: '关闭' },
-  ];
+  function goPath(path: string) {
+    router.push(path);
+  }
 </script>
 
-<style scoped>
-  .dashboard-restored {
+<style scoped lang="less">
+  .home-dashboard {
+    --home-page-gutter: clamp(18px, 2vw, 42px);
+
+    min-height: 100%;
+    color: #1b2a38;
+    background: linear-gradient(180deg, rgba(247, 250, 252, 0.34), #eff5fa 62%);
+  }
+
+  .home-dashboard__frame {
+    width: 100%;
+    padding-bottom: clamp(28px, 3vw, 48px);
+  }
+
+  .home-hero {
+    min-height: clamp(480px, 41vw, 680px);
+    padding: clamp(58px, 5vw, 92px) var(--home-page-gutter) clamp(44px, 4vw, 72px);
+    display: grid;
+    grid-template-columns: minmax(0, 1.42fr) minmax(380px, 0.58fr);
+    gap: clamp(28px, 4vw, 72px);
+    align-items: start;
+    overflow: hidden;
+    background: url('@/assets/images/home-hero-generated-20260726.png') center / cover no-repeat;
+    box-shadow: 0 24px 60px rgba(156, 174, 195, 0.16);
+  }
+
+  .home-hero__copy {
+    max-width: 620px;
+    padding-top: clamp(10px, 2.6vw, 46px);
+  }
+
+  .home-hero__copy span {
+    display: block;
+    margin-bottom: 14px;
+    color: #3e4b56;
+    font-size: clamp(16px, 1.2vw, 19px);
+    font-weight: 600;
+  }
+
+  .home-hero__copy h1 {
+    margin: 0;
+    color: #182633;
+    font-family: 'Noto Serif SC', 'Songti SC', 'SimSun', serif;
+    font-size: clamp(50px, 4.2vw, 72px);
+    font-weight: 600;
+    line-height: 1.06;
+    text-shadow: 0 8px 22px rgba(255, 255, 255, 0.72);
+  }
+
+  .home-hero__copy p {
+    margin: 20px 0 0;
+    color: #43525f;
+    font-size: clamp(18px, 1.45vw, 23px);
+    font-weight: 500;
+  }
+
+  .home-hero__summaries {
+    display: grid;
+    gap: 18px;
+  }
+
+  .hero-side,
+  .dashboard-panel {
+    min-width: 0;
+    border: 1px solid rgba(232, 237, 243, 0.95);
+    border-radius: 20px;
+    background: rgba(255, 255, 255, 0.82);
+    box-shadow: 0 20px 50px rgba(136, 158, 184, 0.13);
+    backdrop-filter: blur(18px);
+  }
+
+  .hero-side {
+    padding: 24px;
+  }
+
+  .hero-side header,
+  .dashboard-panel header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+  }
+
+  .hero-side header div {
+    display: grid;
+    gap: 4px;
+  }
+
+  .hero-side header span {
+    color: #84909c;
+    font-size: 12px;
+  }
+
+  .market-mini-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+    margin-top: 22px;
+  }
+
+  .market-mini-grid article {
+    display: grid;
+    grid-template-columns: 1fr 70px auto;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+  }
+
+  .market-mini-grid svg,
+  .pulse-row svg,
+  .strategy-row svg {
+    width: 100%;
+    height: 22px;
+  }
+
+  .portfolio-summary {
+    display: grid;
+    grid-template-columns: 1fr 1fr 92px;
+    align-items: center;
+    gap: 18px;
+    margin-top: 22px;
+  }
+
+  .portfolio-summary > div:not(.portfolio-ring) {
+    display: grid;
+    gap: 8px;
+  }
+
+  .portfolio-summary span {
+    color: #71808e;
+    font-size: 12px;
+  }
+
+  .portfolio-ring,
+  .allocation-ring {
+    aspect-ratio: 1;
+    border-radius: 50%;
+    background: conic-gradient(#d9b576 0 32%, #8fb2d8 32% 55%, #d9dee5 55% 78%, #eee0c7 78%);
+    box-shadow: inset 0 0 0 15px rgba(255, 255, 255, 0.88);
+  }
+
+  .dashboard-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 20px;
+    padding: 22px var(--home-page-gutter) 0;
+  }
+
+  .dashboard-panel {
     display: grid;
     gap: 16px;
-    padding: 4px;
-    color: #172033;
+    padding: 24px;
   }
 
-  .hero {
-    display: flex;
-    justify-content: space-between;
-    gap: 24px;
-    padding: 28px;
-    border-radius: 18px;
-    background: linear-gradient(135deg, #101a2e, #203a63);
-    color: white;
-  }
-
-  .hero h1 {
-    margin: 4px 0 8px;
-    font-size: 34px;
-  }
-
-  .hero p {
+  .dashboard-panel h2 {
     margin: 0;
-    color: #cbd7e8;
+    font-size: 21px;
   }
 
-  .eyebrow {
-    font-size: 11px;
-    letter-spacing: 0.18em;
-  }
-
-  .hero__status {
-    display: grid;
-    min-width: 180px;
-    align-content: center;
-    gap: 4px;
-    padding: 16px;
-    border: 1px solid rgb(255 255 255 / 18%);
-    border-radius: 14px;
-    background: rgb(255 255 255 / 8%);
-  }
-
-  .hero__status strong {
-    font-size: 24px;
-  }
-
-  .hero__status small {
-    color: #cbd7e8;
-  }
-
-  .metric-grid {
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 12px;
-  }
-
-  .metric-card,
-  .panel {
-    border: 1px solid #e4e9f0;
-    border-radius: 14px;
-    background: #fff;
-    box-shadow: 0 8px 24px rgb(26 39 66 / 5%);
-  }
-
-  .metric-card {
-    display: grid;
-    gap: 6px;
-    padding: 18px;
-  }
-
-  .metric-card span,
-  .metric-card small,
-  .panel small {
-    color: #6b7587;
-  }
-
-  .metric-card strong {
-    font-size: 28px;
-  }
-
-  .content-grid {
-    display: grid;
-    grid-template-columns: 1.5fr 1fr 1fr;
-    gap: 12px;
-  }
-
-  .panel {
-    padding: 18px;
-  }
-
-  .panel__head {
+  .pulse-tabs {
     display: flex;
-    align-items: start;
-    justify-content: space-between;
-    margin-bottom: 16px;
+    gap: 8px;
   }
 
-  .panel__head h2 {
-    margin: 2px 0 0;
-    font-size: 17px;
+  .pulse-tabs button,
+  .panel-link {
+    border: 0;
+    background: transparent;
+    cursor: pointer;
   }
 
-  .panel__head em {
-    padding: 4px 8px;
+  .pulse-tabs button {
+    padding: 7px 12px;
     border-radius: 999px;
-    background: #fff5d6;
-    color: #8a6210;
-    font-size: 11px;
+    color: #73808d;
+  }
+
+  .pulse-tabs button.is-active {
+    background: #eef3f8;
+    color: #233d56;
+    font-weight: 700;
+  }
+
+  .pulse-list,
+  .strategy-list,
+  .calendar-list {
+    display: grid;
+    gap: 8px;
+  }
+
+  .pulse-row,
+  .strategy-row {
+    display: grid;
+    grid-template-columns: 36px minmax(110px, 1fr) 82px auto;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 0;
+    border: 0;
+    border-bottom: 1px solid #edf1f5;
+    background: transparent;
+    color: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .row-icon {
+    display: grid;
+    width: 34px;
+    height: 34px;
+    place-items: center;
+    border-radius: 10px;
+    background: #edf3f8;
+    color: #526f8a;
+  }
+
+  .row-copy {
+    display: grid;
+    gap: 4px;
+  }
+
+  .row-copy em {
+    color: #8a96a2;
+    font-size: 12px;
     font-style: normal;
   }
 
-  .heat-row {
-    display: grid;
-    grid-template-columns: 80px 1fr 50px;
+  .panel-link {
+    display: flex;
     align-items: center;
-    gap: 10px;
-    margin: 14px 0;
-  }
-
-  .heat-track {
-    height: 7px;
-    overflow: hidden;
-    border-radius: 999px;
-    background: #edf1f6;
-  }
-
-  .heat-track i {
-    display: block;
-    height: 100%;
-    border-radius: inherit;
-    background: linear-gradient(90deg, #5a83d8, #26a477);
-  }
-
-  .focus-list {
-    display: grid;
-    gap: 14px;
-    padding: 0;
-    margin: 0;
-    list-style: none;
-  }
-
-  .focus-list li {
-    display: grid;
-    grid-template-columns: 48px 1fr;
-    gap: 10px;
-  }
-
-  .focus-list li > span {
-    color: #6a79a2;
+    justify-content: flex-end;
+    gap: 6px;
+    color: #45647f;
     font-weight: 700;
   }
 
-  .focus-list div {
+  .allocation-content {
     display: grid;
-    gap: 3px;
+    grid-template-columns: 150px 1fr;
+    align-items: center;
+    gap: 24px;
   }
 
-  .risk-list {
+  .allocation-legend {
     display: grid;
-    gap: 12px;
-    margin: 0;
+    gap: 10px;
   }
 
-  .risk-list div {
+  .allocation-legend div {
+    display: grid;
+    grid-template-columns: 10px 1fr auto;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .allocation-legend i {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+  }
+
+  .risk-metrics {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+
+  .risk-metrics article {
     display: flex;
     justify-content: space-between;
-    padding-bottom: 10px;
-    border-bottom: 1px solid #eef1f5;
+    padding: 10px 12px;
+    border-radius: 10px;
+    background: #f7f9fb;
   }
 
-  .risk-list dt {
-    color: #6b7587;
+  .calendar-strip {
+    display: grid;
+    grid-template-columns: auto 1fr auto auto;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    background: #f4f7fa;
   }
 
-  .risk-list dd {
+  .calendar-list article {
+    display: grid;
+    grid-template-columns: 70px 56px 1fr auto;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 0;
+    border-bottom: 1px solid #edf1f5;
+  }
+
+  .calendar-list p,
+  .calendar-list em {
     margin: 0;
+  }
+
+  .calendar-list em {
+    color: #85919c;
+    font-size: 12px;
+    font-style: normal;
+    text-align: right;
+  }
+
+  .calendar-time {
+    color: #47617a;
     font-weight: 700;
   }
 
-  @media (max-width: 1100px) {
-    .metric-grid {
-      grid-template-columns: repeat(2, 1fr);
+  @media (max-width: 1024px) {
+    .home-hero {
+      grid-template-columns: 1fr;
     }
 
-    .content-grid {
-      grid-template-columns: 1fr;
+    .home-hero__summaries {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
     }
   }
 
-  @media (max-width: 640px) {
-    .hero {
-      flex-direction: column;
+  @media (max-width: 768px) {
+    .home-hero {
+      min-height: auto;
+      padding-top: 42px;
     }
 
-    .metric-grid {
+    .home-hero__summaries,
+    .dashboard-grid {
       grid-template-columns: 1fr;
+    }
+
+    .portfolio-summary,
+    .allocation-content {
+      grid-template-columns: 1fr;
+    }
+
+    .portfolio-ring,
+    .allocation-ring {
+      width: 110px;
+    }
+  }
+
+  @media (max-width: 520px) {
+    .market-mini-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .pulse-row,
+    .strategy-row {
+      grid-template-columns: 34px 1fr;
+    }
+
+    .pulse-row svg,
+    .strategy-row svg,
+    .row-value {
+      display: none;
+    }
+
+    .calendar-list article {
+      grid-template-columns: 60px 1fr;
+    }
+
+    .calendar-list p,
+    .calendar-list em {
+      grid-column: 2;
+      text-align: left;
     }
   }
 </style>
