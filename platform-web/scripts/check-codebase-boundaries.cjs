@@ -43,37 +43,19 @@ const rootPackage = JSON.parse(read('package.json'));
 const vitePackage = JSON.parse(read('internal/vite-config/package.json'));
 for (const dependency of ['mockjs', '@types/mockjs', 'vite-plugin-mock']) {
   assert(!rootPackage.dependencies?.[dependency], `runtime Mock dependency returned: ${dependency}`);
-  assert(
-    !rootPackage.devDependencies?.[dependency],
-    `development Mock dependency returned: ${dependency}`,
-  );
+  assert(!rootPackage.devDependencies?.[dependency], `development Mock dependency returned: ${dependency}`);
   assert(!vitePackage.dependencies?.[dependency], `Vite Mock dependency returned: ${dependency}`);
-  assert(
-    !vitePackage.devDependencies?.[dependency],
-    `Vite Mock dependency returned: ${dependency}`,
-  );
+  assert(!vitePackage.devDependencies?.[dependency], `Vite Mock dependency returned: ${dependency}`);
 }
 
-for (const envFile of [
-  '.env.analyze',
-  '.env.development',
-  '.env.docker',
-  '.env.production',
-  '.env.test',
-]) {
+for (const envFile of ['.env.analyze', '.env.development', '.env.docker', '.env.production', '.env.test']) {
   assert(!read(envFile).includes('VITE_USE_MOCK'), `${envFile} re-enabled template Mock loading`);
 }
 
 const routeIndex = read('src/router/routes/index.ts');
 const menuIndex = read('src/router/menus/index.ts');
-for (const [name, source] of [
-  ['routes', routeIndex],
-  ['menus', menuIndex],
-]) {
-  assert(
-    source.includes("import.meta.glob('./modules/*.ts'"),
-    `${name} module discovery is not top-level bounded`,
-  );
+for (const [name, source] of [['routes', routeIndex], ['menus', menuIndex]]) {
+  assert(source.includes("import.meta.glob('./modules/*.ts'"), `${name} module discovery is not top-level bounded`);
   assert(!source.includes('./modules/**/*.ts'), `${name} recursive module discovery returned`);
 }
 
@@ -102,19 +84,12 @@ for (const relative of hedgeBoardOwners) {
 const hedgeBoardSource = read(hedgeBoardShell);
 assert(hedgeBoardSource.includes('useHedgeBoardPage'), 'Hedge Board page state owner is not wired');
 assert(hedgeBoardSource.includes('LocalChartWidget'), 'Hedge Board chart owner is not wired');
-assert(
-  hedgeBoardSource.includes('src="./hedgeBoard.less"'),
-  'Hedge Board style owner is not wired',
-);
+assert(hedgeBoardSource.includes('src="./hedgeBoard.less"'), 'Hedge Board style owner is not wired');
 for (const legacyOwner of ['GroupedBarChart', 'SnapshotDetailTable', 'LOCAL_MARKET_DETAIL_TABLES']) {
-  assert(
-    !hedgeBoardSource.includes(legacyOwner),
-    `Hedge Board legacy owner remains in page shell: ${legacyOwner}`,
-  );
+  assert(!hedgeBoardSource.includes(legacyOwner), `Hedge Board legacy owner remains in page shell: ${legacyOwner}`);
 }
 
-const crossVenueShell =
-  'src/views/strategy/spread-carry/components/CrossVenueExecutionWorkspace.vue';
+const crossVenueShell = 'src/views/strategy/spread-carry/components/CrossVenueExecutionWorkspace.vue';
 const crossVenueOwners = [
   crossVenueShell,
   'src/views/strategy/spread-carry/components/crossVenueExecutionWorkspace.less',
@@ -125,35 +100,24 @@ for (const relative of crossVenueOwners) {
   assert(lineCount(relative) <= 500, `Cross Venue owner exceeds 500 lines: ${relative}`);
 }
 const spreadEntry = read('src/views/strategy/spread-carry/index.vue');
+assert(spreadEntry.includes('CrossVenueExecutionWorkspace'), 'Spread entry does not use the formal Cross Venue owner');
 assert(
-  spreadEntry.includes('CrossVenueExecutionWorkspace'),
-  'Spread entry does not use the formal Cross Venue owner',
-);
-assert(
-  spreadEntry.includes('ProductNotConfiguredPanel') &&
-    spreadEntry.includes('not-configured: spread-research-provider'),
-  'Spread research path is not fail-closed when no Provider owner exists',
+  spreadEntry.includes('RestoredProductSurface') &&
+    spreadEntry.includes('sample:spread-research') &&
+    spreadEntry.includes(':actionable="false"'),
+  'Spread research path is not explicitly disclosed and non-actionable when no Provider owner exists',
 );
 for (const replicaOwner of ['CrossVenueExecutionReplica', 'DomesticOverseasExecutionReplica']) {
   assert(!spreadEntry.includes(replicaOwner), `Spread entry still imports Replica owner: ${replicaOwner}`);
 }
 const crossVenueSource = read(crossVenueShell);
-assert(
-  crossVenueSource.includes('useCrossVenueExecutionWorkspace'),
-  'Cross Venue page state owner is not wired',
-);
-assert(
-  crossVenueSource.includes('src="./crossVenueExecutionWorkspace.less"'),
-  'Cross Venue style owner is not wired',
-);
+assert(crossVenueSource.includes('useCrossVenueExecutionWorkspace'), 'Cross Venue page state owner is not wired');
+assert(crossVenueSource.includes('src="./crossVenueExecutionWorkspace.less"'), 'Cross Venue style owner is not wired');
 
 const registryResult = checkRegistry({ root });
 for (const entry of registryResult.entries) {
   for (const forbidden of ['demo', 'mock', 'test', 'example', 'template', 'archive']) {
-    assert(
-      !entry.relative.toLowerCase().split('/').includes(forbidden),
-      `non-product View entered the Registry: ${entry.relative}`,
-    );
+    assert(!entry.relative.toLowerCase().split('/').includes(forbidden), `non-product View entered the Registry: ${entry.relative}`);
   }
 }
 
@@ -164,13 +128,8 @@ for (const module of manifest.modules) {
   for (const route of module.routes) {
     if (!route.view_import) continue;
     for (const forbidden of ['demo', 'mock', 'test', 'example', 'template']) {
-      assert(
-        !route.view_import.toLowerCase().split('/').includes(forbidden),
-        `non-product View entered formal manifest: ${route.view_import}`,
-      );
+      assert(!route.view_import.toLowerCase().split('/').includes(forbidden), `non-product View entered formal manifest: ${route.view_import}`);
     }
   }
 }
-console.log(
-  `Codebase boundaries passed: ${manifest.modules.length} formal route modules, ${registryResult.entries.length} View keys; manifest ${manifestResult.sha256}.`,
-);
+console.log(`Codebase boundaries passed: ${manifest.modules.length} formal route modules, ${registryResult.entries.length} View keys; manifest ${manifestResult.sha256}.`);
