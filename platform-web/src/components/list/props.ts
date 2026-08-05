@@ -1,11 +1,9 @@
 import type { FetchSetting } from './types/type';
 import { listSetting } from './const';
 
-import type { ColumnProps } from 'ant-design-vue/es/table';
-
 export const baseListProps = {
   api: {
-    type: [Function as PropType<(...arg: any[]) => Promise<any>>, Function as PropType<any>],
+    type: Function as PropType<(...arg: any[]) => Promise<any>>,
     default: null,
   },
   beforeFetch: {
@@ -18,12 +16,12 @@ export const baseListProps = {
   },
   dataSource: {
     type: Array as PropType<Recordable[]>,
-    default: null,
+    default: () => [],
   },
   // 额外的请求参数
   searchInfo: {
     type: Object as PropType<Recordable>,
-    default: null,
+    default: () => ({}),
   },
   isHandle: {
     type: Boolean,
@@ -39,8 +37,6 @@ export const baseListProps = {
   },
   fetchSetting: {
     type: Object as PropType<FetchSetting>,
-    default: () => {
-      return listSetting.fetchSetting;
-    },
+    default: () => listSetting.fetchSetting,
   },
 };
