@@ -128,7 +128,7 @@ test('restored formal product surfaces disclose state, source and non-actionabil
   await expect(page.getByTestId('wealth-original-structure')).toBeVisible();
   await expect(page.getByRole('button', { name: '不可申购' }).first()).toBeDisabled();
 
-  await page.goto(absoluteUrl('/settings/index'));
+  await page.goto(absoluteUrl('/settings/profile'));
   await expect(page.getByTestId('settings-original-structure')).toBeVisible();
   await expect(
     page.getByText('not-configured:settings-write-owner', { exact: false }),
