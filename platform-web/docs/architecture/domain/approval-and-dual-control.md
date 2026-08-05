@@ -1,4 +1,4 @@
-# Platform V6 审批与双人复核模型
+# Platform 0.10.x 审批与双人复核模型
 
 状态：`active`  
 产品基线：Platform V5  

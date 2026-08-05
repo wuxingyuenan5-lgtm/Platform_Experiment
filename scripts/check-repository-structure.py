@@ -36,6 +36,7 @@ REQUIRED_ENTRYPOINTS = (
     "docs/architecture/SYSTEM_MAP.md",
     "docs/architecture/OWNERSHIP.md",
     "docs/operations/RUNBOOK.md",
+    "docs/operations/LIVE_ACCEPTANCE_RUNBOOK.md",
     "docs/database/README.md",
     "docs/engineering/GIT_WORKFLOW.md",
     "docs/contracts/README.md",
@@ -134,14 +135,20 @@ def check_documents(errors: list[str]) -> None:
     if current.is_file():
         source = current.read_text(encoding="utf-8")
         for anchor in (
-            "Platform `0.10.0`",
-            "Platform `0.10.1`",
-            "refactor/platform-0-10-1-non-ui-convergence",
-            "Live Write",
-            "Frontend product restoration is explicitly deferred",
+            "Stable baseline: Platform `0.10.0`",
+            "Current candidate target: Platform `0.10.1`",
+            "Platform Live Write and Runtime Live Write remain disabled by default",
+            "Frontend product restoration has not been executed",
+            "remain unverified",
+            "must not be assumed",
         ):
             if anchor not in source:
-                errors.append(f"docs/codex/current-state.md missing current anchor: {anchor}")
+                errors.append(f"docs/codex/current-state.md missing durable anchor: {anchor}")
+        for volatile in ("Active branch:", "Active review:", "Draft PR"):
+            if volatile in source:
+                errors.append(
+                    f"docs/codex/current-state.md persists volatile Git/GitHub fact: {volatile}"
+                )
     database = ROOT / "docs/database/README.md"
     if (
         database.is_file()
@@ -149,6 +156,43 @@ def check_documents(errors: list[str]) -> None:
         not in database.read_text(encoding="utf-8")
     ):
         errors.append("docs/database/README.md must register execution_risk_repository.py")
+
+
+
+def check_execution_risk_typecheck_scope(errors: list[str]) -> None:
+    path = ROOT / "platform-api/pyproject.toml"
+    if not path.is_file():
+        errors.append("platform-api/pyproject.toml: type-check configuration is missing")
+        return
+    source = path.read_text(encoding="utf-8")
+    for module in (
+        "app/execution_risk.py",
+        "app/execution_risk_models.py",
+        "app/execution_risk_policy.py",
+        "app/execution_risk_repository.py",
+    ):
+        if module not in source:
+            errors.append(f"platform-api/pyproject.toml must include {module} in Pyright scope")
+    ignore_match = re.search(r"(?ms)^ignore\s*=\s*\[(.*?)^\]", source)
+    ignored = ignore_match.group(1) if ignore_match else ""
+    for module in ("app/execution_risk.py", "app/execution_risk_repository.py"):
+        if module in ignored:
+            errors.append(f"platform-api/pyproject.toml must not ignore {module}")
+
+
+def check_long_term_governance(errors: list[str]) -> None:
+    workflow = ROOT / ".github/workflows/repository-quality.yml"
+    if not workflow.is_file():
+        errors.append("repository-quality workflow is missing")
+        return
+    source = workflow.read_text(encoding="utf-8")
+    for command in (
+        "python scripts/audit-product-data-owner-matrix.py --require-closed",
+        "python scripts/audit-production-data-boundaries.py",
+        "python scripts/frontend-no-new-debt.py",
+    ):
+        if command not in source:
+            errors.append(f"repository-quality workflow missing permanent gate: {command}")
 
 
 def check_deployment_contract(errors: list[str]) -> None:
@@ -201,6 +245,8 @@ def main() -> int:
     check_backend_venue_boundary(errors)
     check_execution_risk_boundaries(errors)
     check_documents(errors)
+    check_execution_risk_typecheck_scope(errors)
+    check_long_term_governance(errors)
     check_deployment_contract(errors)
     check_workflows(errors)
     if errors:

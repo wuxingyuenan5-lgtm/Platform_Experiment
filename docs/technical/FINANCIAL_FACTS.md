@@ -1,8 +1,7 @@
 # Financial Facts and Formal Accounting
 
-状态：`active`  
-适用版本：`Platform V6 / Phase 3`  
-
+状态：`active`
+适用版本：`Platform 0.10.x`
 ## 1. 权威边界
 
 ```text

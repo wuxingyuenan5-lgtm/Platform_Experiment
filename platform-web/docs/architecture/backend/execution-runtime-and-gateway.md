@@ -1,4 +1,4 @@
-# Platform V6+ Execution Runtime 与 Gateway 架构
+# Platform 0.10.x+ Execution Runtime 与 Gateway 架构
 
 状态：`active`  
 产品基线：Platform V5  

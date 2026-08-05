@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Audit and resolve the Phase 5 product/data owner matrix."""
+"""Audit the long-term product data ownership and availability registry."""
 
 from __future__ import annotations
 
@@ -131,6 +131,18 @@ def resolve_matrix(matrix_path: Path, overrides_path: Path) -> dict[str, Any]:
     matrix = _load_json(matrix_path)
     if matrix.get("schema_version") != 1:
         raise AuditError("product data owner matrix schema_version must be 1")
+    historical_fields = {
+        "generated_from_head",
+        "evidence_debt",
+        "blocks_final_rc",
+    } & matrix.keys()
+    if historical_fields:
+        raise AuditError(
+            f"product data owner matrix contains historical fields: {sorted(historical_fields)}"
+        )
+    authority = matrix.get("authority")
+    if not isinstance(authority, str) or not authority:
+        raise AuditError("product data owner matrix requires a durable authority")
     return _apply_overrides(matrix, _load_json(overrides_path))
 
 
@@ -236,7 +248,7 @@ def audit(
         if raw_entry["unavailable_state"] not in ALLOWED_UNAVAILABLE:
             raise AuditError(f"{module}: invalid unavailable_state {raw_entry['unavailable_state']!r}")
         if raw_entry["live_write"] is not False:
-            raise AuditError(f"{module}: Phase 5 must not enable Live Write")
+            raise AuditError(f"{module}: product data ownership must not enable Live Write")
         if not isinstance(raw_entry["writes"], bool):
             raise AuditError(f"{module}: writes must be boolean")
 
@@ -276,28 +288,6 @@ def audit(
         if mapped_names[name] != expected_route:
             raise AuditError(f"{name}: matrix route {mapped_names[name]} does not match {expected_route}")
 
-    debt = matrix.get("evidence_debt")
-    if not isinstance(debt, dict):
-        raise AuditError("matrix must contain evidence_debt")
-    expected_heads = {
-        "pr_149": "964f26031e708b3599852fb25b5b4dc5535333fa",
-        "pr_150": "bbdff03948322e25b2d995946d6fa25e6ba21b0d",
-    }
-    pending = False
-    for key, expected_head in expected_heads.items():
-        item = debt.get(key)
-        if not isinstance(item, dict):
-            raise AuditError(f"evidence_debt.{key} is missing")
-        if item.get("head") != expected_head:
-            raise AuditError(f"evidence_debt.{key} head drifted")
-        if item.get("status") not in {"pending", "resolved"}:
-            raise AuditError(f"evidence_debt.{key} has invalid status")
-        pending = pending or item["status"] == "pending"
-    if debt.get("affects_phase5_engineering") is not False:
-        raise AuditError("Phase 4 evidence debt must not block Phase 5 engineering")
-    if pending and debt.get("blocks_final_rc") is not True:
-        raise AuditError("pending Phase 4 evidence debt must block final RC")
-
     return {
         "schema_version": 1,
         "status": "ok",
@@ -306,11 +296,6 @@ def audit(
         "entries": len(entries),
         "unique_views": len(unique_views),
         "closure": dict(sorted(statuses.items())),
-        "evidence_debt": {
-            "pr_149": debt["pr_149"]["status"],
-            "pr_150": debt["pr_150"]["status"],
-            "blocks_final_rc": debt["blocks_final_rc"],
-        },
     }
 
 

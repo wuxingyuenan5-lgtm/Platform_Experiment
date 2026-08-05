@@ -696,7 +696,7 @@ def filled_quantity(order_id: str | None, fallback: Decimal) -> Decimal:
         ).fetchall()
     if not rows:
         return fallback
-    return sum(Decimal(row["quantity"]) for row in rows)
+    return sum((Decimal(row["quantity"]) for row in rows), start=Decimal("0"))
 
 
 def kill_switch_from_row(row: Row) -> KillSwitchResponse:

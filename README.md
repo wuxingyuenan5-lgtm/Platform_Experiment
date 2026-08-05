@@ -22,7 +22,7 @@ Operating details and safety defaults are in `docs/operations/RUNBOOK.md`.
 
 | Need | Authority |
 |---|---|
-| Current baseline, target, branch and limits | `docs/codex/current-state.md` |
+| Current stable baseline, target scope and known limits | `docs/codex/current-state.md` |
 | Documentation navigation | `docs/README.md` |
 | AI and engineering rules | `AGENTS.md` |
 | Minimal context selection | `docs/codex/context-map.md` |

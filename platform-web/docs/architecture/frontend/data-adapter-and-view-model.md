@@ -1,4 +1,4 @@
-# Platform V6 前端数据适配与 View Model 规范
+# Platform 0.10.x 前端数据适配与 View Model 规范
 
 状态：`active`  
 适用分支：`refactor/frontend-architecture-v6`  

@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from datetime import UTC, datetime
 from decimal import Decimal
+from typing import cast
 
 from fastapi import APIRouter, HTTPException
 
@@ -68,7 +69,7 @@ def validate_scope(scope_type: str, scope_id: str) -> KillSwitchScope:
         raise HTTPException(status_code=404, detail="Strategy instance not found")
     if scope_type == "account" and not repository.account_exists(scope_id):
         raise HTTPException(status_code=404, detail="Account not found")
-    return scope_type
+    return cast(KillSwitchScope, scope_type)
 
 
 def get_kill_switch(scope_type: str, scope_id: str) -> KillSwitchResponse:
@@ -330,16 +331,29 @@ def perform_risk_action(
         return "completed", [], None
 
     if request.action == "substitute_hedge":
+        replacement_account_id = request.replacement_account_id
+        replacement_instrument_id = request.replacement_instrument_id
+        replacement_symbol = request.replacement_symbol
+        replacement_side = request.replacement_side
+        replacement_quantity = request.replacement_quantity
+        if (
+            replacement_account_id is None
+            or replacement_instrument_id is None
+            or replacement_symbol is None
+            or replacement_side is None
+            or replacement_quantity is None
+        ):
+            raise ValueError("substitute_hedge requires a complete replacement leg")
         command = _create_trade_command(
             CreateTradeCommandRequest(
                 idempotencyKey=f"{request.idempotency_key}:replacement",
                 strategyInstanceId=risk.strategy_instance_id,
-                accountId=request.replacement_account_id,
-                instrumentId=request.replacement_instrument_id,
-                symbol=request.replacement_symbol,
-                side=request.replacement_side,
+                accountId=replacement_account_id,
+                instrumentId=replacement_instrument_id,
+                symbol=replacement_symbol,
+                side=replacement_side,
                 orderType="limit" if request.replacement_price is not None else "market",
-                quantity=request.replacement_quantity,
+                quantity=replacement_quantity,
                 price=request.replacement_price,
             )
         )

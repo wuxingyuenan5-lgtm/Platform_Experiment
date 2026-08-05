@@ -1,8 +1,8 @@
 # Secret Provider and Redaction Contract
 
-状态：`active`  
-适用版本：`Platform V6 / Production Gate 5C`  
-实施计划：`../planning/V6-Production-Gate-密钥托管与脱敏.md`
+状态：`active`
+适用版本：`Platform 0.10.x`
+合同状态：长期维护；历史实施计划保留在 Git 历史中。
 
 ## 1. 安全边界
 

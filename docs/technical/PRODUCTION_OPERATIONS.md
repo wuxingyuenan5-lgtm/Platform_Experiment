@@ -1,8 +1,10 @@
 # Production Operations Contract
 
-状态：`active`  
-适用版本：`Platform V6 / Production Gate 5D`  
-实施计划：`../planning/V6-Production-Gate-监控备份恢复.md`
+状态：`active`
+适用版本：`Platform 0.10.x`
+合同状态：长期维护；历史实施计划保留在 Git 历史中。
+
+受控实盘验收、失败处置、EOD与强制复位见 [`../operations/LIVE_ACCEPTANCE_RUNBOOK.md`](../operations/LIVE_ACCEPTANCE_RUNBOOK.md)。
 
 ## 1. 权威边界
 

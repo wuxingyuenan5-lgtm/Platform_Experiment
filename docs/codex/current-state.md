@@ -1,35 +1,25 @@
 # Current State
 
-This is the sole repository authority for current version, branch, review scope and known limits.
+This is the sole repository authority for the current stable baseline, candidate target scope and known limits. It is not an authority for volatile Git or GitHub state.
 
 ## Delivery
 
 - Stable baseline: Platform `0.10.0`, release commit `cf6030d53b3e9a759263455569503b6c7242174e`.
-- Current remediation target: Platform `0.10.1`.
-- Active branch: `refactor/platform-0-10-1-non-ui-convergence`.
-- Active review: Draft PR #155.
-- The Platform 0.9.3 phase chain is complete. PRs #141 and #148–#153 are closed historical work and are not active execution state.
-- Frontend product restoration is explicitly deferred and is outside this pull request.
-- Context Pack, `scripts/context-for.py`, `scripts/context-packs.json`, module `AGENTS.md` files and the current context budgets are frozen at their accepted design.
+- Current candidate target: Platform `0.10.1`.
+- Platform 0.10.1 non-UI convergence covers active-document correction, durable live-acceptance operations, historical naming/process cleanup, Execution Risk responsibility separation, type safety and long-term repository governance.
+- Frontend product restoration has not been executed and remains outside the current non-UI scope.
+- Context Pack, `scripts/context-for.py`, `scripts/context-packs.json`, module `AGENTS.md` files and accepted context budgets remain frozen at their maintained design.
 
-## Current scope
-
-Platform 0.10.1 non-UI convergence is limited to:
-
-- active-document and current-state correction;
-- removal of obsolete project/service naming and historical process material;
-- `execution_risk` model, pure-policy, persistence and router/application separation;
-- permanent repository, security and CI governance convergence.
-
-It does not restore product pages, alter frontend product structure, change visual baselines or redesign UI data-state behavior.
+具体活动分支、HEAD和PR状态属于易变Git/GitHub事实，执行时应通过git和GitHub读取，不由长期Markdown充当权威。
 
 ## Safety and contracts
 
 - Platform Live Write and Runtime Live Write remain disabled by default.
-- Kill Switch, two-person approval, idempotency, Decimal precision and Result Unknown semantics remain protected.
-- Public execution-risk API paths and request/response schemas remain compatible.
-- No database schema or data meaning is changed by the module split.
-- No service, database, queue, event bus or dependency-injection framework is added.
+- Kill Switch, two-person approval, idempotency, Decimal precision and `result_unknown` semantics remain protected.
+- Public Execution Risk API paths and request/response schemas remain compatible.
+- The Execution Risk module split does not change database schema or persisted data meaning.
+- No service, database, queue, event bus or dependency-injection framework is introduced by this convergence scope.
+- Controlled live acceptance follows `../operations/LIVE_ACCEPTANCE_RUNBOOK.md`; normal build or deployment validation never authorizes live writes.
 
 ## External-state limits
 
@@ -42,8 +32,10 @@ Repository validation does not prove any external production fact. The following
 - broker or venue credentials, connectivity and permissions;
 - production monitoring, backups and restore readiness.
 
-Deployment configuration must fail clearly when required neutral variables are absent. Their presence outside the repository must not be assumed.
+Deployment configuration must fail clearly when required neutral variables are absent. External production readiness must not be assumed from repository state, CI success or documentation.
 
-## Next decision
+## Known limits and next decisions
 
-Merge, release, tag creation, production deployment, Live Write activation and frontend restoration require separate owner decisions.
+- Frontend product restoration, UI data-state remediation and visual changes require a separate owner decision.
+- Merge, release, tag creation, production deployment and Live Write activation require separate owner decisions.
+- Production expansion in funds, quantity, symbols or automation requires completion of the controlled live-acceptance and end-of-day reconciliation sequence.

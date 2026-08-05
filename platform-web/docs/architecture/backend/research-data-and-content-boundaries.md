@@ -1,4 +1,4 @@
-# Platform V6 研究数据、交易行情与内容数据边界
+# Platform 0.10.x 研究数据、交易行情与内容数据边界
 
 状态：`active`  
 产品基线：Platform V5  

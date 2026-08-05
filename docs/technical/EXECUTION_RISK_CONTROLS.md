@@ -16,6 +16,10 @@ Financial Facts → auditable post-trade economic truth
 
 Risk actions never bypass TradeCommand. Kill Switch does not rewrite historical orders, fills or financial facts.
 
+## Controlled live acceptance
+
+Operational validation of one-ounce Market/FOK, TP/SL, PostOnly Chase, second-leg failure and forced reset follows [`../operations/LIVE_ACCEPTANCE_RUNBOOK.md`](../operations/LIVE_ACCEPTANCE_RUNBOOK.md). Risk actions cannot bypass that fail-closed procedure.
+
 ## Persisted objects
 
 - `trading_kill_switches` and `kill_switch_commands`;

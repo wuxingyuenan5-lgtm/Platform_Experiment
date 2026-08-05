@@ -1,4 +1,4 @@
-# Platform V6 查询与后端读模型规范
+# Platform 0.10.x 查询与后端读模型规范
 
 状态：`active`  
 产品基线：Platform V5  

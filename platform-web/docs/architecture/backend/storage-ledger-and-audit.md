@@ -1,4 +1,4 @@
-# Platform V6 数据存储、策略经济账本与审计架构
+# Platform 0.10.x 数据存储、策略经济账本与审计架构
 
 状态：`active`  
 产品基线：Platform V5  

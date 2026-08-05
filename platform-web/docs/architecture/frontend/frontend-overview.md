@@ -1,4 +1,4 @@
-# Platform V6 前端架构总览
+# Platform 0.10.x 前端架构总览
 
 状态：`active`  
 适用分支：`main`

@@ -36,6 +36,10 @@ The destination and public endpoint are supplied through `PLATFORM_API_DEPLOY_DI
 
 `execution-runtime` is deployed separately from Platform API and remains the exclusive venue side-effect boundary. Credentials, live-routing permissions and Live Write activation require the dedicated controlled-operation process; they are not part of a normal application deployment.
 
+## Controlled live acceptance
+
+Deployment completion is not Live Write approval. The operator sequence, one-ounce limit, failure semantics, EOD reconciliation and forced reset are defined in [`../docs/operations/LIVE_ACCEPTANCE_RUNBOOK.md`](../docs/operations/LIVE_ACCEPTANCE_RUNBOOK.md).
+
 ## Safety
 
 - Do not enable Live Write as a deployment side effect.

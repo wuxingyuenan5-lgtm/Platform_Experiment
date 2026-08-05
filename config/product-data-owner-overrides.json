@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "authority": "Phase 5 reviewed corrections and closure decisions",
+  "authority": "Reviewed product data ownership and availability decisions",
   "overrides": {
     "dashboard": {
       "real_data_source": "not-configured: dashboard aggregate owners",
@@ -8,7 +8,9 @@
       "gap_reason": null
     },
     "audit": {
-      "frontend_services": ["platform-web/src/api/riskControl.ts"],
+      "frontend_services": [
+        "platform-web/src/api/riskControl.ts"
+      ],
       "api_endpoints": [
         "data-service:/health",
         "/risk/api/v1/risk-records/",
@@ -19,7 +21,9 @@
         "external:risk-service",
         "external:notification-service"
       ],
-      "repository_or_provider": ["external:audit-source-aggregation"],
+      "repository_or_provider": [
+        "external:audit-source-aggregation"
+      ],
       "real_data_source": "data-service health plus risk and notification facts",
       "refresh": "on-mount and manual",
       "as_of": "latest source event or provider health timestamp",
@@ -42,7 +46,9 @@
       "gap_reason": null
     },
     "hedge-macro": {
-      "frontend_services": ["platform-web/src/api/hedgeResearch.ts"]
+      "frontend_services": [
+        "platform-web/src/api/hedgeResearch.ts"
+      ]
     },
     "hedge-market": {
       "repository_or_provider": [
@@ -65,11 +71,18 @@
       ]
     },
     "trading-tools": {
-      "repository_or_provider": ["platform-web/docs/trading-tools-bookmarks-review.md"]
+      "repository_or_provider": [
+        "platform-web/docs/trading-tools-bookmarks-review.md"
+      ]
     },
     "monitor": {
-      "frontend_services": ["platform-web/src/api/riskControl.ts"],
-      "api_endpoints": ["data-service:/health", "current browser session"],
+      "frontend_services": [
+        "platform-web/src/api/riskControl.ts"
+      ],
+      "api_endpoints": [
+        "data-service:/health",
+        "current browser session"
+      ],
       "application_services": [
         "external:data-service",
         "external:current-authenticated-session"
@@ -98,14 +111,20 @@
       "gap_reason": null
     },
     "notification": {
-      "roles": ["authenticated-session"],
-      "repository_or_provider": ["external:notification-service"],
+      "roles": [
+        "authenticated-session"
+      ],
+      "repository_or_provider": [
+        "external:notification-service"
+      ],
       "real_data_source": "configured notification endpoint",
       "closure_status": "verified",
       "gap_reason": null
     },
     "reports": {
-      "frontend_services": ["platform-web/src/api/riskControl.ts"],
+      "frontend_services": [
+        "platform-web/src/api/riskControl.ts"
+      ],
       "api_endpoints": [
         "/risk/api/v1/risk-records/",
         "/notifications/api/v1/messages/"
@@ -114,7 +133,9 @@
         "external:risk-service",
         "external:notification-service"
       ],
-      "repository_or_provider": ["external:report-source-aggregation"],
+      "repository_or_provider": [
+        "external:report-source-aggregation"
+      ],
       "real_data_source": "risk and notification facts",
       "refresh": "on-mount and manual",
       "as_of": "latest source event",
@@ -137,7 +158,9 @@
         "external:notification-service",
         "external:data-service"
       ],
-      "repository_or_provider": ["external:risk-and-account-fact-providers"],
+      "repository_or_provider": [
+        "external:risk-and-account-fact-providers"
+      ],
       "real_data_source": "risk, notification, account, finance and health facts",
       "as_of": "latest source fact timestamp",
       "currency": "USD",
@@ -148,8 +171,13 @@
       "gap_reason": null
     },
     "settings": {
-      "frontend_services": ["platform-web/src/api/riskControl.ts"],
-      "api_endpoints": ["data-service:/health", "current browser session"],
+      "frontend_services": [
+        "platform-web/src/api/riskControl.ts"
+      ],
+      "api_endpoints": [
+        "data-service:/health",
+        "current browser session"
+      ],
       "application_services": [
         "external:data-service",
         "external:current-authenticated-session"

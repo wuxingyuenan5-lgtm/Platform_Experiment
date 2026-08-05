@@ -1,4 +1,4 @@
-# Platform V6+ 全平台统一领域模型
+# Platform 0.10.x+ 全平台统一领域模型
 
 状态：`active`  
 产品基线：Platform V5  

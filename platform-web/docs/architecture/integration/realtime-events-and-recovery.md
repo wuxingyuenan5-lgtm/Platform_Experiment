@@ -1,4 +1,4 @@
-# Platform V6 实时事件与状态恢复规范
+# Platform 0.10.x 实时事件与状态恢复规范
 
 状态：`active`  
 产品基线：Platform V5  

@@ -1,4 +1,4 @@
-# Platform V6 前端状态归属规范
+# Platform 0.10.x 前端状态归属规范
 
 状态：`active`  
 产品基线：Platform V5  

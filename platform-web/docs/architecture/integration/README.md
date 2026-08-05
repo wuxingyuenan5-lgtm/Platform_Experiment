@@ -1,4 +1,4 @@
-# Platform V6+ 协作契约入口
+# Platform 0.10.x+ 协作契约入口
 
 状态：`active`  
 产品基线：Platform V5  

@@ -1,7 +1,7 @@
 # Venue Query and Reconciliation
 
-状态：`active`  
-适用版本：`Platform V6 / Phase 4B–4C`  
+状态：`active`
+适用版本：`Platform 0.10.x`
 当前扩展：`Issue #96 / PR #97`
 
 ## 1. 权威边界
@@ -242,5 +242,5 @@ Phase 4D 将继续加入差异严重度、责任人、SLA 和日终汇总。
 - Backend Account Snapshot Run 当前按调用触发，尚无日终调度器。
 - Position Snapshot 只用于对账和实盘生命周期验证，不成为 Formal Position 的计算来源。
 - Difference 尚未完整接入严重度、负责人和 SLA。
-- 1 oz、单活动生命周期和 Market-only 属于临时验收限制；解除条件见 `../operations/V6-小资金实盘验收手册.md`。
+- 1 oz、单活动生命周期和 Market-only 属于临时验收限制；解除条件见 `../operations/LIVE_ACCEPTANCE_RUNBOOK.md`。
 - Platform 与 Runtime Live Write、自动 Exit Monitor 仍默认关闭。

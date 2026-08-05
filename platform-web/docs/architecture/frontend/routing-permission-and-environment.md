@@ -1,4 +1,4 @@
-# Platform V6 前端路由、权限与运行上下文规范
+# Platform 0.10.x 前端路由、权限与运行上下文规范
 
 状态：`active`  
 产品基线：Platform V5  

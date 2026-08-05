@@ -1,4 +1,4 @@
-# Platform V6+ 后端架构总览
+# Platform 0.10.x+ 后端架构总览
 
 状态：`active`
 产品基线：Platform V5

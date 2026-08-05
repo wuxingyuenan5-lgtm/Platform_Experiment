@@ -115,8 +115,6 @@ include = [
 ]
 exclude = ["tests"]
 ignore = [
-  "app/execution_risk.py",
-  "app/execution_risk_repository.py",
   "app/research_providers.py",
 ]
 reportMissingTypeStubs = false
