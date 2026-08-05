@@ -48,6 +48,10 @@
   const chartRef = ref<HTMLDivElement | null>(null);
   const { setOptions } = useECharts(chartRef as Ref<HTMLDivElement>);
 
+  function chartRow(params: any): AccountNetWorthRow | undefined {
+    return Array.isArray(params) ? params[0]?.data : params?.data;
+  }
+
   function initChart() {
     setOptions({
       dataset: { source: props.dataSoure },
@@ -82,8 +86,8 @@
         icon: 'circle',
       },
       tooltip: {
-        formatter: (params: { data?: AccountNetWorthRow }) => {
-          const data = params.data;
+        formatter: (params: any) => {
+          const data = chartRow(params);
           return `<div class='text-xs'>
                 <div class='color-secondary'>${data?.name || ''}</div>
                 <div class='border-bottom my-2'></div>
