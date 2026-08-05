@@ -4,22 +4,21 @@ import { basicProps } from './props';
 export default defineComponent({
   props: basicProps,
   setup(props) {
-    const { value, options, type } = props;
-    const optionsMap = computed(() => {
-      return options?.reduce((acc, cur) => {
-        acc[cur.value] = cur;
+    const optionsMap = computed<Record<string, LabelValueOptions[number]>>(() => {
+      return (props.options || []).reduce<Record<string, LabelValueOptions[number]>>((acc, cur) => {
+        acc[String(cur.value)] = cur;
         return acc;
       }, {});
     });
 
-    function renderItem(color: string) {
-      let style: any,
-        prefixElm: any,
-        classBasic: string = 'break-all truncate';
-      if (type === 'text') {
+    function renderItem(color = '') {
+      let style: Record<string, string> | undefined;
+      let prefixElm;
+      let classBasic = 'break-all truncate';
+      if (props.type === 'text') {
         style = { color };
-      } else if (type === 'dot') {
-        classBasic += 'flex items-center';
+      } else if (props.type === 'dot') {
+        classBasic += ' flex items-center';
         style = {
           position: 'relative',
           paddingLeft: '14px',
@@ -43,12 +42,12 @@ export default defineComponent({
       return { style, prefixElm, classBasic };
     }
     return () => {
-      const item = optionsMap.value?.[value];
+      const item = optionsMap.value[String(props.value)];
       const { style, prefixElm, classBasic } = renderItem(item?.color);
       return (
         <div class={classBasic} title={item?.label} style={style}>
           {prefixElm}
-          {item?.label || value}
+          {item?.label || String(props.value)}
         </div>
       );
     };
