@@ -1,3 +1,4 @@
+import type { PropType, Ref } from 'vue';
 import { computed, defineComponent, reactive, ref, watch } from 'vue';
 import { Form, Input, message, Modal } from 'ant-design-vue';
 import { loginChangepw } from '@/api/sys/user';
@@ -6,10 +7,20 @@ import { useUserStore } from '@/store/modules/user';
 import { validateEmail, validatePassword, validatePhone } from '@/utils/regex';
 import { ConfigPropType } from './enums';
 
+const ModalView = Modal as any;
+const FormView = Form as any;
+const FormItemView = Form.Item as any;
+const InputView = Input as any;
+const PasswordInputView = Input.Password as any;
 const modalFooterButton = { class: 'w-74px !ml-4' };
 const labelCol = { style: { width: '94px' } };
 
-function resetWhenClosed(visible: ReturnType<typeof ref<boolean>>, formRef: ReturnType<typeof ref>) {
+interface FormInstanceLike {
+  validate: () => Promise<Record<string, string>>;
+  resetFields: () => void;
+}
+
+function resetWhenClosed(visible: Ref<boolean>, formRef: Ref<FormInstanceLike | null>) {
   watch(visible, (open) => {
     if (!open) formRef.value?.resetFields();
   });
@@ -19,7 +30,7 @@ export const Password = defineComponent({
   setup(_, { expose }) {
     const userStore = useUserStore();
     const visible = ref(false);
-    const formRef = ref();
+    const formRef = ref<FormInstanceLike | null>(null);
     const confirmLoading = ref(false);
     const formState = reactive({ oldPw: '', newPw1: '', newPw2: '', code: '' });
     const rules = {
@@ -48,10 +59,12 @@ export const Password = defineComponent({
     resetWhenClosed(visible, formRef);
 
     async function handleOk() {
+      if (!formRef.value) return;
       const values = await formRef.value.validate();
       confirmLoading.value = true;
       useApiBasic({
-        apiFn: loginChangepw(values) as any,
+        apiFn: loginChangepw,
+        parameter: values,
         successFn: () => {
           visible.value = false;
           message.warning({
@@ -68,7 +81,7 @@ export const Password = defineComponent({
 
     expose({ visible, confirmLoading });
     return () => (
-      <Modal
+      <ModalView
         v-model:open={visible.value}
         width={574}
         class="modal-white-bg"
@@ -80,7 +93,7 @@ export const Password = defineComponent({
         {{
           title: () => <div class="font-500">修改密码</div>,
           default: () => (
-            <Form
+            <FormView
               ref={formRef}
               model={formState}
               rules={rules}
@@ -89,22 +102,25 @@ export const Password = defineComponent({
               validateFirst
               class="mt-8 mb-12 px-6"
             >
-              <Form.Item name="oldPw" label="旧密码">
-                <Input.Password v-model:value={formState.oldPw} placeholder="请输入旧密码" />
-              </Form.Item>
-              <Form.Item name="newPw1" label="新密码">
-                <Input.Password v-model:value={formState.newPw1} placeholder="请输入新密码" />
-              </Form.Item>
-              <Form.Item name="newPw2" label="重复新密码">
-                <Input.Password v-model:value={formState.newPw2} placeholder="请再次输入新密码" />
-              </Form.Item>
-              <Form.Item name="code" label="谷歌验证码">
-                <Input v-model:value={formState.code} placeholder="请输入验证码" />
-              </Form.Item>
-            </Form>
+              <FormItemView name="oldPw" label="旧密码">
+                <PasswordInputView v-model:value={formState.oldPw} placeholder="请输入旧密码" />
+              </FormItemView>
+              <FormItemView name="newPw1" label="新密码">
+                <PasswordInputView v-model:value={formState.newPw1} placeholder="请输入新密码" />
+              </FormItemView>
+              <FormItemView name="newPw2" label="重复新密码">
+                <PasswordInputView
+                  v-model:value={formState.newPw2}
+                  placeholder="请再次输入新密码"
+                />
+              </FormItemView>
+              <FormItemView name="code" label="谷歌验证码">
+                <InputView v-model:value={formState.code} placeholder="请输入验证码" />
+              </FormItemView>
+            </FormView>
           ),
         }}
-      </Modal>
+      </ModalView>
     );
   },
 });
@@ -118,15 +134,16 @@ function createBindingComponent(
   return defineComponent({
     props: {
       type: {
-        type: String as PropType<ConfigPropType>,
-        validator: (value: string) => Object.values(ConfigPropType).includes(value as ConfigPropType),
+        type: String as unknown as PropType<ConfigPropType>,
+        validator: (value: string) =>
+          (Object.values(ConfigPropType) as string[]).includes(value),
         default: ConfigPropType.BIND,
       },
     },
     emits: ['submit'],
     setup(props, { emit, expose }) {
       const visible = ref(false);
-      const formRef = ref();
+      const formRef = ref<FormInstanceLike | null>(null);
       const confirmLoading = ref(false);
       const formState = reactive<Record<string, string>>({ [field]: '', code: '' });
       const title = computed(() => titleMap[props.type]);
@@ -148,6 +165,7 @@ function createBindingComponent(
       resetWhenClosed(visible, formRef);
 
       async function handleOk() {
+        if (!formRef.value) return;
         const values = await formRef.value.validate();
         confirmLoading.value = true;
         emit('submit', values);
@@ -155,7 +173,7 @@ function createBindingComponent(
 
       expose({ visible, confirmLoading });
       return () => (
-        <Modal
+        <ModalView
           v-model:open={visible.value}
           width={574}
           class="modal-white-bg"
@@ -167,7 +185,7 @@ function createBindingComponent(
           {{
             title: () => <div class="font-500">{title.value}</div>,
             default: () => (
-              <Form
+              <FormView
                 ref={formRef}
                 model={formState}
                 rules={rules}
@@ -175,16 +193,19 @@ function createBindingComponent(
                 hideRequiredMark
                 class="mt-8 mb-12 px-6"
               >
-                <Form.Item name={field} label={label.value}>
-                  <Input v-model:value={formState[field]} placeholder={`请输入${label.value}`} />
-                </Form.Item>
-                <Form.Item name="code" label="谷歌验证码">
-                  <Input v-model:value={formState.code} placeholder="请输入验证码" />
-                </Form.Item>
-              </Form>
+                <FormItemView name={field} label={label.value}>
+                  <InputView
+                    v-model:value={formState[field]}
+                    placeholder={`请输入${label.value}`}
+                  />
+                </FormItemView>
+                <FormItemView name="code" label="谷歌验证码">
+                  <InputView v-model:value={formState.code} placeholder="请输入验证码" />
+                </FormItemView>
+              </FormView>
             ),
           }}
-        </Modal>
+        </ModalView>
       );
     },
   });
