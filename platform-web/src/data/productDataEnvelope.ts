@@ -9,9 +9,7 @@ export interface ProductDataEnvelope<T> {
   message?: string;
 }
 
-export function productDataEnvelope<T>(
-  value: ProductDataEnvelope<T>,
-): ProductDataEnvelope<T> {
+export function productDataEnvelope<T>(value: ProductDataEnvelope<T>): ProductDataEnvelope<T> {
   if (value.state === 'sample' && value.actionable) {
     throw new Error('sample product data must not be actionable');
   }

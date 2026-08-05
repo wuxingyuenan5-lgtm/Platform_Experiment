@@ -31,7 +31,11 @@ const expected = new Map([
 test('formal route families are mapped to one server capability namespace', () => {
   const source = read('src/access/browserRouteCapabilities.ts');
   for (const [route, permission] of expected) {
-    assert.equal(source.includes(`'${route}': '${permission}'`), true, `${route} lacks ${permission}`);
+    assert.equal(
+      source.includes(`'${route}': '${permission}'`),
+      true,
+      `${route} lacks ${permission}`,
+    );
   }
   assert.match(source, /delete meta\.roles/);
 });
@@ -42,9 +46,12 @@ test('the exported async route tree receives capability metadata before menu and
   assert.match(source, /export const asyncRoutes = applyBrowserRouteCapabilities/);
 });
 
-test('CEO wildcard is honored by the same browser permission helper', () => {
+test('browser permission helper remains compatible with API-key wildcard permissions', () => {
   const source = read('src/access/userAccess.ts');
-  assert.match(source, /granted\.includes\('\*'\) \|\| granted\.includes\(permission\)/);
+  assert.match(
+    source,
+    /granted\.includes\('\*'\) \|\| granted\.includes\(permission\)/,
+  );
 });
 
 test('the formal route module directory is part of the full TypeScript project', () => {

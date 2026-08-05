@@ -15,11 +15,11 @@ This contract owns browser-role capabilities, route/menu consistency, personal-a
 | Role | Product pages | Risk and account directory | Business writes | Personal account |
 |---|---|---|---|---|
 | CEO | All formal pages | Full internal visibility | Broad product and administration capability | Own profile, avatar, password, devices, sessions and holdings |
-| Technical lead | All formal pages | Internal visibility and operational management | Broad operational writes, excluding CEO identity governance | Own profile, avatar, password, devices, sessions and holdings |
+| Technical lead | All formal pages | Internal visibility and operational management | Broad operational writes, excluding protected CEO identity governance | Own profile, avatar, password, devices, sessions and holdings |
 | Employee | All formal business pages, read-only | Risk management and account directory read-only | Denied | Own profile, avatar, password, devices, sessions and holdings |
 | Member | All formal business pages, read-only | Hidden and denied | Denied | Own profile, avatar, password, devices, sessions and holdings |
 
-CEO uses the backend wildcard capability. The wildcard affects authorization lookup only; it does not bypass last-CEO protection, two-person approval, Kill Switch, allowlists, risk checks, query-before-retry, EOD controls or either Live Write gate.
+CEO receives an explicit browser business-permission set rather than a wildcard. Technical-lead role changes remain subject to protected-target policy. Neither role can bypass last-CEO protection, two-person approval, Kill Switch, allowlists, risk checks, query-before-retry, EOD controls or either Live Write gate.
 
 ## Route capabilities
 

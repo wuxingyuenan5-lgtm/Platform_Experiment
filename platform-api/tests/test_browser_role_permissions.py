@@ -35,12 +35,16 @@ def test_read_only_roles_do_not_receive_business_write_capabilities() -> None:
         assert HUMAN_ROLE_PERMISSIONS[role].isdisjoint(write_permissions)
 
 
-def test_ceo_wildcard_does_not_remove_domain_safety_checks() -> None:
-    assert HUMAN_ROLE_PERMISSIONS["ceo"] == frozenset({"*"})
-    assert has_permission(("ceo",), "organization.ceo.manage")
+def test_ceo_permissions_are_explicit_and_safety_gates_remain_independent() -> None:
+    permissions = HUMAN_ROLE_PERMISSIONS["ceo"]
+    assert "*" not in permissions
+    assert has_permission(("ceo",), "user.assign_role")
     assert has_permission(("ceo",), "strategy.write")
+    assert not has_permission(("ceo",), "trade:submit")
+    assert not has_permission(("ceo",), "risk:manage")
 
 
-def test_tech_lead_does_not_receive_ceo_identity_governance() -> None:
-    assert not has_permission(("tech_lead",), "user.assign_role")
-    assert not has_permission(("tech_lead",), "organization.ceo.manage")
+def test_tech_lead_role_changes_still_use_protected_target_policy() -> None:
+    assert has_permission(("tech_lead",), "user.assign_role")
+    assert not has_permission(("tech_lead",), "member.holding.update")
+    assert not has_permission(("tech_lead",), "trade:submit")

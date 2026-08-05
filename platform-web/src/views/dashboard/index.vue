@@ -37,28 +37,40 @@
             </div>
             <em>Sample</em>
           </div>
-          <div class="heat-row" v-for="item in heat" :key="item.name">
+          <div v-for="item in heat" :key="item.name" class="heat-row">
             <span>{{ item.name }}</span>
-            <div class="heat-track"><i :style="{ width: `${item.score}%` }"></i></div>
+            <div class="heat-track">
+              <i :style="{ width: `${item.score}%` }"></i>
+            </div>
             <strong>{{ item.view }}</strong>
           </div>
         </article>
 
         <article class="panel">
-          <div class="panel__head"><h2>今日关注</h2><em>只读</em></div>
+          <div class="panel__head">
+            <h2>今日关注</h2>
+            <em>只读</em>
+          </div>
           <ul class="focus-list">
             <li v-for="item in focus" :key="item.title">
               <span>{{ item.time }}</span>
-              <div><strong>{{ item.title }}</strong><small>{{ item.note }}</small></div>
+              <div>
+                <strong>{{ item.title }}</strong>
+                <small>{{ item.note }}</small>
+              </div>
             </li>
           </ul>
         </article>
 
         <article class="panel">
-          <div class="panel__head"><h2>组合风险</h2><em>只读</em></div>
+          <div class="panel__head">
+            <h2>组合风险</h2>
+            <em>只读</em>
+          </div>
           <dl class="risk-list">
             <div v-for="item in risks" :key="item.label">
-              <dt>{{ item.label }}</dt><dd>{{ item.value }}</dd>
+              <dt>{{ item.label }}</dt>
+              <dd>{{ item.value }}</dd>
             </div>
           </dl>
         </article>
@@ -86,9 +98,21 @@
   ];
 
   const focus = [
-    { time: '09:30', title: 'A股开盘结构', note: '观察成交扩散与大小盘同步性' },
-    { time: '15:00', title: '商品日盘收市', note: '关注铜、金与碳酸锂趋势持续性' },
-    { time: '21:30', title: '美股开盘窗口', note: '核对美元、利率与风险资产联动' },
+    {
+      time: '09:30',
+      title: 'A股开盘结构',
+      note: '观察成交扩散与大小盘同步性',
+    },
+    {
+      time: '15:00',
+      title: '商品日盘收市',
+      note: '关注铜、金与碳酸锂趋势持续性',
+    },
+    {
+      time: '21:30',
+      title: '美股开盘窗口',
+      note: '核对美元、利率与风险资产联动',
+    },
   ];
 
   const risks = [
@@ -100,34 +124,203 @@
 </script>
 
 <style scoped>
-  .dashboard-restored { display: grid; gap: 16px; padding: 4px; color: #172033; }
-  .hero { display: flex; justify-content: space-between; gap: 24px; padding: 28px; border-radius: 18px; background: linear-gradient(135deg, #101a2e, #203a63); color: white; }
-  .hero h1 { margin: 4px 0 8px; font-size: 34px; }
-  .hero p { margin: 0; color: #cbd7e8; }
-  .eyebrow { font-size: 11px; letter-spacing: .18em; }
-  .hero__status { min-width: 180px; display: grid; align-content: center; gap: 4px; padding: 16px; border: 1px solid rgba(255,255,255,.18); border-radius: 14px; background: rgba(255,255,255,.08); }
-  .hero__status strong { font-size: 24px; }
-  .hero__status small { color: #cbd7e8; }
-  .metric-grid { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 12px; }
-  .metric-card, .panel { border: 1px solid #e4e9f0; border-radius: 14px; background: #fff; box-shadow: 0 8px 24px rgba(26,39,66,.05); }
-  .metric-card { display: grid; gap: 6px; padding: 18px; }
-  .metric-card span, .metric-card small, .panel small { color: #6b7587; }
-  .metric-card strong { font-size: 28px; }
-  .content-grid { display: grid; grid-template-columns: 1.5fr 1fr 1fr; gap: 12px; }
-  .panel { padding: 18px; }
-  .panel__head { display: flex; justify-content: space-between; align-items: start; margin-bottom: 16px; }
-  .panel__head h2 { margin: 2px 0 0; font-size: 17px; }
-  .panel__head em { font-style: normal; font-size: 11px; color: #8a6210; background: #fff5d6; padding: 4px 8px; border-radius: 999px; }
-  .heat-row { display: grid; grid-template-columns: 80px 1fr 50px; align-items: center; gap: 10px; margin: 14px 0; }
-  .heat-track { height: 7px; overflow: hidden; border-radius: 999px; background: #edf1f6; }
-  .heat-track i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg,#5a83d8,#26a477); }
-  .focus-list { display: grid; gap: 14px; padding: 0; margin: 0; list-style: none; }
-  .focus-list li { display: grid; grid-template-columns: 48px 1fr; gap: 10px; }
-  .focus-list li > span { color: #6a79a2; font-weight: 700; }
-  .focus-list div { display: grid; gap: 3px; }
-  .risk-list { display: grid; gap: 12px; margin: 0; }
-  .risk-list div { display: flex; justify-content: space-between; padding-bottom: 10px; border-bottom: 1px solid #eef1f5; }
-  .risk-list dt { color: #6b7587; } .risk-list dd { margin: 0; font-weight: 700; }
-  @media (max-width: 1100px) { .metric-grid { grid-template-columns: repeat(2,1fr); } .content-grid { grid-template-columns: 1fr; } }
-  @media (max-width: 640px) { .hero { flex-direction: column; } .metric-grid { grid-template-columns: 1fr; } }
+  .dashboard-restored {
+    display: grid;
+    gap: 16px;
+    padding: 4px;
+    color: #172033;
+  }
+
+  .hero {
+    display: flex;
+    justify-content: space-between;
+    gap: 24px;
+    padding: 28px;
+    border-radius: 18px;
+    background: linear-gradient(135deg, #101a2e, #203a63);
+    color: white;
+  }
+
+  .hero h1 {
+    margin: 4px 0 8px;
+    font-size: 34px;
+  }
+
+  .hero p {
+    margin: 0;
+    color: #cbd7e8;
+  }
+
+  .eyebrow {
+    font-size: 11px;
+    letter-spacing: 0.18em;
+  }
+
+  .hero__status {
+    display: grid;
+    min-width: 180px;
+    align-content: center;
+    gap: 4px;
+    padding: 16px;
+    border: 1px solid rgb(255 255 255 / 18%);
+    border-radius: 14px;
+    background: rgb(255 255 255 / 8%);
+  }
+
+  .hero__status strong {
+    font-size: 24px;
+  }
+
+  .hero__status small {
+    color: #cbd7e8;
+  }
+
+  .metric-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .metric-card,
+  .panel {
+    border: 1px solid #e4e9f0;
+    border-radius: 14px;
+    background: #fff;
+    box-shadow: 0 8px 24px rgb(26 39 66 / 5%);
+  }
+
+  .metric-card {
+    display: grid;
+    gap: 6px;
+    padding: 18px;
+  }
+
+  .metric-card span,
+  .metric-card small,
+  .panel small {
+    color: #6b7587;
+  }
+
+  .metric-card strong {
+    font-size: 28px;
+  }
+
+  .content-grid {
+    display: grid;
+    grid-template-columns: 1.5fr 1fr 1fr;
+    gap: 12px;
+  }
+
+  .panel {
+    padding: 18px;
+  }
+
+  .panel__head {
+    display: flex;
+    align-items: start;
+    justify-content: space-between;
+    margin-bottom: 16px;
+  }
+
+  .panel__head h2 {
+    margin: 2px 0 0;
+    font-size: 17px;
+  }
+
+  .panel__head em {
+    padding: 4px 8px;
+    border-radius: 999px;
+    background: #fff5d6;
+    color: #8a6210;
+    font-size: 11px;
+    font-style: normal;
+  }
+
+  .heat-row {
+    display: grid;
+    grid-template-columns: 80px 1fr 50px;
+    align-items: center;
+    gap: 10px;
+    margin: 14px 0;
+  }
+
+  .heat-track {
+    height: 7px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: #edf1f6;
+  }
+
+  .heat-track i {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: linear-gradient(90deg, #5a83d8, #26a477);
+  }
+
+  .focus-list {
+    display: grid;
+    gap: 14px;
+    padding: 0;
+    margin: 0;
+    list-style: none;
+  }
+
+  .focus-list li {
+    display: grid;
+    grid-template-columns: 48px 1fr;
+    gap: 10px;
+  }
+
+  .focus-list li > span {
+    color: #6a79a2;
+    font-weight: 700;
+  }
+
+  .focus-list div {
+    display: grid;
+    gap: 3px;
+  }
+
+  .risk-list {
+    display: grid;
+    gap: 12px;
+    margin: 0;
+  }
+
+  .risk-list div {
+    display: flex;
+    justify-content: space-between;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #eef1f5;
+  }
+
+  .risk-list dt {
+    color: #6b7587;
+  }
+
+  .risk-list dd {
+    margin: 0;
+    font-weight: 700;
+  }
+
+  @media (max-width: 1100px) {
+    .metric-grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
+
+    .content-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  @media (max-width: 640px) {
+    .hero {
+      flex-direction: column;
+    }
+
+    .metric-grid {
+      grid-template-columns: 1fr;
+    }
+  }
 </style>

@@ -11,7 +11,7 @@
       :actionable="actionable"
       :message="message"
     />
-    <slot />
+    <slot></slot>
   </section>
 </template>
 

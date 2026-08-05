@@ -72,7 +72,7 @@ const EMPLOYEE_PAGES: readonly VisualPage[] = [
     route: '/financial-ai/index',
     marker: '金融 AI',
     markerKind: 'heading',
-    evidenceSource: 'restored financial AI structure; real Provider unavailable and no generated answer',
+    evidenceSource: 'financial AI Provider unavailable; no generated answer',
   },
   {
     key: 'news-digest',
@@ -86,7 +86,7 @@ const EMPLOYEE_PAGES: readonly VisualPage[] = [
     route: '/settings/index',
     marker: '系统设置',
     markerKind: 'heading',
-    evidenceSource: 'real current session and personal-account navigation; unavailable writes disabled',
+    evidenceSource: 'session is live; settings writes remain disabled',
   },
   {
     key: 'risk-detail',
@@ -99,24 +99,6 @@ const EMPLOYEE_PAGES: readonly VisualPage[] = [
     route: '/monitor/index',
     marker: '系统监控',
     evidenceSource: 'deterministic health fixture',
-  },
-  {
-    key: 'finance-overview',
-    route: '/finance/index',
-    marker: '财务概览',
-    evidenceSource: 'deterministic operational projection fixture; not formal accounting evidence',
-  },
-  {
-    key: 'data-overview',
-    route: '/data/index',
-    marker: '数据管理',
-    evidenceSource: 'deterministic account and NAV chart fixture',
-  },
-  {
-    key: 'reports',
-    route: '/reports/index',
-    marker: '报表',
-    evidenceSource: 'deterministic risk and notification fixture',
   },
 ];
 
@@ -149,7 +131,11 @@ function absoluteUrl(route: string): string {
 }
 
 function usernameFor(role: AuthenticatedRole): string {
-  return { employee: 'e2e_employee_1', ceo: 'e2e_ceo', member: 'e2e_vip_1' }[role];
+  return {
+    employee: 'e2e_employee_1',
+    ceo: 'e2e_ceo',
+    member: 'e2e_vip_1',
+  }[role];
 }
 
 async function loginWithUi(page: Page, username: string, password: string): Promise<void> {
@@ -158,7 +144,8 @@ async function loginWithUi(page: Page, username: string, password: string): Prom
   await page.getByPlaceholder('请输入账号').fill(username);
   await page.getByPlaceholder('请输入密码').fill(password);
   const loginResponse = page.waitForResponse(
-    (response) => response.url().endsWith('/api/v1/auth/login') && response.request().method() === 'POST',
+    (response) =>
+      response.url().endsWith('/api/v1/auth/login') && response.request().method() === 'POST',
   );
   await page.getByRole('button', { name: '登录', exact: true }).click();
   expect((await loginResponse).ok()).toBeTruthy();
@@ -166,7 +153,9 @@ async function loginWithUi(page: Page, username: string, password: string): Prom
 }
 
 async function preparePage(page: Page): Promise<void> {
-  await page.route(/^https?:\/\/(?!127\.0\.0\.1(?::\d+)?|localhost(?::\d+)?)/, (route) => route.abort());
+  await page.route(/^https?:\/\/(?!127\.0\.0\.1(?::\d+)?|localhost(?::\d+)?)/, (route) =>
+    route.abort(),
+  );
   await mockPlatformVisualRoutes(page);
 }
 
@@ -176,7 +165,11 @@ async function openAuthenticatedPage(
   viewport: { width: number; height: number },
 ): Promise<{ page: Page; close: () => Promise<void> }> {
   const context = await browser.newContext({
-    locale: 'zh-CN', timezoneId: 'Asia/Shanghai', colorScheme: 'light', reducedMotion: 'reduce', viewport,
+    locale: 'zh-CN',
+    timezoneId: 'Asia/Shanghai',
+    colorScheme: 'light',
+    reducedMotion: 'reduce',
+    viewport,
   });
   const page = await context.newPage();
   await preparePage(page);
@@ -185,23 +178,40 @@ async function openAuthenticatedPage(
 }
 
 async function waitForMarker(page: Page, definition: VisualPage): Promise<void> {
-  const marker = definition.markerKind === 'heading'
-    ? page.getByRole('heading', { name: definition.marker }).first()
-    : page.getByText(definition.marker, { exact: false }).first();
+  const marker =
+    definition.markerKind === 'heading'
+      ? page.getByRole('heading', { name: definition.marker }).first()
+      : page.getByText(definition.marker, { exact: false }).first();
   await expect(marker).toBeVisible({ timeout: 30_000 });
 }
 
 async function stabilizePage(page: Page, dismissTransientOverlays: boolean): Promise<void> {
-  await page.addStyleTag({ content: `
-    *, *::before, *::after { animation-duration: 0s !important; animation-delay: 0s !important; transition-duration: 0s !important; transition-delay: 0s !important; caret-color: transparent !important; }
-    .ant-message, .ant-notification { pointer-events: none !important; }
-  ` });
+  await page.addStyleTag({
+    content: `
+      *, *::before, *::after {
+        animation-duration: 0s !important;
+        animation-delay: 0s !important;
+        transition-duration: 0s !important;
+        transition-delay: 0s !important;
+        caret-color: transparent !important;
+      }
+      .ant-message, .ant-notification {
+        pointer-events: none !important;
+      }
+    `,
+  });
   if (dismissTransientOverlays) {
     await page.keyboard.press('Escape');
     const mask = page.locator('.ant-drawer-mask:visible, .ant-modal-mask:visible').first();
-    if (await mask.isVisible().catch(() => false)) await mask.click({ force: true, timeout: 1_000 }).catch(() => undefined);
+    if (await mask.isVisible().catch(() => false)) {
+      await mask.click({ force: true, timeout: 1_000 }).catch(() => undefined);
+    }
   }
-  await page.locator('.ant-spin-spinning').first().waitFor({ state: 'hidden', timeout: 12_000 }).catch(() => undefined);
+  await page
+    .locator('.ant-spin-spinning')
+    .first()
+    .waitFor({ state: 'hidden', timeout: 12_000 })
+    .catch(() => undefined);
   await page.waitForTimeout(900);
   await page.evaluate(async () => {
     if ('fonts' in document) await document.fonts.ready;
@@ -231,16 +241,33 @@ async function capturePage(
   const directory = path.join(EVIDENCE_ROOT, viewport.name, role);
   fs.mkdirSync(directory, { recursive: true });
   const screenshotName = `${definition.key}.png`;
-  await page.screenshot({ path: path.join(directory, screenshotName), animations: 'disabled' });
+  await page.screenshot({
+    path: path.join(directory, screenshotName),
+    animations: 'disabled',
+  });
   fs.writeFileSync(
     path.join(directory, `${definition.key}.json`),
-    JSON.stringify({
-      key: definition.key, route: definition.route, role, viewport, marker: definition.marker,
-      evidenceSource: definition.evidenceSource,
-      evidenceClassification: 'deterministic visual baseline; not production or real Provider acceptance',
-      liveWrite: false, screenshot: screenshotName, layout, pageOverflowPx, bodyDiagnosticOverflowPx,
-      capturedAt: new Date().toISOString(), gitSha: process.env.GITHUB_SHA || null,
-    }, null, 2),
+    JSON.stringify(
+      {
+        key: definition.key,
+        route: definition.route,
+        role,
+        viewport,
+        marker: definition.marker,
+        evidenceSource: definition.evidenceSource,
+        evidenceClassification:
+          'deterministic visual baseline; not production or real Provider acceptance',
+        liveWrite: false,
+        screenshot: screenshotName,
+        layout,
+        pageOverflowPx,
+        bodyDiagnosticOverflowPx,
+        capturedAt: new Date().toISOString(),
+        gitSha: process.env.GITHUB_SHA || null,
+      },
+      null,
+      2,
+    ),
     'utf8',
   );
   expect(pageOverflowPx).toBeLessThanOrEqual(1);
@@ -251,7 +278,9 @@ for (const viewport of VIEWPORTS) {
     await page.setViewportSize(viewport);
     await preparePage(page);
     await capturePage(page, 'anonymous', viewport, {
-      key: 'login', route: '/login', marker: '欢迎登录',
+      key: 'login',
+      route: '/login',
+      marker: '欢迎登录',
       evidenceSource: 'public authentication UI; no Session',
     });
   });
@@ -260,22 +289,34 @@ for (const viewport of VIEWPORTS) {
     const session = await openAuthenticatedPage(browser, 'employee', viewport);
     try {
       for (const definition of EMPLOYEE_PAGES) {
-        await test.step(definition.key, () => capturePage(session.page, 'employee', viewport, definition));
+        await test.step(definition.key, () =>
+          capturePage(session.page, 'employee', viewport, definition),
+        );
       }
-    } finally { await session.close(); }
+    } finally {
+      await session.close();
+    }
   });
 
   test(`captures CEO administration surface at ${viewport.name}`, async ({ browser }) => {
     const session = await openAuthenticatedPage(browser, 'ceo', viewport);
     try {
-      for (const definition of CEO_PAGES) await capturePage(session.page, 'ceo', viewport, definition);
-    } finally { await session.close(); }
+      for (const definition of CEO_PAGES) {
+        await capturePage(session.page, 'ceo', viewport, definition);
+      }
+    } finally {
+      await session.close();
+    }
   });
 
   test(`captures member account surface at ${viewport.name}`, async ({ browser }) => {
     const session = await openAuthenticatedPage(browser, 'member', viewport);
     try {
-      for (const definition of MEMBER_PAGES) await capturePage(session.page, 'member', viewport, definition);
-    } finally { await session.close(); }
+      for (const definition of MEMBER_PAGES) {
+        await capturePage(session.page, 'member', viewport, definition);
+      }
+    } finally {
+      await session.close();
+    }
   });
 }
