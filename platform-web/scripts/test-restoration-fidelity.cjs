@@ -34,7 +34,6 @@ test('dashboard renders the reference information architecture', () => {
       '策略概览',
       '重要日历',
       "@/data/sample/dashboard",
-      'sample:dashboard-restoration',
     ],
     'dashboard',
   );
@@ -132,8 +131,6 @@ test('financial AI, news/wealth and settings retain reference product shells', (
       'news-asset-tabs',
       'wealth-toolbar',
       "@/data/sample/news",
-      'sample:news-digest',
-      'sample:wealth-campaigns',
     ],
     'news and wealth',
   );
@@ -154,17 +151,23 @@ test('financial AI, news/wealth and settings retain reference product shells', (
   );
 });
 
-test('sample data is isolated from production APIs and remains non-actionable', () => {
-  for (const relativePath of [
-    'src/data/sample/dashboard/index.ts',
-    'src/data/sample/strategy/index.ts',
-    'src/data/sample/funding/index.ts',
-    'src/data/sample/spread/index.ts',
-    'src/data/sample/news/index.ts',
-  ]) {
+test('sample data is isolated, accurately sourced and non-actionable', () => {
+  const expectedSources = new Map([
+    ['src/data/sample/dashboard/index.ts', 'sample:dashboard-restoration'],
+    ['src/data/sample/strategy/index.ts', 'sample:strategy-management-restoration'],
+    ['src/data/sample/funding/index.ts', 'sample:funding-carry-research'],
+    ['src/data/sample/spread/index.ts', 'sample:spread-research'],
+    ['src/data/sample/news/index.ts', 'sample:news-digest'],
+  ]);
+
+  for (const [relativePath, expectedSource] of expectedSources) {
     const source = read(relativePath);
     assert.match(source, /state:\s*'sample'/, `${relativePath} lacks sample state`);
+    assert.equal(source.includes(expectedSource), true, `${relativePath} lacks ${expectedSource}`);
     assert.match(source, /actionable:\s*false/, `${relativePath} is not explicitly non-actionable`);
     assert.doesNotMatch(source, /Math\.random|fetch\(|axios\.|\/api\//);
   }
+
+  const news = read('src/data/sample/news/index.ts');
+  assert.equal(news.includes('sample:wealth-campaigns'), true);
 });
