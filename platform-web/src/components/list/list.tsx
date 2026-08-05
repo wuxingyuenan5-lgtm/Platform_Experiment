@@ -1,4 +1,4 @@
-import { computed, defineComponent, ref, toRaw, unref } from 'vue';
+import { computed, defineComponent, h, ref, toRaw, unref } from 'vue';
 import { List } from 'ant-design-vue';
 import { isFunction } from '@/utils/is';
 import { useDataSource } from './hook/useDataSource';
@@ -40,15 +40,16 @@ export default defineComponent({
       if (onChange && isFunction(onChange)) onChange(pagination, filters, sorter, extra);
     }
 
-    const getBindValues = computed(() => ({
+    const getBindValues = computed<Record<string, unknown>>(() => ({
       ...attrs,
       ...unref(getProps),
       loading: unref(getLoading),
       pagination: toRaw(unref(getPaginationInfo)),
       dataSource: unref(getDataSourceRef),
+      class: style.list,
     }));
 
     expose({ fetch, listData });
-    return () => <List {...getBindValues.value} class={style.list} v-slots={slots}></List>;
+    return () => h(List as any, getBindValues.value, slots);
   },
 });
