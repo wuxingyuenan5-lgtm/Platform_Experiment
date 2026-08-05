@@ -85,7 +85,7 @@ const EMPLOYEE_PAGES: readonly VisualPage[] = [
   },
   {
     key: 'settings',
-    route: '/settings/index',
+    route: '/settings/profile',
     marker: 'settings-original-structure',
     markerKind: 'testid',
     evidenceSource:
