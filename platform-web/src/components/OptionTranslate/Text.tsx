@@ -44,7 +44,8 @@ export default defineComponent({
     return () => {
       const item = optionsMap.value[String(props.value)];
       const label = String(item?.label ?? props.value ?? '');
-      const { style, prefixElm, classBasic } = renderItem(item?.color);
+      const color = String(item?.color ?? '');
+      const { style, prefixElm, classBasic } = renderItem(color);
       return (
         <div class={classBasic} title={label} style={style}>
           {prefixElm}
