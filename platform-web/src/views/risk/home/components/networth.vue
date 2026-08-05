@@ -54,6 +54,10 @@
   const { setOptions } = useECharts(chartRef as Ref<HTMLDivElement>);
   const loading = ref(false);
 
+  function chartRow(params: any): NetWorthChartRow | undefined {
+    return Array.isArray(params) ? params[0]?.data : params?.data;
+  }
+
   function initData() {
     setOptions({
       dataset: { source: record.value },
@@ -66,8 +70,8 @@
         itemGap: 36,
       },
       tooltip: {
-        formatter: (params: { data?: NetWorthChartRow }) => {
-          const data = params.data;
+        formatter: (params: any) => {
+          const data = chartRow(params);
           return `<div class='text-xs'>
                 <div class='color-secondary'>${data?.name || ''}</div>
                 <div class='border-bottom my-2'></div>
@@ -84,11 +88,13 @@
           color: ['#F55458', '#5BB86F'],
           label: {
             show: true,
-            formatter: (params: { data?: NetWorthChartRow }) =>
-              `${params.data?.name || ''}\n${formateNumStr(params.data?.value, {
+            formatter: (params: any) => {
+              const data = chartRow(params);
+              return `${data?.name || ''}\n${formateNumStr(data?.value, {
                 decimals: 2,
                 keepZero: true,
-              })}`,
+              })}`;
+            },
           },
           animationType: 'scale',
           animationEasing: 'exponentialInOut',
