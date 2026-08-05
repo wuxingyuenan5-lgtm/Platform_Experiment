@@ -61,8 +61,8 @@ def update_versions(root: Path, version: str) -> None:
 
     replace_once(
         root / "docs/codex/current-state.md",
-        r'^- Current target version: Platform `\d+\.\d+\.\d+`\.$',
-        f'- Current target version: Platform `{version}`.',
+        r'^- Stable baseline: Platform `\d+\.\d+\.\d+`, release commit `([^`]+)`\.$',
+        f'- Stable baseline: Platform `{version}`, release commit `\\g<1>`.',
     )
 
 

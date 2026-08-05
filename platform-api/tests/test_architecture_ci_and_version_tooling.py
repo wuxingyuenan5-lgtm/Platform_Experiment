@@ -68,12 +68,10 @@ def test_bump_version_updates_all_maintained_declarations(tmp_path: Path) -> Non
     (tmp_path / "docs/codex").mkdir(parents=True)
     (tmp_path / "VERSION").write_text("0.8.0\n", encoding="utf-8")
     (tmp_path / "platform-api/pyproject.toml").write_text(
-        '[project]\nversion = "0.8.0"\n',
-        encoding="utf-8",
+        '[project]\nversion = "0.8.0"\n', encoding="utf-8"
     )
     (tmp_path / "execution-runtime/pyproject.toml").write_text(
-        '[project]\nversion = "0.8.0"\n',
-        encoding="utf-8",
+        '[project]\nversion = "0.8.0"\n', encoding="utf-8"
     )
     (tmp_path / "platform-web/package.json").write_text(
         '{\n  "name": "platform-web",\n  "version": "0.8.0",\n  "private": true\n}\n',
@@ -81,8 +79,7 @@ def test_bump_version_updates_all_maintained_declarations(tmp_path: Path) -> Non
     )
     for filename in (".env.development", ".env.production"):
         (tmp_path / f"platform-web/{filename}").write_text(
-            'VITE_GLOB_APP_VERSION = "0.8.0"\n',
-            encoding="utf-8",
+            'VITE_GLOB_APP_VERSION = "0.8.0"\n', encoding="utf-8"
         )
     (tmp_path / "platform-api/app/application.py").write_text(
         'PLATFORM_VERSION = "0.8.0"\n', encoding="utf-8"
@@ -91,7 +88,8 @@ def test_bump_version_updates_all_maintained_declarations(tmp_path: Path) -> Non
         'PLATFORM_VERSION = "0.8.0"\n', encoding="utf-8"
     )
     (tmp_path / "docs/codex/current-state.md").write_text(
-        '- Current target version: Platform `0.8.0`.\n', encoding="utf-8"
+        '- Stable baseline: Platform `0.8.0`, release commit `old-sha`.\n',
+        encoding="utf-8",
     )
 
     bump_version.update_versions(tmp_path, "0.9.3")
@@ -116,7 +114,7 @@ def test_bump_version_updates_all_maintained_declarations(tmp_path: Path) -> Non
     assert 'PLATFORM_VERSION = "0.9.3"' in (
         tmp_path / "execution-runtime/app/version.py"
     ).read_text(encoding="utf-8")
-    assert 'Platform `0.9.3`' in (
+    assert '- Stable baseline: Platform `0.9.3`' in (
         tmp_path / "docs/codex/current-state.md"
     ).read_text(encoding="utf-8")
 
