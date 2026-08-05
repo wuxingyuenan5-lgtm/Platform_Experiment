@@ -171,6 +171,7 @@
 <script setup lang="ts">
   import { ReloadOutlined } from '@ant-design/icons-vue';
   import { Button, Card, Col, Row, Space, Statistic, Table, Tag } from 'ant-design-vue';
+  import type { ColumnsType } from 'ant-design-vue/es/table/interface';
   import Decimal from 'decimal.js';
   import { computed, onMounted, reactive, ref } from 'vue';
   import type { DecimalString, ProductDataMeta } from '@/api/platform/productDataState';
@@ -196,6 +197,13 @@
   import { formatMoneyString, formatRatioPercentString } from '@/utils/decimalDisplay';
 
   type SourceStatus = 'ready' | 'no_data' | 'unavailable';
+
+  interface SourceRow {
+    key: string;
+    label: string;
+    status: SourceStatus;
+    detail: string;
+  }
 
   const loading = ref(false);
   const riskRecords = ref<RiskRecord[]>([]);
@@ -265,7 +273,7 @@
     sumAccountField('available_fund'),
   );
 
-  const riskColumns = [
+  const riskColumns: ColumnsType<RiskRecord> = [
     { title: 'ID', dataIndex: 'id', key: 'id', width: 70 },
     { title: '标题', dataIndex: 'title', key: 'title' },
     { title: '内容', dataIndex: 'content', key: 'content' },
@@ -273,23 +281,23 @@
     { title: '状态', dataIndex: 'status', key: 'status', width: 100 },
     { title: '时间', dataIndex: 'created_at', key: 'created_at', width: 180 },
   ];
-  const sourceColumns = [
+  const sourceColumns: ColumnsType<SourceRow> = [
     { title: '来源', dataIndex: 'label', key: 'label' },
     { title: '状态', dataIndex: 'status', key: 'status', width: 110 },
     { title: '截至/错误', dataIndex: 'detail', key: 'detail' },
   ];
-  const notificationColumns = [
+  const notificationColumns: ColumnsType<NotificationMessage> = [
     { title: '消息', key: 'title' },
     { title: '状态', key: 'status', width: 100 },
     { title: '时间', dataIndex: 'created_at', key: 'created_at', width: 170 },
   ];
-  const ratioColumns = [
+  const ratioColumns: ColumnsType<ProductRatioItem> = [
     { title: '资产项', dataIndex: 'name', key: 'name' },
     { title: '金额 USD', key: 'value', align: 'right', width: 180 },
     { title: '占比', key: 'percent', width: 130 },
   ];
 
-  const sourceRows = computed(() => [
+  const sourceRows = computed<SourceRow[]>(() => [
     {
       key: 'risk',
       label: 'risk-service',
@@ -443,8 +451,8 @@
       sourceStatus.finance = financeFailures
         ? 'unavailable'
         : accounts.value.length || ratioItems.value.length || totalAsset.value !== undefined
-        ? 'ready'
-        : 'no_data';
+          ? 'ready'
+          : 'no_data';
 
       if (healthResult.status === 'fulfilled') {
         health.value = healthResult.value;
@@ -471,8 +479,8 @@
         message: unavailable
           ? `${unavailable}个来源不可用；成功来源的事实仍单独保留`
           : ready
-          ? undefined
-          : '所有来源成功，但没有风控或账户事实',
+            ? undefined
+            : '所有来源成功，但没有风控或账户事实',
         degraded: unavailable > 0,
       };
     } finally {
