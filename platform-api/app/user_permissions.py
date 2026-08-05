@@ -30,23 +30,24 @@ API_KEY_ROLE_PERMISSIONS: dict[str, frozenset[str]] = {
     "admin": frozenset({"*"}),
 }
 
-CEO_PERMISSIONS = frozenset(
+PRODUCT_READ_PERMISSIONS = frozenset(
     {
         "platform:read",
-        "audit:read",
-        "system.read",
-        "system.manage",
-        "risk.read",
-        "trade.read",
-        "user.read",
-        "user.sensitive.read",
-        "user.create",
-        "user.update",
-        "user.disable",
-        "user.reset_password",
-        "user.assign_role",
-        "user.session.revoke",
-        "user.audit.read",
+        "dashboard.read",
+        "research.read",
+        "strategy.read",
+        "finance.read",
+        "data.read",
+        "monitor.read",
+        "reports.read",
+        "news.read",
+        "financial_ai.read",
+        "settings.read",
+    }
+)
+
+SELF_SERVICE_PERMISSIONS = frozenset(
+    {
         "profile.read_self",
         "profile.update_self",
         "profile.avatar.update_self",
@@ -54,71 +55,62 @@ CEO_PERMISSIONS = frozenset(
         "session.read_self",
         "session.revoke_self",
         "member.read_self",
-        "member.read_all",
         "member.holding.read_self",
-        "member.holding.read_all",
-        "member.holding.update",
+    }
+)
+
+CEO_PERMISSIONS = frozenset({"*"})
+
+TECH_LEAD_PERMISSIONS = frozenset(
+    {
+        *PRODUCT_READ_PERMISSIONS,
+        *SELF_SERVICE_PERMISSIONS,
+        "audit:read",
+        "system.read",
+        "system.manage",
+        "risk.read",
+        "risk.write",
+        "trade.read",
+        "strategy.write",
+        "trading.write",
+        "research.write",
+        "finance.write",
+        "settings.write",
+        "user.read",
+        "user.sensitive.read",
+        "user.create",
+        "user.update",
+        "user.disable",
+        "user.reset_password",
+        "user.session.revoke",
+        "user.audit.read",
+        "member.read_all",
+    }
+)
+
+EMPLOYEE_PERMISSIONS = frozenset(
+    {
+        *PRODUCT_READ_PERMISSIONS,
+        *SELF_SERVICE_PERMISSIONS,
+        "audit:read",
+        "risk.read",
+        "user.read",
+        "member.read_all",
+    }
+)
+
+MEMBER_PERMISSIONS = frozenset(
+    {
+        *PRODUCT_READ_PERMISSIONS,
+        *SELF_SERVICE_PERMISSIONS,
     }
 )
 
 HUMAN_ROLE_PERMISSIONS: dict[str, frozenset[str]] = {
     "ceo": CEO_PERMISSIONS,
-    "tech_lead": frozenset(
-        {
-            "platform:read",
-            "audit:read",
-            "system.read",
-            "system.manage",
-            "risk.read",
-            "trade.read",
-            "user.read",
-            "user.sensitive.read",
-            "user.create",
-            "user.update",
-            "user.disable",
-            "user.reset_password",
-            "user.assign_role",
-            "user.session.revoke",
-            "user.audit.read",
-            "profile.read_self",
-            "profile.update_self",
-            "profile.avatar.update_self",
-            "profile.password.change_self",
-            "session.read_self",
-            "session.revoke_self",
-            "member.read_self",
-            "member.read_all",
-            "member.holding.read_self",
-        }
-    ),
-    "employee": frozenset(
-        {
-            "platform:read",
-            "risk.read",
-            "trade.read",
-            "user.read",
-            "profile.read_self",
-            "profile.update_self",
-            "profile.avatar.update_self",
-            "profile.password.change_self",
-            "session.read_self",
-            "session.revoke_self",
-            "member.read_self",
-            "member.holding.read_self",
-        }
-    ),
-    "member": frozenset(
-        {
-            "profile.read_self",
-            "profile.update_self",
-            "profile.avatar.update_self",
-            "profile.password.change_self",
-            "session.read_self",
-            "session.revoke_self",
-            "member.read_self",
-            "member.holding.read_self",
-        }
-    ),
+    "tech_lead": TECH_LEAD_PERMISSIONS,
+    "employee": EMPLOYEE_PERMISSIONS,
+    "member": MEMBER_PERMISSIONS,
 }
 
 ROLE_PERMISSIONS: dict[str, frozenset[str]] = {

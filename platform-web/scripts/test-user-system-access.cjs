@@ -79,9 +79,9 @@ const decimalDisplay = loadTypeScriptModule(
   path.join(projectRoot, 'src/utils/decimalDisplay.ts'),
 );
 
-test('browser permission points match exactly without wildcard expansion', () => {
+test('browser permission points honor the server wildcard capability', () => {
   assert.equal(userAccess.hasPermission(['user.read'], 'user.read'), true);
-  assert.equal(userAccess.hasPermission(['*'], 'user.read'), false);
+  assert.equal(userAccess.hasPermission(['*'], 'user.read'), true);
 });
 
 test('all-of and any-of permission requirements remain exact', () => {
@@ -92,7 +92,7 @@ test('all-of and any-of permission requirements remain exact', () => {
   );
   assert.equal(userAccess.hasEveryPermission(granted, ['profile.read_self', 'user.read']), false);
   assert.equal(userAccess.hasAnyPermission(granted, ['user.read', 'profile.read_self']), true);
-  assert.equal(userAccess.hasAnyPermission(['*'], ['user.read', 'profile.read_self']), false);
+  assert.equal(userAccess.hasAnyPermission(['*'], ['user.read', 'profile.read_self']), true);
 });
 
 test('route all-of and any-of metadata use the same policy', () => {

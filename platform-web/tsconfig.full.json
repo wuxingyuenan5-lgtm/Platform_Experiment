@@ -8,6 +8,7 @@
   },
   "include": [
     "internal/**/*.ts",
+    "src/access/**/*.ts",
     "src/api/hedgeResearch.ts",
     "src/api/platform/**/*.ts",
     "src/api/riskControl.ts",
@@ -24,7 +25,8 @@
     "src/hooks/web/useECharts.ts",
     "src/layouts/default/menu/**/*.vue",
     "src/router/helper/routeHelper.ts",
-    "src/router/routes/modules/hedge.ts",
+    "src/router/routes/index.ts",
+    "src/router/routes/modules/**/*.ts",
     "src/router/types.ts",
     "src/router/viewRegistry.generated.ts",
     "src/views/audit/**/*.vue",
