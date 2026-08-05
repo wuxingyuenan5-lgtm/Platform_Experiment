@@ -4,6 +4,7 @@ This index routes to current contracts; implementation history is not a contract
 
 | Domain | Contract | Implementation owner |
 |---|---|---|
+| Browser Access & Product Data | `BROWSER_ACCESS_AND_PRODUCT_DATA.md` | browser role capabilities, route/menu policy, personal account and restored product state owners |
 | Identity & Permission | `../technical/AUTH_RBAC_LIVE_SESSIONS.md`, `../technical/USER_SYSTEM_AUTH_ERROR_CONTRACT.md` | auth, authority, permissions and user modules |
 | Live Write | `../technical/EXECUTION_RISK_CONTROLS.md` | Live session modules, risk modules and Runtime live safety |
 | Execution Risk | `../technical/EXECUTION_RISK_CONTROLS.md` | `execution_risk_models.py`, `execution_risk_policy.py`, `execution_risk_repository.py`, `execution_risk.py` |
