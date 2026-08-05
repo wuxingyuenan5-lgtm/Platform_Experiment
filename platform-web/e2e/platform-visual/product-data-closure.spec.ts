@@ -40,9 +40,9 @@ async function expectDataState(
   source: string,
 ): Promise<void> {
   await page.goto(absoluteUrl(route));
-  const surface = page.locator(
-    `[data-product-state="${state}"][data-actionable="false"]`,
-  ).first();
+  const surface = page
+    .locator(`[data-product-state="${state}"][data-actionable="false"]`)
+    .first();
   await expect(surface).toBeVisible({ timeout: 20_000 });
   await expect(surface.getByText(source, { exact: false }).first()).toBeVisible();
 }
@@ -55,7 +55,14 @@ test('restored formal product surfaces disclose state, source and non-actionabil
 
   await expectDataState(page, '/home/index', 'sample', 'sample:dashboard-restoration');
   await expect(page.getByTestId('dashboard-original-structure')).toBeVisible();
-  for (const title of ['全球市场概览', '投资组合总览', '市场脉搏', '组合概览', '策略概览', '重要日历']) {
+  for (const title of [
+    '全球市场概览',
+    '投资组合总览',
+    '市场脉搏',
+    '组合概览',
+    '策略概览',
+    '重要日历',
+  ]) {
     await expect(page.getByText(title, { exact: true }).first()).toBeVisible();
   }
   await expect(page.getByText('实时数据', { exact: true })).toHaveCount(0);
@@ -119,18 +126,15 @@ test('restored formal product surfaces disclose state, source and non-actionabil
   await expect(page.getByTestId('news-digest-original-structure')).toBeVisible();
   await expect(page.getByText('非实时', { exact: true }).first()).toBeVisible();
 
-  await expectDataState(
-    page,
-    '/news-calendar/wealth',
-    'sample',
-    'sample:wealth-campaigns',
-  );
+  await expectDataState(page, '/news-calendar/wealth', 'sample', 'sample:wealth-campaigns');
   await expect(page.getByTestId('wealth-original-structure')).toBeVisible();
   await expect(page.getByRole('button', { name: '不可申购' }).first()).toBeDisabled();
 
   await page.goto(absoluteUrl('/settings/index'));
   await expect(page.getByTestId('settings-original-structure')).toBeVisible();
-  await expect(page.getByText('not-configured:settings-write-owner', { exact: false })).toBeVisible();
+  await expect(
+    page.getByText('not-configured:settings-write-owner', { exact: false }),
+  ).toBeVisible();
   await expect(page.getByRole('button', { name: '保存（Owner未配置）' })).toBeDisabled();
 
   await page.goto(absoluteUrl('/notification/index'));
