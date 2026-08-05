@@ -62,7 +62,7 @@
   type RangeValue = [Dayjs, Dayjs];
 
   interface OperationLogSearchInfo {
-    userId?: number;
+    userId?: string;
     operationModule?: string;
     operationStatus?: string | number;
     timeRange?: RangeValue;
@@ -72,7 +72,7 @@
 
   interface AccountOption {
     label: string;
-    value: number;
+    value: string;
   }
 
   const { createMessage } = useMessage();
@@ -134,7 +134,7 @@
   async function loadAccountOptions() {
     const result = await getAccountList();
     accountOptions.value = result.items.map((item) => ({
-      label: item.name,
+      label: item.nickname || item.account,
       value: item.id,
     }));
   }
