@@ -40,9 +40,7 @@ async function expectDataState(
   source: string,
 ): Promise<void> {
   await page.goto(absoluteUrl(route));
-  const surface = page
-    .locator(`[data-product-state="${state}"][data-actionable="false"]`)
-    .first();
+  const surface = page.locator(`[data-product-state="${state}"][data-actionable="false"]`).first();
   await expect(surface).toBeVisible({ timeout: 20_000 });
   await expect(surface.getByText(source, { exact: false }).first()).toBeVisible();
 }
