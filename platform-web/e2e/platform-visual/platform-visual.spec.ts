@@ -59,7 +59,8 @@ const EMPLOYEE_PAGES: readonly VisualPage[] = [
     route: '/strategy/platform?desk=crossSpread',
     marker: '跨所价差研究',
     markerKind: 'heading',
-    evidenceSource: 'reference spread research with current CrossVenue execution workspace retained',
+    evidenceSource:
+      'reference spread research with current CrossVenue execution workspace retained',
   },
   {
     key: 'strategy-management',
@@ -87,7 +88,8 @@ const EMPLOYEE_PAGES: readonly VisualPage[] = [
     route: '/settings/index',
     marker: '系统设置',
     markerKind: 'heading',
-    evidenceSource: 'reference settings layout; Session and health are live reads, writes unavailable',
+    evidenceSource:
+      'reference settings layout; Session and health are live reads, writes unavailable',
   },
   {
     key: 'risk-detail',
@@ -179,12 +181,14 @@ async function openAuthenticatedPage(
 }
 
 async function waitForMarker(page: Page, definition: VisualPage): Promise<void> {
-  const marker =
-    definition.markerKind === 'heading'
-      ? page.getByRole('heading', { name: definition.marker }).first()
-      : definition.markerKind === 'testid'
-        ? page.getByTestId(definition.marker).first()
-        : page.getByText(definition.marker, { exact: false }).first();
+  let marker;
+  if (definition.markerKind === 'heading') {
+    marker = page.getByRole('heading', { name: definition.marker }).first();
+  } else if (definition.markerKind === 'testid') {
+    marker = page.getByTestId(definition.marker).first();
+  } else {
+    marker = page.getByText(definition.marker, { exact: false }).first();
+  }
   await expect(marker).toBeVisible({ timeout: 30_000 });
 }
 
@@ -255,7 +259,8 @@ async function capturePage(
         viewport,
         marker: definition.marker,
         evidenceSource: definition.evidenceSource,
-        evidenceClassification: 'deterministic visual baseline; not production or real Provider acceptance',
+        evidenceClassification:
+          'deterministic visual baseline; not production or real Provider acceptance',
         liveWrite: false,
         screenshot: screenshotName,
         layout,
