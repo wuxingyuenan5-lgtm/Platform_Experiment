@@ -63,8 +63,7 @@ export const Password = defineComponent({
       const values = await formRef.value.validate();
       confirmLoading.value = true;
       useApiBasic({
-        apiFn: loginChangepw,
-        parameter: values,
+        apiFn: loginChangepw(values),
         successFn: () => {
           visible.value = false;
           message.warning({
