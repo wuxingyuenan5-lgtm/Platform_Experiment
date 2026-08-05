@@ -51,7 +51,7 @@
   "explicit_unavailable_views": [
     {
       "path": "platform-web/src/views/dashboard/index.vue",
-      "required_markers": ["RestoredProductSurface", "sample:dashboard-restoration", ":actionable=\"false\""]
+      "required_markers": ["RestoredProductSurface", "@/data/sample/dashboard", "dashboard-original-structure"]
     },
     {
       "path": "platform-web/src/views/financialAi/index.vue",
@@ -59,19 +59,19 @@
     },
     {
       "path": "platform-web/src/views/strategy/management/index.vue",
-      "required_markers": ["RestoredProductSurface", "sample:strategy-catalog", ":actionable=\"false\""]
+      "required_markers": ["RestoredProductSurface", "@/data/sample/strategy", "strategy-management-original-structure"]
     },
     {
       "path": "platform-web/src/views/strategy/funding-carry/index.vue",
-      "required_markers": ["RestoredProductSurface", "sample:funding-carry-research", ":actionable=\"false\""]
+      "required_markers": ["RestoredProductSurface", "@/data/sample/funding", "funding-original-structure"]
     },
     {
       "path": "platform-web/src/views/strategy/spread-carry/index.vue",
-      "required_markers": ["RestoredProductSurface", "CrossVenueExecutionWorkspace", ":actionable=\"false\""]
+      "required_markers": ["RestoredProductSurface", "CrossVenueExecutionWorkspace", "@/data/sample/spread"]
     },
     {
       "path": "platform-web/src/views/newsCalendar/index.vue",
-      "required_markers": ["TradingView Economic Calendar", "sample:news-digest", "sample:wealth-campaigns"]
+      "required_markers": ["TradingView Economic Calendar", "@/data/sample/news", "news-calendar-original-structure"]
     },
     {
       "path": "platform-web/src/views/settings/index.vue",
