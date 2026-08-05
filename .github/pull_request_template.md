@@ -1,28 +1,28 @@
-<!-- Choose one and remove the others.
-Workstream: fast
-Behavior change: none
-Safety change: none
-
-Workstream: standard
-
-Workstream: critical
-Issue: #123
--->
-
 ## Outcome
 
-What measurable result does this PR deliver?
+What measurable result does this pull request deliver?
 
 ## Scope
 
 - Included:
-- Excluded:
+- Explicitly excluded:
+
+## Contracts and safety
+
+- Public API or data-contract impact:
+- Database schema impact:
+- Live Write impact:
+- New infrastructure:
 
 ## Verification
 
-- Relevant local checks:
-- Required CI:
+- Commands executed:
+- CI status:
 
-## Risk / rollback
+## Deployment prerequisites
 
-Required for Critical or meaningful behavior changes; otherwise write `low / revert squash commit`.
+List required external variables, credentials, migrations or operator actions. Write `none` when not applicable.
+
+## Risk and rollback
+
+State the main risk and the smallest safe rollback or forward-fix.

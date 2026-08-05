@@ -1,4 +1,4 @@
-# Platform V6 策略产品能力矩阵
+# Platform 0.10.x 策略产品能力矩阵
 
 状态：`active`  
 适用分支：`refactor/frontend-architecture-v6`  

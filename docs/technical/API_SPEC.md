@@ -1,10 +1,11 @@
-# Platform V6 API Specification
+# Platform 0.10.x API Specification
 
-状态：`active`  
-Platform API Prefix：`/api/v1`  
-Runtime 根地址：`http://127.0.0.1:8100`  
-当前阶段：`docs/planning/V6-Production-Gate-密钥托管与脱敏.md`  
-当前技术合同：`docs/technical/SECRET_PROVIDER_AND_REDACTION.md`
+状态：`active`
+适用合同系列：`Platform 0.10.x`
+Platform API Prefix：`/api/v1`
+Runtime 根地址：`http://127.0.0.1:8100`
+关联安全合同：`SECRET_PROVIDER_AND_REDACTION.md`
+关联实盘验收：`../operations/LIVE_ACCEPTANCE_RUNBOOK.md`
 
 ## 1. 服务边界
 

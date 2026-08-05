@@ -1,4 +1,4 @@
-# Platform V6 前端策略注册表规范
+# Platform 0.10.x 前端策略注册表规范
 
 状态：`active`  
 适用分支：`refactor/frontend-architecture-v6`  

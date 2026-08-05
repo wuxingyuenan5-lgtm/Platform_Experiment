@@ -68,12 +68,10 @@ def test_bump_version_updates_all_maintained_declarations(tmp_path: Path) -> Non
     (tmp_path / "docs/codex").mkdir(parents=True)
     (tmp_path / "VERSION").write_text("0.8.0\n", encoding="utf-8")
     (tmp_path / "platform-api/pyproject.toml").write_text(
-        '[project]\nversion = "0.8.0"\n',
-        encoding="utf-8",
+        '[project]\nversion = "0.8.0"\n', encoding="utf-8"
     )
     (tmp_path / "execution-runtime/pyproject.toml").write_text(
-        '[project]\nversion = "0.8.0"\n',
-        encoding="utf-8",
+        '[project]\nversion = "0.8.0"\n', encoding="utf-8"
     )
     (tmp_path / "platform-web/package.json").write_text(
         '{\n  "name": "platform-web",\n  "version": "0.8.0",\n  "private": true\n}\n',
@@ -81,8 +79,7 @@ def test_bump_version_updates_all_maintained_declarations(tmp_path: Path) -> Non
     )
     for filename in (".env.development", ".env.production"):
         (tmp_path / f"platform-web/{filename}").write_text(
-            'VITE_GLOB_APP_VERSION = "0.8.0"\n',
-            encoding="utf-8",
+            'VITE_GLOB_APP_VERSION = "0.8.0"\n', encoding="utf-8"
         )
     (tmp_path / "platform-api/app/application.py").write_text(
         'PLATFORM_VERSION = "0.8.0"\n', encoding="utf-8"
@@ -91,7 +88,8 @@ def test_bump_version_updates_all_maintained_declarations(tmp_path: Path) -> Non
         'PLATFORM_VERSION = "0.8.0"\n', encoding="utf-8"
     )
     (tmp_path / "docs/codex/current-state.md").write_text(
-        '- Current target version: Platform `0.8.0`.\n', encoding="utf-8"
+        '- Stable baseline: Platform `0.8.0`, release commit `old-sha`.\n',
+        encoding="utf-8",
     )
 
     bump_version.update_versions(tmp_path, "0.9.3")
@@ -116,20 +114,23 @@ def test_bump_version_updates_all_maintained_declarations(tmp_path: Path) -> Non
     assert 'PLATFORM_VERSION = "0.9.3"' in (
         tmp_path / "execution-runtime/app/version.py"
     ).read_text(encoding="utf-8")
-    assert 'Platform `0.9.3`' in (
+    assert '- Stable baseline: Platform `0.9.3`' in (
         tmp_path / "docs/codex/current-state.md"
     ).read_text(encoding="utf-8")
 
 
-def test_pr_workflows_do_not_duplicate_feature_branch_push_runs() -> None:
+def test_permanent_workflows_have_distinct_long_term_responsibilities() -> None:
     platform = (ROOT / ".github/workflows/platform-ci.yml").read_text(encoding="utf-8")
-    versions = (ROOT / ".github/workflows/version-consistency.yml").read_text(
+    quality = (ROOT / ".github/workflows/repository-quality.yml").read_text(
         encoding="utf-8"
     )
+    secret = (ROOT / ".github/workflows/secret-scan.yml").read_text(encoding="utf-8")
 
-    assert "- 'feature/**'" not in platform
-    assert "- 'feature/**'" not in versions
+    assert "refactor/platform-0-9-3-" not in platform + quality + secret
     assert "python scripts/scan-secrets.py" not in platform
-    assert "needs.changes.outputs.backend" in platform
-    assert "needs.changes.outputs.runtime" in platform
-    assert "needs.changes.outputs.frontend" in platform
+    assert "python scripts/scan-secrets.py" in secret
+    assert "python scripts/check-version-consistency.py" in quality
+    assert "python scripts/context-for.py --check-budgets --json" in quality
+    assert "name: platform-api" in platform
+    assert "name: execution-runtime" in platform
+    assert "name: platform-web" in platform

@@ -1,4 +1,4 @@
-# Platform V6+ Runtime Command 与 Event 契约
+# Platform 0.10.x+ Runtime Command 与 Event 契约
 
 状态：`active`  
 产品基线：Platform V5  

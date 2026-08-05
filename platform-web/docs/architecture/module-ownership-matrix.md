@@ -1,4 +1,4 @@
-# Platform V6 模块职责、技术领域与数据权威矩阵
+# Platform 0.10.x 模块职责、技术领域与数据权威矩阵
 
 状态：`active`  
 产品基线：Platform V5  

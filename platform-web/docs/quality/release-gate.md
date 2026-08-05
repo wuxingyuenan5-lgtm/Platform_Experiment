@@ -1,9 +1,9 @@
-# Platform V6 最小发布门槛
+# Platform 0.10.x 最小发布门槛
 
 状态：`active`
 适用基线：`main / Platform V6`
-总体计划：`../../../docs/planning/V6-交易安全加固实施计划.md`
-当前阶段：`../../../docs/planning/V6-Production-Gate-密钥托管与脱敏.md`
+总体计划：historical implementation record in Git history
+当前阶段：historical implementation record in Git history
 
 ## 1. 原则
 

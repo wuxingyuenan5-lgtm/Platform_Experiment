@@ -16,9 +16,9 @@ FRONTEND_VERSION_FILES = (
 RUNTIME_VERSION_OWNER = "execution-runtime/app/version.py"
 RUNTIME_VERSION_DIRECTORY = "execution-runtime/app"
 CURRENT_DOCUMENTS = {
-    "current engineering state": (
+    "current stable baseline": (
         "docs/codex/current-state.md",
-        r"Current target version: Platform `([^`]+)`\.",
+        r"Stable baseline: Platform `([^`]+)`, release commit `[^`]+`\.",
     ),
 }
 MAINTAINED_VERSION_PATHS = (

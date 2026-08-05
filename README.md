@@ -1,10 +1,14 @@
 # 全球变量金融平台（Variable-Global）
 
-全球变量金融平台（Variable-Global）服务于Research、Market Data、Strategy、Trading、Execution、Risk、Accounting、Reconciliation、User & Access、Member Portfolio和Operations。`Platform`是工程与架构层通用简称，不取代正式产品品牌。
+全球变量金融平台覆盖 Research、Market Data、Strategy、Trading、Execution、Risk、Accounting、Reconciliation、User & Access、Member Portfolio 与 Operations。`Platform`仅作为工程简称。
 
-The maintained services are Platform Web, Platform API and Platform Execution Runtime.
+The maintained deployable subjects are:
 
-## Start locally
+- `platform-web` — Vue frontend;
+- `platform-api` — modular-monolith business API;
+- `execution-runtime` — isolated execution runtime and venue boundary.
+
+## Local startup
 
 From Windows PowerShell at the repository root:
 
@@ -12,17 +16,17 @@ From Windows PowerShell at the repository root:
 powershell -ExecutionPolicy Bypass -File .\scripts\dev-platform.ps1
 ```
 
-Operational details, service addresses, stop procedures and troubleshooting belong to `docs/operations/RUNBOOK.md`.
+Operating details and safety defaults are in `docs/operations/RUNBOOK.md`.
 
-## Read next
+## Authorities
 
 | Need | Authority |
 |---|---|
-| Current version, branch, phase and known limits | `docs/codex/current-state.md` |
+| Current stable baseline, target scope and known limits | `docs/codex/current-state.md` |
 | Documentation navigation | `docs/README.md` |
-| AI and engineering execution rules | `AGENTS.md` |
-| Smallest task context | `docs/codex/context-map.md` |
+| AI and engineering rules | `AGENTS.md` |
+| Minimal context selection | `docs/codex/context-map.md` |
 | Service and data-flow boundaries | `docs/architecture/SYSTEM_MAP.md` |
-| Business-rule and data ownership | `docs/architecture/OWNERSHIP.md` |
+| Code and data ownership | `docs/architecture/OWNERSHIP.md` |
 | Domain contracts | `docs/contracts/README.md` |
-| Database, migration, backup and recovery | `docs/database/README.md` |
+| Database and migration rules | `docs/database/README.md` |

@@ -1,4 +1,4 @@
-# Platform V6+ 交易执行与可靠性架构
+# Platform 0.10.x+ 交易执行与可靠性架构
 
 状态：`active`  
 产品基线：Platform V5  

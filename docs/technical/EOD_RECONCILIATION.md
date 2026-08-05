@@ -1,9 +1,8 @@
 # EOD Reconciliation and Live Scale Gate
 
-状态：`active`  
-适用版本：`Platform V6 / Phase 4D`  
-实施计划：`../planning/V6-Phase4D-实盘日终对账与运营门禁.md`
-
+状态：`active`
+适用版本：`Platform 0.10.x`
+合同状态：长期维护；历史实施材料保留在 Git 历史中。
 ## 1. 权威边界
 
 EOD Report 是运营核对结果，不是新的金融事实来源：

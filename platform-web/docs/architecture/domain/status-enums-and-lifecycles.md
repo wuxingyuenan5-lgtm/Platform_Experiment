@@ -1,4 +1,4 @@
-# Platform V6+ 状态枚举与生命周期规范
+# Platform 0.10.x+ 状态枚举与生命周期规范
 
 状态：`active`  
 产品基线：Platform V5  

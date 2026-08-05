@@ -1,94 +1,77 @@
 stages:
   - build
+  - deploy
 
-# 测试构建 job
+variables:
+  PNPM_VERSION: "9.15.9"
+  NPM_CONFIG_REGISTRY: "https://registry.npmmirror.com"
+
+.frontend-job:
+  image: node:20
+  tags:
+    - runner20
+  before_script:
+    - corepack enable
+    - corepack prepare pnpm@$PNPM_VERSION --activate
+    - echo "registry=$NPM_CONFIG_REGISTRY" > ~/.npmrc
+    - pnpm config set store-dir .pnpm-store
+    - HUSKY=0 pnpm install --frozen-lockfile
+  cache:
+    key: ${CI_COMMIT_REF_SLUG}
+    paths:
+      - .pnpm-store/
+      - node_modules/
+
 build-test:
+  extends: .frontend-job
   stage: build
-  image: node:18.19.0
-  tags:
-    - runner20
-  variables:
-    NPM_VERSION: "9.5.0"
-    PNPM_VERSION: "8.1.0"
-    NPM_CONFIG_REGISTRY: "https://registry.npmmirror.com"
-  before_script:
-    - npm install -g npm@$NPM_VERSION
-    - corepack enable
-    - corepack prepare pnpm@$PNPM_VERSION --activate
-    - echo "registry=https://registry.npmmirror.com" > ~/.npmrc
-    - pnpm config set fetch-retries 5
-    - pnpm config set fetch-retry-factor 2
-    - pnpm config set fetch-retry-mintimeout 10000
-    - pnpm config set fetch-retry-maxtimeout 600000
-    - pnpm config set store-dir .pnpm-store
-    - npm config set loglevel=warn
   script:
-    - pnpm install
-    - pnpm turbo run stub
     - pnpm run build:test
-    - mkdir -p /www/wwwroot/risk-web.rta-office.com/
-    - cp -R dist/* /www/wwwroot/risk-web.rta-office.com/
-    - cp -R node_modules /www/wwwroot/risk-web.rta-office.com/
-    - 'if [ ! -f /www/wwwroot/risk-web.rta-office.com/index.html ]; then echo "ERROR: index.html not found in target dir"; exit 1; fi'
-    - 'if [ ! -d /www/wwwroot/risk-web.rta-office.com/assets ]; then echo "ERROR: assets directory not found"; exit 1; fi'
-    - ls -l /www/wwwroot/risk-web.rta-office.com/ | head -n 20
   artifacts:
     paths:
       - dist/
     expire_in: 1 week
-  cache:
-    key: ${CI_COMMIT_REF_SLUG}
-    paths:
-      - .pnpm-store/
-      - node_modules/
-      - internal/*/dist/
   rules:
-    - if: '$CI_COMMIT_TAG'     # 如果是 tag，不跑这个 job
+    - if: '$CI_COMMIT_TAG'
       when: never
-    - when: always             # 默认执行
+    - when: always
 
-# 正式构建 job
 build-prod:
+  extends: .frontend-job
   stage: build
-  image: node:18.19.0
+  script:
+    - pnpm run build
+  artifacts:
+    paths:
+      - dist/
+    expire_in: 1 week
+  rules:
+    - if: '$CI_COMMIT_TAG =~ /^platform-web-.*$/'
+      when: always
+    - when: never
+
+deploy-prod:
+  stage: deploy
+  image: alpine:3.20
   tags:
     - runner20
-  variables:
-    NPM_VERSION: "9.5.0"
-    PNPM_VERSION: "8.1.0"
-    NPM_CONFIG_REGISTRY: "https://registry.npmmirror.com"
+  needs:
+    - job: build-prod
+      artifacts: true
   before_script:
-    - npm install -g npm@$NPM_VERSION
-    - corepack enable
-    - corepack prepare pnpm@$PNPM_VERSION --activate
-    - echo "registry=https://registry.npmmirror.com" > ~/.npmrc
-    - pnpm config set fetch-retries 5
-    - pnpm config set fetch-retry-factor 2
-    - pnpm config set fetch-retry-mintimeout 10000
-    - pnpm config set fetch-retry-maxtimeout 600000
-    - pnpm config set store-dir .pnpm-store
-    - npm config set loglevel=warn
+    - apk add --no-cache rsync
   script:
-    - pnpm install
-    - pnpm turbo run stub
-    - pnpm run build
-    - mkdir -p /www/wwwroot/risk-web.rta-office.com/
-    - cp -R dist/* /www/wwwroot/risk-web.rta-office.com/
-    - cp -R node_modules /www/wwwroot/risk-web.rta-office.com/
-    - 'if [ ! -f /www/wwwroot/risk-web.rta-office.com/index.html ]; then echo "ERROR: index.html not found in target dir"; exit 1; fi'
-    - 'if [ ! -d /www/wwwroot/risk-web.rta-office.com/assets ]; then echo "ERROR: assets directory not found"; exit 1; fi'
-    - ls -l /www/wwwroot/risk-web.rta-office.com/ | head -n 20
-  artifacts:
-    paths:
-      - dist/
-    expire_in: 1 week
-  cache:
-    key: ${CI_COMMIT_REF_SLUG}
-    paths:
-      - .pnpm-store/
-      - node_modules/
-      - internal/*/dist/
+    - ': "${PLATFORM_WEB_DEPLOY_DIR:?PLATFORM_WEB_DEPLOY_DIR must be configured outside the repository}"'
+    - ': "${PLATFORM_WEB_PUBLIC_URL:?PLATFORM_WEB_PUBLIC_URL must be configured outside the repository}"'
+    - install -d "$PLATFORM_WEB_DEPLOY_DIR"
+    - rsync -a --delete dist/ "$PLATFORM_WEB_DEPLOY_DIR/"
+    - test -f "$PLATFORM_WEB_DEPLOY_DIR/index.html"
+    - test -d "$PLATFORM_WEB_DEPLOY_DIR/assets"
+    - echo "Platform Web deployed to $PLATFORM_WEB_PUBLIC_URL"
+  environment:
+    name: production
+    url: $PLATFORM_WEB_PUBLIC_URL
   rules:
-    - if: '$CI_COMMIT_TAG =~ /^risk.*$/'
-      when: always
+    - if: '$CI_COMMIT_TAG =~ /^platform-web-.*$/'
+      when: manual
     - when: never

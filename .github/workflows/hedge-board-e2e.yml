@@ -2,14 +2,9 @@ name: Hedge Board Browser E2E
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - refactor/platform-0-9-3-*
   pull_request:
     branches:
       - main
-      - refactor/platform-0-9-3-*
-      - feature/issue-134-platform-0-9-1-unified-delivery
     paths:
       - '.github/workflows/hedge-board-e2e.yml'
       - 'platform-web/.env.development'
@@ -26,7 +21,6 @@ on:
       - 'platform-web/src/store/modules/user.ts'
       - 'platform-web/src/views/hedgeBoard/**'
       - 'docs/operations/HEDGE_BOARD_ACCEPTANCE.md'
-      - 'docs/operations/PLATFORM_0_9_1_LOCAL_ACCEPTANCE_HANDOFF.md'
       - 'platform-api/app/auth.py'
       - 'platform-api/app/config.py'
       - 'platform-api/app/main.py'
@@ -51,37 +45,30 @@ jobs:
       CI: 'true'
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
           cache: pip
           cache-dependency-path: platform-api/pyproject.toml
-
       - name: Install Platform API
         run: python -m pip install -e './platform-api[dev]'
-
       - uses: pnpm/action-setup@v4
         with:
           version: 9.15.9
           run_install: false
-
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: pnpm
           cache-dependency-path: platform-web/pnpm-lock.yaml
-
       - name: Install frontend dependencies
         working-directory: platform-web
         env:
           HUSKY: '0'
         run: pnpm install --frozen-lockfile
-
       - name: Install Chromium
         working-directory: platform-web
         run: pnpm exec playwright install --with-deps chromium
-
       - name: Generate isolated employee credentials
         shell: bash
         run: |
@@ -95,11 +82,9 @@ jobs:
               output.write('E2E_CEO_USERNAME=e2e_employee_1\n')
               output.write(f"E2E_CEO_PASSWORD={password}\n")
           PY
-
       - name: Run hedge-board browser acceptance
         working-directory: platform-web
         run: pnpm test:e2e:hedge-board
-
       - name: Upload browser diagnostics
         if: always()
         uses: actions/upload-artifact@v4

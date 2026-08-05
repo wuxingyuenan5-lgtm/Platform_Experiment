@@ -2,14 +2,9 @@ name: Research Provider Smoke
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - refactor/platform-0-9-3-*
   pull_request:
     branches:
       - main
-      - refactor/platform-0-9-3-*
-      - feature/issue-134-platform-0-9-1-unified-delivery
     paths:
       - '.github/workflows/research-provider-smoke.yml'
       - 'platform-api/app/research_providers.py'
@@ -29,23 +24,19 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
           cache: pip
           cache-dependency-path: platform-api/pyproject.toml
-
       - name: Install Platform API
         run: python -m pip install -e './platform-api[dev]'
-
       - name: Probe free research providers
         working-directory: platform-api
         shell: bash
         run: |
           set -o pipefail
           python scripts/smoke_research_providers.py --timeout 60 | tee research-provider-smoke.json
-
       - name: Publish result summary
         if: always()
         working-directory: platform-api
@@ -57,7 +48,6 @@ jobs:
             cat research-provider-smoke.json >> "$GITHUB_STEP_SUMMARY"
             echo '```' >> "$GITHUB_STEP_SUMMARY"
           fi
-
       - name: Upload smoke result
         if: always()
         uses: actions/upload-artifact@v4

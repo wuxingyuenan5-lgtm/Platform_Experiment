@@ -45,4 +45,4 @@
 - Deployment Environment、Trading Mode 与 Trading Permission State 必须分别展示和校验；任一项不能替代另一项。
 - 跨模块跳转只传稳定 ID，目标模块重新读取权威数据并重新鉴权；摘要页面不拥有目标领域事实。
 - 页面刷新后重建路由上下文并重新查询服务端状态；断线恢复不能重放 Command 或把 `result_unknown` 推断为成功。
-- 统一状态语义以 `../../../docs/product/ACCEPTANCE_CRITERIA.md` 为准，组件局部状态不得升级为第二套业务状态机。
+- 统一状态语义以 `../../../../docs/product/ACCEPTANCE_CRITERIA.md` 为准，组件局部状态不得升级为第二套业务状态机。

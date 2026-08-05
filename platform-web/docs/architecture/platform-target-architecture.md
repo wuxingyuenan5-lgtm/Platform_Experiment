@@ -1,4 +1,4 @@
-# Platform V6 简化目标架构
+# Platform 0.10.x 简化目标架构
 
 状态：`active`
 产品基线：Platform V5

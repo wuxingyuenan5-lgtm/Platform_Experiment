@@ -1,4 +1,4 @@
-# Platform V6 文档治理规则
+# Platform 0.10.x 文档治理规则
 
 状态：`active`  
 产品基线：Platform V5  

@@ -1,4 +1,4 @@
-# Platform V6+ 数值、币种、单位与时间统一契约
+# Platform 0.10.x+ 数值、币种、单位与时间统一契约
 
 状态：`active`  
 产品基线：Platform V5  

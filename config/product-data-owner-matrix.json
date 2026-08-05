@@ -1,34 +1,29 @@
 {
   "schema_version": 1,
-  "authority": "platform-web/scripts/formal-route-manifest.json plus this registry",
-  "generated_from_head": "bbdff03948322e25b2d995946d6fa25e6ba21b0d",
-  "evidence_debt": {
-    "pr_149": {
-      "status": "pending",
-      "head": "964f26031e708b3599852fb25b5b4dc5535333fa",
-      "missing": "nine same-head push workflow run/job/artifact/digest records"
-    },
-    "pr_150": {
-      "status": "pending",
-      "head": "bbdff03948322e25b2d995946d6fa25e6ba21b0d",
-      "missing": "nine same-head push workflow run/job/artifact/digest records"
-    },
-    "affects_phase5_engineering": false,
-    "blocks_final_rc": true
-  },
+  "authority": "Formal route manifest and reviewed product data ownership registry",
   "entries": [
     {
       "module": "dashboard",
-      "routes": ["/home/index"],
-      "route_names": ["Dashboard"],
+      "routes": [
+        "/home/index"
+      ],
+      "route_names": [
+        "Dashboard"
+      ],
       "view_owner": "platform-web/src/views/dashboard/index.vue",
       "frontend_services": [],
       "api_endpoints": [],
       "application_services": [],
       "repository_or_provider": [],
       "real_data_source": "not-configured",
-      "permissions": ["platform:read"],
-      "roles": ["ceo", "tech_lead", "employee"],
+      "permissions": [
+        "platform:read"
+      ],
+      "roles": [
+        "ceo",
+        "tech_lead",
+        "employee"
+      ],
       "refresh": "none",
       "as_of": "required-when-ready",
       "timezone": "Asia/Shanghai",
@@ -40,23 +35,48 @@
       "fallback": "none",
       "writes": false,
       "live_write": false,
-      "e2e": ["platform-visual"],
+      "e2e": [
+        "platform-visual"
+      ],
       "provider_smoke": [],
       "closure_status": "gap",
       "gap_reason": "production view contains static market/calendar presentation without a registered data owner"
     },
     {
       "module": "account",
-      "routes": ["/account/index"],
-      "route_names": ["AccountIndex"],
+      "routes": [
+        "/account/index"
+      ],
+      "route_names": [
+        "AccountIndex"
+      ],
       "view_owner": "platform-web/src/views/account/index.vue",
-      "frontend_services": ["platform-web/src/api/platform/userSystem.ts"],
-      "api_endpoints": ["/api/v1/me", "/api/v1/me/sessions", "/api/v1/me/holdings"],
-      "application_services": ["platform-api/app/user_service.py", "platform-api/app/member_holding_service.py"],
-      "repository_or_provider": ["platform-api/app/user_repository.py", "platform-api/app/member_holding_repository.py"],
+      "frontend_services": [
+        "platform-web/src/api/platform/userSystem.ts"
+      ],
+      "api_endpoints": [
+        "/api/v1/me",
+        "/api/v1/me/sessions",
+        "/api/v1/me/holdings"
+      ],
+      "application_services": [
+        "platform-api/app/user_service.py",
+        "platform-api/app/member_holding_service.py"
+      ],
+      "repository_or_provider": [
+        "platform-api/app/user_repository.py",
+        "platform-api/app/member_holding_repository.py"
+      ],
       "real_data_source": "platform SQLite facts",
-      "permissions": ["profile.read_self"],
-      "roles": ["ceo", "tech_lead", "employee", "member"],
+      "permissions": [
+        "profile.read_self"
+      ],
+      "roles": [
+        "ceo",
+        "tech_lead",
+        "employee",
+        "member"
+      ],
       "refresh": "on-mount and manual",
       "as_of": "server timestamps",
       "timezone": "UTC",
@@ -68,15 +88,22 @@
       "fallback": "none",
       "writes": true,
       "live_write": false,
-      "e2e": ["user-system", "platform-visual"],
+      "e2e": [
+        "user-system",
+        "platform-visual"
+      ],
       "provider_smoke": [],
       "closure_status": "verified",
       "gap_reason": null
     },
     {
       "module": "audit",
-      "routes": ["/audit/index"],
-      "route_names": ["AuditIndex"],
+      "routes": [
+        "/audit/index"
+      ],
+      "route_names": [
+        "AuditIndex"
+      ],
       "view_owner": "platform-web/src/views/audit/index.vue",
       "frontend_services": [],
       "api_endpoints": [],
@@ -84,7 +111,9 @@
       "repository_or_provider": [],
       "real_data_source": "not-configured",
       "permissions": [],
-      "roles": ["admin-legacy"],
+      "roles": [
+        "admin-legacy"
+      ],
       "refresh": "none",
       "as_of": "required-when-ready",
       "timezone": "UTC",
@@ -96,23 +125,44 @@
       "fallback": "none",
       "writes": false,
       "live_write": false,
-      "e2e": ["platform-visual"],
+      "e2e": [
+        "platform-visual"
+      ],
       "provider_smoke": [],
       "closure_status": "gap",
       "gap_reason": "formal route has no registered API/service/repository chain"
     },
     {
       "module": "data",
-      "routes": ["/data/index"],
-      "route_names": ["DataIndex"],
+      "routes": [
+        "/data/index"
+      ],
+      "route_names": [
+        "DataIndex"
+      ],
       "view_owner": "platform-web/src/views/data/index.vue",
-      "frontend_services": ["platform-web/src/api/riskControl.ts"],
-      "api_endpoints": ["data-service:/health", "data-service:/api/v1/accounts", "data-service:/api/v1/data/net-value", "data-service:/api/v1/data/sync"],
-      "application_services": ["external:data-service"],
-      "repository_or_provider": ["external:data-service account provider"],
+      "frontend_services": [
+        "platform-web/src/api/riskControl.ts"
+      ],
+      "api_endpoints": [
+        "data-service:/health",
+        "data-service:/api/v1/accounts",
+        "data-service:/api/v1/data/net-value",
+        "data-service:/api/v1/data/sync"
+      ],
+      "application_services": [
+        "external:data-service"
+      ],
+      "repository_or_provider": [
+        "external:data-service account provider"
+      ],
       "real_data_source": "configured dataHttp origin",
       "permissions": [],
-      "roles": ["admin-legacy", "employee", "guest-legacy"],
+      "roles": [
+        "admin-legacy",
+        "employee",
+        "guest-legacy"
+      ],
       "refresh": "on-mount and manual",
       "as_of": "asset_updated_at and health metadata",
       "timezone": "source-defined",
@@ -124,23 +174,46 @@
       "fallback": "none",
       "writes": true,
       "live_write": false,
-      "e2e": ["platform-visual"],
-      "provider_smoke": ["data-service health"],
+      "e2e": [
+        "platform-visual"
+      ],
+      "provider_smoke": [
+        "data-service health"
+      ],
       "closure_status": "gap",
       "gap_reason": "permissive fallback and number coercion collapse unavailable values into empty/zero"
     },
     {
       "module": "finance",
-      "routes": ["/finance/index"],
-      "route_names": ["FinanceIndex"],
+      "routes": [
+        "/finance/index"
+      ],
+      "route_names": [
+        "FinanceIndex"
+      ],
       "view_owner": "platform-web/src/views/finance/index.vue",
-      "frontend_services": ["platform-web/src/api/riskControl.ts"],
-      "api_endpoints": ["data-service:/api/v1/accounts", "data-service:/api/v1/data/total", "data-service:/product/nav/productRatio", "data-service:/exchange/"],
-      "application_services": ["external:data-service"],
-      "repository_or_provider": ["external:data-service accounting provider"],
+      "frontend_services": [
+        "platform-web/src/api/riskControl.ts"
+      ],
+      "api_endpoints": [
+        "data-service:/api/v1/accounts",
+        "data-service:/api/v1/data/total",
+        "data-service:/product/nav/productRatio",
+        "data-service:/exchange/"
+      ],
+      "application_services": [
+        "external:data-service"
+      ],
+      "repository_or_provider": [
+        "external:data-service accounting provider"
+      ],
       "real_data_source": "configured dataHttp origin",
       "permissions": [],
-      "roles": ["admin-legacy", "employee", "guest-legacy"],
+      "roles": [
+        "admin-legacy",
+        "employee",
+        "guest-legacy"
+      ],
       "refresh": "on-mount and manual",
       "as_of": "asset_updated_at/updated_at",
       "timezone": "source-defined",
@@ -152,15 +225,23 @@
       "fallback": "none",
       "writes": false,
       "live_write": false,
-      "e2e": ["platform-visual"],
-      "provider_smoke": ["data-service finance endpoints"],
+      "e2e": [
+        "platform-visual"
+      ],
+      "provider_smoke": [
+        "data-service finance endpoints"
+      ],
       "closure_status": "gap",
       "gap_reason": "number coercion and empty object fallback do not distinguish zero from unavailable"
     },
     {
       "module": "financial-ai",
-      "routes": ["/financial-ai/index"],
-      "route_names": ["FinancialAiIndex"],
+      "routes": [
+        "/financial-ai/index"
+      ],
+      "route_names": [
+        "FinancialAiIndex"
+      ],
       "view_owner": "platform-web/src/views/financialAi/index.vue",
       "frontend_services": [],
       "api_endpoints": [],
@@ -168,7 +249,11 @@
       "repository_or_provider": [],
       "real_data_source": "not-configured",
       "permissions": [],
-      "roles": ["admin-legacy", "employee", "guest-legacy"],
+      "roles": [
+        "admin-legacy",
+        "employee",
+        "guest-legacy"
+      ],
       "refresh": "none",
       "as_of": "required-when-ready",
       "timezone": "UTC",
@@ -180,23 +265,43 @@
       "fallback": "none",
       "writes": false,
       "live_write": false,
-      "e2e": ["platform-visual"],
+      "e2e": [
+        "platform-visual"
+      ],
       "provider_smoke": [],
       "closure_status": "gap",
       "gap_reason": "formal route requires explicit not-configured state or a real analysis owner"
     },
     {
       "module": "hedge-macro",
-      "routes": ["/hedge-board/macro"],
-      "route_names": ["HedgeMacroBoard"],
+      "routes": [
+        "/hedge-board/macro"
+      ],
+      "route_names": [
+        "HedgeMacroBoard"
+      ],
       "view_owner": "platform-web/src/views/hedgeBoard/macro/index.vue",
-      "frontend_services": ["platform-web/src/api/platform/research.ts"],
-      "api_endpoints": ["/api/v1/research/macro/expectations"],
-      "application_services": ["platform-api/app/research_service.py"],
-      "repository_or_provider": ["platform-api/app/research_providers.py", "platform-api/app/research_cache.py"],
+      "frontend_services": [
+        "platform-web/src/api/platform/research.ts"
+      ],
+      "api_endpoints": [
+        "/api/v1/research/macro/expectations"
+      ],
+      "application_services": [
+        "platform-api/app/research_service.py"
+      ],
+      "repository_or_provider": [
+        "platform-api/app/research_providers.py",
+        "platform-api/app/research_cache.py"
+      ],
       "real_data_source": "free public research providers",
-      "permissions": ["platform:read"],
-      "roles": ["admin-legacy", "employee"],
+      "permissions": [
+        "platform:read"
+      ],
+      "roles": [
+        "admin-legacy",
+        "employee"
+      ],
       "refresh": "on-mount and manual",
       "as_of": "generatedAt/meta.fetchedAt",
       "timezone": "UTC",
@@ -208,15 +313,30 @@
       "fallback": "last-known-good marked stale",
       "writes": false,
       "live_write": false,
-      "e2e": ["hedge-board", "platform-visual"],
-      "provider_smoke": ["research-provider-smoke"],
+      "e2e": [
+        "hedge-board",
+        "platform-visual"
+      ],
+      "provider_smoke": [
+        "research-provider-smoke"
+      ],
       "closure_status": "verified",
       "gap_reason": null
     },
     {
       "module": "hedge-market",
-      "routes": ["/hedge-board/gold", "/hedge-board/crypto", "/hedge-board/us", "/hedge-board/global"],
-      "route_names": ["HedgeGoldBoard", "HedgeCryptoBoard", "HedgeUsBoard", "HedgeGlobalBoard"],
+      "routes": [
+        "/hedge-board/gold",
+        "/hedge-board/crypto",
+        "/hedge-board/us",
+        "/hedge-board/global"
+      ],
+      "route_names": [
+        "HedgeGoldBoard",
+        "HedgeCryptoBoard",
+        "HedgeUsBoard",
+        "HedgeGlobalBoard"
+      ],
       "view_owner": "platform-web/src/views/hedgeBoard/index.vue",
       "frontend_services": [],
       "api_endpoints": [],
@@ -224,7 +344,10 @@
       "repository_or_provider": [],
       "real_data_source": "not-configured per category",
       "permissions": [],
-      "roles": ["admin-legacy", "employee"],
+      "roles": [
+        "admin-legacy",
+        "employee"
+      ],
       "refresh": "none",
       "as_of": "required-when-ready",
       "timezone": "UTC",
@@ -236,23 +359,47 @@
       "fallback": "none",
       "writes": false,
       "live_write": false,
-      "e2e": ["hedge-board", "platform-visual"],
+      "e2e": [
+        "hedge-board",
+        "platform-visual"
+      ],
       "provider_smoke": [],
       "closure_status": "gap",
       "gap_reason": "generic board must expose data-source status instead of implicit/static content"
     },
     {
       "module": "hedge-a-share",
-      "routes": ["/hedge-board/a-share"],
-      "route_names": ["HedgeAShareBoard"],
+      "routes": [
+        "/hedge-board/a-share"
+      ],
+      "route_names": [
+        "HedgeAShareBoard"
+      ],
       "view_owner": "platform-web/src/views/hedgeBoard/aShare/index.vue",
-      "frontend_services": ["platform-web/src/api/platform/research.ts"],
-      "api_endpoints": ["/api/v1/research/a-share/dashboard", "/api/v1/research/a-share/stocks/{code}/snapshot", "/api/v1/me/research-watchlist"],
-      "application_services": ["platform-api/app/research_service.py", "platform-api/app/research_watchlist_service.py"],
-      "repository_or_provider": ["platform-api/app/research_providers.py", "platform-api/app/research_watchlist_repository.py"],
+      "frontend_services": [
+        "platform-web/src/api/platform/research.ts"
+      ],
+      "api_endpoints": [
+        "/api/v1/research/a-share/dashboard",
+        "/api/v1/research/a-share/stocks/{code}/snapshot",
+        "/api/v1/me/research-watchlist"
+      ],
+      "application_services": [
+        "platform-api/app/research_service.py",
+        "platform-api/app/research_watchlist_service.py"
+      ],
+      "repository_or_provider": [
+        "platform-api/app/research_providers.py",
+        "platform-api/app/research_watchlist_repository.py"
+      ],
       "real_data_source": "AKShare adapters and platform watchlist",
-      "permissions": ["platform:read"],
-      "roles": ["admin-legacy", "employee"],
+      "permissions": [
+        "platform:read"
+      ],
+      "roles": [
+        "admin-legacy",
+        "employee"
+      ],
       "refresh": "on-mount and manual",
       "as_of": "generatedAt/meta.fetchedAt",
       "timezone": "UTC",
@@ -264,23 +411,47 @@
       "fallback": "last-known-good marked stale",
       "writes": true,
       "live_write": false,
-      "e2e": ["hedge-board", "platform-visual"],
-      "provider_smoke": ["research-provider-smoke"],
+      "e2e": [
+        "hedge-board",
+        "platform-visual"
+      ],
+      "provider_smoke": [
+        "research-provider-smoke"
+      ],
       "closure_status": "verified",
       "gap_reason": null
     },
     {
       "module": "trading-tools",
-      "routes": ["/hedge-board/trading-tools/macro", "/hedge-board/trading-tools/equity", "/hedge-board/trading-tools/crypto", "/hedge-board/trading-tools/metal", "/hedge-board/trading-tools/quant", "/hedge-board/trading-tools/general"],
-      "route_names": ["HedgeTradingToolsMacro", "HedgeTradingToolsEquity", "HedgeTradingToolsCrypto", "HedgeTradingToolsMetal", "HedgeTradingToolsQuant", "HedgeTradingToolsGeneral"],
+      "routes": [
+        "/hedge-board/trading-tools/macro",
+        "/hedge-board/trading-tools/equity",
+        "/hedge-board/trading-tools/crypto",
+        "/hedge-board/trading-tools/metal",
+        "/hedge-board/trading-tools/quant",
+        "/hedge-board/trading-tools/general"
+      ],
+      "route_names": [
+        "HedgeTradingToolsMacro",
+        "HedgeTradingToolsEquity",
+        "HedgeTradingToolsCrypto",
+        "HedgeTradingToolsMetal",
+        "HedgeTradingToolsQuant",
+        "HedgeTradingToolsGeneral"
+      ],
       "view_owner": "platform-web/src/views/hedgeBoard/tradingTools/index.vue",
       "frontend_services": [],
       "api_endpoints": [],
       "application_services": [],
-      "repository_or_provider": ["docs/trading-tools-bookmarks-review.md"],
+      "repository_or_provider": [
+        "docs/trading-tools-bookmarks-review.md"
+      ],
       "real_data_source": "reviewed static bookmark catalog",
       "permissions": [],
-      "roles": ["admin-legacy", "employee"],
+      "roles": [
+        "admin-legacy",
+        "employee"
+      ],
       "refresh": "build-time sync",
       "as_of": "catalog review date",
       "timezone": "not-applicable",
@@ -292,15 +463,22 @@
       "fallback": "none",
       "writes": false,
       "live_write": false,
-      "e2e": ["hedge-board", "platform-visual"],
+      "e2e": [
+        "hedge-board",
+        "platform-visual"
+      ],
       "provider_smoke": [],
       "closure_status": "verified",
       "gap_reason": null
     },
     {
       "module": "monitor",
-      "routes": ["/monitor/index"],
-      "route_names": ["MonitorIndex"],
+      "routes": [
+        "/monitor/index"
+      ],
+      "route_names": [
+        "MonitorIndex"
+      ],
       "view_owner": "platform-web/src/views/monitor/index.vue",
       "frontend_services": [],
       "api_endpoints": [],
@@ -308,7 +486,10 @@
       "repository_or_provider": [],
       "real_data_source": "not-configured",
       "permissions": [],
-      "roles": ["admin-legacy", "employee"],
+      "roles": [
+        "admin-legacy",
+        "employee"
+      ],
       "refresh": "none",
       "as_of": "required-when-ready",
       "timezone": "UTC",
@@ -320,23 +501,38 @@
       "fallback": "none",
       "writes": false,
       "live_write": false,
-      "e2e": ["platform-visual"],
+      "e2e": [
+        "platform-visual"
+      ],
       "provider_smoke": [],
       "closure_status": "gap",
       "gap_reason": "formal route has no registered system/runtime status chain"
     },
     {
       "module": "news-calendar",
-      "routes": ["/news-calendar/macro", "/news-calendar/news", "/news-calendar/wealth"],
-      "route_names": ["NewsCalendarMacro", "NewsCalendarNews", "NewsCalendarWealth"],
+      "routes": [
+        "/news-calendar/macro",
+        "/news-calendar/news",
+        "/news-calendar/wealth"
+      ],
+      "route_names": [
+        "NewsCalendarMacro",
+        "NewsCalendarNews",
+        "NewsCalendarWealth"
+      ],
       "view_owner": "platform-web/src/views/newsCalendar/index.vue",
       "frontend_services": [],
       "api_endpoints": [],
       "application_services": [],
-      "repository_or_provider": ["external:barker-money for wealth section"],
+      "repository_or_provider": [
+        "external:barker-money for wealth section"
+      ],
       "real_data_source": "not-configured for macro/news; explicit external embed for wealth",
       "permissions": [],
-      "roles": ["admin-legacy", "employee"],
+      "roles": [
+        "admin-legacy",
+        "employee"
+      ],
       "refresh": "external/manual",
       "as_of": "required-when-ready",
       "timezone": "source-defined",
@@ -348,20 +544,34 @@
       "fallback": "none",
       "writes": false,
       "live_write": false,
-      "e2e": ["platform-visual"],
+      "e2e": [
+        "platform-visual"
+      ],
       "provider_smoke": [],
       "closure_status": "gap",
       "gap_reason": "macro/news sections require explicit source and unavailable state"
     },
     {
       "module": "notification",
-      "routes": ["/notification/index"],
-      "route_names": ["notificationPage"],
+      "routes": [
+        "/notification/index"
+      ],
+      "route_names": [
+        "notificationPage"
+      ],
       "view_owner": "platform-web/src/views/notification/index.vue",
-      "frontend_services": ["platform-web/src/api/riskControl.ts"],
-      "api_endpoints": ["/notifications/api/v1/messages/"],
-      "application_services": ["external/legacy notification endpoint"],
-      "repository_or_provider": ["external notification owner"],
+      "frontend_services": [
+        "platform-web/src/api/riskControl.ts"
+      ],
+      "api_endpoints": [
+        "/notifications/api/v1/messages/"
+      ],
+      "application_services": [
+        "external/legacy notification endpoint"
+      ],
+      "repository_or_provider": [
+        "external notification owner"
+      ],
       "real_data_source": "configured defHttp origin",
       "permissions": [],
       "roles": [],
@@ -376,15 +586,21 @@
       "fallback": "none",
       "writes": false,
       "live_write": false,
-      "e2e": ["platform-visual"],
+      "e2e": [
+        "platform-visual"
+      ],
       "provider_smoke": [],
       "closure_status": "gap",
       "gap_reason": "route lacks explicit access metadata and API adapter silently returns empty list"
     },
     {
       "module": "reports",
-      "routes": ["/reports/index"],
-      "route_names": ["ReportsIndex"],
+      "routes": [
+        "/reports/index"
+      ],
+      "route_names": [
+        "ReportsIndex"
+      ],
       "view_owner": "platform-web/src/views/reports/index.vue",
       "frontend_services": [],
       "api_endpoints": [],
@@ -392,7 +608,10 @@
       "repository_or_provider": [],
       "real_data_source": "not-configured",
       "permissions": [],
-      "roles": ["admin-legacy", "employee"],
+      "roles": [
+        "admin-legacy",
+        "employee"
+      ],
       "refresh": "none",
       "as_of": "required-when-ready",
       "timezone": "UTC",
@@ -404,23 +623,43 @@
       "fallback": "none",
       "writes": false,
       "live_write": false,
-      "e2e": ["platform-visual"],
+      "e2e": [
+        "platform-visual"
+      ],
       "provider_smoke": [],
       "closure_status": "gap",
       "gap_reason": "formal route has no registered report data owner"
     },
     {
       "module": "risk",
-      "routes": ["/risk/detail"],
-      "route_names": ["RiskDetail"],
+      "routes": [
+        "/risk/detail"
+      ],
+      "route_names": [
+        "RiskDetail"
+      ],
       "view_owner": "platform-web/src/views/risk/detail/index.vue",
-      "frontend_services": ["platform-web/src/api/riskControl.ts"],
-      "api_endpoints": ["/risk/api/v1/risk-records/"],
-      "application_services": ["external/legacy risk endpoint"],
-      "repository_or_provider": ["external risk owner"],
+      "frontend_services": [
+        "platform-web/src/api/riskControl.ts"
+      ],
+      "api_endpoints": [
+        "/risk/api/v1/risk-records/"
+      ],
+      "application_services": [
+        "external/legacy risk endpoint"
+      ],
+      "repository_or_provider": [
+        "external risk owner"
+      ],
       "real_data_source": "configured defHttp origin",
-      "permissions": ["risk.read"],
-      "roles": ["ceo", "tech_lead", "employee"],
+      "permissions": [
+        "risk.read"
+      ],
+      "roles": [
+        "ceo",
+        "tech_lead",
+        "employee"
+      ],
       "refresh": "on-mount and manual",
       "as_of": "created_at",
       "timezone": "source-defined",
@@ -432,23 +671,46 @@
       "fallback": "none",
       "writes": false,
       "live_write": false,
-      "e2e": ["platform-visual"],
+      "e2e": [
+        "platform-visual"
+      ],
       "provider_smoke": [],
       "closure_status": "gap",
       "gap_reason": "API adapter silently maps malformed/unavailable responses to empty list"
     },
     {
       "module": "users",
-      "routes": ["/risk/users", "/user/list"],
-      "route_names": ["RiskUserManagement", "UserList"],
+      "routes": [
+        "/risk/users",
+        "/user/list"
+      ],
+      "route_names": [
+        "RiskUserManagement",
+        "UserList"
+      ],
       "view_owner": "platform-web/src/views/users/index.vue",
-      "frontend_services": ["platform-web/src/api/platform/userSystem.ts"],
-      "api_endpoints": ["/api/v1/users"],
-      "application_services": ["platform-api/app/user_admin_service.py"],
-      "repository_or_provider": ["platform-api/app/user_repository.py"],
+      "frontend_services": [
+        "platform-web/src/api/platform/userSystem.ts"
+      ],
+      "api_endpoints": [
+        "/api/v1/users"
+      ],
+      "application_services": [
+        "platform-api/app/user_admin_service.py"
+      ],
+      "repository_or_provider": [
+        "platform-api/app/user_repository.py"
+      ],
       "real_data_source": "platform SQLite user facts",
-      "permissions": ["user.read"],
-      "roles": ["ceo", "tech_lead", "employee", "admin-legacy"],
+      "permissions": [
+        "user.read"
+      ],
+      "roles": [
+        "ceo",
+        "tech_lead",
+        "employee",
+        "admin-legacy"
+      ],
       "refresh": "on-mount and manual",
       "as_of": "registeredAt/updatedAt",
       "timezone": "UTC",
@@ -460,15 +722,22 @@
       "fallback": "none",
       "writes": true,
       "live_write": false,
-      "e2e": ["user-system", "platform-visual"],
+      "e2e": [
+        "user-system",
+        "platform-visual"
+      ],
       "provider_smoke": [],
       "closure_status": "verified",
       "gap_reason": null
     },
     {
       "module": "settings",
-      "routes": ["/settings/profile"],
-      "route_names": ["SettingsProfile"],
+      "routes": [
+        "/settings/profile"
+      ],
+      "route_names": [
+        "SettingsProfile"
+      ],
       "view_owner": "platform-web/src/views/settings/index.vue",
       "frontend_services": [],
       "api_endpoints": [],
@@ -476,7 +745,9 @@
       "repository_or_provider": [],
       "real_data_source": "not-configured",
       "permissions": [],
-      "roles": ["admin-legacy"],
+      "roles": [
+        "admin-legacy"
+      ],
       "refresh": "none",
       "as_of": "required-when-ready",
       "timezone": "UTC",
@@ -488,23 +759,44 @@
       "fallback": "none",
       "writes": false,
       "live_write": false,
-      "e2e": ["platform-visual"],
+      "e2e": [
+        "platform-visual"
+      ],
       "provider_smoke": [],
       "closure_status": "gap",
       "gap_reason": "formal route has no registered settings owner"
     },
     {
       "module": "strategy-platform",
-      "routes": ["/strategy/platform"],
-      "route_names": ["StrategyPlatform"],
+      "routes": [
+        "/strategy/platform"
+      ],
+      "route_names": [
+        "StrategyPlatform"
+      ],
       "view_owner": "platform-web/src/views/platform/index.vue",
-      "frontend_services": ["platform-web/src/api/platform/trading.ts"],
-      "api_endpoints": ["/api/v1/trading/commands", "/api/v1/trading/orders", "/api/v1/trading/runtime/status"],
-      "application_services": ["platform-api/app/trading.py", "platform-api/app/trade_command_execution.py"],
-      "repository_or_provider": ["platform-api/app/repositories.py", "execution-runtime"],
+      "frontend_services": [
+        "platform-web/src/api/platform/trading.ts"
+      ],
+      "api_endpoints": [
+        "/api/v1/trading/commands",
+        "/api/v1/trading/orders",
+        "/api/v1/trading/runtime/status"
+      ],
+      "application_services": [
+        "platform-api/app/trading.py",
+        "platform-api/app/trade_command_execution.py"
+      ],
+      "repository_or_provider": [
+        "platform-api/app/repositories.py",
+        "execution-runtime"
+      ],
       "real_data_source": "platform trading facts and runtime-v1",
       "permissions": [],
-      "roles": ["admin-legacy", "employee"],
+      "roles": [
+        "admin-legacy",
+        "employee"
+      ],
       "refresh": "polling/manual",
       "as_of": "runtime and order timestamps",
       "timezone": "UTC",
@@ -516,15 +808,22 @@
       "fallback": "none",
       "writes": true,
       "live_write": false,
-      "e2e": ["hedge-board", "platform-visual"],
+      "e2e": [
+        "hedge-board",
+        "platform-visual"
+      ],
       "provider_smoke": [],
       "closure_status": "verified",
       "gap_reason": null
     },
     {
       "module": "strategy-management",
-      "routes": ["/strategy/management"],
-      "route_names": ["StrategyManagement"],
+      "routes": [
+        "/strategy/management"
+      ],
+      "route_names": [
+        "StrategyManagement"
+      ],
       "view_owner": "platform-web/src/views/strategy/index.vue",
       "frontend_services": [],
       "api_endpoints": [],
@@ -532,7 +831,10 @@
       "repository_or_provider": [],
       "real_data_source": "not-configured",
       "permissions": [],
-      "roles": ["admin-legacy", "employee"],
+      "roles": [
+        "admin-legacy",
+        "employee"
+      ],
       "refresh": "none",
       "as_of": "required-when-ready",
       "timezone": "UTC",
@@ -544,7 +846,9 @@
       "fallback": "none",
       "writes": false,
       "live_write": false,
-      "e2e": ["platform-visual"],
+      "e2e": [
+        "platform-visual"
+      ],
       "provider_smoke": [],
       "closure_status": "gap",
       "gap_reason": "formal route has no registered strategy catalog owner"

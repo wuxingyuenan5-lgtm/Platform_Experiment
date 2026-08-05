@@ -29,36 +29,33 @@ def _write_matrix(tmp_path: Path, mutate) -> Path:
     return target
 
 
-def test_current_product_data_owner_matrix_covers_formal_views() -> None:
+def test_current_product_data_owner_matrix_is_closed_and_covers_formal_views() -> None:
     audit = _load_audit_module()
-    result = audit.audit(MATRIX, require_closed=False)
+    result = audit.audit(MATRIX, require_closed=True)
     assert result["status"] == "ok"
     assert result["formal_routes"] == 30
     assert result["route_names"] == 30
     assert result["entries"] == 19
     assert result["unique_views"] == 19
-    assert result["evidence_debt"] == {
-        "pr_149": "pending",
-        "pr_150": "pending",
-        "blocks_final_rc": True,
-    }
+    assert result["closure"].get("gap", 0) == 0
+    assert "evidence_debt" not in result
 
 
 def test_missing_formal_route_is_rejected(tmp_path: Path) -> None:
     audit = _load_audit_module()
     target = _write_matrix(tmp_path, lambda value: value["entries"][0]["routes"].clear())
     with pytest.raises(audit.AuditError, match="routes must be a non-empty list"):
-        audit.audit(target, require_closed=False)
+        audit.audit(target, require_closed=True)
 
 
-def test_phase5_registry_cannot_enable_live_write(tmp_path: Path) -> None:
+def test_registry_cannot_enable_live_write(tmp_path: Path) -> None:
     audit = _load_audit_module()
     target = _write_matrix(
         tmp_path,
         lambda value: value["entries"][0].__setitem__("live_write", True),
     )
     with pytest.raises(audit.AuditError, match="must not enable Live Write"):
-        audit.audit(target, require_closed=False)
+        audit.audit(target, require_closed=True)
 
 
 def test_require_closed_rejects_unresolved_product_gap(tmp_path: Path) -> None:
@@ -74,11 +71,23 @@ def test_require_closed_rejects_unresolved_product_gap(tmp_path: Path) -> None:
         audit.audit(target, require_closed=True)
 
 
-def test_phase4_evidence_head_drift_is_rejected(tmp_path: Path) -> None:
+def test_historical_evidence_fields_are_rejected(tmp_path: Path) -> None:
     audit = _load_audit_module()
     target = _write_matrix(
         tmp_path,
-        lambda value: value["evidence_debt"]["pr_150"].__setitem__("head", "deadbeef"),
+        lambda value: value.__setitem__("generated_from_head", "deadbeef"),
     )
-    with pytest.raises(audit.AuditError, match="head drifted"):
-        audit.audit(target, require_closed=False)
+    with pytest.raises(audit.AuditError, match="contains historical fields"):
+        audit.audit(target, require_closed=True)
+
+
+def test_nonexistent_repository_owner_path_is_rejected(tmp_path: Path) -> None:
+    audit = _load_audit_module()
+
+    def break_owner(value: dict) -> None:
+        account = next(entry for entry in value["entries"] if entry["module"] == "account")
+        account["frontend_services"] = ["platform-web/src/api/does-not-exist.ts"]
+
+    target = _write_matrix(tmp_path, break_owner)
+    with pytest.raises(audit.AuditError, match="path does not exist"):
+        audit.audit(target, require_closed=True)
