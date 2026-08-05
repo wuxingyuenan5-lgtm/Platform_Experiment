@@ -62,18 +62,23 @@ test('all eight reusable accounts obey menu URL API and personal-account boundar
         expect(authentication.user.role).toBe(expected.role);
 
         await account.page.goto(absoluteUrl('/home/index'));
-        await expect(
-          account.page.getByRole('heading', { name: '全球变量' }),
-        ).toBeVisible();
+        await expect(account.page.getByRole('heading', { name: '全球变量' })).toBeVisible();
 
         await account.page.goto(absoluteUrl('/strategy/management'));
         await expect(
-          account.page.getByRole('heading', { name: '策略管理' }),
+          account.page.getByTestId('strategy-management-original-structure'),
+        ).toBeVisible();
+        await expect(
+          account.page.getByText('示例策略不可启停、部署或下单', { exact: true }),
         ).toBeVisible();
         if (expected.write) {
-          await expect(account.page.getByText('部署策略（Live Write关闭）')).toBeVisible();
+          await expect(account.page.getByRole('button', { name: '启停策略' })).toBeDisabled();
+          await expect(account.page.getByRole('button', { name: '部署策略' })).toBeDisabled();
         } else {
-          await expect(account.page.getByText('只读权限')).toBeVisible();
+          await expect(
+            account.page.getByText('当前账号为只读权限', { exact: true }),
+          ).toBeVisible();
+          await expect(account.page.locator('[data-write-action="true"]')).toHaveCount(0);
         }
 
         await account.page.goto(absoluteUrl('/account/index'));
