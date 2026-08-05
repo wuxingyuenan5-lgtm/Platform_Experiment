@@ -1,5 +1,7 @@
 import { computed, ref } from 'vue';
 
+import type { CrossSpreadLimitExecutionResult } from '@/api/platform/crossSpreadLifecycle';
+
 export interface LogEntry {
   id: string;
   time: string;
@@ -22,7 +24,7 @@ export function useCrossSpreadExecution(_options: unknown) {
   const executionLogs = ref<LogEntry[]>([]);
   const executionMessage = ref(UNAVAILABLE_MESSAGE);
   const executionMessageTone = ref<MessageTone>('is-warn');
-  const limitEvidence = ref<null>(null);
+  const limitEvidence = ref<CrossSpreadLimitExecutionResult | null>(null);
 
   const confirmGuardMessage = computed(() => UNAVAILABLE_MESSAGE);
   const confirmSummary = computed(() => ({
