@@ -1,54 +1,43 @@
-# Project Agent Rules
+# Platform Agent Rules
 
-## Start Here
+This repository is the engineering source for 全球变量金融平台（Variable-Global）.
 
-- `docs/codex/current-state.md` is the sole repository document for current version, branch, phase and known limits.
-- `docs/codex/context-map.md` routes a task to the smallest sufficient reading pack.
-- `docs/architecture/OWNERSHIP.md` is the canonical business-rule, code and data ownership catalog.
-- `docs/contracts/README.md` indexes current domain contracts; load only the contract required by the task.
-- After these root rules, read the nearest module `AGENTS.md`, then only directly affected source files and tests.
-- GitHub PR #141 owns volatile HEAD, CI and review evidence for the active Platform 0.9.3 workstream.
+## Read first
 
-## Protected Invariants
+1. `docs/codex/current-state.md`
+2. the nearest module `AGENTS.md`
+3. directly affected source and tests
+4. one owning contract or architecture document only when the change crosses that boundary
 
-- Keep Browser Session authority separate from API-Key and Live Write authority.
-- Preserve CSRF and Origin validation, role scope, last-CEO protection and member-data isolation.
-- Preserve Decimal money, Financial Fact, PnL, NAV, formal accounting, reconciliation and immutable migration semantics.
-- Preserve Kill Switch, two-person approval, Live Write disabled by default, idempotency, Market/FOK/PostOnly/TP-SL, Result Unknown, EOD and Last Known Good behavior.
-- Do not disable TLS, security checks, type checks or critical tests to make a change pass.
-- Keep Platform API and Platform Execution Runtime as separate safety boundaries.
-- Do not modify or merge `main` without explicit owner approval.
+Use `python scripts/context-for.py <pack>` for bounded task context. Context Pack definitions and budgets remain authoritative in `scripts/context-packs.json`.
 
-## Scope Control
+## Repository boundaries
 
-- For a narrow UI fix, read the target component, its direct owner and necessary styles; do not scan the repository.
-- For a business-domain change, start from the owning route/service/schema or composable/API client and its direct tests.
-- For Trading, Execution, Risk, Accounting, authentication, migrations, Runtime contracts or Live behavior, use the Critical workstream and the active task packet.
-- Plan, Handoff, Audit, Superseded, release-history, generated, lock and unrelated module material is excluded by default.
-- Do not create a new abstraction, interface, factory or permanent document unless it removes a demonstrated second responsibility or repeated fact.
+- Deployable subjects are `platform-web`, `platform-api` and `execution-runtime`.
+- Platform API is a modular monolith. Do not add a service, database, queue or global dependency-injection framework without an approved architecture decision.
+- External venue SDKs and order side effects belong to `execution-runtime`; Platform API communicates through versioned contracts.
+- Formal accounting is rebuilt from immutable Financial Facts. Operational projections are not formal accounting inputs.
+- Preserve exact Decimal values and timezone-aware timestamps at financial boundaries.
+- Live Write is disabled by default. Kill Switch, two-person approval, idempotency and Result Unknown semantics are protected invariants.
 
-## Product UI Boundary
+## Change discipline
 
-- Preserve the existing navigation, layout, information hierarchy, workflows, typography, spacing, colors and responsive behavior unless an explicit product change is approved.
-- Do not add engineering explanations, validation panels or debug state to product pages.
-- Reuse maintained product components and the existing visual language.
+- Work on a branch and a pull request; never commit directly to `main`.
+- Keep public API paths, schemas and persistent semantics compatible unless the task explicitly changes a contract.
+- Prefer the smallest ownership boundary that makes pure rules independently testable.
+- Update the current authority instead of creating handoff, evidence-ledger or phase-history documents.
+- Do not infer external production status from repository files. Servers, domains, databases, credentials and venue connectivity require separate evidence.
 
-## Default Checks
+## Validation
 
-Use the smallest check set that proves the change, then expand for cross-domain or safety-sensitive work.
+Run the checks owned by the changed modules plus:
 
-```powershell
+```bash
+git diff --check
+python scripts/context-for.py --check-budgets --json
 python scripts/check-version-consistency.py
-python scripts/check-codex-context.py
 python scripts/check-repository-structure.py
 python scripts/check-documentation-consistency.py
 ```
 
-Module commands are owned by the nearest module `AGENTS.md`. The frontend package-manager authority is recorded in `docs/codex/current-state.md`.
-
-## File Safety
-
-- Do not batch-delete files or directories.
-- Delete only reviewed paths after proving they are unused and recording rollback evidence.
-- Keep directory renames separate from behavioral refactors.
-- Preserve third-party licenses, attribution, compatibility fixtures and historical records.
+See `.github/workflows/` for the maintained CI commands.
