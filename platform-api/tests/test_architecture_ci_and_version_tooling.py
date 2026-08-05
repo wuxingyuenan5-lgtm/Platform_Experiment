@@ -121,15 +121,18 @@ def test_bump_version_updates_all_maintained_declarations(tmp_path: Path) -> Non
     ).read_text(encoding="utf-8")
 
 
-def test_pr_workflows_do_not_duplicate_feature_branch_push_runs() -> None:
+def test_permanent_workflows_have_distinct_long_term_responsibilities() -> None:
     platform = (ROOT / ".github/workflows/platform-ci.yml").read_text(encoding="utf-8")
-    versions = (ROOT / ".github/workflows/version-consistency.yml").read_text(
+    quality = (ROOT / ".github/workflows/repository-quality.yml").read_text(
         encoding="utf-8"
     )
+    secret = (ROOT / ".github/workflows/secret-scan.yml").read_text(encoding="utf-8")
 
-    assert "- 'feature/**'" not in platform
-    assert "- 'feature/**'" not in versions
+    assert "refactor/platform-0-9-3-" not in platform + quality + secret
     assert "python scripts/scan-secrets.py" not in platform
-    assert "needs.changes.outputs.backend" in platform
-    assert "needs.changes.outputs.runtime" in platform
-    assert "needs.changes.outputs.frontend" in platform
+    assert "python scripts/scan-secrets.py" in secret
+    assert "python scripts/check-version-consistency.py" in quality
+    assert "python scripts/context-for.py --check-budgets --json" in quality
+    assert "name: platform-api" in platform
+    assert "name: execution-runtime" in platform
+    assert "name: platform-web" in platform

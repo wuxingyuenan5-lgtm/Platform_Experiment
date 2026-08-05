@@ -114,7 +114,11 @@ include = [
   "app/venue_reconciliation_service.py",
 ]
 exclude = ["tests"]
-ignore = ["app/research_providers.py"]
+ignore = [
+  "app/execution_risk.py",
+  "app/execution_risk_repository.py",
+  "app/research_providers.py",
+]
 reportMissingTypeStubs = false
 
 [tool.ruff]

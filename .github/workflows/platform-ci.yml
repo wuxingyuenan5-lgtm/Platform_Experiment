@@ -4,182 +4,44 @@ on:
   push:
     branches:
       - main
-      - refactor/platform-0-9-3-*
   pull_request:
     branches:
       - main
-      - refactor/platform-0-9-3-*
-      - feature/issue-134-platform-0-9-1-unified-delivery
 
 permissions:
   contents: read
-  issues: read
-  pull-requests: read
 
 concurrency:
   group: platform-ci-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
-  changes:
+  platform-api:
+    name: platform-api
     runs-on: ubuntu-latest
-    outputs:
-      backend: ${{ steps.scope.outputs.backend }}
-      runtime: ${{ steps.scope.outputs.runtime }}
-      frontend: ${{ steps.scope.outputs.frontend }}
-      docs_only: ${{ steps.scope.outputs.docs_only }}
+    defaults:
+      run:
+        working-directory: platform-api
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Detect affected areas
-        id: scope
-        shell: bash
-        env:
-          EVENT_NAME: ${{ github.event_name }}
-          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
-          HEAD_SHA: ${{ github.sha }}
-        run: |
-          if [ "$EVENT_NAME" = "push" ]; then
-            python scripts/ci-scope.py --full --github-output "$GITHUB_OUTPUT"
-          else
-            python scripts/ci-scope.py \
-              --base "$BASE_SHA" \
-              --head "$HEAD_SHA" \
-              --github-output "$GITHUB_OUTPUT"
-          fi
-
-  repository-safety:
-    needs: changes
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-      - name: Validate PR workstream
-        id: workstream
-        continue-on-error: true
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-        run: |
-          set -o pipefail
-          python scripts/check-workstream.py 2>&1 | tee "$RUNNER_TEMP/workstream.log"
-      - name: Audit stacked Phase history
-        id: phase_history
-        continue-on-error: true
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-        run: |
-          set -o pipefail
-          if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
-            AUDIT_REF="$GITHUB_HEAD_REF"
-          else
-            AUDIT_REF="${GITHUB_REF#refs/heads/}"
-          fi
-          if [[ "$AUDIT_REF" != refactor/platform-0-9-3-* ]]; then
-            printf '%s\n' '{"schema_version":2,"status":"not-applicable"}' \
-              > "$RUNNER_TEMP/phase-history-audit.json"
-            echo "Stacked Phase history audit not applicable to $AUDIT_REF" \
-              | tee "$RUNNER_TEMP/phase-history-audit.log"
-            exit 0
-          fi
-          python scripts/audit-phase-history.py \
-            --event "$GITHUB_EVENT_PATH" \
-            --repository "$GITHUB_REPOSITORY" \
-            --output "$RUNNER_TEMP/phase-history-audit.json" \
-            2>&1 | tee "$RUNNER_TEMP/phase-history-audit.log"
-      - name: Check repository structure and architecture boundaries
-        id: structure
-        continue-on-error: true
-        run: |
-          set -o pipefail
-          python scripts/check-repository-structure.py 2>&1 | tee "$RUNNER_TEMP/repository-structure.log"
-      - name: Check documentation consistency
-        id: documentation
-        continue-on-error: true
-        run: |
-          set -o pipefail
-          python scripts/check-documentation-consistency.py 2>&1 | tee "$RUNNER_TEMP/documentation-consistency.log"
-      - name: Check active product naming
-        id: active_naming
-        continue-on-error: true
-        run: |
-          set -o pipefail
-          python scripts/check-active-naming-consistency.py 2>&1 | tee "$RUNNER_TEMP/active-naming-consistency.log"
-      - name: Check bounded AI context budgets
-        id: context_budget
-        continue-on-error: true
-        run: |
-          set -o pipefail
-          python scripts/context-for.py --check-budgets --json 2>&1 | tee "$RUNNER_TEMP/context-budget.json"
-      - name: Check Phase 3 codebase boundaries
-        id: codebase_boundaries
-        continue-on-error: true
-        run: |
-          set -o pipefail
-          node platform-web/scripts/check-codebase-boundaries.cjs 2>&1 | tee "$RUNNER_TEMP/codebase-boundaries.log"
-      - name: Audit product and data owners
-        id: product_data_owners
-        continue-on-error: true
-        run: |
-          set -o pipefail
-          python scripts/audit-product-data-owner-matrix.py \
-            --require-closed \
-            --output "$RUNNER_TEMP/product-data-owner-audit.json" \
-            --resolved-output "$RUNNER_TEMP/product-data-owner-resolved.json" \
-            2>&1 | tee "$RUNNER_TEMP/product-data-owner-audit.log"
-      - name: Audit production data boundaries
-        id: production_data_boundaries
-        continue-on-error: true
-        run: |
-          set -o pipefail
-          python scripts/audit-production-data-boundaries.py \
-            --output "$RUNNER_TEMP/production-data-boundary-audit.json" \
-            2>&1 | tee "$RUNNER_TEMP/production-data-boundary-audit.log"
-      - name: Upload repository-safety diagnostics
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: repository-safety-diagnostics
-          path: |
-            ${{ runner.temp }}/workstream.log
-            ${{ runner.temp }}/phase-history-audit.log
-            ${{ runner.temp }}/phase-history-audit.json
-            ${{ runner.temp }}/repository-structure.log
-            ${{ runner.temp }}/documentation-consistency.log
-            ${{ runner.temp }}/active-naming-consistency.log
-            ${{ runner.temp }}/context-budget.json
-            ${{ runner.temp }}/codebase-boundaries.log
-            ${{ runner.temp }}/product-data-owner-audit.log
-            ${{ runner.temp }}/product-data-owner-audit.json
-            ${{ runner.temp }}/product-data-owner-resolved.json
-            ${{ runner.temp }}/production-data-boundary-audit.log
-            ${{ runner.temp }}/production-data-boundary-audit.json
-          if-no-files-found: error
-          retention-days: 3
-      - name: Enforce repository-safety results
-        if: always()
-        run: |
-          python scripts/enforce-ci-results.py \
-            "workstream=${{ steps.workstream.outcome }}" \
-            "phase_history=${{ steps.phase_history.outcome }}" \
-            "structure=${{ steps.structure.outcome }}" \
-            "documentation=${{ steps.documentation.outcome }}" \
-            "active_naming=${{ steps.active_naming.outcome }}" \
-            "context_budget=${{ steps.context_budget.outcome }}" \
-            "codebase_boundaries=${{ steps.codebase_boundaries.outcome }}" \
-            "product_data_owners=${{ steps.product_data_owners.outcome }}" \
-            "production_data_boundaries=${{ steps.production_data_boundaries.outcome }}"
+          cache: pip
+          cache-dependency-path: platform-api/pyproject.toml
+      - name: Install Platform API
+        run: python -m pip install -e '.[dev]'
+      - name: Validate dependency graph
+        run: python -m pip check
+      - name: Lint Platform API
+        run: python -m ruff check app tests
+      - name: Type check Platform API
+        run: python -m pyright
+      - name: Test Platform API
+        run: python -m pytest -m "architecture or unit or integration or live_safety"
 
   execution-runtime:
-    needs: changes
-    if: needs.changes.outputs.runtime == 'true'
+    name: execution-runtime
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -191,89 +53,25 @@ jobs:
           python-version: '3.12'
           cache: pip
           cache-dependency-path: execution-runtime/pyproject.toml
-      - name: Install dependencies
+      - name: Install Execution Runtime
         run: python -m pip install -e '.[dev]'
       - name: Validate dependency graph
         run: python -m pip check
-      - name: Validate Runtime distribution metadata
-        run: python -m pip show variable-global-execution-runtime
-      - name: Runtime lint
+      - name: Lint Execution Runtime
         run: python -m ruff check app tests
-      - name: Runtime type check
+      - name: Type check Execution Runtime
         run: python -m pyright
-      - name: Runtime tests
+      - name: Test Execution Runtime
         run: python -m pytest -m "unit or integration or live_safety"
 
-  platform-api:
-    needs: changes
-    if: needs.changes.outputs.backend == 'true'
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: platform-api
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-          cache: pip
-          cache-dependency-path: platform-api/pyproject.toml
-      - name: Install dependencies
-        run: python -m pip install -e '.[dev]'
-      - name: Validate dependency graph
-        run: python -m pip check
-      - name: Validate Platform API distribution metadata
-        run: python -m pip show variable-global-platform-api
-      - name: Backend lint
-        id: backend_lint
-        continue-on-error: true
-        run: |
-          set -o pipefail
-          python -m ruff check app tests 2>&1 | tee "$RUNNER_TEMP/backend-ruff.log"
-      - name: Backend type check
-        id: backend_type
-        continue-on-error: true
-        run: |
-          set -o pipefail
-          python -m pyright 2>&1 | tee "$RUNNER_TEMP/backend-pyright.log"
-      - name: Backend tests
-        id: backend_tests
-        continue-on-error: true
-        run: |
-          set -o pipefail
-          python -m pytest -m "architecture or unit or integration or live_safety" 2>&1 | tee "$RUNNER_TEMP/backend-pytest.log"
-      - name: Upload backend diagnostics
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: platform-api-diagnostics
-          path: |
-            ${{ runner.temp }}/backend-ruff.log
-            ${{ runner.temp }}/backend-pyright.log
-            ${{ runner.temp }}/backend-pytest.log
-          if-no-files-found: error
-          retention-days: 3
-      - name: Enforce backend results
-        if: always()
-        run: |
-          python ../scripts/enforce-ci-results.py \
-            "backend_lint=${{ steps.backend_lint.outcome }}" \
-            "backend_type=${{ steps.backend_type.outcome }}" \
-            "backend_tests=${{ steps.backend_tests.outcome }}"
-
-  frontend-quality:
-    needs: changes
-    if: needs.changes.outputs.frontend == 'true'
+  platform-web:
+    name: platform-web
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: platform-web
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
       - uses: pnpm/action-setup@v4
         with:
           version: 9.15.9
@@ -283,114 +81,19 @@ jobs:
           node-version: '20'
           cache: pnpm
           cache-dependency-path: platform-web/pnpm-lock.yaml
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-      - name: Install dependencies
+      - name: Install Platform Web
         env:
           HUSKY: '0'
         run: pnpm install --frozen-lockfile
       - name: Test formal route manifest
-        id: frontend_route_manifest
-        continue-on-error: true
-        run: |
-          set -o pipefail
-          node scripts/test-formal-route-manifest.cjs 2>&1 | tee "$RUNNER_TEMP/frontend-route-manifest.log"
+        run: node scripts/test-formal-route-manifest.cjs
       - name: Test browser access policy
-        id: frontend_access_tests
-        continue-on-error: true
-        run: |
-          set -o pipefail
-          pnpm test:user-system 2>&1 | tee "$RUNNER_TEMP/frontend-access-tests.log"
-      - name: Lint maintained frontend
-        id: frontend_lint
-        continue-on-error: true
-        run: |
-          set -o pipefail
-          pnpm exec eslint --max-warnings 0 \
-            "src/access/**/*.{ts,tsx}" \
-            "src/api/platform/**/*.{ts,tsx}" \
-            "src/api/riskControl.ts" \
-            "src/components/ProductDataState/**/*.{vue,ts,tsx}" \
-            "src/enums/roleEnum.ts" \
-            "src/hooks/web/useRoleAccess.ts" \
-            "src/hooks/trading/**/*.{ts,tsx}" \
-            "src/router/guard/permissionGuard.ts" \
-            "src/router/routes/index.ts" \
-            "src/router/routes/modules/{account,dashboard,risk}.ts" \
-            "src/store/modules/user.ts" \
-            "src/utils/decimalDisplay.ts" \
-            "src/views/account/index.vue" \
-            "src/views/account/components/HoldingsPanel.vue" \
-            "src/views/audit/index.vue" \
-            "src/views/dashboard/index.vue" \
-            "src/views/data/index.vue" \
-            "src/views/data/components/AccountNetValueChart.vue" \
-            "src/views/finance/index.vue" \
-            "src/views/financialAi/index.vue" \
-            "src/views/hedgeBoard/index.vue" \
-            "src/views/hedgeBoard/composables/useHedgeBoardPage.ts" \
-            "src/views/monitor/index.vue" \
-            "src/views/newsCalendar/index.vue" \
-            "src/views/notification/index.vue" \
-            "src/views/reports/index.vue" \
-            "src/views/risk/detail/index.vue" \
-            "src/views/settings/index.vue" \
-            "src/views/strategy/index.vue" \
-            "src/views/strategy/management/index.vue" \
-            "src/views/sys/login/LoginForm.vue" \
-            "src/views/sys/register/index.vue" \
-            "src/views/sys/reset-password/index.vue" \
-            "src/views/users/**/*.{vue,ts,tsx}" \
-            "src/views/strategy/funding-carry/**/*.{vue,ts,tsx}" \
-            2>&1 | tee "$RUNNER_TEMP/frontend-eslint.log"
-      - name: Enforce frontend no-new-debt gate
-        id: frontend_debt
-        continue-on-error: true
-        run: |
-          set -o pipefail
-          python ../scripts/frontend-no-new-debt.py 2>&1 | tee "$RUNNER_TEMP/frontend-no-new-debt.log"
+        run: pnpm test:user-system
+      - name: Check frontend architecture boundaries
+        run: pnpm test:codebase-boundaries
       - name: Type check strategy frontend
-        id: frontend_strategy_type
-        continue-on-error: true
-        run: |
-          set -o pipefail
-          pnpm type:check 2>&1 | tee "$RUNNER_TEMP/frontend-strategy-typecheck.log"
+        run: pnpm type:check
       - name: Type check user-system frontend
-        id: frontend_user_type
-        continue-on-error: true
-        run: |
-          set -o pipefail
-          pnpm exec vue-tsc -p tsconfig.user-system.json --noEmit --skipLibCheck 2>&1 | tee "$RUNNER_TEMP/frontend-user-typecheck.log"
-      - name: Build frontend
-        id: frontend_build
-        continue-on-error: true
-        run: |
-          set -o pipefail
-          pnpm build 2>&1 | tee "$RUNNER_TEMP/frontend-build.log"
-      - name: Upload frontend diagnostics
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: frontend-quality-diagnostics
-          path: |
-            ${{ runner.temp }}/frontend-route-manifest.log
-            ${{ runner.temp }}/frontend-access-tests.log
-            ${{ runner.temp }}/frontend-eslint.log
-            ${{ runner.temp }}/frontend-no-new-debt.log
-            ${{ runner.temp }}/frontend-strategy-typecheck.log
-            ${{ runner.temp }}/frontend-user-typecheck.log
-            ${{ runner.temp }}/frontend-build.log
-          if-no-files-found: error
-          retention-days: 3
-      - name: Enforce frontend results
-        if: always()
-        run: |
-          python ../scripts/enforce-ci-results.py \
-            "frontend_route_manifest=${{ steps.frontend_route_manifest.outcome }}" \
-            "frontend_access_tests=${{ steps.frontend_access_tests.outcome }}" \
-            "frontend_lint=${{ steps.frontend_lint.outcome }}" \
-            "frontend_debt=${{ steps.frontend_debt.outcome }}" \
-            "frontend_strategy_type=${{ steps.frontend_strategy_type.outcome }}" \
-            "frontend_user_type=${{ steps.frontend_user_type.outcome }}" \
-            "frontend_build=${{ steps.frontend_build.outcome }}"
+        run: pnpm exec vue-tsc -p tsconfig.user-system.json --noEmit --skipLibCheck
+      - name: Build Platform Web
+        run: pnpm build

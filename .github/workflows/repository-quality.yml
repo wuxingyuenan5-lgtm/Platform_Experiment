@@ -1,0 +1,48 @@
+name: Repository Quality
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: repository-quality-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Check Git patch formatting
+        shell: bash
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
+            git diff --check "${{ github.event.pull_request.base.sha }}"...HEAD
+          else
+            git diff --check HEAD^
+          fi
+      - name: Check maintained versions
+        run: python scripts/check-version-consistency.py
+      - name: Check bounded AI context budgets
+        run: python scripts/context-for.py --check-budgets --json
+      - name: Check repository structure and architecture
+        run: python scripts/check-repository-structure.py
+      - name: Check active documentation and links
+        run: python scripts/check-documentation-consistency.py
+      - name: Check frontend codebase boundaries
+        run: node platform-web/scripts/check-codebase-boundaries.cjs

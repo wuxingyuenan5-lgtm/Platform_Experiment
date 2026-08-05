@@ -12,10 +12,8 @@ from app.cross_spread_observability_routes import router as cross_spread_observa
 from app.database import initialize_database
 from app.disaster_recovery import router as disaster_recovery_router
 from app.eod_reconciliation_routes import router as eod_reconciliation_router
-from app.execution_risk import (
-    configure_trade_command_port,
-    router as execution_risk_router,
-)
+from app.execution_risk import configure_trade_command_port
+from app.execution_risk import router as execution_risk_router
 from app.financial_facts import router as financial_facts_router
 from app.live_trading_sessions import router as live_trading_sessions_router
 from app.live_venue_accounting import router as live_venue_accounting_router

@@ -1,36 +1,28 @@
 #!/usr/bin/env python3
-"""Print a bounded repository reading pack for common Platform tasks."""
+"""Print bounded repository reading packs and enforce their token budgets."""
+
 from __future__ import annotations
 
 import argparse
 import json
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Iterable
 
 ROOT = Path(__file__).resolve().parents[1]
 CONFIG_PATH = ROOT / "scripts/context-packs.json"
-CONTEXT_PACK_KEYS = (
-    "hedge-style",
-    "research-field",
-    "identity-permission",
-    "member-contract",
-    "trading-display",
-    "research-provider",
-    "user-e2e",
-)
 FORMAL_CROSS_VENUE_OWNER = (
     "platform-web/src/views/strategy/spread-carry/components/"
     "CrossVenueExecutionWorkspace.vue"
 )
 DEFAULT_EXCLUSIONS = (
-    "tasks/ except the active Critical packet",
-    "closed PR discussions and historical handoffs",
+    "closed pull-request discussions and historical handoffs",
     "lock files unless dependency resolution is the task",
     "node_modules, virtual environments, build, coverage and Playwright output",
-    "src/views/demo, Mock data and template examples",
-    "projects/risk-control unless legacy deployment or migration is the task",
+    "src/views/demo, mock data and template examples",
+    "retired project material and external migration evidence",
     "unrelated services and large static catalogs",
 )
+
 CONFIG = json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
 PACKS: dict[str, dict[str, object]] = CONFIG["packs"]
 PACK_BUDGETS: dict[str, list[int]] = CONFIG["budgets"]
@@ -44,23 +36,28 @@ def file_metrics(paths: Iterable[str]) -> dict[str, object]:
     for relative in paths:
         path = ROOT / relative
         if not path.is_file():
-            rows.append({
-                "path": relative,
-                "exists": False,
-                "lines": 0,
-                "bytes": 0,
-                "estimated_tokens": 0,
-            })
+            rows.append(
+                {
+                    "path": relative,
+                    "exists": False,
+                    "lines": 0,
+                    "bytes": 0,
+                    "estimated_tokens": 0,
+                }
+            )
             continue
         raw = path.read_bytes()
         text = raw.decode("utf-8", errors="replace")
-        rows.append({
-            "path": relative,
-            "exists": True,
-            "lines": len(text.splitlines()),
-            "bytes": len(raw),
-            "estimated_tokens": (len(text) + 3) // 4,
-        })
+        rows.append(
+            {
+                "path": relative,
+                "exists": True,
+                "lines": len(text.splitlines()),
+                "bytes": len(raw),
+                "estimated_tokens": (len(text) + 3) // 4,
+            }
+        )
+
     existing = [row for row in rows if row["exists"]]
     return {
         "file_count": len(rows),
@@ -104,37 +101,46 @@ def pack_report(name: str) -> dict[str, object]:
             "estimated_tokens": required_tokens + optional_tokens,
             "budget_tokens": required_budget + optional_budget,
             "over_budget": (
-                required_tokens > required_budget or optional_tokens > optional_budget
+                required_tokens > required_budget
+                or optional_tokens > optional_budget
             ),
         },
-        "missing_paths": [*required["missing_paths"], *optional["missing_paths"]],
+        "missing_paths": [
+            *required["missing_paths"],
+            *optional["missing_paths"],
+        ],
         "checks": list(pack["checks"]),
         "default_exclusions": list(DEFAULT_EXCLUSIONS),
     }
 
 
 def default_startup_report() -> dict[str, object]:
-    variants = []
+    variants: list[dict[str, object]] = []
     for module_agent in DEFAULT_STARTUP_MODULES:
         paths = (*DEFAULT_STARTUP_BASE, module_agent)
-        variants.append({
-            "module_agent": module_agent,
-            "paths": list(paths),
-            **file_metrics(paths),
-        })
+        variants.append(
+            {
+                "module_agent": module_agent,
+                "paths": list(paths),
+                **file_metrics(paths),
+            }
+        )
     maximum = max(
         variants,
         key=lambda row: (int(row["estimated_tokens"]), str(row["module_agent"])),
     )
-    missing = sorted({
-        path for variant in variants for path in variant["missing_paths"]
-    })
+    missing = sorted(
+        {
+            str(path)
+            for variant in variants
+            for path in variant["missing_paths"]
+        }
+    )
+    maximum_tokens = int(maximum["estimated_tokens"])
     return {
         "budget_tokens": DEFAULT_STARTUP_BUDGET_TOKENS,
-        "maximum_estimated_tokens": int(maximum["estimated_tokens"]),
-        "over_budget": (
-            int(maximum["estimated_tokens"]) > DEFAULT_STARTUP_BUDGET_TOKENS
-        ),
+        "maximum_estimated_tokens": maximum_tokens,
+        "over_budget": maximum_tokens > DEFAULT_STARTUP_BUDGET_TOKENS,
         "largest_variant": maximum["module_agent"],
         "missing_paths": missing,
         "variants": variants,
@@ -147,6 +153,7 @@ def budget_report() -> dict[str, object]:
     orphan_budgets = sorted(set(PACK_BUDGETS) - set(PACKS))
     startup = default_startup_report()
     failures: list[str] = []
+
     for name, report in reports.items():
         if report["missing_paths"]:
             failures.append(
@@ -165,13 +172,15 @@ def budget_report() -> dict[str, object]:
         failures.append(f"budgets without packs: {', '.join(orphan_budgets)}")
     if startup["missing_paths"]:
         failures.append(
-            "default startup missing paths: " + ", ".join(startup["missing_paths"])
+            "default startup missing paths: "
+            + ", ".join(startup["missing_paths"])
         )
     if startup["over_budget"]:
         failures.append(
             f"default startup tokens {startup['maximum_estimated_tokens']} exceed "
             f"budget {startup['budget_tokens']}"
         )
+
     return {
         "schema_version": 1,
         "packs": reports,
@@ -226,20 +235,10 @@ def render_markdown(name: str, include_optional: bool) -> str:
         "",
         f"Required files: {report['required']['file_count']}",
         f"Optional files: {report['optional']['file_count']}",
-        f"Required lines: {report['required']['line_count']}",
-        f"Optional lines: {report['optional']['line_count']}",
-        f"Required bytes: {report['required']['byte_count']}",
-        f"Optional bytes: {report['optional']['byte_count']}",
-        (
-            "Required estimated tokens: "
-            f"{report['required']['estimated_tokens']} / "
-            f"{report['required']['budget_tokens']}"
-        ),
-        (
-            "Optional estimated tokens: "
-            f"{report['optional']['estimated_tokens']} / "
-            f"{report['optional']['budget_tokens']}"
-        ),
+        f"Required estimated tokens: {report['required']['estimated_tokens']} / "
+        f"{report['required']['budget_tokens']}",
+        f"Optional estimated tokens: {report['optional']['estimated_tokens']} / "
+        f"{report['optional']['budget_tokens']}",
         f"Selected estimated tokens: {report['estimated_tokens']}",
         f"Selected over budget: {report['over_budget']}",
         "",
@@ -257,15 +256,15 @@ def render_markdown(name: str, include_optional: bool) -> str:
             f"{row['bytes']} | {row['estimated_tokens']} |"
         )
     if pack["optional"] and not include_optional:
-        output += ["", "## Optional only when semantics require it", ""]
-        output += [f"- `{path}`" for path in pack["optional"]]
-    output += ["", "## Checks", ""]
-    output += [f"- `{command}`" for command in pack["checks"]]
-    output += ["", "## Exclude by default", ""]
-    output += [f"- {item}" for item in DEFAULT_EXCLUSIONS]
+        output.extend(["", "## Optional only when semantics require it", ""])
+        output.extend(f"- `{path}`" for path in pack["optional"])
+    output.extend(["", "## Checks", ""])
+    output.extend(f"- `{command}`" for command in pack["checks"])
+    output.extend(["", "## Exclude by default", ""])
+    output.extend(f"- {item}" for item in DEFAULT_EXCLUSIONS)
     if report["missing_paths"]:
-        output += ["", "## Missing paths", ""]
-        output += [f"- `{path}`" for path in report["missing_paths"]]
+        output.extend(["", "## Missing paths", ""])
+        output.extend(f"- `{path}`" for path in report["missing_paths"])
     return "\n".join(output) + "\n"
 
 
@@ -277,6 +276,7 @@ def main() -> None:
     parser.add_argument("--json", action="store_true")
     parser.add_argument("--check-budgets", action="store_true")
     args = parser.parse_args()
+
     if args.check_budgets:
         report = budget_report()
         if args.json:
@@ -297,6 +297,7 @@ def main() -> None:
             for failure in report["failures"]:
                 print(f"ERROR: {failure}")
         raise SystemExit(0 if report["ok"] else 1)
+
     if args.list or args.task is None:
         for name, pack in sorted(PACKS.items()):
             required_budget, optional_budget = PACK_BUDGETS[name]
@@ -306,13 +307,16 @@ def main() -> None:
                 f"optional budget={optional_budget}]"
             )
         return
+
     if args.json:
-        print(json.dumps(
-            selected_report(args.task, args.with_optional),
-            ensure_ascii=False,
-            indent=2,
-            sort_keys=True,
-        ))
+        print(
+            json.dumps(
+                selected_report(args.task, args.with_optional),
+                ensure_ascii=False,
+                indent=2,
+                sort_keys=True,
+            )
+        )
         return
     print(render_markdown(args.task, args.with_optional), end="")
 

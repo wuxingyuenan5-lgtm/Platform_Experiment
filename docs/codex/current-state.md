@@ -5,9 +5,10 @@ This is the sole repository authority for current version, branch, review scope 
 ## Delivery
 
 - Stable baseline: Platform `0.10.0`, release commit `cf6030d53b3e9a759263455569503b6c7242174e`.
+- Current target version: Platform `0.10.0`.
 - Current remediation target: Platform `0.10.1`.
 - Active branch: `refactor/platform-0-10-1-non-ui-convergence`.
-- Active review: Draft PR `<DRAFT_PR>`.
+- Active review: Draft PR #155.
 - The Platform 0.9.3 phase chain is complete. PRs #141 and #148–#153 are closed historical work and are not active execution state.
 - Frontend product restoration is explicitly deferred and is outside this pull request.
 - Context Pack, `scripts/context-for.py`, `scripts/context-packs.json`, module `AGENTS.md` files and the current context budgets are frozen at their accepted design.

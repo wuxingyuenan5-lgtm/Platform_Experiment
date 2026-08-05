@@ -1,40 +1,39 @@
 # Deployment
 
-The current primary workflow is local Platform development and GitHub acceptance.
+The maintained topology is:
 
-## Local services
+```text
+platform-web
+    ↓ Browser Session / REST
+platform-api
+    ↓ versioned Runtime contracts
+execution-runtime
+    ↓ external venues and brokers
+```
+
+## Local development
 
 - Platform Web: `http://127.0.0.1:4373/index.html`
-- Platform API: `http://127.0.0.1:8000`
-- Platform Execution Runtime: `http://127.0.0.1:8100`
-
-Windows PowerShell entry:
+- Platform API: `http://127.0.0.1:8000/health`
+- Execution Runtime: `http://127.0.0.1:8100/health`
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\dev-platform.ps1
 ```
 
-The default local state remains Simulation, Fake Gateway and Platform/Runtime Live Write disabled.
+Simulation/Fake Gateway and disabled Platform/Runtime Live Write remain the default safety state.
 
-## Target topology
+## External deployment contract
+
+Actual server directories and public endpoints are external configuration:
 
 ```text
-Platform Web
-    ↓ Browser Session / REST
-Platform API
-    ↓ versioned Runtime contracts
-Platform Execution Runtime
-    ↓ Venue / Broker / MT5 / Bybit
+PLATFORM_WEB_DEPLOY_DIR
+PLATFORM_WEB_PUBLIC_URL
+PLATFORM_API_DEPLOY_DIR
+PLATFORM_API_PUBLIC_URL
 ```
 
-## Legacy deployment boundary
+Repository automation must not provide server-specific defaults. Missing variables fail deployment. See `../../deploy/README.md` for the operator contract.
 
-`deploy/`, `projects/risk-control/`, `platform-web/.gitlab-ci.yml` and the production frontend Legacy API routes describe a second historical production topology. They remain frozen until authorized server, GitLab Runner, MySQL, consumer, TLS and rollback evidence is reviewed.
-
-Do not infer from repository contents that the Legacy stack is inactive. Do not switch production routes, stop services, migrate MySQL automatically or delete those assets as part of routine deployment cleanup.
-
-Authoritative references:
-
-- `../architecture/PLATFORM_LEGACY_DEPLOYMENT_AUDIT.md`
-- `../architecture/PLATFORM_LEGACY_GITLAB_DEPLOYMENT_AUDIT.md`
-- `../operations/LEGACY_PRODUCTION_EVIDENCE_HANDOFF.md`
+A successful build does not prove external server, domain, TLS, database, reverse-proxy, credential, monitoring, backup or broker readiness. Those require separate operator evidence.
