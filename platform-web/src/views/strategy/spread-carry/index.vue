@@ -1,114 +1,84 @@
 <template>
-  <main class="spread-page">
-    <template v-if="activeSection === 'analysis'">
+  <main class="spread-page" data-testid="spread-original-structure">
+    <template v-if="localSection === 'analysis'">
       <RestoredProductSurface
-        state="sample"
-        source="sample:spread-research"
-        as-of="2026-08-05 · 非实时"
-        :actionable="false"
-        message="价差研究结构已恢复；图表与拆分值为不可执行样例，当前执行区继续使用正式 CrossVenueExecutionWorkspace。"
+        :state="spreadSampleMeta.state"
+        :source="spreadSampleMeta.source"
+        :as-of="spreadSampleMeta.asOf"
+        :actionable="spreadSampleMeta.actionable"
+        message="原研究筛选、价差路径与统计结构已选择性恢复；研究样例不可执行，正式执行工作区保持不变。"
       >
-        <header class="spread-head">
-          <div>
-            <span>SPREAD RESEARCH</span>
-            <h2>跨所价差研究</h2>
-            <p>
-              {{ selectedVenue }} · {{ leftLegSymbol }} / {{ rightLegSymbol }} ·
-              {{ selectedResolution }}
-            </p>
-          </div>
-          <b>{{ variant === 'domesticOverseas' ? '海内外价差' : '跨所价差' }}</b>
-        </header>
+        <div class="spread-analysis-layout">
+          <SpreadAnalysisWorkspaceHeader
+            v-model:selected-venue="localVenue"
+            v-model:left-leg-symbol="localLeftLeg"
+            v-model:right-leg-symbol="localRightLeg"
+            v-model:selected-resolution="localResolution"
+          />
+          <SpreadAnalysisOverview :items="spreadOverview" />
 
-        <section class="quote-grid">
-          <article v-for="item in quotes" :key="item.label">
-            <span>{{ item.label }}</span>
-            <strong>{{ item.value }}</strong>
-            <small>{{ item.note }}</small>
-          </article>
-        </section>
-
-        <section class="research-grid">
-          <article class="panel chart-panel">
-            <div class="panel-head">
-              <h3>价差路径</h3>
-              <span>Sample</span>
+          <section class="spread-chart-card" data-testid="spread-research-chart">
+            <div class="spread-chart-toolbar">
+              <div>
+                <select v-model="progressLevel" aria-label="价差图表周期">
+                  <option value="15min">15min</option><option value="1h">1h</option><option value="4h">4h</option><option value="日线">日线</option>
+                </select>
+                <input v-model="startDate" type="date" aria-label="开始日期" />
+                <input v-model="endDate" type="date" aria-label="结束日期" />
+              </div>
+              <div>
+                <button type="button" :class="{ active: showSpread }" @click="showSpread = !showSpread">价差</button>
+                <button type="button" :class="{ active: showGoldPrice }" @click="showGoldPrice = !showGoldPrice">黄金价格</button>
+              </div>
             </div>
-            <div class="chart-area">
-              <div class="zero-line"></div>
-              <svg
-                viewBox="0 0 800 250"
-                preserveAspectRatio="none"
-                aria-label="sample spread chart"
-              >
-                <polyline
-                  points="0,150 70,130 140,165 210,108 280,126 350,72 420,96 490,54 560,88 630,46 700,76 800,42"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="5"
-                />
+            <div class="chart-area" role="img" aria-label="跨所价差与黄金价格非实时样例路径">
+              <svg v-if="showSpread" viewBox="0 0 800 280" preserveAspectRatio="none">
+                <polyline :points="toPoints(spreadSeries, 800, 250)" fill="none" class="spread-line" stroke-width="4" />
+              </svg>
+              <svg v-if="showGoldPrice" viewBox="0 0 800 280" preserveAspectRatio="none">
+                <polyline :points="toPoints(goldPriceSeries, 800, 250)" fill="none" class="gold-line" stroke-width="4" />
               </svg>
             </div>
-            <div class="axis">
-              <span>09:30</span>
-              <span>12:00</span>
-              <span>15:00</span>
-              <span>21:30</span>
-            </div>
-          </article>
+            <footer><span>{{ spreadChartDates[0] }}</span><span>{{ progressLevel }} · 非实时</span><span>{{ spreadChartDates[spreadChartDates.length - 1] }}</span></footer>
+          </section>
 
-          <article class="panel">
-            <div class="panel-head">
-              <h3>损益拆分</h3>
-              <span>只读</span>
-            </div>
-            <dl>
-              <div v-for="item in decomposition" :key="item.label">
-                <dt>{{ item.label }}</dt>
-                <dd>{{ item.value }}</dd>
-              </div>
-            </dl>
-          </article>
-        </section>
-
-        <section class="panel scenario-panel">
-          <div class="panel-head">
-            <h3>研究场景</h3>
-            <span>不可下单</span>
-          </div>
-          <div class="scenario-grid">
-            <article v-for="item in scenarios" :key="item.title">
-              <strong>{{ item.title }}</strong>
-              <p>{{ item.body }}</p>
-              <small>{{ item.result }}</small>
-            </article>
-          </div>
-        </section>
+          <SpreadStatisticsSection :decomposition="spreadDecomposition" :scenarios="spreadScenarios" />
+        </div>
       </RestoredProductSurface>
     </template>
 
     <template v-else>
       <div class="execution-state">
         <div>
-          <strong>正式执行工作区</strong>
-          <span>继续使用 Platform API 与 Execution Runtime 的事实和安全门禁。</span>
+          <strong>正式 CrossVenueExecutionWorkspace</strong>
+          <span>继续服从正式权限、审批、风险检查、ACK/Fill 区分和 result_unknown 处置语义。</span>
         </div>
-        <b>Live Write关闭</b>
+        <b>Live Write 关闭</b>
       </div>
-      <CrossVenueExecutionWorkspace
-        :left-leg-symbol="leftLegSymbol"
-        :right-leg-symbol="rightLegSymbol"
-      />
+      <CrossVenueExecutionWorkspace :left-leg-symbol="localLeftLeg" :right-leg-symbol="localRightLeg" />
     </template>
   </main>
 </template>
 
 <script setup lang="ts">
+  import { ref, watch } from 'vue';
   import RestoredProductSurface from '@/components/ProductDataState/RestoredProductSurface.vue';
+  import {
+    goldPriceSeries,
+    spreadChartDates,
+    spreadDecomposition,
+    spreadOverview,
+    spreadSampleMeta,
+    spreadScenarios,
+    spreadSeries,
+  } from '@/data/sample/spread';
   import CrossVenueExecutionWorkspace from './components/CrossVenueExecutionWorkspace.vue';
+  import SpreadAnalysisOverview from './components/SpreadAnalysisOverview.vue';
+  import SpreadAnalysisWorkspaceHeader from './components/SpreadAnalysisWorkspaceHeader.vue';
+  import SpreadStatisticsSection from './components/SpreadStatisticsSection.vue';
   import type { SpreadWorkspaceVariant } from './types';
 
-  withDefaults(
+  const props = withDefaults(
     defineProps<{
       activeSection?: 'analysis' | 'execution';
       selectedVenue?: string;
@@ -127,259 +97,46 @@
     },
   );
 
-  const quotes = [
-    { label: '做多价差', value: '+18.42', note: '主腿Ask - 对冲腿Bid' },
-    { label: '做空价差', value: '+17.96', note: '主腿Bid - 对冲腿Ask' },
-    { label: 'USDT/USD', value: '1.0008', note: '样例换算因子' },
-    { label: '资金费库存', value: '+0.010%', note: '非实时' },
-  ];
-  const decomposition = [
-    { label: '合约溢价', value: '+6.18' },
-    { label: '稳定币换汇', value: '+1.87' },
-    { label: '场所报价差', value: '+9.96' },
-    { label: '交易成本预估', value: '-0.42' },
-  ];
-  const scenarios = [
-    {
-      title: '价差扩张',
-      body: '主腿相对对冲腿继续走强，观察资金费与库存是否同步恶化。',
-      result: '研究阈值：+20.00',
-    },
-    {
-      title: '均值回归',
-      body: '价差回到中轴，检查两腿流动性和成交确认是否完整。',
-      result: '研究阈值：+14.50',
-    },
-    {
-      title: '结果不确定',
-      body: '任一场所查询不可用时保持 fail-closed，不把 ACK 当作 Fill。',
-      result: '状态：result_unknown',
-    },
-  ];
+  const localSection = ref(props.activeSection);
+  const localVenue = ref(props.selectedVenue);
+  const localLeftLeg = ref(props.leftLegSymbol);
+  const localRightLeg = ref(props.rightLegSymbol);
+  const localResolution = ref(props.selectedResolution);
+  const startDate = ref('2026-03-16');
+  const endDate = ref('2026-04-16');
+  const progressLevel = ref<'15min' | '1h' | '4h' | '日线'>('日线');
+  const showSpread = ref(true);
+  const showGoldPrice = ref(true);
+
+  watch(() => props.activeSection, (value) => (localSection.value = value));
+  watch(() => props.selectedVenue, (value) => (localVenue.value = value));
+  watch(() => props.leftLegSymbol, (value) => (localLeftLeg.value = value));
+  watch(() => props.rightLegSymbol, (value) => (localRightLeg.value = value));
+  watch(() => props.selectedResolution, (value) => (localResolution.value = value));
+
+  function toPoints(values: number[], width: number, height: number): string {
+    const max = Math.max(...values);
+    const min = Math.min(...values);
+    const range = Math.max(max - min, 1);
+    return values.map((value, index) => `${((index / Math.max(values.length - 1, 1)) * width).toFixed(1)},${(height - ((value - min) / range) * (height - 40) - 20).toFixed(1)}`).join(' ');
+  }
 </script>
 
-<style scoped>
-  .spread-page {
-    display: grid;
-    gap: 12px;
-    color: #172033;
-  }
-
-  .spread-head,
-  .execution-state {
-    display: flex;
-    align-items: end;
-    justify-content: space-between;
-    gap: 16px;
-    padding: 18px;
-    border: 1px solid #e1e7ef;
-    border-radius: 14px;
-    background: #fff;
-  }
-
-  .spread-head span {
-    color: #63739b;
-    font-size: 11px;
-    letter-spacing: 0.16em;
-  }
-
-  .spread-head h2 {
-    margin: 4px 0;
-    font-size: 24px;
-  }
-
-  .spread-head p {
-    margin: 0;
-    color: #6d788a;
-  }
-
-  .spread-head b,
-  .execution-state b {
-    padding: 6px 10px;
-    border-radius: 999px;
-    background: #eef3fb;
-    color: #44618f;
-    font-size: 12px;
-  }
-
-  .quote-grid {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 10px;
-    margin-top: 12px;
-  }
-
-  .quote-grid article,
-  .panel {
-    border: 1px solid #e1e7ef;
-    border-radius: 13px;
-    background: #fff;
-  }
-
-  .quote-grid article {
-    display: grid;
-    gap: 5px;
-    padding: 15px;
-  }
-
-  .quote-grid span,
-  .quote-grid small {
-    color: #6c778a;
-  }
-
-  .quote-grid strong {
-    font-size: 22px;
-  }
-
-  .research-grid {
-    display: grid;
-    grid-template-columns: 1.6fr 0.8fr;
-    gap: 10px;
-    margin-top: 10px;
-  }
-
-  .panel {
-    padding: 16px;
-  }
-
-  .panel-head {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 12px;
-  }
-
-  .panel-head h3 {
-    margin: 0;
-    font-size: 16px;
-  }
-
-  .panel-head span {
-    padding: 4px 8px;
-    border-radius: 999px;
-    background: #fff4d5;
-    color: #846116;
-    font-size: 11px;
-  }
-
-  .chart-area {
-    position: relative;
-    height: 260px;
-    overflow: hidden;
-    border-radius: 10px;
-    background: linear-gradient(180deg, #f7faff, #fff);
-    color: #3978c9;
-  }
-
-  .chart-area svg {
-    position: absolute;
-    inset: 20px 0 12px;
-    width: 100%;
-    height: calc(100% - 32px);
-  }
-
-  .zero-line {
-    position: absolute;
-    top: 55%;
-    right: 0;
-    left: 0;
-    border-top: 1px dashed #ccd6e4;
-  }
-
-  .axis {
-    display: flex;
-    justify-content: space-between;
-    margin-top: 8px;
-    color: #8290a5;
-    font-size: 11px;
-  }
-
-  dl {
-    display: grid;
-    gap: 13px;
-    margin: 0;
-  }
-
-  dl div {
-    display: flex;
-    justify-content: space-between;
-    padding-bottom: 10px;
-    border-bottom: 1px solid #edf1f5;
-  }
-
-  dt {
-    color: #6d788a;
-  }
-
-  dd {
-    margin: 0;
-    font-weight: 700;
-  }
-
-  .scenario-panel {
-    margin-top: 10px;
-  }
-
-  .scenario-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 10px;
-  }
-
-  .scenario-grid article {
-    padding: 14px;
-    border: 1px solid #e5eaf1;
-    border-radius: 10px;
-    background: #fafbfd;
-  }
-
-  .scenario-grid p {
-    color: #667085;
-    line-height: 1.6;
-  }
-
-  .scenario-grid small {
-    color: #3c649d;
-    font-weight: 700;
-  }
-
-  .execution-state {
-    align-items: center;
-  }
-
-  .execution-state div {
-    display: grid;
-    gap: 4px;
-  }
-
-  .execution-state span {
-    color: #687386;
-    font-size: 12px;
-  }
-
-  @media (max-width: 960px) {
-    .quote-grid {
-      grid-template-columns: repeat(2, 1fr);
-    }
-
-    .research-grid {
-      grid-template-columns: 1fr;
-    }
-
-    .scenario-grid {
-      grid-template-columns: 1fr;
-    }
-  }
-
-  @media (max-width: 560px) {
-    .quote-grid {
-      grid-template-columns: 1fr;
-    }
-
-    .spread-head,
-    .execution-state {
-      flex-direction: column;
-      align-items: start;
-    }
-  }
+<style scoped lang="less">
+  .spread-page, .spread-analysis-layout { display: grid; gap: 14px; color: #172033; }
+  .spread-chart-card, .execution-state { padding: 18px; border: 1px solid #e1e7ef; border-radius: 14px; background: #fff; }
+  .spread-chart-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+  .spread-chart-toolbar > div { display: flex; flex-wrap: wrap; gap: 8px; }
+  select, input, button { height: 36px; padding: 0 10px; border: 1px solid #dce3eb; border-radius: 8px; background: #fff; color: #526173; }
+  button.active { border-color: #aac4dd; background: #edf4fa; color: #294a67; font-weight: 700; }
+  .chart-area { position: relative; height: 330px; margin-top: 14px; overflow: hidden; border-radius: 12px; background: linear-gradient(to bottom, transparent 24%, #edf1f5 25%, transparent 26%) 0 0 / 100% 82px, #fafbfd; }
+  .chart-area svg { position: absolute; inset: 22px 12px; width: calc(100% - 24px); height: calc(100% - 44px); }
+  .spread-line { stroke: #3da6de; }
+  .gold-line { stroke: #d9a72d; opacity: .78; }
+  .spread-chart-card footer { display: flex; justify-content: space-between; margin-top: 8px; color: #8290a5; font-size: 11px; }
+  .execution-state { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+  .execution-state div { display: grid; gap: 4px; }
+  .execution-state span { color: #687386; font-size: 12px; }
+  .execution-state b { padding: 6px 10px; border-radius: 999px; background: #fff5d6; color: #8a6210; font-size: 12px; }
+  @media (max-width: 720px) { .spread-chart-toolbar, .execution-state { flex-direction: column; align-items: stretch; } }
 </style>
