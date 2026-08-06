@@ -43,7 +43,7 @@ on:
       - 'execution-runtime/pyproject.toml'
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: platform-visual-baseline-${{ github.event.pull_request.number || github.ref }}
@@ -58,9 +58,6 @@ jobs:
       CI: 'true'
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.head.ref || github.ref_name }}
-          fetch-depth: 0
 
       - uses: actions/setup-python@v5
         with:
@@ -129,48 +126,6 @@ jobs:
       - name: Capture full-platform visual baseline
         working-directory: platform-web
         run: pnpm test:e2e:platform-visual
-
-      - name: Commit repository-formatted restoration sources
-        if: github.event_name == 'pull_request' && github.event.pull_request.number == 160
-        shell: bash
-        env:
-          TARGET_BRANCH: ${{ github.event.pull_request.head.ref }}
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -- \
-            platform-web/src/access/browserRouteCapabilities.ts \
-            platform-web/src/components/ProductDataState/RestoredProductDataBanner.vue \
-            platform-web/src/data/sample/news/index.ts \
-            platform-web/src/data/sample/spread/index.ts \
-            platform-web/src/views/dashboard/index.vue \
-            platform-web/src/views/financialAi/index.vue \
-            platform-web/src/views/log/operate/index.vue \
-            platform-web/src/views/monitor/index.vue \
-            platform-web/src/views/newsCalendar/index.vue \
-            platform-web/src/views/risk/detail/index.vue \
-            platform-web/src/views/risk/home/components/networth.vue \
-            platform-web/src/views/risk/product/overview/components/networthPie.vue \
-            platform-web/src/views/risk/profile/security/modules.tsx \
-            platform-web/src/views/settings/index.vue \
-            platform-web/src/views/strategy/funding-carry/components/FundingChartPanel.vue \
-            platform-web/src/views/strategy/funding-carry/components/FundingDetailPanel.vue \
-            platform-web/src/views/strategy/funding-carry/components/FundingMarketBoard.vue \
-            platform-web/src/views/strategy/funding-carry/components/FundingOrderPanel.vue \
-            platform-web/src/views/strategy/funding-carry/index.vue \
-            platform-web/src/views/strategy/management/components/StrategyCapitalNetValueBoard.vue \
-            platform-web/src/views/strategy/management/components/StrategyCurveGrid.vue \
-            platform-web/src/views/strategy/management/components/StrategyRecordsPanel.vue \
-            platform-web/src/views/strategy/spread-carry/components/SpreadAnalysisOverview.vue \
-            platform-web/src/views/strategy/spread-carry/components/SpreadAnalysisWorkspaceHeader.vue \
-            platform-web/src/views/strategy/spread-carry/components/SpreadStatisticsSection.vue \
-            platform-web/src/views/strategy/spread-carry/index.vue
-          if git diff --cached --quiet; then
-            echo "No formatting changes to commit."
-            exit 0
-          fi
-          git commit -m "chore(frontend): format restored product surfaces"
-          git push origin "HEAD:${TARGET_BRANCH}"
 
       - name: Validate and describe evidence
         if: always()
