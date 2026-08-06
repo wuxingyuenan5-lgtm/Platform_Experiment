@@ -46,7 +46,12 @@ async function openAccount(browser: Browser, username: string, password: string)
   return { page, close: () => context.close() };
 }
 
-test('all eight reusable accounts obey menu URL API and personal-account boundaries', async ({
+async function expectForbiddenPage(page: Page, path: string): Promise<void> {
+  await page.goto(absoluteUrl(path));
+  await expect(page).toHaveURL(/\/exception\/403|\/403/, { timeout: 20_000 });
+}
+
+test('all eight reusable accounts keep self account access and obey risk, URL and API boundaries', async ({
   browser,
 }) => {
   const password = requiredEnvironment('E2E_CEO_PASSWORD');
@@ -64,8 +69,12 @@ test('all eight reusable accounts obey menu URL API and personal-account boundar
         await account.page.goto(absoluteUrl('/home/index'));
         if (expected.role === 'member') {
           await expect(account.page.getByText(/个人账号|我的资产/).first()).toBeVisible();
+          await expect(account.page.getByText('风险管理', { exact: true })).toHaveCount(0);
+          await expect(account.page.getByText('用户管理', { exact: true })).toHaveCount(0);
         } else {
           await expect(account.page.getByRole('heading', { name: '全球变量' })).toBeVisible();
+          await expect(account.page.getByText('个人账号', { exact: true }).first()).toBeVisible();
+          await expect(account.page.getByText('风险管理', { exact: true }).first()).toBeVisible();
         }
 
         await account.page.goto(absoluteUrl('/strategy/management'));
@@ -87,16 +96,40 @@ test('all eight reusable accounts obey menu URL API and personal-account boundar
 
         await account.page.goto(absoluteUrl('/account/index'));
         await expect(account.page.getByText(/个人账号|我的资产/).first()).toBeVisible();
+        await expect(
+          account.page.getByText(expected.username, { exact: true }).first(),
+        ).toBeVisible();
 
         const listResponse = await account.page.request.get(absoluteUrl('/api/v1/users'));
         if (!expected.risk) {
           expect(listResponse.status()).toBe(403);
-          await account.page.goto(absoluteUrl('/risk/users'));
-          await expect(account.page).toHaveURL(/\/exception\/403|\/403/, {
-            timeout: 20_000,
-          });
+          expect(
+            (
+              await account.page.request.get(
+                absoluteUrl('/api/v1/users?search=e2e_ceo'),
+              )
+            ).status(),
+          ).toBe(403);
+          expect(
+            (
+              await account.page.request.get(
+                absoluteUrl('/api/v1/users/not-the-current-member'),
+              )
+            ).status(),
+          ).toBe(403);
+
+          await account.page.goto(absoluteUrl('/account/index?id=e2e_ceo'));
+          await expect(
+            account.page.getByText(expected.username, { exact: true }).first(),
+          ).toBeVisible();
+          await expect(account.page.getByText('e2e_ceo', { exact: true })).toHaveCount(0);
+
+          await expectForbiddenPage(account.page, '/risk');
+          await expectForbiddenPage(account.page, '/risk/users');
         } else {
           expect(listResponse.ok()).toBe(true);
+          await account.page.goto(absoluteUrl('/risk'));
+          await expect(account.page).not.toHaveURL(/\/exception\/403|\/403/);
           await account.page.goto(absoluteUrl('/risk/users'));
           await expect(
             account.page.getByText('用户管理', { exact: true }).first(),
