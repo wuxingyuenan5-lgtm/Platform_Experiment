@@ -59,9 +59,10 @@ def write_candidate_contracts(
     auth: str = "状态：`active authentication and authorization contract`\n",
     matrix: str = "状态：`active Platform candidate access contract`\n",
 ) -> list[Path]:
+    (root / "VERSION").write_text("0.10.2\n", encoding="utf-8")
     current_path = root / "docs/codex/current-state.md"
     auth_path = root / "docs/technical/AUTH_RBAC_LIVE_SESSIONS.md"
-    matrix_path = root / "docs/product/PLATFORM_ACCESS_MATRIX.md"
+    matrix_path = root / "docs/product/PLATFORM_0_10_2_FRONTEND_ACCESS_MATRIX.md"
     for path, content in ((current_path, current), (auth_path, auth), (matrix_path, matrix)):
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(content, encoding="utf-8")
@@ -70,16 +71,38 @@ def write_candidate_contracts(
 
 def valid_candidate_state() -> str:
     return (
-        "Current candidate target: Platform `0.10.1`.\n"
+        "Current candidate target: Platform `0.10.2`.\n"
         "The candidate includes browser access and frontend product restoration.\n"
+    )
+
+
+def test_active_authority_requires_an_exact_active_status(tmp_path: Path) -> None:
+    path = tmp_path / "docs/authority.md"
+    path.parent.mkdir(parents=True)
+
+    path.write_text("状态：`active authentication contract`\n", encoding="utf-8")
+    assert not DOCUMENTATION_CONSISTENCY.is_active_authority(
+        tmp_path,
+        path,
+        path.read_text(encoding="utf-8"),
+    )
+
+    path.write_text("状态：`active`\n", encoding="utf-8")
+    assert DOCUMENTATION_CONSISTENCY.is_active_authority(
+        tmp_path,
+        path,
+        path.read_text(encoding="utf-8"),
     )
 
 
 def test_candidate_documentation_rejects_stale_frontend_status(tmp_path: Path) -> None:
     paths = write_candidate_contracts(
         tmp_path,
-        current=valid_candidate_state()
-        + "Frontend product restoration has not been executed and remains outside the current non-UI scope.\n",
+        current=(
+            valid_candidate_state()
+            + "Frontend product restoration has not been executed and remains "
+            "outside the current non-UI scope.\n"
+        ),
     )
 
     errors = DOCUMENTATION_CONSISTENCY.validate_candidate_documentation(tmp_path, paths)
@@ -96,7 +119,8 @@ def test_candidate_documentation_rejects_draft_pr_status(tmp_path: Path) -> None
     )
 
     assert DOCUMENTATION_CONSISTENCY.validate_candidate_documentation(tmp_path, paths) == [
-        "docs/product/PLATFORM_ACCESS_MATRIX.md:1: active status must not persist a Draft PR number"
+        "docs/product/PLATFORM_0_10_2_FRONTEND_ACCESS_MATRIX.md:1: "
+        "candidate status must not persist a Draft PR number"
     ]
 
 
@@ -108,14 +132,15 @@ def test_candidate_documentation_rejects_pending_auth_status(tmp_path: Path) -> 
     )
 
     assert DOCUMENTATION_CONSISTENCY.validate_candidate_documentation(tmp_path, paths) == [
-        "docs/technical/AUTH_RBAC_LIVE_SESSIONS.md contains stale verification status: verification pending"
+        "docs/technical/AUTH_RBAC_LIVE_SESSIONS.md contains stale verification "
+        "status: verification pending"
     ]
 
 
 def test_candidate_documentation_requires_browser_and_restoration_scope(tmp_path: Path) -> None:
     paths = write_candidate_contracts(
         tmp_path,
-        current="Current candidate target: Platform `0.10.1`.\n",
+        current="Current candidate target: Platform `0.10.2`.\n",
     )
 
     errors = DOCUMENTATION_CONSISTENCY.validate_candidate_documentation(tmp_path, paths)
