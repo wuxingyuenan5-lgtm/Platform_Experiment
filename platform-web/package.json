@@ -129,7 +129,7 @@
     "@types/codemirror": "^5.60.8",
     "@types/crypto-js": "^4.1.1",
     "@types/lodash-es": "^4.17.7",
-    "@types/nprogress": "^2.0.0",
+    "@types/nprogress": "^0.2.0",
     "@types/qrcode": "^1.5.1",
     "@types/qs": "^6.9.7",
     "@types/showdown": "^2.0.1",
