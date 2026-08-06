@@ -22,7 +22,7 @@
 
 ## Identity, permission, and member-data criteria
 
-The durable browser-access contracts are [Browser Access and Product Data](../contracts/BROWSER_ACCESS_AND_PRODUCT_DATA.md) and the [Platform 0.10.1 frontend access matrix](PLATFORM_0_10_1_FRONTEND_ACCESS_MATRIX.md).
+The durable browser-access contracts are [Browser Access and Product Data](../contracts/BROWSER_ACCESS_AND_PRODUCT_DATA.md) and the [Platform 0.10.2 frontend access matrix](PLATFORM_0_10_2_FRONTEND_ACCESS_MATRIX.md).
 
 - Browser Cookie and Bearer API Key are mutually exclusive request credentials; ambiguous requests fail closed.
 - Browser Session uses server-side revocation, CSRF plus Origin validation, secure cookie settings in production, and immediate permission invalidation after role or status change.
