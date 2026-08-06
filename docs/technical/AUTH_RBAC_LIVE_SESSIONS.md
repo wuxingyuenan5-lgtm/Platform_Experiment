@@ -1,9 +1,11 @@
 # Authentication, RBAC, Browser Session, and LiveTradingSession
 
-状态：`active / user-system Batches 1–5 implemented, verification pending`
+状态：`active authentication and authorization contract`
 适用产品：`Platform`
 用户系统架构：`USER_SYSTEM_TECHNICAL_ARCHITECTURE.md`
 产品与验收基线：`../product/PRD.md`、`../product/ACCEPTANCE_CRITERIA.md`
+浏览器访问合同：[Browser Access and Product Data](../contracts/BROWSER_ACCESS_AND_PRODUCT_DATA.md)
+角色权限矩阵：[Platform 0.10.1 前端访问权限矩阵](../product/PLATFORM_0_10_1_FRONTEND_ACCESS_MATRIX.md)
 
 ## 1. 两类 Session 不是同一概念
 
@@ -11,7 +13,7 @@
 
 | 类型 | 目的 | 凭证/身份 | 能否授权真实交易 |
 |---|---|---|---|
-| Browser Session | 让会员和内部人员登录网页、访问个人账号和被授权的业务页面 | HttpOnly opaque Cookie → human Principal | 不能替代 API Key；第一阶段不能直接授权 Live Write |
+| Browser Session | 让会员和内部人员登录网页、访问个人账号和被授权的业务页面 | HttpOnly opaque Cookie → human Principal | 不能替代 API Key，也不能直接授权 Live Write |
 | LiveTradingSession | 对已经通过 API-Key 认证的真实交易 Command 提供限时、限范围、双人审批授权 | API-Key Principal + approved LiveTradingSession claim | 只有继续通过全部 Live 闸门时才可参与授权 |
 
 禁止把 Browser Session ID、Cookie 或 CSRF Token 写入 `LiveTradingSession`，也禁止把 LiveTradingSession ID 当作浏览器登录凭证。
@@ -69,18 +71,25 @@ API-Key `admin` 保留 `*` 通配符兼容语义，但该通配符只能在 API-
 
 ### 4.2 浏览器业务角色
 
-```text
-ceo
-tech_lead
-employee
-member
-```
+浏览器角色来自 `users.role_code`，使用显式权限集合，不使用 API-Key wildcard，也不与 API-Key 角色自动转换。
 
-这些角色来自 `users.role_code`，只用于人类 Browser Session。API-Key `admin` 不自动等同 CEO，`ceo` 也不是有效 API-Key 配置角色。
+| 浏览器角色 | 正式业务页面 | 风险管理 | 用户管理 | 本人个人账号 | 写入边界 |
+|---|---|---|---|---|---|
+| CEO | 全部正式页面 | 允许 | 允许 | 允许 | 产品业务写权限保留，但仍受 Live Write、审批、Kill Switch 和全部交易安全门禁约束 |
+| 技术负责人 | 接近完整或完整的正式页面范围 | 允许 | 允许 | 允许 | 仍受全部正式安全门禁约束 |
+| 员工 | 全部正式业务页面只读 | 只读 | 用户列表只读 | 允许 | 仅本人获准的密码、头像、设备和会话等安全自助；无业务或其他账号写权限 |
+| 会员 | 规定范围内正式业务页面只读 | 禁止 | 禁止 | 必须允许 | 只能访问当前认证会员本人；不得读取其他账号或内部组织数据 |
 
-人类 CEO 使用显式业务权限集合，不返回或依赖 `*`。其权限包括用户管理、本人账号、系统读取和会员持仓管理，但不包含 `trade:submit`、`risk:manage` 或任何可授权 Live Write 的 API-Key 权限。
+长期授权原则：
 
-两组角色可以解析到部分同名权限，但不能通过名称自动转换。前端菜单和直接 URL 只做显式权限点精确匹配，不识别 API-Key wildcard。
+- 菜单隐藏不是授权；
+- 直接 URL 与后端 API 必须独立验证权限和数据范围；
+- 浏览器角色只使用显式权限集；
+- API-Key 角色命名空间继续独立；
+- Browser Session 不能授权 Platform 或 Runtime Live Write；
+- 前端菜单和路由转换不拥有后端授权决策。
+
+人类 CEO 使用显式业务权限集合，不返回或依赖 `*`。API-Key `admin` 不自动等同 CEO，`ceo` 也不是有效 API-Key 配置角色。
 
 ## 5. 认证保障等级
 
@@ -107,7 +116,7 @@ member
 - Browser Session 不能替代 API Key 申请、批准、认领或提交真实交易；
 - 匿名、无效配置、未知角色和无法识别的保障等级全部拒绝。
 
-现有 `auth_mode=api_key` 仍是 Live 系统凭证配置要求，但不再解释为“生产环境所有网页接口只能 Bearer”。路由保障等级负责区分人类网页访问和真实写入。
+现有 `auth_mode=api_key` 是 Live 系统凭证配置要求，但不解释为“生产环境所有网页接口只能 Bearer”。路由保障等级负责区分人类网页访问和真实写入。
 
 ### 6.2 Non-live
 
@@ -168,7 +177,7 @@ CSRF 原始值只存在于当前浏览器内存；数据库保存哈希。用户
 
 - 密码使用 Argon2id；
 - 密码、密码哈希、原始 Session/CSRF/reset token 不进入日志、响应、Markdown 或 Git；
-- 第一阶段没有默认 CEO Seed 或默认密码；
+- 不提供默认 CEO Seed 或默认密码；
 - 初始 CEO 通过 `python -m app.user_cli create-ceo` 交互创建；
 - 命令使用 `getpass`，只有数据库尚无 active CEO 时才能成功；
 - 最后一个 active CEO 的停用或降级必须在 `BEGIN IMMEDIATE` 保护的事务内拒绝；
@@ -225,7 +234,7 @@ authentication assurance
 
 员工账号在批准或改为 `employee` 前必须有非空部门；会员账号在批准或改为 `member` 前必须有非空会员类型。检查必须位于权限和目标角色策略之后，并由 `expectedVersion` 防止并发资料变化被静默覆盖。
 
-## 10. Actor Binding
+## 10. Actor、Target 和 Data Scope Binding
 
 Live 或 API-Key 模式下，JSON 请求体出现以下字段时必须与 Principal User ID 相同：
 
@@ -237,7 +246,7 @@ Live 或 API-Key 模式下，JSON 请求体出现以下字段时必须与 Princi
 
 不一致在进入业务处理前返回 403。新接口优先不在请求体暴露身份字段，直接从 Principal 读取。
 
-用户域还必须执行目标与数据范围绑定：会员本人接口不接受客户端提供的其他 `user_id` 或 `member_id`。
+用户域还必须执行目标与数据范围绑定：本人账号接口不接受客户端提供的其他 `user_id` 或 `member_id`。Path、Query、ID 和 API 参数不能扩大当前认证主体的数据范围。
 
 ## 11. Request Audit
 
@@ -282,7 +291,7 @@ Applicant 来自 API-Key 请求 Principal。Approver 来自批准请求 Principa
 - Approval 只允许 pending → approved；
 - Approval 原因、User ID 和时间不可被后续请求覆盖；
 - 修改 Session Payload 必须使用新 Idempotency Key 新建申请；
-- Browser Session CEO 身份第一阶段不能替代 API-Key Applicant 或 Approver。
+- Browser Session CEO 身份不能替代 API-Key Applicant 或 Approver。
 
 ## 14. LiveTradingSession Scope
 
@@ -343,29 +352,18 @@ Command ID
 - 429：登录、注册或恢复请求达到频率限制；
 - 503：认证、安全配置或绝对上限未安全配置。
 
-## 18. 当前实施状态与限制
+## 18. 部署与外部状态限制
 
-Issue #117 分支已实现：
+仓库合同、自动化测试和候选验证不能证明外部生产环境已经就绪。生产启用前仍需独立确认：
 
-- Batch 1：API-Key/human role 命名空间、Migration 5、Argon2id、Browser Session、CSRF/Origin、认证保障等级、初始 CEO 和最后 CEO 事务保护；
-- Batch 2：注册、登录、`/auth/me`、退出、近期再认证、本人资料、头像、改密、设备、公开重置凭证消费和前端个人账号；
-- Batch 3：用户搜索/详情/创建/审批/拒绝/角色/状态/重置凭证/强退、目标角色策略、资料字段不变量、审计事务和后台页面；
-- Batch 4：Migration 6、会员持仓、基金单位净值、Decimal 字符串、本人隔离、CEO 管理、NAV 缺失/过期语义和前端持仓面板；
-- Batch 5：同源 `/api/v1`、Cookie Session Store、精确权限菜单/直接 URL、旧个人入口重定向、显式 CEO 权限和旧 JWT/持久化 Token 隔离。
+- 同源 TLS、反向代理、Cookie Secure 与 Origin 配置；
+- 权威用户、会员持仓和基金净值数据来源；
+- 数据库、头像、密钥和会话数据的备份恢复；
+- 账号、凭证、Provider、Broker 与 Venue 的真实连接和权限；
+- 生产监控、告警、回滚和灾备演练。
 
-自动化验收证据：
-
-- Draft PR #118 的 Repository Safety、Backend、Runtime 和 Frontend 全矩阵已通过；
-- Backend Ruff、Pyright 与 399 项分类 Pytest 已通过；
-- 前端权限/Decimal 测试、ESLint、无新增债务检查、两套类型检查和生产构建已通过；
-- Version Consistency 与 Secret Scan 已通过；
-- 用户域 Table Count 与头像归档/恢复已纳入现有生产灾备自动化；
-- 浏览器验收入口：`../operations/USER_SYSTEM_BROWSER_ACCEPTANCE.md`；
-- 部署、SQLite/头像恢复入口：`../operations/USER_SYSTEM_DEPLOYMENT_READINESS.md`；
-- 仍需在受控主机完成浏览器同源验收、Cookie Secure/反向代理验证、备份恢复演练和三项生产切换决策。
-
-当前 API Key 配置适合单机小型私募第一阶段，不等同完整企业身份提供商。认证、审批、代码完成和 CI 均不能自动打开 Platform 或 Runtime Live Write。
+当前 API-Key 配置适合单机小型私募的受控部署边界，不等同完整企业身份提供商。认证、审批、代码完成、候选验证和 CI 均不能自动打开 Platform 或 Runtime Live Write。
 
 ## 19. Product authority and scope
 
-The current browser role set is CEO, technical lead, employee and member. Capability and resource scope are resolved centrally; UI visibility is never authorization. Any future research, trader, strategy-owner, risk, reconciliation or system-administration specialization must be introduced as reviewed Capability and Data Scope policy, not as an unreviewed page-local role.
+The browser role set is CEO, technical lead, employee and member. Capability and resource scope are resolved centrally; UI visibility is never authorization. Any future research, trader, strategy-owner, risk, reconciliation or system-administration specialization must be introduced as reviewed Capability and Data Scope policy, not as an unreviewed page-local role.

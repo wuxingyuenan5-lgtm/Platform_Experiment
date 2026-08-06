@@ -56,6 +56,20 @@ CURRENT_LEGACY_STATUS = re.compile(
     r"(?:当前阶段|实施计划|适用版本|^#).*?(?:Platform\s+V6|Production\s+Gate|0\.9\.\d+.*Phase|Phase\s*[0-9])",
     re.IGNORECASE,
 )
+ACTIVE_STATUS_PATTERN = re.compile(r"(?:状态：`active(?:[\s/]|`)|Status:\s*active\b)", re.IGNORECASE)
+DRAFT_PR_STATUS_PATTERN = re.compile(
+    r"状态[^\n]*(?:frozen\s+for\s+)?Draft\s+PR\s*#\d+[^\n]*(?:acceptance)?",
+    re.IGNORECASE,
+)
+CURRENT_STATE_STALE_MARKERS = (
+    "Frontend product restoration has not been executed",
+    "remains outside the current non-UI scope",
+)
+CURRENT_STATE_SCOPE_REQUIREMENTS = (
+    ("browser access", "浏览器权限", "浏览器访问"),
+    ("frontend product restoration", "product restoration", "前端产品恢复", "前端恢复"),
+)
+AUTH_CONTRACT_PATH = "docs/technical/AUTH_RBAC_LIVE_SESSIONS.md"
 WORKSTATION_PATH_PATTERNS = (
     (
         "Windows user profile",
@@ -94,7 +108,7 @@ def is_active_authority(root: Path, path: Path, content: str) -> bool:
     if relative in REQUIRED_ENTRYPOINTS:
         return True
     header = "\n".join(content.splitlines()[:20])
-    return "状态：`active`" in header or "Status: active" in header
+    return ACTIVE_STATUS_PATTERN.search(header) is not None
 
 
 def markdown_link_target(raw_target: str) -> str | None:
@@ -193,7 +207,37 @@ def validate_active_status(root: Path, active_paths: Iterable[Path]) -> list[str
                 errors.append(f"{relative}:{line_number}: active document references a retired planning/task/project path")
             if CURRENT_LEGACY_STATUS.search(line) and not HISTORICAL_CONTEXT.search(line):
                 errors.append(f"{relative}:{line_number}: old V6/Production Gate/phase text is presented as current")
+            if DRAFT_PR_STATUS_PATTERN.search(line):
+                errors.append(f"{relative}:{line_number}: active status must not persist a Draft PR number")
     return sorted(errors)
+
+
+def validate_candidate_documentation(root: Path, paths: Iterable[Path]) -> list[str]:
+    errors: list[str] = []
+    current_path = root / "docs/codex/current-state.md"
+    current = current_path.read_text(encoding="utf-8")
+    for marker in CURRENT_STATE_STALE_MARKERS:
+        if marker in current:
+            errors.append(f"docs/codex/current-state.md contains stale candidate status: {marker}")
+    current_folded = current.casefold()
+    for alternatives in CURRENT_STATE_SCOPE_REQUIREMENTS:
+        if not any(alternative.casefold() in current_folded for alternative in alternatives):
+            errors.append(
+                "docs/codex/current-state.md must describe Platform 0.10.1 candidate scope: "
+                + " or ".join(alternatives)
+            )
+
+    auth_path = root / AUTH_CONTRACT_PATH
+    if auth_path.is_file() and "verification pending" in auth_path.read_text(encoding="utf-8").casefold():
+        errors.append(f"{AUTH_CONTRACT_PATH} contains stale verification status: verification pending")
+
+    for source in sorted(paths):
+        relative = source.relative_to(root).as_posix()
+        content = markdown_without_examples(source.read_text(encoding="utf-8"))
+        for line_number, line in enumerate(content.splitlines(), start=1):
+            if DRAFT_PR_STATUS_PATTERN.search(line):
+                errors.append(f"{relative}:{line_number}: active status must not persist a Draft PR number")
+    return sorted(set(errors))
 
 
 def validate_portable_documentation(root: Path, paths: Iterable[Path]) -> list[str]:
@@ -232,7 +276,7 @@ def validate_current_authority(root: Path) -> list[str]:
         "Stable baseline: Platform `0.10.0`",
         "Current candidate target: Platform `0.10.1`",
         "Platform Live Write and Runtime Live Write remain disabled by default",
-        "Frontend product restoration has not been executed",
+        "Candidate validation does not mean the candidate is released, deployed or production-ready",
         "remain unverified",
         "must not be assumed",
         "具体活动分支、HEAD和PR状态属于易变Git/GitHub事实",
@@ -265,6 +309,7 @@ def validate_repository(root: Path) -> list[str]:
     return sorted(
         validate_entrypoints(root)
         + validate_current_authority(root)
+        + validate_candidate_documentation(root, active_paths)
         + validate_markdown_links(root, all_paths)
         + validate_backticked_paths(root, active_paths)
         + validate_active_status(root, active_paths)

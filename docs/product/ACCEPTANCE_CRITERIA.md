@@ -22,9 +22,17 @@
 
 ## Identity, permission, and member-data criteria
 
+The durable browser-access contracts are [Browser Access and Product Data](../contracts/BROWSER_ACCESS_AND_PRODUCT_DATA.md) and the [Platform 0.10.1 frontend access matrix](PLATFORM_0_10_1_FRONTEND_ACCESS_MATRIX.md).
+
 - Browser Cookie and Bearer API Key are mutually exclusive request credentials; ambiguous requests fail closed.
 - Browser Session uses server-side revocation, CSRF plus Origin validation, secure cookie settings in production, and immediate permission invalidation after role or status change.
 - CEO, technical lead, employee, and member permissions are enforced on the server for routes, fields, actions, and resource scope; direct URL access cannot bypass them.
+- All four browser-role classes have access to their own personal account.
+- CEO, technical lead and employees retain both their authorized risk-management scope and their own personal account.
+- Members retain their own personal account but have no risk-management or user-management access.
+- A member cannot use Path, Query, ID or API parameters to switch the personal-account scope to another user or internal organization data.
+- Employees have read-only formal business pages; backend business or other-account write requests must return 403.
+- Menu visibility, direct URL authorization and backend API authorization must resolve consistently from explicit permissions and data scope.
 - A member can read only their own fund holdings. Administrative full-holding reads and holding changes require explicit permission, recent reauthentication, transactionally coupled audit, and Decimal-string responses.
 - The last active CEO cannot be disabled or downgraded, including concurrent requests. Passwords, raw tokens, API keys, complete contact details, and complete holding snapshots never enter Git or ordinary logs.
 - Browser identity never authorizes Platform or Runtime Live Write. LiveTradingSession, Kill Switch, absolute limits, approval, reconciliation, and data-quality gates remain independently required.
@@ -35,12 +43,17 @@
 - Legacy user import, when required, is dry-run capable, idempotent, excludes old Sessions, never auto-promotes an old admin to CEO, and records only counts and redacted errors.
 - Schema migrations are append-only and must pass fresh-database, upgrade, repeat-initialization, checksum-drift, failed-rollback, index, and foreign-key tests without changing existing trading, accounting, reconciliation, or audit facts.
 - A failed identity or holding cutover rolls back the complete deployment unit; it must not leave mixed identity authorities or partially migrated customer data.
+
 ## Global product and frontend criteria
 
 - Every page exposes explicit loading, empty, error, stale/delayed, partial, permission-denied, read-only and degraded states where applicable.
+- Restored formal product pages distinguish `live`, `sample`, `unavailable` and `error` states.
+- `sample` state declares its source, is marked `actionable=false`, and cannot trigger save, strategy, deployment, order or provider actions.
+- `error` state remains explicit and cannot be silently presented as a normal `live` or `sample` result.
 - Unknown, delayed or incomplete financial data is never rendered as confirmed zero.
 - Commands are idempotent, auditable and recoverable; `result_unknown` remains unknown until authoritative reconciliation.
 - Monetary, price and quantity values use exact Decimal/string contracts, explicit currency/unit and UTC timestamps.
 - Module degradation remains bounded: a failed external widget, provider or realtime channel cannot erase unrelated page content.
 - Responsive behavior preserves the primary decision path; secondary panels may stack or collapse but critical status, risk and action context remain visible.
+- The visual candidate covers the current four formal viewport widths and records evidence against the candidate under review.
 - Sensitive credentials, approval evidence and unrestricted personal data never enter routes, browser persistence or client logs.

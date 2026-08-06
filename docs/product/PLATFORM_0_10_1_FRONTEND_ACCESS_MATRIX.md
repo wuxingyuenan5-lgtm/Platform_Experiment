@@ -1,6 +1,6 @@
 # Platform 0.10.1 前端访问权限矩阵
 
-状态：`frozen for Draft PR #156 acceptance`
+状态：`active Platform 0.10.1 candidate access contract`
 
 本矩阵同时约束菜单展示、直接 URL 访问、浏览器 API 权限和个人账号数据范围。角色权限不替代 Live Write、审批、Kill Switch、交易安全与执行门禁。
 
