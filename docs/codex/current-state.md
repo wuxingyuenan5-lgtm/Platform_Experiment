@@ -5,8 +5,8 @@ This is the sole repository authority for the current stable baseline, candidate
 ## Delivery
 
 - Stable baseline: Platform `0.10.0`, release commit `cf6030d53b3e9a759263455569503b6c7242174e`.
-- Current candidate target: Platform `0.10.1`.
-- The Platform 0.10.1 candidate scope includes non-UI governance convergence, browser access and Capability alignment, personal-account and risk-management boundaries, selective frontend product restoration, explicit `live`, `sample`, `unavailable` and `error` product-data states, and visual and browser acceptance.
+- Current candidate target: Platform `0.10.2`.
+- The Platform 0.10.2 candidate scope includes non-UI governance convergence, browser access and Capability alignment, personal-account and risk-management boundaries, selective frontend product restoration, explicit `live`, `sample`, `unavailable` and `error` product-data states, and visual and browser acceptance.
 - Candidate validation does not mean the candidate is released, deployed or production-ready.
 - Context Pack, `scripts/context-for.py`, `scripts/context-packs.json`, module `AGENTS.md` files and accepted context budgets remain frozen at their maintained design.
 
