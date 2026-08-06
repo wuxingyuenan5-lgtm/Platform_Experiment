@@ -76,11 +76,10 @@ test('export repository-configured formatting for restored sources', async ({
     stdio: 'inherit',
   });
 
-  const changedFiles = execFileSync(
-    'git',
-    ['diff', '--name-only', '--', ...existingTargetFiles],
-    { cwd: frontendRoot, encoding: 'utf8' },
-  )
+  const changedFiles = execFileSync('git', ['diff', '--name-only', '--', ...existingTargetFiles], {
+    cwd: frontendRoot,
+    encoding: 'utf8',
+  })
     .split(/\r?\n/)
     .filter(Boolean);
 
