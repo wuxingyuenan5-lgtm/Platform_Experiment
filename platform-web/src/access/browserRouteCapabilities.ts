@@ -1,27 +1,26 @@
 import type { PermissionRequirement } from '@/access/userAccess';
 import type { AppRouteRecordRaw } from '@/router/types';
 
-export const BROWSER_ROUTE_CAPABILITIES: Readonly<
-  Record<string, PermissionRequirement>
-> = Object.freeze({
-  '/home': 'dashboard.read',
-  '/hedge-board': 'research.read',
-  '/strategy': 'strategy.read',
-  '/finance': 'finance.read',
-  '/data': 'data.read',
-  '/monitor': 'monitor.read',
-  '/reports': 'reports.read',
-  '/news-calendar': 'news.read',
-  '/financial-ai': 'financial_ai.read',
-  '/settings': 'settings.read',
-  '/risk': 'risk.read',
-  '/risk/detail': 'risk.read',
-  '/risk/users': 'user.read',
-  '/risk/profile': 'profile.read_self',
-  '/users': 'user.read',
-  '/audit': 'audit:read',
-  '/account': 'profile.read_self',
-});
+export const BROWSER_ROUTE_CAPABILITIES: Readonly<Record<string, PermissionRequirement>> =
+  Object.freeze({
+    '/home': 'dashboard.read',
+    '/hedge-board': 'research.read',
+    '/strategy': 'strategy.read',
+    '/finance': 'finance.read',
+    '/data': 'data.read',
+    '/monitor': 'monitor.read',
+    '/reports': 'reports.read',
+    '/news-calendar': 'news.read',
+    '/financial-ai': 'financial_ai.read',
+    '/settings': 'settings.read',
+    '/risk': 'risk.read',
+    '/risk/detail': 'risk.read',
+    '/risk/users': 'user.read',
+    '/risk/profile': 'profile.read_self',
+    '/users': 'user.read',
+    '/audit': 'audit:read',
+    '/account': 'profile.read_self',
+  });
 
 function normalizeRoutePath(parentPath: string, routePath: string): string {
   if (routePath.startsWith('/')) return routePath.replace(/\/+$/, '') || '/';
@@ -49,9 +48,7 @@ function applyCapability(
   return {
     ...route,
     meta,
-    children: route.children?.map((child) =>
-      applyCapability(child, fullPath, capability),
-    ),
+    children: route.children?.map((child) => applyCapability(child, fullPath, capability)),
   } as AppRouteRecordRaw;
 }
 

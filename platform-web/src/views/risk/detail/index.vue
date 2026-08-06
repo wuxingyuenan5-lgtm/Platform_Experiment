@@ -451,8 +451,8 @@
       sourceStatus.finance = financeFailures
         ? 'unavailable'
         : accounts.value.length || ratioItems.value.length || totalAsset.value !== undefined
-          ? 'ready'
-          : 'no_data';
+        ? 'ready'
+        : 'no_data';
 
       if (healthResult.status === 'fulfilled') {
         health.value = healthResult.value;
@@ -479,8 +479,8 @@
         message: unavailable
           ? `${unavailable}个来源不可用；成功来源的事实仍单独保留`
           : ready
-            ? undefined
-            : '所有来源成功，但没有风控或账户事实',
+          ? undefined
+          : '所有来源成功，但没有风控或账户事实',
         degraded: unavailable > 0,
       };
     } finally {

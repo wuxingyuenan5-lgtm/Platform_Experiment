@@ -134,8 +134,7 @@ function createBindingComponent(
     props: {
       type: {
         type: String as unknown as PropType<ConfigPropType>,
-        validator: (value: string) =>
-          (Object.values(ConfigPropType) as string[]).includes(value),
+        validator: (value: string) => (Object.values(ConfigPropType) as string[]).includes(value),
         default: ConfigPropType.BIND,
       },
     },

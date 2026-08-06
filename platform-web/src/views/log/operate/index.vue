@@ -121,9 +121,9 @@
 
       let fileName = '操作日志';
       if (params.startTime && params.endTime) {
-        fileName += `_${params.startTime.replaceAll('-', '').split(' ')[0]}_${params.endTime
-          .replaceAll('-', '')
-          .split(' ')[0]}`;
+        fileName += `_${params.startTime.replaceAll('-', '').split(' ')[0]}_${
+          params.endTime.replaceAll('-', '').split(' ')[0]
+        }`;
       }
       downloadFile(response, fileName);
     } finally {

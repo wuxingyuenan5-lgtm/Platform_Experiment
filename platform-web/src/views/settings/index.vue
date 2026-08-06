@@ -50,7 +50,9 @@
                     <td>{{ item.name }}</td>
                     <td>{{ item.route }}</td>
                     <td>{{ item.target }}</td>
-                    <td><Tag :color="item.color">{{ item.status }}</Tag></td>
+                    <td
+                      ><Tag :color="item.color">{{ item.status }}</Tag></td
+                    >
                   </tr>
                 </tbody>
               </table>
@@ -62,7 +64,10 @@
       <section class="account-grid" aria-label="个人账号自助管理">
         <article v-for="item in accountServices" :key="item.title">
           <component :is="item.icon" />
-          <div><strong>{{ item.title }}</strong><p>{{ item.note }}</p></div>
+          <div
+            ><strong>{{ item.title }}</strong
+            ><p>{{ item.note }}</p></div
+          >
           <Button @click="openPersonalAccount">进入个人账号</Button>
         </article>
       </section>
