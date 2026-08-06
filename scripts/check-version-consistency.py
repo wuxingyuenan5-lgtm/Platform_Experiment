@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fail when current Platform release declarations drift from root VERSION."""
+"""Fail when maintained Platform candidate declarations drift from root VERSION."""
 
 from __future__ import annotations
 
@@ -16,9 +16,9 @@ FRONTEND_VERSION_FILES = (
 RUNTIME_VERSION_OWNER = "execution-runtime/app/version.py"
 RUNTIME_VERSION_DIRECTORY = "execution-runtime/app"
 CURRENT_DOCUMENTS = {
-    "current stable baseline": (
+    "current candidate target": (
         "docs/codex/current-state.md",
-        r"Stable baseline: Platform `([^`]+)`, release commit `[^`]+`\.",
+        r"Current candidate target: Platform `([^`]+)`\.",
     ),
 }
 MAINTAINED_VERSION_PATHS = (
@@ -58,7 +58,7 @@ def frontend_version(root: Path, path: str) -> str:
     content = read_text(root, path)
     match = re.search(r'VITE_GLOB_APP_VERSION\s*=\s*["\']([^"\']+)["\']', content)
     if match is None:
-        raise SystemExit(f"Frontend release version declaration is missing from {path}")
+        raise SystemExit(f"Frontend candidate version declaration is missing from {path}")
     return match.group(1)
 
 
@@ -108,7 +108,7 @@ def require_pattern_usage(root: Path, path: str, label: str, pattern: str) -> No
 def document_version(root: Path, path: str, pattern: str) -> str:
     match = re.search(pattern, read_text(root, path))
     if match is None:
-        raise SystemExit(f"Current version declaration is missing from {path}")
+        raise SystemExit(f"Current candidate version declaration is missing from {path}")
     return match.group(1)
 
 
@@ -196,7 +196,7 @@ def check_versions(root: Path = ROOT) -> None:
     if drift:
         details = ", ".join(f"{name}={value}" for name, value in sorted(drift.items()))
         raise SystemExit(f"Version drift from VERSION={expected}: {details}")
-    print(f"Maintained Platform release versions are consistent: {expected}")
+    print(f"Maintained Platform candidate versions are consistent: {expected}")
 
 
 def main() -> None:
