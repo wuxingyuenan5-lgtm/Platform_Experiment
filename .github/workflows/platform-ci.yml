@@ -72,6 +72,8 @@ jobs:
         working-directory: platform-web
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: pnpm/action-setup@v4
         with:
           version: 9.15.9
@@ -95,9 +97,13 @@ jobs:
         run: node scripts/test-restored-product-data.cjs
       - name: Test restored product fidelity
         run: node scripts/test-restoration-fidelity.cjs
+      - name: Test full typecheck diagnostic baseline
+        run: pnpm test:full-typecheck-baseline
       - name: Check frontend architecture boundaries
         run: pnpm test:codebase-boundaries
       - name: Type check full formal frontend
+        env:
+          PLATFORM_FULL_TYPECHECK_BASE_REF: ${{ github.event.pull_request.base.sha || 'origin/main' }}
         run: pnpm type:check:full
       - name: Type check strategy frontend
         run: pnpm type:check
