@@ -13,13 +13,16 @@ export interface FetchSetting {
 
 export interface BaseListProps extends ListProps {
   // 接口请求对象
-  api?: (...arg: any) => Promise<any>;
+  api?: (...arg: any[]) => Promise<any>;
   // 额外的请求参数
-  searchInfo?: any;
+  searchInfo?: Recordable;
   // 是否手动筛选
   isHandle?: boolean;
   beforeFetch?: Fn;
   afterFetch?: Fn;
+  sortFn?: Fn;
+  filterFn?: Fn;
+  defSort?: Recordable;
   // 请求接口配置
   fetchSetting?: Partial<FetchSetting>;
   // 是否显示loading动画

@@ -87,7 +87,9 @@
                   @click="goPath(item.path)"
                 >
                   <span class="row-icon"><component :is="iconMap[item.icon]" /></span>
-                  <span class="row-copy"><strong>{{ item.title }}</strong></span>
+                  <span class="row-copy"
+                    ><strong>{{ item.title }}</strong></span
+                  >
                   <svg viewBox="0 0 82 22" preserveAspectRatio="none" aria-hidden="true">
                     <polyline
                       :points="item.spark"

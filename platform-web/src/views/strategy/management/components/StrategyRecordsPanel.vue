@@ -56,8 +56,8 @@
     (event: 'update:activeTab', value: string): void;
   }>();
 
-  const table = computed<StrategyTableSection>(() =>
-    props.tables[props.activeTab] || { columns: [], rows: [] },
+  const table = computed<StrategyTableSection>(
+    () => props.tables[props.activeTab] || { columns: [], rows: [] },
   );
 </script>
 

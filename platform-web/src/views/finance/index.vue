@@ -106,6 +106,7 @@
     Table,
     Tag,
   } from 'ant-design-vue';
+  import type { ColumnsType } from 'ant-design-vue/es/table/interface';
   import Decimal from 'decimal.js';
   import { computed, onMounted, ref } from 'vue';
   import {
@@ -177,7 +178,7 @@
     latestUpdate.value ? formatToDateTime(latestUpdate.value) : '不可用',
   );
 
-  const ratioColumns = [
+  const ratioColumns: ColumnsType<ProductRatioItem> = [
     { title: '资产项', dataIndex: 'name', key: 'name' },
     { title: '金额 USD', key: 'value', align: 'right', width: 180 },
     { title: '占比', key: 'percent', width: 180 },

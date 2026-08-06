@@ -40,9 +40,7 @@ async function expectDataState(
   source: string,
 ): Promise<void> {
   await page.goto(absoluteUrl(route));
-  const surface = page
-    .locator(`[data-product-state="${state}"][data-actionable="false"]`)
-    .first();
+  const surface = page.locator(`[data-product-state="${state}"][data-actionable="false"]`).first();
   await expect(surface).toBeVisible({ timeout: 20_000 });
   await expect(surface.getByText(source, { exact: false }).first()).toBeVisible();
 }
@@ -80,8 +78,8 @@ test('restored formal product surfaces disclose state, source and non-actionabil
   await expect(page.getByTestId('strategy-capital-finance-board')).toBeVisible();
   await page.getByRole('button', { name: '订单信息', exact: true }).click();
   await expect(page.getByTestId('strategy-records-panel')).toBeVisible();
-  await expect(page.getByRole('button', { name: '启停策略' })).toBeDisabled();
-  await expect(page.getByRole('button', { name: '部署策略' })).toBeDisabled();
+  await expect(page.getByText('当前账号为只读权限', { exact: true })).toBeVisible();
+  await expect(page.locator('[data-write-action="true"]')).toHaveCount(0);
 
   await expectDataState(
     page,
@@ -130,7 +128,7 @@ test('restored formal product surfaces disclose state, source and non-actionabil
   await expect(page.getByTestId('wealth-original-structure')).toBeVisible();
   await expect(page.getByRole('button', { name: '不可申购' }).first()).toBeDisabled();
 
-  await page.goto(absoluteUrl('/settings/index'));
+  await page.goto(absoluteUrl('/settings/profile'));
   await expect(page.getByTestId('settings-original-structure')).toBeVisible();
   await expect(
     page.getByText('not-configured:settings-write-owner', { exact: false }),

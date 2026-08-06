@@ -171,3 +171,8 @@ test('sample data is isolated, accurately sourced and non-actionable', () => {
   const news = read('src/data/sample/news/index.ts');
   assert.equal(news.includes('sample:wealth-campaigns'), true);
 });
+
+test('the full TypeScript project continues to include formal route modules', () => {
+  const config = JSON.parse(read('tsconfig.full.json'));
+  assert.equal(config.include.includes('src/router/routes/modules/**/*.ts'), true);
+});

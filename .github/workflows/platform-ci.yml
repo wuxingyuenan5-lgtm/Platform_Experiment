@@ -95,6 +95,8 @@ jobs:
         run: node scripts/test-restored-product-data.cjs
       - name: Test restored product fidelity
         run: node scripts/test-restoration-fidelity.cjs
+      - name: Test personal security module contracts
+        run: pnpm test:security-modules
       - name: Check frontend architecture boundaries
         run: pnpm test:codebase-boundaries
       - name: Type check full formal frontend

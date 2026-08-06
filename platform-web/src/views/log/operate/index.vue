@@ -9,13 +9,9 @@
             placeholder="请选择用户名"
             style="width: 180px"
             show-search
-            :filter-option="
-              (input, option) => {
-                return option?.label.toLocaleLowerCase().includes(input?.toLocaleLowerCase());
-              }
-            "
+            :filter-option="filterAccountOption"
             :options="accountOptions"
-            allowClear
+            allow-clear
           />
         </div>
         <div class="flex items-center">
@@ -24,180 +20,124 @@
             v-model:value="searchInfo.operationModule"
             placeholder="请输入操作模块"
             style="width: 180px"
-            allowClear
+            allow-clear
           />
         </div>
         <div class="flex items-center">
           <div class="color-secondary">操作状态：</div>
           <Select
-            allowClear
             v-model:value="searchInfo.operationStatus"
+            allow-clear
             placeholder="请选择操作状态"
             style="width: 180px"
             :options="logStatusOptions"
-        /></div>
+          />
+        </div>
         <div class="flex items-center">
-          <RangePicker style="width: 250px" v-model:value="searchInfo.timeRange" />
+          <RangePicker v-model:value="searchInfo.timeRange" style="width: 250px" />
         </div>
         <Button type="primary" @click="reload()">查询</Button>
       </div>
       <div class="pb-2">
-        <Button type="primary" @click="handleClickExport">导出</Button>
+        <Button type="primary" :loading="exporting" @click="handleClickExport">导出</Button>
       </div>
     </div>
-    <BasicTable @register="registerTable" body-padding="">
-      <!-- <template #form-timeRange="{ model, field }">
-        <FormItem :labelCol="labelCol" :name="field" :label="t('account.timeRange')">
-          <RangePicker
-            :value="hackValue || model[field]"
-            @change="
-              (val) => {
-                model[field] = val;
-              }
-            "
-            @openChange="onOpenChange"
-            @calendarChange="onCalendarChange"
-            class="w-full"
-          />
-        </FormItem>
-      </template> -->
-      <!-- <template #form-advanceAfter>
-        <Button
-          :loading="loading"
-          type="primary"
-          @click="handleClickExport"
-          class="is-green min-w-15 ml-2"
-        >
-          <span>导出</span>
-        </Button>
-      </template> -->
-    </BasicTable>
+    <BasicTable @register="registerTable" body-padding="" />
   </SimpleContainer>
 </template>
+
 <script lang="ts" setup>
-  import { SimpleContainer, CollapseContainer } from '@/components/Container';
-
-  import { ref, computed, watch, reactive, onMounted } from 'vue';
-  import { BasicTable, useTable } from '@/components/Table';
-  import { getBasicColumns, setSchemas } from './data';
+  import type { Dayjs } from 'dayjs';
+  import { onMounted, reactive, ref } from 'vue';
+  import { Button, Input, RangePicker, Select } from 'ant-design-vue';
   import { getOperationLogs, postOperationLogs } from '@/api/quantSystem';
-  import { Select, FormItem, RangePicker, Cascader, Input, Button } from 'ant-design-vue';
-  // import { useSymbol, useUserInfo } from '@/utils/options/useBasicOptions';
-  import { Dayjs } from 'dayjs';
-  import { useMessage } from '@/hooks/web/useMessage';
-  import { useI18n } from '@/hooks/web/useI18n';
-  import { downloadFile } from '@/utils/file/download';
   import { getAccountList } from '@/api/sys/accountDirectory';
+  import { SimpleContainer } from '@/components/Container';
+  import { BasicTable, useTable } from '@/components/Table';
+  import { useMessage } from '@/hooks/web/useMessage';
+  import { downloadFile } from '@/utils/file/download';
   import { logStatusOptions } from '@/utils/options/basicOptions';
-
-  const { createMessage } = useMessage();
-
-  const searchInfo = reactive({
-    userId: undefined,
-    operationModule: undefined,
-    operationStatus: undefined,
-    timeRange: undefined,
-  });
-  const accountOptions = ref();
+  import { getBasicColumns } from './data';
 
   type RangeValue = [Dayjs, Dayjs];
-  const dates = ref<RangeValue>();
-  const hackValue = ref<RangeValue>();
-  const loading = ref(false);
 
-  const onOpenChange = (open: boolean) => {
-    if (open) {
-      dates.value = [] as any;
-      hackValue.value = [] as any;
-    } else {
-      hackValue.value = undefined;
-    }
-  };
+  interface OperationLogSearchInfo {
+    userId?: string;
+    operationModule?: string;
+    operationStatus?: string | number;
+    timeRange?: RangeValue;
+    startTime?: string;
+    endTime?: string;
+  }
 
-  const onCalendarChange = (val: RangeValue) => {
-    dates.value = val;
-  };
+  interface AccountOption {
+    label: string;
+    value: string;
+  }
 
-  const labelCol = { style: { width: '100px' } };
+  const { createMessage } = useMessage();
+  const exporting = ref(false);
+  const accountOptions = ref<AccountOption[]>([]);
+  const searchInfo = reactive<OperationLogSearchInfo>({});
 
-  const [registerTable, { reload, getForm }] = useTable({
+  const [registerTable, { reload }] = useTable({
     useSearchForm: false,
     size: 'small',
-    // formConfig: {
-    //   // labelWidth: 100,
-    //   actionColOptions: { span: 24 },
-    //   submitOnReset: false,
-    //   schemas: setSchemas(),
-    // },
     api: getOperationLogs,
-    beforeFetch: (params) => {
-      const _params = {
-        ...params,
-        ...searchInfo,
-      };
-
-      if (searchInfo?.timeRange?.length > 0) {
-        _params.startTime = searchInfo?.timeRange?.[0]?.format('YYYY-MM-DD') + ' ' + '00:00:00';
-        _params.endTime = searchInfo?.timeRange?.[1]?.format('YYYY-MM-DD') + ' ' + '23:59:59';
-      }
-      console.log('_params----', _params);
-
-      return _params;
-    },
+    beforeFetch: (params) => ({ ...params, ...buildRequestParams() }),
     columns: getBasicColumns(),
     showIndexColumn: false,
   });
 
-  function handleClickExport() {
-    loading.value = true;
-    const _params = {
-      ...searchInfo,
-    };
-    // const { getFieldsValue } = getForm();
-    // let _params = getFieldsValue();
-    if (_params.timeRange?.length > 0) {
-      _params.startTime = _params.timeRange[0].split(' ')[0] + ' ' + '00:00:00';
-      _params.endTime = _params.timeRange[1].split(' ')[0] + ' ' + '23:59:59';
-    }
+  function filterAccountOption(input: string, option?: AccountOption) {
+    return Boolean(option?.label.toLocaleLowerCase().includes(input.toLocaleLowerCase()));
+  }
 
-    postOperationLogs(_params)
-      .then((res) => {
-        if (res?.type == 'application/json') {
-          var reader = new FileReader();
-          reader.readAsText(res, 'utf-8');
-          reader.onload = function (e) {
-            const _res = JSON.parse(reader.result);
-            createMessage.error(_res?.msg || '操作失败！');
-          };
-        } else {
-          let _fileName = '操作日志';
-          if (_params.timeRange?.length > 0) {
-            _fileName +=
-              '_' +
-              _params.startTime.replaceAll('-', '').split(' ')?.[0] +
-              '_' +
-              _params.endTime.replaceAll('-', '').split(' ')?.[0];
-          }
-          downloadFile(res, _fileName);
-        }
-      })
-      .finally(() => {
-        loading.value = false;
-      });
+  function buildRequestParams(): OperationLogSearchInfo {
+    const params: OperationLogSearchInfo = {
+      userId: searchInfo.userId,
+      operationModule: searchInfo.operationModule,
+      operationStatus: searchInfo.operationStatus,
+    };
+    const range = searchInfo.timeRange;
+    if (range?.length === 2) {
+      params.startTime = `${range[0].format('YYYY-MM-DD')} 00:00:00`;
+      params.endTime = `${range[1].format('YYYY-MM-DD')} 23:59:59`;
+    }
+    return params;
   }
-  function getAccountListFn() {
-    getAccountList().then((res) => {
-      if (res.retCode == 0) {
-        accountOptions.value = res?.data?.map((item) => {
-          return {
-            label: item.name,
-            value: item.id,
-          };
-        });
+
+  async function handleClickExport() {
+    exporting.value = true;
+    const params = buildRequestParams();
+    try {
+      const response = await postOperationLogs(params);
+      if (response?.type === 'application/json') {
+        const text = await response.text();
+        const payload = JSON.parse(text || '{}') as { msg?: string };
+        createMessage.error(payload.msg || '操作失败！');
+        return;
       }
-    });
+
+      let fileName = '操作日志';
+      if (params.startTime && params.endTime) {
+        fileName += `_${params.startTime.replaceAll('-', '').split(' ')[0]}_${
+          params.endTime.replaceAll('-', '').split(' ')[0]
+        }`;
+      }
+      downloadFile(response, fileName);
+    } finally {
+      exporting.value = false;
+    }
   }
-  onMounted(() => {
-    getAccountListFn();
-  });
+
+  async function loadAccountOptions() {
+    const result = await getAccountList();
+    accountOptions.value = result.items.map((item) => ({
+      label: item.nickname || item.account,
+      value: item.id,
+    }));
+  }
+
+  onMounted(() => void loadAccountOptions());
 </script>

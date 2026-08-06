@@ -73,8 +73,8 @@
     width: 100%;
     height: 180px;
     border-radius: 12px;
-    background:
-      linear-gradient(to bottom, transparent 24%, #edf1f5 25%, transparent 26%) 0 0 / 100% 45px,
+    background: linear-gradient(to bottom, transparent 24%, #edf1f5 25%, transparent 26%) 0 0 / 100%
+        45px,
       #fafbfd;
   }
 </style>

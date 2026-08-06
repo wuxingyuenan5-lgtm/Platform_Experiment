@@ -1,23 +1,12 @@
-import {
-  computed,
-  unref,
-  ref,
-  watch,
-  reactive,
-  onMounted,
-  type ComputedRef,
-  type Ref,
-  watchEffect,
-  isRef,
-  toRaw,
-} from 'vue';
-import type { BaseTableProps, SorterResult, FetchParams } from '../types/type';
-import { isFunction } from '@/utils/is';
+import { computed, toRaw, unref, type ComputedRef } from 'vue';
 import { watchDebounced } from '@vueuse/core';
+import { isFunction } from '@/utils/is';
+import type { BaseListProps, FetchParams } from '../types/type';
+
 // 类似useTableForm
 export function useSearch(
-  propsRef: ComputedRef<BaseTableProps>,
-  fetch: (opt?: FetchParams | undefined) => Promise<Recordable<any>[] | undefined>,
+  propsRef: ComputedRef<BaseListProps>,
+  fetch: (opt?: FetchParams) => Promise<Recordable<any>[] | undefined>,
 ) {
   const searchInfo = computed(() => propsRef.value?.searchInfo);
   // 是否手动筛选
@@ -26,7 +15,7 @@ export function useSearch(
     searchInfo,
     (curV) => {
       if (!isHandle.value) {
-        handleSearchInfoChange(toRaw(curV));
+        handleSearchInfoChange(toRaw(curV || {}));
       }
     },
     { deep: true, debounce: 1000, maxWait: 3000 },
@@ -36,7 +25,7 @@ export function useSearch(
     if (handleSearchInfoFn && isFunction(handleSearchInfoFn)) {
       info = handleSearchInfoFn(info) || info;
     }
-    fetch({ pageIndex: 1 });
+    void fetch({ pageIndex: 1, searchInfo: info });
   }
   return {
     handleSearchInfoChange,

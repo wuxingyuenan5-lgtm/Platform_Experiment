@@ -1,9 +1,17 @@
 <template>
   <section class="curve-grid" data-testid="strategy-curve-grid">
     <article v-for="curve in curves" :key="curve.title">
-      <header><h2>{{ curve.title }}</h2><span>Sample</span></header>
+      <header
+        ><h2>{{ curve.title }}</h2
+        ><span>Sample</span></header
+      >
       <svg viewBox="0 0 320 120" preserveAspectRatio="none" role="img" :aria-label="curve.title">
-        <polyline :points="toPoints(curve.points)" fill="none" stroke="currentColor" stroke-width="3" />
+        <polyline
+          :points="toPoints(curve.points)"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="3"
+        />
       </svg>
     </article>
   </section>

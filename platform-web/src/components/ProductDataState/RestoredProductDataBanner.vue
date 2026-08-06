@@ -34,13 +34,14 @@
     },
   );
 
-  const stateLabel = computed(() =>
-    ({
-      live: '实时数据',
-      sample: '示例数据 · 非实时 · 不可执行',
-      unavailable: '数据源尚未配置',
-      error: '实时数据获取失败',
-    })[props.state],
+  const stateLabel = computed(
+    () =>
+      ({
+        live: '实时数据',
+        sample: '示例数据 · 非实时 · 不可执行',
+        unavailable: '数据源尚未配置',
+        error: '实时数据获取失败',
+      }[props.state]),
   );
 
   const messageText = computed(() => {
