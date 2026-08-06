@@ -33,7 +33,8 @@ const targetFiles = [
   'src/views/strategy/spread-carry/index.vue',
 ];
 
-test('export repository-configured formatting for restored sources', async ({}, testInfo) => {
+test('export repository-configured formatting for restored sources', async ({ browserName }, testInfo) => {
+  void browserName;
   const frontendRoot = path.resolve(__dirname, '../..');
   const archivePath = path.join(
     frontendRoot,
