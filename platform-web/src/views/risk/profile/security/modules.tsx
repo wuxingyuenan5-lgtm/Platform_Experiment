@@ -23,7 +23,6 @@ import { ConfigPropType } from './enums';
 
 const FormItem = Form.Item;
 const PasswordInput = Input.Password;
-const modalFooterButton = { class: 'w-74px !ml-4' };
 const labelCol = { style: { width: '94px' } };
 
 function resetWhenClosed(visible: Ref<boolean>, formRef: Ref<FormInstance | undefined>) {
@@ -120,8 +119,6 @@ export const Password = defineComponent({
         open={visible.value}
         width={574}
         class="modal-white-bg"
-        okButtonProps={modalFooterButton}
-        cancelButtonProps={modalFooterButton}
         confirmLoading={confirmLoading.value}
         onOk={handleOk}
         onCancel={handleCancel}
@@ -258,8 +255,6 @@ function createBindingComponent(config: BindingComponentConfig) {
           open={visible.value}
           width={574}
           class="modal-white-bg"
-          okButtonProps={modalFooterButton}
-          cancelButtonProps={modalFooterButton}
           confirmLoading={confirmLoading.value}
           onOk={handleOk}
           onCancel={handleCancel}
