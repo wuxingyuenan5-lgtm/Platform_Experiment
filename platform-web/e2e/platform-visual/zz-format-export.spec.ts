@@ -63,14 +63,21 @@ test('export repository-configured formatting for restored sources', async ({
 }, testInfo) => {
   void browserName;
   const frontendRoot = path.resolve(__dirname, '../..');
+  const repositoryRoot = path.resolve(frontendRoot, '..');
   const existingTargetFiles = targetFiles.filter((file) =>
     existsSync(path.join(frontendRoot, file)),
   );
   const artifactRoot = path.join(frontendRoot, 'test-results/platform-visual');
   const archivePath = path.join(artifactRoot, 'formatted-sources.tar.gz');
   const manifestPath = path.join(artifactRoot, 'formatted-sources.txt');
+  const treePath = path.join(artifactRoot, 'base-tree-sha.txt');
+  const baseTreeSha = execFileSync('git', ['rev-parse', 'HEAD^{tree}'], {
+    cwd: repositoryRoot,
+    encoding: 'utf8',
+  }).trim();
 
   expect(existingTargetFiles).toHaveLength(targetFiles.length);
+  expect(baseTreeSha).toMatch(/^[0-9a-f]{40}$/);
   execFileSync('pnpm', ['exec', 'prettier', '--write', ...existingTargetFiles], {
     cwd: frontendRoot,
     stdio: 'inherit',
@@ -86,8 +93,9 @@ test('export repository-configured formatting for restored sources', async ({
   expect(changedFiles.length).toBeGreaterThan(0);
   mkdirSync(artifactRoot, { recursive: true });
   writeFileSync(manifestPath, `${changedFiles.join('\n')}\n`);
+  writeFileSync(treePath, `${baseTreeSha}\n`);
   execFileSync('tar', ['-czf', archivePath, ...changedFiles], {
-    cwd: frontendRoot,
+    cwd: repositoryRoot,
     stdio: 'inherit',
   });
 
