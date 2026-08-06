@@ -1,8 +1,8 @@
 import { execFileSync } from 'node:child_process';
-import { mkdirSync } from 'node:fs';
+import { existsSync, mkdirSync } from 'node:fs';
 import path from 'node:path';
 
-import { test } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 
 const targetFiles = [
   'src/access/browserRouteCapabilities.ts',
@@ -38,18 +38,22 @@ test('export repository-configured formatting for restored sources', async ({
 }, testInfo) => {
   void browserName;
   const frontendRoot = path.resolve(__dirname, '../..');
+  const existingTargetFiles = targetFiles.filter((file) =>
+    existsSync(path.join(frontendRoot, file)),
+  );
   const archivePath = path.join(
     frontendRoot,
     'test-results/platform-visual/formatted-sources.tar.gz',
   );
 
-  execFileSync('pnpm', ['exec', 'prettier', '--write', ...targetFiles], {
+  expect(existingTargetFiles.length).toBeGreaterThan(0);
+  execFileSync('pnpm', ['exec', 'prettier', '--write', ...existingTargetFiles], {
     cwd: frontendRoot,
     stdio: 'inherit',
   });
 
   mkdirSync(path.dirname(archivePath), { recursive: true });
-  execFileSync('tar', ['-czf', archivePath, ...targetFiles], {
+  execFileSync('tar', ['-czf', archivePath, ...existingTargetFiles], {
     cwd: frontendRoot,
     stdio: 'inherit',
   });
