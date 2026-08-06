@@ -44,10 +44,7 @@ export type FeishuSubmitPayload = FeishuFormValues &
     action: 'feishu';
   };
 
-export type SecurityBindingPayload =
-  | PhoneSubmitPayload
-  | EmailSubmitPayload
-  | FeishuSubmitPayload;
+export type SecurityBindingPayload = PhoneSubmitPayload | EmailSubmitPayload | FeishuSubmitPayload;
 
 export function operationFromBindingType(type: SecurityBindingType): SecurityBindingOperation {
   return type === 1 ? 'change' : 'bind';
