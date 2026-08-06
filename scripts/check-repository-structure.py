@@ -138,7 +138,7 @@ def check_documents(errors: list[str]) -> None:
             "Stable baseline: Platform `0.10.0`",
             "Current candidate target: Platform `0.10.1`",
             "Platform Live Write and Runtime Live Write remain disabled by default",
-            "Frontend product restoration has not been executed",
+            "The Platform 0.10.1 candidate scope includes",
             "remain unverified",
             "must not be assumed",
         ):
