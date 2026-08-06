@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync } from 'node:fs';
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
 import { expect, test } from '@playwright/test';
@@ -66,10 +66,9 @@ test('export repository-configured formatting for restored sources', async ({
   const existingTargetFiles = targetFiles.filter((file) =>
     existsSync(path.join(frontendRoot, file)),
   );
-  const archivePath = path.join(
-    frontendRoot,
-    'test-results/platform-visual/formatted-sources.tar.gz',
-  );
+  const artifactRoot = path.join(frontendRoot, 'test-results/platform-visual');
+  const archivePath = path.join(artifactRoot, 'formatted-sources.tar.gz');
+  const manifestPath = path.join(artifactRoot, 'formatted-sources.txt');
 
   expect(existingTargetFiles).toHaveLength(targetFiles.length);
   execFileSync('pnpm', ['exec', 'prettier', '--write', ...existingTargetFiles], {
@@ -77,8 +76,18 @@ test('export repository-configured formatting for restored sources', async ({
     stdio: 'inherit',
   });
 
-  mkdirSync(path.dirname(archivePath), { recursive: true });
-  execFileSync('tar', ['-czf', archivePath, ...existingTargetFiles], {
+  const changedFiles = execFileSync(
+    'git',
+    ['diff', '--name-only', '--', ...existingTargetFiles],
+    { cwd: frontendRoot, encoding: 'utf8' },
+  )
+    .split(/\r?\n/)
+    .filter(Boolean);
+
+  expect(changedFiles.length).toBeGreaterThan(0);
+  mkdirSync(artifactRoot, { recursive: true });
+  writeFileSync(manifestPath, `${changedFiles.join('\n')}\n`);
+  execFileSync('tar', ['-czf', archivePath, ...changedFiles], {
     cwd: frontendRoot,
     stdio: 'inherit',
   });
