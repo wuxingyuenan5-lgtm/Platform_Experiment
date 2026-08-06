@@ -1,5 +1,5 @@
+import type { Component } from 'vue';
 import { computed, defineComponent, h, ref, toRaw, unref } from 'vue';
-import type { ListProps } from 'ant-design-vue';
 import { List } from 'ant-design-vue';
 import { isFunction } from '@/utils/is';
 import { useDataSource } from './hook/useDataSource';
@@ -8,6 +8,8 @@ import { usePagination } from './hook/usePagination';
 import { useSearch } from './hook/useSearch';
 import style from './index.module.less';
 import { baseListProps } from './props';
+
+const ListComponent: Component = List;
 
 export default defineComponent({
   props: baseListProps,
@@ -41,7 +43,7 @@ export default defineComponent({
       if (onChange && isFunction(onChange)) onChange(pagination, filters, sorter, extra);
     }
 
-    const getBindValues = computed<ListProps>(() => ({
+    const getBindValues = computed<Record<string, unknown>>(() => ({
       ...attrs,
       ...unref(getProps),
       loading: unref(getLoading),
@@ -51,6 +53,6 @@ export default defineComponent({
     }));
 
     expose({ fetch, listData });
-    return () => h(List, getBindValues.value, slots);
+    return () => h(ListComponent, getBindValues.value, slots);
   },
 });
