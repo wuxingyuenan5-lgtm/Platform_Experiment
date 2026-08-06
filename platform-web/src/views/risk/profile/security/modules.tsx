@@ -142,10 +142,7 @@ export const Password = defineComponent({
                 <PasswordInput v-model:value={formState.newPw1} placeholder="请输入新密码" />
               </FormItem>
               <FormItem name="newPw2" label="重复新密码">
-                <PasswordInput
-                  v-model:value={formState.newPw2}
-                  placeholder="请再次输入新密码"
-                />
+                <PasswordInput v-model:value={formState.newPw2} placeholder="请再次输入新密码" />
               </FormItem>
               <FormItem name="code" label="谷歌验证码">
                 <Input v-model:value={formState.code} placeholder="请输入验证码" />
