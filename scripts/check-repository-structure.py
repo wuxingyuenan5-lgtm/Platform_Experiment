@@ -132,13 +132,15 @@ def check_documents(errors: list[str]) -> None:
         if not (ROOT / relative).is_file():
             errors.append(f"{relative}: required active entrypoint is missing")
     current = ROOT / "docs/codex/current-state.md"
+    version_path = ROOT / "VERSION"
+    candidate_version = version_path.read_text(encoding="utf-8").strip()
     if current.is_file():
         source = current.read_text(encoding="utf-8")
         for anchor in (
             "Stable baseline: Platform `0.10.0`",
-            "Current candidate target: Platform `0.10.1`",
+            f"Current candidate target: Platform `{candidate_version}`",
             "Platform Live Write and Runtime Live Write remain disabled by default",
-            "The Platform 0.10.1 candidate scope includes",
+            f"The Platform {candidate_version} candidate scope includes",
             "remain unverified",
             "must not be assumed",
         ):
@@ -156,7 +158,6 @@ def check_documents(errors: list[str]) -> None:
         not in database.read_text(encoding="utf-8")
     ):
         errors.append("docs/database/README.md must register execution_risk_repository.py")
-
 
 
 def check_execution_risk_typecheck_scope(errors: list[str]) -> None:
