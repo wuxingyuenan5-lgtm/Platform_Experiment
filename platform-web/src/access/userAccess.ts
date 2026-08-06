@@ -1,7 +1,7 @@
 export type PermissionRequirement = string | string[];
 
 export function hasPermission(granted: readonly string[], permission: string): boolean {
-  return granted.includes(permission);
+  return granted.includes('*') || granted.includes(permission);
 }
 
 export function hasEveryPermission(

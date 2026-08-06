@@ -1,19 +1,24 @@
 import { defineStore } from 'pinia';
-import { Persistent } from '@/utils/cache/persistent';
 import { PROJ_CFG_KEY } from '@/enums/cacheEnum';
+import { Persistent } from '@/utils/cache/persistent';
 
 interface ProjectConfigState {
-  optionsMap: any;
+  optionsMap: Recordable;
   currentSymbolInfo: any;
   currentSymbolFutureInfo: any;
   currentSymbolMt5Info: any;
 }
+
+function readProjectConfig(): Partial<ProjectConfigState> {
+  return Persistent.getSession<ProjectConfigState>(PROJ_CFG_KEY) || {};
+}
+
 // 自定义项目配置
 export const useProjectConfigStore = defineStore({
   id: 'app-project-config',
   state: (): ProjectConfigState => ({
     // 下拉数据
-    optionsMap: null,
+    optionsMap: {},
     // 交易-当前标的信息
     currentSymbolInfo: null,
     // 交易-期货-当前标的信息
@@ -23,12 +28,11 @@ export const useProjectConfigStore = defineStore({
   }),
   getters: {
     getProjectConfig(state): ProjectConfigState {
-      return state || Persistent.getSession(PROJ_CFG_KEY) || ({} as ProjectConfigState);
+      return { ...state, ...readProjectConfig() } as ProjectConfigState;
     },
-    getOptionsMap(state): any {
-      const _mapSession = Persistent.getSession(PROJ_CFG_KEY)?.optionsMap || {};
-      const _map = state.optionsMap || {};
-      return { ..._mapSession, ..._map };
+    getOptionsMap(state): Recordable {
+      const sessionMap = readProjectConfig().optionsMap || {};
+      return { ...sessionMap, ...state.optionsMap };
     },
     getCurrentSymbolInfo(state): any {
       return state.currentSymbolInfo || this.getProjectConfig.currentSymbolInfo || null;
@@ -41,20 +45,20 @@ export const useProjectConfigStore = defineStore({
     },
   },
   actions: {
-    setOptionsMap(val: any) {
-      this.optionsMap = val ? val : {};
+    setOptionsMap(val: Recordable | null) {
+      this.optionsMap = val || {};
       Persistent.setSession(PROJ_CFG_KEY, this.$state as any, false, 60 * 60 * 1000);
     },
     setCurrentSymbolInfo(val: any) {
-      this.currentSymbolInfo = val ? val : null;
+      this.currentSymbolInfo = val || null;
       Persistent.setSession(PROJ_CFG_KEY, this.$state as any, true, 60 * 60 * 1000);
     },
     setCurrentSymbolFutureInfo(val: any) {
-      this.currentSymbolFutureInfo = val ? val : null;
+      this.currentSymbolFutureInfo = val || null;
       Persistent.setSession(PROJ_CFG_KEY, this.$state as any, true, 60 * 60 * 1000);
     },
     setCurrentSymbolMt5Info(val: any) {
-      this.currentSymbolMt5Info = val ? val : null;
+      this.currentSymbolMt5Info = val || null;
       Persistent.setSession(PROJ_CFG_KEY, this.$state as any, true, 60 * 60 * 1000);
     },
   },

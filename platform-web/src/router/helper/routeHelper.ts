@@ -60,10 +60,12 @@ export function transformObjToRoute<T = AppRouteModule>(routeList: AppRouteModul
         if (!route.name) {
           warn(`找不到菜单对应的name, 请检查数据!${JSON.stringify(route)}`);
         }
+        const parentTitle = route.meta?.title || String(route.name || route.path || 'Route');
         route.name = `${route.name}Parent`;
         route.path = '';
         route.meta = {
           ...(route.meta || {}),
+          title: parentTitle,
           single: true,
           affix: false,
         };

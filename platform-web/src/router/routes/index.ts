@@ -3,6 +3,7 @@ import type { AppRouteRecordRaw, AppRouteModule } from '@/router/types';
 import { PAGE_NOT_FOUND_ROUTE, REDIRECT_ROUTE } from '@/router/routes/basic';
 
 import { t } from '@/hooks/web/useI18n';
+import { applyBrowserRouteCapabilities } from '@/access/browserRouteCapabilities';
 import NotificationRoute from './modules/notification';
 // // import { stream } from 'exceljs';
 
@@ -16,7 +17,10 @@ Object.keys(modules).forEach((key) => {
   routeModuleList.push(...modList);
 });
 
-export const asyncRoutes = [PAGE_NOT_FOUND_ROUTE, ...routeModuleList];
+export const asyncRoutes = applyBrowserRouteCapabilities([
+  PAGE_NOT_FOUND_ROUTE,
+  ...routeModuleList,
+]);
 
 // 根路由
 export const RootRoute: AppRouteRecordRaw = {

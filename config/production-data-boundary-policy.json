@@ -51,37 +51,31 @@
   "explicit_unavailable_views": [
     {
       "path": "platform-web/src/views/dashboard/index.vue",
-      "required_markers": ["ProductNotConfiguredPanel", "not-configured: dashboard-market-aggregate"]
+      "required_markers": ["RestoredProductSurface", "@/data/sample/dashboard", "dashboard-original-structure"]
     },
     {
       "path": "platform-web/src/views/financialAi/index.vue",
-      "required_markers": ["ProductNotConfiguredPanel", "not-configured: financial-ai-provider"]
+      "required_markers": ["RestoredProductSurface", "not-configured:financial-ai-provider", ":actionable=\"false\""]
     },
     {
       "path": "platform-web/src/views/strategy/management/index.vue",
-      "required_markers": ["ProductNotConfiguredPanel", "not-configured: strategy-catalog-owner"]
+      "required_markers": ["RestoredProductSurface", "@/data/sample/strategy", "strategy-management-original-structure"]
     },
     {
       "path": "platform-web/src/views/strategy/funding-carry/index.vue",
-      "required_markers": [
-        "ProductNotConfiguredPanel",
-        "not-configured: funding-carry-provider-and-runtime-owner"
-      ]
+      "required_markers": ["RestoredProductSurface", "@/data/sample/funding", "funding-original-structure"]
     },
     {
       "path": "platform-web/src/views/strategy/spread-carry/index.vue",
-      "required_markers": ["ProductNotConfiguredPanel", "not-configured: spread-research-provider"]
+      "required_markers": ["RestoredProductSurface", "CrossVenueExecutionWorkspace", "@/data/sample/spread"]
     },
     {
       "path": "platform-web/src/views/newsCalendar/index.vue",
-      "required_markers": [
-        "not-configured: news-aggregation-provider",
-        "not-configured: wealth-campaign-provider"
-      ]
+      "required_markers": ["TradingView Economic Calendar", "@/data/sample/news", "news-calendar-original-structure"]
     },
     {
       "path": "platform-web/src/views/settings/index.vue",
-      "required_markers": ["not-configured: settings-write-owner"]
+      "required_markers": ["RestoredProductSurface", "not-configured:settings-write-owner", "进入个人账号"]
     }
   ]
 }

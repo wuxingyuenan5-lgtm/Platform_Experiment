@@ -33,75 +33,107 @@ async function loginEmployee(page: Page): Promise<void> {
   await expect(page).not.toHaveURL(/\/login(?:\?|$)/, { timeout: 20_000 });
 }
 
-async function expectUnavailableSource(
+async function expectDataState(
   page: Page,
   route: string,
-  title: string,
+  state: 'sample' | 'unavailable',
   source: string,
 ): Promise<void> {
   await page.goto(absoluteUrl(route));
-  await expect(page.getByText(title, { exact: true })).toBeVisible({ timeout: 20_000 });
-  await expect(page.getByText(source, { exact: false })).toBeVisible();
+  const surface = page.locator(`[data-product-state="${state}"][data-actionable="false"]`).first();
+  await expect(surface).toBeVisible({ timeout: 20_000 });
+  await expect(surface.getByText(source, { exact: false }).first()).toBeVisible();
 }
 
-test('formal product surfaces disclose data gaps instead of demo values', async ({ page }) => {
+test('restored formal product surfaces disclose state, source and non-actionability', async ({
+  page,
+}) => {
   await preparePage(page);
   await loginEmployee(page);
 
-  await expectUnavailableSource(
-    page,
-    '/home/index',
-    '全球市场概览尚未配置',
-    'not-configured: dashboard-market-aggregate',
-  );
+  await expectDataState(page, '/home/index', 'sample', 'sample:dashboard-restoration');
+  await expect(page.getByTestId('dashboard-original-structure')).toBeVisible();
+  for (const title of [
+    '全球市场概览',
+    '投资组合总览',
+    '市场脉搏',
+    '组合概览',
+    '策略概览',
+    '重要日历',
+  ]) {
+    await expect(page.getByText(title, { exact: true }).first()).toBeVisible();
+  }
+  await expect(page.getByText('实时数据', { exact: true })).toHaveCount(0);
 
-  await expectUnavailableSource(
-    page,
-    '/financial-ai/index',
-    '金融AI分析数据源尚未配置',
-    'not-configured: financial-ai-provider',
-  );
-  await expect(page.getByText('铜价情景概率', { exact: false })).toHaveCount(0);
-
-  await expectUnavailableSource(
+  await expectDataState(
     page,
     '/strategy/management',
-    '策略管理目录尚未配置',
-    'not-configured: strategy-catalog-owner',
+    'sample',
+    'sample:strategy-management-restoration',
   );
-  await expect(page.getByText('account_mt5_demo', { exact: false })).toHaveCount(0);
+  await expect(page.getByTestId('strategy-management-original-structure')).toBeVisible();
+  await expect(page.getByTestId('strategy-pnl-panel')).toBeVisible();
+  await page.getByRole('button', { name: '账户资金', exact: true }).click();
+  await expect(page.getByTestId('strategy-kpi-grid')).toBeVisible();
+  await expect(page.getByTestId('strategy-capital-finance-board')).toBeVisible();
+  await page.getByRole('button', { name: '订单信息', exact: true }).click();
+  await expect(page.getByTestId('strategy-records-panel')).toBeVisible();
+  await expect(page.getByText('当前账号为只读权限', { exact: true })).toBeVisible();
+  await expect(page.locator('[data-write-action="true"]')).toHaveCount(0);
 
-  await expectUnavailableSource(
+  await expectDataState(
     page,
     '/strategy/platform?desk=funding',
-    '资费与资金费率套利数据链尚未配置',
-    'not-configured: funding-carry-provider-and-runtime-owner',
+    'sample',
+    'sample:funding-carry-research',
   );
-  await expect(page.getByText('29.57%', { exact: false })).toHaveCount(0);
-  await expect(page.getByText('开仓成功', { exact: false })).toHaveCount(0);
+  await expect(page.getByTestId('funding-market-board')).toBeVisible();
+  await expect(page.getByTestId('funding-chart-panel')).toBeVisible();
+  await expect(page.getByTestId('funding-detail-panel')).toBeVisible();
+  await page.getByRole('button', { name: '交易执行', exact: true }).click();
+  await expect(page.getByTestId('funding-order-panel')).toBeVisible();
+  await expect(page.getByRole('button', { name: '提交组合订单' })).toBeDisabled();
 
-  await expectUnavailableSource(
+  await expectDataState(
     page,
     '/strategy/platform?desk=crossSpread',
-    '跨所价差研究数据链尚未配置',
-    'not-configured: spread-research-provider',
+    'sample',
+    'sample:spread-research',
   );
-  await expect(page.getByText('模拟持仓', { exact: false })).toHaveCount(0);
+  await expect(page.getByTestId('spread-analysis-workspace-header')).toBeVisible();
+  await expect(page.getByTestId('spread-analysis-overview')).toBeVisible();
+  await expect(page.getByTestId('spread-research-chart')).toBeVisible();
+  await expect(page.getByTestId('spread-statistics-section')).toBeVisible();
+  await page.getByRole('button', { name: '交易执行', exact: true }).click();
+  await expect(page.getByText('正式 CrossVenueExecutionWorkspace', { exact: true })).toBeVisible();
+  await expect(page.getByText('ACK/Fill 区分', { exact: false })).toBeVisible();
 
-  await expectUnavailableSource(
+  await expectDataState(
     page,
-    '/news-calendar/news',
-    '新闻聚合Provider尚未配置',
-    'not-configured: news-aggregation-provider',
+    '/financial-ai/index',
+    'unavailable',
+    'not-configured:financial-ai-provider',
   );
+  await expect(page.getByTestId('financial-ai-original-structure')).toBeVisible();
+  await expect(page.getByText('暂无模型结果', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: '运行分析' })).toBeDisabled();
+  await expect(page.getByText('模型运行成功', { exact: false })).toHaveCount(0);
 
-  await expectUnavailableSource(
-    page,
-    '/news-calendar/wealth',
-    '理财活动数据源尚未配置',
-    'not-configured: wealth-campaign-provider',
-  );
-  await expect(page.getByText('15.00%', { exact: true })).toHaveCount(0);
+  await expectDataState(page, '/news-calendar/news', 'sample', 'sample:news-digest');
+  await expect(page.getByRole('heading', { name: '新闻日历与理财' })).toBeVisible();
+  await expect(page.getByTestId('news-digest-original-structure')).toBeVisible();
+  await expect(page.getByText('非实时', { exact: true }).first()).toBeVisible();
+
+  await expectDataState(page, '/news-calendar/wealth', 'sample', 'sample:wealth-campaigns');
+  await expect(page.getByTestId('wealth-original-structure')).toBeVisible();
+  await expect(page.getByRole('button', { name: '不可申购' }).first()).toBeDisabled();
+
+  await page.goto(absoluteUrl('/settings/profile'));
+  await expect(page.getByTestId('settings-original-structure')).toBeVisible();
+  await expect(
+    page.getByText('not-configured:settings-write-owner', { exact: false }),
+  ).toBeVisible();
+  await expect(page.getByRole('button', { name: '保存（Owner未配置）' })).toBeDisabled();
 
   await page.goto(absoluteUrl('/notification/index'));
   await expect(page.getByRole('heading', { name: '消息通知' })).toBeVisible({ timeout: 20_000 });

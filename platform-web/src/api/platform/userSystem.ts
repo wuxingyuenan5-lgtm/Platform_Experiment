@@ -200,6 +200,11 @@ interface SessionMemoryMessage {
 }
 
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS', 'TRACE']);
+const AUTH_REFRESH_BYPASS_PATHS = new Set([
+  '/auth/login',
+  '/auth/register',
+  '/auth/reset-password',
+]);
 const SESSION_INVALIDATION_CODES = new Set([
   'invalid_session',
   'human_session_required',
@@ -221,6 +226,7 @@ const sessionMemoryChannel =
     : null;
 
 let csrfToken = '';
+let authenticationRefresh: Promise<AuthenticationState> | null = null;
 
 sessionMemoryChannel?.addEventListener('message', (event: MessageEvent<SessionMemoryMessage>) => {
   if (event.data?.type === 'csrf' && typeof event.data.value === 'string') {
@@ -308,7 +314,16 @@ client.interceptors.response.use(
   },
 );
 
+function shouldWaitForAuthenticationRefresh(config: AxiosRequestConfig): boolean {
+  const method = String(config.method || 'GET').toUpperCase();
+  const url = String(config.url || '').split('?')[0];
+  return !SAFE_METHODS.has(method) && !AUTH_REFRESH_BYPASS_PATHS.has(url);
+}
+
 async function request<T>(config: AxiosRequestConfig): Promise<T> {
+  if (authenticationRefresh && shouldWaitForAuthenticationRefresh(config)) {
+    await authenticationRefresh;
+  }
   const response = await client.request<T>(config);
   return response.data;
 }
@@ -332,8 +347,13 @@ export async function loginUser(username: string, password: string): Promise<Aut
 }
 
 export async function getCurrentAuthentication(): Promise<AuthenticationState> {
-  const state = await request<AuthenticationState>({ method: 'GET', url: '/auth/me' });
-  return acceptAuthenticationState(state);
+  if (authenticationRefresh) return authenticationRefresh;
+  authenticationRefresh = request<AuthenticationState>({ method: 'GET', url: '/auth/me' })
+    .then(acceptAuthenticationState)
+    .finally(() => {
+      authenticationRefresh = null;
+    });
+  return authenticationRefresh;
 }
 
 export async function logoutUser(): Promise<void> {

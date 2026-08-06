@@ -66,6 +66,11 @@
   import { useRoleAccess } from '@/hooks/web/useRoleAccess';
   import { useUserStore } from '@/store/modules/user';
 
+  interface SessionIdentity {
+    username?: string;
+    name?: string;
+  }
+
   const loading = ref(false);
   const health = ref<DataServiceHealth>({
     status: 'unknown',
@@ -81,8 +86,8 @@
   });
   const { roleLabel, roleColor } = useRoleAccess();
   const userStore = useUserStore();
-  const userInfo = computed(() => userStore.getUserInfo as Record<string, unknown>);
-  const authenticated = computed(() => Boolean(userInfo.value?.username || userInfo.value?.name));
+  const userInfo = computed<SessionIdentity>(() => userStore.getUserInfo as SessionIdentity);
+  const authenticated = computed(() => Boolean(userInfo.value.username || userInfo.value.name));
 
   async function loadHealth() {
     loading.value = true;

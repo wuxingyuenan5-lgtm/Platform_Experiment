@@ -89,8 +89,18 @@ jobs:
         run: node scripts/test-formal-route-manifest.cjs
       - name: Test browser access policy
         run: pnpm test:user-system
+      - name: Test transformed browser route capabilities
+        run: node scripts/test-browser-role-matrix.cjs
+      - name: Test restored product data states
+        run: node scripts/test-restored-product-data.cjs
+      - name: Test restored product fidelity
+        run: node scripts/test-restoration-fidelity.cjs
+      - name: Test personal security module contracts
+        run: pnpm test:security-modules
       - name: Check frontend architecture boundaries
         run: pnpm test:codebase-boundaries
+      - name: Type check full formal frontend
+        run: pnpm type:check:full
       - name: Type check strategy frontend
         run: pnpm type:check
       - name: Type check user-system frontend

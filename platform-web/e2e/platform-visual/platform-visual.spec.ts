@@ -21,7 +21,7 @@ interface VisualPage {
   key: string;
   route: string;
   marker: string;
-  markerKind?: 'heading' | 'text';
+  markerKind?: 'heading' | 'text' | 'testid';
   evidenceSource: string;
 }
 
@@ -31,7 +31,7 @@ const EMPLOYEE_PAGES: readonly VisualPage[] = [
     route: '/home/index',
     marker: '全球变量',
     markerKind: 'heading',
-    evidenceSource: 'static product content',
+    evidenceSource: 'reference dashboard structure with disclosed non-actionable sample state',
   },
   {
     key: 'research-macro',
@@ -50,21 +50,46 @@ const EMPLOYEE_PAGES: readonly VisualPage[] = [
   {
     key: 'strategy-funding',
     route: '/strategy/platform?desk=funding',
-    marker: '资费与资金费率套利数据链尚未配置',
-    evidenceSource:
-      'explicit not-configured product state; no Provider, Runtime or Live Write evidence',
+    marker: 'funding-original-structure',
+    markerKind: 'testid',
+    evidenceSource: 'reference funding market/chart/detail structure; sample writes disabled',
   },
   {
     key: 'strategy-cross-spread',
     route: '/strategy/platform?desk=crossSpread',
-    marker: '跨所价差',
-    evidenceSource: 'isolated Platform API and fake Runtime; Live Write disabled',
+    marker: '跨所价差研究',
+    markerKind: 'heading',
+    evidenceSource:
+      'reference spread research with current CrossVenue execution workspace retained',
   },
   {
     key: 'strategy-management',
     route: '/strategy/management',
-    marker: '策略管理',
-    evidenceSource: 'explicit not-configured product state; no strategy fixture data',
+    marker: 'strategy-management-original-structure',
+    markerKind: 'testid',
+    evidenceSource: 'reference strategy component system with employee write controls disabled',
+  },
+  {
+    key: 'financial-ai',
+    route: '/financial-ai/index',
+    marker: '研究辅助与情景推演中枢',
+    markerKind: 'heading',
+    evidenceSource: 'reference financial AI layout; Provider unavailable and no generated answer',
+  },
+  {
+    key: 'news-digest',
+    route: '/news-calendar/news',
+    marker: '新闻日历与理财',
+    markerKind: 'heading',
+    evidenceSource: 'reference news digest hierarchy with visible non-real-time sample state',
+  },
+  {
+    key: 'settings',
+    route: '/settings/profile',
+    marker: 'settings-original-structure',
+    markerKind: 'testid',
+    evidenceSource:
+      'reference settings layout; Session and health are live reads, writes unavailable',
   },
   {
     key: 'risk-detail',
@@ -78,24 +103,6 @@ const EMPLOYEE_PAGES: readonly VisualPage[] = [
     marker: '系统监控',
     evidenceSource: 'deterministic health fixture',
   },
-  {
-    key: 'finance-overview',
-    route: '/finance/index',
-    marker: '财务概览',
-    evidenceSource: 'deterministic operational projection fixture; not formal accounting evidence',
-  },
-  {
-    key: 'data-overview',
-    route: '/data/index',
-    marker: '数据管理',
-    evidenceSource: 'deterministic account and NAV chart fixture',
-  },
-  {
-    key: 'reports',
-    route: '/reports/index',
-    marker: '报表',
-    evidenceSource: 'deterministic risk and notification fixture',
-  },
 ];
 
 const CEO_PAGES: readonly VisualPage[] = [
@@ -103,7 +110,7 @@ const CEO_PAGES: readonly VisualPage[] = [
     key: 'user-management',
     route: '/risk/users',
     marker: '用户管理',
-    evidenceSource: 'isolated seeded CEO browser Session; no API-Key or Live Write authority',
+    evidenceSource: 'isolated seeded CEO browser Session; domain safety gates remain independent',
   },
 ];
 
@@ -174,10 +181,14 @@ async function openAuthenticatedPage(
 }
 
 async function waitForMarker(page: Page, definition: VisualPage): Promise<void> {
-  const marker =
-    definition.markerKind === 'heading'
-      ? page.getByRole('heading', { name: definition.marker }).first()
-      : page.getByText(definition.marker, { exact: false }).first();
+  let marker;
+  if (definition.markerKind === 'heading') {
+    marker = page.getByRole('heading', { name: definition.marker }).first();
+  } else if (definition.markerKind === 'testid') {
+    marker = page.getByTestId(definition.marker).first();
+  } else {
+    marker = page.getByText(definition.marker, { exact: false }).first();
+  }
   await expect(marker).toBeVisible({ timeout: 30_000 });
 }
 
@@ -191,7 +202,9 @@ async function stabilizePage(page: Page, dismissTransientOverlays: boolean): Pro
         transition-delay: 0s !important;
         caret-color: transparent !important;
       }
-      .ant-message, .ant-notification { pointer-events: none !important; }
+      .ant-message, .ant-notification {
+        pointer-events: none !important;
+      }
     `,
   });
   if (dismissTransientOverlays) {
@@ -235,8 +248,7 @@ async function capturePage(
   const directory = path.join(EVIDENCE_ROOT, viewport.name, role);
   fs.mkdirSync(directory, { recursive: true });
   const screenshotName = `${definition.key}.png`;
-  const screenshotPath = path.join(directory, screenshotName);
-  await page.screenshot({ path: screenshotPath, animations: 'disabled' });
+  await page.screenshot({ path: path.join(directory, screenshotName), animations: 'disabled' });
   fs.writeFileSync(
     path.join(directory, `${definition.key}.json`),
     JSON.stringify(
@@ -262,7 +274,6 @@ async function capturePage(
     ),
     'utf8',
   );
-
   expect(pageOverflowPx).toBeLessThanOrEqual(1);
 }
 

@@ -11,6 +11,17 @@ This document owns current code and data responsibilities. It records present au
 | Platform–Runtime contract | both `runtime_contracts.py` modules and `docs/contracts/runtime-v1.json` | silent incompatible changes |
 | Frontend API boundary | `platform-web/src/api/platform/` | database access or authorization policy |
 
+## Browser access and restored product presentation
+
+| Boundary | Owner | Must not own |
+|---|---|---|
+| Human browser role capability registry | `platform-api/app/user_permissions.py`, `platform-api/app/user_authority.py` | page-local role invention or API-Key role conversion |
+| Browser route capability transformation and route/menu access | `platform-web/src/access/browserRouteCapabilities.ts`, `platform-web/src/access/userAccess.ts`, `platform-web/src/router/routes/index.ts` | backend authorization decisions or data-scope enforcement |
+| Product data envelope and restored state presentation | `platform-web/src/data/productDataEnvelope.ts`, `platform-web/src/components/ProductDataState/`, `platform-web/src/data/sample/` | fabricated provider success or authoritative realtime market facts |
+| Personal-security form and payload contracts | `platform-web/src/views/risk/profile/security/contracts.ts`, `platform-web/src/views/risk/profile/security/modules.tsx` | parent persistence, provider completion or synthetic success responses |
+
+Frontend owners present and transform capabilities but do not own backend authorization decisions. Menu hiding is not a security authorization boundary. The sample-data directory does not own realtime market facts. Personal-security child components must not fabricate parent persistence or provider success.
+
 ## Execution risk
 
 | Boundary | Owner | Responsibility |

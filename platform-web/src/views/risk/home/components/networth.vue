@@ -6,9 +6,9 @@
       </div>
       <div class="h-388px">
         <Spin :spinning="loading">
-          <div ref="chartRef" :style="{ width, height: height }">
+          <div ref="chartRef" :style="{ width, height }">
             <div
-              v-if="!record || record?.length == 0"
+              v-if="!record || record.length === 0"
               class="flex items-center justify-center h-full"
             >
               <Empty :image="Empty.PRESENTED_IMAGE_SIMPLE" />
@@ -19,26 +19,25 @@
     </div>
   </SimpleContainer>
 </template>
+
 <script lang="tsx" setup>
-  import { SimpleContainer } from '@/components/Container';
   import type { PropType, Ref } from 'vue';
-  import { watch, ref, reactive, toRaw, onMounted } from 'vue';
+  import { ref } from 'vue';
+  import { Empty, Segmented, Spin } from 'ant-design-vue';
+  import { watchDebounced } from '@vueuse/shared';
+  import { getProductNavProductRatio } from '@/api/data/product';
+  import { SimpleContainer } from '@/components/Container';
   import { useECharts } from '@/hooks/web/useECharts';
-  import { Empty, Spin, Segmented } from 'ant-design-vue';
   import { formateNumStr } from '@/utils/formate';
   import { unitOptions } from '@/utils/options/basicOptions';
-  import { getProductNavProductRatio } from '@/api/data/product';
-  import { watchDebounced } from '@vueuse/shared';
 
-  const props = defineProps({
-    // record: {
-    //   type: Object,
-    //   default: () => {},
-    // },
-    // loading: {
-    //   type: Boolean,
-    //   default: false,
-    // },
+  interface NetWorthChartRow {
+    name: string;
+    value: string;
+    percent: string | number;
+  }
+
+  defineProps({
     width: {
       type: String as PropType<string>,
       default: '100%',
@@ -48,12 +47,17 @@
       default: '364px',
     },
   });
-  const record = ref();
-  // 当前单位
+
+  const record = ref<NetWorthChartRow[]>([]);
   const curUnit = ref('USD');
   const chartRef = ref<HTMLDivElement | null>(null);
-  const { setOptions, getInstance } = useECharts(chartRef as Ref<HTMLDivElement>);
+  const { setOptions } = useECharts(chartRef as Ref<HTMLDivElement>);
   const loading = ref(false);
+
+  function chartRow(params: any): NetWorthChartRow | undefined {
+    return Array.isArray(params) ? params[0]?.data : params?.data;
+  }
+
   function initData() {
     setOptions({
       dataset: { source: record.value },
@@ -66,17 +70,14 @@
         itemGap: 36,
       },
       tooltip: {
-        formatter: function (params) {
-          // console.log(params);
-
-          const _data = params?.data;
+        formatter: (params: any) => {
+          const data = chartRow(params);
           return `<div class='text-xs'>
-                <div class='color-secondary'>${_data?.name}</div>
+                <div class='color-secondary'>${data?.name || ''}</div>
                 <div class='border-bottom my-2'></div>
-                <div>净值：${formateNumStr(_data?.value, { decimals: 2, keepZero: true })}</div>
-                <div>占比：${((_data?.percent || 0) * 100).toFixed(2)}%</div>
-                </div>
-                `;
+                <div>净值：${formateNumStr(data?.value, { decimals: 2, keepZero: true })}</div>
+                <div>占比：${(Number(data?.percent || 0) * 100).toFixed(2)}%</div>
+                </div>`;
         },
       },
       series: [
@@ -87,9 +88,9 @@
           color: ['#F55458', '#5BB86F'],
           label: {
             show: true,
-            formatter: function (params) {
-              // console.log(params);
-              return `${params?.data?.name}\n${formateNumStr(params?.data?.value, {
+            formatter: (params: any) => {
+              const data = chartRow(params);
+              return `${data?.name || ''}\n${formateNumStr(data?.value, {
                 decimals: 2,
                 keepZero: true,
               })}`;
@@ -102,35 +103,29 @@
       ],
     });
   }
-  function getProductNavProductRatioFn() {
+
+  async function loadProductRatio() {
     loading.value = true;
-    getProductNavProductRatio()
-      .then((res: any) => {
-        if (res.retCode == 0) {
-          const _total = res.data.reduce((pre: any, cur: any) => {
-            const _val = curUnit.value == 'USD' ? cur.valueUSD : cur.value;
-            return pre + _val;
-          }, 0);
-          record.value = res.data?.map((item: any) => {
-            let _val = curUnit.value == 'USD' ? item.valueUSD : item.value;
-            return {
-              name: item.name,
-              value: _val.toFixed(2),
-              percent: _total ? (_val / _total).toFixed(4) : 0,
-            };
-          });
-          initData();
-        }
-      })
-      .finally(() => {
-        loading.value = false;
+    try {
+      const response: any = await getProductNavProductRatio();
+      if (response.retCode !== 0) return;
+      const total = response.data.reduce((sum: number, item: any) => {
+        const value = curUnit.value === 'USD' ? item.valueUSD : item.value;
+        return sum + Number(value || 0);
+      }, 0);
+      record.value = response.data.map((item: any) => {
+        const value = Number(curUnit.value === 'USD' ? item.valueUSD : item.value);
+        return {
+          name: item.name,
+          value: value.toFixed(2),
+          percent: total ? (value / total).toFixed(4) : 0,
+        };
       });
+      initData();
+    } finally {
+      loading.value = false;
+    }
   }
-  watchDebounced(
-    () => curUnit.value,
-    () => {
-      getProductNavProductRatioFn();
-    },
-    { immediate: true },
-  );
+
+  watchDebounced(curUnit, () => void loadProductRatio(), { immediate: true });
 </script>

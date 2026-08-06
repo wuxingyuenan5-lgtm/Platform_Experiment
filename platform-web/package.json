@@ -1,6 +1,6 @@
 {
   "name": "vg-platform-web",
-  "version": "0.10.0",
+  "version": "0.10.2",
   "private": true,
   "description": "Platform research, trading, risk, identity, portfolio and reconciliation web application",
   "homepage": "https://github.com/wuxingyuenan5-lgtm/Platform_Experiment",
@@ -40,9 +40,10 @@
     "test:gzip": "npx http-server dist --cors --gzip -c-1",
     "test:hedge-board-layout": "node scripts/verify-hedge-board-layout.cjs",
     "test:homepage-layout": "node scripts/verify-homepage-layout.cjs",
+    "test:security-modules": "node --test scripts/test-security-modules.cjs",
     "test:user-system": "node scripts/test-user-system-access.cjs",
     "type:check": "vue-tsc -p tsconfig.strategy.json --noEmit --skipLibCheck",
-    "type:check:full": "vue-tsc -p tsconfig.full.json --noEmit --skipLibCheck",
+    "type:check:full": "vue-tsc -p tsconfig.full.json --noEmit",
     "test:codebase-boundaries": "node scripts/check-codebase-boundaries.cjs"
   },
   "lint-staged": {

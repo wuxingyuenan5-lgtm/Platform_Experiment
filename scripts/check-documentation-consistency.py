@@ -22,6 +22,13 @@ REQUIRED_ENTRYPOINTS = (
     "docs/engineering/GIT_WORKFLOW.md",
     "docs/contracts/README.md",
 )
+CANDIDATE_AUTHORITY_PATHS = (
+    "docs/codex/current-state.md",
+    "docs/technical/AUTH_RBAC_LIVE_SESSIONS.md",
+    "docs/product/PLATFORM_0_10_2_FRONTEND_ACCESS_MATRIX.md",
+    "docs/product/ACCEPTANCE_CRITERIA.md",
+    "docs/architecture/OWNERSHIP.md",
+)
 EXCLUDED_PARTS = frozenset(
     {
         ".git",
@@ -56,6 +63,23 @@ CURRENT_LEGACY_STATUS = re.compile(
     r"(?:当前阶段|实施计划|适用版本|^#).*?(?:Platform\s+V6|Production\s+Gate|0\.9\.\d+.*Phase|Phase\s*[0-9])",
     re.IGNORECASE,
 )
+ACTIVE_STATUS_PATTERN = re.compile(
+    r"^(?:状态：`active`|Status:\s*active)\s*$",
+    re.IGNORECASE | re.MULTILINE,
+)
+DRAFT_PR_STATUS_PATTERN = re.compile(
+    r"状态[^\n]*(?:frozen\s+for\s+)?Draft\s+PR\s*#\d+[^\n]*(?:acceptance)?",
+    re.IGNORECASE,
+)
+CURRENT_STATE_STALE_MARKERS = (
+    "Frontend product restoration has not been executed",
+    "remains outside the current non-UI scope",
+)
+CURRENT_STATE_SCOPE_REQUIREMENTS = (
+    ("browser access", "浏览器权限", "浏览器访问"),
+    ("frontend product restoration", "product restoration", "前端产品恢复", "前端恢复"),
+)
+AUTH_CONTRACT_PATH = "docs/technical/AUTH_RBAC_LIVE_SESSIONS.md"
 WORKSTATION_PATH_PATTERNS = (
     (
         "Windows user profile",
@@ -87,6 +111,17 @@ def markdown_without_examples(content: str) -> str:
     return HTML_COMMENT_PATTERN.sub("", FENCED_CODE_PATTERN.sub("", content))
 
 
+def candidate_version(root: Path) -> str:
+    version_path = root / "VERSION"
+    if not version_path.is_file():
+        return ""
+    return version_path.read_text(encoding="utf-8").strip()
+
+
+def candidate_authority_paths(root: Path) -> list[Path]:
+    return [root / relative for relative in CANDIDATE_AUTHORITY_PATHS]
+
+
 def is_active_authority(root: Path, path: Path, content: str) -> bool:
     relative = path.relative_to(root).as_posix()
     if relative.startswith("platform-web/docs/archive/"):
@@ -94,7 +129,7 @@ def is_active_authority(root: Path, path: Path, content: str) -> bool:
     if relative in REQUIRED_ENTRYPOINTS:
         return True
     header = "\n".join(content.splitlines()[:20])
-    return "状态：`active`" in header or "Status: active" in header
+    return ACTIVE_STATUS_PATTERN.search(header) is not None
 
 
 def markdown_link_target(raw_target: str) -> str | None:
@@ -196,6 +231,51 @@ def validate_active_status(root: Path, active_paths: Iterable[Path]) -> list[str
     return sorted(errors)
 
 
+def validate_candidate_documentation(
+    root: Path,
+    paths: Iterable[Path] | None = None,
+) -> list[str]:
+    errors: list[str] = []
+    version = candidate_version(root)
+    if not version:
+        errors.append("VERSION is missing or empty for candidate documentation validation")
+
+    candidate_paths = list(paths) if paths is not None else candidate_authority_paths(root)
+    for source in candidate_paths:
+        if not source.is_file():
+            errors.append(
+                "candidate documentation authority is missing: "
+                f"{source.relative_to(root).as_posix()}"
+            )
+
+    current_path = root / "docs/codex/current-state.md"
+    current = current_path.read_text(encoding="utf-8") if current_path.is_file() else ""
+    for marker in CURRENT_STATE_STALE_MARKERS:
+        if marker in current:
+            errors.append(f"docs/codex/current-state.md contains stale candidate status: {marker}")
+    current_folded = current.casefold()
+    for alternatives in CURRENT_STATE_SCOPE_REQUIREMENTS:
+        if not any(alternative.casefold() in current_folded for alternative in alternatives):
+            errors.append(
+                f"docs/codex/current-state.md must describe Platform {version} candidate scope: "
+                + " or ".join(alternatives)
+            )
+
+    auth_path = root / AUTH_CONTRACT_PATH
+    if auth_path.is_file() and "verification pending" in auth_path.read_text(encoding="utf-8").casefold():
+        errors.append(f"{AUTH_CONTRACT_PATH} contains stale verification status: verification pending")
+
+    for source in sorted(path for path in candidate_paths if path.is_file()):
+        relative = source.relative_to(root).as_posix()
+        content = markdown_without_examples(source.read_text(encoding="utf-8"))
+        for line_number, line in enumerate(content.splitlines(), start=1):
+            if DRAFT_PR_STATUS_PATTERN.search(line):
+                errors.append(
+                    f"{relative}:{line_number}: candidate status must not persist a Draft PR number"
+                )
+    return sorted(set(errors))
+
+
 def validate_portable_documentation(root: Path, paths: Iterable[Path]) -> list[str]:
     errors: list[str] = []
     for source in sorted(paths):
@@ -227,12 +307,13 @@ def validate_entrypoints(root: Path) -> list[str]:
 
 def validate_current_authority(root: Path) -> list[str]:
     current = (root / "docs/codex/current-state.md").read_text(encoding="utf-8")
+    version = candidate_version(root)
     errors: list[str] = []
     required = (
         "Stable baseline: Platform `0.10.0`",
-        "Current candidate target: Platform `0.10.1`",
+        f"Current candidate target: Platform `{version}`",
         "Platform Live Write and Runtime Live Write remain disabled by default",
-        "Frontend product restoration has not been executed",
+        "Candidate validation does not mean the candidate is released, deployed or production-ready",
         "remain unverified",
         "must not be assumed",
         "具体活动分支、HEAD和PR状态属于易变Git/GitHub事实",
@@ -265,6 +346,7 @@ def validate_repository(root: Path) -> list[str]:
     return sorted(
         validate_entrypoints(root)
         + validate_current_authority(root)
+        + validate_candidate_documentation(root)
         + validate_markdown_links(root, all_paths)
         + validate_backticked_paths(root, active_paths)
         + validate_active_status(root, active_paths)
