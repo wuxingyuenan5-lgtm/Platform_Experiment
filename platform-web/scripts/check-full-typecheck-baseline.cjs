@@ -35,15 +35,17 @@ function resolveBaseRef() {
   }
   const mergeBase = run('git', ['merge-base', 'origin/main', 'HEAD']);
   if (mergeBase.status !== 0 || !mergeBase.output.trim()) {
-    throw new Error('Unable to resolve the full typecheck base ref. Fetch origin/main or set PLATFORM_FULL_TYPECHECK_BASE_REF.');
+    throw new Error(
+      'Unable to resolve the full typecheck base ref. Fetch origin/main or set PLATFORM_FULL_TYPECHECK_BASE_REF.',
+    );
   }
   return mergeBase.output.trim();
 }
 
-function collectDiagnostics(cwd, configPath) {
+function collectDiagnostics(cwd, configPath, diagnosticRepoRoot) {
   const result = run(vueTscBin, ['-p', configPath, '--noEmit', '--pretty', 'false'], { cwd });
   return {
-    diagnostics: parseDiagnostics(result.output, cwd, repoRoot),
+    diagnostics: parseDiagnostics(result.output, cwd, diagnosticRepoRoot),
     output: result.output,
     status: result.status,
   };
@@ -75,18 +77,34 @@ function printDiagnostics(title, diagnostics) {
   diagnostics.forEach((diagnostic) => console.error(formatDiagnostic(diagnostic)));
 }
 
+function assertParseableFailure(result, label) {
+  if (result.status !== 0 && result.diagnostics.length === 0) {
+    console.error(result.output);
+    throw new Error(`${label} failed without parseable TypeScript diagnostics.`);
+  }
+}
+
 function main() {
   if (!fs.existsSync(vueTscBin)) {
     throw new Error('vue-tsc is not installed. Run pnpm install --frozen-lockfile first.');
   }
 
   const baseRef = resolveBaseRef();
-  const current = collectDiagnostics(webRoot, 'tsconfig.full.json');
+  const current = collectDiagnostics(webRoot, 'tsconfig.full.json', repoRoot);
+  assertParseableFailure(current, 'Head full typecheck');
+
   const temporaryRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'platform-full-typecheck-'));
   let worktreeAdded = false;
 
   try {
-    const addWorktree = run('git', ['worktree', 'add', '--detach', '--quiet', temporaryRoot, baseRef]);
+    const addWorktree = run('git', [
+      'worktree',
+      'add',
+      '--detach',
+      '--quiet',
+      temporaryRoot,
+      baseRef,
+    ]);
     if (addWorktree.status !== 0) {
       throw new Error(`Unable to create base worktree:\n${addWorktree.output}`);
     }
@@ -100,7 +118,9 @@ function main() {
     linkIfPresent(path.join(repoRoot, 'node_modules'), path.join(temporaryRoot, 'node_modules'));
     linkIfPresent(path.join(webRoot, 'node_modules'), path.join(baseWebRoot, 'node_modules'));
 
-    const baseline = collectDiagnostics(baseWebRoot, baseConfigPath);
+    const baseline = collectDiagnostics(baseWebRoot, baseConfigPath, temporaryRoot);
+    assertParseableFailure(baseline, 'Base full typecheck');
+
     const changedFiles = changedFilesSince(baseRef);
     const changedFileDiagnostics = findChangedFileDiagnostics(
       current.diagnostics,
@@ -123,12 +143,6 @@ function main() {
 
     if (changedFileDiagnostics.length > 0 || newDiagnostics.length > 0) {
       process.exitCode = 1;
-      return;
-    }
-
-    if (current.status !== 0 && current.diagnostics.length === 0) {
-      console.error(current.output);
-      throw new Error('Full typecheck failed without parseable TypeScript diagnostics.');
     }
   } finally {
     if (worktreeAdded) {
