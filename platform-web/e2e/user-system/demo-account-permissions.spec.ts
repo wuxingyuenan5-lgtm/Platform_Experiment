@@ -69,12 +69,12 @@ test('all eight reusable accounts keep self account access and obey risk, URL an
         await account.page.goto(absoluteUrl('/home/index'));
         if (expected.role === 'member') {
           await expect(account.page.getByText(/个人账号|我的资产/).first()).toBeVisible();
-          await expect(account.page.getByText('风险管理', { exact: true })).toHaveCount(0);
+          await expect(account.page.getByText('风控管理', { exact: true })).toHaveCount(0);
           await expect(account.page.getByText('用户管理', { exact: true })).toHaveCount(0);
         } else {
           await expect(account.page.getByRole('heading', { name: '全球变量' })).toBeVisible();
           await expect(account.page.getByText('个人账号', { exact: true }).first()).toBeVisible();
-          await expect(account.page.getByText('风险管理', { exact: true }).first()).toBeVisible();
+          await expect(account.page.getByText('风控管理', { exact: true }).first()).toBeVisible();
         }
 
         await account.page.goto(absoluteUrl('/strategy/management'));
