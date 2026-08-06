@@ -5,7 +5,7 @@
 用户系统架构：`USER_SYSTEM_TECHNICAL_ARCHITECTURE.md`
 产品与验收基线：`../product/PRD.md`、`../product/ACCEPTANCE_CRITERIA.md`
 浏览器访问合同：[Browser Access and Product Data](../contracts/BROWSER_ACCESS_AND_PRODUCT_DATA.md)
-角色权限矩阵：[Platform 0.10.1 前端访问权限矩阵](../product/PLATFORM_0_10_1_FRONTEND_ACCESS_MATRIX.md)
+角色权限矩阵：[Platform 0.10.2 前端访问权限矩阵](../product/PLATFORM_0_10_2_FRONTEND_ACCESS_MATRIX.md)
 
 ## 1. 两类 Session 不是同一概念
 
