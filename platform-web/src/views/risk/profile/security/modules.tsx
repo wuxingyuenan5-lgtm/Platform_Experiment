@@ -37,7 +37,7 @@ function readString(values: Record<string, unknown>, field: string): string {
   return typeof value === 'string' ? value : '';
 }
 
-function isConfigPropType(value: ConfigPropType): boolean {
+function isConfigPropType(value: unknown): boolean {
   return value === ConfigPropType.BIND || value === ConfigPropType.CHANGE;
 }
 
