@@ -5,10 +5,20 @@
         <button type="button" class="market-terminal__toolbar-btn" @click="toggleEditMode">
           {{ editMode ? '完成编辑' : '编辑标的' }}
         </button>
-        <button v-if="editMode" type="button" class="market-terminal__toolbar-btn" @click="openAddForm">
+        <button
+          v-if="editMode"
+          type="button"
+          class="market-terminal__toolbar-btn"
+          @click="openAddForm"
+        >
           添加标的
         </button>
-        <button v-if="editMode && hasSavedOverrides" type="button" class="market-terminal__toolbar-btn is-danger" @click="resetGroups">
+        <button
+          v-if="editMode && hasSavedOverrides"
+          type="button"
+          class="market-terminal__toolbar-btn is-danger"
+          @click="resetGroups"
+        >
           恢复默认
         </button>
       </div>
@@ -36,12 +46,20 @@
 
         <label class="market-terminal__editor-field">
           <span>代码</span>
-          <input v-model.trim="addForm.symbol" type="text" placeholder="例如：BTCUSD / SPY / 000300" />
+          <input
+            v-model.trim="addForm.symbol"
+            type="text"
+            placeholder="例如：BTCUSD / SPY / 000300"
+          />
         </label>
 
         <label class="market-terminal__editor-field market-terminal__editor-field--wide">
           <span>TradingView 代码</span>
-          <input v-model.trim="addForm.tvSymbol" type="text" placeholder="例如：COINBASE:BTCUSD，可留空" />
+          <input
+            v-model.trim="addForm.tvSymbol"
+            type="text"
+            placeholder="例如：COINBASE:BTCUSD，可留空"
+          />
         </label>
       </div>
 
@@ -79,11 +97,17 @@
             <tr class="market-terminal__group-row">
               <td :colspan="columns.length">
                 <div class="market-terminal__group-meta">
-                  <button type="button" class="market-terminal__group-toggle" @click="toggleGroup(group.label)">
+                  <button
+                    type="button"
+                    class="market-terminal__group-toggle"
+                    @click="toggleGroup(group.label)"
+                  >
                     <span>{{ isGroupExpanded(group.label) ? '▼' : '▶' }}</span>
                     {{ group.label }}
                   </button>
-                  <span v-if="editMode" class="market-terminal__group-count">{{ group.rows.length }} 项</span>
+                  <span v-if="editMode" class="market-terminal__group-count"
+                    >{{ group.rows.length }} 项</span
+                  >
                 </div>
               </td>
             </tr>
@@ -111,13 +135,25 @@
                 </div>
 
                 <div v-if="editMode" class="market-terminal__row-tools">
-                  <button type="button" class="market-terminal__row-tool" @click="moveRow(group.label, row.id, 'up')">
+                  <button
+                    type="button"
+                    class="market-terminal__row-tool"
+                    @click="moveRow(group.label, row.id, 'up')"
+                  >
                     上移
                   </button>
-                  <button type="button" class="market-terminal__row-tool" @click="moveRow(group.label, row.id, 'down')">
+                  <button
+                    type="button"
+                    class="market-terminal__row-tool"
+                    @click="moveRow(group.label, row.id, 'down')"
+                  >
                     下移
                   </button>
-                  <button type="button" class="market-terminal__row-tool is-danger" @click="removeRow(group.label, row.id)">
+                  <button
+                    type="button"
+                    class="market-terminal__row-tool is-danger"
+                    @click="removeRow(group.label, row.id)"
+                  >
                     删除
                   </button>
                 </div>
@@ -130,26 +166,56 @@
                   class="market-terminal__spark-button"
                   @click="openTickerChart(row.symbol, row.name, row.tvSymbol)"
                 >
-                  <svg class="market-terminal__sparkline" viewBox="0 0 96 24" preserveAspectRatio="none">
-                    <polyline :points="compactSparkline(row.spark, 96, 24)" :class="sparkStrokeClass(row.d1)" />
+                  <svg
+                    class="market-terminal__sparkline"
+                    viewBox="0 0 96 24"
+                    preserveAspectRatio="none"
+                  >
+                    <polyline
+                      :points="compactSparkline(row.spark, 96, 24)"
+                      :class="sparkStrokeClass(row.d1)"
+                    />
                   </svg>
                 </button>
-                <svg v-else class="market-terminal__sparkline" viewBox="0 0 96 24" preserveAspectRatio="none">
-                  <polyline :points="compactSparkline(row.spark, 96, 24)" :class="sparkStrokeClass(row.d1)" />
+                <svg
+                  v-else
+                  class="market-terminal__sparkline"
+                  viewBox="0 0 96 24"
+                  preserveAspectRatio="none"
+                >
+                  <polyline
+                    :points="compactSparkline(row.spark, 96, 24)"
+                    :class="sparkStrokeClass(row.d1)"
+                  />
                 </svg>
               </td>
 
               <td class="is-right">{{ row.price }}</td>
-              <td class="is-center"><span class="market-chip" :class="chipTone(row.d1)">{{ row.d1 }}</span></td>
-              <td class="is-center"><span class="market-chip" :class="chipTone(row.ytd)">{{ row.ytd }}</span></td>
-              <td class="is-center"><span class="market-chip" :class="chipTone(row.qtd)">{{ row.qtd }}</span></td>
-              <td class="is-center"><span class="market-chip" :class="chipTone(row.w1)">{{ row.w1 }}</span></td>
-              <td class="is-center"><span class="market-chip" :class="chipTone(row.m1)">{{ row.m1 }}</span></td>
-              <td class="is-center"><span class="market-chip" :class="chipTone(row.y1)">{{ row.y1 }}</span></td>
+              <td class="is-center"
+                ><span class="market-chip" :class="chipTone(row.d1)">{{ row.d1 }}</span></td
+              >
+              <td class="is-center"
+                ><span class="market-chip" :class="chipTone(row.ytd)">{{ row.ytd }}</span></td
+              >
+              <td class="is-center"
+                ><span class="market-chip" :class="chipTone(row.qtd)">{{ row.qtd }}</span></td
+              >
+              <td class="is-center"
+                ><span class="market-chip" :class="chipTone(row.w1)">{{ row.w1 }}</span></td
+              >
+              <td class="is-center"
+                ><span class="market-chip" :class="chipTone(row.m1)">{{ row.m1 }}</span></td
+              >
+              <td class="is-center"
+                ><span class="market-chip" :class="chipTone(row.y1)">{{ row.y1 }}</span></td
+              >
               <td class="market-terminal__high-cell-td">
                 <div class="market-terminal__high-cell">
                   <div class="market-terminal__high-track">
-                    <i :style="{ width: `${highWidth(row.high)}%` }" :class="sparkStrokeClass(row.high)" />
+                    <i
+                      :style="{ width: `${highWidth(row.high)}%` }"
+                      :class="sparkStrokeClass(row.high)"
+                    ></i>
                   </div>
                   <span :class="toneClass(parseTone(row.high))">{{ row.high }}</span>
                 </div>
@@ -168,7 +234,10 @@
       </table>
     </div>
 
-    <section v-if="rotationButtonLabel && rotationHeatmap?.length" class="market-terminal__rotation">
+    <section
+      v-if="rotationButtonLabel && rotationHeatmap?.length"
+      class="market-terminal__rotation"
+    >
       <button type="button" class="market-terminal__rotation-button" @click="toggleRotation">
         <span>{{ rotationExpanded ? '▼' : '▶' }}</span>
         {{ rotationButtonLabel }}
@@ -220,14 +289,22 @@
     </section>
 
     <Teleport to="body">
-      <div v-if="chartModal.visible" class="market-terminal-chart-modal" @click.self="closeTickerChart">
+      <div
+        v-if="chartModal.visible"
+        class="market-terminal-chart-modal"
+        @click.self="closeTickerChart"
+      >
         <div class="market-terminal-chart-modal__dialog">
           <div class="market-terminal-chart-modal__header">
             <div>
               <p class="market-terminal-chart-modal__eyebrow">{{ chartModal.symbol }}</p>
               <h3>{{ chartModal.name || chartModal.symbol }} 走势图</h3>
             </div>
-            <button type="button" class="market-terminal-chart-modal__close" @click="closeTickerChart">
+            <button
+              type="button"
+              class="market-terminal-chart-modal__close"
+              @click="closeTickerChart"
+            >
               关闭
             </button>
           </div>
@@ -243,7 +320,7 @@
               ref="chartContainerRef"
               class="market-terminal-chart-modal__widget"
               :class="{ 'is-hidden': chartModal.loading }"
-            />
+            ></div>
           </div>
         </div>
       </div>
@@ -347,7 +424,13 @@
     const rows = [...props.rotationHeatmap];
     const state = rotationSortState.value;
     if (!state) return rows;
-    return rows.sort((left, right) => compareValues(readRotationValue(left, state.key), readRotationValue(right, state.key), state.direction));
+    return rows.sort((left, right) =>
+      compareValues(
+        readRotationValue(left, state.key),
+        readRotationValue(right, state.key),
+        state.direction,
+      ),
+    );
   });
 
   watch(
@@ -362,7 +445,9 @@
     const fallbackGroups = cloneGroups(props.groups);
     const savedGroups = readSavedGroups();
     editableGroups.value = savedGroups ?? fallbackGroups;
-    expandedGroups.value = Object.fromEntries(editableGroups.value.map((group) => [group.label, true]));
+    expandedGroups.value = Object.fromEntries(
+      editableGroups.value.map((group) => [group.label, true]),
+    );
     if (!addForm.value.groupLabel) {
       addForm.value.groupLabel = editableGroups.value[0]?.label || '';
     }
@@ -395,15 +480,23 @@
     if (!group || typeof group.label !== 'string' || !Array.isArray(group.rows)) return null;
     return {
       label: group.label,
-      rows: group.rows.map((row: any, index: number) => normalizeRow(group.label, row, index)).filter(Boolean) as TerminalTableRow[],
+      rows: group.rows
+        .map((row: any, index: number) => normalizeRow(group.label, row, index))
+        .filter(Boolean) as TerminalTableRow[],
     };
   }
 
   function normalizeRow(groupLabel: string, row: any, index: number): TerminalTableRow | null {
     if (!row || typeof row.name !== 'string' || typeof row.symbol !== 'string') return null;
-    const spark = Array.isArray(row.spark) && row.spark.length ? row.spark.map(Number) : buildPlaceholderSpark(row.symbol, index);
+    const spark =
+      Array.isArray(row.spark) && row.spark.length
+        ? row.spark.map(Number)
+        : buildPlaceholderSpark(row.symbol, index);
     return {
-      id: typeof row.id === 'string' ? row.id : `${props.marketId}-${groupLabel}-${row.symbol}-${index}`,
+      id:
+        typeof row.id === 'string'
+          ? row.id
+          : `${props.marketId}-${groupLabel}-${row.symbol}-${index}`,
       name: row.name,
       symbol: row.symbol,
       tvSymbol: typeof row.tvSymbol === 'string' ? row.tvSymbol : '',
@@ -510,7 +603,9 @@
       window.localStorage.removeItem(storageKey.value);
     }
     editableGroups.value = cloneGroups(props.groups);
-    expandedGroups.value = Object.fromEntries(editableGroups.value.map((group) => [group.label, true]));
+    expandedGroups.value = Object.fromEntries(
+      editableGroups.value.map((group) => [group.label, true]),
+    );
     addFormVisible.value = false;
   }
 
@@ -561,7 +656,13 @@
     const rows = [...group.rows];
     const state = tableSortState.value;
     if (!state) return rows;
-    return rows.sort((left, right) => compareValues(readTableValue(left, state.key), readTableValue(right, state.key), state.direction));
+    return rows.sort((left, right) =>
+      compareValues(
+        readTableValue(left, state.key),
+        readTableValue(right, state.key),
+        state.direction,
+      ),
+    );
   }
 
   function isSortableColumn(key: string) {
@@ -573,8 +674,10 @@
     if (key === 'symbol') return row.symbol;
     if (key === 'price') return parseDisplayNumber(row.price);
     if (key === 'high') return parseDisplayNumber(row.high);
-    if (['d1', 'ytd', 'qtd', 'w1', 'm1', 'y1'].includes(key)) return parseDisplayNumber(row[key as keyof TerminalTableRow] as string);
-    if (['d10', 'd20', 'd50', 'd200', 'x2050'].includes(key)) return arrowScore(row[key as keyof TerminalTableRow] as string);
+    if (['d1', 'ytd', 'qtd', 'w1', 'm1', 'y1'].includes(key))
+      return parseDisplayNumber(row[key as keyof TerminalTableRow] as string);
+    if (['d10', 'd20', 'd50', 'd200', 'x2050'].includes(key))
+      return arrowScore(row[key as keyof TerminalTableRow] as string);
     return String(row[key as keyof TerminalTableRow] ?? '');
   }
 
@@ -624,7 +727,10 @@
   }
 
   function heatmapClass(value: string) {
-    return ['market-terminal__rotation-cell', parseTone(value) === 'negative' ? 'is-negative-cell' : 'is-positive-cell'];
+    return [
+      'market-terminal__rotation-cell',
+      parseTone(value) === 'negative' ? 'is-negative-cell' : 'is-positive-cell',
+    ];
   }
 
   function alignClass(align?: 'left' | 'right' | 'center') {
@@ -640,14 +746,16 @@
     return series
       .map((value, index) => {
         const x = (index / Math.max(series.length - 1, 1)) * width;
-        const y = max === min ? height / 2 : height - 1 - ((value - min) / (max - min)) * (height - 2);
+        const y =
+          max === min ? height / 2 : height - 1 - ((value - min) / (max - min)) * (height - 2);
         return `${x.toFixed(1)},${y.toFixed(1)}`;
       })
       .join(' ');
   }
 
   function buildPlaceholderSpark(seed: string, offset: number) {
-    const base = Array.from(seed).reduce((total, char) => total + char.charCodeAt(0), 0) + offset * 3;
+    const base =
+      Array.from(seed).reduce((total, char) => total + char.charCodeAt(0), 0) + offset * 3;
     return Array.from({ length: 24 }, (_, index) => 10 + ((base + index * 7) % 12));
   }
 

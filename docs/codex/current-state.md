@@ -4,21 +4,24 @@ This is the sole repository authority for the current stable baseline, candidate
 
 ## Delivery
 
-- Stable baseline: Platform `0.10.2`, main promotion commit `e2400cb14c3c0355adf77ccefcf29262c21cade4`.
-- No active repository candidate is declared.
-- Platform 0.10.2 includes the non-UI governance convergence, browser access and Capability alignment, personal-account and risk-management boundaries, selective frontend product restoration, explicit `live`, `sample`, `unavailable` and `error` product-data states, and visual and browser acceptance completed through PR #156.
+- Stable baseline: Platform `0.10.3`.
+- Current candidate target: Platform `0.10.4`.
+- Platform 0.10.3 is the owner-accepted functional-restoration release. It includes the restored product pages, public copy cleanup, Axios URL hardening, browser access route verification, Capability alignment and documentation authority cleanup.
+- The Platform 0.10.4 candidate scope includes Windows local lifecycle governance and regression hardening without reopening the accepted product restoration; implementation is not yet authorized.
+- Candidate validation does not mean the candidate is released, deployed or production-ready.
+- Platform 0.10.3 acceptance does not prove external deployment or production readiness.
 - Main promotion does not by itself prove deployment, external production readiness, provider connectivity or Live Write authorization.
 - Context Pack, `scripts/context-for.py`, `scripts/context-packs.json`, module `AGENTS.md` files and accepted context budgets remain the maintained AI-context design.
-
-具体活动分支、HEAD和PR状态属于易变Git/GitHub事实，执行时应通过git和GitHub读取，不由长期Markdown充当权威。
+- Concrete active branch, HEAD and PR state are volatile Git/GitHub facts. Read them from Git and GitHub at execution time instead of treating long-lived Markdown as authority.
 
 ## Safety and contracts
 
 - Platform Live Write and Runtime Live Write remain disabled by default.
 - Kill Switch, two-person approval, idempotency, Decimal precision and `result_unknown` semantics remain protected.
 - Public Execution Risk API paths and request/response schemas remain compatible.
+- Cross-venue spread execution continues to use the restored new-version safety implementation.
 - The Execution Risk module split does not change database schema or persisted data meaning.
-- No service, database, queue, event bus or dependency-injection framework was introduced by Platform 0.10.2.
+- No service, database, queue, event bus or dependency-injection framework was introduced by the 0.10.3 release.
 - Controlled live acceptance follows `../operations/LIVE_ACCEPTANCE_RUNBOOK.md`; normal build, validation, merge or deployment validation never authorizes live writes.
 
 ## External-state limits
@@ -36,8 +39,11 @@ Deployment configuration must fail clearly when required neutral variables are a
 
 ## Known limits and next decisions
 
-- Some Dashboard aggregates, the strategy catalog and financial-AI providers remain unconfigured.
-- Affected pages use explicitly disclosed, non-actionable `sample` or `unavailable` states instead of presenting fabricated live results.
+- The restored product pages use the new architecture to carry the accepted legacy product content, layout hierarchy and primary interactions. Fonts and small spacing follow the newer frontend conventions.
+- Product-data metadata remains internal. Ordinary product UI uses concise business state language and does not expose Provider, Owner, source, `actionable`, static-design or architecture explanations.
+- Risk detail is available as a formal page. The global risk message strip and notification center currently have no available backend message source, so they display empty business states and must later be restored only through Capability or explicit service configuration rather than unconditional polling.
+- Windows local multi-service start/stop lifecycle governance is deferred to the next development stage and is not part of this release gate.
+- External data sources, broker connectivity, production hosts, databases, credentials and real production connections remain unproven without separate operator evidence.
 - External deployment, domains, databases, credentials and provider state are not proven by CI.
 - Production expansion in funds, quantity, symbols or automation requires completion of the controlled live-acceptance and end-of-day reconciliation sequence.
 - Further optimization should focus on measured AI execution cost, bounded task context, selective frontend-template simplification and removal of proven unused code rather than another unbounded architecture rewrite.

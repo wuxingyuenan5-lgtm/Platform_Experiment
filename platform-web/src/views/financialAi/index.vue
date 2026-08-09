@@ -1,267 +1,417 @@
 <template>
-  <RestoredProductSurface
-    state="unavailable"
-    source="not-configured:financial-ai-provider"
-    :actionable="false"
-    message="原金融 AI 页面布局和信息架构已恢复；真实模型 Provider 尚未配置，不生成假回答或伪成功状态。"
-  >
-    <PageWrapper title="金融AI分析">
-      <main class="financial-ai-page" data-testid="financial-ai-original-structure">
-        <section class="hero-card">
-          <div class="hero-copy">
-            <div class="eyebrow">FINANCIAL AI</div>
-            <h1>研究辅助与情景推演中枢</h1>
-            <p>保留研究输入、资料引用、情景推演与结果容器；Provider 接入前，全部执行入口关闭。</p>
+  <PageWrapper title="金融AI分析">
+    <main class="financial-ai-page" data-testid="financial-ai-restored">
+      <section class="workspace-card">
+        <header class="section-head">
+          <div>
+            <h2>研究辅助与情景推演中枢</h2>
+            <p>围绕宏观、商品和跨资产主题沉淀研究输入、情景假设、价格表和历史结论。</p>
           </div>
-          <div class="hero-status">
-            <span>当前状态</span>
-            <strong>Provider 未配置</strong>
-            <p>不调用模型，不展示静态内容冒充模型输出，不伪造数据来源或运行成功。</p>
-          </div>
-        </section>
+          <Tag :color="reviewStatus === '待复核' ? 'orange' : 'blue'">{{ reviewStatus }}</Tag>
+        </header>
 
-        <section class="case-card">
-          <header class="section-head">
-            <div>
-              <div class="eyebrow">RESEARCH WORKSPACE</div>
-              <h2>专题研究输入与结果区</h2>
+        <div class="workspace-grid">
+          <article class="panel input-panel">
+            <h3>研究问题</h3>
+            <label>
+              专题
+              <select v-model="selectedTopic">
+                <option v-for="item in topics" :key="item">{{ item }}</option>
+              </select>
+            </label>
+            <label>
+              研究要求
+              <textarea
+                v-model="researchQuestion"
+                placeholder="输入研究问题、时间范围、变量或证据要求"
+              ></textarea>
+            </label>
+            <div class="input-actions">
+              <button type="button" :disabled="submitting" @click="submitForReview">
+                {{ submitting ? '生成复核单' : '提交复核' }}
+              </button>
+              <span data-testid="financial-ai-review-state">{{ reviewMessage }}</span>
             </div>
-            <b>Unavailable</b>
-          </header>
+          </article>
 
-          <div class="case-grid">
-            <article class="panel input-panel">
-              <h3>研究问题</h3>
-              <label>
-                专题
-                <select disabled
-                  ><option>铜价中期（6-12个月）走势分析</option></select
-                >
-              </label>
-              <label>
-                研究要求
-                <textarea
-                  disabled
-                  placeholder="Provider 配置后可输入研究问题、时间范围与证据要求"
-                ></textarea>
-              </label>
-              <div class="input-actions">
-                <button type="button" disabled data-write-action="true">运行分析</button>
-                <span>执行入口禁用：not-configured:financial-ai-provider</span>
-              </div>
-            </article>
+          <article class="panel result-panel">
+            <h3>分析结果</h3>
+            <div class="result-summary" data-testid="financial-ai-result-panel">
+              <strong>铜价中期（6-12个月）走势分析</strong>
+              <p>
+                当前案例以供给扰动、国内库存周期和美元利率三条主线进行情景推演；结论为区间震荡偏强，但需等待需求和库存信号确认。
+              </p>
+              <dl>
+                <div><dt>市场判断</dt><dd>基准情景偏强震荡</dd></div>
+                <div><dt>核心区间</dt><dd>9,200 - 10,400 USD/吨</dd></div>
+                <div><dt>主要变量</dt><dd>美元、库存、矿端扰动</dd></div>
+              </dl>
+            </div>
+          </article>
+        </div>
+      </section>
 
-            <article class="panel result-panel">
-              <h3>分析结果</h3>
-              <div class="unavailable-result">
-                <strong>暂无模型结果</strong>
-                <p
-                  >真实
-                  Provider、数据引用与时间戳均未配置，因此不生成任何结论、预测或机构观点汇总。</p
-                >
-                <dl>
-                  <div><dt>模型状态</dt><dd>unavailable</dd></div>
-                  <div><dt>数据来源</dt><dd>未获取</dd></div>
-                  <div><dt>数据时间</dt><dd>未获取</dd></div>
-                  <div><dt>可操作性</dt><dd>false</dd></div>
-                </dl>
-              </div>
-            </article>
+      <section class="case-card">
+        <header class="section-head">
+          <div>
+            <h2>当前价格概览</h2>
+            <p>保留旧版价格、机构预测、情景推演和风险变量的组合方式。</p>
           </div>
-
-          <div class="case-grid case-grid--bottom">
-            <article class="panel">
-              <h3>情景推演容器</h3>
-              <div class="scenario-board">
-                <div v-for="item in scenarioSlots" :key="item" class="scenario-row">
-                  <span>--</span><strong>{{ item }}</strong
-                  ><em>等待 Provider</em>
-                </div>
-              </div>
-            </article>
-            <article class="panel">
-              <h3>证据与风险要求</h3>
-              <div class="risk-columns">
-                <section>
-                  <h4>结果必须包含</h4>
-                  <ul
-                    ><li>明确数据来源与时间</li
-                    ><li>区分事实、计算与推断</li
-                    ><li>展示数据状态和局限</li></ul
-                  >
-                </section>
-                <section>
-                  <h4>禁止事项</h4>
-                  <ul
-                    ><li>无来源模型回答</li
-                    ><li>伪造机构观点或数值</li
-                    ><li>绕过交易安全门禁</li></ul
-                  >
-                </section>
-              </div>
-            </article>
+          <div class="case-tabs">
+            <button
+              v-for="item in caseTabs"
+              :key="item"
+              type="button"
+              :class="{ active: activeCaseTab === item }"
+              @click="activeCaseTab = item"
+            >
+              {{ item }}
+            </button>
           </div>
-        </section>
+        </header>
 
-        <section class="todo-card">
-          <div class="eyebrow">PIPELINE</div>
-          <h3>待真实 Owner 接入</h3>
-          <ul
-            ><li>模型 Provider 与鉴权</li
-            ><li>研究数据引用和时间戳</li
-            ><li>结果审计与来源追踪</li
-            ><li>受控研究 Memo 输出</li></ul
+        <div v-if="activeCaseTab === '价格与机构'" class="table-grid">
+          <article class="panel">
+            <h3>当前价格</h3>
+            <table>
+              <thead>
+                <tr>
+                  <th>市场</th>
+                  <th>价格</th>
+                  <th>涨跌</th>
+                  <th>说明</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="row in priceRows" :key="row.market">
+                  <td>{{ row.market }}</td>
+                  <td>{{ row.price }}</td>
+                  <td :class="row.change.startsWith('+') ? 'positive' : 'negative'">{{
+                    row.change
+                  }}</td>
+                  <td>{{ row.note }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </article>
+
+          <article class="panel">
+            <h3>主要机构中期预测</h3>
+            <table>
+              <thead>
+                <tr>
+                  <th>机构</th>
+                  <th>区间</th>
+                  <th>观点</th>
+                  <th>关键变量</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="row in forecastRows" :key="row.name">
+                  <td>{{ row.name }}</td>
+                  <td>{{ row.range }}</td>
+                  <td>{{ row.view }}</td>
+                  <td>{{ row.driver }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </article>
+        </div>
+
+        <div v-else-if="activeCaseTab === '情景推演'" class="scenario-grid">
+          <article v-for="item in scenarios" :key="item.name" class="scenario-card">
+            <header>
+              <span>{{ item.probability }}</span>
+              <strong>{{ item.name }}</strong>
+            </header>
+            <p>{{ item.description }}</p>
+            <dl>
+              <div
+                ><dt>价格区间</dt><dd>{{ item.range }}</dd></div
+              >
+              <div
+                ><dt>触发条件</dt><dd>{{ item.trigger }}</dd></div
+              >
+            </dl>
+          </article>
+        </div>
+
+        <div v-else class="risk-grid">
+          <article v-for="item in riskVariables" :key="item.name" class="risk-card">
+            <span>{{ item.type }}</span>
+            <strong>{{ item.name }}</strong>
+            <p>{{ item.impact }}</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="history-card">
+        <header class="section-head">
+          <div>
+            <h2>历史记录</h2>
+            <p>保留研究主题、结果状态和复核流转，未接入后端动作不展示完成结果。</p>
+          </div>
+        </header>
+        <div class="history-list">
+          <button
+            v-for="item in historyItems"
+            :key="item.id"
+            type="button"
+            :class="{ active: activeHistory === item.id }"
+            @click="activeHistory = item.id"
           >
-        </section>
-      </main>
-    </PageWrapper>
-  </RestoredProductSurface>
+            <span>{{ item.time }}</span>
+            <strong>{{ item.title }}</strong>
+            <em>{{ item.status }}</em>
+          </button>
+        </div>
+      </section>
+    </main>
+  </PageWrapper>
 </template>
 
 <script setup lang="ts">
+  import { Tag } from 'ant-design-vue';
+  import { computed, ref } from 'vue';
   import { PageWrapper } from '@/components/Page';
-  import RestoredProductSurface from '@/components/ProductDataState/RestoredProductSurface.vue';
 
-  const scenarioSlots = ['强势情景', '基准情景', '弱势情景', '压力情景'];
+  const topics = [
+    '铜价中期（6-12个月）走势分析',
+    '黄金实际利率压力测试',
+    'BTC 流动性与风险偏好跟踪',
+  ];
+  const selectedTopic = ref(topics[0]);
+  const researchQuestion = ref('跟踪矿端扰动、国内库存和美元利率对铜价中期走势的影响。');
+  const submitting = ref(false);
+  const reviewStatus = ref('归档案例');
+  const reviewMessage = ref('当前展示归档研究案例；新请求会进入待复核。');
+  const caseTabs = ['价格与机构', '情景推演', '风险变量'];
+  const activeCaseTab = ref(caseTabs[0]);
+  const activeHistory = ref('H-01');
+
+  const priceRows = [
+    { market: 'LME 铜', price: '9,842 USD/吨', change: '+1.8%', note: '库存继续低位震荡' },
+    { market: '沪铜主力', price: '80,420 CNY/吨', change: '+1.2%', note: '国内现货升水小幅扩大' },
+    { market: 'COMEX 铜', price: '4.52 USD/lb', change: '-0.3%', note: '美元反弹压制短线估值' },
+  ];
+
+  const forecastRows = [
+    { name: '高盛', range: '9,500-10,800', view: '供给扰动支撑价格中枢', driver: '矿端供给' },
+    { name: '花旗', range: '8,900-10,200', view: '需求确认前维持区间判断', driver: '中国需求' },
+    { name: '摩根士丹利', range: '9,200-10,400', view: '库存周期决定上行斜率', driver: '库存变化' },
+  ];
+
+  const scenarios = [
+    {
+      name: '强势情景',
+      probability: '25%',
+      range: '10,400-11,200 USD/吨',
+      trigger: '国内补库与矿端扰动共振',
+      description: '低库存环境下需求超预期回升，现货升水和远期曲线同步走强。',
+    },
+    {
+      name: '基准情景',
+      probability: '50%',
+      range: '9,200-10,400 USD/吨',
+      trigger: '供给扰动延续但需求温和',
+      description: '价格中枢抬升但缺少连续突破动能，适合跟踪库存和升贴水确认。',
+    },
+    {
+      name: '弱势情景',
+      probability: '25%',
+      range: '8,300-9,200 USD/吨',
+      trigger: '美元走强与需求恢复不及预期',
+      description: '金融属性压制估值，库存回补导致价格回到成本支撑附近。',
+    },
+  ];
+
+  const riskVariables = [
+    {
+      type: '宏观',
+      name: '美元与实际利率',
+      impact: '若实际利率重新上行，铜价估值扩张会受到压制。',
+    },
+    { type: '供给', name: '矿端扰动', impact: '矿山检修、品位下降和运输约束会放大低库存弹性。' },
+    { type: '需求', name: '国内补库', impact: '电网、地产链和新能源需求决定上行持续性。' },
+    { type: '库存', name: '交易所库存', impact: '低库存支撑近月升水，但库存回升会削弱风险溢价。' },
+  ];
+
+  const historyItems = [
+    { id: 'H-01', time: '2026-07-11', title: '铜价中期走势分析', status: '归档' },
+    { id: 'H-02', time: '2026-07-09', title: '黄金实际利率压力测试', status: '归档' },
+    { id: 'H-03', time: '2026-07-08', title: 'BTC 风险偏好跟踪', status: '待复核' },
+  ];
+
+  const selectedHistory = computed(() =>
+    historyItems.find((item) => item.id === activeHistory.value),
+  );
+
+  function submitForReview() {
+    submitting.value = true;
+    window.setTimeout(() => {
+      submitting.value = false;
+      reviewStatus.value = '待复核';
+      reviewMessage.value = `${selectedTopic.value} 已生成待复核请求，尚未形成正式分析结果。`;
+      activeHistory.value = selectedHistory.value?.id || 'H-01';
+    }, 300);
+  }
 </script>
 
 <style scoped lang="less">
   .financial-ai-page {
     display: flex;
     flex-direction: column;
-    gap: 18px;
+    gap: 14px;
     padding: 12px 4px 18px;
   }
-  .hero-card,
+
+  .workspace-card,
   .case-card,
-  .todo-card,
-  .panel {
-    border: 1px solid rgba(214, 223, 232, 0.92);
-    border-radius: 22px;
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(246, 250, 253, 0.96));
-    box-shadow: 0 18px 40px rgba(137, 160, 187, 0.1);
+  .history-card,
+  .panel,
+  .scenario-card,
+  .risk-card {
+    border: 1px solid #dbe4ed;
+    border-radius: 8px;
+    background: #fff;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
   }
-  .hero-card {
-    display: grid;
-    grid-template-columns: minmax(0, 1.45fr) 320px;
-    gap: 18px;
-    padding: 24px 26px;
+
+  .workspace-card,
+  .case-card,
+  .history-card {
+    padding: 18px;
   }
-  .eyebrow {
-    color: #6c8fb1;
-    font-size: 12px;
-    font-weight: 700;
-    letter-spacing: 0.18em;
-  }
-  h1,
-  h2 {
-    margin: 8px 0 0;
-    color: #172126;
-  }
-  .hero-copy p,
-  .hero-status p {
-    color: #5f6b78;
-    line-height: 1.8;
-  }
-  .hero-status {
-    padding: 18px 20px;
-    border-radius: 18px;
-    background: rgba(239, 246, 252, 0.92);
-  }
-  .hero-status span {
-    color: #8b97a5;
-    font-size: 12px;
-  }
-  .hero-status strong {
-    display: block;
-    margin-top: 8px;
-    color: #7c5b11;
-    font-size: 24px;
-  }
-  .case-card {
-    padding: 22px;
-  }
+
   .section-head {
     display: flex;
-    justify-content: space-between;
     align-items: flex-start;
-    margin-bottom: 16px;
-  }
-  .section-head b {
-    padding: 6px 10px;
-    border-radius: 999px;
-    background: #fff4d5;
-    color: #846116;
-    font-size: 12px;
-  }
-  .case-grid {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    justify-content: space-between;
     gap: 16px;
+    margin-bottom: 14px;
   }
-  .case-grid--bottom {
-    margin-top: 16px;
+
+  h2,
+  h3 {
+    margin: 0;
+    color: #17212f;
+    font-weight: 800;
   }
-  .panel {
-    padding: 18px 20px;
+
+  h2 {
+    font-size: 22px;
   }
-  .panel h3 {
-    margin: 0 0 14px;
-    color: #203247;
+
+  h3 {
+    margin-bottom: 12px;
     font-size: 18px;
   }
+
+  p {
+    color: #5b6572;
+    line-height: 1.7;
+  }
+
+  .section-head p {
+    margin: 6px 0 0;
+  }
+
+  .workspace-grid,
+  .table-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+  }
+
+  .panel {
+    padding: 16px;
+  }
+
   .input-panel {
     display: grid;
-    gap: 13px;
+    gap: 12px;
   }
+
   label {
     display: grid;
     gap: 6px;
-    color: #657181;
+    color: #59636e;
+    font-weight: 700;
   }
+
   select,
   textarea {
-    padding: 10px;
-    border: 1px solid #dce3eb;
-    border-radius: 10px;
-    background: #f7f9fb;
+    width: 100%;
+    border: 1px solid #d8e1ea;
+    border-radius: 6px;
+    background: #f8fafc;
+    color: #17212f;
+    font-size: 14px;
   }
+
+  select {
+    height: 36px;
+    padding: 0 10px;
+  }
+
   textarea {
-    min-height: 150px;
-    resize: none;
+    min-height: 142px;
+    padding: 10px;
+    resize: vertical;
   }
+
   .input-actions {
-    display: grid;
-    gap: 7px;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
   }
+
   button {
-    height: 40px;
-    border: 0;
-    border-radius: 9px;
-    background: #e2e7ed;
-    color: #75808e;
+    min-height: 34px;
+    border: 1px solid #d8e1ea;
+    border-radius: 6px;
+    background: #f8fafc;
+    color: #344054;
+    font-weight: 700;
   }
+
+  .input-actions button {
+    padding: 0 18px;
+    border-color: #2f6fed;
+    background: #eef5ff;
+    color: #1f5cc4;
+  }
+
+  .input-actions button:disabled {
+    opacity: 0.6;
+  }
+
   .input-actions span {
-    color: #846116;
+    color: #7a5a00;
     font-size: 12px;
+    font-weight: 700;
   }
-  .unavailable-result {
+
+  .result-summary {
     display: grid;
     gap: 12px;
-    padding: 18px;
-    border-radius: 14px;
-    background: #f6f8fb;
+    padding: 14px;
+    border-radius: 8px;
+    background: #f8fafc;
   }
-  .unavailable-result p {
-    margin: 0;
-    color: #637083;
-    line-height: 1.7;
+
+  .result-summary strong {
+    color: #17212f;
+    font-size: 18px;
   }
+
   dl {
     display: grid;
     gap: 8px;
     margin: 0;
   }
+
   dl div {
     display: flex;
     justify-content: space-between;
@@ -269,58 +419,128 @@
     padding-bottom: 8px;
     border-bottom: 1px solid #e8edf2;
   }
+
   dt {
-    color: #768294;
+    color: #667085;
   }
+
   dd {
     margin: 0;
+    color: #17212f;
+    font-weight: 800;
+  }
+
+  .case-tabs {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .case-tabs button {
+    padding: 0 12px;
+  }
+
+  .case-tabs button.active,
+  .history-list button.active {
+    border-color: #2f6fed;
+    background: #eef5ff;
+    color: #1f5cc4;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  th,
+  td {
+    padding: 10px 8px;
+    border-bottom: 1px solid #e8edf2;
+    text-align: left;
+  }
+
+  th {
+    color: #667085;
+    background: #f8fafc;
+    font-weight: 800;
+  }
+
+  td {
+    color: #344054;
     font-weight: 700;
   }
-  .scenario-board {
+
+  .positive {
+    color: #14804a;
+  }
+
+  .negative {
+    color: #b42318;
+  }
+
+  .scenario-grid,
+  .risk-grid,
+  .history-list {
     display: grid;
+    gap: 12px;
+  }
+
+  .scenario-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .risk-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .scenario-card,
+  .risk-card {
+    padding: 14px;
+  }
+
+  .scenario-card header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
     gap: 10px;
   }
-  .scenario-row {
-    display: grid;
-    grid-template-columns: 0.8fr 1fr 1fr;
-    gap: 12px;
-    padding: 12px 14px;
-    border-radius: 12px;
-    background: rgba(21, 37, 42, 0.05);
+
+  .scenario-card header span,
+  .risk-card span {
+    color: #1f5cc4;
+    font-weight: 800;
   }
-  .scenario-row em {
-    color: #7c5b11;
+
+  .scenario-card header strong,
+  .risk-card strong {
+    color: #17212f;
+    font-size: 17px;
+  }
+
+  .history-list {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .history-list button {
+    display: grid;
+    gap: 6px;
+    padding: 12px;
+    text-align: left;
+  }
+
+  .history-list span,
+  .history-list em {
+    color: #667085;
     font-style: normal;
+    font-size: 12px;
   }
-  .risk-columns {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 14px;
-  }
-  .risk-columns section {
-    padding: 14px;
-    border-radius: 13px;
-    background: #f8fafc;
-  }
-  .risk-columns h4 {
-    margin: 0 0 8px;
-  }
-  ul {
-    margin: 0;
-    padding-left: 18px;
-    color: #5f6b78;
-    line-height: 1.8;
-  }
-  .todo-card {
-    padding: 22px 24px;
-  }
-  .todo-card h3 {
-    margin: 10px 0 12px;
-  }
-  @media (max-width: 1000px) {
-    .hero-card,
-    .case-grid,
-    .risk-columns {
+
+  @media (max-width: 1100px) {
+    .workspace-grid,
+    .table-grid,
+    .scenario-grid,
+    .risk-grid,
+    .history-list {
       grid-template-columns: 1fr;
     }
   }

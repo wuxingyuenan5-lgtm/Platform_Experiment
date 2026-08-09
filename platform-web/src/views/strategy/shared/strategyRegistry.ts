@@ -16,20 +16,17 @@ export interface StrategyManifest {
   shortName: string;
   category: StrategyCategory;
   order: number;
-
   platform: {
     enabled: boolean;
     analysis: boolean;
     execution: boolean;
   };
-
   management: {
     enabled: boolean;
     pnl: boolean;
     capital: boolean;
     orders: boolean;
   };
-
   structure: {
     legModel: StrategyLegModel;
     accountModel: StrategyAccountModel;
@@ -39,7 +36,7 @@ export interface StrategyManifest {
 export const strategyRegistry: readonly StrategyManifest[] = [
   {
     id: 'funding',
-    name: '资费套利',
+    name: '资费',
     shortName: '资费',
     category: 'arbitrage',
     order: 10,
@@ -63,7 +60,7 @@ export const strategyRegistry: readonly StrategyManifest[] = [
     shortName: '海内外价差',
     category: 'arbitrage',
     order: 30,
-    platform: { enabled: true, analysis: true, execution: true },
+    platform: { enabled: true, analysis: true, execution: false },
     management: { enabled: true, pnl: true, capital: true, orders: true },
     structure: { legModel: 'dual', accountModel: 'dual' },
   },
@@ -79,8 +76,8 @@ export const strategyRegistry: readonly StrategyManifest[] = [
   },
   {
     id: 'shortLineTraderL',
-    name: '短线交易员 L',
-    shortName: '短线 L',
+    name: '短线交易员A',
+    shortName: '短线交易员A',
     category: 'intraday',
     order: 50,
     platform: { enabled: false, analysis: false, execution: false },
@@ -89,8 +86,8 @@ export const strategyRegistry: readonly StrategyManifest[] = [
   },
   {
     id: 'shortLineTraderW',
-    name: '短线交易员 W',
-    shortName: '短线 W',
+    name: '短线交易员B',
+    shortName: '短线交易员B',
     category: 'intraday',
     order: 60,
     platform: { enabled: false, analysis: false, execution: false },
@@ -107,13 +104,10 @@ export const managementStrategies = strategyRegistry
   .filter((strategy) => strategy.management.enabled)
   .sort((left, right) => left.order - right.order);
 
-export const strategyRegistryMap = strategyRegistry.reduce(
-  (map, strategy) => {
-    map[strategy.id] = strategy;
-    return map;
-  },
-  {} as Record<StrategyId, StrategyManifest>,
-);
+export const strategyRegistryMap = strategyRegistry.reduce((map, strategy) => {
+  map[strategy.id] = strategy;
+  return map;
+}, {} as Record<StrategyId, StrategyManifest>);
 
 export function getStrategyManifest(id: StrategyId): StrategyManifest {
   return strategyRegistryMap[id];

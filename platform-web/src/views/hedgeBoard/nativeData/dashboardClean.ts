@@ -101,111 +101,6 @@ function advancedChart(
   };
 }
 
-function symbolOverview(
-  title: string,
-  subtitle: string,
-  symbols: [string, string][],
-  options: Partial<Record<string, unknown>> = {},
-): WidgetConfig {
-  return {
-    kind: 'symbol-overview',
-    title,
-    subtitle,
-    height: Number(options.height ?? 360),
-    scriptSrc: 'https://s3.tradingview.com/external-embedding/embed-widget-symbol-overview.js',
-    config: {
-      ...tvBase,
-      symbols,
-      chartOnly: false,
-      width: '100%',
-      height: '100%',
-      lineWidth: 2,
-      isTransparent: false,
-      chartType: 'area',
-      scalePosition: 'right',
-      scaleMode: 'Normal',
-      fontFamily: 'Segoe UI, PingFang SC, Microsoft YaHei, sans-serif',
-      fontSize: '10',
-      valuesTracking: '1',
-      changeMode: 'price-and-percent',
-      dateRanges: ['1d|1', '1m|30', '3m|60', '12m|1D', '60m|1W', 'all|1M'],
-      lineType: 0,
-      backgroundColor: '#ffffff',
-      gridLineColor: 'rgba(15, 23, 42, 0.08)',
-      widgetFontColor: '#0f172a',
-      upColor: '#16a34a',
-      downColor: '#dc2626',
-      borderUpColor: '#16a34a',
-      borderDownColor: '#dc2626',
-      wickUpColor: '#16a34a',
-      wickDownColor: '#dc2626',
-      ...options,
-    },
-  };
-}
-
-function technicalAnalysis(
-  title: string,
-  subtitle: string,
-  symbol: string,
-  interval = '1D',
-): WidgetConfig {
-  return {
-    kind: 'technical-analysis',
-    title,
-    subtitle,
-    height: 390,
-    scriptSrc: 'https://s3.tradingview.com/external-embedding/embed-widget-technical-analysis.js',
-    config: {
-      interval,
-      width: '100%',
-      isTransparent: false,
-      height: '100%',
-      symbol,
-      showIntervalTabs: true,
-      displayMode: 'single',
-      locale: 'zh_CN',
-      colorTheme: 'light',
-    },
-  };
-}
-
-function marketOverview(
-  title: string,
-  subtitle: string,
-  tabs: Array<{ title: string; symbols: Array<Record<string, string>> }>,
-): WidgetConfig {
-  return {
-    kind: 'market-overview',
-    title,
-    subtitle,
-    height: 420,
-    scriptSrc: 'https://s3.tradingview.com/external-embedding/embed-widget-market-overview.js',
-    config: {
-      colorTheme: 'light',
-      dateRange: '12M',
-      showChart: true,
-      locale: 'zh_CN',
-      largeChartUrl: '',
-      isTransparent: false,
-      showSymbolLogo: true,
-      showFloatingTooltip: false,
-      width: '100%',
-      height: '100%',
-      plotLineColorGrowing: 'rgba(22, 163, 74, 1)',
-      plotLineColorFalling: 'rgba(220, 38, 38, 1)',
-      gridLineColor: 'rgba(15, 23, 42, 0.08)',
-      scaleFontColor: 'rgba(15, 23, 42, 0.58)',
-      belowLineFillColorGrowing: 'rgba(22, 163, 74, 0.12)',
-      belowLineFillColorFalling: 'rgba(220, 38, 38, 0.12)',
-      belowLineFillColorGrowingBottom: 'rgba(22, 163, 74, 0.02)',
-      belowLineFillColorFallingBottom: 'rgba(220, 38, 38, 0.02)',
-      symbolActiveColor: 'rgba(22, 93, 255, 0.12)',
-      tabs,
-    },
-  };
-}
-
 function localChart(
   title: string,
   subtitle: string,
@@ -234,7 +129,8 @@ export const researchModules: ResearchModule[] = [
     label: '宏观',
     eyebrow: 'Macro',
     headline: '先定宏观环境，再解释黄金和加密的价格主线。',
-    summary: '宏观页负责给出大的环境判断，先看流动性，再看利率汇率与增长通胀，最后再映射到风险偏好。',
+    summary:
+      '宏观页负责给出大的环境判断，先看流动性，再看利率汇率与增长通胀，最后再映射到风险偏好。',
     summaryPoints: ['先看流动性', '再看利率汇率', '最后看风险偏好与经济'],
     sourceLinks: [
       { label: 'Dollar Liquidity', href: 'https://dollarliquidity.com/zh' },
@@ -249,10 +145,15 @@ export const researchModules: ResearchModule[] = [
         description: '先看净美元流动性，再拆解 Fed、TGA 与逆回购的贡献。',
         layout: 'hero',
         widgets: [
-          advancedChart('Net Dollar Liquidity', 'Formula: WALCL - WDTGAL - RRPONTTLD', 'FRED:WALCL-FRED:WDTGAL-FRED:RRPONTTLD', {
-            height: 640,
-            hide_side_toolbar: false,
-          }),
+          advancedChart(
+            'Net Dollar Liquidity',
+            'Formula: WALCL - WDTGAL - RRPONTTLD',
+            'FRED:WALCL-FRED:WDTGAL-FRED:RRPONTTLD',
+            {
+              height: 640,
+              hide_side_toolbar: false,
+            },
+          ),
         ],
       },
       {
@@ -262,10 +163,15 @@ export const researchModules: ResearchModule[] = [
         description: '统一终端式明细布局，按流动性、利率汇率、风险偏好与经济四组变量展开。',
         layout: 'hero',
         widgets: [
-          localChart('Macro Market Detail', '统一终端式明细布局，聚焦流动性、利率汇率、风险偏好与经济四组变量。', 'macro-market-detail-table', {
-            height: 620,
-            sourceNote: '数据展示：前端静态设计稿，后续再接入实时宏观行情与衍生指标',
-          }),
+          localChart(
+            'Macro Market Detail',
+            '统一终端式明细布局，聚焦流动性、利率汇率、风险偏好与经济四组变量。',
+            'macro-market-detail-table',
+            {
+              height: 620,
+              sourceNote: '',
+            },
+          ),
         ],
       },
     ],
@@ -304,7 +210,7 @@ export const researchModules: ResearchModule[] = [
         widgets: [
           localChart('Commodity Market Detail', '', 'gold-market-detail-table', {
             height: 620,
-            sourceNote: '数据展示：前端静态设计稿，后续再接入实时行情',
+            sourceNote: '',
           }),
         ],
       },
@@ -357,14 +263,24 @@ export const researchModules: ResearchModule[] = [
         description: '把名义利率、通胀预期和实际利率放在同一组里看。',
         layout: 'two',
         widgets: [
-          localChart('金价 vs 10Y 名义利率', '左轴黄金价格，右轴美国 10 年名义国债收益率', 'gold-vs-nominal', {
-            height: 400,
-            sourceNote: '数据源：SPDR archive gold proxy + U.S. Treasury nominal yield curve',
-          }),
-          localChart('金价 vs 10Y 通胀预期', '用名义 10Y 减实际 10Y 得到 breakeven', 'gold-vs-breakeven', {
-            height: 400,
-            sourceNote: '数据源：U.S. Treasury nominal/real yield curves',
-          }),
+          localChart(
+            '金价 vs 10Y 名义利率',
+            '左轴黄金价格，右轴美国 10 年名义国债收益率',
+            'gold-vs-nominal',
+            {
+              height: 400,
+              sourceNote: '数据源：SPDR archive gold proxy + U.S. Treasury nominal yield curve',
+            },
+          ),
+          localChart(
+            '金价 vs 10Y 通胀预期',
+            '用名义 10Y 减实际 10Y 得到 breakeven',
+            'gold-vs-breakeven',
+            {
+              height: 400,
+              sourceNote: '数据源：U.S. Treasury nominal/real yield curves',
+            },
+          ),
           localChart('金价 vs 10Y 实际利率', '实际利率是黄金最硬的宏观约束之一', 'gold-vs-real', {
             height: 400,
             sourceNote: '数据源：SPDR archive gold proxy + U.S. Treasury real yield curve',
@@ -382,7 +298,8 @@ export const researchModules: ResearchModule[] = [
     label: '加密',
     eyebrow: 'Crypto',
     headline: '加密页按 BTC 主图、市场明细、ETF 资金、扩散结构与财库公司购币展开。',
-    summary: '加密不能脱离宏观看，重点是看 BTC 主线、ETF 资金是否持续吸纳、以及风险是否继续向高 beta 扩散。',
+    summary:
+      '加密不能脱离宏观看，重点是看 BTC 主线、ETF 资金是否持续吸纳、以及风险是否继续向高 beta 扩散。',
     summaryPoints: ['BTC 主图先看', '再看主流币与 ETF 资金', '最后看扩散与财库公司购币'],
     sourceLinks: [],
     sections: [
@@ -411,7 +328,7 @@ export const researchModules: ResearchModule[] = [
         widgets: [
           localChart('Crypto Market Detail', '', 'crypto-market-detail-table', {
             height: 620,
-            sourceNote: '数据展示：前端静态设计稿，后续再接入实时行情',
+            sourceNote: '',
           }),
         ],
       },
@@ -435,4 +352,3 @@ export const researchModules: ResearchModule[] = [
     ],
   },
 ];
-

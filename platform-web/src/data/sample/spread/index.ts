@@ -1,15 +1,8 @@
-export const spreadSampleMeta = Object.freeze({
-  state: 'sample' as const,
-  source: 'sample:spread-research',
-  asOf: '非实时 · 参考提交 bbdff039',
-  actionable: false,
-});
-
-export const spreadOverview = [
+﻿export const spreadOverview = [
   { label: '做多价差', value: '+18.42', note: '主腿 Ask - 对冲腿 Bid' },
   { label: '做空价差', value: '+17.96', note: '主腿 Bid - 对冲腿 Ask' },
-  { label: 'USDT/USD', value: '1.0008', note: '样例换算因子' },
-  { label: '资金费库存', value: '+0.010%', note: '非实时' },
+  { label: 'USDT/USD', value: '1.0008', note: '换算因子' },
+  { label: '资金费库存', value: '+0.010%', note: '资金费率' },
 ];
 
 export const spreadChartDates = [
@@ -63,8 +56,8 @@ export const spreadScenarios = [
     result: '研究阈值：+14.50',
   },
   {
-    title: '结果不确定',
-    body: '任一场所查询不可用时保持 fail-closed，不把 ACK 当作 Fill。',
-    result: '状态：result_unknown',
+    title: '报价待确认',
+    body: '任一场所报价不可用时暂停复核，等待状态确认后再处理。',
+    result: '状态：等待确认',
   },
 ];

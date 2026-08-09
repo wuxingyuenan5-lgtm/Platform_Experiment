@@ -16,21 +16,21 @@
 
       <Row :gutter="[16, 16]">
         <Col :xs="24" :md="12">
-          <Card :bordered="false" title="data-service" class="vg-panel">
+          <Card :bordered="false" title="数据服务" class="vg-panel">
             <Descriptions :column="1" size="small">
               <Descriptions.Item label="状态">
                 <Tag :color="health.status === 'ok' ? 'green' : 'orange'">
-                  {{ health.status || 'unavailable' }}
+                  {{ health.status === 'ok' ? '可用' : '不可用' }}
                 </Tag>
               </Descriptions.Item>
               <Descriptions.Item label="服务">
-                {{ health.service || 'data-service' }}
+                {{ health.service ? '已配置' : '数据服务' }}
               </Descriptions.Item>
               <Descriptions.Item label="同步频率">
                 {{ health.update_frequency || '不可用' }}
               </Descriptions.Item>
               <Descriptions.Item label="截至时间">{{ health.as_of || '不可用' }}</Descriptions.Item>
-              <Descriptions.Item label="来源">配置的dataHttp origin</Descriptions.Item>
+              <Descriptions.Item label="连接">当前配置</Descriptions.Item>
             </Descriptions>
           </Card>
         </Col>
@@ -39,14 +39,14 @@
             <Descriptions :column="1" size="small">
               <Descriptions.Item label="状态">
                 <Tag :color="authenticated ? 'green' : 'orange'">
-                  {{ authenticated ? 'authenticated' : 'unavailable' }}
+                  {{ authenticated ? '已登录' : '不可用' }}
                 </Tag>
               </Descriptions.Item>
               <Descriptions.Item label="登录用户">
                 {{ userInfo.username || userInfo.name || '不可用' }}
               </Descriptions.Item>
               <Descriptions.Item label="角色">{{ roleLabel }}</Descriptions.Item>
-              <Descriptions.Item label="来源">当前浏览器Session</Descriptions.Item>
+              <Descriptions.Item label="会话">当前浏览器</Descriptions.Item>
             </Descriptions>
           </Card>
         </Col>
@@ -103,7 +103,7 @@
         message:
           health.value.status === 'ok'
             ? undefined
-            : `Provider报告状态：${health.value.status || 'unknown'}`,
+            : `服务暂时不可用：${health.value.status || 'unknown'}`,
       };
     } catch (error) {
       health.value = {

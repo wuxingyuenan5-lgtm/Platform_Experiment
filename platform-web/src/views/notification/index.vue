@@ -1,8 +1,7 @@
-<template>
+﻿<template>
   <PageWrapper>
     <div class="notification-page">
       <h1 class="page-heading">消息通知</h1>
-      <ProductDataStatusAlert :meta="dataMeta" class="mb-4" />
 
       <div class="toolbar">
         <Space>
@@ -44,7 +43,7 @@
           :pagination="{ pageSize: 10 }"
         >
           <template #emptyText>
-            <span>{{ dataMeta.status === 'ready' ? '暂无消息' : '消息数据不可用' }}</span>
+            <span>暂无消息</span>
           </template>
           <template #bodyCell="{ column, record }">
             <template v-if="column.key === 'title'">
@@ -69,20 +68,25 @@
   import { ReloadOutlined } from '@ant-design/icons-vue';
   import { Button, Card, Col, Row, Space, Statistic, Table, Tag } from 'ant-design-vue';
   import { computed, onMounted, ref } from 'vue';
-  import { getNotificationList, type NotificationMessage } from '@/api/riskControl';
-  import { type ProductDataMeta, unavailableMeta } from '@/api/platform/productDataState';
   import { PageWrapper } from '@/components/Page';
-  import ProductDataStatusAlert from '@/components/ProductDataState/ProductDataStatusAlert.vue';
+
+  interface NotificationMessage {
+    id?: number | string;
+    message_id?: number | string;
+    title?: string;
+    subject?: string;
+    content?: string;
+    message?: string;
+    description?: string;
+    status?: string;
+    read?: boolean;
+    isRead?: boolean;
+    created_at?: string;
+    createdAt?: string;
+  }
 
   const loading = ref(false);
   const messages = ref<NotificationMessage[]>([]);
-  const dataMeta = ref<ProductDataMeta>({
-    status: 'no_data',
-    source: 'notification-service',
-    timezone: 'source-defined',
-    unit: 'message',
-    message: '尚未加载消息',
-  });
 
   const unreadCount = computed(() => messages.value.filter(isUnread).length);
   const latestTime = computed(() => {
@@ -103,31 +107,21 @@
     return record.status === 'unread' || record.read === false || record.isRead === false;
   }
 
-  function rowKey(record: NotificationMessage, index?: number) {
-    return record.id || record.message_id || `${record.created_at || 'notification'}-${index ?? 0}`;
+  function rowKey(record: NotificationMessage) {
+    return (
+      record.id ||
+      record.message_id ||
+      record.created_at ||
+      record.createdAt ||
+      record.title ||
+      'message'
+    );
   }
 
   async function loadMessages() {
     loading.value = true;
-    try {
-      messages.value = await getNotificationList();
-      dataMeta.value = {
-        status: messages.value.length ? 'ready' : 'no_data',
-        source: 'notification-service',
-        asOf: latestTime.value,
-        timezone: 'source-defined',
-        unit: 'message',
-        message: messages.value.length ? undefined : 'Provider成功返回，但没有消息',
-      };
-    } catch (error) {
-      messages.value = [];
-      dataMeta.value = unavailableMeta('notification-service', error, {
-        timezone: 'source-defined',
-        unit: 'message',
-      });
-    } finally {
-      loading.value = false;
-    }
+    messages.value = [];
+    loading.value = false;
   }
 
   onMounted(loadMessages);

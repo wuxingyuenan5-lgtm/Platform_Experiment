@@ -7,7 +7,6 @@
   >
     <span class="research-source-state__dot"></span>
     <span>{{ statusLabel }}</span>
-    <span class="research-source-state__source">{{ meta.source || '未知来源' }}</span>
     <span class="research-source-state__time">{{ displayedTime }}</span>
   </div>
 </template>
@@ -45,12 +44,10 @@
   const detailTitle = computed(() => {
     const details = [
       `状态：${statusLabel.value}`,
-      `来源：${props.meta.source || '未知来源'}`,
-      `源数据时间：${sourceTime.value}`,
-      `平台抓取时间：${fetchedTime.value}`,
+      props.meta.sourceTimestamp
+        ? `数据时间：${sourceTime.value}`
+        : `更新时间：${fetchedTime.value}`,
     ];
-    if (props.meta.message) details.push(`说明：${props.meta.message}`);
-    if (props.meta.errorCode) details.push(`错误码：${props.meta.errorCode}`);
     return details.join('；');
   });
 </script>

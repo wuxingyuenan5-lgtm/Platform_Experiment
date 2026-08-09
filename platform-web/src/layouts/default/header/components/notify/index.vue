@@ -26,22 +26,17 @@
   </div>
 </template>
 <script lang="tsx" setup>
-  import { computed, ref, onMounted } from 'vue';
-  import { Popover, Tabs, Badge, message } from 'ant-design-vue';
-  import { BellOutlined, ExclamationCircleFilled } from '@ant-design/icons-vue';
-  import { tabListData, ListItem } from './data';
+  import { computed, ref } from 'vue';
+  import { Popover, Tabs, Badge } from 'ant-design-vue';
+  import { BellOutlined } from '@ant-design/icons-vue';
+  import { tabListData } from './data';
   import { useDesign } from '@/hooks/web/useDesign';
-  import { useMessage } from '@/hooks/web/useMessage';
   import NoticeExamine from './NoticeExamine.vue';
-  import { getNtification } from '@/api/notifications';
-  import { useGo } from '@/hooks/web/usePage';
 
   const { prefixCls } = useDesign('header-notify');
-  const { createMessage } = useMessage();
   const listData = ref(tabListData);
   const active = ref('alert');
   const numberStyle = {};
-  const go = useGo();
 
   const count = computed(() => {
     let count = 0;
@@ -57,25 +52,4 @@
   //   record.titleDelete = !record.titleDelete;
   // }
   const loading = ref(false);
-  async function getNtificationFn() {
-    loading.value = true;
-    try {
-      const res = await getNtification({ isRead: false, pageSize: 99 });
-      listData.value[0].list = res?.data?.list || [];
-    } finally {
-      loading.value = false;
-    }
-  }
-  // function dealNtification() {
-  //   go({
-  //     path: '/dashboard',
-  //     query: {
-  //       scrollBottom: true,
-  //     },
-  //   });
-  //   message.destroy();
-  // }
-  onMounted(() => {
-    getNtificationFn();
-  });
 </script>

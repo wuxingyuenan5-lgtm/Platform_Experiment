@@ -1,11 +1,5 @@
 <template>
-  <Alert
-    v-if="meta.status !== 'ready'"
-    show-icon
-    :type="alertType"
-    :message="title"
-    :description="description"
-  />
+  <Alert v-if="visible" show-icon :type="alertType" :message="title" :description="description" />
 </template>
 
 <script setup lang="ts">
@@ -20,30 +14,15 @@
     },
   });
 
-  const alertType = computed(() => {
-    if (props.meta.status === 'unavailable') return 'error';
-    if (props.meta.status === 'stale') return 'warning';
-    return 'info';
-  });
+  const visible = computed(() => ['unavailable', 'stale'].includes(props.meta.status));
 
-  const title = computed(() => {
-    const labels: Record<ProductDataMeta['status'], string> = {
-      ready: '数据可用',
-      no_data: '暂无数据',
-      unavailable: '数据源不可用',
-      stale: '正在展示过期数据',
-      not_configured: '数据源尚未配置',
-      unsupported: '当前数据源不支持此功能',
-    };
-    return labels[props.meta.status];
-  });
+  const alertType = computed(() => (props.meta.status === 'unavailable' ? 'error' : 'warning'));
 
-  const description = computed(() => {
-    const parts = [props.meta.message, `来源：${props.meta.source}`];
-    if (props.meta.asOf) parts.push(`截至：${props.meta.asOf}`);
-    if (props.meta.timezone) parts.push(`时区：${props.meta.timezone}`);
-    if (props.meta.errorCode) parts.push(`错误码：${props.meta.errorCode}`);
-    if (props.meta.fallbackSource) parts.push(`回退来源：${props.meta.fallbackSource}`);
-    return parts.filter(Boolean).join('；');
-  });
+  const title = computed(() => (props.meta.status === 'stale' ? '数据更新延迟' : '数据暂不可用'));
+
+  const description = computed(() =>
+    props.meta.status === 'stale'
+      ? '当前数据可能存在延迟，请结合页面更新时间判断。'
+      : '当前数据暂时无法获取，请稍后重试。',
+  );
 </script>

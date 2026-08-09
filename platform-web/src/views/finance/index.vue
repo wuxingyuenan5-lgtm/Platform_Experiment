@@ -6,9 +6,7 @@
       <div class="toolbar">
         <Space>
           <Tag :color="roleColor">{{ roleLabel }}</Tag>
-          <Tag :color="dataMeta.status === 'ready' ? 'green' : 'orange'">
-            {{ dataMeta.source }}
-          </Tag>
+          <Tag :color="dataMeta.status === 'ready' ? 'green' : 'orange'">财务数据</Tag>
           <Tag>{{ exchangeInfo.symbol || 'USD' }}</Tag>
         </Space>
         <Button :loading="loading" @click="loadData">
@@ -56,7 +54,7 @@
               :pagination="false"
             >
               <template #emptyText>
-                <span>{{ dataMeta.status === 'ready' ? '暂无资产占比数据' : '数据源不可用' }}</span>
+                <span>{{ dataMeta.status === 'ready' ? '暂无资产占比数据' : '数据暂不可用' }}</span>
               </template>
               <template #bodyCell="{ column, record }">
                 <template v-if="column.key === 'value'">
@@ -72,8 +70,9 @@
         <Col :xs="24" :xl="9">
           <Card :bordered="false" title="财务数据状态" class="vg-panel">
             <Descriptions :column="1" size="small">
-              <Descriptions.Item label="状态">{{ dataMeta.status }}</Descriptions.Item>
-              <Descriptions.Item label="来源">{{ dataMeta.source }}</Descriptions.Item>
+              <Descriptions.Item label="状态">{{
+                dataMeta.status === 'ready' ? '可用' : '暂不可用'
+              }}</Descriptions.Item>
               <Descriptions.Item label="汇率标的">
                 {{ exchangeInfo.symbol || '不可用' }}
               </Descriptions.Item>
@@ -81,10 +80,6 @@
                 {{ formatDecimal(exchangeInfo.rate) }}
               </Descriptions.Item>
               <Descriptions.Item label="截至时间">{{ latestUpdateText }}</Descriptions.Item>
-              <Descriptions.Item label="时区">
-                {{ dataMeta.timezone || '来源定义' }}
-              </Descriptions.Item>
-              <Descriptions.Item label="精度">Decimal字符串</Descriptions.Item>
             </Descriptions>
           </Card>
         </Col>
@@ -245,10 +240,7 @@
           currency: 'USD',
           unit: 'money and ratio',
           precision: 'decimal-string',
-          message:
-            accounts.value.length || ratioItems.value.length
-              ? undefined
-              : 'Provider成功返回，但没有财务记录',
+          message: accounts.value.length || ratioItems.value.length ? undefined : '暂无财务记录',
         };
       }
     } finally {

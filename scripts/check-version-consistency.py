@@ -16,11 +16,15 @@ FRONTEND_VERSION_FILES = (
 RUNTIME_VERSION_OWNER = "execution-runtime/app/version.py"
 RUNTIME_VERSION_DIRECTORY = "execution-runtime/app"
 CURRENT_DOCUMENTS = {
-    "current candidate target": (
+    "stable baseline": (
         "docs/codex/current-state.md",
-        r"Current candidate target: Platform `([^`]+)`\.",
+        r"Stable baseline: Platform `([^`]+)`\.",
     ),
 }
+CANDIDATE_DOCUMENT = (
+    "docs/codex/current-state.md",
+    r"Current candidate target: Platform `([^`]+)`\.",
+)
 MAINTAINED_VERSION_PATHS = (
     "VERSION",
     "platform-web/package.json",
@@ -190,13 +194,29 @@ def collect_versions(root: Path) -> tuple[str, dict[str, str]]:
     return expected, actual
 
 
+def next_patch_version(version: str) -> str:
+    parts = version.split(".")
+    if len(parts) != 3 or not all(part.isdigit() for part in parts):
+        raise SystemExit(f"Unsupported semantic version in VERSION: {version}")
+    major, minor, patch = (int(part) for part in parts)
+    return f"{major}.{minor}.{patch + 1}"
+
+
 def check_versions(root: Path = ROOT) -> None:
     expected, actual = collect_versions(root)
     drift = {name: value for name, value in actual.items() if value != expected}
     if drift:
         details = ", ".join(f"{name}={value}" for name, value in sorted(drift.items()))
         raise SystemExit(f"Version drift from VERSION={expected}: {details}")
-    print(f"Maintained Platform candidate versions are consistent: {expected}")
+    candidate_path, candidate_pattern = CANDIDATE_DOCUMENT
+    candidate = document_version(root, candidate_path, candidate_pattern)
+    allowed_candidates = {expected, next_patch_version(expected)}
+    if candidate not in allowed_candidates:
+        raise SystemExit(
+            "Current candidate target must be the stable VERSION or next patch candidate: "
+            f"VERSION={expected}, candidate={candidate}"
+        )
+    print(f"Maintained Platform stable version is consistent: {expected}; candidate target: {candidate}")
 
 
 def main() -> None:

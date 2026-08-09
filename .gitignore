@@ -27,6 +27,9 @@ platform-api/data/
 
 # Local generated outputs
 outputs/
+.codex/
+platform-web/test-results/
+platform-api/scripts/data/
 
 # Large local/reference material
 鍙傝€冧唬鐮?

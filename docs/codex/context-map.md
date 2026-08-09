@@ -1,6 +1,6 @@
 # Agent Context Map
 
-Use the smallest sufficient evidence set. Historical process material is not active context.
+Use the smallest sufficient evidence set. Historical process material, phase receipts and chat history are not active context.
 
 ## Default startup
 
@@ -26,6 +26,7 @@ Pack paths and numeric budgets remain owned by `scripts/context-packs.json`. Req
 | Task | Read first | Add only when necessary |
 |---|---|---|
 | Frontend layout or style | target view/component, direct layout test, `platform-web/AGENTS.md` | visual spec and direct child |
+| Restored product acceptance | accepted product page, direct E2E or screenshot script, owning product criteria | old snapshot only as read-only historical reference |
 | Research field/provider | schema, provider/service/cache and direct tests | frontend mapper for public-contract changes |
 | Identity and permission | auth, authority, permission registry and tests | persistence and browser E2E |
 | Member holdings/NAV | schemas, service, valuation and tests | repository and contract |
@@ -37,6 +38,6 @@ Pack paths and numeric budgets remain owned by `scripts/context-packs.json`. Req
 
 ## Default exclusions
 
-Do not load generated output, dependencies, virtual environments, historical plans, handoffs, evidence ledgers, closed review discussions, release-status snapshots, unrelated services, demo pages or visual assets unless the task directly requires them.
+Do not load generated output, dependencies, virtual environments, historical plans, handoffs, evidence ledgers, phase receipts, closed review discussions, release-status snapshots, unrelated services, demo pages or visual assets unless the task directly requires them.
 
 Browser state and external environments are evidence only. Do not infer product or production status from them.

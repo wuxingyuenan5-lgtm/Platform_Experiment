@@ -58,3 +58,9 @@ python platform-api/scripts/seed_user_system_demo.py
 - 未显式设置 `USER_SYSTEM_DEMO_SEED=1`；
 - 环境不是 development、local、test 或 testing；
 - Platform Live Write 已启用。
+
+## Local startup password source
+
+`scripts/dev-platform.ps1` never stores a demo password in source, logs or state JSON. Set `PLATFORM_DEMO_PASSWORD` before local startup when a reusable local password is required. If it is absent, the startup script generates a temporary strong password, prints it once in the current console and passes it to `platform-api/scripts/seed_user_system_demo.py` through `USER_SYSTEM_DEMO_PASSWORD` only for that process.
+
+Browser E2E scripts require explicit `E2E_CEO_USERNAME` and `E2E_CEO_PASSWORD`; they do not contain or fall back to a source-code password.

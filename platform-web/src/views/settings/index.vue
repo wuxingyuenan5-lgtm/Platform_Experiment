@@ -1,12 +1,12 @@
-<template>
+﻿<template>
   <PageWrapper title="系统设置">
     <main class="settings-page" data-testid="settings-original-structure">
       <header class="settings-identity">
-        <div><span>SYSTEM SETTINGS</span><h1>系统设置</h1></div>
+        <div><span>账户与偏好</span><h1>系统设置</h1></div>
         <div class="toolbar">
           <Tag :color="roleColor">{{ roleLabel }}</Tag>
           <Tag :color="health.status === 'ok' ? 'green' : 'orange'">
-            data-service {{ health.status || 'unknown' }}
+            数据服务 {{ health.status || 'unknown' }}
           </Tag>
           <Button :loading="loading" @click="loadSettings">
             <template #icon><ReloadOutlined /></template>
@@ -14,8 +14,6 @@
           </Button>
         </div>
       </header>
-
-      <ProductDataStatusAlert :meta="healthMeta" />
 
       <Row :gutter="[16, 16]">
         <Col :xs="24" :xl="9">
@@ -39,11 +37,11 @@
         </Col>
 
         <Col :xs="24" :xl="15">
-          <Card :bordered="false" title="本地服务配置" class="vg-panel">
+          <Card :bordered="false" title="服务状态" class="vg-panel">
             <div class="service-table-wrap">
               <table class="service-table">
                 <thead>
-                  <tr><th>服务</th><th>正式接口</th><th>当前来源</th><th>状态</th></tr>
+                  <tr><th>服务</th><th>范围</th><th>当前状态</th><th>结果</th></tr>
                 </thead>
                 <tbody>
                   <tr v-for="item in serviceRows" :key="item.name">
@@ -77,7 +75,7 @@
           <Card :bordered="false" title="数据服务状态" class="vg-panel">
             <Descriptions :column="1" size="small">
               <Descriptions.Item label="服务">
-                {{ health.service || 'data-service' }}
+                {{ health.service || '数据服务' }}
               </Descriptions.Item>
               <Descriptions.Item label="同步频率">
                 {{ health.update_frequency || '不可用' }}
@@ -85,36 +83,29 @@
               <Descriptions.Item label="截至时间">
                 {{ health.as_of || '不可用' }}
               </Descriptions.Item>
-              <Descriptions.Item label="来源">配置的 dataHttp origin</Descriptions.Item>
+              <Descriptions.Item label="连接">当前配置</Descriptions.Item>
             </Descriptions>
           </Card>
         </Col>
         <Col :xs="24" :xl="16">
-          <RestoredProductSurface
-            state="unavailable"
-            source="not-configured:settings-write-owner"
-            :actionable="false"
-            message="没有真实 Owner 的设置项保留原布局但禁止保存；页面不会伪造保存成功。"
-          >
-            <Card :bordered="false" title="平台偏好" class="vg-panel settings-options">
-              <div>
-                <span>通知策略</span>
-                <Button disabled data-write-action="true">配置（Owner未配置）</Button>
-              </div>
-              <div>
-                <span>研究数据刷新</span>
-                <Button disabled data-write-action="true">配置（Owner未配置）</Button>
-              </div>
-              <div>
-                <span>外观与布局偏好</span>
-                <Button disabled data-write-action="true">保存（Owner未配置）</Button>
-              </div>
-              <div>
-                <span>交易安全</span>
-                <strong>Live Write关闭 · 审批、Kill Switch、Allowlist与风险门禁不可绕过</strong>
-              </div>
-            </Card>
-          </RestoredProductSurface>
+          <Card :bordered="false" title="平台偏好" class="vg-panel settings-options">
+            <div>
+              <span>通知策略</span>
+              <Button disabled data-write-action="true">配置</Button>
+            </div>
+            <div>
+              <span>研究数据刷新</span>
+              <Button disabled data-write-action="true">配置</Button>
+            </div>
+            <div>
+              <span>外观与布局偏好</span>
+              <Button disabled data-write-action="true">保存</Button>
+            </div>
+            <div>
+              <span>交易安全</span>
+              <strong>交易写入关闭，复核与风险门禁保持启用</strong>
+            </div>
+          </Card>
         </Col>
       </Row>
     </main>
@@ -132,11 +123,8 @@
   import { Button, Card, Col, Descriptions, Row, Tag } from 'ant-design-vue';
   import { computed, onMounted, ref } from 'vue';
   import { useRouter } from 'vue-router';
-  import { type ProductDataMeta, unavailableMeta } from '@/api/platform/productDataState';
   import { type DataServiceHealth, getDataHealth } from '@/api/riskControl';
   import { PageWrapper } from '@/components/Page';
-  import ProductDataStatusAlert from '@/components/ProductDataState/ProductDataStatusAlert.vue';
-  import RestoredProductSurface from '@/components/ProductDataState/RestoredProductSurface.vue';
   import { useRoleAccess } from '@/hooks/web/useRoleAccess';
   import { useUserStore } from '@/store/modules/user';
 
@@ -152,15 +140,8 @@
   const loading = ref(false);
   const health = ref<DataServiceHealth>({
     status: 'unknown',
-    service: 'data-service',
+    service: '数据服务',
     update_frequency: 'unknown',
-  });
-  const healthMeta = ref<ProductDataMeta>({
-    status: 'no_data',
-    source: 'data-service health',
-    unit: 'service status',
-    timezone: 'source-defined',
-    message: '尚未读取数据服务状态',
   });
   const userStore = useUserStore();
   const userInfo = computed<SettingsSessionIdentity>(
@@ -181,24 +162,24 @@
 
   const serviceRows = computed(() => [
     {
-      name: 'platform-api',
-      route: '/api/v1/*',
-      target: 'Platform API',
+      name: '业务服务',
+      route: '核心业务',
+      target: '已配置',
       status: '正式接口',
       color: 'green',
     },
     {
-      name: 'data-service',
-      route: 'dataHttp origin',
-      target: health.value.service || 'data-service',
+      name: '数据服务',
+      route: '数据服务',
+      target: health.value.service ? '已配置' : '待连接',
       status: health.value.status === 'ok' ? '已连接' : '不可用',
       color: health.value.status === 'ok' ? 'green' : 'orange',
     },
     {
-      name: 'execution-runtime',
-      route: '/runtime/*',
-      target: 'Execution Runtime',
-      status: 'Live Write关闭',
+      name: '执行服务',
+      route: '交易执行',
+      target: '已配置',
+      status: '交易写入关闭',
       color: 'blue',
     },
   ]);
@@ -211,23 +192,8 @@
     loading.value = true;
     try {
       health.value = await getDataHealth();
-      healthMeta.value = {
-        status: health.value.status === 'ok' ? 'ready' : 'unavailable',
-        source: health.value.service || 'data-service',
-        asOf: health.value.as_of,
-        unit: 'service status',
-        timezone: 'source-defined',
-        errorCode: health.value.status === 'ok' ? undefined : 'provider_reported_unhealthy',
-        message:
-          health.value.status === 'ok'
-            ? undefined
-            : `Provider报告状态：${health.value.status || 'unknown'}`,
-      };
-    } catch (error) {
-      healthMeta.value = unavailableMeta('data-service health', error, {
-        unit: 'service status',
-        timezone: 'source-defined',
-      });
+    } catch {
+      health.value = { status: 'unavailable', service: '数据服务', update_frequency: 'unknown' };
     } finally {
       loading.value = false;
     }

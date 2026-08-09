@@ -1,7 +1,7 @@
-<template>
+﻿<template>
   <section class="spread-statistics" data-testid="spread-statistics-section">
     <article>
-      <header><h2>损益拆分</h2><span>只读</span></header>
+      <header><h2>损益拆分</h2></header>
       <dl
         ><div v-for="item in decomposition" :key="item.label"
           ><dt>{{ item.label }}</dt
@@ -10,7 +10,7 @@
       >
     </article>
     <article>
-      <header><h2>研究场景</h2><span>不可执行</span></header>
+      <header><h2>研究场景</h2></header>
       <div class="scenario-grid">
         <section v-for="item in scenarios" :key="item.title"
           ><strong>{{ item.title }}</strong
@@ -51,10 +51,6 @@
   h2 {
     margin: 0;
     font-size: 17px;
-  }
-  header span {
-    color: #846116;
-    font-size: 11px;
   }
   dl {
     display: grid;

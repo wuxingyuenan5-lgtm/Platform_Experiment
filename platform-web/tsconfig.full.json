@@ -1,12 +1,14 @@
-{
+﻿{
   "$schema": "https://json.schemastore.org/tsconfig",
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "strict": false,
     "noUnusedLocals": false,
-    "noUnusedParameters": false
+    "noUnusedParameters": false,
+    "allowJs": true
   },
   "include": [
+    "scripts/**/*.cjs",
     "internal/**/*.ts",
     "src/access/**/*.ts",
     "src/api/hedgeResearch.ts",
@@ -24,6 +26,8 @@
     "src/hooks/trading/**/*.ts",
     "src/hooks/web/useECharts.ts",
     "src/layouts/default/menu/**/*.vue",
+    "src/layouts/default/header/components/notify/**/*.vue",
+    "src/layouts/default/risk/**/*.tsx",
     "src/router/helper/routeHelper.ts",
     "src/router/routes/index.ts",
     "src/router/routes/modules/**/*.ts",

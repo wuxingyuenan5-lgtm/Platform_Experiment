@@ -1,11 +1,6 @@
 <template>
   <PageWrapper :title="pageTitle">
-    <main class="news-page" data-testid="news-calendar-original-structure">
-      <header class="page-identity">
-        <div><span>NEWS · CALENDAR · WEALTH</span><h1>新闻日历与理财</h1></div>
-        <b>{{ sectionLabel }}</b>
-      </header>
-
+    <main class="news-page">
       <div class="news-layout">
         <aside class="section-sidebar" aria-label="新闻日历与理财导航">
           <RouterLink
@@ -14,138 +9,169 @@
             :to="item.path"
             :class="{ 'is-active': section === item.key }"
           >
-            <component :is="item.icon" /><span>{{ item.label }}</span>
+            <component :is="item.icon" />
+            <span>{{ item.label }}</span>
           </RouterLink>
         </aside>
 
         <section class="section-content">
-          <template v-if="section === 'macro'">
-            <RestoredProductDataBanner
-              state="live"
-              source="TradingView Economic Calendar"
-              as-of="provider-defined"
-              :actionable="false"
-              message="宏观日历直接读取第三方公开 Widget；Platform 不缓存或改写事件数值。"
-            />
+          <section v-if="section === 'macro'" class="panel-card calendar-panel">
+            <header class="section-head">
+              <div>
+                <span>MACRO CALENDAR</span>
+                <h2>宏观日历</h2>
+              </div>
+            </header>
             <TradingViewEconomicCalendarPanel />
-          </template>
+          </section>
 
-          <RestoredProductSurface
-            v-else-if="section === 'news'"
-            :state="newsSampleMeta.state"
-            :source="newsSampleMeta.source"
-            :as-of="newsSampleMeta.asOf"
-            :actionable="newsSampleMeta.actionable"
-            message="原新闻资产切换、重点卡片和摘要网格已恢复；全部内容为明确样例，不冒充实时新闻。"
-          >
-            <section class="panel-card" data-testid="news-digest-original-structure">
-              <header class="section-head"
-                ><div><span>NEWS DIGEST</span><h2>新闻整理</h2></div
-                ><em>Sample</em></header
+          <section v-else-if="section === 'news'" class="panel-card">
+            <header class="section-head">
+              <div>
+                <span>NEWS DIGEST</span>
+                <h2>新闻整理</h2>
+              </div>
+            </header>
+
+            <nav class="news-asset-tabs" aria-label="新闻资产分类">
+              <button
+                v-for="asset in newsDigestSections"
+                :key="asset.key"
+                type="button"
+                :class="{ 'is-active': activeNewsAsset === asset.key }"
+                @click="activeNewsAsset = asset.key"
               >
-              <nav class="news-asset-tabs" aria-label="新闻资产分类">
-                <button
-                  v-for="asset in newsDigestSections"
-                  :key="asset.key"
-                  type="button"
-                  :class="{ 'is-active': activeNewsAsset === asset.key }"
-                  @click="activeNewsAsset = asset.key"
-                >
-                  <span>{{ asset.index }}</span
-                  ><strong>{{ asset.label }}</strong>
-                </button>
-              </nav>
-              <section v-if="activeNewsSection" class="digest-shell">
-                <article class="feature-card">
-                  <div class="eyebrow">{{ activeNewsSection.eyebrow }}</div>
-                  <h3>{{ activeNewsSection.items[0].title }}</h3>
-                  <p>{{ activeNewsSection.items[0].summary }}</p>
-                  <div class="meta-row"
-                    ><span>{{ activeNewsSection.items[0].publishedAt }}</span
-                    ><span>{{ activeNewsSection.items[0].source }}</span
-                    ><span>重要度 P{{ activeNewsSection.items[0].importance }}</span></div
-                  >
-                </article>
-                <div class="digest-grid">
-                  <article
-                    v-for="item in activeNewsSection.items.slice(1)"
-                    :key="item.id"
-                    class="digest-card"
-                  >
-                    <div class="digest-card__head"
-                      ><h4>{{ item.title }}</h4
-                      ><em :class="`bias-${item.bias}`">{{ biasLabel(item.bias) }}</em></div
-                    >
-                    <p>{{ item.summary }}</p>
-                    <div class="meta-row"
-                      ><span>{{ item.publishedAt }}</span
-                      ><span>{{ item.source }}</span></div
-                    >
-                  </article>
+                <span>{{ asset.index }}</span>
+                <strong>{{ asset.label }}</strong>
+              </button>
+            </nav>
+
+            <section v-if="activeNewsSection" class="digest-shell">
+              <article class="feature-card">
+                <div class="eyebrow">{{ activeNewsSection.eyebrow }}</div>
+                <h3>{{ activeNewsSection.items[0].title }}</h3>
+                <p>{{ activeNewsSection.items[0].summary }}</p>
+                <div class="impact-row">
+                  <span>{{ activeNewsSection.items[0].publishedAt }}</span>
+                  <span>{{ activeNewsSection.items[0].source }}</span>
+                  <span>重要度 P{{ activeNewsSection.items[0].importance }}</span>
+                  <em :class="newsBiasClass(activeNewsSection.items[0].bias)">
+                    {{ newsBiasLabel(activeNewsSection.items[0].bias) }}
+                  </em>
                 </div>
-              </section>
-            </section>
-          </RestoredProductSurface>
+                <p class="section-description">{{ activeNewsSection.description }}</p>
+              </article>
 
-          <RestoredProductSurface
-            v-else
-            :state="wealthSampleMeta.state"
-            :source="wealthSampleMeta.source"
-            :as-of="wealthSampleMeta.asOf"
-            :actionable="wealthSampleMeta.actionable"
-            message="原筛选、收益排序和活动列表结构已恢复；样例利率不构成事实、推荐、收益承诺或申购入口。"
-          >
-            <section class="wealth-page" data-testid="wealth-original-structure">
-              <header class="wealth-header"
-                ><div><span>WEALTH INFORMATION</span><h2>理财信息</h2></div
-                ><div
-                  ><button type="button" disabled>刷新数据</button
-                  ><button type="button" disabled>打开参考页面</button></div
-                ></header
-              >
-              <div class="wealth-toolbar">
-                <select v-model="wealthFilters.frequency" aria-label="派息频度"
-                  ><option value="all">不限频度</option
-                  ><option value="daily">每日派息</option
-                  ><option value="fixed">锁仓固定</option
-                  ><option value="floating">利率浮动</option></select
+              <div class="digest-grid">
+                <article
+                  v-for="item in activeNewsSection.items.slice(1)"
+                  :key="item.id"
+                  class="digest-card"
                 >
-                <select v-model="wealthFilters.lock" aria-label="锁定期限"
-                  ><option value="all">不限锁定日期</option
-                  ><option value="short">7天以内</option
-                  ><option value="mid">30天以内</option
-                  ><option value="long">长期</option></select
-                >
-                <input v-model="wealthFilters.keyword" placeholder="按活动名称搜索…" />
-              </div>
-              <div class="wealth-table-head"
-                ><span>活动</span
-                ><button type="button" @click="yieldDesc = !yieldDesc"
-                  >示例年利率 {{ yieldDesc ? '↓' : '↑' }}</button
-                ><span>标签</span><span>到期时间</span></div
-              >
-              <div class="wealth-list">
-                <article v-for="item in filteredWealthCampaigns" :key="item.id" class="wealth-row">
-                  <div class="wealth-campaign"
-                    ><strong>{{ item.name }}</strong
-                    ><p>{{ item.platform }}</p></div
-                  >
-                  <div class="wealth-yield"
-                    ><strong>{{ item.apy }}</strong
-                    ><p>{{ item.apyNote }}</p></div
-                  >
-                  <div class="wealth-tags"
-                    ><span v-for="tag in item.tags" :key="tag">{{ tag }}</span></div
-                  >
-                  <div class="wealth-expiry"
-                    ><strong>{{ item.expiryLabel }}</strong
-                    ><p>{{ item.expiryNote }}</p></div
-                  >
-                  <button type="button" disabled data-write-action="true">不可申购</button>
+                  <div class="digest-card__head">
+                    <h4>{{ item.title }}</h4>
+                    <em :class="newsBiasClass(item.bias)">{{ newsBiasLabel(item.bias) }}</em>
+                  </div>
+                  <p>{{ item.summary }}</p>
+                  <div class="impact-row">
+                    <span>{{ item.publishedAt }}</span>
+                    <span>{{ item.source }}</span>
+                    <span>P{{ item.importance }}</span>
+                  </div>
                 </article>
               </div>
             </section>
-          </RestoredProductSurface>
+          </section>
+
+          <section v-else class="wealth-page">
+            <header class="wealth-header">
+              <div>
+                <span>WEALTH INFORMATION</span>
+                <h2>理财信息</h2>
+              </div>
+              <div class="wealth-actions">
+                <button type="button" class="wealth-reference-button" @click="openEmbeddedUrl">
+                  打开参考页面
+                </button>
+              </div>
+            </header>
+
+            <div class="wealth-toolbar">
+              <label>
+                <span>平台</span>
+                <select v-model="wealthFilters.exchange">
+                  <option value="all">全部平台</option>
+                  <option v-for="item in exchangeOptions" :key="item.value" :value="item.value">
+                    {{ item.label }}
+                  </option>
+                </select>
+              </label>
+              <label>
+                <span>派息</span>
+                <select v-model="wealthFilters.frequency">
+                  <option value="all">不限派息</option>
+                  <option value="daily">每日派息</option>
+                  <option value="fixed">固定期限</option>
+                  <option value="floating">浮动利率</option>
+                </select>
+              </label>
+              <label>
+                <span>期限</span>
+                <select v-model="wealthFilters.lock">
+                  <option value="all">不限期限</option>
+                  <option value="short">7 天以内</option>
+                  <option value="mid">30 天以内</option>
+                  <option value="long">长期</option>
+                </select>
+              </label>
+              <label class="wealth-search">
+                <span>搜索</span>
+                <input v-model="wealthFilters.keyword" placeholder="搜索平台、币种或活动" />
+              </label>
+            </div>
+
+            <div class="wealth-table-head">
+              <span>活动</span>
+              <span>平台 / 币种</span>
+              <button type="button" @click="toggleYieldSort">
+                收益率 {{ wealthSortOrder === 'desc' ? '↓' : '↑' }}
+              </button>
+              <span>期限 / 锁仓</span>
+              <span>到期时间</span>
+              <span>活动说明</span>
+            </div>
+
+            <div v-if="!filteredWealthCampaigns.length" class="wealth-empty">暂无匹配活动</div>
+            <div v-else class="wealth-list">
+              <article v-for="item in filteredWealthCampaigns" :key="item.id" class="wealth-row">
+                <div class="wealth-campaign">
+                  <strong>{{ item.name }}</strong>
+                  <div class="wealth-tags">
+                    <span v-for="tag in item.tags" :key="tag">{{ tag }}</span>
+                  </div>
+                </div>
+                <div>
+                  <strong>{{ item.platform }}</strong>
+                  <p>{{ item.coin }}</p>
+                </div>
+                <div class="wealth-yield">
+                  <strong>{{ item.apy }}</strong>
+                  <p>{{ item.apyNote }}</p>
+                </div>
+                <div>
+                  <strong>{{ lockLabel(item.lock) }}</strong>
+                  <p>{{ frequencyLabel(item.frequency) }}</p>
+                </div>
+                <div class="wealth-expiry">
+                  <strong :class="{ 'is-urgent': item.daysLeft <= 1 }">{{
+                    item.expiryLabel
+                  }}</strong>
+                  <p>{{ item.expiryNote }}</p>
+                </div>
+                <p class="wealth-description">{{ item.description }}</p>
+              </article>
+            </div>
+          </section>
         </section>
       </div>
     </main>
@@ -157,105 +183,114 @@
   import { RouterLink, useRoute } from 'vue-router';
   import { CalendarOutlined, FileSearchOutlined, FundOutlined } from '@ant-design/icons-vue';
   import { PageWrapper } from '@/components/Page';
-  import RestoredProductDataBanner from '@/components/ProductDataState/RestoredProductDataBanner.vue';
-  import RestoredProductSurface from '@/components/ProductDataState/RestoredProductSurface.vue';
   import {
     newsDigestSections,
-    newsSampleMeta,
     wealthCampaigns,
-    wealthSampleMeta,
     type NewsAssetKey,
+    type NewsDigestItem,
+    type WealthFrequency,
+    type WealthLock,
   } from '@/data/sample/news';
   import TradingViewEconomicCalendarPanel from '@/views/hedgeBoard/tradingTools/components/TradingViewEconomicCalendarPanel.vue';
 
   type NewsSection = 'macro' | 'news' | 'wealth';
+  type SortOrder = 'desc' | 'asc';
+
   const route = useRoute();
   const activeNewsAsset = ref<NewsAssetKey>('macro');
-  const yieldDesc = ref(true);
-  const wealthFilters = reactive({ frequency: 'all', lock: 'all', keyword: '' });
-  const section = computed<NewsSection>(() =>
-    route.meta.newsSection === 'news' || route.meta.newsSection === 'wealth'
-      ? route.meta.newsSection
-      : 'macro',
-  );
+  const wealthSortOrder = ref<SortOrder>('desc');
+  const wealthFilters = reactive({
+    exchange: 'all',
+    frequency: 'all',
+    lock: 'all',
+    keyword: '',
+  });
+
+  const section = computed<NewsSection>(() => {
+    if (route.path.endsWith('/news')) return 'news';
+    if (route.path.endsWith('/wealth')) return 'wealth';
+    const value = route.meta.newsSection;
+    if (value === 'news' || value === 'wealth') return value;
+    return 'macro';
+  });
   const pageTitle = computed(() => '新闻日历与理财');
-  const sectionLabel = computed(
-    () => ({ macro: '宏观日历', news: '新闻整理', wealth: '理财信息' }[section.value]),
-  );
   const sectionTabs: Array<{ key: NewsSection; label: string; path: string; icon: Component }> = [
     { key: 'macro', label: '宏观日历', path: '/news-calendar/macro', icon: CalendarOutlined },
     { key: 'news', label: '新闻整理', path: '/news-calendar/news', icon: FileSearchOutlined },
     { key: 'wealth', label: '理财信息', path: '/news-calendar/wealth', icon: FundOutlined },
   ];
-  const activeNewsSection = computed(() =>
-    newsDigestSections.find((item) => item.key === activeNewsAsset.value),
+  const exchangeOptions = [
+    { value: 'gate', label: 'Gate' },
+    { value: 'aave', label: 'Aave' },
+    { value: 'binance', label: 'Binance' },
+    { value: 'bitget', label: 'Bitget' },
+    { value: 'okx', label: 'OKX' },
+    { value: 'bybit', label: 'Bybit' },
+  ];
+  const activeNewsSection = computed(
+    () =>
+      newsDigestSections.find((item) => item.key === activeNewsAsset.value) ??
+      newsDigestSections[0],
   );
-  const filteredWealthCampaigns = computed(() =>
-    wealthCampaigns
-      .filter(
-        (item) => wealthFilters.frequency === 'all' || item.frequency === wealthFilters.frequency,
-      )
-      .filter((item) => wealthFilters.lock === 'all' || item.lock === wealthFilters.lock)
-      .filter((item) =>
-        item.name.toLowerCase().includes(wealthFilters.keyword.trim().toLowerCase()),
-      )
+  const filteredWealthCampaigns = computed(() => {
+    const keyword = wealthFilters.keyword.trim().toLowerCase();
+    const rows = wealthCampaigns.filter((item) => {
+      if (wealthFilters.exchange !== 'all' && item.exchange !== wealthFilters.exchange)
+        return false;
+      if (wealthFilters.frequency !== 'all' && item.frequency !== wealthFilters.frequency)
+        return false;
+      if (wealthFilters.lock !== 'all' && item.lock !== wealthFilters.lock) return false;
+      if (!keyword) return true;
+      return [item.name, item.platform, item.coin].join(' ').toLowerCase().includes(keyword);
+    });
+    return rows
       .slice()
       .sort((left, right) =>
-        yieldDesc.value ? right.apyValue - left.apyValue : left.apyValue - right.apyValue,
-      ),
-  );
-  function biasLabel(value: 'positive' | 'neutral' | 'negative') {
-    return { positive: '偏正面', neutral: '中性', negative: '偏负面' }[value];
+        wealthSortOrder.value === 'desc'
+          ? right.apyValue - left.apyValue
+          : left.apyValue - right.apyValue,
+      );
+  });
+
+  function toggleYieldSort() {
+    wealthSortOrder.value = wealthSortOrder.value === 'desc' ? 'asc' : 'desc';
+  }
+  function openEmbeddedUrl() {
+    const url = String(route.meta.embeddedUrl || 'https://app.barker.money/campaigns');
+    window.open(url, '_blank', 'noopener,noreferrer');
+  }
+  function newsBiasClass(bias: NewsDigestItem['bias']) {
+    return { bull: 'is-bull', neutral: 'is-flat', bear: 'is-bear' }[bias];
+  }
+  function newsBiasLabel(bias: NewsDigestItem['bias']) {
+    return { bull: '偏多', neutral: '中性', bear: '偏空' }[bias];
+  }
+  function frequencyLabel(value: WealthFrequency) {
+    return { daily: '每日派息', fixed: '固定期限', floating: '浮动利率' }[value];
+  }
+  function lockLabel(value: WealthLock) {
+    return { short: '7 天以内', mid: '30 天以内', long: '长期' }[value];
   }
 </script>
 
 <style scoped lang="less">
   .news-page {
-    display: grid;
-    gap: 14px;
     padding: 16px;
-  }
-  .page-identity {
-    display: flex;
-    align-items: flex-end;
-    justify-content: space-between;
-    gap: 14px;
-    padding: 18px 20px;
-    border: 1px solid #e2e8f0;
-    border-radius: 14px;
-    background: #fff;
-  }
-  .page-identity span,
-  .section-head span,
-  .wealth-header span {
-    color: #6c8fb1;
-    font-size: 11px;
-    letter-spacing: 0.15em;
-  }
-  h1 {
-    margin: 4px 0 0;
-    font-size: 25px;
-  }
-  .page-identity b {
-    padding: 6px 10px;
-    border-radius: 999px;
-    background: #eef4fa;
-    color: #45647f;
-    font-size: 12px;
   }
   .news-layout {
     display: grid;
-    grid-template-columns: 190px minmax(0, 1fr);
+    grid-template-columns: 180px minmax(0, 1fr);
     gap: 16px;
     min-width: 0;
   }
   .section-sidebar {
-    display: flex;
-    flex-direction: column;
+    position: sticky;
+    top: 12px;
+    display: grid;
     align-self: start;
-    gap: 6px;
+    gap: 7px;
     padding: 8px;
-    border: 1px solid #e7edf3;
+    border: 1px solid #e2e8f0;
     border-radius: 10px;
     background: #fff;
   }
@@ -265,12 +300,12 @@
     gap: 9px;
     padding: 10px 12px;
     border-radius: 7px;
-    color: #59636e;
+    color: #526173;
   }
   .section-sidebar a.is-active {
-    background: #edf6ff;
+    background: #eaf4ff;
     color: #1769aa;
-    font-weight: 600;
+    font-weight: 700;
   }
   .section-content {
     min-width: 0;
@@ -291,61 +326,92 @@
     justify-content: space-between;
     gap: 14px;
   }
-  h2 {
-    margin: 4px 0 0;
-    font-size: 20px;
-  }
-  .section-head em {
-    padding: 4px 8px;
-    border-radius: 999px;
-    background: #fff5d6;
-    color: #8a6210;
+  .section-head span,
+  .wealth-header span {
+    color: #6c7d90;
     font-size: 11px;
-    font-style: normal;
+    font-weight: 800;
+    letter-spacing: 0.14em;
   }
-  .news-asset-tabs {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 8px;
-  }
-  .news-asset-tabs button {
+  .wealth-actions {
     display: flex;
     align-items: center;
     gap: 8px;
-    padding: 11px;
-    border: 1px solid #e3e8ef;
-    border-radius: 10px;
+  }
+  .wealth-reference-button {
+    height: 34px;
+    padding: 0 14px;
+    border: 1px solid #d8e2ee;
+    border-radius: 8px;
     background: #fff;
-    color: #667085;
+    color: #294a67;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .wealth-reference-button:hover {
+    border-color: #aac7df;
+    background: #edf6ff;
+  }
+  h2 {
+    margin: 4px 0 0;
+    color: #172033;
+    font-size: 20px;
+  }
+  .news-asset-tabs {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 8px;
+  }
+  .news-asset-tabs button {
+    display: grid;
+    gap: 4px;
+    min-width: 0;
+    padding: 10px;
+    border: 1px solid #e3e8ef;
+    border-radius: 8px;
+    background: #fff;
+    color: #647084;
+    text-align: left;
   }
   .news-asset-tabs button.is-active {
-    border-color: #abc5dc;
-    background: #edf5fb;
+    border-color: #aac7df;
+    background: #edf6ff;
     color: #294a67;
-  }
-  .news-asset-tabs span {
-    font-size: 11px;
   }
   .digest-shell {
     display: grid;
-    grid-template-columns: 0.9fr 1.3fr;
+    grid-template-columns: minmax(280px, 0.9fr) minmax(0, 1.35fr);
     gap: 12px;
   }
   .feature-card,
   .digest-card {
     padding: 16px;
     border: 1px solid #e3e8ef;
-    border-radius: 12px;
+    border-radius: 10px;
     background: #fafbfd;
   }
+  .eyebrow {
+    color: #6c7d90;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+  }
   .feature-card h3 {
-    margin: 8px 0;
-    font-size: 21px;
+    margin: 10px 0;
+    color: #172033;
+    font-size: 22px;
   }
   .feature-card p,
-  .digest-card p {
+  .digest-card p,
+  .wealth-description {
+    margin: 8px 0 0;
     color: #667085;
     line-height: 1.65;
+  }
+  .section-description {
+    padding-top: 10px;
+    border-top: 1px solid #e4e9f0;
   }
   .digest-grid {
     display: grid;
@@ -359,65 +425,66 @@
   }
   .digest-card h4 {
     margin: 0;
+    color: #172033;
     font-size: 16px;
   }
-  .digest-card em {
-    font-size: 11px;
-    font-style: normal;
-  }
-  .bias-positive {
-    color: #087a55;
-  }
-  .bias-neutral {
-    color: #667085;
-  }
-  .bias-negative {
-    color: #b42318;
-  }
-  .meta-row {
+  .impact-row {
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
+    margin-top: 12px;
     color: #8490a0;
     font-size: 11px;
   }
-  .wealth-header > div:last-child,
-  .wealth-toolbar {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
+  .impact-row em,
+  .digest-card__head em {
+    font-style: normal;
+    font-weight: 800;
   }
-  .wealth-header button,
-  .wealth-row > button {
-    padding: 8px 11px;
-    border: 0;
-    border-radius: 8px;
-    background: #e7ecf3;
-    color: #748094;
+  .is-bull {
+    color: #087a55;
+  }
+  .is-flat {
+    color: #667085;
+  }
+  .is-bear {
+    color: #b42318;
+  }
+  .wealth-toolbar {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(140px, 180px)) minmax(220px, 1fr);
+    gap: 10px;
+  }
+  .wealth-toolbar label {
+    display: grid;
+    gap: 6px;
+  }
+  .wealth-toolbar span {
+    color: #667085;
+    font-size: 12px;
+    font-weight: 700;
   }
   .wealth-toolbar select,
   .wealth-toolbar input {
     height: 36px;
+    min-width: 0;
     padding: 0 10px;
     border: 1px solid #dce3eb;
     border-radius: 8px;
     background: #fff;
   }
-  .wealth-toolbar input {
-    flex: 1;
-    min-width: 180px;
-  }
   .wealth-table-head,
   .wealth-row {
     display: grid;
-    grid-template-columns: 1.1fr 0.8fr 1fr 0.7fr auto;
-    align-items: center;
+    grid-template-columns: 1.1fr 0.9fr 0.8fr 0.7fr 0.8fr 1.15fr;
+    align-items: start;
     gap: 12px;
   }
   .wealth-table-head {
     padding: 0 12px;
     color: #778396;
     font-size: 12px;
+    font-weight: 700;
   }
   .wealth-table-head button {
     border: 0;
@@ -429,15 +496,24 @@
     display: grid;
     gap: 8px;
   }
+  .wealth-empty {
+    padding: 28px 16px;
+    border: 1px dashed #d8e0ea;
+    border-radius: 10px;
+    background: #fafbfd;
+    color: #667085;
+    text-align: center;
+  }
   .wealth-row {
     padding: 14px;
     border: 1px solid #e5eaf0;
-    border-radius: 11px;
+    border-radius: 10px;
     background: #fafbfd;
   }
-  .wealth-campaign p,
-  .wealth-yield p,
-  .wealth-expiry p {
+  .wealth-row strong {
+    color: #172033;
+  }
+  .wealth-row p {
     margin: 4px 0 0;
     color: #7b8798;
     font-size: 12px;
@@ -446,10 +522,14 @@
     color: #225a96;
     font-size: 20px;
   }
+  .wealth-expiry .is-urgent {
+    color: #b42318;
+  }
   .wealth-tags {
     display: flex;
     flex-wrap: wrap;
     gap: 5px;
+    margin-top: 8px;
   }
   .wealth-tags span {
     padding: 4px 7px;
@@ -458,13 +538,24 @@
     color: #526b82;
     font-size: 11px;
   }
-  @media (max-width: 980px) {
+  @media (max-width: 1200px) {
+    .news-asset-tabs {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+    .wealth-table-head,
+    .wealth-row {
+      grid-template-columns: 1fr 0.8fr 0.75fr;
+    }
+  }
+  @media (max-width: 900px) {
     .news-layout,
-    .digest-shell {
+    .digest-shell,
+    .wealth-toolbar {
       grid-template-columns: 1fr;
     }
     .section-sidebar {
-      flex-direction: row;
+      position: static;
+      display: flex;
       overflow-x: auto;
     }
     .section-sidebar a {
@@ -473,19 +564,10 @@
     .wealth-table-head {
       display: none;
     }
-    .wealth-row {
-      grid-template-columns: 1fr 1fr;
-    }
   }
   @media (max-width: 620px) {
-    .page-identity,
-    .section-head,
-    .wealth-header {
-      flex-direction: column;
-      align-items: stretch;
-    }
     .news-asset-tabs {
-      grid-template-columns: repeat(2, 1fr);
+      grid-template-columns: repeat(2, minmax(0, 1fr));
     }
     .wealth-row {
       grid-template-columns: 1fr;

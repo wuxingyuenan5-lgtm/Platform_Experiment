@@ -1,10 +1,10 @@
-<template>
+﻿<template>
   <div class="strategy-page">
     <div class="toolbar">
       <Space>
         <Tag :color="roleColor">{{ roleLabel }}</Tag>
         <Tag :color="canOperateData ? 'blue' : 'default'">
-          {{ canOperateData ? '可同步' : '只读' }}
+          {{ canOperateData ? '可同步' : '待同步' }}
         </Tag>
       </Space>
       <Button :loading="loading" @click="loadStrategyState">
@@ -49,7 +49,9 @@
           >
             <template #bodyCell="{ column, record }">
               <template v-if="column.key === 'status'">
-                <Tag :color="record.status === 'active' ? 'green' : 'default'">{{ record.status }}</Tag>
+                <Tag :color="record.status === 'active' ? 'green' : 'default'">{{
+                  record.status
+                }}</Tag>
               </template>
               <template v-else-if="column.key === 'ready'">
                 <Tag :color="record.asset_updated_at ? 'green' : 'orange'">
@@ -64,15 +66,15 @@
         </Card>
       </Col>
       <Col :xs="24" :xl="10">
-        <Card :bordered="false" title="策略服务状态" class="vg-panel">
+        <Card :bordered="false" title="数据状态" class="vg-panel">
           <Descriptions :column="1" size="small">
-            <Descriptions.Item label="strategy-service">
-              <Tag color="default">未启用</Tag>
+            <Descriptions.Item label="策略状态">
+              <Tag color="default">待同步</Tag>
             </Descriptions.Item>
-            <Descriptions.Item label="data-service">
+            <Descriptions.Item label="数据状态">
               <Tag :color="health.status === 'ok' ? 'green' : 'orange'">{{ health.status }}</Tag>
             </Descriptions.Item>
-            <Descriptions.Item label="可操作角色">
+            <Descriptions.Item label="当前角色">
               <Tag :color="canOperateData ? 'blue' : 'default'">
                 {{ canOperateData ? 'employee/admin' : roleLabel }}
               </Tag>
@@ -87,7 +89,17 @@
 
 <script setup lang="ts">
   import { computed, onMounted, ref } from 'vue';
-  import { Button, Card, Col, Descriptions, Row, Space, Statistic, Table, Tag } from 'ant-design-vue';
+  import {
+    Button,
+    Card,
+    Col,
+    Descriptions,
+    Row,
+    Space,
+    Statistic,
+    Table,
+    Tag,
+  } from 'ant-design-vue';
   import { ReloadOutlined } from '@ant-design/icons-vue';
   import { DataAccount, DataServiceHealth, getAccounts, getDataHealth } from '@/api/riskControl';
   import { useRoleAccess } from '@/hooks/web/useRoleAccess';
@@ -97,16 +109,21 @@
   const accounts = ref<DataAccount[]>([]);
   const health = ref<DataServiceHealth>({
     status: 'unknown',
-    service: 'data-service',
+    service: '数据状态',
     update_frequency: '-',
   });
   const { roleLabel, roleColor, canOperateData } = useRoleAccess();
 
   const activeAccounts = computed(() => accounts.value.filter((item) => item.status === 'active'));
-  const bybitAccounts = computed(() => accounts.value.filter((item) => item.account_type === 'bybit'));
+  const bybitAccounts = computed(() =>
+    accounts.value.filter((item) => item.account_type === 'bybit'),
+  );
   const syncedAccounts = computed(() => accounts.value.filter((item) => !!item.asset_updated_at));
   const latestUpdate = computed(() => {
-    const times = accounts.value.map((item) => item.asset_updated_at).filter(Boolean).sort();
+    const times = accounts.value
+      .map((item) => item.asset_updated_at)
+      .filter(Boolean)
+      .sort();
     return times[times.length - 1] || '';
   });
   const latestUpdateText = computed(() => formatDateTime(latestUpdate.value));
