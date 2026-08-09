@@ -23,6 +23,7 @@ const hedge: AppRouteModule = {
         icon: 'ant-design:global-outlined',
         roles: [RoleEnum.ADMIN, RoleEnum.EMPLOYEE],
         hedgeCategory: 'macro',
+        ignoreKeepAlive: true,
       },
     },
     {
@@ -34,6 +35,7 @@ const hedge: AppRouteModule = {
         icon: 'ant-design:gold-outlined',
         roles: [RoleEnum.ADMIN, RoleEnum.EMPLOYEE],
         hedgeCategory: 'gold',
+        ignoreKeepAlive: true,
       },
     },
     {
@@ -45,6 +47,7 @@ const hedge: AppRouteModule = {
         icon: 'ant-design:cloud-outlined',
         roles: [RoleEnum.ADMIN, RoleEnum.EMPLOYEE],
         hedgeCategory: 'crypto',
+        ignoreKeepAlive: true,
       },
     },
     {
@@ -56,6 +59,7 @@ const hedge: AppRouteModule = {
         icon: 'ant-design:stock-outlined',
         roles: [RoleEnum.ADMIN, RoleEnum.EMPLOYEE],
         hedgeCategory: 'us',
+        ignoreKeepAlive: true,
       },
     },
     {
@@ -67,6 +71,7 @@ const hedge: AppRouteModule = {
         icon: 'ant-design:bar-chart-outlined',
         roles: [RoleEnum.ADMIN, RoleEnum.EMPLOYEE],
         hedgeCategory: 'aShare',
+        ignoreKeepAlive: true,
       },
     },
     {
@@ -78,6 +83,7 @@ const hedge: AppRouteModule = {
         icon: 'ant-design:global-outlined',
         roles: [RoleEnum.ADMIN, RoleEnum.EMPLOYEE],
         hedgeCategory: 'global',
+        ignoreKeepAlive: true,
       },
     },
     {

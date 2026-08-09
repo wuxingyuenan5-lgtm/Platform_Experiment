@@ -56,19 +56,19 @@ CURRENT_STATE_ALIASES = re.compile(r"^current[-_]state\.md$", re.IGNORECASE)
 START_HERE_ALIASES = re.compile(r"^start[-_]here(?:\.md)?$", re.IGNORECASE)
 DELETED_ACTIVE_TREES = re.compile(r"(?:^|/)(?:planning|tasks|projects)/", re.IGNORECASE)
 HISTORICAL_CONTEXT = re.compile(
-    r"历史|historical|retired|superseded|completed|已完成|已归档|非当前|not current",
+    r"鍘嗗彶|historical|retired|superseded|completed|宸插畬鎴恷宸插綊妗闈炲綋鍓峾not current",
     re.IGNORECASE,
 )
 CURRENT_LEGACY_STATUS = re.compile(
-    r"(?:当前阶段|实施计划|适用版本|^#).*?(?:Platform\s+V6|Production\s+Gate|0\.9\.\d+.*Phase|Phase\s*[0-9])",
+    r"(?:褰撳墠闃舵|瀹炴柦璁″垝|閫傜敤鐗堟湰|^#).*?(?:Platform\s+V6|Production\s+Gate|0\.9\.\d+.*Phase|Phase\s*[0-9])",
     re.IGNORECASE,
 )
 ACTIVE_STATUS_PATTERN = re.compile(
-    r"^(?:状态：`active`|Status:\s*active)\s*$",
+    r"^(?:鐘舵€侊細`active`|Status:\s*active)\s*$",
     re.IGNORECASE | re.MULTILINE,
 )
 DRAFT_PR_STATUS_PATTERN = re.compile(
-    r"状态[^\n]*(?:frozen\s+for\s+)?Draft\s+PR\s*#\d+[^\n]*(?:acceptance)?",
+    r"鐘舵€乕^\n]*(?:frozen\s+for\s+)?Draft\s+PR\s*#\d+[^\n]*(?:acceptance)?",
     re.IGNORECASE,
 )
 CURRENT_STATE_STALE_MARKERS = (
@@ -76,8 +76,8 @@ CURRENT_STATE_STALE_MARKERS = (
     "remains outside the current non-UI scope",
 )
 CURRENT_STATE_SCOPE_REQUIREMENTS = (
-    ("browser access", "浏览器权限", "浏览器访问"),
-    ("frontend product restoration", "product restoration", "前端产品恢复", "前端恢复"),
+    ("browser access", "Capability alignment"),
+    ("frontend product restoration", "restored product pages", "product restoration"),
 )
 AUTH_CONTRACT_PATH = "docs/technical/AUTH_RBAC_LIVE_SESSIONS.md"
 WORKSTATION_PATH_PATTERNS = (
@@ -116,6 +116,14 @@ def candidate_version(root: Path) -> str:
     if not version_path.is_file():
         return ""
     return version_path.read_text(encoding="utf-8").strip()
+
+
+def next_patch_version(version: str) -> str:
+    parts = version.split(".")
+    if len(parts) != 3 or not all(part.isdigit() for part in parts):
+        return version
+    major, minor, patch = (int(part) for part in parts)
+    return f"{major}.{minor}.{patch + 1}"
 
 
 def candidate_authority_paths(root: Path) -> list[Path]:
@@ -236,8 +244,9 @@ def validate_candidate_documentation(
     paths: Iterable[Path] | None = None,
 ) -> list[str]:
     errors: list[str] = []
-    version = candidate_version(root)
-    if not version:
+    stable_version = candidate_version(root)
+    candidate = next_patch_version(stable_version)
+    if not stable_version:
         errors.append("VERSION is missing or empty for candidate documentation validation")
 
     candidate_paths = list(paths) if paths is not None else candidate_authority_paths(root)
@@ -257,7 +266,7 @@ def validate_candidate_documentation(
     for alternatives in CURRENT_STATE_SCOPE_REQUIREMENTS:
         if not any(alternative.casefold() in current_folded for alternative in alternatives):
             errors.append(
-                f"docs/codex/current-state.md must describe Platform {version} candidate scope: "
+                f"docs/codex/current-state.md must describe Platform {candidate} candidate scope: "
                 + " or ".join(alternatives)
             )
 
@@ -307,16 +316,17 @@ def validate_entrypoints(root: Path) -> list[str]:
 
 def validate_current_authority(root: Path) -> list[str]:
     current = (root / "docs/codex/current-state.md").read_text(encoding="utf-8")
-    version = candidate_version(root)
+    stable_version = candidate_version(root)
+    candidate = next_patch_version(stable_version)
     errors: list[str] = []
     required = (
-        "Stable baseline: Platform `0.10.0`",
-        f"Current candidate target: Platform `{version}`",
+        f"Stable baseline: Platform `{stable_version}`",
+        f"Current candidate target: Platform `{candidate}`",
         "Platform Live Write and Runtime Live Write remain disabled by default",
         "Candidate validation does not mean the candidate is released, deployed or production-ready",
         "remain unverified",
         "must not be assumed",
-        "具体活动分支、HEAD和PR状态属于易变Git/GitHub事实",
+        "Concrete active branch, HEAD and PR state are volatile Git/GitHub facts",
     )
     for anchor in required:
         if anchor not in current:

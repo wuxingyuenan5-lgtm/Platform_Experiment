@@ -47,8 +47,9 @@ The durable browser-access contracts are [Browser Access and Product Data](../co
 ## Global product and frontend criteria
 
 - Every page exposes explicit loading, empty, error, stale/delayed, partial, permission-denied, read-only and degraded states where applicable.
-- Restored formal product pages distinguish `live`, `sample`, `unavailable` and `error` states.
-- `sample` state declares its source, is marked `actionable=false`, and cannot trigger save, strategy, deployment, order or provider actions.
+- Restored formal product pages distinguish `live`, `sample`, `unavailable` and `error` states in their internal data model.
+- Internal envelopes retain source and actionability boundaries, but ordinary product UI uses concise business language and does not expose Provider, source, `actionable` or architecture information.
+- `sample` state is non-actionable and cannot trigger save, strategy deployment, order, execution or provider actions.
 - `error` state remains explicit and cannot be silently presented as a normal `live` or `sample` result.
 - Unknown, delayed or incomplete financial data is never rendered as confirmed zero.
 - Commands are idempotent, auditable and recoverable; `result_unknown` remains unknown until authoritative reconciliation.

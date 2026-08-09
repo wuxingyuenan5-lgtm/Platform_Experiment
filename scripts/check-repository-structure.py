@@ -47,6 +47,14 @@ HISTORICAL_WORKFLOW_PATTERN = re.compile(
 )
 
 
+def next_patch_version(version: str) -> str:
+    parts = version.split(".")
+    if len(parts) != 3 or not all(part.isdigit() for part in parts):
+        return version
+    major, minor, patch = (int(part) for part in parts)
+    return f"{major}.{minor}.{patch + 1}"
+
+
 def imported_top_levels(path: Path) -> set[str]:
     tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
     imports: set[str] = set()
@@ -133,11 +141,12 @@ def check_documents(errors: list[str]) -> None:
             errors.append(f"{relative}: required active entrypoint is missing")
     current = ROOT / "docs/codex/current-state.md"
     version_path = ROOT / "VERSION"
-    candidate_version = version_path.read_text(encoding="utf-8").strip()
+    stable_version = version_path.read_text(encoding="utf-8").strip()
+    candidate_version = next_patch_version(stable_version)
     if current.is_file():
         source = current.read_text(encoding="utf-8")
         for anchor in (
-            "Stable baseline: Platform `0.10.0`",
+            f"Stable baseline: Platform `{stable_version}`",
             f"Current candidate target: Platform `{candidate_version}`",
             "Platform Live Write and Runtime Live Write remain disabled by default",
             f"The Platform {candidate_version} candidate scope includes",

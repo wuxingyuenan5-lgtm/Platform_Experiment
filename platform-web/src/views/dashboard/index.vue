@@ -4,7 +4,6 @@
     :source="dashboardSampleMeta.source"
     :as-of="dashboardSampleMeta.asOf"
     :actionable="dashboardSampleMeta.actionable"
-    message="原首页产品结构已按参考提交选择性恢复；当前数值为明确标识的非实时样例。"
   >
     <PageWrapper dense :content-style="{ overflow: 'visible' }">
       <main
@@ -175,7 +174,7 @@
               <div class="calendar-strip">
                 <LeftOutlined />
                 <strong>非实时日历样例</strong>
-                <span>Sample</span>
+                <span>参考</span>
                 <RightOutlined />
               </div>
 

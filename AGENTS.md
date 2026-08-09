@@ -19,6 +19,7 @@ Use `python scripts/context-for.py <pack>` for bounded task context. Context Pac
 - Formal accounting is rebuilt from immutable Financial Facts. Operational projections are not formal accounting inputs.
 - Preserve exact Decimal values and timezone-aware timestamps at financial boundaries.
 - Live Write is disabled by default. Kill Switch, two-person approval, idempotency and Result Unknown semantics are protected invariants.
+- Restored product pages must not expose developer-facing provider, owner, source, `actionable`, static-design or architecture explanations to ordinary users. Keep those facts in data envelopes, contracts and tests.
 
 ## Change discipline
 
@@ -26,6 +27,7 @@ Use `python scripts/context-for.py <pack>` for bounded task context. Context Pac
 - Keep public API paths, schemas and persistent semantics compatible unless the task explicitly changes a contract.
 - Prefer the smallest ownership boundary that makes pure rules independently testable.
 - Update the current authority instead of creating handoff, evidence-ledger or phase-history documents.
+- For AI-assisted restoration, one executor owns code changes. Additional agents should default to read-only investigation, review or acceptance unless explicitly assigned implementation ownership.
 - Do not infer external production status from repository files. Servers, domains, databases, credentials and venue connectivity require separate evidence.
 
 ## Validation

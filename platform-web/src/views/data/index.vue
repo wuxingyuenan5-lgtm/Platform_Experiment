@@ -164,7 +164,7 @@
         currency: 'USD',
         unit: 'account facts',
         precision: 'decimal-string',
-        message: accountRes.length ? undefined : 'Provider成功返回，但没有账户记录',
+        message: accountRes.length ? undefined : '暂无账户记录',
       };
     } catch (error) {
       accounts.value = [];

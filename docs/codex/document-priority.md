@@ -40,6 +40,10 @@ Human entry point and quick navigation only.
 
 Useful for history, not active design authority.
 
+7. Chat transcripts, phase receipts and ad hoc handoffs
+
+Not long-term authorities. Convert only durable facts into the current owning document.
+
 ## Conflict Resolution
 
 If historical documents conflict with current implementation:

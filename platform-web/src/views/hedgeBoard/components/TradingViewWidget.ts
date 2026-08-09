@@ -164,14 +164,16 @@ const TradingViewWidget = defineComponent({
             'div',
             {
               class: 'local-empty',
-              style: { minHeight: `${props.widget.height ?? 360}px` },
+              'data-widget-height': String(props.widget.height ?? 360),
+              style: { height: `${props.widget.height ?? 360}px` },
             },
             '该外部图表当前加载失败，页面主体已保留，可继续浏览其他模块。',
           )
         : h('div', {
             ref: mountRef,
             class: 'widget-frame',
-            style: { minHeight: `${props.widget.height ?? 360}px` },
+            'data-widget-height': String(props.widget.height ?? 360),
+            style: { height: `${props.widget.height ?? 360}px` },
           });
   },
 });

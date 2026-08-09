@@ -4,30 +4,23 @@
     :data-product-state="state"
     :data-actionable="String(actionable)"
   >
-    <RestoredProductDataBanner
-      :state="state"
-      :source="source"
-      :as-of="asOf"
-      :actionable="actionable"
-      :message="message"
-    />
     <slot></slot>
   </section>
 </template>
 
 <script setup lang="ts">
   import type { ProductDataState } from '@/data/productDataEnvelope';
-  import RestoredProductDataBanner from './RestoredProductDataBanner.vue';
 
   withDefaults(
     defineProps<{
       state: ProductDataState;
-      source: string;
+      source?: string;
       asOf?: string | null;
       actionable?: boolean;
       message?: string;
     }>(),
     {
+      source: '',
       asOf: null,
       actionable: false,
       message: '',

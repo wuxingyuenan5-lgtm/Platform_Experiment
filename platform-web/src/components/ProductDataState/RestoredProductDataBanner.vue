@@ -1,5 +1,6 @@
 <template>
   <div
+    v-if="visible"
     class="restored-product-banner"
     :class="`is-${state}`"
     role="status"
@@ -8,10 +9,6 @@
   >
     <strong>{{ stateLabel }}</strong>
     <span>{{ messageText }}</span>
-    <small>
-      {{ source }}
-      <template v-if="asOf"> · {{ asOf }}</template>
-    </small>
   </div>
 </template>
 
@@ -22,75 +19,50 @@
   const props = withDefaults(
     defineProps<{
       state: ProductDataState;
-      source: string;
+      source?: string;
       asOf?: string | null;
       actionable?: boolean;
       message?: string;
     }>(),
     {
+      source: '',
       asOf: null,
       actionable: false,
       message: '',
     },
   );
 
-  const stateLabel = computed(
-    () =>
-      ({
-        live: '实时数据',
-        sample: '示例数据 · 非实时 · 不可执行',
-        unavailable: '数据源尚未配置',
-        error: '实时数据获取失败',
-      }[props.state]),
-  );
+  const visible = computed(() => ['unavailable', 'error'].includes(props.state));
 
-  const messageText = computed(() => {
-    if (props.message) return props.message;
-    if (props.state === 'sample') return '当前恢复原产品结构，数值仅用于界面展示。';
-    if (props.state === 'error') return '当前展示明确标记的示例内容，不冒充实时结果。';
-    return '数据来源和可操作性以本状态为准。';
-  });
+  const stateLabel = computed(() => '数据暂不可用');
+
+  const messageText = computed(() =>
+    props.state === 'error' ? '当前数据暂时无法获取，请稍后重试。' : '暂无数据。',
+  );
 </script>
 
 <style scoped>
   .restored-product-banner {
     display: grid;
-    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-columns: auto minmax(0, 1fr);
     align-items: center;
     gap: 10px;
     margin: 0 0 12px;
-    padding: 10px 12px;
+    padding: 8px 10px;
     border: 1px solid #d8e2ec;
-    border-radius: 8px;
+    border-radius: 6px;
     background: #f8fafc;
     color: #334155;
     font-size: 13px;
   }
 
   .restored-product-banner strong {
-    color: #9a6700;
-  }
-
-  .restored-product-banner.is-live strong {
-    color: #087a55;
-  }
-
-  .restored-product-banner.is-error strong {
     color: #b42318;
-  }
-
-  .restored-product-banner small {
-    color: #64748b;
-    text-align: right;
   }
 
   @media (max-width: 768px) {
     .restored-product-banner {
       grid-template-columns: 1fr;
-    }
-
-    .restored-product-banner small {
-      text-align: left;
     }
   }
 </style>

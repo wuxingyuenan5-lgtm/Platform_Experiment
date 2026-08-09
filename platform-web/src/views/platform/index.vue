@@ -1,13 +1,21 @@
-<template>
-  <PageWrapper title="交易平台">
+﻿<template>
+  <PageWrapper :title="pageTitle">
     <div class="platform-page">
       <section class="strategy-top-toolbar">
         <div class="strategy-top-toolbar__left">
-          <CompactSegmentTabs :items="deskTabs" :model-value="currentKey" @update:modelValue="selectDesk" />
+          <CompactSegmentTabs
+            :items="deskTabs"
+            :model-value="currentKey"
+            @update:model-value="selectDesk"
+          />
         </div>
 
         <div class="strategy-top-toolbar__meta">
-          <CompactSegmentTabs class="section-switcher" :items="platformSections" v-model="activeSection" />
+          <CompactSegmentTabs
+            class="section-switcher"
+            :items="platformSections"
+            v-model="activeSection"
+          />
         </div>
       </section>
 
@@ -55,36 +63,37 @@
 
   const route = useRoute();
   const router = useRouter();
+  const pageTitle = '\u4ea4\u6613\u5e73\u53f0';
 
   const fundingVenueOptions = ['Bybit', 'Binance', 'OKX'];
   const platformSections = [
-    { key: 'analysis', label: '行情分析' },
-    { key: 'execution', label: '交易执行' },
+    { key: 'analysis', label: '\u884c\u60c5\u5206\u6790' },
+    { key: 'execution', label: '\u4ea4\u6613\u6267\u884c' },
   ];
 
   const desks: DeskConfig[] = [
     {
       key: 'funding',
-      label: '资费',
-      venueLabel: '交易所',
+      label: '\u8d44\u8d39',
+      venueLabel: '\u4ea4\u6613\u6240',
       venueOptions: fundingVenueOptions,
       mainLegOptions: [],
       hedgeLegOptions: [],
     },
     {
       key: 'crossSpread',
-      label: '跨所价差',
+      label: '\u8de8\u6240\u4ef7\u5dee',
       variant: 'crossVenue',
-      venueLabel: '主交易所',
+      venueLabel: '\u4e3b\u4ea4\u6613\u6240',
       venueOptions: ['Bybit', 'Binance', 'OKX'],
       mainLegOptions: ['XAUTUSDT.P'],
       hedgeLegOptions: ['XAUUSD+'],
     },
     {
       key: 'domesticOverseas',
-      label: '海内外价差',
+      label: '\u6d77\u5185\u5916\u4ef7\u5dee',
       variant: 'domesticOverseas',
-      venueLabel: '交易场景',
+      venueLabel: '\u4ea4\u6613\u573a\u666f',
       venueOptions: ['SHFE / XAUUSD', 'AU9999 / XAUUSD'],
       mainLegOptions: ['SHFE.au2606', 'AU9999'],
       hedgeLegOptions: ['XAUUSD'],
@@ -100,7 +109,7 @@
   const selectedFundingSymbol = ref('BTC');
   const selectedMainLeg = ref('XAUTUSDT.P');
   const selectedHedgeLeg = ref('XAUUSD+');
-  const selectedResolution = ref('30分钟');
+  const selectedResolution = ref('\u0033\u0030\u5206\u949f');
   const activeSection = ref<'analysis' | 'execution'>('analysis');
 
   const currentKey = computed<DeskKey>(() => {

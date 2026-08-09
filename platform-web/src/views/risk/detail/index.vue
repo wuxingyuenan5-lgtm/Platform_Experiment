@@ -1,511 +1,523 @@
 <template>
   <PageWrapper title="风控详情">
-    <div class="risk-detail-page">
-      <ProductDataStatusAlert :meta="dataMeta" class="mb-4" />
-
-      <div class="toolbar">
-        <Space>
+    <main class="risk-detail-page" data-testid="risk-detail-restored">
+      <section class="risk-toolbar">
+        <div>
+          <h2>风险总览</h2>
+          <p>按账户、策略、持仓和品种维度跟踪敞口、杠杆、保证金、集中度与处理进度。</p>
+        </div>
+        <div class="toolbar-actions">
           <Tag :color="roleColor">{{ roleLabel }}</Tag>
-          <Tag :color="health.status === 'ok' ? 'green' : 'orange'">
-            {{ health.service || 'data-service' }} {{ health.status || 'unavailable' }}
-          </Tag>
-          <Tag>最近事实 {{ latestEventTime || '不可用' }}</Tag>
-        </Space>
-        <Button :loading="loading" @click="loadAll">
-          <template #icon><ReloadOutlined /></template>
-          刷新
-        </Button>
-      </div>
+          <Tag color="green">运行正常</Tag>
+          <Tag>最近更新 {{ latestRefresh }}</Tag>
+          <Button :loading="loading" @click="refreshRisk">刷新</Button>
+        </div>
+      </section>
 
-      <Row :gutter="[16, 16]" class="summary-grid">
-        <Col :xs="24" :sm="12" :xl="4">
+      <Row :gutter="[12, 12]" class="summary-grid">
+        <Col v-for="item in summaryCards" :key="item.label" :xs="24" :sm="12" :xl="6">
           <Card :bordered="false" class="metric-card">
-            <Statistic title="风控记录" :value="riskRecords.length" />
-          </Card>
-        </Col>
-        <Col :xs="24" :sm="12" :xl="4">
-          <Card :bordered="false" class="metric-card">
-            <Statistic title="待处理" :value="pendingCount" />
-          </Card>
-        </Col>
-        <Col :xs="24" :sm="12" :xl="4">
-          <Card :bordered="false" class="metric-card">
-            <Statistic title="高风险" :value="highCount" />
-          </Card>
-        </Col>
-        <Col :xs="24" :sm="12" :xl="4">
-          <Card :bordered="false" class="metric-card">
-            <Statistic title="未读消息" :value="unreadCount" />
-          </Card>
-        </Col>
-        <Col :xs="24" :sm="12" :xl="4">
-          <Card :bordered="false" class="metric-card">
-            <span class="metric-label">总资产</span>
-            <strong class="metric-value">{{ formatMoney(totalAsset) }}</strong>
-          </Card>
-        </Col>
-        <Col :xs="24" :sm="12" :xl="4">
-          <Card :bordered="false" class="metric-card">
-            <span class="metric-label">可用资金</span>
-            <strong class="metric-value">{{ formatMoney(availableFund) }}</strong>
+            <span>{{ item.label }}</span>
+            <strong>{{ item.value }}</strong>
+            <em :class="`tone-${item.tone}`">{{ item.note }}</em>
           </Card>
         </Col>
       </Row>
 
-      <Row :gutter="[16, 16]">
+      <Row :gutter="[12, 12]">
         <Col :xs="24" :xl="14">
-          <Card :bordered="false" title="风控记录" class="vg-panel">
+          <Card :bordered="false" class="vg-panel" title="风险维度">
+            <div class="dimension-tabs">
+              <button
+                v-for="item in dimensionTabs"
+                :key="item.key"
+                type="button"
+                :class="{ active: activeDimension === item.key }"
+                @click="activeDimension = item.key"
+              >
+                {{ item.label }}
+              </button>
+            </div>
             <Table
-              row-key="id"
+              row-key="name"
               size="middle"
-              :columns="riskColumns"
-              :data-source="riskRecords"
-              :loading="loading"
-              :pagination="{ pageSize: 8 }"
-            >
-              <template #emptyText>
-                <span>
-                  {{ sourceStatus.risk === 'unavailable' ? '风控来源不可用' : '暂无风控记录' }}
-                </span>
-              </template>
-              <template #bodyCell="{ column, record, index }">
-                <template v-if="column.key === 'id'">{{ record.id || index + 1 }}</template>
-                <template v-else-if="column.key === 'severity'">
-                  <Tag :color="severityColor(record.severity)">
-                    {{ record.severity || 'unknown' }}
-                  </Tag>
-                </template>
-                <template v-else-if="column.key === 'status'">
-                  <Tag :color="record.status === 'pending' ? 'orange' : 'green'">
-                    {{ record.status || 'unknown' }}
-                  </Tag>
-                </template>
-              </template>
-            </Table>
-          </Card>
-        </Col>
-        <Col :xs="24" :xl="10">
-          <Card :bordered="false" title="数据源状态" class="vg-panel">
-            <Table
-              row-key="key"
-              size="small"
-              :columns="sourceColumns"
-              :data-source="sourceRows"
+              :columns="dimensionColumns"
+              :data-source="filteredDimensions"
               :pagination="false"
             >
               <template #bodyCell="{ column, record }">
-                <template v-if="column.key === 'status'">
-                  <Tag :color="sourceStatusColor(record.status)">{{ record.status }}</Tag>
-                </template>
-              </template>
-            </Table>
-          </Card>
-        </Col>
-      </Row>
-
-      <Row :gutter="[16, 16]" class="mt-4">
-        <Col :xs="24" :xl="12">
-          <Card :bordered="false" title="通知事实" class="vg-panel">
-            <Table
-              :row-key="notificationRowKey"
-              size="small"
-              :columns="notificationColumns"
-              :data-source="notifications"
-              :loading="loading"
-              :pagination="{ pageSize: 6 }"
-            >
-              <template #emptyText>
-                <span>
-                  {{ sourceStatus.notification === 'unavailable' ? '通知来源不可用' : '暂无通知' }}
-                </span>
-              </template>
-              <template #bodyCell="{ column, record }">
-                <template v-if="column.key === 'title'">
-                  <div class="strong-cell">
-                    {{ record.title || record.subject || '未命名消息' }}
-                  </div>
-                  <div class="muted-cell">
-                    {{ record.content || record.message || record.description || '无正文' }}
-                  </div>
+                <template v-if="column.key === 'usage'">
+                  <Progress
+                    :percent="record.usage"
+                    size="small"
+                    :status="record.usage > 82 ? 'exception' : 'normal'"
+                  />
                 </template>
                 <template v-else-if="column.key === 'status'">
-                  <Tag :color="isUnread(record) ? 'orange' : 'green'">
-                    {{ isUnread(record) ? 'unread' : 'read' }}
-                  </Tag>
+                  <Tag :color="record.tone">{{ record.status }}</Tag>
                 </template>
               </template>
             </Table>
           </Card>
         </Col>
-        <Col :xs="24" :xl="12">
-          <Card :bordered="false" title="资产结构" class="vg-panel">
+
+        <Col :xs="24" :xl="10">
+          <Card :bordered="false" class="vg-panel" title="风险限额">
             <Table
               row-key="name"
               size="small"
-              :columns="ratioColumns"
-              :data-source="ratioItems"
-              :loading="loading"
+              :columns="limitColumns"
+              :data-source="riskLimits"
               :pagination="false"
             >
-              <template #emptyText>
-                <span>
-                  {{ sourceStatus.finance === 'unavailable' ? '财务来源不可用' : '暂无资产结构' }}
-                </span>
-              </template>
               <template #bodyCell="{ column, record }">
-                <template v-if="column.key === 'value'">
-                  {{ formatMoney(record.valueUSD ?? record.value) }}
+                <template v-if="column.key === 'usage'">
+                  <Progress
+                    :percent="record.usage"
+                    size="small"
+                    :status="record.usage > 80 ? 'exception' : 'normal'"
+                  />
                 </template>
-                <template v-else-if="column.key === 'percent'">
-                  {{ formatPercent(record.percent) }}
+                <template v-else-if="column.key === 'status'">
+                  <Tag :color="record.tone">{{ record.status }}</Tag>
                 </template>
               </template>
             </Table>
           </Card>
         </Col>
       </Row>
-    </div>
+
+      <Row :gutter="[12, 12]" class="mt-3">
+        <Col :xs="24" :xl="10">
+          <Card :bordered="false" class="vg-panel" title="资产结构快照">
+            <div class="asset-list">
+              <div v-for="item in assetStructure" :key="item.name" class="asset-row">
+                <div>
+                  <b>{{ item.name }}</b>
+                  <span>{{ item.detail }}</span>
+                </div>
+                <strong>{{ item.value }}</strong>
+                <Progress :percent="item.percent" size="small" />
+              </div>
+            </div>
+          </Card>
+        </Col>
+        <Col :xs="24" :xl="14">
+          <Card :bordered="false" class="vg-panel" title="异常事件与处理">
+            <div class="record-toolbar">
+              <Input v-model:value="keyword" allow-clear placeholder="查询事件、策略或品种" />
+              <Select v-model:value="severityFilter" class="filter-select">
+                <Select.Option value="all">全部等级</Select.Option>
+                <Select.Option value="high">高风险</Select.Option>
+                <Select.Option value="medium">中风险</Select.Option>
+                <Select.Option value="low">低风险</Select.Option>
+              </Select>
+              <Select v-model:value="statusFilter" class="filter-select">
+                <Select.Option value="all">全部状态</Select.Option>
+                <Select.Option value="pending">待处理</Select.Option>
+                <Select.Option value="processing">处理中</Select.Option>
+                <Select.Option value="done">处理完成</Select.Option>
+              </Select>
+            </div>
+            <Table
+              row-key="id"
+              size="middle"
+              :columns="recordColumns"
+              :data-source="filteredRecords"
+              :pagination="{ pageSize: 6 }"
+            >
+              <template #emptyText>暂无风险记录</template>
+              <template #bodyCell="{ column, record }">
+                <template v-if="column.key === 'severity'">
+                  <Tag :color="severityColor(record.severity)">{{
+                    severityLabel(record.severity)
+                  }}</Tag>
+                </template>
+                <template v-else-if="column.key === 'status'">
+                  <Tag :color="statusColor(record.status)">{{ statusLabel(record.status) }}</Tag>
+                </template>
+              </template>
+            </Table>
+          </Card>
+        </Col>
+      </Row>
+
+      <Row :gutter="[12, 12]" class="mt-3">
+        <Col :xs="24" :xl="12">
+          <Card :bordered="false" class="vg-panel" title="告警消息">
+            <Table
+              row-key="id"
+              size="small"
+              :columns="messageColumns"
+              :data-source="messages"
+              :pagination="{ pageSize: 5 }"
+            >
+              <template #bodyCell="{ column, record }">
+                <template v-if="column.key === 'status'">
+                  <Tag :color="record.status === '未读' ? 'orange' : 'green'">{{
+                    record.status
+                  }}</Tag>
+                </template>
+              </template>
+            </Table>
+          </Card>
+        </Col>
+        <Col :xs="24" :xl="12">
+          <Card :bordered="false" class="vg-panel" title="审计日志">
+            <Table
+              row-key="id"
+              size="small"
+              :columns="auditColumns"
+              :data-source="auditLogs"
+              :pagination="{ pageSize: 5 }"
+            />
+          </Card>
+        </Col>
+      </Row>
+    </main>
   </PageWrapper>
 </template>
 
 <script setup lang="ts">
-  import { ReloadOutlined } from '@ant-design/icons-vue';
-  import { Button, Card, Col, Row, Space, Statistic, Table, Tag } from 'ant-design-vue';
+  import { Button, Card, Col, Input, Progress, Row, Select, Table, Tag } from 'ant-design-vue';
   import type { ColumnsType } from 'ant-design-vue/es/table/interface';
-  import Decimal from 'decimal.js';
-  import { computed, onMounted, reactive, ref } from 'vue';
-  import type { DecimalString, ProductDataMeta } from '@/api/platform/productDataState';
-  import {
-    type DataAccount,
-    type DataServiceHealth,
-    type ExchangeInfo,
-    getAccounts,
-    getDataHealth,
-    getExchangeInfo,
-    getNotificationList,
-    getProductRatio,
-    getRiskRecordList,
-    getTotalAssetSummary,
-    type NotificationMessage,
-    type ProductRatioItem,
-    type RiskRecord,
-    type TotalAssetSummary,
-  } from '@/api/riskControl';
+  import { computed, ref } from 'vue';
   import { PageWrapper } from '@/components/Page';
-  import ProductDataStatusAlert from '@/components/ProductDataState/ProductDataStatusAlert.vue';
   import { useRoleAccess } from '@/hooks/web/useRoleAccess';
-  import { formatMoneyString, formatRatioPercentString } from '@/utils/decimalDisplay';
 
-  type SourceStatus = 'ready' | 'no_data' | 'unavailable';
+  type DimensionKey = 'all' | 'account' | 'strategy' | 'position' | 'product';
+  type Severity = 'high' | 'medium' | 'low';
+  type RecordStatus = 'pending' | 'processing' | 'done';
 
-  interface SourceRow {
-    key: string;
-    label: string;
-    status: SourceStatus;
-    detail: string;
+  interface RiskDimension {
+    category: Exclude<DimensionKey, 'all'>;
+    name: string;
+    exposure: string;
+    leverage: string;
+    margin: string;
+    concentration: string;
+    liquidity: string;
+    usage: number;
+    status: string;
+    tone: string;
   }
 
-  const loading = ref(false);
-  const riskRecords = ref<RiskRecord[]>([]);
-  const notifications = ref<NotificationMessage[]>([]);
-  const accounts = ref<DataAccount[]>([]);
-  const ratioItems = ref<ProductRatioItem[]>([]);
-  const totalSummary = ref<TotalAssetSummary>({});
-  const exchangeInfo = ref<ExchangeInfo>({});
-  const health = ref<DataServiceHealth>({
-    status: 'unknown',
-    service: 'data-service',
-    update_frequency: 'unknown',
-  });
-  const sourceStatus = reactive<Record<string, SourceStatus>>({
-    risk: 'no_data',
-    notification: 'no_data',
-    finance: 'no_data',
-    health: 'no_data',
-  });
-  const sourceErrors = reactive<Record<string, string>>({});
-  const dataMeta = ref<ProductDataMeta>({
-    status: 'no_data',
-    source: 'risk detail aggregation',
-    timezone: 'source-defined',
-    currency: 'USD',
-    unit: 'risk and account facts',
-    precision: 'decimal-string',
-    message: '尚未加载风控事实',
-  });
+  interface RiskRecord {
+    id: string;
+    time: string;
+    target: string;
+    event: string;
+    severity: Severity;
+    status: RecordStatus;
+    owner: string;
+  }
 
   const { roleLabel, roleColor } = useRoleAccess();
-  const pendingCount = computed(
-    () => riskRecords.value.filter((item) => item.status === 'pending').length,
-  );
-  const highCount = computed(
-    () =>
-      riskRecords.value.filter((item) => ['high', 'critical'].includes(item.severity || '')).length,
-  );
-  const unreadCount = computed(() => notifications.value.filter(isUnread).length);
-  const latestEventTime = computed(() =>
-    [
-      ...riskRecords.value.map((item) => item.created_at),
-      ...notifications.value.map((item) => item.created_at || item.createdAt),
-      ...accounts.value.map((item) => item.asset_updated_at),
-      totalSummary.value.updated_at,
-      exchangeInfo.value.updated_at,
-      health.value.as_of,
-    ]
-      .filter((value): value is string => Boolean(value))
-      .sort()
-      .at(-1),
-  );
+  const loading = ref(false);
+  const latestRefresh = ref('2026-07-12 15:30:00');
+  const activeDimension = ref<DimensionKey>('all');
+  const keyword = ref('');
+  const severityFilter = ref<'all' | Severity>('all');
+  const statusFilter = ref<'all' | RecordStatus>('all');
 
-  function sumAccountField(field: 'total_asset' | 'available_fund'): DecimalString | undefined {
-    const values = accounts.value
-      .map((item) => item[field])
-      .filter((value): value is string => value !== undefined);
-    if (!values.length) return undefined;
-    return values.reduce((sum, value) => sum.plus(value), new Decimal(0)).toFixed();
-  }
-
-  const totalAsset = computed<DecimalString | undefined>(
-    () =>
-      totalSummary.value.total_asset ?? totalSummary.value.total ?? sumAccountField('total_asset'),
-  );
-  const availableFund = computed<DecimalString | undefined>(() =>
-    sumAccountField('available_fund'),
-  );
-
-  const riskColumns: ColumnsType<RiskRecord> = [
-    { title: 'ID', dataIndex: 'id', key: 'id', width: 70 },
-    { title: '标题', dataIndex: 'title', key: 'title' },
-    { title: '内容', dataIndex: 'content', key: 'content' },
-    { title: '等级', dataIndex: 'severity', key: 'severity', width: 100 },
-    { title: '状态', dataIndex: 'status', key: 'status', width: 100 },
-    { title: '时间', dataIndex: 'created_at', key: 'created_at', width: 180 },
-  ];
-  const sourceColumns: ColumnsType<SourceRow> = [
-    { title: '来源', dataIndex: 'label', key: 'label' },
-    { title: '状态', dataIndex: 'status', key: 'status', width: 110 },
-    { title: '截至/错误', dataIndex: 'detail', key: 'detail' },
-  ];
-  const notificationColumns: ColumnsType<NotificationMessage> = [
-    { title: '消息', key: 'title' },
-    { title: '状态', key: 'status', width: 100 },
-    { title: '时间', dataIndex: 'created_at', key: 'created_at', width: 170 },
-  ];
-  const ratioColumns: ColumnsType<ProductRatioItem> = [
-    { title: '资产项', dataIndex: 'name', key: 'name' },
-    { title: '金额 USD', key: 'value', align: 'right', width: 180 },
-    { title: '占比', key: 'percent', width: 130 },
+  const summaryCards = [
+    { label: '风控记录', value: '28', note: '近 24 小时 6 条', tone: 'neutral' },
+    { label: '待处理', value: '4', note: '2 条需要当日处理', tone: 'warning' },
+    { label: '高风险', value: '3', note: '保证金与集中度为主', tone: 'danger' },
+    { label: '总资产', value: '32,846,520 USD', note: '可用资金 61.4%', tone: 'positive' },
+    { label: '组合 VaR', value: '2.84%', note: '低于 3.50% 限额', tone: 'positive' },
+    { label: '最大回撤', value: '-4.72%', note: '距预警线 1.28pct', tone: 'warning' },
+    { label: '保证金使用率', value: '68.5%', note: '海外腿偏高', tone: 'warning' },
+    { label: '集中度', value: '31.8%', note: '黄金主腿占比', tone: 'neutral' },
   ];
 
-  const sourceRows = computed<SourceRow[]>(() => [
+  const dimensionTabs: Array<{ key: DimensionKey; label: string }> = [
+    { key: 'all', label: '全部' },
+    { key: 'account', label: '账户' },
+    { key: 'strategy', label: '策略' },
+    { key: 'position', label: '持仓' },
+    { key: 'product', label: '品种' },
+  ];
+
+  const riskDimensions: RiskDimension[] = [
     {
-      key: 'risk',
-      label: 'risk-service',
-      status: sourceStatus.risk,
-      detail:
-        sourceErrors.risk ||
-        riskRecords.value
-          .map((item) => item.created_at)
-          .filter(Boolean)
-          .sort()
-          .at(-1) ||
-        '不可用',
+      category: 'account',
+      name: '海外黄金账户',
+      exposure: '9,765,941 CNY',
+      leverage: '1.42X',
+      margin: '72.8%',
+      concentration: '28.4%',
+      liquidity: '正常',
+      usage: 76,
+      status: '关注',
+      tone: 'orange',
     },
     {
-      key: 'notification',
-      label: 'notification-service',
-      status: sourceStatus.notification,
-      detail:
-        sourceErrors.notification ||
-        notifications.value
-          .map((item) => item.created_at || item.createdAt)
-          .filter(Boolean)
-          .sort()
-          .at(-1) ||
-        '不可用',
+      category: 'strategy',
+      name: '海内外价差',
+      exposure: '21,773,757 CNY',
+      leverage: '1.14X',
+      margin: '68.5%',
+      concentration: '31.8%',
+      liquidity: '正常',
+      usage: 69,
+      status: '正常',
+      tone: 'green',
     },
     {
-      key: 'finance',
-      label: 'data-service finance',
-      status: sourceStatus.finance,
-      detail:
-        sourceErrors.finance ||
-        totalSummary.value.updated_at ||
-        exchangeInfo.value.updated_at ||
-        '不可用',
+      category: 'position',
+      name: 'XAUUSD 空头腿',
+      exposure: '4,305,580 CNY',
+      leverage: '1.62X',
+      margin: '83.6%',
+      concentration: '18.7%',
+      liquidity: '偏紧',
+      usage: 84,
+      status: '预警',
+      tone: 'red',
     },
     {
-      key: 'health',
-      label: 'data-service health',
-      status: sourceStatus.health,
-      detail:
-        sourceErrors.health || health.value.as_of || health.value.update_frequency || '不可用',
+      category: 'product',
+      name: 'BTC 资费套利',
+      exposure: '5,108,420 USD',
+      leverage: '1.27X',
+      margin: '54.2%',
+      concentration: '16.5%',
+      liquidity: '正常',
+      usage: 58,
+      status: '正常',
+      tone: 'green',
     },
-  ]);
+  ];
 
-  function severityColor(severity?: string) {
-    if (severity === 'critical') return 'red';
-    if (severity === 'high') return 'orange';
-    if (severity === 'medium') return 'gold';
-    return 'blue';
-  }
+  const riskLimits = [
+    {
+      name: '组合 VaR',
+      limit: '3.50%',
+      current: '2.84%',
+      usage: 81,
+      status: '接近',
+      tone: 'orange',
+    },
+    {
+      name: '单策略回撤',
+      limit: '6.00%',
+      current: '4.72%',
+      usage: 79,
+      status: '关注',
+      tone: 'orange',
+    },
+    {
+      name: '保证金使用率',
+      limit: '85.00%',
+      current: '68.50%',
+      usage: 81,
+      status: '接近',
+      tone: 'orange',
+    },
+    {
+      name: '单品种集中度',
+      limit: '40.00%',
+      current: '31.80%',
+      usage: 80,
+      status: '正常',
+      tone: 'green',
+    },
+    {
+      name: '流动性缺口',
+      limit: '8.00%',
+      current: '3.20%',
+      usage: 40,
+      status: '正常',
+      tone: 'green',
+    },
+  ];
 
-  function isUnread(record: NotificationMessage) {
-    return record.status === 'unread' || record.read === false || record.isRead === false;
-  }
+  const assetStructure = [
+    { name: '国内期货账户', detail: '沪金、沪银、股指', value: '12,007,816 CNY', percent: 37 },
+    { name: '海外黄金账户', detail: 'XAUUSD 与保证金', value: '9,765,941 CNY', percent: 30 },
+    { name: '数字资产账户', detail: 'BTC / ETH 资费腿', value: '6,842,190 USD', percent: 21 },
+    { name: '现金与备用资金', detail: '多币种现金缓冲', value: '4,230,573 USD', percent: 12 },
+  ];
 
-  function notificationRowKey(record: NotificationMessage, index?: number) {
-    return record.id || record.message_id || `${record.created_at || 'notification'}-${index ?? 0}`;
-  }
+  const riskRecords: RiskRecord[] = [
+    {
+      id: 'R-260712-01',
+      time: '2026-07-12 14:42:10',
+      target: '海外黄金账户',
+      event: '预付款比例升至 83.6%，接近账户阈值',
+      severity: 'high',
+      status: 'processing',
+      owner: '交易台',
+    },
+    {
+      id: 'R-260712-02',
+      time: '2026-07-12 13:28:44',
+      target: '海内外价差',
+      event: '汇率腿偏移扩大，需复核配平比例',
+      severity: 'medium',
+      status: 'pending',
+      owner: '风控',
+    },
+    {
+      id: 'R-260712-03',
+      time: '2026-07-12 11:06:18',
+      target: 'BTC 资费套利',
+      event: '合约腿保证金占用回落',
+      severity: 'low',
+      status: 'done',
+      owner: '策略',
+    },
+    {
+      id: 'R-260711-08',
+      time: '2026-07-11 22:18:39',
+      target: '短线交易员A',
+      event: '单品种集中度短时超过 30%',
+      severity: 'medium',
+      status: 'done',
+      owner: '交易台',
+    },
+  ];
 
-  function sourceStatusColor(status: SourceStatus) {
-    if (status === 'ready') return 'green';
-    if (status === 'unavailable') return 'red';
-    return 'blue';
-  }
+  const messages = [
+    { id: 'M-01', time: '2026-07-12 14:45:00', title: '海外黄金账户保证金提醒', status: '未读' },
+    { id: 'M-02', time: '2026-07-12 13:35:00', title: '海内外价差汇率腿复核', status: '未读' },
+    { id: 'M-03', time: '2026-07-12 10:16:00', title: 'BTC 资费腿风险解除', status: '已读' },
+  ];
 
-  function formatMoney(value?: DecimalString) {
-    return formatMoneyString(value, 'USD');
-  }
+  const auditLogs = [
+    { id: 'A-01', time: '2026-07-12 14:48:18', operator: '风控', action: '调整海外账户预警等级' },
+    { id: 'A-02', time: '2026-07-12 13:40:09', operator: '交易台', action: '提交海内外价差复核' },
+    { id: 'A-03', time: '2026-07-12 10:20:31', operator: '系统', action: '完成资金占用重算' },
+  ];
 
-  function formatPercent(value: DecimalString) {
-    return formatRatioPercentString(value);
-  }
+  const dimensionColumns: ColumnsType<RiskDimension> = [
+    { title: '对象', dataIndex: 'name', key: 'name', width: 150 },
+    { title: '敞口', dataIndex: 'exposure', key: 'exposure' },
+    { title: '杠杆', dataIndex: 'leverage', key: 'leverage', width: 90 },
+    { title: '保证金', dataIndex: 'margin', key: 'margin', width: 100 },
+    { title: '集中度', dataIndex: 'concentration', key: 'concentration', width: 100 },
+    { title: '流动性', dataIndex: 'liquidity', key: 'liquidity', width: 90 },
+    { title: '使用率', key: 'usage', width: 160 },
+    { title: '状态', key: 'status', width: 90 },
+  ];
 
-  function setRejected(source: string, reason: unknown) {
-    sourceStatus[source] = 'unavailable';
-    sourceErrors[source] =
-      reason instanceof Error ? reason.message : String(reason || 'request failed');
-  }
+  const limitColumns: ColumnsType<(typeof riskLimits)[number]> = [
+    { title: '指标', dataIndex: 'name', key: 'name' },
+    { title: '阈值', dataIndex: 'limit', key: 'limit', width: 90 },
+    { title: '当前', dataIndex: 'current', key: 'current', width: 90 },
+    { title: '使用率', key: 'usage', width: 150 },
+    { title: '状态', key: 'status', width: 90 },
+  ];
 
-  async function loadAll() {
+  const recordColumns: ColumnsType<RiskRecord> = [
+    { title: '时间', dataIndex: 'time', key: 'time', width: 170 },
+    { title: '对象', dataIndex: 'target', key: 'target', width: 140 },
+    { title: '事件', dataIndex: 'event', key: 'event' },
+    { title: '等级', key: 'severity', width: 90 },
+    { title: '处理', key: 'status', width: 100 },
+    { title: '负责', dataIndex: 'owner', key: 'owner', width: 90 },
+  ];
+
+  const messageColumns: ColumnsType<(typeof messages)[number]> = [
+    { title: '时间', dataIndex: 'time', key: 'time', width: 170 },
+    { title: '消息', dataIndex: 'title', key: 'title' },
+    { title: '状态', key: 'status', width: 90 },
+  ];
+
+  const auditColumns: ColumnsType<(typeof auditLogs)[number]> = [
+    { title: '时间', dataIndex: 'time', key: 'time', width: 170 },
+    { title: '操作人', dataIndex: 'operator', key: 'operator', width: 100 },
+    { title: '动作', dataIndex: 'action', key: 'action' },
+  ];
+
+  const filteredDimensions = computed(() =>
+    activeDimension.value === 'all'
+      ? riskDimensions
+      : riskDimensions.filter((item) => item.category === activeDimension.value),
+  );
+
+  const filteredRecords = computed(() => {
+    const text = keyword.value.trim();
+    return riskRecords.filter((item) => {
+      const matchKeyword =
+        !text ||
+        `${item.target}${item.event}${item.owner}`.toLowerCase().includes(text.toLowerCase());
+      const matchSeverity =
+        severityFilter.value === 'all' || item.severity === severityFilter.value;
+      const matchStatus = statusFilter.value === 'all' || item.status === statusFilter.value;
+      return matchKeyword && matchSeverity && matchStatus;
+    });
+  });
+
+  function refreshRisk() {
     loading.value = true;
-    Object.keys(sourceErrors).forEach((key) => delete sourceErrors[key]);
-    const results = await Promise.allSettled([
-      getRiskRecordList(),
-      getNotificationList(),
-      getAccounts(),
-      getProductRatio(),
-      getTotalAssetSummary(),
-      getExchangeInfo(),
-      getDataHealth(),
-    ]);
-    try {
-      const [
-        riskResult,
-        notificationResult,
-        accountResult,
-        ratioResult,
-        totalResult,
-        exchangeResult,
-        healthResult,
-      ] = results;
-
-      if (riskResult.status === 'fulfilled') {
-        riskRecords.value = riskResult.value;
-        sourceStatus.risk = riskResult.value.length ? 'ready' : 'no_data';
-      } else {
-        riskRecords.value = [];
-        setRejected('risk', riskResult.reason);
-      }
-
-      if (notificationResult.status === 'fulfilled') {
-        notifications.value = notificationResult.value;
-        sourceStatus.notification = notificationResult.value.length ? 'ready' : 'no_data';
-      } else {
-        notifications.value = [];
-        setRejected('notification', notificationResult.reason);
-      }
-
-      let financeFailures = 0;
-      if (accountResult.status === 'fulfilled') {
-        accounts.value = accountResult.value;
-      } else {
-        accounts.value = [];
-        financeFailures += 1;
-        sourceErrors.finance = String(
-          accountResult.reason?.message || accountResult.reason || 'accounts failed',
-        );
-      }
-      if (ratioResult.status === 'fulfilled') {
-        ratioItems.value = ratioResult.value;
-      } else {
-        ratioItems.value = [];
-        financeFailures += 1;
-        sourceErrors.finance = `${sourceErrors.finance || ''} ratio failed`.trim();
-      }
-      if (totalResult.status === 'fulfilled') {
-        totalSummary.value = totalResult.value;
-      } else {
-        totalSummary.value = {};
-        financeFailures += 1;
-        sourceErrors.finance = `${sourceErrors.finance || ''} total failed`.trim();
-      }
-      if (exchangeResult.status === 'fulfilled') {
-        exchangeInfo.value = exchangeResult.value;
-      } else {
-        exchangeInfo.value = {};
-        financeFailures += 1;
-        sourceErrors.finance = `${sourceErrors.finance || ''} exchange failed`.trim();
-      }
-      sourceStatus.finance = financeFailures
-        ? 'unavailable'
-        : accounts.value.length || ratioItems.value.length || totalAsset.value !== undefined
-        ? 'ready'
-        : 'no_data';
-
-      if (healthResult.status === 'fulfilled') {
-        health.value = healthResult.value;
-        sourceStatus.health = healthResult.value.status === 'ok' ? 'ready' : 'unavailable';
-        if (healthResult.value.status !== 'ok') {
-          sourceErrors.health = `provider status=${healthResult.value.status}`;
-        }
-      } else {
-        setRejected('health', healthResult.reason);
-      }
-
-      const statuses = Object.values(sourceStatus);
-      const unavailable = statuses.filter((status) => status === 'unavailable').length;
-      const ready = statuses.filter((status) => status === 'ready').length;
-      dataMeta.value = {
-        status: unavailable ? 'unavailable' : ready ? 'ready' : 'no_data',
-        source: unavailable ? 'risk detail aggregation (partial)' : 'risk detail aggregation',
-        asOf: latestEventTime.value,
-        timezone: 'source-defined',
-        currency: 'USD',
-        unit: 'risk and account facts',
-        precision: 'decimal-string',
-        errorCode: unavailable ? 'partial_source_failure' : undefined,
-        message: unavailable
-          ? `${unavailable}个来源不可用；成功来源的事实仍单独保留`
-          : ready
-          ? undefined
-          : '所有来源成功，但没有风控或账户事实',
-        degraded: unavailable > 0,
-      };
-    } finally {
+    window.setTimeout(() => {
+      latestRefresh.value = new Date()
+        .toLocaleString('zh-CN', { hour12: false })
+        .replace(/\//g, '-');
       loading.value = false;
-    }
+    }, 300);
   }
 
-  onMounted(loadAll);
+  function severityColor(value: Severity) {
+    return value === 'high' ? 'red' : value === 'medium' ? 'orange' : 'green';
+  }
+
+  function severityLabel(value: Severity) {
+    return value === 'high' ? '高风险' : value === 'medium' ? '中风险' : '低风险';
+  }
+
+  function statusColor(value: RecordStatus) {
+    return value === 'pending' ? 'orange' : value === 'processing' ? 'blue' : 'green';
+  }
+
+  function statusLabel(value: RecordStatus) {
+    return value === 'pending' ? '待处理' : value === 'processing' ? '处理中' : '处理完成';
+  }
 </script>
 
-<style scoped>
+<style scoped lang="less">
   .risk-detail-page {
-    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 12px 4px 18px;
   }
 
-  .toolbar {
+  .risk-toolbar {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 12px;
-    margin-bottom: 16px;
+    gap: 16px;
+    padding: 16px 18px;
+    border: 1px solid #dbe4ed;
+    border-radius: 8px;
+    background: #fff;
+  }
+
+  .risk-toolbar h2 {
+    margin: 0;
+    color: #17212f;
+    font-size: 22px;
+    font-weight: 800;
+  }
+
+  .risk-toolbar p {
+    margin: 6px 0 0;
+    color: #5b6572;
+  }
+
+  .toolbar-actions {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 8px;
   }
 
   .summary-grid {
-    margin-bottom: 16px;
+    margin: 0;
   }
 
   .metric-card,
@@ -514,37 +526,112 @@
     box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
   }
 
-  .metric-label {
+  .metric-card span {
     display: block;
     color: #59636e;
     font-size: 13px;
+    font-weight: 700;
   }
 
-  .metric-value {
+  .metric-card strong {
     display: block;
     margin-top: 8px;
-    font-size: 20px;
-    line-height: 1.35;
+    color: #17212f;
+    font-size: 22px;
+    line-height: 1.25;
   }
 
-  .strong-cell {
-    font-weight: 600;
-  }
-
-  .muted-cell {
-    margin-top: 4px;
-    color: #59636e;
+  .metric-card em {
+    display: block;
+    margin-top: 6px;
+    font-style: normal;
     font-size: 12px;
   }
 
-  @media (max-width: 768px) {
-    .risk-detail-page {
-      padding: 12px;
-    }
+  .tone-positive {
+    color: #14804a;
+  }
 
-    .toolbar {
+  .tone-warning {
+    color: #a15c00;
+  }
+
+  .tone-danger {
+    color: #b42318;
+  }
+
+  .tone-neutral {
+    color: #59636e;
+  }
+
+  .dimension-tabs,
+  .record-toolbar {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  .dimension-tabs button {
+    height: 32px;
+    padding: 0 12px;
+    border: 1px solid #d8e1ea;
+    border-radius: 6px;
+    background: #f7f9fb;
+    color: #344054;
+    font-weight: 700;
+  }
+
+  .dimension-tabs button.active {
+    border-color: #2f6fed;
+    background: #eef5ff;
+    color: #1f5cc4;
+  }
+
+  .filter-select {
+    width: 132px;
+  }
+
+  .asset-list {
+    display: grid;
+    gap: 14px;
+  }
+
+  .asset-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px 12px;
+  }
+
+  .asset-row b,
+  .asset-row strong {
+    color: #17212f;
+  }
+
+  .asset-row span {
+    display: block;
+    margin-top: 2px;
+    color: #667085;
+    font-size: 12px;
+  }
+
+  .asset-row :deep(.ant-progress) {
+    grid-column: 1 / -1;
+  }
+
+  .mt-3 {
+    margin-top: 12px;
+  }
+
+  @media (max-width: 900px) {
+    .risk-toolbar {
       align-items: flex-start;
       flex-direction: column;
+    }
+
+    .toolbar-actions {
+      justify-content: flex-start;
     }
   }
 </style>

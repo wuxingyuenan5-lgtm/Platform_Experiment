@@ -41,3 +41,18 @@ This register contains only unresolved work with a concrete risk and trigger. Co
 - **Risk:** repository-level contracts may be mistaken for proven server, broker, database or recovery readiness.
 - **Trigger:** approved production evidence for hosts, TLS, Runner, MySQL, backup/restore, credentials and minimum-size Venue execution.
 - **Protected rule:** do not delete Legacy evidence, enable Live Write or replace external routes before owner acceptance.
+
+## TD-009 — Windows local multi-service start/stop lifecycle governance
+
+- **Status:** active, deferred to next development stage.
+- **Risk:** local Platform Web, Platform API, execution runtime and legacy comparison frontend can leave stale listener processes, ambiguous port ownership or misleading health state after repeated starts and stops.
+- **Scope:** process identity verification, port conflict handling, residual process cleanup, repeated start/stop idempotence, new/old version parallel operation, logs and diagnostics.
+- **Trigger:** before declaring local lifecycle management complete or promoting a one-command Windows operator workflow.
+- **Protected rule:** do not stop unrelated Node, Python or PowerShell processes by name or port alone; verify ownership before stopping.
+## TD-010 - Global risk and notification message source
+
+- **Status:** active, deferred until a Capability or explicit backend service is available.
+- **Risk:** the formal risk detail page is available, but the global risk message strip and notification center currently have no backend message source; unconditional polling would create noisy 404s and misleading product state.
+- **Current behavior:** global risk and notification surfaces show empty business states without API, Provider or engineering explanations in the user interface.
+- **Trigger:** restore only after a maintained Capability or explicit service configuration defines message source, permissions and failure semantics.
+- **Protected rule:** do not reintroduce timer polling against nonexistent `/risk` or `/notifications` endpoints.

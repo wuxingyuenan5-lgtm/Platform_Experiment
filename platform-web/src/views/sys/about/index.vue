@@ -3,9 +3,8 @@
     <template #headerContent>
       <div class="flex justify-between items-center">
         <span class="flex-1">
-          全球变量金融平台（Variable-Global）由Platform Web、Platform API和Platform Execution
-          Runtime组成。Platform Web通过Browser Session与REST连接Platform
-          API，不持有Venue凭证，也不直接执行外部交易副作用。
+          全球变量金融平台（Variable-Global）覆盖市场、策略、风控、账户与执行工作流。
+          当前页面用于查看版本信息与运行依赖。
         </span>
       </div>
     </template>

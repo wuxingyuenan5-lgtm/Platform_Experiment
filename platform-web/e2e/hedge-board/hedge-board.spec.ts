@@ -61,16 +61,30 @@ async function removeExistingTestStock(page: Page) {
   );
   await removeButton.click();
   expect((await response).ok()).toBeTruthy();
-  await expect(section.getByRole('button', { name: '浦发银行 600000', exact: true })).toHaveCount(0);
+  await expect(section.getByRole('button', { name: '浦发银行 600000', exact: true })).toHaveCount(
+    0,
+  );
 }
 
 async function expectAShareSections(page: Page): Promise<void> {
-  await expect(page.getByRole('heading', { name: '大盘表现' })).toBeVisible();
-  await expect(page.getByRole('heading', { name: '大盘广度' })).toBeVisible();
-  await expect(page.getByRole('heading', { name: '市场明细' })).toBeVisible();
-  await expect(page.getByRole('heading', { name: '申万板块' })).toBeVisible();
-  await expect(page.getByRole('heading', { name: '短线情绪' })).toBeVisible();
-  await expect(page.getByRole('heading', { name: '自选股' })).toBeVisible();
+  await expect(
+    page.locator('#a-share-overview').getByRole('heading', { name: '大盘表现' }),
+  ).toBeVisible();
+  await expect(
+    page.locator('#a-share-breadth').getByRole('heading', { name: '大盘广度' }),
+  ).toBeVisible();
+  await expect(
+    page.locator('#a-share-market-detail').getByRole('heading', { name: '市场明细' }),
+  ).toBeVisible();
+  await expect(
+    page.locator('#a-share-shenwan').getByRole('heading', { name: '申万板块' }),
+  ).toBeVisible();
+  await expect(
+    page.locator('#a-share-emotion').getByRole('heading', { name: '短线情绪' }),
+  ).toBeVisible();
+  await expect(
+    page.locator('#a-share-watchlist').getByRole('heading', { name: '自选股' }),
+  ).toBeVisible();
   await expect(page.getByText('账号已同步', { exact: true })).toBeVisible();
 }
 
@@ -89,12 +103,14 @@ async function expectTransientMessagesCleared(page: Page): Promise<void> {
   });
 }
 
-async function captureSection(
-  page: Page,
-  headingName: string,
-  outputPath: string,
-): Promise<void> {
-  const heading = page.getByRole('heading', { name: headingName });
+async function captureSection(page: Page, headingName: string, outputPath: string): Promise<void> {
+  const sectionByHeading: Record<string, string> = {
+    大盘表现: '#a-share-overview',
+    申万板块: '#a-share-shenwan',
+    自选股: '#a-share-watchlist',
+  };
+  const section = page.locator(sectionByHeading[headingName] ?? 'body');
+  const heading = section.getByRole('heading', { name: headingName });
   await heading.scrollIntoViewIfNeeded();
   await expect(heading).toBeVisible();
   await page.waitForTimeout(150);
@@ -104,7 +120,9 @@ async function captureSection(
   });
 }
 
-test('covers A-share research workflow and account-level watchlist persistence', async ({ browser }) => {
+test('covers A-share research workflow and account-level watchlist persistence', async ({
+  browser,
+}) => {
   const username = requiredEnvironment('E2E_CEO_USERNAME');
   const password = requiredEnvironment('E2E_CEO_PASSWORD');
 
@@ -145,8 +163,8 @@ test('covers A-share research workflow and account-level watchlist persistence',
   await expect(watchlistSection.getByText('浦发银行', { exact: true })).toBeVisible();
   await expect(watchlistSection.getByText('账号已同步', { exact: true })).toBeVisible();
 
-  const snapshotResponse = first.page.waitForResponse(
-    (response) => response.url().includes('/api/v1/research/a-share/stocks/600000/snapshot'),
+  const snapshotResponse = first.page.waitForResponse((response) =>
+    response.url().includes('/api/v1/research/a-share/stocks/600000/snapshot'),
   );
   await watchlistSection.getByRole('button', { name: '浦发银行 600000', exact: true }).click();
   expect((await snapshotResponse).ok()).toBeTruthy();
@@ -163,10 +181,9 @@ test('covers A-share research workflow and account-level watchlist persistence',
   await second.context.close();
 });
 
-test('captures responsive A-share evidence without page-level horizontal overflow', async (
-  { browser },
-  testInfo,
-) => {
+test('captures responsive A-share evidence without page-level horizontal overflow', async ({
+  browser,
+}, testInfo) => {
   const username = requiredEnvironment('E2E_CEO_USERNAME');
   const password = requiredEnvironment('E2E_CEO_PASSWORD');
 

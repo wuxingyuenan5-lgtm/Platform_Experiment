@@ -77,20 +77,6 @@ function resolveCategory(routeName: string, routePath: string): HedgeCategory {
   return 'macro';
 }
 
-function isStaticDesignWidget(widget: WidgetConfig) {
-  const note = widget.sourceNote?.trim() || '';
-  return widget.kind === 'local-chart' && /静态设计稿/.test(note);
-}
-
-function withoutStaticDesignWidgets(sections: ChartSection[]): ChartSection[] {
-  return sections
-    .map((section) => ({
-      ...section,
-      widgets: section.widgets.filter((widget) => !isStaticDesignWidget(widget)),
-    }))
-    .filter((section) => section.widgets.length > 0);
-}
-
 function scrollPageTop() {
   if (typeof window === 'undefined') return;
   nextTick(() => {
@@ -162,18 +148,7 @@ export function useHedgeBoardPage() {
   );
 
   const useUnifiedResearchUi = computed(() => true);
-  const staticDesignWidgets = computed(() =>
-    activeModule.value.sections.flatMap((section) =>
-      section.widgets.filter(isStaticDesignWidget).map((widget) => ({
-        sectionId: section.id,
-        title: widget.title,
-        sourceNote: widget.sourceNote || '静态设计稿',
-      })),
-    ),
-  );
-  const visibleSections = computed<ChartSection[]>(() =>
-    withoutStaticDesignWidgets(activeModule.value.sections),
-  );
+  const visibleSections = computed<ChartSection[]>(() => activeModule.value.sections);
   const pageTitle = computed(() => `对冲基金看板 / ${activeBoardNav.value.label}`);
 
   function getSectionTitle(sectionId: string, fallback: string) {
@@ -194,8 +169,10 @@ export function useHedgeBoardPage() {
   }
 
   function shouldHideWidgetHeader(sectionId: string, widget: WidgetConfig) {
-    if (['macro-liquidity', 'gold-main', 'crypto-main'].includes(sectionId)) return true;
-    return widget.kind === 'local-chart' && widget.localKey?.includes('market-detail-table');
+    return (
+      ['macro-liquidity', 'gold-main', 'crypto-main'].includes(sectionId) &&
+      widget.kind !== 'local-chart'
+    );
   }
 
   function jumpToSection(sectionId: string) {
@@ -226,7 +203,6 @@ export function useHedgeBoardPage() {
     pageTitle,
     selectBoardCategory,
     shouldHideWidgetHeader,
-    staticDesignWidgets,
     terminalTabs,
     useUnifiedResearchUi,
     visibleSections,

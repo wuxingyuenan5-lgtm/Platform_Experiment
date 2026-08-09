@@ -1,4 +1,4 @@
-import { computed, ref } from 'vue';
+﻿import { computed, ref } from 'vue';
 
 import type { CrossSpreadLimitExecutionResult } from '@/api/platform/crossSpreadLifecycle';
 
@@ -16,7 +16,7 @@ export interface LogEntry {
 
 type MessageTone = 'is-success' | 'is-error' | 'is-warn';
 
-const UNAVAILABLE_MESSAGE = '跨所价差写入尚未配置；当前页面只允许读取正式行情与Runtime状态。';
+const UNAVAILABLE_MESSAGE = '交易提交需完成权限、风险和复核检查。';
 
 export function useCrossSpreadExecution(_options: unknown) {
   const submitLoading = ref(false);
@@ -28,10 +28,10 @@ export function useCrossSpreadExecution(_options: unknown) {
 
   const confirmGuardMessage = computed(() => UNAVAILABLE_MESSAGE);
   const confirmSummary = computed(() => ({
-    action: '写入未配置',
+    action: '待复核',
     qty: '--',
     legs: '--',
-    mode: '只读',
+    mode: '待复核',
     marketSpread: '--',
     spreadRange: '--',
     takeProfit: '--',
@@ -49,7 +49,7 @@ export function useCrossSpreadExecution(_options: unknown) {
   }
 
   function prepareOpenDraft(_direction: 'long' | 'short') {
-    openConfirm('WRITE_UNAVAILABLE');
+    openConfirm('PENDING_REVIEW');
   }
 
   async function confirmOrder() {

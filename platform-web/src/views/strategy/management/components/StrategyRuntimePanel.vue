@@ -1,81 +1,174 @@
-<template>
-  <section class="runtime-panel" data-testid="strategy-runtime-panel">
-    <header><h2>运行状态</h2><span>Live Write 关闭</span></header>
-    <div>
-      <article v-for="item in cards" :key="item.title" :class="`tone-${item.tone || 'neutral'}`">
-        <span>{{ item.title }}</span>
-        <strong>{{ item.value }}</strong>
-        <small>{{ item.note }}</small>
-      </article>
-    </div>
+﻿<template>
+  <section class="runtime-grid" v-if="cards.length">
+    <article v-for="item in cards" :key="item.title" class="runtime-card">
+      <header>
+        <div>
+          <h3>{{ item.title }}</h3>
+        </div>
+        <strong>{{ item.centerValue }}</strong>
+      </header>
+
+      <div
+        class="runtime-ring"
+        :style="{
+          background: `conic-gradient(${item.startColor || '#3f7cff'} 0 ${item.progress}%, ${
+            item.endColor || '#d9e5f7'
+          } ${item.progress}% 100%)`,
+        }"
+      >
+        <div class="runtime-ring__inner">
+          <span>当前对照</span>
+          <strong>{{ item.progress }}%</strong>
+        </div>
+      </div>
+
+      <div class="runtime-ends">
+        <article>
+          <label>{{ item.leftLabel }}</label>
+          <strong>{{ item.leftValue }}</strong>
+          <span v-if="item.leftNote">{{ item.leftNote }}</span>
+        </article>
+        <article>
+          <label>{{ item.rightLabel }}</label>
+          <strong>{{ item.rightValue }}</strong>
+          <span v-if="item.rightNote">{{ item.rightNote }}</span>
+        </article>
+      </div>
+    </article>
   </section>
 </template>
 
 <script setup lang="ts">
-  import type { StrategyCardItem } from '@/data/sample/strategy';
+  import type { StrategyCapitalComparisonCard } from '@/data/sample/strategy';
 
-  defineProps<{ cards: StrategyCardItem[] }>();
+  withDefaults(
+    defineProps<{
+      cards?: StrategyCapitalComparisonCard[];
+    }>(),
+    {
+      cards: () => [],
+    },
+  );
 </script>
 
 <style scoped lang="less">
-  .runtime-panel {
+  .runtime-grid {
     display: grid;
-    gap: 14px;
-    padding: 18px;
-    border: 1px solid var(--strategy-border, #e4e9ef);
-    border-radius: var(--strategy-radius-card, 14px);
-    background: var(--strategy-surface, #fff);
+    grid-template-columns: 1fr;
+    gap: var(--strategy-space-2);
   }
 
-  header {
+  .runtime-card {
+    padding: 20px 22px;
+    border-radius: var(--strategy-radius-panel);
+    background: var(--strategy-surface);
+    box-shadow: var(--strategy-shadow-card);
+    border: 1px solid var(--strategy-border);
+  }
+
+  .runtime-card header {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 18px;
   }
 
-  h2 {
+  .runtime-card h3 {
     margin: 0;
-    font-size: 17px;
+    color: var(--strategy-text-1);
+    font-size: var(--strategy-font-card-title);
+    font-weight: 800;
   }
 
-  header span {
-    color: #9a6700;
-    font-size: 12px;
+  .runtime-card header strong {
+    color: var(--strategy-text-1);
+    font-size: 22px;
+    line-height: 1.1;
+    font-weight: 700;
+    text-align: right;
   }
 
-  .runtime-panel > div {
+  .runtime-ring {
+    display: grid;
+    place-items: center;
+    width: 184px;
+    height: 184px;
+    margin: 0 auto 18px;
+    border-radius: 50%;
+  }
+
+  .runtime-ring__inner {
+    display: grid;
+    place-items: center;
+    width: 132px;
+    height: 132px;
+    border-radius: 50%;
+    background: var(--strategy-surface);
+    text-align: center;
+    box-shadow: inset 0 0 0 1px var(--strategy-border);
+  }
+
+  .runtime-ring__inner span {
+    color: var(--strategy-text-3);
+    font-size: var(--strategy-font-xs);
+    font-weight: 600;
+  }
+
+  .runtime-ring__inner strong {
+    margin-top: 6px;
+    color: var(--strategy-text-1);
+    font-size: 28px;
+    line-height: 1.1;
+    font-weight: 800;
+  }
+
+  .runtime-ends {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 10px;
+    gap: 12px;
   }
 
-  article {
-    display: grid;
-    gap: 5px;
-    padding: 14px;
-    border-radius: 11px;
-    background: #f7f9fc;
+  .runtime-ends article {
+    padding: 14px 16px;
+    border-radius: var(--strategy-radius-card);
+    background: var(--strategy-surface-muted);
+    border: 1px solid var(--strategy-border-strong);
+    box-shadow: var(--strategy-shadow-soft);
   }
 
-  article span,
-  small {
-    color: var(--strategy-text-3, #778396);
+  .runtime-ends label {
+    display: block;
+    color: var(--strategy-text-3);
+    font-size: var(--strategy-font-xs);
+    font-weight: 700;
   }
 
-  strong {
-    font-size: 18px;
+  .runtime-ends strong {
+    display: block;
+    margin-top: 10px;
+    color: var(--strategy-text-1);
+    font-size: 20px;
+    line-height: 1.12;
+    font-weight: 700;
   }
 
-  .tone-positive strong {
-    color: #087a55;
+  .runtime-ends span {
+    display: block;
+    margin-top: 6px;
+    color: var(--strategy-text-3);
+    font-size: var(--strategy-font-base);
+    font-weight: 700;
   }
 
-  .tone-warning strong {
-    color: #a06400;
+  @media (max-width: 1180px) {
+    .runtime-grid {
+      grid-template-columns: 1fr;
+    }
   }
 
-  @media (max-width: 520px) {
-    .runtime-panel > div {
+  @media (max-width: 860px) {
+    .runtime-ends {
       grid-template-columns: 1fr;
     }
   }

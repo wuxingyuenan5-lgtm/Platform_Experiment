@@ -22,6 +22,7 @@ const news: AppRouteModule = {
         title: '宏观日历',
         roles: [RoleEnum.ADMIN, RoleEnum.EMPLOYEE],
         newsSection: 'macro',
+        ignoreKeepAlive: true,
       },
     },
     {
@@ -32,6 +33,7 @@ const news: AppRouteModule = {
         title: '新闻整理',
         roles: [RoleEnum.ADMIN, RoleEnum.EMPLOYEE],
         newsSection: 'news',
+        ignoreKeepAlive: true,
       },
     },
     {
@@ -42,6 +44,7 @@ const news: AppRouteModule = {
         title: '理财信息',
         roles: [RoleEnum.ADMIN, RoleEnum.EMPLOYEE],
         newsSection: 'wealth',
+        ignoreKeepAlive: true,
         embeddedUrl: 'https://app.barker.money/campaigns',
       },
     },

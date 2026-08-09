@@ -6,20 +6,20 @@ Variable-Global 是围绕交易研究、策略管理、风险控制和个人账�
 
 | 模块 | 现有文档 | 当前产品判断 |
 |---|---|---|
-| 首页 | `platform-web/docs/modules/首页-需求文档.md` | 平台入口和跨资产观察面板；聚合 Owner 未配置时使用明确样例状态 |
+| 首页 | `platform-web/docs/modules/首页-需求文档.md` | 平台入口和跨资产观察面板；样例状态不暴露内部 Owner 或来源说明 |
 | 对冲基金看板 | `platform-web/docs/modules/对冲基金看板-需求文档.md` | 市场扫描、工具入口和跨资产观察 |
 | 策略 | `platform-web/docs/modules/策略-需求文档.md` | 资金费率、跨所价差和其他策略研究工作台 |
 | 策略管理 | `platform-web/docs/modules/策略管理-需求文档.md` | 策略目录、账户资金、损益、订单和风险状态 |
 | 交易平台 | `platform-web/docs/modules/交易平台-需求文档.md` | 研究与执行分层；`CrossVenueExecutionWorkspace` 是当前正式跨所执行工作区 |
 | 风控管理 | `platform-web/docs/modules/风控管理-需求文档.md` | 内部高风险模块；员工只读，会员不可见且不可访问 |
-| 新闻日历与理财 | `platform-web/docs/modules/新闻日历与理财-需求文档.md` | 宏观日历、新闻组织和活动信息，必须披露来源与数据状态 |
-| 金融 AI 分析 | `platform-web/docs/modules/金融AI分析-需求文档.md` | 产品结构可见；真实 Provider 未配置时不得生成伪模型回答 |
+| 新闻日历与理财 | `platform-web/docs/modules/新闻日历与理财-需求文档.md` | 宏观日历、新闻组织和活动信息，来源字段限于新闻业务来源，不展示工程数据源说明 |
+| 金融 AI 分析 | `platform-web/docs/modules/金融AI分析-需求文档.md` | 产品结构可见；真实分析服务未接入时不得伪造分析成功 |
 | 设置与个人账号 | `docs/contracts/BROWSER_ACCESS_AND_PRODUCT_DATA.md` | 设置状态与本人账号分离；所有角色均拥有个人账号 |
 
 ## 产品口径
 
 - 正式页面首先服务高频交易和投研工作流，不以整页“尚未配置”代替产品结构。
-- 页面不得把实现细节当作产品文案；技术和 Runtime 术语只在执行、风控或运维语境出现。
+- 页面不得把实现细节当作产品文案；Provider、Owner、source、`actionable`、接口名和架构说明不在普通用户页面展示。
 - 策略管理展示策略、账户、损益、订单和风险，不展示调试面板。
 - 研究、模拟和正式执行必须分层；样例内容始终 `actionable=false`。
 - 写入能力同时受角色 Capability、数据状态、业务规则和 Live Write 门禁约束。
@@ -43,12 +43,12 @@ CEO 使用显式、业务范围内的浏览器权限集合，不使用人类角�
 
 正式页面统一使用以下四种状态：
 
-- `live`：有明确 Owner、来源和时间语义的真实 Provider 或 Platform 事实；
-- `sample`：用于恢复产品结构的非实时样例，必须显著标识并设置 `actionable=false`；
-- `unavailable`：所需 Provider 或 Application Owner 尚未配置；
+- `live`：有明确内部权属、来源和时间语义的真实业务事实；
+- `sample`：用于恢复产品结构的非实时样例，内部必须设置 `actionable=false`，用户侧不得触发真实写入；
+- `unavailable`：所需业务数据暂不可用；
 - `error`：真实请求失败，不得静默替换为成功外观或零值。
 
-Dashboard、策略管理、资金费率研究和价差研究当前含明确的样例状态；金融 AI Provider 不可用；宏观日历使用 TradingView 公开 Widget；设置页使用当前 Session 与 data-service health，并将设置写入 Owner 标为不可用。具体合同见 `docs/contracts/BROWSER_ACCESS_AND_PRODUCT_DATA.md`。
+Dashboard、策略管理、资金费率研究和价差研究当前可使用非实时样例承载产品结构；金融 AI 在真实分析服务接入前只生成待复核状态，不伪造成功。具体合同见 `docs/contracts/BROWSER_ACCESS_AND_PRODUCT_DATA.md`。
 
 ## 跨模块与安全边界
 

@@ -17,6 +17,8 @@
         </button>
       </section>
 
+      <AShareLegacyTerminalSection />
+
       <nav class="research-subnav" aria-label="A股研究模块导航">
         <button
           v-for="(item, index) in sectionNav"
@@ -90,6 +92,7 @@
   import { PageWrapper } from '@/components/Page';
   import CompactSegmentTabs from '@/views/strategy/shared/CompactSegmentTabs.vue';
   import ResearchSourceState from '../research/components/ResearchSourceState.vue';
+  import AShareLegacyTerminalSection from './components/AShareLegacyTerminalSection.vue';
   import AShareBreadthSection from './components/AShareBreadthSection.vue';
   import AShareMarketDetailSection from './components/AShareMarketDetailSection.vue';
   import AShareWatchlistSection from './components/AShareWatchlistSection.vue';

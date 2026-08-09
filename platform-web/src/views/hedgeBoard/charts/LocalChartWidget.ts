@@ -122,6 +122,7 @@ export default defineComponent({
             });
           case 'gold-market-detail-table':
             return h(TerminalDetailPanel, {
+              class: 'terminal-detail-panel--embedded',
               title: '市场明细',
               marketId: 'gold',
               columns: marketTerminalConfigs.gold.detailColumns,
@@ -131,6 +132,7 @@ export default defineComponent({
             });
           case 'macro-market-detail-table':
             return h(TerminalDetailPanel, {
+              class: 'terminal-detail-panel--embedded',
               title: '市场明细',
               marketId: 'macro',
               columns: marketTerminalConfigs.macro.detailColumns,
@@ -138,6 +140,7 @@ export default defineComponent({
             });
           case 'crypto-market-detail-table':
             return h(TerminalDetailPanel, {
+              class: 'terminal-detail-panel--embedded',
               title: '市场明细',
               marketId: 'crypto',
               columns: marketTerminalConfigs.crypto.detailColumns,

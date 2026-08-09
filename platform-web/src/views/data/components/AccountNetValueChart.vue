@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <Card :bordered="false" class="vg-panel net-value-panel">
     <template #title>
       <div class="panel-title">
@@ -36,7 +36,7 @@
         <div v-if="!loading && !hasData" class="empty-layer">
           <Empty
             :image="Empty.PRESENTED_IMAGE_SIMPLE"
-            :description="errorText ? '净值数据源不可用' : '暂无净值数据'"
+            :description="errorText ? '净值数据暂不可用' : '暂无净值数据'"
           />
         </div>
       </div>
@@ -46,7 +46,7 @@
       <span>{{ currentAccount?.name || '未选择账户' }}</span>
       <span v-if="latestPoint">最近净值 {{ formatDecimal(latestPoint.unit_net_worth) }}</span>
       <span v-if="latestPoint">更新时间 {{ latestPoint.created_at }}</span>
-      <span>来源：data-service</span>
+      <span>数据服务</span>
       <span>精度：Decimal字符串</span>
     </div>
   </Card>

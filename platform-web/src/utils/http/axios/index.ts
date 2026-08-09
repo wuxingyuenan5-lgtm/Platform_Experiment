@@ -1,4 +1,4 @@
-// axios配置  可自行根据项目进行更改，只需更改该文件即可，其他文件可以不动
+﻿// axios閰嶇疆  鍙嚜琛屾牴鎹」鐩繘琛屾洿鏀癸紝鍙渶鏇存敼璇ユ枃浠跺嵆鍙紝鍏朵粬鏂囦欢鍙互涓嶅姩
 // The axios configuration can be changed according to the project, just change the file, other files can be left unchanged
 
 import type { AxiosInstance, AxiosResponse } from 'axios';
@@ -26,35 +26,31 @@ const urlPrefix = globSetting.urlPrefix;
 const { createMessage, createErrorModal, createSuccessModal } = useMessage();
 const appenvConfig = getAppEnvConfig();
 /**
- * @description: 数据处理，方便区分多种处理方式
- */
+ * @description: 鏁版嵁澶勭悊锛屾柟渚垮尯鍒嗗绉嶅鐞嗘柟寮? */
 const transform: AxiosTransform = {
   /**
-   * @description: 处理响应数据。如果数据不是预期格式，可直接抛出错误
-   */
+   * @description: 澶勭悊鍝嶅簲鏁版嵁銆傚鏋滄暟鎹笉鏄鏈熸牸寮忥紝鍙洿鎺ユ姏鍑洪敊璇?   */
   transformResponseHook: (res: AxiosResponse<Result>, options: RequestOptions) => {
     const { t } = useI18n();
     const { isTransformResponse, isReturnNativeResponse } = options;
-    // 是否返回原生响应头 比如：需要获取响应头时使用该属性
+    // Return native Axios response when requested.
     if (isReturnNativeResponse) {
       return res;
     }
-    // 不进行任何处理，直接返回
-    // 用于页面代码可能需要直接获取code，data，message这些信息时开启
+    // 涓嶈繘琛屼换浣曞鐞嗭紝鐩存帴杩斿洖
+    // Return raw response data when transform is disabled.
     if (!isTransformResponse) {
       return res.data;
     }
-    // 错误的时候返回
-
+    // 閿欒鐨勬椂鍊欒繑鍥?
     const { data } = res;
     if (!data) {
       // return '[HTTP] Request has no return value';
       throw new Error(t('sys.api.apiRequestFailed'));
     }
-    //  这里 code，result，message为 后台统一的字段，需要在 types.ts内修改为项目自己的接口返回格式
-    const { code, result, message } = data;
+    //  杩欓噷 code锛宺esult锛宮essage涓?鍚庡彴缁熶竴鐨勫瓧娈碉紝闇€瑕佸湪 types.ts鍐呬慨鏀逛负椤圭洰鑷繁鐨勬帴鍙ｈ繑鍥炴牸寮?    const { code, result, message } = data;
 
-    // 这里逻辑可以根据项目进行修改
+    // 杩欓噷閫昏緫鍙互鏍规嵁椤圭洰杩涜淇敼
     const hasSuccess = data && Reflect.has(data, 'code') && code === ResultEnum.SUCCESS;
     if (hasSuccess) {
       let successMsg = message;
@@ -71,9 +67,7 @@ const transform: AxiosTransform = {
       return result;
     }
 
-    // 在此处根据自己项目的实际情况对不同的code执行不同的操作
-    // 如果不希望中断当前请求，请return数据，否则直接抛出异常即可
-    let timeoutMsg = '';
+    // 鍦ㄦ澶勬牴鎹嚜宸遍」鐩殑瀹為檯鎯呭喌瀵逛笉鍚岀殑code鎵ц涓嶅悓鐨勬搷浣?    // 濡傛灉涓嶅笇鏈涗腑鏂綋鍓嶈姹傦紝璇穜eturn鏁版嵁锛屽惁鍒欑洿鎺ユ姏鍑哄紓甯稿嵆鍙?    let timeoutMsg = '';
     switch (code) {
       case ResultEnum.TIMEOUT:
         timeoutMsg = t('sys.api.timeoutMessage');
@@ -86,8 +80,8 @@ const transform: AxiosTransform = {
         }
     }
 
-    // errorMessageMode='modal'的时候会显示modal错误弹窗，而不是消息提示，用于一些比较重要的错误
-    // errorMessageMode='none' 一般是调用时明确表示不希望自动弹出错误提示
+    // errorMessageMode='modal'鐨勬椂鍊欎細鏄剧ずmodal閿欒寮圭獥锛岃€屼笉鏄秷鎭彁绀猴紝鐢ㄤ簬涓€浜涙瘮杈冮噸瑕佺殑閿欒
+    // errorMessageMode='none' 涓€鑸槸璋冪敤鏃舵槑纭〃绀轰笉甯屾湜鑷姩寮瑰嚭閿欒鎻愮ず
     if (options.errorMessageMode === 'modal') {
       createErrorModal({ title: t('sys.api.errorTip'), content: timeoutMsg });
     } else if (options.errorMessageMode === 'message') {
@@ -97,26 +91,30 @@ const transform: AxiosTransform = {
     throw new Error(timeoutMsg || t('sys.api.apiRequestFailed'));
   },
 
-  // 请求之前处理config
+  // 璇锋眰涔嬪墠澶勭悊config
   beforeRequestHook: (config, options) => {
-    const { apiUrl, joinPrefix, joinParamsToUrl, formatDate, joinTime = true, urlPrefix } = options;
+    const { joinPrefix, joinParamsToUrl, formatDate, joinTime = true, requireApiUrl } = options;
+    const apiUrl = normalizeApiBase(options.apiUrl);
+    const urlPrefix = normalizeApiBase(options.urlPrefix);
+    if (requireApiUrl && !apiUrl) {
+      throw new Error('Required service URL is not configured');
+    }
 
     if (joinPrefix) {
-      config.url = `${urlPrefix}${config.url}`;
+      config.url = joinApiBase(urlPrefix, config.url);
     }
 
     if (apiUrl && isString(apiUrl)) {
-      config.url = `${apiUrl}${config.url}`;
+      config.url = joinApiBase(apiUrl, config.url);
     }
     const params = config.params || {};
     const data = config.data || false;
     formatDate && data && !isString(data) && formatRequestDate(data);
     if (config.method?.toUpperCase() === RequestEnum.GET) {
       if (!isString(params)) {
-        // 给 get 请求加上时间戳参数，避免从缓存中拿数据。
-        config.params = Object.assign(params || {}, joinTimestamp(joinTime, false));
+        // 缁?get 璇锋眰鍔犱笂鏃堕棿鎴冲弬鏁帮紝閬垮厤浠庣紦瀛樹腑鎷挎暟鎹€?        config.params = Object.assign(params || {}, joinTimestamp(joinTime, false));
       } else {
-        // 兼容restful风格
+        // 鍏煎restful椋庢牸
         config.url = config.url + params + `${joinTimestamp(joinTime, true)}`;
         config.params = undefined;
       }
@@ -131,7 +129,7 @@ const transform: AxiosTransform = {
           config.data = data;
           config.params = params;
         } else {
-          // 非GET请求如果没有提供data，则将params视为data
+          // 闈濭ET璇锋眰濡傛灉娌℃湁鎻愪緵data锛屽垯灏唒arams瑙嗕负data
           config.data = params;
           config.params = undefined;
         }
@@ -142,7 +140,7 @@ const transform: AxiosTransform = {
           );
         }
       } else {
-        // 兼容restful风格
+        // 鍏煎restful椋庢牸
         config.url = config.url + params;
         config.params = undefined;
       }
@@ -151,10 +149,9 @@ const transform: AxiosTransform = {
   },
 
   /**
-   * @description: 请求拦截器处理
-   */
-  requestInterceptors: (config, options) => {
-    // 请求之前处理config
+   * @description: 璇锋眰鎷︽埅鍣ㄥ鐞?   */
+  requestInterceptors: (config) => {
+    // 璇锋眰涔嬪墠澶勭悊config
     const token = getToken();
 
     if (token && (config as Recordable)?.requestOptions?.withToken !== false) {
@@ -166,14 +163,13 @@ const transform: AxiosTransform = {
   },
 
   /**
-   * @description: 响应拦截器处理
-   */
+   * @description: 鍝嶅簲鎷︽埅鍣ㄥ鐞?   */
   responseInterceptors: (res: AxiosResponse<any>) => {
     return res;
   },
 
   /**
-   * @description: 响应错误处理
+   * @description: 鍝嶅簲閿欒澶勭悊
    */
   responseInterceptorsCatch: (axiosInstance: AxiosInstance, error: any) => {
     const { t } = useI18n();
@@ -210,7 +206,7 @@ const transform: AxiosTransform = {
     }
     checkStatus(error?.response?.status, msg, errorMessageMode);
 
-    // 添加自动重试机制 保险起见 只针对GET请求
+    // 娣诲姞鑷姩閲嶈瘯鏈哄埗 淇濋櫓璧疯 鍙拡瀵笹ET璇锋眰
     const retryRequest = new AxiosRetry();
     const { isOpenRetry } = config.requestOptions.retryRequest;
     config.method?.toUpperCase() === RequestEnum.GET &&
@@ -223,45 +219,42 @@ const transform: AxiosTransform = {
 
 function createAxios(opt?: Partial<CreateAxiosOptions>) {
   return new VAxios(
-    // 深度合并
+    // 娣卞害鍚堝苟
     deepMerge(
       {
         // See https://developer.mozilla.org/en-US/docs/Web/HTTP/Authentication#authentication_schemes
-        // authentication schemes，e.g: Bearer
+        // authentication schemes锛宔.g: Bearer
         // authenticationScheme: 'Bearer',
         authenticationScheme: '',
         timeout: 15 * 1000,
-        // 基础接口地址
+        // 鍩虹鎺ュ彛鍦板潃
         // baseURL: globSetting.apiUrl,
 
         headers: { 'Content-Type': ContentTypeEnum.JSON },
-        // 如果是form-data格式
+        // 濡傛灉鏄痜orm-data鏍煎紡
         // headers: { 'Content-Type': ContentTypeEnum.FORM_URLENCODED },
-        // 数据处理方式
+        // 鏁版嵁澶勭悊鏂瑰紡
         transform: clone(transform),
-        // 配置项，下面的选项都可以在独立的接口请求中覆盖
+        // 閰嶇疆椤癸紝涓嬮潰鐨勯€夐」閮藉彲浠ュ湪鐙珛鐨勬帴鍙ｈ姹備腑瑕嗙洊
         requestOptions: {
-          // 默认将prefix 添加到url
+          // 榛樿灏唒refix 娣诲姞鍒皍rl
           joinPrefix: true,
-          // 是否返回原生响应头 比如：需要获取响应头时使用该属性
-          isReturnNativeResponse: false,
-          // 需要对返回数据进行处理
+          // 鏄惁杩斿洖鍘熺敓鍝嶅簲澶?姣斿锛氶渶瑕佽幏鍙栧搷搴斿ご鏃朵娇鐢ㄨ灞炴€?          isReturnNativeResponse: false,
+          // 闇€瑕佸杩斿洖鏁版嵁杩涜澶勭悊
           isTransformResponse: true,
-          // post请求的时候添加参数到url
+          // post璇锋眰鐨勬椂鍊欐坊鍔犲弬鏁板埌url
           joinParamsToUrl: false,
-          // 格式化提交参数时间
-          formatDate: true,
-          // 消息提示类型
+          // 鏍煎紡鍖栨彁浜ゅ弬鏁版椂闂?          formatDate: true,
+          // 娑堟伅鎻愮ず绫诲瀷
           errorMessageMode: 'message',
-          // 接口地址
+          // 鎺ュ彛鍦板潃
           apiUrl: globSetting.apiUrl,
-          // 接口拼接地址
+          // 鎺ュ彛鎷兼帴鍦板潃
           urlPrefix: urlPrefix,
-          //  是否加入时间戳
-          joinTime: true,
-          // 忽略重复请求
+          //  鏄惁鍔犲叆鏃堕棿鎴?          joinTime: true,
+          // 蹇界暐閲嶅璇锋眰
           ignoreCancelToken: false,
-          // 是否携带token
+          // 鏄惁鎼哄甫token
           withToken: true,
           retryRequest: {
             isOpenRetry: true,
@@ -275,7 +268,53 @@ function createAxios(opt?: Partial<CreateAxiosOptions>) {
   );
 }
 
-const defaultApiUrl = appenvConfig.VITE_GLOB_API_URL_PLOY;
+export function normalizeApiBase(value: unknown) {
+  if (typeof value !== 'string') return '';
+  const trimmed = value.trim();
+  return trimmed && trimmed !== 'undefined' && trimmed !== 'null' ? trimmed : '';
+}
+
+export function joinApiBase(base: string, requestUrl: unknown) {
+  const url = isString(requestUrl) ? requestUrl : '';
+  if (!base) return url;
+  if (!url) return base;
+  if (/^[a-z][a-z\d+\-.]*:\/\//i.test(url)) return url;
+  if (base === '/') return url.startsWith('/') ? url : `/${url}`;
+  return `${base.replace(/\/+$/, '')}/${url.replace(/^\/+/, '')}`;
+}
+
+export function resolveApiBase(
+  candidates: unknown[],
+  label: string,
+  options: { required?: boolean } = {},
+) {
+  for (const candidate of candidates) {
+    const normalized = normalizeApiBase(candidate);
+    if (normalized) return normalized;
+  }
+  if (options.required) {
+    throw new Error(`${label} is not configured`);
+  }
+  return '';
+}
+
+const defaultApiUrl = resolveApiBase(
+  [appenvConfig.VITE_GLOB_API_URL_PLOY, globSetting.apiUrl],
+  '骞冲彴涓氬姟 API',
+  { required: true },
+);
+const monitorApiUrl = resolveApiBase(
+  [appenvConfig.VITE_GLOB_API_URL_MONITOR, defaultApiUrl],
+  '鐩戞帶鏈嶅姟',
+);
+const futureApiUrl = resolveApiBase(
+  [appenvConfig.VITE_GLOB_API_URL_FUTURE, defaultApiUrl],
+  '鏈熻揣鏈嶅姟',
+);
+const dataApiUrl = resolveApiBase(
+  [appenvConfig.VITE_GLOB_API_URL_DATA, defaultApiUrl],
+  '鏁版嵁鏈嶅姟',
+);
 
 export const defHttp = createAxios({
   requestOptions: {
@@ -286,7 +325,8 @@ export const defHttp = createAxios({
 
 export const monitorHttp = createAxios({
   requestOptions: {
-    apiUrl: appenvConfig.VITE_GLOB_API_URL_MONITOR,
+    apiUrl: monitorApiUrl,
+    requireApiUrl: true,
     isTransformResponse: false,
   },
 });
@@ -319,7 +359,8 @@ export const monitorHttp = createAxios({
 
 export const futureHttp = createAxios({
   requestOptions: {
-    apiUrl: appenvConfig.VITE_GLOB_API_URL_FUTURE,
+    apiUrl: futureApiUrl,
+    requireApiUrl: true,
     // apiUrl: '/futureApi',
     isTransformResponse: false,
   },
@@ -327,7 +368,8 @@ export const futureHttp = createAxios({
 
 export const dataHttp = createAxios({
   requestOptions: {
-    apiUrl: appenvConfig.VITE_GLOB_API_URL_DATA,
+    apiUrl: dataApiUrl,
+    requireApiUrl: true,
     isTransformResponse: false,
   },
 });

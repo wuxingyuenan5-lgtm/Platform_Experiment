@@ -1,4 +1,4 @@
-import { defineApplicationConfig } from '@vben/vite-config';
+﻿import { defineApplicationConfig } from '@vben/vite-config';
 
 const localPlatformBackend = 'http://127.0.0.1:8000';
 const localAuthService = 'http://127.0.0.1:8080';
@@ -30,6 +30,26 @@ export default defineApplicationConfig({
         usePolling: true,
       },
       proxy: {
+        '/login': {
+          target: localPlatformBackend,
+          changeOrigin: true,
+        },
+        '/me': {
+          target: localPlatformBackend,
+          changeOrigin: true,
+        },
+        '/logout': {
+          target: localPlatformBackend,
+          changeOrigin: true,
+        },
+        '/getPermCode': {
+          target: localPlatformBackend,
+          changeOrigin: true,
+        },
+        '/health': {
+          target: localPlatformBackend,
+          changeOrigin: true,
+        },
         // Canonical Platform API, including browser identity and Session routes.
         '/api/v1': {
           target: localPlatformBackend,
