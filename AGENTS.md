@@ -18,7 +18,7 @@ Use `python scripts/context-for.py <pack>` for bounded task context. Context Pac
 - External venue SDKs and order side effects belong to `execution-runtime`; Platform API communicates through versioned contracts.
 - Formal accounting is rebuilt from immutable Financial Facts. Operational projections are not formal accounting inputs.
 - Preserve exact Decimal values and timezone-aware timestamps at financial boundaries.
-- Live Write is disabled by default. Kill Switch, two-person approval, idempotency and Result Unknown semantics are protected invariants.
+- Live Write is disabled by default. Kill Switch, idempotency and Result Unknown semantics are protected invariants. A narrow Platform 0.11.1 exception permits single-responsible-person controlled Live Write only on a local machine, using a founder-owned test account under the founder's direct supervision. It requires a time-limited manual unlock, Account/Strategy/Symbol allowlists, hard limits, one active execution batch, Kill Switch, automatic close-on-anomaly, end-of-day reconciliation and complete audit evidence. This exception does not extend to external client funds, multi-person operation, unattended trading, long-lived Live Write, production deployment, or any expansion of funds, symbols or concurrency.
 - Restored product pages must not expose developer-facing provider, owner, source, `actionable`, static-design or architecture explanations to ordinary users. Keep those facts in data envelopes, contracts and tests.
 
 ## Change discipline

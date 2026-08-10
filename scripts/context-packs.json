@@ -1,5 +1,13 @@
 {
   "budgets": {
+    "cross-spread-live": [
+      24000,
+      8000
+    ],
+    "funding-data": [
+      16000,
+      6000
+    ],
     "hedge-style": [
       34000,
       6000
@@ -7,6 +15,10 @@
     "identity-permission": [
       12000,
       8000
+    ],
+    "live-readiness": [
+      16000,
+      6000
     ],
     "member-contract": [
       12750,
@@ -20,9 +32,21 @@
       13000,
       3500
     ],
+    "release-acceptance": [
+      12000,
+      5000
+    ],
+    "strategy-management": [
+      18000,
+      6000
+    ],
     "trading-display": [
       15000,
       4500
+    ],
+    "version-governance": [
+      8000,
+      4000
     ],
     "user-e2e": [
       10500,
@@ -40,6 +64,55 @@
     "execution-runtime/AGENTS.md"
   ],
   "packs": {
+    "cross-spread-live": {
+      "checks": [
+        "cd platform-api && python -m pytest tests/test_cross_spread_market_lifecycle.py tests/test_cross_spread_fok_lifecycle.py tests/test_cross_spread_acceptance_rollback.py",
+        "cd execution-runtime && python -m pytest tests/test_cross_spread_market.py tests/test_cross_spread_market_close.py tests/test_live_safety.py",
+        "git diff --check"
+      ],
+      "description": "Implement or verify controlled cross-venue spread execution without broadening the established execution contract.",
+      "optional": [
+        "platform-api/app/live_trading_sessions.py"
+      ],
+      "required": [
+        "AGENTS.md",
+        "docs/codex/current-state.md",
+        "docs/technical/CROSS_SPREAD_SYNTHETIC_EXECUTION.md",
+        "docs/technical/EXECUTION_RISK_CONTROLS.md",
+        "platform-api/AGENTS.md",
+        "platform-api/app/cross_spread_synthetic_service.py",
+        "platform-api/tests/test_cross_spread_market_lifecycle.py",
+        "execution-runtime/AGENTS.md",
+        "execution-runtime/app/cross_spread_market.py",
+        "execution-runtime/tests/test_cross_spread_market.py"
+      ]
+    },
+    "funding-data": {
+      "checks": [
+        "cd platform-api && python -m pytest tests/test_architecture_production_data_boundaries.py tests/test_strategy_runs_v1.py",
+        "cd platform-web && pnpm test:funding-order-layout",
+        "cd platform-web && pnpm type:check"
+      ],
+      "description": "Build funding-rate collection, persistence and read models without authorizing funding live execution.",
+      "optional": [
+        "platform-api/app/database_bootstrap.py",
+        "platform-api/tests/test_architecture_production_data_boundaries.py"
+      ],
+      "required": [
+        "AGENTS.md",
+        "docs/codex/current-state.md",
+        "docs/product/ACCEPTANCE_CRITERIA.md",
+        "platform-api/AGENTS.md",
+        "platform-api/app/market_data.py",
+        "platform-api/app/schemas.py",
+        "platform-api/app/strategy_runs.py",
+        "platform-api/tests/test_strategy_runs_v1.py",
+        "platform-web/AGENTS.md",
+        "platform-web/src/api/funding.ts",
+        "platform-web/src/api/model/fundingRateModel.ts",
+        "platform-web/src/views/strategy/funding-carry/components/FundingMarketBoard.vue"
+      ]
+    },
     "hedge-style": {
       "checks": [
         "cd platform-web && pnpm test:hedge-board-layout",
@@ -82,6 +155,31 @@
         "platform-api/app/user_authority.py",
         "platform-api/app/user_permissions.py",
         "platform-api/tests/test_auth_rbac.py"
+      ]
+    },
+    "live-readiness": {
+      "checks": [
+        "cd platform-api && python -m pytest tests/test_live_trading_sessions.py tests/test_execution_risk.py",
+        "cd execution-runtime && python -m pytest tests/test_live_safety.py tests/test_runtime_journal.py tests/test_live_acceptance_reads.py",
+        "git diff --check"
+      ],
+      "description": "Verify controlled-live gates, read-only evidence and latency baselines without enabling Live Write.",
+      "optional": [
+        "docs/technical/CROSS_SPREAD_SYNTHETIC_EXECUTION.md",
+        "docs/technical/EXECUTION_RISK_CONTROLS.md",
+        "execution-runtime/app/journal.py"
+      ],
+      "required": [
+        "AGENTS.md",
+        "docs/codex/current-state.md",
+        "docs/operations/LIVE_ACCEPTANCE_RUNBOOK.md",
+        "platform-api/AGENTS.md",
+        "platform-api/app/live_trading_sessions.py",
+        "platform-api/tests/test_live_trading_sessions.py",
+        "execution-runtime/AGENTS.md",
+        "execution-runtime/app/live_safety.py",
+        "execution-runtime/tests/test_live_safety.py",
+        "execution-runtime/tests/test_runtime_journal.py"
       ]
     },
     "member-contract": {
@@ -142,7 +240,6 @@
         "docs/technical/RESEARCH_DATA_PLATFORM.md"
       ],
       "required": [
-        "AGENTS.md",
         "docs/codex/current-state.md",
         "platform-api/AGENTS.md",
         "platform-api/app/research_providers.py",
@@ -151,6 +248,52 @@
         "platform-api/app/research_data_schemas.py",
         "platform-api/scripts/smoke_research_providers.py",
         "platform-api/tests/test_research_service.py"
+      ]
+    },
+    "release-acceptance": {
+      "checks": [
+        "git diff --check",
+        "python scripts/context-for.py --check-budgets --json",
+        "python scripts/check-version-consistency.py",
+        "python scripts/check-repository-structure.py",
+        "python scripts/check-documentation-consistency.py"
+      ],
+      "description": "Independently verify 0.11.1 documentation, safety claims and bounded repository acceptance evidence.",
+      "optional": [
+        "docs/contracts/BROWSER_ACCESS_AND_PRODUCT_DATA.md",
+        "scripts/context-for.py"
+      ],
+      "required": [
+        "AGENTS.md",
+        "docs/codex/current-state.md",
+        "docs/operations/LIVE_ACCEPTANCE_RUNBOOK.md",
+        "docs/product/ACCEPTANCE_CRITERIA.md",
+        "scripts/context-packs.json"
+      ]
+    },
+    "strategy-management": {
+      "checks": [
+        "cd platform-api && python -m pytest tests/test_strategy_runs_v1.py tests/test_cross_spread_observability.py",
+        "cd platform-web && pnpm test:e2e:strategy",
+        "cd platform-web && pnpm type:check"
+      ],
+      "description": "Connect strategy-management reads to verified execution facts while preserving real/sample/unavailable boundaries.",
+      "optional": [
+        "platform-api/app/cross_spread_observability_service.py",
+        "platform-web/src/views/strategy/management/components/StrategyRecordsPanel.vue"
+      ],
+      "required": [
+        "AGENTS.md",
+        "docs/codex/current-state.md",
+        "docs/contracts/BROWSER_ACCESS_AND_PRODUCT_DATA.md",
+        "docs/product/ACCEPTANCE_CRITERIA.md",
+        "platform-api/AGENTS.md",
+        "platform-api/app/strategy_runs.py",
+        "platform-api/app/cross_spread_observability_schemas.py",
+        "platform-api/tests/test_strategy_runs_v1.py",
+        "platform-web/AGENTS.md",
+        "platform-web/src/api/strategy.ts",
+        "platform-web/src/views/strategy/management/index.vue"
       ]
     },
     "trading-display": {
@@ -174,6 +317,25 @@
         "platform-api/AGENTS.md",
         "platform-api/app/cross_spread_observability_schemas.py",
         "platform-api/tests/test_cross_spread_observability.py"
+      ]
+    },
+    "version-governance": {
+      "checks": [
+        "git diff --check",
+        "python scripts/context-for.py --check-budgets --json",
+        "python scripts/check-version-consistency.py",
+        "python scripts/check-repository-structure.py",
+        "python scripts/check-documentation-consistency.py"
+      ],
+      "description": "Align the limited 0.11.1 local founder-controlled-live governance authorities without changing executable trading behavior.",
+      "optional": [
+        "scripts/context-for.py"
+      ],
+      "required": [
+        "AGENTS.md",
+        "docs/codex/current-state.md",
+        "docs/product/ACCEPTANCE_CRITERIA.md",
+        "scripts/context-packs.json"
       ]
     },
     "user-e2e": {

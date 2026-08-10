@@ -7,7 +7,10 @@ This is the sole repository authority for the current stable baseline, candidate
 - Stable baseline: Platform `0.11.0`.
 - Current candidate target: Platform `0.11.1`.
 - Platform 0.11.0 is the owner-accepted local engineering baseline. It includes the restored product surfaces from 0.10.3 plus the single-root repository layout, Windows local lifecycle governance, path-stable local data configuration and clean dependency bootstrapping.
-- The Platform 0.11.1 candidate scope includes follow-on maintenance, browser-access regression hardening and Capability alignment without reopening the accepted product restoration; implementation is not yet authorized.
+- Platform 0.11.1 is the local, founder-supervised controlled-live-acceptance candidate. Only its version-governance stage is authorized. Real credentials, read-only account or venue connections, business implementation and Live Write are not authorized.
+- The Platform 0.11.1 candidate scope includes controlled-live governance and readiness without reopening the accepted product restoration.
+- Its included scope is cross-venue spread controlled-live readiness and acceptance; funding-rate read-only collection, persistence, quality monitoring, fast query, strategy-management reads and market analysis; and strategy-management/market-page presentation of verified data. It excludes funding-rate live execution, unattended trading, account/fund/symbol/concurrency expansion, home-abroad spread, bottom-fishing, short-term trader strategies, external client funds, multi-person fund operation and production deployment.
+- Its six sequential stage gates are version governance; connection verification and performance baseline; cross-venue spread implementation and controlled-live acceptance; funding-rate data pipeline; strategy management and market pages; and final independent acceptance. Each controlled-live execution step requires separate owner authorization.
 - Candidate validation does not mean the candidate is released, deployed or production-ready.
 - Platform 0.11.0 acceptance does not prove external deployment or production readiness.
 - Main promotion does not by itself prove deployment, external production readiness, provider connectivity or Live Write authorization.
@@ -17,7 +20,7 @@ This is the sole repository authority for the current stable baseline, candidate
 ## Safety and contracts
 
 - Platform Live Write and Runtime Live Write remain disabled by default.
-- Kill Switch, two-person approval, idempotency, Decimal precision and `result_unknown` semantics remain protected.
+- Kill Switch, idempotency, Decimal precision and `result_unknown` semantics remain protected. The 0.11.1 narrow single-responsible-person exception is governed by `../operations/LIVE_ACCEPTANCE_RUNBOOK.md`; it requires a new time-limited Live Write window for every authorized step and does not alter the default-disabled gates.
 - Public Execution Risk API paths and request/response schemas remain compatible.
 - Cross-venue spread execution continues to use the restored new-version safety implementation.
 - The Execution Risk module split does not change database schema or persisted data meaning.
@@ -33,6 +36,7 @@ Repository validation does not prove any external production fact. The following
 - external database contents or migrations;
 - secrets and CI/CD variables;
 - broker, venue or data-provider credentials, connectivity and permissions;
+- test-account status, external orders, fills, deals, positions, balances and live-trading state;
 - production monitoring, backups and restore readiness.
 
 Deployment configuration must fail clearly when required neutral variables are absent. External production readiness must not be assumed from repository state, CI success or documentation.
@@ -45,5 +49,6 @@ Deployment configuration must fail clearly when required neutral variables are a
 - Windows local multi-service start/stop lifecycle governance is deferred to the next development stage and is not part of this release gate.
 - External data sources, broker connectivity, production hosts, databases, credentials and real production connections remain unproven without separate operator evidence.
 - External deployment, domains, databases, credentials and provider state are not proven by CI.
+- Repository checks cannot establish external connectivity, a real account state or completion of controlled live trading; those facts require separate operator evidence.
 - Production expansion in funds, quantity, symbols or automation requires completion of the controlled live-acceptance and end-of-day reconciliation sequence.
 - Further optimization should focus on measured AI execution cost, bounded task context, selective frontend-template simplification and removal of proven unused code rather than another unbounded architecture rewrite.
