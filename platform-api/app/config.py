@@ -1,13 +1,17 @@
 from decimal import Decimal
 from functools import lru_cache
+from pathlib import Path
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+PLATFORM_API_ROOT = Path(__file__).resolve().parents[1]
 
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_prefix="VG_",
-        env_file=".env",
+        env_file=str(PLATFORM_API_ROOT / ".env"),
         extra="ignore",
     )
 
@@ -92,6 +96,21 @@ class Settings(BaseSettings):
     operations_restore_root: str = "./data/restore-drills"
     operations_alert_default_owner: str = "operations"
     operations_eod_overdue_grace_minutes: int = 0
+
+    @field_validator(
+        "database_path",
+        "avatar_data_directory",
+        "runtime_journal_path",
+        "operations_backup_root",
+        "operations_restore_root",
+        mode="before",
+    )
+    @classmethod
+    def resolve_local_paths_from_platform_api_root(cls, value: str) -> str:
+        path = Path(str(value)).expanduser()
+        if path.is_absolute():
+            return str(path)
+        return str((PLATFORM_API_ROOT / path).resolve())
 
     @property
     def allowed_cors_origins(self) -> list[str]:

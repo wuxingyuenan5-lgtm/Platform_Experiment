@@ -1,4 +1,7 @@
+import json
 import sqlite3
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -55,3 +58,43 @@ def test_connection_rolls_back_and_reraises_on_exception(tmp_path: Path) -> None
 def test_database_module_preserves_connection_compatibility_identity() -> None:
     assert database.connection is database_connection.connection
     assert database.database_path is database_connection.database_path
+
+
+def test_default_database_path_resolves_to_platform_api_data_from_any_working_directory() -> None:
+    platform_api_root = Path(__file__).resolve().parents[1]
+    repo_root = platform_api_root.parent
+    scripts_root = platform_api_root / "scripts"
+    expected = {
+        "database_path": platform_api_root / "data" / "platform.db",
+        "avatar_data_directory": platform_api_root / "data" / "avatars",
+        "runtime_journal_path": platform_api_root.parent
+        / "execution-runtime"
+        / "data"
+        / "runtime_journal.db",
+    }
+    python = Path(sys.executable)
+
+    command = [
+        str(python),
+        "-c",
+        "import json; from app.config import get_settings; "
+        "settings = get_settings(); "
+        "print(json.dumps({"
+        "'database_path': settings.database_path, "
+        "'avatar_data_directory': settings.avatar_data_directory, "
+        "'runtime_journal_path': settings.runtime_journal_path"
+        "}))",
+    ]
+
+    for working_directory in (repo_root, platform_api_root, scripts_root):
+        completed = subprocess.run(
+            command,
+            cwd=working_directory,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        payload = json.loads(completed.stdout)
+        assert Path(payload["database_path"]) == expected["database_path"]
+        assert Path(payload["avatar_data_directory"]) == expected["avatar_data_directory"]
+        assert Path(payload["runtime_journal_path"]) == expected["runtime_journal_path"]

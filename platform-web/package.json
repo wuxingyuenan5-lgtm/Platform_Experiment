@@ -1,6 +1,6 @@
 {
   "name": "vg-platform-web",
-  "version": "0.10.3",
+  "version": "0.11.0",
   "private": true,
   "description": "Platform research, trading, risk, identity, portfolio and reconciliation web application",
   "homepage": "https://github.com/wuxingyuenan5-lgtm/Platform_Experiment",
@@ -27,7 +27,7 @@
     "lint:eslint": "eslint --cache --max-warnings 0 \"src/**/*.{vue,ts,tsx}\" --fix",
     "lint:prettier": "prettier --write .",
     "lint:stylelint": "stylelint \"**/*.{vue,css,less,scss}\" --fix --cache --cache-location node_modules/.cache/stylelint/",
-    "prepare": "husky install",
+    "prepare": "cd .. && husky install platform-web/.husky",
     "preview": "npm run build && vite preview",
     "reinstall": "rimraf pnpm-lock.yaml && rimraf package.lock.json && rimraf node_modules && npm run bootstrap",
     "serve": "npm run dev",
@@ -36,18 +36,18 @@
     "test:cross-spread-layout": "node scripts/verify-cross-spread-layout.cjs",
     "test:e2e:hedge-board": "playwright test -c playwright.hedge-board.config.ts",
     "test:e2e:platform-visual": "playwright test -c playwright.platform-visual.config.ts",
+    "test:e2e:strategy": "node scripts/verify-strategy-restoration.cjs",
     "test:e2e:user-system": "playwright test -c playwright.user-system.config.ts",
     "test:funding-order-layout": "node scripts/verify-funding-order-layout.cjs",
     "test:gzip": "npx http-server dist --cors --gzip -c-1",
     "test:hedge-board-chart-heights": "node scripts/verify-hedge-board-chart-heights.cjs",
     "test:hedge-board-layout": "node scripts/verify-hedge-board-layout.cjs",
     "test:homepage-layout": "node scripts/verify-homepage-layout.cjs",
+    "test:news-wealth-filters": "node scripts/verify-news-wealth-filters.cjs",
     "test:security-modules": "node --test scripts/test-security-modules.cjs",
     "test:user-system": "node scripts/test-user-system-access.cjs",
     "type:check": "vue-tsc -p tsconfig.strategy.json --noEmit --skipLibCheck",
-    "type:check:full": "vue-tsc -p tsconfig.full.json --noEmit",
-    "test:news-wealth-filters": "node scripts/verify-news-wealth-filters.cjs",
-    "test:e2e:strategy": "node scripts/verify-strategy-restoration.cjs"
+    "type:check:full": "vue-tsc -p tsconfig.full.json --noEmit"
   },
   "lint-staged": {
     "*.{js,jsx,ts,tsx}": [

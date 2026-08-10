@@ -4,12 +4,12 @@ This is the sole repository authority for the current stable baseline, candidate
 
 ## Delivery
 
-- Stable baseline: Platform `0.10.3`.
-- Current candidate target: Platform `0.10.4`.
-- Platform 0.10.3 is the owner-accepted functional-restoration release. It includes the restored product pages, public copy cleanup, Axios URL hardening, browser access route verification, Capability alignment and documentation authority cleanup.
-- The Platform 0.10.4 candidate scope includes Windows local lifecycle governance and regression hardening without reopening the accepted product restoration; implementation is not yet authorized.
+- Stable baseline: Platform `0.11.0`.
+- Current candidate target: Platform `0.11.1`.
+- Platform 0.11.0 is the owner-accepted local engineering baseline. It includes the restored product surfaces from 0.10.3 plus the single-root repository layout, Windows local lifecycle governance, path-stable local data configuration and clean dependency bootstrapping.
+- The Platform 0.11.1 candidate scope includes follow-on maintenance, browser-access regression hardening and Capability alignment without reopening the accepted product restoration; implementation is not yet authorized.
 - Candidate validation does not mean the candidate is released, deployed or production-ready.
-- Platform 0.10.3 acceptance does not prove external deployment or production readiness.
+- Platform 0.11.0 acceptance does not prove external deployment or production readiness.
 - Main promotion does not by itself prove deployment, external production readiness, provider connectivity or Live Write authorization.
 - Context Pack, `scripts/context-for.py`, `scripts/context-packs.json`, module `AGENTS.md` files and accepted context budgets remain the maintained AI-context design.
 - Concrete active branch, HEAD and PR state are volatile Git/GitHub facts. Read them from Git and GitHub at execution time instead of treating long-lived Markdown as authority.
@@ -21,7 +21,7 @@ This is the sole repository authority for the current stable baseline, candidate
 - Public Execution Risk API paths and request/response schemas remain compatible.
 - Cross-venue spread execution continues to use the restored new-version safety implementation.
 - The Execution Risk module split does not change database schema or persisted data meaning.
-- No service, database, queue, event bus or dependency-injection framework was introduced by the 0.10.3 release.
+- No service, database, queue, event bus or dependency-injection framework was introduced by the 0.11.0 release.
 - Controlled live acceptance follows `../operations/LIVE_ACCEPTANCE_RUNBOOK.md`; normal build, validation, merge or deployment validation never authorizes live writes.
 
 ## External-state limits

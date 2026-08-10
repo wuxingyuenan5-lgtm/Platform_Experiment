@@ -6,5 +6,6 @@
 
 PATH="/usr/local/bin:$PATH"
 
-# Format and submit code according to lintstagedrc.js configuration
-pnpm exec lint-staged
+# Hooks run from the repository root while frontend tooling lives in platform-web.
+cd "$(git rev-parse --show-toplevel)/platform-web"
+corepack pnpm@9.15.9 exec lint-staged

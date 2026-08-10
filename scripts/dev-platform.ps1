@@ -47,7 +47,15 @@ function Test-CommandAvailable {
 
 function New-TemporaryDemoPassword {
   $Bytes = New-Object byte[] 24
-  [System.Security.Cryptography.RandomNumberGenerator]::Fill($Bytes)
+  $Rng = [System.Security.Cryptography.RandomNumberGenerator]::Create()
+  try {
+    $Rng.GetBytes($Bytes)
+  }
+  finally {
+    if ($null -ne $Rng) {
+      $Rng.Dispose()
+    }
+  }
   return [Convert]::ToBase64String($Bytes).TrimEnd('=').Replace('+', 'A').Replace('/', 'b') + '!9'
 }
 
@@ -376,7 +384,7 @@ function Initialize-DemoAccounts {
   param([Parameter(Mandatory = $true)][string]$PythonPath)
 
   Write-Host 'Initializing reusable demo accounts...' -ForegroundColor Cyan
-  Push-Location (Join-Path $BackendPath 'scripts')
+  Push-Location $BackendPath
   $OldSeed = $env:USER_SYSTEM_DEMO_SEED
   $OldPassword = $env:USER_SYSTEM_DEMO_PASSWORD
   $OldPrefix = $env:USER_SYSTEM_DEMO_PREFIX
@@ -386,7 +394,7 @@ function Initialize-DemoAccounts {
     $env:USER_SYSTEM_DEMO_PASSWORD = Get-DemoPassword
     $env:USER_SYSTEM_DEMO_PREFIX = 'demo'
     $env:USER_SYSTEM_DEMO_REFRESH = '1'
-    Invoke-CheckedNative -FilePath $PythonPath -Arguments @('seed_user_system_demo.py')
+    Invoke-CheckedNative -FilePath $PythonPath -Arguments @('scripts\seed_user_system_demo.py')
   }
   finally {
     $env:USER_SYSTEM_DEMO_SEED = $OldSeed
@@ -439,8 +447,7 @@ function Resolve-LegacyFrontendPath {
   if ($LegacyFrontendPath) {
     return $LegacyFrontendPath
   }
-  $CodexRoot = Split-Path -Parent (Split-Path -Parent $RepoRoot)
-  return Join-Path $CodexRoot '旧版平台\Platform_Experiment-main\admin-risk'
+  throw 'Legacy frontend path was not provided. Pass -LegacyFrontendPath or set VG_LEGACY_FRONTEND_PATH.'
 }
 
 if (-not (Get-Command py -ErrorAction SilentlyContinue) -and -not (Get-Command python -ErrorAction SilentlyContinue)) {

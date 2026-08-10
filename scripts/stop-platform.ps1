@@ -58,7 +58,7 @@ function Test-ProcessMatchesProject {
   if ($ProcessId -le 0) {
     return $false
   }
-  $Identity = Get-ProcessIdentity -ProcessId $Pid
+  $Identity = Get-ProcessIdentity -ProcessId $ProcessId
   if (-not $Identity) {
     return $false
   }
