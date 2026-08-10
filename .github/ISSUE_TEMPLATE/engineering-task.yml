@@ -22,6 +22,13 @@ body:
     validations:
       required: true
   - type: textarea
+    id: authority
+    attributes:
+      label: Authority
+      description: Direct authorization, owning authority, and when applicable the PR URL, commit range or evidence entry point.
+    validations:
+      required: true
+  - type: textarea
     id: write_scope
     attributes:
       label: Write scope
@@ -40,6 +47,20 @@ body:
     attributes:
       label: Non-goals
       description: Adjacent work and refactors explicitly excluded.
+    validations:
+      required: true
+  - type: textarea
+    id: stop_conditions
+    attributes:
+      label: Stop conditions
+      description: Conditions that require stopping work and escalating instead of expanding scope or authority.
+    validations:
+      required: true
+  - type: textarea
+    id: output_contract
+    attributes:
+      label: Output contract
+      description: Short receipt using outcome, changed_files, validations, evidence, contract_impact, unproven_facts, residual_risks and next_gate.
     validations:
       required: true
   - type: textarea

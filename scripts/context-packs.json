@@ -97,6 +97,7 @@
         "docs/codex/current-state.md",
         "docs/technical/CROSS_SPREAD_SYNTHETIC_EXECUTION.md",
         "docs/technical/EXECUTION_RISK_CONTROLS.md",
+        "docs/operations/LIVE_ACCEPTANCE_RUNBOOK.md",
         "platform-api/AGENTS.md",
         "platform-api/app/cross_spread_synthetic_service.py",
         "platform-api/tests/test_cross_spread_market_lifecycle.py",
@@ -332,9 +333,10 @@
       "required": [
         "AGENTS.md",
         "docs/codex/current-state.md",
+        "docs/codex/AI_DEVELOPMENT_GOVERNANCE.md",
         "docs/operations/LIVE_ACCEPTANCE_RUNBOOK.md",
         "docs/product/ACCEPTANCE_CRITERIA.md",
-        "scripts/context-packs.json"
+        ".github/pull_request_template.md"
       ]
     },
     "strategy-management": {

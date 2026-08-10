@@ -22,6 +22,7 @@ What measurable result does this pull request deliver?
 
 - Commands executed:
 - CI status:
+- Evidence:
 - Token/context anomaly:
 
 ## Deployment prerequisites
@@ -31,3 +32,6 @@ List required external variables, credentials, migrations or operator actions. W
 ## Risk and rollback
 
 State the main risk and the smallest safe rollback or forward-fix.
+
+- Residual risks:
+- Next gate:

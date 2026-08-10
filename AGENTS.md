@@ -4,7 +4,7 @@ This repository is the engineering source for Variable-Global.
 
 ## Startup and context routing
 
-For every task, read `AGENTS.md`, `docs/codex/current-state.md`, run `python scripts/context-for.py <pack>`, then read the Pack required files and the current Issue or task card before work. Read optional files only when a concrete question requires them; do not use broad repository scans for orientation. Read the nearest module `AGENTS.md` before entering that module.
+For every task, read `AGENTS.md`, `docs/codex/current-state.md`, run `python scripts/context-for.py <pack>`, then read the Pack required files and the current Issue or task card before work. Use the project/environment-configured Python interpreter. If `python` is not on `PATH`, use the platform-provided configured dependency runtime; in Codex desktop, load workspace dependencies first and use the returned Python absolute path. Do not install another interpreter or bypass the Pack. If no configured interpreter can be resolved, stop and escalate. Read optional files only when a concrete question requires them; do not use broad repository scans for orientation. Read the nearest module `AGENTS.md` before entering that module.
 
 `docs/codex/AI_DEVELOPMENT_GOVERNANCE.md` owns the permanent role model, task protocol, authority hierarchy, task closure and Context Pack maintenance rules. `scripts/context-packs.json` and `scripts/context-for.py` route stable task types to bounded context and checks.
 

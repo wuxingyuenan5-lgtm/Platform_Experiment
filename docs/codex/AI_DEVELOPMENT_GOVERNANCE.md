@@ -29,13 +29,13 @@ Roles are bound by a task card, not by permanent chat assignments.
 
 ## Task startup protocol
 
-Every task card contains exactly these fields: `role`, `objective`, `context_pack`, `authority`, `write_scope`, `non_goals`, `acceptance`, `stop_conditions`, and `output_contract`. Missing fields prohibit scope expansion.
+Every task card contains at minimum these required fields: `role`, `objective`, `context_pack`, `authority`, `write_scope`, `non_goals`, `acceptance`, `stop_conditions`, and `output_contract`. Additional safety, contract, rollback or evidence fields are allowed. Missing required fields prohibit scope expansion.
 
 New agents start in this order:
 
 1. Read root `AGENTS.md`.
 2. Read `docs/codex/current-state.md`.
-3. Run `python scripts/context-for.py <pack>`.
+3. Run `python scripts/context-for.py <pack>` using the project/environment-configured Python interpreter. If `python` is not on `PATH`, use the platform-provided configured dependency runtime; in Codex desktop, load workspace dependencies first and use the returned Python absolute path. Do not install an interpreter or bypass the Pack. If no configured interpreter resolves, stop and escalate.
 4. Read the Pack required files.
 5. Read the current Issue or task card.
 6. State the understood objective, write scope and stop conditions.
@@ -43,13 +43,17 @@ New agents start in this order:
 
 Optional Pack files are loaded only for an explicit question. Do not scan the repository merely to become familiar with it.
 
+The task card is the dynamic authority loaded at step 5. It is not copied into a static Pack, and it need not repeat the Pack required-file list. Reading static source that contains credential-loading code is not the same as reading a real secret; static code may be read within task scope, while actual secrets, external connections and Live Write remain separately prohibited unless directly authorized.
+
 ## Task closure and durable evidence
 
 An agent ends with only: `outcome`, `changed_files`, `validations`, `evidence`, `contract_impact`, `unproven_facts`, `residual_risks`, and `next_gate`.
 
 One-time status belongs in the Issue or PR. Only stable facts belong in current state or an owning contract. Do not transfer full chat summaries, source, diff or long logs to the next task. Close a completed task; a new phase starts a new task and reloads its Context Pack.
 
-Issue cards preserve role, context pack, write scope, non-goals, acceptance, contract impact, unproven facts and Token/context anomalies. PRs preserve the resulting diff, verification evidence, contract impact, unproven facts and residual risk.
+Issue cards preserve role, context pack, write scope, non-goals, acceptance, contract impact, unproven facts and Token/context anomalies. PRs preserve the resulting diff, verification evidence, contract impact, unproven facts and residual risk. Historical Issue or PR identifiers embedded in contracts are context, not live Git authority; current state and Git/GitHub facts read at execution time govern current status.
+
+An acceptance task card must provide an immutable review reference, either a PR URL or commit range, plus an entry point to test evidence. If either is missing, the acceptance agent stops and requests correction. Repository checks alone cannot establish release completion, external connectivity or production readiness.
 
 ## Context Pack governance
 
