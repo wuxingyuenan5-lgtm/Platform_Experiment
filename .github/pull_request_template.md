@@ -4,6 +4,9 @@ What measurable result does this pull request deliver?
 
 ## Scope
 
+- Role:
+- Context Pack:
+- Write scope:
 - Included:
 - Explicitly excluded:
 
@@ -13,11 +16,13 @@ What measurable result does this pull request deliver?
 - Database schema impact:
 - Live Write impact:
 - New infrastructure:
+- Unproven facts:
 
 ## Verification
 
 - Commands executed:
 - CI status:
+- Token/context anomaly:
 
 ## Deployment prerequisites
 

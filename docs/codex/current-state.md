@@ -7,14 +7,14 @@ This is the sole repository authority for the current stable baseline, candidate
 - Stable baseline: Platform `0.11.0`.
 - Current candidate target: Platform `0.11.1`.
 - Platform 0.11.0 is the owner-accepted local engineering baseline. It includes the restored product surfaces from 0.10.3 plus the single-root repository layout, Windows local lifecycle governance, path-stable local data configuration and clean dependency bootstrapping.
-- Platform 0.11.1 is the local, founder-supervised controlled-live-acceptance candidate. Only its version-governance stage is authorized. Real credentials, read-only account or venue connections, business implementation and Live Write are not authorized.
+- Platform 0.11.1 is the local, founder-supervised controlled-live-acceptance candidate. The project AI-governance foundation is the only currently authorized documentation-only workstream. Real credentials, read-only account or venue connections, business implementation and Live Write are not authorized.
 - The Platform 0.11.1 candidate scope includes controlled-live governance and readiness without reopening the accepted product restoration.
 - Its included scope is cross-venue spread controlled-live readiness and acceptance; funding-rate read-only collection, persistence, quality monitoring, fast query, strategy-management reads and market analysis; and strategy-management/market-page presentation of verified data. It excludes funding-rate live execution, unattended trading, account/fund/symbol/concurrency expansion, home-abroad spread, bottom-fishing, short-term trader strategies, external client funds, multi-person fund operation and production deployment.
-- Its six sequential stage gates are version governance; connection verification and performance baseline; cross-venue spread implementation and controlled-live acceptance; funding-rate data pipeline; strategy management and market pages; and final independent acceptance. Each controlled-live execution step requires separate owner authorization.
+- Its six sequential stage gates are governance foundation; connection verification and performance baseline; cross-venue spread implementation and controlled-live acceptance; funding-rate data pipeline; strategy management and market pages; and final independent acceptance. Each controlled-live execution step requires separate owner authorization.
 - Candidate validation does not mean the candidate is released, deployed or production-ready.
 - Platform 0.11.0 acceptance does not prove external deployment or production readiness.
 - Main promotion does not by itself prove deployment, external production readiness, provider connectivity or Live Write authorization.
-- Context Pack, `scripts/context-for.py`, `scripts/context-packs.json`, module `AGENTS.md` files and accepted context budgets remain the maintained AI-context design.
+- `docs/codex/AI_DEVELOPMENT_GOVERNANCE.md`, Context Packs, `scripts/context-for.py`, `scripts/context-packs.json`, module `AGENTS.md` files and accepted context budgets remain the maintained AI-development governance design.
 - Concrete active branch, HEAD and PR state are volatile Git/GitHub facts. Read them from Git and GitHub at execution time instead of treating long-lived Markdown as authority.
 
 ## Safety and contracts

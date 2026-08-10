@@ -1,45 +1,24 @@
 # Platform Agent Rules
 
-This repository is the engineering source for 全球变量金融平台（Variable-Global）.
+This repository is the engineering source for Variable-Global.
 
-## Read first
+## Startup and context routing
 
-1. `docs/codex/current-state.md`
-2. the nearest module `AGENTS.md`
-3. directly affected source and tests
-4. one owning contract or architecture document only when the change crosses that boundary
+For every task, read `AGENTS.md`, `docs/codex/current-state.md`, run `python scripts/context-for.py <pack>`, then read the Pack required files and the current Issue or task card before work. Read optional files only when a concrete question requires them; do not use broad repository scans for orientation. Read the nearest module `AGENTS.md` before entering that module.
 
-Use `python scripts/context-for.py <pack>` for bounded task context. Context Pack definitions and budgets remain authoritative in `scripts/context-packs.json`.
+`docs/codex/AI_DEVELOPMENT_GOVERNANCE.md` owns the permanent role model, task protocol, authority hierarchy, task closure and Context Pack maintenance rules. `scripts/context-packs.json` and `scripts/context-for.py` route stable task types to bounded context and checks.
 
-## Repository boundaries
+## Safety boundaries
 
-- Deployable subjects are `platform-web`, `platform-api` and `execution-runtime`.
-- Platform API is a modular monolith. Do not add a service, database, queue or global dependency-injection framework without an approved architecture decision.
-- External venue SDKs and order side effects belong to `execution-runtime`; Platform API communicates through versioned contracts.
-- Formal accounting is rebuilt from immutable Financial Facts. Operational projections are not formal accounting inputs.
-- Preserve exact Decimal values and timezone-aware timestamps at financial boundaries.
-- Live Write is disabled by default. Kill Switch, idempotency and Result Unknown semantics are protected invariants. A narrow Platform 0.11.1 exception permits single-responsible-person controlled Live Write only on a local machine, using a founder-owned test account under the founder's direct supervision. It requires a time-limited manual unlock, Account/Strategy/Symbol allowlists, hard limits, one active execution batch, Kill Switch, automatic close-on-anomaly, end-of-day reconciliation and complete audit evidence. This exception does not extend to external client funds, multi-person operation, unattended trading, long-lived Live Write, production deployment, or any expansion of funds, symbols or concurrency.
-- Restored product pages must not expose developer-facing provider, owner, source, `actionable`, static-design or architecture explanations to ordinary users. Keep those facts in data envelopes, contracts and tests.
+- Deployable subjects are `platform-web`, `platform-api` and `execution-runtime`; Platform API remains a modular monolith unless an approved architecture decision says otherwise.
+- Venue SDKs and order side effects belong to `execution-runtime`; Platform API uses versioned contracts. Preserve Decimal values and timezone-aware timestamps at financial boundaries.
+- Live Write is disabled by default. Kill Switch, idempotency and Result Unknown semantics are protected. The narrow 0.11.1 local founder-owned-test-account exception remains governed only by current state, acceptance criteria and the live-acceptance runbook; it never expands to client funds, multi-person operation, unattended trading, long-lived Live Write, production deployment, or funds/symbols/concurrency expansion.
+- Do not infer external connectivity, account state, deployment or production facts from repository files or CI.
 
-## Change discipline
+## Single implementation owner
 
-- Work on a branch and a pull request; never commit directly to `main`.
-- Keep public API paths, schemas and persistent semantics compatible unless the task explicitly changes a contract.
-- Prefer the smallest ownership boundary that makes pure rules independently testable.
-- Update the current authority instead of creating handoff, evidence-ledger or phase-history documents.
-- For AI-assisted restoration, one executor owns code changes. Additional agents should default to read-only investigation, review or acceptance unless explicitly assigned implementation ownership.
-- Do not infer external production status from repository files. Servers, domains, databases, credentials and venue connectivity require separate evidence.
+Every workflow has at most one implementation agent with file-modification authority. Investigation, review and acceptance agents default to read-only. Work on a branch and pull request; preserve public contracts unless explicitly authorized.
 
 ## Validation
 
-Run the checks owned by the changed modules plus:
-
-```bash
-git diff --check
-python scripts/context-for.py --check-budgets --json
-python scripts/check-version-consistency.py
-python scripts/check-repository-structure.py
-python scripts/check-documentation-consistency.py
-```
-
-See `.github/workflows/` for the maintained CI commands.
+Run the Pack checks plus `git diff --check`, `python scripts/context-for.py --check-budgets --json`, `python scripts/check-version-consistency.py`, `python scripts/check-repository-structure.py`, and `python scripts/check-documentation-consistency.py` when applicable.

@@ -24,7 +24,7 @@
 
 The following are prospective gates, not completion claims. Repository validation alone never proves external credentials, venue connectivity, a real account or live execution.
 
-1. Version governance: the five designated authorities agree on the local founder-owned test-account exception, six gates, default-disabled Live Write and excluded scope; context-budget validation passes.
+1. Governance foundation: the designated authorities agree on the local founder-owned test-account exception, six gates, default-disabled Live Write and excluded scope; context-budget validation passes.
 2. Connection verification and performance baseline: authorized read-only verification proves the configured data/account/order/fill/position paths and shadow reconciliation, with measured external-source, collector, database, API and browser p50/p95 latency and no silent 24-hour interruption.
 3. Cross-venue spread controlled-live acceptance: automated, fault-injection, idempotency, duplicate-intent and `result_unknown` tests pass; each separately authorized Market-direction, FOK, TP/SL and PostOnly Chase step has complete venue evidence, reconciliation and forced reset.
 4. Funding-rate data pipeline: authorized real data collection is durable, source/timezone/quality-addressable, deduplicated, queryable within the baseline-derived target, and has a collection success rate of at least 99%; it provides no live trading execution.

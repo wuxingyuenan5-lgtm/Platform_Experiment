@@ -8,6 +8,27 @@ body:
       value: |
         Search existing open Issues and PRs first. Reuse an existing Issue when the outcome is already tracked.
   - type: textarea
+    id: role
+    attributes:
+      label: Role
+      description: Project owner, technical lead, investigation, implementation, acceptance or independent audit.
+    validations:
+      required: true
+  - type: input
+    id: context_pack
+    attributes:
+      label: Context Pack
+      description: Stable task-type Pack name from scripts/context-packs.json.
+    validations:
+      required: true
+  - type: textarea
+    id: write_scope
+    attributes:
+      label: Write scope
+      description: Exact files or ownership boundary the implementation agent may change.
+    validations:
+      required: true
+  - type: textarea
     id: objective
     attributes:
       label: Objective
@@ -40,6 +61,20 @@ body:
     attributes:
       label: Minimal context packet
       description: List the module entry document, direct source files and direct tests needed.
+    validations:
+      required: true
+  - type: textarea
+    id: contract_impact
+    attributes:
+      label: Contract impact
+      description: Owning contracts affected, or `none`.
+    validations:
+      required: true
+  - type: textarea
+    id: unproven_facts
+    attributes:
+      label: Unproven facts and Token/context anomalies
+      description: External facts not established and any repeated Pack or context-budget anomaly.
     validations:
       required: true
   - type: textarea

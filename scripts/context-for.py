@@ -26,6 +26,7 @@ DEFAULT_EXCLUSIONS = (
 CONFIG = json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
 PACKS: dict[str, dict[str, object]] = CONFIG["packs"]
 PACK_BUDGETS: dict[str, list[int]] = CONFIG["budgets"]
+PACK_CATEGORIES = frozenset(CONFIG.get("pack_categories", ()))
 DEFAULT_STARTUP_BUDGET_TOKENS = int(CONFIG["default_startup_budget_tokens"])
 DEFAULT_STARTUP_BASE = tuple(CONFIG["default_startup_base"])
 DEFAULT_STARTUP_MODULES = tuple(CONFIG["default_startup_modules"])
@@ -76,7 +77,9 @@ def file_metrics(paths: Iterable[str]) -> dict[str, object]:
 
 def pack_report(name: str) -> dict[str, object]:
     pack = PACKS[name]
-    required_budget, optional_budget = PACK_BUDGETS[name]
+    legacy_input_budget, legacy_output_budget = PACK_BUDGETS[name]
+    required_budget = int(pack.get("input_budget", legacy_input_budget))
+    optional_budget = int(pack.get("output_budget", legacy_output_budget))
     required = file_metrics(pack["required"])
     optional = file_metrics(pack["optional"])
     required_tokens = int(required["estimated_tokens"])
@@ -84,6 +87,14 @@ def pack_report(name: str) -> dict[str, object]:
     return {
         "task": name,
         "description": pack["description"],
+        "category": pack.get("category"),
+        "owner_modules": list(pack.get("owner_modules", ())),
+        "risk_level": pack.get("risk_level"),
+        "write_boundary": pack.get("write_boundary"),
+        "legacy_budget_compatible": (
+            required_budget == legacy_input_budget
+            and optional_budget == legacy_output_budget
+        ),
         "required": {
             **required,
             "budget_tokens": required_budget,
@@ -155,6 +166,11 @@ def budget_report() -> dict[str, object]:
     failures: list[str] = []
 
     for name, report in reports.items():
+        category = report["category"]
+        if category is not None and category not in PACK_CATEGORIES:
+            failures.append(f"{name}: unsupported category: {category}")
+        if not report["legacy_budget_compatible"]:
+            failures.append(f"{name}: Pack and legacy budget values differ")
         if report["missing_paths"]:
             failures.append(
                 f"{name}: missing paths: {', '.join(report['missing_paths'])}"
@@ -213,6 +229,10 @@ def selected_report(name: str, include_optional: bool) -> dict[str, object]:
         "schema_version": 1,
         "task": name,
         "description": report["description"],
+        "category": report["category"],
+        "owner_modules": report["owner_modules"],
+        "risk_level": report["risk_level"],
+        "write_boundary": report["write_boundary"],
         "include_optional": include_optional,
         **{key: selected[key] for key in keys},
         "missing_paths": report["missing_paths"],
@@ -232,6 +252,11 @@ def render_markdown(name: str, include_optional: bool) -> str:
         f"# Context pack: {name}",
         "",
         str(pack["description"]),
+        "",
+        f"Category: {report['category'] or 'legacy-unspecified'}",
+        f"Owner modules: {', '.join(report['owner_modules']) or 'legacy-unspecified'}",
+        f"Risk level: {report['risk_level'] or 'legacy-unspecified'}",
+        f"Write boundary: {report['write_boundary'] or 'legacy-unspecified'}",
         "",
         f"Required files: {report['required']['file_count']}",
         f"Optional files: {report['optional']['file_count']}",
