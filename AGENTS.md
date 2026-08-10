@@ -17,7 +17,9 @@ For every task, read `AGENTS.md`, `docs/codex/current-state.md`, run `python scr
 
 ## Single implementation owner
 
-Every workflow has at most one implementation agent with file-modification authority. Investigation, review and acceptance agents default to read-only. Work on a branch and pull request; preserve public contracts unless explicitly authorized.
+Project documents, not agent chats, are authoritative memory. The project technical lead arranges technical investigation, coding agents, test work and technical acceptance. Every workflow has at most one implementation agent with file-modification authority; investigation, review and acceptance agents default to read-only. Temporary agents bind to a task card and Context Pack, close after their result is accepted, and do not delegate beyond two levels by default. Parallel work requires independent tasks without shared writes. Work on a branch and pull request; preserve public contracts unless explicitly authorized.
+
+Close with only `outcome`, `changed_files`, `validations`, `evidence`, `contract_impact`, `unproven_facts`, `residual_risks` and `next_gate`. Do not return full source, complete diffs or long logs by default.
 
 ## Validation
 

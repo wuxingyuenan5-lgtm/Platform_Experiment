@@ -32,6 +32,15 @@ DEFAULT_STARTUP_BASE = tuple(CONFIG["default_startup_base"])
 DEFAULT_STARTUP_MODULES = tuple(CONFIG["default_startup_modules"])
 
 
+def largest_file(rows: Iterable[dict[str, object]]) -> dict[str, object] | None:
+    existing = [row for row in rows if row["exists"]]
+    return max(
+        existing,
+        key=lambda row: (int(row["estimated_tokens"]), str(row["path"])),
+        default=None,
+    )
+
+
 def file_metrics(paths: Iterable[str]) -> dict[str, object]:
     rows: list[dict[str, object]] = []
     for relative in paths:
@@ -59,17 +68,12 @@ def file_metrics(paths: Iterable[str]) -> dict[str, object]:
             }
         )
 
-    existing = [row for row in rows if row["exists"]]
     return {
         "file_count": len(rows),
         "line_count": sum(int(row["lines"]) for row in rows),
         "byte_count": sum(int(row["bytes"]) for row in rows),
         "estimated_tokens": sum(int(row["estimated_tokens"]) for row in rows),
-        "largest_file": max(
-            existing,
-            key=lambda row: (int(row["estimated_tokens"]), str(row["path"])),
-            default=None,
-        ),
+        "largest_file": largest_file(rows),
         "missing_paths": [str(row["path"]) for row in rows if not row["exists"]],
         "files": rows,
     }
@@ -114,6 +118,9 @@ def pack_report(name: str) -> dict[str, object]:
             "over_budget": (
                 required_tokens > required_budget
                 or optional_tokens > optional_budget
+            ),
+            "largest_file": largest_file(
+                [*required["files"], *optional["files"]]
             ),
         },
         "missing_paths": [

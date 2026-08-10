@@ -18,14 +18,21 @@ When authorities conflict, stop the affected work, identify the conflict and rou
 ## Roles
 
 - Project owner: product scope, priority, risk acceptance, stage authorization and final acceptance.
-- Project lead: state stewardship, task routing, phase coordination and task closure; does not become the default implementer.
-- Technical lead: invoked by phase; owns technical approach, module boundaries, implementation decomposition and technical acceptance.
+- Development advisor: a long-term, independent and read-only-by-default advisor to the project owner. Reviews Vibe Coding practice, Token and AI-resource efficiency, project strategy, architecture fit and reusable AI-development methods. The advisor does not replace the project lead or technical lead, direct routine implementation or create process merely to demonstrate value; when no material issue exists, the advisor should say that work may continue.
+- Project lead: a long-term coordination owner for state stewardship, objective decomposition, task routing, phase coordination and task closure. The project lead routes coding objectives to the project technical lead instead of directly managing coding agents.
+- Project technical lead: the long-term technical owner for the whole project across modules and releases. Owns architecture direction, module and contract boundaries, technical roadmap, implementation decomposition, technical risk and evidence sufficiency. The technical lead arranges technical investigation, coding agents, test work and technical acceptance, but does not set product priority, expand scope or accept business risk.
 - Investigation agent: read-only by default; gathers current-state, root-cause, external-reference and risk evidence.
 - Implementation agent: the single file-modification owner for one workflow.
 - Acceptance agent: independently reads contracts, diff and test evidence; does not repeat implementation.
-- Project coach or independent auditor: used for repeated rework, Token anomalies, role conflict, major releases or architecture disputes.
+- Research, communication and specialist-audit agents are temporary and receive only the context needed for their assigned evidence or communication outcome.
 
-Roles are bound by a task card, not by permanent chat assignments.
+The project owner, development advisor, project lead and project technical lead may remain long-term responsibilities. This does not make their chats project authority or require them to retain implementation history. Every concrete investigation, implementation or acceptance action remains bound by a task card rather than a permanent chat assignment. The development advisor, project lead and project technical lead report independently to the project owner; delivery and technical disagreements are preserved as short decision briefs for owner disposition rather than silently overriding either role.
+
+## Risk-proportionate delivery and execution channels
+
+Governance is a risk ceiling, not a mandatory large-team ceremony. A small, reversible and non-critical task may use one implementer and its direct checks. Ordinary multi-file work adds investigation or acceptance only when it lowers expected rework. Trading, Live Write, identity and permission, database, public-contract, deployment and other critical work uses explicit technical review and independent acceptance. Do not create an agent when direct handling costs less context and produces equally reliable evidence.
+
+The project technical lead selects and briefs the implementation channel. A web AI may act as a temporary GitHub-based implementation agent for authorized ordinary code, tests or documentation and deliver an immutable branch, commit or pull request for focused local validation. It is not a long-term control role and does not join project-owner, project-lead, project-technical-lead or development-advisor discussions unless the project owner requests it. Web AI work does not currently include trading or Live Write, identity or permission, database, credentials, external-account access or deployment. Local and web agents must not share file-modification ownership in one workflow, and successful use does not expand future authority automatically.
 
 ## Task startup protocol
 
@@ -55,9 +62,19 @@ Issue cards preserve role, context pack, write scope, non-goals, acceptance, con
 
 An acceptance task card must provide an immutable review reference, either a PR URL or commit range, plus an entry point to test evidence. If either is missing, the acceptance agent stops and requests correction. Repository checks alone cannot establish release completion, external connectivity or production readiness.
 
+Temporary agents close after their result is accepted and routed to an Issue, PR or owning authority. Delegation is normally no deeper than two levels. Parallel work is allowed only for independent tasks without shared writes. Semi-long-term assistants are reserved for sustained, frequent, stable-boundary and read-only-by-default work whose reuse benefit exceeds restart cost; they are reviewed and closed when that condition no longer holds.
+
+## Version, phase and conversation context
+
+Context has five layers: durable project authorities; current-version scope and gates; current-phase decisions and risks; task-card and Context Pack inputs; and immutable diff or test evidence. Long-term roles retain only the conclusions and unresolved risks appropriate to their responsibility. They do not retain full source, logs, diffs or chats as project memory.
+
+A new version, phase or materially different topic normally starts a clean task and reloads the relevant Context Pack. Stable facts go to an owning contract or current state; one-time status and evidence go to an Issue or PR. Do not copy an old conversation into the new task. If discussion fails to converge after two focused rounds, repeats background, requires broad new source context or changes from product coordination into technical investigation, implementation or acceptance, the project lead creates a short decision brief and routes the issue to the project technical lead, development advisor, investigator, acceptance agent or project owner as appropriate.
+
 ## Context Pack governance
 
 Packs are stable task types, never release numbers or agent names. Each has `category`, `description`, `owner_modules`, `required`, `optional`, `checks`, `input_budget`, `output_budget`, `risk_level`, and `write_boundary`. Supported categories are `governance`, `architecture`, `product-domain`, `data-provider`, `execution-critical`, `frontend-display`, `identity-security`, `release-acceptance`, `operations`, and `documentation-only`.
+
+Packs route stable input, boundaries and checks; they are not role dossiers or version histories. The task card supplies the one-time role, objective, authority, non-goals, acceptance, stop conditions and `output_contract`. Together, the root startup files, nearest module rules, task-type Pack and task-card delta must be sufficient for a new agent to start without historical chat.
 
 Add or change a Pack only when a repeatable task type appears, a deployed module or durable ownership boundary changes, a Pack exceeds budget twice, agents repeatedly need the same out-of-pack file, or acceptance commands or an owning contract change. Do not create a Pack for every Issue or duplicate Packs per release.
 
@@ -65,4 +82,4 @@ Add or change a Pack only when a repeatable task type appears, a deployed module
 
 Track required-file count, estimated input budget, tool-output volume, repeated file reads, task duration, handoffs, parallel implementers in one module, rework count, out-of-pack read frequency and long-task closure rate. These compare relative consumption only; they are not API billing.
 
-Project leads consume phase status and short receipts. Technical leads consume module and contract context. Implementers consume direct code context. Acceptance agents consume contract, diff and evidence. Repeated over-budget work, repeated out-of-pack reads, rework, role conflict or an architecture dispute triggers technical-lead review and, when material, independent audit.
+Development advisors consume project state, phase receipts, Token indicators and dispute material, not routine source or ordinary PR detail. Project leads consume version scope, phase status, acceptance gates and short receipts. Project technical leads consume module boundaries, owning contracts and the active technical task map, not the whole repository or historical chat. Implementers consume direct code and tests through the task Pack. Acceptance agents consume contracts, immutable diff and evidence rather than the implementer's full process. Repeated over-budget work, repeated out-of-pack reads, rework, role conflict or an architecture dispute triggers technical-lead review and, when material, independent advisor audit.
