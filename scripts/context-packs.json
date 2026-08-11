@@ -1,5 +1,13 @@
 {
   "budgets": {
+    "cross-spread-live": [
+      24000,
+      8000
+    ],
+    "funding-data": [
+      16000,
+      6000
+    ],
     "hedge-style": [
       34000,
       6000
@@ -7,6 +15,10 @@
     "identity-permission": [
       12000,
       8000
+    ],
+    "live-readiness": [
+      16000,
+      6000
     ],
     "member-contract": [
       12750,
@@ -20,9 +32,21 @@
       13000,
       3500
     ],
+    "release-acceptance": [
+      12000,
+      5000
+    ],
+    "strategy-management": [
+      18000,
+      6000
+    ],
     "trading-display": [
       15000,
       4500
+    ],
+    "governance": [
+      8000,
+      4000
     ],
     "user-e2e": [
       10500,
@@ -39,7 +63,81 @@
     "platform-api/AGENTS.md",
     "execution-runtime/AGENTS.md"
   ],
+  "pack_categories": [
+    "governance",
+    "architecture",
+    "product-domain",
+    "data-provider",
+    "execution-critical",
+    "frontend-display",
+    "identity-security",
+    "release-acceptance",
+    "operations",
+    "documentation-only"
+  ],
   "packs": {
+    "cross-spread-live": {
+      "checks": [
+        "cd platform-api && python -m pytest tests/test_cross_spread_market_lifecycle.py tests/test_cross_spread_fok_lifecycle.py tests/test_cross_spread_acceptance_rollback.py",
+        "cd execution-runtime && python -m pytest tests/test_cross_spread_market.py tests/test_cross_spread_market_close.py tests/test_live_safety.py",
+        "git diff --check"
+      ],
+      "description": "Implement or verify controlled cross-venue spread execution without broadening the established execution contract.",
+      "category": "execution-critical",
+      "owner_modules": ["platform-api", "execution-runtime"],
+      "input_budget": 24000,
+      "output_budget": 8000,
+      "risk_level": "critical",
+      "write_boundary": "Cross-venue execution contracts, orchestration and Runtime evidence only.",
+      "optional": [
+        "platform-api/app/live_trading_sessions.py"
+      ],
+      "required": [
+        "AGENTS.md",
+        "docs/codex/current-state.md",
+        "docs/technical/CROSS_SPREAD_SYNTHETIC_EXECUTION.md",
+        "docs/technical/EXECUTION_RISK_CONTROLS.md",
+        "docs/operations/LIVE_ACCEPTANCE_RUNBOOK.md",
+        "platform-api/AGENTS.md",
+        "platform-api/app/cross_spread_synthetic_service.py",
+        "platform-api/tests/test_cross_spread_market_lifecycle.py",
+        "execution-runtime/AGENTS.md",
+        "execution-runtime/app/cross_spread_market.py",
+        "execution-runtime/tests/test_cross_spread_market.py"
+      ]
+    },
+    "funding-data": {
+      "checks": [
+        "cd platform-api && python -m pytest tests/test_architecture_production_data_boundaries.py tests/test_strategy_runs_v1.py",
+        "cd platform-web && pnpm test:funding-order-layout",
+        "cd platform-web && pnpm type:check"
+      ],
+      "description": "Build funding-rate collection, persistence and read models without authorizing funding live execution.",
+      "category": "data-provider",
+      "owner_modules": ["platform-api", "platform-web"],
+      "input_budget": 16000,
+      "output_budget": 6000,
+      "risk_level": "high",
+      "write_boundary": "Funding-rate collection, persistence and read models; no live execution.",
+      "optional": [
+        "platform-api/app/database_bootstrap.py",
+        "platform-api/tests/test_architecture_production_data_boundaries.py"
+      ],
+      "required": [
+        "AGENTS.md",
+        "docs/codex/current-state.md",
+        "docs/product/ACCEPTANCE_CRITERIA.md",
+        "platform-api/AGENTS.md",
+        "platform-api/app/market_data.py",
+        "platform-api/app/schemas.py",
+        "platform-api/app/strategy_runs.py",
+        "platform-api/tests/test_strategy_runs_v1.py",
+        "platform-web/AGENTS.md",
+        "platform-web/src/api/funding.ts",
+        "platform-web/src/api/model/fundingRateModel.ts",
+        "platform-web/src/views/strategy/funding-carry/components/FundingMarketBoard.vue"
+      ]
+    },
     "hedge-style": {
       "checks": [
         "cd platform-web && pnpm test:hedge-board-layout",
@@ -47,6 +145,12 @@
         "cd platform-web && pnpm test:e2e:hedge-board"
       ],
       "description": "Modify hedge/research board layout or styling without changing visible behavior.",
+      "category": "frontend-display",
+      "owner_modules": ["platform-web"],
+      "input_budget": 34000,
+      "output_budget": 6000,
+      "risk_level": "medium",
+      "write_boundary": "Hedge/research display layout and styling only.",
       "optional": [
         "platform-web/docs/design/platform-ui-guidelines.md",
         "platform-web/e2e/hedge-board/hedge-board.spec.ts"
@@ -66,6 +170,12 @@
         "cd platform-web && pnpm test:e2e:user-system"
       ],
       "description": "Change browser role, permission or Session behavior while preserving security boundaries.",
+      "category": "identity-security",
+      "owner_modules": ["platform-api", "platform-web"],
+      "input_budget": 12000,
+      "output_budget": 8000,
+      "risk_level": "critical",
+      "write_boundary": "Browser identity, permission and session contracts only.",
       "optional": [
         "platform-api/app/user_session_auth.py",
         "platform-api/tests/test_last_ceo_concurrency.py",
@@ -84,12 +194,49 @@
         "platform-api/tests/test_auth_rbac.py"
       ]
     },
+    "live-readiness": {
+      "checks": [
+        "cd platform-api && python -m pytest tests/test_live_trading_sessions.py tests/test_execution_risk.py",
+        "cd execution-runtime && python -m pytest tests/test_live_safety.py tests/test_runtime_journal.py tests/test_live_acceptance_reads.py",
+        "git diff --check"
+      ],
+      "description": "Verify controlled-live gates, read-only evidence and latency baselines without enabling Live Write.",
+      "category": "operations",
+      "owner_modules": ["platform-api", "execution-runtime"],
+      "input_budget": 16000,
+      "output_budget": 6000,
+      "risk_level": "critical",
+      "write_boundary": "Readiness gates, read-only evidence and operational safeguards; no Live Write enablement.",
+      "optional": [
+        "docs/technical/CROSS_SPREAD_SYNTHETIC_EXECUTION.md",
+        "docs/technical/EXECUTION_RISK_CONTROLS.md",
+        "execution-runtime/app/journal.py"
+      ],
+      "required": [
+        "AGENTS.md",
+        "docs/codex/current-state.md",
+        "docs/operations/LIVE_ACCEPTANCE_RUNBOOK.md",
+        "platform-api/AGENTS.md",
+        "platform-api/app/live_trading_sessions.py",
+        "platform-api/tests/test_live_trading_sessions.py",
+        "execution-runtime/AGENTS.md",
+        "execution-runtime/app/live_safety.py",
+        "execution-runtime/tests/test_live_safety.py",
+        "execution-runtime/tests/test_runtime_journal.py"
+      ]
+    },
     "member-contract": {
       "checks": [
         "cd platform-api && python -m pytest tests/test_member_holdings.py",
         "cd platform-web && pnpm test:user-system"
       ],
       "description": "Change the member holdings/NAV API contract without loading Runtime or unrelated user administration.",
+      "category": "architecture",
+      "owner_modules": ["platform-api", "platform-web"],
+      "input_budget": 12750,
+      "output_budget": 7000,
+      "risk_level": "high",
+      "write_boundary": "Member holdings/NAV contract and direct read model only.",
       "optional": [
         "platform-api/app/member_holding_repository.py",
         "docs/technical/MEMBER_HOLDINGS_READ_MODEL.md",
@@ -113,6 +260,12 @@
         "cd platform-web && pnpm type:check"
       ],
       "description": "Change one A-share, Shenwan or research field without reading unrelated Providers.",
+      "category": "product-domain",
+      "owner_modules": ["platform-api", "platform-web"],
+      "input_budget": 17000,
+      "output_budget": 4000,
+      "risk_level": "medium",
+      "write_boundary": "One research field and its direct presentation only.",
       "optional": [
         "platform-api/app/research_providers.py",
         "platform-api/app/research_cache.py",
@@ -137,12 +290,17 @@
         "cd platform-api && python scripts/smoke_research_providers.py --timeout 60"
       ],
       "description": "Add or repair one external Research Provider with explicit status and Last Known Good behavior.",
+      "category": "data-provider",
+      "owner_modules": ["platform-api"],
+      "input_budget": 13000,
+      "output_budget": 3500,
+      "risk_level": "high",
+      "write_boundary": "One external research provider, cache and direct contract only.",
       "optional": [
         "platform-web/src/api/hedgeResearch.ts",
         "docs/technical/RESEARCH_DATA_PLATFORM.md"
       ],
       "required": [
-        "AGENTS.md",
         "docs/codex/current-state.md",
         "platform-api/AGENTS.md",
         "platform-api/app/research_providers.py",
@@ -153,6 +311,65 @@
         "platform-api/tests/test_research_service.py"
       ]
     },
+    "release-acceptance": {
+      "checks": [
+        "git diff --check",
+        "python scripts/context-for.py --check-budgets --json",
+        "python scripts/check-version-consistency.py",
+        "python scripts/check-repository-structure.py",
+        "python scripts/check-documentation-consistency.py"
+      ],
+      "description": "Independently verify release documentation, safety claims and bounded repository acceptance evidence.",
+      "category": "release-acceptance",
+      "owner_modules": ["platform-api", "execution-runtime", "platform-web"],
+      "input_budget": 12000,
+      "output_budget": 5000,
+      "risk_level": "high",
+      "write_boundary": "Read-only release and acceptance evidence; no implementation changes.",
+      "optional": [
+        "docs/contracts/BROWSER_ACCESS_AND_PRODUCT_DATA.md",
+        "scripts/context-for.py"
+      ],
+      "required": [
+        "AGENTS.md",
+        "docs/codex/current-state.md",
+        "docs/codex/AI_DEVELOPMENT_GOVERNANCE.md",
+        "docs/operations/LIVE_ACCEPTANCE_RUNBOOK.md",
+        "docs/product/ACCEPTANCE_CRITERIA.md",
+        ".github/pull_request_template.md"
+      ]
+    },
+    "strategy-management": {
+      "checks": [
+        "cd platform-api && python -m pytest tests/test_strategy_runs_v1.py tests/test_cross_spread_observability.py",
+        "cd platform-web && pnpm test:e2e:strategy",
+        "cd platform-web && pnpm type:check"
+      ],
+      "description": "Connect strategy-management reads to verified execution facts while preserving real/sample/unavailable boundaries.",
+      "category": "product-domain",
+      "owner_modules": ["platform-api", "platform-web"],
+      "input_budget": 18000,
+      "output_budget": 6000,
+      "risk_level": "high",
+      "write_boundary": "Strategy-management reads and direct presentation only.",
+      "optional": [
+        "platform-api/app/cross_spread_observability_service.py",
+        "platform-web/src/views/strategy/management/components/StrategyRecordsPanel.vue"
+      ],
+      "required": [
+        "AGENTS.md",
+        "docs/codex/current-state.md",
+        "docs/contracts/BROWSER_ACCESS_AND_PRODUCT_DATA.md",
+        "docs/product/ACCEPTANCE_CRITERIA.md",
+        "platform-api/AGENTS.md",
+        "platform-api/app/strategy_runs.py",
+        "platform-api/app/cross_spread_observability_schemas.py",
+        "platform-api/tests/test_strategy_runs_v1.py",
+        "platform-web/AGENTS.md",
+        "platform-web/src/api/strategy.ts",
+        "platform-web/src/views/strategy/management/index.vue"
+      ]
+    },
     "trading-display": {
       "checks": [
         "cd platform-web && pnpm test:cross-spread-layout",
@@ -160,6 +377,12 @@
         "cd platform-web && pnpm type:check"
       ],
       "description": "Change cross-spread/funding display while keeping execution and accounting semantics unchanged.",
+      "category": "frontend-display",
+      "owner_modules": ["platform-api", "platform-web"],
+      "input_budget": 15000,
+      "output_budget": 4500,
+      "risk_level": "medium",
+      "write_boundary": "Cross-spread and funding display contracts only; no execution semantics.",
       "optional": [
         "platform-web/scripts/verify-cross-spread-layout.cjs",
         "platform-api/app/cross_spread_observability_service.py",
@@ -176,12 +399,42 @@
         "platform-api/tests/test_cross_spread_observability.py"
       ]
     },
+    "governance": {
+      "checks": [
+        "git diff --check",
+        "python scripts/context-for.py --check-budgets --json",
+        "python scripts/check-version-consistency.py",
+        "python scripts/check-repository-structure.py",
+        "python scripts/check-documentation-consistency.py"
+      ],
+      "description": "Align durable governance authorities without changing executable trading behavior.",
+      "category": "governance",
+      "owner_modules": ["repository"],
+      "input_budget": 8000,
+      "output_budget": 4000,
+      "risk_level": "high",
+      "write_boundary": "Governance authorities, task protocol and Context Pack routing only.",
+      "optional": [
+        "scripts/context-for.py"
+      ],
+      "required": [
+        "AGENTS.md",
+        "docs/codex/current-state.md",
+        "docs/codex/AI_DEVELOPMENT_GOVERNANCE.md"
+      ]
+    },
     "user-e2e": {
       "checks": [
         "cd platform-web && pnpm test:user-system",
         "cd platform-web && pnpm test:e2e:user-system"
       ],
       "description": "Repair user-system browser E2E without loading unrelated product modules.",
+      "category": "identity-security",
+      "owner_modules": ["platform-api", "platform-web"],
+      "input_budget": 10500,
+      "output_budget": 4000,
+      "risk_level": "high",
+      "write_boundary": "User-system browser acceptance and direct access fixtures only.",
       "optional": [
         "platform-web/e2e/user-system/demo-accounts.spec.ts",
         "platform-api/tests/test_user_browser_flows.py"

@@ -20,6 +20,17 @@
 - Large external reference code does not live in the project root.
 - Shared documentation and default configuration must not bind the platform to a named developer workstation.
 
+## Platform 0.11.1 staged criteria
+
+The following are prospective gates, not completion claims. Repository validation alone never proves external credentials, venue connectivity, a real account or live execution.
+
+1. Governance foundation: the designated authorities agree on the local founder-owned test-account exception, six gates, default-disabled Live Write and excluded scope; context-budget validation passes.
+2. Connection verification and performance baseline: authorized read-only verification proves the configured data/account/order/fill/position paths and shadow reconciliation, with measured external-source, collector, database, API and browser p50/p95 latency and no silent 24-hour interruption.
+3. Cross-venue spread controlled-live acceptance: automated, fault-injection, idempotency, duplicate-intent and `result_unknown` tests pass; each separately authorized Market-direction, FOK, TP/SL and PostOnly Chase step has complete venue evidence, reconciliation and forced reset.
+4. Funding-rate data pipeline: authorized real data collection is durable, source/timezone/quality-addressable, deduplicated, queryable within the baseline-derived target, and has a collection success rate of at least 99%; it provides no live trading execution.
+5. Strategy management and market pages: real, sample and unavailable data states are distinguished; accounts, orders, fills, positions, fees and PnL/NAV are traceable to their authoritative facts and sampled external reconciliation is exact; pages show freshness, delay and degraded state.
+6. Final independent acceptance: security, browser, recovery, reconciliation, documentation and repository checks pass, and unverified external or production capability remains explicitly unclaimed.
+
 ## Identity, permission, and member-data criteria
 
 The durable browser-access contracts are [Browser Access and Product Data](../contracts/BROWSER_ACCESS_AND_PRODUCT_DATA.md) and the [Platform 0.10.2 frontend access matrix](PLATFORM_0_10_2_FRONTEND_ACCESS_MATRIX.md).

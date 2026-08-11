@@ -1,45 +1,26 @@
 # Platform Agent Rules
 
-This repository is the engineering source for 全球变量金融平台（Variable-Global）.
+This repository is the engineering source for Variable-Global.
 
-## Read first
+## Startup and context routing
 
-1. `docs/codex/current-state.md`
-2. the nearest module `AGENTS.md`
-3. directly affected source and tests
-4. one owning contract or architecture document only when the change crosses that boundary
+For every task, read `AGENTS.md`, `docs/codex/current-state.md`, run `python scripts/context-for.py <pack>`, then read the Pack required files and the current Issue or task card before work. Use the project/environment-configured Python interpreter. If `python` is not on `PATH`, use the platform-provided configured dependency runtime; in Codex desktop, load workspace dependencies first and use the returned Python absolute path. Do not install another interpreter or bypass the Pack. If no configured interpreter can be resolved, stop and escalate. Read optional files only when a concrete question requires them; do not use broad repository scans for orientation. Read the nearest module `AGENTS.md` before entering that module.
 
-Use `python scripts/context-for.py <pack>` for bounded task context. Context Pack definitions and budgets remain authoritative in `scripts/context-packs.json`.
+`docs/codex/AI_DEVELOPMENT_GOVERNANCE.md` owns the permanent role model, task protocol, authority hierarchy, task closure and Context Pack maintenance rules. `scripts/context-packs.json` and `scripts/context-for.py` route stable task types to bounded context and checks.
 
-## Repository boundaries
+## Safety boundaries
 
-- Deployable subjects are `platform-web`, `platform-api` and `execution-runtime`.
-- Platform API is a modular monolith. Do not add a service, database, queue or global dependency-injection framework without an approved architecture decision.
-- External venue SDKs and order side effects belong to `execution-runtime`; Platform API communicates through versioned contracts.
-- Formal accounting is rebuilt from immutable Financial Facts. Operational projections are not formal accounting inputs.
-- Preserve exact Decimal values and timezone-aware timestamps at financial boundaries.
-- Live Write is disabled by default. Kill Switch, two-person approval, idempotency and Result Unknown semantics are protected invariants.
-- Restored product pages must not expose developer-facing provider, owner, source, `actionable`, static-design or architecture explanations to ordinary users. Keep those facts in data envelopes, contracts and tests.
+- Deployable subjects are `platform-web`, `platform-api` and `execution-runtime`; Platform API remains a modular monolith unless an approved architecture decision says otherwise.
+- Venue SDKs and order side effects belong to `execution-runtime`; Platform API uses versioned contracts. Preserve Decimal values and timezone-aware timestamps at financial boundaries.
+- Live Write is disabled by default. Kill Switch, idempotency and Result Unknown semantics are protected. The narrow 0.11.1 local founder-owned-test-account exception remains governed only by current state, acceptance criteria and the live-acceptance runbook; it never expands to client funds, multi-person operation, unattended trading, long-lived Live Write, production deployment, or funds/symbols/concurrency expansion.
+- Do not infer external connectivity, account state, deployment or production facts from repository files or CI.
 
-## Change discipline
+## Single implementation owner
 
-- Work on a branch and a pull request; never commit directly to `main`.
-- Keep public API paths, schemas and persistent semantics compatible unless the task explicitly changes a contract.
-- Prefer the smallest ownership boundary that makes pure rules independently testable.
-- Update the current authority instead of creating handoff, evidence-ledger or phase-history documents.
-- For AI-assisted restoration, one executor owns code changes. Additional agents should default to read-only investigation, review or acceptance unless explicitly assigned implementation ownership.
-- Do not infer external production status from repository files. Servers, domains, databases, credentials and venue connectivity require separate evidence.
+Project documents, not agent chats, are authoritative memory. The project technical lead arranges technical investigation, coding agents, test work and technical acceptance. Every workflow has at most one implementation agent with file-modification authority; investigation, review and acceptance agents default to read-only. Temporary agents bind to a task card and Context Pack, close after their result is accepted, and do not delegate beyond two levels by default. Parallel work requires independent tasks without shared writes. Work on a branch and pull request; preserve public contracts unless explicitly authorized.
+
+Close with only `outcome`, `changed_files`, `validations`, `evidence`, `contract_impact`, `unproven_facts`, `residual_risks` and `next_gate`. Do not return full source, complete diffs or long logs by default.
 
 ## Validation
 
-Run the checks owned by the changed modules plus:
-
-```bash
-git diff --check
-python scripts/context-for.py --check-budgets --json
-python scripts/check-version-consistency.py
-python scripts/check-repository-structure.py
-python scripts/check-documentation-consistency.py
-```
-
-See `.github/workflows/` for the maintained CI commands.
+Run the Pack checks plus `git diff --check`, `python scripts/context-for.py --check-budgets --json`, `python scripts/check-version-consistency.py`, `python scripts/check-repository-structure.py`, and `python scripts/check-documentation-consistency.py` when applicable.

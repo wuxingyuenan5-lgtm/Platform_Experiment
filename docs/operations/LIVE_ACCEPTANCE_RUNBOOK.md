@@ -1,6 +1,6 @@
 # Live Acceptance Runbook
 
-Status: active Platform 0.10.x operational contract.
+Status: active Platform 0.11.1 controlled-live operational contract.
 
 This runbook governs controlled, minimum-size live acceptance. It does not authorize production rollout or Live Write activation. Any failed, unavailable or contradictory step immediately returns the system to read-only live mode and requires an accountable operator decision.
 
@@ -21,9 +21,13 @@ This runbook governs controlled, minimum-size live acceptance. It does not autho
 
 The sequence is strict. A later step cannot compensate for a failed earlier step. Repository CI, simulation results, an order ACK or an application response cannot replace venue evidence.
 
+For Platform 0.11.1, the controlled execution order is Market in one direction, Market in the reverse direction, FOK, TP/SL, then PostOnly Chase. This explicit step gate controls where the shorthand sequence above is less specific; every later step remains blocked until its predecessor has evidence, reconciliation and forced reset.
+
 ## 2. Mandatory safety boundaries
 
-- Platform Live Write and Runtime Live Write are independent gates; both remain disabled except inside an approved supervised window.
+- Platform Live Write and Runtime Live Write are independent gates; both remain disabled except inside an owner-authorized supervised window.
+- Platform 0.11.1 permits one founder CEO/fund-manager to operate a founder-owned local test account under direct supervision. This is a narrow exception, not a precedent for client funds, multi-person operation, unattended trading, long-lived Live Write, production deployment, or expansion of funds, symbols or concurrency.
+- Each window has a named single responsible operator and a single pre-authorized Account, Strategy, Symbol, direction, quantity and execution mode. It is manually unlocked for one execution batch, must be started within 10 minutes and has an absolute 30-minute expiry.
 - Live and Simulation use different databases, Runtime Journals, Accounts and Credentials.
 - Account, Strategy and Symbol use exact allowlists. Per-order and per-day limits are mandatory.
 - ACK is not Fill. External terminal state and fill/deal evidence are authoritative for execution completion.
@@ -31,6 +35,8 @@ The sequence is strict. A later step cannot compensate for a failed earlier step
 - Query failure is unavailable evidence, never an empty position, zero balance, zero order or zero history result.
 - External Order, Fill, Deal and Position identities must remain traceable to Platform and Runtime facts.
 - Funds, quantity, symbols, concurrency and automation cannot expand before end-of-day reconciliation is complete.
+- The initial hard limits are: no more than 1 troy ounce equivalent nominal exposure per order; 2 troy ounces equivalent daily new exposure; 8 troy ounces equivalent daily bilateral cumulative volume; four cross-venue execution batches per day; daily net loss no more than the lower of 50 USDT and 0.25% of account equity; and one active execution batch at a time. No software path may increase these values.
+- A process restart, connection loss, `result_unknown`, identity mismatch, position mismatch or expiry automatically returns both Live Write gates to `false`.
 - Credentials, private values and live evidence are not copied into source control, general logs or ordinary documentation.
 
 ## 3. One-ounce and execution-mode acceptance
@@ -87,6 +93,8 @@ The final disposition must be one of: unfilled legs canceled with proof, filled 
 - A risk-reduction command that is not proven filled cannot be marked resolved.
 - Accepted or unknown external orders are not claimed canceled without Venue evidence.
 - Manual intervention records the subject, observed evidence, difference category, responsible owner, next action and decision time.
+- The responsible CEO/fund-manager may trigger Kill Switch alone. It must be triggered automatically or manually on `result_unknown`, duplicate-order risk, first/second-leg quantity mismatch, external/platform position mismatch, Private Stream or critical-query loss, unmatched order/fill/position identity, any hard-limit breach, or inability to prove an external order terminal.
+- Release requires the responsible operator to manually verify external order status, actual positions, residual exposure, Runtime Journal and Platform records. Release never restores trading automatically: it only permits a new, separately authorized time-limited Live Write window.
 
 ## 6. End-of-day reconciliation
 
@@ -101,6 +109,12 @@ Reconcile at least:
 - realized and unrealized PnL/NAV.
 
 Every Difference receives a category, severity, responsible owner, evidence reference and disposition. Open or unexplained Differences prevent expansion and may require continued Kill Switch protection.
+
+## 6.1 Authorized step sequence and evidence
+
+Read-only venue/account/order/fill/deal/position verification, Platform/Runtime/database/venue shadow reconciliation, automated tests and fault injection must pass before any Live Write window. Controlled-live steps require separate owner authorization and proceed strictly in this order: Market in one direction, Market in the reverse direction, FOK, TP/SL, then PostOnly Chase. A failed step blocks all later steps.
+
+For every step retain the unlock and limits snapshot; operator, account, strategy, symbol and timestamps; pre-submit Bid/Ask, quote age and contract specification; request, correlation and idempotency identifiers; external Order, Fill, Deal and Position identities; acknowledgements, fills, fees and timestamps; before/after account, position, balance and PnL snapshots; Runtime Journal and Platform facts; shadow-reconciliation result; any Kill Switch or exception record; and proof of forced reset. Each step ends with venue-evidence review, end-of-day reconciliation and forced reset.
 
 ## 7. Forced reset
 
