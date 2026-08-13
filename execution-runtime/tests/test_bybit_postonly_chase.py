@@ -5,6 +5,7 @@ from decimal import Decimal
 
 import pytest
 
+import app.bybit_postonly_chase as chase
 from app.bybit_postonly_chase import (
     ChaseActionType,
     ChasePolicy,
@@ -15,6 +16,7 @@ from app.bybit_postonly_chase import (
     maker_safe_price,
     next_quote_action,
 )
+from app.config import Settings
 
 NOW = datetime(2026, 7, 26, tzinfo=UTC)
 POLICY = ChasePolicy(
@@ -245,3 +247,142 @@ def test_filled_order_without_execution_total_requires_reconciliation() -> None:
 def test_invalid_policy_is_rejected() -> None:
     with pytest.raises(ValueError, match="TTL"):
         ChasePolicy(0, 1, 1, 0).validate()
+
+
+def test_initial_funding_chase_parameters_are_bounded() -> None:
+    settings = Settings()
+
+    assert settings.bybit_postonly_chase_ttl_seconds == 15
+    assert settings.bybit_postonly_chase_cooldown_seconds == 1
+    assert settings.bybit_postonly_chase_max_mutations == 5
+    assert settings.bybit_postonly_chase_min_amend_ticks == 1
+
+
+def funding_state(**updates):
+    values = {
+        "batch_id": "funding-batch-1",
+        "perpetual_quantity": Decimal("8"),
+        "spot_quantity": Decimal("1"),
+        "spot_step": Decimal("0.1"),
+    }
+    values.update(updates)
+    return chase.FundingHedgeState(**values)
+
+
+def funding_execution(exec_id: str, cumulative_fill: str):
+    return chase.FundingHedgeEvent(
+        event_id=exec_id,
+        kind="execution",
+        cumulative_perpetual_fill=Decimal(cumulative_fill),
+    )
+
+
+def test_funding_fill_releases_only_new_quantized_proportional_spot() -> None:
+    first = chase.apply_funding_hedge_event(
+        funding_state(),
+        funding_execution("exec-1", "1"),
+    )
+    second = chase.apply_funding_hedge_event(
+        first.state,
+        funding_execution("exec-2", "3"),
+    )
+    complete = chase.apply_funding_hedge_event(
+        second.state,
+        funding_execution("exec-3", "8"),
+    )
+
+    assert first.actions == (
+        chase.FundingSpotRelease(
+            child_id="funding-batch-1:spot:0.1",
+            quantity=Decimal("0.1"),
+        ),
+    )
+    assert first.state.quantization_remainder == Decimal("0.025")
+    assert second.actions[0].quantity == Decimal("0.2")
+    assert second.state.spot_released == Decimal("0.3")
+    assert second.state.quantization_remainder == Decimal("0.075")
+    assert complete.actions[0].quantity == Decimal("0.7")
+    assert complete.state.perpetual_cumulative_fill == Decimal("8")
+    assert complete.state.spot_released == Decimal("1.0")
+    assert complete.state.quantization_remainder == Decimal("0")
+    assert complete.state.status == chase.FundingHedgeStatus.COMPLETE
+
+
+def test_funding_duplicate_exec_id_releases_nothing() -> None:
+    event = funding_execution("exec-1", "2")
+    first = chase.apply_funding_hedge_event(funding_state(), event)
+    replay = chase.apply_funding_hedge_event(first.state, event)
+
+    assert first.state.spot_released == Decimal("0.2")
+    assert replay.state == first.state
+    assert replay.actions == ()
+
+
+def test_funding_missing_exec_id_freezes_without_release() -> None:
+    result = chase.apply_funding_hedge_event(
+        funding_state(),
+        funding_execution("", "2"),
+    )
+
+    assert result.state.status == chase.FundingHedgeStatus.RECONCILE_REQUIRED
+    assert result.state.spot_released == Decimal("0")
+    assert result.actions == ()
+
+
+def test_funding_child_identity_is_stable_across_decimal_scale() -> None:
+    result = chase.apply_funding_hedge_event(
+        funding_state(spot_step=Decimal("0.10")),
+        funding_execution("exec-1", "1"),
+    )
+
+    assert result.actions[0].child_id == "funding-batch-1:spot:0.1"
+
+
+@pytest.mark.parametrize(
+    ("updates", "message"),
+    [
+        ({"perpetual_cumulative_fill": Decimal("8.1")}, "perpetual"),
+        ({"spot_released": Decimal("1.1")}, "Spot release"),
+        ({"spot_released": Decimal("0.05")}, "quantity step"),
+    ],
+)
+def test_funding_state_rejects_ceiling_or_step_violations(updates, message: str) -> None:
+    with pytest.raises(ValueError, match=message):
+        funding_state(**updates)
+
+
+@pytest.mark.parametrize("cumulative_fill", ["1", "9"])
+def test_funding_non_monotonic_or_excess_fill_freezes_without_release(
+    cumulative_fill: str,
+) -> None:
+    initial = funding_state(
+        perpetual_cumulative_fill=Decimal("2"),
+        spot_released=Decimal("0.2"),
+    )
+
+    result = chase.apply_funding_hedge_event(
+        initial,
+        funding_execution("exec-invalid", cumulative_fill),
+    )
+
+    assert result.state.status == chase.FundingHedgeStatus.RECONCILE_REQUIRED
+    assert result.state.perpetual_cumulative_fill == Decimal("2")
+    assert result.state.spot_released == Decimal("0.2")
+    assert result.actions == ()
+
+
+@pytest.mark.parametrize("kind", ["disconnect", "result_unknown", "order_unknown"])
+def test_funding_unknown_state_freezes_future_side_effects(kind: str) -> None:
+    frozen = chase.apply_funding_hedge_event(
+        funding_state(),
+        chase.FundingHedgeEvent(event_id=f"{kind}-1", kind=kind),
+    )
+    after_freeze = chase.apply_funding_hedge_event(
+        frozen.state,
+        funding_execution("exec-after-freeze", "8"),
+    )
+
+    assert frozen.state.status == chase.FundingHedgeStatus.RECONCILE_REQUIRED
+    assert frozen.actions == ()
+    assert after_freeze.state.spot_released == Decimal("0")
+    assert after_freeze.actions == ()

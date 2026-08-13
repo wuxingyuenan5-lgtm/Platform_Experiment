@@ -106,6 +106,154 @@ class ChaseTransition:
     actions: tuple[ChaseAction, ...]
 
 
+class FundingHedgeStatus(StrEnum):
+    ACTIVE = "active"
+    COMPLETE = "complete"
+    RECONCILE_REQUIRED = "reconcile_required"
+
+
+@dataclass(frozen=True, slots=True)
+class FundingHedgeEvent:
+    event_id: str
+    kind: Literal[
+        "execution",
+        "disconnect",
+        "result_unknown",
+        "order_unknown",
+        "sequence_mismatch",
+        "identity_mismatch",
+        "cancel_unconfirmed",
+    ]
+    cumulative_perpetual_fill: Decimal | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class FundingSpotRelease:
+    child_id: str
+    quantity: Decimal
+
+
+@dataclass(frozen=True, slots=True)
+class FundingHedgeState:
+    batch_id: str
+    perpetual_quantity: Decimal
+    spot_quantity: Decimal
+    spot_step: Decimal
+    perpetual_cumulative_fill: Decimal = Decimal("0")
+    spot_released: Decimal = Decimal("0")
+    quantization_remainder: Decimal = Decimal("0")
+    status: FundingHedgeStatus = FundingHedgeStatus.ACTIVE
+    seen_exec_ids: frozenset[str] = frozenset()
+    reconciliation_reason: str | None = None
+
+    def __post_init__(self) -> None:
+        if not self.batch_id:
+            raise ValueError("Funding hedge batch identity is required")
+        if min(self.perpetual_quantity, self.spot_quantity, self.spot_step) <= 0:
+            raise ValueError("Funding hedge quantities and Spot step must be positive")
+        if self.spot_quantity % self.spot_step != 0:
+            raise ValueError("Funding Spot quantity must match the configured quantity step")
+        if not Decimal("0") <= self.perpetual_cumulative_fill <= self.perpetual_quantity:
+            raise ValueError("Funding perpetual cumulative fill exceeds its instruction quantity")
+        if not Decimal("0") <= self.spot_released <= self.spot_quantity:
+            raise ValueError("Funding Spot release exceeds its instruction quantity")
+        if self.spot_released % self.spot_step != 0:
+            raise ValueError("Funding Spot release must match the configured quantity step")
+
+
+@dataclass(frozen=True, slots=True)
+class FundingHedgeTransition:
+    state: FundingHedgeState
+    actions: tuple[FundingSpotRelease, ...]
+
+
+def apply_funding_hedge_event(
+    state: FundingHedgeState,
+    event: FundingHedgeEvent,
+) -> FundingHedgeTransition:
+    if state.status != FundingHedgeStatus.ACTIVE:
+        return FundingHedgeTransition(state, ())
+    if not event.event_id:
+        return FundingHedgeTransition(
+            replace(
+                state,
+                status=FundingHedgeStatus.RECONCILE_REQUIRED,
+                reconciliation_reason="Funding hedge event identity is missing",
+            ),
+            (),
+        )
+    if event.kind != "execution":
+        return FundingHedgeTransition(
+            replace(
+                state,
+                status=FundingHedgeStatus.RECONCILE_REQUIRED,
+                reconciliation_reason=f"Funding hedge stopped on {event.kind}",
+            ),
+            (),
+        )
+    if event.event_id in state.seen_exec_ids:
+        return FundingHedgeTransition(state, ())
+    cumulative_fill = event.cumulative_perpetual_fill
+    if (
+        cumulative_fill is None
+        or cumulative_fill <= state.perpetual_cumulative_fill
+        or cumulative_fill > state.perpetual_quantity
+    ):
+        return FundingHedgeTransition(
+            replace(
+                state,
+                status=FundingHedgeStatus.RECONCILE_REQUIRED,
+                reconciliation_reason=(
+                    "Funding perpetual cumulative fill is non-monotonic or exceeds the instruction"
+                ),
+            ),
+            (),
+        )
+
+    proportional_spot = (
+        cumulative_fill * state.spot_quantity / state.perpetual_quantity
+    )
+    releasable_spot = _round_down(proportional_spot, state.spot_step)
+    release_quantity = releasable_spot - state.spot_released
+    if release_quantity < 0 or releasable_spot > state.spot_quantity:
+        return FundingHedgeTransition(
+            replace(
+                state,
+                status=FundingHedgeStatus.RECONCILE_REQUIRED,
+                reconciliation_reason="Funding Spot release would exceed its instruction ceiling",
+            ),
+            (),
+        )
+
+    status = (
+        FundingHedgeStatus.COMPLETE
+        if cumulative_fill == state.perpetual_quantity
+        and releasable_spot == state.spot_quantity
+        else FundingHedgeStatus.ACTIVE
+    )
+    updated = replace(
+        state,
+        perpetual_cumulative_fill=cumulative_fill,
+        spot_released=releasable_spot,
+        quantization_remainder=proportional_spot - releasable_spot,
+        status=status,
+        seen_exec_ids=state.seen_exec_ids | {event.event_id},
+    )
+    if release_quantity == 0:
+        return FundingHedgeTransition(updated, ())
+    return FundingHedgeTransition(
+        updated,
+        (
+            FundingSpotRelease(
+                child_id=(
+                    f"{state.batch_id}:spot:{format(releasable_spot.normalize(), 'f')}"
+                ),
+                quantity=release_quantity,
+            ),
+        ),
+    )
+
+
 def maker_safe_price(
     *,
     side: Literal["buy", "sell"],

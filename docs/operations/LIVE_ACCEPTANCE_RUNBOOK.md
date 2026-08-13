@@ -10,8 +10,8 @@ This runbook governs controlled, minimum-size live acceptance. It does not autho
 只读实盘
 → 合约规格、账户风险、订单和成交历史核对
 → 影子对账
-→ 1 oz Market人工监督
-→ 1 oz FOK人工监督
+→ 指令限定数量 Market人工监督
+→ 指令限定数量 FOK人工监督
 → TP/SL执行验收
 → PostOnly Chase专门监督验收
 → 失败处置与Kill Switch
@@ -29,19 +29,19 @@ For Platform 0.11.1, the controlled execution order is Market in one direction, 
 - Platform 0.11.1 permits one founder CEO/fund-manager to operate a founder-owned local test account under direct supervision. This is a narrow exception, not a precedent for client funds, multi-person operation, unattended trading, long-lived Live Write, production deployment, or expansion of funds, symbols or concurrency.
 - Each window has a named single responsible operator and a single pre-authorized Account, Strategy, Symbol, direction, quantity and execution mode. It is manually unlocked for one execution batch, must be started within 10 minutes and has an absolute 30-minute expiry.
 - Live and Simulation use different databases, Runtime Journals, Accounts and Credentials.
-- Account, Strategy and Symbol use exact allowlists. Per-order and per-day limits are mandatory.
+- Account, Strategy and Symbol use exact allowlists. Each CEO instruction fixes both leg quantities and creates at most one execution batch; cumulative external fills may not exceed those instruction quantities.
 - ACK is not Fill. External terminal state and fill/deal evidence are authoritative for execution completion.
 - `result_unknown` forbids blind retry, blind rollback and duplicate business intent.
 - Query failure is unavailable evidence, never an empty position, zero balance, zero order or zero history result.
 - External Order, Fill, Deal and Position identities must remain traceable to Platform and Runtime facts.
 - Funds, quantity, symbols, concurrency and automation cannot expand before end-of-day reconciliation is complete.
-- The initial hard limits are: no more than 1 troy ounce equivalent nominal exposure per order; 2 troy ounces equivalent daily new exposure; 8 troy ounces equivalent daily bilateral cumulative volume; four cross-venue execution batches per day; daily net loss no more than the lower of 50 USDT and 0.25% of account equity; and one active execution batch at a time. No software path may increase these values.
+- Fixed position, notional, daily-volume, batch-count and loss caps are not part of the founder-owned local test-account contract. This does not relax one-instruction/one-batch identity, instruction quantity ceilings, global one-active-execution serialization, allowlists, bounded chase, Kill Switch, reconciliation or forced read-only reset.
 - A process restart, connection loss, `result_unknown`, identity mismatch, position mismatch or expiry automatically returns both Live Write gates to `false`.
 - Credentials, private values and live evidence are not copied into source control, general logs or ordinary documentation.
 
-## 3. One-ounce and execution-mode acceptance
+## 3. Instruction-bounded execution-mode acceptance
 
-The maximum acceptance quantity is `1 troy ounce`, including quantity derived after contract-multiplier and step-size conversion.
+The responsible CEO specifies both leg quantities before each authorized window. Runtime validates current contract multiplier, minimum and quantity step, and cumulative external fills remain bounded by the immutable instruction quantities.
 
 ### Market
 
@@ -71,6 +71,14 @@ The maximum acceptance quantity is `1 troy ounce`, including quantity derived af
 - Only deduplicated cumulative fill exactly equal to requested quantity releases the second leg.
 - Partial fill, private-stream disconnect, sequence or identity anomaly, and cancel/fill race fail closed: stop Chase, submit no second leg and reconcile terminal state.
 - Amend/repost behavior remains bounded by TTL, minimum tick movement, mutation count and cooldown; cancel terminal state must be proven before repost.
+
+### Funding carry incremental hedge
+
+- Funding carry opens and closes perpetual-first. Each newly proven, deduplicated perpetual cumulative-fill increment releases only its proportional Spot quantity rounded down to the current Spot quantity step.
+- Quantization remainder stays explicit until later proven cumulative fill makes another full Spot step releasable. Perpetual and Spot cumulative fills never exceed their respective CEO instruction quantities.
+- Every Spot release remains in the same execution batch and uses a deterministic child identity derived from the batch and cumulative released Spot quantity. Replayed `execId` values release nothing.
+- Disconnect, sequence or identity mismatch, unknown order state, terminal-cancel ambiguity or `result_unknown` freezes new releases and retains reconciliation-required state. A cancel acknowledgement alone is not terminal evidence and cannot authorize repost.
+- These incremental second-leg semantics apply only to funding carry. Cross-venue Market, FOK and PostOnly Chase retain their existing terminal-fill rules.
 
 ## 4. Two-leg failure disposition
 
@@ -125,7 +133,7 @@ Before leaving the supervised window, prove all of the following:
 - automatic Exit Monitor = `false`;
 - PostOnly Chase = `false`;
 - temporary Account/Strategy/Symbol allowlists are cleared;
-- temporary per-order and per-day limits are cleared or restored to safe defaults;
+- the window's immutable instruction quantities and one-batch claim are retained with the evidence record;
 - every external pending order has a proven terminal state;
 - every external position matches the Formal Position or has been explicitly transferred to accountable manual ownership;
 - Runtime Journal, Platform facts and EOD reconciliation evidence are retained.

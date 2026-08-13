@@ -68,9 +68,9 @@ class Settings(BaseSettings):
     bybit_postonly_chase_enabled: bool = False
     bybit_postonly_chase_ttl_seconds: float = 15.0
     bybit_postonly_chase_event_timeout_seconds: float = 0.5
-    bybit_postonly_chase_min_amend_ticks: int = 2
+    bybit_postonly_chase_min_amend_ticks: int = 1
     bybit_postonly_chase_max_mutations: int = 5
-    bybit_postonly_chase_cooldown_seconds: float = 0.25
+    bybit_postonly_chase_cooldown_seconds: float = 1.0
     bybit_postonly_chase_rest_reconcile_seconds: float = 3.0
 
     mt5_credential_ref: str = "secret://environment/mt5-live-001"
