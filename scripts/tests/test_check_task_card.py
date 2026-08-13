@@ -31,7 +31,7 @@ def base_short_record() -> str:
 Task ID: `VG-GOV-TEST-READ-001`
 Issue: `none`
 Status: `active`
-Last transition at: `2026-08-13 21:00 CST`
+Last transition at: `2026-08-13 22:35 CST`
 Owner notice: `none`
 Business status summary: `Read-only investigation is active and gathering bounded governance evidence.`
 Current leaf task/agent ID: `investigator-1`
@@ -39,10 +39,12 @@ Risk level: medium
 Role: investigation
 Agent ID: `investigator-1`
 Context Pack: `governance`
-Token indicator budget: `2000000`
-Token indicator used: `200000`
+Token baseline: `200000`
+Token current: `260000`
+Token delta: `60000`
+Control-plane token delta: `18000`
+Token budget: `2000000`
 Token status: `green`
-Control-plane token used: `40000`
 
 ## Objective
 
@@ -80,7 +82,7 @@ def base_implementation_task() -> str:
 Task ID: `VG-GOV-TEST-IMPL-001`
 Issue: `none`
 Status: `active`
-Last transition at: `2026-08-13 21:00 CST`
+Last transition at: `2026-08-13 22:35 CST`
 Owner notice: `none`
 Business status summary: `Implementation is active on governance simplification.`
 Current leaf task/agent ID: `impl-agent-1`
@@ -88,10 +90,12 @@ Risk level: high
 Role: implementation
 Agent ID: `impl-agent-1`
 Context Pack: `governance`
-Token indicator budget: `2000000`
-Token indicator used: `400000`
+Token baseline: `300000`
+Token current: `700000`
+Token delta: `400000`
+Control-plane token delta: `90000`
+Token budget: `2000000`
 Token status: `green`
-Control-plane token used: `90000`
 
 ## Objective
 
@@ -152,93 +156,95 @@ class CheckTaskCardTests(unittest.TestCase):
     def test_valid_serial_implementation_task_passes(self) -> None:
         self.assertEqual(self.validate_content(base_implementation_task()), [])
 
-    def test_short_read_only_record_passes_without_implementation_fields(self) -> None:
+    def test_short_read_only_record_passes(self) -> None:
         self.assertEqual(self.validate_content(base_short_record()), [])
 
-    def test_parallel_requires_disjoint_write_sets_and_evidence(self) -> None:
+    def test_parallel_and_critical_and_recovery_gates_remain(self) -> None:
         content = (
             base_implementation_task()
-            .replace("Token indicator used: `400000`", "Token indicator used: `500000`")
+            .replace("Risk level: high", "Risk level: critical")
+            .replace("Token current: `700000`", "Token current: `1500000`")
+            .replace("Token delta: `400000`", "Token delta: `1200000`")
+            .replace("Token status: `green`", "Token status: `amber`")
+            .replace("Owner notice: `none`", "Owner notice: `required`")
             .replace("Parallel decision: `serial`", "Parallel decision: `parallel-approved`")
             .replace(
                 "## Context",
                 "- Parallel with: `VG-GOV-TEST-IMPL-002`\n"
                 "- Parallel peer write set: `docs/codex/AI_DEVELOPMENT_GOVERNANCE.md`\n"
                 "- Independence evidence: `none`\n"
-                "- Active-agent count after dispatch: `2/2 implementation, 0/2 read-only, 2/4 total`\n\n## Context",
+                "- Active-agent count after dispatch: `2/2 implementation, 0/2 read-only, 2/4 total`\n"
+                "- Recovery from: `impl-agent-0`\n"
+                "- Recovered owner status: `blocked`\n\n## Context",
             )
         )
         failures = self.validate_content(content)
         self.assertIn("parallel-approved requires Independence evidence", failures)
         self.assertIn("parallel-approved write sets must be disjoint", failures)
-
-    def test_parallel_cannot_start_after_sixty_percent_token_use(self) -> None:
-        content = (
-            base_implementation_task()
-            .replace("Token indicator used: `400000`", "Token indicator used: `1300000`")
-            .replace("Token status: `green`", "Token status: `amber`")
-            .replace("Owner notice: `none`", "Owner notice: `required`")
-            .replace("Parallel decision: `serial`", "Parallel decision: `parallel-approved`")
-            .replace(
-                "## Context",
-                "- Parallel with: `VG-GOV-TEST-IMPL-002`\n"
-                "- Parallel peer write set: `scripts/context-for.py`\n"
-                "- Independence evidence: `Disjoint writes, independent tests and rollback.`\n"
-                "- Active-agent count after dispatch: `2/2 implementation, 0/2 read-only, 2/4 total`\n\n## Context",
-            )
-        )
-        failures = self.validate_content(content)
-        self.assertIn(
-            "Token indicator use at or above 60 percent cannot add a parallel implementation agent",
-            failures,
-        )
-
-    def test_critical_implementation_requires_acceptance_task(self) -> None:
-        content = base_implementation_task().replace("Risk level: high", "Risk level: critical")
-        failures = self.validate_content(content)
         self.assertIn(
             "critical implementation must name an independent read-only acceptance task",
             failures,
         )
-
-    def test_recovery_requires_closed_previous_owner(self) -> None:
-        content = base_implementation_task().replace(
-            "## Context",
-            "- Recovery from: `impl-agent-0`\n"
-            "- Recovered owner status: `blocked`\n\n## Context",
-        )
-        failures = self.validate_content(content)
         self.assertIn(
             "recovery takeover requires the previous owner to be recorded as closed",
             failures,
         )
-
-    def test_token_eighty_percent_requires_owner_notice(self) -> None:
-        content = (
-            base_implementation_task()
-            .replace("Token indicator used: `400000`", "Token indicator used: `1700000`")
-            .replace("Token status: `green`", "Token status: `amber`")
-        )
-        failures = self.validate_content(content)
         self.assertIn(
-            "Token indicator use at or above 80 percent requires Owner notice",
+            "Token use at or above 60 percent cannot add a parallel implementation agent",
             failures,
         )
 
-    def test_token_hundred_percent_requires_attention(self) -> None:
+    def test_token_delta_relationship_is_enforced(self) -> None:
+        failures = self.validate_content(
+            base_implementation_task().replace("Token delta: `400000`", "Token delta: `399999`")
+        )
+        self.assertIn("Token delta must equal Token current minus Token baseline", failures)
+
+    def test_unavailable_token_snapshot_requires_attention(self) -> None:
         content = (
             base_implementation_task()
-            .replace("Token indicator used: `400000`", "Token indicator used: `2000000`")
+            .replace("Status: `active`", "Status: `attention`")
+            .replace("Owner notice: `none`", "Owner notice: `required`")
+            .replace("Token baseline: `300000`", "Token baseline: `unavailable`")
+            .replace("Token current: `700000`", "Token current: `unavailable`")
+            .replace("Token delta: `400000`", "Token delta: `unavailable`")
+            .replace("Control-plane token delta: `90000`", "Control-plane token delta: `unavailable`")
+            .replace("Token status: `green`", "Token status: `unavailable`")
+            .replace(
+                "Business status summary: `Implementation is active on governance simplification.`",
+                "Business status summary: `Needs: owner and technical lead must refresh missing Token snapshot before more work.`",
+            )
+        )
+        self.assertEqual(self.validate_content(content), [])
+
+    def test_invalid_token_numbers_return_readable_errors(self) -> None:
+        failures = self.validate_content(
+            base_implementation_task()
+            .replace("Token baseline: `300000`", "Token baseline: `abc`")
+            .replace("Token delta: `400000`", "Token delta: `-1`")
+        )
+        self.assertIn("Token baseline must be a non-negative integer or unavailable", failures)
+        self.assertIn("Token delta must be a non-negative integer or unavailable", failures)
+
+    def test_token_eighty_and_hundred_percent_gates_are_enforced(self) -> None:
+        eighty_failures = self.validate_content(
+            base_implementation_task()
+            .replace("Token current: `700000`", "Token current: `1900000`")
+            .replace("Token delta: `400000`", "Token delta: `1600000`")
+            .replace("Token status: `green`", "Token status: `amber`")
+        )
+        self.assertIn("Token use at or above 80 percent requires Owner notice", eighty_failures)
+
+        hundred_failures = self.validate_content(
+            base_implementation_task()
+            .replace("Token current: `700000`", "Token current: `2300000`")
+            .replace("Token delta: `400000`", "Token delta: `2000000`")
             .replace("Token status: `green`", "Token status: `red`")
             .replace("Owner notice: `none`", "Owner notice: `required`")
         )
-        failures = self.validate_content(content)
-        self.assertIn(
-            "Token indicator use at or above 100 percent requires Status: attention",
-            failures,
-        )
+        self.assertIn("Token use at or above 100 percent requires Status: attention", hundred_failures)
 
-    def test_attention_and_done_require_status_event_content(self) -> None:
+    def test_status_event_and_control_plane_rules_are_enforced(self) -> None:
         attention_failures = self.validate_content(
             base_implementation_task().replace("Status: `active`", "Status: `attention`")
         )
@@ -250,25 +256,19 @@ class CheckTaskCardTests(unittest.TestCase):
         done_failures = self.validate_content(
             base_implementation_task()
             .replace("Status: `active`", "Status: `done`")
-            .replace(
-                "Business status summary: `Implementation is active on governance simplification.`",
-                "Business status summary: `Completed.`",
-            )
+            .replace("Business status summary: `Implementation is active on governance simplification.`", "Business status summary: `Completed.`")
         )
         self.assertIn(
             "done Business status summary must include Capability:, Evidence: and Next gate:",
             done_failures,
         )
 
-    def test_control_plane_share_cannot_exceed_thirty_percent(self) -> None:
-        content = base_implementation_task().replace(
-            "Control-plane token used: `90000`",
-            "Control-plane token used: `150000`",
+        control_failures = self.validate_content(
+            base_implementation_task().replace("Control-plane token delta: `90000`", "Control-plane token delta: `150000`")
         )
-        failures = self.validate_content(content)
         self.assertIn(
-            "Control-plane token used cannot exceed 30 percent of Token indicator used",
-            failures,
+            "Control-plane token delta cannot exceed 30 percent of Token delta",
+            control_failures,
         )
 
     def test_task_template_passes_template_check(self) -> None:

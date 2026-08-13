@@ -8,6 +8,8 @@ For every task, read `AGENTS.md`, `docs/codex/current-state.md`, run `python scr
 
 `docs/codex/AI_DEVELOPMENT_GOVERNANCE.md` owns the permanent role model, task protocol, authority hierarchy, task closure and Context Pack maintenance rules. `scripts/context-packs.json` and `scripts/context-for.py` route stable task types to bounded context and checks.
 
+Long-term governance roles must read their role contract in `docs/codex/AI_DEVELOPMENT_GOVERNANCE.md` and the current version control file before work. Chat startup cannot override repository role boundaries, and new authorization or working agreements must be written into a task card or version control file before they carry forward.
+
 ## Safety boundaries
 
 - Deployable subjects are `platform-web`, `platform-api` and `execution-runtime`; Platform API remains a modular monolith unless an approved architecture decision says otherwise.
