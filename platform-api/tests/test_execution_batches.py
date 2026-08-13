@@ -384,6 +384,48 @@ def test_same_key_replay_precedes_global_lease_and_mismatched_payload_still_conf
     assert "different execution batch payload" in str(conflict.value.detail)
 
 
+def test_same_key_swapped_legs_conflict_without_new_effects(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    get_settings().database_path = str(tmp_path / "global-claim-swapped-legs.db")
+    runtime_calls = 0
+
+    def runtime_post(*args, **kwargs):
+        nonlocal runtime_calls
+        runtime_calls += 1
+        return filled_runtime_response(kwargs["json"])
+
+    monkeypatch.setattr("app.trade_command_execution.httpx.post", runtime_post)
+    payload = batch_payload(
+        "account_sim_usdt",
+        "instrument_btc_usdt",
+        "instrument_btc_usdt_perp",
+        idempotency_key="global-replay-swapped-legs-001",
+    )
+
+    with TestClient(app) as client:
+        insert_persisted_batch(payload=payload, status="executing")
+        swapped_payload = dict(payload)
+        legs = payload["legs"]
+        assert isinstance(legs, list)
+        swapped_payload["legs"] = list(reversed(legs))
+
+        response = client.post(
+            "/api/v1/trading/execution-batches",
+            json=swapped_payload,
+        )
+
+    assert response.status_code == 409
+    assert "different execution batch payload" in response.json()["detail"]
+    assert runtime_calls == 0
+    with connection() as db:
+        assert db.execute("SELECT COUNT(*) FROM execution_batches").fetchone()[0] == 1
+        assert db.execute("SELECT COUNT(*) FROM execution_batch_legs").fetchone()[0] == 2
+        assert db.execute("SELECT COUNT(*) FROM trade_commands").fetchone()[0] == 0
+        assert db.execute("SELECT COUNT(*) FROM orders").fetchone()[0] == 0
+
+
 @pytest.mark.parametrize(
     ("status", "leg_status"),
     [

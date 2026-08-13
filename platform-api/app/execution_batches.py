@@ -473,7 +473,7 @@ def assert_batch_request_matches_in_connection(
     ).fetchone()
     legs = db.execute(
         """
-        SELECT role, account_id, instrument_id, symbol, side,
+        SELECT sequence, role, account_id, instrument_id, symbol, side,
                order_type, quantity, price
         FROM execution_batch_legs
         WHERE batch_id = ?
@@ -496,12 +496,13 @@ def assert_batch_request_matches_in_connection(
     if not batch_matches or set(stored_legs) != requested_roles:
         raise_batch_idempotency_conflict()
 
-    for leg in request.legs:
+    for sequence, leg in enumerate(request.legs, start=1):
         row = stored_legs[leg.role]
         requested_account_id = leg.account_id or default_account_id
         stored_price = Decimal(row["price"]) if row["price"] is not None else None
         leg_matches = (
-            row["account_id"] == requested_account_id
+            row["sequence"] == sequence
+            and row["account_id"] == requested_account_id
             and row["instrument_id"] == leg.instrument_id
             and row["symbol"] == leg.symbol
             and row["side"] == leg.side
