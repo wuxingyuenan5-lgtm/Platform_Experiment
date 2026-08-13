@@ -250,7 +250,7 @@ def test_invalid_policy_is_rejected() -> None:
 
 
 def test_initial_funding_chase_parameters_are_bounded() -> None:
-    settings = Settings()
+    settings = Settings(_env_file=None)
 
     assert settings.bybit_postonly_chase_ttl_seconds == 15
     assert settings.bybit_postonly_chase_cooldown_seconds == 1
@@ -306,6 +306,23 @@ def test_funding_fill_releases_only_new_quantized_proportional_spot() -> None:
     assert complete.state.spot_released == Decimal("1.0")
     assert complete.state.quantization_remainder == Decimal("0")
     assert complete.state.status == chase.FundingHedgeStatus.COMPLETE
+
+
+def test_funding_release_never_exceeds_exact_proportional_entitlement() -> None:
+    exact_entitlement = Decimal("0.099999999999999999999999999999")
+
+    result = chase.apply_funding_hedge_event(
+        funding_state(
+            perpetual_quantity=Decimal("1"),
+            spot_quantity=Decimal("1"),
+        ),
+        funding_execution("exec-precision-boundary", str(exact_entitlement)),
+    )
+
+    assert result.state.perpetual_cumulative_fill == exact_entitlement
+    assert result.state.spot_released == Decimal("0")
+    assert result.state.quantization_remainder == exact_entitlement
+    assert result.actions == ()
 
 
 def test_funding_duplicate_exec_id_releases_nothing() -> None:

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, replace
 from datetime import datetime
-from decimal import ROUND_CEILING, ROUND_FLOOR, Decimal
+from decimal import ROUND_CEILING, ROUND_FLOOR, Decimal, localcontext
 from enum import StrEnum
 from typing import Literal
 
@@ -210,10 +210,12 @@ def apply_funding_hedge_event(
             (),
         )
 
-    proportional_spot = (
-        cumulative_fill * state.spot_quantity / state.perpetual_quantity
+    releasable_spot, quantization_remainder = _funding_spot_entitlement(
+        cumulative_fill=cumulative_fill,
+        perpetual_quantity=state.perpetual_quantity,
+        spot_quantity=state.spot_quantity,
+        spot_step=state.spot_step,
     )
-    releasable_spot = _round_down(proportional_spot, state.spot_step)
     release_quantity = releasable_spot - state.spot_released
     if release_quantity < 0 or releasable_spot > state.spot_quantity:
         return FundingHedgeTransition(
@@ -235,7 +237,7 @@ def apply_funding_hedge_event(
         state,
         perpetual_cumulative_fill=cumulative_fill,
         spot_released=releasable_spot,
-        quantization_remainder=proportional_spot - releasable_spot,
+        quantization_remainder=quantization_remainder,
         status=status,
         seen_exec_ids=state.seen_exec_ids | {event.event_id},
     )
@@ -551,6 +553,51 @@ def _validate_bound(state: ChaseState, price: Decimal) -> None:
 
 def _round_down(value: Decimal, tick_size: Decimal) -> Decimal:
     return (value / tick_size).to_integral_value(rounding=ROUND_FLOOR) * tick_size
+
+
+def _funding_spot_entitlement(
+    *,
+    cumulative_fill: Decimal,
+    perpetual_quantity: Decimal,
+    spot_quantity: Decimal,
+    spot_step: Decimal,
+) -> tuple[Decimal, Decimal]:
+    cumulative_numerator, cumulative_denominator = cumulative_fill.as_integer_ratio()
+    perpetual_numerator, perpetual_denominator = perpetual_quantity.as_integer_ratio()
+    spot_numerator, spot_denominator = spot_quantity.as_integer_ratio()
+    step_numerator, step_denominator = spot_step.as_integer_ratio()
+    entitlement_steps = (
+        cumulative_numerator
+        * spot_numerator
+        * perpetual_denominator
+        * step_denominator
+    ) // (
+        cumulative_denominator
+        * spot_denominator
+        * perpetual_numerator
+        * step_numerator
+    )
+
+    precision = (
+        sum(
+            len(value.as_tuple().digits)
+            for value in (
+                cumulative_fill,
+                perpetual_quantity,
+                spot_quantity,
+                spot_step,
+            )
+        )
+        + len(str(entitlement_steps))
+        + 16
+    )
+    with localcontext() as context:
+        context.prec = max(context.prec, precision)
+        context.rounding = ROUND_FLOOR
+        releasable_spot = spot_step * entitlement_steps
+        proportional_spot = cumulative_fill * spot_quantity / perpetual_quantity
+        remainder = max(Decimal("0"), proportional_spot - releasable_spot)
+    return releasable_spot, remainder
 
 
 def _round_up(value: Decimal, tick_size: Decimal) -> Decimal:
