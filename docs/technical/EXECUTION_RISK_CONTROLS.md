@@ -18,7 +18,7 @@ Risk actions never bypass TradeCommand. Kill Switch does not rewrite historical 
 
 ## Controlled live acceptance
 
-Operational validation of one-ounce Market/FOK, TP/SL, PostOnly Chase, second-leg failure and forced reset follows [`../operations/LIVE_ACCEPTANCE_RUNBOOK.md`](../operations/LIVE_ACCEPTANCE_RUNBOOK.md). Risk actions cannot bypass that fail-closed procedure.
+Operational validation of CEO-instruction-bounded Market/FOK, TP/SL, PostOnly Chase, second-leg failure and forced reset follows [`../operations/LIVE_ACCEPTANCE_RUNBOOK.md`](../operations/LIVE_ACCEPTANCE_RUNBOOK.md). Fixed position, notional, daily-volume, batch-count and loss caps are not part of the founder-owned local test-account contract. This does not relax instruction quantity ceilings, one-instruction/one-batch identity, global execution serialization, Kill Switch, fail-closed unknown handling, reconciliation or forced read-only reset. Risk actions cannot bypass that procedure.
 
 ## Persisted objects
 
@@ -90,4 +90,4 @@ Reusing a key with a different payload returns 409.
 
 - Accepted or Result Unknown external orders are not claimed canceled without venue evidence.
 - Multi-currency residual comparison remains fail-closed without a risk-FX snapshot.
-- Live Write remains disabled by default and continues to require existing authorization, two-person session and Runtime safety gates.
+- Live Write remains disabled by default and continues to require a separately authorized, time-limited window with one named responsible CEO/operator plus the independent Platform and Runtime safety gates.

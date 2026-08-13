@@ -15,8 +15,8 @@ PostOnly 不得作为第一种真实写入模式。顺序固定为：
 ```text
 只读与历史证据
 → 影子核对
-→ 1 oz Market 双向 Open/Close
-→ 1 oz FOK 全成交与零成交
+→ CEO 指令数量限定的 Market 双向 Open/Close
+→ CEO 指令数量限定的 FOK 全成交与零成交
 → TP/SL Market/FOK
 → PostOnly Chase
 ```
@@ -32,11 +32,11 @@ Platform Live Write=false
 Runtime Live Write=false
 Cross-spread Exit Monitor=false
 Bybit PostOnly Chase=false
-Cross-spread acceptance max quantity=1 oz
-Cross-spread non-closed lifecycle max=1
+每条 CEO 指令的双腿数量已冻结
+全局 Open/Close ExecutionBatch 序列化已启用
 ```
 
-验收窗口中只能由负责人临时、显式开启 PostOnly。结束后必须恢复关闭。
+验收窗口中只能由负责人临时、显式开启 PostOnly。每条 CEO 指令最多创建一个 ExecutionBatch，双腿累计外部成交不得超过各自指令数量；已持有多个 Funding Pair 不放宽全局执行序列化。结束后必须恢复关闭。
 
 需要记录：
 
@@ -82,7 +82,7 @@ CI Stub 不能代替这一步。
 
 ## 5. 正常全成交路径
 
-每次只允许一个不超过 1 oz 的意图。
+每次只允许一个 CEO 指令限定的意图。该指令冻结双腿数量并认领唯一 ExecutionBatch；Amend 或 Cancel/Repost 子活动不得增加累计成交 ceiling。
 
 1. 选择流动性正常、盘口可观察的窗口。
 2. 提交 PostOnly Open。
@@ -174,7 +174,7 @@ PostOnly 测试日必须核对：
 - [ ] Platform Live Write=false。
 - [ ] Runtime Live Write=false。
 - [ ] Bybit PostOnly Chase=false。
-- [ ] Runtime 单笔和单日 Notional=0。
+- [ ] 本窗口的 CEO 指令双腿数量、唯一 Batch claim 和累计成交证据已留存。
 - [ ] Cross-spread Exit Monitor=false。
 - [ ] 所有子订单已确认终态。
 - [ ] 双边外部仓位已归零或有明确责任人的人工接管。
