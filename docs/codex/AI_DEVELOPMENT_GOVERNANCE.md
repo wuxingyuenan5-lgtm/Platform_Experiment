@@ -32,6 +32,8 @@ The project technical lead does not modify business source or become the fallbac
 
 The project lead proactively notifies the project owner when an active routed task becomes idle because it reached an owner gate, becomes blocked, changes approved scope or reports a material risk. The owner must not be expected to infer this state from the task list. Ordinary progress remains in the task record and does not require chat narration.
 
+Codex task messages do not automatically wake the sending task when the receiver completes. After routing work, the sender retains the target task identifier and latest cursor and uses the task wait mechanism until completion, attention or an explicit handoff. A sent request is not considered monitored merely because the receiver was told to report back. When the receiver reaches a material terminal state, the project lead updates the system-file control state, advances any already-authorized next work, and notifies the owner only when an owner gate, blocker, scope change or material risk exists.
+
 ## Risk-proportionate delivery and execution channels
 
 Governance is a risk ceiling, not a mandatory large-team ceremony. A small, reversible and non-critical task may use one implementer and its direct checks. Ordinary multi-file work adds investigation or acceptance only when it lowers expected rework. Trading, Live Write, identity and permission, database, public-contract, deployment and other critical work uses explicit technical review and independent acceptance. Do not create an agent when direct handling costs less context and produces equally reliable evidence.
