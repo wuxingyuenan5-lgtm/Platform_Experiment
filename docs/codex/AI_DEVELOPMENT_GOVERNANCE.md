@@ -28,6 +28,8 @@ When authorities conflict, stop the affected work, identify the conflict and rou
 
 The project owner, development advisor, project lead and project technical lead may remain long-term responsibilities. This does not make their chats project authority or require them to retain implementation history. Every concrete investigation, implementation or acceptance action remains bound by a task card rather than a permanent chat assignment. The development advisor, project lead and project technical lead report independently to the project owner; delivery and technical disagreements are preserved as short decision briefs for owner disposition rather than silently overriding either role.
 
+The project lead proactively notifies the project owner when an active routed task becomes idle because it reached an owner gate, becomes blocked, changes approved scope or reports a material risk. The owner must not be expected to infer this state from the task list. Ordinary progress remains in the task record and does not require chat narration.
+
 ## Risk-proportionate delivery and execution channels
 
 Governance is a risk ceiling, not a mandatory large-team ceremony. A small, reversible and non-critical task may use one implementer and its direct checks. Ordinary multi-file work adds investigation or acceptance only when it lowers expected rework. Trading, Live Write, identity and permission, database, public-contract, deployment and other critical work uses explicit technical review and independent acceptance. Do not create an agent when direct handling costs less context and produces equally reliable evidence.
@@ -37,6 +39,8 @@ The project technical lead selects and briefs the implementation channel. A web 
 ## Task startup protocol
 
 Every task card contains at minimum these required fields: `role`, `objective`, `context_pack`, `authority`, `write_scope`, `non_goals`, `acceptance`, `stop_conditions`, and `output_contract`. Additional safety, contract, rollback or evidence fields are allowed. Missing required fields prohibit scope expansion.
+
+Task dispatch is system-file-first. A dispatch message contains only the task identifier, immutable authority reference or commit, Context Pack, task-card or Issue path and any new authorization delta. It does not duplicate full requirements, source, logs, historical summaries or agent process. A receiving agent must be able to cold-start from repository authorities and the task card without access to the sender's chat context; if it cannot, the task card is incomplete and work stops for correction.
 
 New agents start in this order:
 
@@ -83,3 +87,5 @@ Add or change a Pack only when a repeatable task type appears, a deployed module
 Track required-file count, estimated input budget, tool-output volume, repeated file reads, task duration, handoffs, parallel implementers in one module, rework count, out-of-pack read frequency and long-task closure rate. These compare relative consumption only; they are not API billing.
 
 Development advisors consume project state, phase receipts, Token indicators and dispute material, not routine source or ordinary PR detail. Project leads consume version scope, phase status, acceptance gates and short receipts. Project technical leads consume module boundaries, owning contracts and the active technical task map, not the whole repository or historical chat. Implementers consume direct code and tests through the task Pack. Acceptance agents consume contracts, immutable diff and evidence rather than the implementer's full process. Repeated over-budget work, repeated out-of-pack reads, rework, role conflict or an architecture dispute triggers technical-lead review and, when material, independent advisor audit.
+
+The multi-agent operating model is improved incrementally from observed delivery failures, Token evidence and owner feedback. Stable improvements belong in this governance authority, Context Packs or task templates rather than in remembered chat conventions. Do not add permanent roles, mandatory agents or ceremony solely to demonstrate process maturity.
