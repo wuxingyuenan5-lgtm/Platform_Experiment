@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
-from decimal import Decimal
+from decimal import ROUND_CEILING, Decimal, localcontext
+from fractions import Fraction
 
 import pytest
 
@@ -323,6 +324,58 @@ def test_funding_release_never_exceeds_exact_proportional_entitlement() -> None:
     assert result.state.spot_released == Decimal("0")
     assert result.state.quantization_remainder == exact_entitlement
     assert result.actions == ()
+
+
+def test_funding_increment_uses_exact_steps_after_nonzero_prior_release() -> None:
+    spot_step = Decimal("0.12345678901234567890123456789")
+    instruction_quantity = Decimal("1.23456789012345678901234567890")
+    exact_entitlement = Decimal("0.24691357802469135780246913578")
+    prior_release = spot_step
+
+    result = chase.apply_funding_hedge_event(
+        funding_state(
+            perpetual_quantity=instruction_quantity,
+            spot_quantity=instruction_quantity,
+            spot_step=spot_step,
+            perpetual_cumulative_fill=prior_release,
+            spot_released=prior_release,
+        ),
+        funding_execution("exec-second-step", str(exact_entitlement)),
+    )
+
+    emitted = result.actions[0].quantity
+    assert emitted == spot_step
+    assert Fraction(prior_release) + Fraction(emitted) <= Fraction(exact_entitlement)
+    assert result.state.perpetual_cumulative_fill <= instruction_quantity
+    assert result.state.spot_released <= instruction_quantity
+
+
+def test_funding_increment_is_exact_under_constrained_decimal_context() -> None:
+    spot_step = Decimal("0.1234")
+    instruction_quantity = Decimal("1.2340")
+    exact_entitlement = Decimal("0.2468")
+    prior_release = spot_step
+    initial = funding_state(
+        perpetual_quantity=instruction_quantity,
+        spot_quantity=instruction_quantity,
+        spot_step=spot_step,
+        perpetual_cumulative_fill=prior_release,
+        spot_released=prior_release,
+    )
+
+    with localcontext() as context:
+        context.prec = 3
+        context.rounding = ROUND_CEILING
+        result = chase.apply_funding_hedge_event(
+            initial,
+            funding_execution("exec-constrained-second-step", str(exact_entitlement)),
+        )
+
+    emitted = result.actions[0].quantity
+    assert emitted == spot_step
+    assert Fraction(prior_release) + Fraction(emitted) <= Fraction(exact_entitlement)
+    assert result.state.perpetual_cumulative_fill <= instruction_quantity
+    assert result.state.spot_released <= instruction_quantity
 
 
 def test_funding_duplicate_exec_id_releases_nothing() -> None:
