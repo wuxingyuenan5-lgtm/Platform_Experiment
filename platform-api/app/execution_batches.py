@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from decimal import Decimal
+from sqlite3 import Connection
 from uuid import uuid4
 
 from fastapi import HTTPException
@@ -26,6 +27,19 @@ from app.trade_commands import create_trade_command, validate_trade_command_cata
 CROSS_SPREAD_STRATEGY_KEY = "cross_venue_spread"
 BYBIT_LEG_ROLE = "bybit_leg"
 MT5_LEG_ROLE = "mt5_leg"
+GLOBAL_LEASE_STATUSES = (
+    "pending",
+    "executing",
+    "partially_executed",
+    "manual_intervention",
+)
+UNCERTAIN_EXTERNAL_LEG_STATUSES = (
+    "submitting",
+    "accepted",
+    "processing",
+    "acknowledged",
+    "result_unknown",
+)
 
 
 def now_iso() -> str:
@@ -100,11 +114,6 @@ def create_execution_batch(request: CreateExecutionBatchRequest) -> ExecutionBat
             detail="Execution batch requires strategyInstanceId",
         )
 
-    existing_batch_id = find_batch_by_idempotency_key(request.idempotency_key)
-    if existing_batch_id is not None:
-        assert_batch_request_matches(existing_batch_id, request)
-        return get_execution_batch(existing_batch_id)
-
     strategy_key = resolve_strategy_key(request)
     default_account_id = request.account_id or request.legs[0].account_id
     if default_account_id is None:
@@ -134,38 +143,63 @@ def create_execution_batch(request: CreateExecutionBatchRequest) -> ExecutionBat
     batch_id = str(uuid4())
     created_at = now_iso()
     with connection() as db:
-        cursor = db.execute(
-            """
-            INSERT OR IGNORE INTO execution_batches (
-                id, idempotency_key, strategy_instance_id, account_id,
-                strategy_key, direction, status,
-                requires_manual_intervention, failure_reason, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                batch_id,
-                request.idempotency_key,
-                request.strategy_instance_id,
-                default_account_id,
-                strategy_key,
-                request.direction,
-                "pending",
-                0,
-                None,
-                created_at,
-                created_at,
-            ),
-        )
-        if cursor.rowcount == 0:
-            row = db.execute(
-                "SELECT id FROM execution_batches WHERE idempotency_key = ?",
-                (request.idempotency_key,),
-            ).fetchone()
-            if row is None:
-                raise HTTPException(status_code=409, detail="Execution batch claim failed")
-            existing_id = row["id"]
+        db.execute("BEGIN IMMEDIATE")
+        existing = db.execute(
+            "SELECT id FROM execution_batches WHERE idempotency_key = ?",
+            (request.idempotency_key,),
+        ).fetchone()
+        if existing is not None:
+            existing_id = existing["id"]
+            assert_batch_request_matches_in_connection(db, existing_id, request)
         else:
+            blocking_batch = db.execute(
+                """
+                SELECT batch.id, batch.status
+                FROM execution_batches AS batch
+                WHERE batch.status IN (?, ?, ?, ?)
+                   OR EXISTS (
+                       SELECT 1
+                       FROM execution_batch_legs AS leg
+                       WHERE leg.batch_id = batch.id
+                         AND leg.status IN (?, ?, ?, ?, ?)
+                   )
+                ORDER BY batch.created_at, batch.id
+                LIMIT 1
+                """,
+                GLOBAL_LEASE_STATUSES + UNCERTAIN_EXTERNAL_LEG_STATUSES,
+            ).fetchone()
+            if blocking_batch is not None:
+                raise HTTPException(
+                    status_code=409,
+                    detail=(
+                        "Active execution batch blocks new strategy instruction: "
+                        f"{blocking_batch['id']} ({blocking_batch['status']})"
+                    ),
+                )
+
             existing_id = None
+            db.execute(
+                """
+                INSERT INTO execution_batches (
+                    id, idempotency_key, strategy_instance_id, account_id,
+                    strategy_key, direction, status,
+                    requires_manual_intervention, failure_reason, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    batch_id,
+                    request.idempotency_key,
+                    request.strategy_instance_id,
+                    default_account_id,
+                    strategy_key,
+                    request.direction,
+                    "pending",
+                    0,
+                    None,
+                    created_at,
+                    created_at,
+                ),
+            )
             for sequence, leg in enumerate(request.legs, start=1):
                 db.execute(
                     """
@@ -196,7 +230,6 @@ def create_execution_batch(request: CreateExecutionBatchRequest) -> ExecutionBat
                 )
 
     if existing_id is not None:
-        assert_batch_request_matches(existing_id, request)
         return get_execution_batch(existing_id)
 
     initialize_batch_risk(batch_id, request.strategy_instance_id)
@@ -422,23 +455,31 @@ def assert_batch_request_matches(
     request: CreateExecutionBatchRequest,
 ) -> None:
     with connection() as db:
-        batch = db.execute(
-            """
-            SELECT strategy_instance_id, account_id, strategy_key, direction
-            FROM execution_batches
-            WHERE id = ?
-            """,
-            (batch_id,),
-        ).fetchone()
-        legs = db.execute(
-            """
-            SELECT role, account_id, instrument_id, symbol, side,
-                   order_type, quantity, price
-            FROM execution_batch_legs
-            WHERE batch_id = ?
-            """,
-            (batch_id,),
-        ).fetchall()
+        assert_batch_request_matches_in_connection(db, batch_id, request)
+
+
+def assert_batch_request_matches_in_connection(
+    db: Connection,
+    batch_id: str,
+    request: CreateExecutionBatchRequest,
+) -> None:
+    batch = db.execute(
+        """
+        SELECT strategy_instance_id, account_id, strategy_key, direction
+        FROM execution_batches
+        WHERE id = ?
+        """,
+        (batch_id,),
+    ).fetchone()
+    legs = db.execute(
+        """
+        SELECT sequence, role, account_id, instrument_id, symbol, side,
+               order_type, quantity, price
+        FROM execution_batch_legs
+        WHERE batch_id = ?
+        """,
+        (batch_id,),
+    ).fetchall()
 
     if batch is None:
         raise HTTPException(status_code=409, detail="Existing execution batch is unavailable")
@@ -455,12 +496,13 @@ def assert_batch_request_matches(
     if not batch_matches or set(stored_legs) != requested_roles:
         raise_batch_idempotency_conflict()
 
-    for leg in request.legs:
+    for sequence, leg in enumerate(request.legs, start=1):
         row = stored_legs[leg.role]
         requested_account_id = leg.account_id or default_account_id
         stored_price = Decimal(row["price"]) if row["price"] is not None else None
         leg_matches = (
-            row["account_id"] == requested_account_id
+            row["sequence"] == sequence
+            and row["account_id"] == requested_account_id
             and row["instrument_id"] == leg.instrument_id
             and row["symbol"] == leg.symbol
             and row["side"] == leg.side
