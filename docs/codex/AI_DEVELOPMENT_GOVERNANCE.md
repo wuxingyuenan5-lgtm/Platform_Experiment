@@ -28,6 +28,8 @@ When authorities conflict, stop the affected work, identify the conflict and rou
 
 The project owner, development advisor, project lead and project technical lead may remain long-term responsibilities. This does not make their chats project authority or require them to retain implementation history. Every concrete investigation, implementation or acceptance action remains bound by a task card rather than a permanent chat assignment. The development advisor, project lead and project technical lead report independently to the project owner; delivery and technical disagreements are preserved as short decision briefs for owner disposition rather than silently overriding either role.
 
+The project technical lead does not modify business source or become the fallback implementer inside its long-term governance task. It may write technical task cards, create isolated worktrees, run read-only orientation or evidence checks, select implementation and review channels, and route findings. Business code, implementation tests and fix rounds belong to the single temporary implementation owner; independent reviewers remain read-only. The technical lead retains only the active technical task map, contract decisions, material findings and next gate, not step-by-step worker commentary or test logs.
+
 The project lead proactively notifies the project owner when an active routed task becomes idle because it reached an owner gate, becomes blocked, changes approved scope or reports a material risk. The owner must not be expected to infer this state from the task list. Ordinary progress remains in the task record and does not require chat narration.
 
 ## Risk-proportionate delivery and execution channels
