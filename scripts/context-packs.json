@@ -63,6 +63,20 @@
     "platform-api/AGENTS.md",
     "execution-runtime/AGENTS.md"
   ],
+  "bounded_concurrency": {
+    "max_active_agents": 4,
+    "max_implementation_agents": 2,
+    "max_read_only_agents": 2,
+    "parallel_implementation_requires": [
+      "disjoint_write_sets",
+      "no_unfinished_dependencies",
+      "independent_tests",
+      "independent_rollback"
+    ],
+    "default_when_independence_unproven": "serial",
+    "critical_acceptance": "independent-read-only"
+  },
+  "task_card_check": "python scripts/check-task-card.py <task-card-path>",
   "pack_categories": [
     "governance",
     "architecture",
@@ -314,6 +328,7 @@
     "release-acceptance": {
       "checks": [
         "git diff --check",
+        "python scripts/check-task-card.py --check-template docs/codex/task-template.md",
         "python scripts/context-for.py --check-budgets --json",
         "python scripts/check-version-consistency.py",
         "python scripts/check-repository-structure.py",
@@ -402,6 +417,7 @@
     "governance": {
       "checks": [
         "git diff --check",
+        "python scripts/check-task-card.py --check-template docs/codex/task-template.md",
         "python scripts/context-for.py --check-budgets --json",
         "python scripts/check-version-consistency.py",
         "python scripts/check-repository-structure.py",

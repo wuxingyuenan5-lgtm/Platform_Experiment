@@ -40,9 +40,25 @@ Governance is a risk ceiling, not a mandatory large-team ceremony. A small, reve
 
 The project technical lead selects and briefs the implementation channel. A web AI may act as a temporary GitHub-based implementation agent for authorized ordinary code, tests or documentation and deliver an immutable branch, commit or pull request for focused local validation. It is not a long-term control role and does not join project-owner, project-lead, project-technical-lead or development-advisor discussions unless the project owner requests it. Web AI work does not currently include trading or Live Write, identity or permission, database, credentials, external-account access or deployment. Local and web agents must not share file-modification ownership in one workflow, and successful use does not expand future authority automatically.
 
+## Bounded concurrency and implementation ownership
+
+Multi-agent delivery uses bounded concurrency rather than a project-wide single agent:
+
+1. The whole project has at most four active temporary agents: at most two implementation agents and at most two read-only investigation or acceptance agents. Long-term governance roles are not implementation slots, but they may not bypass these limits by modifying business source.
+2. One business workflow, public contract, database migration chain or shared file set has one implementation owner. Overlap in any of these boundaries makes the work serial even if individual paths appear different.
+3. Two implementation agents may run concurrently only when the technical lead proves before dispatch that their declared write sets are disjoint, neither depends on unfinished output from the other, and each can be tested and rolled back independently. Unproven independence defaults to serial execution.
+4. Every implementation agent has a separate task card, `codex/` branch and isolated worktree. A shared branch, shared worktree or undocumented write set prohibits concurrent implementation.
+5. Critical work uses one implementation agent plus one read-only acceptance agent. The acceptance agent reviews an immutable reference and may not repair it.
+6. Review findings return to the original implementation owner. Do not create another implementation agent to fix the same workflow concurrently.
+7. If an implementation agent becomes unavailable or unusable, its coordinator first marks it closed and records its last immutable reference, branch, worktree and unresolved state. Only then may a named recovery owner take over through a new task card or explicit task-card reassignment.
+8. Before dispatch, the technical lead records write set, any parallel peer write set, shared workflow or contract boundary, dependency state, independent test command, rollback boundary and serial-or-parallel decision in the task card. The coordinator also verifies resulting active-agent counts stay within project limits.
+9. Investigation agents are read-only evidence collectors. They do not modify repository or external state, become implicit implementers or delegate further.
+
+System files or the Issue/PR own agent status. Active means dispatched but not closed, including blocked or review-waiting agents; a slot releases only after final state is recorded.
+
 ## Task startup protocol
 
-Every task card contains at minimum these required fields: `role`, `objective`, `context_pack`, `authority`, `write_scope`, `non_goals`, `acceptance`, `stop_conditions`, and `output_contract`. Additional safety, contract, rollback or evidence fields are allowed. Missing required fields prohibit scope expansion.
+Every task card contains at minimum these required fields: `task_id`, `role`, `risk_level`, `status`, `agent_id`, `objective`, `context_pack`, `authority`, `implementation_owner`, `branch`, `worktree`, `base_commit`, `write_set`, `shared_boundary`, `dependencies`, `independent_test`, `rollback_boundary`, `parallel_decision`, `parallel_with`, `parallel_peer_write_set`, `acceptance_task`, `recovery_from`, `recovered_owner_status`, `non_goals`, `acceptance`, `stop_conditions`, and `output_contract`. Read-only tasks use `none` for implementation-only identity fields, declare `write_set: none (read-only)`, and still identify evidence scope. Missing required fields prohibit dispatch or scope expansion.
 
 Task dispatch is system-file-first. A dispatch message contains only the task identifier, immutable authority reference or commit, Context Pack, task-card or Issue path and any new authorization delta. It does not duplicate full requirements, source, logs, historical summaries or agent process. A receiving agent must be able to cold-start from repository authorities and the task card without access to the sender's chat context; if it cannot, the task card is incomplete and work stops for correction.
 
@@ -70,7 +86,7 @@ Issue cards preserve role, context pack, write scope, non-goals, acceptance, con
 
 An acceptance task card must provide an immutable review reference, either a PR URL or commit range, plus an entry point to test evidence. If either is missing, the acceptance agent stops and requests correction. Repository checks alone cannot establish release completion, external connectivity or production readiness.
 
-Temporary agents close after their result is accepted and routed to an Issue, PR or owning authority. Delegation is normally no deeper than two levels. Parallel work is allowed only for independent tasks without shared writes. Semi-long-term assistants are reserved for sustained, frequent, stable-boundary and read-only-by-default work whose reuse benefit exceeds restart cost; they are reviewed and closed when that condition no longer holds.
+Temporary agents close after their result is accepted and routed to an Issue, PR or owning authority. Investigation agents do not delegate; other delegation is normally no deeper than two levels. Parallel work follows the bounded-concurrency proof above. Semi-long-term assistants are reserved for sustained, frequent, stable-boundary and read-only-by-default work whose reuse benefit exceeds restart cost; they are reviewed and closed when that condition no longer holds.
 
 ## Version, phase and conversation context
 

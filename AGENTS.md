@@ -15,9 +15,11 @@ For every task, read `AGENTS.md`, `docs/codex/current-state.md`, run `python scr
 - Live Write is disabled by default. Kill Switch, idempotency and Result Unknown semantics are protected. The narrow 0.11.1 local founder-owned-test-account exception remains governed only by current state, acceptance criteria and the live-acceptance runbook; it never expands to client funds, multi-person operation, unattended trading, long-lived Live Write, production deployment, or funds/symbols/concurrency expansion.
 - Do not infer external connectivity, account state, deployment or production facts from repository files or CI.
 
-## Single implementation owner
+## Bounded multi-agent concurrency
 
-Project documents, not agent chats, are authoritative memory. The project technical lead arranges technical investigation, coding agents, test work and technical acceptance. Every workflow has at most one implementation agent with file-modification authority; investigation, review and acceptance agents default to read-only. Temporary agents bind to a task card and Context Pack, close after their result is accepted, and do not delegate beyond two levels by default. Parallel work requires independent tasks without shared writes. Work on a branch and pull request; preserve public contracts unless explicitly authorized.
+At most four agents are active: two implementation and two read-only. Each workflow, contract, migration chain or shared file set has one implementation owner. Record write set and dependencies before dispatch. Parallel work requires disjoint writes, no unfinished dependency, independent tests, rollback and separate task cards plus `codex/` branches/worktrees; otherwise serial.
+
+Critical work uses one implementer plus acceptance. Findings return to owner. Close failed owners before takeover. Investigators are read-only.
 
 Close with only `outcome`, `changed_files`, `validations`, `evidence`, `contract_impact`, `unproven_facts`, `residual_risks` and `next_gate`. Do not return full source, complete diffs or long logs by default.
 

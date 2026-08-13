@@ -15,6 +15,38 @@ body:
     validations:
       required: true
   - type: input
+    id: task_id
+    attributes:
+      label: Task ID
+      description: Stable task identifier used in task cards and receipts.
+    validations:
+      required: true
+  - type: dropdown
+    id: risk_level
+    attributes:
+      label: Risk level
+      options:
+        - low
+        - medium
+        - high
+        - critical
+    validations:
+      required: true
+  - type: textarea
+    id: agent_identity
+    attributes:
+      label: Agent identity and implementation owner
+      description: Agent ID, status, named implementation owner or none for read-only work, recovery-from agent, and recovered owner closed state if applicable.
+    validations:
+      required: true
+  - type: textarea
+    id: workspace_identity
+    attributes:
+      label: Branch, worktree and base commit
+      description: Separate codex/ branch, isolated worktree and immutable base commit for implementation; use none with reason for read-only work.
+    validations:
+      required: true
+  - type: input
     id: context_pack
     attributes:
       label: Context Pack
@@ -33,6 +65,13 @@ body:
     attributes:
       label: Write scope
       description: Exact files or ownership boundary the implementation agent may change.
+    validations:
+      required: true
+  - type: textarea
+    id: concurrency_decision
+    attributes:
+      label: Write set and dependency decision
+      description: Exact write set; shared workflow/contract/migration/file-set ownership; serial, parallel-approved or read-only decision; parallel peer task and peer write set when applicable; unfinished dependencies; independent test; rollback boundary; Critical acceptance task; independence evidence; and resulting active-agent counts.
     validations:
       required: true
   - type: textarea

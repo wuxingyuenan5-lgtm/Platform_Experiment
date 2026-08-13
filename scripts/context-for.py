@@ -30,6 +30,22 @@ PACK_CATEGORIES = frozenset(CONFIG.get("pack_categories", ()))
 DEFAULT_STARTUP_BUDGET_TOKENS = int(CONFIG["default_startup_budget_tokens"])
 DEFAULT_STARTUP_BASE = tuple(CONFIG["default_startup_base"])
 DEFAULT_STARTUP_MODULES = tuple(CONFIG["default_startup_modules"])
+BOUNDED_CONCURRENCY = CONFIG.get("bounded_concurrency", {})
+TASK_CARD_CHECK = CONFIG.get("task_card_check")
+
+EXPECTED_CONCURRENCY = {
+    "max_active_agents": 4,
+    "max_implementation_agents": 2,
+    "max_read_only_agents": 2,
+    "default_when_independence_unproven": "serial",
+    "critical_acceptance": "independent-read-only",
+}
+EXPECTED_PARALLEL_REQUIREMENTS = {
+    "disjoint_write_sets",
+    "no_unfinished_dependencies",
+    "independent_tests",
+    "independent_rollback",
+}
 
 
 def largest_file(rows: Iterable[dict[str, object]]) -> dict[str, object] | None:
@@ -172,6 +188,21 @@ def budget_report() -> dict[str, object]:
     startup = default_startup_report()
     failures: list[str] = []
 
+    for key, expected in EXPECTED_CONCURRENCY.items():
+        if BOUNDED_CONCURRENCY.get(key) != expected:
+            failures.append(f"bounded_concurrency.{key} must be {expected!r}")
+    actual_requirements = set(
+        BOUNDED_CONCURRENCY.get("parallel_implementation_requires", ())
+    )
+    if actual_requirements != EXPECTED_PARALLEL_REQUIREMENTS:
+        failures.append(
+            "bounded_concurrency.parallel_implementation_requires must declare "
+            "disjoint writes, no unfinished dependencies, independent tests and "
+            "independent rollback"
+        )
+    if TASK_CARD_CHECK != "python scripts/check-task-card.py <task-card-path>":
+        failures.append("task_card_check must route through scripts/check-task-card.py")
+
     for name, report in reports.items():
         category = report["category"]
         if category is not None and category not in PACK_CATEGORIES:
@@ -210,6 +241,8 @@ def budget_report() -> dict[str, object]:
         "default_startup": startup,
         "unbudgeted_packs": unbudgeted,
         "orphan_budgets": orphan_budgets,
+        "bounded_concurrency": BOUNDED_CONCURRENCY,
+        "task_card_check": TASK_CARD_CHECK,
         "failures": failures,
         "ok": not failures,
     }
@@ -249,6 +282,8 @@ def selected_report(name: str, include_optional: bool) -> dict[str, object]:
         "total": report["total"],
         "checks": report["checks"],
         "default_exclusions": report["default_exclusions"],
+        "bounded_concurrency": BOUNDED_CONCURRENCY,
+        "task_card_check": TASK_CARD_CHECK,
     }
 
 
@@ -264,6 +299,9 @@ def render_markdown(name: str, include_optional: bool) -> str:
         f"Owner modules: {', '.join(report['owner_modules']) or 'legacy-unspecified'}",
         f"Risk level: {report['risk_level'] or 'legacy-unspecified'}",
         f"Write boundary: {report['write_boundary'] or 'legacy-unspecified'}",
+        "Bounded concurrency: max 4 active; max 2 implementation; max 2 read-only",
+        "Parallel implementation: disjoint writes, no unfinished dependencies, independent tests and rollback; otherwise serial",
+        f"Task card check: {TASK_CARD_CHECK}",
         "",
         f"Required files: {report['required']['file_count']}",
         f"Optional files: {report['optional']['file_count']}",
