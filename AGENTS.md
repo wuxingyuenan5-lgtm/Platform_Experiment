@@ -17,7 +17,7 @@ For every task, read `AGENTS.md`, `docs/codex/current-state.md`, run `python scr
 
 ## Bounded multi-agent concurrency
 
-At most four agents are active: two implementation and two read-only. Each workflow, contract, migration chain or shared file set has one implementation owner. Record write set and dependencies before dispatch. Parallel work requires disjoint writes, no unfinished dependency, independent tests, rollback and separate task cards plus `codex/` branches/worktrees; otherwise serial.
+The project-wide maximum safe upper bound is four active temporary agents: at most two implementation and at most two read-only. The default is one implementation agent. A second implementation agent is allowed only when the technical lead records concrete independence evidence before dispatch; do not split work merely to consume available concurrency. Each workflow, contract, migration chain or shared file set has one implementation owner. Record write set and dependencies before dispatch. Parallel work requires disjoint writes, no unfinished dependency, independent tests, rollback and separate task cards plus `codex/` branches/worktrees; otherwise serial.
 
 Critical work uses one implementer plus acceptance. Findings return to owner. Close failed owners before takeover. Investigators are read-only.
 

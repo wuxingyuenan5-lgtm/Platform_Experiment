@@ -18,9 +18,9 @@ When authorities conflict, stop the affected work, identify the conflict and rou
 ## Roles
 
 - Project owner: product scope, priority, risk acceptance, stage authorization and final acceptance.
-- Development advisor: a long-term, independent and read-only-by-default advisor to the project owner. Reviews Vibe Coding practice, Token and AI-resource efficiency, project strategy, architecture fit and reusable AI-development methods. The advisor does not replace the project lead or technical lead, direct routine implementation or create process merely to demonstrate value; when no material issue exists, the advisor should say that work may continue.
-- Project lead: a long-term coordination owner for state stewardship, objective decomposition, task routing, phase coordination and task closure. The project lead routes coding objectives to the project technical lead instead of directly managing coding agents.
-- Project technical lead: the long-term technical owner for the whole project across modules and releases. Owns architecture direction, module and contract boundaries, technical roadmap, implementation decomposition, technical risk and evidence sufficiency. The technical lead arranges technical investigation, coding agents, test work and technical acceptance, but does not set product priority, expand scope or accept business risk.
+- Development advisor: a long-term, independent and read-only-by-default advisor to the project owner. Reviews Vibe Coding practice, Token efficiency, project strategy, architecture fit and reusable AI-development methods. The advisor is idle by default and joins only for owner-requested retrospectives, Token reaching 80 percent, two failed repair rounds, role conflict, architecture dispute, external connections, Live Write, controlled live trading or final acceptance. The advisor does not monitor routine tasks, read ordinary source by default, review ordinary PRs or create execution agents.
+- Project lead: a long-term coordination owner for business plan, priority, owner gates, phase authorization and task closure. The project lead routes coding objectives to the project technical lead instead of directly managing coding agents, does not read source, logs or test process by default, and reports to the owner only for business-capability completion, owner gates, material blockers or risks, and Token reaching 80 or 100 percent. Owner-facing reporting uses business capability names rather than internal task identifiers as the primary label.
+- Project technical lead: the long-term technical owner for the whole project across modules and releases. Owns architecture direction, module and contract boundaries, implementation decomposition, technical risk and evidence sufficiency. The technical lead defines slice boundaries and selects implementation ownership at slice start, then organizes necessary review, integration and receipts only after immutable commits exist. The technical lead does not continuously emit "still running" updates, does not create a separate agent for routine task-card maintenance or clean status sync, and does not take over business-source implementation, tests or repair rounds from the named implementation owner. Critical defects may be returned to the original implementer at most two times before escalation.
 - Investigation agent: read-only by default; gathers current-state, root-cause, external-reference and risk evidence.
 - Implementation agent: the single file-modification owner for one workflow.
 - Acceptance agent: independently reads contracts, diff and test evidence; does not repeat implementation.
@@ -28,11 +28,11 @@ When authorities conflict, stop the affected work, identify the conflict and rou
 
 The project owner, development advisor, project lead and project technical lead may remain long-term responsibilities. This does not make their chats project authority or require them to retain implementation history. Every concrete investigation, implementation or acceptance action remains bound by a task card rather than a permanent chat assignment. The development advisor, project lead and project technical lead report independently to the project owner; delivery and technical disagreements are preserved as short decision briefs for owner disposition rather than silently overriding either role.
 
-The project technical lead does not modify business source or become the fallback implementer inside its long-term governance task. It may write technical task cards, create isolated worktrees, run read-only orientation or evidence checks, select implementation and review channels, and route findings. Business code, implementation tests and fix rounds belong to the single temporary implementation owner; independent reviewers remain read-only. The technical lead retains only the active technical task map, contract decisions, material findings and next gate, not step-by-step worker commentary or test logs.
+The project technical lead does not modify business source or become the fallback implementer inside its long-term governance task. It may write technical task cards, create isolated worktrees, run read-only orientation or evidence checks, select implementation and review channels, generate status events and route findings. Business code, implementation tests and fix rounds belong to the single temporary implementation owner; independent reviewers remain read-only. The technical lead retains only the active technical task map, contract decisions, material findings and next gate, not step-by-step worker commentary or test logs.
 
-The project lead proactively notifies the project owner when an active routed task becomes idle because it reached an owner gate, becomes blocked, changes approved scope or reports a material risk. The owner must not be expected to infer this state from the task list. Ordinary progress remains in the task record and does not require chat narration.
+The project lead consumes status events rather than execution process. The owner must not be expected to infer state from the task list or from routine commentary.
 
-Codex task messages and delegated agents do not reliably wake every upstream task when the receiver completes. After routing work, each coordinator records the complete active chain in the task card: parent task, current leaf agent identifier, branch or worktree, immutable starting reference and status. The coordinator waits on the current leaf with the appropriate task or agent wait mechanism until completion, attention or an explicit handoff; after a new reviewer or fix owner is dispatched, monitoring moves to that new leaf. Confirming that a child started is not a valid terminal state, and a sent request is not monitored merely because the receiver was told to report back. When a leaf reaches terminal state, its coordinator reads evidence from system files and Git, advances already-authorized review, repair or integration work, updates the task card, and only then may its own turn end. The project lead separately monitors the technical-lead task plus the recorded current leaf and notifies the owner when an owner gate, blocker, scope change, material risk or version milestone exists.
+Codex task messages and delegated agents do not reliably wake every upstream task when the receiver completes. Repository governance therefore defines only a status-event interface, not a runtime notification guarantee. A coordinator records the current leaf task or agent identifier, immutable reference and business status in the task card, then advances the next authorized review, repair or integration step when evidence arrives. Owner-side automation may later run a lightweight periodic poller that reports only status changes; that poller is not a long-term repository agent, does not write the repository, does not read source and stays off when no active task exists.
 
 ## Risk-proportionate delivery and execution channels
 
@@ -44,9 +44,9 @@ The project technical lead selects and briefs the implementation channel. A web 
 
 Multi-agent delivery uses bounded concurrency rather than a project-wide single agent:
 
-1. The whole project has at most four active temporary agents: at most two implementation agents and at most two read-only investigation or acceptance agents. Long-term governance roles are not implementation slots, but they may not bypass these limits by modifying business source.
+1. The whole project has a maximum safe upper bound of four active temporary agents: at most two implementation agents and at most two read-only investigation or acceptance agents. Long-term governance roles are not implementation slots, but they may not bypass these limits by modifying business source.
 2. One business workflow, public contract, database migration chain or shared file set has one implementation owner. Overlap in any of these boundaries makes the work serial even if individual paths appear different.
-3. Two implementation agents may run concurrently only when the technical lead proves before dispatch that their declared write sets are disjoint, neither depends on unfinished output from the other, and each can be tested and rolled back independently. Unproven independence defaults to serial execution.
+3. The default is one implementation agent. Two implementation agents may run concurrently only when the technical lead proves before dispatch that their declared write sets are disjoint, neither depends on unfinished output from the other, and each can be tested and rolled back independently. Unproven independence defaults to serial execution, and no task may be split merely to consume available concurrency.
 4. Every implementation agent has a separate task card, `codex/` branch and isolated worktree. A shared branch, shared worktree or undocumented write set prohibits concurrent implementation.
 5. Critical work uses one implementation agent plus one read-only acceptance agent. The acceptance agent reviews an immutable reference and may not repair it.
 6. Review findings return to the original implementation owner. Do not create another implementation agent to fix the same workflow concurrently.
@@ -58,7 +58,16 @@ System files or the Issue/PR own agent status. Active means dispatched but not c
 
 ## Task startup protocol
 
-Every task card contains at minimum these required fields: `task_id`, `role`, `risk_level`, `status`, `agent_id`, `objective`, `context_pack`, `authority`, `implementation_owner`, `branch`, `worktree`, `base_commit`, `write_set`, `shared_boundary`, `dependencies`, `independent_test`, `rollback_boundary`, `parallel_decision`, `parallel_with`, `parallel_peer_write_set`, `acceptance_task`, `recovery_from`, `recovered_owner_status`, `non_goals`, `acceptance`, `stop_conditions`, and `output_contract`. Read-only tasks use `none` for implementation-only identity fields, declare `write_set: none (read-only)`, and still identify evidence scope. Missing required fields prohibit dispatch or scope expansion.
+Use the lightest record that still preserves safety and recovery:
+
+- A full task card is required for any implementation that changes repository files, any Critical independent acceptance, any cross-session recovery, any parallel implementation, and any task that needs immutable evidence or an explicit owner gate.
+- A short task record is sufficient for a single-session, read-only investigation or status query with no external-state change.
+- Core required fields for every task record are `task_id`, `status`, `last_transition_at`, `owner_notice`, `business_status_summary`, `current_leaf_task_or_agent_id`, `risk_level`, `role`, `agent_id`, `context_pack`, and `objective`.
+- Implementation-only fields are required only for implementation work: `implementation_owner`, `branch`, `worktree`, `base_commit`, `write_set`, `shared_boundary`, `dependencies`, `independent_test`, `rollback_boundary`, and `parallel_decision`.
+- Parallel-only fields are required only when `parallel_decision` is `parallel-approved`: `parallel_with`, `parallel_peer_write_set`, and `independence_evidence`.
+- Recovery-only fields are required only when taking over prior work: `recovery_from` and `recovered_owner_status`.
+- Critical implementation requires `acceptance_task`.
+- Do not fill in `none` placeholders for fields that do not apply. Conditional validation replaces placeholder compliance.
 
 Task dispatch is system-file-first. A dispatch message contains only the task identifier, immutable authority reference or commit, Context Pack, task-card or Issue path and any new authorization delta. It does not duplicate full requirements, source, logs, historical summaries or agent process. A receiving agent must be able to cold-start from repository authorities and the task card without access to the sender's chat context; if it cannot, the task card is incomplete and work stops for correction.
 
@@ -75,6 +84,48 @@ New agents start in this order:
 Optional Pack files are loaded only for an explicit question. Do not scan the repository merely to become familiar with it.
 
 The task card is the dynamic authority loaded at step 5. It is not copied into a static Pack, and it need not repeat the Pack required-file list. Reading static source that contains credential-loading code is not the same as reading a real secret; static code may be read within task scope, while actual secrets, external connections and Live Write remain separately prohibited unless directly authorized.
+
+## Token gates and status events
+
+Task records track management-only Token indicators, not API billing:
+
+- `Token indicator budget`
+- `Token indicator used`
+- `Token status`: `green | amber | red`
+- `Control-plane token used`
+
+Default slice guardrails are:
+
+- total slice indicator budget: 2,000,000
+- implementation owner: up to 1,200,000
+- technical-lead control plane: up to 300,000
+- independent review: up to 300,000
+- project lead plus development advisor combined: up to 200,000
+- control-plane total: no more than 30 percent of slice indicator use
+
+Behavior gates are:
+
+1. At 60 percent used, do not add agents or broaden scope.
+2. At 80 percent used, stop non-essential refactors, repeated reviews and broad scans; notify the owner through a status event.
+3. At 100 percent used, preserve immutable commit and evidence, set status to `attention`, request owner action and stop further consumption until the owner extends budget.
+4. After two failed repair rounds on the same issue, stop; do not auto-create a recovery agent or start a third repair round.
+
+Every task record also carries the minimal status-event fields:
+
+- `Status`: `planned | active | review | attention | blocked | done`
+- `Last transition at`
+- `Owner notice`: `none | required | sent`
+- `Business status summary`
+- `Current leaf task/agent ID`
+
+Status-event rules are:
+
+1. The technical lead generates the event record when a task moves from `active` to `review`, `attention`, `blocked` or `done`.
+2. `attention` and `blocked` summaries must state who needs to do what next.
+3. `done` summaries must state the business capability completed, immutable evidence and the next gate.
+4. Do not send duplicate notices for the same unchanged state.
+5. "Still running" is not a status event.
+6. Owner-facing event titles use business capability names, not internal task identifiers, as the primary label.
 
 ## Task closure and durable evidence
 

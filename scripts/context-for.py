@@ -34,11 +34,15 @@ BOUNDED_CONCURRENCY = CONFIG.get("bounded_concurrency", {})
 TASK_CARD_CHECK = CONFIG.get("task_card_check")
 
 EXPECTED_CONCURRENCY = {
+    "treat_limits_as": "maximum-safe-upper-bound",
     "max_active_agents": 4,
     "max_implementation_agents": 2,
     "max_read_only_agents": 2,
+    "default_implementation_agents": 1,
+    "second_implementation_requires": "concrete_independence_evidence",
     "default_when_independence_unproven": "serial",
     "critical_acceptance": "independent-read-only",
+    "do_not_split_work_to_fill_capacity": True,
 }
 EXPECTED_PARALLEL_REQUIREMENTS = {
     "disjoint_write_sets",
@@ -299,8 +303,8 @@ def render_markdown(name: str, include_optional: bool) -> str:
         f"Owner modules: {', '.join(report['owner_modules']) or 'legacy-unspecified'}",
         f"Risk level: {report['risk_level'] or 'legacy-unspecified'}",
         f"Write boundary: {report['write_boundary'] or 'legacy-unspecified'}",
-        "Bounded concurrency: max 4 active; max 2 implementation; max 2 read-only",
-        "Parallel implementation: disjoint writes, no unfinished dependencies, independent tests and rollback; otherwise serial",
+        "Bounded concurrency: default 1 implementation agent; max-safe upper bound 4 active, 2 implementation and 2 read-only",
+        "Parallel implementation: disjoint writes, no unfinished dependencies, independent tests and rollback; otherwise serial; do not split work merely to use capacity",
         f"Task card check: {TASK_CARD_CHECK}",
         "",
         f"Required files: {report['required']['file_count']}",

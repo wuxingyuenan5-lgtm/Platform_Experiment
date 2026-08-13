@@ -6,12 +6,12 @@ body:
   - type: markdown
     attributes:
       value: |
-        Search existing open Issues and PRs first. Reuse an existing Issue when the outcome is already tracked.
+        Search existing open Issues and PRs first. Reuse an existing Issue when the outcome is already tracked. Use only the fields that match the task mode: all records need core status and Token fields; implementation-only fields are required only when repository files will change.
   - type: textarea
-    id: role
+    id: task_mode
     attributes:
-      label: Role
-      description: Project owner, technical lead, investigation, implementation, acceptance or independent audit.
+      label: Task mode and role
+      description: State whether this is a short read-only record or a full task card, and name the role.
     validations:
       required: true
   - type: input
@@ -19,6 +19,13 @@ body:
     attributes:
       label: Task ID
       description: Stable task identifier used in task cards and receipts.
+    validations:
+      required: true
+  - type: textarea
+    id: status_event
+    attributes:
+      label: Status event
+      description: Status, last transition time, owner notice, business status summary and current leaf task or agent ID.
     validations:
       required: true
   - type: dropdown
@@ -35,15 +42,15 @@ body:
   - type: textarea
     id: agent_identity
     attributes:
-      label: Agent identity and implementation owner
-      description: Agent ID, status, named implementation owner or none for read-only work, recovery-from agent, and recovered owner closed state if applicable.
+      label: Agent identity
+      description: Agent ID, and when applicable the implementation owner plus recovery-from/closed-owner evidence.
     validations:
       required: true
   - type: textarea
-    id: workspace_identity
+    id: token_indicators
     attributes:
-      label: Branch, worktree and base commit
-      description: Separate codex/ branch, isolated worktree and immutable base commit for implementation; use none with reason for read-only work.
+      label: Token indicators
+      description: Token indicator budget, Token indicator used, Token status and control-plane token used. These are management indicators, not API billing.
     validations:
       required: true
   - type: input
@@ -61,24 +68,17 @@ body:
     validations:
       required: true
   - type: textarea
-    id: write_scope
-    attributes:
-      label: Write scope
-      description: Exact files or ownership boundary the implementation agent may change.
-    validations:
-      required: true
-  - type: textarea
-    id: concurrency_decision
-    attributes:
-      label: Write set and dependency decision
-      description: Exact write set; shared workflow/contract/migration/file-set ownership; serial, parallel-approved or read-only decision; parallel peer task and peer write set when applicable; unfinished dependencies; independent test; rollback boundary; Critical acceptance task; independence evidence; and resulting active-agent counts.
-    validations:
-      required: true
-  - type: textarea
     id: objective
     attributes:
       label: Objective
-      description: One measurable outcome.
+      description: One measurable business outcome.
+    validations:
+      required: true
+  - type: textarea
+    id: implementation_fields
+    attributes:
+      label: Implementation fields when applicable
+      description: Branch, worktree, base commit, write set, dependency decision, rollback boundary, acceptance task, parallel proof and active-agent counts. Leave empty for short read-only records.
     validations:
       required: true
   - type: textarea
@@ -113,7 +113,7 @@ body:
     id: acceptance
     attributes:
       label: Acceptance criteria
-      description: Concrete checks required before merge.
+      description: Concrete checks required before completion or owner gate.
     validations:
       required: true
   - type: textarea
