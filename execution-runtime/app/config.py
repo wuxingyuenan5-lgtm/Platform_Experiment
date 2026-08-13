@@ -67,7 +67,7 @@ class Settings(BaseSettings):
     bybit_fill_confirmation_poll_seconds: float = 0.1
     bybit_postonly_chase_enabled: bool = False
     bybit_postonly_chase_ttl_seconds: float = 15.0
-    bybit_postonly_chase_event_timeout_seconds: float = 0.5
+    bybit_postonly_chase_event_timeout_seconds: float = 1.0
     bybit_postonly_chase_min_amend_ticks: int = 1
     bybit_postonly_chase_max_mutations: int = 5
     bybit_postonly_chase_cooldown_seconds: float = 1.0

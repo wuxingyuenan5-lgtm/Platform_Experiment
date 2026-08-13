@@ -16,6 +16,7 @@ from app.bybit_postonly_chase import (
     apply_private_event,
     maker_safe_price,
     next_quote_action,
+    request_cancel_repost,
 )
 from app.config import Settings
 
@@ -117,6 +118,44 @@ def test_ttl_stops_chase_with_cancel() -> None:
 
     assert result.state.status == ChaseStatus.CANCEL_PENDING
     assert result.actions[0].action_type == ChaseActionType.CANCEL
+
+
+def test_cancel_pending_reposts_only_after_terminal_private_cancellation() -> None:
+    requested = request_cancel_repost(
+        state(),
+        POLICY,
+        replacement_price=Decimal("2500.2"),
+        now=NOW + timedelta(seconds=2),
+    )
+    acknowledged = apply_private_event(
+        requested.state,
+        PrivateChaseEvent(
+            event_id="cancel-pending",
+            sequence=1,
+            occurred_at=NOW + timedelta(seconds=3),
+            kind="order",
+            external_order_id="order-1",
+            order_status="cancel_pending",
+        ),
+    )
+    terminal = apply_private_event(
+        acknowledged.state,
+        PrivateChaseEvent(
+            event_id="cancel-terminal",
+            sequence=2,
+            occurred_at=NOW + timedelta(seconds=4),
+            kind="order",
+            external_order_id="order-1",
+            order_status="canceled",
+        ),
+    )
+
+    assert requested.actions[0].action_type == ChaseActionType.CANCEL
+    assert requested.state.status == ChaseStatus.CANCEL_PENDING
+    assert acknowledged.state.status == ChaseStatus.CANCEL_PENDING
+    assert acknowledged.actions == ()
+    assert terminal.state.status == ChaseStatus.ACTIVE
+    assert terminal.actions[0].action_type == ChaseActionType.REPOST
 
 
 def test_duplicate_execution_event_does_not_duplicate_fill_delta() -> None:
@@ -254,6 +293,7 @@ def test_initial_funding_chase_parameters_are_bounded() -> None:
     settings = Settings(_env_file=None)
 
     assert settings.bybit_postonly_chase_ttl_seconds == 15
+    assert settings.bybit_postonly_chase_event_timeout_seconds == 1
     assert settings.bybit_postonly_chase_cooldown_seconds == 1
     assert settings.bybit_postonly_chase_max_mutations == 5
     assert settings.bybit_postonly_chase_min_amend_ticks == 1
@@ -441,7 +481,17 @@ def test_funding_non_monotonic_or_excess_fill_freezes_without_release(
     assert result.actions == ()
 
 
-@pytest.mark.parametrize("kind", ["disconnect", "result_unknown", "order_unknown"])
+@pytest.mark.parametrize(
+    "kind",
+    [
+        "disconnect",
+        "result_unknown",
+        "order_unknown",
+        "sequence_mismatch",
+        "identity_mismatch",
+        "cancel_unconfirmed",
+    ],
+)
 def test_funding_unknown_state_freezes_future_side_effects(kind: str) -> None:
     frozen = chase.apply_funding_hedge_event(
         funding_state(),

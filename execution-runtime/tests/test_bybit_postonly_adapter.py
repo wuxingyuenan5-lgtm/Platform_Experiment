@@ -19,16 +19,18 @@ NOW = datetime(2026, 7, 26, tzinfo=UTC)
 
 
 class FakePrivateSource:
-    def __init__(self, events: list[PrivateChaseEvent]) -> None:
+    def __init__(self, events: list[PrivateChaseEvent | None]) -> None:
         self.events = list(events)
         self.started = False
         self.closed = False
+        self.timeouts: list[float] = []
 
     def start(self) -> None:
         self.started = True
 
     def next_event(self, timeout_seconds: float) -> PrivateChaseEvent | None:
         assert timeout_seconds > 0
+        self.timeouts.append(timeout_seconds)
         return self.events.pop(0) if self.events else None
 
     def close(self) -> None:
@@ -40,9 +42,11 @@ class FakePostOnlyClient:
         self.place_calls: list[dict[str, object]] = []
         self.amend_calls: list[dict[str, object]] = []
         self.cancel_calls: list[dict[str, object]] = []
+        self.ticker_calls = 0
         self.terminal_row = terminal_row
 
     def get_tickers(self, **kwargs):
+        self.ticker_calls += 1
         return {
             "retCode": 0,
             "result": {
@@ -94,6 +98,7 @@ class FakePostOnlyClient:
 
 def runtime_settings(*, enabled: bool = True) -> Settings:
     return Settings(
+        _env_file=None,
         environment="live",
         live_write_enabled=True,
         live_account_allowlist="account-bybit",
@@ -105,10 +110,8 @@ def runtime_settings(*, enabled: bool = True) -> Settings:
         bybit_instrument_map="XAUTUSDT=instrument-xaut",
         bybit_postonly_chase_enabled=enabled,
         bybit_postonly_chase_ttl_seconds=1,
-        bybit_postonly_chase_event_timeout_seconds=0.001,
         bybit_postonly_chase_min_amend_ticks=2,
         bybit_postonly_chase_max_mutations=2,
-        bybit_postonly_chase_cooldown_seconds=0,
         bybit_postonly_chase_rest_reconcile_seconds=0.001,
     )
 
@@ -149,6 +152,35 @@ def test_postonly_disabled_rejects_before_place(tmp_path) -> None:
 
     assert client.place_calls == []
     assert source.started is False
+
+
+def test_postonly_adapter_reevaluates_quotes_at_configured_cadence(tmp_path) -> None:
+    initialize_runtime_store(tmp_path, "postonly-cadence.db")
+    source = FakePrivateSource(
+        [
+            None,
+            PrivateChaseEvent(
+                event_id="disconnect-after-reevaluation",
+                sequence=1,
+                occurred_at=NOW,
+                kind="disconnect",
+            ),
+        ]
+    )
+    client = FakePostOnlyClient()
+    settings = runtime_settings()
+    adapter = BybitFillConfirmingAdapter(
+        settings,
+        client,
+        private_source_factory=lambda _symbol, _prefix: source,
+    )
+
+    events = adapter.submit_order(command("cadence"))
+
+    assert source.timeouts == [1.0, 1.0]
+    assert client.ticker_calls == 2
+    assert settings.bybit_postonly_chase_cooldown_seconds == 1.0
+    assert [event.event_type for event in events] == ["order_acknowledged"]
 
 
 def test_postonly_exact_full_fill_emits_one_fill(tmp_path) -> None:
