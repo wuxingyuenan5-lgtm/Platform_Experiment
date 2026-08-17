@@ -2,10 +2,10 @@
 Task ID: `VG-GOV-20260817-authority-unification`
 Issue: `#none`
 Status: `attention`
-Last transition at: `2026-08-17 00:00 Asia/Shanghai`
+Last transition at: `2026-08-17 19:30 Asia/Shanghai`
 Owner notice: `sent`
-Business status summary: `Needs: the sole governance implementation owner must form one immutable HEAD containing 75e8e4a and da001936, correct control evidence, and bound only the live-readiness Pack.`
-Current leaf task/agent ID: `01a00f70-8b11-7253-b132-6af15776e1fa`
+Business status summary: `Needs: the independent read-only acceptance owner must review immutable governance candidate 66ef858, including its ancestry, bounded live-readiness Pack, preserved business source and recorded residual failures.`
+Current leaf task/agent ID: `none`
 Risk level: `critical`
 Role: `implementation`
 Agent ID: `01a00f70-8b11-7253-b132-6af15776e1fa`
@@ -76,7 +76,8 @@ Create one traceable immutable repository authority that contains both governanc
 - `git merge-base --is-ancestor da001936 HEAD`
 
 ## Progress
-- Done: cold-started from `75e8e4a` with the governance Pack and confirmed the two required authorities are divergent.
-- Current: sole implementation owner `01a00f70-8b11-7253-b132-6af15776e1fa` is active on the isolated governance branch.
-- Next: merge, resolve only governance authority conflicts, compress only `live-readiness`, validate, then enter independent Critical acceptance.
-- Blocked by: no trusted Token snapshot; owner has been notified and explicitly authorized this bounded governance unification while all external gates remain closed.
+- Done: non-squash merge `95272d1` retains `75e8e4a` and `da001936` as ancestors; governance candidate `66ef858` corrects SF-02 status/evidence, makes the 30 percent measure business-slice aggregate only, and bounds only `live-readiness` at `14991 / 16000` required tokens.
+- Done: task-card tests `10 passed`; task card, template, governance Pack, version, structure and diff checks passed; accepted business paths are identical to `da001936`.
+- Current: immutable candidate `66ef858` is frozen for repair-free independent Critical acceptance.
+- Next: `VG-GOV-20260817-authority-unification-ACCEPTANCE` reviews the immutable candidate and either records acceptance or returns findings to the same implementation owner.
+- Blocked by: no trusted Token snapshot, so all snapshot fields remain `unavailable`; the budget audit intentionally retains six unrelated historical Pack failures, and documentation consistency retains the pre-existing missing tracked-reference finding for the shared-workspace-only retrospective file.
