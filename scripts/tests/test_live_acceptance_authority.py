@@ -62,6 +62,18 @@ class LiveAcceptanceAuthorityTests(unittest.TestCase):
         for statement in required_contract:
             self.assertIn(statement, runbook, f"runbook lost mandatory contract text: {statement}")
 
+    def test_mandatory_safeguards_are_not_relax_or_remove_candidates(self) -> None:
+        observability = read("docs/technical/LIVE_ACCOUNT_OBSERVABILITY.md")
+        safeguards = observability.split("## 10. Controlled-acceptance safeguards", 1)[1].split(
+            "## 11. Windows-host acceptance sequence", 1
+        )[0]
+
+        self.assertIn(
+            "The mandatory safeguards above are not candidates for relaxation or removal",
+            safeguards,
+        )
+        self.assertNotIn("`retain`, `relax` or `remove`", safeguards)
+
     def test_legacy_fixed_cap_code_and_public_session_type_remain_explicit_blockers(self) -> None:
         current_state = read("docs/codex/current-state.md")
         program = read("docs/codex/0.11.1-program.md")

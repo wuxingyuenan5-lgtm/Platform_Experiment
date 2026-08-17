@@ -208,7 +208,7 @@ The following remain mandatory:
 - automatic exit monitor disabled by default;
 - no automatic retry after unknown external result.
 
-They may only be changed by a dedicated Issue/PR after Issue #39 contains mature evidence for:
+Any implementation change touching these safeguards requires a dedicated Issue/PR and mature evidence in Issue #39 for:
 
 1. successful route-independent Order and Fill/Deal reads;
 2. repeated instruction-bounded open/close cycles in both directions;
@@ -218,7 +218,7 @@ They may only be changed by a dedicated Issue/PR after Issue #39 contains mature
 6. no unexplained Order, Fill, Position, Balance, fee, Funding or Swap differences;
 7. Kill Switch and gate reset evidence.
 
-A future review must list each safeguard separately as `retain`, `relax` or `remove`. Passing one small-money test does not automatically delete any safeguard.
+The mandatory safeguards above are not candidates for relaxation or removal. A future review may strengthen their implementation or evidence requirements only; passing one small-money test does not authorize weakening any safeguard.
 
 ## 11. Windows-host acceptance sequence
 
