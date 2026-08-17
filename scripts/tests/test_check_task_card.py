@@ -244,7 +244,7 @@ class CheckTaskCardTests(unittest.TestCase):
         )
         self.assertIn("Token use at or above 100 percent requires Status: attention", hundred_failures)
 
-    def test_status_event_and_control_plane_rules_are_enforced(self) -> None:
+    def test_status_event_rules_are_enforced(self) -> None:
         attention_failures = self.validate_content(
             base_implementation_task().replace("Status: `active`", "Status: `attention`")
         )
@@ -263,10 +263,11 @@ class CheckTaskCardTests(unittest.TestCase):
             done_failures,
         )
 
+    def test_control_plane_ratio_is_not_enforced_per_task(self) -> None:
         control_failures = self.validate_content(
             base_implementation_task().replace("Control-plane token delta: `90000`", "Control-plane token delta: `150000`")
         )
-        self.assertIn(
+        self.assertNotIn(
             "Control-plane token delta cannot exceed 30 percent of Token delta",
             control_failures,
         )

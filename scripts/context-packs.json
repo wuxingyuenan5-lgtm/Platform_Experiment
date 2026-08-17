@@ -236,7 +236,6 @@
         "docs/operations/LIVE_ACCEPTANCE_RUNBOOK.md",
         "platform-api/AGENTS.md",
         "platform-api/app/live_trading_sessions.py",
-        "platform-api/tests/test_live_trading_sessions.py",
         "execution-runtime/AGENTS.md",
         "execution-runtime/app/live_safety.py",
         "execution-runtime/tests/test_live_safety.py",

@@ -23,7 +23,7 @@ Create one traceable immutable repository authority that contains both governanc
 ## Implementation fields
 - Implementation owner: `01a00f70-8b11-7253-b132-6af15776e1fa`
 - Branch: `codex/vg-0111-authority-unification`
-- Worktree: `C:\Users\jiuxi\Desktop\codex\全球变量平台\.codex\worktrees\vg-0111-authority-unification`
+- Worktree: `<workspace-root>\.codex\worktrees\vg-0111-authority-unification`
 - Base commit: `75e8e4a033639c4aaf082ac77720171d0044b3b0`
 
 ## Protected semantics

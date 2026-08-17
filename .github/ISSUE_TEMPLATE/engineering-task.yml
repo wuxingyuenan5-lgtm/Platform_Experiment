@@ -50,7 +50,7 @@ body:
     id: token_indicators
     attributes:
       label: Token indicators
-      description: Token indicator budget, Token indicator used, Token status and control-plane token used. These are management indicators, not API billing.
+      description: Token baseline, current, delta, budget, status and attributable control-plane delta. These are management indicators, not API billing; the 30 percent control-plane measure is evaluated only across the whole business slice, not per task.
     validations:
       required: true
   - type: input

@@ -204,9 +204,6 @@ def validate_token_controls(text: str, failures: list[str]) -> dict[str, int | s
         failures.append("Token delta must equal Token current minus Token baseline")
     if control_delta > delta:
         failures.append("Control-plane token delta cannot exceed Token delta")
-    if delta > 0 and control_delta * 100 > delta * 30:
-        failures.append("Control-plane token delta cannot exceed 30 percent of Token delta")
-
     expected_status = "green"
     if delta >= budget:
         expected_status = "red"
