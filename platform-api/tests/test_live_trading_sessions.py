@@ -227,3 +227,68 @@ def test_limit_and_kill_switch_block_session_approval(monkeypatch, tmp_path: Pat
         )
         assert approval_two.status_code == 422
         assert "Kill Switch" in str(approval_two.json()["detail"])
+
+
+def test_approval_is_not_blocked_without_absolute_limits(
+    monkeypatch, tmp_path: Path
+) -> None:
+    configure_live(monkeypatch, tmp_path)
+    settings = get_settings()
+    monkeypatch.setattr(settings, "live_session_absolute_max_order_notional", 0)
+    monkeypatch.setattr(settings, "live_session_absolute_max_daily_notional", 0)
+    with TestClient(app) as client:
+        make_account_live()
+        requested = client.post(
+            "/api/v1/live-trading/sessions",
+            headers=headers("trader-token"),
+            json=session_payload("session-no-absolute-limit"),
+        )
+        assert requested.status_code == 200
+        approved = client.post(
+            f"/api/v1/live-trading/sessions/{requested.json()['sessionId']}/approve",
+            headers=headers("risk-token"),
+            json={"reason": "zero absolute limits mean non-blocking legacy caps"},
+        )
+        assert approved.status_code == 200
+        assert approved.json()["status"] == "approved"
+
+
+def test_live_order_claim_ignores_legacy_session_notional_caps(
+    monkeypatch, tmp_path: Path
+) -> None:
+    configure_live(monkeypatch, tmp_path)
+    with TestClient(app) as client:
+        make_account_live()
+        requested = client.post(
+            "/api/v1/live-trading/sessions",
+            headers=headers("trader-token"),
+            json=session_payload("session-legacy-caps-ignored"),
+        )
+        assert requested.status_code == 200
+        approved = client.post(
+            f"/api/v1/live-trading/sessions/{requested.json()['sessionId']}/approve",
+            headers=headers("risk-token"),
+            json={"reason": "approve for legacy session-cap regression"},
+        )
+        assert approved.status_code == 200
+
+        def runtime_unavailable(*args, **kwargs):
+            raise httpx.ConnectError("runtime unavailable")
+
+        monkeypatch.setattr("app.trade_command_execution.httpx.post", runtime_unavailable)
+        payload = order_payload("live-command-over-session-cap")
+        payload["quantity"] = "2"
+        payload["price"] = "100"
+        order = client.post(
+            "/api/v1/trading/commands",
+            headers=headers("trader-token"),
+            json=payload,
+        )
+        assert order.status_code == 200
+        assert order.json()["status"] == "result_unknown"
+
+        with connection() as db:
+            claims = db.execute(
+                "SELECT COUNT(*) AS count FROM live_trading_session_claims"
+            ).fetchone()["count"]
+        assert claims == 1

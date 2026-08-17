@@ -32,7 +32,7 @@ def headers(token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
 
 
-def test_concurrent_claims_cannot_oversubscribe_daily_notional(monkeypatch, tmp_path: Path) -> None:
+def test_concurrent_claims_ignore_legacy_daily_caps(monkeypatch, tmp_path: Path) -> None:
     settings = get_settings()
     monkeypatch.setattr(settings, "database_path", str(tmp_path / "atomic-live-claims.db"))
     monkeypatch.setattr(settings, "environment", "live")
@@ -82,7 +82,7 @@ def test_concurrent_claims_cannot_oversubscribe_daily_notional(monkeypatch, tmp_
                 "maxDailyNotional": "100",
                 "readOnlyVerifiedAt": (now - timedelta(minutes=10)).isoformat(),
                 "evidenceReference": "ops://readonly-preflight/atomic-001",
-                "reason": "prove concurrent commands cannot exceed the approved daily limit",
+                "reason": "both concurrent claims succeed under non-blocking legacy caps",
             },
         )
         assert requested.status_code == 200
@@ -116,13 +116,18 @@ def test_concurrent_claims_cannot_oversubscribe_daily_notional(monkeypatch, tmp_
     with ThreadPoolExecutor(max_workers=2) as executor:
         results = list(executor.map(claim, ["atomic-command-a", "atomic-command-b"]))
 
-    assert sorted(status for status, _ in results) == ["accepted", "rejected"]
-    assert [value for status, value in results if status == "rejected"] == [422]
-    assert [value for status, value in results if status == "accepted"] == [session_id]
+    assert sorted(status for status, _ in results) == ["accepted", "accepted"]
+    assert [value for status, value in results if status == "accepted"] == [
+        session_id,
+        session_id,
+    ]
 
     with connection() as db:
         claims = db.execute(
             "SELECT notional FROM live_trading_session_claims WHERE session_id = ?",
             (session_id,),
         ).fetchall()
-    assert [Decimal(row["notional"]) for row in claims] == [Decimal("60.0")]
+    assert sorted(Decimal(row["notional"]) for row in claims) == [
+        Decimal("60.0"),
+        Decimal("60.0"),
+    ]

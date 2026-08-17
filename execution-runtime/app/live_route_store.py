@@ -155,7 +155,7 @@ def claim_live_write(
     command: SubmitOrderCommand,
     adapter: str,
     notional: Decimal,
-    max_daily_notional: Decimal,
+    max_daily_notional: Decimal | None = None,
 ) -> LiveWriteClaim:
     ensure_live_store()
     if command.strategy_instance_id is None:
@@ -203,7 +203,11 @@ def claim_live_write(
             (business_date, command.account_id, adapter),
         ).fetchone()
         daily_total = Decimal(str(daily["total"]))
-        if daily_total + notional > max_daily_notional:
+        if (
+            max_daily_notional is not None
+            and max_daily_notional > 0
+            and daily_total + notional > max_daily_notional
+        ):
             raise ValueError("Live daily notional limit would be exceeded")
         db.execute(
             """

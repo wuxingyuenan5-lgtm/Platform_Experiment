@@ -301,13 +301,19 @@ def request_live_session(
 def check_approval_blockers(row) -> list[str]:
     blockers: list[str] = []
     settings = get_settings()
-    if settings.live_session_absolute_max_order_notional <= 0:
-        blockers.append("Platform absolute order-notional limit is not configured")
-    if settings.live_session_absolute_max_daily_notional <= 0:
-        blockers.append("Platform absolute daily-notional limit is not configured")
-    if Decimal(row["max_order_notional"]) > settings.live_session_absolute_max_order_notional:
+    # Absolute notional limits are legacy-compat: zero means "no cap" and only a
+    # positive configured value blocks approval (legacy opt-in).
+    if (
+        settings.live_session_absolute_max_order_notional > 0
+        and Decimal(row["max_order_notional"])
+        > settings.live_session_absolute_max_order_notional
+    ):
         blockers.append("Requested order notional exceeds Platform absolute limit")
-    if Decimal(row["max_daily_notional"]) > settings.live_session_absolute_max_daily_notional:
+    if (
+        settings.live_session_absolute_max_daily_notional > 0
+        and Decimal(row["max_daily_notional"])
+        > settings.live_session_absolute_max_daily_notional
+    ):
         blockers.append("Requested daily notional exceeds Platform absolute limit")
     if row["session_type"] == "scale_change":
         blockers.append("Scale-change sessions require a separate scale review and are not enabled")
@@ -569,19 +575,9 @@ def validate_and_claim_live_session(
         session = eligible[0]
         if check_approval_blockers(session):
             raise HTTPException(status_code=423, detail="Live session has active safety blockers")
-        if notional > Decimal(session["max_order_notional"]):
-            raise HTTPException(status_code=422, detail="Live session per-order notional exceeded")
-
-        daily_total = db.execute(
-            """
-            SELECT COALESCE(SUM(CAST(notional AS REAL)), 0) AS total
-            FROM live_trading_session_claims
-            WHERE session_id = ?
-            """,
-            (session["id"],),
-        ).fetchone()["total"]
-        if Decimal(str(daily_total)) + notional > Decimal(session["max_daily_notional"]):
-            raise HTTPException(status_code=422, detail="Live session daily notional exceeded")
+        # Session maxOrderNotional/maxDailyNotional are legacy-compat acceptance
+        # caps: exceedance no longer rejects the claim (non-blocking). The claim
+        # row is still recorded for command identity, audit and reconciliation.
         db.execute(
             """
             INSERT INTO live_trading_session_claims (

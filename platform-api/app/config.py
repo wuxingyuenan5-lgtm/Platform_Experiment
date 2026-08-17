@@ -84,7 +84,9 @@ class Settings(BaseSettings):
     fund_nav_stale_after_hours: int = 36
 
     # Platform LiveTradingSession is a separate authorization boundary from the
-    # Runtime live-write gate. Zero absolute limits keep all live sessions blocked.
+    # Runtime live-write gate. The absolute notional limits are legacy-compat:
+    # zero means "no cap" (non-blocking); a positive value re-enables the legacy
+    # absolute approval cap. Public schema fields are unchanged.
     require_live_trading_session: bool = True
     live_session_absolute_max_order_notional: Decimal = Decimal("0")
     live_session_absolute_max_daily_notional: Decimal = Decimal("0")

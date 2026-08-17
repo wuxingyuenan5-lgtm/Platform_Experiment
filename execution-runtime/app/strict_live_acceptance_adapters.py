@@ -34,9 +34,9 @@ class StrictBybitAcceptanceAdapter(BybitAcceptanceAdapter):
             symbol=command.symbol,
         )
         maximum_ounces = self.settings.live_acceptance_max_order_quantity
-        if maximum_ounces <= 0 or command.quantity > maximum_ounces:
+        if maximum_ounces > 0 and command.quantity > maximum_ounces:
             raise GatewayRequestRejectedError(
-                "Live acceptance Bybit quantity exceeds the temporary one-ounce limit"
+                "Live acceptance Bybit quantity exceeds the legacy one-ounce limit"
             )
         _validate_step(
             command.quantity,
@@ -78,9 +78,9 @@ class StrictMt5AcceptanceAdapter(Mt5AcceptanceAdapter):
         )
         maximum_ounces = self.settings.live_acceptance_max_order_quantity
         requested_ounces = command.quantity * specification.contract_size
-        if maximum_ounces <= 0 or requested_ounces > maximum_ounces:
+        if maximum_ounces > 0 and requested_ounces > maximum_ounces:
             raise GatewayRequestRejectedError(
-                "Live acceptance MT5 quantity exceeds the temporary one-ounce limit"
+                "Live acceptance MT5 quantity exceeds the legacy one-ounce limit"
             )
         _validate_step(
             command.quantity,

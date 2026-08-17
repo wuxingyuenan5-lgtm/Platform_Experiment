@@ -516,9 +516,8 @@ class BybitAcceptanceAdapter(BybitFillConfirmingAdapter):
     def _assert_no_existing_position(self, symbol: str) -> None:
         maximum = self.settings.live_acceptance_max_positions_per_symbol
         if maximum <= 0:
-            raise GatewayConfigurationError(
-                "Live acceptance position limit is not configured"
-            )
+            # Legacy position-count cap is disabled: zero means "no cap".
+            return
         try:
             response = self._with_fresh_client_retry(
                 lambda client: client.get_positions(

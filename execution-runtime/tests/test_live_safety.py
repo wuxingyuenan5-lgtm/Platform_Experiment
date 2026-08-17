@@ -88,3 +88,19 @@ def test_live_write_claim_is_idempotent_and_enforces_daily_notional(tmp_path) ->
             reference_price=Decimal("1000"),
             settings=configured,
         )
+
+
+def test_live_write_without_legacy_notional_caps(tmp_path) -> None:
+    get_settings().journal_path = str(tmp_path / "live-nocap.db")
+    initialize_journal()
+    claim = validate_live_write(
+        command(command_id="cmd-live-nocap", quantity="5"),
+        adapter="bybit_live",
+        reference_price=Decimal("1000"),
+        settings=settings(
+            live_max_order_notional=Decimal("0"),
+            live_max_daily_notional=Decimal("0"),
+        ),
+    )
+    assert claim.already_claimed is False
+    assert claim.notional == Decimal("5000")

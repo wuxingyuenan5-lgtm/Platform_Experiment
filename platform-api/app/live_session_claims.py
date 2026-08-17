@@ -98,17 +98,9 @@ def validate_and_claim_live_session_atomic(
         session = eligible[0]
         if check_approval_blockers(session):
             raise HTTPException(status_code=423, detail="Live session has active safety blockers")
-        if notional > Decimal(session["max_order_notional"]):
-            raise HTTPException(status_code=422, detail="Live session per-order notional exceeded")
-
-        claimed_rows = db.execute(
-            "SELECT notional FROM live_trading_session_claims WHERE session_id = ?",
-            (session["id"],),
-        ).fetchall()
-        daily_total = sum((Decimal(row["notional"]) for row in claimed_rows), Decimal("0"))
-        if daily_total + notional > Decimal(session["max_daily_notional"]):
-            raise HTTPException(status_code=422, detail="Live session daily notional exceeded")
-
+        # Session maxOrderNotional/maxDailyNotional are legacy-compat acceptance
+        # caps: exceedance no longer rejects the claim (non-blocking). The claim
+        # row is still recorded for command identity, audit and reconciliation.
         db.execute(
             """
             INSERT INTO live_trading_session_claims (

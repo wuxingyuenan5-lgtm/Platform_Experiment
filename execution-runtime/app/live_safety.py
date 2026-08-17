@@ -31,20 +31,22 @@ def validate_live_write(
         raise GatewayConfigurationError(
             "A positive reference price is required for live risk checks"
         )
-    if settings.live_max_order_notional <= 0:
-        raise GatewayConfigurationError("Live maximum order notional is not configured")
-    if settings.live_max_daily_notional <= 0:
-        raise GatewayConfigurationError("Live maximum daily notional is not configured")
-
     notional = command.quantity * reference_price
-    if notional > settings.live_max_order_notional:
+    if (
+        settings.live_max_order_notional > 0
+        and notional > settings.live_max_order_notional
+    ):
         raise GatewayConfigurationError("Live maximum order notional would be exceeded")
     try:
         return claim_live_write(
             command,
             adapter,
             notional,
-            settings.live_max_daily_notional,
+            (
+                settings.live_max_daily_notional
+                if settings.live_max_daily_notional > 0
+                else None
+            ),
         )
     except ValueError as exc:
         raise GatewayConfigurationError(str(exc)) from exc

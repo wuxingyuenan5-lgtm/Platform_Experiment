@@ -203,8 +203,8 @@ def bybit_settings() -> Settings:
     )
 
 
-def mt5_settings() -> Settings:
-    return Settings(
+def mt5_settings(**overrides) -> Settings:
+    values = dict(
         environment="live",
         live_write_enabled=True,
         live_account_allowlist="account-mt5",
@@ -216,6 +216,8 @@ def mt5_settings() -> Settings:
         mt5_account_ids="account-mt5",
         mt5_instrument_map="XAUUSD+=instrument-xauusd",
     )
+    values.update(overrides)
+    return Settings(**values)
 
 
 def configure_mt5_secret(monkeypatch) -> None:
@@ -309,3 +311,19 @@ def test_mt5_runtime_cap_converts_lots_to_ounces(tmp_path, monkeypatch) -> None:
 
     with pytest.raises(GatewayRequestRejectedError, match="one-ounce limit"):
         adapter.submit_order(mt5_command("0.02"))
+
+
+def test_mt5_legacy_one_ounce_cap_is_disabled_by_default(tmp_path, monkeypatch) -> None:
+    configure_mt5_secret(monkeypatch)
+    get_settings().journal_path = str(tmp_path / "mt5-nocap.db")
+    initialize_journal()
+    provider = AcceptanceMt5()
+    adapter = StrictMt5AcceptanceAdapter(
+        mt5_settings(live_acceptance_max_order_quantity="0"), provider
+    )
+    events = adapter.submit_order(mt5_command("0.02"))
+    assert [event.event_type for event in events] == [
+        "order_acknowledged",
+        "order_filled",
+    ]
+    assert provider.requests[0]["volume"] == 0.02

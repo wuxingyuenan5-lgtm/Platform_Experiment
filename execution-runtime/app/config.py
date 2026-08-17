@@ -45,13 +45,18 @@ class Settings(BaseSettings):
     live_account_allowlist: str = ""
     live_strategy_allowlist: str = ""
     live_symbol_allowlist: str = ""
+
+    # Legacy-compat acceptance caps from the old fixed-size live conventions.
+    # Zero means "no cap" (non-blocking); a positive value opts back into the
+    # legacy enforcement. They are not hard product limits for controlled live.
     live_max_order_notional: Decimal = Decimal("0")
     live_max_daily_notional: Decimal = Decimal("0")
 
-    # Temporary real-money acceptance controls. They do not authorize writes;
-    # the independent live-write gate and allowlists remain mandatory.
-    live_acceptance_max_order_quantity: Decimal = Decimal("1")
-    live_acceptance_max_positions_per_symbol: int = 1
+    # Legacy-compat acceptance controls. They do not authorize writes; the
+    # independent live-write gate and allowlists remain mandatory. Zero means
+    # "no cap"; a positive value re-enables the legacy acceptance limit.
+    live_acceptance_max_order_quantity: Decimal = Decimal("0")
+    live_acceptance_max_positions_per_symbol: int = 0
 
     bybit_credential_ref: str = "secret://environment/bybit-live-001"
     bybit_account_ids: str = ""
