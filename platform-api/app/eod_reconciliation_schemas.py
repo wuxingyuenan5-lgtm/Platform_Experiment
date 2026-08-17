@@ -56,6 +56,7 @@ class EodReconciliationReviewRequest(BaseModel):
 class EodReconciliationReportResponse(BaseModel):
     report_id: str = Field(alias="reportId")
     idempotency_key: str = Field(alias="idempotencyKey")
+    attempt: int
     business_date: date = Field(alias="businessDate")
     timezone: str
     valuation_time: datetime = Field(alias="valuationTime")

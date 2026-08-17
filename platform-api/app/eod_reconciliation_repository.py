@@ -20,7 +20,8 @@ SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS eod_reconciliation_reports (
     id TEXT PRIMARY KEY,
     idempotency_key TEXT NOT NULL UNIQUE,
-    natural_key TEXT NOT NULL UNIQUE,
+    natural_key TEXT NOT NULL,
+    attempt INTEGER NOT NULL DEFAULT 1,
     payload_hash TEXT NOT NULL,
     business_date TEXT NOT NULL,
     timezone TEXT NOT NULL,
@@ -52,7 +53,8 @@ CREATE TABLE IF NOT EXISTS eod_reconciliation_reports (
     created_at TEXT NOT NULL,
     completed_at TEXT,
     FOREIGN KEY(strategy_instance_id) REFERENCES strategy_instances(id),
-    FOREIGN KEY(account_id) REFERENCES accounts(id)
+    FOREIGN KEY(account_id) REFERENCES accounts(id),
+    UNIQUE(natural_key, attempt)
 );
 
 CREATE INDEX IF NOT EXISTS idx_eod_reports_business_date
@@ -78,16 +80,24 @@ def ensure_schema() -> None:
         db.executescript(SCHEMA_SQL)
 
 
-def load_report_by_identity(idempotency_key: str, natural_key: str) -> Row | None:
+def load_report_by_idempotency(idempotency_key: str) -> Row | None:
+    with connection() as db:
+        return db.execute(
+            "SELECT * FROM eod_reconciliation_reports WHERE idempotency_key = ?",
+            (idempotency_key,),
+        ).fetchone()
+
+
+def load_latest_report_by_natural_key(natural_key: str) -> Row | None:
     with connection() as db:
         return db.execute(
             """
             SELECT * FROM eod_reconciliation_reports
-            WHERE idempotency_key = ? OR natural_key = ?
-            ORDER BY created_at
+            WHERE natural_key = ?
+            ORDER BY attempt DESC
             LIMIT 1
             """,
-            (idempotency_key, natural_key),
+            (natural_key,),
         ).fetchone()
 
 
@@ -96,6 +106,7 @@ def insert_initial_report(
     report_id: str,
     idempotency_key: str,
     natural_key: str,
+    attempt: int,
     payload_hash: str,
     business_date: str,
     timezone: str,
@@ -111,7 +122,7 @@ def insert_initial_report(
         db.execute(
             """
             INSERT INTO eod_reconciliation_reports (
-                id, idempotency_key, natural_key, payload_hash, business_date,
+                id, idempotency_key, natural_key, attempt, payload_hash, business_date,
                 timezone, valuation_time, strategy_instance_id, account_id,
                 actor, owner, due_at, status, scale_gate_status,
                 order_reconciliation_count, account_reconciliation_run_id,
@@ -122,12 +133,13 @@ def insert_initial_report(
                 review_payload_hash, reviewer, review_decision, review_reason,
                 reviewed_at, created_at, completed_at
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-                      ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                      ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 report_id,
                 idempotency_key,
                 natural_key,
+                attempt,
                 payload_hash,
                 business_date,
                 timezone,
@@ -356,6 +368,7 @@ def report_from_row(row: Row) -> EodReconciliationReportResponse:
     return EodReconciliationReportResponse(
         reportId=row["id"],
         idempotencyKey=row["idempotency_key"],
+        attempt=row["attempt"],
         businessDate=row["business_date"],
         timezone=row["timezone"],
         valuationTime=row["valuation_time"],

@@ -197,7 +197,4 @@ POST /api/v1/ops/eod-reconciliation/reports/{reportId}/review
 ## 11. 当前限制
 
 - 自动调度尚未与 Windows Task Scheduler 或其他调度器正式绑定。
-- 报告修订/尝试号仍待完成。
-- 历史 Outstanding Difference 的全量阻断仍待完成。
-- 订单筛选需完善为“当日窗口 + 未终结历史订单”。
 - 认证、RBAC、双人审批、生产密钥托管和告警仍属于后续生产门禁。

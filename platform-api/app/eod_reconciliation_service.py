@@ -76,7 +76,7 @@ def create_eod_report(
     payload_hash = canonical_hash(payload)
     report_natural_key = natural_key(request)
 
-    existing = repository.load_report_by_identity(request.idempotency_key, report_natural_key)
+    existing = repository.load_report_by_idempotency(request.idempotency_key)
     if existing is not None:
         if existing["payload_hash"] != payload_hash:
             raise EodReportIdentityConflictError(
@@ -84,12 +84,16 @@ def create_eod_report(
             )
         return repository.report_from_row(existing)
 
+    latest = repository.load_latest_report_by_natural_key(report_natural_key)
+    attempt = (int(latest["attempt"]) + 1) if latest is not None else 1
+
     report_id = str(uuid4())
     created_at = now_iso()
     repository.insert_initial_report(
         report_id=report_id,
         idempotency_key=request.idempotency_key,
         natural_key=report_natural_key,
+        attempt=attempt,
         payload_hash=payload_hash,
         business_date=request.business_date.isoformat(),
         timezone=request.timezone,
