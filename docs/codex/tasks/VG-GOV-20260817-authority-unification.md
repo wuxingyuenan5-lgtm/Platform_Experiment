@@ -4,8 +4,8 @@ Issue: `#none`
 Status: `attention`
 Last transition at: `2026-08-17 19:30 Asia/Shanghai`
 Owner notice: `sent`
-Business status summary: `Needs: the independent read-only acceptance owner must review immutable governance candidate 66ef858, including its ancestry, bounded live-readiness Pack, preserved business source and recorded residual failures.`
-Current leaf task/agent ID: `01a00f7e-8208-7f41-8c6b-300b7b4cab0d`
+Business status summary: `Needs: project lead consumes the accepted unified authority; capability complete at 7af68b3, while Token telemetry remains unavailable and external gates remain closed.`
+Current leaf task/agent ID: `none`
 Risk level: `critical`
 Role: `implementation`
 Agent ID: `01a00f70-8b11-7253-b132-6af15776e1fa`
@@ -78,6 +78,7 @@ Create one traceable immutable repository authority that contains both governanc
 ## Progress
 - Done: non-squash merge `95272d1` retains `75e8e4a` and `da001936` as ancestors; governance candidate `66ef858` corrects SF-02 status/evidence, makes the 30 percent measure business-slice aggregate only, and bounds only `live-readiness` at `14991 / 16000` required tokens.
 - Done: task-card tests `10 passed`; task card, template, governance Pack, version, structure and diff checks passed; accepted business paths are identical to `da001936`.
-- Current: immutable candidate `66ef858` is under read-only Critical acceptance by `01a00f7e-8208-7f41-8c6b-300b7b4cab0d`.
-- Next: `VG-GOV-20260817-authority-unification-ACCEPTANCE` reviews the immutable candidate and either records acceptance or returns findings to the same implementation owner.
+- Done: independent Critical acceptance `01a00f7e-8208-7f41-8c6b-300b7b4cab0d` accepted the candidate with no Critical/High/Medium findings; ancestry, governance-only delta, SF-02 evidence, Token semantics and `live-readiness` budget were independently verified.
+- Current: capability complete; status remains `attention` solely because no trustworthy Token snapshot exists and governance forbids substituting estimates or zeroes.
+- Next: project lead consumes the unified immutable HEAD; the next repository slice is live-acceptance rule alignment, with all external and Live Write gates still closed.
 - Blocked by: no trusted Token snapshot, so all snapshot fields remain `unavailable`; the budget audit intentionally retains six unrelated historical Pack failures, and documentation consistency retains the pre-existing missing tracked-reference finding for the shared-workspace-only retrospective file.
