@@ -242,5 +242,5 @@ Phase 4D 将继续加入差异严重度、责任人、SLA 和日终汇总。
 - Backend Account Snapshot Run 当前按调用触发，尚无日终调度器。
 - Position Snapshot 只用于对账和实盘生命周期验证，不成为 Formal Position 的计算来源。
 - Difference 尚未完整接入严重度、负责人和 SLA。
-- 1 oz、单活动生命周期和 Market-only 属于临时验收限制；解除条件见 `../operations/LIVE_ACCEPTANCE_RUNBOOK.md`。
+- CEO 指令数量、累计成交上限、全局新批次串行和分阶段执行模式属于当前验收合同；固定 `1 oz`、固定批次数量和 Market-only 不是 owner 要求，具体门禁见 `../operations/LIVE_ACCEPTANCE_RUNBOOK.md`。
 - Platform 与 Runtime Live Write、自动 Exit Monitor 仍默认关闭。

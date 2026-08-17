@@ -25,7 +25,7 @@ Simulation/Fake Gateway and disabled Platform/Runtime Live Write remain the defa
 
 ## Live acceptance is separate
 
-A successful deployment or health check does not authorize live trading. Controlled minimum-size validation follows [`../operations/LIVE_ACCEPTANCE_RUNBOOK.md`](../operations/LIVE_ACCEPTANCE_RUNBOOK.md), and any failed step returns the system to read-only mode.
+A successful deployment or health check does not authorize live trading. Controlled instruction-bounded validation follows [`../operations/LIVE_ACCEPTANCE_RUNBOOK.md`](../operations/LIVE_ACCEPTANCE_RUNBOOK.md), and any failed step returns the system to read-only mode.
 
 ## External deployment contract
 

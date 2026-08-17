@@ -27,7 +27,7 @@
 | `mt5_live_adapter.py` | MT5 Terminal 基础 Query、受控 order_check/order_send、Swap/Fee 映射 |
 | `mt5_position_closing_adapter.py` | Position Ticket 绑定的 reduce-only close |
 | `mt5_acceptance_adapter.py` | 无 Route Order／Deal 读取、Order/Deal Ticket 纠错、实时 Symbol/Terminal 规格 |
-| `strict_live_acceptance_adapters.py` | 旧 1 oz／单仓验收 Gate；其固定 cap 已被 owner 决策取代，在绑定 CEO 指令数量前不能作为 0.11.1 Live Write readiness 证据 |
+| `strict_live_acceptance_adapters.py` | 旧 1 oz／单仓验收 Gate；仅为 legacy compatibility 保留，其固定 cap 已被 owner 决策取代，是后续代码对齐前的 controlled-live readiness blocker |
 | `bybit_mt5_gateway.py` | 根据 Account 确定性选择适配器，并提供跨 Adapter 只读查询 |
 | `live_safety.py` | Environment、双重写开关、allowlist、单笔限额校验 |
 | `live_route_store.py` | 外部 client identity、Order Route、日累计名义金额幂等认领 |
@@ -203,7 +203,9 @@ VG_RUNTIME_LIVE_MAX_ORDER_NOTIONAL=...
 VG_RUNTIME_LIVE_MAX_DAILY_NOTIONAL=...
 ```
 
-写命令校验顺序：
+`VG_RUNTIME_LIVE_MAX_ORDER_NOTIONAL`、`VG_RUNTIME_LIVE_MAX_DAILY_NOTIONAL` 及对应认领逻辑仅为 legacy compatibility 保留。现行代码仍强制检查它们，因此它们是 controlled-live readiness blocker，不是 owner 要求的永久 cap，也不能作为 Live Write readiness 证据。
+
+现行写命令校验顺序如下；第 5、6 步描述未在本切片修改的 legacy 行为，不表示目标 owner 合同：
 
 1. Runtime Environment 必须是 live。
 2. Runtime Live Write 必须显式开启。

@@ -31,7 +31,7 @@ Get-NetTCPConnection -LocalPort 4373,8000,8100 -ErrorAction SilentlyContinue |
 
 ## Controlled live acceptance
 
-Normal startup and deployment do not authorize Live Write. Minimum-size live validation, fail-closed two-leg handling, EOD reconciliation and forced reset are governed by [`LIVE_ACCEPTANCE_RUNBOOK.md`](LIVE_ACCEPTANCE_RUNBOOK.md).
+Normal startup and deployment do not authorize Live Write. Instruction-bounded controlled-live validation, fail-closed two-leg handling, EOD reconciliation and forced reset are governed by [`LIVE_ACCEPTANCE_RUNBOOK.md`](LIVE_ACCEPTANCE_RUNBOOK.md).
 
 ## Result Unknown
 

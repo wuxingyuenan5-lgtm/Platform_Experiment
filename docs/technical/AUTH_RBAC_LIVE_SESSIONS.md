@@ -307,13 +307,13 @@ LiveTradingSession 固化：
 - Read-only Evidence；
 - Session Type。
 
-`minimum_size_acceptance` 用于真实账户最小允许仓位验收。`existing_limits` 需要最新 Clean EOD。`scale_change` 在独立扩大规模流程落地前始终阻断。
+`minimum_size_acceptance` 是必须保留的 public schema legacy compatibility 标识，不再表示 owner 要求固定最小仓位或 `1 oz` 上限。`existing_limits` 需要最新 Clean EOD。`scale_change` 在独立扩大规模流程落地前始终阻断。当前 Per-order / Daily Notional 字段及校验仍是 legacy fixed-cap 实现；在后续行为对齐完成前，它们是 controlled-live readiness blocker，不是 owner 风险合同。
 
 ## 15. Approval Blockers
 
 批准与每次 Command Claim 都必须重新检查：
 
-- Platform Absolute Notional Limits；
+- Legacy Platform fixed-notional enforcement；当前代码仍检查，但只构成 controlled-live readiness blocker，不构成 owner 要求的固定 cap；
 - Kill Switch；
 - Open / Accepted Reconciliation Difference；
 - Approved Session 时间重叠；

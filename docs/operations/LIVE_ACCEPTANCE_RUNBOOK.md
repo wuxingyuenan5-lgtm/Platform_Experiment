@@ -2,7 +2,7 @@
 
 Status: active Platform 0.11.1 controlled-live operational contract.
 
-This runbook governs controlled, minimum-size live acceptance. It does not authorize production rollout or Live Write activation. Any failed, unavailable or contradictory step immediately returns the system to read-only live mode and requires an accountable operator decision.
+This runbook governs controlled, instruction-bounded live acceptance. It does not authorize production rollout or Live Write activation. Any failed, unavailable or contradictory step immediately returns the system to read-only live mode and requires an accountable operator decision.
 
 ## 1. Release sequence
 
@@ -36,6 +36,7 @@ For Platform 0.11.1, the controlled execution order is Market in one direction, 
 - External Order, Fill, Deal and Position identities must remain traceable to Platform and Runtime facts.
 - Funds, quantity, symbols, concurrency and automation cannot expand before end-of-day reconciliation is complete.
 - Fixed position, notional, daily-volume, batch-count and loss caps are not part of the founder-owned local test-account contract. This does not relax one-instruction/one-batch identity, instruction quantity ceilings, global one-active-execution serialization, allowlists, bounded chase, Kill Switch, reconciliation or forced read-only reset.
+- Existing Platform and Runtime fixed-notional-cap code remains a controlled-live readiness blocker. It is retained unchanged in this rule-alignment slice for legacy compatibility and cannot be treated as owner-approved risk policy or readiness evidence; a separately authorized behavior change must align it before any Live Write window.
 - A process restart, connection loss, `result_unknown`, identity mismatch, position mismatch or expiry automatically returns both Live Write gates to `false`.
 - Credentials, private values and live evidence are not copied into source control, general logs or ordinary documentation.
 
@@ -70,7 +71,7 @@ The responsible CEO specifies both leg quantities before each authorized window.
 - Private order/execution events are the primary state source; REST is bounded reconciliation evidence.
 - Only deduplicated cumulative fill exactly equal to requested quantity releases the second leg.
 - Partial fill, private-stream disconnect, sequence or identity anomaly, and cancel/fill race fail closed: stop Chase, submit no second leg and reconcile terminal state.
-- Amend/repost behavior remains bounded by TTL, minimum tick movement, mutation count and cooldown; cancel terminal state must be proven before repost.
+- Initial local-test amend/repost settings are a 15-second total chase TTL, one-second evaluation cadence, at most five amend or cancel-repost mutations, and at least one tick of price change before mutation. These are owner-approved initial configuration values, not exchange facts or permanent production defaults; cancel terminal state must be proven before repost, and any pre-live change requires evidence and owner approval.
 
 ### Funding carry incremental hedge
 

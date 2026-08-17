@@ -6,7 +6,7 @@ Related Issues: #39, #96, #98
 
 ## 1. Purpose
 
-The final Windows-host acceptance must be an environment integration exercise, not a product-design session. Before any 1 oz real-money write is enabled, the Platform must already expose enough read-only evidence to answer:
+The final Windows-host acceptance must be an environment integration exercise, not a product-design session. Before any separately owner-authorized, instruction-bounded real-money write, the Platform must already expose enough read-only evidence to answer:
 
 - Which active and historical Orders exist on each venue?
 - Which Fill or Deal produced each position?
@@ -15,7 +15,7 @@ The final Windows-host acceptance must be an environment integration exercise, n
 - What liquidation or Stop Out evidence is authoritative?
 - Is an empty result a healthy zero, or did the read fail?
 
-This contract adds observability only. It does not authorize Live Write, automatic TP/SL monitoring, limit execution or a larger acceptance size.
+This contract adds observability only. It does not authorize Live Write, automatic TP/SL monitoring, limit execution or any execution quantity.
 
 ## 2. Runtime read-only endpoints
 
@@ -193,32 +193,32 @@ The cross-spread page includes a read-only panel showing:
 
 The panel has no Order, Cancel, Close or account-modification control.
 
-The market-lifecycle input defaults to `1 oz`, matching the temporary acceptance cap.
+Any legacy `1 oz` market-lifecycle default is a historical test convention, not a current owner requirement or readiness fact. The immutable CEO instruction supplies both leg quantities for an authorized batch.
 
-## 10. Temporary acceptance restrictions
+## 10. Controlled-acceptance safeguards
 
-The following remain temporary but mandatory:
+The following remain mandatory:
 
-- maximum Order quantity: 1 oz equivalent;
-- maximum active cross-spread lifecycle: one;
+- immutable CEO instruction quantities and cumulative-fill ceilings for both legs;
+- global serialization of new execution batches;
 - no scale-in or duplicate open;
-- Market-only open/close and Market close after TP/SL spread trigger;
+- execution-mode progression and fallback behavior governed by `../operations/LIVE_ACCEPTANCE_RUNBOOK.md`;
 - Platform Live Write disabled by default;
 - Runtime Live Write disabled by default;
 - automatic exit monitor disabled by default;
 - no automatic retry after unknown external result.
 
-They may only be relaxed by a dedicated Issue/PR after Issue #39 contains mature evidence for:
+They may only be changed by a dedicated Issue/PR after Issue #39 contains mature evidence for:
 
 1. successful route-independent Order and Fill/Deal reads;
-2. repeated 1 oz open/close cycles in both directions;
+2. repeated instruction-bounded open/close cycles in both directions;
 3. correct position and account-risk reconciliation;
 4. Bybit rollback and single-leg exposure handling;
 5. Runtime restart, Terminal restart and network interruption drills;
 6. no unexplained Order, Fill, Position, Balance, fee, Funding or Swap differences;
 7. Kill Switch and gate reset evidence.
 
-A future review must list each restriction separately as `retain`, `relax` or `remove`. Passing one small-money test does not automatically delete all restrictions.
+A future review must list each safeguard separately as `retain`, `relax` or `remove`. Passing one small-money test does not automatically delete any safeguard.
 
 ## 11. Windows-host acceptance sequence
 
@@ -230,4 +230,4 @@ A future review must list each restriction separately as `retain`, `relax` or `r
 6. Verify a 24-hour historical Order/Fill window, then a seven-day window.
 7. Confirm Bybit liquidation values match the venue UI where a finite value exists.
 8. Confirm MT5 shows no fabricated position liquidation price and matches Margin Call / Stop Out settings.
-9. Resolve every unavailable or unexplained section before enabling the first 1 oz write window.
+9. Resolve every unavailable or unexplained section before requesting an owner-authorized, instruction-bounded write window.
