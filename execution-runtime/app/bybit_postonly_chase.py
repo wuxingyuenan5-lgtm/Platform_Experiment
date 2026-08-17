@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, replace
 from datetime import datetime
-from decimal import ROUND_CEILING, ROUND_FLOOR, Decimal
+from decimal import ROUND_CEILING, ROUND_FLOOR, Decimal, localcontext
 from enum import StrEnum
 from typing import Literal
 
@@ -104,6 +104,167 @@ class ChaseState:
 class ChaseTransition:
     state: ChaseState
     actions: tuple[ChaseAction, ...]
+
+
+class FundingHedgeStatus(StrEnum):
+    ACTIVE = "active"
+    COMPLETE = "complete"
+    RECONCILE_REQUIRED = "reconcile_required"
+
+
+@dataclass(frozen=True, slots=True)
+class FundingHedgeEvent:
+    event_id: str
+    kind: Literal[
+        "execution",
+        "disconnect",
+        "result_unknown",
+        "order_unknown",
+        "sequence_mismatch",
+        "identity_mismatch",
+        "cancel_unconfirmed",
+    ]
+    cumulative_perpetual_fill: Decimal | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class FundingSpotRelease:
+    child_id: str
+    quantity: Decimal
+
+
+@dataclass(frozen=True, slots=True)
+class FundingHedgeState:
+    batch_id: str
+    perpetual_quantity: Decimal
+    spot_quantity: Decimal
+    spot_step: Decimal
+    perpetual_cumulative_fill: Decimal = Decimal("0")
+    spot_released: Decimal = Decimal("0")
+    quantization_remainder: Decimal = Decimal("0")
+    status: FundingHedgeStatus = FundingHedgeStatus.ACTIVE
+    seen_exec_ids: frozenset[str] = frozenset()
+    reconciliation_reason: str | None = None
+
+    def __post_init__(self) -> None:
+        if not self.batch_id:
+            raise ValueError("Funding hedge batch identity is required")
+        if min(self.perpetual_quantity, self.spot_quantity, self.spot_step) <= 0:
+            raise ValueError("Funding hedge quantities and Spot step must be positive")
+        if _integer_step_count(self.spot_quantity, self.spot_step) is None:
+            raise ValueError("Funding Spot quantity must match the configured quantity step")
+        if not Decimal("0") <= self.perpetual_cumulative_fill <= self.perpetual_quantity:
+            raise ValueError("Funding perpetual cumulative fill exceeds its instruction quantity")
+        if not Decimal("0") <= self.spot_released <= self.spot_quantity:
+            raise ValueError("Funding Spot release exceeds its instruction quantity")
+        if _integer_step_count(self.spot_released, self.spot_step) is None:
+            raise ValueError("Funding Spot release must match the configured quantity step")
+
+
+@dataclass(frozen=True, slots=True)
+class FundingHedgeTransition:
+    state: FundingHedgeState
+    actions: tuple[FundingSpotRelease, ...]
+
+
+def apply_funding_hedge_event(
+    state: FundingHedgeState,
+    event: FundingHedgeEvent,
+) -> FundingHedgeTransition:
+    if state.status != FundingHedgeStatus.ACTIVE:
+        return FundingHedgeTransition(state, ())
+    if not event.event_id:
+        return FundingHedgeTransition(
+            replace(
+                state,
+                status=FundingHedgeStatus.RECONCILE_REQUIRED,
+                reconciliation_reason="Funding hedge event identity is missing",
+            ),
+            (),
+        )
+    if event.kind != "execution":
+        return FundingHedgeTransition(
+            replace(
+                state,
+                status=FundingHedgeStatus.RECONCILE_REQUIRED,
+                reconciliation_reason=f"Funding hedge stopped on {event.kind}",
+            ),
+            (),
+        )
+    if event.event_id in state.seen_exec_ids:
+        return FundingHedgeTransition(state, ())
+    cumulative_fill = event.cumulative_perpetual_fill
+    if (
+        cumulative_fill is None
+        or cumulative_fill <= state.perpetual_cumulative_fill
+        or cumulative_fill > state.perpetual_quantity
+    ):
+        return FundingHedgeTransition(
+            replace(
+                state,
+                status=FundingHedgeStatus.RECONCILE_REQUIRED,
+                reconciliation_reason=(
+                    "Funding perpetual cumulative fill is non-monotonic or exceeds the instruction"
+                ),
+            ),
+            (),
+        )
+
+    entitlement_steps, releasable_spot, quantization_remainder = (
+        _funding_spot_entitlement(
+            cumulative_fill=cumulative_fill,
+            perpetual_quantity=state.perpetual_quantity,
+            spot_quantity=state.spot_quantity,
+            spot_step=state.spot_step,
+        )
+    )
+    released_steps = _integer_step_count(state.spot_released, state.spot_step)
+    if released_steps is None:
+        return FundingHedgeTransition(
+            replace(
+                state,
+                status=FundingHedgeStatus.RECONCILE_REQUIRED,
+                reconciliation_reason="Funding Spot release is not aligned to its quantity step",
+            ),
+            (),
+        )
+    release_steps = entitlement_steps - released_steps
+    if release_steps < 0 or releasable_spot > state.spot_quantity:
+        return FundingHedgeTransition(
+            replace(
+                state,
+                status=FundingHedgeStatus.RECONCILE_REQUIRED,
+                reconciliation_reason="Funding Spot release would exceed its instruction ceiling",
+            ),
+            (),
+        )
+    release_quantity = _decimal_times_int_exact(state.spot_step, release_steps)
+
+    status = (
+        FundingHedgeStatus.COMPLETE
+        if cumulative_fill == state.perpetual_quantity
+        and releasable_spot == state.spot_quantity
+        else FundingHedgeStatus.ACTIVE
+    )
+    updated = replace(
+        state,
+        perpetual_cumulative_fill=cumulative_fill,
+        spot_released=releasable_spot,
+        quantization_remainder=quantization_remainder,
+        status=status,
+        seen_exec_ids=state.seen_exec_ids | {event.event_id},
+    )
+    if release_quantity == 0:
+        return FundingHedgeTransition(updated, ())
+    return FundingHedgeTransition(
+        updated,
+        (
+            FundingSpotRelease(
+                child_id=f"{state.batch_id}:spot:{_canonical_decimal(releasable_spot)}",
+                quantity=release_quantity,
+            ),
+        ),
+    )
 
 
 def maker_safe_price(
@@ -403,6 +564,76 @@ def _validate_bound(state: ChaseState, price: Decimal) -> None:
 
 def _round_down(value: Decimal, tick_size: Decimal) -> Decimal:
     return (value / tick_size).to_integral_value(rounding=ROUND_FLOOR) * tick_size
+
+
+def _funding_spot_entitlement(
+    *,
+    cumulative_fill: Decimal,
+    perpetual_quantity: Decimal,
+    spot_quantity: Decimal,
+    spot_step: Decimal,
+) -> tuple[int, Decimal, Decimal]:
+    cumulative_numerator, cumulative_denominator = cumulative_fill.as_integer_ratio()
+    perpetual_numerator, perpetual_denominator = perpetual_quantity.as_integer_ratio()
+    spot_numerator, spot_denominator = spot_quantity.as_integer_ratio()
+    step_numerator, step_denominator = spot_step.as_integer_ratio()
+    entitlement_steps = (
+        cumulative_numerator
+        * spot_numerator
+        * perpetual_denominator
+        * step_denominator
+    ) // (
+        cumulative_denominator
+        * spot_denominator
+        * perpetual_numerator
+        * step_numerator
+    )
+
+    precision = (
+        sum(
+            len(value.as_tuple().digits)
+            for value in (
+                cumulative_fill,
+                perpetual_quantity,
+                spot_quantity,
+                spot_step,
+            )
+        )
+        + len(str(entitlement_steps))
+        + 16
+    )
+    with localcontext() as context:
+        context.prec = max(context.prec, precision)
+        context.rounding = ROUND_FLOOR
+        releasable_spot = _decimal_times_int_exact(spot_step, entitlement_steps)
+        proportional_spot = cumulative_fill * spot_quantity / perpetual_quantity
+        remainder = max(Decimal("0"), proportional_spot - releasable_spot)
+    return entitlement_steps, releasable_spot, remainder
+
+
+def _integer_step_count(quantity: Decimal, step: Decimal) -> int | None:
+    quantity_numerator, quantity_denominator = quantity.as_integer_ratio()
+    step_numerator, step_denominator = step.as_integer_ratio()
+    numerator = quantity_numerator * step_denominator
+    denominator = quantity_denominator * step_numerator
+    quotient, remainder = divmod(numerator, denominator)
+    return quotient if remainder == 0 else None
+
+
+def _decimal_times_int_exact(value: Decimal, multiplier: int) -> Decimal:
+    if multiplier < 0:
+        raise ValueError("Decimal multiplier cannot be negative")
+    precision = len(value.as_tuple().digits) + len(str(multiplier)) + 1
+    with localcontext() as context:
+        context.prec = max(context.prec, precision)
+        return value * multiplier
+
+
+def _canonical_decimal(value: Decimal) -> str:
+    text = format(value, "f")
+    if "." in text:
+        text = text.rstrip("0").rstrip(".")
+    return text or "0"
 
 
 def _round_up(value: Decimal, tick_size: Decimal) -> Decimal:

@@ -87,7 +87,7 @@ Submitted Sell Limit = ceil(Raw Price / Tick Size) × Tick Size
 - 开仓后必须验证双边目标持仓；平仓后必须验证双边归零。
 - 明确失败、已受理、处理中、结果未知和外部仓位不一致使用不同处置。
 - `result_unknown` 不允许盲目重试、回滚或生成第二个业务意图。
-- Platform 与 Runtime Live Write、退出监控、1 oz 和单生命周期限制保持独立且默认关闭／受限。
+- Platform 与 Runtime Live Write、退出监控和单指令／单批次生命周期限制保持独立且默认关闭／受限。数量由 CEO 指令明确给定，双腿累计外部成交不得超过各自指令数量。
 
 ## 4. FOK Limit 合同
 
@@ -141,7 +141,7 @@ Runtime executionPolicy = post_only_chase
 
 - Runtime Chase 开关默认关闭；
 - Live Write 仍由 Platform 与 Runtime 双重控制；
-- 1 oz 和单生命周期限制不变；
+- 单指令／单批次生命周期与累计成交数量上限不变；固定仓位、名义金额、日成交量、批次数和亏损 cap 不属于该受控合同；
 - 不自动启用退出监控；
 - 不支持 IOC；
 - 不静默改成 FOK 或 Market。
@@ -157,6 +157,7 @@ Runtime executionPolicy = post_only_chase
 - 只有终态 Cancel 私有事件确认后，才允许 Repost；
 - 达到 TTL、最大次数或人工取消后停止继续追价；
 - 不允许无限循环。
+- 初始仓库参数为 15 秒 TTL、1 秒评估 cadence、最多 5 次 mutation、至少 1 Tick 价格移动；它们是 owner 批准的受控配置，不是交易所事实或永久生产默认值。
 
 ### 6.3 私有事件与竞态
 
@@ -178,6 +179,8 @@ Private Order 和 Private Execution 是主状态来源：
 - 重复 Execution 不会重复累计；
 - 部分成交、无效数量 Step、断线或终态不一致不会提交 MT5；
 - 残余 Bybit 敞口以明确人工介入／补偿证据保留，不能伪装成完整成交。
+
+Funding carry 的增量 Spot 对冲是独立策略语义，不改变上述跨 Venue 合同：每个去重后的永续累计成交增量只释放按 CEO 双腿指令比例、向下量化到 Spot Step 的新增数量；量化余数显式保留，子指令留在同一 Batch 并使用确定性身份。重复 `execId`、累计量回退或超量、断线、身份不一致、未知订单状态或 `result_unknown` 均停止新副作用并进入对账。跨 Venue FOK 与 PostOnly Chase 仍只有终态累计全成交才允许 MT5 第二腿。
 
 增量 MT5 对冲属于后续可单独讨论的策略扩展；当前实现优先保证不会重复对冲或错误放行第二腿。
 
@@ -246,8 +249,8 @@ Issue #39 仍需依次验证：
 2. 当前／历史 Order、Fill／Deal、Position 和 Account Risk；
 3. 真实 Bybit Tick、数量 Step 与 Platform Contract Specification；
 4. MT5 Hedge Reserve；
-5. 受控 1 oz Market；
-6. 受控 1 oz FOK；
+5. CEO 指令数量限定的受控 Market；
+6. CEO 指令数量限定的受控 FOK；
 7. 自动 TP/SL 的 Market/FOK 行为；
 8. PostOnly Private Stream、TTL、Amend、Cancel/Repost、断线和异常结果；
 9. 多轮干净 EOD 后才复审临时限制。

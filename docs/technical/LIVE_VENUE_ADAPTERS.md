@@ -27,7 +27,7 @@
 | `mt5_live_adapter.py` | MT5 Terminal 基础 Query、受控 order_check/order_send、Swap/Fee 映射 |
 | `mt5_position_closing_adapter.py` | Position Ticket 绑定的 reduce-only close |
 | `mt5_acceptance_adapter.py` | 无 Route Order／Deal 读取、Order/Deal Ticket 纠错、实时 Symbol/Terminal 规格 |
-| `strict_live_acceptance_adapters.py` | Runtime 独立的 1 oz 上限、实时 step／contract size／权限校验和单仓限制 |
+| `strict_live_acceptance_adapters.py` | 旧 1 oz／单仓验收 Gate；其固定 cap 已被 owner 决策取代，在绑定 CEO 指令数量前不能作为 0.11.1 Live Write readiness 证据 |
 | `bybit_mt5_gateway.py` | 根据 Account 确定性选择适配器，并提供跨 Adapter 只读查询 |
 | `live_safety.py` | Environment、双重写开关、allowlist、单笔限额校验 |
 | `live_route_store.py` | 外部 client identity、Order Route、日累计名义金额幂等认领 |
@@ -121,7 +121,7 @@ MT5 Command 数量单位是 Lot。Runtime 必须先计算：
 requestedOunces = requestedLots × trade_contract_size
 ```
 
-再应用临时 1 oz 上限。不能把 `1 lot` 误认为 `1 oz`。
+再与 CEO 指令中的 MT5 腿数量上限比较。不能把 `1 lot` 误认为一个基础资产单位。
 
 ## 5. Route-independent Order Query
 
@@ -168,31 +168,26 @@ Platform 跨所价差写入前必须分别查询 Bybit 与 MT5；任一查询失
 
 Runtime 配置：
 
-```text
-VG_RUNTIME_LIVE_ACCEPTANCE_MAX_ORDER_QUANTITY=1
-VG_RUNTIME_LIVE_ACCEPTANCE_MAX_POSITIONS_PER_SYMBOL=1
-```
-
-该 Gate 不授权写入，只在已有 Live Write 授权之后继续收紧：
+0.11.1 目标 Gate 不授权写入，只在已有 Live Write 授权之后按不可变 CEO 指令数量继续收紧。当前 legacy adapter 仍编码旧固定 cap；本任务不授权修改该 adapter，因此它不能证明新合同已经具备 Live Write readiness。
 
 ### Bybit
 
-- Command Quantity 必须不超过 1 oz。
+- Command Quantity 与累计外部成交必须不超过 CEO 指令中的 Bybit 腿数量。
 - Quantity 必须满足当前 `minOrderQty` 和 `qtyStep`。
 - Symbol 必须处于 Trading／Available。
 - API Key 不能是 read-only。
 - API Key 必须绑定固定 IP。
 - ContractTrade 必须包含 Order 与 Position 权限。
-- 非 reduce-only Open 前目标 Symbol 不得已有活动仓位。
+- 新执行批次必须通过全局序列化 claim；已持有的 funding pair 不授权并发开／平批次。
 
 ### MT5
 
-- `lots × contractSize` 必须不超过 1 oz。
+- `lots × contractSize` 与累计外部成交必须不超过 CEO 指令中的 MT5／Spot 腿数量。
 - Lot 必须满足当前 `volume_min`、`volume_step` 和 `volume_max`。
 - Account Login 必须与配置一致。
 - Account 与 Terminal 均必须允许交易。
-- 非 reduce-only Open 前目标 Symbol 不得已有活动仓位。
-- Bybit 终态部分成交可生成小于 1 oz 的 MT5 对冲，只要数量精确满足 MT5 当前规格。
+- 新执行批次必须通过全局序列化 claim。
+- 跨 Venue Bybit 只有终态全成交才释放 MT5；funding carry 才允许按去重永续累计成交增量比例、向下量化到 Spot Step 后释放同 Batch Spot 子指令。
 
 ## 8. Live Safety Gate
 
@@ -308,8 +303,8 @@ CI 可以证明：
 - Route-independent Order／Fill 映射。
 - MT5 Order／Deal Ticket 纠错。
 - 当前规格模型和权限布尔值映射。
-- 1 oz Runtime 独立数量限制。
-- Bybit 终态部分成交的精确 MT5 对冲边界。
+- 纯状态转换可证明 CEO 指令数量 ceiling；legacy acceptance adapter 的 instruction binding 和全局批次序列化仍需后续授权实现与验收。
+- 跨 Venue 终态全成交边界与 funding carry 增量 Spot 释放边界互不混用。
 - definitive failure 与 result_unknown 的不同处置。
 - 路由、门禁、限额与幂等。
 - 凭证不进入响应。
@@ -325,6 +320,6 @@ CI 不能证明：
 
 真实账户运营验收必须按 `../operations/V6-小资金实盘验收手册.md` 独立记录。
 
-## 14. 临时限制解除
+## 14. 受控边界
 
-1 oz、单活动仓位、Market-only 和自动监控关闭属于临时运营限制。只有 Issue #39 形成重复真实验收证据后，才允许通过独立 Issue／PR 逐项放宽；禁止直接修改环境变量绕过复审。ACK／Fill 区分、result_unknown 禁止盲重试、双重写门禁、Position Ticket close 和凭证隔离属于永久安全原则，不随放量删除。
+固定仓位、名义金额、日成交量、批次数和亏损 cap 已从 founder-owned local test-account 合同移除。该决定不允许通过环境变量绕过 CEO 指令数量 ceiling、单指令／单 Batch 身份、全局执行序列化、bounded chase、Kill Switch、强制只读复位或对账。ACK／Fill 区分、`result_unknown` 禁止盲重试、双重写门禁、Position Ticket close 和凭证隔离属于永久安全原则，不随数量变化删除。
