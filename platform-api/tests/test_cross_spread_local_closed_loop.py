@@ -177,6 +177,23 @@ def test_cross_spread_gold_local_closed_loop(runtime_url: str, tmp_path: Path) -
         assert bybit_positions, "Bybit long position missing after hedged open"
         assert mt5_positions, "MT5 short position missing after hedged open"
 
+        # Exact platform <-> venue reconciliation: each platform leg order id
+        # must exist in the runtime venue order book with a matching filled
+        # quantity and terminal status.
+        with httpx.Client(base_url=runtime_url, timeout=10) as rt:
+            venue_orders = rt.get("/venue/orders").json()
+        leg_order_ids = {leg["role"]: leg["orderId"] for leg in batch["legs"]}
+        expected_fill = {"bybit_leg": Decimal("1"), "mt5_leg": Decimal("0.01")}
+        for role, order_id in leg_order_ids.items():
+            matches = [
+                o for o in venue_orders if o.get("platformOrderId") == order_id
+            ]
+            assert len(matches) == 1, f"{role} venue order missing: {order_id}"
+            assert matches[0]["status"] == "filled", matches[0]
+            assert Decimal(matches[0]["filledQuantity"]) == expected_fill[role], (
+                matches[0]
+            )
+
         # --- CLOSE_LONG through the claimed exit plan ---
         closed = client.post(
             f"/api/v1/trading/cross-spread/exit-plans/{plan['planId']}/close",
@@ -191,6 +208,34 @@ def test_cross_spread_gold_local_closed_loop(runtime_url: str, tmp_path: Path) -
         mt5_after = _venue_positions(runtime_url, MT5_ACCOUNT_ID)
         assert bybit_after and all(Decimal(p["netQuantity"]) == 0 for p in bybit_after), bybit_after
         assert mt5_after and all(Decimal(p["netQuantity"]) == 0 for p in mt5_after), mt5_after
+
+        # Close reconciliation: every close-batch leg order id is terminal in
+        # the venue book, and each leg accumulated exactly two fills (open +
+        # close) at the same quantity.
+        close_leg_ids = {leg["role"]: leg["orderId"] for leg in close_batch["legs"]}
+        with httpx.Client(base_url=runtime_url, timeout=10) as rt:
+            venue_orders_after = rt.get("/venue/orders").json()
+            venue_fills_after = rt.get("/venue/fills").json()
+        for role, order_id in close_leg_ids.items():
+            matches = [
+                o
+                for o in venue_orders_after
+                if o.get("platformOrderId") == order_id
+            ]
+            assert len(matches) == 1, f"{role} close venue order missing"
+            assert matches[0]["status"] == "filled", matches[0]
+            assert Decimal(matches[0]["filledQuantity"]) == expected_fill[role]
+        open_ids = set(leg_order_ids.values())
+        close_ids = set(close_leg_ids.values())
+        leg_fill_counts: dict[str, int] = {}
+        for fill in venue_fills_after:
+            platform_id = fill.get("platformOrderId")
+            if platform_id in open_ids or platform_id in close_ids:
+                leg_fill_counts[platform_id] = leg_fill_counts.get(platform_id, 0) + 1
+        for order_id in list(open_ids) + list(close_ids):
+            assert leg_fill_counts.get(order_id) == 1, (
+                f"expected exactly one fill per order, got {leg_fill_counts.get(order_id)}"
+            )
 
 
 def test_cross_spread_local_closed_loop_fails_closed_when_runtime_unavailable(
