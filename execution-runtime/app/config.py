@@ -81,7 +81,7 @@ class Settings(BaseSettings):
     mt5_credential_ref: str = "secret://environment/mt5-live-001"
     mt5_account_ids: str = ""
     mt5_instrument_map: str = ""
-    mt5_symbol: str = "XAUUSD+"
+    mt5_symbol: str = "XAUUSD.s"
     mt5_terminal_path: str | None = None
     mt5_bridge_file_path: str = Field(default_factory=default_mt5_bridge_file_path)
     mt5_check_timeout_seconds: float = 5.0

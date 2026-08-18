@@ -144,9 +144,9 @@ def check_mt5_symbol(
     timeout_seconds: float = 5.0,
 ) -> VenueReadinessResult:
     env_prefix = env_prefix_for_secret_ref(credential_ref)
-    login = os.getenv(f"{env_prefix}_API_KEY")
-    password = os.getenv(f"{env_prefix}_SECRET")
-    server = os.getenv(f"{env_prefix}_PASSPHRASE")
+    login = os.getenv(f"{env_prefix}_LOGIN")
+    password = os.getenv(f"{env_prefix}_PASSWORD")
+    server = os.getenv(f"{env_prefix}_SERVER")
     if not login or not password or not server:
         return _venue_result(
             venue="mt5",
@@ -280,9 +280,9 @@ import MetaTrader5 as mt5
 prefix = sys.argv[1]
 symbol = sys.argv[2]
 terminal_path = sys.argv[3] or None
-login = os.getenv(f"{prefix}_API_KEY")
-password = os.getenv(f"{prefix}_SECRET")
-server = os.getenv(f"{prefix}_PASSPHRASE")
+login = os.getenv(f"{prefix}_LOGIN")
+password = os.getenv(f"{prefix}_PASSWORD")
+server = os.getenv(f"{prefix}_SERVER")
 
 try:
     kwargs = {"login": int(login), "password": password, "server": server}
@@ -365,17 +365,19 @@ def get_venue_readiness(
     mt5_symbol: str,
     mt5_terminal_path: str | None = None,
     mt5_timeout_seconds: float = 5.0,
+    bybit_credential_ref: str = "secret://environment/bybit-live-001",
+    mt5_credential_ref: str = "secret://environment/mt5-live-001",
 ) -> VenueReadinessResponse:
     venues = [
         check_bybit_contract(
-            credential_ref="secret://crypto-test-001",
+            credential_ref=bybit_credential_ref,
             symbol=bybit_symbol,
             demo=bybit_demo,
             recv_window=bybit_recv_window,
             timeout_seconds=bybit_timeout_seconds,
         ),
         check_mt5_symbol(
-            credential_ref="secret://mt5-demo-001",
+            credential_ref=mt5_credential_ref,
             symbol=mt5_symbol,
             terminal_path=mt5_terminal_path,
             timeout_seconds=mt5_timeout_seconds,

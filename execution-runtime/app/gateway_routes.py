@@ -33,7 +33,12 @@ def create_gateway_router(*, settings: Settings, gateway: ExecutionGateway) -> A
     )
     def gateway_connectivity() -> GatewayConnectivityResponse:
         credentials = [
-            inspect_credential_reference(credential_ref)
+            inspect_credential_reference(
+                credential_ref,
+                required_fields=("LOGIN", "PASSWORD", "SERVER")
+                if credential_ref == settings.mt5_credential_ref
+                else ("API_KEY", "SECRET"),
+            )
             for credential_ref in settings.configured_credential_refs
         ]
         return GatewayConnectivityResponse(
@@ -57,6 +62,8 @@ def create_gateway_router(*, settings: Settings, gateway: ExecutionGateway) -> A
             mt5_symbol=settings.mt5_symbol,
             mt5_terminal_path=settings.mt5_terminal_path,
             mt5_timeout_seconds=settings.mt5_check_timeout_seconds,
+            bybit_credential_ref=settings.bybit_credential_ref,
+            mt5_credential_ref=settings.mt5_credential_ref,
         )
 
     @router.get(
