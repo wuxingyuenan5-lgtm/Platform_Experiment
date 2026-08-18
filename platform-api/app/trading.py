@@ -219,6 +219,20 @@ def _record_fill_and_update_operational_projections(
             raise HTTPException(status_code=502, detail="Fill identity has conflicting payload")
         return False
 
+    # Cumulative-fill ceiling (defense-in-depth): total filled quantity must
+    # never exceed the instruction quantity. Runtime enforces this precisely;
+    # the Platform asserts it fail-closed on the confirmed fill path.
+    cumulative_row = db.execute(
+        "SELECT COALESCE(SUM(CAST(quantity AS REAL)), 0) AS total FROM fills WHERE order_id = ?",
+        (order_id,),
+    ).fetchone()
+    cumulative_quantity = Decimal(str(cumulative_row["total"]))
+    if cumulative_quantity + fill_quantity > request.quantity:
+        raise HTTPException(
+            status_code=502,
+            detail="Cumulative fill quantity exceeds instruction quantity",
+        )
+
     db.execute(
         """
         INSERT INTO fills (
