@@ -286,6 +286,12 @@ def _validate_bybit_live_specification(
             status_code=423,
             detail="Bybit instrument is not currently trading",
         )
+    if specification.trade_mode == "simulation":
+        # Simulation venues (deterministic FakeGateway) carry no real API-key
+        # credential state; local closed-loop execution must not require a
+        # bound production key. Real venues report a non-simulation mode and
+        # keep the full access-check gate.
+        return
     if checks.get("readOnly") is True:
         raise HTTPException(status_code=423, detail="Bybit API key is read-only")
     if checks.get("ipBound") is not True:
@@ -314,6 +320,8 @@ def _validate_mt5_live_specification(
             status_code=423,
             detail="MT5 symbol is not available for trading",
         )
+    if specification.trade_mode == "simulation":
+        return
     if checks.get("accountLoginMatched") is not True:
         raise HTTPException(
             status_code=423,
