@@ -113,8 +113,14 @@ def test_cross_spread_gold_local_closed_loop(runtime_url: str, tmp_path: Path) -
     # until owner-authorized live readiness. The closed loop activates them in
     # the isolated test database only.
     with connection() as db:
-        db.execute("UPDATE accounts SET status = 'active' WHERE id IN ('account_crypto_test', 'account_mt5_demo')")
-        db.execute("UPDATE strategy_instances SET status = 'active' WHERE id = 'strategy_cross_venue_spread_instance_default'")
+        db.execute(
+            "UPDATE accounts SET status = 'active' "
+            "WHERE id IN ('account_crypto_test', 'account_mt5_demo')"
+        )
+        db.execute(
+            "UPDATE strategy_instances SET status = 'active' "
+            "WHERE id = 'strategy_cross_venue_spread_instance_default'"
+        )
     settings.live_trading_enabled = True
     settings.cross_spread_acceptance_max_quantity_oz = Decimal("1")
 
