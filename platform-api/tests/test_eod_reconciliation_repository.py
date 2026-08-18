@@ -12,7 +12,7 @@ from app.database import connection, initialize_database
 
 STRATEGY_ID = "strategy_funding_arbitrage_instance_default"
 ACCOUNT_ID = "account_sim_usdt"
-DDL_SHA256 = "4cc299bbf57dd2dfa4db7c8092055eebc2e4862c5e4c9ecfe26be813d93f12b1"
+DDL_SHA256 = "2858fb2fec54506f8bf6d6956e906cecc6a40959a2ae6bf643d7046c2f86133f"
 
 
 def configure_database(tmp_path: Path) -> None:
@@ -21,11 +21,18 @@ def configure_database(tmp_path: Path) -> None:
     repository.ensure_schema()
 
 
-def insert_report(report_id: str = "report-1") -> None:
+def insert_report(
+    report_id: str = "report-1",
+    attempt: int = 1,
+    *,
+    idempotency_key: str | None = None,
+    natural_key: str | None = None,
+) -> None:
     repository.insert_initial_report(
         report_id=report_id,
-        idempotency_key=f"idempotency-{report_id}",
-        natural_key=f"2026-07-23:{STRATEGY_ID}:{ACCOUNT_ID}:{report_id}",
+        idempotency_key=idempotency_key or f"idempotency-{report_id}",
+        natural_key=natural_key or f"2026-07-23:{STRATEGY_ID}:{ACCOUNT_ID}:{report_id}",
+        attempt=attempt,
         payload_hash=f"payload-{report_id}",
         business_date="2026-07-23",
         timezone="Asia/Shanghai",
@@ -53,38 +60,36 @@ def test_report_identity_reads_and_unique_constraints_are_preserved(tmp_path: Pa
     configure_database(tmp_path)
     insert_report()
 
-    by_idempotency = repository.load_report_by_identity(
-        "idempotency-report-1",
-        "unused-natural-key",
-    )
-    by_natural_key = repository.load_report_by_identity(
-        "unused-idempotency-key",
-        f"2026-07-23:{STRATEGY_ID}:{ACCOUNT_ID}:report-1",
-    )
+    natural_key = f"2026-07-23:{STRATEGY_ID}:{ACCOUNT_ID}:report-1"
+    by_idempotency = repository.load_report_by_idempotency("idempotency-report-1")
+    by_natural_key = repository.load_latest_report_by_natural_key(natural_key)
 
     assert by_idempotency is not None
     assert by_natural_key is not None
     assert by_idempotency["id"] == "report-1"
     assert by_natural_key["id"] == "report-1"
+    assert by_natural_key["attempt"] == 1
 
+    # idempotency_key remains globally unique: a different report cannot reuse it,
+    # even with a different natural_key.
     with pytest.raises(sqlite3.IntegrityError):
-        repository.insert_initial_report(
+        insert_report(
             report_id="report-2",
             idempotency_key="idempotency-report-1",
             natural_key=f"2026-07-24:{STRATEGY_ID}:{ACCOUNT_ID}:report-2",
-            payload_hash="payload-report-2",
-            business_date="2026-07-24",
-            timezone="Asia/Shanghai",
-            valuation_time="2026-07-24T15:59:00+00:00",
-            strategy_instance_id=STRATEGY_ID,
-            account_id=ACCOUNT_ID,
-            actor="eod-runner",
-            owner="operations-owner",
-            due_at="2026-07-25T15:59:00+00:00",
-            created_at="2026-07-24T16:00:00+00:00",
         )
-
     assert repository.load_report("report-2") is None
+
+    # A re-run of the same business day creates a NEW attempt row instead of
+    # overwriting the previous report; UNIQUE(natural_key, attempt) is enforced.
+    insert_report(report_id="report-1-rerun", attempt=2)
+    latest = repository.load_latest_report_by_natural_key(natural_key)
+    assert latest is not None
+    assert latest["id"] == "report-1-rerun"
+    assert latest["attempt"] == 2
+
+    with pytest.raises(sqlite3.IntegrityError):
+        insert_report(report_id="report-1-duplicate-attempt", attempt=2)
 
 
 def test_review_is_idempotent_immutable_and_preserves_approval_gate(tmp_path: Path) -> None:

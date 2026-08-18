@@ -7,7 +7,7 @@ from pydantic import ValidationError
 from app import eod_reconciliation as compatibility
 from app import eod_reconciliation_schemas as schemas
 
-SCHEMA_SHA256 = "2efe4b115c26481dcae5997611cdd18eb98ba8d7fdc76b1a7a855837249ed6d0"
+SCHEMA_SHA256 = "3a4f1a3d7d96930b53065b579ca67a584d7c8c8a6df5fc4ba846ae68bfce7beb"
 
 
 def canonical_schema_hash() -> str:

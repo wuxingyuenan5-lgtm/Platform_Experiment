@@ -148,7 +148,9 @@ def test_clean_eod_report_is_idempotent_and_reviewable(monkeypatch, tmp_path: Pa
             },
         )
         assert listed.status_code == 200
-        assert len(listed.json()) == 1
+        # Attempt revision: the clean run (attempt 1) and the rerun (attempt 2)
+        # share the same natural_key and are both listed.
+        assert len(listed.json()) == 2
 
 
 def test_differences_skips_and_missing_accounts_block_approval(monkeypatch, tmp_path: Path) -> None:
