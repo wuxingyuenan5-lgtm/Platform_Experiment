@@ -236,7 +236,13 @@ class FakeGateway:
         instrument_id: str | None = None,
         event_type: str | None = None,
     ) -> list[VenueEconomicEventSnapshot]:
-        return []
+        from app.venue_store import list_economic_events as _list_events
+
+        return _list_events(
+            account_id=account_id,
+            instrument_id=instrument_id,
+            event_type=event_type,
+        )
 
     def cancel_order(
         self,

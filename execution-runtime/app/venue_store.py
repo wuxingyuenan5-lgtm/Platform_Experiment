@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from datetime import UTC, datetime
 from decimal import Decimal
 
@@ -8,6 +9,7 @@ from app.models import (
     CancelOrderResponse,
     SubmitOrderCommand,
     VenueBalanceSnapshot,
+    VenueEconomicEventSnapshot,
     VenueFillSnapshot,
     VenueOrderSnapshot,
     VenuePositionSnapshot,
@@ -80,6 +82,20 @@ CREATE TABLE IF NOT EXISTS fake_venue_cancel_commands (
 
 CREATE INDEX IF NOT EXISTS idx_fake_venue_fills_order
 ON fake_venue_fills(external_order_id, occurred_at);
+
+CREATE TABLE IF NOT EXISTS fake_venue_economic_events (
+    external_event_id TEXT PRIMARY KEY,
+    event_type TEXT NOT NULL,
+    account_id TEXT NOT NULL,
+    instrument_id TEXT,
+    symbol TEXT,
+    amount TEXT NOT NULL,
+    currency TEXT NOT NULL,
+    occurred_at TEXT NOT NULL,
+    data_quality_state TEXT NOT NULL,
+    payload_json TEXT NOT NULL
+);
+
 
 CREATE INDEX IF NOT EXISTS idx_fake_venue_positions_account
 ON fake_venue_positions(account_id, instrument_id);
@@ -296,6 +312,87 @@ def list_fills(
             tuple(parameters),
         ).fetchall()
     return [fill_from_row(row) for row in rows]
+
+
+def persist_economic_event(
+    event_type: str,
+    *,
+    external_event_id: str,
+    account_id: str,
+    instrument_id: str | None,
+    symbol: str | None,
+    amount: Decimal,
+    currency: str,
+    occurred_at: str,
+    payload: dict[str, object],
+) -> None:
+    ensure_store()
+    with connection() as db:
+        db.execute(
+            """
+            INSERT OR REPLACE INTO fake_venue_economic_events (
+                external_event_id, event_type, account_id, instrument_id, symbol,
+                amount, currency, occurred_at, data_quality_state, payload_json
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'complete', ?)
+            """,
+            (
+                external_event_id,
+                event_type,
+                account_id,
+                instrument_id,
+                symbol,
+                decimal_text(amount),
+                currency,
+                occurred_at,
+                json.dumps(payload, sort_keys=True, default=str),
+            ),
+        )
+
+
+def list_economic_events(
+    *,
+    account_id: str | None = None,
+    instrument_id: str | None = None,
+    event_type: str | None = None,
+) -> list[VenueEconomicEventSnapshot]:
+    ensure_store()
+    clauses: list[str] = []
+    parameters: list[object] = []
+    if account_id is not None:
+        clauses.append("account_id = ?")
+        parameters.append(account_id)
+    if instrument_id is not None:
+        clauses.append("instrument_id = ?")
+        parameters.append(instrument_id)
+    if event_type is not None:
+        clauses.append("event_type = ?")
+        parameters.append(event_type)
+    where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+    with connection() as db:
+        rows = db.execute(
+            f"""
+            SELECT * FROM fake_venue_economic_events
+            {where}
+            ORDER BY occurred_at
+            """,
+            parameters,
+        ).fetchall()
+    return [
+        VenueEconomicEventSnapshot(
+            source="fake",
+            externalEventId=row["external_event_id"],
+            eventType=row["event_type"],
+            accountId=row["account_id"],
+            instrumentId=row["instrument_id"],
+            symbol=row["symbol"],
+            amount=Decimal(row["amount"]),
+            currency=row["currency"],
+            occurredAt=row["occurred_at"],
+            dataQualityState=row["data_quality_state"],
+            payload=json.loads(row["payload_json"]),
+        )
+        for row in rows
+    ]
 
 
 def list_positions(account_id: str | None = None) -> list[VenuePositionSnapshot]:

@@ -30,7 +30,7 @@ from app.main import app
 pytestmark = pytest.mark.integration
 
 REPO_ROOT = Path(os.environ.get("VG_REPO_ROOT") or Path(__file__).resolve().parents[2])
-RUNTIME_DIR = REPO_ROOT / "execution-runtime"
+RUNTIME_DIR = Path(os.environ.get("VG_RUNTIME_DIR") or REPO_ROOT / "execution-runtime")
 RUNTIME_PYTHON = RUNTIME_DIR / ".venv" / "Scripts" / "python.exe"
 if not RUNTIME_PYTHON.exists():
     RUNTIME_PYTHON = Path(sys.executable)
@@ -91,7 +91,7 @@ def _wait_runtime_ready(proc: subprocess.Popen, base_url: str, log_file: Path) -
 
 
 @pytest.fixture(scope="module")
-def runtime_url(tmp_path_factory: pytest.TempPathFactory) -> str:
+def runtime(tmp_path_factory: pytest.TempPathFactory) -> str:
     journal_dir = tmp_path_factory.mktemp("runtime-journal")
     proc, base_url, log_file = _start_runtime(journal_dir)
     if not _wait_runtime_ready(proc, base_url, log_file):
@@ -104,7 +104,7 @@ def runtime_url(tmp_path_factory: pytest.TempPathFactory) -> str:
         assert _wait_runtime_ready(proc, base_url, log_file), (
             f"runtime did not become ready; log={log_file}"
         )
-    yield base_url
+    yield base_url, journal_dir
     proc.terminate()
     try:
         proc.wait(timeout=10)
@@ -175,9 +175,10 @@ def _venue_positions(runtime_url: str, account_id: str) -> list[dict]:
 
 
 def test_funding_local_closed_loop_open_close_and_reconcile(
-    runtime_url: str,
+    runtime: tuple[str, Path],
     tmp_path: Path,
 ) -> None:
+    runtime_url, _journal_dir = runtime
     _seed_funding_environment(tmp_path)
     settings = get_settings()
     settings.runtime_base_url = runtime_url
@@ -272,3 +273,80 @@ def test_funding_local_closed_loop_fails_closed_when_runtime_unavailable(
         legs = {leg["role"]: leg for leg in batch["legs"]}
         assert legs["perpetual_leg"]["status"] == "result_unknown", legs
         assert legs["spot_leg"]["status"] == "pending", legs
+
+
+def test_funding_local_closed_loop_simulated_funding_settlement(
+    runtime: tuple[str, Path],
+    tmp_path: Path,
+) -> None:
+    runtime_url, journal_dir = runtime
+    _seed_funding_environment(tmp_path)
+    settings = get_settings()
+    settings.runtime_base_url = runtime_url
+    settings.live_trading_enabled = True
+
+    with TestClient(app) as client:
+        opened = client.post(
+            FUNDING_ENDPOINT,
+            json={
+                "action": "OPEN_SHORT_PERP_LONG_SPOT",
+                "perpetualSymbol": PERPETUAL_SYMBOL,
+                "spotSymbol": SPOT_SYMBOL,
+                "quantity": "1",
+            },
+        )
+        assert opened.status_code == 200, opened.text
+        assert opened.json()["status"] == "hedged", opened.json()
+
+    # Simulated funding settlement on the perpetual leg, recorded directly in
+    # the deterministic fake venue, then imported through the platform's live
+    # economic-event machinery into the financial-fact ledger.
+    import sqlite3
+
+    with sqlite3.connect(journal_dir / "runtime_journal.db") as db:
+        db.execute(
+            """
+            INSERT OR REPLACE INTO fake_venue_economic_events (
+                external_event_id, event_type, account_id, instrument_id, symbol,
+                amount, currency, occurred_at, data_quality_state, payload_json
+            ) VALUES (?, 'funding', ?, ?, ?, ?, 'USDT', ?, 'complete', ?)
+            """,
+            (
+                "FUND-SETTLE-001",
+                FUNDING_ACCOUNT_ID,
+                "instrument_btcusdt",
+                PERPETUAL_SYMBOL,
+                "0.001",
+                "2026-08-18T12:00:00+00:00",
+                '{"simulated": true}',
+            ),
+        )
+
+    from app.live_venue_accounting import (
+        LiveEconomicEventImportRequest,
+        import_live_economic_events,
+    )
+
+    result = import_live_economic_events(
+        LiveEconomicEventImportRequest(
+            idempotencyKey="funding-import-001",
+            strategyInstanceId="strategy_funding_arbitrage_instance_default",
+            accountId=FUNDING_ACCOUNT_ID,
+            eventType="funding",
+            actor="eod-runner",
+        )
+    )
+    assert result.status == "completed", result
+    assert len(result.imported_fact_ids) == 1, result
+
+    with connection() as db:
+        row = db.execute(
+            """
+            SELECT fact_type, amount, external_id
+            FROM financial_facts
+            WHERE external_id = 'FUND-SETTLE-001'
+            """
+        ).fetchone()
+    assert row is not None, "funding fact not imported into the ledger"
+    assert row["fact_type"] == "funding"
+    assert Decimal(row["amount"]) == Decimal("0.001")
