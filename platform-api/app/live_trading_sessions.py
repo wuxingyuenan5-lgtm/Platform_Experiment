@@ -298,7 +298,7 @@ def request_live_session(
     return response_from_row(row)
 
 
-def check_approval_blockers(row) -> list[str]:
+def check_approval_blockers(row, *, db=None) -> list[str]:
     blockers: list[str] = []
     settings = get_settings()
     # Absolute notional limits are legacy-compat: zero means "no cap" and only a
@@ -318,8 +318,8 @@ def check_approval_blockers(row) -> list[str]:
     if row["session_type"] == "scale_change":
         blockers.append("Scale-change sessions require a separate scale review and are not enabled")
 
-    with connection() as db:
-        kill_switch = db.execute(
+    def _append_db_blockers(conn) -> None:
+        kill_switch = conn.execute(
             """
             SELECT scope_type, scope_id
             FROM trading_kill_switches
@@ -335,7 +335,7 @@ def check_approval_blockers(row) -> list[str]:
         if kill_switch is not None:
             blockers.append("A relevant Kill Switch is enabled")
 
-        differences = db.execute(
+        differences = conn.execute(
             """
             SELECT COUNT(*) AS count
             FROM reconciliation_differences rd
@@ -349,7 +349,7 @@ def check_approval_blockers(row) -> list[str]:
         if differences:
             blockers.append("Outstanding open or accepted reconciliation differences exist")
 
-        overlap = db.execute(
+        overlap = conn.execute(
             """
             SELECT id
             FROM live_trading_sessions
@@ -370,7 +370,7 @@ def check_approval_blockers(row) -> list[str]:
             blockers.append("An overlapping approved live session already exists")
 
         if row["session_type"] == "existing_limits":
-            eod = db.execute(
+            eod = conn.execute(
                 """
                 SELECT status, scale_gate_status
                 FROM eod_reconciliation_reports
@@ -385,6 +385,12 @@ def check_approval_blockers(row) -> list[str]:
                 "approved_same_limits",
             }:
                 blockers.append("Existing-limit session requires a clean latest EOD report")
+
+    if db is not None:
+        _append_db_blockers(db)
+    else:
+        with connection() as conn:
+            _append_db_blockers(conn)
     return blockers
 
 
@@ -573,7 +579,7 @@ def validate_and_claim_live_session(
                 detail="Exactly one active approved LiveTradingSession is required",
             )
         session = eligible[0]
-        if check_approval_blockers(session):
+        if check_approval_blockers(session, db=db):
             raise HTTPException(status_code=423, detail="Live session has active safety blockers")
         # Session maxOrderNotional/maxDailyNotional are legacy-compat acceptance
         # caps: exceedance no longer rejects the claim (non-blocking). The claim

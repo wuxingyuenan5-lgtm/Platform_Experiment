@@ -96,7 +96,7 @@ def validate_and_claim_live_session_atomic(
             )
 
         session = eligible[0]
-        if check_approval_blockers(session):
+        if check_approval_blockers(session, db=db):
             raise HTTPException(status_code=423, detail="Live session has active safety blockers")
         # Session maxOrderNotional/maxDailyNotional are legacy-compat acceptance
         # caps: exceedance no longer rejects the claim (non-blocking). The claim
