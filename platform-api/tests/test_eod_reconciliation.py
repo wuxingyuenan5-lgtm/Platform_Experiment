@@ -111,11 +111,12 @@ def test_clean_eod_report_is_idempotent_and_reviewable(monkeypatch, tmp_path: Pa
         assert report["missingAccountIds"] == []
         assert report["errors"] == []
 
-        conflict = client.post(
+        rerun = client.post(
             "/api/v1/ops/eod-reconciliation/reports",
             json={**report_payload("different-key"), "actor": "different-actor"},
         )
-        assert conflict.status_code == 409
+        assert rerun.status_code == 200
+        assert rerun.json()["attempt"] == 2
 
         approved = client.post(
             f"/api/v1/ops/eod-reconciliation/reports/{report['reportId']}/review",
