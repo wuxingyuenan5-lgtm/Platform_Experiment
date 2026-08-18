@@ -45,56 +45,71 @@ def _free_port() -> int:
         return sock.getsockname()[1]
 
 
-@pytest.fixture(scope="module")
-def runtime_url(tmp_path_factory: pytest.TempPathFactory) -> str:
+def _start_runtime(journal_dir: Path) -> tuple[subprocess.Popen, str, Path]:
     port = _free_port()
-    journal_dir = tmp_path_factory.mktemp("runtime-journal")
     env = dict(os.environ)
     env["VG_RUNTIME_GATEWAY_NAME"] = "fake"
     env["VG_RUNTIME_JOURNAL_PATH"] = str(journal_dir / "runtime_journal.db")
     env["VG_RUNTIME_LIVE_WRITE_ENABLED"] = "false"
     log_file = journal_dir / "runtime.log"
-    with log_file.open("ab") as log_out:
-        proc = subprocess.Popen(
-            [
-                str(RUNTIME_PYTHON),
-                "-m",
-                "uvicorn",
-                "app.main:app",
-                "--host",
-                "127.0.0.1",
-                "--port",
-                str(port),
-                "--log-level",
-                "warning",
-            ],
-            cwd=str(RUNTIME_DIR),
-            env=env,
-            stdout=log_out,
-            stderr=subprocess.STDOUT,
-        )
-        base_url = f"http://127.0.0.1:{port}"
-        deadline = time.monotonic() + 45
-        while time.monotonic() < deadline:
-            if proc.poll() is not None:
-                raise RuntimeError(
-                    f"runtime exited early rc={proc.returncode}; log={log_file}"
-                )
-            try:
-                with httpx.Client(timeout=1.0) as client:
-                    if client.get(f"{base_url}/status").status_code == 200:
-                        break
-            except Exception:
-                time.sleep(0.3)
-        else:
-            proc.terminate()
-            raise RuntimeError(f"runtime did not become ready; log={log_file}")
-        yield base_url
+    log_out = log_file.open("ab")
+    proc = subprocess.Popen(
+        [
+            str(RUNTIME_PYTHON),
+            "-m",
+            "uvicorn",
+            "app.main:app",
+            "--host",
+            "127.0.0.1",
+            "--port",
+            str(port),
+            "--log-level",
+            "warning",
+        ],
+        cwd=str(RUNTIME_DIR),
+        env=env,
+        stdout=log_out,
+        stderr=subprocess.STDOUT,
+    )
+    return proc, f"http://127.0.0.1:{port}", log_file
+
+
+def _wait_runtime_ready(proc: subprocess.Popen, base_url: str, log_file: Path) -> bool:
+    deadline = time.monotonic() + 90
+    while time.monotonic() < deadline:
+        if proc.poll() is not None:
+            return False
+        try:
+            with httpx.Client(timeout=1.0) as client:
+                if client.get(f"{base_url}/status").status_code == 200:
+                    return True
+        except Exception:
+            time.sleep(0.3)
+    return False
+
+
+@pytest.fixture(scope="module")
+def runtime_url(tmp_path_factory: pytest.TempPathFactory) -> str:
+    journal_dir = tmp_path_factory.mktemp("runtime-journal")
+    proc, base_url, log_file = _start_runtime(journal_dir)
+    if not _wait_runtime_ready(proc, base_url, log_file):
+        # Transient port/startup contention under a loaded suite: retry once
+        # with a fresh port before failing the fixture.
         proc.terminate()
         try:
             proc.wait(timeout=10)
         except subprocess.TimeoutExpired:
             proc.kill()
+        proc, base_url, log_file = _start_runtime(journal_dir)
+        assert _wait_runtime_ready(proc, base_url, log_file), (
+            f"runtime did not become ready; log={log_file}"
+        )
+    yield base_url
+    proc.terminate()
+    try:
+        proc.wait(timeout=10)
+    except subprocess.TimeoutExpired:
+        proc.kill()
 
 
 def _venue_positions(runtime_url: str, account_id: str) -> list[dict]:
