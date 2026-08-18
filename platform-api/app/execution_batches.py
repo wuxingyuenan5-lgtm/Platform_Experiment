@@ -27,6 +27,9 @@ from app.trade_commands import create_trade_command, validate_trade_command_cata
 CROSS_SPREAD_STRATEGY_KEY = "cross_venue_spread"
 BYBIT_LEG_ROLE = "bybit_leg"
 MT5_LEG_ROLE = "mt5_leg"
+FUNDING_STRATEGY_KEY = "funding_arbitrage"
+PERPETUAL_LEG_ROLE = "perpetual_leg"
+SPOT_LEG_ROLE = "spot_leg"
 GLOBAL_LEASE_STATUSES = (
     "pending",
     "executing",
@@ -320,6 +323,36 @@ def create_execution_batch(request: CreateExecutionBatchRequest) -> ExecutionBat
                     handle_batch_failure(batch_id, reason)
                     return get_execution_batch(batch_id)
 
+            if (
+                strategy_key == FUNDING_STRATEGY_KEY
+                and role == PERPETUAL_LEG_ROLE
+                and command.platform_order_id is not None
+            ):
+                try:
+                    command_requests = resize_funding_spot_hedge(
+                        command_requests,
+                        perpetual_index=index,
+                        perpetual_filled_quantity=get_order_filled_quantity(
+                            command.platform_order_id
+                        ),
+                    )
+                except ValueError as exc:
+                    reason = str(exc)
+                    update_leg_status(
+                        batch_id,
+                        SPOT_LEG_ROLE,
+                        "blocked",
+                        failure_reason=reason,
+                    )
+                    update_batch_status(
+                        batch_id,
+                        "manual_intervention",
+                        failure_reason=reason,
+                        requires_manual_intervention=True,
+                    )
+                    handle_batch_failure(batch_id, reason)
+                    return get_execution_batch(batch_id)
+
             filled_count += 1
             risk_ok, risk_reason = record_filled_leg(batch_id)
             if not risk_ok and filled_count < len(command_requests):
@@ -420,6 +453,60 @@ def resize_cross_spread_mt5_hedge(
     command_requests[mt5_index] = (
         mt5_role,
         mt5_request.model_copy(update={"quantity": adjusted_quantity}),
+    )
+    return command_requests
+
+
+def resize_funding_spot_hedge(
+    command_requests: list[tuple[str, CreateTradeCommandRequest]],
+    *,
+    perpetual_index: int,
+    perpetual_filled_quantity: Decimal,
+) -> list[tuple[str, CreateTradeCommandRequest]]:
+    """Release the Spot hedge only for the confirmed perpetual fill increment.
+
+    The Spot quantity is proportional to the authoritative perpetual
+    cumulative fill and never exceeds the CEO instruction quantity.
+    """
+    if perpetual_filled_quantity <= 0:
+        raise ValueError(
+            "Confirmed perpetual fill quantity is unavailable; Spot hedge is blocked"
+        )
+
+    perpetual_role, perpetual_request = command_requests[perpetual_index]
+    if perpetual_role != PERPETUAL_LEG_ROLE:
+        raise ValueError("Funding execution order must place the perpetual leg first")
+    if perpetual_filled_quantity > perpetual_request.quantity:
+        raise ValueError(
+            "Confirmed perpetual fill exceeds the requested quantity; Spot hedge is blocked"
+        )
+
+    spot_index = next(
+        (
+            index
+            for index, (role, _) in enumerate(command_requests)
+            if role == SPOT_LEG_ROLE
+        ),
+        None,
+    )
+    if spot_index is None or spot_index <= perpetual_index:
+        raise ValueError("Funding Spot hedge leg is missing or ordered before perpetual")
+
+    spot_role, spot_request = command_requests[spot_index]
+    adjusted_quantity = (
+        perpetual_filled_quantity * spot_request.quantity / perpetual_request.quantity
+    )
+    if adjusted_quantity > spot_request.quantity:
+        raise ValueError("Funding Spot hedge would exceed its instruction quantity")
+    validate_contract_quantity(
+        adjusted_quantity,
+        instrument_id=spot_request.instrument_id,
+        label=spot_request.symbol,
+    )
+
+    command_requests[spot_index] = (
+        spot_role,
+        spot_request.model_copy(update={"quantity": adjusted_quantity}),
     )
     return command_requests
 

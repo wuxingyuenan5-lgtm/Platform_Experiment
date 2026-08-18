@@ -11,6 +11,8 @@ from app.execution_batches import (
     get_execution_batch,
     list_execution_batches,
 )
+from app.execution_schemas import FundingMarketCommandRequest
+from app.funding import submit_funding_market_command
 from app.schemas import (
     CreateExecutionBatchRequest,
     CreateOrderRequest,
@@ -85,6 +87,16 @@ def create_trading_router(api_prefix: str) -> APIRouter:
         request: CrossSpreadMarketCommandRequest,
     ) -> ExecutionBatchResponse:
         return submit_cross_spread_market_command(request)
+
+    @router.post(
+        f"{api_prefix}/trading/funding/market-command",
+        response_model=ExecutionBatchResponse,
+        tags=["trading"],
+    )
+    def funding_market_command(
+        request: FundingMarketCommandRequest,
+    ) -> ExecutionBatchResponse:
+        return submit_funding_market_command(request)
 
     @router.post(
         f"{api_prefix}/trading/commands",

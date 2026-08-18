@@ -59,6 +59,19 @@ class CreateExecutionBatchRequest(BaseModel):
         return self
 
 
+class FundingMarketCommandRequest(BaseModel):
+    action: Literal[
+        "OPEN_SHORT_PERP_LONG_SPOT",
+        "CLOSE_SHORT_PERP_LONG_SPOT",
+    ]
+    perpetual_symbol: str = Field(alias="perpetualSymbol", min_length=1, max_length=32)
+    spot_symbol: str = Field(alias="spotSymbol", min_length=1, max_length=32)
+    quantity: Decimal = Field(gt=0)
+    idempotency_key: str | None = Field(
+        default=None, alias="idempotencyKey", min_length=1, max_length=128
+    )
+
+
 class BatchLegResponse(BaseModel):
     role: str
     account_id: str | None = Field(default=None, alias="accountId")
