@@ -181,10 +181,12 @@ def test_cross_spread_local_closed_loop_fails_closed_when_runtime_unavailable(
     initialize_database()
     with connection() as db:
         db.execute(
-            "UPDATE accounts SET status = 'active' WHERE id IN ('account_crypto_test', 'account_mt5_demo')"
+            "UPDATE accounts SET status = 'active' "
+            "WHERE id IN ('account_crypto_test', 'account_mt5_demo')"
         )
         db.execute(
-            "UPDATE strategy_instances SET status = 'active' WHERE id = 'strategy_cross_venue_spread_instance_default'"
+            "UPDATE strategy_instances SET status = 'active' "
+            "WHERE id = 'strategy_cross_venue_spread_instance_default'"
         )
     settings.runtime_base_url = "http://127.0.0.1:1"  # nothing listening
     settings.live_trading_enabled = True
