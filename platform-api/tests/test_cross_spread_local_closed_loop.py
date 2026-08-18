@@ -17,6 +17,7 @@ from __future__ import annotations
 import os
 import socket
 import subprocess
+import sys
 import time
 from decimal import Decimal
 from pathlib import Path
@@ -34,6 +35,10 @@ pytestmark = pytest.mark.integration
 REPO_ROOT = Path(os.environ.get("VG_REPO_ROOT") or Path(__file__).resolve().parents[2])
 RUNTIME_DIR = REPO_ROOT / "execution-runtime"
 RUNTIME_PYTHON = RUNTIME_DIR / ".venv" / "Scripts" / "python.exe"
+if not RUNTIME_PYTHON.exists():
+    # Isolated checkouts (worktrees) do not carry the gitignored venv; the
+    # interpreter running the test shares the required dependencies.
+    RUNTIME_PYTHON = Path(sys.executable)
 MARKET_COMMAND_ENDPOINT = "/api/v1/trading/cross-spread/market-command"
 BYBIT_ACCOUNT_ID = "account_crypto_test"
 MT5_ACCOUNT_ID = "account_mt5_demo"
