@@ -80,16 +80,25 @@ def test_report_identity_reads_and_unique_constraints_are_preserved(tmp_path: Pa
         )
     assert repository.load_report("report-2") is None
 
-    # A re-run of the same business day creates a NEW attempt row instead of
-    # overwriting the previous report; UNIQUE(natural_key, attempt) is enforced.
-    insert_report(report_id="report-1-rerun", attempt=2)
+    # A re-run of the same business day creates a NEW attempt row for the SAME
+    # natural_key instead of overwriting the previous report; UNIQUE(natural_key,
+    # attempt) is enforced and the latest attempt wins.
+    insert_report(
+        report_id="report-1-rerun",
+        attempt=2,
+        natural_key=natural_key,
+    )
     latest = repository.load_latest_report_by_natural_key(natural_key)
     assert latest is not None
     assert latest["id"] == "report-1-rerun"
     assert latest["attempt"] == 2
 
     with pytest.raises(sqlite3.IntegrityError):
-        insert_report(report_id="report-1-duplicate-attempt", attempt=2)
+        insert_report(
+            report_id="report-1-duplicate-attempt",
+            attempt=2,
+            natural_key=natural_key,
+        )
 
 
 def test_review_is_idempotent_immutable_and_preserves_approval_gate(tmp_path: Path) -> None:
