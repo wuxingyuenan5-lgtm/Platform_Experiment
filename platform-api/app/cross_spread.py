@@ -234,16 +234,11 @@ def _sides_for_action(action: str) -> tuple[str, str]:
 
 def _validate_acceptance_quantity(quantity_oz: Decimal) -> None:
     maximum = get_settings().cross_spread_acceptance_max_quantity_oz
-    if maximum <= 0:
-        raise HTTPException(
-            status_code=423,
-            detail="Cross-spread acceptance maximum quantity is not configured",
-        )
-    if quantity_oz > maximum:
+    if maximum > 0 and quantity_oz > maximum:
         raise HTTPException(
             status_code=422,
             detail=(
-                "Cross-spread acceptance quantity is temporarily capped at "
+                "Cross-spread acceptance quantity exceeds the legacy cap of "
                 f"{maximum} oz"
             ),
         )

@@ -35,9 +35,10 @@ class Settings(BaseSettings):
     # broker slippage. The value must remain non-negative.
     cross_spread_limit_hedge_reserve_price: Decimal = Decimal("0")
 
-    # Temporary real-money acceptance controls. They remain enforced until a
-    # separate Issue/PR reviews evidence from Issue #39 and explicitly changes them.
-    cross_spread_acceptance_max_quantity_oz: Decimal = Decimal("1")
+    # Legacy-compat acceptance controls. Zero means "no platform cap" (the CEO
+    # instruction quantity is the boundary); a positive value re-enables the
+    # legacy cross-spread acceptance cap.
+    cross_spread_acceptance_max_quantity_oz: Decimal = Decimal("0")
     cross_spread_acceptance_max_active_plans: int = 1
     cross_spread_definitive_failure_rollback_enabled: bool = True
     cross_spread_position_verification_required: bool = True

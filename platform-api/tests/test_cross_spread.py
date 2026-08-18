@@ -191,7 +191,7 @@ def test_cross_spread_market_command_rejects_quantity_above_acceptance_cap(
         )
 
     assert response.status_code == 422
-    assert "temporarily capped" in response.json()["detail"]
+    assert "legacy cap" in response.json()["detail"]
 
 
 def test_cross_spread_market_command_rejects_when_live_trading_disabled(
