@@ -1,0 +1,27 @@
+VG-0111-REC-01 shared-root protection evidence
+Captured: 2026-08-20T14:31:10+08:00
+
+Authority
+- authority commit: eb950c4c
+- recovery worktree HEAD before evidence writes: eb950c4c
+- recovery branch: codex/vg-0111-recovery
+- recovered base: 2f3b29119e192f6e26661d8a145f4cdc5c2688e5
+- git merge-base --is-ancestor 2f3b291 HEAD: exit 0
+- recovery worktree status before evidence writes: clean
+
+Isolation
+- worktree root: .codex/worktrees/vg-0111-recovery
+- worktree git dir: .git/worktrees/vg-0111-recovery
+- shared common git dir: .git
+- no checkout, reset, clean, switch, stage, restore, move, delete, ref update or index update was performed in the shared root
+
+Shared-root inventory start snapshot
+- inventory input: sorted git status --porcelain=v1 --untracked-files=all status/path records only
+- entry count: 11209
+- status/path manifest SHA-256: e6680162d67645c3440e66b4ad0009b8f3630fcef4a28f5da3008d77a54eb378
+- file contents and credential/environment values were not collected
+
+Closure snapshot
+- entry count: 11209
+- status/path manifest SHA-256: e6680162d67645c3440e66b4ad0009b8f3630fcef4a28f5da3008d77a54eb378
+- result: exactly matches the start snapshot; no shared-root status/path change was introduced
