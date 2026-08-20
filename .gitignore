@@ -64,3 +64,17 @@ outputs/**/*.csv
 *.swo
 .DS_Store
 Thumbs.db
+
+# Codex local temporary residues
+.fn01-tmp/
+.fn01-test-tmp/
+.tmp/
+.wt-test/
+.probe-a/
+.pytest-tmp/
+.codex-cleanup-quarantine/
+
+# Sandbox probe residues: fixed directory, eight-character random basename.
+/execution-runtime/[0-9a-z_][0-9a-z_][0-9a-z_][0-9a-z_][0-9a-z_][0-9a-z_][0-9a-z_][0-9a-z_]
+/platform-api/[0-9a-z_][0-9a-z_][0-9a-z_][0-9a-z_][0-9a-z_][0-9a-z_][0-9a-z_][0-9a-z_]
+/platform-api/scripts/[0-9a-z_][0-9a-z_][0-9a-z_][0-9a-z_][0-9a-z_][0-9a-z_][0-9a-z_][0-9a-z_]
