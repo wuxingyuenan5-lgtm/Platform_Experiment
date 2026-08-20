@@ -35,11 +35,11 @@ TASK_CARD_CHECK = CONFIG.get("task_card_check")
 
 EXPECTED_CONCURRENCY = {
     "treat_limits_as": "maximum-safe-upper-bound",
-    "max_active_agents": 4,
-    "max_implementation_agents": 2,
-    "max_read_only_agents": 2,
+    "max_active_agents": 2,
+    "max_implementation_agents": 1,
+    "max_read_only_agents": 1,
     "default_implementation_agents": 1,
-    "second_implementation_requires": "concrete_independence_evidence",
+    "second_implementation_requires": "not-permitted-by-default",
     "default_when_independence_unproven": "serial",
     "critical_acceptance": "independent-read-only",
     "do_not_split_work_to_fill_capacity": True,

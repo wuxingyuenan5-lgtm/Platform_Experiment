@@ -23,7 +23,7 @@ Re-audit and finish the uncommitted bounded multi-agent governance candidate so 
 ## Protected semantics
 
 - Do not change executable trading behavior, Live Write boundaries, external connectivity assumptions or production claims.
-- Do not modify protected frontend files or `docs/codex/AI_DEVELOPMENT_STAGE_RETROSPECTIVE.md`.
+- Do not modify protected frontend files or retrospective material.
 - Do not represent task-card declarations as a runtime-enforced Codex agent counter.
 
 ## Scope

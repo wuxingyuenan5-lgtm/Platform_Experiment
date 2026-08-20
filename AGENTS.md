@@ -8,7 +8,7 @@ For every task, read `AGENTS.md`, `docs/codex/current-state.md`, run `python scr
 
 `docs/codex/AI_DEVELOPMENT_GOVERNANCE.md` owns the permanent role model, task protocol, authority hierarchy, task closure and Context Pack maintenance rules. `scripts/context-packs.json` and `scripts/context-for.py` route stable task types to bounded context and checks.
 
-Long-term governance roles must read their role contract in `docs/codex/AI_DEVELOPMENT_GOVERNANCE.md` and the current version control file before work. Project-scoped `.codex/config.toml`, `.codex/agents/` and trusted `.codex/hooks.json` provide runtime defaults only; they do not replace repository authority. Chat startup cannot override repository role boundaries, and new authorization or working agreements must be written into a task card or version control file before they carry forward.
+Long-term governance roles must read their role contract in `docs/codex/AI_DEVELOPMENT_GOVERNANCE.md` and the current version control file before work. Project-scoped `.codex/config.toml`, `.codex/agents/` and `.codex/hooks.json` are optional local conveniences only; hooks are disabled by default and must never be a prerequisite for project operation. They do not replace repository authority. Chat startup cannot override repository role boundaries, and new authorization or working agreements must be written into a task card or version control file before they carry forward.
 
 ## Safety boundaries
 
@@ -17,9 +17,15 @@ Long-term governance roles must read their role contract in `docs/codex/AI_DEVEL
 - Live Write is disabled by default. Kill Switch, idempotency and Result Unknown semantics are protected. The narrow 0.11.1 local founder-owned-test-account exception remains governed only by current state, acceptance criteria and the live-acceptance runbook; it never expands to client funds, multi-person operation, unattended trading, long-lived Live Write, production deployment, or funds/symbols/concurrency expansion.
 - Do not infer external connectivity, account state, deployment or production facts from repository files or CI.
 
+## Default delivery shape
+
+- The durable default is Local execution on `codex/platform-main`, with one implementation writer and serial work.
+- Do not create a task branch or linked worktree for ordinary work. Use a worktree only for explicitly approved high-risk recovery or separately proven parallel writes; close it after the task.
+- Read-only review does not create a branch or worktree. No second implementation agent is created by default or to consume capacity.
+
 ## Bounded multi-agent concurrency
 
-The project-wide maximum safe upper bound is four active temporary agents: at most two implementation and at most two read-only. The default is one implementation agent. A second implementation agent is allowed only when the technical lead records concrete independence evidence before dispatch; do not split work merely to consume available concurrency. Each workflow, contract, migration chain or shared file set has one implementation owner. Record write set and dependencies before dispatch. Parallel work requires disjoint writes, no unfinished dependency, independent tests, rollback and separate task cards plus `codex/` branches/worktrees; otherwise serial.
+The project-wide default is one active implementation writer in Local mode. This is the normal operating limit, not a target to expand. Each workflow, contract, migration chain or shared file set has one implementation owner. Record the write set and dependencies before work. A linked worktree or task branch requires explicit high-risk recovery approval or evidence of an independently necessary parallel write; otherwise remain on `codex/platform-main` and work serially.
 
 Critical work uses one implementer plus acceptance. Findings return to owner. Close failed owners before takeover. Investigators are read-only. Do not create a standing reporting or monitoring agent; wake parent roles only on real task-card state transitions or explicit Owner gates.
 
