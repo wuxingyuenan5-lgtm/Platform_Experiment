@@ -8,8 +8,8 @@
           {
             "type": "command",
             "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/session_start.py\"",
-            "commandWindows": "powershell -NoProfile -Command \"& python (Join-Path (git rev-parse --show-toplevel) '.codex/hooks/session_start.py')\"",
-            "additionalContextLimit": 1200,
+            "commandWindows": "powershell -NoProfile -File ((git rev-parse --show-toplevel) + '/.codex/hooks/run_hook.ps1') ((git rev-parse --show-toplevel) + '/.codex/hooks/session_start.py')",
+            "additionalContextLimit": 1000,
             "statusMessage": "Checking Codex session guardrails"
           }
         ]
@@ -22,8 +22,8 @@
           {
             "type": "command",
             "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/session_start.py\"",
-            "commandWindows": "powershell -NoProfile -Command \"& python (Join-Path (git rev-parse --show-toplevel) '.codex/hooks/session_start.py')\"",
-            "additionalContextLimit": 1200,
+            "commandWindows": "powershell -NoProfile -File ((git rev-parse --show-toplevel) + '/.codex/hooks/run_hook.ps1') ((git rev-parse --show-toplevel) + '/.codex/hooks/session_start.py')",
+            "additionalContextLimit": 1000,
             "statusMessage": "Checking Codex subagent guardrails"
           }
         ]
@@ -31,12 +31,12 @@
     ],
     "PreToolUse": [
       {
-        "matcher": "Bash|apply_patch|Edit|Write",
+        "matcher": "Bash|exec_command|apply_patch|Edit|Write",
         "hooks": [
           {
             "type": "command",
             "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/pre_tool_use.py\"",
-            "commandWindows": "powershell -NoProfile -Command \"& python (Join-Path (git rev-parse --show-toplevel) '.codex/hooks/pre_tool_use.py')\"",
+            "commandWindows": "powershell -NoProfile -File ((git rev-parse --show-toplevel) + '/.codex/hooks/run_hook.ps1') ((git rev-parse --show-toplevel) + '/.codex/hooks/pre_tool_use.py')",
             "statusMessage": "Checking repository tool guardrails"
           }
         ]

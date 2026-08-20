@@ -1,6 +1,6 @@
 name = "platform-worker"
 description = "Default implementation worker for one task card, one worktree, and one bounded write set."
-model = "gpt-5.4-mini"
+model = "gpt-5.6-luna"
 model_reasoning_effort = "medium"
 sandbox_mode = "workspace-write"
 developer_instructions = """

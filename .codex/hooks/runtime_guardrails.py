@@ -2,35 +2,25 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import json
+import os
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 
 
-AUTHORIZED_WORKTREE_ROOT = Path(__file__).resolve().parents[2]
-PROTECTED_SHARED_ROOT = AUTHORIZED_WORKTREE_ROOT.parents[2]
-AGENTS_PATH = AUTHORIZED_WORKTREE_ROOT / "AGENTS.md"
-CURRENT_STATE_PATH = AUTHORIZED_WORKTREE_ROOT / "docs" / "codex" / "current-state.md"
-GOVERNANCE_PATH = (
-    AUTHORIZED_WORKTREE_ROOT / "docs" / "codex" / "AI_DEVELOPMENT_GOVERNANCE.md"
-)
-TASK_CARD_PATH = (
-    AUTHORIZED_WORKTREE_ROOT
-    / "docs"
-    / "codex"
-    / "tasks"
-    / "VG-GOV-20260820-agent-runtime-guardrails.md"
-)
-CONTEXT_PACK = "governance"
+INVALID = "invalid"
 
 
 @dataclass(frozen=True)
 class RuntimeState:
     cwd: Path
+    repo_root: Path | None
     branch: str
     head: str
+    git_dir: Path | None
+    git_common_dir: Path | None
     registered_worktree: bool
-    in_protected_shared_root: bool
     write_allowed: bool
     marker: str
 
@@ -44,12 +34,22 @@ def resolve_cwd(payload: dict[str, object]) -> Path:
     cwd = payload.get("cwd")
     if not isinstance(cwd, str) or not cwd.strip():
         raise ValueError("missing cwd")
-    return Path(cwd).resolve()
+    resolved = Path(cwd).resolve()
+    if not resolved.is_dir():
+        raise ValueError("cwd is not a directory")
+    return resolved
+
+
+def git_executable() -> str | None:
+    return shutil.which("git")
 
 
 def git_output(cwd: Path, *args: str) -> str:
+    executable = git_executable()
+    if executable is None:
+        raise RuntimeError("git is unavailable")
     completed = subprocess.run(
-        ["git", *args],
+        [executable, *args],
         cwd=cwd,
         text=True,
         capture_output=True,
@@ -67,67 +67,94 @@ def git_output_or_default(cwd: Path, default: str, *args: str) -> str:
         return default
 
 
+def resolve_path(raw: str) -> Path | None:
+    if raw == INVALID or not raw:
+        return None
+    return Path(raw).resolve()
+
+
+def normalize_path_string(path: Path) -> str:
+    return os.path.normcase(os.path.normpath(str(path.resolve())))
+
+
 def path_is_within(path: Path, root: Path) -> bool:
-    return path == root or root in path.parents
-
-
-def is_registered_worktree(cwd: Path) -> bool:
     try:
-        listing = git_output(cwd, "worktree", "list", "--porcelain")
-    except RuntimeError:
+        if path.samefile(root):
+            return True
+    except OSError:
+        pass
+    normalized_path = normalize_path_string(path)
+    normalized_root = normalize_path_string(root)
+    return normalized_path == normalized_root or normalized_path.startswith(normalized_root + os.sep)
+
+
+def is_registered_worktree(cwd: Path, repo_root: Path | None) -> bool:
+    if repo_root is None:
         return False
-    target = str(cwd)
+    normalized_repo_root = normalize_path_string(repo_root)
+    listing = git_output_or_default(cwd, "", "worktree", "list", "--porcelain")
+    if not listing:
+        return False
     for line in listing.splitlines():
-        if line.startswith("worktree ") and Path(line.split(" ", 1)[1]).resolve() == cwd:
+        if not line.startswith("worktree "):
+            continue
+        candidate = Path(line.split(" ", 1)[1]).resolve()
+        if normalize_path_string(candidate) == normalized_repo_root:
             return True
     return False
 
 
 def resolve_runtime_state(cwd: Path) -> RuntimeState:
-    git_dir = git_output_or_default(cwd, "invalid", "rev-parse", "--git-dir")
-    git_common_dir = git_output_or_default(cwd, "invalid", "rev-parse", "--git-common-dir")
-    branch = git_output_or_default(cwd, "invalid", "branch", "--show-current") or "detached"
-    head = git_output_or_default(cwd, "invalid", "rev-parse", "--verify", "HEAD")
-    registered = (
-        git_dir != "invalid"
-        and git_common_dir != "invalid"
-        and Path(git_dir) != Path(git_common_dir)
-    ) or is_registered_worktree(cwd)
-    in_protected_shared_root = cwd == PROTECTED_SHARED_ROOT
-
+    repo_root = resolve_path(git_output_or_default(cwd, INVALID, "rev-parse", "--show-toplevel"))
+    git_dir = resolve_path(
+        git_output_or_default(cwd, INVALID, "rev-parse", "--path-format=absolute", "--git-dir")
+    )
+    git_common_dir = resolve_path(
+        git_output_or_default(cwd, INVALID, "rev-parse", "--path-format=absolute", "--git-common-dir")
+    )
+    branch = git_output_or_default(cwd, INVALID, "branch", "--show-current") or "detached"
+    head = git_output_or_default(cwd, INVALID, "rev-parse", "--verify", "HEAD")
+    show_prefix = git_output_or_default(cwd, INVALID, "rev-parse", "--show-prefix")
+    registered_worktree = is_registered_worktree(cwd, repo_root)
+    linked_worktree = git_dir is not None and git_common_dir is not None and git_dir != git_common_dir
+    within_repo_root = repo_root is not None and show_prefix != INVALID
     write_allowed = (
-        path_is_within(cwd, AUTHORIZED_WORKTREE_ROOT)
-        and cwd != PROTECTED_SHARED_ROOT
-        and registered
-        and head != "invalid"
+        linked_worktree
+        and head != INVALID
+        and branch.startswith("codex/")
+        and within_repo_root
+        and registered_worktree
     )
     marker = "WRITE_ALLOWED" if write_allowed else "READ_ONLY_NO_WRITE"
     return RuntimeState(
         cwd=cwd,
+        repo_root=repo_root,
         branch=branch,
         head=head,
-        registered_worktree=registered,
-        in_protected_shared_root=in_protected_shared_root,
+        git_dir=git_dir,
+        git_common_dir=git_common_dir,
+        registered_worktree=registered_worktree,
         write_allowed=write_allowed,
         marker=marker,
     )
 
 
 def build_additional_context(state: RuntimeState) -> str:
+    repo_root = state.repo_root or state.cwd
     lines = [
-        f"Repo: {AUTHORIZED_WORKTREE_ROOT}",
+        f"Repo root: {repo_root}",
         f"Branch: {state.branch}",
         f"HEAD: {state.head}",
         f"Mode: {state.marker}",
-        f"Authority: {AGENTS_PATH}",
-        f"State: {CURRENT_STATE_PATH}",
-        f"Governance: {GOVERNANCE_PATH}",
-        f"Pack: use {CONTEXT_PACK}",
-        f"Task card: {TASK_CARD_PATH}",
-        "Live Write: disabled by default",
+        f"Authority: {repo_root / 'AGENTS.md'}",
+        f"State: {repo_root / 'docs' / 'codex' / 'current-state.md'}",
+        f"Governance: {repo_root / 'docs' / 'codex' / 'AI_DEVELOPMENT_GOVERNANCE.md'}",
+        "Load the Context Pack and task card named in the current startup envelope.",
+        "If no Pack or task card was supplied for a repository write task, stop before writing.",
+        "Live Write is disabled by default.",
     ]
-    text = "\n".join(lines)
-    return text[:1200]
+    context = "\n".join(lines)
+    return context[:1000]
 
 
 def hook_context_response(event_name: str, state: RuntimeState) -> dict[str, object]:

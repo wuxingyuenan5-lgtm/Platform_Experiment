@@ -38,6 +38,7 @@ outputs/
 !.codex/hooks/
 .codex/hooks/*
 !.codex/hooks/pre_tool_use.py
+!.codex/hooks/run_hook.ps1
 !.codex/hooks/runtime_guardrails.py
 !.codex/hooks/session_start.py
 platform-web/test-results/
