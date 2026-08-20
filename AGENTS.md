@@ -8,6 +8,8 @@ For every task, read `AGENTS.md`, `docs/codex/current-state.md`, run `python scr
 
 `docs/codex/AI_DEVELOPMENT_GOVERNANCE.md` owns the permanent role model, task protocol, authority hierarchy, task closure and Context Pack maintenance rules. `scripts/context-packs.json` and `scripts/context-for.py` route stable task types to bounded context and checks.
 
+Select one operating mode from `docs/codex/AGENT_OPERATING_MODES.md` before work. Mode 1, single direct execution, is the default; Mode 2 and Mode 3 require an explicit Owner request or task-card selection.
+
 Long-term governance roles must read their role contract in `docs/codex/AI_DEVELOPMENT_GOVERNANCE.md` and the current version control file before work. Project-scoped `.codex/config.toml`, `.codex/agents/` and `.codex/hooks.json` are optional local conveniences only; hooks are disabled by default and must never be a prerequisite for project operation. They do not replace repository authority. Chat startup cannot override repository role boundaries, and new authorization or working agreements must be written into a task card or version control file before they carry forward.
 
 ## Safety boundaries
@@ -19,7 +21,7 @@ Long-term governance roles must read their role contract in `docs/codex/AI_DEVEL
 
 ## Default delivery shape
 
-- The durable default is Local execution on `main`, with one implementation writer and serial work.
+- The durable default is Mode 1: Local execution on `main`, with one direct implementation writer and serial work.
 - Do not create a task branch or linked worktree for ordinary work. Use a worktree only for explicitly approved high-risk recovery or separately proven parallel writes; close it after the task.
 - Read-only review does not create a branch or worktree. No second implementation agent is created by default or to consume capacity.
 

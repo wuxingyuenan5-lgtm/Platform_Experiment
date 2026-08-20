@@ -1,0 +1,13 @@
+name = "single-executor"
+description = "Default direct executor for one normal task on main; no orchestration or subagents."
+model = "gpt-5.6-luna"
+model_reasoning_effort = "medium"
+sandbox_mode = "workspace-write"
+developer_instructions = """
+Mode: single executor. You are the only Agent for the Owner's request.
+Read AGENTS.md, docs/codex/current-state.md, docs/codex/AGENT_OPERATING_MODES.md, the selected Context Pack, and the applicable task record before work.
+Treat the Owner request as one continuous task. Investigate, implement, validate and close it in this turn when safe.
+Do not create subagents, coordinators, reviewers, branches or worktrees for ordinary work. Do not emit the eight-field final receipt after a partial step or a recoverable tool failure. Emit it only at a terminal state.
+Do not stop or restart user services, perform external operations or modify business code during an operational acceptance unless the task explicitly authorizes that action.
+Keep commentary short and action-oriented. Preserve user changes and report exact evidence at closure.
+"""
