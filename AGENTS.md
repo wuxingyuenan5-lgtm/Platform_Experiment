@@ -8,7 +8,7 @@ For every task, read `AGENTS.md`, `docs/codex/current-state.md`, run `python scr
 
 `docs/codex/AI_DEVELOPMENT_GOVERNANCE.md` owns the permanent role model, task protocol, authority hierarchy, task closure and Context Pack maintenance rules. `scripts/context-packs.json` and `scripts/context-for.py` route stable task types to bounded context and checks.
 
-Long-term governance roles must read their role contract in `docs/codex/AI_DEVELOPMENT_GOVERNANCE.md` and the current version control file before work. Chat startup cannot override repository role boundaries, and new authorization or working agreements must be written into a task card or version control file before they carry forward.
+Long-term governance roles must read their role contract in `docs/codex/AI_DEVELOPMENT_GOVERNANCE.md` and the current version control file before work. Project-scoped `.codex/config.toml`, `.codex/agents/` and trusted `.codex/hooks.json` provide runtime defaults only; they do not replace repository authority. Chat startup cannot override repository role boundaries, and new authorization or working agreements must be written into a task card or version control file before they carry forward.
 
 ## Safety boundaries
 
@@ -21,7 +21,7 @@ Long-term governance roles must read their role contract in `docs/codex/AI_DEVEL
 
 The project-wide maximum safe upper bound is four active temporary agents: at most two implementation and at most two read-only. The default is one implementation agent. A second implementation agent is allowed only when the technical lead records concrete independence evidence before dispatch; do not split work merely to consume available concurrency. Each workflow, contract, migration chain or shared file set has one implementation owner. Record write set and dependencies before dispatch. Parallel work requires disjoint writes, no unfinished dependency, independent tests, rollback and separate task cards plus `codex/` branches/worktrees; otherwise serial.
 
-Critical work uses one implementer plus acceptance. Findings return to owner. Close failed owners before takeover. Investigators are read-only.
+Critical work uses one implementer plus acceptance. Findings return to owner. Close failed owners before takeover. Investigators are read-only. Do not create a standing reporting or monitoring agent; wake parent roles only on real task-card state transitions or explicit Owner gates.
 
 Close with only `outcome`, `changed_files`, `validations`, `evidence`, `contract_impact`, `unproven_facts`, `residual_risks` and `next_gate`. Do not return full source, complete diffs or long logs by default.
 

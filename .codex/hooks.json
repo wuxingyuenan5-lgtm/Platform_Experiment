@@ -1,0 +1,46 @@
+{
+  "description": "Project-scoped guardrails for Codex runtime startup and local tool safety.",
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|clear|compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/session_start.py\"",
+            "commandWindows": "powershell -NoProfile -Command \"& python (Join-Path (git rev-parse --show-toplevel) '.codex/hooks/session_start.py')\"",
+            "additionalContextLimit": 1200,
+            "statusMessage": "Checking Codex session guardrails"
+          }
+        ]
+      }
+    ],
+    "SubagentStart": [
+      {
+        "matcher": ".*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/session_start.py\"",
+            "commandWindows": "powershell -NoProfile -Command \"& python (Join-Path (git rev-parse --show-toplevel) '.codex/hooks/session_start.py')\"",
+            "additionalContextLimit": 1200,
+            "statusMessage": "Checking Codex subagent guardrails"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash|apply_patch|Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/pre_tool_use.py\"",
+            "commandWindows": "powershell -NoProfile -Command \"& python (Join-Path (git rev-parse --show-toplevel) '.codex/hooks/pre_tool_use.py')\"",
+            "statusMessage": "Checking repository tool guardrails"
+          }
+        ]
+      }
+    ]
+  }
+}
