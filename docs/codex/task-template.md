@@ -28,7 +28,7 @@ One measurable business outcome.
 - Implementation owner: `<agent-id>`
 - Mode: `Local`
 - Branch/worktree exception: `none` (only approved high-risk recovery or proven parallel write)
-- Branch: `codex/platform-main` unless the exception above is approved
+- Branch: `main` unless the exception above is approved
 - Worktree: `none` unless the exception above is approved
 - Base commit: `<sha>`
 
@@ -69,4 +69,4 @@ Exact commands and any final full-CI requirement.
 
 Status-event rules: `review`, `attention`, `blocked` and `done` are real events; "still running" is not. `attention` and `blocked` summaries must include `Needs:`. `done` summaries must include `Capability:`, `Evidence:` and `Next gate:`.
 Token rules: `Token delta = Token current - Token baseline`; at 60 percent of budget, do not add agents or broaden scope; at 80 percent, `Owner notice` is mandatory and non-essential work stops; at 100 percent, `Status` must be `attention` and work stops; if any Token snapshot field is unavailable, record `unavailable` instead of fake zero and move the task to `attention`; the 30 percent control-plane measure is calculated across the whole business slice, not enforced per task or leaf agent; repository validation checks task declarations only and is not Codex runtime throttling.
-Concurrency rules: default to one Local implementation writer on `codex/platform-main`; no second implementation agent; read-only acceptance may review an immutable candidate without creating a branch; linked worktrees are exception-only for approved high-risk recovery or proven parallel writes and must close after use.
+Concurrency rules: default to one Local implementation writer on `main`; no second implementation agent; read-only acceptance may review an immutable candidate without creating a branch; linked worktrees are exception-only for approved high-risk recovery or proven parallel writes and must close after use.

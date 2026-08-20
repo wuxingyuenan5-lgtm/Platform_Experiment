@@ -19,13 +19,13 @@ Long-term governance roles must read their role contract in `docs/codex/AI_DEVEL
 
 ## Default delivery shape
 
-- The durable default is Local execution on `codex/platform-main`, with one implementation writer and serial work.
+- The durable default is Local execution on `main`, with one implementation writer and serial work.
 - Do not create a task branch or linked worktree for ordinary work. Use a worktree only for explicitly approved high-risk recovery or separately proven parallel writes; close it after the task.
 - Read-only review does not create a branch or worktree. No second implementation agent is created by default or to consume capacity.
 
 ## Bounded multi-agent concurrency
 
-The project-wide default is one active implementation writer in Local mode. This is the normal operating limit, not a target to expand. Each workflow, contract, migration chain or shared file set has one implementation owner. Record the write set and dependencies before work. A linked worktree or task branch requires explicit high-risk recovery approval or evidence of an independently necessary parallel write; otherwise remain on `codex/platform-main` and work serially.
+The project-wide default is one active implementation writer in Local mode. This is the normal operating limit, not a target to expand. Each workflow, contract, migration chain or shared file set has one implementation owner. Record the write set and dependencies before work. A linked worktree or task branch requires explicit high-risk recovery approval or evidence of an independently necessary parallel write; otherwise remain on `main` and work serially.
 
 Critical work uses one implementer plus acceptance. Findings return to owner. Close failed owners before takeover. Investigators are read-only. Do not create a standing reporting or monitoring agent; wake parent roles only on real task-card state transitions or explicit Owner gates.
 
