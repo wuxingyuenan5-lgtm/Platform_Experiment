@@ -13,8 +13,13 @@ from app.cross_spread_live_read_client import (
     LiveInstrumentSpecification,
     get_instrument_specification,
 )
+from app.database import connection
 from app.execution_batches import create_execution_batch
-from app.market_data import list_cross_spread_market_history, save_cross_spread_market_snapshot
+from app.market_data import (
+    get_latest_cross_spread_market_snapshot,
+    list_cross_spread_market_history,
+    save_cross_spread_market_snapshot,
+)
 from app.order_execution_intents import register_order_execution_intent
 from app.schemas import (
     BatchLegRequest,
@@ -23,6 +28,7 @@ from app.schemas import (
     CrossSpreadHistoryPointResponse,
     CrossSpreadMarketCommandRequest,
     CrossSpreadSnapshotResponse,
+    CrossSpreadVenueSnapshotResponse,
     ExecutionBatchResponse,
     TradeCommandResponse,
 )
@@ -30,18 +36,19 @@ from app.trade_commands import create_trade_command
 
 STRATEGY_INSTANCE_ID = "strategy_cross_venue_spread_instance_default"
 STRATEGY_KEY = "cross_venue_spread"
-BYBIT_ACCOUNT_ID = "account_crypto_test"
-MT5_ACCOUNT_ID = "account_mt5_demo"
 BYBIT_INSTRUMENT_ID = "instrument_xau_usdt_perp"
 MT5_INSTRUMENT_ID = "instrument_xau_usd"
 BYBIT_SYMBOL = "XAUTUSDT"
 MT5_SYMBOL = "XAUUSD.s"
 BYBIT_LEG_ROLE = "bybit_leg"
 MT5_LEG_ROLE = "mt5_leg"
+_RUNTIME_SNAPSHOT_CLIENT = httpx.Client(trust_env=False)
 
 
 @dataclass(frozen=True, slots=True)
 class CrossSpreadLiveSizing:
+    bybit_account_id: str
+    mt5_account_id: str
     bybit_min: Decimal
     bybit_step: Decimal
     bybit_max: Decimal | None
@@ -54,7 +61,7 @@ class CrossSpreadLiveSizing:
 def get_cross_spread_snapshot() -> CrossSpreadSnapshotResponse:
     settings = get_settings()
     try:
-        response = httpx.get(
+        response = _RUNTIME_SNAPSHOT_CLIENT.get(
             f"{settings.runtime_base_url}/gateway/cross-spread/snapshot",
             timeout=max(settings.runtime_timeout_seconds, 20.0),
         )
@@ -65,6 +72,9 @@ def get_cross_spread_snapshot() -> CrossSpreadSnapshotResponse:
                 response=response,
             )
     except httpx.HTTPError as exc:
+        stale = get_latest_cross_spread_market_snapshot(strategy_key=STRATEGY_KEY)
+        if stale is not None:
+            return _mark_stale(stale)
         raise HTTPException(
             status_code=502,
             detail="Platform Execution Runtime is unavailable",
@@ -76,6 +86,40 @@ def get_cross_spread_snapshot() -> CrossSpreadSnapshotResponse:
         strategy_instance_id=STRATEGY_INSTANCE_ID,
     )
     return snapshot
+
+
+def _mark_stale(snapshot: CrossSpreadSnapshotResponse) -> CrossSpreadSnapshotResponse:
+    """Mark a fallback snapshot as degraded so the UI never shows it as live."""
+    return CrossSpreadSnapshotResponse(
+        status="partial",
+        bybit=CrossSpreadVenueSnapshotResponse(
+            venue=snapshot.bybit.venue,
+            symbol=snapshot.bybit.symbol,
+            status=snapshot.bybit.status,
+            quote=snapshot.bybit.quote,
+            positions=snapshot.bybit.positions,
+            reason=_join_stale_reason(snapshot.bybit.reason),
+        ),
+        mt5=CrossSpreadVenueSnapshotResponse(
+            venue=snapshot.mt5.venue,
+            symbol=snapshot.mt5.symbol,
+            status=snapshot.mt5.status,
+            quote=snapshot.mt5.quote,
+            positions=snapshot.mt5.positions,
+            reason=_join_stale_reason(snapshot.mt5.reason),
+        ),
+        longSpread=snapshot.long_spread,
+        shortSpread=snapshot.short_spread,
+        metrics=snapshot.metrics,
+        asOf=snapshot.as_of,
+    )
+
+
+def _join_stale_reason(reason: str | None) -> str | None:
+    stale_hint = "stale fallback snapshot (runtime temporarily unavailable)"
+    if reason:
+        return f"{reason};{stale_hint}"
+    return stale_hint
 
 
 def get_cross_spread_history(limit: int = 200) -> list[CrossSpreadHistoryPointResponse]:
@@ -157,13 +201,13 @@ def submit_cross_spread_market_command(
         CreateExecutionBatchRequest(
             idempotencyKey=batch_key,
             strategyInstanceId=STRATEGY_INSTANCE_ID,
-            accountId=BYBIT_ACCOUNT_ID,
+            accountId=sizing.bybit_account_id,
             strategyKey=STRATEGY_KEY,
             direction=request.action,
             legs=[
                 BatchLegRequest(
                     role=BYBIT_LEG_ROLE,
-                    accountId=BYBIT_ACCOUNT_ID,
+                    accountId=sizing.bybit_account_id,
                     instrumentId=BYBIT_INSTRUMENT_ID,
                     symbol=BYBIT_SYMBOL,
                     side=bybit_side,
@@ -172,7 +216,7 @@ def submit_cross_spread_market_command(
                 ),
                 BatchLegRequest(
                     role=MT5_LEG_ROLE,
-                    accountId=MT5_ACCOUNT_ID,
+                    accountId=sizing.mt5_account_id,
                     instrumentId=MT5_INSTRUMENT_ID,
                     symbol=MT5_SYMBOL,
                     side=mt5_side,
@@ -211,7 +255,7 @@ def submit_bybit_definitive_failure_rollback(
         CreateTradeCommandRequest(
             idempotencyKey=idempotency_key,
             strategyInstanceId=STRATEGY_INSTANCE_ID,
-            accountId=BYBIT_ACCOUNT_ID,
+            accountId=_bound_cross_spread_account_id(BYBIT_LEG_ROLE),
             instrumentId=BYBIT_INSTRUMENT_ID,
             symbol=BYBIT_SYMBOL,
             side="sell" if open_action == "OPEN_LONG" else "buy",
@@ -247,7 +291,7 @@ def _validate_acceptance_quantity(quantity_oz: Decimal) -> None:
 def _load_live_bybit_specification() -> LiveInstrumentSpecification:
     try:
         bybit = get_instrument_specification(
-            account_id=BYBIT_ACCOUNT_ID,
+            account_id=_bound_cross_spread_account_id(BYBIT_LEG_ROLE),
             symbol=BYBIT_SYMBOL,
         )
     except CrossSpreadLiveReadError as exc:
@@ -257,16 +301,20 @@ def _load_live_bybit_specification() -> LiveInstrumentSpecification:
 
 
 def _load_live_cross_spread_sizing() -> CrossSpreadLiveSizing:
+    bybit_account_id = _bound_cross_spread_account_id(BYBIT_LEG_ROLE)
+    mt5_account_id = _bound_cross_spread_account_id(MT5_LEG_ROLE)
     bybit = _load_live_bybit_specification()
     try:
         mt5 = get_instrument_specification(
-            account_id=MT5_ACCOUNT_ID,
+            account_id=mt5_account_id,
             symbol=MT5_SYMBOL,
         )
     except CrossSpreadLiveReadError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     _validate_mt5_live_specification(mt5)
     return CrossSpreadLiveSizing(
+        bybit_account_id=bybit_account_id,
+        mt5_account_id=mt5_account_id,
         bybit_min=bybit.min_quantity,
         bybit_step=bybit.quantity_step,
         bybit_max=bybit.max_market_quantity,
@@ -275,6 +323,55 @@ def _load_live_cross_spread_sizing() -> CrossSpreadLiveSizing:
         mt5_max=mt5.max_market_quantity,
         mt5_multiplier=mt5.contract_size,
     )
+
+
+def _bound_cross_spread_account_id(role: str) -> str:
+    settings = get_settings()
+    preferred_environment = settings.cross_spread_preferred_account_environment.strip().lower()
+    with connection() as db:
+        row = db.execute(
+            """
+            SELECT sab.account_id
+            FROM strategy_account_bindings sab
+            LEFT JOIN accounts a ON a.id = sab.account_id
+            WHERE sab.strategy_instance_id = ?
+              AND sab.role = ?
+              AND sab.status = 'active'
+            ORDER BY
+              CASE
+                WHEN ? != '' AND lower(COALESCE(a.environment, '')) = ? THEN 0
+                ELSE 1
+              END,
+              CASE
+                WHEN lower(COALESCE(a.status, '')) = 'active' THEN 0
+                ELSE 1
+              END,
+              sab.created_at DESC,
+              sab.id DESC
+            LIMIT 1
+            """,
+            (
+                STRATEGY_INSTANCE_ID,
+                "venue_a" if role == BYBIT_LEG_ROLE else "mt5_leg",
+                preferred_environment,
+                preferred_environment,
+            ),
+        ).fetchone()
+    if row is None:
+        venue_name = "Bybit" if role == BYBIT_LEG_ROLE else "MT5"
+        raise HTTPException(
+            status_code=503,
+            detail=f"{venue_name} account binding is unavailable for cross-spread",
+        )
+    return str(row["account_id"])
+
+
+def get_bybit_account_id() -> str:
+    return _bound_cross_spread_account_id(BYBIT_LEG_ROLE)
+
+
+def get_mt5_account_id() -> str:
+    return _bound_cross_spread_account_id(MT5_LEG_ROLE)
 
 
 def _validate_bybit_live_specification(

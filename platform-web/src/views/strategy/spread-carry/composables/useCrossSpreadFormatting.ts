@@ -34,13 +34,14 @@ export function formatNullableRate(value: NumericInput) {
   return `${(parsed * 100).toFixed(4)}%`;
 }
 
-export function formatEditableNumber(value: number) {
-  if (!Number.isFinite(value)) return '0';
+export function formatEditableNumber(value: number | null | undefined) {
+  if (value === null || value === undefined) return '';
+  if (!Number.isFinite(value)) return '';
   return Number.isInteger(value) ? String(value) : String(value);
 }
 
 export function parseEditableNumber(value: string) {
-  const normalized = value.trim().replace(/[^0-9.\-]/g, '');
+  const normalized = value.trim().replace(/[^0-9.-]/g, '');
   if (!normalized || normalized === '-' || normalized === '.' || normalized === '-.') return null;
   const parsed = Number(normalized);
   return Number.isFinite(parsed) ? parsed : null;

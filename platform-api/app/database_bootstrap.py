@@ -129,6 +129,7 @@ CREATE TABLE IF NOT EXISTS strategy_account_bindings (
     strategy_instance_id TEXT NOT NULL,
     account_id TEXT NOT NULL,
     role TEXT NOT NULL,
+    capability TEXT NOT NULL DEFAULT 'read_only',
     max_notional TEXT,
     status TEXT NOT NULL,
     created_at TEXT NOT NULL,
@@ -431,6 +432,12 @@ def migrate_schema(db: sqlite3.Connection) -> None:
     ensure_column(db, "execution_batches", "idempotency_key", "TEXT")
     ensure_column(db, "execution_batches", "strategy_instance_id", "TEXT")
     ensure_column(db, "execution_batch_legs", "account_id", "TEXT")
+    ensure_column(
+        db,
+        "strategy_account_bindings",
+        "capability",
+        "TEXT NOT NULL DEFAULT 'read_only'",
+    )
     db.execute(
         """
         CREATE UNIQUE INDEX IF NOT EXISTS idx_execution_batches_idempotency

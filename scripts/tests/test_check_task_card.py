@@ -39,12 +39,6 @@ Risk level: medium
 Role: investigation
 Agent ID: `investigator-1`
 Context Pack: `governance`
-Token baseline: `200000`
-Token current: `260000`
-Token delta: `60000`
-Control-plane token delta: `18000`
-Token budget: `2000000`
-Token status: `green`
 
 ## Objective
 
@@ -90,12 +84,6 @@ Risk level: high
 Role: implementation
 Agent ID: `impl-agent-1`
 Context Pack: `governance`
-Token baseline: `300000`
-Token current: `700000`
-Token delta: `400000`
-Control-plane token delta: `90000`
-Token budget: `2000000`
-Token status: `green`
 
 ## Objective
 
@@ -104,8 +92,6 @@ Reduce governance overhead without changing business logic.
 ## Implementation fields
 
 - Implementation owner: `impl-agent-1`
-- Branch: `codex/sample-governance`
-- Worktree: `C:\\worktrees\\sample-governance`
 - Base commit: `0123456789abcdef0123456789abcdef01234567`
 
 ## Protected semantics
@@ -159,14 +145,10 @@ class CheckTaskCardTests(unittest.TestCase):
     def test_short_read_only_record_passes(self) -> None:
         self.assertEqual(self.validate_content(base_short_record()), [])
 
-    def test_parallel_and_critical_and_recovery_gates_remain(self) -> None:
+    def test_parallel_and_critical_gates_remain_only_when_explicitly_selected(self) -> None:
         content = (
             base_implementation_task()
             .replace("Risk level: high", "Risk level: critical")
-            .replace("Token current: `700000`", "Token current: `1500000`")
-            .replace("Token delta: `400000`", "Token delta: `1200000`")
-            .replace("Token status: `green`", "Token status: `amber`")
-            .replace("Owner notice: `none`", "Owner notice: `required`")
             .replace("Parallel decision: `serial`", "Parallel decision: `parallel-approved`")
             .replace(
                 "## Context",
@@ -185,92 +167,10 @@ class CheckTaskCardTests(unittest.TestCase):
             "critical implementation must name an independent read-only acceptance task",
             failures,
         )
-        self.assertIn(
-            "recovery takeover requires the previous owner to be recorded as closed",
-            failures,
-        )
-        self.assertIn(
-            "Token use at or above 60 percent cannot add a parallel implementation agent",
-            failures,
-        )
+        self.assertNotIn("recovery takeover requires", failures)
 
-    def test_token_delta_relationship_is_enforced(self) -> None:
-        failures = self.validate_content(
-            base_implementation_task().replace("Token delta: `400000`", "Token delta: `399999`")
-        )
-        self.assertIn("Token delta must equal Token current minus Token baseline", failures)
-
-    def test_unavailable_token_snapshot_requires_attention(self) -> None:
-        content = (
-            base_implementation_task()
-            .replace("Status: `active`", "Status: `attention`")
-            .replace("Owner notice: `none`", "Owner notice: `required`")
-            .replace("Token baseline: `300000`", "Token baseline: `unavailable`")
-            .replace("Token current: `700000`", "Token current: `unavailable`")
-            .replace("Token delta: `400000`", "Token delta: `unavailable`")
-            .replace("Control-plane token delta: `90000`", "Control-plane token delta: `unavailable`")
-            .replace("Token status: `green`", "Token status: `unavailable`")
-            .replace(
-                "Business status summary: `Implementation is active on governance simplification.`",
-                "Business status summary: `Needs: owner and technical lead must refresh missing Token snapshot before more work.`",
-            )
-        )
-        self.assertEqual(self.validate_content(content), [])
-
-    def test_invalid_token_numbers_return_readable_errors(self) -> None:
-        failures = self.validate_content(
-            base_implementation_task()
-            .replace("Token baseline: `300000`", "Token baseline: `abc`")
-            .replace("Token delta: `400000`", "Token delta: `-1`")
-        )
-        self.assertIn("Token baseline must be a non-negative integer or unavailable", failures)
-        self.assertIn("Token delta must be a non-negative integer or unavailable", failures)
-
-    def test_token_eighty_and_hundred_percent_gates_are_enforced(self) -> None:
-        eighty_failures = self.validate_content(
-            base_implementation_task()
-            .replace("Token current: `700000`", "Token current: `1900000`")
-            .replace("Token delta: `400000`", "Token delta: `1600000`")
-            .replace("Token status: `green`", "Token status: `amber`")
-        )
-        self.assertIn("Token use at or above 80 percent requires Owner notice", eighty_failures)
-
-        hundred_failures = self.validate_content(
-            base_implementation_task()
-            .replace("Token current: `700000`", "Token current: `2300000`")
-            .replace("Token delta: `400000`", "Token delta: `2000000`")
-            .replace("Token status: `green`", "Token status: `red`")
-            .replace("Owner notice: `none`", "Owner notice: `required`")
-        )
-        self.assertIn("Token use at or above 100 percent requires Status: attention", hundred_failures)
-
-    def test_status_event_rules_are_enforced(self) -> None:
-        attention_failures = self.validate_content(
-            base_implementation_task().replace("Status: `active`", "Status: `attention`")
-        )
-        self.assertIn(
-            "attention Business status summary must state who needs to do what next using Needs:",
-            attention_failures,
-        )
-
-        done_failures = self.validate_content(
-            base_implementation_task()
-            .replace("Status: `active`", "Status: `done`")
-            .replace("Business status summary: `Implementation is active on governance simplification.`", "Business status summary: `Completed.`")
-        )
-        self.assertIn(
-            "done Business status summary must include Capability:, Evidence: and Next gate:",
-            done_failures,
-        )
-
-    def test_control_plane_ratio_is_not_enforced_per_task(self) -> None:
-        control_failures = self.validate_content(
-            base_implementation_task().replace("Control-plane token delta: `90000`", "Control-plane token delta: `150000`")
-        )
-        self.assertNotIn(
-            "Control-plane token delta cannot exceed 30 percent of Token delta",
-            control_failures,
-        )
+    def test_normal_implementation_card_does_not_require_branch_worktree_or_token_fields(self) -> None:
+        self.assertEqual(self.validate_content(base_implementation_task()), [])
 
     def test_task_template_passes_template_check(self) -> None:
         module = load_module()

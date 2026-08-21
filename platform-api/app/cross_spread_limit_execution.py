@@ -9,16 +9,16 @@ from fastapi import HTTPException
 from app.catalog import get_instrument
 from app.config import get_settings
 from app.cross_spread import (
-    BYBIT_ACCOUNT_ID,
     BYBIT_INSTRUMENT_ID,
     BYBIT_LEG_ROLE,
     BYBIT_SYMBOL,
-    MT5_ACCOUNT_ID,
     MT5_INSTRUMENT_ID,
     MT5_LEG_ROLE,
     MT5_SYMBOL,
     STRATEGY_INSTANCE_ID,
     STRATEGY_KEY,
+    get_bybit_account_id,
+    get_mt5_account_id,
     _load_live_cross_spread_sizing,
     _sides_for_action,
     _validate_acceptance_quantity,
@@ -134,13 +134,13 @@ def submit_cross_spread_limit_command(
         CreateExecutionBatchRequest(
             idempotencyKey=batch_key,
             strategyInstanceId=STRATEGY_INSTANCE_ID,
-            accountId=BYBIT_ACCOUNT_ID,
+            accountId=get_bybit_account_id(),
             strategyKey=STRATEGY_KEY,
             direction=request.action,
             legs=[
                 BatchLegRequest(
                     role=BYBIT_LEG_ROLE,
-                    accountId=BYBIT_ACCOUNT_ID,
+                    accountId=get_bybit_account_id(),
                     instrumentId=BYBIT_INSTRUMENT_ID,
                     symbol=BYBIT_SYMBOL,
                     side=bybit_side,
@@ -150,7 +150,7 @@ def submit_cross_spread_limit_command(
                 ),
                 BatchLegRequest(
                     role=MT5_LEG_ROLE,
-                    accountId=MT5_ACCOUNT_ID,
+                    accountId=get_mt5_account_id(),
                     instrumentId=MT5_INSTRUMENT_ID,
                     symbol=MT5_SYMBOL,
                     side=mt5_side,

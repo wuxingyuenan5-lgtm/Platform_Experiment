@@ -12,7 +12,12 @@ function resolveError(error: unknown, fallback: string) {
     };
     const detail = candidate.response?.data?.detail;
     if (Array.isArray(detail)) {
-      return detail.map((item) => item.msg).filter(Boolean).join('；') || fallback;
+      return (
+        detail
+          .map((item) => item.msg)
+          .filter(Boolean)
+          .join('；') || fallback
+      );
     }
     return detail || candidate.message || fallback;
   }
@@ -21,6 +26,22 @@ function resolveError(error: unknown, fallback: string) {
 
 export function useCrossSpreadExitPlans() {
   const exitPlans = ref<CrossSpreadExitPlanResult[]>([]);
+
+  function comparePlans(left: CrossSpreadExitPlanResult, right: CrossSpreadExitPlanResult): number {
+    return new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime();
+  }
+
+  function upsertExitPlan(plan: CrossSpreadExitPlanResult) {
+    const nextPlans = [...exitPlans.value];
+    const index = nextPlans.findIndex((item) => item.planId === plan.planId);
+    if (index >= 0) {
+      nextPlans[index] = plan;
+    } else {
+      nextPlans.unshift(plan);
+    }
+    nextPlans.sort(comparePlans);
+    exitPlans.value = nextPlans;
+  }
 
   async function refreshExitPlans() {
     try {
@@ -34,5 +55,6 @@ export function useCrossSpreadExitPlans() {
   return {
     exitPlans,
     refreshExitPlans,
+    upsertExitPlan,
   };
 }

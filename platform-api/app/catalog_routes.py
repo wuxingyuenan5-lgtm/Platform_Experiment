@@ -8,6 +8,7 @@ from app.catalog import (
     get_account,
     get_instrument,
     get_latest_balance,
+    get_strategy_account_snapshot,
     get_strategy_instance,
     get_strategy_pnl,
     list_accounts,
@@ -27,6 +28,7 @@ from app.schemas import (
     PnlResponse,
     PositionResponse,
     StrategyAccountBindingResponse,
+    StrategyAccountSnapshotResponse,
     StrategyDefinitionResponse,
     StrategyInstanceResponse,
     StrategyNavSnapshotResponse,
@@ -74,6 +76,16 @@ def create_catalog_router(api_prefix: str) -> APIRouter:
         strategy_instance_id: str,
     ) -> list[StrategyAccountBindingResponse]:
         return list_strategy_account_bindings(strategy_instance_id)
+
+    @router.get(
+        f"{api_prefix}/strategies/instances/{{strategy_instance_id}}/account-snapshot",
+        response_model=StrategyAccountSnapshotResponse,
+        tags=["strategies"],
+    )
+    def strategy_account_snapshot(
+        strategy_instance_id: str,
+    ) -> StrategyAccountSnapshotResponse:
+        return get_strategy_account_snapshot(strategy_instance_id)
 
     @router.post(
         f"{api_prefix}/strategies/instances/{{strategy_instance_id}}/runs",

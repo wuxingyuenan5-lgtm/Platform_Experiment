@@ -87,12 +87,13 @@
   import type { Ref } from 'vue';
   import { computed, nextTick, onMounted, ref, watch } from 'vue';
   import { useECharts } from '@/hooks/web/useECharts';
-  import type { StrategyDeskKey } from '@/data/sample/strategy';
+  import type { StrategyDeskKey, StrategyPnlProfile } from '@/data/sample/strategy';
   import StrategyCurveCardChart from './StrategyCurveCardChart.vue';
   import { strategyPnlProfiles } from '@/data/sample/strategy';
 
   const props = defineProps<{
     activeDesk: StrategyDeskKey;
+    liveProfile?: StrategyPnlProfile | null;
   }>();
 
   const periodTabs = ['日报', '周报', '月报', '自定义'];
@@ -104,7 +105,72 @@
     breakdownChartRef as Ref<HTMLDivElement>,
   );
 
-  const profile = computed(() => strategyPnlProfiles[props.activeDesk]);
+  const emptyCrossSpreadProfile: StrategyPnlProfile = {
+    ...strategyPnlProfiles.crossSpread,
+    totalFund: '--',
+    period: '--',
+    xLabels: [],
+    dailyReturns: [],
+    netValues: [],
+    metrics: strategyPnlProfiles.crossSpread.metrics.map((item) => ({
+      ...item,
+      value: '--',
+      ratio: '接口待接入',
+      tone: 'neutral',
+    })),
+    attributions: strategyPnlProfiles.crossSpread.attributions.map((item) => ({
+      ...item,
+      value: '--',
+      ratio: '接口待接入',
+      tone: 'neutral',
+    })),
+    breakdownSeries: strategyPnlProfiles.crossSpread.breakdownSeries.map((item) => ({
+      ...item,
+      data: [],
+    })),
+    legSnapshots: [
+      {
+        title: 'Bybit 腿',
+        venue: '--',
+        symbol: 'XAUTUSDT',
+        rows: [
+          { label: '持仓数量', value: '--' },
+          { label: '均价', value: '--' },
+          { label: '最新价', value: '--' },
+          { label: '未实现盈亏', value: '--' },
+          { label: '已实现盈亏', value: '--' },
+          { label: '最后同步', value: '--' },
+        ],
+      },
+      {
+        title: 'MT5 腿',
+        venue: '--',
+        symbol: 'XAUUSD.s',
+        rows: [
+          { label: '持仓数量', value: '--' },
+          { label: '均价', value: '--' },
+          { label: '最新价', value: '--' },
+          { label: '未实现盈亏', value: '--' },
+          { label: '已实现盈亏', value: '--' },
+          { label: '最后同步', value: '--' },
+        ],
+      },
+    ],
+    detailCurves: strategyPnlProfiles.crossSpread.detailCurves.map((item) => ({
+      ...item,
+      value: '--',
+      tone: 'neutral',
+      data: [],
+    })),
+  };
+
+  const profile = computed(() => {
+    const base = strategyPnlProfiles[props.activeDesk];
+    if (props.liveProfile) return props.liveProfile;
+    if (props.activeDesk !== 'crossSpread') return base;
+    if (!props.liveProfile) return emptyCrossSpreadProfile;
+    return emptyCrossSpreadProfile;
+  });
   const detailCurveCards = computed(() =>
     profile.value.detailCurves.map((item) => ({
       title: item.title,
@@ -198,8 +264,8 @@
       '#d8585f',
       '#8b6bd8',
     ];
-    const series = profile.value.detailCurves.map((item, index) => ({
-      name: item.title,
+    const series = profile.value.breakdownSeries.map((item, index) => ({
+      name: item.name,
       color: palette[index % palette.length],
       data: item.data,
     }));
@@ -256,7 +322,7 @@
     renderBreakdownChart();
   }
 
-  watch(() => props.activeDesk, renderCharts);
+  watch(() => [props.activeDesk, profile.value], renderCharts, { deep: true });
   onMounted(renderCharts);
 </script>
 
@@ -272,8 +338,8 @@
   .detail-curve-card,
   .breakdown-curve-card,
   .leg-snapshot-card {
-    background: var(--strategy-surface);
     border: 1px solid var(--strategy-border);
+    background: var(--strategy-surface);
     box-shadow: var(--strategy-shadow-card);
   }
 
@@ -346,8 +412,8 @@
 
   .period-tabs button.is-active {
     background: var(--strategy-accent-soft);
-    color: var(--strategy-accent-strong);
     box-shadow: inset 0 0 0 1px var(--strategy-accent-ring);
+    color: var(--strategy-accent-strong);
   }
 
   .legend-pill {

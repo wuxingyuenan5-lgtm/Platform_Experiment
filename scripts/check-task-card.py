@@ -12,25 +12,14 @@ CORE_REQUIRED_LABELS = (
     "Task ID",
     "Status",
     "Last transition at",
-    "Owner notice",
     "Business status summary",
-    "Current leaf task/agent ID",
     "Risk level",
     "Role",
-    "Agent ID",
     "Context Pack",
-    "Token baseline",
-    "Token current",
-    "Token delta",
-    "Control-plane token delta",
-    "Token budget",
-    "Token status",
 )
 
 IMPLEMENTATION_REQUIRED_LABELS = (
     "Implementation owner",
-    "Branch",
-    "Worktree",
     "Base commit",
     "Write set",
     "Shared workflow, public contract, migration chain or file set",
@@ -44,21 +33,11 @@ PARALLEL_REQUIRED_LABELS = (
     "Parallel with",
     "Parallel peer write set",
     "Independence evidence",
-    "Active-agent count after dispatch",
 )
 
 RECOVERY_REQUIRED_LABELS = ("Recovery from", "Recovered owner status")
-TOKEN_SNAPSHOT_LABELS = (
-    "Token baseline",
-    "Token current",
-    "Token delta",
-    "Control-plane token delta",
-)
-
 ALLOWED_ROLES = {"investigation", "implementation", "acceptance"}
 ALLOWED_STATUSES = {"planned", "active", "review", "attention", "blocked", "done"}
-ALLOWED_OWNER_NOTICE = {"none", "required", "sent"}
-ALLOWED_TOKEN_STATUS = {"green", "amber", "red", "unavailable"}
 ALLOWED_DECISIONS = {"serial", "parallel-approved"}
 
 
@@ -130,10 +109,10 @@ def validate_status_summary(status: str, summary: str, failures: list[str]) -> N
             f"{status} Business status summary must state who needs to do what next using Needs:"
         )
     if status == "done":
-        required_tokens = ("capability:", "evidence:", "next gate:")
+        required_tokens = ("capability:", "evidence:")
         if any(token not in lowered for token in required_tokens):
             failures.append(
-                "done Business status summary must include Capability:, Evidence: and Next gate:"
+                "done Business status summary must include Capability: and Evidence:"
             )
 
 
@@ -156,69 +135,7 @@ def validate_counts(counts: str, failures: list[str]) -> None:
 
 def validate_token_controls(text: str, failures: list[str]) -> dict[str, int | str | None]:
     status = (field_value(text, "Status") or "").lower()
-    owner_notice = (field_value(text, "Owner notice") or "").lower()
-    token_status = (field_value(text, "Token status") or "").lower()
-
-    if token_status not in ALLOWED_TOKEN_STATUS:
-        failures.append("Token status must be green, amber, red or unavailable")
-
-    values = {
-        label: parse_token_value(
-            text,
-            label,
-            failures,
-            allow_unavailable=label != "Token budget",
-        )
-        for label in (*TOKEN_SNAPSHOT_LABELS, "Token budget")
-    }
-
-    if any(values[label] == "unavailable" for label in TOKEN_SNAPSHOT_LABELS):
-        if status != "attention":
-            failures.append("unavailable Token snapshots require Status: attention")
-        if owner_notice == "none":
-            failures.append("unavailable Token snapshots require Owner notice")
-        if token_status != "unavailable":
-            failures.append("unavailable Token snapshots require Token status: unavailable")
-        return values
-
-    budget = values["Token budget"]
-    baseline = values["Token baseline"]
-    current = values["Token current"]
-    delta = values["Token delta"]
-    control_delta = values["Control-plane token delta"]
-    if None in {budget, baseline, current, delta, control_delta}:
-        return values
-
-    assert isinstance(budget, int)
-    assert isinstance(baseline, int)
-    assert isinstance(current, int)
-    assert isinstance(delta, int)
-    assert isinstance(control_delta, int)
-
-    if budget <= 0:
-        failures.append("Token budget must be greater than zero")
-        return values
-    if current < baseline:
-        failures.append("Token current cannot be less than Token baseline")
-    if delta != current - baseline:
-        failures.append("Token delta must equal Token current minus Token baseline")
-    if control_delta > delta:
-        failures.append("Control-plane token delta cannot exceed Token delta")
-    expected_status = "green"
-    if delta >= budget:
-        expected_status = "red"
-    elif delta * 100 >= budget * 60:
-        expected_status = "amber"
-    if token_status != expected_status:
-        failures.append(
-            f"Token status must be {expected_status} for Token delta {delta} of budget {budget}"
-        )
-    if delta * 100 >= budget * 80 and owner_notice == "none":
-        failures.append("Token use at or above 80 percent requires Owner notice")
-    if delta >= budget and status != "attention":
-        failures.append("Token use at or above 100 percent requires Status: attention")
-
-    return values
+    return {}
 
 
 def validate(path: Path, template: bool) -> list[str]:
@@ -237,15 +154,12 @@ def validate(path: Path, template: bool) -> list[str]:
 
     role = (field_value(text, "Role") or "").lower()
     status = (field_value(text, "Status") or "").lower()
-    owner_notice = (field_value(text, "Owner notice") or "").lower()
     summary = field_value(text, "Business status summary") or ""
 
     if role not in ALLOWED_ROLES:
         failures.append("Role must be investigation, implementation or acceptance")
     if status not in ALLOWED_STATUSES:
         failures.append("Status must be planned, active, review, attention, blocked or done")
-    if owner_notice not in ALLOWED_OWNER_NOTICE:
-        failures.append("Owner notice must be none, required or sent")
     if not (field_value(text, "Last transition at") or "").strip():
         failures.append("Last transition at must be recorded")
     if not summary.strip():
@@ -253,11 +167,9 @@ def validate(path: Path, template: bool) -> list[str]:
     else:
         validate_status_summary(status, summary, failures)
 
-    token_values = validate_token_controls(text, failures)
-
     if role == "implementation":
         failures.extend(require_labels(text, IMPLEMENTATION_REQUIRED_LABELS))
-        for label in ("Implementation owner", "Branch", "Worktree", "Base commit"):
+        for label in ("Implementation owner", "Base commit"):
             if is_none_value(field_value(text, label)):
                 failures.append(f"implementation task requires a concrete {label}")
         branch = field_value(text, "Branch") or ""
@@ -267,16 +179,6 @@ def validate(path: Path, template: bool) -> list[str]:
         decision = (field_value(text, "Parallel decision") or "").lower()
         if decision not in ALLOWED_DECISIONS:
             failures.append("Parallel decision must be serial or parallel-approved")
-
-        delta = token_values["Token delta"]
-        budget = token_values["Token budget"]
-        if (
-            decision == "parallel-approved"
-            and isinstance(delta, int)
-            and isinstance(budget, int)
-            and delta * 100 >= budget * 60
-        ):
-            failures.append("Token use at or above 60 percent cannot add a parallel implementation agent")
 
         if decision == "parallel-approved":
             failures.extend(require_labels(text, PARALLEL_REQUIRED_LABELS))

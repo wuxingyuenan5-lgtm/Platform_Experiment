@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import time
 from decimal import Decimal
 from typing import Any
 
+from app.config import get_settings
+from app.gateway_factory import create_gateway
 from app.models import (
     CrossSpreadMetrics,
     CrossSpreadSnapshotResponse,
@@ -15,6 +18,12 @@ from app.secret_resolver import resolve_secret_reference
 
 BYBIT_CREDENTIAL_REF = "secret://crypto-test-001"
 MT5_CREDENTIAL_REF = "secret://mt5-demo-001"
+
+# Snapshot cache to absorb the 1Hz exit-monitor polling without hammering the
+# live venues on every tick. TTL is short enough to keep quotes fresh while
+# cutting venue round-trips by an order of magnitude.
+_SNAPSHOT_CACHE: dict[str, tuple[float, CrossSpreadSnapshotResponse]] = {}
+_SNAPSHOT_CACHE_TTL_SECONDS = 5.0
 
 
 def build_cross_spread_snapshot(
@@ -30,13 +39,22 @@ def build_cross_spread_snapshot(
     mt5_timeout_seconds: float = 5.0,
     bybit_session_factory: Any | None = None,
     mt5_module: Any | None = None,
+    mt5_preferred_symbol: str | None = None,
+    bybit_timestamp_offset_ms: int = 0,
 ) -> CrossSpreadSnapshotResponse:
+    settings = get_settings()
+    cache_key = f"{bybit_symbol}|{mt5_symbol}|{bybit_demo}|{bybit_credential_ref}|{mt5_credential_ref}"
+    cached = _SNAPSHOT_CACHE.get(cache_key)
+    if cached is not None and time.time() - cached[0] < _SNAPSHOT_CACHE_TTL_SECONDS:
+        return cached[1]
+
     bybit = _build_bybit_snapshot(
         symbol=bybit_symbol,
         demo=bybit_demo,
         recv_window=bybit_recv_window,
         credential_ref=bybit_credential_ref,
         session_factory=bybit_session_factory,
+        bybit_timestamp_offset_ms=bybit_timestamp_offset_ms,
     )
     mt5 = _build_mt5_snapshot(
         symbol=mt5_symbol,
@@ -45,13 +63,26 @@ def build_cross_spread_snapshot(
         bridge_file_path=mt5_bridge_file_path,
         timeout_seconds=mt5_timeout_seconds,
         mt5_module=mt5_module,
+        preferred_symbol=mt5_preferred_symbol,
     )
+    if (
+        settings.gateway_name.strip().lower() in {"fake", "simulation"}
+        and bybit_session_factory is None
+        and mt5_module is None
+    ):
+        bybit = bybit.model_copy(
+            update={"positions": _gateway_positions_for_symbol(bybit_symbol)}
+        )
+        mt5 = mt5.model_copy(
+            update={"positions": _gateway_positions_for_symbol(mt5.symbol)}
+        )
     metrics = CrossSpreadMetrics(
         fundingRate=_extract_funding_rate(bybit),
         usdtUsd=_fetch_usdt_usd(
             demo=bybit_demo,
             recv_window=bybit_recv_window,
             session_factory=bybit_session_factory,
+            bybit_timestamp_offset_ms=bybit_timestamp_offset_ms,
         ),
         buyerInventoryFee=_extract_swap_value(mt5.reason, "swapLong"),
         sellerInventoryFee=_extract_swap_value(mt5.reason, "swapShort"),
@@ -69,7 +100,7 @@ def build_cross_spread_snapshot(
     else:
         status = "unavailable"
 
-    return CrossSpreadSnapshotResponse(
+    result = CrossSpreadSnapshotResponse(
         status=status,
         bybit=bybit,
         mt5=mt5,
@@ -77,6 +108,51 @@ def build_cross_spread_snapshot(
         shortSpread=short_spread,
         metrics=metrics,
     )
+    _SNAPSHOT_CACHE[cache_key] = (time.time(), result)
+    return result
+
+
+def estimate_cached_fill_price(
+    *,
+    symbol: str,
+    side: str,
+) -> Decimal | None:
+    normalized_symbol = symbol.upper()
+    normalized_side = side.lower()
+    snapshots = sorted(_SNAPSHOT_CACHE.values(), key=lambda item: item[0], reverse=True)
+    for _, snapshot in snapshots:
+        venue = None
+        if snapshot.bybit.symbol.upper() == normalized_symbol:
+            venue = snapshot.bybit
+        elif snapshot.mt5.symbol.upper() == normalized_symbol:
+            venue = snapshot.mt5
+        if venue is None or venue.quote is None:
+            continue
+        if normalized_side == "buy":
+            return venue.quote.ask
+        if normalized_side == "sell":
+            return venue.quote.bid
+    return None
+
+
+def _gateway_positions_for_symbol(symbol: str) -> list[VenuePosition]:
+    gateway = create_gateway(get_settings().gateway_name, live_write_enabled=False)
+    normalized_symbol = symbol.upper()
+    positions = []
+    for row in gateway.list_positions():
+        if row.symbol.upper() != normalized_symbol or row.net_quantity == 0:
+            continue
+        positions.append(
+            VenuePosition(
+                symbol=row.symbol,
+                side="buy" if row.net_quantity > 0 else "sell",
+                quantity=row.net_quantity,
+                averagePrice=row.average_price,
+                unrealizedPnl=row.unrealized_pnl,
+                externalId=row.external_position_id,
+            )
+        )
+    return positions
 
 
 def _build_bybit_snapshot(
@@ -86,16 +162,18 @@ def _build_bybit_snapshot(
     recv_window: int,
     credential_ref: str,
     session_factory: Any | None,
+    bybit_timestamp_offset_ms: int = 0,
 ) -> CrossSpreadVenueSnapshot:
     try:
         credentials = resolve_secret_reference(
             credential_ref,
             required_fields=("API_KEY", "SECRET"),
         )
-        using_injected_session = session_factory is not None
         if session_factory is None:
+            from pybit import _helpers
             from pybit.unified_trading import HTTP
 
+            _apply_bybit_timestamp_offset(_helpers, bybit_timestamp_offset_ms)
             session_factory = HTTP
         session = session_factory(
             testnet=False,
@@ -104,7 +182,17 @@ def _build_bybit_snapshot(
             api_key=credentials["API_KEY"],
             api_secret=credentials["SECRET"],
         )
-        ticker = session.get_tickers(category="linear", symbol=symbol)
+        ticker = _fetch_bybit_tickers_with_retry(
+            session,
+            symbol=symbol,
+            attempts=2,
+        )
+        if ticker is None:
+            return _unavailable(
+                "bybit",
+                symbol,
+                "Bybit ticker fetch failed after retry (proxy/link flaky)",
+            )
         if ticker.get("retCode") != 0:
             return _unavailable("bybit", symbol, f"ticker error: {ticker.get('retMsg')}")
         ticker_row = ticker["result"]["list"][0]
@@ -118,16 +206,6 @@ def _build_bybit_snapshot(
         )
         funding_rate = _optional_decimal(ticker_row.get("fundingRate"))
         positions = []
-        position_reason = "Bybit position fetch is skipped in live quote snapshot"
-        if not using_injected_session:
-            return CrossSpreadVenueSnapshot(
-                venue="bybit",
-                symbol=symbol,
-                status="available",
-                quote=quote,
-                positions=positions,
-                reason=_join_reason(position_reason, funding_rate),
-            )
         position_reason = None
         try:
             positions_response = session.get_positions(category="linear", symbol=symbol)
@@ -171,6 +249,7 @@ def _build_mt5_snapshot(
     bridge_file_path: str | None,
     timeout_seconds: float,
     mt5_module: Any | None,
+    preferred_symbol: str | None = None,
 ) -> CrossSpreadVenueSnapshot:
     try:
         credentials = resolve_secret_reference(
@@ -208,6 +287,20 @@ def _build_mt5_snapshot(
             return _unavailable("mt5", symbol, "MT5 login failed")
 
         try:
+            try:
+                from app.mt5_symbol_resolver import resolve_mt5_symbol
+
+                resolved = resolve_mt5_symbol(
+                    mt5_module=mt5_module,
+                    base_symbol=symbol,
+                    preferred=preferred_symbol,
+                    cache_key=(str(login), str(credentials.get("SERVER") or "")),
+                )
+                if resolved is not None:
+                    symbol = resolved.symbol
+            except Exception:
+                # Resolution is best-effort; fall back to the configured symbol.
+                pass
             symbol_selector = getattr(mt5_module, "symbol_select", None)
             if callable(symbol_selector):
                 symbol_selector(symbol, True)
@@ -337,12 +430,15 @@ def _fetch_usdt_usd(
     demo: bool,
     recv_window: int,
     session_factory: Any | None,
+    bybit_timestamp_offset_ms: int = 0,
 ) -> Decimal | None:
     try:
         credentials = resolve_secret_reference(BYBIT_CREDENTIAL_REF)
         if session_factory is None:
+            from pybit import _helpers
             from pybit.unified_trading import HTTP
 
+            _apply_bybit_timestamp_offset(_helpers, bybit_timestamp_offset_ms)
             session_factory = HTTP
         session = session_factory(
             testnet=False,
@@ -370,4 +466,42 @@ def _unavailable(venue: str, symbol: str, reason: str) -> CrossSpreadVenueSnapsh
         status="unavailable",
         reason=reason,
     )
+
+
+def _apply_bybit_timestamp_offset(helpers: Any, offset_ms: int) -> None:
+    """Compensate local clock skew against the Bybit server.
+
+    Bybit rejects authenticated requests whose timestamp is in the future by
+    more than the recv_window.  When the local clock runs ahead (measured via
+    ``/v5/market/time``), injecting a negative offset keeps signatures valid.
+    """
+    offset_ms = int(offset_ms or 0)
+    if offset_ms == 0:
+        return
+    original = getattr(helpers, "_vg_original_generate_timestamp", None)
+    if original is None:
+        original = helpers.generate_timestamp
+        helpers._vg_original_generate_timestamp = original
+    helpers.generate_timestamp = lambda: original() + offset_ms
+
+
+def _fetch_bybit_tickers_with_retry(session: Any, *, symbol: str, attempts: int) -> Any | None:
+    """Fetch Bybit tickers with a single retry for flaky proxy connections.
+
+    Returns the raw ticker response (or ``None`` when all attempts fail), so
+    callers can keep a stale-but-readable snapshot instead of an empty page.
+    """
+    import time
+
+    last_error: Exception | None = None
+    for attempt in range(max(1, attempts)):
+        try:
+            return session.get_tickers(category="linear", symbol=symbol)
+        except Exception as exc:  # noqa: BLE001 - network flakiness is expected
+            last_error = exc
+            if attempt < max(1, attempts) - 1:
+                time.sleep(0.5)
+    if last_error is not None:
+        return None
+    return None
 

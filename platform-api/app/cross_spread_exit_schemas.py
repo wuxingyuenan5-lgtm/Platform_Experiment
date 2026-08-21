@@ -28,8 +28,8 @@ ExitPlanStatus = Literal[
 class CrossSpreadMarketOpenRequest(BaseModel):
     direction: SpreadDirection
     quantity_oz: Decimal = Field(alias="quantityOz", gt=0)
-    take_profit_spread: Decimal = Field(alias="takeProfitSpread")
-    stop_loss_spread: Decimal = Field(alias="stopLossSpread")
+    take_profit_spread: Decimal | None = Field(default=None, alias="takeProfitSpread")
+    stop_loss_spread: Decimal | None = Field(default=None, alias="stopLossSpread")
     execution_mode: ExecutionMode = Field(default="market", alias="executionMode")
     limit_spread: Decimal | None = Field(default=None, alias="limitSpread")
     limit_strategy: LimitStrategy = Field(default="fok", alias="limitStrategy")
@@ -52,15 +52,19 @@ class CrossSpreadMarketOpenRequest(BaseModel):
 
     @model_validator(mode="after")
     def validate_request(self) -> CrossSpreadMarketOpenRequest:
-        if self.direction == "LONG_SPREAD":
-            if self.take_profit_spread <= self.stop_loss_spread:
+        if (
+            self.take_profit_spread is not None
+            and self.stop_loss_spread is not None
+        ):
+            if self.direction == "LONG_SPREAD":
+                if self.take_profit_spread <= self.stop_loss_spread:
+                    raise ValueError(
+                        "LONG_SPREAD take-profit exit spread must be above stop-loss exit spread"
+                    )
+            elif self.take_profit_spread >= self.stop_loss_spread:
                 raise ValueError(
-                    "LONG_SPREAD take-profit exit spread must be above stop-loss exit spread"
+                    "SHORT_SPREAD take-profit exit spread must be below stop-loss exit spread"
                 )
-        elif self.take_profit_spread >= self.stop_loss_spread:
-            raise ValueError(
-                "SHORT_SPREAD take-profit exit spread must be below stop-loss exit spread"
-            )
         _validate_limit_selection(self.execution_mode, self.limit_spread)
         return self
 
@@ -107,8 +111,8 @@ class CrossSpreadExitPlanResponse(BaseModel):
     quantity_oz: Decimal = Field(alias="quantityOz")
     mt5_position_id: str = Field(alias="mt5PositionId")
     entry_spread: Decimal = Field(alias="entrySpread")
-    take_profit_spread: Decimal = Field(alias="takeProfitSpread")
-    stop_loss_spread: Decimal = Field(alias="stopLossSpread")
+    take_profit_spread: Decimal | None = Field(default=None, alias="takeProfitSpread")
+    stop_loss_spread: Decimal | None = Field(default=None, alias="stopLossSpread")
     take_profit_execution_mode: ExecutionMode = Field(
         default="market",
         alias="takeProfitExecutionMode",

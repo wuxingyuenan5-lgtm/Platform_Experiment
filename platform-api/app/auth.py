@@ -47,6 +47,24 @@ IDENTITY_FIELDS = {
     "revokedBy",
 }
 SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS", "TRACE"})
+CEO_TRADE_WRITE_PATHS = frozenset(
+    {
+        "/api/v1/trading/funding/market-command",
+        "/api/v1/trading/cross-spread/market-command",
+    }
+)
+CEO_TRADE_STRATEGY_INSTANCE_IDS = frozenset(
+    {
+        "strategy_funding_arbitrage_instance_default",
+        "strategy_cross_venue_spread_instance_default",
+    }
+)
+GENERIC_TRADE_WRITE_PATHS = frozenset(
+    {
+        "/api/v1/trading/commands",
+        "/api/v1/trading/execution-batches",
+    }
+)
 
 
 class AuthenticationAssurance(StrEnum):
@@ -299,8 +317,21 @@ def permission_for_request(method: str, path: str) -> str:
         return "trade:submit"
     if path.endswith("/trading/orders") and normalized_method == "POST":
         return "trade:submit"
-    if path.endswith("/trading/cross-spread/market-command"):
-        return "trade:submit"
+    # Strategy market commands are browser-facing CEO actions.  They use the
+    # product-level trading permission here; the middleware below then applies
+    # the narrower CEO/demo-CEO authority check.  Keeping those two checks
+    # separate prevents a technical lead from acquiring order authority merely
+    # through the shared `trading.write` capability.
+    if path.endswith("/trading/funding/market-command") or path.endswith(
+        "/trading/cross-spread/market-command"
+    ):
+        return "trading.write"
+    if path.endswith("/trading/cross-spread/lifecycle/open"):
+        return "trading.write"
+    if "/trading/cross-spread/exit-plans/" in path and path.endswith("/close"):
+        return "trading.write"
+    if path.endswith("/trading/cross-spread/exit-plans/evaluate"):
+        return "trading.write"
 
     if "/risk/kill-switches/" in path or path.endswith("/execution-risk-policy"):
         return "risk:manage"
@@ -337,6 +368,34 @@ def permission_for_request(method: str, path: str) -> str:
     if "/strategies/instances/" in path and path.endswith("/runs"):
         return "strategy:run"
     return "admin:write"
+
+
+def has_ceo_trade_authority(principal: Principal, settings: Settings) -> bool:
+    if "ceo" in principal.roles:
+        return True
+    return (
+        settings.environment.lower() == "development"
+        and settings.auth_mode.lower() == "development"
+        and "admin" in principal.roles
+    )
+
+
+async def requires_ceo_trade_authority(request: Request) -> bool:
+    """Classify privileged strategy writes without trusting a client route choice."""
+    if request.method.upper() != "POST":
+        return False
+    if request.url.path in CEO_TRADE_WRITE_PATHS:
+        return True
+    if request.url.path not in GENERIC_TRADE_WRITE_PATHS:
+        return False
+    try:
+        body = json.loads((await request.body()).decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        return False
+    return (
+        isinstance(body, dict)
+        and body.get("strategyInstanceId") in CEO_TRADE_STRATEGY_INSTANCE_IDS
+    )
 
 
 def audit_auth_event(
@@ -442,6 +501,15 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
                     "permission_denied",
                     "Authenticated identity lacks required permission",
                 )
+            if (
+                await requires_ceo_trade_authority(request)
+                and not has_ceo_trade_authority(principal, settings)
+            ):
+                raise AuthenticationError(
+                    403,
+                    "ceo_trade_authority_required",
+                    "Strategy trade commands require CEO trade authority",
+                )
             if settings.environment.lower() == "live" or settings.auth_mode.lower() == "api_key":
                 await validate_body_identity(request, principal)
         except AuthenticationError as exc:
@@ -524,6 +592,8 @@ __all__ = [
     "ROLE_PERMISSIONS",
     "assurance_for_request",
     "authenticate_request",
+    "has_ceo_trade_authority",
+    "requires_ceo_trade_authority",
     "permission_for_request",
     "require_human_session",
     "require_permission",

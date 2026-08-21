@@ -474,6 +474,85 @@ def test_persisted_unresolved_batch_blocks_new_instruction_after_restart(
         assert db.execute("SELECT COUNT(*) FROM orders").fetchone()[0] == 0
 
 
+def test_unrelated_account_residue_does_not_block_new_instruction(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    get_settings().database_path = str(tmp_path / "restart-unrelated-account.db")
+    blocking_payload = batch_payload(
+        "account_crypto_test",
+        "instrument_btc_usdt",
+        "instrument_btc_usdt_perp",
+        idempotency_key="persisted-unrelated-account-001",
+    )
+    with TestClient(app):
+        insert_persisted_batch(
+            payload=blocking_payload,
+            status="hedged",
+            leg_status="acknowledged",
+        )
+
+    runtime_calls = 0
+
+    def runtime_post(*args, **kwargs):
+        nonlocal runtime_calls
+        runtime_calls += 1
+        return filled_runtime_response(kwargs["json"])
+
+    monkeypatch.setattr("app.trade_command_execution.httpx.post", runtime_post)
+    with TestClient(app) as client:
+        response = client.post(
+            "/api/v1/trading/execution-batches",
+            json=cross_strategy_payload(idempotency_key="after-unrelated-account-001"),
+        )
+
+    assert response.status_code == 200, response.text
+    assert "active execution batch" not in response.text.lower()
+    with connection() as db:
+        assert db.execute("SELECT COUNT(*) FROM execution_batches").fetchone()[0] == 2
+
+
+def test_terminal_hedged_batch_with_uncertain_leg_releases_same_account_admission(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    get_settings().database_path = str(tmp_path / "hedged-uncertain-same-account.db")
+    initialize_database()
+    blocking_payload = batch_payload(
+        "account_sim_usdt",
+        "instrument_btc_usdt",
+        "instrument_btc_usdt_perp",
+        idempotency_key="persisted-hedged-ack-001",
+    )
+    insert_persisted_batch(
+        payload=blocking_payload,
+        status="hedged",
+        leg_status="acknowledged",
+    )
+
+    runtime_calls = 0
+
+    def runtime_post(*args, **kwargs):
+        nonlocal runtime_calls
+        runtime_calls += 1
+        return filled_runtime_response(kwargs["json"])
+
+    monkeypatch.setattr("app.trade_command_execution.httpx.post", runtime_post)
+    with TestClient(app) as client:
+        response = client.post(
+            "/api/v1/trading/execution-batches",
+            json=batch_payload(
+                "account_sim_usdt",
+                "instrument_btc_usdt",
+                "instrument_btc_usdt_perp",
+                idempotency_key="after-hedged-ack-001",
+            ),
+        )
+
+    assert response.status_code == 200, response.text
+    assert "active execution batch" not in response.text.lower()
+
+
 def test_result_unknown_disposition_retains_lease_after_failed_batch_state(
     monkeypatch,
     tmp_path: Path,
@@ -552,3 +631,68 @@ def test_proven_terminal_batch_releases_global_admission(
             (historical_batch_id,),
         ).fetchone()
         assert historical["status"] == terminal_status
+
+
+def test_update_batch_status_hedged_normalizes_uncertain_legs(
+    tmp_path: Path,
+) -> None:
+    from app.execution_batches import update_batch_status
+
+    get_settings().database_path = str(tmp_path / "normalize-hedged-legs.db")
+    initialize_database()
+    payload = cross_strategy_payload(idempotency_key="normalize-hedged-legs-001")
+    batch_id = insert_persisted_batch(
+        payload=payload,
+        status="executing",
+        leg_status="acknowledged",
+    )
+
+    with connection() as db:
+        db.execute(
+            """
+            INSERT INTO orders (
+                id, command_id, account_id, instrument_id, symbol, side,
+                order_type, quantity, price, status, external_order_id,
+                created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                "external-order-001",
+                "command-normalize-001",
+                "account_sim_usdt",
+                "instrument_btc_usdt",
+                "BTCUSDT",
+                "buy",
+                "limit",
+                "1",
+                "100",
+                "acknowledged",
+                "venue-order-001",
+                "2026-08-21T00:00:00+00:00",
+                "2026-08-21T00:00:00+00:00",
+            ),
+        )
+        db.execute(
+            """
+            UPDATE execution_batch_legs
+            SET order_id = ?, status = 'acknowledged'
+            WHERE batch_id = ? AND sequence = 1
+            """,
+            ("external-order-001", batch_id),
+        )
+
+    update_batch_status(batch_id, "hedged")
+
+    with connection() as db:
+        legs = db.execute(
+            """
+            SELECT status, failure_reason
+            FROM execution_batch_legs
+            WHERE batch_id = ?
+            ORDER BY sequence
+            """,
+            (batch_id,),
+        ).fetchall()
+
+    assert legs[0]["status"] == "filled"
+    assert legs[0]["failure_reason"] is None

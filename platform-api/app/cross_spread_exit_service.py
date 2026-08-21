@@ -7,14 +7,14 @@ from fastapi import HTTPException
 
 from app.config import get_settings
 from app.cross_spread import (
-    BYBIT_ACCOUNT_ID,
     BYBIT_LEG_ROLE,
     BYBIT_SYMBOL,
-    MT5_ACCOUNT_ID,
     MT5_LEG_ROLE,
     MT5_SYMBOL,
     STRATEGY_INSTANCE_ID,
+    get_bybit_account_id,
     get_cross_spread_snapshot,
+    get_mt5_account_id,
     submit_bybit_definitive_failure_rollback,
     submit_cross_spread_market_command,
 )
@@ -185,17 +185,12 @@ async def run_cross_spread_exit_monitor() -> None:
 def _assert_acceptance_open_allowed() -> None:
     settings = get_settings()
     maximum = settings.cross_spread_acceptance_max_active_plans
-    if maximum <= 0:
-        raise HTTPException(
-            status_code=423,
-            detail="Cross-spread acceptance active-plan limit is not configured",
-        )
-    if count_non_closed_exit_plans() >= maximum:
+    if maximum > 0 and count_non_closed_exit_plans() >= maximum:
         raise HTTPException(
             status_code=409,
             detail="A non-closed cross-spread lifecycle already exists",
         )
-    if count_unresolved_cross_spread_batches() > 0:
+    if count_unresolved_cross_spread_batches(get_bybit_account_id()) > 0:
         raise HTTPException(
             status_code=409,
             detail="An unresolved cross-spread execution batch blocks new opens",
@@ -349,8 +344,8 @@ def _create_exit_plan_for_open_batch(
     batch_id: str,
     *,
     direction: SpreadDirection,
-    take_profit_spread: Decimal,
-    stop_loss_spread: Decimal,
+    take_profit_spread: Decimal | None,
+    stop_loss_spread: Decimal | None,
 ) -> CrossSpreadExitPlanResponse:
     summaries = load_batch_fill_summaries(batch_id)
     bybit = summaries.get(BYBIT_LEG_ROLE)
@@ -464,7 +459,7 @@ def _verify_flat_positions(*, expected_mt5_position_id: str | None = None) -> No
 
 def _load_live_positions() -> tuple[list[LivePosition], list[LivePosition]]:
     try:
-        return list_positions(BYBIT_ACCOUNT_ID), list_positions(MT5_ACCOUNT_ID)
+        return list_positions(get_bybit_account_id()), list_positions(get_mt5_account_id())
     except CrossSpreadLiveReadError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 

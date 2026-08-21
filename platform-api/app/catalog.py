@@ -16,7 +16,9 @@ from app.schemas import (
     FillResponse,
     InstrumentResponse,
     OrderDetailResponse,
+    PnlResponse,
     StrategyAccountBindingResponse,
+    StrategyAccountSnapshotResponse,
     StrategyDefinitionResponse,
     StrategyInstanceResponse,
     StrategyNavSnapshotResponse,
@@ -121,7 +123,7 @@ def list_strategy_account_bindings(
         rows = db.execute(
             """
             SELECT sab.id, sab.strategy_instance_id, sab.account_id, a.account_code,
-                   sab.role, sab.max_notional, sab.status
+                   sab.role, sab.capability, sab.max_notional, sab.status
             FROM strategy_account_bindings sab
             JOIN accounts a ON a.id = sab.account_id
             WHERE sab.strategy_instance_id = ?
@@ -136,11 +138,96 @@ def list_strategy_account_bindings(
             accountId=row["account_id"],
             accountCode=row["account_code"],
             role=row["role"],
+            capability=row["capability"],
             maxNotional=optional_decimal(row["max_notional"]),
             status=row["status"],
         )
         for row in rows
     ]
+
+
+def get_strategy_account_snapshot(
+    strategy_instance_id: str,
+) -> StrategyAccountSnapshotResponse:
+    bindings = list_strategy_account_bindings(strategy_instance_id)
+    binding = next((item for item in bindings if item.role == "primary"), None)
+    if binding is None:
+        raise HTTPException(status_code=422, detail="Strategy has no primary account binding")
+
+    account = get_account(binding.account_id)
+    with connection() as db:
+        balance_row = db.execute(
+            """
+            SELECT id, account_id, currency, equity, available_balance, source,
+                   data_quality_state, as_of
+            FROM balance_snapshots
+            WHERE account_id = ?
+            ORDER BY as_of DESC
+            LIMIT 1
+            """,
+            (binding.account_id,),
+        ).fetchone()
+        pnl_rows = db.execute(
+            """
+            SELECT realized_pnl, trading_pnl, fees
+            FROM pnl_results
+            WHERE account_id = ?
+            """,
+            (binding.account_id,),
+        ).fetchall()
+
+    balance = (
+        BalanceSnapshotResponse(
+            snapshotId=balance_row["id"],
+            accountId=balance_row["account_id"],
+            currency=balance_row["currency"],
+            equity=Decimal(balance_row["equity"]),
+            availableBalance=Decimal(balance_row["available_balance"]),
+            source=balance_row["source"],
+            dataQualityState=balance_row["data_quality_state"],
+            asOf=balance_row["as_of"],
+        )
+        if balance_row is not None
+        else None
+    )
+    positions = [
+        PositionResponse(
+            accountId=row["account_id"],
+            instrumentId=row["instrument_id"],
+            netQuantity=Decimal(row["net_quantity"]),
+            averagePrice=optional_decimal(row["average_price"]),
+        )
+        for row in list_positions(binding.account_id)
+    ]
+    orders = [item for item in list_orders() if item.account_id == binding.account_id]
+    fills = [item for item in list_fills() if item.account_id == binding.account_id]
+    pnl = (
+        PnlResponse(
+            accountId=binding.account_id,
+            instrumentId="account_total",
+            # SQLite's SUM can coerce DECIMAL text through binary float. Keep
+            # financial aggregation in Decimal from the persisted strings.
+            realizedPnl=sum((Decimal(row["realized_pnl"]) for row in pnl_rows), Decimal("0")),
+            tradingPnl=sum((Decimal(row["trading_pnl"]) for row in pnl_rows), Decimal("0")),
+            fees=sum((Decimal(row["fees"]) for row in pnl_rows), Decimal("0")),
+        )
+        if pnl_rows
+        else None
+    )
+    quality = balance.data_quality_state if balance is not None else account.data_quality_state
+    return StrategyAccountSnapshotResponse(
+        strategyInstanceId=strategy_instance_id,
+        accountId=binding.account_id,
+        accountCode=binding.account_code,
+        capability=binding.capability,
+        dataQualityState=quality,
+        asOf=balance.as_of if balance is not None else None,
+        balance=balance,
+        positions=positions,
+        orders=orders,
+        fills=fills,
+        pnl=pnl,
+    )
 
 
 def list_accounts() -> list[AccountResponse]:
@@ -193,12 +280,11 @@ def account_from_row(row) -> AccountResponse:
 
 
 def get_latest_balance(account_id: str) -> BalanceSnapshotResponse:
-    get_account(account_id)
+    account = get_account(account_id)
     with connection() as db:
-        row = db.execute(
+        latest = db.execute(
             """
-            SELECT id, account_id, currency, equity, available_balance, source,
-                   data_quality_state, as_of
+            SELECT as_of
             FROM balance_snapshots
             WHERE account_id = ?
             ORDER BY as_of DESC
@@ -206,17 +292,42 @@ def get_latest_balance(account_id: str) -> BalanceSnapshotResponse:
             """,
             (account_id,),
         ).fetchone()
-    if row is None:
+        if latest is None:
+            raise HTTPException(status_code=404, detail="Balance snapshot not found")
+        rows = db.execute(
+            """
+            SELECT id, account_id, currency, equity, available_balance, source,
+                   data_quality_state, as_of
+            FROM balance_snapshots
+            WHERE account_id = ? AND as_of = ?
+            ORDER BY id ASC
+            """,
+            (account_id, latest["as_of"]),
+        ).fetchall()
+    if not rows:
         raise HTTPException(status_code=404, detail="Balance snapshot not found")
+    representative = rows[0]
+    currencies = {str(row["currency"]) for row in rows if row["currency"]}
+    equity = sum((Decimal(str(row["equity"])) for row in rows), Decimal("0"))
+    available_balance = max(
+        (Decimal(str(row["available_balance"])) for row in rows),
+        default=Decimal("0"),
+    )
+    data_quality_state = (
+        "partial"
+        if any(str(row["data_quality_state"]) != "complete" for row in rows)
+        else str(representative["data_quality_state"])
+    )
+    currency = next(iter(currencies)) if len(currencies) == 1 else account.baseCurrency
     return BalanceSnapshotResponse(
-        snapshotId=row["id"],
-        accountId=row["account_id"],
-        currency=row["currency"],
-        equity=Decimal(row["equity"]),
-        availableBalance=Decimal(row["available_balance"]),
-        source=row["source"],
-        dataQualityState=row["data_quality_state"],
-        asOf=row["as_of"],
+        snapshotId=representative["id"],
+        accountId=representative["account_id"],
+        currency=currency,
+        equity=equity,
+        availableBalance=available_balance,
+        source=representative["source"],
+        dataQualityState=data_quality_state,
+        asOf=representative["as_of"],
     )
 
 

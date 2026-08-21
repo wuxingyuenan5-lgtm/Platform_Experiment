@@ -38,7 +38,7 @@ class FakeGateway:
     name = "fake"
 
     def submit_order(self, command: SubmitOrderCommand) -> list[ExecutionEvent]:
-        fill_price = command.price or Decimal("100")
+        fill_price = command.price or self._estimate_market_fill_price(command)
         external_order_id, _ = persist_filled_order(command, fill_price)
         return [
             ExecutionEvent(
@@ -60,6 +60,12 @@ class FakeGateway:
                 occurred_at=command.received_at,
             ),
         ]
+
+    def _estimate_market_fill_price(self, command: SubmitOrderCommand) -> Decimal:
+        from app.cross_spread_market import estimate_cached_fill_price
+
+        estimated = estimate_cached_fill_price(symbol=command.symbol, side=command.side)
+        return estimated or Decimal("100")
 
     def get_order(
         self,

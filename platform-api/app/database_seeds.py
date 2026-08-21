@@ -64,27 +64,27 @@ def seed_reference_data(db: sqlite3.Connection) -> None:
             "strategy_bottom_fishing",
             "bottom_fishing",
             "抄底",
-            "placeholder",
-            "paused",
-            "V1 保留管理入口和占位状态。",
+            "read_only",
+            "active",
+            "Bybit 只读账户：策略损益、账户资金与订单信息。",
             None,
         ),
         (
             "strategy_short_term_l",
             "short_term_l",
-            "短线交易员 L",
-            "placeholder",
-            "paused",
-            "V1 保留管理入口和占位状态。",
+            "短线交易员A",
+            "read_only",
+            "active",
+            "Bybit 只读账户：策略损益、账户资金与订单信息。",
             None,
         ),
         (
             "strategy_short_term_w",
             "short_term_w",
-            "短线交易员 W",
-            "placeholder",
-            "paused",
-            "V1 保留管理入口和占位状态。",
+            "短线交易员B",
+            "read_only",
+            "active",
+            "Bybit 只读账户：策略损益、账户资金与订单信息。",
             None,
         ),
     ]
@@ -129,10 +129,30 @@ def seed_reference_data(db: sqlite3.Connection) -> None:
             ),
         )
 
+    db.execute(
+        """
+        UPDATE strategy_definitions
+        SET v1_scope = 'read_only', status = 'active'
+        WHERE strategy_key IN ('bottom_fishing', 'short_term_l', 'short_term_w')
+        """
+    )
+    db.execute(
+        """
+        UPDATE strategy_instances
+        SET status = 'active', data_quality_state = 'unavailable'
+        WHERE id IN (
+            'strategy_bottom_fishing_instance_default',
+            'strategy_short_term_l_instance_default',
+            'strategy_short_term_w_instance_default'
+        )
+        """
+    )
+
     venues = [
         ("venue_simulation", "SIM", "Simulation Venue", "simulation", "active"),
         ("venue_crypto", "CRYPTO_TEST", "Crypto Test Venue", "crypto", "active"),
         ("venue_mt5", "MT5_DEMO", "MT5 Demo", "mt5", "paused"),
+        ("venue_bybit", "BYBIT", "Bybit", "crypto", "active"),
     ]
     for venue in venues:
         db.execute(
@@ -228,6 +248,54 @@ def seed_reference_data(db: sqlite3.Connection) -> None:
             "paused",
             "partial",
         ),
+        (
+            "account_bybit_funding",
+            "venue_bybit",
+            "BYBIT-FUNDING",
+            "资金费账户",
+            "crypto",
+            "live",
+            "USDT",
+            "secret://environment/bybit-funding",
+            "active",
+            "unavailable",
+        ),
+        (
+            "account_bybit_bottom_fishing",
+            "venue_bybit",
+            "BYBIT-BOTTOM-FISHING",
+            "抄底账户",
+            "crypto",
+            "live",
+            "USDT",
+            "secret://environment/bybit-bottom-fishing",
+            "active",
+            "unavailable",
+        ),
+        (
+            "account_bybit_short_term_l",
+            "venue_bybit",
+            "BYBIT-SHORT-TERM-A",
+            "短线交易员A账户",
+            "crypto",
+            "live",
+            "USDT",
+            "secret://environment/bybit-short-term-a",
+            "active",
+            "unavailable",
+        ),
+        (
+            "account_bybit_short_term_w",
+            "venue_bybit",
+            "BYBIT-SHORT-TERM-B",
+            "短线交易员B账户",
+            "crypto",
+            "live",
+            "USDT",
+            "secret://environment/bybit-short-term-b",
+            "active",
+            "unavailable",
+        ),
     ]
     for account in accounts:
         db.execute(
@@ -239,6 +307,8 @@ def seed_reference_data(db: sqlite3.Connection) -> None:
             """,
             (*account, created_at),
         )
+        if account[1] == "venue_bybit":
+            continue
         db.execute(
             """
             INSERT OR IGNORE INTO balance_snapshots (
@@ -261,44 +331,77 @@ def seed_reference_data(db: sqlite3.Connection) -> None:
 
     bindings = [
         (
-            "binding_funding_sim",
+            "binding_funding_bybit",
+            "strategy_funding_arbitrage_instance_default",
+            "account_bybit_funding",
+            "primary",
+            "trade_and_read",
+        ),
+        (
+            "binding_funding_simulation",
             "strategy_funding_arbitrage_instance_default",
             "account_sim_usdt",
-            "primary",
+            "local_test",
+            "trade_and_read",
         ),
         (
             "binding_cross_sim",
             "strategy_cross_venue_spread_instance_default",
             "account_sim_usdt",
             "primary",
+            "trade_and_read",
         ),
         (
             "binding_cross_crypto",
             "strategy_cross_venue_spread_instance_default",
             "account_crypto_test",
             "venue_a",
+            "trade_and_read",
         ),
         (
             "binding_cross_crypto_b",
             "strategy_cross_venue_spread_instance_default",
             "account_crypto_test_b",
             "venue_b",
+            "trade_and_read",
         ),
         (
             "binding_cross_mt5",
             "strategy_cross_venue_spread_instance_default",
             "account_mt5_demo",
             "mt5_leg",
+            "trade_and_read",
+        ),
+        (
+            "binding_bottom_fishing_bybit",
+            "strategy_bottom_fishing_instance_default",
+            "account_bybit_bottom_fishing",
+            "primary",
+            "read_only",
+        ),
+        (
+            "binding_short_term_l_bybit",
+            "strategy_short_term_l_instance_default",
+            "account_bybit_short_term_l",
+            "primary",
+            "read_only",
+        ),
+        (
+            "binding_short_term_w_bybit",
+            "strategy_short_term_w_instance_default",
+            "account_bybit_short_term_w",
+            "primary",
+            "read_only",
         ),
     ]
-    for binding_id, instance_id, account_id, role in bindings:
+    for binding_id, instance_id, account_id, role, capability in bindings:
         db.execute(
             """
             INSERT OR IGNORE INTO strategy_account_bindings (
-                id, strategy_instance_id, account_id, role, max_notional, status, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                id, strategy_instance_id, account_id, role, capability, max_notional, status, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,
-            (binding_id, instance_id, account_id, role, "100000", "active", created_at),
+            (binding_id, instance_id, account_id, role, capability, None, "active", created_at),
         )
 
     instruments = [

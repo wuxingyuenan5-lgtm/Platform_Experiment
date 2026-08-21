@@ -36,7 +36,7 @@ def validate_and_claim_live_session_atomic(
     """
 
     ensure_schema()
-    if price is None or price <= 0:
+    if order_type != "market" and (price is None or price <= 0):
         raise HTTPException(
             status_code=422,
             detail="Live session notional validation requires an explicit positive price",
@@ -45,7 +45,7 @@ def validate_and_claim_live_session_atomic(
     expire_sessions()
     timestamp = now_iso()
     normalized_symbol = symbol.strip().upper()
-    notional = quantity * price
+    notional = quantity * price if price is not None else Decimal(0)
     payload_hash = canonical_hash(
         {
             "commandId": command_id,
@@ -55,7 +55,7 @@ def validate_and_claim_live_session_atomic(
             "side": side,
             "orderType": order_type,
             "quantity": decimal_text(quantity),
-            "price": decimal_text(price),
+            "price": decimal_text(price) if price is not None else None,
         }
     )
 

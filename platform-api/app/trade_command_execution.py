@@ -25,6 +25,19 @@ from app.trading import (
 SubmissionMode = Literal["legacy", "v1"]
 
 
+def _runtime_error_detail(response: httpx.Response) -> str:
+    try:
+        payload = response.json()
+    except ValueError:
+        payload = None
+    if isinstance(payload, dict) and payload.get("detail"):
+        return str(payload["detail"])
+    text = response.text.strip()
+    if text:
+        return text
+    return f"HTTP {response.status_code}"
+
+
 def submit_order_through_runtime(
     request: CreateOrderRequest,
     *,
@@ -146,6 +159,10 @@ def submit_order_through_runtime(
             ]
         else:
             events = response.json()
+    except httpx.HTTPStatusError as exc:
+        mark_order_result_unknown(order_id)
+        detail = _runtime_error_detail(exc.response)
+        raise HTTPException(status_code=502, detail=detail) from exc
     except httpx.HTTPError:
         mark_order_result_unknown(order_id)
         return get_order_response(order_id)

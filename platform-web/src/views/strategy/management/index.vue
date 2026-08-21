@@ -11,7 +11,7 @@
     </section>
 
     <template v-if="activeSection === 'pnl'">
-      <StrategyPnlPanel :active-desk="activeDesk" />
+      <StrategyPnlPanel :active-desk="activeDesk" :live-profile="activePnlProfile" />
     </template>
 
     <template v-else-if="activeSection === 'capital'">
@@ -55,8 +55,12 @@
 </template>
 
 <script setup lang="ts">
-  import { computed, ref, watch } from 'vue';
+  import { computed, onMounted, ref, watch } from 'vue';
+  import { useRoute } from 'vue-router';
   import CompactSegmentTabs from '../shared/CompactSegmentTabs.vue';
+  import { useCrossSpreadFinance } from './composables/useCrossSpreadFinance';
+  import { useCrossSpreadRecords } from './composables/useCrossSpreadRecords';
+  import { useStrategyAccountSnapshots } from './composables/useStrategyAccountSnapshots';
   import StrategyKpiGrid from './components/StrategyKpiGrid.vue';
   import StrategyRuntimePanel from './components/StrategyRuntimePanel.vue';
   import StrategyCurveGrid from './components/StrategyCurveGrid.vue';
@@ -73,7 +77,10 @@
     type StrategyDeskKey,
   } from '@/data/sample/strategy';
 
-  const activeDesk = ref<StrategyDeskKey>('funding');
+  const route = useRoute();
+  const activeDesk = ref<StrategyDeskKey>(
+    route.query.desk === 'crossSpread' ? 'crossSpread' : 'funding',
+  );
   const activeRecordTab = ref('positions');
   const activeSection = ref<'pnl' | 'capital' | 'orders'>('pnl');
 
@@ -88,12 +95,68 @@
     { key: 'orders', label: '订单信息' },
   ];
 
-  const orderProfile = computed(() => strategyOrderProfiles[activeDesk.value]);
-  const capitalProfile = computed(() => strategyCapitalProfiles[activeDesk.value]);
+  const {
+    tabs: liveCrossSpreadTabs,
+    tables: liveCrossSpreadTables,
+    refresh: refreshCrossSpreadRecords,
+  } = useCrossSpreadRecords();
+
+  const {
+    pnlProfile,
+    refresh: refreshCrossSpreadFinance,
+    liveCapitalProfile,
+  } = useCrossSpreadFinance();
+
+  const {
+    capitalProfiles: accountCapitalProfiles,
+    isAccountStrategy,
+    orderProfiles: accountOrderProfiles,
+    pnlProfiles: accountPnlProfiles,
+    refresh: refreshAccountSnapshots,
+  } = useStrategyAccountSnapshots();
+
+  const activePnlProfile = computed(() => {
+    if (activeDesk.value === 'crossSpread') return pnlProfile.value;
+    return isAccountStrategy(activeDesk.value) ? accountPnlProfiles.value[activeDesk.value] : null;
+  });
+
+  const orderProfile = computed(() => {
+    if (activeDesk.value === 'crossSpread') {
+      return {
+        label: strategyOrderProfiles.crossSpread.label,
+        tabs: liveCrossSpreadTabs,
+        tables: liveCrossSpreadTables.value,
+      };
+    }
+    if (isAccountStrategy(activeDesk.value)) {
+      return accountOrderProfiles.value[activeDesk.value];
+    }
+    return strategyOrderProfiles[activeDesk.value];
+  });
+  const capitalProfile = computed(() => {
+    const base = strategyCapitalProfiles[activeDesk.value];
+    if (activeDesk.value === 'crossSpread') return liveCapitalProfile.value;
+    return isAccountStrategy(activeDesk.value)
+      ? accountCapitalProfiles.value[activeDesk.value]
+      : base;
+  });
+
+  onMounted(() => {
+    void refreshCrossSpreadRecords();
+    void refreshCrossSpreadFinance();
+    void refreshAccountSnapshots();
+  });
 
   watch(
     () => activeDesk.value,
     () => {
+      if (activeDesk.value === 'crossSpread') {
+        void refreshCrossSpreadRecords();
+        void refreshCrossSpreadFinance();
+      }
+      if (isAccountStrategy(activeDesk.value)) {
+        void refreshAccountSnapshots(activeDesk.value);
+      }
       activeRecordTab.value = orderProfile.value.tabs[0]?.key || 'positions';
       activeSection.value = 'pnl';
     },

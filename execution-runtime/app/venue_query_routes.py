@@ -3,7 +3,10 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Annotated, Literal
 
+from decimal import Decimal
+
 from fastapi import APIRouter, HTTPException, Query
+from pydantic import BaseModel, Field
 
 from app.gateway import ExecutionGateway
 from app.gateway_errors import (
@@ -29,6 +32,22 @@ from app.route_errors import history_window, query_gateway
 
 def create_venue_query_router(*, gateway: ExecutionGateway) -> APIRouter:
     router = APIRouter()
+
+    class BybitLeverageRequest(BaseModel):
+        account_id: str = Field(alias="accountId")
+        symbol: str
+        leverage: Decimal = Field(gt=0, le=100)
+
+    @router.post("/venue/bybit/leverage", tags=["venue-write"])
+    def set_bybit_leverage(request: BybitLeverageRequest) -> dict[str, object]:
+        adapter = getattr(gateway, "bybit", None)
+        if adapter is None or not hasattr(adapter, "set_leverage"):
+            raise HTTPException(status_code=501, detail="Bybit leverage update is unavailable")
+        return adapter.set_leverage(
+            account_id=request.account_id,
+            symbol=request.symbol,
+            leverage=request.leverage,
+        )
 
     @router.get("/venue/orders", response_model=list[VenueOrderSnapshot], tags=["venue-query"])
     def venue_orders(

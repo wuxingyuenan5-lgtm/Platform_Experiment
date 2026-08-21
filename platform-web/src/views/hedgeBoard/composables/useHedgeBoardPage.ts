@@ -68,6 +68,12 @@ const widgetSourceLinks: Partial<Record<string, string>> = {
     'https://sc.macromicro.me/collections/45/mm-gold-price/712/spdr-gold-trust-etf-gold-price',
 };
 
+const marketDetailWidgetKeys = new Set([
+  'macro-market-detail-table',
+  'gold-market-detail-table',
+  'crypto-market-detail-table',
+]);
+
 function resolveCategory(routeName: string, routePath: string): HedgeCategory {
   if (routeName === 'HedgeUsBoard' || routePath.endsWith('/us')) return 'us';
   if (routeName === 'HedgeAShareBoard' || routePath.endsWith('/a-share')) return 'aShare';
@@ -169,9 +175,15 @@ export function useHedgeBoardPage() {
   }
 
   function shouldHideWidgetHeader(sectionId: string, widget: WidgetConfig) {
+    const localKey = widget.localKey;
+    if (['macro-liquidity', 'gold-main', 'crypto-main'].includes(sectionId)) {
+      return widget.kind !== 'local-chart';
+    }
+    if (!localKey) return false;
     return (
-      ['macro-liquidity', 'gold-main', 'crypto-main'].includes(sectionId) &&
-      widget.kind !== 'local-chart'
+      ['macro-market', 'gold-market', 'crypto-market'].includes(sectionId) &&
+      widget.kind === 'local-chart' &&
+      marketDetailWidgetKeys.has(localKey)
     );
   }
 

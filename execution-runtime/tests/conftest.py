@@ -58,3 +58,13 @@ def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
                 f"{item.nodeid} must have exactly one primary test marker; "
                 f"found {sorted(primary_markers)}"
             )
+
+
+@pytest.fixture(autouse=True)
+def _clear_cross_spread_snapshot_cache():
+    """Isolate module-level snapshot cache between tests."""
+    from app import cross_spread_market
+
+    cross_spread_market._SNAPSHOT_CACHE.clear()
+    yield
+    cross_spread_market._SNAPSHOT_CACHE.clear()

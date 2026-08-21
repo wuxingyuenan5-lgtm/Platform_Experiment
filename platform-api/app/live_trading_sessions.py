@@ -343,6 +343,14 @@ def check_approval_blockers(row, *, db=None) -> list[str]:
             WHERE vr.strategy_instance_id = ?
               AND vr.account_id = ?
               AND rd.status IN ('open', 'accepted')
+              AND NOT (
+                  rd.status = 'accepted'
+                  AND rd.difference_type = 'missing_external'
+                  AND EXISTS (
+                      SELECT 1 FROM orders o
+                      WHERE o.id = rd.local_reference AND o.status = 'rejected'
+                  )
+              )
             """,
             (row["strategy_instance_id"], row["account_id"]),
         ).fetchone()["count"]
@@ -400,6 +408,7 @@ def approve_live_session(
     principal: Principal,
 ) -> LiveTradingSessionResponse:
     ensure_schema()
+    settings = get_settings()
     if not ({"risk_officer", "admin"} & set(principal.roles)):
         raise HTTPException(status_code=403, detail="Risk approval role is required")
     with connection() as db:
@@ -413,7 +422,14 @@ def approve_live_session(
             if row["status"] == "approved" and row["approver_user_id"] == principal.user_id:
                 return response_from_row(row)
             raise HTTPException(status_code=409, detail="LiveTradingSession is not pending")
-        if row["applicant_user_id"] == principal.user_id:
+        founder_demo_self_approval = (
+            settings.founder_demo_live_acceptance_enabled
+            and settings.environment.lower() == "development"
+            and settings.auth_mode.lower() == "development"
+            and bool({"ceo", "admin"} & set(principal.roles))
+            and row["session_type"] == "minimum_size_acceptance"
+        )
+        if row["applicant_user_id"] == principal.user_id and not founder_demo_self_approval:
             raise HTTPException(status_code=403, detail="Applicant cannot approve their own live session")
         blockers = check_approval_blockers(row)
         if blockers:

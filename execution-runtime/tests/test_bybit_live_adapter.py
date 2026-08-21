@@ -4,7 +4,11 @@ import pytest
 
 from app.bybit_live_adapter import BybitLiveAdapter
 from app.config import Settings, get_settings
-from app.gateway_errors import GatewayConfigurationError
+from app.gateway_errors import (
+    GatewayConfigurationError,
+    GatewayRequestRejectedError,
+    GatewayResultUnknownError,
+)
 from app.journal import initialize_journal
 from app.models import SubmitOrderCommand
 
@@ -147,6 +151,11 @@ class FakeUnifiedBalanceClient(FakeBybitClient):
         }
 
 
+class ExplodingBybitClient(FakeBybitClient):
+    def place_order(self, **kwargs):
+        raise RuntimeError("timestamp outside venue tolerance")
+
+
 def runtime_settings(write_enabled: bool = True) -> Settings:
     return Settings(
         environment="live",
@@ -227,3 +236,43 @@ def test_bybit_live_adapter_maps_order_fills_and_economic_events(tmp_path) -> No
 
     canceled = adapter.cancel_order("BYBIT-ORDER-1", "cancel-key-1", "operator request")
     assert canceled.status == "canceled"
+
+
+def test_bybit_live_adapter_preserves_underlying_place_order_error(tmp_path) -> None:
+    get_settings().journal_path = str(tmp_path / "bybit-place-order-error.db")
+    initialize_journal()
+    adapter = BybitLiveAdapter(runtime_settings(), ExplodingBybitClient())
+
+    with pytest.raises(
+        GatewayResultUnknownError,
+        match="Bybit place_order result is unknown: RuntimeError: timestamp outside venue tolerance",
+    ):
+        adapter.submit_order(order_command())
+
+
+def test_bybit_account_credential_mapping_isolated_with_legacy_fallback() -> None:
+    settings = Settings(
+        bybit_credential_ref="secret://environment/bybit-default",
+        bybit_account_ids="account-funding,account-bottom",
+        bybit_account_credential_refs=(
+            "account-funding=secret://environment/bybit-funding,"
+            "account-bottom=secret://environment/bybit-bottom"
+        ),
+    )
+
+    assert settings.bybit_credential_for_account("account-funding") == "secret://environment/bybit-funding"
+    assert settings.bybit_credential_for_account("account-bottom") == "secret://environment/bybit-bottom"
+    assert settings.bybit_credential_for_account("legacy-account") == "secret://environment/bybit-default"
+
+
+def test_bybit_read_only_account_rejects_submit_before_client_call(tmp_path) -> None:
+    get_settings().journal_path = str(tmp_path / "bybit-read-only-account.db")
+    initialize_journal()
+    client = FakeBybitClient()
+    settings = runtime_settings()
+    settings.bybit_read_only_account_ids = "account-bybit"
+    adapter = BybitLiveAdapter(settings, client)
+
+    with pytest.raises(GatewayRequestRejectedError, match="configured read-only"):
+        adapter.submit_order(order_command())
+    assert client.place_calls == []

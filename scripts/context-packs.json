@@ -53,16 +53,6 @@
       4000
     ]
   },
-  "default_startup_base": [
-    "AGENTS.md",
-    "docs/codex/current-state.md"
-  ],
-  "default_startup_budget_tokens": 4000,
-  "default_startup_modules": [
-    "platform-web/AGENTS.md",
-    "platform-api/AGENTS.md",
-    "execution-runtime/AGENTS.md"
-  ],
   "bounded_concurrency": {
     "treat_limits_as": "maximum-safe-upper-bound",
     "max_active_agents": 2,
@@ -80,7 +70,7 @@
     "critical_acceptance": "independent-read-only",
     "do_not_split_work_to_fill_capacity": true
   },
-  "task_card_check": "python scripts/check-task-card.py <task-card-path>",
+  "task_card_check": "optional: python scripts/check-task-card.py <task-card-path> (only for an explicit Mode 2, critical, recovery, parallel, or owner-gated evidence record)",
   "pack_categories": [
     "governance",
     "architecture",
@@ -331,7 +321,6 @@
     "release-acceptance": {
       "checks": [
         "git diff --check",
-        "python scripts/check-task-card.py --check-template docs/codex/task-template.md",
         "python scripts/context-for.py --check-budgets --json",
         "python scripts/check-version-consistency.py",
         "python scripts/check-repository-structure.py",
@@ -420,7 +409,6 @@
     "governance": {
       "checks": [
         "git diff --check",
-        "python scripts/check-task-card.py --check-template docs/codex/task-template.md",
         "python scripts/context-for.py --check-budgets --json",
         "python scripts/check-version-consistency.py",
         "python scripts/check-repository-structure.py",

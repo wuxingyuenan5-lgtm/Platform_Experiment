@@ -7,6 +7,7 @@ from uuid import uuid4
 
 from app import venue_reconciliation_repository as repository
 from app import venue_reconciliation_runtime_client as runtime_client
+from app.database import connection
 from app.financial_facts import CreateFinancialFactRequest, record_financial_fact
 from app.trading import (
     apply_execution_events,
@@ -72,9 +73,7 @@ def runtime_get(path: str, params: dict[str, str] | None = None):
 
 
 def strategy_for_order(order_row) -> str:
-    strategy_instance_id = repository.load_strategy_instance_id_for_command(
-        order_row["command_id"]
-    )
+    strategy_instance_id = repository.load_strategy_instance_id_for_command(order_row["command_id"])
     if strategy_instance_id is None:
         raise MissingAuthoritativeStrategyError(
             "Order has no authoritative StrategyInstance and cannot enter formal reconciliation"
@@ -119,8 +118,7 @@ def reconcile_order_with_venue(order_id: str) -> OrderVenueReconciliationRespons
     order_fact = record_financial_fact(
         CreateFinancialFactRequest(
             idempotencyKey=(
-                f"venue-order:{source}:{external_order['externalOrderId']}:"
-                f"{external_order['asOf']}"
+                f"venue-order:{source}:{external_order['externalOrderId']}:{external_order['asOf']}"
             ),
             factType="external_order",
             source=source,
@@ -183,7 +181,7 @@ def reconcile_order_with_venue(order_id: str) -> OrderVenueReconciliationRespons
             expected_command_id=row["command_id"],
         )
         synchronize_trade_command_status(row["command_id"], order_id)
-    elif external_order["status"] in {"accepted", "rejected", "canceled"}:
+    elif external_order["status"] in {"accepted", "filled", "rejected", "canceled"}:
         update_order_from_external(row, external_order)
 
     final = get_order_row(order_id)
@@ -213,6 +211,85 @@ def reconcile_order_with_venue(order_id: str) -> OrderVenueReconciliationRespons
         differenceIds=differences,
         reconciledAt=datetime.now(UTC),
     )
+
+
+def resolve_owner_accepted_missing_external_order(
+    order_id: str,
+) -> OrderVenueReconciliationResponse:
+    """Close one result-unknown order only after formal absent-order evidence.
+
+    This is deliberately narrower than a generic override: the Runtime must
+    again return 404 for the exact platform-order lookup, and a reconciliation
+    reviewer must already have accepted that missing-external difference.
+    """
+    repository.ensure_schema()
+    initial = get_order_row(order_id)
+    if initial["status"] != "result_unknown":
+        raise ReconciliationDifferenceNotFoundError("Order is not result-unknown")
+    response = runtime_get(f"/venue/orders/by-platform/{order_id}")
+    if response.status_code != 404:
+        raise ReconciliationDifferenceNotFoundError(
+            "Venue still has an order record or could not prove it absent"
+        )
+    with connection() as db:
+        proof = db.execute(
+            """
+            SELECT 1 FROM reconciliation_differences
+            WHERE entity_type = 'order' AND difference_type = 'missing_external'
+              AND local_reference = ? AND status = 'accepted'
+            LIMIT 1
+            """,
+            (order_id,),
+        ).fetchone()
+        if proof is None:
+            raise ReconciliationDifferenceNotFoundError(
+                "Accepted missing-external reconciliation evidence is required"
+            )
+        leg = db.execute(
+            "SELECT batch_id FROM execution_batch_legs WHERE order_id = ?",
+            (order_id,),
+        ).fetchone()
+        batch_id = str(leg["batch_id"]) if leg is not None else None
+        if batch_id is not None:
+            unsafe = db.execute(
+                """
+                SELECT 1 FROM execution_batch_legs
+                WHERE batch_id = ? AND status IN ('filled', 'partially_filled', 'acknowledged')
+                LIMIT 1
+                """,
+                (batch_id,),
+            ).fetchone()
+            if unsafe is not None:
+                raise ReconciliationDifferenceNotFoundError(
+                    "Batch contains external execution evidence and cannot be closed as absent"
+                )
+        reason = "Owner-accepted reconciliation confirmed no external venue order"
+        db.execute(
+            "UPDATE orders SET status = 'rejected', updated_at = ? WHERE id = ?",
+            (now_iso(), order_id),
+        )
+        if batch_id is not None:
+            db.execute(
+                """
+                UPDATE execution_batch_legs
+                SET status = 'rejected', failure_reason = ?, updated_at = ?
+                WHERE order_id = ?
+                """,
+                (reason, now_iso(), order_id),
+            )
+            db.execute(
+                """
+                UPDATE execution_batches
+                SET status = 'failed', requires_manual_intervention = 0,
+                    failure_reason = ?, updated_at = ?
+                WHERE id = ?
+                """,
+                (reason, now_iso(), batch_id),
+            )
+    repository.audit(
+        "result_unknown_absent_order_resolved", "order", order_id, {"batchId": batch_id}
+    )
+    return reconcile_order_with_venue(order_id)
 
 
 def update_order_from_external(row, external_order: dict[str, object]) -> None:
@@ -318,8 +395,7 @@ def run_account_reconciliation(
         fact = record_financial_fact(
             CreateFinancialFactRequest(
                 idempotencyKey=(
-                    f"venue-position:{source}:{position['externalPositionId']}:"
-                    f"{position['asOf']}"
+                    f"venue-position:{source}:{position['externalPositionId']}:{position['asOf']}"
                 ),
                 factType="position",
                 source=source,
@@ -441,10 +517,7 @@ def get_run(run_id: str) -> VenueReconciliationRunResponse:
 def list_differences(run_id: str) -> list[ReconciliationDifferenceResponse]:
     repository.ensure_schema()
     get_run(run_id)
-    return [
-        repository.difference_from_row(row)
-        for row in repository.list_difference_rows(run_id)
-    ]
+    return [repository.difference_from_row(row) for row in repository.list_difference_rows(run_id)]
 
 
 def resolve_difference(
@@ -460,9 +533,7 @@ def resolve_difference(
         resolved_at=now_iso(),
     )
     if row is None:
-        raise ReconciliationDifferenceNotFoundError(
-            "Reconciliation difference not found"
-        )
+        raise ReconciliationDifferenceNotFoundError("Reconciliation difference not found")
     if not changed:
         return repository.difference_from_row(row)
     repository.audit(

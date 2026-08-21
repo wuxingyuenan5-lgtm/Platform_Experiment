@@ -1,6 +1,6 @@
 {
   "name": "vg-platform-web",
-  "version": "0.11.0",
+  "version": "0.11.1",
   "private": true,
   "description": "Platform research, trading, risk, identity, portfolio and reconciliation web application",
   "homepage": "https://github.com/wuxingyuenan5-lgtm/Platform_Experiment",
@@ -34,6 +34,7 @@
     "sync:trading-tools": "node scripts/sync-trading-tools-from-md.cjs",
     "test:codebase-boundaries": "node scripts/check-codebase-boundaries.cjs",
     "test:cross-spread-layout": "node scripts/verify-cross-spread-layout.cjs",
+    "test:cross-spread-live-data": "node --test scripts/test-cross-spread-live-data.cjs",
     "test:e2e:hedge-board": "playwright test -c playwright.hedge-board.config.ts",
     "test:e2e:platform-visual": "playwright test -c playwright.platform-visual.config.ts",
     "test:e2e:strategy": "node scripts/verify-strategy-restoration.cjs",
@@ -45,6 +46,7 @@
     "test:homepage-layout": "node scripts/verify-homepage-layout.cjs",
     "test:news-wealth-filters": "node scripts/verify-news-wealth-filters.cjs",
     "test:security-modules": "node --test scripts/test-security-modules.cjs",
+    "test:strategy-account-wiring": "node scripts/test-strategy-account-wiring.cjs",
     "test:user-system": "node scripts/test-user-system-access.cjs",
     "type:check": "vue-tsc -p tsconfig.strategy.json --noEmit --skipLibCheck",
     "type:check:full": "vue-tsc -p tsconfig.full.json --noEmit"

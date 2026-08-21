@@ -167,6 +167,7 @@ class VenuePositionSnapshot(BaseModel):
     as_of: datetime = Field(alias="asOf")
     field_availability: dict[str, str] = Field(default_factory=dict, alias="fieldAvailability")
     data_quality_state: str = Field(default="complete", alias="dataQualityState")
+    open_time: datetime | None = Field(default=None, alias="openTime")
 
 
 class VenueBalanceSnapshot(BaseModel):

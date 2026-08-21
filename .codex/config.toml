@@ -1,13 +1,2 @@
-[features]
-hooks = false
-
-[agents]
-enabled = true
-max_concurrent_threads_per_session = 1
-default_subagent_model = "gpt-5.6-luna"
-default_subagent_reasoning_effort = "medium"
-interrupt_message = true
-
-[models.new_thread]
-model = "gpt-5.6-luna"
-model_reasoning_effort = "medium"
+# Project configuration is intentionally minimal.
+# Runtime hooks and project-scoped agent profiles are not enabled here.

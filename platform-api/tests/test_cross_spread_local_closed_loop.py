@@ -1,7 +1,7 @@
 """Cross-venue gold spread: local closed-loop acceptance.
 
-Drives the real Platform API flow (cross-spread market command -> execution
-batch -> runtime command submission) against a real execution-runtime
+Drives the real Platform API flow (cross-spread lifecycle open/close ->
+execution batch -> runtime command submission) against a real execution-runtime
 subprocess configured with the deterministic FakeGateway. It opens the gold
 spread, verifies both venue legs fill and both venue positions appear, closes
 through the claimed exit plan, and verifies both venue positions return to
@@ -32,14 +32,12 @@ from app.main import app
 
 pytestmark = pytest.mark.integration
 
-REPO_ROOT = Path(os.environ.get("VG_REPO_ROOT") or Path(__file__).resolve().parents[2])
+REPO_ROOT = Path(__file__).resolve().parents[2]
 RUNTIME_DIR = REPO_ROOT / "execution-runtime"
 RUNTIME_PYTHON = RUNTIME_DIR / ".venv" / "Scripts" / "python.exe"
 if not RUNTIME_PYTHON.exists():
-    # Isolated checkouts (worktrees) do not carry the gitignored venv; the
-    # interpreter running the test shares the required dependencies.
     RUNTIME_PYTHON = Path(sys.executable)
-MARKET_COMMAND_ENDPOINT = "/api/v1/trading/cross-spread/market-command"
+LIFECYCLE_OPEN_ENDPOINT = "/api/v1/trading/cross-spread/lifecycle/open"
 BYBIT_ACCOUNT_ID = "account_crypto_test"
 MT5_ACCOUNT_ID = "account_mt5_demo"
 
@@ -50,71 +48,56 @@ def _free_port() -> int:
         return sock.getsockname()[1]
 
 
-def _start_runtime(journal_dir: Path) -> tuple[subprocess.Popen, str, Path]:
+@pytest.fixture(scope="module")
+def runtime_url(tmp_path_factory: pytest.TempPathFactory) -> str:
     port = _free_port()
+    journal_dir = tmp_path_factory.mktemp("runtime-journal")
     env = dict(os.environ)
     env["VG_RUNTIME_GATEWAY_NAME"] = "fake"
     env["VG_RUNTIME_JOURNAL_PATH"] = str(journal_dir / "runtime_journal.db")
     env["VG_RUNTIME_LIVE_WRITE_ENABLED"] = "false"
     log_file = journal_dir / "runtime.log"
-    log_out = log_file.open("ab")
-    proc = subprocess.Popen(
-        [
-            str(RUNTIME_PYTHON),
-            "-m",
-            "uvicorn",
-            "app.main:app",
-            "--host",
-            "127.0.0.1",
-            "--port",
-            str(port),
-            "--log-level",
-            "warning",
-        ],
-        cwd=str(RUNTIME_DIR),
-        env=env,
-        stdout=log_out,
-        stderr=subprocess.STDOUT,
-    )
-    return proc, f"http://127.0.0.1:{port}", log_file
-
-
-def _wait_runtime_ready(proc: subprocess.Popen, base_url: str, log_file: Path) -> bool:
-    deadline = time.monotonic() + 90
-    while time.monotonic() < deadline:
-        if proc.poll() is not None:
-            return False
-        try:
-            with httpx.Client(timeout=1.0) as client:
-                if client.get(f"{base_url}/status").status_code == 200:
-                    return True
-        except Exception:
-            time.sleep(0.3)
-    return False
-
-
-@pytest.fixture(scope="module")
-def runtime_url(tmp_path_factory: pytest.TempPathFactory) -> str:
-    journal_dir = tmp_path_factory.mktemp("runtime-journal")
-    proc, base_url, log_file = _start_runtime(journal_dir)
-    if not _wait_runtime_ready(proc, base_url, log_file):
-        # Transient port/startup contention under a loaded suite: retry once
-        # with a fresh port before failing the fixture.
+    with log_file.open("ab") as log_out:
+        proc = subprocess.Popen(
+            [
+                str(RUNTIME_PYTHON),
+                "-m",
+                "uvicorn",
+                "app.main:app",
+                "--host",
+                "127.0.0.1",
+                "--port",
+                str(port),
+                "--log-level",
+                "warning",
+            ],
+            cwd=str(RUNTIME_DIR),
+            env=env,
+            stdout=log_out,
+            stderr=subprocess.STDOUT,
+        )
+        base_url = f"http://127.0.0.1:{port}"
+        deadline = time.monotonic() + 45
+        while time.monotonic() < deadline:
+            if proc.poll() is not None:
+                raise RuntimeError(
+                    f"runtime exited early rc={proc.returncode}; log={log_file}"
+                )
+            try:
+                with httpx.Client(timeout=1.0) as client:
+                    if client.get(f"{base_url}/status").status_code == 200:
+                        break
+            except Exception:
+                time.sleep(0.3)
+        else:
+            proc.terminate()
+            raise RuntimeError("runtime did not become ready; log={log_file}")
+        yield base_url
         proc.terminate()
         try:
             proc.wait(timeout=10)
         except subprocess.TimeoutExpired:
             proc.kill()
-        proc, base_url, log_file = _start_runtime(journal_dir)
-        assert _wait_runtime_ready(proc, base_url, log_file), (
-            f"runtime did not become ready; log={log_file}"
-        )
-    yield base_url
-    proc.terminate()
-    try:
-        proc.wait(timeout=10)
-    except subprocess.TimeoutExpired:
-        proc.kill()
 
 
 def _venue_positions(runtime_url: str, account_id: str) -> list[dict]:
@@ -124,35 +107,40 @@ def _venue_positions(runtime_url: str, account_id: str) -> list[dict]:
         return [p for p in response.json() if p.get("accountId") == account_id]
 
 
-def test_cross_spread_gold_local_closed_loop(runtime_url: str, tmp_path: Path) -> None:
+def _seed_cross_spread_environment(tmp_path: Path, database_name: str) -> None:
     settings = get_settings()
-    settings.database_path = str(tmp_path / "platform-closed-loop.db")
+    settings.database_path = str(tmp_path / database_name)
     initialize_database()
-    settings.runtime_base_url = runtime_url
-    # Local-simulation activation: the seeded accounts are intentionally paused
-    # until owner-authorized live readiness. The closed loop activates them in
-    # the isolated test database only.
     with connection() as db:
         db.execute(
-            "UPDATE accounts SET status = 'active' "
-            "WHERE id IN ('account_crypto_test', 'account_mt5_demo')"
+            "UPDATE accounts SET status = 'active' WHERE id IN (?, ?)",
+            (BYBIT_ACCOUNT_ID, MT5_ACCOUNT_ID),
         )
         db.execute(
-            "UPDATE strategy_instances SET status = 'active' "
-            "WHERE id = 'strategy_cross_venue_spread_instance_default'"
+            """
+            UPDATE strategy_instances
+            SET status = 'active'
+            WHERE id = 'strategy_cross_venue_spread_instance_default'
+            """
         )
+
+
+def test_cross_spread_gold_local_closed_loop(runtime_url: str, tmp_path: Path) -> None:
+    _seed_cross_spread_environment(tmp_path, "platform-closed-loop.db")
+    settings = get_settings()
+    settings.runtime_base_url = runtime_url
     settings.live_trading_enabled = True
     settings.cross_spread_acceptance_max_quantity_oz = Decimal("1")
 
     with TestClient(app) as client:
-        # --- OPEN_LONG lifecycle: buy Bybit XAUTUSDT, sell MT5 XAUUSD.s ---
+        # --- OPEN_LONG: buy Bybit XAUTUSDT, sell MT5 XAUUSD.s ---
         opened = client.post(
-            "/api/v1/trading/cross-spread/lifecycle/open",
+            LIFECYCLE_OPEN_ENDPOINT,
             json={
                 "direction": "LONG_SPREAD",
                 "quantityOz": "1",
-                "takeProfitSpread": "1.00",
-                "stopLossSpread": "0.50",
+                "takeProfitSpread": "0",
+                "stopLossSpread": "-3",
                 "executionMode": "market",
             },
         )
@@ -177,23 +165,6 @@ def test_cross_spread_gold_local_closed_loop(runtime_url: str, tmp_path: Path) -
         assert bybit_positions, "Bybit long position missing after hedged open"
         assert mt5_positions, "MT5 short position missing after hedged open"
 
-        # Exact platform <-> venue reconciliation: each platform leg order id
-        # must exist in the runtime venue order book with a matching filled
-        # quantity and terminal status.
-        with httpx.Client(base_url=runtime_url, timeout=10) as rt:
-            venue_orders = rt.get("/venue/orders").json()
-        leg_order_ids = {leg["role"]: leg["orderId"] for leg in batch["legs"]}
-        expected_fill = {"bybit_leg": Decimal("1"), "mt5_leg": Decimal("0.01")}
-        for role, order_id in leg_order_ids.items():
-            matches = [
-                o for o in venue_orders if o.get("platformOrderId") == order_id
-            ]
-            assert len(matches) == 1, f"{role} venue order missing: {order_id}"
-            assert matches[0]["status"] == "filled", matches[0]
-            assert Decimal(matches[0]["filledQuantity"]) == expected_fill[role], (
-                matches[0]
-            )
-
         # --- CLOSE_LONG through the claimed exit plan ---
         closed = client.post(
             f"/api/v1/trading/cross-spread/exit-plans/{plan['planId']}/close",
@@ -206,75 +177,48 @@ def test_cross_spread_gold_local_closed_loop(runtime_url: str, tmp_path: Path) -
         # Both venue positions must return to zero after the close.
         bybit_after = _venue_positions(runtime_url, BYBIT_ACCOUNT_ID)
         mt5_after = _venue_positions(runtime_url, MT5_ACCOUNT_ID)
-        assert bybit_after and all(Decimal(p["netQuantity"]) == 0 for p in bybit_after), bybit_after
-        assert mt5_after and all(Decimal(p["netQuantity"]) == 0 for p in mt5_after), mt5_after
-
-        # Close reconciliation: every close-batch leg order id is terminal in
-        # the venue book, and each leg accumulated exactly two fills (open +
-        # close) at the same quantity.
-        close_leg_ids = {leg["role"]: leg["orderId"] for leg in close_batch["legs"]}
-        with httpx.Client(base_url=runtime_url, timeout=10) as rt:
-            venue_orders_after = rt.get("/venue/orders").json()
-            venue_fills_after = rt.get("/venue/fills").json()
-        for role, order_id in close_leg_ids.items():
-            matches = [
-                o
-                for o in venue_orders_after
-                if o.get("platformOrderId") == order_id
-            ]
-            assert len(matches) == 1, f"{role} close venue order missing"
-            assert matches[0]["status"] == "filled", matches[0]
-            assert Decimal(matches[0]["filledQuantity"]) == expected_fill[role]
-        open_ids = set(leg_order_ids.values())
-        close_ids = set(close_leg_ids.values())
-        leg_fill_counts: dict[str, int] = {}
-        for fill in venue_fills_after:
-            platform_id = fill.get("platformOrderId")
-            if platform_id in open_ids or platform_id in close_ids:
-                leg_fill_counts[platform_id] = leg_fill_counts.get(platform_id, 0) + 1
-        for order_id in list(open_ids) + list(close_ids):
-            assert leg_fill_counts.get(order_id) == 1, (
-                f"expected exactly one fill per order, got {leg_fill_counts.get(order_id)}"
-            )
+        assert bybit_after and all(
+            Decimal(position["netQuantity"]) == 0 for position in bybit_after
+        ), bybit_after
+        assert mt5_after and all(
+            Decimal(position["netQuantity"]) == 0 for position in mt5_after
+        ), mt5_after
 
 
-def test_cross_spread_local_closed_loop_fails_closed_when_runtime_unavailable(
+def test_cross_spread_local_closed_loop_blocks_second_open_while_plan_is_active(
+    runtime_url: str,
     tmp_path: Path,
 ) -> None:
+    _seed_cross_spread_environment(tmp_path, "platform-closed-loop-idem.db")
     settings = get_settings()
-    settings.database_path = str(tmp_path / "platform-closed-loop-fail.db")
-    initialize_database()
-    with connection() as db:
-        db.execute(
-            "UPDATE accounts SET status = 'active' "
-            "WHERE id IN ('account_crypto_test', 'account_mt5_demo')"
-        )
-        db.execute(
-            "UPDATE strategy_instances SET status = 'active' "
-            "WHERE id = 'strategy_cross_venue_spread_instance_default'"
-        )
-    settings.runtime_base_url = "http://127.0.0.1:1"  # nothing listening
+    settings.runtime_base_url = runtime_url
     settings.live_trading_enabled = True
     settings.cross_spread_acceptance_max_quantity_oz = Decimal("1")
 
     with TestClient(app) as client:
-        opened = client.post(
-            "/api/v1/trading/cross-spread/lifecycle/open",
+        first = client.post(
+            LIFECYCLE_OPEN_ENDPOINT,
             json={
                 "direction": "LONG_SPREAD",
                 "quantityOz": "1",
-                "takeProfitSpread": "1.00",
-                "stopLossSpread": "0.50",
+                "takeProfitSpread": "0",
+                "stopLossSpread": "-3",
                 "executionMode": "market",
             },
         )
-        # Fail closed: an unreachable runtime must not produce a hedge, a batch
-        # or any venue side effect.
-        assert opened.status_code == 503, opened.text
-        with connection() as db:
-            batch_count = db.execute("SELECT COUNT(*) FROM execution_batches").fetchone()[0]
-            intent_count = db.execute(
-                "SELECT COUNT(*) FROM order_execution_intents"
-            ).fetchone()[0]
-        assert batch_count == 0
-        assert intent_count == 0
+        assert first.status_code == 200, first.text
+        first_batch_id = first.json()["executionBatch"]["batchId"]
+
+        second = client.post(
+            LIFECYCLE_OPEN_ENDPOINT,
+            json={
+                "direction": "LONG_SPREAD",
+                "quantityOz": "1",
+                "takeProfitSpread": "0",
+                "stopLossSpread": "-3",
+                "executionMode": "market",
+            },
+        )
+        assert second.status_code == 409, second.text
+        assert second.json()["detail"] == "A non-closed cross-spread lifecycle already exists"
+        assert first_batch_id

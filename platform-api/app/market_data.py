@@ -82,6 +82,35 @@ def list_cross_spread_market_history(
     ]
 
 
+def get_latest_cross_spread_market_snapshot(
+    *,
+    strategy_key: str,
+) -> CrossSpreadSnapshotResponse | None:
+    """Return the most recent persisted snapshot, if any.
+
+    Used as a degraded fallback when the Execution Runtime is temporarily
+    unavailable, so the UI can keep rendering a stale-but-readable market view
+    instead of a blank error page.
+    """
+    with connection() as db:
+        row = db.execute(
+            """
+            SELECT payload_json
+            FROM market_spread_snapshots
+            WHERE strategy_key = ?
+            ORDER BY observed_at DESC, created_at DESC
+            LIMIT 1
+            """,
+            (strategy_key,),
+        ).fetchone()
+    if row is None or not row["payload_json"]:
+        return None
+    try:
+        return CrossSpreadSnapshotResponse.model_validate_json(row["payload_json"])
+    except Exception:
+        return None
+
+
 def _decimal_text(value: Decimal | None) -> str | None:
     return None if value is None else format(value, "f")
 

@@ -45,32 +45,32 @@ function requestErrorMessage(error: unknown, fallback: string) {
 
 export function useCrossVenueExecutionWorkspace() {
   const ranges = CROSS_SPREAD_RANGES;
-  const selectedPair = ref('XAUTUSDT.P-XAUUSD.s');
+  const selectedPair = ref('XAUTUSDT-XAUUSD');
   const selectedRange = ref('15m');
   const executionStage = ref<'open' | 'close'>('open');
   const executionMode = ref<CrossSpreadExecutionMode>('market');
   const closeExecutionMode = ref<CrossSpreadExecutionMode>('market');
-  const qtyOz = ref(100);
-  const qtyInput = ref('100');
+  // Start at the live contract minimum, never at a demo-sized default.
+  const qtyOz = ref(1);
+  const qtyInput = ref('1');
   const instruments = ref<InstrumentResult[]>([]);
-  const leverage = ref(10);
-  const triggerSpread = ref(-1);
-  const acceptableSpread = ref(-1.1);
-  const takeProfitSpread = ref(-3);
-  const stopLossSpread = ref(1);
+  const triggerSpread = ref<number | null>(null);
+  const acceptableSpread = ref<number | null>(null);
+  const takeProfitSpread = ref<number | null>(null);
+  const stopLossSpread = ref<number | null>(null);
   const takeProfitExecution = ref<CrossSpreadExecutionMode>('limit');
   const stopLossExecution = ref<CrossSpreadExecutionMode>('market');
   const openLimitStrategy = ref<CrossSpreadLimitStrategy>('fok');
   const takeProfitLimitStrategy = ref<CrossSpreadLimitStrategy>('fok');
   const stopLossLimitStrategy = ref<CrossSpreadLimitStrategy>('fok');
   const closeLimitStrategy = ref<CrossSpreadLimitStrategy>('fok');
-  const closeLimitSpread = ref(-1.9);
+  const closeLimitSpread = ref<number | null>(null);
   const triggerSpreadInput = ref(formatEditableNumber(triggerSpread.value));
   const acceptableSpreadInput = ref(formatEditableNumber(acceptableSpread.value));
   const takeProfitSpreadInput = ref(formatEditableNumber(takeProfitSpread.value));
   const stopLossSpreadInput = ref(formatEditableNumber(stopLossSpread.value));
   const closeLimitSpreadInput = ref(formatEditableNumber(closeLimitSpread.value));
-  const { exitPlans, refreshExitPlans: loadExitPlans } = useCrossSpreadExitPlans();
+  const { exitPlans, refreshExitPlans: loadExitPlans, upsertExitPlan } = useCrossSpreadExitPlans();
   const tradingRuleRows = CROSS_SPREAD_TRADING_RULE_ROWS;
   const openDirection = ref<'long' | 'short'>('long');
   const snapshot = ref<CrossSpreadSnapshotResult | null>(null);
@@ -146,9 +146,22 @@ export function useCrossVenueExecutionWorkspace() {
     const parsed = parseOptionalNumber(snapshot.value?.metrics?.usdtUsd);
     return parsed === null ? '--' : formatNumber(parsed, 4);
   });
+  const bybitLatencyMs = computed(() => {
+    const asOf =
+      observability.value?.bybit?.accountRisk?.asOf ||
+      observability.value?.bybit?.positions?.[0]?.asOf ||
+      snapshot.value?.asOf;
+    return latencyMs(asOf);
+  });
+  const mt5LatencyMs = computed(() => {
+    const asOf =
+      observability.value?.mt5?.accountRisk?.asOf ||
+      observability.value?.mt5?.positions?.[0]?.asOf ||
+      snapshot.value?.asOf;
+    return latencyMs(asOf);
+  });
   const { closeOrders, overviewRows } = useCrossSpreadPositions({
     exitPlans,
-    leverage,
     snapshot,
     observability,
     quantityRules,
@@ -193,8 +206,10 @@ export function useCrossVenueExecutionWorkspace() {
     shortSpread,
     exitPlans,
     closeOrders,
+    upsertExitPlan,
     refreshExitPlans,
     refreshSnapshot,
+    refreshObservability,
   });
   const qtyError = computed(() => {
     if (qtyOz.value <= 0) return '数量必须大于 0';
@@ -303,11 +318,6 @@ export function useCrossVenueExecutionWorkspace() {
     qtyInput.value = formatEditableNumber(qtyOz.value);
   }
 
-  function handleLeverageInput(event: Event) {
-    const value = Number((event.target as HTMLInputElement).value);
-    leverage.value = Number.isFinite(value) ? Math.max(1, Math.min(20, value)) : 1;
-  }
-
   function nudgeQty(delta: number) {
     const step = quantityRules.value?.stepOz || Math.abs(delta);
     const direction = delta >= 0 ? 1 : -1;
@@ -315,17 +325,22 @@ export function useCrossVenueExecutionWorkspace() {
     qtyInput.value = formatEditableNumber(qtyOz.value);
   }
 
-  async function refreshExitPlans() {
+  async function refreshExitPlans(): Promise<string> {
     const errorMessage = await loadExitPlans();
     if (errorMessage) setExecutionMessage(errorMessage, 'is-error');
+    return errorMessage;
   }
 
   onMounted(async () => {
-    await refreshInstruments();
-    await refreshExitPlans();
-    await refreshHistory();
-    await refreshObservability();
-    await refreshSnapshot();
+    await Promise.all([
+      refreshInstruments(),
+      refreshExitPlans().then((errorMessage) => {
+        if (errorMessage) setExecutionMessage(errorMessage, 'is-error');
+      }),
+      refreshHistory(),
+      refreshObservability(),
+      refreshSnapshot(),
+    ]);
     snapshotTimer = window.setInterval(() => {
       void refreshSnapshot();
       void refreshObservability();
@@ -336,9 +351,17 @@ export function useCrossVenueExecutionWorkspace() {
     if (snapshotTimer) window.clearInterval(snapshotTimer);
   });
 
+  function latencyMs(value: string | null | undefined) {
+    if (!value) return null;
+    const parsed = new Date(value).getTime();
+    if (!Number.isFinite(parsed)) return null;
+    return Math.max(0, Date.now() - parsed);
+  }
+
   return {
     acceptableSpreadInput,
     bybitQty,
+    bybitLatencyMs,
     bybitQuote,
     closeExecutionMode,
     closeLimitSpreadInput,
@@ -356,14 +379,14 @@ export function useCrossVenueExecutionWorkspace() {
     executionMode,
     executionStage,
     fundingInventoryText,
-    handleLeverageInput,
-    leverage,
     limitEvidence,
     longSpread,
     mt5Lot,
+    mt5LatencyMs,
     mt5Quote,
     nudgeQty,
     observabilityError,
+    openLimitStrategy,
     openConfirm,
     overviewRows,
     prepareOpenDraft,

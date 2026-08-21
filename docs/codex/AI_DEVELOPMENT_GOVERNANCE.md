@@ -1,55 +1,44 @@
 # AI Development Governance
-This document is the durable repository contract for AI-assisted development. It is authority, not a release diary, status log or chat transcript.
 
-## Authority hierarchy
-1. Direct owner authorization and applicable safety policy.
+This reference is read only when the Owner explicitly requests governance context or the task directly changes governance. It is not a startup gate.
+
+## Authority
+
+1. Direct Owner authorization and applicable safety policy.
 2. `AGENTS.md`.
-3. `docs/codex/current-state.md`.
-4. Nearest module `AGENTS.md`.
-5. Owning contracts and approved runbooks.
-6. `scripts/context-packs.json` and `scripts/context-for.py`.
-7. Current version control file and current task card or Issue.
-8. Chat history and temporary startup instructions are not project authority.
-Conflicts stop work and route to the owner or technical lead. Lower authority cannot weaken a higher boundary.
+3. Directly affected contracts and runbooks when needed.
 
-## Cold-start role contract
-Long-term governance roles are long-term responsibilities, not long-lived Codex chats. Their concrete tasks are rebuilt per version or business slice. A role task must close and a clean task must be created when a slice finishes, Token reaches 80 percent, or the role starts repeating historical context that should live in repository authority.
-Every new role task cold-starts in this order: `AGENTS.md`; `docs/codex/current-state.md`; one formal Context Pack via `scripts/context-for.py`; this role contract; the current version control file; the current task card or Issue.
-Historical chats, old summaries and temporary prompts are not role authority. A chat rule affects later work only after it is written into repository authority. Startup messages for new role tasks may contain only the role, authority commit, Context Pack, current task-card or version-control-file path, and new owner authorization delta. Project-scoped Codex config and custom agent profiles are optional local conveniences for those clean tasks, not a substitute for repository authority. Hooks are disabled by default, are not trusted infrastructure, and must not block project operation.
+Direct Owner authorization may select an operating mode but cannot weaken trading, credential, or Live Write safety.
 
-## Long-term roles
-- Project owner: scope, priority, authorization gates, risk acceptance and final acceptance.
-- Project lead: business plan, milestones, owner gates, stage Token view and owner communication when Mode 2 is explicitly selected. It is not a mandatory intermediary for Mode 1.
-- Project technical lead: technical boundary, task cards, write sets, temporary implementation dispatch, evidence sufficiency and status-event generation when Mode 2 is explicitly selected.
-- Development advisor: independent read-only challenge for retrospectives, Token pressure, repeated rework, role conflict, architecture dispute, external connection, Live Write, controlled live and final acceptance.
-Project lead contract: when Mode 2 is selected, maintain only business plan, priority, owner gates, milestone status and stage Token; do not read business source, implementation logs or test process by default; do not directly manage implementation agents or wait on leaf agents continuously; consume only task-card status events; notify the owner only on business-capability completion, owner gates, material blocker or risk, or Token reaching 80 or 100 percent; use business capability names as the primary owner-facing title and keep internal task IDs as evidence only. Mode 1 bypasses this role and reports directly from the single executor to the Owner.
-Project technical lead contract: when Mode 2 is selected, at slice start define technical boundary, task card, write set, acceptance route and Token budget; default to one implementation agent; dispatch a read-only acceptance agent only after a Critical immutable candidate exists; handle ordinary task-card maintenance, conflict-free merge work and status sync directly; do not emit "still running"; do not take over business source, implementation tests or repair work from the named implementer; do not continuously poll implementers after dispatch; return the same issue to the original implementer at most two times; write a status event on transition into `review`, `attention`, `blocked` or `done`. Mode 1 has no technical-lead handoff.
-Development advisor contract: idle and read-only by default; intervene only for owner-requested retrospective, Token at 80 percent, two failed repair rounds, role conflict, architecture dispute, external connection, Live Write, controlled live or final acceptance; do not monitor routine tasks, read ordinary source, review ordinary PRs or create execution agents; each retrospective counts only the increment since the previous frozen baseline.
+## Default Execution
 
-## Operating modes
+Mode 1 is the normal path: one Agent directly completes one Owner request on `main`. It has no parent, child, coordinator, technical lead, project lead, reviewer, task card, branch, Worktree, global lock, or monitoring Agent by default.
 
-The complete mode contract, Owner switches and terminal receipt rule are in `docs/codex/AGENT_OPERATING_MODES.md`. Mode 1 is the default and has no parent, child or reporting Agent. Mode 2 is explicit and bounded. Mode 3 treats an exact Web GPT GitHub commit as an external candidate and uses local verification as the repository gate.
+An Agent reads only the context needed to solve the request. Context Packs, task cards, status records, and this document are on-demand references, not default startup inputs. It preserves user changes and runs validation needed for the changed surface.
 
-## Delivery boundaries
-Governance is a risk ceiling, not mandatory ceremony. The default is Local execution on `main` with one implementation writer and serial work. Do not create a task branch or linked worktree for ordinary work. Use a linked worktree only for explicitly approved high-risk recovery or separately proven parallel writes, and close it when the task ends. Read-only roles do not create branches or worktrees. One workflow, public contract, migration chain or shared file set has one implementation owner; no second implementation agent is created by default.
-Critical work may add one read-only acceptance owner after an immutable candidate exists; acceptance is review-only and does not create a branch. Any exception must record its reason, write set, dependency, independent test, rollback boundary and closure plan in the task card before work begins.
-Critical work uses one implementation owner plus one read-only acceptance owner. Acceptance reviews immutable evidence and does not repair it. Recovery requires the prior owner to be recorded as closed before takeover. Repository governance does not claim Codex runtime throttling or notification guarantees; it validates declarations and status events only.
+Mode 2 is allowed only by explicit Owner request for multi-Agent execution. Mode 3 is allowed only by explicit Owner request for a Web GPT/GitHub candidate and local verification. Neither is inferred from task complexity, criticality, available capacity, a task card, or a profile file. An explicit Mode 2 record may define independent parallel write sets and recovery evidence, but must never become a normal-task gate.
 
-## Task records and startup
-Use the lightest record that preserves safety: full task card for any repository write, Critical acceptance, recovery, parallel implementation or explicit owner-gated immutable evidence; short task record for single-session read-only work with no external-state change.
-Core required fields for every task record are `Task ID`, `Status`, `Last transition at`, `Owner notice`, `Business status summary`, `Current leaf task/agent ID`, `Risk level`, `Role`, `Agent ID`, `Context Pack`, `Token baseline`, `Token current`, `Token delta`, `Control-plane token delta`, `Token budget` and `Token status`.
-Implementation-only fields are required only for implementation work: `Implementation owner`, `Mode`, `Branch/worktree exception`, `Base commit`, `Write set`, `Shared workflow, public contract, migration chain or file set`, `Dependencies`, `Independent test`, `Rollback boundary` and `Parallel decision`. `Mode` defaults to `Local`; branch/worktree fields are `none` unless an approved exception is recorded.
-Parallel-only fields are required only when `Parallel decision` is `parallel-approved`: `Parallel with`, `Parallel peer write set`, `Independence evidence` and `Active-agent count after dispatch`. Recovery-only fields are required only when taking over prior work: `Recovery from` and `Recovered owner status`. Critical implementation also requires `Acceptance task`.
-Dispatch is system-file-first. The startup message passes only task identifier, authority commit, Context Pack, task-card or version-control-file path, and any new owner delta. If a new agent cannot cold-start from repository authority, the task card is incomplete. Authorization changes belong in a new or updated task card plus a fresh execution turn; do not keep pausing and resuming one long-running chat after the authority changed.
+## Progress, Recovery, and Closure
 
-## Token lifecycle and status events
-Token fields are management indicators, not API billing. `Token delta` must equal `Token current - Token baseline`. The 30 percent control-plane measure is evaluated only as the aggregate control-plane Token delta divided by aggregate total Token delta for one business slice; it is a reporting guardrail, not a hard constraint on each task or leaf agent. Task cards record their attributable control-plane contribution, while the business-slice control record owns the aggregate calculation. The repository validator checks task-level arithmetic and declarations; it does not enforce the aggregate ratio or provide Codex runtime hard rate limiting. Token cost and usage evidence must come from trustworthy external Codex snapshots; agents may not estimate or invent those numbers.
-Default guardrails are: total slice Token budget `2,000,000`; implementation owner ceiling `1,200,000`; technical-lead control plane ceiling `300,000`; independent review ceiling `300,000`; project lead plus advisor ceiling `200,000`.
-Behavior gates: at 60 percent of Token budget, do not add agents or broaden scope; at 80 percent, owner notice is mandatory and non-essential work stops; at 100 percent, status must become `attention` and work stops; if no trustworthy snapshot exists, `Token baseline`, `Token current`, `Token delta` and `Control-plane token delta` may be `unavailable`, and the task must move to `attention` rather than inventing zero; after two failed repair rounds on the same issue, stop and do not auto-create a recovery agent or a third repair round.
-Repository status events are only `planned`, `active`, `review`, `attention`, `blocked`, `done`. The technical lead records the event on transition into `review`, `attention`, `blocked` or `done`. `attention` and `blocked` must state who needs to do what next. `done` must state the completed business capability, immutable evidence and next gate. Do not send duplicate notices for unchanged state. "Still running" is not a status event. Owner-facing event titles use business capability names, not internal task IDs.
-Owner-side active notification requires a Codex runtime poller or equivalent lightweight automation. That runtime mechanism is outside repository governance and is not a repository role.
+Progress belongs in commentary. Ordinary tasks close with a concise outcome and relevant evidence, not a fixed receipt. A type error, failed test, source-location problem, local service recovery, ordinary API failure, or normal interface mismatch is work to diagnose and safely repair.
 
-## Closure, context packs and memory
-Agent closure returns only `outcome`, `changed_files`, `validations`, `evidence`, `contract_impact`, `unproven_facts`, `residual_risks` and `next_gate`. This is a terminal receipt only. An active Agent must not emit a final receipt after a partial action or a recoverable tool failure; it continues the same task or explicitly enters `blocked` or `attention`.
-Stable facts belong in owning contracts or current state. One-time status and evidence belong in the current task card, Issue or PR. Do not carry full chats, long logs or diff text into the next task.
-Context Packs are stable task types, not release numbers, role dossiers or chat memory. Add or change a Pack only when a stable repeated task shape changes. A new version, materially different topic or over-explained history should start a clean task and reload authority from the repository rather than extending chat memory.
+For external credentials, API access, or Live Write, finish all safe local and read-only work first, then pause for explicit authorization. Do not infer permission from repository files, CI, or prior chats.
+
+## Task Records and Token Use
+
+Ordinary Mode 1 work does not require a task card, Issue, status event, Token budget, Token snapshot, or Token gate. A task record remains optional for explicit Mode 2 work, critical acceptance, recovery, parallel writes, or separately Owner-gated immutable evidence.
+
+There are no standing monitor Agents, mandatory polling loops, or repository-enforced serialization across chats. Different chats may proceed independently while preserving normal Git conflict discipline.
+
+## Hooks and Local Configuration
+
+Project Codex configuration is intentionally minimal. Project hooks, runtime injection, and agent profiles do not route or block work.
+
+## Non-Negotiable Financial Safety
+
+- Live Write remains disabled by default.
+- Never guess, create, expose, or configure credentials.
+- Preserve Decimal precision and timezone-aware timestamps at financial boundaries.
+- `result_unknown` fails closed and is never blindly retried.
+- Real trading retains idempotency, one-business-intent protection, duplicate prevention, cumulative-fill ceilings, position convergence, Kill Switch controls, and safe reconciliation.
+- Repository validation does not prove external connectivity, account state, deployment, credentials, or Live Write authorization.

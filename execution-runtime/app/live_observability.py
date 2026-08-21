@@ -83,6 +83,11 @@ def bybit_positions(adapter, account_id: str | None = None) -> list[VenuePositio
                 ),
                 currency=adapter.settings.bybit_settle_coin,
                 asOf=adapter._millis(row.get("updatedTime")),
+                openTime=(
+                    adapter._millis(row.get("openTime"))
+                    if row.get("openTime")
+                    else None
+                ),
                 fieldAvailability={
                     "liquidationPrice": (
                         "venue_reported" if liquidation is not None else "not_finite_for_mode"
@@ -132,6 +137,11 @@ def mt5_positions(adapter, account_id: str | None = None) -> list[VenuePositionS
                 positionStatus="open",
                 currency=currency,
                 asOf=adapter._position_time(row),
+                openTime=(
+                    datetime.fromtimestamp(int(getattr(row, "time_msc", 0)) / 1000, UTC)
+                    if int(getattr(row, "time_msc", 0) or 0)
+                    else None
+                ),
                 fieldAvailability={
                     "liquidationPrice": "not_available_mt5_api",
                     "initialMargin": "account_level_only",
@@ -158,7 +168,7 @@ def mt5_account_risk(adapter, account_id: str) -> VenueAccountRiskSnapshot:
     return VenueAccountRiskSnapshot(
         source=adapter.name,
         accountId=account_id,
-        currency=str(getattr(info, "currency", "USD")),
+        currency=adapter._account_currency(mt5),
         equity=Decimal(str(getattr(info, "equity", 0) or 0)),
         walletBalance=Decimal(str(getattr(info, "balance", 0) or 0)),
         marginBalance=Decimal(str(getattr(info, "equity", 0) or 0)),

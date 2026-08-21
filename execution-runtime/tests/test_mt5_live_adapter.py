@@ -236,3 +236,21 @@ def test_mt5_live_adapter_maps_orders_deals_and_swap(tmp_path, monkeypatch) -> N
 
     canceled = adapter.cancel_order("123", "cancel-mt5-1", "operator request")
     assert canceled.status == "canceled"
+
+
+def test_mt5_live_adapter_normalizes_ust_currency_to_usdt(tmp_path, monkeypatch) -> None:
+    configure_mt5_secret(monkeypatch)
+    get_settings().journal_path = str(tmp_path / "mt5-currency.db")
+    initialize_journal()
+    provider = FakeMt5()
+    provider.account_info = lambda: SimpleNamespace(
+        login=123456,
+        currency="UST",
+        equity=100000.0,
+        margin_free=90000.0,
+    )
+    adapter = Mt5LiveAdapter(runtime_settings(write_enabled=False), provider)
+
+    balance = adapter.list_balances("account-mt5")[0]
+
+    assert balance.currency == "USDT"

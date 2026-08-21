@@ -236,6 +236,32 @@ def configure_platform(tmp_path: Path) -> None:
     settings.cross_spread_position_verification_required = True
 
 
+def created_plan_stub() -> "exit_service.CrossSpreadExitPlanResponse":
+    return exit_service.CrossSpreadExitPlanResponse(
+        planId="plan-safe-open",
+        strategyInstanceId="strategy_cross_venue_spread_instance_default",
+        openBatchId="open-batch-safe",
+        closeBatchId=None,
+        direction="LONG_SPREAD",
+        quantityOz="1",
+        mt5PositionId="778899",
+        entrySpread="-2",
+        takeProfitSpread="0",
+        stopLossSpread="-3",
+        takeProfitExecutionMode="market",
+        stopLossExecutionMode="market",
+        takeProfitLimitStrategy="fok",
+        stopLossLimitStrategy="fok",
+        status="active",
+        triggerReason=None,
+        triggerSpread=None,
+        createdAt=NOW,
+        updatedAt=NOW,
+        triggeredAt=None,
+        closedAt=None,
+    )
+
+
 def test_hedged_market_open_creates_plan_from_actual_fills(
     monkeypatch,
     tmp_path: Path,
@@ -270,6 +296,63 @@ def test_hedged_market_open_creates_plan_from_actual_fills(
     assert result.exit_plan.quantity_oz == Decimal("1")
     assert result.exit_plan.entry_spread == Decimal("-2")
     assert result.exit_plan.mt5_position_id == "778899"
+
+
+def test_open_ignores_unresolved_batches_from_other_accounts(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    configure_platform(tmp_path)
+    with TestClient(app):
+        with connection() as db:
+          db.execute(
+              """
+              INSERT INTO execution_batches (
+                  id, idempotency_key, strategy_instance_id, account_id, strategy_key,
+                  direction, status, requires_manual_intervention, failure_reason,
+                  created_at, updated_at
+              ) VALUES (?, ?, ?, ?, ?, ?, 'manual_intervention', 1, 'legacy residue', ?, ?)
+              """,
+              (
+                  "legacy-live-batch",
+                  "legacy-live-key",
+                  "strategy_cross_venue_spread_instance_default",
+                  "bybit-live-main",
+                  "cross_venue_spread",
+                  "OPEN_LONG",
+                  NOW,
+                  NOW,
+              ),
+          )
+        monkeypatch.setattr(
+            exit_service,
+            "_load_live_positions",
+            lambda: ([], []),
+        )
+        monkeypatch.setattr(
+            exit_service,
+            "submit_cross_spread_market_command",
+            lambda request: batch_response("open-batch-safe", direction=request.action),
+        )
+        monkeypatch.setattr(
+            exit_service,
+            "_create_exit_plan_for_open_batch",
+            lambda *args, **kwargs: created_plan_stub(),
+        )
+
+        result = exit_service.open_cross_spread_market(
+            CrossSpreadMarketOpenRequest(
+                direction="LONG_SPREAD",
+                quantityOz="1",
+                takeProfitSpread="0",
+                stopLossSpread="-3",
+                executionMode="market",
+            )
+        )
+
+    assert result.execution_batch.batch_id == "open-batch-safe"
+    assert result.exit_plan is not None
+    assert result.exit_plan.plan_id == "plan-safe-open"
 
 
 def test_exit_plan_claim_is_atomic(tmp_path: Path) -> None:

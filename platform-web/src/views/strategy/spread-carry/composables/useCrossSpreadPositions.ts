@@ -12,7 +12,6 @@ import {
 
 interface UseCrossSpreadPositionsOptions {
   exitPlans: Ref<CrossSpreadExitPlanResult[]>;
-  leverage: Ref<number>;
   snapshot: Ref<CrossSpreadSnapshotResult | null>;
   observability: Ref<CrossSpreadObservabilityResult | null>;
   quantityRules: ComputedRef<QuantityRules | null>;
@@ -22,9 +21,7 @@ interface UseCrossSpreadPositionsOptions {
 }
 
 export function useCrossSpreadPositions(options: UseCrossSpreadPositionsOptions) {
-  const closeOrders = computed<CloseOrder[]>(() =>
-    mapCloseOrders(options.exitPlans.value, options.leverage.value),
-  );
+  const closeOrders = computed<CloseOrder[]>(() => mapCloseOrders(options.exitPlans.value));
 
   const overviewRows = computed<OverviewRow[]>(() =>
     mapOverviewRows({
@@ -34,6 +31,7 @@ export function useCrossSpreadPositions(options: UseCrossSpreadPositionsOptions)
       longSpread: options.longSpread.value,
       shortSpread: options.shortSpread.value,
       snapshotStatusText: options.snapshotStatusText.value,
+      exitPlans: options.exitPlans.value,
     }),
   );
 

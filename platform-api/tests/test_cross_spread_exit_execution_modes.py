@@ -7,9 +7,11 @@ from decimal import Decimal
 import pytest
 from fastapi import HTTPException
 
+import app.cross_spread_exit_routes as exit_routes
 import app.cross_spread_synthetic_service as synthetic_service
 from app.cross_spread_exit_schemas import (
     CrossSpreadExitPlanResponse,
+    CrossSpreadMarketCloseRequest,
     CrossSpreadMarketOpenRequest,
 )
 from app.cross_spread_limit_policy import CrossSpreadFokPrice
@@ -105,6 +107,114 @@ def test_open_request_defaults_exit_execution_modes_to_market() -> None:
 
     assert request.take_profit_execution_mode == "market"
     assert request.stop_loss_execution_mode == "market"
+
+
+@pytest.mark.parametrize(
+    ("route_name", "service_name", "request_model"),
+    [
+        (
+            "open_market_lifecycle",
+            "open_cross_spread_market",
+            CrossSpreadMarketOpenRequest(
+                direction="LONG_SPREAD",
+                quantityOz="1",
+                takeProfitSpread="0",
+                stopLossSpread="-3",
+                executionMode="limit",
+                limitSpread="-1",
+                limitStrategy="post_only_chase",
+            ),
+        ),
+        (
+            "close_market_lifecycle",
+            "close_cross_spread_market",
+            CrossSpreadMarketCloseRequest(
+                executionMode="limit",
+                limitSpread="-1",
+                limitStrategy="post_only_chase",
+            ),
+        ),
+    ],
+)
+def test_lifecycle_routes_delegate_to_limit_capable_service(
+    monkeypatch,
+    route_name: str,
+    service_name: str,
+    request_model,
+) -> None:
+    captured = {}
+    marker = object()
+
+    def fake_service(*args, **kwargs):
+        captured["args"] = args
+        captured["kwargs"] = kwargs
+        return marker
+
+    monkeypatch.setattr(exit_routes, service_name, fake_service)
+
+    if route_name == "open_market_lifecycle":
+        result = exit_routes.open_market_lifecycle(request_model)
+    else:
+        result = exit_routes.close_market_lifecycle("plan-1", request_model)
+
+    assert result is marker
+    if route_name == "open_market_lifecycle":
+        assert captured["args"] == (request_model,)
+    else:
+        assert captured["args"] == ("plan-1",)
+        assert captured["kwargs"] == {
+            "execution_mode": "limit",
+            "limit_spread": request_model.limit_spread,
+            "limit_strategy": "post_only_chase",
+        }
+
+
+def test_manual_close_passes_limit_template_to_close_execution(
+    monkeypatch,
+) -> None:
+    plan = triggered_plan("manual")
+    pricing_result = pricing()
+    captured = {}
+
+    monkeypatch.setattr(synthetic_service, "get_exit_plan", lambda _plan_id: plan)
+    monkeypatch.setattr(
+        synthetic_service,
+        "_prepare_limit_execution",
+        lambda intent, limit_spread: (
+            captured.update(
+                intent=intent,
+                limit_spread=limit_spread,
+            )
+            or pricing_result
+        ),
+    )
+    monkeypatch.setattr(
+        synthetic_service,
+        "claim_exit_plan",
+        lambda *_args, **_kwargs: plan,
+    )
+    monkeypatch.setattr(
+        synthetic_service,
+        "_close_claimed_plan",
+        lambda claimed, **kwargs: (
+            captured.update(claimed=claimed, close_kwargs=kwargs) or "closed"
+        ),
+    )
+
+    result = synthetic_service.close_cross_spread_market(
+        "plan-mode-1",
+        execution_mode="limit",
+        limit_spread=Decimal("-0.2"),
+        limit_strategy="post_only_chase",
+    )
+
+    assert result == "closed"
+    assert captured["limit_spread"] == Decimal("-0.2")
+    assert captured["close_kwargs"] == {
+        "execution_mode": "limit",
+        "limit_strategy": "post_only_chase",
+        "limit_execution": pricing_result,
+    }
 
 
 def test_take_profit_limit_uses_claimed_trigger_spread(monkeypatch) -> None:

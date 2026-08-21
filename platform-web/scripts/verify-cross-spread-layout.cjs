@@ -40,7 +40,7 @@ const workspacePath = path.join(
   'strategy',
   'spread-carry',
   'components',
-  'SpreadExecutionWorkspace.vue',
+  'CrossVenueExecutionWorkspace.vue',
 );
 const spreadCarryPagePath = path.join(
   __dirname,
@@ -50,46 +50,6 @@ const spreadCarryPagePath = path.join(
   'strategy',
   'spread-carry',
   'index.vue',
-);
-const analysisWorkspaceHeaderPath = path.join(
-  __dirname,
-  '..',
-  'src',
-  'views',
-  'strategy',
-  'spread-carry',
-  'components',
-  'SpreadAnalysisWorkspaceHeader.vue',
-);
-const analysisOverviewPath = path.join(
-  __dirname,
-  '..',
-  'src',
-  'views',
-  'strategy',
-  'spread-carry',
-  'components',
-  'SpreadAnalysisOverview.vue',
-);
-const domesticSupplementPath = path.join(
-  __dirname,
-  '..',
-  'src',
-  'views',
-  'strategy',
-  'spread-carry',
-  'components',
-  'DomesticOverseasSupplement.vue',
-);
-const statisticsSectionPath = path.join(
-  __dirname,
-  '..',
-  'src',
-  'views',
-  'strategy',
-  'spread-carry',
-  'components',
-  'SpreadStatisticsSection.vue',
 );
 const marketQuotesPath = path.join(
   __dirname,
@@ -202,10 +162,6 @@ const mountedProductSources = [
   source,
   spreadCarryPageSource,
   workspaceSource,
-  fs.readFileSync(analysisWorkspaceHeaderPath, 'utf8'),
-  fs.readFileSync(analysisOverviewPath, 'utf8'),
-  fs.readFileSync(domesticSupplementPath, 'utf8'),
-  fs.readFileSync(statisticsSectionPath, 'utf8'),
   fs.readFileSync(marketQuotesPath, 'utf8'),
   fs.readFileSync(spreadSummaryPath, 'utf8'),
   fs.readFileSync(spreadChartPath, 'utf8'),
@@ -267,45 +223,10 @@ assert(
 );
 
 assert(
-  spreadCarryPageSource.includes('SpreadAnalysisWorkspaceHeader'),
-  'Expected spread-carry analysis page to use extracted workspace header.',
-);
-assert(
-  spreadCarryPageSource.includes('SpreadAnalysisOverview'),
-  'Expected spread-carry analysis page to use extracted overview section.',
-);
-assert(
-  spreadCarryPageSource.includes('DomesticOverseasSupplement'),
-  'Expected spread-carry analysis page to use extracted domestic/overseas supplement.',
-);
-assert(
-  spreadCarryPageSource.includes('SpreadStatisticsSection'),
-  'Expected spread-carry analysis page to use extracted statistics section.',
-);
-assert(
-  !spreadCarryPageSource.includes('class="workspace-control"') &&
-    !spreadCarryPageSource.includes('.workspace-control'),
-  'Spread-carry page must not inline workspace header controls or styles.',
-);
-assert(
-  !spreadCarryPageSource.includes('domesticAnalysisRows') &&
-    !spreadCarryPageSource.includes('domesticRealtimeRows') &&
-    !spreadCarryPageSource.includes('.domestic-analysis-table'),
-  'Spread-carry page must not inline domestic supplement tables or data.',
-);
-assert(
-  !spreadCarryPageSource.includes('termRows') &&
-    !spreadCarryPageSource.includes('premiumRows') &&
-    !spreadCarryPageSource.includes('.analysis-grid'),
-  'Spread-carry page must not inline spread analysis overview rows.',
-);
-assert(
-  !spreadCarryPageSource.includes('statsRows') &&
-    !spreadCarryPageSource.includes('heatmapRows') &&
-    !spreadCarryPageSource.includes('distributionRef') &&
-    !spreadCarryPageSource.includes('seasonalRef') &&
-    !spreadCarryPageSource.includes('.heatmap-table'),
-  'Spread-carry page must not inline statistics charts, heatmap, or data.',
+  spreadCarryPageSource.includes('CrossVenueExecutionWorkspace') &&
+    spreadCarryPageSource.includes('DomesticOverseasExecutionWorkspace') &&
+    spreadCarryPageSource.includes('DomesticOverseasMarketInsight'),
+  'Expected spread-carry page to mount the formal execution and domestic/overseas workspace components.',
 );
 
 for (const fileName of requiredComposables) {

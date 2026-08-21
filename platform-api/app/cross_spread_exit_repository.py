@@ -82,17 +82,46 @@ def count_non_closed_exit_plans() -> int:
     return int(row["count"])
 
 
-def count_unresolved_cross_spread_batches() -> int:
+def count_unresolved_cross_spread_batches(account_id: str | None = None) -> int:
+    with connection() as db:
+        if account_id:
+            row = db.execute(
+                """
+                SELECT COUNT(*) AS count
+                FROM execution_batches
+                WHERE strategy_key = 'cross_venue_spread'
+                  AND account_id = ?
+                  AND status IN ('pending', 'executing', 'partially_executed', 'manual_intervention')
+                """,
+                (account_id,),
+            ).fetchone()
+        else:
+            row = db.execute(
+                """
+                SELECT COUNT(*) AS count
+                FROM execution_batches
+                WHERE strategy_key = 'cross_venue_spread'
+                  AND status IN ('pending', 'executing', 'partially_executed', 'manual_intervention')
+                """
+            ).fetchone()
+    return int(row["count"])
+
+
+def has_accepted_missing_external_order_difference(order_id: str) -> bool:
+    """Require formal Owner acceptance of venue-proven absent order evidence."""
     with connection() as db:
         row = db.execute(
             """
-            SELECT COUNT(*) AS count
-            FROM execution_batches
-            WHERE strategy_key = 'cross_venue_spread'
-              AND status IN ('pending', 'executing', 'partially_executed', 'manual_intervention')
-            """
+            SELECT 1 FROM reconciliation_differences
+            WHERE entity_type = 'order'
+              AND difference_type = 'missing_external'
+              AND local_reference = ?
+              AND status IN ('accepted', 'resolved')
+            LIMIT 1
+            """,
+            (order_id,),
         ).fetchone()
-    return int(row["count"])
+    return row is not None
 
 
 def create_exit_plan(
@@ -103,8 +132,8 @@ def create_exit_plan(
     quantity_oz: Decimal,
     mt5_position_id: str,
     entry_spread: Decimal,
-    take_profit_spread: Decimal,
-    stop_loss_spread: Decimal,
+    take_profit_spread: Decimal | None,
+    stop_loss_spread: Decimal | None,
     take_profit_execution_mode: ExecutionMode = "market",
     stop_loss_execution_mode: ExecutionMode = "market",
     take_profit_limit_strategy: LimitStrategy = "fok",
@@ -152,8 +181,8 @@ def create_exit_plan(
                 format(quantity_oz, "f"),
                 mt5_position_id,
                 format(entry_spread, "f"),
-                format(take_profit_spread, "f"),
-                format(stop_loss_spread, "f"),
+                format(take_profit_spread, "f") if take_profit_spread is not None else "",
+                format(stop_loss_spread, "f") if stop_loss_spread is not None else "",
                 take_profit_execution_mode,
                 stop_loss_execution_mode,
                 take_profit_limit_strategy,
@@ -279,6 +308,25 @@ def claim_exit_plan(
     return get_exit_plan(plan_id) if cursor.rowcount == 1 else None
 
 
+def reclaim_manual_exit_plan(
+    plan_id: str,
+    *,
+    expected_close_batch_id: str,
+) -> CrossSpreadExitPlanResponse | None:
+    reclaimed_at = now_iso()
+    with connection() as db:
+        cursor = db.execute(
+            """
+            UPDATE cross_spread_exit_plans
+            SET status = 'triggered', trigger_reason = 'manual', trigger_spread = NULL,
+                triggered_at = ?, updated_at = ?
+            WHERE id = ? AND status = 'manual_intervention' AND close_batch_id = ?
+            """,
+            (reclaimed_at, reclaimed_at, plan_id, expected_close_batch_id),
+        )
+    return get_exit_plan(plan_id) if cursor.rowcount == 1 else None
+
+
 def release_exit_plan_claim(plan_id: str) -> CrossSpreadExitPlanResponse:
     updated_at = now_iso()
     with connection() as db:
@@ -368,8 +416,12 @@ def _plan_from_row(row) -> CrossSpreadExitPlanResponse:
         quantityOz=Decimal(row["quantity_oz"]),
         mt5PositionId=row["mt5_position_id"],
         entrySpread=Decimal(row["entry_spread"]),
-        takeProfitSpread=Decimal(row["take_profit_spread"]),
-        stopLossSpread=Decimal(row["stop_loss_spread"]),
+        takeProfitSpread=(
+            Decimal(row["take_profit_spread"]) if row["take_profit_spread"] else None
+        ),
+        stopLossSpread=(
+            Decimal(row["stop_loss_spread"]) if row["stop_loss_spread"] else None
+        ),
         takeProfitExecutionMode=row["take_profit_execution_mode"],
         stopLossExecutionMode=row["stop_loss_execution_mode"],
         takeProfitLimitStrategy=row["take_profit_limit_strategy"],

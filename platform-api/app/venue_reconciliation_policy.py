@@ -19,6 +19,7 @@ class DifferenceDraft:
 
 _ORDER_UPDATE_STATUSES = {
     "accepted": "acknowledged",
+    "filled": "filled",
     "rejected": "rejected",
     "canceled": "canceled",
     "unknown": "result_unknown",

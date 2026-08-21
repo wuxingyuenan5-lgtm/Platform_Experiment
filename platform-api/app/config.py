@@ -20,7 +20,10 @@ class Settings(BaseSettings):
     api_prefix: str = "/api/v1"
     database_path: str = "./data/platform.db"
     runtime_base_url: str = "http://127.0.0.1:8100"
-    runtime_timeout_seconds: float = 5.0
+    # Live venue capability reads may legitimately include a retry against the
+    # venue clock. Keep the platform-side deadline long enough that the read
+    # gate can fail closed on a real response rather than a local timeout.
+    runtime_timeout_seconds: float = 20.0
     cors_origins: str = "http://127.0.0.1:4373,http://localhost:4373"
     live_trading_enabled: bool = False
     default_trading_environment: str = "simulation"
@@ -29,6 +32,7 @@ class Settings(BaseSettings):
     # operations explicitly enables it on a controlled host; Live Write gates still apply.
     cross_spread_exit_monitor_enabled: bool = False
     cross_spread_exit_monitor_interval_seconds: float = 1.0
+    cross_spread_preferred_account_environment: str = "simulation"
 
     # Synthetic FOK pricing reserves a fixed MT5 price amount before deriving the
     # Bybit limit. Zero is the safe default until the controlled host sets evidence-based
@@ -39,7 +43,9 @@ class Settings(BaseSettings):
     # instruction quantity is the boundary); a positive value re-enables the
     # legacy cross-spread acceptance cap.
     cross_spread_acceptance_max_quantity_oz: Decimal = Decimal("0")
-    cross_spread_acceptance_max_active_plans: int = 1
+    # Zero means "no platform-side active-plan cap". A positive value restores
+    # the legacy acceptance-era singleton limit.
+    cross_spread_acceptance_max_active_plans: int = 0
     cross_spread_definitive_failure_rollback_enabled: bool = True
     cross_spread_position_verification_required: bool = True
 
@@ -50,6 +56,10 @@ class Settings(BaseSettings):
     auth_credentials_json: str = "[]"
     development_user_id: str = "development-user"
     development_roles: str = "admin"
+    # This is a narrow local founder-acceptance bridge for the single configured
+    # development identity.  It remains off by default and never applies to a
+    # live environment or API-key authentication.
+    founder_demo_live_acceptance_enabled: bool = False
 
     # Browser users use opaque, server-side sessions. These are security defaults,
     # not user-editable business settings. Production cookies are configured by the

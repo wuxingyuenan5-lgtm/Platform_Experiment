@@ -18,6 +18,7 @@ def get(path: str, params: dict[str, str] | None = None) -> httpx.Response:
             f"{settings.runtime_base_url}{path}",
             params=params,
             timeout=settings.runtime_timeout_seconds,
+            trust_env=False,
         )
     except httpx.HTTPError as exc:
         raise RuntimeQueryError("Platform Execution Runtime query failed") from exc

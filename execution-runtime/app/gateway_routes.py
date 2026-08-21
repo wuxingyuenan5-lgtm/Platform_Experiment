@@ -15,6 +15,14 @@ from app.secret_resolver import inspect_credential_reference
 from app.venue_readiness import get_venue_readiness
 
 
+def _preferred_mt5_symbol(settings: Settings) -> str | None:
+    """Return the explicitly mapped MT5 symbol, if any, else None (auto-resolve)."""
+    mapped = settings.mt5_instruments
+    if mapped:
+        return next(iter(mapped))
+    return None
+
+
 def create_gateway_router(*, settings: Settings, gateway: ExecutionGateway) -> APIRouter:
     router = APIRouter()
 
@@ -82,6 +90,8 @@ def create_gateway_router(*, settings: Settings, gateway: ExecutionGateway) -> A
             mt5_terminal_path=settings.mt5_terminal_path,
             mt5_bridge_file_path=settings.mt5_bridge_file_path,
             mt5_timeout_seconds=settings.mt5_check_timeout_seconds,
+            mt5_preferred_symbol=_preferred_mt5_symbol(settings),
+            bybit_timestamp_offset_ms=settings.bybit_timestamp_offset_ms,
         )
 
     return router

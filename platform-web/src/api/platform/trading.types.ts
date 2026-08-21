@@ -234,6 +234,11 @@ export interface BalanceResult {
   asOf: string;
 }
 
+export interface EquityHistoryPointResult {
+  asOf: string;
+  equity: string;
+}
+
 export interface PnlResult {
   accountId: string;
   instrumentId: string;
@@ -296,9 +301,24 @@ export interface StrategyAccountBindingResult {
   strategyInstanceId: string;
   accountId: string;
   accountCode: string;
+  capability: 'trade_and_read' | 'read_only';
   role: string;
   maxNotional?: string | null;
   status: string;
+}
+
+export interface StrategyAccountSnapshotResult {
+  strategyInstanceId: string;
+  accountId: string;
+  accountCode: string;
+  capability: 'trade_and_read' | 'read_only';
+  dataQualityState: string;
+  asOf?: string | null;
+  balance?: BalanceResult | null;
+  positions: PositionResult[];
+  orders: OrderDetailResult[];
+  fills: FillResult[];
+  pnl?: PnlResult | null;
 }
 
 export interface InstrumentResult {
@@ -323,7 +343,11 @@ export interface ContractSpecificationResult {
   dataQualityState: string;
 }
 
-export interface OrderDetailResult extends OrderResult {
+// The detail endpoint is a read model and deliberately preserves every venue
+// terminal state (for example `canceled` and `result_unknown`).  A submit
+// response remains constrained by TradingOrderStatus above.
+export interface OrderDetailResult extends Omit<OrderResult, 'status'> {
+  status: string;
   accountId: string;
   instrumentId: string;
   symbol: string;

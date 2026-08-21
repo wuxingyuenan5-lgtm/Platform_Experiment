@@ -169,7 +169,7 @@
 
   const activeMetal = ref<MetalKey>(props.selectedMetal);
   const historyPeriod = ref<'day' | 'week'>('day');
-  const historySymbol = ref('XAUUSD+');
+  const historySymbol = ref('XAUUSD');
   const startDate = ref('2026-03-16');
   const endDate = ref('2026-04-16');
 
@@ -180,7 +180,7 @@
       overseasSpot: '4,812.77 美元',
       spotCardLabel: '金价',
       spotCardValue: '国内 1,055.5元 | 国外 4,812.77美元',
-      symbolOptions: ['XAUUSD+', 'SHFE.au2606', 'SHFE.au2612'],
+      symbolOptions: ['XAUUSD', 'SHFE.au2606', 'SHFE.au2612'],
       fxCards: [
         { label: '离岸汇率', value: '6.8182' },
         { label: '在岸汇率', value: '6.8213' },
@@ -553,15 +553,15 @@
   .compact-table td {
     padding: 11px var(--strategy-space-4);
     border-bottom: 1px solid var(--strategy-border-soft);
-    text-align: left;
     font-size: var(--strategy-font-sm);
+    text-align: left;
     white-space: nowrap;
   }
 
   .compact-table th {
+    background: var(--strategy-table-head-bg);
     color: var(--strategy-text-3);
     font-weight: 700;
-    background: var(--strategy-table-head-bg);
   }
 
   .compact-table td {
@@ -625,10 +625,10 @@
     border: 1px solid var(--strategy-border-strong);
     border-radius: var(--strategy-radius-control);
     background: var(--strategy-surface);
+    box-shadow: var(--strategy-shadow-soft);
     color: var(--strategy-text-1);
     font-size: var(--strategy-font-base);
     font-weight: 700;
-    box-shadow: var(--strategy-shadow-soft);
   }
 
   .control-select {

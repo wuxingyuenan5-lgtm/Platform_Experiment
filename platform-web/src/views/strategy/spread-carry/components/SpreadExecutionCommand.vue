@@ -7,8 +7,16 @@
     </div>
 
     <div class="stage-tabs">
-      <button :class="{ active: executionStage === 'open' }" @click="$emit('update:executionStage', 'open')">开仓价差</button>
-      <button :class="{ active: executionStage === 'close' }" @click="$emit('update:executionStage', 'close')">平仓价差</button>
+      <button
+        :class="{ active: executionStage === 'open' }"
+        @click="$emit('update:executionStage', 'open')"
+        >开仓价差</button
+      >
+      <button
+        :class="{ active: executionStage === 'close' }"
+        @click="$emit('update:executionStage', 'close')"
+        >平仓价差</button
+      >
     </div>
 
     <template v-if="executionStage === 'open'">
@@ -17,7 +25,12 @@
           <label class="field-block">
             <span>下单数量</span>
             <div class="input-row input-row--qty">
-              <input :value="qtyInput" inputmode="decimal" @input="emitInput('qtyInput', $event)" @blur="$emit('commitQtyInput')" />
+              <input
+                :value="qtyInput"
+                inputmode="decimal"
+                @input="emitInput('qtyInput', $event)"
+                @blur="$emit('commitQtyInput')"
+              />
               <button type="button" class="unit-btn">盎司</button>
               <button type="button" @click="$emit('nudgeQty', -10)">-</button>
               <button type="button" @click="$emit('nudgeQty', 10)">+</button>
@@ -39,34 +52,44 @@
             </div>
           </div>
 
-          <div class="mini-grid">
-            <label class="field-block">
-              <span>BY 杠杆</span>
-              <div class="input-row">
-                <input :value="String(leverage)" @input="$emit('handleLeverageInput', $event)" />
-                <em>x</em>
-              </div>
-            </label>
-            <label class="field-block">
-              <span>MT5 杠杆</span>
-              <div class="input-row">
-                <input :value="String(leverage)" @input="$emit('handleLeverageInput', $event)" />
-                <em>x</em>
-              </div>
-            </label>
-          </div>
+          <label class="field-block">
+            <span>Bybit 杠杆（XAUTUSDT）</span>
+            <div class="input-row">
+              <input v-model="bybitLeverageInput" inputmode="decimal" aria-label="Bybit 杠杆" />
+              <em>x</em>
+              <button type="button" :disabled="leverageLoading" @click="applyBybitLeverage">{{
+                leverageLoading ? '设置中' : '应用到交易所'
+              }}</button>
+            </div>
+            <p class="execution-note">{{
+              leverageMessage || '账户级真实设置：仅在 Bybit 回执成功后生效。MT5 杠杆由账户管理。'
+            }}</p>
+          </label>
         </div>
 
         <div class="execution-column execution-column--pricing">
           <div class="mode-tabs">
-            <button :class="{ active: executionMode === 'market' }" @click="$emit('update:executionMode', 'market')">市价开仓</button>
-            <button :class="{ active: executionMode === 'limit' }" @click="$emit('update:executionMode', 'limit')">限价开仓</button>
+            <button
+              :class="{ active: executionMode === 'market' }"
+              @click="$emit('update:executionMode', 'market')"
+              >市价开仓</button
+            >
+            <button
+              :class="{ active: executionMode === 'limit' }"
+              @click="$emit('update:executionMode', 'limit')"
+              >限价开仓</button
+            >
           </div>
 
           <label class="field-block">
             <span>开仓价差</span>
             <div class="input-row">
-              <input :value="triggerSpreadInput" inputmode="decimal" @input="emitInput('triggerSpreadInput', $event)" @blur="$emit('commitSpreadInput', 'trigger')" />
+              <input
+                :value="triggerSpreadInput"
+                inputmode="decimal"
+                @input="emitInput('triggerSpreadInput', $event)"
+                @blur="$emit('commitSpreadInput', 'trigger')"
+              />
               <em>USDT</em>
             </div>
           </label>
@@ -74,15 +97,33 @@
           <label class="field-block">
             <span>可接受价差</span>
             <div class="input-row">
-              <input :value="acceptableSpreadInput" inputmode="decimal" @input="emitInput('acceptableSpreadInput', $event)" @blur="$emit('commitSpreadInput', 'acceptable')" />
+              <input
+                :value="acceptableSpreadInput"
+                inputmode="decimal"
+                @input="emitInput('acceptableSpreadInput', $event)"
+                @blur="$emit('commitSpreadInput', 'acceptable')"
+              />
               <em>USDT</em>
+            </div>
+          </label>
+
+          <label v-if="executionMode === 'limit'" class="field-block">
+            <span>开仓限价策略</span>
+            <div class="input-row input-row--single-select">
+              <select :value="openLimitStrategy" @change="emitSelect('openLimitStrategy', $event)">
+                <option value="fok">FOK 全成全撤</option>
+                <option value="post_only_chase">PostOnly Chase</option>
+              </select>
             </div>
           </label>
 
           <label v-if="takeProfitExecution === 'limit'" class="field-block">
             <span>止盈限价策略</span>
             <div class="input-row input-row--single-select">
-              <select :value="takeProfitLimitStrategy" @change="emitSelect('takeProfitLimitStrategy', $event)">
+              <select
+                :value="takeProfitLimitStrategy"
+                @change="emitSelect('takeProfitLimitStrategy', $event)"
+              >
                 <option value="fok">FOK 全成全撤</option>
                 <option value="post_only_chase">PostOnly Chase</option>
               </select>
@@ -91,52 +132,97 @@
         </div>
 
         <div class="execution-column execution-column--right">
-          <div class="execution-column__spacer" aria-hidden="true"></div>
-          <label class="field-block field-block--lower">
-            <span>止盈价差</span>
-            <div class="input-row input-row--select">
-              <input :value="takeProfitSpreadInput" inputmode="decimal" @input="emitInput('takeProfitSpreadInput', $event)" @blur="$emit('commitSpreadInput', 'takeProfit')" />
-              <em>USDT</em>
-              <select :value="takeProfitExecution" @change="emitSelect('takeProfitExecution', $event)">
-                <option value="limit">限价</option>
-                <option value="market">市价</option>
-              </select>
-            </div>
-          </label>
+          <div class="risk-stack">
+            <label class="field-block field-block--stacked">
+              <span>止盈价差</span>
+              <div class="input-row input-row--select">
+                <input
+                  :value="takeProfitSpreadInput"
+                  inputmode="decimal"
+                  @input="emitInput('takeProfitSpreadInput', $event)"
+                  @blur="$emit('commitSpreadInput', 'takeProfit')"
+                />
+                <em>USDT</em>
+                <select
+                  class="stacked-select"
+                  :value="takeProfitExecution"
+                  @change="emitSelect('takeProfitExecution', $event)"
+                >
+                  <option value="limit">限价</option>
+                  <option value="market">市价</option>
+                </select>
+              </div>
+              <div
+                v-if="takeProfitExecution === 'limit'"
+                class="input-row input-row--single-select"
+              >
+                <select
+                  :value="takeProfitLimitStrategy"
+                  @change="emitSelect('takeProfitLimitStrategy', $event)"
+                >
+                  <option value="fok">FOK 全成全撤</option>
+                  <option value="post_only_chase">PostOnly Chase</option>
+                </select>
+              </div>
+            </label>
 
-          <label class="field-block">
-            <span>止损价差</span>
-            <div class="input-row input-row--select">
-              <input :value="stopLossSpreadInput" inputmode="decimal" @input="emitInput('stopLossSpreadInput', $event)" @blur="$emit('commitSpreadInput', 'stopLoss')" />
-              <em>USDT</em>
-              <select :value="stopLossExecution" @change="emitSelect('stopLossExecution', $event)">
-                <option value="market">市价</option>
-                <option value="limit">限价</option>
-              </select>
-            </div>
-          </label>
-
-          <label v-if="stopLossExecution === 'limit'" class="field-block">
-            <span>止损限价策略</span>
-            <div class="input-row input-row--single-select">
-              <select :value="stopLossLimitStrategy" @change="emitSelect('stopLossLimitStrategy', $event)">
-                <option value="fok">FOK 全成全撤</option>
-                <option value="post_only_chase">PostOnly Chase</option>
-              </select>
-            </div>
-          </label>
+            <label class="field-block field-block--stacked">
+              <span>止损价差</span>
+              <div class="input-row input-row--select">
+                <input
+                  :value="stopLossSpreadInput"
+                  inputmode="decimal"
+                  @input="emitInput('stopLossSpreadInput', $event)"
+                  @blur="$emit('commitSpreadInput', 'stopLoss')"
+                />
+                <em>USDT</em>
+                <select
+                  class="stacked-select"
+                  :value="stopLossExecution"
+                  @change="emitSelect('stopLossExecution', $event)"
+                >
+                  <option value="market">市价</option>
+                  <option value="limit">限价</option>
+                </select>
+              </div>
+              <div v-if="stopLossExecution === 'limit'" class="input-row input-row--single-select">
+                <select
+                  :value="stopLossLimitStrategy"
+                  @change="emitSelect('stopLossLimitStrategy', $event)"
+                >
+                  <option value="fok">FOK 全成全撤</option>
+                  <option value="post_only_chase">PostOnly Chase</option>
+                </select>
+              </div>
+            </label>
+          </div>
         </div>
       </div>
 
       <div class="submit-row">
-        <button class="submit-btn submit-btn--green" :disabled="submitLoading" @click="$emit('prepareOpenDraft', 'long')">开多价差</button>
-        <button class="submit-btn submit-btn--red" :disabled="submitLoading" @click="$emit('prepareOpenDraft', 'short')">开空价差</button>
+        <button
+          class="submit-btn submit-btn--green"
+          :disabled="submitLoading"
+          @click="$emit('prepareOpenDraft', 'long')"
+          >开多价差</button
+        >
+        <button
+          class="submit-btn submit-btn--red"
+          :disabled="submitLoading"
+          @click="$emit('prepareOpenDraft', 'short')"
+          >开空价差</button
+        >
       </div>
 
       <div v-if="executionMessage || limitEvidence" class="execution-feedback">
-        <strong v-if="executionMessage" :class="executionMessageTone">{{ executionMessage }}</strong>
+        <strong v-if="executionMessage" :class="executionMessageTone">{{
+          executionMessage
+        }}</strong>
         <span v-if="limitEvidence">
-          {{ limitStrategyLabel(limitEvidence.limitStrategy) }} / {{ limitEvidence.timeInForce }}，限制 {{ formatNullableSigned(limitEvidence.limitSpread) }}，可成交 {{ formatNullableSigned(limitEvidence.executableSpread) }}
+          {{ limitStrategyLabel(limitEvidence.limitStrategy) }} /
+          {{ limitEvidence.timeInForce }}，限制
+          {{ formatNullableSigned(limitEvidence.limitSpread) }}，可成交
+          {{ formatNullableSigned(limitEvidence.executableSpread) }}
         </span>
       </div>
     </template>
@@ -144,25 +230,42 @@
     <template v-else>
       <div class="close-shell">
         <div class="mode-tabs">
-          <button :class="{ active: closeExecutionMode === 'market' }" @click="$emit('update:closeExecutionMode', 'market')">市价平仓</button>
-          <button :class="{ active: closeExecutionMode === 'limit' }" @click="$emit('update:closeExecutionMode', 'limit')">限价平仓</button>
+          <button
+            :class="{ active: closeExecutionMode === 'market' }"
+            @click="$emit('update:closeExecutionMode', 'market')"
+            >市价平仓</button
+          >
+          <button
+            :class="{ active: closeExecutionMode === 'limit' }"
+            @click="$emit('update:closeExecutionMode', 'limit')"
+            >限价平仓</button
+          >
         </div>
 
         <div class="close-market-strip">
           <article>
             <span>平多当前价差</span>
-            <strong :class="spreadTone(longSpread)">{{ formatNullableSigned(longSpread) }} USDT</strong>
+            <strong :class="spreadTone(longSpread)"
+              >{{ formatNullableSigned(longSpread) }} USDT</strong
+            >
           </article>
           <article>
             <span>平空当前价差</span>
-            <strong :class="spreadTone(shortSpread)">{{ formatNullableSigned(shortSpread) }} USDT</strong>
+            <strong :class="spreadTone(shortSpread)"
+              >{{ formatNullableSigned(shortSpread) }} USDT</strong
+            >
           </article>
         </div>
 
         <label v-if="closeExecutionMode === 'limit'" class="field-block field-block--compact">
           <span>平仓限制价差</span>
           <div class="input-row">
-            <input :value="closeLimitSpreadInput" inputmode="decimal" @input="emitInput('closeLimitSpreadInput', $event)" @blur="$emit('commitSpreadInput', 'closeLimit')" />
+            <input
+              :value="closeLimitSpreadInput"
+              inputmode="decimal"
+              @input="emitInput('closeLimitSpreadInput', $event)"
+              @blur="$emit('commitSpreadInput', 'closeLimit')"
+            />
             <em>USDT</em>
           </div>
         </label>
@@ -182,7 +285,7 @@
             <tr>
               <th>方向</th>
               <th>盎司</th>
-              <th>杠杆</th>
+              <th>账户杠杆</th>
               <th>开仓价差</th>
               <th>当前价差</th>
               <th>止盈 / 止损</th>
@@ -196,13 +299,23 @@
                 {{ position.direction === 'LONG_SPREAD' ? '多头' : '空头' }}
               </td>
               <td>{{ formatNumber(position.qtyOz, 2) }}</td>
-              <td>{{ position.leverage }}x</td>
+              <td>账户级（只读）</td>
               <td>{{ formatSigned(position.entrySpread) }}</td>
-              <td :class="spreadTone(closeMarketSpread(position.direction))">{{ formatNullableSigned(closeMarketSpread(position.direction)) }}</td>
-              <td>{{ formatSigned(position.takeProfit) }} / {{ formatSigned(position.stopLoss) }}</td>
+              <td :class="spreadTone(closeMarketSpread(position.direction))">{{
+                formatNullableSigned(closeMarketSpread(position.direction))
+              }}</td>
+              <td
+                >{{ formatNullableSigned(position.takeProfit) }} /
+                {{ formatNullableSigned(position.stopLoss) }}</td
+              >
               <td>{{ position.execution }}</td>
               <td>
-                <button class="row-btn" :disabled="submitLoading" @click="$emit('openConfirm', `CLOSE:${position.id}`)">手动平仓</button>
+                <button
+                  class="row-btn"
+                  :disabled="submitLoading"
+                  @click="$emit('openConfirm', `CLOSE:${position.id}`)"
+                  >手动平仓</button
+                >
               </td>
             </tr>
             <tr v-if="!closeOrders.length">
@@ -211,12 +324,22 @@
           </tbody>
         </table>
 
-        <button class="submit-btn submit-btn--red submit-btn--full" :disabled="submitLoading || !closeOrders.length" @click="$emit('openConfirm', 'CLOSE_ALL')">手动全平</button>
+        <button
+          class="submit-btn submit-btn--red submit-btn--full"
+          :disabled="submitLoading || !closeOrders.length"
+          @click="$emit('openConfirm', 'CLOSE_ALL')"
+          >手动全平</button
+        >
 
         <div v-if="executionMessage || limitEvidence" class="execution-feedback">
-          <strong v-if="executionMessage" :class="executionMessageTone">{{ executionMessage }}</strong>
+          <strong v-if="executionMessage" :class="executionMessageTone">{{
+            executionMessage
+          }}</strong>
           <span v-if="limitEvidence">
-            {{ limitStrategyLabel(limitEvidence.limitStrategy) }} / {{ limitEvidence.timeInForce }}，限制 {{ formatNullableSigned(limitEvidence.limitSpread) }}，可成交 {{ formatNullableSigned(limitEvidence.executableSpread) }}
+            {{ limitStrategyLabel(limitEvidence.limitStrategy) }} /
+            {{ limitEvidence.timeInForce }}，限制
+            {{ formatNullableSigned(limitEvidence.limitSpread) }}，可成交
+            {{ formatNullableSigned(limitEvidence.executableSpread) }}
           </span>
         </div>
       </div>
@@ -225,6 +348,7 @@
 </template>
 
 <script setup lang="ts">
+  import { ref } from 'vue';
   import type {
     CrossSpreadExecutionMode,
     CrossSpreadLimitExecutionResult,
@@ -240,6 +364,7 @@
     | 'stopLossSpreadInput'
     | 'closeLimitSpreadInput';
   type SelectInputName =
+    | 'openLimitStrategy'
     | 'takeProfitExecution'
     | 'takeProfitLimitStrategy'
     | 'stopLossExecution'
@@ -250,10 +375,9 @@
     id: string;
     direction: 'LONG_SPREAD' | 'SHORT_SPREAD';
     qtyOz: number;
-    leverage: number;
     entrySpread: number;
-    takeProfit: number;
-    stopLoss: number;
+    takeProfit: number | null;
+    stopLoss: number | null;
     execution: string;
   }
 
@@ -265,11 +389,11 @@
     qtyError: string;
     bybitQty: number;
     mt5Lot: number | null;
-    leverage: number;
     longSpread: number | null;
     shortSpread: number | null;
     triggerSpreadInput: string;
     acceptableSpreadInput: string;
+    openLimitStrategy: CrossSpreadLimitStrategy;
     takeProfitExecution: CrossSpreadExecutionMode;
     takeProfitLimitStrategy: CrossSpreadLimitStrategy;
     takeProfitSpreadInput: string;
@@ -292,6 +416,7 @@
     (event: 'update:qtyInput', value: string): void;
     (event: 'update:triggerSpreadInput', value: string): void;
     (event: 'update:acceptableSpreadInput', value: string): void;
+    (event: 'update:openLimitStrategy', value: CrossSpreadLimitStrategy): void;
     (event: 'update:takeProfitExecution', value: CrossSpreadExecutionMode): void;
     (event: 'update:takeProfitLimitStrategy', value: CrossSpreadLimitStrategy): void;
     (event: 'update:stopLossExecution', value: CrossSpreadExecutionMode): void;
@@ -302,11 +427,37 @@
     (event: 'update:closeLimitStrategy', value: CrossSpreadLimitStrategy): void;
     (event: 'commitQtyInput'): void;
     (event: 'nudgeQty', value: number): void;
-    (event: 'handleLeverageInput', value: Event): void;
     (event: 'commitSpreadInput', value: SpreadInputField): void;
     (event: 'prepareOpenDraft', value: 'long' | 'short'): void;
     (event: 'openConfirm', value: string): void;
   }>();
+
+  const bybitLeverageInput = ref('20');
+  const leverageLoading = ref(false);
+  const leverageMessage = ref('');
+  async function applyBybitLeverage() {
+    const leverage = Number(bybitLeverageInput.value);
+    if (!Number.isFinite(leverage) || leverage <= 0 || leverage > 100) {
+      leverageMessage.value = '请输入 0–100 的有效杠杆。';
+      return;
+    }
+    leverageLoading.value = true;
+    leverageMessage.value = '';
+    try {
+      const response = await fetch('http://127.0.0.1:8100/venue/bybit/leverage', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ accountId: 'bybit-live-main', symbol: 'XAUTUSDT', leverage }),
+      });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.detail || '交易所未接受杠杆设置');
+      leverageMessage.value = `交易所已确认 ${body.symbol} 为 ${body.leverage}x。`;
+    } catch (error) {
+      leverageMessage.value = error instanceof Error ? `设置失败：${error.message}` : '设置失败。';
+    } finally {
+      leverageLoading.value = false;
+    }
+  }
 
   function emitInput(name: EditableInputName, event: Event) {
     const value = (event.target as HTMLInputElement).value;
@@ -366,24 +517,24 @@
     padding: 16px 18px 18px;
     border: 1px solid #e7ebf0;
     border-radius: 18px;
-    background: linear-gradient(180deg, #ffffff 0%, #fcfdff 100%);
-    box-shadow: 0 10px 22px rgba(94, 109, 133, 0.04);
+    background: linear-gradient(180deg, #fff 0%, #fcfdff 100%);
+    box-shadow: 0 10px 22px rgb(94 109 133 / 4%);
   }
 
   .card-head {
     display: flex;
-    justify-content: space-between;
     align-items: flex-start;
+    justify-content: space-between;
     margin-bottom: 12px;
   }
 
   .card-head h3 {
     margin: 0;
+    color: #162845;
     font-family: var(--strategy-font-heading);
     font-size: 21px;
     font-weight: 800;
     letter-spacing: -0.012em;
-    color: #162845;
   }
 
   .stage-tabs,
@@ -427,10 +578,10 @@
 
   .stage-tabs button.active,
   .mode-tabs button.active {
-    border-color: rgba(220, 82, 82, 0.38);
+    border-color: rgb(220 82 82 / 38%);
     background: linear-gradient(180deg, #ff6868 0%, #ef4343 100%);
+    box-shadow: 0 8px 20px rgb(239 67 67 / 18%);
     color: #fff;
-    box-shadow: 0 8px 20px rgba(239, 67, 67, 0.18);
   }
 
   .execution-grid {
@@ -452,9 +603,19 @@
     padding-top: 18px;
   }
 
-  .execution-column__spacer {
-    height: 64px;
-    flex: none;
+  .risk-stack {
+    display: grid;
+    gap: 14px;
+    padding: 2px;
+  }
+
+  .field-block--stacked {
+    gap: 10px;
+    padding: 14px;
+    border: 1px solid #e9edf2;
+    border-radius: 16px;
+    background: linear-gradient(180deg, #fff 0%, #fcfdff 100%);
+    box-shadow: 0 6px 18px rgb(94 109 133 / 5%);
   }
 
   .field-block {
@@ -484,7 +645,7 @@
     border: 1px solid #e7ebf0;
     border-radius: 12px;
     background: #fff;
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 80%);
   }
 
   .input-row input,
@@ -493,8 +654,8 @@
     min-width: 0;
     padding: 0 14px;
     border: none;
-    background: transparent;
     outline: none;
+    background: transparent;
     color: #1a2a48;
     font-family: var(--strategy-font-data);
     font-size: 15px;
@@ -523,6 +684,13 @@
 
   .input-row--select select {
     border-left: 1px solid #e7ebf0;
+    color: #1a2a48;
+    font-size: 14px;
+    font-weight: 700;
+  }
+
+  .stacked-select {
+    background: #f8fbff !important;
   }
 
   .input-row--single-select {
@@ -548,7 +716,7 @@
   .metric-card,
   .close-market-strip article {
     border: 1px solid #e9edf2;
-    background: linear-gradient(180deg, #ffffff 0%, #fcfdff 100%);
+    background: linear-gradient(180deg, #fff 0%, #fcfdff 100%);
   }
 
   .mini-panel {
@@ -721,5 +889,3 @@
     }
   }
 </style>
-
-

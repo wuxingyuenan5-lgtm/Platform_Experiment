@@ -37,14 +37,16 @@ class BybitLiveAdapter:
     def __init__(self, settings: Settings, client: Any | None = None) -> None:
         self.settings = settings
         self._injected_client = client
-        self._resolved_client: Any | None = None
+        self._resolved_clients: dict[str, Any] = {}
 
     def capability(self) -> GatewayAdapterCapability:
-        inspection = inspect_credential_reference(
-            self.settings.bybit_credential_ref,
-            required_fields=("API_KEY", "SECRET"),
-        )
-        missing = list(inspection.missing_fields)
+        missing: list[str] = []
+        for account_id in self.settings.bybit_accounts:
+            inspection = inspect_credential_reference(
+                self.settings.bybit_credential_for_account(account_id),
+                required_fields=("API_KEY", "SECRET"),
+            )
+            missing.extend(f"{account_id}:{field}" for field in inspection.missing_fields)
         if not self.settings.bybit_accounts:
             missing.append("BYBIT_ACCOUNT_IDS")
         if not self.settings.bybit_instruments:
@@ -74,7 +76,8 @@ class BybitLiveAdapter:
 
     def submit_order(self, command: SubmitOrderCommand) -> list[ExecutionEvent]:
         self._assert_account(command.account_id)
-        client = self._client()
+        self._assert_write_account(command.account_id)
+        client = self._client(command.account_id)
         reference_price = command.price or self._market_reference_price(client, command)
         validate_live_write(
             command,
@@ -101,7 +104,7 @@ class BybitLiveAdapter:
         try:
             response = client.place_order(**payload)
         except Exception as exc:
-            raise GatewayResultUnknownError("Bybit place_order result is unknown") from exc
+            raise self._unknown_error("Bybit place_order result is unknown", exc) from exc
         self._require_success(response, "Bybit rejected order")
         result = response.get("result") or {}
         external_order_id = str(result.get("orderId") or "")
@@ -118,6 +121,25 @@ class BybitLiveAdapter:
             )
         ]
 
+    def set_leverage(self, *, account_id: str, symbol: str, leverage: Decimal) -> dict[str, object]:
+        self._assert_account(account_id)
+        self._assert_write_account(account_id)
+        if leverage <= 0 or leverage > Decimal("100"):
+            raise GatewayRequestRejectedError("Bybit leverage must be between 0 and 100")
+        try:
+            response = self._client(account_id).set_leverage(
+                category=self.settings.bybit_category,
+                symbol=symbol.upper(),
+                buyLeverage=format(leverage, "f"),
+                sellLeverage=format(leverage, "f"),
+            )
+            self._require_success(response, "Bybit rejected leverage update")
+        except GatewayRequestRejectedError:
+            raise
+        except Exception as exc:
+            raise self._unknown_error("Bybit leverage update result is unknown", exc) from exc
+        return {"accountId": account_id, "symbol": symbol.upper(), "leverage": str(leverage), "source": self.name}
+
     def get_order(
         self,
         *,
@@ -130,7 +152,7 @@ class BybitLiveAdapter:
         )
         if route is None:
             return None
-        client = self._client()
+        client = self._client(route.account_id)
         query: dict[str, object] = {
             "category": self.settings.bybit_category,
             "symbol": route.symbol,
@@ -150,7 +172,7 @@ class BybitLiveAdapter:
         except GatewayRequestRejectedError:
             raise
         except Exception as exc:
-            raise GatewayResultUnknownError("Bybit order query result is unknown") from exc
+            raise self._unknown_error("Bybit order query result is unknown", exc) from exc
         if not rows:
             return None
         return self._order_snapshot(rows[0], route)
@@ -178,12 +200,13 @@ class BybitLiveAdapter:
             else:
                 query["orderLinkId"] = route.external_client_id
         try:
-            response = self._client().get_executions(**query)
+            client_account = account_id or (route.account_id if route else None)
+            response = self._client(client_account).get_executions(**query)
             self._require_success(response, "Bybit execution query failed")
         except GatewayRequestRejectedError:
             raise
         except Exception as exc:
-            raise GatewayResultUnknownError("Bybit execution query result is unknown") from exc
+            raise self._unknown_error("Bybit execution query result is unknown", exc) from exc
         snapshots: list[VenueFillSnapshot] = []
         default_account = account_id or self._single_account()
         for row in self._result_list(response):
@@ -219,7 +242,7 @@ class BybitLiveAdapter:
         account = account_id or self._single_account()
         self._assert_account(account)
         try:
-            response = self._with_fresh_client_retry(
+            response = self._with_fresh_client_retry(account,
                 lambda client: client.get_positions(
                     category=self.settings.bybit_category,
                     settleCoin=self.settings.bybit_settle_coin,
@@ -229,7 +252,7 @@ class BybitLiveAdapter:
         except GatewayRequestRejectedError:
             raise
         except Exception as exc:
-            raise GatewayResultUnknownError("Bybit position query result is unknown") from exc
+            raise self._unknown_error("Bybit position query result is unknown", exc) from exc
         snapshots: list[VenuePositionSnapshot] = []
         for row in self._result_list(response):
             size = Decimal(str(row.get("size") or "0"))
@@ -252,6 +275,7 @@ class BybitLiveAdapter:
                     averagePrice=self._optional_decimal(row.get("avgPrice")),
                     currency=self.settings.bybit_settle_coin,
                     asOf=self._millis(row.get("updatedTime")),
+                    openTime=self._micros(row.get("openTime")),
                 )
             )
         return snapshots
@@ -260,14 +284,14 @@ class BybitLiveAdapter:
         account = account_id or self._single_account()
         self._assert_account(account)
         try:
-            response = self._with_fresh_client_retry(
+            response = self._with_fresh_client_retry(account,
                 lambda client: client.get_wallet_balance(accountType="UNIFIED")
             )
             self._require_success(response, "Bybit wallet query failed")
         except GatewayRequestRejectedError:
             raise
         except Exception as exc:
-            raise GatewayResultUnknownError("Bybit wallet query result is unknown") from exc
+            raise self._unknown_error("Bybit wallet query result is unknown", exc) from exc
         result_rows = self._result_list(response)
         if not result_rows:
             return []
@@ -309,7 +333,7 @@ class BybitLiveAdapter:
         if event_type not in {None, "funding", "fee"}:
             return []
         try:
-            response = self._client().get_transaction_log(
+            response = self._client(account).get_transaction_log(
                 accountType="UNIFIED",
                 category=self.settings.bybit_category,
                 limit=50,
@@ -318,7 +342,7 @@ class BybitLiveAdapter:
         except GatewayRequestRejectedError:
             raise
         except Exception as exc:
-            raise GatewayResultUnknownError("Bybit transaction log result is unknown") from exc
+            raise self._unknown_error("Bybit transaction log result is unknown", exc) from exc
         events: list[VenueEconomicEventSnapshot] = []
         for row in self._result_list(response):
             symbol = str(row.get("symbol") or "").upper()
@@ -380,16 +404,17 @@ class BybitLiveAdapter:
                 reason="Live order route not found",
                 asOf=datetime.now(UTC),
             )
+        self._assert_write_account(route.account_id)
         validate_live_cancel(route, self.settings)
         try:
-            response = self._client().cancel_order(
+            response = self._client(route.account_id).cancel_order(
                 category=self.settings.bybit_category,
                 symbol=route.symbol,
                 orderId=external_order_id,
                 orderLinkId=route.external_client_id,
             )
         except Exception as exc:
-            raise GatewayResultUnknownError("Bybit cancel result is unknown") from exc
+            raise self._unknown_error("Bybit cancel result is unknown", exc) from exc
         self._require_success(response, "Bybit cancel rejected")
         return CancelOrderResponse(
             source=self.name,
@@ -400,11 +425,12 @@ class BybitLiveAdapter:
             asOf=datetime.now(UTC),
         )
 
-    def _client(self):
+    def _client(self, account_id: str | None = None):
         if self._injected_client is not None:
             return self._injected_client
-        if self._resolved_client is not None:
-            return self._resolved_client
+        account = account_id or self._single_account()
+        if account in self._resolved_clients:
+            return self._resolved_clients[account]
         try:
             from pybit import _helpers
             from pybit.unified_trading import HTTP
@@ -413,28 +439,28 @@ class BybitLiveAdapter:
         self._apply_timestamp_offset(_helpers)
         try:
             secret = resolve_secret_reference(
-                self.settings.bybit_credential_ref,
+                self.settings.bybit_credential_for_account(account),
                 required_fields=("API_KEY", "SECRET"),
             )
         except ValueError as exc:
             raise GatewayConfigurationError(str(exc)) from exc
-        self._resolved_client = HTTP(
+        self._resolved_clients[account] = HTTP(
             testnet=False,
             demo=False,
             api_key=secret["API_KEY"],
             api_secret=secret["SECRET"],
             recv_window=self.settings.bybit_recv_window,
         )
-        return self._resolved_client
+        return self._resolved_clients[account]
 
-    def _with_fresh_client_retry(self, operation):
+    def _with_fresh_client_retry(self, account_id: str, operation):
         try:
-            return operation(self._client())
+            return operation(self._client(account_id))
         except Exception:
             if self._injected_client is not None:
                 raise
-            self._resolved_client = None
-            return operation(self._client())
+            self._resolved_clients.pop(account_id, None)
+            return operation(self._client(account_id))
 
     def _apply_timestamp_offset(self, helpers) -> None:
         offset_ms = int(getattr(self.settings, "bybit_timestamp_offset_ms", 0) or 0)
@@ -449,6 +475,10 @@ class BybitLiveAdapter:
     def _assert_account(self, account_id: str) -> None:
         if account_id not in self.settings.bybit_accounts:
             raise GatewayConfigurationError("Account is not mapped to Bybit live adapter")
+
+    def _assert_write_account(self, account_id: str) -> None:
+        if account_id in self.settings.bybit_read_only_accounts:
+            raise GatewayRequestRejectedError("Bybit account is configured read-only")
 
     def _single_account(self) -> str:
         accounts = sorted(self.settings.bybit_accounts)
@@ -527,6 +557,15 @@ class BybitLiveAdapter:
             raise GatewayRequestRejectedError(f"{message}: {detail}")
 
     @staticmethod
+    def _unknown_error(message: str, exc: Exception) -> GatewayResultUnknownError:
+        detail = str(exc).strip()
+        if detail:
+            return GatewayResultUnknownError(
+                f"{message}: {exc.__class__.__name__}: {detail}"
+            )
+        return GatewayResultUnknownError(f"{message}: {exc.__class__.__name__}")
+
+    @staticmethod
     def _result_list(response: dict[str, object]) -> list[dict[str, object]]:
         result = response.get("result") or {}
         rows = result.get("list") if isinstance(result, dict) else None
@@ -558,6 +597,14 @@ class BybitLiveAdapter:
         if value in {None, ""}:
             return datetime.now(UTC)
         return datetime.fromtimestamp(int(str(value)) / 1000, UTC)
+
+    def _micros(self, value: object) -> datetime | None:
+        if value in {None, ""}:
+            return None
+        try:
+            return datetime.fromtimestamp(int(str(value)) / 1_000_000, UTC)
+        except (TypeError, ValueError, OSError):
+            return None
 
     def _dependency_available(self) -> bool:
         if self._injected_client is not None:

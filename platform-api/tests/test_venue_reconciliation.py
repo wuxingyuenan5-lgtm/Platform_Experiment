@@ -139,6 +139,57 @@ def test_result_unknown_recovers_from_venue_and_imports_facts_once(
         assert position["netQuantity"] == "1"
 
 
+def test_owner_can_close_absent_standalone_result_unknown_order(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    get_settings().database_path = str(tmp_path / "venue-order-absent.db")
+    monkeypatch.setattr(
+        "app.trade_command_execution.httpx.post",
+        lambda *args, **kwargs: (_ for _ in ()).throw(httpx.ConnectError("timeout")),
+    )
+
+    def runtime_get(url, *args, **kwargs):
+        if "/commands/" in url and url.endswith("/events"):
+            return FakeResponse({}, 404)
+        if "/venue/orders/by-platform/" in url:
+            return FakeResponse({}, 404)
+        raise AssertionError(f"unexpected runtime URL: {url}")
+
+    monkeypatch.setattr("app.venue_reconciliation_runtime_client.httpx.get", runtime_get)
+
+    with TestClient(app) as client:
+        created = client.post(
+            "/api/v1/trading/commands",
+            json=command_payload("venue-absent-command-001"),
+        )
+        assert created.status_code == 200
+        order_id = created.json()["platformOrderId"]
+
+        reconciled = client.post(f"/api/v1/trading/orders/{order_id}/venue-reconcile")
+        assert reconciled.status_code == 200
+        difference_id = reconciled.json()["differenceIds"][0]
+        accepted = client.post(
+            f"/api/v1/ops/venue-reconciliation/differences/{difference_id}/resolve",
+            json={
+                "status": "accepted",
+                "actor": "risk-officer",
+                "reason": "Runtime exact order lookup returned 404",
+            },
+        )
+        assert accepted.status_code == 200
+
+        closed = client.post(
+            f"/api/v1/trading/orders/{order_id}/resolve-missing-external"
+        )
+        assert closed.status_code == 200
+        assert closed.json()["statusAfter"] == "rejected"
+
+        summary = client.get("/api/v1/ops/reconciliation-summary")
+        assert summary.status_code == 200
+        assert summary.json()["resultUnknownOrderCount"] == 0
+
+
 def test_account_snapshot_import_is_idempotent_and_difference_is_auditable(
     monkeypatch,
     tmp_path: Path,

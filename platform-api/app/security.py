@@ -16,6 +16,7 @@ from app.schemas import (
 
 LIVE_ENVIRONMENT = "live"
 ACTIVE_STATUS = "active"
+LOCAL_TEST_STATUSES = {"simulation", "testnet", "demo"}
 
 
 def get_trading_safety() -> TradingSafetyResponse:
@@ -105,7 +106,7 @@ def enforce_order_safety(
     if account is None:
         raise HTTPException(status_code=404, detail="Account not found")
 
-    if account["status"] != ACTIVE_STATUS:
+    if not _account_is_order_eligible(account["status"], account["environment"]):
         raise HTTPException(status_code=403, detail="Account is not active")
 
     credential_ref = account["credential_ref"]
@@ -147,7 +148,12 @@ def enforce_order_safety(
             status_code=403,
             detail="Live trading is disabled by global safety switch",
         )
-    if settings.auth_mode.lower() != "api_key":
+    founder_demo_acceptance = (
+        settings.founder_demo_live_acceptance_enabled
+        and settings.environment.lower() == "development"
+        and settings.auth_mode.lower() == "development"
+    )
+    if settings.auth_mode.lower() != "api_key" and not founder_demo_acceptance:
         raise HTTPException(
             status_code=503,
             detail="Live trading requires production authentication",
@@ -175,6 +181,12 @@ def enforce_order_safety(
         quantity=quantity,
         price=price,
     )
+
+
+def _account_is_order_eligible(status: str, environment: str) -> bool:
+    if status == ACTIVE_STATUS:
+        return True
+    return status == "paused" and environment in LOCAL_TEST_STATUSES
 
 
 def get_account_security_row(account_id: str):

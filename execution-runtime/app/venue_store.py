@@ -4,6 +4,7 @@ import json
 from datetime import UTC, datetime
 from decimal import Decimal
 
+from app.config import get_settings
 from app.journal import connection
 from app.models import (
     CancelOrderResponse,
@@ -100,6 +101,8 @@ CREATE TABLE IF NOT EXISTS fake_venue_economic_events (
 CREATE INDEX IF NOT EXISTS idx_fake_venue_positions_account
 ON fake_venue_positions(account_id, instrument_id);
 """
+
+LEGACY_FAKE_BALANCE = Decimal("100000")
 
 
 def now() -> datetime:
@@ -266,14 +269,85 @@ def calculate_position(
 
 
 def ensure_balance(db, account_id: str, currency: str, at: str) -> None:
+    target_balance = _fake_balance_seed(account_id, currency)
     db.execute(
         """
         INSERT OR IGNORE INTO fake_venue_balances (
             account_id, currency, equity, available_balance, updated_at
         ) VALUES (?, ?, ?, ?, ?)
         """,
-        (account_id, currency, "100000", "100000", at),
+        (
+            account_id,
+            currency,
+            decimal_text(target_balance),
+            decimal_text(target_balance),
+            at,
+        ),
     )
+    _backfill_legacy_balance_seed(
+        db,
+        account_id=account_id,
+        currency=currency,
+        target_balance=target_balance,
+        at=at,
+    )
+
+
+def _fake_balance_seed(account_id: str, currency: str) -> Decimal:
+    return get_settings().fake_balance_seed_overrides.get(
+        (account_id, currency.upper()),
+        LEGACY_FAKE_BALANCE,
+    )
+
+
+def _backfill_legacy_balance_seed(
+    db,
+    *,
+    account_id: str,
+    currency: str,
+    target_balance: Decimal,
+    at: str,
+) -> None:
+    if target_balance == LEGACY_FAKE_BALANCE:
+        return
+    row = db.execute(
+        """
+        SELECT equity, available_balance
+        FROM fake_venue_balances
+        WHERE account_id = ? AND currency = ?
+        """,
+        (account_id, currency),
+    ).fetchone()
+    if row is None:
+        return
+    if (
+        Decimal(row["equity"]) != LEGACY_FAKE_BALANCE
+        or Decimal(row["available_balance"]) != LEGACY_FAKE_BALANCE
+    ):
+        return
+    db.execute(
+        """
+        UPDATE fake_venue_balances
+        SET equity = ?, available_balance = ?, updated_at = ?
+        WHERE account_id = ? AND currency = ?
+        """,
+        (
+            decimal_text(target_balance),
+            decimal_text(target_balance),
+            at,
+            account_id,
+            currency,
+        ),
+    )
+
+
+def _seed_configured_balances(db, account_id: str | None) -> None:
+    at = now_iso()
+    overrides = get_settings().fake_balance_seed_overrides
+    for (seed_account_id, currency), _ in overrides.items():
+        if account_id is not None and seed_account_id != account_id:
+            continue
+        ensure_balance(db, seed_account_id, currency, at)
 
 
 def get_order(*, platform_order_id: str | None = None, external_id: str | None = None) -> VenueOrderSnapshot | None:
@@ -412,6 +486,7 @@ def list_balances(account_id: str | None = None) -> list[VenueBalanceSnapshot]:
     where = "WHERE account_id = ?" if account_id is not None else ""
     parameters = (account_id,) if account_id is not None else ()
     with connection() as db:
+        _seed_configured_balances(db, account_id)
         rows = db.execute(
             f"SELECT * FROM fake_venue_balances {where} ORDER BY account_id, currency",
             parameters,

@@ -6,6 +6,7 @@ from fastapi.testclient import TestClient
 
 from app.config import get_settings
 from app.main import app
+from app.auth import permission_for_request
 
 
 def credential(user_id: str, token: str, roles: list[str]) -> dict[str, object]:
@@ -106,6 +107,59 @@ def test_rbac_is_default_deny_for_trading_and_audit(monkeypatch, tmp_path: Path)
             headers=auth_headers("admin-token"),
         )
         assert admin_audit.status_code == 200
+
+
+def test_live_api_admin_is_not_a_ceo_trade_authority(monkeypatch, tmp_path: Path) -> None:
+    configure_live_auth(monkeypatch, tmp_path)
+    with TestClient(app) as client:
+        response = client.post(
+            "/api/v1/trading/funding/market-command",
+            headers=auth_headers("admin-token"),
+            json={
+                "action": "OPEN_SHORT_PERP_LONG_SPOT",
+                "perpetualSymbol": "BTCUSDT",
+                "spotSymbol": "BTCUSDC",
+                "quantity": "0.01",
+            },
+        )
+
+    assert_auth_error(response, status_code=403, code="ceo_trade_authority_required")
+
+
+def test_strategy_market_commands_use_ceo_browser_permission_boundary() -> None:
+    assert (
+        permission_for_request("POST", "/api/v1/trading/funding/market-command")
+        == "trading.write"
+    )
+
+
+def test_live_api_admin_cannot_bypass_funding_gate_through_generic_command(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    configure_live_auth(monkeypatch, tmp_path)
+    with TestClient(app) as client:
+        response = client.post(
+            "/api/v1/trading/commands",
+            headers=auth_headers("admin-token"),
+            json={
+                "idempotencyKey": "admin-funding-generic-command",
+                "strategyInstanceId": "strategy_funding_arbitrage_instance_default",
+                "accountId": "account_sim_usdt",
+                "instrumentId": "instrument_btc_usdt",
+                "symbol": "BTCUSDT",
+                "side": "buy",
+                "orderType": "limit",
+                "quantity": "0.01",
+                "price": "100",
+            },
+        )
+
+    assert_auth_error(response, status_code=403, code="ceo_trade_authority_required")
+    assert (
+        permission_for_request("POST", "/api/v1/trading/cross-spread/market-command")
+        == "trading.write"
+    )
 
 
 def test_live_actor_field_cannot_impersonate_another_user(

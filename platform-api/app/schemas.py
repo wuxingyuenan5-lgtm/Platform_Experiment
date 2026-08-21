@@ -196,6 +196,7 @@ class StrategyAccountBindingResponse(BaseModel):
     account_id: str = Field(alias="accountId")
     account_code: str = Field(alias="accountCode")
     role: str
+    capability: Literal["trade_and_read", "read_only"]
     max_notional: Decimal | None = Field(alias="maxNotional")
     status: str
 
@@ -330,3 +331,17 @@ class AuditEventResponse(BaseModel):
     subject_id: str = Field(alias="subjectId")
     details_json: str = Field(alias="detailsJson")
     created_at: datetime = Field(alias="createdAt")
+
+
+class StrategyAccountSnapshotResponse(BaseModel):
+    strategy_instance_id: str = Field(alias="strategyInstanceId")
+    account_id: str = Field(alias="accountId")
+    account_code: str = Field(alias="accountCode")
+    capability: Literal["trade_and_read", "read_only"]
+    data_quality_state: str = Field(alias="dataQualityState")
+    as_of: datetime | None = Field(default=None, alias="asOf")
+    balance: BalanceSnapshotResponse | None = None
+    positions: list[PositionResponse] = Field(default_factory=list)
+    orders: list[OrderDetailResponse] = Field(default_factory=list)
+    fills: list[FillResponse] = Field(default_factory=list)
+    pnl: PnlResponse | None = None

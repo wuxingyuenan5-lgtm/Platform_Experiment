@@ -4,7 +4,6 @@
       <section class="risk-toolbar">
         <div>
           <h2>风险总览</h2>
-          <p>按账户、策略、持仓和品种维度跟踪敞口、杠杆、保证金、集中度与处理进度。</p>
         </div>
         <div class="toolbar-actions">
           <Tag :color="roleColor">{{ roleLabel }}</Tag>
@@ -510,8 +509,8 @@
 
   .toolbar-actions {
     display: flex;
-    align-items: center;
     flex-wrap: wrap;
+    align-items: center;
     justify-content: flex-end;
     gap: 8px;
   }
@@ -523,7 +522,7 @@
   .metric-card,
   .vg-panel {
     border-radius: 8px;
-    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+    box-shadow: 0 1px 3px rgb(15 23 42 / 6%);
   }
 
   .metric-card span {
@@ -544,8 +543,8 @@
   .metric-card em {
     display: block;
     margin-top: 6px;
-    font-style: normal;
     font-size: 12px;
+    font-style: normal;
   }
 
   .tone-positive {
@@ -567,10 +566,10 @@
   .dimension-tabs,
   .record-toolbar {
     display: flex;
-    align-items: center;
     flex-wrap: wrap;
-    gap: 8px;
+    align-items: center;
     margin-bottom: 12px;
+    gap: 8px;
   }
 
   .dimension-tabs button {
@@ -626,8 +625,8 @@
 
   @media (max-width: 900px) {
     .risk-toolbar {
-      align-items: flex-start;
       flex-direction: column;
+      align-items: flex-start;
     }
 
     .toolbar-actions {

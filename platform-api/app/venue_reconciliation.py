@@ -90,6 +90,12 @@ def reconcile_order_with_venue(order_id: str) -> OrderVenueReconciliationRespons
     return _call_service(service.reconcile_order_with_venue, order_id)
 
 
+def resolve_owner_accepted_missing_external_order(
+    order_id: str,
+) -> OrderVenueReconciliationResponse:
+    return _call_service(service.resolve_owner_accepted_missing_external_order, order_id)
+
+
 def update_order_from_external(row, external_order: dict[str, object]) -> None:
     return _call_service(service.update_order_from_external, row, external_order)
 

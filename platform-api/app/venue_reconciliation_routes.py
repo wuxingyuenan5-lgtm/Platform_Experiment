@@ -25,6 +25,15 @@ def reconcile_platform_order(order_id: str) -> OrderVenueReconciliationResponse:
 
 
 @router.post(
+    "/trading/orders/{order_id}/resolve-missing-external",
+    response_model=OrderVenueReconciliationResponse,
+    tags=["venue-reconciliation"],
+)
+def resolve_missing_external_platform_order(order_id: str) -> OrderVenueReconciliationResponse:
+    return facade.resolve_owner_accepted_missing_external_order(order_id)
+
+
+@router.post(
     "/ops/venue-reconciliation/runs",
     response_model=VenueReconciliationRunResponse,
     tags=["venue-reconciliation"],

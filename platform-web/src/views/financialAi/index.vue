@@ -5,7 +5,6 @@
         <header class="section-head">
           <div>
             <h2>研究辅助与情景推演中枢</h2>
-            <p>围绕宏观、商品和跨资产主题沉淀研究输入、情景假设、价格表和历史结论。</p>
           </div>
           <Tag :color="reviewStatus === '待复核' ? 'orange' : 'blue'">{{ reviewStatus }}</Tag>
         </header>
@@ -274,7 +273,7 @@
     border: 1px solid #dbe4ed;
     border-radius: 8px;
     background: #fff;
-    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+    box-shadow: 0 1px 3px rgb(15 23 42 / 6%);
   }
 
   .workspace-card,
@@ -362,8 +361,8 @@
 
   .input-actions {
     display: flex;
-    align-items: center;
     flex-wrap: wrap;
+    align-items: center;
     gap: 10px;
   }
 
@@ -460,8 +459,8 @@
   }
 
   th {
-    color: #667085;
     background: #f8fafc;
+    color: #667085;
     font-weight: 800;
   }
 
@@ -531,8 +530,8 @@
   .history-list span,
   .history-list em {
     color: #667085;
-    font-style: normal;
     font-size: 12px;
+    font-style: normal;
   }
 
   @media (max-width: 1100px) {

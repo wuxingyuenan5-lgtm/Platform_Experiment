@@ -6,10 +6,10 @@ from typing import Any, Literal
 
 from app import cross_spread_live_read_client as runtime
 from app.cross_spread import (
-    BYBIT_ACCOUNT_ID,
     BYBIT_SYMBOL,
-    MT5_ACCOUNT_ID,
     MT5_SYMBOL,
+    get_bybit_account_id,
+    get_mt5_account_id,
 )
 from app.cross_spread_live_read_client import CrossSpreadLiveReadError
 from app.cross_spread_observability_schemas import (
@@ -30,7 +30,7 @@ def get_cross_spread_observability(
     start_time = end_time - timedelta(hours=history_hours)
     bybit = _venue_observability(
         venue="Bybit",
-        account_id=BYBIT_ACCOUNT_ID,
+        account_id=get_bybit_account_id(),
         symbol=BYBIT_SYMBOL,
         start_time=start_time,
         end_time=end_time,
@@ -39,7 +39,7 @@ def get_cross_spread_observability(
     )
     mt5 = _venue_observability(
         venue="MT5",
-        account_id=MT5_ACCOUNT_ID,
+        account_id=get_mt5_account_id(),
         symbol=MT5_SYMBOL,
         start_time=start_time,
         end_time=end_time,

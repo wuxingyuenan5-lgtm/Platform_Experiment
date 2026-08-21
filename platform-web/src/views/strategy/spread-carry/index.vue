@@ -23,7 +23,7 @@
         <label class="workspace-control">
           <span>主腿</span>
           <select v-model="leftLegSymbol">
-            <option value="XAUTUSDT.P">XAUTUSDT.P</option>
+            <option value="XAUTUSDT">XAUTUSDT</option>
             <option value="SHFE.au2604">SHFE.au2604</option>
             <option value="SHFE.ag2510">SHFE.ag2510</option>
           </select>
@@ -32,7 +32,7 @@
         <label class="workspace-control">
           <span>对冲腿</span>
           <select v-model="rightLegSymbol">
-            <option value="XAUUSD+">XAUUSD+</option>
+            <option value="XAUUSD">XAUUSD</option>
             <option value="SHFE.au2606">SHFE.au2606</option>
             <option value="SHFE.ag2512">SHFE.ag2512</option>
           </select>
@@ -311,9 +311,6 @@
     />
 
     <div v-else class="execution-shell"
-      ><div class="execution-state"
-        ><div><strong>交易执行</strong><span>下单前需要完成权限、风险和复核检查。</span></div
-        ><b>待复核</b></div
       ><CrossVenueExecutionWorkspace
         :left-leg-symbol="leftLegSymbol"
         :right-leg-symbol="rightLegSymbol"
@@ -341,8 +338,8 @@
     {
       activeSection: 'analysis',
       selectedVenue: 'Bybit',
-      leftLegSymbol: 'XAUTUSDT.P',
-      rightLegSymbol: 'XAUUSD+',
+      leftLegSymbol: 'XAUTUSDT',
+      rightLegSymbol: 'XAUUSD',
       selectedResolution: '30分钟',
       variant: 'crossVenue',
     },
@@ -827,9 +824,9 @@
   .spread-page {
     display: flex;
     flex-direction: column;
-    gap: 14px;
-    color: var(--strategy-text-1);
     background: var(--strategy-bg);
+    color: var(--strategy-text-1);
+    gap: 14px;
   }
 
   .spread-workspace-head {
@@ -841,26 +838,26 @@
 
   .spread-workspace-head__main {
     display: flex;
+    flex: 0 0 auto;
     flex-wrap: nowrap;
-    gap: var(--strategy-space-2);
     align-items: center;
     width: auto;
     max-width: 100%;
-    flex: 0 0 auto;
     min-height: 46px;
     padding: 5px var(--strategy-space-2);
     border: 1px solid var(--strategy-border);
     border-radius: var(--strategy-radius-card);
     background: var(--strategy-surface);
     box-shadow: var(--strategy-shadow-soft);
+    gap: var(--strategy-space-2);
   }
 
   .workspace-control {
     display: inline-flex;
-    align-items: center;
-    gap: var(--strategy-space-1);
-    min-width: 0;
     flex: 0 0 auto;
+    align-items: center;
+    min-width: 0;
+    gap: var(--strategy-space-1);
   }
 
   .workspace-control span {
@@ -872,6 +869,8 @@
   }
 
   .workspace-control select {
+    width: auto;
+    min-width: 88px;
     height: var(--strategy-control-height);
     padding: 0 var(--strategy-space-2);
     border: 1px solid var(--strategy-border-strong);
@@ -880,8 +879,6 @@
     color: var(--strategy-text-1);
     font-size: var(--strategy-font-base);
     font-weight: 700;
-    min-width: 88px;
-    width: auto;
   }
 
   .spread-overview {
@@ -894,9 +891,9 @@
   .spread-chart-card,
   .stats-card {
     border: 1px solid var(--strategy-border);
+    border-radius: var(--strategy-radius-panel);
     background: var(--strategy-surface);
     box-shadow: var(--strategy-shadow-card);
-    border-radius: var(--strategy-radius-panel);
   }
 
   .spread-card,
@@ -921,10 +918,10 @@
     border: 1px solid var(--strategy-border-strong);
     border-radius: var(--strategy-radius-control);
     background: var(--strategy-surface);
+    box-shadow: var(--strategy-shadow-soft);
     color: var(--strategy-text-2);
     font-size: var(--strategy-font-base);
     font-weight: 700;
-    box-shadow: var(--strategy-shadow-soft);
     cursor: pointer;
   }
 
@@ -937,8 +934,8 @@
   td {
     padding: 10px 0;
     border-bottom: 1px solid var(--strategy-border-soft);
-    text-align: left;
     font-size: var(--strategy-font-sm);
+    text-align: left;
   }
 
   th {
@@ -994,8 +991,8 @@
   .spread-chart-filters,
   .stats-card__controls {
     display: flex;
-    align-items: center;
     flex-wrap: wrap;
+    align-items: center;
     justify-content: flex-end;
     gap: 10px;
   }
@@ -1040,10 +1037,10 @@
     border: 1px solid var(--strategy-border-strong);
     border-radius: var(--strategy-radius-control);
     background: var(--strategy-surface);
+    box-shadow: var(--strategy-shadow-soft);
     color: var(--strategy-text-1);
     font-size: var(--strategy-font-base);
     font-weight: 700;
-    box-shadow: var(--strategy-shadow-soft);
   }
 
   .series-switch {
@@ -1053,8 +1050,8 @@
   .series-switch.is-active {
     border-color: var(--strategy-accent-soft);
     background: var(--strategy-accent-soft);
-    color: var(--strategy-accent-strong);
     box-shadow: inset 0 0 0 1px var(--strategy-accent-ring);
+    color: var(--strategy-accent-strong);
   }
 
   .chart-select {
@@ -1074,11 +1071,11 @@
     border: 1px solid var(--strategy-border-strong);
     border-radius: var(--strategy-radius-control);
     background: var(--strategy-surface);
+    box-shadow: var(--strategy-shadow-soft);
     color: var(--strategy-text-1);
     font-size: var(--strategy-font-base);
     font-weight: 700;
     line-height: 1;
-    box-shadow: var(--strategy-shadow-soft);
   }
 
   .spread-chart-toolbar__left input {
@@ -1110,8 +1107,8 @@
 
   .stats-card__controls {
     display: flex;
-    align-items: center;
     flex-wrap: wrap;
+    align-items: center;
     justify-content: flex-end;
     gap: 8px;
   }
@@ -1166,16 +1163,16 @@
   .domestic-realtime-table td {
     padding: 12px 16px;
     border-bottom: 1px solid var(--strategy-border-soft);
+    font-size: var(--strategy-font-sm);
     text-align: center;
     white-space: nowrap;
-    font-size: var(--strategy-font-sm);
   }
 
   .domestic-analysis-table th,
   .domestic-realtime-table th {
+    background: var(--strategy-table-head-bg);
     color: var(--strategy-text-3);
     font-weight: 700;
-    background: var(--strategy-table-head-bg);
   }
 
   .domestic-analysis-table td,
@@ -1203,10 +1200,10 @@
     border: 1px solid var(--strategy-border-strong);
     border-radius: var(--strategy-radius-control);
     background: var(--strategy-surface);
+    box-shadow: var(--strategy-shadow-soft);
     color: var(--strategy-text-2);
     font-size: var(--strategy-font-base);
     font-weight: 700;
-    box-shadow: var(--strategy-shadow-soft);
     cursor: pointer;
   }
 
@@ -1320,12 +1317,12 @@
   }
 
   .heatmap-cell.is-warm {
-    background: rgba(217, 83, 79, 0.12);
+    background: rgb(217 83 79 / 12%);
     color: #cf4653;
   }
 
   .heatmap-cell.is-cold {
-    background: rgba(46, 204, 113, 0.12);
+    background: rgb(46 204 113 / 12%);
     color: #239b63;
   }
 
@@ -1357,8 +1354,8 @@
     .spread-chart-toolbar__left,
     .spread-chart-toolbar__center,
     .spread-chart-toolbar__right {
-      width: 100%;
       justify-content: flex-start;
+      width: 100%;
     }
 
     .spread-chart-toolbar__left {

@@ -2,13 +2,9 @@
 
 Use the smallest sufficient evidence set. Historical process material, phase receipts and chat history are not active context.
 
-## Default startup
+## On-demand context
 
-1. `AGENTS.md`
-2. `docs/codex/current-state.md`
-3. nearest module `AGENTS.md`
-4. directly affected source and tests
-5. one owning architecture or contract document when responsibility or semantics change
+Read `AGENTS.md` first. Read this map, Context Packs, task cards, governance documents, module instructions, contracts, and historical records only when the Owner explicitly asks or the affected technical surface requires them.
 
 ## Context Pack commands
 
@@ -19,7 +15,7 @@ python scripts/context-for.py identity-permission --json
 python scripts/context-for.py --check-budgets --json
 ```
 
-Pack paths and numeric budgets remain owned by `scripts/context-packs.json`. Required files must exist and stay within budget; optional files remain unloaded by default.
+Context Packs are optional reading aids. Their estimates are informational and never a Token gate.
 
 ## Task routing
 

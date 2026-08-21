@@ -17,6 +17,7 @@ from app.execution_risk import router as execution_risk_router
 from app.financial_facts import router as financial_facts_router
 from app.live_trading_sessions import router as live_trading_sessions_router
 from app.live_venue_accounting import router as live_venue_accounting_router
+from app.live_venue_snapshot_sync import router as live_venue_snapshot_sync_router
 from app.member_holding_routes import router as member_holding_router
 from app.production_monitoring import router as production_monitoring_router
 from app.research_routes import router as research_router
@@ -33,7 +34,7 @@ from app.user_cache_control import UserNoStoreMiddleware
 from app.user_routes import router as user_router
 from app.venue_reconciliation_routes import router as venue_reconciliation_router
 
-PLATFORM_VERSION = "0.11.0"
+PLATFORM_VERSION = "0.11.1"
 
 configure_trade_command_port(create_trade_command)
 
@@ -68,6 +69,7 @@ def create_application() -> FastAPI:
     application.include_router(execution_risk_router)
     application.include_router(venue_reconciliation_router)
     application.include_router(live_venue_accounting_router)
+    application.include_router(live_venue_snapshot_sync_router)
     application.include_router(eod_reconciliation_router)
     application.include_router(live_trading_sessions_router)
     application.include_router(credential_security_router)

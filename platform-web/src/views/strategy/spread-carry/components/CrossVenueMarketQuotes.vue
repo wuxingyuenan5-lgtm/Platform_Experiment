@@ -31,8 +31,10 @@
           </div>
           <div class="quote-stat">
             <span>延迟</span>
-            <strong>{{ venueStatusLabel(bybitStatus) }}</strong>
-            <small>&nbsp;</small>
+            <strong :class="latencyTone(bybitLatencyMs, bybitStatus)">{{
+              formatLatencyMs(bybitLatencyMs, bybitStatus)
+            }}</strong>
+            <small>ms</small>
           </div>
         </div>
       </article>
@@ -60,8 +62,10 @@
           </div>
           <div class="quote-stat">
             <span>延迟</span>
-            <strong>{{ venueStatusLabel(mt5Status) }}</strong>
-            <small>&nbsp;</small>
+            <strong :class="latencyTone(mt5LatencyMs, mt5Status)">{{
+              formatLatencyMs(mt5LatencyMs, mt5Status)
+            }}</strong>
+            <small>ms</small>
           </div>
         </div>
       </article>
@@ -77,6 +81,8 @@
     rightLegSymbol: string;
     bybitQuote: MarketQuoteResult | null;
     mt5Quote: MarketQuoteResult | null;
+    bybitLatencyMs?: number | null;
+    mt5LatencyMs?: number | null;
     bybitStatus?: string | null;
     mt5Status?: string | null;
   }>();
@@ -99,11 +105,23 @@
     return parsed === null ? '--' : formatNumber(parsed, digits);
   }
 
-  function venueStatusLabel(status: string | null | undefined) {
-    if (status === 'available') return '可用';
+  function formatLatencyMs(
+    latencyMs: number | null | undefined,
+    status: string | null | undefined,
+  ) {
+    if (latencyMs !== null && latencyMs !== undefined)
+      return Math.round(latencyMs).toLocaleString('en-US');
     if (status === 'timeout') return '超时';
-    if (status === 'unavailable') return '不可用';
-    return '等待';
+    if (status === 'unavailable') return '--';
+    return '--';
+  }
+
+  function latencyTone(latencyMs: number | null | undefined, status: string | null | undefined) {
+    if (status === 'timeout' || status === 'unavailable') return 'red';
+    if (latencyMs === null || latencyMs === undefined) return '';
+    if (latencyMs <= 80) return 'green';
+    if (latencyMs <= 250) return '';
+    return 'red';
   }
 </script>
 
@@ -112,24 +130,24 @@
     padding: 16px 18px 18px;
     border: 1px solid #e7ebf0;
     border-radius: 18px;
-    background: linear-gradient(180deg, #ffffff 0%, #fcfdff 100%);
-    box-shadow: 0 10px 22px rgba(94, 109, 133, 0.04);
+    background: linear-gradient(180deg, #fff 0%, #fcfdff 100%);
+    box-shadow: 0 10px 22px rgb(94 109 133 / 4%);
   }
 
   .card-head {
     display: flex;
-    justify-content: space-between;
     align-items: flex-start;
+    justify-content: space-between;
     margin-bottom: 12px;
   }
 
   .card-head h3 {
     margin: 0;
+    color: #162845;
     font-family: var(--strategy-font-heading);
     font-size: 21px;
     font-weight: 800;
     letter-spacing: -0.012em;
-    color: #162845;
   }
 
   .card-head span {
@@ -149,17 +167,17 @@
     padding: 18px 18px 14px;
     border: 1px solid #e9edf2;
     border-radius: 16px;
-    background: linear-gradient(180deg, #ffffff 0%, #fcfdff 100%);
+    background: linear-gradient(180deg, #fff 0%, #fcfdff 100%);
   }
 
   .quote-card__head {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     justify-content: space-between;
-    gap: 10px 14px;
-    flex-wrap: wrap;
     margin-bottom: 14px;
     color: #1a2b4a;
+    gap: 10px 14px;
   }
 
   .quote-card__head strong {
@@ -181,7 +199,7 @@
     height: 8px;
     border-radius: 999px;
     background: #1db954;
-    box-shadow: 0 0 0 3px rgba(29, 185, 84, 0.12);
+    box-shadow: 0 0 0 3px rgb(29 185 84 / 12%);
   }
 
   .quote-stats {
@@ -210,9 +228,9 @@
   .quote-stat strong {
     font-family: var(--strategy-font-data);
     font-size: clamp(14px, 0.82vw, 18px);
-    line-height: 1.08;
     font-weight: 600;
     letter-spacing: -0.02em;
+    line-height: 1.08;
     white-space: nowrap;
   }
 

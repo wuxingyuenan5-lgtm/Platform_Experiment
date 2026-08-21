@@ -41,14 +41,21 @@ def validate_trade_command_catalog(request: CreateTradeCommandRequest) -> None:
             WHERE sab.strategy_instance_id = ?
               AND sab.account_id = ?
               AND sab.status = 'active'
-              AND a.status = 'active'
+              AND sab.capability = 'trade_and_read'
+              AND (
+                    a.status = 'active'
+                    OR (
+                        a.status = 'paused'
+                        AND a.environment IN ('simulation', 'testnet', 'demo')
+                    )
+                  )
             """,
             (request.strategy_instance_id, request.account_id),
         ).fetchone()
         if binding is None:
             raise HTTPException(
                 status_code=403,
-                detail="Account is not actively bound to strategy instance",
+                detail="Account is not write-capable for this strategy instance",
             )
 
         instrument = db.execute(

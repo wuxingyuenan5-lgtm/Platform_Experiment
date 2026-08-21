@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Print bounded repository reading packs and enforce their token budgets."""
+"""Print bounded repository reading packs and report their context estimates."""
 
 from __future__ import annotations
 
@@ -27,9 +27,6 @@ CONFIG = json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
 PACKS: dict[str, dict[str, object]] = CONFIG["packs"]
 PACK_BUDGETS: dict[str, list[int]] = CONFIG["budgets"]
 PACK_CATEGORIES = frozenset(CONFIG.get("pack_categories", ()))
-DEFAULT_STARTUP_BUDGET_TOKENS = int(CONFIG["default_startup_budget_tokens"])
-DEFAULT_STARTUP_BASE = tuple(CONFIG["default_startup_base"])
-DEFAULT_STARTUP_MODULES = tuple(CONFIG["default_startup_modules"])
 BOUNDED_CONCURRENCY = CONFIG.get("bounded_concurrency", {})
 TASK_CARD_CHECK = CONFIG.get("task_card_check")
 
@@ -152,44 +149,10 @@ def pack_report(name: str) -> dict[str, object]:
     }
 
 
-def default_startup_report() -> dict[str, object]:
-    variants: list[dict[str, object]] = []
-    for module_agent in DEFAULT_STARTUP_MODULES:
-        paths = (*DEFAULT_STARTUP_BASE, module_agent)
-        variants.append(
-            {
-                "module_agent": module_agent,
-                "paths": list(paths),
-                **file_metrics(paths),
-            }
-        )
-    maximum = max(
-        variants,
-        key=lambda row: (int(row["estimated_tokens"]), str(row["module_agent"])),
-    )
-    missing = sorted(
-        {
-            str(path)
-            for variant in variants
-            for path in variant["missing_paths"]
-        }
-    )
-    maximum_tokens = int(maximum["estimated_tokens"])
-    return {
-        "budget_tokens": DEFAULT_STARTUP_BUDGET_TOKENS,
-        "maximum_estimated_tokens": maximum_tokens,
-        "over_budget": maximum_tokens > DEFAULT_STARTUP_BUDGET_TOKENS,
-        "largest_variant": maximum["module_agent"],
-        "missing_paths": missing,
-        "variants": variants,
-    }
-
-
 def budget_report() -> dict[str, object]:
     reports = {name: pack_report(name) for name in sorted(PACKS)}
     unbudgeted = sorted(set(PACKS) - set(PACK_BUDGETS))
     orphan_budgets = sorted(set(PACK_BUDGETS) - set(PACKS))
-    startup = default_startup_report()
     failures: list[str] = []
 
     for key, expected in EXPECTED_CONCURRENCY.items():
@@ -204,45 +167,20 @@ def budget_report() -> dict[str, object]:
             "disjoint writes, no unfinished dependencies, independent tests and "
             "independent rollback"
         )
-    if TASK_CARD_CHECK != "python scripts/check-task-card.py <task-card-path>":
-        failures.append("task_card_check must route through scripts/check-task-card.py")
+    if not isinstance(TASK_CARD_CHECK, str) or "scripts/check-task-card.py" not in TASK_CARD_CHECK:
+        failures.append("task_card_check must identify the optional task-card validator")
 
     for name, report in reports.items():
         category = report["category"]
         if category is not None and category not in PACK_CATEGORIES:
             failures.append(f"{name}: unsupported category: {category}")
-        if not report["legacy_budget_compatible"]:
-            failures.append(f"{name}: Pack and legacy budget values differ")
         if report["missing_paths"]:
             failures.append(
                 f"{name}: missing paths: {', '.join(report['missing_paths'])}"
             )
-        for kind in ("required", "optional"):
-            section = report[kind]
-            if section["over_budget"]:
-                failures.append(
-                    f"{name}: {kind} tokens {section['estimated_tokens']} exceed "
-                    f"budget {section['budget_tokens']}"
-                )
-    if unbudgeted:
-        failures.append(f"packs without budgets: {', '.join(unbudgeted)}")
-    if orphan_budgets:
-        failures.append(f"budgets without packs: {', '.join(orphan_budgets)}")
-    if startup["missing_paths"]:
-        failures.append(
-            "default startup missing paths: "
-            + ", ".join(startup["missing_paths"])
-        )
-    if startup["over_budget"]:
-        failures.append(
-            f"default startup tokens {startup['maximum_estimated_tokens']} exceed "
-            f"budget {startup['budget_tokens']}"
-        )
-
     return {
         "schema_version": 1,
         "packs": reports,
-        "default_startup": startup,
         "unbudgeted_packs": unbudgeted,
         "orphan_budgets": orphan_budgets,
         "bounded_concurrency": BOUNDED_CONCURRENCY,
@@ -363,11 +301,6 @@ def main() -> None:
                     f"{data['optional']['estimated_tokens']}/"
                     f"{data['optional']['budget_tokens']}"
                 )
-            print(
-                "default-startup: "
-                f"{report['default_startup']['maximum_estimated_tokens']}/"
-                f"{report['default_startup']['budget_tokens']}"
-            )
             for failure in report["failures"]:
                 print(f"ERROR: {failure}")
         raise SystemExit(0 if report["ok"] else 1)

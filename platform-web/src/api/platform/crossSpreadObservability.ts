@@ -58,6 +58,7 @@ export interface VenuePositionSnapshot {
   fieldAvailability?: Record<string, string>;
   dataQualityState: string;
   asOf: string;
+  openTime?: string | null;
 }
 
 export interface VenueOrderSnapshot {
@@ -124,11 +125,14 @@ export interface CrossSpreadObservabilityResult {
 
 const apiBaseUrl = import.meta.env.VITE_PLATFORM_API_BASE_URL || 'http://127.0.0.1:8000/api/v1';
 
+const platformApiToken = import.meta.env.VITE_PLATFORM_API_TOKEN || '';
+
 const client: AxiosInstance = axios.create({
   baseURL: apiBaseUrl,
   timeout: 30_000,
   headers: {
     'Content-Type': 'application/json',
+    ...(platformApiToken ? { Authorization: `Bearer ${platformApiToken}` } : {}),
   },
 });
 

@@ -2,11 +2,14 @@ from __future__ import annotations
 
 from decimal import Decimal
 
+import pytest
+
 from app.bybit_fill_confirming_adapter import (
     CROSS_SPREAD_STRATEGY_INSTANCE_ID,
     BybitFillConfirmingAdapter,
 )
 from app.config import Settings, get_settings
+from app.gateway_errors import GatewayResultUnknownError
 from app.journal import initialize_journal
 from app.models import SubmitOrderCommand
 
@@ -34,6 +37,14 @@ class FakeBybitConfirmationClient:
 
     def get_order_history(self, **kwargs):
         return {"retCode": 0, "result": {"list": []}}
+
+
+class ExplodingBybitConfirmationClient(FakeBybitConfirmationClient):
+    def __init__(self) -> None:
+        super().__init__([order_row("New", filled_quantity="0", average_price="")])
+
+    def place_order(self, **kwargs):
+        raise RuntimeError("position check timed out")
 
 
 def runtime_settings() -> Settings:
@@ -202,3 +213,14 @@ def test_cross_spread_fok_partial_fill_never_emits_fill_event(tmp_path) -> None:
     assert events[0].reason is not None
     assert "terminal partial fill" in events[0].reason
     assert "MT5 hedge was not submitted" in events[0].reason
+
+
+def test_market_acknowledgement_preserves_underlying_place_order_error(tmp_path) -> None:
+    initialize_runtime_store(tmp_path, "bybit-confirm-place-order-error.db")
+    adapter = BybitFillConfirmingAdapter(runtime_settings(), ExplodingBybitConfirmationClient())
+
+    with pytest.raises(
+        GatewayResultUnknownError,
+        match="Bybit place_order result is unknown: RuntimeError: position check timed out",
+    ):
+        adapter.submit_order(order_command("explode"))

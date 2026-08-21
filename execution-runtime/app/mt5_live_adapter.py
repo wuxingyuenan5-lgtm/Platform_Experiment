@@ -79,6 +79,9 @@ class Mt5LiveAdapter:
     def submit_order(self, command: SubmitOrderCommand) -> list[ExecutionEvent]:
         self._assert_account(command.account_id)
         mt5 = self._connect()
+        resolved = self._resolve_command_symbol(mt5, command)
+        if resolved is not None:
+            command = command.model_copy(update={"symbol": resolved.symbol})
         reference_price = command.price or self._market_reference_price(mt5, command)
         validate_live_write(
             command,
@@ -132,16 +135,30 @@ class Mt5LiveAdapter:
         ]
         result_volume = Decimal(str(getattr(result, "volume", 0) or 0))
         result_price = Decimal(str(getattr(result, "price", 0) or 0))
-        if deal_ticket and result_volume > 0 and result_price > 0:
+        fill_quantity = result_volume
+        fill_price = result_price
+        if (fill_quantity <= 0 or fill_price <= 0) and (order_ticket or deal_ticket):
+            # Some MT5 terminals (e.g. Bybit MT5) return an accepted order_send
+            # without deal/volume/price populated. Recover the fill from the
+            # just-opened position so the runtime still emits order_filled.
+            ticket = order_ticket or deal_ticket
+            try:
+                positions = mt5.positions_get(ticket=ticket) or ()
+            except Exception:
+                positions = ()
+            if positions:
+                fill_quantity = Decimal(str(getattr(positions[0], "volume", 0) or 0))
+                fill_price = Decimal(str(getattr(positions[0], "price_open", 0) or 0))
+        if fill_quantity > 0 and fill_price > 0:
             events.append(
                 ExecutionEvent(
-                    event_id=f"MT5-DEAL-{deal_ticket}",
+                    event_id=f"MT5-DEAL-{deal_ticket or order_ticket}",
                     command_id=command.command_id,
                     platform_order_id=command.platform_order_id,
                     event_type="order_filled",
                     external_order_id=external_order_id,
-                    fill_price=result_price,
-                    fill_quantity=result_volume,
+                    fill_price=fill_price,
+                    fill_quantity=fill_quantity,
                     occurred_at=datetime.now(UTC),
                 )
             )
@@ -254,6 +271,12 @@ class Mt5LiveAdapter:
             volume = Decimal(str(getattr(row, "volume", 0)))
             if int(getattr(row, "type", -1)) == int(getattr(mt5, "POSITION_TYPE_SELL", 1)):
                 volume = -volume
+            open_time_msc = int(getattr(row, "time_msc", 0) or 0)
+            open_time = (
+                datetime.fromtimestamp(open_time_msc / 1000, UTC)
+                if open_time_msc
+                else None
+            )
             snapshots.append(
                 VenuePositionSnapshot(
                     source=self.name,
@@ -265,6 +288,7 @@ class Mt5LiveAdapter:
                     averagePrice=Decimal(str(getattr(row, "price_open", 0))),
                     currency=currency,
                     asOf=self._position_time(row),
+                    openTime=open_time,
                 )
             )
         return snapshots
@@ -281,7 +305,7 @@ class Mt5LiveAdapter:
         if actual_login != str(secret["LOGIN"]):
             raise GatewayConfigurationError("Connected MT5 account does not match configured login")
         as_of = datetime.now(UTC)
-        currency = str(getattr(info, "currency", "USD"))
+        currency = self._normalize_account_currency(getattr(info, "currency", "USD"))
         return [
             VenueBalanceSnapshot(
                 source=self.name,
@@ -403,10 +427,10 @@ class Mt5LiveAdapter:
             return mt5
         self._connected = False
         timeout_ms = int(self.settings.mt5_check_timeout_seconds * 1000)
-        initialized = mt5.initialize(
-            path=self.settings.mt5_terminal_path,
-            timeout=timeout_ms,
-        )
+        initialize_kwargs: dict[str, object] = {"timeout": timeout_ms}
+        if self.settings.mt5_terminal_path:
+            initialize_kwargs["path"] = self.settings.mt5_terminal_path
+        initialized = mt5.initialize(**initialize_kwargs)
         if not initialized:
             raise GatewayConfigurationError(f"MT5 initialize failed: {mt5.last_error()}")
         secret = self._secret()
@@ -420,6 +444,33 @@ class Mt5LiveAdapter:
             raise GatewayConfigurationError(f"MT5 login failed: {mt5.last_error()}")
         self._connected = True
         return mt5
+
+    def _resolve_command_symbol(self, mt5, command: SubmitOrderCommand) -> Any | None:
+        """Resolve the concrete MT5 symbol for the command's logical symbol.
+
+        Returns a dataclass with ``symbol``/``matched_by`` when a selectable
+        symbol with a live tick exists, else ``None`` (the caller keeps the
+        original symbol so failures stay visible rather than silently re-routing).
+        """
+        try:
+            from app.mt5_symbol_resolver import resolve_mt5_symbol
+
+            account = getattr(mt5, "account_info", lambda: None)()
+            cache_key = None
+            if account is not None:
+                cache_key = (
+                    str(getattr(account, "login", "") or ""),
+                    str(getattr(account, "server", "") or ""),
+                )
+            base = _logical_mt5_symbol(command.symbol)
+            return resolve_mt5_symbol(
+                mt5_module=mt5,
+                base_symbol=base,
+                preferred=command.symbol,
+                cache_key=cache_key,
+            )
+        except Exception:
+            return None
 
     def _secret(self) -> dict[str, str]:
         try:
@@ -602,4 +653,26 @@ class Mt5LiveAdapter:
         info = mt5.account_info()
         if info is None:
             raise GatewayResultUnknownError(f"MT5 account_info failed: {mt5.last_error()}")
-        return str(getattr(info, "currency", "USD"))
+        return Mt5LiveAdapter._normalize_account_currency(getattr(info, "currency", "USD"))
+
+    @staticmethod
+    def _normalize_account_currency(value: object) -> str:
+        currency = str(value or "USD").strip().upper()
+        # Some MT5 bridges expose UST while the desk settles it 1:1 as USDT.
+        # Normalize it here so downstream accounting and UI stay on one unit.
+        if currency == "UST":
+            return "USDT"
+        return currency or "USD"
+
+
+def _logical_mt5_symbol(symbol: str) -> str:
+    """Strip known broker suffixes (``.s``/``+``/``.a``/``.m``) to the logical name.
+
+    ``XAUUSD.s`` -> ``XAUUSD``; ``XAUUSD+`` -> ``XAUUSD``. Unknown suffixes are
+    kept so an explicit custom name still resolves against the terminal.
+    """
+    upper = symbol.upper()
+    for suffix in (".S", "+", ".A", ".M", ".A", ".PRO"):
+        if upper.endswith(suffix):
+            return symbol[: -len(suffix)]
+    return symbol

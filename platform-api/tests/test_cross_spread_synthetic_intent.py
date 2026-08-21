@@ -23,6 +23,7 @@ from app.cross_spread_order_intent import (
     market_command_action,
 )
 from app.execution_schemas import ExecutionBatchResponse
+from app.schemas import BatchLegResponse
 
 NOW = datetime(2026, 7, 25, tzinfo=UTC)
 
@@ -54,12 +55,13 @@ def exit_plan(
     direction: SpreadDirection = "LONG_SPREAD",
     trigger_reason: str | None = None,
     status: ExitPlanStatus = "active",
+    close_batch_id: str | None = None,
 ) -> CrossSpreadExitPlanResponse:
     return CrossSpreadExitPlanResponse(
         planId="plan-1",
         strategyInstanceId="strategy_cross_venue_spread_instance_default",
         openBatchId="open-batch-1",
-        closeBatchId=None,
+        closeBatchId=close_batch_id,
         direction=direction,
         quantityOz="1",
         mt5PositionId="778899",
@@ -251,6 +253,64 @@ def test_manual_close_and_take_profit_close_share_close_action(monkeypatch) -> N
     assert take_profit_result.order_intent.action == "CLOSE_LONG_SPREAD"
 
 
+def test_manual_close_recovers_a_failed_unsubmitted_exit_batch(monkeypatch) -> None:
+    manual_plan = exit_plan(
+        status="manual_intervention",
+        close_batch_id="failed-close-1",
+    )
+    recovered_plan = exit_plan(
+        trigger_reason="manual",
+        status="triggered",
+        close_batch_id="failed-close-1",
+    )
+    failed_batch = batch_response("failed-close-1", direction="CLOSE_LONG", status="failed")
+    failed_batch.legs = [
+        BatchLegResponse(
+            role="bybit_leg",
+            accountId="bybit-live-main",
+            orderId="platform-order-rejected-before-venue",
+            status="rejected",
+            failureReason="Runtime environment is not live",
+        ),
+        BatchLegResponse(
+            role="mt5_leg",
+            accountId="mt5-live-main",
+            orderId=None,
+            status="pending",
+            failureReason=None,
+        ),
+    ]
+    captured = {}
+
+    monkeypatch.setattr(synthetic_service, "get_exit_plan", lambda _plan_id: manual_plan)
+    monkeypatch.setattr(
+        synthetic_service,
+        "get_execution_batch",
+        lambda _batch_id: failed_batch,
+    )
+    monkeypatch.setattr(
+        synthetic_service,
+        "reclaim_manual_exit_plan",
+        lambda *_args, **_kwargs: recovered_plan,
+    )
+    monkeypatch.setattr(
+        synthetic_service,
+        "_close_claimed_plan",
+        lambda claimed, **kwargs: captured.update(plan=claimed, kwargs=kwargs) or "closed",
+    )
+
+    result = synthetic_service.close_cross_spread_market(
+        manual_plan.plan_id,
+        execution_mode="market",
+    )
+
+    assert result == "closed"
+    assert captured["plan"] == recovered_plan
+    assert captured["kwargs"]["idempotency_key"] == (
+        "cross-spread-exit-recovery:plan-1:failed-close-1"
+    )
+
+
 def test_limit_open_routes_only_to_fok_executor(monkeypatch) -> None:
     captured = {}
     plan = exit_plan()
@@ -316,3 +376,14 @@ def test_limit_request_requires_explicit_spread() -> None:
             stopLossSpread="-3",
             executionMode="limit",
         )
+
+
+def test_market_open_request_allows_missing_take_profit_and_stop_loss() -> None:
+    request = CrossSpreadMarketOpenRequest(
+        direction="LONG_SPREAD",
+        quantityOz="1",
+        executionMode="market",
+    )
+
+    assert request.take_profit_spread is None
+    assert request.stop_loss_spread is None

@@ -96,13 +96,6 @@ body:
     validations:
       required: true
   - type: textarea
-    id: output_contract
-    attributes:
-      label: Output contract
-      description: Short receipt using outcome, changed_files, validations, evidence, contract_impact, unproven_facts, residual_risks and next_gate.
-    validations:
-      required: true
-  - type: textarea
     id: protected_semantics
     attributes:
       label: Protected semantics

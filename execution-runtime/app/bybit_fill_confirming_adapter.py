@@ -158,7 +158,7 @@ class BybitFillConfirmingAdapter(BybitLiveAdapter):
             raise GatewayRequestRejectedError("Bybit PostOnly Chase requires a hard limit price")
 
         self._assert_account(command.account_id)
-        client = self._client()
+        client = self._client(command.account_id)
         validate_live_write(
             command,
             adapter=self.name,
@@ -419,8 +419,9 @@ class BybitFillConfirmingAdapter(BybitLiveAdapter):
         try:
             response = client.place_order(**payload)
         except Exception as exc:
-            raise GatewayResultUnknownError(
-                "Bybit PostOnly place_order result is unknown"
+            raise self._unknown_error(
+                "Bybit PostOnly place_order result is unknown",
+                exc,
             ) from exc
         self._require_success(response, "Bybit rejected PostOnly order")
         result = response.get("result") or {}
@@ -571,7 +572,7 @@ class BybitFillConfirmingAdapter(BybitLiveAdapter):
 
     def _submit_acknowledgement(self, command: SubmitOrderCommand) -> list[ExecutionEvent]:
         self._assert_account(command.account_id)
-        client = self._client()
+        client = self._client(command.account_id)
         reference_price = command.price or self._market_reference_price(client, command)
         validate_live_write(
             command,
@@ -600,7 +601,7 @@ class BybitFillConfirmingAdapter(BybitLiveAdapter):
         try:
             response = client.place_order(**payload)
         except Exception as exc:
-            raise GatewayResultUnknownError("Bybit place_order result is unknown") from exc
+            raise self._unknown_error("Bybit place_order result is unknown", exc) from exc
         self._require_success(response, "Bybit rejected order")
         result = response.get("result") or {}
         external_order_id = str(result.get("orderId") or "")

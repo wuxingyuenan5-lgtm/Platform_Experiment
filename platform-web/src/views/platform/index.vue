@@ -86,8 +86,8 @@
       variant: 'crossVenue',
       venueLabel: '\u4e3b\u4ea4\u6613\u6240',
       venueOptions: ['Bybit', 'Binance', 'OKX'],
-      mainLegOptions: ['XAUTUSDT.P'],
-      hedgeLegOptions: ['XAUUSD+'],
+      mainLegOptions: ['XAUTUSDT'],
+      hedgeLegOptions: ['XAUUSD'],
     },
     {
       key: 'domesticOverseas',
@@ -107,8 +107,8 @@
 
   const selectedVenue = ref('Bybit');
   const selectedFundingSymbol = ref('BTC');
-  const selectedMainLeg = ref('XAUTUSDT.P');
-  const selectedHedgeLeg = ref('XAUUSD+');
+  const selectedMainLeg = ref('XAUTUSDT');
+  const selectedHedgeLeg = ref('XAUUSD');
   const selectedResolution = ref('\u0033\u0030\u5206\u949f');
   const activeSection = ref<'analysis' | 'execution'>('analysis');
 

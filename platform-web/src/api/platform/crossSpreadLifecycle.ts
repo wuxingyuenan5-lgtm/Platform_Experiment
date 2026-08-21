@@ -56,8 +56,8 @@ export interface CrossSpreadExitPlanResult {
   quantityOz: string;
   mt5PositionId: string;
   entrySpread: string;
-  takeProfitSpread: string;
-  stopLossSpread: string;
+  takeProfitSpread: string | null;
+  stopLossSpread: string | null;
   takeProfitExecutionMode: CrossSpreadExecutionMode;
   stopLossExecutionMode: CrossSpreadExecutionMode;
   takeProfitLimitStrategy: CrossSpreadLimitStrategy;
@@ -74,8 +74,8 @@ export interface CrossSpreadExitPlanResult {
 export interface CrossSpreadMarketOpenInput {
   direction: CrossSpreadDirection;
   quantityOz: string;
-  takeProfitSpread: string;
-  stopLossSpread: string;
+  takeProfitSpread?: string;
+  stopLossSpread?: string;
   executionMode: CrossSpreadExecutionMode;
   limitSpread?: string;
   limitStrategy: CrossSpreadLimitStrategy;
@@ -101,11 +101,14 @@ export interface CrossSpreadMarketCloseResult {
 
 const apiBaseUrl = import.meta.env.VITE_PLATFORM_API_BASE_URL || 'http://127.0.0.1:8000/api/v1';
 
+const platformApiToken = import.meta.env.VITE_PLATFORM_API_TOKEN || '';
+
 const client: AxiosInstance = axios.create({
   baseURL: apiBaseUrl,
   timeout: 30_000,
   headers: {
     'Content-Type': 'application/json',
+    ...(platformApiToken ? { Authorization: `Bearer ${platformApiToken}` } : {}),
   },
 });
 

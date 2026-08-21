@@ -53,3 +53,14 @@ def test_production_operations_permissions_live_in_auth_policy() -> None:
         permission_for_request("POST", "/api/v1/ops/alerts/alert-1/acknowledge")
         == "reconciliation:review"
     )
+    assert (
+        permission_for_request("POST", "/api/v1/trading/cross-spread/lifecycle/open")
+        == "trading.write"
+    )
+    assert (
+        permission_for_request(
+            "POST",
+            "/api/v1/trading/cross-spread/exit-plans/plan-1/close",
+        )
+        == "trading.write"
+    )

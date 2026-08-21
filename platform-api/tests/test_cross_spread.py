@@ -61,7 +61,7 @@ def test_cross_spread_snapshot_proxies_runtime_market_data(monkeypatch, tmp_path
             },
         )
 
-    monkeypatch.setattr(httpx, "get", fake_get)
+    monkeypatch.setattr("app.cross_spread._RUNTIME_SNAPSHOT_CLIENT.get", fake_get)
 
     with TestClient(app) as client:
         response = client.get("/api/v1/trading/cross-spread/snapshot")
@@ -145,6 +145,8 @@ def test_cross_spread_market_command_maps_open_long_to_two_market_legs(
     monkeypatch.setattr(
         "app.cross_spread._load_live_cross_spread_sizing",
         lambda: CrossSpreadLiveSizing(
+            bybit_account_id="account_crypto_test",
+            mt5_account_id="account_mt5_demo",
             bybit_min=Decimal("0.001"),
             bybit_step=Decimal("0.001"),
             bybit_max=Decimal("10"),
@@ -174,6 +176,86 @@ def test_cross_spread_market_command_maps_open_long_to_two_market_legs(
     assert request.legs[1].symbol == "XAUUSD.s"
     assert request.legs[1].side == "sell"
     assert request.legs[1].quantity == Decimal("0.01")
+
+
+def test_cross_spread_market_command_prefers_live_bindings_when_configured(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    settings = get_settings()
+    settings.database_path = str(tmp_path / "cross-spread-command-live-bindings.db")
+    settings.runtime_base_url = "http://runtime.local"
+    settings.live_trading_enabled = True
+    settings.cross_spread_preferred_account_environment = "live"
+
+    import app.database_bootstrap as bootstrap
+    import app.database_seeds as seeds
+
+    with connection() as db:
+        bootstrap.bootstrap_database(db)
+        seeds.seed_reference_data(db)
+
+    captured = {}
+
+    def fake_create_execution_batch(request):
+        captured["request"] = request
+        return {
+            "batchId": "batch-live-1",
+            "idempotencyKey": request.idempotency_key,
+            "strategyInstanceId": request.strategy_instance_id,
+            "accountId": request.account_id,
+            "strategyKey": request.strategy_key,
+            "direction": request.direction,
+            "status": "failed",
+            "requiresManualIntervention": False,
+            "failureReason": "write disabled in test",
+            "legs": [
+                {
+                    "role": "bybit_leg",
+                    "accountId": request.legs[0].account_id,
+                    "orderId": None,
+                    "status": "failed",
+                    "failureReason": "write disabled in test",
+                },
+                {
+                    "role": "mt5_leg",
+                    "accountId": request.legs[1].account_id,
+                    "orderId": None,
+                    "status": "failed",
+                    "failureReason": "write disabled in test",
+                },
+            ],
+            "createdAt": "2026-08-21T00:00:00+00:00",
+            "updatedAt": "2026-08-21T00:00:00+00:00",
+        }
+
+    monkeypatch.setattr("app.cross_spread.create_execution_batch", fake_create_execution_batch)
+    monkeypatch.setattr(
+        "app.cross_spread._load_live_cross_spread_sizing",
+        lambda: CrossSpreadLiveSizing(
+            bybit_account_id="bybit-live-main",
+            mt5_account_id="mt5-live-main",
+            bybit_min=Decimal("0.001"),
+            bybit_step=Decimal("0.001"),
+            bybit_max=Decimal("10"),
+            mt5_min=Decimal("0.01"),
+            mt5_step=Decimal("0.01"),
+            mt5_max=Decimal("100"),
+            mt5_multiplier=Decimal("100"),
+        ),
+    )
+
+    with TestClient(app) as client:
+        response = client.post(
+            "/api/v1/trading/cross-spread/market-command",
+            json={"action": "OPEN_LONG", "quantityOz": "1"},
+        )
+
+    assert response.status_code == 200
+    request = captured["request"]
+    assert request.account_id == "bybit-live-main"
+    assert request.legs[0].account_id == "bybit-live-main"
+    assert request.legs[1].account_id == "mt5-live-main"
 
 
 def test_cross_spread_market_command_rejects_quantity_above_acceptance_cap(

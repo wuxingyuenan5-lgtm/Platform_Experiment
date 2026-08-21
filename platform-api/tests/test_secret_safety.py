@@ -83,6 +83,29 @@ def test_all_accounts_must_be_active_before_order_submission(tmp_path: Path) -> 
         assert response.json()["detail"] == "Account is not active"
 
 
+def test_paused_demo_account_is_allowed_for_local_order_submission(tmp_path: Path) -> None:
+    settings = get_settings()
+    settings.database_path = str(tmp_path / "demo-account-status.db")
+    settings.live_trading_enabled = True
+    initialize_database()
+
+    with TestClient(app) as client:
+        response = client.post(
+            "/api/v1/trading/orders",
+            json={
+                "accountId": "account_mt5_demo",
+                "instrumentId": "instrument_xau_usd",
+                "symbol": "XAUUSD.s",
+                "side": "buy",
+                "orderType": "market",
+                "quantity": "0.01",
+            },
+        )
+
+    assert response.status_code != 403
+    assert response.json().get("detail") != "Account is not active"
+
+
 def seed_live_account_for_test(status: str = "active") -> None:
     with connection() as db:
         db.execute(

@@ -170,6 +170,30 @@ def test_applicant_cannot_self_approve_even_with_admin_role(monkeypatch, tmp_pat
         assert "cannot approve" in response.json()["detail"]
 
 
+def test_founder_demo_admin_can_self_approve_minimum_size_acceptance(
+    monkeypatch, tmp_path: Path
+) -> None:
+    configure_live(monkeypatch, tmp_path)
+    settings = get_settings()
+    monkeypatch.setattr(settings, "environment", "development")
+    monkeypatch.setattr(settings, "auth_mode", "development")
+    monkeypatch.setattr(settings, "founder_demo_live_acceptance_enabled", True)
+    with TestClient(app) as client:
+        make_account_live()
+        requested = client.post(
+            "/api/v1/live-trading/sessions",
+            json=session_payload("founder-demo-self-approval-session"),
+        )
+        assert requested.status_code == 200
+        approved = client.post(
+            f"/api/v1/live-trading/sessions/{requested.json()['sessionId']}/approve",
+            json={"reason": "founder-supervised minimum-size acceptance"},
+        )
+        assert approved.status_code == 200
+        assert approved.json()["status"] == "approved"
+        assert approved.json()["applicantUserId"] == approved.json()["approverUserId"]
+
+
 def test_live_order_without_approved_session_is_rejected(monkeypatch, tmp_path: Path) -> None:
     configure_live(monkeypatch, tmp_path)
     with TestClient(app) as client:

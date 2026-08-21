@@ -22,18 +22,18 @@ def evaluate_exit_threshold(
     direction: SpreadDirection,
     *,
     close_spread: Decimal,
-    take_profit_spread: Decimal,
-    stop_loss_spread: Decimal,
+    take_profit_spread: Decimal | None,
+    stop_loss_spread: Decimal | None,
 ) -> ExitTriggerReason | None:
     if direction == "LONG_SPREAD":
-        if close_spread >= take_profit_spread:
+        if take_profit_spread is not None and close_spread >= take_profit_spread:
             return "take_profit"
-        if close_spread <= stop_loss_spread:
+        if stop_loss_spread is not None and close_spread <= stop_loss_spread:
             return "stop_loss"
         return None
 
-    if close_spread <= take_profit_spread:
+    if take_profit_spread is not None and close_spread <= take_profit_spread:
         return "take_profit"
-    if close_spread >= stop_loss_spread:
+    if stop_loss_spread is not None and close_spread >= stop_loss_spread:
         return "stop_loss"
     return None

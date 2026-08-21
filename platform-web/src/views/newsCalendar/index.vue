@@ -18,7 +18,6 @@
           <section v-if="section === 'macro'" class="panel-card calendar-panel">
             <header class="section-head">
               <div>
-                <span>MACRO CALENDAR</span>
                 <h2>宏观日历</h2>
               </div>
             </header>
@@ -28,7 +27,6 @@
           <section v-else-if="section === 'news'" class="panel-card">
             <header class="section-head">
               <div>
-                <span>NEWS DIGEST</span>
                 <h2>新闻整理</h2>
               </div>
             </header>
@@ -86,7 +84,6 @@
           <section v-else class="wealth-page">
             <header class="wealth-header">
               <div>
-                <span>WEALTH INFORMATION</span>
                 <h2>理财信息</h2>
               </div>
               <div class="wealth-actions">
@@ -277,23 +274,26 @@
   .news-page {
     padding: 16px;
   }
+
   .news-layout {
     display: grid;
     grid-template-columns: 180px minmax(0, 1fr);
     gap: 16px;
     min-width: 0;
   }
+
   .section-sidebar {
+    display: grid;
     position: sticky;
     top: 12px;
-    display: grid;
     align-self: start;
-    gap: 7px;
     padding: 8px;
     border: 1px solid #e2e8f0;
     border-radius: 10px;
     background: #fff;
+    gap: 7px;
   }
+
   .section-sidebar a {
     display: flex;
     align-items: center;
@@ -302,14 +302,17 @@
     border-radius: 7px;
     color: #526173;
   }
+
   .section-sidebar a.is-active {
     background: #eaf4ff;
     color: #1769aa;
     font-weight: 700;
   }
+
   .section-content {
     min-width: 0;
   }
+
   .panel-card,
   .wealth-page {
     display: grid;
@@ -319,6 +322,7 @@
     border-radius: 14px;
     background: #fff;
   }
+
   .section-head,
   .wealth-header {
     display: flex;
@@ -326,6 +330,7 @@
     justify-content: space-between;
     gap: 14px;
   }
+
   .section-head span,
   .wealth-header span {
     color: #6c7d90;
@@ -333,11 +338,13 @@
     font-weight: 800;
     letter-spacing: 0.14em;
   }
+
   .wealth-actions {
     display: flex;
     align-items: center;
     gap: 8px;
   }
+
   .wealth-reference-button {
     height: 34px;
     padding: 0 14px;
@@ -349,20 +356,24 @@
     font-weight: 700;
     cursor: pointer;
   }
+
   .wealth-reference-button:hover {
     border-color: #aac7df;
     background: #edf6ff;
   }
+
   h2 {
     margin: 4px 0 0;
     color: #172033;
     font-size: 20px;
   }
+
   .news-asset-tabs {
     display: grid;
     grid-template-columns: repeat(7, minmax(0, 1fr));
     gap: 8px;
   }
+
   .news-asset-tabs button {
     display: grid;
     gap: 4px;
@@ -374,16 +385,19 @@
     color: #647084;
     text-align: left;
   }
+
   .news-asset-tabs button.is-active {
     border-color: #aac7df;
     background: #edf6ff;
     color: #294a67;
   }
+
   .digest-shell {
     display: grid;
     grid-template-columns: minmax(280px, 0.9fr) minmax(0, 1.35fr);
     gap: 12px;
   }
+
   .feature-card,
   .digest-card {
     padding: 16px;
@@ -391,17 +405,20 @@
     border-radius: 10px;
     background: #fafbfd;
   }
+
   .eyebrow {
     color: #6c7d90;
     font-size: 11px;
     font-weight: 800;
     letter-spacing: 0.12em;
   }
+
   .feature-card h3 {
     margin: 10px 0;
     color: #172033;
     font-size: 22px;
   }
+
   .feature-card p,
   .digest-card p,
   .wealth-description {
@@ -409,25 +426,30 @@
     color: #667085;
     line-height: 1.65;
   }
+
   .section-description {
     padding-top: 10px;
     border-top: 1px solid #e4e9f0;
   }
+
   .digest-grid {
     display: grid;
     gap: 10px;
   }
+
   .digest-card__head {
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
     gap: 10px;
   }
+
   .digest-card h4 {
     margin: 0;
     color: #172033;
     font-size: 16px;
   }
+
   .impact-row {
     display: flex;
     flex-wrap: wrap;
@@ -436,43 +458,52 @@
     color: #8490a0;
     font-size: 11px;
   }
+
   .impact-row em,
   .digest-card__head em {
     font-style: normal;
     font-weight: 800;
   }
+
   .is-bull {
     color: #087a55;
   }
+
   .is-flat {
     color: #667085;
   }
+
   .is-bear {
     color: #b42318;
   }
+
   .wealth-toolbar {
     display: grid;
     grid-template-columns: repeat(3, minmax(140px, 180px)) minmax(220px, 1fr);
     gap: 10px;
   }
+
   .wealth-toolbar label {
     display: grid;
     gap: 6px;
   }
+
   .wealth-toolbar span {
     color: #667085;
     font-size: 12px;
     font-weight: 700;
   }
+
   .wealth-toolbar select,
   .wealth-toolbar input {
-    height: 36px;
     min-width: 0;
+    height: 36px;
     padding: 0 10px;
     border: 1px solid #dce3eb;
     border-radius: 8px;
     background: #fff;
   }
+
   .wealth-table-head,
   .wealth-row {
     display: grid;
@@ -480,22 +511,26 @@
     align-items: start;
     gap: 12px;
   }
+
   .wealth-table-head {
     padding: 0 12px;
     color: #778396;
     font-size: 12px;
     font-weight: 700;
   }
+
   .wealth-table-head button {
     border: 0;
     background: transparent;
     color: inherit;
     text-align: left;
   }
+
   .wealth-list {
     display: grid;
     gap: 8px;
   }
+
   .wealth-empty {
     padding: 28px 16px;
     border: 1px dashed #d8e0ea;
@@ -504,33 +539,40 @@
     color: #667085;
     text-align: center;
   }
+
   .wealth-row {
     padding: 14px;
     border: 1px solid #e5eaf0;
     border-radius: 10px;
     background: #fafbfd;
   }
+
   .wealth-row strong {
     color: #172033;
   }
+
   .wealth-row p {
     margin: 4px 0 0;
     color: #7b8798;
     font-size: 12px;
   }
+
   .wealth-yield strong {
     color: #225a96;
     font-size: 20px;
   }
+
   .wealth-expiry .is-urgent {
     color: #b42318;
   }
+
   .wealth-tags {
     display: flex;
     flex-wrap: wrap;
     gap: 5px;
     margin-top: 8px;
   }
+
   .wealth-tags span {
     padding: 4px 7px;
     border-radius: 999px;
@@ -538,37 +580,45 @@
     color: #526b82;
     font-size: 11px;
   }
+
   @media (max-width: 1200px) {
     .news-asset-tabs {
       grid-template-columns: repeat(4, minmax(0, 1fr));
     }
+
     .wealth-table-head,
     .wealth-row {
       grid-template-columns: 1fr 0.8fr 0.75fr;
     }
   }
+
   @media (max-width: 900px) {
     .news-layout,
     .digest-shell,
     .wealth-toolbar {
       grid-template-columns: 1fr;
     }
+
     .section-sidebar {
-      position: static;
       display: flex;
+      position: static;
       overflow-x: auto;
     }
+
     .section-sidebar a {
       flex: 0 0 auto;
     }
+
     .wealth-table-head {
       display: none;
     }
   }
+
   @media (max-width: 620px) {
     .news-asset-tabs {
       grid-template-columns: repeat(2, minmax(0, 1fr));
     }
+
     .wealth-row {
       grid-template-columns: 1fr;
     }

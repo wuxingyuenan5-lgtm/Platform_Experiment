@@ -113,6 +113,31 @@ def update_order_from_external(
             """,
             (status, external_order_id, updated_at, order_id),
         )
+        if status != "filled":
+            return
+        leg = db.execute(
+            "SELECT batch_id FROM execution_batch_legs WHERE order_id = ?", (order_id,)
+        ).fetchone()
+        if leg is None:
+            return
+        batch_id = leg["batch_id"]
+        db.execute(
+            "UPDATE execution_batch_legs SET status = 'filled', failure_reason = NULL, updated_at = ? WHERE order_id = ?",
+            (updated_at, order_id),
+        )
+        pending = db.execute(
+            "SELECT 1 FROM execution_batch_legs WHERE batch_id = ? AND status != 'filled' LIMIT 1",
+            (batch_id,),
+        ).fetchone()
+        if pending is None:
+            db.execute(
+                "UPDATE execution_batches SET status = 'hedged', requires_manual_intervention = 0, failure_reason = NULL, updated_at = ? WHERE id = ?",
+                (updated_at, batch_id),
+            )
+            db.execute(
+                "UPDATE cross_spread_exit_plans SET status = 'closed', closed_at = ?, updated_at = ? WHERE close_batch_id = ? AND status = 'manual_intervention'",
+                (updated_at, updated_at, batch_id),
+            )
 
 
 def list_fill_quantities(order_id: str) -> list[object]:

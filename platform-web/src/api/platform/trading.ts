@@ -3,6 +3,7 @@ import axios, { type AxiosInstance } from 'axios';
 import type {
   AccountResult,
   BalanceResult,
+  EquityHistoryPointResult,
   CreateExecutionBatchInput,
   CredentialReferenceResult,
   CrossSpreadHistoryPointResult,
@@ -19,6 +20,7 @@ import type {
   ReconciliationSummaryResult,
   RuntimeReadinessResult,
   StrategyAccountBindingResult,
+  StrategyAccountSnapshotResult,
   StrategyDefinitionResult,
   StrategyInstanceResult,
   StrategyNavSnapshotResult,
@@ -31,11 +33,14 @@ import type {
 
 const apiBaseUrl = import.meta.env.VITE_PLATFORM_API_BASE_URL || 'http://127.0.0.1:8000/api/v1';
 
+const platformApiToken = import.meta.env.VITE_PLATFORM_API_TOKEN || '';
+
 const client: AxiosInstance = axios.create({
   baseURL: apiBaseUrl,
   timeout: 10_000,
   headers: {
     'Content-Type': 'application/json',
+    ...(platformApiToken ? { Authorization: `Bearer ${platformApiToken}` } : {}),
   },
 });
 
@@ -115,6 +120,17 @@ export async function getAccountBalanceLatest(accountId: string): Promise<Balanc
   }
 }
 
+export async function getEquityHistory(
+  accountId: string,
+  currency?: string,
+): Promise<EquityHistoryPointResult[]> {
+  const response = await client.get<EquityHistoryPointResult[]>(
+    `/accounts/${encodeURIComponent(accountId)}/equity-history`,
+    { params: currency ? { currency } : undefined },
+  );
+  return response.data;
+}
+
 export async function getTradingSnapshot(
   accountId: string,
   instrumentId: string,
@@ -189,6 +205,15 @@ export async function getStrategyAccountBindings(
 ): Promise<StrategyAccountBindingResult[]> {
   const response = await client.get<StrategyAccountBindingResult[]>(
     `/strategies/instances/${encodeURIComponent(strategyInstanceId)}/accounts`,
+  );
+  return response.data;
+}
+
+export async function getStrategyAccountSnapshot(
+  strategyInstanceId: string,
+): Promise<StrategyAccountSnapshotResult> {
+  const response = await client.get<StrategyAccountSnapshotResult>(
+    `/strategies/instances/${encodeURIComponent(strategyInstanceId)}/account-snapshot`,
   );
   return response.data;
 }

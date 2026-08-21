@@ -19,6 +19,8 @@
         :right-leg-symbol="rightLegSymbol"
         :bybit-quote="bybitQuote"
         :mt5-quote="mt5Quote"
+        :bybit-latency-ms="bybitLatencyMs"
+        :mt5-latency-ms="mt5LatencyMs"
         :bybit-status="snapshot?.bybit.status"
         :mt5-status="snapshot?.mt5.status"
       />
@@ -49,6 +51,7 @@
         v-model:qty-input="qtyInput"
         v-model:trigger-spread-input="triggerSpreadInput"
         v-model:acceptable-spread-input="acceptableSpreadInput"
+        v-model:open-limit-strategy="openLimitStrategy"
         v-model:take-profit-execution="takeProfitExecution"
         v-model:take-profit-limit-strategy="takeProfitLimitStrategy"
         v-model:take-profit-spread-input="takeProfitSpreadInput"
@@ -60,7 +63,6 @@
         :qty-error="qtyError"
         :bybit-qty="bybitQty"
         :mt5-lot="mt5Lot"
-        :leverage="leverage"
         :long-spread="longSpread"
         :short-spread="shortSpread"
         :submit-loading="submitLoading"
@@ -70,7 +72,6 @@
         :close-orders="closeOrders"
         @commit-qty-input="commitQtyInput"
         @nudge-qty="nudgeQty"
-        @handle-leverage-input="handleLeverageInput"
         @commit-spread-input="commitSpreadInput"
         @prepare-open-draft="prepareOpenDraft"
         @open-confirm="openConfirm"
@@ -117,6 +118,7 @@
   const {
     acceptableSpreadInput,
     bybitQty,
+    bybitLatencyMs,
     bybitQuote,
     closeExecutionMode,
     closeLimitSpreadInput,
@@ -134,15 +136,15 @@
     executionMode,
     executionStage,
     fundingInventoryText,
-    handleLeverageInput,
-    leverage,
     limitEvidence,
     longSpread,
     mt5Lot,
+    mt5LatencyMs,
     mt5Quote,
     nudgeQty,
     observabilityError,
     openConfirm,
+    openLimitStrategy,
     overviewRows,
     prepareOpenDraft,
     qtyError,
