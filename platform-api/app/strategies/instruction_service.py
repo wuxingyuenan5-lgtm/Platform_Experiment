@@ -26,6 +26,7 @@ from app.strategies.domain import (
     StrategyInstructionAction,
     StrategyInstructionStatus,
 )
+from app.strategies.funding_orchestration import execute_funding_instruction
 from app.strategies.plan_service import build_plan, normalize_parameters
 
 
@@ -124,7 +125,7 @@ def attach_legacy_batch_to_instruction(
     strategy_key: str,
     action: str,
     parameters: dict[str, object],
-    legs: list[object],
+    legs: list[BatchLegRequest],
     requested_by: str,
 ) -> None:
     """Freeze an old endpoint's already-authorised request on its one batch.
@@ -333,6 +334,12 @@ def execute_instruction(
         if instruction is None or instruction["execution_plan_json"] is None:
             raise HTTPException(status_code=404, detail="Strategy instruction not found")
         plan = ExecutionPlan.model_validate_json(instruction["execution_plan_json"])
+        if plan.strategy_key == "funding_arbitrage":
+            return execute_funding_instruction(
+                instruction_id,
+                instruction_row=instruction,
+                plan=plan,
+            )
         unsupported = [
             leg.execution_policy.value
             for leg in plan.legs

@@ -125,47 +125,6 @@ def _seed_funding_environment(tmp_path: Path) -> None:
             "UPDATE strategy_instances SET status = 'active' "
             "WHERE id = 'strategy_funding_arbitrage_instance_default'"
         )
-        for instrument_id, symbol, instrument_type, code in (
-            ("instrument_btcusdt", "BTCUSDT", "crypto_perp", "BTCUSDT.PERP"),
-            ("instrument_btc", "BTC", "crypto_spot", "BTC.SPOT"),
-        ):
-            db.execute(
-                """
-                INSERT OR IGNORE INTO instruments (
-                    id, instrument_code, name, instrument_type, base_currency,
-                    quote_currency, settle_currency, quantity_unit,
-                    data_quality_state, created_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'complete', ?)
-                """,
-                (
-                    instrument_id,
-                    code,
-                    symbol,
-                    instrument_type,
-                    "BTC",
-                    "USDT",
-                    "USDT",
-                    "BTC",
-                    "2026-08-18T00:00:00+00:00",
-                ),
-            )
-            db.execute(
-                """
-                INSERT OR IGNORE INTO contract_specifications (
-                    id, instrument_id, version, price_tick, min_order_quantity,
-                    quantity_step, contract_multiplier, effective_from,
-                    data_quality_state
-                ) VALUES (?, ?, 1, ?, ?, ?, 1, ?, 'complete')
-                """,
-                (
-                    f"contract_{instrument_id}",
-                    instrument_id,
-                    "0.01",
-                    "0.000001",
-                    "0.000001",
-                    "2026-08-18T00:00:00+00:00",
-                ),
-            )
 
 
 def _venue_positions(runtime_url: str, account_id: str) -> list[dict]:
@@ -203,8 +162,8 @@ def test_funding_local_closed_loop_open_close_and_reconcile(
         assert legs["spot_leg"]["status"] == "filled"
 
         positions = _venue_positions(runtime_url, FUNDING_ACCOUNT_ID)
-        perp = [p for p in positions if p.get("instrumentId") == "instrument_btcusdt"]
-        spot = [p for p in positions if p.get("instrumentId") == "instrument_btc"]
+        perp = [p for p in positions if p.get("instrumentId") == "instrument_btc_usdt_perp"]
+        spot = [p for p in positions if p.get("instrumentId") == "instrument_btc_usdt"]
         assert perp, "perpetual short position missing"
         assert spot, "spot long position missing"
 
@@ -237,8 +196,12 @@ def test_funding_local_closed_loop_open_close_and_reconcile(
         assert close_batch["status"] == "hedged", close_batch
 
         positions_after = _venue_positions(runtime_url, FUNDING_ACCOUNT_ID)
-        perp_after = [p for p in positions_after if p.get("instrumentId") == "instrument_btcusdt"]
-        spot_after = [p for p in positions_after if p.get("instrumentId") == "instrument_btc"]
+        perp_after = [
+            p for p in positions_after if p.get("instrumentId") == "instrument_btc_usdt_perp"
+        ]
+        spot_after = [
+            p for p in positions_after if p.get("instrumentId") == "instrument_btc_usdt"
+        ]
         assert perp_after and all(
             Decimal(p["netQuantity"]) == 0 for p in perp_after
         ), perp_after
@@ -315,7 +278,7 @@ def test_funding_local_closed_loop_simulated_funding_settlement(
             (
                 "FUND-SETTLE-001",
                 FUNDING_ACCOUNT_ID,
-                "instrument_btcusdt",
+                "instrument_btc_usdt_perp",
                 PERPETUAL_SYMBOL,
                 "0.001",
                 "2026-08-18T12:00:00+00:00",

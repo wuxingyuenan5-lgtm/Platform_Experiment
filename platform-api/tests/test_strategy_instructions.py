@@ -42,11 +42,8 @@ def test_instruction_replay_returns_the_original_frozen_plan_and_one_batch(
         assert second.json() == first.json()
         assert first.json()["status"] == "accepted"
         assert first.json()["executionPlan"]["schemaVersion"] == "1"
-        assert first.json()["executionPlan"]["legs"][0]["executionPolicy"] == "market"
-        assert (
-            first.json()["executionPlan"]["simulationCompatibilityPolicy"]
-            == "fake_gateway_market"
-        )
+        assert first.json()["executionPlan"]["legs"][0]["executionPolicy"] == "post_only_chase"
+        assert first.json()["executionPlan"]["simulationCompatibilityPolicy"] is None
         assert first.json()["executionBatchId"]
         assert first.json()["requestedBy"] == get_settings().development_user_id
 

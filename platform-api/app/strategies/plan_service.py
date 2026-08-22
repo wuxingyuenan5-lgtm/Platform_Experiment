@@ -46,8 +46,8 @@ def _binding(rows, role: str):
 
 def _instrument(db, *, venue_id: str, instrument_type: str, external_symbol: str | None = None):
     sql = """
-        SELECT i.id AS instrument_id, m.external_symbol, cs.min_order_quantity,
-               cs.quantity_step, cs.contract_multiplier
+        SELECT i.id AS instrument_id, m.external_symbol, cs.price_tick,
+               cs.min_order_quantity, cs.quantity_step, cs.contract_multiplier
         FROM instrument_mappings m
         JOIN instruments i ON i.id = m.instrument_id
         JOIN contract_specifications cs ON cs.instrument_id = i.id
@@ -158,17 +158,11 @@ def build_plan(
                     "perpetualInstrumentId": perpetual["instrument_id"],
                     "spotInstrumentId": spot["instrument_id"],
                     "perpetualQuantityStep": perpetual["quantity_step"],
+                    "perpetualPriceTick": perpetual["price_tick"],
                     "spotQuantityStep": spot["quantity_step"],
+                    "spotPriceTick": spot["price_tick"],
                     "perpetualContractMultiplier": perpetual["contract_multiplier"],
                     "spotContractMultiplier": spot["contract_multiplier"],
-                    **(
-                        {
-                            "executionPolicy": "market",
-                            "simulationCompatibilityPolicy": "fake_gateway_market",
-                        }
-                        if is_simulation
-                        else {}
-                    ),
                 },
                 created_at=now,
             )
@@ -196,7 +190,9 @@ def build_plan(
                     "mt5ContractMultiplier": mt5["contract_multiplier"],
                     "bybitContractMultiplier": bybit["contract_multiplier"],
                     "bybitQuantityStep": bybit["quantity_step"],
+                    "bybitPriceTick": bybit["price_tick"],
                     "mt5QuantityStep": mt5["quantity_step"],
+                    "mt5PriceTick": mt5["price_tick"],
                 },
                 created_at=now,
             )

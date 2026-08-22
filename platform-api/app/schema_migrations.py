@@ -407,6 +407,36 @@ PLATFORM_MIGRATIONS: tuple[Migration, ...] = (
             """,
         ),
     ),
+    Migration(
+        version=12,
+        name="funding-spot-release-commands",
+        statements=(
+            """
+            CREATE TABLE funding_spot_release_commands (
+                child_id TEXT PRIMARY KEY,
+                batch_id TEXT NOT NULL,
+                cumulative_perpetual_fill TEXT NOT NULL,
+                release_quantity TEXT NOT NULL,
+                cumulative_spot_quantity TEXT NOT NULL,
+                trade_command_id TEXT,
+                order_id TEXT,
+                status TEXT NOT NULL CHECK (
+                    status IN ('declared', 'filled', 'failed', 'result_unknown')
+                ),
+                failure_reason TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                FOREIGN KEY(batch_id) REFERENCES execution_batches(id),
+                FOREIGN KEY(trade_command_id) REFERENCES trade_commands(id),
+                FOREIGN KEY(order_id) REFERENCES orders(id)
+            )
+            """,
+            """
+            CREATE INDEX idx_funding_spot_release_batch_created
+            ON funding_spot_release_commands(batch_id, created_at)
+            """,
+        ),
+    ),
 )
 
 

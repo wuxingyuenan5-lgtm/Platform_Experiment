@@ -74,7 +74,7 @@ def test_funding_plan_rejects_market_policy_override() -> None:
         )
 
 
-def test_funding_plan_explicitly_freezes_fake_gateway_market_compatibility() -> None:
+def test_funding_plan_freezes_price_ticks_for_phase_2_postonly_open() -> None:
     plan = build_funding_carry_plan(
         action="open",
         parameters={
@@ -83,11 +83,13 @@ def test_funding_plan_explicitly_freezes_fake_gateway_market_compatibility() -> 
             "spotSymbol": "BTC",
             "spotQuantity": "1",
             "accountId": "account_sim_usdt",
-            "executionPolicy": "market",
-            "simulationCompatibilityPolicy": "fake_gateway_market",
+            "perpetualPriceTick": "0.10",
+            "spotPriceTick": "0.01",
         },
         created_at=datetime(2026, 8, 22, tzinfo=UTC),
     )
 
-    assert plan.simulation_compatibility_policy == "fake_gateway_market"
-    assert plan.legs[0].execution_policy is ExecutionPolicy.MARKET
+    assert plan.simulation_compatibility_policy is None
+    assert plan.legs[0].execution_policy is ExecutionPolicy.POST_ONLY_CHASE
+    assert plan.legs[0].price_tick == Decimal("0.10")
+    assert plan.legs[1].price_tick == Decimal("0.01")

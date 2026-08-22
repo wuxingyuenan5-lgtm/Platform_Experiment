@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from decimal import Decimal
 from enum import StrEnum
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -45,7 +46,7 @@ class ExecutionPlanLeg(BaseModel):
     account_id: str
     instrument_id: str
     external_symbol: str
-    side: str
+    side: Literal["buy", "sell"]
     maximum_quantity: Decimal = Field(gt=0)
     sequence: int = Field(ge=1)
     execution_policy: ExecutionPolicy
@@ -54,6 +55,7 @@ class ExecutionPlanLeg(BaseModel):
     release_ratio: Decimal | None = Field(default=None, gt=0)
     release_cap: Decimal | None = Field(default=None, gt=0)
     quantity_step: Decimal = Field(gt=0)
+    price_tick: Decimal = Field(default=Decimal("0.01"), gt=0)
     rounding_rule: str = "floor_to_step"
     contract_multiplier: Decimal = Field(gt=0)
     minimum_quantity: Decimal = Field(gt=0)
