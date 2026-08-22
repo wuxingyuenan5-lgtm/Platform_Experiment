@@ -17,6 +17,7 @@ from app.schemas import (
     InstrumentResponse,
     OrderDetailResponse,
     PnlResponse,
+    PositionResponse,
     StrategyAccountBindingResponse,
     StrategyAccountSnapshotResponse,
     StrategyDefinitionResponse,

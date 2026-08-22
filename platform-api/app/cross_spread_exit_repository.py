@@ -91,7 +91,9 @@ def count_unresolved_cross_spread_batches(account_id: str | None = None) -> int:
                 FROM execution_batches
                 WHERE strategy_key = 'cross_venue_spread'
                   AND account_id = ?
-                  AND status IN ('pending', 'executing', 'partially_executed', 'manual_intervention')
+                  AND status IN (
+                      'pending', 'executing', 'partially_executed', 'manual_intervention'
+                  )
                 """,
                 (account_id,),
             ).fetchone()
@@ -101,7 +103,9 @@ def count_unresolved_cross_spread_batches(account_id: str | None = None) -> int:
                 SELECT COUNT(*) AS count
                 FROM execution_batches
                 WHERE strategy_key = 'cross_venue_spread'
-                  AND status IN ('pending', 'executing', 'partially_executed', 'manual_intervention')
+                  AND status IN (
+                      'pending', 'executing', 'partially_executed', 'manual_intervention'
+                  )
                 """
             ).fetchone()
     return int(row["count"])

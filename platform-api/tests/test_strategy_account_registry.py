@@ -5,7 +5,6 @@ from fastapi.testclient import TestClient
 from app.config import get_settings
 from app.main import app
 
-
 EXPECTED_READ_ONLY_INSTANCES = {
     "strategy_bottom_fishing_instance_default",
     "strategy_short_term_l_instance_default",

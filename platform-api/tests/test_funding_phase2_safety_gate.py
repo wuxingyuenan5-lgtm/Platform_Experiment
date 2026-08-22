@@ -13,6 +13,7 @@ def test_funding_controlled_live_is_rejected_until_phase_2_capability_exists(
     settings = get_settings()
     settings.database_path = str(tmp_path / "funding-phase-2-gate.db")
     settings.live_trading_enabled = True
+    settings.default_trading_environment = "live"
 
     with TestClient(app) as client:
         response = client.post(

@@ -236,7 +236,7 @@ def configure_platform(tmp_path: Path) -> None:
     settings.cross_spread_position_verification_required = True
 
 
-def created_plan_stub() -> "exit_service.CrossSpreadExitPlanResponse":
+def created_plan_stub() -> exit_service.CrossSpreadExitPlanResponse:
     return exit_service.CrossSpreadExitPlanResponse(
         planId="plan-safe-open",
         strategyInstanceId="strategy_cross_venue_spread_instance_default",

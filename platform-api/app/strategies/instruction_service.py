@@ -9,6 +9,16 @@ from fastapi import HTTPException
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.database import connection
+from app.execution_batches import (
+    create_execution_batch,
+    get_execution_batch,
+    update_batch_status,
+)
+from app.execution_schemas import (
+    BatchLegRequest,
+    CreateExecutionBatchRequest,
+    ExecutionBatchResponse,
+)
 from app.strategies.domain import (
     ExecutionPlan,
     ExecutionPlanLeg,
@@ -305,3 +315,131 @@ def create_instruction(
             )
         row = db.execute("SELECT * FROM strategy_runs WHERE id = ?", (instruction_id,)).fetchone()
     return _response(row)
+
+
+def execute_instruction(
+    instruction_id: str,
+) -> ExecutionBatchResponse:
+    """Dispatch an instruction's atomically declared Batch exactly once.
+
+    The immutable plan is the execution-policy authority. Unsupported policies
+    fail closed; this seam never rewrites a persisted Batch leg at dispatch time.
+    """
+    timestamp = _utc_now()
+    with connection() as db:
+        instruction = db.execute(
+            "SELECT * FROM strategy_runs WHERE id = ?", (instruction_id,)
+        ).fetchone()
+        if instruction is None or instruction["execution_plan_json"] is None:
+            raise HTTPException(status_code=404, detail="Strategy instruction not found")
+        plan = ExecutionPlan.model_validate_json(instruction["execution_plan_json"])
+        unsupported = [
+            leg.execution_policy.value
+            for leg in plan.legs
+            if leg.execution_policy is not ExecutionPolicy.MARKET
+        ]
+        if unsupported:
+            detail = (
+                "Execution Plan policy is unavailable in the Phase 0-1 shared executor: "
+                + ", ".join(dict.fromkeys(unsupported))
+            )
+            update_batch_status(instruction["execution_batch_id"], "failed", failure_reason=detail)
+            _update_instruction_result(
+                instruction_id,
+                StrategyInstructionStatus.REJECTED,
+                failure_reason=detail,
+            )
+            raise HTTPException(status_code=423, detail=detail)
+        db.execute(
+            """
+            UPDATE strategy_runs SET status = ?, updated_at = ?
+            WHERE id = ? AND status = ?
+            """,
+            (
+                StrategyInstructionStatus.EXECUTING.value,
+                timestamp,
+                instruction_id,
+                StrategyInstructionStatus.ACCEPTED.value,
+            ),
+        )
+
+    request = CreateExecutionBatchRequest(
+        idempotencyKey=f"instruction:{instruction['idempotency_key']}",
+        strategyInstanceId=instruction["strategy_instance_id"],
+        accountId=plan.legs[0].account_id,
+        strategyKey=instruction["strategy_key"],
+        direction=plan.action.value,
+        legs=[
+            BatchLegRequest(
+                role=leg.role,
+                accountId=leg.account_id,
+                instrumentId=leg.instrument_id,
+                symbol=leg.external_symbol,
+                side=leg.side,
+                orderType="market",
+                quantity=leg.maximum_quantity,
+            )
+            for leg in plan.legs
+        ],
+    )
+    try:
+        result = create_execution_batch(request)
+    except HTTPException as exc:
+        _synchronise_instruction_after_dispatch_error(instruction_id, str(exc.detail))
+        raise
+    except Exception as exc:
+        _synchronise_instruction_after_dispatch_error(instruction_id, str(exc))
+        raise
+    status = {
+        "hedged": StrategyInstructionStatus.COMPLETED,
+        "completed": StrategyInstructionStatus.COMPLETED,
+        "manual_intervention": StrategyInstructionStatus.MANUAL_INTERVENTION,
+        "failed": StrategyInstructionStatus.FAILED,
+    }.get(result.status, StrategyInstructionStatus.EXECUTING)
+    _update_instruction_result(instruction_id, status, failure_reason=result.failure_reason)
+    return result
+
+
+def _synchronise_instruction_after_dispatch_error(
+    instruction_id: str,
+    failure_reason: str,
+) -> None:
+    with connection() as db:
+        row = db.execute(
+            "SELECT execution_batch_id FROM strategy_runs WHERE id = ?",
+            (instruction_id,),
+        ).fetchone()
+    if row is None or row["execution_batch_id"] is None:
+        return
+    batch = get_execution_batch(row["execution_batch_id"])
+    if batch.status == "pending":
+        update_batch_status(batch.batch_id, "failed", failure_reason=failure_reason)
+        status = StrategyInstructionStatus.REJECTED
+    elif batch.status == "failed":
+        status = StrategyInstructionStatus.FAILED
+    else:
+        update_batch_status(
+            batch.batch_id,
+            "manual_intervention",
+            failure_reason=failure_reason,
+            requires_manual_intervention=True,
+        )
+        status = StrategyInstructionStatus.MANUAL_INTERVENTION
+    _update_instruction_result(instruction_id, status, failure_reason=failure_reason)
+
+
+def _update_instruction_result(
+    instruction_id: str,
+    status: StrategyInstructionStatus,
+    *,
+    failure_reason: str | None,
+) -> None:
+    with connection() as db:
+        db.execute(
+            """
+            UPDATE strategy_runs
+            SET status = ?, failure_reason = ?, updated_at = ?
+            WHERE id = ?
+            """,
+            (status.value, failure_reason, _utc_now(), instruction_id),
+        )

@@ -1,9 +1,14 @@
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from threading import Event
+from uuid import uuid4
 
 from fastapi.testclient import TestClient
 
 from app.config import get_settings
+from app.database import connection
 from app.main import app
+from app.strategies.instruction_service import execute_instruction
 
 FUNDING_INSTANCE = "strategy_funding_arbitrage_instance_default"
 
@@ -37,7 +42,11 @@ def test_instruction_replay_returns_the_original_frozen_plan_and_one_batch(
         assert second.json() == first.json()
         assert first.json()["status"] == "accepted"
         assert first.json()["executionPlan"]["schemaVersion"] == "1"
-        assert first.json()["executionPlan"]["legs"][0]["executionPolicy"] == "post_only_chase"
+        assert first.json()["executionPlan"]["legs"][0]["executionPolicy"] == "market"
+        assert (
+            first.json()["executionPlan"]["simulationCompatibilityPolicy"]
+            == "fake_gateway_market"
+        )
         assert first.json()["executionBatchId"]
         assert first.json()["requestedBy"] == get_settings().development_user_id
 
@@ -154,3 +163,76 @@ def test_instruction_preserves_account_ids_in_capability_snapshot(tmp_path: Path
     assert response.status_code == 200, response.text
     snapshot = response.json()["executionPlan"]["accountCapabilitySnapshot"]
     assert snapshot == {"account_sim_usdt": "trade_and_read"}
+
+
+def test_pending_instruction_batch_is_claimed_once_and_replay_does_not_duplicate_commands(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    settings = get_settings()
+    settings.database_path = str(tmp_path / "instruction-dispatch-claim.db")
+    settings.live_trading_enabled = True
+    settings.default_trading_environment = "simulation"
+    first_submit_started = Event()
+    release_first_submit = Event()
+
+    class FilledResponse:
+        def __init__(self, command: dict[str, object]) -> None:
+            self.command = command
+
+        def raise_for_status(self) -> None:
+            return None
+
+        def json(self) -> list[dict[str, object]]:
+            command = self.command
+            return [
+                {
+                    "event_id": str(uuid4()),
+                    "command_id": command["command_id"],
+                    "platform_order_id": command["platform_order_id"],
+                    "event_type": "order_filled",
+                    "external_order_id": f"fake-{command['platform_order_id']}",
+                    "fill_price": "100",
+                    "fill_quantity": command["quantity"],
+                    "occurred_at": "2026-08-22T00:00:00+00:00",
+                    "reason": None,
+                }
+            ]
+
+    call_count = 0
+
+    def fake_post(*args, **kwargs):
+        nonlocal call_count
+        call_count += 1
+        if call_count == 1:
+            first_submit_started.set()
+            assert release_first_submit.wait(timeout=5)
+        return FilledResponse(kwargs["json"])
+
+    monkeypatch.setattr("app.trade_command_execution.httpx.post", fake_post)
+
+    with TestClient(app) as client:
+        created = client.post(
+            f"/api/v1/strategies/{FUNDING_INSTANCE}/instructions",
+            json=_payload(key="instruction-dispatch-claim"),
+        )
+        assert created.status_code == 200, created.text
+        instruction_id = created.json()["instructionId"]
+
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            first = pool.submit(execute_instruction, instruction_id)
+            assert first_submit_started.wait(timeout=5)
+            replay = pool.submit(execute_instruction, instruction_id)
+            replay.result(timeout=5)
+            release_first_submit.set()
+            result = first.result(timeout=10)
+
+    assert result.status == "hedged"
+    assert call_count == 2
+    with connection() as db:
+        command_count = db.execute("SELECT COUNT(*) AS count FROM trade_commands").fetchone()
+        instruction = db.execute(
+            "SELECT status FROM strategy_runs WHERE id = ?", (instruction_id,)
+        ).fetchone()
+    assert command_count["count"] == 2
+    assert instruction["status"] == "completed"

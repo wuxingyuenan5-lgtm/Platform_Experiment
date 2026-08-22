@@ -113,7 +113,8 @@ def build_plan(
             raise _unprocessable("Strategy instance is not runnable")
         bindings = db.execute(
             """
-            SELECT sab.account_id, sab.role, sab.capability, a.venue_id, a.status AS account_status,
+            SELECT sab.account_id, sab.role, sab.capability, a.venue_id,
+                   a.environment AS account_environment, a.status AS account_status,
                    v.status AS venue_status
             FROM strategy_account_bindings sab
             JOIN accounts a ON a.id = sab.account_id JOIN venues v ON v.id = a.venue_id
@@ -131,6 +132,9 @@ def build_plan(
             )
             if account["account_status"] != "active" or account["venue_status"] != "active":
                 raise _unprocessable("Strategy account or venue is unavailable")
+            is_simulation = instance["trading_mode"] == "simulation"
+            if is_simulation and account["account_environment"] != "simulation":
+                raise _unprocessable("Simulation strategy requires a simulation account")
             perpetual = _instrument(
                 db,
                 venue_id=account["venue_id"],
@@ -157,6 +161,14 @@ def build_plan(
                     "spotQuantityStep": spot["quantity_step"],
                     "perpetualContractMultiplier": perpetual["contract_multiplier"],
                     "spotContractMultiplier": spot["contract_multiplier"],
+                    **(
+                        {
+                            "executionPolicy": "market",
+                            "simulationCompatibilityPolicy": "fake_gateway_market",
+                        }
+                        if is_simulation
+                        else {}
+                    ),
                 },
                 created_at=now,
             )

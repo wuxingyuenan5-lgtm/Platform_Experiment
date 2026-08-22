@@ -72,3 +72,22 @@ def test_funding_plan_rejects_market_policy_override() -> None:
             },
             created_at=datetime(2026, 8, 22, tzinfo=UTC),
         )
+
+
+def test_funding_plan_explicitly_freezes_fake_gateway_market_compatibility() -> None:
+    plan = build_funding_carry_plan(
+        action="open",
+        parameters={
+            "perpetualSymbol": "BTCUSDT",
+            "perpetualQuantity": "1",
+            "spotSymbol": "BTC",
+            "spotQuantity": "1",
+            "accountId": "account_sim_usdt",
+            "executionPolicy": "market",
+            "simulationCompatibilityPolicy": "fake_gateway_market",
+        },
+        created_at=datetime(2026, 8, 22, tzinfo=UTC),
+    )
+
+    assert plan.simulation_compatibility_policy == "fake_gateway_market"
+    assert plan.legs[0].execution_policy is ExecutionPolicy.MARKET

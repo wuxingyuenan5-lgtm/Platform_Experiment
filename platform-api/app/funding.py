@@ -11,7 +11,6 @@ from __future__ import annotations
 
 from uuid import uuid4
 
-import httpx
 from fastapi import HTTPException
 
 from app.config import get_settings
@@ -58,27 +57,20 @@ def assert_funding_controlled_live_capability() -> None:
     be treated as controlled-live funding execution while PostOnly Chase and
     deduplicated incremental hedge release remain unimplemented.
     """
-    if _is_simulation_fake_gateway():
+    if _is_simulation_execution():
         return
     raise HTTPException(status_code=423, detail=PHASE_2_CAPABILITY_MESSAGE)
 
 
-def _is_simulation_fake_gateway() -> bool:
-    """Allow the legacy two-market-leg path only for its local test harness."""
+def _is_simulation_execution() -> bool:
+    """Allow the legacy Market path only for an authoritative simulation account."""
+    if get_settings().default_trading_environment.strip().lower() != "simulation":
+        return False
     with connection() as db:
         account = db.execute(
             "SELECT environment FROM accounts WHERE id = ?", (ACCOUNT_ID,)
         ).fetchone()
-    if account is None or account["environment"] != "simulation":
-        return False
-    try:
-        response = httpx.get(f"{get_settings().runtime_base_url}/status", timeout=1.0)
-        return response.status_code == 200 and response.json().get("gateway") in {
-            "fake",
-            "simulation",
-        }
-    except httpx.HTTPError:
-        return False
+    return account is not None and account["environment"] == "simulation"
 
 
 def submit_funding_market_command(

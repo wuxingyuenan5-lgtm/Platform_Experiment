@@ -146,15 +146,27 @@ def create_execution_batch(request: CreateExecutionBatchRequest) -> ExecutionBat
 
     batch_id = str(uuid4())
     created_at = now_iso()
+    execute_batch_id: str | None = None
     with connection() as db:
         db.execute("BEGIN IMMEDIATE")
         existing = db.execute(
-            "SELECT id FROM execution_batches WHERE idempotency_key = ?",
+            "SELECT id, status FROM execution_batches WHERE idempotency_key = ?",
             (request.idempotency_key,),
         ).fetchone()
         if existing is not None:
             existing_id = existing["id"]
             assert_batch_request_matches_in_connection(db, existing_id, request)
+            if existing["status"] == "pending":
+                claimed = db.execute(
+                    """
+                    UPDATE execution_batches
+                    SET status = 'executing', updated_at = ?
+                    WHERE id = ? AND status = 'pending'
+                    """,
+                    (created_at, existing_id),
+                )
+                if claimed.rowcount == 1:
+                    execute_batch_id = existing_id
         else:
             blocking_batch = _find_blocking_batch_for_accounts(db, account_ids)
             if blocking_batch is not None:
@@ -217,12 +229,26 @@ def create_execution_batch(request: CreateExecutionBatchRequest) -> ExecutionBat
                         created_at,
                     ),
                 )
+            claimed = db.execute(
+                """
+                UPDATE execution_batches
+                SET status = 'executing', updated_at = ?
+                WHERE id = ? AND status = 'pending'
+                """,
+                (created_at, batch_id),
+            )
+            if claimed.rowcount != 1:
+                raise HTTPException(
+                    status_code=409,
+                    detail="New execution batch could not be claimed for dispatch",
+                )
+            execute_batch_id = batch_id
 
-    if existing_id is not None:
+    if execute_batch_id is None:
         return get_execution_batch(existing_id)
 
+    batch_id = execute_batch_id
     initialize_batch_risk(batch_id, request.strategy_instance_id)
-    update_batch_status(batch_id, "executing")
     filled_count = 0
 
     for index, (role, command_request) in enumerate(command_requests):
@@ -260,6 +286,25 @@ def create_execution_batch(request: CreateExecutionBatchRequest) -> ExecutionBat
             command = create_trade_command(command_request)
         except HTTPException as exc:
             reason = str(exc.detail)
+            unknown_order_id = _result_unknown_order_for_command(
+                command_request.idempotency_key
+            )
+            if unknown_order_id is not None:
+                update_leg_status(
+                    batch_id,
+                    role,
+                    "result_unknown",
+                    order_id=unknown_order_id,
+                    failure_reason=reason,
+                )
+                update_batch_status(
+                    batch_id,
+                    "manual_intervention",
+                    failure_reason=reason,
+                    requires_manual_intervention=True,
+                )
+                handle_batch_failure(batch_id, reason)
+                return get_execution_batch(batch_id)
             status = "manual_intervention" if filled_count else "failed"
             update_leg_status(batch_id, role, "failed", failure_reason=reason)
             update_batch_status(
@@ -357,6 +402,29 @@ def create_execution_batch(request: CreateExecutionBatchRequest) -> ExecutionBat
         )
         handle_batch_failure(batch_id, reason)
     return get_execution_batch(batch_id)
+
+
+def _result_unknown_order_for_command(idempotency_key: str) -> str | None:
+    """Preserve an order's unknown external result when command dispatch raises."""
+    with connection() as db:
+        row = db.execute(
+            """
+            SELECT o.id
+            FROM trade_commands AS command
+            JOIN orders AS o ON o.command_id = command.id
+            WHERE command.idempotency_key = ? AND o.status = 'result_unknown'
+            """,
+            (idempotency_key,),
+        ).fetchone()
+        if row is not None:
+            db.execute(
+                """
+                UPDATE trade_commands SET status = 'result_unknown', updated_at = ?
+                WHERE idempotency_key = ?
+                """,
+                (now_iso(), idempotency_key),
+            )
+    return row["id"] if row is not None else None
 
 
 def _find_blocking_batch_for_accounts(

@@ -8,6 +8,7 @@ from app.strategies.domain import (
     ExecutionPlanLeg,
     ExecutionPolicy,
     ReleaseCondition,
+    SimulationCompatibilityPolicy,
     StrategyInstructionAction,
 )
 
@@ -15,8 +16,12 @@ from app.strategies.domain import (
 def build_funding_carry_plan(
     *, action: str, parameters: dict[str, object], created_at: datetime
 ) -> ExecutionPlan:
-    if parameters.get("executionPolicy") not in (None, "post_only_chase"):
-        raise ValueError("Funding perpetual execution policy must be post_only_chase")
+    compatibility_policy = parameters.get("simulationCompatibilityPolicy")
+    if compatibility_policy not in (None, SimulationCompatibilityPolicy.FAKE_GATEWAY_MARKET):
+        raise ValueError("Unsupported funding simulation compatibility policy")
+    expected_policy = "market" if compatibility_policy else "post_only_chase"
+    if parameters.get("executionPolicy") not in (None, expected_policy):
+        raise ValueError(f"Funding perpetual execution policy must be {expected_policy}")
     perpetual_quantity = Decimal(str(parameters["perpetualQuantity"]))
     spot_quantity = Decimal(str(parameters["spotQuantity"]))
     if perpetual_quantity <= 0 or spot_quantity <= 0:
@@ -33,6 +38,7 @@ def build_funding_carry_plan(
         strategy_key="funding_arbitrage",
         action=StrategyInstructionAction(action),
         created_at=created_at,
+        simulation_compatibility_policy=compatibility_policy,
         account_capability_snapshot={account_id: "trade_and_read"},
         legs=(
             ExecutionPlanLeg(
@@ -48,7 +54,11 @@ def build_funding_carry_plan(
                 side=perpetual_side,
                 maximum_quantity=perpetual_quantity,
                 sequence=1,
-                execution_policy=ExecutionPolicy.POST_ONLY_CHASE,
+                execution_policy=(
+                    ExecutionPolicy.MARKET
+                    if compatibility_policy
+                    else ExecutionPolicy.POST_ONLY_CHASE
+                ),
                 quantity_step=perp_step,
                 contract_multiplier=Decimal(
                     str(parameters.get("perpetualContractMultiplier", "1"))

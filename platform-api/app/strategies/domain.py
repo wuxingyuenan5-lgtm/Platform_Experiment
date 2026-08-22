@@ -34,6 +34,10 @@ class ReleaseCondition(StrEnum):
     INCREMENTAL_CUMULATIVE_FILL = "incremental_cumulative_fill"
 
 
+class SimulationCompatibilityPolicy(StrEnum):
+    FAKE_GATEWAY_MARKET = "fake_gateway_market"
+
+
 class ExecutionPlanLeg(BaseModel):
     model_config = ConfigDict(frozen=True)
 
@@ -79,6 +83,7 @@ class ExecutionPlan(BaseModel):
     action: StrategyInstructionAction
     legs: tuple[ExecutionPlanLeg, ...] = Field(min_length=2)
     failure_rule: str = "manual_intervention_and_reconcile"
+    simulation_compatibility_policy: SimulationCompatibilityPolicy | None = None
     account_capability_snapshot: dict[str, str]
     created_at: datetime
 

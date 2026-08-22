@@ -43,6 +43,8 @@ markers = [
 
 [tool.pyright]
 pythonVersion = "3.12"
+venvPath = "."
+venv = ".venv"
 typeCheckingMode = "standard"
 include = [
   "app/a_share_research_policy.py",

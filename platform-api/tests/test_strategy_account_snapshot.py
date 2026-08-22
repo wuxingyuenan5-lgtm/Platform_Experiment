@@ -44,8 +44,18 @@ def test_strategy_account_snapshot_aggregates_all_account_pnl_rows(tmp_path: Pat
                 ) VALUES (?, ?, ?, ?, ?, ?), (?, ?, ?, ?, ?, ?)
                 """,
                 (
-                    "account_bybit_bottom_fishing", "instrument-one", "1.25", "2.50", "0.10", "2026-08-21T00:00:00+00:00",
-                    "account_bybit_bottom_fishing", "instrument-two", "3.75", "4.50", "0.20", "2026-08-21T00:01:00+00:00",
+                    "account_bybit_bottom_fishing",
+                    "instrument-one",
+                    "1.25",
+                    "2.50",
+                    "0.10",
+                    "2026-08-21T00:00:00+00:00",
+                    "account_bybit_bottom_fishing",
+                    "instrument-two",
+                    "3.75",
+                    "4.50",
+                    "0.20",
+                    "2026-08-21T00:01:00+00:00",
                 ),
             )
         response = client.get(

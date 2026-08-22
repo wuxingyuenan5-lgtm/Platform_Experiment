@@ -115,6 +115,7 @@ def runtime(tmp_path_factory: pytest.TempPathFactory) -> str:
 def _seed_funding_environment(tmp_path: Path) -> None:
     settings = get_settings()
     settings.database_path = str(tmp_path / "funding-closed-loop.db")
+    settings.default_trading_environment = "simulation"
     initialize_database()
     with connection() as db:
         db.execute(
