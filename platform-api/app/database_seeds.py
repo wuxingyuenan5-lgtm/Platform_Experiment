@@ -398,7 +398,8 @@ def seed_reference_data(db: sqlite3.Connection) -> None:
         db.execute(
             """
             INSERT OR IGNORE INTO strategy_account_bindings (
-                id, strategy_instance_id, account_id, role, capability, max_notional, status, created_at
+                id, strategy_instance_id, account_id, role, capability, max_notional,
+                status, created_at
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (binding_id, instance_id, account_id, role, capability, None, "active", created_at),
@@ -505,6 +506,13 @@ def seed_reference_data(db: sqlite3.Connection) -> None:
             "venue_crypto",
             "BTCUSDT",
             "exchange_symbol",
+        ),
+        (
+            "mapping_btc_perp_sim",
+            "instrument_btc_usdt_perp",
+            "venue_simulation",
+            "BTCUSDT",
+            "simulation",
         ),
         (
             "mapping_xaut_perp_crypto",

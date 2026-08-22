@@ -70,6 +70,7 @@ CEO_PERMISSIONS = frozenset(
         "risk.write",
         "trade.read",
         "strategy.write",
+        "strategy:run",
         "trading.write",
         "research.write",
         "finance.write",

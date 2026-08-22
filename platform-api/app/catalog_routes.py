@@ -1,9 +1,10 @@
 from decimal import Decimal
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 
 from app.account_read_service import get_pnl as read_pnl
 from app.account_read_service import get_position as read_position
+from app.auth import require_principal
 from app.catalog import (
     get_account,
     get_instrument,
@@ -116,9 +117,13 @@ def create_catalog_router(api_prefix: str) -> APIRouter:
         f"{api_prefix}/strategies/{{strategy_instance_id}}/instructions", tags=["strategies"]
     )
     def create_strategy_instruction(
-        strategy_instance_id: str, request: CreateStrategyInstructionRequest
+        strategy_instance_id: str,
+        request: CreateStrategyInstructionRequest,
+        http_request: Request,
     ) -> dict[str, object]:
-        return create_instruction(strategy_instance_id, request)
+        return create_instruction(
+            strategy_instance_id, request, requested_by=require_principal(http_request).user_id
+        )
 
     @router.get(
         f"{api_prefix}/strategies/{{strategy_instance_id}}/instructions", tags=["strategies"]
@@ -176,9 +181,7 @@ def create_catalog_router(api_prefix: str) -> APIRouter:
                 accountId=row["account_id"],
                 instrumentId=row["instrument_id"],
                 netQuantity=Decimal(row["net_quantity"]),
-                averagePrice=(
-                    Decimal(row["average_price"]) if row["average_price"] else None
-                ),
+                averagePrice=(Decimal(row["average_price"]) if row["average_price"] else None),
             )
             for row in rows
         ]

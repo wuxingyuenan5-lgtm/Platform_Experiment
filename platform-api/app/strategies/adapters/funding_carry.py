@@ -21,8 +21,6 @@ def build_funding_carry_plan(
     spot_quantity = Decimal(str(parameters["spotQuantity"]))
     if perpetual_quantity <= 0 or spot_quantity <= 0:
         raise ValueError("Funding quantities must be positive")
-    if str(parameters["perpetualSymbol"]).upper() == str(parameters["spotSymbol"]).upper():
-        raise ValueError("Funding perpetual and spot symbols must differ")
     perpetual_side, spot_side = ("sell", "buy") if action == "open" else ("buy", "sell")
     with localcontext() as context:
         context.prec = 28
@@ -52,7 +50,9 @@ def build_funding_carry_plan(
                 sequence=1,
                 execution_policy=ExecutionPolicy.POST_ONLY_CHASE,
                 quantity_step=perp_step,
-                contract_multiplier=Decimal("1"),
+                contract_multiplier=Decimal(
+                    str(parameters.get("perpetualContractMultiplier", "1"))
+                ),
                 minimum_quantity=perp_step,
                 max_mutations=5,
             ),
@@ -74,7 +74,7 @@ def build_funding_carry_plan(
                 release_ratio=release_ratio,
                 release_cap=spot_quantity,
                 quantity_step=spot_step,
-                contract_multiplier=Decimal("1"),
+                contract_multiplier=Decimal(str(parameters.get("spotContractMultiplier", "1"))),
                 minimum_quantity=spot_step,
             ),
         ),

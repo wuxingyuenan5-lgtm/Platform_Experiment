@@ -371,6 +371,11 @@ PLATFORM_MIGRATIONS: tuple[Migration, ...] = (
             ),
         ),
     ),
+    Migration(
+        version=10,
+        name="strategy-instruction-request-fingerprint",
+        statements=("ALTER TABLE strategy_runs ADD COLUMN request_fingerprint TEXT",),
+    ),
 )
 
 

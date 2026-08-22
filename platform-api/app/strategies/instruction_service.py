@@ -14,11 +14,11 @@ from app.strategies.domain import (
     StrategyInstructionAction,
     StrategyInstructionStatus,
 )
-from app.strategies.plan_service import build_plan
+from app.strategies.plan_service import build_plan, normalize_parameters
 
 
 class CreateStrategyInstructionRequest(BaseModel):
-    model_config = ConfigDict(populate_by_name=True)
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
     idempotency_key: str = Field(alias="idempotencyKey", min_length=1, max_length=128)
     action: StrategyInstructionAction
     parameters: dict[str, object]
@@ -40,12 +40,21 @@ def _json_plan(plan: ExecutionPlan) -> str:
 
 def _camel(value: object) -> object:
     if isinstance(value, dict):
-        return {
-            part.split("_")[0] + "".join(item.title() for item in part.split("_")[1:])
-            if "_" in part
-            else part: _camel(item)
-            for part, item in value.items()
-        }
+        converted: dict[str, object] = {}
+        for key, item in value.items():
+            camel_key = (
+                key.split("_")[0] + "".join(part.title() for part in key.split("_")[1:])
+                if "_" in key
+                else key
+            )
+            # Map keys are business identifiers, not API field names.  Converting
+            # them corrupts account IDs such as account_sim_usdt.
+            converted[camel_key] = (
+                {str(identifier): _camel(capability) for identifier, capability in item.items()}
+                if key == "account_capability_snapshot" and isinstance(item, dict)
+                else _camel(item)
+            )
+        return converted
     if isinstance(value, list):
         return [_camel(item) for item in value]
     if isinstance(value, tuple):
@@ -65,6 +74,7 @@ def _response(row) -> dict[str, object]:
         "action": row["action"],
         "status": row["status"],
         "positionGroupId": row["position_group_id"],
+        "requestedBy": row["requested_by"],
         "requestedParameters": json.loads(row["requested_parameters_json"]),
         "executionPlan": _camel(plan),
         "executionBatchId": row["execution_batch_id"],
@@ -96,20 +106,36 @@ def list_instructions(strategy_instance_id: str) -> list[dict[str, object]]:
 
 
 def create_instruction(
-    strategy_instance_id: str, request: CreateStrategyInstructionRequest
+    strategy_instance_id: str,
+    request: CreateStrategyInstructionRequest,
+    *,
+    requested_by: str,
 ) -> dict[str, object]:
-    requested_json = _canonical(request.parameters)
+    if request.action in {
+        StrategyInstructionAction.CLOSE,
+        StrategyInstructionAction.RISK_DISPOSITION,
+    }:
+        # Position Groups are not materialised in Phase 0–1.  Never create an
+        # executable instruction for an exit that cannot be reconciled to one.
+        raise HTTPException(status_code=423, detail="Position Group close planning is unavailable")
+    normalized_parameters = normalize_parameters(strategy_instance_id, request.parameters)
+    requested_json = _canonical(normalized_parameters)
+    request_fingerprint = _canonical(
+        {
+            "action": request.action.value,
+            "parameters": normalized_parameters,
+            "position_group_id": request.position_group_id,
+            "reason": request.reason,
+            "strategy_instance_id": strategy_instance_id,
+        }
+    )
     with connection() as db:
         db.execute("BEGIN IMMEDIATE")
         existing = db.execute(
             "SELECT * FROM strategy_runs WHERE idempotency_key = ?", (request.idempotency_key,)
         ).fetchone()
         if existing is not None:
-            if (
-                existing["requested_parameters_json"] == requested_json
-                and existing["action"] == request.action.value
-                and existing["strategy_instance_id"] == strategy_instance_id
-            ):
+            if existing["request_fingerprint"] == request_fingerprint:
                 return _response(existing)
             raise HTTPException(
                 status_code=409,
@@ -117,7 +143,7 @@ def create_instruction(
                     "Idempotency key is already used by a different strategy instruction payload"
                 ),
             )
-        plan = build_plan(strategy_instance_id, request.action, request.parameters)
+        plan = build_plan(strategy_instance_id, request.action, normalized_parameters)
         instruction_id, batch_id, timestamp = str(uuid4()), str(uuid4()), _utc_now()
         first_leg = plan.legs[0]
         db.execute(
@@ -141,10 +167,11 @@ def create_instruction(
         db.execute(
             """INSERT INTO strategy_runs (
                 id, idempotency_key, strategy_instance_id, strategy_key, direction,
-                action, position_group_id, requested_parameters_json, execution_plan_json,
+                action, position_group_id, requested_parameters_json, request_fingerprint,
+                execution_plan_json,
                 requested_by, status, execution_batch_id, reason, failure_reason,
                 created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 instruction_id,
                 request.idempotency_key,
@@ -154,8 +181,9 @@ def create_instruction(
                 request.action.value,
                 request.position_group_id,
                 requested_json,
+                request_fingerprint,
                 _json_plan(plan),
-                "ceo_manual",
+                requested_by,
                 StrategyInstructionStatus.ACCEPTED.value,
                 batch_id,
                 request.reason,

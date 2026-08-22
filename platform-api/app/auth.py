@@ -367,6 +367,8 @@ def permission_for_request(method: str, path: str) -> str:
         return "operations:run"
     if "/strategies/instances/" in path and path.endswith("/runs"):
         return "strategy:run"
+    if "/strategies/" in path and path.endswith("/instructions"):
+        return "strategy:run"
     return "admin:write"
 
 
@@ -386,6 +388,12 @@ async def requires_ceo_trade_authority(request: Request) -> bool:
         return False
     if request.url.path in CEO_TRADE_WRITE_PATHS:
         return True
+    if (
+        request.url.path.startswith("/api/v1/strategies/")
+        and request.url.path.endswith("/instructions")
+    ):
+        instance_id = request.url.path.split("/")[4]
+        return instance_id in CEO_TRADE_STRATEGY_INSTANCE_IDS
     if request.url.path not in GENERIC_TRADE_WRITE_PATHS:
         return False
     try:

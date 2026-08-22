@@ -4,9 +4,9 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 
+from app.auth import permission_for_request
 from app.config import get_settings
 from app.main import app
-from app.auth import permission_for_request
 
 
 def credential(user_id: str, token: str, roles: list[str]) -> dict[str, object]:
@@ -128,8 +128,17 @@ def test_live_api_admin_is_not_a_ceo_trade_authority(monkeypatch, tmp_path: Path
 
 def test_strategy_market_commands_use_ceo_browser_permission_boundary() -> None:
     assert (
-        permission_for_request("POST", "/api/v1/trading/funding/market-command")
-        == "trading.write"
+        permission_for_request("POST", "/api/v1/trading/funding/market-command") == "trading.write"
+    )
+
+
+def test_instruction_post_uses_strategy_permission_and_ceo_trade_boundary() -> None:
+    assert (
+        permission_for_request(
+            "POST",
+            "/api/v1/strategies/strategy_funding_arbitrage_instance_default/instructions",
+        )
+        == "strategy:run"
     )
 
 

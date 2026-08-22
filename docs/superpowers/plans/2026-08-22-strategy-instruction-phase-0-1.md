@@ -1,7 +1,5 @@
 # Strategy Instruction Phase 0–1 Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
-
 **Goal:** Semantically upgrade the existing `strategy_runs` business record into the single CEO `StrategyInstruction` entry point, with a versioned immutable `ExecutionPlan`, explicit strategy adapters, and legacy entry-point compatibility without changing live execution semantics.
 
 **Architecture:** The existing `strategy_runs` table remains the durable business identity and gains append-only instruction/plan columns; no parallel long-lived `StrategyInstruction` table is introduced. A small `app/strategies` boundary validates manual input, selects a statically registered adapter and persists an immutable plan plus a single `ExecutionBatch` claim before any existing batch executor is invoked. Funding controlled-live is explicitly rejected until Phase 2 provides bounded PostOnly Chase and authoritative incremental release.
@@ -119,3 +117,28 @@
 - Phase 4 StrategyPositionGroup, dashboard/read-model migration, frontend redesign or sample-data migration.
 - Phase 5 one-command Offline E2E, controlled-session schema expansion and deletion of old Catalog paths.
 - Any Runtime rewrite, venue SDK work, ledger/Position/Fill/PnL/NAV/Reconciliation rewrite, external account connectivity, credentials, Live Write activation or real order activity.
+
+## Phase 0–1 Review Remediation
+
+### Root causes recorded before remediation
+
+1. Instruction POST is absent from the dynamic strategy-write route classification, and the route does not receive a `Principal`; `requested_by` is consequently hard-coded.
+2. Adapter inputs are unconstrained dictionaries and Plan Service substitutes hard-coded IDs/specifications and a `bindings[0]` fallback for authoritative directory resolution.
+3. Idempotency compares only part of the business request; close/disposition have no Position Group fail-closed boundary.
+4. The generic recursive camel-case response mapper mutates business identifiers such as account IDs.
+5. The funding gate treats all enabled paths as controlled-live and therefore blocks the existing local FakeGateway simulation regression.
+6. Existing `/runs`, funding and cross-spread routes still independently create batches rather than delegating to one instruction claim.
+
+### Remediation write set
+
+- Modify: `platform-api/app/auth.py`, `catalog_routes.py`, `funding.py`, `cross_spread.py`, `strategy_runs.py`, `execution_batches.py`, `execution_schemas.py`, `schema_migrations.py`, `strategies/domain.py`, `strategies/plan_service.py`, `strategies/instruction_service.py`, and both adapters.
+- Modify/Add tests: `test_auth_rbac.py`, `test_strategy_instructions.py`, `test_strategy_plan_adapters.py`, `test_funding_phase2_safety_gate.py`, `test_strategy_runs_v1.py`, `test_funding_local_closed_loop.py`, and `test_cross_spread.py`.
+- Add migration 10 only for new immutable request fingerprint / trace fields; migration 9 remains unchanged.
+
+### TDD order and acceptance
+
+1. Add authorization, actor and exact-idempotency red tests; run the focused tests.
+2. Add strict parameter/directory-resolution and fail-closed close tests; run focused tests.
+3. Add environment-aware funding gate tests and restore all three FakeGateway funding regressions.
+4. Extract the minimum batch-claim/dispatch seam, then add legacy delegation tests without a second batch.
+5. Run the two owner-specified pytest groups to completion, Ruff, Pyright and root checks. Document any pre-existing bootstrap/structure failure without changing unrelated evidence.
