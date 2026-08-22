@@ -28,6 +28,10 @@ STRATEGY_KEY = "funding_arbitrage"
 ACCOUNT_ID = "account_sim_usdt"
 PERPETUAL_LEG_ROLE = "perpetual_leg"
 SPOT_LEG_ROLE = "spot_leg"
+PHASE_2_CAPABILITY_MESSAGE = (
+    "Funding controlled-live execution requires Phase 2 post-only "
+    "chase and authoritative incremental release"
+)
 
 
 def _sides_for_action(action: str) -> tuple[str, str]:
@@ -45,6 +49,16 @@ def _funding_execution_gate_allows_write() -> bool:
     return bool(get_settings().live_trading_enabled)
 
 
+def assert_funding_controlled_live_capability() -> None:
+    """Fail closed until the approved funding execution policy exists.
+
+    The legacy endpoint currently constructs two market orders.  It must never
+    be treated as controlled-live funding execution while PostOnly Chase and
+    deduplicated incremental hedge release remain unimplemented.
+    """
+    raise HTTPException(status_code=423, detail=PHASE_2_CAPABILITY_MESSAGE)
+
+
 def submit_funding_market_command(
     request: FundingMarketCommandRequest,
 ) -> ExecutionBatchResponse:
@@ -53,6 +67,7 @@ def submit_funding_market_command(
             status_code=403,
             detail="Live funding execution is disabled",
         )
+    assert_funding_controlled_live_capability()
     if request.quantity <= 0:
         raise HTTPException(
             status_code=422,

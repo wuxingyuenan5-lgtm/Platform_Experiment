@@ -36,6 +36,12 @@ from app.schemas import (
     StrategyRunResponse,
     StrategyV1ReadinessResponse,
 )
+from app.strategies.instruction_service import (
+    CreateStrategyInstructionRequest,
+    create_instruction,
+    get_instruction,
+    list_instructions,
+)
 from app.strategy_runs import create_strategy_run, list_strategy_runs
 from app.v1_readiness import get_strategy_v1_readiness
 
@@ -105,6 +111,24 @@ def create_catalog_router(api_prefix: str) -> APIRouter:
     )
     def strategy_runs(strategy_instance_id: str) -> list[StrategyRunResponse]:
         return list_strategy_runs(strategy_instance_id)
+
+    @router.post(
+        f"{api_prefix}/strategies/{{strategy_instance_id}}/instructions", tags=["strategies"]
+    )
+    def create_strategy_instruction(
+        strategy_instance_id: str, request: CreateStrategyInstructionRequest
+    ) -> dict[str, object]:
+        return create_instruction(strategy_instance_id, request)
+
+    @router.get(
+        f"{api_prefix}/strategies/{{strategy_instance_id}}/instructions", tags=["strategies"]
+    )
+    def strategy_instructions(strategy_instance_id: str) -> list[dict[str, object]]:
+        return list_instructions(strategy_instance_id)
+
+    @router.get(f"{api_prefix}/strategy-instructions/{{instruction_id}}", tags=["strategies"])
+    def strategy_instruction(instruction_id: str) -> dict[str, object]:
+        return get_instruction(instruction_id)
 
     @router.get(
         f"{api_prefix}/strategies/instances/{{strategy_instance_id}}/v1-readiness",

@@ -354,6 +354,23 @@ PLATFORM_MIGRATIONS: tuple[Migration, ...] = (
             """,
         ),
     ),
+    Migration(
+        version=9,
+        name="strategy-instruction-immutable-plan",
+        statements=(
+            "ALTER TABLE strategy_runs ADD COLUMN action TEXT",
+            "ALTER TABLE strategy_runs ADD COLUMN position_group_id TEXT",
+            "ALTER TABLE strategy_runs ADD COLUMN requested_parameters_json TEXT",
+            "ALTER TABLE strategy_runs ADD COLUMN execution_plan_json TEXT",
+            "ALTER TABLE strategy_runs ADD COLUMN requested_by TEXT",
+            "ALTER TABLE execution_batches ADD COLUMN strategy_instruction_id TEXT",
+            (
+                "CREATE UNIQUE INDEX idx_execution_batches_strategy_instruction "
+                "ON execution_batches(strategy_instruction_id) "
+                "WHERE strategy_instruction_id IS NOT NULL"
+            ),
+        ),
+    ),
 )
 
 

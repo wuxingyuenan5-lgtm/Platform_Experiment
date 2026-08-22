@@ -1,8 +1,25 @@
 # Live Acceptance Runbook
 
-Status: active Platform 0.11.1 controlled-live operational contract.
+Status: active Platform 0.11.2 controlled-live operational contract.
 
 This runbook governs controlled, instruction-bounded live acceptance. It does not authorize production rollout or Live Write activation. Any failed, unavailable or contradictory step immediately returns the system to read-only live mode and requires an accountable operator decision.
+
+## 0. Authorization unit
+
+An Owner authorization is one complete, named business scenario, not one local
+technical action. Its written scope must identify the responsible CEO, account,
+strategy, symbols, each leg's maximum quantity, permitted execution policy and
+absolute expiry. Within that scope the operator may complete the matching open,
+authoritative order/fill/position verification, corresponding close,
+reconciliation and forced reset without seeking a separate authorization for
+each local call.
+
+This reduces approval fragmentation only. It never replaces the independent
+Platform and Runtime Live Write gates, API-key/live-session requirements, Kill
+Switch, one-instruction/one-batch identity, idempotency, cumulative-fill and
+quantity limits, `result_unknown` fail-closed handling, or reconciliation. A
+scope change, expiry, identity mismatch, unknown external state or unavailable
+venue evidence ends the scenario and requires a new Owner decision.
 
 ## 1. Release sequence
 
@@ -74,6 +91,11 @@ The responsible CEO specifies both leg quantities before each authorized window.
 - Initial local-test amend/repost settings are a 15-second total chase TTL, one-second evaluation cadence, at most five amend or cancel-repost mutations, and at least one tick of price change before mutation. These are owner-approved initial configuration values, not exchange facts or permanent production defaults; cancel terminal state must be proven before repost, and any pre-live change requires evidence and owner approval.
 
 ### Funding carry incremental hedge
+
+Funding controlled-live is unavailable until Phase 2 implements and proves the
+bounded PostOnly Chase plus authoritative, deduplicated incremental release.
+The legacy two-market-leg endpoint is not acceptance evidence and must remain
+fail closed for controlled-live funding during that gap.
 
 - Funding carry opens and closes perpetual-first. Each newly proven, deduplicated perpetual cumulative-fill increment releases only its proportional Spot quantity rounded down to the current Spot quantity step.
 - Quantization remainder stays explicit until later proven cumulative fill makes another full Spot step releasable. Perpetual and Spot cumulative fills never exceed their respective CEO instruction quantities.
