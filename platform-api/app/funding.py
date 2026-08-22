@@ -77,7 +77,9 @@ def _is_simulation_execution() -> bool:
 
 def submit_funding_market_command(
     request: FundingMarketCommandRequest,
-    ) -> ExecutionBatchResponse:
+    *,
+    requested_by: str,
+) -> ExecutionBatchResponse:
     if not _funding_execution_gate_allows_write():
         raise HTTPException(
             status_code=403,
@@ -119,7 +121,7 @@ def submit_funding_market_command(
                 },
                 reason="legacy funding market-command bridge",
             ),
-            requested_by=get_settings().development_user_id,
+            requested_by=requested_by,
         )
         return execute_instruction(str(instruction["instructionId"]))
 

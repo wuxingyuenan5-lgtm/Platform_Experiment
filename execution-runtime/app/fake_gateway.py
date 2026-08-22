@@ -24,13 +24,16 @@ from app.models import (
 )
 from app.venue_store import (
     cancel_order,
+    claim_order_script,
     ensure_store,
+    get_market_quote,
     get_order,
     list_balances,
     list_fills,
     list_positions,
     order_from_row,
     persist_filled_order,
+    persist_order,
     transfer_internal_capital,
 )
 
@@ -41,6 +44,55 @@ class FakeGateway:
     name = "fake"
 
     def submit_order(self, command: SubmitOrderCommand) -> list[ExecutionEvent]:
+        ensure_store()
+        script = None
+        if command.order_type == "limit":
+            with connection() as db:
+                script = claim_order_script(db, command.symbol.upper())
+        if script is not None and script["behavior"] == "result_unknown":
+            from app.gateway_errors import GatewayResultUnknownError
+
+            raise GatewayResultUnknownError("Fake scripted result is unknown")
+        if script is not None and script["behavior"] == "accepted_no_fill":
+            external_order_id, _ = persist_order(
+                command,
+                status="accepted",
+                fill_price=None,
+                fill_quantity=Decimal("0"),
+                cancel_terminal_after_queries=int(script["cancel_terminal_after_queries"]),
+            )
+            return [
+                ExecutionEvent(
+                    event_id=f"FAKE-ACK-{command.platform_order_id}",
+                    command_id=command.command_id,
+                    platform_order_id=command.platform_order_id,
+                    event_type="order_acknowledged",
+                    external_order_id=external_order_id,
+                    occurred_at=command.received_at,
+                )
+            ]
+        if script is not None and script["behavior"] == "partial_fill":
+            fill_price = Decimal(
+                str(script["partial_fill_price"] or command.price or Decimal("100"))
+            )
+            fill_quantity = Decimal(str(script["partial_fill_quantity"]))
+            external_order_id, _ = persist_order(
+                command,
+                status="partially_filled",
+                fill_price=fill_price,
+                fill_quantity=fill_quantity,
+                cancel_terminal_after_queries=int(script["cancel_terminal_after_queries"]),
+            )
+            return [
+                ExecutionEvent(
+                    event_id=f"FAKE-ACK-{command.platform_order_id}",
+                    command_id=command.command_id,
+                    platform_order_id=command.platform_order_id,
+                    event_type="order_acknowledged",
+                    external_order_id=external_order_id,
+                    occurred_at=command.received_at,
+                )
+            ]
         fill_price = command.price or self._estimate_market_fill_price(command)
         external_order_id, _ = persist_filled_order(command, fill_price)
         return [
@@ -244,6 +296,14 @@ class FakeGateway:
             asOf=datetime.now(UTC),
         )
 
+    def get_market_quote(
+        self,
+        *,
+        account_id: str,
+        symbol: str,
+    ):
+        return get_market_quote(account_id=account_id, symbol=symbol)
+
     def list_economic_events(
         self,
         *,
@@ -294,6 +354,7 @@ class FakeGateway:
                         "account_risk_query",
                         "internal_capital_transfer",
                         "instrument_specification_query",
+                        "market_quote_query",
                     ],
                     missingRequirements=[],
                     checkedAt=datetime.now(UTC),

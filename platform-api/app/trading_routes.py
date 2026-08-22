@@ -141,8 +141,10 @@ def create_trading_router(api_prefix: str) -> APIRouter:
     )
     def funding_market_command(
         request: FundingMarketCommandRequest,
+        http_request: Request,
     ) -> ExecutionBatchResponse:
-        return submit_funding_market_command(request)
+        principal = require_principal(http_request)
+        return submit_funding_market_command(request, requested_by=principal.user_id)
 
     @router.post(
         f"{api_prefix}/trading/commands",

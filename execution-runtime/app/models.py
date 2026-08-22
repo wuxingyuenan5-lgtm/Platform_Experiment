@@ -181,6 +181,19 @@ class VenueBalanceSnapshot(BaseModel):
     data_quality_state: str = Field(default="complete", alias="dataQualityState")
 
 
+class VenueMarketQuoteSnapshot(BaseModel):
+    source: str
+    account_id: str = Field(alias="accountId")
+    symbol: str
+    bid: Decimal
+    ask: Decimal
+    mid: Decimal
+    last: Decimal | None = None
+    currency: str
+    as_of: datetime = Field(alias="asOf")
+    data_quality_state: str = Field(default="complete", alias="dataQualityState")
+
+
 class InternalCapitalTransferStepCommand(BaseModel):
     idempotency_key: str = Field(alias="idempotencyKey", min_length=1, max_length=160)
     source_account_id: str = Field(alias="sourceAccountId", min_length=1)

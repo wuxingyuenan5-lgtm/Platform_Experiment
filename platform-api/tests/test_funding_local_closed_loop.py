@@ -229,14 +229,23 @@ def test_funding_local_closed_loop_fails_closed_when_runtime_unavailable(
             },
         )
         # Fail closed: an unreachable runtime must not hedge or silently retry.
-        # The perpetual leg becomes result_unknown and the batch requires manual
-        # intervention; the spot hedge is never released.
+        # No authoritative quote means no external side effect. The batch fails
+        # closed in-platform, no chase attempt is declared, and the spot hedge
+        # is never released.
         assert opened.status_code == 200, opened.text
         batch = opened.json()
-        assert batch["status"] == "manual_intervention", batch
+        assert batch["status"] == "failed", batch
         legs = {leg["role"]: leg for leg in batch["legs"]}
-        assert legs["perpetual_leg"]["status"] == "result_unknown", legs
+        assert legs["perpetual_leg"]["status"] == "pending", legs
         assert legs["spot_leg"]["status"] == "pending", legs
+        assert "Funding runtime query is unavailable" in batch["failureReason"]
+        with connection() as db:
+            attempt_count = db.execute(
+                "SELECT COUNT(*) AS count FROM funding_perpetual_attempts"
+            ).fetchone()
+            command_count = db.execute("SELECT COUNT(*) AS count FROM trade_commands").fetchone()
+        assert attempt_count["count"] == 0
+        assert command_count["count"] == 0
 
 
 def test_funding_local_closed_loop_simulated_funding_settlement(

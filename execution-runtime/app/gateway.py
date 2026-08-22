@@ -14,6 +14,7 @@ from app.models import (
     VenueFillHistoryPage,
     VenueFillSnapshot,
     VenueInstrumentSpecification,
+    VenueMarketQuoteSnapshot,
     VenueOrderHistoryPage,
     VenueOrderSnapshot,
     VenuePositionSnapshot,
@@ -109,6 +110,15 @@ class ExecutionGateway(Protocol):
         symbol: str,
     ) -> VenueInstrumentSpecification:
         """Return current venue sizing and access evidence for one symbol."""
+        ...
+
+    def get_market_quote(
+        self,
+        *,
+        account_id: str,
+        symbol: str,
+    ) -> VenueMarketQuoteSnapshot:
+        """Return one authoritative market quote for the supplied symbol."""
         ...
 
     def list_economic_events(

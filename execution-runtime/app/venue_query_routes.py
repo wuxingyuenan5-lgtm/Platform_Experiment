@@ -24,6 +24,7 @@ from app.models import (
     VenueFillHistoryPage,
     VenueFillSnapshot,
     VenueInstrumentSpecification,
+    VenueMarketQuoteSnapshot,
     VenueOrderHistoryPage,
     VenueOrderSnapshot,
     VenuePositionSnapshot,
@@ -208,6 +209,17 @@ def create_venue_query_router(*, gateway: ExecutionGateway) -> APIRouter:
         return query_gateway(
             lambda: gateway.get_instrument_specification(account_id=account_id, symbol=symbol)
         )
+
+    @router.get(
+        "/venue/quotes/{symbol}",
+        response_model=VenueMarketQuoteSnapshot,
+        tags=["venue-query"],
+    )
+    def venue_market_quote(
+        symbol: str,
+        account_id: str = Query(alias="accountId"),
+    ) -> VenueMarketQuoteSnapshot:
+        return query_gateway(lambda: gateway.get_market_quote(account_id=account_id, symbol=symbol))
 
     @router.get(
         "/venue/economic-events",

@@ -165,6 +165,10 @@ def apply_execution_events(
                     fill_quantity=Decimal(str(event["fill_quantity"])),
                     occurred_at=occurred_at,
                 )
+                db.execute(
+                    "UPDATE orders SET status = ?, updated_at = ? WHERE id = ?",
+                    ("filled", occurred_at, order_id),
+                )
 
 
 def validate_execution_event(
@@ -222,11 +226,14 @@ def _record_fill_and_update_operational_projections(
     # Cumulative-fill ceiling (defense-in-depth): total filled quantity must
     # never exceed the instruction quantity. Runtime enforces this precisely;
     # the Platform asserts it fail-closed on the confirmed fill path.
-    cumulative_row = db.execute(
-        "SELECT COALESCE(SUM(CAST(quantity AS REAL)), 0) AS total FROM fills WHERE order_id = ?",
+    cumulative_rows = db.execute(
+        "SELECT quantity FROM fills WHERE order_id = ?",
         (order_id,),
-    ).fetchone()
-    cumulative_quantity = Decimal(str(cumulative_row["total"]))
+    ).fetchall()
+    cumulative_quantity = sum(
+        (Decimal(str(row["quantity"])) for row in cumulative_rows),
+        Decimal("0"),
+    )
     if cumulative_quantity + fill_quantity > request.quantity:
         raise HTTPException(
             status_code=502,
@@ -282,11 +289,6 @@ def _record_fill_and_update_operational_projections(
             decimal_text(new_average) if new_average is not None else None,
             occurred_at,
         ),
-    )
-
-    db.execute(
-        "UPDATE orders SET status = ?, updated_at = ? WHERE id = ?",
-        ("filled", occurred_at, order_id),
     )
 
     db.execute(
@@ -361,6 +363,54 @@ def record_fill_and_update_operational_projections(
             fill_quantity=fill_quantity,
             occurred_at=occurred_at,
         )
+
+
+def synchronize_order_with_authoritative_facts(
+    order_id: str,
+    *,
+    external_order: dict[str, object],
+    external_fills: list[dict[str, object]],
+) -> None:
+    row = get_order_row(order_id)
+    request = request_from_order_row(row)
+    status = _mapped_external_order_status(str(external_order.get("status") or "unknown"))
+    external_order_id = external_order.get("externalOrderId")
+    occurred_at = str(external_order.get("asOf") or now_iso())
+
+    with connection() as db:
+        for fill in external_fills:
+            platform_order_id = str(fill.get("platformOrderId") or "")
+            if platform_order_id != order_id:
+                raise HTTPException(status_code=502, detail="Runtime fill order mismatch")
+            _record_fill_and_update_operational_projections(
+                db,
+                fill_id=str(fill["externalFillId"]),
+                order_id=order_id,
+                request=request,
+                fill_price=Decimal(str(fill["price"])),
+                fill_quantity=Decimal(str(fill["quantity"])),
+                occurred_at=str(fill["occurredAt"]),
+            )
+        db.execute(
+            """
+            UPDATE orders
+            SET status = ?, external_order_id = COALESCE(?, external_order_id), updated_at = ?
+            WHERE id = ?
+            """,
+            (status, external_order_id, occurred_at, order_id),
+        )
+    synchronize_trade_command_status(row["command_id"], order_id)
+
+
+def _mapped_external_order_status(status: str) -> str:
+    return {
+        "accepted": "accepted",
+        "partially_filled": "partially_filled",
+        "filled": "filled",
+        "canceled": "canceled",
+        "rejected": "rejected",
+        "unknown": "result_unknown",
+    }.get(status, "result_unknown")
 
 
 def get_order_row(order_id: str):

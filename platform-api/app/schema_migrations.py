@@ -437,6 +437,53 @@ PLATFORM_MIGRATIONS: tuple[Migration, ...] = (
             """,
         ),
     ),
+    Migration(
+        version=13,
+        name="funding-perpetual-attempts",
+        statements=(
+            """
+            CREATE TABLE funding_perpetual_attempts (
+                id TEXT PRIMARY KEY,
+                batch_id TEXT NOT NULL,
+                attempt_number INTEGER NOT NULL,
+                idempotency_key TEXT NOT NULL UNIQUE,
+                limit_price TEXT NOT NULL,
+                trade_command_id TEXT,
+                order_id TEXT,
+                status TEXT NOT NULL CHECK (
+                    status IN (
+                        'declared', 'acknowledged', 'accepted', 'partially_filled',
+                        'filled', 'cancel_pending', 'canceled', 'rejected', 'result_unknown'
+                    )
+                ),
+                cancel_requested_at TEXT,
+                cancel_terminal_at TEXT,
+                failure_reason TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                UNIQUE(batch_id, attempt_number),
+                FOREIGN KEY(batch_id) REFERENCES execution_batches(id),
+                FOREIGN KEY(trade_command_id) REFERENCES trade_commands(id),
+                FOREIGN KEY(order_id) REFERENCES orders(id)
+            )
+            """,
+            """
+            CREATE UNIQUE INDEX idx_funding_perpetual_attempts_one_active
+            ON funding_perpetual_attempts(batch_id)
+            WHERE status IN (
+                'declared',
+                'acknowledged',
+                'accepted',
+                'partially_filled',
+                'cancel_pending'
+            )
+            """,
+            """
+            CREATE INDEX idx_funding_perpetual_attempts_batch_created
+            ON funding_perpetual_attempts(batch_id, created_at)
+            """,
+        ),
+    ),
 )
 
 
