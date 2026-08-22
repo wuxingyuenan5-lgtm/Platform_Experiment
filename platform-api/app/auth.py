@@ -51,6 +51,7 @@ CEO_TRADE_WRITE_PATHS = frozenset(
     {
         "/api/v1/trading/funding/market-command",
         "/api/v1/trading/cross-spread/market-command",
+        "/api/v1/trading/cross-spread/funding-transfer",
     }
 )
 CEO_TRADE_STRATEGY_INSTANCE_IDS = frozenset(
@@ -324,7 +325,7 @@ def permission_for_request(method: str, path: str) -> str:
     # through the shared `trading.write` capability.
     if path.endswith("/trading/funding/market-command") or path.endswith(
         "/trading/cross-spread/market-command"
-    ):
+    ) or path.endswith("/trading/cross-spread/funding-transfer"):
         return "trading.write"
     if path.endswith("/trading/cross-spread/lifecycle/open"):
         return "trading.write"

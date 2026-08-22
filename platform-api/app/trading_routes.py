@@ -1,5 +1,6 @@
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, Request
 
+from app.auth import require_principal
 from app.catalog import get_order, list_fills, list_orders
 from app.cross_spread import (
     get_cross_spread_history,
@@ -25,6 +26,14 @@ from app.schemas import (
     OrderDetailResponse,
     OrderResponse,
     TradeCommandResponse,
+)
+from app.strategies.capital_transfer import (
+    CreateInternalCapitalTransferRequest,
+    FundingTransferQuoteResponse,
+    InternalCapitalTransferResponse,
+    create_funding_transfer,
+    get_funding_transfer,
+    get_funding_transfer_quote,
 )
 from app.trade_commands import create_trade_command, get_trade_command
 from app.trading import reconcile_order, submit_order
@@ -77,6 +86,43 @@ def create_trading_router(api_prefix: str) -> APIRouter:
         limit: int = Query(default=200, ge=1, le=1000),
     ) -> list[CrossSpreadHistoryPointResponse]:
         return get_cross_spread_history(limit)
+
+    @router.get(
+        f"{api_prefix}/trading/cross-spread/funding-transfer/quote",
+        response_model=FundingTransferQuoteResponse,
+        tags=["trading"],
+    )
+    def cross_spread_funding_transfer_quote(
+        http_request: Request,
+    ) -> FundingTransferQuoteResponse:
+        require_principal(http_request)
+        return get_funding_transfer_quote()
+
+    @router.post(
+        f"{api_prefix}/trading/cross-spread/funding-transfer",
+        response_model=InternalCapitalTransferResponse,
+        tags=["trading"],
+    )
+    def cross_spread_funding_transfer(
+        request: CreateInternalCapitalTransferRequest,
+        http_request: Request,
+    ) -> InternalCapitalTransferResponse:
+        return create_funding_transfer(
+            request,
+            requested_by=require_principal(http_request).user_id,
+        )
+
+    @router.get(
+        f"{api_prefix}/trading/cross-spread/funding-transfers/{{transfer_id}}",
+        response_model=InternalCapitalTransferResponse,
+        tags=["trading"],
+    )
+    def cross_spread_funding_transfer_status(
+        transfer_id: str,
+        http_request: Request,
+    ) -> InternalCapitalTransferResponse:
+        require_principal(http_request)
+        return get_funding_transfer(transfer_id)
 
     @router.post(
         f"{api_prefix}/trading/cross-spread/market-command",

@@ -122,13 +122,29 @@ def test_live_api_admin_is_not_a_ceo_trade_authority(monkeypatch, tmp_path: Path
                 "quantity": "0.01",
             },
         )
+        capital_transfer = client.post(
+            "/api/v1/trading/cross-spread/funding-transfer",
+            headers=auth_headers("admin-token"),
+            json={
+                "idempotencyKey": "admin-capital-transfer",
+                "direction": "bybit_to_mt5",
+                "amount": "1",
+            },
+        )
 
     assert_auth_error(response, status_code=403, code="ceo_trade_authority_required")
+    assert_auth_error(capital_transfer, status_code=403, code="ceo_trade_authority_required")
 
 
 def test_strategy_market_commands_use_ceo_browser_permission_boundary() -> None:
     assert (
         permission_for_request("POST", "/api/v1/trading/funding/market-command") == "trading.write"
+    )
+    assert (
+        permission_for_request(
+            "POST", "/api/v1/trading/cross-spread/funding-transfer"
+        )
+        == "trading.write"
     )
 
 

@@ -47,7 +47,7 @@ export function useCrossVenueExecutionWorkspace() {
   const ranges = CROSS_SPREAD_RANGES;
   const selectedPair = ref('XAUTUSDT-XAUUSD');
   const selectedRange = ref('15m');
-  const executionStage = ref<'open' | 'close'>('open');
+  const executionStage = ref<'open' | 'close' | 'funding'>('open');
   const executionMode = ref<CrossSpreadExecutionMode>('market');
   const closeExecutionMode = ref<CrossSpreadExecutionMode>('market');
   // Start at the live contract minimum, never at a demo-sized default.

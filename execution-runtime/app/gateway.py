@@ -5,6 +5,8 @@ from app.models import (
     CancelOrderResponse,
     ExecutionEvent,
     GatewayCapabilitiesResponse,
+    InternalCapitalTransferStepCommand,
+    InternalCapitalTransferStepResponse,
     SubmitOrderCommand,
     VenueAccountRiskSnapshot,
     VenueBalanceSnapshot,
@@ -91,6 +93,13 @@ class ExecutionGateway(Protocol):
 
     def get_account_risk(self, account_id: str) -> VenueAccountRiskSnapshot:
         """Return account-level authoritative margin and stop-out evidence."""
+        ...
+
+    def transfer_internal_capital(
+        self,
+        command: InternalCapitalTransferStepCommand,
+    ) -> InternalCapitalTransferStepResponse:
+        """Move capital between verified internal accounts idempotently."""
         ...
 
     def get_instrument_specification(

@@ -8,6 +8,8 @@ from app.config import get_settings
 from app.journal import connection
 from app.models import (
     CancelOrderResponse,
+    InternalCapitalTransferStepCommand,
+    InternalCapitalTransferStepResponse,
     SubmitOrderCommand,
     VenueBalanceSnapshot,
     VenueEconomicEventSnapshot,
@@ -95,6 +97,19 @@ CREATE TABLE IF NOT EXISTS fake_venue_economic_events (
     occurred_at TEXT NOT NULL,
     data_quality_state TEXT NOT NULL,
     payload_json TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS fake_internal_capital_transfers (
+    idempotency_key TEXT PRIMARY KEY,
+    external_transfer_id TEXT NOT NULL UNIQUE,
+    source_account_id TEXT NOT NULL,
+    destination_account_id TEXT NOT NULL,
+    source_currency TEXT NOT NULL,
+    destination_currency TEXT NOT NULL,
+    amount TEXT NOT NULL,
+    status TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    completed_at TEXT
 );
 
 
@@ -290,6 +305,124 @@ def ensure_balance(db, account_id: str, currency: str, at: str) -> None:
         currency=currency,
         target_balance=target_balance,
         at=at,
+    )
+
+
+def transfer_internal_capital(
+    command: InternalCapitalTransferStepCommand,
+) -> InternalCapitalTransferStepResponse:
+    """Apply one deterministic FakeGateway transfer step exactly once."""
+    from app.gateway_errors import GatewayRequestRejectedError
+
+    ensure_store()
+    source_currency = command.source_currency.upper()
+    destination_currency = command.destination_currency.upper()
+    at = now_iso()
+    external_id = f"FAKE-TRANSFER-{command.idempotency_key}"
+    with connection() as db:
+        db.execute("BEGIN IMMEDIATE")
+        existing = db.execute(
+            "SELECT * FROM fake_internal_capital_transfers WHERE idempotency_key = ?",
+            (command.idempotency_key,),
+        ).fetchone()
+        if existing is not None:
+            if (
+                existing["source_account_id"] != command.source_account_id
+                or existing["destination_account_id"] != command.destination_account_id
+                or existing["source_currency"] != source_currency
+                or existing["destination_currency"] != destination_currency
+                or Decimal(existing["amount"]) != command.amount
+            ):
+                raise GatewayRequestRejectedError(
+                    "Internal transfer idempotency key conflicts with another payload"
+                )
+            return _internal_transfer_response(existing)
+
+        ensure_balance(db, command.source_account_id, source_currency, at)
+        ensure_balance(db, command.destination_account_id, destination_currency, at)
+        source = db.execute(
+            """
+            SELECT equity, available_balance FROM fake_venue_balances
+            WHERE account_id = ? AND currency = ?
+            """,
+            (command.source_account_id, source_currency),
+        ).fetchone()
+        if source is None or Decimal(source["available_balance"]) < command.amount:
+            raise GatewayRequestRejectedError("Insufficient transferable balance")
+        db.execute(
+            """
+            UPDATE fake_venue_balances
+            SET equity = ?, available_balance = ?, updated_at = ?
+            WHERE account_id = ? AND currency = ?
+            """,
+            (
+                decimal_text(Decimal(source["equity"]) - command.amount),
+                decimal_text(Decimal(source["available_balance"]) - command.amount),
+                at,
+                command.source_account_id,
+                source_currency,
+            ),
+        )
+        destination = db.execute(
+            """
+            SELECT equity, available_balance FROM fake_venue_balances
+            WHERE account_id = ? AND currency = ?
+            """,
+            (command.destination_account_id, destination_currency),
+        ).fetchone()
+        if destination is None:
+            raise RuntimeError("Fake transfer destination balance is unavailable")
+        db.execute(
+            """
+            UPDATE fake_venue_balances
+            SET equity = ?, available_balance = ?, updated_at = ?
+            WHERE account_id = ? AND currency = ?
+            """,
+            (
+                decimal_text(Decimal(destination["equity"]) + command.amount),
+                decimal_text(Decimal(destination["available_balance"]) + command.amount),
+                at,
+                command.destination_account_id,
+                destination_currency,
+            ),
+        )
+        db.execute(
+            """
+            INSERT INTO fake_internal_capital_transfers (
+                idempotency_key, external_transfer_id, source_account_id,
+                destination_account_id, source_currency, destination_currency,
+                amount, status, created_at, completed_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, 'completed', ?, ?)
+            """,
+            (
+                command.idempotency_key,
+                external_id,
+                command.source_account_id,
+                command.destination_account_id,
+                source_currency,
+                destination_currency,
+                decimal_text(command.amount),
+                at,
+                at,
+            ),
+        )
+        row = db.execute(
+            "SELECT * FROM fake_internal_capital_transfers WHERE idempotency_key = ?",
+            (command.idempotency_key,),
+        ).fetchone()
+    return _internal_transfer_response(row)
+
+
+def _internal_transfer_response(row) -> InternalCapitalTransferStepResponse:
+    return InternalCapitalTransferStepResponse(
+        externalTransferId=row["external_transfer_id"],
+        status=row["status"],
+        sourceAccountId=row["source_account_id"],
+        destinationAccountId=row["destination_account_id"],
+        sourceCurrency=row["source_currency"],
+        destinationCurrency=row["destination_currency"],
+        amount=Decimal(row["amount"]),
+        completedAt=row["completed_at"],
     )
 
 

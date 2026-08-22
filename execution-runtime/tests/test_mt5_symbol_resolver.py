@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
 
 from app.mt5_symbol_resolver import (
     clear_mt5_symbol_cache,

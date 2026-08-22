@@ -43,7 +43,10 @@ def build_cross_spread_snapshot(
     bybit_timestamp_offset_ms: int = 0,
 ) -> CrossSpreadSnapshotResponse:
     settings = get_settings()
-    cache_key = f"{bybit_symbol}|{mt5_symbol}|{bybit_demo}|{bybit_credential_ref}|{mt5_credential_ref}"
+    cache_key = (
+        f"{bybit_symbol}|{mt5_symbol}|{bybit_demo}|"
+        f"{bybit_credential_ref}|{mt5_credential_ref}"
+    )
     cached = _SNAPSHOT_CACHE.get(cache_key)
     if cached is not None and time.time() - cached[0] < _SNAPSHOT_CACHE_TTL_SECONDS:
         return cached[1]

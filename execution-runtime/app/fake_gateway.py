@@ -9,6 +9,8 @@ from app.models import (
     ExecutionEvent,
     GatewayAdapterCapability,
     GatewayCapabilitiesResponse,
+    InternalCapitalTransferStepCommand,
+    InternalCapitalTransferStepResponse,
     SubmitOrderCommand,
     VenueAccountRiskSnapshot,
     VenueBalanceSnapshot,
@@ -29,6 +31,7 @@ from app.venue_store import (
     list_positions,
     order_from_row,
     persist_filled_order,
+    transfer_internal_capital,
 )
 
 
@@ -210,6 +213,12 @@ class FakeGateway:
             asOf=datetime.now(UTC),
         )
 
+    def transfer_internal_capital(
+        self,
+        command: InternalCapitalTransferStepCommand,
+    ) -> InternalCapitalTransferStepResponse:
+        return transfer_internal_capital(command)
+
     def get_instrument_specification(
         self,
         *,
@@ -283,6 +292,7 @@ class FakeGateway:
                         "position_query",
                         "balance_query",
                         "account_risk_query",
+                        "internal_capital_transfer",
                         "instrument_specification_query",
                     ],
                     missingRequirements=[],

@@ -48,6 +48,7 @@ class Settings(BaseSettings):
     cross_spread_acceptance_max_active_plans: int = 0
     cross_spread_definitive_failure_rollback_enabled: bool = True
     cross_spread_position_verification_required: bool = True
+    bybit_mt5_funding_url: str = "https://www.bybit.com/user/assets/home/account-mt5"
 
     # Authentication is permissive only in non-live development. A live process
     # must use api_key mode with SHA-256 token hashes; raw tokens never belong in

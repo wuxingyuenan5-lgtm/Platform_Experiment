@@ -23,7 +23,7 @@ from typing import Any
 
 # Process-local cache: (login, server) -> resolution. Keyed by account identity
 # because the same terminal process can switch servers/accounts.
-_symbol_cache: dict[tuple[str, str], "Mt5SymbolResolution"] = {}
+_symbol_cache: dict[tuple[str, str], Mt5SymbolResolution] = {}
 
 
 @dataclass(frozen=True)

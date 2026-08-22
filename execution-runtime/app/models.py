@@ -181,6 +181,26 @@ class VenueBalanceSnapshot(BaseModel):
     data_quality_state: str = Field(default="complete", alias="dataQualityState")
 
 
+class InternalCapitalTransferStepCommand(BaseModel):
+    idempotency_key: str = Field(alias="idempotencyKey", min_length=1, max_length=160)
+    source_account_id: str = Field(alias="sourceAccountId", min_length=1)
+    destination_account_id: str = Field(alias="destinationAccountId", min_length=1)
+    source_currency: str = Field(alias="sourceCurrency", min_length=3, max_length=8)
+    destination_currency: str = Field(alias="destinationCurrency", min_length=3, max_length=8)
+    amount: Decimal = Field(gt=0)
+
+
+class InternalCapitalTransferStepResponse(BaseModel):
+    external_transfer_id: str = Field(alias="externalTransferId")
+    status: Literal["completed", "result_unknown"]
+    source_account_id: str = Field(alias="sourceAccountId")
+    destination_account_id: str = Field(alias="destinationAccountId")
+    source_currency: str = Field(alias="sourceCurrency")
+    destination_currency: str = Field(alias="destinationCurrency")
+    amount: Decimal
+    completed_at: datetime | None = Field(default=None, alias="completedAt")
+
+
 class VenueAccountRiskSnapshot(BaseModel):
     source: str
     account_id: str = Field(alias="accountId")

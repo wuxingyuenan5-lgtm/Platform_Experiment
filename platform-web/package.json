@@ -33,6 +33,7 @@
     "serve": "npm run dev",
     "sync:trading-tools": "node scripts/sync-trading-tools-from-md.cjs",
     "test:codebase-boundaries": "node scripts/check-codebase-boundaries.cjs",
+    "test:cross-spread-funding-transfer": "node scripts/test-cross-spread-funding-transfer.cjs",
     "test:cross-spread-layout": "node scripts/verify-cross-spread-layout.cjs",
     "test:cross-spread-live-data": "node --test scripts/test-cross-spread-live-data.cjs",
     "test:e2e:hedge-board": "playwright test -c playwright.hedge-board.config.ts",

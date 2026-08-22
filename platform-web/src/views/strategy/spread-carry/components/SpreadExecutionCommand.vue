@@ -17,6 +17,11 @@
         @click="$emit('update:executionStage', 'close')"
         >平仓价差</button
       >
+      <button
+        :class="{ active: executionStage === 'funding' }"
+        @click="$emit('update:executionStage', 'funding')"
+        >移动双边资金</button
+      >
     </div>
 
     <template v-if="executionStage === 'open'">
@@ -227,7 +232,7 @@
       </div>
     </template>
 
-    <template v-else>
+    <template v-else-if="executionStage === 'close'">
       <div class="close-shell">
         <div class="mode-tabs">
           <button
@@ -344,6 +349,135 @@
         </div>
       </div>
     </template>
+
+    <template v-else>
+      <div class="funding-shell">
+        <div class="funding-balance-grid">
+          <article class="funding-balance-card">
+            <span>Bybit 所内真实可调拨余额</span>
+            <strong>
+              {{ fundingBalanceText(bybitAmount, quote?.bybitTransferable.currency) }}
+            </strong>
+            <small v-if="quote?.bybitTransferable.dataQualityState === 'unavailable'">
+              {{ quote.bybitTransferable.reason || '数据暂不可用' }}
+            </small>
+          </article>
+          <article class="funding-balance-card">
+            <span>MT5 真实可转出余额</span>
+            <strong>{{ fundingBalanceText(mt5Amount, quote?.mt5Withdrawable.currency) }}</strong>
+            <small v-if="quote?.mt5Withdrawable.dataQualityState === 'unavailable'">
+              {{ quote.mt5Withdrawable.reason || '数据暂不可用' }}
+            </small>
+          </article>
+        </div>
+
+        <div class="funding-form-grid">
+          <label class="field-block">
+            <span>调拨方向</span>
+            <div class="input-row input-row--single-select">
+              <select v-model="direction" aria-label="资金调拨方向">
+                <option value="bybit_to_mt5">Bybit UTA → Funding → MT5</option>
+                <option value="mt5_to_bybit">MT5 → Funding → Bybit UTA</option>
+              </select>
+            </div>
+          </label>
+          <button type="button" class="row-btn funding-swap" @click="swapDirection">
+            手工换向
+          </button>
+          <label class="field-block">
+            <span>调拨金额</span>
+            <div class="input-row">
+              <input
+                :value="amountInput"
+                inputmode="decimal"
+                aria-label="资金调拨金额"
+                @input="updateFundingAmount"
+              />
+              <em>USDT 等值</em>
+            </div>
+            <p v-if="amountError" class="field-error">{{ amountError }}</p>
+          </label>
+        </div>
+
+        <div class="funding-projection">
+          <span>确认前预计余额</span>
+          <div class="mini-grid">
+            <article class="metric-card">
+              <small>Bybit 调拨后</small>
+              <strong>
+                {{
+                  fundingBalanceText(
+                    projectedBalances?.bybit ?? null,
+                    quote?.bybitTransferable.currency,
+                  )
+                }}
+              </strong>
+            </article>
+            <article class="metric-card">
+              <small>MT5 调拨后</small>
+              <strong>
+                {{
+                  fundingBalanceText(
+                    projectedBalances?.mt5 ?? null,
+                    quote?.mt5Withdrawable.currency,
+                  )
+                }}
+              </strong>
+            </article>
+          </div>
+        </div>
+
+        <label class="funding-confirm">
+          <input v-model="confirmed" type="checkbox" />
+          <span>我已核对调拨方向、金额和调拨后预计余额</span>
+        </label>
+
+        <div v-if="transfer" class="funding-status" :data-status="transfer.status">
+          <strong>{{ fundingStatusLabel(transfer.status) }}</strong>
+          <span>资金位置：{{ fundingLocationLabel(transfer.currentLocation) }}</span>
+          <span v-if="transfer.failureReason">{{ transfer.failureReason }}</span>
+        </div>
+
+        <div v-if="quote?.mode === 'assisted'" class="funding-assisted">
+          <strong>辅助模式</strong>
+          <span>真实 MT5 Transfer API 尚未确认，请复制金额并在 Bybit 官方资金页完成。</span>
+          <div class="funding-actions">
+            <button type="button" class="row-btn" @click="copyAmount">一键复制金额</button>
+            <button type="button" class="row-btn" @click="openOfficialFundingPage">
+              打开 Bybit 官方资金页
+            </button>
+          </div>
+        </div>
+
+        <div class="funding-actions">
+          <button
+            type="button"
+            class="submit-btn submit-btn--green"
+            :disabled="!canSubmit"
+            @click="submitTransfer"
+          >
+            {{
+              loading ? '处理中' : quote?.mode === 'assisted' ? '记录并进入辅助调拨' : '确认调拨'
+            }}
+          </button>
+          <button
+            type="button"
+            class="row-btn"
+            :disabled="loading"
+            @click="refreshTransferAndBalances"
+          >
+            刷新并核对两边余额
+          </button>
+        </div>
+        <p v-if="balanceVerification === 'matched'" class="funding-verified">
+          两边余额已与调拨后预计值一致。
+        </p>
+        <p v-else-if="balanceVerification === 'not_matched'" class="execution-note">
+          最新余额尚未与预计值一致，请在 Bybit 完成后再次刷新。
+        </p>
+        <p v-if="error" class="field-error">{{ error }}</p>
+      </div>
+    </template>
   </section>
 </template>
 
@@ -354,6 +488,7 @@
     CrossSpreadLimitExecutionResult,
     CrossSpreadLimitStrategy,
   } from '@/api/platform/crossSpreadLifecycle';
+  import { useCrossSpreadFundingTransfer } from '../composables/useCrossSpreadFundingTransfer';
 
   type SpreadInputField = 'trigger' | 'acceptable' | 'takeProfit' | 'stopLoss' | 'closeLimit';
   type EditableInputName =
@@ -382,7 +517,7 @@
   }
 
   const props = defineProps<{
-    executionStage: 'open' | 'close';
+    executionStage: 'open' | 'close' | 'funding';
     executionMode: CrossSpreadExecutionMode;
     closeExecutionMode: CrossSpreadExecutionMode;
     qtyInput: string;
@@ -410,7 +545,7 @@
   }>();
 
   const emit = defineEmits<{
-    (event: 'update:executionStage', value: 'open' | 'close'): void;
+    (event: 'update:executionStage', value: 'open' | 'close' | 'funding'): void;
     (event: 'update:executionMode', value: CrossSpreadExecutionMode): void;
     (event: 'update:closeExecutionMode', value: CrossSpreadExecutionMode): void;
     (event: 'update:qtyInput', value: string): void;
@@ -435,6 +570,27 @@
   const bybitLeverageInput = ref('20');
   const leverageLoading = ref(false);
   const leverageMessage = ref('');
+  const {
+    amountError,
+    amountInput,
+    balanceVerification,
+    bybitAmount,
+    canSubmit,
+    confirmed,
+    copyAmount,
+    direction,
+    error,
+    loading,
+    mt5Amount,
+    openOfficialFundingPage,
+    projectedBalances,
+    quote,
+    refreshTransferAndBalances,
+    submitTransfer,
+    swapDirection,
+    transfer,
+    updateAmount,
+  } = useCrossSpreadFundingTransfer();
   async function applyBybitLeverage() {
     const leverage = Number(bybitLeverageInput.value);
     if (!Number.isFinite(leverage) || leverage <= 0 || leverage > 100) {
@@ -509,6 +665,32 @@
 
   function limitStrategyLabel(strategy: CrossSpreadLimitStrategy) {
     return strategy === 'post_only_chase' ? 'PostOnly Chase' : 'FOK';
+  }
+
+  function updateFundingAmount(event: Event) {
+    updateAmount((event.target as HTMLInputElement).value);
+  }
+
+  function fundingBalanceText(value: string | null, currency?: string) {
+    return value === null ? '--' : `${value} ${currency || 'USDT'}`;
+  }
+
+  function fundingStatusLabel(status: string) {
+    return {
+      pending: '待完成',
+      completed: '已完成',
+      failed: '失败',
+      result_unknown: '结果未知，禁止自动重试',
+    }[status];
+  }
+
+  function fundingLocationLabel(location: string) {
+    return {
+      bybit_uta: 'Bybit UTA',
+      funding: 'Bybit Funding',
+      mt5: 'MT5',
+      unknown: '待人工核对',
+    }[location];
   }
 </script>
 
@@ -795,6 +977,106 @@
     gap: 16px;
   }
 
+  .funding-shell {
+    display: grid;
+    gap: 16px;
+  }
+
+  .funding-balance-grid,
+  .funding-form-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+  }
+
+  .funding-balance-card,
+  .funding-projection,
+  .funding-assisted,
+  .funding-status {
+    padding: 14px;
+    border: 1px solid #e7ebf0;
+    border-radius: 14px;
+    background: #fff;
+  }
+
+  .funding-balance-card span,
+  .funding-projection > span {
+    color: #47617f;
+    font-size: 13px;
+    font-weight: 700;
+  }
+
+  .funding-balance-card strong {
+    display: block;
+    margin-top: 8px;
+    color: #172947;
+    font-family: var(--strategy-font-data);
+    font-size: 18px;
+  }
+
+  .funding-balance-card small {
+    display: block;
+    margin-top: 8px;
+    color: var(--strategy-danger, #ef3232);
+  }
+
+  .funding-form-grid {
+    grid-template-columns: minmax(0, 1fr) 112px minmax(0, 1fr);
+    align-items: end;
+  }
+
+  .funding-swap {
+    margin-bottom: 1px;
+  }
+
+  .funding-projection > span {
+    display: block;
+    margin-bottom: 10px;
+  }
+
+  .funding-confirm {
+    display: flex;
+    gap: 9px;
+    align-items: center;
+    color: #2f3640;
+    font-size: 13px;
+    font-weight: 700;
+  }
+
+  .funding-status,
+  .funding-assisted {
+    display: grid;
+    gap: 6px;
+    color: #47617f;
+    font-size: 13px;
+  }
+
+  .funding-status[data-status='completed'],
+  .funding-verified {
+    color: var(--strategy-success, #179b4b);
+  }
+
+  .funding-status[data-status='failed'],
+  .funding-status[data-status='result_unknown'] {
+    color: var(--strategy-danger, #ef3232);
+  }
+
+  .funding-actions {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+  }
+
+  .funding-actions .submit-btn {
+    font-size: 16px;
+  }
+
+  .funding-verified {
+    margin: 0;
+    font-size: 13px;
+    font-weight: 700;
+  }
+
   .basic-table {
     width: 100%;
     border-collapse: collapse;
@@ -879,6 +1161,13 @@
     .mode-tabs,
     .submit-row,
     .close-market-strip {
+      grid-template-columns: 1fr;
+      flex-direction: column;
+    }
+
+    .funding-balance-grid,
+    .funding-form-grid,
+    .funding-actions {
       grid-template-columns: 1fr;
       flex-direction: column;
     }

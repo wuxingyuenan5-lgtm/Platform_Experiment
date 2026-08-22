@@ -376,6 +376,37 @@ PLATFORM_MIGRATIONS: tuple[Migration, ...] = (
         name="strategy-instruction-request-fingerprint",
         statements=("ALTER TABLE strategy_runs ADD COLUMN request_fingerprint TEXT",),
     ),
+    Migration(
+        version=11,
+        name="cross-spread-internal-capital-transfers",
+        statements=(
+            """
+            CREATE TABLE internal_capital_transfers (
+                id TEXT PRIMARY KEY,
+                idempotency_key TEXT NOT NULL UNIQUE,
+                strategy_instance_id TEXT NOT NULL,
+                direction TEXT NOT NULL CHECK (
+                    direction IN ('bybit_to_mt5', 'mt5_to_bybit')
+                ),
+                currency TEXT NOT NULL,
+                amount TEXT NOT NULL,
+                status TEXT NOT NULL CHECK (
+                    status IN ('pending', 'completed', 'failed', 'result_unknown')
+                ),
+                external_transfer_id TEXT,
+                failure_reason TEXT,
+                requested_by TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                FOREIGN KEY(strategy_instance_id) REFERENCES strategy_instances(id)
+            )
+            """,
+            """
+            CREATE INDEX idx_internal_capital_transfers_strategy_created
+            ON internal_capital_transfers(strategy_instance_id, created_at DESC)
+            """,
+        ),
+    ),
 )
 
 

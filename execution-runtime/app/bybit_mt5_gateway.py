@@ -5,12 +5,14 @@ from typing import Literal
 
 from app.bybit_live_adapter import BybitLiveAdapter
 from app.config import Settings, get_settings
-from app.gateway_errors import GatewayConfigurationError
+from app.gateway_errors import GatewayConfigurationError, GatewayQueryUnsupportedError
 from app.live_route_store import get_order_route
 from app.models import (
     CancelOrderResponse,
     ExecutionEvent,
     GatewayCapabilitiesResponse,
+    InternalCapitalTransferStepCommand,
+    InternalCapitalTransferStepResponse,
     SubmitOrderCommand,
     VenueAccountRiskSnapshot,
     VenueBalanceSnapshot,
@@ -174,6 +176,14 @@ class BybitMt5Gateway:
 
     def get_account_risk(self, account_id: str) -> VenueAccountRiskSnapshot:
         return self._adapter_for_account(account_id).get_account_risk(account_id)
+
+    def transfer_internal_capital(
+        self,
+        command: InternalCapitalTransferStepCommand,
+    ) -> InternalCapitalTransferStepResponse:
+        raise GatewayQueryUnsupportedError(
+            "Verified Bybit TradFi (MT5) Transfer In/Out API is unavailable"
+        )
 
     def get_instrument_specification(
         self,

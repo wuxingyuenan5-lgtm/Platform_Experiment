@@ -1,9 +1,8 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Annotated, Literal
-
 from decimal import Decimal
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
@@ -17,6 +16,8 @@ from app.gateway_errors import (
 from app.models import (
     CancelOrderRequest,
     CancelOrderResponse,
+    InternalCapitalTransferStepCommand,
+    InternalCapitalTransferStepResponse,
     VenueAccountRiskSnapshot,
     VenueBalanceSnapshot,
     VenueEconomicEventSnapshot,
@@ -184,6 +185,16 @@ def create_venue_query_router(*, gateway: ExecutionGateway) -> APIRouter:
         account_id: str = Query(alias="accountId"),
     ) -> VenueAccountRiskSnapshot:
         return query_gateway(lambda: gateway.get_account_risk(account_id))
+
+    @router.post(
+        "/venue/internal-capital-transfers",
+        response_model=InternalCapitalTransferStepResponse,
+        tags=["venue-write"],
+    )
+    def venue_internal_capital_transfer(
+        request: InternalCapitalTransferStepCommand,
+    ) -> InternalCapitalTransferStepResponse:
+        return query_gateway(lambda: gateway.transfer_internal_capital(request))
 
     @router.get(
         "/venue/instruments/{symbol}",
