@@ -102,8 +102,13 @@ def create_catalog_router(api_prefix: str) -> APIRouter:
     def create_run(
         strategy_instance_id: str,
         request: CreateStrategyRunRequest,
+        http_request: Request,
     ) -> StrategyRunResponse:
-        return create_strategy_run(strategy_instance_id, request)
+        return create_strategy_run(
+            strategy_instance_id,
+            request,
+            requested_by=require_principal(http_request).user_id,
+        )
 
     @router.get(
         f"{api_prefix}/strategies/instances/{{strategy_instance_id}}/runs",

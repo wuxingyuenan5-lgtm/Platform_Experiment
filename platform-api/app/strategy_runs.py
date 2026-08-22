@@ -13,6 +13,7 @@ from app.schemas import (
     ExecutionBatchResponse,
     StrategyRunResponse,
 )
+from app.strategies.instruction_service import attach_legacy_batch_to_instruction
 
 
 def now_iso() -> str:
@@ -22,6 +23,8 @@ def now_iso() -> str:
 def create_strategy_run(
     strategy_instance_id: str,
     request: CreateStrategyRunRequest,
+    *,
+    requested_by: str,
 ) -> StrategyRunResponse:
     existing_run_id = find_strategy_run_by_idempotency_key(request.idempotency_key)
     if existing_run_id is not None:
@@ -63,6 +66,15 @@ def create_strategy_run(
             direction=request.direction,
             legs=request.legs,
         )
+    )
+    attach_legacy_batch_to_instruction(
+        instruction_id=run_id,
+        batch_id=batch.batch_id,
+        strategy_key=strategy_key,
+        action=request.direction,
+        parameters=request.model_dump(by_alias=True, mode="json"),
+        legs=request.legs,
+        requested_by=requested_by,
     )
     final_status = map_batch_status(batch)
     update_strategy_run_status(

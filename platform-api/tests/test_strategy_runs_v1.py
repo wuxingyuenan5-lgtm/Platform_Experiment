@@ -4,6 +4,7 @@ from uuid import uuid4
 from fastapi.testclient import TestClient
 
 from app.config import get_settings
+from app.database import connection
 from app.main import app
 
 
@@ -82,10 +83,7 @@ def test_strategy_run_creates_idempotent_hedged_batch(
     )
 
     with TestClient(app) as client:
-        url = (
-            "/api/v1/strategies/instances/"
-            "strategy_funding_arbitrage_instance_default/runs"
-        )
+        url = "/api/v1/strategies/instances/strategy_funding_arbitrage_instance_default/runs"
         first = client.post(url, json=funding_run_payload())
         second = client.post(url, json=funding_run_payload())
 
@@ -95,6 +93,18 @@ def test_strategy_run_creates_idempotent_hedged_batch(
         assert first.json()["status"] == "completed"
         assert first.json()["executionBatch"]["status"] == "hedged"
         assert first.json()["strategyKey"] == "funding_arbitrage"
+
+        with connection() as db:
+            instruction = db.execute(
+                "SELECT execution_plan_json FROM strategy_runs WHERE id = ?",
+                (first.json()["strategyRunId"],),
+            ).fetchone()
+            linked_batch = db.execute(
+                "SELECT strategy_instruction_id FROM execution_batches WHERE id = ?",
+                (first.json()["executionBatchId"],),
+            ).fetchone()
+        assert instruction["execution_plan_json"] is not None
+        assert linked_batch["strategy_instruction_id"] == first.json()["strategyRunId"]
 
         runs = client.get(url)
         assert runs.status_code == 200
@@ -106,8 +116,7 @@ def test_strategy_run_rejects_non_closed_loop_strategy(tmp_path: Path) -> None:
 
     with TestClient(app) as client:
         response = client.post(
-            "/api/v1/strategies/instances/"
-            "strategy_home_abroad_spread_instance_default/runs",
+            "/api/v1/strategies/instances/strategy_home_abroad_spread_instance_default/runs",
             json=funding_run_payload(),
         )
 

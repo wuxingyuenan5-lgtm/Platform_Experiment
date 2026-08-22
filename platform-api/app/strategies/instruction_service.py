@@ -11,6 +11,8 @@ from pydantic import BaseModel, ConfigDict, Field
 from app.database import connection
 from app.strategies.domain import (
     ExecutionPlan,
+    ExecutionPlanLeg,
+    ExecutionPolicy,
     StrategyInstructionAction,
     StrategyInstructionStatus,
 )
@@ -103,6 +105,92 @@ def list_instructions(strategy_instance_id: str) -> list[dict[str, object]]:
             (strategy_instance_id,),
         ).fetchall()
     return [_response(row) for row in rows]
+
+
+def attach_legacy_batch_to_instruction(
+    *,
+    instruction_id: str,
+    batch_id: str,
+    strategy_key: str,
+    action: str,
+    parameters: dict[str, object],
+    legs: list[object],
+    requested_by: str,
+) -> None:
+    """Freeze an old endpoint's already-authorised request on its one batch.
+
+    This is compatibility glue: old response contracts still execute through
+    their proven batch path, but the business record is now an Instruction.
+    """
+    with connection() as db:
+        plan_legs = []
+        capabilities: dict[str, str] = {}
+        for sequence, leg in enumerate(legs, start=1):
+            spec = db.execute(
+                """
+                SELECT min_order_quantity, quantity_step, contract_multiplier
+                FROM contract_specifications WHERE instrument_id = ?
+                AND data_quality_state = 'complete'
+                """,
+                (leg.instrument_id,),
+            ).fetchone()
+            if spec is None:
+                raise HTTPException(
+                    status_code=422, detail="Legacy leg contract specification is unavailable"
+                )
+            account_id = leg.account_id
+            if account_id is None:
+                raise HTTPException(status_code=422, detail="Legacy leg account is unavailable")
+            capabilities[account_id] = "trade_and_read"
+            plan_legs.append(
+                ExecutionPlanLeg(
+                    role=leg.role,
+                    account_id=account_id,
+                    instrument_id=leg.instrument_id,
+                    external_symbol=leg.symbol,
+                    side=leg.side,
+                    maximum_quantity=leg.quantity,
+                    sequence=sequence,
+                    execution_policy=(
+                        ExecutionPolicy.MARKET
+                        if leg.order_type == "market"
+                        else ExecutionPolicy.POST_ONLY_CHASE
+                    ),
+                    quantity_step=Decimal(spec["quantity_step"]),
+                    contract_multiplier=Decimal(spec["contract_multiplier"]),
+                    minimum_quantity=Decimal(spec["min_order_quantity"]),
+                )
+            )
+        plan = ExecutionPlan(
+            adapter_version="legacy_batch.v1",
+            strategy_key=strategy_key,
+            action=StrategyInstructionAction.OPEN,
+            legs=tuple(plan_legs),
+            account_capability_snapshot=capabilities,
+            created_at=datetime.now(UTC),
+        )
+        db.execute(
+            """
+            UPDATE execution_batches SET strategy_instruction_id = ? WHERE id = ?
+            """,
+            (instruction_id, batch_id),
+        )
+        db.execute(
+            """
+            UPDATE strategy_runs
+            SET action = ?, requested_parameters_json = ?, execution_plan_json = ?,
+                requested_by = ?, updated_at = ?
+            WHERE id = ?
+            """,
+            (
+                action,
+                _canonical(parameters),
+                _json_plan(plan),
+                requested_by,
+                _utc_now(),
+                instruction_id,
+            ),
+        )
 
 
 def create_instruction(
