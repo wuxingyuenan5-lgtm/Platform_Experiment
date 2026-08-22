@@ -17,6 +17,7 @@
 - Use append-only schema migrations only. Preserve existing fields, routes and response contracts while consumers remain.
 - Do not add strategy-key branching to the shared batch executor. Existing cross-spread branch is recorded as Phase 3 migration debt, not expanded here.
 - Existing untracked `.workbuddy/`, `data/`, `docs/codex/.cp*.new`, `execution-runtime/_wtest.py`, and `platform-api/.pytest-basetemp/` are outside this work set.
+- Keep the startup boundary small: the cross-spread funding transfer is a dedicated internal-account action, not a StrategyInstruction leg, generic treasury workflow, approval system, or new service.
 
 ## Phase 0 Baseline Findings
 
@@ -33,6 +34,7 @@
 - Modify: `platform-api/app/schema_migrations.py`, `platform-api/app/strategy_runs.py`, `platform-api/app/execution_batches.py`, `platform-api/app/execution_schemas.py`, `platform-api/app/schemas.py`, `platform-api/app/catalog_routes.py`, `platform-api/app/trading_routes.py`, `platform-api/app/funding.py`, `platform-api/app/cross_spread.py`, and `docs/operations/LIVE_ACCEPTANCE_RUNBOOK.md`.
 - Create tests: `platform-api/tests/test_strategy_instructions.py`, `platform-api/tests/test_strategy_plan_adapters.py`, and `platform-api/tests/test_funding_phase2_safety_gate.py`.
 - Modify tests only if a legacy response contract requires explicit compatibility coverage: `platform-api/tests/test_strategy_runs_v1.py`, `platform-api/tests/test_funding_local_closed_loop.py`, `platform-api/tests/test_cross_spread.py`.
+- Funding-transfer slice: modify `platform-web/src/views/strategy/spread-carry/components/SpreadExecutionCommand.vue` and its owning composable/API types; add only a thin Platform API module, additive transfer record migration, focused API/UI tests, and a FakeGateway transfer capability.
 
 ### Task 1: Freeze the P0 funding safety contract
 
@@ -109,6 +111,18 @@
 - [ ] **Step 1: Run relevant regression**: `python -m pytest tests/test_strategy_instructions.py tests/test_strategy_plan_adapters.py tests/test_funding_phase2_safety_gate.py tests/test_strategy_runs_v1.py tests/test_execution_batches_v1.py tests/test_idempotency_conflicts.py tests/test_funding_local_closed_loop.py tests/test_cross_spread.py tests/test_live_safety_failure_injection.py -q`.
 - [ ] **Step 2: Run required repository checks**: `python -m unittest scripts.tests.test_no_fixed_receipt_contract scripts.tests.test_context_for -v`; `git diff --check`; `python scripts/context-for.py --check-budgets --json`; `python scripts/check-version-consistency.py`; `python scripts/check-repository-structure.py`; and `python scripts/check-documentation-consistency.py`.
 - [ ] **Step 3: Inspect** `git status --short`, `git diff`, and `git diff --cached`; add only the exact task paths, make the final 0.11.2 commit, and do not push.
+
+### Task 6: Add the third cross-spread funding-transfer template
+
+**Product boundary:** The existing execution card has three peer templates: `open`, `close`, and `funding transfer`. Transfer is an internal Bybit/MT5 capital movement and never becomes an ExecutionPlan leg or ExecutionBatch.
+
+- [ ] Add the third template to `SpreadExecutionCommand.vue` without redesigning the page. Show Bybit transferable balance, MT5 withdrawable balance, direction, an automatically prefilled amount, projected balances, confirmation, progress and exact failure state.
+- [ ] Add quote/create/status Platform API endpoints. The public create payload contains only `idempotencyKey`, `direction`, and Decimal-string `amount`; account identities and low-level account types come from authoritative strategy bindings.
+- [ ] Persist one lightweight `InternalCapitalTransfer` record for idempotency and audit. Do not add approvals, queues, schedulers or a generic treasury subsystem.
+- [ ] Calculate the default amount as half of the absolute difference between the two real transferable balances, capped by the source transferable/withdrawable amount. Allow CEO override and direction swap.
+- [ ] Treat UTA → Funding → MT5 and MT5 → Funding → UTA as resumable internal steps. If a later step fails, report that funds remain in Funding; do not auto-reverse and do not blindly retry `result_unknown`.
+- [ ] Implement and test a bidirectional FakeGateway closed loop. Enable real automatic transfer only when an exact Bybit MT5 Transfer In/Out interface is verified. Otherwise deliver the usable assisted mode: calculate/copy the amount, open the configured official Bybit MT5 funds page, then refresh and reconcile balances.
+- [ ] Add focused tests for automatic amount, manual override, Decimal precision, duplicate-click idempotency, pending/unknown behavior, partial two-step completion, balance refresh and the three-template UI.
 
 ## Explicitly Out of Scope
 
