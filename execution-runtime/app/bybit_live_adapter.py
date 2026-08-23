@@ -463,7 +463,12 @@ class BybitLiveAdapter:
         )
         return self._resolved_clients[account]
 
-    def _with_fresh_client_retry(self, account_id: str, operation):
+    def _with_fresh_client_retry(self, account_id_or_operation, operation=None):
+        if operation is None:
+            account_id = self._single_account()
+            operation = account_id_or_operation
+        else:
+            account_id = account_id_or_operation
         try:
             return operation(self._client(account_id))
         except Exception:

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from decimal import Decimal
-from sqlite3 import Connection
+from sqlite3 import Connection, OperationalError
 from typing import TypedDict
 from uuid import uuid4
 
@@ -818,9 +818,7 @@ def _batch_terminal_release_is_safe(
     batch_id: str,
     status: str,
 ) -> bool:
-    if status == "completed":
-        return True
-    if status != "hedged":
+    if status not in LEASE_RELEASED_BATCH_STATUSES:
         return False
     try:
         row = db.execute(
@@ -835,8 +833,10 @@ def _batch_terminal_release_is_safe(
             """,
             (batch_id,),
         ).fetchone()
-    except Exception:  # noqa: BLE001
-        return True
+    except OperationalError as exc:
+        if "strategy_instruction_id" in str(exc):
+            return True
+        raise
     if row is None:
         return False
     if row["strategy_instruction_id"] is None:
@@ -844,6 +844,69 @@ def _batch_terminal_release_is_safe(
     if row["strategy_key"] != "funding_arbitrage":
         return True
     return row["instruction_status"] == "completed"
+
+
+def complete_funding_reconciliation(batch_id: str, instruction_id: str) -> None:
+    """Atomically complete Funding truth and release its shared-account resources."""
+
+    timestamp = now_iso()
+    with connection() as db:
+        db.execute("BEGIN IMMEDIATE")
+        row = db.execute(
+            """
+            SELECT batch.status AS batch_status,
+                   batch.strategy_key,
+                   batch.strategy_instruction_id,
+                   instruction.status AS instruction_status
+            FROM execution_batches AS batch
+            JOIN strategy_runs AS instruction
+              ON instruction.id = batch.strategy_instruction_id
+            WHERE batch.id = ? AND instruction.id = ?
+            """,
+            (batch_id, instruction_id),
+        ).fetchone()
+        if row is None or row["strategy_key"] != "funding_arbitrage":
+            raise HTTPException(
+                status_code=409,
+                detail="Funding reconciliation identity is invalid",
+            )
+        if row["batch_status"] == "completed" and row["instruction_status"] == "completed":
+            risk_repository.release_claims_for_owner("batch", batch_id, db=db)
+            risk_repository.release_reservations_for_owner("batch", batch_id, db=db)
+            return
+        if row["batch_status"] != "hedged" or row["instruction_status"] != "reconciling":
+            raise HTTPException(
+                status_code=409,
+                detail="Funding reconciliation is not ready for completion",
+            )
+        db.execute(
+            """
+            UPDATE strategy_runs
+            SET status = 'completed', failure_reason = NULL, updated_at = ?
+            WHERE id = ? AND status = 'reconciling'
+            """,
+            (timestamp, instruction_id),
+        )
+        db.execute(
+            """
+            UPDATE execution_batches
+            SET status = 'completed', requires_manual_intervention = 0,
+                failure_reason = NULL, updated_at = ?
+            WHERE id = ? AND status = 'hedged'
+            """,
+            (timestamp, batch_id),
+        )
+        db.execute(
+            """
+            UPDATE execution_batch_legs
+            SET status = 'filled', failure_reason = NULL, updated_at = ?
+            WHERE batch_id = ? AND order_id IS NOT NULL
+              AND status IN (?, ?, ?, ?, ?)
+            """,
+            (timestamp, batch_id, *UNCERTAIN_EXTERNAL_LEG_STATUSES),
+        )
+        risk_repository.release_claims_for_owner("batch", batch_id, db=db)
+        risk_repository.release_reservations_for_owner("batch", batch_id, db=db)
 
 
 def get_order_filled_quantity(order_id: str) -> Decimal:

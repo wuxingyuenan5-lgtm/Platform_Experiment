@@ -16,7 +16,8 @@ from app.config import get_settings
 from app.database import connection
 from app.execution_batches import (
     _claim_batch_execution_resources,
-    _find_blocking_batch_for_accounts,
+    _find_blocking_batch_for_resources,
+    complete_funding_reconciliation,
     get_execution_batch,
     update_batch_status,
     update_leg_status,
@@ -312,7 +313,10 @@ def _claim_funding_batch(
                 status_code=409,
                 detail="Funding execution batch strategy is invalid",
             )
-        blocking = _find_blocking_batch_for_accounts(db, account_ids)
+        blocking = _find_blocking_batch_for_resources(
+            db,
+            [(leg.account_id, leg.external_symbol) for leg in legs],
+        )
         if blocking is not None and str(blocking["id"]) != batch_id:
             raise HTTPException(
                 status_code=409,
@@ -1074,9 +1078,8 @@ def _complete_reconciliation(
             batch_id,
             "Funding authoritative position evidence mismatches plan",
         )
-    update_batch_status(batch_id, "completed")
     complete_batch_risk(batch_id)
-    _set_instruction_status(instruction_id, StrategyInstructionStatus.COMPLETED)
+    complete_funding_reconciliation(batch_id, instruction_id)
     return get_execution_batch(batch_id)
 
 

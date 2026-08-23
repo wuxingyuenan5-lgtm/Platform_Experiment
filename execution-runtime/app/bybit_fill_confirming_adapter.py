@@ -597,7 +597,10 @@ class BybitFillConfirmingAdapter(BybitLiveAdapter):
             if command.price is None:
                 raise GatewayRequestRejectedError("Bybit limit order requires price")
             payload["price"] = format(command.price, "f")
-            payload["timeInForce"] = "FOK" if self._is_cross_spread_fok(command) else "GTC"
+            if command.execution_policy == "post_only_single_attempt":
+                payload["timeInForce"] = "PostOnly"
+            else:
+                payload["timeInForce"] = "FOK" if self._is_cross_spread_fok(command) else "GTC"
         try:
             response = client.place_order(**payload)
         except Exception as exc:

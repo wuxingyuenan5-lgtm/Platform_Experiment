@@ -3,6 +3,7 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
 from threading import Barrier, Lock, local
+from types import SimpleNamespace
 from uuid import uuid4
 
 import httpx
@@ -13,6 +14,7 @@ from fastapi.testclient import TestClient
 from app.config import get_settings
 from app.database import connection, initialize_database
 from app.execution_batches import (
+    _claim_batch_execution_resources,
     _reservation_requirement_for_leg,
     create_execution_batch,
 )
@@ -741,3 +743,107 @@ def test_reservation_rules_use_authoritative_crypto_instrument_types() -> None:
     assert spot_sell_amount == Decimal("2.5")
     assert perp_key == ("account_crypto_test", "USDT")
     assert perp_amount == Decimal("29.85")
+
+
+def test_shared_account_claims_allow_different_symbols_and_block_same_resource(
+    tmp_path: Path,
+) -> None:
+    get_settings().database_path = str(tmp_path / "shared-account-resource-identity.db")
+    initialize_database()
+    timestamp = "2026-08-23T00:00:00+00:00"
+    with connection() as db:
+        db.execute(
+            """
+            INSERT INTO instruments (
+                id, instrument_code, name, instrument_type, base_currency,
+                quote_currency, settle_currency, quantity_unit,
+                data_quality_state, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'complete', ?)
+            """,
+            (
+                "instrument_eth_usdt_perp_test",
+                "ETH-USDT-PERP-TEST",
+                "ETH USDT Perpetual Test",
+                "crypto_perp",
+                "ETH",
+                "USDT",
+                "USDT",
+                "contract",
+                timestamp,
+            ),
+        )
+    for batch_id, instrument_id, symbol in (
+        ("batch-btc", "instrument_btc_usdt_perp", "BTCUSDT"),
+        ("batch-eth", "instrument_eth_usdt_perp_test", "ETHUSDT"),
+    ):
+        with connection() as db:
+            db.execute("BEGIN IMMEDIATE")
+            _claim_batch_execution_resources(
+                db,
+                batch_id=batch_id,
+                strategy_instance_id=STRATEGY_INSTANCE_ID,
+                legs=[
+                    SimpleNamespace(
+                        account_id="account_sim_usdt",
+                        instrument_id=instrument_id,
+                        symbol=symbol,
+                        side="buy",
+                        price=Decimal("100"),
+                        quantity=Decimal("1"),
+                    )
+                ],
+                default_account_id="account_sim_usdt",
+            )
+
+    with pytest.raises(HTTPException, match="Active execution resource claim"):
+        with connection() as db:
+            db.execute("BEGIN IMMEDIATE")
+            _claim_batch_execution_resources(
+                db,
+                batch_id="batch-btc-conflict",
+                strategy_instance_id="strategy_cross_venue_spread_instance_default",
+                legs=[
+                    SimpleNamespace(
+                        account_id="account_sim_usdt",
+                        instrument_id="instrument_btc_usdt_perp",
+                        symbol="BTCUSDT",
+                        side="sell",
+                        price=Decimal("100"),
+                        quantity=Decimal("1"),
+                    )
+                ],
+                default_account_id="account_sim_usdt",
+            )
+
+    with pytest.raises(HTTPException, match="balance reservation is insufficient"):
+        with connection() as db:
+            db.execute("BEGIN IMMEDIATE")
+            _claim_batch_execution_resources(
+                db,
+                batch_id="batch-insufficient",
+                strategy_instance_id=STRATEGY_INSTANCE_ID,
+                legs=[
+                    SimpleNamespace(
+                        account_id="account_sim_usdt",
+                        instrument_id="instrument_eth_usdt_perp_test",
+                        symbol="ETHUSDT-LARGE",
+                        side="buy",
+                        price=Decimal("100"),
+                        quantity=Decimal("2000"),
+                    )
+                ],
+                default_account_id="account_sim_usdt",
+            )
+
+    with connection() as db:
+        active = db.execute(
+            """
+            SELECT resource_key FROM execution_resource_claims
+            WHERE status = 'active' ORDER BY resource_key
+            """
+        ).fetchall()
+    assert len(active) == 2
+    assert {str(row["resource_key"]).split("|")[-1] for row in active} == {
+        "BTCUSDT",
+        "ETHUSDT",
+    }

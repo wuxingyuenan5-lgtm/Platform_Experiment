@@ -10,6 +10,14 @@ import {
   type CrossSpreadLimitStrategy,
 } from '@/api/platform/crossSpreadLifecycle';
 import type { CloseOrder } from './mapCrossSpreadPositions';
+import {
+  clearExecutionDraft,
+  createCloseAllExecutionDraft,
+  isTerminalBatchStatus,
+  persistExecutionDraft,
+  readExecutionDraft,
+  type PersistedExecutionDraft,
+} from './crossSpreadExecutionRecovery';
 
 export interface LogEntry {
   id: string;
@@ -60,49 +68,6 @@ type PendingAction =
   | { kind: 'CLOSE'; planId: string }
   | { kind: 'CLOSE_ALL' };
 
-type PersistedExecutionDraft =
-  | {
-      kind: 'OPEN';
-      idempotencyKey: string;
-      payload: {
-        direction: CrossSpreadDirection;
-        quantityOz: string;
-        takeProfitSpread?: string;
-        stopLossSpread?: string;
-        executionMode: CrossSpreadExecutionMode;
-        limitSpread?: string;
-        limitStrategy: CrossSpreadLimitStrategy;
-        takeProfitExecutionMode: CrossSpreadExecutionMode;
-        stopLossExecutionMode: CrossSpreadExecutionMode;
-        takeProfitLimitStrategy: CrossSpreadLimitStrategy;
-        stopLossLimitStrategy: CrossSpreadLimitStrategy;
-      };
-    }
-  | {
-      kind: 'CLOSE';
-      idempotencyKey: string;
-      planId: string;
-      payload: {
-        executionMode: CrossSpreadExecutionMode;
-        limitSpread?: string;
-        limitStrategy: CrossSpreadLimitStrategy;
-      };
-    }
-  | {
-      kind: 'CLOSE_ALL';
-      payload: {
-        executionMode: CrossSpreadExecutionMode;
-        limitSpread?: string;
-        limitStrategy: CrossSpreadLimitStrategy;
-      };
-      plans: Array<{
-        planId: string;
-        idempotencyKey: string;
-      }>;
-    };
-
-const PENDING_EXECUTION_STORAGE_KEY = 'vg.crossSpread.pendingExecution';
-
 function requestErrorMessage(error: unknown, fallback: string): string {
   if (typeof error === 'object' && error !== null) {
     const candidate = error as {
@@ -140,29 +105,6 @@ function numericText(value: number | null | undefined, fallback = 0): string {
 
 function optionalNumericText(value: number | null | undefined): string | undefined {
   return value === null || value === undefined ? undefined : String(value);
-}
-
-function persistDraft(draft: PersistedExecutionDraft) {
-  localStorage.setItem(PENDING_EXECUTION_STORAGE_KEY, JSON.stringify(draft));
-}
-
-function readDraft(): PersistedExecutionDraft | null {
-  const raw = localStorage.getItem(PENDING_EXECUTION_STORAGE_KEY);
-  if (!raw) return null;
-  try {
-    return JSON.parse(raw) as PersistedExecutionDraft;
-  } catch {
-    localStorage.removeItem(PENDING_EXECUTION_STORAGE_KEY);
-    return null;
-  }
-}
-
-function clearDraft() {
-  localStorage.removeItem(PENDING_EXECUTION_STORAGE_KEY);
-}
-
-function isTerminalBatchStatus(status: string | null | undefined) {
-  return status === 'hedged' || status === 'completed' || status === 'failed';
 }
 
 export function useCrossSpreadExecution(options: UseCrossSpreadExecutionOptions) {
@@ -312,7 +254,7 @@ export function useCrossSpreadExecution(options: UseCrossSpreadExecutionOptions)
           idempotencyKey: crypto.randomUUID(),
           payload,
         };
-        persistDraft(draft);
+        persistExecutionDraft(draft);
         const result = await openCrossSpreadMarket({
           idempotencyKey: draft.idempotencyKey,
           ...payload,
@@ -330,7 +272,7 @@ export function useCrossSpreadExecution(options: UseCrossSpreadExecutionOptions)
           );
         }
         if (isTerminalBatchStatus(result.executionBatch?.status)) {
-          clearDraft();
+          clearExecutionDraft();
         }
       } else if (action.kind === 'CLOSE') {
         if (
@@ -353,7 +295,7 @@ export function useCrossSpreadExecution(options: UseCrossSpreadExecutionOptions)
             limitStrategy: options.closeLimitStrategy.value,
           },
         };
-        persistDraft(draft);
+        persistExecutionDraft(draft);
         const result = await closeCrossSpreadMarket(action.planId, {
           idempotencyKey: draft.idempotencyKey,
           ...draft.payload,
@@ -364,7 +306,7 @@ export function useCrossSpreadExecution(options: UseCrossSpreadExecutionOptions)
           'is-success',
         );
         if (isTerminalBatchStatus(result.executionBatch.status)) {
-          clearDraft();
+          clearExecutionDraft();
         }
       } else {
         const closablePlans = options.exitPlans.value.filter(
@@ -374,9 +316,9 @@ export function useCrossSpreadExecution(options: UseCrossSpreadExecutionOptions)
           setExecutionMessage('没有可平仓的退出计划', 'is-warn');
           return;
         }
-        const draft: PersistedExecutionDraft = {
-          kind: 'CLOSE_ALL',
-          payload: {
+        const draft = createCloseAllExecutionDraft(
+          closablePlans.map((plan) => plan.planId),
+          {
             executionMode: options.closeExecutionMode.value,
             limitSpread:
               options.closeExecutionMode.value === 'limit'
@@ -384,12 +326,8 @@ export function useCrossSpreadExecution(options: UseCrossSpreadExecutionOptions)
                 : undefined,
             limitStrategy: options.closeLimitStrategy.value,
           },
-          plans: closablePlans.map((plan) => ({
-            planId: plan.planId,
-            idempotencyKey: crypto.randomUUID(),
-          })),
-        };
-        persistDraft(draft);
+        );
+        persistExecutionDraft(draft);
         let allTerminal = true;
         for (const planDraft of draft.plans) {
           const result = await closeCrossSpreadMarket(planDraft.planId, {
@@ -400,7 +338,7 @@ export function useCrossSpreadExecution(options: UseCrossSpreadExecutionOptions)
           allTerminal = allTerminal && isTerminalBatchStatus(result.executionBatch.status);
         }
         if (allTerminal) {
-          clearDraft();
+          clearExecutionDraft();
         }
         setExecutionMessage(`已提交 ${closablePlans.length} 个退出计划平仓`, 'is-success');
       }
@@ -415,7 +353,7 @@ export function useCrossSpreadExecution(options: UseCrossSpreadExecutionOptions)
   }
 
   async function resumePendingExecution() {
-    const draft = readDraft();
+    const draft = readExecutionDraft();
     if (!draft) return;
     submitLoading.value = true;
     setExecutionMessage('检测到未确认回执的价差指令，正在恢复状态…', 'is-warn');
@@ -429,7 +367,7 @@ export function useCrossSpreadExecution(options: UseCrossSpreadExecutionOptions)
         limitEvidence.value = result.limitExecution ?? null;
         setExecutionMessage(`已恢复开仓状态：${result.executionBatch.status}`, 'is-success');
         if (isTerminalBatchStatus(result.executionBatch.status)) {
-          clearDraft();
+          clearExecutionDraft();
         }
       } else if (draft.kind === 'CLOSE') {
         const result = await closeCrossSpreadMarket(draft.planId, {
@@ -440,7 +378,7 @@ export function useCrossSpreadExecution(options: UseCrossSpreadExecutionOptions)
         limitEvidence.value = result.limitExecution ?? null;
         setExecutionMessage(`已恢复平仓状态：${result.executionBatch.status}`, 'is-success');
         if (isTerminalBatchStatus(result.executionBatch.status)) {
-          clearDraft();
+          clearExecutionDraft();
         }
       } else {
         let allTerminal = true;
@@ -455,7 +393,7 @@ export function useCrossSpreadExecution(options: UseCrossSpreadExecutionOptions)
         }
         setExecutionMessage(`已恢复批量平仓状态：${draft.plans.length} 个计划已核对`, 'is-success');
         if (allTerminal) {
-          clearDraft();
+          clearExecutionDraft();
         }
       }
       await refreshExecutionViews();

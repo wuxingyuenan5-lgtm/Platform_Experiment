@@ -7,7 +7,8 @@ from types import SimpleNamespace
 from fastapi.testclient import TestClient
 
 from app.config import Settings, get_settings
-from app.main import app
+from app.fake_gateway import FakeGateway
+from app.main import app, create_app
 from app.strict_live_acceptance_adapters import (
     StrictBybitAcceptanceAdapter,
     StrictMt5AcceptanceAdapter,
@@ -213,7 +214,7 @@ def test_fake_history_and_account_risk_are_read_only_and_pageable(tmp_path) -> N
         "quantity": "1",
     }
 
-    with TestClient(app) as client:
+    with TestClient(create_app(FakeGateway())) as client:
         assert client.post("/commands/orders", json=command).status_code == 200
         orders = client.get(
             "/venue/order-history",

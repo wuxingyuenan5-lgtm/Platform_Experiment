@@ -12,6 +12,7 @@ from app.config import Settings, get_settings
 from app.gateway_errors import GatewayResultUnknownError
 from app.journal import initialize_journal
 from app.models import SubmitOrderCommand
+from app.strict_live_acceptance_adapters import StrictBybitAcceptanceAdapter
 
 
 class FakeBybitConfirmationClient:
@@ -36,6 +37,37 @@ class FakeBybitConfirmationClient:
         return {"retCode": 0, "result": {"list": [row]}}
 
     def get_order_history(self, **kwargs):
+        return {"retCode": 0, "result": {"list": []}}
+
+    def get_instruments_info(self, **kwargs):
+        return {
+            "retCode": 0,
+            "result": {
+                "list": [
+                    {
+                        "symbol": "XAUTUSDT",
+                        "status": "Trading",
+                        "lotSizeFilter": {
+                            "minOrderQty": "1",
+                            "qtyStep": "1",
+                            "maxMktOrderQty": "1000",
+                        },
+                    }
+                ]
+            },
+        }
+
+    def get_api_key_information(self):
+        return {
+            "retCode": 0,
+            "result": {
+                "readOnly": 0,
+                "ips": ["127.0.0.1"],
+                "permissions": {"ContractTrade": ["Order", "Position"]},
+            },
+        }
+
+    def get_positions(self, **kwargs):
         return {"retCode": 0, "result": {"list": []}}
 
 
@@ -89,6 +121,22 @@ def fok_order_command(suffix: str) -> SubmitOrderCommand:
         symbol="XAUTUSDT",
         side="buy",
         order_type="limit",
+        quantity="100",
+        price="1001.5",
+    )
+
+
+def single_postonly_attempt_command(suffix: str) -> SubmitOrderCommand:
+    return SubmitOrderCommand(
+        command_id=f"command-bybit-single-postonly-{suffix}",
+        platform_order_id=f"platform-order-bybit-single-postonly-{suffix}",
+        strategy_instance_id="strategy-live",
+        account_id="account-bybit",
+        instrument_id="instrument-xaut",
+        symbol="XAUTUSDT",
+        side="buy",
+        order_type="limit",
+        execution_policy="post_only_single_attempt",
         quantity="100",
         price="1001.5",
     )
@@ -182,6 +230,38 @@ def test_cross_spread_limit_uses_fok_and_emits_only_full_fill(tmp_path) -> None:
     assert client.place_calls[0]["price"] == "1001.5"
     assert [event.event_type for event in events] == ["order_acknowledged", "order_filled"]
     assert events[1].fill_quantity == Decimal("100")
+
+
+def test_single_postonly_attempt_uses_maker_tif_without_runtime_chase(tmp_path) -> None:
+    initialize_runtime_store(tmp_path, "bybit-single-postonly-confirming.db")
+    client = FakeBybitConfirmationClient(
+        [order_row("New", filled_quantity="0", average_price="", order_type="Limit")]
+    )
+    adapter = BybitFillConfirmingAdapter(runtime_settings(), client)
+
+    events = adapter.submit_order(single_postonly_attempt_command("funding"))
+
+    assert client.place_calls[0]["timeInForce"] == "PostOnly"
+    assert client.place_calls[0]["price"] == "1001.5"
+    assert len(client.place_calls) == 1
+    assert [event.event_type for event in events] == ["order_acknowledged"]
+
+
+def test_strict_acceptance_path_preserves_postonly_single_attempt_without_runtime_chase(
+    tmp_path,
+) -> None:
+    initialize_runtime_store(tmp_path, "bybit-single-postonly-strict.db")
+    client = FakeBybitConfirmationClient(
+        [order_row("New", filled_quantity="0", average_price="", order_type="Limit")]
+    )
+    adapter = StrictBybitAcceptanceAdapter(runtime_settings(), client)
+
+    events = adapter.submit_order(single_postonly_attempt_command("strict"))
+
+    assert client.place_calls[0]["timeInForce"] == "PostOnly"
+    assert client.place_calls[0]["price"] == "1001.5"
+    assert len(client.place_calls) == 1
+    assert [event.event_type for event in events] == ["order_acknowledged"]
 
 
 def test_cross_spread_fok_no_fill_rejects_without_fill_event(tmp_path) -> None:

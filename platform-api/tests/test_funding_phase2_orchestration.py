@@ -841,6 +841,23 @@ def test_reconciliation_query_unavailable_keeps_instruction_reconciling(
     assert first.status == "hedged"
     assert second.status == "hedged"
     assert _instruction_row(instruction_id)["status"] == "reconciling"
+    with connection() as db:
+        active_claims = db.execute(
+            """
+            SELECT COUNT(*) AS count FROM execution_resource_claims
+            WHERE owner_type = 'batch' AND owner_id = ? AND status = 'active'
+            """,
+            (first.batch_id,),
+        ).fetchone()
+        active_reservations = db.execute(
+            """
+            SELECT COUNT(*) AS count FROM execution_balance_reservations
+            WHERE owner_type = 'batch' AND owner_id = ? AND status = 'active'
+            """,
+            (first.batch_id,),
+        ).fetchone()
+    assert int(active_claims["count"]) > 0
+    assert int(active_reservations["count"]) > 0
 
 
 def test_reconciliation_position_mismatch_enters_manual_intervention(
