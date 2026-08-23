@@ -1,5 +1,7 @@
 # Strategy Instruction Phase 0–1 Implementation Plan
 
+**Status (2026-08-23):** Phase 0–1 and the third cross-spread funding-transfer template are complete. Funding Phase 2 has an Attempt/cancel/atomic-release simulation skeleton through `ab27f3ca`, but controlled-live remains blocked pending residual-quantity chase, explicit TTL/mutation/same-price tests, final reconciliation, shared-account resource isolation and balance reservation. The accelerated continuation plan is recorded at the end of this document; Phase 3–5 are maintenance work, not prerequisites for the first controlled-live acceptance of cross-spread or funding.
+
 **Goal:** Semantically upgrade the existing `strategy_runs` business record into the single CEO `StrategyInstruction` entry point, with a versioned immutable `ExecutionPlan`, explicit strategy adapters, and legacy entry-point compatibility without changing live execution semantics.
 
 **Architecture:** The existing `strategy_runs` table remains the durable business identity and gains append-only instruction/plan columns; no parallel long-lived `StrategyInstruction` table is introduced. A small `app/strategies` boundary validates manual input, selects a statically registered adapter and persists an immutable plan plus a single `ExecutionBatch` claim before any existing batch executor is invoked. Funding controlled-live is explicitly rejected until Phase 2 provides bounded PostOnly Chase and authoritative incremental release.
@@ -132,6 +134,8 @@
 - Phase 5 one-command Offline E2E, controlled-session schema expansion and deletion of old Catalog paths.
 - Any Runtime rewrite, venue SDK work, ledger/Position/Fill/PnL/NAV/Reconciliation rewrite, external account connectivity, credentials, Live Write activation or real order activity.
 
+The exclusions above describe the original Phase 0–1 slice. They do not exclude the approved accelerated continuation below.
+
 ## Phase 0–1 Review Remediation
 
 ### Root causes recorded before remediation
@@ -156,3 +160,36 @@
 3. Add environment-aware funding gate tests and restore all three FakeGateway funding regressions.
 4. Extract the minimum batch-claim/dispatch seam, then add legacy delegation tests without a second batch.
 5. Run the two owner-specified pytest groups to completion, Ruff, Pyright and root checks. Document any pre-existing bootstrap/structure failure without changing unrelated evidence.
+
+## Accelerated continuation approved 2026-08-23
+
+### Product boundary
+
+- Active trading scope: cross-venue spread and funding carry only.
+- Cross-venue spread is already in final live acceptance; do not restart it from a read-only onboarding phase and do not wait for Phase 3–5.
+- Funding carry reuses the same real Bybit UTA, Platform `account_id` and credential reference as cross-spread. It may proceed to small controlled-live after the focused items below pass.
+- Bottom-fishing and short-term trader A/B remain read-only. Home/abroad spread remains paused.
+- Do not create a generic portfolio engine, service split, scheduler, event bus or same-symbol multi-strategy allocation system.
+
+### One integrated implementation batch
+
+The next execution AI should complete the following in one bounded task and normally one final receipt, using separate logical commits only where rollback value is clear:
+
+1. **Correct Funding Phase 2.** Repost only the residual perpetual quantity (`maximumQuantity - authoritative cumulative fills across all attempts`), reject non-positive or over-cap quantities, require at least one tick of price change before a mutation, and add direct tests for TTL, maxMutations, restart, residual-quantity repost, cumulative overfill prevention and reconciliation completion evidence. Preserve cancel-terminal proof, atomic Spot claim, Decimal and `result_unknown` fail-closed behavior.
+2. **Stabilize cross-spread interaction.** Persist/reuse a client idempotency key, recover the original Instruction/Batch after timeout or refresh, distinguish accepted/partial/hedged/reconciling/manual-intervention/result-unknown, show per-plan results for close-all, and block confirmation on stale/partial market or invalid sizing. Add focused component/composable/browser tests without redesigning the page.
+3. **Enable shared-account concurrency.** Bind funding live `primary` to the same logical Bybit account as cross-spread only after tests prove the model. Replace account-wide batch blocking with atomic resource claims keyed by account/category/symbol; allow disjoint resources and reject same-resource overlap. Capital transfer and ambiguous account state retain account-wide exclusion.
+4. **Add lightweight balance reservation.** Atomically reserve the instruction's maximum planned account/currency usage, subtract active reservations from authoritative available balance, release only after terminal external state and required reconciliation, and retain on unknown/cancel ambiguity/residual exposure. No generic portfolio risk engine.
+5. **Complete reconciliation seam.** Funding remains `reconciling` until authoritative Order/Fill/Position/Balance evidence matches the immutable plan; only then mark completed. Query unavailability remains non-completion.
+
+### Acceptance
+
+- Cross-spread duplicate-click, timeout, refresh, partial leg, result-unknown and close-all partial failure tests pass.
+- Funding tests prove residual attempt quantity, no cumulative overfill, cancel terminal before repost, one-tick mutation, TTL, maxMutations, partial cumulative releases, duplicate fill, concurrent resume, restart and reconciliation completion.
+- Shared-account tests prove cross-spread XAUT and funding BTC/ETH may execute concurrently, while the same account/category/symbol conflicts; reservations prevent double spending and unknown results retain claims.
+- Existing focused cross-spread, funding, instruction, batch, idempotency, live-safety and FakeGateway regressions pass, plus targeted Ruff/Pyright, frontend typecheck/lint/build and `git diff --check`.
+- Controlled-live funding remains 423 in repository tests. Do not enable credentials, Live Write or real orders in this implementation task; operational activation is a separate Owner-authorized action after review.
+
+### Commit and delivery shape
+
+- Prefer no more than three commits: cross-spread interaction, shared-account execution isolation, and Funding correction/reconciliation. A smaller number is acceptable if ownership remains clear.
+- Return one consolidated receipt with commits, exact changed files, behavioral evidence, test commands/results, remaining blockers and protected-file status. Do not push.

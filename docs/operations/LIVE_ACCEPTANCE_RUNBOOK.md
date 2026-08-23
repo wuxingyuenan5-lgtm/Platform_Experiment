@@ -103,6 +103,16 @@ fail closed for controlled-live funding during that gap.
 - Disconnect, sequence or identity mismatch, unknown order state, terminal-cancel ambiguity or `result_unknown` freezes new releases and retains reconciliation-required state. A cancel acknowledgement alone is not terminal evidence and cannot authorize repost.
 - These incremental second-leg semantics apply only to funding carry. Cross-venue Market, FOK and PostOnly Chase retain their existing terminal-fill rules.
 
+### Shared Bybit account concurrency
+
+Cross-spread and funding carry may use the same real Bybit UTA, logical Platform Account and credential reference. Trading permission may be configured before a controlled-live window, but both Live Write gates remain false outside an authorized scenario.
+
+- Concurrent writes are permitted only when the immutable plans use disjoint `account + category + symbol` resources and sufficient authoritative available balance remains after active reservations.
+- The same `category + symbol` cannot be opened, chased or closed concurrently by different strategies until a reviewed strategy-position allocation mechanism exists.
+- Orders, fills, fees and PnL retain Strategy/Instruction/Batch/Command identity. The UTA balance is shared account truth and must not be duplicated as separate strategy-owned cash.
+- Internal capital transfer, unknown account identity, unavailable balance/margin evidence, account Kill Switch or an uncertainty whose resource scope cannot be proven blocks account writes.
+- `result_unknown`, cancel ambiguity and residual exposure retain the affected resource and balance reservation. Completion alone does not release them without terminal external and reconciliation evidence.
+
 ## 4. Two-leg failure disposition
 
 Each case has distinct semantics:
