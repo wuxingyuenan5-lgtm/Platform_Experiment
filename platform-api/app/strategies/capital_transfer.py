@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from decimal import Decimal
+from sqlite3 import IntegrityError
 from typing import Literal
 from uuid import uuid4
 
@@ -9,6 +10,7 @@ import httpx
 from fastapi import HTTPException
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from app import execution_risk_repository as risk_repository
 from app.config import get_settings
 from app.database import connection
 
@@ -267,6 +269,97 @@ def create_funding_transfer(
                     detail="Idempotency key is already used by a different funding transfer",
                 )
             return _response(existing, mode=_stored_mode(existing))
+        for account_id in (bybit_account_id, mt5_account_id):
+            if (
+                risk_repository.active_non_account_claim_for_account(account_id, db=db)
+                is not None
+            ):
+                raise HTTPException(
+                    status_code=409,
+                    detail=(
+                        "Active execution resource claim blocks funding transfer "
+                        f"for {account_id}"
+                    ),
+                )
+        source_account_id = (
+            bybit_account_id
+            if request.direction == "bybit_to_mt5"
+            else mt5_account_id
+        )
+        active_reserved = risk_repository.active_reserved_amount(
+            source_account_id,
+            TRANSFER_CURRENCY,
+            db=db,
+        )
+        if active_reserved + request.amount > source_quote.amount:
+            raise HTTPException(
+                status_code=409,
+                detail="Available balance reservation is insufficient for funding transfer",
+            )
+        for account_id in (bybit_account_id, mt5_account_id):
+            venue_row = db.execute(
+                "SELECT venue_id FROM accounts WHERE id = ?",
+                (account_id,),
+            ).fetchone()
+            assert venue_row is not None
+            resource_key = f"{account_id}|{venue_row['venue_id']}|account|*"
+            blocking_claim = risk_repository.active_claim_for_resource(
+                resource_key,
+                account_id=account_id,
+                db=db,
+            )
+            if blocking_claim is not None:
+                raise HTTPException(
+                    status_code=409,
+                    detail=(
+                        "Active execution resource claim blocks funding transfer "
+                        f"for {account_id}"
+                    ),
+                )
+            try:
+                db.execute(
+                    """
+                    INSERT INTO execution_resource_claims (
+                        id, resource_key, owner_type, owner_id, account_id, venue_id,
+                        resource_category, symbol, status, created_at, updated_at
+                    ) VALUES (?, ?, 'transfer', ?, ?, ?, 'account', '*', 'active', ?, ?)
+                    """,
+                    (
+                        str(uuid4()),
+                        resource_key,
+                        transfer_id,
+                        account_id,
+                        str(venue_row["venue_id"]),
+                        timestamp,
+                        timestamp,
+                    ),
+                )
+            except IntegrityError as exc:
+                raise HTTPException(
+                    status_code=409,
+                    detail=(
+                        "Active execution resource claim blocks funding transfer "
+                        f"for {account_id}"
+                    ),
+                ) from exc
+        db.execute(
+            """
+            INSERT INTO execution_balance_reservations (
+                id, owner_type, owner_id, account_id, strategy_instance_id, instruction_id,
+                currency, reserved_amount, status, created_at, updated_at
+            ) VALUES (?, 'transfer', ?, ?, ?, NULL, ?, ?, 'active', ?, ?)
+            """,
+            (
+                str(uuid4()),
+                transfer_id,
+                source_account_id,
+                CROSS_SPREAD_INSTANCE_ID,
+                TRANSFER_CURRENCY,
+                format(request.amount, "f"),
+                timestamp,
+                timestamp,
+            ),
+        )
         db.execute(
             """
             INSERT INTO internal_capital_transfers (
@@ -371,7 +464,7 @@ def create_funding_transfer(
     return response.model_copy(update={"current_location": completed_location})
 
 
-def _source_location(direction: TransferDirection) -> str:
+def _source_location(direction: TransferDirection) -> Literal["bybit_uta", "mt5"]:
     return "bybit_uta" if direction == "bybit_to_mt5" else "mt5"
 
 
@@ -391,6 +484,9 @@ def _finish_transfer(
             """,
             (status, external_transfer_id, failure_reason, _now().isoformat(), transfer_id),
         )
+        if status in {"completed", "failed"}:
+            risk_repository.release_claims_for_owner("transfer", transfer_id, db=db)
+            risk_repository.release_reservations_for_owner("transfer", transfer_id, db=db)
 
 
 def get_funding_transfer(transfer_id: str) -> InternalCapitalTransferResponse:
@@ -408,6 +504,7 @@ def _stored_mode(row) -> Literal["automated", "assisted"]:
 
 
 def _response(row, *, mode: Literal["automated", "assisted"]) -> InternalCapitalTransferResponse:
+    location: Literal["bybit_uta", "funding", "mt5", "unknown"]
     if row["status"] == "completed":
         location = "mt5" if row["direction"] == "bybit_to_mt5" else "bybit_uta"
     elif row["status"] == "result_unknown":

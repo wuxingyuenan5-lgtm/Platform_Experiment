@@ -329,6 +329,30 @@ def seed_reference_data(db: sqlite3.Connection) -> None:
             ),
         )
 
+    for account_id, currency, available_balance in (
+        ("account_crypto_test", "USDT", "100000"),
+        ("account_crypto_test_b", "USDT", "100000"),
+        ("account_mt5_demo", "USDT", "100000"),
+    ):
+        db.execute(
+            """
+            INSERT OR IGNORE INTO balance_snapshots (
+                id, account_id, currency, equity, available_balance, source,
+                data_quality_state, as_of, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, 'complete', ?, ?)
+            """,
+            (
+                f"balance_complete_{account_id}",
+                account_id,
+                currency,
+                available_balance,
+                available_balance,
+                "seed",
+                created_at,
+                created_at,
+            ),
+        )
+
     bindings = [
         (
             "binding_funding_bybit",

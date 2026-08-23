@@ -3,10 +3,14 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from decimal import Decimal
 from sqlite3 import Connection
+from typing import TypedDict
 from uuid import uuid4
 
+import httpx
 from fastapi import HTTPException
 
+from app import execution_risk_repository as risk_repository
+from app.config import get_settings
 from app.database import connection
 from app.execution_risk import (
     assert_execution_allowed,
@@ -44,6 +48,19 @@ LEASE_RELEASED_BATCH_STATUSES = (
     "hedged",
     "completed",
 )
+
+
+class BlockingBatchLeg(TypedDict):
+    account_id: str
+    symbol: str
+    leg_status: str
+
+
+class BlockingBatch(TypedDict):
+    id: str
+    status: str
+    account_id: str
+    legs: list[BlockingBatchLeg]
 
 
 def now_iso() -> str:
@@ -168,7 +185,10 @@ def create_execution_batch(request: CreateExecutionBatchRequest) -> ExecutionBat
                 if claimed.rowcount == 1:
                     execute_batch_id = existing_id
         else:
-            blocking_batch = _find_blocking_batch_for_accounts(db, account_ids)
+            blocking_batch = _find_blocking_batch_for_resources(
+                db,
+                [(leg.account_id or default_account_id, leg.symbol) for leg in request.legs],
+            )
             if blocking_batch is not None:
                 raise HTTPException(
                     status_code=409,
@@ -177,7 +197,6 @@ def create_execution_batch(request: CreateExecutionBatchRequest) -> ExecutionBat
                         f"{blocking_batch['id']} ({blocking_batch['status']})"
                     ),
                 )
-
             existing_id = None
             db.execute(
                 """
@@ -229,6 +248,13 @@ def create_execution_batch(request: CreateExecutionBatchRequest) -> ExecutionBat
                         created_at,
                     ),
                 )
+            _claim_batch_execution_resources(
+                db,
+                batch_id=batch_id,
+                strategy_instance_id=request.strategy_instance_id,
+                legs=request.legs,
+                default_account_id=default_account_id,
+            )
             claimed = db.execute(
                 """
                 UPDATE execution_batches
@@ -245,6 +271,7 @@ def create_execution_batch(request: CreateExecutionBatchRequest) -> ExecutionBat
             execute_batch_id = batch_id
 
     if execute_batch_id is None:
+        assert existing_id is not None
         return get_execution_batch(existing_id)
 
     batch_id = execute_batch_id
@@ -465,6 +492,314 @@ def _find_blocking_batch_for_accounts(
     ).fetchone()
 
 
+def _find_blocking_batch_for_resources(
+    db: Connection,
+    resources: list[tuple[str, str]],
+) -> BlockingBatch | None:
+    requested = {(account_id, symbol.upper()) for account_id, symbol in resources}
+    if not requested:
+        return None
+    rows = db.execute(
+        """
+        SELECT batch.id, batch.status, batch.account_id,
+               leg.account_id AS leg_account_id, leg.symbol, leg.status AS leg_status
+        FROM execution_batches AS batch
+        JOIN execution_batch_legs AS leg ON leg.batch_id = batch.id
+        ORDER BY batch.created_at, batch.id, leg.sequence
+        """
+    ).fetchall()
+    grouped: dict[str, BlockingBatch] = {}
+    for row in rows:
+        batch_id = str(row["id"])
+        batch = grouped.setdefault(
+            batch_id,
+            {
+                "id": batch_id,
+                "status": str(row["status"]),
+                "account_id": str(row["account_id"]),
+                "legs": [],
+            },
+        )
+        batch["legs"].append(
+            {
+                "account_id": str(row["leg_account_id"]),
+                "symbol": str(row["symbol"]).upper(),
+                "leg_status": str(row["leg_status"]),
+            }
+        )
+    for batch in grouped.values():
+        batch_status = str(batch["status"])
+        account_id = str(batch["account_id"])
+        legs = batch["legs"]
+        if batch_status in GLOBAL_LEASE_STATUSES:
+            if any((str(leg["account_id"]), str(leg["symbol"])) in requested for leg in legs):
+                return batch
+            continue
+        if batch_status == "failed":
+            if any(
+                str(leg["leg_status"]) in UNCERTAIN_EXTERNAL_LEG_STATUSES
+                and (str(leg["account_id"]), str(leg["symbol"])) in requested
+                for leg in legs
+            ):
+                return batch
+            if any(
+                str(leg["leg_status"]) == "result_unknown"
+                and account_id == account
+                for account, _symbol in requested
+                for leg in legs
+            ):
+                return batch
+    return None
+
+
+def _claim_batch_execution_resources(
+    db: Connection,
+    *,
+    batch_id: str,
+    strategy_instance_id: str,
+    legs,
+    default_account_id: str,
+) -> None:
+    resources: dict[str, tuple[str, str, str, str]] = {}
+    reservations: dict[tuple[str, str], Decimal] = {}
+    reservation_timestamps = now_iso()
+    for leg in legs:
+        account_id = leg.account_id or default_account_id
+        spec = db.execute(
+            """
+            SELECT account.venue_id,
+                   instrument.instrument_type,
+                   instrument.base_currency,
+                   instrument.quote_currency,
+                   specification.contract_multiplier
+            FROM accounts AS account
+            JOIN instruments AS instrument ON instrument.id = ?
+            LEFT JOIN contract_specifications AS specification
+              ON specification.instrument_id = instrument.id
+            WHERE account.id = ?
+            """,
+            (leg.instrument_id, account_id),
+        ).fetchone()
+        if spec is None:
+            raise HTTPException(
+                status_code=409,
+                detail="Execution resource metadata is unavailable",
+            )
+        resource_key = (
+            f"{account_id}|{spec['venue_id']}|{spec['instrument_type']}|{leg.symbol.upper()}"
+        )
+        resources[resource_key] = (
+            account_id,
+            str(spec["venue_id"]),
+            str(spec["instrument_type"]),
+            leg.symbol.upper(),
+        )
+        reservation_key, amount = _reservation_requirement_for_leg(
+            leg,
+            account_id=account_id,
+            instrument_type=str(spec["instrument_type"]),
+            base_currency=str(spec["base_currency"]),
+            quote_currency=str(spec["quote_currency"]),
+            contract_multiplier=(
+                Decimal(str(spec["contract_multiplier"]))
+                if spec["contract_multiplier"] is not None
+                else None
+            ),
+        )
+        reservations[reservation_key] = reservations.get(reservation_key, Decimal("0")) + amount
+
+    for resource_key, (account_id, venue_id, category, symbol) in resources.items():
+        blocking_claim = risk_repository.active_claim_for_resource(
+            resource_key,
+            account_id=account_id,
+            db=db,
+        )
+        if blocking_claim is not None:
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    "Active execution resource claim blocks new strategy instruction: "
+                    f"{blocking_claim['resource_key']}"
+                ),
+            )
+        db.execute(
+            """
+            INSERT INTO execution_resource_claims (
+                id, resource_key, owner_type, owner_id, account_id, venue_id,
+                resource_category, symbol, status, created_at, updated_at
+            ) VALUES (?, ?, 'batch', ?, ?, ?, ?, ?, 'active', ?, ?)
+            """,
+            (
+                str(uuid4()),
+                resource_key,
+                batch_id,
+                account_id,
+                venue_id,
+                category,
+                symbol,
+                reservation_timestamps,
+                reservation_timestamps,
+            ),
+        )
+
+    for (account_id, currency), amount in reservations.items():
+        available = _latest_available_balance(db, account_id=account_id, currency=currency)
+        if available is None:
+            raise HTTPException(
+                status_code=409,
+                detail=f"Available balance evidence is unavailable for {account_id} {currency}",
+            )
+        active_reserved = risk_repository.active_reserved_amount(account_id, currency, db=db)
+        if active_reserved + amount > available:
+            raise HTTPException(
+                status_code=409,
+                detail=f"Available balance reservation is insufficient for {account_id} {currency}",
+            )
+        db.execute(
+            """
+            INSERT INTO execution_balance_reservations (
+                id, owner_type, owner_id, account_id, strategy_instance_id, instruction_id,
+                currency, reserved_amount, status, created_at, updated_at
+            ) VALUES (?, 'batch', ?, ?, ?, NULL, ?, ?, 'active', ?, ?)
+            """,
+            (
+                str(uuid4()),
+                batch_id,
+                account_id,
+                strategy_instance_id,
+                currency,
+                format(amount, "f"),
+                reservation_timestamps,
+                reservation_timestamps,
+            ),
+        )
+
+
+def _reservation_requirement_for_leg(
+    leg,
+    *,
+    account_id: str,
+    instrument_type: str,
+    base_currency: str,
+    quote_currency: str,
+    contract_multiplier: Decimal | None,
+) -> tuple[tuple[str, str], Decimal]:
+    if instrument_type == "spot" and leg.side == "sell":
+        return (account_id, base_currency), leg.quantity
+    reference_price = leg.price or _reservation_reference_price(
+        account_id=account_id,
+        symbol=leg.symbol,
+        side=leg.side,
+    )
+    if instrument_type == "spot":
+        return (account_id, quote_currency), leg.quantity * reference_price
+    multiplier = contract_multiplier or Decimal("1")
+    return (account_id, quote_currency), leg.quantity * reference_price * multiplier
+
+
+def _reservation_reference_price(
+    *,
+    account_id: str,
+    symbol: str,
+    side: str,
+) -> Decimal:
+    settings = get_settings()
+    try:
+        with httpx.Client(
+            trust_env=False,
+            timeout=settings.runtime_timeout_seconds,
+        ) as client:
+            response = client.get(
+                f"{settings.runtime_base_url}/venue/quotes/{symbol}",
+                params={"accountId": account_id},
+            )
+            response.raise_for_status()
+            payload = response.json()
+    except httpx.HTTPError as exc:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Reference price is unavailable for reservation of {symbol}",
+        ) from exc
+    if not isinstance(payload, dict):
+        raise HTTPException(
+            status_code=409,
+            detail=f"Reference price is unavailable for reservation of {symbol}",
+        )
+    field = "ask" if side == "buy" else "bid"
+    fallback_field = "bid" if field == "ask" else "ask"
+    raw = payload.get(field)
+    if raw is None:
+        raw = payload.get(fallback_field)
+    try:
+        price = Decimal(str(raw))
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(
+            status_code=409,
+            detail=f"Reference price is unavailable for reservation of {symbol}",
+        ) from exc
+    if price <= 0:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Reference price is unavailable for reservation of {symbol}",
+        )
+    return price
+
+
+def _latest_available_balance(
+    db: Connection,
+    *,
+    account_id: str,
+    currency: str,
+) -> Decimal | None:
+    row = db.execute(
+        """
+        SELECT available_balance
+        FROM balance_snapshots
+        WHERE account_id = ? AND currency = ? AND data_quality_state = 'complete'
+        ORDER BY as_of DESC
+        LIMIT 1
+        """,
+        (account_id, currency),
+    ).fetchone()
+    if row is None:
+        return None
+    return Decimal(str(row["available_balance"]))
+
+
+def _release_batch_claims_and_reservations_if_safe(batch_id: str, status: str) -> None:
+    if status in LEASE_RELEASED_BATCH_STATUSES:
+        with connection() as db:
+            risk_repository.release_claims_for_owner("batch", batch_id, db=db)
+            risk_repository.release_reservations_for_owner("batch", batch_id, db=db)
+        return
+    if status != "failed":
+        return
+    with connection() as db:
+        has_external_orders = db.execute(
+            """
+            SELECT 1
+            FROM execution_batch_legs
+            WHERE batch_id = ? AND order_id IS NOT NULL
+            LIMIT 1
+            """,
+            (batch_id,),
+        ).fetchone()
+        has_fills = db.execute(
+            """
+            SELECT 1
+            FROM fills
+            WHERE order_id IN (
+                SELECT order_id FROM execution_batch_legs WHERE batch_id = ?
+            )
+            LIMIT 1
+            """,
+            (batch_id,),
+        ).fetchone()
+        if has_external_orders is None and has_fills is None:
+            risk_repository.release_claims_for_owner("batch", batch_id, db=db)
+            risk_repository.release_reservations_for_owner("batch", batch_id, db=db)
+
+
 def get_order_filled_quantity(order_id: str) -> Decimal:
     with connection() as db:
         rows = db.execute(
@@ -656,6 +991,7 @@ def update_batch_status(
                     *UNCERTAIN_EXTERNAL_LEG_STATUSES,
                 ),
             )
+    _release_batch_claims_and_reservations_if_safe(batch_id, status)
 
 
 def update_leg_status(

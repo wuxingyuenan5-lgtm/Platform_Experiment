@@ -4,7 +4,7 @@ import hashlib
 import json
 from datetime import UTC, datetime
 from decimal import Decimal
-from sqlite3 import Row
+from sqlite3 import Connection, Row
 from typing import Literal
 from uuid import uuid4
 
@@ -90,6 +90,44 @@ CREATE TABLE IF NOT EXISTS execution_risk_actions (
 );
 CREATE INDEX IF NOT EXISTS idx_execution_risk_actions_batch
 ON execution_risk_actions(batch_id, created_at);
+
+CREATE TABLE IF NOT EXISTS execution_resource_claims (
+    id TEXT PRIMARY KEY,
+    resource_key TEXT NOT NULL,
+    owner_type TEXT NOT NULL,
+    owner_id TEXT NOT NULL,
+    account_id TEXT NOT NULL,
+    venue_id TEXT NOT NULL,
+    resource_category TEXT NOT NULL,
+    symbol TEXT NOT NULL,
+    status TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS execution_balance_reservations (
+    id TEXT PRIMARY KEY,
+    owner_type TEXT NOT NULL,
+    owner_id TEXT NOT NULL,
+    account_id TEXT NOT NULL,
+    strategy_instance_id TEXT NOT NULL,
+    instruction_id TEXT,
+    currency TEXT NOT NULL,
+    reserved_amount TEXT NOT NULL,
+    status TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_execution_resource_claims_owner
+ON execution_resource_claims(owner_type, owner_id, status);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_execution_resource_claims_active_resource
+ON execution_resource_claims(resource_key)
+WHERE status = 'active';
+
+CREATE INDEX IF NOT EXISTS idx_execution_balance_reservations_account
+ON execution_balance_reservations(account_id, currency, status);
 """
 
 
@@ -697,6 +735,113 @@ def filled_quantity(order_id: str | None, fallback: Decimal) -> Decimal:
     if not rows:
         return fallback
     return sum((Decimal(row["quantity"]) for row in rows), start=Decimal("0"))
+
+
+def active_claim_for_resource(
+    resource_key: str,
+    *,
+    account_id: str,
+    db: Connection | None = None,
+) -> Row | None:
+    if db is not None:
+        return db.execute(
+            """
+            SELECT *
+            FROM execution_resource_claims
+            WHERE status = 'active'
+              AND (
+                    resource_key = ?
+                    OR (account_id = ? AND resource_category = 'account')
+                  )
+            LIMIT 1
+            """,
+            (resource_key, account_id),
+        ).fetchone()
+    with connection() as managed_db:
+        return active_claim_for_resource(resource_key, account_id=account_id, db=managed_db)
+
+
+def active_non_account_claim_for_account(
+    account_id: str,
+    *,
+    db: Connection | None = None,
+) -> Row | None:
+    if db is not None:
+        return db.execute(
+            """
+            SELECT *
+            FROM execution_resource_claims
+            WHERE status = 'active'
+              AND account_id = ?
+              AND resource_category != 'account'
+            LIMIT 1
+            """,
+            (account_id,),
+        ).fetchone()
+    with connection() as managed_db:
+        return active_non_account_claim_for_account(account_id, db=managed_db)
+
+
+def active_reserved_amount(
+    account_id: str,
+    currency: str,
+    *,
+    db: Connection | None = None,
+) -> Decimal:
+    if db is not None:
+        rows = db.execute(
+            """
+            SELECT reserved_amount
+            FROM execution_balance_reservations
+            WHERE account_id = ? AND currency = ? AND status = 'active'
+            """,
+            (account_id, currency),
+        ).fetchall()
+        return sum((Decimal(str(row["reserved_amount"])) for row in rows), start=Decimal("0"))
+    with connection() as managed_db:
+        return active_reserved_amount(account_id, currency, db=managed_db)
+
+
+def release_claims_for_owner(
+    owner_type: str,
+    owner_id: str,
+    *,
+    db: Connection | None = None,
+) -> None:
+    if db is not None:
+        db.execute(
+            """
+            UPDATE execution_resource_claims
+            SET status = 'released', updated_at = ?
+            WHERE owner_type = ? AND owner_id = ? AND status = 'active'
+            """,
+            (now_iso(), owner_type, owner_id),
+        )
+        return
+    ensure_schema()
+    with connection() as managed_db:
+        release_claims_for_owner(owner_type, owner_id, db=managed_db)
+
+
+def release_reservations_for_owner(
+    owner_type: str,
+    owner_id: str,
+    *,
+    db: Connection | None = None,
+) -> None:
+    if db is not None:
+        db.execute(
+            """
+            UPDATE execution_balance_reservations
+            SET status = 'released', updated_at = ?
+            WHERE owner_type = ? AND owner_id = ? AND status = 'active'
+            """,
+            (now_iso(), owner_type, owner_id),
+        )
+        return
+    ensure_schema()
+    with connection() as managed_db:
+        release_reservations_for_owner(owner_type, owner_id, db=managed_db)
 
 
 def kill_switch_from_row(row: Row) -> KillSwitchResponse:

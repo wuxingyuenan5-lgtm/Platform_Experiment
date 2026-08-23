@@ -484,6 +484,69 @@ PLATFORM_MIGRATIONS: tuple[Migration, ...] = (
             """,
         ),
     ),
+    Migration(
+        version=14,
+        name="funding-attempt-requested-quantity",
+        statements=(
+            "ALTER TABLE funding_perpetual_attempts ADD COLUMN requested_quantity TEXT",
+        ),
+    ),
+    Migration(
+        version=15,
+        name="execution-resource-claims",
+        statements=(
+            """
+            CREATE TABLE IF NOT EXISTS execution_resource_claims (
+                id TEXT PRIMARY KEY,
+                resource_key TEXT NOT NULL,
+                owner_type TEXT NOT NULL,
+                owner_id TEXT NOT NULL,
+                account_id TEXT NOT NULL,
+                venue_id TEXT NOT NULL,
+                resource_category TEXT NOT NULL,
+                symbol TEXT NOT NULL,
+                status TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )
+            """,
+            """
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_execution_resource_claims_active_resource
+            ON execution_resource_claims(resource_key)
+            WHERE status = 'active'
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_execution_resource_claims_owner
+            ON execution_resource_claims(owner_type, owner_id, status)
+            """,
+        ),
+    ),
+    Migration(
+        version=16,
+        name="execution-balance-reservations",
+        statements=(
+            """
+            CREATE TABLE IF NOT EXISTS execution_balance_reservations (
+                id TEXT PRIMARY KEY,
+                owner_type TEXT NOT NULL,
+                owner_id TEXT NOT NULL,
+                account_id TEXT NOT NULL,
+                strategy_instance_id TEXT NOT NULL,
+                instruction_id TEXT,
+                currency TEXT NOT NULL,
+                reserved_amount TEXT NOT NULL,
+                status TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                FOREIGN KEY(strategy_instance_id) REFERENCES strategy_instances(id)
+            )
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_execution_balance_reservations_account
+            ON execution_balance_reservations(account_id, currency, status)
+            """,
+        ),
+    ),
 )
 
 

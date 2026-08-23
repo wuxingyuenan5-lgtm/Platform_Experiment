@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from sqlite3 import IntegrityError
 from typing import Literal
 
 from fastapi import HTTPException
@@ -46,14 +47,36 @@ def register_order_execution_intent(
                     detail="Order execution intent conflicts with an existing idempotency key",
                 )
             return
-        db.execute(
-            """
-            INSERT INTO order_execution_intents (
-                idempotency_key, reduce_only, position_id, execution_policy
-            ) VALUES (?, ?, ?, ?)
-            """,
-            (idempotency_key, int(reduce_only), position_id, execution_policy),
-        )
+        try:
+            db.execute(
+                """
+                INSERT INTO order_execution_intents (
+                    idempotency_key, reduce_only, position_id, execution_policy
+                ) VALUES (?, ?, ?, ?)
+                """,
+                (idempotency_key, int(reduce_only), position_id, execution_policy),
+            )
+        except IntegrityError:
+            existing = db.execute(
+                """
+                SELECT reduce_only, position_id, execution_policy
+                FROM order_execution_intents
+                WHERE idempotency_key = ?
+                """,
+                (idempotency_key,),
+            ).fetchone()
+            if existing is None:
+                raise
+            matches = (
+                bool(existing["reduce_only"]) == reduce_only
+                and existing["position_id"] == position_id
+                and existing["execution_policy"] == execution_policy
+            )
+            if not matches:
+                raise HTTPException(
+                    status_code=409,
+                    detail="Order execution intent conflicts with an existing idempotency key",
+                )
 
 
 def get_order_execution_intent(idempotency_key: str) -> OrderExecutionIntent:
