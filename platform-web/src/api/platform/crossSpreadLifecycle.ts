@@ -72,6 +72,7 @@ export interface CrossSpreadExitPlanResult {
 }
 
 export interface CrossSpreadMarketOpenInput {
+  idempotencyKey?: string;
   direction: CrossSpreadDirection;
   quantityOz: string;
   takeProfitSpread?: string;
@@ -97,6 +98,13 @@ export interface CrossSpreadMarketCloseResult {
   orderIntent: CrossSpreadOrderIntentResult;
   limitExecution?: CrossSpreadLimitExecutionResult | null;
   exitPlan: CrossSpreadExitPlanResult;
+}
+
+export interface CrossSpreadMarketCloseInput {
+  idempotencyKey?: string;
+  executionMode: CrossSpreadExecutionMode;
+  limitSpread?: string;
+  limitStrategy?: CrossSpreadLimitStrategy;
 }
 
 const apiBaseUrl = import.meta.env.VITE_PLATFORM_API_BASE_URL || 'http://127.0.0.1:8000/api/v1';
@@ -134,16 +142,15 @@ export async function getCrossSpreadExitPlans(
 
 export async function closeCrossSpreadMarket(
   planId: string,
-  executionMode: CrossSpreadExecutionMode,
-  limitSpread?: string,
-  limitStrategy: CrossSpreadLimitStrategy = 'fok',
+  input: CrossSpreadMarketCloseInput,
 ): Promise<CrossSpreadMarketCloseResult> {
   const response = await client.post<CrossSpreadMarketCloseResult>(
     `/trading/cross-spread/exit-plans/${encodeURIComponent(planId)}/close`,
     {
-      executionMode,
-      limitStrategy,
-      ...(limitSpread === undefined ? {} : { limitSpread }),
+      executionMode: input.executionMode,
+      limitStrategy: input.limitStrategy ?? 'fok',
+      ...(input.idempotencyKey ? { idempotencyKey: input.idempotencyKey } : {}),
+      ...(input.limitSpread === undefined ? {} : { limitSpread: input.limitSpread }),
     },
   );
   return response.data;

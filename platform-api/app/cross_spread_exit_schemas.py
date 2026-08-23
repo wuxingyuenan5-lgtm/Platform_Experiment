@@ -26,6 +26,7 @@ ExitPlanStatus = Literal[
 
 
 class CrossSpreadMarketOpenRequest(BaseModel):
+    idempotency_key: str | None = Field(default=None, alias="idempotencyKey", min_length=1)
     direction: SpreadDirection
     quantity_oz: Decimal = Field(alias="quantityOz", gt=0)
     take_profit_spread: Decimal | None = Field(default=None, alias="takeProfitSpread")
@@ -70,6 +71,7 @@ class CrossSpreadMarketOpenRequest(BaseModel):
 
 
 class CrossSpreadMarketCloseRequest(BaseModel):
+    idempotency_key: str | None = Field(default=None, alias="idempotencyKey", min_length=1)
     execution_mode: ExecutionMode = Field(default="market", alias="executionMode")
     limit_spread: Decimal | None = Field(default=None, alias="limitSpread")
     limit_strategy: LimitStrategy = Field(default="fok", alias="limitStrategy")

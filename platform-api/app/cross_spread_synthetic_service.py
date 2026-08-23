@@ -15,6 +15,7 @@ from app.cross_spread_exit_policy import (
 from app.cross_spread_exit_repository import (
     claim_exit_plan,
     configure_exit_plan_execution_modes,
+    find_plan_by_open_batch,
     get_exit_plan,
     has_accepted_missing_external_order_difference,
     list_exit_plans,
@@ -50,7 +51,7 @@ from app.cross_spread_order_intent import (
     build_open_intent,
     command_action,
 )
-from app.execution_batches import get_execution_batch
+from app.execution_batches import find_batch_by_idempotency_key, get_execution_batch
 from app.schemas import CrossSpreadMarketCommandRequest
 
 
@@ -60,6 +61,9 @@ def open_cross_spread_market(request: CrossSpreadMarketOpenRequest) -> CrossSpre
         request.execution_mode,
         trigger_reason="MANUAL",
     )
+    recovered = _recover_open_by_idempotency(request, intent)
+    if recovered is not None:
+        return recovered
     market_helpers._assert_acceptance_open_allowed()
     limit_execution = _prepare_limit_execution(intent, request.limit_spread)
     command_request = CrossSpreadMarketCommandRequest(
@@ -67,15 +71,34 @@ def open_cross_spread_market(request: CrossSpreadMarketOpenRequest) -> CrossSpre
         quantityOz=request.quantity_oz,
     )
     if intent.execution_type == "MARKET":
-        batch = submit_cross_spread_market_command(command_request)
+        batch = submit_cross_spread_market_command(
+            command_request,
+            idempotency_key=request.idempotency_key,
+        )
     else:
         assert limit_execution is not None
         batch = _submit_limit_batch(
             command_request,
             limit_strategy=request.limit_strategy,
             bybit_limit_price=limit_execution.bybit_limit_price,
+            idempotency_key=request.idempotency_key,
         )
 
+    return _open_result_from_batch(
+        batch,
+        request=request,
+        intent=intent,
+        limit_execution=limit_execution,
+    )
+
+
+def _open_result_from_batch(
+    batch,
+    *,
+    request: CrossSpreadMarketOpenRequest,
+    intent: SyntheticOrderIntent,
+    limit_execution: CrossSpreadFokPrice | None,
+) -> CrossSpreadOpenResult:
     if batch.status != "hedged":
         handled = market_helpers._handle_definitive_open_failure(batch)
         return CrossSpreadOpenResult(
@@ -86,19 +109,15 @@ def open_cross_spread_market(request: CrossSpreadMarketOpenRequest) -> CrossSpre
         )
 
     try:
-        plan = market_helpers._create_exit_plan_for_open_batch(
-            batch.batch_id,
-            direction=request.direction,
-            take_profit_spread=request.take_profit_spread,
-            stop_loss_spread=request.stop_loss_spread,
+        plan = find_plan_by_open_batch(batch.batch_id) or (
+            market_helpers._create_exit_plan_for_open_batch(
+                batch.batch_id,
+                direction=request.direction,
+                take_profit_spread=request.take_profit_spread,
+                stop_loss_spread=request.stop_loss_spread,
+            )
         )
-        plan = configure_exit_plan_execution_modes(
-            plan.plan_id,
-            take_profit_execution_mode=request.take_profit_execution_mode,
-            stop_loss_execution_mode=request.stop_loss_execution_mode,
-            take_profit_limit_strategy=request.take_profit_limit_strategy,
-            stop_loss_limit_strategy=request.stop_loss_limit_strategy,
-        )
+        plan = _configure_open_plan(plan, request)
     except HTTPException as exc:
         market_helpers.update_batch_status(
             batch.batch_id,
@@ -126,8 +145,36 @@ def close_cross_spread_market(
     execution_mode: str,
     limit_spread: Decimal | None = None,
     limit_strategy: LimitStrategy = "fok",
+    idempotency_key: str | None = None,
 ) -> CrossSpreadCloseResult:
     current_plan = get_exit_plan(plan_id)
+    if (
+        idempotency_key is not None
+        and current_plan.close_batch_id is not None
+        and get_execution_batch(current_plan.close_batch_id).idempotency_key == idempotency_key
+    ):
+        return CrossSpreadCloseResult(
+            executionBatch=get_execution_batch(current_plan.close_batch_id),
+            orderIntent=_intent_response(
+                build_close_intent(
+                    current_plan.direction,
+                    execution_mode,
+                    trigger_reason=current_plan.trigger_reason or "MANUAL",
+                )
+            ),
+            limitExecution=_limit_response(
+                _prepare_limit_execution(
+                    build_close_intent(
+                        current_plan.direction,
+                        execution_mode,
+                        trigger_reason=current_plan.trigger_reason or "MANUAL",
+                    ),
+                    limit_spread,
+                ),
+                limit_strategy,
+            ),
+            exitPlan=current_plan,
+        )
     intent = build_close_intent(
         current_plan.direction,
         execution_mode,
@@ -211,6 +258,36 @@ def close_cross_spread_market(
     if idempotency_key is not None:
         close_kwargs["idempotency_key"] = idempotency_key
     return _close_claimed_plan(claimed, **close_kwargs)
+
+
+def _recover_open_by_idempotency(
+    request: CrossSpreadMarketOpenRequest,
+    intent: SyntheticOrderIntent,
+) -> CrossSpreadOpenResult | None:
+    if request.idempotency_key is None:
+        return None
+    existing_batch_id = find_batch_by_idempotency_key(request.idempotency_key)
+    if existing_batch_id is None:
+        return None
+    return _open_result_from_batch(
+        get_execution_batch(existing_batch_id),
+        request=request,
+        intent=intent,
+        limit_execution=_prepare_limit_execution(intent, request.limit_spread),
+    )
+
+
+def _configure_open_plan(
+    plan: CrossSpreadExitPlanResponse,
+    request: CrossSpreadMarketOpenRequest,
+) -> CrossSpreadExitPlanResponse:
+    return configure_exit_plan_execution_modes(
+        plan.plan_id,
+        take_profit_execution_mode=request.take_profit_execution_mode,
+        stop_loss_execution_mode=request.stop_loss_execution_mode,
+        take_profit_limit_strategy=request.take_profit_limit_strategy,
+        stop_loss_limit_strategy=request.stop_loss_limit_strategy,
+    )
 
 
 def evaluate_cross_spread_exit_plans() -> CrossSpreadExitEvaluationResponse:

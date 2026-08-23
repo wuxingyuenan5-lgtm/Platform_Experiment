@@ -168,7 +168,7 @@ def test_market_open_uses_normalized_intent_without_changing_legacy_action(
         lambda *_args, **_kwargs: plan,
     )
 
-    def fake_submit(request):
+    def fake_submit(request, **_kwargs):
         captured["request"] = request
         return batch_response("open-batch-1", direction=request.action)
 
@@ -194,6 +194,56 @@ def test_market_open_uses_normalized_intent_without_changing_legacy_action(
     assert result.order_intent.execution_type == "MARKET"
     assert result.order_intent.trigger_reason == "MANUAL"
     assert result.limit_execution is None
+    assert result.exit_plan == plan
+
+
+def test_market_open_reuses_existing_batch_by_client_idempotency_key(monkeypatch) -> None:
+    plan = exit_plan()
+    existing_batch = batch_response("open-batch-1", direction="OPEN_LONG")
+
+    monkeypatch.setattr(
+        synthetic_service,
+        "find_batch_by_idempotency_key",
+        lambda value: "open-batch-1" if value == "client-open-1" else None,
+    )
+    monkeypatch.setattr(
+        synthetic_service,
+        "get_execution_batch",
+        lambda _batch_id: existing_batch,
+    )
+    monkeypatch.setattr(
+        synthetic_service,
+        "find_plan_by_open_batch",
+        lambda _batch_id: plan,
+    )
+    monkeypatch.setattr(
+        synthetic_service,
+        "configure_exit_plan_execution_modes",
+        lambda *_args, **_kwargs: plan,
+    )
+    monkeypatch.setattr(
+        synthetic_service.market_helpers,
+        "_assert_acceptance_open_allowed",
+        lambda: pytest.fail("idempotent replay must not re-run acceptance gate"),
+    )
+    monkeypatch.setattr(
+        synthetic_service,
+        "submit_cross_spread_market_command",
+        lambda *_args, **_kwargs: pytest.fail("idempotent replay must not submit again"),
+    )
+
+    result = synthetic_service.open_cross_spread_market(
+        CrossSpreadMarketOpenRequest(
+            idempotencyKey="client-open-1",
+            direction="LONG_SPREAD",
+            quantityOz="1",
+            takeProfitSpread="0",
+            stopLossSpread="-3",
+            executionMode="market",
+        )
+    )
+
+    assert result.execution_batch.batch_id == "open-batch-1"
     assert result.exit_plan == plan
 
 
@@ -251,6 +301,33 @@ def test_manual_close_and_take_profit_close_share_close_action(monkeypatch) -> N
     assert take_profit_result.order_intent.trigger_reason == "TAKE_PROFIT"
     assert manual_result.order_intent.action == "CLOSE_LONG_SPREAD"
     assert take_profit_result.order_intent.action == "CLOSE_LONG_SPREAD"
+
+
+def test_manual_close_reuses_existing_close_batch_by_client_idempotency_key(monkeypatch) -> None:
+    plan = exit_plan(status="closing", close_batch_id="close-batch-1")
+    existing_batch = batch_response("close-batch-1", direction="CLOSE_LONG")
+    existing_batch.idempotency_key = "client-close-1"
+
+    monkeypatch.setattr(synthetic_service, "get_exit_plan", lambda _plan_id: plan)
+    monkeypatch.setattr(
+        synthetic_service,
+        "get_execution_batch",
+        lambda _batch_id: existing_batch,
+    )
+    monkeypatch.setattr(
+        synthetic_service,
+        "claim_exit_plan",
+        lambda *_args, **_kwargs: pytest.fail("idempotent replay must not reclaim plan"),
+    )
+
+    result = synthetic_service.close_cross_spread_market(
+        plan.plan_id,
+        execution_mode="market",
+        idempotency_key="client-close-1",
+    )
+
+    assert result.execution_batch.batch_id == "close-batch-1"
+    assert result.exit_plan == plan
 
 
 def test_manual_close_recovers_a_failed_unsubmitted_exit_batch(monkeypatch) -> None:

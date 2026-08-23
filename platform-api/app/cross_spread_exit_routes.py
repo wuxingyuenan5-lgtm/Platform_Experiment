@@ -82,6 +82,7 @@ def close_market_lifecycle(
         execution_mode=request.execution_mode,
         limit_spread=request.limit_spread,
         limit_strategy=request.limit_strategy,
+        idempotency_key=request.idempotency_key,
     )
 
 
