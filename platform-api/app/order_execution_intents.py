@@ -8,7 +8,7 @@ from fastapi import HTTPException
 
 from app.database import connection
 
-ExecutionPolicy = Literal["default", "fok", "post_only_chase"]
+ExecutionPolicy = Literal["default", "fok", "post_only_chase", "post_only_single_attempt"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -56,7 +56,7 @@ def register_order_execution_intent(
                 """,
                 (idempotency_key, int(reduce_only), position_id, execution_policy),
             )
-        except IntegrityError:
+        except IntegrityError as exc:
             existing = db.execute(
                 """
                 SELECT reduce_only, position_id, execution_policy
@@ -66,7 +66,7 @@ def register_order_execution_intent(
                 (idempotency_key,),
             ).fetchone()
             if existing is None:
-                raise
+                raise exc
             matches = (
                 bool(existing["reduce_only"]) == reduce_only
                 and existing["position_id"] == position_id
@@ -76,7 +76,7 @@ def register_order_execution_intent(
                 raise HTTPException(
                     status_code=409,
                     detail="Order execution intent conflicts with an existing idempotency key",
-                )
+                ) from exc
 
 
 def get_order_execution_intent(idempotency_key: str) -> OrderExecutionIntent:

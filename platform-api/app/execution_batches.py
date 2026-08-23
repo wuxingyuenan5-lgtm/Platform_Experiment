@@ -48,6 +48,12 @@ LEASE_RELEASED_BATCH_STATUSES = (
     "hedged",
     "completed",
 )
+INSTRUMENT_TYPE_ALIASES = {
+    "spot": "crypto_spot",
+    "crypto_spot": "crypto_spot",
+    "perp": "crypto_perp",
+    "crypto_perp": "crypto_perp",
+}
 
 
 class BlockingBatchLeg(TypedDict):
@@ -65,6 +71,10 @@ class BlockingBatch(TypedDict):
 
 def now_iso() -> str:
     return datetime.now(UTC).isoformat()
+
+
+def normalize_instrument_type(instrument_type: str) -> str:
+    return INSTRUMENT_TYPE_ALIASES.get(instrument_type.strip().lower(), instrument_type.strip())
 
 
 def find_batch_by_idempotency_key(idempotency_key: str) -> str | None:
@@ -585,19 +595,18 @@ def _claim_batch_execution_resources(
                 status_code=409,
                 detail="Execution resource metadata is unavailable",
             )
-        resource_key = (
-            f"{account_id}|{spec['venue_id']}|{spec['instrument_type']}|{leg.symbol.upper()}"
-        )
+        normalized_type = normalize_instrument_type(str(spec["instrument_type"]))
+        resource_key = f"{account_id}|{spec['venue_id']}|{normalized_type}|{leg.symbol.upper()}"
         resources[resource_key] = (
             account_id,
             str(spec["venue_id"]),
-            str(spec["instrument_type"]),
+            normalized_type,
             leg.symbol.upper(),
         )
         reservation_key, amount = _reservation_requirement_for_leg(
             leg,
             account_id=account_id,
-            instrument_type=str(spec["instrument_type"]),
+            instrument_type=normalized_type,
             base_currency=str(spec["base_currency"]),
             quote_currency=str(spec["quote_currency"]),
             contract_multiplier=(
@@ -684,14 +693,15 @@ def _reservation_requirement_for_leg(
     quote_currency: str,
     contract_multiplier: Decimal | None,
 ) -> tuple[tuple[str, str], Decimal]:
-    if instrument_type == "spot" and leg.side == "sell":
+    normalized_type = normalize_instrument_type(instrument_type)
+    if normalized_type == "crypto_spot" and leg.side == "sell":
         return (account_id, base_currency), leg.quantity
     reference_price = leg.price or _reservation_reference_price(
         account_id=account_id,
         symbol=leg.symbol,
         side=leg.side,
     )
-    if instrument_type == "spot":
+    if normalized_type == "crypto_spot":
         return (account_id, quote_currency), leg.quantity * reference_price
     multiplier = contract_multiplier or Decimal("1")
     return (account_id, quote_currency), leg.quantity * reference_price * multiplier
@@ -769,6 +779,8 @@ def _latest_available_balance(
 def _release_batch_claims_and_reservations_if_safe(batch_id: str, status: str) -> None:
     if status in LEASE_RELEASED_BATCH_STATUSES:
         with connection() as db:
+            if not _batch_terminal_release_is_safe(db, batch_id=batch_id, status=status):
+                return
             risk_repository.release_claims_for_owner("batch", batch_id, db=db)
             risk_repository.release_reservations_for_owner("batch", batch_id, db=db)
         return
@@ -798,6 +810,40 @@ def _release_batch_claims_and_reservations_if_safe(batch_id: str, status: str) -
         if has_external_orders is None and has_fills is None:
             risk_repository.release_claims_for_owner("batch", batch_id, db=db)
             risk_repository.release_reservations_for_owner("batch", batch_id, db=db)
+
+
+def _batch_terminal_release_is_safe(
+    db: Connection,
+    *,
+    batch_id: str,
+    status: str,
+) -> bool:
+    if status == "completed":
+        return True
+    if status != "hedged":
+        return False
+    try:
+        row = db.execute(
+            """
+            SELECT batch.strategy_key,
+                   batch.strategy_instruction_id,
+                   instruction.status AS instruction_status
+            FROM execution_batches AS batch
+            LEFT JOIN strategy_runs AS instruction
+              ON instruction.id = batch.strategy_instruction_id
+            WHERE batch.id = ?
+            """,
+            (batch_id,),
+        ).fetchone()
+    except Exception:  # noqa: BLE001
+        return True
+    if row is None:
+        return False
+    if row["strategy_instruction_id"] is None:
+        return True
+    if row["strategy_key"] != "funding_arbitrage":
+        return True
+    return row["instruction_status"] == "completed"
 
 
 def get_order_filled_quantity(order_id: str) -> Decimal:

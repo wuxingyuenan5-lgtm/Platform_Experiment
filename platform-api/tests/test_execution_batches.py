@@ -1,5 +1,6 @@
 from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime
+from decimal import Decimal
 from pathlib import Path
 from threading import Barrier, Lock, local
 from uuid import uuid4
@@ -11,7 +12,10 @@ from fastapi.testclient import TestClient
 
 from app.config import get_settings
 from app.database import connection, initialize_database
-from app.execution_batches import create_execution_batch
+from app.execution_batches import (
+    _reservation_requirement_for_leg,
+    create_execution_batch,
+)
 from app.main import app
 from app.schemas import CreateExecutionBatchRequest, TradeCommandResponse
 
@@ -696,3 +700,44 @@ def test_update_batch_status_hedged_normalizes_uncertain_legs(
 
     assert legs[0]["status"] == "filled"
     assert legs[0]["failure_reason"] is None
+
+
+def test_reservation_rules_use_authoritative_crypto_instrument_types() -> None:
+    class Leg:
+        def __init__(self, *, side: str, quantity: str, price: str | None = None) -> None:
+            self.side = side
+            self.quantity = Decimal(quantity)
+            self.price = Decimal(price) if price is not None else None
+            self.symbol = "BTCUSDT"
+
+    spot_buy_key, spot_buy_amount = _reservation_requirement_for_leg(
+        Leg(side="buy", quantity="2", price="101.25"),
+        account_id="account_crypto_test",
+        instrument_type="crypto_spot",
+        base_currency="BTC",
+        quote_currency="USDT",
+        contract_multiplier=None,
+    )
+    spot_sell_key, spot_sell_amount = _reservation_requirement_for_leg(
+        Leg(side="sell", quantity="2.5"),
+        account_id="account_crypto_test",
+        instrument_type="crypto_spot",
+        base_currency="BTC",
+        quote_currency="USDT",
+        contract_multiplier=None,
+    )
+    perp_key, perp_amount = _reservation_requirement_for_leg(
+        Leg(side="sell", quantity="3", price="99.5"),
+        account_id="account_crypto_test",
+        instrument_type="crypto_perp",
+        base_currency="BTC",
+        quote_currency="USDT",
+        contract_multiplier=Decimal("0.1"),
+    )
+
+    assert spot_buy_key == ("account_crypto_test", "USDT")
+    assert spot_buy_amount == Decimal("202.50")
+    assert spot_sell_key == ("account_crypto_test", "BTC")
+    assert spot_sell_amount == Decimal("2.5")
+    assert perp_key == ("account_crypto_test", "USDT")
+    assert perp_amount == Decimal("29.85")

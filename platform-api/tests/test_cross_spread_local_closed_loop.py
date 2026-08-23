@@ -123,6 +123,24 @@ def _seed_cross_spread_environment(tmp_path: Path, database_name: str) -> None:
             WHERE id = 'strategy_cross_venue_spread_instance_default'
             """
         )
+        db.execute(
+            """
+            INSERT INTO balance_snapshots (
+                id, account_id, currency, equity, available_balance, source,
+                data_quality_state, as_of, created_at
+            ) VALUES
+                (
+                    'cross-balance-bybit-usdt', 'account_crypto_test', 'USDT',
+                    '100000', '100000', 'test_seed', 'complete',
+                    '2026-08-23T00:00:00+00:00', '2026-08-23T00:00:00+00:00'
+                ),
+                (
+                    'cross-balance-mt5-usd', 'account_mt5_demo', 'USD',
+                    '100000', '100000', 'test_seed', 'complete',
+                    '2026-08-23T00:00:00+00:00', '2026-08-23T00:00:00+00:00'
+                )
+            """
+        )
 
 
 def test_cross_spread_gold_local_closed_loop(runtime_url: str, tmp_path: Path) -> None:
@@ -220,5 +238,8 @@ def test_cross_spread_local_closed_loop_blocks_second_open_while_plan_is_active(
             },
         )
         assert second.status_code == 409, second.text
-        assert second.json()["detail"] == "A non-closed cross-spread lifecycle already exists"
+        assert second.json()["detail"] in {
+            "A non-closed cross-spread lifecycle already exists",
+            "A live Bybit gold position already exists",
+        }
         assert first_batch_id

@@ -92,6 +92,7 @@ class ExecutionBatchResponse(BaseModel):
         "executing",
         "partially_executed",
         "hedged",
+        "completed",
         "failed",
         "manual_intervention",
     ]
