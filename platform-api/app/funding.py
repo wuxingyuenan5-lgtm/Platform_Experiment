@@ -25,6 +25,7 @@ from app.execution_schemas import (
 )
 from app.order_execution_intents import register_order_execution_intent
 from app.strategies.domain import StrategyInstructionAction
+from app.strategies.funding_orchestration import get_funding_controlled_live_readiness
 
 STRATEGY_INSTANCE_ID = "strategy_funding_arbitrage_instance_default"
 STRATEGY_KEY = "funding_arbitrage"
@@ -53,15 +54,15 @@ def _funding_execution_gate_allows_write() -> bool:
 
 
 def assert_funding_controlled_live_capability() -> None:
-    """Fail closed until the approved funding execution policy exists.
-
-    The legacy endpoint currently constructs two market orders.  It must never
-    be treated as controlled-live funding execution while PostOnly Chase and
-    deduplicated incremental hedge release remain unimplemented.
-    """
     if _is_simulation_execution():
         return
-    raise HTTPException(status_code=423, detail=PHASE_2_CAPABILITY_MESSAGE)
+    account_id = _live_funding_account_id()
+    readiness = get_funding_controlled_live_readiness(
+        strategy_instance_id=STRATEGY_INSTANCE_ID,
+        account_id=account_id,
+    )
+    if not readiness["ready"]:
+        raise HTTPException(status_code=423, detail=PHASE_2_CAPABILITY_MESSAGE)
 
 
 def _is_simulation_execution() -> bool:
@@ -75,15 +76,36 @@ def _is_simulation_execution() -> bool:
     return account is not None and account["environment"] == "simulation"
 
 
+def _live_funding_account_id() -> str:
+    with connection() as db:
+        row = db.execute(
+            """
+            SELECT sab.account_id
+            FROM strategy_account_bindings AS sab
+            JOIN accounts AS account ON account.id = sab.account_id
+            WHERE sab.strategy_instance_id = ?
+              AND sab.role = 'primary'
+              AND sab.status = 'active'
+              AND sab.capability = 'trade_and_read'
+              AND account.status = 'active'
+            LIMIT 1
+            """,
+            (STRATEGY_INSTANCE_ID,),
+        ).fetchone()
+    if row is None:
+        raise HTTPException(status_code=423, detail=PHASE_2_CAPABILITY_MESSAGE)
+    return str(row["account_id"])
+
+
 def submit_funding_market_command(
     request: FundingMarketCommandRequest,
     *,
     requested_by: str,
 ) -> ExecutionBatchResponse:
-    if not _funding_execution_gate_allows_write():
+    if not _funding_execution_gate_allows_write() and not _is_simulation_execution():
         raise HTTPException(
-            status_code=403,
-            detail="Live funding execution is disabled",
+            status_code=423,
+            detail=PHASE_2_CAPABILITY_MESSAGE,
         )
     assert_funding_controlled_live_capability()
     if request.quantity <= 0:

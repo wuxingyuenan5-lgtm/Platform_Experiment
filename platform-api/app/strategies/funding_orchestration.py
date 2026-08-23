@@ -4,14 +4,18 @@ import hashlib
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from decimal import ROUND_CEILING, ROUND_FLOOR, Decimal, localcontext
+from types import SimpleNamespace
+from typing import Any
 from uuid import uuid4
 
 import httpx
 from fastapi import HTTPException
 
+from app import execution_risk_repository as risk_repository
 from app.config import get_settings
 from app.database import connection
 from app.execution_batches import (
+    _claim_batch_execution_resources,
     _find_blocking_batch_for_accounts,
     get_execution_batch,
     update_batch_status,
@@ -47,6 +51,16 @@ TERMINAL_ATTEMPT_STATUSES = {"filled", "canceled", "rejected", "result_unknown"}
 PHASE_2_CAPABILITY_MESSAGE = (
     "Funding controlled-live execution requires Phase 2 post-only "
     "chase and authoritative incremental release"
+)
+FUNDING_RUNTIME_REQUIRED_CAPABILITIES = frozenset(
+    {
+        "post_only_single_attempt_submit",
+        "order_query",
+        "fill_query",
+        "position_query",
+        "account_risk_query",
+        "cancel_order_gated",
+    }
 )
 
 
@@ -87,7 +101,12 @@ def execute_funding_instruction(
     strategy_instance_id = str(instruction_row["strategy_instance_id"])
     trading_mode = _strategy_trading_mode(strategy_instance_id)
     if trading_mode != "simulation":
-        raise HTTPException(status_code=423, detail=PHASE_2_CAPABILITY_MESSAGE)
+        readiness = get_funding_controlled_live_readiness(
+            strategy_instance_id=strategy_instance_id,
+            account_id=_leg(plan, PERPETUAL_ROLE).account_id,
+        )
+        if not readiness["ready"]:
+            raise HTTPException(status_code=423, detail=PHASE_2_CAPABILITY_MESSAGE)
 
     perpetual_leg = _leg(plan, PERPETUAL_ROLE)
     spot_leg = _leg(plan, SPOT_ROLE)
@@ -108,6 +127,7 @@ def execute_funding_instruction(
         batch_id=batch_id,
         strategy_instance_id=strategy_instance_id,
         account_ids=[perpetual_leg.account_id, spot_leg.account_id],
+        legs=[perpetual_leg, spot_leg],
     )
     _set_instruction_status(instruction_id, StrategyInstructionStatus.EXECUTING)
     try:
@@ -268,6 +288,7 @@ def _claim_funding_batch(
     batch_id: str,
     strategy_instance_id: str,
     account_ids: list[str],
+    legs: list[ExecutionPlanLeg],
 ) -> None:
     with connection() as db:
         db.execute("BEGIN IMMEDIATE")
@@ -299,6 +320,33 @@ def _claim_funding_batch(
                     "Active execution batch blocks new strategy instruction: "
                     f"{blocking['id']} ({blocking['status']})"
                 ),
+            )
+        existing_claim = db.execute(
+            """
+            SELECT 1
+            FROM execution_resource_claims
+            WHERE owner_type = 'batch' AND owner_id = ? AND status = 'active'
+            LIMIT 1
+            """,
+            (batch_id,),
+        ).fetchone()
+        if existing_claim is None:
+            _claim_batch_execution_resources(
+                db,
+                batch_id=batch_id,
+                strategy_instance_id=strategy_instance_id,
+                legs=[
+                    SimpleNamespace(
+                        account_id=leg.account_id,
+                        instrument_id=leg.instrument_id,
+                        symbol=leg.external_symbol,
+                        side=leg.side,
+                        price=None,
+                        quantity=leg.maximum_quantity,
+                    )
+                    for leg in legs
+                ],
+                default_account_id=legs[0].account_id,
             )
         if str(row["status"]) == "pending":
             claimed = db.execute(
@@ -408,7 +456,6 @@ def _create_attempt(
         )
     if row["order_id"] is not None or row["status"] != "declared":
         return False
-
     _assert_attempt_within_maximum(
         batch_id=batch_id,
         requested_quantity=requested_quantity,
@@ -417,7 +464,7 @@ def _create_attempt(
     register_order_execution_intent(
         idempotency_key,
         reduce_only=False,
-        execution_policy="post_only_chase",
+        execution_policy="post_only_single_attempt",
     )
     try:
         command = create_trade_command(
@@ -797,6 +844,79 @@ def _strategy_trading_mode(strategy_instance_id: str) -> str:
     return str(row["trading_mode"])
 
 
+def get_funding_controlled_live_readiness(
+    *,
+    strategy_instance_id: str,
+    account_id: str,
+) -> dict[str, Any]:
+    settings = get_settings()
+    checks: dict[str, Any] = {
+        "liveTradingEnabled": settings.live_trading_enabled,
+        "sharedClaims": True,
+        "balanceReservations": True,
+    }
+    checks["killSwitchClear"] = (
+        risk_repository.first_enabled_kill_switch(strategy_instance_id, [account_id]) is None
+    )
+    adapter: dict[str, Any] | None = None
+    try:
+        with httpx.Client(
+            trust_env=False,
+            timeout=settings.runtime_timeout_seconds,
+        ) as client:
+            response = client.get(f"{settings.runtime_base_url}/gateway/capabilities")
+            response.raise_for_status()
+            payload = response.json()
+    except (httpx.HTTPError, ValueError):
+        payload = None
+    if isinstance(payload, dict):
+        checks["runtimeLiveWriteEnabled"] = bool(payload.get("liveWriteEnabled"))
+        adapters = payload.get("adapters")
+        if isinstance(adapters, list):
+            for item in adapters:
+                if not isinstance(item, dict):
+                    continue
+                account_ids = item.get("accountIds")
+                if isinstance(account_ids, list) and account_id in account_ids:
+                    adapter = item
+                    break
+    if adapter is None:
+        checks.update(
+            {
+                "adapterConfigured": False,
+                "adapterOperational": False,
+                "runtimeCapabilities": [],
+                "hasRequiredRuntimeCapabilities": False,
+                "ready": False,
+            }
+        )
+        return checks
+    runtime_capabilities = {
+        str(item)
+        for item in adapter.get("capabilities", [])
+        if isinstance(item, str)
+    }
+    checks["adapterConfigured"] = bool(adapter.get("configured"))
+    checks["adapterOperational"] = bool(adapter.get("operational"))
+    checks["adapterWriteEnabled"] = bool(adapter.get("writeEnabled"))
+    checks["runtimeCapabilities"] = sorted(runtime_capabilities)
+    checks["hasRequiredRuntimeCapabilities"] = FUNDING_RUNTIME_REQUIRED_CAPABILITIES.issubset(
+        runtime_capabilities
+    )
+    checks["ready"] = bool(
+        checks["liveTradingEnabled"]
+        and checks["killSwitchClear"]
+        and checks.get("runtimeLiveWriteEnabled")
+        and checks["adapterConfigured"]
+        and checks["adapterOperational"]
+        and checks["adapterWriteEnabled"]
+        and checks["hasRequiredRuntimeCapabilities"]
+        and checks["sharedClaims"]
+        and checks["balanceReservations"]
+    )
+    return checks
+
+
 def _leg(plan: ExecutionPlan, role: str) -> ExecutionPlanLeg:
     for leg in plan.legs:
         if leg.role == role:
@@ -954,7 +1074,7 @@ def _complete_reconciliation(
             batch_id,
             "Funding authoritative position evidence mismatches plan",
         )
-    update_batch_status(batch_id, "hedged")
+    update_batch_status(batch_id, "completed")
     complete_batch_risk(batch_id)
     _set_instruction_status(instruction_id, StrategyInstructionStatus.COMPLETED)
     return get_execution_batch(batch_id)

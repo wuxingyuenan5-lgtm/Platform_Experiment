@@ -346,7 +346,9 @@ class FakeGateway:
                     accountIds=[],
                     capabilities=[
                         "submit_order",
+                        "post_only_single_attempt_submit",
                         "cancel_order",
+                        "cancel_order_gated",
                         "order_query",
                         "order_list",
                         "paged_order_history",

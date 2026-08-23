@@ -547,6 +547,37 @@ PLATFORM_MIGRATIONS: tuple[Migration, ...] = (
             """,
         ),
     ),
+    Migration(
+        version=17,
+        name="order-execution-intent-single-postonly-attempt",
+        statements=(
+            """
+            CREATE TABLE IF NOT EXISTS order_execution_intents_v17 (
+                idempotency_key TEXT PRIMARY KEY,
+                reduce_only INTEGER NOT NULL DEFAULT 0,
+                position_id TEXT,
+                execution_policy TEXT NOT NULL DEFAULT 'default'
+                CHECK (
+                    execution_policy IN (
+                        'default',
+                        'fok',
+                        'post_only_chase',
+                        'post_only_single_attempt'
+                    )
+                )
+            )
+            """,
+            """
+            INSERT INTO order_execution_intents_v17 (
+                idempotency_key, reduce_only, position_id, execution_policy
+            )
+            SELECT idempotency_key, reduce_only, position_id, execution_policy
+            FROM order_execution_intents
+            """,
+            "DROP TABLE order_execution_intents",
+            "ALTER TABLE order_execution_intents_v17 RENAME TO order_execution_intents",
+        ),
+    ),
 )
 
 

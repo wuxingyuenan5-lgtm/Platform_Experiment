@@ -19,6 +19,8 @@ from app.config import get_settings
 from app.database import connection, initialize_database
 from app.main import app
 from app.schema_migrations import apply_platform_migrations
+from app.strategies.adapters.funding_carry import build_funding_carry_plan
+from app.strategies.domain import StrategyInstructionAction
 from app.strategies.funding_orchestration import _attempt_status_from_order_status
 from app.strategies.instruction_service import (
     CreateStrategyInstructionRequest,
@@ -615,13 +617,51 @@ def test_reconciling_instruction_completes_without_creating_new_attempt(
 
     instruction_id = _make_instruction("phase2-reconcile-complete")
     first = execute_instruction(instruction_id)
+    with connection() as db:
+        claim_count = db.execute(
+            """
+            SELECT COUNT(*) AS count
+            FROM execution_resource_claims
+            WHERE owner_type = 'batch' AND owner_id = ? AND status = 'active'
+            """,
+            (first.batch_id,),
+        ).fetchone()
+        reservation_count = db.execute(
+            """
+            SELECT COUNT(*) AS count
+            FROM execution_balance_reservations
+            WHERE owner_type = 'batch' AND owner_id = ? AND status = 'active'
+            """,
+            (first.batch_id,),
+        ).fetchone()
+    assert int(claim_count["count"]) > 0
+    assert int(reservation_count["count"]) > 0
     second = execute_instruction(instruction_id)
 
     attempts = _attempt_rows(first.batch_id)
     assert first.status == "hedged"
-    assert second.status == "hedged"
+    assert second.status == "completed"
     assert len(attempts) == 1, attempts
     assert _instruction_row(instruction_id)["status"] == "completed"
+    with connection() as db:
+        released_claims = db.execute(
+            """
+            SELECT COUNT(*) AS count
+            FROM execution_resource_claims
+            WHERE owner_type = 'batch' AND owner_id = ? AND status = 'active'
+            """,
+            (first.batch_id,),
+        ).fetchone()
+        released_reservations = db.execute(
+            """
+            SELECT COUNT(*) AS count
+            FROM execution_balance_reservations
+            WHERE owner_type = 'batch' AND owner_id = ? AND status = 'active'
+            """,
+            (first.batch_id,),
+        ).fetchone()
+    assert int(released_claims["count"]) == 0
+    assert int(released_reservations["count"]) == 0
 
 
 def test_ttl_expiry_stops_new_attempts_directly(
@@ -871,7 +911,7 @@ def test_hedged_batch_leaves_instruction_in_reconciling_and_legacy_route_uses_pr
     assert row["status"] == "reconciling"
 
 
-def test_controlled_live_funding_still_returns_423(
+def test_controlled_live_funding_still_returns_423_when_readiness_is_missing(
     tmp_path: Path,
 ) -> None:
     settings = get_settings()
@@ -897,3 +937,125 @@ def test_controlled_live_funding_still_returns_423(
         "Funding controlled-live execution requires Phase 2 post-only "
         "chase and authoritative incremental release"
     )
+
+
+def test_controlled_live_funding_path_uses_single_postonly_attempt_when_ready(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    settings = get_settings()
+    settings.database_path = str(tmp_path / "funding-phase2-live-ready.db")
+    settings.live_trading_enabled = True
+    settings.environment = "development"
+    settings.auth_mode = "development"
+    settings.default_trading_environment = "live"
+    initialize_database()
+    apply_platform_migrations()
+    with connection() as db:
+        db.execute(
+            "UPDATE strategy_instances SET trading_mode = 'live', status = 'active' WHERE id = ?",
+            (INSTANCE_ID,),
+        )
+        db.execute("UPDATE accounts SET status = 'active' WHERE id = ?", ("account_bybit_funding",))
+        db.execute(
+            """
+            INSERT INTO balance_snapshots (
+                id, account_id, currency, equity, available_balance, source,
+                data_quality_state, as_of, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                "balance_account_bybit_funding_live_test",
+                "account_bybit_funding",
+                "USDT",
+                "100000",
+                "100000",
+                "seed",
+                "complete",
+                "2026-08-23T00:00:00+00:00",
+                "2026-08-23T00:00:00+00:00",
+            ),
+        )
+    monkeypatch.setattr(
+        "app.strategies.funding_orchestration.get_funding_controlled_live_readiness",
+        lambda **_: {"ready": True},
+    )
+    monkeypatch.setattr(
+        "app.funding.get_funding_controlled_live_readiness",
+        lambda **_: {"ready": True},
+    )
+    monkeypatch.setattr(
+        "app.trade_command_execution.enforce_order_safety",
+        lambda *args, **kwargs: None,
+    )
+    monkeypatch.setattr(
+        "app.execution_batches._reservation_reference_price",
+        lambda **_: Decimal("100"),
+    )
+    monkeypatch.setattr(
+        "app.strategies.funding_orchestration._authoritative_quote",
+        lambda **_: {"bid": Decimal("100"), "ask": Decimal("100.1")},
+    )
+    monkeypatch.setattr(
+        "app.strategies.instruction_service.build_plan",
+        lambda strategy_instance_id, action, parameters: build_funding_carry_plan(
+            action=StrategyInstructionAction(action).value,
+            parameters={
+                "perpetualSymbol": "BTCUSDT",
+                "perpetualQuantity": "1",
+                "spotSymbol": "BTCUSDT",
+                "spotQuantity": "1",
+                "accountId": "account_bybit_funding",
+                "perpetualInstrumentId": "instrument_btc_usdt_perp",
+                "spotInstrumentId": "instrument_btc_usdt",
+                "perpetualQuantityStep": "0.001",
+                "spotQuantityStep": "0.001",
+            },
+            created_at=datetime.now(UTC),
+        ),
+    )
+
+    captured_payloads: list[dict[str, object]] = []
+
+    class FakeRuntimeResponse:
+        status_code = 200
+
+        def raise_for_status(self) -> None:
+            return None
+
+        def json(self) -> list[dict[str, object]]:
+            payload = captured_payloads[-1]
+            return [
+                {
+                    "command_id": payload["command_id"],
+                    "platform_order_id": payload["platform_order_id"],
+                    "event_type": "order_acknowledged",
+                    "external_order_id": "BYBIT-ORDER-1",
+                    "occurred_at": "2026-08-23T00:00:00+00:00",
+                }
+            ]
+
+    def runtime_post(url: str, *, json: dict[str, object], timeout: float):
+        assert url.endswith("/commands/orders")
+        assert timeout == settings.runtime_timeout_seconds
+        captured_payloads.append(json)
+        return FakeRuntimeResponse()
+
+    monkeypatch.setattr("app.trade_command_execution.httpx.post", runtime_post)
+
+    with TestClient(app) as client:
+        response = client.post(
+            "/api/v1/trading/funding/market-command",
+            json={
+                "action": "OPEN_SHORT_PERP_LONG_SPOT",
+                "perpetualSymbol": "BTCUSDT",
+                "spotSymbol": "BTC",
+                "quantity": "1",
+                "idempotencyKey": "phase2-live-single-attempt",
+            },
+        )
+
+    assert response.status_code == 200, response.text
+    assert captured_payloads
+    assert captured_payloads[0]["execution_policy"] == "post_only_single_attempt"
+    assert response.json()["status"] in {"executing", "manual_intervention"}

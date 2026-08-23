@@ -172,7 +172,12 @@ def runtime_settings(write_enabled: bool = True) -> Settings:
     )
 
 
-def order_command() -> SubmitOrderCommand:
+def order_command(
+    *,
+    order_type: str = "market",
+    execution_policy: str = "default",
+    price: str | None = None,
+) -> SubmitOrderCommand:
     return SubmitOrderCommand(
         command_id="command-bybit-1",
         platform_order_id="platform-order-bybit-1",
@@ -181,8 +186,10 @@ def order_command() -> SubmitOrderCommand:
         instrument_id="instrument-xaut",
         symbol="XAUTUSDT",
         side="buy",
-        order_type="market",
+        order_type=order_type,
+        execution_policy=execution_policy,
         quantity="1",
+        price=price,
     )
 
 
@@ -236,6 +243,23 @@ def test_bybit_live_adapter_maps_order_fills_and_economic_events(tmp_path) -> No
 
     canceled = adapter.cancel_order("BYBIT-ORDER-1", "cancel-key-1", "operator request")
     assert canceled.status == "canceled"
+
+
+def test_bybit_live_adapter_sends_postonly_time_in_force_for_single_attempt(tmp_path) -> None:
+    get_settings().journal_path = str(tmp_path / "bybit-single-postonly.db")
+    initialize_journal()
+    client = FakeBybitClient()
+    adapter = BybitLiveAdapter(runtime_settings(), client)
+
+    adapter.submit_order(
+        order_command(
+            order_type="limit",
+            execution_policy="post_only_single_attempt",
+            price="1000",
+        )
+    )
+
+    assert client.place_calls[0]["timeInForce"] == "PostOnly"
 
 
 def test_bybit_live_adapter_preserves_underlying_place_order_error(tmp_path) -> None:

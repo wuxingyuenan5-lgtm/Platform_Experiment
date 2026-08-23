@@ -26,6 +26,7 @@ from fastapi.testclient import TestClient
 from app.config import get_settings
 from app.database import connection, initialize_database
 from app.main import app
+from app.strategies.instruction_service import execute_instruction
 
 pytestmark = pytest.mark.integration
 
@@ -125,6 +126,34 @@ def _seed_funding_environment(tmp_path: Path) -> None:
             "UPDATE strategy_instances SET status = 'active' "
             "WHERE id = 'strategy_funding_arbitrage_instance_default'"
         )
+        db.execute(
+            """
+            INSERT INTO balance_snapshots (
+                id, account_id, currency, equity, available_balance, source,
+                data_quality_state, as_of, created_at
+            ) VALUES
+                (
+                    'funding-balance-usdt', 'account_sim_usdt', 'USDT',
+                    '100000', '100000', 'test_seed', 'complete',
+                    '2026-08-23T00:00:00+00:00', '2026-08-23T00:00:00+00:00'
+                ),
+                (
+                    'funding-balance-btc', 'account_sim_usdt', 'BTC',
+                    '10', '10', 'test_seed', 'complete',
+                    '2026-08-23T00:00:00+00:00', '2026-08-23T00:00:00+00:00'
+                )
+            """
+        )
+
+
+def _reconcile_instruction_for_batch(batch_id: str) -> None:
+    with connection() as db:
+        row = db.execute(
+            "SELECT strategy_instruction_id FROM execution_batches WHERE id = ?",
+            (batch_id,),
+        ).fetchone()
+    assert row is not None and row["strategy_instruction_id"] is not None
+    execute_instruction(str(row["strategy_instruction_id"]))
 
 
 def _venue_positions(runtime_url: str, account_id: str) -> list[dict]:
@@ -160,6 +189,7 @@ def test_funding_local_closed_loop_open_close_and_reconcile(
         legs = {leg["role"]: leg for leg in open_batch["legs"]}
         assert legs["perpetual_leg"]["status"] == "filled"
         assert legs["spot_leg"]["status"] == "filled"
+        _reconcile_instruction_for_batch(open_batch["batchId"])
 
         positions = _venue_positions(runtime_url, FUNDING_ACCOUNT_ID)
         perp = [p for p in positions if p.get("instrumentId") == "instrument_btc_usdt_perp"]
@@ -229,23 +259,21 @@ def test_funding_local_closed_loop_fails_closed_when_runtime_unavailable(
             },
         )
         # Fail closed: an unreachable runtime must not hedge or silently retry.
-        # No authoritative quote means no external side effect. The batch fails
-        # closed in-platform, no chase attempt is declared, and the spot hedge
-        # is never released.
-        assert opened.status_code == 200, opened.text
-        batch = opened.json()
-        assert batch["status"] == "failed", batch
-        legs = {leg["role"]: leg for leg in batch["legs"]}
-        assert legs["perpetual_leg"]["status"] == "pending", legs
-        assert legs["spot_leg"]["status"] == "pending", legs
-        assert "Funding runtime query is unavailable" in batch["failureReason"]
+        # No authoritative quote means reservation evidence cannot be computed,
+        # so the request is rejected before any batch or external side effect.
+        assert opened.status_code == 409, opened.text
+        assert opened.json()["detail"] == (
+            "Reference price is unavailable for reservation of BTCUSDT"
+        )
         with connection() as db:
             attempt_count = db.execute(
                 "SELECT COUNT(*) AS count FROM funding_perpetual_attempts"
             ).fetchone()
             command_count = db.execute("SELECT COUNT(*) AS count FROM trade_commands").fetchone()
+            batch_count = db.execute("SELECT COUNT(*) AS count FROM execution_batches").fetchone()
         assert attempt_count["count"] == 0
         assert command_count["count"] == 0
+        assert batch_count["count"] == 1
 
 
 def test_funding_local_closed_loop_simulated_funding_settlement(

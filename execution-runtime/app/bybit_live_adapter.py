@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from decimal import Decimal
-from typing import Any
+from typing import Any, Literal, cast
 
 from app.config import Settings
 from app.gateway_errors import (
@@ -69,7 +69,9 @@ class BybitLiveAdapter:
                 "balance_query",
                 "funding_query",
                 "submit_order_gated",
+                "post_only_single_attempt_submit",
                 "cancel_order_gated",
+                "account_risk_query",
             ],
             missingRequirements=sorted(set(missing)),
         )
@@ -100,7 +102,11 @@ class BybitLiveAdapter:
             if command.price is None:
                 raise GatewayRequestRejectedError("Bybit limit order requires price")
             payload["price"] = format(command.price, "f")
-            payload["timeInForce"] = "GTC"
+            payload["timeInForce"] = (
+                "PostOnly"
+                if command.execution_policy == "post_only_single_attempt"
+                else "GTC"
+            )
         try:
             response = client.place_order(**payload)
         except Exception as exc:
@@ -299,7 +305,11 @@ class BybitLiveAdapter:
         as_of = datetime.now(UTC)
         account_available = self._optional_decimal(account_row.get("totalAvailableBalance"))
         snapshots: list[VenueBalanceSnapshot] = []
-        for coin in account_row.get("coin") or []:
+        raw_coins = account_row.get("coin")
+        coins = raw_coins if isinstance(raw_coins, list) else []
+        for coin in coins:
+            if not isinstance(coin, dict):
+                continue
             currency = str(coin.get("coin") or "").upper()
             equity = Decimal(str(coin.get("equity") or "0"))
             wallet = Decimal(str(coin.get("walletBalance") or "0"))
@@ -463,7 +473,8 @@ class BybitLiveAdapter:
             return operation(self._client(account_id))
 
     def _apply_timestamp_offset(self, helpers) -> None:
-        offset_ms = int(getattr(self.settings, "bybit_timestamp_offset_ms", 0) or 0)
+        raw_offset = getattr(self.settings, "bybit_timestamp_offset_ms", 0)
+        offset_ms = int(cast(str | int | float, raw_offset or 0))
         if offset_ms == 0:
             return
         original = getattr(helpers, "_vg_original_generate_timestamp", None)
@@ -521,7 +532,10 @@ class BybitLiveAdapter:
             raise GatewayConfigurationError("Unable to obtain Bybit reference price") from exc
 
     def _order_snapshot(self, row: dict[str, object], route) -> VenueOrderSnapshot:
-        status_map = {
+        status_map: dict[
+            str,
+            Literal["accepted", "partially_filled", "filled", "canceled", "rejected", "unknown"],
+        ] = {
             "New": "accepted",
             "Created": "accepted",
             "PartiallyFilled": "partially_filled",
@@ -551,7 +565,8 @@ class BybitLiveAdapter:
 
     @staticmethod
     def _require_success(response: dict[str, object], message: str) -> None:
-        code = int(response.get("retCode") or 0)
+        raw_code = response.get("retCode")
+        code = int(cast(str | int | float, raw_code or 0))
         if code != 0:
             detail = str(response.get("retMsg") or message)
             raise GatewayRequestRejectedError(f"{message}: {detail}")
@@ -596,7 +611,8 @@ class BybitLiveAdapter:
     def _millis(value: object) -> datetime:
         if value in {None, ""}:
             return datetime.now(UTC)
-        return datetime.fromtimestamp(int(str(value)) / 1000, UTC)
+        timestamp_ms = int(cast(str | int | float, value))
+        return datetime.fromtimestamp(timestamp_ms / 1000, UTC)
 
     def _micros(self, value: object) -> datetime | None:
         if value in {None, ""}:
