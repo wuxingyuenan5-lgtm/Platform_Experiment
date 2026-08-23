@@ -12,6 +12,7 @@ export type ExecutionBatchStatus =
   | 'executing'
   | 'partially_executed'
   | 'hedged'
+  | 'completed'
   | 'failed'
   | 'manual_intervention';
 
