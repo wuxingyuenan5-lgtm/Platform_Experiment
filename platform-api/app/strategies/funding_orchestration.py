@@ -68,6 +68,7 @@ class FundingAttemptRow:
     attempt_number: int
     idempotency_key: str
     limit_price: Decimal
+    requested_quantity: Decimal
     trade_command_id: str | None
     order_id: str | None
     status: str
@@ -91,6 +92,16 @@ def execute_funding_instruction(
     perpetual_leg = _leg(plan, PERPETUAL_ROLE)
     spot_leg = _leg(plan, SPOT_ROLE)
     batch_id = str(instruction_row["execution_batch_id"])
+    batch_status = _batch_status(batch_id)
+    instruction_status = str(instruction_row["status"])
+
+    if batch_status in {"failed", "manual_intervention", "completed"}:
+        return get_execution_batch(batch_id)
+    if (
+        batch_status == "hedged"
+        or instruction_status == StrategyInstructionStatus.RECONCILING.value
+    ):
+        return _complete_reconciliation(instruction_id, batch_id, perpetual_leg, spot_leg)
 
     _claim_funding_batch(
         instruction_id=instruction_id,
@@ -127,7 +138,7 @@ def execute_funding_instruction(
                     batch_id,
                     "Funding perpetual chase maxMutations exhausted",
                 )
-            _create_attempt(
+            created_attempt = _create_attempt(
                 batch_id=batch_id,
                 strategy_instance_id=strategy_instance_id,
                 request_idempotency_key=str(instruction_row["idempotency_key"]),
@@ -135,7 +146,6 @@ def execute_funding_instruction(
                 attempt_number=next_number,
             )
             active_attempt = _active_attempt(batch_id)
-            created_attempt = True
             if active_attempt is None:
                 latest_attempt = _latest_attempt(batch_id)
                 if latest_attempt is not None and latest_attempt.status == "result_unknown":
@@ -145,10 +155,10 @@ def execute_funding_instruction(
                         "Funding perpetual PostOnly result is unknown",
                     )
                 if (
-                    latest_attempt is not None
-                    and latest_attempt.status in TERMINAL_ATTEMPT_STATUSES
-                ):
-                    active_attempt = latest_attempt
+                        latest_attempt is not None
+                        and latest_attempt.status in TERMINAL_ATTEMPT_STATUSES
+                    ):
+                        active_attempt = latest_attempt
 
         assert active_attempt is not None
         synced = _synchronize_attempt_from_authority(active_attempt)
@@ -169,6 +179,17 @@ def execute_funding_instruction(
                 order_id=synced.order_id,
                 status=synced.status,
                 price=synced.limit_price,
+            )
+
+        if (
+            synced.status in {"declared", "acknowledged", "accepted", "partially_filled"}
+            and synced.attempt_number >= perpetual_leg.max_mutations + 1
+            and _quote_move_requires_new_attempt(synced, perpetual_leg)
+        ):
+            return _bounded_stop(
+                instruction_id,
+                batch_id,
+                "Funding perpetual chase maxMutations exhausted",
             )
 
         if _has_release_side_effect_failure(batch_id):
@@ -215,7 +236,7 @@ def execute_funding_instruction(
                     batch_id,
                     "Funding perpetual chase maxMutations exhausted",
                 )
-            _create_attempt(
+            created_attempt = _create_attempt(
                 batch_id=batch_id,
                 strategy_instance_id=strategy_instance_id,
                 request_idempotency_key=str(instruction_row["idempotency_key"]),
@@ -332,9 +353,21 @@ def _create_attempt(
     request_idempotency_key: str,
     leg: ExecutionPlanLeg,
     attempt_number: int,
-) -> None:
+) -> bool:
+    requested_quantity = _remaining_perpetual_quantity(batch_id, leg)
+    if requested_quantity <= 0:
+        return False
+    if requested_quantity < leg.minimum_quantity:
+        return False
     quote = _authoritative_quote(account_id=leg.account_id, symbol=leg.external_symbol)
     limit_price = _aligned_limit_price(leg, bid=quote["bid"], ask=quote["ask"])
+    latest_attempt = _latest_attempt(batch_id)
+    if (
+        latest_attempt is not None
+        and latest_attempt.status in {"canceled", "rejected"}
+        and limit_price == latest_attempt.limit_price
+    ):
+        return False
     attempt_id = str(uuid4())
     idempotency_key = _attempt_idempotency_key(
         request_idempotency_key=request_idempotency_key,
@@ -344,10 +377,10 @@ def _create_attempt(
         db.execute(
             """
             INSERT OR IGNORE INTO funding_perpetual_attempts (
-                id, batch_id, attempt_number, idempotency_key, limit_price,
+                id, batch_id, attempt_number, idempotency_key, limit_price, requested_quantity,
                 trade_command_id, order_id, status, cancel_requested_at,
                 cancel_terminal_at, failure_reason, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, NULL, NULL, 'declared', NULL, NULL, NULL, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, NULL, NULL, 'declared', NULL, NULL, NULL, ?, ?)
             """,
             (
                 attempt_id,
@@ -355,6 +388,7 @@ def _create_attempt(
                 attempt_number,
                 idempotency_key,
                 _decimal_text(limit_price),
+                _decimal_text(requested_quantity),
                 _utc_now(),
                 _utc_now(),
             ),
@@ -373,8 +407,13 @@ def _create_attempt(
             detail="Funding perpetual attempt claim is unavailable",
         )
     if row["order_id"] is not None or row["status"] != "declared":
-        return
+        return False
 
+    _assert_attempt_within_maximum(
+        batch_id=batch_id,
+        requested_quantity=requested_quantity,
+        maximum_quantity=leg.maximum_quantity,
+    )
     register_order_execution_intent(
         idempotency_key,
         reduce_only=False,
@@ -390,7 +429,7 @@ def _create_attempt(
                 symbol=leg.external_symbol,
                 side=leg.side,
                 orderType="limit",
-                quantity=leg.maximum_quantity,
+                quantity=requested_quantity,
                 price=limit_price,
             )
         )
@@ -416,6 +455,7 @@ def _create_attempt(
             status=command.status,
             price=limit_price,
         )
+        return True
     except HTTPException as exc:
         unknown_order_id = _result_unknown_order_for_idempotency_key(idempotency_key)
         if unknown_order_id is None:
@@ -436,6 +476,7 @@ def _create_attempt(
             status="result_unknown",
             price=limit_price,
         )
+        return True
 
 
 def _synchronize_attempt_from_authority(attempt: FundingAttemptRow) -> FundingAttemptRow:
@@ -820,6 +861,7 @@ def _attempt_from_row(row) -> FundingAttemptRow:
         attempt_number=int(row["attempt_number"]),
         idempotency_key=str(row["idempotency_key"]),
         limit_price=Decimal(str(row["limit_price"])),
+        requested_quantity=Decimal(str(row["requested_quantity"] or "0")),
         trade_command_id=row["trade_command_id"],
         order_id=row["order_id"],
         status=str(row["status"]),
@@ -839,7 +881,184 @@ def _attempt_status_from_order_status(status: str) -> str:
         "canceled": "canceled",
         "rejected": "rejected",
         "result_unknown": "result_unknown",
-    }.get(status, "accepted")
+    }.get(status, "result_unknown")
+
+
+def _remaining_perpetual_quantity(batch_id: str, leg: ExecutionPlanLeg) -> Decimal:
+    remaining = leg.maximum_quantity - _latest_perpetual_cumulative_fill(batch_id)
+    if remaining <= 0:
+        return Decimal("0")
+    with localcontext() as context:
+        context.prec = 28
+        steps = (remaining / leg.quantity_step).to_integral_value(rounding=ROUND_FLOOR)
+        quantized = steps * leg.quantity_step
+    return max(quantized, Decimal("0"))
+
+
+def _assert_attempt_within_maximum(
+    *,
+    batch_id: str,
+    requested_quantity: Decimal,
+    maximum_quantity: Decimal,
+) -> None:
+    cumulative_fill = _latest_perpetual_cumulative_fill(batch_id)
+    if cumulative_fill + requested_quantity > maximum_quantity:
+        raise HTTPException(
+            status_code=502,
+            detail="Funding perpetual attempt would exceed maximumQuantity",
+        )
+
+
+def _batch_status(batch_id: str) -> str:
+    with connection() as db:
+        row = db.execute(
+            "SELECT status FROM execution_batches WHERE id = ?",
+            (batch_id,),
+        ).fetchone()
+    if row is None:
+        raise HTTPException(status_code=404, detail="Funding execution batch is unavailable")
+    return str(row["status"])
+
+
+def _complete_reconciliation(
+    instruction_id: str,
+    batch_id: str,
+    perpetual_leg: ExecutionPlanLeg,
+    spot_leg: ExecutionPlanLeg,
+) -> ExecutionBatchResponse:
+    cumulative_fill = _latest_perpetual_cumulative_fill(batch_id)
+    cumulative_spot = _declared_cumulative_spot(batch_id)
+    expected_spot = spot_leg.release_cap or Decimal("0")
+    if _has_release_side_effect_failure(batch_id):
+        return _manual_intervention(
+            instruction_id,
+            batch_id,
+            "Funding Spot release requires manual intervention",
+        )
+    if cumulative_fill != perpetual_leg.maximum_quantity or cumulative_spot != expected_spot:
+        return _manual_intervention(
+            instruction_id,
+            batch_id,
+            "Funding reconciliation is incomplete",
+        )
+    reconciliation_status = _authoritative_reconciliation_status(
+        batch_id,
+        perpetual_leg,
+        spot_leg,
+    )
+    if reconciliation_status == "unavailable":
+        return get_execution_batch(batch_id)
+    if reconciliation_status == "mismatch":
+        return _manual_intervention(
+            instruction_id,
+            batch_id,
+            "Funding authoritative position evidence mismatches plan",
+        )
+    update_batch_status(batch_id, "hedged")
+    complete_batch_risk(batch_id)
+    _set_instruction_status(instruction_id, StrategyInstructionStatus.COMPLETED)
+    return get_execution_batch(batch_id)
+
+
+def _authoritative_reconciliation_status(
+    batch_id: str,
+    perpetual_leg: ExecutionPlanLeg,
+    spot_leg: ExecutionPlanLeg,
+) -> str:
+    attempts = _attempts(batch_id)
+    if not attempts or any(attempt.order_id is None for attempt in attempts):
+        return "unavailable"
+    try:
+        for attempt in attempts:
+            order_id = attempt.order_id
+            assert order_id is not None
+            order = _runtime_get(f"/venue/orders/by-platform/{order_id}")
+            fills = _runtime_get("/venue/fills", params={"platformOrderId": order_id})
+            if not isinstance(order, dict) or not isinstance(fills, list):
+                return "unavailable"
+        release_orders = [
+            row.order_id for row in _release_rows(batch_id) if row.order_id is not None
+        ]
+        for order_id in release_orders:
+            order = _runtime_get(f"/venue/orders/by-platform/{order_id}")
+            fills = _runtime_get("/venue/fills", params={"platformOrderId": order_id})
+            if not isinstance(order, dict) or not isinstance(fills, list):
+                return "unavailable"
+        positions = _runtime_get(
+            "/venue/positions",
+            params={"accountId": perpetual_leg.account_id},
+        )
+        if not isinstance(positions, list):
+            return "unavailable"
+        account_risk = _runtime_get(
+            "/venue/account-risk",
+            params={"accountId": perpetual_leg.account_id},
+        )
+        if not isinstance(account_risk, dict) or account_risk.get("dataQualityState") != "complete":
+            return "unavailable"
+    except HTTPException:
+        return "unavailable"
+
+    expected_positions = {
+        perpetual_leg.instrument_id: _signed_fill_quantity(
+            account_id=perpetual_leg.account_id,
+            instrument_id=perpetual_leg.instrument_id,
+            side=perpetual_leg.side,
+            order_ids=[attempt.order_id for attempt in attempts if attempt.order_id is not None],
+        ),
+        spot_leg.instrument_id: _signed_fill_quantity(
+            account_id=spot_leg.account_id,
+            instrument_id=spot_leg.instrument_id,
+            side=spot_leg.side,
+            order_ids=release_orders,
+        ),
+    }
+    actual_positions = {
+        str(position.get("instrumentId")): Decimal(str(position.get("netQuantity", "0")))
+        for position in positions
+        if isinstance(position, dict)
+    }
+    for instrument_id, expected_quantity in expected_positions.items():
+        if actual_positions.get(instrument_id, Decimal("0")) != expected_quantity:
+            return "mismatch"
+    return "ready"
+
+
+def _signed_fill_quantity(
+    *,
+    account_id: str,
+    instrument_id: str,
+    side: str,
+    order_ids: list[str],
+) -> Decimal:
+    if not order_ids:
+        return Decimal("0")
+    placeholders = ", ".join("?" for _ in order_ids)
+    with connection() as db:
+        rows = db.execute(
+            f"""
+            SELECT quantity
+            FROM fills
+            WHERE account_id = ? AND instrument_id = ? AND order_id IN ({placeholders})
+            """,
+            (account_id, instrument_id, *order_ids),
+        ).fetchall()
+    quantity = _sum_decimal_rows(rows, key="quantity")
+    return quantity if side == "buy" else -quantity
+
+
+def _attempts(batch_id: str) -> list[FundingAttemptRow]:
+    with connection() as db:
+        rows = db.execute(
+            """
+            SELECT *
+            FROM funding_perpetual_attempts
+            WHERE batch_id = ?
+            ORDER BY attempt_number
+            """,
+            (batch_id,),
+        ).fetchall()
+    return [_attempt_from_row(row) for row in rows]
 
 
 def _order_cumulative_fill(order_id: str) -> Decimal:
@@ -1012,7 +1231,7 @@ def _ttl_expired(batch_id: str, leg: ExecutionPlanLeg) -> bool:
     with connection() as db:
         row = db.execute(
             """
-            SELECT MIN(created_at) AS created_at
+            SELECT MAX(created_at) AS created_at
             FROM funding_perpetual_attempts
             WHERE batch_id = ?
             """,
@@ -1022,6 +1241,11 @@ def _ttl_expired(batch_id: str, leg: ExecutionPlanLeg) -> bool:
         return False
     started = datetime.fromisoformat(str(row["created_at"]))
     return datetime.now(UTC) >= started + timedelta(seconds=leg.ttl_seconds)
+
+
+def _quote_move_requires_new_attempt(attempt: FundingAttemptRow, leg: ExecutionPlanLeg) -> bool:
+    quote = _authoritative_quote(account_id=leg.account_id, symbol=leg.external_symbol)
+    return _aligned_limit_price(leg, bid=quote["bid"], ask=quote["ask"]) != attempt.limit_price
 
 
 def _has_release_side_effect_failure(batch_id: str) -> bool:

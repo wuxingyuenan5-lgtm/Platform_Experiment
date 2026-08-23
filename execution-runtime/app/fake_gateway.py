@@ -75,10 +75,13 @@ class FakeGateway:
             fill_price = Decimal(
                 str(script["partial_fill_price"] or command.price or Decimal("100"))
             )
-            fill_quantity = Decimal(str(script["partial_fill_quantity"]))
+            scripted_quantity = Decimal(str(script["partial_fill_quantity"]))
+            fill_quantity = min(scripted_quantity, command.quantity)
+            if fill_quantity < Decimal("0"):
+                fill_quantity = Decimal("0")
             external_order_id, _ = persist_order(
                 command,
-                status="partially_filled",
+                status="partially_filled" if fill_quantity > 0 else "accepted",
                 fill_price=fill_price,
                 fill_quantity=fill_quantity,
                 cancel_terminal_after_queries=int(script["cancel_terminal_after_queries"]),

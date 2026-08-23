@@ -19,6 +19,7 @@ from app.config import get_settings
 from app.database import connection, initialize_database
 from app.main import app
 from app.schema_migrations import apply_platform_migrations
+from app.strategies.funding_orchestration import _attempt_status_from_order_status
 from app.strategies.instruction_service import (
     CreateStrategyInstructionRequest,
     create_instruction,
@@ -167,6 +168,39 @@ def _set_quote(journal_dir: Path, *, symbol: str, bid: str, ask: str, last: str 
         )
 
 
+def _set_runtime_position(
+    journal_dir: Path,
+    *,
+    account_id: str,
+    instrument_id: str,
+    symbol: str,
+    net_quantity: str,
+    currency: str = "USDT",
+) -> None:
+    import sqlite3
+
+    with sqlite3.connect(journal_dir / "runtime_journal.db") as db:
+        db.execute(
+            """
+            INSERT INTO fake_venue_positions (
+                account_id, instrument_id, symbol, net_quantity, average_price, currency, updated_at
+            ) VALUES (?, ?, ?, ?, NULL, ?, ?)
+            ON CONFLICT(account_id, instrument_id) DO UPDATE SET
+                symbol = excluded.symbol,
+                net_quantity = excluded.net_quantity,
+                updated_at = excluded.updated_at
+            """,
+            (
+                account_id,
+                instrument_id,
+                symbol,
+                net_quantity,
+                currency,
+                datetime.now(UTC).isoformat(),
+            ),
+        )
+
+
 def _instruction_row(instruction_id: str):
     with connection() as db:
         return db.execute("SELECT * FROM strategy_runs WHERE id = ?", (instruction_id,)).fetchone()
@@ -176,7 +210,8 @@ def _attempt_rows(batch_id: str) -> list[dict[str, object]]:
     with connection() as db:
         rows = db.execute(
             """
-            SELECT attempt_number, idempotency_key, limit_price, order_id, status,
+            SELECT attempt_number, idempotency_key, limit_price,
+                   requested_quantity, order_id, status,
                    cancel_requested_at, cancel_terminal_at
             FROM funding_perpetual_attempts
             WHERE batch_id = ?
@@ -391,6 +426,8 @@ def test_second_cumulative_fill_only_releases_new_decimal_delta(
     _age_attempt(first.batch_id, 1)
     execute_instruction(instruction_id)
     execute_instruction(instruction_id)
+    _set_quote(journal_dir, symbol="BTCUSDT", bid="100.1", ask="100.2")
+    execute_instruction(instruction_id)
     execute_instruction(instruction_id)
 
     releases = _release_rows(first.batch_id)
@@ -402,6 +439,49 @@ def test_second_cumulative_fill_only_releases_new_decimal_delta(
         (Decimal(str(row["release_quantity"])) for row in releases),
         Decimal("0"),
     ) == Decimal("1.009")
+
+
+def test_second_attempt_uses_residual_quantity_and_caps_runtime_partial_fill_to_remaining(
+    runtime: tuple[str, Path],
+    tmp_path: Path,
+) -> None:
+    runtime_url, journal_dir = runtime
+    _seed_environment(tmp_path, runtime_url)
+    _set_quote(journal_dir, symbol="BTCUSDT", bid="100", ask="100.1")
+    _seed_script(
+        journal_dir,
+        symbol="BTCUSDT",
+        behavior="partial_fill",
+        partial_fill_quantity="0.4",
+        partial_fill_price="100.1",
+        cancel_terminal_after_queries=1,
+    )
+    _seed_script(
+        journal_dir,
+        symbol="BTCUSDT",
+        behavior="partial_fill",
+        partial_fill_quantity="1.0",
+        partial_fill_price="100.2",
+    )
+
+    instruction_id = _make_instruction("phase2-residual-attempt")
+    first = execute_instruction(instruction_id)
+    _age_attempt(first.batch_id, 1)
+    execute_instruction(instruction_id)
+    execute_instruction(instruction_id)
+    _set_quote(journal_dir, symbol="BTCUSDT", bid="100.1", ask="100.2")
+    execute_instruction(instruction_id)
+    execute_instruction(instruction_id)
+
+    attempts = _attempt_rows(first.batch_id)
+    releases = _release_rows(first.batch_id)
+    assert len(attempts) == 2, attempts
+    assert Decimal(str(attempts[0]["requested_quantity"])) == Decimal("1")
+    assert Decimal(str(attempts[1]["requested_quantity"])) == Decimal("0.6")
+    assert [Decimal(str(row["release_quantity"])) for row in releases] == [
+        Decimal("0.4"),
+        Decimal("0.6"),
+    ]
 
 
 def test_same_instruction_concurrent_resume_claims_one_release_and_one_spot_command(
@@ -434,6 +514,45 @@ def test_same_instruction_concurrent_resume_claims_one_release_and_one_spot_comm
             """
         ).fetchone()
     assert int(count["count"]) == 1
+
+
+def test_same_price_cancel_terminal_does_not_repost_until_quote_moves_one_tick(
+    runtime: tuple[str, Path],
+    tmp_path: Path,
+) -> None:
+    runtime_url, journal_dir = runtime
+    _seed_environment(tmp_path, runtime_url)
+    _set_quote(journal_dir, symbol="BTCUSDT", bid="100.03", ask="100.07")
+    _seed_script(
+        journal_dir,
+        symbol="BTCUSDT",
+        behavior="accepted_no_fill",
+        cancel_terminal_after_queries=1,
+    )
+    _seed_script(
+        journal_dir,
+        symbol="BTCUSDT",
+        behavior="accepted_no_fill",
+        cancel_terminal_after_queries=1,
+    )
+
+    instruction_id = _make_instruction("phase2-no-same-price-repost")
+    first = execute_instruction(instruction_id)
+    _age_attempt(first.batch_id, 1)
+
+    execute_instruction(instruction_id)
+    execute_instruction(instruction_id)
+    still_one = execute_instruction(instruction_id)
+
+    attempts = _attempt_rows(still_one.batch_id)
+    assert len(attempts) == 1, attempts
+    assert attempts[0]["status"] == "canceled"
+
+    _set_quote(journal_dir, symbol="BTCUSDT", bid="100.04", ask="100.08")
+    moved = execute_instruction(instruction_id)
+    moved_attempts = _attempt_rows(moved.batch_id)
+    assert len(moved_attempts) == 2, moved_attempts
+    assert Decimal(str(moved_attempts[1]["limit_price"])) == Decimal("100.08")
 
 
 def test_two_funding_instructions_cannot_hold_execution_lease_concurrently(
@@ -480,6 +599,232 @@ def test_result_unknown_keeps_lease_and_creates_no_new_attempt_or_spot(
     assert len(attempts) == 1
     assert attempts[0]["status"] == "result_unknown"
     assert _release_rows(first.batch_id) == []
+
+
+def test_unknown_order_status_is_fail_closed_to_result_unknown() -> None:
+    assert _attempt_status_from_order_status("mystery_status") == "result_unknown"
+
+
+def test_reconciling_instruction_completes_without_creating_new_attempt(
+    runtime: tuple[str, Path],
+    tmp_path: Path,
+) -> None:
+    runtime_url, journal_dir = runtime
+    _seed_environment(tmp_path, runtime_url)
+    _set_quote(journal_dir, symbol="BTCUSDT", bid="100", ask="100.1")
+
+    instruction_id = _make_instruction("phase2-reconcile-complete")
+    first = execute_instruction(instruction_id)
+    second = execute_instruction(instruction_id)
+
+    attempts = _attempt_rows(first.batch_id)
+    assert first.status == "hedged"
+    assert second.status == "hedged"
+    assert len(attempts) == 1, attempts
+    assert _instruction_row(instruction_id)["status"] == "completed"
+
+
+def test_ttl_expiry_stops_new_attempts_directly(
+    runtime: tuple[str, Path],
+    tmp_path: Path,
+) -> None:
+    runtime_url, journal_dir = runtime
+    _seed_environment(tmp_path, runtime_url)
+    _set_quote(journal_dir, symbol="BTCUSDT", bid="100", ask="100.1")
+    _seed_script(
+        journal_dir,
+        symbol="BTCUSDT",
+        behavior="accepted_no_fill",
+        cancel_terminal_after_queries=1,
+    )
+
+    instruction_id = _make_instruction("phase2-ttl-stop")
+    first = execute_instruction(instruction_id)
+    with connection() as db:
+        stale = (datetime.now(UTC) - timedelta(seconds=30)).isoformat()
+        db.execute(
+            """
+            UPDATE funding_perpetual_attempts
+            SET created_at = ?, updated_at = ?
+            WHERE batch_id = ?
+            """,
+            (stale, stale, first.batch_id),
+        )
+    execute_instruction(instruction_id)
+    execute_instruction(instruction_id)
+    _set_quote(journal_dir, symbol="BTCUSDT", bid="100.1", ask="100.2")
+    final_batch = execute_instruction(instruction_id)
+
+    assert final_batch.status == "manual_intervention"
+    assert "TTL expired" in str(final_batch.failure_reason)
+
+
+def test_max_mutations_exhaustion_stops_reposts_directly(
+    runtime: tuple[str, Path],
+    tmp_path: Path,
+) -> None:
+    runtime_url, journal_dir = runtime
+    _seed_environment(tmp_path, runtime_url)
+    _set_quote(journal_dir, symbol="BTCUSDT", bid="100", ask="100.1")
+    for _ in range(8):
+        _seed_script(
+            journal_dir,
+            symbol="BTCUSDT",
+            behavior="accepted_no_fill",
+            cancel_terminal_after_queries=1,
+        )
+
+    instruction_id = _make_instruction("phase2-max-mutations")
+    batch_id = None
+    result = None
+    for index in range(6):
+        result = execute_instruction(instruction_id)
+        batch_id = result.batch_id
+        _age_attempt(result.batch_id, 2)
+        execute_instruction(instruction_id)
+        _set_quote(
+            journal_dir,
+            symbol="BTCUSDT",
+            bid=str(100 + index + 1),
+            ask=str(100.1 + index + 1),
+        )
+        result = execute_instruction(instruction_id)
+        if index < 5:
+            assert result.status == "executing"
+        else:
+            assert result.status == "manual_intervention"
+    assert result is not None
+    assert batch_id is not None
+    attempts = _attempt_rows(batch_id)
+    assert len(attempts) == 6
+    assert "maxMutations exhausted" in str(result.failure_reason)
+
+
+def test_restart_recovery_resumes_without_duplicate_release(
+    runtime: tuple[str, Path],
+    tmp_path: Path,
+) -> None:
+    runtime_url, journal_dir = runtime
+    _seed_environment(tmp_path, runtime_url)
+    _set_quote(journal_dir, symbol="BTCUSDT", bid="100", ask="100.1")
+    _seed_script(
+        journal_dir,
+        symbol="BTCUSDT",
+        behavior="partial_fill",
+        partial_fill_quantity="0.5",
+        partial_fill_price="100.1",
+    )
+
+    instruction_id = _make_instruction("phase2-restart-recovery")
+    first = execute_instruction(instruction_id)
+    settings = get_settings()
+    settings.database_path = str(tmp_path / "funding-phase2-orchestration.db")
+    apply_platform_migrations()
+    second = execute_instruction(instruction_id)
+
+    assert first.status == "partially_executed"
+    assert second.status == "partially_executed"
+    assert len(_release_rows(first.batch_id)) == 1
+
+
+def test_residual_quantity_is_quantized_and_total_requested_never_exceeds_maximum(
+    runtime: tuple[str, Path],
+    tmp_path: Path,
+) -> None:
+    runtime_url, journal_dir = runtime
+    _seed_environment(tmp_path, runtime_url)
+    _set_quote(journal_dir, symbol="BTCUSDT", bid="100", ask="100.1")
+    _seed_script(
+        journal_dir,
+        symbol="BTCUSDT",
+        behavior="partial_fill",
+        partial_fill_quantity="0.9995",
+        partial_fill_price="100.1",
+        cancel_terminal_after_queries=1,
+    )
+    _seed_script(
+        journal_dir,
+        symbol="BTCUSDT",
+        behavior="partial_fill",
+        partial_fill_quantity="1.0",
+        partial_fill_price="100.2",
+    )
+
+    instruction_id = _make_instruction("phase2-residual-quantized")
+    first = execute_instruction(instruction_id)
+    _age_attempt(first.batch_id, 1)
+    execute_instruction(instruction_id)
+    execute_instruction(instruction_id)
+    _set_quote(journal_dir, symbol="BTCUSDT", bid="100.1", ask="100.2")
+    execute_instruction(instruction_id)
+    execute_instruction(instruction_id)
+
+    attempts = _attempt_rows(first.batch_id)
+    assert len(attempts) == 1
+    assert Decimal(str(attempts[0]["requested_quantity"])) == Decimal("1")
+    with connection() as db:
+        total_requested = db.execute(
+            """
+            SELECT COALESCE(SUM(CAST(requested_quantity AS REAL)), 0) AS total
+            FROM funding_perpetual_attempts
+            WHERE batch_id = ?
+            """,
+            (first.batch_id,),
+        ).fetchone()
+    assert Decimal(str(total_requested["total"])) <= Decimal("1")
+
+
+def test_reconciliation_query_unavailable_keeps_instruction_reconciling(
+    runtime: tuple[str, Path],
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    runtime_url, journal_dir = runtime
+    _seed_environment(tmp_path, runtime_url)
+    _set_quote(journal_dir, symbol="BTCUSDT", bid="100", ask="100.1")
+
+    instruction_id = _make_instruction("phase2-reconcile-unavailable")
+    first = execute_instruction(instruction_id)
+
+    from app.strategies import funding_orchestration as orchestration
+
+    original_runtime_get = orchestration._runtime_get
+
+    def blocked_runtime_get(path: str, *args, **kwargs):
+        if path == "/venue/positions":
+            raise HTTPException(status_code=502, detail="runtime unavailable")
+        return original_runtime_get(path, *args, **kwargs)
+
+    monkeypatch.setattr(orchestration, "_runtime_get", blocked_runtime_get)
+    second = execute_instruction(instruction_id)
+
+    assert first.status == "hedged"
+    assert second.status == "hedged"
+    assert _instruction_row(instruction_id)["status"] == "reconciling"
+
+
+def test_reconciliation_position_mismatch_enters_manual_intervention(
+    runtime: tuple[str, Path],
+    tmp_path: Path,
+) -> None:
+    runtime_url, journal_dir = runtime
+    _seed_environment(tmp_path, runtime_url)
+    _set_quote(journal_dir, symbol="BTCUSDT", bid="100", ask="100.1")
+
+    instruction_id = _make_instruction("phase2-reconcile-mismatch")
+    first = execute_instruction(instruction_id)
+    _set_runtime_position(
+        journal_dir,
+        account_id=ACCOUNT_ID,
+        instrument_id="instrument_btc_usdt_perp",
+        symbol="BTCUSDT",
+        net_quantity="-2",
+    )
+    second = execute_instruction(instruction_id)
+
+    assert first.status == "hedged"
+    assert second.status == "manual_intervention"
+    assert "mismatches plan" in str(second.failure_reason)
 
 
 def test_hedged_batch_leaves_instruction_in_reconciling_and_legacy_route_uses_principal_user_id(
