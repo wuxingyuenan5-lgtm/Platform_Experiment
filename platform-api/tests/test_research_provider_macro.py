@@ -78,8 +78,8 @@ def test_macro_provider_reads_platform_data_contract(
 
     assert contract.status == "ready"
     assert contract.events[0].id == "us-recession-by-end-2026"
-    assert contract.events[0].probability == Decimal("8")
-    assert contract.events[0].history[0].probability == Decimal("8")
+    assert contract.events[0].probability == 8.0
+    assert contract.events[0].history[0].probability == 8.0
 
 
 def test_macro_provider_rejects_ready_empty_contract(

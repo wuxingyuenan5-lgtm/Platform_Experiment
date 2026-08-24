@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from datetime import datetime
-from decimal import Decimal
 from typing import Any, Literal, cast
 
 import httpx
@@ -30,7 +29,7 @@ MacroExpectationFeedStatus = Literal[
 
 class MacroExpectationFeedPoint(ResearchApiModel):
     observed_at: datetime
-    probability: Decimal = Field(ge=0, le=100)
+    probability: float = Field(ge=0, le=100)
 
     @field_validator("observed_at")
     @classmethod
@@ -44,7 +43,7 @@ class MacroExpectationFeedEvent(ResearchApiModel):
     id: str = Field(min_length=1, max_length=160)
     label: str = Field(min_length=1, max_length=512)
     category: MacroCategory
-    probability: Decimal = Field(ge=0, le=100)
+    probability: float = Field(ge=0, le=100)
     history: list[MacroExpectationFeedPoint] = Field(default_factory=list)
 
 
