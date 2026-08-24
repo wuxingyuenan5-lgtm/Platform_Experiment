@@ -33,18 +33,27 @@ def test_existing_management_strategies_have_bybit_account_bindings_with_read_on
         assert funding.status_code == 200
         funding_bindings = funding.json()
         assert {
-            (item["accountId"], item["role"], item["capability"])
+            (item["accountId"], item["role"], item["capability"], item["status"])
             for item in funding_bindings
         } == {
-            ("account_bybit_funding", "primary", "trade_and_read"),
-            ("account_sim_usdt", "local_test", "trade_and_read"),
+            ("bybit-live-main", "primary", "trade_and_read", "active"),
+            ("account_sim_usdt", "local_test", "trade_and_read", "active"),
+            ("account_bybit_funding", "primary", "trade_and_read", "inactive"),
         }
 
         for instance_id in EXPECTED_READ_ONLY_INSTANCES:
             response = client.get(f"/api/v1/strategies/instances/{instance_id}/accounts")
             assert response.status_code == 200
             bindings = response.json()
-            assert len(bindings) == 1
-            assert bindings[0]["capability"] == "read_only"
-            assert bindings[0]["accountCode"].startswith("BYBIT-")
-            assert bindings[0]["status"] == "active"
+            active_bindings = [item for item in bindings if item["status"] == "active"]
+            if instance_id == "strategy_short_term_w_instance_default":
+                assert active_bindings == []
+                continue
+            assert len(active_bindings) == 1
+            assert active_bindings[0]["capability"] == "read_only"
+            expected_prefix = (
+                "MT5-"
+                if instance_id == "strategy_short_term_l_instance_default"
+                else "BYBIT-"
+            )
+            assert active_bindings[0]["accountCode"].startswith(expected_prefix)

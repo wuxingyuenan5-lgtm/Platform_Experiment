@@ -69,7 +69,15 @@ function formatTime(value: string | null | undefined): string {
 
 function unavailableReason(snapshot: StrategyAccountSnapshotResult | null): string {
   if (!snapshot) return '账户快照未加载';
-  if (snapshot.dataQualityState === 'unavailable') return 'Bybit API 未配置';
+  if (snapshot.syncErrorCode === 'account_unbound') return '暂未绑定账号';
+  if (snapshot.syncStatus === 'waiting_initial_sync') return '等待首次同步';
+  if (snapshot.syncStatus === 'syncing') return '正在同步';
+  if (snapshot.syncStatus === 'ready') return '最近同步成功';
+  if (snapshot.syncStatus === 'stale') return '数据过期';
+  if (snapshot.syncErrorCode === 'credential_unavailable') return '凭据未配置';
+  if (snapshot.syncErrorCode === 'runtime_unavailable') return 'Runtime 不可达';
+  if (snapshot.dataQualityState === 'unbound') return '暂未绑定账号';
+  if (snapshot.dataQualityState === 'unavailable') return '账户不可用';
   return snapshot.dataQualityState || '数据待同步';
 }
 
@@ -146,7 +154,12 @@ function pnlProfile(
         rows: [
           {
             label: '账户权限',
-            value: snapshot?.capability === 'trade_and_read' ? '可交易、可读取' : '仅可读取',
+            value:
+              snapshot?.capability === 'trade_and_read'
+                ? '可交易、可读取'
+                : snapshot?.capability === 'read_only'
+                ? '仅可读取'
+                : '未绑定',
           },
           { label: '数据状态', value: reason },
           { label: '最后同步', value: formatTime(snapshot?.asOf) },
@@ -219,7 +232,12 @@ function capitalProfile(
       },
       {
         label: '账户能力',
-        value: snapshot?.capability === 'trade_and_read' ? '可交易' : '仅读取',
+        value:
+          snapshot?.capability === 'trade_and_read'
+            ? '可交易'
+            : snapshot?.capability === 'read_only'
+            ? '仅读取'
+            : '未绑定',
         note: '读取权限向所有授权用户开放',
         tone: 'neutral',
       },
@@ -256,7 +274,6 @@ function orderProfile(
   desk: AccountStrategyDesk,
   snapshot: StrategyAccountSnapshotResult | null,
 ): StrategyOrderProfile {
-  const reason = unavailableReason(snapshot);
   const tables: Record<string, StrategyTableSection> = {
     positions: {
       columns: [

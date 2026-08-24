@@ -75,7 +75,7 @@ def seed_reference_data(db: sqlite3.Connection) -> None:
             "短线交易员A",
             "read_only",
             "active",
-            "Bybit 只读账户：策略损益、账户资金与订单信息。",
+            "MT5 只读监控账户：账户、订单、持仓、Deal、费用与风控信息。",
             None,
         ),
         (
@@ -84,7 +84,7 @@ def seed_reference_data(db: sqlite3.Connection) -> None:
             "短线交易员B",
             "read_only",
             "active",
-            "Bybit 只读账户：策略损益、账户资金与订单信息。",
+            "未绑定真实账号的只读占位策略。",
             None,
         ),
     ]
@@ -164,6 +164,38 @@ def seed_reference_data(db: sqlite3.Connection) -> None:
         )
 
     credential_references = [
+        (
+            "credential_bybit_live_001",
+            "secret://environment/bybit-live-001",
+            "venue_bybit",
+            "live",
+            "trading",
+            "pending_secret",
+        ),
+        (
+            "credential_mt5_live_001",
+            "secret://environment/mt5-live-001",
+            "venue_mt5",
+            "live",
+            "trading",
+            "pending_secret",
+        ),
+        (
+            "credential_bybit_bottom_fishing",
+            "secret://environment/bybit-bottom-fishing",
+            "venue_bybit",
+            "live",
+            "monitoring",
+            "pending_secret",
+        ),
+        (
+            "credential_mt5_short_term_a",
+            "secret://environment/mt5-short-term-a",
+            "venue_mt5",
+            "live",
+            "monitoring",
+            "pending_secret",
+        ),
         (
             "credential_crypto_test_001",
             "secret://crypto-test-001",
@@ -249,6 +281,30 @@ def seed_reference_data(db: sqlite3.Connection) -> None:
             "partial",
         ),
         (
+            "bybit-live-main",
+            "venue_bybit",
+            "BYBIT-LIVE-MAIN",
+            "Bybit Live Main UTA",
+            "crypto",
+            "live",
+            "USDT",
+            "secret://environment/bybit-live-001",
+            "active",
+            "unavailable",
+        ),
+        (
+            "mt5-live-main",
+            "venue_mt5",
+            "MT5-LIVE-MAIN",
+            "MT5 Live Main Account",
+            "mt5",
+            "live",
+            "USD",
+            "secret://environment/mt5-live-001",
+            "active",
+            "unavailable",
+        ),
+        (
             "account_bybit_funding",
             "venue_bybit",
             "BYBIT-FUNDING",
@@ -257,7 +313,7 @@ def seed_reference_data(db: sqlite3.Connection) -> None:
             "live",
             "USDT",
             "secret://environment/bybit-funding",
-            "active",
+            "inactive",
             "unavailable",
         ),
         (
@@ -273,14 +329,14 @@ def seed_reference_data(db: sqlite3.Connection) -> None:
             "unavailable",
         ),
         (
-            "account_bybit_short_term_l",
-            "venue_bybit",
-            "BYBIT-SHORT-TERM-A",
-            "短线交易员A账户",
-            "crypto",
+            "account_mt5_short_term_a",
+            "venue_mt5",
+            "MT5-SHORT-TERM-A",
+            "短线交易员A监控账户",
+            "mt5",
             "live",
-            "USDT",
-            "secret://environment/bybit-short-term-a",
+            "USD",
+            "secret://environment/mt5-short-term-a",
             "active",
             "unavailable",
         ),
@@ -288,12 +344,12 @@ def seed_reference_data(db: sqlite3.Connection) -> None:
             "account_bybit_short_term_w",
             "venue_bybit",
             "BYBIT-SHORT-TERM-B",
-            "短线交易员B账户",
+            "短线交易员B历史占位账户",
             "crypto",
             "live",
             "USDT",
             "secret://environment/bybit-short-term-b",
-            "active",
+            "inactive",
             "unavailable",
         ),
     ]
@@ -353,7 +409,40 @@ def seed_reference_data(db: sqlite3.Connection) -> None:
             ),
         )
 
+    db.execute(
+        """
+        UPDATE accounts
+        SET status = 'active', data_quality_state = 'unavailable'
+        WHERE id IN (
+            'bybit-live-main',
+            'mt5-live-main',
+            'account_bybit_bottom_fishing',
+            'account_mt5_short_term_a'
+        )
+        """
+    )
+    db.execute(
+        """
+        UPDATE accounts
+        SET status = 'inactive'
+        WHERE id IN (
+            'account_bybit_funding',
+            'account_crypto_test',
+            'account_crypto_test_b',
+            'account_mt5_demo',
+            'account_bybit_short_term_w'
+        )
+        """
+    )
+
     bindings = [
+        (
+            "binding_funding_bybit_live_main",
+            "strategy_funding_arbitrage_instance_default",
+            "bybit-live-main",
+            "primary",
+            "trade_and_read",
+        ),
         (
             "binding_funding_bybit",
             "strategy_funding_arbitrage_instance_default",
@@ -369,31 +458,24 @@ def seed_reference_data(db: sqlite3.Connection) -> None:
             "trade_and_read",
         ),
         (
-            "binding_cross_sim",
+            "binding_cross_bybit_live_main",
             "strategy_cross_venue_spread_instance_default",
-            "account_sim_usdt",
-            "primary",
-            "trade_and_read",
-        ),
-        (
-            "binding_cross_crypto",
-            "strategy_cross_venue_spread_instance_default",
-            "account_crypto_test",
+            "bybit-live-main",
             "venue_a",
             "trade_and_read",
         ),
         (
-            "binding_cross_crypto_b",
+            "binding_cross_mt5_live_main",
             "strategy_cross_venue_spread_instance_default",
-            "account_crypto_test_b",
-            "venue_b",
+            "mt5-live-main",
+            "mt5_leg",
             "trade_and_read",
         ),
         (
-            "binding_cross_mt5",
+            "binding_cross_sim",
             "strategy_cross_venue_spread_instance_default",
-            "account_mt5_demo",
-            "mt5_leg",
+            "account_sim_usdt",
+            "local_test",
             "trade_and_read",
         ),
         (
@@ -404,16 +486,9 @@ def seed_reference_data(db: sqlite3.Connection) -> None:
             "read_only",
         ),
         (
-            "binding_short_term_l_bybit",
+            "binding_short_term_l_mt5",
             "strategy_short_term_l_instance_default",
-            "account_bybit_short_term_l",
-            "primary",
-            "read_only",
-        ),
-        (
-            "binding_short_term_w_bybit",
-            "strategy_short_term_w_instance_default",
-            "account_bybit_short_term_w",
+            "account_mt5_short_term_a",
             "primary",
             "read_only",
         ),
@@ -428,6 +503,49 @@ def seed_reference_data(db: sqlite3.Connection) -> None:
             """,
             (binding_id, instance_id, account_id, role, capability, None, "active", created_at),
         )
+
+    db.execute(
+        """
+        UPDATE strategy_account_bindings
+        SET status = CASE
+            WHEN id IN (
+                'binding_funding_bybit_live_main',
+                'binding_funding_simulation',
+                'binding_cross_bybit_live_main',
+                'binding_cross_mt5_live_main',
+                'binding_cross_sim',
+                'binding_bottom_fishing_bybit',
+                'binding_short_term_l_mt5'
+            ) THEN 'active'
+            ELSE 'inactive'
+        END
+        WHERE strategy_instance_id IN (
+            'strategy_funding_arbitrage_instance_default',
+            'strategy_cross_venue_spread_instance_default',
+            'strategy_bottom_fishing_instance_default',
+            'strategy_short_term_l_instance_default',
+            'strategy_short_term_w_instance_default'
+        )
+        """
+    )
+    db.execute(
+        """
+        UPDATE strategy_instances
+        SET data_quality_state = CASE
+            WHEN id = 'strategy_short_term_w_instance_default' THEN 'unavailable'
+            WHEN id IN (
+                'strategy_bottom_fishing_instance_default',
+                'strategy_short_term_l_instance_default'
+            ) THEN 'partial'
+            ELSE data_quality_state
+        END
+        WHERE id IN (
+            'strategy_bottom_fishing_instance_default',
+            'strategy_short_term_l_instance_default',
+            'strategy_short_term_w_instance_default'
+        )
+        """
+    )
 
     instruments = [
         (

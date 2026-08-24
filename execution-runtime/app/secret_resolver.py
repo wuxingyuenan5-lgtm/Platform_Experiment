@@ -5,6 +5,7 @@ import re
 import sys
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
+from functools import lru_cache
 from typing import Protocol
 
 from app.models import CredentialInspection
@@ -14,6 +15,11 @@ OPTIONAL_SECRET_FIELDS = ("PASSPHRASE", "LOGIN", "PASSWORD", "SERVER")
 SECRET_REF_PREFIX = "secret://"
 ENVIRONMENT_PROVIDER = "environment"
 WINDOWS_PROVIDER = "windows-credential-manager"
+MT5_LEGACY_FIELD_ALIASES: Mapping[str, tuple[str, ...]] = {
+    "LOGIN": ("API_KEY",),
+    "PASSWORD": ("SECRET",),
+    "SERVER": ("PASSPHRASE",),
+}
 
 
 @dataclass(frozen=True)
@@ -45,6 +51,15 @@ class SecretProvider(Protocol):
 class EnvironmentSecretProvider:
     name = ENVIRONMENT_PROVIDER
 
+    def __init__(
+        self,
+        *,
+        user_env_reader: Callable[[str], str | None] | None = None,
+        platform: str | None = None,
+    ) -> None:
+        self._user_env_reader = user_env_reader
+        self._platform = platform or sys.platform
+
     def inspect(
         self,
         reference: ParsedSecretReference,
@@ -52,11 +67,16 @@ class EnvironmentSecretProvider:
         known_fields: tuple[str, ...],
     ) -> CredentialInspection:
         env_prefix = env_prefix_for_secret_name(reference.secret_name)
-        available_fields = [
-            field for field in known_fields if os.getenv(f"{env_prefix}_{field}")
-        ]
+        available_fields = [field for field in known_fields if self._lookup(env_prefix, field)]
+        if "_MT5_" in env_prefix:
+            suppressed = {
+                alias
+                for alias_group in MT5_LEGACY_FIELD_ALIASES.values()
+                for alias in alias_group
+            }
+            available_fields = [field for field in available_fields if field not in suppressed]
         missing_fields = [field for field in required_fields if field not in available_fields]
-        version = os.getenv(f"{env_prefix}_VERSION", "unversioned")
+        version = self._lookup(env_prefix, "VERSION") or "unversioned"
         return CredentialInspection(
             credentialRef=reference.original_ref,
             provider=self.name,
@@ -76,13 +96,41 @@ class EnvironmentSecretProvider:
         known_fields: tuple[str, ...],
     ) -> dict[str, str]:
         env_prefix = env_prefix_for_secret_name(reference.secret_name)
-        values = {field: os.getenv(f"{env_prefix}_{field}") for field in known_fields}
+        values = {field: self._lookup(env_prefix, field) for field in known_fields}
         missing_fields = [field for field in required_fields if not values.get(field)]
         if missing_fields:
             raise ValueError(
                 f"Credential reference is missing fields: {', '.join(missing_fields)}"
             )
         return {field: value for field, value in values.items() if value}
+
+    def _lookup(self, env_prefix: str, field: str) -> str | None:
+        key = f"{env_prefix}_{field}"
+        value = os.getenv(key)
+        if value:
+            return value
+        alias_fields = self._legacy_aliases(env_prefix, field)
+        for alias in alias_fields:
+            alias_value = os.getenv(f"{env_prefix}_{alias}")
+            if alias_value:
+                return alias_value
+        if self._platform != "win32":
+            return None
+        reader = self._user_env_reader or read_windows_user_environment_variable
+        fallback = reader(key)
+        if fallback:
+            return fallback
+        for alias in alias_fields:
+            alias_value = reader(f"{env_prefix}_{alias}")
+            if alias_value:
+                return alias_value
+        return None
+
+    @staticmethod
+    def _legacy_aliases(env_prefix: str, field: str) -> tuple[str, ...]:
+        if "_MT5_" not in env_prefix:
+            return ()
+        return MT5_LEGACY_FIELD_ALIASES.get(field, ())
 
 
 class WindowsCredentialManagerProvider:
@@ -266,3 +314,22 @@ def env_prefix_for_secret_name(secret_name: str) -> str:
     if not normalized:
         raise ValueError("Credential reference name is empty")
     return f"VG_SECRET_{normalized}"
+
+
+@lru_cache(maxsize=256)
+def read_windows_user_environment_variable(name: str) -> str | None:
+    if sys.platform != "win32":
+        return None
+    if not name.startswith("VG_SECRET_"):
+        return None
+    try:
+        import winreg
+
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, "Environment") as key:
+            value, _ = winreg.QueryValueEx(key, name)
+    except Exception:
+        return None
+    if value is None:
+        return None
+    resolved = str(value).strip()
+    return resolved or None

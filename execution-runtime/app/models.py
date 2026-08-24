@@ -308,7 +308,9 @@ class RuntimeStatusResponse(BaseModel):
     version: str
     environment: str
     gateway: str
+    process_started_at: datetime = Field(alias="processStartedAt")
     journal: dict[str, object]
+    capabilities: GatewayCapabilitiesResponse
 
 
 class CredentialInspection(BaseModel):

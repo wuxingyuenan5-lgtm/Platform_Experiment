@@ -53,6 +53,10 @@ def test_seeded_strategy_account_and_instrument_catalog(tmp_path: Path) -> None:
         assert by_desk["shortLineTraderL"]["executionReadiness"] is None
         assert by_desk["shortLineTraderW"]["executionReadiness"] is None
         assert by_desk["dip"]["primaryAccountDataQualityState"] == "unavailable"
+        assert by_desk["funding"]["primaryAccountCode"] == "BYBIT-LIVE-MAIN"
+        assert by_desk["crossSpread"]["primaryAccountCode"] is None
+        assert by_desk["shortLineTraderL"]["primaryAccountCode"] == "MT5-SHORT-TERM-A"
+        assert by_desk["shortLineTraderW"]["activeCapability"] == "unbound"
         assert by_desk["dip"]["operatingStatus"] == "active"
         assert by_desk["dip"]["latestRunStatus"] is None
         assert by_desk["dip"]["latestRunAt"] is None
@@ -62,8 +66,10 @@ def test_seeded_strategy_account_and_instrument_catalog(tmp_path: Path) -> None:
         assert accounts.status_code == 200
         assert {item["accountId"] for item in accounts.json()} >= {
             "account_sim_usdt",
-            "account_crypto_test",
-            "account_mt5_demo",
+            "bybit-live-main",
+            "mt5-live-main",
+            "account_bybit_bottom_fishing",
+            "account_mt5_short_term_a",
         }
 
         instruments = client.get("/api/v1/instruments")

@@ -289,9 +289,26 @@ def get_strategy_account_snapshot(
     strategy_instance_id: str,
 ) -> StrategyAccountSnapshotResponse:
     bindings = list_strategy_account_bindings(strategy_instance_id)
-    binding = next((item for item in bindings if item.role == "primary"), None)
+    binding = next(
+        (item for item in bindings if item.role == "primary" and item.status == "active"),
+        None,
+    )
     if binding is None:
-        raise HTTPException(status_code=422, detail="Strategy has no primary account binding")
+        return StrategyAccountSnapshotResponse(
+            strategyInstanceId=strategy_instance_id,
+            accountId=None,
+            accountCode=None,
+            capability=None,
+            dataQualityState="unbound",
+            asOf=None,
+            balance=None,
+            positions=[],
+            orders=[],
+            fills=[],
+            pnl=None,
+            syncStatus="unbound",
+            syncErrorCode="account_unbound",
+        )
 
     account = get_account(binding.account_id)
     with connection() as db:
@@ -366,6 +383,16 @@ def get_strategy_account_snapshot(
         orders=orders,
         fills=fills,
         pnl=pnl,
+        syncStatus=(
+            "waiting_initial_sync"
+            if balance is None and quality == "unavailable"
+            else ("ready" if balance is not None and quality == "complete" else quality)
+        ),
+        syncErrorCode=(
+            "credential_unavailable"
+            if balance is None and quality == "unavailable"
+            else None
+        ),
     )
 
 

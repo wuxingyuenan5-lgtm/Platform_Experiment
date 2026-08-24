@@ -9,7 +9,7 @@ from concurrent.futures import ThreadPoolExecutor, TimeoutError
 from typing import Any
 
 from app.models import VenueReadinessResponse, VenueReadinessResult
-from app.secret_resolver import env_prefix_for_secret_ref
+from app.secret_resolver import env_prefix_for_secret_ref, resolve_secret_reference
 
 
 def check_bybit_contract(
@@ -143,11 +143,12 @@ def check_mt5_symbol(
     mt5_module: Any | None = None,
     timeout_seconds: float = 5.0,
 ) -> VenueReadinessResult:
-    env_prefix = env_prefix_for_secret_ref(credential_ref)
-    login = os.getenv(f"{env_prefix}_LOGIN")
-    password = os.getenv(f"{env_prefix}_PASSWORD")
-    server = os.getenv(f"{env_prefix}_SERVER")
-    if not login or not password or not server:
+    try:
+        secret = resolve_secret_reference(
+            credential_ref,
+            required_fields=("LOGIN", "PASSWORD", "SERVER"),
+        )
+    except ValueError:
         return _venue_result(
             venue="mt5",
             status="missing_credentials",
@@ -155,6 +156,9 @@ def check_mt5_symbol(
             symbol=symbol,
             reason="MT5 login, password and server are required",
         )
+    login = secret["LOGIN"]
+    password = secret["PASSWORD"]
+    server = secret["SERVER"]
 
     if mt5_module is None:
         try:

@@ -32,13 +32,14 @@ from app.models import (
 from app.route_errors import history_window, query_gateway
 
 
+class BybitLeverageRequest(BaseModel):
+    account_id: str = Field(alias="accountId")
+    symbol: str
+    leverage: Decimal = Field(gt=0, le=100)
+
+
 def create_venue_query_router(*, gateway: ExecutionGateway) -> APIRouter:
     router = APIRouter()
-
-    class BybitLeverageRequest(BaseModel):
-        account_id: str = Field(alias="accountId")
-        symbol: str
-        leverage: Decimal = Field(gt=0, le=100)
 
     @router.post("/venue/bybit/leverage", tags=["venue-write"])
     def set_bybit_leverage(request: BybitLeverageRequest) -> dict[str, object]:

@@ -333,9 +333,9 @@ export interface StrategyAccountBindingResult {
 
 export interface StrategyAccountSnapshotResult {
   strategyInstanceId: string;
-  accountId: string;
-  accountCode: string;
-  capability: 'trade_and_read' | 'read_only';
+  accountId?: string | null;
+  accountCode?: string | null;
+  capability?: 'trade_and_read' | 'read_only' | null;
   dataQualityState: string;
   asOf?: string | null;
   balance?: BalanceResult | null;
@@ -343,6 +343,8 @@ export interface StrategyAccountSnapshotResult {
   orders: OrderDetailResult[];
   fills: FillResult[];
   pnl?: PnlResult | null;
+  syncStatus?: string | null;
+  syncErrorCode?: string | null;
 }
 
 export interface InstrumentResult {

@@ -41,6 +41,8 @@ def test_runtime_persists_events_and_replays_duplicate_command(tmp_path: Path) -
         status = client.get("/status")
         assert status.status_code == 200
         assert status.json()["version"] == PLATFORM_VERSION
+        assert status.json()["processStartedAt"]
+        assert status.json()["capabilities"]["gateway"] == status.json()["gateway"]
         journal = status.json()["journal"]
         assert journal["status"] == "available"
         assert journal["commandCount"] == 1
@@ -50,3 +52,5 @@ def test_runtime_persists_events_and_replays_duplicate_command(tmp_path: Path) -
         assert openapi.status_code == 200
         properties = openapi.json()["components"]["schemas"]["RuntimeStatusResponse"]["properties"]
         assert properties["version"]["type"] == "string"
+        assert "processStartedAt" in properties
+        assert "capabilities" in properties

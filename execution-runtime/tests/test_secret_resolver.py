@@ -56,20 +56,91 @@ def test_missing_required_fields_are_reported_without_values(monkeypatch) -> Non
     monkeypatch.delenv("VG_SECRET_MT5_LIVE_001_LOGIN", raising=False)
     monkeypatch.delenv("VG_SECRET_MT5_LIVE_001_PASSWORD", raising=False)
     monkeypatch.delenv("VG_SECRET_MT5_LIVE_001_SERVER", raising=False)
+    monkeypatch.delenv("VG_SECRET_MT5_LIVE_001_API_KEY", raising=False)
+    monkeypatch.delenv("VG_SECRET_MT5_LIVE_001_SECRET", raising=False)
+    monkeypatch.delenv("VG_SECRET_MT5_LIVE_001_PASSPHRASE", raising=False)
 
-    result = inspect_credential_reference(
+    provider = EnvironmentSecretProvider(platform="linux")
+    reset_secret_providers({"environment": provider})
+    try:
+        result = inspect_credential_reference(
+            "secret://environment/mt5-live-001",
+            required_fields=("LOGIN", "PASSWORD", "SERVER"),
+        )
+
+        assert result.configured is False
+        assert result.provider == "environment"
+        assert result.missing_fields == ["LOGIN", "PASSWORD", "SERVER"]
+        with pytest.raises(ValueError, match="missing fields"):
+            resolve_secret_reference(
+                "secret://environment/mt5-live-001",
+                required_fields=("LOGIN", "PASSWORD", "SERVER"),
+            )
+    finally:
+        reset_secret_providers()
+
+
+def test_environment_provider_accepts_legacy_mt5_field_names(monkeypatch) -> None:
+    monkeypatch.delenv("VG_SECRET_MT5_LIVE_001_LOGIN", raising=False)
+    monkeypatch.delenv("VG_SECRET_MT5_LIVE_001_PASSWORD", raising=False)
+    monkeypatch.delenv("VG_SECRET_MT5_LIVE_001_SERVER", raising=False)
+    monkeypatch.setenv("VG_SECRET_MT5_LIVE_001_API_KEY", "123456")
+    monkeypatch.setenv("VG_SECRET_MT5_LIVE_001_SECRET", "legacy-password")
+    monkeypatch.setenv("VG_SECRET_MT5_LIVE_001_PASSPHRASE", "Broker-Live")
+
+    inspection = inspect_credential_reference(
         "secret://environment/mt5-live-001",
         required_fields=("LOGIN", "PASSWORD", "SERVER"),
     )
 
-    assert result.configured is False
-    assert result.provider == "environment"
-    assert result.missing_fields == ["LOGIN", "PASSWORD", "SERVER"]
-    with pytest.raises(ValueError, match="missing fields"):
-        resolve_secret_reference(
+    assert inspection.configured is True
+    assert inspection.available_fields == ["LOGIN", "PASSWORD", "SERVER"]
+    resolved = resolve_secret_reference(
+        "secret://environment/mt5-live-001",
+        required_fields=("LOGIN", "PASSWORD", "SERVER"),
+    )
+    assert resolved["LOGIN"] == "123456"
+    assert resolved["PASSWORD"] == "legacy-password"
+    assert resolved["SERVER"] == "Broker-Live"
+
+
+def test_environment_provider_reads_windows_user_environment_when_process_env_is_missing(
+    monkeypatch,
+) -> None:
+    for key in (
+        "VG_SECRET_MT5_LIVE_001_LOGIN",
+        "VG_SECRET_MT5_LIVE_001_PASSWORD",
+        "VG_SECRET_MT5_LIVE_001_SERVER",
+        "VG_SECRET_MT5_LIVE_001_API_KEY",
+        "VG_SECRET_MT5_LIVE_001_SECRET",
+        "VG_SECRET_MT5_LIVE_001_PASSPHRASE",
+    ):
+        monkeypatch.delenv(key, raising=False)
+    provider = EnvironmentSecretProvider(
+        platform="win32",
+        user_env_reader=lambda key: {
+            "VG_SECRET_MT5_LIVE_001_LOGIN": "7654321",
+            "VG_SECRET_MT5_LIVE_001_PASSWORD": "user-password",
+            "VG_SECRET_MT5_LIVE_001_SERVER": "Broker-User",
+        }.get(key),
+    )
+    reset_secret_providers({"environment": provider})
+    try:
+        inspection = inspect_credential_reference(
             "secret://environment/mt5-live-001",
             required_fields=("LOGIN", "PASSWORD", "SERVER"),
         )
+        assert inspection.configured is True
+        assert inspection.available_fields == ["LOGIN", "PASSWORD", "SERVER"]
+        resolved = resolve_secret_reference(
+            "secret://environment/mt5-live-001",
+            required_fields=("LOGIN", "PASSWORD", "SERVER"),
+        )
+        assert resolved["LOGIN"] == "7654321"
+        assert resolved["PASSWORD"] == "user-password"
+        assert resolved["SERVER"] == "Broker-User"
+    finally:
+        reset_secret_providers()
 
 
 def test_unknown_provider_and_invalid_reference_fail_closed() -> None:

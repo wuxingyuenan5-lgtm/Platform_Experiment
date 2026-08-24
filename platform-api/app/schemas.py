@@ -335,9 +335,9 @@ class AuditEventResponse(BaseModel):
 
 class StrategyAccountSnapshotResponse(BaseModel):
     strategy_instance_id: str = Field(alias="strategyInstanceId")
-    account_id: str = Field(alias="accountId")
-    account_code: str = Field(alias="accountCode")
-    capability: Literal["trade_and_read", "read_only"]
+    account_id: str | None = Field(default=None, alias="accountId")
+    account_code: str | None = Field(default=None, alias="accountCode")
+    capability: Literal["trade_and_read", "read_only"] | None = None
     data_quality_state: str = Field(alias="dataQualityState")
     as_of: datetime | None = Field(default=None, alias="asOf")
     balance: BalanceSnapshotResponse | None = None
@@ -345,6 +345,8 @@ class StrategyAccountSnapshotResponse(BaseModel):
     orders: list[OrderDetailResponse] = Field(default_factory=list)
     fills: list[FillResponse] = Field(default_factory=list)
     pnl: PnlResponse | None = None
+    sync_status: str | None = Field(default=None, alias="syncStatus")
+    sync_error_code: str | None = Field(default=None, alias="syncErrorCode")
 
 
 class StrategyManagementOverviewResponse(BaseModel):
