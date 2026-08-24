@@ -7,8 +7,14 @@ $StateDir = Join-Path $RepoRoot '.codex\dev-platform'
 $StatePath = Join-Path $StateDir 'platform-dev-state.json'
 $LogDir = Join-Path $StateDir 'logs'
 $Services = @(
-  @{ Name = 'Execution Runtime'; Port = 8100; HealthUrl = 'http://127.0.0.1:8100/health'; WorkingDirectory = (Join-Path $RepoRoot 'execution-runtime'); Python = $true },
-  @{ Name = 'Platform API'; Port = 8000; HealthUrl = 'http://127.0.0.1:8000/health'; WorkingDirectory = (Join-Path $RepoRoot 'platform-api'); Python = $true },
+  @{ Name = 'Execution Runtime'; Port = 8100; HealthUrl = 'http://127.0.0.1:8100/health'; WorkingDirectory = (Join-Path $RepoRoot 'execution-runtime'); Python = $true; ContractChecks = @(
+      @{ Url = 'http://127.0.0.1:8100/status'; JsonField = 'status'; Expected = 'ok' },
+      @{ Url = 'http://127.0.0.1:8100/venue/account-snapshot?accountId=account_sim_usdt'; AcceptStatus = @(200, 503) }
+    ) },
+  @{ Name = 'Platform API'; Port = 8000; HealthUrl = 'http://127.0.0.1:8000/health'; WorkingDirectory = (Join-Path $RepoRoot 'platform-api'); Python = $true; ContractChecks = @(
+      @{ Url = 'http://127.0.0.1:8000/api/v1/strategies/management-overview'; AcceptStatus = @(200) },
+      @{ Url = 'http://127.0.0.1:8000/api/v1/ops/venue-snapshots/status'; AcceptStatus = @(200) }
+    ) },
   @{ Name = 'Platform Web'; Port = 4373; HealthUrl = 'http://127.0.0.1:4373/index.html'; WorkingDirectory = (Join-Path $RepoRoot 'platform-web'); Python = $false }
 )
 
@@ -22,14 +28,28 @@ function Test-Health {
     return $response.Content -match 'id="htmlRoot"|vite|/src/main'
   } catch { return $false }
 }
+function Test-Contracts {
+  param([hashtable]$Service)
+  foreach ($check in @($Service.ContractChecks)) {
+    try {
+      $response = Invoke-WebRequest -Uri $check.Url -UseBasicParsing -TimeoutSec 3 -ErrorAction Stop
+      if ($check.AcceptStatus -and (@($check.AcceptStatus) -notcontains [int]$response.StatusCode)) { return $false }
+      if ($check.JsonField -and (((($response.Content | ConvertFrom-Json).($check.JsonField))) -ne $check.Expected)) { return $false }
+    } catch {
+      $statusCode = [int]($_.Exception.Response.StatusCode.value__ 2>$null)
+      if (-not $check.AcceptStatus -or (@($check.AcceptStatus) -notcontains $statusCode)) { return $false }
+    }
+  }
+  return $true
+}
 function Wait-ForHealth {
   param([hashtable]$Service)
   $deadline = (Get-Date).AddSeconds($HealthTimeoutSeconds)
   while ((Get-Date) -lt $deadline) {
-    if ((Get-PortListener $Service.Port) -and (Test-Health $Service)) { return }
+    if ((Get-PortListener $Service.Port) -and (Test-Health $Service) -and (Test-Contracts $Service)) { return }
     Start-Sleep -Seconds 1
   }
-  throw "$($Service.Name) failed to start on port $($Service.Port). Logs: $($Service.Stdout); $($Service.Stderr)"
+  throw "$($Service.Name) failed startup contract checks on port $($Service.Port). Logs: $($Service.Stdout); $($Service.Stderr)"
 }
 function Assert-Dependencies {
   param([hashtable]$Service)

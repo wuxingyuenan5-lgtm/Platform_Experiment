@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
+import json
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from decimal import Decimal
 from sqlite3 import Row
-from uuid import uuid4
 
 from fastapi import APIRouter, FastAPI, HTTPException
 from pydantic import BaseModel, Field
@@ -24,6 +25,20 @@ CREATE TABLE IF NOT EXISTS account_sync_status (
     last_attempt_at TEXT,
     last_success_at TEXT,
     updated_at TEXT NOT NULL,
+    FOREIGN KEY(account_id) REFERENCES accounts(id)
+);
+
+CREATE TABLE IF NOT EXISTS account_risk_snapshots (
+    account_id TEXT NOT NULL,
+    as_of TEXT NOT NULL,
+    currency TEXT NOT NULL,
+    equity TEXT,
+    margin TEXT,
+    free_margin TEXT,
+    margin_level TEXT,
+    data_quality_state TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    PRIMARY KEY(account_id, as_of),
     FOREIGN KEY(account_id) REFERENCES accounts(id)
 );
 """
@@ -66,6 +81,28 @@ def _as_decimal(value: object, *, default: str = "0") -> Decimal:
     if value is None or value == "":
         return Decimal(default)
     return Decimal(str(value))
+
+
+def _canonical_json(payload: object) -> str:
+    return json.dumps(payload, sort_keys=True, separators=(",", ":"))
+
+
+def _fill_fingerprint(account_id: str, fill: dict[str, object]) -> str | None:
+    required = {
+        "externalOrderId": fill.get("externalOrderId"),
+        "symbol": fill.get("symbol"),
+        "side": fill.get("side"),
+        "quantity": fill.get("quantity"),
+        "price": fill.get("price"),
+        "occurredAt": fill.get("occurredAt"),
+    }
+    if any(value in {None, ""} for value in required.values()):
+        return None
+    payload = {
+        "accountId": account_id,
+        **required,
+    }
+    return f"fingerprint:{hashlib.sha256(_canonical_json(payload).encode('utf-8')).hexdigest()}"
 
 
 def _status_row(account_id: str) -> Row | None:
@@ -125,10 +162,13 @@ def discover_live_accounts() -> list[str]:
             """
             SELECT DISTINCT a.id
             FROM strategy_account_bindings sab
+            JOIN strategy_instances si ON si.id = sab.strategy_instance_id
+            JOIN strategy_definitions sd ON sd.id = si.strategy_definition_id
             JOIN accounts a ON a.id = sab.account_id
             WHERE sab.status = 'active'
               AND a.status = 'active'
               AND lower(a.environment) = 'live'
+              AND sd.strategy_key != 'short_term_w'
             ORDER BY a.id
             """
         ).fetchall()
@@ -177,156 +217,162 @@ def load_sync_statuses() -> list[AccountSyncStatusResponse]:
     return results
 
 
-def _persist_balances(account_id: str, balances: list[dict[str, object]]) -> int:
+def _persist_balances(db, account_id: str, balances: list[dict[str, object]]) -> int:
     written = 0
-    with connection() as db:
-        for balance in balances:
-            as_of = str(balance.get("asOf") or _iso_now())
-            currency = str(balance.get("currency") or "USD").upper()
-            snapshot_id = f"sync:{account_id}:{currency}:{as_of}"
-            db.execute(
-                """
-                INSERT OR REPLACE INTO balance_snapshots (
-                    id, account_id, currency, equity, available_balance,
-                    source, data_quality_state, as_of, created_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    snapshot_id,
-                    account_id,
-                    currency,
-                    str(_as_decimal(balance.get("equity"))),
-                    str(_as_decimal(balance.get("availableBalance"))),
-                    str(balance.get("source") or "runtime"),
-                    str(balance.get("dataQualityState") or "complete"),
-                    as_of,
-                    _iso_now(),
-                ),
-            )
-            written += 1
+    for balance in balances:
+        as_of = str(balance.get("asOf") or _iso_now())
+        currency = str(balance.get("currency") or "USD").upper()
+        snapshot_id = f"sync:{account_id}:{currency}:{as_of}"
+        db.execute(
+            """
+            INSERT OR REPLACE INTO balance_snapshots (
+                id, account_id, currency, equity, available_balance,
+                source, data_quality_state, as_of, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                snapshot_id,
+                account_id,
+                currency,
+                str(_as_decimal(balance.get("equity"))),
+                str(_as_decimal(balance.get("availableBalance"))),
+                str(balance.get("source") or "runtime"),
+                str(balance.get("dataQualityState") or "complete"),
+                as_of,
+                _iso_now(),
+            ),
+        )
+        written += 1
     return written
 
 
 def _persist_positions(
+    db,
     account_id: str,
     positions: list[dict[str, object]],
 ) -> tuple[int, dict[str, Decimal]]:
     written = 0
     unrealized_by_instrument: dict[str, Decimal] = {}
-    with connection() as db:
-        db.execute("DELETE FROM positions WHERE account_id = ?", (account_id,))
-        for position in positions:
-            instrument_id = str(position.get("instrumentId") or "")
-            if not instrument_id:
-                continue
-            unrealized_by_instrument[instrument_id] = _as_decimal(position.get("unrealizedPnl"))
-            db.execute(
-                """
-                INSERT INTO positions (
-                    account_id, instrument_id, net_quantity, average_price, updated_at
-                ) VALUES (?, ?, ?, ?, ?)
-                ON CONFLICT(account_id, instrument_id) DO UPDATE SET
-                    net_quantity = excluded.net_quantity,
-                    average_price = excluded.average_price,
-                    updated_at = excluded.updated_at
-                """,
+    db.execute("DELETE FROM positions WHERE account_id = ?", (account_id,))
+    for position in positions:
+        instrument_id = str(position.get("instrumentId") or "")
+        if not instrument_id:
+            continue
+        unrealized_by_instrument[instrument_id] = _as_decimal(position.get("unrealizedPnl"))
+        db.execute(
+            """
+            INSERT INTO positions (
+                account_id, instrument_id, net_quantity, average_price, updated_at
+            ) VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT(account_id, instrument_id) DO UPDATE SET
+                net_quantity = excluded.net_quantity,
+                average_price = excluded.average_price,
+                updated_at = excluded.updated_at
+            """,
+            (
+                account_id,
+                instrument_id,
+                str(_as_decimal(position.get("netQuantity"))),
                 (
-                    account_id,
-                    instrument_id,
-                    str(_as_decimal(position.get("netQuantity"))),
-                    (
-                        str(_as_decimal(position.get("averagePrice")))
-                        if position.get("averagePrice") not in {None, ""}
-                        else None
-                    ),
-                    str(position.get("asOf") or _iso_now()),
+                    str(_as_decimal(position.get("averagePrice")))
+                    if position.get("averagePrice") not in {None, ""}
+                    else None
                 ),
-            )
-            written += 1
+                str(position.get("asOf") or _iso_now()),
+            ),
+        )
+        written += 1
     return written, unrealized_by_instrument
 
 
-def _persist_orders(account_id: str, orders: list[dict[str, object]]) -> int:
+def _persist_orders(db, account_id: str, orders: list[dict[str, object]]) -> int:
     written = 0
-    with connection() as db:
-        for order in orders:
-            order_id = str(
-                order.get("platformOrderId") or f"external:{order.get('externalOrderId')}"
-            )
-            instrument_id = str(order.get("instrumentId") or "")
-            if not instrument_id:
-                continue
-            db.execute(
-                """
-                INSERT OR REPLACE INTO orders (
-                    id, command_id, account_id, instrument_id, symbol, side, order_type,
-                    quantity, price, status, external_order_id, created_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
+    for order in orders:
+        order_id = str(
+            order.get("platformOrderId") or f"external:{order.get('externalOrderId')}"
+        )
+        instrument_id = str(order.get("instrumentId") or "")
+        if not instrument_id:
+            continue
+        db.execute(
+            """
+            INSERT OR REPLACE INTO orders (
+                id, command_id, account_id, instrument_id, symbol, side, order_type,
+                quantity, price, status, external_order_id, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                order_id,
+                str(order.get("commandId") or order_id),
+                account_id,
+                instrument_id,
+                str(order.get("symbol") or ""),
+                str(order.get("side") or "buy"),
+                str(order.get("orderType") or "limit"),
+                str(_as_decimal(order.get("quantity"))),
                 (
-                    order_id,
-                    str(order.get("commandId") or order_id),
-                    account_id,
-                    instrument_id,
-                    str(order.get("symbol") or ""),
-                    str(order.get("side") or "buy"),
-                    str(order.get("orderType") or "limit"),
-                    str(_as_decimal(order.get("quantity"))),
-                    (
-                        str(_as_decimal(order.get("price")))
-                        if order.get("price") not in {None, ""}
-                        else None
-                    ),
-                    str(order.get("status") or "accepted"),
-                    str(order.get("externalOrderId") or ""),
-                    str(order.get("occurredAt") or _iso_now()),
-                    str(order.get("asOf") or _iso_now()),
+                    str(_as_decimal(order.get("price")))
+                    if order.get("price") not in {None, ""}
+                    else None
                 ),
-            )
-            written += 1
+                str(order.get("status") or "accepted"),
+                str(order.get("externalOrderId") or ""),
+                str(order.get("occurredAt") or _iso_now()),
+                str(order.get("asOf") or _iso_now()),
+            ),
+        )
+        written += 1
     return written
 
 
 def _persist_fills(
+    db,
     account_id: str,
     fills: list[dict[str, object]],
 ) -> tuple[int, dict[str, Decimal], dict[str, Decimal]]:
     written = 0
     fees_by_instrument: dict[str, Decimal] = {}
     realized_by_instrument: dict[str, Decimal] = {}
-    with connection() as db:
-        for fill in fills:
-            fill_id = str(fill.get("externalFillId") or uuid4())
-            order_id = str(fill.get("platformOrderId") or f"external:{fill.get('externalOrderId')}")
-            instrument_id = str(fill.get("instrumentId") or "")
-            if not instrument_id:
-                continue
-            fee = _as_decimal(fill.get("fee"))
+    for fill in fills:
+        fill_id = str(fill.get("externalFillId") or "")
+        if not fill_id:
+            fingerprint = _fill_fingerprint(account_id, fill)
+            if fingerprint is None:
+                raise ValueError("Runtime fill lacks authoritative identity")
+            fill_id = fingerprint
+        order_id = str(fill.get("platformOrderId") or f"external:{fill.get('externalOrderId')}")
+        instrument_id = str(fill.get("instrumentId") or "")
+        if not instrument_id:
+            continue
+        fee = _as_decimal(fill.get("fee"))
+        if fill_id not in fees_by_instrument:
             fees_by_instrument[instrument_id] = (
                 fees_by_instrument.get(instrument_id, Decimal("0")) + fee
             )
-            db.execute(
-                """
-                INSERT OR IGNORE INTO fills (
-                    id, order_id, account_id, instrument_id, side, quantity, price, occurred_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    fill_id,
-                    order_id,
-                    account_id,
-                    instrument_id,
-                    str(fill.get("side") or "buy"),
-                    str(_as_decimal(fill.get("quantity"))),
-                    str(_as_decimal(fill.get("price"))),
-                    str(fill.get("occurredAt") or _iso_now()),
-                ),
-            )
+        cursor = db.execute(
+            """
+            INSERT OR IGNORE INTO fills (
+                id, order_id, account_id, instrument_id, side, quantity, price, occurred_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                fill_id,
+                order_id,
+                account_id,
+                instrument_id,
+                str(fill.get("side") or "buy"),
+                str(_as_decimal(fill.get("quantity"))),
+                str(_as_decimal(fill.get("price"))),
+                str(fill.get("occurredAt") or _iso_now()),
+            ),
+        )
+        if cursor.rowcount and cursor.rowcount > 0:
             written += 1
     return written, realized_by_instrument, fees_by_instrument
 
 
 def _persist_pnl(
+    db,
     account_id: str,
     *,
     unrealized_by_instrument: dict[str, Decimal],
@@ -339,82 +385,158 @@ def _persist_pnl(
         | set(realized_by_instrument)
         | set(fees_by_instrument)
     )
-    with connection() as db:
-        for instrument_id in instrument_ids:
-            db.execute(
-                """
-                INSERT INTO pnl_results (
-                    account_id, instrument_id, realized_pnl, trading_pnl, fees, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?)
-                ON CONFLICT(account_id, instrument_id) DO UPDATE SET
-                    realized_pnl = excluded.realized_pnl,
-                    trading_pnl = excluded.trading_pnl,
-                    fees = excluded.fees,
-                    updated_at = excluded.updated_at
-                """,
-                (
-                    account_id,
-                    instrument_id,
-                    str(realized_by_instrument.get(instrument_id, Decimal("0"))),
-                    str(unrealized_by_instrument.get(instrument_id, Decimal("0"))),
-                    str(fees_by_instrument.get(instrument_id, Decimal("0"))),
-                    _iso_now(),
-                ),
-            )
-            written += 1
+    for instrument_id in instrument_ids:
+        existing = db.execute(
+            """
+            SELECT realized_pnl, trading_pnl, fees
+            FROM pnl_results
+            WHERE account_id = ? AND instrument_id = ?
+            """,
+            (account_id, instrument_id),
+        ).fetchone()
+        realized = (
+            Decimal(str(existing["realized_pnl"]))
+            if existing is not None
+            else Decimal("0")
+        )
+        trading = (
+            Decimal(str(existing["trading_pnl"]))
+            if existing is not None
+            else Decimal("0")
+        )
+        fees = Decimal(str(existing["fees"])) if existing is not None else Decimal("0")
+        if instrument_id in realized_by_instrument:
+            realized = realized_by_instrument[instrument_id]
+        if instrument_id in unrealized_by_instrument:
+            trading = unrealized_by_instrument[instrument_id]
+        if instrument_id in fees_by_instrument:
+            fees = fees_by_instrument[instrument_id]
+        db.execute(
+            """
+            INSERT INTO pnl_results (
+                account_id, instrument_id, realized_pnl, trading_pnl, fees, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?)
+            ON CONFLICT(account_id, instrument_id) DO UPDATE SET
+                realized_pnl = excluded.realized_pnl,
+                trading_pnl = excluded.trading_pnl,
+                fees = excluded.fees,
+                updated_at = excluded.updated_at
+            """,
+            (
+                account_id,
+                instrument_id,
+                str(realized),
+                str(trading),
+                str(fees),
+                _iso_now(),
+            ),
+        )
+        written += 1
     return written
+
+
+def _persist_account_risk(db, account_id: str, risk: dict[str, object] | None) -> int:
+    if not risk:
+        return 0
+    as_of = str(risk.get("asOf") or _iso_now())
+    db.execute(
+        """
+        INSERT OR REPLACE INTO account_risk_snapshots (
+            account_id, as_of, currency, equity, margin, free_margin, margin_level,
+            data_quality_state, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            account_id,
+            as_of,
+            str(risk.get("currency") or "USD"),
+            (
+                str(_as_decimal(risk.get("equity")))
+                if risk.get("equity") not in {None, ""}
+                else None
+            ),
+            (
+                str(_as_decimal(risk.get("initialMargin")))
+                if risk.get("initialMargin") not in {None, ""}
+                else None
+            ),
+            (
+                str(_as_decimal(risk.get("availableBalance")))
+                if risk.get("availableBalance") not in {None, ""}
+                else None
+            ),
+            (
+                str(_as_decimal(risk.get("marginLevel")))
+                if risk.get("marginLevel") not in {None, ""}
+                else None
+            ),
+            str(risk.get("dataQualityState") or "complete"),
+            _iso_now(),
+        ),
+    )
+    return 1
+
+
+def _classify_sync_failure(exc: Exception) -> tuple[str, str]:
+    response = getattr(exc, "response", None)
+    status_code = getattr(response, "status_code", None)
+    detail = ""
+    if response is not None:
+        try:
+            payload = response.json()
+            detail = str(payload.get("detail") or "")
+        except Exception:
+            detail = str(getattr(response, "text", "") or "")
+    lowered = detail.lower()
+    if "identity mismatch" in lowered:
+        return "identity_mismatch", "identity_mismatch"
+    if "restore failed" in lowered:
+        return "restore_failed", "restore_failed"
+    if "missing required secret" in lowered or "credential" in lowered:
+        return "credential_unavailable", "credential_unavailable"
+    if status_code is not None:
+        return "runtime_unavailable", f"runtime_{status_code}"
+    return "runtime_unavailable", "runtime_unavailable"
 
 
 def _sync_one_account(account_id: str) -> dict[str, int]:
     last_attempt_at = _iso_now()
     _write_status(account_id, status="syncing", error_code=None, last_attempt_at=last_attempt_at)
     try:
-        balances = runtime_get("/venue/balances", params={"accountId": account_id}).json()
-        positions = runtime_get("/venue/positions", params={"accountId": account_id}).json()
-        active_orders = runtime_get(
-            "/venue/orders",
-            params={"accountId": account_id, "limit": "100"},
-        ).json()
-        closed_orders = runtime_get(
-            "/venue/order-history",
-            params={
-                "accountId": account_id,
-                "scope": "closed",
-                "limit": "100",
-                "startTime": (datetime.now(UTC) - timedelta(days=30)).isoformat(),
-                "endTime": datetime.now(UTC).isoformat(),
-            },
-        ).json()["items"]
-        fills = runtime_get(
-            "/venue/fill-history",
-            params={
-                "accountId": account_id,
-                "limit": "200",
-                "startTime": (datetime.now(UTC) - timedelta(days=30)).isoformat(),
-                "endTime": datetime.now(UTC).isoformat(),
-            },
-        ).json()["items"]
-        runtime_get("/venue/account-risk", params={"accountId": account_id}).json()
+        snapshot_response = runtime_get("/venue/account-snapshot", params={"accountId": account_id})
+        snapshot_response.raise_for_status()
+        snapshot = snapshot_response.json()
     except Exception as exc:
-        error_code = getattr(getattr(exc, "response", None), "status_code", None)
+        status, error_code = _classify_sync_failure(exc)
         _write_status(
             account_id,
-            status="unavailable",
-            error_code=f"runtime_{error_code}" if error_code is not None else "runtime_unavailable",
+            status=status,
+            error_code=error_code,
             last_attempt_at=last_attempt_at,
         )
         raise
 
-    balance_count = _persist_balances(account_id, balances)
-    position_count, unrealized = _persist_positions(account_id, positions)
-    order_count = _persist_orders(account_id, [*active_orders, *closed_orders])
-    fill_count, realized, fees = _persist_fills(account_id, fills)
-    pnl_count = _persist_pnl(
-        account_id,
-        unrealized_by_instrument=unrealized,
-        realized_by_instrument=realized,
-        fees_by_instrument=fees,
-    )
+    with connection() as db:
+        balance_count = _persist_balances(db, account_id, list(snapshot.get("balances") or []))
+        position_count, unrealized = _persist_positions(
+            db,
+            account_id,
+            list(snapshot.get("positions") or []),
+        )
+        order_count = _persist_orders(db, account_id, list(snapshot.get("orders") or []))
+        fill_count, realized, fees = _persist_fills(
+            db,
+            account_id,
+            list(snapshot.get("fills") or []),
+        )
+        pnl_count = _persist_pnl(
+            db,
+            account_id,
+            unrealized_by_instrument=unrealized,
+            realized_by_instrument=realized,
+            fees_by_instrument=fees,
+        )
+        _persist_account_risk(db, account_id, snapshot.get("accountRisk"))
     _write_status(
         account_id,
         status="ready",

@@ -8,8 +8,10 @@ from uuid import uuid4
 from fastapi import HTTPException
 
 from app.database import connection
+from app.live_venue_snapshot_sync import ensure_sync_schema
 from app.schemas import (
     AccountResponse,
+    AccountRiskSnapshotResponse,
     BalanceSnapshotResponse,
     ContractSpecificationResponse,
     CreateOrderRequest,
@@ -288,6 +290,7 @@ def list_strategy_account_bindings(
 def get_strategy_account_snapshot(
     strategy_instance_id: str,
 ) -> StrategyAccountSnapshotResponse:
+    ensure_sync_schema()
     bindings = list_strategy_account_bindings(strategy_instance_id)
     binding = next(
         (item for item in bindings if item.role == "primary" and item.status == "active"),
@@ -310,8 +313,15 @@ def get_strategy_account_snapshot(
             syncErrorCode="account_unbound",
         )
 
-    account = get_account(binding.account_id)
     with connection() as db:
+        sync_row = db.execute(
+            """
+            SELECT status, error_code, last_attempt_at, last_success_at, updated_at
+            FROM account_sync_status
+            WHERE account_id = ?
+            """,
+            (binding.account_id,),
+        ).fetchone()
         balance_row = db.execute(
             """
             SELECT id, account_id, currency, equity, available_balance, source,
@@ -331,6 +341,17 @@ def get_strategy_account_snapshot(
             """,
             (binding.account_id,),
         ).fetchall()
+        risk_row = db.execute(
+            """
+            SELECT account_id, as_of, currency, equity, margin, free_margin, margin_level,
+                   data_quality_state
+            FROM account_risk_snapshots
+            WHERE account_id = ?
+            ORDER BY as_of DESC
+            LIMIT 1
+            """,
+            (binding.account_id,),
+        ).fetchone()
 
     balance = (
         BalanceSnapshotResponse(
@@ -370,29 +391,54 @@ def get_strategy_account_snapshot(
         if pnl_rows
         else None
     )
-    quality = balance.data_quality_state if balance is not None else account.data_quality_state
+    account_risk = (
+        AccountRiskSnapshotResponse(
+            accountId=risk_row["account_id"],
+            currency=risk_row["currency"],
+            equity=optional_decimal(risk_row["equity"]),
+            margin=optional_decimal(risk_row["margin"]),
+            freeMargin=optional_decimal(risk_row["free_margin"]),
+            marginLevel=optional_decimal(risk_row["margin_level"]),
+            dataQualityState=risk_row["data_quality_state"],
+            asOf=risk_row["as_of"],
+        )
+        if risk_row is not None
+        else None
+    )
+    sync_status = str(sync_row["status"]) if sync_row is not None else "waiting_initial_sync"
+    sync_error = (
+        str(sync_row["error_code"])
+        if sync_row is not None and sync_row["error_code"]
+        else None
+    )
+    quality = (
+        balance.data_quality_state
+        if balance is not None
+        else (
+            sync_status
+            if sync_status in {"unbound", "waiting_initial_sync", "syncing", "stale"}
+            else "unavailable"
+        )
+    )
     return StrategyAccountSnapshotResponse(
         strategyInstanceId=strategy_instance_id,
         accountId=binding.account_id,
         accountCode=binding.account_code,
         capability=binding.capability,
         dataQualityState=quality,
-        asOf=balance.as_of if balance is not None else None,
+        asOf=(
+            balance.as_of
+            if balance is not None
+            else (account_risk.as_of if account_risk is not None else None)
+        ),
         balance=balance,
+        accountRisk=account_risk,
         positions=positions,
         orders=orders,
         fills=fills,
         pnl=pnl,
-        syncStatus=(
-            "waiting_initial_sync"
-            if balance is None and quality == "unavailable"
-            else ("ready" if balance is not None and quality == "complete" else quality)
-        ),
-        syncErrorCode=(
-            "credential_unavailable"
-            if balance is None and quality == "unavailable"
-            else None
-        ),
+        syncStatus=sync_status,
+        syncErrorCode=sync_error,
     )
 
 

@@ -235,6 +235,17 @@ export interface BalanceResult {
   asOf: string;
 }
 
+export interface AccountRiskResult {
+  accountId: string;
+  currency: string;
+  equity?: string | null;
+  margin?: string | null;
+  freeMargin?: string | null;
+  marginLevel?: string | null;
+  dataQualityState: string;
+  asOf: string;
+}
+
 export interface EquityHistoryPointResult {
   asOf: string;
   equity: string;
@@ -339,6 +350,7 @@ export interface StrategyAccountSnapshotResult {
   dataQualityState: string;
   asOf?: string | null;
   balance?: BalanceResult | null;
+  accountRisk?: AccountRiskResult | null;
   positions: PositionResult[];
   orders: OrderDetailResult[];
   fills: FillResult[];

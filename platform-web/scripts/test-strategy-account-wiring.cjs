@@ -32,6 +32,11 @@ for (const [desk, instanceId] of Object.entries({
 assert.match(snapshots, /getStrategyAccountSnapshot/);
 assert.match(snapshots, /暂未绑定账号/);
 assert.match(snapshots, /等待首次同步/);
+assert.match(snapshots, /账户身份校验失败/);
+assert.match(snapshots, /主账号恢复失败/);
+assert.match(snapshots, /venueLabel/);
+assert.doesNotMatch(snapshots, /venue: 'Bybit'/);
+assert.doesNotMatch(snapshots, /Bybit 账户/);
 assert.doesNotMatch(snapshots, /2,984,316\.97|511,986\.31|4,502,541\.72/);
 
 console.log('strategy account API wiring checks passed');

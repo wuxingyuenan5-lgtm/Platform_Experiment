@@ -212,6 +212,17 @@ class BalanceSnapshotResponse(BaseModel):
     as_of: datetime = Field(alias="asOf")
 
 
+class AccountRiskSnapshotResponse(BaseModel):
+    account_id: str = Field(alias="accountId")
+    currency: str
+    equity: Decimal | None = None
+    margin: Decimal | None = None
+    free_margin: Decimal | None = Field(default=None, alias="freeMargin")
+    margin_level: Decimal | None = Field(default=None, alias="marginLevel")
+    data_quality_state: str = Field(alias="dataQualityState")
+    as_of: datetime = Field(alias="asOf")
+
+
 class ContractSpecificationResponse(BaseModel):
     version: str
     price_tick: Decimal = Field(alias="priceTick")
@@ -341,6 +352,7 @@ class StrategyAccountSnapshotResponse(BaseModel):
     data_quality_state: str = Field(alias="dataQualityState")
     as_of: datetime | None = Field(default=None, alias="asOf")
     balance: BalanceSnapshotResponse | None = None
+    account_risk: AccountRiskSnapshotResponse | None = Field(default=None, alias="accountRisk")
     positions: list[PositionResponse] = Field(default_factory=list)
     orders: list[OrderDetailResponse] = Field(default_factory=list)
     fills: list[FillResponse] = Field(default_factory=list)

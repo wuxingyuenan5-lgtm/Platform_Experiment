@@ -74,11 +74,25 @@ function unavailableReason(snapshot: StrategyAccountSnapshotResult | null): stri
   if (snapshot.syncStatus === 'syncing') return '正在同步';
   if (snapshot.syncStatus === 'ready') return '最近同步成功';
   if (snapshot.syncStatus === 'stale') return '数据过期';
+  if (snapshot.syncStatus === 'identity_mismatch') return '账户身份校验失败';
+  if (snapshot.syncStatus === 'restore_failed') return '主账号恢复失败';
   if (snapshot.syncErrorCode === 'credential_unavailable') return '凭据未配置';
   if (snapshot.syncErrorCode === 'runtime_unavailable') return 'Runtime 不可达';
+  if (snapshot.syncErrorCode?.startsWith('runtime_')) {
+    return `Runtime 错误：${snapshot.syncErrorCode}`;
+  }
+  if (snapshot.syncErrorCode === 'identity_mismatch') return '账户身份校验失败';
+  if (snapshot.syncErrorCode === 'restore_failed') return '主账号恢复失败';
   if (snapshot.dataQualityState === 'unbound') return '暂未绑定账号';
   if (snapshot.dataQualityState === 'unavailable') return '账户不可用';
   return snapshot.dataQualityState || '数据待同步';
+}
+
+function venueLabel(snapshot: StrategyAccountSnapshotResult | null): string {
+  if (!snapshot?.accountCode) return '--';
+  if (snapshot.accountCode.startsWith('MT5-')) return 'MT5';
+  if (snapshot.accountCode.startsWith('BYBIT-')) return 'Bybit';
+  return snapshot.accountCode.split('-')[0] || '--';
 }
 
 function pnlProfile(
@@ -148,8 +162,8 @@ function pnlProfile(
     ],
     legSnapshots: [
       {
-        title: snapshot?.accountCode || 'Bybit 账户',
-        venue: 'Bybit',
+        title: snapshot?.accountCode || '未绑定账户',
+        venue: venueLabel(snapshot),
         symbol: '--',
         rows: [
           {
@@ -231,6 +245,14 @@ function capitalProfile(
         tone: snapshot?.dataQualityState === 'unavailable' ? 'neutral' : 'positive',
       },
       {
+        label: '保证金水平',
+        value: snapshot?.accountRisk?.marginLevel || '--',
+        note: snapshot?.accountRisk?.asOf
+          ? `风险截至 ${formatTime(snapshot.accountRisk.asOf)}`
+          : reason,
+        tone: 'neutral',
+      },
+      {
         label: '账户能力',
         value:
           snapshot?.capability === 'trade_and_read'
@@ -243,7 +265,12 @@ function capitalProfile(
       },
     ],
     structureCards: [
-      { label: '账户', value: snapshot?.accountCode || '--', note: 'Bybit', tone: 'neutral' },
+      {
+        label: '账户',
+        value: snapshot?.accountCode || '--',
+        note: venueLabel(snapshot),
+        tone: 'neutral',
+      },
       { label: '最后同步', value: formatTime(snapshot?.asOf), note: reason, tone: 'neutral' },
     ],
     comparisonCards: [],

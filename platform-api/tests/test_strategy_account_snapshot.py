@@ -22,15 +22,16 @@ def test_unconfigured_bybit_strategy_account_is_explicitly_unavailable(tmp_path:
         "accountId": "account_bybit_bottom_fishing",
         "accountCode": "BYBIT-BOTTOM-FISHING",
         "capability": "read_only",
-        "dataQualityState": "unavailable",
+        "dataQualityState": "waiting_initial_sync",
         "asOf": None,
         "balance": None,
+        "accountRisk": None,
         "positions": [],
         "orders": [],
         "fills": [],
         "pnl": None,
         "syncStatus": "waiting_initial_sync",
-        "syncErrorCode": "credential_unavailable",
+        "syncErrorCode": None,
     }
 
 
@@ -52,6 +53,7 @@ def test_unbound_strategy_account_snapshot_returns_explicit_unbound_state(tmp_pa
         "dataQualityState": "unbound",
         "asOf": None,
         "balance": None,
+        "accountRisk": None,
         "positions": [],
         "orders": [],
         "fills": [],
