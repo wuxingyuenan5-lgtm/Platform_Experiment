@@ -29,6 +29,7 @@ from app.models import (
     VenueOrderSnapshot,
     VenuePositionSnapshot,
 )
+from app.mt5_read_coordinator import COORDINATOR
 from app.secret_resolver import inspect_credential_reference, resolve_secret_reference
 
 
@@ -41,19 +42,24 @@ class Mt5LiveAdapter:
         self._connected = False
 
     def capability(self) -> GatewayAdapterCapability:
-        inspection = inspect_credential_reference(
-            self.settings.mt5_credential_ref,
-            required_fields=("LOGIN", "PASSWORD", "SERVER"),
-        )
-        missing = list(inspection.missing_fields)
+        missing: list[str] = []
+        for account_id in self.settings.mt5_accounts:
+            inspection = inspect_credential_reference(
+                self.settings.mt5_credential_for_account(account_id),
+                required_fields=("LOGIN", "PASSWORD", "SERVER"),
+            )
+            missing.extend(f"{account_id}:{field}" for field in inspection.missing_fields)
         if not self.settings.mt5_accounts:
             missing.append("MT5_ACCOUNT_IDS")
         if not self.settings.mt5_instruments:
             missing.append("MT5_INSTRUMENT_MAP")
+        if not self.settings.mt5_primary_account_id:
+            missing.append("MT5_PRIMARY_ACCOUNT_ID")
         if self._provider is None and platform.system() != "Windows":
             missing.append("WINDOWS_RUNTIME")
         if self._provider is None and not self._dependency_available():
             missing.append("METATRADER5_DEPENDENCY")
+        missing.extend(COORDINATOR.readiness_suffix())
         configured = not [item for item in missing if item not in {"WINDOWS_RUNTIME", "METATRADER5_DEPENDENCY"}]
         operational = configured and not missing
         return GatewayAdapterCapability(
@@ -70,6 +76,7 @@ class Mt5LiveAdapter:
                 "balance_query",
                 "swap_query",
                 "fee_query",
+                "account_snapshot_query",
                 "submit_order_gated",
                 "cancel_order_gated",
             ],
@@ -415,6 +422,26 @@ class Mt5LiveAdapter:
         )
 
     def _connect(self):
+        mt5 = self._runtime_mt5()
+        if self._provider is not None and not hasattr(mt5, "login"):
+            return mt5
+        if self._connected and mt5.account_info() is not None:
+            return mt5
+        self._connected = False
+        secret = self._secret()
+        timeout_ms = int(self.settings.mt5_check_timeout_seconds * 1000)
+        authorized = mt5.login(
+            int(secret["LOGIN"]),
+            password=secret["PASSWORD"],
+            server=secret["SERVER"],
+            timeout=timeout_ms,
+        )
+        if not authorized:
+            raise GatewayConfigurationError(f"MT5 login failed: {mt5.last_error()}")
+        self._connected = True
+        return mt5
+
+    def _runtime_mt5(self):
         if self._provider is not None:
             return self._provider
         if platform.system() != "Windows":
@@ -425,7 +452,6 @@ class Mt5LiveAdapter:
             raise GatewayConfigurationError("MetaTrader5 dependency is not installed") from exc
         if self._connected and mt5.account_info() is not None:
             return mt5
-        self._connected = False
         timeout_ms = int(self.settings.mt5_check_timeout_seconds * 1000)
         initialize_kwargs: dict[str, object] = {"timeout": timeout_ms}
         if self.settings.mt5_terminal_path:
@@ -433,16 +459,6 @@ class Mt5LiveAdapter:
         initialized = mt5.initialize(**initialize_kwargs)
         if not initialized:
             raise GatewayConfigurationError(f"MT5 initialize failed: {mt5.last_error()}")
-        secret = self._secret()
-        authorized = mt5.login(
-            int(secret["LOGIN"]),
-            password=secret["PASSWORD"],
-            server=secret["SERVER"],
-            timeout=timeout_ms,
-        )
-        if not authorized:
-            raise GatewayConfigurationError(f"MT5 login failed: {mt5.last_error()}")
-        self._connected = True
         return mt5
 
     def _resolve_command_symbol(self, mt5, command: SubmitOrderCommand) -> Any | None:
@@ -473,9 +489,12 @@ class Mt5LiveAdapter:
             return None
 
     def _secret(self) -> dict[str, str]:
+        return self._secret_for_account(self.settings.mt5_primary_account_id or self._single_account())
+
+    def _secret_for_account(self, account_id: str) -> dict[str, str]:
         try:
             return resolve_secret_reference(
-                self.settings.mt5_credential_ref,
+                self.settings.mt5_credential_for_account(account_id),
                 required_fields=("LOGIN", "PASSWORD", "SERVER"),
             )
         except ValueError as exc:

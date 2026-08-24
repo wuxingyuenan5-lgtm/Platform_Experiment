@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from datetime import datetime
-from typing import Literal
+from datetime import UTC, datetime, timedelta
+from decimal import Decimal
+from typing import Any, Literal, cast
 
 from app.bybit_live_adapter import BybitLiveAdapter
 from app.config import Settings, get_settings
@@ -15,6 +16,7 @@ from app.models import (
     InternalCapitalTransferStepResponse,
     SubmitOrderCommand,
     VenueAccountRiskSnapshot,
+    VenueAccountSnapshot,
     VenueBalanceSnapshot,
     VenueEconomicEventSnapshot,
     VenueFillHistoryPage,
@@ -25,6 +27,7 @@ from app.models import (
     VenuePositionSnapshot,
 )
 from app.mt5_live_adapter import Mt5LiveAdapter
+from app.mt5_read_coordinator import with_mt5_read_session
 from app.strict_live_acceptance_adapters import (
     StrictBybitAcceptanceAdapter,
     StrictMt5AcceptanceAdapter,
@@ -43,8 +46,8 @@ class BybitMt5Gateway:
         mt5: Mt5LiveAdapter | None = None,
     ) -> None:
         self.settings = settings or get_settings()
-        self.bybit = bybit or StrictBybitAcceptanceAdapter(self.settings)
-        self.mt5 = mt5 or StrictMt5AcceptanceAdapter(self.settings)
+        self.bybit: Any = bybit or StrictBybitAcceptanceAdapter(self.settings)
+        self.mt5: Any = mt5 or StrictMt5AcceptanceAdapter(self.settings)
 
     def submit_order(self, command: SubmitOrderCommand) -> list[ExecutionEvent]:
         return self._adapter_for_account(command.account_id).submit_order(command)
@@ -177,6 +180,35 @@ class BybitMt5Gateway:
     def get_account_risk(self, account_id: str) -> VenueAccountRiskSnapshot:
         return self._adapter_for_account(account_id).get_account_risk(account_id)
 
+    def get_account_snapshot(self, account_id: str) -> VenueAccountSnapshot:
+        adapter: Any = self._adapter_for_account(account_id)
+        if account_id in self.settings.bybit_accounts:
+            if hasattr(adapter, "get_account_snapshot"):
+                return adapter.get_account_snapshot(account_id)
+            risk = adapter.get_account_risk(account_id)
+            balances = adapter.list_balances(account_id)
+            return VenueAccountSnapshot(
+                source=adapter.name,
+                accountId=account_id,
+                venue="bybit",
+                identity={"accountId": account_id},
+                balances=balances,
+                positions=adapter.list_positions(account_id),
+                orders=adapter.list_orders(account_id=account_id, limit=100),
+                fills=adapter.query_fill_history(
+                    account_id=account_id,
+                    symbol=None,
+                    start_time=datetime.now(UTC) - timedelta(days=30),
+                    end_time=datetime.now(UTC),
+                    cursor=None,
+                    limit=200,
+                ).items,
+                accountRisk=risk,
+                asOf=risk.as_of,
+                dataQualityState=risk.data_quality_state,
+            )
+        return self._mt5_account_snapshot(account_id)
+
     def transfer_internal_capital(
         self,
         command: InternalCapitalTransferStepCommand,
@@ -192,6 +224,17 @@ class BybitMt5Gateway:
         symbol: str,
     ) -> VenueInstrumentSpecification:
         return self._adapter_for_account(account_id).get_instrument_specification(
+            account_id=account_id,
+            symbol=symbol,
+        )
+
+    def get_market_quote(
+        self,
+        *,
+        account_id: str,
+        symbol: str,
+    ):
+        return self._adapter_for_account(account_id).get_market_quote(
             account_id=account_id,
             symbol=symbol,
         )
@@ -260,3 +303,148 @@ class BybitMt5Gateway:
         if name == self.mt5.name:
             return self.mt5
         raise GatewayConfigurationError(f"Unknown live adapter route: {name}")
+
+    def _mt5_account_snapshot(self, account_id: str) -> VenueAccountSnapshot:
+        mt5 = cast(Any, self.mt5._runtime_mt5())
+
+        def read(_session) -> VenueAccountSnapshot:
+            info = mt5.account_info()
+            terminal = mt5.terminal_info()
+            if info is None or terminal is None:
+                raise GatewayConfigurationError(f"MT5 account snapshot failed: {mt5.last_error()}")
+            currency = self.mt5._account_currency(mt5)
+            as_of = datetime.now(UTC)
+            balances = [
+                VenueBalanceSnapshot(
+                    source=self.mt5.name,
+                    externalBalanceId=(
+                        f"{account_id}:{getattr(info, 'login', '')}:{int(as_of.timestamp())}"
+                    ),
+                    accountId=account_id,
+                    equity=Decimal(str(getattr(info, "equity", 0) or 0)),
+                    availableBalance=Decimal(str(getattr(info, "margin_free", 0) or 0)),
+                    currency=currency,
+                    asOf=as_of,
+                )
+            ]
+            positions = []
+            for row in mt5.positions_get() or ():
+                symbol = str(getattr(row, "symbol", "")).upper()
+                instrument_id = self.settings.mt5_instruments.get(symbol)
+                if instrument_id is None:
+                    continue
+                volume = Decimal(str(getattr(row, "volume", 0) or 0))
+                if int(getattr(row, "type", -1)) == int(getattr(mt5, "POSITION_TYPE_SELL", 1)):
+                    volume = -volume
+                positions.append(
+                    VenuePositionSnapshot(
+                        source=self.mt5.name,
+                        externalPositionId=str(getattr(row, "ticket", 0)),
+                        accountId=account_id,
+                        instrumentId=instrument_id,
+                        symbol=symbol,
+                        netQuantity=volume,
+                        averagePrice=Decimal(str(getattr(row, "price_open", 0) or 0)),
+                        currentPrice=Decimal(str(getattr(row, "price_current", 0) or 0)),
+                        unrealizedPnl=Decimal(str(getattr(row, "profit", 0) or 0)),
+                        currency=currency,
+                        asOf=self.mt5._position_time(row),
+                        dataQualityState="complete",
+                    )
+                )
+            end = datetime.now(UTC)
+            start = end - timedelta(days=self.settings.mt5_history_lookback_days)
+            orders: list[VenueOrderSnapshot] = []
+            seen_order_ids: set[str] = set()
+            for row in [*(mt5.orders_get() or ()), *(mt5.history_orders_get(start, end) or ())]:
+                snapshot = self.mt5._snapshot(mt5, row, account_id)
+                if snapshot is None or snapshot.external_order_id in seen_order_ids:
+                    continue
+                seen_order_ids.add(snapshot.external_order_id)
+                orders.append(snapshot)
+            fills: list[VenueFillSnapshot] = []
+            seen_fill_ids: set[str] = set()
+            for deal in mt5.history_deals_get(start, end) or ():
+                if not self.mt5._is_trade_deal(mt5, deal):
+                    continue
+                snapshot = self.mt5._fill_snapshot(
+                    mt5,
+                    deal,
+                    account_id,
+                    target=None,
+                    fallback_route=None,
+                )
+                if snapshot is None or snapshot.external_fill_id in seen_fill_ids:
+                    continue
+                seen_fill_ids.add(snapshot.external_fill_id)
+                fills.append(snapshot)
+            risk = VenueAccountRiskSnapshot(
+                source=self.mt5.name,
+                accountId=account_id,
+                currency=currency,
+                equity=Decimal(str(getattr(info, "equity", 0) or 0)),
+                walletBalance=Decimal(str(getattr(info, "balance", 0) or 0)),
+                marginBalance=Decimal(str(getattr(info, "equity", 0) or 0)),
+                availableBalance=Decimal(str(getattr(info, "margin_free", 0) or 0)),
+                initialMargin=Decimal(str(getattr(info, "margin", 0) or 0)),
+                maintenanceMargin=(
+                    Decimal(str(getattr(info, "margin_maintenance", 0) or 0))
+                    if getattr(info, "margin_maintenance", None) is not None
+                    else None
+                ),
+                unrealizedPnl=Decimal(str(getattr(info, "profit", 0) or 0)),
+                marginLevel=(
+                    Decimal(str(getattr(info, "margin_level", 0)))
+                    if getattr(info, "margin_level", None) is not None
+                    else None
+                ),
+                marginCallLevel=(
+                    Decimal(str(getattr(info, "margin_so_call", 0)))
+                    if getattr(info, "margin_so_call", None) is not None
+                    else None
+                ),
+                stopOutLevel=(
+                    Decimal(str(getattr(info, "margin_so_so", 0)))
+                    if getattr(info, "margin_so_so", None) is not None
+                    else None
+                ),
+                marginThresholdMode=str(int(getattr(info, "margin_so_mode", -1))),
+                leverage=(
+                    Decimal(str(getattr(info, "leverage", 0)))
+                    if getattr(info, "leverage", None) is not None
+                    else None
+                ),
+                marginMode=str(int(getattr(info, "margin_mode", -1))),
+                tradeAllowed=bool(getattr(info, "trade_allowed", False)),
+                expertTradingAllowed=bool(getattr(terminal, "trade_allowed", False)),
+                fieldAvailability={
+                    "accountSnapshot": "single_session",
+                    "liquidationPrice": "not_available_mt5_api",
+                },
+                asOf=as_of,
+                dataQualityState="complete",
+            )
+            return VenueAccountSnapshot(
+                source=self.mt5.name,
+                accountId=account_id,
+                venue="mt5",
+                identity={
+                    "accountId": account_id,
+                    "login": str(getattr(info, "login", "") or ""),
+                    "server": str(getattr(info, "server", "") or ""),
+                },
+                balances=balances,
+                positions=positions,
+                orders=orders,
+                fills=fills,
+                accountRisk=risk,
+                asOf=as_of,
+                dataQualityState="complete",
+            )
+
+        return with_mt5_read_session(
+            mt5=mt5,
+            settings=self.settings,
+            account_id=account_id,
+            callback=read,
+        )

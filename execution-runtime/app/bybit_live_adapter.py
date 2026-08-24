@@ -22,6 +22,8 @@ from app.models import (
     ExecutionEvent,
     GatewayAdapterCapability,
     SubmitOrderCommand,
+    VenueAccountRiskSnapshot,
+    VenueAccountSnapshot,
     VenueBalanceSnapshot,
     VenueEconomicEventSnapshot,
     VenueFillSnapshot,
@@ -433,6 +435,184 @@ class BybitLiveAdapter:
             status="canceled",
             reason=reason,
             asOf=datetime.now(UTC),
+        )
+
+    def get_account_snapshot(self, account_id: str) -> VenueAccountSnapshot:
+        self._assert_account(account_id)
+        balances = self.list_balances(account_id)
+        categories = self.settings.bybit_categories_for_account(account_id)
+        positions: list[VenuePositionSnapshot] = []
+        orders_by_id: dict[str, VenueOrderSnapshot] = {}
+        fills_by_id: dict[str, VenueFillSnapshot] = {}
+        for category in categories:
+            position_response = self._with_fresh_client_retry(
+                account_id,
+                lambda refreshed, current_category=category: refreshed.get_positions(
+                    category=current_category,
+                    settleCoin=self.settings.bybit_settle_coin,
+                    limit=200,
+                ),
+            )
+            self._require_success(position_response, "Bybit position query failed")
+            for row in self._result_list(position_response):
+                size = Decimal(str(row.get("size") or "0"))
+                if size == 0:
+                    continue
+                symbol = str(row.get("symbol") or "").upper()
+                instrument_id = self.settings.bybit_instruments.get(symbol)
+                if instrument_id is None:
+                    continue
+                side = str(row.get("side") or "")
+                quantity = size if side == "Buy" else -size
+                positions.append(
+                    VenuePositionSnapshot(
+                        source=self.name,
+                        externalPositionId=f"{account_id}:{category}:{symbol}:{row.get('positionIdx', 0)}",
+                        accountId=account_id,
+                        instrumentId=instrument_id,
+                        symbol=symbol,
+                        netQuantity=quantity,
+                        averagePrice=self._optional_decimal(row.get("avgPrice")),
+                        currentPrice=self._optional_decimal(row.get("markPrice")),
+                        markPrice=self._optional_decimal(row.get("markPrice")),
+                        unrealizedPnl=self._optional_decimal(row.get("unrealisedPnl")),
+                        currency=self.settings.bybit_settle_coin,
+                        asOf=self._millis(row.get("updatedTime")),
+                    )
+                )
+            for query_name in ("get_open_orders", "get_order_history"):
+                response = self._with_fresh_client_retry(
+                    account_id,
+                    lambda refreshed, method_name=query_name, current_category=category: getattr(
+                        refreshed,
+                        method_name,
+                    )(
+                        category=current_category,
+                        limit=100,
+                    ),
+                )
+                self._require_success(response, "Bybit order snapshot query failed")
+                for row in self._result_list(response):
+                    status_map: dict[
+                        str,
+                        Literal[
+                            "accepted",
+                            "partially_filled",
+                            "filled",
+                            "canceled",
+                            "rejected",
+                            "unknown",
+                        ],
+                    ] = {
+                        "New": "accepted",
+                        "Created": "accepted",
+                        "PartiallyFilled": "partially_filled",
+                        "Filled": "filled",
+                        "Cancelled": "canceled",
+                        "Canceled": "canceled",
+                        "Rejected": "rejected",
+                    }
+                    symbol = str(row.get("symbol") or "").upper()
+                    instrument_id = self.settings.bybit_instruments.get(symbol)
+                    if instrument_id is None:
+                        continue
+                    external_order_id = str(row.get("orderId") or "")
+                    route = get_order_route(external_order_id=external_order_id) or get_order_route(
+                        external_client_id=str(row.get("orderLinkId") or "")
+                    )
+                    platform_order_id = (
+                        route.platform_order_id
+                        if route is not None
+                        else f"external:{self.name}:{external_order_id}"
+                    )
+                    command_id = route.command_id if route is not None else platform_order_id
+                    orders_by_id[external_order_id] = VenueOrderSnapshot(
+                        source=self.name,
+                        externalOrderId=external_order_id,
+                        platformOrderId=platform_order_id,
+                        commandId=command_id,
+                        accountId=route.account_id if route is not None else account_id,
+                        instrumentId=route.instrument_id if route is not None else instrument_id,
+                        symbol=symbol,
+                        side="buy" if str(row.get("side")) == "Buy" else "sell",
+                        orderType="market" if str(row.get("orderType")) == "Market" else "limit",
+                        quantity=Decimal(str(row.get("qty") or "0")),
+                        price=self._optional_decimal(row.get("price")),
+                        status=status_map.get(str(row.get("orderStatus")), "unknown"),
+                        filledQuantity=Decimal(str(row.get("cumExecQty") or "0")),
+                        averageFillPrice=self._optional_decimal(row.get("avgPrice")),
+                        occurredAt=self._millis(row.get("createdTime")),
+                        asOf=self._millis(row.get("updatedTime")),
+                        dataQualityState="complete" if route is not None else "external_only",
+                    )
+            execution_response = self._with_fresh_client_retry(
+                account_id,
+                lambda refreshed, current_category=category: refreshed.get_executions(
+                    category=current_category,
+                    limit=200,
+                ),
+            )
+            self._require_success(execution_response, "Bybit execution query failed")
+            for row in self._result_list(execution_response):
+                symbol = str(row.get("symbol") or "").upper()
+                instrument_id = self.settings.bybit_instruments.get(symbol)
+                if instrument_id is None:
+                    continue
+                external_order_id = str(row.get("orderId") or "unknown")
+                external_fill_id = str(row.get("execId") or f"{external_order_id}:{row.get('execTime')}")
+                route = get_order_route(external_order_id=external_order_id)
+                platform_order_id = (
+                    route.platform_order_id
+                    if route is not None
+                    else f"external:{self.name}:{external_order_id}"
+                )
+                command_id = route.command_id if route is not None else platform_order_id
+                fills_by_id[external_fill_id] = VenueFillSnapshot(
+                    source=self.name,
+                    externalFillId=external_fill_id,
+                    externalOrderId=external_order_id,
+                    platformOrderId=platform_order_id,
+                    commandId=command_id,
+                    accountId=route.account_id if route is not None else account_id,
+                    instrumentId=route.instrument_id if route is not None else instrument_id,
+                    symbol=symbol,
+                    side="buy" if str(row.get("side")) == "Buy" else "sell",
+                    quantity=Decimal(str(row.get("execQty") or "0")),
+                    price=Decimal(str(row.get("execPrice") or "0")),
+                    fee=Decimal(str(row.get("execFee") or "0")),
+                    currency=str(row.get("feeCurrency") or self.settings.bybit_settle_coin),
+                    occurredAt=self._millis(row.get("execTime")),
+                    dataQualityState="complete" if route is not None else "external_only",
+                )
+        risk = (
+            cast(Any, self).get_account_risk(account_id)
+            if hasattr(self, "get_account_risk")
+            else VenueAccountRiskSnapshot(
+                source=self.name,
+                accountId=account_id,
+                currency=self.settings.bybit_settle_coin,
+                equity=balances[0].equity if balances else None,
+                availableBalance=balances[0].available_balance if balances else None,
+                asOf=datetime.now(UTC),
+                dataQualityState="partial",
+            )
+        )
+        return VenueAccountSnapshot(
+            source=self.name,
+            accountId=account_id,
+            venue="bybit",
+            identity={
+                "accountId": account_id,
+                "categories": "|".join(categories),
+                "credentialRef": self.settings.bybit_credential_for_account(account_id),
+            },
+            balances=balances,
+            positions=positions,
+            orders=sorted(orders_by_id.values(), key=lambda item: item.as_of, reverse=True),
+            fills=sorted(fills_by_id.values(), key=lambda item: item.occurred_at, reverse=True),
+            accountRisk=risk,
+            asOf=risk.as_of,
+            dataQualityState=risk.data_quality_state,
         )
 
     def _client(self, account_id: str | None = None):

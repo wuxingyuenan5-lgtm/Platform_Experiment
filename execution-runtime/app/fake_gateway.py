@@ -13,6 +13,7 @@ from app.models import (
     InternalCapitalTransferStepResponse,
     SubmitOrderCommand,
     VenueAccountRiskSnapshot,
+    VenueAccountSnapshot,
     VenueBalanceSnapshot,
     VenueEconomicEventSnapshot,
     VenueFillHistoryPage,
@@ -297,6 +298,29 @@ class FakeGateway:
             filling_mode="deterministic",
             accessChecks={"simulation": True},
             asOf=datetime.now(UTC),
+        )
+
+    def get_account_snapshot(self, account_id: str) -> VenueAccountSnapshot:
+        balances = self.list_balances(account_id)
+        positions = self.list_positions(account_id)
+        orders = self.list_orders(account_id=account_id, limit=100)
+        fills = self.list_fills(account_id=account_id)
+        risk = self.get_account_risk(account_id)
+        as_of = max(
+            [risk.as_of, *(balance.as_of for balance in balances)] or [datetime.now(UTC)]
+        )
+        return VenueAccountSnapshot(
+            source=self.name,
+            accountId=account_id,
+            venue="fake",
+            identity={"accountId": account_id},
+            balances=balances,
+            positions=positions,
+            orders=orders,
+            fills=fills,
+            accountRisk=risk,
+            asOf=as_of,
+            dataQualityState="complete",
         )
 
     def get_market_quote(

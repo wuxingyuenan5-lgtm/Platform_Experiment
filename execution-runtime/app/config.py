@@ -68,6 +68,7 @@ class Settings(BaseSettings):
     # keeps the legacy default reference, which makes the migration backward
     # compatible while allowing isolated Bybit subaccounts.
     bybit_account_credential_refs: str = ""
+    bybit_account_category_scopes: str = ""
     bybit_read_only_account_ids: str = ""
     bybit_instrument_map: str = ""
     bybit_category: str = "linear"
@@ -89,6 +90,8 @@ class Settings(BaseSettings):
 
     mt5_credential_ref: str = "secret://environment/mt5-live-001"
     mt5_account_ids: str = ""
+    mt5_account_credential_refs: str = ""
+    mt5_primary_account_id: str = ""
     mt5_instrument_map: str = ""
     # Logical gold symbol used as the resolution base. The concrete broker name
     # (XAUUSD / XAUUSD.s / XAUUSD+ ...) is auto-resolved against the terminal;
@@ -140,8 +143,44 @@ class Settings(BaseSettings):
         return self.bybit_account_credentials.get(account_id, self.bybit_credential_ref)
 
     @property
+    def bybit_account_category_sets(self) -> dict[str, tuple[str, ...]]:
+        mapping: dict[str, tuple[str, ...]] = {}
+        for item in self._csv(self.bybit_account_category_scopes):
+            if "=" not in item:
+                continue
+            account_id, categories = item.split("=", 1)
+            normalized = tuple(
+                category.strip().lower()
+                for category in categories.split("|")
+                if category.strip()
+            )
+            if account_id.strip() and normalized:
+                mapping[account_id.strip()] = normalized
+        return mapping
+
+    def bybit_categories_for_account(self, account_id: str) -> tuple[str, ...]:
+        return self.bybit_account_category_sets.get(
+            account_id,
+            (self.bybit_category.lower(),),
+        )
+
+    @property
     def mt5_accounts(self) -> set[str]:
         return set(self._csv(self.mt5_account_ids))
+
+    @property
+    def mt5_account_credentials(self) -> dict[str, str]:
+        mapping: dict[str, str] = {}
+        for item in self._csv(self.mt5_account_credential_refs):
+            if "=" not in item:
+                continue
+            account_id, credential_ref = item.split("=", 1)
+            if account_id.strip() and credential_ref.strip():
+                mapping[account_id.strip()] = credential_ref.strip()
+        return mapping
+
+    def mt5_credential_for_account(self, account_id: str) -> str:
+        return self.mt5_account_credentials.get(account_id, self.mt5_credential_ref)
 
     @property
     def bybit_instruments(self) -> dict[str, str]:

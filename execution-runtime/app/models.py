@@ -245,6 +245,21 @@ class VenueAccountRiskSnapshot(BaseModel):
     data_quality_state: str = Field(default="complete", alias="dataQualityState")
 
 
+class VenueAccountSnapshot(BaseModel):
+    source: str
+    account_id: str = Field(alias="accountId")
+    venue: str
+    identity: dict[str, str | None] = Field(default_factory=dict)
+    balances: list[VenueBalanceSnapshot] = Field(default_factory=list)
+    positions: list[VenuePositionSnapshot] = Field(default_factory=list)
+    orders: list[VenueOrderSnapshot] = Field(default_factory=list)
+    fills: list[VenueFillSnapshot] = Field(default_factory=list)
+    account_risk: VenueAccountRiskSnapshot | None = Field(default=None, alias="accountRisk")
+    warnings: list[str] = Field(default_factory=list)
+    as_of: datetime = Field(default_factory=lambda: datetime.now(UTC), alias="asOf")
+    data_quality_state: str = Field(default="complete", alias="dataQualityState")
+
+
 class VenueEconomicEventSnapshot(BaseModel):
     source: str
     external_event_id: str = Field(alias="externalEventId")

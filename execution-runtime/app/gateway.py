@@ -9,6 +9,7 @@ from app.models import (
     InternalCapitalTransferStepResponse,
     SubmitOrderCommand,
     VenueAccountRiskSnapshot,
+    VenueAccountSnapshot,
     VenueBalanceSnapshot,
     VenueEconomicEventSnapshot,
     VenueFillHistoryPage,
@@ -94,6 +95,10 @@ class ExecutionGateway(Protocol):
 
     def get_account_risk(self, account_id: str) -> VenueAccountRiskSnapshot:
         """Return account-level authoritative margin and stop-out evidence."""
+        ...
+
+    def get_account_snapshot(self, account_id: str) -> VenueAccountSnapshot:
+        """Return one authoritative account snapshot for one sync cycle."""
         ...
 
     def transfer_internal_capital(

@@ -19,6 +19,7 @@ from app.models import (
     InternalCapitalTransferStepCommand,
     InternalCapitalTransferStepResponse,
     VenueAccountRiskSnapshot,
+    VenueAccountSnapshot,
     VenueBalanceSnapshot,
     VenueEconomicEventSnapshot,
     VenueFillHistoryPage,
@@ -187,6 +188,16 @@ def create_venue_query_router(*, gateway: ExecutionGateway) -> APIRouter:
         account_id: str = Query(alias="accountId"),
     ) -> VenueAccountRiskSnapshot:
         return query_gateway(lambda: gateway.get_account_risk(account_id))
+
+    @router.get(
+        "/venue/account-snapshot",
+        response_model=VenueAccountSnapshot,
+        tags=["venue-query"],
+    )
+    def venue_account_snapshot(
+        account_id: str = Query(alias="accountId"),
+    ) -> VenueAccountSnapshot:
+        return query_gateway(lambda: gateway.get_account_snapshot(account_id))
 
     @router.post(
         "/venue/internal-capital-transfers",
