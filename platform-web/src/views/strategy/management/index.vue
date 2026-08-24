@@ -1,55 +1,75 @@
 ﻿<template>
   <div class="strategy-management-page" data-testid="strategy-management-original-structure">
-    <section class="strategy-top-toolbar">
-      <div class="strategy-top-toolbar__left">
-        <CompactSegmentTabs :items="deskTabs" v-model="activeDesk" />
-      </div>
-
-      <div class="strategy-top-toolbar__meta">
-        <CompactSegmentTabs :items="sectionTabs" v-model="activeSection" />
-      </div>
+    <section v-if="overviewLoading" class="strategy-overview-state" data-testid="overview-loading">
+      <p>策略管理总览加载中</p>
     </section>
 
-    <template v-if="activeSection === 'pnl'">
-      <StrategyPnlPanel :active-desk="activeDesk" :live-profile="activePnlProfile" />
-    </template>
+    <section v-else-if="overviewError" class="strategy-overview-state" data-testid="overview-error">
+      <p>{{ overviewError }}</p>
+      <button type="button" class="state-refresh-btn" @click="refreshManagementOverview">
+        重新刷新
+      </button>
+    </section>
 
-    <template v-else-if="activeSection === 'capital'">
-      <StrategyKpiGrid :items="capitalProfile.overview" />
-
-      <StrategyCapitalFinanceBoard
-        :risk-cards="capitalProfile.riskCards"
-        :structure-cards="capitalProfile.structureCards"
-      />
-
-      <StrategyCapitalRulePanel
-        v-if="capitalProfile.specialRulePanel"
-        :panel="capitalProfile.specialRulePanel"
-      />
-
-      <StrategyCapitalRiskOverview
-        v-if="capitalProfile.riskOverview"
-        :overview="capitalProfile.riskOverview"
-      />
-
-      <StrategyRuntimePanel :cards="capitalProfile.comparisonCards" />
-
-      <StrategyCapitalNetValueBoard :curve="capitalProfile.curve" />
-
-      <StrategyCurveGrid
-        v-if="capitalProfile.metricCurves?.length"
-        :curves="capitalProfile.metricCurves"
-      />
-    </template>
+    <section v-else-if="overviewEmpty" class="strategy-overview-state" data-testid="overview-empty">
+      <p>暂无策略</p>
+      <button type="button" class="state-refresh-btn" @click="refreshManagementOverview">
+        重新刷新
+      </button>
+    </section>
 
     <template v-else>
-      <section class="records-only-grid">
-        <StrategyRecordsPanel
-          :tabs="orderProfile.tabs"
-          :tables="orderProfile.tables"
-          v-model:activeTab="activeRecordTab"
-        />
+      <section class="strategy-top-toolbar">
+        <div class="strategy-top-toolbar__left">
+          <CompactSegmentTabs :items="deskTabs" v-model="activeDesk" />
+        </div>
+
+        <div class="strategy-top-toolbar__meta">
+          <CompactSegmentTabs :items="sectionTabs" v-model="activeSection" />
+        </div>
       </section>
+
+      <template v-if="activeSection === 'pnl'">
+        <StrategyPnlPanel :active-desk="activeDesk" :live-profile="activePnlProfile" />
+      </template>
+
+      <template v-else-if="activeSection === 'capital'">
+        <StrategyKpiGrid :items="capitalProfile.overview" />
+
+        <StrategyCapitalFinanceBoard
+          :risk-cards="capitalProfile.riskCards"
+          :structure-cards="capitalProfile.structureCards"
+        />
+
+        <StrategyCapitalRulePanel
+          v-if="capitalProfile.specialRulePanel"
+          :panel="capitalProfile.specialRulePanel"
+        />
+
+        <StrategyCapitalRiskOverview
+          v-if="capitalProfile.riskOverview"
+          :overview="capitalProfile.riskOverview"
+        />
+
+        <StrategyRuntimePanel :cards="capitalProfile.comparisonCards" />
+
+        <StrategyCapitalNetValueBoard :curve="capitalProfile.curve" />
+
+        <StrategyCurveGrid
+          v-if="capitalProfile.metricCurves?.length"
+          :curves="capitalProfile.metricCurves"
+        />
+      </template>
+
+      <template v-else>
+        <section class="records-only-grid">
+          <StrategyRecordsPanel
+            :tabs="orderProfile.tabs"
+            :tables="orderProfile.tables"
+            v-model:activeTab="activeRecordTab"
+          />
+        </section>
+      </template>
     </template>
   </div>
 </template>
@@ -61,6 +81,10 @@
   import CompactSegmentTabs from '../shared/CompactSegmentTabs.vue';
   import { useCrossSpreadFinance } from './composables/useCrossSpreadFinance';
   import { useCrossSpreadRecords } from './composables/useCrossSpreadRecords';
+  import {
+    normalizeManagementSection,
+    resolveManagementDesk,
+  } from './composables/strategyManagementOverviewState';
   import { useStrategyAccountSnapshots } from './composables/useStrategyAccountSnapshots';
   import { useStrategyManagementOverview } from './composables/useStrategyManagementOverview';
   import StrategyKpiGrid from './components/StrategyKpiGrid.vue';
@@ -104,7 +128,11 @@
   } = useCrossSpreadFinance();
   const {
     byDesk: strategyOverviewByDesk,
+    empty: overviewEmpty,
+    error: overviewError,
+    hasData: overviewHasData,
     items: strategyOverview,
+    loading: overviewLoading,
     refresh: refreshStrategyOverview,
   } = useStrategyManagementOverview();
 
@@ -127,8 +155,8 @@
     );
   }
 
-  function normalizeSection(value: unknown): 'pnl' | 'capital' | 'orders' {
-    return value === 'capital' || value === 'orders' ? value : 'pnl';
+  async function refreshManagementOverview() {
+    await refreshStrategyOverview();
   }
 
   function statusLabel(value: string | null | undefined): string {
@@ -377,7 +405,7 @@
   });
 
   onMounted(() => {
-    void refreshStrategyOverview();
+    void refreshManagementOverview();
     void refreshCrossSpreadRecords();
     void refreshCrossSpreadFinance();
     void refreshAccountSnapshots();
@@ -386,7 +414,7 @@
   watch(
     () => route.query.section,
     (section) => {
-      activeSection.value = normalizeSection(section);
+      activeSection.value = normalizeManagementSection(section);
     },
     { immediate: true },
   );
@@ -394,12 +422,8 @@
   watch(
     () => [route.query.desk, strategyOverview.value] as const,
     ([requestedDesk, items]) => {
-      const available = items.map((item) => item.deskKey).filter(isDeskKey);
-      if (!available.length) return;
-      const nextDesk =
-        isDeskKey(requestedDesk) && available.includes(requestedDesk)
-          ? requestedDesk
-          : available[0];
+      const nextDesk = resolveManagementDesk(requestedDesk, items);
+      if (!isDeskKey(nextDesk)) return;
       if (activeDesk.value !== nextDesk) activeDesk.value = nextDesk;
     },
     { immediate: true, deep: true },
@@ -408,6 +432,7 @@
   watch(
     () => [activeDesk.value, activeSection.value] as const,
     ([desk, section]) => {
+      if (!overviewHasData.value) return;
       if (!deskTabs.value.some((item) => item.key === desk)) return;
       if (route.query.desk === desk && route.query.section === section) return;
       void router.replace({
@@ -463,5 +488,34 @@
     display: grid;
     grid-template-columns: 1fr;
     gap: 16px;
+  }
+
+  .strategy-overview-state {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 18px 20px;
+    border: 1px solid var(--strategy-border);
+    border-radius: var(--strategy-radius-panel);
+    background: var(--strategy-surface);
+    box-shadow: var(--strategy-shadow-card);
+    gap: 12px;
+  }
+
+  .strategy-overview-state p {
+    margin: 0;
+    color: var(--strategy-text-2);
+    font-size: 14px;
+    font-weight: 600;
+  }
+
+  .state-refresh-btn {
+    min-width: 88px;
+    padding: 8px 12px;
+    border: 1px solid var(--strategy-border-strong);
+    border-radius: 10px;
+    background: var(--strategy-surface-muted);
+    color: var(--strategy-text-1);
+    font-weight: 700;
   }
 </style>

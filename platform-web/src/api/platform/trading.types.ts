@@ -298,6 +298,8 @@ export interface StrategyManagementOverviewResult {
   dataQualityState: string;
   activeCapability: 'trade_and_read' | 'read_only' | 'unbound' | string;
   bindingCount: number;
+  latestRunStatus?: string | null;
+  latestRunAt?: string | null;
   primaryAccountCode?: string | null;
   primaryAccountStatus?: string | null;
   primaryAccountDataQualityState?: string | null;

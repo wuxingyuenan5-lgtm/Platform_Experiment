@@ -4,6 +4,7 @@ import httpx
 from fastapi.testclient import TestClient
 
 from app.config import get_settings
+from app.database import connection
 from app.main import app
 
 
@@ -53,6 +54,8 @@ def test_seeded_strategy_account_and_instrument_catalog(tmp_path: Path) -> None:
         assert by_desk["shortLineTraderW"]["executionReadiness"] is None
         assert by_desk["dip"]["primaryAccountDataQualityState"] == "unavailable"
         assert by_desk["dip"]["operatingStatus"] == "active"
+        assert by_desk["dip"]["latestRunStatus"] is None
+        assert by_desk["dip"]["latestRunAt"] is None
         assert all("credentialRef" not in item for item in overview_body)
 
         accounts = client.get("/api/v1/accounts")
@@ -128,3 +131,56 @@ def test_strategy_nav_snapshot_uses_seed_balance_and_capital_base(tmp_path: Path
         )
         assert snapshots.status_code == 200
         assert len(snapshots.json()) == 1
+
+
+def test_management_overview_exposes_latest_run_freshness_for_closed_loop_and_read_only(
+    tmp_path: Path,
+) -> None:
+    get_settings().database_path = str(tmp_path / "management-overview-runs.db")
+
+    with TestClient(app) as client:
+        with connection() as db:
+            db.execute(
+                """
+                INSERT INTO strategy_runs (
+                    id, idempotency_key, strategy_instance_id, strategy_key, direction,
+                    status, execution_batch_id, reason, failure_reason, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?), (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    "run-funding-latest",
+                    "idem-funding-latest",
+                    "strategy_funding_arbitrage_instance_default",
+                    "funding_arbitrage",
+                    "collect",
+                    "completed",
+                    None,
+                    None,
+                    None,
+                    "2026-08-24T01:00:00+00:00",
+                    "2026-08-24T01:00:00+00:00",
+                    "run-bottom-fishing-latest",
+                    "idem-bottom-fishing-latest",
+                    "strategy_bottom_fishing_instance_default",
+                    "bottom_fishing",
+                    "read_only_refresh",
+                    "executing",
+                    None,
+                    None,
+                    None,
+                    "2026-08-24T02:00:00+00:00",
+                    "2026-08-24T02:00:00+00:00",
+                ),
+            )
+
+        response = client.get("/api/v1/strategies/management-overview")
+
+    assert response.status_code == 200
+    overview_by_desk = {item["deskKey"]: item for item in response.json()}
+    assert overview_by_desk["funding"]["latestRunStatus"] == "completed"
+    assert overview_by_desk["funding"]["latestRunAt"] == "2026-08-24T01:00:00Z"
+    assert overview_by_desk["dip"]["latestRunStatus"] == "executing"
+    assert overview_by_desk["dip"]["latestRunAt"] == "2026-08-24T02:00:00Z"
+    assert overview_by_desk["shortLineTraderL"]["latestRunStatus"] is None
+    assert overview_by_desk["shortLineTraderL"]["latestRunAt"] is None
+    assert overview_by_desk["shortLineTraderL"]["operatingStatus"] == "active"

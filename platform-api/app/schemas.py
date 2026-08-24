@@ -362,6 +362,8 @@ class StrategyManagementOverviewResponse(BaseModel):
     data_quality_state: str = Field(alias="dataQualityState")
     active_capability: str = Field(alias="activeCapability")
     binding_count: int = Field(alias="bindingCount")
+    latest_run_status: str | None = Field(default=None, alias="latestRunStatus")
+    latest_run_at: datetime | None = Field(default=None, alias="latestRunAt")
     primary_account_code: str | None = Field(default=None, alias="primaryAccountCode")
     primary_account_status: str | None = Field(default=None, alias="primaryAccountStatus")
     primary_account_data_quality_state: str | None = Field(

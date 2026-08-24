@@ -3,13 +3,17 @@ import { computed, ref } from 'vue';
 import { getStrategyManagementOverview } from '@/api/platform/trading';
 import type { StrategyManagementOverviewResult } from '@/api/platform/trading.types';
 import type { StrategyDeskKey } from '@/data/sample/strategy';
+import { createStrategyManagementOverviewStore } from './strategyManagementOverviewState';
 
 export function useStrategyManagementOverview() {
+  const store = createStrategyManagementOverviewStore<StrategyManagementOverviewResult>(
+    getStrategyManagementOverview,
+  );
   const items = ref<StrategyManagementOverviewResult[]>([]);
 
   async function refresh() {
-    const next = await getStrategyManagementOverview();
-    items.value = [...next].sort((left, right) => left.sortOrder - right.sortOrder);
+    await store.refresh();
+    items.value = store.items.value;
   }
 
   const byDesk = computed(
@@ -22,6 +26,10 @@ export function useStrategyManagementOverview() {
   return {
     items,
     byDesk,
+    loading: store.loading,
+    error: store.error,
+    empty: store.empty,
+    hasData: store.hasData,
     refresh,
   };
 }

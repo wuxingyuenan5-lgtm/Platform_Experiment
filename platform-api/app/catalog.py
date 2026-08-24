@@ -130,6 +130,8 @@ def list_strategy_management_overview() -> list[StrategyManagementOverviewRespon
                    si.data_quality_state,
                    sd.v1_scope,
                    COUNT(sab.id) AS binding_count,
+                   latest_run.status AS latest_run_status,
+                   latest_run.created_at AS latest_run_at,
                    COALESCE(
                        MAX(
                            CASE
@@ -156,6 +158,14 @@ def list_strategy_management_overview() -> list[StrategyManagementOverviewRespon
                    ) AS primary_account_data_quality_state
             FROM strategy_instances si
             JOIN strategy_definitions sd ON sd.id = si.strategy_definition_id
+            LEFT JOIN strategy_runs latest_run
+              ON latest_run.id = (
+                  SELECT sr.id
+                  FROM strategy_runs sr
+                  WHERE sr.strategy_instance_id = si.id
+                  ORDER BY sr.created_at DESC, sr.id DESC
+                  LIMIT 1
+              )
             LEFT JOIN strategy_account_bindings sab ON sab.strategy_instance_id = si.id
             LEFT JOIN accounts a ON a.id = sab.account_id
             GROUP BY
@@ -197,6 +207,8 @@ def list_strategy_management_overview() -> list[StrategyManagementOverviewRespon
                 dataQualityState=row["data_quality_state"],
                 activeCapability=row["active_capability"],
                 bindingCount=int(row["binding_count"]),
+                latestRunStatus=row["latest_run_status"],
+                latestRunAt=row["latest_run_at"],
                 primaryAccountCode=row["primary_account_code"],
                 primaryAccountStatus=row["primary_account_status"],
                 primaryAccountDataQualityState=row["primary_account_data_quality_state"],
