@@ -140,28 +140,26 @@ export interface StockSnapshotResponse {
   modules: Record<string, ResearchModuleResult>;
 }
 
+export type MacroExpectationStatus = 'ready' | 'no_data' | 'not_configured' | 'stale' | 'error';
+
 export interface MacroProbabilityPoint {
   observedAt: string;
-  probabilityPct: string | number;
+  probability: string | number;
 }
 
 export interface MacroExpectationEvent {
-  eventId: string;
+  id: string;
+  label: string;
   category: 'monetary_policy' | 'macro' | 'geopolitics' | 'election';
-  title: string;
-  outcome: string;
-  currentProbabilityPct: string | number;
-  change1dPctPoints?: string | number | null;
-  change7dPctPoints?: string | number | null;
-  liquidityLabel?: string | null;
-  expiryAt?: string | null;
-  sourceUrl?: string | null;
+  probability: string | number;
   history: MacroProbabilityPoint[];
 }
 
 export interface MacroExpectationResponse {
-  generatedAt: string;
-  events: ResearchModuleResult<MacroExpectationEvent[]>;
+  status: MacroExpectationStatus;
+  source: string;
+  updatedAt: string;
+  events: MacroExpectationEvent[];
 }
 
 const SESSION_INVALIDATION_CODES = new Set([

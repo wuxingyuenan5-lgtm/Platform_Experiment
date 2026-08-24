@@ -1,103 +1,139 @@
 from __future__ import annotations
 
-import json
 from datetime import datetime
 from decimal import Decimal
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 import httpx
+from pydantic import Field, field_validator
 
-from app.research_data_schemas import MacroExpectationEvent
+from app.research_data_schemas import (
+    MacroExpectationEvent,
+    MacroProbabilityPoint,
+    ResearchApiModel,
+)
 from app.research_provider_errors import ResearchProviderError
 
-POLYMARKET_MARKETS_URL = "https://gamma-api.polymarket.com/markets"
+PLATFORM_DATA_EXPECTATIONS_URL = (
+    "https://raw.githubusercontent.com/wuxingyuenan5-lgtm/platform-data/"
+    "macro-expectations-phase-1a/public/v1/macro/expectations.json"
+)
 MacroCategory = Literal["monetary_policy", "macro", "geopolitics", "election"]
+MacroExpectationFeedStatus = Literal[
+    "ready",
+    "no_data",
+    "not_configured",
+    "stale",
+    "error",
+]
+
+
+class MacroExpectationFeedPoint(ResearchApiModel):
+    observed_at: datetime
+    probability: Decimal = Field(ge=0, le=100)
+
+    @field_validator("observed_at")
+    @classmethod
+    def require_timezone(cls, value: datetime) -> datetime:
+        if value.tzinfo is None:
+            raise ValueError("macro expectation timestamps must include a timezone")
+        return value
+
+
+class MacroExpectationFeedEvent(ResearchApiModel):
+    id: str = Field(min_length=1, max_length=160)
+    label: str = Field(min_length=1, max_length=512)
+    category: MacroCategory
+    probability: Decimal = Field(ge=0, le=100)
+    history: list[MacroExpectationFeedPoint] = Field(default_factory=list)
+
+
+class MacroExpectationFeedResponse(ResearchApiModel):
+    status: MacroExpectationFeedStatus
+    source: str = Field(min_length=1, max_length=256)
+    updated_at: datetime
+    events: list[MacroExpectationFeedEvent] = Field(default_factory=list)
+
+    @field_validator("updated_at")
+    @classmethod
+    def require_timezone(cls, value: datetime) -> datetime:
+        if value.tzinfo is None:
+            raise ValueError("macro expectation timestamps must include a timezone")
+        return value
 
 
 class MacroResearchProvider:
+    """Reads the configuration-driven macro expectation artifact from platform-data.
+
+    Event discovery and probability extraction happen upstream. This provider never scans
+    Polymarket markets and never infers event categories from titles.
+    """
+
     def __init__(self, *, timeout_seconds: float, user_agent: str) -> None:
         self._timeout_seconds = timeout_seconds
         self._user_agent = user_agent
+        self._last_known_good: MacroExpectationFeedResponse | None = None
 
-    async def macro_expectation_events(self, limit: int = 12) -> list[MacroExpectationEvent]:
-        params = {"active": "true", "closed": "false", "limit": 200}
-        async with httpx.AsyncClient(timeout=self._timeout_seconds, trust_env=False) as client:
-            response = await client.get(
-                POLYMARKET_MARKETS_URL,
-                params=params,
-                headers={"User-Agent": self._user_agent},
-            )
-            response.raise_for_status()
-            rows = response.json()
-
-        events: list[MacroExpectationEvent] = []
-        for row in rows if isinstance(rows, list) else []:
-            event = self._event_from_row(row)
-            if event is not None:
-                events.append(event)
-        events.sort(key=lambda item: (item.category, -item.current_probability_pct))
-        if not events:
-            raise ResearchProviderError("macro_expectation_events_empty")
-        return events[:limit]
-
-    @staticmethod
-    def _event_from_row(row: dict[str, Any]) -> MacroExpectationEvent | None:
-        title = str(row.get("question") or row.get("title") or "").strip()
-        category = _category_for_title(title)
-        if category is None:
-            return None
-
-        outcomes_raw = row.get("outcomes") or "[]"
-        prices_raw = row.get("outcomePrices") or "[]"
+    async def macro_expectation_contract(self) -> MacroExpectationFeedResponse:
         try:
-            outcomes = json.loads(outcomes_raw) if isinstance(outcomes_raw, str) else outcomes_raw
-            prices = json.loads(prices_raw) if isinstance(prices_raw, str) else prices_raw
-        except json.JSONDecodeError:
-            return None
-        if not outcomes or not prices:
-            return None
+            async with httpx.AsyncClient(
+                timeout=self._timeout_seconds,
+                trust_env=False,
+            ) as client:
+                response = await client.get(
+                    PLATFORM_DATA_EXPECTATIONS_URL,
+                    headers={"User-Agent": self._user_agent},
+                )
+                response.raise_for_status()
+                payload = response.json()
 
-        best_index = max(
-            range(min(len(outcomes), len(prices))),
-            key=lambda index: float(prices[index]),
-        )
-        probability = Decimal(str(float(prices[best_index]) * 100))
-        return MacroExpectationEvent(
-            event_id=str(row.get("id") or row.get("conditionId") or title),
-            category=category,
-            title=title,
-            outcome=str(outcomes[best_index]),
-            current_probability_pct=probability,
-            liquidity_label=str(row.get("liquidityNum") or row.get("liquidity") or "") or None,
-            expiry_at=_expiry_at(row.get("endDate") or row.get("end_date_iso")),
-            source_url=(
-                f"https://polymarket.com/event/{row.get('slug')}" if row.get("slug") else None
-            ),
-        )
+            if not isinstance(payload, dict):
+                raise ResearchProviderError("macro_expectation_feed_invalid_payload")
+            document = cast(dict[str, Any], payload)
+            if str(document.get("schemaVersion") or "") != "1.0":
+                raise ResearchProviderError("macro_expectation_feed_schema_mismatch")
 
+            contract = MacroExpectationFeedResponse.model_validate(document)
+            if contract.status == "ready" and not contract.events:
+                raise ResearchProviderError("macro_expectation_feed_ready_without_events")
+            if contract.status in {"ready", "stale"} and contract.events:
+                self._last_known_good = contract.model_copy(deep=True)
+            return contract
+        except Exception as exc:
+            if self._last_known_good is not None:
+                stale = self._last_known_good.model_copy(deep=True)
+                stale.status = "stale"
+                return stale
+            if isinstance(exc, ResearchProviderError):
+                raise
+            raise ResearchProviderError(
+                f"macro_expectation_feed_unavailable:{type(exc).__name__}"
+            ) from exc
 
-def _category_for_title(title: str) -> MacroCategory | None:
-    lowered = title.lower()
-    keywords: dict[MacroCategory, tuple[str, ...]] = {
-        "monetary_policy": ("fed", "interest rate", "rate cut", "fomc"),
-        "macro": ("inflation", "cpi", "recession", "unemployment", "gdp"),
-        "geopolitics": ("war", "ceasefire", "iran", "ukraine", "taiwan"),
-        "election": ("election", "president", "senate", "congress"),
-    }
-    return next(
-        (
-            category
-            for category, terms in keywords.items()
-            if any(term in lowered for term in terms)
-        ),
-        None,
-    )
+    async def macro_expectation_events(
+        self,
+        limit: int = 12,
+    ) -> list[MacroExpectationEvent]:
+        """Compatibility adapter for the pre-Phase-1A research service."""
 
+        contract = await self.macro_expectation_contract()
+        if contract.status not in {"ready", "stale"}:
+            return []
 
-def _expiry_at(value: Any) -> datetime | None:
-    if not value:
-        return None
-    try:
-        return datetime.fromisoformat(str(value).replace("Z", "+00:00"))
-    except ValueError:
-        return None
+        return [
+            MacroExpectationEvent(
+                event_id=event.id,
+                category=event.category,
+                title=event.label,
+                outcome="Configured outcome",
+                current_probability_pct=event.probability,
+                history=[
+                    MacroProbabilityPoint(
+                        observed_at=point.observed_at,
+                        probability_pct=point.probability,
+                    )
+                    for point in event.history
+                ],
+            )
+            for event in contract.events[:limit]
+        ]
