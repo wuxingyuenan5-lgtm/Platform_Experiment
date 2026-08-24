@@ -835,7 +835,7 @@ def _batch_terminal_release_is_safe(
         ).fetchone()
     except OperationalError as exc:
         if "strategy_instruction_id" in str(exc):
-            return True
+            return _legacy_batch_terminal_release_is_safe(db, batch_id=batch_id, status=status)
         raise
     if row is None:
         return False
@@ -844,6 +844,32 @@ def _batch_terminal_release_is_safe(
     if row["strategy_key"] != "funding_arbitrage":
         return True
     return row["instruction_status"] == "completed"
+
+
+def _legacy_batch_terminal_release_is_safe(
+    db: Connection,
+    *,
+    batch_id: str,
+    status: str,
+) -> bool:
+    if status not in LEASE_RELEASED_BATCH_STATUSES:
+        return False
+    row = db.execute(
+        """
+        SELECT strategy_key, status
+        FROM execution_batches
+        WHERE id = ?
+        """,
+        (batch_id,),
+    ).fetchone()
+    if row is None:
+        return False
+    persisted_status = str(row["status"])
+    if persisted_status not in LEASE_RELEASED_BATCH_STATUSES:
+        return False
+    if row["strategy_key"] == "funding_arbitrage":
+        return persisted_status == "completed"
+    return True
 
 
 def complete_funding_reconciliation(batch_id: str, instruction_id: str) -> None:

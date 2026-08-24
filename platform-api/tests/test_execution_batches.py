@@ -2,7 +2,9 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
+from sqlite3 import OperationalError
 from threading import Barrier, Lock, local
+from typing import Any, cast
 from types import SimpleNamespace
 from uuid import uuid4
 
@@ -14,6 +16,7 @@ from fastapi.testclient import TestClient
 from app.config import get_settings
 from app.database import connection, initialize_database
 from app.execution_batches import (
+    _batch_terminal_release_is_safe,
     _claim_batch_execution_resources,
     _reservation_requirement_for_leg,
     create_execution_batch,
@@ -702,6 +705,94 @@ def test_update_batch_status_hedged_normalizes_uncertain_legs(
 
     assert legs[0]["status"] == "filled"
     assert legs[0]["failure_reason"] is None
+
+
+class _FakeCursor:
+    def __init__(self, row) -> None:
+        self._row = row
+
+    def fetchone(self):
+        return self._row
+
+
+class _LegacyReleaseCompatibilityDb:
+    def __init__(
+        self,
+        row,
+        *,
+        error_message: str = "no such column: batch.strategy_instruction_id",
+    ):
+        self._row = row
+        self._error_message = error_message
+
+    def execute(self, sql: str, params: tuple[str, ...]):
+        assert params
+        if "strategy_instruction_id" in sql:
+            raise OperationalError(self._error_message)
+        return _FakeCursor(self._row)
+
+
+def test_legacy_release_keeps_funding_hedged_fail_closed() -> None:
+    assert (
+        _batch_terminal_release_is_safe(
+            cast(
+                Any,
+                _LegacyReleaseCompatibilityDb(
+                    {"strategy_key": "funding_arbitrage", "status": "hedged"}
+                ),
+            ),
+            batch_id="legacy-funding-hedged",
+            status="hedged",
+        )
+        is False
+    )
+
+
+def test_legacy_release_allows_funding_completed() -> None:
+    assert (
+        _batch_terminal_release_is_safe(
+            cast(
+                Any,
+                _LegacyReleaseCompatibilityDb(
+                    {"strategy_key": "funding_arbitrage", "status": "completed"}
+                ),
+            ),
+            batch_id="legacy-funding-completed",
+            status="completed",
+        )
+        is True
+    )
+
+
+def test_legacy_release_keeps_non_funding_hedged_compatible() -> None:
+    assert (
+        _batch_terminal_release_is_safe(
+            cast(
+                Any,
+                _LegacyReleaseCompatibilityDb(
+                    {"strategy_key": "cross_venue_spread", "status": "hedged"}
+                ),
+            ),
+            batch_id="legacy-cross-hedged",
+            status="hedged",
+        )
+        is True
+    )
+
+
+def test_release_compatibility_only_handles_missing_column_error() -> None:
+    with pytest.raises(OperationalError, match="database disk image is malformed"):
+        _batch_terminal_release_is_safe(
+            cast(
+                Any,
+                _LegacyReleaseCompatibilityDb(
+                    {"strategy_key": "funding_arbitrage", "status": "completed"},
+                    error_message="database disk image is malformed",
+                ),
+            ),
+            batch_id="legacy-error",
+            status="completed",
+        )
 
 
 def test_reservation_rules_use_authoritative_crypto_instrument_types() -> None:
