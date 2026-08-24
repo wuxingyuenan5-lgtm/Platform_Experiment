@@ -7,11 +7,14 @@ const read = (relativePath) => fs.readFileSync(path.join(root, relativePath), 'u
 
 const management = read('src/views/strategy/management/index.vue');
 const snapshots = read('src/views/strategy/management/composables/useStrategyAccountSnapshots.ts');
+const overview = read('src/views/strategy/management/composables/useStrategyManagementOverview.ts');
 
 assert.match(management, /useStrategyAccountSnapshots/);
+assert.match(management, /useStrategyManagementOverview/);
 assert.match(management, /accountPnlProfiles/);
 assert.match(management, /accountCapitalProfiles/);
 assert.match(management, /accountOrderProfiles/);
+assert.match(overview, /getStrategyManagementOverview/);
 
 for (const [desk, instanceId] of Object.entries({
   funding: 'strategy_funding_arbitrage_instance_default',

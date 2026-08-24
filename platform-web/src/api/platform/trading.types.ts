@@ -283,6 +283,27 @@ export interface StrategyInstanceResult {
   dataQualityState: string;
 }
 
+export interface StrategyManagementOverviewResult {
+  deskKey: string;
+  sortOrder: number;
+  strategyInstanceId: string;
+  strategyId: string;
+  strategyKey: string;
+  strategyName: string;
+  instanceName: string;
+  category: string;
+  v1Scope: 'closed_loop' | 'reserved' | 'read_only' | string;
+  operatingStatus: string;
+  tradingMode: string;
+  dataQualityState: string;
+  activeCapability: 'trade_and_read' | 'read_only' | 'unbound' | string;
+  bindingCount: number;
+  primaryAccountCode?: string | null;
+  primaryAccountStatus?: string | null;
+  primaryAccountDataQualityState?: string | null;
+  executionReadiness?: StrategyV1ReadinessResult | null;
+}
+
 export interface AccountResult {
   accountId: string;
   accountCode: string;

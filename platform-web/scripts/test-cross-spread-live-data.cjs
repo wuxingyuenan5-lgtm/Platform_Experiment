@@ -10,7 +10,9 @@ function read(relativePath) {
 }
 
 test('cross spread execution workspace clears legacy default spreads', () => {
-  const source = read('src/views/strategy/spread-carry/composables/useCrossVenueExecutionWorkspace.ts');
+  const source = read(
+    'src/views/strategy/spread-carry/composables/useCrossVenueExecutionWorkspace.ts',
+  );
   assert.match(source, /const triggerSpread = ref<[^>]+>\(null\);/);
   assert.match(source, /const acceptableSpread = ref<[^>]+>\(null\);/);
   assert.match(source, /const takeProfitSpread = ref<[^>]+>\(null\);/);
@@ -40,9 +42,15 @@ test('cross spread stop-loss and take-profit controls use stacked execution rows
 });
 
 test('cross spread does not present a local leverage input as an executable venue setting', () => {
-  const commandSource = read('src/views/strategy/spread-carry/components/SpreadExecutionCommand.vue');
-  const workspaceSource = read('src/views/strategy/spread-carry/components/CrossVenueExecutionWorkspace.vue');
-  const composableSource = read('src/views/strategy/spread-carry/composables/useCrossVenueExecutionWorkspace.ts');
+  const commandSource = read(
+    'src/views/strategy/spread-carry/components/SpreadExecutionCommand.vue',
+  );
+  const workspaceSource = read(
+    'src/views/strategy/spread-carry/components/CrossVenueExecutionWorkspace.vue',
+  );
+  const composableSource = read(
+    'src/views/strategy/spread-carry/composables/useCrossVenueExecutionWorkspace.ts',
+  );
   assert.equal(commandSource.includes('账户级（只读）'), true);
   assert.doesNotMatch(commandSource, /<span>BY 杠杆<\/span>/);
   assert.doesNotMatch(commandSource, /<span>MT5 杠杆<\/span>/);
@@ -67,7 +75,10 @@ test('cross spread finance composable uses dynamic bindings instead of hardcoded
 test('strategy management wires full cross spread live profiles into pnl and capital views', () => {
   const indexSource = read('src/views/strategy/management/index.vue');
   const pnlSource = read('src/views/strategy/management/components/StrategyPnlPanel.vue');
-  assert.equal(indexSource.includes(':live-profile="activeDesk === \'crossSpread\' ? pnlProfile : null"'), true);
+  assert.equal(
+    indexSource.includes("if (activeDesk.value === 'crossSpread') return pnlProfile.value;"),
+    true,
+  );
   assert.equal(indexSource.includes('liveCapitalProfile'), true);
   assert.equal(pnlSource.includes('liveProfile?: StrategyPnlProfile | null;'), true);
   assert.equal(pnlSource.includes('props.liveProfile'), true);
@@ -77,8 +88,10 @@ test('strategy management wires full cross spread live profiles into pnl and cap
 
 test('strategy management honors the cross-spread route context before rendering profile data', () => {
   const source = read('src/views/strategy/management/index.vue');
-  assert.equal(source.includes("useRoute"), true);
-  assert.equal(source.includes("route.query.desk === 'crossSpread'"), true);
+  assert.equal(source.includes('useRoute'), true);
+  assert.equal(source.includes('route.query.desk'), true);
+  assert.equal(source.includes('router.replace'), true);
+  assert.equal(source.includes('route.query.section'), true);
 });
 
 test('cross spread execution records preserve result-unknown and leg evidence', () => {

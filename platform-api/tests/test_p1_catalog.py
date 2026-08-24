@@ -22,6 +22,39 @@ def test_seeded_strategy_account_and_instrument_catalog(tmp_path: Path) -> None:
         assert instances.status_code == 200
         assert len(instances.json()) == 6
 
+        overview = client.get("/api/v1/strategies/management-overview")
+        assert overview.status_code == 200
+        overview_body = overview.json()
+        assert [item["deskKey"] for item in overview_body] == [
+            "funding",
+            "crossSpread",
+            "domesticOverseas",
+            "dip",
+            "shortLineTraderL",
+            "shortLineTraderW",
+        ]
+        assert {item["strategyKey"] for item in overview_body} == {
+            "funding_arbitrage",
+            "cross_venue_spread",
+            "home_abroad_spread",
+            "bottom_fishing",
+            "short_term_l",
+            "short_term_w",
+        }
+        by_desk = {item["deskKey"]: item for item in overview_body}
+        assert by_desk["funding"]["activeCapability"] == "trade_and_read"
+        assert by_desk["crossSpread"]["activeCapability"] == "trade_and_read"
+        assert by_desk["domesticOverseas"]["operatingStatus"] == "paused"
+        assert by_desk["dip"]["operatingStatus"] == "active"
+        assert by_desk["shortLineTraderL"]["operatingStatus"] == "active"
+        assert by_desk["shortLineTraderW"]["operatingStatus"] == "active"
+        assert by_desk["dip"]["executionReadiness"] is None
+        assert by_desk["shortLineTraderL"]["executionReadiness"] is None
+        assert by_desk["shortLineTraderW"]["executionReadiness"] is None
+        assert by_desk["dip"]["primaryAccountDataQualityState"] == "unavailable"
+        assert by_desk["dip"]["operatingStatus"] == "active"
+        assert all("credentialRef" not in item for item in overview_body)
+
         accounts = client.get("/api/v1/accounts")
         assert accounts.status_code == 200
         assert {item["accountId"] for item in accounts.json()} >= {

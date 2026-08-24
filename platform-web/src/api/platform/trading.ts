@@ -23,6 +23,7 @@ import type {
   StrategyAccountSnapshotResult,
   StrategyDefinitionResult,
   StrategyInstanceResult,
+  StrategyManagementOverviewResult,
   StrategyNavSnapshotResult,
   StrategyPnlResult,
   StrategyRunResult,
@@ -197,6 +198,13 @@ export async function getStrategyDefinitions(): Promise<StrategyDefinitionResult
 
 export async function getStrategyInstances(): Promise<StrategyInstanceResult[]> {
   const response = await client.get<StrategyInstanceResult[]>('/strategies/instances');
+  return response.data;
+}
+
+export async function getStrategyManagementOverview(): Promise<StrategyManagementOverviewResult[]> {
+  const response = await client.get<StrategyManagementOverviewResult[]>(
+    '/strategies/management-overview',
+  );
   return response.data;
 }
 

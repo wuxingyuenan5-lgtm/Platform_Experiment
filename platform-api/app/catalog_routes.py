@@ -19,6 +19,7 @@ from app.catalog import (
     list_strategy_account_bindings,
     list_strategy_definitions,
     list_strategy_instances,
+    list_strategy_management_overview,
     run_nav_snapshot,
 )
 from app.schemas import (
@@ -32,6 +33,7 @@ from app.schemas import (
     StrategyAccountSnapshotResponse,
     StrategyDefinitionResponse,
     StrategyInstanceResponse,
+    StrategyManagementOverviewResponse,
     StrategyNavSnapshotResponse,
     StrategyPnlResponse,
     StrategyRunResponse,
@@ -65,6 +67,14 @@ def create_catalog_router(api_prefix: str) -> APIRouter:
     )
     def strategies_instances() -> list[StrategyInstanceResponse]:
         return list_strategy_instances()
+
+    @router.get(
+        f"{api_prefix}/strategies/management-overview",
+        response_model=list[StrategyManagementOverviewResponse],
+        tags=["strategies"],
+    )
+    def strategy_management_overview() -> list[StrategyManagementOverviewResponse]:
+        return list_strategy_management_overview()
 
     @router.get(
         f"{api_prefix}/strategies/instances/{{strategy_instance_id}}",

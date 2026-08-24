@@ -345,3 +345,28 @@ class StrategyAccountSnapshotResponse(BaseModel):
     orders: list[OrderDetailResponse] = Field(default_factory=list)
     fills: list[FillResponse] = Field(default_factory=list)
     pnl: PnlResponse | None = None
+
+
+class StrategyManagementOverviewResponse(BaseModel):
+    desk_key: str = Field(alias="deskKey")
+    sort_order: int = Field(alias="sortOrder")
+    strategy_instance_id: str = Field(alias="strategyInstanceId")
+    strategy_id: str = Field(alias="strategyId")
+    strategy_key: str = Field(alias="strategyKey")
+    strategy_name: str = Field(alias="strategyName")
+    instance_name: str = Field(alias="instanceName")
+    category: str
+    v1_scope: str = Field(alias="v1Scope")
+    operating_status: str = Field(alias="operatingStatus")
+    trading_mode: str = Field(alias="tradingMode")
+    data_quality_state: str = Field(alias="dataQualityState")
+    active_capability: str = Field(alias="activeCapability")
+    binding_count: int = Field(alias="bindingCount")
+    primary_account_code: str | None = Field(default=None, alias="primaryAccountCode")
+    primary_account_status: str | None = Field(default=None, alias="primaryAccountStatus")
+    primary_account_data_quality_state: str | None = Field(
+        default=None, alias="primaryAccountDataQualityState"
+    )
+    execution_readiness: StrategyV1ReadinessResponse | None = Field(
+        default=None, alias="executionReadiness"
+    )

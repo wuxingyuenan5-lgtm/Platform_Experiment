@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from decimal import Decimal
+from typing import TypedDict
 from uuid import uuid4
 
 from fastapi import HTTPException
@@ -22,11 +23,45 @@ from app.schemas import (
     StrategyAccountSnapshotResponse,
     StrategyDefinitionResponse,
     StrategyInstanceResponse,
+    StrategyManagementOverviewResponse,
     StrategyNavSnapshotResponse,
     StrategyPnlResponse,
     TradeCommandResponse,
 )
 from app.trading import decimal_text, submit_order
+from app.v1_readiness import get_strategy_v1_readiness
+
+
+class ManagementDeskMetadata(TypedDict):
+    desk_key: str
+    category: str
+    sort_order: int
+
+
+MANAGEMENT_DESK_METADATA: dict[str, ManagementDeskMetadata] = {
+    "funding_arbitrage": {"desk_key": "funding", "category": "arbitrage", "sort_order": 10},
+    "cross_venue_spread": {
+        "desk_key": "crossSpread",
+        "category": "arbitrage",
+        "sort_order": 20,
+    },
+    "home_abroad_spread": {
+        "desk_key": "domesticOverseas",
+        "category": "arbitrage",
+        "sort_order": 30,
+    },
+    "bottom_fishing": {"desk_key": "dip", "category": "directional", "sort_order": 40},
+    "short_term_l": {
+        "desk_key": "shortLineTraderL",
+        "category": "intraday",
+        "sort_order": 50,
+    },
+    "short_term_w": {
+        "desk_key": "shortLineTraderW",
+        "category": "intraday",
+        "sort_order": 60,
+    },
+}
 
 
 def now_iso() -> str:
@@ -79,6 +114,97 @@ def list_strategy_instances() -> list[StrategyInstanceResponse]:
             """
         ).fetchall()
     return [strategy_instance_from_row(row) for row in rows]
+
+
+def list_strategy_management_overview() -> list[StrategyManagementOverviewResponse]:
+    with connection() as db:
+        rows = db.execute(
+            """
+            SELECT si.id,
+                   si.strategy_definition_id,
+                   sd.strategy_key,
+                   sd.name AS strategy_name,
+                   si.name AS instance_name,
+                   si.trading_mode,
+                   si.status,
+                   si.data_quality_state,
+                   sd.v1_scope,
+                   COUNT(sab.id) AS binding_count,
+                   COALESCE(
+                       MAX(
+                           CASE
+                               WHEN sab.status = 'active' AND sab.capability = 'trade_and_read'
+                               THEN 'trade_and_read'
+                           END
+                       ),
+                       MAX(
+                           CASE
+                               WHEN sab.status = 'active' AND sab.capability = 'read_only'
+                               THEN 'read_only'
+                           END
+                       ),
+                       'unbound'
+                   ) AS active_capability,
+                   MAX(
+                       CASE WHEN sab.role = 'primary' THEN a.account_code END
+                   ) AS primary_account_code,
+                   MAX(CASE WHEN sab.role = 'primary' THEN a.status END) AS primary_account_status,
+                   MAX(
+                       CASE
+                           WHEN sab.role = 'primary' THEN a.data_quality_state
+                       END
+                   ) AS primary_account_data_quality_state
+            FROM strategy_instances si
+            JOIN strategy_definitions sd ON sd.id = si.strategy_definition_id
+            LEFT JOIN strategy_account_bindings sab ON sab.strategy_instance_id = si.id
+            LEFT JOIN accounts a ON a.id = sab.account_id
+            GROUP BY
+                si.id,
+                si.strategy_definition_id,
+                sd.strategy_key,
+                sd.name,
+                si.name,
+                si.trading_mode,
+                si.status,
+                si.data_quality_state,
+                sd.v1_scope
+            """
+        ).fetchall()
+
+    overview: list[StrategyManagementOverviewResponse] = []
+    for row in rows:
+        metadata = MANAGEMENT_DESK_METADATA.get(row["strategy_key"])
+        if metadata is None:
+            continue
+        execution_readiness = (
+            None
+            if row["v1_scope"] == "read_only"
+            else get_strategy_v1_readiness(row["id"])
+        )
+        overview.append(
+            StrategyManagementOverviewResponse(
+                deskKey=str(metadata["desk_key"]),
+                sortOrder=int(metadata["sort_order"]),
+                strategyInstanceId=row["id"],
+                strategyId=row["strategy_definition_id"],
+                strategyKey=row["strategy_key"],
+                strategyName=row["strategy_name"],
+                instanceName=row["instance_name"],
+                category=str(metadata["category"]),
+                v1Scope=row["v1_scope"],
+                operatingStatus=row["status"],
+                tradingMode=row["trading_mode"],
+                dataQualityState=row["data_quality_state"],
+                activeCapability=row["active_capability"],
+                bindingCount=int(row["binding_count"]),
+                primaryAccountCode=row["primary_account_code"],
+                primaryAccountStatus=row["primary_account_status"],
+                primaryAccountDataQualityState=row["primary_account_data_quality_state"],
+                executionReadiness=execution_readiness,
+            )
+        )
+    overview.sort(key=lambda item: (item.sort_order, item.strategy_name))
+    return overview
 
 
 def get_strategy_instance(strategy_instance_id: str) -> StrategyInstanceResponse:
@@ -319,7 +445,7 @@ def get_latest_balance(account_id: str) -> BalanceSnapshotResponse:
         if any(str(row["data_quality_state"]) != "complete" for row in rows)
         else str(representative["data_quality_state"])
     )
-    currency = next(iter(currencies)) if len(currencies) == 1 else account.baseCurrency
+    currency = next(iter(currencies)) if len(currencies) == 1 else account.base_currency
     return BalanceSnapshotResponse(
         snapshotId=representative["id"],
         accountId=representative["account_id"],
