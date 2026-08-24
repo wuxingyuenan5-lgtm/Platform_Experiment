@@ -4,6 +4,47 @@ Status: active Platform 0.11.2 controlled-live operational contract.
 
 This runbook governs controlled, instruction-bounded live acceptance. It does not authorize production rollout or Live Write activation. Any failed, unavailable or contradictory step immediately returns the system to read-only live mode and requires an accountable operator decision.
 
+## 0.1 Read-only real-account onboarding prerequisites
+
+Read-only onboarding is a prerequisite audit step. It does not authorize live
+execution, controlled-live windows, funds transfer, `LiveTradingSession`
+creation or any write action.
+
+The responsible Owner must provide exact, already-installed configuration facts
+before any credential-backed read-only verification:
+
+- Bybit
+  - the real UTA's Platform logical `accounts.id`
+  - installed credential secret reference
+  - whether the API key is read-only or has trade permission
+  - IP allowlist status
+  - `environment=live`
+  - instrument mappings
+  - symbol allowlist
+  - category and settle coin
+  - Runtime account allowlist entry
+- MT5
+  - Platform logical `accounts.id`
+  - installed credential reference
+  - terminal/login identity
+  - instrument mapping
+  - read-only readiness
+  - whether trading is currently permitted
+
+Same-UTA binding rules:
+
+- Funding primary and the cross-spread Bybit leg must reference the same
+  `accounts.id`.
+- Account identity is proven only by the explicit logical account binding, never
+  by display name, account code or API-key label.
+- The first read-only verification uses one logical account ID and one
+  credential reference.
+- Do not create two logical Platform accounts that map to the same real UTA.
+
+If the Owner has not yet installed the secret reference, stop at local
+configuration audit only. Do not call any external account, venue, quote,
+balance, order, fill, risk or funding endpoint.
+
 ## 0. Authorization unit
 
 An Owner authorization is one complete, named business scenario, not one local
@@ -35,6 +76,10 @@ venue evidence ends the scenario and requires a new Owner decision.
 → 日终对账
 → 强制复位
 ```
+
+Read-only onboarding always happens before this sequence. It only verifies
+configuration, private-read readiness and observability contracts; it never
+submits, cancels, transfers or changes venue state.
 
 The sequence is strict. A later step cannot compensate for a failed earlier step. Repository CI, simulation results, an order ACK or an application response cannot replace venue evidence.
 
@@ -156,6 +201,47 @@ Every Difference receives a category, severity, responsible owner, evidence refe
 Read-only venue/account/order/fill/deal/position verification, Platform/Runtime/database/venue shadow reconciliation, automated tests and fault injection must pass before any Live Write window. Controlled-live steps require separate owner authorization and proceed strictly in this order: Market in one direction, Market in the reverse direction, FOK, TP/SL, then PostOnly Chase. A failed step blocks all later steps.
 
 For every step retain the unlock and limits snapshot; operator, account, strategy, symbol and timestamps; pre-submit Bid/Ask, quote age and contract specification; request, correlation and idempotency identifiers; external Order, Fill, Deal and Position identities; acknowledgements, fills, fees and timestamps; before/after account, position, balance and PnL snapshots; Runtime Journal and Platform facts; shadow-reconciliation result; any Kill Switch or exception record; and proof of forced reset. Each step ends with venue-evidence review, end-of-day reconciliation and forced reset.
+
+## 6.2 Read-only onboarding checklist
+
+Before any separately authorized controlled-live step, confirm all of the
+following in read-only mode:
+
+- Runtime gateway capability is readable.
+- Credential configured/operational state is readable without exposing the
+  secret value.
+- Bybit API-key readiness is readable.
+- Instrument specifications are readable.
+- Authoritative quote is readable.
+- Balances are readable.
+- Positions are readable.
+- Open orders are readable.
+- Order history is readable.
+- Fill history is readable.
+- Account risk is readable.
+- Funding rate is readable.
+- MT5 account/readiness is readable.
+- Platform account binding is correct.
+- `management-overview` returns all six strategies with current status.
+- Reconciliation baseline is captured before any write window.
+- Platform Live Write remains `false`.
+- Runtime Live Write remains `false`.
+- Funding controlled-live still returns `423` until separately authorized and
+  fully ready.
+- No approved `LiveTradingSession` exists.
+
+Two states are valid:
+
+- A. Owner has not installed the secret reference:
+  - local configuration audit only;
+  - no external request;
+  - final receipt lists the exact missing Owner-provided items.
+- B. Owner has installed the secret reference and later gives explicit read-only
+  authorization:
+  - only read endpoints may be called;
+  - no submit/cancel/transfer;
+  - no state-changing action on account, order, position or funds;
+  - acceptance output remains redacted.
 
 ## 7. Forced reset
 
