@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from threading import Event, Thread
 from types import SimpleNamespace
 
 import pytest
@@ -7,7 +8,7 @@ import pytest
 from app.bybit_live_adapter import BybitLiveAdapter
 from app.bybit_mt5_gateway import BybitMt5Gateway
 from app.config import Settings
-from app.mt5_read_coordinator import COORDINATOR
+from app.mt5_read_coordinator import COORDINATOR, with_mt5_read_session
 
 
 class FakeScopedBybitClient:
@@ -235,3 +236,251 @@ def test_mt5_restore_failure_fail_closes_readiness(monkeypatch) -> None:
 
     capability = gateway.mt5.capability()
     assert "MT5_PRIMARY_RESTORE_FAILED" in capability.missing_requirements
+
+
+def test_mt5_restore_failure_blocks_waiting_and_future_requests(monkeypatch) -> None:
+    COORDINATOR.clear_restore_failure()
+    configure_mt5_refs(monkeypatch)
+
+    class CoordinatedProvider(FakeMt5SnapshotProvider):
+        def __init__(self) -> None:
+            super().__init__(fail_restore=True)
+            self.target_started = Event()
+            self.release_target = Event()
+            self.callback_entered = Event()
+            self.callback_calls = 0
+
+        def login(self, login, **kwargs):
+            login_text = str(login)
+            if login_text == "222222":
+                self.target_started.set()
+                self.release_target.wait(timeout=5)
+            return super().login(login, **kwargs)
+
+    provider = CoordinatedProvider()
+    settings = Settings(
+        mt5_account_ids="mt5-live-main,account_mt5_short_term_a",
+        mt5_account_credential_refs=(
+            "mt5-live-main=secret://environment/mt5-main,"
+            "account_mt5_short_term_a=secret://environment/mt5-short-a"
+        ),
+        mt5_primary_account_id="mt5-live-main",
+        mt5_instrument_map="XAUUSD+=instrument_xau_usd",
+    )
+
+    errors: dict[str, str] = {}
+
+    def worker(name: str) -> None:
+        try:
+            with_mt5_read_session(
+                mt5=provider,
+                settings=settings,
+                account_id="account_mt5_short_term_a",
+                callback=lambda _session: _callback(provider),
+            )
+        except Exception as exc:  # noqa: BLE001
+            errors[name] = str(exc)
+
+    def _callback(current_provider: CoordinatedProvider) -> str:
+        current_provider.callback_calls += 1
+        current_provider.callback_entered.set()
+        return "ok"
+
+    thread_a = Thread(target=worker, args=("A",), daemon=True)
+    thread_b = Thread(target=worker, args=("B",), daemon=True)
+    thread_a.start()
+    assert provider.target_started.wait(timeout=5)
+    thread_b.start()
+    provider.release_target.set()
+    thread_a.join(timeout=5)
+    thread_b.join(timeout=5)
+
+    assert provider.callback_calls == 1
+    assert provider.callback_entered.is_set()
+    assert provider.login_calls == [
+        ("222222", "Broker-Short"),
+        ("111111", "Broker-Main"),
+    ]
+    assert "restore failed" in errors["A"]
+    assert "MT5 login failed" in errors["B"]
+
+    with pytest.raises(Exception, match="MT5 login failed"):
+        with_mt5_read_session(
+            mt5=provider,
+            settings=settings,
+            account_id="account_mt5_short_term_a",
+            callback=lambda _session: "unexpected",
+        )
+    assert provider.login_calls == [
+        ("222222", "Broker-Short"),
+        ("111111", "Broker-Main"),
+    ]
+
+
+def test_mt5_callback_exception_still_restores_primary(monkeypatch) -> None:
+    COORDINATOR.clear_restore_failure()
+    configure_mt5_refs(monkeypatch)
+    provider = FakeMt5SnapshotProvider()
+    settings = Settings(
+        mt5_account_ids="mt5-live-main,account_mt5_short_term_a",
+        mt5_account_credential_refs=(
+            "mt5-live-main=secret://environment/mt5-main,"
+            "account_mt5_short_term_a=secret://environment/mt5-short-a"
+        ),
+        mt5_primary_account_id="mt5-live-main",
+        mt5_instrument_map="XAUUSD+=instrument_xau_usd",
+    )
+
+    callback_calls = 0
+
+    def raising_callback(_session):
+        nonlocal callback_calls
+        callback_calls += 1
+        raise RuntimeError("boom")
+
+    with pytest.raises(Exception, match="snapshot failed"):
+        with_mt5_read_session(
+            mt5=provider,
+            settings=settings,
+            account_id="account_mt5_short_term_a",
+            callback=raising_callback,
+        )
+
+    assert callback_calls == 1
+    assert provider.login_calls == [("222222", "Broker-Short"), ("111111", "Broker-Main")]
+
+
+def test_mt5_identity_mismatch_still_restores_primary(monkeypatch) -> None:
+    COORDINATOR.clear_restore_failure()
+    configure_mt5_refs(monkeypatch)
+
+    class TargetMismatchProvider(FakeMt5SnapshotProvider):
+        def login(self, login, **kwargs):
+            result = super().login(login, **kwargs)
+            if str(login) == "222222":
+                self.current_login = "999999"
+            return result
+
+    provider = TargetMismatchProvider()
+    settings = Settings(
+        mt5_account_ids="mt5-live-main,account_mt5_short_term_a",
+        mt5_account_credential_refs=(
+            "mt5-live-main=secret://environment/mt5-main,"
+            "account_mt5_short_term_a=secret://environment/mt5-short-a"
+        ),
+        mt5_primary_account_id="mt5-live-main",
+        mt5_instrument_map="XAUUSD+=instrument_xau_usd",
+    )
+
+    with pytest.raises(Exception, match="identity mismatch"):
+        with_mt5_read_session(
+            mt5=provider,
+            settings=settings,
+            account_id="account_mt5_short_term_a",
+            callback=lambda _session: "unexpected",
+        )
+
+    assert provider.login_calls == [("222222", "Broker-Short"), ("111111", "Broker-Main")]
+
+
+def test_mt5_account_snapshot_keeps_unmapped_symbols_for_readonly_monitoring(monkeypatch) -> None:
+    COORDINATOR.clear_restore_failure()
+    configure_mt5_refs(monkeypatch)
+    provider = FakeMt5SnapshotProvider()
+    gateway = BybitMt5Gateway(
+        Settings(
+            mt5_account_ids="mt5-live-main,account_mt5_short_term_a",
+            mt5_account_credential_refs=(
+                "mt5-live-main=secret://environment/mt5-main,"
+                "account_mt5_short_term_a=secret://environment/mt5-short-a"
+            ),
+            mt5_primary_account_id="mt5-live-main",
+            mt5_instrument_map="",
+        ),
+        bybit=None,
+        mt5=None,
+    )
+    gateway.mt5 = gateway.mt5.__class__(gateway.settings, provider)
+
+    snapshot = gateway.get_account_snapshot("account_mt5_short_term_a")
+
+    assert snapshot.data_quality_state == "external_unmapped"
+    assert snapshot.warnings == ["read_only_monitoring_unmapped:XAUUSD+"]
+    assert snapshot.positions[0].symbol == "XAUUSD+"
+    assert snapshot.positions[0].instrument_id.startswith(
+        "monitor:mt5:account_mt5_short_term_a:"
+    )
+    assert snapshot.positions[0].data_quality_state == "external_unmapped"
+    assert snapshot.orders[0].instrument_id == snapshot.positions[0].instrument_id
+    assert snapshot.orders[0].data_quality_state == "external_unmapped"
+    assert snapshot.fills[0].instrument_id == snapshot.positions[0].instrument_id
+    assert snapshot.fills[0].data_quality_state == "external_unmapped"
+
+
+def test_mt5_unmapped_monitoring_identity_is_stable_and_account_scoped(monkeypatch) -> None:
+    COORDINATOR.clear_restore_failure()
+    configure_mt5_refs(monkeypatch)
+    provider = FakeMt5SnapshotProvider()
+    gateway = BybitMt5Gateway(
+        Settings(
+            mt5_account_ids="mt5-live-main,account_mt5_short_term_a",
+            mt5_account_credential_refs=(
+                "mt5-live-main=secret://environment/mt5-main,"
+                "account_mt5_short_term_a=secret://environment/mt5-short-a"
+            ),
+            mt5_primary_account_id="mt5-live-main",
+            mt5_instrument_map="",
+        ),
+        bybit=None,
+        mt5=None,
+    )
+    gateway.mt5 = gateway.mt5.__class__(gateway.settings, provider)
+
+    first = gateway.get_account_snapshot("account_mt5_short_term_a")
+    second = gateway.get_account_snapshot("account_mt5_short_term_a")
+    main = gateway.get_account_snapshot("mt5-live-main")
+
+    assert first.positions[0].instrument_id == second.positions[0].instrument_id
+    assert first.orders[0].instrument_id == second.orders[0].instrument_id
+    assert first.fills[0].instrument_id == second.fills[0].instrument_id
+    assert first.positions[0].instrument_id != main.positions[0].instrument_id
+
+
+def test_mt5_account_snapshot_reports_real_zero_when_positions_and_orders_are_empty(
+    monkeypatch,
+) -> None:
+    COORDINATOR.clear_restore_failure()
+    configure_mt5_refs(monkeypatch)
+
+    class EmptyProvider(FakeMt5SnapshotProvider):
+        def positions_get(self):
+            return ()
+
+        def orders_get(self):
+            return ()
+
+        def history_deals_get(self, *args, **kwargs):
+            return ()
+
+    provider = EmptyProvider()
+    gateway = BybitMt5Gateway(
+        Settings(
+            mt5_account_ids="mt5-live-main,account_mt5_short_term_a",
+            mt5_account_credential_refs=(
+                "mt5-live-main=secret://environment/mt5-main,"
+                "account_mt5_short_term_a=secret://environment/mt5-short-a"
+            ),
+            mt5_primary_account_id="mt5-live-main",
+            mt5_instrument_map="",
+        ),
+        bybit=None,
+        mt5=None,
+    )
+    gateway.mt5 = gateway.mt5.__class__(gateway.settings, provider)
+
+    snapshot = gateway.get_account_snapshot("account_mt5_short_term_a")
+
+    assert snapshot.positions == []
+    assert snapshot.orders == []
+    assert snapshot.fills == []
+    assert snapshot.data_quality_state == "complete"

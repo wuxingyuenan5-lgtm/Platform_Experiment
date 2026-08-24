@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any, cast
 
 import pytest
 from fastapi.testclient import TestClient
@@ -184,6 +185,7 @@ def test_sync_failure_isolated_and_does_not_commit_partial_rows(
             "SELECT COUNT(*) AS c FROM balance_snapshots WHERE account_id = ?",
             ("account_mt5_short_term_a",),
         ).fetchone()["c"]
+    assert status is not None
     assert dict(status) == {"status": "restore_failed", "error_code": "restore_failed"}
 
     invalid_snapshot = base_snapshot("account_mt5_short_term_a")
@@ -275,3 +277,97 @@ def test_sync_without_current_window_keeps_existing_historical_pnl(
             ("bybit-live-main", "instrument_btc_usdt"),
         ).fetchone()
     assert dict(row) == {"realized_pnl": "12.5", "trading_pnl": "3.4", "fees": "0.6"}
+
+
+def test_sync_persists_unmapped_mt5_monitoring_identity_without_duplicates(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    bootstrap(tmp_path)
+    snapshot = base_snapshot("account_mt5_short_term_a")
+    snapshot["venue"] = "mt5"
+    snapshot["dataQualityState"] = "external_unmapped"
+    balances = cast(list[dict[str, Any]], snapshot["balances"])
+    balances[0]["currency"] = "USD"
+    account_risk = cast(dict[str, Any], snapshot["accountRisk"])
+    account_risk["currency"] = "USD"
+    snapshot["positions"] = [
+        {
+            "source": "runtime-test",
+            "externalPositionId": "1",
+            "accountId": "account_mt5_short_term_a",
+            "instrumentId": "monitor:mt5:account_mt5_short_term_a:abc123",
+            "symbol": "XAUUSD+",
+            "netQuantity": "0.01",
+            "averagePrice": "2400",
+            "currentPrice": "2401",
+            "unrealizedPnl": "1.2",
+            "currency": "USD",
+            "asOf": "2026-08-24T00:00:00+00:00",
+            "dataQualityState": "external_unmapped",
+        }
+    ]
+    snapshot["orders"] = [
+        {
+            "source": "runtime-test",
+            "externalOrderId": "2",
+            "platformOrderId": "external:mt5_live:2",
+            "commandId": "external:mt5_live:2",
+            "accountId": "account_mt5_short_term_a",
+            "instrumentId": "monitor:mt5:account_mt5_short_term_a:abc123",
+            "symbol": "XAUUSD+",
+            "side": "buy",
+            "orderType": "limit",
+            "quantity": "0.01",
+            "price": "2400",
+            "status": "accepted",
+            "filledQuantity": "0",
+            "remainingQuantity": "0.01",
+            "occurredAt": "2026-08-24T00:00:00+00:00",
+            "asOf": "2026-08-24T00:00:00+00:00",
+            "dataQualityState": "external_unmapped",
+        }
+    ]
+    snapshot["fills"] = [
+        {
+            "source": "runtime-test",
+            "externalFillId": "3",
+            "externalOrderId": "2",
+            "platformOrderId": "external:mt5_live:2",
+            "commandId": "external:mt5_live:2",
+            "accountId": "account_mt5_short_term_a",
+            "instrumentId": "monitor:mt5:account_mt5_short_term_a:abc123",
+            "symbol": "XAUUSD+",
+            "side": "buy",
+            "quantity": "0.01",
+            "price": "2400.5",
+            "fee": "0.1",
+            "currency": "USD",
+            "occurredAt": "2026-08-24T00:00:01+00:00",
+            "dataQualityState": "external_unmapped",
+        }
+    ]
+    monkeypatch.setattr(
+        "app.live_venue_snapshot_sync.runtime_get",
+        lambda path, params=None: StubResponse(snapshot),
+    )
+
+    first = sync_venue_snapshots("account_mt5_short_term_a")
+    second = sync_venue_snapshots("account_mt5_short_term_a")
+
+    assert first.fill_rows == 1
+    assert second.fill_rows == 0
+    with connection() as db:
+        position = db.execute(
+            "SELECT instrument_id, net_quantity FROM positions WHERE account_id = ?",
+            ("account_mt5_short_term_a",),
+        ).fetchone()
+        fill_count = db.execute(
+            "SELECT COUNT(*) AS c FROM fills WHERE account_id = ? AND instrument_id = ?",
+            ("account_mt5_short_term_a", "monitor:mt5:account_mt5_short_term_a:abc123"),
+        ).fetchone()["c"]
+    assert dict(position) == {
+        "instrument_id": "monitor:mt5:account_mt5_short_term_a:abc123",
+        "net_quantity": "0.01",
+    }
+    assert fill_count == 1

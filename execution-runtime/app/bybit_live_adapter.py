@@ -487,8 +487,7 @@ class BybitLiveAdapter:
                         refreshed,
                         method_name,
                     )(
-                        category=current_category,
-                        limit=100,
+                        **self._account_snapshot_order_query_kwargs(current_category, limit=100),
                     ),
                 )
                 self._require_success(response, "Bybit order snapshot query failed")
@@ -548,8 +547,7 @@ class BybitLiveAdapter:
             execution_response = self._with_fresh_client_retry(
                 account_id,
                 lambda refreshed, current_category=category: refreshed.get_executions(
-                    category=current_category,
-                    limit=200,
+                    **self._account_snapshot_order_query_kwargs(current_category, limit=200),
                 ),
             )
             self._require_success(execution_response, "Bybit execution query failed")
@@ -614,6 +612,20 @@ class BybitLiveAdapter:
             asOf=risk.as_of,
             dataQualityState=risk.data_quality_state,
         )
+
+    def _account_snapshot_order_query_kwargs(
+        self,
+        category: str,
+        *,
+        limit: int,
+    ) -> dict[str, object]:
+        kwargs: dict[str, object] = {
+            "category": category,
+            "limit": limit,
+        }
+        if category in {"linear", "inverse"}:
+            kwargs["settleCoin"] = self.settings.bybit_settle_coin
+        return kwargs
 
     def _client(self, account_id: str | None = None):
         if self._injected_client is not None:

@@ -8,7 +8,7 @@ $StatePath = Join-Path $StateDir 'platform-dev-state.json'
 $LogDir = Join-Path $StateDir 'logs'
 $Services = @(
   @{ Name = 'Execution Runtime'; Port = 8100; HealthUrl = 'http://127.0.0.1:8100/health'; WorkingDirectory = (Join-Path $RepoRoot 'execution-runtime'); Python = $true; ContractChecks = @(
-      @{ Url = 'http://127.0.0.1:8100/status'; JsonField = 'status'; Expected = 'ok' },
+      @{ Url = 'http://127.0.0.1:8100/status'; JsonField = 'status'; Expected = 'available' },
       @{ Url = 'http://127.0.0.1:8100/venue/account-snapshot?accountId=account_sim_usdt'; AcceptStatus = @(200, 503) }
     ) },
   @{ Name = 'Platform API'; Port = 8000; HealthUrl = 'http://127.0.0.1:8000/health'; WorkingDirectory = (Join-Path $RepoRoot 'platform-api'); Python = $true; ContractChecks = @(

@@ -42,6 +42,13 @@ class Mt5ReadOnlyCoordinator:
         self._restore_failed = False
         self._restore_failure_reason = None
 
+    def assert_healthy(self) -> None:
+        if not self._restore_failed:
+            return
+        raise GatewayConfigurationError(
+            self._restore_failure_reason or "MT5 primary account restore failed"
+        )
+
     @contextmanager
     def acquire(self):
         self._lock.acquire()
@@ -104,7 +111,20 @@ class Mt5ReadOnlyCoordinator:
             self._restore_failed = True
             self._restore_failure_reason = str(exc)
             raise GatewayConfigurationError("MT5 primary account restore failed") from exc
-        self.clear_restore_failure()
+
+    def probe_primary_health(self, *, mt5: Any, settings: Settings) -> None:
+        with self.acquire():
+            primary_account_id = settings.mt5_primary_account_id.strip()
+            if not primary_account_id:
+                self.clear_restore_failure()
+                return
+            try:
+                self.login(mt5=mt5, settings=settings, account_id=primary_account_id)
+            except Exception as exc:
+                self._restore_failed = True
+                self._restore_failure_reason = str(exc)
+                raise GatewayConfigurationError("MT5 primary account restore failed") from exc
+            self.clear_restore_failure()
 
 
 COORDINATOR = Mt5ReadOnlyCoordinator()
@@ -117,11 +137,8 @@ def with_mt5_read_session[T](
     account_id: str,
     callback: Callable[[Mt5ReadSession], T],
 ) -> T:
-    if COORDINATOR.restore_failed:
-        raise GatewayConfigurationError(
-            COORDINATOR.restore_failure_reason or "MT5 primary account restore failed"
-        )
     with COORDINATOR.acquire():
+        COORDINATOR.assert_healthy()
         try:
             session = COORDINATOR.login(mt5=mt5, settings=settings, account_id=account_id)
             return callback(session)

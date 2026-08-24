@@ -328,11 +328,18 @@ class BybitMt5Gateway:
                 )
             ]
             positions = []
+            warnings: list[str] = []
             for row in mt5.positions_get() or ():
                 symbol = str(getattr(row, "symbol", "")).upper()
-                instrument_id = self.settings.mt5_instruments.get(symbol)
-                if instrument_id is None:
-                    continue
+                mapped_instrument_id = self.settings.mt5_instruments.get(symbol)
+                instrument_id, quality = self.mt5._resolve_read_instrument(
+                    account_id=account_id,
+                    symbol=symbol,
+                    instrument_id=mapped_instrument_id,
+                    prefer_route=False,
+                )
+                if quality == "external_unmapped":
+                    warnings.append(f"read_only_monitoring_unmapped:{symbol}")
                 volume = Decimal(str(getattr(row, "volume", 0) or 0))
                 if int(getattr(row, "type", -1)) == int(getattr(mt5, "POSITION_TYPE_SELL", 1)):
                     volume = -volume
@@ -349,7 +356,7 @@ class BybitMt5Gateway:
                         unrealizedPnl=Decimal(str(getattr(row, "profit", 0) or 0)),
                         currency=currency,
                         asOf=self.mt5._position_time(row),
-                        dataQualityState="complete",
+                        dataQualityState=quality,
                     )
                 )
             end = datetime.now(UTC)
@@ -438,8 +445,11 @@ class BybitMt5Gateway:
                 orders=orders,
                 fills=fills,
                 accountRisk=risk,
+                warnings=sorted(set(warnings)),
                 asOf=as_of,
-                dataQualityState="complete",
+                dataQualityState=(
+                    "external_unmapped" if warnings else "complete"
+                ),
             )
 
         return with_mt5_read_session(
