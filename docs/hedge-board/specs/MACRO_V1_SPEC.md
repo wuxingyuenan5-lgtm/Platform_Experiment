@@ -1,33 +1,33 @@
 # 对冲基金看板｜宏观看板 V1 规格（Macro V1 Spec）
 
-> 状态：Discussion Draft v0.1  
+> 状态：Product Scope Frozen v1.0 / Data & Implementation Details OPEN  
 > 上位文档：`docs/hedge-board/HEDGE_BOARD_OPTIMIZATION_MASTER_PLAN.md`  
+> 数据源文档：`docs/hedge-board/specs/MACRO_DATA_SOURCE_MAP.md`  
 > 适用分支：`feature/hedge-board-online-optimization`  
-> 作用：冻结“对冲基金看板 → 宏观看板”的产品内容、展示边界与验收口径。  
-> 说明：本文件只描述宏观看板，不替代整个对冲基金看板 Master Plan。
+> 说明：本文件只描述宏观看板，不替代整个 Hedge Board Master Plan。
 
 ---
 
-## 1. 范围与开发原则【冻结】
+## 1. 全局原则【冻结】
 
-当前只讨论并优化 `/hedge-board/macro`。
-
-必须遵守上位 Master Plan 的 Additive Only 原则：
+宏观看板严格遵守 Hedge Board 全局 Additive Only：
 
 - 不删除现有内容；
 - 不移动现有内容；
 - 不改变现有顺序；
 - 不重构现有整体 UI；
-- 不改变现有视觉组件硬编码；
-- 新内容以追加方式进入页面；
+- 不改变视觉组件硬编码；
+- 新内容先追加在现有页面下方；
 - 新增组件必须与现有平台视觉风格一致；
-- 金融数据硬编码逐步真实化，但视觉组件硬编码不因“去硬编码”而改写。
+- 金融数据硬编码逐步真实化，但视觉组件不因“去硬编码”被重写。
 
-开发期新增 Section 统一先追加在现有内容下方；真正的最终顺序、合并与删减，待 Macro V1 全部做完并线下验收后再决定。
+最终页面顺序、合并与删减，等 V1 做完并线下验收后再决定。
+
+当前阶段：**先不继续工程实施。**
 
 ---
 
-## 2. Macro V1 新增内容总览【冻结】
+## 2. Macro V1 新增结构【冻结】
 
 开发期逻辑顺序：
 
@@ -40,13 +40,13 @@
 
 不新增独立 Macro Volatility Section。
 
-现有美元净流动性、现有 Market Detail、现有其他宏观内容全部保留。
+现有美元净流动性、Macro Market Detail 和其他既有宏观内容全部保留。
 
 ---
 
 ## 3. Growth【冻结】
 
-目标是用少量高信号指标判断美国增长状态，不建设宏观数据库大全。
+保持精简，不做宏观数据库大全。
 
 ### 3.1 Growth / Production
 
@@ -68,9 +68,9 @@
 - CFNAI
 - CFNAIMA3
 
-CFNAI 保留较快响应，CFNAIMA3 作为趋势平滑辅助线。
+CFNAI 保留较快响应，CFNAIMA3 作为趋势平滑辅助。
 
-不在 V1 继续加入 PMI、零售、地产、耐用品、非农等大量指标。
+V1 不继续加入 PMI、零售、地产、耐用品、非农等大量指标。
 
 ---
 
@@ -91,19 +91,17 @@ CFNAI 保留较快响应，CFNAIMA3 作为趋势平滑辅助线。
 - PCE YoY
 - Core PCE YoY
 
-目的：同时观察 Headline vs Core、CPI 体系 vs PCE 体系。
-
 ### 4.2 Upstream Inflation
 
 单独一张图：
 
 - PPI YoY
 
-页面命名采用“上游通胀 / Upstream Inflation”，不将 PPI 绝对定义为永远领先 CPI 的指标。
+页面命名采用“上游通胀 / Upstream Inflation”，不把 PPI 定义成永远领先 CPI 的指标。
 
 ### 4.3 Actual vs Market-Implied Inflation
 
-采用曲线图展示。
+使用曲线图展示。
 
 主序列：
 
@@ -116,12 +114,12 @@ CFNAI 保留较快响应，CFNAIMA3 作为趋势平滑辅助线。
 
 - 5Y5Y Forward Inflation
 
-允许在图表状态区显示：
+允许在状态区显示：
 
 - 5Y BE - CPI YoY
 - 10Y BE - CPI YoY
 
-但必须命名为 `Inflation Pricing Gap` 或同等不误导的表述，并明确：该差值只用于比较当前实际通胀与市场中长期隐含定价，不代表预测误差。
+命名为 `Inflation Pricing Gap` 或同等不误导表述，并明确：该差值只是当前实际通胀与中长期市场隐含定价的状态比较，不是预测误差。
 
 ---
 
@@ -129,9 +127,9 @@ CFNAI 保留较快响应，CFNAIMA3 作为趋势平滑辅助线。
 
 ### 5.1 Short-End Rate Corridor
 
-使用一张多序列图，不拆成多个 Section。
+使用一张多序列图，不拆多个 Section。
 
-固定序列：
+固定：
 
 - Fed Target Lower
 - Fed Target Upper
@@ -140,26 +138,16 @@ CFNAI 保留较快响应，CFNAIMA3 作为趋势平滑辅助线。
 - EFFR
 - SOFR
 
-目标：同时观察政策利率区间、准备金定价、隔夜工具以及实际货币市场成交利率。
-
 ### 5.2 Treasury Yields
 
-严格只保留四个期限：
+严格只保留：
 
 - 3M
 - 2Y
 - 10Y
 - 30Y
 
-Macro V1 不增加：
-
-- 5Y
-- 7Y
-- 20Y
-- 2s10s
-- 3m10y
-
-Treasury 官方数据优先，FRED 可作为权威分发或 fallback；具体 Source Map 另行冻结。
+Macro V1 不增加 5Y、7Y、20Y、2s10s、3m10y。
 
 ---
 
@@ -170,8 +158,6 @@ Treasury 官方数据优先，FRED 可作为权威分发或 fallback；具体 So
 只新增 Global M2 Proxy。
 
 ### 6.1 公式
-
-固定公式：
 
 ```text
 globalM2 =
@@ -192,24 +178,22 @@ globalM2 =
 
 ### 6.2 统一口径
 
-计算前必须统一：
+计算前统一：
 
 - 货币单位；
 - 数量级；
 - 观察月份；
 - FX 报价方向。
 
-最终建议统一成 USD trillion 或 USD billion 后聚合。
+最终统一到 USD billion 或 USD trillion 后聚合。
 
 ### 6.3 时间对齐
 
 使用五个地区均有有效观测值的最近共同月份。
 
-不得把不同月份的数据直接拼成某一个“最新月份 Global M2”。
-
 ### 6.4 汇率
 
-月度货币量转换使用对应月份的月平均 FX rate，避免单一月末汇率造成不必要的短期跳变。
+月度货币量转换使用对应月份的月平均 FX rate。
 
 ### 6.5 展示
 
@@ -218,28 +202,30 @@ globalM2 =
 - Global M2 Level
 - Global M2 YoY
 
-其中 Global M2 必须标记为 `proxy / methodology-based derived series`，而不是官方统一全球 M2 统计。
+Tooltip / 辅助信息应能够查看各地区成分规模或贡献。
+
+Global M2 必须标记为 `proxy / methodology-based derived series`，不是官方统一全球 M2 指标。
 
 ---
 
 ## 7. Risk Appetite【冻结】
 
-保持极简，只新增两项：
+只新增：
 
 1. US High Yield OAS
 2. HYG / LQD Ratio
 
-建议使用两个独立图表，不强行共用一个纵轴。
+建议两个独立图表，不强行共用一个纵轴。
 
-不在 Macro V1 继续增加第三个或更多 risk-on / risk-off 指标。
+V1 不继续加入更多 risk-on / risk-off 指标。
 
 ---
 
 ## 8. Macro Volatility【冻结】
 
-Macro V1 不新增独立 Volatility Section。
+不新增独立 Volatility Section。
 
-现有页面已有的 VIX、MOVE 等内容不删除，但本次不扩展宏观波动率体系。
+现有 VIX、MOVE 等不删除，但本次不扩展宏观波动率体系。
 
 未来波动率优先回归对应资产页。
 
@@ -249,121 +235,56 @@ Macro V1 不新增独立 Volatility Section。
 
 ### 9.1 产品形态
 
-Macro V1 保留并完善原有“Polymarket 概率 + 历史概率曲线”的视觉形态。
+Macro V1 保留并完善原有：
 
-不以 CME FedWatch 概率矩阵作为 Macro V1 的核心展示。
+**Polymarket 当前概率 + 历史概率曲线**
 
-目标是让用户能快速看到：
+不以 CME FedWatch 矩阵作为 V1 核心展示。
 
-- 当前事件概率；
-- 概率随时间的变化；
+目标快速展示：
+
+- 当前概率；
+- 历史概率曲线；
 - 1D / 7D 概率变化；
-- 市场流动性与交易活跃度；
-- 事件到期 / 结算时间；
-- 数据来源与更新时间。
+- liquidity；
+- volume（稳定可取时）；
+- expiry / resolution date；
+- source；
+- updated_at；
+- status。
 
-### 9.2 数据获取模型
+### 9.2 数据模型
 
-Polymarket 数据链必须显式区分：
+正式展示必须显式区分：
 
 1. Event / Market metadata
-2. 当前 outcome probability
-3. CLOB token id
-4. 历史 probability series
+2. outcome
+3. current probability
+4. token id
+5. historical probability series
 
-实现原则：
-
-```text
-explicit whitelist event / market id or slug
-        ↓
-Polymarket Gamma metadata
-        ↓
-outcomes / outcomePrices / clobTokenIds
-        ↓
-YES token or selected outcome token
-        ↓
-Polymarket CLOB price history
-        ↓
-probability history curve
-```
-
-不得继续采用“拉取大量市场 → 按标题关键词分类 → 自动塞入页面”的旧逻辑作为正式展示链路。
-
-### 9.3 历史概率曲线
-
-曲线必须来自真实 Polymarket historical price / probability series。
-
-不得：
-
-- 由当前概率随机生成历史曲线；
-- 用占位 sparkline 冒充历史概率；
-- 将无历史记录的市场展示为稳定概率曲线。
-
-二元市场默认使用 YES token 概率。
-
-多结果事件如存在多个互斥 outcome，应保留 outcome 与 token 的明确映射；若现有视觉组件不能在不重构 UI 的情况下显示多条 outcome 曲线，V1 可按独立 outcome 卡展示，而不是破坏现有组件。
-
-### 9.4 白名单机制
-
-正式展示必须由显式配置驱动，例如：
+采用显式白名单，例如：
 
 `platform-data/config/macro_events.yaml`
 
-每个跟踪项至少应包含：
+禁止继续使用“拉取大量市场 → 标题关键词分类 → 自动塞进页面”的旧逻辑作为正式发布链路。
 
-- id
-- provider
-- event_id / market_id / slug
-- label
-- category
-- outcome / token selection
-- enabled
-- expiry
-- minimum_liquidity（如适用）
+### 9.3 事件类别
 
-可以建立“候选事件发现”任务辅助找新市场，但候选事件不得未经配置直接发布到宏观看板。
-
-### 9.5 V1 事件类别
-
-优先展示与主流金融市场最相关的事件，建议类别：
+优先：
 
 1. Monetary Policy
-   - Fed rate decision / rate cut / rate hike / target range related markets
-
 2. Macro Economy
-   - recession / inflation / growth / major macro threshold related markets
-
 3. Financial Markets
-   - major equity index、Treasury yield、USD、gold、BTC 等具有明确金融市场意义的重大阈值或年度事件
-
 4. Policy / Geopolitics
-   - 仅保留对全球金融资产定价具有明显影响的关税、制裁、重大地缘冲突、重大财政或监管事件
 
-Election 类事件不作为固定默认类别；只有在对金融市场具有明显影响并被显式加入白名单时才展示。
+Election 不作为固定默认类别；只有明确影响金融市场且被白名单选中时才展示。
 
-### 9.6 卡片信息
+### 9.4 数量控制
 
-每张 Event Probability 卡原则上保留：
+主页面只保留少量高相关、高流动性的主流金融事件。
 
-- 事件标题 / question
-- 当前概率
-- 历史概率曲线
-- 1D probability change
-- 7D probability change
-- liquidity
-- volume（数据可稳定获得时）
-- expiry / resolution date
-- source
-- updated_at
-- status
-
-页面信息密度以现有 MacroExpectationPanel 的视觉结构为基准，不因补字段重构视觉组件。
-
-### 9.7 数量控制
-
-Macro V1 目标是“主流、高信号、可扫盘”，不是预测市场大全。
-
-默认展示数量应保持克制，优先少量高流动性、高市场相关性的事件；最终数量在页面线下验收时再决定。
+建议同屏控制在约 6–8 个 active events，最终数量在线下页面验收时再定。
 
 ---
 
@@ -371,18 +292,18 @@ Macro V1 目标是“主流、高信号、可扫盘”，不是预测市场大�
 
 ### 10.1 总原则
 
-现有 Macro Market Detail 所有行先保留。
+现有行全部先保留。
 
-V1 不主动删除、重命名或重新排序现有行，也不因为新增研究 Section 就把所有新指标重复塞进 Market Detail。
+不删除、不重命名、不重新排序。
 
-优先任务是把现有静态金融数据、假收益率和假 30D sparkline 真实化。
+优先真实化现有静态金融数据、假收益率和假 30D Sparkline。
 
-### 10.2 A 类：日频市场数据，完整真实化
+### 10.2 日频市场数据
 
-适用现有行：
+适合完整真实化：
 
 - VIX
-- DSPX（以能否取得稳定合法数据源为前提）
+- DSPX（前提是稳定合法免费源可用）
 - DXY
 - US 2Y
 - US 10Y
@@ -397,7 +318,7 @@ V1 不主动删除、重命名或重新排序现有行，也不因为新增研�
 - 10Y TIPS Real Yield
 - 10Y Breakeven Inflation
 
-尽可能真实计算 / 展示：
+尽可能计算：
 
 - latest / close
 - 1D
@@ -407,11 +328,11 @@ V1 不主动删除、重命名或重新排序现有行，也不因为新增研�
 - YTD
 - 1Y
 - 52W High distance
-- 30D sparkline
+- 30D Sparkline
 
-### 10.3 B 类：政策 / 流动性日周频数据
+### 10.3 政策 / 流动性数据
 
-适用现有行：
+现有：
 
 - DFF
 - SOFR
@@ -420,118 +341,104 @@ V1 不主动删除、重命名或重新排序现有行，也不因为新增研�
 - RRP
 - Net Dollar Liquidity
 
-必须按指标本身的金融语义展示变化。
+按指标本身语义展示变化；利率类优先使用 bp，而不是机械套股票收益率百分比。
 
-利率类变化优先以 bp 变化解释，而不是机械套股票收益率百分比。
+### 10.4 低频宏观数据
 
-### 10.4 C 类：低频宏观数据
-
-适用现有行：
+现有：
 
 - CPI
 - PCE
 - UNRATE
 - US M2
 
-必须 frequency-aware。
+必须 frequency-aware：
 
-月频数据在没有新 observation 时：
-
-- 不把 1D / 1W 显示成 `0.00%` 冒充“没有变化”；
-- 无有效比较 observation 的周期显示 `—` 或明确 no comparable observation；
-- 30D 内不足以形成真实曲线时，不画假平线。
+- 没有新 observation 时，1D / 1W 不显示 `0.00%` 冒充“没变”；
+- 无可比较 observation 时显示 `—`；
+- 30D 内不足以形成真实曲线时不画假平线。
 
 ### 10.5 30D Sparkline
 
 继续使用现有 SVG Sparkline 视觉组件。
 
-数据来源必须是对应 canonical series 的最近约 30 个真实有效日度观测值。
+数据来自对应 canonical series 的真实历史观测。
 
-不同 Market Detail 行允许使用不同 Primary Provider；不强制所有行从同一个网站获取。
-
-当前值、收益率与 30D 曲线应尽量使用同一 canonical series 和同一价格 / 收益率口径。
-
-### 10.6 技术状态列
-
-当前 1H / 4H / 日线 / 3日线 / 周线技术箭头不作为 Macro V1 本轮优化目标。
-
-不扩展假信号，不在本阶段重新设计算法。
-
-最终是否保留、真实化或删减，待整体页面完成后线下验收决定。
+不同 Market Detail 行允许使用不同 Primary Provider；不要求全部来自一个网站。
 
 ---
 
-## 11. 数据时效定位【冻结】
+## 11. 图表通用展示能力【冻结】
 
-`platform-data` 当前定位是 Macro V1 的稳定数据生产与历史存储层，不承担实时 tick / 毫秒级行情数据库职责。
+### 11.1 Data Freshness
 
-Macro V1 目标：
+每个新增宏观图尽可能显示：
 
-- 市场行情类：最新有效市场 / 官方日度值；
-- 日频利率类：最新官方日值；
-- 周频数据：最新发布 observation；
-- 月频 / 季频：最新正式 observation；
-- 所有序列明确 as_of、retrieved_at、frequency、stale 状态。
+- Latest observation date
+- Frequency
+- Updated / retrieved time
+- stale 状态
 
-未来如需真正盘中实时行情，应使用独立实时市场数据服务，不依赖 GitHub Actions 冒充实时 feed。
+### 11.2 Latest vs Previous
 
----
+低频宏观数据优先补充：
 
-## 12. 数据架构【继承 Master Plan】
+- latest
+- previous
+- delta / change
 
-统一链路：
+### 11.3 默认时间窗口
 
-```text
-External Sources
-    ↓
-platform-data
-    ↓
-normalize / derive / validate / store / LKG
-    ↓
-versioned canonical output
-    ↓
-platform-api
-    ↓
-Platform Web
-    ↓
-existing UI components
-```
+按数据频率设合理默认窗口，而不是所有图统一周期。
 
-前端不直接抓取 FRED、Treasury、Polymarket、Yahoo、TradingView 或其他外部数据源。
+建议基线：
 
----
+- Treasury / SOFR / Breakeven：1Y
+- Claims：2Y
+- CPI / PCE / PPI：5Y
+- CFNAI：5Y
+- GDP：10Y
+- Global M2：10Y
+- Polymarket：30D / All
 
-## 13. 开发阶段建议【当前基线】
+### 11.4 不做 Event Marker
 
-1. Phase 1A — Market Expectations / Event Probability 真实数据链
-2. Phase 1B — Macro Market Detail 真实化 + 30D Sparkline
-3. Phase 1C — Growth
-4. Phase 1D — Inflation
-5. Phase 1E — Rates
-6. Phase 1F — Global M2
-7. Phase 1G — Risk Appetite
-8. Phase 1H — Macro 整体数据质量、状态、UI一致性与回归验收
-9. Offline Acceptance
-10. Macro V1 Freeze
+Macro V1 不增加 CPI / FOMC / NFP 等 Release / Event Marker。
 
-开发期 Section 顺序只是临时逻辑顺序；最终页面顺序、删减和合并在完整页面线下验收后决定。
+原因：增加数据维护和图表复杂度，当前收益不足。
 
 ---
 
-## 14. 当前仍需后续数据工程冻结的事项【OPEN】
+## 12. 数据源原则【冻结】
 
-产品规格层已基本确定，以下转入 Data Source Map / 工程规格讨论：
+详细 Source Map 见：
 
-1. 每个 Growth / Inflation / Rates 序列的 Primary / Fallback Provider；
-2. Global M2 各地区 M2 与 FX 的精确 series id；
-3. Global M2 历史修订与共同月份对齐实现；
-4. HYG / LQD 的 adjusted price 数据源；
-5. HY OAS 的 Primary / Fallback；
-6. Macro Market Detail 每行完整 Source Map；
-7. DSPX / MOVE / DXY / 中国国债等公开数据源稳定性；
-8. Polymarket whitelist 的首批具体 event / market id；
-9. Polymarket 卡片默认 history window 与更新频率；
-10. 每个序列 stale threshold；
-11. GitHub Actions 更新频率和失败 / LKG 策略的具体参数。
+`docs/hedge-board/specs/MACRO_DATA_SOURCE_MAP.md`
 
-这些 OPEN 项不得由执行 Agent 随意改变上述已冻结产品定义。
+总体原则：
+
+- 只用免费数据源作为 V1 基础；
+- 统一 canonical contract，而不是强制统一 Provider；
+- AKShare 能稳定、清晰获取的数据可优先复用；
+- 官方 API 更稳定或 AKShare 上游陈旧时直接用官方免费源；
+- 官方源可作为 Primary、Fallback 或 Cross-check，按数据集实际情况决定；
+- 记录 upstream source；
+- TradingView 只负责展示，不抓数据；
+- 没有可靠免费链路时宁可 `not_configured`，不造数据。
+
+---
+
+## 13. 当前状态【冻结】
+
+Macro V1 产品范围已经冻结。
+
+当前不继续实施，等待整个 Hedge Board 计划进一步完善。
+
+后续重新进入 Macro 工程开发时：
+
+1. 先读取 Master Plan；
+2. 再读取本 Spec；
+3. 再读取 Macro Data Source Map；
+4. 按独立 Phase 实施；
+5. 不得影响 Deferred 的美股、A股、全球、交易工具页面；
+6. 最终由用户线下验收。
