@@ -24,6 +24,11 @@ def get_trading_safety() -> TradingSafetyResponse:
     return TradingSafetyResponse(
         liveTradingEnabled=settings.live_trading_enabled,
         defaultTradingEnvironment=settings.default_trading_environment,
+        founderDemoLocalSelfApprovalEnabled=(
+            settings.founder_demo_live_acceptance_enabled
+            and settings.environment.lower() == "development"
+            and settings.auth_mode.lower() == "development"
+        ),
         secretStoragePolicy="database_stores_references_only",
         liveGuardPolicy=(
             "all_accounts_fail_closed_live_requires_global_switch_authentication_"

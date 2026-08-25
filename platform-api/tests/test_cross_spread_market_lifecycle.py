@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import json
 from decimal import Decimal
 from pathlib import Path
 
@@ -20,6 +22,20 @@ from app.main import app
 from app.schemas import CrossSpreadSnapshotResponse
 
 NOW = "2026-07-25T00:00:00+00:00"
+
+
+def credential(user_id: str, token: str, roles: list[str]) -> dict[str, object]:
+    return {
+        "credentialId": f"credential-{user_id}",
+        "userId": user_id,
+        "tokenSha256": hashlib.sha256(token.encode("utf-8")).hexdigest(),
+        "roles": roles,
+        "status": "active",
+    }
+
+
+def headers(token: str) -> dict[str, str]:
+    return {"Authorization": f"Bearer {token}"}
 
 
 def insert_batch_with_fills(batch_id: str, *, direction: str = "OPEN_LONG") -> None:
@@ -229,6 +245,9 @@ def live_open_positions() -> tuple[list[LivePosition], list[LivePosition]]:
 def configure_platform(tmp_path: Path) -> None:
     settings = get_settings()
     settings.database_path = str(tmp_path / "cross-spread-lifecycle.db")
+    settings.environment = "live"
+    settings.auth_mode = "api_key"
+    settings.auth_credentials_json = json.dumps([credential("admin-1", "admin-token", ["admin"])])
     settings.live_trading_enabled = True
     settings.cross_spread_exit_monitor_enabled = False
     settings.cross_spread_acceptance_max_quantity_oz = Decimal("1")
@@ -317,7 +336,7 @@ def test_open_ignores_unresolved_batches_from_other_accounts(
                   "legacy-live-batch",
                   "legacy-live-key",
                   "strategy_cross_venue_spread_instance_default",
-                  "bybit-live-main",
+                  "account_crypto_test",
                   "cross_venue_spread",
                   "OPEN_LONG",
                   NOW,
@@ -457,9 +476,14 @@ def test_market_close_registers_reduce_only_and_mt5_ticket(
 
 def test_limit_requires_spread_and_legacy_close_fails_closed(tmp_path: Path) -> None:
     configure_platform(tmp_path)
+    exit_service.has_ceo_trade_authority = lambda principal, current: True
+    import app.auth as auth_module
+
+    auth_module.has_ceo_trade_authority = lambda principal, current: True
     with TestClient(app) as client:
         limit_response = client.post(
             "/api/v1/trading/cross-spread/lifecycle/open",
+            headers=headers("admin-token"),
             json={
                 "direction": "LONG_SPREAD",
                 "quantityOz": "1",
@@ -470,6 +494,7 @@ def test_limit_requires_spread_and_legacy_close_fails_closed(tmp_path: Path) -> 
         )
         legacy_close = client.post(
             "/api/v1/trading/cross-spread/market-command",
+            headers=headers("admin-token"),
             json={"action": "CLOSE_LONG", "quantityOz": "1"},
         )
 

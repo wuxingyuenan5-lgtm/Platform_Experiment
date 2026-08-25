@@ -320,9 +320,15 @@ function Start-ServiceManaged {
   }
   if ($Service.Python) {
     $previousLiveWrite = $env:VG_RUNTIME_LIVE_WRITE_ENABLED
+    $previousPlatformLiveWrite = $env:VG_LIVE_TRADING_ENABLED
+    $previousFounderDemo = $env:VG_FOUNDER_DEMO_LIVE_ACCEPTANCE_ENABLED
     try {
       if ($Service.Key -eq 'runtime') {
         $env:VG_RUNTIME_LIVE_WRITE_ENABLED = 'false'
+      }
+      if ($Service.Key -in @('runtime', 'api')) {
+        $env:VG_LIVE_TRADING_ENABLED = 'false'
+        $env:VG_FOUNDER_DEMO_LIVE_ACCEPTANCE_ENABLED = 'false'
       }
       Start-Process $Service.PythonPath -ArgumentList @('-m', 'uvicorn', 'app.main:app', '--host', '127.0.0.1', '--port', "$($Service.Port)") `
         -WorkingDirectory $Service.WorkingDirectory -RedirectStandardOutput $stdout -RedirectStandardError $stderr `
@@ -332,6 +338,16 @@ function Start-ServiceManaged {
         Remove-Item Env:VG_RUNTIME_LIVE_WRITE_ENABLED -ErrorAction SilentlyContinue
       } else {
         $env:VG_RUNTIME_LIVE_WRITE_ENABLED = $previousLiveWrite
+      }
+      if ($null -eq $previousPlatformLiveWrite) {
+        Remove-Item Env:VG_LIVE_TRADING_ENABLED -ErrorAction SilentlyContinue
+      } else {
+        $env:VG_LIVE_TRADING_ENABLED = $previousPlatformLiveWrite
+      }
+      if ($null -eq $previousFounderDemo) {
+        Remove-Item Env:VG_FOUNDER_DEMO_LIVE_ACCEPTANCE_ENABLED -ErrorAction SilentlyContinue
+      } else {
+        $env:VG_FOUNDER_DEMO_LIVE_ACCEPTANCE_ENABLED = $previousFounderDemo
       }
     }
   } else {

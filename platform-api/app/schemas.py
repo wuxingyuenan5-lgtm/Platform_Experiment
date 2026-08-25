@@ -49,6 +49,9 @@ class RuntimeReadinessResponse(BaseModel):
 class TradingSafetyResponse(BaseModel):
     live_trading_enabled: bool = Field(alias="liveTradingEnabled")
     default_trading_environment: str = Field(alias="defaultTradingEnvironment")
+    founder_demo_local_self_approval_enabled: bool = Field(
+        alias="founderDemoLocalSelfApprovalEnabled"
+    )
     secret_storage_policy: str = Field(alias="secretStoragePolicy")
     live_guard_policy: str = Field(alias="liveGuardPolicy")
 

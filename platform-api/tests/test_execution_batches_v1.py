@@ -1,3 +1,5 @@
+import hashlib
+import json
 from pathlib import Path
 from uuid import uuid4
 
@@ -6,6 +8,20 @@ from fastapi.testclient import TestClient
 from app.config import get_settings
 from app.database import connection
 from app.main import app
+
+
+def credential(user_id: str, token: str, roles: list[str]) -> dict[str, object]:
+    return {
+        "credentialId": f"credential-{user_id}",
+        "userId": user_id,
+        "tokenSha256": hashlib.sha256(token.encode("utf-8")).hexdigest(),
+        "roles": roles,
+        "status": "active",
+    }
+
+
+def headers(token: str) -> dict[str, str]:
+    return {"Authorization": f"Bearer {token}"}
 
 
 def _seed_balance_snapshot(
@@ -70,11 +86,21 @@ def filled_runtime_response(command: dict[str, object]) -> object:
 
 
 def test_execution_batch_is_idempotent(monkeypatch, tmp_path: Path) -> None:
-    get_settings().database_path = str(tmp_path / "batch-idempotency.db")
+    settings = get_settings()
+    settings.database_path = str(tmp_path / "batch-idempotency.db")
+    settings.environment = "live"
+    settings.auth_mode = "api_key"
+    settings.auth_credentials_json = json.dumps(
+        [
+            credential("trader-1", "trader-token", ["trader"]),
+            credential("admin-1", "admin-token", ["admin"]),
+        ]
+    )
     monkeypatch.setattr(
         "app.trade_command_execution.httpx.post",
         lambda *args, **kwargs: filled_runtime_response(kwargs["json"]),
     )
+    monkeypatch.setattr("app.auth.has_ceo_trade_authority", lambda principal, current: True)
 
     payload = {
         "idempotencyKey": "cross-venue-001",
@@ -111,6 +137,40 @@ def test_execution_batch_is_idempotent(monkeypatch, tmp_path: Path) -> None:
                 "UPDATE accounts SET status = 'active' WHERE id IN (?, ?)",
                 ("account_crypto_test", "account_crypto_test_b"),
             )
+            db.execute(
+                "UPDATE strategy_instances SET status = 'active' WHERE id = ?",
+                ("strategy_cross_venue_spread_instance_default",),
+            )
+            db.execute(
+                """
+                INSERT INTO strategy_account_bindings (
+                    id, strategy_instance_id, account_id, role, capability,
+                    max_notional, status, created_at
+                ) VALUES (?, ?, ?, ?, 'trade_and_read', NULL, 'active', ?)
+                """,
+                (
+                    str(uuid4()),
+                    "strategy_cross_venue_spread_instance_default",
+                    "account_crypto_test",
+                    "venue_a",
+                    "2026-08-25T00:00:00+00:00",
+                ),
+            )
+            db.execute(
+                """
+                INSERT INTO strategy_account_bindings (
+                    id, strategy_instance_id, account_id, role, capability,
+                    max_notional, status, created_at
+                ) VALUES (?, ?, ?, ?, 'trade_and_read', NULL, 'active', ?)
+                """,
+                (
+                    str(uuid4()),
+                    "strategy_cross_venue_spread_instance_default",
+                    "account_crypto_test_b",
+                    "venue_b",
+                    "2026-08-25T00:00:00+00:00",
+                ),
+            )
         _seed_balance_snapshot(
             account_id="account_crypto_test",
             currency="USDT",
@@ -122,8 +182,16 @@ def test_execution_batch_is_idempotent(monkeypatch, tmp_path: Path) -> None:
             available_balance="10",
         )
 
-        first = client.post("/api/v1/trading/execution-batches", json=payload)
-        second = client.post("/api/v1/trading/execution-batches", json=payload)
+        first = client.post(
+            "/api/v1/trading/execution-batches",
+            headers=headers("trader-token"),
+            json=payload,
+        )
+        second = client.post(
+            "/api/v1/trading/execution-batches",
+            headers=headers("trader-token"),
+            json=payload,
+        )
 
         assert first.status_code == 200
         assert second.status_code == 200
@@ -139,7 +207,16 @@ def test_execution_batch_is_idempotent(monkeypatch, tmp_path: Path) -> None:
 
 
 def test_execution_batch_rejects_mismatched_strategy_instance(tmp_path: Path) -> None:
-    get_settings().database_path = str(tmp_path / "batch-mismatch.db")
+    settings = get_settings()
+    settings.database_path = str(tmp_path / "batch-mismatch.db")
+    settings.environment = "live"
+    settings.auth_mode = "api_key"
+    settings.auth_credentials_json = json.dumps(
+        [credential("admin-1", "admin-token", ["admin"])]
+    )
+    import app.auth as auth_module
+
+    auth_module.has_ceo_trade_authority = lambda principal, current: True
 
     payload = {
         "strategyInstanceId": "strategy_funding_arbitrage_instance_default",
@@ -169,6 +246,10 @@ def test_execution_batch_rejects_mismatched_strategy_instance(tmp_path: Path) ->
     }
 
     with TestClient(app) as client:
-        response = client.post("/api/v1/trading/execution-batches", json=payload)
+        response = client.post(
+            "/api/v1/trading/execution-batches",
+            headers=headers("admin-token"),
+            json=payload,
+        )
 
         assert response.status_code == 422

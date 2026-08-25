@@ -48,7 +48,9 @@ const transform: AxiosTransform = {
       // return '[HTTP] Request has no return value';
       throw new Error(t('sys.api.apiRequestFailed'));
     }
-    //  杩欓噷 code锛宺esult锛宮essage涓?鍚庡彴缁熶竴鐨勫瓧娈碉紝闇€瑕佸湪 types.ts鍐呬慨鏀逛负椤圭洰鑷繁鐨勬帴鍙ｈ繑鍥炴牸寮?    const { code, result, message } = data;
+    //  杩欓噷 code锛宺esult锛宮essage涓?鍚庡彴缁熶竴鐨勫瓧娈碉紝闇€瑕佸湪
+    //  types.ts 鍐呬慨鏀逛负椤圭洰鑷繁鐨勬帴鍙ｈ繑鍥炴牸寮?
+    const { code, result, message } = data;
 
     // 杩欓噷閫昏緫鍙互鏍规嵁椤圭洰杩涜淇敼
     const hasSuccess = data && Reflect.has(data, 'code') && code === ResultEnum.SUCCESS;
@@ -67,7 +69,9 @@ const transform: AxiosTransform = {
       return result;
     }
 
-    // 鍦ㄦ澶勬牴鎹嚜宸遍」鐩殑瀹為檯鎯呭喌瀵逛笉鍚岀殑code鎵ц涓嶅悓鐨勬搷浣?    // 濡傛灉涓嶅笇鏈涗腑鏂綋鍓嶈姹傦紝璇穜eturn鏁版嵁锛屽惁鍒欑洿鎺ユ姏鍑哄紓甯稿嵆鍙?    let timeoutMsg = '';
+    // 鍦ㄦ澶勬牴鎹嚜宸遍」鐩殑瀹為檯鎯呭喌瀵逛笉鍚岀殑 code 鎵ц涓嶅悓鐨勬搷浣?
+    // 濡傛灉涓嶅笇鏈涗腑鏂綋鍓嶈姹傦紝璇穜eturn 鏁版嵁锛屽惁鍒欑洿鎺ユ姏鍑哄紓甯稿嵆鍙?
+    let timeoutMsg = '';
     switch (code) {
       case ResultEnum.TIMEOUT:
         timeoutMsg = t('sys.api.timeoutMessage');

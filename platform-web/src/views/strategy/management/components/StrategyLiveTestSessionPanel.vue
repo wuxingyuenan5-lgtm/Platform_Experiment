@@ -3,7 +3,7 @@
     <div class="live-test-panel__header">
       <div>
         <h3>CEO 实盘测试会话</h3>
-        <p>复用现有 LiveTradingSession。可同时覆盖 Funding 与 Cross，共享 bybit-live-main。</p>
+        <p>复用现有 LiveTradingSession。Cross 会覆盖 Bybit + MT5 两个账户，会话审批不等于武装。</p>
       </div>
       <button type="button" class="state-refresh-btn" @click="refresh">刷新状态</button>
     </div>
@@ -29,37 +29,54 @@
         <span>累计上限</span>
         <input v-model="maxDailyNotional" type="text" />
       </label>
-      <label class="field">
-        <span>Symbol allowlist</span>
-        <input v-model="symbolsCsv" type="text" placeholder="BTCUSDT,ETHUSDT" />
-      </label>
+      <div class="field">
+        <span>Funding Spot / Perp</span>
+        <strong>{{ fundingSymbolLabel }}</strong>
+      </div>
+      <div class="field">
+        <span>Cross Bybit Symbol</span>
+        <strong>{{ crossBybitSymbolLabel }}</strong>
+      </div>
+      <div class="field">
+        <span>Cross MT5 Broker Symbol</span>
+        <strong>{{ crossMt5SymbolLabel }}</strong>
+      </div>
     </div>
 
     <div class="live-test-panel__meta">
       <div
-        ><span>共享 Bybit 账户</span
-        ><strong>{{ fundingContext?.accountId || '未就绪' }}</strong></div
-      >
-      <div
-        ><span>Cross MT5 腿</span
-        ><strong>{{ crossOverview?.primaryAccountCode || '--' }}</strong></div
+        ><span>Platform Live Write</span><strong>{{ platformWriteLabel }}</strong></div
       >
       <div
         ><span>Runtime Live Write</span><strong>{{ runtimeWriteLabel }}</strong></div
       >
-      <div><span>默认武装状态</span><strong>未武装</strong></div>
+      <div
+        ><span>Founder 本地自审批</span><strong>{{ founderDemoApprovalLabel }}</strong></div
+      >
+      <div><span>当前武装状态</span><strong>未武装</strong></div>
     </div>
 
     <div class="live-test-panel__cards">
       <article class="status-card">
-        <strong>Funding readiness</strong>
-        <p>{{ readinessLabel(fundingOverview?.executionReadiness?.runnable) }}</p>
-        <small>{{ blockerLabel(fundingOverview?.executionReadiness?.blockers) }}</small>
+        <strong>Funding 会话 / readiness</strong>
+        <p
+          >{{ coverageLabel(fundingState.coverageStatus) }} /
+          {{ readyLabel(fundingState.ready) }}</p
+        >
+        <small>
+          缺少会话：{{ missingLabel(fundingState.missingAccounts) }} ｜ 阻断：{{
+            blockerLabel(fundingState.blockers)
+          }}
+        </small>
       </article>
       <article class="status-card">
-        <strong>Cross readiness</strong>
-        <p>{{ readinessLabel(crossOverview?.executionReadiness?.runnable) }}</p>
-        <small>{{ blockerLabel(crossOverview?.executionReadiness?.blockers) }}</small>
+        <strong>Cross 会话 / readiness</strong>
+        <p>{{ coverageLabel(crossState.coverageStatus) }} / {{ readyLabel(crossState.ready) }}</p>
+        <small>
+          缺少会话：{{ missingLabel(crossState.missingAccounts) }} ｜ 阻断：{{
+            blockerLabel(crossState.blockers)
+          }}
+        </small>
       </article>
       <article class="status-card">
         <strong>未解决 result_unknown</strong>
@@ -67,9 +84,9 @@
         <small>来自两策略 executionReadiness 的 resultUnknownOrderCount</small>
       </article>
       <article class="status-card">
-        <strong>Kill Switch / 账户门控</strong>
-        <p>{{ blockerLabel(killSwitchSignals) }}</p>
-        <small>状态来自现有 readiness blockers；本面板不绕过任何门控</small>
+        <strong>会话覆盖</strong>
+        <p>{{ targetLabels.join(' ｜ ') || '未选择策略' }}</p>
+        <small>Funding 单选创建 1 个会话；Cross 单选创建 2 个；同时选择共 3 个</small>
       </article>
     </div>
 
@@ -77,7 +94,7 @@
       <button type="button" :disabled="busy || !canCreate" @click="createSessions">创建会话</button>
       <button
         type="button"
-        :disabled="busy || actionablePending.length === 0"
+        :disabled="busy || actionablePending.length === 0 || !canApproveLocally"
         @click="approveSessions"
       >
         审批并准备武装
@@ -92,6 +109,7 @@
     </div>
 
     <p v-if="error" class="state-text state-text--error">{{ error }}</p>
+    <p v-else-if="approvalHint" class="state-text">{{ approvalHint }}</p>
 
     <ul class="session-list">
       <li v-for="item in actionableSessions" :key="item.sessionId">
@@ -110,16 +128,29 @@
   import { message } from 'ant-design-vue';
   import { useUserStoreWithOut } from '@/store/modules/user';
   import { getFundingExecutionContext } from '@/api/platform/fundingWorkspace';
+  import { getCrossSpreadObservability } from '@/api/platform/crossSpreadObservability';
   import {
     approveLiveTradingSession,
     createLiveTradingSession,
     getLiveTradingSessions,
+    getStrategyAccountBindings,
+    getTradingSafety,
     revokeLiveTradingSession,
   } from '@/api/platform/trading';
+  import type { CrossSpreadObservabilityResult } from '@/api/platform/crossSpreadObservability';
+  import type { FundingExecutionContext } from '@/api/platform/fundingWorkspace';
   import type {
     LiveTradingSessionResult,
+    StrategyAccountBindingResult,
     StrategyManagementOverviewResult,
+    TradingSafetyResult,
   } from '@/api/platform/trading.types';
+  import {
+    buildLiveTradingSessionPayload,
+    deriveLiveTestSessionTargets,
+    deriveStrategySessionView,
+    findReusableLiveSession,
+  } from '../composables/liveTestSessionPanelState';
 
   const props = defineProps<{
     fundingOverview: StrategyManagementOverviewResult | null;
@@ -129,24 +160,34 @@
   const userStore = useUserStoreWithOut();
   const busy = ref(false);
   const error = ref<string | null>(null);
-  const fundingContext = ref<Record<string, any> | null>(null);
+  const fundingContext = ref<FundingExecutionContext | null>(null);
+  const crossObservability = ref<CrossSpreadObservabilityResult | null>(null);
   const sessions = ref<LiveTradingSessionResult[]>([]);
+  const tradingSafety = ref<TradingSafetyResult | null>(null);
+  const fundingBindings = ref<StrategyAccountBindingResult[]>([]);
+  const crossBindings = ref<StrategyAccountBindingResult[]>([]);
   const selectedFunding = ref(true);
   const selectedCross = ref(true);
   const expiryMinutes = ref('15');
   const maxOrderNotional = ref('100');
   const maxDailyNotional = ref('200');
-  const symbolsCsv = ref('BTCUSDT');
 
   const visible = computed(() => {
     const roles = userStore.getRoleList;
     return roles.includes('ceo') || roles.includes('admin');
   });
-  const selectedStrategies = computed(() =>
-    [
-      selectedFunding.value ? props.fundingOverview?.strategyInstanceId : null,
-      selectedCross.value ? props.crossOverview?.strategyInstanceId : null,
-    ].filter((value): value is string => Boolean(value)),
+  const currentUserId = computed(() => String(userStore.getUserInfo?.userId || ''));
+  const selectedTargets = computed(() =>
+    deriveLiveTestSessionTargets({
+      selectedFunding: selectedFunding.value,
+      selectedCross: selectedCross.value,
+      fundingOverview: props.fundingOverview,
+      crossOverview: props.crossOverview,
+      fundingBindings: fundingBindings.value,
+      crossBindings: crossBindings.value,
+      fundingContext: fundingContext.value,
+      crossObservability: crossObservability.value,
+    }),
   );
   const actionableSessions = computed(() =>
     sessions.value.filter((item) =>
@@ -163,16 +204,76 @@
       (props.fundingOverview?.executionReadiness?.resultUnknownOrderCount || 0) +
       (props.crossOverview?.executionReadiness?.resultUnknownOrderCount || 0),
   );
-  const killSwitchSignals = computed(() => [
-    ...(props.fundingOverview?.executionReadiness?.blockers || []),
-    ...(props.crossOverview?.executionReadiness?.blockers || []),
-  ]);
+  const fundingState = computed(() =>
+    deriveStrategySessionView({
+      strategyLabel: 'Funding',
+      overview: props.fundingOverview,
+      targets: selectedTargets.value,
+      sessions: sessions.value,
+      tradingSafety: tradingSafety.value,
+      runtimeLiveWriteEnabled: fundingContext.value?.runtime?.liveWriteEnabled === true,
+      unresolvedUnknownCount:
+        props.fundingOverview?.executionReadiness?.resultUnknownOrderCount || 0,
+    }),
+  );
+  const crossState = computed(() =>
+    deriveStrategySessionView({
+      strategyLabel: 'Cross',
+      overview: props.crossOverview,
+      targets: selectedTargets.value,
+      sessions: sessions.value,
+      tradingSafety: tradingSafety.value,
+      runtimeLiveWriteEnabled: fundingContext.value?.runtime?.liveWriteEnabled === true,
+      unresolvedUnknownCount: props.crossOverview?.executionReadiness?.resultUnknownOrderCount || 0,
+    }),
+  );
+  const fundingSymbolLabel = computed(() => {
+    const target = selectedTargets.value.find((item) => item.targetKey === 'funding:primary');
+    return target?.symbolText || target?.missingReason || '未就绪';
+  });
+  const crossBybitSymbolLabel = computed(() => {
+    const target = selectedTargets.value.find((item) => item.targetKey === 'cross:venue_a');
+    return target?.symbolText || target?.missingReason || '未就绪';
+  });
+  const crossMt5SymbolLabel = computed(() => {
+    const target = selectedTargets.value.find((item) => item.targetKey === 'cross:mt5_leg');
+    return target?.symbolText || target?.missingReason || '未就绪';
+  });
+  const targetLabels = computed(() =>
+    selectedTargets.value.map((item) => {
+      const account = item.accountCode || item.accountId || item.role;
+      return `${item.strategyLabel}/${item.role}/${account}/${item.symbolText || '未就绪'}`;
+    }),
+  );
+  const platformWriteLabel = computed(() =>
+    tradingSafety.value?.liveTradingEnabled === true ? '开启' : '关闭',
+  );
   const runtimeWriteLabel = computed(() =>
     fundingContext.value?.runtime?.liveWriteEnabled === true ? '已开启' : '关闭',
   );
-  const canCreate = computed(
-    () => selectedStrategies.value.length > 0 && Boolean(fundingContext.value?.accountId),
+  const founderDemoApprovalLabel = computed(() =>
+    tradingSafety.value?.founderDemoLocalSelfApprovalEnabled === true ? '允许' : '关闭',
   );
+  const canCreate = computed(
+    () =>
+      selectedTargets.value.length > 0 &&
+      selectedTargets.value.every((item) => item.accountId && !item.missingReason),
+  );
+  const canApproveLocally = computed(() => {
+    if (!actionablePending.value.length) return false;
+    if (tradingSafety.value?.founderDemoLocalSelfApprovalEnabled === true) return true;
+    return actionablePending.value.some((item) => item.applicantUserId !== currentUserId.value);
+  });
+  const approvalHint = computed(() => {
+    if (error.value) return '';
+    if (tradingSafety.value?.founderDemoLocalSelfApprovalEnabled === true) {
+      return '当前环境允许 founder demo minimum_size_acceptance 本地 CEO 自审批；审批后仍不等于武装。';
+    }
+    if (actionablePending.value.some((item) => item.applicantUserId === currentUserId.value)) {
+      return 'Founder demo 本地自审批默认关闭；当前申请需要独立 approver，页面不会伪造审批成功。';
+    }
+    return '';
+  });
 
   function strategyLabel(strategyInstanceId: string): string {
     if (strategyInstanceId === props.fundingOverview?.strategyInstanceId) return 'Funding';
@@ -184,49 +285,56 @@
     return values && values.length ? values.join('；') : '无阻断';
   }
 
-  function readinessLabel(value: boolean | undefined): string {
+  function readyLabel(value: boolean): string {
     return value ? 'ready' : 'blocked';
   }
 
-  function sessionPayload(strategyInstanceId: string) {
-    const now = new Date();
-    const startsAt = new Date(now.getTime() + 60_000);
-    const endsAt = new Date(startsAt.getTime() + Number(expiryMinutes.value || '15') * 60_000);
-    const readOnlyVerifiedAt = new Date(now.getTime() - 5 * 60_000);
-    const symbols = symbolsCsv.value
-      .split(',')
-      .map((item) => item.trim().toUpperCase())
-      .filter(Boolean);
-    const keySuffix =
-      strategyInstanceId === props.fundingOverview?.strategyInstanceId ? 'funding' : 'cross';
-    return {
-      idempotencyKey: `live-session:${keySuffix}:${startsAt.toISOString()}`,
-      sessionType: 'minimum_size_acceptance' as const,
-      strategyInstanceId,
-      accountId: String(fundingContext.value?.accountId || ''),
-      symbols,
-      sides: ['buy', 'sell'] as Array<'buy' | 'sell'>,
-      orderTypes: ['market', 'limit'] as Array<'market' | 'limit'>,
-      startsAt: startsAt.toISOString(),
-      endsAt: endsAt.toISOString(),
-      maxOrderNotional: maxOrderNotional.value,
-      maxDailyNotional: maxDailyNotional.value,
-      readOnlyVerifiedAt: readOnlyVerifiedAt.toISOString(),
-      evidenceReference: 'ui://strategy-management/live-test-session',
-      reason: 'CEO controlled-live test session',
+  function coverageLabel(
+    value: 'not_created' | 'pending' | 'approved' | 'revoked_or_expired' | 'blocked',
+  ): string {
+    const labels = {
+      not_created: '会话未创建',
+      pending: 'pending',
+      approved: 'approved',
+      revoked_or_expired: 'revoked/expired',
+      blocked: 'blocked',
     };
+    return labels[value];
+  }
+
+  function missingLabel(values: string[]): string {
+    return values.length ? values.join('、') : '无';
   }
 
   async function refresh() {
     if (!visible.value) return;
     error.value = null;
     try {
-      const [context, liveSessions] = await Promise.all([
+      const [
+        context,
+        liveSessions,
+        nextTradingSafety,
+        nextCrossObservability,
+        nextFundingBindings,
+        nextCrossBindings,
+      ] = await Promise.all([
         getFundingExecutionContext(),
         getLiveTradingSessions(),
+        getTradingSafety(),
+        getCrossSpreadObservability(1, 1, 'fast'),
+        props.fundingOverview?.strategyInstanceId
+          ? getStrategyAccountBindings(props.fundingOverview.strategyInstanceId)
+          : Promise.resolve([]),
+        props.crossOverview?.strategyInstanceId
+          ? getStrategyAccountBindings(props.crossOverview.strategyInstanceId)
+          : Promise.resolve([]),
       ]);
       fundingContext.value = context;
       sessions.value = liveSessions;
+      tradingSafety.value = nextTradingSafety;
+      crossObservability.value = nextCrossObservability;
+      fundingBindings.value = nextFundingBindings;
+      crossBindings.value = nextCrossBindings;
     } catch (caught) {
       error.value = caught instanceof Error ? caught.message : '实盘测试会话状态加载失败';
     }
@@ -237,10 +345,18 @@
     busy.value = true;
     error.value = null;
     try {
+      await refresh();
+      const form = {
+        expiryMinutes: expiryMinutes.value,
+        maxOrderNotional: maxOrderNotional.value,
+        maxDailyNotional: maxDailyNotional.value,
+      };
       await Promise.all(
-        selectedStrategies.value.map((strategyInstanceId) =>
-          createLiveTradingSession(sessionPayload(strategyInstanceId)),
-        ),
+        selectedTargets.value.map(async (target) => {
+          const existing = findReusableLiveSession(sessions.value, target, form);
+          if (existing) return existing;
+          return createLiveTradingSession(buildLiveTradingSessionPayload(target, form));
+        }),
       );
       await refresh();
       message.success('测试会话已创建');
@@ -255,6 +371,9 @@
     busy.value = true;
     error.value = null;
     try {
+      if (!canApproveLocally.value) {
+        throw new Error('当前会话需要独立 approver，或 founder demo 本地自审批未开启');
+      }
       await Promise.all(
         actionablePending.value.map((item) =>
           approveLiveTradingSession(

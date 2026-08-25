@@ -119,6 +119,7 @@ export interface ReconciliationSummaryResult {
 export interface TradingSafetyResult {
   liveTradingEnabled: boolean;
   defaultTradingEnvironment: string;
+  founderDemoLocalSelfApprovalEnabled: boolean;
   secretStoragePolicy: string;
   liveGuardPolicy: string;
 }

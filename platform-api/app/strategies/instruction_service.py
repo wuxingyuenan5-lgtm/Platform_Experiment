@@ -246,10 +246,14 @@ def create_instruction(
         raise HTTPException(status_code=423, detail="Position Group close planning is unavailable")
     if (
         request.action is StrategyInstructionAction.CLOSE
-        and strategy_key != "funding_arbitrage"
+        and (
+            strategy_key != "funding_arbitrage"
+            or not str(request.parameters.get("targetOpenInstructionId") or "").strip()
+        )
     ):
         # Position Groups are not materialised in Phase 0–1. Funding is the
-        # only strategy that now has a bounded, strategy-owned close path.
+        # only strategy that now has a bounded, strategy-owned close path, and
+        # it still requires an explicit target open instruction.
         raise HTTPException(status_code=423, detail="Position Group close planning is unavailable")
     normalized_parameters = normalize_parameters(strategy_instance_id, request.parameters)
     requested_json = _canonical(normalized_parameters)
