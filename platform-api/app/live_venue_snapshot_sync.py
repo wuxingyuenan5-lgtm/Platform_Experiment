@@ -54,7 +54,16 @@ class AccountSyncStatusResponse(BaseModel):
 
 
 class VenueSnapshotSyncResponse(BaseModel):
+    overall_status: str = Field(alias="overallStatus")
     synced_accounts: list[str] = Field(alias="syncedAccounts")
+    failed_accounts: list[AccountSyncStatusResponse] = Field(
+        default_factory=list,
+        alias="failedAccounts",
+    )
+    skipped_accounts: list[AccountSyncStatusResponse] = Field(
+        default_factory=list,
+        alias="skippedAccounts",
+    )
     balance_snapshots: int = Field(alias="balanceSnapshots")
     order_rows: int = Field(alias="orderRows")
     fill_rows: int = Field(alias="fillRows")
@@ -325,6 +334,47 @@ def _persist_orders(db, account_id: str, orders: list[dict[str, object]]) -> int
     return written
 
 
+def _ensure_fill_order_row(
+    db,
+    account_id: str,
+    fill: dict[str, object],
+    order_id: str,
+    instrument_id: str,
+) -> None:
+    existing = db.execute("SELECT 1 FROM orders WHERE id = ?", (order_id,)).fetchone()
+    if existing is not None:
+        return
+    occurred_at = str(fill.get("occurredAt") or _iso_now())
+    symbol = str(fill.get("symbol") or "")
+    side = str(fill.get("side") or "buy")
+    quantity = str(_as_decimal(fill.get("quantity")))
+    price = str(_as_decimal(fill.get("price")))
+    external_order_id = str(fill.get("externalOrderId") or order_id)
+    db.execute(
+        """
+        INSERT INTO orders (
+            id, command_id, account_id, instrument_id, symbol, side, order_type,
+            quantity, price, status, external_order_id, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            order_id,
+            order_id,
+            account_id,
+            instrument_id,
+            symbol,
+            side,
+            "market",
+            quantity,
+            price,
+            "filled",
+            external_order_id,
+            occurred_at,
+            occurred_at,
+        ),
+    )
+
+
 def _persist_fills(
     db,
     account_id: str,
@@ -344,6 +394,13 @@ def _persist_fills(
         instrument_id = str(fill.get("instrumentId") or "")
         if not instrument_id:
             continue
+        _ensure_fill_order_row(
+            db,
+            account_id,
+            fill,
+            order_id,
+            instrument_id,
+        )
         fee = _as_decimal(fill.get("fee"))
         if fill_id not in fees_by_instrument:
             fees_by_instrument[instrument_id] = (
@@ -478,6 +535,8 @@ def _persist_account_risk(db, account_id: str, risk: dict[str, object] | None) -
 
 
 def _classify_sync_failure(exc: Exception) -> tuple[str, str]:
+    if isinstance(exc, ValueError):
+        return "query_failed", "query_failed"
     response = getattr(exc, "response", None)
     status_code = getattr(response, "status_code", None)
     detail = ""
@@ -494,6 +553,8 @@ def _classify_sync_failure(exc: Exception) -> tuple[str, str]:
         return "restore_failed", "restore_failed"
     if "missing required secret" in lowered or "credential" in lowered:
         return "credential_unavailable", "credential_unavailable"
+    if "query failed" in lowered or "authoritative identity" in lowered:
+        return "query_failed", "query_failed"
     if status_code is not None:
         return "runtime_unavailable", f"runtime_{status_code}"
     return "runtime_unavailable", "runtime_unavailable"
@@ -506,6 +567,27 @@ def _sync_one_account(account_id: str) -> dict[str, int]:
         snapshot_response = runtime_get("/venue/account-snapshot", params={"accountId": account_id})
         snapshot_response.raise_for_status()
         snapshot = snapshot_response.json()
+        with connection() as db:
+            balance_count = _persist_balances(db, account_id, list(snapshot.get("balances") or []))
+            position_count, unrealized = _persist_positions(
+                db,
+                account_id,
+                list(snapshot.get("positions") or []),
+            )
+            order_count = _persist_orders(db, account_id, list(snapshot.get("orders") or []))
+            fill_count, realized, fees = _persist_fills(
+                db,
+                account_id,
+                list(snapshot.get("fills") or []),
+            )
+            pnl_count = _persist_pnl(
+                db,
+                account_id,
+                unrealized_by_instrument=unrealized,
+                realized_by_instrument=realized,
+                fees_by_instrument=fees,
+            )
+            _persist_account_risk(db, account_id, snapshot.get("accountRisk"))
     except Exception as exc:
         status, error_code = _classify_sync_failure(exc)
         _write_status(
@@ -515,28 +597,6 @@ def _sync_one_account(account_id: str) -> dict[str, int]:
             last_attempt_at=last_attempt_at,
         )
         raise
-
-    with connection() as db:
-        balance_count = _persist_balances(db, account_id, list(snapshot.get("balances") or []))
-        position_count, unrealized = _persist_positions(
-            db,
-            account_id,
-            list(snapshot.get("positions") or []),
-        )
-        order_count = _persist_orders(db, account_id, list(snapshot.get("orders") or []))
-        fill_count, realized, fees = _persist_fills(
-            db,
-            account_id,
-            list(snapshot.get("fills") or []),
-        )
-        pnl_count = _persist_pnl(
-            db,
-            account_id,
-            unrealized_by_instrument=unrealized,
-            realized_by_instrument=realized,
-            fees_by_instrument=fees,
-        )
-        _persist_account_risk(db, account_id, snapshot.get("accountRisk"))
     _write_status(
         account_id,
         status="ready",
@@ -568,16 +628,57 @@ def sync_venue_snapshots(account_id: str | None = None) -> VenueSnapshotSyncResp
         "pnlRows": 0,
     }
     synced: list[str] = []
+    failed: list[AccountSyncStatusResponse] = []
+    skipped: list[AccountSyncStatusResponse] = []
     for current in account_ids:
         try:
             result = _sync_one_account(current)
+        except HTTPException as exc:
+            status = _status_row(current)
+            failed.append(
+                AccountSyncStatusResponse(
+                    accountId=current,
+                    status=(str(status["status"]) if status is not None else "failed"),
+                    errorCode=(str(status["error_code"]) if status is not None else exc.detail),
+                    lastAttemptAt=(str(status["last_attempt_at"]) if status is not None else None),
+                    lastSuccessAt=(str(status["last_success_at"]) if status is not None else None),
+                    updatedAt=(str(status["updated_at"]) if status is not None else _iso_now()),
+                )
+            )
+            continue
         except Exception:
+            status = _status_row(current)
+            failed.append(
+                AccountSyncStatusResponse(
+                    accountId=current,
+                    status=(str(status["status"]) if status is not None else "failed"),
+                    errorCode=(
+                        str(status["error_code"])
+                        if status is not None
+                        else "runtime_unavailable"
+                    ),
+                    lastAttemptAt=(str(status["last_attempt_at"]) if status is not None else None),
+                    lastSuccessAt=(str(status["last_success_at"]) if status is not None else None),
+                    updatedAt=(str(status["updated_at"]) if status is not None else _iso_now()),
+                )
+            )
             continue
         synced.append(current)
         for key, value in result.items():
             totals[key] += value
+    if synced and failed:
+        overall_status = "partial"
+    elif failed:
+        overall_status = "failed"
+    elif skipped:
+        overall_status = "skipped"
+    else:
+        overall_status = "synced"
     return VenueSnapshotSyncResponse(
+        overallStatus=overall_status,
         syncedAccounts=synced,
+        failedAccounts=failed,
+        skippedAccounts=skipped,
         balanceSnapshots=totals["balanceSnapshots"],
         orderRows=totals["orderRows"],
         fillRows=totals["fillRows"],

@@ -507,16 +507,118 @@ def seed_reference_data(db: sqlite3.Connection) -> None:
     db.execute(
         """
         UPDATE strategy_account_bindings
+        SET role = 'primary', capability = 'trade_and_read', status = 'active'
+        WHERE strategy_instance_id = 'strategy_funding_arbitrage_instance_default'
+          AND account_id = 'bybit-live-main'
+        """
+    )
+    db.execute(
+        """
+        UPDATE strategy_account_bindings
+        SET role = 'local_test', capability = 'trade_and_read', status = 'active'
+        WHERE strategy_instance_id = 'strategy_funding_arbitrage_instance_default'
+          AND account_id = 'account_sim_usdt'
+          AND role = 'local_test'
+        """
+    )
+    db.execute(
+        """
+        UPDATE strategy_account_bindings
+        SET role = 'primary', capability = 'trade_and_read', status = 'inactive'
+        WHERE strategy_instance_id = 'strategy_funding_arbitrage_instance_default'
+          AND account_id = 'account_bybit_funding'
+        """
+    )
+    db.execute(
+        """
+        UPDATE strategy_account_bindings
+        SET role = 'venue_a', capability = 'trade_and_read', status = 'active'
+        WHERE strategy_instance_id = 'strategy_cross_venue_spread_instance_default'
+          AND account_id = 'bybit-live-main'
+        """
+    )
+    db.execute(
+        """
+        UPDATE strategy_account_bindings
+        SET role = 'mt5_leg', capability = 'trade_and_read', status = 'active'
+        WHERE strategy_instance_id = 'strategy_cross_venue_spread_instance_default'
+          AND account_id = 'mt5-live-main'
+        """
+    )
+    db.execute(
+        """
+        UPDATE strategy_account_bindings
+        SET role = 'local_test', capability = 'trade_and_read', status = 'active'
+        WHERE strategy_instance_id = 'strategy_cross_venue_spread_instance_default'
+          AND account_id = 'account_sim_usdt'
+          AND role = 'local_test'
+        """
+    )
+    db.execute(
+        """
+        UPDATE strategy_account_bindings
+        SET role = 'local_test', capability = 'trade_and_read', status = 'active'
+        WHERE strategy_instance_id = 'strategy_cross_venue_spread_instance_default'
+          AND account_id = 'account_sim_usdt'
+          AND role = 'primary'
+          AND NOT EXISTS (
+              SELECT 1
+              FROM strategy_account_bindings existing
+              WHERE existing.strategy_instance_id = 'strategy_cross_venue_spread_instance_default'
+                AND existing.account_id = 'account_sim_usdt'
+                AND existing.role = 'local_test'
+          )
+        """
+    )
+    db.execute(
+        """
+        UPDATE strategy_account_bindings
+        SET role = 'primary', capability = 'read_only', status = 'active'
+        WHERE strategy_instance_id = 'strategy_bottom_fishing_instance_default'
+          AND account_id = 'account_bybit_bottom_fishing'
+        """
+    )
+    db.execute(
+        """
+        UPDATE strategy_account_bindings
+        SET role = 'primary', capability = 'read_only', status = 'active'
+        WHERE strategy_instance_id = 'strategy_short_term_l_instance_default'
+          AND account_id = 'account_mt5_short_term_a'
+        """
+    )
+    db.execute(
+        """
+        UPDATE strategy_account_bindings
+        SET role = 'primary', capability = 'read_only', status = 'inactive'
+        WHERE strategy_instance_id = 'strategy_short_term_w_instance_default'
+          AND account_id = 'account_bybit_short_term_w'
+        """
+    )
+
+    db.execute(
+        """
+        UPDATE strategy_account_bindings
         SET status = CASE
-            WHEN id IN (
-                'binding_funding_bybit_live_main',
-                'binding_funding_simulation',
-                'binding_cross_bybit_live_main',
-                'binding_cross_mt5_live_main',
-                'binding_cross_sim',
-                'binding_bottom_fishing_bybit',
-                'binding_short_term_l_mt5'
-            ) THEN 'active'
+            WHEN strategy_instance_id = 'strategy_funding_arbitrage_instance_default'
+                 AND account_id = 'bybit-live-main'
+                 THEN 'active'
+            WHEN strategy_instance_id = 'strategy_funding_arbitrage_instance_default'
+                 AND account_id = 'account_sim_usdt'
+                 AND role = 'local_test'
+                 THEN 'active'
+            WHEN strategy_instance_id = 'strategy_cross_venue_spread_instance_default'
+                 AND account_id IN ('bybit-live-main', 'mt5-live-main')
+                 THEN 'active'
+            WHEN strategy_instance_id = 'strategy_cross_venue_spread_instance_default'
+                 AND account_id = 'account_sim_usdt'
+                 AND role = 'local_test'
+                 THEN 'active'
+            WHEN strategy_instance_id = 'strategy_bottom_fishing_instance_default'
+                 AND account_id = 'account_bybit_bottom_fishing'
+                 THEN 'active'
+            WHEN strategy_instance_id = 'strategy_short_term_l_instance_default'
+                 AND account_id = 'account_mt5_short_term_a'
+                 THEN 'active'
             ELSE 'inactive'
         END
         WHERE strategy_instance_id IN (

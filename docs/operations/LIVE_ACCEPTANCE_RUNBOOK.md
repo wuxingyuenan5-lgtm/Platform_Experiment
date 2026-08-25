@@ -40,6 +40,9 @@ Same-UTA binding rules:
 - The first read-only verification uses one logical account ID and one
   credential reference.
 - Do not create two logical Platform accounts that map to the same real UTA.
+- In a multi-account Bybit Runtime, every private-read path must carry the
+  explicit logical `accountId` all the way to the resolved client. A read that
+  falls back to a single-account default is a contract failure.
 
 If the Owner has not yet installed the secret reference, stop at local
 configuration audit only. Do not call any external account, venue, quote,
@@ -137,8 +140,8 @@ The responsible CEO specifies both leg quantities before each authorized window.
 
 ### Funding carry incremental hedge
 
-Funding controlled-live is unavailable until Phase 2 implements and proves the
-bounded PostOnly Chase plus authoritative, deduplicated incremental release.
+Funding controlled-live remains unavailable until the bounded PostOnly Chase
+and authoritative, deduplicated incremental release are proven for the affected build.
 The legacy two-market-leg endpoint is not acceptance evidence and must remain
 fail closed for controlled-live funding during that gap.
 
@@ -221,11 +224,16 @@ following in read-only mode:
 - Account risk is readable.
 - Funding rate is readable.
 - MT5 account/readiness is readable.
+- For single-Terminal MT5 read-only monitoring, one sync cycle must use one
+  combined account snapshot read per logical account, under the coordinator
+  lock, with an explicit restore back to `mt5-live-main`.
 - Platform account binding is correct.
 - `management-overview` returns all six strategies with current status.
 - Reconciliation baseline is captured before any write window.
 - Platform Live Write remains `false`.
 - Runtime Live Write remains `false`.
+- Runtime `/status` must report `capabilities.liveWriteEnabled=false` before
+  any credential-backed read-only verification and after every verification.
 - Funding controlled-live still returns `423` until separately authorized and
   fully ready.
 - No approved `LiveTradingSession` exists.

@@ -150,12 +150,21 @@ def list_strategy_management_overview() -> list[StrategyManagementOverviewRespon
                        'unbound'
                    ) AS active_capability,
                    MAX(
-                       CASE WHEN sab.role = 'primary' THEN a.account_code END
+                       CASE
+                           WHEN sab.role = 'primary' AND sab.status = 'active'
+                           THEN a.account_code
+                       END
                    ) AS primary_account_code,
-                   MAX(CASE WHEN sab.role = 'primary' THEN a.status END) AS primary_account_status,
                    MAX(
                        CASE
-                           WHEN sab.role = 'primary' THEN a.data_quality_state
+                           WHEN sab.role = 'primary' AND sab.status = 'active'
+                           THEN a.status
+                       END
+                   ) AS primary_account_status,
+                   MAX(
+                       CASE
+                           WHEN sab.role = 'primary' AND sab.status = 'active'
+                           THEN a.data_quality_state
                        END
                    ) AS primary_account_data_quality_state
             FROM strategy_instances si
@@ -182,12 +191,82 @@ def list_strategy_management_overview() -> list[StrategyManagementOverviewRespon
                 sd.v1_scope
             """
         ).fetchall()
+        binding_rows = db.execute(
+            """
+            SELECT
+                sab.strategy_instance_id,
+                sab.role,
+                sab.status,
+                a.account_code,
+                a.status AS account_status,
+                a.data_quality_state
+            FROM strategy_account_bindings sab
+            JOIN accounts a ON a.id = sab.account_id
+            WHERE sab.status = 'active'
+            ORDER BY sab.strategy_instance_id,
+                     CASE sab.role
+                         WHEN 'primary' THEN 1
+                         WHEN 'venue_a' THEN 2
+                         WHEN 'mt5_leg' THEN 3
+                         WHEN 'local_test' THEN 9
+                         ELSE 5
+                     END,
+                     a.account_code
+            """
+        ).fetchall()
+
+    bindings_by_strategy: dict[str, list[dict[str, str | None]]] = {}
+    for binding in binding_rows:
+        bindings_by_strategy.setdefault(str(binding["strategy_instance_id"]), []).append(
+            {
+                "role": str(binding["role"]),
+                "account_code": str(binding["account_code"]),
+                "account_status": (
+                    str(binding["account_status"])
+                    if binding["account_status"] is not None
+                    else None
+                ),
+                "data_quality_state": (
+                    str(binding["data_quality_state"])
+                    if binding["data_quality_state"] is not None
+                    else None
+                ),
+            }
+        )
 
     overview: list[StrategyManagementOverviewResponse] = []
     for row in rows:
         metadata = MANAGEMENT_DESK_METADATA.get(row["strategy_key"])
         if metadata is None:
             continue
+        active_bindings = bindings_by_strategy.get(str(row["id"]), [])
+        display_account_code = row["primary_account_code"]
+        display_account_status = row["primary_account_status"]
+        display_account_quality = row["primary_account_data_quality_state"]
+        if display_account_code is None:
+            non_local_test = [
+                binding for binding in active_bindings if binding["role"] != "local_test"
+            ]
+            if non_local_test:
+                display_account_code = " / ".join(
+                    str(binding["account_code"]) for binding in non_local_test
+                )
+                display_account_status = next(
+                    (
+                        binding["account_status"]
+                        for binding in non_local_test
+                        if binding["account_status"] is not None
+                    ),
+                    None,
+                )
+                display_account_quality = next(
+                    (
+                        binding["data_quality_state"]
+                        for binding in non_local_test
+                        if binding["data_quality_state"] is not None
+                    ),
+                    None,
+                )
         execution_readiness = (
             None
             if row["v1_scope"] == "read_only"
@@ -211,9 +290,9 @@ def list_strategy_management_overview() -> list[StrategyManagementOverviewRespon
                 bindingCount=int(row["binding_count"]),
                 latestRunStatus=row["latest_run_status"],
                 latestRunAt=row["latest_run_at"],
-                primaryAccountCode=row["primary_account_code"],
-                primaryAccountStatus=row["primary_account_status"],
-                primaryAccountDataQualityState=row["primary_account_data_quality_state"],
+                primaryAccountCode=display_account_code,
+                primaryAccountStatus=display_account_status,
+                primaryAccountDataQualityState=display_account_quality,
                 executionReadiness=execution_readiness,
             )
         )

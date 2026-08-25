@@ -127,7 +127,9 @@ def test_sync_persists_risk_and_deduplicates_fill_fingerprint(monkeypatch, tmp_p
     first = sync_venue_snapshots("bybit-live-main")
     second = sync_venue_snapshots("bybit-live-main")
 
+    assert first.overall_status == "synced"
     assert first.fill_rows == 1
+    assert second.overall_status == "synced"
     assert second.fill_rows == 0
     with connection() as db:
         fill_count = db.execute(
@@ -175,7 +177,11 @@ def test_sync_failure_isolated_and_does_not_commit_partial_rows(
 
     result = sync_venue_snapshots("account_mt5_short_term_a")
 
+    assert result.overall_status == "failed"
     assert result.synced_accounts == []
+    assert [(item.account_id, item.status, item.error_code) for item in result.failed_accounts] == [
+        ("account_mt5_short_term_a", "restore_failed", "restore_failed")
+    ]
     with connection() as db:
         status = db.execute(
             "SELECT status, error_code FROM account_sync_status WHERE account_id = ?",
@@ -355,7 +361,9 @@ def test_sync_persists_unmapped_mt5_monitoring_identity_without_duplicates(
     first = sync_venue_snapshots("account_mt5_short_term_a")
     second = sync_venue_snapshots("account_mt5_short_term_a")
 
+    assert first.overall_status == "synced"
     assert first.fill_rows == 1
+    assert second.overall_status == "synced"
     assert second.fill_rows == 0
     with connection() as db:
         position = db.execute(

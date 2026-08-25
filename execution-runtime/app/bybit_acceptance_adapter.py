@@ -65,7 +65,7 @@ class BybitAcceptanceAdapter(BybitFillConfirmingAdapter):
             query["orderId"] = external_order_id
         else:
             raise ValueError("Order identity is required")
-        rows = self._query_order_rows(query)
+        rows = self._query_order_rows(account, query)
         if not rows:
             return None
         return self._snapshot(rows[0], account)
@@ -88,10 +88,12 @@ class BybitAcceptanceAdapter(BybitFillConfirmingAdapter):
             query["symbol"] = symbol.upper()
         try:
             active = self._with_fresh_client_retry(
+                account,
                 lambda client: client.get_open_orders(openOnly=0, **query)
             )
             self._require_success(active, "Bybit active-order query failed")
             history = self._with_fresh_client_retry(
+                account,
                 lambda client: client.get_order_history(**query)
             )
             self._require_success(history, "Bybit order-history query failed")
@@ -137,6 +139,7 @@ class BybitAcceptanceAdapter(BybitFillConfirmingAdapter):
         try:
             if scope == "active":
                 response = self._with_fresh_client_retry(
+                    account_id,
                     lambda client: client.get_open_orders(openOnly=0, **query)
                 )
                 quality = "complete"
@@ -144,6 +147,7 @@ class BybitAcceptanceAdapter(BybitFillConfirmingAdapter):
                 query["startTime"] = int(start_time.timestamp() * 1000)
                 query["endTime"] = int(end_time.timestamp() * 1000)
                 response = self._with_fresh_client_retry(
+                    account_id,
                     lambda client: client.get_order_history(**query)
                 )
                 quality = "venue_windowed"
@@ -198,6 +202,7 @@ class BybitAcceptanceAdapter(BybitFillConfirmingAdapter):
             query["orderId"] = external_order_id
         try:
             response = self._with_fresh_client_retry(
+                account,
                 lambda client: client.get_executions(**query)
             )
             self._require_success(response, "Bybit execution query failed")
@@ -236,6 +241,7 @@ class BybitAcceptanceAdapter(BybitFillConfirmingAdapter):
             query["cursor"] = cursor
         try:
             response = self._with_fresh_client_retry(
+                account_id,
                 lambda client: client.get_executions(**query)
             )
             self._require_success(response, "Bybit paged execution query failed")
@@ -262,6 +268,7 @@ class BybitAcceptanceAdapter(BybitFillConfirmingAdapter):
         self._assert_account(account_id)
         try:
             response = self._with_fresh_client_retry(
+                account_id,
                 lambda client: client.get_wallet_balance(accountType="UNIFIED")
             )
             self._require_success(response, "Bybit account-risk query failed")
@@ -269,6 +276,7 @@ class BybitAcceptanceAdapter(BybitFillConfirmingAdapter):
             if not rows:
                 raise GatewayConfigurationError("Bybit account-risk query returned no data")
             account_response = self._with_fresh_client_retry(
+                account_id,
                 lambda client: (
                     client.get_account_info()
                     if callable(getattr(client, "get_account_info", None))
@@ -324,6 +332,7 @@ class BybitAcceptanceAdapter(BybitFillConfirmingAdapter):
             )
         try:
             response = self._with_fresh_client_retry(
+                account_id,
                 lambda client: client.get_instruments_info(
                     category=self.settings.bybit_category,
                     symbol=normalized,
@@ -336,6 +345,7 @@ class BybitAcceptanceAdapter(BybitFillConfirmingAdapter):
                     "Bybit instrument query returned no data"
                 )
             api_response = self._with_fresh_client_retry(
+                account_id,
                 lambda client: client.get_api_key_information()
             )
             self._require_success(api_response, "Bybit API-key readiness query failed")
@@ -375,16 +385,19 @@ class BybitAcceptanceAdapter(BybitFillConfirmingAdapter):
 
     def _query_order_rows(
         self,
+        account_id: str,
         query: dict[str, object],
     ) -> list[dict[str, object]]:
         try:
             realtime = self._with_fresh_client_retry(
+                account_id,
                 lambda client: client.get_open_orders(**query)
             )
             self._require_success(realtime, "Bybit order query failed")
             rows = self._result_list(realtime)
             if not rows:
                 history = self._with_fresh_client_retry(
+                    account_id,
                     lambda client: client.get_order_history(**query)
                 )
                 self._require_success(history, "Bybit order history query failed")

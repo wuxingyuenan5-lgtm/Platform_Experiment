@@ -156,6 +156,21 @@ class ExplodingBybitClient(FakeBybitClient):
         raise RuntimeError("timestamp outside venue tolerance")
 
 
+class TracingBybitClient(FakeBybitClient):
+    def __init__(self, label: str) -> None:
+        super().__init__()
+        self.label = label
+        self.calls: list[tuple[str, dict[str, object]]] = []
+
+    def get_wallet_balance(self, **kwargs):
+        self.calls.append(("get_wallet_balance", kwargs))
+        return super().get_wallet_balance(**kwargs)
+
+    def get_executions(self, **kwargs):
+        self.calls.append(("get_executions", kwargs))
+        return super().get_executions(**kwargs)
+
+
 def runtime_settings(write_enabled: bool = True) -> Settings:
     return Settings(
         environment="live",
@@ -300,3 +315,46 @@ def test_bybit_read_only_account_rejects_submit_before_client_call(tmp_path) -> 
     with pytest.raises(GatewayRequestRejectedError, match="configured read-only"):
         adapter.submit_order(order_command())
     assert client.place_calls == []
+
+
+def test_bybit_live_adapter_routes_multi_account_reads_to_explicit_client(tmp_path) -> None:
+    get_settings().journal_path = str(tmp_path / "bybit-multi-client.db")
+    initialize_journal()
+
+    class MultiClientAdapter(BybitLiveAdapter):
+        def __init__(self, settings: Settings, clients: dict[str, TracingBybitClient]) -> None:
+            super().__init__(settings, None)
+            self._clients = clients
+
+        def _client(self, account_id: str | None = None):
+            if account_id is None:
+                raise AssertionError("multi-account reads must pass account_id explicitly")
+            return self._clients[account_id]
+
+    funding_client = TracingBybitClient("funding")
+    bottom_client = TracingBybitClient("bottom")
+    adapter = MultiClientAdapter(
+        Settings(
+            environment="live",
+            bybit_account_ids="bybit-live-main,account_bybit_bottom_fishing",
+            bybit_account_credential_refs=(
+                "bybit-live-main=secret://environment/bybit-live-001,"
+                "account_bybit_bottom_fishing=secret://environment/bybit-bottom-fishing"
+            ),
+            bybit_instrument_map="XAUTUSDT=instrument-xaut",
+            bybit_category="linear",
+            bybit_settle_coin="USDT",
+        ),
+        {
+            "bybit-live-main": funding_client,
+            "account_bybit_bottom_fishing": bottom_client,
+        },
+    )
+
+    balances = adapter.list_balances("bybit-live-main")
+    fills = adapter.list_fills(account_id="account_bybit_bottom_fishing")
+
+    assert balances[0].account_id == "bybit-live-main"
+    assert fills[0].account_id == "account_bybit_bottom_fishing"
+    assert {name for name, _ in funding_client.calls} == {"get_wallet_balance"}
+    assert {name for name, _ in bottom_client.calls} == {"get_executions"}

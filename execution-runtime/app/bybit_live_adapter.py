@@ -200,6 +200,10 @@ class BybitLiveAdapter:
                 platform_order_id=platform_order_id,
                 external_order_id=external_order_id,
             )
+        resolved_account = account_id or (route.account_id if route is not None else None)
+        if resolved_account is None:
+            resolved_account = self._single_account()
+        self._assert_account(resolved_account)
         query: dict[str, object] = {"category": self.settings.bybit_category, "limit": 100}
         if route is not None:
             query["symbol"] = route.symbol
@@ -208,15 +212,13 @@ class BybitLiveAdapter:
             else:
                 query["orderLinkId"] = route.external_client_id
         try:
-            client_account = account_id or (route.account_id if route else None)
-            response = self._client(client_account).get_executions(**query)
+            response = self._client(resolved_account).get_executions(**query)
             self._require_success(response, "Bybit execution query failed")
         except GatewayRequestRejectedError:
             raise
         except Exception as exc:
             raise self._unknown_error("Bybit execution query result is unknown", exc) from exc
         snapshots: list[VenueFillSnapshot] = []
-        default_account = account_id or self._single_account()
         for row in self._result_list(response):
             symbol = str(row.get("symbol") or "").upper()
             instrument_id = self.settings.bybit_instruments.get(symbol)
@@ -233,7 +235,7 @@ class BybitLiveAdapter:
                         row_route.platform_order_id if row_route else f"external:{order_id}"
                     ),
                     commandId=(row_route.command_id if row_route else f"external:{order_id}"),
-                    accountId=(row_route.account_id if row_route else default_account),
+                    accountId=(row_route.account_id if row_route else resolved_account),
                     instrumentId=(row_route.instrument_id if row_route else instrument_id),
                     symbol=symbol,
                     side="buy" if str(row.get("side")) == "Buy" else "sell",
@@ -661,6 +663,8 @@ class BybitLiveAdapter:
             operation = account_id_or_operation
         else:
             account_id = account_id_or_operation
+        if account_id is None:
+            account_id = self._single_account()
         try:
             return operation(self._client(account_id))
         except Exception:

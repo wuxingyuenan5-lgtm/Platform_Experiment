@@ -9,7 +9,8 @@ $LogDir = Join-Path $StateDir 'logs'
 $Services = @(
   @{ Name = 'Execution Runtime'; Port = 8100; HealthUrl = 'http://127.0.0.1:8100/health'; WorkingDirectory = (Join-Path $RepoRoot 'execution-runtime'); Python = $true; ContractChecks = @(
       @{ Url = 'http://127.0.0.1:8100/status'; JsonField = 'status'; Expected = 'available' },
-      @{ Url = 'http://127.0.0.1:8100/venue/account-snapshot?accountId=account_sim_usdt'; AcceptStatus = @(200, 503) }
+      @{ Url = 'http://127.0.0.1:8100/status'; JsonField = 'capabilities.liveWriteEnabled'; Expected = $false },
+      @{ Url = 'http://127.0.0.1:8100/venue/account-snapshot?accountId=bybit-live-main'; AcceptStatus = @(200, 503) }
     ) },
   @{ Name = 'Platform API'; Port = 8000; HealthUrl = 'http://127.0.0.1:8000/health'; WorkingDirectory = (Join-Path $RepoRoot 'platform-api'); Python = $true; ContractChecks = @(
       @{ Url = 'http://127.0.0.1:8000/api/v1/strategies/management-overview'; AcceptStatus = @(200) },
@@ -34,7 +35,15 @@ function Test-Contracts {
     try {
       $response = Invoke-WebRequest -Uri $check.Url -UseBasicParsing -TimeoutSec 3 -ErrorAction Stop
       if ($check.AcceptStatus -and (@($check.AcceptStatus) -notcontains [int]$response.StatusCode)) { return $false }
-      if ($check.JsonField -and (((($response.Content | ConvertFrom-Json).($check.JsonField))) -ne $check.Expected)) { return $false }
+      if ($check.JsonField) {
+        $payload = $response.Content | ConvertFrom-Json
+        $current = $payload
+        foreach ($segment in ($check.JsonField -split '\.')) {
+          if ($null -eq $current) { return $false }
+          $current = $current.$segment
+        }
+        if ($current -ne $check.Expected) { return $false }
+      }
     } catch {
       $statusCode = [int]($_.Exception.Response.StatusCode.value__ 2>$null)
       if (-not $check.AcceptStatus -or (@($check.AcceptStatus) -notcontains $statusCode)) { return $false }
@@ -72,7 +81,12 @@ function Start-Service {
   $Service.Stdout = Join-Path $LogDir "$safeName.out.log"
   $Service.Stderr = Join-Path $LogDir "$safeName.err.log"
   $existing = Get-PortListener $Service.Port
-  if ($existing) { throw "$($Service.Name) cannot start: port $($Service.Port) is already in use by PID $($existing.OwningProcess). Logs: $($Service.Stdout); $($Service.Stderr)" }
+  if ($existing) {
+    if ((Test-Health $Service) -and (Test-Contracts $Service)) {
+      throw "$($Service.Name) cannot start: port $($Service.Port) is already in use by an already-healthy process (PID $($existing.OwningProcess))."
+    }
+    throw "$($Service.Name) cannot start: port $($Service.Port) is occupied by PID $($existing.OwningProcess), but the current process fails health or contract checks. Stop the stale process first. Logs: $($Service.Stdout); $($Service.Stderr)"
+  }
   if ($Service.Python) {
     $process = Start-Process $Service.PythonPath -ArgumentList @('-m', 'uvicorn', 'app.main:app', '--host', '127.0.0.1', '--port', "$($Service.Port)") -WorkingDirectory $Service.WorkingDirectory -RedirectStandardOutput $Service.Stdout -RedirectStandardError $Service.Stderr -WindowStyle Hidden -PassThru
   } else {
@@ -122,8 +136,10 @@ Remove-StaleStateFile
 foreach ($service in $Services) { Assert-Dependencies $service }
 $started = @()
 $wroteState = $false
+$currentService = $null
 try {
   foreach ($service in $Services) {
+    $currentService = $service
     Start-Service $service
     $started += $service
   }
@@ -131,6 +147,12 @@ try {
   @{ repoRoot = $RepoRoot; updatedAt = (Get-Date).ToString('o'); services = @($started) } | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $StatePath -Encoding UTF8
   $wroteState = $true
 } catch {
+  $webFailed = $null -ne $currentService -and $currentService.Name -eq 'Platform Web'
+  if ($webFailed -and $started.Count -gt 0) {
+    foreach ($service in $started) { $service.ownership = 'managed' }
+    @{ repoRoot = $RepoRoot; updatedAt = (Get-Date).ToString('o'); services = @($started) } | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $StatePath -Encoding UTF8
+    throw "Startup partially succeeded: Platform Web failed, but healthy services were kept running. Healthy: $((@($started | ForEach-Object Name)) -join ', '). Failure: $($_.Exception.Message)"
+  }
   foreach ($service in @($started | Sort-Object { $_.Port })) { Stop-StartedService $service }
   if ($wroteState -and (Test-Path $StatePath)) { Remove-Item -LiteralPath $StatePath -Force }
   Remove-StaleStateFile

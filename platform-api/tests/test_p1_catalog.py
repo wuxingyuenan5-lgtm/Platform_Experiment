@@ -54,7 +54,8 @@ def test_seeded_strategy_account_and_instrument_catalog(tmp_path: Path) -> None:
         assert by_desk["shortLineTraderW"]["executionReadiness"] is None
         assert by_desk["dip"]["primaryAccountDataQualityState"] == "unavailable"
         assert by_desk["funding"]["primaryAccountCode"] == "BYBIT-LIVE-MAIN"
-        assert by_desk["crossSpread"]["primaryAccountCode"] is None
+        assert by_desk["crossSpread"]["primaryAccountCode"] == "BYBIT-LIVE-MAIN / MT5-LIVE-MAIN"
+        assert by_desk["crossSpread"]["primaryAccountStatus"] == "active"
         assert by_desk["shortLineTraderL"]["primaryAccountCode"] == "MT5-SHORT-TERM-A"
         assert by_desk["shortLineTraderW"]["activeCapability"] == "unbound"
         assert by_desk["dip"]["operatingStatus"] == "active"

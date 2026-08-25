@@ -13,7 +13,12 @@ from app.strict_live_acceptance_adapters import StrictMt5AcceptanceAdapter
 
 
 class AcceptanceBybitClient:
+    def __init__(self, label: str = "account-bybit") -> None:
+        self.label = label
+        self.calls: list[tuple[str, dict[str, object]]] = []
+
     def get_open_orders(self, **kwargs):
+        self.calls.append(("get_open_orders", kwargs))
         return {
             "retCode": 0,
             "result": {
@@ -37,9 +42,11 @@ class AcceptanceBybitClient:
         }
 
     def get_order_history(self, **kwargs):
+        self.calls.append(("get_order_history", kwargs))
         return {"retCode": 0, "result": {"list": []}}
 
     def get_executions(self, **kwargs):
+        self.calls.append(("get_executions", kwargs))
         return {
             "retCode": 0,
             "result": {
@@ -60,6 +67,7 @@ class AcceptanceBybitClient:
         }
 
     def get_instruments_info(self, **kwargs):
+        self.calls.append(("get_instruments_info", kwargs))
         return {
             "retCode": 0,
             "result": {
@@ -78,6 +86,7 @@ class AcceptanceBybitClient:
         }
 
     def get_api_key_information(self):
+        self.calls.append(("get_api_key_information", {}))
         return {
             "retCode": 0,
             "result": {
@@ -88,6 +97,39 @@ class AcceptanceBybitClient:
                 },
             },
         }
+
+    def get_wallet_balance(self, **kwargs):
+        self.calls.append(("get_wallet_balance", kwargs))
+        return {
+            "retCode": 0,
+            "result": {
+                "list": [
+                    {
+                        "totalEquity": "1000",
+                        "totalWalletBalance": "1000",
+                        "totalMarginBalance": "950",
+                        "totalAvailableBalance": "900",
+                        "totalInitialMargin": "25",
+                        "totalMaintenanceMargin": "10",
+                        "totalPerpUPL": "5",
+                        "accountIMRate": "0.05",
+                        "accountMMRate": "0.02",
+                        "coin": [
+                            {
+                                "coin": "USDT",
+                                "equity": "1000",
+                                "walletBalance": "1000",
+                                "availableToWithdraw": "900",
+                            }
+                        ],
+                    }
+                ]
+            },
+        }
+
+    def get_account_info(self):
+        self.calls.append(("get_account_info", {}))
+        return {"retCode": 0, "result": {"marginMode": f"UNIFIED-{self.label}"}}
 
 
 class AcceptanceMt5:
@@ -272,6 +314,58 @@ def test_bybit_specification_includes_access_and_quantity_evidence(tmp_path) -> 
     assert specification.max_market_quantity == Decimal("10")
     assert specification.access_checks["ipBound"] is True
     assert specification.access_checks["orderPermission"] is True
+
+
+def test_bybit_multi_account_reads_require_and_use_explicit_account_id(tmp_path) -> None:
+    get_settings().journal_path = str(tmp_path / "bybit-multi-account-reads.db")
+    initialize_journal()
+
+    class MultiAccountAdapter(BybitAcceptanceAdapter):
+        def __init__(self, settings, clients):
+            super().__init__(settings, None)
+            self._clients = clients
+
+        def _client(self, account_id: str | None = None):
+            if account_id is None:
+                raise AssertionError("account_id must be explicit in multi-account reads")
+            return self._clients[account_id]
+
+    funding_client = AcceptanceBybitClient("funding")
+    bottom_client = AcceptanceBybitClient("bottom")
+    adapter = MultiAccountAdapter(
+        Settings(
+            environment="live",
+            bybit_account_ids="bybit-live-main,account_bybit_bottom_fishing",
+            bybit_account_credential_refs=(
+                "bybit-live-main=secret://environment/bybit-live-001,"
+                "account_bybit_bottom_fishing=secret://environment/bybit-bottom-fishing"
+            ),
+            bybit_instrument_map="XAUTUSDT=instrument-xaut",
+            bybit_category="linear",
+            bybit_settle_coin="USDT",
+        ),
+        {
+            "bybit-live-main": funding_client,
+            "account_bybit_bottom_fishing": bottom_client,
+        },
+    )
+
+    funding_orders = adapter.list_orders(account_id="bybit-live-main")
+    bottom_fills = adapter.list_fills(
+        account_id="account_bybit_bottom_fishing",
+        external_order_id="BYBIT-EXTERNAL-1",
+    )
+    risk = adapter.get_account_risk("account_bybit_bottom_fishing")
+
+    assert [item.account_id for item in funding_orders] == ["bybit-live-main"]
+    assert [item.account_id for item in bottom_fills] == ["account_bybit_bottom_fishing"]
+    assert risk.account_id == "account_bybit_bottom_fishing"
+    assert {name for name, _ in funding_client.calls} >= {"get_open_orders", "get_order_history"}
+    assert {name for name, _ in bottom_client.calls} >= {
+        "get_executions",
+        "get_wallet_balance",
+        "get_account_info",
+    }
 
 
 def test_mt5_deal_ticket_resolves_to_filled_order_without_route(
