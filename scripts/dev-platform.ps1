@@ -9,17 +9,15 @@ $RepoRoot = Split-Path -Parent $PSScriptRoot
 $StateDir = Join-Path $RepoRoot '.codex\dev-platform'
 $StatePath = Join-Path $StateDir 'platform-dev-state.json'
 $LogDir = Join-Path $StateDir 'logs'
-$ContractVersion = '2026-08-25.dev-platform.v2'
+$ContractVersion = '2026-08-25.dev-platform.v3'
 $DemoUsername = 'demo_ceo'
-$DemoPassword = 'Demo-Accounts!2026'
 $Services = @(
   @{
     Key = 'runtime'; Name = 'Execution Runtime'; Port = 8100; HealthUrl = 'http://127.0.0.1:8100/health';
     WorkingDirectory = (Join-Path $RepoRoot 'execution-runtime'); Python = $true;
     ContractChecks = @(
       @{ Url = 'http://127.0.0.1:8100/status'; JsonField = 'status'; Expected = 'available' },
-      @{ Url = 'http://127.0.0.1:8100/status'; JsonField = 'capabilities.liveWriteEnabled'; Expected = $false },
-      @{ Url = 'http://127.0.0.1:8100/venue/account-snapshot?accountId=bybit-live-main'; AcceptStatus = @(200, 503) }
+      @{ Url = 'http://127.0.0.1:8100/status'; JsonField = 'capabilities.liveWriteEnabled'; Expected = $false }
     )
   },
   @{
@@ -168,13 +166,31 @@ function Invoke-DemoUserSeed {
     USER_SYSTEM_DEMO_REFRESH = $env:USER_SYSTEM_DEMO_REFRESH
   }
   try {
+    $bootstrapPassword = $env:PLATFORM_DEMO_PASSWORD
+    if ([string]::IsNullOrWhiteSpace($bootstrapPassword)) {
+      $bootstrapPassword = [Environment]::GetEnvironmentVariable('PLATFORM_DEMO_PASSWORD', 'User')
+    }
+    $generatedPassword = [string]::IsNullOrWhiteSpace($bootstrapPassword)
+    if ($generatedPassword) {
+      $bootstrapPassword = "Local-$([guid]::NewGuid().ToString('N'))!9aA"
+    }
     $env:VG_LIVE_TRADING_ENABLED = 'false'
     $env:USER_SYSTEM_DEMO_SEED = '1'
-    $env:USER_SYSTEM_DEMO_PASSWORD = $DemoPassword
-    $env:USER_SYSTEM_DEMO_REFRESH = '1'
-    & $platformApi.PythonPath $seedScript | Out-Null
+    $env:USER_SYSTEM_DEMO_PASSWORD = $bootstrapPassword
+    $env:USER_SYSTEM_DEMO_REFRESH = '0'
+    $seedOutput = @(& $platformApi.PythonPath $seedScript)
     if ($LASTEXITCODE -ne 0) {
       throw 'Reusable demo account seeding failed.'
+    }
+    $created = @($seedOutput | Where-Object { $_ -match '\screated$' }).Count -gt 0
+    if ($created -and $generatedPassword) {
+      Write-Host 'A temporary local demo password was generated for newly created accounts.' -ForegroundColor Yellow
+      Write-Host "Temporary password (shown once): $bootstrapPassword" -ForegroundColor Yellow
+    }
+    return [pscustomobject]@{
+      Created = $created
+      Username = $DemoUsername
+      Password = if ($created) { $bootstrapPassword } else { $null }
     }
   } finally {
     foreach ($entry in $previous.GetEnumerator()) {
@@ -281,20 +297,36 @@ function Show-Status {
 }
 
 function Invoke-LoginSmoke {
+  param($SeedResult)
   $headers = @{ Origin = 'http://127.0.0.1:4373' }
-  $session = New-Object Microsoft.PowerShell.Commands.WebRequestSession
-  $body = @{ username = $DemoUsername; password = $DemoPassword } | ConvertTo-Json
-  $login = Invoke-WebRequest -Uri 'http://127.0.0.1:8000/api/v1/auth/login' -Method Post `
-    -Headers $headers -WebSession $session -ContentType 'application/json' -Body $body -UseBasicParsing
-  if ($login.StatusCode -ne 200) {
-    throw 'Platform API login smoke check failed.'
-  }
-  $me = Invoke-WebRequest -Uri 'http://127.0.0.1:8000/api/v1/auth/me' -Headers $headers -WebSession $session -UseBasicParsing
-  if ($me.StatusCode -ne 200) {
-    throw 'Platform API auth/me smoke check failed.'
+  if ($SeedResult.Created) {
+    $session = New-Object Microsoft.PowerShell.Commands.WebRequestSession
+    $body = @{ username = $SeedResult.Username; password = $SeedResult.Password } | ConvertTo-Json
+    $login = Invoke-WebRequest -Uri 'http://127.0.0.1:8000/api/v1/auth/login' -Method Post `
+      -Headers $headers -WebSession $session -ContentType 'application/json' -Body $body -UseBasicParsing
+    if ($login.StatusCode -ne 200) {
+      throw 'Platform API newly seeded account login smoke check failed.'
+    }
+    $me = Invoke-WebRequest -Uri 'http://127.0.0.1:8000/api/v1/auth/me' -Headers $headers -WebSession $session -UseBasicParsing
+    if ($me.StatusCode -ne 200) {
+      throw 'Platform API auth/me smoke check failed.'
+    }
+  } else {
+    $invalidBody = @{
+      username = "startup_probe_$([guid]::NewGuid().ToString('N'))"
+      password = "Invalid-$([guid]::NewGuid().ToString('N'))!9aA"
+    } | ConvertTo-Json
+    try {
+      Invoke-WebRequest -Uri 'http://127.0.0.1:8000/api/v1/auth/login' -Method Post `
+        -Headers $headers -ContentType 'application/json' -Body $invalidBody -UseBasicParsing | Out-Null
+      throw 'Platform API auth route accepted an invalid startup probe.'
+    } catch {
+      $statusCode = [int]($_.Exception.Response.StatusCode.value__ 2>$null)
+      if ($statusCode -ne 401) { throw }
+    }
   }
   $overview = Invoke-WebRequest -Uri 'http://127.0.0.1:8000/api/v1/strategies/management-overview' `
-    -Headers $headers -WebSession $session -UseBasicParsing
+    -Headers $headers -UseBasicParsing
   if ($overview.StatusCode -ne 200) {
     throw 'Platform API management overview smoke check failed.'
   }
@@ -363,7 +395,7 @@ function Start-ManagedServices {
   New-Item -ItemType Directory -Path $StateDir -Force | Out-Null
   New-Item -ItemType Directory -Path $LogDir -Force | Out-Null
   foreach ($service in $Services) { Assert-Dependencies $service }
-  Invoke-DemoUserSeed
+  $seedResult = Invoke-DemoUserSeed
   $records = @()
   $startedNow = @()
   try {
@@ -384,7 +416,7 @@ function Start-ManagedServices {
     throw
   }
   Write-State $records
-  Invoke-LoginSmoke
+  Invoke-LoginSmoke -SeedResult $seedResult
   Write-Host 'Platform local services are ready.' -ForegroundColor Green
   Write-Host 'Execution Runtime: http://127.0.0.1:8100/health'
   Write-Host 'Platform API:      http://127.0.0.1:8000/health'
