@@ -27,11 +27,11 @@ CEO 面板现在按真实 binding 建立会话：Funding 单选 1 个 Bybit 会�
 
 尚未完成的是外部实盘证据：没有真实开仓、平仓、Funding Settlement、差异核对或 EOD。普通启动器会强制 Platform Live Write、Runtime Live Write 和 founder-demo CEO 自审批为 `false`，因此当前运行中的服务仍是安全只读状态；页面只显示这些门，不自行开启它们。
 
+Owner 已授权 2026-08-25 16:55–24:00（北京时间）的 Cross + Funding 最小实盘窗口，并允许仅在该窗口临时启用双 Live Write 与 founder-demo CEO 本地自审批。执行必须串行：先以 Cross `XAUTUSDT` + `XAUUSD.s`、每腿 1 盎司完成开仓、核对、平仓和对账；由于共享 Bybit UTA 约 500 USDT、并行时资金不足，Cross 完全退出并复核余额后，Funding 才以 `BTCUSDT` Spot + Perpetual 和账户实际可用资金下的最小可开仓位执行 `post_only_chase`。完成后立即撤销会话并关闭全部写入门控。
+
 ## 下一动作与 Owner 决策
 
-下一步不是继续泛化优化，而是由 Owner 定义一次受控实盘窗口：选择 Funding Pair、Cross/Funding 每腿最大数量与执行政策、窗口开始和绝对过期，并决定首次在同一窗口内顺序发起还是实际并行。若仍由同一个 CEO 申请并审批，还需明确授权仅在该本地最小测试窗口启用现有 `founder_demo_live_acceptance_enabled` 例外；默认继续关闭。
-
-获得本次明确授权后，运维应以受控方式启动双 Live Write，在页面创建并审批对应的 3 个账户会话，先确认 Cross/Funding 分别 ready，再执行最小真实开仓、核对、对应平仓、Venue reconciliation、EOD 和强制复位。任何一步出现 unknown、账户或 Symbol 不一致、会话缺失或查询不可用都停止新副作用。
+下一步不再继续泛化优化。授权窗口内由 Owner 或明确承担本次操作的执行方受控启动双 Live Write，在页面创建并审批 Cross 所需的 Bybit、MT5 会话；确认 ready 后完成 Cross 全闭环并对账。Cross 会话和持仓完全退出、共享账户余额复核无误后，再创建/审批 Funding 会话，以页面权威可用余额计算最小仓位完成 Funding 全闭环。任何一步出现 unknown、账户或 Symbol 不一致、会话缺失、查询不可用或无法确认平仓都停止新副作用并保持 fail-closed。若未能在 24:00 前完成，不顺延授权，必须维持只读并由 Owner 重新给出窗口。
 
 ## 关联长期权威文档
 
