@@ -40,6 +40,10 @@ def test_ceo_permissions_are_explicit_and_safety_gates_remain_independent() -> N
     assert "*" not in permissions
     assert has_permission(("ceo",), "user.assign_role")
     assert has_permission(("ceo",), "strategy.write")
+    assert has_permission(("ceo",), "live_session:request")
+    assert has_permission(("ceo",), "live_session:approve")
+    assert has_permission(("ceo",), "live_session:revoke")
+    assert has_permission(("ceo",), "reconciliation:review")
     assert not has_permission(("ceo",), "trade:submit")
     assert not has_permission(("ceo",), "risk:manage")
 

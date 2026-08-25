@@ -39,6 +39,10 @@ def test_ceo_browser_permissions_are_explicit_and_business_scoped() -> None:
     assert "user.assign_role" in permissions
     assert "member.holding.read_all" in permissions
     assert "member.holding.update" in permissions
+    assert "live_session:request" in permissions
+    assert "live_session:approve" in permissions
+    assert "live_session:revoke" in permissions
+    assert "reconciliation:review" in permissions
     assert "trade:submit" not in permissions
     assert "risk:manage" not in permissions
 

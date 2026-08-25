@@ -285,6 +285,7 @@ def test_manual_close_and_take_profit_close_share_close_action(monkeypatch) -> N
     manual_result = synthetic_service.close_cross_spread_market(
         active_plan.plan_id,
         execution_mode="market",
+        idempotency_key="client-close-submit-1",
     )
     take_profit_result = synthetic_service._close_claimed_plan(
         take_profit_plan,
@@ -295,6 +296,7 @@ def test_manual_close_and_take_profit_close_share_close_action(monkeypatch) -> N
         "CLOSE_LONG",
         "CLOSE_LONG",
     ]
+    assert submitted[0][1]["idempotency_key"] == "client-close-submit-1"
     assert manual_result.order_intent is not None
     assert take_profit_result.order_intent is not None
     assert manual_result.order_intent.trigger_reason == "MANUAL"

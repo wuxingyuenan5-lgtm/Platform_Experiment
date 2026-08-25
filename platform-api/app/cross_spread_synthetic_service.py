@@ -181,7 +181,6 @@ def close_cross_spread_market(
         trigger_reason="MANUAL",
     )
     limit_execution = _prepare_limit_execution(intent, limit_spread)
-    idempotency_key: str | None = None
     if current_plan.status == "manual_intervention":
         previous_batch_id = current_plan.close_batch_id
         if previous_batch_id is None:

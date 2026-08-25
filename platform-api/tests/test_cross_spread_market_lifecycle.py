@@ -474,12 +474,17 @@ def test_market_close_registers_reduce_only_and_mt5_ticket(
     assert get_exit_plan(plan.plan_id).status == "closed"
 
 
-def test_limit_requires_spread_and_legacy_close_fails_closed(tmp_path: Path) -> None:
+def test_limit_requires_spread_and_legacy_close_fails_closed(
+    monkeypatch, tmp_path: Path
+) -> None:
     configure_platform(tmp_path)
-    exit_service.has_ceo_trade_authority = lambda principal, current: True
     import app.auth as auth_module
 
-    auth_module.has_ceo_trade_authority = lambda principal, current: True
+    monkeypatch.setattr(
+        auth_module,
+        "has_ceo_trade_authority",
+        lambda principal, current: True,
+    )
     with TestClient(app) as client:
         limit_response = client.post(
             "/api/v1/trading/cross-spread/lifecycle/open",

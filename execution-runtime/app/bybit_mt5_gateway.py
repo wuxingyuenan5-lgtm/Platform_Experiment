@@ -233,7 +233,13 @@ class BybitMt5Gateway:
         instrument_type: str | None = None,
         category: str | None = None,
     ) -> VenueInstrumentSpecification:
-        return self._adapter_for_account(account_id).get_instrument_specification(
+        adapter = self._adapter_for_account(account_id)
+        if account_id in self.settings.mt5_accounts:
+            return adapter.get_instrument_specification(
+                account_id=account_id,
+                symbol=symbol,
+            )
+        return adapter.get_instrument_specification(
             account_id=account_id,
             symbol=symbol,
             instrument_type=instrument_type,

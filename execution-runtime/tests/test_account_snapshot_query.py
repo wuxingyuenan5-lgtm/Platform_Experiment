@@ -190,6 +190,29 @@ def test_bybit_account_snapshot_uses_scoped_categories() -> None:
     assert "positions:spot" not in client.categories
 
 
+def test_mt5_instrument_query_does_not_forward_bybit_scope_arguments() -> None:
+    calls: list[dict[str, str]] = []
+
+    class Mt5InstrumentAdapter:
+        def get_instrument_specification(self, *, account_id: str, symbol: str):
+            calls.append({"account_id": account_id, "symbol": symbol})
+            return SimpleNamespace(symbol=symbol)
+
+    settings = Settings(mt5_account_ids="mt5-live-main")
+    gateway = BybitMt5Gateway(settings=settings)
+    gateway.mt5 = Mt5InstrumentAdapter()
+
+    result = gateway.get_instrument_specification(
+        account_id="mt5-live-main",
+        symbol="XAUUSD.s",
+        instrument_type="mt5_contract",
+        category="mt5",
+    )
+
+    assert result.symbol == "XAUUSD.s"
+    assert calls == [{"account_id": "mt5-live-main", "symbol": "XAUUSD.s"}]
+
+
 def test_mt5_account_snapshot_switches_once_and_restores_primary(monkeypatch) -> None:
     COORDINATOR.clear_restore_failure()
     configure_mt5_refs(monkeypatch)

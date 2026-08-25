@@ -9,6 +9,7 @@ from fastapi.testclient import TestClient
 from app.config import get_settings
 from app.database import connection
 from app.main import app
+from app.user_service import create_initial_ceo, issue_browser_session
 
 STRATEGY_ID = "strategy_funding_arbitrage_instance_default"
 ACCOUNT_ID = "account_sim_usdt"
@@ -171,7 +172,7 @@ def test_applicant_cannot_self_approve_even_with_admin_role(monkeypatch, tmp_pat
         assert "cannot approve" in response.json()["detail"]
 
 
-def test_founder_demo_admin_can_self_approve_minimum_size_acceptance(
+def test_founder_demo_ceo_can_request_self_approve_and_revoke_minimum_size_acceptance(
     monkeypatch, tmp_path: Path
 ) -> None:
     configure_live(monkeypatch, tmp_path)
@@ -181,18 +182,42 @@ def test_founder_demo_admin_can_self_approve_minimum_size_acceptance(
     monkeypatch.setattr(settings, "founder_demo_live_acceptance_enabled", True)
     with TestClient(app) as client:
         make_account_live()
+        ceo = create_initial_ceo(
+            username="founder-live-test",
+            password="correct horse battery staple",
+        )
+        browser_session = issue_browser_session(
+            user_id=ceo.id,
+            ip_address="127.0.0.1",
+            user_agent="pytest",
+            now=datetime.now(UTC),
+        )
+        client.cookies.set(settings.session_cookie_name, browser_session.session_token)
+        browser_headers = {
+            "Origin": "http://127.0.0.1:4373",
+            "X-CSRF-Token": browser_session.csrf_token,
+        }
         requested = client.post(
             "/api/v1/live-trading/sessions",
+            headers=browser_headers,
             json=session_payload("founder-demo-self-approval-session"),
         )
         assert requested.status_code == 200
         approved = client.post(
             f"/api/v1/live-trading/sessions/{requested.json()['sessionId']}/approve",
+            headers=browser_headers,
             json={"reason": "founder-supervised minimum-size acceptance"},
         )
         assert approved.status_code == 200
         assert approved.json()["status"] == "approved"
         assert approved.json()["applicantUserId"] == approved.json()["approverUserId"]
+        revoked = client.post(
+            f"/api/v1/live-trading/sessions/{requested.json()['sessionId']}/revoke",
+            headers=browser_headers,
+            json={"reason": "founder-supervised acceptance complete"},
+        )
+        assert revoked.status_code == 200
+        assert revoked.json()["status"] == "revoked"
 
 
 def test_live_order_without_approved_session_is_rejected(monkeypatch, tmp_path: Path) -> None:
