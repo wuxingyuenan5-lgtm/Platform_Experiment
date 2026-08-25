@@ -31,3 +31,39 @@ def test_gateway_connectivity_exposes_only_credential_metadata(
     serialized = str(body).lower()
     assert "real-api-key" not in serialized
     assert "real-secret" not in serialized
+
+
+def test_gateway_connectivity_classifies_secondary_mt5_account_reference(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    settings = get_settings()
+    monkeypatch.setattr(settings, "journal_path", str(tmp_path / "runtime_journal.db"))
+    monkeypatch.setattr(
+        settings, "mt5_credential_ref", "secret://environment/mt5-primary"
+    )
+    monkeypatch.setattr(
+        settings,
+        "mt5_account_credential_refs",
+        "mt5-live-main=secret://environment/mt5-primary,"
+        "account-mt5-short-a=secret://environment/mt5-secondary",
+    )
+    monkeypatch.setattr(
+        settings,
+        "credential_refs",
+        "secret://environment/mt5-primary,secret://environment/mt5-secondary",
+    )
+    for prefix in ("VG_SECRET_MT5_PRIMARY", "VG_SECRET_MT5_SECONDARY"):
+        monkeypatch.setenv(f"{prefix}_LOGIN", "10001")
+        monkeypatch.setenv(f"{prefix}_PASSWORD", "password")
+        monkeypatch.setenv(f"{prefix}_SERVER", "Broker")
+
+    with TestClient(app) as client:
+        response = client.get("/gateway/connectivity")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["credentialCount"] == 2
+    assert body["configuredCredentialCount"] == 2
+    assert body["credentials"][1]["configured"] is True
+    assert body["credentials"][1]["missingFields"] == []

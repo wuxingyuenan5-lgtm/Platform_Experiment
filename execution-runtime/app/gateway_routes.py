@@ -23,6 +23,18 @@ def _preferred_mt5_symbol(settings: Settings) -> str | None:
     return None
 
 
+def _credential_required_fields(
+    settings: Settings, credential_ref: str
+) -> tuple[str, ...]:
+    mt5_credential_refs = {
+        settings.mt5_credential_ref,
+        *settings.mt5_account_credentials.values(),
+    }
+    if credential_ref in mt5_credential_refs:
+        return ("LOGIN", "PASSWORD", "SERVER")
+    return ("API_KEY", "SECRET")
+
+
 def create_gateway_router(*, settings: Settings, gateway: ExecutionGateway) -> APIRouter:
     router = APIRouter()
 
@@ -43,9 +55,7 @@ def create_gateway_router(*, settings: Settings, gateway: ExecutionGateway) -> A
         credentials = [
             inspect_credential_reference(
                 credential_ref,
-                required_fields=("LOGIN", "PASSWORD", "SERVER")
-                if credential_ref == settings.mt5_credential_ref
-                else ("API_KEY", "SECRET"),
+                required_fields=_credential_required_fields(settings, credential_ref),
             )
             for credential_ref in settings.configured_credential_refs
         ]
