@@ -49,7 +49,7 @@
         @click="showFunding = !showFunding"
       >
         <span class="dot dot-funding"></span>
-        {{ data.legendFunding }}
+        {{ props.data.legendFunding }}
       </button>
       <button
         type="button"
@@ -58,7 +58,7 @@
         @click="showPrice = !showPrice"
       >
         <span class="dot dot-price"></span>
-        {{ data.legendPrice }}
+        {{ props.data.legendPrice }}
       </button>
     </div>
 
@@ -70,67 +70,116 @@
   import type { Ref } from 'vue';
   import { computed, nextTick, onMounted, ref, watch } from 'vue';
   import { useECharts } from '@/hooks/web/useECharts';
-  import type { FundingChartPanelData, FundingExchange } from '../types';
+  import type { FundingChartPanelData, FundingExchange, FundingMarketRange } from '../types';
 
   const props = defineProps<{
-    context: Record<string, any> | null;
-    positionGroups: Array<Record<string, any>>;
+    data: FundingChartPanelData;
+    exchange: FundingExchange;
+    symbol: string;
+    range: FundingMarketRange;
+    resolution: string;
+    startDate: string;
+    endDate: string;
+  }>();
+
+  const emit = defineEmits<{
+    (e: 'update:exchange', value: FundingExchange): void;
+    (e: 'update:symbol', value: string): void;
+    (e: 'update:range', value: FundingMarketRange): void;
+    (e: 'update:resolution', value: string): void;
+    (e: 'update:start-date', value: string): void;
+    (e: 'update:end-date', value: string): void;
   }>();
 
   const chartRef = ref<HTMLDivElement | null>(null);
   const { setOptions, resize } = useECharts(chartRef as Ref<HTMLDivElement>);
   type FundingRangeLabel = '当前' | '7日' | '30日';
-  const rangeOptions: FundingRangeLabel[] = ['当前'];
-  const exchangeOptions: FundingExchange[] = ['Bybit'];
-  const symbolOptions = computed(() =>
-    (props.context?.symbolOptions ?? []).map((item: Record<string, any>) => item.baseAsset),
+  const rangeOptions: FundingRangeLabel[] = ['当前', '7日', '30日'];
+  const exchangeOptions: FundingExchange[] = ['Binance', 'Bybit', 'OKX'];
+  const rangeToLabelMap: Record<FundingMarketRange, FundingRangeLabel> = {
+    current: '当前',
+    '1d': '当前',
+    '7d': '7日',
+    '30d': '30日',
+    '1y': '30日',
+  };
+  const labelToRangeMap: Record<FundingRangeLabel, FundingMarketRange> = {
+    当前: 'current',
+    '7日': '7d',
+    '30日': '30d',
+  };
+  const symbolOptions = ['BTC', 'ETH', 'SOL', 'DOGE', 'XRP', 'XAUT'];
+  const resolutionOptions = ['15分钟', '30分钟', '1小时', '4小时'];
+  const selectedRange = ref<FundingRangeLabel>(rangeToLabelMap[props.range] ?? '当前');
+  const selectedExchange = ref<FundingExchange>(props.exchange);
+  const selectedSymbol = ref(props.symbol);
+  const selectedResolution = ref(props.resolution);
+  const startDate = ref(props.startDate || props.data.points[0]?.date || '2026-05-28');
+  const endDate = ref(
+    props.endDate || props.data.points[props.data.points.length - 1]?.date || '2026-06-24',
   );
-  const resolutionOptions = ['实时'];
-  const selectedRange = ref<FundingRangeLabel>('当前');
-  const selectedExchange = ref<FundingExchange>('Bybit');
-  const selectedSymbol = ref('BTC');
-  const selectedResolution = ref('实时');
-  const today = new Date().toISOString().slice(0, 10);
-  const startDate = ref(today);
-  const endDate = ref(today);
   const showFunding = ref(true);
   const showPrice = ref(true);
 
   watch(
-    () => props.context?.perpetualSymbol,
-    () => {
-      const option = props.context?.symbolOptions?.find(
-        (item: Record<string, any>) => item.perpetualSymbol === props.context?.perpetualSymbol,
-      );
-      selectedSymbol.value = option?.baseAsset ?? 'BTC';
+    () => props.range,
+    (value) => {
+      selectedRange.value = rangeToLabelMap[value] ?? '当前';
     },
     { immediate: true },
   );
 
-  const data = computed<FundingChartPanelData>(() => {
-    const price = Number(props.context?.perpetualQuote?.mid);
-    const funding = Number(props.context?.fundingRate);
-    return {
-      title: '持仓加权资金费率',
-      legendPrice: '永续中间价',
-      legendFunding: '实时资金费率',
-      points:
-        Number.isFinite(price) || Number.isFinite(funding)
-          ? [
-              {
-                date: String(props.context?.asOf ?? new Date().toISOString()),
-                price: Number.isFinite(price) ? price : 0,
-                funding: Number.isFinite(funding) ? funding * 100 : 0,
-              },
-            ]
-          : [],
-    };
-  });
+  watch(
+    () => props.exchange,
+    (value) => {
+      selectedExchange.value = value;
+    },
+    { immediate: true },
+  );
+
+  watch(
+    () => props.symbol,
+    (value) => {
+      selectedSymbol.value = value;
+    },
+    { immediate: true },
+  );
+
+  watch(
+    () => props.resolution,
+    (value) => {
+      selectedResolution.value = value;
+    },
+    { immediate: true },
+  );
+
+  watch(
+    () => props.startDate,
+    (value) => {
+      startDate.value = value;
+    },
+    { immediate: true },
+  );
+
+  watch(
+    () => props.endDate,
+    (value) => {
+      endDate.value = value;
+    },
+    { immediate: true },
+  );
+
+  watch(selectedRange, (value) => emit('update:range', labelToRangeMap[value] ?? 'current'));
+  watch(selectedExchange, (value) => emit('update:exchange', value));
+  watch(selectedSymbol, (value) => emit('update:symbol', value));
+  watch(selectedResolution, (value) => emit('update:resolution', value));
+  watch(startDate, (value) => emit('update:start-date', value));
+  watch(endDate, (value) => emit('update:end-date', value));
 
   const filteredPoints = computed(() => {
     const start = new Date(startDate.value).getTime();
     const end = new Date(endDate.value).getTime();
-    const base = data.value.points.filter((point) => {
+    const base = props.data.points.filter((point) => {
       const time = new Date(point.date).getTime();
       return time >= start && time <= end;
     });
@@ -200,7 +249,7 @@
         ...(showFunding.value
           ? [
               {
-                name: data.value.legendFunding,
+                name: props.data.legendFunding,
                 type: 'bar' as const,
                 barWidth: 16,
                 itemStyle: {
@@ -214,7 +263,7 @@
         ...(showPrice.value
           ? [
               {
-                name: data.value.legendPrice,
+                name: props.data.legendPrice,
                 type: 'line' as const,
                 yAxisIndex: 1,
                 smooth: true,
@@ -282,9 +331,9 @@
 
   .toolbar-legend {
     display: flex;
-    flex-wrap: wrap;
     align-items: center;
     gap: 8px;
+    flex-wrap: wrap;
   }
 
   .toolbar-legend--center {
@@ -301,10 +350,10 @@
     border: 1px solid var(--strategy-border-strong);
     border-radius: var(--strategy-radius-control);
     background: var(--strategy-surface);
-    box-shadow: var(--strategy-shadow-soft);
     color: var(--strategy-text-2);
     font-size: var(--strategy-font-base);
     font-weight: 700;
+    box-shadow: var(--strategy-shadow-soft);
   }
 
   .toolbar-field {
@@ -349,16 +398,16 @@
   }
 
   .toolbar-group .is-active {
+    color: var(--strategy-accent-strong);
     background: var(--strategy-accent-soft);
     box-shadow: inset 0 0 0 1px var(--strategy-accent-ring);
-    color: var(--strategy-accent-strong);
   }
 
   .legend-pill.is-active {
     border-color: var(--strategy-accent-soft);
     background: var(--strategy-accent-soft);
-    box-shadow: inset 0 0 0 1px var(--strategy-accent-ring);
     color: var(--strategy-accent-strong);
+    box-shadow: inset 0 0 0 1px var(--strategy-accent-ring);
   }
 
   .dot {
@@ -383,8 +432,8 @@
 
   @media (max-width: 960px) {
     .chart-panel__header {
-      flex-direction: column;
       align-items: flex-start;
+      flex-direction: column;
     }
 
     .toolbar {

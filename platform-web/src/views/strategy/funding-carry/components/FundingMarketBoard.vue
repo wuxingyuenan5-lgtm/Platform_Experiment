@@ -89,12 +89,7 @@
           </div>
         </div>
 
-        <div
-          v-for="row in data.rows"
-          :key="row.symbol"
-          class="heatmap-table__row"
-          @click="selectRow(row.symbol)"
-        >
+        <div v-for="row in data.rows" :key="row.symbol" class="heatmap-table__row">
           <div class="symbol-cell symbol-cell--row">{{ row.symbol }}</div>
           <div
             class="group-row"
@@ -131,100 +126,22 @@
 </template>
 
 <script setup lang="ts">
-  import { computed } from 'vue';
   import type { FundingMarketBoardData, FundingMarketRange } from '../types';
 
-  const props = defineProps<{
-    context: Record<string, any> | null;
-    loading: boolean;
-    error: string | null;
+  defineProps<{
+    data: FundingMarketBoardData;
+    exchange: string;
+    selectedRange: FundingMarketRange;
+    selectedSymbol: string;
+    selectedResolution: string;
+    rangeOptions: Array<{ value: FundingMarketRange; label: string }>;
   }>();
 
-  const emit = defineEmits<{
-    (e: 'refresh'): void;
-    (e: 'select-symbol', perpetualSymbol: string, spotSymbol: string): void;
+  defineEmits<{
     (e: 'update:selectedRange', value: FundingMarketRange): void;
+    (e: 'update:selectedSymbol', value: string): void;
+    (e: 'update:selectedResolution', value: string): void;
   }>();
-
-  const exchange = computed(() => props.context?.venue ?? 'Bybit');
-  const selectedSymbol = computed(() => {
-    const option = props.context?.symbolOptions?.find(
-      (item: Record<string, any>) => item.perpetualSymbol === props.context?.perpetualSymbol,
-    );
-    return option?.baseAsset ?? props.context?.perpetualSymbol?.replace(/USDT$/i, '') ?? '--';
-  });
-  const selectedResolution = computed(() => '实时');
-  const selectedRange = computed<FundingMarketRange>(() => 'current');
-  const rangeOptions = computed(() => [{ value: 'current' as FundingMarketRange, label: '实时' }]);
-
-  const fundingRatePercent = computed(() => {
-    const raw = Number(props.context?.fundingRate);
-    return Number.isFinite(raw) ? raw * 100 : null;
-  });
-
-  function displayQuote(quote: Record<string, any> | null | undefined) {
-    const value = quote?.mid;
-    return value === null || value === undefined || value === '' ? '--' : String(value);
-  }
-
-  const data = computed<FundingMarketBoardData>(() => {
-    const rate = fundingRatePercent.value;
-    const selected = selectedSymbol.value;
-    const options = props.context?.symbolOptions ?? [];
-    return {
-      updatedAt: props.context?.asOf ?? '',
-      symbolOptions: options.map((item: Record<string, any>) => item.baseAsset),
-      resolutionOptions: ['实时'],
-      summaryCards: [
-        {
-          title: '当前资金费率',
-          value: rate === null ? '--' : formatRate(rate),
-          subtitle: props.context?.nextFundingTime
-            ? `下次结算 ${props.context.nextFundingTime}`
-            : '结算时间待同步',
-          tone: rate !== null && rate < 0 ? 'negative' : 'positive',
-        },
-        {
-          title: '现货 / 永续基差',
-          value: props.context?.basis ?? '--',
-          subtitle: `${displayQuote(props.context?.spotQuote)} / ${displayQuote(
-            props.context?.perpetualQuote,
-          )}`,
-          tone: Number(props.context?.basis) < 0 ? 'negative' : 'positive',
-        },
-        {
-          title: '账户可用资金',
-          value: props.context?.activeReservation?.fundingAvailable ?? '--',
-          subtitle: props.context?.activeReservation?.currency ?? 'USDT',
-          tone: 'positive',
-        },
-        {
-          title: '数据状态',
-          value: props.loading ? '同步中' : props.error ? '不可用' : '实时',
-          subtitle: props.error ?? props.context?.dataQualityState ?? 'authoritative',
-          tone: props.error ? 'negative' : 'positive',
-        },
-      ],
-      highest: rate !== null && rate >= 0 ? [{ market: `${selected} · Bybit`, value: rate }] : [],
-      lowest: rate !== null && rate < 0 ? [{ market: `${selected} · Bybit`, value: rate }] : [],
-      usdtExchanges: ['Bybit'],
-      inverseExchanges: ['交割合约'],
-      rows: options.map((item: Record<string, any>) => ({
-        symbol: item.baseAsset,
-        usdtPerps: {
-          Bybit: item.perpetualSymbol === props.context?.perpetualSymbol ? rate : null,
-        },
-        inversePerps: { 交割合约: null },
-      })),
-    };
-  });
-
-  function selectRow(symbol: string) {
-    const option = props.context?.symbolOptions?.find(
-      (item: Record<string, any>) => item.baseAsset === symbol,
-    );
-    if (option) emit('select-symbol', option.perpetualSymbol, option.spotSymbol);
-  }
 
   function formatRate(value: number) {
     return `${value.toFixed(4)}%`;
@@ -403,24 +320,24 @@
     border: 1px solid var(--strategy-border-strong);
     border-radius: var(--strategy-radius-control);
     background: var(--strategy-surface);
-    box-shadow: var(--strategy-shadow-soft);
     color: var(--strategy-text-2);
     font-size: var(--strategy-font-base);
     font-weight: 700;
     cursor: pointer;
+    box-shadow: var(--strategy-shadow-soft);
   }
 
   .range-tabs .is-active {
-    border-color: var(--strategy-accent-soft);
     background: var(--strategy-accent-soft);
-    box-shadow: inset 0 0 0 1px var(--strategy-accent-ring);
+    border-color: var(--strategy-accent-soft);
     color: var(--strategy-accent-strong);
+    box-shadow: inset 0 0 0 1px var(--strategy-accent-ring);
   }
 
   .heatmap-shell {
     margin-top: 14px;
-    padding-top: 16px;
     border-top: 1px solid var(--strategy-border);
+    padding-top: 16px;
   }
 
   .heatmap-caption {

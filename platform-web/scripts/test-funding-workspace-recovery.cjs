@@ -125,7 +125,9 @@ async function main() {
   const pagePath = path.join(root, 'src/views/strategy/funding-carry/index.vue');
 
   const pageSource = fs.readFileSync(pagePath, 'utf8');
-  assert.equal(pageSource.includes('@/data/sample/funding'), false);
+  assert.equal(pageSource.includes('@/data/sample/funding'), true);
+  assert.equal(pageSource.includes('fundingOrderPanel'), false);
+  assert.equal(pageSource.includes('useFundingWorkspace'), true);
 
   const storage = createMemoryStorage();
   const timers = createFakeTimers();

@@ -21,7 +21,7 @@ Cross 保留开仓、平仓、移动双边资金三个模板；MT5 Transfer API 
 
 本地代码门已经通过。三服务常驻和登录链路可用；共享 UTA、Bottom、Cross MT5、Short A 均完成真实账户只读预检，Short A 切换后能恢复主 MT5 账号。Cross 开/单平/批平和三模板、Funding Spot/Perp context、开平仓、自动轮询、幂等恢复、权威已平量和 active/history 均有本地回归证据。
 
-Funding 原有行情板、资金费率图表、期现/借贷详情和套利执行工作台已经恢复，真实 execution context、持仓组合与指令恢复继续在原产品结构背后工作；联调诊断卡和工程状态字段不再替代产品界面。策略管理中的“CEO 实盘测试会话”及其专用前端状态逻辑已移除。LiveTradingSession、Kill Switch、额度、幂等和 fail-closed 继续作为后台安全机制存在，但不构成策略产品页面或产品概念。
+Funding 行情分析三组件已逐字恢复到 `731e21bb` 之前的 Owner 历史设计，继续使用原完整行情板、历史资金费率图、期现与借贷详情及其原筛选交互，不接入或改写实时执行数据；交易执行页单独使用真实 execution context、持仓组合与指令恢复链路，不再使用生产 mock。联调诊断卡和工程状态字段不再替代产品界面。策略管理中的“CEO 实盘测试会话”及其专用前端状态逻辑已移除。LiveTradingSession、Kill Switch、额度、幂等和 fail-closed 继续作为后台安全机制存在，但不构成策略产品页面或产品概念。
 
 最近验证包括 Platform 相关 53 tests、Runtime MT5 相关 17 tests，以及 Platform/Runtime Pyright、相关 Ruff、前端 typecheck、行为测试和 production build。当前只读事实为 Funding `BTCUSDT` Spot/Perp、Cross Bybit `XAUTUSDT`、Cross MT5 `XAUUSD.s`；approved session 为 0，Funding/Cross unresolved `result_unknown` 为 0。
 
@@ -31,7 +31,7 @@ Owner 已授权 2026-08-25 16:55–24:00（北京时间）的 Cross + Funding �
 
 ## 下一动作与 Owner 决策
 
-下一步先由 Owner 对恢复后的 Funding 行情分析与交易执行界面做视觉确认；确认前暂停真实副作用。确认后，授权窗口内通过既有运维安全路径受控启动双 Live Write 并建立后台账户会话，不在策略产品页暴露测试工具；随后完成 Cross 全闭环并对账，再以共享账户可用资金的最小仓位完成 Funding。任何一步出现 unknown、账户或 Symbol 不一致、会话缺失、查询不可用或无法确认平仓都停止新副作用并保持 fail-closed。若未能在 24:00 前完成，不顺延授权，必须维持只读并由 Owner 重新给出窗口。
+Funding 历史行情设计与真实交易执行页已经完成聚焦浏览器验收。下一步在授权窗口内通过既有运维安全路径完成只读预检，再受控启动双 Live Write 并建立后台账户会话，不在策略产品页暴露测试工具；随后完成 Cross 全闭环并对账，再以共享账户可用资金的最小仓位完成 Funding。任何一步出现 unknown、账户或 Symbol 不一致、会话缺失、查询不可用或无法确认平仓都停止新副作用并保持 fail-closed。若未能在 24:00 前完成，不顺延授权，必须维持只读并由 Owner 重新给出窗口。
 
 ## 关联长期权威文档
 
