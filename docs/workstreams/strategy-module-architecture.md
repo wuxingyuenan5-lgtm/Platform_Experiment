@@ -25,13 +25,13 @@ Funding 行情分析三组件已逐字恢复到 `731e21bb` 之前的 Owner 历�
 
 最近验证包括 Platform 相关 53 tests、Runtime MT5 相关 17 tests，以及 Platform/Runtime Pyright、相关 Ruff、前端 typecheck、行为测试和 production build。Funding 历史行情与真实执行页已通过聚焦浏览器验收；多 MT5 凭据引用分类和只读预检状态枚举已与 Runtime 合同对齐，Bybit/MT5 当前只读预检通过。当前只读事实为 Funding `BTCUSDT` Spot/Perp、Cross Bybit `XAUTUSDT`、Cross MT5 `XAUUSD.s`；approved session 为 0，Funding/Cross unresolved `result_unknown` 为 0。
 
-尚未完成的是外部实盘证据：没有真实开仓、平仓、Funding Settlement、差异核对或 EOD。普通启动器会强制 Platform Live Write、Runtime Live Write 和 founder-demo CEO 自审批为 `false`，因此当前运行中的服务仍是安全只读状态；页面只显示这些门，不自行开启它们。
+尚未完成的是外部实盘证据：没有真实开仓、平仓、Funding Settlement、差异核对或 EOD。普通启动器会强制 Platform Live Write、Runtime Live Write 和 founder-demo CEO 自审批为 `false`，因此当前运行中的服务仍是安全只读状态；页面只显示这些门，不自行开启它们。2026-08-25 当前窗口的只读基线发现 Cross 的 `mt5-live-main` 没有可用资金且终端 `trade_allowed=false`，因此在 Owner 完成 MT5 入金并开启终端算法交易前，不得发送 Bybit 单边订单或开启写入门。
 
 Owner 已授权 2026-08-25 16:55–24:00（北京时间）的 Cross + Funding 最小实盘窗口，并允许仅在该窗口临时启用双 Live Write 与 founder-demo CEO 本地自审批。执行必须串行：先以 Cross `XAUTUSDT` + `XAUUSD.s`、每腿 1 盎司完成开仓、核对、平仓和对账；由于共享 Bybit UTA 约 500 USDT、并行时资金不足，Cross 完全退出并复核余额后，Funding 才以 `BTCUSDT` Spot + Perpetual 和账户实际可用资金下的最小可开仓位执行 `post_only_chase`。完成后立即撤销会话并关闭全部写入门控。
 
 ## 下一动作与 Owner 决策
 
-Funding 历史行情设计与真实交易执行页已经完成聚焦浏览器验收。下一步在授权窗口内通过既有运维安全路径完成只读预检，再受控启动双 Live Write 并建立后台账户会话，不在策略产品页暴露测试工具；随后完成 Cross 全闭环并对账，再以共享账户可用资金的最小仓位完成 Funding。任何一步出现 unknown、账户或 Symbol 不一致、会话缺失、查询不可用或无法确认平仓都停止新副作用并保持 fail-closed。若未能在 24:00 前完成，不顺延授权，必须维持只读并由 Owner 重新给出窗口。
+Funding 历史行情设计与真实交易执行页已经完成聚焦浏览器验收，Bybit/MT5 只读预检也已通过。下一步由 Owner 向 `mt5-live-main` 转入足够的测试保证金并在当前 MT5 Terminal 开启算法交易；Runtime 复核 MT5 可用资金大于零且 `trade_allowed=true` 后，才在授权窗口内受控启动双 Live Write、建立 Cross 两个后台账户会话并执行 Cross 全闭环。Cross 对账并完全退出后，再以共享账户可用资金的最小仓位完成 Funding。任何一步出现 unknown、账户或 Symbol 不一致、会话缺失、查询不可用或无法确认平仓都停止新副作用并保持 fail-closed。若未能在 24:00 前完成，不顺延授权，必须维持只读并由 Owner 重新给出窗口。
 
 ## 关联长期权威文档
 
