@@ -27,7 +27,7 @@ from app.models import (
     VenuePositionSnapshot,
 )
 from app.mt5_live_adapter import Mt5LiveAdapter
-from app.mt5_read_coordinator import with_mt5_read_session
+from app.mt5_read_coordinator import COORDINATOR, with_mt5_read_session
 from app.strict_live_acceptance_adapters import (
     StrictBybitAcceptanceAdapter,
     StrictMt5AcceptanceAdapter,
@@ -50,7 +50,15 @@ class BybitMt5Gateway:
         self.mt5: Any = mt5 or StrictMt5AcceptanceAdapter(self.settings)
 
     def submit_order(self, command: SubmitOrderCommand) -> list[ExecutionEvent]:
-        return self._adapter_for_account(command.account_id).submit_order(command)
+        adapter = self._adapter_for_account(command.account_id)
+        if command.account_id not in self.settings.mt5_accounts:
+            return adapter.submit_order(command)
+        # MetaTrader5's Python package controls one process-global Terminal
+        # session. Hold the same coordinator lock used by account snapshots so
+        # a read-only account switch cannot overlap order checks or order_send.
+        with COORDINATOR.acquire():
+            COORDINATOR.assert_healthy()
+            return adapter.submit_order(command)
 
     def get_order(
         self,
@@ -280,11 +288,12 @@ class BybitMt5Gateway:
         route = get_order_route(external_order_id=external_order_id)
         if route is None:
             raise GatewayConfigurationError("Live order route not found")
-        return self._adapter_by_name(route.adapter).cancel_order(
-            external_order_id,
-            idempotency_key,
-            reason,
-        )
+        adapter = self._adapter_by_name(route.adapter)
+        if route.adapter != self.mt5.name:
+            return adapter.cancel_order(external_order_id, idempotency_key, reason)
+        with COORDINATOR.acquire():
+            COORDINATOR.assert_healthy()
+            return adapter.cancel_order(external_order_id, idempotency_key, reason)
 
     def capabilities(self) -> GatewayCapabilitiesResponse:
         return GatewayCapabilitiesResponse(

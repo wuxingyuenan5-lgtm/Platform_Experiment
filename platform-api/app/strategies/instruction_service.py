@@ -106,6 +106,27 @@ def get_instruction(instruction_id: str) -> dict[str, object]:
     return _response(row)
 
 
+def get_instruction_by_idempotency(
+    strategy_instance_id: str,
+    idempotency_key: str,
+) -> dict[str, object]:
+    with connection() as db:
+        row = db.execute(
+            """
+            SELECT * FROM strategy_runs
+            WHERE strategy_instance_id = ?
+              AND idempotency_key = ?
+              AND execution_plan_json IS NOT NULL
+            ORDER BY created_at DESC
+            LIMIT 1
+            """,
+            (strategy_instance_id, idempotency_key),
+        ).fetchone()
+    if row is None:
+        raise HTTPException(status_code=404, detail="Strategy instruction not found")
+    return _response(row)
+
+
 def list_instructions(strategy_instance_id: str) -> list[dict[str, object]]:
     with connection() as db:
         rows = db.execute(
