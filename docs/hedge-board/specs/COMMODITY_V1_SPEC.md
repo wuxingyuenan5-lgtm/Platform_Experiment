@@ -1,10 +1,10 @@
 # 对冲基金看板｜商品看板 V1 规格（Commodity V1 Spec）
 
-> 状态：Discussion Draft v0.1  
+> 状态：Product Scope Frozen v1.0 / Data & Implementation Details OPEN  
 > 上位文档：`docs/hedge-board/HEDGE_BOARD_OPTIMIZATION_MASTER_PLAN.md`  
 > 适用分支：`feature/hedge-board-online-optimization`  
 > 作用：冻结“对冲基金看板 → 商品看板”的产品内容、展示边界与验收口径。  
-> 说明：本文件只描述商品看板，不替代整个对冲基金看板 Master Plan。
+> 说明：本文件只描述商品看板，不替代整个对冲基金看板 Master Plan。除非用户明确提出修改，否则已冻结的产品范围、既有内容保护和 UI 原则不得调整。
 
 ---
 
@@ -329,7 +329,7 @@ Commodity V1 不新增：
 
 ---
 
-## 14. 后续讨论项【OPEN】
+## 14. 后续讨论项【OPEN，仅数据/工程细节，不改变已冻结产品范围】
 
 1. WTI / Brent / Copper 期限结构具体展示形态；
 2. EIA库存是否用绝对量 + WoW变化双展示；
