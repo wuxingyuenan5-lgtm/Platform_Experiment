@@ -973,7 +973,7 @@ def test_controlled_live_funding_path_uses_single_postonly_attempt_when_ready(
             "UPDATE strategy_instances SET trading_mode = 'live', status = 'active' WHERE id = ?",
             (INSTANCE_ID,),
         )
-        db.execute("UPDATE accounts SET status = 'active' WHERE id = ?", ("account_bybit_funding",))
+        db.execute("UPDATE accounts SET status = 'active' WHERE id = ?", ("bybit-live-main",))
         db.execute(
             """
             INSERT INTO balance_snapshots (
@@ -982,8 +982,8 @@ def test_controlled_live_funding_path_uses_single_postonly_attempt_when_ready(
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
-                "balance_account_bybit_funding_live_test",
-                "account_bybit_funding",
+                "balance_bybit_live_main_live_test",
+                "bybit-live-main",
                 "USDT",
                 "100000",
                 "100000",
@@ -1022,7 +1022,7 @@ def test_controlled_live_funding_path_uses_single_postonly_attempt_when_ready(
                 "perpetualQuantity": "1",
                 "spotSymbol": "BTCUSDT",
                 "spotQuantity": "1",
-                "accountId": "account_bybit_funding",
+                "accountId": "bybit-live-main",
                 "perpetualInstrumentId": "instrument_btc_usdt_perp",
                 "spotInstrumentId": "instrument_btc_usdt",
                 "perpetualQuantityStep": "0.001",

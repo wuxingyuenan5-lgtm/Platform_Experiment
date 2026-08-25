@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from fastapi import APIRouter, Query, Request
 
 from app.auth import require_principal
@@ -34,6 +36,12 @@ from app.strategies.capital_transfer import (
     create_funding_transfer,
     get_funding_transfer,
     get_funding_transfer_quote,
+)
+from app.strategies.funding_workspace import (
+    get_funding_execution_context,
+    get_funding_instruction_workspace,
+    list_funding_position_groups,
+    submit_funding_instruction,
 )
 from app.trade_commands import create_trade_command, get_trade_command
 from app.trading import reconcile_order, submit_order
@@ -145,6 +153,51 @@ def create_trading_router(api_prefix: str) -> APIRouter:
     ) -> ExecutionBatchResponse:
         principal = require_principal(http_request)
         return submit_funding_market_command(request, requested_by=principal.user_id)
+
+    @router.get(f"{api_prefix}/trading/funding/execution-context", tags=["trading"])
+    def funding_execution_context(
+        http_request: Request,
+        perpetual_symbol: str | None = Query(default=None, alias="perpetualSymbol"),
+        spot_symbol: str | None = Query(default=None, alias="spotSymbol"),
+        notional: str | None = Query(default=None),
+    ) -> dict[str, object]:
+        require_principal(http_request)
+        return get_funding_execution_context(
+            perpetual_symbol=perpetual_symbol,
+            spot_symbol=spot_symbol,
+            notional=Decimal(notional) if notional not in (None, "") else None,
+        )
+
+    @router.get(f"{api_prefix}/trading/funding/positions", tags=["trading"])
+    def funding_positions(http_request: Request) -> list[dict[str, object]]:
+        require_principal(http_request)
+        return list_funding_position_groups()
+
+    @router.post(f"{api_prefix}/trading/funding/instructions", tags=["trading"])
+    def funding_instruction_submit(
+        payload: dict[str, object],
+        http_request: Request,
+    ) -> dict[str, object]:
+        principal = require_principal(http_request)
+        return submit_funding_instruction(
+            action=str(payload["action"]),
+            idempotency_key=str(payload["idempotencyKey"]),
+            perpetual_symbol=str(payload["perpetualSymbol"]),
+            spot_symbol=str(payload["spotSymbol"]),
+            quantity=Decimal(str(payload["quantity"])),
+            requested_by=principal.user_id,
+        )
+
+    @router.get(
+        f"{api_prefix}/trading/funding/instructions/{{instruction_id}}",
+        tags=["trading"],
+    )
+    def funding_instruction_workspace(
+        instruction_id: str,
+        http_request: Request,
+    ) -> dict[str, object]:
+        require_principal(http_request)
+        return get_funding_instruction_workspace(instruction_id)
 
     @router.post(
         f"{api_prefix}/trading/commands",

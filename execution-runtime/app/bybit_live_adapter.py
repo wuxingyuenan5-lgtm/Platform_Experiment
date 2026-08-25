@@ -27,6 +27,7 @@ from app.models import (
     VenueBalanceSnapshot,
     VenueEconomicEventSnapshot,
     VenueFillSnapshot,
+    VenueMarketQuoteSnapshot,
     VenueOrderSnapshot,
     VenuePositionSnapshot,
 )
@@ -289,6 +290,52 @@ class BybitLiveAdapter:
                 )
             )
         return snapshots
+
+    def get_market_quote(self, *, account_id: str, symbol: str) -> VenueMarketQuoteSnapshot:
+        self._assert_account(account_id)
+        normalized_symbol = symbol.strip().upper()
+        try:
+            response = self._with_fresh_client_retry(
+                account_id,
+                lambda client: client.get_tickers(
+                    category=self.settings.bybit_category,
+                    symbol=normalized_symbol,
+                ),
+            )
+            self._require_success(response, "Bybit ticker query failed")
+            rows = self._result_list(response)
+            if not rows:
+                raise GatewayConfigurationError("Bybit ticker query returned no data")
+            row = rows[0]
+            bid = Decimal(str(row.get("bid1Price") or "0"))
+            ask = Decimal(str(row.get("ask1Price") or "0"))
+            if bid <= 0 or ask <= 0:
+                raise GatewayConfigurationError("Bybit ticker query returned an incomplete quote")
+            funding_time_raw = row.get("nextFundingTime")
+            funding_time = (
+                self._millis(funding_time_raw)
+                if funding_time_raw not in (None, "", 0, "0")
+                else None
+            )
+            return VenueMarketQuoteSnapshot(
+                source=self.name,
+                accountId=account_id,
+                symbol=normalized_symbol,
+                bid=bid,
+                ask=ask,
+                mid=(bid + ask) / Decimal("2"),
+                last=self._optional_decimal(row.get("lastPrice")),
+                fundingRate=self._optional_decimal(row.get("fundingRate")),
+                nextFundingTime=funding_time,
+                currency=self.settings.bybit_settle_coin,
+                asOf=datetime.now(UTC),
+            )
+        except GatewayConfigurationError:
+            raise
+        except GatewayRequestRejectedError:
+            raise
+        except Exception as exc:
+            raise self._unknown_error("Bybit ticker result is unknown", exc) from exc
 
     def list_balances(self, account_id: str | None = None) -> list[VenueBalanceSnapshot]:
         account = account_id or self._single_account()

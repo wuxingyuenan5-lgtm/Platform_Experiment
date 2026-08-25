@@ -11,13 +11,14 @@
 | 工作流 | 当前结果 | 完成定义 | 下一动作 |
 |---|---|---|---|
 | 文档与项目跟进 | `pending_cleanup`：新结构、AI 回填和活跃文档已收敛；旧材料已移入清理隔离区 | 项目只从本页跟进；产品、架构、合同和前端各有明确位置；旧过程材料退出仓库 | Owner 手动删除 `.codex-cleanup-quarantine/docs-retire-20260825`，随后执行最终复核 |
-| Platform 0.11.2 候选 | `in_progress`：真实 Bybit/MT5 只读监控链路已打通，Funding/Cross/Bottom/Short A 的 logical account 绑定和同步合同已收敛，但这仍不是发布或生产就绪 | 独立验收、浏览器访问回归和 Capability 对齐完成，已知限制明确 | 保持只读链路稳定；仅在 Owner 额外授权后推进下一步外部联调 |
+| Platform 0.11.2 候选 | `in_progress`：真实 Bybit/MT5 只读监控链路已打通，Funding/Cross/Bottom/Short A 的 logical account 绑定和同步合同已收敛；本地开发启动器现已常驻复用并带登录烟测，但 Funding 页面仍存在同一 Bybit UTA 的 spot/perp category 读取阻断 | 独立验收、浏览器访问回归和 Capability 对齐完成，已知限制明确 | 保持只读链路稳定；先完成 Funding 多 category 只读合同，再进入 Owner 页面小额受控测试 |
 | 受控交易闭环 | `blocked_by_authorization/evidence`：真实只读验收不等于交易授权；Live Write 仍关闭，Funding controlled-live 仍默认 `423`，且不存在 approved LiveTradingSession | 每个外部连接或写入步骤具有单独授权、外部证据、对账和强制回只读 | 继续保持只读；等待 Owner 提供下一步明确操作授权 |
 
 ## Next
 
 - 把 0.11.2 剩余工作压缩成可验收结果，不再用新的阶段文档复制当前状态。
 - 保持真实只读监控链路：Funding/Cross 共享 `bybit-live-main`，Bottom 使用独立 Bybit 只读账号，Cross/Short A 共用单 Terminal MT5 只读切换，Short B 继续 `unbound`。
+- 保持本地三服务常驻：`scripts/dev-platform.ps1` 负责健康复用、失败清理、状态文件和登录烟测，不再接受“前端还在、API/Runtime 已被回收”的半残状态。
 - 在任何下一步外部操作前，继续要求 `liveWriteEnabled=false`、无 approved `LiveTradingSession`、Funding controlled-live 默认 `423`。
 - 当产品方向出现新想法时，先放入下方发现箱；确认后再进入正式 PRD 或策略文档。
 
@@ -29,7 +30,7 @@
 
 ## 发现箱
 
-这里允许记录不完整需求。条目在 Owner 确认前都不是承诺，也不能授权外部连接、部署或真实交易。
+AI 可以自动记录不完整需求、缺口和不确定性。条目在 Owner 明确说出“确认进入范围”前都不是正式产品需求，也不能授权外部连接、部署或真实交易。
 
 | 想法或问题 | 当前判断 | 需要确认 |
 |---|---|---|
@@ -48,8 +49,11 @@
 
 ## 更新约定
 
-- 更新本页：目标、优先级、能力状态、阻塞、下一动作或 Owner 决策发生变化。
+- AI 可以根据代码、测试或外部证据，自动更新既有工作流的状态、阻塞、已验证结果和下一技术动作。
+- AI 可以自动向发现箱增加待确认条目。
+- 产品优先级、里程碑选择和风险容忍度由 Owner 决定；AI 不从开发行为推断。
+- 只有 Owner 明确说出“确认进入范围”，相关需求才可以写入 `product/` 正式产品文档。
 - 不更新本页：纯重构、补测试、格式调整以及不改变项目判断的内部实现。
 - 每个表格条目只写“结果、完成定义、下一动作”，不粘贴日志、提交号或长篇设计。
-- 新需求先进入发现箱；确认后移动到 Now、Next 或 Later，并同步其真正的产品/技术权威。
+- 新需求先进入发现箱；范围和优先级分别确认后，再移动到 Now、Next 或 Later，并同步真正的产品权威。
 - 已完成事项不在这里累积成长日志；把稳定结论并入权威文档，历史由 Git 保存。

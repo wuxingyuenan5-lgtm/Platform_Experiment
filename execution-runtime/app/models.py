@@ -194,6 +194,8 @@ class VenueMarketQuoteSnapshot(BaseModel):
     ask: Decimal
     mid: Decimal
     last: Decimal | None = None
+    funding_rate: Decimal | None = Field(default=None, alias="fundingRate")
+    next_funding_time: datetime | None = Field(default=None, alias="nextFundingTime")
     currency: str
     as_of: datetime = Field(alias="asOf")
     data_quality_state: str = Field(default="complete", alias="dataQualityState")

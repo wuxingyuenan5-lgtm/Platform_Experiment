@@ -210,12 +210,25 @@ def create_instruction(
     *,
     requested_by: str,
 ) -> dict[str, object]:
-    if request.action in {
-        StrategyInstructionAction.CLOSE,
-        StrategyInstructionAction.RISK_DISPOSITION,
-    }:
-        # Position Groups are not materialised in Phase 0–1.  Never create an
-        # executable instruction for an exit that cannot be reconciled to one.
+    with connection() as db:
+        instance = db.execute(
+            """
+            SELECT sd.strategy_key
+            FROM strategy_instances si
+            JOIN strategy_definitions sd ON sd.id = si.strategy_definition_id
+            WHERE si.id = ?
+            """,
+            (strategy_instance_id,),
+        ).fetchone()
+    strategy_key = str(instance["strategy_key"]) if instance is not None else None
+    if request.action is StrategyInstructionAction.RISK_DISPOSITION:
+        raise HTTPException(status_code=423, detail="Position Group close planning is unavailable")
+    if (
+        request.action is StrategyInstructionAction.CLOSE
+        and strategy_key != "funding_arbitrage"
+    ):
+        # Position Groups are not materialised in Phase 0–1. Funding is the
+        # only strategy that now has a bounded, strategy-owned close path.
         raise HTTPException(status_code=423, detail="Position Group close planning is unavailable")
     normalized_parameters = normalize_parameters(strategy_instance_id, request.parameters)
     requested_json = _canonical(normalized_parameters)

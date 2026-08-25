@@ -234,9 +234,22 @@ following in read-only mode:
 - Runtime Live Write remains `false`.
 - Runtime `/status` must report `capabilities.liveWriteEnabled=false` before
   any credential-backed read-only verification and after every verification.
+- The local startup path must keep Runtime, Platform API and Platform Web
+  running independently of transient test processes. `scripts/dev-platform.ps1`
+  is the authority for start/status/stop/restart, persistent PID ownership and
+  login smoke verification.
 - Funding controlled-live still returns `423` until separately authorized and
   fully ready.
 - No approved `LiveTradingSession` exists.
+
+Current known blocker for Funding page read-only execution context:
+
+- Funding and Cross already share the same logical Bybit UTA binding
+  (`bybit-live-main`), but the current Runtime Bybit read contract still
+  exposes instrument/quote reads through a single-category symbol path. Until
+  that contract distinguishes or safely multiplexes spot/perpetual reads for
+  the same external symbol, the Funding page must fail closed instead of
+  showing mock market data or pretending readiness.
 
 Two states are valid:
 

@@ -1,115 +1,82 @@
-﻿<template>
+<template>
   <div class="funding-page" data-testid="funding-original-structure">
     <template v-if="localSection === 'analysis'">
       <FundingMarketBoard
-        :data="fundingMarketBoard"
-        :exchange="selectedExchange"
-        :selected-range="selectedRange"
-        :selected-symbol="selectedSymbol"
-        :selected-resolution="selectedResolution"
-        :range-options="rangeOptions"
-        @update:selected-range="selectedRange = $event"
-        @update:selected-symbol="handleChartSymbolUpdate"
-        @update:selected-resolution="selectedResolution = $event"
+        :context="context"
+        :loading="loading"
+        :error="error"
+        @refresh="refreshAll"
+        @select-symbol="handleSelectSymbol"
       />
 
-      <FundingChartPanel
-        :data="fundingChartPanel"
-        :exchange="selectedExchange"
-        :symbol="selectedSymbol"
-        :range="selectedRange"
-        :resolution="selectedResolution"
-        :start-date="selectedStartDate"
-        :end-date="selectedEndDate"
-        @update:exchange="handleExchangeUpdate"
-        @update:symbol="handleChartSymbolUpdate"
-        @update:range="selectedRange = $event"
-        @update:resolution="selectedResolution = $event"
-        @update:start-date="selectedStartDate = $event"
-        @update:end-date="selectedEndDate = $event"
-      />
+      <FundingChartPanel :context="context" :position-groups="positionGroups" />
 
-      <FundingDetailPanel
-        :exchange="selectedExchange"
-        :symbol="selectedSymbol"
-        :selected-range="selectedRange"
-        :resolution="selectedResolution"
-        :start-date="selectedStartDate"
-        :end-date="selectedEndDate"
-        :research="currentResearch"
-      />
+      <FundingDetailPanel :context="context" :workspace="activeWorkspace" />
     </template>
 
     <template v-else>
-      <FundingOrderPanel :data="profileOrderPanel" />
+      <FundingOrderPanel
+        :context="context"
+        :position-groups="positionGroups"
+        :pending-draft="pendingDraft"
+        :workspace-state="workspaceState"
+        :submitting="submitting"
+        :error="error"
+        :quantity-input="quantityInput"
+        :notional-input="notionalInput"
+        :can-submit="canSubmit"
+        @update:notional-input="notionalInput = $event"
+        @update:quantity-input="quantityInput = $event"
+        @refresh="refreshAll"
+        @submit-open="submit('open')"
+        @submit-close="submit('close')"
+        @select-symbol="handleSelectSymbol"
+      />
     </template>
   </div>
 </template>
 
 <script setup lang="ts">
-  import { computed, ref, watch } from 'vue';
+  import { ref, watch } from 'vue';
+
   import FundingChartPanel from './components/FundingChartPanel.vue';
   import FundingDetailPanel from './components/FundingDetailPanel.vue';
   import FundingMarketBoard from './components/FundingMarketBoard.vue';
   import FundingOrderPanel from './components/FundingOrderPanel.vue';
-  import {
-    defaultSymbol,
-    fundingChartPanel,
-    fundingCarryProfiles,
-    fundingMarketBoard,
-    fundingOrderPanel,
-    fundingRangeLabels,
-  } from '@/data/sample/funding';
-  import type { FundingExchange, FundingMarketRange, FundingSymbol } from './types';
+  import { useFundingWorkspace } from './composables/useFundingWorkspace';
 
   const props = withDefaults(
     defineProps<{
       activeSection?: 'analysis' | 'execution';
-      selectedExchange?: FundingExchange;
-      selectedSymbol?: FundingSymbol;
-      selectedResolution?: string;
+      selectedSymbol?: string;
     }>(),
     {
       activeSection: 'analysis',
-      selectedExchange: 'Bybit',
-      selectedSymbol: 'BTC',
-      selectedResolution: '30分钟',
+      selectedSymbol: '',
     },
   );
 
   const localSection = ref(props.activeSection);
-  const selectedExchange = ref<FundingExchange>(props.selectedExchange);
-  const selectedSymbol = ref<FundingSymbol>(props.selectedSymbol);
-  const selectedRange = ref<FundingMarketRange>('current');
-  const selectedResolution = ref<string>(props.selectedResolution);
-  const selectedStartDate = ref('2026-05-28');
-  const selectedEndDate = ref('2026-06-24');
+  const {
+    loading,
+    submitting,
+    error,
+    context,
+    positionGroups,
+    pendingDraft,
+    activeWorkspace,
+    workspaceState,
+    notionalInput,
+    quantityInput,
+    canSubmit,
+    refreshAll,
+    submit,
+    selectSymbol,
+  } = useFundingWorkspace();
 
-  const profile = computed(
-    () => fundingCarryProfiles[selectedExchange.value] ?? fundingCarryProfiles.Bybit,
-  );
-  const currentResearch = computed(
-    () => profile.value.research[selectedSymbol.value] ?? profile.value.research[defaultSymbol],
-  );
-
-  const rangeOptions = computed(() =>
-    (Object.keys(fundingRangeLabels) as FundingMarketRange[]).map((value) => ({
-      value,
-      label: fundingRangeLabels[value],
-    })),
-  );
-
-  const profileOrderPanel = computed(() => ({
-    ...fundingOrderPanel,
-    strategyLabel: `${selectedExchange.value} ${selectedSymbol.value}资金费率套利`,
-  }));
-
-  function handleChartSymbolUpdate(value: string) {
-    selectedSymbol.value = value as FundingSymbol;
-  }
-
-  function handleExchangeUpdate(value: FundingExchange) {
-    selectedExchange.value = value;
+  function handleSelectSymbol(perpetualSymbol: string, spotSymbol: string) {
+    selectSymbol(perpetualSymbol, spotSymbol);
+    refreshAll();
   }
 
   watch(
@@ -121,39 +88,24 @@
   );
 
   watch(
-    () => props.selectedExchange,
-    (value) => {
-      selectedExchange.value = value;
-    },
-    { immediate: true },
-  );
-
-  watch(
     () => props.selectedSymbol,
     (value) => {
-      selectedSymbol.value = value;
-    },
-    { immediate: true },
-  );
-
-  watch(
-    () => props.selectedResolution,
-    (value) => {
-      selectedResolution.value = value;
-    },
-    { immediate: true },
-  );
-
-  watch(
-    profile,
-    (nextProfile) => {
-      const nextSymbols = nextProfile.snapshots.map((item) => item.symbol);
-      if (!nextSymbols.includes(selectedSymbol.value)) {
-        selectedSymbol.value = nextSymbols[0] ?? defaultSymbol;
+      if (typeof value === 'string' && value.trim() && context.value) {
+        const match = context.value.symbolOptions.find(
+          (item) =>
+            item.baseAsset === value.trim().toUpperCase() ||
+            item.perpetualSymbol === value.trim().toUpperCase() ||
+            item.spotSymbol === value.trim().toUpperCase(),
+        );
+        if (match) {
+          selectSymbol(match.perpetualSymbol, match.spotSymbol);
+        }
       }
     },
     { immediate: true },
   );
+
+  refreshAll();
 </script>
 
 <style lang="less">
