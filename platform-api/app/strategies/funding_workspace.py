@@ -469,12 +469,12 @@ def _execution_state(instruction: dict[str, object], batch, attempts, releases) 
         return "manual_intervention"
     if instruction["status"] == "failed":
         return "failed"
-    if batch is not None and batch.status == "hedged":
-        return "partially_hedged"
     if any(row["status"] == "result_unknown" for row in attempts) or any(
         row["status"] == "result_unknown" for row in releases
     ):
         return "result_unknown"
+    if batch is not None and batch.status == "hedged":
+        return "partially_hedged"
     if attempts:
         return "executing"
     return "submitting"

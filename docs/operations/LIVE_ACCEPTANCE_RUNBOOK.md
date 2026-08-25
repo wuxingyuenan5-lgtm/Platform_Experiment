@@ -242,14 +242,22 @@ following in read-only mode:
   fully ready.
 - No approved `LiveTradingSession` exists.
 
-Current known blocker for Funding page read-only execution context:
+Funding page read-only execution context requirements:
 
-- Funding and Cross already share the same logical Bybit UTA binding
-  (`bybit-live-main`), but the current Runtime Bybit read contract still
-  exposes instrument/quote reads through a single-category symbol path. Until
-  that contract distinguishes or safely multiplexes spot/perpetual reads for
-  the same external symbol, the Funding page must fail closed instead of
-  showing mock market data or pretending readiness.
+- Funding and Cross share the same logical Bybit UTA binding
+  (`bybit-live-main`).
+- Funding execution context must read spot/perpetual quotes and contract
+  specifications through explicit market scope (`crypto_spot/spot`,
+  `crypto_perp/linear`) and expose the shared reservation summary.
+- The Funding page may auto-poll only non-terminal instruction states; it must
+  stop automatic progression on `result_unknown` or `manual_intervention`, keep
+  read-only recovery identity, and never auto-resubmit.
+- Funding close availability must use authoritative cumulative close fills for
+  both legs. Requested close quantity is reservation only and cannot be shown as
+  already closed.
+- A fully closed Funding group moves to history only when authoritative closed
+  quantity reaches hedged quantity and no pending or uncertain close
+  reservation remains.
 
 Two states are valid:
 

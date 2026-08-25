@@ -100,6 +100,7 @@ def order_payload(key: str) -> dict[str, str]:
 
 def test_two_person_approval_and_live_order_claim(monkeypatch, tmp_path: Path) -> None:
     configure_live(monkeypatch, tmp_path)
+    monkeypatch.setattr("app.auth.has_ceo_trade_authority", lambda principal, settings: True)
     with TestClient(app) as client:
         make_account_live()
         payload = session_payload()
@@ -196,6 +197,7 @@ def test_founder_demo_admin_can_self_approve_minimum_size_acceptance(
 
 def test_live_order_without_approved_session_is_rejected(monkeypatch, tmp_path: Path) -> None:
     configure_live(monkeypatch, tmp_path)
+    monkeypatch.setattr("app.auth.has_ceo_trade_authority", lambda principal, settings: True)
     with TestClient(app) as client:
         make_account_live()
         response = client.post(
@@ -281,6 +283,7 @@ def test_live_order_claim_ignores_legacy_session_notional_caps(
     monkeypatch, tmp_path: Path
 ) -> None:
     configure_live(monkeypatch, tmp_path)
+    monkeypatch.setattr("app.auth.has_ceo_trade_authority", lambda principal, settings: True)
     with TestClient(app) as client:
         make_account_live()
         requested = client.post(

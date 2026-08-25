@@ -317,6 +317,34 @@ export interface StrategyManagementOverviewResult {
   executionReadiness?: StrategyV1ReadinessResult | null;
 }
 
+export interface LiveTradingSessionResult {
+  sessionId: string;
+  idempotencyKey: string;
+  sessionType: 'minimum_size_acceptance' | 'existing_limits' | 'scale_change';
+  strategyInstanceId: string;
+  accountId: string;
+  symbols: string[];
+  sides: string[];
+  orderTypes: string[];
+  startsAt: string;
+  endsAt: string;
+  maxOrderNotional: string;
+  maxDailyNotional: string;
+  readOnlyVerifiedAt: string;
+  evidenceReference: string;
+  reason: string;
+  applicantUserId: string;
+  approverUserId?: string | null;
+  approvalReason?: string | null;
+  approvedAt?: string | null;
+  revokedBy?: string | null;
+  revocationReason?: string | null;
+  revokedAt?: string | null;
+  status: 'pending' | 'approved' | 'revoked' | 'expired';
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface AccountResult {
   accountId: string;
   accountCode: string;

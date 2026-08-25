@@ -19,6 +19,7 @@ import type {
   PositionResult,
   ReconciliationSummaryResult,
   RuntimeReadinessResult,
+  LiveTradingSessionResult,
   StrategyAccountBindingResult,
   StrategyAccountSnapshotResult,
   StrategyDefinitionResult,
@@ -238,6 +239,53 @@ export async function getStrategyV1Readiness(
 ): Promise<StrategyV1ReadinessResult> {
   const response = await client.get<StrategyV1ReadinessResult>(
     `/strategies/instances/${encodeURIComponent(strategyInstanceId)}/v1-readiness`,
+  );
+  return response.data;
+}
+
+export async function getLiveTradingSessions(): Promise<LiveTradingSessionResult[]> {
+  const response = await client.get<LiveTradingSessionResult[]>('/live-trading/sessions');
+  return response.data;
+}
+
+export async function createLiveTradingSession(input: {
+  idempotencyKey: string;
+  sessionType: 'minimum_size_acceptance' | 'existing_limits' | 'scale_change';
+  strategyInstanceId: string;
+  accountId: string;
+  symbols: string[];
+  sides: Array<'buy' | 'sell'>;
+  orderTypes: Array<'market' | 'limit'>;
+  startsAt: string;
+  endsAt: string;
+  maxOrderNotional: string;
+  maxDailyNotional: string;
+  readOnlyVerifiedAt: string;
+  evidenceReference: string;
+  reason: string;
+}): Promise<LiveTradingSessionResult> {
+  const response = await client.post<LiveTradingSessionResult>('/live-trading/sessions', input);
+  return response.data;
+}
+
+export async function approveLiveTradingSession(
+  sessionId: string,
+  reason: string,
+): Promise<LiveTradingSessionResult> {
+  const response = await client.post<LiveTradingSessionResult>(
+    `/live-trading/sessions/${encodeURIComponent(sessionId)}/approve`,
+    { reason },
+  );
+  return response.data;
+}
+
+export async function revokeLiveTradingSession(
+  sessionId: string,
+  reason: string,
+): Promise<LiveTradingSessionResult> {
+  const response = await client.post<LiveTradingSessionResult>(
+    `/live-trading/sessions/${encodeURIComponent(sessionId)}/revoke`,
+    { reason },
   );
   return response.data;
 }

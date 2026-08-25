@@ -10,15 +10,17 @@
 
 | 工作流 | 当前结果 | 完成定义 | 下一动作 |
 |---|---|---|---|
-| 文档与项目跟进 | `pending_cleanup`：新结构、AI 回填和活跃文档已收敛；旧材料已移入清理隔离区 | 项目只从本页跟进；产品、架构、合同和前端各有明确位置；旧过程材料退出仓库 | Owner 手动删除 `.codex-cleanup-quarantine/docs-retire-20260825`，随后执行最终复核 |
-| Platform 0.11.2 候选 | `in_progress`：真实 Bybit/MT5 只读监控链路已打通，Funding/Cross/Bottom/Short A 的 logical account 绑定和同步合同已收敛；本地开发启动器现已常驻复用并带登录烟测，但 Funding 页面仍存在同一 Bybit UTA 的 spot/perp category 读取阻断 | 独立验收、浏览器访问回归和 Capability 对齐完成，已知限制明确 | 保持只读链路稳定；先完成 Funding 多 category 只读合同，再进入 Owner 页面小额受控测试 |
-| 受控交易闭环 | `blocked_by_authorization/evidence`：真实只读验收不等于交易授权；Live Write 仍关闭，Funding controlled-live 仍默认 `423`，且不存在 approved LiveTradingSession | 每个外部连接或写入步骤具有单独授权、外部证据、对账和强制回只读 | 继续保持只读；等待 Owner 提供下一步明确操作授权 |
+| 文档与项目跟进 | `in_progress`：项目驾驶舱、发现箱和 AI 回填规则已启用；新增“一个阶段一份 workstream、完成后归并并删除”的轻量机制，旧材料仍在清理隔离区 | 项目级状态只从本页跟进；跨任务阶段依赖唯一 workstream；长期事实各归其权威；旧过程材料退出仓库 | 用“策略模块架构”试运行阶段机制；确认接续和收尾顺畅后，再完成隔离区人工清理与最终复核 |
+| Platform 0.11.2 候选 | `in_progress`：真实 Bybit/MT5 只读监控链路已打通，Funding/Cross/Bottom/Short A 的 logical account 绑定和同步合同已收敛；本地开发启动器现已常驻复用并带登录烟测；Funding 页面现已使用真实 execution-context、非终态自动追踪和权威平仓口径，不再依赖生产 mock | 独立验收、浏览器访问回归和 Capability 对齐完成，已知限制明确 | 保持三服务常驻；完成最终文档与专项回归后，由 Owner 在页面创建测试会话并输入小额测试金额 |
+| 受控交易闭环 | `blocked_by_authorization/evidence`：真实只读验收不等于交易授权；Runtime 仍默认未武装，Live Write 仍关闭，Funding/Cross 仍需 Owner 在页面创建并审批 LiveTradingSession 后才可能进入受控测试窗口 | 每个外部连接或写入步骤具有单独授权、外部证据、对账和强制回只读 | 继续保持只读；由 Owner 通过页面完成测试会话创建/审批和具体金额确认，执行 AI 不代替点击 |
 
 ## Next
 
-- 把 0.11.2 剩余工作压缩成可验收结果，不再用新的阶段文档复制当前状态。
+- 把 0.11.2 剩余工作压缩成可验收结果；相关子任务共同维护一份活跃 workstream，不再复制阶段计划、回执或当前状态。
 - 保持真实只读监控链路：Funding/Cross 共享 `bybit-live-main`，Bottom 使用独立 Bybit 只读账号，Cross/Short A 共用单 Terminal MT5 只读切换，Short B 继续 `unbound`。
 - 保持本地三服务常驻：`scripts/dev-platform.ps1` 负责健康复用、失败清理、状态文件和登录烟测，不再接受“前端还在、API/Runtime 已被回收”的半残状态。
+- Funding 页面现在必须持续展示真实共享 UTA 余额、Reservation、服务端执行状态和权威平仓数量；页面刷新只能恢复既有 instruction identity，不能重新提交。
+- 策略管理页现在提供 CEO-only 测试会话面板，可同时为 Funding 与 Cross 创建/审批/撤销现有 `LiveTradingSession`，但默认仍显示未武装。
 - 在任何下一步外部操作前，继续要求 `liveWriteEnabled=false`、无 approved `LiveTradingSession`、Funding controlled-live 默认 `423`。
 - 当产品方向出现新想法时，先放入下方发现箱；确认后再进入正式 PRD 或策略文档。
 
@@ -34,7 +36,7 @@ AI 可以自动记录不完整需求、缺口和不确定性。条目在 Owner �
 
 | 想法或问题 | 当前判断 | 需要确认 |
 |---|---|---|
-| 如何让 AI 自动维护项目跟进 | 已采用“任务结束前文档影响检查 + 本页唯一跟进入口” | 连续使用若干任务后，确认字段是否足够、是否需要更直观的 UI |
+| 如何让 AI 自动维护项目跟进 | 已采用“任务结束前文档影响检查 + 本页项目级入口 + 活跃阶段唯一 workstream”；AI 可自动更新状态和发现，不能自动批准范围 | 用“策略模块架构”完成一次从接续到收尾的完整试运行后复核 |
 | 早期需求无法一次写好 | 采用“发现箱 → Now/Next/Later → 稳定权威”的渐进流程 | 哪些新产品方向进入近期优先级，由 Owner 逐项确认 |
 
 ## 当前不可突破的边界
