@@ -35,6 +35,56 @@ function watch(_sources, callback) {
   callback();
 }
 
+function createFakeTimers() {
+  let now = 0;
+  let nextId = 1;
+  const queue = [];
+
+  function setTimeoutStub(fn, delay = 0) {
+    const id = nextId++;
+    queue.push({ id, at: now + delay, fn });
+    queue.sort((left, right) => left.at - right.at || left.id - right.id);
+    return id;
+  }
+
+  function clearTimeoutStub(id) {
+    const index = queue.findIndex((item) => item.id === id);
+    if (index >= 0) queue.splice(index, 1);
+  }
+
+  async function advance(ms) {
+    now += ms;
+    while (queue.length && queue[0].at <= now) {
+      const item = queue.shift();
+      await item.fn();
+    }
+  }
+
+  return { setTimeoutStub, clearTimeoutStub, advance };
+}
+
+function createEventTarget(initialVisibility = 'visible') {
+  const listeners = new Map();
+  return {
+    visibilityState: initialVisibility,
+    addEventListener(type, handler) {
+      if (!listeners.has(type)) listeners.set(type, new Set());
+      listeners.get(type).add(handler);
+    },
+    removeEventListener(type, handler) {
+      listeners.get(type)?.delete(handler);
+    },
+    dispatch(type) {
+      for (const handler of listeners.get(type) || []) {
+        handler();
+      }
+    },
+    listenerCount(type) {
+      return (listeners.get(type) || new Set()).size;
+    },
+  };
+}
+
 function loadTsModule(modulePath, stubs) {
   const source = fs.readFileSync(modulePath, 'utf8');
   const compiled = ts.transpileModule(source, {
@@ -57,6 +107,11 @@ function loadTsModule(modulePath, stubs) {
   return loaded.exports;
 }
 
+async function flushMicrotasks() {
+  await Promise.resolve();
+  await Promise.resolve();
+}
+
 async function main() {
   const root = path.resolve(__dirname, '..');
   const recoveryPath = path.join(
@@ -73,12 +128,17 @@ async function main() {
   assert.equal(pageSource.includes('@/data/sample/funding'), false);
 
   const storage = createMemoryStorage();
+  const timers = createFakeTimers();
+  const documentStub = createEventTarget('visible');
+  const windowStub = createEventTarget();
+  const mountedHandlers = [];
+  const unmountedHandlers = [];
+
   global.localStorage = storage;
-  global.setTimeout = (fn) => {
-    fn();
-    return 1;
-  };
-  global.clearTimeout = () => {};
+  global.setTimeout = timers.setTimeoutStub;
+  global.clearTimeout = timers.clearTimeoutStub;
+  global.document = documentStub;
+  global.window = windowStub;
 
   const recovery = loadTsModule(recoveryPath, {});
   const executionContextCalls = [];
@@ -91,25 +151,57 @@ async function main() {
       perpetualSymbol: 'BTCUSDT',
       spotSymbol: 'BTCUSDT',
       hedgedQuantity: '0.020',
-      remainingClosableQuantity: '0.015',
+      authoritativeClosedQuantity: '0.005',
+      pendingCloseQuantity: '0.002',
+      resultUnknownReservedQuantity: '0',
+      remainingClosableQuantity: '0.013',
+      lifecycleState: 'active',
+      status: 'reconciling',
+      workspaceState: { executionState: 'reconciling' },
+    },
+    {
+      instructionId: 'open-history-1',
+      openInstructionId: 'open-history-1',
+      perpetualSymbol: 'ETHUSDT',
+      spotSymbol: 'ETHUSDT',
+      hedgedQuantity: '1.000',
+      authoritativeClosedQuantity: '1.000',
+      pendingCloseQuantity: '0',
+      resultUnknownReservedQuantity: '0',
+      remainingClosableQuantity: '0',
+      lifecycleState: 'history',
       status: 'completed',
       workspaceState: { executionState: 'completed' },
     },
   ];
-  const workspaceResponses = [
-    {
-      instruction: { instructionId: 'instruction-open-1' },
-      workspaceState: { executionState: 'executing' },
-    },
-    {
-      instruction: { instructionId: 'instruction-open-1' },
-      workspaceState: { executionState: 'result_unknown' },
-    },
-    {
-      instruction: { instructionId: 'instruction-open-1' },
-      workspaceState: { executionState: 'completed' },
-    },
-  ];
+  const workspaceByInstruction = new Map([
+    [
+      'instruction-open-1',
+      [
+        {
+          instruction: { instructionId: 'instruction-open-1' },
+          workspaceState: { executionState: 'executing' },
+        },
+        {
+          instruction: { instructionId: 'instruction-open-1' },
+          workspaceState: { executionState: 'reconciling' },
+        },
+        {
+          instruction: { instructionId: 'instruction-open-1' },
+          workspaceState: { executionState: 'completed' },
+        },
+      ],
+    ],
+    [
+      'instruction-close-1',
+      [
+        {
+          instruction: { instructionId: 'instruction-close-1' },
+          workspaceState: { executionState: 'result_unknown' },
+        },
+      ],
+    ],
+  ]);
 
   const apiStub = {
     async getFundingExecutionContext(params) {
@@ -147,32 +239,82 @@ async function main() {
         asOf: '2026-08-25T00:00:00Z',
       };
     },
-    async getFundingPositionGroups() {
+    async getFundingPositionGroups(scope) {
+      assert.equal(scope, 'all');
       return groups;
     },
     async submitFundingInstruction(payload) {
       submitCalls.push(payload);
-      return workspaceResponses.shift();
+      if (payload.action === 'open') {
+        return {
+          instruction: { instructionId: 'instruction-open-1' },
+          workspaceState: { executionState: 'executing' },
+        };
+      }
+      return {
+        instruction: { instructionId: 'instruction-close-1' },
+        workspaceState: { executionState: 'result_unknown' },
+      };
     },
     async getFundingInstructionWorkspace(instructionId) {
-      workspaceCalls.push(instructionId);
-      return workspaceResponses.shift();
+      workspaceCalls.push(['instruction', instructionId]);
+      const queue = workspaceByInstruction.get(instructionId) || [];
+      return (
+        queue.shift() || {
+          instruction: { instructionId },
+          workspaceState: { executionState: 'completed' },
+        }
+      );
+    },
+    async getFundingInstructionWorkspaceByIdempotency(idempotencyKey) {
+      workspaceCalls.push(['idempotency', idempotencyKey]);
+      return {
+        instruction: { instructionId: 'instruction-open-1' },
+        workspaceState: { executionState: 'executing' },
+      };
     },
   };
 
   const composable = loadTsModule(composablePath, {
-    vue: { computed, ref, watch },
+    vue: {
+      computed,
+      ref,
+      watch,
+      onMounted: (handler) => mountedHandlers.push(handler),
+      onBeforeUnmount: (handler) => unmountedHandlers.push(handler),
+    },
     '@/api/platform/fundingWorkspace': apiStub,
     './fundingExecutionRecovery': recovery,
   });
 
   const { useFundingWorkspace } = composable;
-  const { readFundingDraft } = recovery;
-  const workspace = useFundingWorkspace();
+  const { readFundingDraft, writeFundingDraft } = recovery;
 
-  await workspace.refreshAll();
+  writeFundingDraft(
+    {
+      idempotencyKey: 'funding:recover-open-1',
+      action: 'open',
+      perpetualSymbol: 'BTCUSDT',
+      spotSymbol: 'BTCUSDT',
+      quantity: '0.001',
+      state: 'executing',
+    },
+    storage,
+  );
+
+  const workspace = useFundingWorkspace();
+  for (const handler of mountedHandlers) {
+    handler();
+  }
+  await flushMicrotasks();
+  if (!workspaceCalls.length) {
+    await workspace.refreshAll();
+  }
+
   assert.equal(workspace.quantityInput.value, '0.001');
-  assert.equal(executionContextCalls.length >= 1, true);
+  assert.equal(workspace.selectedCloseInstructionId.value, 'open-1');
+  assert.equal(workspaceCalls[0][0], 'idempotency');
+  assert.equal(workspace.pendingDraft.value.instructionId, 'instruction-open-1');
 
   await workspace.submit('open');
   let draft = readFundingDraft(storage);
@@ -181,23 +323,42 @@ async function main() {
   assert.equal(draft.instructionId, 'instruction-open-1');
   assert.equal(draft.state, 'executing');
 
-  await workspace.refreshInstruction();
+  await timers.advance(1000);
+  await flushMicrotasks();
   draft = readFundingDraft(storage);
-  assert.equal(workspaceCalls.length, 1);
-  assert.equal(draft.state, 'result_unknown');
+  assert.equal(draft.state, 'reconciling');
 
-  await workspace.refreshInstruction();
+  documentStub.visibilityState = 'hidden';
+  documentStub.dispatch('visibilitychange');
+  const callsWhileHidden = workspaceCalls.length;
+  await timers.advance(3000);
+  await flushMicrotasks();
+  assert.equal(workspaceCalls.length, callsWhileHidden);
+
+  documentStub.visibilityState = 'visible';
+  documentStub.dispatch('visibilitychange');
+  await flushMicrotasks();
   assert.equal(readFundingDraft(storage), null);
 
-  workspaceResponses.push({
-    instruction: { instructionId: 'instruction-close-1' },
-    workspaceState: { executionState: 'executing' },
-  });
   workspace.selectCloseInstruction('open-1');
   await workspace.submit('close');
+  draft = readFundingDraft(storage);
   assert.equal(submitCalls[1].action, 'close');
   assert.equal(submitCalls[1].targetOpenInstructionId, 'open-1');
-  assert.equal(submitCalls[1].quantity, '0.015');
+  assert.equal(submitCalls[1].quantity, '0.013');
+  assert.equal(draft.state, 'result_unknown');
+
+  windowStub.dispatch('online');
+  await flushMicrotasks();
+  assert.equal(workspace.pendingDraft.value.state, 'result_unknown');
+
+  assert.equal(documentStub.listenerCount('visibilitychange'), 1);
+  assert.equal(windowStub.listenerCount('online'), 1);
+  for (const handler of unmountedHandlers) {
+    handler();
+  }
+  assert.equal(documentStub.listenerCount('visibilitychange'), 0);
+  assert.equal(windowStub.listenerCount('online'), 0);
 
   console.log('funding workspace recovery behavior passed');
 }

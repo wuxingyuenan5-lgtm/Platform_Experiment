@@ -1,8 +1,9 @@
-import { computed, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
 import {
   getFundingExecutionContext,
   getFundingInstructionWorkspace,
+  getFundingInstructionWorkspaceByIdempotency,
   getFundingPositionGroups,
   type FundingPositionGroup,
   submitFundingInstruction,
@@ -10,6 +11,7 @@ import {
 } from '@/api/platform/fundingWorkspace';
 import {
   clearFundingDraft,
+  isFundingAutoPollingState,
   isFundingTerminalState,
   readFundingDraft,
   writeFundingDraft,
@@ -24,8 +26,15 @@ function normalizeWorkspaceState(workspace: Record<string, unknown> | undefined 
   return typeof workspace?.executionState === 'string' ? workspace.executionState : 'loading';
 }
 
+function isPageVisible(): boolean {
+  return typeof document === 'undefined' || document.visibilityState === 'visible';
+}
+
 export function useFundingWorkspace() {
   let refreshTimer: ReturnType<typeof setTimeout> | null = null;
+  let instructionPollTimer: ReturnType<typeof setTimeout> | null = null;
+  let instructionPollAttempt = 0;
+  const instructionPollDelays = [1_000, 2_000, 3_000];
   const loading = ref(false);
   const submitting = ref(false);
   const error = ref<string | null>(null);
@@ -53,7 +62,7 @@ export function useFundingWorkspace() {
   );
   const canSubmit = computed(() => {
     const ready = readiness.value.ready === true;
-    if (!ready || submitting.value || !quantityInput.value) return false;
+    if (!ready || submitting.value || pendingDraft.value || !quantityInput.value) return false;
     if (!selectedPerpetualSymbol.value) return false;
     return (
       !selectedCloseInstructionId.value ||
@@ -89,29 +98,83 @@ export function useFundingWorkspace() {
   }
 
   async function refreshPositionGroups() {
-    positionGroups.value = await getFundingPositionGroups();
+    positionGroups.value = await getFundingPositionGroups('all');
     if (!selectedCloseInstructionId.value && positionGroups.value.length) {
-      selectedCloseInstructionId.value = positionGroups.value[0].instructionId;
+      selectedCloseInstructionId.value =
+        positionGroups.value.find((item) => item.lifecycleState === 'active')?.instructionId ??
+        positionGroups.value[0].instructionId;
     }
     if (
       selectedCloseInstructionId.value &&
       !positionGroups.value.some((item) => item.instructionId === selectedCloseInstructionId.value)
     ) {
-      selectedCloseInstructionId.value = positionGroups.value[0]?.instructionId ?? '';
+      selectedCloseInstructionId.value =
+        positionGroups.value.find((item) => item.lifecycleState === 'active')?.instructionId ??
+        positionGroups.value[0]?.instructionId ??
+        '';
     }
   }
 
-  async function refreshInstruction() {
-    if (!pendingDraft.value?.instructionId) return;
-    const response = await getFundingInstructionWorkspace(pendingDraft.value.instructionId);
+  function stopInstructionPolling() {
+    if (instructionPollTimer) {
+      clearTimeout(instructionPollTimer);
+      instructionPollTimer = null;
+    }
+    instructionPollAttempt = 0;
+  }
+
+  function scheduleInstructionPoll() {
+    if (
+      instructionPollTimer ||
+      !pendingDraft.value ||
+      !isFundingAutoPollingState(pendingDraft.value.state) ||
+      !isPageVisible()
+    ) {
+      return;
+    }
+    const delay =
+      instructionPollDelays[Math.min(instructionPollAttempt, instructionPollDelays.length - 1)];
+    instructionPollAttempt += 1;
+    instructionPollTimer = setTimeout(async () => {
+      instructionPollTimer = null;
+      await refreshInstruction({ silent: true });
+      scheduleInstructionPoll();
+    }, delay);
+  }
+
+  function startInstructionPolling() {
+    if (!pendingDraft.value || !isFundingAutoPollingState(pendingDraft.value.state)) return;
+    scheduleInstructionPoll();
+  }
+
+  async function refreshInstruction(options: { silent?: boolean } = {}) {
+    const draft = pendingDraft.value;
+    if (!draft) return;
+    let response;
+    try {
+      response = draft.instructionId
+        ? await getFundingInstructionWorkspace(draft.instructionId)
+        : await getFundingInstructionWorkspaceByIdempotency(draft.idempotencyKey);
+    } catch (caught) {
+      if (!options.silent) {
+        error.value =
+          caught instanceof Error ? caught.message : 'Funding instruction recovery unavailable';
+      }
+      return;
+    }
     activeInstruction.value = response.instruction;
     activeWorkspace.value = response.workspaceState ?? null;
     const state = normalizeWorkspaceState(response.workspaceState);
     if (isFundingTerminalState(state)) {
+      stopInstructionPolling();
       clearFundingDraft();
       pendingDraft.value = null;
-    } else if (pendingDraft.value) {
-      pendingDraft.value = { ...pendingDraft.value, state: state as FundingPendingDraft['state'] };
+    } else {
+      pendingDraft.value = {
+        ...draft,
+        instructionId: String(response.instruction.instructionId ?? draft.instructionId ?? ''),
+        state: state as FundingPendingDraft['state'],
+      };
       writeFundingDraft(pendingDraft.value);
     }
   }
@@ -167,13 +230,17 @@ export function useFundingWorkspace() {
         writeFundingDraft(pendingDraft.value);
       }
       if (isFundingTerminalState(state)) {
+        stopInstructionPolling();
         clearFundingDraft();
         pendingDraft.value = null;
+      } else {
+        startInstructionPolling();
       }
       await refreshPositionGroups();
       return response;
     } catch (caught) {
       error.value = caught instanceof Error ? caught.message : 'Funding instruction submit failed';
+      startInstructionPolling();
       throw caught;
     } finally {
       submitting.value = false;
@@ -206,6 +273,33 @@ export function useFundingWorkspace() {
     { flush: 'post' },
   );
 
+  function recoverPendingInstruction() {
+    if (!pendingDraft.value) return;
+    stopInstructionPolling();
+    void refreshInstruction({ silent: true }).finally(startInstructionPolling);
+  }
+
+  function handleVisibilityChange() {
+    if (!isPageVisible()) {
+      stopInstructionPolling();
+      return;
+    }
+    recoverPendingInstruction();
+  }
+
+  onMounted(() => {
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('online', recoverPendingInstruction);
+    void refreshAll().finally(startInstructionPolling);
+  });
+
+  onBeforeUnmount(() => {
+    if (refreshTimer) clearTimeout(refreshTimer);
+    stopInstructionPolling();
+    document.removeEventListener('visibilitychange', handleVisibilityChange);
+    window.removeEventListener('online', recoverPendingInstruction);
+  });
+
   return {
     loading,
     submitting,
@@ -229,6 +323,7 @@ export function useFundingWorkspace() {
     refreshContext,
     refreshPositionGroups,
     refreshInstruction,
+    startInstructionPolling,
     submit,
     selectSymbol,
     selectCloseInstruction,

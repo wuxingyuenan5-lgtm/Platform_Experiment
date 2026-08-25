@@ -71,7 +71,11 @@ export interface FundingPositionGroup {
   hedgedQuantity: string;
   residualQuantity: string;
   alreadyClosedQuantity?: string | null;
+  authoritativeClosedQuantity?: string | null;
+  pendingCloseQuantity?: string | null;
+  resultUnknownReservedQuantity?: string | null;
   remainingClosableQuantity?: string | null;
+  lifecycleState: 'active' | 'history';
   fundingFees?: string | null;
   fees?: string | null;
   pnl?: string | null;
@@ -90,8 +94,12 @@ export async function getFundingExecutionContext(params?: {
   return response.data;
 }
 
-export async function getFundingPositionGroups(): Promise<FundingPositionGroup[]> {
-  const response = await client.get<FundingPositionGroup[]>('/trading/funding/positions');
+export async function getFundingPositionGroups(
+  scope: 'active' | 'history' | 'all' = 'all',
+): Promise<FundingPositionGroup[]> {
+  const response = await client.get<FundingPositionGroup[]>('/trading/funding/positions', {
+    params: { scope },
+  });
   return response.data;
 }
 
@@ -116,5 +124,14 @@ export async function getFundingInstructionWorkspace(
   const response = await client.get<FundingWorkspaceResponse>(
     `/trading/funding/instructions/${encodeURIComponent(instructionId)}`,
   );
+  return response.data;
+}
+
+export async function getFundingInstructionWorkspaceByIdempotency(
+  idempotencyKey: string,
+): Promise<FundingWorkspaceResponse> {
+  const response = await client.get<FundingWorkspaceResponse>('/trading/funding/instructions', {
+    params: { idempotencyKey },
+  });
   return response.data;
 }

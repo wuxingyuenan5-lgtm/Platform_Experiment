@@ -16,6 +16,7 @@ from app.strategies.instruction_service import (
     create_instruction,
     execute_instruction,
     get_instruction,
+    get_instruction_by_idempotency,
     list_instructions,
 )
 
@@ -203,7 +204,9 @@ def get_funding_execution_context(
     }
 
 
-def list_funding_position_groups() -> list[dict[str, object]]:
+def list_funding_position_groups(*, scope: str = "active") -> list[dict[str, object]]:
+    if scope not in {"active", "history", "all"}:
+        raise HTTPException(status_code=422, detail="Unsupported Funding position scope")
     instructions = list_instructions(STRATEGY_INSTANCE_ID)
     close_summary = _close_summary_by_open_instruction(instructions)
     groups: list[dict[str, object]] = []
@@ -213,13 +216,17 @@ def list_funding_position_groups() -> list[dict[str, object]]:
         batch_id = instruction.get("executionBatchId")
         if not batch_id:
             continue
-        groups.append(
-            _funding_group_snapshot(
-                instruction_id=str(instruction["instructionId"]),
-                batch_id=str(batch_id),
-                close_summary=close_summary.get(str(instruction["instructionId"])),
-            )
+        group = _funding_group_snapshot(
+            instruction_id=str(instruction["instructionId"]),
+            batch_id=str(batch_id),
+            close_summary=close_summary.get(str(instruction["instructionId"])),
         )
+        lifecycle_state = str(group["lifecycleState"])
+        if scope == "active" and lifecycle_state != "active":
+            continue
+        if scope == "history" and lifecycle_state == "active":
+            continue
+        groups.append(group)
     return groups
 
 
@@ -302,6 +309,13 @@ def get_funding_instruction_workspace(instruction_id: str) -> dict[str, object]:
         "executionBatch": batch,
         "workspaceState": _workspace_state_from_instruction(instruction),
     }
+
+
+def get_funding_instruction_workspace_by_idempotency(
+    idempotency_key: str,
+) -> dict[str, object]:
+    instruction = get_instruction_by_idempotency(STRATEGY_INSTANCE_ID, idempotency_key)
+    return get_funding_instruction_workspace(str(instruction["instructionId"]))
 
 
 def _workspace_state_from_instruction(instruction: dict[str, object]) -> dict[str, object]:
@@ -485,8 +499,23 @@ def _funding_group_snapshot(
     cumulative_perp = Decimal(str(workspace["cumulativePerpetualFill"] or "0"))
     hedged_quantity = min(cumulative_perp, cumulative_spot)
     residual = max(Decimal("0"), cumulative_perp - cumulative_spot)
-    already_closed = (close_summary or {}).get("alreadyClosedQuantity", Decimal("0"))
-    remaining_closable = max(Decimal("0"), hedged_quantity - already_closed)
+    authoritative_closed = (close_summary or {}).get(
+        "authoritativeClosedQuantity", Decimal("0")
+    )
+    pending_close = (close_summary or {}).get("pendingCloseQuantity", Decimal("0"))
+    result_unknown_reserved = (close_summary or {}).get(
+        "resultUnknownReservedQuantity", Decimal("0")
+    )
+    reserved_or_closed = authoritative_closed + pending_close + result_unknown_reserved
+    remaining_closable = max(Decimal("0"), hedged_quantity - reserved_or_closed)
+    lifecycle_state = (
+        "history"
+        if hedged_quantity > 0
+        and authoritative_closed >= hedged_quantity
+        and pending_close == 0
+        and result_unknown_reserved == 0
+        else "active"
+    )
     funding_fees, trading_fees = _funding_fees_for_batch(batch_id)
     return {
         "openInstructionId": instruction_id,
@@ -503,8 +532,12 @@ def _funding_group_snapshot(
         "cumulativeSpotFill": _decimal_text(cumulative_spot),
         "hedgedQuantity": _decimal_text(hedged_quantity),
         "residualQuantity": _decimal_text(residual),
-        "alreadyClosedQuantity": _decimal_text(already_closed),
+        "alreadyClosedQuantity": _decimal_text(authoritative_closed),
+        "authoritativeClosedQuantity": _decimal_text(authoritative_closed),
+        "pendingCloseQuantity": _decimal_text(pending_close),
+        "resultUnknownReservedQuantity": _decimal_text(result_unknown_reserved),
         "remainingClosableQuantity": _decimal_text(remaining_closable),
+        "lifecycleState": lifecycle_state,
         "fundingFees": _decimal_text(funding_fees),
         "fees": _decimal_text(trading_fees),
         "pnl": None,
@@ -517,18 +550,10 @@ def _close_summary_by_open_instruction(
     instructions: list[dict[str, object]],
 ) -> dict[str, dict[str, Decimal]]:
     summary: dict[str, dict[str, Decimal]] = {}
-    active_statuses = {
-        "accepted",
-        "executing",
-        "reconciling",
-        "completed",
-        "manual_intervention",
-        "result_unknown",
-    }
+    pending_states = {"accepted", "submitting", "executing", "partially_hedged", "reconciling"}
+    uncertain_states = {"manual_intervention", "result_unknown"}
     for instruction in instructions:
         if instruction["action"] != StrategyInstructionAction.CLOSE.value:
-            continue
-        if str(instruction["status"]) not in active_statuses:
             continue
         parameters = instruction.get("requestedParameters") or {}
         if not isinstance(parameters, dict):
@@ -539,12 +564,63 @@ def _close_summary_by_open_instruction(
         quantity = Decimal(
             str(parameters.get("perpetualQuantity") or parameters.get("spotQuantity") or "0")
         )
+        workspace = _workspace_state_from_instruction(instruction)
+        perpetual_fill = Decimal(str(workspace.get("cumulativePerpetualFill") or "0"))
+        releases = workspace.get("spotReleases") or []
+        spot_fill = max(
+            (
+                Decimal(str(row.get("cumulativeSpotQuantity") or "0"))
+                for row in releases
+                if isinstance(row, dict)
+            ),
+            default=Decimal("0"),
+        )
+        authoritative = min(quantity, perpetual_fill, spot_fill)
+        unresolved = max(Decimal("0"), quantity - authoritative)
+        execution_state = str(workspace.get("executionState") or instruction["status"])
+        pending = unresolved if execution_state in pending_states else Decimal("0")
+        uncertain = unresolved if execution_state in uncertain_states else Decimal("0")
+        if execution_state == "failed" and unresolved > 0:
+            if _workspace_has_confirmed_no_external_side_effects(workspace):
+                pending = Decimal("0")
+                uncertain = Decimal("0")
+            else:
+                uncertain = unresolved
+        if execution_state == "completed" and unresolved > 0:
+            # A completed close without matching authoritative fills is internally
+            # inconsistent. Preserve the unresolved amount instead of allowing a
+            # second close to enlarge exposure.
+            uncertain = unresolved
         bucket = summary.setdefault(
             target_id,
-            {"alreadyClosedQuantity": Decimal("0")},
+            {
+                "authoritativeClosedQuantity": Decimal("0"),
+                "pendingCloseQuantity": Decimal("0"),
+                "resultUnknownReservedQuantity": Decimal("0"),
+            },
         )
-        bucket["alreadyClosedQuantity"] += quantity
+        bucket["authoritativeClosedQuantity"] += authoritative
+        bucket["pendingCloseQuantity"] += pending
+        bucket["resultUnknownReservedQuantity"] += uncertain
     return summary
+
+
+def _workspace_has_confirmed_no_external_side_effects(workspace: dict[str, object]) -> bool:
+    if Decimal(str(workspace.get("cumulativePerpetualFill") or "0")) > 0:
+        return False
+    for row in workspace.get("attempts", []):
+        if not isinstance(row, dict):
+            continue
+        if row.get("orderId") not in (None, ""):
+            return False
+    for row in workspace.get("spotReleases", []):
+        if not isinstance(row, dict):
+            continue
+        if row.get("orderId") not in (None, ""):
+            return False
+        if Decimal(str(row.get("cumulativeSpotQuantity") or "0")) > 0:
+            return False
+    return True
 
 
 def _funding_fees_for_batch(batch_id: str) -> tuple[Decimal, Decimal]:

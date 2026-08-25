@@ -110,8 +110,6 @@
     },
     { immediate: true },
   );
-
-  refreshAll();
 </script>
 
 <style lang="less">

@@ -1,6 +1,7 @@
 export const FUNDING_PENDING_DRAFT_STORAGE_KEY = 'vg.platform.funding.pendingDraft';
 
 export type FundingDraftState =
+  | 'accepted'
   | 'submitting'
   | 'executing'
   | 'partially_hedged'
@@ -44,4 +45,14 @@ export function clearFundingDraft(storage: Pick<Storage, 'removeItem'> = localSt
 
 export function isFundingTerminalState(state: string | null | undefined): boolean {
   return state === 'completed' || state === 'failed';
+}
+
+export function isFundingAutoPollingState(state: string | null | undefined): boolean {
+  return (
+    state === 'accepted' ||
+    state === 'submitting' ||
+    state === 'executing' ||
+    state === 'partially_hedged' ||
+    state === 'reconciling'
+  );
 }

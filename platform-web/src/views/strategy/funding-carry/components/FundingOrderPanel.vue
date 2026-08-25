@@ -54,24 +54,51 @@
     </div>
 
     <div class="positions-block">
-      <strong>真实 Funding 组合</strong>
-      <ul v-if="positionGroups.length" class="group-selector">
-        <li v-for="item in positionGroups" :key="item.instructionId">
+      <strong>真实 Funding 活动组合</strong>
+      <ul v-if="activeGroups.length" class="group-selector">
+        <li v-for="item in activeGroups" :key="item.instructionId">
           <label class="group-option">
             <input
               type="radio"
               name="funding-close-group"
+              :disabled="item.lifecycleState !== 'active'"
               :checked="selectedCloseInstructionId === item.instructionId"
               @change="$emit('select-close-instruction', item.instructionId)"
             />
-            <span>
-              {{ item.perpetualSymbol }} / {{ item.spotSymbol }} · {{ formatState(item.status) }} ·
-              可平 {{ item.remainingClosableQuantity ?? item.hedgedQuantity }}
-            </span>
+            <div class="group-metrics">
+              <span>
+                {{ item.perpetualSymbol }} / {{ item.spotSymbol }} ·
+                {{ formatState(item.status) }} ·
+                {{ item.lifecycleState === 'history' ? '历史' : '活动' }}
+              </span>
+              <small>
+                已对冲 {{ item.hedgedQuantity ?? '0' }} / 权威已平
+                {{ item.authoritativeClosedQuantity ?? item.alreadyClosedQuantity ?? '0' }} /
+                待平预约 {{ item.pendingCloseQuantity ?? '0' }} / 结果未知预约
+                {{ item.resultUnknownReservedQuantity ?? '0' }} / 剩余可平
+                {{ item.remainingClosableQuantity ?? '0' }}
+              </small>
+            </div>
           </label>
         </li>
       </ul>
-      <p v-else class="state-text">暂无可平真实组合。</p>
+      <p v-else class="state-text">暂无活动 Funding 组合。</p>
+      <div v-if="historyGroups.length" class="history-block">
+        <strong>已完成历史组合</strong>
+        <ul class="group-selector">
+          <li v-for="item in historyGroups" :key="item.instructionId">
+            <div class="group-option group-option--history">
+              <div class="group-metrics">
+                <span>{{ item.perpetualSymbol }} / {{ item.spotSymbol }} · 已完全平仓</span>
+                <small>
+                  已对冲 {{ item.hedgedQuantity ?? '0' }} / 权威已平
+                  {{ item.authoritativeClosedQuantity ?? item.alreadyClosedQuantity ?? '0' }}
+                </small>
+              </div>
+            </div>
+          </li>
+        </ul>
+      </div>
     </div>
 
     <div class="action-row">
@@ -103,6 +130,8 @@
 </template>
 
 <script setup lang="ts">
+  import { computed } from 'vue';
+
   const props = defineProps<{
     context: Record<string, any> | null;
     positionGroups: Array<Record<string, any>>;
@@ -116,6 +145,13 @@
     selectedCloseGroup: Record<string, any> | null;
     canSubmit: boolean;
   }>();
+
+  const activeGroups = computed(() =>
+    props.positionGroups.filter((item: Record<string, any>) => item.lifecycleState !== 'history'),
+  );
+  const historyGroups = computed(() =>
+    props.positionGroups.filter((item: Record<string, any>) => item.lifecycleState === 'history'),
+  );
 
   const emit = defineEmits<{
     (event: 'update:notional-input', value: string): void;
@@ -206,7 +242,25 @@
   .group-option {
     display: flex;
     gap: 8px;
-    align-items: center;
+    align-items: flex-start;
+  }
+
+  .group-option--history {
+    cursor: default;
+  }
+
+  .group-metrics {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .group-metrics small {
+    color: var(--strategy-text-2);
+  }
+
+  .history-block {
+    margin-top: 12px;
   }
 
   .ghost-button,

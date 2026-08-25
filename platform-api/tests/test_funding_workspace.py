@@ -155,15 +155,20 @@ def test_close_summary_and_group_snapshot_track_remaining_closable_quantity(monk
         "get_instruction",
         lambda instruction_id: instructions[0],
     )
-    monkeypatch.setattr(
-        funding_workspace,
-        "_workspace_state_from_instruction",
-        lambda instruction: {
+    def workspace_state(instruction):
+        if instruction["instructionId"] == "close-1":
+            return {
+                "executionState": "completed",
+                "spotReleases": [{"cumulativeSpotQuantity": "0.003"}],
+                "cumulativePerpetualFill": "0.003",
+            }
+        return {
             "executionState": "completed",
             "spotReleases": [{"cumulativeSpotQuantity": "0.020"}],
             "cumulativePerpetualFill": "0.020",
-        },
-    )
+        }
+
+    monkeypatch.setattr(funding_workspace, "_workspace_state_from_instruction", workspace_state)
     monkeypatch.setattr(
         funding_workspace,
         "_funding_fees_for_batch",
@@ -177,9 +182,113 @@ def test_close_summary_and_group_snapshot_track_remaining_closable_quantity(monk
         close_summary=summary["open-1"],
     )
 
-    assert group["alreadyClosedQuantity"] == "0.005"
+    assert group["alreadyClosedQuantity"] == "0.003"
+    assert group["authoritativeClosedQuantity"] == "0.003"
+    assert group["resultUnknownReservedQuantity"] == "0.002"
     assert group["remainingClosableQuantity"] == "0.015"
     assert group["hedgedQuantity"] == "0.020"
+
+
+@pytest.mark.parametrize(
+    (
+        "execution_state",
+        "spot_fill",
+        "order_id",
+        "expected_pending",
+        "expected_unknown",
+        "expected_remaining",
+    ),
+    [
+        ("executing", "0.002", None, "0.003", "0", "0.015"),
+        ("result_unknown", "0.002", "order-1", "0", "0.003", "0.015"),
+        ("manual_intervention", "0.002", "order-1", "0", "0.003", "0.015"),
+        ("failed", "0.002", "order-1", "0", "0.003", "0.015"),
+        ("failed", "0", None, "0", "0", "0.020"),
+    ],
+)
+def test_close_summary_separates_authoritative_pending_and_uncertain_quantity(
+    monkeypatch,
+    execution_state: str,
+    spot_fill: str,
+    order_id: str | None,
+    expected_pending: str,
+    expected_unknown: str,
+    expected_remaining: str,
+) -> None:
+    instructions = [
+        {
+            "instructionId": "close-1",
+            "action": "close",
+            "status": execution_state,
+            "requestedParameters": {
+                "targetOpenInstructionId": "open-1",
+                "perpetualQuantity": "0.005",
+            },
+        }
+    ]
+    monkeypatch.setattr(
+        funding_workspace,
+        "_workspace_state_from_instruction",
+        lambda instruction: {
+            "executionState": execution_state,
+            "attempts": [{"orderId": order_id}] if order_id else [],
+            "spotReleases": [{"cumulativeSpotQuantity": spot_fill, "orderId": order_id}],
+            "cumulativePerpetualFill": spot_fill,
+        },
+    )
+
+    summary = funding_workspace._close_summary_by_open_instruction(instructions)["open-1"]
+
+    expected_authoritative = Decimal(spot_fill)
+    assert summary["authoritativeClosedQuantity"] == expected_authoritative
+    assert summary["pendingCloseQuantity"] == Decimal(expected_pending)
+    assert summary["resultUnknownReservedQuantity"] == Decimal(expected_unknown)
+    reserved = sum(summary.values(), Decimal("0"))
+    assert Decimal("0.020") - reserved == Decimal(expected_remaining)
+
+
+def test_position_groups_exclude_fully_closed_group_from_active_scope(monkeypatch) -> None:
+    instructions = [
+        {
+            "instructionId": "open-1",
+            "action": "open",
+            "status": "completed",
+            "executionBatchId": "batch-open-1",
+        }
+    ]
+    monkeypatch.setattr(funding_workspace, "list_instructions", lambda strategy_id: instructions)
+    monkeypatch.setattr(
+        funding_workspace,
+        "_close_summary_by_open_instruction",
+        lambda rows: {"open-1": {}},
+    )
+    monkeypatch.setattr(
+        funding_workspace,
+        "_funding_group_snapshot",
+        lambda **kwargs: {"lifecycleState": "history", "instructionId": "open-1"},
+    )
+
+    assert funding_workspace.list_funding_position_groups(scope="active") == []
+    assert funding_workspace.list_funding_position_groups(scope="history") == [
+        {"lifecycleState": "history", "instructionId": "open-1"}
+    ]
+
+
+def test_workspace_lookup_recovers_instruction_by_idempotency(monkeypatch) -> None:
+    monkeypatch.setattr(
+        funding_workspace,
+        "get_instruction_by_idempotency",
+        lambda strategy_id, key: {"instructionId": "instruction-1"},
+    )
+    monkeypatch.setattr(
+        funding_workspace,
+        "get_funding_instruction_workspace",
+        lambda instruction_id: {"instruction": {"instructionId": instruction_id}},
+    )
+
+    assert funding_workspace.get_funding_instruction_workspace_by_idempotency(
+        "funding:recover-1"
+    ) == {"instruction": {"instructionId": "instruction-1"}}
 
 
 def test_submit_close_rejects_quantity_above_remaining(monkeypatch) -> None:

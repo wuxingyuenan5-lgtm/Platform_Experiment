@@ -40,6 +40,7 @@ from app.strategies.capital_transfer import (
 from app.strategies.funding_workspace import (
     get_funding_execution_context,
     get_funding_instruction_workspace,
+    get_funding_instruction_workspace_by_idempotency,
     list_funding_position_groups,
     submit_funding_instruction,
 )
@@ -169,9 +170,20 @@ def create_trading_router(api_prefix: str) -> APIRouter:
         )
 
     @router.get(f"{api_prefix}/trading/funding/positions", tags=["trading"])
-    def funding_positions(http_request: Request) -> list[dict[str, object]]:
+    def funding_positions(
+        http_request: Request,
+        scope: str = Query(default="active"),
+    ) -> list[dict[str, object]]:
         require_principal(http_request)
-        return list_funding_position_groups()
+        return list_funding_position_groups(scope=scope)
+
+    @router.get(f"{api_prefix}/trading/funding/instructions", tags=["trading"])
+    def funding_instruction_by_idempotency(
+        http_request: Request,
+        idempotency_key: str = Query(alias="idempotencyKey"),
+    ) -> dict[str, object]:
+        require_principal(http_request)
+        return get_funding_instruction_workspace_by_idempotency(idempotency_key)
 
     @router.post(f"{api_prefix}/trading/funding/instructions", tags=["trading"])
     def funding_instruction_submit(
