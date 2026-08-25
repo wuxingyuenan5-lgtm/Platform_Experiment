@@ -86,19 +86,35 @@ def get_funding_execution_context(
     spot_symbol = str(pair["spotSymbol"])
     perp_quote = _runtime_get(
         f"/venue/quotes/{perp_symbol}",
-        params={"accountId": account["account_id"]},
+        params={
+            "accountId": account["account_id"],
+            "instrumentType": "crypto_perp",
+            "category": "linear",
+        },
     )
     spot_quote = _runtime_get(
         f"/venue/quotes/{spot_symbol}",
-        params={"accountId": account["account_id"]},
+        params={
+            "accountId": account["account_id"],
+            "instrumentType": "crypto_spot",
+            "category": "spot",
+        },
     )
     perp_spec = _runtime_get(
         f"/venue/instruments/{perp_symbol}",
-        params={"accountId": account["account_id"]},
+        params={
+            "accountId": account["account_id"],
+            "instrumentType": "crypto_perp",
+            "category": "linear",
+        },
     )
     spot_spec = _runtime_get(
         f"/venue/instruments/{spot_symbol}",
-        params={"accountId": account["account_id"]},
+        params={
+            "accountId": account["account_id"],
+            "instrumentType": "crypto_spot",
+            "category": "spot",
+        },
     )
     funding_events = _runtime_get(
         "/venue/economic-events",
@@ -124,9 +140,12 @@ def get_funding_execution_context(
     )
     next_funding_time = perp_quote.get("nextFundingTime")
     basis = Decimal(str(perp_quote["mid"])) - Decimal(str(spot_quote["mid"]))
+    active_available_balance = (
+        Decimal(str(active_balance["availableBalance"])) if active_balance is not None else None
+    )
     funding_available = (
-        active_balance["availableBalance"] - reservation_summary["activeReserved"]
-        if active_balance is not None
+        active_available_balance - reservation_summary["activeReserved"]
+        if active_available_balance is not None
         else None
     )
     return {
@@ -186,6 +205,7 @@ def get_funding_execution_context(
 
 def list_funding_position_groups() -> list[dict[str, object]]:
     instructions = list_instructions(STRATEGY_INSTANCE_ID)
+    close_summary = _close_summary_by_open_instruction(instructions)
     groups: list[dict[str, object]] = []
     for instruction in instructions:
         if instruction["action"] != StrategyInstructionAction.OPEN.value:
@@ -197,6 +217,7 @@ def list_funding_position_groups() -> list[dict[str, object]]:
             _funding_group_snapshot(
                 instruction_id=str(instruction["instructionId"]),
                 batch_id=str(batch_id),
+                close_summary=close_summary.get(str(instruction["instructionId"])),
             )
         )
     return groups
@@ -210,17 +231,54 @@ def submit_funding_instruction(
     spot_symbol: str,
     quantity: Decimal,
     requested_by: str,
+    target_open_instruction_id: str | None = None,
 ) -> dict[str, object]:
+    normalized_action = StrategyInstructionAction(action)
+    if normalized_action is StrategyInstructionAction.CLOSE:
+        if not target_open_instruction_id:
+            raise HTTPException(
+                status_code=409,
+                detail="Funding close requires a target open instruction",
+            )
+        open_instruction = get_instruction(target_open_instruction_id)
+        batch_id = open_instruction.get("executionBatchId")
+        if not batch_id:
+            raise HTTPException(status_code=409, detail="Funding close target is unavailable")
+        target_group = _funding_group_snapshot(
+            instruction_id=target_open_instruction_id,
+            batch_id=str(batch_id),
+            close_summary=_close_summary_by_open_instruction(
+                list_instructions(STRATEGY_INSTANCE_ID)
+            ).get(target_open_instruction_id),
+        )
+        remaining = Decimal(str(target_group["remainingClosableQuantity"] or "0"))
+        if remaining <= 0:
+            raise HTTPException(
+                status_code=409,
+                detail="Funding close target has no remaining hedged quantity",
+            )
+        if quantity > remaining:
+            raise HTTPException(
+                status_code=409,
+                detail="Funding close quantity exceeds remaining hedged quantity",
+            )
+        perpetual_symbol = str(target_group["perpetualSymbol"])
+        spot_symbol = str(target_group["spotSymbol"])
     instruction = create_instruction(
         STRATEGY_INSTANCE_ID,
         CreateStrategyInstructionRequest(
             idempotencyKey=idempotency_key,
-            action=StrategyInstructionAction(action),
+            action=normalized_action,
             parameters={
                 "perpetualSymbol": perpetual_symbol,
                 "perpetualQuantity": quantity,
                 "spotSymbol": spot_symbol,
                 "spotQuantity": quantity,
+                **(
+                    {"targetOpenInstructionId": target_open_instruction_id}
+                    if target_open_instruction_id
+                    else {}
+                ),
             },
             reason="funding workspace submit",
         ),
@@ -408,7 +466,12 @@ def _execution_state(instruction: dict[str, object], batch, attempts, releases) 
     return "submitting"
 
 
-def _funding_group_snapshot(*, instruction_id: str, batch_id: str) -> dict[str, object]:
+def _funding_group_snapshot(
+    *,
+    instruction_id: str,
+    batch_id: str,
+    close_summary: dict[str, Decimal] | None = None,
+) -> dict[str, object]:
     instruction = get_instruction(instruction_id)
     workspace = _workspace_state_from_instruction(instruction)
     plan = instruction["executionPlan"]
@@ -422,8 +485,11 @@ def _funding_group_snapshot(*, instruction_id: str, batch_id: str) -> dict[str, 
     cumulative_perp = Decimal(str(workspace["cumulativePerpetualFill"] or "0"))
     hedged_quantity = min(cumulative_perp, cumulative_spot)
     residual = max(Decimal("0"), cumulative_perp - cumulative_spot)
+    already_closed = (close_summary or {}).get("alreadyClosedQuantity", Decimal("0"))
+    remaining_closable = max(Decimal("0"), hedged_quantity - already_closed)
     funding_fees, trading_fees = _funding_fees_for_batch(batch_id)
     return {
+        "openInstructionId": instruction_id,
         "instructionId": instruction_id,
         "batchId": batch_id,
         "status": workspace["executionState"],
@@ -437,12 +503,48 @@ def _funding_group_snapshot(*, instruction_id: str, batch_id: str) -> dict[str, 
         "cumulativeSpotFill": _decimal_text(cumulative_spot),
         "hedgedQuantity": _decimal_text(hedged_quantity),
         "residualQuantity": _decimal_text(residual),
+        "alreadyClosedQuantity": _decimal_text(already_closed),
+        "remainingClosableQuantity": _decimal_text(remaining_closable),
         "fundingFees": _decimal_text(funding_fees),
         "fees": _decimal_text(trading_fees),
         "pnl": None,
         "asOf": instruction["updatedAt"],
         "workspaceState": workspace,
     }
+
+
+def _close_summary_by_open_instruction(
+    instructions: list[dict[str, object]],
+) -> dict[str, dict[str, Decimal]]:
+    summary: dict[str, dict[str, Decimal]] = {}
+    active_statuses = {
+        "accepted",
+        "executing",
+        "reconciling",
+        "completed",
+        "manual_intervention",
+        "result_unknown",
+    }
+    for instruction in instructions:
+        if instruction["action"] != StrategyInstructionAction.CLOSE.value:
+            continue
+        if str(instruction["status"]) not in active_statuses:
+            continue
+        parameters = instruction.get("requestedParameters") or {}
+        if not isinstance(parameters, dict):
+            continue
+        target_id = str(parameters.get("targetOpenInstructionId") or "").strip()
+        if not target_id:
+            continue
+        quantity = Decimal(
+            str(parameters.get("perpetualQuantity") or parameters.get("spotQuantity") or "0")
+        )
+        bucket = summary.setdefault(
+            target_id,
+            {"alreadyClosedQuantity": Decimal("0")},
+        )
+        bucket["alreadyClosedQuantity"] += quantity
+    return summary
 
 
 def _funding_fees_for_batch(batch_id: str) -> tuple[Decimal, Decimal]:

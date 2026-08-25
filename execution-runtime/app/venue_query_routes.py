@@ -217,9 +217,16 @@ def create_venue_query_router(*, gateway: ExecutionGateway) -> APIRouter:
     def venue_instrument_specification(
         symbol: str,
         account_id: str = Query(alias="accountId"),
+        instrument_type: str | None = Query(default=None, alias="instrumentType"),
+        category: str | None = Query(default=None),
     ) -> VenueInstrumentSpecification:
         return query_gateway(
-            lambda: gateway.get_instrument_specification(account_id=account_id, symbol=symbol)
+            lambda: gateway.get_instrument_specification(
+                account_id=account_id,
+                symbol=symbol,
+                instrument_type=instrument_type,
+                category=category,
+            )
         )
 
     @router.get(
@@ -230,8 +237,17 @@ def create_venue_query_router(*, gateway: ExecutionGateway) -> APIRouter:
     def venue_market_quote(
         symbol: str,
         account_id: str = Query(alias="accountId"),
+        instrument_type: str | None = Query(default=None, alias="instrumentType"),
+        category: str | None = Query(default=None),
     ) -> VenueMarketQuoteSnapshot:
-        return query_gateway(lambda: gateway.get_market_quote(account_id=account_id, symbol=symbol))
+        return query_gateway(
+            lambda: gateway.get_market_quote(
+                account_id=account_id,
+                symbol=symbol,
+                instrument_type=instrument_type,
+                category=category,
+            )
+        )
 
     @router.get(
         "/venue/economic-events",

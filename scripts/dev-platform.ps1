@@ -94,10 +94,13 @@ function Test-ServiceSignature {
 function Test-ExpectedRuntime {
   param([hashtable]$Service, [int]$ProcessId)
   if (-not $Service.Python) { return $true }
-  if (-not $Service.PythonPath) { return $false }
   $process = Get-CimInstance Win32_Process -Filter "ProcessId=$ProcessId" -ErrorAction SilentlyContinue
   if ($null -eq $process) { return $false }
-  return ([string]$process.ExecutablePath).ToLowerInvariant() -eq $Service.PythonPath.ToLowerInvariant()
+  $executablePath = ([string]$process.ExecutablePath).ToLowerInvariant()
+  if ($Service.PythonPath -and $executablePath -eq $Service.PythonPath.ToLowerInvariant()) {
+    return $true
+  }
+  return (Test-ServiceSignature $Service $ProcessId)
 }
 
 function Invoke-ServiceRequest {

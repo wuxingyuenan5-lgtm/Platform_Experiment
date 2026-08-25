@@ -15,6 +15,7 @@ export interface FundingPendingDraft {
   perpetualSymbol: string;
   spotSymbol: string;
   quantity: string;
+  targetOpenInstructionId?: string;
   state: FundingDraftState;
 }
 

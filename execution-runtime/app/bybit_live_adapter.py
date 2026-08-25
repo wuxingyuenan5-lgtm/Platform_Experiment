@@ -281,6 +281,8 @@ class BybitLiveAdapter:
                     externalPositionId=f"{account}:{symbol}",
                     accountId=account,
                     instrumentId=instrument_id,
+                    instrumentType="crypto_perp",
+                    category=self.settings.bybit_category.lower(),
                     symbol=symbol,
                     netQuantity=quantity,
                     averagePrice=self._optional_decimal(row.get("avgPrice")),
@@ -291,14 +293,27 @@ class BybitLiveAdapter:
             )
         return snapshots
 
-    def get_market_quote(self, *, account_id: str, symbol: str) -> VenueMarketQuoteSnapshot:
+    def get_market_quote(
+        self,
+        *,
+        account_id: str,
+        symbol: str,
+        instrument_type: str | None = None,
+        category: str | None = None,
+    ) -> VenueMarketQuoteSnapshot:
         self._assert_account(account_id)
         normalized_symbol = symbol.strip().upper()
+        resolved_instrument_type, resolved_category = self._market_identity(
+            account_id=account_id,
+            symbol=normalized_symbol,
+            instrument_type=instrument_type,
+            category=category,
+        )
         try:
             response = self._with_fresh_client_retry(
                 account_id,
                 lambda client: client.get_tickers(
-                    category=self.settings.bybit_category,
+                    category=resolved_category,
                     symbol=normalized_symbol,
                 ),
             )
@@ -320,13 +335,21 @@ class BybitLiveAdapter:
             return VenueMarketQuoteSnapshot(
                 source=self.name,
                 accountId=account_id,
+                instrumentType=resolved_instrument_type,
+                category=resolved_category,
                 symbol=normalized_symbol,
                 bid=bid,
                 ask=ask,
                 mid=(bid + ask) / Decimal("2"),
                 last=self._optional_decimal(row.get("lastPrice")),
-                fundingRate=self._optional_decimal(row.get("fundingRate")),
-                nextFundingTime=funding_time,
+                fundingRate=(
+                    self._optional_decimal(row.get("fundingRate"))
+                    if resolved_instrument_type == "crypto_perp"
+                    else None
+                ),
+                nextFundingTime=(
+                    funding_time if resolved_instrument_type == "crypto_perp" else None
+                ),
                 currency=self.settings.bybit_settle_coin,
                 asOf=datetime.now(UTC),
             )
@@ -371,7 +394,11 @@ class BybitLiveAdapter:
                     source=self.name,
                     externalBalanceId=f"{account}:{currency}:{int(as_of.timestamp())}",
                     accountId=account,
+                    instrumentType="crypto_spot",
+                    category="spot",
                     equity=equity,
+                    walletBalance=wallet,
+                    availableToWithdraw=self._optional_decimal(coin.get("availableToWithdraw")),
                     availableBalance=self._available_balance(
                         coin,
                         account_available=account_available,
@@ -494,41 +521,46 @@ class BybitLiveAdapter:
         orders_by_id: dict[str, VenueOrderSnapshot] = {}
         fills_by_id: dict[str, VenueFillSnapshot] = {}
         for category in categories:
-            position_response = self._with_fresh_client_retry(
-                account_id,
-                lambda refreshed, current_category=category: refreshed.get_positions(
-                    category=current_category,
-                    settleCoin=self.settings.bybit_settle_coin,
-                    limit=200,
-                ),
-            )
-            self._require_success(position_response, "Bybit position query failed")
-            for row in self._result_list(position_response):
-                size = Decimal(str(row.get("size") or "0"))
-                if size == 0:
-                    continue
-                symbol = str(row.get("symbol") or "").upper()
-                instrument_id = self.settings.bybit_instruments.get(symbol)
-                if instrument_id is None:
-                    continue
-                side = str(row.get("side") or "")
-                quantity = size if side == "Buy" else -size
-                positions.append(
-                    VenuePositionSnapshot(
-                        source=self.name,
-                        externalPositionId=f"{account_id}:{category}:{symbol}:{row.get('positionIdx', 0)}",
-                        accountId=account_id,
-                        instrumentId=instrument_id,
-                        symbol=symbol,
-                        netQuantity=quantity,
-                        averagePrice=self._optional_decimal(row.get("avgPrice")),
-                        currentPrice=self._optional_decimal(row.get("markPrice")),
-                        markPrice=self._optional_decimal(row.get("markPrice")),
-                        unrealizedPnl=self._optional_decimal(row.get("unrealisedPnl")),
-                        currency=self.settings.bybit_settle_coin,
-                        asOf=self._millis(row.get("updatedTime")),
-                    )
+            if category in {"linear", "inverse"}:
+                position_response = self._with_fresh_client_retry(
+                    account_id,
+                    lambda refreshed, current_category=category: refreshed.get_positions(
+                        category=current_category,
+                        settleCoin=self.settings.bybit_settle_coin,
+                        limit=200,
+                    ),
                 )
+                self._require_success(position_response, "Bybit position query failed")
+                for row in self._result_list(position_response):
+                    size = Decimal(str(row.get("size") or "0"))
+                    if size == 0:
+                        continue
+                    symbol = str(row.get("symbol") or "").upper()
+                    side = str(row.get("side") or "")
+                    quantity = size if side == "Buy" else -size
+                    positions.append(
+                        VenuePositionSnapshot(
+                            source=self.name,
+                            externalPositionId=f"{account_id}:{category}:{symbol}:{row.get('positionIdx', 0)}",
+                            accountId=account_id,
+                            instrumentId=self._instrument_id_for_symbol(
+                                account_id=account_id,
+                                symbol=symbol,
+                                instrument_type="crypto_perp",
+                                category=category,
+                            ),
+                            instrumentType="crypto_perp",
+                            category=category,
+                            symbol=symbol,
+                            netQuantity=quantity,
+                            averagePrice=self._optional_decimal(row.get("avgPrice")),
+                            currentPrice=self._optional_decimal(row.get("markPrice")),
+                            markPrice=self._optional_decimal(row.get("markPrice")),
+                            unrealizedPnl=self._optional_decimal(row.get("unrealisedPnl")),
+                            currency=self.settings.bybit_settle_coin,
+                            asOf=self._millis(row.get("updatedTime")),
+                        )
+                    )
             for query_name in ("get_open_orders", "get_order_history"):
                 response = self._with_fresh_client_retry(
                     account_id,
@@ -561,9 +593,14 @@ class BybitLiveAdapter:
                         "Rejected": "rejected",
                     }
                     symbol = str(row.get("symbol") or "").upper()
-                    instrument_id = self.settings.bybit_instruments.get(symbol)
-                    if instrument_id is None:
-                        continue
+                    row_category = str(row.get("category") or category).lower()
+                    instrument_type = self._instrument_type_for_category(row_category)
+                    instrument_id = self._instrument_id_for_symbol(
+                        account_id=account_id,
+                        symbol=symbol,
+                        instrument_type=instrument_type,
+                        category=row_category,
+                    )
                     external_order_id = str(row.get("orderId") or "")
                     route = get_order_route(external_order_id=external_order_id) or get_order_route(
                         external_client_id=str(row.get("orderLinkId") or "")
@@ -602,9 +639,14 @@ class BybitLiveAdapter:
             self._require_success(execution_response, "Bybit execution query failed")
             for row in self._result_list(execution_response):
                 symbol = str(row.get("symbol") or "").upper()
-                instrument_id = self.settings.bybit_instruments.get(symbol)
-                if instrument_id is None:
-                    continue
+                row_category = str(row.get("category") or category).lower()
+                instrument_type = self._instrument_type_for_category(row_category)
+                instrument_id = self._instrument_id_for_symbol(
+                    account_id=account_id,
+                    symbol=symbol,
+                    instrument_type=instrument_type,
+                    category=row_category,
+                )
                 external_order_id = str(row.get("orderId") or "unknown")
                 external_fill_id = str(row.get("execId") or f"{external_order_id}:{row.get('execTime')}")
                 route = get_order_route(external_order_id=external_order_id)
@@ -675,6 +717,62 @@ class BybitLiveAdapter:
         if category in {"linear", "inverse"}:
             kwargs["settleCoin"] = self.settings.bybit_settle_coin
         return kwargs
+
+    def _market_identity(
+        self,
+        *,
+        account_id: str,
+        symbol: str,
+        instrument_type: str | None,
+        category: str | None,
+    ) -> tuple[str, str]:
+        normalized_category = (category or "").strip().lower() or None
+        normalized_type = (instrument_type or "").strip().lower() or None
+        if normalized_category is None:
+            if normalized_type in {"crypto_spot", "spot"}:
+                normalized_category = "spot"
+            elif normalized_type in {"crypto_perp", "perp", "perpetual"}:
+                normalized_category = self.settings.bybit_category.lower()
+        if normalized_category is None:
+            categories = self.settings.bybit_categories_for_account(account_id)
+            normalized_category = (
+                self.settings.bybit_category.lower()
+                if self.settings.bybit_category.lower() in categories
+                else categories[0]
+            )
+        resolved_type = self._instrument_type_for_category(normalized_category)
+        if normalized_type and normalized_type not in {resolved_type, normalized_category}:
+            raise GatewayConfigurationError(
+                f"Bybit instrumentType/category mismatch for {symbol}"
+            )
+        return resolved_type, normalized_category
+
+    def _instrument_type_for_category(self, category: str) -> str:
+        return "crypto_spot" if category == "spot" else "crypto_perp"
+
+    def _instrument_id_for_symbol(
+        self,
+        *,
+        account_id: str,
+        symbol: str,
+        instrument_type: str,
+        category: str,
+    ) -> str:
+        normalized = symbol.upper()
+        categories = self.settings.bybit_categories_for_account(account_id)
+        candidates = (
+            f"{normalized}|{category}",
+            f"{normalized}|{instrument_type}",
+            normalized,
+        )
+        for candidate in candidates:
+            instrument_id = self.settings.bybit_instruments.get(candidate.upper())
+            if instrument_id is None:
+                continue
+            if candidate == normalized and len(categories) > 1:
+                break
+            return instrument_id
+        return f"monitor:bybit:{account_id}:{category}:{normalized}"
 
     def _client(self, account_id: str | None = None):
         if self._injected_client is not None:

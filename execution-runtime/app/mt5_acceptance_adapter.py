@@ -196,12 +196,18 @@ class Mt5AcceptanceAdapter(Mt5PositionClosingAdapter):
             source=self.name,
             accountId=account_id,
             instrumentId=instrument_id,
+            instrumentType="mt5_contract",
+            category="mt5",
             symbol=normalized,
             status="available" if bool(getattr(info, "select", True)) else "unselected",
+            priceTick=Decimal(str(getattr(info, "point", 0) or 0)),
             minQuantity=Decimal(str(getattr(info, "volume_min", 0) or 0)),
             quantityStep=Decimal(str(getattr(info, "volume_step", 0) or 0)),
             maxMarketQuantity=Decimal(
                 str(getattr(info, "volume_max", 0) or 0)
+            ),
+            contractMultiplier=Decimal(
+                str(getattr(info, "trade_contract_size", 0) or 0)
             ),
             contractSize=Decimal(
                 str(getattr(info, "trade_contract_size", 0) or 0)

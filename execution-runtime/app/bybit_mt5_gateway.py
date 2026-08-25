@@ -222,10 +222,14 @@ class BybitMt5Gateway:
         *,
         account_id: str,
         symbol: str,
+        instrument_type: str | None = None,
+        category: str | None = None,
     ) -> VenueInstrumentSpecification:
         return self._adapter_for_account(account_id).get_instrument_specification(
             account_id=account_id,
             symbol=symbol,
+            instrument_type=instrument_type,
+            category=category,
         )
 
     def get_market_quote(
@@ -233,10 +237,14 @@ class BybitMt5Gateway:
         *,
         account_id: str,
         symbol: str,
+        instrument_type: str | None = None,
+        category: str | None = None,
     ):
         return self._adapter_for_account(account_id).get_market_quote(
             account_id=account_id,
             symbol=symbol,
+            instrument_type=instrument_type,
+            category=category,
         )
 
     def list_economic_events(
@@ -321,6 +329,8 @@ class BybitMt5Gateway:
                         f"{account_id}:{getattr(info, 'login', '')}:{int(as_of.timestamp())}"
                     ),
                     accountId=account_id,
+                    instrumentType="mt5_cash",
+                    category="mt5",
                     equity=Decimal(str(getattr(info, "equity", 0) or 0)),
                     availableBalance=Decimal(str(getattr(info, "margin_free", 0) or 0)),
                     currency=currency,
@@ -349,6 +359,8 @@ class BybitMt5Gateway:
                         externalPositionId=str(getattr(row, "ticket", 0)),
                         accountId=account_id,
                         instrumentId=instrument_id,
+                        instrumentType="mt5_contract",
+                        category="mt5",
                         symbol=symbol,
                         netQuantity=volume,
                         averagePrice=Decimal(str(getattr(row, "price_open", 0) or 0)),

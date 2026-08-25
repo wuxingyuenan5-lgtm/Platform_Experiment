@@ -113,6 +113,8 @@ class ExecutionGateway(Protocol):
         *,
         account_id: str,
         symbol: str,
+        instrument_type: str | None = None,
+        category: str | None = None,
     ) -> VenueInstrumentSpecification:
         """Return current venue sizing and access evidence for one symbol."""
         ...
@@ -122,6 +124,8 @@ class ExecutionGateway(Protocol):
         *,
         account_id: str,
         symbol: str,
+        instrument_type: str | None = None,
+        category: str | None = None,
     ) -> VenueMarketQuoteSnapshot:
         """Return one authoritative market quote for the supplied symbol."""
         ...

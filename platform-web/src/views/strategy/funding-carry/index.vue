@@ -24,6 +24,8 @@
         :error="error"
         :quantity-input="quantityInput"
         :notional-input="notionalInput"
+        :selected-close-instruction-id="selectedCloseInstructionId"
+        :selected-close-group="selectedCloseGroup"
         :can-submit="canSubmit"
         @update:notional-input="notionalInput = $event"
         @update:quantity-input="quantityInput = $event"
@@ -31,6 +33,7 @@
         @submit-open="submit('open')"
         @submit-close="submit('close')"
         @select-symbol="handleSelectSymbol"
+        @select-close-instruction="selectCloseInstruction"
       />
     </template>
   </div>
@@ -68,10 +71,13 @@
     workspaceState,
     notionalInput,
     quantityInput,
+    selectedCloseInstructionId,
+    selectedCloseGroup,
     canSubmit,
     refreshAll,
     submit,
     selectSymbol,
+    selectCloseInstruction,
   } = useFundingWorkspace();
 
   function handleSelectSymbol(perpetualSymbol: string, spotSymbol: string) {

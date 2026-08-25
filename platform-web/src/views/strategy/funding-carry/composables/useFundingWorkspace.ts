@@ -1,9 +1,10 @@
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 
 import {
   getFundingExecutionContext,
   getFundingInstructionWorkspace,
   getFundingPositionGroups,
+  type FundingPositionGroup,
   submitFundingInstruction,
   type FundingExecutionContext,
 } from '@/api/platform/fundingWorkspace';
@@ -24,13 +25,15 @@ function normalizeWorkspaceState(workspace: Record<string, unknown> | undefined 
 }
 
 export function useFundingWorkspace() {
+  let refreshTimer: ReturnType<typeof setTimeout> | null = null;
   const loading = ref(false);
   const submitting = ref(false);
   const error = ref<string | null>(null);
   const context = ref<FundingExecutionContext | null>(null);
-  const positionGroups = ref<Array<Record<string, unknown>>>([]);
+  const positionGroups = ref<FundingPositionGroup[]>([]);
   const selectedPerpetualSymbol = ref<string>('');
   const selectedSpotSymbol = ref<string>('');
+  const selectedCloseInstructionId = ref<string>('');
   const notionalInput = ref<string>('100');
   const quantityInput = ref<string>('');
   const activeInstruction = ref<Record<string, unknown> | null>(null);
@@ -42,9 +45,20 @@ export function useFundingWorkspace() {
   );
   const symbolOptions = computed(() => context.value?.symbolOptions ?? []);
   const workspaceState = computed(() => normalizeWorkspaceState(activeWorkspace.value));
+  const selectedCloseGroup = computed(
+    () =>
+      positionGroups.value.find(
+        (item) => item.instructionId === selectedCloseInstructionId.value,
+      ) ?? null,
+  );
   const canSubmit = computed(() => {
     const ready = readiness.value.ready === true;
-    return ready && !submitting.value && !!selectedPerpetualSymbol.value && !!quantityInput.value;
+    if (!ready || submitting.value || !quantityInput.value) return false;
+    if (!selectedPerpetualSymbol.value) return false;
+    return (
+      !selectedCloseInstructionId.value ||
+      (selectedCloseGroup.value?.remainingClosableQuantity ?? '0') !== '0'
+    );
   });
 
   async function refreshContext() {
@@ -63,7 +77,7 @@ export function useFundingWorkspace() {
       if (!selectedSpotSymbol.value) {
         selectedSpotSymbol.value = next.spotSymbol;
       }
-      if (!quantityInput.value && next.suggestedQuantity) {
+      if ((!selectedCloseInstructionId.value || !quantityInput.value) && next.suggestedQuantity) {
         quantityInput.value = next.suggestedQuantity;
       }
     } catch (caught) {
@@ -76,6 +90,15 @@ export function useFundingWorkspace() {
 
   async function refreshPositionGroups() {
     positionGroups.value = await getFundingPositionGroups();
+    if (!selectedCloseInstructionId.value && positionGroups.value.length) {
+      selectedCloseInstructionId.value = positionGroups.value[0].instructionId;
+    }
+    if (
+      selectedCloseInstructionId.value &&
+      !positionGroups.value.some((item) => item.instructionId === selectedCloseInstructionId.value)
+    ) {
+      selectedCloseInstructionId.value = positionGroups.value[0]?.instructionId ?? '';
+    }
   }
 
   async function refreshInstruction() {
@@ -111,12 +134,15 @@ export function useFundingWorkspace() {
       perpetualSymbol: selectedPerpetualSymbol.value,
       spotSymbol: selectedSpotSymbol.value,
       quantity: quantityInput.value,
+      targetOpenInstructionId: action === 'close' ? selectedCloseInstructionId.value : undefined,
       state: 'submitting',
     };
     draft.action = action;
     draft.perpetualSymbol = selectedPerpetualSymbol.value;
     draft.spotSymbol = selectedSpotSymbol.value;
     draft.quantity = quantityInput.value;
+    draft.targetOpenInstructionId =
+      action === 'close' ? selectedCloseInstructionId.value : undefined;
     writeFundingDraft(draft);
     pendingDraft.value = draft;
     try {
@@ -126,6 +152,7 @@ export function useFundingWorkspace() {
         perpetualSymbol: draft.perpetualSymbol,
         spotSymbol: draft.spotSymbol,
         quantity: draft.quantity,
+        targetOpenInstructionId: draft.targetOpenInstructionId,
       });
       activeInstruction.value = response.instruction;
       activeWorkspace.value = response.workspaceState ?? null;
@@ -158,6 +185,27 @@ export function useFundingWorkspace() {
     selectedSpotSymbol.value = spotSymbol;
   }
 
+  function selectCloseInstruction(instructionId: string) {
+    selectedCloseInstructionId.value = instructionId;
+    const group = positionGroups.value.find((item) => item.instructionId === instructionId);
+    if (group?.remainingClosableQuantity) {
+      quantityInput.value = group.remainingClosableQuantity;
+    }
+  }
+
+  watch(
+    [selectedPerpetualSymbol, selectedSpotSymbol, notionalInput],
+    () => {
+      if (refreshTimer) {
+        clearTimeout(refreshTimer);
+      }
+      refreshTimer = setTimeout(() => {
+        void refreshContext();
+      }, 250);
+    },
+    { flush: 'post' },
+  );
+
   return {
     loading,
     submitting,
@@ -166,6 +214,8 @@ export function useFundingWorkspace() {
     positionGroups,
     selectedPerpetualSymbol,
     selectedSpotSymbol,
+    selectedCloseInstructionId,
+    selectedCloseGroup,
     notionalInput,
     quantityInput,
     activeInstruction,
@@ -181,5 +231,6 @@ export function useFundingWorkspace() {
     refreshInstruction,
     submit,
     selectSymbol,
+    selectCloseInstruction,
   };
 }

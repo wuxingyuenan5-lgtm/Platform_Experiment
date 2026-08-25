@@ -322,19 +322,28 @@ class BybitAcceptanceAdapter(BybitFillConfirmingAdapter):
         *,
         account_id: str,
         symbol: str,
+        instrument_type: str | None = None,
+        category: str | None = None,
     ) -> VenueInstrumentSpecification:
         self._assert_account(account_id)
         normalized = symbol.upper()
-        instrument_id = self.settings.bybit_instruments.get(normalized)
-        if instrument_id is None:
-            raise GatewayConfigurationError(
-                "Bybit symbol is not mapped to a Platform instrument"
-            )
+        resolved_instrument_type, resolved_category = self._market_identity(
+            account_id=account_id,
+            symbol=normalized,
+            instrument_type=instrument_type,
+            category=category,
+        )
+        instrument_id = self._instrument_id_for_symbol(
+            account_id=account_id,
+            symbol=normalized,
+            instrument_type=resolved_instrument_type,
+            category=resolved_category,
+        )
         try:
             response = self._with_fresh_client_retry(
                 account_id,
                 lambda client: client.get_instruments_info(
-                    category=self.settings.bybit_category,
+                    category=resolved_category,
                     symbol=normalized,
                 )
             )
@@ -366,13 +375,17 @@ class BybitAcceptanceAdapter(BybitFillConfirmingAdapter):
             source=self.name,
             accountId=account_id,
             instrumentId=instrument_id,
+            instrumentType=resolved_instrument_type,
+            category=resolved_category,
             symbol=normalized,
             status=str(row.get("status") or "unknown"),
+            priceTick=Decimal(str((row.get("priceFilter") or {}).get("tickSize") or "0")),
             minQuantity=Decimal(str(lot.get("minOrderQty") or "0")),
             quantityStep=Decimal(str(lot.get("qtyStep") or "0")),
             maxMarketQuantity=self._optional_decimal(maximum),
+            contractMultiplier=Decimal("1"),
             contractSize=Decimal("1"),
-            trade_mode=self.settings.bybit_category,
+            trade_mode=resolved_category,
             filling_mode="market",
             accessChecks={
                 "readOnly": int(api_result.get("readOnly") or 0) == 1,

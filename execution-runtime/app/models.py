@@ -87,11 +87,15 @@ class VenueInstrumentSpecification(BaseModel):
     source: str
     account_id: str = Field(alias="accountId")
     instrument_id: str = Field(alias="instrumentId")
+    instrument_type: str = Field(alias="instrumentType")
+    category: str
     symbol: str
     status: str
+    price_tick: Decimal = Field(alias="priceTick")
     min_quantity: Decimal = Field(alias="minQuantity")
     quantity_step: Decimal = Field(alias="quantityStep")
     max_market_quantity: Decimal | None = Field(default=None, alias="maxMarketQuantity")
+    contract_multiplier: Decimal = Field(alias="contractMultiplier")
     contract_size: Decimal = Field(alias="contractSize")
     trade_mode: str
     filling_mode: str
@@ -145,6 +149,8 @@ class VenuePositionSnapshot(BaseModel):
     external_position_id: str = Field(alias="externalPositionId")
     account_id: str = Field(alias="accountId")
     instrument_id: str = Field(alias="instrumentId")
+    instrument_type: str = Field(alias="instrumentType")
+    category: str
     symbol: str
     net_quantity: Decimal = Field(alias="netQuantity")
     average_price: Decimal | None = Field(default=None, alias="averagePrice")
@@ -179,7 +185,12 @@ class VenueBalanceSnapshot(BaseModel):
     source: str
     external_balance_id: str = Field(alias="externalBalanceId")
     account_id: str = Field(alias="accountId")
+    instrument_type: str = Field(default="spot", alias="instrumentType")
+    category: str = "spot"
     equity: Decimal
+    wallet_balance: Decimal | None = Field(default=None, alias="walletBalance")
+    locked: Decimal | None = None
+    available_to_withdraw: Decimal | None = Field(default=None, alias="availableToWithdraw")
     available_balance: Decimal = Field(alias="availableBalance")
     currency: str
     as_of: datetime = Field(alias="asOf")
@@ -189,6 +200,8 @@ class VenueBalanceSnapshot(BaseModel):
 class VenueMarketQuoteSnapshot(BaseModel):
     source: str
     account_id: str = Field(alias="accountId")
+    instrument_type: str = Field(alias="instrumentType")
+    category: str
     symbol: str
     bid: Decimal
     ask: Decimal

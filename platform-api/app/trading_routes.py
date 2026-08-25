@@ -186,6 +186,11 @@ def create_trading_router(api_prefix: str) -> APIRouter:
             spot_symbol=str(payload["spotSymbol"]),
             quantity=Decimal(str(payload["quantity"])),
             requested_by=principal.user_id,
+            target_open_instruction_id=(
+                str(payload["targetOpenInstructionId"])
+                if payload.get("targetOpenInstructionId") not in (None, "")
+                else None
+            ),
         )
 
     @router.get(

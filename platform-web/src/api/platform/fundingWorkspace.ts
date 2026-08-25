@@ -59,6 +59,26 @@ export interface FundingWorkspaceResponse {
   workspaceState: Record<string, unknown>;
 }
 
+export interface FundingPositionGroup {
+  instructionId: string;
+  openInstructionId: string;
+  batchId: string;
+  status: string;
+  perpetualSymbol: string;
+  spotSymbol: string;
+  perpetualSide: string;
+  spotSide: string;
+  hedgedQuantity: string;
+  residualQuantity: string;
+  alreadyClosedQuantity?: string | null;
+  remainingClosableQuantity?: string | null;
+  fundingFees?: string | null;
+  fees?: string | null;
+  pnl?: string | null;
+  asOf: string;
+  workspaceState?: Record<string, unknown> | null;
+}
+
 export async function getFundingExecutionContext(params?: {
   perpetualSymbol?: string;
   spotSymbol?: string;
@@ -70,8 +90,8 @@ export async function getFundingExecutionContext(params?: {
   return response.data;
 }
 
-export async function getFundingPositionGroups(): Promise<Array<Record<string, unknown>>> {
-  const response = await client.get<Array<Record<string, unknown>>>('/trading/funding/positions');
+export async function getFundingPositionGroups(): Promise<FundingPositionGroup[]> {
+  const response = await client.get<FundingPositionGroup[]>('/trading/funding/positions');
   return response.data;
 }
 
@@ -81,6 +101,7 @@ export async function submitFundingInstruction(input: {
   perpetualSymbol: string;
   spotSymbol: string;
   quantity: string;
+  targetOpenInstructionId?: string;
 }): Promise<FundingWorkspaceResponse> {
   const response = await client.post<FundingWorkspaceResponse>(
     '/trading/funding/instructions',

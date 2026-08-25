@@ -280,6 +280,8 @@ class FakeGateway:
         *,
         account_id: str,
         symbol: str,
+        instrument_type: str | None = None,
+        category: str | None = None,
     ) -> VenueInstrumentSpecification:
         normalized = symbol.upper()
         contract_size = Decimal("100") if normalized.startswith("XAUUSD") else Decimal("1")
@@ -288,11 +290,15 @@ class FakeGateway:
             source=self.name,
             accountId=account_id,
             instrumentId=f"fake:{normalized}",
+            instrumentType=instrument_type or "simulation",
+            category=category or "simulation",
             symbol=normalized,
             status="available",
+            priceTick=minimum,
             minQuantity=minimum,
             quantityStep=minimum,
             maxMarketQuantity=Decimal("100"),
+            contractMultiplier=contract_size,
             contractSize=contract_size,
             trade_mode="simulation",
             filling_mode="deterministic",
@@ -328,8 +334,15 @@ class FakeGateway:
         *,
         account_id: str,
         symbol: str,
+        instrument_type: str | None = None,
+        category: str | None = None,
     ):
-        return get_market_quote(account_id=account_id, symbol=symbol)
+        return get_market_quote(
+            account_id=account_id,
+            symbol=symbol,
+            instrument_type=instrument_type or "simulation",
+            category=category or "simulation",
+        )
 
     def list_economic_events(
         self,

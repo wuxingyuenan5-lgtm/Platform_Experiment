@@ -181,13 +181,13 @@ def test_bybit_account_snapshot_uses_scoped_categories() -> None:
 
     assert snapshot.venue == "bybit"
     assert set(client.categories) >= {
-        "positions:spot",
         "positions:linear",
         "open:spot",
         "open:linear",
         "fills:spot",
         "fills:linear",
     }
+    assert "positions:spot" not in client.categories
 
 
 def test_mt5_account_snapshot_switches_once_and_restores_primary(monkeypatch) -> None:

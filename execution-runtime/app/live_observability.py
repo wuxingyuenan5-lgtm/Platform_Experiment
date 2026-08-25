@@ -18,6 +18,7 @@ def bybit_positions(adapter, account_id: str | None = None) -> list[VenuePositio
     adapter._assert_account(account)
     try:
         response = adapter._with_fresh_client_retry(
+            account,
             lambda client: client.get_positions(
                 category=adapter.settings.bybit_category,
                 settleCoin=adapter.settings.bybit_settle_coin,
@@ -33,9 +34,12 @@ def bybit_positions(adapter, account_id: str | None = None) -> list[VenuePositio
         if size == 0:
             continue
         symbol = str(row.get("symbol") or "").upper()
-        instrument_id = adapter.settings.bybit_instruments.get(symbol)
-        if instrument_id is None:
-            continue
+        instrument_id = adapter._instrument_id_for_symbol(
+            account_id=account,
+            symbol=symbol,
+            instrument_type="crypto_perp",
+            category=adapter.settings.bybit_category.lower(),
+        )
         side = str(row.get("side") or "")
         quantity = size if side == "Buy" else -size
         liquidation = adapter._optional_decimal(row.get("liqPrice"))
@@ -47,6 +51,8 @@ def bybit_positions(adapter, account_id: str | None = None) -> list[VenuePositio
                 externalPositionId=f"{account}:{symbol}:{row.get('positionIdx', 0)}",
                 accountId=account,
                 instrumentId=instrument_id,
+                instrumentType="crypto_perp",
+                category=adapter.settings.bybit_category.lower(),
                 symbol=symbol,
                 netQuantity=quantity,
                 averagePrice=adapter._optional_decimal(row.get("avgPrice")),
@@ -124,6 +130,8 @@ def mt5_positions(adapter, account_id: str | None = None) -> list[VenuePositionS
                 externalPositionId=str(getattr(row, "ticket", 0)),
                 accountId=account,
                 instrumentId=instrument_id,
+                instrumentType="mt5_contract",
+                category="mt5",
                 symbol=symbol,
                 netQuantity=volume,
                 averagePrice=Decimal(str(getattr(row, "price_open", 0) or 0)),

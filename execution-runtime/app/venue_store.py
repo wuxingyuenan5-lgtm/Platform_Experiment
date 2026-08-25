@@ -582,7 +582,13 @@ def get_order(*, platform_order_id: str | None = None, external_id: str | None =
     return order_from_row(row) if row is not None else None
 
 
-def get_market_quote(*, account_id: str, symbol: str) -> VenueMarketQuoteSnapshot:
+def get_market_quote(
+    *,
+    account_id: str,
+    symbol: str,
+    instrument_type: str = "simulation",
+    category: str = "simulation",
+) -> VenueMarketQuoteSnapshot:
     ensure_store()
     normalized = symbol.upper()
     with connection() as db:
@@ -606,6 +612,8 @@ def get_market_quote(*, account_id: str, symbol: str) -> VenueMarketQuoteSnapsho
     return VenueMarketQuoteSnapshot(
         source="fake",
         accountId=account_id,
+        instrumentType=instrument_type,
+        category=category,
         symbol=normalized,
         bid=bid,
         ask=ask,
@@ -917,6 +925,8 @@ def position_from_row(row) -> VenuePositionSnapshot:
         externalPositionId=f"FAKE-POS-{row['account_id']}-{row['instrument_id']}",
         accountId=row["account_id"],
         instrumentId=row["instrument_id"],
+        instrumentType="simulation",
+        category="simulation",
         symbol=row["symbol"],
         netQuantity=Decimal(row["net_quantity"]),
         averagePrice=Decimal(row["average_price"]) if row["average_price"] is not None else None,
@@ -931,6 +941,8 @@ def balance_from_row(row) -> VenueBalanceSnapshot:
         source="fake",
         externalBalanceId=f"FAKE-BAL-{row['account_id']}-{row['currency']}-{row['updated_at']}",
         accountId=row["account_id"],
+        instrumentType="simulation",
+        category="simulation",
         equity=Decimal(row["equity"]),
         availableBalance=Decimal(row["available_balance"]),
         currency=row["currency"],

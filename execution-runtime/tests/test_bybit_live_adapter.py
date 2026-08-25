@@ -2,6 +2,7 @@ from decimal import Decimal
 
 import pytest
 
+from app.bybit_acceptance_adapter import BybitAcceptanceAdapter
 from app.bybit_live_adapter import BybitLiveAdapter
 from app.config import Settings, get_settings
 from app.gateway_errors import (
@@ -16,9 +17,56 @@ from app.models import SubmitOrderCommand
 class FakeBybitClient:
     def __init__(self) -> None:
         self.place_calls: list[dict[str, object]] = []
+        self.ticker_calls: list[dict[str, object]] = []
+        self.instrument_calls: list[dict[str, object]] = []
 
     def get_tickers(self, **kwargs):
-        return {"retCode": 0, "result": {"list": [{"markPrice": "1000"}]}}
+        self.ticker_calls.append(kwargs)
+        return {
+            "retCode": 0,
+            "result": {
+                "list": [
+                    {
+                        "markPrice": "1000",
+                        "bid1Price": "999.5",
+                        "ask1Price": "1000.5",
+                        "lastPrice": "1000",
+                        "fundingRate": "0.0001",
+                        "nextFundingTime": "1784800004000",
+                    }
+                ]
+            },
+        }
+
+    def get_instruments_info(self, **kwargs):
+        self.instrument_calls.append(kwargs)
+        return {
+            "retCode": 0,
+            "result": {
+                "list": [
+                    {
+                        "symbol": kwargs["symbol"],
+                        "status": "Trading",
+                        "priceFilter": {"tickSize": "0.1"},
+                        "lotSizeFilter": {
+                            "minOrderQty": "0.001",
+                            "qtyStep": "0.001",
+                            "maxMktOrderQty": "10",
+                        },
+                    }
+                ]
+            },
+        }
+
+    def get_api_key_information(self, **kwargs):
+        return {
+            "retCode": 0,
+            "result": {
+                "readOnly": 0,
+                "ips": ["127.0.0.1"],
+                "permissions": {"ContractTrade": ["Order", "Position"]},
+            },
+        }
 
     def place_order(self, **kwargs):
         self.place_calls.append(kwargs)
@@ -358,3 +406,48 @@ def test_bybit_live_adapter_routes_multi_account_reads_to_explicit_client(tmp_pa
     assert fills[0].account_id == "account_bybit_bottom_fishing"
     assert {name for name, _ in funding_client.calls} == {"get_wallet_balance"}
     assert {name for name, _ in bottom_client.calls} == {"get_executions"}
+
+
+def test_bybit_live_adapter_quote_and_spec_use_explicit_category_scope(tmp_path) -> None:
+    get_settings().journal_path = str(tmp_path / "bybit-explicit-scope.db")
+    initialize_journal()
+    client = FakeBybitClient()
+    adapter = BybitLiveAdapter(
+        Settings(
+            environment="live",
+            bybit_account_ids="bybit-live-main",
+            bybit_account_category_scopes="bybit-live-main=spot|linear",
+            bybit_instrument_map=(
+                "BTCUSDT|SPOT=instrument_btc_spot,"
+                "BTCUSDT|LINEAR=instrument_btc_perp"
+            ),
+            bybit_category="linear",
+            bybit_settle_coin="USDT",
+        ),
+        client,
+    )
+
+    spot_quote = adapter.get_market_quote(
+        account_id="bybit-live-main",
+        symbol="BTCUSDT",
+        instrument_type="crypto_spot",
+        category="spot",
+    )
+
+    acceptance = BybitAcceptanceAdapter(adapter.settings, client)
+    perp_spec = acceptance.get_instrument_specification(
+        account_id="bybit-live-main",
+        symbol="BTCUSDT",
+        instrument_type="crypto_perp",
+        category="linear",
+    )
+
+    assert spot_quote.category == "spot"
+    assert spot_quote.instrument_type == "crypto_spot"
+    assert spot_quote.funding_rate is None
+    assert client.ticker_calls[-1]["category"] == "spot"
+    assert perp_spec.category == "linear"
+    assert perp_spec.instrument_type == "crypto_perp"
+    assert perp_spec.price_tick == Decimal("0.1")
+    assert perp_spec.contract_multiplier == Decimal("1")
+    assert client.instrument_calls[-1]["category"] == "linear"
