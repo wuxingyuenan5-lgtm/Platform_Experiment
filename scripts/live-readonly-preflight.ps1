@@ -58,7 +58,7 @@ Assert-True (
 
 Write-Host "[5/5] Venue readiness"
 $readiness = Invoke-RuntimeJson -Path "/gateway/venue-readiness"
-$failedVenues = @($readiness.venues | Where-Object { $_.status -ne "ready" })
+$failedVenues = @($readiness.venues | Where-Object { $_.status -ne "available" })
 if ($failedVenues.Count -gt 0) {
     $details = $failedVenues | ForEach-Object {
         "$($_.venue): $($_.status) - $($_.reason)"
