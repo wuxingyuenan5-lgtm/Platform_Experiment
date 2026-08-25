@@ -29,11 +29,6 @@
         </div>
       </section>
 
-      <StrategyLiveTestSessionPanel
-        :funding-overview="strategyOverviewByDesk.funding || null"
-        :cross-overview="strategyOverviewByDesk.crossSpread || null"
-      />
-
       <template v-if="activeSection === 'pnl'">
         <StrategyPnlPanel :active-desk="activeDesk" :live-profile="activePnlProfile" />
       </template>
@@ -100,7 +95,6 @@
   import StrategyCapitalNetValueBoard from './components/StrategyCapitalNetValueBoard.vue';
   import StrategyCapitalRulePanel from './components/StrategyCapitalRulePanel.vue';
   import StrategyCapitalRiskOverview from './components/StrategyCapitalRiskOverview.vue';
-  import StrategyLiveTestSessionPanel from './components/StrategyLiveTestSessionPanel.vue';
   import StrategyPnlPanel from './components/StrategyPnlPanel.vue';
   import type {
     StrategyCapitalProfile,
