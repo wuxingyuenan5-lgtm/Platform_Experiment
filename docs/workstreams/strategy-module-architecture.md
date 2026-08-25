@@ -7,100 +7,31 @@ Owner：Founder CEO
 
 本文件是“策略模块架构”活跃阶段的唯一接续入口。它只维护当前范围、验收门、阻断和下一动作；稳定产品、合同和运维事实仍归属下方列出的长期权威文档。
 
-## 阶段目标
+## 当前目标与范围
 
-在不引入新服务或通用组合引擎的前提下，把创始人本地策略平台收敛为一个可持续运行、可恢复、可审计的闭环：
+把创始人本地策略平台收敛为可恢复、可审计的真实账户闭环。本阶段把 Cross 与 Funding 作为同一个实盘测试工作流：二者共用逻辑账户 `bybit-live-main`，Cross 的另一腿使用 `mt5-live-main`。策略管理继续统一展示六个策略；Bottom 和 Short A 只读，Short B 暂不绑定，海内外价差暂停。
 
-- 策略管理统一展示六个策略及其真实账户状态；
-- 跨所黄金价差和资金费率套利共用一个 Bybit UTA，并保持策略级订单、成交、费用和 PnL 归属；
-- 两个交易策略从 CEO 业务指令进入 immutable Plan、单一 Batch、权威成交、对账和恢复；
-- Funding 页面只使用真实账户、行情、指令和组合事实，不使用生产 mock；
-- 本地 Web、Platform API、Runtime 能稳定常驻，执行任务结束不导致网站失联；
-- 默认只读，任何真实写入仍受 Owner 场景授权、双 Live Write、Kill Switch、受控会话和强制复位约束。
+Cross 保留开仓、平仓、移动双边资金三个模板；MT5 Transfer API 未验证时继续使用辅助模式。Funding 不使用生产 mock，开平仓必须进入 StrategyInstruction、immutable Plan、单一 Batch、权威成交、恢复和对账路径。共享账户通过 claim、余额预约和稳定业务身份避免两个 Alpha 策略互相干扰。
 
-## Owner 已确认范围
+当前不建设通用组合引擎、消息队列或新增服务，不开放 Bottom/Short 的交易，不做自动选币、自动定仓、无人值守 Live Write、未验证的自动资金划转或海内外价差实盘。
 
-- 当前交易策略只有跨所黄金价差和资金费率套利；二者属于同一个实盘测试工作流，不拆成彼此等待的开发阶段。
-- Funding `primary` 与 Cross `venue_a` 使用同一个逻辑账户 `bybit-live-main`；不得按 display name 或 API Key 名称推断同一账户。
-- Cross 的 MT5 腿继续使用既有 `mt5-live-main`，其账户本质关系不要求 Owner 重新配置。
-- Bottom 使用独立 Bybit 账户，只读展示账户、持仓、订单、风险和 PnL。
-- Short-term A 使用一个 MT5 Terminal 经 Python API 串行切换，只读监控账户、持仓、订单、风险和 PnL；未知 Broker Symbol 不自动加入可交易目录。
-- Short-term B 暂不绑定账户；A 的链路通过即可复用同类能力。
-- 海内外价差保持暂停，不进入当前真实交易准备。
-- 跨所执行区保留开仓、平仓、移动双边资金三个模板；真实 MT5 Transfer API 未验证时使用官方页面辅助模式。
-- Funding 页面必须移除生产 mock，真实开平仓必须创建 StrategyInstruction，并能从刷新、超时和非终态恢复同一业务身份。
-- 网站登录和三服务常驻属于本阶段完成条件，不作为独立运维项目延后。
-- Cross 与 Funding 可以在同一受控测试工作流中准备和运行；共享 claim、资源互斥和余额预约防止互相干扰。
+长期边界保持不变：Venue SDK 与外部副作用只在 Runtime；ACK 不等于 Fill；`result_unknown`、身份不一致和查询不可用均 fail-closed；FinancialFact 才是正式金融事实入口。任何真实订单仍需要 Owner 对具体策略、账户、Symbol、数量、执行政策和绝对过期时间作本次授权。
 
-## 明确不在范围
+## 当前快照
 
-- 海内外价差真实账户或交易执行。
-- Bottom、Short A、Short B 的下单、改单、撤单或自动策略执行。
-- 自动选币、自动定仓、自动再平衡、反向 Carry 或跨交易所 Funding。
-- 同 Symbol 多策略仓位分配引擎、通用 Portfolio/Risk Engine、消息队列、事件总线或新增微服务。
-- 多 MT5 Terminal 部署、自动导入 Broker 品种为可交易 Instrument。
-- 未验证的 MT5 自动资金划转、链上提现或外部地址转账。
-- 外部客户资金、多人基金运营、生产部署或无人值守 Live Write。
-- 本阶段内执行真实订单；每个真实交易场景仍需 Owner 给出账户、策略、Symbol、数量、执行政策和绝对过期时间。
+本地代码门已经通过。三服务常驻和登录链路可用；共享 UTA、Bottom、Cross MT5、Short A 均完成真实账户只读预检，Short A 切换后能恢复主 MT5 账号。Cross 开/单平/批平和三模板、Funding Spot/Perp context、开平仓、自动轮询、幂等恢复、权威已平量和 active/history 均有本地回归证据。
 
-## 稳定架构边界
+CEO 面板现在按真实 binding 建立会话：Funding 单选 1 个 Bybit 会话，Cross 单选 1 个 Bybit 加 1 个 MT5 会话，两者同选共 3 个 strategy/account 会话。Funding Symbol 来自 execution context；Cross Bybit 与实际 MT5 Broker Symbol 来自只读 observability。缺少权威 Symbol、账户会话、双 Live Write、Kill Switch 条件或存在 unresolved `result_unknown` 时继续显示 blocked；approved 不等于 armed/ready。
 
-- `platform-web → platform-api → versioned Runtime contract → Venue SDK`；前端和 Platform 不直接调用 Venue SDK。
-- `platform-api` 保持模块化单体；SQLite 继续作为当前本地数据库。
-- `strategy_runs` 承担 StrategyInstruction 的持久业务身份；一个 Instruction 最多关联一个业务 ExecutionBatch。
-- Immutable ExecutionPlan 冻结账户、Instrument、Symbol、腿顺序、数量、Step、Tick、Multiplier、执行政策和释放条件。
-- ACK 不等于 Fill；Runtime Journal 与 Venue Order/Fill/Deal/Position 是外部执行证据。
-- `result_unknown`、身份不一致、查询不可用和取消终态不明均停止新副作用并保留必要 claim/reservation。
-- FinancialFact 是不可变金融事实；运营投影不能反向成为正式账务输入。
-- 共享 UTA 的现金是账户事实，不复制为策略自有现金；归属通过 Strategy → Instruction → Batch → Command → External Identity 建立。
+最近验证包括 Platform 相关 53 tests、Runtime MT5 相关 17 tests，以及 Platform/Runtime Pyright、相关 Ruff、前端 typecheck、行为测试和 production build。当前只读事实为 Funding `BTCUSDT` Spot/Perp、Cross Bybit `XAUTUSDT`、Cross MT5 `XAUUSD.s`；approved session 为 0，Funding/Cross unresolved `result_unknown` 为 0。
 
-## 验收门
+尚未完成的是外部实盘证据：没有真实开仓、平仓、Funding Settlement、差异核对或 EOD。普通启动器会强制 Platform Live Write、Runtime Live Write 和 founder-demo CEO 自审批为 `false`，因此当前运行中的服务仍是安全只读状态；页面只显示这些门，不自行开启它们。
 
-| 门 | 完成定义 | 当前状态 |
-|---|---|---|
-| G1 阶段治理 | 唯一 workstream 存在；子任务以本文件接续 | `completed` |
-| G2 本地服务 | 三服务健康、合同匹配、`expectedRuntime=true`；重复 start 不换 PID；登录烟测通过 | `verified` |
-| G3 账户只读 | 共享 UTA、Bottom、Cross MT5、Short A 均可读；Short A 恢复主账号；Short B unbound | `verified` |
-| G4 指令内核 | 幂等 Instruction、immutable Plan、单 Batch、共享 claim/reservation、unknown fail-closed | `verified_local` |
-| G5 Cross 产品链路 | 开/单平/批平恢复稳定；三模板保留；真实账户与状态可见 | `verified_local` |
-| G6 Funding 市场与开仓 | spot/linear 显式合同、真实 context、后端 Decimal 数量、真实 open Instruction | `verified_local` |
-| G7 Funding 平仓 | 引用真实 Open Group；已平量来自权威两腿 Fill；部分/未知/完成状态准确 | `verified_local` |
-| G8 Funding 恢复 | non-terminal 自动轮询；刷新、超时、重新可见复用原身份；unknown 不自动重提 | `verified_local` |
-| G9 受控会话 UX | CEO 可从页面建立合规测试窗口；默认未武装；过期/撤销/重启 fail-closed | `verified_local` |
-| G10 联合受控准备 | Cross/Funding 同一 UTA、资源冲突和余额预约通过；技术 readiness 可分别证明 | `verified_local` |
-| G11 真实场景证据 | Owner 授权的开仓、核实、对应平仓、对账、复位完成 | `not_authorized` |
-| G12 最终质量 | 聚焦与相关回归、Ruff、Pyright、前端检查、文档归并全部通过 | `verified_local` |
+## 下一动作与 Owner 决策
 
-## 当前工作项
+下一步不是继续泛化优化，而是由 Owner 定义一次受控实盘窗口：选择 Funding Pair、Cross/Funding 每腿最大数量与执行政策、窗口开始和绝对过期，并决定首次在同一窗口内顺序发起还是实际并行。若仍由同一个 CEO 申请并审批，还需明确授权仅在该本地最小测试窗口启用现有 `founder_demo_live_acceptance_enabled` 例外；默认继续关闭。
 
-| 工作项 | 状态 | 已验证结果 | 当前阻断 | 下一动作 |
-|---|---|---|---|---|
-| 本地生命周期与登录 | `verified` | Web/API/Runtime 常驻；登录、`auth/me`、策略总览通过；重复 start 复用 PID | 无当前代码阻断 | 后续改动后执行烟测，保持服务运行 |
-| 策略管理总览 | `verified_local` | 六策略服务端驱动；Funding/Cross live binding、Bottom、Short A、Short B unbound 状态已接入；CEO 面板已区分 approved 与 ready | 真实交易状态尚无受控场景证据 | 在 Owner 建立测试会话后复核页面事实 |
-| Bybit 多账户与分类读取 | `verified` | logical account 显式传播；Funding context 区分 spot/linear；Spot 不再调用 position/list | 无当前只读阻断 | 保持多账户 client 隔离回归 |
-| MT5 单 Terminal 只读/写互斥 | `verified_local` | Short A 读取切换后恢复主账号；Cross MT5 submit/cancel 与只读快照共用 coordinator lock，恢复失败阻断写 | 尚无真实账户并发证据 | 保持本地并发回归，真实场景只在授权窗口验证 |
-| Funding 生产页面 | `verified_local` | sample import 已移除；真实 context；超时按 idempotency 找回；可见/联网恢复；non-terminal 自动轮询；会话 allowlist 现使用权威 Spot/Perp Symbol | `result_unknown`/人工介入仍需人工查询，符合 fail-closed | Owner 创建会话后用小额指令验证最终 ready 文案 |
-| Funding 活动组合 | `verified_local` | 两腿累计 Fill 决定 authoritative closed；pending/unknown 分列预约；全平进入 history | 尚无真实 close Fill 与 EOD 证据 | 等待 Owner 授权的最小场景后对账 |
-| Cross/Funding 共享 UTA | `verified_local` | 同一 `account_id`、资源 claim、余额预约和 account-wide transfer claim 已实现并回归；Cross/Funding 会话现分别按实际 binding 建立 | 尚无同一 Owner 场景下的真实写入和对账证据 | 等待 Owner 创建同一测试窗口下的最小真实场景 |
-| CEO 受控会话入口 | `verified_local` | 管理页已复用 LiveTradingSession 创建、审批、撤销；Funding 单选创建 1 个会话，Cross 单选创建 Bybit+MT5 2 个会话，同时选择共 3 个；approved / ready / armed 已分离；默认 self-approval 关闭 | 仍缺真实 Owner 创建/审批后的页面证据 | Owner 在页面创建测试会话并确认 Cross/Funding ready |
-| 质量基线 | `verified_local` | 本轮 Funding/Cross/会话/ExecutionBatch/MT5 相关回归、Ruff、Platform+Runtime Pyright、前端 typecheck/ESLint/build 已通过；启动器已强制 Platform/Runtime Live Write 与 founder-demo self-approval 默认为 false | 仍缺真实交易证据，不属代码基线问题 | 保持三服务常驻，等待 Owner 页面操作 |
-| Funding Settlement 与正式账务 | `pending_external` | Funding/fee/fill 事实和正式投影合同存在 | 尚无一笔 Owner 授权的真实 Funding Settlement 与关闭后 EOD 证据 | 真实场景获批后按 Runbook 留存证据 |
-
-## 当前下一动作
-
-1. 由 Owner 在页面创建 Funding/Cross 最小测试会话；Cross 需同时看到 Bybit 与 MT5 两个账户会话，Funding 只看到共享 Bybit 会话。
-2. 在 approved session、双 Live Write、Kill Switch、allowlist 和 unresolved result_unknown 全部满足前，页面必须继续显示 blocked，不能伪装 ready。
-3. 继续保持 Runtime 与 Platform Live Write 关闭；未经 Owner 明确操作，不创建真实会话、不审批、不执行真实交易。
-4. 当 Owner 授权最小实盘窗口后，记录第一笔 Cross/Funding 真实开仓、核对、平仓和对账证据，并据此推进 G11。
-
-## 需要 Owner 决策
-
-| 决策 | 当前可选边界 | 默认处理 |
-|---|---|---|
-| 创始人本地受控会话审批 | 仓库已有 disabled-by-default 的 `founder_demo_live_acceptance_enabled` 最小测试例外；当前启动器已强制常驻服务默认为 false | 不启用该设置，不把例外扩展到生产 |
-| 首个 Cross/Funding 真实场景 | 明确账户、两个策略的 Symbol、每腿最大数量、执行政策、开始期限和绝对过期 | 不创建会话、不武装、不下单 |
-| 首次是否允许同一窗口实际并行 | 同一工作流内顺序发起以便归因；或在资源不冲突时并发发起 | 只证明并发安全，不执行外部写入 |
-| Funding 真实 Pair | Owner 指定永续/现货组合；系统不自动选币 | 不推断 Symbol |
+获得本次明确授权后，运维应以受控方式启动双 Live Write，在页面创建并审批对应的 3 个账户会话，先确认 Cross/Funding 分别 ready，再执行最小真实开仓、核对、对应平仓、Venue reconciliation、EOD 和强制复位。任何一步出现 unknown、账户或 Symbol 不一致、会话缺失或查询不可用都停止新副作用。
 
 ## 关联长期权威文档
 
