@@ -1,6 +1,6 @@
 # 对冲基金看板优化总方案（Master Plan）
 
-> 状态：Current Planning Baseline / v0.4  
+> 状态：Current Planning Baseline / v0.5  
 > 适用分支：`feature/hedge-board-online-optimization`  
 > 用途：作为对冲基金看板后续产品讨论、规格拆分、数据源设计、GitHub 执行与线下验收的最高约束来源。  
 > 原则：本文件只冻结全局规则与当前路线；各一级看板的详细产品规格进入 `docs/hedge-board/specs/` 子文档。执行 Agent 不得自行改变已冻结方向。
@@ -81,24 +81,24 @@
 
 ### 3.3 加密看板
 
-状态：**Product Scope Discussion v0.1 / Not Frozen / Not Implementing Yet**
+状态：**Product Scope Frozen v1.0 / Data & Implementation Details OPEN**
 
 权威子文档：
 
 - `docs/hedge-board/specs/CRYPTO_V1_SPEC.md`
 
-当前讨论方向：
+当前决定：
 
 - 保留 BTC 主图、DVOL、Crypto Market Detail、BTC ETF Flow、Bitcoin Treasuries Flow 等既有内容；
-- 补充 Institutional Flows；
-- 补充 Derivatives & Leverage；
-- 补充 Options & Volatility；
-- 补充 Stablecoin Liquidity；
-- **链上数据 On-chain Data 已确认纳入 Crypto V1**；
+- 新增 Institutional Flows；
+- 新增 Derivatives & Leverage；
+- 新增 Options & Volatility；
+- 新增 Stablecoin Liquidity；
+- On-chain Data 正式纳入 V1，并收敛为少量主流核心指标；
+- Funding / OI / Basis 同时支持 Aggregate 与单 Venue 视角；
 - Breadth / Rotation 优先利用现有 Market Detail，不重复建设大型 Altcoin Season 页面；
-- 当前只继续完善产品规格，不进入工程实施。
-
-Crypto V1 未经用户明确确认前，不得由执行 Agent 自行升级为 Frozen。
+- 产品范围已冻结，当前不进入工程实施；
+- 后续若继续开发，先进入 `CRYPTO_DATA_SOURCE_MAP.md` 与工程细节设计。
 
 ### 3.4 暂缓开发模块【Deferred】
 
@@ -401,7 +401,7 @@ existing SVG sparkline
 ### Crypto
 
 - `docs/hedge-board/specs/CRYPTO_V1_SPEC.md`
-- 当前状态：产品规格讨论中，尚未冻结。
+- 当前状态：Product Scope Frozen v1.0 / Data & Implementation Details OPEN。
 
 ### US / A-Share / Global / Trading Tools
 
@@ -492,10 +492,15 @@ existing SVG sparkline
 
 1. Macro V1：产品规格已冻结，Data Source Map 已有初版；
 2. Commodity V1：产品规格已冻结；
-3. Crypto V1：正在继续完善产品规格，**On-chain 已确认纳入 V1**；
+3. Crypto V1：产品规格已冻结；
 4. US / A-Share / Global / Trading Tools：Deferred，暂不开发。
 
-Crypto 产品规格确认后，再决定是否冻结 `CRYPTO_V1_SPEC.md`；冻结后才进入 `CRYPTO_DATA_SOURCE_MAP.md` 与后续工程 Phase。
+如果继续完善数据层：
+
+- Commodity → `COMMODITY_DATA_SOURCE_MAP.md`；
+- Crypto → `CRYPTO_DATA_SOURCE_MAP.md`。
+
+后续若用户决定开始工程实施，再依据对应 Spec / Source Map 单独开启 Phase。
 
 ---
 
