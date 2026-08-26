@@ -1,10 +1,10 @@
 # 对冲基金看板｜加密看板 V1 规格（Crypto V1 Spec）
 
-> 状态：Product Scope Discussion v0.1 / Not Frozen  
+> 状态：Product Scope Frozen v1.0 / Data & Implementation Details OPEN  
 > 上位文档：`docs/hedge-board/HEDGE_BOARD_OPTIMIZATION_MASTER_PLAN.md`  
 > 适用分支：`feature/hedge-board-online-optimization`  
-> 作用：定义“对冲基金看板 → 加密看板”的 V1 产品范围、既有内容保护、拟新增模块与后续数据源设计边界。  
-> 说明：本文件只描述 Crypto V1，不替代整个 Hedge Board Master Plan；当前仍处于产品规格讨论阶段，未经用户确认不得自行升级为 Frozen。
+> 作用：冻结“对冲基金看板 → 加密看板”的 V1 产品范围、既有内容保护、拟新增模块与后续数据源设计边界。  
+> 说明：本文件只描述 Crypto V1，不替代整个 Hedge Board Master Plan；除非用户明确提出修改，否则已冻结的产品范围、既有内容保护和 UI 原则不得调整。
 
 ---
 
@@ -23,7 +23,7 @@ Crypto V1 严格遵守 Hedge Board 全局 Additive Only：
 
 最终页面顺序、合并与删减，等 V1 完成并线下验收后再决定。
 
-当前只完善产品规格，不进入工程实施。
+当前只冻结产品规格，不进入工程实施。
 
 ---
 
@@ -70,7 +70,7 @@ Crypto V1 严格遵守 Hedge Board 全局 Additive Only：
 
 ---
 
-## 3. Crypto V1 产品目标【方向冻结】
+## 3. Crypto V1 产品目标【冻结】
 
 Crypto V1 不以“继续增加币种”为核心，而是补齐加密市场特有的结构数据。
 
@@ -96,13 +96,13 @@ Breadth / Rotation（利用现有 Market Detail）
 
 ---
 
-## 4. Institutional Flows【方向冻结】
+## 4. Institutional Flows【冻结】
 
 ### 4.1 BTC ETF
 
 保留现有 BTC ETF 日净流量 vs BTC 价格，并在工程实施时接入真实数据。
 
-可在不增加独立复杂模块的前提下增加轻量状态：
+允许增加轻量状态：
 
 - 最新单日净流量；
 - 5D / 7D rolling net flow；
@@ -133,7 +133,7 @@ V1 不建设大规模公司持币排行榜或公司基本面数据库。
 
 ---
 
-## 5. Derivatives & Leverage【新增核心 / 方向冻结】
+## 5. Derivatives & Leverage【新增核心 / 冻结】
 
 V1 重点覆盖 BTC 与 ETH，不扩展到大量 Altcoin。
 
@@ -154,7 +154,7 @@ V1 重点覆盖 BTC 与 ETH，不扩展到大量 Altcoin。
 - ETH Open Interest；
 - 与价格同图或同 Section 对照。
 
-不在页面自动解释“上涨 + OI 上升”等交易结论，只提供数据。
+主展示口径优先使用统一 USD notional，coin amount 可作为次级信息保留（数据可得时）。
 
 ### 5.3 Basis
 
@@ -172,7 +172,27 @@ V1 重点覆盖 BTC 与 ETH，不扩展到大量 Altcoin。
 - exchange / venue；
 - timestamp alignment。
 
-### 5.4 Liquidations
+### 5.4 Aggregate / Venue 视角【冻结】
+
+Funding / OI / Basis 均支持两种查看模式：
+
+1. **Aggregate**：多交易所聚合视角；
+2. **Venue**：单一交易所视角。
+
+默认优先展示 Aggregate，用户可切换到具体交易所。
+
+产品层不强制写死交易所名单；最终支持的 venue 由免费数据源稳定性决定，并在 `CRYPTO_DATA_SOURCE_MAP.md` 中冻结。
+
+聚合方法原则：
+
+- Funding：优先 OI-weighted aggregate；
+- OI：统一为 USD notional 后求和；
+- Basis：只聚合可比合约 / 可比期限，优先使用 OI-weighted aggregate；
+- 不可比合约不得为了“全市场平均”被强行混合。
+
+前端必须显示当前模式（Aggregate 或具体 Venue），不得让用户误以为单交易所数据代表全市场。
+
+### 5.5 Liquidations
 
 V1 暂不强制纳入。
 
@@ -180,7 +200,7 @@ V1 暂不强制纳入。
 
 ---
 
-## 6. Options & Volatility【新增 / 方向冻结】
+## 6. Options & Volatility【新增 / 冻结】
 
 ### 6.1 DVOL
 
@@ -204,7 +224,7 @@ V1 暂不强制纳入。
 
 新增 BTC / ETH 25Δ skew。
 
-建议统一方向定义并在数据源文档中固定，例如：
+统一方向原则：
 
 ```text
 25D Skew = Put IV - Call IV
@@ -218,7 +238,7 @@ V1 暂不强制纳入。
 
 ---
 
-## 7. Stablecoin Liquidity【新增核心 / 方向冻结】
+## 7. Stablecoin Liquidity【新增核心 / 冻结】
 
 目标：用稳定币供给观察 Crypto 体系内部美元流动性。
 
@@ -231,8 +251,6 @@ V1 重点：
 - USDC Supply；
 - USDT Share；
 - USDC Share。
-
-建议展示：
 
 ### 7.1 Stablecoin Supply vs BTC
 
@@ -255,71 +273,92 @@ V1 不拆分 Ethereum / Tron / Solana / Base 等链级稳定币供给模块。
 
 ---
 
-## 8. On-chain Data【新增核心 / 已确认纳入 V1】
+## 8. On-chain Data【新增核心 / 冻结】
 
-链上数据纳入 Crypto V1，但坚持“少量高信号、适合扫盘”的原则，不建设链上数据数据库大全。
+链上数据纳入 Crypto V1，但坚持“少量高信号、最主流、适合扫盘”的原则，不建设链上数据库大全。
 
-优先围绕四类信息：
+BTC 为 V1 主体，ETH 不要求对称铺开。
 
 ### 8.1 Valuation / Profitability
 
-优先候选：
+固定主流指标：
 
 - MVRV；
-- MVRV Z-Score（免费稳定源可得时）；
-- SOPR；
-- NUPL。
+- NUPL；
+- SOPR。
 
-目标：观察链上持币者整体未实现盈亏、实现盈亏与估值状态。
+用途：分别观察链上估值、整体未实现盈亏状态与已实现盈亏行为。
 
-V1 不要求四个指标全部强制上线；最终保留组合以后续免费数据源稳定性与页面信息密度为准。
+MVRV Z-Score 不作为 V1 强制核心项；若后续免费稳定源与方法学足够可靠，可作为 MVRV 的辅助视图，而不是新增独立大模块。
 
 ### 8.2 Cost Basis / Realized Value
 
-优先候选：
+固定：
 
 - Realized Price；
-- Realized Cap。
+- Realized Cap（轻量 KPI / 趋势辅助）。
 
-展示优先考虑：
+主展示优先：
 
-- BTC Price vs Realized Price；
-- Realized Cap 单独趋势或轻量 KPI。
+- BTC Price vs Realized Price。
+
+Realized Cap 不强制占用独立大图，可作为状态值或辅助趋势。
 
 ### 8.3 Exchange Flow / Exchange Balance
 
-优先候选：
+固定：
 
 - BTC Exchange Balance / Reserve；
-- Exchange Netflow；
-- 7D / 30D change（数据口径稳定时）。
+- BTC Exchange Netflow；
+- 7D / 30D change（数据可稳定计算时）。
 
-必须避免把不同数据商对“exchange wallet set”的定义混成一条连续历史序列。
+Exchange Balance 与 Netflow 应尽量来自同一钱包标签体系 / 同一 Provider，避免因交易所地址集合定义不同造成历史断裂。
 
 ### 8.4 Holder Structure
 
-优先候选：
+固定：
 
 - Long-Term Holder Supply；
-- Short-Term Holder Supply；
-- LTH / STH 相关成本基础或供给占比（免费稳定源可得时）。
+- Short-Term Holder Supply。
 
-不在 V1 扩展到大量地址标签、鲸鱼榜单、矿工地址或复杂实体聚类。
+若免费稳定数据源能持续提供统一口径，可补充：
 
-### 8.5 On-chain V1 原则
+- LTH / STH Supply Share；
+- LTH / STH Cost Basis。
 
-- BTC 为主；
-- ETH 链上数据暂不要求与 BTC 对称铺开；
-- 数据源必须免费、口径可解释、可持续自动更新；
-- 无可靠免费历史源的指标允许 `not_configured`；
+但它们属于辅助信息，不再扩展新的 Holder 子模块。
+
+### 8.5 On-chain V1 最终核心集合【冻结】
+
+Crypto V1 链上核心最终收敛为：
+
+1. MVRV；
+2. NUPL；
+3. SOPR；
+4. BTC Price vs Realized Price；
+5. Realized Cap（轻量辅助）；
+6. Exchange Balance / Reserve；
+7. Exchange Netflow；
+8. LTH Supply；
+9. STH Supply。
+
+页面实现时允许把高度相关指标合并到同一图 / 同一 Section，不要求“一指标一张图”。
+
+### 8.6 On-chain 数据规则【冻结】
+
+- 数据源必须免费；
+- 口径必须可解释；
+- 必须能持续自动更新；
+- 无可靠免费历史源的指标允许 `not_configured`，不得伪造；
 - 不使用来源不明的截图、二次转载或不可验证指标；
-- 同一 canonical on-chain series 不得在历史中静默更换不同钱包标签 / 口径算法。
+- 同一 canonical series 不得在历史中静默更换钱包标签、实体聚类或算法口径；
+- Provider / methodology 变化必须显式产生新的 methodology version / quality flag。
 
-具体指标最终选择、Primary/Fallback、方法学与更新频率进入后续 `CRYPTO_DATA_SOURCE_MAP.md`。
+具体 Primary / Fallback、方法学和更新频率进入后续 `CRYPTO_DATA_SOURCE_MAP.md`。
 
 ---
 
-## 9. Breadth / Rotation【利用现有内容，不新增独立 Section】
+## 9. Breadth / Rotation【利用现有内容，不新增独立 Section / 冻结】
 
 Crypto V1 暂不新建大型 Altcoin Season / Breadth Dashboard。
 
@@ -338,7 +377,7 @@ Crypto V1 暂不新建大型 Altcoin Season / Breadth Dashboard。
 
 ---
 
-## 10. Market Detail 真实化【方向冻结】
+## 10. Market Detail 真实化【冻结】
 
 继续沿用现有视觉和列结构。
 
@@ -371,7 +410,7 @@ Crypto V1 必须明确区分：
 
 ---
 
-## 11. 数据新鲜度与展示规则【方向冻结】
+## 11. 数据新鲜度与展示规则【冻结】
 
 所有新增 Crypto 数据应显示或保留：
 
@@ -408,9 +447,9 @@ Crypto V1 继续遵循 Hedge Board 全局免费优先：
 
 ---
 
-## 13. V1 明确不做【当前方向】
+## 13. V1 明确不做【冻结】
 
-Crypto V1 暂不建设：
+Crypto V1 不建设：
 
 - 大规模 Altcoin 新币列表；
 - 完整链上数据库；
@@ -418,16 +457,16 @@ Crypto V1 暂不建设：
 - Whale 地址榜单；
 - 矿工地址追踪；
 - 复杂实体标签系统；
-- 全量 liquidation 数据（除非后续确认稳定免费源）；
+- 全量 liquidation 数据（除非后续确认稳定免费源并由用户重新批准加入）；
 - 完整 Vol Surface / Greeks 分析器；
 - Crypto 新闻流；
 - 自动交易观点、风险建议或仓位建议。
 
 ---
 
-## 14. 当前拟议开发优先级【OPEN】
+## 14. 后续工程优先级【建议基线，实施前可调整】
 
-若未来进入工程实施，当前建议优先级：
+若未来进入工程实施，建议优先级：
 
 1. 既有 BTC ETF / Treasury 静态数据真实化；
 2. Derivatives & Leverage；
@@ -437,22 +476,23 @@ Crypto V1 暂不建设：
 6. Options Structure；
 7. Crypto Market Detail 全量真实化与质量验收。
 
-该顺序尚未冻结，最终在 Crypto V1 产品范围确认后决定。
+该顺序只是工程基线，不改变已冻结产品范围。
 
 ---
 
-## 15. 仍需讨论【OPEN】
+## 15. 后续 Data Source Map 需要冻结的细节【OPEN】
 
-1. On-chain V1 最终保留哪些核心指标；
-2. MVRV / SOPR / NUPL / Realized Price 等免费稳定数据源；
-3. Exchange Balance / Netflow 是否能获得长期稳定、免费且口径可解释的数据；
-4. LTH / STH 数据是否进入 V1 最终验收范围；
-5. BTC / ETH Funding 是否采用单一主交易所还是多交易所聚合；
-6. OI 是否展示 USD notional、coin amount 或两者；
-7. Basis 的标准合约与年化算法；
-8. Deribit IV Term Structure / 25D Skew 的免费历史数据获取与本地计算；
-9. BTC / ETH ETF Flow 免费稳定源；
-10. Bitcoin Treasuries 免费稳定源；
-11. Stablecoin Supply 免费稳定源与 canonical definition；
-12. Crypto Market Detail 各行 Primary / Fallback；
-13. V1 最终页面顺序与线下验收后删减。
+产品范围已冻结；后续仅讨论数据与工程细节：
+
+1. MVRV / NUPL / SOPR / Realized Price / Realized Cap 的免费稳定源；
+2. Exchange Balance / Netflow 的免费稳定源与钱包标签口径；
+3. LTH / STH 免费数据源与方法学；
+4. Aggregate Funding / OI / Basis 的交易所清单与权重；
+5. Venue 模式支持哪些交易所；
+6. Basis 的标准合约、期限和年化算法；
+7. Deribit IV Term Structure / 25D Skew 的免费历史数据获取与本地计算；
+8. BTC / ETH ETF Flow 免费稳定源；
+9. Bitcoin Treasuries 免费稳定源；
+10. Stablecoin Supply 免费稳定源与 canonical definition；
+11. Crypto Market Detail 各行 Primary / Fallback；
+12. V1 最终页面顺序与线下验收后删减。
