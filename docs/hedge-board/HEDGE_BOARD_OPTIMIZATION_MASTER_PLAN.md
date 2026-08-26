@@ -1,6 +1,6 @@
 # 对冲基金看板优化总方案（Master Plan）
 
-> 状态：Current Planning Baseline / v0.3  
+> 状态：Current Planning Baseline / v0.4  
 > 适用分支：`feature/hedge-board-online-optimization`  
 > 用途：作为对冲基金看板后续产品讨论、规格拆分、数据源设计、GitHub 执行与线下验收的最高约束来源。  
 > 原则：本文件只冻结全局规则与当前路线；各一级看板的详细产品规格进入 `docs/hedge-board/specs/` 子文档。执行 Agent 不得自行改变已冻结方向。
@@ -49,11 +49,9 @@
 
 ## 3. 当前路线与模块状态【冻结】
 
-### 3.1 已完成产品规格讨论
+### 3.1 宏观看板
 
-#### 宏观看板
-
-状态：**Product Scope Frozen / Data & Implementation Details OPEN**
+状态：**Product Scope Frozen v1.0 / Data & Implementation Details OPEN**
 
 权威子文档：
 
@@ -62,11 +60,11 @@
 
 当前决定：
 
-- 产品范围已基本冻结；
+- 产品范围已冻结；
 - Data Source Map 已有初版；
-- 当前先不继续实施，待整体看板计划进一步完善后再进入工程开发。
+- 当前先不继续实施，待整个 Hedge Board 计划完善后再进入工程开发。
 
-#### 商品看板
+### 3.2 商品看板
 
 状态：**Product Scope Frozen v1.0 / Data & Implementation Details OPEN**
 
@@ -78,17 +76,31 @@
 
 - 产品范围已冻结；
 - 不纳入农产品；
-- 后续如继续开发，再进入 `COMMODITY_DATA_SOURCE_MAP.md` 与工程实施。
+- 当前不实施；
+- 后续如重新开启工程开发，再进入 `COMMODITY_DATA_SOURCE_MAP.md` 与实际 Phase。
 
-### 3.2 可继续讨论但尚未冻结
+### 3.3 加密看板
 
-#### 加密看板
+状态：**Product Scope Discussion v0.1 / Not Frozen / Not Implementing Yet**
 
-状态：**Planning Candidate / Not Frozen / Not Implementing Yet**
+权威子文档：
 
-现有页面与内容全部受保护。后续如继续完善 Hedge Board，优先在不改原设计的前提下讨论 Crypto V1。
+- `docs/hedge-board/specs/CRYPTO_V1_SPEC.md`
 
-### 3.3 暂缓开发模块【Deferred】
+当前讨论方向：
+
+- 保留 BTC 主图、DVOL、Crypto Market Detail、BTC ETF Flow、Bitcoin Treasuries Flow 等既有内容；
+- 补充 Institutional Flows；
+- 补充 Derivatives & Leverage；
+- 补充 Options & Volatility；
+- 补充 Stablecoin Liquidity；
+- **链上数据 On-chain Data 已确认纳入 Crypto V1**；
+- Breadth / Rotation 优先利用现有 Market Detail，不重复建设大型 Altcoin Season 页面；
+- 当前只继续完善产品规格，不进入工程实施。
+
+Crypto V1 未经用户明确确认前，不得由执行 Agent 自行升级为 Frozen。
+
+### 3.4 暂缓开发模块【Deferred】
 
 以下一级看板当前统一暂停新增开发：
 
@@ -347,6 +359,8 @@ TradingView 不作为通用市场数据抓取源。
 
 低频数据必须 frequency-aware；没有新 observation 时不得用 `0.00%` 冒充“没有变化”。
 
+不同资产的交易日历、结算时点与报价时区必须保留，不允许为页面统一而静默混用。
+
 技术状态列（1H、4H、日线、3日线、周线等）在统一算法未冻结前，不继续扩展假信号。
 
 ---
@@ -386,7 +400,8 @@ existing SVG sparkline
 
 ### Crypto
 
-- 尚未建立正式 V1 Spec；后续如继续讨论再创建。
+- `docs/hedge-board/specs/CRYPTO_V1_SPEC.md`
+- 当前状态：产品规格讨论中，尚未冻结。
 
 ### US / A-Share / Global / Trading Tools
 
@@ -471,16 +486,16 @@ existing SVG sparkline
 
 ## 15. 当前下一步【Current】
 
-当前不急于实施。
+当前不进入工程实施。
 
 计划状态：
 
-1. Macro V1：产品规格已冻结，数据源图已有初版；
+1. Macro V1：产品规格已冻结，Data Source Map 已有初版；
 2. Commodity V1：产品规格已冻结；
-3. Crypto V1：如继续完善 Hedge Board，则下一步可讨论；
+3. Crypto V1：正在继续完善产品规格，**On-chain 已确认纳入 V1**；
 4. US / A-Share / Global / Trading Tools：Deferred，暂不开发。
 
-后续若用户决定开始工程实施，再依据对应 Spec / Source Map 单独开启 Phase。
+Crypto 产品规格确认后，再决定是否冻结 `CRYPTO_V1_SPEC.md`；冻结后才进入 `CRYPTO_DATA_SOURCE_MAP.md` 与后续工程 Phase。
 
 ---
 
