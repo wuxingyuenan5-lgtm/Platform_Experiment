@@ -17,6 +17,7 @@ from app.database import connection
 CROSS_SPREAD_INSTANCE_ID = "strategy_cross_venue_spread_instance_default"
 FUNDING_BRIDGE_ACCOUNT_ID = "fake:bybit-funding"
 TRANSFER_CURRENCY = "USDT"
+ASSISTED_BALANCE_TOLERANCE = Decimal("0.01")
 
 TransferDirection = Literal["bybit_to_mt5", "mt5_to_bybit"]
 TransferStatus = Literal["pending", "completed", "failed", "result_unknown"]
@@ -246,8 +247,18 @@ def create_funding_transfer(
         if request.direction == "bybit_to_mt5"
         else quote.mt5_withdrawable
     )
+    destination_quote = (
+        quote.mt5_withdrawable
+        if request.direction == "bybit_to_mt5"
+        else quote.bybit_transferable
+    )
     if source_quote.amount is None:
         raise HTTPException(status_code=503, detail="Source transferable balance is unavailable")
+    if destination_quote.amount is None:
+        raise HTTPException(
+            status_code=503,
+            detail="Destination transferable balance is unavailable",
+        )
     if request.amount > source_quote.amount:
         raise HTTPException(status_code=422, detail="Amount exceeds source transferable balance")
 
@@ -365,8 +376,10 @@ def create_funding_transfer(
             INSERT INTO internal_capital_transfers (
                 id, idempotency_key, strategy_instance_id, direction, currency,
                 amount, status, external_transfer_id, failure_reason,
-                requested_by, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, 'pending', NULL, NULL, ?, ?, ?)
+                requested_by, created_at, updated_at, mode,
+                source_account_id, destination_account_id,
+                source_balance_before, destination_balance_before
+            ) VALUES (?, ?, ?, ?, ?, ?, 'pending', NULL, NULL, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 transfer_id,
@@ -378,6 +391,13 @@ def create_funding_transfer(
                 requested_by,
                 timestamp,
                 timestamp,
+                quote.mode,
+                source_account_id,
+                mt5_account_id
+                if request.direction == "bybit_to_mt5"
+                else bybit_account_id,
+                format(source_quote.amount, "f"),
+                format(destination_quote.amount, "f"),
             ),
         )
 
@@ -496,10 +516,110 @@ def get_funding_transfer(transfer_id: str) -> InternalCapitalTransferResponse:
         ).fetchone()
     if row is None:
         raise HTTPException(status_code=404, detail="Funding transfer not found")
+    if row["status"] == "pending" and _stored_mode(row) == "assisted":
+        _reconcile_assisted_transfer(row)
+        with connection() as db:
+            row = db.execute(
+                "SELECT * FROM internal_capital_transfers WHERE id = ?", (transfer_id,)
+            ).fetchone()
+        assert row is not None
     return _response(row, mode=_stored_mode(row))
 
 
+def cancel_funding_transfer(
+    transfer_id: str,
+    *,
+    requested_by: str,
+) -> InternalCapitalTransferResponse:
+    with connection() as db:
+        row = db.execute(
+            "SELECT * FROM internal_capital_transfers WHERE id = ?", (transfer_id,)
+        ).fetchone()
+    if row is None:
+        raise HTTPException(status_code=404, detail="Funding transfer not found")
+    if _stored_mode(row) != "assisted":
+        raise HTTPException(status_code=409, detail="Only assisted transfers can be cancelled")
+    if row["status"] != "pending":
+        if row["status"] == "failed" and row["failure_reason"] == "Assisted transfer cancelled":
+            return _response(row, mode="assisted")
+        raise HTTPException(status_code=409, detail="Funding transfer is no longer pending")
+    if not _has_assisted_baseline(row):
+        raise HTTPException(
+            status_code=409,
+            detail="Legacy assisted transfer requires manual balance review before release",
+        )
+    source, _ = _balance_quote(str(row["source_account_id"]))
+    destination, _ = _balance_quote(str(row["destination_account_id"]))
+    if source.amount is None or destination.amount is None:
+        raise HTTPException(status_code=503, detail="Current balances are unavailable")
+    source_before = Decimal(str(row["source_balance_before"]))
+    destination_before = Decimal(str(row["destination_balance_before"]))
+    if (
+        abs(source.amount - source_before) > ASSISTED_BALANCE_TOLERANCE
+        or abs(destination.amount - destination_before) > ASSISTED_BALANCE_TOLERANCE
+    ):
+        raise HTTPException(
+            status_code=409,
+            detail="Account balances changed; reconcile the assisted transfer before cancellation",
+        )
+    _finish_transfer(
+        transfer_id,
+        status="failed",
+        external_transfer_id=None,
+        failure_reason="Assisted transfer cancelled",
+    )
+    risk_repository.audit(
+        "assisted_capital_transfer_cancelled",
+        "internal_capital_transfer",
+        transfer_id,
+        {"requestedBy": requested_by},
+    )
+    return get_funding_transfer(transfer_id)
+
+
+def _has_assisted_baseline(row) -> bool:
+    return all(
+        row[key] not in (None, "")
+        for key in (
+            "source_account_id",
+            "destination_account_id",
+            "source_balance_before",
+            "destination_balance_before",
+        )
+    )
+
+
+def _reconcile_assisted_transfer(row) -> None:
+    if not _has_assisted_baseline(row):
+        return
+    source, _ = _balance_quote(str(row["source_account_id"]))
+    destination, _ = _balance_quote(str(row["destination_account_id"]))
+    if source.amount is None or destination.amount is None:
+        return
+    amount = Decimal(str(row["amount"]))
+    expected_source = Decimal(str(row["source_balance_before"])) - amount
+    expected_destination = Decimal(str(row["destination_balance_before"])) + amount
+    if (
+        source.amount <= expected_source + ASSISTED_BALANCE_TOLERANCE
+        and destination.amount >= expected_destination - ASSISTED_BALANCE_TOLERANCE
+    ):
+        _finish_transfer(
+            str(row["id"]),
+            status="completed",
+            external_transfer_id=None,
+            failure_reason=None,
+        )
+        risk_repository.audit(
+            "assisted_capital_transfer_reconciled",
+            "internal_capital_transfer",
+            str(row["id"]),
+            {"direction": row["direction"], "amount": row["amount"]},
+        )
+
+
 def _stored_mode(row) -> Literal["automated", "assisted"]:
+    if "mode" in row.keys() and row["mode"] in {"automated", "assisted"}:
+        return row["mode"]
     return "automated" if row["external_transfer_id"] or row["failure_reason"] else "assisted"
 
 

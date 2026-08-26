@@ -578,6 +578,26 @@ PLATFORM_MIGRATIONS: tuple[Migration, ...] = (
             "ALTER TABLE order_execution_intents_v17 RENAME TO order_execution_intents",
         ),
     ),
+    Migration(
+        version=18,
+        name="assisted-capital-transfer-reconciliation",
+        statements=(
+            "ALTER TABLE internal_capital_transfers ADD COLUMN mode TEXT",
+            "ALTER TABLE internal_capital_transfers ADD COLUMN source_account_id TEXT",
+            "ALTER TABLE internal_capital_transfers ADD COLUMN destination_account_id TEXT",
+            "ALTER TABLE internal_capital_transfers ADD COLUMN source_balance_before TEXT",
+            "ALTER TABLE internal_capital_transfers ADD COLUMN destination_balance_before TEXT",
+            """
+            UPDATE internal_capital_transfers
+            SET mode = CASE
+                WHEN external_transfer_id IS NULL AND failure_reason IS NULL
+                    THEN 'assisted'
+                ELSE 'automated'
+            END
+            WHERE mode IS NULL
+            """,
+        ),
+    ),
 )
 
 

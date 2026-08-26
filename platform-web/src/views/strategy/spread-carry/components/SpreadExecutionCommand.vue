@@ -468,6 +468,15 @@
           >
             刷新并核对两边余额
           </button>
+          <button
+            v-if="transfer?.mode === 'assisted' && transfer.status === 'pending'"
+            type="button"
+            class="row-btn"
+            :disabled="loading"
+            @click="cancelTransfer"
+          >
+            取消本次辅助调拨
+          </button>
         </div>
         <p v-if="balanceVerification === 'matched'" class="funding-verified">
           两边余额已与调拨后预计值一致。
@@ -576,6 +585,7 @@
     balanceVerification,
     bybitAmount,
     canSubmit,
+    cancelTransfer,
     confirmed,
     copyAmount,
     direction,

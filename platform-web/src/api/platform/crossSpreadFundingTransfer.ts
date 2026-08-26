@@ -79,3 +79,12 @@ export async function getFundingTransfer(
   );
   return response.data;
 }
+
+export async function cancelFundingTransfer(
+  transferId: string,
+): Promise<InternalCapitalTransferResult> {
+  const response = await client.post<InternalCapitalTransferResult>(
+    `/trading/cross-spread/funding-transfers/${encodeURIComponent(transferId)}/cancel`,
+  );
+  return response.data;
+}

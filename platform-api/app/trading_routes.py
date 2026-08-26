@@ -33,6 +33,7 @@ from app.strategies.capital_transfer import (
     CreateInternalCapitalTransferRequest,
     FundingTransferQuoteResponse,
     InternalCapitalTransferResponse,
+    cancel_funding_transfer,
     create_funding_transfer,
     get_funding_transfer,
     get_funding_transfer_quote,
@@ -132,6 +133,18 @@ def create_trading_router(api_prefix: str) -> APIRouter:
     ) -> InternalCapitalTransferResponse:
         require_principal(http_request)
         return get_funding_transfer(transfer_id)
+
+    @router.post(
+        f"{api_prefix}/trading/cross-spread/funding-transfers/{{transfer_id}}/cancel",
+        response_model=InternalCapitalTransferResponse,
+        tags=["trading"],
+    )
+    def cross_spread_funding_transfer_cancel(
+        transfer_id: str,
+        http_request: Request,
+    ) -> InternalCapitalTransferResponse:
+        principal = require_principal(http_request)
+        return cancel_funding_transfer(transfer_id, requested_by=principal.user_id)
 
     @router.post(
         f"{api_prefix}/trading/cross-spread/market-command",

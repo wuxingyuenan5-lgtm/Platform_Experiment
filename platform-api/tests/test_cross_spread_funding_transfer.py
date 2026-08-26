@@ -27,7 +27,7 @@ def _risk(
         "source": source,
         "accountId": account_id,
         "currency": "USDT",
-        "availableBalance": bybit if account_id == "account_crypto_test" else mt5,
+        "availableBalance": mt5 if "mt5" in account_id.lower() else bybit,
         "dataQualityState": "complete",
         "asOf": "2026-08-22T00:00:00+00:00",
     }
@@ -62,7 +62,7 @@ def test_quote_uses_decimal_half_difference_and_never_turns_failure_into_zero(
     assert quote.json()["suggestedAmount"] == "80.0000000000000000005"
 
     def one_side_unavailable(account_id: str) -> dict[str, object]:
-        if account_id == "account_crypto_test":
+        if "bybit" in account_id.lower():
             raise httpx.ConnectError("Bybit read unavailable")
         return _risk(account_id)
 
@@ -81,15 +81,15 @@ def test_quote_uses_decimal_half_difference_and_never_turns_failure_into_zero(
         (
             "bybit_to_mt5",
             [
-                ("account_crypto_test", "fake:bybit-funding"),
-                ("fake:bybit-funding", "account_mt5_demo"),
+                ("bybit-live-main", "fake:bybit-funding"),
+                ("fake:bybit-funding", "mt5-live-main"),
             ],
         ),
         (
             "mt5_to_bybit",
             [
-                ("account_mt5_demo", "fake:bybit-funding"),
-                ("fake:bybit-funding", "account_crypto_test"),
+                ("mt5-live-main", "fake:bybit-funding"),
+                ("fake:bybit-funding", "bybit-live-main"),
             ],
         ),
     ],
@@ -219,19 +219,107 @@ def test_second_step_failure_leaves_funds_in_funding_and_unknown_is_not_retried(
     assert calls == 1
 
 
-def test_assisted_mode_stays_pending_and_can_be_queried(monkeypatch, tmp_path: Path) -> None:
+def test_assisted_mode_reconciles_authoritative_balance_movement_and_releases_claims(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
     get_settings().database_path = str(tmp_path / "funding-transfer-assisted.db")
+    balances = {"bybit-live-main": "300", "mt5-live-main": "100"}
     _configure_quote(
         monkeypatch,
-        lambda account_id: _risk(account_id, bybit="300", mt5="100", source="bybit_mt5"),
+        lambda account_id: _risk(
+            account_id,
+            bybit=balances["bybit-live-main"],
+            mt5=balances["mt5-live-main"],
+            source="bybit_mt5",
+        ),
     )
     with TestClient(app) as client:
         created = client.post(CREATE_URL, json=_payload(key="assisted", amount="25"))
+        balances["bybit-live-main"] = "275"
+        balances["mt5-live-main"] = "125"
         fetched = client.get(
             f"/api/v1/trading/cross-spread/funding-transfers/{created.json()['transferId']}"
         )
     assert created.status_code == fetched.status_code == 200
     assert created.json()["status"] == "pending"
     assert created.json()["mode"] == "assisted"
-    assert fetched.json() == created.json()
+    assert fetched.json()["status"] == "completed"
+    assert fetched.json()["mode"] == "assisted"
     assert created.json()["officialFundingUrl"].startswith("https://www.bybit.com/")
+    with connection() as db:
+        assert (
+            db.execute(
+                """
+                SELECT COUNT(*) FROM execution_resource_claims
+                WHERE owner_id = ? AND status = 'active'
+                """,
+                (created.json()["transferId"],),
+            ).fetchone()[0]
+            == 0
+        )
+        assert (
+            db.execute(
+                """
+                SELECT COUNT(*) FROM execution_balance_reservations
+                WHERE owner_id = ? AND status = 'active'
+                """,
+                (created.json()["transferId"],),
+            ).fetchone()[0]
+            == 0
+        )
+
+
+def test_assisted_mode_can_cancel_only_while_balances_are_unchanged(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    get_settings().database_path = str(tmp_path / "funding-transfer-assisted-cancel.db")
+    balances = {"bybit-live-main": "300", "mt5-live-main": "100"}
+    _configure_quote(
+        monkeypatch,
+        lambda account_id: _risk(
+            account_id,
+            bybit=balances["bybit-live-main"],
+            mt5=balances["mt5-live-main"],
+            source="bybit_mt5",
+        ),
+    )
+    with TestClient(app) as client:
+        created = client.post(CREATE_URL, json=_payload(key="cancel-assisted", amount="25"))
+        cancelled = client.post(
+            f"/api/v1/trading/cross-spread/funding-transfers/{created.json()['transferId']}/cancel"
+        )
+        replay = client.post(
+            f"/api/v1/trading/cross-spread/funding-transfers/{created.json()['transferId']}/cancel"
+        )
+    assert cancelled.status_code == replay.status_code == 200
+    assert cancelled.json()["status"] == "failed"
+    assert cancelled.json()["mode"] == "assisted"
+    assert cancelled.json()["failureReason"] == "Assisted transfer cancelled"
+    assert replay.json() == cancelled.json()
+
+
+def test_assisted_mode_refuses_cancel_after_ambiguous_one_sided_balance_change(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    get_settings().database_path = str(tmp_path / "funding-transfer-assisted-ambiguous.db")
+    balances = {"bybit-live-main": "300", "mt5-live-main": "100"}
+    _configure_quote(
+        monkeypatch,
+        lambda account_id: _risk(
+            account_id,
+            bybit=balances["bybit-live-main"],
+            mt5=balances["mt5-live-main"],
+            source="bybit_mt5",
+        ),
+    )
+    with TestClient(app) as client:
+        created = client.post(CREATE_URL, json=_payload(key="ambiguous-assisted", amount="25"))
+        balances["bybit-live-main"] = "275"
+        blocked = client.post(
+            f"/api/v1/trading/cross-spread/funding-transfers/{created.json()['transferId']}/cancel"
+        )
+    assert blocked.status_code == 409
+    assert "balances changed" in blocked.json()["detail"]

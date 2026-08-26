@@ -2,6 +2,7 @@ import Decimal from 'decimal.js';
 import { computed, onMounted, ref, watch } from 'vue';
 
 import {
+  cancelFundingTransfer,
   createFundingTransfer,
   getFundingTransfer,
   getFundingTransferQuote,
@@ -164,6 +165,22 @@ export function useCrossSpreadFundingTransfer() {
     }
   }
 
+  async function cancelTransfer() {
+    if (!transfer.value || transfer.value.status !== 'pending') return;
+    loading.value = true;
+    error.value = '';
+    try {
+      transfer.value = await cancelFundingTransfer(transfer.value.transferId);
+      assistedExpected.value = null;
+      balanceVerification.value = 'idle';
+      await refreshQuote({ preserveInput: true });
+    } catch (cause) {
+      error.value = requestErrorMessage(cause, '辅助调拨取消失败');
+    } finally {
+      loading.value = false;
+    }
+  }
+
   async function copyAmount() {
     await navigator.clipboard.writeText(amountInput.value);
   }
@@ -181,6 +198,7 @@ export function useCrossSpreadFundingTransfer() {
     balanceVerification,
     bybitAmount,
     canSubmit,
+    cancelTransfer,
     confirmed,
     copyAmount,
     direction,
