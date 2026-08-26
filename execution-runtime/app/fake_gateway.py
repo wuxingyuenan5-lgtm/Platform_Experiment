@@ -9,6 +9,7 @@ from app.models import (
     ExecutionEvent,
     GatewayAdapterCapability,
     GatewayCapabilitiesResponse,
+    InternalCapitalTransferReadinessResponse,
     InternalCapitalTransferStepCommand,
     InternalCapitalTransferStepResponse,
     SubmitOrderCommand,
@@ -27,6 +28,7 @@ from app.venue_store import (
     cancel_order,
     claim_order_script,
     ensure_store,
+    get_internal_capital_transfer,
     get_market_quote,
     get_order,
     list_balances,
@@ -274,6 +276,35 @@ class FakeGateway:
         command: InternalCapitalTransferStepCommand,
     ) -> InternalCapitalTransferStepResponse:
         return transfer_internal_capital(command)
+
+    def get_internal_capital_transfer_readiness(
+        self,
+        *,
+        source_account_id: str,
+        destination_account_id: str,
+        currency: str,
+    ) -> InternalCapitalTransferReadinessResponse:
+        risk = self.get_account_risk(source_account_id)
+        return InternalCapitalTransferReadinessResponse(
+            ready=True,
+            sourceAccountId=source_account_id,
+            destinationAccountId=destination_account_id,
+            currency=currency.upper(),
+            transferableBalance=risk.available_balance,
+            fromAccountType="simulation",
+            toAccountType="simulation",
+        )
+
+    def query_internal_capital_transfer(
+        self,
+        command: InternalCapitalTransferStepCommand,
+        *,
+        external_transfer_id: str,
+    ) -> InternalCapitalTransferStepResponse:
+        return get_internal_capital_transfer(
+            command,
+            external_transfer_id=external_transfer_id,
+        )
 
     def get_instrument_specification(
         self,

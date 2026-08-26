@@ -513,6 +513,30 @@ def _internal_transfer_response(row) -> InternalCapitalTransferStepResponse:
     )
 
 
+def get_internal_capital_transfer(
+    command: InternalCapitalTransferStepCommand,
+    *,
+    external_transfer_id: str,
+) -> InternalCapitalTransferStepResponse:
+    ensure_store()
+    with connection() as db:
+        row = db.execute(
+            "SELECT * FROM fake_internal_capital_transfers WHERE external_transfer_id = ?",
+            (external_transfer_id,),
+        ).fetchone()
+    if row is None:
+        return InternalCapitalTransferStepResponse(
+            externalTransferId=external_transfer_id,
+            status="result_unknown",
+            sourceAccountId=command.source_account_id,
+            destinationAccountId=command.destination_account_id,
+            sourceCurrency=command.source_currency,
+            destinationCurrency=command.destination_currency,
+            amount=command.amount,
+        )
+    return _internal_transfer_response(row)
+
+
 def _fake_balance_seed(account_id: str, currency: str) -> Decimal:
     return get_settings().fake_balance_seed_overrides.get(
         (account_id, currency.upper()),
@@ -830,7 +854,7 @@ def cancel_order(external_id: str, idempotency_key: str, reason: str | None) -> 
         platformOrderId=platform_order_id,
         status=response_status,
         reason=reason,
-        asOf=at,
+        asOf=datetime.fromisoformat(at),
     )
 
 

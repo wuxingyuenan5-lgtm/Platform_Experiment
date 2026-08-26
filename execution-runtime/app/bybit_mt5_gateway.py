@@ -6,12 +6,13 @@ from typing import Any, Literal, cast
 
 from app.bybit_live_adapter import BybitLiveAdapter
 from app.config import Settings, get_settings
-from app.gateway_errors import GatewayConfigurationError, GatewayQueryUnsupportedError
+from app.gateway_errors import GatewayConfigurationError, GatewayRequestRejectedError
 from app.live_route_store import get_order_route
 from app.models import (
     CancelOrderResponse,
     ExecutionEvent,
     GatewayCapabilitiesResponse,
+    InternalCapitalTransferReadinessResponse,
     InternalCapitalTransferStepCommand,
     InternalCapitalTransferStepResponse,
     SubmitOrderCommand,
@@ -221,8 +222,105 @@ class BybitMt5Gateway:
         self,
         command: InternalCapitalTransferStepCommand,
     ) -> InternalCapitalTransferStepResponse:
-        raise GatewayQueryUnsupportedError(
-            "Verified Bybit TradFi (MT5) Transfer In/Out API is unavailable"
+        bybit_account_id, from_type, to_type = self._tradfi_transfer_route(
+            command.source_account_id,
+            command.destination_account_id,
+        )
+        if command.source_currency.upper() != "USDT":
+            raise GatewayConfigurationError("Bybit TradFi transfer requires USDT")
+        if command.destination_currency.upper() not in {"USDT", "USD"}:
+            raise GatewayConfigurationError("Bybit TradFi destination currency is unsupported")
+        for account_id in (command.source_account_id, command.destination_account_id):
+            if account_id not in self.settings.allowed_live_accounts:
+                raise GatewayConfigurationError(
+                    "Transfer account is not in the live allowlist"
+                )
+        ready, transferable, reason = self.bybit.internal_transfer_readiness(
+            account_id=bybit_account_id,
+            from_account_type=from_type,
+            to_account_type=to_type,
+            currency="USDT",
+        )
+        if not ready or transferable is None:
+            raise GatewayConfigurationError(
+                reason or "Bybit TradFi transfer readiness is unavailable"
+            )
+        if command.amount > transferable:
+            raise GatewayRequestRejectedError(
+                "Bybit TradFi transfer exceeds transferable balance"
+            )
+        return self.bybit.transfer_tradfi_capital(
+            command,
+            account_id=bybit_account_id,
+            from_account_type=from_type,
+            to_account_type=to_type,
+        )
+
+    def get_internal_capital_transfer_readiness(
+        self,
+        *,
+        source_account_id: str,
+        destination_account_id: str,
+        currency: str,
+    ) -> InternalCapitalTransferReadinessResponse:
+        try:
+            bybit_account_id, from_type, to_type = self._tradfi_transfer_route(
+                source_account_id,
+                destination_account_id,
+            )
+        except GatewayConfigurationError as exc:
+            return InternalCapitalTransferReadinessResponse(
+                ready=False,
+                sourceAccountId=source_account_id,
+                destinationAccountId=destination_account_id,
+                currency=currency.upper(),
+                reason=str(exc),
+            )
+        ready, transferable, reason = self.bybit.internal_transfer_readiness(
+            account_id=bybit_account_id,
+            from_account_type=from_type,
+            to_account_type=to_type,
+            currency=currency.upper(),
+        )
+        return InternalCapitalTransferReadinessResponse(
+            ready=ready,
+            sourceAccountId=source_account_id,
+            destinationAccountId=destination_account_id,
+            currency=currency.upper(),
+            transferableBalance=transferable,
+            fromAccountType=from_type,
+            toAccountType=to_type,
+            reason=reason,
+        )
+
+    def query_internal_capital_transfer(
+        self,
+        command: InternalCapitalTransferStepCommand,
+        *,
+        external_transfer_id: str,
+    ) -> InternalCapitalTransferStepResponse:
+        bybit_account_id, _, _ = self._tradfi_transfer_route(
+            command.source_account_id,
+            command.destination_account_id,
+        )
+        return self.bybit.query_tradfi_capital(
+            command,
+            account_id=bybit_account_id,
+            external_transfer_id=external_transfer_id,
+        )
+
+    def _tradfi_transfer_route(
+        self,
+        source_account_id: str,
+        destination_account_id: str,
+    ) -> tuple[str, str, str]:
+        pairs = self.settings.tradfi_transfer_pairs
+        if pairs.get(source_account_id) == destination_account_id:
+            return source_account_id, "UNIFIED", "TradFi"
+        if pairs.get(destination_account_id) == source_account_id:
+            return destination_account_id, "TradFi", "UNIFIED"
+        raise GatewayConfigurationError(
+            "Accounts are not explicitly mapped to one Bybit UTA/TradFi relationship"
         )
 
     def get_instrument_specification(

@@ -4,6 +4,7 @@ import pytest
 
 from app.bybit_acceptance_adapter import BybitAcceptanceAdapter
 from app.bybit_live_adapter import BybitLiveAdapter
+from app.bybit_mt5_gateway import BybitMt5Gateway
 from app.config import Settings, get_settings
 from app.gateway_errors import (
     GatewayConfigurationError,
@@ -11,7 +12,7 @@ from app.gateway_errors import (
     GatewayResultUnknownError,
 )
 from app.journal import initialize_journal
-from app.models import SubmitOrderCommand
+from app.models import InternalCapitalTransferStepCommand, SubmitOrderCommand
 
 
 class FakeBybitClient:
@@ -219,6 +220,43 @@ class TracingBybitClient(FakeBybitClient):
         return super().get_executions(**kwargs)
 
 
+class FakeTradFiTransferClient(FakeBybitClient):
+    def __init__(self, *, permission: bool = True, create_status: str = "SUCCESS") -> None:
+        super().__init__()
+        self.permission = permission
+        self.create_status = create_status
+        self.balance_calls: list[dict[str, object]] = []
+        self.transfer_calls: list[dict[str, object]] = []
+        self.records: dict[str, dict[str, object]] = {}
+
+    def get_api_key_information(self, **kwargs):
+        wallet = ["AccountTransfer"] if self.permission else []
+        return {
+            "retCode": 0,
+            "result": {
+                "readOnly": 0,
+                "permissions": {"Wallet": wallet},
+            },
+        }
+
+    def get_coin_balance(self, **kwargs):
+        self.balance_calls.append(kwargs)
+        return {
+            "retCode": 0,
+            "result": {"balance": {"transferBalance": "350.125"}},
+        }
+
+    def get_internal_transfer_records(self, **kwargs):
+        row = self.records.get(str(kwargs["transferId"]))
+        return {"retCode": 0, "result": {"list": [row] if row is not None else []}}
+
+    def create_internal_transfer(self, **kwargs):
+        self.transfer_calls.append(kwargs)
+        row = {"transferId": kwargs["transferId"], "status": self.create_status}
+        self.records[str(kwargs["transferId"])] = row
+        return {"retCode": 0, "result": row}
+
+
 def runtime_settings(write_enabled: bool = True) -> Settings:
     return Settings(
         environment="live",
@@ -253,6 +291,34 @@ def order_command(
         execution_policy=execution_policy,
         quantity="1",
         price=price,
+    )
+
+
+def tradfi_settings(*, write_enabled: bool = True) -> Settings:
+    return Settings(
+        environment="live",
+        live_write_enabled=write_enabled,
+        live_account_allowlist="bybit-live-main,mt5-live-main",
+        bybit_account_ids="bybit-live-main",
+        mt5_account_ids="mt5-live-main",
+        bybit_instrument_map="XAUTUSDT=instrument-xaut",
+        tradfi_transfer_account_pairs="bybit-live-main=mt5-live-main",
+    )
+
+
+def transfer_command(
+    *,
+    direction: str = "bybit_to_mt5",
+    key: str = "tradfi-transfer-1",
+) -> InternalCapitalTransferStepCommand:
+    bybit_to_mt5 = direction == "bybit_to_mt5"
+    return InternalCapitalTransferStepCommand(
+        idempotencyKey=key,
+        sourceAccountId="bybit-live-main" if bybit_to_mt5 else "mt5-live-main",
+        destinationAccountId="mt5-live-main" if bybit_to_mt5 else "bybit-live-main",
+        sourceCurrency="USDT",
+        destinationCurrency="USDT",
+        amount="300",
     )
 
 
@@ -363,6 +429,123 @@ def test_bybit_read_only_account_rejects_submit_before_client_call(tmp_path) -> 
     with pytest.raises(GatewayRequestRejectedError, match="configured read-only"):
         adapter.submit_order(order_command())
     assert client.place_calls == []
+
+
+def test_tradfi_transfer_readiness_requires_wallet_account_transfer_permission() -> None:
+    client = FakeTradFiTransferClient(permission=False)
+    gateway = BybitMt5Gateway(
+        tradfi_settings(write_enabled=False),
+        bybit=BybitLiveAdapter(tradfi_settings(write_enabled=False), client),
+        mt5=object(),
+    )
+
+    readiness = gateway.get_internal_capital_transfer_readiness(
+        source_account_id="bybit-live-main",
+        destination_account_id="mt5-live-main",
+        currency="USDT",
+    )
+
+    assert readiness.ready is False
+    assert readiness.reason == "BYBIT_WALLET_ACCOUNT_TRANSFER_PERMISSION_REQUIRED"
+    assert client.balance_calls == []
+
+
+def test_tradfi_transfer_readiness_uses_explicit_account_mapping() -> None:
+    client = FakeTradFiTransferClient()
+    settings = tradfi_settings(write_enabled=False)
+    gateway = BybitMt5Gateway(
+        settings,
+        bybit=BybitLiveAdapter(settings, client),
+        mt5=object(),
+    )
+
+    forward = gateway.get_internal_capital_transfer_readiness(
+        source_account_id="bybit-live-main",
+        destination_account_id="mt5-live-main",
+        currency="USDT",
+    )
+    reverse = gateway.get_internal_capital_transfer_readiness(
+        source_account_id="mt5-live-main",
+        destination_account_id="bybit-live-main",
+        currency="USDT",
+    )
+    unmapped = gateway.get_internal_capital_transfer_readiness(
+        source_account_id="bybit-live-main",
+        destination_account_id="display-name-is-not-identity",
+        currency="USDT",
+    )
+
+    assert forward.ready is True
+    assert forward.transferable_balance == Decimal("350.125")
+    assert forward.from_account_type == "UNIFIED"
+    assert forward.to_account_type == "TradFi"
+    assert reverse.ready is True
+    assert reverse.from_account_type == "TradFi"
+    assert reverse.to_account_type == "UNIFIED"
+    assert unmapped.ready is False
+    assert "explicitly mapped" in str(unmapped.reason)
+    assert client.balance_calls == [
+        {"accountType": "UNIFIED", "toAccountType": "TradFi", "coin": "USDT"},
+        {"accountType": "TradFi", "toAccountType": "UNIFIED", "coin": "USDT"},
+    ]
+
+
+def test_tradfi_transfer_posts_once_and_replay_queries_same_identity() -> None:
+    client = FakeTradFiTransferClient()
+    settings = tradfi_settings()
+    gateway = BybitMt5Gateway(
+        settings,
+        bybit=BybitLiveAdapter(settings, client),
+        mt5=object(),
+    )
+    command = transfer_command()
+
+    first = gateway.transfer_internal_capital(command)
+    replay = gateway.transfer_internal_capital(command)
+
+    assert first.status == replay.status == "completed"
+    assert first.external_transfer_id == replay.external_transfer_id
+    assert len(client.transfer_calls) == 1
+    assert client.transfer_calls[0] == {
+        "transferId": first.external_transfer_id,
+        "coin": "USDT",
+        "amount": "300",
+        "fromAccountType": "UNIFIED",
+        "toAccountType": "TradFi",
+    }
+
+
+def test_tradfi_pending_is_result_unknown_and_live_write_remains_gated() -> None:
+    pending_client = FakeTradFiTransferClient(create_status="PENDING")
+    settings = tradfi_settings()
+    gateway = BybitMt5Gateway(
+        settings,
+        bybit=BybitLiveAdapter(settings, pending_client),
+        mt5=object(),
+    )
+
+    result = gateway.transfer_internal_capital(transfer_command(key="pending-transfer"))
+
+    assert result.status == "result_unknown"
+    assert len(pending_client.transfer_calls) == 1
+    pending_client.records[result.external_transfer_id]["status"] = "SUCCESS"
+    reconciled = gateway.query_internal_capital_transfer(
+        transfer_command(key="pending-transfer"),
+        external_transfer_id=result.external_transfer_id,
+    )
+    assert reconciled.status == "completed"
+    assert len(pending_client.transfer_calls) == 1
+
+    blocked_settings = tradfi_settings(write_enabled=False)
+    blocked_client = FakeTradFiTransferClient()
+    blocked_gateway = BybitMt5Gateway(
+        blocked_settings,
+        bybit=BybitLiveAdapter(blocked_settings, blocked_client),
+        mt5=object(),
+    )
+    with pytest.raises(GatewayConfigurationError, match="live write gate is disabled"):
+        blocked_gateway.transfer_internal_capital(transfer_command(key="blocked-transfer"))
+    assert blocked_client.transfer_calls == []
 
 
 def test_bybit_live_adapter_routes_multi_account_reads_to_explicit_client(tmp_path) -> None:

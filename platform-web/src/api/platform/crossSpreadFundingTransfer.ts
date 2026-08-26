@@ -17,7 +17,8 @@ export interface FundingTransferQuoteResult {
   mt5Withdrawable: FundingBalanceQuote;
   suggestedDirection: FundingTransferDirection | null;
   suggestedAmount: string | null;
-  mode: 'automated' | 'assisted';
+  mode: 'automated' | 'unavailable';
+  readinessReason: string | null;
   officialFundingUrl: string;
   asOf: string;
 }
@@ -76,15 +77,6 @@ export async function getFundingTransfer(
 ): Promise<InternalCapitalTransferResult> {
   const response = await client.get<InternalCapitalTransferResult>(
     `/trading/cross-spread/funding-transfers/${encodeURIComponent(transferId)}`,
-  );
-  return response.data;
-}
-
-export async function cancelFundingTransfer(
-  transferId: string,
-): Promise<InternalCapitalTransferResult> {
-  const response = await client.post<InternalCapitalTransferResult>(
-    `/trading/cross-spread/funding-transfers/${encodeURIComponent(transferId)}/cancel`,
   );
   return response.data;
 }

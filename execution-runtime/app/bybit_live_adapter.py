@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any, Literal, cast
+from uuid import NAMESPACE_URL, uuid5
 
 from app.config import Settings
 from app.gateway_errors import (
@@ -21,6 +22,8 @@ from app.models import (
     CancelOrderResponse,
     ExecutionEvent,
     GatewayAdapterCapability,
+    InternalCapitalTransferStepCommand,
+    InternalCapitalTransferStepResponse,
     SubmitOrderCommand,
     VenueAccountRiskSnapshot,
     VenueAccountSnapshot,
@@ -75,6 +78,7 @@ class BybitLiveAdapter:
                 "post_only_single_attempt_submit",
                 "cancel_order_gated",
                 "account_risk_query",
+                "tradfi_internal_transfer_gated",
             ],
             missingRequirements=sorted(set(missing)),
         )
@@ -408,6 +412,170 @@ class BybitLiveAdapter:
                 )
             )
         return snapshots
+
+    def internal_transfer_readiness(
+        self,
+        *,
+        account_id: str,
+        from_account_type: str,
+        to_account_type: str,
+        currency: str,
+    ) -> tuple[bool, Decimal | None, str | None]:
+        self._assert_account(account_id)
+        client = self._client(account_id)
+        try:
+            key_response = client.get_api_key_information()
+            self._require_success(key_response, "Bybit API key query failed")
+            key_result = key_response.get("result") or {}
+            permissions = (
+                key_result.get("permissions") if isinstance(key_result, dict) else {}
+            ) or {}
+            wallet_permissions = (
+                permissions.get("Wallet") if isinstance(permissions, dict) else []
+            ) or []
+            if "AccountTransfer" not in wallet_permissions:
+                return False, None, "BYBIT_WALLET_ACCOUNT_TRANSFER_PERMISSION_REQUIRED"
+            response = client.get_coin_balance(
+                accountType=from_account_type,
+                toAccountType=to_account_type,
+                coin=currency,
+            )
+            self._require_success(response, "Bybit transferable balance query failed")
+            result = response.get("result") or {}
+            balance = result.get("balance") if isinstance(result, dict) else {}
+            raw_amount = balance.get("transferBalance") if isinstance(balance, dict) else None
+            if raw_amount in (None, ""):
+                return False, None, "BYBIT_TRADFI_TRANSFER_BALANCE_UNAVAILABLE"
+            amount = Decimal(str(raw_amount))
+            if amount < 0:
+                return False, None, "BYBIT_TRADFI_TRANSFER_BALANCE_INVALID"
+            return True, amount, None
+        except GatewayRequestRejectedError as exc:
+            return False, None, f"BYBIT_TRADFI_TRANSFER_REJECTED:{exc}"
+        except Exception as exc:
+            return False, None, f"BYBIT_TRADFI_TRANSFER_QUERY_UNAVAILABLE:{type(exc).__name__}"
+
+    def transfer_tradfi_capital(
+        self,
+        command: InternalCapitalTransferStepCommand,
+        *,
+        account_id: str,
+        from_account_type: str,
+        to_account_type: str,
+    ) -> InternalCapitalTransferStepResponse:
+        self._assert_account(account_id)
+        self._assert_write_account(account_id)
+        if self.settings.environment.lower() != "live":
+            raise GatewayConfigurationError("Runtime environment is not live")
+        if not self.settings.live_write_enabled:
+            raise GatewayConfigurationError("Runtime live write gate is disabled")
+        transfer_id = str(
+            uuid5(
+                NAMESPACE_URL,
+                f"variable-global:bybit-tradfi:{command.idempotency_key}",
+            )
+        )
+        client = self._client(account_id)
+        existing = self._query_internal_transfer(client, transfer_id)
+        if existing is not None:
+            return self._internal_transfer_response(command, transfer_id, existing)
+        payload = {
+            "transferId": transfer_id,
+            "coin": command.source_currency.upper(),
+            "amount": format(command.amount, "f"),
+            "fromAccountType": from_account_type,
+            "toAccountType": to_account_type,
+        }
+        try:
+            response = client.create_internal_transfer(**payload)
+            self._require_success(response, "Bybit TradFi transfer rejected")
+        except GatewayRequestRejectedError:
+            raise
+        except Exception as exc:
+            recovered = self._query_internal_transfer(client, transfer_id)
+            if recovered is not None:
+                return self._internal_transfer_response(command, transfer_id, recovered)
+            if exc.__class__.__name__ in {"InvalidRequestError", "FailedRequestError"}:
+                raise GatewayRequestRejectedError(
+                    f"Bybit TradFi transfer rejected: {exc}"
+                ) from exc
+            raise self._unknown_error("Bybit TradFi transfer result is unknown", exc) from exc
+        # Bybit's create response guarantees the transfer identity, not a final
+        # settlement state. Resolve status through the authoritative record API;
+        # if it is not visible yet, retain result_unknown and never resubmit.
+        queried = self._query_internal_transfer(client, transfer_id)
+        result = response.get("result") or {}
+        row = queried or (result if isinstance(result, dict) else {})
+        return self._internal_transfer_response(command, transfer_id, row)
+
+    def _query_internal_transfer(
+        self,
+        client: Any,
+        transfer_id: str,
+    ) -> dict[str, object] | None:
+        try:
+            response = client.get_internal_transfer_records(transferId=transfer_id)
+            self._require_success(response, "Bybit transfer query failed")
+        except Exception:
+            return None
+        rows = self._result_list(response)
+        return rows[0] if rows else None
+
+    def query_tradfi_capital(
+        self,
+        command: InternalCapitalTransferStepCommand,
+        *,
+        account_id: str,
+        external_transfer_id: str,
+    ) -> InternalCapitalTransferStepResponse:
+        self._assert_account(account_id)
+        row = self._query_internal_transfer(self._client(account_id), external_transfer_id)
+        if row is None:
+            return InternalCapitalTransferStepResponse(
+                externalTransferId=external_transfer_id,
+                status="result_unknown",
+                sourceAccountId=command.source_account_id,
+                destinationAccountId=command.destination_account_id,
+                sourceCurrency=command.source_currency,
+                destinationCurrency=command.destination_currency,
+                amount=command.amount,
+            )
+        return self._internal_transfer_response(command, external_transfer_id, row)
+
+    @staticmethod
+    def _internal_transfer_response(
+        command: InternalCapitalTransferStepCommand,
+        transfer_id: str,
+        row: dict[str, object],
+    ) -> InternalCapitalTransferStepResponse:
+        status = str(row.get("status") or "").upper()
+        if status == "SUCCESS":
+            return InternalCapitalTransferStepResponse(
+                externalTransferId=transfer_id,
+                status="completed",
+                sourceAccountId=command.source_account_id,
+                destinationAccountId=command.destination_account_id,
+                sourceCurrency=command.source_currency,
+                destinationCurrency=command.destination_currency,
+                amount=command.amount,
+                completedAt=datetime.now(UTC),
+            )
+        if status == "FAILED":
+            raise GatewayRequestRejectedError("Bybit TradFi transfer failed")
+        if status in {"PENDING", "STATUS_UNKNOWN", ""}:
+            return InternalCapitalTransferStepResponse(
+                externalTransferId=transfer_id,
+                status="result_unknown",
+                sourceAccountId=command.source_account_id,
+                destinationAccountId=command.destination_account_id,
+                sourceCurrency=command.source_currency,
+                destinationCurrency=command.destination_currency,
+                amount=command.amount,
+                completedAt=None,
+            )
+        raise GatewayResultUnknownError(
+            f"Bybit TradFi transfer returned unknown status: {status}"
+        )
 
     def list_economic_events(
         self,

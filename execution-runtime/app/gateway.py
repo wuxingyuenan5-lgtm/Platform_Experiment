@@ -5,6 +5,7 @@ from app.models import (
     CancelOrderResponse,
     ExecutionEvent,
     GatewayCapabilitiesResponse,
+    InternalCapitalTransferReadinessResponse,
     InternalCapitalTransferStepCommand,
     InternalCapitalTransferStepResponse,
     SubmitOrderCommand,
@@ -106,6 +107,25 @@ class ExecutionGateway(Protocol):
         command: InternalCapitalTransferStepCommand,
     ) -> InternalCapitalTransferStepResponse:
         """Move capital between verified internal accounts idempotently."""
+        ...
+
+    def get_internal_capital_transfer_readiness(
+        self,
+        *,
+        source_account_id: str,
+        destination_account_id: str,
+        currency: str,
+    ) -> InternalCapitalTransferReadinessResponse:
+        """Return authoritative transfer permission and transferable balance."""
+        ...
+
+    def query_internal_capital_transfer(
+        self,
+        command: InternalCapitalTransferStepCommand,
+        *,
+        external_transfer_id: str,
+    ) -> InternalCapitalTransferStepResponse:
+        """Query one existing transfer identity without creating a new transfer."""
         ...
 
     def get_instrument_specification(

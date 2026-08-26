@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from collections.abc import Callable
 from decimal import Decimal
 from pathlib import Path
 
@@ -16,20 +15,28 @@ QUOTE_URL = "/api/v1/trading/cross-spread/funding-transfer/quote"
 CREATE_URL = "/api/v1/trading/cross-spread/funding-transfer"
 
 
-def _risk(
-    account_id: str,
+def _readiness(
+    source_account_id: str,
+    destination_account_id: str,
     *,
     bybit: str = "260.000000000000000001",
     mt5: str = "100",
-    source: str = "fake",
+    ready: bool = True,
+    simulation: bool = True,
 ) -> dict[str, object]:
+    source_is_mt5 = "mt5" in source_account_id.lower()
     return {
-        "source": source,
-        "accountId": account_id,
+        "ready": ready,
+        "sourceAccountId": source_account_id,
+        "destinationAccountId": destination_account_id,
         "currency": "USDT",
-        "availableBalance": mt5 if "mt5" in account_id.lower() else bybit,
-        "dataQualityState": "complete",
-        "asOf": "2026-08-22T00:00:00+00:00",
+        "transferableBalance": (mt5 if source_is_mt5 else bybit) if ready else None,
+        "fromAccountType": (
+            "simulation" if simulation else ("TradFi" if source_is_mt5 else "UNIFIED")
+        ),
+        "toAccountType": "simulation" if simulation else ("UNIFIED" if source_is_mt5 else "TradFi"),
+        "reason": None if ready else "BYBIT_WALLET_ACCOUNT_TRANSFER_PERMISSION_REQUIRED",
+        "checkedAt": "2026-08-22T00:00:00+00:00",
     }
 
 
@@ -42,9 +49,9 @@ def _payload(
     return {"idempotencyKey": key, "direction": direction, "amount": amount}
 
 
-def _configure_quote(monkeypatch, callback: Callable[[str], dict[str, object]]) -> None:
+def _configure_quote(monkeypatch, callback=_readiness) -> None:
     monkeypatch.setattr(
-        "app.strategies.capital_transfer._runtime_account_risk",
+        "app.strategies.capital_transfer._runtime_transfer_readiness",
         callback,
     )
 
@@ -54,17 +61,22 @@ def test_quote_uses_decimal_half_difference_and_never_turns_failure_into_zero(
     tmp_path: Path,
 ) -> None:
     get_settings().database_path = str(tmp_path / "funding-transfer-quote.db")
-    _configure_quote(monkeypatch, _risk)
+    _configure_quote(monkeypatch)
     with TestClient(app) as client:
         quote = client.get(QUOTE_URL)
     assert quote.status_code == 200, quote.text
     assert quote.json()["suggestedDirection"] == "bybit_to_mt5"
     assert quote.json()["suggestedAmount"] == "80.0000000000000000005"
 
-    def one_side_unavailable(account_id: str) -> dict[str, object]:
-        if "bybit" in account_id.lower():
-            raise httpx.ConnectError("Bybit read unavailable")
-        return _risk(account_id)
+    def one_side_unavailable(
+        source_account_id: str,
+        destination_account_id: str,
+    ) -> dict[str, object]:
+        return _readiness(
+            source_account_id,
+            destination_account_id,
+            ready="bybit" not in source_account_id.lower(),
+        )
 
     _configure_quote(monkeypatch, one_side_unavailable)
     with TestClient(app) as client:
@@ -73,6 +85,12 @@ def test_quote_uses_decimal_half_difference_and_never_turns_failure_into_zero(
     assert unavailable.json()["bybitTransferable"]["amount"] is None
     assert unavailable.json()["bybitTransferable"]["dataQualityState"] == "unavailable"
     assert unavailable.json()["suggestedAmount"] is None
+    assert unavailable.json()["mode"] == "unavailable"
+
+    with TestClient(app) as client:
+        blocked = client.post(CREATE_URL, json=_payload(key="permission-blocked", amount="10"))
+    assert blocked.status_code == 423
+    assert "ACCOUNT_TRANSFER_PERMISSION_REQUIRED" in blocked.json()["detail"]
 
 
 @pytest.mark.parametrize(
@@ -104,7 +122,12 @@ def test_fake_transfer_executes_two_internal_steps_without_trading_objects(
     settings.database_path = str(tmp_path / f"funding-transfer-{direction}.db")
     _configure_quote(
         monkeypatch,
-        lambda account_id: _risk(account_id, bybit="300", mt5="300"),
+        lambda source, destination: _readiness(
+            source,
+            destination,
+            bybit="300",
+            mt5="300",
+        ),
     )
     calls: list[tuple[str, str, Decimal]] = []
 
@@ -143,7 +166,15 @@ def test_fake_transfer_executes_two_internal_steps_without_trading_objects(
 
 def test_transfer_replay_conflict_and_public_payload_boundary(monkeypatch, tmp_path: Path) -> None:
     get_settings().database_path = str(tmp_path / "funding-transfer-idempotency.db")
-    _configure_quote(monkeypatch, lambda account_id: _risk(account_id, bybit="300", mt5="100"))
+    _configure_quote(
+        monkeypatch,
+        lambda source, destination: _readiness(
+            source,
+            destination,
+            bybit="300",
+            mt5="100",
+        ),
+    )
     calls = 0
 
     def transfer_step(**kwargs) -> dict[str, object]:
@@ -177,7 +208,15 @@ def test_second_step_failure_leaves_funds_in_funding_and_unknown_is_not_retried(
     tmp_path: Path,
 ) -> None:
     get_settings().database_path = str(tmp_path / "funding-transfer-partial.db")
-    _configure_quote(monkeypatch, lambda account_id: _risk(account_id, bybit="300", mt5="100"))
+    _configure_quote(
+        monkeypatch,
+        lambda source, destination: _readiness(
+            source,
+            destination,
+            bybit="300",
+            mt5="100",
+        ),
+    )
     calls = 0
 
     def partial_step(**kwargs) -> dict[str, object]:
@@ -218,35 +257,69 @@ def test_second_step_failure_leaves_funds_in_funding_and_unknown_is_not_retried(
     assert replay.json() == unknown.json()
     assert calls == 1
 
+    monkeypatch.setattr(
+        "app.strategies.capital_transfer._runtime_transfer_status",
+        lambda row: {
+            "status": "completed",
+            "externalTransferId": row["external_transfer_id"],
+        },
+    )
+    with TestClient(app) as client:
+        reconciled = client.get(
+            f"/api/v1/trading/cross-spread/funding-transfers/{unknown.json()['transferId']}"
+        )
+    assert reconciled.status_code == 200
+    assert reconciled.json()["status"] == "completed"
+    with connection() as db:
+        assert (
+            db.execute(
+                """
+                SELECT COUNT(*) FROM execution_resource_claims
+                WHERE owner_id = ? AND status = 'active'
+                """,
+                (unknown.json()["transferId"],),
+            ).fetchone()[0]
+            == 0
+        )
 
-def test_assisted_mode_reconciles_authoritative_balance_movement_and_releases_claims(
+
+def test_live_transfer_uses_one_official_runtime_step_and_releases_claims(
     monkeypatch,
     tmp_path: Path,
 ) -> None:
-    get_settings().database_path = str(tmp_path / "funding-transfer-assisted.db")
-    balances = {"bybit-live-main": "300", "mt5-live-main": "100"}
+    get_settings().database_path = str(tmp_path / "funding-transfer-live.db")
     _configure_quote(
         monkeypatch,
-        lambda account_id: _risk(
-            account_id,
-            bybit=balances["bybit-live-main"],
-            mt5=balances["mt5-live-main"],
-            source="bybit_mt5",
+        lambda source, destination: _readiness(
+            source,
+            destination,
+            bybit="300",
+            mt5="100",
+            simulation=False,
         ),
     )
+    calls: list[dict[str, object]] = []
+
+    def transfer_step(**kwargs) -> dict[str, object]:
+        calls.append(kwargs)
+        return {"status": "completed", "externalTransferId": "official-transfer-1"}
+
+    monkeypatch.setattr(
+        "app.strategies.capital_transfer._runtime_transfer_step",
+        transfer_step,
+    )
     with TestClient(app) as client:
-        created = client.post(CREATE_URL, json=_payload(key="assisted", amount="25"))
-        balances["bybit-live-main"] = "275"
-        balances["mt5-live-main"] = "125"
-        fetched = client.get(
-            f"/api/v1/trading/cross-spread/funding-transfers/{created.json()['transferId']}"
-        )
-    assert created.status_code == fetched.status_code == 200
-    assert created.json()["status"] == "pending"
-    assert created.json()["mode"] == "assisted"
-    assert fetched.json()["status"] == "completed"
-    assert fetched.json()["mode"] == "assisted"
-    assert created.json()["officialFundingUrl"].startswith("https://www.bybit.com/")
+        created = client.post(CREATE_URL, json=_payload(key="live-direct", amount="25"))
+    assert created.status_code == 200, created.text
+    assert created.json()["status"] == "completed"
+    assert created.json()["mode"] == "automated"
+    assert created.json()["externalTransferId"] == "official-transfer-1"
+    assert len(calls) == 1
+    assert calls[0]["source_account_id"] == "bybit-live-main"
+    assert calls[0]["destination_account_id"] == "mt5-live-main"
+    assert calls[0]["source_currency"] == "USDT"
+    assert calls[0]["destination_currency"] == "USDT"
+    assert calls[0]["amount"] == Decimal("25")
     with connection() as db:
         assert (
             db.execute(
@@ -268,58 +341,3 @@ def test_assisted_mode_reconciles_authoritative_balance_movement_and_releases_cl
             ).fetchone()[0]
             == 0
         )
-
-
-def test_assisted_mode_can_cancel_only_while_balances_are_unchanged(
-    monkeypatch,
-    tmp_path: Path,
-) -> None:
-    get_settings().database_path = str(tmp_path / "funding-transfer-assisted-cancel.db")
-    balances = {"bybit-live-main": "300", "mt5-live-main": "100"}
-    _configure_quote(
-        monkeypatch,
-        lambda account_id: _risk(
-            account_id,
-            bybit=balances["bybit-live-main"],
-            mt5=balances["mt5-live-main"],
-            source="bybit_mt5",
-        ),
-    )
-    with TestClient(app) as client:
-        created = client.post(CREATE_URL, json=_payload(key="cancel-assisted", amount="25"))
-        cancelled = client.post(
-            f"/api/v1/trading/cross-spread/funding-transfers/{created.json()['transferId']}/cancel"
-        )
-        replay = client.post(
-            f"/api/v1/trading/cross-spread/funding-transfers/{created.json()['transferId']}/cancel"
-        )
-    assert cancelled.status_code == replay.status_code == 200
-    assert cancelled.json()["status"] == "failed"
-    assert cancelled.json()["mode"] == "assisted"
-    assert cancelled.json()["failureReason"] == "Assisted transfer cancelled"
-    assert replay.json() == cancelled.json()
-
-
-def test_assisted_mode_refuses_cancel_after_ambiguous_one_sided_balance_change(
-    monkeypatch,
-    tmp_path: Path,
-) -> None:
-    get_settings().database_path = str(tmp_path / "funding-transfer-assisted-ambiguous.db")
-    balances = {"bybit-live-main": "300", "mt5-live-main": "100"}
-    _configure_quote(
-        monkeypatch,
-        lambda account_id: _risk(
-            account_id,
-            bybit=balances["bybit-live-main"],
-            mt5=balances["mt5-live-main"],
-            source="bybit_mt5",
-        ),
-    )
-    with TestClient(app) as client:
-        created = client.post(CREATE_URL, json=_payload(key="ambiguous-assisted", amount="25"))
-        balances["bybit-live-main"] = "275"
-        blocked = client.post(
-            f"/api/v1/trading/cross-spread/funding-transfers/{created.json()['transferId']}/cancel"
-        )
-    assert blocked.status_code == 409
-    assert "balances changed" in blocked.json()["detail"]

@@ -87,6 +87,9 @@ class Settings(BaseSettings):
     bybit_postonly_chase_max_mutations: int = 5
     bybit_postonly_chase_cooldown_seconds: float = 1.0
     bybit_postonly_chase_rest_reconcile_seconds: float = 3.0
+    # Explicit logical UTA -> MT5/TradFi mapping. Display names or shared
+    # credentials must never be used to infer custody identity.
+    tradfi_transfer_account_pairs: str = ""
 
     mt5_credential_ref: str = "secret://environment/mt5-live-001"
     mt5_account_ids: str = ""
@@ -141,6 +144,17 @@ class Settings(BaseSettings):
 
     def bybit_credential_for_account(self, account_id: str) -> str:
         return self.bybit_account_credentials.get(account_id, self.bybit_credential_ref)
+
+    @property
+    def tradfi_transfer_pairs(self) -> dict[str, str]:
+        mapping: dict[str, str] = {}
+        for item in self._csv(self.tradfi_transfer_account_pairs):
+            if "=" not in item:
+                continue
+            bybit_account_id, mt5_account_id = item.split("=", 1)
+            if bybit_account_id.strip() and mt5_account_id.strip():
+                mapping[bybit_account_id.strip()] = mt5_account_id.strip()
+        return mapping
 
     @property
     def bybit_account_category_sets(self) -> dict[str, tuple[str, ...]]:

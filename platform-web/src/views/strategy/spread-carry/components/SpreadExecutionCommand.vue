@@ -438,15 +438,9 @@
           <span v-if="transfer.failureReason">{{ transfer.failureReason }}</span>
         </div>
 
-        <div v-if="quote?.mode === 'assisted'" class="funding-assisted">
-          <strong>辅助模式</strong>
-          <span>真实 MT5 Transfer API 尚未确认，请复制金额并在 Bybit 官方资金页完成。</span>
-          <div class="funding-actions">
-            <button type="button" class="row-btn" @click="copyAmount">一键复制金额</button>
-            <button type="button" class="row-btn" @click="openOfficialFundingPage">
-              打开 Bybit 官方资金页
-            </button>
-          </div>
+        <div v-if="quote?.mode === 'unavailable'" class="funding-unavailable">
+          <strong>自动划转暂不可用</strong>
+          <span>{{ readinessMessage }}</span>
         </div>
 
         <div class="funding-actions">
@@ -456,9 +450,7 @@
             :disabled="!canSubmit"
             @click="submitTransfer"
           >
-            {{
-              loading ? '处理中' : quote?.mode === 'assisted' ? '记录并进入辅助调拨' : '确认调拨'
-            }}
+            {{ loading ? '处理中' : '确认调拨' }}
           </button>
           <button
             type="button"
@@ -468,22 +460,7 @@
           >
             刷新并核对两边余额
           </button>
-          <button
-            v-if="transfer?.mode === 'assisted' && transfer.status === 'pending'"
-            type="button"
-            class="row-btn"
-            :disabled="loading"
-            @click="cancelTransfer"
-          >
-            取消本次辅助调拨
-          </button>
         </div>
-        <p v-if="balanceVerification === 'matched'" class="funding-verified">
-          两边余额已与调拨后预计值一致。
-        </p>
-        <p v-else-if="balanceVerification === 'not_matched'" class="execution-note">
-          最新余额尚未与预计值一致，请在 Bybit 完成后再次刷新。
-        </p>
         <p v-if="error" class="field-error">{{ error }}</p>
       </div>
     </template>
@@ -582,19 +559,16 @@
   const {
     amountError,
     amountInput,
-    balanceVerification,
     bybitAmount,
     canSubmit,
-    cancelTransfer,
     confirmed,
-    copyAmount,
     direction,
     error,
     loading,
     mt5Amount,
-    openOfficialFundingPage,
     projectedBalances,
     quote,
+    readinessMessage,
     refreshTransferAndBalances,
     submitTransfer,
     swapDirection,
@@ -1001,7 +975,7 @@
 
   .funding-balance-card,
   .funding-projection,
-  .funding-assisted,
+  .funding-unavailable,
   .funding-status {
     padding: 14px;
     border: 1px solid #e7ebf0;
@@ -1054,7 +1028,7 @@
   }
 
   .funding-status,
-  .funding-assisted {
+  .funding-unavailable {
     display: grid;
     gap: 6px;
     color: #47617f;

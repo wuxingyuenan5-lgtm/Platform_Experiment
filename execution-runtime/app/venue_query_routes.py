@@ -16,6 +16,7 @@ from app.gateway_errors import (
 from app.models import (
     CancelOrderRequest,
     CancelOrderResponse,
+    InternalCapitalTransferReadinessResponse,
     InternalCapitalTransferStepCommand,
     InternalCapitalTransferStepResponse,
     VenueAccountRiskSnapshot,
@@ -208,6 +209,53 @@ def create_venue_query_router(*, gateway: ExecutionGateway) -> APIRouter:
         request: InternalCapitalTransferStepCommand,
     ) -> InternalCapitalTransferStepResponse:
         return query_gateway(lambda: gateway.transfer_internal_capital(request))
+
+    @router.get(
+        "/venue/internal-capital-transfers/readiness",
+        response_model=InternalCapitalTransferReadinessResponse,
+        tags=["venue-query"],
+    )
+    def venue_internal_capital_transfer_readiness(
+        source_account_id: str = Query(alias="sourceAccountId"),
+        destination_account_id: str = Query(alias="destinationAccountId"),
+        currency: str = Query(default="USDT"),
+    ) -> InternalCapitalTransferReadinessResponse:
+        return query_gateway(
+            lambda: gateway.get_internal_capital_transfer_readiness(
+                source_account_id=source_account_id,
+                destination_account_id=destination_account_id,
+                currency=currency,
+            )
+        )
+
+    @router.get(
+        "/venue/internal-capital-transfers/{external_transfer_id}",
+        response_model=InternalCapitalTransferStepResponse,
+        tags=["venue-query"],
+    )
+    def venue_internal_capital_transfer_status(
+        external_transfer_id: str,
+        amount: Annotated[Decimal, Query(gt=0)],
+        idempotency_key: str = Query(alias="idempotencyKey"),
+        source_account_id: str = Query(alias="sourceAccountId"),
+        destination_account_id: str = Query(alias="destinationAccountId"),
+        source_currency: str = Query(alias="sourceCurrency"),
+        destination_currency: str = Query(alias="destinationCurrency"),
+    ) -> InternalCapitalTransferStepResponse:
+        command = InternalCapitalTransferStepCommand(
+            idempotencyKey=idempotency_key,
+            sourceAccountId=source_account_id,
+            destinationAccountId=destination_account_id,
+            sourceCurrency=source_currency,
+            destinationCurrency=destination_currency,
+            amount=amount,
+        )
+        return query_gateway(
+            lambda: gateway.query_internal_capital_transfer(
+                command,
+                external_transfer_id=external_transfer_id,
+            )
+        )
 
     @router.get(
         "/venue/instruments/{symbol}",

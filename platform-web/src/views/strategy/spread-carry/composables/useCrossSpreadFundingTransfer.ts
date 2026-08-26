@@ -2,7 +2,6 @@ import Decimal from 'decimal.js';
 import { computed, onMounted, ref, watch } from 'vue';
 
 import {
-  cancelFundingTransfer,
   createFundingTransfer,
   getFundingTransfer,
   getFundingTransferQuote,
@@ -43,6 +42,20 @@ function requestErrorMessage(error: unknown, fallback: string): string {
   return typeof candidate.message === 'string' && candidate.message ? candidate.message : fallback;
 }
 
+function transferReadinessMessage(reason: string | null | undefined): string {
+  if (!reason) return 'Bybit TradFi 资金接口尚未就绪。';
+  if (reason.includes('ACCOUNT_TRANSFER_PERMISSION_REQUIRED')) {
+    return '当前 Bybit API 尚未启用“账户资金划转”权限。';
+  }
+  if (reason.includes('TRANSFER_BALANCE_UNAVAILABLE')) {
+    return 'Bybit 暂未返回该方向的可划转余额。';
+  }
+  if (reason.includes('explicitly mapped')) {
+    return 'Bybit 统一账户与 MT5/TradFi 账户尚未完成绑定。';
+  }
+  return 'Bybit TradFi 资金接口当前不可用，请刷新后重试。';
+}
+
 export function useCrossSpreadFundingTransfer() {
   const quote = ref<FundingTransferQuoteResult | null>(null);
   const transfer = ref<InternalCapitalTransferResult | null>(null);
@@ -53,11 +66,10 @@ export function useCrossSpreadFundingTransfer() {
   const confirmed = ref(false);
   const manuallyEdited = ref(false);
   const draftIdempotencyKey = ref('');
-  const assistedExpected = ref<{ bybit: string; mt5: string } | null>(null);
-  const balanceVerification = ref<'idle' | 'matched' | 'not_matched'>('idle');
 
   const bybitAmount = computed(() => quote.value?.bybitTransferable.amount ?? null);
   const mt5Amount = computed(() => quote.value?.mt5Withdrawable.amount ?? null);
+  const readinessMessage = computed(() => transferReadinessMessage(quote.value?.readinessReason));
   const sourceAvailable = computed(() =>
     direction.value === 'bybit_to_mt5' ? bybitAmount.value : mt5Amount.value,
   );
@@ -83,14 +95,13 @@ export function useCrossSpreadFundingTransfer() {
       : { bybit: bybit.plus(amount).toFixed(), mt5: mt5.minus(amount).toFixed() };
   });
   const canSubmit = computed(
-    () => confirmed.value && !loading.value && !amountError.value && quote.value !== null,
+    () =>
+      confirmed.value && !loading.value && !amountError.value && quote.value?.mode === 'automated',
   );
 
   watch([direction, amountInput], () => {
     confirmed.value = false;
     draftIdempotencyKey.value = '';
-    assistedExpected.value = null;
-    balanceVerification.value = 'idle';
   });
 
   async function refreshQuote(options: { preserveInput?: boolean } = {}) {
@@ -106,13 +117,6 @@ export function useCrossSpreadFundingTransfer() {
       if (!options.preserveInput && !manuallyEdited.value) {
         if (suggestion.direction) direction.value = suggestion.direction;
         amountInput.value = suggestion.amount ?? '';
-      }
-      if (assistedExpected.value && next.bybitTransferable.amount && next.mt5Withdrawable.amount) {
-        balanceVerification.value =
-          new Decimal(next.bybitTransferable.amount).eq(assistedExpected.value.bybit) &&
-          new Decimal(next.mt5Withdrawable.amount).eq(assistedExpected.value.mt5)
-            ? 'matched'
-            : 'not_matched';
       }
     } catch (cause) {
       error.value = requestErrorMessage(cause, '双边资金余额读取失败');
@@ -135,7 +139,6 @@ export function useCrossSpreadFundingTransfer() {
     loading.value = true;
     error.value = '';
     draftIdempotencyKey.value ||= crypto.randomUUID();
-    assistedExpected.value = projectedBalances.value;
     try {
       transfer.value = await createFundingTransfer({
         idempotencyKey: draftIdempotencyKey.value,
@@ -165,49 +168,21 @@ export function useCrossSpreadFundingTransfer() {
     }
   }
 
-  async function cancelTransfer() {
-    if (!transfer.value || transfer.value.status !== 'pending') return;
-    loading.value = true;
-    error.value = '';
-    try {
-      transfer.value = await cancelFundingTransfer(transfer.value.transferId);
-      assistedExpected.value = null;
-      balanceVerification.value = 'idle';
-      await refreshQuote({ preserveInput: true });
-    } catch (cause) {
-      error.value = requestErrorMessage(cause, '辅助调拨取消失败');
-    } finally {
-      loading.value = false;
-    }
-  }
-
-  async function copyAmount() {
-    await navigator.clipboard.writeText(amountInput.value);
-  }
-
-  function openOfficialFundingPage() {
-    const url = quote.value?.officialFundingUrl;
-    if (url) window.open(url, '_blank', 'noopener,noreferrer');
-  }
-
   onMounted(() => void refreshQuote());
 
   return {
     amountError,
     amountInput,
-    balanceVerification,
     bybitAmount,
     canSubmit,
-    cancelTransfer,
     confirmed,
-    copyAmount,
     direction,
     error,
     loading,
     mt5Amount,
-    openOfficialFundingPage,
     projectedBalances,
     quote,
+    readinessMessage,
     refreshTransferAndBalances,
     submitTransfer,
     swapDirection,

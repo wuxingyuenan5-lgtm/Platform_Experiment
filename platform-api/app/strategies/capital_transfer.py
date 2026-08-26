@@ -56,7 +56,8 @@ class FundingTransferQuoteResponse(BaseModel):
     mt5_withdrawable: FundingBalanceQuote = Field(alias="mt5Withdrawable")
     suggested_direction: TransferDirection | None = Field(alias="suggestedDirection")
     suggested_amount: Decimal | None = Field(alias="suggestedAmount")
-    mode: Literal["automated", "assisted"]
+    mode: Literal["automated", "unavailable"]
+    readiness_reason: str | None = Field(default=None, alias="readinessReason")
     official_funding_url: str = Field(alias="officialFundingUrl")
     as_of: datetime = Field(alias="asOf")
 
@@ -157,10 +158,66 @@ def _balance_quote(account_id: str) -> tuple[FundingBalanceQuote, str | None]:
         )
 
 
+def _runtime_transfer_readiness(
+    source_account_id: str,
+    destination_account_id: str,
+) -> dict[str, object]:
+    settings = get_settings()
+    try:
+        with httpx.Client(trust_env=False, timeout=settings.runtime_timeout_seconds) as client:
+            response = client.get(
+                f"{settings.runtime_base_url}/venue/internal-capital-transfers/readiness",
+                params={
+                    "sourceAccountId": source_account_id,
+                    "destinationAccountId": destination_account_id,
+                    "currency": TRANSFER_CURRENCY,
+                },
+            )
+            response.raise_for_status()
+            payload = response.json()
+        if not isinstance(payload, dict):
+            raise ValueError("Runtime transfer readiness response is malformed")
+        return payload
+    except (httpx.HTTPError, ValueError) as exc:
+        return {"ready": False, "reason": str(exc) or "Runtime transfer readiness failed"}
+
+
+def _readiness_balance(payload: dict[str, object]) -> FundingBalanceQuote:
+    ready = payload.get("ready") is True
+    raw_amount = payload.get("transferableBalance")
+    if not ready or raw_amount in (None, ""):
+        return FundingBalanceQuote(
+            amount=None,
+            currency=TRANSFER_CURRENCY,
+            dataQualityState="unavailable",
+            asOf=None,
+            reason=str(payload.get("reason") or "Automated transfer is unavailable"),
+        )
+    try:
+        amount = Decimal(str(raw_amount))
+        as_of = datetime.fromisoformat(str(payload["checkedAt"]).replace("Z", "+00:00"))
+    except (KeyError, ValueError, ArithmeticError) as exc:
+        return FundingBalanceQuote(
+            amount=None,
+            currency=TRANSFER_CURRENCY,
+            dataQualityState="unavailable",
+            asOf=None,
+            reason=f"Invalid Runtime transfer readiness: {exc}",
+        )
+    return FundingBalanceQuote(
+        amount=amount,
+        currency=TRANSFER_CURRENCY,
+        dataQualityState="complete",
+        asOf=as_of,
+    )
+
+
 def get_funding_transfer_quote() -> FundingTransferQuoteResponse:
     bybit_account_id, mt5_account_id = _bound_accounts()
-    bybit, bybit_source = _balance_quote(bybit_account_id)
-    mt5, mt5_source = _balance_quote(mt5_account_id)
+    forward = _runtime_transfer_readiness(bybit_account_id, mt5_account_id)
+    reverse = _runtime_transfer_readiness(mt5_account_id, bybit_account_id)
+    bybit = _readiness_balance(forward)
+    mt5 = _readiness_balance(reverse)
     direction: TransferDirection | None = None
     amount: Decimal | None = None
     if bybit.amount is not None and mt5.amount is not None:
@@ -172,9 +229,16 @@ def get_funding_transfer_quote() -> FundingTransferQuoteResponse:
             amount = min((mt5.amount - bybit.amount) / Decimal("2"), mt5.amount)
         else:
             amount = Decimal("0")
-    mode: Literal["automated", "assisted"] = (
-        "automated" if bybit_source == mt5_source == "fake" else "assisted"
+    mode: Literal["automated", "unavailable"] = (
+        "automated"
+        if forward.get("ready") is True and reverse.get("ready") is True
+        else "unavailable"
     )
+    readiness_reason = None
+    if mode == "unavailable":
+        readiness_reason = str(
+            forward.get("reason") or reverse.get("reason") or "Automated transfer is unavailable"
+        )
     return FundingTransferQuoteResponse(
         strategyInstanceId=CROSS_SPREAD_INSTANCE_ID,
         bybitTransferable=bybit,
@@ -182,6 +246,7 @@ def get_funding_transfer_quote() -> FundingTransferQuoteResponse:
         suggestedDirection=direction,
         suggestedAmount=amount,
         mode=mode,
+        readinessReason=readiness_reason,
         officialFundingUrl=get_settings().bybit_mt5_funding_url,
         asOf=_now(),
     )
@@ -219,6 +284,35 @@ def _runtime_transfer_step(
     return payload
 
 
+def _runtime_transfer_status(row) -> dict[str, object]:
+    settings = get_settings()
+    source_account_id = str(row["source_account_id"])
+    destination_account_id = str(row["destination_account_id"])
+    with httpx.Client(trust_env=False, timeout=settings.runtime_timeout_seconds) as client:
+        response = client.get(
+            (
+                f"{settings.runtime_base_url}/venue/internal-capital-transfers/"
+                f"{row['external_transfer_id']}"
+            ),
+            params={
+                "idempotencyKey": f"{row['idempotency_key']}:step:1",
+                "sourceAccountId": source_account_id,
+                "destinationAccountId": destination_account_id,
+                "sourceCurrency": TRANSFER_CURRENCY,
+                "destinationCurrency": TRANSFER_CURRENCY,
+                "amount": str(row["amount"]),
+            },
+        )
+        response.raise_for_status()
+        payload = response.json()
+    if not isinstance(payload, dict) or payload.get("status") not in {
+        "completed",
+        "result_unknown",
+    }:
+        raise ValueError("Runtime transfer status response is malformed")
+    return payload
+
+
 def create_funding_transfer(
     request: CreateInternalCapitalTransferRequest,
     *,
@@ -242,6 +336,11 @@ def create_funding_transfer(
 
     bybit_account_id, mt5_account_id = _bound_accounts()
     quote = get_funding_transfer_quote()
+    if quote.mode != "automated":
+        raise HTTPException(
+            status_code=423,
+            detail=quote.readiness_reason or "Automated MT5/TradFi transfer is unavailable",
+        )
     source_quote = (
         quote.bybit_transferable
         if request.direction == "bybit_to_mt5"
@@ -401,10 +500,22 @@ def create_funding_transfer(
             ),
         )
 
-    if quote.mode == "assisted":
-        return get_funding_transfer(transfer_id)
-
-    if request.direction == "bybit_to_mt5":
+    direction_readiness = _runtime_transfer_readiness(
+        source_account_id,
+        mt5_account_id if request.direction == "bybit_to_mt5" else bybit_account_id,
+    )
+    is_simulation = direction_readiness.get("fromAccountType") == "simulation"
+    if not is_simulation:
+        steps = (
+            (
+                source_account_id,
+                mt5_account_id if request.direction == "bybit_to_mt5" else bybit_account_id,
+                "USDT",
+                "USDT",
+            ),
+        )
+        completed_location = "mt5" if request.direction == "bybit_to_mt5" else "bybit_uta"
+    elif request.direction == "bybit_to_mt5":
         steps = (
             (bybit_account_id, FUNDING_BRIDGE_ACCOUNT_ID, "USDT", "USDT"),
             (FUNDING_BRIDGE_ACCOUNT_ID, mt5_account_id, "USDT", "USD"),
@@ -500,7 +611,7 @@ def _finish_transfer(
             """
             UPDATE internal_capital_transfers
             SET status = ?, external_transfer_id = ?, failure_reason = ?, updated_at = ?
-            WHERE id = ? AND status = 'pending'
+            WHERE id = ? AND status IN ('pending', 'result_unknown')
             """,
             (status, external_transfer_id, failure_reason, _now().isoformat(), transfer_id),
         )
@@ -516,7 +627,19 @@ def get_funding_transfer(transfer_id: str) -> InternalCapitalTransferResponse:
         ).fetchone()
     if row is None:
         raise HTTPException(status_code=404, detail="Funding transfer not found")
-    if row["status"] == "pending" and _stored_mode(row) == "assisted":
+    mode = _stored_mode(row)
+    if (
+        row["status"] in {"pending", "result_unknown"}
+        and mode == "automated"
+        and row["external_transfer_id"]
+    ):
+        _reconcile_automated_transfer(row)
+        with connection() as db:
+            row = db.execute(
+                "SELECT * FROM internal_capital_transfers WHERE id = ?", (transfer_id,)
+            ).fetchone()
+        assert row is not None
+    elif row["status"] == "pending" and mode == "assisted":
         _reconcile_assisted_transfer(row)
         with connection() as db:
             row = db.execute(
@@ -524,6 +647,29 @@ def get_funding_transfer(transfer_id: str) -> InternalCapitalTransferResponse:
             ).fetchone()
         assert row is not None
     return _response(row, mode=_stored_mode(row))
+
+
+def _reconcile_automated_transfer(row) -> None:
+    try:
+        result = _runtime_transfer_status(row)
+    except httpx.HTTPStatusError as exc:
+        if exc.response.status_code == 409:
+            _finish_transfer(
+                str(row["id"]),
+                status="failed",
+                external_transfer_id=str(row["external_transfer_id"]),
+                failure_reason="Bybit authoritatively reported the transfer as failed",
+            )
+        return
+    except (httpx.HTTPError, ValueError):
+        return
+    if result["status"] == "completed":
+        _finish_transfer(
+            str(row["id"]),
+            status="completed",
+            external_transfer_id=str(row["external_transfer_id"]),
+            failure_reason=None,
+        )
 
 
 def cancel_funding_transfer(

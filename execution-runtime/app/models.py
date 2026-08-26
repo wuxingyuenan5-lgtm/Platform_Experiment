@@ -234,6 +234,21 @@ class InternalCapitalTransferStepResponse(BaseModel):
     completed_at: datetime | None = Field(default=None, alias="completedAt")
 
 
+class InternalCapitalTransferReadinessResponse(BaseModel):
+    ready: bool
+    source_account_id: str = Field(alias="sourceAccountId")
+    destination_account_id: str = Field(alias="destinationAccountId")
+    currency: str
+    transferable_balance: Decimal | None = Field(
+        default=None,
+        alias="transferableBalance",
+    )
+    from_account_type: str | None = Field(default=None, alias="fromAccountType")
+    to_account_type: str | None = Field(default=None, alias="toAccountType")
+    reason: str | None = None
+    checked_at: datetime = Field(default_factory=lambda: datetime.now(UTC), alias="checkedAt")
+
+
 class VenueAccountRiskSnapshot(BaseModel):
     source: str
     account_id: str = Field(alias="accountId")
