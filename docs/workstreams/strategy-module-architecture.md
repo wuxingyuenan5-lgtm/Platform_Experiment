@@ -2,7 +2,7 @@
 
 状态：`in_progress`  
 Owner：Founder CEO  
-更新时间：2026-08-25  
+更新时间：2026-08-26  
 当前基线：Platform `0.11.2` 候选；已包含 Funding 收口、CEO 会话候选和本工作流 MT5 协调修正
 
 本文件是“策略模块架构”活跃阶段的唯一接续入口。它只维护当前范围、验收门、阻断和下一动作；稳定产品、合同和运维事实仍归属下方列出的长期权威文档。
@@ -23,7 +23,7 @@ Cross 保留开仓、平仓、移动双边资金三个模板；MT5 Transfer API 
 
 Funding 行情分析三组件已逐字恢复到 `731e21bb` 之前的 Owner 历史设计，继续使用原完整行情板、历史资金费率图、期现与借贷详情及其原筛选交互，不接入或改写实时执行数据；交易执行页单独使用真实 execution context、持仓组合与指令恢复链路，不再使用生产 mock。联调诊断卡和工程状态字段不再替代产品界面。策略管理中的“CEO 实盘测试会话”及其专用前端状态逻辑已移除。LiveTradingSession、Kill Switch、额度、幂等和 fail-closed 继续作为后台安全机制存在，但不构成策略产品页面或产品概念。
 
-Cross 的辅助资金划转已补齐可恢复生命周期：新请求保存调拨前双边权威余额，“刷新并核对”只有在两边余额同时按金额移动后才完成并释放账户 claim；余额未变可取消，单边变化、查询不可用和缺少历史基线继续 fail closed。2026-08-25 留有一笔旧版 `MT5 → Bybit`、81 USDT 的 pending 记录；由于旧版未保存余额基线，需 Owner 确认是否在 Bybit 官方页实际执行过后才能处置，不能自动释放。
+Cross 的辅助资金划转已补齐可恢复生命周期：新请求保存调拨前双边权威余额，“刷新并核对”只有在两边余额同时按金额移动后才完成并释放账户 claim；余额未变可取消，单边变化、查询不可用和缺少历史基线继续 fail closed。Owner 已确认 2026-08-25 的旧版 `MT5 → Bybit`、81 USDT 平台请求没有外部副作用，该遗留记录已审计关闭并释放 claim/reservation。2026-08-26 已创建 `Bybit → mt5-live-main`、300 USDT 的新辅助调拨，调拨前双边余额已冻结记录，当前保持 pending 和账户级保护，等待 Bybit 官方 TradFi 页面最终确认及双边权威余额复核。
 
 最近验证包括 Platform 相关 53 tests、Runtime MT5 相关 17 tests，以及 Platform/Runtime Pyright、相关 Ruff、前端 typecheck、行为测试和 production build。Funding 历史行情与真实执行页已通过聚焦浏览器验收；多 MT5 凭据引用分类和只读预检状态枚举已与 Runtime 合同对齐，Bybit/MT5 当前只读预检通过。当前只读事实为 Funding `BTCUSDT` Spot/Perp、Cross Bybit `XAUTUSDT`、Cross MT5 `XAUUSD.s`；approved session 为 0，Funding/Cross unresolved `result_unknown` 为 0。
 
@@ -33,7 +33,7 @@ Owner 已授权 2026-08-25 16:55–24:00（北京时间）的 Cross + Funding �
 
 ## 下一动作与 Owner 决策
 
-Funding 历史行情设计与真实交易执行页已经完成聚焦浏览器验收，Bybit/MT5 只读预检也已通过。下一步由 Owner 向 `mt5-live-main` 转入足够的测试保证金并在当前 MT5 Terminal 开启算法交易；Runtime 复核 MT5 可用资金大于零且 `trade_allowed=true` 后，才在授权窗口内受控启动双 Live Write、建立 Cross 两个后台账户会话并执行 Cross 全闭环。Cross 对账并完全退出后，再以共享账户可用资金的最小仓位完成 Funding。任何一步出现 unknown、账户或 Symbol 不一致、会话缺失、查询不可用或无法确认平仓都停止新副作用并保持 fail-closed。若未能在 24:00 前完成，不顺延授权，必须维持只读并由 Owner 重新给出窗口。
+Funding 历史行情设计与真实交易执行页已经完成聚焦浏览器验收，Bybit/MT5 只读预检也已通过。当前只推进 Owner 于 2026-08-26 明确授权的 300 USDT `bybit-live-main → mt5-live-main/TradFi` 资金划转：在 Bybit 官方页确认后立即用双边权威余额对账并完成平台 pending 记录；若出现单边变化、页面结果不明或余额查询不可用则保持 claim/reservation，不自动重复。完成入金后仍需 Owner 另行给出新的 Cross/Funding 实盘交易窗口；2026-08-25 的交易授权不顺延。新窗口内 Runtime 复核 MT5 可用资金大于零且 `trade_allowed=true` 后，才可受控启动双 Live Write 并按 Cross 后 Funding 的顺序执行全闭环。
 
 ## 关联长期权威文档
 
