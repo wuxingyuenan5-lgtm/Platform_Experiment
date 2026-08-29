@@ -1,7 +1,8 @@
 # 对冲基金看板｜统一实施计划（Implementation Plan）
 
-> 状态：Implementation Planning Baseline v0.1 / NOT STARTED  
+> 状态：Implementation Planning Baseline v0.2 / NOT STARTED  
 > 上位文档：`docs/hedge-board/HEDGE_BOARD_OPTIMIZATION_MASTER_PLAN.md`  
+> 数据可行性文档：`docs/hedge-board/HEDGE_BOARD_DATA_FEASIBILITY_AND_MAINTENANCE.md`  
 > 适用分支：`feature/hedge-board-online-optimization`  
 > 数据仓库：`wuxingyuenan5-lgtm/platform-data`  
 > 说明：本文只定义实施顺序、共享基础设施、Phase 边界与验收标准；当前不代表已经开始工程实施。
@@ -10,7 +11,7 @@
 
 ## 1. 实施总原则【冻结】
 
-所有实际开发必须同时遵守 Master Plan 与对应模块 Spec / Data Source Map。
+所有实际开发必须同时遵守 Master Plan、Data Feasibility & Maintenance、对应模块 Spec / Data Source Map。
 
 最高约束：
 
@@ -23,6 +24,9 @@
 - TradingView 只作为展示 / 大图入口，不作为通用数据抓取源；
 - 免费数据源优先；
 - 无可靠免费源时 `not_configured`，不得伪造；
+- 网站上“能看到”的图表 / 子模块不自动等于可嵌入或可抓取的数据源；
+- 数据源进入开发前必须先通过 Data Feasibility Gate；
+- GitHub / `platform-data` 是 V1 的版本化数据生产与分发层，不作为分钟级 / tick 高频数据库；
 - 美股、A股、全球、交易工具保持 Deferred，不允许顺手修改。
 
 当前实际实施范围只包括：
@@ -38,10 +42,12 @@
 ```text
 External free/public sources
         ↓
+Data Feasibility Gate
+        ↓
 platform-data
   providers / normalize / derive / validate / LKG
         ↓
-versioned canonical JSON
+versioned canonical data / JSON + partitioned history
         ↓
 platform-api
   cache / status / stale / fallback visibility
@@ -65,7 +71,8 @@ Platform Web
 - Last Known Good；
 - quality flags；
 - GitHub Actions 定时更新；
-- 版本化 JSON 发布。
+- 版本化 JSON 发布；
+- 较长历史的 CSV / Parquet 分区（适用时）。
 
 ### `Platform_Experiment`
 
@@ -78,13 +85,131 @@ Platform Web
 - 前端状态与图表展示；
 - 不改变现有视觉基线。
 
+### V1 存储边界
+
+适合 GitHub / 文件化保存：
+
+- 宏观日 / 周 / 月 / 季频；
+- Market Detail 日频历史；
+- ETF Flow；
+- CFTC；
+- 库存；
+- 日频 On-chain / Stablecoin；
+- Polymarket 适度采样概率；
+- Crypto Funding / OI / Basis 页面所需的快照与适度聚合历史。
+
+不在 V1 用 GitHub 保存：
+
+- tick；
+- order book；
+- 秒级；
+- 每分钟全市场衍生品 raw feed；
+- 高频实时交易流。
+
+如果未来确实需要分钟级长期历史或复杂 SQL 查询，再在 canonical contract 不变的前提下升级到真正的时序 / 分析存储。
+
 ---
 
-## 3. Phase 0 — Shared Data Foundation【第一优先级】
+## 3. Phase F — Data Feasibility & Website Module Audit【实施前置硬门槛】
+
+这是 Phase 0 之前必须完成的可行性阶段。
+
+目标：
+
+> 不写业务页面，先证明每个准备实现的数据源“真实可拿、免费、可自动更新、能维护”。
+
+### 3.1 Data Source live validation
+
+对三个 Data Source Map 的 Primary / Fallback 逐项检查：
+
+- 实际请求是否成功；
+- 是否需要免费 key；
+- 免费额度 / 限制；
+- 最新 observation 日期；
+- 历史区间；
+- 数据字段；
+- frequency / publish timing；
+- unit / currency / timezone / trading day；
+- stale threshold；
+- rights_scope；
+- parser / schema 风险；
+- 预计维护复杂度；
+- 是否可稳定运行在 GitHub Actions；
+- 是否需要 fallback；
+- 是否适合 GitHub 文件化存储。
+
+最终逐项标记：
+
+- `READY`
+- `FALLBACK`
+- `OPEN`
+- `EMBED_ONLY`
+- `REFERENCE_ONLY`
+- `NOT_CONFIGURED`
+
+### 3.2 用户已有网站 / 子模块审计
+
+用户整理的现成网站图表、资金流、期限结构、排名等子模块不得直接假定可复用。
+
+逐项分类：
+
+```text
+官方 API
+→ canonical_api
+
+官方 Widget / Embed
+→ official_embed（只展示，不反向取数）
+
+公开但非文档化 JSON endpoint
+→ public_endpoint_with_lkg（只有合规、稳定时）
+
+只有网页 / JS 图表
+→ 尝试找到 upstream source 后自行重画
+
+iframe / CSP / X-Frame-Options / 登录受限
+→ reference_only / not_configured
+```
+
+禁止：
+
+- 绕 CAPTCHA / WAF；
+- 绕登录；
+- 从 iframe 跨域读取内部 DOM；
+- 把浏览器自动化当成长期数据生产主链；
+- 因复制第三方模块视觉而破坏现有平台 UI。
+
+### 3.3 Phase F 输出
+
+必须输出：
+
+- Data Feasibility Matrix；
+- Website Module Reuse Matrix；
+- READY Source List；
+- OPEN / NOT_CONFIGURED List；
+- Storage Class（JSON / CSV / Parquet / snapshot-only）；
+- 建议更新频率；
+- 维护风险等级。
+
+Phase F 不改业务页面。
+
+### 3.4 Phase F 完成标准
+
+只有当核心 V1 指标具备足够 READY 数据链后才进入 Phase 0。
+
+如果某些非核心指标未通过：
+
+- 保留 `not_configured`；
+- 不阻塞整个 V1；
+- 不自行删除产品规格；
+- 是否最终删减由用户线下验收后决定。
+
+---
+
+## 4. Phase 0 — Shared Data Foundation
 
 目标：只建立后续三个看板共用的数据基础设施，不提前实现任何具体大页面重构。
 
-### 3.1 `platform-data` 最小共用骨架
+### 4.1 `platform-data` 最小共用骨架
 
 建议形成：
 
@@ -97,11 +222,12 @@ src/platform_data/
   pipelines/
   storage/
 public/v1/
+history/
 tests/
 .github/workflows/
 ```
 
-### 3.2 共用 canonical contract
+### 4.2 共用 canonical contract
 
 至少支持：
 
@@ -124,7 +250,7 @@ tests/
 - `quality_flags`
 - `rights_scope`
 
-### 3.3 共用运行机制
+### 4.3 共用运行机制
 
 必须建立：
 
@@ -136,9 +262,22 @@ tests/
 - schema validation；
 - no-change no-commit；
 - failed fetch 不覆盖上一份有效数据；
-- provider failure 与 genuine no-data 分离。
+- provider failure 与 genuine no-data 分离；
+- schema drift / latest-date / abnormal-scale checks。
 
-### 3.4 Phase 0 完成标准
+### 4.4 存储实现基线
+
+最新发布数据优先 JSON。
+
+长历史：
+
+- 小数据量：CSV；
+- 较大 / 多列数据：Parquet；
+- 按年或按月稳定分区；
+- 不频繁 commit SQLite / DuckDB 二进制数据库；
+- 不为每日数据建立海量细碎 snapshot 文件。
+
+### 4.5 Phase 0 完成标准
 
 不能只创建 README / schema 即宣布完成。
 
@@ -149,6 +288,7 @@ Provider
 → canonical series
 → validation
 → published JSON
+→ history storage
 → automated workflow or reproducible pipeline
 ```
 
@@ -156,7 +296,7 @@ Provider
 
 ---
 
-## 4. Phase 1 — Shared Market Detail Data Layer
+## 5. Phase 1 — Shared Market Detail Data Layer
 
 目标：为 Macro / Commodity / Crypto 共用的 Market Detail 建立统一数据模型，但不重构 `MarketTerminalPage.vue` / `TerminalDetailPanel.vue` 的视觉结构。
 
@@ -185,7 +325,7 @@ Phase 1 先完成数据层和适配能力；具体哪些行正式接通，由后
 
 ---
 
-# 5. Macro V1 实施路线
+# 6. Macro V1 实施路线
 
 权威产品文档：
 
@@ -294,7 +434,7 @@ globalM2 =
 
 ---
 
-# 6. Commodity V1 实施路线
+# 7. Commodity V1 实施路线
 
 权威产品文档：
 
@@ -410,7 +550,7 @@ globalM2 =
 
 ---
 
-# 7. Crypto V1 实施路线
+# 8. Crypto V1 实施路线
 
 权威产品文档：
 
@@ -446,6 +586,12 @@ globalM2 =
 - Funding：OI weighted；
 - OI：USD notional sum；
 - Basis：只聚合可比合约 / 期限，优先 OI weighted。
+
+高频存储规则：
+
+- 页面 latest 可按适当频率更新；
+- Git 历史只保留页面需要的采样 / 聚合粒度；
+- 不 commit 分钟级全市场 raw feed。
 
 ## X3 — Stablecoin Liquidity
 
@@ -524,7 +670,7 @@ BTC 为主，固定核心：
 
 ---
 
-## 8. Shared Provider Reuse【冻结】
+## 9. Shared Provider Reuse【冻结】
 
 同一基础数据不得在三个模块重复抓取三次。
 
@@ -553,7 +699,7 @@ one page
 
 ---
 
-## 9. GitHub Actions 建议拆分【实施时再冻结具体 cron】
+## 10. GitHub Actions 建议拆分【实施时再冻结具体 cron】
 
 建议按数据变化速度分 workflow，而不是每指标一个 workflow：
 
@@ -596,7 +742,7 @@ one page
 
 ---
 
-## 10. Commit / Phase Discipline【冻结】
+## 11. Commit / Phase Discipline【冻结】
 
 每个 Phase 必须是可验证的垂直切片。
 
@@ -625,30 +771,31 @@ platform-data
 
 ---
 
-## 11. 推荐总体执行顺序【冻结为当前基线】
+## 12. 推荐总体执行顺序【冻结为当前基线】
 
-为了先建立稳定共享能力，再做复杂模块，当前推荐：
+当前推荐：
 
-1. Phase 0 — Shared Data Foundation
-2. Phase 1 — Shared Market Detail Data Layer
-3. M1 — Macro Polymarket
-4. M2 — Macro Market Detail
-5. M3-M7 — Macro additive sections
-6. M8 — Macro QA
-7. C1-C2 — Existing Commodity real-data stabilization
-8. C3-C7 — Commodity new structural modules
-9. C8 — Commodity QA
-10. X1 — Existing Crypto flow stabilization
-11. X2-X5 — Crypto new structure / on-chain
-12. X6 — Crypto Market Detail
-13. X7 — Crypto QA
-14. Hedge Board Phase 1 Offline Acceptance
+1. **Phase F — Data Feasibility & Website Module Audit**
+2. Phase 0 — Shared Data Foundation
+3. Phase 1 — Shared Market Detail Data Layer
+4. M1 — Macro Polymarket
+5. M2 — Macro Market Detail
+6. M3-M7 — Macro additive sections
+7. M8 — Macro QA
+8. C1-C2 — Existing Commodity real-data stabilization
+9. C3-C7 — Commodity new structural modules
+10. C8 — Commodity QA
+11. X1 — Existing Crypto flow stabilization
+12. X2-X5 — Crypto new structure / on-chain
+13. X6 — Crypto Market Detail
+14. X7 — Crypto QA
+15. Hedge Board Phase 1 Offline Acceptance
 
 用户可明确改变执行优先级；执行 Agent 不得自行重排业务优先级。
 
 ---
 
-## 12. 最终阶段验收【冻结】
+## 13. 最终阶段验收【冻结】
 
 三个 V1 都完成后，用户线下验收前必须产出统一清单：
 
@@ -661,7 +808,9 @@ platform-data
 - no fake data；
 - no silent stale；
 - no empty overwrite；
-- no cross-frequency fake precision。
+- no cross-frequency fake precision；
+- website / internal endpoint 依赖已标风险等级；
+- 高频数据没有被不合理塞入 Git。
 
 ### UI
 
