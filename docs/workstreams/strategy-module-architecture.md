@@ -23,7 +23,7 @@ Cross 保留开仓、平仓、移动双边资金三个模板；Owner 已明确�
 
 Funding 行情分析三组件已逐字恢复到 `731e21bb` 之前的 Owner 历史设计，继续使用原完整行情板、历史资金费率图、期现与借贷详情及其原筛选交互，不接入或改写实时执行数据；交易执行页单独使用真实 execution context、持仓组合与指令恢复链路，不再使用生产 mock。联调诊断卡和工程状态字段不再替代产品界面。策略管理中的“CEO 实盘测试会话”及其专用前端状态逻辑已移除。LiveTradingSession、Kill Switch、额度、幂等和 fail-closed 继续作为后台安全机制存在，但不构成策略产品页面或产品概念。
 
-Cross 的辅助资金划转实验已经退出产品路径：第三模板不再提供官网跳转、复制金额或辅助记录。2026-08-29 的真实最小写入验收发现 Bybit balance/readiness 查询接受 `toAccountType=TradFi`，但公开 Internal Transfer 写接口不接受 `TradFi`，造成假阳性；300 USDT 请求被确定性拒绝，TradFi equity 仍为 0、UTA 余额未变化、确定性 transferId 无外部记录。Runtime 现按正式写合同 fail closed，第三模板不得宣称可用。稳定 transferId 与无副作用查询代码保留，等待官方写合同真正开放。
+Cross 的辅助资金划转实验已经退出产品路径：第三模板不再提供官网跳转、复制金额或辅助记录。2026-08-29 的真实最小写入验收发现 Bybit balance/readiness 查询接受 `toAccountType=TradFi`，但公开 Internal Transfer 写接口不接受 `TradFi`，造成假阳性；300 USDT 请求被确定性拒绝，TradFi equity 仍为 0、UTA 余额未变化、确定性 transferId 无外部记录。随后确认官方网页使用 `/v3/private/asset/transfer/mt5/precheck|deposit|withdraw` 专用合同，入金业务链路经 Funding Account；该合同依赖网页登录 token，现有 API Key 以 V5 与旧式 HMAC 访问专用只读账户列表均返回 `10007 User authentication failed`。Runtime 现按 API Key 的真实合同 fail closed，第三模板不得宣称可用。
 
 最近验证包括 Platform 相关 53 tests、Runtime MT5 相关 17 tests，以及 Platform/Runtime Pyright、相关 Ruff、前端 typecheck、行为测试和 production build。Funding 历史行情与真实执行页已通过聚焦浏览器验收；多 MT5 凭据引用分类和只读预检状态枚举已与 Runtime 合同对齐，Bybit/MT5 当前只读预检通过。当前只读事实为 Funding `BTCUSDT` Spot/Perp、Cross Bybit `XAUTUSDT`、Cross MT5 `XAUUSD.s`；approved session 为 0，Funding/Cross unresolved `result_unknown` 为 0。
 
@@ -33,7 +33,7 @@ Owner 已授权 2026-08-25 16:55–24:00（北京时间）的 Cross + Funding �
 
 ## 下一动作与 Owner 决策
 
-资金划转保持外部阻断，直到 Bybit 正式公开 TradFi 写接口；不使用网页自动化或私有接口，也不把 UTA→Funding 的部分动作冒充 MT5 入金完成。Runtime Live Write 按 Owner 最新要求保持开启。下一动作是由 Owner 明确下一项实盘操作；每笔订单仍需新的账户、Symbol、方向、数量与执行方式授权，2026-08-25 的订单窗口不顺延。
+资金划转保持外部阻断，直到 Bybit 为 MT5 CFD 专用合同提供可长期部署的 API Key/OAuth/机构授权；不把网页登录 token 当服务器凭据，也不把 UTA→Funding 的部分动作冒充 MT5 入金完成。Runtime Live Write 按 Owner 最新要求保持开启。下一动作是向 Bybit 确认 MT5 CFD transfer API 的服务器授权方式，或由 Owner 另行确认是否接受临时网页登录自动化这一降级方案；每笔订单仍需新的账户、Symbol、方向、数量与执行方式授权。
 
 ## 关联长期权威文档
 
