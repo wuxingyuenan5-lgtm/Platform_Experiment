@@ -1,4 +1,5 @@
 from decimal import Decimal
+from types import SimpleNamespace
 
 import pytest
 
@@ -621,3 +622,38 @@ def test_bybit_live_adapter_quote_and_spec_use_explicit_category_scope(tmp_path)
     assert perp_spec.price_tick == Decimal("0.1")
     assert perp_spec.contract_multiplier == Decimal("1")
     assert client.instrument_calls[-1]["category"] == "linear"
+
+
+def test_bybit_live_adapter_synchronizes_signature_clock_from_server_time() -> None:
+    helpers = SimpleNamespace(generate_timestamp=lambda: 1_000_000)
+
+    class PublicClient:
+        @staticmethod
+        def get_server_time():
+            return {"retCode": 0, "time": 994_500}
+
+    calls: list[dict[str, object]] = []
+
+    def factory(**kwargs):
+        calls.append(kwargs)
+        return PublicClient()
+
+    adapter = BybitLiveAdapter(Settings(bybit_timestamp_offset_ms=0), object())
+    adapter._apply_timestamp_offset(helpers, factory)
+
+    assert helpers.generate_timestamp() == 994_500
+    assert calls == [{"testnet": False, "demo": False}]
+
+
+def test_bybit_live_adapter_rejects_unsafe_signature_clock_offset() -> None:
+    helpers = SimpleNamespace(generate_timestamp=lambda: 1_000_000)
+
+    class PublicClient:
+        @staticmethod
+        def get_server_time():
+            return {"retCode": 0, "time": 2_000_000}
+
+    adapter = BybitLiveAdapter(Settings(bybit_timestamp_offset_ms=0), object())
+
+    with pytest.raises(GatewayConfigurationError, match="offset exceeds safety limit"):
+        adapter._apply_timestamp_offset(helpers, lambda **_: PublicClient())

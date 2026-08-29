@@ -952,7 +952,7 @@ class BybitLiveAdapter:
             from pybit.unified_trading import HTTP
         except ImportError as exc:
             raise GatewayConfigurationError("pybit dependency is not installed") from exc
-        self._apply_timestamp_offset(_helpers)
+        self._apply_timestamp_offset(_helpers, HTTP)
         try:
             secret = resolve_secret_reference(
                 self.settings.bybit_credential_for_account(account),
@@ -985,15 +985,29 @@ class BybitLiveAdapter:
             self._resolved_clients.pop(account_id, None)
             return operation(self._client(account_id))
 
-    def _apply_timestamp_offset(self, helpers) -> None:
+    def _apply_timestamp_offset(self, helpers, http_factory=None) -> None:
         raw_offset = getattr(self.settings, "bybit_timestamp_offset_ms", 0)
         offset_ms = int(cast(str | int | float, raw_offset or 0))
-        if offset_ms == 0:
-            return
         original = getattr(helpers, "_vg_original_generate_timestamp", None)
         if original is None:
             original = helpers.generate_timestamp
             helpers._vg_original_generate_timestamp = original
+        if offset_ms == 0:
+            if http_factory is None:
+                return
+            try:
+                response = http_factory(testnet=False, demo=False).get_server_time()
+                self._require_success(response, "Bybit server-time query failed")
+                server_ms = int(response.get("time") or 0)
+                if server_ms <= 0:
+                    raise ValueError("Bybit server time is unavailable")
+                offset_ms = server_ms - int(original())
+            except Exception as exc:
+                raise GatewayConfigurationError(
+                    f"Bybit server-time synchronization failed: {type(exc).__name__}"
+                ) from exc
+        if abs(offset_ms) > 60_000:
+            raise GatewayConfigurationError("Bybit server-time offset exceeds safety limit")
         helpers.generate_timestamp = lambda: original() + offset_ms
 
     def _assert_account(self, account_id: str) -> None:

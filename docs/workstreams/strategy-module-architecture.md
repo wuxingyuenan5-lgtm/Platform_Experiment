@@ -23,17 +23,17 @@ Cross 保留开仓、平仓、移动双边资金三个模板；Owner 已明确�
 
 Funding 行情分析三组件已逐字恢复到 `731e21bb` 之前的 Owner 历史设计，继续使用原完整行情板、历史资金费率图、期现与借贷详情及其原筛选交互，不接入或改写实时执行数据；交易执行页单独使用真实 execution context、持仓组合与指令恢复链路，不再使用生产 mock。联调诊断卡和工程状态字段不再替代产品界面。策略管理中的“CEO 实盘测试会话”及其专用前端状态逻辑已移除。LiveTradingSession、Kill Switch、额度、幂等和 fail-closed 继续作为后台安全机制存在，但不构成策略产品页面或产品概念。
 
-Cross 的辅助资金划转实验已经退出产品路径：第三模板不再提供官网跳转、复制金额或辅助记录。2026-08-29 的真实写入验收确认 Bybit balance/readiness 查询接受 `toAccountType=TradFi`，但公开 V5 Internal Transfer 写接口只允许 `UNIFIED/FUND`；`FUND→TradFi` 被确定性拒绝并返回 `131203`。本次 300 USDT 的第一段 `UNIFIED→FUND` 已成功，当前 UTA 可转余额 `686.3479`、Funding 可转余额 `300`、TradFi equity `0`，第二段没有外部成功记录。官方网页使用 `/v3/private/asset/transfer/mt5/precheck|deposit|withdraw` 专用合同；该合同依赖网页登录 token，现有 API Key 以 V5 与旧式 HMAC 访问均返回 `10007 User authentication failed`。Runtime 已恢复在移动 UTA 资金前 fail closed，第三模板不得宣称可用。
+Cross 的辅助资金划转实验已经退出产品路径：第三模板不再提供官网跳转、复制金额或辅助记录。2026-08-29 的真实写入验收确认公开 V5 Internal Transfer 写接口只允许 `UNIFIED/FUND`；`FUND→TradFi` 被确定性拒绝并返回 `131203`。随后在 Owner 明确授权下，通过 Bybit 已登录网页的正式 MT5 CFD 专用合同完成唯一一笔 300 USDT 入金；权威页面显示 MT5 CFD 净值、余额和可用预付款均为 `300.00 USDx`，资金记录 `2026-08-29 13:08:41` 已完成。错误实验遗留的 Funding 300 USDT 已通过 V5 原路退回 UTA，transferId `0c45f9ed-1bdf-4291-b6c5-2c88acdf8746` 为 `SUCCESS`；最终 Funding `0`、UTA 可转 `686.3479`。官方网页使用 `/v3/private/asset/transfer/mt5/precheck|deposit|withdraw` 专用合同并依赖网页登录会话，现有 API Key 不能签署该合同。Runtime 继续在服务器认证缺失时 fail closed，真实资金已就位不等于第三模板的平台内自动划转验收通过。
 
 最近验证包括 Platform 相关 53 tests、Runtime MT5 相关 17 tests，以及 Platform/Runtime Pyright、相关 Ruff、前端 typecheck、行为测试和 production build。Funding 历史行情与真实执行页已通过聚焦浏览器验收；多 MT5 凭据引用分类和只读预检状态枚举已与 Runtime 合同对齐，Bybit/MT5 当前只读预检通过。当前只读事实为 Funding `BTCUSDT` Spot/Perp、Cross Bybit `XAUTUSDT`、Cross MT5 `XAUUSD.s`；approved session 为 0，Funding/Cross unresolved `result_unknown` 为 0。
 
-尚未完成的是 MT5 入金、开仓、平仓、Funding Settlement、差异核对或 EOD。`bybit-live-main` 已具备 Account Transfer 权限，但该权限只完成了本次 UTA 到 Funding 的真实划转，公开 API 仍缺 TradFi 写能力。Owner 要求保持 Runtime Live Write 开启以继续实盘测试；该门已保持开启，但资金划转和订单仍分别受 capability、claim、会话与逐操作授权约束。
+MT5 入金已经完成；尚未完成的是 Cross 开仓、平仓、Funding Settlement、差异核对或 EOD。`bybit-live-main` 的 Account Transfer 权限可完成 UTA/Funding 划转，但公开 API 仍缺 MT5 CFD 写合同。Owner 要求保持 Runtime Live Write 开启以继续实盘测试；该门已保持开启，但资金划转和订单仍分别受 capability、claim、会话与逐操作授权约束。
 
 Owner 已授权 2026-08-25 16:55–24:00（北京时间）的 Cross + Funding 最小实盘窗口，并允许仅在该窗口临时启用双 Live Write 与 founder-demo CEO 本地自审批。执行必须串行：先以 Cross `XAUTUSDT` + `XAUUSD.s`、每腿 1 盎司完成开仓、核对、平仓和对账；由于共享 Bybit UTA 约 500 USDT、并行时资金不足，Cross 完全退出并复核余额后，Funding 才以 `BTCUSDT` Spot + Perpetual 和账户实际可用资金下的最小可开仓位执行 `post_only_chase`。完成后立即撤销会话并关闭全部写入门控。
 
 ## 下一动作与 Owner 决策
 
-资金划转保持外部阻断，直到 Bybit 为 MT5 CFD 专用合同提供可长期部署的 API Key/OAuth/机构授权；不把网页登录 token 当服务器凭据，也不把当前停在 Funding 的 300 USDT 冒充 MT5 入金完成。Runtime Live Write 按 Owner 最新要求保持开启。下一动作是由 Owner 决定把 Funding 中的 300 USDT 手工转入 TradFi、转回 UTA，或先向 Bybit 获取 MT5 CFD 的服务器授权合同；每笔订单仍需新的账户、Symbol、方向、数量与执行方式授权。
+真实测试资金已在 MT5 CFD，不再阻断 Cross 最小实盘。第三模板的平台内自动划转仍保持 fail closed，直到 Bybit 为 MT5 CFD 专用合同提供可长期部署的 API Key、OAuth 扩展范围或机构授权；不把短期网页登录 Cookie 当服务器长期凭据。Runtime Live Write 按 Owner 最新要求保持开启。下一动作是先完成 Cross 1 盎司的页面手动开仓、核对、平仓和对账，再使用共享 UTA 实际可用余额完成 Funding 最小仓位闭环；每笔订单仍需 Owner 的具体操作确认。
 
 ## 关联长期权威文档
 
