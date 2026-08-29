@@ -1,9 +1,9 @@
 # 对冲基金看板优化总方案（Master Plan）
 
-> 状态：Current Planning Baseline / v0.7  
+> 状态：Current Planning Baseline / v0.8  
 > 适用分支：`feature/hedge-board-online-optimization`  
 > 用途：作为对冲基金看板后续产品讨论、数据源设计、工程实施与线下验收的最高约束来源。  
-> 原则：总文件只冻结全局规则与当前路线；各一级看板产品细节进入 `docs/hedge-board/specs/`；工程顺序进入 `docs/hedge-board/HEDGE_BOARD_IMPLEMENTATION_PLAN.md`。任何执行 Agent 不得自行改变已冻结方向。
+> 原则：总文件只冻结全局规则与当前路线；各一级看板产品细节进入 `docs/hedge-board/specs/`；数据可行性与长期维护进入 `docs/hedge-board/HEDGE_BOARD_DATA_FEASIBILITY_AND_MAINTENANCE.md`；工程顺序进入 `docs/hedge-board/HEDGE_BOARD_IMPLEMENTATION_PLAN.md`。任何执行 Agent 不得自行改变已冻结方向。
 
 ---
 
@@ -196,11 +196,13 @@ Deferred 的含义：
 ```text
 External Source
     ↓
+Data Feasibility Gate
+    ↓
 platform-data
     ↓
 fetch / normalize / derive / validate / store
     ↓
-versioned canonical data / JSON
+versioned canonical data / JSON + partitioned history
     ↓
 platform-api
     ↓
@@ -229,6 +231,8 @@ existing chart / table components
 - 标准化、版本化输出。
 
 允许为了稳定完成数据抓取、存储、更新全流程而调整 `platform-data` 目录、脚本、配置和工作流，但不得伪造数据、绕过访问控制或未经确认改变金融指标定义。
+
+V1 中 `platform-data` 定位为**版本化数据生产与分发仓库**，不是分钟级 / tick 高频实时数据库。低频与日频历史可文件化保存；Crypto 高频数据只保留页面需要的采样、聚合和最新 snapshot。未来若真实需要分钟级长期历史，再在 canonical contract 不变的前提下升级专业存储。
 
 ### 5.2 `Platform_Experiment`
 
@@ -289,6 +293,31 @@ AKShare 等成熟统一接入层（适用时）
 ```
 
 不得绕过 CAPTCHA、WAF、登录、权限或授权限制。
+
+### 6.5 现成网站子模块复用【冻结】
+
+网页上存在现成图表 / 子模块，不代表可直接搬入平台。
+
+优先策略：
+
+```text
+官方 API
+→ 自有 canonical data + 现有平台 UI 重画
+
+官方 Embed / Widget
+→ 仅作为展示层
+
+公开但未文档化 endpoint
+→ 只有稳定、合规且配 LKG 时作为 B-tier / fallback
+
+只有网页 / JS 图表
+→ 追溯 upstream source 后自行重画
+
+CSP / X-Frame-Options / 登录 / WAF 限制
+→ reference-only / not_configured
+```
+
+详细规则以 `HEDGE_BOARD_DATA_FEASIBILITY_AND_MAINTENANCE.md` 为准。
 
 ---
 
@@ -403,6 +432,7 @@ existing SVG sparkline
 ### 总体
 
 - `docs/hedge-board/HEDGE_BOARD_OPTIMIZATION_MASTER_PLAN.md`
+- `docs/hedge-board/HEDGE_BOARD_DATA_FEASIBILITY_AND_MAINTENANCE.md`
 - `docs/hedge-board/HEDGE_BOARD_IMPLEMENTATION_PLAN.md`
 
 ### Macro
@@ -426,25 +456,21 @@ existing SVG sparkline
 
 ---
 
-## 12. Implementation Plan【冻结为当前工程基线】
+## 12. Data Feasibility & Implementation Plan【冻结为当前工程基线】
+
+数据可行性与维护策略：
+
+`docs/hedge-board/HEDGE_BOARD_DATA_FEASIBILITY_AND_MAINTENANCE.md`
 
 统一实施计划：
 
 `docs/hedge-board/HEDGE_BOARD_IMPLEMENTATION_PLAN.md`
 
-该文档负责：
-
-- Shared Data Foundation；
-- Shared Market Detail Data Layer；
-- Macro / Commodity / Crypto 各垂直 Phase；
-- Shared Provider / canonical series 去重；
-- GitHub Actions 分层；
-- 每个 Phase 的业务完成标准；
-- 最终线下验收准备。
-
-当前推荐总体执行顺序：
+实施前置顺序固定为：
 
 ```text
+Phase F Data Feasibility & Website Module Audit
+    ↓
 Phase 0 Shared Data Foundation
     ↓
 Phase 1 Shared Market Detail Data Layer
@@ -458,9 +484,18 @@ Crypto V1
 Hedge Board Phase 1 Offline Acceptance
 ```
 
+Phase F 负责先证明：
+
+- 数据真实可取；
+- 免费条件可接受；
+- 历史和更新频率满足产品需要；
+- 网站子模块属于 API / Embed / Rebuild / Reference-only 哪一类；
+- 数据适合什么存储格式；
+- 长期维护风险可接受。
+
 用户可以明确改变业务优先级；执行 Agent 不得自行重排。
 
-当前状态：**Implementation Plan Ready / Engineering NOT STARTED**。
+当前状态：**Planning Ready / Engineering NOT STARTED**。
 
 ---
 
@@ -488,7 +523,8 @@ Hedge Board Phase 1 Offline Acceptance
 - 显著改变页面信息密度；
 - 修改公共视觉组件；
 - 重新开启 Deferred 模块；
-- 改变已经冻结的总体 Phase 优先级。
+- 改变已经冻结的总体 Phase 优先级；
+- 在未通过 Phase F 的情况下强行使用高维护风险数据源。
 
 ### RED：无明确授权不得执行
 
@@ -499,7 +535,8 @@ Hedge Board Phase 1 Offline Acceptance
 - 修改 Deferred 模块；
 - 将看板改造成 AI 投资决策系统；
 - 修改 `main`；
-- 未授权合并分支。
+- 未授权合并分支；
+- 绕过 CAPTCHA / WAF / 登录 / CSP / 访问控制抓取第三方模块。
 
 ---
 
@@ -508,17 +545,19 @@ Hedge Board Phase 1 Offline Acceptance
 后续执行 Agent 必须：
 
 1. 先读取本 Master Plan；
-2. 再读取 `HEDGE_BOARD_IMPLEMENTATION_PLAN.md`；
-3. 再读取当前模块 Spec / Data Source Map；
-4. 只执行用户明确开启的 Phase；
-5. 不自行重新设计产品；
-6. 遵守 Additive Only；
-7. 不得用 contract / schema / README 单独冒充业务 Phase 完成；
-8. 端到端 Phase 以真实业务链路作为验收；
-9. 无法验证时标记 `not_verified`，不得伪造；
-10. 单一工具路径失败时先尝试合理替代路径；
-11. Deferred 模块不得因顺手重构或公共组件修改而改变；
-12. 当前仍属于规划阶段，未经用户明确“开始实施”不得自行进入大规模代码开发。
+2. 再读取 `HEDGE_BOARD_DATA_FEASIBILITY_AND_MAINTENANCE.md`；
+3. 再读取 `HEDGE_BOARD_IMPLEMENTATION_PLAN.md`；
+4. 再读取当前模块 Spec / Data Source Map；
+5. 只执行用户明确开启的 Phase；
+6. 未完成 Phase F 前不得直接大规模实现业务页面；
+7. 不自行重新设计产品；
+8. 遵守 Additive Only；
+9. 不得用 contract / schema / README 单独冒充业务 Phase 完成；
+10. 端到端 Phase 以真实业务链路作为验收；
+11. 无法验证时标记 `not_verified`，不得伪造；
+12. 单一工具路径失败时先尝试合理替代路径；
+13. Deferred 模块不得因顺手重构或公共组件修改而改变；
+14. 当前仍属于规划 / 可行性审计阶段，未经用户明确“开始实施”不得自行进入大规模代码开发。
 
 ---
 
@@ -546,7 +585,7 @@ Hedge Board Phase 1 Offline Acceptance
 
 当前仍不进入工程实施。
 
-第一阶段设计文档已具备三层：
+第一阶段设计文档现为：
 
 ```text
 Master Plan
@@ -554,6 +593,8 @@ Master Plan
 Module V1 Spec
     ↓
 Data Source Map
+    ↓
+Data Feasibility & Maintenance
     ↓
 Unified Implementation Plan
 ```
@@ -563,13 +604,15 @@ Unified Implementation Plan
 1. Macro V1：产品规格冻结 + Data Source Map baseline；
 2. Commodity V1：产品规格冻结 + Data Source Map baseline；
 3. Crypto V1：产品规格冻结 + Data Source Map baseline；
-4. Unified Implementation Plan：已建立；
-5. US / A-Share / Global / Trading Tools：Deferred。
+4. Data Feasibility & Maintenance：已建立；
+5. Unified Implementation Plan：已更新为 Phase F 优先；
+6. US / A-Share / Global / Trading Tools：Deferred。
 
-下一步只有两类工作：
+当前下一步不是直接开发页面，而是：
 
-- 继续审阅 / 修订当前方案文档；
-- 用户明确开启工程实施后，按 Implementation Plan 启动 Phase 0。
+> **Phase F — 对现有 Data Source Map 与用户已整理的网站 / 子模块做真实可行性审计。**
+
+Phase F 完成并确认核心数据链可长期维护后，才进入 Phase 0。
 
 ---
 
@@ -580,6 +623,7 @@ Unified Implementation Plan
 - 用户明确确认的事项才可升级为冻结项；
 - 子模块详细产品内容进入对应 `*_V1_SPEC.md`；
 - 数据源细节进入对应 `*_DATA_SOURCE_MAP.md`；
+- 跨模块数据可行性、网站子模块复用与存储维护进入 `HEDGE_BOARD_DATA_FEASIBILITY_AND_MAINTENANCE.md`；
 - 工程顺序与验收进入 `HEDGE_BOARD_IMPLEMENTATION_PLAN.md`；
 - Deferred 状态只有用户明确提出时才能解除；
 - 临时执行指令与本 Master Plan 冲突时，除非用户明确正在修改 Master Plan，否则以本文件为准。
