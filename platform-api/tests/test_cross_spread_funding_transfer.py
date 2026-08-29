@@ -54,6 +54,17 @@ def _configure_quote(monkeypatch, callback=_readiness) -> None:
         "app.strategies.capital_transfer._runtime_transfer_readiness",
         callback,
     )
+    monkeypatch.setattr(
+        "app.strategies.capital_transfer._runtime_account_risk",
+        lambda account_id: {
+            "source": "test",
+            "accountId": account_id,
+            "currency": "USD" if "mt5" in account_id.lower() else "USDT",
+            "availableBalance": "100" if "mt5" in account_id.lower() else "300",
+            "dataQualityState": "complete",
+            "asOf": "2026-08-22T00:00:00+00:00",
+        },
+    )
 
 
 def test_quote_uses_decimal_half_difference_and_never_turns_failure_into_zero(
@@ -68,17 +79,17 @@ def test_quote_uses_decimal_half_difference_and_never_turns_failure_into_zero(
     assert quote.json()["suggestedDirection"] == "bybit_to_mt5"
     assert quote.json()["suggestedAmount"] == "80.0000000000000000005"
 
-    def one_side_unavailable(
+    def unavailable_readiness(
         source_account_id: str,
         destination_account_id: str,
     ) -> dict[str, object]:
         return _readiness(
             source_account_id,
             destination_account_id,
-            ready="bybit" not in source_account_id.lower(),
+            ready=False,
         )
 
-    _configure_quote(monkeypatch, one_side_unavailable)
+    _configure_quote(monkeypatch, unavailable_readiness)
     with TestClient(app) as client:
         unavailable = client.get(QUOTE_URL)
     assert unavailable.status_code == 200
@@ -295,6 +306,7 @@ def test_live_transfer_uses_one_official_runtime_step_and_releases_claims(
             destination,
             bybit="300",
             mt5="100",
+            ready="mt5" not in source.lower(),
             simulation=False,
         ),
     )

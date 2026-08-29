@@ -226,6 +226,10 @@ class BybitMt5Gateway:
             command.source_account_id,
             command.destination_account_id,
         )
+        if "TradFi" in {from_type, to_type}:
+            raise GatewayConfigurationError(
+                "BYBIT_TRADFI_WRITE_API_UNAVAILABLE"
+            )
         if command.source_currency.upper() != "USDT":
             raise GatewayConfigurationError("Bybit TradFi transfer requires USDT")
         if command.destination_currency.upper() not in {"USDT", "USD"}:
@@ -275,6 +279,16 @@ class BybitMt5Gateway:
                 destinationAccountId=destination_account_id,
                 currency=currency.upper(),
                 reason=str(exc),
+            )
+        if "TradFi" in {from_type, to_type}:
+            return InternalCapitalTransferReadinessResponse(
+                ready=False,
+                sourceAccountId=source_account_id,
+                destinationAccountId=destination_account_id,
+                currency=currency.upper(),
+                fromAccountType=from_type,
+                toAccountType=to_type,
+                reason="BYBIT_TRADFI_WRITE_API_UNAVAILABLE",
             )
         ready, transferable, reason = self.bybit.internal_transfer_readiness(
             account_id=bybit_account_id,

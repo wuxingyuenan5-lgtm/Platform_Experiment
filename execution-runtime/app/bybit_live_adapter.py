@@ -78,7 +78,6 @@ class BybitLiveAdapter:
                 "post_only_single_attempt_submit",
                 "cancel_order_gated",
                 "account_risk_query",
-                "tradfi_internal_transfer_gated",
             ],
             missingRequirements=sorted(set(missing)),
         )

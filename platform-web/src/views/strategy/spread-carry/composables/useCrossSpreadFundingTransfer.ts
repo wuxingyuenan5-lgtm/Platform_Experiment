@@ -50,6 +50,9 @@ function transferReadinessMessage(reason: string | null | undefined): string {
   if (reason.includes('TRANSFER_BALANCE_UNAVAILABLE')) {
     return 'Bybit 暂未返回该方向的可划转余额。';
   }
+  if (reason.includes('TRADFI_WRITE_API_UNAVAILABLE')) {
+    return 'Bybit 当前未向公开 API 开放 TradFi/MT5 资金划转。';
+  }
   if (reason.includes('explicitly mapped')) {
     return 'Bybit 统一账户与 MT5/TradFi 账户尚未完成绑定。';
   }
@@ -135,7 +138,7 @@ export function useCrossSpreadFundingTransfer() {
   }
 
   async function submitTransfer() {
-    if (!canSubmit.value || !projectedBalances.value) return;
+    if (!canSubmit.value) return;
     loading.value = true;
     error.value = '';
     draftIdempotencyKey.value ||= crypto.randomUUID();

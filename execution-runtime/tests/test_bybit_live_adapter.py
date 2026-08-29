@@ -431,7 +431,7 @@ def test_bybit_read_only_account_rejects_submit_before_client_call(tmp_path) -> 
     assert client.place_calls == []
 
 
-def test_tradfi_transfer_readiness_requires_wallet_account_transfer_permission() -> None:
+def test_tradfi_transfer_readiness_rejects_unsupported_write_before_permission_probe() -> None:
     client = FakeTradFiTransferClient(permission=False)
     gateway = BybitMt5Gateway(
         tradfi_settings(write_enabled=False),
@@ -446,11 +446,11 @@ def test_tradfi_transfer_readiness_requires_wallet_account_transfer_permission()
     )
 
     assert readiness.ready is False
-    assert readiness.reason == "BYBIT_WALLET_ACCOUNT_TRANSFER_PERMISSION_REQUIRED"
+    assert readiness.reason == "BYBIT_TRADFI_WRITE_API_UNAVAILABLE"
     assert client.balance_calls == []
 
 
-def test_tradfi_transfer_readiness_uses_explicit_account_mapping() -> None:
+def test_tradfi_transfer_readiness_rejects_unsupported_public_write_contract() -> None:
     client = FakeTradFiTransferClient()
     settings = tradfi_settings(write_enabled=False)
     gateway = BybitMt5Gateway(
@@ -475,22 +475,21 @@ def test_tradfi_transfer_readiness_uses_explicit_account_mapping() -> None:
         currency="USDT",
     )
 
-    assert forward.ready is True
-    assert forward.transferable_balance == Decimal("350.125")
+    assert forward.ready is False
+    assert forward.transferable_balance is None
     assert forward.from_account_type == "UNIFIED"
     assert forward.to_account_type == "TradFi"
-    assert reverse.ready is True
+    assert forward.reason == "BYBIT_TRADFI_WRITE_API_UNAVAILABLE"
+    assert reverse.ready is False
     assert reverse.from_account_type == "TradFi"
     assert reverse.to_account_type == "UNIFIED"
+    assert reverse.reason == "BYBIT_TRADFI_WRITE_API_UNAVAILABLE"
     assert unmapped.ready is False
     assert "explicitly mapped" in str(unmapped.reason)
-    assert client.balance_calls == [
-        {"accountType": "UNIFIED", "toAccountType": "TradFi", "coin": "USDT"},
-        {"accountType": "TradFi", "toAccountType": "UNIFIED", "coin": "USDT"},
-    ]
+    assert client.balance_calls == []
 
 
-def test_tradfi_transfer_posts_once_and_replay_queries_same_identity() -> None:
+def test_tradfi_transfer_never_posts_to_unsupported_public_account_type() -> None:
     client = FakeTradFiTransferClient()
     settings = tradfi_settings()
     gateway = BybitMt5Gateway(
@@ -498,24 +497,12 @@ def test_tradfi_transfer_posts_once_and_replay_queries_same_identity() -> None:
         bybit=BybitLiveAdapter(settings, client),
         mt5=object(),
     )
-    command = transfer_command()
-
-    first = gateway.transfer_internal_capital(command)
-    replay = gateway.transfer_internal_capital(command)
-
-    assert first.status == replay.status == "completed"
-    assert first.external_transfer_id == replay.external_transfer_id
-    assert len(client.transfer_calls) == 1
-    assert client.transfer_calls[0] == {
-        "transferId": first.external_transfer_id,
-        "coin": "USDT",
-        "amount": "300",
-        "fromAccountType": "UNIFIED",
-        "toAccountType": "TradFi",
-    }
+    with pytest.raises(GatewayConfigurationError, match="TRADFI_WRITE_API_UNAVAILABLE"):
+        gateway.transfer_internal_capital(transfer_command())
+    assert client.transfer_calls == []
 
 
-def test_tradfi_pending_is_result_unknown_and_live_write_remains_gated() -> None:
+def test_tradfi_query_can_reconcile_existing_identity_without_new_write() -> None:
     pending_client = FakeTradFiTransferClient(create_status="PENDING")
     settings = tradfi_settings()
     gateway = BybitMt5Gateway(
@@ -524,17 +511,17 @@ def test_tradfi_pending_is_result_unknown_and_live_write_remains_gated() -> None
         mt5=object(),
     )
 
-    result = gateway.transfer_internal_capital(transfer_command(key="pending-transfer"))
-
-    assert result.status == "result_unknown"
-    assert len(pending_client.transfer_calls) == 1
-    pending_client.records[result.external_transfer_id]["status"] = "SUCCESS"
+    external_transfer_id = "existing-transfer-identity"
+    pending_client.records[external_transfer_id] = {
+        "transferId": external_transfer_id,
+        "status": "SUCCESS",
+    }
     reconciled = gateway.query_internal_capital_transfer(
         transfer_command(key="pending-transfer"),
-        external_transfer_id=result.external_transfer_id,
+        external_transfer_id=external_transfer_id,
     )
     assert reconciled.status == "completed"
-    assert len(pending_client.transfer_calls) == 1
+    assert pending_client.transfer_calls == []
 
     blocked_settings = tradfi_settings(write_enabled=False)
     blocked_client = FakeTradFiTransferClient()
@@ -543,7 +530,7 @@ def test_tradfi_pending_is_result_unknown_and_live_write_remains_gated() -> None
         bybit=BybitLiveAdapter(blocked_settings, blocked_client),
         mt5=object(),
     )
-    with pytest.raises(GatewayConfigurationError, match="live write gate is disabled"):
+    with pytest.raises(GatewayConfigurationError, match="TRADFI_WRITE_API_UNAVAILABLE"):
         blocked_gateway.transfer_internal_capital(transfer_command(key="blocked-transfer"))
     assert blocked_client.transfer_calls == []
 

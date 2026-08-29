@@ -231,7 +231,7 @@ def get_funding_transfer_quote() -> FundingTransferQuoteResponse:
             amount = Decimal("0")
     mode: Literal["automated", "unavailable"] = (
         "automated"
-        if forward.get("ready") is True and reverse.get("ready") is True
+        if forward.get("ready") is True or reverse.get("ready") is True
         else "unavailable"
     )
     readiness_reason = None
@@ -335,22 +335,26 @@ def create_funding_transfer(
         return _response(existing, mode=_stored_mode(existing))
 
     bybit_account_id, mt5_account_id = _bound_accounts()
-    quote = get_funding_transfer_quote()
-    if quote.mode != "automated":
+    source_account_id = (
+        bybit_account_id if request.direction == "bybit_to_mt5" else mt5_account_id
+    )
+    destination_account_id = (
+        mt5_account_id if request.direction == "bybit_to_mt5" else bybit_account_id
+    )
+    direction_readiness = _runtime_transfer_readiness(
+        source_account_id,
+        destination_account_id,
+    )
+    if direction_readiness.get("ready") is not True:
         raise HTTPException(
             status_code=423,
-            detail=quote.readiness_reason or "Automated MT5/TradFi transfer is unavailable",
+            detail=str(
+                direction_readiness.get("reason")
+                or "Automated MT5/TradFi transfer is unavailable"
+            ),
         )
-    source_quote = (
-        quote.bybit_transferable
-        if request.direction == "bybit_to_mt5"
-        else quote.mt5_withdrawable
-    )
-    destination_quote = (
-        quote.mt5_withdrawable
-        if request.direction == "bybit_to_mt5"
-        else quote.bybit_transferable
-    )
+    source_quote = _readiness_balance(direction_readiness)
+    destination_quote, _ = _balance_quote(destination_account_id)
     if source_quote.amount is None:
         raise HTTPException(status_code=503, detail="Source transferable balance is unavailable")
     if destination_quote.amount is None:
@@ -391,11 +395,6 @@ def create_funding_transfer(
                         f"for {account_id}"
                     ),
                 )
-        source_account_id = (
-            bybit_account_id
-            if request.direction == "bybit_to_mt5"
-            else mt5_account_id
-        )
         active_reserved = risk_repository.active_reserved_amount(
             source_account_id,
             TRANSFER_CURRENCY,
@@ -490,26 +489,20 @@ def create_funding_transfer(
                 requested_by,
                 timestamp,
                 timestamp,
-                quote.mode,
+                "automated",
                 source_account_id,
-                mt5_account_id
-                if request.direction == "bybit_to_mt5"
-                else bybit_account_id,
+                destination_account_id,
                 format(source_quote.amount, "f"),
                 format(destination_quote.amount, "f"),
             ),
         )
 
-    direction_readiness = _runtime_transfer_readiness(
-        source_account_id,
-        mt5_account_id if request.direction == "bybit_to_mt5" else bybit_account_id,
-    )
     is_simulation = direction_readiness.get("fromAccountType") == "simulation"
     if not is_simulation:
         steps = (
             (
                 source_account_id,
-                mt5_account_id if request.direction == "bybit_to_mt5" else bybit_account_id,
+                destination_account_id,
                 "USDT",
                 "USDT",
             ),
