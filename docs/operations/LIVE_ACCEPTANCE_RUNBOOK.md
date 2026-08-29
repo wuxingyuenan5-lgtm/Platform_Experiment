@@ -102,7 +102,7 @@ For Platform 0.11.1, the controlled execution order is Market in one direction, 
 - Funds, quantity, symbols, concurrency and automation cannot expand before end-of-day reconciliation is complete.
 - Fixed position, notional, daily-volume, batch-count and loss caps are not part of the founder-owned local test-account contract. This does not relax one-instruction/one-batch identity, instruction quantity ceilings, global one-active-execution serialization, allowlists, bounded chase, Kill Switch, reconciliation or forced read-only reset.
 - Existing Platform and Runtime fixed-notional-cap code remains a controlled-live readiness blocker. It is retained unchanged in this rule-alignment slice for legacy compatibility and cannot be treated as owner-approved risk policy or readiness evidence; a separately authorized behavior change must align it before any Live Write window.
-- A process restart, connection loss, `result_unknown`, identity mismatch, position mismatch or expiry automatically returns both Live Write gates to `false`.
+- A process restart returns both Live Write gates to `false` unless the responsible operator explicitly restarts the managed topology with `scripts/dev-platform.ps1 -EnableLiveWrite` inside a currently authorized supervised window. The flag is a fresh startup choice, not automatic restoration and not order authorization. Connection loss, `result_unknown`, identity mismatch, position mismatch or expiry always returns both gates to `false`.
 - Credentials, private values and live evidence are not copied into source control, general logs or ordinary documentation.
 
 ## 3. Instruction-bounded execution-mode acceptance
@@ -237,7 +237,10 @@ following in read-only mode:
 - The local startup path must keep Runtime, Platform API and Platform Web
   running independently of transient test processes. `scripts/dev-platform.ps1`
   is the authority for start/status/stop/restart, persistent PID ownership and
-  login smoke verification.
+  login smoke verification. Its default startup contract keeps both Live Write
+  gates disabled; `-EnableLiveWrite` is valid only for an active Owner-authorized
+  supervised window. Both Python services must report an active project virtual
+  environment before the launcher accepts them as healthy.
 - Funding controlled-live still returns `423` until separately authorized and
   fully ready.
 - No approved `LiveTradingSession` exists.

@@ -41,6 +41,23 @@ test('cross spread stop-loss and take-profit controls use stacked execution rows
   assert.equal(source.includes('stacked-select'), true);
 });
 
+test('cross spread open command shows both authoritative account balances above execution mode', () => {
+  const commandSource = read(
+    'src/views/strategy/spread-carry/components/SpreadExecutionCommand.vue',
+  );
+  const workspaceSource = read(
+    'src/views/strategy/spread-carry/components/CrossVenueExecutionWorkspace.vue',
+  );
+  const balanceStripIndex = commandSource.indexOf('account-balance-strip');
+  const marketModeIndex = commandSource.indexOf('市价开仓');
+  assert.ok(balanceStripIndex >= 0 && balanceStripIndex < marketModeIndex);
+  assert.equal(commandSource.includes('Bybit 账户资金'), true);
+  assert.equal(commandSource.includes('MT5 账户资金'), true);
+  assert.equal(commandSource.includes('可用资金'), true);
+  assert.equal(workspaceSource.includes(':bybit-account-risk="observability?.bybit.accountRisk || null"'), true);
+  assert.equal(workspaceSource.includes(':mt5-account-risk="observability?.mt5.accountRisk || null"'), true);
+});
+
 test('cross spread does not present a local leverage input as an executable venue setting', () => {
   const commandSource = read(
     'src/views/strategy/spread-carry/components/SpreadExecutionCommand.vue',

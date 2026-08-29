@@ -1,3 +1,5 @@
+import sys
+
 from fastapi import APIRouter
 
 from app.config import Settings
@@ -9,11 +11,12 @@ def create_system_router(settings: Settings, platform_version: str) -> APIRouter
     router = APIRouter()
 
     @router.get("/health", tags=["system"])
-    def health() -> dict[str, str]:
+    def health() -> dict[str, str | bool]:
         return {
             "status": "ok",
             "service": "platform-api",
             "environment": settings.environment,
+            "pythonVirtualEnvironment": sys.prefix != sys.base_prefix,
         }
 
     @router.get(f"{settings.api_prefix}/system/info", tags=["system"])

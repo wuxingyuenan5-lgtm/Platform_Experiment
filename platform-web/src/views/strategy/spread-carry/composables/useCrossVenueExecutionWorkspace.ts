@@ -385,6 +385,7 @@ export function useCrossVenueExecutionWorkspace() {
     mt5LatencyMs,
     mt5Quote,
     nudgeQty,
+    observability,
     observabilityError,
     openLimitStrategy,
     openConfirm,

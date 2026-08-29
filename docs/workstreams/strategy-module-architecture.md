@@ -2,7 +2,7 @@
 
 状态：`in_progress`  
 Owner：Founder CEO  
-更新时间：2026-08-26  
+更新时间：2026-08-29
 当前基线：Platform `0.11.2` 候选；已包含 Funding 收口、CEO 会话候选和本工作流 MT5 协调修正
 
 本文件是“策略模块架构”活跃阶段的唯一接续入口。它只维护当前范围、验收门、阻断和下一动作；稳定产品、合同和运维事实仍归属下方列出的长期权威文档。
@@ -27,13 +27,17 @@ Cross 的辅助资金划转实验已经退出产品路径：第三模板不再�
 
 最近验证包括 Platform 相关 53 tests、Runtime MT5 相关 17 tests，以及 Platform/Runtime Pyright、相关 Ruff、前端 typecheck、行为测试和 production build。Funding 历史行情与真实执行页已通过聚焦浏览器验收；多 MT5 凭据引用分类和只读预检状态枚举已与 Runtime 合同对齐，Bybit/MT5 当前只读预检通过。当前只读事实为 Funding `BTCUSDT` Spot/Perp、Cross Bybit `XAUTUSDT`、Cross MT5 `XAUUSD.s`；approved session 为 0，Funding/Cross unresolved `result_unknown` 为 0。
 
+2026-08-29 已修复策略管理读取链的底层分叉：管理汇总不再使用账户初始化时的静态 `data_quality_state` 冒充当前状态，而是使用最新账户同步、余额和风险快照。四个已绑定真实账号重新同步均成功，Funding、Cross、Bottom 与 Short A 的当前账号质量均为 `complete`。Cross 开仓模板现直接复用现有双边 observability 账户风险快照，在市价/限价开仓控件上方展示两端净值与可用资金；没有新增余额旁路或 mock。当前实读约为 Bybit `686.40 USD`、MT5 `300.00 USDT`，数值随后端轮询变化。
+
+本地启动器现以一个受管拓扑启动三服务，并由服务自身报告虚拟环境状态，避免把系统 Python 的相似命令行误判为项目运行时。默认仍关闭 Live Write；只有显式 `-EnableLiveWrite` 才选择已授权验收启动合同。当前三服务健康、受管、项目 venv 与启动合同全部匹配，Runtime Live Write 按 Owner 最新要求保持开启。
+
 MT5 入金已经完成；尚未完成的是 Cross 开仓、平仓、Funding Settlement、差异核对或 EOD。`bybit-live-main` 的 Account Transfer 权限可完成 UTA/Funding 划转，但公开 API 仍缺 MT5 CFD 写合同。Owner 要求保持 Runtime Live Write 开启以继续实盘测试；该门已保持开启，但资金划转和订单仍分别受 capability、claim、会话与逐操作授权约束。
 
-Owner 已授权 2026-08-25 16:55–24:00（北京时间）的 Cross + Funding 最小实盘窗口，并允许仅在该窗口临时启用双 Live Write 与 founder-demo CEO 本地自审批。执行必须串行：先以 Cross `XAUTUSDT` + `XAUUSD.s`、每腿 1 盎司完成开仓、核对、平仓和对账；由于共享 Bybit UTA 约 500 USDT、并行时资金不足，Cross 完全退出并复核余额后，Funding 才以 `BTCUSDT` Spot + Perpetual 和账户实际可用资金下的最小可开仓位执行 `post_only_chase`。完成后立即撤销会话并关闭全部写入门控。
+Owner 原 2026-08-25 16:55–24:00（北京时间）的绝对授权窗口已经结束；2026-08-29 Owner 后续明确要求继续人工实盘测试并保持 Live Write 开启，但这不替代每笔订单的页面确认。执行仍须串行：先以 Cross `XAUTUSDT` + `XAUUSD.s`、每腿 1 盎司完成开仓、核对、平仓和对账；Cross 完全退出并复核余额后，Funding 才以 `BTCUSDT` Spot + Perpetual 和账户实际可用资金下的最小可开仓位执行 `post_only_chase`。完成后撤销会话并关闭全部写入门控。
 
 ## 下一动作与 Owner 决策
 
-真实测试资金已在 MT5 CFD，不再阻断 Cross 最小实盘。第三模板的平台内自动划转仍保持 fail closed，直到 Bybit 为 MT5 CFD 专用合同提供可长期部署的 API Key、OAuth 扩展范围或机构授权；不把短期网页登录 Cookie 当服务器长期凭据。Runtime Live Write 按 Owner 最新要求保持开启。下一动作是先完成 Cross 1 盎司的页面手动开仓、核对、平仓和对账，再使用共享 UTA 实际可用余额完成 Funding 最小仓位闭环；每笔订单仍需 Owner 的具体操作确认。
+真实测试资金与统一只读链均已就位，不再阻断 Cross 最小实盘。第三模板的平台内自动划转仍保持 fail closed，直到 Bybit 为 MT5 CFD 专用合同提供可长期部署的 API Key、OAuth 扩展范围或机构授权；不把短期网页登录 Cookie 当服务器长期凭据。Runtime Live Write 按 Owner 最新要求保持开启。下一动作是 Owner 登录页面确认两端余额卡片和双边行情后，手动完成 Cross 1 盎司开仓、核对、平仓和对账，再使用共享 UTA 实际可用余额完成 Funding 最小仓位闭环；每笔订单仍由 Owner 在页面确认。
 
 ## 关联长期权威文档
 

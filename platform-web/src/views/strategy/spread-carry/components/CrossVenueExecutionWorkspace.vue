@@ -63,6 +63,8 @@
         :qty-error="qtyError"
         :bybit-qty="bybitQty"
         :mt5-lot="mt5Lot"
+        :bybit-account-risk="observability?.bybit.accountRisk || null"
+        :mt5-account-risk="observability?.mt5.accountRisk || null"
         :long-spread="longSpread"
         :short-spread="shortSpread"
         :submit-loading="submitLoading"
@@ -142,6 +144,7 @@
     mt5LatencyMs,
     mt5Quote,
     nudgeQty,
+    observability,
     observabilityError,
     openConfirm,
     openLimitStrategy,

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sys
 from datetime import UTC, datetime
 
 from fastapi import APIRouter
@@ -21,11 +22,12 @@ def create_system_router(
     router = APIRouter()
 
     @router.get("/health", tags=["system"])
-    def health() -> dict[str, str]:
+    def health() -> dict[str, str | bool]:
         return {
             "status": "ok",
             "service": "execution-runtime",
             "gateway": gateway.name,
+            "pythonVirtualEnvironment": sys.prefix != sys.base_prefix,
         }
 
     @router.get("/status", response_model=RuntimeStatusResponse, tags=["system"])

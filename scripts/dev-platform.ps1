@@ -1,7 +1,8 @@
 [CmdletBinding()]
 param(
   [ValidateSet('start', 'status', 'stop', 'restart')][string]$Action = 'start',
-  [ValidateRange(1, 180)][int]$HealthTimeoutSeconds = 90
+  [ValidateRange(1, 180)][int]$HealthTimeoutSeconds = 90,
+  [switch]$EnableLiveWrite
 )
 
 $ErrorActionPreference = 'Stop'
@@ -17,7 +18,7 @@ $Services = @(
     WorkingDirectory = (Join-Path $RepoRoot 'execution-runtime'); Python = $true;
     ContractChecks = @(
       @{ Url = 'http://127.0.0.1:8100/status'; JsonField = 'status'; Expected = 'available' },
-      @{ Url = 'http://127.0.0.1:8100/status'; JsonField = 'capabilities.liveWriteEnabled'; Expected = $false }
+      @{ Url = 'http://127.0.0.1:8100/status'; JsonField = 'capabilities.liveWriteEnabled'; Expected = [bool]$EnableLiveWrite }
     )
   },
   @{
@@ -92,13 +93,13 @@ function Test-ServiceSignature {
 function Test-ExpectedRuntime {
   param([hashtable]$Service, [int]$ProcessId)
   if (-not $Service.Python) { return $true }
-  $process = Get-CimInstance Win32_Process -Filter "ProcessId=$ProcessId" -ErrorAction SilentlyContinue
-  if ($null -eq $process) { return $false }
-  $executablePath = ([string]$process.ExecutablePath).ToLowerInvariant()
-  if ($Service.PythonPath -and $executablePath -eq $Service.PythonPath.ToLowerInvariant()) {
-    return $true
+  if (-not $Service.PythonPath) { return $false }
+  try {
+    $health = (Invoke-ServiceRequest $Service.HealthUrl).Content | ConvertFrom-Json
+    return [bool]$health.pythonVirtualEnvironment
+  } catch {
+    return $false
   }
-  return (Test-ServiceSignature $Service $ProcessId)
 }
 
 function Invoke-ServiceRequest {
@@ -355,12 +356,13 @@ function Start-ServiceManaged {
     $previousPlatformLiveWrite = $env:VG_LIVE_TRADING_ENABLED
     $previousFounderDemo = $env:VG_FOUNDER_DEMO_LIVE_ACCEPTANCE_ENABLED
     try {
+      $liveWriteValue = if ($EnableLiveWrite) { 'true' } else { 'false' }
       if ($Service.Key -eq 'runtime') {
-        $env:VG_RUNTIME_LIVE_WRITE_ENABLED = 'false'
+        $env:VG_RUNTIME_LIVE_WRITE_ENABLED = $liveWriteValue
       }
       if ($Service.Key -in @('runtime', 'api')) {
-        $env:VG_LIVE_TRADING_ENABLED = 'false'
-        $env:VG_FOUNDER_DEMO_LIVE_ACCEPTANCE_ENABLED = 'false'
+        $env:VG_LIVE_TRADING_ENABLED = $liveWriteValue
+        $env:VG_FOUNDER_DEMO_LIVE_ACCEPTANCE_ENABLED = $liveWriteValue
       }
       Start-Process $Service.PythonPath -ArgumentList @('-m', 'uvicorn', 'app.main:app', '--host', '127.0.0.1', '--port', "$($Service.Port)") `
         -WorkingDirectory $Service.WorkingDirectory -RedirectStandardOutput $stdout -RedirectStandardError $stderr `
@@ -422,6 +424,7 @@ function Start-ManagedServices {
   Write-Host 'Platform API:      http://127.0.0.1:8000/health'
   Write-Host 'Platform Web:      http://127.0.0.1:4373/index.html'
   Write-Host 'Platform Web API:  http://127.0.0.1:8000/api/v1'
+  Write-Host "Live Write:        $(if ($EnableLiveWrite) { 'enabled by explicit operator flag' } else { 'disabled' })"
 }
 
 switch ($Action) {

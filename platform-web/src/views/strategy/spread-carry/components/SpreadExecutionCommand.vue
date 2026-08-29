@@ -25,6 +25,19 @@
     </div>
 
     <template v-if="executionStage === 'open'">
+      <div class="account-balance-strip">
+        <article class="metric-card account-balance-card">
+          <small>Bybit 账户资金</small>
+          <strong>{{ accountEquityText(bybitAccountRisk) }}</strong>
+          <span>可用资金 {{ accountAvailableText(bybitAccountRisk) }}</span>
+        </article>
+        <article class="metric-card account-balance-card">
+          <small>MT5 账户资金</small>
+          <strong>{{ accountEquityText(mt5AccountRisk) }}</strong>
+          <span>可用资金 {{ accountAvailableText(mt5AccountRisk) }}</span>
+        </article>
+      </div>
+
       <div class="execution-grid">
         <div class="execution-column execution-column--left">
           <label class="field-block">
@@ -474,6 +487,7 @@
     CrossSpreadLimitExecutionResult,
     CrossSpreadLimitStrategy,
   } from '@/api/platform/crossSpreadLifecycle';
+  import type { VenueAccountRiskSnapshot } from '@/api/platform/crossSpreadObservability';
   import { useCrossSpreadFundingTransfer } from '../composables/useCrossSpreadFundingTransfer';
 
   type SpreadInputField = 'trigger' | 'acceptable' | 'takeProfit' | 'stopLoss' | 'closeLimit';
@@ -510,6 +524,8 @@
     qtyError: string;
     bybitQty: number;
     mt5Lot: number | null;
+    bybitAccountRisk: VenueAccountRiskSnapshot | null;
+    mt5AccountRisk: VenueAccountRiskSnapshot | null;
     longSpread: number | null;
     shortSpread: number | null;
     triggerSpreadInput: string;
@@ -637,6 +653,23 @@
     return formatSigned(parsed);
   }
 
+  function accountMoneyText(
+    risk: VenueAccountRiskSnapshot | null,
+    field: 'equity' | 'availableBalance',
+  ) {
+    if (!risk || risk.dataQualityState !== 'complete') return '--';
+    const value = parseOptionalNumber(risk[field]);
+    return value === null ? '--' : `${formatNumber(value, 2)} ${risk.currency}`;
+  }
+
+  function accountEquityText(risk: VenueAccountRiskSnapshot | null) {
+    return accountMoneyText(risk, 'equity');
+  }
+
+  function accountAvailableText(risk: VenueAccountRiskSnapshot | null) {
+    return accountMoneyText(risk, 'availableBalance');
+  }
+
   function spreadTone(value: string | number | null | undefined) {
     const parsed = parseOptionalNumber(value);
     if (parsed === null) return '';
@@ -755,6 +788,25 @@
     grid-template-columns: 1.08fr 1fr 1fr;
     gap: 20px;
     align-items: start;
+  }
+
+  .account-balance-strip {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    margin-bottom: 14px;
+  }
+
+  .account-balance-card {
+    min-height: 84px;
+  }
+
+  .account-balance-card span {
+    display: block;
+    margin-top: 6px;
+    color: #667891;
+    font-size: 12px;
+    font-weight: 700;
   }
 
   .execution-column {
@@ -1151,7 +1203,8 @@
 
     .funding-balance-grid,
     .funding-form-grid,
-    .funding-actions {
+    .funding-actions,
+    .account-balance-strip {
       grid-template-columns: 1fr;
       flex-direction: column;
     }

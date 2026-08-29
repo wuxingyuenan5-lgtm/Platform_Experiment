@@ -119,6 +119,7 @@ def list_strategy_instances() -> list[StrategyInstanceResponse]:
 
 
 def list_strategy_management_overview() -> list[StrategyManagementOverviewResponse]:
+    ensure_sync_schema()
     with connection() as db:
         rows = db.execute(
             """
@@ -199,9 +200,25 @@ def list_strategy_management_overview() -> list[StrategyManagementOverviewRespon
                 sab.status,
                 a.account_code,
                 a.status AS account_status,
-                a.data_quality_state
+                a.data_quality_state,
+                sync.status AS sync_status,
+                (
+                    SELECT bs.data_quality_state
+                    FROM balance_snapshots bs
+                    WHERE bs.account_id = a.id
+                    ORDER BY bs.as_of DESC, bs.id DESC
+                    LIMIT 1
+                ) AS latest_balance_quality,
+                (
+                    SELECT ars.data_quality_state
+                    FROM account_risk_snapshots ars
+                    WHERE ars.account_id = a.id
+                    ORDER BY ars.as_of DESC
+                    LIMIT 1
+                ) AS latest_risk_quality
             FROM strategy_account_bindings sab
             JOIN accounts a ON a.id = sab.account_id
+            LEFT JOIN account_sync_status sync ON sync.account_id = a.id
             WHERE sab.status = 'active'
             ORDER BY sab.strategy_instance_id,
                      CASE sab.role
@@ -217,6 +234,17 @@ def list_strategy_management_overview() -> list[StrategyManagementOverviewRespon
 
     bindings_by_strategy: dict[str, list[dict[str, str | None]]] = {}
     for binding in binding_rows:
+        sync_status = str(binding["sync_status"]) if binding["sync_status"] else None
+        if sync_status == "ready":
+            effective_quality = (
+                binding["latest_balance_quality"]
+                or binding["latest_risk_quality"]
+                or "unavailable"
+            )
+        elif sync_status is not None:
+            effective_quality = sync_status
+        else:
+            effective_quality = binding["data_quality_state"]
         bindings_by_strategy.setdefault(str(binding["strategy_instance_id"]), []).append(
             {
                 "role": str(binding["role"]),
@@ -227,8 +255,8 @@ def list_strategy_management_overview() -> list[StrategyManagementOverviewRespon
                     else None
                 ),
                 "data_quality_state": (
-                    str(binding["data_quality_state"])
-                    if binding["data_quality_state"] is not None
+                    str(effective_quality)
+                    if effective_quality is not None
                     else None
                 ),
             }
@@ -243,6 +271,14 @@ def list_strategy_management_overview() -> list[StrategyManagementOverviewRespon
         display_account_code = row["primary_account_code"]
         display_account_status = row["primary_account_status"]
         display_account_quality = row["primary_account_data_quality_state"]
+        primary_binding = next(
+            (binding for binding in active_bindings if binding["role"] == "primary"),
+            None,
+        )
+        if primary_binding is not None:
+            display_account_code = primary_binding["account_code"]
+            display_account_status = primary_binding["account_status"]
+            display_account_quality = primary_binding["data_quality_state"]
         if display_account_code is None:
             non_local_test = [
                 binding for binding in active_bindings if binding["role"] != "local_test"

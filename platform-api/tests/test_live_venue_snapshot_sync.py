@@ -244,6 +244,13 @@ def test_strategy_account_snapshot_returns_ready_sync_status_and_account_risk(
     assert body["accountRisk"]["marginLevel"] == "100"
     assert body["accountCode"] == "MT5-SHORT-TERM-A"
 
+    with TestClient(app) as client:
+        overview = client.get("/api/v1/strategies/management-overview")
+
+    assert overview.status_code == 200
+    by_desk = {item["deskKey"]: item for item in overview.json()}
+    assert by_desk["shortLineTraderL"]["primaryAccountDataQualityState"] == "complete"
+
 
 def test_sync_without_current_window_keeps_existing_historical_pnl(
     monkeypatch,
