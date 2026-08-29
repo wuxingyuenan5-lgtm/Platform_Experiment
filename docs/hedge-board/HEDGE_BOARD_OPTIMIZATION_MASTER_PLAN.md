@@ -1,9 +1,9 @@
 # 对冲基金看板优化总方案（Master Plan）
 
-> 状态：Current Planning Baseline / v0.6  
+> 状态：Current Planning Baseline / v0.7  
 > 适用分支：`feature/hedge-board-online-optimization`  
-> 用途：作为对冲基金看板后续产品讨论、规格拆分、数据源设计、GitHub 执行与线下验收的最高约束来源。  
-> 原则：本文件只冻结全局规则与当前路线；各一级看板的详细产品规格进入 `docs/hedge-board/specs/` 子文档。执行 Agent 不得自行改变已冻结方向。
+> 用途：作为对冲基金看板后续产品讨论、数据源设计、工程实施与线下验收的最高约束来源。  
+> 原则：总文件只冻结全局规则与当前路线；各一级看板产品细节进入 `docs/hedge-board/specs/`；工程顺序进入 `docs/hedge-board/HEDGE_BOARD_IMPLEMENTATION_PLAN.md`。任何执行 Agent 不得自行改变已冻结方向。
 
 ---
 
@@ -53,7 +53,7 @@
 
 状态：**Product Scope Frozen v1.0 / Data Source Baseline Ready / Implementation OPEN**
 
-权威子文档：
+权威文档：
 
 - `docs/hedge-board/specs/MACRO_V1_SPEC.md`
 - `docs/hedge-board/specs/MACRO_DATA_SOURCE_MAP.md`
@@ -61,15 +61,16 @@
 当前决定：
 
 - 产品范围已冻结；
+- Growth、Inflation、Rates、Global M2、Risk Appetite、Polymarket Market Expectations 等范围已确定；
 - Data Source Map 已有初版；
 - 当前不进入工程实施；
-- 后续实施前，对 OPEN / not_configured 数据源再次做 live validation。
+- 实施前对 OPEN / `not_configured` 数据源重新做 live validation。
 
 ### 3.2 商品看板
 
 状态：**Product Scope Frozen v1.0 / Data Source Baseline Ready / Implementation OPEN**
 
-权威子文档：
+权威文档：
 
 - `docs/hedge-board/specs/COMMODITY_V1_SPEC.md`
 - `docs/hedge-board/specs/COMMODITY_DATA_SOURCE_MAP.md`
@@ -78,17 +79,19 @@
 
 - 产品范围已冻结；
 - 不纳入农产品；
+- 保留现有黄金 ETF / SPDR / 央行购金 / 黄金宏观驱动等核心内容；
+- 新增期限结构、库存、CFTC、跨市场价差与精简商品波动率；
 - Data Source Map 已建立免费数据源基线；
 - EIA / CFTC / WGC / Cboe / CME 等官方免费源优先；
-- SHFE 等中国数据可优先复用 AKShare 成熟封装并记录 upstream；
-- WTI / Brent 当前期限结构、LME 相关数据等仍保留 OPEN / not_configured gate；
+- SHFE 等中国数据可在口径稳定时复用 AKShare 并记录 upstream；
+- 当前期限结构、LME 等无法确认稳定免费链路的项目保留 OPEN / `not_configured` gate；
 - 当前不进入工程实施。
 
 ### 3.3 加密看板
 
 状态：**Product Scope Frozen v1.0 / Data Source Baseline Ready / Implementation OPEN**
 
-权威子文档：
+权威文档：
 
 - `docs/hedge-board/specs/CRYPTO_V1_SPEC.md`
 - `docs/hedge-board/specs/CRYPTO_DATA_SOURCE_MAP.md`
@@ -100,14 +103,12 @@
 - 新增 Derivatives & Leverage；
 - 新增 Options & Volatility；
 - 新增 Stablecoin Liquidity；
-- On-chain Data 正式纳入 V1，并收敛为少量主流核心指标；
-- Funding / OI / Basis 同时支持 Aggregate 与单 Venue 视角；
-- Breadth / Rotation 优先利用现有 Market Detail，不重复建设大型 Altcoin Season 页面；
-- Data Source Map 已建立；
-- Binance / Deribit 官方 public API 作为衍生品与期权核心源；
-- Stablecoin 以 DefiLlama 等免费聚合源为候选；
-- On-chain 以 Coin Metrics Community 为首选候选，但 Community entitlement 必须逐项 live validate；
-- Exchange Balance / Netflow、LTH / STH Supply 等若无可靠免费源，保持 `not_configured`；
+- On-chain Data 纳入 V1，并收敛为 MVRV、NUPL、SOPR、Realized Price/Cap、Exchange Balance/Netflow、LTH/STH 等主流核心；
+- Funding / OI / Basis 同时支持 Aggregate 与 Venue 视角；
+- Breadth / Rotation 优先利用现有 Market Detail；
+- Binance / Deribit 等官方公共接口作为衍生品与期权核心候选源；
+- Stablecoin / ETF / Treasury / On-chain 允许使用免费聚合或 Community 数据，但必须记录 provenance、方法学与 rights_scope；
+- 无可靠免费源时保持 `not_configured`；
 - 当前不进入工程实施。
 
 ### 3.4 暂缓开发模块【Deferred】
@@ -127,7 +128,7 @@ Deferred 的含义：
 - 不新增数据源工程；
 - 不顺手真实化或重构；
 - 不因公共组件开发而主动改变这些页面；
-- 只有用户后续明确重新开启，才恢复产品讨论或工程开发。
+- 只有用户明确重新开启，才恢复产品讨论或工程开发。
 
 ---
 
@@ -264,7 +265,7 @@ existing chart / table components
 
 ### 6.3 AKShare 定位
 
-AKShare 可作为重要的统一接入层，特别适合中国市场及其已成熟封装的数据。
+AKShare 可作为重要统一接入层，尤其适合中国市场及已成熟封装的数据。
 
 原则：
 
@@ -282,7 +283,7 @@ AKShare 可作为重要的统一接入层，特别适合中国市场及其已成
     ↓
 AKShare 等成熟统一接入层（适用时）
     ↓
-稳定公开 Vendor
+稳定公开 Vendor / Community / Aggregator
     ↓
 独立 Fallback
 ```
@@ -397,7 +398,12 @@ existing SVG sparkline
 
 ---
 
-## 11. 当前产品规格与数据源文档索引【冻结】
+## 11. 权威文档索引【冻结】
+
+### 总体
+
+- `docs/hedge-board/HEDGE_BOARD_OPTIMIZATION_MASTER_PLAN.md`
+- `docs/hedge-board/HEDGE_BOARD_IMPLEMENTATION_PLAN.md`
 
 ### Macro
 
@@ -420,7 +426,45 @@ existing SVG sparkline
 
 ---
 
-## 12. Change Control【冻结】
+## 12. Implementation Plan【冻结为当前工程基线】
+
+统一实施计划：
+
+`docs/hedge-board/HEDGE_BOARD_IMPLEMENTATION_PLAN.md`
+
+该文档负责：
+
+- Shared Data Foundation；
+- Shared Market Detail Data Layer；
+- Macro / Commodity / Crypto 各垂直 Phase；
+- Shared Provider / canonical series 去重；
+- GitHub Actions 分层；
+- 每个 Phase 的业务完成标准；
+- 最终线下验收准备。
+
+当前推荐总体执行顺序：
+
+```text
+Phase 0 Shared Data Foundation
+    ↓
+Phase 1 Shared Market Detail Data Layer
+    ↓
+Macro V1
+    ↓
+Commodity V1
+    ↓
+Crypto V1
+    ↓
+Hedge Board Phase 1 Offline Acceptance
+```
+
+用户可以明确改变业务优先级；执行 Agent 不得自行重排。
+
+当前状态：**Implementation Plan Ready / Engineering NOT STARTED**。
+
+---
+
+## 13. Change Control【冻结】
 
 ### GREEN：可直接执行
 
@@ -443,7 +487,8 @@ existing SVG sparkline
 - 新增二级主题；
 - 显著改变页面信息密度；
 - 修改公共视觉组件；
-- 重新开启 Deferred 模块。
+- 重新开启 Deferred 模块；
+- 改变已经冻结的总体 Phase 优先级。
 
 ### RED：无明确授权不得执行
 
@@ -458,24 +503,26 @@ existing SVG sparkline
 
 ---
 
-## 13. GitHub 执行原则【冻结】
+## 14. GitHub 执行原则【冻结】
 
 后续执行 Agent 必须：
 
 1. 先读取本 Master Plan；
-2. 再读取对应模块 Spec / Source Map；
-3. 只执行当前明确开启的 Phase；
-4. 不自行重新设计产品；
-5. 遵守 Additive Only；
-6. 不得用 contract / schema / README 单独冒充业务 Phase 完成；
-7. 端到端 Phase 以真实业务链路作为验收；
-8. 无法验证时标记 `not_verified`，不得伪造；
-9. 单一工具路径失败时先尝试合理替代路径；
-10. Deferred 模块不因顺手重构或公共组件修改而被改变。
+2. 再读取 `HEDGE_BOARD_IMPLEMENTATION_PLAN.md`；
+3. 再读取当前模块 Spec / Data Source Map；
+4. 只执行用户明确开启的 Phase；
+5. 不自行重新设计产品；
+6. 遵守 Additive Only；
+7. 不得用 contract / schema / README 单独冒充业务 Phase 完成；
+8. 端到端 Phase 以真实业务链路作为验收；
+9. 无法验证时标记 `not_verified`，不得伪造；
+10. 单一工具路径失败时先尝试合理替代路径；
+11. Deferred 模块不得因顺手重构或公共组件修改而改变；
+12. 当前仍属于规划阶段，未经用户明确“开始实施”不得自行进入大规模代码开发。
 
 ---
 
-## 14. 线下验收原则【冻结】
+## 15. 线下验收原则【冻结】
 
 所有实际开发先进入独立分支：
 
@@ -495,34 +542,44 @@ existing SVG sparkline
 
 ---
 
-## 15. 当前计划状态【Current】
+## 16. 当前计划状态【Current】
 
 当前仍不进入工程实施。
 
-第一阶段设计文档状态：
+第一阶段设计文档已具备三层：
+
+```text
+Master Plan
+    ↓
+Module V1 Spec
+    ↓
+Data Source Map
+    ↓
+Unified Implementation Plan
+```
+
+当前状态：
 
 1. Macro V1：产品规格冻结 + Data Source Map baseline；
 2. Commodity V1：产品规格冻结 + Data Source Map baseline；
 3. Crypto V1：产品规格冻结 + Data Source Map baseline；
-4. US / A-Share / Global / Trading Tools：Deferred，暂不开发。
+4. Unified Implementation Plan：已建立；
+5. US / A-Share / Global / Trading Tools：Deferred。
 
-下一步如果继续做规划，优先是：
+下一步只有两类工作：
 
-- 三个 active V1 的 Phase / Implementation Order；
-- 跨模块共享 Provider / canonical series 去重；
-- 最终验收清单；
-- OPEN / not_configured 数据源实施前 live validation checklist。
-
-只有用户明确开启工程实施后，才依据对应 Spec / Source Map 启动真实代码 Phase。
+- 继续审阅 / 修订当前方案文档；
+- 用户明确开启工程实施后，按 Implementation Plan 启动 Phase 0。
 
 ---
 
-## 16. 文档维护规则
+## 17. 文档维护规则
 
 本文件是当前分支上的 Hedge Board 最高权威计划文档。
 
 - 用户明确确认的事项才可升级为冻结项；
-- 子模块详细内容进入对应 `*_V1_SPEC.md`；
+- 子模块详细产品内容进入对应 `*_V1_SPEC.md`；
 - 数据源细节进入对应 `*_DATA_SOURCE_MAP.md`；
+- 工程顺序与验收进入 `HEDGE_BOARD_IMPLEMENTATION_PLAN.md`；
 - Deferred 状态只有用户明确提出时才能解除；
 - 临时执行指令与本 Master Plan 冲突时，除非用户明确正在修改 Master Plan，否则以本文件为准。
