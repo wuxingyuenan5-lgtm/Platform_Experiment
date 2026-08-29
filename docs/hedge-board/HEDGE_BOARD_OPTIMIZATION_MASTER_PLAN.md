@@ -1,6 +1,6 @@
 # 对冲基金看板优化总方案（Master Plan）
 
-> 状态：Current Planning Baseline / v0.5  
+> 状态：Current Planning Baseline / v0.6  
 > 适用分支：`feature/hedge-board-online-optimization`  
 > 用途：作为对冲基金看板后续产品讨论、规格拆分、数据源设计、GitHub 执行与线下验收的最高约束来源。  
 > 原则：本文件只冻结全局规则与当前路线；各一级看板的详细产品规格进入 `docs/hedge-board/specs/` 子文档。执行 Agent 不得自行改变已冻结方向。
@@ -51,7 +51,7 @@
 
 ### 3.1 宏观看板
 
-状态：**Product Scope Frozen v1.0 / Data & Implementation Details OPEN**
+状态：**Product Scope Frozen v1.0 / Data Source Baseline Ready / Implementation OPEN**
 
 权威子文档：
 
@@ -62,30 +62,36 @@
 
 - 产品范围已冻结；
 - Data Source Map 已有初版；
-- 当前先不继续实施，待整个 Hedge Board 计划完善后再进入工程开发。
+- 当前不进入工程实施；
+- 后续实施前，对 OPEN / not_configured 数据源再次做 live validation。
 
 ### 3.2 商品看板
 
-状态：**Product Scope Frozen v1.0 / Data & Implementation Details OPEN**
+状态：**Product Scope Frozen v1.0 / Data Source Baseline Ready / Implementation OPEN**
 
 权威子文档：
 
 - `docs/hedge-board/specs/COMMODITY_V1_SPEC.md`
+- `docs/hedge-board/specs/COMMODITY_DATA_SOURCE_MAP.md`
 
 当前决定：
 
 - 产品范围已冻结；
 - 不纳入农产品；
-- 当前不实施；
-- 后续如重新开启工程开发，再进入 `COMMODITY_DATA_SOURCE_MAP.md` 与实际 Phase。
+- Data Source Map 已建立免费数据源基线；
+- EIA / CFTC / WGC / Cboe / CME 等官方免费源优先；
+- SHFE 等中国数据可优先复用 AKShare 成熟封装并记录 upstream；
+- WTI / Brent 当前期限结构、LME 相关数据等仍保留 OPEN / not_configured gate；
+- 当前不进入工程实施。
 
 ### 3.3 加密看板
 
-状态：**Product Scope Frozen v1.0 / Data & Implementation Details OPEN**
+状态：**Product Scope Frozen v1.0 / Data Source Baseline Ready / Implementation OPEN**
 
 权威子文档：
 
 - `docs/hedge-board/specs/CRYPTO_V1_SPEC.md`
+- `docs/hedge-board/specs/CRYPTO_DATA_SOURCE_MAP.md`
 
 当前决定：
 
@@ -97,8 +103,12 @@
 - On-chain Data 正式纳入 V1，并收敛为少量主流核心指标；
 - Funding / OI / Basis 同时支持 Aggregate 与单 Venue 视角；
 - Breadth / Rotation 优先利用现有 Market Detail，不重复建设大型 Altcoin Season 页面；
-- 产品范围已冻结，当前不进入工程实施；
-- 后续若继续开发，先进入 `CRYPTO_DATA_SOURCE_MAP.md` 与工程细节设计。
+- Data Source Map 已建立；
+- Binance / Deribit 官方 public API 作为衍生品与期权核心源；
+- Stablecoin 以 DefiLlama 等免费聚合源为候选；
+- On-chain 以 Coin Metrics Community 为首选候选，但 Community entitlement 必须逐项 live validate；
+- Exchange Balance / Netflow、LTH / STH Supply 等若无可靠免费源，保持 `not_configured`；
+- 当前不进入工程实施。
 
 ### 3.4 暂缓开发模块【Deferred】
 
@@ -387,7 +397,7 @@ existing SVG sparkline
 
 ---
 
-## 11. 当前产品规格索引【冻结】
+## 11. 当前产品规格与数据源文档索引【冻结】
 
 ### Macro
 
@@ -397,15 +407,16 @@ existing SVG sparkline
 ### Commodity
 
 - `docs/hedge-board/specs/COMMODITY_V1_SPEC.md`
+- `docs/hedge-board/specs/COMMODITY_DATA_SOURCE_MAP.md`
 
 ### Crypto
 
 - `docs/hedge-board/specs/CRYPTO_V1_SPEC.md`
-- 当前状态：Product Scope Frozen v1.0 / Data & Implementation Details OPEN。
+- `docs/hedge-board/specs/CRYPTO_DATA_SOURCE_MAP.md`
 
 ### US / A-Share / Global / Trading Tools
 
-- 当前不创建新增 V1 Spec；状态统一为 Deferred。
+- 当前不创建新增 V1 Spec / Data Source Map；状态统一为 Deferred。
 
 ---
 
@@ -484,23 +495,25 @@ existing SVG sparkline
 
 ---
 
-## 15. 当前下一步【Current】
+## 15. 当前计划状态【Current】
 
-当前不进入工程实施。
+当前仍不进入工程实施。
 
-计划状态：
+第一阶段设计文档状态：
 
-1. Macro V1：产品规格已冻结，Data Source Map 已有初版；
-2. Commodity V1：产品规格已冻结；
-3. Crypto V1：产品规格已冻结；
+1. Macro V1：产品规格冻结 + Data Source Map baseline；
+2. Commodity V1：产品规格冻结 + Data Source Map baseline；
+3. Crypto V1：产品规格冻结 + Data Source Map baseline；
 4. US / A-Share / Global / Trading Tools：Deferred，暂不开发。
 
-如果继续完善数据层：
+下一步如果继续做规划，优先是：
 
-- Commodity → `COMMODITY_DATA_SOURCE_MAP.md`；
-- Crypto → `CRYPTO_DATA_SOURCE_MAP.md`。
+- 三个 active V1 的 Phase / Implementation Order；
+- 跨模块共享 Provider / canonical series 去重；
+- 最终验收清单；
+- OPEN / not_configured 数据源实施前 live validation checklist。
 
-后续若用户决定开始工程实施，再依据对应 Spec / Source Map 单独开启 Phase。
+只有用户明确开启工程实施后，才依据对应 Spec / Source Map 启动真实代码 Phase。
 
 ---
 
