@@ -1,6 +1,6 @@
 # 对冲基金看板｜Phase F 数据与参考入口审计
 
-> 状态：Audit Baseline v0.9 / Engineering NOT STARTED  
+> 状态：Feasibility Frozen v1.0 / Engineering NOT STARTED  
 > 上位文档：`docs/hedge-board/HEDGE_BOARD_OPTIMIZATION_MASTER_PLAN.md`  
 > 可行性原则：`docs/hedge-board/HEDGE_BOARD_DATA_FEASIBILITY_AND_MAINTENANCE.md`  
 > 实施计划：`docs/hedge-board/HEDGE_BOARD_IMPLEMENTATION_PLAN.md`  
@@ -8,66 +8,77 @@
 
 ---
 
-## 1. Phase F 边界【冻结】
+## 1. Phase F 结论【冻结】
 
-Trading Tools 继续 Deferred：不开发、不改 UI、不处理元数据。Phase F 只读其现有链接，作为 External Reference Button 候选。
+Phase F 的目标不是把所有第三方数据都抓进本地，而是给 Macro / Commodity / Crypto V1 的每个重点模块确定长期可维护的交付方式。
 
-Macro / Commodity / Crypto V1 完成后，子页此前整块读取 Trading Tools 的模块不再需要；最终由 Native 内容 + 少量精准 External Link 取代。当前不删除，待线下验收后处理。
+统一判定：
 
-### 判定状态
-
-- `NATIVE_READY`：技术、维护、rights 均有清晰低风险路径；
-- `NATIVE_CANDIDATE`：技术可行，但仍需 live request / rights / schema 验证；
-- `EXTERNAL_LINK`：不值得或不适合自建，跳转成熟原站；
-- `OFFICIAL_EMBED`：官方 Widget 明显更合适；
+- `NATIVE_READY`：技术、维护、使用边界已有清晰低风险路径；
+- `NATIVE_CANDIDATE`：技术可行，但实施时仍需 live request / rights / schema 检查；
+- `EXTERNAL_LINK`：不值得或不适合自建，直接跳转成熟原站；
+- `OFFICIAL_EMBED`：官方 Widget / Embed 明显优于自建；
 - `OPEN`：仍需研究；
 - `NOT_CONFIGURED`：既无合理 Native 链，也无合适参考入口。
 
-核心原则：**好落地的自己落地；不好落地的直接给参考网站按钮。**
+核心产品原则：
+
+> **好落地的自己落地；不好落地的直接给参考网站按钮。**
+
+Phase F v1.0 冻结后，不再因为“网页上能看到”而继续逆向第三方网站。
 
 ---
 
-## 2. Rights Gate【冻结】
+## 2. Trading Tools 角色【冻结】
 
-> **免费访问 / 能下载 / public API 不等于可进入组织内部或对外生产看板。**
+`/hedge-board/trading-tools/*` 继续保持 Deferred：
 
-必须分别判断：
+- 不开发；
+- 不改 UI；
+- 不处理元数据；
+- 不调整现有收藏与分类。
+
+但 Phase F 与后续业务页允许**只读** Trading Tools 中已经整理好的 `name / url / description / domain / tags`，作为 External Reference Button 的候选库。
+
+不建设第二套 Reference Links 数据库。
+
+Macro / Commodity / Crypto V1 完善后，子页过去整块读取 Trading Tools 的“本页工具”模块不再需要；最终由 Native 内容 + 少量精准 External Link 取代。当前不删除，待对应 V1 完成并线下验收后处理。
+
+---
+
+## 3. Rights Gate【冻结】
+
+> **免费访问 / public API / 可下载，不等于可以直接复制进组织内部或公开生产看板。**
+
+必须区分：
 
 - automated extraction；
 - internal organizational use；
 - redistribution / public display；
 - derived-data use；
+- attribution；
 - third-party copyright；
-- attribution / permission。
+- permission requirement。
 
-商业数据源明确限制上述用途时，默认 External Link；只有取得许可或找到权利更清晰的替代 Source of Record 才 Native。
-
-FRED、聚合站、第三方网页不会覆盖原数据所有者的版权限制。
+商业数据源对组织、专业投资机构、商业展示存在明确限制时，V1 默认 `EXTERNAL_LINK`；只有许可清晰或找到权利更清晰的 Source of Record 才 Native。
 
 ---
 
-# 3. Macro Audit Baseline
+# 4. Macro Feasibility Baseline【冻结】
 
-## 3.1 Source-of-Record Native
+## 4.1 Source-of-Record Native
 
 | 指标 | 状态 | 首选 Source |
 |---|---|---|
 | CPI / Core CPI | `NATIVE_READY` | BLS Public Data API |
 | PPI | `NATIVE_READY` | BLS Public Data API |
-| Unemployment / labor series | `NATIVE_READY` | BLS Public Data API |
+| Unemployment / labor | `NATIVE_READY` | BLS Public Data API |
 | Real GDP | `NATIVE_READY` | BEA API / NIPA |
 | PCE / Core PCE | `NATIVE_READY` | BEA API / NIPA |
 | Industrial Production | `NATIVE_READY` | Federal Reserve G.17 |
 | US M2 | `NATIVE_READY` | Federal Reserve H.6 |
-| CFNAI / CFNAIMA3 | `NATIVE_READY` | Chicago Fed XLSX |
-| Initial Claims / 4W MA | `NATIVE_READY` | DOL ETA Weekly Claims Spreadsheet/XML + raw downloads |
-
-BLS 官方 API 明确面向开发者/第三方组织构建应用；BEA API 明确支持开发者搜索、展示、分析和构建新服务。
-
-## 3.2 Rates / Inflation Expectations
-
-| 指标 | 状态 | Source |
-|---|---|---|
+| CFNAI / CFNAIMA3 | `NATIVE_READY` | Chicago Fed |
+| Initial Claims / 4W MA | `NATIVE_READY` | DOL ETA |
 | UST 3M / 2Y / 10Y / 30Y | `NATIVE_READY` | U.S. Treasury |
 | 5Y / 10Y real yield | `NATIVE_READY` | U.S. Treasury real curve |
 | 5Y / 10Y Breakeven | `NATIVE_READY` | nominal - real，本地计算 |
@@ -75,39 +86,20 @@ BLS 官方 API 明确面向开发者/第三方组织构建应用；BEA API 明�
 | SOFR / EFFR | `NATIVE_READY` | New York Fed |
 | Fed Target / IORB / ON RRP Award | `NATIVE_READY` | Fed / NY Fed |
 
-5Y5Y 本地使用公开公式计算并版本化；FRED仅作核验。
+FRED 可用于便利分发、核验和 fallback，但 Source-of-Record 能直接使用时优先官方源。
 
-## 3.3 Risk Appetite
+## 4.2 Global M2
 
-| 指标 | 状态 | 产品处理 |
-|---|---|---|
-| US High Yield OAS | `EXTERNAL_LINK` | ICE BofA数据明确有版权/internal-use/redistribution限制；链接 FRED/ICE |
-| HYG / LQD Ratio | `OFFICIAL_EMBED` | 优先利用现有 TradingView expression 展示，不建立 ETF 行情数据库 |
-
-## 3.4 Market Expectations / Polymarket【重要修正】
-
-Polymarket public CLOB API 技术上完整，`prices-history` 等 endpoint 也有明确 rate limits。
-
-但 Polymarket Institutional 当前明确：
-
-- Capital Markets Entities 若消费 Polymarket data，需要与 Polymarket 和 ICE 协商；
-- 其定义明确包含 hedge funds、investment managers、proprietary trading firms、banks 等；
-- 约束覆盖 API、on-chain、raw/derived/aggregated/anonymized data。
-
-因此针对当前 Hedge Board 使用场景：
+固定公式仍按 `MACRO_V1_SPEC.md`：
 
 ```text
-Polymarket Market Expectations
-→ EXTERNAL_LINK / permission_required
+globalM2 =
+  cnm2 * cnyusd
++ usm2
++ eum2 * eurusd
++ jpm2 * jpyusd
++ gbm2 * gbpusd
 ```
-
-V1 产品需求不删除，但不能在未取得许可前建立公司内部概率历史数据库。
-
-Trading Tools / 页面可提供 Polymarket 精确入口；若未来完成数据许可，再恢复原冻结的 whitelist + historical curve Native 方案。
-
-CME FedWatch 继续 `EXTERNAL_LINK`。
-
-## 3.5 Global M2
 
 | 组成 | 状态 | Source |
 |---|---|---|
@@ -115,158 +107,229 @@ CME FedWatch 继续 `EXTERNAL_LINK`。
 | Euro Area M2 | `NATIVE_READY` | ECB SDMX |
 | Japan M2 | `NATIVE_READY` | BOJ API |
 | UK M2 | `NATIVE_READY` | BoE IADB |
-| China M2 | `NATIVE_CANDIDATE → 高概率Native` | AKShare adapter + PBOC核验 |
+| China M2 | `NATIVE_READY_WITH_VALIDATION` | AKShare adapter + PBOC official release validation |
 | FX | `NATIVE_READY` | ECB reference FX |
 
-China M2 官方核验基准：2026-07 M2 余额 355.51 万亿元、同比 7.7%，报告日 2026-08-14。
+### China M2 规则【冻结】
+
+AKShare `macro_china_money_supply` / 同类货币供应接口只作为接入适配层；AKShare 文档明确其上游属于东方财富等公开分发层，不视为 PBOC Source of Record。
+
+发布规则：
+
+```text
+AKShare fetch
+→ normalize
+→ latest month/value
+→ 与 PBOC 最新金融统计发布核验
+→ 一致：publish
+→ 不一致 / 日期落后：保留 LKG + degraded/stale
+```
+
+2026-07 PBOC 核验基准：M2 余额 355.51 万亿元，同比增长 7.7%，发布于 2026-08-14。
+
+## 4.3 Risk Appetite
+
+| 指标 | 状态 | 产品处理 |
+|---|---|---|
+| US High Yield OAS | `EXTERNAL_LINK` | ICE BofA / FRED 页面 |
+| HYG / LQD Ratio | `OFFICIAL_EMBED` | 现有 TradingView expression |
+
+不为这两项额外建设 ETF / ICE 历史数据库。
+
+## 4.4 Market Expectations
+
+### Polymarket
+
+技术 API 完整，但专业 / capital markets entities 的数据使用涉及单独商业数据安排。
+
+因此：
+
+```text
+Polymarket Market Expectations
+→ EXTERNAL_LINK / permission_required
+```
+
+原产品需求不删除；未来如取得许可，再恢复 whitelist + historical probability Native 方案。
+
+### CME FedWatch
+
+`EXTERNAL_LINK`，直接使用 Trading Tools 中精确入口。
 
 ### Macro 结论
 
-除 Polymarket / HY OAS 等商业数据外，Macro 绝大多数可以直接走政府/央行 Source of Record，是后续最适合优先实施的 V1。
+Macro V1 的核心 Source-of-Record 数据最稳定，后续最适合作为第一个实际业务 V1 开发对象。
 
 ---
 
-# 4. Commodity Audit Baseline
+# 5. Commodity Feasibility Baseline【冻结】
 
-## 4.1 Native
+## 5.1 Native
 
 | 数据 | 状态 | Source |
 |---|---|---|
 | EIA crude / Cushing / gasoline / distillate | `NATIVE_READY` | EIA API v2 |
 | CFTC Gold / Silver / Copper / WTI / NatGas | `NATIVE_READY` | CFTC PRE API |
 
-## 4.2 Commercial / Licensed Data → External Link
+## 5.2 Central Bank Gold
+
+IMF International Liquidity (`IL`) dataset 确认包含官方黄金储备相关统计概念；技术上有 IMF Data API / SDMX 入口。
+
+但 IMF API portal 当前需要账号登录，且 IMF 条款对潜在 commercial reuse 要求额外联系确认。
+
+因此 V1 决策：
+
+```text
+Central Bank Gold
+→ EXTERNAL_LINK / permission_required
+```
+
+保留 WGC / IMF 等原站作为参考入口；不在 V1 为此继续投入复杂 API / rights 工作。
+
+如未来取得 IMF / 数据权利确认，可重新评估 Native。
+
+## 5.3 Commercial / Licensed Data
 
 | 数据/模块 | 状态 | 原因 |
 |---|---|---|
-| WGC Global Gold ETF flows | `EXTERNAL_LINK` | WGC条款限制复制、抓取、分发、衍生使用 |
-| SPDR GLD holdings / daily flow | `EXTERNAL_LINK` | Archive明确禁止未经书面同意复制/再分发 |
-| CME Gold/Silver/Copper warehouse stocks | `EXTERNAL_LINK` | CME条款限制系统化提取/编译等用途 |
-| WTI futures curve | `EXTERNAL_LINK` | CME市场数据许可边界明确 |
-| Brent futures curve | `EXTERNAL_LINK` | ICE delayed/public display/derived use需许可 |
-| LME stocks / prices / prompt curve | `EXTERNAL_LINK` | LME条款限制归档、派生、分发和自动化抓取 |
-| COMEX-LME / SHFE-LME | `EXTERNAL_LINK` | 多受限 data leg，专业原站更适合 |
+| WGC Global Gold ETF flows | `EXTERNAL_LINK` | 使用/复制/分发边界较严格 |
+| SPDR GLD holdings / daily flow | `EXTERNAL_LINK` | archive 数据再利用边界受限 |
+| CME Gold/Silver/Copper warehouse stocks | `EXTERNAL_LINK` | CME市场数据许可边界 |
+| WTI futures curve | `EXTERNAL_LINK` | CME市场数据许可边界 |
+| Brent futures curve | `EXTERNAL_LINK` | ICE market-data licensing |
+| LME stocks / prices / prompt curve | `EXTERNAL_LINK` | LME数据许可与自动化限制 |
+| COMEX-LME / SHFE-LME | `EXTERNAL_LINK` | 关键 leg 使用权受限 |
 | CVOL | `EXTERNAL_LINK` | CME专业市场数据 |
 
-## 4.3 GVZ / OVX
+## 5.4 GVZ / OVX
 
-Cboe index data 有独立 licensing 体系，历史数据可见不等于可自建公司数据库。
+Cboe 指数存在独立 licensing 体系。
 
-产品处理：
+- GVZ：保留当前 TradingView / 现有展示入口；
+- OVX：`OFFICIAL_EMBED / EXTERNAL_LINK`；
+- 不建设自有 Cboe index history 数据库。
 
-- GVZ：保留现有 TradingView/展示方式；
-- OVX：优先 `OFFICIAL_EMBED / EXTERNAL_LINK`。
-
-不新增自有 Cboe index history 数据库。
-
-## 4.4 Central Bank Gold → IMF Candidate
-
-IMF 官方 International Liquidity (`IL`) dataset 已确认存在 API 入口。
-
-官方 Introductory Notes 精确指标：
+## 5.5 Commodity 结论
 
 ```text
-RAFAGOLDV_OZT
-= Gold (Million Fine Troy Ounces)
+EIA / CFTC
+→ NATIVE
+
+WGC / SPDR / CME / ICE / LME / Cboe index / complex spreads
+→ OFFICIAL_EMBED or EXTERNAL_LINK
 ```
 
-IRFCL 模板也明确包含官方储备 Gold volume in fine troy ounces。
-
-IMF published statistical data 的一般条款允许下载、提取、复制、派生、发布和分发并要求 attribution；潜在 commercial reuse 仍应按 IMF 条款联系确认。
-
-状态：`NATIVE_CANDIDATE / rights_review_required`。
-
-不宣称 IMF 能 100% 复刻 WGC 的全球 Top Holders / 修订口径；WGC继续外链校验。
-
-### Commodity 结论
-
-```text
-EIA / CFTC → NATIVE
-IMF central-bank gold → Candidate
-WGC / SPDR / CME / ICE / LME / Cboe index → Embed / External Link
-```
+Commodity V1 应接受混合模式，不再追求每个图都由本地数据库维护。
 
 ---
 
-# 5. Crypto Audit Baseline
+# 6. Crypto Feasibility Baseline【冻结】
 
-## 5.1 Binance
+## 6.1 Binance Core Market Data【NATIVE_READY】
 
-Binance官方开发者文档明确列出：
+Binance 官方开发者文档明确支持：
 
 - real-time / historical market data；
-- trading bots / automation；
 - internal services；
 - dashboards / analytics / reporting systems；
 - institutional workflows。
 
-因此 Binance 是当前最清晰的 Native crypto provider 候选。
+2026-08 Phase F smoke test 已实际验证：
 
-状态：`NATIVE_CANDIDATE → 高概率Native`，正式实现仍记录适用 ToS / rights_scope。
+### BTCUSDT
 
-## 5.2 Bybit
+- Funding history：成功返回；
+- 1H Open Interest Statistics：成功返回；
+- Basis：成功返回；
+- OI 响应直接包含 `sumOpenInterestValue`，可作为统一 USD notional 基础；
+- Basis 响应包含 `indexPrice / futuresPrice / basis / basisRate / annualizedBasisRate` 等结构化字段。
 
-Bybit API Terms：
+### ETHUSDT
 
-- 可开发 API Client；
-- 不得 repackage / resell Service Data；
-- 不得 commercially exploit APIs；
-- 使用受个别 API 文档额外限制。
+- Funding history：成功返回。
 
-针对组织内部交易/研究 dashboard 的边界仍不够清晰。
+因此 V1 第一 Native Venue 固定为 Binance。
 
-状态：`NATIVE_CANDIDATE / rights_review_required`；若不确认，直接 External Link。
+### Binance 数据粒度规则
 
-## 5.3 OKX
+官方历史端点存在窗口限制，例如 Basis / OI statistics 只提供近约 30 天。
 
-OKX 2026 API Agreement 明确：public Market Data 仍受限制，主要限个人、非商业交易/账户管理；机构/商业 market-data 用途需单独许可。
+因此 `platform-data` 必须从启用后持续增量保存自己的采样历史：
 
-状态：`EXTERNAL_LINK / permission_required`。
+```text
+Binance public API
+→ periodic fetch
+→ canonical snapshot/history
+→ GitHub partitioned history
+```
 
-## 5.4 Deribit
+不能等几年后再依赖 Binance API 回补完整高频历史。
 
-Deribit market data / derived data 的非个人用途需要明确批准。
+## 6.2 Bybit【EXTERNAL_LINK / permission_required】
 
-状态：`EXTERNAL_LINK / permission_required`。
+Bybit V5 技术接口本身完整：
 
-DVOL / options structure 用现有 TradingView + Deribit/Greeks.live 精准外链。
+- Funding Rate History；
+- Open Interest；
+- 5min / 15min / 30min / 1h / 4h / 1d OI；
+- linear / inverse；
+- OI 单位会随合约类型不同。
 
-## 5.5 Multi-Venue Funding / OI / Basis
+但 Bybit API Terms 明确限制：
 
-产品需求保留，但 V1 默认交付改为：
+- repackage / resell Service Data；
+- commercially exploit APIs；
+- API 使用还受各具体文档额外条件约束。
+
+对于当前组织内部投资研究 dashboard，V1 不再为第二 Venue 做许可边界投入。
+
+决策：
+
+```text
+Bybit
+→ EXTERNAL_LINK
+```
+
+未来如取得适用许可，再加入 Native Aggregate。
+
+## 6.3 OKX / Deribit
+
+- OKX：机构 / commercial market-data 用途需额外许可 → `EXTERNAL_LINK`；
+- Deribit：非个人 market / derived data 使用需额外批准 → `EXTERNAL_LINK`。
+
+Deribit DVOL / options 保留 TradingView + Deribit / Greeks.live 精准入口。
+
+## 6.4 Funding / OI / Basis 最终 V1 方案【冻结】
 
 ```text
 Native Venue
-→ Binance（rights最终通过后）
+→ Binance
 
 Multi-Venue Aggregate
 → Coinglass External Link
 
 Additional Venue
-→ Bybit only if rights cleared
+→ permission / rights cleared 后再加入
 ```
 
-不再为了聚合功能把 OKX / Deribit 受限数据复制进本地数据库。
+产品层仍允许未来 Aggregate / Venue 切换，但 V1 不为了满足“多 Venue”而复制受限数据。
 
-## 5.6 Stablecoin
+## 6.5 Stablecoin
 
-DefiLlama Terms 适用于其 Services（包括 official public APIs），默认 licence 为 personal/non-commercial，并限制未经许可的数据 republish / commercial exploitation。
+DefiLlama API 技术好用，但其服务条款对 personal / non-commercial 与再发布存在限制。
 
-因此：`EXTERNAL_LINK / permission_required`。
+V1：`EXTERNAL_LINK / permission_required`。
 
-Stablecoin产品需求不删除，V1默认跳转 DefiLlama；若后续有权利清晰的替代源再 Native。
+## 6.6 ETF Flow
 
-## 5.7 ETF Flow
+Farside BTC / ETH ETF Flow 技术上易读取、历史表完整，但未确认适合组织内部系统化再利用的许可边界。
 
-Farside BTC/ETH tables 技术上容易解析，但未发现明确允许系统化再利用/组织展示的许可。
+V1：`EXTERNAL_LINK / rights_review_required`。
 
-状态：`EXTERNAL_LINK / rights_review_required`。
-
-## 5.8 On-chain
+## 6.7 On-chain
 
 | 数据 | 状态 | 产品处理 |
 |---|---|---|
-| MVRV / NUPL / SOPR / Realized Cap | `EXTERNAL_LINK优先` | Coin Metrics Community仅 non-commercial；Checkonchain/Glassnode |
+| MVRV / NUPL / SOPR / Realized Cap | `EXTERNAL_LINK` | Coin Metrics Community 主要面向 non-commercial；Checkonchain / Glassnode |
 | Exchange Balance / Netflow | `EXTERNAL_LINK` | CryptoQuant / Glassnode / Arkham |
 | LTH / STH | `EXTERNAL_LINK` | Checkonchain / Glassnode |
 | Liquidation Heatmap | `EXTERNAL_LINK` | Coinglass |
@@ -275,65 +338,88 @@ Farside BTC/ETH tables 技术上容易解析，但未发现明确允许系统化
 
 ### Crypto 结论
 
-Crypto 的低维护 V1 更适合：
+Crypto V1 的本地维护范围应主动收敛：
 
 ```text
-Binance核心数据（许可最终通过后）
+Binance core market / derivatives data
 +
-现有 TradingView
+existing TradingView
 +
-Coinglass / Deribit / DefiLlama / Checkonchain / Glassnode / CryptoQuant / Farside / BitcoinTreasuries 精准外链
+专业网站精准 External Link
 ```
 
-而不是复制大量“免费可见但使用权受限”的商业数据。
+这比复制大量“免费可见但组织使用权受限”的商业数据更稳定。
 
 ---
 
-# 6. 高价值 External Link 候选
+# 7. 高价值 External Link 候选【来自 Trading Tools / 官方原站】
 
-### Macro
-- CME FedWatch
-- Polymarket
-- HY OAS FRED / ICE
-- MacroMicro
-- TradingEconomics / 金十 / 奇货可查
+## Macro
 
-### Commodity
-- WGC Gold ETF
-- SPDR GLD Historical Data
-- CME WTI / warehouse
-- ICE Brent
-- LME warehouse / price
-- Cboe GVZ / OVX
-- CME CVOL
-- SMM / 1qh / 奇货可查
+- CME FedWatch；
+- Polymarket；
+- HY OAS FRED / ICE；
+- MacroMicro；
+- TradingEconomics；
+- 金十；
+- 奇货可查。
 
-### Crypto
-- Coinglass Funding / OI / Liquidation HeatMap
-- Checkonchain
-- Deribit Options Metrics
-- Greeks.live
-- DefiLlama Stablecoins
-- Farside BTC / ETH ETF Flow
-- Glassnode
-- CryptoQuant
-- Arkham (`https://arkm.com/`)
-- BGeometrics
-- BitcoinTreasuries
+## Commodity
 
-Trading Tools 本体仍只读。
+- World Gold Council Gold ETF；
+- SPDR GLD Historical Data；
+- CME WTI / warehouse；
+- ICE Brent；
+- LME warehouse / price；
+- Cboe GVZ / OVX；
+- CME CVOL；
+- SMM；
+- 1qh；
+- 奇货可查。
+
+## Crypto
+
+- Coinglass Funding / OI / Liquidation HeatMap；
+- Checkonchain；
+- Deribit Options Metrics；
+- Greeks.live；
+- DefiLlama Stablecoins；
+- Farside BTC / ETH ETF Flow；
+- Glassnode；
+- CryptoQuant；
+- Arkham；
+- BGeometrics；
+- BitcoinTreasuries。
+
+Trading Tools 本体仍只读，不调整。
 
 ---
 
-# 7. Phase F 剩余事项【已显著收敛】
+# 8. Phase F 实施交接清单【冻结】
 
-真正还值得继续验证的只剩：
+Phase F v1.0 完成后，实施阶段只需继续做以下**运行级检查**，不再属于产品/数据源方案未知：
 
-1. **China M2**：真实运行环境执行 AKShare，确认最新月份与 PBOC一致；
-2. **IMF Central Bank Gold**：用 IMF SDMX API 固定 `IL` dataset + `RAFAGOLDV_OZT` 的 exact query / country mapping，并按实际组织使用场景确认 commercial reuse；
-3. **Binance**：记录最终适用 terms + Funding/OI/Basis smoke test；
-4. **Bybit**：若用户希望 Native 第二 venue，再确认 internal organizational dashboard 是否允许；否则直接 Coinglass/Bybit External Link。
+1. China M2：Phase 0/Global M2 provider 首次运行时执行 AKShare smoke test，并与 PBOC 最新发布值比较；
+2. Binance：Phase 0/7 实现时把已验证 Funding / OI / Basis endpoint 固化进 provider tests；
+3. External Links：实现按钮前做 HTTP 可达性 / 登录状态检查，并从 Trading Tools 只读选取精确 URL；
+4. Rights：任何未来希望从 `EXTERNAL_LINK` 升级 `NATIVE` 的商业数据源，先取得适用许可，再修改 Data Source Map / Phase F 状态。
 
-其它大部分目标已经有明确 `NATIVE_READY` / `OFFICIAL_EMBED` / `EXTERNAL_LINK` 路线。
+上述检查不阻塞 Phase F 冻结。
 
-**Phase F 已经接近可以冻结，不再建议扩展新的产品指标或新的数据网站。**
+---
+
+# 9. Phase F Gate Result
+
+```text
+Product Scope
+    ↓
+Data Feasibility / Rights / Maintenance Audit
+    ↓
+NATIVE_READY / EMBED / EXTERNAL_LINK
+    ↓
+Phase F FROZEN
+    ↓
+Phase 0 Shared Data Foundation（尚未启动）
+```
+
+**Phase F 已完成。当前仍不代表已开始工程实施。**
