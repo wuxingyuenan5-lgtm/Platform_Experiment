@@ -1,72 +1,133 @@
 # 对冲基金看板｜数据可行性与维护策略
 
-> 状态：Planning Baseline v0.3 / Engineering NOT STARTED  
+> 状态：Planning Baseline v0.4 / Engineering NOT STARTED  
 > 上位文档：`docs/hedge-board/HEDGE_BOARD_OPTIMIZATION_MASTER_PLAN.md`  
 > 实施文档：`docs/hedge-board/HEDGE_BOARD_IMPLEMENTATION_PLAN.md`  
 > Phase F 审计：`docs/hedge-board/HEDGE_BOARD_PHASE_F_AUDIT.md`  
 > 数据仓库：`wuxingyuenan5-lgtm/platform-data`  
-> 作用：在实际开发前审计数据可获取性、自动化稳定性、存储成本，以及目标数据/子模块应采用“自己落地”还是“外链跳转”。
+> 作用：实际开发前，同时审计数据可获取性、自动化稳定性、**使用/再分发权利**、存储成本，以及目标数据应自己落地还是外链跳转。
 
 ---
 
 ## 1. 当前最高优先级【冻结】
 
-在正式进入大规模工程实施前，优先解决：
+正式工程实施前，优先解决：
 
-1. 数据是否能够长期、免费、稳定获取；
-2. 数据是否具备足够历史序列；
-3. 数据是否能够自动更新；
-4. 数据频率与更新时点是否明确；
+1. 数据能否长期、稳定获取；
+2. 数据是否具备足够历史；
+3. 数据是否能无人值守自动更新；
+4. 更新频率、发布时间、交易日与时区是否明确；
 5. 数据源失效时是否有 fallback / LKG；
-6. 数据是否适合存入 GitHub 文件仓库；
-7. 用户已整理的参考网站/子模块，哪些值得自己落地；
-8. 不好稳定落地的项目，对应哪个原站链接最适合作为跳转入口。
+6. 数据是否适合 GitHub 文件化存储；
+7. **免费访问是否同时具备当前使用场景需要的 rights_scope**；
+8. 用户已整理的参考网站中，哪些值得 Native，哪些直接 External Link。
 
-核心产品原则固定为：
+核心产品原则：
 
-> **好落地的自己落地；不好落地的保留参考网站入口，做成按钮直接跳转原站。**
+> **好落地的自己落地；不好落地的保留参考网站入口，做按钮跳转原站。**
 
-因此，“无法稳定抓取”不自动等于删除功能，也不意味着必须继续投入大量时间逆向第三方网站。
+其中“好落地”同时意味着：技术低维护 + 口径清楚 + 权利边界可接受。
 
 ---
 
 ## 2. Data Feasibility Gate【冻结】
 
-任何准备由本平台自己展示真实数据的新指标，在进入工程 Phase 前，至少检查：
+任何准备由本平台自己展示真实数据的指标，进入工程 Phase 前至少检查：
 
-- canonical identity 明确；
-- Primary Source 明确；
-- Fallback 或 no-fallback 状态明确；
-- 免费访问条件明确；
-- 自动化访问可行；
-- 历史区间满足页面需要；
-- 更新频率 / 发布时间明确；
-- 单位 / 货币 / 交易日 / 时区明确；
-- stale threshold 可定义；
-- 页面需要的 latest / history / 30D / derived fields 可计算；
-- rights_scope 可记录；
-- Provider 失败不会覆盖 LKG；
-- 预计维护复杂度在 V1 可接受范围内。
+- canonical identity；
+- Primary / Fallback；
+- 免费/付费访问条件；
+- 自动化可行性；
+- 历史区间；
+- frequency / publish timing；
+- unit / currency / timezone / trading day；
+- stale threshold；
+- 页面所需 latest / history / derived fields；
+- Provider failure 不覆盖 LKG；
+- 预计维护复杂度；
+- `rights_scope`。
 
-通过 Gate：进入本平台真实数据链路。
+通过 Gate → 可进入 Native 数据链。  
+未通过 Gate → **优先 External Reference Button**。
 
-未通过 Gate：**优先转为 External Reference Button，而不是继续强行抓取。**
-
-只有以下两项同时成立才使用 `not_configured`：
-
-1. 暂无可维护的自有数据链；
-2. 也没有用户认可的稳定参考网站/原站入口。
+只有“没有可维护 Native 链 + 没有合适参考入口”才使用 `NOT_CONFIGURED`。
 
 ---
 
-## 3. 网站子模块的最终产品策略【冻结】
+## 3. Rights Gate【最高优先级之一 / 冻结】
 
-### A. Native / Own Data Implementation
+### 3.1 免费可访问 ≠ 可自由生产/展示
 
-当数据容易稳定落地时：
+必须严格区分：
 
 ```text
-official / reliable public source
+free access
+≠
+free automated extraction
+≠
+free internal organizational use
+≠
+free redistribution / public display
+≠
+free derived-data use
+```
+
+因此：
+
+- 网站能打开，不代表可以脚本化抓取；
+- XLSX/CSV 能下载，不代表可以长期复制进平台；
+- API 无费用，不代表第三方版权数据可以任意复用；
+- 通过 FRED/聚合商拿到的数据，不会覆盖原始数据所有者的版权限制。
+
+### 3.2 Native 的 rights_scope 必须明确
+
+每个 Native Provider 至少记录：
+
+- `access_cost`；
+- `usage_scope`；
+- `redistribution_scope`；
+- `derived_use_scope`（适用时）；
+- `attribution_required`；
+- `rights_review_required`；
+- `rights_source_url`。
+
+如果数据源明确限制系统化抓取、组织内使用、再分发、公开展示或派生数据使用，则默认：
+
+```text
+EXTERNAL_LINK
+```
+
+除非取得许可或找到权利更清晰的替代 Source of Record。
+
+### 3.3 Source of Record 优先
+
+当 FRED、商业聚合站与政府/央行官方源同时存在时，优先直接用官方 Source of Record。
+
+例如美国宏观：
+
+- BLS → CPI / Core CPI / PPI / unemployment；
+- BEA → GDP / PCE / Core PCE；
+- Federal Reserve Board → M2 / Industrial Production；
+- Chicago Fed → CFNAI / CFNAIMA3；
+- U.S. Treasury → nominal / real Treasury curves；
+- New York Fed → SOFR / EFFR。
+
+FRED 更适合作为：
+
+- 研究参考；
+- 快速交叉核验；
+- rights_scope 允许时的 fallback；
+
+而不是默认把所有序列都从 FRED 进入生产链。
+
+---
+
+## 4. Native / External Link / Embed【冻结】
+
+### A. Native
+
+```text
+official / reliable permitted source
 → platform-data
 → canonical data
 → platform-api
@@ -75,218 +136,137 @@ official / reliable public source
 
 适用条件：
 
-- 数据免费或满足当前免费策略；
 - 自动化稳定；
 - 历史足够；
 - 口径明确；
 - 维护成本合理；
-- 使用条件允许。
-
-这是优先方案。
+- rights_scope 可接受。
 
 ### B. External Reference Button
 
-当成熟网站已经提供高质量子模块，但我们自己抓取/重建存在以下任一问题时：
+当存在以下任一情形时优先外链：
 
-- 无稳定免费 API；
-- 历史数据难拿；
-- 页面内部接口维护风险高；
-- 需要复杂动态 token / 登录；
-- 授权或再分发不清晰；
-- 数据复杂但原站体验已经成熟；
-- V1 自建数据链投入产出比过低；
+- 无稳定低维护接口；
+- 登录/动态 token/WAF；
+- 历史难取；
+- 数据许可/再分发不清晰；
+- 商业数据所有者明确限制自动提取或展示；
+- 原站已经提供成熟专业模块，V1 自建投入产出比低。
 
-则不继续强行实现数据链，直接在对应位置提供参考入口：
+按钮直接指向具体子页面，新标签页打开。
 
-```text
-[查看原站 / 查看详细数据 / 查看完整期限结构]
-            ↓
-新标签页打开原站具体子页面
-```
+### C. Official Embed
 
-External Reference Button 是正式产品能力，不是失败占位。
+仅在官方明确允许嵌入、体验明显优于外链、且不破坏现有 UI 时使用。
 
-按钮应尽量指向具体数据子页面，而不是网站首页。
+TradingView 继续主要作为展示层，不反向抓取数据。
 
 ---
 
-## 4. Trading Tools 的只读参考库角色【冻结】
+## 5. Trading Tools 只读参考库【冻结】
 
-当前 Hedge Board 的 Trading Tools 已经整理了大量宏观、金属、加密等参考网站。
+Trading Tools 继续 Deferred，不开发、不改 UI、不处理其元数据。
 
-本轮不再建立第二套 Reference Links 数据库。
+Phase F 只读现有：
 
-Trading Tools 在本项目中的当前定位：
+- `name`
+- `url`
+- `description`
+- `domain`
+- `tags`
 
-```text
-Trading Tools
-= 用户现有参考网站目录
-= Phase F 可只读检索
-= External Reference Button 的优先候选来源
-≠ 当前要继续开发/维护的业务模块
-```
+作为 External Link 的优先候选来源。
 
-具体规则：
+不再建立第二套 Reference Links。
 
-- Trading Tools 继续保持 Deferred；
-- 不修改 Trading Tools 页面；
-- 不重构其分类；
-- 不要求处理/修复其元数据生成来源；
-- 不因本轮审计去清理书签；
-- Phase F 只读取当前已经存在的 `name / url / description / domain / tags`；
-- Native 不合适时，优先从 Trading Tools 中寻找对应的精确参考页面。
-
-如果未来 External Reference Button 需要配置，可直接引用已有 Trading Tool item / URL，避免再人工维护一套重复书签。
+对应 V1 完成后，Macro / Commodity / Crypto 子页此前“整块 Trading Tools”模块最终不再需要；届时由 Native 内容 + 精准 External Link 取代。当前不删除，待线下验收后处理。
 
 ---
 
-## 5. 子页旧“交易工具”模块与 External Link 的区别【冻结】
+## 6. 未文档化网页接口【冻结】
 
-Macro / Commodity / Crypto 子页此前存在从 Trading Tools 读取并展示一整块“本页工具”的设计。
+网页背后的 HTTP/JSON endpoint 没有官方 API 文档时，只有同时满足以下条件才考虑 Native：
 
-当对应子页 V1 完善后，该整块通用工具目录不再需要。
-
-最终产品应是：
-
-```text
-子页
-├─ Native核心数据/图表
-├─ Native核心Market Detail
-└─ 个别难落地指标的精准External Reference Button
-```
-
-而不是：
-
-```text
-子页
-├─ Native内容
-└─ 再复制一整块Trading Tools目录
-```
-
-注意：
-
-- 当前不立即删除现有子页工具模块；
-- 删除/隐藏属于线下最终验收后的页面整理事项；
-- 目标方向已冻结：当 V1 内容完善后，旧的整块子页 Trading Tools 不再保留；
-- 精准 External Reference Button 与旧的整块工具目录不是同一产品能力。
-
----
-
-## 6. Embed / Widget 的定位【冻结】
-
-官方 Embed / Widget 可以使用，但不是必须优先于外链按钮。
-
-仅当以下条件同时满足时考虑嵌入：
-
-- 官方明确支持第三方 Embed；
-- 页面稳定；
-- CSP / X-Frame-Options 允许；
-- 与现有 UI 冲突不大；
-- 用户体验明显优于跳转原站。
-
-否则直接采用 External Reference Button，更简单、更稳定。
-
-TradingView 仍主要作为现有图表展示 / 大图入口使用；不从 Widget 反向抓取数据。
-
----
-
-## 7. 网站内部公开接口的处理【冻结】
-
-如果某参考网站子模块背后存在公开 HTTP/JSON endpoint，但没有正式 API 文档，只有在以下条件都满足时才允许进入自有数据链：
-
-- 无登录绕过；
-- 无 token / CAPTCHA / WAF 绕过；
-- endpoint 可重复稳定访问；
+- 无登录/绕过行为；
+- 无 CAPTCHA/WAF/token 绕过；
+- endpoint 稳定；
 - 参数和字段口径可解释；
-- 使用条件允许；
-- 有 parser/schema health check；
-- 有 cache / LKG；
-- 上游失效时可降级。
+- rights_scope 允许；
+- parser/schema health check；
+- cache / LKG；
+- 失效可降级。
 
-如果维护风险明显偏高：
-
-> **不要因为技术上暂时能抓就强行使用，直接保留原站按钮。**
+只要维护或权利风险明显偏高，直接外链。
 
 ---
 
-## 8. Phase F 分类台账【冻结】
+## 7. Phase F 分类台账【冻结】
 
-每个目标输出：
+每个目标至少记录：
 
-| Module | Reference Website | Exact URL | Own Data Feasible | Primary Source | History | Automation | Maintenance | Final Product |
-|---|---|---|---|---|---|---|---|---|
-| 示例 | Example | direct-url | yes/no | source | enough/limited | ready/open | low/med/high | NATIVE / EXTERNAL_LINK |
+| Field | 含义 |
+|---|---|
+| Module / Metric | 对应模块与指标 |
+| Reference Website / Exact URL | 参考原站 |
+| Primary / Fallback | Native来源 |
+| History / Frequency | 历史与频率 |
+| Automation | 自动化状态 |
+| Maintenance | low / medium / high |
+| Rights Scope | internal / attribution / review / restricted 等 |
+| Final Product | Native / External Link / Embed |
 
-最终状态优先使用：
+最终状态：
 
-- `NATIVE_READY`；
-- `NATIVE_CANDIDATE`；
-- `EXTERNAL_LINK`；
-- `OFFICIAL_EMBED`；
-- `OPEN`；
-- `NOT_CONFIGURED`。
+- `NATIVE_READY`
+- `NATIVE_CANDIDATE`
+- `EXTERNAL_LINK`
+- `OFFICIAL_EMBED`
+- `OPEN`
+- `NOT_CONFIGURED`
 
-真实审计结果统一进入：
-
-`docs/hedge-board/HEDGE_BOARD_PHASE_F_AUDIT.md`
+真实结果统一写入 `HEDGE_BOARD_PHASE_F_AUDIT.md`。
 
 ---
 
-## 9. UI 规则：外链按钮【冻结】
-
-External Reference Button 必须遵守现有 Hedge Board UI，不重新设计页面。
-
-原则：
+## 8. UI：External Reference Button【冻结】
 
 - Additive Only；
-- 放在对应 Section / Card 合理位置；
-- 文案清晰，例如“查看原站”“查看完整期限结构”“查看详细链上数据”；
-- 默认新标签页打开；
+- 放在对应 Section / Card；
+- 文案明确，例如“查看原站”“查看完整期限结构”“查看详细链上数据”；
+- 新标签页打开；
 - 不伪装成平台自有数据；
-- 可显示来源网站名称；
-- 不因第三方网站变化影响本平台其他模块运行。
+- 可显示网站名称；
+- 原站失效不影响本平台其它模块。
 
 ---
 
-## 10. `platform-data` 的定位【冻结】
+## 9. `platform-data` 定位【冻结】
 
-`platform-data` 是：
+`platform-data` 是**版本化数据生产与分发仓库**，不是高频实时交易数据库。
 
-> **版本化数据生产与分发仓库**
+适合：
 
-不是：
+- 宏观月/周/日频；
+- Market Detail 日频历史；
+- ETF Flow（rights允许时）；
+- CFTC/官方库存；
+- 日频 On-chain / Stablecoin；
+- Polymarket适度采样概率；
+- Crypto derivatives 适度聚合/snapshot。
 
-> 高频实时交易数据库。
-
-它适合保存：
-
-- 月频 / 周频 / 日频宏观数据；
-- 日频 Market Detail 历史；
-- ETF Flow；
-- CFTC；
-- 库存；
-- 日频 On-chain；
-- 日频 Stablecoin；
-- Polymarket 适度采样后的历史概率；
-- Crypto derivatives 的适度聚合 / snapshot。
-
-不适合长期保存：
+不保存：
 
 - tick；
 - order book；
 - 秒级；
-- 每分钟全市场 OI / Funding / Basis 全量原始数据；
+- 每分钟全市场 raw feed；
 - 高频实时交易流。
-
-V1 不建设这些高频数据库能力。
 
 ---
 
-## 11. GitHub 存储策略【冻结为 V1 基线】
+## 10. GitHub 存储策略【冻结】
 
-### 11.1 最新数据 / 前端消费
-
-使用 JSON：
+最新前端消费：JSON。
 
 ```text
 public/v1/<module>/manifest.json
@@ -295,132 +275,75 @@ public/v1/<module>/market-detail.json
 public/v1/<module>/series/*.json
 ```
 
-用途：
-
-- Platform API 快速读取；
-- 人工审计；
-- diff 可读；
-- status / source / freshness 透明。
-
-### 11.2 长历史
-
-较长历史序列优先：
-
-- CSV（数据量较小）；
-- Parquet（数据量较大 / 多列 / 高频一些）。
+长历史：CSV / Parquet，按年或月分区。
 
 避免：
 
-- 一个巨大 JSON 每天整体重写；
-- 每个日期建立大量小文件；
-- 把 SQLite / DuckDB 二进制数据库频繁 commit 到 Git。
+- 巨型 JSON 每天整体重写；
+- 大量日粒度小文件；
+- SQLite / DuckDB 二进制数据库频繁 commit。
 
-建议按年或按月分区。
-
-### 11.3 高频 Crypto
-
-Funding / OI / Basis V1 只保存页面实际需要的聚合粒度，例如：
-
-- latest snapshot；
-- 1H / 4H 采样或聚合；
-- Daily aggregate；
-- 滚动历史。
-
-不在 GitHub 保存每分钟全量 raw feed。
-
-未来产品明确需要分钟级 / tick 历史时，再单独引入真正时序存储。
+Crypto Funding/OI/Basis V1 只存 latest + 页面需要的适度采样/聚合历史。
 
 ---
 
-## 12. 数据维护规则【冻结】
+## 11. 数据维护规则【冻结】
 
 每个 Native Provider 必须有：
 
 - adapter；
 - source registry；
-- parser/schema check；
-- latest-date check；
+- schema / latest-date check；
 - freshness threshold；
-- timeout；
-- finite retry；
-- fallback；
-- LKG；
+- timeout / finite retry；
+- fallback / LKG；
 - quality flags；
 - provenance；
-- usage / rights note。
+- rights note。
 
-### 12.1 不变不提交
-
-```text
-fetch
-→ normalize
-→ compare
-→ no material change
-→ no commit
-```
-
-### 12.2 失败不清空
+### 不变不提交
 
 ```text
-fetch failed
-→ retain last known good
-→ status stale/error/degraded
-→ log failure
+fetch → normalize → compare → no material change → no commit
 ```
 
-禁止空数组覆盖有效历史。
+### 失败不清空
 
-### 12.3 External Link 维护
+```text
+fetch failed → retain LKG → stale/degraded/error → log
+```
 
-外链入口不需要数据抓取，只需要最小维护：
-
-- 优先读取 Trading Tools 已有链接；
-- 只记录业务页选中了哪个精确入口；
-- 定期检查 URL 可达性；
-- 原站迁移时更新引用/URL，不改页面结构。
+External Link 只需复用 Trading Tools 精确入口并做最小可达性维护。
 
 ---
 
-## 13. 数据库维护结论【当前基线】
+## 12. 数据库维护结论【当前基线】
 
-V1 暂时**不引入传统数据库**。
+V1 不引入传统数据库。
 
-原因：
+未来出现以下任一情况再升级专业存储：
 
-- 当前核心用途是日常扫盘与复盘，不是高频交易；
-- Macro / Commodity 大部分是日 / 周 / 月频；
-- Crypto 高频数据只保留页面必要聚合粒度；
-- GitHub 文件 + Git 历史能够承担版本化、追溯、回滚和分发；
-- 数据量在 V1 仍可控制。
+- 分钟级以上长期历史；
+- 文件量明显膨胀；
+- Git / Actions / API读取性能恶化；
+- 复杂 SQL/横截面查询；
+- WebSocket实时入库；
+- 多用户并发写入。
 
-但 GitHub 不是通用数据库，也不是实时数据服务。
-
-未来出现以下条件之一时再升级存储层：
-
-- 需要分钟级以上长期历史；
-- 数据文件明显膨胀；
-- Git clone / Actions / API 读取性能明显恶化；
-- 需要复杂 SQL / 横截面查询；
-- 需要实时 websocket 入库；
-- 多用户同时写入；
-- 数据量达到 Git 文件维护明显不合理的程度。
-
-升级时保持 canonical contract 不变，使前端与 Platform API 无需跟随大改。
+升级时保持 canonical contract 稳定，避免前端大改。
 
 ---
 
-## 14. Phase F 最终目标【Current】
-
-Phase F 给每一个目标模块确定最终落地方式：
+## 13. Phase F 最终目标【Current】
 
 ```text
-产品需要某数据 / 子模块
+产品需要某数据
         ↓
-能否低维护、免费、稳定自己落地？
+技术 + 维护 + rights 都适合 Native？
         ↓
 YES → NATIVE
         ↓
-NO → Trading Tools/其他用户认可来源中是否已有成熟参考页面？
+NO → Trading Tools / 官方原站有成熟入口？
         ↓
 YES → EXTERNAL_LINK
         ↓
@@ -429,7 +352,7 @@ NO → OPEN / NOT_CONFIGURED
 
 Phase F 完成后：
 
-- Phase 0 只为 `NATIVE` 项建设数据基础设施；
-- `EXTERNAL_LINK` 项只建设精准外链按钮；
-- 不再建设脆弱抓取链；
+- Phase 0 只为 Native 项建设数据基础设施；
+- External Link 只建设精准按钮；
+- 不为商业/受限数据建立脆弱抓取链；
 - 不再在业务子页重复展示整块 Trading Tools 目录。
