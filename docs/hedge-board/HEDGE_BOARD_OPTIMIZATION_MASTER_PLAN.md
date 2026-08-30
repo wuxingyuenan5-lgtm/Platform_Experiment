@@ -1,9 +1,10 @@
 # 对冲基金看板优化总方案（Master Plan）
 
-> 状态：Planning Baseline v1.1 / Phase F FROZEN / Phase 0 DONE / Phase 1 NOT STARTED  
+> 状态：Planning Baseline v1.2 / Phase F FROZEN / Phase 0 DONE / Phase 1 NOT STARTED  
+> 项目总览：`docs/hedge-board/HEDGE_BOARD_PROJECT_PLAN_AND_PROGRESS.md`  
 > 适用分支：`feature/hedge-board-online-optimization`  
 > 用途：作为 Hedge Board 后续产品、数据、工程与验收的最高约束来源。  
-> 原则：总文件只维护全局规则与当前状态；模块产品细节进入 `specs/*_V1_SPEC.md`；数据源进入 `*_DATA_SOURCE_MAP.md`；可行性结论进入 `HEDGE_BOARD_PHASE_F_AUDIT.md`；工程顺序进入 `HEDGE_BOARD_IMPLEMENTATION_PLAN.md`。
+> 原则：总文件只维护全局规则与当前状态；完整项目计划与进度进入 `HEDGE_BOARD_PROJECT_PLAN_AND_PROGRESS.md`；模块产品细节进入 `specs/*_V1_SPEC.md`；数据源进入 `*_DATA_SOURCE_MAP.md`；可行性结论进入 `HEDGE_BOARD_PHASE_F_AUDIT.md`；工程顺序进入 `HEDGE_BOARD_IMPLEMENTATION_PLAN.md`。
 
 ---
 
@@ -73,7 +74,7 @@ Deferred 含义：不新增开发、不重构、不顺手真实化。
 除非用户明确批准，不得：
 
 - 删除现有内容；
-- 移动现有内容；
+- 移动现有模块；
 - 改变原顺序；
 - 重命名现有模块；
 - 用新模块替换旧模块；
@@ -391,10 +392,11 @@ Phase F / active V1 可以读取它的参考网址。
 
 ### 总体
 
-- `HEDGE_BOARD_OPTIMIZATION_MASTER_PLAN.md`
-- `HEDGE_BOARD_DATA_FEASIBILITY_AND_MAINTENANCE.md`
-- `HEDGE_BOARD_PHASE_F_AUDIT.md`
-- `HEDGE_BOARD_IMPLEMENTATION_PLAN.md`
+- `HEDGE_BOARD_PROJECT_PLAN_AND_PROGRESS.md` — 完整项目计划、管理总览和进度表；
+- `HEDGE_BOARD_OPTIMIZATION_MASTER_PLAN.md` — 本文件，最高产品 / Change Control 约束；
+- `HEDGE_BOARD_DATA_FEASIBILITY_AND_MAINTENANCE.md`；
+- `HEDGE_BOARD_PHASE_F_AUDIT.md`；
+- `HEDGE_BOARD_IMPLEMENTATION_PLAN.md`。
 
 ### Macro
 
@@ -424,6 +426,13 @@ Implementation Plan        v1.1 / Phase 1 Gate
 Engineering Phase 1        NOT STARTED
 ```
 
+当前统一进度口径：
+
+- **规划准备度：100%**；
+- **工程主阶段：1 / 6 = 16.7%**；
+- 工程主阶段口径：Phase 0、Phase 1、Macro V1、Commodity V1、Crypto V1、Unified QA / Offline Acceptance；
+- 该比例只用于管理 Gate，不代表各阶段实际工作量等权，也不用于推算工期。
+
 Phase 0 真实验收：
 
 - `platform-data` 共享 runtime helper 已落库；
@@ -436,7 +445,7 @@ Phase 0 真实验收：
 
 > `Phase 1 — Shared Market Detail Data Layer`
 
-当前 Phase 0 收尾不自动进入 Phase 1；下一轮工程推进再依据 Implementation Plan 执行。
+完整阶段状态、模块进度、风险和后续路线以 `HEDGE_BOARD_PROJECT_PLAN_AND_PROGRESS.md` 为管理总览。
 
 ---
 
@@ -489,18 +498,19 @@ Phase 0 真实验收：
 
 后续 Agent 必须：
 
-1. 读取 Master Plan；
-2. 读取 Phase F Audit；
-3. 读取 Implementation Plan；
-4. 读取当前模块 Spec / Source Map；
-5. 只执行用户明确开启的 Phase；
-6. 遵守 Additive Only；
-7. 不用 README / schema 冒充业务 Phase 完成；
-8. Native Phase 必须形成真实数据链；
-9. 无法验证标 `not_verified`；
-10. 不伪造 build / test / E2E；
-11. External Link 不得重新变成未经批准的抓取链；
-12. Phase 0 已完成，后续不得以“补基础设施”为名重复重构共享层。
+1. 读取 Project Plan & Progress；
+2. 读取 Master Plan；
+3. 读取 Phase F Audit；
+4. 读取 Implementation Plan；
+5. 读取当前模块 Spec / Source Map；
+6. 只执行用户明确开启的 Phase；
+7. 遵守 Additive Only；
+8. 不用 README / schema 冒充业务 Phase 完成；
+9. Native Phase 必须形成真实数据链；
+10. 无法验证标 `not_verified`；
+11. 不伪造 build / test / E2E；
+12. External Link 不得重新变成未经批准的抓取链；
+13. Phase 0 已完成，后续不得以“补基础设施”为名重复重构共享层。
 
 ---
 
