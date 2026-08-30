@@ -1,6 +1,7 @@
 # 对冲基金看板｜统一实施计划（Implementation Plan）
 
-> 状态：Implementation Plan v1.1 / PHASE 0 DONE / PHASE 1 NOT STARTED  
+> 状态：Implementation Plan v1.2 / PHASE 0 DONE / PHASE 1 NOT STARTED  
+> 项目总览：`docs/hedge-board/HEDGE_BOARD_PROJECT_PLAN_AND_PROGRESS.md`  
 > 上位文档：`docs/hedge-board/HEDGE_BOARD_OPTIMIZATION_MASTER_PLAN.md`  
 > 数据可行性：`docs/hedge-board/HEDGE_BOARD_DATA_FEASIBILITY_AND_MAINTENANCE.md`  
 > Phase F 审计：`docs/hedge-board/HEDGE_BOARD_PHASE_F_AUDIT.md`  
@@ -26,15 +27,25 @@ Phase 1 Shared Market Detail Data Layer
 → NOT STARTED
 ```
 
-Phase 0 完成后不得在同一阶段顺手进入业务页面开发。下一阶段为 Phase 1，只有用户继续明确推进工程实施时才启动。
+当前管理口径：
+
+- 规划准备度：`100%`；
+- 工程主阶段：`1 / 6 = 16.7%`；
+- 六个工程主阶段：Phase 0、Phase 1、Macro V1、Commodity V1、Crypto V1、Unified QA / Offline Acceptance；
+- 百分比仅用于阶段 Gate 管理，不代表工作量严格等权，不用于推算工期。
+
+完整阶段状态与项目进度表统一维护在：
+
+`docs/hedge-board/HEDGE_BOARD_PROJECT_PLAN_AND_PROGRESS.md`
 
 所有工程实现必须同时遵守：
 
-1. Master Plan；
-2. Data Feasibility & Maintenance；
-3. Phase F Audit；
-4. 对应模块 V1 Spec；
-5. 对应模块 Data Source Map。
+1. Project Plan & Progress；
+2. Master Plan；
+3. Data Feasibility & Maintenance；
+4. Phase F Audit；
+5. 对应模块 V1 Spec；
+6. 对应模块 Data Source Map。
 
 当旧 Spec / Source Map 与较新的 Phase F rights / feasibility 判定冲突时：
 
@@ -273,6 +284,8 @@ Phase 0 本轮新增 / 修改的 `platform-data` commits：
 - 低频数据 frequency-aware；
 - Crypto 7×24 与 US ETF / equities 日历分离；
 - 技术状态箭头不在本 Phase 重构。
+
+Phase 1 完成后更新 `HEDGE_BOARD_PROJECT_PLAN_AND_PROGRESS.md`，再进入 Macro V1。
 
 ---
 
@@ -634,8 +647,14 @@ Offline Acceptance
 - Data Feasibility / Maintenance；
 - Phase F Audit v1.0；
 - Phase 0 Shared Data Foundation；
-- Phase 0 GitHub Actions 验证。
+- Phase 0 GitHub Actions 验证；
+- Project Plan & Progress v1.0。
 
 下一步是 **Phase 1 — Shared Market Detail Data Layer**。
 
-当前不在 Phase 0 收尾过程中自动进入 Phase 1；下一轮工程推进再按本计划执行。
+以后每完成一个正式 Phase，都必须同步更新：
+
+1. `HEDGE_BOARD_PROJECT_PLAN_AND_PROGRESS.md`；
+2. `HEDGE_BOARD_IMPLEMENTATION_PLAN.md`；
+3. `HEDGE_BOARD_OPTIMIZATION_MASTER_PLAN.md`；
+4. 真实 commit / workflow / test 结果。
