@@ -1,6 +1,6 @@
 # 对冲基金看板优化总方案（Master Plan）
 
-> 状态：Planning Baseline v1.0 / Phase F FROZEN / Engineering NOT STARTED  
+> 状态：Planning Baseline v1.1 / Phase F FROZEN / Phase 0 DONE / Phase 1 NOT STARTED  
 > 适用分支：`feature/hedge-board-online-optimization`  
 > 用途：作为 Hedge Board 后续产品、数据、工程与验收的最高约束来源。  
 > 原则：总文件只维护全局规则与当前状态；模块产品细节进入 `specs/*_V1_SPEC.md`；数据源进入 `*_DATA_SOURCE_MAP.md`；可行性结论进入 `HEDGE_BOARD_PHASE_F_AUDIT.md`；工程顺序进入 `HEDGE_BOARD_IMPLEMENTATION_PLAN.md`。
@@ -210,6 +210,8 @@ TradingView 主要用于图表展示 / 大图入口，不作为通用抓取源�
 
 V1 不提前建设传统数据库。
 
+Phase 0 已基于现有仓库完成共享 runtime 基线，包括 retry、freshness、material-change/no-change 处理，并以 Treasury 10Y 真实数据链通过 GitHub Actions 验证。
+
 ---
 
 ## 7. 存储基线【冻结】
@@ -417,15 +419,24 @@ Phase F / active V1 可以读取它的参考网址。
 Product Scope Design       DONE
 Data Source Baselines      DONE
 Data Feasibility Phase F   DONE / FROZEN
-Implementation Plan        READY
-Engineering Phase 0        NOT STARTED
+Engineering Phase 0        DONE
+Implementation Plan        v1.1 / Phase 1 Gate
+Engineering Phase 1        NOT STARTED
 ```
+
+Phase 0 真实验收：
+
+- `platform-data` 共享 runtime helper 已落库；
+- Treasury provider / pipeline 已改为使用共享 retry / freshness / material-change 机制；
+- 新增共享 runtime tests；
+- GitHub Actions `macro-data` run `33295430507` 对 commit `2a1428ccfc02b9f096f7f3397eb9183f972acdc2` 结论为 `success`；
+- Treasury 10Y 已存在真实 `Provider → canonical JSON → CSV history → workflow` 链路。
 
 下一阶段：
 
-> `Phase 0 — Shared Data Foundation`
+> `Phase 1 — Shared Market Detail Data Layer`
 
-但必须由用户明确下达“开始实施 / 执行 Phase 0”后才能启动。
+当前 Phase 0 收尾不自动进入 Phase 1；下一轮工程推进再依据 Implementation Plan 执行。
 
 ---
 
@@ -466,9 +477,11 @@ Engineering Phase 0        NOT STARTED
 - 改一级分类或导航；
 - 修改 Deferred 模块；
 - 绕 CAPTCHA / WAF / 登录 / CSP / 权限；
-- 修改 `main`；
+- 修改 `Platform_Experiment/main`；
 - 未授权合并；
 - 把看板改成 AI 自动投资决策系统。
+
+说明：`platform-data/main` 是当前数据生产仓库的工作分支，Phase 0 已在该仓库产生真实 commit；禁止修改 main 的约束继续专指 `Platform_Experiment/main`。
 
 ---
 
@@ -487,17 +500,17 @@ Engineering Phase 0        NOT STARTED
 9. 无法验证标 `not_verified`；
 10. 不伪造 build / test / E2E；
 11. External Link 不得重新变成未经批准的抓取链；
-12. 当前仍未开始 Engineering，除非用户明确启动 Phase 0。
+12. Phase 0 已完成，后续不得以“补基础设施”为名重复重构共享层。
 
 ---
 
 ## 16. 线下验收【冻结】
 
-开发全部在：
+Platform Web / API 开发全部在：
 
 `feature/hedge-board-online-optimization`
 
-不直接改 `main`。
+不直接改 `Platform_Experiment/main`。
 
 最终由用户线下：
 
