@@ -1,6 +1,6 @@
 # 对冲基金看板｜统一实施计划（Implementation Plan）
 
-> 状态：Implementation Plan v1.0 / NOT STARTED  
+> 状态：Implementation Plan v1.1 / PHASE 0 DONE / PHASE 1 NOT STARTED  
 > 上位文档：`docs/hedge-board/HEDGE_BOARD_OPTIMIZATION_MASTER_PLAN.md`  
 > 数据可行性：`docs/hedge-board/HEDGE_BOARD_DATA_FEASIBILITY_AND_MAINTENANCE.md`  
 > Phase F 审计：`docs/hedge-board/HEDGE_BOARD_PHASE_F_AUDIT.md`  
@@ -11,7 +11,7 @@
 
 ## 1. 当前状态【冻结】
 
-Phase F 已完成并冻结。
+Phase F 已完成并冻结；Phase 0 已完成并通过真实 GitHub Actions 验证。
 
 当前：
 
@@ -20,10 +20,13 @@ Phase F Data Feasibility & Rights Audit
 → DONE / FROZEN
 
 Phase 0 Shared Data Foundation
+→ DONE
+
+Phase 1 Shared Market Detail Data Layer
 → NOT STARTED
 ```
 
-除非用户明确要求“开始实施”，不得自行进入 Phase 0 或业务代码开发。
+Phase 0 完成后不得在同一阶段顺手进入业务页面开发。下一阶段为 Phase 1，只有用户继续明确推进工程实施时才启动。
 
 所有工程实现必须同时遵守：
 
@@ -133,11 +136,11 @@ External Link 是正式产品交付方式，不是“加载失败占位”。
 
 ---
 
-# 5. Phase 0 — Shared Data Foundation【下一阶段，尚未启动】
+# 5. Phase 0 — Shared Data Foundation【DONE】
 
 目标：建立三个 active V1 共用的数据基础设施，不提前改页面。
 
-## 5.1 `platform-data` 骨架
+## 5.1 `platform-data` 骨架【已存在并复用】
 
 ```text
 config/
@@ -153,9 +156,11 @@ tests/
 .github/workflows/
 ```
 
-## 5.2 Canonical Contract
+没有为 Phase 0 另建平行框架；直接复用并增强现有 `platform-data`。
 
-至少：
+## 5.2 Canonical Contract【DONE】
+
+现有 Pydantic `CanonicalSeries` 已覆盖：
 
 - `series_id`
 - `label`
@@ -176,22 +181,26 @@ tests/
 - `methodology_version`
 - `quality_flags`
 - `rights_scope`
-- `delivery_mode` (`native / external_link / official_embed`)
 
-## 5.3 共用运行机制
+`delivery_mode` 属于产品交付路由，不强制塞进每个纯 Native time-series payload；在业务 manifest / route config 层表达即可。
+
+## 5.3 共用运行机制【DONE / 基线】
+
+已具备：
 
 - finite timeout；
-- finite retry；
-- Primary / Fallback；
-- LKG；
+- finite transient retry；
+- LKG 保留（fetch/validation失败时不覆盖上一份有效数据）；
 - stale detection；
-- schema validation；
-- latest-date check；
-- abnormal-scale check；
+- Pydantic schema validation；
+- latest/future-date / duplicate / numeric range 等质量检查；
 - no-change no-commit；
-- failed fetch 不覆盖有效历史。
+- material payload 不变时保留旧 `retrievedAt`，避免 Git 噪音；
+- deterministic JSON / CSV history output。
 
-## 5.4 External Link Registry
+Primary / Fallback 仍按具体 Provider 在后续业务 Phase 中逐源配置，不为 Phase 0 强造无业务意义的 fallback。
+
+## 5.4 External Link Registry【设计完成，按需实施】
 
 不复制 Trading Tools 全库。
 
@@ -205,26 +214,42 @@ tests/
 - `last_checked_at`；
 - `status`。
 
-来源仍以 Trading Tools 为准。
+来源仍以 Trading Tools 为准；Phase 0 不修改 Trading Tools。
 
-## 5.5 Phase 0 完成标准
+## 5.5 Phase 0 真实验收链【DONE】
 
-至少完成一条真实 Native 链路：
+已存在并增强的真实链路：
 
 ```text
-Provider
-→ canonical series
-→ validation
-→ published JSON
-→ history
-→ automated/reproducible pipeline
+U.S. Treasury official CSV
+→ Treasury provider
+→ CanonicalSeries
+→ quality validation / stale detection
+→ public/v1/macro/series/us_treasury_10y.json
+→ history/us_treasury_10y/<year>.csv
+→ GitHub Actions scheduled / push pipeline
 ```
 
-推荐首条用 Treasury / BLS / Binance 等已经 Phase F `NATIVE_READY` 的源。
+Phase 0 本轮新增 / 修改的 `platform-data` commits：
+
+- `0677b2f1dbe12fd7fa38b83927ea0a965471f2e8` — shared runtime helpers；
+- `bce33d6d33fc105068488e7ec8855e0b3e197dfa` — Treasury provider 使用共享 retry session；
+- `95ca27f6587fe37e1109876e85d7703d4a6659ed` — Treasury pipeline 使用共享 freshness / material-change helpers；
+- `2a1428ccfc02b9f096f7f3397eb9183f972acdc2` — shared runtime tests。
+
+真实 GitHub Actions：
+
+- workflow: `macro-data`；
+- run id: `33295430507`；
+- head SHA: `2a1428ccfc02b9f096f7f3397eb9183f972acdc2`；
+- conclusion: `success`；
+- completed: 2026-08-30。
+
+因此 Phase 0 完成标准已经满足。
 
 ---
 
-# 6. Phase 1 — Shared Market Detail Data Layer
+# 6. Phase 1 — Shared Market Detail Data Layer【NEXT / NOT STARTED】
 
 保留现有 Market Terminal 视觉和列结构。
 
@@ -574,9 +599,9 @@ platform-data
 ```text
 Phase F                         DONE
 ↓
-Phase 0 Shared Data Foundation NOT STARTED
+Phase 0 Shared Data Foundation DONE
 ↓
-Phase 1 Shared Market Detail
+Phase 1 Shared Market Detail   NOT STARTED
 ↓
 Macro V1
 ↓
@@ -589,26 +614,28 @@ Offline Acceptance
 
 业务内部建议：
 
-1. Phase 0；
-2. Phase 1；
-3. Macro Native core + links；
-4. Commodity EIA/CFTC + links；
-5. Crypto Binance Native + links；
-6. 三模块 QA；
-7. 线下验收。
+1. Phase 1；
+2. Macro Native core + links；
+3. Commodity EIA/CFTC + links；
+4. Crypto Binance Native + links；
+5. 三模块 QA；
+6. 线下验收。
 
 用户可明确改变优先级；执行 Agent 不得自行重排。
 
 ---
 
-# 14. 工程启动 Gate【冻结】
+# 14. 下一阶段 Gate【冻结】
 
-当前计划已具备：
+当前已经完成：
 
 - Product Spec；
 - Data Source Map；
 - Data Feasibility / Maintenance；
 - Phase F Audit v1.0；
-- Implementation Plan v1.0。
+- Phase 0 Shared Data Foundation；
+- Phase 0 GitHub Actions 验证。
 
-下一步是 Phase 0，但只有用户明确下达“开始实施 / 执行 Phase 0”后才启动代码开发。
+下一步是 **Phase 1 — Shared Market Detail Data Layer**。
+
+当前不在 Phase 0 收尾过程中自动进入 Phase 1；下一轮工程推进再按本计划执行。
