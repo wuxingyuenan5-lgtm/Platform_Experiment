@@ -1,6 +1,6 @@
 # 对冲基金看板｜Phase F 数据与参考入口审计
 
-> 状态：Initial Audit v0.3 / Engineering NOT STARTED  
+> 状态：Initial Audit v0.4 / Engineering NOT STARTED  
 > 上位文档：`docs/hedge-board/HEDGE_BOARD_OPTIMIZATION_MASTER_PLAN.md`  
 > 可行性原则：`docs/hedge-board/HEDGE_BOARD_DATA_FEASIBILITY_AND_MAINTENANCE.md`  
 > 实施计划：`docs/hedge-board/HEDGE_BOARD_IMPLEMENTATION_PLAN.md`  
@@ -8,19 +8,19 @@
 
 ---
 
-## 1. 本轮确认的产品边界【冻结】
+## 1. 产品边界【冻结】
 
-### 1.1 Trading Tools 的角色
+### 1.1 Trading Tools 只读
 
-`/hedge-board/trading-tools/*` 当前继续保持 Deferred：
+`/hedge-board/trading-tools/*` 继续保持 Deferred：
 
 - 不开发；
 - 不重构；
 - 不改 UI；
-- 不调整其元数据生成逻辑；
+- 不处理其元数据生成逻辑；
 - 不要求为了本轮 Hedge Board 优化去维护 Trading Tools 本身。
 
-但 Trading Tools 中已经整理好的 `name / url / description / domain / tags` 可以被 Phase F **只读使用**，作为 Macro / Commodity / Crypto 的参考网站目录。
+但其现有 `name / url / description / domain / tags` 可被 Phase F **只读使用**，作为 Macro / Commodity / Crypto 的参考网站目录。
 
 ```text
 Trading Tools
@@ -29,248 +29,312 @@ Trading Tools
 ≠ 当前要开发的业务模块
 ```
 
-### 1.2 不再建设第二套 Reference Links
+### 1.2 不建设第二套 Reference Links
 
-不新建重复的参考网站书签库。
+不新建重复书签库。
 
-当某数据不值得 Native 落地时，优先从 Trading Tools 对应分类中选择最合适的精确 URL，供业务看板生成 `External Reference Button`。
+某项数据不值得 Native 落地时，优先从 Trading Tools 对应分类中选精确 URL，给业务看板生成 `External Reference Button`。
 
-### 1.3 子页内部“交易工具”模块的后续处理
+### 1.3 子页旧“交易工具”模块未来退出
 
-Macro / Commodity / Crypto 子页此前存在从 Trading Tools 读取并展示“本页工具”的能力。
+Macro / Commodity / Crypto 子页此前存在把对应 Trading Tools 分类再次嵌入子页的能力。
 
-当对应业务子页 V1 数据和参考入口完善后，这种“把整个交易工具分类再次嵌入子页”的模块**不再需要**。
+对应 V1 完成后，目标是：
 
-最终目标：
+- Native 数据直接展示；
+- 不适合 Native 的具体指标，在对应 Section / Card 上提供精确 External Reference Button；
+- 不再重复展示整块 Trading Tools 目录。
 
-- 子页直接展示 Native 数据；
-- Native 不合适的具体指标，在对应 Section / Card 上给出精确 External Reference Button；
-- 不再在子页重复展示一整块通用 Trading Tools 目录。
-
-注意：当前只冻结这一方向，**本轮不修改 Trading Tools 或现有子页工具代码**；实际删除/隐藏旧子页工具模块需等对应 V1 完成并线下验收后执行。
+当前只冻结方向，**本轮不修改 Trading Tools，也不删除现有子页工具模块**；实际删除/隐藏必须等对应 V1 完成并线下验收后处理。
 
 ---
 
-## 2. Phase F 最终判定状态【冻结】
+## 2. Phase F 判定状态【冻结】
 
-每个数据/子模块最终优先判为：
+- `NATIVE_READY`：已有明确、低维护、可自动化的数据链；
+- `NATIVE_CANDIDATE`：路线可行，但仍需 live request / 权限 / schema / history 验证；
+- `EXTERNAL_LINK`：不值得自建，直接复用成熟原站；
+- `OFFICIAL_EMBED`：官方 Widget 明显优于 Native / Link 时使用；
+- `OPEN`：仍需研究；
+- `NOT_CONFIGURED`：既无合理 Native 链路，也无合适参考入口。
 
-- `NATIVE_READY`：已有明确、低维护、可自动化数据链，可进入实施；
-- `NATIVE_CANDIDATE`：技术路线可行，但还需 live request / 权限 / schema / 历史覆盖验证；
-- `EXTERNAL_LINK`：不值得自建，直接复用 Trading Tools 中的成熟原站入口；
-- `OFFICIAL_EMBED`：仅官方 Widget 明显优于 Native / Link 时使用；
-- `OPEN`：还需研究；
-- `NOT_CONFIGURED`：既没有合理 Native 链路，也没有合适参考入口。
+核心原则：
+
+> **好落地的自己落地；不好落地的直接给参考网站按钮。**
 
 ---
 
-# 3. Macro 初步审计
+# 3. Macro 审计
 
-| 数据/模块 | 初步状态 | Native 来源 | Trading Tools / 参考入口 | 维护判断 |
+| 数据/模块 | 状态 | Native 来源 | 参考入口 | 维护 |
 |---|---|---|---|---|
-| GDP / CPI / PCE / PPI / UNRATE / M2 / Breakeven / HY OAS 等 FRED 序列 | `NATIVE_READY` | FRED REST API | Trading Tools 已有 FRED / MacroMicro 等入口 | 低 |
-| UST 3M / 2Y / 10Y / 30Y | `NATIVE_READY` | U.S. Treasury XML / CSV | Treasury 官方页面 | 低 |
-| 10Y real yield | `NATIVE_READY` | Treasury real yield XML / FRED fallback | FRED DFII10 | 低 |
-| SOFR / EFFR | `NATIVE_READY` | New York Fed Markets Data / FRED fallback | Trading Tools 已有 NY Fed、FRED SOFR | 低 |
-| Fed target / IORB / ON RRP award | `NATIVE_READY` | Fed / FRED | Trading Tools 宏观工具 | 低 |
-| Polymarket event probability + history | `NATIVE_READY` | Gamma metadata + CLOB `prices-history` | Trading Tools 综合工具已有 Polymarket | 中，主要复杂度在 whitelist / token mapping |
-| CME FedWatch | `EXTERNAL_LINK` | 不作为 Macro V1 主数据链 | Trading Tools 已有 CME FedWatch 精确页面 | 低 |
-| MacroMicro 复杂宏观交叉图 | `EXTERNAL_LINK` | 不逆向抓取 | Trading Tools 已有大量 MacroMicro 精确子页面 | 低 |
-| TradingEconomics / 金十 / 奇货可查宏观总览 | `EXTERNAL_LINK` | 不作为核心官方数据源 | Trading Tools 已整理 | 低 |
+| GDP / CPI / Core CPI / PCE / Core PCE / PPI / UNRATE / M2 / Breakeven / HY OAS 等 | `NATIVE_READY` | FRED REST API / 官方上游 | FRED / MacroMicro | 低 |
+| UST 3M / 2Y / 10Y / 30Y | `NATIVE_READY` | U.S. Treasury | Treasury 官方 | 低 |
+| 10Y Real Yield | `NATIVE_READY` | Treasury / FRED fallback | FRED DFII10 | 低 |
+| SOFR / EFFR | `NATIVE_READY` | New York Fed / FRED fallback | NY Fed / FRED | 低 |
+| Fed Target / IORB / ON RRP Award | `NATIVE_READY` | Fed / FRED | Fed / FRED | 低 |
+| CFNAI / CFNAIMA3 | `NATIVE_READY` | FRED / Chicago Fed | FRED | 低 |
+| Polymarket概率+历史曲线 | `NATIVE_READY` | Gamma metadata + CLOB `prices-history` | Polymarket | 中，复杂点在 whitelist/token mapping |
+| CME FedWatch | `EXTERNAL_LINK` | 不作为 Macro V1 主数据链 | Trading Tools 已有 CME FedWatch | 低 |
+| MacroMicro 复杂交叉图 | `EXTERNAL_LINK` | 不逆向抓取 | Trading Tools 已整理 | 低 |
+| TradingEconomics / 金十 / 奇货可查总览 | `EXTERNAL_LINK` | 不作为核心官方数据源 | Trading Tools 已整理 | 低 |
 
-## 3.1 Global M2 组成审计
+## 3.1 Global M2
 
-| 组成 | 状态 | 推荐来源 | 审计结论 |
+| 组成 | 状态 | 推荐来源 | 结论 |
 |---|---|---|---|
-| US M2 | `NATIVE_READY` | FRED / Federal Reserve | 官方序列成熟 |
-| Euro Area M2 | `NATIVE_READY` | ECB Data Portal SDMX 2.1 REST API | 官方 API 支持 JSON/CSV、历史/修订查询 |
-| Japan M2 | `NATIVE_READY` | BOJ Time-Series Data Search API | BOJ 2026-02-18 正式上线 API，任何人可用，支持 JSON/CSV |
-| UK M2 | `NATIVE_READY` | Bank of England IADB CSV download | 官方数据库支持 series code 自动 CSV 下载；`LPMVWYH` 等系列需实施时最终复核口径 |
-| China M2 level | `NATIVE_CANDIDATE` | AKShare `macro_china_money_supply` / 上游东方财富，PBOC官方发布作核验 | AKShare接口明确提供M2数量，但上游不是PBOC API；必须做最新日期与stale health check |
-| FX conversion | `NATIVE_READY` | ECB reference FX / official FX series | ECB SDMX API适合统一月均汇率 |
+| US M2 | `NATIVE_READY` | FRED / Federal Reserve | 官方成熟 |
+| Euro Area M2 | `NATIVE_READY` | ECB SDMX REST API | JSON/CSV，历史/修订可查 |
+| Japan M2 | `NATIVE_READY` | BOJ Time-Series API | 2026-02正式上线，JSON/CSV |
+| UK M2 | `NATIVE_READY` | Bank of England IADB CSV | series code自动下载，实施时复核最终口径 |
+| China M2 | `NATIVE_CANDIDATE` | AKShare `macro_china_money_supply` + PBOC官方核验 | 重点防 stale/upstream停更 |
+| FX Conversion | `NATIVE_READY` | ECB reference FX | 月均汇率可本地计算 |
 
 ### Global M2 结论
 
-Global M2 **整体可 Native 实现**，不需要降级为外链。
+整体可以 Native，不需要外链降级。
 
-真正需要重点防守的只有 China M2：
+China M2 采用：
 
-- AKShare可作为便捷主适配器；
-- 必须记录其 upstream；
-- 每次抓取检查最新月份；
-- 与PBOC官方发布做日期/数值核验；
-- AKShare/上游陈旧时不得继续把旧值当最新值。
+```text
+AKShare adapter
++ upstream provenance
++ latest month check
++ PBOC official date/value verification
++ stale gate
+```
 
-### Macro 总结
-
-Macro V1 的核心新增指标大部分可以 Native，数据可行性风险最低。
-
-第一批 Native Provider 优先：
-
-1. FRED；
-2. U.S. Treasury；
-3. New York Fed；
-4. ECB；
-5. BOJ；
-6. Bank of England；
-7. Polymarket official public APIs；
-8. China M2 使用 AKShare + 官方核验策略。
+AKShare 调用成功不等于数据最新。
 
 ---
 
-# 4. Commodity 初步审计
+# 4. Commodity 审计
 
-| 数据/模块 | 初步状态 | Native 来源 | Trading Tools / 参考入口 | 维护判断 |
+| 数据/模块 | 状态 | Native 来源 | 参考入口 | 维护 |
 |---|---|---|---|---|
-| EIA crude / Cushing / gasoline / distillate inventories | `NATIVE_READY` | EIA API v2（免费 key） | EIA 原站可作辅助 | 低 |
-| CFTC Gold / Silver / Copper / WTI / NatGas positioning | `NATIVE_READY` | CFTC Public Reporting Environment API | Trading Tools 已有 CME COT 页面 | 低 |
-| Gold ETF monthly regional/fund flow | `NATIVE_CANDIDATE → 高概率Native` | World Gold Council monthly XLSX | WGC Gold ETF 原页 | 中低，月频下载路径清晰 |
-| Gold ETF weekly web flow | `NATIVE_CANDIDATE` | WGC weekly website / existing page data chain需 live validate | WGC Gold ETF 原页 | 中，部分页面可能涉及登录/网页接口 |
-| SPDR holdings / daily flow | `NATIVE_CANDIDATE → 高概率Native` | SPDR official Historical Archive XLSX + current fund disclosures | SPDR GLD 原页 | 中低 |
-| CME Gold / Silver / Copper warehouse stocks | `NATIVE_CANDIDATE` | CME Warehouse & Depository Stocks reports | CME Registrar Reports | 中，需验证文件地址稳定性 |
-| LME monthly copper warehouse stock | `NATIVE_CANDIDATE` | LME Stocks Summary monthly Excel | LME Stocks Summary | 中 |
-| LME daily two-day delayed stock breakdown | `OPEN / EXTERNAL_LINK优先` | LME Stock Breakdown XLS；官方页面提示登录/注册访问全部报告 | LME Warehouse Reports | 中高，不为日频库存维持登录自动化 |
-| LME historical price / full prompt curve | `EXTERNAL_LINK` | V1 不强行自建 | LME Copper；Trading Tools 中 SMM / 奇货可查等 | 高，官方历史/实时价格存在注册/授权边界 |
-| WTI / Brent current futures curve | `OPEN → EXTERNAL_LINK优先` | 继续找低维护 current chain；无则不自建 | Trading Tools 中 1qh跨期价差、奇货可查等入口 | 中高 |
-| COMEX-LME / SHFE-LME copper structure | `OPEN / EXTERNAL_LINK优先` | 只有在 LME leg 可稳定自动化时 Native | Trading Tools SMM进口盈亏 / 奇货可查 | 高 |
-| 国内期货跨期/库存/仓单 | `NATIVE_CANDIDATE` | AKShare + SHFE/INE等 upstream | Trading Tools 奇货可查 / 1qh | 中 |
-| GVZ | `NATIVE_READY` | Cboe official historical volatility index data | Cboe index page | 低 |
-| OVX | `NATIVE_READY` | Cboe official historical volatility index data | Cboe index page | 低 |
-| CVOL / 高级金属期权分析 | `EXTERNAL_LINK` | V1 不必复制完整模块 | Trading Tools 已有 CME CVOL / option volume | 低 |
+| EIA crude / Cushing / gasoline / distillate inventories | `NATIVE_READY` | EIA API v2（免费 key） | EIA | 低 |
+| CFTC Gold / Silver / Copper / WTI / NatGas | `NATIVE_READY` | CFTC PRE API | CME COT页面 | 低 |
+| Gold ETF monthly regional/fund flow | `NATIVE_CANDIDATE → 高概率Native` | WGC monthly XLSX | WGC Gold ETF | 中低 |
+| Gold ETF weekly web flow | `NATIVE_CANDIDATE` | WGC weekly website/data chain | WGC Gold ETF | 中 |
+| SPDR holdings / daily flow | `NATIVE_CANDIDATE → 高概率Native` | SPDR Historical Archive XLSX + current disclosure | SPDR GLD | 中低 |
+| CME Gold / Silver / Copper warehouse stocks | `NATIVE_CANDIDATE` | CME warehouse/depository reports | CME Registrar Reports | 中 |
+| LME monthly copper stocks | `NATIVE_CANDIDATE` | LME monthly XLSX | LME warehouse reports | 中 |
+| LME daily 2-day delayed stock breakdown | `EXTERNAL_LINK优先` | 官方日度XLS页面涉及登录/注册 | LME Stock Breakdown | 中高 |
+| LME historical price / full prompt curve | `EXTERNAL_LINK` | V1 不强行自建 | LME / SMM / 奇货可查 | 高 |
+| WTI current futures curve | `NATIVE_CANDIDATE → 高概率Native` | CME free midnight settlement files / product settlements | CME WTI settlements | 中低 |
+| Brent current futures curve | `NATIVE_CANDIDATE / EXTERNAL_LINK fallback` | ICE官网公开多到期月延迟报价，自动化稳定性/rights仍需确认 | ICE Brent futures page | 中 |
+| COMEX-LME / SHFE-LME copper structure | `EXTERNAL_LINK优先` | LME leg长期自动化/授权复杂 | SMM进口盈亏 / 奇货可查 | 高 |
+| 国内跨期/库存/仓单 | `NATIVE_CANDIDATE` | AKShare + SHFE/INE upstream | 奇货可查 / 1qh | 中 |
+| GVZ | `NATIVE_READY` | Cboe historical data | Cboe | 低 |
+| OVX | `NATIVE_READY` | Cboe historical data | Cboe | 低 |
+| CVOL / 高级金属期权 | `EXTERNAL_LINK` | V1 不复制完整模块 | Trading Tools已有CME CVOL | 低 |
 
-### Commodity 结论
+## 4.1 WTI Curve 新结论
 
-商品页采用混合模式：
+CME 已明确：
 
-- EIA库存、CFTC、GVZ/OVX、核心黄金ETF/SPDR数据优先 Native；
-- LME月度库存值得 Native 验证；
-- LME日频完整库存、历史价格、复杂期限结构、进口盈亏等高维护数据优先使用 Trading Tools 精确入口；
-- WTI/Brent current futures curve 在没有低维护免费 current chain 前不强行实现。
+- daily settlement report覆盖当日所有可交易合约；
+- Settlement Files 自 2024 年起通过 CME DataMine 提供；
+- **midnight CT 的 Settlements File 继续免费**；
+- NYMEX settlement 文件包含多月份合约，足以形成日终 WTI curve、M1-M2、M1-M3。
+
+因此 WTI curve 不再默认外链，优先验证免费 midnight settlement 文件自动下载。
+
+目标数据口径应使用：
+
+```text
+Daily settlement
+not intraday last price
+```
+
+这与本看板“日常扫盘 + 盘后复盘”定位一致。
+
+## 4.2 Brent Curve 新结论
+
+ICE Brent页面公开多到期月 delayed quotes，说明数据展示本身存在；但尚未确认适合作为长期无人值守数据接口。
+
+因此：
+
+- 若找到稳定、允许自动访问的数据接口 → `NATIVE`；
+- 否则直接 `EXTERNAL_LINK` 到 ICE Brent futures data page。
+
+不为做曲线长期依赖脆弱网页逆向。
 
 ---
 
-# 5. Crypto 初步审计
+# 5. Crypto 审计
 
-| 数据/模块 | 初步状态 | Native 来源 | Trading Tools / 参考入口 | 维护判断 |
+| 数据/模块 | 状态 | Native 来源 | 参考入口 | 维护 |
 |---|---|---|---|---|
-| BTC / ETH spot | `NATIVE_READY` | Binance / Coinbase等官方 public API | TradingView现有大图 | 低 |
-| Binance Funding | `NATIVE_READY` | Binance `fundingRate` / mark price APIs | Trading Tools 已有 Coinglass Funding Rate | 低 |
-| Binance OI | `NATIVE_READY` | Binance current OI + `openInterestHist` | Trading Tools 已有 Coinglass OI | 低 |
-| Bybit Funding / OI | `NATIVE_READY` | Bybit V5 `market/funding/history` + `market/open-interest` | Coinglass作参考 | 低 |
-| OKX Funding / OI | `NATIVE_READY` | OKX public funding history + open interest APIs | Coinglass作参考 | 低 |
-| Deribit Funding / OI | `NATIVE_READY` | Deribit public market data | Trading Tools Deribit / Greeks.live | 低 |
-| BTC DVOL | `NATIVE_READY` | Deribit `get_volatility_index_data` | Deribit statistics | 低 |
-| BTC/ETH options snapshot / mark IV | `NATIVE_READY` | Deribit option book summary / instruments | Trading Tools Deribit / Greeks.live | 中 |
-| IV Term Structure / 25D Skew | `NATIVE_CANDIDATE` | Deribit option chain + local interpolation / calculation | Greeks.live / Deribit statistics | 中高；若维护成本过高可转外链 |
-| Stablecoin total / USDT / USDC supply | `NATIVE_READY` | DefiLlama stablecoin endpoints | Trading Tools 可保留专业稳定币站点 | 低 |
-| BTC ETF Daily Flow | `NATIVE_CANDIDATE → 高概率Native` | Farside公开完整 daily flow 表；持续自动更新 | Trading Tools Coinglass / SoSoValue 可作参考 | 中低，需确认rights_scope与parser稳定性 |
-| ETH ETF Daily Flow | `NATIVE_CANDIDATE → 高概率Native` | Farside公开 daily flow 表；持续自动更新 | Trading Tools相关ETF入口 | 中低，需确认rights_scope与parser稳定性 |
-| Bitcoin Treasuries holdings | `EXTERNAL_LINK优先 / Native仍OPEN` | 当前未确认正式公共 API；网页数据丰富但名单维护成本高 | BitcoinTreasuries专业页面 | 高 |
-| MVRV / Realized Cap | `NATIVE_CANDIDATE` | Coin Metrics metric IDs明确；Community API entitlement需实际请求测试 | Checkonchain / Glassnode | 中 |
-| NUPL / SOPR | `NATIVE_CANDIDATE` | Coin Metrics方法学/metric IDs明确；Community entitlement待测 | Checkonchain / Glassnode | 中 |
-| Exchange Balance / Netflow | `EXTERNAL_LINK优先` | 不自建 exchange entity labels | Trading Tools CryptoQuant / Glassnode / Checkonchain / Arkham | 高 |
+| BTC / ETH spot | `NATIVE_READY` | Binance / Coinbase官方API | TradingView大图 | 低 |
+| Binance Funding / OI | `NATIVE_READY` | Binance Futures API | Coinglass | 低 |
+| Bybit Funding / OI | `NATIVE_READY` | Bybit V5 | Coinglass | 低 |
+| OKX Funding / OI | `NATIVE_READY` | OKX API v5 | Coinglass | 低 |
+| Deribit Funding / OI | `NATIVE_READY` | Deribit public API | Deribit / Greeks.live | 低 |
+| BTC DVOL | `NATIVE_READY` | Deribit | Deribit statistics | 低 |
+| BTC/ETH option snapshot / mark IV | `NATIVE_READY` | Deribit | Deribit / Greeks.live | 中 |
+| IV Term Structure / 25D Skew | `NATIVE_CANDIDATE` | Deribit option chain + 本地插值计算 | Greeks.live / Deribit | 中高，可随时回退外链 |
+| Stablecoin total / USDT / USDC | `NATIVE_READY` | DefiLlama stablecoin endpoints | 专业稳定币站点 | 低 |
+| BTC ETF Daily Flow | `NATIVE_CANDIDATE → 高概率Native` | Farside完整公开daily table | Coinglass / SoSoValue | 中低 |
+| ETH ETF Daily Flow | `NATIVE_CANDIDATE → 高概率Native` | Farside完整公开daily table | 对应ETF页面 | 中低 |
+| Bitcoin Treasuries | `EXTERNAL_LINK优先` | 当前未确认稳定公开API；网页聚合丰富 | BitcoinTreasuries | 高 |
+| MVRV / Realized Cap | `NATIVE_CANDIDATE` | Coin Metrics metric IDs明确 | Checkonchain / Glassnode | 中 |
+| NUPL / SOPR | `NATIVE_CANDIDATE` | Coin Metrics metric IDs/方法学明确 | Checkonchain / Glassnode | 中 |
+| Exchange Balance / Netflow | `EXTERNAL_LINK优先` | 不自建entity labels | CryptoQuant / Glassnode / Arkham | 高 |
 | LTH / STH Supply / Cost Basis | `EXTERNAL_LINK优先` | 除非找到稳定免费统一方法源 | Checkonchain / Glassnode | 高 |
-| Liquidation Heatmap | `EXTERNAL_LINK` | 不自建全市场 liquidation map | Trading Tools 已有 Coinglass Liquidation HeatMap | 很高，外链更合理 |
-| 全市场 Funding / OI | `NATIVE_READY（第一版3 Venue） + EXTERNAL_LINK` | Binance + Bybit + OKX；后续可增加Deribit | Coinglass Funding / OI | 中 |
-| BTC期限结构专业图 | `NATIVE_CANDIDATE / EXTERNAL_LINK` | Deribit/CME等可构建简版；复杂版不强求 | Trading Tools 已有 Checkonchain BTC期限结构 | 中高 |
-| Crypto complex analytics / whales | `EXTERNAL_LINK` | 不建设地址标签系统 | CryptoQuant / Arkham / BGeometrics 等 | 高 |
+| Liquidation Heatmap | `EXTERNAL_LINK` | 不自建全市场heatmap | Coinglass | 很高 |
+| Aggregate Funding / OI | `NATIVE_READY（首批3 Venue） + EXTERNAL_LINK` | Binance + Bybit + OKX | Coinglass | 中 |
+| BTC期限结构专业图 | `NATIVE_CANDIDATE / EXTERNAL_LINK` | 可做简版；复杂版不强求 | Checkonchain | 中高 |
+| Whale / Wallet Intelligence | `EXTERNAL_LINK` | 不建设地址标签系统 | Arkham / CryptoQuant / BGeometrics | 高 |
 
-### Coin Metrics rights_scope 特别说明
+## 5.1 Multi-Venue 第一版【基本确认】
 
-Coin Metrics Community API：
-
-- 无需 API key；
-- 官方文档明确为 Community free tier；
-- 官方文档同时明确 Community 数据为 **non-commercial use** 的 Creative Commons 数据。
-
-因此在 Phase F 中：
-
-- 技术可获取性与指标 entitlement 可以继续验证；
-- `rights_scope` 必须明确标记；
-- 若未来使用场景超出允许范围，不得因为“接口免费”就默认可以继续 Native 分发；
-- 对受限指标可直接回退为 Trading Tools 中的 Checkonchain / Glassnode 等 External Link。
-
-### Crypto 结论
-
-Crypto V1 Native 可行性比最初预估更好。
-
-第一版多 Venue 聚合建议：
+第一版 Aggregate：
 
 ```text
 Binance + Bybit + OKX
 ```
 
-三者均存在公开 Funding / OI 数据接口；Deribit更适合作为期权/DVOL核心和补充 derivatives venue。
+Deribit主要承担 Options / DVOL，并可补充 derivatives venue。
 
-因此：
+### Funding 归一化
 
-- Funding：先归一 funding interval / timestamp，再按 OI 加权；
-- OI：根据 linear/inverse 合约单位统一为 USD notional；
-- Venue 模式可切 Binance / Bybit / OKX；
-- Deribit按指标性质加入；
-- Coinglass继续作为全市场专业参考入口，而不是生产主源。
+各 venue funding interval 不一定一致。
 
-真正应主动放弃自建的主要仍是：
+Canonical至少记录：
 
-- entity-labelled exchange flows；
-- LTH/STH 高级口径（免费稳定源不足时）；
-- liquidation heatmap；
-- whale / wallet intelligence；
-- 专业完整 options analytics 页面。
+- raw funding rate；
+- funding interval hours；
+- timestamp；
+- annualized / normalized rate（如展示需要）；
+- venue；
+- contract type。
+
+Aggregate前必须先把 funding interval 统一，再按 OI weighted。
+
+### OI 归一化
+
+Bybit官方明确：
+
+- inverse合约 OI 可为 USD；
+- linear合约 OI 可为 coin amount。
+
+因此统一策略：
+
+```text
+venue raw OI
+→ identify contract type
+→ convert to USD notional
+→ aggregate
+```
+
+不得直接对不同单位的原始 OI 求和。
+
+### OKX 方法学版本
+
+OKX funding API 已存在 formula type 等字段变化历史，Provider必须保留 `methodology_version / quality_flags`，避免上游算法变化后历史被静默混用。
+
+## 5.2 Coin Metrics【技术可行，rights需保留】
+
+官方文档确认：
+
+- Community API root：`https://community-api.coinmetrics.io/v4`；
+- Community endpoint 无需 API key；
+- 免费范围为 **non-commercial use**，Creative Commons条款；
+- MVRV：`CapMVRVCur`；
+- Realized Cap：`CapRealUSD`；
+- NUPL：`NUPL`；
+- SOPR：`SOPR`；
+- 均为标准日频 asset metrics。
+
+目前尚未用实际 Community 请求逐个证明四个 metric 都对 BTC 返回 200；因此状态仍保留 `NATIVE_CANDIDATE`，而不是直接升级 `READY`。
+
+即使技术可取，未来用途若超出 Community license，也应改用其他来源或 External Link，不因“无API key”就默认具备任意再分发权。
+
+## 5.3 ETF Flow
+
+Farside目前：
+
+- BTC ETF完整daily flow table公开；
+- ETH ETF daily flow table公开；
+- 页面标明自动更新。
+
+所以技术路径非常简单，但仍需验证：
+
+- rights_scope；
+- HTML/table schema长期稳定；
+- 页面异常时parser health check与LKG。
+
+V1高概率可以 Native。
+
+## 5.4 Bitcoin Treasuries
+
+当前网页数据丰富、分类完整，但未确认正式公开API，且名单维护本身属于专业数据聚合工作。
+
+因此当前默认：
+
+```text
+EXTERNAL_LINK
+```
+
+除非后续发现正式、稳定、授权清晰的数据接口，否则不为这一项建立脆弱抓取链。
 
 ---
 
-## 6. 已核验的核心公开 API / 数据入口
+## 6. 已核验的核心数据入口
 
 ### Macro
 
-- FRED API：`https://api.stlouisfed.org/fred/`
-- U.S. Treasury daily interest rate XML：`https://home.treasury.gov/resource-center/data-chart-center/interest-rates/pages/xml`
-- New York Fed reference rates / Markets Data APIs：`https://www.newyorkfed.org/markets/reference-rates`
-- ECB SDMX API：`https://data-api.ecb.europa.eu/service/`
-- BOJ Time-Series API：`https://www.stat-search.boj.or.jp/api/v1/`
-- Bank of England automatic CSV database download：`https://www.bankofengland.co.uk/boeapps/database/`
-- Polymarket CLOB price history：`https://clob.polymarket.com/prices-history`
+- FRED：`https://api.stlouisfed.org/fred/`
+- U.S. Treasury：`https://home.treasury.gov/resource-center/data-chart-center/interest-rates/pages/xml`
+- New York Fed：`https://www.newyorkfed.org/markets/reference-rates`
+- ECB SDMX：`https://data-api.ecb.europa.eu/service/`
+- BOJ API：`https://www.stat-search.boj.or.jp/api/v1/`
+- Bank of England Database：`https://www.bankofengland.co.uk/boeapps/database/`
+- Polymarket CLOB：`https://clob.polymarket.com/prices-history`
 
 ### Commodity
 
 - EIA API v2：`https://api.eia.gov/v2/`
-- CFTC Public Reporting Environment：`https://publicreporting.cftc.gov/`
-- World Gold Council Gold ETF data：`https://www.gold.org/goldhub/data/gold-etfs-holdings-and-flows`
-- SPDR GLD official Historical Archive：`https://www.spdrgoldshares.com/usa/gld/`
-- CME Registrar / warehouse reports：`https://www.cmegroup.com/clearing/operations-and-deliveries/registrar-reports.html`
-- LME warehouse reports：`https://www.lme.com/Market-data/Reports-and-data/Warehouse-and-stocks-reports`
-- Cboe volatility historical data：`https://www.cboe.com/tradable_products/vix/vix_historical_data`
+- CFTC PRE：`https://publicreporting.cftc.gov/`
+- WGC ETF：`https://www.gold.org/goldhub/data/gold-etfs-holdings-and-flows`
+- SPDR GLD：`https://www.spdrgoldshares.com/usa/gld/`
+- CME Registrar：`https://www.cmegroup.com/clearing/operations-and-deliveries/registrar-reports.html`
+- CME Daily Settlements：`https://www.cmegroup.com/market-data/daily-settlements.html`
+- CME WTI Settlements：`https://www.cmegroup.com/markets/energy/crude-oil/light-sweet-crude.settlements.html`
+- LME Warehouse Reports：`https://www.lme.com/Market-data/Reports-and-data/Warehouse-and-stocks-reports`
+- Cboe Volatility History：`https://www.cboe.com/tradable_products/vix/vix_historical_data`
+- ICE Brent Futures Data：`https://www.ice.com/products/219/Brent-Crude-Futures/data`
 
 ### Crypto
 
-- Binance Developer Docs：`https://developers.binance.com/docs/derivatives/`
-- Bybit V5 Market API docs：`https://bybit-exchange.github.io/docs/v5/market/`
-- OKX API v5 docs：`https://www.okx.com/docs-v5/`
-- Deribit API docs：`https://docs.deribit.com/`
-- DefiLlama stablecoins API host：`https://stablecoins.llama.fi/`
-- Coin Metrics Community API：`https://community-api.coinmetrics.io/v4/`
-- Farside BTC ETF Flow：`https://farside.co.uk/btc/`
-- Farside ETH ETF Flow：`https://farside.co.uk/eth/`
+- Binance：`https://developers.binance.com/docs/derivatives/`
+- Bybit：`https://bybit-exchange.github.io/docs/v5/market/`
+- OKX：`https://www.okx.com/docs-v5/`
+- Deribit：`https://docs.deribit.com/`
+- DefiLlama Stablecoins：`https://stablecoins.llama.fi/`
+- Coin Metrics Community：`https://community-api.coinmetrics.io/v4/`
+- Farside BTC ETF：`https://farside.co.uk/btc/`
+- Farside ETH ETF：`https://farside.co.uk/eth/`
 - Bitcoin Treasuries：`https://bitcointreasuries.net/`
 
 ---
 
-## 7. Trading Tools 已确认可直接复用的高价值 External Link 候选
+## 7. Trading Tools 高价值 External Link 候选
 
 ### Macro
 
 - CME FedWatch；
-- MacroMicro各类宏观交叉图；
-- TradingEconomics / 金十 / 奇货可查宏观总览。
+- MacroMicro宏观交叉图；
+- TradingEconomics / 金十 / 奇货可查总览。
 
 ### Commodity
 
-- CME CVOL / options metrics；
+- CME CVOL / option metrics；
 - 奇货可查国内商品数据；
 - 1qh跨期价差；
 - SMM有色金属进口盈亏；
-- LME官方Copper / warehouse pages。
+- LME官方价格/warehouse页面。
 
 ### Crypto
 
@@ -286,24 +350,24 @@ Binance + Bybit + OKX
 - Arkham；
 - BGeometrics。
 
-这些链接当前只读，不修改 Trading Tools 本体。
+这些链接只读，不修改 Trading Tools 本体。
 
 ---
 
-## 8. 当前剩余高价值 OPEN 项
+## 8. 当前剩余高价值 OPEN / Live Validation 项
 
-下一轮不扩产品范围，只继续 live validation：
+下一轮不扩产品范围，只做真实请求验证：
 
-1. China M2：AKShare当前最新月份与PBOC官方值一致性；
-2. WGC weekly flow：现有网页数据接口是否无需会话并适合长期自动化；
-3. SPDR Historical Archive XLSX 的实际下载URL与schema稳定性；
-4. CME warehouse report文件地址与历史下载稳定性；
-5. LME monthly Stocks Summary 是否可无登录稳定自动下载；
-6. WTI/Brent current contract chain是否存在维护成本合理的免费Native方案；
-7. Farside BTC/ETH ETF Flow 的rights_scope与长期parser稳定性；
-8. Coin Metrics Community 对 MVRV/NUPL/SOPR/Realized Cap 的实际免费 entitlement；
-9. Bitcoin Treasuries 是否存在正式/稳定数据接口；若无则固定 `EXTERNAL_LINK`；
-10. Binance / Bybit / OKX Funding interval、OI单位、linear/inverse contract mapping的最终归一化公式；
-11. Trading Tools 中最终被选为按钮的精确URL可达性、登录要求与迁移风险。
+1. China M2：AKShare当前最新月份与PBOC官方发布一致性；
+2. WGC weekly flow：是否能稳定无人值守读取周度数据；
+3. SPDR Historical Archive XLSX：实际下载URL与schema稳定性；
+4. CME warehouse report：文件地址与历史下载稳定性；
+5. LME monthly stocks：月度XLSX能否无登录稳定自动下载；
+6. CME DataMine免费 midnight settlement file：实际自动下载流程，确认 WTI curve 可无人值守；
+7. ICE Brent delayed contract table：是否存在低维护、允许的自动读取方式；否则固定 External Link；
+8. Farside BTC/ETH ETF Flow：rights_scope与parser稳定性；
+9. Coin Metrics Community：直接请求 BTC `CapMVRVCur,NUPL,SOPR,CapRealUSD` 验证 entitlement；
+10. Binance / Bybit / OKX：用实际返回字段冻结 funding interval / OI USD notional 归一化公式；
+11. Trading Tools：最终按钮候选精确URL的可达性、登录要求、迁移风险。
 
-本文件是 Phase F 审计，不代表对应业务 Phase 已经开始实施。
+本文件是 Phase F 审计，不代表对应业务 Phase 已开始实施。
