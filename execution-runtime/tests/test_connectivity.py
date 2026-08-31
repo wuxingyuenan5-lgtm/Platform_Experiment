@@ -3,7 +3,8 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 
 from app.config import get_settings
-from app.main import app
+from app.fake_gateway import FakeGateway
+from app.main import create_app
 
 
 def test_gateway_connectivity_exposes_only_credential_metadata(
@@ -16,7 +17,7 @@ def test_gateway_connectivity_exposes_only_credential_metadata(
     monkeypatch.setenv("VG_SECRET_CRYPTO_TEST_001_API_KEY", "real-api-key")
     monkeypatch.setenv("VG_SECRET_CRYPTO_TEST_001_SECRET", "real-secret")
 
-    with TestClient(app) as client:
+    with TestClient(create_app(FakeGateway())) as client:
         response = client.get("/gateway/connectivity")
 
     assert response.status_code == 200
@@ -58,7 +59,7 @@ def test_gateway_connectivity_classifies_secondary_mt5_account_reference(
         monkeypatch.setenv(f"{prefix}_PASSWORD", "password")
         monkeypatch.setenv(f"{prefix}_SERVER", "Broker")
 
-    with TestClient(app) as client:
+    with TestClient(create_app(FakeGateway())) as client:
         response = client.get("/gateway/connectivity")
 
     assert response.status_code == 200

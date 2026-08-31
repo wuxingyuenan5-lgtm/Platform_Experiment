@@ -23,11 +23,35 @@ from app.models import (
 )
 
 
-class ExecutionGateway(Protocol):
+class VenueGateway(Protocol):
+    """Single normalized execution boundary used by every strategy and venue.
+
+    Venue adapters may keep SDK-shaped method names internally. Platform-facing
+    execution, recovery, and reconciliation use this contract only.
+    """
+
     name: str
 
-    def submit_order(self, command: SubmitOrderCommand) -> list[ExecutionEvent]:
+    def place_order(self, command: SubmitOrderCommand) -> list[ExecutionEvent]:
         """Submit one normalized platform order command to the configured venue."""
+        ...
+
+    def get_account(self, account_id: str) -> VenueAccountSnapshot:
+        """Return one authoritative account snapshot for one sync cycle."""
+        ...
+
+    def get_positions(self, account_id: str | None = None) -> list[VenuePositionSnapshot]:
+        """Return current authoritative positions."""
+        ...
+
+    def get_open_orders(
+        self,
+        *,
+        account_id: str | None = None,
+        symbol: str | None = None,
+        limit: int = 50,
+    ) -> list[VenueOrderSnapshot]:
+        """Return only accepted or partially-filled orders."""
         ...
 
     def get_order(
@@ -49,7 +73,7 @@ class ExecutionGateway(Protocol):
         """Return bounded current and recent external orders."""
         ...
 
-    def query_order_history(
+    def get_order_history(
         self,
         *,
         account_id: str,
@@ -73,7 +97,7 @@ class ExecutionGateway(Protocol):
         """Return external fills matching the supplied filters."""
         ...
 
-    def query_fill_history(
+    def get_fill_history(
         self,
         *,
         account_id: str,
@@ -86,20 +110,12 @@ class ExecutionGateway(Protocol):
         """Return one bounded page of Fill or Deal history."""
         ...
 
-    def list_positions(self, account_id: str | None = None) -> list[VenuePositionSnapshot]:
-        """Return current external position snapshots."""
-        ...
-
     def list_balances(self, account_id: str | None = None) -> list[VenueBalanceSnapshot]:
         """Return current external balance snapshots."""
         ...
 
     def get_account_risk(self, account_id: str) -> VenueAccountRiskSnapshot:
         """Return account-level authoritative margin and stop-out evidence."""
-        ...
-
-    def get_account_snapshot(self, account_id: str) -> VenueAccountSnapshot:
-        """Return one authoritative account snapshot for one sync cycle."""
         ...
 
     def transfer_internal_capital(
@@ -172,3 +188,12 @@ class ExecutionGateway(Protocol):
     def capabilities(self) -> GatewayCapabilitiesResponse:
         """Return fail-closed adapter readiness without exposing secrets."""
         ...
+
+    def health(self) -> GatewayCapabilitiesResponse:
+        """Return account/adapter readiness without causing an external write."""
+        ...
+
+
+# Compatibility import for code outside Runtime. Runtime routes and recovery use
+# VenueGateway; venue-specific adapters remain implementation details.
+ExecutionGateway = VenueGateway

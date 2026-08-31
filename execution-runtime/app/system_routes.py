@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 from fastapi import APIRouter
 
 from app.config import Settings
-from app.gateway import ExecutionGateway
+from app.gateway import VenueGateway
 from app.journal import journal_status
 from app.models import RuntimeStatusResponse
 from app.version import PLATFORM_VERSION
@@ -17,7 +17,7 @@ PROCESS_STARTED_AT = datetime.now(UTC)
 def create_system_router(
     *,
     settings: Settings,
-    gateway: ExecutionGateway,
+    gateway: VenueGateway,
 ) -> APIRouter:
     router = APIRouter()
 

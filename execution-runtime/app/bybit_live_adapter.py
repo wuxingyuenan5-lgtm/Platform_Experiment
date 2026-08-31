@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from decimal import Decimal
-from typing import Any, Literal, cast
+from typing import Any, cast
 from uuid import NAMESPACE_URL, uuid5
 
 from app.config import Settings
@@ -34,6 +34,7 @@ from app.models import (
     VenueOrderSnapshot,
     VenuePositionSnapshot,
 )
+from app.order_semantics import normalize_bybit_order_status
 from app.secret_resolver import inspect_credential_reference, resolve_secret_reference
 
 
@@ -740,25 +741,6 @@ class BybitLiveAdapter:
                 )
                 self._require_success(response, "Bybit order snapshot query failed")
                 for row in self._result_list(response):
-                    status_map: dict[
-                        str,
-                        Literal[
-                            "accepted",
-                            "partially_filled",
-                            "filled",
-                            "canceled",
-                            "rejected",
-                            "unknown",
-                        ],
-                    ] = {
-                        "New": "accepted",
-                        "Created": "accepted",
-                        "PartiallyFilled": "partially_filled",
-                        "Filled": "filled",
-                        "Cancelled": "canceled",
-                        "Canceled": "canceled",
-                        "Rejected": "rejected",
-                    }
                     symbol = str(row.get("symbol") or "").upper()
                     row_category = str(row.get("category") or category).lower()
                     instrument_type = self._instrument_type_for_category(row_category)
@@ -790,7 +772,7 @@ class BybitLiveAdapter:
                         orderType="market" if str(row.get("orderType")) == "Market" else "limit",
                         quantity=Decimal(str(row.get("qty") or "0")),
                         price=self._optional_decimal(row.get("price")),
-                        status=status_map.get(str(row.get("orderStatus")), "unknown"),
+                        status=normalize_bybit_order_status(row.get("orderStatus")),
                         filledQuantity=Decimal(str(row.get("cumExecQty") or "0")),
                         averageFillPrice=self._optional_decimal(row.get("avgPrice")),
                         occurredAt=self._millis(row.get("createdTime")),
@@ -1059,18 +1041,6 @@ class BybitLiveAdapter:
             raise GatewayConfigurationError("Unable to obtain Bybit reference price") from exc
 
     def _order_snapshot(self, row: dict[str, object], route) -> VenueOrderSnapshot:
-        status_map: dict[
-            str,
-            Literal["accepted", "partially_filled", "filled", "canceled", "rejected", "unknown"],
-        ] = {
-            "New": "accepted",
-            "Created": "accepted",
-            "PartiallyFilled": "partially_filled",
-            "Filled": "filled",
-            "Cancelled": "canceled",
-            "Canceled": "canceled",
-            "Rejected": "rejected",
-        }
         return VenueOrderSnapshot(
             source=self.name,
             externalOrderId=str(row.get("orderId") or route.external_order_id or "unknown"),
@@ -1083,7 +1053,7 @@ class BybitLiveAdapter:
             orderType="market" if str(row.get("orderType")) == "Market" else "limit",
             quantity=Decimal(str(row.get("qty") or "0")),
             price=self._optional_decimal(row.get("price")),
-            status=status_map.get(str(row.get("orderStatus")), "unknown"),
+            status=normalize_bybit_order_status(row.get("orderStatus")),
             filledQuantity=Decimal(str(row.get("cumExecQty") or "0")),
             averageFillPrice=self._optional_decimal(row.get("avgPrice")),
             occurredAt=self._millis(row.get("createdTime")),

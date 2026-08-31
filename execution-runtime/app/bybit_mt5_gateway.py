@@ -58,6 +58,37 @@ class BybitMt5Gateway:
         # lazily from the explicit account id on the first account-scoped call.
         self.mt5: Any = mt5 or StrictMt5AcceptanceAdapter(self.settings)
 
+    def place_order(self, command: SubmitOrderCommand) -> list[ExecutionEvent]:
+        return self.submit_order(command)
+
+    def get_account(self, account_id: str) -> VenueAccountSnapshot:
+        return self.get_account_snapshot(account_id)
+
+    def get_positions(self, account_id: str | None = None) -> list[VenuePositionSnapshot]:
+        return self.list_positions(account_id)
+
+    def get_open_orders(
+        self,
+        *,
+        account_id: str | None = None,
+        symbol: str | None = None,
+        limit: int = 50,
+    ) -> list[VenueOrderSnapshot]:
+        return [
+            order
+            for order in self.list_orders(account_id=account_id, symbol=symbol, limit=limit)
+            if order.status in {"accepted", "partially_filled"}
+        ][:limit]
+
+    def get_order_history(self, **kwargs) -> VenueOrderHistoryPage:
+        return self.query_order_history(**kwargs)
+
+    def get_fill_history(self, **kwargs) -> VenueFillHistoryPage:
+        return self.query_fill_history(**kwargs)
+
+    def health(self) -> GatewayCapabilitiesResponse:
+        return self.capabilities()
+
     def submit_order(self, command: SubmitOrderCommand) -> list[ExecutionEvent]:
         adapter = self._adapter_for_account(command.account_id)
         return adapter.submit_order(command)

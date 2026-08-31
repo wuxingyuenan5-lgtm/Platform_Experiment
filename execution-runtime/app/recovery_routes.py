@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException
 
-from app.gateway import ExecutionGateway
+from app.gateway import VenueGateway
 from app.journal import JournalEventError
 from app.runtime_contracts import RuntimeExecutionEventV1, version_execution_events
 from app.runtime_recovery import (
@@ -13,7 +13,7 @@ from app.runtime_recovery import (
 )
 
 
-def create_recovery_router(*, gateway: ExecutionGateway) -> APIRouter:
+def create_recovery_router(*, gateway: VenueGateway) -> APIRouter:
     router = APIRouter()
 
     @router.post(

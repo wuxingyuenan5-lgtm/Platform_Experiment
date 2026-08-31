@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 
-from app.gateway import ExecutionGateway
+from app.gateway import VenueGateway
 from app.gateway_errors import (
     GatewayConfigurationError,
     GatewayQueryUnsupportedError,
@@ -17,6 +17,7 @@ from app.journal import (
     save_command_events,
 )
 from app.models import ExecutionEvent, VenueFillSnapshot, VenueOrderSnapshot
+from app.order_semantics import FillEvidenceConflictError, canonical_fills
 
 PROCESSING_STALE_AFTER = timedelta(seconds=30)
 
@@ -113,7 +114,11 @@ def _fill_events(
     fills: list[VenueFillSnapshot],
 ) -> list[ExecutionEvent]:
     events: list[ExecutionEvent] = []
-    for fill in sorted(fills, key=lambda item: (item.occurred_at, item.external_fill_id)):
+    try:
+        ordered_fills = canonical_fills(fills, requested_quantity=order.quantity)
+    except FillEvidenceConflictError as exc:
+        raise RecoveryEvidenceMismatchError(str(exc)) from exc
+    for fill in ordered_fills:
         _validate_fill(record, order, fill)
         events.append(
             ExecutionEvent(
@@ -152,7 +157,7 @@ def _fill_events(
 
 def _events_from_venue(
     record: RuntimeCommandRecord,
-    gateway: ExecutionGateway,
+    gateway: VenueGateway,
     order: VenueOrderSnapshot,
 ) -> list[ExecutionEvent]:
     _validate_order(record, order)
@@ -192,7 +197,7 @@ def _events_from_venue(
 def recover_command(
     command_id: str,
     *,
-    gateway: ExecutionGateway,
+    gateway: VenueGateway,
     now: datetime | None = None,
 ) -> list[ExecutionEvent]:
     """Recover one uncertain command from venue facts without resubmitting it."""

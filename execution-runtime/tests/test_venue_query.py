@@ -3,7 +3,8 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 
 from app.config import get_settings
-from app.main import app
+from app.fake_gateway import FakeGateway
+from app.main import create_app
 
 
 def test_fake_venue_state_is_queryable_and_persists_across_clients(tmp_path: Path) -> None:
@@ -20,7 +21,7 @@ def test_fake_venue_state_is_queryable_and_persists_across_clients(tmp_path: Pat
         "price": "100",
     }
 
-    with TestClient(app) as client:
+    with TestClient(create_app(FakeGateway())) as client:
         submitted = client.post("/commands/orders", json=command)
         assert submitted.status_code == 200
 
@@ -53,7 +54,7 @@ def test_fake_venue_state_is_queryable_and_persists_across_clients(tmp_path: Pat
         assert balance.status_code == 200
         assert balance.json()[0]["equity"] == "100000"
 
-    with TestClient(app) as restarted_client:
+    with TestClient(create_app(FakeGateway())) as restarted_client:
         order = restarted_client.get("/venue/orders/by-platform/venue-order-001")
         fills = restarted_client.get(
             "/venue/fills",
@@ -81,7 +82,7 @@ def test_fake_cancel_is_idempotent_and_does_not_claim_filled_order(tmp_path: Pat
         "reason": "test cancellation",
     }
 
-    with TestClient(app) as client:
+    with TestClient(create_app(FakeGateway())) as client:
         assert client.post("/commands/orders", json=command).status_code == 200
         first = client.post(
             "/venue/orders/FAKE-venue-order-cancel-001/cancel",

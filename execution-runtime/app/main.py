@@ -6,7 +6,7 @@ from fastapi import FastAPI
 
 from app.command_routes import create_command_router
 from app.config import get_settings
-from app.gateway import ExecutionGateway
+from app.gateway import VenueGateway
 from app.gateway_factory import create_gateway
 from app.gateway_routes import create_gateway_router
 from app.journal import initialize_journal
@@ -20,7 +20,7 @@ from app.version import PLATFORM_VERSION
 settings = get_settings()
 
 
-def create_app(gateway: ExecutionGateway | None = None) -> FastAPI:
+def create_app(gateway: VenueGateway | None = None) -> FastAPI:
     runtime_gateway = gateway or create_gateway(
         settings.gateway_name,
         live_write_enabled=settings.live_write_enabled,

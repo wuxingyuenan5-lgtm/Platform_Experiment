@@ -107,7 +107,7 @@ def test_empty_gateway_evidence_leaves_command_result_unknown(tmp_path: Path) ->
     class EmptyGateway:
         name = "empty"
 
-        def submit_order(self, _command: SubmitOrderCommand) -> list[ExecutionEvent]:
+        def place_order(self, _command: SubmitOrderCommand) -> list[ExecutionEvent]:
             return []
 
     command = build_command()

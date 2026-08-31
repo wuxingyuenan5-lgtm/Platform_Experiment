@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
-from typing import Any, Literal
+from typing import Any
 
 from app.gateway_errors import (
     GatewayConfigurationError,
@@ -18,6 +18,7 @@ from app.models import (
     VenueOrderSnapshot,
 )
 from app.mt5_position_closing_adapter import Mt5PositionClosingAdapter
+from app.order_semantics import OrderStatus, normalize_mt5_order_status
 
 
 class Mt5AcceptanceAdapter(Mt5PositionClosingAdapter):
@@ -433,24 +434,5 @@ class Mt5AcceptanceAdapter(Mt5PositionClosingAdapter):
             )
 
     @staticmethod
-    def _status(
-        mt5, state: int
-    ) -> Literal["accepted", "partially_filled", "filled", "canceled", "rejected", "unknown"]:
-        if state in {
-            int(getattr(mt5, "ORDER_STATE_STARTED", 0)),
-            int(getattr(mt5, "ORDER_STATE_PLACED", 1)),
-            int(getattr(mt5, "ORDER_STATE_REQUEST_ADD", 7)),
-        }:
-            return "accepted"
-        if state == int(getattr(mt5, "ORDER_STATE_PARTIAL", 3)):
-            return "partially_filled"
-        if state == int(getattr(mt5, "ORDER_STATE_FILLED", 4)):
-            return "filled"
-        if state in {
-            int(getattr(mt5, "ORDER_STATE_CANCELED", 2)),
-            int(getattr(mt5, "ORDER_STATE_EXPIRED", 6)),
-        }:
-            return "canceled"
-        if state == int(getattr(mt5, "ORDER_STATE_REJECTED", 5)):
-            return "rejected"
-        return "unknown"
+    def _status(mt5, state: int) -> OrderStatus:
+        return normalize_mt5_order_status(mt5, state)

@@ -3,7 +3,8 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 
 from app.config import get_settings
-from app.main import app
+from app.fake_gateway import FakeGateway
+from app.main import create_app
 from app.version import PLATFORM_VERSION
 
 
@@ -13,7 +14,7 @@ def test_runtime_persists_events_and_replays_duplicate_command(tmp_path: Path) -
     payload = {
         "command_id": "command-001",
         "platform_order_id": "order-001",
-        "account_id": "account_sim_usdt",
+        "account_id": "account_crypto_test",
         "instrument_id": "instrument_btc_usdt",
         "symbol": "BTCUSDT",
         "side": "buy",
@@ -22,7 +23,7 @@ def test_runtime_persists_events_and_replays_duplicate_command(tmp_path: Path) -
         "price": "100",
     }
 
-    with TestClient(app) as client:
+    with TestClient(create_app(FakeGateway())) as client:
         first = client.post("/commands/orders", json=payload)
         second = client.post("/commands/orders", json=payload)
 
@@ -32,7 +33,7 @@ def test_runtime_persists_events_and_replays_duplicate_command(tmp_path: Path) -
         assert [event["event_type"] for event in first.json()] == [
             "order_acknowledged",
             "order_filled",
-        ]
+        ], first.json()[0].get("reason")
 
         events = client.get("/commands/command-001/events")
         assert events.status_code == 200

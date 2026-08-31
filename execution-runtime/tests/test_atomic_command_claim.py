@@ -41,7 +41,7 @@ def test_duplicate_http_command_reuses_events_without_second_gateway_call(
         def __init__(self) -> None:
             self.calls = 0
 
-        def submit_order(self, command: SubmitOrderCommand) -> list[ExecutionEvent]:
+        def place_order(self, command: SubmitOrderCommand) -> list[ExecutionEvent]:
             self.calls += 1
             return [
                 ExecutionEvent(

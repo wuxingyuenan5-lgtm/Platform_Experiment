@@ -4,7 +4,7 @@ from fastapi import APIRouter
 
 from app.config import Settings
 from app.cross_spread_market import build_cross_spread_snapshot
-from app.gateway import ExecutionGateway
+from app.gateway import VenueGateway
 from app.models import (
     CrossSpreadSnapshotResponse,
     GatewayCapabilitiesResponse,
@@ -35,7 +35,7 @@ def _credential_required_fields(
     return ("API_KEY", "SECRET")
 
 
-def create_gateway_router(*, settings: Settings, gateway: ExecutionGateway) -> APIRouter:
+def create_gateway_router(*, settings: Settings, gateway: VenueGateway) -> APIRouter:
     router = APIRouter()
 
     @router.get(

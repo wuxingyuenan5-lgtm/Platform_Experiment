@@ -1,13 +1,13 @@
 from app.bybit_mt5_gateway import BybitMt5Gateway
 from app.fake_gateway import FakeGateway
-from app.gateway import ExecutionGateway
+from app.gateway import VenueGateway
 
 
 def create_gateway(
     gateway_name: str,
     *,
     live_write_enabled: bool = False,
-) -> ExecutionGateway:
+) -> VenueGateway:
     normalized_name = gateway_name.strip().lower()
     if normalized_name in {"fake", "simulation"}:
         if live_write_enabled:

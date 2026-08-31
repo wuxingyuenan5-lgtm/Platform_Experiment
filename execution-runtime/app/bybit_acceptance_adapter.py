@@ -20,6 +20,7 @@ from app.models import (
     VenueOrderHistoryPage,
     VenueOrderSnapshot,
 )
+from app.order_semantics import normalize_bybit_order_status
 
 
 class BybitAcceptanceAdapter(BybitFillConfirmingAdapter):
@@ -443,16 +444,6 @@ class BybitAcceptanceAdapter(BybitFillConfirmingAdapter):
         )
         if instrument_id is None:
             return None
-        status_map = {
-            "New": "accepted",
-            "Created": "accepted",
-            "PartiallyFilled": "partially_filled",
-            "Filled": "filled",
-            "Cancelled": "canceled",
-            "Canceled": "canceled",
-            "Rejected": "rejected",
-            "Deactivated": "canceled",
-        }
         external_identity = f"external:{self.name}:{order_id}"
         quantity = Decimal(str(row.get("qty") or "0"))
         filled = Decimal(str(row.get("cumExecQty") or "0"))
@@ -474,7 +465,7 @@ class BybitAcceptanceAdapter(BybitFillConfirmingAdapter):
             ),
             quantity=quantity,
             price=self._optional_decimal(row.get("price")),
-            status=status_map.get(str(row.get("orderStatus")), "unknown"),
+            status=normalize_bybit_order_status(row.get("orderStatus")),
             filledQuantity=filled,
             remainingQuantity=remaining,
             averageFillPrice=self._optional_decimal(row.get("avgPrice")),

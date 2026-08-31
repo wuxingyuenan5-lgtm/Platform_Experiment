@@ -30,11 +30,11 @@ def test_main_is_bounded_composition_root() -> None:
         assert factory in source
 
 
-def test_main_only_defines_lifecycle_and_composition_functions() -> None:
+def test_main_only_defines_the_composition_function_at_module_scope() -> None:
     tree = ast.parse(MAIN.read_text(encoding="utf-8"))
     functions = {
         node.name
         for node in tree.body
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
     }
-    assert functions == {"lifespan", "create_app"}
+    assert functions == {"create_app"}

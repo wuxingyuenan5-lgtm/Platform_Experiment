@@ -31,6 +31,7 @@ from app.models import (
 )
 from app.mt5_connection import initialize_mt5
 from app.mt5_read_coordinator import COORDINATOR
+from app.order_semantics import normalize_mt5_order_status
 from app.secret_resolver import inspect_credential_reference, resolve_secret_reference
 
 
@@ -601,24 +602,7 @@ class Mt5LiveAdapter:
 
     def _order_snapshot(self, mt5, row, route) -> VenueOrderSnapshot:
         state = int(getattr(row, "state", -1))
-        status = "unknown"
-        if state in {
-            int(getattr(mt5, "ORDER_STATE_STARTED", 0)),
-            int(getattr(mt5, "ORDER_STATE_PLACED", 1)),
-            int(getattr(mt5, "ORDER_STATE_REQUEST_ADD", 7)),
-        }:
-            status = "accepted"
-        elif state == int(getattr(mt5, "ORDER_STATE_PARTIAL", 3)):
-            status = "partially_filled"
-        elif state == int(getattr(mt5, "ORDER_STATE_FILLED", 4)):
-            status = "filled"
-        elif state in {
-            int(getattr(mt5, "ORDER_STATE_CANCELED", 2)),
-            int(getattr(mt5, "ORDER_STATE_EXPIRED", 6)),
-        }:
-            status = "canceled"
-        elif state == int(getattr(mt5, "ORDER_STATE_REJECTED", 5)):
-            status = "rejected"
+        status = normalize_mt5_order_status(mt5, state)
         order_type_value = int(getattr(row, "type", -1))
         buy_types = {
             int(getattr(mt5, "ORDER_TYPE_BUY", 0)),

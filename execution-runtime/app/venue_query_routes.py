@@ -7,7 +7,7 @@ from typing import Annotated, Literal
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
-from app.gateway import ExecutionGateway
+from app.gateway import VenueGateway
 from app.gateway_errors import (
     GatewayConfigurationError,
     GatewayRequestRejectedError,
@@ -40,7 +40,7 @@ class BybitLeverageRequest(BaseModel):
     leverage: Decimal = Field(gt=0, le=100)
 
 
-def create_venue_query_router(*, gateway: ExecutionGateway) -> APIRouter:
+def create_venue_query_router(*, gateway: VenueGateway) -> APIRouter:
     router = APIRouter()
 
     @router.post("/venue/bybit/leverage", tags=["venue-write"])
@@ -86,7 +86,7 @@ def create_venue_query_router(*, gateway: ExecutionGateway) -> APIRouter:
     ) -> VenueOrderHistoryPage:
         bounded_start, bounded_end = history_window(start_time, end_time)
         return query_gateway(
-            lambda: gateway.query_order_history(
+            lambda: gateway.get_order_history(
                 account_id=account_id,
                 symbol=symbol,
                 start_time=bounded_start,
@@ -154,7 +154,7 @@ def create_venue_query_router(*, gateway: ExecutionGateway) -> APIRouter:
     ) -> VenueFillHistoryPage:
         bounded_start, bounded_end = history_window(start_time, end_time)
         return query_gateway(
-            lambda: gateway.query_fill_history(
+            lambda: gateway.get_fill_history(
                 account_id=account_id,
                 symbol=symbol,
                 start_time=bounded_start,
@@ -172,7 +172,7 @@ def create_venue_query_router(*, gateway: ExecutionGateway) -> APIRouter:
     def venue_positions(
         account_id: str | None = Query(default=None, alias="accountId"),
     ) -> list[VenuePositionSnapshot]:
-        return query_gateway(lambda: gateway.list_positions(account_id))
+        return query_gateway(lambda: gateway.get_positions(account_id))
 
     @router.get("/venue/balances", response_model=list[VenueBalanceSnapshot], tags=["venue-query"])
     def venue_balances(
@@ -198,7 +198,7 @@ def create_venue_query_router(*, gateway: ExecutionGateway) -> APIRouter:
     def venue_account_snapshot(
         account_id: str = Query(alias="accountId"),
     ) -> VenueAccountSnapshot:
-        return query_gateway(lambda: gateway.get_account_snapshot(account_id))
+        return query_gateway(lambda: gateway.get_account(account_id))
 
     @router.post(
         "/venue/internal-capital-transfers",

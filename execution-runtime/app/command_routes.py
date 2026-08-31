@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException
 
-from app.gateway import ExecutionGateway
+from app.gateway import VenueGateway
 from app.gateway_errors import (
     GatewayConfigurationError,
     GatewayRequestRejectedError,
@@ -23,7 +23,7 @@ from app.runtime_contracts import (
 )
 
 
-def create_command_router(*, gateway: ExecutionGateway) -> APIRouter:
+def create_command_router(*, gateway: VenueGateway) -> APIRouter:
     router = APIRouter()
 
     @router.post(
@@ -42,7 +42,7 @@ def create_command_router(*, gateway: ExecutionGateway) -> APIRouter:
             return version_execution_events(events)
 
         try:
-            events = gateway.submit_order(command)
+            events = gateway.place_order(command)
         except (GatewayConfigurationError, GatewayRequestRejectedError) as exc:
             events = [
                 ExecutionEvent(
