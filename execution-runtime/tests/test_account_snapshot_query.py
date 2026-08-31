@@ -9,6 +9,7 @@ from app.bybit_live_adapter import BybitLiveAdapter
 from app.bybit_mt5_gateway import BybitMt5Gateway
 from app.config import Settings
 from app.mt5_read_coordinator import COORDINATOR, with_mt5_read_session
+from app.strict_live_acceptance_adapters import StrictMt5AcceptanceAdapter
 
 
 class FakeScopedBybitClient:
@@ -158,6 +159,7 @@ class FakeMt5SnapshotProvider:
 
 
 def configure_mt5_refs(monkeypatch) -> None:
+    monkeypatch.setenv("VG_RUNTIME_LIVE_WRITE_ENABLED", "false")
     monkeypatch.setenv("VG_SECRET_MT5_MAIN_LOGIN", "111111")
     monkeypatch.setenv("VG_SECRET_MT5_MAIN_PASSWORD", "main-pass")
     monkeypatch.setenv("VG_SECRET_MT5_MAIN_SERVER", "Broker-Main")
@@ -190,7 +192,7 @@ def test_bybit_account_snapshot_uses_scoped_categories() -> None:
     assert "positions:spot" not in client.categories
 
 
-def test_mt5_instrument_query_does_not_forward_bybit_scope_arguments() -> None:
+def test_mt5_instrument_query_does_not_forward_bybit_scope_arguments(monkeypatch) -> None:
     calls: list[dict[str, str]] = []
 
     class Mt5InstrumentAdapter:
@@ -201,7 +203,7 @@ def test_mt5_instrument_query_does_not_forward_bybit_scope_arguments() -> None:
     settings = Settings(mt5_account_ids="mt5-live-main")
     gateway = BybitMt5Gateway(settings=settings)
     gateway.mt5 = Mt5InstrumentAdapter()
-
+    gateway._injected_mt5 = gateway.mt5
     result = gateway.get_instrument_specification(
         account_id="mt5-live-main",
         symbol="XAUUSD.s",
@@ -230,12 +232,85 @@ def test_mt5_account_snapshot_switches_once_and_restores_primary(monkeypatch) ->
         bybit=None,
         mt5=None,
     )
-    gateway.mt5 = gateway.mt5.__class__(gateway.settings, provider)
+    gateway.mt5 = StrictMt5AcceptanceAdapter(gateway.settings, provider)
+    gateway._injected_mt5 = gateway.mt5
 
     snapshot = gateway.get_account_snapshot("account_mt5_short_term_a")
 
     assert snapshot.venue == "mt5"
     assert provider.login_calls == [("222222", "Broker-Short"), ("111111", "Broker-Main")]
+
+
+def test_mt5_explicit_risk_read_uses_fixed_account_worker(monkeypatch) -> None:
+    COORDINATOR.clear_restore_failure()
+    configure_mt5_refs(monkeypatch)
+    provider = FakeMt5SnapshotProvider()
+    provider.current_login = "222222"
+    provider.current_server = "Broker-Short"
+    settings = Settings(
+        mt5_account_ids="mt5-live-main,account_mt5_short_term_a",
+        mt5_account_credential_refs=(
+            "mt5-live-main=secret://environment/mt5-main,"
+            "account_mt5_short_term_a=secret://environment/mt5-short-a"
+        ),
+        mt5_primary_account_id="mt5-live-main",
+        mt5_instrument_map="XAUUSD+=instrument_xau_usd",
+    )
+    gateway = BybitMt5Gateway(settings=settings)
+    gateway.mt5 = StrictMt5AcceptanceAdapter(settings, provider)
+    gateway._injected_mt5 = gateway.mt5
+
+    risk = gateway.get_account_risk("account_mt5_short_term_a")
+
+    assert risk.account_id == "account_mt5_short_term_a"
+    assert provider.login_calls == []
+
+
+def test_mt5_primary_risk_read_does_not_relogin_current_primary(monkeypatch) -> None:
+    COORDINATOR.clear_restore_failure()
+    configure_mt5_refs(monkeypatch)
+    provider = FakeMt5SnapshotProvider()
+    settings = Settings(
+        mt5_account_ids="mt5-live-main,account_mt5_short_term_a",
+        mt5_account_credential_refs=(
+            "mt5-live-main=secret://environment/mt5-main,"
+            "account_mt5_short_term_a=secret://environment/mt5-short-a"
+        ),
+        mt5_primary_account_id="mt5-live-main",
+        mt5_instrument_map="XAUUSD+=instrument_xau_usd",
+    )
+    gateway = BybitMt5Gateway(settings=settings)
+    gateway.mt5 = StrictMt5AcceptanceAdapter(settings, provider)
+    gateway._injected_mt5 = gateway.mt5
+
+    risk = gateway.get_account_risk("mt5-live-main")
+
+    assert risk.account_id == "mt5-live-main"
+    assert provider.login_calls == []
+
+
+def test_mt5_non_primary_session_is_paused_while_live_write_is_enabled(monkeypatch) -> None:
+    COORDINATOR.clear_restore_failure()
+    configure_mt5_refs(monkeypatch)
+    provider = FakeMt5SnapshotProvider()
+    settings = Settings(
+        live_write_enabled=True,
+        mt5_account_ids="mt5-live-main,account_mt5_short_term_a",
+        mt5_account_credential_refs=(
+            "mt5-live-main=secret://environment/mt5-main,"
+            "account_mt5_short_term_a=secret://environment/mt5-short-a"
+        ),
+        mt5_primary_account_id="mt5-live-main",
+        mt5_instrument_map="XAUUSD+=instrument_xau_usd",
+    )
+    gateway = BybitMt5Gateway(settings=settings)
+    gateway.mt5 = StrictMt5AcceptanceAdapter(settings, provider)
+    gateway._injected_mt5 = gateway.mt5
+
+    with pytest.raises(Exception, match="MT5_NON_PRIMARY_SESSION_PAUSED"):
+        gateway.get_account_snapshot("account_mt5_short_term_a")
+
+    assert provider.login_calls == []
 
 
 def test_mt5_restore_failure_fail_closes_readiness(monkeypatch) -> None:
@@ -252,7 +327,8 @@ def test_mt5_restore_failure_fail_closes_readiness(monkeypatch) -> None:
         mt5_instrument_map="XAUUSD+=instrument_xau_usd",
     )
     gateway = BybitMt5Gateway(settings=settings)
-    gateway.mt5 = gateway.mt5.__class__(settings, provider)
+    gateway.mt5 = StrictMt5AcceptanceAdapter(settings, provider)
+    gateway._injected_mt5 = gateway.mt5
 
     with pytest.raises(Exception, match="restore failed"):
         gateway.get_account_snapshot("account_mt5_short_term_a")
@@ -261,7 +337,7 @@ def test_mt5_restore_failure_fail_closes_readiness(monkeypatch) -> None:
     assert "MT5_PRIMARY_RESTORE_FAILED" in capability.missing_requirements
 
 
-def test_mt5_restore_failure_blocks_waiting_and_future_requests(monkeypatch) -> None:
+def test_mt5_restore_failure_blocks_until_primary_identity_recovers(monkeypatch) -> None:
     COORDINATOR.clear_restore_failure()
     configure_mt5_refs(monkeypatch)
 
@@ -323,18 +399,24 @@ def test_mt5_restore_failure_blocks_waiting_and_future_requests(monkeypatch) -> 
     assert provider.login_calls == [
         ("222222", "Broker-Short"),
         ("111111", "Broker-Main"),
+        ("111111", "Broker-Main"),
     ]
     assert "restore failed" in errors["A"]
     assert "MT5 login failed" in errors["B"]
 
-    with pytest.raises(Exception, match="MT5 login failed"):
-        with_mt5_read_session(
-            mt5=provider,
-            settings=settings,
-            account_id="account_mt5_short_term_a",
-            callback=lambda _session: "unexpected",
-        )
+    provider.fail_restore = False
+    recovered = with_mt5_read_session(
+        mt5=provider,
+        settings=settings,
+        account_id="account_mt5_short_term_a",
+        callback=lambda _session: "recovered",
+    )
+    assert recovered == "recovered"
     assert provider.login_calls == [
+        ("222222", "Broker-Short"),
+        ("111111", "Broker-Main"),
+        ("111111", "Broker-Main"),
+        ("111111", "Broker-Main"),
         ("222222", "Broker-Short"),
         ("111111", "Broker-Main"),
     ]
@@ -423,7 +505,8 @@ def test_mt5_account_snapshot_keeps_unmapped_symbols_for_readonly_monitoring(mon
         bybit=None,
         mt5=None,
     )
-    gateway.mt5 = gateway.mt5.__class__(gateway.settings, provider)
+    gateway.mt5 = StrictMt5AcceptanceAdapter(gateway.settings, provider)
+    gateway._injected_mt5 = gateway.mt5
 
     snapshot = gateway.get_account_snapshot("account_mt5_short_term_a")
 
@@ -457,7 +540,8 @@ def test_mt5_unmapped_monitoring_identity_is_stable_and_account_scoped(monkeypat
         bybit=None,
         mt5=None,
     )
-    gateway.mt5 = gateway.mt5.__class__(gateway.settings, provider)
+    gateway.mt5 = StrictMt5AcceptanceAdapter(gateway.settings, provider)
+    gateway._injected_mt5 = gateway.mt5
 
     first = gateway.get_account_snapshot("account_mt5_short_term_a")
     second = gateway.get_account_snapshot("account_mt5_short_term_a")
@@ -499,7 +583,8 @@ def test_mt5_account_snapshot_reports_real_zero_when_positions_and_orders_are_em
         bybit=None,
         mt5=None,
     )
-    gateway.mt5 = gateway.mt5.__class__(gateway.settings, provider)
+    gateway.mt5 = StrictMt5AcceptanceAdapter(gateway.settings, provider)
+    gateway._injected_mt5 = gateway.mt5
 
     snapshot = gateway.get_account_snapshot("account_mt5_short_term_a")
 

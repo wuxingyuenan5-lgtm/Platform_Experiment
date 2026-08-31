@@ -13,6 +13,7 @@ from app.models import (
     MarketQuote,
     VenuePosition,
 )
+from app.mt5_connection import initialize_mt5
 from app.mt5_file_bridge import read_mt5_bridge_snapshot
 from app.secret_resolver import resolve_secret_reference
 
@@ -276,10 +277,11 @@ def _build_mt5_snapshot(
 
         login = int(credentials["LOGIN"])
         timeout_ms = int(timeout_seconds * 1000)
-        initialize_kwargs = {"timeout": timeout_ms}
-        if terminal_path:
-            initialize_kwargs["path"] = terminal_path
-        if not mt5_module.initialize(**initialize_kwargs):
+        if not initialize_mt5(
+            mt5_module,
+            terminal_path=terminal_path,
+            timeout=timeout_ms,
+        ):
             return _unavailable("mt5", symbol, "MT5 initialize failed")
         if not mt5_module.login(
             login,
@@ -356,12 +358,9 @@ def _read_mt5_terminal_swap_reason(symbol: str, terminal_path: str | None) -> st
     try:
         import MetaTrader5 as mt5  # type: ignore[import-not-found]
 
-        initialize_attempts: list[dict[str, object]] = []
-        if terminal_path:
-            initialize_attempts.append({"path": terminal_path})
-        initialize_attempts.append({})
-        for initialize_kwargs in initialize_attempts:
-            if not mt5.initialize(**initialize_kwargs):
+        initialize_attempts = [terminal_path, None] if terminal_path else [None]
+        for attempted_path in initialize_attempts:
+            if not initialize_mt5(mt5, terminal_path=attempted_path):
                 continue
             try:
                 symbol_info = mt5.symbol_info(symbol)

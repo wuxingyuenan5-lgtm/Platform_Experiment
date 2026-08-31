@@ -10,12 +10,14 @@ class FakeMt5MarketData:
     ORDER_TYPE_BUY = 0
 
     def __init__(self) -> None:
+        self.initialize_args: tuple[object, ...] | None = None
         self.initialize_kwargs: dict[str, object] | None = None
         self.login_args: tuple[object, ...] | None = None
         self.login_kwargs: dict[str, object] | None = None
         self.shutdown_called = False
 
-    def initialize(self, **kwargs):
+    def initialize(self, *args, **kwargs):
+        self.initialize_args = args
         self.initialize_kwargs = kwargs
         return True
 
@@ -67,10 +69,8 @@ def test_direct_mt5_snapshot_exposes_swap_values(monkeypatch) -> None:
     assert "swapMode=1" in snapshot.reason
     assert "swapRollover3Days=3" in snapshot.reason
     assert "contractSize=100.0" in snapshot.reason
-    assert mt5.initialize_kwargs == {
-        "path": "C:/MT5/terminal64.exe",
-        "timeout": 8000,
-    }
+    assert mt5.initialize_args == ("C:/MT5/terminal64.exe",)
+    assert mt5.initialize_kwargs == {"timeout": 8000}
     assert mt5.login_args == (123456,)
     assert mt5.login_kwargs == {
         "password": "not-exposed",

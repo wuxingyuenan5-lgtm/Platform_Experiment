@@ -191,7 +191,7 @@ class Mt5AcceptanceAdapter(Mt5PositionClosingAdapter):
                 f"MT5 specification query failed: {mt5.last_error()}"
             )
         actual_login = str(getattr(account, "login", ""))
-        secret = self._secret()
+        secret = self._secret_for_account(account_id)
         return VenueInstrumentSpecification(
             source=self.name,
             accountId=account_id,

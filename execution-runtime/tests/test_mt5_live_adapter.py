@@ -122,6 +122,7 @@ class FakeMt5:
     def account_info(self):
         return SimpleNamespace(
             login=123456,
+            server="Broker-Live",
             currency="USD",
             equity=100000.0,
             margin_free=90000.0,
@@ -131,11 +132,11 @@ class FakeMt5:
 class FakeRuntimeMt5(FakeMt5):
     def __init__(self) -> None:
         super().__init__()
-        self.initialize_calls: list[dict[str, object]] = []
+        self.initialize_calls: list[tuple[tuple[object, ...], dict[str, object]]] = []
         self.login_calls: list[dict[str, object]] = []
 
-    def initialize(self, **kwargs):
-        self.initialize_calls.append(kwargs)
+    def initialize(self, *args, **kwargs):
+        self.initialize_calls.append((args, kwargs))
         return True
 
     def login(self, login, **kwargs):
@@ -203,8 +204,44 @@ def test_mt5_live_adapter_sets_terminal_timeouts(tmp_path, monkeypatch) -> None:
     balance = adapter.list_balances("account-mt5")[0]
 
     assert balance.equity == Decimal("100000.0")
-    assert fake_mt5.initialize_calls[0]["timeout"] == 8000
+    assert fake_mt5.initialize_calls[0][1]["timeout"] == 8000
     assert fake_mt5.login_calls[0]["timeout"] == 8000
+
+
+def test_mt5_live_adapter_passes_terminal_path_positionally(tmp_path, monkeypatch) -> None:
+    configure_mt5_secret(monkeypatch)
+    get_settings().journal_path = str(tmp_path / "mt5-path.db")
+    initialize_journal()
+    fake_mt5 = FakeRuntimeMt5()
+    monkeypatch.setitem(sys.modules, "MetaTrader5", fake_mt5)
+    monkeypatch.setattr("app.mt5_live_adapter.platform.system", lambda: "Windows")
+    settings = runtime_settings(write_enabled=False)
+    settings.mt5_terminal_path = "C:/MT5/terminal64.exe"
+
+    Mt5LiveAdapter(settings).list_balances("account-mt5")
+
+    args, kwargs = fake_mt5.initialize_calls[0]
+    assert args == ("C:/MT5/terminal64.exe",)
+    assert kwargs["timeout"] == 8000
+
+
+def test_mt5_live_adapter_rejects_wrong_runtime_server(tmp_path, monkeypatch) -> None:
+    configure_mt5_secret(monkeypatch)
+    get_settings().journal_path = str(tmp_path / "mt5-identity.db")
+    initialize_journal()
+    fake_mt5 = FakeRuntimeMt5()
+    original_account_info = fake_mt5.account_info
+
+    def wrong_server_info():
+        info = original_account_info()
+        return SimpleNamespace(**{**vars(info), "server": "Wrong-Broker"})
+
+    monkeypatch.setattr(fake_mt5, "account_info", wrong_server_info)
+    monkeypatch.setitem(sys.modules, "MetaTrader5", fake_mt5)
+    monkeypatch.setattr("app.mt5_live_adapter.platform.system", lambda: "Windows")
+
+    with pytest.raises(GatewayConfigurationError, match="identity does not match"):
+        Mt5LiveAdapter(runtime_settings(write_enabled=False)).list_balances("account-mt5")
 
 
 def test_mt5_live_adapter_maps_orders_deals_and_swap(tmp_path, monkeypatch) -> None:

@@ -169,7 +169,7 @@ def mt5_account_risk(adapter, account_id: str) -> VenueAccountRiskSnapshot:
     if info is None or terminal is None:
         raise GatewayResultUnknownError(f"MT5 account-risk query failed: {mt5.last_error()}")
     actual_login = str(getattr(info, "login", ""))
-    secret = adapter._secret()
+    secret = adapter._secret_for_account(account_id)
     if actual_login != str(secret["LOGIN"]):
         raise GatewayConfigurationError("Connected MT5 account does not match configured login")
     threshold_mode = str(int(getattr(info, "margin_so_mode", -1)))

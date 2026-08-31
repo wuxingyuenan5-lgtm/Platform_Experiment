@@ -20,19 +20,24 @@ from app.version import PLATFORM_VERSION
 settings = get_settings()
 
 
-@asynccontextmanager
-async def lifespan(_: FastAPI):
-    initialize_journal()
-    ensure_store()
-    ensure_live_store()
-    yield
-
-
 def create_app(gateway: ExecutionGateway | None = None) -> FastAPI:
     runtime_gateway = gateway or create_gateway(
         settings.gateway_name,
         live_write_enabled=settings.live_write_enabled,
     )
+
+    @asynccontextmanager
+    async def lifespan(_: FastAPI):
+        initialize_journal()
+        ensure_store()
+        ensure_live_store()
+        try:
+            yield
+        finally:
+            close = getattr(runtime_gateway, "close", None)
+            if close is not None:
+                close()
+
     application = FastAPI(
         title=settings.app_name,
         version=PLATFORM_VERSION,

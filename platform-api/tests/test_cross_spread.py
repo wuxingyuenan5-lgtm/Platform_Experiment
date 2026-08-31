@@ -2,12 +2,87 @@ from decimal import Decimal
 from pathlib import Path
 
 import httpx
+import pytest
+from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
 from app.config import get_settings
-from app.cross_spread import CrossSpreadLiveSizing
+from app.cross_spread import CrossSpreadLiveSizing, submit_cross_spread_market_command
+from app.cross_spread_live_read_client import LiveInstrumentSpecification
 from app.database import connection
 from app.main import app
+from app.schemas import CrossSpreadMarketCommandRequest
+
+
+def _live_specification(
+    *, account_id: str, symbol: str, venue: str, terminal_allowed: bool = True
+) -> LiveInstrumentSpecification:
+    is_mt5 = venue == "mt5_live"
+    return LiveInstrumentSpecification(
+        source=venue,
+        account_id=account_id,
+        instrument_id=("instrument_xau_usd_mt5" if is_mt5 else "instrument_xaut_usdt"),
+        symbol=symbol,
+        status="available" if is_mt5 else "Trading",
+        min_quantity=Decimal("0.01" if is_mt5 else "0.001"),
+        quantity_step=Decimal("0.01" if is_mt5 else "0.001"),
+        max_market_quantity=Decimal("100"),
+        contract_size=Decimal("100" if is_mt5 else "1"),
+        trade_mode="2" if is_mt5 else "live",
+        filling_mode="2",
+        access_checks=(
+            {
+                "accountLoginMatched": True,
+                "accountTradeAllowed": True,
+                "terminalTradeAllowed": terminal_allowed,
+            }
+            if is_mt5
+            else {
+                "readOnly": False,
+                "ipBound": True,
+                "orderPermission": True,
+                "positionPermission": True,
+            }
+        ),
+    )
+
+
+def test_cross_spread_mt5_preflight_failure_creates_no_execution_batch(
+    monkeypatch, tmp_path: Path
+) -> None:
+    settings = get_settings()
+    settings.database_path = str(tmp_path / "cross-spread-preflight.db")
+    settings.live_trading_enabled = True
+    settings.cross_spread_acceptance_max_quantity_oz = Decimal("1")
+    created = 0
+
+    monkeypatch.setattr(
+        "app.cross_spread._bound_cross_spread_account_id",
+        lambda role: "bybit-live-main" if role == "bybit_leg" else "mt5-live-main",
+    )
+
+    def specification(*, account_id: str, symbol: str):
+        return _live_specification(
+            account_id=account_id,
+            symbol=symbol,
+            venue="mt5_live" if account_id == "mt5-live-main" else "bybit_live",
+            terminal_allowed=account_id != "mt5-live-main",
+        )
+
+    def create_batch(_request):
+        nonlocal created
+        created += 1
+        raise AssertionError("execution batch must not be created after failed MT5 preflight")
+
+    monkeypatch.setattr("app.cross_spread.get_instrument_specification", specification)
+    monkeypatch.setattr("app.cross_spread.create_execution_batch", create_batch)
+
+    with pytest.raises(HTTPException, match="MT5 Terminal does not allow trading"):
+        submit_cross_spread_market_command(
+            CrossSpreadMarketCommandRequest(action="OPEN_SHORT", quantityOz=Decimal("1"))
+        )
+
+    assert created == 0
 
 
 def test_cross_spread_snapshot_proxies_runtime_market_data(monkeypatch, tmp_path: Path) -> None:

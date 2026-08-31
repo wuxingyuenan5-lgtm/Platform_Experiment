@@ -143,6 +143,36 @@ def command_exists(command_id: str) -> bool:
     return get_command(command_id) is not None
 
 
+def has_unresolved_command_for_account(
+    account_id: str,
+    *,
+    exclude_command_id: str | None = None,
+) -> bool:
+    """Return whether an account still owns an uncertain external write.
+
+    The Runtime Journal is the restart-safe authority. A new command must not
+    bypass an older processing/result-unknown command merely because its MT5
+    worker process was restarted.
+    """
+
+    query = """
+        SELECT payload_json
+        FROM runtime_commands
+        WHERE status IN ('processing', 'result_unknown')
+    """
+    parameters: tuple[object, ...] = ()
+    if exclude_command_id is not None:
+        query += " AND command_id <> ?"
+        parameters = (exclude_command_id,)
+    with connection() as db:
+        rows = db.execute(query, parameters).fetchall()
+    for row in rows:
+        command = SubmitOrderCommand.model_validate_json(row["payload_json"])
+        if command.account_id == account_id:
+            return True
+    return False
+
+
 def claim_command(command: SubmitOrderCommand) -> bool:
     """Atomically claim a command before any external gateway side effect."""
 

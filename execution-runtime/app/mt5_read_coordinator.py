@@ -81,6 +81,13 @@ class Mt5ReadOnlyCoordinator:
         account_id: str,
     ) -> Mt5ReadSession:
         session = self.resolve_session(settings, account_id)
+        current = mt5.account_info()
+        current_login = str(getattr(current, "login", "") or "")
+        current_server = str(getattr(current, "server", "") or "")
+        if current_login == session.login and current_server == session.server:
+            if account_id == settings.mt5_primary_account_id.strip():
+                self.clear_restore_failure()
+            return session
         timeout_ms = int(settings.mt5_check_timeout_seconds * 1000)
         secret = resolve_secret_reference(
             session.secret_ref,
@@ -99,6 +106,8 @@ class Mt5ReadOnlyCoordinator:
         actual_server = str(getattr(info, "server", "") or "")
         if actual_login != session.login or actual_server != session.server:
             raise GatewayConfigurationError("MT5 account identity mismatch after login")
+        if account_id == settings.mt5_primary_account_id.strip():
+            self.clear_restore_failure()
         return session
 
     def restore_primary(self, *, mt5: Any, settings: Settings) -> None:
@@ -111,6 +120,7 @@ class Mt5ReadOnlyCoordinator:
             self._restore_failed = True
             self._restore_failure_reason = str(exc)
             raise GatewayConfigurationError("MT5 primary account restore failed") from exc
+        self.clear_restore_failure()
 
     def probe_primary_health(self, *, mt5: Any, settings: Settings) -> None:
         with self.acquire():
@@ -130,6 +140,44 @@ class Mt5ReadOnlyCoordinator:
 COORDINATOR = Mt5ReadOnlyCoordinator()
 
 
+@contextmanager
+def mt5_account_session(
+    *,
+    mt5: Any,
+    settings: Settings,
+    account_id: str,
+):
+    """Serialize one explicit MT5 account session across every read and write.
+
+    MetaTrader5 controls one process-global Terminal session. A prior restore
+    failure is recoverable only by proving the primary identity again; it must
+    not permanently poison the Runtime after a transient IPC timeout.
+    """
+    with COORDINATOR.acquire():
+        primary_account_id = settings.mt5_primary_account_id.strip()
+        if settings.live_write_enabled and account_id != primary_account_id:
+            raise GatewayConfigurationError(
+                "MT5_NON_PRIMARY_SESSION_PAUSED_DURING_LIVE_WRITE"
+            )
+        if COORDINATOR.restore_failed:
+            COORDINATOR.login(
+                mt5=mt5,
+                settings=settings,
+                account_id=primary_account_id,
+            )
+        switched_away_from_primary = account_id != primary_account_id
+        try:
+            session = COORDINATOR.login(
+                mt5=mt5,
+                settings=settings,
+                account_id=account_id,
+            )
+            yield session
+        finally:
+            if switched_away_from_primary:
+                COORDINATOR.restore_primary(mt5=mt5, settings=settings)
+
+
 def with_mt5_read_session[T](
     *,
     mt5: Any,
@@ -137,17 +185,14 @@ def with_mt5_read_session[T](
     account_id: str,
     callback: Callable[[Mt5ReadSession], T],
 ) -> T:
-    with COORDINATOR.acquire():
-        COORDINATOR.assert_healthy()
+    with mt5_account_session(
+        mt5=mt5,
+        settings=settings,
+        account_id=account_id,
+    ) as session:
         try:
-            session = COORDINATOR.login(mt5=mt5, settings=settings, account_id=account_id)
             return callback(session)
         except GatewayConfigurationError:
             raise
         except Exception as exc:
             raise GatewayResultUnknownError("MT5 read-only snapshot failed") from exc
-        finally:
-            try:
-                COORDINATOR.restore_primary(mt5=mt5, settings=settings)
-            except GatewayConfigurationError:
-                raise

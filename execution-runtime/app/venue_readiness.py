@@ -290,9 +290,11 @@ server = os.getenv(f"{prefix}_SERVER")
 
 try:
     kwargs = {"login": int(login), "password": password, "server": server}
-    if terminal_path:
-        kwargs["path"] = terminal_path
-    ok = mt5.initialize(**kwargs)
+    ok = (
+        mt5.initialize(terminal_path, **kwargs)
+        if terminal_path
+        else mt5.initialize(**kwargs)
+    )
     if not ok:
         print(
             json.dumps(

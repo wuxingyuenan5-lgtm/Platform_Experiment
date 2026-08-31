@@ -94,6 +94,7 @@ class Settings(BaseSettings):
     mt5_credential_ref: str = "secret://environment/mt5-live-001"
     mt5_account_ids: str = ""
     mt5_account_credential_refs: str = ""
+    mt5_account_terminal_paths: str = ""
     mt5_primary_account_id: str = ""
     mt5_instrument_map: str = ""
     # Logical gold symbol used as the resolution base. The concrete broker name
@@ -101,6 +102,7 @@ class Settings(BaseSettings):
     # set MT5_INSTRUMENT_MAP for an explicit override.
     mt5_symbol: str = "XAUUSD"
     mt5_terminal_path: str | None = None
+    mt5_terminal_portable: bool = False
     mt5_bridge_file_path: str = Field(default_factory=default_mt5_bridge_file_path)
     mt5_check_timeout_seconds: float = 5.0
     mt5_magic_number: int = 5604001
@@ -195,6 +197,20 @@ class Settings(BaseSettings):
 
     def mt5_credential_for_account(self, account_id: str) -> str:
         return self.mt5_account_credentials.get(account_id, self.mt5_credential_ref)
+
+    @property
+    def mt5_account_terminals(self) -> dict[str, str]:
+        mapping: dict[str, str] = {}
+        for item in self._csv(self.mt5_account_terminal_paths):
+            if "=" not in item:
+                continue
+            account_id, terminal_path = item.split("=", 1)
+            if account_id.strip() and terminal_path.strip():
+                mapping[account_id.strip()] = terminal_path.strip()
+        return mapping
+
+    def mt5_terminal_for_account(self, account_id: str) -> str | None:
+        return self.mt5_account_terminals.get(account_id)
 
     @property
     def bybit_instruments(self) -> dict[str, str]:

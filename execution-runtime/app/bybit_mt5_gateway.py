@@ -27,8 +27,9 @@ from app.models import (
     VenueOrderSnapshot,
     VenuePositionSnapshot,
 )
+from app.mt5_account_worker import Mt5AccountWorkerSupervisor
 from app.mt5_live_adapter import Mt5LiveAdapter
-from app.mt5_read_coordinator import COORDINATOR, with_mt5_read_session
+from app.mt5_read_coordinator import with_mt5_read_session
 from app.strict_live_acceptance_adapters import (
     StrictBybitAcceptanceAdapter,
     StrictMt5AcceptanceAdapter,
@@ -45,21 +46,21 @@ class BybitMt5Gateway:
         settings: Settings | None = None,
         bybit: BybitLiveAdapter | None = None,
         mt5: Mt5LiveAdapter | None = None,
+        mt5_supervisor: Mt5AccountWorkerSupervisor | None = None,
     ) -> None:
         self.settings = settings or get_settings()
         self.bybit: Any = bybit or StrictBybitAcceptanceAdapter(self.settings)
+        self._injected_mt5: Any | None = mt5
+        self._mt5_supervisor = (
+            None if mt5 is not None else mt5_supervisor or Mt5AccountWorkerSupervisor(self.settings)
+        )
+        # Keep construction side-effect free. Production MT5 workers are created
+        # lazily from the explicit account id on the first account-scoped call.
         self.mt5: Any = mt5 or StrictMt5AcceptanceAdapter(self.settings)
 
     def submit_order(self, command: SubmitOrderCommand) -> list[ExecutionEvent]:
         adapter = self._adapter_for_account(command.account_id)
-        if command.account_id not in self.settings.mt5_accounts:
-            return adapter.submit_order(command)
-        # MetaTrader5's Python package controls one process-global Terminal
-        # session. Hold the same coordinator lock used by account snapshots so
-        # a read-only account switch cannot overlap order checks or order_send.
-        with COORDINATOR.acquire():
-            COORDINATOR.assert_healthy()
-            return adapter.submit_order(command)
+        return adapter.submit_order(command)
 
     def get_order(
         self,
@@ -71,16 +72,14 @@ class BybitMt5Gateway:
             route = get_order_route(platform_order_id=platform_order_id)
             if route is None:
                 return None
-            return self._adapter_by_name(route.adapter).get_order(
-                platform_order_id=platform_order_id,
-            )
+            adapter = self._adapter_by_name(route.adapter, account_id=route.account_id)
+            return adapter.get_order(platform_order_id=platform_order_id)
         if external_order_id is None:
             raise ValueError("Order identity is required")
         route = get_order_route(external_order_id=external_order_id)
         if route is not None:
-            return self._adapter_by_name(route.adapter).get_order(
-                external_order_id=external_order_id,
-            )
+            adapter = self._adapter_by_name(route.adapter, account_id=route.account_id)
+            return adapter.get_order(external_order_id=external_order_id)
         if external_order_id.isdigit():
             return self.mt5.get_order(external_order_id=external_order_id)
         return self.bybit.get_order(external_order_id=external_order_id)
@@ -94,14 +93,15 @@ class BybitMt5Gateway:
     ) -> list[VenueOrderSnapshot]:
         if account_id is not None:
             return self._adapter_for_account(account_id).list_orders(
-                account_id=account_id,
-                symbol=symbol,
-                limit=limit,
+                account_id=account_id, symbol=symbol, limit=limit
             )
-        snapshots = [
-            *self.bybit.list_orders(symbol=symbol, limit=limit),
-            *self.mt5.list_orders(symbol=symbol, limit=limit),
-        ]
+        snapshots = [*self.bybit.list_orders(symbol=symbol, limit=limit)]
+        for mt5_account_id in sorted(self.settings.mt5_accounts):
+            snapshots.extend(
+                self._mt5_adapter(mt5_account_id).list_orders(
+                    account_id=mt5_account_id, symbol=symbol, limit=limit
+                )
+            )
         snapshots.sort(key=lambda item: item.as_of, reverse=True)
         return snapshots[: max(1, limit)]
 
@@ -116,14 +116,10 @@ class BybitMt5Gateway:
         limit: int,
         scope: Literal["active", "closed"],
     ) -> VenueOrderHistoryPage:
-        return self._adapter_for_account(account_id).query_order_history(
-            account_id=account_id,
-            symbol=symbol,
-            start_time=start_time,
-            end_time=end_time,
-            cursor=cursor,
-            limit=limit,
-            scope=scope,
+        adapter = self._adapter_for_account(account_id)
+        return adapter.query_order_history(
+            account_id=account_id, symbol=symbol, start_time=start_time,
+            end_time=end_time, cursor=cursor, limit=limit, scope=scope,
         )
 
     def list_fills(
@@ -134,28 +130,33 @@ class BybitMt5Gateway:
         platform_order_id: str | None = None,
     ) -> list[VenueFillSnapshot]:
         if account_id is not None:
-            return self._adapter_for_account(account_id).list_fills(
-                account_id=account_id,
-                external_order_id=external_order_id,
+            adapter = self._adapter_for_account(account_id)
+            return adapter.list_fills(
+                account_id=account_id, external_order_id=external_order_id,
                 platform_order_id=platform_order_id,
             )
         if platform_order_id is not None:
             route = get_order_route(platform_order_id=platform_order_id)
             if route is None:
                 return []
-            return self._adapter_by_name(route.adapter).list_fills(
+            return self._adapter_by_name(route.adapter, account_id=route.account_id).list_fills(
                 platform_order_id=platform_order_id,
             )
         if external_order_id is not None:
             route = get_order_route(external_order_id=external_order_id)
             if route is not None:
-                return self._adapter_by_name(route.adapter).list_fills(
+                return self._adapter_by_name(route.adapter, account_id=route.account_id).list_fills(
                     external_order_id=external_order_id,
                 )
             if external_order_id.isdigit():
                 return self.mt5.list_fills(external_order_id=external_order_id)
             return self.bybit.list_fills(external_order_id=external_order_id)
-        return [*self.bybit.list_fills(), *self.mt5.list_fills()]
+        snapshots = [*self.bybit.list_fills()]
+        for mt5_account_id in sorted(self.settings.mt5_accounts):
+            snapshots.extend(
+                self._mt5_adapter(mt5_account_id).list_fills(account_id=mt5_account_id)
+            )
+        return snapshots
 
     def query_fill_history(
         self,
@@ -167,24 +168,27 @@ class BybitMt5Gateway:
         cursor: str | None,
         limit: int,
     ) -> VenueFillHistoryPage:
-        return self._adapter_for_account(account_id).query_fill_history(
-            account_id=account_id,
-            symbol=symbol,
-            start_time=start_time,
-            end_time=end_time,
-            cursor=cursor,
-            limit=limit,
+        adapter = self._adapter_for_account(account_id)
+        return adapter.query_fill_history(
+            account_id=account_id, symbol=symbol, start_time=start_time,
+            end_time=end_time, cursor=cursor, limit=limit,
         )
 
     def list_positions(self, account_id: str | None = None) -> list[VenuePositionSnapshot]:
         if account_id is not None:
             return self._adapter_for_account(account_id).list_positions(account_id)
-        return [*self.bybit.list_positions(), *self.mt5.list_positions()]
+        snapshots = [*self.bybit.list_positions()]
+        for mt5_account_id in sorted(self.settings.mt5_accounts):
+            snapshots.extend(self._mt5_adapter(mt5_account_id).list_positions(mt5_account_id))
+        return snapshots
 
     def list_balances(self, account_id: str | None = None) -> list[VenueBalanceSnapshot]:
         if account_id is not None:
             return self._adapter_for_account(account_id).list_balances(account_id)
-        return [*self.bybit.list_balances(), *self.mt5.list_balances()]
+        snapshots = [*self.bybit.list_balances()]
+        for mt5_account_id in sorted(self.settings.mt5_accounts):
+            snapshots.extend(self._mt5_adapter(mt5_account_id).list_balances(mt5_account_id))
+        return snapshots
 
     def get_account_risk(self, account_id: str) -> VenueAccountRiskSnapshot:
         return self._adapter_for_account(account_id).get_account_risk(account_id)
@@ -216,6 +220,8 @@ class BybitMt5Gateway:
                 asOf=risk.as_of,
                 dataQualityState=risk.data_quality_state,
             )
+        if hasattr(adapter, "get_account_snapshot"):
+            return adapter.get_account_snapshot(account_id)
         return self._mt5_account_snapshot(account_id)
 
     def transfer_internal_capital(
@@ -386,16 +392,21 @@ class BybitMt5Gateway:
                 instrument_id=instrument_id,
                 event_type=event_type,
             )
-        return [
+        snapshots = [
             *self.bybit.list_economic_events(
                 instrument_id=instrument_id,
                 event_type=event_type,
-            ),
-            *self.mt5.list_economic_events(
-                instrument_id=instrument_id,
-                event_type=event_type,
-            ),
+            )
         ]
+        for mt5_account_id in sorted(self.settings.mt5_accounts):
+            snapshots.extend(
+                self._mt5_adapter(mt5_account_id).list_economic_events(
+                    account_id=mt5_account_id,
+                    instrument_id=instrument_id,
+                    event_type=event_type,
+                )
+            )
+        return snapshots
 
     def cancel_order(
         self,
@@ -406,20 +417,35 @@ class BybitMt5Gateway:
         route = get_order_route(external_order_id=external_order_id)
         if route is None:
             raise GatewayConfigurationError("Live order route not found")
-        adapter = self._adapter_by_name(route.adapter)
-        if route.adapter != self.mt5.name:
-            return adapter.cancel_order(external_order_id, idempotency_key, reason)
-        with COORDINATOR.acquire():
-            COORDINATOR.assert_healthy()
-            return adapter.cancel_order(external_order_id, idempotency_key, reason)
+        return self._adapter_by_name(route.adapter, account_id=route.account_id).cancel_order(
+            external_order_id, idempotency_key, reason
+        )
 
     def capabilities(self) -> GatewayCapabilitiesResponse:
+        mt5_capability = self.mt5.capability()
+        if self._mt5_supervisor is not None:
+            missing = sorted(
+                set(mt5_capability.missing_requirements)
+                | set(self._mt5_supervisor.missing_requirements())
+            )
+            mt5_capability = mt5_capability.model_copy(
+                update={
+                    "configured": mt5_capability.configured and not missing,
+                    "operational": mt5_capability.operational and not missing,
+                    "write_enabled": mt5_capability.write_enabled and not missing,
+                    "missing_requirements": missing,
+                }
+            )
         return GatewayCapabilitiesResponse(
             gateway=self.name,
             environment=self.settings.environment,
             liveWriteEnabled=self.settings.live_write_enabled,
-            adapters=[self.bybit.capability(), self.mt5.capability()],
+            adapters=[self.bybit.capability(), mt5_capability],
         )
+
+    def close(self) -> None:
+        if self._mt5_supervisor is not None:
+            self._mt5_supervisor.close()
 
     def _adapter_for_account(self, account_id: str):
         in_bybit = account_id in self.settings.bybit_accounts
@@ -429,14 +455,22 @@ class BybitMt5Gateway:
         if in_bybit:
             return self.bybit
         if in_mt5:
-            return self.mt5
+            return self._mt5_adapter(account_id)
         raise GatewayConfigurationError("Account is not mapped to a live adapter")
 
-    def _adapter_by_name(self, name: str):
+    def _mt5_adapter(self, account_id: str):
+        if self._injected_mt5 is not None:
+            return self._injected_mt5
+        assert self._mt5_supervisor is not None
+        return self._mt5_supervisor.adapter(account_id)
+
+    def _adapter_by_name(self, name: str, *, account_id: str | None = None):
         if name == self.bybit.name:
             return self.bybit
         if name == self.mt5.name:
-            return self.mt5
+            if account_id is None:
+                raise GatewayConfigurationError("MT5 order route has no account identity")
+            return self._mt5_adapter(account_id)
         raise GatewayConfigurationError(f"Unknown live adapter route: {name}")
 
     def _mt5_account_snapshot(self, account_id: str) -> VenueAccountSnapshot:

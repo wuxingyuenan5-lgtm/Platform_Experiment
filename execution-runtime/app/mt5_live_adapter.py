@@ -29,6 +29,7 @@ from app.models import (
     VenueOrderSnapshot,
     VenuePositionSnapshot,
 )
+from app.mt5_connection import initialize_mt5
 from app.mt5_read_coordinator import COORDINATOR
 from app.secret_resolver import inspect_credential_reference, resolve_secret_reference
 
@@ -39,6 +40,7 @@ class Mt5LiveAdapter:
     def __init__(self, settings: Settings, provider: Any | None = None) -> None:
         self.settings = settings
         self._provider = provider
+        self._initialized = False
         self._connected = False
 
     def capability(self) -> GatewayAdapterCapability:
@@ -310,7 +312,7 @@ class Mt5LiveAdapter:
         if info is None:
             raise GatewayResultUnknownError(f"MT5 account_info failed: {mt5.last_error()}")
         actual_login = str(getattr(info, "login", ""))
-        secret = self._secret()
+        secret = self._secret_for_account(account)
         if actual_login != str(secret["LOGIN"]):
             raise GatewayConfigurationError("Connected MT5 account does not match configured login")
         as_of = datetime.now(UTC)
@@ -429,10 +431,12 @@ class Mt5LiveAdapter:
         mt5 = self._runtime_mt5()
         if self._provider is not None and not hasattr(mt5, "login"):
             return mt5
-        if self._connected and mt5.account_info() is not None:
-            return mt5
-        self._connected = False
         secret = self._secret()
+        if self._provider is not None and mt5.account_info() is not None:
+            return mt5
+        if self._connected:
+            self._assert_runtime_identity(mt5, secret)
+            return mt5
         timeout_ms = int(self.settings.mt5_check_timeout_seconds * 1000)
         authorized = mt5.login(
             int(secret["LOGIN"]),
@@ -442,6 +446,7 @@ class Mt5LiveAdapter:
         )
         if not authorized:
             raise GatewayConfigurationError(f"MT5 login failed: {mt5.last_error()}")
+        self._assert_runtime_identity(mt5, secret)
         self._connected = True
         return mt5
 
@@ -454,16 +459,31 @@ class Mt5LiveAdapter:
             import MetaTrader5 as mt5
         except ImportError as exc:
             raise GatewayConfigurationError("MetaTrader5 dependency is not installed") from exc
-        if self._connected and mt5.account_info() is not None:
+        if self._initialized:
             return mt5
         timeout_ms = int(self.settings.mt5_check_timeout_seconds * 1000)
-        initialize_kwargs: dict[str, object] = {"timeout": timeout_ms}
-        if self.settings.mt5_terminal_path:
-            initialize_kwargs["path"] = self.settings.mt5_terminal_path
-        initialized = mt5.initialize(**initialize_kwargs)
+        initialized = initialize_mt5(
+            mt5,
+            terminal_path=self.settings.mt5_terminal_path,
+            timeout=timeout_ms,
+            portable=self.settings.mt5_terminal_portable,
+        )
         if not initialized:
             raise GatewayConfigurationError(f"MT5 initialize failed: {mt5.last_error()}")
+        self._initialized = True
         return mt5
+
+    @staticmethod
+    def _assert_runtime_identity(mt5, secret: dict[str, str]) -> None:
+        info = mt5.account_info()
+        if info is None:
+            raise GatewayConfigurationError(
+                f"MT5 account identity unavailable: {mt5.last_error()}"
+            )
+        actual_login = str(getattr(info, "login", "") or "")
+        actual_server = str(getattr(info, "server", "") or "")
+        if actual_login != str(secret["LOGIN"]) or actual_server != str(secret["SERVER"]):
+            raise GatewayConfigurationError("MT5 account identity does not match configuration")
 
     def _resolve_command_symbol(self, mt5, command: SubmitOrderCommand) -> Any | None:
         """Resolve the concrete MT5 symbol for the command's logical symbol.

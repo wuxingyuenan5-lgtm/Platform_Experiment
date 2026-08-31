@@ -1,64 +1,57 @@
 # 策略模块架构工作流
 
-状态：`in_progress`  
-Owner：Founder CEO  
-更新时间：2026-08-29
-当前基线：Platform `0.11.2` 候选；已包含 Funding 收口、CEO 会话候选和本工作流 MT5 协调修正
+状态：进行中
 
-本文件是“策略模块架构”活跃阶段的唯一接续入口。它只维护当前范围、验收门、阻断和下一动作；稳定产品、合同和运维事实仍归属下方列出的长期权威文档。
+Owner：Founder CEO
 
-## 当前目标与范围
+更新日期：2026-08-30
 
-把创始人本地策略平台收敛为可恢复、可审计的真实账户闭环。本阶段把 Cross 与 Funding 作为同一个实盘测试工作流：二者共用逻辑账户 `bybit-live-main`，Cross 的另一腿使用 `mt5-live-main`。策略管理继续统一展示六个策略；Bottom 和 Short A 只读，Short B 暂不绑定，海内外价差暂停。
+本文件只保留跨任务接续所需的当前快照。产品、架构、合同和运维规则以文末的长期权威文档为准。
 
-Cross 保留开仓、平仓、移动双边资金三个模板；Owner 已明确官网手工操作不构成“移动双边资金”验收，第三模板必须最终接入可验证的 Bybit MT5/TradFi 正式划转能力。Funding 不使用生产 mock，开平仓必须进入 StrategyInstruction、immutable Plan、单一 Batch、权威成交、恢复和对账路径。共享账户通过 claim、余额预约和稳定业务身份避免两个 Alpha 策略互相干扰。
+## 当前目标与已确认边界
 
-当前不建设通用组合引擎、消息队列或新增服务，不开放 Bottom/Short 的交易，不做自动选币、自动定仓、无人值守 Live Write、未验证的自动资金划转或海内外价差实盘。
+本阶段把 Cross 与 Funding 收敛为可恢复、可对账的真实账户闭环。Funding 和 Cross 的 Bybit 腿共用逻辑账户 `bybit-live-main`，Cross 的 MT5 腿使用 `mt5-live-main`。策略管理继续统一展示六个策略；Bottom 和 Short A 只读，Short B 暂不绑定，海内外价差暂停。
 
-长期边界保持不变：Venue SDK 与外部副作用只在 Runtime；ACK 不等于 Fill；`result_unknown`、身份不一致和查询不可用均 fail-closed；FinancialFact 才是正式金融事实入口。任何真实订单仍需要 Owner 对具体策略、账户、Symbol、数量、执行政策和绝对过期时间作本次授权。
+Cross 保留开仓、平仓、移动双边资金三个模板。Funding 行情分析保留 Owner 原设计，交易执行使用真实 context、instruction identity、权威成交和对账链路，不使用生产 mock。两个 Alpha 策略共用 UTA 时，继续由 resource claim、余额预约和稳定业务身份防止相互干扰。
 
-## 当前快照
+Owner 已确认 MT5 多账户不再采用单 Terminal 运行期切换：每个活跃 MT5 逻辑账户必须使用独立 Terminal 实例和独立 Worker，由 Runtime 后台自动启动、路由、重连和健康检查，不要求 Owner 人工维护多个窗口。一个 Worker 启动后只能服务一个 `account_id`，监控账户不得切换或改变 Cross 执行会话。
 
-本地代码门已经通过。三服务常驻和登录链路可用；共享 UTA、Bottom、Cross MT5、Short A 均完成真实账户只读预检，Short A 切换后能恢复主 MT5 账号。Cross 开/单平/批平和三模板、Funding Spot/Perp context、开平仓、自动轮询、幂等恢复、权威已平量和 active/history 均有本地回归证据。
+当前不建设通用组合引擎、消息队列或新的独立业务服务；不开放 Bottom/Short 交易，不做无人值守 Live Write、自动选币、自动定仓、未验证的资金划转或海内外价差实盘。交易安全边界不在本文重复，以 Runbook 和执行合同为准。
 
-Funding 行情分析三组件已逐字恢复到 `731e21bb` 之前的 Owner 历史设计，继续使用原完整行情板、历史资金费率图、期现与借贷详情及其原筛选交互，不接入或改写实时执行数据；交易执行页单独使用真实 execution context、持仓组合与指令恢复链路，不再使用生产 mock。联调诊断卡和工程状态字段不再替代产品界面。策略管理中的“CEO 实盘测试会话”及其专用前端状态逻辑已移除。LiveTradingSession、Kill Switch、额度、幂等和 fail-closed 继续作为后台安全机制存在，但不构成策略产品页面或产品概念。
+## 目前做到哪里
 
-Cross 的辅助资金划转实验已经退出产品路径：第三模板不再提供官网跳转、复制金额或辅助记录。2026-08-29 的真实写入验收确认公开 V5 Internal Transfer 写接口只允许 `UNIFIED/FUND`；`FUND→TradFi` 被确定性拒绝并返回 `131203`。随后在 Owner 明确授权下，通过 Bybit 已登录网页的正式 MT5 CFD 专用合同完成唯一一笔 300 USDT 入金；权威页面显示 MT5 CFD 净值、余额和可用预付款均为 `300.00 USDx`，资金记录 `2026-08-29 13:08:41` 已完成。错误实验遗留的 Funding 300 USDT 已通过 V5 原路退回 UTA，transferId `0c45f9ed-1bdf-4291-b6c5-2c88acdf8746` 为 `SUCCESS`；最终 Funding `0`、UTA 可转 `686.3479`。官方网页使用 `/v3/private/asset/transfer/mt5/precheck|deposit|withdraw` 专用合同并依赖网页登录会话，现有 API Key 不能签署该合同。Runtime 继续在服务器认证缺失时 fail closed，真实资金已就位不等于第三模板的平台内自动划转验收通过。
+- 本地三服务受管启动和登录烟测链路已建立；策略管理使用服务端六策略概览和当前账户快照。
+- Funding 已有真实 Spot/Perp 执行上下文、开平仓、非终态追踪、幂等恢复、权威已平数量和 active/history 语义。
+- Cross 已有开仓、单平、批平、可恢复身份与双边账户资金展示。资金已就位，但平台内 MT5/TradFi 自动划转仍没有可部署的官方 API 授权，第三模板不能视为自动划转已验收。
+- Runtime 已改为按显式 `account_id` 路由到独立 MT5 Worker/Terminal；Worker 只有在 Terminal 初始化且 Login/Server 身份核验后才 ready，RPC 面收窄到明确查询与写入方法。Runtime Journal 中同账户存在未解决命令时，新 MT5 写入在 Worker/Runtime 重启后仍会阻断。
+- Short A 已有独立安装且账户登录成立，但新终端尚未完成外部 Python API 的一次性终端授权；它当前只影响 Short A 监控，不再改变 Cross 会话。
+- Cross 两端已经真实读取并核对为空仓、空单，MT5 固定账户身份与 `XAUUSD.s` 规格可读。Cross Terminal 的 Algo Trading 仍关闭。Runtime Journal 另有 8 条历史 Bybit `XAUTUSDT` `result_unknown`；当前 Venue 恢复查询无法证明其终态，不得删库或强制标记完成。
 
-最近验证包括 Platform 相关 53 tests、Runtime MT5 相关 17 tests，以及 Platform/Runtime Pyright、相关 Ruff、前端 typecheck、行为测试和 production build。Funding 历史行情与真实执行页已通过聚焦浏览器验收；多 MT5 凭据引用分类和只读预检状态枚举已与 Runtime 合同对齐，Bybit/MT5 当前只读预检通过。当前只读事实为 Funding `BTCUSDT` Spot/Perp、Cross Bybit `XAUTUSDT`、Cross MT5 `XAUUSD.s`；approved session 为 0，Funding/Cross unresolved `result_unknown` 为 0。
+## 尚未满足的验收
 
-2026-08-29 已修复策略管理读取链的底层分叉：管理汇总不再使用账户初始化时的静态 `data_quality_state` 冒充当前状态，而是使用最新账户同步、余额和风险快照。四个已绑定真实账号重新同步均成功，Funding、Cross、Bottom 与 Short A 的当前账号质量均为 `complete`。Cross 开仓模板现直接复用现有双边 observability 账户风险快照，在市价/限价开仓控件上方展示两端净值与可用资金；没有新增余额旁路或 mock。当前实读约为 Bybit `686.40 USD`、MT5 `300.00 USDT`，数值随后端轮询变化。
+1. 完成两个真实终端的运行态验收：Cross Worker 可稳定读取和写前预检；Short A 完成外部 Python API 一次性授权后可独立只读，且失败隔离继续成立。
+2. Owner 在页面手动完成 Cross 最小开仓、双腿核对、平仓和对账；随后使用共享 UTA 可用资金完成 Funding 最小仓位闭环。
+3. 外部持仓、订单、成交、费用与 Platform/Runtime 事实一致，完成强制复位；任何 `result_unknown`、身份不一致或查询不可用均停止扩展。
 
-本地启动器现以一个受管拓扑启动三服务，并由服务自身报告虚拟环境状态，避免把系统 Python 的相似命令行误判为项目运行时。默认仍关闭 Live Write；只有显式 `-EnableLiveWrite` 才选择已授权验收启动合同。当前三服务健康、受管、项目 venv 与启动合同全部匹配，Runtime Live Write 按 Owner 最新要求保持开启。
+## 阻断、决策与下一动作
 
-MT5 入金已经完成；尚未完成的是 Cross 开仓、平仓、Funding Settlement、差异核对或 EOD。`bybit-live-main` 的 Account Transfer 权限可完成 UTA/Funding 划转，但公开 API 仍缺 MT5 CFD 写合同。Owner 要求保持 Runtime Live Write 开启以继续实盘测试；该门已保持开启，但资金划转和订单仍分别受 capability、claim、会话与逐操作授权约束。
+Owner 决定在继续实盘前，由另一实施 AI 集中完成执行主链与 Connector 优化，然后由本阶段审核通过再恢复 Cross/Funding 测试。优化不得替换现有 Platform 业务内核，不得引入消息队列、微服务或通用组合引擎；重点是唯一业务入口、唯一恢复/查询语义、固定账户 Connector、历史 unknown 处置和可理解的执行证据。
 
-Owner 原 2026-08-25 16:55–24:00（北京时间）的绝对授权窗口已经结束；2026-08-29 Owner 后续明确要求继续人工实盘测试并保持 Live Write 开启，但这不替代每笔订单的页面确认。执行仍须串行：先以 Cross `XAUTUSDT` + `XAUUSD.s`、每腿 1 盎司完成开仓、核对、平仓和对账；Cross 完全退出并复核余额后，Funding 才以 `BTCUSDT` Spot + Perpetual 和账户实际可用资金下的最小可开仓位执行 `post_only_chase`。完成后撤销会话并关闭全部写入门控。
+实盘恢复前，必须先使 8 条历史 Bybit unknown 获得权威终态或明确的人工责任处置，再由 Owner 手动开启 Cross Terminal Algo Trading，重新核对双端身份、空仓空单和写前预检。
 
-## 下一动作与 Owner 决策
+Short A 的新终端需要 Owner 在终端内完成一次外部 Python API 授权/登录保存；这不是 Cross 实盘前置条件，但仍是本阶段账户隔离验收的一部分。真实交易仍需页面中的当次金额确认；阶段记录本身不构成下单授权。
 
-真实测试资金与统一只读链均已就位，不再阻断 Cross 最小实盘。第三模板的平台内自动划转仍保持 fail closed，直到 Bybit 为 MT5 CFD 专用合同提供可长期部署的 API Key、OAuth 扩展范围或机构授权；不把短期网页登录 Cookie 当服务器长期凭据。Runtime Live Write 按 Owner 最新要求保持开启。下一动作是 Owner 登录页面确认两端余额卡片和双边行情后，手动完成 Cross 1 盎司开仓、核对、平仓和对账，再使用共享 UTA 实际可用余额完成 Funding 最小仓位闭环；每笔订单仍由 Owner 在页面确认。
+平台内 MT5/TradFi 自动划转的长期阻断是缺少可部署的官方 API/OAuth/Broker 授权；不使用网页 Cookie 作为长期服务器凭据。
 
-## 关联长期权威文档
+## 长期权威
 
-- 产品总边界：`docs/product/modules/策略.md`
-- Funding 产品合同：`docs/product/strategies/资金费率套利.md`
-- Cross 产品合同：`docs/product/strategies/跨所黄金价差.md`
-- 系统边界：`docs/architecture/SYSTEM_MAP.md`
-- Platform/Runtime API：`docs/contracts/API.md`
+- 项目状态：`docs/PROJECT.md`
+- 产品范围：`docs/product/modules/策略.md`
+- 策略产品合同：`docs/product/strategies/资金费率套利.md`、`docs/product/strategies/跨所黄金价差.md`
+- 系统与 Runtime 边界：`docs/architecture/SYSTEM_MAP.md`、`docs/contracts/VENUE_ADAPTERS.md`
 - Cross 执行合同：`docs/contracts/CROSS_SPREAD_EXECUTION.md`
-- Venue 与只读查询：`docs/contracts/VENUE_ADAPTERS.md`、`docs/contracts/LIVE_ACCOUNT_OBSERVABILITY.md`
-- 金融事实与对账：`docs/contracts/FINANCIAL_FACTS.md`、`docs/contracts/EOD_RECONCILIATION.md`
-- 受控实盘操作：`docs/operations/LIVE_ACCEPTANCE_RUNBOOK.md`
-- 稳定工程基线：`docs/BASELINE.md`
+- 只读可观测与对账：`docs/contracts/LIVE_ACCOUNT_OBSERVABILITY.md`、`docs/contracts/EOD_RECONCILIATION.md`
+- 实盘验收和强制复位：`docs/operations/LIVE_ACCEPTANCE_RUNBOOK.md`
+- 当前工程基线：`docs/BASELINE.md`
 
-## 阶段结束时的归并清单
-
-全部验收门满足后才执行：
-
-- 将稳定的 Funding 开平仓、组合、恢复和 shared-account 语义归并到对应产品与合同文档。
-- 将最终 Runtime spot/perp、MT5 session/write lock 和 capability 语义归并到 Venue/API 合同。
-- 将受控会话审批、页面操作、强制复位和联合测试顺序归并到 Live Acceptance Runbook。
-- 将真实 Funding Settlement、关闭、EOD 与差异处置保留到批准的 operator evidence 位置，不写入项目驾驶舱过程记录。
-- 根据最终证据只更新 `docs/PROJECT.md` 的结果、阻断和下一动作，不改变其结构。
-- 删除本文件；不建立阶段 archive，历史由 Git 保留。
+阶段验收完成后，只把稳定产品、执行、MT5 隔离和运维事实归并到上述权威文档，更新 `docs/PROJECT.md`，然后删除本阶段文件。不建立阶段归档。
