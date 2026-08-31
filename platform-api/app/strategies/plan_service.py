@@ -23,8 +23,16 @@ class FundingCarryParameters(BaseModel):
 
 class CrossSpreadParameters(BaseModel):
     model_config = ConfigDict(extra="forbid", populate_by_name=True)
-    action: Literal["OPEN_LONG", "OPEN_SHORT"]
+    action: Literal["OPEN_LONG", "CLOSE_LONG", "OPEN_SHORT", "CLOSE_SHORT"]
     quantity_oz: Decimal = Field(alias="quantityOz", gt=0)
+    bybit_reduce_only: bool = Field(default=False, alias="bybitReduceOnly")
+    mt5_reduce_only: bool = Field(default=False, alias="mt5ReduceOnly")
+    mt5_position_id: str | None = Field(default=None, alias="mt5PositionId")
+    execution_policy: Literal["market", "fok", "post_only_chase"] = Field(
+        default="market",
+        alias="executionPolicy",
+    )
+    bybit_limit_price: Decimal | None = Field(default=None, alias="bybitLimitPrice", gt=0)
 
 
 def _unprocessable(detail: str) -> HTTPException:
@@ -173,7 +181,10 @@ def build_plan(
                 _binding(bindings, "mt5_leg"),
             )
             bybit = _instrument(
-                db, venue_id=bybit_account["venue_id"], instrument_type="crypto_perp"
+                db,
+                venue_id=bybit_account["venue_id"],
+                instrument_type="crypto_perp",
+                external_symbol="XAUTUSDT",
             )
             mt5 = _instrument(db, venue_id=mt5_account["venue_id"], instrument_type="mt5_cfd")
             return build_cross_spread_plan(
@@ -193,6 +204,11 @@ def build_plan(
                     "bybitPriceTick": bybit["price_tick"],
                     "mt5QuantityStep": mt5["quantity_step"],
                     "mt5PriceTick": mt5["price_tick"],
+                    "bybitReduceOnly": typed.bybit_reduce_only,
+                    "mt5ReduceOnly": typed.mt5_reduce_only,
+                    "mt5PositionId": typed.mt5_position_id,
+                    "executionPolicy": typed.execution_policy,
+                    "bybitLimitPrice": typed.bybit_limit_price,
                 },
                 created_at=now,
             )

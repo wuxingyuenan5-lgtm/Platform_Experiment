@@ -154,6 +154,12 @@ class CrossSpreadHistoryPointResponse(BaseModel):
 class CrossSpreadMarketCommandRequest(BaseModel):
     action: Literal["OPEN_LONG", "CLOSE_LONG", "OPEN_SHORT", "CLOSE_SHORT"]
     quantity_oz: Decimal = Field(alias="quantityOz", gt=0)
+    idempotency_key: str | None = Field(
+        default=None,
+        alias="idempotencyKey",
+        min_length=1,
+        max_length=128,
+    )
 
 
 class StrategyDefinitionResponse(BaseModel):

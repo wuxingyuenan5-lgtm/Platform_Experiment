@@ -207,6 +207,7 @@ export type CrossSpreadMarketAction = 'OPEN_LONG' | 'CLOSE_LONG' | 'OPEN_SHORT' 
 export interface CrossSpreadMarketCommandInput {
   action: CrossSpreadMarketAction;
   quantityOz: string;
+  idempotencyKey: string;
 }
 
 export interface AuditEventResult {

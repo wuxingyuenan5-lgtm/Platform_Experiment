@@ -47,9 +47,12 @@ class ExecutionPlanLeg(BaseModel):
     instrument_id: str
     external_symbol: str
     side: Literal["buy", "sell"]
+    reduce_only: bool = False
+    position_id: str | None = None
     maximum_quantity: Decimal = Field(gt=0)
     sequence: int = Field(ge=1)
     execution_policy: ExecutionPolicy
+    limit_price: Decimal | None = Field(default=None, gt=0)
     depends_on: str | None = None
     release_condition: ReleaseCondition | None = None
     release_ratio: Decimal | None = Field(default=None, gt=0)
@@ -65,6 +68,8 @@ class ExecutionPlanLeg(BaseModel):
 
     @model_validator(mode="after")
     def validate_release(self) -> ExecutionPlanLeg:
+        if self.position_id is not None and not self.reduce_only:
+            raise ValueError("position_id requires reduce_only")
         if self.depends_on is None:
             if any(
                 value is not None

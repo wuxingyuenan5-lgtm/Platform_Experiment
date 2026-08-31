@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from decimal import Decimal
-from uuid import uuid4
 
 import httpx
 from fastapi import HTTPException
@@ -14,7 +13,6 @@ from app.cross_spread_live_read_client import (
     get_instrument_specification,
 )
 from app.database import connection
-from app.execution_batches import create_execution_batch
 from app.market_data import (
     get_latest_cross_spread_market_snapshot,
     list_cross_spread_market_history,
@@ -22,8 +20,6 @@ from app.market_data import (
 )
 from app.order_execution_intents import register_order_execution_intent
 from app.schemas import (
-    BatchLegRequest,
-    CreateExecutionBatchRequest,
     CreateTradeCommandRequest,
     CrossSpreadHistoryPointResponse,
     CrossSpreadMarketCommandRequest,
@@ -31,6 +27,12 @@ from app.schemas import (
     CrossSpreadVenueSnapshotResponse,
     ExecutionBatchResponse,
     TradeCommandResponse,
+)
+from app.strategies.domain import StrategyInstructionAction
+from app.strategies.instruction_service import (
+    CreateStrategyInstructionRequest,
+    create_instruction,
+    execute_instruction,
 )
 from app.trade_commands import create_trade_command
 
@@ -161,7 +163,6 @@ def submit_cross_spread_market_command(
         )
 
     _validate_acceptance_quantity(request.quantity_oz)
-    bybit_side, mt5_side = _sides_for_action(request.action)
     sizing = _load_live_cross_spread_sizing()
     _validate_leg_quantity(
         request.quantity_oz,
@@ -184,48 +185,33 @@ def submit_cross_spread_market_command(
             detail="Requested ounces do not map exactly to the current MT5 contract size",
         )
 
-    batch_key = idempotency_key or (
-        f"cross-spread:{request.action}:{request.quantity_oz}:{uuid4()}"
-    )
-    register_order_execution_intent(
-        f"{batch_key}:{BYBIT_LEG_ROLE}",
-        reduce_only=bybit_reduce_only,
-    )
-    register_order_execution_intent(
-        f"{batch_key}:{MT5_LEG_ROLE}",
-        reduce_only=mt5_reduce_only,
-        position_id=mt5_position_id,
-    )
-
-    return create_execution_batch(
-        CreateExecutionBatchRequest(
-            idempotencyKey=batch_key,
-            strategyInstanceId=STRATEGY_INSTANCE_ID,
-            accountId=sizing.bybit_account_id,
-            strategyKey=STRATEGY_KEY,
-            direction=request.action,
-            legs=[
-                BatchLegRequest(
-                    role=BYBIT_LEG_ROLE,
-                    accountId=sizing.bybit_account_id,
-                    instrumentId=BYBIT_INSTRUMENT_ID,
-                    symbol=BYBIT_SYMBOL,
-                    side=bybit_side,
-                    orderType="market",
-                    quantity=request.quantity_oz,
-                ),
-                BatchLegRequest(
-                    role=MT5_LEG_ROLE,
-                    accountId=sizing.mt5_account_id,
-                    instrumentId=MT5_INSTRUMENT_ID,
-                    symbol=MT5_SYMBOL,
-                    side=mt5_side,
-                    orderType="market",
-                    quantity=mt5_lot,
-                ),
-            ],
+    batch_key = idempotency_key or request.idempotency_key
+    if batch_key is None:
+        raise HTTPException(
+            status_code=422,
+            detail="Cross-spread execution requires a stable idempotencyKey",
         )
+    instruction = create_instruction(
+        STRATEGY_INSTANCE_ID,
+        CreateStrategyInstructionRequest(
+            idempotencyKey=batch_key,
+            action=(
+                StrategyInstructionAction.CLOSE
+                if is_close
+                else StrategyInstructionAction.OPEN
+            ),
+            parameters={
+                "action": request.action,
+                "quantityOz": request.quantity_oz,
+                "bybitReduceOnly": bybit_reduce_only,
+                "mt5ReduceOnly": mt5_reduce_only,
+                "mt5PositionId": mt5_position_id,
+            },
+            reason="cross spread market command",
+        ),
+        requested_by="cross_spread_command",
     )
+    return execute_instruction(str(instruction["instructionId"]))
 
 
 def submit_bybit_definitive_failure_rollback(

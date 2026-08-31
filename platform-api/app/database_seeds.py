@@ -752,6 +752,20 @@ def seed_reference_data(db: sqlite3.Connection) -> None:
             "exchange_symbol",
         ),
         (
+            "mapping_btc_bybit",
+            "instrument_btc_usdt",
+            "venue_bybit",
+            "BTCUSDT",
+            "exchange_symbol",
+        ),
+        (
+            "mapping_btc_perp_bybit",
+            "instrument_btc_usdt_perp",
+            "venue_bybit",
+            "BTCUSDT",
+            "exchange_symbol",
+        ),
+        (
             "mapping_btc_perp_sim",
             "instrument_btc_usdt_perp",
             "venue_simulation",
@@ -766,10 +780,17 @@ def seed_reference_data(db: sqlite3.Connection) -> None:
             "exchange_symbol",
         ),
         (
+            "mapping_xaut_perp_bybit",
+            "instrument_xau_usdt_perp",
+            "venue_bybit",
+            "XAUTUSDT",
+            "exchange_symbol",
+        ),
+        (
             "mapping_xau_mt5",
             "instrument_xau_usd",
             "venue_mt5",
-            "XAUUSD",
+            "XAUUSD.s",
             "mt5_symbol",
         ),
     ]
@@ -782,6 +803,13 @@ def seed_reference_data(db: sqlite3.Connection) -> None:
             """,
             (*mapping, "active", created_at),
         )
+    db.execute(
+        """
+        UPDATE instrument_mappings
+        SET external_symbol = 'XAUUSD.s', status = 'active'
+        WHERE id = 'mapping_xau_mt5'
+        """
+    )
 
 
 __all__ = ["seed_reference_data"]

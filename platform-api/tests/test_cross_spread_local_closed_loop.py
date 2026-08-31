@@ -109,6 +109,9 @@ def _venue_positions(runtime_url: str, account_id: str) -> list[dict]:
 
 def _seed_cross_spread_environment(tmp_path: Path, database_name: str) -> None:
     settings = get_settings()
+    settings.environment = "development"
+    settings.auth_mode = "development"
+    settings.development_roles = "admin"
     settings.database_path = str(tmp_path / database_name)
     initialize_database()
     with connection() as db:
@@ -119,13 +122,26 @@ def _seed_cross_spread_environment(tmp_path: Path, database_name: str) -> None:
         db.execute(
             """
             UPDATE strategy_instances
-            SET status = 'active'
+            SET status = 'active', trading_mode = 'simulation'
             WHERE id = 'strategy_cross_venue_spread_instance_default'
             """
         )
         db.execute(
             """
-            INSERT INTO balance_snapshots (
+            UPDATE strategy_account_bindings
+            SET account_id = CASE role
+                    WHEN 'venue_a' THEN 'account_crypto_test'
+                    WHEN 'mt5_leg' THEN 'account_mt5_demo'
+                    ELSE account_id
+                END,
+                status = 'active'
+            WHERE strategy_instance_id = 'strategy_cross_venue_spread_instance_default'
+              AND role IN ('venue_a', 'mt5_leg')
+            """
+        )
+        db.execute(
+            """
+            INSERT OR REPLACE INTO balance_snapshots (
                 id, account_id, currency, equity, available_balance, source,
                 data_quality_state, as_of, created_at
             ) VALUES
@@ -151,6 +167,7 @@ def test_cross_spread_gold_local_closed_loop(runtime_url: str, tmp_path: Path) -
     settings.cross_spread_acceptance_max_quantity_oz = Decimal("1")
 
     with TestClient(app) as client:
+        _seed_cross_spread_environment(tmp_path, "platform-closed-loop.db")
         # --- OPEN_LONG: buy Bybit XAUTUSDT, sell MT5 XAUUSD.s ---
         opened = client.post(
             LIFECYCLE_OPEN_ENDPOINT,
@@ -160,12 +177,13 @@ def test_cross_spread_gold_local_closed_loop(runtime_url: str, tmp_path: Path) -
                 "takeProfitSpread": "0",
                 "stopLossSpread": "-3",
                 "executionMode": "market",
+                "idempotencyKey": "cross-local-open-1",
             },
         )
         assert opened.status_code == 200, opened.text
         open_data = opened.json()
         batch = open_data["executionBatch"]
-        assert batch["status"] == "hedged", batch
+        assert batch["status"] == "hedged", (batch["failureReason"], batch["legs"])
         legs = {leg["role"]: leg for leg in batch["legs"]}
         assert legs["bybit_leg"]["status"] == "filled"
         assert legs["mt5_leg"]["status"] == "filled"
@@ -214,6 +232,7 @@ def test_cross_spread_local_closed_loop_blocks_second_open_while_plan_is_active(
     settings.cross_spread_acceptance_max_quantity_oz = Decimal("1")
 
     with TestClient(app) as client:
+        _seed_cross_spread_environment(tmp_path, "platform-closed-loop-idem.db")
         first = client.post(
             LIFECYCLE_OPEN_ENDPOINT,
             json={
@@ -222,6 +241,7 @@ def test_cross_spread_local_closed_loop_blocks_second_open_while_plan_is_active(
                 "takeProfitSpread": "0",
                 "stopLossSpread": "-3",
                 "executionMode": "market",
+                "idempotencyKey": "cross-local-open-active-1",
             },
         )
         assert first.status_code == 200, first.text
@@ -235,6 +255,7 @@ def test_cross_spread_local_closed_loop_blocks_second_open_while_plan_is_active(
                 "takeProfitSpread": "0",
                 "stopLossSpread": "-3",
                 "executionMode": "market",
+                "idempotencyKey": "cross-local-open-active-2",
             },
         )
         assert second.status_code == 409, second.text

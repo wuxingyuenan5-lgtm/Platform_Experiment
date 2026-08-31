@@ -35,6 +35,53 @@ def test_cross_spread_plan_snapshots_decimal_conversion_and_terminal_release() -
     assert plan.model_dump(mode="json")["legs"][1]["maximum_quantity"] == "0.02"
 
 
+def test_cross_spread_close_plan_freezes_reduce_only_and_mt5_position_identity() -> None:
+    plan = build_cross_spread_plan(
+        action="close",
+        parameters={
+            "action": "CLOSE_SHORT",
+            "quantityOz": "1",
+            "bybitAccountId": "bybit-live-main",
+            "mt5AccountId": "mt5-live-main",
+            "mt5ContractMultiplier": "100",
+            "bybitQuantityStep": "0.001",
+            "mt5QuantityStep": "0.01",
+            "bybitReduceOnly": True,
+            "mt5ReduceOnly": True,
+            "mt5PositionId": "position-ticket-42",
+        },
+        created_at=datetime(2026, 8, 31, tzinfo=UTC),
+    )
+
+    assert plan.legs[0].side == "buy"
+    assert plan.legs[1].side == "sell"
+    assert plan.legs[0].reduce_only is True
+    assert plan.legs[1].reduce_only is True
+    assert plan.legs[1].position_id == "position-ticket-42"
+
+
+def test_cross_spread_limit_plan_freezes_bybit_policy_and_price() -> None:
+    plan = build_cross_spread_plan(
+        action="open",
+        parameters={
+            "action": "OPEN_LONG",
+            "quantityOz": "1",
+            "bybitAccountId": "bybit-live-main",
+            "mt5AccountId": "mt5-live-main",
+            "mt5ContractMultiplier": "100",
+            "bybitQuantityStep": "0.001",
+            "mt5QuantityStep": "0.01",
+            "executionPolicy": "fok",
+            "bybitLimitPrice": "2400.10",
+        },
+        created_at=datetime(2026, 8, 31, tzinfo=UTC),
+    )
+
+    assert plan.legs[0].execution_policy is ExecutionPolicy.FOK
+    assert plan.legs[0].limit_price == Decimal("2400.10")
+    assert plan.legs[1].execution_policy is ExecutionPolicy.MARKET
+
+
 def test_funding_plan_is_perpetual_first_post_only_with_incremental_spot_release() -> None:
     plan = build_funding_carry_plan(
         action="open",
@@ -103,23 +150,11 @@ def test_live_funding_and_cross_spread_can_bind_the_same_logical_bybit_account(t
     initialize_database()
     with connection() as db:
         db.execute(
-            "UPDATE accounts SET status = 'active' WHERE id IN (?, ?)",
-            ("account_crypto_test", "account_mt5_demo"),
-        )
-        db.execute(
             """
             UPDATE strategy_instances
             SET trading_mode = 'live', status = 'active'
             WHERE id = 'strategy_funding_arbitrage_instance_default'
             """
-        )
-        db.execute(
-            """
-            UPDATE strategy_account_bindings
-            SET account_id = ?
-            WHERE id = 'binding_funding_bybit'
-            """,
-            ("account_crypto_test",),
         )
 
     funding_plan = build_plan(
@@ -144,6 +179,6 @@ def test_live_funding_and_cross_spread_can_bind_the_same_logical_bybit_account(t
             ("strategy_cross_venue_spread_instance_default",),
         ).fetchone()
 
-    assert funding_plan.legs[0].account_id == "account_crypto_test"
+    assert funding_plan.legs[0].account_id == "bybit-live-main"
     assert cross_binding is not None
-    assert cross_binding["account_id"] == "account_crypto_test"
+    assert cross_binding["account_id"] == "bybit-live-main"

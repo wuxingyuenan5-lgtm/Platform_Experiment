@@ -19,6 +19,7 @@ from app.execution_schemas import (
     CreateExecutionBatchRequest,
     ExecutionBatchResponse,
 )
+from app.order_execution_intents import register_order_execution_intent
 from app.strategies.domain import (
     ExecutionPlan,
     ExecutionPlanLeg,
@@ -247,13 +248,15 @@ def create_instruction(
     if (
         request.action is StrategyInstructionAction.CLOSE
         and (
-            strategy_key != "funding_arbitrage"
-            or not str(request.parameters.get("targetOpenInstructionId") or "").strip()
+            strategy_key not in {"funding_arbitrage", "cross_venue_spread"}
+            or (
+                strategy_key == "funding_arbitrage"
+                and not str(request.parameters.get("targetOpenInstructionId") or "").strip()
+            )
         )
     ):
-        # Position Groups are not materialised in Phase 0–1. Funding is the
-        # only strategy that now has a bounded, strategy-owned close path, and
-        # it still requires an explicit target open instruction.
+        # Funding close still requires an explicit target open instruction.
+        # Cross close carries reduce-only and MT5 Position identity in its plan.
         raise HTTPException(status_code=423, detail="Position Group close planning is unavailable")
     normalized_parameters = normalize_parameters(strategy_instance_id, request.parameters)
     requested_json = _canonical(normalized_parameters)
@@ -330,13 +333,17 @@ def create_instruction(
             ),
         )
         for leg in plan.legs:
-            order_type = "limit" if leg.execution_policy.value == "post_only_chase" else "market"
+            order_type = (
+                "market"
+                if leg.execution_policy is ExecutionPolicy.MARKET
+                else "limit"
+            )
             db.execute(
                 """INSERT INTO execution_batch_legs (
                     id, batch_id, sequence, role, account_id, instrument_id, symbol,
                     side, order_type, quantity, price, order_id, status,
                     failure_reason, created_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, 'pending', NULL, ?, ?)""",
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, 'pending', NULL, ?, ?)""",
                 (
                     str(uuid4()),
                     batch_id,
@@ -348,6 +355,7 @@ def create_instruction(
                     leg.side,
                     order_type,
                     format(leg.maximum_quantity, "f"),
+                    format(leg.limit_price, "f") if leg.limit_price is not None else None,
                     timestamp,
                     timestamp,
                 ),
@@ -378,23 +386,6 @@ def execute_instruction(
                 instruction_row=instruction,
                 plan=plan,
             )
-        unsupported = [
-            leg.execution_policy.value
-            for leg in plan.legs
-            if leg.execution_policy is not ExecutionPolicy.MARKET
-        ]
-        if unsupported:
-            detail = (
-                "Execution Plan policy is unavailable in the Phase 0-1 shared executor: "
-                + ", ".join(dict.fromkeys(unsupported))
-            )
-            update_batch_status(instruction["execution_batch_id"], "failed", failure_reason=detail)
-            _update_instruction_result(
-                instruction_id,
-                StrategyInstructionStatus.REJECTED,
-                failure_reason=detail,
-            )
-            raise HTTPException(status_code=423, detail=detail)
         db.execute(
             """
             UPDATE strategy_runs SET status = ?, updated_at = ?
@@ -421,12 +412,28 @@ def execute_instruction(
                 instrumentId=leg.instrument_id,
                 symbol=leg.external_symbol,
                 side=leg.side,
-                orderType="market",
+                orderType=(
+                    "market"
+                    if leg.execution_policy is ExecutionPolicy.MARKET
+                    else "limit"
+                ),
                 quantity=leg.maximum_quantity,
+                price=leg.limit_price,
             )
             for leg in plan.legs
         ],
     )
+    for leg in plan.legs:
+        register_order_execution_intent(
+            f"instruction:{instruction['idempotency_key']}:{leg.role}",
+            reduce_only=leg.reduce_only,
+            position_id=leg.position_id,
+            execution_policy=(
+                "default"
+                if leg.execution_policy is ExecutionPolicy.MARKET
+                else leg.execution_policy.value
+            ),
+        )
     try:
         result = create_execution_batch(request)
     except HTTPException as exc:

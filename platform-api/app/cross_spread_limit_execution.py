@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from decimal import Decimal
 from typing import Literal
-from uuid import uuid4
 
 from fastapi import HTTPException
 
@@ -10,30 +9,19 @@ from app.catalog import get_instrument
 from app.config import get_settings
 from app.cross_spread import (
     BYBIT_INSTRUMENT_ID,
-    BYBIT_LEG_ROLE,
     BYBIT_SYMBOL,
-    MT5_INSTRUMENT_ID,
-    MT5_LEG_ROLE,
     MT5_SYMBOL,
     STRATEGY_INSTANCE_ID,
-    STRATEGY_KEY,
     _load_live_cross_spread_sizing,
-    _sides_for_action,
     _validate_acceptance_quantity,
     _validate_leg_quantity,
-    get_bybit_account_id,
-    get_mt5_account_id,
 )
-from app.execution_batches import create_execution_batch
-from app.order_execution_intents import (
-    ExecutionPolicy,
-    register_order_execution_intent,
-)
-from app.schemas import (
-    BatchLegRequest,
-    CreateExecutionBatchRequest,
-    CrossSpreadMarketCommandRequest,
-    ExecutionBatchResponse,
+from app.schemas import CrossSpreadMarketCommandRequest, ExecutionBatchResponse
+from app.strategies.domain import StrategyInstructionAction
+from app.strategies.instruction_service import (
+    CreateStrategyInstructionRequest,
+    create_instruction,
+    execute_instruction,
 )
 
 LimitStrategy = Literal["fok", "post_only_chase"]
@@ -90,7 +78,6 @@ def submit_cross_spread_limit_command(
         )
 
     _validate_acceptance_quantity(request.quantity_oz)
-    bybit_side, mt5_side = _sides_for_action(request.action)
     sizing = _load_live_cross_spread_sizing()
     _validate_leg_quantity(
         request.quantity_oz,
@@ -113,53 +100,35 @@ def submit_cross_spread_limit_command(
             detail="Requested ounces do not map exactly to the current MT5 contract size",
         )
 
-    batch_key = idempotency_key or (
-        f"cross-spread-{limit_strategy}:{request.action}:{request.quantity_oz}:"
-        f"{bybit_limit_price}:{uuid4()}"
-    )
-    execution_policy: ExecutionPolicy = limit_strategy
-    register_order_execution_intent(
-        f"{batch_key}:{BYBIT_LEG_ROLE}",
-        reduce_only=bybit_reduce_only,
-        execution_policy=execution_policy,
-    )
-    register_order_execution_intent(
-        f"{batch_key}:{MT5_LEG_ROLE}",
-        reduce_only=mt5_reduce_only,
-        position_id=mt5_position_id,
-        execution_policy="default",
-    )
-
-    return create_execution_batch(
-        CreateExecutionBatchRequest(
-            idempotencyKey=batch_key,
-            strategyInstanceId=STRATEGY_INSTANCE_ID,
-            accountId=get_bybit_account_id(),
-            strategyKey=STRATEGY_KEY,
-            direction=request.action,
-            legs=[
-                BatchLegRequest(
-                    role=BYBIT_LEG_ROLE,
-                    accountId=get_bybit_account_id(),
-                    instrumentId=BYBIT_INSTRUMENT_ID,
-                    symbol=BYBIT_SYMBOL,
-                    side=bybit_side,
-                    orderType="limit",
-                    quantity=request.quantity_oz,
-                    price=bybit_limit_price,
-                ),
-                BatchLegRequest(
-                    role=MT5_LEG_ROLE,
-                    accountId=get_mt5_account_id(),
-                    instrumentId=MT5_INSTRUMENT_ID,
-                    symbol=MT5_SYMBOL,
-                    side=mt5_side,
-                    orderType="market",
-                    quantity=mt5_lot,
-                ),
-            ],
+    batch_key = idempotency_key or request.idempotency_key
+    if batch_key is None:
+        raise HTTPException(
+            status_code=422,
+            detail="Cross-spread execution requires a stable idempotencyKey",
         )
+    instruction = create_instruction(
+        STRATEGY_INSTANCE_ID,
+        CreateStrategyInstructionRequest(
+            idempotencyKey=batch_key,
+            action=(
+                StrategyInstructionAction.CLOSE
+                if is_close
+                else StrategyInstructionAction.OPEN
+            ),
+            parameters={
+                "action": request.action,
+                "quantityOz": request.quantity_oz,
+                "bybitReduceOnly": bybit_reduce_only,
+                "mt5ReduceOnly": mt5_reduce_only,
+                "mt5PositionId": mt5_position_id,
+                "executionPolicy": limit_strategy,
+                "bybitLimitPrice": bybit_limit_price,
+            },
+            reason="cross spread limit command",
+        ),
+        requested_by="cross_spread_command",
     )
+    return execute_instruction(str(instruction["instructionId"]))
 
 
 def submit_cross_spread_fok_command(

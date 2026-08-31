@@ -163,6 +163,7 @@ def test_lifecycle_routes_delegate_to_limit_capable_service(
     else:
         assert captured["args"] == ("plan-1",)
         assert captured["kwargs"] == {
+            "idempotency_key": None,
             "execution_mode": "limit",
             "limit_spread": request_model.limit_spread,
             "limit_strategy": "post_only_chase",

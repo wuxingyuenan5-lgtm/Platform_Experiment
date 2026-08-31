@@ -20,8 +20,18 @@ def build_cross_spread_plan(
     if quantity_oz <= 0 or multiplier <= 0:
         raise ValueError("quantityOz and mt5ContractMultiplier must be positive")
     mt5_quantity = quantity_oz / multiplier
+    execution_policy = ExecutionPolicy(str(parameters.get("executionPolicy", "market")))
+    limit_price = (
+        Decimal(str(parameters["bybitLimitPrice"]))
+        if parameters.get("bybitLimitPrice") is not None
+        else None
+    )
+    if execution_policy is not ExecutionPolicy.MARKET and limit_price is None:
+        raise ValueError("Cross-spread limit execution requires bybitLimitPrice")
     bybit_side, mt5_side = (
-        ("buy", "sell") if parameters["action"] == "OPEN_LONG" else ("sell", "buy")
+        ("buy", "sell")
+        if parameters["action"] in {"OPEN_LONG", "CLOSE_SHORT"}
+        else ("sell", "buy")
     )
     return ExecutionPlan(
         adapter_version="cross_spread.v1",
@@ -39,9 +49,11 @@ def build_cross_spread_plan(
                 instrument_id=str(parameters.get("bybitInstrumentId", "instrument_xautusdt")),
                 external_symbol=str(parameters.get("bybitSymbol", "XAUTUSDT")),
                 side=bybit_side,
+                reduce_only=bool(parameters.get("bybitReduceOnly", False)),
                 maximum_quantity=quantity_oz,
                 sequence=1,
-                execution_policy=ExecutionPolicy.MARKET,
+                execution_policy=execution_policy,
+                limit_price=limit_price,
                 quantity_step=Decimal(str(parameters["bybitQuantityStep"])),
                 price_tick=Decimal(str(parameters.get("bybitPriceTick", "0.01"))),
                 contract_multiplier=Decimal(str(parameters.get("bybitContractMultiplier", "1"))),
@@ -53,6 +65,12 @@ def build_cross_spread_plan(
                 instrument_id=str(parameters.get("mt5InstrumentId", "instrument_xauusd_s")),
                 external_symbol=str(parameters.get("mt5Symbol", "XAUUSD.s")),
                 side=mt5_side,
+                reduce_only=bool(parameters.get("mt5ReduceOnly", False)),
+                position_id=(
+                    str(parameters["mt5PositionId"])
+                    if parameters.get("mt5PositionId")
+                    else None
+                ),
                 maximum_quantity=mt5_quantity,
                 sequence=2,
                 execution_policy=ExecutionPolicy.MARKET,

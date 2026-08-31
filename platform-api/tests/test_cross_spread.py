@@ -14,6 +14,14 @@ from app.main import app
 from app.schemas import CrossSpreadMarketCommandRequest
 
 
+@pytest.fixture(autouse=True)
+def _isolate_development_auth() -> None:
+    settings = get_settings()
+    settings.environment = "development"
+    settings.auth_mode = "development"
+    settings.development_roles = "admin"
+
+
 def _live_specification(
     *, account_id: str, symbol: str, venue: str, terminal_allowed: bool = True
 ) -> LiveInstrumentSpecification:
@@ -69,13 +77,13 @@ def test_cross_spread_mt5_preflight_failure_creates_no_execution_batch(
             terminal_allowed=account_id != "mt5-live-main",
         )
 
-    def create_batch(_request):
+    def create_strategy_instruction(*_args, **_kwargs):
         nonlocal created
         created += 1
-        raise AssertionError("execution batch must not be created after failed MT5 preflight")
+        raise AssertionError("instruction must not be created after failed MT5 preflight")
 
     monkeypatch.setattr("app.cross_spread.get_instrument_specification", specification)
-    monkeypatch.setattr("app.cross_spread.create_execution_batch", create_batch)
+    monkeypatch.setattr("app.cross_spread.create_instruction", create_strategy_instruction)
 
     with pytest.raises(HTTPException, match="MT5 Terminal does not allow trading"):
         submit_cross_spread_market_command(
@@ -184,15 +192,20 @@ def test_cross_spread_market_command_maps_open_long_to_two_market_legs(
     settings.cross_spread_acceptance_max_quantity_oz = Decimal("1")
     captured = {}
 
-    def fake_create_execution_batch(request):
+    def fake_create_instruction(_strategy_instance_id, request, *, requested_by):
         captured["request"] = request
+        captured["requested_by"] = requested_by
+        return {"instructionId": "instruction-cross-1"}
+
+    def fake_execute_instruction(instruction_id):
+        assert instruction_id == "instruction-cross-1"
         return {
             "batchId": "batch-1",
-            "idempotencyKey": request.idempotency_key,
-            "strategyInstanceId": request.strategy_instance_id,
-            "accountId": request.account_id,
-            "strategyKey": request.strategy_key,
-            "direction": request.direction,
+            "idempotencyKey": "instruction:cross-open-1",
+            "strategyInstanceId": "strategy_cross_venue_spread_instance_default",
+            "accountId": "account_crypto_test",
+            "strategyKey": "cross_venue_spread",
+            "direction": "open",
             "status": "failed",
             "requiresManualIntervention": False,
             "failureReason": "live trading disabled",
@@ -216,7 +229,8 @@ def test_cross_spread_market_command_maps_open_long_to_two_market_legs(
             "updatedAt": "2026-07-22T00:00:00+00:00",
         }
 
-    monkeypatch.setattr("app.cross_spread.create_execution_batch", fake_create_execution_batch)
+    monkeypatch.setattr("app.cross_spread.create_instruction", fake_create_instruction)
+    monkeypatch.setattr("app.cross_spread.execute_instruction", fake_execute_instruction)
     monkeypatch.setattr(
         "app.cross_spread._load_live_cross_spread_sizing",
         lambda: CrossSpreadLiveSizing(
@@ -235,22 +249,25 @@ def test_cross_spread_market_command_maps_open_long_to_two_market_legs(
     with TestClient(app) as client:
         response = client.post(
             "/api/v1/trading/cross-spread/market-command",
-            json={"action": "OPEN_LONG", "quantityOz": "1"},
+            json={
+                "action": "OPEN_LONG",
+                "quantityOz": "1",
+                "idempotencyKey": "cross-open-1",
+            },
         )
 
     assert response.status_code == 200
     request = captured["request"]
-    assert request.strategy_key == "cross_venue_spread"
-    assert request.direction == "OPEN_LONG"
-    assert request.legs[0].account_id == "account_crypto_test"
-    assert request.legs[0].symbol == "XAUTUSDT"
-    assert request.legs[0].side == "buy"
-    assert request.legs[0].order_type == "market"
-    assert request.legs[0].quantity == 1
-    assert request.legs[1].account_id == "account_mt5_demo"
-    assert request.legs[1].symbol == "XAUUSD.s"
-    assert request.legs[1].side == "sell"
-    assert request.legs[1].quantity == Decimal("0.01")
+    assert request.idempotency_key == "cross-open-1"
+    assert request.action.value == "open"
+    assert request.parameters == {
+        "action": "OPEN_LONG",
+        "quantityOz": Decimal("1"),
+        "bybitReduceOnly": False,
+        "mt5ReduceOnly": False,
+        "mt5PositionId": None,
+    }
+    assert captured["requested_by"] == "cross_spread_command"
 
 
 def test_cross_spread_market_command_prefers_live_bindings_when_configured(
@@ -272,29 +289,35 @@ def test_cross_spread_market_command_prefers_live_bindings_when_configured(
 
     captured = {}
 
-    def fake_create_execution_batch(request):
+    def fake_create_instruction(strategy_instance_id, request, *, requested_by):
+        captured["strategy_instance_id"] = strategy_instance_id
         captured["request"] = request
+        captured["requested_by"] = requested_by
+        return {"instructionId": "instruction-live-1"}
+
+    def fake_execute_instruction(instruction_id):
+        assert instruction_id == "instruction-live-1"
         return {
             "batchId": "batch-live-1",
-            "idempotencyKey": request.idempotency_key,
-            "strategyInstanceId": request.strategy_instance_id,
-            "accountId": request.account_id,
-            "strategyKey": request.strategy_key,
-            "direction": request.direction,
+            "idempotencyKey": "instruction:cross-live-1",
+            "strategyInstanceId": "strategy_cross_venue_spread_instance_default",
+            "accountId": "bybit-live-main",
+            "strategyKey": "cross_venue_spread",
+            "direction": "open",
             "status": "failed",
             "requiresManualIntervention": False,
             "failureReason": "write disabled in test",
             "legs": [
                 {
                     "role": "bybit_leg",
-                    "accountId": request.legs[0].account_id,
+                    "accountId": "bybit-live-main",
                     "orderId": None,
                     "status": "failed",
                     "failureReason": "write disabled in test",
                 },
                 {
                     "role": "mt5_leg",
-                    "accountId": request.legs[1].account_id,
+                    "accountId": "mt5-live-main",
                     "orderId": None,
                     "status": "failed",
                     "failureReason": "write disabled in test",
@@ -304,7 +327,8 @@ def test_cross_spread_market_command_prefers_live_bindings_when_configured(
             "updatedAt": "2026-08-21T00:00:00+00:00",
         }
 
-    monkeypatch.setattr("app.cross_spread.create_execution_batch", fake_create_execution_batch)
+    monkeypatch.setattr("app.cross_spread.create_instruction", fake_create_instruction)
+    monkeypatch.setattr("app.cross_spread.execute_instruction", fake_execute_instruction)
     monkeypatch.setattr(
         "app.cross_spread._load_live_cross_spread_sizing",
         lambda: CrossSpreadLiveSizing(
@@ -323,14 +347,18 @@ def test_cross_spread_market_command_prefers_live_bindings_when_configured(
     with TestClient(app) as client:
         response = client.post(
             "/api/v1/trading/cross-spread/market-command",
-            json={"action": "OPEN_LONG", "quantityOz": "1"},
+            json={
+                "action": "OPEN_LONG",
+                "quantityOz": "1",
+                "idempotencyKey": "cross-live-1",
+            },
         )
 
     assert response.status_code == 200
     request = captured["request"]
-    assert request.account_id == "bybit-live-main"
-    assert request.legs[0].account_id == "bybit-live-main"
-    assert request.legs[1].account_id == "mt5-live-main"
+    assert captured["strategy_instance_id"] == "strategy_cross_venue_spread_instance_default"
+    assert request.idempotency_key == "cross-live-1"
+    assert request.parameters["action"] == "OPEN_LONG"
 
 
 def test_cross_spread_market_command_rejects_quantity_above_acceptance_cap(
