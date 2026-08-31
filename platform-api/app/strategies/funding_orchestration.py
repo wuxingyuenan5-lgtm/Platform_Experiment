@@ -325,33 +325,23 @@ def _claim_funding_batch(
                     f"{blocking['id']} ({blocking['status']})"
                 ),
             )
-        existing_claim = db.execute(
-            """
-            SELECT 1
-            FROM execution_resource_claims
-            WHERE owner_type = 'batch' AND owner_id = ? AND status = 'active'
-            LIMIT 1
-            """,
-            (batch_id,),
-        ).fetchone()
-        if existing_claim is None:
-            _claim_batch_execution_resources(
-                db,
-                batch_id=batch_id,
-                strategy_instance_id=strategy_instance_id,
-                legs=[
-                    SimpleNamespace(
-                        account_id=leg.account_id,
-                        instrument_id=leg.instrument_id,
-                        symbol=leg.external_symbol,
-                        side=leg.side,
-                        price=None,
-                        quantity=leg.maximum_quantity,
-                    )
-                    for leg in legs
-                ],
-                default_account_id=legs[0].account_id,
-            )
+        _claim_batch_execution_resources(
+            db,
+            batch_id=batch_id,
+            strategy_instance_id=strategy_instance_id,
+            legs=[
+                SimpleNamespace(
+                    account_id=leg.account_id,
+                    instrument_id=leg.instrument_id,
+                    symbol=leg.external_symbol,
+                    side=leg.side,
+                    price=None,
+                    quantity=leg.maximum_quantity,
+                )
+                for leg in legs
+            ],
+            default_account_id=legs[0].account_id,
+        )
         if str(row["status"]) == "pending":
             claimed = db.execute(
                 """

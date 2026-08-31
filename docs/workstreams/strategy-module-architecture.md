@@ -10,11 +10,13 @@ Owner：Founder CEO
 
 Cross 与 Funding 现在共用唯一执行主链：`Strategy Action → StrategyInstruction → immutable ExecutionPlan → ExecutionBatch / TradeCommand → VenueGateway → authoritative Order / Fill → Position → Reconciliation → 页面状态`。Platform 继续拥有策略、账户绑定、计划、风险和产品交互；Execution Runtime 继续独占 Venue SDK、账户连接和订单副作用。没有新增微服务、消息总线、工作流引擎或第二套订单状态机。
 
-Runtime 的平台侧入口统一命名为 `VenueGateway`，覆盖 account、positions、open orders、order、place、cancel、history 和 readiness；Bybit 与 MT5 保持薄适配。旧 `ExecutionGateway` 仅保留导入兼容别名，Runtime 路由与恢复代码不再依赖旧名。Bybit/MT5 Order 状态归一，以及 Fill/Deal 的重复、乱序、冲突身份和累计 overfill 防护，集中由同一语义模块处理；恢复只查询和对账，禁止重发不确定命令。
+`VenueGateway` 是项目现有 Runtime 合同的统一命名和薄适配，覆盖 account、positions、open orders、order、place、cancel、history 和 readiness；它不是对 vn.py 的直接依赖或移植。旧 `ExecutionGateway` 仅保留导入兼容别名，Runtime 路由与恢复代码不再依赖旧名。Bybit/MT5 Order 状态归一共用底层安全规则；`canonical_fills` 当前只用于 Runtime recovery 的重复、乱序、冲突身份和累计 overfill 防护，恢复只查询和对账，禁止重发不确定命令。
 
 Cross Market、FOK 与 PostOnly 入口已停止直接创建 Batch。两腿账户、symbol、权限和 readiness 全部通过后，入口必须使用稳定 `idempotencyKey` 创建同一 StrategyInstruction；reduce-only、MT5 Position Ticket、执行策略与限价固化进不可变计划，再交给共享执行器。MT5 未准备好时不会创建 Instruction、Batch 或先发送 Bybit 腿。Bybit live 账户的 BTC Spot/Perp、XAUT Perp 映射和 Cross 当前固定账户的 `XAUUSD.s` 映射已补齐，避免用泛化 instrument type 误选品种。
 
-Funding 继续由平台侧编排 PostOnly chase；Runtime 每次只接受 `post_only_single_attempt`，Perpetual 权威累计成交决定 Spot residual release。Funding 与 Cross 共用命令身份、订单/成交事实、duplicate prevention、result_unknown、恢复、对账、账户 claim/余额预约和非终态页面恢复。
+Funding 继续由平台侧特有状态机编排 PostOnly chase 和增量 Spot release；Runtime 每次只接受 `post_only_single_attempt`，Perpetual 权威累计成交决定 Spot residual。Funding 与 Cross 共享底层命令/订单合同、result_unknown 与对账安全规则，并调用同一资源 claim/余额预约实现；不宣称两个策略共用 Funding 的增量释放状态机。
+
+Instruction 预创建的 pending Batch 现在必须在同一个 `BEGIN IMMEDIATE` 事务内先取得完整 resource claims 和 balance reservations，再 CAS 为 executing。权威 claim 函数会精确校验已有租约，完整重放不重复预约，部分或不一致租约 fail-closed；余额不足或 account-wide transfer claim 冲突时事务整体回滚，不创建 TradeCommand。Cross 与 Funding 在同一 UTA、同 venue/instrument/symbol 上互斥，不同 symbol 在余额充足时可以并行；result_unknown、manual_intervention 与 Funding reconciling 的资源保留规则未改变。
 
 MT5 主模型保持“一账户一固定 Terminal/Worker 实例”：Router 只按逻辑 `account_id` 选择实例，启动时验证 Login/Server，终端路径不得复用，一个实例失败不影响其他实例，重启后的 unresolved command 继续冻结该账户写入。Cross 使用 `mt5-live-main`，Short A 使用独立实例且仅监控，Short B 未绑定。Native Worker 暂作生产兼容与 fallback；没有增加第二条 HTTP 下单链，也没有在同一 Python MT5 会话中切换账户。
 
@@ -38,6 +40,8 @@ MT5 主模型保持“一账户一固定 Terminal/Worker 实例”：Router 只�
 历史 8 条 Bybit `XAUTUSDT` `result_unknown` 未删除、未强制完成、未伪造结果。统一恢复机制在没有权威 Order/Fill 证据时继续 fail-closed；它们仍阻止受影响账户的最小实盘 readiness，不能用全局绕过规则解除。
 
 当前没有已知代码缺陷阻止 Owner 进入“处置历史 unknown 后”的最小手动实盘验收。实盘前仍需 Owner 完成：权威只读处置或明确人工责任确认、Cross Terminal Algo Trading 开启、双端身份/空仓空单/写前预检复核。Short A 外部 Python API 一次性授权只影响其独立监控，不是 Cross 前置条件。Live Write 默认仍为 false；本阶段记录不构成任何真实交易授权。
+
+`docs/PROJECT.md` 当前存在并行全局文档改动，本轮不覆盖。文档 Owner 仍需收口两项冲突事实：2026-08-25 实盘授权窗口已经过期，不构成当前授权；其中“Cross/Short A 共用单 Terminal 切换”的旧表述与当前一账户一固定实例模型冲突。
 
 ## 下一动作
 

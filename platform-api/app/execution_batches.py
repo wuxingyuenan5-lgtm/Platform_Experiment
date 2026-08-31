@@ -184,6 +184,13 @@ def create_execution_batch(request: CreateExecutionBatchRequest) -> ExecutionBat
             existing_id = existing["id"]
             assert_batch_request_matches_in_connection(db, existing_id, request)
             if existing["status"] == "pending":
+                _claim_batch_execution_resources(
+                    db,
+                    batch_id=existing_id,
+                    strategy_instance_id=request.strategy_instance_id,
+                    legs=request.legs,
+                    default_account_id=default_account_id,
+                )
                 claimed = db.execute(
                     """
                     UPDATE execution_batches
@@ -571,7 +578,8 @@ def _claim_batch_execution_resources(
     default_account_id: str,
 ) -> None:
     resources: dict[str, tuple[str, str, str, str]] = {}
-    reservations: dict[tuple[str, str], Decimal] = {}
+    reservation_keys: set[tuple[str, str]] = set()
+    prepared_legs = []
     reservation_timestamps = now_iso()
     for leg in legs:
         account_id = leg.account_id or default_account_id
@@ -603,17 +611,103 @@ def _claim_batch_execution_resources(
             normalized_type,
             leg.symbol.upper(),
         )
+        base_currency = str(spec["base_currency"])
+        quote_currency = str(spec["quote_currency"])
+        reservation_keys.add(
+            (
+                account_id,
+                base_currency
+                if normalized_type == "crypto_spot" and leg.side == "sell"
+                else quote_currency,
+            )
+        )
+        prepared_legs.append(
+            (
+                leg,
+                account_id,
+                normalized_type,
+                base_currency,
+                quote_currency,
+                (
+                    Decimal(str(spec["contract_multiplier"]))
+                    if spec["contract_multiplier"] is not None
+                    else None
+                ),
+            )
+        )
+
+    existing_claims = db.execute(
+        """
+        SELECT resource_key, account_id, venue_id, resource_category, symbol, status
+        FROM execution_resource_claims
+        WHERE owner_type = 'batch' AND owner_id = ?
+        """,
+        (batch_id,),
+    ).fetchall()
+    existing_reservations = db.execute(
+        """
+        SELECT account_id, strategy_instance_id, currency, reserved_amount, status
+        FROM execution_balance_reservations
+        WHERE owner_type = 'batch' AND owner_id = ?
+        """,
+        (batch_id,),
+    ).fetchall()
+    if existing_claims or existing_reservations:
+        persisted_claims = {
+            str(row["resource_key"]): (
+                str(row["account_id"]),
+                str(row["venue_id"]),
+                str(row["resource_category"]),
+                str(row["symbol"]),
+                str(row["status"]),
+            )
+            for row in existing_claims
+        }
+        expected_claims = {
+            key: (*value, "active") for key, value in resources.items()
+        }
+        persisted_reservations = {
+            (str(row["account_id"]), str(row["currency"])): (
+                str(row["strategy_instance_id"]),
+                str(row["status"]),
+            )
+            for row in existing_reservations
+        }
+        expected_reservations = {
+            key: (strategy_instance_id, "active") for key in reservation_keys
+        }
+        if (
+            len(existing_claims) == len(expected_claims)
+            and len(existing_reservations) == len(expected_reservations)
+            and persisted_claims == expected_claims
+            and persisted_reservations == expected_reservations
+            and all(
+                Decimal(str(row["reserved_amount"])) > 0
+                for row in existing_reservations
+            )
+        ):
+            return
+        raise HTTPException(
+            status_code=409,
+            detail="Execution batch claims or balance reservations are incomplete",
+        )
+
+    reservations: dict[tuple[str, str], Decimal] = {}
+    for (
+        leg,
+        account_id,
+        normalized_type,
+        base_currency,
+        quote_currency,
+        contract_multiplier,
+    ) in prepared_legs:
         reservation_key, amount = _reservation_requirement_for_leg(
             leg,
             account_id=account_id,
             instrument_type=normalized_type,
-            base_currency=str(spec["base_currency"]),
-            quote_currency=str(spec["quote_currency"]),
-            contract_multiplier=(
-                Decimal(str(spec["contract_multiplier"]))
-                if spec["contract_multiplier"] is not None
-                else None
-            ),
+            base_currency=base_currency,
+            quote_currency=quote_currency,
+            contract_multiplier=contract_multiplier,
         )
         reservations[reservation_key] = reservations.get(reservation_key, Decimal("0")) + amount
 
