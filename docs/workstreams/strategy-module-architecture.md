@@ -4,7 +4,7 @@
 
 Owner：Founder CEO
 
-更新日期：2026-08-31
+更新日期：2026-09-01
 
 ## 当前范围与结果
 
@@ -37,14 +37,14 @@ MT5 主模型保持“一账户一固定 Terminal/Worker 实例”：Router 只�
 
 已由 FakeGateway、离线 fixture 和本地 stub 验证：双腿预检、稳定身份/重复点击、partial/duplicate/out-of-order fill、overfill、ACK 丢失查询恢复、result_unknown fail-closed、重启恢复、权威平仓数量、Funding 单次 attempt/cancel terminal/residual/TTL/maxMutations/Spot release，以及 MT5 固定实例路由、身份不一致拒绝、故障隔离和 unresolved 写冻结。Runtime 全量、Platform 相关纵向套件、Ruff、Pyright、前端类型检查、Cross/账户页面检查和生产构建通过。
 
-历史 8 条 Bybit `XAUTUSDT` `result_unknown` 未删除、未强制完成、未伪造结果。统一恢复机制在没有权威 Order/Fill 证据时继续 fail-closed；它们仍阻止受影响账户的最小实盘 readiness，不能用全局绕过规则解除。
+历史 8 条 Bybit `XAUTUSDT` Runtime orphan 已通过受控 operator disposition 处置：逐条要求 exact order 不存在、命令时间窗口内 closed Order/Fill 无身份匹配、当前空仓空单及 Owner 明确确认，随后仅追加不可变审计并将 Journal 命令标记为 `resolved_absent`。原命令、payload 和历史状态保留，未删除、未标记 filled、未伪造 external order identity，处置路径不含 Venue 写操作；对应账户的旧 unknown readiness 阻断已解除。
 
-当前没有已知代码缺陷阻止 Owner 进入“处置历史 unknown 后”的最小手动实盘验收。实盘前仍需 Owner 完成：权威只读处置或明确人工责任确认、Cross Terminal Algo Trading 开启、双端身份/空仓空单/写前预检复核。Short A 外部 Python API 一次性授权只影响其独立监控，不是 Cross 前置条件。Live Write 默认仍为 false；本阶段记录不构成任何真实交易授权。
+当前没有已知代码缺陷阻止 Owner 请求新的最小手动实盘验收窗口。Platform 与 Runtime 持久配置及标准启动进程均已恢复 Live Write=false；Bybit `XAUTUSDT` 与 Cross MT5 `XAUUSD.s` 已只读确认空仓空单、账户与 symbol 数据可用。当前外部人工前置项只剩 Cross Terminal 的 Algo/Expert Trading 开关；开启后仍须在新授权窗口内完成写前复核。Short A 外部 Python API 一次性授权只影响其独立监控，不是 Cross 前置条件。本阶段记录不构成任何真实交易授权。
 
 `docs/PROJECT.md` 当前存在并行全局文档改动，本轮不覆盖。文档 Owner 仍需收口两项冲突事实：2026-08-25 实盘授权窗口已经过期，不构成当前授权；其中“Cross/Short A 共用单 Terminal 切换”的旧表述与当前一账户一固定实例模型冲突。
 
 ## 下一动作
 
-Owner 先处置历史 unknown，并按 `docs/operations/LIVE_ACCEPTANCE_RUNBOOK.md` 手动完成 Cross 最小开仓、双腿核对、平仓与对账；通过后再以共享 UTA 最小仓位验收 Funding。任何身份不一致、查询不可用、累计成交冲突或 result_unknown 都立即停止扩展。
+Owner 开启 Cross Terminal Algo/Expert Trading 后，可请求新的、操作明确且有时限的最小实盘窗口；获批后按 `docs/operations/LIVE_ACCEPTANCE_RUNBOOK.md` 手动完成 Cross 最小开仓、双腿核对、平仓与对账，通过后再以共享 UTA 最小仓位验收 Funding。任何身份不一致、查询不可用、累计成交冲突或 result_unknown 都立即停止扩展。
 
 长期权威仍为 `docs/PROJECT.md`、`docs/contracts/VENUE_ADAPTERS.md`、`docs/contracts/CROSS_SPREAD_EXECUTION.md`、`docs/contracts/LIVE_ACCOUNT_OBSERVABILITY.md`、`docs/contracts/EOD_RECONCILIATION.md` 与 `docs/operations/LIVE_ACCEPTANCE_RUNBOOK.md`。

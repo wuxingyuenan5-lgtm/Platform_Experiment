@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Literal
@@ -61,7 +62,7 @@ class RuntimeExecutionEventV1(BaseModel):
     reason: str | None = None
 
 
-def version_execution_events(events: list[BaseModel]) -> list[RuntimeExecutionEventV1]:
+def version_execution_events(events: Sequence[BaseModel]) -> list[RuntimeExecutionEventV1]:
     return [
         RuntimeExecutionEventV1.model_validate(event.model_dump())
         for event in events

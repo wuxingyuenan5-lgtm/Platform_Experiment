@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import sqlite3
 from collections.abc import Iterator
@@ -39,6 +40,29 @@ CREATE TABLE IF NOT EXISTS runtime_events (
 
 CREATE INDEX IF NOT EXISTS idx_runtime_events_command
 ON runtime_events(command_id, sequence);
+
+CREATE TABLE IF NOT EXISTS runtime_command_dispositions (
+    command_id TEXT PRIMARY KEY,
+    disposition TEXT NOT NULL CHECK (disposition = 'resolved_absent'),
+    previous_status TEXT NOT NULL CHECK (previous_status = 'result_unknown'),
+    actor TEXT NOT NULL,
+    reason TEXT NOT NULL,
+    evidence_json TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    FOREIGN KEY(command_id) REFERENCES runtime_commands(command_id)
+);
+
+CREATE TRIGGER IF NOT EXISTS runtime_command_dispositions_immutable_update
+BEFORE UPDATE ON runtime_command_dispositions
+BEGIN
+    SELECT RAISE(ABORT, 'runtime command disposition evidence is immutable');
+END;
+
+CREATE TRIGGER IF NOT EXISTS runtime_command_dispositions_immutable_delete
+BEFORE DELETE ON runtime_command_dispositions
+BEGIN
+    SELECT RAISE(ABORT, 'runtime command disposition evidence is immutable');
+END;
 """
 
 
@@ -95,6 +119,17 @@ def connection() -> Iterator[sqlite3.Connection]:
 def initialize_journal() -> None:
     with connection() as db:
         db.executescript(SCHEMA_SQL)
+        columns = {
+            row["name"]
+            for row in db.execute("PRAGMA table_info(runtime_command_dispositions)").fetchall()
+        }
+        if "previous_status" not in columns:
+            db.execute(
+                """
+                ALTER TABLE runtime_command_dispositions
+                ADD COLUMN previous_status TEXT NOT NULL DEFAULT 'result_unknown'
+                """
+            )
 
 
 def get_events(command_id: str) -> list[ExecutionEvent]:
@@ -216,6 +251,72 @@ def mark_command_result_unknown(command_id: str) -> bool:
             (utc_now().isoformat(), command_id),
         )
     return cursor.rowcount == 1
+
+
+def resolve_command_absent(
+    command_id: str,
+    *,
+    actor: str,
+    reason: str,
+    evidence: dict[str, object],
+) -> dict[str, object]:
+    """Atomically retain an immutable absent-order disposition for one unknown command."""
+
+    now = utc_now().isoformat()
+    with connection() as db:
+        db.execute("BEGIN IMMEDIATE")
+        existing = db.execute(
+            """
+            SELECT disposition, actor, reason, evidence_json, created_at
+            FROM runtime_command_dispositions WHERE command_id = ?
+            """,
+            (command_id,),
+        ).fetchone()
+        if existing is not None:
+            return {
+                "commandId": command_id,
+                "disposition": existing["disposition"],
+                "actor": existing["actor"],
+                "reason": existing["reason"],
+                "evidence": json.loads(existing["evidence_json"]),
+                "resolvedAt": existing["created_at"],
+            }
+        row = db.execute(
+            "SELECT status, payload_json FROM runtime_commands WHERE command_id = ?",
+            (command_id,),
+        ).fetchone()
+        if row is None:
+            raise KeyError(command_id)
+        if row["status"] != "result_unknown":
+            raise ValueError("Only result_unknown commands can be resolved absent")
+        stored_evidence = dict(evidence)
+        stored_evidence["originalPayloadSha256"] = hashlib.sha256(
+            row["payload_json"].encode("utf-8")
+        ).hexdigest()
+        evidence_json = json.dumps(stored_evidence, sort_keys=True, separators=(",", ":"))
+        db.execute(
+            """
+            INSERT INTO runtime_command_dispositions (
+                command_id, disposition, previous_status, actor, reason, evidence_json, created_at
+            ) VALUES (?, 'resolved_absent', 'result_unknown', ?, ?, ?, ?)
+            """,
+            (command_id, actor, reason, evidence_json, now),
+        )
+        db.execute(
+            """
+            UPDATE runtime_commands SET status = 'resolved_absent', updated_at = ?
+            WHERE command_id = ? AND status = 'result_unknown'
+            """,
+            (now, command_id),
+        )
+    return {
+        "commandId": command_id,
+        "disposition": "resolved_absent",
+        "actor": actor,
+        "reason": reason,
+        "evidence": stored_evidence,
+        "resolvedAt": now,
+    }
 
 
 def _validated_unique_events(
