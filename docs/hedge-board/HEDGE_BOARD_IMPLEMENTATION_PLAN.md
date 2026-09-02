@@ -1,6 +1,6 @@
 # 对冲基金看板｜统一实施计划（Implementation Plan）
 
-> 状态：Implementation Plan v1.5 / PHASE 0 DONE / PHASE 1 DONE / MACRO V1 DONE / COMMODITY V1 IN PROGRESS
+> 状态：Implementation Plan v1.6 / PHASE 0 DONE / PHASE 1 DONE / MACRO V1 DONE / COMMODITY V1 DONE / CRYPTO V1 NEXT
 > 项目总览：`docs/hedge-board/HEDGE_BOARD_PROJECT_PLAN_AND_PROGRESS.md`  
 > 上位文档：`docs/hedge-board/HEDGE_BOARD_OPTIMIZATION_MASTER_PLAN.md`  
 > 数据可行性：`docs/hedge-board/HEDGE_BOARD_DATA_FEASIBILITY_AND_MAINTENANCE.md`  
@@ -30,13 +30,16 @@ Macro V1 Engineering
 → DONE
 
 Commodity V1 Engineering
-→ IN PROGRESS
+→ DONE
+
+Crypto V1 Engineering
+→ NEXT
 ```
 
 当前管理口径：
 
 - 规划准备度：`100%`；
-- 工程主阶段：`3 / 6 = 50%`；
+- 工程主阶段：`4 / 6 = 66.7%`；
 - 六个工程主阶段：Phase 0、Phase 1、Macro V1、Commodity V1、Crypto V1、Unified QA / Offline Acceptance；
 - 百分比仅用于阶段 Gate 管理，不代表工作量严格等权，不用于推算工期。
 
@@ -465,6 +468,8 @@ CFTC核心品种全部 Native。
 - 单位/合约/结算口径正确；
 - 不新增农产品。
 
+Commodity V1 已于 2026-09-02 完成。EIA Secret 配置后，workflow `33631637867` 实际刷新四条官方库存序列并成功；数据 commit `a0e42a8`，应用两组 Native 图表 commit `8ec3ce7e`。最新 EIA observation date `2026-08-21`，按冻结阈值保持 `stale`，未伪造最新值。Commodity 全部 Native / Link / no-fake-data / source / freshness Gate 已通过。
+
 ---
 
 # 9. Crypto V1 实施路线
@@ -663,7 +668,7 @@ Offline Acceptance
 - Phase 0 GitHub Actions 验证；
 - Project Plan & Progress v1.0。
 
-下一步继续 **Commodity V1 Engineering**：完成 C3/C4/C5/C7/C8 的 Native / Embed / External Link 路由；EIA 在 Owner 提供 GitHub Secret 后完成真实刷新验收。
+下一步是 **Crypto V1 Engineering**。
 
 以后每完成一个正式 Phase，都必须同步更新：
 

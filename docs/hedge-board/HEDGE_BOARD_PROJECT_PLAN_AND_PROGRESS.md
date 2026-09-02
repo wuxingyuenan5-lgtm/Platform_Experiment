@@ -1,6 +1,6 @@
 # 对冲基金看板｜完整项目计划书与进度总表
 
-> 状态：Project Baseline v1.3 / Phase 0 DONE / Phase 1 DONE / Macro V1 DONE / Commodity V1 IN PROGRESS
+> 状态：Project Baseline v1.4 / Phase 0 DONE / Phase 1 DONE / Macro V1 DONE / Commodity V1 DONE / Crypto V1 NEXT
 > 主仓库：`wuxingyuenan5-lgtm/Platform_Experiment`  
 > 开发分支：`feature/hedge-board-online-optimization`  
 > 数据仓库：`wuxingyuenan5-lgtm/platform-data`  
@@ -382,11 +382,11 @@ GitHub Actions：
 | Phase 0 — Shared Data Foundation | DONE | 100% | CI success |
 | Phase 1 — Shared Market Detail | DONE | 100% | 真实 Treasury 10Y 垂直样板已验收 |
 | Macro V1 Engineering | DONE | 100% | Market Detail 23 行；Growth / Inflation / Rates / Risk / Global M2 全部验收 |
-| Commodity V1 Engineering | IN PROGRESS | 70% | EIA fail-closed 工程链已完成；真实刷新与 UI 验收待 Owner Secret |
+| Commodity V1 Engineering | DONE | 100% | CFTC / EIA Native、受限模块官方 Link、母表 fail-closed 与 QA 全部完成 |
 | Crypto V1 Engineering | NOT STARTED | 0% | 等共享层稳定 |
 | Unified QA + Offline Acceptance | NOT STARTED | 0% | 三模块后执行 |
 
-**工程主阶段完成：3 / 6 = 50%。**
+**工程主阶段完成：4 / 6 = 66.7%。**
 
 该比例只表示主阶段 Gate，不代表工作量严格等权；后续项目管理以阶段状态和实际交付为主，不使用该比例推算工期。
 
@@ -567,7 +567,7 @@ DONE（2026-09-02）：
 
 CFTC 已使用官方 PRE Disaggregated Futures Only 数据集，按 Contract Market Code 显式绑定五个品种，发布 Managed Money Net、Producer/Merchant Net 与滚动 260 周 Managed Money 历史分位，共 15 条 canonical series。数据 commits `7dc7646`、`d01e038`、CI 修复 `c771318`；应用/API commit `fac747c2`；workflow runs `33603224576`、`33604442977` success，后者验证完整 dashboard 路径触发。
 
-EIA Native 工程链已完成（数据 commit `4a317da`）：四条官方 series identity、API v2 provider、canonical pipeline、CLI、Commodity dashboard groups、周三/周六条件式 CI 与密钥不落盘测试均已落库。本地 28 tests 通过，workflow run `33606084985` success，并验证缺少 Secret 时 EIA step 明确 `skipped`、CFTC 与 dashboard 正常运行。真实刷新、应用图表与最终 QA 仍需 Owner 配置 `EIA_API_KEY`。
+EIA Native 已完成：工程 commit `4a317da`，真实数据 commit `a0e42a8`，应用图表 commit `8ec3ce7e`。四条官方 series identity、API v2 provider、canonical pipeline、CLI、Commodity dashboard groups、周三/周六条件式 CI 与密钥不落盘测试均已验收。workflow run `33631637867` success，EIA refresh step 实际执行；API 返回两组四序列。最新观测为 2026-08-21，按 10 天阈值正确标记 `stale`，未 forward-fill。
 
 ### C2 — Existing Gold Modules 去假数据
 
@@ -598,7 +598,7 @@ EIA Native 工程链已完成（数据 commit `4a317da`）：四条官方 series
 - CME/LME受限库存 Link；
 - SHFE/INE rights-clear 数据按需 Native。
 
-【PARTIAL】CME delivery / stocks 与 LME warehouse / stocks 已增加官方 External Link；EIA Native 待 Secret。
+【DONE】CME delivery / stocks 与 LME warehouse / stocks 已增加官方 External Link；EIA crude / Cushing / gasoline / distillate 已 Native。
 
 ### C6 — CFTC Positioning
 
@@ -620,7 +620,13 @@ EIA Native 工程链已完成（数据 commit `4a317da`）：四条官方 series
 
 ### C9 — Commodity QA
 
-确保不新增农产品、不显示假数据。
+DONE（2026-09-02）：
+
+- 未新增农产品；旧商品母表、黄金 ETF / SPDR / 央行储备及 GVZ 对比静态值均退出渲染；
+- Native / External Link、周频频率、10 天 freshness 与 `stale` 状态正确；
+- `platform-data` 28 tests、目标 Ruff、API provider 2 tests、目标 Pyright、前端 type check、ESLint、布局守护与 5681-module production build 通过；
+- 完整 API Pyright 的 2 个既存 Macro `float → Decimal` 错误不属于 Commodity 变更，Commodity provider 单独为 0 error；
+- 数据 commits `7dc7646`、`d01e038`、`4a317da`、`a0e42a8`；应用 commits `fac747c2`、`eebbde6b`、`4ff5b0e7`、`8ec3ce7e`；真实 workflow `33631637867` success。
 
 ---
 
@@ -752,7 +758,7 @@ Native Binance / rights-clear data；严格区分 7×24 与 US securities calend
 
 当前唯一下一工程阶段：
 
-> **Commodity V1 Engineering**
+> **Crypto V1 Engineering**
 
 建议执行顺序：
 

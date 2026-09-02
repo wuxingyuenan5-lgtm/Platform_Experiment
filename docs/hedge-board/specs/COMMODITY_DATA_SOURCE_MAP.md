@@ -183,7 +183,7 @@ Historical Percentile：
 | U.S. Motor Gasoline Stocks | `PET.WGTSTUS1.W` | thousand barrels |
 | U.S. Distillate Fuel Oil Stocks | `PET.WDISTUS1.W` | thousand barrels |
 
-四条 identity 已通过 EIA 官方 weekly history 下载端点验证。实现只从 `EIA_API_KEY` 环境变量读取凭据；缺少 Secret 时拒绝发布，生成 artifact 的 `sourceUrl` 永不包含 API key。数据工程 commit `4a317da`，无 Secret CI run `33606084985` success 且 EIA refresh step 按预期 skipped。
+四条 identity 已通过 EIA 官方 weekly history 下载端点验证。实现只从 `EIA_API_KEY` 环境变量读取凭据；缺少 Secret 时拒绝发布，生成 artifact 的 `sourceUrl` 永不包含 API key。数据工程 commit `4a317da`；真实数据 commit `a0e42a8`；workflow `33631637867` success。最新 observation date `2026-08-21`，四序列因超过 10 天 freshness threshold 正确标为 `stale`。
 
 ### 6.1 Crude / Products
 
