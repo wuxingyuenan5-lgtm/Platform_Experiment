@@ -148,6 +148,14 @@ export default defineComponent({
             return h(MacroSeriesChart, { groupId: 'marketInflation', years: 5, unitLabel: '%' });
           case 'macro-rate-corridor':
             return h(MacroSeriesChart, { groupId: 'rateCorridor', years: 1, unitLabel: '%' });
+          case 'macro-risk-hy-oas':
+            return h(MacroSeriesChart, { groupId: 'riskHighYieldOas', years: 5, unitLabel: '%' });
+          case 'macro-risk-credit-ratio':
+            return h(MacroSeriesChart, {
+              groupId: 'riskCreditRatio',
+              years: 2,
+              unitLabel: 'ratio',
+            });
           case 'crypto-market-detail-table':
             return h(TerminalDetailPanel, {
               class: 'terminal-detail-panel--embedded',

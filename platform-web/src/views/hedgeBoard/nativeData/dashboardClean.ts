@@ -14,6 +14,8 @@ export type LocalWidgetKey =
   | 'macro-upstream-inflation'
   | 'macro-market-inflation'
   | 'macro-rate-corridor'
+  | 'macro-risk-hy-oas'
+  | 'macro-risk-credit-ratio'
   | 'gold-market-detail-table'
   | 'crypto-market-detail-table'
   | 'btc-etf-flow'
@@ -221,6 +223,21 @@ export const researchModules: ResearchModule[] = [
             'Fed target / IORB / ON RRP / EFFR / SOFR',
             'macro-rate-corridor',
           ),
+        ],
+      },
+      {
+        id: 'macro-risk-appetite',
+        eyebrow: 'Risk Appetite',
+        title: '信用风险偏好',
+        description: '分别观察高收益信用利差与 HYG/LQD 相对表现，避免混用纵轴。',
+        layout: 'two',
+        widgets: [
+          localChart(
+            '美国高收益债 OAS',
+            'ICE BofA US High Yield OAS via FRED',
+            'macro-risk-hy-oas',
+          ),
+          localChart('HYG / LQD', '同日 adjusted close ratio', 'macro-risk-credit-ratio'),
         ],
       },
     ],
