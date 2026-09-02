@@ -132,6 +132,26 @@ const externalCryptoResearch = {
     description: 'Bitcoin 链上估值、持有者与周期指标',
     href: 'https://checkonchain.com/',
   },
+  'crypto-eth-etf-flow': {
+    provider: 'Farside Investors',
+    description: '美国现货 ETH ETF 每日资金流',
+    href: 'https://farside.co.uk/eth/',
+  },
+  'crypto-coinglass': {
+    provider: 'CoinGlass',
+    description: '跨交易所资金费率、未平仓量与清算聚合',
+    href: 'https://www.coinglass.com/',
+  },
+  'crypto-bybit': {
+    provider: 'Bybit',
+    description: 'Bybit 官方衍生品市场数据入口',
+    href: 'https://www.bybit.com/en/derivatives/',
+  },
+  'crypto-okx': {
+    provider: 'OKX',
+    description: 'OKX 官方永续合约市场入口',
+    href: 'https://www.okx.com/markets/prices/swap',
+  },
 } as const;
 
 type ExternalGoldResearchKey = keyof typeof externalGoldResearch;
@@ -403,6 +423,10 @@ export default defineComponent({
           case 'crypto-stablecoin-supply':
           case 'crypto-options-iv':
           case 'crypto-onchain':
+          case 'crypto-eth-etf-flow':
+          case 'crypto-coinglass':
+          case 'crypto-bybit':
+          case 'crypto-okx':
             return renderExternalCryptoResearch(key);
           case 'crypto-binance-spot':
             return h(MacroSeriesChart, {

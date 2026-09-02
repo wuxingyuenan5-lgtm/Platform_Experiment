@@ -29,6 +29,10 @@ export type LocalWidgetKey =
   | 'crypto-stablecoin-supply'
   | 'crypto-options-iv'
   | 'crypto-onchain'
+  | 'crypto-eth-etf-flow'
+  | 'crypto-coinglass'
+  | 'crypto-bybit'
+  | 'crypto-okx'
   | 'spdr-daily-flow'
   | 'spdr-holdings-vs-price'
   | 'etf-weekly-flows'
@@ -541,6 +545,9 @@ export const researchModules: ResearchModule[] = [
             height: 420,
             sourceNote: '',
           }),
+          localChart('ETH ETF 日流量', 'Farside Investors', 'crypto-eth-etf-flow', {
+            height: 420,
+          }),
           localChart('Bitcoin Treasuries Weekly Net Inflow', '', 'btc-treasury-flow', {
             height: 420,
             sourceNote: '',
@@ -586,6 +593,9 @@ export const researchModules: ResearchModule[] = [
           localChart('Stablecoin Supply', 'DefiLlama', 'crypto-stablecoin-supply'),
           localChart('Options IV / Skew', 'Deribit / Greeks.live', 'crypto-options-iv'),
           localChart('On-chain Signals', 'Checkonchain / Glassnode', 'crypto-onchain'),
+          localChart('Aggregate Derivatives', 'CoinGlass', 'crypto-coinglass'),
+          localChart('Bybit Derivatives', 'Bybit', 'crypto-bybit'),
+          localChart('OKX Derivatives', 'OKX', 'crypto-okx'),
         ],
       },
     ],
