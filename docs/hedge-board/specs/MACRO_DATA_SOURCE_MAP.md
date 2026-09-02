@@ -178,7 +178,7 @@ Treasury 官方 XML/CSV feed 为主；不对缺失 tenor 自行插值后伪装�
 
 ---
 
-## 6. Global M2 Source Map【公式冻结；Series 细节继续核验】
+## 6. Global M2 Source Map【公式与 Series 已核验】
 
 ### 6.1 公式
 
@@ -199,11 +199,13 @@ globalM2 =
 
 | Component | Canonical ID | Primary | Fallback | Frequency | Notes |
 |---|---|---|---|---|---|
-| US M2 | `us_m2` | FRED | Federal Reserve | Monthly | 优先 NSA level；最终 Series ID 实施前再确认 |
-| China M2 | `cn_m2` | AKShare | PBOC | Monthly | AKShare 成熟接口优先；必须记录 upstream source |
-| Euro Area M2 | `eu_m2` | ECB Data Portal | OPEN | Monthly | 官方 SDMX API |
-| Japan M2 | `jp_m2` | BOJ API | OPEN | Monthly | 官方 Time-Series API |
-| UK M2 | `gb_m2` | Bank of England | OPEN | Monthly | 官方月度广义货币序列 |
+| US M2 | `us_m2` | FRED `M2NS` | Federal Reserve H.6 | Monthly | NSA；USD billion |
+| China M2 | `cn_m2` | AKShare-compatible Sina adapter | PBOC mandatory validation | Monthly | 亿元；2026-07 必须通过 PBOC 355.51 万亿元基准 |
+| Euro Area M2 | `eu_m2` | ECB BSI | `M.U2.Y.V.M20.X.1.U2.2300.Z01.E` | Monthly | Working-day / seasonally adjusted stock；EUR million |
+| Japan M2 | `jp_m2` | BOJ API `MD02` | `MAM1NAM2M2MO` | Monthly | Average amounts outstanding；100 million yen |
+| UK broad money | `gb_m2` | BoE IADB | `LPMAUYM` | Monthly | M4 amount outstanding NSA；GBP million |
+
+拒绝使用 IMF/FRED 的 `MYAGM2CNM189N`（停于 2019-08）以及 BOJ / BoE 已停更的旧 IMF 镜像。Global M2 不允许以停更镜像补齐当前值。
 
 ### 6.3 FX Conversion
 
@@ -218,6 +220,8 @@ Canonical FX：
 
 每日官方汇率 → 对月度 M2 观察期求月均 → 转换为 USD。
 
+ECB keys：`D.USD.EUR.SP00.A`、`D.CNY.EUR.SP00.A`、`D.JPY.EUR.SP00.A`、`D.GBP.EUR.SP00.A`。非欧元货币按同日 `USD/EUR ÷ local/EUR` 先转成 USD/local，再取月均；禁止用两条月均汇率之比替代同日交叉汇率月均。
+
 ### 6.4 Global M2 输出
 
 至少输出：
@@ -228,6 +232,8 @@ Canonical FX：
 - 各地区 component share
 - common observation month
 - methodology version
+
+实现状态（2026-09-02）：132 个共同月份通过端到端刷新，最新共同月份 2026-07；总量、YoY、五区 USD component 与 component share 均保存为 canonical series。方法版本 `global_m2_five_region_monthly_fx_v1`。
 
 ---
 

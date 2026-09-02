@@ -381,7 +381,7 @@ GitHub Actions：
 |---|---|---:|---|
 | Phase 0 — Shared Data Foundation | DONE | 100% | CI success |
 | Phase 1 — Shared Market Detail | DONE | 100% | 真实 Treasury 10Y 垂直样板已验收 |
-| Macro V1 Engineering | IN PROGRESS | 75% | Market Detail 20 行；Growth / Inflation / Rates / Risk 已接入；Global M2 待完成 |
+| Macro V1 Engineering | IN PROGRESS | 90% | Market Detail 20 行；Growth / Inflation / Rates / Risk / Global M2 已接入；中国国债 mapping 待完成 |
 | Commodity V1 Engineering | NOT STARTED | 0% | 等 Phase 1 / Macro |
 | Crypto V1 Engineering | NOT STARTED | 0% | 等共享层稳定 |
 | Unified QA + Offline Acceptance | NOT STARTED | 0% | 三模块后执行 |
@@ -490,12 +490,13 @@ Market Detail 尚未完成中国国债行；MOVE / DSPX 按 Source Map 保持 `n
 - Inflation：CPI / Core CPI / PCE / Core PCE YoY、PPI YoY、5Y / 10Y Breakeven、5Y5Y Forward；
 - Rates：Fed Target Lower / Upper、IORB、ON RRP Award、EFFR、SOFR；
 - Risk Appetite：US HY OAS、HYG/LQD exact-date adjusted-close ratio；
+- Global M2：五区官方/强校验广义货币、共同月份、ECB 同日交叉汇率月均、USD 总量与 YoY；132 个月端到端刷新通过，最新共同月份 2026-07；
 - Market Expectations 继续复用已有白名单 Polymarket 面板；
 - 聚合合约按规格窗口裁剪，并对日频展示序列周度抽样；完整 canonical history 保留在单序列文件中。
 
 数据 commits：`c62dbb299efaa1dcc21d95bd26612be262535d7e`、`34cb72f7d28539ca25360234e175c654ee418106`、`36ba32b78d8ce037dc9c75d2bfe0f00dd97fbbc6`、`9ce61a1f29d781dfa015085a94771e7405014fec`。应用 commits：`e294e75398005b3efa040f575e3a0ff37954278e`、`ecbb20a9463fd0da237566eee3bdf4a4668182cb`、`88e94bd53f6a51b02b2cef9a2cb1a83ef5d4bf11`。`platform-data` 17 tests、API targeted tests、Ruff、Pyright、前端 type check 与 production build 已通过。
 
-当前剩余：Global M2 官方 series code / unit / common-month / monthly-average FX 链路；中国国债 2Y / 10Y / 30Y 精确 AKShare/ChinaBond mapping。二者未确认前不发布替代数据。
+当前剩余：中国国债 2Y / 10Y / 30Y 精确 AKShare/ChinaBond mapping；未确认前不发布替代数据。Global M2 已完成数据链路与页面展示，待合并本轮 commit / CI 证据后计入 Macro Gate。
 
 ### M2 — Growth
 

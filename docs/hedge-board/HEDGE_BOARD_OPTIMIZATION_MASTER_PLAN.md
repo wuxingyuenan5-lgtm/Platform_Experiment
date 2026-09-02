@@ -455,7 +455,7 @@ Phase 1 真实验收：
 
 Native core 已真实化 20 个既有 Macro Market Detail 行。Treasury curve 数据 commit `774dccacebbd6f1fdca02f47071c0f74dc9fe07b`，FRED core commit `183e99db29e44d7b6a9e490840b430e23c41f537`，VIX / DXY / USDCNH / TLT / HYG commit `997adb4871bbfbd3d5c089c8761344433bd0e77c`；workflow runs `33596176092`、`33596701735` 均为 `success`。该进度不代表 Macro V1 完成；专题模块及其余市场行仍按冻结范围继续。
 
-Macro 专题模块已完成 Growth、Inflation、Short-End Rate Corridor 和 Risk Appetite 的真实数据/API/additive SVG 图表；既有 Polymarket 白名单面板继续作为 Market Expectations。数据 commits `c62dbb299efaa1dcc21d95bd26612be262535d7e`、`9ce61a1f29d781dfa015085a94771e7405014fec`；应用 commits `e294e75398005b3efa040f575e3a0ff37954278e`、`ecbb20a9463fd0da237566eee3bdf4a4668182cb`。当前 Macro V1 主要剩余 Global M2 与中国国债 mapping。
+Macro 专题模块已完成 Growth、Inflation、Short-End Rate Corridor、Risk Appetite 和 Global M2 的真实数据/API/additive SVG 图表；既有 Polymarket 白名单面板继续作为 Market Expectations。Global M2 已通过五区官方/强校验序列、共同月份和 ECB 日汇率月均端到端验证。既有数据 commits `c62dbb299efaa1dcc21d95bd26612be262535d7e`、`9ce61a1f29d781dfa015085a94771e7405014fec`；应用 commits `e294e75398005b3efa040f575e3a0ff37954278e`、`ecbb20a9463fd0da237566eee3bdf4a4668182cb`。当前 Macro V1 主要剩余中国国债 mapping。
 
 完整阶段状态、模块进度、风险和后续路线以 `HEDGE_BOARD_PROJECT_PLAN_AND_PROGRESS.md` 为管理总览。
 

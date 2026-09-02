@@ -305,7 +305,7 @@ Phase 1 已于 2026-09-02 完成。数据 commit 为 `9c5eb80f056bcbf2896fd85d32
 
 当前已完成 Native core 20 行：Treasury 2Y / 10Y / 30Y；DFF、SOFR、10Y real yield、10Y breakeven、CPI、PCE、UNRATE、M2、WALCL、TGA、RRP、派生 Net Dollar Liquidity，以及 VIX、DXY、USDCNH、TLT、HYG。数据 commits 为 `774dccacebbd6f1fdca02f47071c0f74dc9fe07b`、`02bdfef35f803ef18e1f379598ba85abf001383c`、`183e99db29e44d7b6a9e490840b430e23c41f537`、`997adb4871bbfbd3d5c089c8761344433bd0e77c`；应用 commits 为 `cca0a46685f86dc17271f9d46216646fa0ada6f1`、`482c636fca46833d6ab0a77ea17df922c2f457ea`、`913d7df85e88bd3d2881c37a8750da3b3562df0d`；workflow runs `33596176092`、`33596701735` 均为 `success`。
 
-Macro 专题已交付 Growth、Actual / Upstream / Market-Implied Inflation、Short-End Rate Corridor、Risk Appetite。数据 commits `c62dbb299efaa1dcc21d95bd26612be262535d7e`、`34cb72f7d28539ca25360234e175c654ee418106`、`36ba32b78d8ce037dc9c75d2bfe0f00dd97fbbc6`、`9ce61a1f29d781dfa015085a94771e7405014fec`；应用 commits `e294e75398005b3efa040f575e3a0ff37954278e`、`ecbb20a9463fd0da237566eee3bdf4a4668182cb`、`88e94bd53f6a51b02b2cef9a2cb1a83ef5d4bf11`。Global M2 与中国国债 mapping 继续实施，未确认部分保持 unavailable。
+Macro 专题已交付 Growth、Actual / Upstream / Market-Implied Inflation、Short-End Rate Corridor、Risk Appetite，并完成 Global M2 五区共同月份、ECB 日汇率月均折算、总量/YoY/component/share canonical 输出与双图展示。既有数据 commits `c62dbb299efaa1dcc21d95bd26612be262535d7e`、`34cb72f7d28539ca25360234e175c654ee418106`、`36ba32b78d8ce037dc9c75d2bfe0f00dd97fbbc6`、`9ce61a1f29d781dfa015085a94771e7405014fec`；应用 commits `e294e75398005b3efa040f575e3a0ff37954278e`、`ecbb20a9463fd0da237566eee3bdf4a4668182cb`、`88e94bd53f6a51b02b2cef9a2cb1a83ef5d4bf11`。当前仅剩中国国债 mapping，未确认部分保持 unavailable。
 
 处理：
 
