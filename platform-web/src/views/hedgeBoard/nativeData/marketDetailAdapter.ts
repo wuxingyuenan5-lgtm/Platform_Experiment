@@ -24,6 +24,9 @@ const ENABLED_MACRO_ROW_IDS = new Set([
   'macro-usdcnh',
   'macro-tlt',
   'macro-hyg',
+  'macro-cn2y',
+  'macro-cn10y',
+  'macro-cn30y',
 ]);
 const DATA_SIGNAL_KEYS: Array<keyof TerminalTableRow> = [
   'd10',
