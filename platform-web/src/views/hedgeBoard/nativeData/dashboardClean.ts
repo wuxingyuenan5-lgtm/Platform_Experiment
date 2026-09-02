@@ -326,19 +326,19 @@ export const researchModules: ResearchModule[] = [
         widgets: [
           localChart('全球各地区 ETF 每周流入', '', 'etf-weekly-flows', {
             height: 430,
-            sourceNote: '数据源：World Gold Council ETF flows-chart2 / archive-tablegroup API',
+            sourceNote: 'External Link · World Gold Council · permission_required',
           }),
           localChart('全球 ETF 年内汇总', '', 'etf-ytd-summary', {
             height: 430,
-            sourceNote: '数据源：World Gold Council regional year-to-date dataset',
+            sourceNote: 'External Link · World Gold Council · permission_required',
           }),
           localChart('金价 vs SPDR 每日流量', '', 'spdr-daily-flow', {
             height: 420,
-            sourceNote: '数据源：SPDR Gold Shares historical archive',
+            sourceNote: 'External Link · SPDR Gold Shares · permission_required',
           }),
           localChart('SPDR 持仓量 vs 黄金价格', '', 'spdr-holdings-vs-price', {
             height: 420,
-            sourceNote: '数据源：SPDR Gold Shares historical archive',
+            sourceNote: 'External Link · SPDR Gold Shares · permission_required',
           }),
         ],
       },
@@ -351,11 +351,11 @@ export const researchModules: ResearchModule[] = [
         widgets: [
           localChart('官方黄金储备前十', '', 'central-bank-holders', {
             height: 420,
-            sourceNote: '数据源：World Gold Council central bank reserves snapshot API',
+            sourceNote: 'External Link · World Gold Council · permission_required',
           }),
           localChart('近一年持续增持的央行', '', 'central-bank-buyers', {
             height: 420,
-            sourceNote: '数据源：World Gold Council date_range reserves API',
+            sourceNote: 'External Link · World Gold Council · permission_required',
           }),
         ],
       },

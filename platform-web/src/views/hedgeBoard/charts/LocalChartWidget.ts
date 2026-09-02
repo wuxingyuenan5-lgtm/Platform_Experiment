@@ -1,16 +1,103 @@
 import { defineComponent, h, type PropType } from 'vue';
 
-import ReserveRanking from '../components/ReserveRanking';
 import TerminalDetailPanel from '../components/TerminalDetailPanel.vue';
 import MacroMarketDetailPanel from '../components/MacroMarketDetailPanel.vue';
 import { type LocalWidgetKey, type WidgetConfig } from '../nativeData/dashboardClean';
-import { marketData } from '../nativeData/generated/marketData';
 import { marketTerminalConfigs } from '../nativeData/marketTerminal';
 import { BTC_ETF_FLOW_ROWS, mergeGoldWithGvz, mergeGoldWithSeries } from './chartCore';
 import DualAxisChart from './DualAxisChart';
-import { EtfWeeklyFlowsPanel, YtdSummaryPanel } from './EtfResearchPanels';
 import TreasuryFlowChart from './TreasuryFlowChart';
 import MacroSeriesChart from './MacroSeriesChart';
+
+const externalGoldResearch = {
+  'etf-weekly-flows': {
+    provider: 'World Gold Council',
+    description: '全球及区域黄金 ETF 持仓与资金流',
+    href: 'https://www.gold.org/goldhub/data/gold-etfs-holdings-and-flows',
+  },
+  'etf-ytd-summary': {
+    provider: 'World Gold Council',
+    description: '全球黄金 ETF 年内持仓与资金流汇总',
+    href: 'https://www.gold.org/goldhub/data/gold-etfs-holdings-and-flows',
+  },
+  'spdr-daily-flow': {
+    provider: 'SPDR Gold Shares',
+    description: 'GLD 官方每日持仓及历史资料',
+    href: 'https://www.spdrgoldshares.com/usa/historical-data/',
+  },
+  'spdr-holdings-vs-price': {
+    provider: 'SPDR Gold Shares',
+    description: 'GLD 官方每日持仓及历史资料',
+    href: 'https://www.spdrgoldshares.com/usa/historical-data/',
+  },
+  'central-bank-holders': {
+    provider: 'World Gold Council',
+    description: '各国官方黄金储备数据',
+    href: 'https://www.gold.org/goldhub/data/gold-reserves-by-country',
+  },
+  'central-bank-buyers': {
+    provider: 'World Gold Council',
+    description: '各国官方黄金储备数据',
+    href: 'https://www.gold.org/goldhub/data/gold-reserves-by-country',
+  },
+} as const;
+
+type ExternalGoldResearchKey = keyof typeof externalGoldResearch;
+
+function renderExternalGoldResearch(key: ExternalGoldResearchKey) {
+  const item = externalGoldResearch[key];
+  return h(
+    'div',
+    {
+      style: {
+        minHeight: '260px',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: '14px',
+        padding: '32px',
+        textAlign: 'center',
+        color: 'var(--color-text-2)',
+      },
+    },
+    [
+      h(
+        'span',
+        {
+          style: {
+            padding: '4px 10px',
+            border: '1px solid var(--color-border-2)',
+            borderRadius: '999px',
+            fontSize: '12px',
+            letterSpacing: '0.04em',
+          },
+        },
+        'External Link · permission_required',
+      ),
+      h('strong', { style: { color: 'var(--color-text-1)', fontSize: '16px' } }, item.provider),
+      h('span', item.description),
+      h(
+        'a',
+        {
+          href: item.href,
+          target: '_blank',
+          rel: 'noopener noreferrer',
+          style: {
+            padding: '9px 16px',
+            borderRadius: '8px',
+            background: 'rgb(var(--primary-6))',
+            color: '#fff',
+            fontWeight: '600',
+            textDecoration: 'none',
+          },
+        },
+        '打开官方数据页 ↗',
+      ),
+      h('small', '未取得生产再利用许可前，不在本地复制或展示第三方静态快照。'),
+    ],
+  );
+}
 
 export default defineComponent({
   name: 'LocalChartWidget',
@@ -23,65 +110,17 @@ export default defineComponent({
         const key = props.widget.localKey as LocalWidgetKey;
         switch (key) {
           case 'spdr-daily-flow':
-            return h(DualAxisChart, {
-              rows: marketData.spdr.history.slice(-60).map((point) => ({
-                date: point.date,
-                left: point.flowTonnes ?? 0,
-                right: point.goldPrice,
-              })),
-              leftLabel: 'SPDR 日流量',
-              rightLabel: '黄金价格',
-              leftUnit: '吨',
-              rightUnit: '美元/盎司',
-              leftColor: '#159a76',
-              rightColor: '#2f63f2',
-              barPositiveColor: '#18a17d',
-              barNegativeColor: '#de5d56',
-              barWidthRatio: 0.7,
-              leftAsBars: true,
-              divergingBars: true,
-            });
+            return renderExternalGoldResearch(key);
           case 'spdr-holdings-vs-price':
-            return h(DualAxisChart, {
-              rows: marketData.spdr.history.slice(-60).map((point) => ({
-                date: point.date,
-                left: point.tonnes,
-                right: point.goldPrice,
-              })),
-              leftLabel: 'SPDR 持仓量',
-              rightLabel: '黄金价格',
-              leftUnit: '吨',
-              rightUnit: '美元/盎司',
-              leftColor: '#d6ae4a',
-              rightColor: '#2f63f2',
-              barWidthRatio: 0.6,
-              leftAsBars: true,
-            });
+            return renderExternalGoldResearch(key);
           case 'etf-weekly-flows':
-            return h(EtfWeeklyFlowsPanel);
+            return renderExternalGoldResearch(key);
           case 'etf-ytd-summary':
-            return h(YtdSummaryPanel);
+            return renderExternalGoldResearch(key);
           case 'central-bank-holders':
-            return h(ReserveRanking, {
-              rows: marketData.centralBank.topHolders.map((item) => ({
-                label: item.name,
-                value: item.tonnes,
-                sublabel: item.region,
-                detail: item.region,
-              })),
-              color: '#c7931a',
-            });
+            return renderExternalGoldResearch(key);
           case 'central-bank-buyers':
-            return h(ReserveRanking, {
-              rows: marketData.centralBank.strategicBuyers.map((item) => ({
-                label: item.name,
-                value: item.deltaTonnes,
-                sublabel: `${item.startTonnes.toFixed(2)} → ${item.endTonnes.toFixed(2)} 吨`,
-                detail: `${item.startTonnes.toFixed(2)} → ${item.endTonnes.toFixed(2)} 吨`,
-              })),
-              color: '#165dff',
-              diverging: true,
-            });
+            return renderExternalGoldResearch(key);
           case 'gold-vs-nominal':
             return h(DualAxisChart, {
               rows: mergeGoldWithSeries('nominal10Y'),

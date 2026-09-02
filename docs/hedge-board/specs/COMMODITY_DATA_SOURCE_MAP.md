@@ -148,8 +148,20 @@ Prod_Merc_Positions_Long_All - Prod_Merc_Positions_Short_All
 Historical Percentile：
 
 - 本地 deterministic calculation；
-- 默认 rolling window 在实现阶段冻结；
+- rolling window 已冻结为 260 周（5 年）；
 - 不由前端临时计算。
+
+### Implemented contract identities（2026-09-02）
+
+| Commodity | CFTC Contract Market Code |
+|---|---:|
+| Gold | `088691` |
+| Silver | `084691` |
+| Copper | `085692` |
+| WTI | `067651` |
+| Natural Gas | `023651` |
+
+正式实现使用 PRE Socrata dataset `72hh-3qpy`，保留完整 canonical 周频历史；供页面读取的 dashboard artifact 仅裁剪为最近 5 年，避免把文件分发层误用作无限历史数据库。
 
 ### Quality rules
 

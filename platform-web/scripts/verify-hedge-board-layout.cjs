@@ -165,9 +165,11 @@ assert(
 );
 assert(
   hedgeBoardSource.includes('LocalChartWidget from') &&
-    localChartWidgetSource.includes("import ReserveRanking from '../components/ReserveRanking';") &&
-    localChartWidgetSource.includes('return h(ReserveRanking'),
-  'Hedge board local chart owner must delegate reserve ranking rendering to ReserveRanking.',
+    localChartWidgetSource.includes("'central-bank-holders': {") &&
+    localChartWidgetSource.includes("'central-bank-buyers': {") &&
+    localChartWidgetSource.includes('return renderExternalGoldResearch(key);') &&
+    localChartWidgetSource.includes('External Link · permission_required'),
+  'Hedge board local chart owner must preserve official-sector cards without rendering static reserve snapshots.',
 );
 assert(
   reserveRankingSource.includes("name: 'ReserveRanking'") &&

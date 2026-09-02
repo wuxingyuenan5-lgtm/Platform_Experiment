@@ -1,6 +1,6 @@
 # 对冲基金看板｜统一实施计划（Implementation Plan）
 
-> 状态：Implementation Plan v1.4 / PHASE 0 DONE / PHASE 1 DONE / MACRO V1 IN PROGRESS  
+> 状态：Implementation Plan v1.5 / PHASE 0 DONE / PHASE 1 DONE / MACRO V1 DONE / COMMODITY V1 IN PROGRESS
 > 项目总览：`docs/hedge-board/HEDGE_BOARD_PROJECT_PLAN_AND_PROGRESS.md`  
 > 上位文档：`docs/hedge-board/HEDGE_BOARD_OPTIMIZATION_MASTER_PLAN.md`  
 > 数据可行性：`docs/hedge-board/HEDGE_BOARD_DATA_FEASIBILITY_AND_MAINTENANCE.md`  
@@ -27,6 +27,9 @@ Phase 1 Shared Market Detail Data Layer【DONE】
 → DONE
 
 Macro V1 Engineering
+→ DONE
+
+Commodity V1 Engineering
 → IN PROGRESS
 ```
 
@@ -416,6 +419,8 @@ Native：
 - Treasury / DXY 等 rights-clear 宏观驱动可继续 Native/Embed；
 - GVZ 保留现有展示入口，不新建本地 Cboe history DB。
 
+实施进度（2026-09-02）：CFTC 五品种 15 条 canonical series、10 个 additive 图表卡片与 Commodity dashboard API 已完成；Managed Money 拥挤度窗口冻结为 260 周。黄金 WGC ETF、SPDR 与 Central Bank Gold 共 6 张受保护卡片已停止渲染静态快照，改为精确官方 External Link / `permission_required`。EIA Native 仍依赖 Owner 配置 `EIA_API_KEY` GitHub Secret，仓库不保存凭据。
+
 ## C3 — Commodity Market Detail
 
 逐行按 Phase F：
@@ -658,7 +663,7 @@ Offline Acceptance
 - Phase 0 GitHub Actions 验证；
 - Project Plan & Progress v1.0。
 
-下一步是 **Commodity V1 Engineering**。
+下一步继续 **Commodity V1 Engineering**：完成 C3/C4/C5/C7/C8 的 Native / Embed / External Link 路由；EIA 在 Owner 提供 GitHub Secret 后完成真实刷新验收。
 
 以后每完成一个正式 Phase，都必须同步更新：
 

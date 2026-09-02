@@ -1,6 +1,6 @@
 # 对冲基金看板｜完整项目计划书与进度总表
 
-> 状态：Project Baseline v1.2 / Phase 0 DONE / Phase 1 DONE / Macro V1 DONE / Commodity V1 NEXT  
+> 状态：Project Baseline v1.3 / Phase 0 DONE / Phase 1 DONE / Macro V1 DONE / Commodity V1 IN PROGRESS
 > 主仓库：`wuxingyuenan5-lgtm/Platform_Experiment`  
 > 开发分支：`feature/hedge-board-online-optimization`  
 > 数据仓库：`wuxingyuenan5-lgtm/platform-data`  
@@ -382,7 +382,7 @@ GitHub Actions：
 | Phase 0 — Shared Data Foundation | DONE | 100% | CI success |
 | Phase 1 — Shared Market Detail | DONE | 100% | 真实 Treasury 10Y 垂直样板已验收 |
 | Macro V1 Engineering | DONE | 100% | Market Detail 23 行；Growth / Inflation / Rates / Risk / Global M2 全部验收 |
-| Commodity V1 Engineering | NOT STARTED | 0% | 等 Phase 1 / Macro |
+| Commodity V1 Engineering | IN PROGRESS | 30% | CFTC 五品种 Native 与黄金受限数据 External Link 已完成；EIA 待凭据配置 |
 | Crypto V1 Engineering | NOT STARTED | 0% | 等共享层稳定 |
 | Unified QA + Offline Acceptance | NOT STARTED | 0% | 三模块后执行 |
 
@@ -558,12 +558,16 @@ DONE（2026-09-02）：
 
 ---
 
-## 11. Commodity V1 后续计划
+## 11. Commodity V1 实施进度
 
 ### C1 — Native Commodity Core
 
 - EIA crude / Cushing / gasoline / distillate；
-- CFTC Gold / Silver / Copper / WTI / NatGas positioning。
+- CFTC Gold / Silver / Copper / WTI / NatGas positioning。【DONE】
+
+CFTC 已使用官方 PRE Disaggregated Futures Only 数据集，按 Contract Market Code 显式绑定五个品种，发布 Managed Money Net、Producer/Merchant Net 与滚动 260 周 Managed Money 历史分位，共 15 条 canonical series。数据 commits `7dc7646`、`d01e038`、CI 修复 `c771318`；应用/API commit `fac747c2`；workflow runs `33603224576`、`33604442977` success，后者验证完整 dashboard 路径触发。
+
+EIA Native 尚未开始生产接入：实现必须读取 Owner 配置的 GitHub Secret，不得在仓库中保存或推断 API key。
 
 ### C2 — Existing Gold Modules 去假数据
 
@@ -572,6 +576,8 @@ DONE（2026-09-02）：
 - Central Bank Gold → IMF/WGC External Link；
 - rights-clear macro driver → Native/Embed；
 - GVZ 保留既有展示入口。
+
+【DONE】原有 6 张黄金 ETF / SPDR / 央行储备卡片与 Section 顺序保持不变，旧静态快照已退出渲染，统一显示精确官方 External Link 与 `permission_required` 状态。
 
 ### C3 — Commodity Market Detail
 
