@@ -39,11 +39,7 @@ class _Client:
 
 
 def _provider(monkeypatch: pytest.MonkeyPatch, payload: Any) -> MacroResearchProvider:
-    monkeypatch.setattr(
-        macro.httpx,
-        "AsyncClient",
-        lambda **kwargs: _Client(payload, **kwargs),
-    )
+    monkeypatch.setattr(macro, "read_local_json", lambda _path: payload)
     return MacroResearchProvider(timeout_seconds=7.5, user_agent="research-test")
 
 

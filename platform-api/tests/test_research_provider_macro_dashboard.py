@@ -57,7 +57,7 @@ class _Client:
 
 
 def test_macro_dashboard_provider_preserves_decimal_history(monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.setattr(dashboard.httpx, "AsyncClient", lambda **_kwargs: _Client())
+    monkeypatch.setattr(dashboard, "read_local_json", lambda _path: _Response().json())
     provider = MacroDashboardProvider(timeout_seconds=5, user_agent="test")
 
     contract = asyncio.run(provider.get())

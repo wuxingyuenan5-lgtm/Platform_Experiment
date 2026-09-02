@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, Literal, cast
+from decimal import Decimal
+from typing import Literal
 
-import httpx
 from pydantic import Field, field_validator
 
 from app.research_data_schemas import (
@@ -11,12 +11,9 @@ from app.research_data_schemas import (
     MacroProbabilityPoint,
     ResearchApiModel,
 )
+from app.research_local_data import read_local_json
 from app.research_provider_errors import ResearchProviderError
 
-PLATFORM_DATA_EXPECTATIONS_URL = (
-    "https://raw.githubusercontent.com/wuxingyuenan5-lgtm/platform-data/"
-    "macro-expectations-phase-1a/public/v1/macro/expectations.json"
-)
 MacroCategory = Literal["monetary_policy", "macro", "geopolitics", "election"]
 MacroExpectationFeedStatus = Literal[
     "ready",
@@ -75,20 +72,7 @@ class MacroResearchProvider:
 
     async def macro_expectation_contract(self) -> MacroExpectationFeedResponse:
         try:
-            async with httpx.AsyncClient(
-                timeout=self._timeout_seconds,
-                trust_env=False,
-            ) as client:
-                response = await client.get(
-                    PLATFORM_DATA_EXPECTATIONS_URL,
-                    headers={"User-Agent": self._user_agent},
-                )
-                response.raise_for_status()
-                payload = response.json()
-
-            if not isinstance(payload, dict):
-                raise ResearchProviderError("macro_expectation_feed_invalid_payload")
-            document = cast(dict[str, Any], payload)
+            document = read_local_json("public/v1/macro/expectations.json")
             if str(document.get("schemaVersion") or "") != "1.0":
                 raise ResearchProviderError("macro_expectation_feed_schema_mismatch")
 
@@ -125,11 +109,11 @@ class MacroResearchProvider:
                 category=event.category,
                 title=event.label,
                 outcome="Configured outcome",
-                current_probability_pct=event.probability,
+                current_probability_pct=Decimal(str(event.probability)),
                 history=[
                     MacroProbabilityPoint(
                         observed_at=point.observed_at,
-                        probability_pct=point.probability,
+                        probability_pct=Decimal(str(point.probability)),
                     )
                     for point in event.history
                 ],

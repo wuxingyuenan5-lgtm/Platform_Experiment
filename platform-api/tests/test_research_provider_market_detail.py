@@ -75,11 +75,7 @@ def _payload() -> dict[str, Any]:
 
 
 def test_provider_preserves_decimal_and_unavailable_values(monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.setattr(
-        market_detail.httpx,
-        "AsyncClient",
-        lambda **kwargs: _Client(_payload(), **kwargs),
-    )
+    monkeypatch.setattr(market_detail, "read_local_json", lambda _path: _payload())
     provider = MarketDetailProvider(timeout_seconds=5, user_agent="test")
 
     contract = asyncio.run(provider.get("macro"))

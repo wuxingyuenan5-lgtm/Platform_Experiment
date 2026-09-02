@@ -2,18 +2,14 @@ from __future__ import annotations
 
 from datetime import datetime
 from decimal import Decimal
-from typing import Any, Literal, cast
+from typing import Literal
 
-import httpx
 from pydantic import Field, field_validator
 
 from app.research_data_schemas import ResearchApiModel
+from app.research_local_data import read_local_json
 from app.research_provider_errors import ResearchProviderError
 
-PLATFORM_DATA_MARKET_DETAIL_URL = (
-    "https://raw.githubusercontent.com/wuxingyuenan5-lgtm/platform-data/"
-    "main/public/v1/{market_id}/market-detail.json"
-)
 MarketDetailStatus = Literal["ready", "partial", "degraded", "stale", "no_data", "error"]
 
 
@@ -72,16 +68,7 @@ class MarketDetailProvider:
         if market_id != "macro":
             raise ResearchProviderError("market_detail_not_enabled")
         try:
-            async with httpx.AsyncClient(timeout=self._timeout_seconds, trust_env=False) as client:
-                response = await client.get(
-                    PLATFORM_DATA_MARKET_DETAIL_URL.format(market_id=market_id),
-                    headers={"User-Agent": self._user_agent},
-                )
-                response.raise_for_status()
-                payload = response.json()
-            if not isinstance(payload, dict):
-                raise ResearchProviderError("market_detail_invalid_payload")
-            document = cast(dict[str, Any], payload)
+            document = read_local_json(f"public/v1/{market_id}/market-detail.json")
             if document.get("schemaVersion") != "1.0" or document.get("marketId") != market_id:
                 raise ResearchProviderError("market_detail_schema_mismatch")
             contract = MarketDetailResponse.model_validate(document)

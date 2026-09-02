@@ -1,21 +1,14 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import datetime
 from decimal import Decimal
-from typing import Any, Literal, cast
+from typing import Literal
 
-import httpx
 from pydantic import Field, field_validator
 
 from app.research_data_schemas import ResearchApiModel
+from app.research_local_data import read_local_json
 from app.research_provider_errors import ResearchProviderError
-
-MACRO_DASHBOARD_URLS = (
-    "https://raw.githubusercontent.com/wuxingyuenan5-lgtm/platform-data/"
-    "main/public/v1/macro/dashboard.json",
-    "https://cdn.jsdelivr.net/gh/wuxingyuenan5-lgtm/platform-data@main/"
-    "public/v1/macro/dashboard.json",
-)
 
 
 class MacroDashboardObservation(ResearchApiModel):
@@ -65,27 +58,7 @@ class MacroDashboardProvider:
 
     async def get(self) -> MacroDashboardResponse:
         try:
-            payload: Any = None
-            last_error: Exception | None = None
-            cache_key = int(datetime.now(UTC).timestamp() // 300)
-            async with httpx.AsyncClient(timeout=self._timeout_seconds, trust_env=False) as client:
-                for url in MACRO_DASHBOARD_URLS:
-                    try:
-                        response = await client.get(
-                            url,
-                            params={"v": cache_key},
-                            headers={"User-Agent": self._user_agent},
-                        )
-                        response.raise_for_status()
-                        payload = response.json()
-                        break
-                    except Exception as exc:
-                        last_error = exc
-            if payload is None and last_error is not None:
-                raise last_error
-            if not isinstance(payload, dict):
-                raise ResearchProviderError("macro_dashboard_invalid_payload")
-            document = cast(dict[str, Any], payload)
+            document = read_local_json("public/v1/macro/dashboard.json")
             if document.get("schemaVersion") != "1.0":
                 raise ResearchProviderError("macro_dashboard_schema_mismatch")
             contract = MacroDashboardResponse.model_validate(document)

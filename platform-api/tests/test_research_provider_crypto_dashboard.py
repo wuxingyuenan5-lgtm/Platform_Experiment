@@ -53,7 +53,7 @@ class _Client:
 
 
 def test_crypto_dashboard_provider_preserves_decimal(monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.setattr(crypto.httpx, "AsyncClient", lambda **_kwargs: _Client())
+    monkeypatch.setattr(crypto, "read_local_json", lambda _path: _Response().json())
     provider = CryptoDashboardProvider(timeout_seconds=5, user_agent="test")
     contract = asyncio.run(provider.get())
     assert str(contract.groups["binanceSpot"][0].latest_value) == "77439"

@@ -53,7 +53,7 @@ class _Client:
 
 
 def test_commodity_dashboard_provider_preserves_decimal(monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.setattr(commodity.httpx, "AsyncClient", lambda **_kwargs: _Client())
+    monkeypatch.setattr(commodity, "read_local_json", lambda _path: _Response().json())
     provider = CommodityDashboardProvider(timeout_seconds=5, user_agent="test")
     contract = asyncio.run(provider.get())
     assert str(contract.groups["cftcGoldNet"][0].latest_value) == "125"
