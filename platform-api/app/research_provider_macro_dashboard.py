@@ -10,9 +10,11 @@ from pydantic import Field, field_validator
 from app.research_data_schemas import ResearchApiModel
 from app.research_provider_errors import ResearchProviderError
 
-MACRO_DASHBOARD_URL = (
+MACRO_DASHBOARD_URLS = (
+    "https://cdn.jsdelivr.net/gh/wuxingyuenan5-lgtm/platform-data@main/"
+    "public/v1/macro/dashboard.json",
     "https://raw.githubusercontent.com/wuxingyuenan5-lgtm/platform-data/"
-    "main/public/v1/macro/dashboard.json"
+    "main/public/v1/macro/dashboard.json",
 )
 
 
@@ -63,12 +65,19 @@ class MacroDashboardProvider:
 
     async def get(self) -> MacroDashboardResponse:
         try:
+            payload: Any = None
+            last_error: Exception | None = None
             async with httpx.AsyncClient(timeout=self._timeout_seconds, trust_env=False) as client:
-                response = await client.get(
-                    MACRO_DASHBOARD_URL, headers={"User-Agent": self._user_agent}
-                )
-                response.raise_for_status()
-                payload = response.json()
+                for url in MACRO_DASHBOARD_URLS:
+                    try:
+                        response = await client.get(url, headers={"User-Agent": self._user_agent})
+                        response.raise_for_status()
+                        payload = response.json()
+                        break
+                    except Exception as exc:
+                        last_error = exc
+            if payload is None and last_error is not None:
+                raise last_error
             if not isinstance(payload, dict):
                 raise ResearchProviderError("macro_dashboard_invalid_payload")
             document = cast(dict[str, Any], payload)

@@ -38,7 +38,7 @@ _market_detail_provider = MarketDetailProvider(
     user_agent="Platform-API hedge-board-market-detail",
 )
 _macro_dashboard_provider = MacroDashboardProvider(
-    timeout_seconds=20.0,
+    timeout_seconds=12.0,
     user_agent="Platform-API hedge-board-macro-dashboard",
 )
 
