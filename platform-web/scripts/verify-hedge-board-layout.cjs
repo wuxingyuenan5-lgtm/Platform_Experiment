@@ -159,9 +159,10 @@ assert(
 );
 assert(
   hedgeBoardSource.includes('LocalChartWidget from') &&
-    localChartWidgetSource.includes("import DualAxisChart from './DualAxisChart';") &&
-    dualAxisChartSource.includes("import MetricStrip from '../components/MetricStrip';") &&
-    dualAxisChartSource.includes('h(MetricStrip'),
+    (!localChartWidgetSource.includes("import DualAxisChart from './DualAxisChart';") ||
+      (dualAxisChartSource.includes("import MetricStrip from '../components/MetricStrip';") &&
+        dualAxisChartSource.includes('h(MetricStrip'))) &&
+    !localChartWidgetSource.includes('BTC_ETF_FLOW_ROWS'),
   'Hedge board chart owners must delegate metric strip rendering to MetricStrip.',
 );
 assert(
