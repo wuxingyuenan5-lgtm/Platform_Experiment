@@ -288,7 +288,7 @@ Phase 0 本轮新增 / 修改的 `platform-data` commits：
 - Crypto 7×24 与 US ETF / equities 日历分离；
 - 技术状态箭头不在本 Phase 重构。
 
-Phase 1 已于 2026-09-02 完成。数据 commit 为 `9c5eb80f056bcbf2896fd85d321abb2c67bde01c`，workflow run `33588457408` 为 `success`；应用纵切片 commit 为 `14fda8c4b1cf79013ca38396753f197ff17d7806`。真实样本 `macro-us10y` 已通过统一窗口层、API Decimal 合约接回现有母表，最新远端验收 as-of `2026-09-01`、收盘 `4.79%`、1D `+4bp`。缺少足够历史的窗口显式返回 unavailable；没有 forward-fill 或 placeholder。
+Phase 1 已于 2026-09-02 完成。数据 commit 为 `9c5eb80f056bcbf2896fd85d321abb2c67bde01c`，workflow run `33588457408` 为 `success`；官方日更后的动态一致性测试 commit `8203a727923215bec573ced2db11858d3fd2c936` / run `33589428430` 再次为 `success`。应用纵切片 commit 为 `14fda8c4b1cf79013ca38396753f197ff17d7806`。真实样本 `macro-us10y` 已通过统一窗口层、API Decimal 合约接回现有母表，最新远端验收 as-of `2026-09-01`、收盘 `4.79%`、1D `+4bp`。缺少足够历史的窗口显式返回 unavailable；没有 forward-fill 或 placeholder。
 
 ---
 

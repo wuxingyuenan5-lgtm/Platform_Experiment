@@ -444,7 +444,7 @@ Phase 0 真实验收：
 Phase 1 真实验收：
 
 - `platform-data` commit `9c5eb80f056bcbf2896fd85d321abb2c67bde01c`；
-- `macro-data` workflow run `33588457408`：`success`；
+- `macro-data` workflow run `33588457408`：`success`；日更后的动态一致性测试 commit `8203a727923215bec573ced2db11858d3fd2c936` / run `33589428430` 再次为 `success`；
 - 应用 commit `14fda8c4b1cf79013ca38396753f197ff17d7806`；
 - 已形成 `canonical Treasury history → shared metrics → platform-api → macro-us10y existing row → existing SVG sparkline` 的真实纵切片；
 - 最新远端验收 as-of `2026-09-01`，美国 10Y `4.79%`，1D `+4bp`；缺历史窗口显式为 `—`。

@@ -456,7 +456,7 @@ canonical history
 ### 9.4 Phase 1 验收结果（2026-09-02）
 
 - `platform-data` commit `9c5eb80f056bcbf2896fd85d321abb2c67bde01c` 已发布共享窗口计算、frequency-aware 缺失规则、52 周覆盖检查、30D sparkline 和 exact-date ratio alignment；
-- `macro-data` workflow run `33588457408` 对该 SHA 结论为 `success`；
+- `macro-data` 初始 workflow run `33588457408` 对该 SHA 结论为 `success`；官方日更到 `4.79%` 后，动态数据一致性测试修复 commit `8203a727923215bec573ced2db11858d3fd2c936` 的 run `33589428430` 再次为 `success`；
 - 应用 commit `14fda8c4b1cf79013ca38396753f197ff17d7806` 已接入 `platform-api` Decimal 合约和现有宏观母表；
 - 真实远端验收读取 `macro-us10y`：as-of `2026-09-01`、收盘 `4.79%`、1D `+4bp`；
 - 完整历史不足的 YTD / 1Y / 52W 指标保持 `—`，不 forward-fill、不生成 placeholder；
