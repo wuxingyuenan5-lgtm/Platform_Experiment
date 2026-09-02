@@ -19,6 +19,11 @@ const ENABLED_MACRO_ROW_IDS = new Set([
   'macro-cpi',
   'macro-pce',
   'macro-unrate',
+  'macro-vix',
+  'macro-dxy',
+  'macro-usdcnh',
+  'macro-tlt',
+  'macro-hyg',
 ]);
 const DATA_SIGNAL_KEYS: Array<keyof TerminalTableRow> = [
   'd10',
@@ -66,6 +71,7 @@ function closeValue(value: number | null, unit: string): string {
   if (unit === 'usd_million') return `$${(value / 1_000_000).toFixed(2)}T`;
   if (unit === 'usd_billion' && Math.abs(value) >= 1_000) return `$${(value / 1_000).toFixed(2)}T`;
   if (unit === 'usd_billion') return `$${value.toFixed(2)}B`;
+  if (unit === 'price') return `$${value.toFixed(2)}`;
   return value.toFixed(2);
 }
 
