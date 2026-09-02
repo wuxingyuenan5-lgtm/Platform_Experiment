@@ -1,6 +1,6 @@
 # 对冲基金看板｜宏观看板 V1 规格（Macro V1 Spec）
 
-> 状态：Product Scope Frozen v1.0 / Data & Implementation Details OPEN  
+> 状态：Product Scope Frozen v1.0 / Engineering IN PROGRESS  
 > 上位文档：`docs/hedge-board/HEDGE_BOARD_OPTIMIZATION_MASTER_PLAN.md`  
 > 数据源文档：`docs/hedge-board/specs/MACRO_DATA_SOURCE_MAP.md`  
 > 适用分支：`feature/hedge-board-online-optimization`  
@@ -23,7 +23,7 @@
 
 最终页面顺序、合并与删减，等 V1 做完并线下验收后再决定。
 
-当前阶段：**先不继续工程实施。**
+当前阶段：**Owner 已于 2026-09-02 明确要求继续执行，Macro V1 工程进行中；冻结产品范围不变。**
 
 ---
 
@@ -432,7 +432,7 @@ Macro V1 不增加 CPI / FOMC / NFP 等 Release / Event Marker。
 
 Macro V1 产品范围已经冻结。
 
-当前不继续实施，等待整个 Hedge Board 计划进一步完善。
+当前已进入实施阶段；产品范围仍冻结，工程只按本规格和 Source Map 增量落地。
 
 后续重新进入 Macro 工程开发时：
 

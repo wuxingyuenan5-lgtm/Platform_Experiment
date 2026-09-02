@@ -1,6 +1,6 @@
 # 对冲基金看板｜完整项目计划书与进度总表
 
-> 状态：Project Baseline v1.1 / Phase 0 DONE / Phase 1 DONE / Macro V1 NEXT  
+> 状态：Project Baseline v1.2 / Phase 0 DONE / Phase 1 DONE / Macro V1 IN PROGRESS  
 > 主仓库：`wuxingyuenan5-lgtm/Platform_Experiment`  
 > 开发分支：`feature/hedge-board-online-optimization`  
 > 数据仓库：`wuxingyuenan5-lgtm/platform-data`  
@@ -381,7 +381,7 @@ GitHub Actions：
 |---|---|---:|---|
 | Phase 0 — Shared Data Foundation | DONE | 100% | CI success |
 | Phase 1 — Shared Market Detail | DONE | 100% | 真实 Treasury 10Y 垂直样板已验收 |
-| Macro V1 Engineering | NEXT | 0% | 下一阶段 |
+| Macro V1 Engineering | IN PROGRESS | 20% | Market Detail Native core 已接入 15 行；专题模块待完成 |
 | Commodity V1 Engineering | NOT STARTED | 0% | 等 Phase 1 / Macro |
 | Crypto V1 Engineering | NOT STARTED | 0% | 等共享层稳定 |
 | Unified QA + Offline Acceptance | NOT STARTED | 0% | 三模块后执行 |
@@ -394,7 +394,7 @@ GitHub Actions：
 
 | 模块 | Product | Feasibility | Data Foundation | Business Engineering | QA |
 |---|---|---|---|---|---|
-| Macro | Frozen | Frozen | Shared Phase 0 / 1 Done | Next | Not Started |
+| Macro | Frozen | Frozen | Shared Phase 0 / 1 Done | In Progress | In Progress |
 | Commodity | Frozen | Frozen | Shared Phase 0 Done | Not Started | Not Started |
 | Crypto | Frozen | Frozen | Shared Phase 0 Done | Not Started | Not Started |
 | US Equity | Existing / Deferred | Deferred | N/A | Deferred | N/A |
@@ -471,6 +471,16 @@ canonical history
 ### M1 — Macro Market Detail
 
 Native 优先：BLS / BEA / Fed / Treasury / NY Fed 等。
+
+截至 2026-09-02，M1 第一、二批已完成：
+
+- Treasury 2Y / 10Y / 30Y 使用官方 CSV，并保留上一年度历史以支持 YTD / 1Y / 52W；
+- FRED core 已覆盖 DFF、SOFR、10Y real yield、10Y breakeven、CPI、PCE、UNRATE、M2、WALCL、TGA、RRP；
+- Net Dollar Liquidity 按 `WALCL - WDTGAL - RRPONTSYD × 1000`、同日对齐派生；
+- `platform-data` commits：`774dccacebbd6f1fdca02f47071c0f74dc9fe07b`、`02bdfef35f803ef18e1f379598ba85abf001383c`、`183e99db29e44d7b6a9e490840b430e23c41f537`；
+- workflow run `33596176092`：`success`；应用 commits `cca0a46685f86dc17271f9d46216646fa0ada6f1`、`482c636fca46833d6ab0a77ea17df922c2f457ea` 已启用全部 15 行。
+
+尚未完成：DXY / USDCNH / TLT / HYG / VIX、中国国债行，以及 Growth、Inflation、Rates corridor、Global M2、Risk Appetite 专题模块。
 
 ### M2 — Growth
 
@@ -706,7 +716,7 @@ Native Binance / rights-clear data；严格区分 7×24 与 US securities calend
 
 当前唯一下一工程阶段：
 
-> **Macro V1 Engineering**
+> **继续 Macro V1 Engineering**
 
 建议执行顺序：
 

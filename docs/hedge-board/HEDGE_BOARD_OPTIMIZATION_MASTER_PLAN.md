@@ -1,6 +1,6 @@
 # 对冲基金看板优化总方案（Master Plan）
 
-> 状态：Planning Baseline v1.3 / Phase F FROZEN / Phase 0 DONE / Phase 1 DONE / Macro V1 NEXT  
+> 状态：Planning Baseline v1.4 / Phase F FROZEN / Phase 0 DONE / Phase 1 DONE / Macro V1 IN PROGRESS  
 > 项目总览：`docs/hedge-board/HEDGE_BOARD_PROJECT_PLAN_AND_PROGRESS.md`  
 > 适用分支：`feature/hedge-board-online-optimization`  
 > 用途：作为 Hedge Board 后续产品、数据、工程与验收的最高约束来源。  
@@ -449,9 +449,11 @@ Phase 1 真实验收：
 - 已形成 `canonical Treasury history → shared metrics → platform-api → macro-us10y existing row → existing SVG sparkline` 的真实纵切片；
 - 最新远端验收 as-of `2026-09-01`，美国 10Y `4.79%`，1D `+4bp`；缺历史窗口显式为 `—`。
 
-下一阶段：
+当前阶段：
 
-> `Macro V1 Engineering`
+> `Macro V1 Engineering — IN PROGRESS`
+
+首批 Native core 已真实化 15 个既有 Macro Market Detail 行。Treasury curve 数据 commit `774dccacebbd6f1fdca02f47071c0f74dc9fe07b`，FRED core commit `183e99db29e44d7b6a9e490840b430e23c41f537`，workflow run `33596176092` 为 `success`。该进度不代表 Macro V1 完成；专题模块及其余市场行仍按冻结范围继续。
 
 完整阶段状态、模块进度、风险和后续路线以 `HEDGE_BOARD_PROJECT_PLAN_AND_PROGRESS.md` 为管理总览。
 

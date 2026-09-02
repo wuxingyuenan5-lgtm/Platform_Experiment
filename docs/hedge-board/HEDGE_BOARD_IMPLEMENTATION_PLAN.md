@@ -1,6 +1,6 @@
 # 对冲基金看板｜统一实施计划（Implementation Plan）
 
-> 状态：Implementation Plan v1.3 / PHASE 0 DONE / PHASE 1 DONE / MACRO V1 NEXT  
+> 状态：Implementation Plan v1.4 / PHASE 0 DONE / PHASE 1 DONE / MACRO V1 IN PROGRESS  
 > 项目总览：`docs/hedge-board/HEDGE_BOARD_PROJECT_PLAN_AND_PROGRESS.md`  
 > 上位文档：`docs/hedge-board/HEDGE_BOARD_OPTIMIZATION_MASTER_PLAN.md`  
 > 数据可行性：`docs/hedge-board/HEDGE_BOARD_DATA_FEASIBILITY_AND_MAINTENANCE.md`  
@@ -27,7 +27,7 @@ Phase 1 Shared Market Detail Data Layer【DONE】
 → DONE
 
 Macro V1 Engineering
-→ NEXT
+→ IN PROGRESS
 ```
 
 当前管理口径：
@@ -302,6 +302,8 @@ Phase 1 已于 2026-09-02 完成。数据 commit 为 `9c5eb80f056bcbf2896fd85d32
 ## M1 — Macro Market Detail 真实化
 
 优先使用 BLS / BEA / Fed / Treasury / NY Fed 等 Phase F `NATIVE_READY` Source of Record。
+
+当前已完成 Native core 15 行：Treasury 2Y / 10Y / 30Y；DFF、SOFR、10Y real yield、10Y breakeven、CPI、PCE、UNRATE、M2、WALCL、TGA、RRP 和派生 Net Dollar Liquidity。数据 commits 为 `774dccacebbd6f1fdca02f47071c0f74dc9fe07b`、`02bdfef35f803ef18e1f379598ba85abf001383c`、`183e99db29e44d7b6a9e490840b430e23c41f537`；应用 commits 为 `cca0a46685f86dc17271f9d46216646fa0ada6f1`、`482c636fca46833d6ab0a77ea17df922c2f457ea`；workflow run `33596176092` 为 `success`。
 
 处理：
 
