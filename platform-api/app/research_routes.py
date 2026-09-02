@@ -17,6 +17,7 @@ from app.research_provider_macro import (
     MacroExpectationFeedResponse,
     MacroResearchProvider,
 )
+from app.research_provider_market_detail import MarketDetailProvider, MarketDetailResponse
 from app.research_service import (
     DEFAULT_THRESHOLD_YUAN,
     ResearchServiceError,
@@ -30,6 +31,10 @@ ResearchPrincipal = Annotated[Principal, Depends(require_permission("platform:re
 _macro_expectation_provider = MacroResearchProvider(
     timeout_seconds=20.0,
     user_agent="Platform-API macro-expectations",
+)
+_market_detail_provider = MarketDetailProvider(
+    timeout_seconds=20.0,
+    user_agent="Platform-API hedge-board-market-detail",
 )
 
 
@@ -90,5 +95,22 @@ async def macro_expectations(
             updated_at=datetime.now(UTC),
             events=[],
         )
+    _cache_header(response, 300)
+    return result
+
+
+@router.get("/market-detail/{market_id}", response_model=MarketDetailResponse)
+async def market_detail(
+    market_id: str,
+    response: Response,
+    _: ResearchPrincipal,
+) -> MarketDetailResponse:
+    try:
+        result = await _market_detail_provider.get(market_id)
+    except ResearchProviderError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail={"code": "market_detail_unavailable", "message": str(exc)},
+        ) from exc
     _cache_header(response, 300)
     return result

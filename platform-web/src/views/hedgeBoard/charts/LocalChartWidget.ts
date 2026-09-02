@@ -2,6 +2,7 @@ import { defineComponent, h, type PropType } from 'vue';
 
 import ReserveRanking from '../components/ReserveRanking';
 import TerminalDetailPanel from '../components/TerminalDetailPanel.vue';
+import MacroMarketDetailPanel from '../components/MacroMarketDetailPanel.vue';
 import { type LocalWidgetKey, type WidgetConfig } from '../nativeData/dashboardClean';
 import { marketData } from '../nativeData/generated/marketData';
 import { marketTerminalConfigs } from '../nativeData/marketTerminal';
@@ -131,13 +132,7 @@ export default defineComponent({
               rotationHeatmap: marketTerminalConfigs.gold.rotationHeatmap,
             });
           case 'macro-market-detail-table':
-            return h(TerminalDetailPanel, {
-              class: 'terminal-detail-panel--embedded',
-              title: '市场明细',
-              marketId: 'macro',
-              columns: marketTerminalConfigs.macro.detailColumns,
-              groups: marketTerminalConfigs.macro.detailGroups,
-            });
+            return h(MacroMarketDetailPanel);
           case 'crypto-market-detail-table':
             return h(TerminalDetailPanel, {
               class: 'terminal-detail-panel--embedded',

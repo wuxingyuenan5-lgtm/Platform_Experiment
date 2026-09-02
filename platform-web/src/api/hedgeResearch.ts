@@ -162,6 +162,44 @@ export interface MacroExpectationResponse {
   events: MacroExpectationEvent[];
 }
 
+export type MarketDetailStatus = 'ready' | 'partial' | 'degraded' | 'stale' | 'no_data' | 'error';
+
+export interface MarketDetailRow {
+  id: string;
+  name: string;
+  symbol: string;
+  status: MarketDetailStatus;
+  unit: string;
+  changeUnit: 'percent' | 'basis_points' | 'absolute';
+  frequency: string;
+  timezone: string;
+  observationDate?: string | null;
+  asOf?: string | null;
+  source: string;
+  sourceUrl?: string | null;
+  methodologyVersion: string;
+  qualityFlags: string[];
+  close?: string | number | null;
+  change1d?: string | number | null;
+  change1w?: string | number | null;
+  change1m?: string | number | null;
+  changeQtd?: string | number | null;
+  changeYtd?: string | number | null;
+  change1y?: string | number | null;
+  high52w?: string | number | null;
+  distance52wHigh?: string | number | null;
+  spark30d: Array<string | number>;
+}
+
+export interface MarketDetailResponse {
+  schemaVersion: '1.0';
+  marketId: string;
+  status: MarketDetailStatus;
+  asOf?: string | null;
+  retrievedAt?: string | null;
+  rows: MarketDetailRow[];
+}
+
 const SESSION_INVALIDATION_CODES = new Set([
   'invalid_session',
   'human_session_required',
@@ -222,4 +260,10 @@ export const getMacroExpectations = () =>
   request<MacroExpectationResponse>({
     method: 'GET',
     url: '/research/macro/expectations',
+  });
+
+export const getMarketDetail = (marketId: 'macro') =>
+  request<MarketDetailResponse>({
+    method: 'GET',
+    url: `/research/market-detail/${marketId}`,
   });
