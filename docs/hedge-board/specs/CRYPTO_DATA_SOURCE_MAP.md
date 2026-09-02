@@ -595,5 +595,7 @@ GitHub Actions 不适合作分钟级实时市场数据库。若最终只用 GitH
 - BTC / ETH spot、funding、OI、perpetual basis 共 8 条 series 已发布，`venue_binance` 与 `mode_venue_not_aggregate` 写入 quality flags；
 - spot 使用已收盘 UTC 日线；funding 为当日已实现费率均值；OI 与 perpetual basis 为当日最后观测；
 - 数据 commit：`1707668`；应用 commit：`9fa3d25b`；
-- GitHub Actions run `33636569033` 单元测试通过，真实 Futures refresh 因 runner 地域限制收到 HTTP 451，状态维持 blocker；
-- 未批准替代 runner 或 Binance 官方归档 fallback 前，不把远端更新链标为 `ready`，不以旧值伪装新鲜数据。
+- 2026-09-03 Owner 确认统一迁移至 `D:\自营数据库`，GitHub 仅保留代码；
+- Binance Futures 本机系统 DNS 被污染至错误地址；实现限定 `fapi.binance.com` 的 Cloudflare DoH fallback，并继续依赖 TLS 主机名校验，不修改系统 DNS / hosts；
+- 本地真实刷新通过，Crypto 8/8 series ready；DuckDB 与 JSON serving contract 同步；
+- 数据 commit `ccc69cc`，应用本地读取 commit `05c37323`；GitHub code-only CI runs `33658157466`、`33658157488`、`33658157326` 均成功。

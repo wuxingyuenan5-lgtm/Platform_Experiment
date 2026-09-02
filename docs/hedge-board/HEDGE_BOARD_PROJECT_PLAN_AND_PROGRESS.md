@@ -1,6 +1,6 @@
 # 对冲基金看板｜完整项目计划书与进度总表
 
-> 状态：Project Baseline v1.5 / Phase 0 DONE / Phase 1 DONE / Macro V1 DONE / Commodity V1 DONE / Crypto V1 IN PROGRESS
+> 状态：Project Baseline v1.6 / Phase 0 DONE / Phase 1 DONE / Macro V1 DONE / Commodity V1 DONE / Crypto V1 DONE / Unified QA NEXT
 > 主仓库：`wuxingyuenan5-lgtm/Platform_Experiment`  
 > 开发分支：`feature/hedge-board-online-optimization`  
 > 数据仓库：`wuxingyuenan5-lgtm/platform-data`  
@@ -383,10 +383,10 @@ GitHub Actions：
 | Phase 1 — Shared Market Detail | DONE | 100% | 真实 Treasury 10Y 垂直样板已验收 |
 | Macro V1 Engineering | DONE | 100% | Market Detail 23 行；Growth / Inflation / Rates / Risk / Global M2 全部验收 |
 | Commodity V1 Engineering | DONE | 100% | CFTC / EIA Native、受限模块官方 Link、母表 fail-closed 与 QA 全部完成 |
-| Crypto V1 Engineering | IN PROGRESS | 85% | Native / links / fail-closed 已实现；GitHub runner 对 Binance Futures 返回 HTTP 451 |
-| Unified QA + Offline Acceptance | NOT STARTED | 0% | 三模块后执行 |
+| Crypto V1 Engineering | DONE | 100% | Binance Native、links、fail-closed、本地数据库与本地调度已验收 |
+| Unified QA + Offline Acceptance | IN PROGRESS | 70% | 数据/API/UI自动化已完成；浏览器与 Owner 线下验收待执行 |
 
-**工程主阶段完成：4 / 6 = 66.7%。**
+**工程主阶段完成：5 / 6 = 83.3%。**
 
 该比例只表示主阶段 Gate，不代表工作量严格等权；后续项目管理以阶段状态和实际交付为主，不使用该比例推算工期。
 
@@ -395,8 +395,8 @@ GitHub Actions：
 | 模块 | Product | Feasibility | Data Foundation | Business Engineering | QA |
 |---|---|---|---|---|---|
 | Macro | Frozen | Frozen | Shared Phase 0 / 1 Done | Done | Done |
-| Commodity | Frozen | Frozen | Shared Phase 0 Done | Not Started | Not Started |
-| Crypto | Frozen | Frozen | Shared Phase 0 Done | Not Started | Not Started |
+| Commodity | Frozen | Frozen | Shared Phase 0 Done | Done | Done |
+| Crypto | Frozen | Frozen | Shared Phase 0 Done | Done | Done |
 | US Equity | Existing / Deferred | Deferred | N/A | Deferred | N/A |
 | A-Share | Existing / Deferred | Deferred | N/A | Deferred | N/A |
 | Global | Existing / Deferred | Deferred | N/A | Deferred | N/A |
@@ -756,9 +756,9 @@ Native Binance / rights-clear data；严格区分 7×24 与 US securities calend
 
 ## 16. 当前下一步
 
-当前唯一在执行工程阶段：
+当前唯一下一工程阶段：
 
-> **Crypto V1 Engineering**
+> **Unified QA + Offline Acceptance**
 
 已验证实现：
 
@@ -766,7 +766,13 @@ Native Binance / rights-clear data；严格区分 7×24 与 US securities calend
 - 应用 commits `9fa3d25b`、`3dc7d676`、`b5ffe90f`：API、Native 图表、Crypto Market Detail fail-closed、ETF / Treasury / derivatives / stablecoin / options / on-chain 精确外链及静态假数据退出守卫；
 - 本地真实刷新：8 条 series ready；spot 仅使用已收盘 UTC 日线，derivatives 明确为 Binance Venue / not Aggregate；
 - QA：数据仓库 31 tests passed；API provider tests 2 passed、target Ruff / Pyright 通过；frontend ESLint、typecheck、layout verifier、production build（5677 modules）通过；
-- 外部 blocker：GitHub Actions run `33636569033` 的 tests 通过，但美国 runner 请求 `fapi.binance.com` 返回 HTTP 451。现有真实 LKG 不被占位数据覆盖；在 runner / 数据分发方案确认前不把远端自动刷新标为完成。
+- Owner 已于 2026-09-03 确认统一迁移至 `D:\自营数据库`，GitHub 仅保留代码；数据 commit `ccc69cc`，应用 commit `05c37323`；
+- 本地主库 `D:\自营数据库\hedge-board\hedge_board.duckdb` 已验收 82 条 series / 78,846 observations；Macro 55 ready、Crypto 8 ready，Commodity 15 ready + 4 stale（按真实 EIA observation date）；
+- Windows 计划任务 `HedgeBoard-LocalData-Refresh` 已安装，每日 00:15 / 06:15 / 12:15 / 18:15 执行，GitHub 三个 workflow 仅运行代码测试且 runs `33658157466`、`33658157488`、`33658157326` 均为 success；
+- Binance Futures 系统 DNS 污染通过限定主机的 Cloudflare DoH + TLS 校验 fallback 解决；不修改系统 DNS，不写 hosts；
+- GitHub 中 EIA secret 已移除；本地用户环境保留刷新凭据。
+- Unified QA 首轮：Hedge Board 专项 12 tests、Pyright 0 errors、frontend ESLint / typecheck / layout verifier、production build 均通过；全仓 API 套件 615 项中 592 passed、23 failed，失败均位于既有版本工具、上下文预算、数据库 seed、交易执行与 venue reconciliation 边界，未触及本次 Hedge Board 本地数据读取文件。不得将这些失败记为本阶段通过，最终验收保留为 IN PROGRESS；
+- `platform-data` 仓库中历史已提交的数据快照仍存在。受根目录安全规则限制，AI 不批量删除；当前已停止一切 GitHub 数据刷新与提交，后续若要求物理移除旧快照，由 Owner 手动批量删除后再提交。
 
 建议执行顺序：
 

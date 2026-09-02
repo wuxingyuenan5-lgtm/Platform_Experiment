@@ -39,7 +39,7 @@ Crypto V1 Engineering
 当前管理口径：
 
 - 规划准备度：`100%`；
-- 工程主阶段：`4 / 6 = 66.7%`；
+- 工程主阶段：`5 / 6 = 83.3%`；
 - 六个工程主阶段：Phase 0、Phase 1、Macro V1、Commodity V1、Crypto V1、Unified QA / Offline Acceptance；
 - 百分比仅用于阶段 Gate 管理，不代表工作量严格等权，不用于推算工期。
 
@@ -577,9 +577,15 @@ one canonical series
 
 ---
 
-# 11. GitHub Actions 分层【实施时冻结 cron】
+# 11. 本地数据调度分层【Owner 2026-09-03 确认】
 
-建议：
+权威运行方式：
+
+- 主数据根目录：`D:\自营数据库\hedge-board`；
+- DuckDB 为统一查询镜像，versioned JSON 为 Platform API serving contract；
+- Windows 计划任务每日四次运行；
+- GitHub 只保留代码与单元测试，不再承担数据抓取、分发或行情 commit；
+- fetch failure 保留 LKG 并显式 stale / failed，不覆盖为占位数据。
 
 ### Macro Daily / Low Frequency
 - BLS / BEA / Fed / Treasury / NY Fed / ECB / BOJ / BoE / PBOC validation；
@@ -668,9 +674,9 @@ Offline Acceptance
 - Phase 0 GitHub Actions 验证；
 - Project Plan & Progress v1.0。
 
-当前为 **Crypto V1 Engineering — IN PROGRESS**。
+**Crypto V1 Engineering — DONE**。下一阶段为 **Unified QA + Offline Acceptance**。
 
-Native 数据、API、页面图表、Crypto Market Detail fail-closed 及受限来源精确外链已完成并通过本地 QA。远端自动刷新尚未关闭 Gate：GitHub Actions run `33636569033` 在 Binance USD-M Futures 请求处收到 HTTP 451；这属于 runner 地域访问限制，不得通过假数据或错误标记 `ready` 绕过。下一技术动作是确认可长期运行的非受限 runner，或批准 Binance 官方归档数据作为降频 fallback。
+Native 数据、API、页面图表、Crypto Market Detail fail-closed 及受限来源精确外链已完成。Owner 已确认本地数据库架构；数据 commit `ccc69cc`、应用 commit `05c37323`。本地主库验收 82 条 series / 78,846 observations，Crypto 8/8 ready。Binance Futures 的本机 DNS 污染已通过限定 Binance Futures 主机的 DoH + TLS 校验 fallback 解决。
 
 以后每完成一个正式 Phase，都必须同步更新：
 

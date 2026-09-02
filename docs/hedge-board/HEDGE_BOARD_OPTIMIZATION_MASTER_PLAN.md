@@ -1,6 +1,6 @@
 # 对冲基金看板优化总方案（Master Plan）
 
-> 状态：Planning Baseline v1.7 / Phase F FROZEN / Phase 0 DONE / Phase 1 DONE / Macro V1 DONE / Commodity V1 DONE / Crypto V1 IN PROGRESS
+> 状态：Planning Baseline v1.8 / Phase F FROZEN / Phase 0 DONE / Phase 1 DONE / Macro V1 DONE / Commodity V1 DONE / Crypto V1 DONE / Unified QA NEXT
 > 项目总览：`docs/hedge-board/HEDGE_BOARD_PROJECT_PLAN_AND_PROGRESS.md`  
 > 适用分支：`feature/hedge-board-online-optimization`  
 > 用途：作为 Hedge Board 后续产品、数据、工程与验收的最高约束来源。  
@@ -429,7 +429,7 @@ Engineering Phase 1        DONE
 当前统一进度口径：
 
 - **规划准备度：100%**；
-- **工程主阶段：4 / 6 = 66.7%**；
+- **工程主阶段：5 / 6 = 83.3%**；
 - 工程主阶段口径：Phase 0、Phase 1、Macro V1、Commodity V1、Crypto V1、Unified QA / Offline Acceptance；
 - 该比例只用于管理 Gate，不代表各阶段实际工作量等权，也不用于推算工期。
 
@@ -451,7 +451,7 @@ Phase 1 真实验收：
 
 当前阶段：
 
-> `Macro V1 Engineering — DONE / Commodity V1 — DONE / Crypto V1 — NEXT`
+> `Macro V1 Engineering — DONE / Commodity V1 — DONE / Crypto V1 — DONE / Unified QA — NEXT`
 
 Native core 已真实化 20 个既有 Macro Market Detail 行。Treasury curve 数据 commit `774dccacebbd6f1fdca02f47071c0f74dc9fe07b`，FRED core commit `183e99db29e44d7b6a9e490840b430e23c41f537`，VIX / DXY / USDCNH / TLT / HYG commit `997adb4871bbfbd3d5c089c8761344433bd0e77c`；workflow runs `33596176092`、`33596701735` 均为 `success`。该进度不代表 Macro V1 完成；专题模块及其余市场行仍按冻结范围继续。
 
@@ -459,7 +459,7 @@ Macro V1 已完成：Growth、Inflation、Short-End Rate Corridor、Risk Appetit
 
 Commodity V1 已完成：CFTC Gold / Silver / Copper / WTI / Natural Gas 使用官方 PRE Native pipeline、API 与 10 张定位图表；EIA crude / Cushing / gasoline / distillate 已通过真实 workflow `33631637867` 刷新并以两组 Native 图表接回。WGC、SPDR、CME、ICE、LME、Cboe 等受限数据均使用精确官方 External Link；Commodity Market Detail fail-closed，不再显示旧静态值。下一阶段为 Crypto V1。
 
-Crypto V1 已进入工程收口：Binance 8 条 BTC / ETH Native series、API、页面图表和 Market Detail 已落地；单一 Venue 口径显式标注为 not Aggregate。Farside、BitcoinTreasuries、DefiLlama、Deribit、Checkonchain、CoinGlass、Bybit、OKX 使用精确 External Link，旧 BTC ETF / Treasury 假数组已退出渲染路径。当前不能关闭 Gate：GitHub Actions run `33636569033` 因美国 runner 访问 Binance Futures 返回 HTTP 451 而失败，需 Owner 决定 runner 或官方归档 fallback 路线。
+Crypto V1 已完成：Binance 8 条 BTC / ETH Native series、API、页面图表和 Market Detail 已落地；单一 Venue 口径显式标注为 not Aggregate。Farside、BitcoinTreasuries、DefiLlama、Deribit、Checkonchain、CoinGlass、Bybit、OKX 使用精确 External Link，旧 BTC ETF / Treasury 假数组已退出渲染路径。Owner 已确认 `D:\自营数据库` 为主数据源、GitHub 仅保留代码；本地主库与每日四次计划任务已验收，DNS 污染由限定域名的 DoH/TLS fallback 解决。下一阶段为 Unified QA / Offline Acceptance。
 
 完整阶段状态、模块进度、风险和后续路线以 `HEDGE_BOARD_PROJECT_PLAN_AND_PROGRESS.md` 为管理总览。
 
