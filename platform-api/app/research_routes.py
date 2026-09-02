@@ -13,6 +13,7 @@ from app.research_data_schemas import (
     StockSnapshotResponse,
 )
 from app.research_provider_commodity_dashboard import CommodityDashboardProvider
+from app.research_provider_crypto_dashboard import CryptoDashboardProvider
 from app.research_provider_errors import ResearchProviderError
 from app.research_provider_macro import (
     MacroExpectationFeedResponse,
@@ -45,6 +46,10 @@ _macro_dashboard_provider = MacroDashboardProvider(
 _commodity_dashboard_provider = CommodityDashboardProvider(
     timeout_seconds=12.0,
     user_agent="Platform-API hedge-board-commodity-dashboard",
+)
+_crypto_dashboard_provider = CryptoDashboardProvider(
+    timeout_seconds=12.0,
+    user_agent="Platform-API hedge-board-crypto-dashboard",
 )
 
 
@@ -149,6 +154,21 @@ async def commodity_dashboard_v1(
         raise HTTPException(
             status_code=503,
             detail={"code": "commodity_dashboard_unavailable", "message": str(exc)},
+        ) from exc
+    _cache_header(response, 300)
+    return result
+
+
+@router.get("/crypto/dashboard-v1", response_model=MacroDashboardResponse)
+async def crypto_dashboard_v1(
+    response: Response, _: ResearchPrincipal
+) -> MacroDashboardResponse:
+    try:
+        result = await _crypto_dashboard_provider.get()
+    except ResearchProviderError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail={"code": "crypto_dashboard_unavailable", "message": str(exc)},
         ) from exc
     _cache_header(response, 300)
     return result

@@ -311,3 +311,9 @@ export const getCommodityDashboardV1 = () =>
     method: 'GET',
     url: '/research/commodity/dashboard-v1',
   });
+
+export const getCryptoDashboardV1 = () =>
+  request<MacroDashboardResponse>({
+    method: 'GET',
+    url: '/research/crypto/dashboard-v1',
+  });

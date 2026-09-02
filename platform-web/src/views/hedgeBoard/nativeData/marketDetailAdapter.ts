@@ -1,4 +1,4 @@
-import type { MarketDetailRow } from '@/api/hedgeResearch';
+import type { MacroDashboardSeries, MarketDetailRow } from '@/api/hedgeResearch';
 
 import type { TerminalTableGroup, TerminalTableRow } from './marketTerminal';
 
@@ -106,6 +106,79 @@ export function prepareCommodityMarketDetail(groups: TerminalTableGroup[]): Term
   return cloneGroups(groups).map((group) => ({
     ...group,
     rows: group.rows.map(unavailableRow),
+  }));
+}
+
+export function prepareCryptoMarketDetail(groups: TerminalTableGroup[]): TerminalTableGroup[] {
+  return cloneGroups(groups).map((group) => ({ ...group, rows: group.rows.map(unavailableRow) }));
+}
+
+function cryptoChange(points: Array<{ date: string; value: number }>, days: number): string {
+  if (points.length < 2) return UNAVAILABLE;
+  const latest = points[points.length - 1];
+  const cutoff = Date.parse(latest.date) - days * 86_400_000;
+  const previous = [...points].reverse().find((point) => Date.parse(point.date) <= cutoff);
+  if (!previous || previous.value === 0) return UNAVAILABLE;
+  return signed((latest.value / previous.value - 1) * 100, 'percent');
+}
+
+function cryptoChangeSince(points: Array<{ date: string; value: number }>, cutoff: number): string {
+  const latest = points[points.length - 1];
+  const baseline = points.find((point) => Date.parse(point.date) >= cutoff);
+  if (!baseline || baseline.value === 0) return UNAVAILABLE;
+  return signed((latest.value / baseline.value - 1) * 100, 'percent');
+}
+
+export function mergeCryptoMarketDetail(
+  groups: TerminalTableGroup[],
+  series: MacroDashboardSeries[],
+): TerminalTableGroup[] {
+  const rowBySeries = new Map([
+    ['binance_btc_spot', 'crypto-btc-row'],
+    ['binance_eth_spot', 'crypto-eth-row'],
+  ]);
+  const byRow = new Map(
+    series.flatMap((item) => {
+      const rowId = rowBySeries.get(item.seriesId);
+      if (!rowId || item.status === 'error' || item.status === 'no_data') return [];
+      return [[rowId, item] as const];
+    }),
+  );
+  return prepareCryptoMarketDetail(groups).map((group) => ({
+    ...group,
+    rows: group.rows.map((row) => {
+      const remote = byRow.get(row.id);
+      if (!remote) return row;
+      const points = remote.observations
+        .map((point) => ({ date: point.date, value: Number(point.value) }))
+        .filter((point) => Number.isFinite(point.value));
+      if (!points.length) return row;
+      const latest = points[points.length - 1].value;
+      const latestDate = new Date(`${points[points.length - 1].date}T00:00:00Z`);
+      const yearStart = Date.UTC(latestDate.getUTCFullYear(), 0, 1);
+      const quarterStart = Date.UTC(
+        latestDate.getUTCFullYear(),
+        Math.floor(latestDate.getUTCMonth() / 3) * 3,
+        1,
+      );
+      const trailingYear = points.filter(
+        (point) =>
+          Date.parse(point.date) >= Date.parse(points[points.length - 1].date) - 366 * 86_400_000,
+      );
+      const high = Math.max(...trailingYear.map((point) => point.value));
+      return {
+        ...row,
+        price: closeValue(latest, 'price'),
+        d1: cryptoChange(points, 1),
+        w1: cryptoChange(points, 7),
+        m1: cryptoChange(points, 30),
+        qtd: cryptoChangeSince(points, quarterStart),
+        ytd: cryptoChangeSince(points, yearStart),
+        y1: cryptoChange(points, 365),
+        high: signed((latest / high - 1) * 100, 'percent'),
+        spark: points.slice(-30).map((point) => point.value),
+      };
+    }),
   }));
 }
 

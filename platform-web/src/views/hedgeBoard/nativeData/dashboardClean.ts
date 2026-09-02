@@ -22,6 +22,13 @@ export type LocalWidgetKey =
   | 'crypto-market-detail-table'
   | 'btc-etf-flow'
   | 'btc-treasury-flow'
+  | 'crypto-binance-spot'
+  | 'crypto-binance-funding'
+  | 'crypto-binance-open-interest'
+  | 'crypto-binance-basis'
+  | 'crypto-stablecoin-supply'
+  | 'crypto-options-iv'
+  | 'crypto-onchain'
   | 'spdr-daily-flow'
   | 'spdr-holdings-vs-price'
   | 'etf-weekly-flows'
@@ -538,6 +545,47 @@ export const researchModules: ResearchModule[] = [
             height: 420,
             sourceNote: '',
           }),
+        ],
+      },
+      {
+        id: 'crypto-native-venue',
+        eyebrow: 'Derivatives · Native',
+        title: 'Binance BTC / ETH 现货与衍生品结构',
+        description: '单一 Venue 口径，不代表全市场聚合；Crypto 数据按 UTC 7×24 日历维护。',
+        layout: 'two',
+        widgets: [
+          localChart(
+            'BTC / ETH Spot · Binance Venue',
+            '已收盘 UTC 日线 · not Aggregate',
+            'crypto-binance-spot',
+          ),
+          localChart(
+            'BTC / ETH Funding · Binance Venue',
+            'USD-M 日内费率日均 · not Aggregate',
+            'crypto-binance-funding',
+          ),
+          localChart(
+            'BTC / ETH Open Interest · Binance Venue',
+            'USD-M 日末名义价值 · not Aggregate',
+            'crypto-binance-open-interest',
+          ),
+          localChart(
+            'BTC / ETH Perpetual Basis · Binance Venue',
+            'USD-M 日末基差率 · not Aggregate',
+            'crypto-binance-basis',
+          ),
+        ],
+      },
+      {
+        id: 'crypto-external-research',
+        eyebrow: 'Research Links',
+        title: '稳定币、期权与链上研究入口',
+        description: '受许可或维护边界限制的专题，保留精确数据入口，不复制第三方静态快照。',
+        layout: 'three',
+        widgets: [
+          localChart('Stablecoin Supply', 'DefiLlama', 'crypto-stablecoin-supply'),
+          localChart('Options IV / Skew', 'Deribit / Greeks.live', 'crypto-options-iv'),
+          localChart('On-chain Signals', 'Checkonchain / Glassnode', 'crypto-onchain'),
         ],
       },
     ],

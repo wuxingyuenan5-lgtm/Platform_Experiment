@@ -1,13 +1,11 @@
 import { defineComponent, h, type PropType } from 'vue';
 
 import TerminalDetailPanel from '../components/TerminalDetailPanel.vue';
+import CryptoMarketDetailPanel from '../components/CryptoMarketDetailPanel.vue';
 import MacroMarketDetailPanel from '../components/MacroMarketDetailPanel.vue';
 import { type LocalWidgetKey, type WidgetConfig } from '../nativeData/dashboardClean';
 import { prepareCommodityMarketDetail } from '../nativeData/marketDetailAdapter';
 import { marketTerminalConfigs } from '../nativeData/marketTerminal';
-import { BTC_ETF_FLOW_ROWS } from './chartCore';
-import DualAxisChart from './DualAxisChart';
-import TreasuryFlowChart from './TreasuryFlowChart';
 import MacroSeriesChart from './MacroSeriesChart';
 
 const externalGoldResearch = {
@@ -108,7 +106,36 @@ const externalGoldResearch = {
   },
 } as const;
 
+const externalCryptoResearch = {
+  'btc-etf-flow': {
+    provider: 'Farside Investors',
+    description: '美国现货 BTC ETF 每日资金流',
+    href: 'https://farside.co.uk/btc/',
+  },
+  'btc-treasury-flow': {
+    provider: 'BitcoinTreasuries.net',
+    description: '上市公司及机构 Bitcoin 持仓披露',
+    href: 'https://bitcointreasuries.net/',
+  },
+  'crypto-stablecoin-supply': {
+    provider: 'DefiLlama',
+    description: '稳定币总市值、链与币种分布',
+    href: 'https://defillama.com/stablecoins',
+  },
+  'crypto-options-iv': {
+    provider: 'Deribit',
+    description: 'BTC / ETH 波动率指数与期权市场统计',
+    href: 'https://www.deribit.com/statistics/BTC/volatility-index',
+  },
+  'crypto-onchain': {
+    provider: 'Checkonchain',
+    description: 'Bitcoin 链上估值、持有者与周期指标',
+    href: 'https://checkonchain.com/',
+  },
+} as const;
+
 type ExternalGoldResearchKey = keyof typeof externalGoldResearch;
+type ExternalCryptoResearchKey = keyof typeof externalCryptoResearch;
 
 function renderExternalGoldResearch(key: ExternalGoldResearchKey) {
   const item = externalGoldResearch[key];
@@ -159,6 +186,49 @@ function renderExternalGoldResearch(key: ExternalGoldResearchKey) {
           },
         },
         '打开官方数据页 ↗',
+      ),
+      h('small', '未取得生产再利用许可前，不在本地复制或展示第三方静态快照。'),
+    ],
+  );
+}
+
+function renderExternalCryptoResearch(key: ExternalCryptoResearchKey) {
+  const item = externalCryptoResearch[key];
+  return h(
+    'div',
+    {
+      style: {
+        minHeight: '260px',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: '14px',
+        padding: '32px',
+        textAlign: 'center',
+        color: 'var(--color-text-2)',
+      },
+    },
+    [
+      h('span', 'External Link · permission_required'),
+      h('strong', { style: { color: 'var(--color-text-1)', fontSize: '16px' } }, item.provider),
+      h('span', item.description),
+      h(
+        'a',
+        {
+          href: item.href,
+          target: '_blank',
+          rel: 'noopener noreferrer',
+          style: {
+            padding: '9px 16px',
+            borderRadius: '8px',
+            background: 'rgb(var(--primary-6))',
+            color: '#fff',
+            fontWeight: '600',
+            textDecoration: 'none',
+          },
+        },
+        '打开数据页 ↗',
       ),
       h('small', '未取得生产再利用许可前，不在本地复制或展示第三方静态快照。'),
     ],
@@ -327,34 +397,41 @@ export default defineComponent({
               unitLabel: 'percentile',
             });
           case 'crypto-market-detail-table':
-            return h(TerminalDetailPanel, {
-              class: 'terminal-detail-panel--embedded',
-              title: '市场明细',
-              marketId: 'crypto',
-              columns: marketTerminalConfigs.crypto.detailColumns,
-              groups: marketTerminalConfigs.crypto.detailGroups,
-              rotationButtonLabel: marketTerminalConfigs.crypto.rotationButtonLabel,
-              rotationHeatmap: marketTerminalConfigs.crypto.rotationHeatmap,
-            });
+            return h(CryptoMarketDetailPanel);
           case 'btc-etf-flow':
-            return h(DualAxisChart, {
-              rows: BTC_ETF_FLOW_ROWS,
-              leftLabel: 'BTC ETF 日净流量',
-              rightLabel: 'BTC 价格',
-              leftUnit: '百万美元',
-              rightUnit: '美元',
-              leftColor: '#1b9a7a',
-              rightColor: '#2f63f2',
-              barPositiveColor: '#1b9a7a',
-              barNegativeColor: '#df5a55',
-              barWidthRatio: 0.68,
-              leftAsBars: true,
-              divergingBars: true,
-              showRangeSlider: true,
-              windowSize: 8,
-            });
           case 'btc-treasury-flow':
-            return h(TreasuryFlowChart);
+          case 'crypto-stablecoin-supply':
+          case 'crypto-options-iv':
+          case 'crypto-onchain':
+            return renderExternalCryptoResearch(key);
+          case 'crypto-binance-spot':
+            return h(MacroSeriesChart, {
+              dataDomain: 'crypto',
+              groupId: 'binanceSpot',
+              years: 5,
+              unitLabel: 'USDT',
+            });
+          case 'crypto-binance-funding':
+            return h(MacroSeriesChart, {
+              dataDomain: 'crypto',
+              groupId: 'binanceFunding',
+              years: 1,
+              unitLabel: '%',
+            });
+          case 'crypto-binance-open-interest':
+            return h(MacroSeriesChart, {
+              dataDomain: 'crypto',
+              groupId: 'binanceOpenInterest',
+              years: 1,
+              unitLabel: 'USD',
+            });
+          case 'crypto-binance-basis':
+            return h(MacroSeriesChart, {
+              dataDomain: 'crypto',
+              groupId: 'binancePerpetualBasis',
+              years: 1,
+              unitLabel: '%',
+            });
           default:
             return h('div', { class: 'local-empty' }, '该图表配置尚未接入。');
         }
