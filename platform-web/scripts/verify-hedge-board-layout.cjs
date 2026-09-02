@@ -10,24 +10,21 @@ const hedgeResearchModulePath = path.join(viewRoot, 'components', 'HedgeResearch
 const terminalDetailPanelPath = path.join(viewRoot, 'components', 'TerminalDetailPanel.vue');
 const localChartWidgetPath = path.join(viewRoot, 'charts', 'LocalChartWidget.ts');
 const dualAxisChartPath = path.join(viewRoot, 'charts', 'DualAxisChart.ts');
-const widgetErrorBoundaryPath = path.join(
-  viewRoot,
-  'components',
-  'WidgetErrorBoundary.ts',
-);
+const widgetErrorBoundaryPath = path.join(viewRoot, 'components', 'WidgetErrorBoundary.ts');
 const metricStripPath = path.join(viewRoot, 'components', 'MetricStrip.ts');
 const reserveRankingPath = path.join(viewRoot, 'components', 'ReserveRanking.ts');
 const marketDetailCatalogPath = path.join(viewRoot, 'nativeData', 'marketDetailCatalog.ts');
-const toolGroupSectionPath = path.join(viewRoot, 'tradingTools', 'components', 'ToolGroupSection.vue');
+const toolGroupSectionPath = path.join(
+  viewRoot,
+  'tradingTools',
+  'components',
+  'ToolGroupSection.vue',
+);
 const tradingToolCatalogPath = path.join(viewRoot, 'tradingTools', 'data', 'catalog.ts');
 const tradingToolsPagePath = path.join(viewRoot, 'tradingTools', 'index.vue');
 const aSharePagePath = path.join(viewRoot, 'aShare', 'index.vue');
 const aShareResearchComposablePath = path.join(viewRoot, 'aShare', 'useAShareResearch.ts');
-const aShareWatchlistLocalStatePath = path.join(
-  viewRoot,
-  'aShare',
-  'aShareWatchlistLocalState.ts',
-);
+const aShareWatchlistLocalStatePath = path.join(viewRoot, 'aShare', 'aShareWatchlistLocalState.ts');
 const accountWatchlistApiPath = path.join(
   __dirname,
   '..',
@@ -54,12 +51,7 @@ const shenwanSectionPath = path.join(
   'components',
   'ShenwanIndustrySection.vue',
 );
-const stockSnapshotPath = path.join(
-  viewRoot,
-  'aShare',
-  'components',
-  'StockSnapshotSection.vue',
-);
+const stockSnapshotPath = path.join(viewRoot, 'aShare', 'components', 'StockSnapshotSection.vue');
 const macroExpectationPath = path.join(viewRoot, 'macro', 'MacroExpectationPanel.vue');
 const hedgeBoardPageComposablePath = path.join(viewRoot, 'composables', 'useHedgeBoardPage.ts');
 const routePath = path.join(__dirname, '..', 'src', 'router', 'routes', 'modules', 'hedge.ts');
@@ -102,28 +94,46 @@ assert(fs.existsSync(reserveRankingPath), 'Expected ReserveRanking component to 
 assert(fs.existsSync(marketDetailCatalogPath), 'Expected market detail catalog to exist.');
 assert(fs.existsSync(toolGroupSectionPath), 'Expected ToolGroupSection component to exist.');
 assert(fs.existsSync(aSharePagePath), 'Expected dedicated A-share research page to exist.');
-assert(fs.existsSync(aShareWatchlistLocalStatePath), 'Expected A-share watchlist local state adapter to exist.');
-assert(fs.existsSync(accountWatchlistApiPath), 'Expected account research watchlist API client to exist.');
+assert(
+  fs.existsSync(aShareWatchlistLocalStatePath),
+  'Expected A-share watchlist local state adapter to exist.',
+);
+assert(
+  fs.existsSync(accountWatchlistApiPath),
+  'Expected account research watchlist API client to exist.',
+);
 assert(fs.existsSync(macroExpectationPath), 'Expected macro expectation panel to exist.');
 
 assert(
-  hedgeBoardSource.includes('<MarketTerminalPage') && hedgeBoardSource.includes('MarketTerminalPage from'),
+  hedgeBoardSource.includes('<MarketTerminalPage') &&
+    hedgeBoardSource.includes('MarketTerminalPage from'),
   'Hedge board terminal categories must use MarketTerminalPage.',
 );
 assert(
-  hedgeBoardSource.includes('<HedgeResearchModule') && hedgeBoardSource.includes('HedgeResearchModule from'),
+  hedgeBoardSource.includes('<HedgeResearchModule') &&
+    hedgeBoardSource.includes('HedgeResearchModule from'),
   'Hedge board page must use HedgeResearchModule for research section rendering.',
 );
 assert(
-  hedgeBoardSource.includes('<ToolGroupSection') && hedgeBoardSource.includes('ToolGroupSection from'),
+  hedgeBoardSource.includes('<ToolGroupSection') &&
+    hedgeBoardSource.includes('ToolGroupSection from'),
   'Hedge board trading tools must use ToolGroupSection.',
 );
 assert(
   hedgeBoardSource.includes('LocalChartWidget from') &&
     hedgeBoardSource.includes(':local-chart-widget="LocalChartWidget"') &&
-    localChartWidgetSource.includes("import TerminalDetailPanel from '../components/TerminalDetailPanel.vue';") &&
+    localChartWidgetSource.includes(
+      "import TerminalDetailPanel from '../components/TerminalDetailPanel.vue';",
+    ) &&
     localChartWidgetSource.includes('return h(TerminalDetailPanel'),
   'Hedge board local detail widgets must delegate through LocalChartWidget to TerminalDetailPanel.',
+);
+assert(
+  localChartWidgetSource.includes('prepareCommodityMarketDetail') &&
+    localChartWidgetSource.includes(
+      'groups: prepareCommodityMarketDetail(marketTerminalConfigs.gold.detailGroups)',
+    ),
+  'Commodity Market Detail must clear static values until a validated Native source supplies each row.',
 );
 assert(
   hedgeBoardSource.includes(
@@ -178,7 +188,9 @@ assert(
     reserveRankingSource.includes('Math.max(...props.rows.map') &&
     reserveRankingSource.includes('key: `${row.label}-${row.value}`') &&
     reserveRankingSource.includes("row.value >= 0 ? '#148b6a' : '#dc2626'") &&
-    reserveRankingSource.includes("minWidth: props.diverging && row.value < 0 ? '12px' : undefined") &&
+    reserveRankingSource.includes(
+      "minWidth: props.diverging && row.value < 0 ? '12px' : undefined",
+    ) &&
     reserveRankingSource.includes("formatSigned(row.value) + ' 吨'"),
   'ReserveRanking must preserve props, scaling, tones, item key and displayed value.',
 );
@@ -189,7 +201,8 @@ assert(
   'Hedge board must not re-import legacy dashboard or individual trading-tool data files.',
 );
 assert(
-  !hedgeBoardSource.includes('<nav class="module-subnav"') && !hedgeBoardSource.includes('.module-subnav'),
+  !hedgeBoardSource.includes('<nav class="module-subnav"') &&
+    !hedgeBoardSource.includes('.module-subnav'),
   'Hedge board page must not inline research subnav markup or styles.',
 );
 assert(
@@ -199,7 +212,8 @@ assert(
   'Hedge board page must not inline research module, chart section, or widget card markup.',
 );
 assert(
-  hedgeBoardSubnavSource.includes('module-subnav') && hedgeBoardSubnavSource.includes('defineEmits'),
+  hedgeBoardSubnavSource.includes('module-subnav') &&
+    hedgeBoardSubnavSource.includes('defineEmits'),
   'HedgeBoardSubnav must own research subnav rendering and jump event.',
 );
 assert(
@@ -290,9 +304,15 @@ const requiredAShareColumns = [
   '周线',
 ];
 requiredAShareColumns.forEach((column) => {
-  assert(aShareMarketDetailSource.includes(`>${column}<`), `Missing A-share detail column: ${column}`);
+  assert(
+    aShareMarketDetailSource.includes(`>${column}<`),
+    `Missing A-share detail column: ${column}`,
+  );
 });
-assert(!aShareMarketDetailSource.includes('>4H<'), 'A-share market detail must not display a 4H column.');
+assert(
+  !aShareMarketDetailSource.includes('>4H<'),
+  'A-share market detail must not display a 4H column.',
+);
 assert(
   shenwanSectionSource.includes('申万二级成交额 Top 10') &&
     shenwanSectionSource.includes('全部申万二级行业') &&
@@ -309,15 +329,21 @@ assert(
     aShareResearchComposableSource.includes(
       "export type WatchlistSyncState = 'local' | 'syncing' | 'synced' | 'offline';",
     ) &&
-    aShareResearchComposableSource.includes('const groupIndexes = watchlist.value.reduce<number[]>') &&
+    aShareResearchComposableSource.includes(
+      'const groupIndexes = watchlist.value.reduce<number[]>',
+    ) &&
     !aShareResearchComposableSource.includes('window.localStorage'),
   'A-share composable must delegate local watchlist persistence while preserving public types and group moves.',
 );
 assert(
   aShareWatchlistLocalStateSource.includes('export function normalizeStockCode') &&
-    aShareWatchlistLocalStateSource.includes("if (stored === null) return [...DEFAULT_WATCHLIST]") &&
+    aShareWatchlistLocalStateSource.includes(
+      'if (stored === null) return [...DEFAULT_WATCHLIST]',
+    ) &&
     !aShareWatchlistLocalStateSource.includes('!Array.isArray(payload) || !payload.length') &&
-    aShareWatchlistLocalStateSource.includes("const WATCHLIST_STORAGE_KEY = 'vg_a_share_watchlist_v1'") &&
+    aShareWatchlistLocalStateSource.includes(
+      "const WATCHLIST_STORAGE_KEY = 'vg_a_share_watchlist_v1'",
+    ) &&
     aShareWatchlistLocalStateSource.includes(
       "const WATCHLIST_DIRTY_STORAGE_KEY = 'vg_a_share_watchlist_dirty_v1'",
     ) &&
@@ -360,7 +386,9 @@ assert(
     aShareResearchComposableSource.includes('let activeStockCode =') &&
     aShareResearchComposableSource.includes('shanghaiDateStamp') &&
     aShareResearchComposableSource.includes("import { message } from 'ant-design-vue'") &&
-    aShareResearchComposableSource.includes("import { copyText } from '@/utils/copyTextToClipboard'"),
+    aShareResearchComposableSource.includes(
+      "import { copyText } from '@/utils/copyTextToClipboard'",
+    ),
   'A-share interactions must guard stale requests and use platform feedback/copy utilities with China-market dates.',
 );
 assert(

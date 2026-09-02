@@ -41,7 +41,16 @@ export type LocalWidgetKey =
   | 'cftc-wti-net'
   | 'cftc-wti-percentile'
   | 'cftc-natural-gas-net'
-  | 'cftc-natural-gas-percentile';
+  | 'cftc-natural-gas-percentile'
+  | 'commodity-wti-curve'
+  | 'commodity-brent-curve'
+  | 'commodity-copper-curve'
+  | 'commodity-cme-inventory'
+  | 'commodity-lme-inventory'
+  | 'commodity-copper-spreads'
+  | 'commodity-brent-wti-spread'
+  | 'commodity-ovx'
+  | 'commodity-cvol';
 
 export interface WidgetConfig {
   kind: WidgetKind;
@@ -372,7 +381,7 @@ export const researchModules: ResearchModule[] = [
             'gold-vs-nominal',
             {
               height: 400,
-              sourceNote: '数据源：SPDR archive gold proxy + U.S. Treasury nominal yield curve',
+              sourceNote: 'External Link · U.S. Treasury · no local gold proxy',
             },
           ),
           localChart(
@@ -381,12 +390,12 @@ export const researchModules: ResearchModule[] = [
             'gold-vs-breakeven',
             {
               height: 400,
-              sourceNote: '数据源：U.S. Treasury nominal/real yield curves',
+              sourceNote: 'External Link · U.S. Treasury · no local gold proxy',
             },
           ),
           localChart('金价 vs 10Y 实际利率', '实际利率是黄金最硬的宏观约束之一', 'gold-vs-real', {
             height: 400,
-            sourceNote: '数据源：SPDR archive gold proxy + U.S. Treasury real yield curve',
+            sourceNote: 'External Link · U.S. Treasury · no local gold proxy',
           }),
           advancedChart('Gold vs DXY', '黄金与美元指数', 'OANDA:XAUUSD', {
             compareSymbols: [{ symbol: 'TVC:DXY', position: 'SameScale' }],
@@ -420,6 +429,37 @@ export const researchModules: ResearchModule[] = [
             'Managed Money Net',
             'cftc-natural-gas-percentile',
           ),
+        ],
+      },
+      {
+        id: 'commodity-official-references',
+        eyebrow: 'Curves / Physical / Volatility',
+        title: '期限结构、库存与波动率',
+        description:
+          'CME、ICE、LME 与 Cboe 的受限市场数据按 Phase F 采用官方 External Link；不在本地复制曲线、库存或指数历史。',
+        layout: 'two',
+        widgets: [
+          localChart('WTI Futures Curve', 'CME official contract chain', 'commodity-wti-curve'),
+          localChart('Brent Futures Curve', 'ICE official contract chain', 'commodity-brent-curve'),
+          localChart('Copper Prompt Curve', 'LME official contract page', 'commodity-copper-curve'),
+          localChart(
+            'CME Delivery & Stocks',
+            'CME official delivery reports',
+            'commodity-cme-inventory',
+          ),
+          localChart(
+            'LME Copper Stocks',
+            'LME official reports and data',
+            'commodity-lme-inventory',
+          ),
+          localChart(
+            'Copper Cross-Market Spreads',
+            'COMEX / LME / SHFE legs',
+            'commodity-copper-spreads',
+          ),
+          localChart('Brent - WTI Spread', 'ICE / CME licensed legs', 'commodity-brent-wti-spread'),
+          localChart('OVX', 'Cboe Crude Oil ETF Volatility Index', 'commodity-ovx'),
+          localChart('CVOL', 'CME Group Volatility Indexes', 'commodity-cvol'),
         ],
       },
     ],

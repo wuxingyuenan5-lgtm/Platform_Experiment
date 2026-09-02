@@ -382,7 +382,7 @@ GitHub Actions：
 | Phase 0 — Shared Data Foundation | DONE | 100% | CI success |
 | Phase 1 — Shared Market Detail | DONE | 100% | 真实 Treasury 10Y 垂直样板已验收 |
 | Macro V1 Engineering | DONE | 100% | Market Detail 23 行；Growth / Inflation / Rates / Risk / Global M2 全部验收 |
-| Commodity V1 Engineering | IN PROGRESS | 30% | CFTC 五品种 Native 与黄金受限数据 External Link 已完成；EIA 待凭据配置 |
+| Commodity V1 Engineering | IN PROGRESS | 60% | CFTC Native、黄金去静态、商品母表 fail-closed 与受限模块官方 Link 已完成；EIA 待凭据配置 |
 | Crypto V1 Engineering | NOT STARTED | 0% | 等共享层稳定 |
 | Unified QA + Offline Acceptance | NOT STARTED | 0% | 三模块后执行 |
 
@@ -581,7 +581,7 @@ EIA Native 尚未开始生产接入：实现必须读取 Owner 配置的 GitHub 
 
 ### C3 — Commodity Market Detail
 
-逐行按 rights / feasibility 路由 Native / Embed / Link。
+【DONE / fail-closed】全部旧静态 current value、收益率、技术信号和 sparkline 已在展示适配层清空；在逐行 Native source 通过验证前统一显示不可用，并关闭含农产品静态数据的旧轮动热图入口。
 
 ### C4 — Term Structure
 
@@ -590,11 +590,15 @@ EIA Native 尚未开始生产接入：实现必须读取 Owner 配置的 GitHub 
 - LME complex curve → link；
 - 中国公开期货结构仅在 rights-clear 时 Native。
 
+【DONE】WTI / Brent / LME Copper 已增加精确官方 External Link 卡片，不复制受限期限结构数据。
+
 ### C5 — Inventory
 
 - EIA Native；
 - CME/LME受限库存 Link；
 - SHFE/INE rights-clear 数据按需 Native。
+
+【PARTIAL】CME delivery / stocks 与 LME warehouse / stocks 已增加官方 External Link；EIA Native 待 Secret。
 
 ### C6 — CFTC Positioning
 
@@ -604,11 +608,15 @@ EIA Native 尚未开始生产接入：实现必须读取 Owner 配置的 GitHub 
 
 受限 commercial legs 默认 Link。
 
+【DONE】Copper cross-market 与 Brent-WTI 均按受限 leg 路由至官方入口，不在本地计算未经许可的价差历史。
+
 ### C8 — Volatility
 
 - GVZ existing；
 - OVX Embed / Link；
 - CVOL Link。
+
+【DONE】GVZ / OVX 使用 Cboe 官方入口，CVOL 使用 CME 官方入口；旧本地 SPDR gold proxy 与静态 GVZ 对比不再渲染。
 
 ### C9 — Commodity QA
 

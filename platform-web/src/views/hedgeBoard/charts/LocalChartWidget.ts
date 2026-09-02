@@ -3,8 +3,9 @@ import { defineComponent, h, type PropType } from 'vue';
 import TerminalDetailPanel from '../components/TerminalDetailPanel.vue';
 import MacroMarketDetailPanel from '../components/MacroMarketDetailPanel.vue';
 import { type LocalWidgetKey, type WidgetConfig } from '../nativeData/dashboardClean';
+import { prepareCommodityMarketDetail } from '../nativeData/marketDetailAdapter';
 import { marketTerminalConfigs } from '../nativeData/marketTerminal';
-import { BTC_ETF_FLOW_ROWS, mergeGoldWithGvz, mergeGoldWithSeries } from './chartCore';
+import { BTC_ETF_FLOW_ROWS } from './chartCore';
 import DualAxisChart from './DualAxisChart';
 import TreasuryFlowChart from './TreasuryFlowChart';
 import MacroSeriesChart from './MacroSeriesChart';
@@ -39,6 +40,71 @@ const externalGoldResearch = {
     provider: 'World Gold Council',
     description: '各国官方黄金储备数据',
     href: 'https://www.gold.org/goldhub/data/gold-reserves-by-country',
+  },
+  'gold-vs-nominal': {
+    provider: 'U.S. Treasury',
+    description: '黄金与名义利率对比；当前仅保留官方利率数据入口',
+    href: 'https://home.treasury.gov/resource-center/data-chart-center/interest-rates',
+  },
+  'gold-vs-breakeven': {
+    provider: 'U.S. Treasury',
+    description: '黄金与盈亏平衡通胀对比；当前仅保留官方利率数据入口',
+    href: 'https://home.treasury.gov/resource-center/data-chart-center/interest-rates',
+  },
+  'gold-vs-real': {
+    provider: 'U.S. Treasury',
+    description: '黄金与实际利率对比；当前仅保留官方实际收益率入口',
+    href: 'https://home.treasury.gov/resource-center/data-chart-center/interest-rates',
+  },
+  'gold-vs-gvz': {
+    provider: 'Cboe Global Markets',
+    description: 'GVZ 黄金波动率指数官方入口',
+    href: 'https://www.cboe.com/us/indices/dashboard/GVZ/',
+  },
+  'commodity-wti-curve': {
+    provider: 'CME Group',
+    description: 'WTI 原油期货合约链与期限结构',
+    href: 'https://www.cmegroup.com/markets/energy/crude-oil/light-sweet-crude.html',
+  },
+  'commodity-brent-curve': {
+    provider: 'ICE',
+    description: 'Brent 原油期货合约链与期限结构',
+    href: 'https://www.ice.com/products/219/Brent-Crude-Futures',
+  },
+  'commodity-copper-curve': {
+    provider: 'London Metal Exchange',
+    description: 'LME Copper 官方合约与 prompt data 入口',
+    href: 'https://www.lme.com/en/metals/non-ferrous/lme-copper',
+  },
+  'commodity-cme-inventory': {
+    provider: 'CME Group',
+    description: 'NYMEX / COMEX 官方交割通知与库存报告',
+    href: 'https://www.cmegroup.com/clearing/operations-and-deliveries/nymex-delivery-notices.html',
+  },
+  'commodity-lme-inventory': {
+    provider: 'London Metal Exchange',
+    description: 'LME 官方仓库、库存与报告入口',
+    href: 'https://www.lme.com/en/market-data/reports-and-data/warehouse-and-stocks-reports',
+  },
+  'commodity-copper-spreads': {
+    provider: 'LME / CME / SHFE',
+    description: '铜跨市场价差的受限 leg；从 LME 官方铜页面进入',
+    href: 'https://www.lme.com/en/metals/non-ferrous/lme-copper',
+  },
+  'commodity-brent-wti-spread': {
+    provider: 'ICE / CME Group',
+    description: 'Brent-WTI 价差的受限 leg；从 ICE Brent 官方页面进入',
+    href: 'https://www.ice.com/products/219/Brent-Crude-Futures',
+  },
+  'commodity-ovx': {
+    provider: 'Cboe Global Markets',
+    description: 'Cboe Crude Oil ETF Volatility Index 官方入口',
+    href: 'https://www.cboe.com/us/indices/dashboard/OVX/',
+  },
+  'commodity-cvol': {
+    provider: 'CME Group',
+    description: 'CME Group Volatility Indexes 官方入口',
+    href: 'https://www.cmegroup.com/markets/volatility/cvol.html',
   },
 } as const;
 
@@ -121,55 +187,28 @@ export default defineComponent({
             return renderExternalGoldResearch(key);
           case 'central-bank-buyers':
             return renderExternalGoldResearch(key);
+          case 'commodity-wti-curve':
+          case 'commodity-brent-curve':
+          case 'commodity-copper-curve':
+          case 'commodity-cme-inventory':
+          case 'commodity-lme-inventory':
+          case 'commodity-copper-spreads':
+          case 'commodity-brent-wti-spread':
+          case 'commodity-ovx':
+          case 'commodity-cvol':
+            return renderExternalGoldResearch(key);
           case 'gold-vs-nominal':
-            return h(DualAxisChart, {
-              rows: mergeGoldWithSeries('nominal10Y'),
-              leftLabel: '黄金价格代理',
-              rightLabel: '美国 10Y 名义利率',
-              leftUnit: '美元/盎司',
-              rightUnit: '%',
-              leftColor: '#c7931a',
-              rightColor: '#165dff',
-            });
           case 'gold-vs-breakeven':
-            return h(DualAxisChart, {
-              rows: mergeGoldWithSeries('breakeven10Y'),
-              leftLabel: '黄金价格代理',
-              rightLabel: '10Y Breakeven',
-              leftUnit: '美元/盎司',
-              rightUnit: '%',
-              leftColor: '#c7931a',
-              rightColor: '#0f8b6d',
-            });
           case 'gold-vs-real':
-            return h(DualAxisChart, {
-              rows: mergeGoldWithSeries('real10Y'),
-              leftLabel: '黄金价格代理',
-              rightLabel: '美国 10Y 实际利率',
-              leftUnit: '美元/盎司',
-              rightUnit: '%',
-              leftColor: '#c7931a',
-              rightColor: '#7c3aed',
-            });
           case 'gold-vs-gvz':
-            return h(DualAxisChart, {
-              rows: mergeGoldWithGvz(),
-              leftLabel: '黄金价格代理',
-              rightLabel: 'GVZ',
-              leftUnit: '美元/盎司',
-              rightUnit: '指数点',
-              leftColor: '#c7931a',
-              rightColor: '#dc2626',
-            });
+            return renderExternalGoldResearch(key);
           case 'gold-market-detail-table':
             return h(TerminalDetailPanel, {
               class: 'terminal-detail-panel--embedded',
               title: '市场明细',
               marketId: 'gold',
               columns: marketTerminalConfigs.gold.detailColumns,
-              groups: marketTerminalConfigs.gold.detailGroups,
-              rotationButtonLabel: marketTerminalConfigs.gold.rotationButtonLabel,
-              rotationHeatmap: marketTerminalConfigs.gold.rotationHeatmap,
+              groups: prepareCommodityMarketDetail(marketTerminalConfigs.gold.detailGroups),
             });
           case 'macro-market-detail-table':
             return h(MacroMarketDetailPanel);

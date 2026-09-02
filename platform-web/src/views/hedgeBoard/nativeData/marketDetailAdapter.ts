@@ -102,6 +102,13 @@ export function prepareMacroMarketDetail(groups: TerminalTableGroup[]): Terminal
   }));
 }
 
+export function prepareCommodityMarketDetail(groups: TerminalTableGroup[]): TerminalTableGroup[] {
+  return cloneGroups(groups).map((group) => ({
+    ...group,
+    rows: group.rows.map(unavailableRow),
+  }));
+}
+
 export function mergeMacroMarketDetail(
   groups: TerminalTableGroup[],
   remoteRows: MarketDetailRow[],
