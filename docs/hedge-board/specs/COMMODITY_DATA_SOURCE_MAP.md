@@ -174,6 +174,17 @@ Historical Percentile：
 
 ## 6. Energy Inventory / Physical【冻结】
 
+### Implemented EIA identities（2026-09-02）
+
+| Canonical | EIA API v2 series ID | Unit |
+|---|---|---|
+| U.S. Commercial Crude Stocks | `PET.WCESTUS1.W` | thousand barrels |
+| Cushing Crude Stocks | `PET.W_EPC0_SAX_YCUOK_MBBL.W` | thousand barrels |
+| U.S. Motor Gasoline Stocks | `PET.WGTSTUS1.W` | thousand barrels |
+| U.S. Distillate Fuel Oil Stocks | `PET.WDISTUS1.W` | thousand barrels |
+
+四条 identity 已通过 EIA 官方 weekly history 下载端点验证。实现只从 `EIA_API_KEY` 环境变量读取凭据；缺少 Secret 时拒绝发布，生成 artifact 的 `sourceUrl` 永不包含 API key。数据工程 commit `4a317da`，无 Secret CI run `33606084985` success 且 EIA refresh step 按预期 skipped。
+
 ### 6.1 Crude / Products
 
 Primary: U.S. EIA Open Data API v2

@@ -382,7 +382,7 @@ GitHub Actions：
 | Phase 0 — Shared Data Foundation | DONE | 100% | CI success |
 | Phase 1 — Shared Market Detail | DONE | 100% | 真实 Treasury 10Y 垂直样板已验收 |
 | Macro V1 Engineering | DONE | 100% | Market Detail 23 行；Growth / Inflation / Rates / Risk / Global M2 全部验收 |
-| Commodity V1 Engineering | IN PROGRESS | 60% | CFTC Native、黄金去静态、商品母表 fail-closed 与受限模块官方 Link 已完成；EIA 待凭据配置 |
+| Commodity V1 Engineering | IN PROGRESS | 70% | EIA fail-closed 工程链已完成；真实刷新与 UI 验收待 Owner Secret |
 | Crypto V1 Engineering | NOT STARTED | 0% | 等共享层稳定 |
 | Unified QA + Offline Acceptance | NOT STARTED | 0% | 三模块后执行 |
 
@@ -567,7 +567,7 @@ DONE（2026-09-02）：
 
 CFTC 已使用官方 PRE Disaggregated Futures Only 数据集，按 Contract Market Code 显式绑定五个品种，发布 Managed Money Net、Producer/Merchant Net 与滚动 260 周 Managed Money 历史分位，共 15 条 canonical series。数据 commits `7dc7646`、`d01e038`、CI 修复 `c771318`；应用/API commit `fac747c2`；workflow runs `33603224576`、`33604442977` success，后者验证完整 dashboard 路径触发。
 
-EIA Native 尚未开始生产接入：实现必须读取 Owner 配置的 GitHub Secret，不得在仓库中保存或推断 API key。
+EIA Native 工程链已完成（数据 commit `4a317da`）：四条官方 series identity、API v2 provider、canonical pipeline、CLI、Commodity dashboard groups、周三/周六条件式 CI 与密钥不落盘测试均已落库。本地 28 tests 通过，workflow run `33606084985` success，并验证缺少 Secret 时 EIA step 明确 `skipped`、CFTC 与 dashboard 正常运行。真实刷新、应用图表与最终 QA 仍需 Owner 配置 `EIA_API_KEY`。
 
 ### C2 — Existing Gold Modules 去假数据
 

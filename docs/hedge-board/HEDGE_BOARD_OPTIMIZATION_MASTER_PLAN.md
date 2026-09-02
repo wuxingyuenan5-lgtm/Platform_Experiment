@@ -457,7 +457,7 @@ Native core 已真实化 20 个既有 Macro Market Detail 行。Treasury curve �
 
 Macro V1 已完成：Growth、Inflation、Short-End Rate Corridor、Risk Appetite、Global M2 与 Market Detail 23 行均使用真实数据/API/additive SVG 图表；既有 Polymarket 白名单面板继续作为 Market Expectations。Global M2 已通过五区官方/强校验序列、共同月份和 ECB 日汇率月均端到端验证；中国国债 2Y / 10Y / 30Y 已切换为财政部—中国国债收益率曲线官方字段。数据 commits `2e5812593a8a5a1e3ddba9d9402e5888d6d25331`、`5dac2e68c7664824e0dc8423531f9819f5307bfc`、`d5fc17f6248baaffcb1878cadfd9043542047b9f`；应用 commits `ee8dd4d0`、`97eff694`。下一阶段为 Commodity V1。
 
-Commodity V1 已进入实施：CFTC Gold / Silver / Copper / WTI / Natural Gas 已完成官方 PRE Native pipeline、API 与 10 张定位图表；WGC ETF、SPDR 与央行黄金模块已停止显示旧静态快照并按 Phase F 切换为官方 External Link / `permission_required`。Commodity Market Detail 已 fail-closed；CME / ICE / LME / Cboe 的曲线、库存、价差与波动率模块已增加精确官方入口。EIA Native 等剩余商品路由继续推进。
+Commodity V1 已进入实施：CFTC Gold / Silver / Copper / WTI / Natural Gas 已完成官方 PRE Native pipeline、API 与 10 张定位图表；WGC ETF、SPDR 与央行黄金模块已停止显示旧静态快照并按 Phase F 切换为官方 External Link / `permission_required`。Commodity Market Detail 已 fail-closed；CME / ICE / LME / Cboe 的曲线、库存、价差与波动率模块已增加精确官方入口。EIA Native 的 fail-closed provider、四序列 pipeline、dashboard groups 与条件式 CI 已完成，真实刷新待 Owner Secret。
 
 完整阶段状态、模块进度、风险和后续路线以 `HEDGE_BOARD_PROJECT_PLAN_AND_PROGRESS.md` 为管理总览。
 

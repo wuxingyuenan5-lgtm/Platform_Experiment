@@ -419,7 +419,7 @@ Native：
 - Treasury / DXY 等 rights-clear 宏观驱动可继续 Native/Embed；
 - GVZ 保留现有展示入口，不新建本地 Cboe history DB。
 
-实施进度（2026-09-02）：CFTC 五品种 15 条 canonical series、10 个 additive 图表卡片与 Commodity dashboard API 已完成；Managed Money 拥挤度窗口冻结为 260 周。黄金 WGC ETF、SPDR 与 Central Bank Gold 共 6 张受保护卡片已停止渲染静态快照，改为精确官方 External Link / `permission_required`。Commodity Market Detail 旧静态值与轮动热图已 fail-closed；WTI / Brent / Copper 曲线、CME / LME 库存、铜与油价差、GVZ / OVX / CVOL 已按 Phase F 接入官方 External Link。EIA Native 仍依赖 Owner 配置 `EIA_API_KEY` GitHub Secret，仓库不保存凭据。
+实施进度（2026-09-02）：CFTC 五品种 15 条 canonical series、10 个 additive 图表卡片与 Commodity dashboard API 已完成；Managed Money 拥挤度窗口冻结为 260 周。黄金 WGC ETF、SPDR 与 Central Bank Gold 共 6 张受保护卡片已停止渲染静态快照，改为精确官方 External Link / `permission_required`。Commodity Market Detail 旧静态值与轮动热图已 fail-closed；WTI / Brent / Copper 曲线、CME / LME 库存、铜与油价差、GVZ / OVX / CVOL 已按 Phase F 接入官方 External Link。EIA 四序列 provider / pipeline / CLI / dashboard / conditional CI 已由数据 commit `4a317da` 落库，workflow `33606084985` success；真实刷新仍依赖 Owner 配置 `EIA_API_KEY` GitHub Secret，仓库不保存凭据。
 
 ## C3 — Commodity Market Detail
 
