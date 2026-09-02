@@ -381,7 +381,7 @@ GitHub Actions：
 |---|---|---:|---|
 | Phase 0 — Shared Data Foundation | DONE | 100% | CI success |
 | Phase 1 — Shared Market Detail | DONE | 100% | 真实 Treasury 10Y 垂直样板已验收 |
-| Macro V1 Engineering | IN PROGRESS | 25% | Market Detail Native core 已接入 20 行；专题模块待完成 |
+| Macro V1 Engineering | IN PROGRESS | 75% | Market Detail 20 行；Growth / Inflation / Rates / Risk 已接入；Global M2 待完成 |
 | Commodity V1 Engineering | NOT STARTED | 0% | 等 Phase 1 / Macro |
 | Crypto V1 Engineering | NOT STARTED | 0% | 等共享层稳定 |
 | Unified QA + Offline Acceptance | NOT STARTED | 0% | 三模块后执行 |
@@ -482,7 +482,20 @@ Native 优先：BLS / BEA / Fed / Treasury / NY Fed 等。
 - workflow run `33596176092`：`success`；应用 commits `cca0a46685f86dc17271f9d46216646fa0ada6f1`、`482c636fca46833d6ab0a77ea17df922c2f457ea` 已启用全部 15 行。
 - 第三批数据 commit `997adb4871bbfbd3d5c089c8761344433bd0e77c`、应用 commit `913d7df85e88bd3d2881c37a8750da3b3562df0d` 将覆盖扩大到 20 行。
 
-尚未完成：中国国债行，以及 Growth、Inflation、Rates corridor、Global M2、Risk Appetite 专题模块。MOVE / DSPX 按 Source Map 保持 `not_configured`，不抓 TradingView。
+Market Detail 尚未完成中国国债行；MOVE / DSPX 按 Source Map 保持 `not_configured`，不抓 TradingView。
+
+### M2 — Macro V1 专题模块进展（2026-09-02）
+
+- Growth：Real GDP YoY、Industrial Production YoY、Initial Claims 4W MA、CFNAI、CFNAIMA3；
+- Inflation：CPI / Core CPI / PCE / Core PCE YoY、PPI YoY、5Y / 10Y Breakeven、5Y5Y Forward；
+- Rates：Fed Target Lower / Upper、IORB、ON RRP Award、EFFR、SOFR；
+- Risk Appetite：US HY OAS、HYG/LQD exact-date adjusted-close ratio；
+- Market Expectations 继续复用已有白名单 Polymarket 面板；
+- 聚合合约按规格窗口裁剪，并对日频展示序列周度抽样；完整 canonical history 保留在单序列文件中。
+
+数据 commits：`c62dbb299efaa1dcc21d95bd26612be262535d7e`、`34cb72f7d28539ca25360234e175c654ee418106`、`36ba32b78d8ce037dc9c75d2bfe0f00dd97fbbc6`、`9ce61a1f29d781dfa015085a94771e7405014fec`。应用 commits：`e294e75398005b3efa040f575e3a0ff37954278e`、`ecbb20a9463fd0da237566eee3bdf4a4668182cb`、`88e94bd53f6a51b02b2cef9a2cb1a83ef5d4bf11`。`platform-data` 17 tests、API targeted tests、Ruff、Pyright、前端 type check 与 production build 已通过。
+
+当前剩余：Global M2 官方 series code / unit / common-month / monthly-average FX 链路；中国国债 2Y / 10Y / 30Y 精确 AKShare/ChinaBond mapping。二者未确认前不发布替代数据。
 
 ### M2 — Growth
 
