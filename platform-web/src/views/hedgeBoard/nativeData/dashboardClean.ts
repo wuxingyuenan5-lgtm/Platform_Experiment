@@ -50,7 +50,9 @@ export type LocalWidgetKey =
   | 'commodity-copper-spreads'
   | 'commodity-brent-wti-spread'
   | 'commodity-ovx'
-  | 'commodity-cvol';
+  | 'commodity-cvol'
+  | 'eia-crude-stocks'
+  | 'eia-products-stocks';
 
 export interface WidgetConfig {
   kind: WidgetKind;
@@ -428,6 +430,24 @@ export const researchModules: ResearchModule[] = [
             'Natural Gas 5Y Percentile',
             'Managed Money Net',
             'cftc-natural-gas-percentile',
+          ),
+        ],
+      },
+      {
+        id: 'commodity-eia-inventory',
+        eyebrow: 'Inventory / EIA',
+        title: '美国能源库存',
+        description: 'EIA API v2 官方周频库存；保留周频口径和 stale 状态，不做日频 forward-fill。',
+        layout: 'two',
+        widgets: [
+          localChart('Crude Oil Stocks', 'U.S. Commercial / Cushing', 'eia-crude-stocks', {
+            sourceNote: 'Native · U.S. EIA Open Data API v2 · weekly',
+          }),
+          localChart(
+            'Products Stocks',
+            'Motor Gasoline / Distillate Fuel Oil',
+            'eia-products-stocks',
+            { sourceNote: 'Native · U.S. EIA Open Data API v2 · weekly' },
           ),
         ],
       },

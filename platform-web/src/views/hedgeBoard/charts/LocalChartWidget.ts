@@ -197,6 +197,20 @@ export default defineComponent({
           case 'commodity-ovx':
           case 'commodity-cvol':
             return renderExternalGoldResearch(key);
+          case 'eia-crude-stocks':
+            return h(MacroSeriesChart, {
+              groupId: 'eiaCrudeStocks',
+              years: 5,
+              unitLabel: 'thousand barrels',
+              dataDomain: 'commodity',
+            });
+          case 'eia-products-stocks':
+            return h(MacroSeriesChart, {
+              groupId: 'eiaProductsStocks',
+              years: 5,
+              unitLabel: 'thousand barrels',
+              dataDomain: 'commodity',
+            });
           case 'gold-vs-nominal':
           case 'gold-vs-breakeven':
           case 'gold-vs-real':

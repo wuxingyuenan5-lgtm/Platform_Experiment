@@ -14,6 +14,7 @@ const widgetErrorBoundaryPath = path.join(viewRoot, 'components', 'WidgetErrorBo
 const metricStripPath = path.join(viewRoot, 'components', 'MetricStrip.ts');
 const reserveRankingPath = path.join(viewRoot, 'components', 'ReserveRanking.ts');
 const marketDetailCatalogPath = path.join(viewRoot, 'nativeData', 'marketDetailCatalog.ts');
+const dashboardCleanPath = path.join(viewRoot, 'nativeData', 'dashboardClean.ts');
 const toolGroupSectionPath = path.join(
   viewRoot,
   'tradingTools',
@@ -67,6 +68,7 @@ const widgetErrorBoundarySource = fs.readFileSync(widgetErrorBoundaryPath, 'utf8
 const metricStripSource = fs.readFileSync(metricStripPath, 'utf8');
 const reserveRankingSource = fs.readFileSync(reserveRankingPath, 'utf8');
 const marketDetailCatalogSource = fs.readFileSync(marketDetailCatalogPath, 'utf8');
+const dashboardSource = fs.readFileSync(dashboardCleanPath, 'utf8');
 const tradingToolCatalogSource = fs.readFileSync(tradingToolCatalogPath, 'utf8');
 const tradingToolsPageSource = fs.readFileSync(tradingToolsPagePath, 'utf8');
 const aSharePageSource = fs.readFileSync(aSharePagePath, 'utf8');
@@ -180,6 +182,15 @@ assert(
     localChartWidgetSource.includes('return renderExternalGoldResearch(key);') &&
     localChartWidgetSource.includes('External Link · permission_required'),
   'Hedge board local chart owner must preserve official-sector cards without rendering static reserve snapshots.',
+);
+assert(
+  dashboardSource.includes("id: 'commodity-eia-inventory'") &&
+    dashboardSource.includes("'eia-crude-stocks'") &&
+    dashboardSource.includes("'eia-products-stocks'") &&
+    localChartWidgetSource.includes("groupId: 'eiaCrudeStocks'") &&
+    localChartWidgetSource.includes("groupId: 'eiaProductsStocks'") &&
+    localChartWidgetSource.includes("dataDomain: 'commodity'"),
+  'Commodity inventory must keep both EIA groups on the source-backed Commodity API.',
 );
 assert(
   reserveRankingSource.includes("name: 'ReserveRanking'") &&
