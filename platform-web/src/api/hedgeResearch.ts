@@ -305,3 +305,9 @@ export const getMacroDashboardV1 = () =>
     method: 'GET',
     url: '/research/macro/dashboard-v1',
   });
+
+export const getCommodityDashboardV1 = () =>
+  request<MacroDashboardResponse>({
+    method: 'GET',
+    url: '/research/commodity/dashboard-v1',
+  });

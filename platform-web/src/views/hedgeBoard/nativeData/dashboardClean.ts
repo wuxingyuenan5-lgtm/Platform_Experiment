@@ -31,7 +31,17 @@ export type LocalWidgetKey =
   | 'gold-vs-nominal'
   | 'gold-vs-breakeven'
   | 'gold-vs-real'
-  | 'gold-vs-gvz';
+  | 'gold-vs-gvz'
+  | 'cftc-gold-net'
+  | 'cftc-gold-percentile'
+  | 'cftc-silver-net'
+  | 'cftc-silver-percentile'
+  | 'cftc-copper-net'
+  | 'cftc-copper-percentile'
+  | 'cftc-wti-net'
+  | 'cftc-wti-percentile'
+  | 'cftc-natural-gas-net'
+  | 'cftc-natural-gas-percentile';
 
 export interface WidgetConfig {
   kind: WidgetKind;
@@ -382,6 +392,34 @@ export const researchModules: ResearchModule[] = [
             compareSymbols: [{ symbol: 'TVC:DXY', position: 'SameScale' }],
             height: 420,
           }),
+        ],
+      },
+      {
+        id: 'commodity-positioning',
+        eyebrow: 'Positioning / CFTC',
+        title: '核心商品持仓结构',
+        description:
+          'CFTC Disaggregated Futures Only 周报；净持仓按明确 Contract Market Code 映射，拥挤度为 Managed Money Net 的滚动 260 周历史分位。',
+        layout: 'two',
+        widgets: [
+          localChart('Gold Net Position', 'Managed Money / Producer-Merchant', 'cftc-gold-net'),
+          localChart('Gold 5Y Percentile', 'Managed Money Net', 'cftc-gold-percentile'),
+          localChart('Silver Net Position', 'Managed Money / Producer-Merchant', 'cftc-silver-net'),
+          localChart('Silver 5Y Percentile', 'Managed Money Net', 'cftc-silver-percentile'),
+          localChart('Copper Net Position', 'Managed Money / Producer-Merchant', 'cftc-copper-net'),
+          localChart('Copper 5Y Percentile', 'Managed Money Net', 'cftc-copper-percentile'),
+          localChart('WTI Net Position', 'Managed Money / Producer-Merchant', 'cftc-wti-net'),
+          localChart('WTI 5Y Percentile', 'Managed Money Net', 'cftc-wti-percentile'),
+          localChart(
+            'Natural Gas Net Position',
+            'Managed Money / Producer-Merchant',
+            'cftc-natural-gas-net',
+          ),
+          localChart(
+            'Natural Gas 5Y Percentile',
+            'Managed Money Net',
+            'cftc-natural-gas-percentile',
+          ),
         ],
       },
     ],

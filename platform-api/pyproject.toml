@@ -74,6 +74,7 @@ include = [
   "app/research_data_schemas.py",
   "app/research_macro_history.py",
   "app/research_provider_a_share.py",
+  "app/research_provider_commodity_dashboard.py",
   "app/research_provider_datacenter.py",
   "app/research_provider_errors.py",
   "app/research_provider_macro.py",

@@ -12,6 +12,7 @@ from app.research_data_schemas import (
     AShareDashboardResponse,
     StockSnapshotResponse,
 )
+from app.research_provider_commodity_dashboard import CommodityDashboardProvider
 from app.research_provider_errors import ResearchProviderError
 from app.research_provider_macro import (
     MacroExpectationFeedResponse,
@@ -40,6 +41,10 @@ _market_detail_provider = MarketDetailProvider(
 _macro_dashboard_provider = MacroDashboardProvider(
     timeout_seconds=12.0,
     user_agent="Platform-API hedge-board-macro-dashboard",
+)
+_commodity_dashboard_provider = CommodityDashboardProvider(
+    timeout_seconds=12.0,
+    user_agent="Platform-API hedge-board-commodity-dashboard",
 )
 
 
@@ -129,6 +134,21 @@ async def macro_dashboard_v1(response: Response, _: ResearchPrincipal) -> MacroD
         raise HTTPException(
             status_code=503,
             detail={"code": "macro_dashboard_unavailable", "message": str(exc)},
+        ) from exc
+    _cache_header(response, 300)
+    return result
+
+
+@router.get("/commodity/dashboard-v1", response_model=MacroDashboardResponse)
+async def commodity_dashboard_v1(
+    response: Response, _: ResearchPrincipal
+) -> MacroDashboardResponse:
+    try:
+        result = await _commodity_dashboard_provider.get()
+    except ResearchProviderError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail={"code": "commodity_dashboard_unavailable", "message": str(exc)},
         ) from exc
     _cache_header(response, 300)
     return result

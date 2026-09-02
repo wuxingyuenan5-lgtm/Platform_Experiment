@@ -164,6 +164,76 @@ export default defineComponent({
               years: 2,
               unitLabel: 'ratio',
             });
+          case 'cftc-gold-net':
+            return h(MacroSeriesChart, {
+              dataDomain: 'commodity',
+              groupId: 'cftcGoldNet',
+              years: 5,
+              unitLabel: 'contracts',
+            });
+          case 'cftc-gold-percentile':
+            return h(MacroSeriesChart, {
+              dataDomain: 'commodity',
+              groupId: 'cftcGoldPercentile',
+              years: 5,
+              unitLabel: 'percentile',
+            });
+          case 'cftc-silver-net':
+            return h(MacroSeriesChart, {
+              dataDomain: 'commodity',
+              groupId: 'cftcSilverNet',
+              years: 5,
+              unitLabel: 'contracts',
+            });
+          case 'cftc-silver-percentile':
+            return h(MacroSeriesChart, {
+              dataDomain: 'commodity',
+              groupId: 'cftcSilverPercentile',
+              years: 5,
+              unitLabel: 'percentile',
+            });
+          case 'cftc-copper-net':
+            return h(MacroSeriesChart, {
+              dataDomain: 'commodity',
+              groupId: 'cftcCopperNet',
+              years: 5,
+              unitLabel: 'contracts',
+            });
+          case 'cftc-copper-percentile':
+            return h(MacroSeriesChart, {
+              dataDomain: 'commodity',
+              groupId: 'cftcCopperPercentile',
+              years: 5,
+              unitLabel: 'percentile',
+            });
+          case 'cftc-wti-net':
+            return h(MacroSeriesChart, {
+              dataDomain: 'commodity',
+              groupId: 'cftcWtiNet',
+              years: 5,
+              unitLabel: 'contracts',
+            });
+          case 'cftc-wti-percentile':
+            return h(MacroSeriesChart, {
+              dataDomain: 'commodity',
+              groupId: 'cftcWtiPercentile',
+              years: 5,
+              unitLabel: 'percentile',
+            });
+          case 'cftc-natural-gas-net':
+            return h(MacroSeriesChart, {
+              dataDomain: 'commodity',
+              groupId: 'cftcNaturalGasNet',
+              years: 5,
+              unitLabel: 'contracts',
+            });
+          case 'cftc-natural-gas-percentile':
+            return h(MacroSeriesChart, {
+              dataDomain: 'commodity',
+              groupId: 'cftcNaturalGasPercentile',
+              years: 5,
+              unitLabel: 'percentile',
+            });
           case 'crypto-market-detail-table':
             return h(TerminalDetailPanel, {
               class: 'terminal-detail-panel--embedded',

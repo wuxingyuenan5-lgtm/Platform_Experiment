@@ -1,6 +1,10 @@
 import { defineComponent, h, onMounted, type PropType, ref } from 'vue';
 
-import { getMacroDashboardV1, type MacroDashboardSeries } from '@/api/hedgeResearch';
+import {
+  getCommodityDashboardV1,
+  getMacroDashboardV1,
+  type MacroDashboardSeries,
+} from '@/api/hedgeResearch';
 
 const WIDTH = 960;
 const HEIGHT = 320;
@@ -29,6 +33,7 @@ export default defineComponent({
     years: { type: Number, default: 5 },
     unitLabel: { type: String, default: '' },
     preferredSeriesIds: { type: Array as PropType<string[]>, default: () => [] },
+    dataDomain: { type: String as PropType<'macro' | 'commodity'>, default: 'macro' },
   },
   setup(props) {
     const series = ref<MacroDashboardSeries[]>([]);
@@ -36,7 +41,10 @@ export default defineComponent({
 
     onMounted(async () => {
       try {
-        const dashboard = await getMacroDashboardV1();
+        const dashboard =
+          props.dataDomain === 'commodity'
+            ? await getCommodityDashboardV1()
+            : await getMacroDashboardV1();
         const group = dashboard.groups[props.groupId] ?? [];
         series.value = props.preferredSeriesIds.length
           ? props.preferredSeriesIds
@@ -45,7 +53,7 @@ export default defineComponent({
           : group;
         status.value = series.value.length ? 'ready' : 'error';
       } catch (error) {
-        console.warn('[hedgeBoard] macro dashboard group unavailable', props.groupId, error);
+        console.warn('[hedgeBoard] dashboard group unavailable', props.groupId, error);
         status.value = 'error';
       }
     });
