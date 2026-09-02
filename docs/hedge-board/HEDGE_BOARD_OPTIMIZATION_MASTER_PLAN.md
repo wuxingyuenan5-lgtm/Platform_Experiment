@@ -1,6 +1,6 @@
 # 对冲基金看板优化总方案（Master Plan）
 
-> 状态：Planning Baseline v1.2 / Phase F FROZEN / Phase 0 DONE / Phase 1 NOT STARTED  
+> 状态：Planning Baseline v1.3 / Phase F FROZEN / Phase 0 DONE / Phase 1 DONE / Macro V1 NEXT  
 > 项目总览：`docs/hedge-board/HEDGE_BOARD_PROJECT_PLAN_AND_PROGRESS.md`  
 > 适用分支：`feature/hedge-board-online-optimization`  
 > 用途：作为 Hedge Board 后续产品、数据、工程与验收的最高约束来源。  
@@ -422,14 +422,14 @@ Product Scope Design       DONE
 Data Source Baselines      DONE
 Data Feasibility Phase F   DONE / FROZEN
 Engineering Phase 0        DONE
-Implementation Plan        v1.1 / Phase 1 Gate
-Engineering Phase 1        NOT STARTED
+Implementation Plan        v1.2 / Macro V1 Gate
+Engineering Phase 1        DONE
 ```
 
 当前统一进度口径：
 
 - **规划准备度：100%**；
-- **工程主阶段：1 / 6 = 16.7%**；
+- **工程主阶段：2 / 6 = 33.3%**；
 - 工程主阶段口径：Phase 0、Phase 1、Macro V1、Commodity V1、Crypto V1、Unified QA / Offline Acceptance；
 - 该比例只用于管理 Gate，不代表各阶段实际工作量等权，也不用于推算工期。
 
@@ -441,9 +441,17 @@ Phase 0 真实验收：
 - GitHub Actions `macro-data` run `33295430507` 对 commit `2a1428ccfc02b9f096f7f3397eb9183f972acdc2` 结论为 `success`；
 - Treasury 10Y 已存在真实 `Provider → canonical JSON → CSV history → workflow` 链路。
 
+Phase 1 真实验收：
+
+- `platform-data` commit `9c5eb80f056bcbf2896fd85d321abb2c67bde01c`；
+- `macro-data` workflow run `33588457408`：`success`；
+- 应用 commit `14fda8c4b1cf79013ca38396753f197ff17d7806`；
+- 已形成 `canonical Treasury history → shared metrics → platform-api → macro-us10y existing row → existing SVG sparkline` 的真实纵切片；
+- 最新远端验收 as-of `2026-09-01`，美国 10Y `4.79%`，1D `+4bp`；缺历史窗口显式为 `—`。
+
 下一阶段：
 
-> `Phase 1 — Shared Market Detail Data Layer`
+> `Macro V1 Engineering`
 
 完整阶段状态、模块进度、风险和后续路线以 `HEDGE_BOARD_PROJECT_PLAN_AND_PROGRESS.md` 为管理总览。
 

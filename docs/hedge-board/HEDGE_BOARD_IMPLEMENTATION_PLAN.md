@@ -1,6 +1,6 @@
 # 对冲基金看板｜统一实施计划（Implementation Plan）
 
-> 状态：Implementation Plan v1.2 / PHASE 0 DONE / PHASE 1 NOT STARTED  
+> 状态：Implementation Plan v1.3 / PHASE 0 DONE / PHASE 1 DONE / MACRO V1 NEXT  
 > 项目总览：`docs/hedge-board/HEDGE_BOARD_PROJECT_PLAN_AND_PROGRESS.md`  
 > 上位文档：`docs/hedge-board/HEDGE_BOARD_OPTIMIZATION_MASTER_PLAN.md`  
 > 数据可行性：`docs/hedge-board/HEDGE_BOARD_DATA_FEASIBILITY_AND_MAINTENANCE.md`  
@@ -12,7 +12,7 @@
 
 ## 1. 当前状态【冻结】
 
-Phase F 已完成并冻结；Phase 0 已完成并通过真实 GitHub Actions 验证。
+Phase F 已完成并冻结；Phase 0、Phase 1 已完成并通过真实 GitHub Actions 与应用验证。
 
 当前：
 
@@ -23,14 +23,17 @@ Phase F Data Feasibility & Rights Audit
 Phase 0 Shared Data Foundation
 → DONE
 
-Phase 1 Shared Market Detail Data Layer
-→ NOT STARTED
+Phase 1 Shared Market Detail Data Layer【DONE】
+→ DONE
+
+Macro V1 Engineering
+→ NEXT
 ```
 
 当前管理口径：
 
 - 规划准备度：`100%`；
-- 工程主阶段：`1 / 6 = 16.7%`；
+- 工程主阶段：`2 / 6 = 33.3%`；
 - 六个工程主阶段：Phase 0、Phase 1、Macro V1、Commodity V1、Crypto V1、Unified QA / Offline Acceptance；
 - 百分比仅用于阶段 Gate 管理，不代表工作量严格等权，不用于推算工期。
 
@@ -260,7 +263,7 @@ Phase 0 本轮新增 / 修改的 `platform-data` commits：
 
 ---
 
-# 6. Phase 1 — Shared Market Detail Data Layer【NEXT / NOT STARTED】
+# 6. Phase 1 — Shared Market Detail Data Layer【DONE】
 
 保留现有 Market Terminal 视觉和列结构。
 
@@ -285,7 +288,7 @@ Phase 0 本轮新增 / 修改的 `platform-data` commits：
 - Crypto 7×24 与 US ETF / equities 日历分离；
 - 技术状态箭头不在本 Phase 重构。
 
-Phase 1 完成后更新 `HEDGE_BOARD_PROJECT_PLAN_AND_PROGRESS.md`，再进入 Macro V1。
+Phase 1 已于 2026-09-02 完成。数据 commit 为 `9c5eb80f056bcbf2896fd85d321abb2c67bde01c`，workflow run `33588457408` 为 `success`；应用纵切片 commit 为 `14fda8c4b1cf79013ca38396753f197ff17d7806`。真实样本 `macro-us10y` 已通过统一窗口层、API Decimal 合约接回现有母表，最新远端验收 as-of `2026-09-01`、收盘 `4.79%`、1D `+4bp`。缺少足够历史的窗口显式返回 unavailable；没有 forward-fill 或 placeholder。
 
 ---
 
@@ -614,7 +617,7 @@ Phase F                         DONE
 ↓
 Phase 0 Shared Data Foundation DONE
 ↓
-Phase 1 Shared Market Detail   NOT STARTED
+Phase 1 Shared Market Detail   DONE
 ↓
 Macro V1
 ↓
@@ -627,12 +630,11 @@ Offline Acceptance
 
 业务内部建议：
 
-1. Phase 1；
-2. Macro Native core + links；
-3. Commodity EIA/CFTC + links；
-4. Crypto Binance Native + links；
-5. 三模块 QA；
-6. 线下验收。
+1. Macro Native core + links；
+2. Commodity EIA/CFTC + links；
+3. Crypto Binance Native + links；
+4. 三模块 QA；
+5. 线下验收。
 
 用户可明确改变优先级；执行 Agent 不得自行重排。
 
@@ -650,7 +652,7 @@ Offline Acceptance
 - Phase 0 GitHub Actions 验证；
 - Project Plan & Progress v1.0。
 
-下一步是 **Phase 1 — Shared Market Detail Data Layer**。
+下一步是 **Macro V1 Engineering**。
 
 以后每完成一个正式 Phase，都必须同步更新：
 

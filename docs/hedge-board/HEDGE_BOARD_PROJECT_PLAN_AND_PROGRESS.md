@@ -1,6 +1,6 @@
 # 对冲基金看板｜完整项目计划书与进度总表
 
-> 状态：Project Baseline v1.0 / Phase 0 DONE / Phase 1 NEXT  
+> 状态：Project Baseline v1.1 / Phase 0 DONE / Phase 1 DONE / Macro V1 NEXT  
 > 主仓库：`wuxingyuenan5-lgtm/Platform_Experiment`  
 > 开发分支：`feature/hedge-board-online-optimization`  
 > 数据仓库：`wuxingyuenan5-lgtm/platform-data`  
@@ -367,7 +367,7 @@ GitHub Actions：
 | Crypto V1 产品规格 | DONE | 100% | 已冻结 |
 | 三模块 Data Source Map | DONE | 100% | baseline 已建立 |
 | Phase F 可行性 / rights 审计 | DONE | 100% | v1.0 frozen |
-| Unified Implementation Plan | DONE | 100% | 当前进入 Phase 1 Gate |
+| Unified Implementation Plan | DONE | 100% | Phase 1 Gate 已通过 |
 
 **规划准备度：100%。**
 
@@ -380,13 +380,13 @@ GitHub Actions：
 | 工程阶段 | 状态 | 完成度 | 当前说明 |
 |---|---|---:|---|
 | Phase 0 — Shared Data Foundation | DONE | 100% | CI success |
-| Phase 1 — Shared Market Detail | NEXT | 0% | 下一阶段 |
-| Macro V1 Engineering | NOT STARTED | 0% | 等 Phase 1 |
+| Phase 1 — Shared Market Detail | DONE | 100% | 真实 Treasury 10Y 垂直样板已验收 |
+| Macro V1 Engineering | NEXT | 0% | 下一阶段 |
 | Commodity V1 Engineering | NOT STARTED | 0% | 等 Phase 1 / Macro |
 | Crypto V1 Engineering | NOT STARTED | 0% | 等共享层稳定 |
 | Unified QA + Offline Acceptance | NOT STARTED | 0% | 三模块后执行 |
 
-**工程主阶段完成：1 / 6 = 16.7%。**
+**工程主阶段完成：2 / 6 = 33.3%。**
 
 该比例只表示主阶段 Gate，不代表工作量严格等权；后续项目管理以阶段状态和实际交付为主，不使用该比例推算工期。
 
@@ -394,7 +394,7 @@ GitHub Actions：
 
 | 模块 | Product | Feasibility | Data Foundation | Business Engineering | QA |
 |---|---|---|---|---|---|
-| Macro | Frozen | Frozen | Shared Phase 0 Done | Not Started | Not Started |
+| Macro | Frozen | Frozen | Shared Phase 0 / 1 Done | Next | Not Started |
 | Commodity | Frozen | Frozen | Shared Phase 0 Done | Not Started | Not Started |
 | Crypto | Frozen | Frozen | Shared Phase 0 Done | Not Started | Not Started |
 | US Equity | Existing / Deferred | Deferred | N/A | Deferred | N/A |
@@ -404,7 +404,7 @@ GitHub Actions：
 
 ---
 
-## 9. 下一阶段：Phase 1 — Shared Market Detail Data Layer
+## 9. 已完成：Phase 1 — Shared Market Detail Data Layer
 
 ### 9.1 目标
 
@@ -452,6 +452,17 @@ canonical history
 - provider / frequency / stale 状态可追溯；
 - 假数据退出；
 - UI 不被改坏。
+
+### 9.4 Phase 1 验收结果（2026-09-02）
+
+- `platform-data` commit `9c5eb80f056bcbf2896fd85d321abb2c67bde01c` 已发布共享窗口计算、frequency-aware 缺失规则、52 周覆盖检查、30D sparkline 和 exact-date ratio alignment；
+- `macro-data` workflow run `33588457408` 对该 SHA 结论为 `success`；
+- 应用 commit `14fda8c4b1cf79013ca38396753f197ff17d7806` 已接入 `platform-api` Decimal 合约和现有宏观母表；
+- 真实远端验收读取 `macro-us10y`：as-of `2026-09-01`、收盘 `4.79%`、1D `+4bp`；
+- 完整历史不足的 YTD / 1Y / 52W 指标保持 `—`，不 forward-fill、不生成 placeholder；
+- `TerminalDetailPanel.vue`、现有 SVG sparkline、列顺序和视觉结构未改；US Equity、A-Share、Global、Trading Tools 未改。
+
+验证：`platform-data` 11 tests passed；新增 API/provider 6 tests passed；Ruff、Pyright、前端 type check、targeted ESLint、production Vite build 均通过。API 全量测试曾启动，但因既有慢速套件出现多项非本阶段失败且未在合理时限内完成，未将其伪报为全绿。
 
 ---
 
@@ -695,13 +706,11 @@ Native Binance / rights-clear data；严格区分 7×24 与 US securities calend
 
 当前唯一下一工程阶段：
 
-> **Phase 1 — Shared Market Detail Data Layer**
+> **Macro V1 Engineering**
 
 建议执行顺序：
 
 ```text
-Phase 1
-↓
 Macro V1
 ↓
 Macro QA
