@@ -3,6 +3,7 @@ import type { MarketDetailRow } from '@/api/hedgeResearch';
 import type { TerminalTableGroup, TerminalTableRow } from './marketTerminal';
 
 const UNAVAILABLE = '—';
+const ENABLED_MACRO_ROW_IDS = new Set(['macro-us2y', 'macro-us10y', 'macro-us30y']);
 const DATA_SIGNAL_KEYS: Array<keyof TerminalTableRow> = [
   'd10',
   'd20',
@@ -50,7 +51,7 @@ function unavailableRow(row: TerminalTableRow): TerminalTableRow {
 export function prepareMacroMarketDetail(groups: TerminalTableGroup[]): TerminalTableGroup[] {
   return cloneGroups(groups).map((group) => ({
     ...group,
-    rows: group.rows.map((row) => (row.id === 'macro-us10y' ? unavailableRow(row) : row)),
+    rows: group.rows.map((row) => (ENABLED_MACRO_ROW_IDS.has(row.id) ? unavailableRow(row) : row)),
   }));
 }
 
