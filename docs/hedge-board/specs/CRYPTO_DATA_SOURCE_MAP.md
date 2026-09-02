@@ -586,3 +586,14 @@ GitHub Actions 不适合作分钟级实时市场数据库。若最终只用 GitH
 10. 每个跨资产 ratio 的 calendar alignment。
 
 未通过 live validation 的 source 不得进入 `ready`。
+
+---
+
+## 17. Implementation Evidence（2026-09-02）
+
+- Binance Spot `data-api.binance.vision` 与 USD-M Futures `fapi.binance.com` 已在本地 live validate；
+- BTC / ETH spot、funding、OI、perpetual basis 共 8 条 series 已发布，`venue_binance` 与 `mode_venue_not_aggregate` 写入 quality flags；
+- spot 使用已收盘 UTC 日线；funding 为当日已实现费率均值；OI 与 perpetual basis 为当日最后观测；
+- 数据 commit：`1707668`；应用 commit：`9fa3d25b`；
+- GitHub Actions run `33636569033` 单元测试通过，真实 Futures refresh 因 runner 地域限制收到 HTTP 451，状态维持 blocker；
+- 未批准替代 runner 或 Binance 官方归档 fallback 前，不把远端更新链标为 `ready`，不以旧值伪装新鲜数据。

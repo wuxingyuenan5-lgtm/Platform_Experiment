@@ -1,6 +1,6 @@
 # 对冲基金看板优化总方案（Master Plan）
 
-> 状态：Planning Baseline v1.6 / Phase F FROZEN / Phase 0 DONE / Phase 1 DONE / Macro V1 DONE / Commodity V1 DONE / Crypto V1 NEXT
+> 状态：Planning Baseline v1.7 / Phase F FROZEN / Phase 0 DONE / Phase 1 DONE / Macro V1 DONE / Commodity V1 DONE / Crypto V1 IN PROGRESS
 > 项目总览：`docs/hedge-board/HEDGE_BOARD_PROJECT_PLAN_AND_PROGRESS.md`  
 > 适用分支：`feature/hedge-board-online-optimization`  
 > 用途：作为 Hedge Board 后续产品、数据、工程与验收的最高约束来源。  
@@ -458,6 +458,8 @@ Native core 已真实化 20 个既有 Macro Market Detail 行。Treasury curve �
 Macro V1 已完成：Growth、Inflation、Short-End Rate Corridor、Risk Appetite、Global M2 与 Market Detail 23 行均使用真实数据/API/additive SVG 图表；既有 Polymarket 白名单面板继续作为 Market Expectations。Global M2 已通过五区官方/强校验序列、共同月份和 ECB 日汇率月均端到端验证；中国国债 2Y / 10Y / 30Y 已切换为财政部—中国国债收益率曲线官方字段。数据 commits `2e5812593a8a5a1e3ddba9d9402e5888d6d25331`、`5dac2e68c7664824e0dc8423531f9819f5307bfc`、`d5fc17f6248baaffcb1878cadfd9043542047b9f`；应用 commits `ee8dd4d0`、`97eff694`。下一阶段为 Commodity V1。
 
 Commodity V1 已完成：CFTC Gold / Silver / Copper / WTI / Natural Gas 使用官方 PRE Native pipeline、API 与 10 张定位图表；EIA crude / Cushing / gasoline / distillate 已通过真实 workflow `33631637867` 刷新并以两组 Native 图表接回。WGC、SPDR、CME、ICE、LME、Cboe 等受限数据均使用精确官方 External Link；Commodity Market Detail fail-closed，不再显示旧静态值。下一阶段为 Crypto V1。
+
+Crypto V1 已进入工程收口：Binance 8 条 BTC / ETH Native series、API、页面图表和 Market Detail 已落地；单一 Venue 口径显式标注为 not Aggregate。Farside、BitcoinTreasuries、DefiLlama、Deribit、Checkonchain、CoinGlass、Bybit、OKX 使用精确 External Link，旧 BTC ETF / Treasury 假数组已退出渲染路径。当前不能关闭 Gate：GitHub Actions run `33636569033` 因美国 runner 访问 Binance Futures 返回 HTTP 451 而失败，需 Owner 决定 runner 或官方归档 fallback 路线。
 
 完整阶段状态、模块进度、风险和后续路线以 `HEDGE_BOARD_PROJECT_PLAN_AND_PROGRESS.md` 为管理总览。
 

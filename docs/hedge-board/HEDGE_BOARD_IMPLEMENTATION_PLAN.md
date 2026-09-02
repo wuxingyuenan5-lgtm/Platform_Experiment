@@ -668,7 +668,9 @@ Offline Acceptance
 - Phase 0 GitHub Actions 验证；
 - Project Plan & Progress v1.0。
 
-下一步是 **Crypto V1 Engineering**。
+当前为 **Crypto V1 Engineering — IN PROGRESS**。
+
+Native 数据、API、页面图表、Crypto Market Detail fail-closed 及受限来源精确外链已完成并通过本地 QA。远端自动刷新尚未关闭 Gate：GitHub Actions run `33636569033` 在 Binance USD-M Futures 请求处收到 HTTP 451；这属于 runner 地域访问限制，不得通过假数据或错误标记 `ready` 绕过。下一技术动作是确认可长期运行的非受限 runner，或批准 Binance 官方归档数据作为降频 fallback。
 
 以后每完成一个正式 Phase，都必须同步更新：
 

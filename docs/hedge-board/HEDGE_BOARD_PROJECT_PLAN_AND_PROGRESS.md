@@ -1,6 +1,6 @@
 # 对冲基金看板｜完整项目计划书与进度总表
 
-> 状态：Project Baseline v1.4 / Phase 0 DONE / Phase 1 DONE / Macro V1 DONE / Commodity V1 DONE / Crypto V1 NEXT
+> 状态：Project Baseline v1.5 / Phase 0 DONE / Phase 1 DONE / Macro V1 DONE / Commodity V1 DONE / Crypto V1 IN PROGRESS
 > 主仓库：`wuxingyuenan5-lgtm/Platform_Experiment`  
 > 开发分支：`feature/hedge-board-online-optimization`  
 > 数据仓库：`wuxingyuenan5-lgtm/platform-data`  
@@ -383,7 +383,7 @@ GitHub Actions：
 | Phase 1 — Shared Market Detail | DONE | 100% | 真实 Treasury 10Y 垂直样板已验收 |
 | Macro V1 Engineering | DONE | 100% | Market Detail 23 行；Growth / Inflation / Rates / Risk / Global M2 全部验收 |
 | Commodity V1 Engineering | DONE | 100% | CFTC / EIA Native、受限模块官方 Link、母表 fail-closed 与 QA 全部完成 |
-| Crypto V1 Engineering | NOT STARTED | 0% | 等共享层稳定 |
+| Crypto V1 Engineering | IN PROGRESS | 85% | Native / links / fail-closed 已实现；GitHub runner 对 Binance Futures 返回 HTTP 451 |
 | Unified QA + Offline Acceptance | NOT STARTED | 0% | 三模块后执行 |
 
 **工程主阶段完成：4 / 6 = 66.7%。**
@@ -756,9 +756,17 @@ Native Binance / rights-clear data；严格区分 7×24 与 US securities calend
 
 ## 16. 当前下一步
 
-当前唯一下一工程阶段：
+当前唯一在执行工程阶段：
 
 > **Crypto V1 Engineering**
+
+已验证实现：
+
+- `platform-data` commit `1707668`：Binance BTC / ETH spot、funding、OI、perpetual basis 共 8 条 canonical series 与 dashboard；
+- 应用 commits `9fa3d25b`、`3dc7d676`、`b5ffe90f`：API、Native 图表、Crypto Market Detail fail-closed、ETF / Treasury / derivatives / stablecoin / options / on-chain 精确外链及静态假数据退出守卫；
+- 本地真实刷新：8 条 series ready；spot 仅使用已收盘 UTC 日线，derivatives 明确为 Binance Venue / not Aggregate；
+- QA：数据仓库 31 tests passed；API provider tests 2 passed、target Ruff / Pyright 通过；frontend ESLint、typecheck、layout verifier、production build（5677 modules）通过；
+- 外部 blocker：GitHub Actions run `33636569033` 的 tests 通过，但美国 runner 请求 `fapi.binance.com` 返回 HTTP 451。现有真实 LKG 不被占位数据覆盖；在 runner / 数据分发方案确认前不把远端自动刷新标为完成。
 
 建议执行顺序：
 
