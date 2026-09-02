@@ -200,6 +200,38 @@ export interface MarketDetailResponse {
   rows: MarketDetailRow[];
 }
 
+export interface MacroDashboardObservation {
+  date: string;
+  value?: string | number | null;
+}
+
+export interface MacroDashboardSeries {
+  seriesId: string;
+  label: string;
+  status: string;
+  latestValue?: string | number | null;
+  unit: string;
+  frequency: string;
+  timezone: string;
+  source: string;
+  sourceSeriesId?: string | null;
+  sourceUrl?: string | null;
+  observationDate?: string | null;
+  asOf?: string | null;
+  retrievedAt?: string | null;
+  isStale: boolean;
+  methodologyVersion: string;
+  qualityFlags: string[];
+  observations: MacroDashboardObservation[];
+}
+
+export interface MacroDashboardResponse {
+  schemaVersion: '1.0';
+  status: string;
+  asOf: string;
+  groups: Record<string, MacroDashboardSeries[]>;
+}
+
 const SESSION_INVALIDATION_CODES = new Set([
   'invalid_session',
   'human_session_required',
@@ -266,4 +298,10 @@ export const getMarketDetail = (marketId: 'macro') =>
   request<MarketDetailResponse>({
     method: 'GET',
     url: `/research/market-detail/${marketId}`,
+  });
+
+export const getMacroDashboardV1 = () =>
+  request<MacroDashboardResponse>({
+    method: 'GET',
+    url: '/research/macro/dashboard-v1',
   });

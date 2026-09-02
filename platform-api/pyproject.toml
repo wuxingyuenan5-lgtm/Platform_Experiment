@@ -78,6 +78,7 @@ include = [
   "app/research_provider_errors.py",
   "app/research_provider_macro.py",
   "app/research_provider_market_detail.py",
+  "app/research_provider_macro_dashboard.py",
   "app/research_provider_normalization.py",
   "app/research_provider_stock_akshare.py",
   "app/research_provider_stock_datacenter.py",

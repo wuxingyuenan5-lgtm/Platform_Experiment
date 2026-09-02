@@ -17,6 +17,7 @@ from app.research_provider_macro import (
     MacroExpectationFeedResponse,
     MacroResearchProvider,
 )
+from app.research_provider_macro_dashboard import MacroDashboardProvider, MacroDashboardResponse
 from app.research_provider_market_detail import MarketDetailProvider, MarketDetailResponse
 from app.research_service import (
     DEFAULT_THRESHOLD_YUAN,
@@ -35,6 +36,10 @@ _macro_expectation_provider = MacroResearchProvider(
 _market_detail_provider = MarketDetailProvider(
     timeout_seconds=20.0,
     user_agent="Platform-API hedge-board-market-detail",
+)
+_macro_dashboard_provider = MacroDashboardProvider(
+    timeout_seconds=20.0,
+    user_agent="Platform-API hedge-board-macro-dashboard",
 )
 
 
@@ -111,6 +116,19 @@ async def market_detail(
         raise HTTPException(
             status_code=503,
             detail={"code": "market_detail_unavailable", "message": str(exc)},
+        ) from exc
+    _cache_header(response, 300)
+    return result
+
+
+@router.get("/macro/dashboard-v1", response_model=MacroDashboardResponse)
+async def macro_dashboard_v1(response: Response, _: ResearchPrincipal) -> MacroDashboardResponse:
+    try:
+        result = await _macro_dashboard_provider.get()
+    except ResearchProviderError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail={"code": "macro_dashboard_unavailable", "message": str(exc)},
         ) from exc
     _cache_header(response, 300)
     return result

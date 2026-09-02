@@ -10,6 +10,7 @@ import { BTC_ETF_FLOW_ROWS, mergeGoldWithGvz, mergeGoldWithSeries } from './char
 import DualAxisChart from './DualAxisChart';
 import { EtfWeeklyFlowsPanel, YtdSummaryPanel } from './EtfResearchPanels';
 import TreasuryFlowChart from './TreasuryFlowChart';
+import MacroSeriesChart from './MacroSeriesChart';
 
 export default defineComponent({
   name: 'LocalChartWidget',
@@ -133,6 +134,20 @@ export default defineComponent({
             });
           case 'macro-market-detail-table':
             return h(MacroMarketDetailPanel);
+          case 'macro-growth-production':
+            return h(MacroSeriesChart, { groupId: 'growthProduction', years: 10, unitLabel: '%' });
+          case 'macro-growth-labor':
+            return h(MacroSeriesChart, { groupId: 'growthLabor', years: 2, unitLabel: 'persons' });
+          case 'macro-growth-activity':
+            return h(MacroSeriesChart, { groupId: 'growthActivity', years: 5, unitLabel: 'index' });
+          case 'macro-actual-inflation':
+            return h(MacroSeriesChart, { groupId: 'actualInflation', years: 5, unitLabel: '%' });
+          case 'macro-upstream-inflation':
+            return h(MacroSeriesChart, { groupId: 'upstreamInflation', years: 5, unitLabel: '%' });
+          case 'macro-market-inflation':
+            return h(MacroSeriesChart, { groupId: 'marketInflation', years: 5, unitLabel: '%' });
+          case 'macro-rate-corridor':
+            return h(MacroSeriesChart, { groupId: 'rateCorridor', years: 1, unitLabel: '%' });
           case 'crypto-market-detail-table':
             return h(TerminalDetailPanel, {
               class: 'terminal-detail-panel--embedded',

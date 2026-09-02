@@ -7,6 +7,13 @@
 
 export type LocalWidgetKey =
   | 'macro-market-detail-table'
+  | 'macro-growth-production'
+  | 'macro-growth-labor'
+  | 'macro-growth-activity'
+  | 'macro-actual-inflation'
+  | 'macro-upstream-inflation'
+  | 'macro-market-inflation'
+  | 'macro-rate-corridor'
   | 'gold-market-detail-table'
   | 'crypto-market-detail-table'
   | 'btc-etf-flow'
@@ -171,6 +178,48 @@ export const researchModules: ResearchModule[] = [
               height: 620,
               sourceNote: '',
             },
+          ),
+        ],
+      },
+      {
+        id: 'macro-growth',
+        eyebrow: 'Growth',
+        title: '增长与经济活动',
+        description: '生产、劳动力与广义活动指标使用各自适配频率，不对低频数据补点。',
+        layout: 'two',
+        widgets: [
+          localChart(
+            '增长与生产',
+            'Real GDP YoY / Industrial Production YoY',
+            'macro-growth-production',
+          ),
+          localChart('初请失业金四周均值', 'Initial Claims 4W MA', 'macro-growth-labor'),
+          localChart('广义经济活动', 'CFNAI / CFNAIMA3', 'macro-growth-activity'),
+        ],
+      },
+      {
+        id: 'macro-inflation',
+        eyebrow: 'Inflation',
+        title: '实际、上游与市场隐含通胀',
+        description: '明确区分已实现通胀、上游价格和中长期市场定价。',
+        layout: 'two',
+        widgets: [
+          localChart('实际通胀', 'CPI / Core CPI / PCE / Core PCE YoY', 'macro-actual-inflation'),
+          localChart('上游通胀', 'PPI Final Demand YoY', 'macro-upstream-inflation'),
+          localChart('市场隐含通胀', '5Y / 10Y Breakeven / 5Y5Y Forward', 'macro-market-inflation'),
+        ],
+      },
+      {
+        id: 'macro-rates',
+        eyebrow: 'Rates',
+        title: '短端利率走廊',
+        description: '目标区间、准备金利率、逆回购、EFFR 与 SOFR 的统一比较。',
+        layout: 'hero',
+        widgets: [
+          localChart(
+            'Short-End Rate Corridor',
+            'Fed target / IORB / ON RRP / EFFR / SOFR',
+            'macro-rate-corridor',
           ),
         ],
       },
