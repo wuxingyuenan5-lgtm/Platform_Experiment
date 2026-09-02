@@ -381,7 +381,7 @@ GitHub Actions：
 |---|---|---:|---|
 | Phase 0 — Shared Data Foundation | DONE | 100% | CI success |
 | Phase 1 — Shared Market Detail | DONE | 100% | 真实 Treasury 10Y 垂直样板已验收 |
-| Macro V1 Engineering | IN PROGRESS | 20% | Market Detail Native core 已接入 15 行；专题模块待完成 |
+| Macro V1 Engineering | IN PROGRESS | 25% | Market Detail Native core 已接入 20 行；专题模块待完成 |
 | Commodity V1 Engineering | NOT STARTED | 0% | 等 Phase 1 / Macro |
 | Crypto V1 Engineering | NOT STARTED | 0% | 等共享层稳定 |
 | Unified QA + Offline Acceptance | NOT STARTED | 0% | 三模块后执行 |
@@ -472,15 +472,17 @@ canonical history
 
 Native 优先：BLS / BEA / Fed / Treasury / NY Fed 等。
 
-截至 2026-09-02，M1 第一、二批已完成：
+截至 2026-09-02，M1 前三批已完成：
 
 - Treasury 2Y / 10Y / 30Y 使用官方 CSV，并保留上一年度历史以支持 YTD / 1Y / 52W；
 - FRED core 已覆盖 DFF、SOFR、10Y real yield、10Y breakeven、CPI、PCE、UNRATE、M2、WALCL、TGA、RRP；
 - Net Dollar Liquidity 按 `WALCL - WDTGAL - RRPONTSYD × 1000`、同日对齐派生；
+- VIX 使用 FRED/Cboe 分发；DXY、USDCNH、TLT、HYG 使用已批准的 Yahoo Chart 两年历史并标记 public-web / no-SLA 权利状态；
 - `platform-data` commits：`774dccacebbd6f1fdca02f47071c0f74dc9fe07b`、`02bdfef35f803ef18e1f379598ba85abf001383c`、`183e99db29e44d7b6a9e490840b430e23c41f537`；
 - workflow run `33596176092`：`success`；应用 commits `cca0a46685f86dc17271f9d46216646fa0ada6f1`、`482c636fca46833d6ab0a77ea17df922c2f457ea` 已启用全部 15 行。
+- 第三批数据 commit `997adb4871bbfbd3d5c089c8761344433bd0e77c`、应用 commit `913d7df85e88bd3d2881c37a8750da3b3562df0d` 将覆盖扩大到 20 行。
 
-尚未完成：DXY / USDCNH / TLT / HYG / VIX、中国国债行，以及 Growth、Inflation、Rates corridor、Global M2、Risk Appetite 专题模块。
+尚未完成：中国国债行，以及 Growth、Inflation、Rates corridor、Global M2、Risk Appetite 专题模块。MOVE / DSPX 按 Source Map 保持 `not_configured`，不抓 TradingView。
 
 ### M2 — Growth
 

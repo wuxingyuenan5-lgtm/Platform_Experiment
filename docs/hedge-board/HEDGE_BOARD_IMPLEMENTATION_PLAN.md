@@ -303,7 +303,7 @@ Phase 1 已于 2026-09-02 完成。数据 commit 为 `9c5eb80f056bcbf2896fd85d32
 
 优先使用 BLS / BEA / Fed / Treasury / NY Fed 等 Phase F `NATIVE_READY` Source of Record。
 
-当前已完成 Native core 15 行：Treasury 2Y / 10Y / 30Y；DFF、SOFR、10Y real yield、10Y breakeven、CPI、PCE、UNRATE、M2、WALCL、TGA、RRP 和派生 Net Dollar Liquidity。数据 commits 为 `774dccacebbd6f1fdca02f47071c0f74dc9fe07b`、`02bdfef35f803ef18e1f379598ba85abf001383c`、`183e99db29e44d7b6a9e490840b430e23c41f537`；应用 commits 为 `cca0a46685f86dc17271f9d46216646fa0ada6f1`、`482c636fca46833d6ab0a77ea17df922c2f457ea`；workflow run `33596176092` 为 `success`。
+当前已完成 Native core 20 行：Treasury 2Y / 10Y / 30Y；DFF、SOFR、10Y real yield、10Y breakeven、CPI、PCE、UNRATE、M2、WALCL、TGA、RRP、派生 Net Dollar Liquidity，以及 VIX、DXY、USDCNH、TLT、HYG。数据 commits 为 `774dccacebbd6f1fdca02f47071c0f74dc9fe07b`、`02bdfef35f803ef18e1f379598ba85abf001383c`、`183e99db29e44d7b6a9e490840b430e23c41f537`、`997adb4871bbfbd3d5c089c8761344433bd0e77c`；应用 commits 为 `cca0a46685f86dc17271f9d46216646fa0ada6f1`、`482c636fca46833d6ab0a77ea17df922c2f457ea`、`913d7df85e88bd3d2881c37a8750da3b3562df0d`；workflow runs `33596176092`、`33596701735` 均为 `success`。
 
 处理：
 

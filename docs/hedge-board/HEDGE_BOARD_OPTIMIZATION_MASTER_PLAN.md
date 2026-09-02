@@ -453,7 +453,7 @@ Phase 1 真实验收：
 
 > `Macro V1 Engineering — IN PROGRESS`
 
-首批 Native core 已真实化 15 个既有 Macro Market Detail 行。Treasury curve 数据 commit `774dccacebbd6f1fdca02f47071c0f74dc9fe07b`，FRED core commit `183e99db29e44d7b6a9e490840b430e23c41f537`，workflow run `33596176092` 为 `success`。该进度不代表 Macro V1 完成；专题模块及其余市场行仍按冻结范围继续。
+Native core 已真实化 20 个既有 Macro Market Detail 行。Treasury curve 数据 commit `774dccacebbd6f1fdca02f47071c0f74dc9fe07b`，FRED core commit `183e99db29e44d7b6a9e490840b430e23c41f537`，VIX / DXY / USDCNH / TLT / HYG commit `997adb4871bbfbd3d5c089c8761344433bd0e77c`；workflow runs `33596176092`、`33596701735` 均为 `success`。该进度不代表 Macro V1 完成；专题模块及其余市场行仍按冻结范围继续。
 
 完整阶段状态、模块进度、风险和后续路线以 `HEDGE_BOARD_PROJECT_PLAN_AND_PROGRESS.md` 为管理总览。
 
