@@ -1,6 +1,6 @@
 # 对冲基金看板｜完整项目计划书与进度总表
 
-> 状态：Project Baseline v1.2 / Phase 0 DONE / Phase 1 DONE / Macro V1 IN PROGRESS  
+> 状态：Project Baseline v1.2 / Phase 0 DONE / Phase 1 DONE / Macro V1 DONE / Commodity V1 NEXT  
 > 主仓库：`wuxingyuenan5-lgtm/Platform_Experiment`  
 > 开发分支：`feature/hedge-board-online-optimization`  
 > 数据仓库：`wuxingyuenan5-lgtm/platform-data`  
@@ -381,12 +381,12 @@ GitHub Actions：
 |---|---|---:|---|
 | Phase 0 — Shared Data Foundation | DONE | 100% | CI success |
 | Phase 1 — Shared Market Detail | DONE | 100% | 真实 Treasury 10Y 垂直样板已验收 |
-| Macro V1 Engineering | IN PROGRESS | 90% | Market Detail 20 行；Growth / Inflation / Rates / Risk / Global M2 已接入；中国国债 mapping 待完成 |
+| Macro V1 Engineering | DONE | 100% | Market Detail 23 行；Growth / Inflation / Rates / Risk / Global M2 全部验收 |
 | Commodity V1 Engineering | NOT STARTED | 0% | 等 Phase 1 / Macro |
 | Crypto V1 Engineering | NOT STARTED | 0% | 等共享层稳定 |
 | Unified QA + Offline Acceptance | NOT STARTED | 0% | 三模块后执行 |
 
-**工程主阶段完成：2 / 6 = 33.3%。**
+**工程主阶段完成：3 / 6 = 50%。**
 
 该比例只表示主阶段 Gate，不代表工作量严格等权；后续项目管理以阶段状态和实际交付为主，不使用该比例推算工期。
 
@@ -394,7 +394,7 @@ GitHub Actions：
 
 | 模块 | Product | Feasibility | Data Foundation | Business Engineering | QA |
 |---|---|---|---|---|---|
-| Macro | Frozen | Frozen | Shared Phase 0 / 1 Done | In Progress | In Progress |
+| Macro | Frozen | Frozen | Shared Phase 0 / 1 Done | Done | Done |
 | Commodity | Frozen | Frozen | Shared Phase 0 Done | Not Started | Not Started |
 | Crypto | Frozen | Frozen | Shared Phase 0 Done | Not Started | Not Started |
 | US Equity | Existing / Deferred | Deferred | N/A | Deferred | N/A |
@@ -466,7 +466,7 @@ canonical history
 
 ---
 
-## 10. Macro V1 后续计划
+## 10. Macro V1 验收结果
 
 ### M1 — Macro Market Detail
 
@@ -496,7 +496,7 @@ Market Detail 尚未完成中国国债行；MOVE / DSPX 按 Source Map 保持 `n
 
 数据 commits：`c62dbb299efaa1dcc21d95bd26612be262535d7e`、`34cb72f7d28539ca25360234e175c654ee418106`、`36ba32b78d8ce037dc9c75d2bfe0f00dd97fbbc6`、`9ce61a1f29d781dfa015085a94771e7405014fec`。应用 commits：`e294e75398005b3efa040f575e3a0ff37954278e`、`ecbb20a9463fd0da237566eee3bdf4a4668182cb`、`88e94bd53f6a51b02b2cef9a2cb1a83ef5d4bf11`。`platform-data` 17 tests、API targeted tests、Ruff、Pyright、前端 type check 与 production build 已通过。
 
-当前剩余：中国国债 2Y / 10Y / 30Y 精确 AKShare/ChinaBond mapping；未确认前不发布替代数据。Global M2 已完成数据链路与页面展示，待合并本轮 commit / CI 证据后计入 Macro Gate。
+中国国债 2Y / 10Y / 30Y 已使用财政部—中国国债收益率曲线官方 `historyQuery` 精确字段 `twoYear / tenYear / thirtyYear` 接入。2026-09-01 实测分别为 1.24% / 1.68% / 2.14%，Market Detail 扩展至 23 行；远端数据 commit `5dac2e68c7664824e0dc8423531f9819f5307bfc`，增量刷新修复 `d5fc17f6248baaffcb1878cadfd9043542047b9f`。
 
 ### M2 — Growth
 
@@ -548,7 +548,13 @@ Market Detail 尚未完成中国国债行；MOVE / DSPX 按 Source Map 保持 `n
 
 ### M8 — Macro QA
 
-完成后单独 QA，不自动进入 Commodity。
+DONE（2026-09-02）：
+
+- Native / Link 边界与 Source / freshness 元数据复核通过；MOVE / DSPX 保持 `not_configured`；
+- 中国债券旧静态样例在 Native API 返回前已统一清空为不可用，不再短暂泄漏假值；
+- `platform-data` 21 tests、目标 API tests、Ruff、前端 type check、targeted ESLint 与 5683-module production build 通过；
+- Global M2 API 实测返回 6 条 level/component series 与 1 条 YoY；ChinaBond API 实测返回 23 行母表和三条官方曲线；
+- 应用 commits `ee8dd4d0`、`97eff694`，文档 commit `4f04349d`；数据 workflow runs `33601155026`、`33601543904` 成功，后者同时验证并发生成数据 push 的 rebase 修复。
 
 ---
 
@@ -732,7 +738,7 @@ Native Binance / rights-clear data；严格区分 7×24 与 US securities calend
 
 当前唯一下一工程阶段：
 
-> **继续 Macro V1 Engineering**
+> **Commodity V1 Engineering**
 
 建议执行顺序：
 

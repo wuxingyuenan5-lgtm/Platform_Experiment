@@ -503,7 +503,7 @@ Git 历史本身承担版本审计。
 
 ## 14. 当前 OPEN 项
 
-1. 中国 2Y 国债在 AKShare 中的精确稳定接口与 tenor mapping；
+1. ~~中国 2Y 国债精确稳定接口与 tenor mapping~~：已采用财政部—中国国债收益率曲线 `historyQuery` 的 `twoYear` 官方字段；
 2. DXY 是否存在比 Yahoo 更稳定的免费 Provider，同时保持真正 DXY 定义；
 3. MOVE 的可信免费历史数据链；
 4. DSPX 的可信免费历史数据链；

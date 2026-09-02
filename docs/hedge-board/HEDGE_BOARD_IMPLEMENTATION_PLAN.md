@@ -12,7 +12,7 @@
 
 ## 1. 当前状态【冻结】
 
-Phase F 已完成并冻结；Phase 0、Phase 1 已完成并通过真实 GitHub Actions 与应用验证。
+Phase F 已完成并冻结；Phase 0、Phase 1、Macro V1 已完成并通过真实 GitHub Actions 与应用验证。
 
 当前：
 
@@ -33,7 +33,7 @@ Macro V1 Engineering
 当前管理口径：
 
 - 规划准备度：`100%`；
-- 工程主阶段：`2 / 6 = 33.3%`；
+- 工程主阶段：`3 / 6 = 50%`；
 - 六个工程主阶段：Phase 0、Phase 1、Macro V1、Commodity V1、Crypto V1、Unified QA / Offline Acceptance；
 - 百分比仅用于阶段 Gate 管理，不代表工作量严格等权，不用于推算工期。
 
@@ -303,7 +303,7 @@ Phase 1 已于 2026-09-02 完成。数据 commit 为 `9c5eb80f056bcbf2896fd85d32
 
 优先使用 BLS / BEA / Fed / Treasury / NY Fed 等 Phase F `NATIVE_READY` Source of Record。
 
-当前已完成 Native core 20 行：Treasury 2Y / 10Y / 30Y；DFF、SOFR、10Y real yield、10Y breakeven、CPI、PCE、UNRATE、M2、WALCL、TGA、RRP、派生 Net Dollar Liquidity，以及 VIX、DXY、USDCNH、TLT、HYG。数据 commits 为 `774dccacebbd6f1fdca02f47071c0f74dc9fe07b`、`02bdfef35f803ef18e1f379598ba85abf001383c`、`183e99db29e44d7b6a9e490840b430e23c41f537`、`997adb4871bbfbd3d5c089c8761344433bd0e77c`；应用 commits 为 `cca0a46685f86dc17271f9d46216646fa0ada6f1`、`482c636fca46833d6ab0a77ea17df922c2f457ea`、`913d7df85e88bd3d2881c37a8750da3b3562df0d`；workflow runs `33596176092`、`33596701735` 均为 `success`。
+Native core 最终完成 23 行：原 20 行 Treasury / FRED / Yahoo core，加财政部—中国国债收益率曲线 2Y / 10Y / 30Y。既有数据 commits 为 `774dccacebbd6f1fdca02f47071c0f74dc9fe07b`、`02bdfef35f803ef18e1f379598ba85abf001383c`、`183e99db29e44d7b6a9e490840b430e23c41f537`、`997adb4871bbfbd3d5c089c8761344433bd0e77c`；中国曲线 commit `5dac2e68c7664824e0dc8423531f9819f5307bfc`。应用 commits 为 `cca0a46685f86dc17271f9d46216646fa0ada6f1`、`482c636fca46833d6ab0a77ea17df922c2f457ea`、`913d7df85e88bd3d2881c37a8750da3b3562df0d`、`97eff694`；workflow run `33601155026` success。
 
 Macro 专题已交付 Growth、Actual / Upstream / Market-Implied Inflation、Short-End Rate Corridor、Risk Appetite，并完成 Global M2 五区共同月份、ECB 日汇率月均折算、总量/YoY/component/share canonical 输出与双图展示。既有数据 commits `c62dbb299efaa1dcc21d95bd26612be262535d7e`、`34cb72f7d28539ca25360234e175c654ee418106`、`36ba32b78d8ce037dc9c75d2bfe0f00dd97fbbc6`、`9ce61a1f29d781dfa015085a94771e7405014fec`；应用 commits `e294e75398005b3efa040f575e3a0ff37954278e`、`ecbb20a9463fd0da237566eee3bdf4a4668182cb`、`88e94bd53f6a51b02b2cef9a2cb1a83ef5d4bf11`。当前仅剩中国国债 mapping，未确认部分保持 unavailable。
 
@@ -385,6 +385,8 @@ Native：
 - 不出现假数据；
 - Source / freshness 正确；
 - 现有 UI 未被擅自重排。
+
+Macro V1 已于 2026-09-02 完成。Global M2 数据 commit `2e5812593a8a5a1e3ddba9d9402e5888d6d25331`；中国国债 2Y / 10Y / 30Y commit `5dac2e68c7664824e0dc8423531f9819f5307bfc`，增量刷新修复 `d5fc17f6248baaffcb1878cadfd9043542047b9f`；workflow runs `33601155026`、`33601543904` success。应用 Global M2 / cache consistency commit `ee8dd4d0`、中国债券 placeholder 清理 commit `97eff694`。Macro Market Detail 共 23 行，Global M2 level/component/YoY 与全部专题模块均通过真实 API 和 production build 验证。
 
 ---
 
@@ -656,7 +658,7 @@ Offline Acceptance
 - Phase 0 GitHub Actions 验证；
 - Project Plan & Progress v1.0。
 
-下一步是 **Macro V1 Engineering**。
+下一步是 **Commodity V1 Engineering**。
 
 以后每完成一个正式 Phase，都必须同步更新：
 
