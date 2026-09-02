@@ -3,7 +3,23 @@ import type { MarketDetailRow } from '@/api/hedgeResearch';
 import type { TerminalTableGroup, TerminalTableRow } from './marketTerminal';
 
 const UNAVAILABLE = '—';
-const ENABLED_MACRO_ROW_IDS = new Set(['macro-us2y', 'macro-us10y', 'macro-us30y']);
+const ENABLED_MACRO_ROW_IDS = new Set([
+  'macro-netliq',
+  'macro-m2sl',
+  'macro-walcl',
+  'macro-wdtgal',
+  'macro-rrp',
+  'macro-dff',
+  'macro-sofr',
+  'macro-us2y',
+  'macro-us10y',
+  'macro-us30y',
+  'macro-dfii10',
+  'macro-t10yie',
+  'macro-cpi',
+  'macro-pce',
+  'macro-unrate',
+]);
 const DATA_SIGNAL_KEYS: Array<keyof TerminalTableRow> = [
   'd10',
   'd20',
@@ -23,12 +39,34 @@ function numeric(value: string | number | null | undefined): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-function signed(value: string | number | null | undefined, unit: MarketDetailRow['changeUnit']) {
+function signed(
+  value: string | number | null | undefined,
+  unit: MarketDetailRow['changeUnit'],
+  valueUnit?: string,
+) {
   const parsed = numeric(value);
   if (parsed === null) return UNAVAILABLE;
   const sign = parsed > 0 ? '+' : '';
-  const suffix = unit === 'basis_points' ? 'bp' : unit === 'percent' ? '%' : '';
+  const suffix =
+    unit === 'basis_points'
+      ? 'bp'
+      : unit === 'percent'
+      ? '%'
+      : valueUnit === 'usd_million'
+      ? 'M'
+      : valueUnit === 'usd_billion'
+      ? 'B'
+      : '';
   return `${sign}${parsed.toFixed(unit === 'basis_points' ? 1 : 2)}${suffix}`;
+}
+
+function closeValue(value: number | null, unit: string): string {
+  if (value === null) return UNAVAILABLE;
+  if (unit === 'percent') return `${value.toFixed(2)}%`;
+  if (unit === 'usd_million') return `$${(value / 1_000_000).toFixed(2)}T`;
+  if (unit === 'usd_billion' && Math.abs(value) >= 1_000) return `$${(value / 1_000).toFixed(2)}T`;
+  if (unit === 'usd_billion') return `$${value.toFixed(2)}B`;
+  return value.toFixed(2);
 }
 
 function unavailableRow(row: TerminalTableRow): TerminalTableRow {
@@ -71,13 +109,13 @@ export function mergeMacroMarketDetail(
         name: remote.name,
         symbol: remote.symbol,
         spark: remote.spark30d.map(Number).filter(Number.isFinite),
-        price: close === null ? UNAVAILABLE : `${close.toFixed(2)}%`,
-        d1: signed(remote.change1d, remote.changeUnit),
-        ytd: signed(remote.changeYtd, remote.changeUnit),
-        qtd: signed(remote.changeQtd, remote.changeUnit),
-        w1: signed(remote.change1w, remote.changeUnit),
-        m1: signed(remote.change1m, remote.changeUnit),
-        y1: signed(remote.change1y, remote.changeUnit),
+        price: closeValue(close, remote.unit),
+        d1: signed(remote.change1d, remote.changeUnit, remote.unit),
+        ytd: signed(remote.changeYtd, remote.changeUnit, remote.unit),
+        qtd: signed(remote.changeQtd, remote.changeUnit, remote.unit),
+        w1: signed(remote.change1w, remote.changeUnit, remote.unit),
+        m1: signed(remote.change1m, remote.changeUnit, remote.unit),
+        y1: signed(remote.change1y, remote.changeUnit, remote.unit),
         high: signed(remote.distance52wHigh, 'percent'),
       };
       DATA_SIGNAL_KEYS.forEach((key) => (next[key] = UNAVAILABLE as never));
