@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any, Literal, cast
 
@@ -11,10 +11,10 @@ from app.research_data_schemas import ResearchApiModel
 from app.research_provider_errors import ResearchProviderError
 
 MACRO_DASHBOARD_URLS = (
-    "https://cdn.jsdelivr.net/gh/wuxingyuenan5-lgtm/platform-data@main/"
-    "public/v1/macro/dashboard.json",
     "https://raw.githubusercontent.com/wuxingyuenan5-lgtm/platform-data/"
     "main/public/v1/macro/dashboard.json",
+    "https://cdn.jsdelivr.net/gh/wuxingyuenan5-lgtm/platform-data@main/"
+    "public/v1/macro/dashboard.json",
 )
 
 
@@ -67,10 +67,15 @@ class MacroDashboardProvider:
         try:
             payload: Any = None
             last_error: Exception | None = None
+            cache_key = int(datetime.now(UTC).timestamp() // 300)
             async with httpx.AsyncClient(timeout=self._timeout_seconds, trust_env=False) as client:
                 for url in MACRO_DASHBOARD_URLS:
                     try:
-                        response = await client.get(url, headers={"User-Agent": self._user_agent})
+                        response = await client.get(
+                            url,
+                            params={"v": cache_key},
+                            headers={"User-Agent": self._user_agent},
+                        )
                         response.raise_for_status()
                         payload = response.json()
                         break

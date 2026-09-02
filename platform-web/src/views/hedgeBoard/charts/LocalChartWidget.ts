@@ -134,6 +134,14 @@ export default defineComponent({
             });
           case 'macro-market-detail-table':
             return h(MacroMarketDetailPanel);
+          case 'macro-global-m2':
+            return h(MacroSeriesChart, {
+              groupId: 'globalM2Level',
+              years: 10,
+              unitLabel: 'USD tn',
+            });
+          case 'macro-global-m2-yoy':
+            return h(MacroSeriesChart, { groupId: 'globalM2YoY', years: 10, unitLabel: '%' });
           case 'macro-growth-production':
             return h(MacroSeriesChart, { groupId: 'growthProduction', years: 10, unitLabel: '%' });
           case 'macro-growth-labor':

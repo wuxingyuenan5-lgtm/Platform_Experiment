@@ -7,6 +7,8 @@
 
 export type LocalWidgetKey =
   | 'macro-market-detail-table'
+  | 'macro-global-m2'
+  | 'macro-global-m2-yoy'
   | 'macro-growth-production'
   | 'macro-growth-labor'
   | 'macro-growth-activity'
@@ -162,6 +164,31 @@ export const researchModules: ResearchModule[] = [
               height: 640,
               hide_side_toolbar: false,
             },
+          ),
+        ],
+      },
+      {
+        id: 'macro-global-m2',
+        eyebrow: 'Global Liquidity',
+        title: 'Global M2 Proxy',
+        description:
+          '美国、中国、欧元区、日本与英国广义货币按共同月份对齐，并使用 ECB 官方日汇率月均值折算为美元。该指标为方法论代理，不是官方统一全球 M2。',
+        layout: 'two',
+        widgets: [
+          localChart(
+            'Global M2 Level',
+            'Aggregate and five regional USD components',
+            'macro-global-m2',
+            {
+              height: 420,
+              sourceNote: 'Fed / PBOC-validated adapter / ECB / BOJ / BoE; ECB reference FX',
+            },
+          ),
+          localChart(
+            'Global M2 YoY',
+            'Five-region methodology-based proxy growth',
+            'macro-global-m2-yoy',
+            { height: 420 },
           ),
         ],
       },
