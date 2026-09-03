@@ -270,6 +270,10 @@ export const researchModules: ResearchModule[] = [
                 label: 'TradingView 模板',
                 href: 'https://cn.tradingview.com/chart/K47lvX8b/',
               },
+              {
+                label: '美元流动性大全',
+                href: 'https://dollarliquidity.com/zh',
+              },
             ],
           ),
           localChart(
@@ -323,6 +327,18 @@ export const researchModules: ResearchModule[] = [
                 {
                   label: 'TradingView 模板',
                   href: 'https://cn.tradingview.com/chart/AmPBnM2J/',
+                },
+                {
+                  label: '金十美国数据',
+                  href: 'https://datas.jin10.com/#/category/52001/detail/52013',
+                },
+                {
+                  label: '美国宏观',
+                  href: 'https://sc.macromicro.me/macro/us',
+                },
+                {
+                  label: '中国宏观',
+                  href: 'https://sc.macromicro.me/macro/cn',
                 },
               ],
             },
