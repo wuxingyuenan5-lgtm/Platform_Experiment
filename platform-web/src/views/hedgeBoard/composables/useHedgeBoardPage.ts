@@ -39,12 +39,29 @@ const hedgeBoardNav: ReadonlyArray<{
 ];
 
 const sectionLabelOverrides: Record<string, { title?: string }> = {
+  'macro-market': { title: '宏观市场明细' },
+  'macro-global-m2': { title: 'Global M2 Proxy' },
+  'macro-rates': { title: '利率' },
+  'macro-liquidity': { title: '流动性' },
+  'macro-inflation': { title: '通胀' },
+  'macro-growth': { title: '经济' },
+  'macro-risk-appetite': { title: '风险偏好' },
   'gold-flows': { title: 'ETF与资金面' },
   'gold-central-bank': { title: '央行购金' },
   'gold-main': { title: '黄金主图' },
   'gold-rates': { title: '利率与通胀' },
   'crypto-etf': { title: '加密资金面' },
 };
+
+const macroSectionOrder = [
+  'macro-market',
+  'macro-global-m2',
+  'macro-rates',
+  'macro-liquidity',
+  'macro-inflation',
+  'macro-growth',
+  'macro-risk-appetite',
+] as const;
 
 const widgetTextOverrides: Record<string, { title?: string }> = {
   'etf-weekly-flows': { title: '全球各地区ETF每周流入' },
@@ -205,7 +222,22 @@ export function useHedgeBoardPage() {
   );
 
   const useUnifiedResearchUi = computed(() => true);
-  const visibleSections = computed<ChartSection[]>(() => activeModule.value.sections);
+  const visibleSections = computed<ChartSection[]>(() => {
+    const sections = activeModule.value.sections;
+    if (activeCategory.value !== 'macro') return sections;
+
+    const sectionsById = new Map(sections.map((section) => [section.id, section]));
+    const orderedSectionIds = new Set<string>(macroSectionOrder);
+    const orderedSections = macroSectionOrder.flatMap((sectionId) => {
+      const section = sectionsById.get(sectionId);
+      return section ? [section] : [];
+    });
+
+    return [
+      ...orderedSections,
+      ...sections.filter((section) => !orderedSectionIds.has(section.id)),
+    ];
+  });
   const pageTitle = computed(() => `对冲基金看板 / ${activeBoardNav.value.label}`);
 
   function getSectionTitle(sectionId: string, fallback: string) {
