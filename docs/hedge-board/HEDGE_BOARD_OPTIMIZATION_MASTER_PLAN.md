@@ -457,9 +457,9 @@ Native core 已真实化 20 个既有 Macro Market Detail 行。Treasury curve �
 
 Macro V1 已完成：Growth、Inflation、Short-End Rate Corridor、Risk Appetite、Global M2 与 Market Detail 23 行均使用真实数据/API/additive SVG 图表；既有 Polymarket 白名单面板继续作为 Market Expectations。Global M2 已通过五区官方/强校验序列、共同月份和 ECB 日汇率月均端到端验证；中国国债 2Y / 10Y / 30Y 已切换为财政部—中国国债收益率曲线官方字段。数据 commits `2e5812593a8a5a1e3ddba9d9402e5888d6d25331`、`5dac2e68c7664824e0dc8423531f9819f5307bfc`、`d5fc17f6248baaffcb1878cadfd9043542047b9f`；应用 commits `ee8dd4d0`、`97eff694`。下一阶段为 Commodity V1。
 
-Commodity V1 已完成：CFTC Gold / Silver / Copper / WTI / Natural Gas 使用官方 PRE Native pipeline、API 与 10 张定位图表；EIA crude / Cushing / gasoline / distillate 已通过真实 workflow `33631637867` 刷新并以两组 Native 图表接回。WGC、SPDR、CME、ICE、LME、Cboe 等受限数据均使用精确官方 External Link；Commodity Market Detail fail-closed，不再显示旧静态值。下一阶段为 Crypto V1。
+Commodity V1 已完成：CFTC Gold / Silver / Copper / WTI / Natural Gas 使用官方 PRE Native pipeline、API 与 10 张定位图表；EIA crude / Cushing / gasoline / distillate 已通过真实 workflow `33631637867` 刷新并以两组 Native 图表接回。WGC、SPDR、CME、ICE、LME、Cboe 等受限数据均使用精确官方 External Link。Owner 于 2026-09-03 修正 Market Detail 范围：保留原有完整表格和轮动热图，Native 仅覆盖已接通字段，其他字段标为历史参考并逐步替换。
 
-Crypto V1 已完成：Binance 8 条 BTC / ETH Native series、API、页面图表和 Market Detail 已落地；单一 Venue 口径显式标注为 not Aggregate。Farside、BitcoinTreasuries、DefiLlama、Deribit、Checkonchain、CoinGlass、Bybit、OKX 使用精确 External Link，旧 BTC ETF / Treasury 假数组已退出渲染路径。Owner 已确认 `D:\自营数据库` 为主数据源、GitHub 仅保留代码；本地主库与每日四次计划任务已验收，DNS 污染由限定域名的 DoH/TLS fallback 解决。下一阶段为 Unified QA / Offline Acceptance。
+Crypto V1 已完成：Binance 8 条 BTC / ETH Native series、API、页面图表和 Market Detail 已落地；单一 Venue 口径显式标注为 not Aggregate。Farside、BitcoinTreasuries、DefiLlama、Deribit、Checkonchain、CoinGlass、Bybit、OKX 使用精确 External Link。Owner 已确认 `D:\自营数据库` 为主数据源、GitHub 仅保留代码；本地主库与每日四次计划任务已验收，DNS 污染由限定域名的 DoH/TLS fallback 解决。2026-09-03 起所有图表右上角统一保留精确“原始网页”入口，先保证研究可跳转性，再逐图建设完整采集与本地数据库。
 
 完整阶段状态、模块进度、风险和后续路线以 `HEDGE_BOARD_PROJECT_PLAN_AND_PROGRESS.md` 为管理总览。
 

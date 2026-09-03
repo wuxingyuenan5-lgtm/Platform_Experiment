@@ -581,7 +581,7 @@ EIA Native 已完成：工程 commit `4a317da`，真实数据 commit `a0e42a8`�
 
 ### C3 — Commodity Market Detail
 
-【DONE / fail-closed】全部旧静态 current value、收益率、技术信号和 sparkline 已在展示适配层清空；在逐行 Native source 通过验证前统一显示不可用，并关闭含农产品静态数据的旧轮动热图入口。
+【OWNER CORRECTION / 2026-09-03】Macro、Commodity、Crypto 三个市场明细表必须保留原有完整行、收益率、技术信号、sparkline 与轮动热图，Native 数据只覆盖已接通字段，不得以数据治理名义删减既有页面信息。未接入字段明确标为历史参考，不宣称实时；后续按逐行 source audit 慢慢替换为本地数据库数据。
 
 ### C4 — Term Structure
 
@@ -776,6 +776,7 @@ Native Binance / rights-clear data；严格区分 7×24 与 US securities calend
 - 已使用隔离 E2E 数据库完成认证浏览器 QA：Macro / Commodity / Crypto 在 normal 与 blocked 两种网络模拟下共 6 组 chart/detail flow 全部通过；本地 API 实际请求 `/research/macro/dashboard-v1`、`/research/commodity/dashboard-v1`、`/research/crypto/dashboard-v1`、`/research/market-detail/macro` 均返回 HTTP 200。测试账户环境变量和临时数据库已清理；
 - Owner 线下页面验收使用独立 `127.0.0.1:14373` Web 与 `127.0.0.1:18000` API，账号库隔离且 Live Write 关闭，数据只读 `D:\自营数据库\hedge-board`；默认平台 `4373/8000` 不受占用。启动与关闭入口分别为仓库根目录 `启动HedgeBoard验收站.bat`、`关闭HedgeBoard验收站.bat`；
 - 当前最终 Gate 只保留 Owner 线下页面验收以及是否合并应用分支。AI 未合并 `Platform_Experiment/main`。
+- Owner 线下反馈后已修正验收范围：恢复三个市场明细表原有信息密度与轮动热图；所有图表（Market Detail 表除外）右上角统一提供“原始网页 ↗”，当前无法完整 Native 展示的卡片以原网页作为初期可用入口，后续再逐图升级为正式采集与本地主库图表。
 
 建议执行顺序：
 

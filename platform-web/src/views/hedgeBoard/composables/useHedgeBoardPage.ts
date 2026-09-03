@@ -55,17 +55,68 @@ const widgetTextOverrides: Record<string, { title?: string }> = {
   'central-bank-buyers': { title: '近一年持续增持的央行' },
 };
 
-const ETF_REFERENCE_URL =
-  'https://china.gold.org/goldhub/data/gold-etfs-holdings-and-flows#from-login=1&login-type=wechat';
+const ETF_REFERENCE_URL = 'https://www.gold.org/goldhub/data/gold-etfs-holdings-and-flows';
 
 const widgetSourceLinks: Partial<Record<string, string>> = {
-  'btc-etf-flow': 'https://sosovalue.com/zh/assets/etf/Total_Crypto_Spot_ETF_Fund_Flow?page=usBTC',
-  'btc-treasury-flow': 'https://sosovalue.com/zh/assets/bitcoin-treasuries/weekly-net-inflow',
+  'macro-global-m2': 'https://fred.stlouisfed.org/series/M2SL',
+  'macro-global-m2-yoy': 'https://fred.stlouisfed.org/series/M2SL',
+  'macro-growth-production': 'https://fred.stlouisfed.org/series/GDPC1',
+  'macro-growth-labor': 'https://fred.stlouisfed.org/series/IC4WSA',
+  'macro-growth-activity': 'https://fred.stlouisfed.org/series/CFNAI',
+  'macro-actual-inflation': 'https://fred.stlouisfed.org/series/CPIAUCSL',
+  'macro-upstream-inflation': 'https://fred.stlouisfed.org/series/PPIFIS',
+  'macro-market-inflation': 'https://fred.stlouisfed.org/series/T10YIE',
+  'macro-rate-corridor': 'https://www.newyorkfed.org/markets/reference-rates',
+  'macro-risk-hy-oas': 'https://fred.stlouisfed.org/series/BAMLH0A0HYM2',
+  'macro-risk-credit-ratio': 'https://finance.yahoo.com/quote/HYG/history/',
+  'btc-etf-flow': 'https://farside.co.uk/btc/',
+  'btc-treasury-flow': 'https://bitcointreasuries.net/',
+  'crypto-eth-etf-flow': 'https://farside.co.uk/eth/',
+  'crypto-binance-spot': 'https://www.binance.com/en/markets/overview',
+  'crypto-binance-funding':
+    'https://www.binance.com/en/futures/funding-history/perpetual/real-time-funding-rate',
+  'crypto-binance-open-interest': 'https://www.binance.com/en/futures/BTCUSDT',
+  'crypto-binance-basis': 'https://www.binance.com/en/futures/BTCUSDT',
+  'crypto-stablecoin-supply': 'https://defillama.com/stablecoins',
+  'crypto-options-iv': 'https://www.deribit.com/statistics/BTC/volatility-index',
+  'crypto-onchain': 'https://checkonchain.com/',
+  'crypto-coinglass': 'https://www.coinglass.com/',
+  'crypto-bybit': 'https://www.bybit.com/en/derivatives/',
+  'crypto-okx': 'https://www.okx.com/markets/prices/swap',
   'etf-weekly-flows': ETF_REFERENCE_URL,
   'etf-ytd-summary': ETF_REFERENCE_URL,
-  'spdr-daily-flow': 'https://sc.macromicro.me/collections/45/mm-gold-price/23274/gld-fund-flow',
-  'spdr-holdings-vs-price':
-    'https://sc.macromicro.me/collections/45/mm-gold-price/712/spdr-gold-trust-etf-gold-price',
+  'spdr-daily-flow': 'https://www.spdrgoldshares.com/usa/historical-data/',
+  'spdr-holdings-vs-price': 'https://www.spdrgoldshares.com/usa/historical-data/',
+  'central-bank-holders': 'https://www.gold.org/goldhub/data/gold-reserves-by-country',
+  'central-bank-buyers': 'https://www.gold.org/goldhub/data/gold-reserves-by-country',
+  'gold-vs-nominal': 'https://home.treasury.gov/resource-center/data-chart-center/interest-rates',
+  'gold-vs-breakeven': 'https://fred.stlouisfed.org/series/T10YIE',
+  'gold-vs-real': 'https://fred.stlouisfed.org/series/DFII10',
+  'gold-vs-gvz': 'https://www.cboe.com/us/indices/dashboard/GVZ/',
+  'cftc-gold-net': 'https://www.cftc.gov/MarketReports/CommitmentsofTraders/index.htm',
+  'cftc-gold-percentile': 'https://www.cftc.gov/MarketReports/CommitmentsofTraders/index.htm',
+  'cftc-silver-net': 'https://www.cftc.gov/MarketReports/CommitmentsofTraders/index.htm',
+  'cftc-silver-percentile': 'https://www.cftc.gov/MarketReports/CommitmentsofTraders/index.htm',
+  'cftc-copper-net': 'https://www.cftc.gov/MarketReports/CommitmentsofTraders/index.htm',
+  'cftc-copper-percentile': 'https://www.cftc.gov/MarketReports/CommitmentsofTraders/index.htm',
+  'cftc-wti-net': 'https://www.cftc.gov/MarketReports/CommitmentsofTraders/index.htm',
+  'cftc-wti-percentile': 'https://www.cftc.gov/MarketReports/CommitmentsofTraders/index.htm',
+  'cftc-natural-gas-net': 'https://www.cftc.gov/MarketReports/CommitmentsofTraders/index.htm',
+  'cftc-natural-gas-percentile':
+    'https://www.cftc.gov/MarketReports/CommitmentsofTraders/index.htm',
+  'eia-crude-stocks': 'https://www.eia.gov/petroleum/supply/weekly/',
+  'eia-products-stocks': 'https://www.eia.gov/petroleum/supply/weekly/',
+  'commodity-wti-curve': 'https://www.cmegroup.com/markets/energy/crude-oil/light-sweet-crude.html',
+  'commodity-brent-curve': 'https://www.ice.com/products/219/Brent-Crude-Futures',
+  'commodity-copper-curve': 'https://www.lme.com/en/metals/non-ferrous/lme-copper',
+  'commodity-cme-inventory':
+    'https://www.cmegroup.com/clearing/operations-and-deliveries/nymex-delivery-notices.html',
+  'commodity-lme-inventory':
+    'https://www.lme.com/en/market-data/reports-and-data/warehouse-and-stocks-reports',
+  'commodity-copper-spreads': 'https://www.lme.com/en/metals/non-ferrous/lme-copper',
+  'commodity-brent-wti-spread': 'https://www.ice.com/products/219/Brent-Crude-Futures',
+  'commodity-ovx': 'https://www.cboe.com/us/indices/dashboard/OVX/',
+  'commodity-cvol': 'https://www.cmegroup.com/markets/volatility/cvol.html',
 };
 
 const marketDetailWidgetKeys = new Set([
@@ -165,8 +216,8 @@ export function useHedgeBoardPage() {
     return localKey ? widgetTextOverrides[localKey]?.title ?? fallback : fallback;
   }
 
-  function getWidgetSourceLink(localKey: string | undefined) {
-    return localKey ? widgetSourceLinks[localKey] ?? '' : '';
+  function getWidgetSourceLink(widget: WidgetConfig) {
+    return widget.sourceUrl || (widget.localKey ? widgetSourceLinks[widget.localKey] ?? '' : '');
   }
 
   function selectBoardCategory(key: string) {
@@ -177,7 +228,7 @@ export function useHedgeBoardPage() {
   function shouldHideWidgetHeader(sectionId: string, widget: WidgetConfig) {
     const localKey = widget.localKey;
     if (['macro-liquidity', 'gold-main', 'crypto-main'].includes(sectionId)) {
-      return widget.kind !== 'local-chart';
+      return widget.kind !== 'local-chart' && !getWidgetSourceLink(widget);
     }
     if (!localKey) return false;
     return (

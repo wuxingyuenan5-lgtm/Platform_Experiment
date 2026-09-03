@@ -190,24 +190,7 @@ function renderExternalGoldResearch(key: ExternalGoldResearchKey) {
       ),
       h('strong', { style: { color: 'var(--color-text-1)', fontSize: '16px' } }, item.provider),
       h('span', item.description),
-      h(
-        'a',
-        {
-          href: item.href,
-          target: '_blank',
-          rel: 'noopener noreferrer',
-          style: {
-            padding: '9px 16px',
-            borderRadius: '8px',
-            background: 'rgb(var(--primary-6))',
-            color: '#fff',
-            fontWeight: '600',
-            textDecoration: 'none',
-          },
-        },
-        '打开官方数据页 ↗',
-      ),
-      h('small', '未取得生产再利用许可前，不在本地复制或展示第三方静态快照。'),
+      h('small', '请使用卡片右上角“原始网页”查看；后续接入正式采集后在此显示完整图表。'),
     ],
   );
 }
@@ -233,24 +216,7 @@ function renderExternalCryptoResearch(key: ExternalCryptoResearchKey) {
       h('span', 'External Link · permission_required'),
       h('strong', { style: { color: 'var(--color-text-1)', fontSize: '16px' } }, item.provider),
       h('span', item.description),
-      h(
-        'a',
-        {
-          href: item.href,
-          target: '_blank',
-          rel: 'noopener noreferrer',
-          style: {
-            padding: '9px 16px',
-            borderRadius: '8px',
-            background: 'rgb(var(--primary-6))',
-            color: '#fff',
-            fontWeight: '600',
-            textDecoration: 'none',
-          },
-        },
-        '打开数据页 ↗',
-      ),
-      h('small', '未取得生产再利用许可前，不在本地复制或展示第三方静态快照。'),
+      h('small', '请使用卡片右上角“原始网页”查看；后续接入正式采集后在此显示完整图表。'),
     ],
   );
 }
@@ -309,10 +275,12 @@ export default defineComponent({
           case 'gold-market-detail-table':
             return h(TerminalDetailPanel, {
               class: 'terminal-detail-panel--embedded',
-              title: '市场明细',
+              title: '市场明细 · 未接入字段为历史参考',
               marketId: 'gold',
               columns: marketTerminalConfigs.gold.detailColumns,
               groups: prepareCommodityMarketDetail(marketTerminalConfigs.gold.detailGroups),
+              rotationButtonLabel: marketTerminalConfigs.gold.rotationButtonLabel,
+              rotationHeatmap: marketTerminalConfigs.gold.rotationHeatmap,
             });
           case 'macro-market-detail-table':
             return h(MacroMarketDetailPanel);

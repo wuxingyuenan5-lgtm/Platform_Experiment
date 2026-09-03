@@ -1,12 +1,12 @@
 <template>
   <TerminalDetailPanel
     class="terminal-detail-panel--embedded"
-    title="市场明细 · Binance Venue · not Aggregate"
+    title="市场明细 · 未接入字段为历史参考"
     market-id="crypto"
     :columns="config.detailColumns"
     :groups="groups"
     :rotation-button-label="config.rotationButtonLabel"
-    :rotation-heatmap="[]"
+    :rotation-heatmap="config.rotationHeatmap"
   />
 </template>
 

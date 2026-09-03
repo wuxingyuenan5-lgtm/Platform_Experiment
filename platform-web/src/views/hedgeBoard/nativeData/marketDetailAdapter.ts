@@ -3,39 +3,6 @@ import type { MacroDashboardSeries, MarketDetailRow } from '@/api/hedgeResearch'
 import type { TerminalTableGroup, TerminalTableRow } from './marketTerminal';
 
 const UNAVAILABLE = '—';
-const ENABLED_MACRO_ROW_IDS = new Set([
-  'macro-netliq',
-  'macro-m2sl',
-  'macro-walcl',
-  'macro-wdtgal',
-  'macro-rrp',
-  'macro-dff',
-  'macro-sofr',
-  'macro-us2y',
-  'macro-us10y',
-  'macro-us30y',
-  'macro-dfii10',
-  'macro-t10yie',
-  'macro-cpi',
-  'macro-pce',
-  'macro-unrate',
-  'macro-vix',
-  'macro-dxy',
-  'macro-usdcnh',
-  'macro-tlt',
-  'macro-hyg',
-  'macro-cn2y',
-  'macro-cn10y',
-  'macro-cn30y',
-]);
-const DATA_SIGNAL_KEYS: Array<keyof TerminalTableRow> = [
-  'd10',
-  'd20',
-  'd50',
-  'd200',
-  'x2050',
-  'x50200',
-];
 
 function cloneGroups(groups: TerminalTableGroup[]): TerminalTableGroup[] {
   return groups.map((group) => ({ ...group, rows: group.rows.map((row) => ({ ...row })) }));
@@ -78,39 +45,16 @@ function closeValue(value: number | null, unit: string): string {
   return value.toFixed(2);
 }
 
-function unavailableRow(row: TerminalTableRow): TerminalTableRow {
-  const next = {
-    ...row,
-    spark: [],
-    price: UNAVAILABLE,
-    d1: UNAVAILABLE,
-    ytd: UNAVAILABLE,
-    qtd: UNAVAILABLE,
-    w1: UNAVAILABLE,
-    m1: UNAVAILABLE,
-    y1: UNAVAILABLE,
-    high: UNAVAILABLE,
-  };
-  DATA_SIGNAL_KEYS.forEach((key) => (next[key] = UNAVAILABLE as never));
-  return next;
-}
-
 export function prepareMacroMarketDetail(groups: TerminalTableGroup[]): TerminalTableGroup[] {
-  return cloneGroups(groups).map((group) => ({
-    ...group,
-    rows: group.rows.map((row) => (ENABLED_MACRO_ROW_IDS.has(row.id) ? unavailableRow(row) : row)),
-  }));
+  return cloneGroups(groups);
 }
 
 export function prepareCommodityMarketDetail(groups: TerminalTableGroup[]): TerminalTableGroup[] {
-  return cloneGroups(groups).map((group) => ({
-    ...group,
-    rows: group.rows.map(unavailableRow),
-  }));
+  return cloneGroups(groups);
 }
 
 export function prepareCryptoMarketDetail(groups: TerminalTableGroup[]): TerminalTableGroup[] {
-  return cloneGroups(groups).map((group) => ({ ...group, rows: group.rows.map(unavailableRow) }));
+  return cloneGroups(groups);
 }
 
 function cryptoChange(points: Array<{ date: string; value: number }>, days: number): string {
@@ -207,7 +151,6 @@ export function mergeMacroMarketDetail(
         y1: signed(remote.change1y, remote.changeUnit, remote.unit),
         high: signed(remote.distance52wHigh, 'percent'),
       };
-      DATA_SIGNAL_KEYS.forEach((key) => (next[key] = UNAVAILABLE as never));
       return next;
     }),
   }));

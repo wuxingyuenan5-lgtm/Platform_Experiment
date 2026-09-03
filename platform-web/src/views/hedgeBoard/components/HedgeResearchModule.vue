@@ -41,13 +41,13 @@
                 <h5>{{ resolveWidgetTitle(widget.localKey, widget.title) }}</h5>
               </div>
               <a
-                v-if="resolveWidgetSourceLink(widget.localKey)"
+                v-if="resolveWidgetSourceLink(widget)"
                 class="widget-card__link"
-                :href="resolveWidgetSourceLink(widget.localKey)"
+                :href="resolveWidgetSourceLink(widget)"
                 target="_blank"
                 rel="noopener noreferrer"
               >
-                原网址
+                原始网页 ↗
               </a>
             </div>
           </div>
@@ -83,7 +83,7 @@
     resolveSectionTitle: (sectionId: string, fallback: string) => string;
     shouldHideWidgetHeader: (sectionId: string, widget: WidgetConfig) => boolean;
     resolveWidgetTitle: (localKey: LocalWidgetKey | undefined, fallback: string) => string;
-    resolveWidgetSourceLink: (localKey: LocalWidgetKey | undefined) => string | undefined;
+    resolveWidgetSourceLink: (widget: WidgetConfig) => string | undefined;
     localChartWidget: Component;
     tradingViewWidget: Component;
     widgetErrorBoundary: Component;
@@ -113,24 +113,22 @@
   .formula-strip,
   .chart-section,
   .widget-card {
-    border: 1px solid var(--hedge-cool-border, rgba(193, 207, 220, 0.88));
-    background:
-      linear-gradient(180deg, rgba(255, 255, 255, 0.95), rgba(243, 248, 252, 0.96)),
-      #fff;
-    box-shadow: 0 18px 45px rgba(31, 41, 55, 0.05);
+    border: 1px solid var(--hedge-cool-border, rgb(193 207 220 / 88%));
+    background: linear-gradient(180deg, rgb(255 255 255 / 95%), rgb(243 248 252 / 96%)), #fff;
+    box-shadow: 0 18px 45px rgb(31 41 55 / 5%);
   }
 
   .formula-strip,
   .chart-section {
-    border-radius: 24px;
     padding: 22px;
+    border-radius: 24px;
   }
 
   .formula-strip {
     display: grid;
     grid-template-columns: 280px minmax(0, 1fr);
     gap: 18px;
-    background: linear-gradient(135deg, rgba(226, 236, 244, 0.96), rgba(248, 251, 253, 0.98));
+    background: linear-gradient(135deg, rgb(226 236 244 / 96%), rgb(248 251 253 / 98%));
   }
 
   .formula-strip span {
@@ -224,10 +222,25 @@
   }
 
   .widget-card__link {
-    color: var(--hedge-cool-muted, #6d8293);
+    display: inline-flex;
+    align-items: center;
+    min-height: 28px;
+    padding: 4px 9px;
+    transition: border-color 0.18s ease, color 0.18s ease, background 0.18s ease;
+    border: 1px solid rgb(109 130 147 / 28%);
+    border-radius: 999px;
+    color: var(--hedge-cool-muted, #526b7d);
     font-size: 12px;
     font-weight: 700;
     text-decoration: none;
+  }
+
+  .widget-card__link:hover,
+  .widget-card__link:focus-visible {
+    border-color: rgb(22 93 255 / 42%);
+    outline: none;
+    background: rgb(22 93 255 / 6%);
+    color: #165dff;
   }
 
   .widget-card--local-chart .widget-card__link {
@@ -238,10 +251,8 @@
   .chart-section--gold {
     padding: 22px 24px 24px;
     border-radius: 20px;
-    background:
-      linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(243, 248, 252, 0.98)),
-      #fff;
-    box-shadow: 0 16px 36px rgba(31, 41, 55, 0.04);
+    background: linear-gradient(180deg, rgb(255 255 255 / 98%), rgb(243 248 252 / 98%)), #fff;
+    box-shadow: 0 16px 36px rgb(31 41 55 / 4%);
   }
 
   @media (max-width: 1200px) {

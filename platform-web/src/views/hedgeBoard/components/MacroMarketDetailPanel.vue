@@ -1,7 +1,7 @@
 <template>
   <TerminalDetailPanel
     class="terminal-detail-panel--embedded"
-    title="市场明细"
+    title="市场明细 · 未接入字段为历史参考"
     market-id="macro"
     :columns="config.detailColumns"
     :groups="groups"

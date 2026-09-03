@@ -74,6 +74,7 @@ export interface WidgetConfig {
   scriptSrc?: string;
   config?: Record<string, unknown>;
   localKey?: LocalWidgetKey;
+  sourceUrl?: string;
 }
 
 export interface ChartSection {
@@ -121,6 +122,7 @@ function advancedChart(
     subtitle,
     height: Number(options.height ?? 420),
     scriptSrc: 'https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js',
+    sourceUrl: `https://www.tradingview.com/chart/?symbol=${encodeURIComponent(symbol)}`,
     config: {
       ...tvBase,
       symbol,
