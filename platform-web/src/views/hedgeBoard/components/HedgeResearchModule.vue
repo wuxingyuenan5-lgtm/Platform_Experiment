@@ -65,9 +65,13 @@
           </div>
 
           <component :is="widgetErrorBoundary" :widget-title="widget.title">
+            <div v-if="widget.kind === 'external-link'" class="external-reference-card">
+              <p>{{ widget.subtitle }}</p>
+              <span>点击右上角“原始网页”打开完整工具</span>
+            </div>
             <component
               :is="localChartWidget"
-              v-if="widget.kind === 'local-chart' && widget.localKey"
+              v-else-if="widget.kind === 'local-chart' && widget.localKey"
               :widget="widget"
             />
             <component :is="tradingViewWidget" v-else :widget="widget" />
@@ -113,6 +117,21 @@
     display: flex;
     flex-direction: column;
     gap: 18px;
+  }
+
+  .external-reference-card {
+    min-height: 96px;
+    padding: 4px 18px 18px;
+    color: var(--hedge-cool-muted, #6d8293);
+    font-size: 13px;
+    line-height: 1.65;
+  }
+
+  .external-reference-card p {
+    margin: 0 0 10px;
+    color: var(--hedge-cool-text, #18313c);
+    font-size: 14px;
+    font-weight: 650;
   }
 
   .research-module--gold {

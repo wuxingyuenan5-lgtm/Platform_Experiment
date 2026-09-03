@@ -571,6 +571,8 @@ EIA Native 已完成：工程 commit `4a317da`，真实数据 commit `a0e42a8`�
 
 2026-09-03 商品页补充 MacroMicro 二级参考入口：仅挂接与现有卡片口径明确对应的黄金 ETF、央行黄金、黄金利率关系、CFTC 持仓、EIA 库存、原油期限结构/波动率及 Brent-WTI 价差页面；官方或一手来源继续作为“原始网页”，MacroMicro 不替代数据权威来源。
 
+Owner 随后确认将 Chrome 三个研究标签组全部接入：商品页新增“黄金与商品补充研究工具”13 个入口；加密页新增 ETF/稳定币/财库公司 7 个、杠杆/清算/期权 8 个、链上/周期/研究 6 个入口。新增卡片采用轻量外链组件，不加载第三方 iframe、不共享浏览器账号，且既有图表和默认折叠工具目录保持不变。
+
 ### C2 — Existing Gold Modules 去假数据
 
 - WGC ETF Flow → External Link；

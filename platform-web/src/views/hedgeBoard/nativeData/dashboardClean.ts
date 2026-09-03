@@ -3,7 +3,8 @@
   | 'symbol-overview'
   | 'market-overview'
   | 'technical-analysis'
-  | 'local-chart';
+  | 'local-chart'
+  | 'external-link';
 
 export type LocalWidgetKey =
   | 'macro-market-detail-table'
@@ -180,6 +181,10 @@ function withReferenceLinks(
   referenceLinks: Array<{ label: string; href: string }>,
 ): WidgetConfig {
   return { ...widget, referenceLinks };
+}
+
+function externalReference(title: string, subtitle: string, sourceUrl: string): WidgetConfig {
+  return { kind: 'external-link', title, subtitle, sourceUrl, height: 128 };
 }
 
 function macroMicroReference(href: string) {
@@ -750,6 +755,80 @@ export const researchModules: ResearchModule[] = [
           localChart('CVOL', 'CME Group Volatility Indexes', 'commodity-cvol'),
         ],
       },
+      {
+        id: 'gold-browser-toolbox',
+        eyebrow: 'Owner Toolkit',
+        title: '黄金与商品补充研究工具',
+        description: 'Owner 浏览器中的黄金研究框架入口，按实物、期货、期权与辅助研究集中保留。',
+        layout: 'three',
+        widgets: [
+          externalReference(
+            'GLD 借券费率',
+            'ChartExchange · ETF 做空拥挤与借券成本',
+            'https://chartexchange.com/symbol/nyse-gld/borrow-fee/',
+          ),
+          externalReference(
+            '全球黄金期货未平仓量',
+            'MacroMicro · 分交易所累计未平仓量',
+            'https://en.macromicro.me/collections/45/mm-gold-price/110916/global-gold-futures-open-interest-by-exchanges-stacked-bar-chart',
+          ),
+          externalReference(
+            'COMEX 黄金总库存',
+            'CommoditiesChart · 注册与合格库存',
+            'https://commoditieschart.net/zh/metals/gold/comex-gold-stocks',
+          ),
+          externalReference(
+            '沪金期限结构',
+            '奇货可查 · AU 近远月结构',
+            'https://x.qhkch.com/fundamental/futurespot/fut_spot_structure?variety=%E6%B2%AA%E9%87%91',
+          ),
+          externalReference(
+            '沪金期权波动率',
+            'OpenVlab · AU 隐含波动率分析',
+            'https://www.openvlab.cn/volatility/analysis/AU',
+          ),
+          externalReference(
+            '商品期权 PCR',
+            '交易法门 · Put/Call Ratio',
+            'https://www.jiaoyifamen.com/variety/option-PCR',
+          ),
+          externalReference(
+            'CFTC 持仓分析',
+            '交易法门 · 商品资金持仓辅助视图',
+            'https://www.jiaoyifamen.com/variety/positionAnalysis-CFTC',
+          ),
+          externalReference(
+            '期货席位成本',
+            '交易法门 · 席位与成本结构',
+            'https://www.jiaoyifamen.com/variety/seat-cost',
+          ),
+          externalReference(
+            'CME QuikStrike 黄金期权',
+            'CME · 期权波动率与策略工具入口',
+            'https://cmegroup-sso.quikstrike.net/User/Disclaimer.aspx?ret=%2fUser%2fPartnerRegister.aspx',
+          ),
+          externalReference(
+            'MacroMicro 黄金研究',
+            '黄金、流动性与央行需求集合',
+            'https://en.macromicro.me/collections/45/mm-gold-price',
+          ),
+          externalReference(
+            '黄金与全球 M2',
+            'MacroMicro · 主要央行货币供应',
+            'https://en.macromicro.me/collections/45/mm-gold-price/3439/major-bank-m2-comparsion',
+          ),
+          externalReference(
+            '全球央行净购金',
+            'MacroMicro · 全球央行季度净购买',
+            'https://en.macromicro.me/collections/45/mm-gold-price/93189/gold-demand-central-banks-and-other-inst',
+          ),
+          externalReference(
+            'Owner 黄金复盘模板',
+            'TradingView · XAUUSD 复盘布局',
+            'https://cn.tradingview.com/chart/CVV3rItf/',
+          ),
+        ],
+      },
     ],
   },
   {
@@ -853,6 +932,138 @@ export const researchModules: ResearchModule[] = [
           localChart('Aggregate Derivatives', 'CoinGlass', 'crypto-coinglass'),
           localChart('Bybit Derivatives', 'Bybit', 'crypto-bybit'),
           localChart('OKX Derivatives', 'OKX', 'crypto-okx'),
+        ],
+      },
+      {
+        id: 'crypto-capital-toolbox',
+        eyebrow: 'Capital Flows & Treasury',
+        title: 'ETF、稳定币与财库公司工具',
+        description: '跟踪法币入口、稳定币流动性以及上市公司 BTC / ETH 储备与融资。',
+        layout: 'three',
+        widgets: [
+          externalReference(
+            'SoSoValue 现货 ETF 资金流',
+            'BTC / ETH 等美国现货 ETF 汇总',
+            'https://sosovalue.com/zh/assets/etf/Total_Crypto_Spot_ETF_Fund_Flow?page=usBTC',
+          ),
+          externalReference(
+            '稳定币市值历史',
+            'CoinGlass · 稳定币供应趋势',
+            'https://www.coinglass.com/pro/stablecoin',
+          ),
+          externalReference(
+            'Bitcoin Treasuries 周度净流入',
+            'SoSoValue · 企业与机构购币',
+            'https://sosovalue.com/zh/assets/bitcoin-treasuries/weekly-net-inflow',
+          ),
+          externalReference(
+            'Strategy BTC 持仓',
+            'BitcoinTreasuries · Strategy 持仓与分析',
+            'https://bitcointreasuries.net/public-companies/strategy',
+          ),
+          externalReference(
+            'Strategic ETH Reserve',
+            '企业与机构 ETH 储备',
+            'https://www.strategicethreserve.xyz/',
+          ),
+          externalReference(
+            'STRC ATM Tracker',
+            'Bitcoin for Corporations · ATM 融资进度',
+            'https://bitcoinforcorporations.com/strc-atm-tracker/',
+          ),
+          externalReference(
+            'STRC 实时定价',
+            'STRC 股价、收益率与 ATM 状态',
+            'https://strc.live/ticker/strc',
+          ),
+        ],
+      },
+      {
+        id: 'crypto-derivatives-toolbox',
+        eyebrow: 'Derivatives & Options',
+        title: '全市场杠杆、清算与期权结构',
+        description: '覆盖聚合未平仓量、清算位置、波动率、偏度与 Gamma 暴露。',
+        layout: 'three',
+        widgets: [
+          externalReference(
+            '全市场期货未平仓量',
+            'CoinGlass · 跨交易所 OI',
+            'https://www.coinglass.com/zh/pro/futures/OpenInterest',
+          ),
+          externalReference(
+            'BTC 清算热力图',
+            'CoinGlass · 杠杆清算密集区',
+            'https://www.coinglass.com/zh/pro/futures/LiquidationHeatMap?coin=BTC',
+          ),
+          externalReference(
+            'Coinbase Premium Index',
+            'CoinGlass · 美国现货相对溢价',
+            'https://www.coinglass.com/pro/i/coinbase-bitcoin-premium-index',
+          ),
+          externalReference(
+            'Deribit BTC Options Metrics',
+            '期限结构、偏度、Put/Call 与到期分布',
+            'https://www.deribit.com/statistics/BTC/metrics/options',
+          ),
+          externalReference(
+            'Greeks.live BTC Data Lab',
+            'Deribit 期权数据实验室',
+            'https://www.greeks.live/deribit/tools/datalab/BTC',
+          ),
+          externalReference(
+            'Laevitas BTC Gamma Exposure',
+            'Deribit BTC 期权 GEX',
+            'https://app.laevitas.ch/assets/options/gex/btc/deribit',
+          ),
+          externalReference(
+            'IBIT Gamma Exposure',
+            'Barchart · IBIT 期权 GEX',
+            'https://www.barchart.com/etfs-funds/quotes/IBIT/gamma-exposure',
+          ),
+          externalReference(
+            'CoinGlass BTC 行情终端',
+            'BTCUSDT K线与衍生品入口',
+            'https://www.coinglass.com/tv/zh/Binance_BTCUSDT',
+          ),
+        ],
+      },
+      {
+        id: 'crypto-onchain-toolbox',
+        eyebrow: 'On-chain & Cycle',
+        title: '链上成本、周期与研究跟踪',
+        description: '用于观察筹码成本分布、地址结构、周期位置与研究观点。',
+        layout: 'three',
+        widgets: [
+          externalReference(
+            'Realized Price Distribution',
+            'Bitcoin Magazine Pro · 实现价格分布',
+            'https://charts.bgeometrics.com/distribution_realized_price.html',
+          ),
+          externalReference(
+            'Bitcoin Address Distribution',
+            'Bitcoin Magazine Pro · 地址持币分布',
+            'https://charts.bgeometrics.com/bitcoin_distribution_addr_tables.html',
+          ),
+          externalReference(
+            'Bitcoin 减半周期表现',
+            'CoinGlass · 历次减半后的价格路径',
+            'https://www.coinglass.com/pro/i/bitcoin-price-performance-since-halving',
+          ),
+          externalReference(
+            'Glassnode Week On-chain',
+            '周度链上市场研究',
+            'https://research.glassnode.com/the-week-onchain-week-18-2026/',
+          ),
+          externalReference(
+            'Unbias Analysts',
+            '加密研究员与观点聚合',
+            'https://unbias.fyi/analysts?source=all',
+          ),
+          externalReference(
+            'Owner BTC 看盘模板',
+            'TradingView · BTCUSD 日常看盘布局',
+            'https://cn.tradingview.com/chart/3QJfnHcC/?symbol=COINBASE%3ABTCUSD',
+          ),
         ],
       },
     ],

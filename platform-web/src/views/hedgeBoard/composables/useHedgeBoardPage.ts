@@ -72,6 +72,7 @@ const researchSectionOrder: Partial<Record<HedgeCategory, readonly string[]>> = 
     'commodity-positioning',
     'commodity-eia-inventory',
     'commodity-official-references',
+    'gold-browser-toolbox',
   ],
   crypto: [
     'crypto-market',
@@ -79,6 +80,9 @@ const researchSectionOrder: Partial<Record<HedgeCategory, readonly string[]>> = 
     'crypto-etf',
     'crypto-native-venue',
     'crypto-external-research',
+    'crypto-capital-toolbox',
+    'crypto-derivatives-toolbox',
+    'crypto-onchain-toolbox',
   ],
 };
 
