@@ -58,7 +58,12 @@ New-Item -ItemType Directory -Path $StateDir -Force | Out-Null
 New-Item -ItemType Directory -Path $LogDir -Force | Out-Null
 New-Item -ItemType Directory -Path (Split-Path -Parent $DatabasePath) -Force | Out-Null
 
-$password = "Review!$([guid]::NewGuid().ToString('N').Substring(0, 16))Aa1"
+$password = $null
+if (Test-Path -LiteralPath $CredentialPath) {
+  $passwordLine = Get-Content -LiteralPath $CredentialPath | Where-Object { $_ -like '密码：*' } | Select-Object -First 1
+  if ($passwordLine) { $password = $passwordLine.Substring(3).Trim() }
+}
+if (-not $password) { $password = "Review!$([guid]::NewGuid().ToString('N').Substring(0, 16))Aa1" }
 $previousEnvironment = @{}
 $reviewEnvironment = @{
   VG_DATABASE_PATH = $DatabasePath
