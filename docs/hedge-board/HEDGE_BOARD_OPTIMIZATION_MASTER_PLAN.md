@@ -457,7 +457,9 @@ Native core 已真实化 20 个既有 Macro Market Detail 行。Treasury curve �
 
 Macro V1 已完成：Growth、Inflation、Short-End Rate Corridor、Risk Appetite、Global M2 与 Market Detail 23 行均使用真实数据/API/additive SVG 图表；既有 Polymarket 白名单面板继续作为 Market Expectations。Global M2 已通过五区官方/强校验序列、共同月份和 ECB 日汇率月均端到端验证；中国国债 2Y / 10Y / 30Y 已切换为财政部—中国国债收益率曲线官方字段。数据 commits `2e5812593a8a5a1e3ddba9d9402e5888d6d25331`、`5dac2e68c7664824e0dc8423531f9819f5307bfc`、`d5fc17f6248baaffcb1878cadfd9043542047b9f`；应用 commits `ee8dd4d0`、`97eff694`。下一阶段为 Commodity V1。
 
-【OWNER CONFIRMED / 2026-09-03】宏观页一级阅读顺序统一为：1 宏观市场明细、2 流动性、3 利率、4 通胀、5 经济、6 风险偏好。Global M2 Proxy 与美元净流动性、美联储资产负债结构共同归入流动性，不再单列；Global M2 YoY 退出页面。利率按美债 3M / 2Y / 10Y / 30Y、短期利率走廊、CME FedWatch 与 Polymarket 概率定价组织。未完成正式采集的来源先以原始网页入口呈现。
+【OWNER CONFIRMED / 2026-09-03】宏观页一级阅读顺序统一为：1 宏观市场明细、2 流动性、3 利率、4 经济、5 通胀、6 风险偏好。Global M2 Proxy 与美元净流动性、美联储资产负债结构共同归入流动性，不再单列；Global M2 YoY 退出页面。利率按美债 3M / 2Y / 10Y / 30Y、短期利率走廊、CME FedWatch 与 Polymarket 概率定价组织。未完成正式采集的来源先以原始网页入口呈现。
+
+【OWNER CONFIRMED / 2026-09-03】Macro、Commodity、Crypto 三页的工具目录默认折叠并可点击展开；三页研究阅读顺序统一以市场明细为第一屏、主图或专题模块随后。市场明细 sparkline 统一为 90 日窗口：96px 小图保留足够趋势信息且避免 180 个点过密；接口新增 `spark90d` 并兼容既有 `spark30d` 快照。
 
 宏观研究卡片另保留 Owner 的 6 套 TradingView 布局入口：流动性与美联储负债结构归入流动性，美债利率市场与美元短期利率监控归入利率，美国经济归入经济，VIX 期限结构归入风险偏好。入口与官方/方法论原始来源并存，不以私人登录态作为平台依赖。
 

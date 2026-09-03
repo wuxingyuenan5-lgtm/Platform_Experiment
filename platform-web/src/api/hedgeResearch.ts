@@ -189,6 +189,7 @@ export interface MarketDetailRow {
   high52w?: string | number | null;
   distance52wHigh?: string | number | null;
   spark30d: Array<string | number>;
+  spark90d?: Array<string | number>;
 }
 
 export interface MarketDetailResponse {

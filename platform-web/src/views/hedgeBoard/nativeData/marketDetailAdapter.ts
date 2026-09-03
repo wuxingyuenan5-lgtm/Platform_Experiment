@@ -120,7 +120,7 @@ export function mergeCryptoMarketDetail(
         ytd: cryptoChangeSince(points, yearStart),
         y1: cryptoChange(points, 365),
         high: signed((latest / high - 1) * 100, 'percent'),
-        spark: points.slice(-30).map((point) => point.value),
+        spark: points.slice(-90).map((point) => point.value),
       };
     }),
   }));
@@ -141,7 +141,9 @@ export function mergeMacroMarketDetail(
         ...row,
         name: remote.name,
         symbol: remote.symbol,
-        spark: remote.spark30d.map(Number).filter(Number.isFinite),
+        spark: (remote.spark90d?.length ? remote.spark90d : remote.spark30d)
+          .map(Number)
+          .filter(Number.isFinite),
         price: closeValue(close, remote.unit),
         d1: signed(remote.change1d, remote.changeUnit, remote.unit),
         ytd: signed(remote.changeYtd, remote.changeUnit, remote.unit),

@@ -56,10 +56,31 @@ const macroSectionOrder = [
   'macro-market',
   'macro-liquidity',
   'macro-rates',
-  'macro-inflation',
   'macro-growth',
+  'macro-inflation',
   'macro-risk-appetite',
 ] as const;
+
+const researchSectionOrder: Partial<Record<HedgeCategory, readonly string[]>> = {
+  macro: macroSectionOrder,
+  gold: [
+    'gold-market',
+    'gold-main',
+    'gold-flows',
+    'gold-central-bank',
+    'gold-rates',
+    'commodity-positioning',
+    'commodity-eia-inventory',
+    'commodity-official-references',
+  ],
+  crypto: [
+    'crypto-market',
+    'crypto-main',
+    'crypto-etf',
+    'crypto-native-venue',
+    'crypto-external-research',
+  ],
+};
 
 const widgetTextOverrides: Record<string, { title?: string }> = {
   'etf-weekly-flows': { title: '全球各地区ETF每周流入' },
@@ -230,11 +251,12 @@ export function useHedgeBoardPage() {
   const useUnifiedResearchUi = computed(() => true);
   const visibleSections = computed<ChartSection[]>(() => {
     const sections = activeModule.value.sections;
-    if (activeCategory.value !== 'macro') return sections;
+    const sectionOrder = researchSectionOrder[activeCategory.value];
+    if (!sectionOrder) return sections;
 
     const sectionsById = new Map(sections.map((section) => [section.id, section]));
-    const orderedSectionIds = new Set<string>(macroSectionOrder);
-    const orderedSections = macroSectionOrder.flatMap((sectionId) => {
+    const orderedSectionIds = new Set<string>(sectionOrder);
+    const orderedSections = sectionOrder.flatMap((sectionId) => {
       const section = sectionsById.get(sectionId);
       return section ? [section] : [];
     });

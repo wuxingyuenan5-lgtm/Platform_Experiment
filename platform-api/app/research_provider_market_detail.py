@@ -38,6 +38,7 @@ class MarketDetailRow(ResearchApiModel):
     high_52w: Decimal | None = None
     distance_52w_high: Decimal | None = None
     spark_30d: list[Decimal] = Field(default_factory=list)
+    spark_90d: list[Decimal] = Field(default_factory=list)
 
 
 class MarketDetailResponse(ResearchApiModel):

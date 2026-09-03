@@ -1,20 +1,20 @@
 @import '../strategy/shared/strategy-theme.less';
 
 .hedge-board {
-  --hedge-cool-border: rgba(201, 213, 226, 0.72);
-  --hedge-cool-border-strong: rgba(175, 190, 207, 0.82);
+  --hedge-cool-border: rgb(201 213 226 / 72%);
+  --hedge-cool-border-strong: rgb(175 190 207 / 82%);
   --hedge-cool-surface: linear-gradient(
     180deg,
-    rgba(255, 255, 255, 0.98),
-    rgba(243, 248, 252, 0.96)
+    rgb(255 255 255 / 98%),
+    rgb(243 248 252 / 96%)
   );
   --hedge-cool-surface-soft: linear-gradient(
     180deg,
-    rgba(255, 255, 255, 0.98),
-    rgba(248, 251, 253, 0.96)
+    rgb(255 255 255 / 98%),
+    rgb(248 251 253 / 96%)
   );
-  --hedge-cool-pill: rgba(243, 247, 250, 0.94);
-  --hedge-cool-shadow: 0 18px 45px rgba(15, 23, 42, 0.05);
+  --hedge-cool-pill: rgb(243 247 250 / 94%);
+  --hedge-cool-shadow: 0 18px 45px rgb(15 23 42 / 5%);
   --hedge-cool-text: #18313c;
   --hedge-cool-muted: #6d8293;
   --hedge-cool-accent: #35586e;
@@ -22,6 +22,28 @@
   display: flex;
   flex-direction: column;
   gap: 16px;
+
+  @media (max-width: 960px) {
+    .ytd-module__metrics,
+    .ytd-module__table-head,
+    .ytd-module__table-row {
+      grid-template-columns: 1fr;
+    }
+
+    .etf-weekly-panel__toolbar,
+    .etf-weekly-panel__actions {
+      flex-direction: column;
+      align-items: stretch;
+    }
+  }
+
+  @media (max-width: 768px) {
+    .local-widget-stack,
+    .local-empty {
+      padding-right: 16px;
+      padding-left: 16px;
+    }
+  }
 
   .terminal-content {
     display: flex;
@@ -38,22 +60,64 @@
     display: flex;
     flex-direction: column;
     gap: 20px;
-    padding: 8px 0 0;
+    padding: 16px 18px;
+    border: 1px solid var(--hedge-cool-border);
+    border-radius: 18px;
+    background: var(--hedge-cool-surface-soft), #fff;
+  }
+
+  .hedge-board__tool-board-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
   }
 
   .hedge-board__tool-board-head h3 {
     margin: 0;
     color: var(--hedge-cool-text);
     font-size: 24px;
-    line-height: 1.25;
     font-weight: 800;
     letter-spacing: 0.01em;
+    line-height: 1.25;
   }
 
   .hedge-board__tool-board-body {
     display: flex;
     flex-direction: column;
     gap: 28px;
+  }
+
+  .hedge-board__tool-board-toggle {
+    display: inline-flex;
+    align-items: center;
+    min-height: 36px;
+    padding: 7px 12px;
+    border: 1px solid var(--hedge-cool-border-strong);
+    border-radius: 999px;
+    background: #fff;
+    color: var(--hedge-cool-accent);
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    gap: 7px;
+  }
+
+  .hedge-board__tool-board-toggle:hover,
+  .hedge-board__tool-board-toggle:focus-visible {
+    border-color: var(--hedge-cool-accent);
+    outline: none;
+  }
+
+  .hedge-board__tool-board-chevron {
+    display: inline-block;
+    transition: transform 160ms ease;
+    font-size: 17px;
+    line-height: 1;
+  }
+
+  .hedge-board__tool-board-toggle[aria-expanded='true'] .hedge-board__tool-board-chevron {
+    transform: rotate(180deg);
   }
 
   .local-widget-stack {
@@ -117,8 +181,8 @@
   }
 
   .chart-grid-line {
-    stroke: rgba(15, 23, 42, 0.08);
     stroke-width: 1;
+    stroke: rgb(15 23 42 / 8%);
   }
 
   .chart-axis-label {
@@ -136,13 +200,13 @@
 
   .chart-axis-head {
     display: flex;
+    flex: 1;
     align-items: center;
     justify-content: space-between;
-    gap: 16px;
-    flex: 1;
     color: var(--hedge-cool-muted);
     font-size: 11px;
     font-weight: 700;
+    gap: 16px;
   }
 
   .chart-axis-head span:last-child {
@@ -172,9 +236,9 @@
   }
 
   .chart-zero-line {
-    stroke: rgba(111, 125, 151, 0.38);
     stroke-width: 1.2;
     stroke-dasharray: 3 3;
+    stroke: rgb(111 125 151 / 38%);
   }
 
   .chart-range {
@@ -188,8 +252,8 @@
     height: 16px;
     color: var(--hedge-cool-muted);
     font-size: 11px;
-    line-height: 1;
     letter-spacing: 0.01em;
+    line-height: 1;
   }
 
   .chart-range__label {
@@ -212,14 +276,14 @@
   }
 
   .chart-range__overview-area {
-    fill: rgba(197, 214, 249, 0.7);
+    fill: rgb(197 214 249 / 70%);
   }
 
   .chart-range__overview-line {
-    fill: none;
-    stroke: rgba(137, 167, 233, 0.95);
     stroke-width: 1.1;
     stroke-linecap: round;
+    stroke: rgb(137 167 233 / 95%);
+    fill: none;
     stroke-linejoin: round;
   }
 
@@ -227,23 +291,23 @@
   .chart-range__selection {
     position: absolute;
     top: 50%;
-    transform: translateY(-50%);
     height: 12px;
+    transform: translateY(-50%);
     border-radius: 999px;
   }
 
   .chart-range__rail {
-    left: 0;
     right: 0;
-    border: 1px solid rgba(192, 205, 227, 0.92);
-    background: rgba(225, 235, 252, 0.28);
-    box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.72);
+    left: 0;
+    border: 1px solid rgb(192 205 227 / 92%);
+    background: rgb(225 235 252 / 28%);
+    box-shadow: inset 0 1px 1px rgb(255 255 255 / 72%);
   }
 
   .chart-range__selection {
-    background: rgba(202, 218, 251, 0.34);
-    border: 1px solid rgba(142, 171, 235, 0.88);
-    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.32);
+    border: 1px solid rgb(142 171 235 / 88%);
+    background: rgb(202 218 251 / 34%);
+    box-shadow: inset 0 0 0 1px rgb(255 255 255 / 32%);
   }
 
   .chart-range__handle {
@@ -251,10 +315,10 @@
     top: 50%;
     width: 2px;
     height: 12px;
-    border-radius: 999px;
-    background: rgba(255, 255, 255, 0.98);
-    box-shadow: 0 0 0 1px rgba(126, 151, 211, 0.3);
     transform: translateY(-50%);
+    border-radius: 999px;
+    background: rgb(255 255 255 / 98%);
+    box-shadow: 0 0 0 1px rgb(126 151 211 / 30%);
   }
 
   .etf-weekly-panel {
@@ -273,11 +337,11 @@
   .etf-weekly-panel__periods {
     display: inline-flex;
     align-items: center;
-    gap: 0;
+    overflow: hidden;
     border: 1px solid var(--hedge-cool-border);
     border-radius: 10px;
-    overflow: hidden;
     background: #f8f8f7;
+    gap: 0;
   }
 
   .etf-weekly-panel__toggle button,
@@ -314,10 +378,10 @@
 
   .chart-shell--etf-weekly {
     padding-top: 8px;
-    border-radius: 0;
-    border-left: none;
     border-right: none;
     border-bottom: none;
+    border-left: none;
+    border-radius: 0;
     background: transparent;
   }
 
@@ -345,32 +409,32 @@
   .ytd-module__metrics article {
     min-height: 100px;
     padding: 14px 16px;
-    border: 1px solid rgba(15, 23, 42, 0.07);
+    border: 1px solid rgb(15 23 42 / 7%);
     border-radius: 10px;
     background: #fff;
-    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+    box-shadow: 0 1px 3px rgb(15 23 42 / 6%);
   }
 
   .ytd-module__metrics span {
     display: block;
-    color: rgba(0, 0, 0, 0.45);
+    color: rgb(0 0 0 / 45%);
     font-size: 12px;
   }
 
   .ytd-module__metrics strong {
     display: block;
     margin-top: 12px;
-    color: rgba(0, 0, 0, 0.88);
+    color: rgb(0 0 0 / 88%);
     font-size: 18px;
     line-height: 1.35;
   }
 
   .ytd-module__table {
-    border: 1px solid rgba(15, 23, 42, 0.07);
-    border-radius: 10px;
     overflow: hidden;
+    border: 1px solid rgb(15 23 42 / 7%);
+    border-radius: 10px;
     background: #fff;
-    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+    box-shadow: 0 1px 3px rgb(15 23 42 / 6%);
   }
 
   .ytd-module__table-head,
@@ -384,21 +448,21 @@
 
   .ytd-module__table-head {
     background: #fafafa;
-    color: rgba(0, 0, 0, 0.45);
-    font-weight: 700;
+    color: rgb(0 0 0 / 45%);
     font-size: 12px;
+    font-weight: 700;
     letter-spacing: 0.06em;
     text-transform: uppercase;
   }
 
   .ytd-module__table-row {
-    border-top: 1px solid rgba(15, 23, 42, 0.07);
-    color: rgba(0, 0, 0, 0.65);
     align-items: center;
+    border-top: 1px solid rgb(15 23 42 / 7%);
+    color: rgb(0 0 0 / 65%);
   }
 
   .ytd-module__table-row strong {
-    color: rgba(0, 0, 0, 0.88);
+    color: rgb(0 0 0 / 88%);
     font-size: 15px;
   }
 
@@ -423,23 +487,23 @@
 
   .reserve-module__title strong {
     display: block;
-    color: rgba(0, 0, 0, 0.88);
+    color: rgb(0 0 0 / 88%);
     font-size: 15px;
     font-weight: 700;
   }
 
   .reserve-module__title span,
   .reserve-module__detail {
-    color: rgba(0, 0, 0, 0.45);
+    color: rgb(0 0 0 / 45%);
     font-size: 12px;
     line-height: 1.6;
   }
 
   .reserve-module__track {
     height: 12px;
-    border-radius: 999px;
-    background: rgba(148, 163, 184, 0.18);
     overflow: hidden;
+    border-radius: 999px;
+    background: rgb(148 163 184 / 18%);
   }
 
   .reserve-module__fill {
@@ -448,7 +512,7 @@
   }
 
   .reserve-module__value {
-    color: rgba(0, 0, 0, 0.88);
+    color: rgb(0 0 0 / 88%);
     font-size: 14px;
     font-weight: 700;
   }
@@ -459,27 +523,5 @@
 
   .is-negative-text {
     color: #3777bf;
-  }
-
-  @media (max-width: 960px) {
-    .ytd-module__metrics,
-    .ytd-module__table-head,
-    .ytd-module__table-row {
-      grid-template-columns: 1fr;
-    }
-
-    .etf-weekly-panel__toolbar,
-    .etf-weekly-panel__actions {
-      flex-direction: column;
-      align-items: stretch;
-    }
-  }
-
-  @media (max-width: 768px) {
-    .local-widget-stack,
-    .local-empty {
-      padding-left: 16px;
-      padding-right: 16px;
-    }
   }
 }
