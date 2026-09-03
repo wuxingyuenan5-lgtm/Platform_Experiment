@@ -583,7 +583,7 @@ EIA Native 已完成：工程 commit `4a317da`，真实数据 commit `a0e42a8`�
 
 【OWNER CORRECTION / 2026-09-03】Macro、Commodity、Crypto 三个市场明细表必须保留原有完整行、收益率、技术信号、sparkline 与轮动热图，Native 数据只覆盖已接通字段，不得以数据治理名义删减既有页面信息。未接入字段明确标为历史参考，不宣称实时；后续按逐行 source audit 慢慢替换为本地数据库数据。
 
-【OWNER CONFIRMED / 2026-09-03】宏观页一级阅读顺序调整为：1 宏观市场明细、2 Global M2 Proxy、3 利率、4 流动性、5 通胀、6 经济、7 风险偏好；仅调整分组顺序与一级标题，各分组内部内容保持不变，后续由 Owner 逐类确认增删。
+【OWNER CONFIRMED / 2026-09-03】宏观页一级阅读顺序调整为：1 宏观市场明细、2 流动性、3 利率、4 通胀、5 经济、6 风险偏好。Global M2 Proxy、美元净流动性和美联储资产负债结构合并为流动性层，Global M2 YoY 已删除；利率层补齐美债期限走势、短期利率走廊、CME FedWatch 与 Polymarket 利率路径。通胀、经济、风险偏好增加交易工具母表中的关键领先指标，未采集来源明确保留为原始网页入口。
 
 ### C4 — Term Structure
 

@@ -9,6 +9,13 @@ export type LocalWidgetKey =
   | 'macro-market-detail-table'
   | 'macro-global-m2'
   | 'macro-global-m2-yoy'
+  | 'macro-fed-balance-structure'
+  | 'macro-fedwatch'
+  | 'macro-polymarket-fed'
+  | 'macro-inflation-nowcast'
+  | 'macro-inflation-expectations'
+  | 'macro-gdp-now'
+  | 'macro-lending-standards'
   | 'macro-growth-production'
   | 'macro-growth-labor'
   | 'macro-growth-activity'
@@ -162,6 +169,47 @@ function localChart(
   };
 }
 
+function treasuryYieldOverview(): WidgetConfig {
+  return {
+    kind: 'symbol-overview',
+    title: '美债收益率曲线走势',
+    subtitle: '3M / 2Y / 10Y / 30Y U.S. Treasury yields',
+    height: 500,
+    scriptSrc: 'https://s3.tradingview.com/external-embedding/embed-widget-symbol-overview.js',
+    sourceUrl: 'https://www.tradingview.com/markets/bonds/prices-usa/',
+    config: {
+      ...tvBase,
+      symbols: [
+        ['美国 3M', 'TVC:US03MY|1D'],
+        ['美国 2Y', 'TVC:US02Y|1D'],
+        ['美国 10Y', 'TVC:US10Y|1D'],
+        ['美国 30Y', 'TVC:US30Y|1D'],
+      ],
+      chartOnly: false,
+      width: '100%',
+      height: 500,
+      locale: 'zh_CN',
+      colorTheme: 'light',
+      autosize: true,
+      showVolume: false,
+      showMA: false,
+      hideDateRanges: false,
+      hideMarketStatus: false,
+      hideSymbolLogo: false,
+      scalePosition: 'right',
+      scaleMode: 'Normal',
+      fontFamily: 'Arial, sans-serif',
+      fontSize: '10',
+      noTimeScale: false,
+      valuesTracking: '1',
+      changeMode: 'price-and-percent',
+      chartType: 'area',
+      lineWidth: 2,
+      lineType: 0,
+    },
+  };
+}
+
 export const pageSections = [
   { id: 'macro', index: '01', label: '宏观', description: '经济、通胀、流动性。' },
   { id: 'gold', index: '02', label: '商品', description: '贵金属、能源、资金面与比价结构。' },
@@ -186,43 +234,28 @@ export const researchModules: ResearchModule[] = [
       {
         id: 'macro-liquidity',
         eyebrow: 'Liquidity',
-        title: '流动性总图',
-        description: '先看净美元流动性，再拆解 Fed、TGA 与逆回购的贡献。',
-        layout: 'hero',
+        title: '流动性',
+        description: '从全球货币供给、美元净流动性与美联储负债结构观察流动性环境。',
+        layout: 'two',
         widgets: [
+          localChart('Global M2 Proxy', '全球主要央行广义货币的美元折算代理', 'macro-global-m2', {
+            height: 420,
+            sourceNote: 'Native proxy · reference methodology: MacroMicro',
+          }),
           advancedChart(
-            'Net Dollar Liquidity',
+            '美元净流动性',
             'Formula: WALCL - WDTGAL - RRPONTTLD',
             'FRED:WALCL-FRED:WDTGAL-FRED:RRPONTTLD',
             {
-              height: 640,
+              height: 420,
               hide_side_toolbar: false,
             },
           ),
-        ],
-      },
-      {
-        id: 'macro-global-m2',
-        eyebrow: 'Global Liquidity',
-        title: 'Global M2 Proxy',
-        description:
-          '美国、中国、欧元区、日本与英国广义货币按共同月份对齐，并使用 ECB 官方日汇率月均值折算为美元。该指标为方法论代理，不是官方统一全球 M2。',
-        layout: 'two',
-        widgets: [
           localChart(
-            'Global M2 Level',
-            'Aggregate and five regional USD components',
-            'macro-global-m2',
-            {
-              height: 420,
-              sourceNote: 'Fed / PBOC-validated adapter / ECB / BOJ / BoE; ECB reference FX',
-            },
-          ),
-          localChart(
-            'Global M2 YoY',
-            'Five-region methodology-based proxy growth',
-            'macro-global-m2-yoy',
-            { height: 420 },
+            '美联储资产负债结构',
+            '准备金、TGA、逆回购及其他负债结构',
+            'macro-fed-balance-structure',
+            { height: 300, sourceNote: 'External Link · MacroMicro' },
           ),
         ],
       },
@@ -258,6 +291,14 @@ export const researchModules: ResearchModule[] = [
           ),
           localChart('初请失业金四周均值', 'Initial Claims 4W MA', 'macro-growth-labor'),
           localChart('广义经济活动', 'CFNAI / CFNAIMA3', 'macro-growth-activity'),
+          localChart('GDPNow', '亚特兰大联储实时 GDP 增长估计', 'macro-gdp-now', {
+            height: 280,
+            sourceNote: 'External Link · Atlanta Fed',
+          }),
+          localChart('银行信贷标准', '商业和工业贷款标准收紧比例', 'macro-lending-standards', {
+            height: 280,
+            sourceNote: 'External Link · Federal Reserve / MacroMicro',
+          }),
         ],
       },
       {
@@ -270,19 +311,45 @@ export const researchModules: ResearchModule[] = [
           localChart('实际通胀', 'CPI / Core CPI / PCE / Core PCE YoY', 'macro-actual-inflation'),
           localChart('上游通胀', 'PPI Final Demand YoY', 'macro-upstream-inflation'),
           localChart('市场隐含通胀', '5Y / 10Y Breakeven / 5Y5Y Forward', 'macro-market-inflation'),
+          localChart(
+            '通胀 Nowcast',
+            'Cleveland Fed CPI / PCE nowcasting',
+            'macro-inflation-nowcast',
+            {
+              height: 280,
+              sourceNote: 'External Link · Cleveland Fed',
+            },
+          ),
+          localChart(
+            '消费者通胀预期',
+            '1年 / 3年 / 5年消费者通胀预期',
+            'macro-inflation-expectations',
+            { height: 280, sourceNote: 'External Link · New York Fed' },
+          ),
         ],
       },
       {
         id: 'macro-rates',
         eyebrow: 'Rates',
-        title: '短端利率走廊',
-        description: '目标区间、准备金利率、逆回购、EFFR 与 SOFR 的统一比较。',
-        layout: 'hero',
+        title: '利率',
+        description: '同时观察美债期限曲线、短端政策走廊与市场对下一次 FOMC 的概率定价。',
+        layout: 'two',
         widgets: [
+          treasuryYieldOverview(),
           localChart(
-            'Short-End Rate Corridor',
+            '短期利率走廊',
             'Fed target / IORB / ON RRP / EFFR / SOFR',
             'macro-rate-corridor',
+          ),
+          localChart('CME FedWatch', '期货隐含的 FOMC 利率概率', 'macro-fedwatch', {
+            height: 280,
+            sourceNote: 'External Link · CME Group',
+          }),
+          localChart(
+            'Polymarket 美联储利率路径',
+            '事件市场对下一次美联储决议的押注',
+            'macro-polymarket-fed',
+            { height: 280, sourceNote: 'External Link · Polymarket' },
           ),
         ],
       },
@@ -299,6 +366,8 @@ export const researchModules: ResearchModule[] = [
             'macro-risk-hy-oas',
           ),
           localChart('HYG / LQD', '同日 adjusted close ratio', 'macro-risk-credit-ratio'),
+          advancedChart('VIX 波动率', 'Equity volatility regime', 'CBOE:VIX', { height: 360 }),
+          advancedChart('美国金融状况指数', 'Chicago Fed NFCI', 'FRED:NFCI', { height: 360 }),
         ],
       },
     ],

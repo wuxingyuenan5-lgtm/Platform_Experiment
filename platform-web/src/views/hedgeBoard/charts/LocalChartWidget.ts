@@ -154,8 +154,66 @@ const externalCryptoResearch = {
   },
 } as const;
 
+const externalMacroResearch = {
+  'macro-fed-balance-structure': {
+    provider: 'MacroMicro',
+    description: '美联储准备金、TGA、逆回购及其他负债结构',
+  },
+  'macro-fedwatch': {
+    provider: 'CME Group',
+    description: '联邦基金期货隐含的 FOMC 目标利率概率',
+  },
+  'macro-polymarket-fed': {
+    provider: 'Polymarket',
+    description: '事件市场参与者对下一次美联储利率决议的押注',
+  },
+  'macro-inflation-nowcast': {
+    provider: 'Cleveland Fed',
+    description: '当月 CPI 与 PCE 的实时估计',
+  },
+  'macro-inflation-expectations': {
+    provider: 'New York Fed',
+    description: '消费者对未来 1 年、3 年与 5 年通胀的预期',
+  },
+  'macro-gdp-now': {
+    provider: 'Atlanta Fed',
+    description: '基于已公布经济数据更新的当季实际 GDP 增长估计',
+  },
+  'macro-lending-standards': {
+    provider: 'Federal Reserve / MacroMicro',
+    description: '银行收紧商业和工业贷款标准的净比例',
+  },
+} as const;
+
 type ExternalGoldResearchKey = keyof typeof externalGoldResearch;
 type ExternalCryptoResearchKey = keyof typeof externalCryptoResearch;
+type ExternalMacroResearchKey = keyof typeof externalMacroResearch;
+
+function renderExternalMacroResearch(key: ExternalMacroResearchKey) {
+  const item = externalMacroResearch[key];
+  return h(
+    'div',
+    {
+      style: {
+        minHeight: '240px',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: '14px',
+        padding: '32px',
+        textAlign: 'center',
+        color: 'var(--color-text-2)',
+      },
+    },
+    [
+      h('span', 'External Link · reference'),
+      h('strong', { style: { color: 'var(--color-text-1)', fontSize: '16px' } }, item.provider),
+      h('span', item.description),
+      h('small', '点击卡片右上角“原始网页”查看；完成正式采集后再替换为本地图表。'),
+    ],
+  );
+}
 
 function renderExternalGoldResearch(key: ExternalGoldResearchKey) {
   const item = externalGoldResearch[key];
@@ -231,6 +289,14 @@ export default defineComponent({
       try {
         const key = props.widget.localKey as LocalWidgetKey;
         switch (key) {
+          case 'macro-fed-balance-structure':
+          case 'macro-fedwatch':
+          case 'macro-polymarket-fed':
+          case 'macro-inflation-nowcast':
+          case 'macro-inflation-expectations':
+          case 'macro-gdp-now':
+          case 'macro-lending-standards':
+            return renderExternalMacroResearch(key);
           case 'spdr-daily-flow':
             return renderExternalGoldResearch(key);
           case 'spdr-holdings-vs-price':

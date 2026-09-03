@@ -40,7 +40,6 @@ const hedgeBoardNav: ReadonlyArray<{
 
 const sectionLabelOverrides: Record<string, { title?: string }> = {
   'macro-market': { title: '宏观市场明细' },
-  'macro-global-m2': { title: 'Global M2 Proxy' },
   'macro-rates': { title: '利率' },
   'macro-liquidity': { title: '流动性' },
   'macro-inflation': { title: '通胀' },
@@ -55,9 +54,8 @@ const sectionLabelOverrides: Record<string, { title?: string }> = {
 
 const macroSectionOrder = [
   'macro-market',
-  'macro-global-m2',
-  'macro-rates',
   'macro-liquidity',
+  'macro-rates',
   'macro-inflation',
   'macro-growth',
   'macro-risk-appetite',
@@ -75,8 +73,16 @@ const widgetTextOverrides: Record<string, { title?: string }> = {
 const ETF_REFERENCE_URL = 'https://www.gold.org/goldhub/data/gold-etfs-holdings-and-flows';
 
 const widgetSourceLinks: Partial<Record<string, string>> = {
-  'macro-global-m2': 'https://fred.stlouisfed.org/series/M2SL',
-  'macro-global-m2-yoy': 'https://fred.stlouisfed.org/series/M2SL',
+  'macro-global-m2': 'https://www.macromicro.me/charts/3439/major-bank-m2-comparsion',
+  'macro-fed-balance-structure':
+    'https://sc.macromicro.me/collections/4238/us-federal/1320/us-fed-liabilities-structure',
+  'macro-fedwatch': 'https://www.cmegroup.com/markets/interest-rates/cme-fedwatch-tool.html',
+  'macro-polymarket-fed': 'https://polymarket.com/zh/event/fed-decision-in-september-762',
+  'macro-inflation-nowcast':
+    'https://www.clevelandfed.org/indicators-and-data/inflation-nowcasting',
+  'macro-inflation-expectations': 'https://www.newyorkfed.org/microeconomics/sce#/inflexp-1',
+  'macro-gdp-now': 'https://www.atlantafed.org/cqer/research/gdpnow',
+  'macro-lending-standards': 'https://en.macromicro.me/charts/1241/us-bank-net-percent-tight-loan',
   'macro-growth-production': 'https://fred.stlouisfed.org/series/GDPC1',
   'macro-growth-labor': 'https://fred.stlouisfed.org/series/IC4WSA',
   'macro-growth-activity': 'https://fred.stlouisfed.org/series/CFNAI',
