@@ -585,6 +585,8 @@ EIA Native 已完成：工程 commit `4a317da`，真实数据 commit `a0e42a8`�
 
 【OWNER CONFIRMED / 2026-09-03】宏观页一级阅读顺序调整为：1 宏观市场明细、2 流动性、3 利率、4 通胀、5 经济、6 风险偏好。Global M2 Proxy、美元净流动性和美联储资产负债结构合并为流动性层，Global M2 YoY 已删除；利率层补齐美债期限走势、短期利率走廊、CME FedWatch 与 Polymarket 利率路径。通胀、经济、风险偏好增加交易工具母表中的关键领先指标，未采集来源明确保留为原始网页入口。
 
+Owner 指定的 6 套 TradingView 研究布局已按语义接入对应卡片的“TradingView 模板”入口，同时保留各卡片原有官方/方法论来源：流动性、美联储负债结构、美债利率市场、美元短期利率监控、美国经济、VIX 期限结构。对外可访问性仍取决于 TradingView 逐布局共享权限，不共享账号登录态。
+
 ### C4 — Term Structure
 
 - WTI → CME link；

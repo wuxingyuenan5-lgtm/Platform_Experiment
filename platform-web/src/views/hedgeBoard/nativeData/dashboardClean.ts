@@ -82,6 +82,7 @@ export interface WidgetConfig {
   config?: Record<string, unknown>;
   localKey?: LocalWidgetKey;
   sourceUrl?: string;
+  referenceLinks?: Array<{ label: string; href: string }>;
 }
 
 export interface ChartSection {
@@ -157,7 +158,11 @@ function localChart(
   title: string,
   subtitle: string,
   localKey: LocalWidgetKey,
-  options: { height?: number; sourceNote?: string } = {},
+  options: {
+    height?: number;
+    sourceNote?: string;
+    referenceLinks?: Array<{ label: string; href: string }>;
+  } = {},
 ): WidgetConfig {
   return {
     kind: 'local-chart',
@@ -166,7 +171,15 @@ function localChart(
     localKey,
     height: options.height ?? 360,
     sourceNote: options.sourceNote,
+    referenceLinks: options.referenceLinks,
   };
+}
+
+function withReferenceLinks(
+  widget: WidgetConfig,
+  referenceLinks: Array<{ label: string; href: string }>,
+): WidgetConfig {
+  return { ...widget, referenceLinks };
 }
 
 function treasuryYieldOverview(): WidgetConfig {
@@ -242,20 +255,37 @@ export const researchModules: ResearchModule[] = [
             height: 420,
             sourceNote: 'Native proxy · reference methodology: MacroMicro',
           }),
-          advancedChart(
-            '美元净流动性',
-            'Formula: WALCL - WDTGAL - RRPONTTLD',
-            'FRED:WALCL-FRED:WDTGAL-FRED:RRPONTTLD',
-            {
-              height: 420,
-              hide_side_toolbar: false,
-            },
+          withReferenceLinks(
+            advancedChart(
+              '美元净流动性',
+              'Formula: WALCL - WDTGAL - RRPONTTLD',
+              'FRED:WALCL-FRED:WDTGAL-FRED:RRPONTTLD',
+              {
+                height: 420,
+                hide_side_toolbar: false,
+              },
+            ),
+            [
+              {
+                label: 'TradingView 模板',
+                href: 'https://cn.tradingview.com/chart/K47lvX8b/',
+              },
+            ],
           ),
           localChart(
             '美联储资产负债结构',
             '准备金、TGA、逆回购及其他负债结构',
             'macro-fed-balance-structure',
-            { height: 300, sourceNote: 'External Link · MacroMicro' },
+            {
+              height: 300,
+              sourceNote: 'External Link · MacroMicro',
+              referenceLinks: [
+                {
+                  label: 'TradingView 模板',
+                  href: 'https://cn.tradingview.com/chart/EUMNyM4l/',
+                },
+              ],
+            },
           ),
         ],
       },
@@ -288,6 +318,14 @@ export const researchModules: ResearchModule[] = [
             '增长与生产',
             'Real GDP YoY / Industrial Production YoY',
             'macro-growth-production',
+            {
+              referenceLinks: [
+                {
+                  label: 'TradingView 模板',
+                  href: 'https://cn.tradingview.com/chart/AmPBnM2J/',
+                },
+              ],
+            },
           ),
           localChart('初请失业金四周均值', 'Initial Claims 4W MA', 'macro-growth-labor'),
           localChart('广义经济活动', 'CFNAI / CFNAIMA3', 'macro-growth-activity'),
@@ -335,11 +373,24 @@ export const researchModules: ResearchModule[] = [
         description: '同时观察美债期限曲线、短端政策走廊与市场对下一次 FOMC 的概率定价。',
         layout: 'two',
         widgets: [
-          treasuryYieldOverview(),
+          withReferenceLinks(treasuryYieldOverview(), [
+            {
+              label: 'TradingView 模板',
+              href: 'https://cn.tradingview.com/chart/WJhhGPpA/',
+            },
+          ]),
           localChart(
             '短期利率走廊',
             'Fed target / IORB / ON RRP / EFFR / SOFR',
             'macro-rate-corridor',
+            {
+              referenceLinks: [
+                {
+                  label: 'TradingView 模板',
+                  href: 'https://cn.tradingview.com/chart/lJmN3igH/',
+                },
+              ],
+            },
           ),
           localChart('CME FedWatch', '期货隐含的 FOMC 利率概率', 'macro-fedwatch', {
             height: 280,
@@ -366,7 +417,15 @@ export const researchModules: ResearchModule[] = [
             'macro-risk-hy-oas',
           ),
           localChart('HYG / LQD', '同日 adjusted close ratio', 'macro-risk-credit-ratio'),
-          advancedChart('VIX 波动率', 'Equity volatility regime', 'CBOE:VIX', { height: 360 }),
+          withReferenceLinks(
+            advancedChart('VIX 波动率', 'Equity volatility regime', 'TVC:VIX', { height: 360 }),
+            [
+              {
+                label: 'TradingView 模板',
+                href: 'https://cn.tradingview.com/chart/qGloFInw/',
+              },
+            ],
+          ),
           advancedChart('美国金融状况指数', 'Chicago Fed NFCI', 'FRED:NFCI', { height: 360 }),
         ],
       },

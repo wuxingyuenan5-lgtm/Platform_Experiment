@@ -40,15 +40,27 @@
               <div class="widget-card__title-row">
                 <h5>{{ resolveWidgetTitle(widget.localKey, widget.title) }}</h5>
               </div>
-              <a
-                v-if="resolveWidgetSourceLink(widget)"
-                class="widget-card__link"
-                :href="resolveWidgetSourceLink(widget)"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                原始网页 ↗
-              </a>
+              <div class="widget-card__actions">
+                <a
+                  v-if="resolveWidgetSourceLink(widget)"
+                  class="widget-card__link"
+                  :href="resolveWidgetSourceLink(widget)"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  原始网页 ↗
+                </a>
+                <a
+                  v-for="link in widget.referenceLinks ?? []"
+                  :key="link.href"
+                  class="widget-card__link"
+                  :href="link.href"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  {{ link.label }} ↗
+                </a>
+              </div>
             </div>
           </div>
 
@@ -221,6 +233,13 @@
     line-height: 1.35;
   }
 
+  .widget-card__actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 6px;
+  }
+
   .widget-card__link {
     display: inline-flex;
     align-items: center;
@@ -243,7 +262,7 @@
     color: #165dff;
   }
 
-  .widget-card--local-chart .widget-card__link {
+  .widget-card--local-chart .widget-card__actions {
     grid-column: 3;
     justify-self: end;
   }

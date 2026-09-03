@@ -459,6 +459,8 @@ Macro V1 已完成：Growth、Inflation、Short-End Rate Corridor、Risk Appetit
 
 【OWNER CONFIRMED / 2026-09-03】宏观页一级阅读顺序统一为：1 宏观市场明细、2 流动性、3 利率、4 通胀、5 经济、6 风险偏好。Global M2 Proxy 与美元净流动性、美联储资产负债结构共同归入流动性，不再单列；Global M2 YoY 退出页面。利率按美债 3M / 2Y / 10Y / 30Y、短期利率走廊、CME FedWatch 与 Polymarket 概率定价组织。未完成正式采集的来源先以原始网页入口呈现。
 
+宏观研究卡片另保留 Owner 的 6 套 TradingView 布局入口：流动性与美联储负债结构归入流动性，美债利率市场与美元短期利率监控归入利率，美国经济归入经济，VIX 期限结构归入风险偏好。入口与官方/方法论原始来源并存，不以私人登录态作为平台依赖。
+
 Commodity V1 已完成：CFTC Gold / Silver / Copper / WTI / Natural Gas 使用官方 PRE Native pipeline、API 与 10 张定位图表；EIA crude / Cushing / gasoline / distillate 已通过真实 workflow `33631637867` 刷新并以两组 Native 图表接回。WGC、SPDR、CME、ICE、LME、Cboe 等受限数据均使用精确官方 External Link。Owner 于 2026-09-03 修正 Market Detail 范围：保留原有完整表格和轮动热图，Native 仅覆盖已接通字段，其他字段标为历史参考并逐步替换。
 
 Crypto V1 已完成：Binance 8 条 BTC / ETH Native series、API、页面图表和 Market Detail 已落地；单一 Venue 口径显式标注为 not Aggregate。Farside、BitcoinTreasuries、DefiLlama、Deribit、Checkonchain、CoinGlass、Bybit、OKX 使用精确 External Link。Owner 已确认 `D:\自营数据库` 为主数据源、GitHub 仅保留代码；本地主库与每日四次计划任务已验收，DNS 污染由限定域名的 DoH/TLS fallback 解决。2026-09-03 起所有图表右上角统一保留精确“原始网页”入口，先保证研究可跳转性，再逐图建设完整采集与本地数据库。
