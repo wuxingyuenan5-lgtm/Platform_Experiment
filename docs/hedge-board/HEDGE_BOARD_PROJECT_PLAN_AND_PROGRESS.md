@@ -569,6 +569,8 @@ CFTC 已使用官方 PRE Disaggregated Futures Only 数据集，按 Contract Mar
 
 EIA Native 已完成：工程 commit `4a317da`，真实数据 commit `a0e42a8`，应用图表 commit `8ec3ce7e`。四条官方 series identity、API v2 provider、canonical pipeline、CLI、Commodity dashboard groups、周三/周六条件式 CI 与密钥不落盘测试均已验收。workflow run `33631637867` success，EIA refresh step 实际执行；API 返回两组四序列。最新观测为 2026-08-21，按 10 天阈值正确标记 `stale`，未 forward-fill。
 
+2026-09-03 商品页补充 MacroMicro 二级参考入口：仅挂接与现有卡片口径明确对应的黄金 ETF、央行黄金、黄金利率关系、CFTC 持仓、EIA 库存、原油期限结构/波动率及 Brent-WTI 价差页面；官方或一手来源继续作为“原始网页”，MacroMicro 不替代数据权威来源。
+
 ### C2 — Existing Gold Modules 去假数据
 
 - WGC ETF Flow → External Link；

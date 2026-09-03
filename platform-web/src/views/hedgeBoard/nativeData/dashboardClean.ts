@@ -182,6 +182,10 @@ function withReferenceLinks(
   return { ...widget, referenceLinks };
 }
 
+function macroMicroReference(href: string) {
+  return [{ label: 'MacroMicro 参考', href }];
+}
+
 function treasuryYieldOverview(): WidgetConfig {
   return {
     kind: 'symbol-overview',
@@ -503,6 +507,9 @@ export const researchModules: ResearchModule[] = [
           localChart('金价 vs SPDR 每日流量', '', 'spdr-daily-flow', {
             height: 420,
             sourceNote: 'External Link · SPDR Gold Shares · permission_required',
+            referenceLinks: macroMicroReference(
+              'https://en.macromicro.me/charts/23274/gld-fund-flow',
+            ),
           }),
           localChart('SPDR 持仓量 vs 黄金价格', '', 'spdr-holdings-vs-price', {
             height: 420,
@@ -520,10 +527,16 @@ export const researchModules: ResearchModule[] = [
           localChart('官方黄金储备前十', '', 'central-bank-holders', {
             height: 420,
             sourceNote: 'External Link · World Gold Council · permission_required',
+            referenceLinks: macroMicroReference(
+              'https://en.macromicro.me/charts/78898/world-central-bank-gold-reserves',
+            ),
           }),
           localChart('近一年持续增持的央行', '', 'central-bank-buyers', {
             height: 420,
             sourceNote: 'External Link · World Gold Council · permission_required',
+            referenceLinks: macroMicroReference(
+              'https://en.macromicro.me/charts/93189/gold-demand-central-banks-and-other-inst',
+            ),
           }),
         ],
       },
@@ -541,6 +554,9 @@ export const researchModules: ResearchModule[] = [
             {
               height: 400,
               sourceNote: 'External Link · U.S. Treasury · no local gold proxy',
+              referenceLinks: macroMicroReference(
+                'https://en.macromicro.me/charts/81733/Gold-Price-vs-US5-Year-Real-Yield',
+              ),
             },
           ),
           localChart(
@@ -550,16 +566,25 @@ export const researchModules: ResearchModule[] = [
             {
               height: 400,
               sourceNote: 'External Link · U.S. Treasury · no local gold proxy',
+              referenceLinks: macroMicroReference('https://en.macromicro.me/charts/10319/xau'),
             },
           ),
           localChart('金价 vs 10Y 实际利率', '实际利率是黄金最硬的宏观约束之一', 'gold-vs-real', {
             height: 400,
             sourceNote: 'External Link · U.S. Treasury · no local gold proxy',
+            referenceLinks: macroMicroReference(
+              'https://www.macromicro.me/charts/22895/huang-jin-VS-shi-zhi-li-lv-Real-interest-rate',
+            ),
           }),
-          advancedChart('Gold vs DXY', '黄金与美元指数', 'OANDA:XAUUSD', {
-            compareSymbols: [{ symbol: 'TVC:DXY', position: 'SameScale' }],
-            height: 420,
-          }),
+          withReferenceLinks(
+            advancedChart('Gold vs DXY', '黄金与美元指数', 'OANDA:XAUUSD', {
+              compareSymbols: [{ symbol: 'TVC:DXY', position: 'SameScale' }],
+              height: 420,
+            }),
+            macroMicroReference(
+              'https://en.macromicro.me/charts/81733/Gold-Price-vs-US5-Year-Real-Yield',
+            ),
+          ),
         ],
       },
       {
@@ -570,23 +595,75 @@ export const researchModules: ResearchModule[] = [
           'CFTC Disaggregated Futures Only 周报；净持仓按明确 Contract Market Code 映射，拥挤度为 Managed Money Net 的滚动 260 周历史分位。',
         layout: 'two',
         widgets: [
-          localChart('Gold Net Position', 'Managed Money / Producer-Merchant', 'cftc-gold-net'),
-          localChart('Gold 5Y Percentile', 'Managed Money Net', 'cftc-gold-percentile'),
-          localChart('Silver Net Position', 'Managed Money / Producer-Merchant', 'cftc-silver-net'),
-          localChart('Silver 5Y Percentile', 'Managed Money Net', 'cftc-silver-percentile'),
-          localChart('Copper Net Position', 'Managed Money / Producer-Merchant', 'cftc-copper-net'),
-          localChart('Copper 5Y Percentile', 'Managed Money Net', 'cftc-copper-percentile'),
-          localChart('WTI Net Position', 'Managed Money / Producer-Merchant', 'cftc-wti-net'),
-          localChart('WTI 5Y Percentile', 'Managed Money Net', 'cftc-wti-percentile'),
+          localChart('Gold Net Position', 'Managed Money / Producer-Merchant', 'cftc-gold-net', {
+            referenceLinks: macroMicroReference(
+              'https://en.macromicro.me/charts/31138/gold-future-options-fund-net-position-vs-price',
+            ),
+          }),
+          localChart('Gold 5Y Percentile', 'Managed Money Net', 'cftc-gold-percentile', {
+            referenceLinks: macroMicroReference(
+              'https://en.macromicro.me/charts/31138/gold-future-options-fund-net-position-vs-price',
+            ),
+          }),
+          localChart(
+            'Silver Net Position',
+            'Managed Money / Producer-Merchant',
+            'cftc-silver-net',
+            {
+              referenceLinks: macroMicroReference(
+                'https://en.macromicro.me/collections/3961/silver-managed-money/31173/silver-future-options-fund-net-position-vs-price',
+              ),
+            },
+          ),
+          localChart('Silver 5Y Percentile', 'Managed Money Net', 'cftc-silver-percentile', {
+            referenceLinks: macroMicroReference(
+              'https://en.macromicro.me/collections/3961/silver-managed-money/31173/silver-future-options-fund-net-position-vs-price',
+            ),
+          }),
+          localChart(
+            'Copper Net Position',
+            'Managed Money / Producer-Merchant',
+            'cftc-copper-net',
+            {
+              referenceLinks: macroMicroReference(
+                'https://en.macromicro.me/series/8311/copper-futures-and-options-manage-money-net-position',
+              ),
+            },
+          ),
+          localChart('Copper 5Y Percentile', 'Managed Money Net', 'cftc-copper-percentile', {
+            referenceLinks: macroMicroReference(
+              'https://en.macromicro.me/series/8311/copper-futures-and-options-manage-money-net-position',
+            ),
+          }),
+          localChart('WTI Net Position', 'Managed Money / Producer-Merchant', 'cftc-wti-net', {
+            referenceLinks: macroMicroReference(
+              'https://en.macromicro.me/charts/31152/crude-oil-wti-brent-managed-money-net-position',
+            ),
+          }),
+          localChart('WTI 5Y Percentile', 'Managed Money Net', 'cftc-wti-percentile', {
+            referenceLinks: macroMicroReference(
+              'https://en.macromicro.me/charts/31152/crude-oil-wti-brent-managed-money-net-position',
+            ),
+          }),
           localChart(
             'Natural Gas Net Position',
             'Managed Money / Producer-Merchant',
             'cftc-natural-gas-net',
+            {
+              referenceLinks: macroMicroReference(
+                'https://en.macromicro.me/charts/30979/natural-gas-future-options-fund-net-position-vs-price',
+              ),
+            },
           ),
           localChart(
             'Natural Gas 5Y Percentile',
             'Managed Money Net',
             'cftc-natural-gas-percentile',
+            {
+              referenceLinks: macroMicroReference(
+                'https://en.macromicro.me/charts/30979/natural-gas-future-options-fund-net-position-vs-price',
+              ),
+            },
           ),
         ],
       },
@@ -599,12 +676,20 @@ export const researchModules: ResearchModule[] = [
         widgets: [
           localChart('Crude Oil Stocks', 'U.S. Commercial / Cushing', 'eia-crude-stocks', {
             sourceNote: 'Native · U.S. EIA Open Data API v2 · weekly',
+            referenceLinks: macroMicroReference(
+              'https://en.macromicro.me/charts/81111/yuan-you-ku-cun',
+            ),
           }),
           localChart(
             'Products Stocks',
             'Motor Gasoline / Distillate Fuel Oil',
             'eia-products-stocks',
-            { sourceNote: 'Native · U.S. EIA Open Data API v2 · weekly' },
+            {
+              sourceNote: 'Native · U.S. EIA Open Data API v2 · weekly',
+              referenceLinks: macroMicroReference(
+                'https://en.macromicro.me/charts/81111/yuan-you-ku-cun',
+              ),
+            },
           ),
         ],
       },
@@ -616,8 +701,21 @@ export const researchModules: ResearchModule[] = [
           'CME、ICE、LME 与 Cboe 的受限市场数据按 Phase F 采用官方 External Link；不在本地复制曲线、库存或指数历史。',
         layout: 'two',
         widgets: [
-          localChart('WTI Futures Curve', 'CME official contract chain', 'commodity-wti-curve'),
-          localChart('Brent Futures Curve', 'ICE official contract chain', 'commodity-brent-curve'),
+          localChart('WTI Futures Curve', 'CME official contract chain', 'commodity-wti-curve', {
+            referenceLinks: macroMicroReference(
+              'https://en.macromicro.me/charts/148223/volatility-wti-crude-oil-volatility-term-structure',
+            ),
+          }),
+          localChart(
+            'Brent Futures Curve',
+            'ICE official contract chain',
+            'commodity-brent-curve',
+            {
+              referenceLinks: macroMicroReference(
+                'https://en.macromicro.me/charts/889/commodity-brent',
+              ),
+            },
+          ),
           localChart('Copper Prompt Curve', 'LME official contract page', 'commodity-copper-curve'),
           localChart(
             'CME Delivery & Stocks',
@@ -634,8 +732,21 @@ export const researchModules: ResearchModule[] = [
             'COMEX / LME / SHFE legs',
             'commodity-copper-spreads',
           ),
-          localChart('Brent - WTI Spread', 'ICE / CME licensed legs', 'commodity-brent-wti-spread'),
-          localChart('OVX', 'Cboe Crude Oil ETF Volatility Index', 'commodity-ovx'),
+          localChart(
+            'Brent - WTI Spread',
+            'ICE / CME licensed legs',
+            'commodity-brent-wti-spread',
+            {
+              referenceLinks: macroMicroReference(
+                'https://en.macromicro.me/collections/19/mm-oil-price/1024/brent-wti-price-spread',
+              ),
+            },
+          ),
+          localChart('OVX', 'Cboe Crude Oil ETF Volatility Index', 'commodity-ovx', {
+            referenceLinks: macroMicroReference(
+              'https://en.macromicro.me/charts/148223/volatility-wti-crude-oil-volatility-term-structure',
+            ),
+          }),
           localChart('CVOL', 'CME Group Volatility Indexes', 'commodity-cvol'),
         ],
       },
