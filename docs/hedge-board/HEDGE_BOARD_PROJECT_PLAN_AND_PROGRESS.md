@@ -384,7 +384,7 @@ GitHub Actions：
 | Macro V1 Engineering | DONE | 100% | Market Detail 23 行；Growth / Inflation / Rates / Risk / Global M2 全部验收 |
 | Commodity V1 Engineering | DONE | 100% | CFTC / EIA Native、受限模块官方 Link、母表 fail-closed 与 QA 全部完成 |
 | Crypto V1 Engineering | DONE | 100% | Binance Native、links、fail-closed、本地数据库与本地调度已验收 |
-| Unified QA + Offline Acceptance | IN PROGRESS | 90% | 自动化浏览器 QA 已完成；Owner 线下验收与是否合并待决定 |
+| Unified QA + Offline Acceptance | IN PROGRESS | 95% | 隔离本地验收站已就绪；Owner 页面验收与是否合并待决定 |
 
 **工程主阶段完成：5 / 6 = 83.3%。**
 
@@ -772,9 +772,10 @@ Native Binance / rights-clear data；严格区分 7×24 与 US securities calend
 - Binance Futures 系统 DNS 污染通过限定主机的 Cloudflare DoH + TLS 校验 fallback 解决；不修改系统 DNS，不写 hosts；
 - GitHub 中 EIA secret 已移除；本地用户环境保留刷新凭据。
 - Unified QA 首轮：Hedge Board 专项 12 tests、Pyright 0 errors、frontend ESLint / typecheck / layout verifier、production build 均通过；全仓 API 套件 615 项中 592 passed、23 failed，失败均位于既有版本工具、上下文预算、数据库 seed、交易执行与 venue reconciliation 边界，未触及本次 Hedge Board 本地数据读取文件。不得将这些失败记为本阶段通过，最终验收保留为 IN PROGRESS；
-- `platform-data` 仓库中历史已提交的数据快照仍存在。受根目录安全规则限制，AI 不批量删除；当前已停止一切 GitHub 数据刷新与提交，后续若要求物理移除旧快照，由 Owner 手动批量删除后再提交。
+- `platform-data` 仓库中历史已提交的数据快照仍存在。受根目录安全规则限制，AI 不批量删除；当前已停止一切 GitHub 数据刷新与提交，Owner 已确认后续手动批量删除旧快照并自行提交。
 - 已使用隔离 E2E 数据库完成认证浏览器 QA：Macro / Commodity / Crypto 在 normal 与 blocked 两种网络模拟下共 6 组 chart/detail flow 全部通过；本地 API 实际请求 `/research/macro/dashboard-v1`、`/research/commodity/dashboard-v1`、`/research/crypto/dashboard-v1`、`/research/market-detail/macro` 均返回 HTTP 200。测试账户环境变量和临时数据库已清理；
-- 当前最终 Gate 只保留 Owner 线下页面验收、是否处理 GitHub 历史快照以及是否合并应用分支。AI 未合并 `Platform_Experiment/main`。
+- Owner 线下页面验收使用独立 `127.0.0.1:14373` Web 与 `127.0.0.1:18000` API，账号库隔离且 Live Write 关闭，数据只读 `D:\自营数据库\hedge-board`；默认平台 `4373/8000` 不受占用。启动与关闭入口分别为仓库根目录 `启动HedgeBoard验收站.bat`、`关闭HedgeBoard验收站.bat`；
+- 当前最终 Gate 只保留 Owner 线下页面验收以及是否合并应用分支。AI 未合并 `Platform_Experiment/main`。
 
 建议执行顺序：
 
