@@ -486,6 +486,9 @@ export const researchModules: ResearchModule[] = [
           localChart('Commodity Market Detail', '', 'gold-market-detail-table', {
             height: 620,
             sourceNote: '',
+            referenceLinks: [
+              { label: 'TradingView 模板', href: 'https://cn.tradingview.com/chart/3pJneWqX/' },
+            ],
           }),
         ],
       },
@@ -640,6 +643,9 @@ export const researchModules: ResearchModule[] = [
           localChart('Crypto Market Detail', '', 'crypto-market-detail-table', {
             height: 620,
             sourceNote: '',
+            referenceLinks: [
+              { label: 'TradingView 模板', href: 'https://cn.tradingview.com/chart/lYCXN3KJ/' },
+            ],
           }),
         ],
       },

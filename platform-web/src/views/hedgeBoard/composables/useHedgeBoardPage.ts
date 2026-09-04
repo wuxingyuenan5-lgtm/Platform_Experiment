@@ -275,7 +275,8 @@ export function useHedgeBoardPage() {
     return (
       ['macro-market', 'gold-market', 'crypto-market'].includes(sectionId) &&
       widget.kind === 'local-chart' &&
-      marketDetailWidgetKeys.has(localKey)
+      marketDetailWidgetKeys.has(localKey) &&
+      !widget.referenceLinks?.length
     );
   }
 
