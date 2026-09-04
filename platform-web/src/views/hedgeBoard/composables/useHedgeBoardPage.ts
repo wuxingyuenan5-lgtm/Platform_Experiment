@@ -70,8 +70,6 @@ const researchSectionOrder: Partial<Record<HedgeCategory, readonly string[]>> = 
     'gold-main',
     'gold-flows',
     'gold-rates',
-    'commodity-positioning',
-    'commodity-eia-inventory',
     'commodity-official-references',
     'gold-browser-toolbox',
   ],

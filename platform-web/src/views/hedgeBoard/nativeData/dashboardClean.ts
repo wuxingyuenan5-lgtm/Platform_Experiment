@@ -531,6 +531,11 @@ export const researchModules: ResearchModule[] = [
             '交易法门 · 商品期货持仓与结构分析',
             'https://www.jiaoyifamen.com/variety/',
           ),
+          externalReference(
+            'COMEX 黄金总库存',
+            'CommoditiesChart · 注册与合格库存',
+            'https://commoditieschart.net/zh/metals/gold/comex-gold-stocks',
+          ),
           localChart('各国央行黄金净购买量', '', 'central-bank-buyers', {
             height: 420,
             sourceNote: 'External Link · World Gold Council · permission_required',
@@ -565,112 +570,6 @@ export const researchModules: ResearchModule[] = [
               },
             ],
           }),
-        ],
-      },
-      {
-        id: 'commodity-positioning',
-        eyebrow: 'Positioning / CFTC',
-        title: '核心商品持仓结构',
-        description:
-          'CFTC Disaggregated Futures Only 周报；净持仓按明确 Contract Market Code 映射，拥挤度为 Managed Money Net 的滚动 260 周历史分位。',
-        layout: 'two',
-        widgets: [
-          localChart('Gold Net Position', 'Managed Money / Producer-Merchant', 'cftc-gold-net', {
-            referenceLinks: macroMicroReference(
-              'https://en.macromicro.me/charts/31138/gold-future-options-fund-net-position-vs-price',
-            ),
-          }),
-          localChart('Gold 5Y Percentile', 'Managed Money Net', 'cftc-gold-percentile', {
-            referenceLinks: macroMicroReference(
-              'https://en.macromicro.me/charts/31138/gold-future-options-fund-net-position-vs-price',
-            ),
-          }),
-          localChart(
-            'Silver Net Position',
-            'Managed Money / Producer-Merchant',
-            'cftc-silver-net',
-            {
-              referenceLinks: macroMicroReference(
-                'https://en.macromicro.me/collections/3961/silver-managed-money/31173/silver-future-options-fund-net-position-vs-price',
-              ),
-            },
-          ),
-          localChart('Silver 5Y Percentile', 'Managed Money Net', 'cftc-silver-percentile', {
-            referenceLinks: macroMicroReference(
-              'https://en.macromicro.me/collections/3961/silver-managed-money/31173/silver-future-options-fund-net-position-vs-price',
-            ),
-          }),
-          localChart(
-            'Copper Net Position',
-            'Managed Money / Producer-Merchant',
-            'cftc-copper-net',
-            {
-              referenceLinks: macroMicroReference(
-                'https://en.macromicro.me/series/8311/copper-futures-and-options-manage-money-net-position',
-              ),
-            },
-          ),
-          localChart('Copper 5Y Percentile', 'Managed Money Net', 'cftc-copper-percentile', {
-            referenceLinks: macroMicroReference(
-              'https://en.macromicro.me/series/8311/copper-futures-and-options-manage-money-net-position',
-            ),
-          }),
-          localChart('WTI Net Position', 'Managed Money / Producer-Merchant', 'cftc-wti-net', {
-            referenceLinks: macroMicroReference(
-              'https://en.macromicro.me/charts/31152/crude-oil-wti-brent-managed-money-net-position',
-            ),
-          }),
-          localChart('WTI 5Y Percentile', 'Managed Money Net', 'cftc-wti-percentile', {
-            referenceLinks: macroMicroReference(
-              'https://en.macromicro.me/charts/31152/crude-oil-wti-brent-managed-money-net-position',
-            ),
-          }),
-          localChart(
-            'Natural Gas Net Position',
-            'Managed Money / Producer-Merchant',
-            'cftc-natural-gas-net',
-            {
-              referenceLinks: macroMicroReference(
-                'https://en.macromicro.me/charts/30979/natural-gas-future-options-fund-net-position-vs-price',
-              ),
-            },
-          ),
-          localChart(
-            'Natural Gas 5Y Percentile',
-            'Managed Money Net',
-            'cftc-natural-gas-percentile',
-            {
-              referenceLinks: macroMicroReference(
-                'https://en.macromicro.me/charts/30979/natural-gas-future-options-fund-net-position-vs-price',
-              ),
-            },
-          ),
-        ],
-      },
-      {
-        id: 'commodity-eia-inventory',
-        eyebrow: 'Inventory / EIA',
-        title: '美国能源库存',
-        description: 'EIA API v2 官方周频库存；保留周频口径和 stale 状态，不做日频 forward-fill。',
-        layout: 'two',
-        widgets: [
-          localChart('Crude Oil Stocks', 'U.S. Commercial / Cushing', 'eia-crude-stocks', {
-            sourceNote: 'Native · U.S. EIA Open Data API v2 · weekly',
-            referenceLinks: macroMicroReference(
-              'https://en.macromicro.me/charts/81111/yuan-you-ku-cun',
-            ),
-          }),
-          localChart(
-            'Products Stocks',
-            'Motor Gasoline / Distillate Fuel Oil',
-            'eia-products-stocks',
-            {
-              sourceNote: 'Native · U.S. EIA Open Data API v2 · weekly',
-              referenceLinks: macroMicroReference(
-                'https://en.macromicro.me/charts/81111/yuan-you-ku-cun',
-              ),
-            },
-          ),
         ],
       },
       {
@@ -741,11 +640,6 @@ export const researchModules: ResearchModule[] = [
             'GLD 借券费率',
             'ChartExchange · ETF 做空拥挤与借券成本',
             'https://chartexchange.com/symbol/nyse-gld/borrow-fee/',
-          ),
-          externalReference(
-            'COMEX 黄金总库存',
-            'CommoditiesChart · 注册与合格库存',
-            'https://commoditieschart.net/zh/metals/gold/comex-gold-stocks',
           ),
           externalReference(
             '沪金期限结构',
