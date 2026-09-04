@@ -44,6 +44,12 @@ When an external result cannot be proven:
 5. escalate contradictory or absent evidence;
 6. keep Live Write disabled until resolved.
 
+## Hedge Board research data
+
+The Hedge Board is read-only research functionality. Its local refresh service is operator-managed and serves validated canonical data to the Platform API; the web application must not substitute a failed refresh with zeroes, sample curves or a browser-side provider call.
+
+When a source is delayed or unavailable, verify the dashboard status and the local refresh logs before intervention. Preserve the last meaningful observation as explicitly stale where the data contract permits it. External research links open at their original provider and are not part of the Platform service health boundary.
+
 ## Backup and recovery
 
 Use the controlled backup/restore interfaces. Restore only into an isolated path, validate checksums and SQLite integrity, compare critical table counts, and start the restored API in safe state. A restore drill is not a production cutover.
