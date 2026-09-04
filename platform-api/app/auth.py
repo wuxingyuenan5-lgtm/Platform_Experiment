@@ -314,6 +314,9 @@ def permission_for_request(method: str, path: str) -> str:
     if "/live-trading/sessions/" in path and path.endswith("/revoke"):
         return "live_session:revoke"
 
+    if path.endswith("/trading/cross-spread/preflight"):
+        return "platform:read"
+
     if path.endswith("/trading/commands") or path.endswith("/trading/execution-batches"):
         return "trade:submit"
     if path.endswith("/trading/orders") and normalized_method == "POST":

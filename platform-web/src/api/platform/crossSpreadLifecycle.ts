@@ -107,6 +107,16 @@ export interface CrossSpreadMarketCloseInput {
   limitStrategy?: CrossSpreadLimitStrategy;
 }
 
+export interface CrossSpreadPreflightInput {
+  action: 'OPEN_LONG' | 'CLOSE_LONG' | 'OPEN_SHORT' | 'CLOSE_SHORT';
+  quantityOz: string;
+}
+
+export interface CrossSpreadPreflightResult {
+  status: 'ready';
+  preparedAt: string;
+}
+
 const apiBaseUrl = import.meta.env.VITE_PLATFORM_API_BASE_URL || 'http://127.0.0.1:8000/api/v1';
 
 const platformApiToken = import.meta.env.VITE_PLATFORM_API_TOKEN || '';
@@ -125,6 +135,16 @@ export async function openCrossSpreadMarket(
 ): Promise<CrossSpreadMarketOpenResult> {
   const response = await client.post<CrossSpreadMarketOpenResult>(
     '/trading/cross-spread/lifecycle/open',
+    input,
+  );
+  return response.data;
+}
+
+export async function prepareCrossSpreadExecution(
+  input: CrossSpreadPreflightInput,
+): Promise<CrossSpreadPreflightResult> {
+  const response = await client.post<CrossSpreadPreflightResult>(
+    '/trading/cross-spread/preflight',
     input,
   );
   return response.data;

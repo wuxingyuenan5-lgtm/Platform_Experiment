@@ -3,6 +3,7 @@
 import {
   closeCrossSpreadMarket,
   openCrossSpreadMarket,
+  prepareCrossSpreadExecution,
   type CrossSpreadDirection,
   type CrossSpreadExecutionMode,
   type CrossSpreadExitPlanResult,
@@ -115,8 +116,10 @@ export function useCrossSpreadExecution(options: UseCrossSpreadExecutionOptions)
   const executionMessageTone = ref<MessageTone>('is-warn');
   const limitEvidence = ref<CrossSpreadLimitExecutionResult | null>(null);
   const pendingAction = ref<PendingAction | null>(null);
+  const preflightReady = ref(false);
+  const preflightError = ref('');
 
-  const confirmGuardMessage = computed(() => '');
+  const confirmGuardMessage = computed(() => preflightError.value);
   const confirmSummary = computed(() => {
     const action = pendingAction.value;
     const closeOrders =
@@ -197,6 +200,43 @@ export function useCrossSpreadExecution(options: UseCrossSpreadExecutionOptions)
     executionMessageTone.value = nextTone;
   }
 
+  async function prepareAction(action: PendingAction) {
+    preflightReady.value = false;
+    preflightError.value = '';
+    submitLoading.value = true;
+    setExecutionMessage('正在完成账户、报价和保证金预检…', 'is-warn');
+    try {
+      const orders =
+        action.kind === 'CLOSE'
+          ? options.closeOrders.value.filter((order) => order.id === action.planId)
+          : action.kind === 'CLOSE_ALL'
+          ? options.closeOrders.value
+          : [];
+      if (action.kind === 'OPEN') {
+        await prepareCrossSpreadExecution({
+          action: action.direction === 'LONG_SPREAD' ? 'OPEN_LONG' : 'OPEN_SHORT',
+          quantityOz: String(options.qtyOz.value),
+        });
+      } else {
+        await Promise.all(
+          orders.map((order) =>
+            prepareCrossSpreadExecution({
+              action: order.direction === 'LONG_SPREAD' ? 'CLOSE_LONG' : 'CLOSE_SHORT',
+              quantityOz: String(order.qtyOz),
+            }),
+          ),
+        );
+      }
+      preflightReady.value = true;
+      setExecutionMessage('预检完成，可以确认下单', 'is-success');
+    } catch (error) {
+      preflightError.value = requestErrorMessage(error, '执行预检失败');
+      setExecutionMessage(preflightError.value, 'is-error');
+    } finally {
+      submitLoading.value = false;
+    }
+  }
+
   function openConfirm(action: string) {
     if (action.startsWith('CLOSE:')) {
       pendingAction.value = { kind: 'CLOSE', planId: action.slice('CLOSE:'.length) };
@@ -205,6 +245,7 @@ export function useCrossSpreadExecution(options: UseCrossSpreadExecutionOptions)
     }
     confirmVisible.value = true;
     setExecutionMessage('', 'is-warn');
+    if (pendingAction.value) void prepareAction(pendingAction.value);
   }
 
   function prepareOpenDraft(direction: 'long' | 'short') {
@@ -214,6 +255,7 @@ export function useCrossSpreadExecution(options: UseCrossSpreadExecutionOptions)
     };
     confirmVisible.value = true;
     setExecutionMessage('', 'is-warn');
+    void prepareAction(pendingAction.value);
   }
 
   async function refreshExecutionViews() {
@@ -225,6 +267,10 @@ export function useCrossSpreadExecution(options: UseCrossSpreadExecutionOptions)
   async function confirmOrder() {
     const action = pendingAction.value;
     if (!action) return;
+    if (!preflightReady.value) {
+      setExecutionMessage(preflightError.value || '请等待执行预检完成', 'is-warn');
+      return;
+    }
     submitLoading.value = true;
     setExecutionMessage('', 'is-warn');
     try {

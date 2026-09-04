@@ -7,6 +7,7 @@ from app.catalog import get_order, list_fills, list_orders
 from app.cross_spread import (
     get_cross_spread_history,
     get_cross_spread_snapshot,
+    prepare_cross_spread_market_command,
     submit_cross_spread_market_command,
 )
 from app.execution_batches import (
@@ -22,6 +23,7 @@ from app.schemas import (
     CreateTradeCommandRequest,
     CrossSpreadHistoryPointResponse,
     CrossSpreadMarketCommandRequest,
+    CrossSpreadPreflightRequest,
     CrossSpreadSnapshotResponse,
     ExecutionBatchResponse,
     FillResponse,
@@ -96,6 +98,17 @@ def create_trading_router(api_prefix: str) -> APIRouter:
         limit: int = Query(default=200, ge=1, le=1000),
     ) -> list[CrossSpreadHistoryPointResponse]:
         return get_cross_spread_history(limit)
+
+    @router.post(
+        f"{api_prefix}/trading/cross-spread/preflight",
+        tags=["trading"],
+    )
+    def cross_spread_preflight(
+        request: CrossSpreadPreflightRequest,
+        http_request: Request,
+    ) -> dict[str, object]:
+        require_principal(http_request)
+        return prepare_cross_spread_market_command(request)
 
     @router.get(
         f"{api_prefix}/trading/cross-spread/funding-transfer/quote",

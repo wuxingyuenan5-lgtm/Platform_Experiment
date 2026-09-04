@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from decimal import Decimal
 
 import httpx
@@ -23,6 +25,7 @@ from app.schemas import (
     CreateTradeCommandRequest,
     CrossSpreadHistoryPointResponse,
     CrossSpreadMarketCommandRequest,
+    CrossSpreadPreflightRequest,
     CrossSpreadSnapshotResponse,
     CrossSpreadVenueSnapshotResponse,
     ExecutionBatchResponse,
@@ -212,6 +215,80 @@ def submit_cross_spread_market_command(
         requested_by="cross_spread_command",
     )
     return execute_instruction(str(instruction["instructionId"]))
+
+
+def prepare_cross_spread_market_command(
+    request: CrossSpreadPreflightRequest,
+) -> dict[str, object]:
+    """Prepare read-only admission facts before final user confirmation."""
+    _validate_acceptance_quantity(request.quantity_oz)
+    sizing = _load_live_cross_spread_sizing()
+    mt5_quantity = request.quantity_oz / sizing.mt5_multiplier
+    _validate_leg_quantity(
+        request.quantity_oz,
+        minimum=sizing.bybit_min,
+        step=sizing.bybit_step,
+        maximum=sizing.bybit_max,
+        label=BYBIT_SYMBOL,
+    )
+    _validate_leg_quantity(
+        mt5_quantity,
+        minimum=sizing.mt5_min,
+        step=sizing.mt5_step,
+        maximum=sizing.mt5_max,
+        label=MT5_SYMBOL,
+    )
+    bybit_side, mt5_side = _sides_for_action(request.action)
+
+    def prepare_leg(account_id: str, symbol: str, side: str, quantity: Decimal):
+        from app.execution_batches import (
+            _reservation_margin_estimate,
+            _reservation_reference_price,
+        )
+
+        reference_price = _reservation_reference_price(
+            account_id=account_id,
+            symbol=symbol,
+            side=side,
+        )
+        currency, margin = _reservation_margin_estimate(
+            account_id=account_id,
+            symbol=symbol,
+            side=side,
+            quantity=quantity,
+            reference_price=reference_price,
+        )
+        return {
+            "accountId": account_id,
+            "symbol": symbol,
+            "side": side,
+            "quantity": format(quantity, "f"),
+            "referencePrice": format(reference_price, "f"),
+            "reservationCurrency": currency,
+            "reservationAmount": format(margin, "f"),
+        }
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        bybit_future = executor.submit(
+            prepare_leg,
+            sizing.bybit_account_id,
+            BYBIT_SYMBOL,
+            bybit_side,
+            request.quantity_oz,
+        )
+        mt5_future = executor.submit(
+            prepare_leg,
+            sizing.mt5_account_id,
+            MT5_SYMBOL,
+            mt5_side,
+            mt5_quantity,
+        )
+        legs = [bybit_future.result(), mt5_future.result()]
+    return {
+        "status": "ready",
+        "preparedAt": datetime.now(UTC).isoformat(),
+        "legs": legs,
+    }
 
 
 def submit_bybit_definitive_failure_rollback(

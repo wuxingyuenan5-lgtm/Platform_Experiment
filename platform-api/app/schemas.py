@@ -162,6 +162,11 @@ class CrossSpreadMarketCommandRequest(BaseModel):
     )
 
 
+class CrossSpreadPreflightRequest(BaseModel):
+    action: Literal["OPEN_LONG", "CLOSE_LONG", "OPEN_SHORT", "CLOSE_SHORT"]
+    quantity_oz: Decimal = Field(alias="quantityOz", gt=0)
+
+
 class StrategyDefinitionResponse(BaseModel):
     strategy_id: str = Field(alias="strategyId")
     strategy_key: str = Field(alias="strategyKey")

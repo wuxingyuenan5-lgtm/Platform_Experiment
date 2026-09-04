@@ -31,6 +31,10 @@ def create_app(gateway: VenueGateway | None = None) -> FastAPI:
         initialize_journal()
         ensure_store()
         ensure_live_store()
+        if settings.live_write_enabled:
+            warm = getattr(runtime_gateway, "warm_live_execution", None)
+            if warm is not None:
+                warm()
         try:
             yield
         finally:

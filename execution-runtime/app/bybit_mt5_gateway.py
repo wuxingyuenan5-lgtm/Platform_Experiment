@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
+from time import monotonic
 from typing import Any, Literal, cast
 
 from app.bybit_live_adapter import BybitLiveAdapter
@@ -40,6 +41,9 @@ class BybitMt5Gateway:
     """Account-routed live gateway with independent Bybit and MT5 adapters."""
 
     name = "bybit_mt5"
+    _QUOTE_CACHE_SECONDS = 5.0
+    _MARGIN_CACHE_SECONDS = 15.0
+    _SPECIFICATION_CACHE_SECONDS = 60.0
 
     def __init__(
         self,
@@ -57,6 +61,23 @@ class BybitMt5Gateway:
         # Keep construction side-effect free. Production MT5 workers are created
         # lazily from the explicit account id on the first account-scoped call.
         self.mt5: Any = mt5 or StrictMt5AcceptanceAdapter(self.settings)
+        self._execution_read_cache: dict[tuple[object, ...], tuple[float, Any]] = {}
+
+    def warm_live_execution(self) -> None:
+        """Pay connection and identity startup costs before the first order.
+
+        This performs authenticated reads only. A failure keeps Runtime startup
+        fail-closed instead of moving Terminal login or client initialization
+        into the first live command's latency budget.
+        """
+        for account_id in sorted(self.settings.allowed_live_accounts):
+            if account_id in self.settings.bybit_accounts:
+                self.bybit.get_account_risk(account_id)
+            elif account_id in self.settings.mt5_accounts:
+                # Worker startup already proves an authoritative account
+                # snapshot. The capability call merely triggers that startup;
+                # avoid immediately fetching the full account history twice.
+                self._mt5_adapter(account_id).capability()
 
     def place_order(self, command: SubmitOrderCommand) -> list[ExecutionEvent]:
         return self.submit_order(command)
@@ -382,6 +403,87 @@ class BybitMt5Gateway:
         instrument_type: str | None = None,
         category: str | None = None,
     ) -> VenueInstrumentSpecification:
+        key = (
+            "specification",
+            account_id,
+            symbol.upper(),
+            instrument_type or "",
+            category or "",
+        )
+        return self._cached_execution_read(
+            key,
+            self._SPECIFICATION_CACHE_SECONDS,
+            lambda: self._load_instrument_specification(
+                account_id=account_id,
+                symbol=symbol,
+                instrument_type=instrument_type,
+                category=category,
+            ),
+        )
+
+    def get_market_quote(
+        self,
+        *,
+        account_id: str,
+        symbol: str,
+        instrument_type: str | None = None,
+        category: str | None = None,
+    ):
+        key = (
+            "quote",
+            account_id,
+            symbol.upper(),
+            instrument_type or "",
+            category or "",
+        )
+        return self._cached_execution_read(
+            key,
+            self._QUOTE_CACHE_SECONDS,
+            lambda: self._adapter_for_account(account_id).get_market_quote(
+                account_id=account_id,
+                symbol=symbol,
+                instrument_type=instrument_type,
+                category=category,
+            ),
+        )
+
+    def estimate_order_margin(
+        self,
+        *,
+        account_id: str,
+        symbol: str,
+        side,
+        quantity,
+        reference_price,
+    ):
+        key = (
+            "margin",
+            account_id,
+            symbol.upper(),
+            str(side),
+            format(Decimal(quantity), "f"),
+            format(Decimal(reference_price), "f"),
+        )
+        return self._cached_execution_read(
+            key,
+            self._MARGIN_CACHE_SECONDS,
+            lambda: self._adapter_for_account(account_id).estimate_order_margin(
+                account_id=account_id,
+                symbol=symbol,
+                side=side,
+                quantity=quantity,
+                reference_price=reference_price,
+            ),
+        )
+
+    def _load_instrument_specification(
+        self,
+        *,
+        account_id: str,
+        symbol: str,
+        instrument_type: str | None,
+        category: str | None,
+    ):
         adapter = self._adapter_for_account(account_id)
         if account_id in self.settings.mt5_accounts:
             return adapter.get_instrument_specification(
@@ -395,37 +497,14 @@ class BybitMt5Gateway:
             category=category,
         )
 
-    def get_market_quote(
-        self,
-        *,
-        account_id: str,
-        symbol: str,
-        instrument_type: str | None = None,
-        category: str | None = None,
-    ):
-        return self._adapter_for_account(account_id).get_market_quote(
-            account_id=account_id,
-            symbol=symbol,
-            instrument_type=instrument_type,
-            category=category,
-        )
-
-    def estimate_order_margin(
-        self,
-        *,
-        account_id: str,
-        symbol: str,
-        side,
-        quantity,
-        reference_price,
-    ):
-        return self._adapter_for_account(account_id).estimate_order_margin(
-            account_id=account_id,
-            symbol=symbol,
-            side=side,
-            quantity=quantity,
-            reference_price=reference_price,
-        )
+    def _cached_execution_read(self, key, ttl_seconds: float, loader):
+        cached = self._execution_read_cache.get(key)
+        now = monotonic()
+        if cached is not None and now - cached[0] <= ttl_seconds:
+            return cached[1]
+        value = loader()
+        self._execution_read_cache[key] = (now, value)
+        return value
 
     def list_economic_events(
         self,
