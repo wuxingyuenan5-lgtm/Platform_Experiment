@@ -734,6 +734,7 @@
   }
 
   function arrowScore(value: string) {
+    if (isUnavailable(value)) return 0;
     return parseTone(value) === 'negative' ? -1 : 1;
   }
 
@@ -746,15 +747,22 @@
   }
 
   function chipTone(value: string) {
+    if (isUnavailable(value)) return '';
     return parseTone(value) === 'negative' ? 'is-down' : 'is-up';
   }
 
   function normalizeArrow(value: string) {
+    if (isUnavailable(value)) return '—';
     return parseTone(value) === 'negative' ? '▼' : '▲';
   }
 
   function arrowClass(value: string) {
+    if (isUnavailable(value)) return '';
     return parseTone(value) === 'negative' ? 'is-arrow-down' : 'is-arrow-up';
+  }
+
+  function isUnavailable(value: string) {
+    return value.trim() === '—';
   }
 
   function heatmapClass(value: string) {

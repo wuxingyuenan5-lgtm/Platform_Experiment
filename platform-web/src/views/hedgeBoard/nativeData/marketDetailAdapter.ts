@@ -50,18 +50,70 @@ export function prepareMacroMarketDetail(groups: TerminalTableGroup[]): Terminal
 }
 
 export function prepareCommodityMarketDetail(groups: TerminalTableGroup[]): TerminalTableGroup[] {
-  return cloneGroups(groups).map((group) => ({
-    ...group,
-    rows: group.rows.map((row) => ({ ...row, spark: [] })),
-  }));
+  return prepareLiveMarketDetail(groups);
 }
 
 export function prepareCryptoMarketDetail(groups: TerminalTableGroup[]): TerminalTableGroup[] {
+  return prepareLiveMarketDetail(groups);
+}
+
+/**
+ * Commodity and crypto detail tables are sourced from the market-detail API.
+ * Until a row is received, show an explicit unavailable state instead of the
+ * design-time sample figures that exist in the terminal catalog.
+ */
+function prepareLiveMarketDetail(groups: TerminalTableGroup[]): TerminalTableGroup[] {
   return cloneGroups(groups).map((group) => ({
     ...group,
-    rows: group.rows.map((row) => ({ ...row, spark: [] })),
+    rows: group.rows.map((row) => ({
+      ...row,
+      spark: [],
+      price: UNAVAILABLE,
+      d1: UNAVAILABLE,
+      ytd: UNAVAILABLE,
+      qtd: UNAVAILABLE,
+      w1: UNAVAILABLE,
+      m1: UNAVAILABLE,
+      y1: UNAVAILABLE,
+      high: UNAVAILABLE,
+      d10: UNAVAILABLE,
+      d20: UNAVAILABLE,
+      d50: UNAVAILABLE,
+      d200: UNAVAILABLE,
+      x2050: UNAVAILABLE,
+    })),
   }));
 }
+
+// The research catalogue uses stable UI identifiers while the provider uses
+// canonical series identifiers. Keep this mapping at the display boundary so
+// neither identifier leaks into the other contract.
+const LIVE_ROW_ID_BY_CATALOG_ID: Record<string, string> = {
+  'gold-xauusd': 'gold-xau-row',
+  'gold-xagusd': 'gold-slv-row',
+  'gold-copper': 'gold-copper-row',
+  'gold-plat': 'gold-plat-row',
+  'gold-pall': 'gold-pall-row',
+  'gold-ratio-xauxag': 'gold-ratio-row',
+  'gold-bcom': 'gold-bcom-row',
+  'gold-spgsci': 'gold-spgsci-row',
+  'gold-usoil': 'gold-wti-row',
+  'gold-brent': 'gold-brent-row',
+  'gold-xng': 'gold-gas-row',
+  'crypto-btcusd': 'crypto-btc-row',
+  'crypto-ibit': 'crypto-ibit-row',
+  'crypto-ethusd': 'crypto-eth-row',
+  'crypto-solusd': 'crypto-sol-row',
+  'crypto-bnbusd': 'crypto-bnb-row',
+  'crypto-xrpusd': 'crypto-xrp-row',
+  'crypto-dogeusd': 'crypto-doge-row',
+  'crypto-mstr': 'crypto-mstr-row',
+  'crypto-crcl': 'crypto-crcl-row',
+  'crypto-coin': 'crypto-coin-row',
+  'crypto-bmnr': 'crypto-bmnr-row',
+  'crypto-hood': 'crypto-hood-row',
+  'crypto-usdc': 'crypto-usdc-row',
+};
 
 function cryptoChange(points: Array<{ date: string; value: number }>, days: number): string {
   if (points.length < 2) return UNAVAILABLE;
@@ -169,10 +221,10 @@ export function mergeLiveMarketDetail(
   remoteRows: MarketDetailRow[],
 ): TerminalTableGroup[] {
   const byId = new Map(remoteRows.map((row) => [row.id, row]));
-  return groups.map((group) => ({
+  return prepareLiveMarketDetail(groups).map((group) => ({
     ...group,
     rows: group.rows.map((row) => {
-      const remote = byId.get(row.id);
+      const remote = byId.get(LIVE_ROW_ID_BY_CATALOG_ID[row.id] ?? row.id);
       if (!remote || remote.status === 'no_data' || remote.status === 'error') return row;
       const spark = (remote.spark90d?.length ? remote.spark90d : remote.spark30d)
         .map(Number)
