@@ -708,6 +708,11 @@ export const researchModules: ResearchModule[] = [
             'https://www.coinglass.com/zh/pro/futures/OpenInterest',
           ),
           externalReference(
+            '资费详情',
+            'CoinGlass · 全市场资金费率',
+            'https://www.coinglass.com/zh/FundingRate',
+          ),
+          externalReference(
             'Coinbase Premium Index',
             'CoinGlass · 美国现货相对溢价',
             'https://www.coinglass.com/pro/i/coinbase-bitcoin-premium-index',
