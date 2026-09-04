@@ -869,19 +869,50 @@ export const researchModules: ResearchModule[] = [
         eyebrow: 'ETF Flow',
         title: 'BTC ETF 与价格',
         description: '',
-        layout: 'two',
+        layout: 'three',
         widgets: [
           localChart('BTC ETF 日流量 vs BTC 价格', '', 'btc-etf-flow', {
             height: 420,
             sourceNote: '',
           }),
-          localChart('ETH ETF 日流量', 'Farside Investors', 'crypto-eth-etf-flow', {
+          localChart('ETH ETF 日流量', 'SoSoValue', 'crypto-eth-etf-flow', {
             height: 420,
           }),
           localChart('Bitcoin Treasuries Weekly Net Inflow', '', 'btc-treasury-flow', {
             height: 420,
             sourceNote: '',
+            referenceLinks: [
+              {
+                label: 'SoSoValue 参考 ↗',
+                href: 'https://sosovalue.com/zh/assets/bitcoin-treasuries/weekly-net-inflow',
+              },
+            ],
           }),
+          externalReference(
+            '稳定币市值历史',
+            'CoinGlass · 稳定币供应趋势',
+            'https://www.coinglass.com/pro/stablecoin',
+          ),
+          externalReference(
+            'Strategy BTC 持仓',
+            'BitcoinTreasuries · Strategy 持仓与分析',
+            'https://bitcointreasuries.net/public-companies/strategy',
+          ),
+          externalReference(
+            'Strategic ETH Reserve',
+            '企业与机构 ETH 储备',
+            'https://www.strategicethreserve.xyz/',
+          ),
+          externalReference(
+            'STRC ATM Tracker',
+            'Bitcoin for Corporations · ATM 融资进度',
+            'https://bitcoinforcorporations.com/strc-atm-tracker/',
+          ),
+          externalReference(
+            'STRC 实时定价',
+            'STRC 股价、收益率与 ATM 状态',
+            'https://strc.live/ticker/strc',
+          ),
         ],
       },
       {
@@ -926,50 +957,6 @@ export const researchModules: ResearchModule[] = [
           localChart('Aggregate Derivatives', 'CoinGlass', 'crypto-coinglass'),
           localChart('Bybit Derivatives', 'Bybit', 'crypto-bybit'),
           localChart('OKX Derivatives', 'OKX', 'crypto-okx'),
-        ],
-      },
-      {
-        id: 'crypto-capital-toolbox',
-        eyebrow: 'Capital Flows & Treasury',
-        title: 'ETF、稳定币与财库公司工具',
-        description: '跟踪法币入口、稳定币流动性以及上市公司 BTC / ETH 储备与融资。',
-        layout: 'three',
-        widgets: [
-          externalReference(
-            'SoSoValue 现货 ETF 资金流',
-            'BTC / ETH 等美国现货 ETF 汇总',
-            'https://sosovalue.com/zh/assets/etf/Total_Crypto_Spot_ETF_Fund_Flow?page=usBTC',
-          ),
-          externalReference(
-            '稳定币市值历史',
-            'CoinGlass · 稳定币供应趋势',
-            'https://www.coinglass.com/pro/stablecoin',
-          ),
-          externalReference(
-            'Bitcoin Treasuries 周度净流入',
-            'SoSoValue · 企业与机构购币',
-            'https://sosovalue.com/zh/assets/bitcoin-treasuries/weekly-net-inflow',
-          ),
-          externalReference(
-            'Strategy BTC 持仓',
-            'BitcoinTreasuries · Strategy 持仓与分析',
-            'https://bitcointreasuries.net/public-companies/strategy',
-          ),
-          externalReference(
-            'Strategic ETH Reserve',
-            '企业与机构 ETH 储备',
-            'https://www.strategicethreserve.xyz/',
-          ),
-          externalReference(
-            'STRC ATM Tracker',
-            'Bitcoin for Corporations · ATM 融资进度',
-            'https://bitcoinforcorporations.com/strc-atm-tracker/',
-          ),
-          externalReference(
-            'STRC 实时定价',
-            'STRC 股价、收益率与 ATM 状态',
-            'https://strc.live/ticker/strc',
-          ),
         ],
       },
       {
@@ -1052,11 +1039,6 @@ export const researchModules: ResearchModule[] = [
             'Unbias Analysts',
             '加密研究员与观点聚合',
             'https://unbias.fyi/analysts?source=all',
-          ),
-          externalReference(
-            'Owner BTC 看盘模板',
-            'TradingView · BTCUSD 日常看盘布局',
-            'https://cn.tradingview.com/chart/3QJfnHcC/?symbol=COINBASE%3ABTCUSD',
           ),
         ],
       },

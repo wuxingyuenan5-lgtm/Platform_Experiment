@@ -107,9 +107,9 @@ const externalGoldResearch = {
 
 const externalCryptoResearch = {
   'btc-etf-flow': {
-    provider: 'Farside Investors',
+    provider: 'SoSoValue',
     description: '美国现货 BTC ETF 每日资金流',
-    href: 'https://farside.co.uk/btc/',
+    href: 'https://sosovalue.com/zh/assets/etf/Total_Crypto_Spot_ETF_Fund_Flow?page=usBTC',
   },
   'btc-treasury-flow': {
     provider: 'BitcoinTreasuries.net',
@@ -132,9 +132,9 @@ const externalCryptoResearch = {
     href: 'https://checkonchain.com/',
   },
   'crypto-eth-etf-flow': {
-    provider: 'Farside Investors',
+    provider: 'SoSoValue',
     description: '美国现货 ETH ETF 每日资金流',
-    href: 'https://farside.co.uk/eth/',
+    href: 'https://sosovalue.com/zh/assets/etf/Total_Crypto_ETH_ETF_Fund_Flow?page=usETH',
   },
   'crypto-coinglass': {
     provider: 'CoinGlass',

@@ -80,7 +80,6 @@ const researchSectionOrder: Partial<Record<HedgeCategory, readonly string[]>> = 
     'crypto-etf',
     'crypto-native-venue',
     'crypto-external-research',
-    'crypto-capital-toolbox',
     'crypto-derivatives-toolbox',
     'crypto-onchain-toolbox',
   ],
@@ -117,9 +116,10 @@ const widgetSourceLinks: Partial<Record<string, string>> = {
   'macro-rate-corridor': 'https://www.newyorkfed.org/markets/reference-rates',
   'macro-risk-hy-oas': 'https://fred.stlouisfed.org/series/BAMLH0A0HYM2',
   'macro-risk-credit-ratio': 'https://finance.yahoo.com/quote/HYG/history/',
-  'btc-etf-flow': 'https://farside.co.uk/btc/',
+  'btc-etf-flow': 'https://sosovalue.com/zh/assets/etf/Total_Crypto_Spot_ETF_Fund_Flow?page=usBTC',
   'btc-treasury-flow': 'https://bitcointreasuries.net/',
-  'crypto-eth-etf-flow': 'https://farside.co.uk/eth/',
+  'crypto-eth-etf-flow':
+    'https://sosovalue.com/zh/assets/etf/Total_Crypto_ETH_ETF_Fund_Flow?page=usETH',
   'crypto-binance-spot': 'https://www.binance.com/en/markets/overview',
   'crypto-binance-funding':
     'https://www.binance.com/en/futures/funding-history/perpetual/real-time-funding-rate',
