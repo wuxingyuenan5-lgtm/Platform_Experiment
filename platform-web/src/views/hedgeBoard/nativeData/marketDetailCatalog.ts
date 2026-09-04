@@ -161,7 +161,7 @@ export const marketDetailCatalog: Record<CatalogMarketId, CatalogGroup[]> = {
         { id: 'crypto-dogeusd', name: '狗狗币', symbol: 'DOGEUSD', tvSymbol: 'COINBASE:DOGEUSD' },
         { id: 'crypto-aaveusd', name: 'AAVE', symbol: 'AAVEUSD', tvSymbol: 'COINBASE:AAVEUSD' },
         { id: 'crypto-uniusd', name: 'UNI', symbol: 'UNIUSD', tvSymbol: 'COINBASE:UNIUSD' },
-        { id: 'crypto-crvusd', name: 'CRV', symbol: 'CRVUSD', tvSymbol: 'COINBASE:CRVUSD' },
+        { id: 'crypto-hypeusd', name: 'HYPE', symbol: 'HYPEUSD', tvSymbol: 'CRYPTO:HYPEUSD' },
         { id: 'crypto-humausd', name: 'HUMA', symbol: 'HUMAUSD', tvSymbol: 'COINBASE:HUMAUSD' },
         { id: 'crypto-ondousd', name: 'ONDO', symbol: 'ONDOUSD', tvSymbol: 'COINBASE:ONDOUSD' },
         { id: 'crypto-plumeusd', name: 'PLUME', symbol: 'PLUMEUSD', tvSymbol: 'COINBASE:PLUMEUSD' },

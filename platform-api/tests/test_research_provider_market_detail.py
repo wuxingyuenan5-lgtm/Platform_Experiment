@@ -140,3 +140,7 @@ def test_live_provider_fails_closed_when_every_symbol_is_unavailable(
 
     with pytest.raises(ResearchProviderError, match="market_detail_no_live_rows"):
         asyncio.run(provider.get("crypto"))
+
+
+def test_crypto_provider_includes_hype_series():
+    assert market_detail.CRYPTO_YAHOO_SYMBOLS["crypto-hype-row"] == "HYPE-USD"

@@ -2,83 +2,96 @@
   <section id="crypto-wealth" class="wealth-panel" data-testid="crypto-wealth-panel">
     <header class="wealth-header">
       <h2>理财信息</h2>
-      <button type="button" class="reference-button" @click="openReferencePage">
-        打开参考页面
-      </button>
+      <div class="wealth-actions">
+        <button
+          type="button"
+          class="reference-button"
+          :aria-expanded="expanded"
+          aria-controls="crypto-wealth-content"
+          @click="expanded = !expanded"
+        >
+          {{ expanded ? '收起' : '展开' }}
+        </button>
+        <button type="button" class="reference-button" @click="openReferencePage">
+          打开参考页面
+        </button>
+      </div>
     </header>
 
-    <div class="wealth-toolbar">
-      <label>
-        <span>平台</span>
-        <select v-model="filters.exchange">
-          <option value="all">全部平台</option>
-          <option v-for="item in exchangeOptions" :key="item.value" :value="item.value">
-            {{ item.label }}
-          </option>
-        </select>
-      </label>
-      <label>
-        <span>派息</span>
-        <select v-model="filters.frequency">
-          <option value="all">不限派息</option>
-          <option value="daily">每日派息</option>
-          <option value="fixed">固定期限</option>
-          <option value="floating">浮动利率</option>
-        </select>
-      </label>
-      <label>
-        <span>期限</span>
-        <select v-model="filters.lock">
-          <option value="all">不限期限</option>
-          <option value="short">7 天以内</option>
-          <option value="mid">30 天以内</option>
-          <option value="long">长期</option>
-        </select>
-      </label>
-      <label>
-        <span>搜索</span>
-        <input v-model="filters.keyword" placeholder="搜索平台、币种或活动" />
-      </label>
-    </div>
+    <div v-if="expanded" id="crypto-wealth-content" class="wealth-content">
+      <div class="wealth-toolbar">
+        <label>
+          <span>平台</span>
+          <select v-model="filters.exchange">
+            <option value="all">全部平台</option>
+            <option v-for="item in exchangeOptions" :key="item.value" :value="item.value">
+              {{ item.label }}
+            </option>
+          </select>
+        </label>
+        <label>
+          <span>派息</span>
+          <select v-model="filters.frequency">
+            <option value="all">不限派息</option>
+            <option value="daily">每日派息</option>
+            <option value="fixed">固定期限</option>
+            <option value="floating">浮动利率</option>
+          </select>
+        </label>
+        <label>
+          <span>期限</span>
+          <select v-model="filters.lock">
+            <option value="all">不限期限</option>
+            <option value="short">7 天以内</option>
+            <option value="mid">30 天以内</option>
+            <option value="long">长期</option>
+          </select>
+        </label>
+        <label>
+          <span>搜索</span>
+          <input v-model="filters.keyword" placeholder="搜索平台、币种或活动" />
+        </label>
+      </div>
 
-    <div class="wealth-table-head">
-      <span>活动</span>
-      <span>平台 / 币种</span>
-      <button type="button" @click="toggleYieldSort">
-        收益率 {{ sortOrder === 'desc' ? '↓' : '↑' }}
-      </button>
-      <span>期限 / 锁仓</span>
-      <span>到期时间</span>
-      <span>活动说明</span>
-    </div>
+      <div class="wealth-table-head">
+        <span>活动</span>
+        <span>平台 / 币种</span>
+        <button type="button" @click="toggleYieldSort">
+          收益率 {{ sortOrder === 'desc' ? '↓' : '↑' }}
+        </button>
+        <span>期限 / 锁仓</span>
+        <span>到期时间</span>
+        <span>活动说明</span>
+      </div>
 
-    <div v-if="!filteredCampaigns.length" class="wealth-empty">暂无匹配活动</div>
-    <div v-else class="wealth-list">
-      <article v-for="item in filteredCampaigns" :key="item.id" class="wealth-row">
-        <div>
-          <strong>{{ item.name }}</strong>
-          <div class="wealth-tags">
-            <span v-for="tag in item.tags" :key="tag">{{ tag }}</span>
+      <div v-if="!filteredCampaigns.length" class="wealth-empty">暂无匹配活动</div>
+      <div v-else class="wealth-list">
+        <article v-for="item in filteredCampaigns" :key="item.id" class="wealth-row">
+          <div>
+            <strong>{{ item.name }}</strong>
+            <div class="wealth-tags">
+              <span v-for="tag in item.tags" :key="tag">{{ tag }}</span>
+            </div>
           </div>
-        </div>
-        <div
-          ><strong>{{ item.platform }}</strong
-          ><p>{{ item.coin }}</p></div
-        >
-        <div class="wealth-yield"
-          ><strong>{{ item.apy }}</strong
-          ><p>{{ item.apyNote }}</p></div
-        >
-        <div
-          ><strong>{{ lockLabel(item.lock) }}</strong
-          ><p>{{ frequencyLabel(item.frequency) }}</p></div
-        >
-        <div
-          ><strong :class="{ 'is-urgent': item.daysLeft <= 1 }">{{ item.expiryLabel }}</strong
-          ><p>{{ item.expiryNote }}</p></div
-        >
-        <p>{{ item.description }}</p>
-      </article>
+          <div
+            ><strong>{{ item.platform }}</strong
+            ><p>{{ item.coin }}</p></div
+          >
+          <div class="wealth-yield"
+            ><strong>{{ item.apy }}</strong
+            ><p>{{ item.apyNote }}</p></div
+          >
+          <div
+            ><strong>{{ lockLabel(item.lock) }}</strong
+            ><p>{{ frequencyLabel(item.frequency) }}</p></div
+          >
+          <div
+            ><strong :class="{ 'is-urgent': item.daysLeft <= 1 }">{{ item.expiryLabel }}</strong
+            ><p>{{ item.expiryNote }}</p></div
+          >
+          <p>{{ item.description }}</p>
+        </article>
+      </div>
     </div>
   </section>
 </template>
@@ -90,6 +103,7 @@
   type SortOrder = 'desc' | 'asc';
 
   const sortOrder = ref<SortOrder>('desc');
+  const expanded = ref(false);
   const filters = reactive({ exchange: 'all', frequency: 'all', lock: 'all', keyword: '' });
   const exchangeOptions = [
     { value: 'gate', label: 'Gate' },
@@ -151,6 +165,16 @@
     align-items: center;
     justify-content: space-between;
     gap: 14px;
+  }
+
+  .wealth-actions {
+    display: flex;
+    gap: 8px;
+  }
+
+  .wealth-content {
+    display: grid;
+    gap: 16px;
   }
 
   h2 {

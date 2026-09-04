@@ -107,6 +107,7 @@ const LIVE_ROW_ID_BY_CATALOG_ID: Record<string, string> = {
   'crypto-bnbusd': 'crypto-bnb-row',
   'crypto-xrpusd': 'crypto-xrp-row',
   'crypto-dogeusd': 'crypto-doge-row',
+  'crypto-hypeusd': 'crypto-hype-row',
   'crypto-mstr': 'crypto-mstr-row',
   'crypto-crcl': 'crypto-crcl-row',
   'crypto-coin': 'crypto-coin-row',

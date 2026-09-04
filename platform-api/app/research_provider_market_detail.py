@@ -190,6 +190,7 @@ CRYPTO_YAHOO_SYMBOLS = {
     "crypto-bnb-row": "BNB-USD",
     "crypto-xrp-row": "XRP-USD",
     "crypto-doge-row": "DOGE-USD",
+    "crypto-hype-row": "HYPE-USD",
     "crypto-mstr-row": "MSTR",
     "crypto-crcl-row": "CRCL",
     "crypto-coin-row": "COIN",
