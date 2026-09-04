@@ -285,12 +285,11 @@ export function useHedgeBoardPage() {
     });
   }
 
-  watch(() => route.fullPath, scrollPageTop, { immediate: true });
+  watch(() => route.path, scrollPageTop, { immediate: true });
   onMounted(() => {
     if (typeof window !== 'undefined' && 'scrollRestoration' in window.history) {
       window.history.scrollRestoration = 'manual';
     }
-    scrollPageTop();
   });
 
   return {

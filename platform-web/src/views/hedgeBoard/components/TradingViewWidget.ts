@@ -51,7 +51,6 @@ const TradingViewWidget = defineComponent({
       verifyTimers = [180, 520, 1100, 1900].map((delay) =>
         window.setTimeout(() => {
           verifyWidgetLayout();
-          window.dispatchEvent(new Event('resize'));
         }, delay),
       );
     };
@@ -135,8 +134,11 @@ const TradingViewWidget = defineComponent({
       if (typeof IntersectionObserver !== 'undefined' && mountRef.value) {
         intersectionObserver = new IntersectionObserver(
           (entries) => {
-            if (entries.some((entry) => entry.isIntersecting)) {
-              scheduleRender(true);
+            if (
+              entries.some((entry) => entry.isIntersecting) &&
+              !mountRef.value?.childElementCount
+            ) {
+              scheduleRender();
             }
           },
           { threshold: 0.2 },
