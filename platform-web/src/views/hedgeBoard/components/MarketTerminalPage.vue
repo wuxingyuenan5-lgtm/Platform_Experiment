@@ -4,7 +4,9 @@
       <article class="market-terminal__overview-panel">
         <div class="market-terminal__panel-head">
           <h3>大盘表现</h3>
-          <div v-if="config.overviewChip" class="market-terminal__mini-chip">{{ config.overviewChip }}</div>
+          <div v-if="config.overviewChip" class="market-terminal__mini-chip">{{
+            config.overviewChip
+          }}</div>
         </div>
 
         <div class="market-terminal__market-grid">
@@ -21,8 +23,15 @@
               <strong>{{ item.label }}</strong>
               <em :class="toneClass(item.tone)">{{ item.change }}</em>
             </div>
-            <svg class="market-terminal__market-spark" viewBox="0 0 80 22" preserveAspectRatio="none">
-              <polyline :points="compactSparkline(item.spark, 80, 22)" :class="sparkStrokeClass(item.change)" />
+            <svg
+              class="market-terminal__market-spark"
+              viewBox="0 0 80 22"
+              preserveAspectRatio="none"
+            >
+              <polyline
+                :points="compactSparkline(item.spark, 80, 22)"
+                :class="sparkStrokeClass(item.change)"
+              />
             </svg>
           </button>
         </div>
@@ -45,14 +54,24 @@
               <em :class="toneClass(item.tone)">{{ item.change }}</em>
             </div>
             <span v-if="item.price" class="market-terminal__market-price">{{ item.price }}</span>
-            <svg class="market-terminal__market-spark" viewBox="0 0 80 22" preserveAspectRatio="none">
-              <polyline :points="compactSparkline(item.spark, 80, 22)" :class="sparkStrokeClass(item.change)" />
+            <svg
+              class="market-terminal__market-spark"
+              viewBox="0 0 80 22"
+              preserveAspectRatio="none"
+            >
+              <polyline
+                :points="compactSparkline(item.spark, 80, 22)"
+                :class="sparkStrokeClass(item.change)"
+              />
             </svg>
           </button>
         </div>
       </article>
 
-      <div v-if="config.breadthCards?.length || config.volatilityCards?.length" class="market-terminal__overview-side">
+      <div
+        v-if="config.breadthCards?.length || config.volatilityCards?.length"
+        class="market-terminal__overview-side"
+      >
         <article class="market-terminal__side-panel">
           <div class="market-terminal__panel-head">
             <h3>大盘广度</h3>
@@ -75,7 +94,7 @@
                 <em>{{ item.delta }}</em>
               </div>
               <div class="market-terminal__breadth-track">
-                <i :style="{ width: `${parsePercent(item.value)}%` }" />
+                <i :style="{ width: `${parsePercent(item.value)}%` }"></i>
               </div>
             </article>
           </div>
@@ -106,12 +125,28 @@
       </div>
     </section>
 
-    <TerminalDetailPanel
-      title="市场明细"
-      :market-id="config.id"
-      :columns="config.detailColumns"
-      :groups="config.detailGroups"
-    />
+    <section class="market-terminal__detail-section">
+      <div class="market-terminal__panel-head market-terminal__panel-head--detail-toggle">
+        <h3>市场明细</h3>
+        <button
+          type="button"
+          class="market-terminal__toolbar-btn"
+          :aria-expanded="marketDetailExpanded"
+          aria-controls="market-terminal-detail-content"
+          @click="marketDetailExpanded = !marketDetailExpanded"
+        >
+          {{ marketDetailExpanded ? '收起' : '展开' }}
+        </button>
+      </div>
+      <TerminalDetailPanel
+        v-if="marketDetailExpanded"
+        id="market-terminal-detail-content"
+        title="市场明细"
+        :market-id="config.id"
+        :columns="config.detailColumns"
+        :groups="config.detailGroups"
+      />
+    </section>
 
     <section v-if="config.rotationButtonLabel" class="market-terminal__rotation">
       <button type="button" class="market-terminal__rotation-button" @click="toggleRotation">
@@ -119,7 +154,10 @@
         {{ config.rotationButtonLabel }}
       </button>
 
-      <div v-if="rotationExpanded && config.rotationHeatmap?.length" class="market-terminal__rotation-heatmap">
+      <div
+        v-if="rotationExpanded && config.rotationHeatmap?.length"
+        class="market-terminal__rotation-heatmap"
+      >
         <table class="market-terminal__rotation-table">
           <thead>
             <tr>
@@ -163,7 +201,10 @@
         </table>
       </div>
 
-      <div v-else-if="rotationExpanded && config.rotationSections?.length" class="market-terminal__rotation-grid">
+      <div
+        v-else-if="rotationExpanded && config.rotationSections?.length"
+        class="market-terminal__rotation-grid"
+      >
         <article
           v-for="section in config.rotationSections"
           :key="section.id"
@@ -183,7 +224,10 @@
         </article>
       </div>
 
-      <div v-else-if="rotationExpanded && config.rotationList?.length" class="market-terminal__rotation-list">
+      <div
+        v-else-if="rotationExpanded && config.rotationList?.length"
+        class="market-terminal__rotation-list"
+      >
         <span
           v-for="item in config.rotationList"
           :key="item.id"
@@ -207,7 +251,11 @@
               <p class="market-terminal-chart-modal__eyebrow">{{ chartModal.symbol }}</p>
               <h3>{{ chartModal.name || chartModal.symbol }} 走势</h3>
             </div>
-            <button type="button" class="market-terminal-chart-modal__close" @click="closeTickerChart">
+            <button
+              type="button"
+              class="market-terminal-chart-modal__close"
+              @click="closeTickerChart"
+            >
               关闭
             </button>
           </div>
@@ -223,7 +271,7 @@
               ref="chartContainerRef"
               class="market-terminal-chart-modal__widget"
               :class="{ 'is-hidden': chartModal.loading }"
-            />
+            ></div>
           </div>
         </div>
       </div>
@@ -273,6 +321,7 @@
   );
   const tableSortState = ref<SortState | null>(null);
   const rotationExpanded = ref(true);
+  const marketDetailExpanded = ref(false);
   const rotationSortState = ref<SortState | null>(null);
   const chartContainerRef = ref<HTMLDivElement | null>(null);
   const chartModal = ref<ChartModalState>({
@@ -297,12 +346,20 @@
     const rows = [...(props.config.rotationHeatmap ?? [])];
     const state = rotationSortState.value;
     if (!state) return rows;
-    return rows.sort((left, right) => compareValues(readRotationValue(left, state.key), readRotationValue(right, state.key), state.direction));
+    return rows.sort((left, right) =>
+      compareValues(
+        readRotationValue(left, state.key),
+        readRotationValue(right, state.key),
+        state.direction,
+      ),
+    );
   });
   const displayGroups = computed<TerminalTableGroup[]>(() => {
     const baseGroups = props.config.detailGroups.map((group) => ({
       ...group,
-      rows: group.rows.filter((row) => !(props.config.id === 'gold' && row.id === 'gold-ratio-row')),
+      rows: group.rows.filter(
+        (row) => !(props.config.id === 'gold' && row.id === 'gold-ratio-row'),
+      ),
     }));
 
     if (props.config.id === 'gold') {
@@ -311,10 +368,78 @@
         {
           label: '相对比价',
           rows: [
-            buildRatioRow('gold-ratio-xs', '金银比', 'XAU/XAG', '78.40', '-0.30%', '-1.90%', '-2.40%', '-1.10%', '-2.40%', '-4.60%', '-9.8%', [18, 18, 17, 17, 16, 16, 15, 15, 14, 14, 13, 13, 12, 12, 11, 11, 10, 10, 9, 9, 8, 8, 8, 7], 'OANDA:XAUUSD/OANDA:XAGUSD'),
-            buildRatioRow('gold-ratio-xc', '金铜比', 'XAU/COPPER', '523.1', '+0.20%', '+1.80%', '+0.90%', '+0.60%', '+0.90%', '+4.60%', '-6.2%', [14, 14, 15, 15, 15, 14, 13, 12, 12, 11, 10, 10, 9, 9, 8, 8, 8, 9, 10, 10, 11, 12, 12, 13], 'OANDA:XAUUSD/VANTAGE:COPPER'),
-            buildRatioRow('gold-ratio-xo', '金油比', 'XAU/OIL', '28.6', '+0.50%', '-0.40%', '-1.20%', '-0.20%', '-1.20%', '+8.10%', '-7.4%', [10, 10, 11, 11, 12, 13, 13, 14, 14, 14, 13, 12, 12, 11, 11, 10, 10, 10, 11, 11, 12, 12, 13, 13], 'OANDA:XAUUSD/TVC:USOIL'),
-            buildRatioRow('gold-ratio-xe', '金股比', 'XAU/SPX', '0.42', '+0.80%', '+6.20%', '+3.10%', '+1.10%', '+3.10%', '+9.80%', '-2.9%', [7, 7, 8, 8, 9, 10, 10, 11, 11, 12, 13, 13, 14, 15, 15, 16, 17, 17, 18, 19, 19, 20, 20, 21], 'OANDA:XAUUSD/SP:SPX'),
+            buildRatioRow(
+              'gold-ratio-xs',
+              '金银比',
+              'XAU/XAG',
+              '78.40',
+              '-0.30%',
+              '-1.90%',
+              '-2.40%',
+              '-1.10%',
+              '-2.40%',
+              '-4.60%',
+              '-9.8%',
+              [
+                18, 18, 17, 17, 16, 16, 15, 15, 14, 14, 13, 13, 12, 12, 11, 11, 10, 10, 9, 9, 8, 8,
+                8, 7,
+              ],
+              'OANDA:XAUUSD/OANDA:XAGUSD',
+            ),
+            buildRatioRow(
+              'gold-ratio-xc',
+              '金铜比',
+              'XAU/COPPER',
+              '523.1',
+              '+0.20%',
+              '+1.80%',
+              '+0.90%',
+              '+0.60%',
+              '+0.90%',
+              '+4.60%',
+              '-6.2%',
+              [
+                14, 14, 15, 15, 15, 14, 13, 12, 12, 11, 10, 10, 9, 9, 8, 8, 8, 9, 10, 10, 11, 12,
+                12, 13,
+              ],
+              'OANDA:XAUUSD/VANTAGE:COPPER',
+            ),
+            buildRatioRow(
+              'gold-ratio-xo',
+              '金油比',
+              'XAU/OIL',
+              '28.6',
+              '+0.50%',
+              '-0.40%',
+              '-1.20%',
+              '-0.20%',
+              '-1.20%',
+              '+8.10%',
+              '-7.4%',
+              [
+                10, 10, 11, 11, 12, 13, 13, 14, 14, 14, 13, 12, 12, 11, 11, 10, 10, 10, 11, 11, 12,
+                12, 13, 13,
+              ],
+              'OANDA:XAUUSD/TVC:USOIL',
+            ),
+            buildRatioRow(
+              'gold-ratio-xe',
+              '金股比',
+              'XAU/SPX',
+              '0.42',
+              '+0.80%',
+              '+6.20%',
+              '+3.10%',
+              '+1.10%',
+              '+3.10%',
+              '+9.80%',
+              '-2.9%',
+              [
+                7, 7, 8, 8, 9, 10, 10, 11, 11, 12, 13, 13, 14, 15, 15, 16, 17, 17, 18, 19, 19, 20,
+                20, 21,
+              ],
+              'OANDA:XAUUSD/SP:SPX',
+            ),
           ],
         },
       ];
@@ -326,11 +451,96 @@
         {
           label: '相对比价',
           rows: [
-            buildRatioRow('crypto-ratio-btc-eth', 'BTC / ETH', 'BTC/ETH', '18.28', '+0.40%', '+4.90%', '+1.10%', '+0.70%', '+1.10%', '+15.20%', '-3.6%', [12, 12, 12, 13, 13, 14, 14, 15, 15, 16, 16, 16, 17, 17, 18, 18, 18, 18, 19, 19, 19, 18, 18, 18], 'BINANCE:BTCUSDT/BINANCE:ETHUSDT'),
-            buildRatioRow('crypto-ratio-btc-spx', 'BTC / SPX', 'BTC/SPX', '10.43', '+1.10%', '+36.80%', '+7.60%', '+3.20%', '+7.60%', '+76.40%', '-4.9%', [6, 7, 8, 9, 9, 10, 11, 11, 12, 13, 13, 14, 15, 15, 16, 17, 18, 18, 19, 20, 21, 21, 22, 23], 'COINBASE:BTCUSD/SP:SPX'),
-            buildRatioRow('crypto-ratio-btc-xau', 'BTC / XAU', 'BTC/XAU', '26.94', '+0.70%', '+29.10%', '+5.20%', '+2.30%', '+5.20%', '+80.30%', '-3.1%', [8, 8, 9, 10, 10, 11, 12, 12, 13, 14, 14, 15, 15, 16, 17, 18, 18, 19, 20, 20, 21, 22, 23, 23], 'COINBASE:BTCUSD/OANDA:XAUUSD'),
-            buildRatioRow('crypto-ratio-mstr-btc', 'MSTR / BTC', 'MSTR/BTC', '0.0237', '+0.60%', '+11.30%', '+2.80%', '+1.10%', '+2.80%', '+23.40%', '-5.7%', [10, 10, 10, 11, 11, 12, 12, 12, 13, 13, 13, 14, 14, 15, 15, 16, 16, 16, 17, 17, 18, 18, 18, 19], 'NASDAQ:MSTR/COINBASE:BTCUSD'),
-            buildRatioRow('crypto-ratio-crcl-btc', 'CRCL / BTC', 'CRCL/BTC', '0.00189', '+0.90%', '+18.40%', '+4.20%', '+1.90%', '+4.20%', '+41.60%', '-4.4%', [9, 9, 10, 10, 11, 11, 12, 12, 13, 13, 14, 14, 15, 15, 16, 16, 17, 17, 18, 18, 18, 19, 19, 20], 'NYSE:CRCL/COINBASE:BTCUSD'),
+            buildRatioRow(
+              'crypto-ratio-btc-eth',
+              'BTC / ETH',
+              'BTC/ETH',
+              '18.28',
+              '+0.40%',
+              '+4.90%',
+              '+1.10%',
+              '+0.70%',
+              '+1.10%',
+              '+15.20%',
+              '-3.6%',
+              [
+                12, 12, 12, 13, 13, 14, 14, 15, 15, 16, 16, 16, 17, 17, 18, 18, 18, 18, 19, 19, 19,
+                18, 18, 18,
+              ],
+              'BINANCE:BTCUSDT/BINANCE:ETHUSDT',
+            ),
+            buildRatioRow(
+              'crypto-ratio-btc-spx',
+              'BTC / SPX',
+              'BTC/SPX',
+              '10.43',
+              '+1.10%',
+              '+36.80%',
+              '+7.60%',
+              '+3.20%',
+              '+7.60%',
+              '+76.40%',
+              '-4.9%',
+              [
+                6, 7, 8, 9, 9, 10, 11, 11, 12, 13, 13, 14, 15, 15, 16, 17, 18, 18, 19, 20, 21, 21,
+                22, 23,
+              ],
+              'COINBASE:BTCUSD/SP:SPX',
+            ),
+            buildRatioRow(
+              'crypto-ratio-btc-xau',
+              'BTC / XAU',
+              'BTC/XAU',
+              '26.94',
+              '+0.70%',
+              '+29.10%',
+              '+5.20%',
+              '+2.30%',
+              '+5.20%',
+              '+80.30%',
+              '-3.1%',
+              [
+                8, 8, 9, 10, 10, 11, 12, 12, 13, 14, 14, 15, 15, 16, 17, 18, 18, 19, 20, 20, 21, 22,
+                23, 23,
+              ],
+              'COINBASE:BTCUSD/OANDA:XAUUSD',
+            ),
+            buildRatioRow(
+              'crypto-ratio-mstr-btc',
+              'MSTR / BTC',
+              'MSTR/BTC',
+              '0.0237',
+              '+0.60%',
+              '+11.30%',
+              '+2.80%',
+              '+1.10%',
+              '+2.80%',
+              '+23.40%',
+              '-5.7%',
+              [
+                10, 10, 10, 11, 11, 12, 12, 12, 13, 13, 13, 14, 14, 15, 15, 16, 16, 16, 17, 17, 18,
+                18, 18, 19,
+              ],
+              'NASDAQ:MSTR/COINBASE:BTCUSD',
+            ),
+            buildRatioRow(
+              'crypto-ratio-crcl-btc',
+              'CRCL / BTC',
+              'CRCL/BTC',
+              '0.00189',
+              '+0.90%',
+              '+18.40%',
+              '+4.20%',
+              '+1.90%',
+              '+4.20%',
+              '+41.60%',
+              '-4.4%',
+              [
+                9, 9, 10, 10, 11, 11, 12, 12, 13, 13, 14, 14, 15, 15, 16, 16, 17, 17, 18, 18, 18,
+                19, 19, 20,
+              ],
+              'NYSE:CRCL/COINBASE:BTCUSD',
+            ),
           ],
         },
       ];
@@ -446,12 +656,12 @@
     '399006': 'SZSE:399006',
     '000852': 'SSE:000852',
     '000688': 'SSE:000688',
-    '证券': 'SSE:512000',
-    '芯片': 'SSE:512760',
-    '电新': 'SZSE:159755',
-    '银行': 'SSE:512800',
-    '消费': 'SZSE:159928',
-    '黄金': 'SSE:518880',
+    证券: 'SSE:512000',
+    芯片: 'SSE:512760',
+    电新: 'SZSE:159755',
+    银行: 'SSE:512800',
+    消费: 'SZSE:159928',
+    黄金: 'SSE:518880',
   };
 
   const GOLD_TICKER_TO_TV_SYMBOL: Record<string, string> = {
@@ -547,7 +757,13 @@
     const rows = [...group.rows];
     const state = tableSortState.value;
     if (!state) return rows;
-    return rows.sort((left, right) => compareValues(readTableValue(left, state.key), readTableValue(right, state.key), state.direction));
+    return rows.sort((left, right) =>
+      compareValues(
+        readTableValue(left, state.key),
+        readTableValue(right, state.key),
+        state.direction,
+      ),
+    );
   }
 
   function buildRatioRow(
@@ -597,8 +813,10 @@
     if (key === 'symbol') return row.symbol;
     if (key === 'price') return parseDisplayNumber(row.price);
     if (key === 'high') return parseDisplayNumber(row.high);
-    if (['d1', 'ytd', 'qtd', 'w1', 'm1', 'y1'].includes(key)) return parseDisplayNumber(row[key as keyof TerminalTableRow] as string);
-    if (['d10', 'd20', 'd50', 'd200', 'x2050'].includes(key)) return arrowScore(row[key as keyof TerminalTableRow] as string);
+    if (['d1', 'ytd', 'qtd', 'w1', 'm1', 'y1'].includes(key))
+      return parseDisplayNumber(row[key as keyof TerminalTableRow] as string);
+    if (['d10', 'd20', 'd50', 'd200', 'x2050'].includes(key))
+      return arrowScore(row[key as keyof TerminalTableRow] as string);
     return String(row[key as keyof TerminalTableRow] ?? '');
   }
 
@@ -664,7 +882,8 @@
     return series
       .map((value, index) => {
         const x = (index / Math.max(series.length - 1, 1)) * width;
-        const y = max === min ? height / 2 : height - 1 - ((value - min) / (max - min)) * (height - 2);
+        const y =
+          max === min ? height / 2 : height - 1 - ((value - min) / (max - min)) * (height - 2);
         return `${x.toFixed(1)},${y.toFixed(1)}`;
       })
       .join(' ');
@@ -685,7 +904,10 @@
   }
 
   function heatmapClass(value: string) {
-    return ['market-terminal__rotation-cell', parseTone(value) === 'negative' ? 'is-negative-cell' : 'is-positive-cell'];
+    return [
+      'market-terminal__rotation-cell',
+      parseTone(value) === 'negative' ? 'is-negative-cell' : 'is-positive-cell',
+    ];
   }
 
   function resolveTradingViewSymbol(marketId: TerminalMarketId, symbol: string, tvSymbol?: string) {
@@ -701,7 +923,9 @@
       return GLOBAL_TICKER_TO_TV_SYMBOL[normalized] ?? '';
     }
     if (marketId === 'aShare') {
-      return A_SHARE_TICKER_TO_TV_SYMBOL[symbol.trim()] ?? A_SHARE_TICKER_TO_TV_SYMBOL[normalized] ?? '';
+      return (
+        A_SHARE_TICKER_TO_TV_SYMBOL[symbol.trim()] ?? A_SHARE_TICKER_TO_TV_SYMBOL[normalized] ?? ''
+      );
     }
     if (marketId === 'gold') {
       return GOLD_TICKER_TO_TV_SYMBOL[normalized] ?? '';
@@ -818,15 +1042,24 @@
 
 <style lang="less" scoped>
   .market-terminal {
-    --terminal-border: rgba(201, 213, 226, 0.72);
-    --terminal-border-strong: rgba(170, 186, 203, 0.82);
-    --terminal-panel-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(243, 248, 252, 0.96));
-    --terminal-card-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(247, 250, 252, 0.96));
-    --terminal-chip-bg: rgba(240, 246, 250, 0.96);
+    --terminal-border: rgb(201 213 226 / 72%);
+    --terminal-border-strong: rgb(170 186 203 / 82%);
+    --terminal-panel-bg: linear-gradient(
+      180deg,
+      rgb(255 255 255 / 98%),
+      rgb(243 248 252 / 96%)
+    );
+    --terminal-card-bg: linear-gradient(
+      180deg,
+      rgb(255 255 255 / 98%),
+      rgb(247 250 252 / 96%)
+    );
+    --terminal-chip-bg: rgb(240 246 250 / 96%);
     --terminal-text: #16303a;
     --terminal-muted: #6e8395;
     --terminal-accent: #2d5b74;
-    --terminal-shadow: 0 18px 40px rgba(15, 23, 42, 0.06);
+    --terminal-shadow: 0 18px 40px rgb(15 23 42 / 6%);
+
     display: flex;
     flex-direction: column;
     gap: 14px;
@@ -841,6 +1074,15 @@
     box-shadow: var(--terminal-shadow);
   }
 
+  .market-terminal__detail-section {
+    display: grid;
+    gap: 12px;
+  }
+
+  .market-terminal__panel-head--detail-toggle {
+    margin-bottom: 0;
+  }
+
   .market-terminal__overview-strip {
     display: grid;
     grid-template-columns: 1.05fr 1fr;
@@ -851,8 +1093,8 @@
   .market-terminal__overview-panel,
   .market-terminal__side-panel {
     padding: 12px;
-    border: 1px solid rgba(201, 213, 226, 0.58);
-    background: rgba(255, 255, 255, 0.92);
+    border: 1px solid rgb(201 213 226 / 58%);
+    background: rgb(255 255 255 / 92%);
   }
 
   .market-terminal__overview-side {
@@ -904,24 +1146,21 @@
 
   .market-terminal__market-card {
     padding: 10px;
-    border: 1px solid rgba(201, 213, 226, 0.78);
+    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+    border: 1px solid rgb(201 213 226 / 78%);
     background: var(--terminal-card-bg);
     text-align: left;
-    transition:
-      transform 0.2s ease,
-      box-shadow 0.2s ease,
-      border-color 0.2s ease;
   }
 
   .market-terminal__market-card--mover {
-    border-color: rgba(176, 193, 210, 0.8);
+    border-color: rgb(176 193 210 / 80%);
   }
 
   .market-terminal__market-card.is-clickable:hover,
   .market-terminal__name-button.is-clickable:hover {
     transform: translateY(-1px);
-    border-color: rgba(116, 146, 170, 0.68);
-    box-shadow: 0 14px 32px rgba(15, 23, 42, 0.08);
+    border-color: rgb(116 146 170 / 68%);
+    box-shadow: 0 14px 32px rgb(15 23 42 / 8%);
   }
 
   .market-terminal__market-symbol,
@@ -950,8 +1189,8 @@
   }
 
   .market-terminal__market-head em {
-    font-style: normal;
     font-size: 14px;
+    font-style: normal;
     font-weight: 800;
   }
 
@@ -972,9 +1211,9 @@
 
   .market-terminal__market-spark polyline,
   .market-terminal__sparkline polyline {
-    fill: none;
     stroke-width: 1.5;
     stroke-linecap: round;
+    fill: none;
     stroke-linejoin: round;
   }
 
@@ -1001,8 +1240,8 @@
 
   .market-terminal__breadth-card {
     padding: 10px;
-    border: 1px dashed rgba(191, 205, 218, 0.74);
-    background: rgba(246, 250, 252, 0.92);
+    border: 1px dashed rgb(191 205 218 / 74%);
+    background: rgb(246 250 252 / 92%);
   }
 
   .market-terminal__breadth-head,
@@ -1032,15 +1271,15 @@
   }
 
   .market-terminal__breadth-meta em {
-    font-style: normal;
     color: #5b89ac;
+    font-style: normal;
     font-weight: 700;
   }
 
   .market-terminal__breadth-track {
     height: 5px;
     margin-top: 10px;
-    background: rgba(120, 141, 162, 0.16);
+    background: rgb(120 141 162 / 16%);
   }
 
   .market-terminal__breadth-track i {
@@ -1057,8 +1296,8 @@
 
   .market-terminal__vol-card {
     padding: 10px;
-    border: 1px dashed rgba(191, 205, 218, 0.74);
-    background: rgba(246, 250, 252, 0.92);
+    border: 1px dashed rgb(191 205 218 / 74%);
+    background: rgb(246 250 252 / 92%);
   }
 
   .market-terminal__vol-card p,
@@ -1092,8 +1331,8 @@
 
   .market-terminal__table th,
   .market-terminal__table td {
-    padding: 10px 10px;
-    border-bottom: 1px solid rgba(201, 213, 226, 0.52);
+    padding: 10px;
+    border-bottom: 1px solid rgb(201 213 226 / 52%);
   }
 
   .market-terminal__table th {
@@ -1104,8 +1343,8 @@
   }
 
   .market-terminal__group-row td {
-    background: rgba(241, 246, 251, 0.92);
     padding: 8px 10px;
+    background: rgb(241 246 251 / 92%);
   }
 
   .market-terminal__group-meta {
@@ -1131,7 +1370,7 @@
     align-items: center;
     gap: 8px;
     padding: 6px 10px;
-    border: 1px solid rgba(201, 213, 226, 0.7);
+    border: 1px solid rgb(201 213 226 / 70%);
     border-radius: 999px;
     background: transparent;
     color: var(--terminal-muted);
@@ -1143,8 +1382,8 @@
   .market-terminal__rotation-sort.is-active,
   .market-terminal__sort-button:hover,
   .market-terminal__rotation-sort:hover {
-    border-color: rgba(116, 146, 170, 0.68);
-    background: rgba(236, 243, 249, 0.92);
+    border-color: rgb(116 146 170 / 68%);
+    background: rgb(236 243 249 / 92%);
     color: var(--terminal-accent);
   }
 
@@ -1170,10 +1409,10 @@
     display: block;
     width: 100%;
     padding: 0;
+    transition: transform 0.2s ease;
     border: none;
     background: transparent;
     text-align: left;
-    transition: transform 0.2s ease;
   }
 
   .market-terminal__spark-button {
@@ -1204,7 +1443,7 @@
     display: inline-flex;
     width: fit-content;
     padding: 2px 6px;
-    border: 1px solid rgba(201, 213, 226, 0.86);
+    border: 1px solid rgb(201 213 226 / 86%);
     color: var(--terminal-muted);
     font-size: 11px;
     font-weight: 700;
@@ -1231,15 +1470,15 @@
     flex: 1;
     width: 100%;
     height: 4px;
-    background: rgba(184, 198, 212, 0.24);
-    border-radius: 999px;
     overflow: hidden;
+    border-radius: 999px;
+    background: rgb(184 198 212 / 24%);
   }
 
   .market-terminal__high-cell span {
     flex: 0 0 52px;
-    margin-left: 8px;
     width: 52px;
+    margin-left: 8px;
     text-align: right;
   }
 
@@ -1260,14 +1499,14 @@
   }
 
   .market-chip.is-up {
-    border-color: rgba(91, 147, 211, 0.2);
-    background: rgba(91, 147, 211, 0.12);
+    border-color: rgb(91 147 211 / 20%);
+    background: rgb(91 147 211 / 12%);
     color: #5b93d3;
   }
 
   .market-chip.is-down {
-    border-color: rgba(210, 107, 90, 0.2);
-    background: rgba(210, 107, 90, 0.12);
+    border-color: rgb(210 107 90 / 20%);
+    background: rgb(210 107 90 / 12%);
     color: #d26b5a;
   }
 
@@ -1287,8 +1526,8 @@
   }
 
   .market-terminal__rotation-sort {
-    width: 100%;
     justify-content: center;
+    width: 100%;
   }
 
   .market-terminal__rotation-table {
@@ -1300,9 +1539,9 @@
   .market-terminal__rotation-table th,
   .market-terminal__rotation-table td {
     padding: 10px 12px;
-    border: 1px solid rgba(201, 213, 226, 0.68);
-    text-align: center;
+    border: 1px solid rgb(201 213 226 / 68%);
     font-size: 12px;
+    text-align: center;
   }
 
   .market-terminal__rotation-name {
@@ -1325,12 +1564,12 @@
   }
 
   .market-terminal__rotation-cell.is-positive-cell {
-    background: rgba(91, 147, 211, 0.18);
+    background: rgb(91 147 211 / 18%);
     color: #3777bf;
   }
 
   .market-terminal__rotation-cell.is-negative-cell {
-    background: rgba(210, 107, 90, 0.16);
+    background: rgb(210 107 90 / 16%);
     color: #c95b48;
   }
 
@@ -1343,8 +1582,8 @@
 
   .market-terminal__rotation-panel {
     padding: 12px;
-    border: 1px solid rgba(201, 213, 226, 0.62);
-    background: rgba(246, 250, 252, 0.92);
+    border: 1px solid rgb(201 213 226 / 62%);
+    background: rgb(246 250 252 / 92%);
   }
 
   .market-terminal__rotation-panel h4 {
@@ -1365,8 +1604,8 @@
     align-items: center;
     gap: 6px;
     padding: 8px 10px;
-    border: 1px solid rgba(201, 213, 226, 0.72);
-    background: rgba(255, 255, 255, 0.86);
+    border: 1px solid rgb(201 213 226 / 72%);
+    background: rgb(255 255 255 / 86%);
     color: #5f7485;
     font-size: 12px;
     font-weight: 700;
@@ -1377,25 +1616,25 @@
   }
 
   .market-terminal-chart-modal {
-    position: fixed;
-    inset: 0;
-    z-index: 1200;
     display: flex;
+    position: fixed;
+    z-index: 1200;
     align-items: center;
     justify-content: center;
     padding: 32px;
-    background: rgba(9, 20, 17, 0.46);
+    background: rgb(9 20 17 / 46%);
+    inset: 0;
     backdrop-filter: blur(8px);
   }
 
   .market-terminal-chart-modal__dialog {
     width: min(72vw, 1440px);
     max-width: calc(100vw - 48px);
-    border: 1px solid rgba(201, 213, 226, 0.82);
-    border-radius: 24px;
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.99), rgba(244, 248, 252, 0.98)), #fff;
-    box-shadow: 0 30px 80px rgba(15, 23, 42, 0.18);
     overflow: hidden;
+    border: 1px solid rgb(201 213 226 / 82%);
+    border-radius: 24px;
+    background: linear-gradient(180deg, rgb(255 255 255 / 99%), rgb(244 248 252 / 98%)), #fff;
+    box-shadow: 0 30px 80px rgb(15 23 42 / 18%);
   }
 
   .market-terminal-chart-modal__header {
@@ -1424,9 +1663,9 @@
 
   .market-terminal-chart-modal__close {
     padding: 10px 14px;
-    border: 1px solid rgba(201, 213, 226, 0.82);
+    border: 1px solid rgb(201 213 226 / 82%);
     border-radius: 999px;
-    background: rgba(245, 249, 252, 0.96);
+    background: rgb(245 249 252 / 96%);
     color: var(--terminal-text);
     font-size: 12px;
     font-weight: 700;
@@ -1442,7 +1681,7 @@
     align-items: center;
     justify-content: center;
     height: min(78vh, 860px);
-    background: linear-gradient(180deg, rgba(251, 253, 255, 0.98), rgba(243, 248, 252, 0.98));
+    background: linear-gradient(180deg, rgb(251 253 255 / 98%), rgb(243 248 252 / 98%));
     color: var(--terminal-muted);
     font-size: 14px;
     font-weight: 700;
@@ -1471,15 +1710,15 @@
   .is-positive,
   .is-stroke-up,
   .is-arrow-up {
-    color: #5b93d3;
     stroke: #5b93d3;
+    color: #5b93d3;
   }
 
   .is-negative,
   .is-stroke-down,
   .is-arrow-down {
-    color: #d26b5a;
     stroke: #d26b5a;
+    color: #d26b5a;
   }
 
   .is-badge-neutral,
@@ -1488,8 +1727,8 @@
     display: inline-flex;
     align-items: center;
     padding: 4px 8px;
-    border: 1px solid rgba(201, 213, 226, 0.72);
-    background: rgba(243, 247, 250, 0.94);
+    border: 1px solid rgb(201 213 226 / 72%);
+    background: rgb(243 247 250 / 94%);
     font-size: 11px;
     font-weight: 700;
   }
@@ -1540,8 +1779,3 @@
     }
   }
 </style>
-
-
-
-
-

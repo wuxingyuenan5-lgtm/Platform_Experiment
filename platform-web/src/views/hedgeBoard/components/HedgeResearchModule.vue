@@ -26,9 +26,24 @@
         <div>
           <h4>{{ resolveSectionTitle(section.id, section.title) }}</h4>
         </div>
+        <button
+          v-if="isMarketDetailSection(section)"
+          type="button"
+          class="section-toggle"
+          :aria-expanded="isMarketDetailExpanded(section.id)"
+          :aria-controls="`${section.id}-content`"
+          @click="toggleMarketDetailSection(section.id)"
+        >
+          {{ isMarketDetailExpanded(section.id) ? '收起' : '展开' }}
+        </button>
       </div>
 
-      <div class="widget-grid" :class="`widget-grid--${section.layout ?? 'three'}`">
+      <div
+        v-if="!isMarketDetailSection(section) || isMarketDetailExpanded(section.id)"
+        :id="`${section.id}-content`"
+        class="widget-grid"
+        :class="`widget-grid--${section.layout ?? 'three'}`"
+      >
         <article
           v-for="widget in section.widgets"
           :key="`${section.id}-${widget.title}`"
@@ -83,7 +98,7 @@
 </template>
 
 <script setup lang="ts">
-  import { computed, type Component } from 'vue';
+  import { computed, ref, type Component } from 'vue';
   import HedgeBoardSubnav from './HedgeBoardSubnav.vue';
   import type { ChartSection, LocalWidgetKey, WidgetConfig } from '../nativeData/dashboardClean';
 
@@ -110,6 +125,22 @@
     ...props.sections,
     ...(props.trailingNavigationSections ?? []),
   ]);
+
+  const expandedMarketDetailSectionIds = ref<string[]>([]);
+
+  function isMarketDetailSection(section: ChartSection) {
+    return section.widgets.some((widget) => widget.localKey?.endsWith('-market-detail-table'));
+  }
+
+  function isMarketDetailExpanded(sectionId: string) {
+    return expandedMarketDetailSectionIds.value.includes(sectionId);
+  }
+
+  function toggleMarketDetailSection(sectionId: string) {
+    expandedMarketDetailSectionIds.value = isMarketDetailExpanded(sectionId)
+      ? expandedMarketDetailSectionIds.value.filter((id) => id !== sectionId)
+      : [...expandedMarketDetailSectionIds.value, sectionId];
+  }
 
   defineEmits<{
     (event: 'jump', sectionId: string): void;
@@ -199,6 +230,33 @@
     margin: 0;
     font-size: 22px;
     font-weight: 800;
+  }
+
+  .chart-section__heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+  }
+
+  .section-toggle {
+    min-height: 32px;
+    padding: 5px 12px;
+    border: 1px solid rgb(109 130 147 / 28%);
+    border-radius: 999px;
+    background: #fff;
+    color: var(--hedge-cool-muted, #526b7d);
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  .section-toggle:hover,
+  .section-toggle:focus-visible {
+    border-color: rgb(22 93 255 / 42%);
+    outline: none;
+    background: rgb(22 93 255 / 6%);
+    color: #165dff;
   }
 
   .widget-grid {

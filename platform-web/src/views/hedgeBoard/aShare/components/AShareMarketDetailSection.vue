@@ -5,10 +5,21 @@
         <p class="research-card__eyebrow">MARKET DETAIL</p>
         <h2>A股市场明细</h2>
       </div>
-      <ResearchSourceState v-if="module" :meta="module.meta" />
+      <div class="research-card__actions">
+        <ResearchSourceState v-if="module" :meta="module.meta" />
+        <button
+          type="button"
+          class="section-toggle"
+          :aria-expanded="expanded"
+          aria-controls="a-share-market-detail-content"
+          @click="expanded = !expanded"
+        >
+          {{ expanded ? '收起' : '展开' }}
+        </button>
+      </div>
     </header>
 
-    <div v-if="rows.length" class="table-shell">
+    <div v-if="expanded && rows.length" id="a-share-market-detail-content" class="table-shell">
       <table class="market-table">
         <thead>
           <tr>
@@ -83,17 +94,20 @@
         </tbody>
       </table>
     </div>
-    <div v-else class="research-empty">{{ module?.meta.message || '暂无指数明细数据' }}</div>
+    <div v-else-if="expanded" class="research-empty">
+      {{ module?.meta.message || '暂无指数明细数据' }}
+    </div>
   </section>
 </template>
 
 <script setup lang="ts">
-  import { computed } from 'vue';
+  import { computed, ref } from 'vue';
   import type { AShareIndexSnapshot, ResearchModuleResult } from '@/api/hedgeResearch';
   import ResearchSourceState from '../../research/components/ResearchSourceState.vue';
 
   const props = defineProps<{ module?: ResearchModuleResult<AShareIndexSnapshot[]> | null }>();
   const rows = computed(() => props.module?.data || []);
+  const expanded = ref(false);
 
   function numeric(value: string | number | null | undefined) {
     const result = Number(value);
@@ -156,6 +170,7 @@
     background: var(--strategy-surface);
     box-shadow: var(--strategy-shadow-soft);
   }
+
   .research-card__header {
     display: flex;
     align-items: flex-start;
@@ -163,6 +178,32 @@
     gap: 16px;
     margin-bottom: 16px;
   }
+
+  .research-card__actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .section-toggle {
+    min-height: 32px;
+    padding: 5px 12px;
+    border: 1px solid var(--strategy-border);
+    border-radius: 999px;
+    background: var(--strategy-surface);
+    color: var(--strategy-text-3);
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  .section-toggle:hover,
+  .section-toggle:focus-visible {
+    border-color: var(--strategy-primary);
+    outline: none;
+    color: var(--strategy-primary);
+  }
+
   .research-card__eyebrow {
     margin: 0 0 3px;
     color: var(--strategy-text-4);
@@ -170,22 +211,26 @@
     font-weight: 800;
     letter-spacing: 0.12em;
   }
+
   h2 {
     margin: 0;
     color: var(--strategy-text-1);
     font-size: 18px;
   }
+
   .table-shell {
     overflow-x: auto;
     border: 1px solid var(--strategy-border);
     border-radius: 12px;
   }
+
   .market-table {
     width: 100%;
     min-width: 1540px;
     border-collapse: collapse;
     font-variant-numeric: tabular-nums;
   }
+
   th,
   td {
     padding: 11px 10px;
@@ -194,71 +239,88 @@
     text-align: center;
     white-space: nowrap;
   }
+
   th {
     position: sticky;
-    top: 0;
     z-index: 1;
+    top: 0;
     background: var(--strategy-surface-2);
     color: var(--strategy-text-3);
     font-size: 12px;
   }
+
   tbody tr:last-child td {
     border-bottom: 0;
   }
+
   tbody tr:hover {
     background: var(--strategy-accent-soft);
   }
+
   .is-left,
   .name-cell {
     text-align: left;
   }
+
   .is-right {
     text-align: right;
   }
+
   .name-cell strong,
   .name-cell span {
     display: block;
   }
+
   .name-cell strong {
     color: var(--strategy-text-1);
   }
+
   .name-cell span {
     margin-top: 3px;
     color: var(--strategy-text-4);
     font-size: 12px;
   }
+
   .spark-cell svg {
     width: 96px;
     height: 26px;
   }
+
   .spark-cell polyline {
-    fill: none;
-    stroke: #64748b;
     stroke-width: 2;
+    stroke: #64748b;
+    fill: none;
     vector-effect: non-scaling-stroke;
   }
+
   .spark-cell polyline.is-positive {
     stroke: var(--strategy-up, #ef4444);
   }
+
   .spark-cell polyline.is-negative {
     stroke: var(--strategy-down, #10b981);
   }
+
   .is-positive {
     color: var(--strategy-up, #ef4444) !important;
     font-weight: 700;
   }
+
   .is-negative {
     color: var(--strategy-down, #10b981) !important;
     font-weight: 700;
   }
+
   .is-neutral {
     color: var(--strategy-text-2);
   }
+
   .research-empty {
     padding: 30px;
     color: var(--strategy-text-3);
     text-align: center;
   }
+
   @media (max-width: 640px) {
     .research-card__header {
       flex-direction: column;
