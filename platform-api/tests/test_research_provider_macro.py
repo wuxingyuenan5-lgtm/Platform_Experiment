@@ -119,6 +119,24 @@ def test_macro_provider_accepts_not_configured_without_fake_probability(
     assert contract.events == []
 
 
+def test_macro_provider_reports_missing_local_feed_as_not_configured(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        macro,
+        "read_local_json",
+        lambda _path: (_ for _ in ()).throw(
+            ResearchProviderError("local_data_not_found:public/v1/macro/expectations.json")
+        ),
+    )
+    provider = MacroResearchProvider(timeout_seconds=7.5, user_agent="research-test")
+
+    contract = asyncio.run(provider.macro_expectation_contract())
+
+    assert contract.status == "not_configured"
+    assert contract.events == []
+
+
 def test_legacy_adapter_uses_only_configured_feed_events(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

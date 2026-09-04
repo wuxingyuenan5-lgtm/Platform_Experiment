@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Literal
 
@@ -87,6 +87,15 @@ class MacroResearchProvider:
                 stale = self._last_known_good.model_copy(deep=True)
                 stale.status = "stale"
                 return stale
+            if isinstance(exc, ResearchProviderError) and str(exc).startswith(
+                "local_data_not_found:"
+            ):
+                return MacroExpectationFeedResponse(
+                    status="not_configured",
+                    source="local macro expectation feed",
+                    updated_at=datetime.now(UTC),
+                    events=[],
+                )
             if isinstance(exc, ResearchProviderError):
                 raise
             raise ResearchProviderError(
