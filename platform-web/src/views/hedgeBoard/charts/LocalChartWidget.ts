@@ -1,6 +1,5 @@
 import { defineComponent, h, type PropType } from 'vue';
 
-import TerminalDetailPanel from '../components/TerminalDetailPanel.vue';
 import CryptoMarketDetailPanel from '../components/CryptoMarketDetailPanel.vue';
 import GoldMarketDetailPanel from '../components/GoldMarketDetailPanel.vue';
 import MacroMarketDetailPanel from '../components/MacroMarketDetailPanel.vue';

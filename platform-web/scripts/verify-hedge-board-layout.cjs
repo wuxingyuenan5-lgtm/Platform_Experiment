@@ -8,6 +8,9 @@ const marketTerminalPagePath = path.join(viewRoot, 'components', 'MarketTerminal
 const hedgeBoardSubnavPath = path.join(viewRoot, 'components', 'HedgeBoardSubnav.vue');
 const hedgeResearchModulePath = path.join(viewRoot, 'components', 'HedgeResearchModule.vue');
 const terminalDetailPanelPath = path.join(viewRoot, 'components', 'TerminalDetailPanel.vue');
+const goldMarketDetailPath = path.join(viewRoot, 'components', 'GoldMarketDetailPanel.vue');
+const macroMarketDetailPath = path.join(viewRoot, 'components', 'MacroMarketDetailPanel.vue');
+const cryptoMarketDetailPath = path.join(viewRoot, 'components', 'CryptoMarketDetailPanel.vue');
 const localChartWidgetPath = path.join(viewRoot, 'charts', 'LocalChartWidget.ts');
 const dualAxisChartPath = path.join(viewRoot, 'charts', 'DualAxisChart.ts');
 const widgetErrorBoundaryPath = path.join(viewRoot, 'components', 'WidgetErrorBoundary.ts');
@@ -62,6 +65,9 @@ const hedgeBoardSource = fs.readFileSync(hedgeBoardPagePath, 'utf8');
 const hedgeBoardSubnavSource = fs.readFileSync(hedgeBoardSubnavPath, 'utf8');
 const hedgeResearchModuleSource = fs.readFileSync(hedgeResearchModulePath, 'utf8');
 const terminalDetailPanelSource = fs.readFileSync(terminalDetailPanelPath, 'utf8');
+const goldMarketDetailSource = fs.readFileSync(goldMarketDetailPath, 'utf8');
+const macroMarketDetailSource = fs.readFileSync(macroMarketDetailPath, 'utf8');
+const cryptoMarketDetailSource = fs.readFileSync(cryptoMarketDetailPath, 'utf8');
 const localChartWidgetSource = fs.readFileSync(localChartWidgetPath, 'utf8');
 const dualAxisChartSource = fs.readFileSync(dualAxisChartPath, 'utf8');
 const widgetErrorBoundarySource = fs.readFileSync(widgetErrorBoundaryPath, 'utf8');
@@ -124,16 +130,18 @@ assert(
 assert(
   hedgeBoardSource.includes('LocalChartWidget from') &&
     hedgeBoardSource.includes(':local-chart-widget="LocalChartWidget"') &&
-    localChartWidgetSource.includes(
-      "import TerminalDetailPanel from '../components/TerminalDetailPanel.vue';",
-    ) &&
-    localChartWidgetSource.includes('return h(TerminalDetailPanel'),
-  'Hedge board local detail widgets must delegate through LocalChartWidget to TerminalDetailPanel.',
+    localChartWidgetSource.includes('return h(GoldMarketDetailPanel') &&
+    localChartWidgetSource.includes('return h(MacroMarketDetailPanel') &&
+    localChartWidgetSource.includes('return h(CryptoMarketDetailPanel') &&
+    goldMarketDetailSource.includes('<TerminalDetailPanel') &&
+    macroMarketDetailSource.includes('<TerminalDetailPanel') &&
+    cryptoMarketDetailSource.includes('<TerminalDetailPanel'),
+  'Hedge board local detail widgets must delegate through domain detail panels to TerminalDetailPanel.',
 );
 assert(
-  localChartWidgetSource.includes('prepareCommodityMarketDetail') &&
-    localChartWidgetSource.includes(
-      'groups: prepareCommodityMarketDetail(marketTerminalConfigs.gold.detailGroups)',
+  goldMarketDetailSource.includes('prepareCommodityMarketDetail') &&
+    goldMarketDetailSource.includes(
+      'prepareCommodityMarketDetail(config.detailGroups)',
     ),
   'Commodity Market Detail must clear static values until a validated Native source supplies each row.',
 );
