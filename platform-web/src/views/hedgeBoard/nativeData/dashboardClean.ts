@@ -559,6 +559,10 @@ export const researchModules: ResearchModule[] = [
             sourceNote: 'External Link · U.S. Treasury · no local gold proxy',
             referenceLinks: [
               { label: 'TradingView 模板', href: 'https://cn.tradingview.com/chart/k8dNGuui/' },
+              {
+                label: 'MacroMicro 参考',
+                href: 'https://sc.macromicro.me/collections/45/mm-gold-price/724/3month-bond-real-yield-gold-price',
+              },
             ],
           }),
         ],
