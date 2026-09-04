@@ -49,7 +49,6 @@ const sectionLabelOverrides: Record<string, { title?: string }> = {
   'macro-growth': { title: '经济' },
   'macro-risk-appetite': { title: '风险偏好' },
   'gold-flows': { title: 'ETF与资金面' },
-  'gold-central-bank': { title: '央行购金' },
   'gold-main': { title: '黄金主图' },
   'gold-rates': { title: '利率与通胀' },
   'crypto-etf': { title: '加密资金面' },
@@ -70,7 +69,6 @@ const researchSectionOrder: Partial<Record<HedgeCategory, readonly string[]>> = 
     'gold-market',
     'gold-main',
     'gold-flows',
-    'gold-central-bank',
     'gold-rates',
     'commodity-positioning',
     'commodity-eia-inventory',
@@ -92,8 +90,8 @@ const widgetTextOverrides: Record<string, { title?: string }> = {
   'etf-weekly-flows': { title: '全球各地区ETF每周流入' },
   'spdr-daily-flow': { title: '金价 vs SPDR 每日流量' },
   'spdr-holdings-vs-price': { title: 'SPDR 持仓量 vs 黄金价格' },
-  'central-bank-holders': { title: '官方黄金储备前十' },
-  'central-bank-buyers': { title: '近一年持续增持的央行' },
+  'central-bank-holders': { title: '全球央行黄金储备' },
+  'central-bank-buyers': { title: '各国央行黄金净购买量' },
 };
 
 const ETF_REFERENCE_URL = 'https://www.gold.org/goldhub/data/gold-etfs-holdings-and-flows';

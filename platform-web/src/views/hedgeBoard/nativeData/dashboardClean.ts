@@ -531,27 +531,18 @@ export const researchModules: ResearchModule[] = [
             '交易法门 · 商品期货持仓与结构分析',
             'https://www.jiaoyifamen.com/variety/',
           ),
-        ],
-      },
-      {
-        id: 'gold-central-bank',
-        eyebrow: 'Official Sector',
-        title: '央行购金与官方储备',
-        description: '',
-        layout: 'two',
-        widgets: [
-          localChart('官方黄金储备前十', '', 'central-bank-holders', {
-            height: 420,
-            sourceNote: 'External Link · World Gold Council · permission_required',
-            referenceLinks: macroMicroReference(
-              'https://en.macromicro.me/charts/78898/world-central-bank-gold-reserves',
-            ),
-          }),
-          localChart('近一年持续增持的央行', '', 'central-bank-buyers', {
+          localChart('各国央行黄金净购买量', '', 'central-bank-buyers', {
             height: 420,
             sourceNote: 'External Link · World Gold Council · permission_required',
             referenceLinks: macroMicroReference(
               'https://en.macromicro.me/charts/93189/gold-demand-central-banks-and-other-inst',
+            ),
+          }),
+          localChart('全球央行黄金储备', '', 'central-bank-holders', {
+            height: 420,
+            sourceNote: 'External Link · World Gold Council · permission_required',
+            referenceLinks: macroMicroReference(
+              'https://en.macromicro.me/charts/78898/world-central-bank-gold-reserves',
             ),
           }),
         ],
