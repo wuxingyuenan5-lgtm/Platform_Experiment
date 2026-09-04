@@ -295,7 +295,7 @@ export const getMacroExpectations = () =>
     url: '/research/macro/expectations',
   });
 
-export const getMarketDetail = (marketId: 'macro') =>
+export const getMarketDetail = (marketId: 'macro' | 'gold' | 'crypto') =>
   request<MarketDetailResponse>({
     method: 'GET',
     url: `/research/market-detail/${marketId}`,

@@ -575,6 +575,8 @@ EIA Native 已完成：工程 commit `4a317da`，真实数据 commit `a0e42a8`�
 
 2026-09-04 加密资金面入口重组：BTC / ETH ETF 日流量原始入口统一切换至 SoSoValue；Bitcoin Treasuries Weekly Net Inflow 增加 SoSoValue 周度净流入参考。稳定币市值、Strategy BTC、Strategic ETH Reserve、STRC ATM Tracker 与 STRC 实时定价并入“加密资金面”，不再保留单独的财库工具分区；“Owner BTC 看盘模板”已移除。
 
+2026-09-04 本地运行链路修复：确认商品/加密市场明细空表并非数据源失败，而是 `platform-api` 旧进程未重载新 provider，对两个 market id 返回 `market_detail_not_enabled`。前端 API 类型已扩展为 `macro | gold | crypto`，本地 API 以当前工作树重启后经后端直连与 Vite 代理双路径验收：Gold 14 行、Crypto 13 行均为 `ready`，每行返回 90 个真实日线点。
+
 Owner 随后确认将 Chrome 三个研究标签组全部接入：商品页新增“黄金与商品补充研究工具”13 个入口；加密页新增 ETF/稳定币/财库公司 7 个、杠杆/清算/期权 8 个、链上/周期/研究 6 个入口。新增卡片采用轻量外链组件，不加载第三方 iframe、不共享浏览器账号，且既有图表和默认折叠工具目录保持不变。
 
 ### C2 — Existing Gold Modules 去假数据
