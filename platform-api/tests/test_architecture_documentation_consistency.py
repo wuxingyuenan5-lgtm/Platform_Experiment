@@ -60,9 +60,9 @@ def write_candidate_contracts(
     matrix: str = "状态：`active Platform candidate access contract`\n",
 ) -> list[Path]:
     (root / "VERSION").write_text("0.10.2\n", encoding="utf-8")
-    current_path = root / "docs/codex/current-state.md"
-    auth_path = root / "docs/technical/AUTH_RBAC_LIVE_SESSIONS.md"
-    matrix_path = root / "docs/product/PLATFORM_0_10_2_FRONTEND_ACCESS_MATRIX.md"
+    current_path = root / "docs/BASELINE.md"
+    auth_path = root / "docs/contracts/AUTHORIZATION.md"
+    matrix_path = root / "docs/contracts/ACCESS_MATRIX.md"
     for path, content in ((current_path, current), (auth_path, auth), (matrix_path, matrix)):
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(content, encoding="utf-8")
@@ -119,7 +119,7 @@ def test_candidate_documentation_rejects_draft_pr_status(tmp_path: Path) -> None
     )
 
     assert DOCUMENTATION_CONSISTENCY.validate_candidate_documentation(tmp_path, paths) == [
-        "docs/product/PLATFORM_0_10_2_FRONTEND_ACCESS_MATRIX.md:1: "
+        "docs/contracts/ACCESS_MATRIX.md:1: "
         "candidate status must not persist a Draft PR number"
     ]
 
@@ -132,7 +132,7 @@ def test_candidate_documentation_rejects_pending_auth_status(tmp_path: Path) -> 
     )
 
     assert DOCUMENTATION_CONSISTENCY.validate_candidate_documentation(tmp_path, paths) == [
-        "docs/technical/AUTH_RBAC_LIVE_SESSIONS.md contains stale verification "
+        "docs/contracts/AUTHORIZATION.md contains stale verification "
         "status: verification pending"
     ]
 

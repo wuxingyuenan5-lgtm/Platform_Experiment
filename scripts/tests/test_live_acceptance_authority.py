@@ -9,13 +9,12 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 ACTIVE_AUTHORITIES = (
     "docs/operations/LIVE_ACCEPTANCE_RUNBOOK.md",
     "docs/operations/RUNBOOK.md",
-    "docs/codex/current-state.md",
-    "docs/codex/0.11.1-program.md",
-    "docs/technical/LIVE_ACCOUNT_OBSERVABILITY.md",
-    "docs/technical/AUTH_RBAC_LIVE_SESSIONS.md",
-    "docs/technical/LIVE_VENUE_ADAPTERS.md",
-    "docs/technical/VENUE_RECONCILIATION.md",
-    "docs/technical/DEPLOYMENT.md",
+    "docs/BASELINE.md",
+    "docs/contracts/LIVE_ACCOUNT_OBSERVABILITY.md",
+    "docs/contracts/AUTHORIZATION.md",
+    "docs/contracts/VENUE_ADAPTERS.md",
+    "docs/contracts/VENUE_RECONCILIATION.md",
+    "docs/operations/DEPLOYMENT.md",
 )
 
 
@@ -63,7 +62,7 @@ class LiveAcceptanceAuthorityTests(unittest.TestCase):
             self.assertIn(statement, runbook, f"runbook lost mandatory contract text: {statement}")
 
     def test_mandatory_safeguards_are_not_relax_or_remove_candidates(self) -> None:
-        observability = read("docs/technical/LIVE_ACCOUNT_OBSERVABILITY.md")
+        observability = read("docs/contracts/LIVE_ACCOUNT_OBSERVABILITY.md")
         safeguards = observability.split("## 10. Controlled-acceptance safeguards", 1)[1].split(
             "## 11. Windows-host acceptance sequence", 1
         )[0]
@@ -75,14 +74,13 @@ class LiveAcceptanceAuthorityTests(unittest.TestCase):
         self.assertNotIn("`retain`, `relax` or `remove`", safeguards)
 
     def test_legacy_fixed_cap_code_and_public_session_type_remain_explicit_blockers(self) -> None:
-        current_state = read("docs/codex/current-state.md")
-        program = read("docs/codex/0.11.1-program.md")
+        current_state = read("docs/BASELINE.md")
         runbook = read("docs/operations/LIVE_ACCEPTANCE_RUNBOOK.md")
-        auth_contract = read("docs/technical/AUTH_RBAC_LIVE_SESSIONS.md")
-        adapter_contract = read("docs/technical/LIVE_VENUE_ADAPTERS.md")
+        auth_contract = read("docs/contracts/AUTHORIZATION.md")
+        adapter_contract = read("docs/contracts/VENUE_ADAPTERS.md")
         platform_sessions = read("platform-api/app/live_trading_sessions.py")
 
-        for authority in (current_state, program, runbook):
+        for authority in (current_state, runbook):
             self.assertIn("fixed-notional-cap code", authority)
             self.assertIn("controlled-live readiness blocker", authority)
 

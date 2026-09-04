@@ -1,12 +1,8 @@
 # 用户系统部署、备份与恢复就绪手册
 
-状态：`local integration ready / production host rehearsal pending`
+状态：`active deployment and recovery reference`
 
-- Issue：`#117`
-- Draft PR：`#118`
-- 交付分支：`feature/issue-117-user-system`
-- 本地交接：`USER_SYSTEM_LOCAL_INTEGRATION_HANDOFF.md`
-- 浏览器验收：`USER_SYSTEM_BROWSER_ACCEPTANCE.md`
+浏览器验收：[USER_SYSTEM_BROWSER_ACCEPTANCE.md](USER_SYSTEM_BROWSER_ACCEPTANCE.md)
 
 ## 1. 适用边界
 

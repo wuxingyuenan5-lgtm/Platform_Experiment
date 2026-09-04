@@ -1,34 +1,44 @@
 # 项目驾驶舱
 
-> 这是项目跟进的唯一日常入口，更新时间：2026-08-25。它记录当前方向、状态和待决问题，不承载详细合同、测试证据或 Git 状态。
+> 这是项目跟进的唯一日常入口，更新时间：2026-09-04。它记录当前方向、状态和待决问题，不承载详细合同、测试证据或 Git 状态。
 
 ## 一句话目标
 
 构建一个由创始人主导、默认只读且交易写入严格受控的投研、策略管理与执行平台；先完成少数真实闭环，再扩展策略、账户和外部用户。
 
+## 活跃阶段
+
+这里只列阶段入口和当前重点，不复制阶段内的验收、证据或执行过程。可以同时存在多个能够独立推进和验收的阶段；存在共享代码、数据或合同边界时，以对应阶段文件中的交叉影响说明为准。
+
+| 阶段 | 当前重点 | 入口 |
+|---|---|---|
+| 策略模块架构 | 执行框架已收敛；等待 Owner 新的最小实盘授权和 Cross Terminal 外部开关确认 | [strategy-module-architecture.md](workstreams/strategy-module-architecture.md) |
+
 ## Now
 
 | 工作流 | 当前结果 | 完成定义 | 下一动作 |
 |---|---|---|---|
-| 文档与项目跟进 | `in_progress`：项目驾驶舱、发现箱和 AI 回填规则已启用；新增“一个阶段一份 workstream、完成后归并并删除”的轻量机制，旧材料仍在清理隔离区 | 项目级状态只从本页跟进；跨任务阶段依赖唯一 workstream；长期事实各归其权威；旧过程材料退出仓库 | 用“策略模块架构”试运行阶段机制；确认接续和收尾顺畅后，再完成隔离区人工清理与最终复核 |
-| Platform 0.11.2 候选 | `in_progress`：真实 Bybit/MT5 只读监控链路已打通，Funding/Cross/Bottom/Short A 的 logical account 绑定和同步合同已收敛；本地开发启动器现已常驻复用并带登录烟测；Funding 页面现已使用真实 execution-context、非终态自动追踪和权威平仓口径，不再依赖生产 mock | 独立验收、浏览器访问回归和 Capability 对齐完成，已知限制明确 | 保持三服务常驻；完成最终文档与专项回归后，由 Owner 在页面创建测试会话并输入小额测试金额 |
-| 受控交易闭环 | `blocked_by_authorization/evidence`：真实只读验收不等于交易授权；Runtime 仍默认未武装，Live Write 仍关闭，Funding/Cross 仍需 Owner 在页面创建并审批 LiveTradingSession 后才可能进入受控测试窗口 | 每个外部连接或写入步骤具有单独授权、外部证据、对账和强制回只读 | 继续保持只读；由 Owner 通过页面完成测试会话创建/审批和具体金额确认，执行 AI 不代替点击 |
+| 文档与项目跟进 | `done`：项目驾驶舱、发现箱和轻量 workstream 机制已启用；Hedge Board 已完成阶段归并，策略阶段保留单一接续快照；旧治理、任务卡、重复技术文档和前端平行知识库已退出当前文档树 | 项目级状态只从本页跟进；阶段以最小快照接续；长期事实各归其权威；过程材料不再持久化 | 后续任务只做文档影响检查：更新现有 Owner，不另建计划、回执、交接或平行架构文档 |
+| Platform 0.11.2 候选 | `in_progress`：策略统一执行框架、真实账户只读链、本地三服务生命周期和 Hedge Board Macro/Commodity/Crypto V1 已进入当前主线；长期文档已完成收敛；新闻日历与理财不再是一级模块，其能力已归入 Hedge Board、金融AI分析和首页入口 | 独立验收、浏览器访问回归、Capability 与长期文档全部收敛，已知限制明确 | 继续完成候选版本专项验收；受控实盘等待新的 Owner 授权和外部前置条件 |
+| Hedge Board V1 | `done`：Macro、Commodity、Crypto、本地研究数据、Market Detail、研究入口和离线浏览器验收已完成；稳定范围、数据合同与运行边界已归并 | 后续变更仅更新产品模块、研究数据合同、运行手册或专项来源图中的唯一 Owner | 保持现有数据质量与来源边界；新的看板范围先按发现箱和产品确认流程进入 |
+| 受控交易闭环 | `awaiting_new_authorization`：2026-08-25 授权窗口已经过期；标准 Platform/Runtime 配置已恢复 Live Write=false，目前没有新的真实交易授权 | 新的、操作明确且有时限的授权窗口内，Cross 完成开仓、双腿核对、平仓与对账，随后 Funding 完成最小仓位闭环并强制回只读 | Owner 确认 Cross Terminal Algo/Expert Trading 外部开关后，再决定是否授权新的最小实盘窗口 |
 
 ## Next
 
 - 把 0.11.2 剩余工作压缩成可验收结果；相关子任务共同维护一份活跃 workstream，不再复制阶段计划、回执或当前状态。
-- 保持真实只读监控链路：Funding/Cross 共享 `bybit-live-main`，Bottom 使用独立 Bybit 只读账号，Cross/Short A 共用单 Terminal MT5 只读切换，Short B 继续 `unbound`。
+- 保持真实只读监控链路：Funding/Cross 共享 `bybit-live-main`；Cross 使用固定 `mt5-live-main` 实例，Short A 使用独立固定 MT5 实例且仅监控，Short B 继续 `unbound`。
 - 保持本地三服务常驻：`scripts/dev-platform.ps1` 负责健康复用、失败清理、状态文件和登录烟测，不再接受“前端还在、API/Runtime 已被回收”的半残状态。
-- Funding 页面现在必须持续展示真实共享 UTA 余额、Reservation、服务端执行状态和权威平仓数量；页面刷新只能恢复既有 instruction identity，不能重新提交。
-- 策略管理页现在提供 CEO-only 测试会话面板，可同时为 Funding 与 Cross 创建/审批/撤销现有 `LiveTradingSession`，但默认仍显示未武装。
-- 在任何下一步外部操作前，继续要求 `liveWriteEnabled=false`、无 approved `LiveTradingSession`、Funding controlled-live 默认 `423`。
+- Funding 页面继续展示真实共享 UTA、Reservation、服务端执行状态和权威平仓数量；页面刷新只能恢复既有 instruction identity，不能重新提交。
+- LiveTradingSession、Kill Switch 与额度是后台安全机制，不作为策略管理或交易平台的产品界面；正式产品页面不得出现“实盘测试会话”等工程验收概念。
+- 每次受控窗口开始前先确认 `liveWriteEnabled=false`、无遗留 approved session 且外部账户前置条件满足；仅按本次明确授权临时开启，结束或超时立即恢复默认只读状态。
+- Hedge Board 已完成阶段不继续在多份计划中累积进度；稳定产品范围、研究数据合同和操作规则分别回填到现有权威文档。
 - 当产品方向出现新想法时，先放入下方发现箱；确认后再进入正式 PRD 或策略文档。
 
 ## Later
 
 - 在已有闭环稳定后再决定海内外价差、抄底、短线交易员、更多 Venue、生产部署和自动化范围。
 - 只有出现真实检索压力时才引入站点生成器、文档数据库或更复杂的元数据系统。
-- 历史过程材料是否清理，等确认其中没有独有规则后由 Owner 单独决定；不批量删除。
+- 已结束阶段和过程材料不建立 archive；稳定结论进入权威文档，必要追溯使用 Git。
 
 ## 发现箱
 
@@ -36,7 +46,7 @@ AI 可以自动记录不完整需求、缺口和不确定性。条目在 Owner �
 
 | 想法或问题 | 当前判断 | 需要确认 |
 |---|---|---|
-| 如何让 AI 自动维护项目跟进 | 已采用“任务结束前文档影响检查 + 本页项目级入口 + 活跃阶段唯一 workstream”；AI 可自动更新状态和发现，不能自动批准范围 | 用“策略模块架构”完成一次从接续到收尾的完整试运行后复核 |
+| 如何让 AI 自动维护项目跟进 | 已采用“任务结束前文档影响检查 + 本页项目级入口 + 每个活跃阶段一份 workstream”；AI 可自动更新状态和发现，不能自动批准范围 | 用“策略模块架构”完成一次从接续到收尾的完整试运行后复核 |
 | 早期需求无法一次写好 | 采用“发现箱 → Now/Next/Later → 稳定权威”的渐进流程 | 哪些新产品方向进入近期优先级，由 Owner 逐项确认 |
 
 ## 当前不可突破的边界

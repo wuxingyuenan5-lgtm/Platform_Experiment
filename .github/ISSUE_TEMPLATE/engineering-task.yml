@@ -1,139 +1,44 @@
 name: Engineering task
-description: Create one tracked engineering workstream before opening a branch
+description: Track a durable engineering outcome when an Issue is useful
 title: "[Engineering] "
 labels: []
 body:
   - type: markdown
     attributes:
       value: |
-        Search existing open Issues and PRs first. Reuse an existing Issue when the outcome is already tracked. Use only the fields that match the task mode: all records need core status and Token fields; implementation-only fields are required only when repository files will change.
+        Use an Issue for work that benefits from durable coordination or review. Ordinary local work does not require a task card, Context Pack or management receipt.
   - type: textarea
-    id: task_mode
+    id: outcome
     attributes:
-      label: Task mode and role
-      description: State whether this is a short read-only record or a full task card, and name the role.
-    validations:
-      required: true
-  - type: input
-    id: task_id
-    attributes:
-      label: Task ID
-      description: Stable task identifier used in task cards and receipts.
+      label: Outcome
+      description: What user or system result should exist when this is complete?
     validations:
       required: true
   - type: textarea
-    id: status_event
+    id: scope
     attributes:
-      label: Status event
-      description: Status, last transition time, owner notice, business status summary and current leaf task or agent ID.
-    validations:
-      required: true
-  - type: dropdown
-    id: risk_level
-    attributes:
-      label: Risk level
-      options:
-        - low
-        - medium
-        - high
-        - critical
-    validations:
-      required: true
-  - type: textarea
-    id: agent_identity
-    attributes:
-      label: Agent identity
-      description: Agent ID, and when applicable the implementation owner plus recovery-from/closed-owner evidence.
-    validations:
-      required: true
-  - type: textarea
-    id: token_indicators
-    attributes:
-      label: Token indicators
-      description: Token baseline, current, delta, budget, status and attributable control-plane delta. These are management indicators, not API billing; the 30 percent control-plane measure is evaluated only across the whole business slice, not per task.
-    validations:
-      required: true
-  - type: input
-    id: context_pack
-    attributes:
-      label: Context Pack
-      description: Stable task-type Pack name from scripts/context-packs.json.
-    validations:
-      required: true
-  - type: textarea
-    id: authority
-    attributes:
-      label: Authority
-      description: Direct authorization, owning authority, and when applicable the PR URL, commit range or evidence entry point.
-    validations:
-      required: true
-  - type: textarea
-    id: objective
-    attributes:
-      label: Objective
-      description: One measurable business outcome.
-    validations:
-      required: true
-  - type: textarea
-    id: implementation_fields
-    attributes:
-      label: Implementation fields when applicable
-      description: Branch, worktree, base commit, write set, dependency decision, rollback boundary, acceptance task, parallel proof and active-agent counts. Leave empty for short read-only records.
-    validations:
-      required: true
-  - type: textarea
-    id: non_goals
-    attributes:
-      label: Non-goals
-      description: Adjacent work and refactors explicitly excluded.
-    validations:
-      required: true
-  - type: textarea
-    id: stop_conditions
-    attributes:
-      label: Stop conditions
-      description: Conditions that require stopping work and escalating instead of expanding scope or authority.
-    validations:
-      required: true
-  - type: textarea
-    id: protected_semantics
-    attributes:
-      label: Protected semantics
-      description: Trading, order-state, funds-safety, API, schema or Live Write behavior that must remain unchanged.
+      label: Scope and non-goals
+      description: What is included, and which adjacent work is explicitly excluded?
     validations:
       required: true
   - type: textarea
     id: acceptance
     attributes:
-      label: Acceptance criteria
-      description: Concrete checks required before completion or owner gate.
+      label: Acceptance
+      description: Concrete evidence or checks that prove the outcome.
     validations:
       required: true
   - type: textarea
-    id: context
+    id: risk
     attributes:
-      label: Minimal context packet
-      description: List the module entry document, direct source files and direct tests needed.
+      label: Risk and safety
+      description: Failure modes, protected semantics, external authorization needs and rollback boundary.
     validations:
       required: true
   - type: textarea
-    id: contract_impact
+    id: docs
     attributes:
-      label: Contract impact
-      description: Owning contracts affected, or `none`.
-    validations:
-      required: true
-  - type: textarea
-    id: unproven_facts
-    attributes:
-      label: Unproven facts and Token/context anomalies
-      description: External facts not established and any repeated Pack or context-budget anomaly.
-    validations:
-      required: true
-  - type: textarea
-    id: rollback
-    attributes:
-      label: Risk and rollback
-      description: Failure modes, detection and safe rollback.
+      label: Documentation impact
+      description: Owning project or authority document to update, or `none`.
     validations:
       required: true

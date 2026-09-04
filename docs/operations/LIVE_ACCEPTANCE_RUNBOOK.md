@@ -155,11 +155,12 @@ fail closed for controlled-live funding during that gap.
 
 Cross-spread and funding carry may use the same real Bybit UTA, logical Platform Account and credential reference. Trading permission may be configured before a controlled-live window, but both Live Write gates remain false outside an authorized scenario.
 
+- Before a Batch may transition to `executing` or emit any `TradeCommand`, the complete resource claims and balance reservations required by its immutable plan must be acquired atomically in one transaction. Conflict, incomplete replay or insufficient balance rolls back the whole acquisition and emits no command.
 - Concurrent writes are permitted only when the immutable plans use disjoint `account + category + symbol` resources and sufficient authoritative available balance remains after active reservations.
 - The same `category + symbol` cannot be opened, chased or closed concurrently by different strategies until a reviewed strategy-position allocation mechanism exists.
 - Orders, fills, fees and PnL retain Strategy/Instruction/Batch/Command identity. The UTA balance is shared account truth and must not be duplicated as separate strategy-owned cash.
 - Internal capital transfer, unknown account identity, unavailable balance/margin evidence, account Kill Switch or an uncertainty whose resource scope cannot be proven blocks account writes.
-- `result_unknown`, cancel ambiguity and residual exposure retain the affected resource and balance reservation. Completion alone does not release them without terminal external and reconciliation evidence.
+- `result_unknown`, `manual_intervention`, cancel ambiguity, residual exposure and Funding `reconciling` retain the affected resource and balance reservation. They are released only after authoritative reconciliation completes or an explicit, accountable safe terminal disposition is recorded; a Batch state change alone is insufficient.
 
 ## 4. Two-leg failure disposition
 
@@ -224,9 +225,10 @@ following in read-only mode:
 - Account risk is readable.
 - Funding rate is readable.
 - MT5 account/readiness is readable.
-- For single-Terminal MT5 read-only monitoring, one sync cycle must use one
-  combined account snapshot read per logical account, under the coordinator
-  lock, with an explicit restore back to `mt5-live-main`.
+- Each MT5 logical account resolves to its own fixed Terminal/Worker and proves
+  the configured Terminal Path, Login and Server. Shared-session account
+  switching or restore-to-primary behavior is prohibited; see
+  [Venue Adapter Contract](../contracts/VENUE_ADAPTERS.md).
 - Platform account binding is correct.
 - `management-overview` returns all six strategies with current status.
 - Reconciliation baseline is captured before any write window.

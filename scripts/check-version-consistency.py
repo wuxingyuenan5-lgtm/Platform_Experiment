@@ -17,12 +17,12 @@ RUNTIME_VERSION_OWNER = "execution-runtime/app/version.py"
 RUNTIME_VERSION_DIRECTORY = "execution-runtime/app"
 CURRENT_DOCUMENTS = {
     "stable baseline": (
-        "docs/codex/current-state.md",
+        "docs/BASELINE.md",
         r"Stable baseline: Platform `([^`]+)`\.",
     ),
 }
 CANDIDATE_DOCUMENT = (
-    "docs/codex/current-state.md",
+    "docs/BASELINE.md",
     r"Current candidate target: Platform `([^`]+)`\.",
 )
 MAINTAINED_VERSION_PATHS = (
@@ -33,7 +33,7 @@ MAINTAINED_VERSION_PATHS = (
     "platform-api/app/application.py",
     "execution-runtime/pyproject.toml",
     RUNTIME_VERSION_OWNER,
-    "docs/codex/current-state.md",
+    "docs/BASELINE.md",
 )
 VERSION_USAGE_PATHS = (
     "platform-web/internal/vite-config/src/config/application.ts",

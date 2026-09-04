@@ -22,10 +22,11 @@ Operating details and safety defaults are in `docs/operations/RUNBOOK.md`.
 
 | Need | Authority |
 |---|---|
-| Current stable baseline, target scope and known limits | `docs/codex/current-state.md` |
+| What is being done now, next and later | `docs/PROJECT.md` |
+| How an active multi-task stage continues | `docs/workstreams/<stage-slug>.md` when that stage exists |
+| Stable engineering baseline and known external limits | `docs/BASELINE.md` |
 | Documentation navigation | `docs/README.md` |
 | AI and engineering rules | `AGENTS.md` |
-| Minimal context selection | `docs/codex/context-map.md` |
 | Service and data-flow boundaries | `docs/architecture/SYSTEM_MAP.md` |
 | Code and data ownership | `docs/architecture/OWNERSHIP.md` |
 | Domain contracts | `docs/contracts/README.md` |

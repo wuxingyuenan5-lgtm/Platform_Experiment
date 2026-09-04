@@ -1,12 +1,8 @@
 # 用户系统浏览器验收手册
 
-状态：`automated browser acceptance passed / local visual smoke optional / production proxy validation pending`
+状态：`active browser acceptance reference`
 
-- Issue：`#117`
-- Draft PR：`#118`
-- 交付分支：`feature/issue-117-user-system`
-- 本地交接：`USER_SYSTEM_LOCAL_INTEGRATION_HANDOFF.md`
-- 部署与恢复：`USER_SYSTEM_DEPLOYMENT_READINESS.md`
+部署与恢复：[USER_SYSTEM_DEPLOYMENT_READINESS.md](USER_SYSTEM_DEPLOYMENT_READINESS.md)
 
 ## 1. 当前结论
 

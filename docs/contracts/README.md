@@ -1,25 +1,27 @@
-# Domain Contract Index
+# 合同索引
 
-This index routes to current contracts; implementation history is not a contract.
+合同定义跨模块可依赖的当前行为、数据语义和失败处理。项目状态不写入合同；实现细节以代码和可执行测试为证据。
 
-| Domain | Contract | Implementation owner |
-|---|---|---|
-| Browser Access & Product Data | `BROWSER_ACCESS_AND_PRODUCT_DATA.md` | browser role capabilities, route/menu policy, personal account and restored product state owners |
-| Identity & Permission | `../technical/AUTH_RBAC_LIVE_SESSIONS.md`, `../technical/USER_SYSTEM_AUTH_ERROR_CONTRACT.md` | auth, authority, permissions and user modules |
-| Live Write | `../technical/EXECUTION_RISK_CONTROLS.md` | Live session modules, risk modules and Runtime live safety |
-| Execution Risk | `../technical/EXECUTION_RISK_CONTROLS.md` | `execution_risk_models.py`, `execution_risk_policy.py`, `execution_risk_repository.py`, `execution_risk.py` |
-| Trading | `../technical/CROSS_SPREAD_SYNTHETIC_EXECUTION.md` | trading and cross-spread owners in `../architecture/OWNERSHIP.md` |
-| Execution | `runtime-v1.json` | both Runtime contract modules |
-| Accounting | `../technical/FINANCIAL_FACTS.md` | Financial Fact repository and formal projection service |
-| Reconciliation | `../technical/VENUE_RECONCILIATION.md`, `../technical/EOD_RECONCILIATION.md` | dedicated reconciliation modules |
-| Member Portfolio | `../technical/MEMBER_HOLDINGS_READ_MODEL.md` | member holding modules |
-| Research & Market Data | `../technical/RESEARCH_DATA_PLATFORM.md` | research schemas, providers, cache and service |
-| Secret handling | `../technical/SECRET_PROVIDER_AND_REDACTION.md` | metadata, resolver and redaction owners |
-| Operations | `../technical/PRODUCTION_OPERATIONS.md` | monitoring, controlled operation and disaster recovery |
+| 领域 | 当前合同 |
+|---|---|
+| 浏览器访问与产品数据 | [BROWSER_ACCESS_AND_PRODUCT_DATA.md](BROWSER_ACCESS_AND_PRODUCT_DATA.md) |
+| 身份、权限和会话 | [AUTHORIZATION.md](AUTHORIZATION.md) · [AUTH_ERRORS.md](AUTH_ERRORS.md) · [ACCESS_MATRIX.md](ACCESS_MATRIX.md) |
+| Platform API | [API.md](API.md) |
+| 执行风险 | [EXECUTION_RISK.md](EXECUTION_RISK.md) |
+| 跨所执行 | [CROSS_SPREAD_EXECUTION.md](CROSS_SPREAD_EXECUTION.md) |
+| Runtime Command/Event | `runtime-v1.json` 可执行快照及双方 `runtime_contracts.py` |
+| Venue Adapter | [VENUE_ADAPTERS.md](VENUE_ADAPTERS.md) |
+| 外部账户可观测性 | [LIVE_ACCOUNT_OBSERVABILITY.md](LIVE_ACCOUNT_OBSERVABILITY.md) |
+| Venue 对账 | [VENUE_RECONCILIATION.md](VENUE_RECONCILIATION.md) |
+| EOD 与扩容门禁 | [EOD_RECONCILIATION.md](EOD_RECONCILIATION.md) |
+| FinancialFact 与正式账务 | [FINANCIAL_FACTS.md](FINANCIAL_FACTS.md) |
+| 会员持仓与单位净值 | [MEMBER_HOLDINGS.md](MEMBER_HOLDINGS.md) |
+| 研究数据 | [RESEARCH_DATA.md](RESEARCH_DATA.md) |
 
-Rules:
+## 维护规则
 
-- one business rule has one implementation owner;
-- `docs/architecture/OWNERSHIP.md` resolves ownership conflicts;
-- public compatibility changes update producer, consumer, snapshot and tests together;
-- historical plans and acceptance receipts are not contracts.
+- 一项跨模块语义只有一个合同 Owner；其他文档链接它，不复制字段和状态机。
+- 不兼容变更提升合同版本并提供迁移或兼容测试。
+- 金融数值保持 Decimal、明确币种和单位；时间保持带时区语义。
+- 未知输入、未知外部结果和无法确认的权限默认 fail closed。
+- JSON 快照是可执行边界，不是另一份人工需求文档。

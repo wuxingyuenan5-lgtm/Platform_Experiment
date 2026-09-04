@@ -17,7 +17,6 @@ EXPECTED_SERVICES = {
     "execution-runtime": ROOT / "execution-runtime",
 }
 ALLOWED_TOP_LEVEL_DIRECTORIES = {
-    "00-人工可读目录",
     "config",
     "deploy",
     "docs",
@@ -31,8 +30,7 @@ REQUIRED_ENTRYPOINTS = (
     "README.md",
     "AGENTS.md",
     "docs/README.md",
-    "docs/codex/current-state.md",
-    "docs/codex/context-map.md",
+    "docs/BASELINE.md",
     "docs/architecture/SYSTEM_MAP.md",
     "docs/architecture/OWNERSHIP.md",
     "docs/operations/RUNBOOK.md",
@@ -139,7 +137,7 @@ def check_documents(errors: list[str]) -> None:
     for relative in REQUIRED_ENTRYPOINTS:
         if not (ROOT / relative).is_file():
             errors.append(f"{relative}: required active entrypoint is missing")
-    current = ROOT / "docs/codex/current-state.md"
+    current = ROOT / "docs/BASELINE.md"
     version_path = ROOT / "VERSION"
     stable_version = version_path.read_text(encoding="utf-8").strip()
     candidate_version = next_patch_version(stable_version)
@@ -154,11 +152,11 @@ def check_documents(errors: list[str]) -> None:
             "must not be assumed",
         ):
             if anchor not in source:
-                errors.append(f"docs/codex/current-state.md missing durable anchor: {anchor}")
+                errors.append(f"docs/BASELINE.md missing durable anchor: {anchor}")
         for volatile in ("Active branch:", "Active review:", "Draft PR"):
             if volatile in source:
                 errors.append(
-                    f"docs/codex/current-state.md persists volatile Git/GitHub fact: {volatile}"
+                    f"docs/BASELINE.md persists volatile Git/GitHub fact: {volatile}"
                 )
     database = ROOT / "docs/database/README.md"
     if (

@@ -1,111 +1,28 @@
-# Architecture Documentation
+# 架构文档入口
 
-本目录保存长期稳定的系统架构说明。最简拓扑和依赖方向见 `SYSTEM_MAP.md`，主要模块的唯一 Owner 见 `docs/architecture/OWNERSHIP.md`。
+架构文档只维护长期稳定的系统边界，不记录当前排期、任务过程、发布状态或测试日志。
 
-## 文档职责
+| 问题 | 权威文档 |
+|---|---|
+| 系统由什么组成、依赖如何流动、数据由谁负责 | [SYSTEM_MAP.md](SYSTEM_MAP.md) |
+| 哪段代码、策略与持久化由谁负责 | [OWNERSHIP.md](OWNERSHIP.md) |
+| 为什么作出一项长期且难逆的决定 | [decisions/README.md](../decisions/README.md) |
+| 当前跨模块合同 | [contracts/README.md](../contracts/README.md) |
+| 数据库、DDL 与迁移纪律 | [database/README.md](../database/README.md) |
 
-- 架构说明：解释系统边界和模块关系。
-- `docs/architecture/OWNERSHIP.md`：记录主要代码边界的唯一 Owner、职责和禁止责任。
-- `docs/decisions/`：记录关键技术决策。
-- `docs/operations/`：记录运行和生产流程。
-- `docs/technical/`：记录接口和领域设计。
-- `docs/contracts/`：保存可执行的跨服务版本快照。
-- `docs/database/`：记录数据权威、DDL Owner 和迁移纪律。
+## 架构底线
 
-## 原则
+- 仓库只有三个可部署工程主体：`platform-web`、`platform-api`、`execution-runtime`。
+- `platform-api` 保持模块化单体；不要为了目录对称引入微服务、消息队列、事件总线或全局 DI。
+- Venue SDK、外部订单副作用、Runtime Journal 与外部结果标准化留在 `execution-runtime`。
+- 跨边界使用版本化合同；未知结果必须保持 `result_unknown`，不能推断失败后自动重下。
+- 运营投影不替代不可变 FinancialFact 及可重建的正式 Position/PnL/NAV。
+- 金融边界保持 `Decimal`、明确币种/单位和带时区时间戳。
 
-不要把历史执行过程、PR 记录和临时任务放入架构文档。
+详细关系以 `SYSTEM_MAP.md` 为准，具体文件 Owner 以 `OWNERSHIP.md` 为准。本页不复制两者的完整内容。
 
-架构文档回答系统为何这样设计、模块如何协作、哪些边界不能突破、数据/契约由谁负责，以及故障时必须保持哪些不变量。具体实施记录进入对应 Issue、任务包、PR 或 Changelog。
+## 何时写 ADR
 
-模块权威发生变化时，必须在同一个 PR 更新 `docs/architecture/OWNERSHIP.md`；`docs/codex/context-map.md` 只负责选择上下文，不重复维护完整 Owner 表。
+只有决策同时满足“影响多个模块、会长期约束后续工作、未来难以无成本撤销”时才新增 ADR。普通重构、字段补充、测试策略和阶段性方案留在代码、合同或 PR，不新增架构总览。
 
-## Composition Root 边界
-
-- `platform-api/app/main.py` 只装配 Router 与 Middleware，不承载业务规则。
-- 风险敞口、EOD 策略和权限映射由各自模块显式导入，禁止运行时 monkey patch。
-- 领域模块之间通过普通 import 建立可静态分析的依赖，不依赖启动顺序改变函数实现。
-- 同一业务事实只能有一个权威实现；残余敞口计算统一由 `execution_exposure.py` 提供。
-
-## 工程门禁边界
-
-- Backend 与 Runtime 的 Ruff 检查覆盖完整 `app/` 与 `tests/`，新增文件不能绕过门禁。
-- Python 安装完成后必须通过 `pip check`。
-- Pyright 覆盖执行 DTO、FinancialFact DTO/Normalization/Repository/Projection Service、共享 Position Math、SQLite Connection/Bootstrap/Seeds、Runtime 契约、迁移账本和权威下单边界。
-- Frontend 活跃交易界面持续执行零警告 ESLint、类型检查和生产构建；其他新增/修改源文件执行 no-new-debt gate。
-- `scripts/check-repository-structure.py` 阻止代码所有权和依赖方向漂移。
-- `scripts/check-documentation-consistency.py` 阻止 canonical 文档入口、Owner 路径和 Agent context 表述漂移。
-- FinancialFact Schema/Normalization/Repository/Projection Service 与 SQLite Connection/Bootstrap/Seeds 各自有静态所有权测试。
-
-## 工作流与上下文边界
-
-- 人工入口唯一为 `00-人工可读目录/README.md`。
-- Agent 入口唯一为 `docs/codex/context-map.md`。
-- 当前工程事实唯一由 `docs/codex/current-state.md` 维护。
-- 主要模块所有权唯一由 `docs/architecture/OWNERSHIP.md` 维护。
-- 每个非简单工作通过一个 Issue、一个任务包、一个 Issue 编号分支和一个开放 PR 推进。
-- `scripts/check-workstream.py` 校验 Issue、分支、任务包和 PR 一致性，并阻止同一 Issue 出现第二个开放 PR。
-
-## Domain Schema 边界
-
-- 执行域 API DTO 由 `platform-api/app/execution_schemas.py` 统一维护。
-- `platform-api/app/schemas.py` 只允许显式兼容重导出，不得重复定义执行域类型。
-- FinancialFact、正式持仓、正式 PnL、NAV 和重建响应 DTO 由 `platform-api/app/financial_fact_schemas.py` 统一维护。
-- `platform-api/app/financial_facts.py` 只保留兼容重导出、目录解析、FinancialFact 写入编排和 API，不得重新定义公开 DTO。
-
-## Platform–Runtime 契约边界
-
-- 当前执行 Command/Event 使用 `runtime-command` / `runtime-event` V1.0。
-- 双端模型分别位于 Platform 和 Runtime 的 `app/runtime_contracts.py`。
-- `docs/contracts/runtime-v1.json` 是字段顺序、名称和版本的可执行快照。
-- Platform 收到无法验证的 Event 时保留 `result_unknown`，不得解释为确定失败或自动重下。
-- `platform-api/app/trade_command_execution.py` 是本地 Order 创建、Safety、Runtime 提交和未知结果处理的唯一编排 Owner。
-- `platform-api/app/trading.py::submit_order` 只保留 deprecated 兼容入口；legacy raw payload 与 TradeCommand V1 payload 由 Owner 显式区分。
-- `platform-api/app/venue_reconciliation_schemas.py` 是 Venue Reconciliation 公开 DTO 和差异状态类型的唯一 Owner；原模块只做兼容导出。
-- `platform-api/app/venue_reconciliation_policy.py` 是外部订单状态映射与 Order/Position/Balance 差异草稿判定的纯 Policy Owner；它不得读取数据库、调用 Runtime 或写入 Difference。
-- `platform-api/app/venue_reconciliation_repository.py` 是 Reconciliation DDL、SQL、Row Mapping 与受保护事务的唯一 Owner；原模块不得直接访问数据库。
-- 不兼容变更必须提升版本并提供迁移/兼容测试。
-
-## Persistence 边界
-
-- SQLite 仍是当前批准的数据库技术。
-- `platform-api/app/database_connection.py` 是共享数据库路径、连接创建、Row Factory、Foreign Key、Commit/Rollback/Close 的唯一 Owner。
-- `platform-api/app/database_bootstrap.py` 是完整核心 `SCHEMA_SQL`、新库 Schema 执行、兼容补列与部分唯一索引的唯一 Owner。
-- `platform-api/app/database_seeds.py` 是固定 Reference Seed 向量、插入顺序与现有 XAUUSD 合约默认更新的唯一 Owner。
-- `platform-api/app/database.py` 只显式重导出 Connection/Bootstrap/Seed 兼容接口，并负责 `Connection → Bootstrap → Seed` 初始化编排；它不得实现连接、Schema 或 Seed 内容。
-- Bootstrap Schema 文本由 SHA-256 `421f0625ffe3a8a26ca48bc827e64bd6aa6b2e49d95faef0b17313e808375801` 固定。
-- 15 张 Seed 表的全部行/字段由 SHA-256 `d42f7e4f95a6efa9044b1e91b4e603f1d87f515923a57d941ee16e75109e6183` 固定。
-- 所有 DDL Owner、数据权威分类、Seed Authority 和迁移规则记录在 `docs/database/README.md`。
-- `platform-api/app/schema_migrations.py` 维护单调递增、带校验和的迁移账本。
-- `platform-api/app/financial_fact_repository.py` 是 FinancialFact 与正式 Position/PnL/NAV 的唯一 SQL、行映射和事务单元 Owner。
-- 数据库拆分由动态路径、事务行为、Schema Checksum、全量 Seed Checksum、新库/旧库及重复启动快照共同证明等价。
-- 已应用迁移不可修改；删除表/列、改变字段语义、替换 Seed、转移账务权威或替换数据库属于专门高风险变更。
-
-## FinancialFact Normalization 边界
-
-- `platform-api/app/financial_fact_normalization.py` 是标准化结构、币种、结算校验、目录派生值、FX、质量状态、Decimal/UTC/JSON 和内容哈希的唯一 Owner。
-- Policy 只接收已解析 Context，不得访问 Repository、数据库或外部交易场所。
-- 标准化键集合、文本值和内容哈希属于不可变事实身份。
-
-## Financial Projection 边界
-
-- `platform-api/app/trading.py` 负责成交后近实时运营投影，只写入 `positions` 与 `pnl_results`。
-- `platform-api/app/financial_fact_repository.py` 负责正式账务持久化和事务。
-- `platform-api/app/position_math.py` 是运营与正式投影共享的逐成交净数量、平均成本和已实现 PnL 纯计算唯一 Owner。
-- `platform-api/app/financial_projection_service.py` 负责 FinancialFact 回放、Multiplier/FX、分项 PnL、正式重建和 NAV 编排。
-- Projection Service 不依赖 FastAPI、配置模块或外部交易场所；数据库操作通过 Repository 完成。
-- 运营投影不构成正式会计权威；正式账务必须从不可变事实重建。
-
-## Test Taxonomy 边界
-
-- Platform API 测试按 `architecture`、`unit`、`integration`、`live_safety` 四层执行。
-- Platform Execution Runtime 测试按 `unit`、`integration`、`live_safety` 三层执行。
-- 每个测试在 collection 阶段必须且只能获得一个主标记；CI 分层运行且不得依赖其他层残留状态。
-
-## Failure/Recovery 边界
-
-- 网络超时、外部 ACK 丢失和 Gateway result unknown 不能解释为确定外部失败。
-- 已认领命令在结果未知后重复请求不得再次调用 Gateway。
-- Fill 身份必须幂等；重复和乱序事件不能重复投影或把 `filled` 降级。
-- 不可恢复事件、对账差异、EOD 不完整、备份/恢复失败必须 fail closed。
-- 自动化故障矩阵和受控实盘验收顺序见 `docs/operations/FAILURE_INJECTION_ACCEPTANCE.md`。
+前端分层与布局只在 `platform-web/docs/FRONTEND.md` 和 `platform-web/docs/DESIGN.md` 维护。后端、领域模型、Runtime 与跨层合同统一归本目录和 `docs/contracts/`，不在前端目录建立平行架构。

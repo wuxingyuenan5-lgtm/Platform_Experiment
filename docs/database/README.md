@@ -50,4 +50,4 @@ Router, pure-policy and service modules must not contain direct SQL when a repos
 6. Do not insert real users, credentials, holdings or secrets.
 7. Do not transfer authority between operational and formal data implicitly.
 
-The Platform 0.10.1 execution-risk split changes module ownership only. It does not alter DDL, table structure or data semantics.
+Execution-risk module refactors change ownership only unless an explicit migration changes DDL or persisted semantics.

@@ -12,8 +12,8 @@ REQUIRED_ENTRYPOINTS = (
     "README.md",
     "AGENTS.md",
     "docs/README.md",
-    "docs/codex/current-state.md",
-    "docs/codex/context-map.md",
+    "docs/PROJECT.md",
+    "docs/BASELINE.md",
     "docs/architecture/SYSTEM_MAP.md",
     "docs/architecture/OWNERSHIP.md",
     "docs/operations/RUNBOOK.md",
@@ -23,15 +23,17 @@ REQUIRED_ENTRYPOINTS = (
     "docs/contracts/README.md",
 )
 CANDIDATE_AUTHORITY_PATHS = (
-    "docs/codex/current-state.md",
-    "docs/technical/AUTH_RBAC_LIVE_SESSIONS.md",
-    "docs/product/PLATFORM_0_10_2_FRONTEND_ACCESS_MATRIX.md",
-    "docs/product/ACCEPTANCE_CRITERIA.md",
+    "docs/BASELINE.md",
+    "docs/contracts/AUTHORIZATION.md",
+    "docs/contracts/ACCESS_MATRIX.md",
     "docs/architecture/OWNERSHIP.md",
 )
 EXCLUDED_PARTS = frozenset(
     {
         ".git",
+        ".codex",
+        ".codex-cleanup-quarantine",
+        ".workbuddy",
         ".mypy_cache",
         ".pytest_cache",
         ".ruff_cache",
@@ -54,21 +56,21 @@ FENCED_CODE_PATTERN = re.compile(r"```.*?```|~~~.*?~~~", re.DOTALL)
 HTML_COMMENT_PATTERN = re.compile(r"<!--.*?-->", re.DOTALL)
 CURRENT_STATE_ALIASES = re.compile(r"^current[-_]state\.md$", re.IGNORECASE)
 START_HERE_ALIASES = re.compile(r"^start[-_]here(?:\.md)?$", re.IGNORECASE)
-DELETED_ACTIVE_TREES = re.compile(r"(?:^|/)(?:planning|tasks|projects)/", re.IGNORECASE)
+DELETED_ACTIVE_TREES = re.compile(r"(?:^|/)(?:planning|projects)/", re.IGNORECASE)
 HISTORICAL_CONTEXT = re.compile(
-    r"鍘嗗彶|historical|retired|superseded|completed|宸插畬鎴恷宸插綊妗闈炲綋鍓峾not current",
+    r"历史|过时|已退役|已替代|已完成|已归档|非当前|historical|retired|superseded|completed|archived|not current",
     re.IGNORECASE,
 )
 CURRENT_LEGACY_STATUS = re.compile(
-    r"(?:褰撳墠闃舵|瀹炴柦璁″垝|閫傜敤鐗堟湰|^#).*?(?:Platform\s+V6|Production\s+Gate|0\.9\.\d+.*Phase|Phase\s*[0-9])",
+    r"(?:当前阶段|实施计划|适用版本|^#).*?(?:Platform\s+V6|Production\s+Gate|0\.9\.\d+.*Phase|Phase\s*[0-9])",
     re.IGNORECASE,
 )
 ACTIVE_STATUS_PATTERN = re.compile(
-    r"^(?:鐘舵€侊細`active`|Status:\s*active)\s*$",
+    r"^(?:状态：`?active`?|Status:\s*active)\s*$",
     re.IGNORECASE | re.MULTILINE,
 )
 DRAFT_PR_STATUS_PATTERN = re.compile(
-    r"鐘舵€乕^\n]*(?:frozen\s+for\s+)?Draft\s+PR\s*#\d+[^\n]*(?:acceptance)?",
+    r"状态[^\n]*(?:frozen\s+for\s+)?Draft\s+PR\s*#\d+[^\n]*(?:acceptance)?",
     re.IGNORECASE,
 )
 CURRENT_STATE_STALE_MARKERS = (
@@ -79,7 +81,7 @@ CURRENT_STATE_SCOPE_REQUIREMENTS = (
     ("browser access", "Capability alignment"),
     ("frontend product restoration", "restored product pages", "product restoration"),
 )
-AUTH_CONTRACT_PATH = "docs/technical/AUTH_RBAC_LIVE_SESSIONS.md"
+AUTH_CONTRACT_PATH = "docs/contracts/AUTHORIZATION.md"
 WORKSTATION_PATH_PATTERNS = (
     (
         "Windows user profile",
@@ -100,11 +102,13 @@ WORKSTATION_PATH_PATTERNS = (
 
 
 def markdown_paths(root: Path) -> list[Path]:
-    return [
-        path
-        for path in sorted(root.rglob("*.md"))
-        if not (set(path.relative_to(root).parts) & EXCLUDED_PARTS)
-    ]
+    paths: list[Path] = []
+    for directory, directory_names, file_names in root.walk():
+        directory_names[:] = [
+            name for name in directory_names if name not in EXCLUDED_PARTS
+        ]
+        paths.extend(directory / name for name in file_names if name.endswith(".md"))
+    return sorted(paths)
 
 
 def markdown_without_examples(content: str) -> str:
@@ -132,8 +136,6 @@ def candidate_authority_paths(root: Path) -> list[Path]:
 
 def is_active_authority(root: Path, path: Path, content: str) -> bool:
     relative = path.relative_to(root).as_posix()
-    if relative.startswith("platform-web/docs/archive/"):
-        return False
     if relative in REQUIRED_ENTRYPOINTS:
         return True
     header = "\n".join(content.splitlines()[:20])
@@ -257,16 +259,16 @@ def validate_candidate_documentation(
                 f"{source.relative_to(root).as_posix()}"
             )
 
-    current_path = root / "docs/codex/current-state.md"
+    current_path = root / "docs/BASELINE.md"
     current = current_path.read_text(encoding="utf-8") if current_path.is_file() else ""
     for marker in CURRENT_STATE_STALE_MARKERS:
         if marker in current:
-            errors.append(f"docs/codex/current-state.md contains stale candidate status: {marker}")
+            errors.append(f"docs/BASELINE.md contains stale candidate status: {marker}")
     current_folded = current.casefold()
     for alternatives in CURRENT_STATE_SCOPE_REQUIREMENTS:
         if not any(alternative.casefold() in current_folded for alternative in alternatives):
             errors.append(
-                f"docs/codex/current-state.md must describe Platform {candidate} candidate scope: "
+                f"docs/BASELINE.md must describe Platform {candidate} candidate scope: "
                 + " or ".join(alternatives)
             )
 
@@ -303,10 +305,8 @@ def validate_entrypoints(root: Path) -> list[str]:
     for relative in REQUIRED_ENTRYPOINTS:
         if not (root / relative).is_file():
             errors.append(f"required documentation entrypoint is missing: {relative}")
-    current = root / "docs/codex/current-state.md"
-    for path in sorted(root.rglob("*")):
-        if not path.is_file() or set(path.relative_to(root).parts) & EXCLUDED_PARTS:
-            continue
+    current = root / "docs/BASELINE.md"
+    for path in markdown_paths(root):
         if START_HERE_ALIASES.fullmatch(path.name):
             errors.append(f"parallel documentation entrypoint is forbidden: {path.relative_to(root)}")
         if CURRENT_STATE_ALIASES.fullmatch(path.name) and path.resolve() != current.resolve():
@@ -315,7 +315,7 @@ def validate_entrypoints(root: Path) -> list[str]:
 
 
 def validate_current_authority(root: Path) -> list[str]:
-    current = (root / "docs/codex/current-state.md").read_text(encoding="utf-8")
+    current = (root / "docs/BASELINE.md").read_text(encoding="utf-8")
     stable_version = candidate_version(root)
     candidate = next_patch_version(stable_version)
     errors: list[str] = []
@@ -330,7 +330,7 @@ def validate_current_authority(root: Path) -> list[str]:
     )
     for anchor in required:
         if anchor not in current:
-            errors.append(f"current-state.md missing durable authority fact: {anchor}")
+            errors.append(f"BASELINE.md missing durable authority fact: {anchor}")
     volatile = (
         "Active branch:",
         "Current branch:",
@@ -340,9 +340,29 @@ def validate_current_authority(root: Path) -> list[str]:
     )
     for marker in volatile:
         if marker in current:
-            errors.append(f"current-state.md must not persist volatile Git/GitHub fact: {marker}")
+            errors.append(f"BASELINE.md must not persist volatile Git/GitHub fact: {marker}")
     if re.search(r"<[A-Z][A-Z0-9_]+>", current):
-        errors.append("current-state.md contains an unresolved placeholder")
+        errors.append("BASELINE.md contains an unresolved placeholder")
+    return errors
+
+
+def validate_project_cockpit(root: Path) -> list[str]:
+    project = (root / "docs/PROJECT.md").read_text(encoding="utf-8")
+    errors: list[str] = []
+    required = (
+        "## Now",
+        "## Next",
+        "## Later",
+        "## 发现箱",
+        "## 更新约定",
+    )
+    for anchor in required:
+        if anchor not in project:
+            errors.append(f"PROJECT.md missing project-tracking section: {anchor}")
+    volatile = ("Active branch:", "Current branch:", "Draft PR", "Open/Unmerged")
+    for marker in volatile:
+        if marker in project:
+            errors.append(f"PROJECT.md must not persist volatile Git/GitHub fact: {marker}")
     return errors
 
 
@@ -356,6 +376,7 @@ def validate_repository(root: Path) -> list[str]:
     return sorted(
         validate_entrypoints(root)
         + validate_current_authority(root)
+        + validate_project_cockpit(root)
         + validate_candidate_documentation(root)
         + validate_markdown_links(root, all_paths)
         + validate_backticked_paths(root, active_paths)

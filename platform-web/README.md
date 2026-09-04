@@ -37,7 +37,7 @@ The authoritative package manager is declared in `package.json#packageManager`.
 
 ## Engineering entry points
 
-- Current state: `../docs/codex/current-state.md`
+- Engineering baseline: `../docs/BASELINE.md`
 - Frontend agent rules: `AGENTS.md`
 - Product and architecture docs: `../docs/README.md`
 - Frontend design history and module detail: `docs/`

@@ -65,7 +65,7 @@ def test_bump_version_updates_all_maintained_declarations(tmp_path: Path) -> Non
     (tmp_path / "platform-api/app").mkdir(parents=True)
     (tmp_path / "execution-runtime/app").mkdir(parents=True)
     (tmp_path / "platform-web").mkdir()
-    (tmp_path / "docs/codex").mkdir(parents=True)
+    (tmp_path / "docs").mkdir(parents=True)
     (tmp_path / "VERSION").write_text("0.8.0\n", encoding="utf-8")
     (tmp_path / "platform-api/pyproject.toml").write_text(
         '[project]\nversion = "0.8.0"\n', encoding="utf-8"
@@ -87,8 +87,8 @@ def test_bump_version_updates_all_maintained_declarations(tmp_path: Path) -> Non
     (tmp_path / "execution-runtime/app/version.py").write_text(
         'PLATFORM_VERSION = "0.8.0"\n', encoding="utf-8"
     )
-    (tmp_path / "docs/codex/current-state.md").write_text(
-        '- Stable baseline: Platform `0.8.0`, release commit `old-sha`.\n',
+    (tmp_path / "docs/BASELINE.md").write_text(
+        '- Stable baseline: Platform `0.8.0`.\n',
         encoding="utf-8",
     )
 
@@ -115,7 +115,7 @@ def test_bump_version_updates_all_maintained_declarations(tmp_path: Path) -> Non
         tmp_path / "execution-runtime/app/version.py"
     ).read_text(encoding="utf-8")
     assert '- Stable baseline: Platform `0.9.3`' in (
-        tmp_path / "docs/codex/current-state.md"
+        tmp_path / "docs/BASELINE.md"
     ).read_text(encoding="utf-8")
 
 
@@ -130,7 +130,6 @@ def test_permanent_workflows_have_distinct_long_term_responsibilities() -> None:
     assert "python scripts/scan-secrets.py" not in platform
     assert "python scripts/scan-secrets.py" in secret
     assert "python scripts/check-version-consistency.py" in quality
-    assert "python scripts/context-for.py --check-budgets --json" in quality
     assert "name: platform-api" in platform
     assert "name: execution-runtime" in platform
     assert "name: platform-web" in platform

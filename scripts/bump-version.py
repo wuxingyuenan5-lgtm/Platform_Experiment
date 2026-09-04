@@ -60,7 +60,7 @@ def update_versions(root: Path, version: str) -> None:
         )
 
     replace_once(
-        root / "docs/codex/current-state.md",
+        root / "docs/BASELINE.md",
         r"^- Stable baseline: Platform `\d+\.\d+\.\d+`\.$",
         f"- Stable baseline: Platform `{version}`.",
     )

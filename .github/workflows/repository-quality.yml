@@ -64,8 +64,6 @@ jobs:
           fi
       - name: Check maintained versions
         run: python scripts/check-version-consistency.py
-      - name: Check bounded AI context budgets
-        run: python scripts/context-for.py --check-budgets --json
       - name: Check repository structure and architecture
         run: python scripts/check-repository-structure.py
       - name: Check active documentation and links

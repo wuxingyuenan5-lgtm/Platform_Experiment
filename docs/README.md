@@ -1,37 +1,93 @@
-# 全球变量金融平台文档导航
+# 项目文档入口
 
-Stable baseline, target scope and known limits belong in the authorities below. Volatile branch, HEAD and pull-request facts must be read from Git and GitHub. Completed plans, handoffs, evidence ledgers, phase receipts and release-status snapshots belong in Git history and pull requests, not in the active documentation tree.
+文档服务于三个问题：现在做什么、系统当前如何工作、某项变更应改哪里。默认先读 [项目驾驶舱](PROJECT.md)，再按任务进入一份负责该事实的文档；不要顺序通读整个 `docs/` 或 `platform-web/docs/`。
 
-## A1 authorities
+## 先从这里进入
 
-| Document | Sole responsibility |
+| 你要解决的问题 | 唯一入口 |
 |---|---|
-| `../README.md` | Project purpose and shortest startup entry |
-| `../AGENTS.md` | Engineering and AI execution constraints |
-| `codex/current-state.md` | Current stable baseline, target scope and known limits |
-| `codex/context-map.md` | Bounded context selection |
-| `architecture/SYSTEM_MAP.md` | Runtime topology and dependency direction |
-| `architecture/OWNERSHIP.md` | Code, policy and persistence ownership |
-| `operations/RUNBOOK.md` | Start, stop, health checks and safe operations |
-| `operations/LIVE_ACCEPTANCE_RUNBOOK.md` | Controlled live acceptance, fail-closed handling, EOD and forced reset |
-| `database/README.md` | Database, DDL and migration authority |
-| `contracts/README.md` | Current domain-contract index |
-| `engineering/GIT_WORKFLOW.md` | Branch, review and CI workflow |
+| 当前目标、优先级、阻塞、下一步 | [PROJECT.md](PROJECT.md) |
+| 一个跨任务阶段如何继续 | 对应的 `workstreams/<stage-slug>.md`；仅在存在活跃阶段时读取 |
+| 已发布基线、候选范围、外部事实限制 | [BASELINE.md](BASELINE.md) |
+| 产品范围和跨模块口径 | [product/PRD.md](product/PRD.md) |
+| 系统拓扑、依赖方向、数据权威 | [architecture/SYSTEM_MAP.md](architecture/SYSTEM_MAP.md) |
+| 代码、策略与持久化 Owner | [architecture/OWNERSHIP.md](architecture/OWNERSHIP.md) |
+| API 与领域合同索引 | [contracts/README.md](contracts/README.md) |
+| 数据库与迁移纪律 | [database/README.md](database/README.md) |
+| 启停、健康检查和恢复 | [operations/RUNBOOK.md](operations/RUNBOOK.md) |
+| 受控实盘验收 | [operations/LIVE_ACCEPTANCE_RUNBOOK.md](operations/LIVE_ACCEPTANCE_RUNBOOK.md) |
+| Git、评审和 CI | [engineering/GIT_WORKFLOW.md](engineering/GIT_WORKFLOW.md) |
 
-## Specialist references
+产品范围与策略位于 `product/`；UI 和前端实现细节位于 [platform-web/docs/README.md](../platform-web/docs/README.md)。历史任务卡、evidence、program 和旧阶段计划已经退出当前文档树，必要追溯由 Git 历史承担。
 
-- `technical/` contains active Platform 0.10.x implementation contracts.
-- `product/` contains current product requirements.
-- `../platform-web/docs/` contains maintained frontend design and acceptance references.
-- `operations/` contains durable operational procedures; temporary acceptance receipts are not authorities.
+## 文档分层
 
-## Maintenance rules
+| 层级 | 回答什么 | 更新时机 |
+|---|---|---|
+| 项目驾驶舱 | 现在做什么，卡在哪里，接下来做什么 | 优先级、状态、阻塞、决策或下一步变化时 |
+| 活跃阶段 | 一个跨任务结果如何继续、验收门是否满足 | 子任务取得证据、出现阻断或下一动作变化时 |
+| 稳定权威 | 产品、架构、合同、数据库、运维的当前规则 | 对外行为或长期边界变化时 |
+| 专项参考 | 模块需求、策略说明、UI、实现设计 | 对应专项发生变化时 |
+| 历史证据 | 为什么曾这样做、当时如何验收 | 原则上不更新；由 Git、PR、ADR 追溯 |
 
-- Change stable baseline, target scope and known limits only in `codex/current-state.md`.
-- Read active branch, HEAD and pull-request status from Git and GitHub rather than copying them into long-term Markdown.
-- Change service topology only in `architecture/SYSTEM_MAP.md`.
-- Change ownership only in `architecture/OWNERSHIP.md`.
-- Change startup and recovery commands only in `operations/RUNBOOK.md`.
-- Change controlled live-acceptance rules only in `operations/LIVE_ACCEPTANCE_RUNBOOK.md` and the owning executable contracts.
-- Change a business rule in its owning contract and executable tests.
-- Do not create parallel “start here”, handoff, audit, phase or evidence documents.
+文档的状态不由所在目录推断。没有被本页或专项入口列为权威的文档，默认是按需参考，不得覆盖代码、测试和上述权威文档所证明的当前事实。
+
+## 活跃阶段怎么管理
+
+只有 Owner 明确称为“阶段”，或一个可独立验收的结果确实跨多个任务或会话时，才使用 `workstreams/<stage-slug>.md`。普通开发任务不创建文件。
+
+- 一个阶段只有一份文件；Phase、子任务、执行 AI、验收和回执不另建 Markdown。
+- 可以同时存在多个活跃阶段，前提是它们能够分别推进、暂停和验收。若两个功能必须共同完成、反复修改同一核心合同或需要持续同步才能避免冲突，应合并为一个阶段下的不同工作线。
+- 阶段文件只是便于接续的当前快照，写清足以继续工作的范围、结果、验收、阻断或待决问题、下一动作和权威链接即可；不规定固定模板、状态枚举或回执字段。
+- Owner 最新明确要求优先于旧阶段记录。发现变化或冲突时，应说明并更新阶段文件，不能机械忽略聊天，也不能让聊天成为唯一事实源。
+- AI 可依据证据自动更新进度、验证结果、技术阻断、验收判断和下一动作，但不能自动改变产品范围、优先级、风险容忍度或外部授权。
+- 开始任务时先看 `PROJECT.md` 中的其他活跃阶段；只有当前修改触及其代码、数据或合同边界时，才读取相应阶段文件并处理交叉影响。同一事实不能在两个阶段文件中分别维护。
+- 新需求保持“未确认”；只有 Owner 明确说出“确认进入范围”后，才可进入正式产品文档。
+- 阶段完成后，把稳定事实归并到对应长期权威，把项目结果更新到 `PROJECT.md`，然后删除该阶段文件。聊天、日志、回执和临时计划不归档，历史由 Git 保留。
+
+相关任务的默认读取顺序是：
+
+```text
+AGENTS.md
+→ docs/PROJECT.md
+→ 对应 workstream
+→ workstream 链接的少量长期权威
+→ 目标代码与测试
+```
+
+如果没有对应 workstream，AI 不应为了“留痕”自行创建；只有满足上述阶段条件时才创建。两个功能是否拆成两个阶段，只需判断它们能否分别验收，以及其中一个暂停后另一个能否继续完成。
+
+## 边做边完善
+
+早期需求不要求一次写完整，按以下顺序成熟：
+
+1. 新想法先进入 `PROJECT.md` 的“发现箱”，标记为待确认，不直接变成承诺。
+2. Owner 明确说出“确认进入范围”后，需求才进入正式产品文档；确认优先级后再进入“Now / Next / Later”。
+3. 开发中发现的新约束，回填到对应条目；只有形成稳定产品或技术规则时，才同步到 PRD、合同、架构或 Runbook。
+4. 完成后从驾驶舱移除过程细节，只保留能力结论、剩余限制和下一步；证据留在代码、测试、Git 或 PR。
+
+这允许需求逐步长出来，同时避免每次讨论都新增一份 Markdown。
+
+## AI 默认更新规则
+
+每个非简单任务结束前，AI 必须判断文档影响：
+
+- 既有工作流的状态、阻塞、已验证结果或下一技术动作改变：AI 根据证据自动更新 `PROJECT.md`，不需要另行提醒。
+- 发现新的想法、缺口或不确定性：AI 可以自动加入发现箱，但必须标记为待确认。
+- 只有 Owner 明确说出“确认进入范围”，对应需求才可以进入 `product/` 正式产品文档。代码已经存在、测试通过或正在开发，都不能替代这项确认。
+- 产品优先级、里程碑选择、风险容忍度、外部连接和真实交易授权仍由 Owner 决定；AI 只能提出建议。
+- 产品行为、合同、架构边界、运维或安全规则改变：更新对应稳定权威。
+- 只是重构、补测试或内部实现变化，且状态和对外行为不变：不改文档。
+- 默认不创建任务卡、交接文档、阶段总结、审计报告或新的架构总览。
+- 已存在活跃阶段时，相关任务必须更新同一份 `workstreams` 文件，不得新建平行计划。
+- 最终回复说明实际结果、关键验证、真实阻断和文档影响即可，不要求固定回执格式。
+
+最终答复必须说明更新了哪一份项目/权威文档，或明确写出 `Docs: no update needed`。
+
+## 防止再次膨胀
+
+- 一类事实只保留一个权威入口；其他文档链接它，不复制整段口径。
+- 状态放驾驶舱，规则放权威文档，证据放代码、测试和 Git；三者不混写。
+- ADR 只记录难以逆转、影响多个模块的长期决策；普通实现选择留在代码和 PR。
+- 不按月份批量创建计划文档，不用 Markdown 镜像 Issue、分支、提交和测试日志；必要阶段只保留一份短期 workstream。
+- 旧文档确认没有独有事实后退出当前文档树；稳定结论归并到 Owner，必要追溯使用 Git，不建立过程文档 archive。

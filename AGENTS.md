@@ -12,6 +12,34 @@ Read this file first. Read a module `AGENTS.md`, Context Pack, task card, govern
 
 Mode 2/3, task cards, branches, Worktrees, locks, monitors, and structured delivery receipts are never prerequisites for ordinary work.
 
+## Documentation maintenance
+
+Before finishing any non-trivial task, perform a documentation-impact check:
+
+- AI may update the status, blocker, verified result and next technical action of an existing workstream in `docs/PROJECT.md` without a separate Owner prompt when repository or external evidence supports the change.
+- AI may add newly discovered ideas, gaps and uncertainties to the discovery inbox in `docs/PROJECT.md`. Every such entry must remain explicitly unconfirmed.
+- Do not promote a discovery, suggestion or inferred requirement into `docs/product/` until the Owner explicitly says `确认进入范围`. Implementation activity, code presence or test coverage does not substitute for that product-scope confirmation.
+- Product priority, milestone choice, risk tolerance, external connectivity and real-trading authorization remain Owner decisions. AI may recommend changes but must not infer approval from an active task.
+- Update the owning durable document when behavior, a contract, an architectural boundary, an operating procedure, or a safety rule changes.
+- Do not create a new task card, status report, handoff, plan, audit, or parallel architecture document unless the Owner explicitly asks for one or the work needs a durable ADR.
+- Do not update documentation for a refactor, test-only change, or implementation detail when the documented behavior and project status did not change.
+- In the final response, state which project or authority document changed, or state `Docs: no update needed`.
+
+Task plans, agent coordination, investigation logs and intermediate evidence are temporary working context. At task close, merge only durable verified facts into the owning document and discard the process narrative. Real-trading or externally auditable evidence is the exception: retain it in the approved audit or operator evidence location, not in active project documentation.
+
+### Active stage workstreams
+
+Use an active stage file only when the Owner defines a stage, or when one independently verifiable outcome spans multiple tasks or sessions. Ordinary bounded work needs no task document.
+
+- Keep one file for one active stage under `docs/workstreams/`. Do not create separate Markdown for its phases, subtasks, handoffs, receipts, test runs or repairs.
+- Multiple stages may be active when they can be progressed, paused and accepted independently. Closely coupled features that share one acceptance outcome or repeatedly change the same core contract should remain work lines in one stage rather than duplicate state across files.
+- A stage file is a concise continuation snapshot, not a product or architecture authority. It should contain enough current scope, result, acceptance, blocker or decision, next action and authority links for another task to continue, but it has no mandatory template, status vocabulary or receipt format.
+- Before continuing a stage, read `AGENTS.md`, `docs/PROJECT.md`, the relevant stage file and only its directly relevant durable authorities. Chat provides the Owner's latest intent and reasoning but must not be the only handoff source. When a new explicit Owner request conflicts with the stage file, point out the change and update the file; do not silently choose either version.
+- At task start, notice other active stages listed in `docs/PROJECT.md`. Read another stage file only when the intended change touches its current code, data or contract boundary. Shared facts must have one durable owner and must not be maintained independently in two stage files.
+- AI may update evidence-backed progress, verified results, technical blockers, acceptance and next technical action. AI must not change confirmed product scope, priority, risk tolerance or authorization. New product needs remain explicitly unconfirmed until the Owner says `确认进入范围`.
+- Task replies should briefly communicate the actual result, important verification, real blocker and documentation impact. Do not use a rigid receipt schema or depend on a long chat receipt for continuation.
+- At stage close, merge durable facts into their owning documents, update `docs/PROJECT.md`, and delete the single stage file. Git retains history; do not archive completed stage files. A blocked stage remains active, while cancellation or milestone changes require an Owner decision.
+
 ## Technical and trading safety
 
 - `platform-api` remains a modular monolith unless an approved architecture decision says otherwise. Venue SDKs and order side effects stay in `execution-runtime`; versioned contracts separate it from Platform API.

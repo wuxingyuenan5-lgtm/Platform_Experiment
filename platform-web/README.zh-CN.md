@@ -37,7 +37,7 @@ pnpm build
 
 ## 工程入口
 
-- 当前工程状态：`../docs/codex/current-state.md`
+- 当前工程基线：`../docs/BASELINE.md`
 - 前端 Agent 规则：`AGENTS.md`
 - 产品与架构文档：`../docs/README.md`
 - 前端历史设计与模块细节：`docs/`

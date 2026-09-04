@@ -1,7 +1,16 @@
-# Architecture Decisions
+# 架构决策
 
-Architecture decision records currently live in:
+这里只记录仍在约束当前系统、影响多个模块且难以无成本撤销的决策。完整字段、流程和实现细节由架构、合同、代码与测试负责。
 
-- `platform-web/docs/architecture/decisions`
+| 决策 | 当前结论 | 主要后果 |
+|---|---|---|
+| 产品骨架 | 保持五个一级产品模块；原新闻日历与理财能力由对冲基金看板、金融AI分析和首页入口承接 | 菜单可以演进，但跨模块职责变化需更新 PRD |
+| Platform API 形态 | 优先模块化单体 | 不为了目录对称引入微服务、消息队列或全局 DI |
+| 执行隔离 | Venue SDK 和订单副作用留在独立 Execution Runtime | Platform 与 Runtime 只通过版本化合同协作 |
+| 环境与交易模式 | deployment environment 与 trading mode 分离 | 连接真实 SDK 不等于 Live，部署成功不授权写入 |
+| 金融语义 | Decimal、币种、单位、带时区时间和明确状态统一 | 跨边界不得用 float 或无时区时间偷换语义 |
+| 正式账务 | 不可变 FinancialFact 是可审计经济事实 | 正式 Position/PnL/NAV 可重建，运营投影不替代正式账务 |
+| 响应式布局 | 统一 Shell、Grid/Flex 和内容优先级 | 不用逐页面分辨率补丁或 JS 宽度状态治理普通布局 |
+| 交易工具内容 | Markdown 是人工维护源，代码由脚本生成 | 生成文件不作为人工编辑入口 |
 
-Future root-level ADRs should be added here only after the current documentation ownership is consolidated.
+新增 ADR 的门槛：决策必须影响多个模块、持续约束未来工作且难以低成本撤销。普通实现选择、任务计划和阶段状态不写 ADR；若某项决策被替代，直接在本表注明替代关系并由 Git 保留历史。
