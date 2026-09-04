@@ -450,7 +450,9 @@
   function hydrateGroups() {
     const fallbackGroups = cloneGroups(props.groups);
     const savedGroups = readSavedGroups();
-    editableGroups.value = savedGroups ?? fallbackGroups;
+    editableGroups.value = savedGroups
+      ? reconcileSavedGroups(fallbackGroups, savedGroups)
+      : fallbackGroups;
     expandedGroups.value = Object.fromEntries(
       editableGroups.value.map((group) => [group.label, true]),
     );
@@ -480,6 +482,29 @@
     } catch {
       return null;
     }
+  }
+
+  /**
+   * Local storage owns only the user's table layout. A stored row must never
+   * become a stale cache for market data after the API has supplied live rows.
+   */
+  function reconcileSavedGroups(
+    liveGroups: TerminalTableGroup[],
+    savedGroups: TerminalTableGroup[],
+  ): TerminalTableGroup[] {
+    const liveById = new Map(
+      liveGroups.flatMap((group) => group.rows.map((row) => [row.id, row] as const)),
+    );
+    const liveBySymbol = new Map(
+      liveGroups.flatMap((group) => group.rows.map((row) => [row.symbol, row] as const)),
+    );
+    return savedGroups.map((group) => ({
+      ...group,
+      rows: group.rows.map((savedRow) => {
+        const liveRow = liveById.get(savedRow.id) || liveBySymbol.get(savedRow.symbol);
+        return liveRow ? { ...savedRow, ...liveRow } : savedRow;
+      }),
+    }));
   }
 
   function normalizeGroup(group: any): TerminalTableGroup | null {
