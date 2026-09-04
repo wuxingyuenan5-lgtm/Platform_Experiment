@@ -713,6 +713,11 @@ export const researchModules: ResearchModule[] = [
             'https://www.coinglass.com/zh/FundingRate',
           ),
           externalReference(
+            'CoinGlass 加密衍生品风险指数',
+            'CoinGlass · 衍生品市场风险指标',
+            'https://www.coinglass.com/zh-TW/pro/i/CDRI',
+          ),
+          externalReference(
             'Coinbase Premium Index',
             'CoinGlass · 美国现货相对溢价',
             'https://www.coinglass.com/pro/i/coinbase-bitcoin-premium-index',
