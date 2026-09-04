@@ -551,47 +551,16 @@ export const researchModules: ResearchModule[] = [
         id: 'gold-rates',
         eyebrow: 'Rates & Inflation',
         title: '利率与通胀',
-        description: '把名义利率、通胀预期和实际利率放在同一组里看。',
-        layout: 'two',
+        description: '以实际利率为核心观察黄金的宏观驱动。',
+        layout: 'hero',
         widgets: [
-          localChart(
-            '金价 vs 10Y 名义利率',
-            '左轴黄金价格，右轴美国 10 年名义国债收益率',
-            'gold-vs-nominal',
-            {
-              height: 400,
-              sourceNote: 'External Link · U.S. Treasury · no local gold proxy',
-              referenceLinks: macroMicroReference(
-                'https://www.macromicro.me/charts/5490/huang-jin-vs-mei-guo-10-nian-guo-zhai-shou-yi-lv',
-              ),
-            },
-          ),
-          localChart(
-            '金价 vs 10Y 通胀预期',
-            '用名义 10Y 减实际 10Y 得到 breakeven',
-            'gold-vs-breakeven',
-            {
-              height: 400,
-              sourceNote: 'External Link · U.S. Treasury · no local gold proxy',
-              referenceLinks: macroMicroReference('https://www.macromicro.me/charts/10319/xau'),
-            },
-          ),
-          localChart('金价 vs 10Y 实际利率', '实际利率是黄金最硬的宏观约束之一', 'gold-vs-real', {
+          localChart('金价驱动分析', '以实际利率为核心的黄金宏观驱动观察', 'gold-vs-real', {
             height: 400,
             sourceNote: 'External Link · U.S. Treasury · no local gold proxy',
-            referenceLinks: macroMicroReference(
-              'https://sc.macromicro.me/collections/45/mm-gold-price/724/3month-bond-real-yield-gold-price',
-            ),
+            referenceLinks: [
+              { label: 'TradingView 模板', href: 'https://cn.tradingview.com/chart/k8dNGuui/' },
+            ],
           }),
-          withReferenceLinks(
-            advancedChart('Gold vs DXY', '黄金与美元指数', 'OANDA:XAUUSD', {
-              compareSymbols: [{ symbol: 'TVC:DXY', position: 'SameScale' }],
-              height: 420,
-            }),
-            macroMicroReference(
-              'https://sc.macromicro.me/collections/45/mm-gold-price/592/us-usd-dollar-',
-            ),
-          ),
         ],
       },
       {
