@@ -110,16 +110,6 @@ const externalCryptoResearch = {
     description: '上市公司及机构 Bitcoin 持仓披露',
     href: 'https://bitcointreasuries.net/',
   },
-  'crypto-options-iv': {
-    provider: 'Deribit',
-    description: 'BTC / ETH 波动率指数与期权市场统计',
-    href: 'https://www.deribit.com/statistics/BTC/volatility-index',
-  },
-  'crypto-onchain': {
-    provider: 'Checkonchain',
-    description: 'Bitcoin 链上估值、持有者与周期指标',
-    href: 'https://checkonchain.com/',
-  },
   'crypto-eth-etf-flow': {
     provider: 'SoSoValue',
     description: '美国现货 ETH ETF 每日资金流',
@@ -422,8 +412,6 @@ export default defineComponent({
             return h(CryptoMarketDetailPanel);
           case 'btc-etf-flow':
           case 'btc-treasury-flow':
-          case 'crypto-options-iv':
-          case 'crypto-onchain':
           case 'crypto-eth-etf-flow':
             return renderExternalCryptoResearch(key);
           case 'crypto-binance-open-interest':

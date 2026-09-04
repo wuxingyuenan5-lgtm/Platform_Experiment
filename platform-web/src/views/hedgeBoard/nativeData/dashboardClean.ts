@@ -31,8 +31,6 @@ export type LocalWidgetKey =
   | 'btc-etf-flow'
   | 'btc-treasury-flow'
   | 'crypto-binance-open-interest'
-  | 'crypto-options-iv'
-  | 'crypto-onchain'
   | 'crypto-eth-etf-flow'
   | 'spdr-daily-flow'
   | 'spdr-holdings-vs-price'
@@ -728,17 +726,15 @@ export const researchModules: ResearchModule[] = [
         description: '受许可或维护边界限制的专题，保留精确数据入口，不复制第三方静态快照。',
         layout: 'three',
         widgets: [
-          localChart('Options IV / Skew', 'Deribit / Greeks.live', 'crypto-options-iv'),
-          localChart('On-chain Signals', 'Checkonchain / Glassnode', 'crypto-onchain'),
-          externalReference(
-            'Deribit BTC Options Metrics',
-            '期限结构、偏度、Put/Call 与到期分布',
-            'https://www.deribit.com/statistics/BTC/metrics/options',
-          ),
           externalReference(
             'Greeks.live BTC Data Lab',
             'Deribit 期权数据实验室',
             'https://www.greeks.live/deribit/tools/datalab/BTC',
+          ),
+          externalReference(
+            'Deribit BTC Options Metrics',
+            '期限结构、偏度、Put/Call 与到期分布',
+            'https://www.deribit.com/statistics/BTC/metrics/options',
           ),
           externalReference(
             'Laevitas BTC Gamma Exposure',
@@ -749,11 +745,6 @@ export const researchModules: ResearchModule[] = [
             'IBIT Gamma Exposure',
             'Barchart · IBIT 期权 GEX',
             'https://www.barchart.com/etfs-funds/quotes/IBIT/gamma-exposure',
-          ),
-          externalReference(
-            'CoinGlass BTC 行情终端',
-            'BTCUSDT K线与衍生品入口',
-            'https://www.coinglass.com/tv/zh/Binance_BTCUSDT',
           ),
         ],
       },
