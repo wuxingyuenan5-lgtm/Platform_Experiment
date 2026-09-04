@@ -580,8 +580,7 @@ class BybitMt5Gateway:
                         dataQualityState=quality,
                     )
                 )
-            end = datetime.now(UTC)
-            start = end - timedelta(days=self.settings.mt5_history_lookback_days)
+            start, end = self.mt5._history_window()
             orders: list[VenueOrderSnapshot] = []
             seen_order_ids: set[str] = set()
             for row in [*(mt5.orders_get() or ()), *(mt5.history_orders_get(start, end) or ())]:

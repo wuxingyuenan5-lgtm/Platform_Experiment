@@ -12,7 +12,7 @@
 
 | 阶段 | 当前重点 | 入口 |
 |---|---|---|
-| 策略模块架构 | Cross 1 盎司 Market 已完成真实开仓、双腿核对、平仓、归零与权威对账；当前收口回执恢复和延迟，再继续 Funding 最小闭环 | [strategy-module-architecture.md](workstreams/strategy-module-architecture.md) |
+| 策略模块架构 | Cross 最小实盘闭环及策略管理订单、损益、账户净值读模型已贯通；下一步继续 Funding 最小闭环 | [strategy-module-architecture.md](workstreams/strategy-module-architecture.md) |
 
 ## Now
 
@@ -21,7 +21,7 @@
 | 文档与项目跟进 | `done`：项目驾驶舱、发现箱和轻量 workstream 机制已启用；Hedge Board 已完成阶段归并，策略阶段保留单一接续快照；旧治理、任务卡、重复技术文档和前端平行知识库已退出当前文档树 | 项目级状态只从本页跟进；阶段以最小快照接续；长期事实各归其权威；过程材料不再持久化 | 后续任务只做文档影响检查：更新现有 Owner，不另建计划、回执、交接或平行架构文档 |
 | Platform 0.11.2 候选 | `in_progress`：策略统一执行框架、真实账户只读链、本地三服务生命周期和 Hedge Board Macro/Commodity/Crypto V1 已进入当前主线；长期文档已完成收敛；新闻日历与理财不再是一级模块，其能力已归入 Hedge Board、金融AI分析和首页入口 | 独立验收、浏览器访问回归、Capability 与长期文档全部收敛，已知限制明确 | 继续完成候选版本专项验收；受控实盘等待新的 Owner 授权和外部前置条件 |
 | Hedge Board V1 | `done`：Macro、Commodity、Crypto、本地研究数据、Market Detail、研究入口和离线浏览器验收已完成；稳定范围、数据合同与运行边界已归并 | 后续变更仅更新产品模块、研究数据合同、运行手册或专项来源图中的唯一 Owner | 保持现有数据质量与来源边界；新的看板范围先按发现箱和产品确认流程进入 |
-| 受控交易闭环 | `cross_live_closed_loop_verified`：Cross 1 盎司 Market 双腿已真实开仓并平仓归零；平仓暴露的 MT5 稀疏终态回执和生命周期恢复缺口已修复，当前会话已撤销且双层 Live Write 为关闭 | 窗口内 Cross 完成开仓、双腿核对、平仓与对账，随后 Funding 完成最小仓位闭环并强制回只读 | 完成 Cross corrective 回归后，在现有授权窗口内由 Owner 手动执行 Funding 最小可成交数量闭环 |
+| 受控交易闭环 | `cross_live_closed_loop_verified`：Cross 1 盎司 Market 双腿已真实开平仓归零，订单、权威成交、策略损益和双账户净值历史均已进入策略管理读模型；当前会话已撤销且双层 Live Write 为关闭 | 窗口内 Cross 完成开仓、双腿核对、平仓与对账，随后 Funding 完成最小仓位闭环并强制回只读 | 在现有授权窗口内由 Owner 手动执行 Funding 最小可成交数量闭环 |
 
 ## Next
 

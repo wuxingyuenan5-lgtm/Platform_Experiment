@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import hashlib
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
 
@@ -107,8 +107,7 @@ class Mt5AcceptanceAdapter(Mt5PositionClosingAdapter):
         self._assert_account(account)
         bounded_limit = max(1, min(limit, 100))
         mt5 = self._connect()
-        end = datetime.now(UTC)
-        start = end - timedelta(days=self.settings.mt5_history_lookback_days)
+        start, end = self._history_window()
         try:
             active = mt5.orders_get(symbol=symbol) if symbol else mt5.orders_get()
             history = mt5.history_orders_get(start, end) or ()
@@ -148,8 +147,7 @@ class Mt5AcceptanceAdapter(Mt5PositionClosingAdapter):
             if route is None and platform_order_id is not None:
                 return []
         mt5 = self._connect()
-        end = datetime.now(UTC)
-        start = end - timedelta(days=self.settings.mt5_history_lookback_days)
+        start, end = self._history_window()
         try:
             deals = mt5.history_deals_get(start, end) or ()
         except Exception as exc:

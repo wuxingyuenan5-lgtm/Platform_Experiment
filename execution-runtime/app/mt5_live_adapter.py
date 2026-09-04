@@ -269,8 +269,7 @@ class Mt5LiveAdapter:
             if route is not None and route.external_order_id:
                 deals = mt5.history_deals_get(ticket=int(route.external_order_id)) or ()
             else:
-                end = datetime.now(UTC)
-                start = end - timedelta(days=self.settings.mt5_history_lookback_days)
+                start, end = self._history_window()
                 deals = mt5.history_deals_get(start, end) or ()
         except Exception as exc:
             raise GatewayResultUnknownError("MT5 deal query result is unknown") from exc
@@ -857,6 +856,16 @@ class Mt5LiveAdapter:
         if source_time > observed_at + timedelta(minutes=5):
             return observed_at
         return source_time
+
+    def _history_window(self) -> tuple[datetime, datetime]:
+        observed_at = datetime.now(UTC)
+        # MT5 history range filtering follows the broker terminal clock. Some
+        # terminals expose server-local epochs several hours ahead of UTC, so
+        # a narrow `end=now` silently drops the newest orders and deals.
+        return (
+            observed_at - timedelta(days=self.settings.mt5_history_lookback_days + 1),
+            observed_at + timedelta(days=1),
+        )
 
     @staticmethod
     def _as_dict(value: object) -> dict[str, object]:

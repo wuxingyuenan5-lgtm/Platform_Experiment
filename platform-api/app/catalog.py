@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from decimal import Decimal
-from typing import TypedDict
+from typing import Any, TypedDict
 from uuid import uuid4
 
 from fastapi import HTTPException
@@ -947,18 +947,91 @@ def list_fills() -> list[FillResponse]:
 def get_strategy_pnl(strategy_instance_id: str) -> StrategyPnlResponse:
     instance = get_strategy_instance(strategy_instance_id)
     with connection() as db:
-        rows = db.execute(
+        fill_rows = db.execute(
             """
-            SELECT pr.realized_pnl, pr.trading_pnl, pr.fees
-            FROM strategy_account_bindings sab
-            JOIN pnl_results pr ON pr.account_id = sab.account_id
-            WHERE sab.strategy_instance_id = ?
+            SELECT o.id AS order_id, o.account_id, o.instrument_id,
+                   o.quantity AS requested_quantity, f.id AS fill_id, f.side,
+                   f.quantity, f.price, f.occurred_at,
+                   COALESCE(cs.contract_multiplier, '1') AS contract_multiplier
+            FROM trade_commands tc
+            JOIN orders o ON o.command_id = tc.id
+            JOIN fills f ON f.order_id = o.id
+            LEFT JOIN contract_specifications cs ON cs.instrument_id = o.instrument_id
+            WHERE tc.strategy_instance_id = ?
+            ORDER BY f.occurred_at, f.id
             """,
             (strategy_instance_id,),
         ).fetchall()
-    realized_pnl = sum((Decimal(row["realized_pnl"]) for row in rows), Decimal("0"))
-    trading_pnl = sum((Decimal(row["trading_pnl"]) for row in rows), Decimal("0"))
-    fees = sum((Decimal(row["fees"]) for row in rows), Decimal("0"))
+        pnl_rows = db.execute(
+            """
+            SELECT pr.trading_pnl, pr.fees
+            FROM strategy_account_bindings sab
+            JOIN pnl_results pr ON pr.account_id = sab.account_id
+            WHERE sab.strategy_instance_id = ? AND sab.status = 'active'
+              AND pr.instrument_id IN (
+                  SELECT DISTINCT instrument_id
+                  FROM trade_commands
+                  WHERE strategy_instance_id = ?
+              )
+            """,
+            (strategy_instance_id, strategy_instance_id),
+        ).fetchall()
+
+    grouped: dict[str, list[Any]] = {}
+    for row in fill_rows:
+        grouped.setdefault(str(row["order_id"]), []).append(row)
+    canonical: list[Any] = []
+    for rows in grouped.values():
+        requested = Decimal(str(rows[0]["requested_quantity"]))
+        exact = next(
+            (row for row in rows if Decimal(str(row["quantity"])) == requested),
+            None,
+        )
+        if exact is not None:
+            canonical.append(exact)
+            continue
+        accepted = Decimal("0")
+        for row in rows:
+            quantity = Decimal(str(row["quantity"]))
+            if quantity <= 0 or accepted + quantity > requested:
+                continue
+            canonical.append(row)
+            accepted += quantity
+
+    positions: dict[tuple[str, str], tuple[Decimal, Decimal | None]] = {}
+    realized_pnl = Decimal("0")
+    for row in canonical:
+        key = (str(row["account_id"]), str(row["instrument_id"]))
+        old_quantity, old_average = positions.get(key, (Decimal("0"), None))
+        multiplier = Decimal(str(row["contract_multiplier"]))
+        quantity = Decimal(str(row["quantity"])) * multiplier
+        price = Decimal(str(row["price"]))
+        signed_fill = quantity if str(row["side"]).lower() == "buy" else -quantity
+        if old_quantity == 0 or old_quantity * signed_fill > 0:
+            new_quantity = old_quantity + signed_fill
+            old_notional = abs(old_quantity) * (old_average or Decimal("0"))
+            new_average = (
+                None
+                if new_quantity == 0
+                else (old_notional + abs(signed_fill) * price) / abs(new_quantity)
+            )
+        else:
+            closing_quantity = min(abs(old_quantity), abs(signed_fill))
+            direction = Decimal("1") if old_quantity > 0 else Decimal("-1")
+            realized_pnl += closing_quantity * (price - (old_average or price)) * direction
+            new_quantity = old_quantity + signed_fill
+            if new_quantity == 0:
+                new_average = None
+            elif old_quantity * new_quantity > 0:
+                new_average = old_average
+            else:
+                new_average = price
+        positions[key] = (new_quantity, new_average)
+
+    trading_pnl = sum(
+        (Decimal(str(row["trading_pnl"])) for row in pnl_rows), Decimal("0")
+    )
+    fees = sum((Decimal(str(row["fees"])) for row in pnl_rows), Decimal("0"))
     return StrategyPnlResponse(
         strategyInstanceId=strategy_instance_id,
         realizedPnl=realized_pnl,

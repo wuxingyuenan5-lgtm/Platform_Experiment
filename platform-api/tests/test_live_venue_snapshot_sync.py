@@ -332,7 +332,7 @@ def test_strategy_account_snapshot_returns_ready_sync_status_and_account_risk(
     assert by_desk["shortLineTraderL"]["primaryAccountDataQualityState"] == "complete"
 
 
-def test_sync_without_current_window_keeps_existing_historical_pnl(
+def test_sync_without_position_keeps_realized_and_fees_but_clears_unrealized(
     monkeypatch,
     tmp_path: Path,
 ) -> None:
@@ -369,7 +369,51 @@ def test_sync_without_current_window_keeps_existing_historical_pnl(
             """,
             ("bybit-live-main", "instrument_btc_usdt"),
         ).fetchone()
-    assert dict(row) == {"realized_pnl": "12.5", "trading_pnl": "3.4", "fees": "0.6"}
+    assert dict(row) == {"realized_pnl": "12.5", "trading_pnl": "0", "fees": "0.6"}
+
+
+def test_sync_resets_unrealized_pnl_when_authoritative_position_is_flat(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    bootstrap(tmp_path)
+    with connection() as db:
+        db.execute(
+            """
+            INSERT INTO positions (
+                account_id, instrument_id, net_quantity, average_price, updated_at
+            ) VALUES ('bybit-live-main', 'instrument_xau_usdt_perp', '1', '2000', ?)
+            """,
+            ("2026-08-24T00:00:00+00:00",),
+        )
+        db.execute(
+            """
+            INSERT INTO pnl_results (
+                account_id, instrument_id, realized_pnl, trading_pnl, fees, updated_at
+            ) VALUES ('bybit-live-main', 'instrument_xau_usdt_perp', '2', '9', '0.5', ?)
+            """,
+            ("2026-08-24T00:00:00+00:00",),
+        )
+    snapshot = base_snapshot("bybit-live-main")
+    snapshot["positions"] = []
+    snapshot["fills"] = []
+    monkeypatch.setattr(
+        "app.live_venue_snapshot_sync.runtime_get",
+        lambda path, params=None: StubResponse(snapshot),
+    )
+
+    sync_venue_snapshots("bybit-live-main")
+
+    with connection() as db:
+        row = db.execute(
+            """
+            SELECT realized_pnl, trading_pnl, fees
+            FROM pnl_results
+            WHERE account_id = 'bybit-live-main'
+              AND instrument_id = 'instrument_xau_usdt_perp'
+            """
+        ).fetchone()
+    assert dict(row) == {"realized_pnl": "2", "trading_pnl": "0", "fees": "0.5"}
 
 
 def test_sync_persists_unmapped_mt5_monitoring_identity_without_duplicates(

@@ -140,6 +140,111 @@ def test_strategy_nav_snapshot_uses_seed_balance_and_capital_base(tmp_path: Path
         assert len(snapshots.json()) == 1
 
 
+def test_cross_strategy_pnl_uses_canonical_fills_and_contract_multiplier(
+    tmp_path: Path,
+) -> None:
+    get_settings().database_path = str(tmp_path / "cross-strategy-pnl.db")
+    timestamp = "2026-09-04T12:00:00+00:00"
+    strategy_id = "strategy_cross_venue_spread_instance_default"
+    with TestClient(app) as client:
+        with connection() as db:
+            orders = (
+                (
+                    "bybit-open",
+                    "cmd-bybit-open",
+                    "bybit-live-main",
+                    "instrument_xau_usdt_perp",
+                    "buy",
+                    "100",
+                ),
+                (
+                    "bybit-close",
+                    "cmd-bybit-close",
+                    "bybit-live-main",
+                    "instrument_xau_usdt_perp",
+                    "sell",
+                    "101",
+                ),
+                ("mt5-open", "cmd-mt5-open", "mt5-live-main", "instrument_xau_usd", "sell", "102"),
+                ("mt5-close", "cmd-mt5-close", "mt5-live-main", "instrument_xau_usd", "buy", "100"),
+            )
+            for order_id, command_id, account_id, instrument_id, side, price in orders:
+                quantity = "0.01" if account_id == "mt5-live-main" else "1"
+                db.execute(
+                    """
+                    INSERT INTO trade_commands (
+                        id, idempotency_key, strategy_instance_id, account_id, instrument_id,
+                        command_type, side, order_type, quantity, price, status,
+                        created_at, updated_at
+                    ) VALUES (?, ?, ?, ?, ?, 'submit_order', ?, 'market', ?, NULL,
+                              'filled', ?, ?)
+                    """,
+                    (
+                        command_id,
+                        f"{command_id}-key",
+                        strategy_id,
+                        account_id,
+                        instrument_id,
+                        side,
+                        quantity,
+                        timestamp,
+                        timestamp,
+                    ),
+                )
+                db.execute(
+                    """
+                    INSERT INTO orders (
+                        id, command_id, account_id, instrument_id, symbol, side,
+                        order_type, quantity, status, created_at, updated_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, 'market', ?, 'filled', ?, ?)
+                    """,
+                    (
+                        order_id,
+                        command_id,
+                        account_id,
+                        instrument_id,
+                        "XAUUSD.S" if account_id == "mt5-live-main" else "XAUTUSDT",
+                        side,
+                        quantity,
+                        timestamp,
+                        timestamp,
+                    ),
+                )
+                db.execute(
+                    """
+                    INSERT INTO fills (
+                        id, order_id, account_id, instrument_id, side, quantity, price, occurred_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        f"fill-{order_id}",
+                        order_id,
+                        account_id,
+                        instrument_id,
+                        side,
+                        quantity,
+                        price,
+                        timestamp,
+                    ),
+                )
+            db.execute(
+                """
+                INSERT INTO fills (
+                    id, order_id, account_id, instrument_id, side, quantity, price, occurred_at
+                ) VALUES ('component-a', 'bybit-close', 'bybit-live-main',
+                          'instrument_xau_usdt_perp', 'sell', '0.4', '101', ?),
+                       ('component-b', 'bybit-close', 'bybit-live-main',
+                          'instrument_xau_usdt_perp', 'sell', '0.6', '101', ?)
+                """,
+                (timestamp, timestamp),
+            )
+
+        response = client.get(f"/api/v1/strategies/instances/{strategy_id}/pnl")
+
+    assert response.status_code == 200
+    assert response.json()["realizedPnl"] == "3.00"
+
+
 def test_management_overview_exposes_latest_run_freshness_for_closed_loop_and_read_only(
     tmp_path: Path,
 ) -> None:

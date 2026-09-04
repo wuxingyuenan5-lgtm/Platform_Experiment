@@ -261,7 +261,17 @@ def _persist_positions(
     positions: list[dict[str, object]],
 ) -> tuple[int, dict[str, Decimal]]:
     written = 0
-    unrealized_by_instrument: dict[str, Decimal] = {}
+    previously_observed = db.execute(
+        """
+        SELECT instrument_id FROM positions WHERE account_id = ?
+        UNION
+        SELECT instrument_id FROM pnl_results WHERE account_id = ?
+        """,
+        (account_id, account_id),
+    ).fetchall()
+    unrealized_by_instrument: dict[str, Decimal] = {
+        str(row["instrument_id"]): Decimal("0") for row in previously_observed
+    }
     db.execute("DELETE FROM positions WHERE account_id = ?", (account_id,))
     for position in positions:
         instrument_id = str(position.get("instrumentId") or "")

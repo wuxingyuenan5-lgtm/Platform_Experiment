@@ -5,15 +5,21 @@ import {
   getAccountBalanceLatest,
   getCrossSpreadSnapshot,
   getEquityHistory,
+  getExecutionBatches,
   getFills,
+  getInstruments,
+  getOrders,
   getStrategyAccountBindings,
-  getTradingPnl,
+  getStrategyPnl,
 } from '@/api/platform/trading';
 import type {
   BalanceResult,
   EquityHistoryPointResult,
+  ExecutionBatchResult,
   FillResult,
-  PnlResult,
+  InstrumentResult,
+  OrderDetailResult,
+  StrategyPnlResult,
   StrategyAccountBindingResult,
   CrossSpreadSnapshotResult,
 } from '@/api/platform/trading.types';
@@ -174,6 +180,7 @@ function derivePnlTimeline(
   fills: FillResult[],
   bybitAccountId: string | null,
   mt5AccountId: string | null,
+  contractMultipliers: Map<string, number>,
 ) {
   const ordered = [...fills]
     .filter(isTrustedLegacyFilteredFill)
@@ -190,7 +197,7 @@ function derivePnlTimeline(
   for (const fill of ordered) {
     const key = `${fill.accountId}:${fill.instrumentId}`;
     const state = states.get(key) ?? { quantity: 0, averagePrice: null, realized: 0 };
-    const quantity = toNumber(fill.quantity);
+    const quantity = toNumber(fill.quantity) * (contractMultipliers.get(fill.instrumentId) ?? 1);
     const price = toNumber(fill.price);
     const signedFill = String(fill.side).toLowerCase() === 'buy' ? quantity : -quantity;
     const nextState = calculatePositionUpdate(
@@ -222,7 +229,53 @@ function derivePnlTimeline(
     bybitRealized: Number(bybitRealized.toFixed(4)),
     mt5Realized: Number(mt5Realized.toFixed(4)),
     trustedFillCount: ordered.length,
+    openExposureCount: [...states.values()].filter((state) => Math.abs(state.quantity) > 1e-9)
+      .length,
   };
+}
+
+function canonicalStrategyFills(
+  fills: FillResult[],
+  orders: OrderDetailResult[],
+  batches: ExecutionBatchResult[],
+) {
+  const strategyOrderIds = new Set(
+    batches.flatMap((batch) => batch.legs.map((leg) => leg.orderId).filter(Boolean) as string[]),
+  );
+  const orderById = new Map(
+    orders
+      .filter((order) => strategyOrderIds.has(order.orderId))
+      .map((order) => [order.orderId, order]),
+  );
+  const grouped = new Map<string, FillResult[]>();
+  for (const fill of fills) {
+    if (!orderById.has(fill.orderId)) continue;
+    const rows = grouped.get(fill.orderId) ?? [];
+    rows.push(fill);
+    grouped.set(fill.orderId, rows);
+  }
+
+  const result: FillResult[] = [];
+  for (const [orderId, candidates] of grouped) {
+    const requested = toNumber(orderById.get(orderId)?.quantity);
+    const exact = candidates.find(
+      (fill) => requested > 0 && Math.abs(toNumber(fill.quantity) - requested) < 1e-9,
+    );
+    if (exact) {
+      result.push(exact);
+      continue;
+    }
+    let accepted = 0;
+    for (const fill of [...candidates].sort(
+      (left, right) => new Date(left.occurredAt).getTime() - new Date(right.occurredAt).getTime(),
+    )) {
+      const quantity = toNumber(fill.quantity);
+      if (quantity <= 0 || (requested > 0 && accepted + quantity > requested + 1e-9)) continue;
+      result.push(fill);
+      accepted += quantity;
+    }
+  }
+  return result;
 }
 
 function navPointsFromSnapshotsOrRealized(
@@ -247,12 +300,18 @@ function navPointsFromSnapshotsOrRealized(
   let mt5Index = 0;
   let bybitEquity = 0;
   let mt5Equity = 0;
-  const merged = timestamps.map((time) => {
+  let bybitAsOf = 0;
+  let mt5AsOf = 0;
+  let bybitSeen = false;
+  let mt5Seen = false;
+  const merged = timestamps.flatMap((time) => {
     while (
       bybitIndex < orderedBybit.length &&
       new Date(orderedBybit[bybitIndex].asOf).getTime() <= new Date(time).getTime()
     ) {
       bybitEquity = toNumber(orderedBybit[bybitIndex].equity);
+      bybitAsOf = new Date(orderedBybit[bybitIndex].asOf).getTime();
+      bybitSeen = true;
       bybitIndex += 1;
     }
     while (
@@ -260,13 +319,24 @@ function navPointsFromSnapshotsOrRealized(
       new Date(orderedMt5[mt5Index].asOf).getTime() <= new Date(time).getTime()
     ) {
       mt5Equity = toNumber(orderedMt5[mt5Index].equity);
+      mt5AsOf = new Date(orderedMt5[mt5Index].asOf).getTime();
+      mt5Seen = true;
       mt5Index += 1;
     }
-    return { time, equity: Number((bybitEquity + mt5Equity).toFixed(2)) };
+    return bybitSeen && mt5Seen && Math.abs(bybitAsOf - mt5AsOf) <= 5 * 60 * 1000
+      ? [{ time, equity: Number((bybitEquity + mt5Equity).toFixed(2)) }]
+      : [];
   });
 
-  const capitalBase = Math.max(merged.find((point) => point.equity > 0)?.equity ?? 0, 1);
-  return merged.map((point) => ({
+  const bounded =
+    merged.length <= 500
+      ? merged
+      : merged.filter(
+          (_point, index) =>
+            index % Math.ceil(merged.length / 499) === 0 || index === merged.length - 1,
+        );
+  const capitalBase = Math.max(bounded.find((point) => point.equity > 0)?.equity ?? 0, 1);
+  return bounded.map((point) => ({
     time: point.time,
     equity: point.equity,
     capitalBase,
@@ -410,9 +480,11 @@ export function useCrossSpreadFinance() {
   const mt5EquityHistory = ref<EquityHistoryPointResult[]>([]);
   const bybitBalance = ref<BalanceResult | null>(null);
   const mt5Balance = ref<BalanceResult | null>(null);
-  const bybitPnl = ref<PnlResult | null>(null);
-  const mt5Pnl = ref<PnlResult | null>(null);
+  const strategyPnl = ref<StrategyPnlResult | null>(null);
   const fills = ref<FillResult[]>([]);
+  const orders = ref<OrderDetailResult[]>([]);
+  const batches = ref<ExecutionBatchResult[]>([]);
+  const instruments = ref<InstrumentResult[]>([]);
 
   const bybitBinding = computed(() =>
     firstActiveBinding(bindings.value, 'venue_a', observability.value?.bybit?.accountId),
@@ -434,8 +506,22 @@ export function useCrossSpreadFinance() {
     ),
   );
 
+  const contractMultipliers = computed(
+    () =>
+      new Map(
+        instruments.value.map((instrument) => [
+          instrument.instrumentId,
+          Math.max(toNumber(instrument.contract?.contractMultiplier), 1),
+        ]),
+      ),
+  );
   const derivedPnl = computed(() =>
-    derivePnlTimeline(selectedFills.value, bybitAccountId.value, mt5AccountId.value),
+    derivePnlTimeline(
+      canonicalStrategyFills(selectedFills.value, orders.value, batches.value),
+      bybitAccountId.value,
+      mt5AccountId.value,
+      contractMultipliers.value,
+    ),
   );
   const bybitBalanceView = computed(() =>
     effectiveBalance(bybitBalance.value, observability.value?.bybit?.accountRisk),
@@ -499,13 +585,13 @@ export function useCrossSpreadFinance() {
   const totalEquity = computed(() => bybitEquity.value + mt5Equity.value);
   const totalUnrealized = computed(() => bybitUnrealized.value + mt5Unrealized.value);
   const totalRealized = computed(() => derivedPnl.value.totalRealized);
-  const strategyFees = computed(
-    () => toNumber(bybitPnl.value?.fees) + toNumber(mt5Pnl.value?.fees),
-  );
+  const strategyFees = computed(() => toNumber(strategyPnl.value?.fees));
   const totalPnl = computed(() => totalUnrealized.value + totalRealized.value - strategyFees.value);
   // The historical accounting endpoints are not yet venue-reconciled for this
   // strategy. Do not turn their legacy rows into a zero realized PnL or fee.
-  const verifiedHistoryAvailable = computed(() => false);
+  const verifiedHistoryAvailable = computed(
+    () => derivedPnl.value.trustedFillCount > 0 && derivedPnl.value.openExposureCount === 0,
+  );
   const financialDataAvailable = computed(
     () =>
       observability.value?.status === 'complete' &&
@@ -518,7 +604,7 @@ export function useCrossSpreadFinance() {
   const pnlMetrics = computed<StrategyPnlMetric[]>(() => [
     {
       label: '累计总盈亏',
-      value: '--',
+      value: verifiedHistoryAvailable.value ? signedMoney(totalPnl.value, 'USDT') : '--',
       ratio: verifiedHistoryAvailable.value
         ? trustedDataNote(derivedPnl.value.trustedFillCount)
         : '历史已实现损益接口待对账',
@@ -532,13 +618,13 @@ export function useCrossSpreadFinance() {
     },
     {
       label: '已实现盈亏',
-      value: '--',
+      value: verifiedHistoryAvailable.value ? signedMoney(totalRealized.value, 'USDT') : '--',
       ratio: verifiedHistoryAvailable.value ? '基于可核验成交重算' : '历史已实现损益接口待对账',
       tone: 'neutral',
     },
     {
       label: '累计费用',
-      value: '--',
+      value: verifiedHistoryAvailable.value ? money(strategyFees.value, 'USDT') : '--',
       ratio: verifiedHistoryAvailable.value ? '双腿费用合计' : '历史费用接口待对账',
       tone: 'neutral',
     },
@@ -624,7 +710,7 @@ export function useCrossSpreadFinance() {
 
   const curvePoints = computed<
     Array<{ time: string; equity: number; capitalBase: number; nav: number; currency: string }>
-  >(() => []);
+  >(() => navPointsFromSnapshotsOrRealized(bybitEquityHistory.value, mt5EquityHistory.value));
 
   const capitalCurveConfig = computed<StrategyCapitalProfile['curve']>(() => {
     const points = curvePoints.value;
@@ -679,7 +765,7 @@ export function useCrossSpreadFinance() {
         'XAUT/XAU价差损益',
         {
           label: 'XAUT/XAU价差损益',
-          value: '--',
+          value: verifiedHistoryAvailable.value ? signedMoney(totalRealized.value, 'USDT') : '--',
           ratio: verifiedHistoryAvailable.value
             ? trustedDataNote(derivedPnl.value.trustedFillCount)
             : '历史已实现损益接口待对账',
@@ -699,7 +785,7 @@ export function useCrossSpreadFinance() {
         '累计交易成本',
         {
           label: '累计交易成本',
-          value: '--',
+          value: verifiedHistoryAvailable.value ? money(strategyFees.value, 'USDT') : '--',
           ratio: verifiedHistoryAvailable.value ? '双腿费用合计' : '历史费用接口待对账',
           tone: 'neutral',
         },
@@ -727,9 +813,11 @@ export function useCrossSpreadFinance() {
       [
         'XAUT/XAU价差损益',
         {
-          value: '--',
-          tone: 'neutral',
-          data: [],
+          value: verifiedHistoryAvailable.value ? signedMoney(totalRealized.value, 'USDT') : '--',
+          tone: verifiedHistoryAvailable.value ? toneFromNumber(totalRealized.value) : 'neutral',
+          data: verifiedHistoryAvailable.value
+            ? derivedPnl.value.points.map((point) => point.totalRealized)
+            : [],
         },
       ],
       [
@@ -743,9 +831,9 @@ export function useCrossSpreadFinance() {
       [
         '累计交易成本',
         {
-          value: '--',
+          value: verifiedHistoryAvailable.value ? money(strategyFees.value, 'USDT') : '--',
           tone: 'neutral',
-          data: [],
+          data: verifiedHistoryAvailable.value ? points.map(() => -strategyFees.value) : [],
         },
       ],
     ]);
@@ -870,10 +958,23 @@ export function useCrossSpreadFinance() {
   async function refresh() {
     loading.value = true;
     try {
-      const [nextBindings, nextObservability, nextFills, nextMarketSnapshot] = await Promise.all([
+      const [
+        nextBindings,
+        nextObservability,
+        nextFills,
+        nextOrders,
+        nextBatches,
+        nextInstruments,
+        nextStrategyPnl,
+        nextMarketSnapshot,
+      ] = await Promise.all([
         getStrategyAccountBindings(STRATEGY_INSTANCE_ID),
         getCrossSpreadObservability(1, 20, 'fast'),
         getFills(),
+        getOrders(),
+        getExecutionBatches(STRATEGY_INSTANCE_ID),
+        getInstruments(),
+        getStrategyPnl(STRATEGY_INSTANCE_ID),
         getCrossSpreadSnapshot(),
       ]);
 
@@ -884,6 +985,10 @@ export function useCrossSpreadFinance() {
         (fill) =>
           fill.instrumentId === BYBIT_INSTRUMENT_ID || fill.instrumentId === MT5_INSTRUMENT_ID,
       );
+      orders.value = nextOrders;
+      batches.value = nextBatches;
+      instruments.value = nextInstruments;
+      strategyPnl.value = nextStrategyPnl;
 
       const nextBybitBinding = firstActiveBinding(
         nextBindings,
@@ -896,32 +1001,20 @@ export function useCrossSpreadFinance() {
         nextObservability.mt5?.accountId,
       );
 
-      const [
-        nextBybitBalance,
-        nextMt5Balance,
-        nextBybitPnl,
-        nextMt5Pnl,
-        nextBybitEquityCurve,
-        nextMt5EquityCurve,
-      ] = await Promise.all([
-        nextBybitBinding
-          ? getAccountBalanceLatest(nextBybitBinding.accountId)
-          : Promise.resolve(null),
-        nextMt5Binding ? getAccountBalanceLatest(nextMt5Binding.accountId) : Promise.resolve(null),
-        nextBybitBinding
-          ? getTradingPnl(nextBybitBinding.accountId, BYBIT_INSTRUMENT_ID)
-          : Promise.resolve(null),
-        nextMt5Binding
-          ? getTradingPnl(nextMt5Binding.accountId, MT5_INSTRUMENT_ID)
-          : Promise.resolve(null),
-        nextBybitBinding ? getEquityHistory(nextBybitBinding.accountId) : Promise.resolve([]),
-        nextMt5Binding ? getEquityHistory(nextMt5Binding.accountId) : Promise.resolve([]),
-      ]);
+      const [nextBybitBalance, nextMt5Balance, nextBybitEquityCurve, nextMt5EquityCurve] =
+        await Promise.all([
+          nextBybitBinding
+            ? getAccountBalanceLatest(nextBybitBinding.accountId)
+            : Promise.resolve(null),
+          nextMt5Binding
+            ? getAccountBalanceLatest(nextMt5Binding.accountId)
+            : Promise.resolve(null),
+          nextBybitBinding ? getEquityHistory(nextBybitBinding.accountId) : Promise.resolve([]),
+          nextMt5Binding ? getEquityHistory(nextMt5Binding.accountId) : Promise.resolve([]),
+        ]);
 
       bybitBalance.value = nextBybitBalance;
       mt5Balance.value = nextMt5Balance;
-      bybitPnl.value = nextBybitPnl;
-      mt5Pnl.value = nextMt5Pnl;
       bybitEquityHistory.value = nextBybitEquityCurve;
       mt5EquityHistory.value = nextMt5EquityCurve;
     } catch {
@@ -932,9 +1025,11 @@ export function useCrossSpreadFinance() {
       mt5EquityHistory.value = [];
       bybitBalance.value = null;
       mt5Balance.value = null;
-      bybitPnl.value = null;
-      mt5Pnl.value = null;
+      strategyPnl.value = null;
       fills.value = [];
+      orders.value = [];
+      batches.value = [];
+      instruments.value = [];
     } finally {
       loading.value = false;
     }
@@ -945,8 +1040,7 @@ export function useCrossSpreadFinance() {
     refresh,
     bybitBalance,
     mt5Balance,
-    bybitPnl,
-    mt5Pnl,
+    strategyPnl,
     bybitEquity,
     mt5Equity,
     totalEquity,

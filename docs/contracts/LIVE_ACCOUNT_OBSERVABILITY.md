@@ -57,6 +57,8 @@ Bybit uses the venue `nextPageCursor`. Closed Order history uses the venue histo
 
 MT5 Python history functions return a bounded time range rather than a venue cursor. Runtime sorts by time and ticket, then exposes a deterministic integer-offset continuation inside that fixed window. A continuation token is invalid outside the same account, symbol and time-window request.
 
+Internal Terminal reads may extend the query boundary only by a bounded clock-tolerance margin because some brokers expose server-local epochs ahead of UTC. Returned timestamps are normalized to the Runtime observation boundary; the tolerance must not silently expand the user-visible economic lookback.
+
 ## 4. Order and execution identity
 
 | Venue | Order identity | Execution identity | Position identity |
@@ -179,6 +181,13 @@ The account-risk snapshot uses `account_info()` and `terminal_info()`:
 | `unavailable` | The section could not be read; zero/empty must not be inferred |
 
 The aggregate returns per-section states for account risk, positions, active Orders, recent Orders and recent Fills.
+
+### 8.1 Strategy-management projections
+
+- Strategy Order and Fill history is attributed through `StrategyInstruction` / `ExecutionBatch` / `TradeCommand` identities, never by account display name or account-plus-symbol filtering. This is required when strategies share one UTA.
+- Strategy realized PnL uses canonical cumulative Fills capped at each Order quantity and applies the stored contract multiplier. A terminal aggregate Fill and its component executions represent one economic quantity, not two.
+- An authoritative empty Position snapshot resets current unrealized PnL to zero while preserving realized PnL and fees.
+- Account equity curves use persisted authoritative balance snapshots from both legs. Points whose venue timestamps are not comparable are omitted rather than joined with stale values.
 
 ## 9. Frontend acceptance panel
 

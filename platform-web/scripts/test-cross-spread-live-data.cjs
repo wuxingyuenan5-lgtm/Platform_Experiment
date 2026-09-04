@@ -79,11 +79,14 @@ test('cross spread finance composable uses dynamic bindings instead of hardcoded
   const source = read('src/views/strategy/management/composables/useCrossSpreadFinance.ts');
   assert.equal(source.includes('getStrategyAccountBindings'), true);
   assert.equal(source.includes('getEquityHistory'), true);
-  assert.equal(source.includes('getTradingPnl'), true);
+  assert.equal(source.includes('getStrategyPnl'), true);
+  assert.equal(source.includes('canonicalStrategyFills'), true);
+  assert.equal(source.includes('contractMultipliers'), true);
   assert.equal(source.includes('getCrossSpreadObservability'), true);
   assert.equal(source.includes('数据暂不可用'), true);
   assert.equal(source.includes('跨所总权益（Bybit + MT5，按当前 USDT/USD 折算）'), true);
-  assert.equal(source.includes('历史已实现损益接口待对账'), true);
+  assert.doesNotMatch(source, /const verifiedHistoryAvailable = computed\(\(\) => false\)/);
+  assert.doesNotMatch(source, /const curvePoints = computed<[\s\S]*?>\(\(\) => \[\]\);/);
   assert.doesNotMatch(source, /new Date\(\)\.toISOString\(\)/);
   assert.doesNotMatch(source, /const BYBIT_ACCOUNT_ID = 'bybit-live-main';/);
   assert.doesNotMatch(source, /const MT5_ACCOUNT_ID = 'mt5-live-main';/);
@@ -114,6 +117,8 @@ test('strategy management honors the cross-spread route context before rendering
 test('cross spread execution records preserve result-unknown and leg evidence', () => {
   const source = read('src/views/strategy/management/composables/useCrossSpreadRecords.ts');
   assert.equal(source.includes("result_unknown: '结果未知'"), true);
+  assert.equal(source.includes('getExecutionBatches(STRATEGY_INSTANCE_ID)'), true);
+  assert.equal(source.includes('strategyOrderIds.has(order.orderId)'), true);
   assert.equal(source.includes('batchDisplayStatus'), true);
   assert.equal(source.includes("{ key: 'legStatus', label: '双腿状态' }"), true);
   assert.equal(source.includes("{ key: 'failureReason', label: '失败/未知原因' }"), true);

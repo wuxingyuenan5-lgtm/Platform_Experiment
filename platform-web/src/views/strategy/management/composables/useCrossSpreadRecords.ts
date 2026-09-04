@@ -14,6 +14,7 @@ import type { StrategyTableSection, StrategyTableTab } from '@/data/sample/strat
 
 const CROSS_SPREAD_SYMBOLS = new Set(['XAUTUSDT', 'XAUUSD', 'XAUUSD.S']);
 const CROSS_SPREAD_INSTRUMENT_IDS = new Set(['instrument_xau_usdt_perp', 'instrument_xau_usd']);
+const STRATEGY_INSTANCE_ID = 'strategy_cross_venue_spread_instance_default';
 
 const statusLabelMap: Record<string, string> = {
   filled: '已成交',
@@ -108,6 +109,7 @@ function mergeOrders(
   platformOrders: OrderDetailResult[],
   observability: CrossSpreadObservabilityResult,
   currentAccountIds: Set<string>,
+  strategyOrderIds: Set<string>,
 ) {
   const merged = new Map<string, OrderDetailResult>();
   for (const order of platformOrders) {
@@ -116,6 +118,7 @@ function mergeOrders(
   for (const venue of [observability.bybit, observability.mt5]) {
     for (const order of venue.recentOrders ?? []) {
       if (!currentAccountIds.has(order.accountId) || !isCrossSpreadSymbol(order.symbol)) continue;
+      if (!order.platformOrderId || !strategyOrderIds.has(order.platformOrderId)) continue;
       const key = String(
         order.externalOrderId ||
           order.platformOrderId ||
@@ -148,6 +151,7 @@ function mergeFills(
   platformFills: FillResult[],
   observability: CrossSpreadObservabilityResult,
   currentAccountIds: Set<string>,
+  strategyExternalOrderIds: Set<string>,
 ) {
   const merged = new Map<string, FillResult>();
   for (const fill of platformFills) {
@@ -164,6 +168,7 @@ function mergeFills(
   for (const venue of [observability.bybit, observability.mt5]) {
     for (const fill of venue.recentFills ?? []) {
       if (!currentAccountIds.has(fill.accountId) || !isCrossSpreadSymbol(fill.symbol)) continue;
+      if (!strategyExternalOrderIds.has(fill.externalOrderId)) continue;
       const instrumentId = instrumentIdFromSymbol(fill.symbol);
       const key = [
         fill.accountId,
@@ -315,7 +320,7 @@ export function useCrossSpreadRecords() {
       const [orderRows, fillRows, batchRows, observability] = await Promise.all([
         getOrders(),
         getFills(),
-        getExecutionBatches(),
+        getExecutionBatches(STRATEGY_INSTANCE_ID),
         getCrossSpreadObservability(24, 50, 'audit'),
       ]);
       const currentAccountIds = new Set(
@@ -323,17 +328,40 @@ export function useCrossSpreadRecords() {
           (value): value is string => Boolean(value),
         ),
       );
+      const strategyOrderIds = new Set(
+        batchRows.flatMap(
+          (batch) => batch.legs.map((leg) => leg.orderId).filter(Boolean) as string[],
+        ),
+      );
       const selectedPlatformOrders = orderRows.filter(
         (order) =>
+          strategyOrderIds.has(order.orderId) &&
           currentAccountIds.has(order.accountId) &&
           (isCrossSpreadSymbol(order.symbol) || isCrossSpreadInstrument(order.instrumentId)),
       );
+      const strategyExternalOrderIds = new Set(
+        selectedPlatformOrders
+          .map((order) => order.externalOrderId)
+          .filter((value): value is string => Boolean(value)),
+      );
       const selectedPlatformFills = fillRows.filter(
         (fill) =>
-          currentAccountIds.has(fill.accountId) && isCrossSpreadInstrument(fill.instrumentId),
+          strategyOrderIds.has(fill.orderId) &&
+          currentAccountIds.has(fill.accountId) &&
+          isCrossSpreadInstrument(fill.instrumentId),
       );
-      orders.value = mergeOrders(selectedPlatformOrders, observability, currentAccountIds);
-      fills.value = mergeFills(selectedPlatformFills, observability, currentAccountIds);
+      orders.value = mergeOrders(
+        selectedPlatformOrders,
+        observability,
+        currentAccountIds,
+        strategyOrderIds,
+      );
+      fills.value = mergeFills(
+        selectedPlatformFills,
+        observability,
+        currentAccountIds,
+        strategyExternalOrderIds,
+      );
       batches.value = batchRows.filter(
         (batch) =>
           batch.strategyKey === 'cross_venue_spread' &&

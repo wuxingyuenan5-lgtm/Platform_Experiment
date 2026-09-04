@@ -321,6 +321,21 @@ def test_mt5_future_server_epoch_is_normalized_to_observation_time() -> None:
     assert before <= normalized <= datetime.now(UTC)
 
 
+def test_mt5_history_window_includes_broker_clocks_ahead_of_utc(
+    tmp_path, monkeypatch
+) -> None:
+    configure_mt5_secret(monkeypatch)
+    get_settings().journal_path = str(tmp_path / "mt5-history-window.db")
+    initialize_journal()
+    adapter = Mt5LiveAdapter(runtime_settings(write_enabled=False), FakeMt5())
+    before = datetime.now(UTC)
+
+    start, end = adapter._history_window()
+
+    assert start <= before - timedelta(days=adapter.settings.mt5_history_lookback_days)
+    assert end >= before + timedelta(hours=23)
+
+
 def test_mt5_live_adapter_sets_terminal_timeouts(tmp_path, monkeypatch) -> None:
     configure_mt5_secret(monkeypatch)
     get_settings().journal_path = str(tmp_path / "mt5-timeout.db")
