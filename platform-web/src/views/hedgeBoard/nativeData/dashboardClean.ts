@@ -782,6 +782,11 @@ export const researchModules: ResearchModule[] = [
             'https://en.macromicro.me/collections/45/mm-gold-price/110916/global-gold-futures-open-interest-by-exchanges-stacked-bar-chart',
           ),
           externalReference(
+            '商品期货持仓分析',
+            '交易法门 · 商品期货持仓与结构分析',
+            'https://www.jiaoyifamen.com/variety/',
+          ),
+          externalReference(
             'COMEX 黄金总库存',
             'CommoditiesChart · 注册与合格库存',
             'https://commoditieschart.net/zh/metals/gold/comex-gold-stocks',
@@ -795,21 +800,6 @@ export const researchModules: ResearchModule[] = [
             '沪金期权波动率',
             'OpenVlab · AU 隐含波动率分析',
             'https://www.openvlab.cn/volatility/analysis/AU',
-          ),
-          externalReference(
-            '商品期权 PCR',
-            '交易法门 · Put/Call Ratio',
-            'https://www.jiaoyifamen.com/variety/option-PCR',
-          ),
-          externalReference(
-            'CFTC 持仓分析',
-            '交易法门 · 商品资金持仓辅助视图',
-            'https://www.jiaoyifamen.com/variety/positionAnalysis-CFTC',
-          ),
-          externalReference(
-            '期货席位成本',
-            '交易法门 · 席位与成本结构',
-            'https://www.jiaoyifamen.com/variety/seat-cost',
           ),
           externalReference(
             'CME QuikStrike 黄金期权',
