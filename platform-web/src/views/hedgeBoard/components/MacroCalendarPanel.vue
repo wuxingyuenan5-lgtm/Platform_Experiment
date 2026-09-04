@@ -2,15 +2,24 @@
   <section class="content-panel" data-testid="macro-calendar-panel">
     <header>
       <h2>宏观日历</h2>
-      <button
-        type="button"
-        :aria-expanded="expanded"
-        aria-controls="macro-calendar-content"
-        @click="expanded = !expanded"
-      >
-        {{ expanded ? '收起' : '展开' }}
-        <span aria-hidden="true">{{ expanded ? '⌃' : '⌄' }}</span>
-      </button>
+      <div class="calendar-actions">
+        <a
+          href="https://www.jin10.com/minipro/index.html#/pages_sub/weeklyEconomic/weeklyEconomic?maxWidth=800&id=calendar&mode=weekly"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          原始网页 ↗
+        </a>
+        <button
+          type="button"
+          :aria-expanded="expanded"
+          aria-controls="macro-calendar-content"
+          @click="expanded = !expanded"
+        >
+          {{ expanded ? '收起' : '展开' }}
+          <span aria-hidden="true">{{ expanded ? '⌃' : '⌄' }}</span>
+        </button>
+      </div>
     </header>
     <div v-show="expanded" id="macro-calendar-content">
       <TradingViewEconomicCalendarPanel />
@@ -51,7 +60,14 @@
     gap: 12px;
   }
 
-  button {
+  .calendar-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  button,
+  .calendar-actions a {
     display: inline-flex;
     align-items: center;
     gap: 6px;
@@ -62,6 +78,7 @@
     background: #fff;
     color: #294a67;
     font-weight: 700;
+    text-decoration: none;
     cursor: pointer;
   }
 </style>
