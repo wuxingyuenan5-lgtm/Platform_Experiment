@@ -275,6 +275,11 @@ export const researchModules: ResearchModule[] = [
               },
             ],
           ),
+          externalReference(
+            '美国国债总发行额',
+            'MacroMicro · 美国国债发行规模',
+            'https://sc.macromicro.me/charts/4458/us-treasury-issuance-gross',
+          ),
           localChart(
             '美联储资产负债结构',
             '准备金、TGA、逆回购及其他负债结构',
