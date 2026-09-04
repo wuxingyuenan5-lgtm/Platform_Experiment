@@ -662,6 +662,14 @@ export const researchModules: ResearchModule[] = [
               },
             ],
           }),
+          withReferenceLinks(
+            externalReference(
+              'BTC分布',
+              'CoinGlass · 比特币持仓主体与分布',
+              'https://www.coinglass.com/BitcoinTreasuries',
+            ),
+            [{ label: 'BitcoinTreasuries 参考', href: 'https://bitcointreasuries.net/' }],
+          ),
           externalReference(
             '稳定币市值历史',
             'CoinGlass · 稳定币供应趋势',
@@ -775,6 +783,11 @@ export const researchModules: ResearchModule[] = [
         description: '用于观察筹码成本分布、地址结构、周期位置与研究观点。',
         layout: 'three',
         widgets: [
+          externalReference(
+            'BTC ETF 溢价',
+            'CoinGlass · 比特币 ETF 溢价与折价',
+            'https://www.coinglass.com/pro/etf/Premium',
+          ),
           externalReference(
             'BTC 三大驱动因素',
             'MacroMicro · 流动性、实际利率与 GDP',

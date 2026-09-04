@@ -107,7 +107,6 @@ const widgetSourceLinks: Partial<Record<string, string>> = {
   'macro-risk-hy-oas': 'https://fred.stlouisfed.org/series/BAMLH0A0HYM2',
   'macro-risk-credit-ratio': 'https://finance.yahoo.com/quote/HYG/history/',
   'btc-etf-flow': 'https://sosovalue.com/zh/assets/etf/Total_Crypto_Spot_ETF_Fund_Flow?page=usBTC',
-  'btc-treasury-flow': 'https://bitcointreasuries.net/',
   'crypto-eth-etf-flow':
     'https://sosovalue.com/zh/assets/etf/Total_Crypto_ETH_ETF_Fund_Flow?page=usETH',
   'crypto-binance-open-interest': 'https://www.coinglass.com/tv/zh/Binance_BTCUSDT',

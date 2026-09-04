@@ -242,7 +242,12 @@ function renderExternalCryptoResearch(key: ExternalCryptoResearchKey) {
       h('span', 'External Link · permission_required'),
       h('strong', { style: { color: 'var(--color-text-1)', fontSize: '16px' } }, item.provider),
       h('span', item.description),
-      h('small', '请使用卡片右上角“原始网页”查看；后续接入正式采集后在此显示完整图表。'),
+      h(
+        'small',
+        key === 'btc-treasury-flow'
+          ? '请使用卡片右上角“SoSoValue 参考”查看；后续接入正式采集后在此显示完整图表。'
+          : '请使用卡片右上角“原始网页”查看；后续接入正式采集后在此显示完整图表。',
+      ),
     ],
   );
 }
