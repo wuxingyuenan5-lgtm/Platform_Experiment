@@ -34,13 +34,9 @@ export type LocalWidgetKey =
   | 'crypto-binance-funding'
   | 'crypto-binance-open-interest'
   | 'crypto-binance-basis'
-  | 'crypto-stablecoin-supply'
   | 'crypto-options-iv'
   | 'crypto-onchain'
   | 'crypto-eth-etf-flow'
-  | 'crypto-coinglass'
-  | 'crypto-bybit'
-  | 'crypto-okx'
   | 'spdr-daily-flow'
   | 'spdr-holdings-vs-price'
   | 'etf-weekly-flows'
@@ -701,8 +697,9 @@ export const researchModules: ResearchModule[] = [
       {
         id: 'crypto-native-venue',
         eyebrow: 'Derivatives · Native',
-        title: 'Binance BTC / ETH 现货与衍生品结构',
-        description: '单一 Venue 口径，不代表全市场聚合；Crypto 数据按 UTC 7×24 日历维护。',
+        title: '期货结构',
+        description:
+          '本地 Binance 单一 Venue 走势；全市场未平仓量与 Coinbase 溢价保留为外部研究入口。Crypto 数据按 UTC 7×24 日历维护。',
         layout: 'two',
         widgets: [
           localChart(
@@ -725,6 +722,16 @@ export const researchModules: ResearchModule[] = [
             'USD-M 日末基差率 · not Aggregate',
             'crypto-binance-basis',
           ),
+          externalReference(
+            '全市场期货未平仓量',
+            'CoinGlass · 跨交易所 OI',
+            'https://www.coinglass.com/zh/pro/futures/OpenInterest',
+          ),
+          externalReference(
+            'Coinbase Premium Index',
+            'CoinGlass · 美国现货相对溢价',
+            'https://www.coinglass.com/pro/i/coinbase-bitcoin-premium-index',
+          ),
         ],
       },
       {
@@ -734,12 +741,8 @@ export const researchModules: ResearchModule[] = [
         description: '受许可或维护边界限制的专题，保留精确数据入口，不复制第三方静态快照。',
         layout: 'three',
         widgets: [
-          localChart('Stablecoin Supply', 'DefiLlama', 'crypto-stablecoin-supply'),
           localChart('Options IV / Skew', 'Deribit / Greeks.live', 'crypto-options-iv'),
           localChart('On-chain Signals', 'Checkonchain / Glassnode', 'crypto-onchain'),
-          localChart('Aggregate Derivatives', 'CoinGlass', 'crypto-coinglass'),
-          localChart('Bybit Derivatives', 'Bybit', 'crypto-bybit'),
-          localChart('OKX Derivatives', 'OKX', 'crypto-okx'),
         ],
       },
       {
@@ -750,19 +753,9 @@ export const researchModules: ResearchModule[] = [
         layout: 'three',
         widgets: [
           externalReference(
-            '全市场期货未平仓量',
-            'CoinGlass · 跨交易所 OI',
-            'https://www.coinglass.com/zh/pro/futures/OpenInterest',
-          ),
-          externalReference(
             'BTC 清算热力图',
             'CoinGlass · 杠杆清算密集区',
             'https://www.coinglass.com/zh/pro/futures/LiquidationHeatMap?coin=BTC',
-          ),
-          externalReference(
-            'Coinbase Premium Index',
-            'CoinGlass · 美国现货相对溢价',
-            'https://www.coinglass.com/pro/i/coinbase-bitcoin-premium-index',
           ),
           externalReference(
             'Deribit BTC Options Metrics',

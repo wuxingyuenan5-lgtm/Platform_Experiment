@@ -110,11 +110,6 @@ const externalCryptoResearch = {
     description: '上市公司及机构 Bitcoin 持仓披露',
     href: 'https://bitcointreasuries.net/',
   },
-  'crypto-stablecoin-supply': {
-    provider: 'DefiLlama',
-    description: '稳定币总市值、链与币种分布',
-    href: 'https://defillama.com/stablecoins',
-  },
   'crypto-options-iv': {
     provider: 'Deribit',
     description: 'BTC / ETH 波动率指数与期权市场统计',
@@ -129,21 +124,6 @@ const externalCryptoResearch = {
     provider: 'SoSoValue',
     description: '美国现货 ETH ETF 每日资金流',
     href: 'https://sosovalue.com/zh/assets/etf/Total_Crypto_ETH_ETF_Fund_Flow?page=usETH',
-  },
-  'crypto-coinglass': {
-    provider: 'CoinGlass',
-    description: '跨交易所资金费率、未平仓量与清算聚合',
-    href: 'https://www.coinglass.com/',
-  },
-  'crypto-bybit': {
-    provider: 'Bybit',
-    description: 'Bybit 官方衍生品市场数据入口',
-    href: 'https://www.bybit.com/en/derivatives/',
-  },
-  'crypto-okx': {
-    provider: 'OKX',
-    description: 'OKX 官方永续合约市场入口',
-    href: 'https://www.okx.com/markets/prices/swap',
   },
 } as const;
 
@@ -442,13 +422,9 @@ export default defineComponent({
             return h(CryptoMarketDetailPanel);
           case 'btc-etf-flow':
           case 'btc-treasury-flow':
-          case 'crypto-stablecoin-supply':
           case 'crypto-options-iv':
           case 'crypto-onchain':
           case 'crypto-eth-etf-flow':
-          case 'crypto-coinglass':
-          case 'crypto-bybit':
-          case 'crypto-okx':
             return renderExternalCryptoResearch(key);
           case 'crypto-binance-spot':
             return h(MacroSeriesChart, {
