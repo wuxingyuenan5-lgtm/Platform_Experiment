@@ -410,6 +410,23 @@ class BybitMt5Gateway:
             category=category,
         )
 
+    def estimate_order_margin(
+        self,
+        *,
+        account_id: str,
+        symbol: str,
+        side,
+        quantity,
+        reference_price,
+    ):
+        return self._adapter_for_account(account_id).estimate_order_margin(
+            account_id=account_id,
+            symbol=symbol,
+            side=side,
+            quantity=quantity,
+            reference_price=reference_price,
+        )
+
     def list_economic_events(
         self,
         *,

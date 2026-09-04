@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from decimal import Decimal
-from typing import Any, cast
+from typing import Any, Literal, cast
 from uuid import NAMESPACE_URL, uuid5
 
 from app.config import Settings
@@ -31,6 +31,7 @@ from app.models import (
     VenueEconomicEventSnapshot,
     VenueFillSnapshot,
     VenueMarketQuoteSnapshot,
+    VenueOrderMarginEstimate,
     VenueOrderSnapshot,
     VenuePositionSnapshot,
 )
@@ -152,6 +153,54 @@ class BybitLiveAdapter:
         except Exception as exc:
             raise self._unknown_error("Bybit leverage update result is unknown", exc) from exc
         return {"accountId": account_id, "symbol": symbol.upper(), "leverage": str(leverage), "source": self.name}
+
+    def estimate_order_margin(
+        self,
+        *,
+        account_id: str,
+        symbol: str,
+        side: Literal["buy", "sell"],
+        quantity: Decimal,
+        reference_price: Decimal,
+    ) -> VenueOrderMarginEstimate:
+        self._assert_account(account_id)
+        normalized_symbol = symbol.upper()
+        try:
+            response = self._client(account_id).get_positions(
+                category=self.settings.bybit_category,
+                symbol=normalized_symbol,
+            )
+            self._require_success(response, "Bybit leverage query failed")
+            row = next(
+                (
+                    item
+                    for item in self._result_list(response)
+                    if str(item.get("symbol") or "").upper() == normalized_symbol
+                ),
+                None,
+            )
+            leverage = Decimal(str((row or {}).get("leverage") or "0"))
+        except GatewayRequestRejectedError:
+            raise
+        except Exception as exc:
+            raise self._unknown_error("Bybit leverage query result is unknown", exc) from exc
+        if leverage <= 0:
+            raise GatewayConfigurationError("Bybit current symbol leverage is unavailable")
+        margin = quantity * reference_price / leverage
+        return VenueOrderMarginEstimate(
+            source=self.name,
+            accountId=account_id,
+            instrumentType="crypto_perp",
+            category=self.settings.bybit_category,
+            symbol=normalized_symbol,
+            side=side,
+            quantity=quantity,
+            referencePrice=reference_price,
+            estimatedInitialMargin=margin,
+            currency=self.settings.bybit_settle_coin.upper(),
+            asOf=datetime.now(UTC),
+            dataQualityState="venue_leverage_estimate",
+        )
 
     def get_order(
         self,

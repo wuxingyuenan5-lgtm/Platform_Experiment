@@ -8,7 +8,11 @@ from fastapi.testclient import TestClient
 
 from app.config import get_settings
 from app.database import connection
-from app.live_venue_snapshot_sync import discover_live_accounts, sync_venue_snapshots
+from app.live_venue_snapshot_sync import (
+    _persist_fills,
+    discover_live_accounts,
+    sync_venue_snapshots,
+)
 from app.main import app
 
 
@@ -84,6 +88,82 @@ def test_discover_live_accounts_deduplicates_shared_uta_and_excludes_short_b(
         "bybit-live-main",
         "mt5-live-main",
     ]
+
+
+def test_snapshot_sync_does_not_double_count_component_fills_after_terminal_aggregate(
+    tmp_path: Path,
+) -> None:
+    bootstrap(tmp_path)
+    timestamp = "2026-09-04T00:00:00+00:00"
+    with connection() as db:
+        db.execute(
+            """
+            INSERT INTO trade_commands (
+                id, idempotency_key, strategy_instance_id, account_id, instrument_id,
+                command_type, side, order_type, quantity, price, status, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, 'submit_order', 'buy', 'market', '1', NULL,
+                      'filled', ?, ?)
+            """,
+            (
+                "command-terminal-aggregate",
+                "command-terminal-aggregate-key",
+                "strategy_cross_venue_spread_instance_default",
+                "bybit-live-main",
+                "instrument_xau_usdt_perp",
+                timestamp,
+                timestamp,
+            ),
+        )
+        db.execute(
+            """
+            INSERT INTO orders (
+                id, command_id, account_id, instrument_id, symbol, side, order_type,
+                quantity, price, status, external_order_id, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, 'XAUTUSDT', 'buy', 'market', '1', NULL, 'filled',
+                      'external-order-1', ?, ?)
+            """,
+            (
+                "platform-order-1",
+                "command-terminal-aggregate",
+                "bybit-live-main",
+                "instrument_xau_usdt_perp",
+                timestamp,
+                timestamp,
+            ),
+        )
+        db.execute(
+            """
+            INSERT INTO fills (
+                id, order_id, account_id, instrument_id, side, quantity, price, occurred_at
+            ) VALUES ('aggregate-fill', 'platform-order-1', 'bybit-live-main',
+                      'instrument_xau_usdt_perp', 'buy', '1', '4462', ?)
+            """,
+            (timestamp,),
+        )
+        written, _realized, _fees = _persist_fills(
+            db,
+            "bybit-live-main",
+            [
+                {
+                    "externalFillId": "component-fill-1",
+                    "externalOrderId": "external-order-1",
+                    "platformOrderId": "platform-order-1",
+                    "instrumentId": "instrument_xau_usdt_perp",
+                    "symbol": "XAUTUSDT",
+                    "side": "buy",
+                    "quantity": "0.5",
+                    "price": "4462",
+                    "fee": "0.1",
+                    "occurredAt": timestamp,
+                }
+            ],
+        )
+        count = db.execute(
+            "SELECT COUNT(*) AS count FROM fills WHERE order_id = 'platform-order-1'"
+        ).fetchone()["count"]
+
+    assert written == 0
+    assert count == 1
 
 
 def test_sync_persists_risk_and_deduplicates_fill_fingerprint(monkeypatch, tmp_path: Path) -> None:

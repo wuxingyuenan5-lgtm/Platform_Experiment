@@ -28,6 +28,7 @@ from app.models import (
     VenueInstrumentSpecification,
     VenueMarketQuoteSnapshot,
     VenueOrderHistoryPage,
+    VenueOrderMarginEstimate,
     VenueOrderSnapshot,
     VenuePositionSnapshot,
 )
@@ -294,6 +295,30 @@ def create_venue_query_router(*, gateway: VenueGateway) -> APIRouter:
                 symbol=symbol,
                 instrument_type=instrument_type,
                 category=category,
+            )
+        )
+
+    @router.get(
+        "/venue/order-margin-estimate/{symbol}",
+        response_model=VenueOrderMarginEstimate,
+        tags=["venue-query"],
+    )
+    def venue_order_margin_estimate(
+        symbol: str,
+        account_id: Annotated[str, Query(alias="accountId")],
+        side: Annotated[Literal["buy", "sell"], Query()],
+        quantity: Annotated[Decimal, Query(gt=0)],
+        reference_price: Annotated[
+            Decimal, Query(alias="referencePrice", gt=0)
+        ],
+    ) -> VenueOrderMarginEstimate:
+        return query_gateway(
+            lambda: gateway.estimate_order_margin(
+                account_id=account_id,
+                symbol=symbol,
+                side=side,
+                quantity=quantity,
+                reference_price=reference_price,
             )
         )
 

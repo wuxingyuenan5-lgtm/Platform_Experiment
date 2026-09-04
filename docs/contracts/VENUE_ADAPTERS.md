@@ -101,8 +101,11 @@ Platform Order ID
 - Deal Ticket 用作 Fill、Swap、Commission/Fee 的自然身份。
 - 市价成交若 `order_send` 主要返回 Deal Ticket，读取层必须通过 Deal 的 `order` 字段恢复 Order Ticket。
 - Close 必须使用真实 Position Ticket；Deal Ticket 或 Order Ticket 不能充当 Position Ticket。
+- MT5 reduce-only close 返回 `DONE` 但未携带成交量或价格时，Runtime 必须按目标 Position Ticket 查询历史 Deal，并用本次 Order/Deal 身份和方向精确匹配后才生成 Fill；无法唯一证明时保持 ACK／待对账，禁止猜测成交。
 
 MT5 非 Windows、Terminal 未连接、登录账号不匹配或交易权限不足时必须 fail-closed。
+
+Platform 将 Runtime 的终态聚合 Fill 与后续 Venue component execution 投影到同一 Order 时，累计数量不得超过指令数量；已经存在完整聚合 Fill 时不得再次计入其组成成交。
 
 每个逻辑 `account_id` 必须确定性映射到一个固定 Terminal/Worker 及其 Terminal Path、Login 和 Server。Worker 不得在同一 Python 会话中切换账户，Terminal Path 不得被不同逻辑账户共享；身份不一致时 fail-closed，单个实例故障不得改变其他账户的路由或状态。
 
@@ -168,6 +171,14 @@ GET /venue/instruments/{symbol}?accountId=...
 - `asOf`
 
 Platform 跨所价差写入前必须分别查询 Bybit 与 MT5；任一查询失败、规格无效或权限不满足时拒绝开仓。
+
+## 6.1 Order Margin Estimate
+
+```http
+GET /venue/order-margin-estimate/{symbol}?accountId=...&side=...&quantity=...&referencePrice=...
+```
+
+衍生品余额预约不得用全额名义本金代替保证金。Runtime 在只读边界内返回 Venue 口径的初始保证金估算：Bybit 使用当前 Symbol 实际杠杆，MT5 使用 Terminal `order_calc_margin`。任一杠杆、品种、报价或保证金结果不可用时 fail-closed；Platform 只消费统一结果，不导入 Venue SDK 或自行猜测保证金率。
 
 ## 7. 临时 1 盎司 Acceptance Gate
 

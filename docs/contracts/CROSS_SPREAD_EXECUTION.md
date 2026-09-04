@@ -126,6 +126,8 @@ stopLossLimitStrategy   = fok | post_only_chase
 
 自动 Limit 使用原子 Claim 保存的 `triggerSpread` 作为价差限制，不静默回退到 Market。干净零成交或下单前行情失效可以释放 Claim；部分成交、数量不一致、提交后超时或结果未知不能释放 Claim。
 
+平仓曾进入人工介入后，若权威 Venue 对账证明两条 Close Leg 均已完整成交且双边仓位归零，Platform 必须在同一恢复边界将 Batch 置为 `hedged`、Instruction 置为 `completed`、Exit Plan 置为 `closed`，并释放该 Batch 的资源 claim 与余额 reservation；证据不完整时不得释放。
+
 ## 6. PostOnly Chase 合同
 
 PostOnly Chase 是 `LIMIT` 的内部策略：

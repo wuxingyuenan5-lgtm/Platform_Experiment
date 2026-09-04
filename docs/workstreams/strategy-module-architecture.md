@@ -1,6 +1,6 @@
 # 策略模块架构工作流
 
-状态：执行框架已收敛，等待新的最小实盘授权与 Cross Terminal 外部条件
+状态：Cross 最小实盘闭环已完成；收口回执恢复与延迟后继续 Funding 最小闭环
 
 更新日期：2026-09-04
 
@@ -19,22 +19,23 @@
 - MT5 使用“一逻辑账户一固定 Terminal/Worker”；Cross 与 Short A 使用独立固定实例，禁止在同一 Python 会话中切换账户，Short B 保持未绑定。
 - `result_unknown`、人工介入和 Funding 对账中状态继续保留相应写入冻结、资源与余额预约；恢复只查询和对账，不重发不确定命令。
 - 历史 Cross orphan 已在保留原始事实的前提下完成责任处置，当前没有遗留 unknown 计数；该结论不构成新的交易授权。
-- Platform 与 Runtime 的标准持久配置及运行默认均为 `Live Write=false`，当前没有有效实盘窗口。
+- 2026-09-04 只读预检确认 Bybit `XAUTUSDT` 与 MT5 `XAUUSD.s` 的账户身份、品种和交易权限可用，双端均无该策略持仓或挂单；标准持久配置默认 `Live Write=false`，当前仅在 Owner 授权窗口内临时启用。
+- Owner 已给出截至北京时间 2026-09-07 00:00 的新窗口；该窗口不自动开启写入，且不得超出本阶段 Cross → Funding 最小闭环范围。
+- Cross 已按 Owner 指定的 `market`、1 盎司完成真实双腿开仓、持仓核对、双腿平仓、归零与权威对账；当前无该策略持仓、挂单、claim 或 reservation，会话已撤销且双层 Live Write 已恢复关闭。
+- 本次闭环暴露两个恢复缺口：MT5 平仓成功时可能返回不含成交量/价格的稀疏 `DONE`，以及终态聚合 Fill 与后续 component execution 可能重复投影。两项均已按订单身份和累计数量上限修复。
+- 开仓和平仓端到端各约 10 秒，主要由双腿顺序执行、Venue 终态确认及预检构成；顺序对冲不并行，后续只优化无副作用读取和页面阶段反馈。
 
 ## 尚未满足的验收
 
-- Owner 尚未提供新的、操作明确且有时限的 Cross/Funding 最小实盘授权。
-- Cross 固定 Terminal 的 Algo/Expert Trading 外部开关仍需 Owner 确认已启用；只读可用不等于执行 ready。
-- Cross 尚需在新授权窗口内完成最小开仓、Bybit/MT5 双腿权威成交与持仓核对、平仓、归零和对账。
+- Cross corrective 修复尚需完成相关 Runtime、Platform、静态与文档回归。
 - Cross 通过后，Funding 尚需使用共享 UTA 的最小可成交数量完成开仓、双腿对冲、平仓和对账。
 - 任一身份不一致、查询不可用、累计成交冲突、外部持仓差异或 `result_unknown` 都会停止扩展并保持 fail-closed。
 
 ## 下一动作
 
-1. Owner 确认 Cross 固定 Terminal 的 Algo/Expert Trading 已开启。
-2. Owner 决定是否签发新的 Cross → Funding 最小实盘窗口；旧窗口已经过期，不能复用。
-3. 获得授权后，操作方按受控实盘 Runbook 先完成 Cross 全闭环，再完成 Funding 最小闭环，并在结束、失败或超时后强制恢复只读。
-4. 两个闭环取得外部权威证据后，将最终状态回填 `docs/PROJECT.md` 与对应长期权威，完成本阶段并删除本文件。
+1. 完成 MT5 稀疏终态、累计 Fill 上限和 Cross 生命周期恢复的回归与静态检查。
+2. 在现有授权窗口内，由 Owner 以共享 UTA 的最小可成交数量手动验收 Funding；结束、失败或超时后强制恢复只读。
+3. Funding 闭环取得外部权威证据后，将最终状态回填 `docs/PROJECT.md` 与对应长期权威，完成本阶段并删除本文件。
 
 ## 长期权威
 

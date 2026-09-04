@@ -21,6 +21,7 @@ from app.models import (
     VenueFillSnapshot,
     VenueInstrumentSpecification,
     VenueOrderHistoryPage,
+    VenueOrderMarginEstimate,
     VenueOrderSnapshot,
     VenuePositionSnapshot,
 )
@@ -404,6 +405,29 @@ class FakeGateway:
             symbol=symbol,
             instrument_type=instrument_type or "simulation",
             category=category or "simulation",
+        )
+
+    def estimate_order_margin(
+        self,
+        *,
+        account_id: str,
+        symbol: str,
+        side: Literal["buy", "sell"],
+        quantity: Decimal,
+        reference_price: Decimal,
+    ) -> VenueOrderMarginEstimate:
+        return VenueOrderMarginEstimate(
+            source=self.name,
+            accountId=account_id,
+            instrumentType="simulation",
+            category="simulation",
+            symbol=symbol.upper(),
+            side=side,
+            quantity=quantity,
+            referencePrice=reference_price,
+            estimatedInitialMargin=quantity * reference_price,
+            currency="USDT",
+            asOf=datetime.now(UTC),
         )
 
     def list_economic_events(

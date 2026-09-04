@@ -1,4 +1,5 @@
 import sys
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from types import SimpleNamespace
 
@@ -9,6 +10,8 @@ from app.gateway_errors import GatewayConfigurationError
 from app.journal import initialize_journal
 from app.models import SubmitOrderCommand
 from app.mt5_live_adapter import Mt5LiveAdapter
+from app.mt5_position_closing_adapter import Mt5PositionClosingAdapter
+from app.strict_live_acceptance_adapters import StrictMt5AcceptanceAdapter
 
 
 class FakeMt5:
@@ -50,6 +53,11 @@ class FakeMt5:
 
     def order_check(self, request):
         return SimpleNamespace(retcode=0, comment="Done")
+
+    def order_calc_margin(self, order_type, symbol, volume, price):
+        assert order_type in {self.ORDER_TYPE_BUY, self.ORDER_TYPE_SELL}
+        assert symbol == "XAUUSD+"
+        return volume * price / 20
 
     def order_send(self, request):
         self.requests.append(request)
@@ -144,6 +152,48 @@ class FakeRuntimeMt5(FakeMt5):
         return True
 
 
+class FakeMt5CloseHistory(FakeMt5):
+    def __init__(self) -> None:
+        super().__init__()
+        self.closed = False
+
+    def positions_get(self, **kwargs):
+        if self.closed:
+            return ()
+        return super().positions_get()
+
+    def order_send(self, request):
+        self.requests.append(request)
+        self.closed = True
+        return SimpleNamespace(
+            retcode=self.TRADE_RETCODE_DONE,
+            comment="Done",
+            order=124,
+            deal=457,
+            volume=0.0,
+            price=0.0,
+        )
+
+    def history_deals_get(self, *args, **kwargs):
+        if kwargs.get("position") != 789:
+            return ()
+        return (
+            SimpleNamespace(
+                ticket=457,
+                order=124,
+                position_id=789,
+                type=self.DEAL_TYPE_SELL,
+                symbol="XAUUSD+",
+                volume=1.0,
+                price=1998.0,
+                commission=-1.0,
+                fee=0.0,
+                swap=0.0,
+                time=1784800003,
+                time_msc=1784800003000,
+            ),
+        )
+
 def runtime_settings(write_enabled: bool = True) -> Settings:
     return Settings(
         environment="live",
@@ -190,6 +240,85 @@ def test_mt5_live_adapter_is_readable_but_write_gated(tmp_path, monkeypatch) -> 
     assert adapter.list_balances("account-mt5")[0].equity == Decimal("100000.0")
     with pytest.raises(GatewayConfigurationError, match="live write gate is disabled"):
         adapter.submit_order(order_command())
+
+
+def test_strict_mt5_adapter_exposes_market_quote_for_platform_reservation(
+    tmp_path, monkeypatch
+) -> None:
+    configure_mt5_secret(monkeypatch)
+    get_settings().journal_path = str(tmp_path / "mt5-quote.db")
+    initialize_journal()
+    adapter = StrictMt5AcceptanceAdapter(
+        runtime_settings(write_enabled=False),
+        FakeMt5(),
+    )
+
+    quote = adapter.get_market_quote(
+        account_id="account-mt5",
+        symbol="XAUUSD+",
+    )
+
+    assert quote.symbol == "XAUUSD+"
+    assert quote.instrument_type == "mt5_contract"
+    assert quote.category == "mt5"
+    assert quote.bid == Decimal("1999.5")
+    assert quote.ask == Decimal("2000.0")
+    assert quote.mid == Decimal("1999.75")
+    assert quote.currency == "USD"
+
+
+def test_strict_mt5_adapter_uses_terminal_margin_calculation(tmp_path, monkeypatch) -> None:
+    configure_mt5_secret(monkeypatch)
+    get_settings().journal_path = str(tmp_path / "mt5-margin.db")
+    initialize_journal()
+    adapter = StrictMt5AcceptanceAdapter(
+        runtime_settings(write_enabled=False),
+        FakeMt5(),
+    )
+
+    estimate = adapter.estimate_order_margin(
+        account_id="account-mt5",
+        symbol="XAUUSD+",
+        side="buy",
+        quantity=Decimal("0.01"),
+        reference_price=Decimal("2000"),
+    )
+
+    assert estimate.estimated_initial_margin == Decimal("1.0")
+    assert estimate.currency == "USD"
+
+
+def test_mt5_reduce_only_recovers_terminal_fill_from_position_deals(
+    tmp_path, monkeypatch
+) -> None:
+    configure_mt5_secret(monkeypatch)
+    get_settings().journal_path = str(tmp_path / "mt5-close-fill.db")
+    initialize_journal()
+    adapter = Mt5PositionClosingAdapter(
+        runtime_settings(write_enabled=True),
+        FakeMt5CloseHistory(),
+    )
+    command = order_command().model_copy(
+        update={"side": "sell", "reduce_only": True, "position_id": "789"}
+    )
+
+    events = adapter.submit_order(command)
+
+    assert [event.event_type for event in events] == [
+        "order_acknowledged",
+        "order_filled",
+    ]
+    assert events[-1].fill_quantity == Decimal("1.0")
+    assert events[-1].fill_price == Decimal("1998.0")
+
+
+def test_mt5_future_server_epoch_is_normalized_to_observation_time() -> None:
+    before = datetime.now(UTC)
+    server_local_epoch = (before + timedelta(hours=3)).timestamp()
+
+    normalized = Mt5LiveAdapter._normalized_mt5_time(server_local_epoch)
+
+    assert before <= normalized <= datetime.now(UTC)
 
 
 def test_mt5_live_adapter_sets_terminal_timeouts(tmp_path, monkeypatch) -> None:

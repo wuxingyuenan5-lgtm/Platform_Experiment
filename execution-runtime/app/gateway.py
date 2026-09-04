@@ -1,4 +1,5 @@
 from datetime import datetime
+from decimal import Decimal
 from typing import Literal, Protocol
 
 from app.models import (
@@ -18,6 +19,7 @@ from app.models import (
     VenueInstrumentSpecification,
     VenueMarketQuoteSnapshot,
     VenueOrderHistoryPage,
+    VenueOrderMarginEstimate,
     VenueOrderSnapshot,
     VenuePositionSnapshot,
 )
@@ -164,6 +166,18 @@ class VenueGateway(Protocol):
         category: str | None = None,
     ) -> VenueMarketQuoteSnapshot:
         """Return one authoritative market quote for the supplied symbol."""
+        ...
+
+    def estimate_order_margin(
+        self,
+        *,
+        account_id: str,
+        symbol: str,
+        side: Literal["buy", "sell"],
+        quantity: Decimal,
+        reference_price: Decimal,
+    ) -> VenueOrderMarginEstimate:
+        """Return the venue-authoritative initial margin estimate for one order."""
         ...
 
     def list_economic_events(

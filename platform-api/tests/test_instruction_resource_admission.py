@@ -28,6 +28,15 @@ CROSS_INSTANCE = "strategy_cross_venue_spread_instance_default"
 FUNDING_INSTANCE = "strategy_funding_arbitrage_instance_default"
 
 
+@pytest.fixture(autouse=True)
+def _stub_venue_margin_estimate(monkeypatch):
+    def estimate(**kwargs):
+        currency = "USD" if str(kwargs["account_id"]).startswith("mt5") else "USDT"
+        return currency, Decimal("100")
+
+    monkeypatch.setattr("app.execution_batches._reservation_margin_estimate", estimate)
+
+
 class _FilledResponse:
     def __init__(self, command: dict[str, object]) -> None:
         self.command = command

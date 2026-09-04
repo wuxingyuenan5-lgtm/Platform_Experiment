@@ -586,6 +586,7 @@ def _claim_batch_execution_resources(
         spec = db.execute(
             """
             SELECT account.venue_id,
+                   account.environment AS account_environment,
                    instrument.instrument_type,
                    instrument.base_currency,
                    instrument.quote_currency,
@@ -633,6 +634,7 @@ def _claim_batch_execution_resources(
                     if spec["contract_multiplier"] is not None
                     else None
                 ),
+                str(spec["account_environment"]).lower() == "live",
             )
         )
 
@@ -700,6 +702,7 @@ def _claim_batch_execution_resources(
         base_currency,
         quote_currency,
         contract_multiplier,
+        use_venue_margin,
     ) in prepared_legs:
         reservation_key, amount = _reservation_requirement_for_leg(
             leg,
@@ -708,6 +711,7 @@ def _claim_batch_execution_resources(
             base_currency=base_currency,
             quote_currency=quote_currency,
             contract_multiplier=contract_multiplier,
+            use_venue_margin=use_venue_margin,
         )
         reservations[reservation_key] = reservations.get(reservation_key, Decimal("0")) + amount
 
@@ -786,6 +790,7 @@ def _reservation_requirement_for_leg(
     base_currency: str,
     quote_currency: str,
     contract_multiplier: Decimal | None,
+    use_venue_margin: bool = False,
 ) -> tuple[tuple[str, str], Decimal]:
     normalized_type = normalize_instrument_type(instrument_type)
     if normalized_type == "crypto_spot" and leg.side == "sell":
@@ -797,6 +802,15 @@ def _reservation_requirement_for_leg(
     )
     if normalized_type == "crypto_spot":
         return (account_id, quote_currency), leg.quantity * reference_price
+    if use_venue_margin:
+        currency, margin = _reservation_margin_estimate(
+            account_id=account_id,
+            symbol=leg.symbol,
+            side=leg.side,
+            quantity=leg.quantity,
+            reference_price=reference_price,
+        )
+        return (account_id, currency), margin
     multiplier = contract_multiplier or Decimal("1")
     return (account_id, quote_currency), leg.quantity * reference_price * multiplier
 
@@ -847,6 +861,57 @@ def _reservation_reference_price(
             detail=f"Reference price is unavailable for reservation of {symbol}",
         )
     return price
+
+
+def _reservation_margin_estimate(
+    *,
+    account_id: str,
+    symbol: str,
+    side: str,
+    quantity: Decimal,
+    reference_price: Decimal,
+) -> tuple[str, Decimal]:
+    settings = get_settings()
+    try:
+        with httpx.Client(
+            trust_env=False,
+            timeout=settings.runtime_timeout_seconds,
+        ) as client:
+            response = client.get(
+                f"{settings.runtime_base_url}/venue/order-margin-estimate/{symbol}",
+                params={
+                    "accountId": account_id,
+                    "side": side,
+                    "quantity": format(quantity, "f"),
+                    "referencePrice": format(reference_price, "f"),
+                },
+            )
+            response.raise_for_status()
+            payload = response.json()
+    except httpx.HTTPError as exc:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Initial margin estimate is unavailable for reservation of {symbol}",
+        ) from exc
+    if not isinstance(payload, dict):
+        raise HTTPException(
+            status_code=409,
+            detail=f"Initial margin estimate is unavailable for reservation of {symbol}",
+        )
+    try:
+        margin = Decimal(str(payload["estimatedInitialMargin"]))
+        currency = str(payload["currency"]).upper()
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(
+            status_code=409,
+            detail=f"Initial margin estimate is unavailable for reservation of {symbol}",
+        ) from exc
+    if margin <= 0 or not currency:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Initial margin estimate is unavailable for reservation of {symbol}",
+        )
+    return currency, margin
 
 
 def _latest_available_balance(

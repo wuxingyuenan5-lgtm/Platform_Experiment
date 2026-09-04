@@ -132,6 +132,7 @@ class FakeBybitClient:
                         "symbol": "XAUTUSDT",
                         "side": "Buy",
                         "size": "1",
+                        "leverage": "20",
                         "avgPrice": "1001",
                         "updatedTime": "1784800003000",
                     }
@@ -622,6 +623,32 @@ def test_bybit_live_adapter_quote_and_spec_use_explicit_category_scope(tmp_path)
     assert perp_spec.price_tick == Decimal("0.1")
     assert perp_spec.contract_multiplier == Decimal("1")
     assert client.instrument_calls[-1]["category"] == "linear"
+
+
+def test_bybit_live_adapter_estimates_margin_from_current_symbol_leverage(tmp_path) -> None:
+    get_settings().journal_path = str(tmp_path / "bybit-margin.db")
+    initialize_journal()
+    adapter = BybitLiveAdapter(
+        Settings(
+            environment="live",
+            bybit_account_ids="bybit-live-main",
+            bybit_instrument_map="XAUTUSDT=instrument-xaut",
+            bybit_category="linear",
+            bybit_settle_coin="USDT",
+        ),
+        FakeBybitClient(),
+    )
+
+    estimate = adapter.estimate_order_margin(
+        account_id="bybit-live-main",
+        symbol="XAUTUSDT",
+        side="sell",
+        quantity=Decimal("1"),
+        reference_price=Decimal("4000"),
+    )
+
+    assert estimate.estimated_initial_margin == Decimal("200")
+    assert estimate.currency == "USDT"
 
 
 def test_bybit_live_adapter_synchronizes_signature_clock_from_server_time() -> None:

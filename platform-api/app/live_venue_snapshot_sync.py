@@ -401,6 +401,30 @@ def _persist_fills(
             order_id,
             instrument_id,
         )
+        requested = db.execute(
+            """
+            SELECT orders.quantity
+            FROM orders
+            JOIN trade_commands ON trade_commands.id = orders.command_id
+            WHERE orders.id = ?
+            """,
+            (order_id,),
+        ).fetchone()
+        incoming_quantity = _as_decimal(fill.get("quantity"))
+        if requested is not None:
+            existing_rows = db.execute(
+                "SELECT quantity FROM fills WHERE order_id = ?",
+                (order_id,),
+            ).fetchall()
+            existing_quantity = sum(
+                (_as_decimal(row["quantity"]) for row in existing_rows),
+                Decimal("0"),
+            )
+            if existing_quantity + incoming_quantity > _as_decimal(requested["quantity"]):
+                # Runtime terminal confirmation may already have persisted one
+                # aggregate fill. Later venue sync can observe its component
+                # executions, but must not double-count them operationally.
+                continue
         fee = _as_decimal(fill.get("fee"))
         if fill_id not in fees_by_instrument:
             fees_by_instrument[instrument_id] = (
@@ -418,7 +442,7 @@ def _persist_fills(
                 account_id,
                 instrument_id,
                 str(fill.get("side") or "buy"),
-                str(_as_decimal(fill.get("quantity"))),
+                str(incoming_quantity),
                 str(_as_decimal(fill.get("price"))),
                 str(fill.get("occurredAt") or _iso_now()),
             ),

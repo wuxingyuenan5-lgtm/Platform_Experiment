@@ -214,6 +214,21 @@ class VenueMarketQuoteSnapshot(BaseModel):
     data_quality_state: str = Field(default="complete", alias="dataQualityState")
 
 
+class VenueOrderMarginEstimate(BaseModel):
+    source: str
+    account_id: str = Field(alias="accountId")
+    instrument_type: str = Field(alias="instrumentType")
+    category: str
+    symbol: str
+    side: Literal["buy", "sell"]
+    quantity: Decimal = Field(gt=0)
+    reference_price: Decimal = Field(alias="referencePrice", gt=0)
+    estimated_initial_margin: Decimal = Field(alias="estimatedInitialMargin", gt=0)
+    currency: str
+    as_of: datetime = Field(alias="asOf")
+    data_quality_state: str = Field(default="complete", alias="dataQualityState")
+
+
 class InternalCapitalTransferStepCommand(BaseModel):
     idempotency_key: str = Field(alias="idempotencyKey", min_length=1, max_length=160)
     source_account_id: str = Field(alias="sourceAccountId", min_length=1)

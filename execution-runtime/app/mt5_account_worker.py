@@ -27,6 +27,7 @@ _READ_METHODS = frozenset(
         "get_account_snapshot",
         "get_instrument_specification",
         "get_market_quote",
+        "estimate_order_margin",
         "get_order",
         "list_balances",
         "list_economic_events",

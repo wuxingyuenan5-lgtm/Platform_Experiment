@@ -6,6 +6,7 @@ from fastapi.testclient import TestClient
 from app.config import get_settings
 from app.database import connection
 from app.main import app
+from app.venue_reconciliation_repository import update_order_from_external
 
 STRATEGY_ID = "strategy_funding_arbitrage_instance_default"
 ACCOUNT_ID = "account_sim_usdt"
@@ -315,3 +316,159 @@ def test_reconciliation_idempotency_payload_conflict_returns_409(
             json={**payload, "actor": "different-actor"},
         )
         assert conflict.status_code == 409
+
+
+def test_cross_close_reconciliation_completes_lifecycle_and_releases_resources(
+    tmp_path: Path,
+) -> None:
+    get_settings().database_path = str(tmp_path / "cross-close-reconciliation.db")
+    timestamp = "2026-09-04T12:00:00+00:00"
+    with TestClient(app):
+        with connection() as db:
+            for batch_id, direction, status in (
+                ("open-batch", "open_long", "hedged"),
+                ("close-batch", "close_long", "manual_intervention"),
+            ):
+                db.execute(
+                    """
+                    INSERT INTO execution_batches (
+                        id, idempotency_key, strategy_instance_id, account_id,
+                        strategy_key, direction, status, requires_manual_intervention,
+                        created_at, updated_at, strategy_instruction_id
+                    ) VALUES (?, ?, ?, ?, 'cross_venue_spread', ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        batch_id,
+                        f"{batch_id}-key",
+                        "strategy_cross_venue_spread_instance_default",
+                        ACCOUNT_ID,
+                        direction,
+                        status,
+                        int(status == "manual_intervention"),
+                        timestamp,
+                        timestamp,
+                        "close-instruction" if batch_id == "close-batch" else None,
+                    ),
+                )
+            db.execute(
+                """
+                INSERT INTO strategy_runs (
+                    id, idempotency_key, strategy_instance_id, strategy_key,
+                    direction, status, execution_batch_id, created_at, updated_at
+                ) VALUES ('close-instruction', 'close-instruction-key', ?,
+                          'cross_venue_spread', 'close_long', 'manual_intervention',
+                          'close-batch', ?, ?)
+                """,
+                ("strategy_cross_venue_spread_instance_default", timestamp, timestamp),
+            )
+            for order_id, command_id, instrument_id, symbol, status in (
+                ("bybit-close-order", "bybit-close-command", INSTRUMENT_ID, "BTCUSDT", "filled"),
+                ("mt5-close-order", "mt5-close-command", "instrument_xau_usd", "XAUUSD.S", "acknowledged"),
+            ):
+                db.execute(
+                    """
+                    INSERT INTO orders (
+                        id, command_id, account_id, instrument_id, symbol, side,
+                        order_type, quantity, status, created_at, updated_at
+                    ) VALUES (?, ?, ?, ?, ?, 'sell', 'market', '1', ?, ?, ?)
+                    """,
+                    (
+                        order_id,
+                        command_id,
+                        ACCOUNT_ID,
+                        instrument_id,
+                        symbol,
+                        status,
+                        timestamp,
+                        timestamp,
+                    ),
+                )
+            for sequence, role, order_id, instrument_id, symbol, status in (
+                (1, "primary", "bybit-close-order", INSTRUMENT_ID, "BTCUSDT", "filled"),
+                (2, "hedge", "mt5-close-order", "instrument_xau_usd", "XAUUSD.S", "acknowledged"),
+            ):
+                db.execute(
+                    """
+                    INSERT INTO execution_batch_legs (
+                        id, batch_id, sequence, role, account_id, instrument_id,
+                        symbol, side, order_type, quantity, order_id, status,
+                        created_at, updated_at
+                    ) VALUES (?, 'close-batch', ?, ?, ?, ?, ?, 'sell', 'market',
+                              '1', ?, ?, ?, ?)
+                    """,
+                    (
+                        f"close-leg-{sequence}",
+                        sequence,
+                        role,
+                        ACCOUNT_ID,
+                        instrument_id,
+                        symbol,
+                        order_id,
+                        status,
+                        timestamp,
+                        timestamp,
+                    ),
+                )
+            db.execute(
+                """
+                INSERT INTO cross_spread_exit_plans (
+                    id, strategy_instance_id, open_batch_id, close_batch_id,
+                    direction, quantity_oz, mt5_position_id, entry_spread,
+                    take_profit_spread, stop_loss_spread, status, created_at, updated_at
+                ) VALUES ('exit-plan', ?, 'open-batch', 'close-batch', 'long', '1',
+                          'position-1', '-1', '-2', '2', 'manual_intervention', ?, ?)
+                """,
+                ("strategy_cross_venue_spread_instance_default", timestamp, timestamp),
+            )
+            db.execute(
+                """
+                INSERT INTO execution_resource_claims (
+                    id, resource_key, owner_type, owner_id, account_id, venue_id,
+                    resource_category, symbol, status, created_at, updated_at
+                ) VALUES ('claim-1', 'resource-1', 'batch', 'close-batch', ?,
+                          'venue-1', 'instrument', 'BTCUSDT', 'active', ?, ?)
+                """,
+                (ACCOUNT_ID, timestamp, timestamp),
+            )
+            db.execute(
+                """
+                INSERT INTO execution_balance_reservations (
+                    id, owner_type, owner_id, account_id, strategy_instance_id,
+                    instruction_id, currency, reserved_amount, status, created_at, updated_at
+                ) VALUES ('reservation-1', 'batch', 'close-batch', ?, ?,
+                          'close-instruction', 'USDT', '100', 'active', ?, ?)
+                """,
+                (
+                    ACCOUNT_ID,
+                    "strategy_cross_venue_spread_instance_default",
+                    timestamp,
+                    timestamp,
+                ),
+            )
+
+        update_order_from_external(
+            "mt5-close-order", "filled", "external-mt5-order", timestamp
+        )
+
+        with connection() as db:
+            batch = db.execute(
+                "SELECT status, requires_manual_intervention FROM execution_batches WHERE id = 'close-batch'"
+            ).fetchone()
+            instruction = db.execute(
+                "SELECT status FROM strategy_runs WHERE id = 'close-instruction'"
+            ).fetchone()
+            plan = db.execute(
+                "SELECT status FROM cross_spread_exit_plans WHERE id = 'exit-plan'"
+            ).fetchone()
+            claim = db.execute(
+                "SELECT status FROM execution_resource_claims WHERE id = 'claim-1'"
+            ).fetchone()
+            reservation = db.execute(
+                "SELECT status FROM execution_balance_reservations WHERE id = 'reservation-1'"
+            ).fetchone()
+
+    assert dict(batch) == {"status": "hedged", "requires_manual_intervention": 0}
+    assert instruction["status"] == "completed"
+    assert plan["status"] == "closed"
+    assert claim["status"] == "released"
+    assert reservation["status"] == "released"

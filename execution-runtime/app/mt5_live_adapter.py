@@ -3,7 +3,7 @@ from __future__ import annotations
 import platform
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
-from typing import Any
+from typing import Any, Literal
 
 from app.config import Settings
 from app.gateway_errors import (
@@ -26,6 +26,8 @@ from app.models import (
     VenueBalanceSnapshot,
     VenueEconomicEventSnapshot,
     VenueFillSnapshot,
+    VenueMarketQuoteSnapshot,
+    VenueOrderMarginEstimate,
     VenueOrderSnapshot,
     VenuePositionSnapshot,
 )
@@ -76,6 +78,7 @@ class Mt5LiveAdapter:
                 "order_query",
                 "deal_query",
                 "position_query",
+                "market_quote_query",
                 "balance_query",
                 "swap_query",
                 "fee_query",
@@ -159,6 +162,13 @@ class Mt5LiveAdapter:
             if positions:
                 fill_quantity = Decimal(str(getattr(positions[0], "volume", 0) or 0))
                 fill_price = Decimal(str(getattr(positions[0], "price_open", 0) or 0))
+        if (fill_quantity <= 0 or fill_price <= 0) and command.reduce_only:
+            fill_quantity, fill_price = self._recover_reduce_only_fill(
+                mt5,
+                command,
+                order_ticket=order_ticket,
+                deal_ticket=deal_ticket,
+            )
         if fill_quantity > 0 and fill_price > 0:
             events.append(
                 ExecutionEvent(
@@ -173,6 +183,47 @@ class Mt5LiveAdapter:
                 )
             )
         return events
+
+    def _recover_reduce_only_fill(
+        self,
+        mt5,
+        command: SubmitOrderCommand,
+        *,
+        order_ticket: int,
+        deal_ticket: int,
+    ) -> tuple[Decimal, Decimal]:
+        if command.position_id is None:
+            return Decimal("0"), Decimal("0")
+        try:
+            deals = mt5.history_deals_get(position=int(command.position_id)) or ()
+        except Exception:
+            return Decimal("0"), Decimal("0")
+        expected_type = (
+            int(getattr(mt5, "DEAL_TYPE_BUY", 0))
+            if command.side == "buy"
+            else int(getattr(mt5, "DEAL_TYPE_SELL", 1))
+        )
+        matching = []
+        for deal in deals:
+            if int(getattr(deal, "type", -1)) != expected_type:
+                continue
+            candidate_order = int(getattr(deal, "order", 0) or 0)
+            candidate_deal = int(getattr(deal, "ticket", 0) or 0)
+            if order_ticket and candidate_order != order_ticket:
+                continue
+            if not order_ticket and deal_ticket and candidate_deal != deal_ticket:
+                continue
+            volume = Decimal(str(getattr(deal, "volume", 0) or 0))
+            price = Decimal(str(getattr(deal, "price", 0) or 0))
+            if volume > 0 and price > 0:
+                matching.append((volume, price))
+        total = sum((volume for volume, _price in matching), Decimal("0"))
+        if total <= 0 or total > command.quantity:
+            return Decimal("0"), Decimal("0")
+        weighted_price = sum(
+            (volume * price for volume, price in matching), Decimal("0")
+        ) / total
+        return total, weighted_price
 
     def get_order(
         self,
@@ -304,6 +355,136 @@ class Mt5LiveAdapter:
                 )
             )
         return snapshots
+
+    def get_market_quote(
+        self,
+        *,
+        account_id: str,
+        symbol: str,
+        instrument_type: str | None = None,
+        category: str | None = None,
+    ) -> VenueMarketQuoteSnapshot:
+        self._assert_account(account_id)
+        mt5 = self._connect()
+        try:
+            from app.mt5_symbol_resolver import resolve_mt5_symbol
+
+            info = mt5.account_info()
+            if info is None:
+                raise GatewayResultUnknownError(
+                    f"MT5 account identity unavailable: {mt5.last_error()}"
+                )
+            resolution = resolve_mt5_symbol(
+                mt5_module=mt5,
+                base_symbol=_logical_mt5_symbol(symbol),
+                preferred=symbol,
+                cache_key=(
+                    str(getattr(info, "login", "") or ""),
+                    str(getattr(info, "server", "") or ""),
+                ),
+            )
+            if resolution is None:
+                raise GatewayConfigurationError(
+                    f"MT5 symbol has no live quote: {symbol}"
+                )
+            tick = mt5.symbol_info_tick(resolution.symbol)
+            if tick is None:
+                raise GatewayResultUnknownError(
+                    f"MT5 symbol tick unavailable: {mt5.last_error()}"
+                )
+            bid = Decimal(str(getattr(tick, "bid", 0) or 0))
+            ask = Decimal(str(getattr(tick, "ask", 0) or 0))
+            if bid <= 0 or ask <= 0:
+                raise GatewayResultUnknownError("MT5 market quote is incomplete")
+            last_raw = Decimal(str(getattr(tick, "last", 0) or 0))
+            return VenueMarketQuoteSnapshot(
+                source=self.name,
+                accountId=account_id,
+                instrumentType=instrument_type or "mt5_contract",
+                category=category or "mt5",
+                symbol=resolution.symbol.upper(),
+                bid=bid,
+                ask=ask,
+                mid=(bid + ask) / Decimal("2"),
+                last=last_raw if last_raw > 0 else None,
+                currency=self._normalize_account_currency(
+                    getattr(info, "currency", "USD")
+                ),
+                # Some brokers expose Terminal/server-local tick epochs. The
+                # normalized quote timestamp is the Runtime observation time.
+                asOf=datetime.now(UTC),
+            )
+        except (GatewayConfigurationError, GatewayResultUnknownError):
+            raise
+        except Exception as exc:
+            raise GatewayResultUnknownError("MT5 market quote result is unknown") from exc
+
+    def estimate_order_margin(
+        self,
+        *,
+        account_id: str,
+        symbol: str,
+        side: Literal["buy", "sell"],
+        quantity: Decimal,
+        reference_price: Decimal,
+    ) -> VenueOrderMarginEstimate:
+        self._assert_account(account_id)
+        mt5 = self._connect()
+        try:
+            from app.mt5_symbol_resolver import resolve_mt5_symbol
+
+            info = mt5.account_info()
+            if info is None:
+                raise GatewayResultUnknownError(
+                    f"MT5 account identity unavailable: {mt5.last_error()}"
+                )
+            resolution = resolve_mt5_symbol(
+                mt5_module=mt5,
+                base_symbol=_logical_mt5_symbol(symbol),
+                preferred=symbol,
+                cache_key=(
+                    str(getattr(info, "login", "") or ""),
+                    str(getattr(info, "server", "") or ""),
+                ),
+            )
+            if resolution is None:
+                raise GatewayConfigurationError(
+                    f"MT5 symbol has no margin model: {symbol}"
+                )
+            order_type = mt5.ORDER_TYPE_BUY if side == "buy" else mt5.ORDER_TYPE_SELL
+            raw_margin = mt5.order_calc_margin(
+                order_type,
+                resolution.symbol,
+                float(quantity),
+                float(reference_price),
+            )
+            if raw_margin is None:
+                raise GatewayConfigurationError(
+                    f"MT5 order margin estimate failed: {mt5.last_error()}"
+                )
+            margin = Decimal(str(raw_margin))
+            if margin <= 0:
+                raise GatewayConfigurationError("MT5 order margin estimate is unavailable")
+            return VenueOrderMarginEstimate(
+                source=self.name,
+                accountId=account_id,
+                instrumentType="mt5_contract",
+                category="mt5",
+                symbol=resolution.symbol.upper(),
+                side=side,
+                quantity=quantity,
+                referencePrice=reference_price,
+                estimatedInitialMargin=margin,
+                currency=self._normalize_account_currency(
+                    getattr(info, "currency", "USD")
+                ),
+                asOf=datetime.now(UTC),
+                dataQualityState="venue_calculated",
+            )
+        except (GatewayConfigurationError, GatewayResultUnknownError):
+            raise
+        except Exception as exc:
+            raise GatewayResultUnknownError("MT5 order margin estimate is unknown") from exc
 
     def list_balances(self, account_id: str | None = None) -> list[VenueBalanceSnapshot]:
         account = account_id or self._single_account()
@@ -644,21 +825,38 @@ class Mt5LiveAdapter:
     def _deal_time(deal) -> datetime:
         time_msc = int(getattr(deal, "time_msc", 0) or 0)
         if time_msc:
-            return datetime.fromtimestamp(time_msc / 1000, UTC)
-        return datetime.fromtimestamp(int(getattr(deal, "time", 0) or 0), UTC)
+            return Mt5LiveAdapter._normalized_mt5_time(time_msc / 1000)
+        return Mt5LiveAdapter._normalized_mt5_time(
+            int(getattr(deal, "time", 0) or 0)
+        )
 
     @staticmethod
     def _position_time(row) -> datetime:
         time_msc = int(getattr(row, "time_update_msc", 0) or 0)
         if time_msc:
-            return datetime.fromtimestamp(time_msc / 1000, UTC)
-        return datetime.fromtimestamp(int(getattr(row, "time_update", 0) or 0), UTC)
+            return Mt5LiveAdapter._normalized_mt5_time(time_msc / 1000)
+        return Mt5LiveAdapter._normalized_mt5_time(
+            int(getattr(row, "time_update", 0) or 0)
+        )
 
     @staticmethod
     def _seconds(value: object) -> datetime:
         if not value:
             return datetime.now(UTC)
-        return datetime.fromtimestamp(int(value), UTC)
+        return Mt5LiveAdapter._normalized_mt5_time(int(str(value)))
+
+    @staticmethod
+    def _normalized_mt5_time(value: int | float) -> datetime:
+        observed_at = datetime.now(UTC)
+        if value <= 0:
+            return observed_at
+        source_time = datetime.fromtimestamp(value, UTC)
+        # Some broker terminals expose server-local epoch values. Preserve
+        # plausible source time, but never let a future broker clock move
+        # Platform lifecycle state into the future.
+        if source_time > observed_at + timedelta(minutes=5):
+            return observed_at
+        return source_time
 
     @staticmethod
     def _as_dict(value: object) -> dict[str, object]:

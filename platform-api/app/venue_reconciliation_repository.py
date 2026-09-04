@@ -134,6 +134,14 @@ def update_order_from_external(
             (batch_id,),
         ).fetchone()
         if pending is None:
+            batch = db.execute(
+                """
+                SELECT strategy_key, strategy_instruction_id
+                FROM execution_batches
+                WHERE id = ?
+                """,
+                (batch_id,),
+            ).fetchone()
             db.execute(
                 """
                 UPDATE execution_batches
@@ -151,6 +159,24 @@ def update_order_from_external(
                 """,
                 (updated_at, updated_at, batch_id),
             )
+            if batch is not None and batch["strategy_key"] == "cross_venue_spread":
+                if batch["strategy_instruction_id"] is not None:
+                    db.execute(
+                        """
+                        UPDATE strategy_runs
+                        SET status = 'completed', failure_reason = NULL, updated_at = ?
+                        WHERE id = ?
+                        """,
+                        (updated_at, batch["strategy_instruction_id"]),
+                    )
+                from app import execution_risk_repository as risk_repository
+
+                risk_repository.release_claims_for_owner(
+                    "batch", batch_id, db=db
+                )
+                risk_repository.release_reservations_for_owner(
+                    "batch", batch_id, db=db
+                )
 
 
 def list_fill_quantities(order_id: str) -> list[object]:
