@@ -426,12 +426,6 @@ export const researchModules: ResearchModule[] = [
         description: '分别观察高收益信用利差与 HYG/LQD 相对表现，避免混用纵轴。',
         layout: 'two',
         widgets: [
-          localChart(
-            '美国高收益债 OAS',
-            'ICE BofA US High Yield OAS via FRED',
-            'macro-risk-hy-oas',
-          ),
-          localChart('HYG / LQD', '同日 adjusted close ratio', 'macro-risk-credit-ratio'),
           withReferenceLinks(
             advancedChart('VIX 波动率', 'Equity volatility regime', 'TVC:VIX', { height: 360 }),
             [
@@ -441,6 +435,12 @@ export const researchModules: ResearchModule[] = [
               },
             ],
           ),
+          localChart(
+            '美国高收益债 OAS',
+            'ICE BofA US High Yield OAS via FRED',
+            'macro-risk-hy-oas',
+          ),
+          localChart('HYG / LQD', '同日 adjusted close ratio', 'macro-risk-credit-ratio'),
           advancedChart('美国金融状况指数', 'Chicago Fed NFCI', 'FRED:NFCI', { height: 360 }),
         ],
       },
