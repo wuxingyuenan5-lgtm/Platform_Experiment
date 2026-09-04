@@ -9,13 +9,10 @@ fs.mkdirSync(outDir, { recursive: true });
 
 const routes = [
   { name: '首页', hash: '/home/index', expect: ['全球变量'] },
-  { name: '宏观日历', hash: '/news-calendar/macro', expect: ['宏观日历'] },
-  { name: '新闻整理', hash: '/news-calendar/news', expect: ['新闻整理', '美股'] },
-  { name: '理财信息', hash: '/news-calendar/wealth', expect: ['理财信息', '期限'] },
-  { name: '宏观看板', hash: '/hedge-board/macro', expect: ['宏观市场明细'] },
+  { name: '宏观看板', hash: '/hedge-board/macro', expect: ['宏观日历', '宏观市场明细'] },
   { name: '全球看板', hash: '/hedge-board/global', expect: ['全球'] },
   { name: '商品看板', hash: '/hedge-board/gold', expect: ['商品市场明细'] },
-  { name: '加密看板', hash: '/hedge-board/crypto', expect: ['加密市场明细'] },
+  { name: '加密看板', hash: '/hedge-board/crypto', expect: ['加密市场明细', '理财信息'] },
   { name: 'A股看板', hash: '/hedge-board/a-share', expect: ['A股', '市场明细'] },
   { name: '美股看板', hash: '/hedge-board/us', expect: ['美股'] },
   { name: '策略管理', hash: '/strategy/management', expect: ['资费', '跨所价差', '海内外价差'] },
@@ -43,7 +40,11 @@ const routes = [
     expect: ['资产水平（CNY）', '仓位平衡', '国内交易腿', '海外交易腿'],
   },
   { name: '风控详情', hash: '/risk/detail', expect: ['风险总览', '风险限额'] },
-  { name: '金融AI', hash: '/financial-ai/index', expect: ['研究问题', '分析结果'] },
+  {
+    name: '金融AI',
+    hash: '/financial-ai/index',
+    expect: ['研究问题', '分析结果', '新闻整理'],
+  },
   { name: '用户管理', hash: '/user/list', expect: ['用户'] },
   { name: '个人账号', hash: '/account/index', expect: ['个人账号'] },
 ];

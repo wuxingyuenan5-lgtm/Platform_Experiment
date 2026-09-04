@@ -22,6 +22,8 @@
         class="terminal-content"
         :class="{ 'terminal-content--gold': useUnifiedResearchUi }"
       >
+        <MacroCalendarPanel v-if="activeCategory === 'macro'" />
+
         <HedgeResearchModule
           :module-id="activeModule.id"
           :module-label="activeModule.label"
@@ -61,6 +63,8 @@
             />
           </div>
         </section>
+
+        <WealthInformationPanel v-if="activeCategory === 'crypto'" />
       </div>
     </div>
   </PageWrapper>
@@ -72,7 +76,9 @@
   import CompactSegmentTabs from '@/views/strategy/shared/CompactSegmentTabs.vue';
   import LocalChartWidget from './charts/LocalChartWidget';
   import HedgeResearchModule from './components/HedgeResearchModule.vue';
+  import MacroCalendarPanel from './components/MacroCalendarPanel.vue';
   import MarketTerminalPage from './components/MarketTerminalPage.vue';
+  import WealthInformationPanel from './components/WealthInformationPanel.vue';
   import TradingViewWidget from './components/TradingViewWidget';
   import WidgetErrorBoundary from './components/WidgetErrorBoundary';
   import { useHedgeBoardPage } from './composables/useHedgeBoardPage';

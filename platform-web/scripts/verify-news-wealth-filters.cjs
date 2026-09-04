@@ -24,12 +24,13 @@ async function login(page) {
   const browser = await chromium.launch({ headless: true });
   const page = await browser.newPage({ viewport: { width: 1366, height: 768 }, locale: 'zh-CN' });
   await login(page);
-  await page.goto(`${origin}/#/news-calendar/wealth`, { waitUntil: 'domcontentloaded' });
-  await page.waitForSelector('.wealth-page');
+  await page.goto(`${origin}/#/hedge-board/crypto`, { waitUntil: 'domcontentloaded' });
+  const wealthPanel = page.getByTestId('crypto-wealth-panel');
+  await wealthPanel.waitFor();
   for (const lock of ['short', 'mid', 'long']) {
-    await page.locator('select').nth(2).selectOption(lock);
+    await wealthPanel.locator('select').nth(2).selectOption(lock);
     await page.waitForTimeout(200);
-    const count = await page.locator('.wealth-row').count();
+    const count = await wealthPanel.locator('.wealth-row').count();
     if (count < 1) throw new Error(`lock filter ${lock} returned no rows`);
     const visibleLockTexts = await page
       .locator('.wealth-row')
@@ -41,13 +42,13 @@ async function login(page) {
       );
     }
   }
-  await page.locator('input[placeholder*="搜索"]').fill('NO_MATCH_TERM');
+  await wealthPanel.locator('input[placeholder*="搜索"]').fill('NO_MATCH_TERM');
   await page.waitForTimeout(200);
-  if (!(await page.locator('.wealth-empty').isVisible())) {
+  if (!(await wealthPanel.locator('.wealth-empty').isVisible())) {
     throw new Error('wealth empty state is not visible');
   }
   await browser.close();
-  console.log('news wealth lock filters passed: short, mid, long, empty state');
+  console.log('crypto wealth lock filters passed: short, mid, long, empty state');
 })().catch((error) => {
   console.error(error);
   process.exitCode = 1;

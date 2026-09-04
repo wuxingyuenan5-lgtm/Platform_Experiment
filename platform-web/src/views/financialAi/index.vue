@@ -165,6 +165,8 @@
           </button>
         </div>
       </section>
+
+      <NewsDigestPanel />
     </main>
   </PageWrapper>
 </template>
@@ -173,6 +175,7 @@
   import { Tag } from 'ant-design-vue';
   import { computed, ref } from 'vue';
   import { PageWrapper } from '@/components/Page';
+  import NewsDigestPanel from './components/NewsDigestPanel.vue';
 
   const topics = [
     '铜价中期（6-12个月）走势分析',

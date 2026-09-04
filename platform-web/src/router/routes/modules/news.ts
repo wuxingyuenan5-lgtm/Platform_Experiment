@@ -9,17 +9,17 @@ const news: AppRouteModule = {
   redirect: '/news-calendar/macro',
   meta: {
     title: '新闻日历与理财',
-    icon: 'ant-design:calendar-outlined',
-    orderNo: 40,
+    hideMenu: true,
     roles: [RoleEnum.ADMIN, RoleEnum.EMPLOYEE],
   },
   children: [
     {
       path: 'macro',
       name: 'NewsCalendarMacro',
-      component: () => import('@/views/newsCalendar/index.vue'),
+      redirect: '/hedge-board/macro',
       meta: {
         title: '宏观日历',
+        hideMenu: true,
         roles: [RoleEnum.ADMIN, RoleEnum.EMPLOYEE],
         newsSection: 'macro',
         ignoreKeepAlive: true,
@@ -28,9 +28,10 @@ const news: AppRouteModule = {
     {
       path: 'news',
       name: 'NewsCalendarNews',
-      component: () => import('@/views/newsCalendar/index.vue'),
+      redirect: '/financial-ai/index#news-digest',
       meta: {
         title: '新闻整理',
+        hideMenu: true,
         roles: [RoleEnum.ADMIN, RoleEnum.EMPLOYEE],
         newsSection: 'news',
         ignoreKeepAlive: true,
@@ -39,13 +40,13 @@ const news: AppRouteModule = {
     {
       path: 'wealth',
       name: 'NewsCalendarWealth',
-      component: () => import('@/views/newsCalendar/index.vue'),
+      redirect: '/hedge-board/crypto',
       meta: {
         title: '理财信息',
+        hideMenu: true,
         roles: [RoleEnum.ADMIN, RoleEnum.EMPLOYEE],
         newsSection: 'wealth',
         ignoreKeepAlive: true,
-        embeddedUrl: 'https://app.barker.money/campaigns',
       },
     },
     {

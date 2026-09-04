@@ -44,7 +44,6 @@
 <script setup lang="ts">
   import { useRouter } from 'vue-router';
   import {
-    CalendarOutlined,
     ClusterOutlined,
     DeploymentUnitOutlined,
     FundProjectionScreenOutlined,
@@ -65,7 +64,6 @@
 
   const navItems: LandingItem[] = [
     { label: '对冲基金看板', path: '/hedge-board/macro' },
-    { label: '新闻日历与理财', path: '/news-calendar/macro' },
     { label: '策略', path: '/strategy/index' },
     { label: '风控管理', path: '/risk/detail' },
     { label: '金融AI分析', path: '/financial-ai/index' },
@@ -77,12 +75,6 @@
       path: '/hedge-board/macro',
       desc: '宏观信号与跨资产联动',
       icon: FundProjectionScreenOutlined,
-    },
-    {
-      label: '新闻日历与理财',
-      path: '/news-calendar/macro',
-      desc: '新闻整理与关键日程追踪',
-      icon: CalendarOutlined,
     },
     {
       label: '策略研究',
@@ -128,36 +120,44 @@
     position: relative;
     min-height: 100vh;
     overflow: hidden;
-    background:
-      linear-gradient(90deg, rgba(2, 9, 24, 0.72) 0%, rgba(4, 14, 31, 0.42) 38%, rgba(4, 12, 27, 0.08) 72%),
+    background: linear-gradient(
+        90deg,
+        rgb(2 9 24 / 72%) 0%,
+        rgb(4 14 31 / 42%) 38%,
+        rgb(4 12 27 / 8%) 72%
+      ),
       url('@/assets/images/landing-global-network.png') center center / cover no-repeat;
   }
 
   .start-hero__shade {
     position: absolute;
-    inset: 0;
+    background: linear-gradient(
+        180deg,
+        rgb(3 12 28 / 8%) 0%,
+        rgb(3 12 28 / 10%) 56%,
+        rgb(3 12 28 / 34%) 100%
+      ),
+      radial-gradient(circle at 28% 35%, rgb(18 54 94 / 50%), transparent 36%);
     pointer-events: none;
-    background:
-      linear-gradient(180deg, rgba(3, 12, 28, 0.08) 0%, rgba(3, 12, 28, 0.1) 56%, rgba(3, 12, 28, 0.34) 100%),
-      radial-gradient(circle at 28% 35%, rgba(18, 54, 94, 0.5), transparent 36%);
+    inset: 0;
   }
 
   .start-header {
+    display: flex;
     position: relative;
     z-index: 2;
-    height: 74px;
-    display: flex;
     align-items: center;
     justify-content: space-between;
+    height: 74px;
     padding: 0 56px 0 78px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.13);
+    border-bottom: 1px solid rgb(255 255 255 / 13%);
   }
 
   .start-logo {
-    width: 192px;
-    height: 72px;
     display: flex;
     align-items: center;
+    width: 192px;
+    height: 72px;
     padding: 0;
     border: none;
     background: transparent;
@@ -167,7 +167,7 @@
       width: 178px;
       height: auto;
       object-fit: contain;
-      filter: drop-shadow(0 12px 26px rgba(0, 0, 0, 0.28));
+      filter: drop-shadow(0 12px 26px rgb(0 0 0 / 28%));
     }
   }
 
@@ -177,20 +177,18 @@
     gap: 34px;
 
     button {
+      transition: color 160ms ease, transform 160ms ease;
       border: none;
       background: transparent;
-      color: rgba(255, 255, 255, 0.88);
+      color: rgb(255 255 255 / 88%);
       font-size: 16px;
       font-weight: 600;
       letter-spacing: 0;
       cursor: pointer;
-      transition:
-        color 160ms ease,
-        transform 160ms ease;
 
       &:hover {
-        color: #f3d09a;
         transform: translateY(-1px);
+        color: #f3d09a;
       }
     }
 
@@ -198,10 +196,10 @@
       min-width: 82px;
       height: 38px;
       padding: 0 22px;
-      border: 1px solid rgba(255, 255, 255, 0.46);
+      border: 1px solid rgb(255 255 255 / 46%);
       border-radius: 999px;
+      box-shadow: inset 0 0 18px rgb(255 255 255 / 6%);
       color: #fff;
-      box-shadow: inset 0 0 18px rgba(255, 255, 255, 0.06);
     }
   }
 
@@ -215,18 +213,18 @@
 
   .start-copy h1 {
     margin: 0;
-    color: rgba(255, 255, 255, 0.96);
-    font-family: 'Noto Serif SC', 'Songti SC', 'SimSun', serif;
+    color: rgb(255 255 255 / 96%);
+    font-family: 'Noto Serif SC', 'Songti SC', SimSun, serif;
     font-size: clamp(54px, 4.7vw, 92px);
     font-weight: 700;
-    line-height: 1.18;
     letter-spacing: 0;
-    text-shadow: 0 18px 42px rgba(0, 0, 0, 0.42);
+    line-height: 1.18;
+    text-shadow: 0 18px 42px rgb(0 0 0 / 42%);
   }
 
   .start-copy__lead {
     margin: 48px 0 0;
-    color: rgba(220, 234, 255, 0.86);
+    color: rgb(220 234 255 / 86%);
     font-size: 18px;
     line-height: 1.8;
   }
@@ -234,50 +232,48 @@
   .start-copy__line {
     margin: 28px 0 0;
     padding-top: 24px;
-    border-top: 1px solid rgba(255, 255, 255, 0.22);
-    color: rgba(206, 224, 249, 0.82);
+    border-top: 1px solid rgb(255 255 255 / 22%);
+    color: rgb(206 224 249 / 82%);
     font-size: 16px;
     line-height: 1.9;
   }
 
   .start-entry-panel {
+    display: grid;
     position: absolute;
     z-index: 2;
-    left: 50%;
     bottom: clamp(42px, 7.5vh, 84px);
+    left: 50%;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     width: min(1160px, calc(100% - 48px));
-    display: grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
     overflow: hidden;
-    border-radius: 8px;
-    background: rgba(255, 255, 255, 0.93);
-    box-shadow: 0 28px 70px rgba(0, 0, 0, 0.34);
     transform: translateX(-50%);
+    border-radius: 8px;
+    background: rgb(255 255 255 / 93%);
+    box-shadow: 0 28px 70px rgb(0 0 0 / 34%);
   }
 
   .start-entry {
-    min-height: 228px;
-    padding: 48px 20px 34px;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: flex-start;
+    min-height: 228px;
+    padding: 48px 20px 34px;
+    transition: background 180ms ease, transform 180ms ease;
     border: none;
-    border-right: 1px solid rgba(9, 24, 44, 0.12);
+    border-right: 1px solid rgb(9 24 44 / 12%);
     background: transparent;
     color: #172234;
     cursor: pointer;
-    transition:
-      background 180ms ease,
-      transform 180ms ease;
 
     &:last-child {
       border-right: none;
     }
 
     &:hover {
-      background: rgba(246, 241, 232, 0.94);
       transform: translateY(-2px);
+      background: rgb(246 241 232 / 94%);
     }
   }
 
@@ -295,7 +291,7 @@
 
   .start-entry strong {
     color: #161c24;
-    font-family: 'Noto Serif SC', 'Songti SC', 'SimSun', serif;
+    font-family: 'Noto Serif SC', 'Songti SC', SimSun, serif;
     font-size: 25px;
     font-weight: 500;
     line-height: 1.25;
@@ -320,10 +316,10 @@
     }
 
     .start-entry-panel {
-      grid-template-columns: repeat(3, minmax(0, 1fr));
       position: relative;
-      left: auto;
       bottom: auto;
+      left: auto;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
       margin: 72px auto 42px;
       transform: none;
     }
@@ -335,12 +331,12 @@
     }
 
     .start-header {
+      flex-direction: column;
+      align-items: flex-start;
       height: auto;
       min-height: 86px;
-      align-items: flex-start;
       padding: 18px 20px;
       gap: 18px;
-      flex-direction: column;
     }
 
     .start-logo {
@@ -353,8 +349,8 @@
     }
 
     .start-nav {
-      width: 100%;
       flex-wrap: wrap;
+      width: 100%;
       gap: 12px 18px;
 
       button {
@@ -380,7 +376,7 @@
     .start-entry {
       min-height: 150px;
       border-right: none;
-      border-bottom: 1px solid rgba(9, 24, 44, 0.12);
+      border-bottom: 1px solid rgb(9 24 44 / 12%);
 
       &:last-child {
         border-bottom: none;

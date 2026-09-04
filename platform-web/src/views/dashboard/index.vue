@@ -187,7 +187,7 @@
                 </article>
               </div>
 
-              <button class="panel-link" type="button" @click="goPath('/news-calendar/macro')">
+              <button class="panel-link" type="button" @click="goPath('/hedge-board/macro')">
                 查看完整日历
                 <RightOutlined />
               </button>
@@ -241,8 +241,8 @@
     --home-page-gutter: clamp(18px, 2vw, 42px);
 
     min-height: 100%;
+    background: linear-gradient(180deg, rgb(247 250 252 / 34%), #eff5fa 62%);
     color: #1b2a38;
-    background: linear-gradient(180deg, rgba(247, 250, 252, 0.34), #eff5fa 62%);
   }
 
   .home-dashboard__frame {
@@ -251,15 +251,15 @@
   }
 
   .home-hero {
-    min-height: clamp(480px, 41vw, 680px);
-    padding: clamp(58px, 5vw, 92px) var(--home-page-gutter) clamp(44px, 4vw, 72px);
     display: grid;
     grid-template-columns: minmax(0, 1.42fr) minmax(380px, 0.58fr);
-    gap: clamp(28px, 4vw, 72px);
     align-items: start;
+    min-height: clamp(480px, 41vw, 680px);
+    padding: clamp(58px, 5vw, 92px) var(--home-page-gutter) clamp(44px, 4vw, 72px);
     overflow: hidden;
     background: url('@/assets/images/home-hero-generated-20260726.png') center / cover no-repeat;
-    box-shadow: 0 24px 60px rgba(156, 174, 195, 0.16);
+    box-shadow: 0 24px 60px rgb(156 174 195 / 16%);
+    gap: clamp(28px, 4vw, 72px);
   }
 
   .home-hero__copy {
@@ -278,11 +278,11 @@
   .home-hero__copy h1 {
     margin: 0;
     color: #182633;
-    font-family: 'Noto Serif SC', 'Songti SC', 'SimSun', serif;
+    font-family: 'Noto Serif SC', 'Songti SC', SimSun, serif;
     font-size: clamp(50px, 4.2vw, 72px);
     font-weight: 600;
     line-height: 1.06;
-    text-shadow: 0 8px 22px rgba(255, 255, 255, 0.72);
+    text-shadow: 0 8px 22px rgb(255 255 255 / 72%);
   }
 
   .home-hero__copy p {
@@ -300,10 +300,10 @@
   .hero-side,
   .dashboard-panel {
     min-width: 0;
-    border: 1px solid rgba(232, 237, 243, 0.95);
+    border: 1px solid rgb(232 237 243 / 95%);
     border-radius: 20px;
-    background: rgba(255, 255, 255, 0.82);
-    box-shadow: 0 20px 50px rgba(136, 158, 184, 0.13);
+    background: rgb(255 255 255 / 82%);
+    box-shadow: 0 20px 50px rgb(136 158 184 / 13%);
     backdrop-filter: blur(18px);
   }
 
@@ -374,7 +374,7 @@
     aspect-ratio: 1;
     border-radius: 50%;
     background: conic-gradient(#d9b576 0 32%, #8fb2d8 32% 55%, #d9dee5 55% 78%, #eee0c7 78%);
-    box-shadow: inset 0 0 0 15px rgba(255, 255, 255, 0.88);
+    box-shadow: inset 0 0 0 15px rgb(255 255 255 / 88%);
   }
 
   .dashboard-grid {
