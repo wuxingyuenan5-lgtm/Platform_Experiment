@@ -426,33 +426,12 @@ export default defineComponent({
           case 'crypto-onchain':
           case 'crypto-eth-etf-flow':
             return renderExternalCryptoResearch(key);
-          case 'crypto-binance-spot':
-            return h(MacroSeriesChart, {
-              dataDomain: 'crypto',
-              groupId: 'binanceSpot',
-              years: 5,
-              unitLabel: 'USDT',
-            });
-          case 'crypto-binance-funding':
-            return h(MacroSeriesChart, {
-              dataDomain: 'crypto',
-              groupId: 'binanceFunding',
-              years: 1,
-              unitLabel: '%',
-            });
           case 'crypto-binance-open-interest':
             return h(MacroSeriesChart, {
               dataDomain: 'crypto',
               groupId: 'binanceOpenInterest',
               years: 1,
               unitLabel: 'USD',
-            });
-          case 'crypto-binance-basis':
-            return h(MacroSeriesChart, {
-              dataDomain: 'crypto',
-              groupId: 'binancePerpetualBasis',
-              years: 1,
-              unitLabel: '%',
             });
           default:
             return h('div', { class: 'local-empty' }, '该图表配置尚未接入。');

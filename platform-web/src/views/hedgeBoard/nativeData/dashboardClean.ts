@@ -30,10 +30,7 @@ export type LocalWidgetKey =
   | 'crypto-market-detail-table'
   | 'btc-etf-flow'
   | 'btc-treasury-flow'
-  | 'crypto-binance-spot'
-  | 'crypto-binance-funding'
   | 'crypto-binance-open-interest'
-  | 'crypto-binance-basis'
   | 'crypto-options-iv'
   | 'crypto-onchain'
   | 'crypto-eth-etf-flow'
@@ -703,24 +700,9 @@ export const researchModules: ResearchModule[] = [
         layout: 'two',
         widgets: [
           localChart(
-            'BTC / ETH Spot · Binance Venue',
-            '已收盘 UTC 日线 · not Aggregate',
-            'crypto-binance-spot',
-          ),
-          localChart(
-            'BTC / ETH Funding · Binance Venue',
-            'USD-M 日内费率日均 · not Aggregate',
-            'crypto-binance-funding',
-          ),
-          localChart(
             'BTC / ETH Open Interest · Binance Venue',
             'USD-M 日末名义价值 · not Aggregate',
             'crypto-binance-open-interest',
-          ),
-          localChart(
-            'BTC / ETH Perpetual Basis · Binance Venue',
-            'USD-M 日末基差率 · not Aggregate',
-            'crypto-binance-basis',
           ),
           externalReference(
             '全市场期货未平仓量',

@@ -110,10 +110,7 @@ const widgetSourceLinks: Partial<Record<string, string>> = {
   'btc-treasury-flow': 'https://bitcointreasuries.net/',
   'crypto-eth-etf-flow':
     'https://sosovalue.com/zh/assets/etf/Total_Crypto_ETH_ETF_Fund_Flow?page=usETH',
-  'crypto-binance-spot': 'https://www.coinglass.com/tv/zh/Binance_BTCUSDT',
-  'crypto-binance-funding': 'https://www.coinglass.com/tv/zh/Binance_BTCUSDT',
   'crypto-binance-open-interest': 'https://www.coinglass.com/tv/zh/Binance_BTCUSDT',
-  'crypto-binance-basis': 'https://www.coinglass.com/tv/zh/Binance_BTCUSDT',
   'crypto-options-iv': 'https://www.deribit.com/statistics/BTC/volatility-index',
   'crypto-onchain': 'https://checkonchain.com/',
   'etf-weekly-flows': ETF_REFERENCE_URL,
