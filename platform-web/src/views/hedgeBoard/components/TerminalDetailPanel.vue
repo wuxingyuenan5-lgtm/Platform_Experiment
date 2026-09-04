@@ -160,8 +160,14 @@
               </td>
 
               <td class="market-terminal__spark-cell is-center">
+                <span
+                  v-if="row.spark.length < 2"
+                  class="market-terminal__spark-unavailable"
+                  title="暂无可靠的 90 日历史数据"
+                  >—</span
+                >
                 <button
-                  v-if="canOpenTickerChart(row.symbol, row.tvSymbol)"
+                  v-else-if="canOpenTickerChart(row.symbol, row.tvSymbol)"
                   type="button"
                   class="market-terminal__spark-button"
                   @click="openTickerChart(row.symbol, row.name, row.tvSymbol)"
@@ -927,10 +933,10 @@
   .market-terminal__detail,
   .market-terminal__rotation {
     padding: 12px;
-    border: 1px solid rgba(201, 213, 226, 0.72);
+    border: 1px solid rgb(201 213 226 / 72%);
     border-radius: 18px;
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(243, 248, 252, 0.96)), #fff;
-    box-shadow: 0 14px 28px rgba(15, 23, 42, 0.04);
+    background: linear-gradient(180deg, rgb(255 255 255 / 98%), rgb(243 248 252 / 96%)), #fff;
+    box-shadow: 0 14px 28px rgb(15 23 42 / 4%);
   }
 
   .market-terminal__rotation {
@@ -963,9 +969,9 @@
     align-items: center;
     justify-content: center;
     padding: 6px 12px;
-    border: 1px solid rgba(201, 213, 226, 0.82);
+    border: 1px solid rgb(201 213 226 / 82%);
     border-radius: 999px;
-    background: rgba(247, 251, 253, 0.96);
+    background: rgb(247 251 253 / 96%);
     color: #35586e;
     font-size: 12px;
     font-weight: 700;
@@ -979,9 +985,9 @@
   .market-terminal__editor-tip {
     margin-bottom: 12px;
     padding: 10px 12px;
-    border: 1px solid rgba(201, 213, 226, 0.72);
+    border: 1px solid rgb(201 213 226 / 72%);
     border-radius: 12px;
-    background: rgba(244, 249, 252, 0.92);
+    background: rgb(244 249 252 / 92%);
     color: #6e8395;
     font-size: 12px;
     line-height: 1.6;
@@ -990,9 +996,9 @@
   .market-terminal__editor-card {
     margin-bottom: 12px;
     padding: 12px;
-    border: 1px solid rgba(201, 213, 226, 0.72);
+    border: 1px solid rgb(201 213 226 / 72%);
     border-radius: 14px;
-    background: rgba(250, 252, 254, 0.94);
+    background: rgb(250 252 254 / 94%);
   }
 
   .market-terminal__editor-grid {
@@ -1021,7 +1027,7 @@
   .market-terminal__editor-field select {
     width: 100%;
     padding: 8px 10px;
-    border: 1px solid rgba(201, 213, 226, 0.82);
+    border: 1px solid rgb(201 213 226 / 82%);
     border-radius: 10px;
     background: #fff;
     color: #18313c;
@@ -1042,8 +1048,8 @@
 
   .market-terminal__table th,
   .market-terminal__table td {
-    padding: 10px 10px;
-    border-bottom: 1px solid rgba(201, 213, 226, 0.52);
+    padding: 10px;
+    border-bottom: 1px solid rgb(201 213 226 / 52%);
   }
 
   .market-terminal__table th {
@@ -1055,7 +1061,7 @@
 
   .market-terminal__group-row td {
     padding: 10px;
-    background: rgba(241, 246, 251, 0.92);
+    background: rgb(241 246 251 / 92%);
   }
 
   .market-terminal__group-meta {
@@ -1108,10 +1114,10 @@
   }
 
   .market-terminal__rotation-sort {
-    width: 100%;
     justify-content: center;
+    width: 100%;
     padding: 6px 10px;
-    border: 1px solid rgba(201, 213, 226, 0.7);
+    border: 1px solid rgb(201 213 226 / 70%);
     border-radius: 999px;
     color: #73879a;
     font-size: 11px;
@@ -1120,8 +1126,8 @@
 
   .market-terminal__rotation-sort.is-active,
   .market-terminal__rotation-sort:hover {
-    border-color: rgba(96, 125, 159, 0.56);
-    background: rgba(236, 243, 249, 0.9);
+    border-color: rgb(96 125 159 / 56%);
+    background: rgb(236 243 249 / 90%);
     color: #35586e;
   }
 
@@ -1151,7 +1157,7 @@
     display: inline-flex;
     width: fit-content;
     padding: 2px 6px;
-    border: 1px solid rgba(201, 213, 226, 0.7);
+    border: 1px solid rgb(201 213 226 / 70%);
     border-radius: 6px;
     color: #73879a;
     font-size: 11px;
@@ -1173,9 +1179,9 @@
   }
 
   .market-terminal__sparkline polyline {
-    fill: none;
     stroke-width: 1.5;
     stroke-linecap: round;
+    fill: none;
     stroke-linejoin: round;
   }
 
@@ -1185,22 +1191,22 @@
   }
 
   .market-terminal__high-cell {
-    position: relative;
     display: flex;
+    position: relative;
     align-items: center;
-    gap: 8px;
     width: 100%;
     min-width: 136px;
+    gap: 8px;
   }
 
   .market-terminal__high-track {
     flex: 1;
-    min-width: 0;
     width: 100%;
+    min-width: 0;
     height: 4px;
-    border-radius: 999px;
-    background: rgba(148, 163, 184, 0.18);
     overflow: hidden;
+    border-radius: 999px;
+    background: rgb(148 163 184 / 18%);
   }
 
   .market-terminal__high-cell span {
@@ -1227,30 +1233,30 @@
   }
 
   .market-chip.is-up {
-    border-color: rgba(91, 147, 211, 0.2);
-    background: rgba(91, 147, 211, 0.12);
+    border-color: rgb(91 147 211 / 20%);
+    background: rgb(91 147 211 / 12%);
     color: #5b93d3;
   }
 
   .market-chip.is-down {
-    border-color: rgba(210, 107, 90, 0.2);
-    background: rgba(210, 107, 90, 0.12);
+    border-color: rgb(210 107 90 / 20%);
+    background: rgb(210 107 90 / 12%);
     color: #d26b5a;
   }
 
   .market-terminal__rotation-table {
     width: 100%;
     min-width: 920px;
-    border-collapse: collapse;
     margin-top: 12px;
+    border-collapse: collapse;
   }
 
   .market-terminal__rotation-table th,
   .market-terminal__rotation-table td {
     padding: 10px 12px;
-    border: 1px solid rgba(201, 213, 226, 0.68);
-    text-align: center;
+    border: 1px solid rgb(201 213 226 / 68%);
     font-size: 12px;
+    text-align: center;
   }
 
   .market-terminal__rotation-name {
@@ -1273,12 +1279,12 @@
   }
 
   .market-terminal__rotation-cell.is-positive-cell {
-    background: rgba(91, 147, 211, 0.18);
+    background: rgb(91 147 211 / 18%);
     color: #3777bf;
   }
 
   .market-terminal__rotation-cell.is-negative-cell {
-    background: rgba(210, 107, 90, 0.16);
+    background: rgb(210 107 90 / 16%);
     color: #c95b48;
   }
 
@@ -1293,26 +1299,26 @@
   .is-positive,
   .is-stroke-up,
   .is-arrow-up {
-    color: #5b93d3;
     stroke: #5b93d3;
+    color: #5b93d3;
   }
 
   .is-negative,
   .is-stroke-down,
   .is-arrow-down {
-    color: #d26b5a;
     stroke: #d26b5a;
+    color: #d26b5a;
   }
 
   .market-terminal-chart-modal {
-    position: fixed;
-    inset: 0;
-    z-index: 2000;
     display: flex;
+    position: fixed;
+    z-index: 2000;
     align-items: center;
     justify-content: center;
     padding: 24px;
-    background: rgba(15, 23, 42, 0.18);
+    background: rgb(15 23 42 / 18%);
+    inset: 0;
     backdrop-filter: blur(8px);
   }
 
@@ -1321,10 +1327,10 @@
     max-width: 1440px;
     min-height: min(78vh, 860px);
     padding: 22px 22px 18px;
-    border: 1px solid rgba(201, 213, 226, 0.9);
+    border: 1px solid rgb(201 213 226 / 90%);
     border-radius: 28px;
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.99), rgba(244, 249, 252, 0.98)), #fff;
-    box-shadow: 0 28px 80px rgba(15, 23, 42, 0.14);
+    background: linear-gradient(180deg, rgb(255 255 255 / 99%), rgb(244 249 252 / 98%)), #fff;
+    box-shadow: 0 28px 80px rgb(15 23 42 / 14%);
   }
 
   .market-terminal-chart-modal__header {
@@ -1353,9 +1359,9 @@
 
   .market-terminal-chart-modal__close {
     padding: 10px 16px;
-    border: 1px solid rgba(201, 213, 226, 0.9);
+    border: 1px solid rgb(201 213 226 / 90%);
     border-radius: 999px;
-    background: rgba(247, 251, 253, 0.98);
+    background: rgb(247 251 253 / 98%);
     color: #35586e;
     font-size: 13px;
     font-weight: 700;
@@ -1363,10 +1369,10 @@
 
   .market-terminal-chart-modal__body {
     min-height: min(calc(78vh - 140px), 720px);
-    border: 1px solid rgba(201, 213, 226, 0.82);
-    border-radius: 20px;
-    background: linear-gradient(180deg, rgba(252, 254, 255, 0.98), rgba(244, 248, 251, 0.98));
     overflow: hidden;
+    border: 1px solid rgb(201 213 226 / 82%);
+    border-radius: 20px;
+    background: linear-gradient(180deg, rgb(252 254 255 / 98%), rgb(244 248 251 / 98%));
   }
 
   .market-terminal-chart-modal__state {
@@ -1375,7 +1381,7 @@
     justify-content: center;
     min-height: min(calc(78vh - 140px), 720px);
     padding: 24px;
-    background: linear-gradient(180deg, rgba(251, 253, 255, 0.98), rgba(243, 248, 252, 0.98));
+    background: linear-gradient(180deg, rgb(251 253 255 / 98%), rgb(243 248 252 / 98%));
     color: #73879a;
     font-size: 14px;
     font-weight: 600;

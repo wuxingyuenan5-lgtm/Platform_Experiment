@@ -39,81 +39,115 @@ class _Client:
 
 
 def _provider(monkeypatch: pytest.MonkeyPatch, payload: Any) -> MacroResearchProvider:
-    monkeypatch.setattr(macro.httpx, "AsyncClient", lambda **kwargs: _Client(payload, **kwargs))
+    monkeypatch.setattr(macro, "read_local_json", lambda _path: payload)
     return MacroResearchProvider(timeout_seconds=7.5, user_agent="research-test")
 
 
-def test_macro_provider_preserves_category_probability_and_source(
+def test_macro_provider_reads_platform_data_contract(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     provider = _provider(
         monkeypatch,
-        [
-            {
-                "id": "rate-cut",
-                "question": "Will the Fed cut interest rates?",
-                "outcomes": '["Yes", "No"]',
-                "outcomePrices": '["0.73", "0.27"]',
-                "liquidityNum": "125000",
-                "endDate": "2026-09-18T00:00:00Z",
-                "slug": "fed-rate-cut",
-            },
-            {
-                "id": "sports",
-                "question": "Will a football team win?",
-                "outcomes": '["Yes", "No"]',
-                "outcomePrices": '["0.90", "0.10"]',
-            },
-        ],
+        {
+            "schemaVersion": "1.0",
+            "status": "ready",
+            "source": "Polymarket whitelist; CME FedWatch API not_configured",
+            "updatedAt": "2026-08-24T06:18:00Z",
+            "events": [
+                {
+                    "id": "us-recession-by-end-2026",
+                    "label": "US recession by end of 2026?",
+                    "category": "macro",
+                    "probability": 8,
+                    "history": [
+                        {
+                            "observedAt": "2026-08-24T06:01:00Z",
+                            "probability": 8,
+                        }
+                    ],
+                }
+            ],
+        },
+    )
+
+    contract = asyncio.run(provider.macro_expectation_contract())
+
+    assert contract.status == "ready"
+    assert contract.events[0].id == "us-recession-by-end-2026"
+    assert contract.events[0].probability == 8.0
+    assert contract.events[0].history[0].probability == 8.0
+
+
+def test_macro_provider_rejects_ready_empty_contract(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    provider = _provider(
+        monkeypatch,
+        {
+            "schemaVersion": "1.0",
+            "status": "ready",
+            "source": "platform-data",
+            "updatedAt": "2026-08-24T06:18:00Z",
+            "events": [],
+        },
+    )
+
+    with pytest.raises(
+        ResearchProviderError,
+        match="macro_expectation_feed_ready_without_events",
+    ):
+        asyncio.run(provider.macro_expectation_contract())
+
+
+def test_macro_provider_accepts_not_configured_without_fake_probability(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    provider = _provider(
+        monkeypatch,
+        {
+            "schemaVersion": "1.0",
+            "status": "not_configured",
+            "source": "CME FedWatch API",
+            "updatedAt": "2026-08-24T06:18:00Z",
+            "events": [],
+        },
+    )
+
+    contract = asyncio.run(provider.macro_expectation_contract())
+
+    assert contract.status == "not_configured"
+    assert contract.events == []
+
+
+def test_legacy_adapter_uses_only_configured_feed_events(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    provider = _provider(
+        monkeypatch,
+        {
+            "schemaVersion": "1.0",
+            "status": "ready",
+            "source": "platform-data",
+            "updatedAt": "2026-08-24T06:18:00Z",
+            "events": [
+                {
+                    "id": "negative-gdp-growth-2026",
+                    "label": "Negative GDP growth in 2026?",
+                    "category": "macro",
+                    "probability": 4,
+                    "history": [
+                        {
+                            "observedAt": "2026-08-24T04:48:00Z",
+                            "probability": 4,
+                        }
+                    ],
+                }
+            ],
+        },
     )
 
     events = asyncio.run(provider.macro_expectation_events())
 
     assert len(events) == 1
-    event = events[0]
-    assert event.event_id == "rate-cut"
-    assert event.category == "monetary_policy"
-    assert event.outcome == "Yes"
-    assert event.current_probability_pct == Decimal("73.0")
-    assert event.liquidity_label == "125000"
-    assert event.source_url == "https://polymarket.com/event/fed-rate-cut"
-    assert event.expiry_at is not None
-    assert event.expiry_at.isoformat() == "2026-09-18T00:00:00+00:00"
-
-
-def test_macro_provider_ignores_malformed_json_but_keeps_empty_error(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    provider = _provider(
-        monkeypatch,
-        [
-            {
-                "id": "broken",
-                "question": "Will CPI fall?",
-                "outcomes": "not-json",
-                "outcomePrices": '["0.5"]',
-            }
-        ],
-    )
-
-    with pytest.raises(ResearchProviderError, match="macro_expectation_events_empty"):
-        asyncio.run(provider.macro_expectation_events())
-
-
-def test_macro_provider_preserves_invalid_probability_failure(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    provider = _provider(
-        monkeypatch,
-        [
-            {
-                "id": "invalid-price",
-                "question": "Will GDP rise?",
-                "outcomes": ["Yes"],
-                "outcomePrices": ["invalid"],
-            }
-        ],
-    )
-
-    with pytest.raises(ValueError):
-        asyncio.run(provider.macro_expectation_events())
+    assert events[0].event_id == "negative-gdp-growth-2026"
+    assert events[0].current_probability_pct == Decimal("4")

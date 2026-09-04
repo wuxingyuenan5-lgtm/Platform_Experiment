@@ -41,9 +41,19 @@
         <section v-if="activeTradingToolCatalog" class="hedge-board__tool-board">
           <div class="hedge-board__tool-board-head">
             <h3>{{ activeTradingToolCatalog.title }}</h3>
+            <button
+              type="button"
+              class="hedge-board__tool-board-toggle"
+              :aria-expanded="toolsExpanded"
+              aria-controls="hedge-board-tool-list"
+              @click="toolsExpanded = !toolsExpanded"
+            >
+              <span>{{ toolsExpanded ? '收起' : '展开' }}</span>
+              <span class="hedge-board__tool-board-chevron" aria-hidden="true">⌄</span>
+            </button>
           </div>
 
-          <div class="hedge-board__tool-board-body">
+          <div v-if="toolsExpanded" id="hedge-board-tool-list" class="hedge-board__tool-board-body">
             <ToolGroupSection
               v-for="group in activeTradingToolCatalog.groups"
               :key="group.id"
@@ -57,6 +67,7 @@
 </template>
 
 <script setup lang="ts">
+  import { ref, watch } from 'vue';
   import { PageWrapper } from '@/components/Page';
   import CompactSegmentTabs from '@/views/strategy/shared/CompactSegmentTabs.vue';
   import LocalChartWidget from './charts/LocalChartWidget';
@@ -85,6 +96,12 @@
     useUnifiedResearchUi,
     visibleSections,
   } = useHedgeBoardPage();
+
+  const toolsExpanded = ref(false);
+
+  watch(activeCategory, () => {
+    toolsExpanded.value = false;
+  });
 </script>
 
 <style lang="less" src="./hedgeBoard.less"></style>

@@ -6,7 +6,7 @@
         <h2>市场预期与事件概率</h2>
       </div>
       <div class="panel-actions">
-        <ResearchSourceState v-if="response" :meta="response.events.meta" />
+        <ResearchSourceState v-if="sourceMeta" :meta="sourceMeta" />
         <button type="button" :disabled="loading" @click="load">{{
           loading ? '刷新中…' : '刷新'
         }}</button>
@@ -14,7 +14,7 @@
     </header>
 
     <div v-if="error" class="error-state">{{ error }}</div>
-    <div v-if="loading && !events.length" class="loading-state">正在读取公开事件市场概率…</div>
+    <div v-if="loading && !events.length" class="loading-state">正在读取配置化市场预期数据…</div>
     <div v-else-if="events.length" class="category-list">
       <section v-for="group in groupedEvents" :key="group.category" class="category-section">
         <header
@@ -22,12 +22,12 @@
           ><span>{{ group.events.length }}项</span></header
         >
         <div class="event-grid">
-          <article v-for="event in group.events" :key="event.eventId" class="event-card">
+          <article v-for="event in group.events" :key="event.id" class="event-card">
             <div class="event-card__header">
-              <span>{{ event.outcome }}</span>
-              <strong>{{ formatProbability(event.currentProbabilityPct) }}</strong>
+              <span>市场隐含概率</span>
+              <strong>{{ formatProbability(event.probability) }}</strong>
             </div>
-            <h4>{{ event.title }}</h4>
+            <h4>{{ event.label }}</h4>
             <svg viewBox="0 0 220 72" preserveAspectRatio="none" aria-label="事件概率历史曲线">
               <line x1="0" y1="18" x2="220" y2="18" />
               <line x1="0" y1="36" x2="220" y2="36" />
@@ -37,35 +37,27 @@
             <div class="event-metrics">
               <span
                 >1日
-                <b :class="changeTone(event.change1dPctPoints)">{{
-                  formatChange(event.change1dPctPoints)
+                <b :class="changeTone(changeOver(event, 1))">{{
+                  formatChange(changeOver(event, 1))
                 }}</b></span
               >
               <span
                 >7日
-                <b :class="changeTone(event.change7dPctPoints)">{{
-                  formatChange(event.change7dPctPoints)
+                <b :class="changeTone(changeOver(event, 7))">{{
+                  formatChange(changeOver(event, 7))
                 }}</b></span
               >
-              <span
-                >流动性 <b>{{ event.liquidityLabel || '—' }}</b></span
-              >
+              <span>来源 <b>配置白名单</b></span>
             </div>
             <footer>
-              <span>{{ formatExpiry(event.expiryAt) }}</span>
-              <a
-                v-if="event.sourceUrl"
-                :href="event.sourceUrl"
-                target="_blank"
-                rel="noopener noreferrer"
-                >查看来源</a
-              >
+              <span>{{ formatUpdated(event.history) }}</span>
+              <a :href="dataFileUrl" target="_blank" rel="noopener noreferrer">查看来源</a>
             </footer>
           </article>
         </div>
       </section>
     </div>
-    <div v-else class="empty-state">暂无可用的市场预期事件。</div>
+    <div v-else class="empty-state">{{ emptyMessage }}</div>
   </section>
 </template>
 
@@ -76,13 +68,42 @@
     type MacroExpectationEvent,
     type MacroExpectationResponse,
     type MacroProbabilityPoint,
+    type ResearchSourceMeta,
   } from '@/api/hedgeResearch';
   import ResearchSourceState from '../research/components/ResearchSourceState.vue';
+
+  const dataFileUrl =
+    'https://github.com/wuxingyuenan5-lgtm/platform-data/blob/macro-expectations-phase-1a/public/v1/macro/expectations.json';
 
   const response = ref<MacroExpectationResponse | null>(null);
   const loading = ref(false);
   const error = ref('');
-  const events = computed(() => response.value?.events.data || []);
+
+  const events = computed(() => response.value?.events || []);
+  const sourceMeta = computed<ResearchSourceMeta | null>(() => {
+    if (!response.value) return null;
+    const status: ResearchSourceMeta['status'] =
+      response.value.status === 'not_configured' ? 'no_data' : response.value.status;
+    return {
+      source: response.value.source,
+      sourceTimestamp: response.value.updatedAt,
+      fetchedAt: response.value.updatedAt,
+      status,
+      isStale: response.value.status === 'stale',
+      message:
+        response.value.status === 'not_configured' ? '官方数据源尚未配置，未生成替代概率' : null,
+    };
+  });
+  const emptyMessage = computed(() => {
+    if (!response.value) return '暂无可用的市场预期事件。';
+    return {
+      ready: '暂无可用的市场预期事件。',
+      no_data: '当前配置未产生可用的市场预期数据。',
+      not_configured: '市场预期官方数据源尚未配置。',
+      stale: '上一份有效数据暂无事件。',
+      error: '市场预期数据暂不可用。',
+    }[response.value.status];
+  });
   const groupedEvents = computed(() => {
     const order: MacroExpectationEvent['category'][] = [
       'monetary_policy',
@@ -129,20 +150,39 @@
     return parsed == null ? '—' : `${parsed.toFixed(1)}%`;
   }
 
-  function formatChange(value: string | number | null | undefined) {
-    const parsed = number(value);
-    return parsed == null ? '—' : `${parsed > 0 ? '+' : ''}${parsed.toFixed(1)}pp`;
+  function formatChange(value: number | null) {
+    return value == null ? '—' : `${value > 0 ? '+' : ''}${value.toFixed(1)}pp`;
   }
 
-  function changeTone(value: string | number | null | undefined) {
-    const parsed = number(value);
-    return parsed == null ? '' : parsed > 0 ? 'is-positive' : parsed < 0 ? 'is-negative' : '';
+  function changeTone(value: number | null) {
+    return value == null ? '' : value > 0 ? 'is-positive' : value < 0 ? 'is-negative' : '';
+  }
+
+  function sortedHistory(history: MacroProbabilityPoint[]) {
+    return history
+      .map((point) => ({
+        observedAt: new Date(point.observedAt).getTime(),
+        probability: number(point.probability),
+      }))
+      .filter(
+        (point): point is { observedAt: number; probability: number } =>
+          Number.isFinite(point.observedAt) && point.probability != null,
+      )
+      .sort((left, right) => left.observedAt - right.observedAt);
+  }
+
+  function changeOver(event: MacroExpectationEvent, days: number) {
+    const history = sortedHistory(event.history);
+    if (history.length < 2) return null;
+    const latest = history[history.length - 1];
+    const cutoff = latest.observedAt - days * 86_400_000;
+    const priorValues = history.filter((point) => point.observedAt <= cutoff);
+    const prior = priorValues.length ? priorValues[priorValues.length - 1] : null;
+    return prior ? latest.probability - prior.probability : null;
   }
 
   function historyPoints(history: MacroProbabilityPoint[]) {
-    const values = history
-      .map((point) => number(point.probabilityPct))
-      .filter((value): value is number => value != null);
+    const values = sortedHistory(history).map((point) => point.probability);
     if (!values.length) return '0,36 220,36';
     if (values.length === 1) return `0,${72 - values[0] * 0.72} 220,${72 - values[0] * 0.72}`;
     return values
@@ -153,11 +193,11 @@
       .join(' ');
   }
 
-  function formatExpiry(value: string | null | undefined) {
-    if (!value) return '无明确到期日';
-    const parsed = new Date(value);
-    if (Number.isNaN(parsed.getTime())) return '到期日未知';
-    return `到期 ${parsed.toLocaleDateString('zh-CN')}`;
+  function formatUpdated(history: MacroProbabilityPoint[]) {
+    const values = sortedHistory(history);
+    const latest = values.length ? values[values.length - 1] : null;
+    if (!latest) return '更新时间未知';
+    return `更新 ${new Date(latest.observedAt).toLocaleString('zh-CN', { hour12: false })}`;
   }
 
   onMounted(() => void load());

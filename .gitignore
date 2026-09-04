@@ -69,6 +69,7 @@ Thumbs.db
 .fn01-tmp/
 .fn01-test-tmp/
 .tmp/
+.e2e/
 .wt-test/
 .probe-a/
 .pytest-tmp/

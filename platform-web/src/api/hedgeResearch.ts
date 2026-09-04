@@ -140,28 +140,97 @@ export interface StockSnapshotResponse {
   modules: Record<string, ResearchModuleResult>;
 }
 
+export type MacroExpectationStatus = 'ready' | 'no_data' | 'not_configured' | 'stale' | 'error';
+
 export interface MacroProbabilityPoint {
   observedAt: string;
-  probabilityPct: string | number;
+  probability: string | number;
 }
 
 export interface MacroExpectationEvent {
-  eventId: string;
+  id: string;
+  label: string;
   category: 'monetary_policy' | 'macro' | 'geopolitics' | 'election';
-  title: string;
-  outcome: string;
-  currentProbabilityPct: string | number;
-  change1dPctPoints?: string | number | null;
-  change7dPctPoints?: string | number | null;
-  liquidityLabel?: string | null;
-  expiryAt?: string | null;
-  sourceUrl?: string | null;
+  probability: string | number;
   history: MacroProbabilityPoint[];
 }
 
 export interface MacroExpectationResponse {
-  generatedAt: string;
-  events: ResearchModuleResult<MacroExpectationEvent[]>;
+  status: MacroExpectationStatus;
+  source: string;
+  updatedAt: string;
+  events: MacroExpectationEvent[];
+}
+
+export type MarketDetailStatus = 'ready' | 'partial' | 'degraded' | 'stale' | 'no_data' | 'error';
+
+export interface MarketDetailRow {
+  id: string;
+  name: string;
+  symbol: string;
+  status: MarketDetailStatus;
+  unit: string;
+  changeUnit: 'percent' | 'basis_points' | 'absolute';
+  frequency: string;
+  timezone: string;
+  observationDate?: string | null;
+  asOf?: string | null;
+  source: string;
+  sourceUrl?: string | null;
+  methodologyVersion: string;
+  qualityFlags: string[];
+  close?: string | number | null;
+  change1d?: string | number | null;
+  change1w?: string | number | null;
+  change1m?: string | number | null;
+  changeQtd?: string | number | null;
+  changeYtd?: string | number | null;
+  change1y?: string | number | null;
+  high52w?: string | number | null;
+  distance52wHigh?: string | number | null;
+  spark30d: Array<string | number>;
+  spark90d?: Array<string | number>;
+}
+
+export interface MarketDetailResponse {
+  schemaVersion: '1.0';
+  marketId: string;
+  status: MarketDetailStatus;
+  asOf?: string | null;
+  retrievedAt?: string | null;
+  rows: MarketDetailRow[];
+}
+
+export interface MacroDashboardObservation {
+  date: string;
+  value?: string | number | null;
+}
+
+export interface MacroDashboardSeries {
+  seriesId: string;
+  label: string;
+  status: string;
+  latestValue?: string | number | null;
+  unit: string;
+  frequency: string;
+  timezone: string;
+  source: string;
+  sourceSeriesId?: string | null;
+  sourceUrl?: string | null;
+  observationDate?: string | null;
+  asOf?: string | null;
+  retrievedAt?: string | null;
+  isStale: boolean;
+  methodologyVersion: string;
+  qualityFlags: string[];
+  observations: MacroDashboardObservation[];
+}
+
+export interface MacroDashboardResponse {
+  schemaVersion: '1.0';
+  status: string;
+  asOf: string;
+  groups: Record<string, MacroDashboardSeries[]>;
 }
 
 const SESSION_INVALIDATION_CODES = new Set([
@@ -224,4 +293,28 @@ export const getMacroExpectations = () =>
   request<MacroExpectationResponse>({
     method: 'GET',
     url: '/research/macro/expectations',
+  });
+
+export const getMarketDetail = (marketId: 'macro' | 'gold' | 'crypto') =>
+  request<MarketDetailResponse>({
+    method: 'GET',
+    url: `/research/market-detail/${marketId}`,
+  });
+
+export const getMacroDashboardV1 = () =>
+  request<MacroDashboardResponse>({
+    method: 'GET',
+    url: '/research/macro/dashboard-v1',
+  });
+
+export const getCommodityDashboardV1 = () =>
+  request<MacroDashboardResponse>({
+    method: 'GET',
+    url: '/research/commodity/dashboard-v1',
+  });
+
+export const getCryptoDashboardV1 = () =>
+  request<MacroDashboardResponse>({
+    method: 'GET',
+    url: '/research/crypto/dashboard-v1',
   });

@@ -1,6 +1,6 @@
 ﻿import { defineApplicationConfig } from '@vben/vite-config';
 
-const localPlatformBackend = 'http://127.0.0.1:8000';
+const localPlatformBackend = process.env.VITE_PLATFORM_BACKEND_TARGET || 'http://127.0.0.1:8000';
 const localAuthService = 'http://127.0.0.1:8080';
 const localDataService = 'http://127.0.0.1:8082';
 
