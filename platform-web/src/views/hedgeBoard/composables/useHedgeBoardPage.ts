@@ -15,18 +15,20 @@ import {
 } from '../tradingTools/data/catalog';
 
 type HedgeCategory = 'macro' | 'gold' | 'crypto' | 'us' | 'global' | 'aShare';
+type HedgeBoardNavKey = HedgeCategory | 'tradingTools';
 
-const moduleRoutes: Record<HedgeCategory, string> = {
+const moduleRoutes: Record<HedgeBoardNavKey, string> = {
   macro: '/hedge-board/macro',
   us: '/hedge-board/us',
   aShare: '/hedge-board/a-share',
   global: '/hedge-board/global',
   gold: '/hedge-board/gold',
   crypto: '/hedge-board/crypto',
+  tradingTools: '/hedge-board/trading-tools/macro',
 };
 
 const hedgeBoardNav: ReadonlyArray<{
-  id: HedgeCategory;
+  id: HedgeBoardNavKey;
   label: string;
   path: string;
 }> = [
@@ -36,6 +38,7 @@ const hedgeBoardNav: ReadonlyArray<{
   { id: 'us', label: '美股', path: moduleRoutes.us },
   { id: 'aShare', label: 'A股', path: moduleRoutes.aShare },
   { id: 'global', label: '全球', path: moduleRoutes.global },
+  { id: 'tradingTools', label: '交易工具', path: moduleRoutes.tradingTools },
 ];
 
 const sectionLabelOverrides: Record<string, { title?: string }> = {
@@ -285,7 +288,7 @@ export function useHedgeBoardPage() {
   }
 
   function selectBoardCategory(key: string) {
-    const nextPath = moduleRoutes[key as HedgeCategory];
+    const nextPath = moduleRoutes[key as HedgeBoardNavKey];
     if (nextPath) void router.push(nextPath);
   }
 
