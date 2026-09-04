@@ -123,6 +123,12 @@ export const marketDetailCatalog: Record<CatalogMarketId, CatalogGroup[]> = {
           symbol: 'XAU/SPY',
           tvSymbol: 'OANDA:XAUUSD/AMEX:SPY',
         },
+        {
+          id: 'gold-ratio-gdxxau',
+          name: '金矿股比',
+          symbol: 'GDX/XAU',
+          tvSymbol: 'AMEX:GDX/OANDA:XAUUSD',
+        },
       ],
     },
     {
