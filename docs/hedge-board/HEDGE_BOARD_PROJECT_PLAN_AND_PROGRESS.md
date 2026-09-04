@@ -1,6 +1,6 @@
 # 对冲基金看板｜完整项目计划书与进度总表
 
-> 状态：Project Baseline v1.6 / Phase 0 DONE / Phase 1 DONE / Macro V1 DONE / Commodity V1 DONE / Crypto V1 DONE / Unified QA NEXT
+> 状态：Project Baseline v1.7 / Phase 0 DONE / Phase 1 DONE / Macro V1 DONE / Commodity V1 DONE / Crypto V1 DONE / Unified QA DONE
 > 主仓库：`wuxingyuenan5-lgtm/Platform_Experiment`  
 > 开发分支：`feature/hedge-board-online-optimization`  
 > 数据仓库：`wuxingyuenan5-lgtm/platform-data`  
@@ -384,9 +384,9 @@ GitHub Actions：
 | Macro V1 Engineering | DONE | 100% | Market Detail 23 行；Growth / Inflation / Rates / Risk / Global M2 全部验收 |
 | Commodity V1 Engineering | DONE | 100% | CFTC / EIA Native、受限模块官方 Link、母表 fail-closed 与 QA 全部完成 |
 | Crypto V1 Engineering | DONE | 100% | Binance Native、links、fail-closed、本地数据库与本地调度已验收 |
-| Unified QA + Offline Acceptance | IN PROGRESS | 95% | 隔离本地验收站已就绪；Owner 页面验收与是否合并待决定 |
+| Unified QA + Offline Acceptance | DONE | 100% | Owner 已于 2026-09-04 完成人工验收并授权合并应用分支 |
 
-**工程主阶段完成：5 / 6 = 83.3%。**
+**工程主阶段完成：6 / 6 = 100%。**
 
 该比例只表示主阶段 Gate，不代表工作量严格等权；后续项目管理以阶段状态和实际交付为主，不使用该比例推算工期。
 
@@ -774,9 +774,9 @@ Native Binance / rights-clear data；严格区分 7×24 与 US securities calend
 
 ## 16. 当前下一步
 
-当前唯一下一工程阶段：
+当前阶段结论：
 
-> **Unified QA + Offline Acceptance**
+> **Unified QA + Offline Acceptance — DONE**
 
 已验证实现：
 
@@ -793,7 +793,7 @@ Native Binance / rights-clear data；严格区分 7×24 与 US securities calend
 - `platform-data` 仓库中历史已提交的数据快照仍存在。受根目录安全规则限制，AI 不批量删除；当前已停止一切 GitHub 数据刷新与提交，Owner 已确认后续手动批量删除旧快照并自行提交。
 - 已使用隔离 E2E 数据库完成认证浏览器 QA：Macro / Commodity / Crypto 在 normal 与 blocked 两种网络模拟下共 6 组 chart/detail flow 全部通过；本地 API 实际请求 `/research/macro/dashboard-v1`、`/research/commodity/dashboard-v1`、`/research/crypto/dashboard-v1`、`/research/market-detail/macro` 均返回 HTTP 200。测试账户环境变量和临时数据库已清理；
 - Owner 线下页面验收使用独立 `127.0.0.1:14373` Web 与 `127.0.0.1:18000` API，账号库隔离且 Live Write 关闭，数据只读 `D:\自营数据库\hedge-board`；默认平台 `4373/8000` 不受占用。启动与关闭入口分别为仓库根目录 `启动HedgeBoard验收站.bat`、`关闭HedgeBoard验收站.bat`；
-- 当前最终 Gate 只保留 Owner 线下页面验收以及是否合并应用分支。AI 未合并 `Platform_Experiment/main`。
+- Owner 已于 2026-09-04 确认总体人工验收通过，并授权将应用分支合并至 `Platform_Experiment/main`。登录失败经现场复核确认为隔离验收站 Web/API 进程退出导致；重启后通过浏览器同源代理 `/api/v1/auth/login` 验证 CEO Session 与 CSRF 返回正常。
 - Owner 线下反馈后已修正验收范围：恢复三个市场明细表原有信息密度与轮动热图；所有图表（Market Detail 表除外）右上角统一提供“原始网页 ↗”，当前无法完整 Native 展示的卡片以原网页作为初期可用入口，后续再逐图升级为正式采集与本地主库图表。
 
 建议执行顺序：

@@ -1,6 +1,6 @@
 # 对冲基金看板优化总方案（Master Plan）
 
-> 状态：Planning Baseline v1.8 / Phase F FROZEN / Phase 0 DONE / Phase 1 DONE / Macro V1 DONE / Commodity V1 DONE / Crypto V1 DONE / Unified QA NEXT
+> 状态：Planning Baseline v1.9 / Phase F FROZEN / Phase 0 DONE / Phase 1 DONE / Macro V1 DONE / Commodity V1 DONE / Crypto V1 DONE / Unified QA DONE
 > 项目总览：`docs/hedge-board/HEDGE_BOARD_PROJECT_PLAN_AND_PROGRESS.md`  
 > 适用分支：`feature/hedge-board-online-optimization`  
 > 用途：作为 Hedge Board 后续产品、数据、工程与验收的最高约束来源。  
@@ -429,7 +429,7 @@ Engineering Phase 1        DONE
 当前统一进度口径：
 
 - **规划准备度：100%**；
-- **工程主阶段：5 / 6 = 83.3%**；
+- **工程主阶段：6 / 6 = 100%**；
 - 工程主阶段口径：Phase 0、Phase 1、Macro V1、Commodity V1、Crypto V1、Unified QA / Offline Acceptance；
 - 该比例只用于管理 Gate，不代表各阶段实际工作量等权，也不用于推算工期。
 
@@ -451,7 +451,7 @@ Phase 1 真实验收：
 
 当前阶段：
 
-> `Macro V1 Engineering — DONE / Commodity V1 — DONE / Crypto V1 — DONE / Unified QA — NEXT`
+> `Macro V1 Engineering — DONE / Commodity V1 — DONE / Crypto V1 — DONE / Unified QA — DONE`
 
 Native core 已真实化 20 个既有 Macro Market Detail 行。Treasury curve 数据 commit `774dccacebbd6f1fdca02f47071c0f74dc9fe07b`，FRED core commit `183e99db29e44d7b6a9e490840b430e23c41f537`，VIX / DXY / USDCNH / TLT / HYG commit `997adb4871bbfbd3d5c089c8761344433bd0e77c`；workflow runs `33596176092`、`33596701735` 均为 `success`。该进度不代表 Macro V1 完成；专题模块及其余市场行仍按冻结范围继续。
 
