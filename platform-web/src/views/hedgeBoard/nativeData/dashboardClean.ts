@@ -718,6 +718,16 @@ export const researchModules: ResearchModule[] = [
             'https://www.coinglass.com/zh-TW/pro/i/CDRI',
           ),
           externalReference(
+            '保证金借贷利率',
+            'CoinGlass · 加密市场保证金借贷成本',
+            'https://www.coinglass.com/zh/pro/i/MarginFeeChart',
+          ),
+          externalReference(
+            '加密恐惧与贪婪指数',
+            'CoinGlass · 市场情绪指标',
+            'https://www.coinglass.com/zh/pro/i/FearGreedIndex',
+          ),
+          externalReference(
             'Coinbase Premium Index',
             'CoinGlass · 美国现货相对溢价',
             'https://www.coinglass.com/pro/i/coinbase-bitcoin-premium-index',
@@ -765,6 +775,11 @@ export const researchModules: ResearchModule[] = [
         description: '用于观察筹码成本分布、地址结构、周期位置与研究观点。',
         layout: 'three',
         widgets: [
+          externalReference(
+            'BTC 三大驱动因素',
+            'MacroMicro · 流动性、实际利率与 GDP',
+            'https://www.macromicro.me/collections/22514/bi-te-bi_418919/111972/bi-te-bi-BTC-qu-dong-san-da-yin-su-liu-dong-xing-shi-ji-li-lyu-GDP',
+          ),
           externalReference(
             'Realized Price Distribution',
             'Bitcoin Magazine Pro · 实现价格分布',
