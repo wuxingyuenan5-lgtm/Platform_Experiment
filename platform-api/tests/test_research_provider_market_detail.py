@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from decimal import Decimal
 from typing import Any
 
 import pytest
@@ -90,3 +91,30 @@ def test_provider_does_not_enable_deferred_market():
 
     with pytest.raises(ResearchProviderError, match="market_detail_not_enabled"):
         asyncio.run(provider.get("us"))
+
+
+def test_gold_provider_builds_real_90_day_series_and_ratio(monkeypatch: pytest.MonkeyPatch):
+    yahoo_payload = {
+        "chart": {
+            "result": [
+                {
+                    "timestamp": [1_700_000_000 + day * 86_400 for day in range(100)],
+                    "indicators": {"quote": [{"close": [100 + day for day in range(100)]}]},
+                }
+            ]
+        }
+    }
+    monkeypatch.setattr(
+        market_detail.httpx,
+        "AsyncClient",
+        lambda **kwargs: _Client(yahoo_payload, **kwargs),
+    )
+    provider = MarketDetailProvider(timeout_seconds=5, user_agent="test")
+
+    contract = asyncio.run(provider.get("gold"))
+
+    assert contract.status == "ready"
+    assert len(contract.rows) == 14
+    assert all(len(row.spark_90d) == 90 for row in contract.rows)
+    ratio = next(row for row in contract.rows if row.id == "gold-ratio-row")
+    assert ratio.spark_90d[-1] == Decimal("1")

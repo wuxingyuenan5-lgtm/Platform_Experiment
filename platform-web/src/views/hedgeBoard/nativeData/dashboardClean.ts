@@ -504,10 +504,16 @@ export const researchModules: ResearchModule[] = [
           localChart('全球各地区 ETF 每周流入', '', 'etf-weekly-flows', {
             height: 430,
             sourceNote: 'External Link · World Gold Council · permission_required',
+            referenceLinks: macroMicroReference(
+              'https://sc.macromicro.me/collections/45/mm-gold-price/110882/global-gold-etf-net-flow-weekly-regional-sum',
+            ),
           }),
-          localChart('全球 ETF 年内汇总', '', 'etf-ytd-summary', {
+          localChart('全球 ETF 月度区域汇总', '', 'etf-ytd-summary', {
             height: 430,
             sourceNote: 'External Link · World Gold Council · permission_required',
+            referenceLinks: macroMicroReference(
+              'https://sc.macromicro.me/collections/45/mm-gold-price/110883/global-gold-etf-net-flow-monthly-regional-sum',
+            ),
           }),
           localChart('金价 vs SPDR 每日流量', '', 'spdr-daily-flow', {
             height: 420,
@@ -519,6 +525,9 @@ export const researchModules: ResearchModule[] = [
           localChart('SPDR 持仓量 vs 黄金价格', '', 'spdr-holdings-vs-price', {
             height: 420,
             sourceNote: 'External Link · SPDR Gold Shares · permission_required',
+            referenceLinks: macroMicroReference(
+              'https://en.macromicro.me/series/3069/gold-spdr-gold-trust-etf-tonnes',
+            ),
           }),
         ],
       },
@@ -560,7 +569,7 @@ export const researchModules: ResearchModule[] = [
               height: 400,
               sourceNote: 'External Link · U.S. Treasury · no local gold proxy',
               referenceLinks: macroMicroReference(
-                'https://en.macromicro.me/charts/81733/Gold-Price-vs-US5-Year-Real-Yield',
+                'https://www.macromicro.me/charts/5490/huang-jin-vs-mei-guo-10-nian-guo-zhai-shou-yi-lv',
               ),
             },
           ),
@@ -571,14 +580,14 @@ export const researchModules: ResearchModule[] = [
             {
               height: 400,
               sourceNote: 'External Link · U.S. Treasury · no local gold proxy',
-              referenceLinks: macroMicroReference('https://en.macromicro.me/charts/10319/xau'),
+              referenceLinks: macroMicroReference('https://www.macromicro.me/charts/10319/xau'),
             },
           ),
           localChart('金价 vs 10Y 实际利率', '实际利率是黄金最硬的宏观约束之一', 'gold-vs-real', {
             height: 400,
             sourceNote: 'External Link · U.S. Treasury · no local gold proxy',
             referenceLinks: macroMicroReference(
-              'https://www.macromicro.me/charts/22895/huang-jin-VS-shi-zhi-li-lv-Real-interest-rate',
+              'https://sc.macromicro.me/collections/45/mm-gold-price/724/3month-bond-real-yield-gold-price',
             ),
           }),
           withReferenceLinks(
@@ -587,7 +596,7 @@ export const researchModules: ResearchModule[] = [
               height: 420,
             }),
             macroMicroReference(
-              'https://en.macromicro.me/charts/81733/Gold-Price-vs-US5-Year-Real-Yield',
+              'https://sc.macromicro.me/collections/45/mm-gold-price/592/us-usd-dollar-',
             ),
           ),
         ],
@@ -810,22 +819,7 @@ export const researchModules: ResearchModule[] = [
           externalReference(
             'MacroMicro 黄金研究',
             '黄金、流动性与央行需求集合',
-            'https://en.macromicro.me/collections/45/mm-gold-price',
-          ),
-          externalReference(
-            '黄金与全球 M2',
-            'MacroMicro · 主要央行货币供应',
-            'https://en.macromicro.me/collections/45/mm-gold-price/3439/major-bank-m2-comparsion',
-          ),
-          externalReference(
-            '全球央行净购金',
-            'MacroMicro · 全球央行季度净购买',
-            'https://en.macromicro.me/collections/45/mm-gold-price/93189/gold-demand-central-banks-and-other-inst',
-          ),
-          externalReference(
-            'Owner 黄金复盘模板',
-            'TradingView · XAUUSD 复盘布局',
-            'https://cn.tradingview.com/chart/CVV3rItf/',
+            'https://sc.macromicro.me/commodities/gold',
           ),
         ],
       },

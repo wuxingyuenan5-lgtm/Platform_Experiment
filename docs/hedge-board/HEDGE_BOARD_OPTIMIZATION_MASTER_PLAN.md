@@ -469,6 +469,8 @@ Commodity V1 已完成：CFTC Gold / Silver / Copper / WTI / Natural Gas 使用�
 
 商品页在保留 WGC、SPDR、CFTC、EIA、CME、ICE、LME、Cboe 等原始来源的同时，增加经口径核对的 MacroMicro 参考入口，覆盖黄金 ETF 流量、央行储备与购金、黄金与利率/美元、核心商品持仓、美国能源库存、WTI 波动与期限结构及 Brent-WTI 价差；不匹配的相似图不挂接。
 
+【VERIFIED / 2026-09-03】商品与加密市场明细已移除静态 sparkline：商品 14/14 行由 Yahoo Chart 两年日线生成真实 90 日曲线（含金银比派生），加密已接通的 13 行同口径生成真实曲线；未取得可靠公开历史的 TOTAL / Dominance 行显示“—”，不得回退为样例曲线。黄金 ETF 周度区域流量、月度区域汇总、GLD 流量与持仓均改挂具体 MacroMicro 图表/序列页。
+
 【OWNER CONFIRMED / 2026-09-03】Owner Chrome 中“黄金分析框架”“加密分析框架”“加密周频率看”三个标签组全部纳入对应看板。商品新增 13 个补充研究入口；加密新增 21 个入口，并按 ETF/稳定币/财库公司、全市场杠杆/清算/期权、链上成本/周期/研究跟踪分组。入口只提供新标签页跳转，不复制登录态或第三方内容。
 
 Crypto V1 已完成：Binance 8 条 BTC / ETH Native series、API、页面图表和 Market Detail 已落地；单一 Venue 口径显式标注为 not Aggregate。Farside、BitcoinTreasuries、DefiLlama、Deribit、Checkonchain、CoinGlass、Bybit、OKX 使用精确 External Link。Owner 已确认 `D:\自营数据库` 为主数据源、GitHub 仅保留代码；本地主库与每日四次计划任务已验收，DNS 污染由限定域名的 DoH/TLS fallback 解决。2026-09-03 起所有图表右上角统一保留精确“原始网页”入口，先保证研究可跳转性，再逐图建设完整采集与本地数据库。

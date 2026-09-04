@@ -50,11 +50,17 @@ export function prepareMacroMarketDetail(groups: TerminalTableGroup[]): Terminal
 }
 
 export function prepareCommodityMarketDetail(groups: TerminalTableGroup[]): TerminalTableGroup[] {
-  return cloneGroups(groups);
+  return cloneGroups(groups).map((group) => ({
+    ...group,
+    rows: group.rows.map((row) => ({ ...row, spark: [] })),
+  }));
 }
 
 export function prepareCryptoMarketDetail(groups: TerminalTableGroup[]): TerminalTableGroup[] {
-  return cloneGroups(groups);
+  return cloneGroups(groups).map((group) => ({
+    ...group,
+    rows: group.rows.map((row) => ({ ...row, spark: [] })),
+  }));
 }
 
 function cryptoChange(points: Array<{ date: string; value: number }>, days: number): string {
@@ -154,6 +160,25 @@ export function mergeMacroMarketDetail(
         high: signed(remote.distance52wHigh, 'percent'),
       };
       return next;
+    }),
+  }));
+}
+
+export function mergeLiveMarketDetail(
+  groups: TerminalTableGroup[],
+  remoteRows: MarketDetailRow[],
+): TerminalTableGroup[] {
+  const byId = new Map(remoteRows.map((row) => [row.id, row]));
+  return groups.map((group) => ({
+    ...group,
+    rows: group.rows.map((row) => {
+      const remote = byId.get(row.id);
+      const spark = remote
+        ? (remote.spark90d?.length ? remote.spark90d : remote.spark30d)
+            .map(Number)
+            .filter(Number.isFinite)
+        : [];
+      return { ...row, spark };
     }),
   }));
 }

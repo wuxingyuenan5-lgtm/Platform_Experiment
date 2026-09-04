@@ -2,10 +2,9 @@ import { defineComponent, h, type PropType } from 'vue';
 
 import TerminalDetailPanel from '../components/TerminalDetailPanel.vue';
 import CryptoMarketDetailPanel from '../components/CryptoMarketDetailPanel.vue';
+import GoldMarketDetailPanel from '../components/GoldMarketDetailPanel.vue';
 import MacroMarketDetailPanel from '../components/MacroMarketDetailPanel.vue';
 import { type LocalWidgetKey, type WidgetConfig } from '../nativeData/dashboardClean';
-import { prepareCommodityMarketDetail } from '../nativeData/marketDetailAdapter';
-import { marketTerminalConfigs } from '../nativeData/marketTerminal';
 import MacroSeriesChart from './MacroSeriesChart';
 
 const externalGoldResearch = {
@@ -339,15 +338,7 @@ export default defineComponent({
           case 'gold-vs-gvz':
             return renderExternalGoldResearch(key);
           case 'gold-market-detail-table':
-            return h(TerminalDetailPanel, {
-              class: 'terminal-detail-panel--embedded',
-              title: '市场明细 · 未接入字段为历史参考',
-              marketId: 'gold',
-              columns: marketTerminalConfigs.gold.detailColumns,
-              groups: prepareCommodityMarketDetail(marketTerminalConfigs.gold.detailGroups),
-              rotationButtonLabel: marketTerminalConfigs.gold.rotationButtonLabel,
-              rotationHeatmap: marketTerminalConfigs.gold.rotationHeatmap,
-            });
+            return h(GoldMarketDetailPanel);
           case 'macro-market-detail-table':
             return h(MacroMarketDetailPanel);
           case 'macro-global-m2':
