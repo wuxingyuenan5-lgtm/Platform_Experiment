@@ -118,3 +118,25 @@ def test_gold_provider_builds_real_90_day_series_and_ratio(monkeypatch: pytest.M
     assert all(len(row.spark_90d) == 90 for row in contract.rows)
     ratio = next(row for row in contract.rows if row.id == "gold-ratio-row")
     assert ratio.spark_90d[-1] == Decimal("1")
+    gold = next(row for row in contract.rows if row.id == "gold-xau-row")
+    assert gold.close == Decimal("199")
+    assert gold.change_1d == (Decimal("199") / Decimal("198") - 1) * Decimal("100")
+    assert gold.change_1w is not None
+    assert gold.change_1m is not None
+    assert gold.change_qtd is not None
+    assert gold.change_ytd is not None
+    assert gold.high_52w == Decimal("199")
+
+
+def test_live_provider_fails_closed_when_every_symbol_is_unavailable(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    monkeypatch.setattr(
+        market_detail.httpx,
+        "AsyncClient",
+        lambda **kwargs: _Client({"chart": {"result": []}}, **kwargs),
+    )
+    provider = MarketDetailProvider(timeout_seconds=5, user_agent="test")
+
+    with pytest.raises(ResearchProviderError, match="market_detail_no_live_rows"):
+        asyncio.run(provider.get("crypto"))

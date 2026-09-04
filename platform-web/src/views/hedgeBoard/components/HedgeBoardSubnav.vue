@@ -1,5 +1,9 @@
 <template>
-  <nav class="module-subnav" :class="{ 'module-subnav--gold': unified }" :aria-label="`${moduleLabel} 子页导航`">
+  <nav
+    class="module-subnav"
+    :class="{ 'module-subnav--gold': unified }"
+    :aria-label="`${moduleLabel} 子页导航`"
+  >
     <button
       v-for="(section, index) in sections"
       :key="section.id"
@@ -15,10 +19,8 @@
 </template>
 
 <script setup lang="ts">
-  import type { ChartSection } from '../nativeData/dashboardClean';
-
   defineProps<{
-    sections: readonly ChartSection[];
+    sections: ReadonlyArray<{ id: string; title: string }>;
     moduleLabel: string;
     unified: boolean;
     resolveTitle: (sectionId: string, fallback: string) => string;
@@ -31,14 +33,14 @@
 
 <style scoped lang="less">
   .module-subnav {
-    position: sticky;
-    top: 0;
-    z-index: 4;
     display: flex;
-    gap: 10px;
-    overflow-x: auto;
+    position: sticky;
+    z-index: 4;
+    top: 0;
     padding: 8px 4px 10px;
+    overflow-x: auto;
     background: var(--strategy-bg);
+    gap: 10px;
   }
 
   .module-subnav button {
@@ -47,10 +49,10 @@
     border: 1px solid var(--strategy-border);
     border-radius: 12px;
     background: var(--strategy-surface);
+    box-shadow: var(--strategy-shadow-soft);
     color: var(--strategy-text-2);
     text-align: left;
     cursor: pointer;
-    box-shadow: var(--strategy-shadow-soft);
   }
 
   .module-subnav__title-row {
@@ -79,7 +81,7 @@
 
   .module-subnav--gold button {
     border-radius: 999px;
-    background: rgba(255, 255, 255, 0.74);
+    background: rgb(255 255 255 / 74%);
   }
 
   .module-subnav--gold .module-subnav__title-row strong,

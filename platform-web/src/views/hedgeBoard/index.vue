@@ -29,6 +29,9 @@
           :module-label="activeModule.label"
           :formula="activeModule.formula"
           :sections="visibleSections"
+          :trailing-navigation-sections="
+            activeCategory === 'crypto' ? [{ id: 'crypto-wealth', title: '理财信息' }] : []
+          "
           :unified="useUnifiedResearchUi"
           :resolve-section-title="getSectionTitle"
           :should-hide-widget-header="shouldHideWidgetHeader"

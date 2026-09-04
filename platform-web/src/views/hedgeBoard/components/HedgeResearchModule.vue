@@ -1,7 +1,7 @@
 <template>
   <section class="research-module" :class="{ 'research-module--gold': unified }" :id="moduleId">
     <HedgeBoardSubnav
-      :sections="sections"
+      :sections="navigationSections"
       :module-label="moduleLabel"
       :unified="unified"
       :resolve-title="resolveSectionTitle"
@@ -83,11 +83,11 @@
 </template>
 
 <script setup lang="ts">
-  import type { Component } from 'vue';
+  import { computed, type Component } from 'vue';
   import HedgeBoardSubnav from './HedgeBoardSubnav.vue';
   import type { ChartSection, LocalWidgetKey, WidgetConfig } from '../nativeData/dashboardClean';
 
-  defineProps<{
+  const props = defineProps<{
     moduleId: string;
     moduleLabel: string;
     formula?: {
@@ -95,6 +95,7 @@
       description: string;
     };
     sections: readonly ChartSection[];
+    trailingNavigationSections?: ReadonlyArray<{ id: string; title: string }>;
     unified: boolean;
     resolveSectionTitle: (sectionId: string, fallback: string) => string;
     shouldHideWidgetHeader: (sectionId: string, widget: WidgetConfig) => boolean;
@@ -104,6 +105,11 @@
     tradingViewWidget: Component;
     widgetErrorBoundary: Component;
   }>();
+
+  const navigationSections = computed(() => [
+    ...props.sections,
+    ...(props.trailingNavigationSections ?? []),
+  ]);
 
   defineEmits<{
     (event: 'jump', sectionId: string): void;

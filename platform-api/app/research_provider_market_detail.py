@@ -1,12 +1,11 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from typing import Literal
 
 import httpx
-
 from pydantic import Field, field_validator
 
 from app.research_data_schemas import ResearchApiModel
@@ -70,7 +69,21 @@ class MarketDetailProvider:
 
     async def get(self, market_id: str) -> MarketDetailResponse:
         if market_id in {"gold", "crypto"}:
-            return await self._get_live_market_detail(market_id)
+            try:
+                contract = await self._get_live_market_detail(market_id)
+                self._last_known_good[market_id] = contract.model_copy(deep=True)
+                return contract
+            except Exception as exc:
+                cached = self._last_known_good.get(market_id)
+                if cached is not None:
+                    stale = cached.model_copy(deep=True)
+                    stale.status = "stale"
+                    return stale
+                if isinstance(exc, ResearchProviderError):
+                    raise
+                raise ResearchProviderError(
+                    f"market_detail_unavailable:{type(exc).__name__}"
+                ) from exc
         if market_id != "macro":
             raise ResearchProviderError("market_detail_not_enabled")
         try:
@@ -97,12 +110,15 @@ class MarketDetailProvider:
         yahoo_symbols = GOLD_YAHOO_SYMBOLS if market_id == "gold" else CRYPTO_YAHOO_SYMBOLS
         async with httpx.AsyncClient(timeout=self._timeout_seconds, trust_env=True) as client:
             results = await asyncio.gather(
-                *(self._fetch_yahoo_history(client, row_id, symbol) for row_id, symbol in yahoo_symbols.items()),
+                *(
+                    self._fetch_yahoo_history(client, row_id, symbol)
+                    for row_id, symbol in yahoo_symbols.items()
+                ),
                 return_exceptions=True,
             )
         series: dict[str, list[tuple[str, Decimal]]] = {}
         for result in results:
-            if isinstance(result, Exception):
+            if isinstance(result, BaseException):
                 continue
             row_id, points = result
             if points:
@@ -113,6 +129,8 @@ class MarketDetailProvider:
             if ratio:
                 series[row_id] = ratio
         rows = [_market_row(row_id, points) for row_id, points in series.items() if points]
+        if not rows:
+            raise ResearchProviderError("market_detail_no_live_rows")
         now = datetime.now(UTC)
         return MarketDetailResponse(
             market_id=market_id,
@@ -138,7 +156,9 @@ class MarketDetailProvider:
         for timestamp, close in zip(timestamps, closes, strict=False):
             if close is None:
                 continue
-            points.append((datetime.fromtimestamp(timestamp, tz=UTC).date().isoformat(), Decimal(str(close))))
+            points.append(
+                (datetime.fromtimestamp(timestamp, tz=UTC).date().isoformat(), Decimal(str(close)))
+            )
         return row_id, points
 
 
@@ -194,8 +214,15 @@ def _ratio_series(
 
 def _market_row(row_id: str, points: list[tuple[str, Decimal]]) -> MarketDetailRow:
     latest_date, latest = points[-1]
-    trailing_year = [value for _, value in points[-366:]]
+    parsed_points = [(date.fromisoformat(point_date), value) for point_date, value in points]
+    latest_day = parsed_points[-1][0]
+    trailing_year = [
+        value
+        for point_date, value in parsed_points
+        if point_date >= latest_day - timedelta(days=366)
+    ]
     high = max(trailing_year) if trailing_year else latest
+    quarter_month = ((latest_day.month - 1) // 3) * 3 + 1
     return MarketDetailRow(
         id=row_id,
         name=row_id,
@@ -211,7 +238,44 @@ def _market_row(row_id: str, points: list[tuple[str, Decimal]]) -> MarketDetailR
         source_url="https://finance.yahoo.com/",
         methodology_version="market-detail-live-v1",
         close=latest,
+        change_1d=_change_from_previous(parsed_points),
+        change_1w=_change_from_cutoff(parsed_points, latest_day - timedelta(days=7)),
+        change_1m=_change_from_cutoff(parsed_points, latest_day - timedelta(days=30)),
+        change_qtd=_change_from_period_start(
+            parsed_points, date(latest_day.year, quarter_month, 1)
+        ),
+        change_ytd=_change_from_period_start(parsed_points, date(latest_day.year, 1, 1)),
+        change_1y=_change_from_cutoff(parsed_points, latest_day - timedelta(days=365)),
+        high_52w=high,
         distance_52w_high=(latest / high - 1) * Decimal("100") if high else None,
         spark_30d=[value for _, value in points[-30:]],
         spark_90d=[value for _, value in points[-90:]],
     )
+
+
+def _percent_change(latest: Decimal, baseline: Decimal | None) -> Decimal | None:
+    if baseline is None or baseline == 0:
+        return None
+    return (latest / baseline - 1) * Decimal("100")
+
+
+def _change_from_previous(points: list[tuple[date, Decimal]]) -> Decimal | None:
+    if len(points) < 2:
+        return None
+    return _percent_change(points[-1][1], points[-2][1])
+
+
+def _change_from_cutoff(points: list[tuple[date, Decimal]], cutoff: date) -> Decimal | None:
+    baseline = next((value for point_date, value in reversed(points) if point_date <= cutoff), None)
+    return _percent_change(points[-1][1], baseline)
+
+
+def _change_from_period_start(
+    points: list[tuple[date, Decimal]], period_start: date
+) -> Decimal | None:
+    baseline = next(
+        (value for point_date, value in reversed(points) if point_date < period_start), None
+    )
+    if baseline is None:
+        baseline = next((value for point_date, value in points if point_date >= period_start), None)
+    return _percent_change(points[-1][1], baseline)

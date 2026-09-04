@@ -34,7 +34,8 @@ def test_market_snapshot_tables_have_one_active_owner() -> None:
         assert legacy_symbol not in index
         assert legacy_symbol not in local_widget
 
-    assert "import TerminalDetailPanel" in local_widget
+    assert "import TerminalDetailPanel" in gold_panel
+    assert "import TerminalDetailPanel" in crypto_panel
     assert "marketTerminalConfigs" not in local_widget
     assert "case 'gold-market-detail-table':" in local_widget
     assert "case 'crypto-market-detail-table':" in local_widget

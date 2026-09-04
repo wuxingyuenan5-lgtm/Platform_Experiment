@@ -173,12 +173,22 @@ export function mergeLiveMarketDetail(
     ...group,
     rows: group.rows.map((row) => {
       const remote = byId.get(row.id);
-      const spark = remote
-        ? (remote.spark90d?.length ? remote.spark90d : remote.spark30d)
-            .map(Number)
-            .filter(Number.isFinite)
-        : [];
-      return { ...row, spark };
+      if (!remote || remote.status === 'no_data' || remote.status === 'error') return row;
+      const spark = (remote.spark90d?.length ? remote.spark90d : remote.spark30d)
+        .map(Number)
+        .filter(Number.isFinite);
+      return {
+        ...row,
+        spark,
+        price: closeValue(numeric(remote.close), remote.unit),
+        d1: signed(remote.change1d, remote.changeUnit, remote.unit),
+        w1: signed(remote.change1w, remote.changeUnit, remote.unit),
+        m1: signed(remote.change1m, remote.changeUnit, remote.unit),
+        qtd: signed(remote.changeQtd, remote.changeUnit, remote.unit),
+        ytd: signed(remote.changeYtd, remote.changeUnit, remote.unit),
+        y1: signed(remote.change1y, remote.changeUnit, remote.unit),
+        high: signed(remote.distance52wHigh, 'percent'),
+      };
     }),
   }));
 }

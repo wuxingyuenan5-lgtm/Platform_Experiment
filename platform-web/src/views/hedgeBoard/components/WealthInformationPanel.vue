@@ -1,5 +1,5 @@
 <template>
-  <section class="wealth-panel" data-testid="crypto-wealth-panel">
+  <section id="crypto-wealth" class="wealth-panel" data-testid="crypto-wealth-panel">
     <header class="wealth-header">
       <h2>理财信息</h2>
       <button type="button" class="reference-button" @click="openReferencePage">

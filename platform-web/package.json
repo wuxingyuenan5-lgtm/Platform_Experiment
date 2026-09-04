@@ -44,6 +44,7 @@
     "test:gzip": "npx http-server dist --cors --gzip -c-1",
     "test:hedge-board-chart-heights": "node scripts/verify-hedge-board-chart-heights.cjs",
     "test:hedge-board-layout": "node scripts/verify-hedge-board-layout.cjs",
+    "test:hedge-board-market-detail": "node --test scripts/test-market-detail-adapter.cjs",
     "test:homepage-layout": "node scripts/verify-homepage-layout.cjs",
     "test:news-wealth-filters": "node scripts/verify-news-wealth-filters.cjs",
     "test:security-modules": "node --test scripts/test-security-modules.cjs",
