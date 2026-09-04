@@ -732,31 +732,22 @@ export const researchModules: ResearchModule[] = [
             'CoinGlass · 美国现货相对溢价',
             'https://www.coinglass.com/pro/i/coinbase-bitcoin-premium-index',
           ),
-        ],
-      },
-      {
-        id: 'crypto-external-research',
-        eyebrow: 'Research Links',
-        title: '稳定币、期权与链上研究入口',
-        description: '受许可或维护边界限制的专题，保留精确数据入口，不复制第三方静态快照。',
-        layout: 'three',
-        widgets: [
-          localChart('Options IV / Skew', 'Deribit / Greeks.live', 'crypto-options-iv'),
-          localChart('On-chain Signals', 'Checkonchain / Glassnode', 'crypto-onchain'),
-        ],
-      },
-      {
-        id: 'crypto-derivatives-toolbox',
-        eyebrow: 'Derivatives & Options',
-        title: '全市场杠杆、清算与期权结构',
-        description: '覆盖聚合未平仓量、清算位置、波动率、偏度与 Gamma 暴露。',
-        layout: 'three',
-        widgets: [
           externalReference(
             'BTC 清算热力图',
             'CoinGlass · 杠杆清算密集区',
             'https://www.coinglass.com/zh/pro/futures/LiquidationHeatMap?coin=BTC',
           ),
+        ],
+      },
+      {
+        id: 'crypto-external-research',
+        eyebrow: 'Research Links',
+        title: '期权分析',
+        description: '受许可或维护边界限制的专题，保留精确数据入口，不复制第三方静态快照。',
+        layout: 'three',
+        widgets: [
+          localChart('Options IV / Skew', 'Deribit / Greeks.live', 'crypto-options-iv'),
+          localChart('On-chain Signals', 'Checkonchain / Glassnode', 'crypto-onchain'),
           externalReference(
             'Deribit BTC Options Metrics',
             '期限结构、偏度、Put/Call 与到期分布',

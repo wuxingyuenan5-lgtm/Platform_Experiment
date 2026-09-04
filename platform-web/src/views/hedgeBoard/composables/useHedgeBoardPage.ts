@@ -72,7 +72,6 @@ const researchSectionOrder: Partial<Record<HedgeCategory, readonly string[]>> = 
     'crypto-etf',
     'crypto-native-venue',
     'crypto-external-research',
-    'crypto-derivatives-toolbox',
     'crypto-onchain-toolbox',
   ],
 };
