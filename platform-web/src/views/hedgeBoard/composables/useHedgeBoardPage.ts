@@ -65,14 +65,7 @@ const macroSectionOrder = [
 
 const researchSectionOrder: Partial<Record<HedgeCategory, readonly string[]>> = {
   macro: macroSectionOrder,
-  gold: [
-    'gold-market',
-    'gold-main',
-    'gold-flows',
-    'gold-rates',
-    'commodity-official-references',
-    'gold-browser-toolbox',
-  ],
+  gold: ['gold-market', 'gold-main', 'gold-flows', 'gold-rates', 'gold-browser-toolbox'],
   crypto: [
     'crypto-market',
     'crypto-main',

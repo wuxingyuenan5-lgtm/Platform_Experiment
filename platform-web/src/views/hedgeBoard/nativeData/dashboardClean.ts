@@ -578,66 +578,9 @@ export const researchModules: ResearchModule[] = [
         ],
       },
       {
-        id: 'commodity-official-references',
-        eyebrow: 'Curves / Physical / Volatility',
-        title: '期限结构、库存与波动率',
-        description:
-          'CME、ICE、LME 与 Cboe 的受限市场数据按 Phase F 采用官方 External Link；不在本地复制曲线、库存或指数历史。',
-        layout: 'two',
-        widgets: [
-          localChart('WTI Futures Curve', 'CME official contract chain', 'commodity-wti-curve', {
-            referenceLinks: macroMicroReference(
-              'https://en.macromicro.me/charts/148223/volatility-wti-crude-oil-volatility-term-structure',
-            ),
-          }),
-          localChart(
-            'Brent Futures Curve',
-            'ICE official contract chain',
-            'commodity-brent-curve',
-            {
-              referenceLinks: macroMicroReference(
-                'https://en.macromicro.me/charts/889/commodity-brent',
-              ),
-            },
-          ),
-          localChart('Copper Prompt Curve', 'LME official contract page', 'commodity-copper-curve'),
-          localChart(
-            'CME Delivery & Stocks',
-            'CME official delivery reports',
-            'commodity-cme-inventory',
-          ),
-          localChart(
-            'LME Copper Stocks',
-            'LME official reports and data',
-            'commodity-lme-inventory',
-          ),
-          localChart(
-            'Copper Cross-Market Spreads',
-            'COMEX / LME / SHFE legs',
-            'commodity-copper-spreads',
-          ),
-          localChart(
-            'Brent - WTI Spread',
-            'ICE / CME licensed legs',
-            'commodity-brent-wti-spread',
-            {
-              referenceLinks: macroMicroReference(
-                'https://en.macromicro.me/collections/19/mm-oil-price/1024/brent-wti-price-spread',
-              ),
-            },
-          ),
-          localChart('OVX', 'Cboe Crude Oil ETF Volatility Index', 'commodity-ovx', {
-            referenceLinks: macroMicroReference(
-              'https://en.macromicro.me/charts/148223/volatility-wti-crude-oil-volatility-term-structure',
-            ),
-          }),
-          localChart('CVOL', 'CME Group Volatility Indexes', 'commodity-cvol'),
-        ],
-      },
-      {
         id: 'gold-browser-toolbox',
         eyebrow: 'Owner Toolkit',
-        title: '黄金与商品补充研究工具',
+        title: '商品补充分析',
         description: 'Owner 浏览器中的黄金研究框架入口，按实物、期货、期权与辅助研究集中保留。',
         layout: 'three',
         widgets: [
