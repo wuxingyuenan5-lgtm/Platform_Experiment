@@ -44,7 +44,6 @@ export type LocalWidgetKey =
   | 'spdr-daily-flow'
   | 'spdr-holdings-vs-price'
   | 'etf-weekly-flows'
-  | 'etf-ytd-summary'
   | 'central-bank-holders'
   | 'central-bank-buyers'
   | 'gold-vs-nominal'
@@ -501,6 +500,13 @@ export const researchModules: ResearchModule[] = [
         description: '',
         layout: 'two',
         widgets: [
+          localChart('金价 vs SPDR 每日流量', '', 'spdr-daily-flow', {
+            height: 420,
+            sourceNote: 'External Link · MacroMicro · permission_required',
+            referenceLinks: macroMicroReference(
+              'https://sc.macromicro.me/collections/45/mm-gold-price/23274/gld-fund-flow',
+            ),
+          }),
           localChart('全球各地区 ETF 每周流入', '', 'etf-weekly-flows', {
             height: 430,
             sourceNote: 'External Link · World Gold Council · permission_required',
@@ -508,27 +514,23 @@ export const researchModules: ResearchModule[] = [
               'https://sc.macromicro.me/collections/45/mm-gold-price/110882/global-gold-etf-net-flow-weekly-regional-sum',
             ),
           }),
-          localChart('全球 ETF 月度区域汇总', '', 'etf-ytd-summary', {
-            height: 430,
-            sourceNote: 'External Link · World Gold Council · permission_required',
-            referenceLinks: macroMicroReference(
-              'https://sc.macromicro.me/collections/45/mm-gold-price/110883/global-gold-etf-net-flow-monthly-regional-sum',
-            ),
-          }),
-          localChart('金价 vs SPDR 每日流量', '', 'spdr-daily-flow', {
-            height: 420,
-            sourceNote: 'External Link · SPDR Gold Shares · permission_required',
-            referenceLinks: macroMicroReference(
-              'https://en.macromicro.me/charts/23274/gld-fund-flow',
-            ),
-          }),
           localChart('SPDR 持仓量 vs 黄金价格', '', 'spdr-holdings-vs-price', {
             height: 420,
             sourceNote: 'External Link · SPDR Gold Shares · permission_required',
             referenceLinks: macroMicroReference(
-              'https://en.macromicro.me/series/3069/gold-spdr-gold-trust-etf-tonnes',
+              'https://sc.macromicro.me/collections/45/mm-gold-price/712/spdr-gold-trust-etf-gold-price',
             ),
           }),
+          externalReference(
+            '全球黄金期货未平仓量',
+            'MacroMicro · 分交易所累计未平仓量',
+            'https://en.macromicro.me/collections/45/mm-gold-price/110916/global-gold-futures-open-interest-by-exchanges-stacked-bar-chart',
+          ),
+          externalReference(
+            '商品期货持仓分析',
+            '交易法门 · 商品期货持仓与结构分析',
+            'https://www.jiaoyifamen.com/variety/',
+          ),
         ],
       },
       {
@@ -775,16 +777,6 @@ export const researchModules: ResearchModule[] = [
             'GLD 借券费率',
             'ChartExchange · ETF 做空拥挤与借券成本',
             'https://chartexchange.com/symbol/nyse-gld/borrow-fee/',
-          ),
-          externalReference(
-            '全球黄金期货未平仓量',
-            'MacroMicro · 分交易所累计未平仓量',
-            'https://en.macromicro.me/collections/45/mm-gold-price/110916/global-gold-futures-open-interest-by-exchanges-stacked-bar-chart',
-          ),
-          externalReference(
-            '商品期货持仓分析',
-            '交易法门 · 商品期货持仓与结构分析',
-            'https://www.jiaoyifamen.com/variety/',
           ),
           externalReference(
             'COMEX 黄金总库存',

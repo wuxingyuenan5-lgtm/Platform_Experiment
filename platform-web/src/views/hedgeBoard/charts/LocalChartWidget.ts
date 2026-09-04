@@ -12,15 +12,10 @@ const externalGoldResearch = {
     description: '全球及区域黄金 ETF 持仓与资金流',
     href: 'https://www.gold.org/goldhub/data/gold-etfs-holdings-and-flows',
   },
-  'etf-ytd-summary': {
-    provider: 'World Gold Council',
-    description: '全球黄金 ETF 年内持仓与资金流汇总',
-    href: 'https://www.gold.org/goldhub/data/gold-etfs-holdings-and-flows',
-  },
   'spdr-daily-flow': {
-    provider: 'SPDR Gold Shares',
-    description: 'GLD 官方每日持仓及历史资料',
-    href: 'https://www.spdrgoldshares.com/usa/historical-data/',
+    provider: 'MacroMicro',
+    description: 'GLD 资金流与黄金价格对照',
+    href: 'https://sc.macromicro.me/collections/45/mm-gold-price/23274/gld-fund-flow',
   },
   'spdr-holdings-vs-price': {
     provider: 'SPDR Gold Shares',
@@ -246,7 +241,12 @@ function renderExternalGoldResearch(key: ExternalGoldResearchKey) {
       ),
       h('strong', { style: { color: 'var(--color-text-1)', fontSize: '16px' } }, item.provider),
       h('span', item.description),
-      h('small', '请使用卡片右上角“原始网页”查看；后续接入正式采集后在此显示完整图表。'),
+      h(
+        'small',
+        key === 'spdr-daily-flow'
+          ? '请使用卡片右上角“MacroMicro 参考”查看；后续接入正式采集后在此显示完整图表。'
+          : '请使用卡片右上角“原始网页”查看；后续接入正式采集后在此显示完整图表。',
+      ),
     ],
   );
 }
@@ -300,8 +300,6 @@ export default defineComponent({
           case 'spdr-holdings-vs-price':
             return renderExternalGoldResearch(key);
           case 'etf-weekly-flows':
-            return renderExternalGoldResearch(key);
-          case 'etf-ytd-summary':
             return renderExternalGoldResearch(key);
           case 'central-bank-holders':
             return renderExternalGoldResearch(key);

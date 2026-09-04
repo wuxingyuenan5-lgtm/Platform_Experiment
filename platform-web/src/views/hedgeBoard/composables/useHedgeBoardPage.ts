@@ -90,7 +90,6 @@ const researchSectionOrder: Partial<Record<HedgeCategory, readonly string[]>> = 
 
 const widgetTextOverrides: Record<string, { title?: string }> = {
   'etf-weekly-flows': { title: '全球各地区ETF每周流入' },
-  'etf-ytd-summary': { title: '全球 ETF 年内汇总' },
   'spdr-daily-flow': { title: '金价 vs SPDR 每日流量' },
   'spdr-holdings-vs-price': { title: 'SPDR 持仓量 vs 黄金价格' },
   'central-bank-holders': { title: '官方黄金储备前十' },
@@ -135,8 +134,6 @@ const widgetSourceLinks: Partial<Record<string, string>> = {
   'crypto-bybit': 'https://www.bybit.com/en/derivatives/',
   'crypto-okx': 'https://www.okx.com/markets/prices/swap',
   'etf-weekly-flows': ETF_REFERENCE_URL,
-  'etf-ytd-summary': ETF_REFERENCE_URL,
-  'spdr-daily-flow': 'https://www.spdrgoldshares.com/usa/historical-data/',
   'spdr-holdings-vs-price': 'https://www.spdrgoldshares.com/usa/historical-data/',
   'central-bank-holders': 'https://www.gold.org/goldhub/data/gold-reserves-by-country',
   'central-bank-buyers': 'https://www.gold.org/goldhub/data/gold-reserves-by-country',
