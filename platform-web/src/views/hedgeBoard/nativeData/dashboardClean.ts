@@ -555,7 +555,7 @@ export const researchModules: ResearchModule[] = [
       {
         id: 'gold-rates',
         eyebrow: 'Rates & Inflation',
-        title: '利率与通胀',
+        title: '金价驱动分析',
         description: '以实际利率为核心观察黄金的宏观驱动。',
         layout: 'hero',
         widgets: [
@@ -570,6 +570,11 @@ export const researchModules: ResearchModule[] = [
               },
             ],
           }),
+          externalReference(
+            'MacroMicro 黄金研究',
+            '黄金、流动性与央行需求集合',
+            'https://sc.macromicro.me/commodities/gold',
+          ),
         ],
       },
       {
@@ -655,11 +660,6 @@ export const researchModules: ResearchModule[] = [
             'CME QuikStrike 黄金期权',
             'CME · 期权波动率与策略工具入口',
             'https://cmegroup-sso.quikstrike.net/User/Disclaimer.aspx?ret=%2fUser%2fPartnerRegister.aspx',
-          ),
-          externalReference(
-            'MacroMicro 黄金研究',
-            '黄金、流动性与央行需求集合',
-            'https://sc.macromicro.me/commodities/gold',
           ),
         ],
       },

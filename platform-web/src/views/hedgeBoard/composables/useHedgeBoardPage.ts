@@ -50,7 +50,7 @@ const sectionLabelOverrides: Record<string, { title?: string }> = {
   'macro-risk-appetite': { title: '风险偏好' },
   'gold-flows': { title: 'ETF与资金面' },
   'gold-main': { title: '黄金主图' },
-  'gold-rates': { title: '利率与通胀' },
+  'gold-rates': { title: '金价驱动分析' },
   'crypto-etf': { title: '加密资金面' },
 };
 
