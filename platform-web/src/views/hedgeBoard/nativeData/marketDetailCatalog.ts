@@ -133,6 +133,12 @@ export const marketDetailCatalog: Record<CatalogMarketId, CatalogGroup[]> = {
         { id: 'gold-usoil', name: 'WTI 原油', symbol: 'USOIL', tvSymbol: 'TVC:USOIL' },
         { id: 'gold-brent', name: '布伦特原油', symbol: 'BRENT', tvSymbol: 'SKILLING:BRENT' },
         { id: 'gold-xng', name: '天然气', symbol: 'XNGUSD', tvSymbol: 'EIGHTCAP:XNGUSD' },
+        {
+          id: 'gold-ltc1',
+          name: '碳酸锂主力',
+          symbol: 'LTC1!',
+          tvSymbol: 'COMEX:LTC1!',
+        },
       ],
     },
   ],
