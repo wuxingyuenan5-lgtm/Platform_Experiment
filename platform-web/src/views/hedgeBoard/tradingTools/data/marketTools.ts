@@ -1809,6 +1809,17 @@ export const tradingToolCategories: TradingToolCategory[] = [
               "加密",
               "基本面类"
             ]
+          },
+          {
+            "id": "crypto-www-coinglass-com-17",
+            "name": "CoinGlass 牛市顶部信号",
+            "url": "https://www.coinglass.com/zh/bull-market-peak-signals",
+            "description": "来源：基本面类",
+            "domain": "www.coinglass.com",
+            "tags": [
+              "加密",
+              "基本面类"
+            ]
           }
         ]
       },

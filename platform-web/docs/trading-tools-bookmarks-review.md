@@ -306,6 +306,8 @@
   - 域名：`xxi.money`
 - [IBIT官网](https://www.ishares.com/us/products/333011/ishares-bitcoin-trust-etf#/)
   - 域名：`www.ishares.com`
+- [CoinGlass 牛市顶部信号](https://www.coinglass.com/zh/bull-market-peak-signals)
+  - 域名：`www.coinglass.com`
 ### 媒体类
 
 - [Foresight News](https://foresightnews.pro/)
