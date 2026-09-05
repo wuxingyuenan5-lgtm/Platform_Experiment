@@ -8,7 +8,7 @@
           target="_blank"
           rel="noopener noreferrer"
         >
-          原始网页 ↗
+          参考网页 ↗
         </a>
         <button
           type="button"

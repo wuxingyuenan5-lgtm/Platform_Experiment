@@ -173,7 +173,7 @@ function renderExternalMacroResearch(key: ExternalMacroResearchKey) {
       h('span', 'External Link · reference'),
       h('strong', { style: { color: 'var(--color-text-1)', fontSize: '16px' } }, item.provider),
       h('span', item.description),
-      h('small', '点击卡片右上角“原始网页”查看；完成正式采集后再替换为本地图表。'),
+      h('small', '点击卡片右上角“参考网页”查看；完成正式采集后再替换为本地图表。'),
     ],
   );
 }
@@ -215,7 +215,7 @@ function renderExternalGoldResearch(key: ExternalGoldResearchKey) {
         'small',
         key === 'spdr-daily-flow'
           ? '请使用卡片右上角“MacroMicro 参考”查看；后续接入正式采集后在此显示完整图表。'
-          : '请使用卡片右上角“原始网页”查看；后续接入正式采集后在此显示完整图表。',
+          : '请使用卡片右上角“参考网页”查看；后续接入正式采集后在此显示完整图表。',
       ),
     ],
   );
@@ -246,7 +246,7 @@ function renderExternalCryptoResearch(key: ExternalCryptoResearchKey) {
         'small',
         key === 'btc-treasury-flow'
           ? '请使用卡片右上角“SoSoValue 参考”查看；后续接入正式采集后在此显示完整图表。'
-          : '请使用卡片右上角“原始网页”查看；后续接入正式采集后在此显示完整图表。',
+          : '请使用卡片右上角“参考网页”查看；后续接入正式采集后在此显示完整图表。',
       ),
     ],
   );
