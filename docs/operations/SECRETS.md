@@ -146,3 +146,9 @@ Rotation Record 不代表 Secret 已经在外部 Provider 中成功写入。运�
 - Runtime 轮换后重启或显式 Reload；不允许无限期使用旧 Client Cache。
 - Live Write 在轮换和验证期间保持关闭。
 - 只读 Preflight、Venue Readiness 与 EOD 必须在轮换后重新执行。
+
+## 11. Financial AI 本机配置
+
+Financial AI Provider API Key 是 Platform API 主机上的共享机器密密，由服务端保存到 `platform-api/data/financial_ai_connection.json`，该目录必须被 Git 忽略。写入使用同目录临时文件原子替换，并在操作系统支持时限制为运行账号可读写。
+
+只有 `settings.write` 可保存、替换或删除该文件。响应和状态读取永不回传 Key，日志、异常、截图、聊天和测试证据必须脱敏。替换是显式的非空 Key 覆盖；留空保留原 Key；删除只能由明确清除操作触发。该文件不得被当作部署完成或 Provider 可用的证据。

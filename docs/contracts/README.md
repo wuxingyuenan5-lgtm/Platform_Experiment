@@ -7,6 +7,7 @@
 | 浏览器访问与产品数据 | [BROWSER_ACCESS_AND_PRODUCT_DATA.md](BROWSER_ACCESS_AND_PRODUCT_DATA.md) |
 | 身份、权限和会话 | [AUTHORIZATION.md](AUTHORIZATION.md) · [AUTH_ERRORS.md](AUTH_ERRORS.md) · [ACCESS_MATRIX.md](ACCESS_MATRIX.md) |
 | Platform API | [API.md](API.md) |
+| Financial AI | [FINANCIAL_AI.md](FINANCIAL_AI.md) |
 | 执行风险 | [EXECUTION_RISK.md](EXECUTION_RISK.md) |
 | 跨所执行 | [CROSS_SPREAD_EXECUTION.md](CROSS_SPREAD_EXECUTION.md) |
 | Runtime Command/Event | `runtime-v1.json` 可执行快照及双方 `runtime_contracts.py` |

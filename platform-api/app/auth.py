@@ -307,6 +307,16 @@ def permission_for_request(method: str, path: str) -> str:
             return "audit:read"
         return "platform:read"
 
+    # Financial-AI POSTs execute read-only analysis and connection checks.  They
+    # do not mutate platform state, so browser users with platform read access
+    # must not be forced through the generic admin-write fallback below.
+    if normalized_method == "POST" and (
+        path.endswith("/financial-ai/chat") or path.endswith("/financial-ai/test-connection")
+    ):
+        return "platform:read"
+    if normalized_method in {"PUT", "DELETE"} and path.endswith("/financial-ai/connection"):
+        return "settings.write"
+
     if path.endswith("/live-trading/sessions") and normalized_method == "POST":
         return "live_session:request"
     if "/live-trading/sessions/" in path and path.endswith("/approve"):

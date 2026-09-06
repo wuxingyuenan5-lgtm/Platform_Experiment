@@ -2,7 +2,7 @@ from decimal import Decimal
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import field_validator
+from pydantic import HttpUrl, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 PLATFORM_API_ROOT = Path(__file__).resolve().parents[1]
@@ -57,6 +57,13 @@ class Settings(BaseSettings):
     auth_credentials_json: str = "[]"
     development_user_id: str = "development-user"
     development_roles: str = "admin"
+    # Optional second gate for the browser-configured financial AI adapter. Store
+    # only a SHA-256 digest; the raw gateway key must never enter settings or logs.
+    financial_ai_access_key_sha256: str = ""
+    # Defaults for the browser-configured connection persisted under platform-api/data.
+    financial_ai_provider: str = "deepseek"
+    financial_ai_base_url: HttpUrl = "https://api.deepseek.com"
+    financial_ai_model: str = "deepseek-v4-flash"
     # This is a narrow local founder-acceptance bridge for the single configured
     # development identity.  It remains off by default and never applies to a
     # live environment or API-key authentication.

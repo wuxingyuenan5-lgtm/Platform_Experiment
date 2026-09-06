@@ -42,6 +42,8 @@ CEO receives an explicit browser business-permission set rather than a wildcard.
 
 Legacy route `roles` fields are not part of the effective browser authorization tree. New route families must be registered in the central mapping and covered by tests.
 
+Financial AI 的正式路由是 `/financial-ai/daily-review`、`/financial-ai/stock-analysis`、`/financial-ai/news-radar` 和 `/financial-ai/ai-connection`。旧 `/financial-ai/index` 进入当日复盘，旧 `/news-calendar/news` 直接进入资讯雷达。路由 Capability 决定页面可见性；底层分析和数据 API 仍要求 `platform:read`，机器级连接配置写入要求 `settings.write`。
+
 ## Product data states
 
 Every restored product surface has one of four states:
@@ -61,8 +63,8 @@ A `sample` envelope with `actionable=true` is invalid. Sample pages must not imp
 | Strategy management | Disclosed sample strategy catalog; no lifecycle writes |
 | Funding carry | Disclosed sample research; no order submission |
 | Cross-venue spread research | Disclosed sample analysis; formal `CrossVenueExecutionWorkspace` retained for execution |
-| Financial AI | Provider unavailable; no fabricated model answer |
-| News calendar | TradingView economic calendar live; news and wealth sections use disclosed samples |
+| Financial AI | 四个子页已接入本机共享 AI 配置、平台研究数据、全球证券公开上游与公开资讯源；实时可用性按 Provider/CLI 状态显式成功、部分失败或失败，模型结果始终待复核 |
+| News calendar | TradingView economic calendar live; legacy news entry redirects to Financial AI news radar; wealth uses the Hedge Board Crypto entry |
 | Settings | Current Session and data-service health are live when available; settings writes unavailable; personal account remains real self-service |
 
 ## Acceptance criteria

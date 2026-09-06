@@ -28,7 +28,7 @@ const news: AppRouteModule = {
     {
       path: 'news',
       name: 'NewsCalendarNews',
-      redirect: '/financial-ai/index#news-digest',
+      redirect: '/financial-ai/news-radar',
       meta: {
         title: '新闻整理',
         hideMenu: true,

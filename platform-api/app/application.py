@@ -14,6 +14,7 @@ from app.disaster_recovery import router as disaster_recovery_router
 from app.eod_reconciliation_routes import router as eod_reconciliation_router
 from app.execution_risk import configure_trade_command_port
 from app.execution_risk import router as execution_risk_router
+from app.financial_ai_routes import router as financial_ai_router
 from app.financial_facts import router as financial_facts_router
 from app.live_trading_sessions import router as live_trading_sessions_router
 from app.live_venue_accounting import router as live_venue_accounting_router
@@ -66,6 +67,7 @@ def create_application() -> FastAPI:
     application.include_router(create_trading_router(settings.api_prefix))
 
     application.include_router(financial_facts_router)
+    application.include_router(financial_ai_router)
     application.include_router(execution_risk_router)
     application.include_router(venue_reconciliation_router)
     application.include_router(live_venue_accounting_router)

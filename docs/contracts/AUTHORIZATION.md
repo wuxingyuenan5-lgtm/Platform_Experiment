@@ -202,6 +202,8 @@ CSRF 原始值只存在于当前浏览器内存；数据库保存哈希。用户
 | `live_session:revoke` | 撤销实盘会话 |
 | `admin:write` | 未明确分类的旧管理写操作 |
 
+Financial AI 的状态、研究数据、连接检查和普通分析使用 `platform:read`。服务端共享 AI 配置的保存、替换和清除使用现有 `settings.write`；该边界同时适用于 Browser Session 和 API-Key Principal，不得由页面私有角色或按钮可见性放宽。详细语义见 [Financial AI 合同](FINANCIAL_AI.md)。
+
 用户域采用显式点号权限，例如：
 
 ```text
