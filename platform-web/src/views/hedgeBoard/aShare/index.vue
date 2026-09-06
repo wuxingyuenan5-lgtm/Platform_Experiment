@@ -104,7 +104,7 @@
 </template>
 
 <script setup lang="ts">
-  import { computed, nextTick } from 'vue';
+  import { computed, nextTick, onActivated, onMounted } from 'vue';
   import { useRouter } from 'vue-router';
   import { PageWrapper } from '@/components/Page';
   import CompactSegmentTabs from '@/views/strategy/shared/CompactSegmentTabs.vue';
@@ -169,6 +169,13 @@
     exportThresholdCsv,
     copyThresholdSummary,
   } = useAShareResearch();
+
+  function resetPageScroll() {
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+  }
+
+  onMounted(resetPageScroll);
+  onActivated(resetPageScroll);
 
   const overviewRows = computed(() => dashboard.value?.marketDetail.data || []);
   const coreIndexRows = computed(() => overviewRows.value.slice(0, 4));
