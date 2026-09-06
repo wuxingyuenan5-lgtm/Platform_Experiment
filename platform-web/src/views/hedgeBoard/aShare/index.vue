@@ -35,16 +35,35 @@
 
       <section id="a-share-overview" class="overview-card">
         <header class="section-header">
-          <div><p>MARKET OVERVIEW</p><h2>大盘表现</h2></div>
+          <div><p>MARKET OVERVIEW</p><h2>市场总览</h2></div>
           <ResearchSourceState v-if="dashboard?.marketDetail" :meta="dashboard.marketDetail.meta" />
         </header>
         <div class="overview-grid">
-          <article v-for="row in overviewRows" :key="row.code">
+          <article v-for="row in coreIndexRows" :key="row.code">
             <div class="overview-card__head"
               ><span>{{ row.code }}</span
               ><b :class="toneClass(row.return1dPct)">{{ formatPct(row.return1dPct) }}</b></div
             >
             <strong>{{ row.name }}</strong>
+            <em>{{ formatNumber(row.close) }}</em>
+            <svg viewBox="0 0 100 28" preserveAspectRatio="none">
+              <polyline :points="sparkPoints(row.spark)" :class="toneClass(row.return1dPct)" />
+            </svg>
+          </article>
+        </div>
+      </section>
+
+      <section id="a-share-theme-index" class="overview-card">
+        <header class="section-header">
+          <div><p>THEME BASKET</p><h2>主题指数</h2></div>
+          <ResearchSourceState v-if="dashboard?.marketDetail" :meta="dashboard.marketDetail.meta" />
+        </header>
+        <div class="overview-grid">
+          <article v-for="row in themeIndexRows" :key="row.code">
+            <div class="overview-card__head"
+              ><span>{{ row.code }}</span
+              ><b :class="toneClass(row.return1dPct)">{{ formatPct(row.return1dPct) }}</b></div
+            ><strong>{{ row.name }}</strong>
             <em>{{ formatNumber(row.close) }}</em>
             <svg viewBox="0 0 100 28" preserveAspectRatio="none">
               <polyline :points="sparkPoints(row.spark)" :class="toneClass(row.return1dPct)" />
@@ -152,7 +171,9 @@
     copyThresholdSummary,
   } = useAShareResearch();
 
-  const overviewRows = computed(() => dashboard.value?.marketDetail.data?.slice(0, 8) || []);
+  const overviewRows = computed(() => dashboard.value?.marketDetail.data || []);
+  const coreIndexRows = computed(() => overviewRows.value.slice(0, 4));
+  const themeIndexRows = computed(() => overviewRows.value.slice(4, 8));
 
   function navigateMarket(value: string) {
     const path = routeByMarket[value];

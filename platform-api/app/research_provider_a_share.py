@@ -31,14 +31,17 @@ from app.research_provider_normalization import trend_marker as _trend
 AkshareLoader = Callable[[], Any]
 
 INDEX_DEFINITIONS: tuple[tuple[str, str, str], ...] = (
-    ("000001", "上证指数", "sh000001"),
-    ("000300", "沪深300", "csi000300"),
-    ("000016", "上证50", "sh000016"),
-    ("399673", "创业板50", "sz399673"),
+    # Market Overview: core benchmarks followed by the fixed theme basket.
+    ("000300", "沪深300", "sh000300"),
+    ("000852", "中证1000", "sh000852"),
+    ("399006", "创业板指", "sz399006"),
     ("000688", "科创50", "sh000688"),
-    ("000905", "中证500", "csi000905"),
-    ("932000", "中证2000", "csi932000"),
-    ("930050", "中证A50", "csi930050"),
+    ("931071", "AI", "931071"),
+    ("931238", "金股", "931238"),
+    ("932082", "医药", "932082"),
+    ("H30590", "机器人", "H30590"),
+    # Retained for non-dashboard consumers that still use the broad index feed.
+    ("000001", "上证指数", "sh000001"),
 )
 
 
