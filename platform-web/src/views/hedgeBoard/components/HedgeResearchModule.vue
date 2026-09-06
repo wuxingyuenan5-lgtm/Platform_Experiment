@@ -20,16 +20,22 @@
       :id="section.id"
       :key="section.id"
       class="chart-section"
-      :class="{ 'chart-section--gold': unified }"
+      :class="{
+        'chart-section--gold': unified,
+        'market-detail-section-shell': isMarketDetailSection(section),
+      }"
     >
-      <div class="chart-section__heading">
+      <div
+        class="chart-section__heading"
+        :class="{ 'market-detail-section-heading': isMarketDetailSection(section) }"
+      >
         <div>
           <h4>{{ resolveSectionTitle(section.id, section.title) }}</h4>
         </div>
         <button
           v-if="isMarketDetailSection(section)"
           type="button"
-          class="section-toggle"
+          class="section-toggle market-detail-section-toggle"
           :aria-expanded="isMarketDetailExpanded(section.id)"
           :aria-controls="`${section.id}-content`"
           @click="toggleMarketDetailSection(section.id)"
@@ -149,6 +155,7 @@
 
 <style scoped lang="less">
   @import '../../strategy/shared/strategy-theme.less';
+  @import './marketDetailSection.less';
 
   .research-module {
     display: flex;

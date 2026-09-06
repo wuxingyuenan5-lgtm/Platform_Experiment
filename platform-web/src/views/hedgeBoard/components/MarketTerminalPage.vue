@@ -125,12 +125,15 @@
       </div>
     </section>
 
-    <section :id="detailSectionId" class="market-terminal__detail-section">
-      <div class="market-terminal__panel-head market-terminal__panel-head--detail-toggle">
-        <h3>{{ marketDetailTitle }}</h3>
+    <section
+      :id="detailSectionId"
+      class="market-terminal__detail-section market-detail-section-shell"
+    >
+      <div class="market-terminal__panel-head market-detail-section-heading">
+        <h4>{{ marketDetailTitle }}</h4>
         <button
           type="button"
-          class="market-terminal__toolbar-btn"
+          class="market-terminal__toolbar-btn market-detail-section-toggle"
           :aria-expanded="marketDetailExpanded"
           aria-controls="market-terminal-detail-content"
           @click="marketDetailExpanded = !marketDetailExpanded"
@@ -1053,6 +1056,8 @@
 </script>
 
 <style lang="less" scoped>
+  @import './marketDetailSection.less';
+
   .market-terminal {
     --terminal-border: rgb(201 213 226 / 72%);
     --terminal-border-strong: rgb(170 186 203 / 82%);
@@ -1084,42 +1089,10 @@
   .market-terminal__detail-section {
     display: grid;
     min-width: 0;
-    gap: 18px;
-    padding: 22px;
-    border: 1px solid rgb(193 207 220 / 88%);
-    border-radius: 24px;
-    background: linear-gradient(180deg, rgb(255 255 255 / 95%), rgb(243 248 252 / 96%)), #fff;
-    box-shadow: 0 18px 45px rgb(31 41 55 / 5%);
   }
 
-  .market-terminal__panel-head--detail-toggle {
+  .market-terminal__detail-section .market-detail-section-heading {
     margin-bottom: 0;
-  }
-
-  .market-terminal__panel-head--detail-toggle h3 {
-    color: #18313c;
-    font-size: 22px;
-    font-weight: 800;
-  }
-
-  .market-terminal__panel-head--detail-toggle .market-terminal__toolbar-btn {
-    min-height: 32px;
-    padding: 5px 12px;
-    border: 1px solid rgb(109 130 147 / 28%);
-    border-radius: 999px;
-    background: #fff;
-    color: #526b7d;
-    font-size: 12px;
-    font-weight: 700;
-    cursor: pointer;
-  }
-
-  .market-terminal__panel-head--detail-toggle .market-terminal__toolbar-btn:hover,
-  .market-terminal__panel-head--detail-toggle .market-terminal__toolbar-btn:focus-visible {
-    border-color: rgb(22 93 255 / 42%);
-    outline: none;
-    background: rgb(22 93 255 / 6%);
-    color: #165dff;
   }
 
   .market-terminal__overview-strip {
