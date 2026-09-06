@@ -659,6 +659,12 @@ export const researchModules: ResearchModule[] = [
           localChart('BTC ETF 日流量 vs BTC 价格', '', 'btc-etf-flow', {
             height: 420,
             sourceNote: '',
+            referenceLinks: [
+              {
+                label: '30日均线',
+                href: 'https://studio.glassnode.com/charts/institutions.UsSpotEtfFlowsNet?a=BTC&mAvg=30&resolution=24h&s=1704657272&u=1788393600&zoom=',
+              },
+            ],
           }),
           localChart('ETH ETF 日流量', 'SoSoValue', 'crypto-eth-etf-flow', {
             height: 420,
