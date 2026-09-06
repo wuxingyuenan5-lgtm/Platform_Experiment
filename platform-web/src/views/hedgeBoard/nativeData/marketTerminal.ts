@@ -4220,8 +4220,7 @@ export const marketTerminalConfigs: Record<TerminalMarketId, MarketTerminalPageC
     volatilityCards: aShareVolatilityCards,
     detailColumns,
     detailGroups: buildCatalogDetailGroups('aShare'),
-    rotationButtonLabel: '板块轮动',
-    rotationHeatmap: aShareRotationHeatmap,
+    rotationButtonLabel: undefined,
   },
   gold: {
     id: 'gold',

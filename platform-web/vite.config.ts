@@ -30,6 +30,14 @@ export default defineApplicationConfig({
         usePolling: true,
       },
       proxy: {
+        // Local vibe-research data service used by the A-share market overview
+        // and stock-pool adapters. The platform falls back to its own API when
+        // this optional reference service is unavailable.
+        '/vibe-research': {
+          target: 'http://127.0.0.1:8900',
+          changeOrigin: true,
+          rewrite: (path) => path.replace(/^\/vibe-research/, ''),
+        },
         '/login': {
           target: localPlatformBackend,
           changeOrigin: true,

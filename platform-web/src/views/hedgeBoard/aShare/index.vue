@@ -19,6 +19,8 @@
 
       <AShareLegacyTerminalSection />
 
+      <AShareMarketOverviewSection :dashboard="dashboard" />
+
       <nav class="research-subnav" aria-label="A股研究模块导航">
         <button
           v-for="(item, index) in sectionNav"
@@ -33,16 +35,6 @@
 
       <div v-if="dashboardError" class="dashboard-error">{{ dashboardError }}</div>
 
-      <AShareBreadthSection :module="dashboard?.breadth" />
-      <ShenwanIndustrySection
-        v-model:threshold-mode="thresholdMode"
-        v-model:custom-threshold-yi="customThresholdYi"
-        :module="dashboard?.shenwan"
-        @apply-threshold="applyThresholdMode"
-        @copy="copyThresholdSummary"
-        @export="exportThresholdCsv"
-      />
-      <ShortTermEmotionSection :module="dashboard?.emotion" />
       <AShareWatchlistSection
         :groups="watchlistGroups"
         :sync-state="watchlistSyncState"
@@ -53,6 +45,7 @@
         @set-group="setWatchlistGroup"
         @query="queryStockAndJump"
       />
+      <VibeStockPoolSection @query="queryStockAndJump" />
       <StockSnapshotSection
         v-model:code="stockCode"
         :snapshot="stockSnapshot"
@@ -71,10 +64,9 @@
   import { PageWrapper } from '@/components/Page';
   import CompactSegmentTabs from '@/views/strategy/shared/CompactSegmentTabs.vue';
   import AShareLegacyTerminalSection from './components/AShareLegacyTerminalSection.vue';
-  import AShareBreadthSection from './components/AShareBreadthSection.vue';
+  import AShareMarketOverviewSection from './components/AShareMarketOverviewSection.vue';
   import AShareWatchlistSection from './components/AShareWatchlistSection.vue';
-  import ShenwanIndustrySection from './components/ShenwanIndustrySection.vue';
-  import ShortTermEmotionSection from './components/ShortTermEmotionSection.vue';
+  import VibeStockPoolSection from './components/VibeStockPoolSection.vue';
   import StockSnapshotSection from './components/StockSnapshotSection.vue';
   import { useAShareResearch } from './useAShareResearch';
 
@@ -98,11 +90,8 @@
     tradingTools: '/hedge-board/trading-tools/macro',
   };
   const sectionNav = [
-    { id: 'a-share-overview', label: '大盘表现' },
-    { id: 'a-share-breadth', label: '大盘广度' },
+    { id: 'a-share-market-overview', label: '市场总览' },
     { id: 'a-share-market-detail', label: '市场明细' },
-    { id: 'a-share-shenwan', label: '申万板块' },
-    { id: 'a-share-emotion', label: '短线情绪' },
     { id: 'a-share-watchlist', label: '自选股' },
     { id: 'a-share-stock-snapshot', label: '一键个股数据' },
   ];
@@ -111,8 +100,6 @@
     dashboard,
     dashboardLoading,
     dashboardError,
-    thresholdMode,
-    customThresholdYi,
     stockCode,
     stockSnapshot,
     stockLoading,
@@ -126,9 +113,6 @@
     removeFromWatchlist,
     moveWatchlistItem,
     setWatchlistGroup,
-    applyThresholdMode,
-    exportThresholdCsv,
-    copyThresholdSummary,
   } = useAShareResearch();
 
   function resetPageScroll() {
