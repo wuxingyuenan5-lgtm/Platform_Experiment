@@ -43,12 +43,6 @@ const aShareWatchlistPath = path.join(
   'components',
   'AShareWatchlistSection.vue',
 );
-const aShareMarketDetailPath = path.join(
-  viewRoot,
-  'aShare',
-  'components',
-  'AShareMarketDetailSection.vue',
-);
 const shenwanSectionPath = path.join(
   viewRoot,
   'aShare',
@@ -62,6 +56,7 @@ const routePath = path.join(__dirname, '..', 'src', 'router', 'routes', 'modules
 const uiGuidelinesPath = path.join(__dirname, '..', 'docs', 'design', 'platform-ui-guidelines.md');
 
 const hedgeBoardSource = fs.readFileSync(hedgeBoardPagePath, 'utf8');
+const marketTerminalPageSource = fs.readFileSync(marketTerminalPagePath, 'utf8');
 const hedgeBoardSubnavSource = fs.readFileSync(hedgeBoardSubnavPath, 'utf8');
 const hedgeResearchModuleSource = fs.readFileSync(hedgeResearchModulePath, 'utf8');
 const terminalDetailPanelSource = fs.readFileSync(terminalDetailPanelPath, 'utf8');
@@ -82,7 +77,6 @@ const aShareResearchComposableSource = fs.readFileSync(aShareResearchComposableP
 const aShareWatchlistLocalStateSource = fs.readFileSync(aShareWatchlistLocalStatePath, 'utf8');
 const accountWatchlistApiSource = fs.readFileSync(accountWatchlistApiPath, 'utf8');
 const aShareWatchlistSource = fs.readFileSync(aShareWatchlistPath, 'utf8');
-const aShareMarketDetailSource = fs.readFileSync(aShareMarketDetailPath, 'utf8');
 const shenwanSectionSource = fs.readFileSync(shenwanSectionPath, 'utf8');
 const stockSnapshotSource = fs.readFileSync(stockSnapshotPath, 'utf8');
 const macroExpectationSource = fs.readFileSync(macroExpectationPath, 'utf8');
@@ -299,39 +293,16 @@ assert(
 );
 assert(
   aSharePageSource.includes('<AShareBreadthSection') &&
-    aSharePageSource.includes('<AShareMarketDetailSection') &&
+    aSharePageSource.includes('<AShareLegacyTerminalSection') &&
     aSharePageSource.includes('<ShenwanIndustrySection') &&
     aSharePageSource.includes('<ShortTermEmotionSection') &&
     aSharePageSource.includes('<StockSnapshotSection'),
   'A-share page must orchestrate each natural research boundary through a child component.',
 );
-const requiredAShareColumns = [
-  '名称 / 代码',
-  '30日走势',
-  '收盘价',
-  '成交额',
-  '20日波动率',
-  '1D',
-  'YTD',
-  'QTD',
-  '1周',
-  '1月',
-  '1年',
-  '52周高',
-  '1H',
-  '日线',
-  '3日线',
-  '周线',
-];
-requiredAShareColumns.forEach((column) => {
-  assert(
-    aShareMarketDetailSource.includes(`>${column}<`),
-    `Missing A-share detail column: ${column}`,
-  );
-});
 assert(
-  !aShareMarketDetailSource.includes('>4H<'),
-  'A-share market detail must not display a 4H column.',
+  marketTerminalPageSource.includes('detailSectionId') &&
+    aSharePageSource.includes('AShareLegacyTerminalSection'),
+  'A-share market detail must reuse the shared market terminal with a navigable section anchor.',
 );
 assert(
   shenwanSectionSource.includes('申万二级成交额 Top 10') &&

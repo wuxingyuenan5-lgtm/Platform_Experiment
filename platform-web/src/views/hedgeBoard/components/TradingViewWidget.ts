@@ -15,44 +15,12 @@ const TradingViewWidget = defineComponent({
     let resizeObserver: ResizeObserver | null = null;
     let intersectionObserver: IntersectionObserver | null = null;
     let renderTimer: number | null = null;
-    let verifyTimers: number[] = [];
     let frameToken = 0;
     let lastSizeKey = '';
-    let repairAttempts = 0;
 
     const clearRenderTimers = () => {
       if (renderTimer) window.clearTimeout(renderTimer);
-      verifyTimers.forEach((timer) => window.clearTimeout(timer));
       renderTimer = null;
-      verifyTimers = [];
-    };
-
-    const verifyWidgetLayout = () => {
-      const mountNode = mountRef.value;
-      if (!mountNode) return;
-
-      const hostWidth = mountNode.clientWidth;
-      if (!hostWidth) return;
-
-      const iframe = mountNode.querySelector('iframe') as HTMLIFrameElement | null;
-      const iframeWidth = iframe?.clientWidth ?? 0;
-      if (iframe && iframeWidth > 0 && iframeWidth < hostWidth * 0.9 && repairAttempts < 3) {
-        repairAttempts += 1;
-        lastSizeKey = '';
-        scheduleRender(true);
-        return;
-      }
-
-      if (iframe && iframeWidth >= hostWidth * 0.9) repairAttempts = 0;
-    };
-
-    const scheduleLayoutHealing = () => {
-      verifyTimers.forEach((timer) => window.clearTimeout(timer));
-      verifyTimers = [180, 520, 1100, 1900].map((delay) =>
-        window.setTimeout(() => {
-          verifyWidgetLayout();
-        }, delay),
-      );
     };
 
     const renderWidget = () => {
@@ -79,9 +47,6 @@ const TradingViewWidget = defineComponent({
         script.async = true;
         script.type = 'text/javascript';
         script.innerHTML = JSON.stringify(props.widget.config);
-        script.onload = () => {
-          scheduleLayoutHealing();
-        };
         script.onerror = () => {
           loadFailed.value = true;
           if (mountRef.value) mountRef.value.innerHTML = '';
@@ -100,17 +65,21 @@ const TradingViewWidget = defineComponent({
       const mountNode = mountRef.value;
       if (!mountNode) return;
 
+      // Embedded pages can move browser focus while they reload.  Once an
+      // iframe is mounted, retain it across layout/scroll changes; only an
+      // actual widget-config change may deliberately rebuild it.
+      if (!force && mountNode.childElementCount) return;
+
       const width = mountNode.clientWidth;
       const height = mountNode.clientHeight;
       if (!width || !height) return;
       if (!mountNode.getClientRects().length) return;
 
       const nextSizeKey = `${Math.round(width)}x${Math.round(height)}`;
-      if (!force && nextSizeKey === lastSizeKey && mountNode.childElementCount) return;
+      if (!force && nextSizeKey === lastSizeKey) return;
       lastSizeKey = nextSizeKey;
 
       clearRenderTimers();
-      if (force) repairAttempts = 0;
       renderTimer = window.setTimeout(() => {
         renderWidget();
       }, 96);
@@ -126,7 +95,7 @@ const TradingViewWidget = defineComponent({
 
       if (typeof ResizeObserver !== 'undefined' && mountRef.value) {
         resizeObserver = new ResizeObserver(() => {
-          scheduleRender();
+          if (!mountRef.value?.childElementCount) scheduleRender();
         });
         resizeObserver.observe(mountRef.value);
       }

@@ -54,7 +54,6 @@
       </section>
 
       <AShareBreadthSection :module="dashboard?.breadth" />
-      <AShareMarketDetailSection :module="dashboard?.marketDetail" />
       <ShenwanIndustrySection
         v-model:threshold-mode="thresholdMode"
         v-model:custom-threshold-yi="customThresholdYi"
@@ -94,7 +93,6 @@
   import ResearchSourceState from '../research/components/ResearchSourceState.vue';
   import AShareLegacyTerminalSection from './components/AShareLegacyTerminalSection.vue';
   import AShareBreadthSection from './components/AShareBreadthSection.vue';
-  import AShareMarketDetailSection from './components/AShareMarketDetailSection.vue';
   import AShareWatchlistSection from './components/AShareWatchlistSection.vue';
   import ShenwanIndustrySection from './components/ShenwanIndustrySection.vue';
   import ShortTermEmotionSection from './components/ShortTermEmotionSection.vue';
@@ -220,15 +218,16 @@
     --strategy-text-4: #94a3b8;
     --strategy-accent-soft: #eef2ff;
     --strategy-accent-strong: #4338ca;
-    --strategy-accent-ring: rgba(67, 56, 202, 0.18);
+    --strategy-accent-ring: rgb(67 56 202 / 18%);
     --strategy-up: #ef4444;
     --strategy-down: #10b981;
     --strategy-radius-card: 14px;
     --strategy-radius-control: 9px;
     --strategy-tab-height: 34px;
     --strategy-font-base: 13px;
-    --strategy-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
-    --strategy-shadow-soft: 0 4px 16px rgba(15, 23, 42, 0.045);
+    --strategy-shadow: 0 8px 24px rgb(15 23 42 / 6%);
+    --strategy-shadow-soft: 0 4px 16px rgb(15 23 42 / 4.5%);
+
     display: grid;
     gap: 14px;
     min-width: 0;
@@ -242,6 +241,7 @@
     justify-content: space-between;
     gap: 12px;
   }
+
   .refresh-button {
     min-height: 36px;
     padding: 0 13px;
@@ -251,45 +251,51 @@
     color: var(--strategy-text-2);
     cursor: pointer;
   }
+
   .refresh-button:disabled {
     opacity: 0.65;
     cursor: wait;
   }
+
   .research-subnav {
-    position: sticky;
-    top: 0;
-    z-index: 5;
     display: flex;
-    gap: 8px;
-    overflow-x: auto;
+    position: sticky;
+    z-index: 5;
+    top: 0;
     padding: 8px 0;
+    overflow-x: auto;
     background: var(--strategy-bg);
+    gap: 8px;
   }
+
   .research-subnav button {
     display: inline-flex;
     align-items: center;
-    gap: 7px;
     min-width: max-content;
     padding: 9px 12px;
     border: 1px solid var(--strategy-border);
     border-radius: 999px;
     background: var(--strategy-surface);
+    box-shadow: var(--strategy-shadow-soft);
     color: #111827;
     cursor: pointer;
-    box-shadow: var(--strategy-shadow-soft);
+    gap: 7px;
   }
+
   .research-subnav span,
   .research-subnav strong {
     color: #111827;
     font-size: 14px;
     font-weight: 800;
   }
+
   .dashboard-error {
     padding: 11px 13px;
     border-radius: 10px;
-    background: rgba(239, 68, 68, 0.08);
+    background: rgb(239 68 68 / 8%);
     color: #dc2626;
   }
+
   .overview-card {
     padding: 18px;
     border: 1px solid var(--strategy-border);
@@ -297,6 +303,7 @@
     background: var(--strategy-surface);
     box-shadow: var(--strategy-shadow-soft);
   }
+
   .section-header {
     display: flex;
     align-items: flex-start;
@@ -304,6 +311,7 @@
     gap: 16px;
     margin-bottom: 15px;
   }
+
   .section-header p {
     margin: 0 0 3px;
     color: var(--strategy-text-4);
@@ -311,16 +319,19 @@
     font-weight: 800;
     letter-spacing: 0.12em;
   }
+
   .section-header h2 {
     margin: 0;
     color: var(--strategy-text-1);
     font-size: 18px;
   }
+
   .overview-grid {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 11px;
   }
+
   .overview-grid article {
     min-width: 0;
     padding: 13px;
@@ -328,21 +339,25 @@
     border-radius: 11px;
     background: var(--strategy-surface-2);
   }
+
   .overview-card__head {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 8px;
   }
+
   .overview-card__head span {
     color: var(--strategy-text-4);
     font-size: 12px;
   }
+
   .overview-grid article > strong {
     display: block;
     margin-top: 8px;
     color: var(--strategy-text-1);
   }
+
   .overview-grid article > em {
     display: block;
     margin-top: 3px;
@@ -351,40 +366,49 @@
     font-style: normal;
     font-variant-numeric: tabular-nums;
   }
+
   .overview-grid svg {
     width: 100%;
     height: 28px;
     margin-top: 8px;
   }
+
   .overview-grid polyline {
-    fill: none;
-    stroke: #64748b;
     stroke-width: 2;
+    stroke: #64748b;
+    fill: none;
     vector-effect: non-scaling-stroke;
   }
+
   .overview-grid polyline.is-positive {
     stroke: var(--strategy-up);
   }
+
   .overview-grid polyline.is-negative {
     stroke: var(--strategy-down);
   }
+
   .is-positive {
     color: var(--strategy-up) !important;
   }
+
   .is-negative {
     color: var(--strategy-down) !important;
   }
+
   @media (max-width: 1150px) {
     .overview-grid {
       grid-template-columns: repeat(2, minmax(0, 1fr));
     }
   }
+
   @media (max-width: 680px) {
     .board-toolbar,
     .section-header {
-      align-items: flex-start;
       flex-direction: column;
+      align-items: flex-start;
     }
+
     .overview-grid {
       grid-template-columns: 1fr;
     }

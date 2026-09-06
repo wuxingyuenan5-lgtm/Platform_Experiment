@@ -1,5 +1,9 @@
 <template>
-  <MarketTerminalPage :config="aShareTerminalConfig" :market-tabs="aShareTerminalTabs" />
+  <MarketTerminalPage
+    :config="aShareTerminalConfig"
+    :market-tabs="aShareTerminalTabs"
+    detail-section-id="a-share-market-detail"
+  />
 </template>
 
 <script setup lang="ts">

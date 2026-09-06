@@ -125,7 +125,7 @@
       </div>
     </section>
 
-    <section class="market-terminal__detail-section">
+    <section :id="detailSectionId" class="market-terminal__detail-section">
       <div class="market-terminal__panel-head market-terminal__panel-head--detail-toggle">
         <h3>市场明细</h3>
         <button
@@ -314,6 +314,7 @@
   const props = defineProps<{
     config: MarketTerminalPageConfig;
     marketTabs: MarketTab[];
+    detailSectionId?: string;
   }>();
 
   const expandedGroups = ref<Record<string, boolean>>(
@@ -1044,16 +1045,8 @@
   .market-terminal {
     --terminal-border: rgb(201 213 226 / 72%);
     --terminal-border-strong: rgb(170 186 203 / 82%);
-    --terminal-panel-bg: linear-gradient(
-      180deg,
-      rgb(255 255 255 / 98%),
-      rgb(243 248 252 / 96%)
-    );
-    --terminal-card-bg: linear-gradient(
-      180deg,
-      rgb(255 255 255 / 98%),
-      rgb(247 250 252 / 96%)
-    );
+    --terminal-panel-bg: linear-gradient(180deg, rgb(255 255 255 / 98%), rgb(243 248 252 / 96%));
+    --terminal-card-bg: linear-gradient(180deg, rgb(255 255 255 / 98%), rgb(247 250 252 / 96%));
     --terminal-chip-bg: rgb(240 246 250 / 96%);
     --terminal-text: #16303a;
     --terminal-muted: #6e8395;
