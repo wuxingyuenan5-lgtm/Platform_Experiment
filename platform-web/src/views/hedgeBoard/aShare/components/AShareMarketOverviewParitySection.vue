@@ -27,9 +27,13 @@
             ><span>全A成交额</span
             ><strong>{{ formatHundredMillion(latestHistory.total_amount_100m) }}</strong></div
           >
-          <div
+          <button
+            type="button"
+            class="meta-action"
+            :disabled="!hotMatrixRows.length"
+            @click="hotMatrixOpen = true"
             ><span>百亿成交股</span
-            ><strong>{{ hotStockCount == null ? '—' : `${hotStockCount}只` }}</strong></div
+            ><strong>{{ hotStockCount == null ? '—' : `${hotStockCount}只` }}</strong></button
           >
           <div
             ><span>市场宽度</span
@@ -57,47 +61,40 @@
         >
         <div v-else class="empty">暂无短线情绪数据</div>
         <div v-if="emotion" class="emotion-detail">
-          <article class="emotion-subpanel"
-            ><h4>连板梯队</h4
-            ><div v-if="ladderRows.length" class="ladder-list"
-              ><div v-for="row in ladderRows" :key="row.label"
-                ><span>{{ row.label }}</span
-                ><div class="ladder-track"
-                  ><i :style="{ width: `${ladderWidth(row.count)}%` }"></i></div
-                ><strong>{{ row.count }}</strong></div
-              ></div
-            ><p v-else class="empty-inline">暂无二板及以上个股</p></article
+          <button
+            type="button"
+            class="emotion-subpanel ladder-trigger"
+            :disabled="!ladderRows.length"
+            @click="ladderOpen = true"
           >
-          <article class="emotion-subpanel emotion-subpanel--table"
-            ><h4>连板股明细</h4
-            ><div class="table-shell"
-              ><table
-                ><thead
-                  ><tr
-                    ><th class="is-left">名称 / 代码</th><th>连板</th><th>现价</th><th>涨跌%</th
-                    ><th class="is-right">成交额</th><th>流通市值</th><th>概念</th></tr
-                  ></thead
-                ><tbody
-                  ><tr v-for="row in emotionLeaders" :key="row.code"
-                    ><td class="is-left"
-                      ><strong>{{ row.name }}</strong
-                      ><small>{{ row.code }}</small></td
-                    ><td>{{ row.boards }}板</td><td>{{ row.price ?? '—' }}</td
-                    ><td :class="tone(row.pct)">{{ formatPct(row.pct) }}</td
-                    ><td class="is-right">{{ formatYi(row.amountYi) }}</td
-                    ><td>{{ formatYi(row.floatCapYi) }}</td
-                    ><td>{{ row.industry || '—' }}</td></tr
-                  ><tr v-if="!emotionLeaders.length"
-                    ><td colspan="7" class="empty-cell">暂无二板及以上个股</td></tr
-                  ></tbody
-                ></table
-              ></div
-            ></article
-          >
+            <span class="subpanel-heading"
+              ><strong>连板梯队</strong
+              ><span>{{
+                ladderRows.length ? '点击查看连板股明细' : '暂无二板及以上个股'
+              }}</span></span
+            >
+            <span v-if="ladderRows.length" class="ladder-list">
+              <span v-for="row in ladderRows" :key="row.boardCount" class="ladder-row"
+                ><span>{{ row.boardCount }}</span
+                ><i class="ladder-track"
+                  ><b :style="{ width: `${ladderWidth(row.stockCount)}%` }"></b></i
+                ><strong>{{ row.stockCount }}</strong></span
+              >
+            </span>
+          </button>
+          <article class="emotion-subpanel emotion-summary-panel">
+            <h4>连板股明细</h4>
+            <p>{{
+              emotionLeaders.length
+                ? `共 ${emotionLeaders.length} 只，点击左侧连板梯队查看完整清单`
+                : '暂无二板及以上个股'
+            }}</p>
+          </article>
         </div>
       </article>
     </div>
-    <article v-if="historyRows.length" class="panel history-panel">
+    <VibeTrendCharts v-if="allHistoryRows.length" :rows="allHistoryRows" />
+    <article v-if="false && historyRows.length" class="panel history-panel">
       <div class="panel-title">
         <h3>市场涨跌结构与宽度</h3>
         <div class="history-actions" role="group" aria-label="历史范围">
@@ -189,7 +186,7 @@
         </div>
       </div>
     </article>
-    <article v-if="hotMatrixRows.length" class="panel matrix-panel">
+    <article v-if="false && hotMatrixRows.length" class="panel matrix-panel">
       <div class="panel-title"
         ><div><h3>百亿成交 · 行业分布</h3></div></div
       >
@@ -301,7 +298,11 @@
             ><tr v-for="(row, index) in turnoverRows.slice(0, topN)" :key="row.securityCode"
               ><td>{{ index + 1 }}</td
               ><td class="is-left"
-                ><strong>{{ row.securityName }}</strong
+                ><button
+                  type="button"
+                  class="stock-name-button"
+                  @click="emit('query', row.securityCode)"
+                  >{{ row.securityName }}</button
                 ><small>{{ row.securityCode }}</small></td
               ><td>{{ row.price ?? '—' }}</td
               ><td :class="tone(row.returnPct)">{{ formatPct(row.returnPct) }}</td
@@ -313,6 +314,73 @@
         ></div
       ><div v-else class="empty">暂无成交额榜数据</div></article
     >
+    <div v-if="hotMatrixOpen" class="detail-modal-mask" @click.self="hotMatrixOpen = false">
+      <article class="detail-modal panel matrix-panel">
+        <div class="panel-title"
+          ><h3>百亿成交 · 行业分布</h3
+          ><button type="button" class="modal-close" @click="hotMatrixOpen = false"
+            >关闭</button
+          ></div
+        >
+        <div class="table-shell matrix-shell">
+          <table
+            ><thead
+              ><tr
+                ><th class="is-left">行业</th
+                ><th v-for="date in hotMatrixDates" :key="date">{{ date.slice(5) }}</th
+                ><th>历史累计</th></tr
+              ></thead
+            >
+            <tbody
+              ><tr class="matrix-total"
+                ><td class="is-left"><strong>合计</strong></td
+                ><td v-for="(total, index) in hotMatrixTotals" :key="index">{{ total || '' }}</td
+                ><td>{{ hotMatrixTotal }}</td></tr
+              >
+              <tr v-for="row in hotMatrixRows" :key="row.industry"
+                ><td class="is-left"
+                  ><strong>{{ row.industry }}</strong></td
+                ><td v-for="(count, index) in row.counts" :key="index">{{ count || '' }}</td
+                ><td>{{ row.historyTotal }}</td></tr
+              ></tbody
+            >
+          </table>
+        </div>
+      </article>
+    </div>
+    <div v-if="ladderOpen" class="detail-modal-mask" @click.self="ladderOpen = false">
+      <article class="detail-modal panel">
+        <div class="panel-title"
+          ><h3>连板股清单</h3
+          ><button type="button" class="modal-close" @click="ladderOpen = false">关闭</button></div
+        >
+        <div class="table-shell">
+          <table
+            ><thead
+              ><tr
+                ><th class="is-left">名称 / 代码</th><th>连板</th><th>现价</th><th>涨跌%</th
+                ><th class="is-right">成交额</th><th>流通市值</th><th>行业</th></tr
+              ></thead
+            >
+            <tbody
+              ><tr v-for="row in emotionLeaders" :key="row.code"
+                ><td class="is-left"
+                  ><strong>{{ row.name }}</strong
+                  ><small>{{ row.code }}</small></td
+                ><td>{{ row.boards }}板</td><td>{{ row.price ?? '—' }}</td
+                ><td :class="tone(row.pct)">{{ formatPct(row.pct) }}</td
+                ><td class="is-right">{{ formatYi(row.amountYi) }}</td
+                ><td>{{ formatYi(row.floatCapYi) }}</td
+                ><td>{{ row.industry || '—' }}</td></tr
+              >
+              <tr v-if="!emotionLeaders.length"
+                ><td colspan="7" class="empty-cell">暂无二板及以上个股</td></tr
+              ></tbody
+            >
+          </table>
+        </div>
+      </article>
+    </div>
   </section>
 </template>
 
@@ -320,8 +388,10 @@
   import { computed, onMounted, ref } from 'vue';
   import type { AShareDashboardResponse } from '@/api/hedgeResearch';
   import ResearchSourceState from '../../research/components/ResearchSourceState.vue';
+  import VibeTrendCharts from './VibeTrendCharts.vue';
 
   const props = defineProps<{ dashboard: AShareDashboardResponse | null }>();
+  const emit = defineEmits<{ (event: 'query', code: string): void }>();
   interface VibeSector {
     name: string;
     pct: number;
@@ -431,6 +501,8 @@
   const vibeMonitor = ref<VibeMonitor | null>(null);
   const sectorsExpanded = ref(false);
   const topN = ref<10 | 20>(10);
+  const ladderOpen = ref(false);
+  const hotMatrixOpen = ref(false);
   const historyRange = ref<'recent' | '90' | 'all'>('recent');
   const historyRangeOptions = [
     { key: 'recent' as const, label: '近60日' },
@@ -607,7 +679,7 @@
         securityName: r.name,
         price: r.price,
         returnPct: r.pct,
-        turnoverYi: r.amount / 1e8,
+        turnoverYi: r.amount == null ? null : r.amount / 1e8,
         marketCapYi: r.mcap == null ? null : r.mcap / 1e8,
         industry: r.industry,
       }));
@@ -619,7 +691,7 @@
         securityCode: r.securityCode,
         securityName: r.securityName,
         returnPct: r.returnPct,
-        turnoverYi: Number(r.turnoverYuan) / 1e8,
+        turnoverYi: r.turnoverYuan == null ? null : Number(r.turnoverYuan) / 1e8,
         marketCapYi: null,
         industry: r.swL2Name,
       }));
@@ -870,6 +942,27 @@
     text-align: center;
   }
 
+  .overview-meta-grid .meta-action {
+    display: block;
+    width: 100%;
+    padding: 8px;
+    border: 0;
+    border-radius: 8px;
+    background: var(--strategy-surface);
+    color: inherit;
+    text-align: center;
+    cursor: pointer;
+  }
+
+  .overview-meta-grid .meta-action:disabled {
+    opacity: 0.65;
+    cursor: not-allowed;
+  }
+
+  .overview-meta-grid .meta-action:hover:not(:disabled) {
+    background: var(--strategy-accent-soft);
+  }
+
   .overview-meta-grid span {
     display: block;
     color: var(--strategy-text-3);
@@ -1045,9 +1138,50 @@
     font-size: 13px;
   }
 
+  .ladder-trigger {
+    width: 100%;
+    border: 1px solid var(--strategy-border);
+    color: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .ladder-trigger:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+  }
+
+  .subpanel-heading {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: 10px;
+    gap: 8px;
+  }
+
+  .subpanel-heading span,
+  .emotion-summary-panel p {
+    margin: 0;
+    color: var(--strategy-text-4);
+    font-size: 11px;
+  }
+
   .ladder-list {
     display: grid;
     gap: 10px;
+  }
+
+  .ladder-row {
+    display: grid;
+    grid-template-columns: 45px minmax(0, 1fr) 24px;
+    align-items: center;
+    gap: 8px;
+    color: var(--strategy-text-2);
+    font-size: 12px;
+  }
+
+  .ladder-row + .ladder-row {
+    margin-top: 10px;
   }
 
   .ladder-list > div {
@@ -1118,6 +1252,21 @@
 
   .is-left {
     text-align: left;
+  }
+
+  .stock-name-button {
+    display: block;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--strategy-text-1);
+    font: inherit;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  .stock-name-button:hover {
+    color: var(--strategy-accent-strong);
   }
 
   .is-right {
@@ -1210,6 +1359,32 @@
   .panel :deep(.research-source-state),
   .metric-panel :deep(.research-source-state) {
     white-space: nowrap;
+  }
+
+  .detail-modal-mask {
+    display: flex;
+    position: fixed;
+    z-index: 50;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    background: rgb(15 23 42 / 55%);
+    inset: 0;
+  }
+
+  .detail-modal {
+    width: min(1100px, 100%);
+    max-height: min(78vh, 760px);
+    overflow: auto;
+  }
+
+  .modal-close {
+    padding: 4px 9px;
+    border: 1px solid var(--strategy-border);
+    border-radius: 6px;
+    background: var(--strategy-surface-2);
+    color: var(--strategy-text-2);
+    cursor: pointer;
   }
 
   @media (max-width: 900px) {

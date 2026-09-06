@@ -1,5 +1,5 @@
 <template>
-  <section id="a-share-watchlist-pool" class="pool-card">
+  <section id="a-share-watchlist-pool" ref="poolRoot" class="pool-card">
     <header class="pool-head"
       ><div><h2>自选股与核心股票池</h2></div
       ><button type="button" class="toolbar" :disabled="loading" @click="load">{{
@@ -8,6 +8,51 @@
     >
     <div v-if="error" class="error">{{ error }}</div>
     <template v-if="data">
+      <div class="pool-kpis">
+        <div class="pool-kpi"
+          ><span>股票池</span><strong>{{ data.summary.tracked_count }}</strong
+          ><small>只</small></div
+        >
+        <div class="pool-kpi"
+          ><span>上涨</span><strong class="up">{{ data.summary.breadth.up }}</strong
+          ><small>只</small></div
+        >
+        <div class="pool-kpi"
+          ><span>下跌</span><strong class="down">{{ data.summary.breadth.down }}</strong
+          ><small>只</small></div
+        >
+        <div class="pool-kpi"
+          ><span>中位涨幅</span
+          ><strong :class="tone(data.summary.breadth.median)">{{
+            formatPct(data.summary.breadth.median)
+          }}</strong></div
+        >
+        <div class="pool-kpi"
+          ><span>平均涨幅</span
+          ><strong :class="tone(data.summary.avg_change)">{{
+            formatPct(data.summary.avg_change)
+          }}</strong></div
+        >
+        <div class="pool-kpi"
+          ><span>成交额</span><strong>{{ formatNumber(data.summary.total_amount_yi) }}</strong
+          ><small>亿</small></div
+        >
+      </div>
+      <section class="breadth-panel">
+        <h3>股票池涨跌宽度</h3>
+        <div class="breadth-track"
+          ><i
+            v-for="(count, index) in breadthBins"
+            :key="index"
+            :class="`breadth-${index}`"
+            :style="{ width: `${(count / breadthTotal) * 100}%` }"
+          ></i
+        ></div>
+        <div class="breadth-labels"
+          ><span>≤ -5%</span><span>-5% ~ -1%</span><span>-1% ~ +1%</span><span>+1% ~ +5%</span
+          ><span>≥ +5%</span></div
+        >
+      </section>
       <div class="pool-grid">
         <section class="sub-panel"
           ><div class="sub-panel-head"
@@ -334,7 +379,7 @@
 </template>
 
 <script setup lang="ts">
-  import { computed, onMounted, ref } from 'vue';
+  import { computed, onMounted, onBeforeUnmount, ref } from 'vue';
 
   interface Stock {
     instrument_id: string;
@@ -359,7 +404,7 @@
     meta?: { report_date?: string; generated_at?: string };
     summary: {
       tracked_count: number;
-      breadth: { up: number; down: number; flat: number };
+      breadth: { up: number; down: number; flat: number; median?: number | null };
       avg_change?: number | null;
       total_amount_yi?: number | null;
     };
@@ -378,7 +423,7 @@
   }
   const emit = defineEmits<{ (event: 'query', code: string): void }>();
   const data = ref<PoolPayload | null>(null);
-  const loading = ref(false);
+  const loading = ref(true);
   const error = ref('');
   const operationMessage = ref('');
   const query = ref('');
@@ -391,10 +436,31 @@
   const editOpen = ref(false);
   const batchInput = ref('');
   const syncing = ref(false);
+  const poolRoot = ref<HTMLElement | null>(null);
+  let poolObserver: IntersectionObserver | null = null;
   const matrixHoverId = ref<string | null>(null);
   const rankingPeriod = ref<Period>('change');
   const heatPeriod = ref<Period>('change');
   const baskets = computed(() => data.value?.definitions?.research_baskets || []);
+  const breadthBins = computed(() => {
+    const bins = [0, 0, 0, 0, 0];
+    for (const row of data.value?.stocks || []) {
+      const value = Number(row.change);
+      if (!Number.isFinite(value)) continue;
+      if (value <= -0.05) bins[0] += 1;
+      else if (value < -0.01) bins[1] += 1;
+      else if (value <= 0.01) bins[2] += 1;
+      else if (value < 0.05) bins[3] += 1;
+      else bins[4] += 1;
+    }
+    return bins;
+  });
+  const breadthTotal = computed(() =>
+    Math.max(
+      1,
+      breadthBins.value.reduce((total, count) => total + count, 0),
+    ),
+  );
   const industries = computed(() =>
     [
       ...new Set((data.value?.stocks || []).map((x) => x.industry).filter(Boolean) as string[]),
@@ -534,32 +600,25 @@
     loading.value = true;
     error.value = '';
     try {
-      const response = await fetch(`/vibe-research/api/stock-pool?_ts=${Date.now()}`, {
-        cache: 'no-store',
-      });
+      const [response, focusResponse] = await Promise.all([
+        fetch(`/vibe-research/api/stock-pool?_ts=${Date.now()}`, { cache: 'no-store' }),
+        fetch(`/vibe-research/api/stock-pool/focus?_ts=${Date.now()}`, { cache: 'no-store' }),
+      ]);
       if (!response.ok) throw new Error(`股票池数据请求失败（HTTP ${response.status}）`);
       const payload = (await response.json()) as { data?: PoolPayload };
       data.value = payload.data || null;
       if (!focusCodes.value.length && payload.data?.definitions?.focus_codes) {
         focusCodes.value = [...payload.data.definitions.focus_codes];
       }
-      await loadFocus();
+      if (focusResponse.ok) {
+        const focusPayload = (await focusResponse.json()) as { data?: { codes?: string[] } };
+        if (Array.isArray(focusPayload.data?.codes))
+          focusCodes.value = [...focusPayload.data.codes];
+      }
     } catch (e) {
       error.value = e instanceof Error ? e.message : '股票池数据请求失败';
     } finally {
       loading.value = false;
-    }
-  }
-  async function loadFocus() {
-    try {
-      const response = await fetch(`/vibe-research/api/stock-pool/focus?_ts=${Date.now()}`, {
-        cache: 'no-store',
-      });
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      const payload = (await response.json()) as { data?: { codes?: string[] } };
-      if (Array.isArray(payload.data?.codes)) focusCodes.value = [...payload.data.codes];
-    } catch {
-      // GET failure must not erase the last known focus definition.
     }
   }
   async function saveFocus(next: string[]) {
@@ -706,7 +765,24 @@
       });
     }
   }
-  onMounted(load);
+  onMounted(() => {
+    if (typeof IntersectionObserver === 'undefined' || !poolRoot.value) {
+      void load();
+      return;
+    }
+    poolObserver = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          poolObserver?.disconnect();
+          poolObserver = null;
+          void load();
+        }
+      },
+      { rootMargin: '640px 0px' },
+    );
+    poolObserver.observe(poolRoot.value);
+  });
+  onBeforeUnmount(() => poolObserver?.disconnect());
 </script>
 
 <style scoped lang="less">
@@ -730,6 +806,100 @@
     margin: 0;
     color: var(--strategy-text-1);
     font-size: 20px;
+  }
+
+  .pool-kpis {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .pool-kpi {
+    min-width: 0;
+    padding: 12px 14px;
+    border: 1px solid var(--strategy-border);
+    border-radius: 9px;
+    background: var(--strategy-surface-2);
+  }
+
+  .pool-kpi span,
+  .pool-kpi small {
+    color: var(--strategy-text-3);
+    font-size: 11px;
+  }
+
+  .pool-kpi strong {
+    display: inline-block;
+    margin-top: 5px;
+    color: var(--strategy-text-1);
+    font-size: 22px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .pool-kpi small {
+    margin-left: 4px;
+  }
+
+  .breadth-panel {
+    padding: 14px;
+    border: 1px solid var(--strategy-border);
+    border-radius: 10px;
+    background: var(--strategy-surface-2);
+  }
+
+  .breadth-panel h3 {
+    margin: 0 0 10px;
+    color: var(--strategy-text-1);
+    font-size: 15px;
+  }
+
+  .breadth-track {
+    display: flex;
+    height: 18px;
+    overflow: hidden;
+    border-radius: 6px;
+    background: var(--strategy-border);
+  }
+
+  .breadth-track i {
+    display: block;
+    min-width: 1px;
+  }
+
+  .breadth-0 {
+    background: #15803d;
+  }
+
+  .breadth-1 {
+    background: #22c55e;
+  }
+
+  .breadth-2 {
+    background: #94a3b8;
+  }
+
+  .breadth-3 {
+    background: #f87171;
+  }
+
+  .breadth-4 {
+    background: #dc2626;
+  }
+
+  .breadth-labels {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    margin-top: 6px;
+    color: var(--strategy-text-3);
+    font-size: 10px;
+  }
+
+  .breadth-labels span:nth-child(n + 2) {
+    text-align: center;
+  }
+
+  .breadth-labels span:last-child {
+    text-align: right;
   }
 
   .toolbar,
@@ -1204,6 +1374,10 @@
   }
 
   @media (max-width: 900px) {
+    .pool-kpis {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
     .pool-head {
       flex-direction: column;
     }
@@ -1223,6 +1397,12 @@
     .matrix-axis-label,
     .matrix-quadrant-label {
       font-size: 10px;
+    }
+  }
+
+  @media (max-width: 560px) {
+    .pool-kpis {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
     }
   }
 </style>
