@@ -75,10 +75,6 @@
         </div>
       </article>
     </div>
-
-    <div v-else-if="!loading && !error" class="research-empty">
-      输入股票代码后，将按固定数据流程并行读取全部客观数据模块。
-    </div>
   </section>
 </template>
 
@@ -193,6 +189,7 @@
     background: var(--strategy-surface);
     box-shadow: var(--strategy-shadow-soft);
   }
+
   .research-card__header {
     display: flex;
     align-items: flex-start;
@@ -200,6 +197,7 @@
     gap: 16px;
     margin-bottom: 15px;
   }
+
   .research-card__eyebrow {
     margin: 0 0 3px;
     color: var(--strategy-text-4);
@@ -207,33 +205,38 @@
     font-weight: 800;
     letter-spacing: 0.12em;
   }
+
   h2 {
     margin: 0;
     color: var(--strategy-text-1);
     font-size: 18px;
   }
+
   .snapshot-meta {
     display: flex;
     align-items: center;
     gap: 9px;
     color: var(--strategy-text-2);
   }
+
   .snapshot-meta b {
     padding: 5px 9px;
     border-radius: 999px;
     background: var(--strategy-accent-soft);
     color: var(--strategy-accent-strong);
   }
+
   .query-form {
     display: flex;
-    align-items: flex-end;
-    gap: 9px;
     flex-wrap: wrap;
+    align-items: flex-end;
     padding: 12px;
     border: 1px solid var(--strategy-border);
     border-radius: 11px;
     background: var(--strategy-surface-2);
+    gap: 9px;
   }
+
   .query-form label {
     display: grid;
     gap: 5px;
@@ -241,6 +244,7 @@
     color: var(--strategy-text-3);
     font-size: 12px;
   }
+
   .query-form input {
     height: 38px;
     padding: 0 11px;
@@ -250,6 +254,7 @@
     color: var(--strategy-text-1);
     font-size: 14px;
   }
+
   .primary-button,
   .toolbar-button {
     height: 38px;
@@ -260,22 +265,26 @@
     color: var(--strategy-text-2);
     cursor: pointer;
   }
+
   .primary-button {
     background: var(--strategy-accent-soft);
     color: var(--strategy-accent-strong);
     font-weight: 800;
   }
+
   .primary-button:disabled {
-    cursor: wait;
     opacity: 0.65;
+    cursor: wait;
   }
+
   .query-error {
     margin-top: 10px;
     padding: 10px 12px;
     border-radius: 9px;
-    background: rgba(239, 68, 68, 0.08);
+    background: rgb(239 68 68 / 8%);
     color: #dc2626;
   }
+
   .query-loading {
     display: flex;
     align-items: center;
@@ -284,30 +293,36 @@
     min-height: 120px;
     color: var(--strategy-text-3);
   }
+
   .loading-dot {
     width: 6px;
     height: 6px;
+    animation: pulse 1s infinite alternate;
     border-radius: 999px;
     background: var(--strategy-accent-strong);
-    animation: pulse 1s infinite alternate;
   }
+
   .loading-dot:nth-child(2) {
     animation-delay: 0.2s;
   }
+
   .loading-dot:nth-child(3) {
-    animation-delay: 0.4s;
     margin-right: 5px;
+    animation-delay: 0.4s;
   }
+
   .module-list {
     display: grid;
     gap: 8px;
     margin-top: 12px;
   }
+
   .snapshot-module {
     overflow: hidden;
     border: 1px solid var(--strategy-border);
     border-radius: 10px;
   }
+
   .snapshot-module__header {
     display: grid;
     grid-template-columns: 20px minmax(180px, 1fr) minmax(200px, auto);
@@ -321,19 +336,24 @@
     text-align: left;
     cursor: pointer;
   }
+
   .module-arrow {
     color: var(--strategy-text-4);
   }
+
   .module-title {
     min-width: 0;
   }
+
   .module-title strong,
   .module-title small {
     display: block;
   }
+
   .module-title strong {
     color: var(--strategy-text-1);
   }
+
   .module-title small {
     margin-top: 3px;
     overflow: hidden;
@@ -341,32 +361,39 @@
     text-overflow: ellipsis;
     white-space: nowrap;
   }
+
   .snapshot-module__body {
     padding: 12px;
     background: var(--strategy-surface);
   }
+
   .research-empty {
     padding: 30px;
     color: var(--strategy-text-3);
     text-align: center;
   }
+
   @keyframes pulse {
     from {
-      opacity: 0.25;
       transform: translateY(1px);
+      opacity: 0.25;
     }
+
     to {
-      opacity: 1;
       transform: translateY(-1px);
+      opacity: 1;
     }
   }
+
   @media (max-width: 760px) {
     .research-card__header {
       flex-direction: column;
     }
+
     .snapshot-module__header {
       grid-template-columns: 20px 1fr;
     }
+
     .snapshot-module__header :deep(.research-source-state) {
       grid-column: 2;
     }

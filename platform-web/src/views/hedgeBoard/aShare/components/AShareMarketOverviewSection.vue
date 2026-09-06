@@ -45,7 +45,7 @@
     <div class="overview-grid">
       <article class="panel">
         <div class="panel-title"
-          ><div><h3>板块资金趋势榜</h3><p>申万二级行业 · 按成交额排序</p></div
+          ><div><h3>板块资金趋势榜</h3></div
           ><ResearchSourceState v-if="dashboard?.shenwan" :meta="dashboard.shenwan.meta"
         /></div>
         <div v-if="topSectors.length" class="sector-list">
@@ -62,7 +62,7 @@
       </article>
       <article class="panel">
         <div class="panel-title"
-          ><div><h3>资金轮动</h3><p>板块级净流入 / 流出</p></div></div
+          ><div><h3>资金轮动</h3></div></div
         >
         <div v-if="rotationRows.length" class="sector-list">
           <div v-for="row in rotationRows" :key="row.swL2Code" class="sector-row"

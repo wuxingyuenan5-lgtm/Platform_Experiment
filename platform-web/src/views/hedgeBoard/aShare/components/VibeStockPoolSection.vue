@@ -105,8 +105,7 @@
       </section>
       <section class="sub-panel matrix-panel">
         <div class="sub-panel-head">
-          <div><h3>强弱矩阵</h3><p>今日涨幅 × 20日涨幅；点击标的查看个股数据。</p></div>
-          <span class="matrix-legend">红色上涨 · 绿色下跌 · 灰色为混合信号</span>
+          <h3>强弱矩阵</h3>
         </div>
         <div class="matrix-grid">
           <div
@@ -630,12 +629,6 @@
     margin: 3px 0 0;
     color: var(--strategy-text-4);
     font-size: 11px;
-  }
-
-  .matrix-legend {
-    color: var(--strategy-text-4);
-    font-size: 11px;
-    white-space: nowrap;
   }
 
   .matrix-grid {

@@ -191,10 +191,7 @@
     </article>
     <article v-if="hotMatrixRows.length" class="panel matrix-panel">
       <div class="panel-title"
-        ><div
-          ><h3>百亿成交 · 行业分布</h3
-          ><p>最近 {{ hotMatrixDates.length }} 个有记录交易日 · 最新日期在左</p></div
-        ></div
+        ><div><h3>百亿成交 · 行业分布</h3></div></div
       >
       <div class="table-shell matrix-shell">
         <table>
@@ -224,7 +221,7 @@
     <div class="overview-grid">
       <article class="panel">
         <div class="panel-title"
-          ><div><h3>板块资金趋势榜</h3><p>申万行业 · 按今日净流入排序</p></div
+          ><div><h3>板块资金趋势榜</h3></div
           ><ResearchSourceState
             v-if="!vibe?.sectors?.length && dashboard?.shenwan"
             :meta="dashboard.shenwan.meta"
@@ -259,7 +256,7 @@
       </article>
       <article class="panel"
         ><div class="panel-title"
-          ><div><h3>资金轮动</h3><p>板块级净流入 / 流出</p></div></div
+          ><div><h3>资金轮动</h3></div></div
         ><div v-if="rotationRows.length" class="rotation-grid"
           ><div class="rotation-column"
             ><h4 class="is-positive">↑ 流入 Top</h4

@@ -12,7 +12,6 @@
       <div class="section-title-row">
         <div>
           <h3>申万二级成交额 Top 10</h3>
-          <p>默认按当日行业总成交额降序。</p>
         </div>
       </div>
       <div v-if="data.sw2Top.length" class="table-shell">
@@ -381,6 +380,7 @@
     background: var(--strategy-surface);
     box-shadow: var(--strategy-shadow-soft);
   }
+
   .research-card__header,
   .section-title-row {
     display: flex;
@@ -388,9 +388,11 @@
     justify-content: space-between;
     gap: 16px;
   }
+
   .research-card__header {
     margin-bottom: 18px;
   }
+
   .research-card__eyebrow {
     margin: 0 0 3px;
     color: var(--strategy-text-4);
@@ -398,36 +400,43 @@
     font-weight: 800;
     letter-spacing: 0.12em;
   }
+
   h2,
   h3,
   p {
     margin: 0;
   }
+
   h2 {
     color: var(--strategy-text-1);
     font-size: 18px;
   }
+
   h3 {
     color: var(--strategy-text-1);
     font-size: 15px;
   }
+
   .section-title-row p {
     margin-top: 4px;
     color: var(--strategy-text-3);
     font-size: 12px;
   }
+
   .table-shell {
-    overflow-x: auto;
     margin-top: 12px;
+    overflow-x: auto;
     border: 1px solid var(--strategy-border);
     border-radius: 12px;
   }
+
   .market-table {
     width: 100%;
     min-width: 860px;
     border-collapse: collapse;
     font-variant-numeric: tabular-nums;
   }
+
   th,
   td {
     padding: 11px 12px;
@@ -435,40 +444,50 @@
     color: var(--strategy-text-2);
     text-align: center;
   }
+
   th {
     background: var(--strategy-surface-2);
     color: var(--strategy-text-3);
     font-size: 12px;
     white-space: nowrap;
   }
+
   tbody tr:last-child td {
     border-bottom: 0;
   }
+
   tbody tr:not(.detail-row):hover {
     background: var(--strategy-accent-soft);
   }
+
   td strong,
   td small {
     display: block;
   }
+
   td small {
     margin-top: 2px;
     color: var(--strategy-text-4);
   }
+
   .is-left {
     text-align: left;
   }
+
   .is-right {
     text-align: right;
   }
+
   .is-positive {
     color: var(--strategy-up, #ef4444) !important;
     font-weight: 700;
   }
+
   .is-negative {
     color: var(--strategy-down, #10b981) !important;
     font-weight: 700;
   }
+
   .collapse-button {
     width: 100%;
     margin-top: 14px;
@@ -480,9 +499,11 @@
     text-align: left;
     cursor: pointer;
   }
+
   .full-panel {
     margin-top: 12px;
   }
+
   .filter-row,
   .threshold-controls,
   .threshold-actions,
@@ -490,22 +511,26 @@
   .filter-summary,
   .filter-actions {
     display: flex;
+    flex-wrap: wrap;
     align-items: flex-end;
     gap: 10px;
-    flex-wrap: wrap;
   }
+
   .filter-row label {
     display: grid;
     gap: 5px;
     color: var(--strategy-text-3);
     font-size: 12px;
   }
+
   .filter-row__search {
     flex: 1 1 260px;
   }
+
   .filter-actions {
     align-items: center;
   }
+
   select,
   input {
     min-height: 36px;
@@ -515,6 +540,7 @@
     background: var(--strategy-surface);
     color: var(--strategy-text-1);
   }
+
   .sort-direction-button,
   .reset-button,
   .threshold-actions button,
@@ -527,61 +553,75 @@
     color: var(--strategy-text-2);
     cursor: pointer;
   }
+
   .sort-direction-button {
     min-height: 36px;
     font-weight: 700;
   }
+
   .reset-button {
     color: var(--strategy-accent-strong);
   }
+
   button:disabled {
-    cursor: not-allowed;
     opacity: 0.5;
+    cursor: not-allowed;
   }
+
   .filter-summary {
     justify-content: space-between;
     margin-top: 10px;
     color: var(--strategy-text-3);
     font-size: 12px;
   }
+
   .filter-summary span {
     padding: 4px 0;
   }
+
   .threshold-panel {
     margin-top: 20px;
     padding-top: 18px;
     border-top: 1px solid var(--strategy-border);
   }
+
   .primary-button {
     background: var(--strategy-accent-soft);
     color: var(--strategy-accent-strong);
     font-weight: 700;
   }
+
   .threshold-controls {
-    margin-top: 14px;
     align-items: center;
+    margin-top: 14px;
   }
+
   .radio-option {
     display: inline-flex;
     align-items: center;
     gap: 5px;
     color: var(--strategy-text-2);
   }
+
   .radio-option input {
     min-height: auto;
   }
+
   .custom-threshold {
     display: inline-flex;
     align-items: center;
     gap: 6px;
   }
+
   .custom-threshold input {
     width: 100px;
   }
+
   .threshold-summary {
-    margin-top: 12px;
     align-items: center;
+    margin-top: 12px;
   }
+
   .threshold-summary span {
     padding: 5px 9px;
     border-radius: 999px;
@@ -589,9 +629,11 @@
     color: var(--strategy-text-3);
     font-size: 12px;
   }
+
   .is-clickable {
     cursor: pointer;
   }
+
   .count-button {
     min-width: 40px;
     padding: 4px 10px;
@@ -602,15 +644,18 @@
     font-weight: 800;
     cursor: pointer;
   }
+
   .detail-row td {
     padding: 14px;
     background: var(--strategy-surface-2);
   }
+
   .threshold-stock-grid {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 9px;
   }
+
   .threshold-stock-grid article {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto auto;
@@ -622,24 +667,29 @@
     background: var(--strategy-surface);
     text-align: left;
   }
+
   .threshold-stock-grid div strong,
   .threshold-stock-grid div span {
     display: block;
   }
+
   .threshold-stock-grid div span {
     color: var(--strategy-text-4);
     font-size: 12px;
   }
+
   .threshold-stock-grid b,
   .threshold-stock-grid em {
-    white-space: nowrap;
     font-style: normal;
+    white-space: nowrap;
   }
+
   .research-empty {
     padding: 30px;
     color: var(--strategy-text-3);
     text-align: center;
   }
+
   .research-empty--compact {
     margin-top: 12px;
     padding: 18px;
@@ -647,6 +697,7 @@
     border-radius: 10px;
     background: var(--strategy-surface-2);
   }
+
   .research-empty--filter {
     display: grid;
     gap: 7px;
@@ -656,19 +707,23 @@
     border-radius: 10px;
     background: var(--strategy-surface-2);
   }
+
   .research-empty--filter strong {
     color: var(--strategy-text-1);
   }
+
   @media (max-width: 900px) {
     .threshold-stock-grid {
       grid-template-columns: 1fr;
     }
   }
+
   @media (max-width: 640px) {
     .research-card__header,
     .section-title-row {
       flex-direction: column;
     }
+
     .filter-actions,
     .filter-actions button {
       width: 100%;
