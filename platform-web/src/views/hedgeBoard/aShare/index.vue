@@ -31,6 +31,8 @@
         @query="queryStock"
         @add-watchlist="addToWatchlist"
       />
+
+      <VibeStockPoolSection @query="queryStock" />
     </div>
   </PageWrapper>
 </template>
@@ -43,6 +45,7 @@
   import AShareLegacyTerminalSection from './components/AShareLegacyTerminalSection.vue';
   import AShareMarketOverviewSection from './components/AShareMarketOverviewParitySection.vue';
   import StockSnapshotSection from './components/StockSnapshotSection.vue';
+  import VibeStockPoolSection from './components/VibeStockPoolSection.vue';
   import { useAShareResearch } from './useAShareResearch';
 
   const router = useRouter();

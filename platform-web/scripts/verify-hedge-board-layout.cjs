@@ -50,6 +50,7 @@ const shenwanSectionPath = path.join(
   'ShenwanIndustrySection.vue',
 );
 const stockSnapshotPath = path.join(viewRoot, 'aShare', 'components', 'StockSnapshotSection.vue');
+const vibeStockPoolPath = path.join(viewRoot, 'aShare', 'components', 'VibeStockPoolSection.vue');
 const macroExpectationPath = path.join(viewRoot, 'macro', 'MacroExpectationPanel.vue');
 const hedgeBoardPageComposablePath = path.join(viewRoot, 'composables', 'useHedgeBoardPage.ts');
 const routePath = path.join(__dirname, '..', 'src', 'router', 'routes', 'modules', 'hedge.ts');
@@ -78,6 +79,7 @@ const accountWatchlistApiSource = fs.readFileSync(accountWatchlistApiPath, 'utf8
 const aShareWatchlistSource = fs.readFileSync(aShareWatchlistPath, 'utf8');
 const shenwanSectionSource = fs.readFileSync(shenwanSectionPath, 'utf8');
 const stockSnapshotSource = fs.readFileSync(stockSnapshotPath, 'utf8');
+const vibeStockPoolSource = fs.readFileSync(vibeStockPoolPath, 'utf8');
 const macroExpectationSource = fs.readFileSync(macroExpectationPath, 'utf8');
 const hedgeBoardPageComposableSource = fs.readFileSync(hedgeBoardPageComposablePath, 'utf8');
 const routeSource = fs.readFileSync(routePath, 'utf8');
@@ -132,9 +134,7 @@ assert(
 );
 assert(
   goldMarketDetailSource.includes('prepareCommodityMarketDetail') &&
-    goldMarketDetailSource.includes(
-      'prepareCommodityMarketDetail(config.detailGroups)',
-    ),
+    goldMarketDetailSource.includes('prepareCommodityMarketDetail(config.detailGroups)'),
   'Commodity Market Detail must clear static values until a validated Native source supplies each row.',
 );
 assert(
@@ -283,8 +283,15 @@ assert(
 assert(
   aSharePageSource.includes('<AShareMarketOverviewSection') &&
     aSharePageSource.includes('<AShareLegacyTerminalSection') &&
-    aSharePageSource.includes('<StockSnapshotSection'),
-  'A-share page must orchestrate the market overview, market detail and stock snapshot through child components.',
+    aSharePageSource.includes('<StockSnapshotSection') &&
+    aSharePageSource.includes('<VibeStockPoolSection') &&
+    vibeStockPoolSource.includes('/vibe-research/api/stock-pool') &&
+    vibeStockPoolSource.includes('/vibe-research/api/stock-pool/focus') &&
+    vibeStockPoolSource.includes('/vibe-research/api/stock-pool/add-batch') &&
+    vibeStockPoolSource.includes('matrixPoints') &&
+    vibeStockPoolSource.includes('heatMaxAbs') &&
+    !vibeStockPoolSource.includes('localStorage'),
+  'A-share page must orchestrate the market overview, market detail, stock snapshot and functional stock pool through child components.',
 );
 assert(
   marketTerminalPageSource.includes('detailSectionId') &&
