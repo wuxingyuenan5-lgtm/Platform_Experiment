@@ -127,7 +127,7 @@
 
     <section :id="detailSectionId" class="market-terminal__detail-section">
       <div class="market-terminal__panel-head market-terminal__panel-head--detail-toggle">
-        <h3>市场明细</h3>
+        <h3>{{ marketDetailTitle }}</h3>
         <button
           type="button"
           class="market-terminal__toolbar-btn"
@@ -333,6 +333,17 @@
     tvSymbol: '',
     error: '',
   });
+
+  const marketDetailTitle = computed(
+    () =>
+      ({
+        us: '美股市场明细',
+        global: '全球市场明细',
+        aShare: 'A股市场明细',
+        gold: '商品市场明细',
+        crypto: '加密市场明细',
+      }[props.config.id] ?? '市场明细'),
+  );
 
   let tradingViewScriptPromise: Promise<void> | null = null;
   const rotationColumns = [
@@ -1056,6 +1067,9 @@
     display: flex;
     flex-direction: column;
     gap: 14px;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
   }
 
   .market-terminal__overview-strip,
@@ -1069,7 +1083,13 @@
 
   .market-terminal__detail-section {
     display: grid;
+    min-width: 0;
     gap: 12px;
+    padding: 18px;
+    border: 1px solid var(--terminal-border);
+    border-radius: 18px;
+    background: var(--terminal-panel-bg), #fff;
+    box-shadow: var(--terminal-shadow);
   }
 
   .market-terminal__panel-head--detail-toggle {
