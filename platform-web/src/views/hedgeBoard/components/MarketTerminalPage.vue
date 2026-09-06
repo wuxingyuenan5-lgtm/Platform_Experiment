@@ -1099,12 +1099,15 @@
   .market-terminal__overview-strip {
     display: grid;
     grid-template-columns: 1.05fr 1fr;
-    gap: 12px;
+    min-width: 0;
+    max-width: 100%;
     padding: 12px;
+    gap: 12px;
   }
 
   .market-terminal__overview-panel,
   .market-terminal__side-panel {
+    min-width: 0;
     padding: 12px;
     border: 1px solid rgb(201 213 226 / 58%);
     background: rgb(255 255 255 / 92%);
@@ -1112,6 +1115,7 @@
 
   .market-terminal__overview-side {
     display: grid;
+    min-width: 0;
     gap: 12px;
   }
 
@@ -1158,6 +1162,7 @@
   }
 
   .market-terminal__market-card {
+    min-width: 0;
     padding: 10px;
     transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
     border: 1px solid rgb(201 213 226 / 78%);
@@ -1252,6 +1257,7 @@
   }
 
   .market-terminal__breadth-card {
+    min-width: 0;
     padding: 10px;
     border: 1px dashed rgb(191 205 218 / 74%);
     background: rgb(246 250 252 / 92%);
@@ -1308,6 +1314,7 @@
   }
 
   .market-terminal__vol-card {
+    min-width: 0;
     padding: 10px;
     border: 1px dashed rgb(191 205 218 / 74%);
     background: rgb(246 250 252 / 92%);
