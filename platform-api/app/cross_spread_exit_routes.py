@@ -83,6 +83,7 @@ def close_market_lifecycle(
         limit_spread=request.limit_spread,
         limit_strategy=request.limit_strategy,
         idempotency_key=request.idempotency_key,
+        quantity_oz=request.quantity_oz,
     )
 
 

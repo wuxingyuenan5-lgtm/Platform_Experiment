@@ -43,6 +43,9 @@ outputs/
 !.codex/hooks/session_start.py
 platform-web/test-results/
 platform-api/scripts/data/
+.workbuddy/
+/data/
+**/.pytest-basetemp/
 
 # Large local/reference material
 鍙傝€冧唬鐮?

@@ -40,12 +40,6 @@ def test_current_production_data_boundaries_are_clean() -> None:
         item["path"] for item in result["explicit_unavailable_views"]
     } == {
         "platform-web/src/views/dashboard/index.vue",
-        "platform-web/src/views/financialAi/index.vue",
-        "platform-web/src/views/strategy/management/index.vue",
-        "platform-web/src/views/strategy/funding-carry/index.vue",
-        "platform-web/src/views/strategy/spread-carry/index.vue",
-        "platform-web/src/views/newsCalendar/index.vue",
-        "platform-web/src/views/settings/index.vue",
     }
 
 
@@ -64,7 +58,7 @@ def test_quarantine_requires_consumer_guard(tmp_path: Path) -> None:
     audit = _load_module()
     target = _write_policy(
         tmp_path,
-        lambda value: value["quarantines"][1].__setitem__(
+            lambda value: value["quarantines"][0].__setitem__(
             "consumer_required_markers",
             ["missing-static-isolation-guard"],
         ),

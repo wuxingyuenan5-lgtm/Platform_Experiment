@@ -5,6 +5,7 @@ import json
 from decimal import Decimal
 from pathlib import Path
 
+import pytest
 from fastapi.testclient import TestClient
 
 import app.cross_spread_exit_service as exit_service
@@ -13,6 +14,8 @@ from app.cross_spread_exit_repository import (
     claim_exit_plan,
     create_exit_plan,
     get_exit_plan,
+    mark_plan_closed,
+    mark_plan_closing,
 )
 from app.cross_spread_exit_schemas import CrossSpreadMarketOpenRequest
 from app.cross_spread_live_read_client import LivePosition
@@ -22,6 +25,26 @@ from app.main import app
 from app.schemas import CrossSpreadSnapshotResponse
 
 NOW = "2026-07-25T00:00:00+00:00"
+
+
+@pytest.fixture(autouse=True)
+def restore_platform_settings():
+    settings = get_settings()
+    fields = (
+        "database_path",
+        "environment",
+        "auth_mode",
+        "auth_credentials_json",
+        "live_trading_enabled",
+        "cross_spread_exit_monitor_enabled",
+        "cross_spread_acceptance_max_quantity_oz",
+        "cross_spread_acceptance_max_active_plans",
+        "cross_spread_position_verification_required",
+    )
+    original = {field: getattr(settings, field) for field in fields}
+    yield
+    for field, value in original.items():
+        setattr(settings, field, value)
 
 
 def credential(user_id: str, token: str, roles: list[str]) -> dict[str, object]:
@@ -90,7 +113,7 @@ def insert_batch_with_fills(batch_id: str, *, direction: str = "OPEN_LONG") -> N
                     id, command_id, account_id, instrument_id, symbol, side,
                     order_type, quantity, price, status, external_order_id,
                     created_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, 'market', ?, NULL, 'filled', NULL, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, 'market', ?, NULL, 'filled', ?, ?, ?)
                 """,
                 (
                     order_id,
@@ -100,6 +123,7 @@ def insert_batch_with_fills(batch_id: str, *, direction: str = "OPEN_LONG") -> N
                     symbol,
                     side,
                     qty,
+                    f"external:{order_id}",
                     NOW,
                     NOW,
                 ),
@@ -286,7 +310,6 @@ def test_hedged_market_open_creates_plan_from_actual_fills(
     tmp_path: Path,
 ) -> None:
     configure_platform(tmp_path)
-    position_reads = iter([([], []), live_open_positions()])
     with TestClient(app):
         insert_batch_with_fills("open-batch-1")
         monkeypatch.setattr(
@@ -294,12 +317,6 @@ def test_hedged_market_open_creates_plan_from_actual_fills(
             "submit_cross_spread_market_command",
             lambda request: batch_response("open-batch-1", direction=request.action),
         )
-        monkeypatch.setattr(
-            exit_service,
-            "_load_live_positions",
-            lambda: next(position_reads),
-        )
-
         result = exit_service.open_cross_spread_market(
             CrossSpreadMarketOpenRequest(
                 direction="LONG_SPREAD",
@@ -314,7 +331,7 @@ def test_hedged_market_open_creates_plan_from_actual_fills(
     assert result.exit_plan is not None
     assert result.exit_plan.quantity_oz == Decimal("1")
     assert result.exit_plan.entry_spread == Decimal("-2")
-    assert result.exit_plan.mt5_position_id == "778899"
+    assert result.exit_plan.mt5_position_id == "external:mt5-order-id"
 
 
 def test_open_ignores_unresolved_batches_from_other_accounts(
@@ -403,7 +420,7 @@ def test_exit_plan_claim_is_atomic(tmp_path: Path) -> None:
     assert second is None
 
 
-def test_market_close_registers_reduce_only_and_mt5_ticket(
+def test_market_close_submits_direct_netting_delta(
     monkeypatch,
     tmp_path: Path,
 ) -> None:
@@ -453,18 +470,13 @@ def test_market_close_registers_reduce_only_and_mt5_ticket(
             "submit_cross_spread_market_command",
             fake_submit,
         )
-        monkeypatch.setattr(
-            exit_service,
-            "_load_live_positions",
-            lambda: ([], []),
-        )
         result = exit_service.close_cross_spread_market(
             plan.plan_id,
             execution_mode="market",
         )
 
     assert captured["request"].action == "CLOSE_LONG"
-    assert captured["kwargs"]["bybit_reduce_only"] is True
+    assert captured["kwargs"]["allow_netting_close"] is True
     assert captured["kwargs"]["mt5_reduce_only"] is True
     assert captured["kwargs"]["mt5_position_id"] == "778899"
     assert captured["kwargs"]["idempotency_key"] == (
@@ -485,6 +497,7 @@ def test_limit_requires_spread_and_legacy_close_fails_closed(
         "has_ceo_trade_authority",
         lambda principal, current: True,
     )
+
     with TestClient(app) as client:
         limit_response = client.post(
             "/api/v1/trading/cross-spread/lifecycle/open",
@@ -507,4 +520,52 @@ def test_limit_requires_spread_and_legacy_close_fails_closed(
     details = limit_response.json()["detail"]
     assert any("limitSpread" in item["msg"] for item in details)
     assert legacy_close.status_code == 422
-    assert "requires reduce-only" in legacy_close.json()["detail"]
+    assert "close intent is incomplete" in legacy_close.json()["detail"]
+
+
+def test_partial_close_retains_the_group_residual_quantity(tmp_path: Path) -> None:
+    configure_platform(tmp_path)
+    with TestClient(app):
+        insert_batch_with_fills("open-batch-partial")
+        plan = create_exit_plan(
+            strategy_instance_id="strategy_cross_venue_spread_instance_default",
+            open_batch_id="open-batch-partial",
+            direction="LONG_SPREAD",
+            quantity_oz=Decimal("2"),
+            mt5_position_id="778899",
+            entry_spread=Decimal("-2"),
+            take_profit_spread=Decimal("0"),
+            stop_loss_spread=Decimal("-3"),
+        )
+        assert claim_exit_plan(
+            plan.plan_id, trigger_reason="manual", trigger_spread=None
+        ) is not None
+        with connection() as db:
+            db.execute(
+                """
+                INSERT INTO execution_batches (
+                    id, idempotency_key, strategy_instance_id, account_id, strategy_key,
+                    direction, status, requires_manual_intervention, failure_reason,
+                    created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, 'hedged', 0, NULL, ?, ?)
+                """,
+                (
+                    "partial-close-1",
+                    "key:partial-close-1",
+                    "strategy_cross_venue_spread_instance_default",
+                    "account_crypto_test",
+                    "cross_venue_spread",
+                    "CLOSE_LONG",
+                    NOW,
+                    NOW,
+                ),
+            )
+        mark_plan_closing(plan.plan_id, "partial-close-1")
+        residual = mark_plan_closed(
+            plan.plan_id,
+            "partial-close-1",
+            Decimal("1"),
+        )
+
+    assert residual.status == "active"
+    assert residual.quantity_oz == Decimal("1")

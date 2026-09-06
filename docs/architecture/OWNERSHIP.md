@@ -10,6 +10,8 @@ This document owns current code and data responsibilities. It records present au
 | Public execution DTO compatibility | `platform-api/app/execution_schemas.py`, `platform-api/app/schemas.py` | persistence or execution |
 | Platform–Runtime contract | both `runtime_contracts.py` modules and `docs/contracts/runtime-v1.json` | silent incompatible changes |
 | Frontend API boundary | `platform-web/src/api/platform/` | database access or authorization policy |
+| Research API composition, providers, cache, quality metadata and partial-failure semantics | `platform-api/app/research_routes.py`, `platform-api/app/research_service.py`, `platform-api/app/research_providers.py`, `platform-api/app/research_cache.py`, `platform-api/app/research_data_schemas.py` | trade quotes, position/accounting facts or browser-side provider fan-out |
+| Hedge Board research presentation | `platform-web/src/api/hedgeResearch.ts`, `platform-web/src/views/hedgeBoard/` | upstream truth, Live Write or fabricated data availability |
 | Financial AI route composition and model/configuration adapter | `platform-api/app/financial_ai_routes.py`, `platform-web/src/router/routes/modules/financial-ai.ts`, `platform-web/src/api/financialAi.ts` | page-local authorization, arbitrary command execution, trading or accounting facts |
 | Financial AI news and global-market upstream adaptation | `platform-api/app/financial_ai_routes.py` | claiming upstream availability or freshness beyond returned evidence |
 | Financial AI machine configuration authorization | `platform-api/app/auth.py`, `platform-api/app/user_permissions.py` | returning provider secrets or delegating authorization to the browser |

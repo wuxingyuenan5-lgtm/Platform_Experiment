@@ -146,8 +146,15 @@ def close_cross_spread_market(
     limit_spread: Decimal | None = None,
     limit_strategy: LimitStrategy = "fok",
     idempotency_key: str | None = None,
+    quantity_oz: Decimal | None = None,
 ) -> CrossSpreadCloseResult:
     current_plan = get_exit_plan(plan_id)
+    close_quantity = quantity_oz or current_plan.quantity_oz
+    if close_quantity > current_plan.quantity_oz:
+        raise HTTPException(
+            status_code=422,
+            detail="Close quantity exceeds remaining group quantity",
+        )
     if (
         idempotency_key is not None
         and current_plan.close_batch_id is not None
@@ -253,6 +260,7 @@ def close_cross_spread_market(
         "execution_mode": execution_mode,
         "limit_strategy": limit_strategy,
         "limit_execution": limit_execution,
+        "quantity_oz": close_quantity,
     }
     if idempotency_key is not None:
         close_kwargs["idempotency_key"] = idempotency_key
@@ -410,6 +418,7 @@ def _close_claimed_plan(
     limit_strategy: LimitStrategy = "fok",
     limit_execution: CrossSpreadFokPrice | None = None,
     idempotency_key: str | None = None,
+    quantity_oz: Decimal | None = None,
 ) -> CrossSpreadCloseResult:
     intent = build_close_intent(
         plan.direction,
@@ -418,18 +427,30 @@ def _close_claimed_plan(
     )
     if intent.execution_type == "LIMIT" and limit_execution is None:
         raise HTTPException(status_code=422, detail="Limit close requires prepared pricing")
+    close_quantity = quantity_oz or plan.quantity_oz
+    if close_quantity > plan.quantity_oz:
+        raise HTTPException(
+            status_code=422,
+            detail="Close quantity exceeds remaining group quantity",
+        )
     command_request = CrossSpreadMarketCommandRequest(
         action=command_action(intent),
-        quantityOz=plan.quantity_oz,
+        quantityOz=close_quantity,
     )
     try:
         if intent.execution_type == "MARKET":
             batch = submit_cross_spread_market_command(
                 command_request,
-                idempotency_key=idempotency_key or f"cross-spread-exit:{plan.plan_id}",
-                bybit_reduce_only=True,
+                idempotency_key=(
+                    idempotency_key
+                    or (
+                        f"cross-spread-exit:{plan.plan_id}:"
+                        f"{plan.quantity_oz}:{close_quantity}"
+                    )
+                ),
                 mt5_reduce_only=True,
                 mt5_position_id=plan.mt5_position_id,
+                allow_netting_close=True,
             )
         else:
             assert limit_execution is not None
@@ -438,9 +459,9 @@ def _close_claimed_plan(
                 limit_strategy=limit_strategy,
                 bybit_limit_price=limit_execution.bybit_limit_price,
                 idempotency_key=_limit_exit_idempotency_key(plan, limit_strategy),
-                bybit_reduce_only=True,
                 mt5_reduce_only=True,
                 mt5_position_id=plan.mt5_position_id,
+                allow_netting_close=True,
             )
     except Exception:
         mark_plan_manual_intervention(plan.plan_id, close_batch_id=None)
@@ -461,17 +482,7 @@ def _close_claimed_plan(
 
     mark_plan_closing(plan.plan_id, batch.batch_id)
     if batch.status == "hedged":
-        try:
-            market_helpers._verify_flat_positions(
-                expected_mt5_position_id=plan.mt5_position_id
-            )
-        except HTTPException:
-            updated = mark_plan_manual_intervention(
-                plan.plan_id,
-                close_batch_id=batch.batch_id,
-            )
-        else:
-            updated = mark_plan_closed(plan.plan_id, batch.batch_id)
+        updated = mark_plan_closed(plan.plan_id, batch.batch_id, close_quantity)
     else:
         updated = mark_plan_manual_intervention(
             plan.plan_id,
@@ -494,6 +505,7 @@ def _submit_limit_batch(
     bybit_reduce_only: bool = False,
     mt5_reduce_only: bool = False,
     mt5_position_id: str | None = None,
+    allow_netting_close: bool = False,
 ):
     submitter = (
         submit_cross_spread_fok_command
@@ -507,6 +519,7 @@ def _submit_limit_batch(
         bybit_reduce_only=bybit_reduce_only,
         mt5_reduce_only=mt5_reduce_only,
         mt5_position_id=mt5_position_id,
+        allow_netting_close=allow_netting_close,
     )
 
 

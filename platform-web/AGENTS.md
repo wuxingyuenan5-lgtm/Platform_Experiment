@@ -8,12 +8,12 @@ Scope: `platform-web/`.
 - Product-data metadata such as provider/source/actionability may exist in state and tests, but visible UI should use business language such as `暂无数据`, `数据暂不可用`, `待复核` and `权限不足`.
 - Reuse existing components before introducing a new UI framework or state layer.
 
-Checks for a Standard frontend change:
+Select from these checks according to the root risk-based validation rule; a local low-risk edit does not require every command, while shared navigation, contracts or release-level changes require broader coverage:
 
 ```powershell
-pnpm exec eslint --max-warnings 0 <changed-files>
-pnpm type:check
-pnpm build
+corepack pnpm exec eslint --max-warnings 0 <changed-files>
+corepack pnpm type:check
+corepack pnpm build
 ```
 
 Package manager version is authoritative in `package.json#packageManager`.

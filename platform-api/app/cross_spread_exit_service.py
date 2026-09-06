@@ -30,6 +30,7 @@ from app.cross_spread_exit_repository import (
     get_exit_plan,
     list_exit_plans,
     load_batch_fill_summaries,
+    load_batch_leg_external_order_id,
     mark_plan_closed,
     mark_plan_closing,
     mark_plan_manual_intervention,
@@ -195,18 +196,6 @@ def _assert_acceptance_open_allowed() -> None:
             status_code=409,
             detail="An unresolved cross-spread execution batch blocks new opens",
         )
-    if settings.cross_spread_position_verification_required:
-        bybit_positions, mt5_positions = _load_live_positions()
-        if _target_positions(bybit_positions, BYBIT_SYMBOL):
-            raise HTTPException(
-                status_code=409,
-                detail="A live Bybit gold position already exists",
-            )
-        if _target_positions(mt5_positions, MT5_SYMBOL):
-            raise HTTPException(
-                status_code=409,
-                detail="A live MT5 gold position already exists",
-            )
 
 
 def _handle_definitive_open_failure(batch: ExecutionBatchResponse) -> ExecutionBatchResponse:
@@ -217,6 +206,22 @@ def _handle_definitive_open_failure(batch: ExecutionBatchResponse) -> ExecutionB
     mt5 = summaries.get(MT5_LEG_ROLE)
     if bybit is None or mt5 is not None:
         return batch
+
+    # A rollback changes the account-level net position.  Once that position is
+    # allocated across more than the failing instruction, it must be handled by
+    # the accountable multi-group reconciliation path rather than guessing which
+    # portion of the net position belongs to the failed batch.
+    if count_non_closed_exit_plans() > 0:
+        update_batch_status(
+            batch.batch_id,
+            "manual_intervention",
+            failure_reason=(
+                f"{batch.failure_reason or 'MT5 hedge failed after confirmed Bybit fill'}; "
+                "automatic rollback is blocked while other Cross position groups are active"
+            ),
+            requires_manual_intervention=True,
+        )
+        return get_execution_batch(batch.batch_id)
 
     original_reason = batch.failure_reason or "MT5 hedge failed after confirmed Bybit fill"
     try:
@@ -353,17 +358,12 @@ def _create_exit_plan_for_open_batch(
     if bybit is None or mt5 is None:
         raise HTTPException(status_code=409, detail="Hedged batch fill evidence is incomplete")
 
-    mt5_position_id = _verify_open_positions(
-        direction=direction,
-        bybit_quantity=bybit.quantity,
-        mt5_quantity=mt5.quantity,
-    )
     return create_exit_plan(
         strategy_instance_id=STRATEGY_INSTANCE_ID,
         open_batch_id=batch_id,
         direction=direction,
         quantity_oz=bybit.quantity,
-        mt5_position_id=mt5_position_id,
+        mt5_position_id=load_batch_leg_external_order_id(batch_id, MT5_LEG_ROLE),
         entry_spread=bybit.average_price - mt5.average_price,
         take_profit_spread=take_profit_spread,
         stop_loss_spread=stop_loss_spread,
@@ -379,9 +379,9 @@ def _close_claimed_plan(plan: CrossSpreadExitPlanResponse) -> CrossSpreadCloseRe
                 quantityOz=plan.quantity_oz,
             ),
             idempotency_key=f"cross-spread-exit:{plan.plan_id}",
-            bybit_reduce_only=True,
             mt5_reduce_only=True,
             mt5_position_id=plan.mt5_position_id,
+            allow_netting_close=True,
         )
     except Exception:
         mark_plan_manual_intervention(plan.plan_id, close_batch_id=None)
@@ -389,55 +389,13 @@ def _close_claimed_plan(plan: CrossSpreadExitPlanResponse) -> CrossSpreadCloseRe
 
     mark_plan_closing(plan.plan_id, batch.batch_id)
     if batch.status == "hedged":
-        try:
-            _verify_flat_positions(expected_mt5_position_id=plan.mt5_position_id)
-        except HTTPException:
-            updated = mark_plan_manual_intervention(
-                plan.plan_id,
-                close_batch_id=batch.batch_id,
-            )
-        else:
-            updated = mark_plan_closed(plan.plan_id, batch.batch_id)
+        updated = mark_plan_closed(plan.plan_id, batch.batch_id)
     else:
         updated = mark_plan_manual_intervention(
             plan.plan_id,
             close_batch_id=batch.batch_id,
         )
     return CrossSpreadCloseResult(executionBatch=batch, exitPlan=updated)
-
-
-def _verify_open_positions(
-    *,
-    direction: SpreadDirection,
-    bybit_quantity: Decimal,
-    mt5_quantity: Decimal,
-) -> str:
-    bybit_positions, mt5_positions = _load_live_positions()
-    bybit_expected_positive = direction == "LONG_SPREAD"
-    mt5_expected_positive = direction == "SHORT_SPREAD"
-    bybit_matches = [
-        position
-        for position in _target_positions(bybit_positions, BYBIT_SYMBOL)
-        if _sign_matches(position.net_quantity, bybit_expected_positive)
-        and abs(position.net_quantity) == bybit_quantity
-    ]
-    mt5_matches = [
-        position
-        for position in _target_positions(mt5_positions, MT5_SYMBOL)
-        if _sign_matches(position.net_quantity, mt5_expected_positive)
-        and abs(position.net_quantity) == mt5_quantity
-    ]
-    if len(bybit_matches) != 1:
-        raise HTTPException(
-            status_code=409,
-            detail="Confirmed Bybit fill does not match exactly one live position",
-        )
-    if len(mt5_matches) != 1:
-        raise HTTPException(
-            status_code=409,
-            detail="Confirmed MT5 fill does not match exactly one live Position Ticket",
-        )
-    return mt5_matches[0].external_position_id
 
 
 def _verify_flat_positions(*, expected_mt5_position_id: str | None = None) -> None:

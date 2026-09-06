@@ -77,6 +77,7 @@
         @commit-spread-input="commitSpreadInput"
         @prepare-open-draft="prepareOpenDraft"
         @open-confirm="openConfirm"
+        @open-partial-close="openPartialClose"
       />
 
       <CrossVenueSpreadAnalysis />
@@ -147,6 +148,7 @@
     observability,
     observabilityError,
     openConfirm,
+    openPartialClose,
     openLimitStrategy,
     overviewRows,
     prepareOpenDraft,

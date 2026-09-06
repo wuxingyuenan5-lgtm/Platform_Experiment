@@ -25,6 +25,19 @@ External venues and brokers
 
 The repository has exactly three deployable engineering subjects: `platform-web`, `platform-api` and `execution-runtime`. Platform API remains a modular monolith.
 
+## Platform business view
+
+These are product and supporting capabilities inside the three deployable systems, not additional services.
+
+| Area | User entry | Nature and authority boundary |
+|---|---|---|
+| Home | `/home/index` | Navigation and cross-module presentation. It may summarize other modules but owns no market, position, risk or accounting fact. |
+| Hedge Board | `/hedge-board/**`, `/api/v1/research/**` | Read-only research and source navigation. Platform research contracts own the served representation and provenance; it does not authorize or supply live execution. |
+| Financial AI | `/financial-ai/**`, `/api/v1/financial-ai/**` | Analysis over authorized research context. Model output remains a reviewable research draft and cannot become a trading, risk or accounting fact. |
+| Strategy | `/strategy/**` and Platform strategy/execution APIs | Strategy definition, instruction and execution orchestration. Platform owns intent and control state; Runtime owns venue side effects and normalized external evidence. |
+| Risk | `/risk/**` and Platform risk/approval APIs | Cross-cutting authorization, risk policy and operational safety controls. It constrains execution but does not replace order, fill or accounting authorities. |
+| Data and operations | Platform persistence, research refresh, reconciliation and operator interfaces | Supporting capabilities rather than a separate product surface. Each dataset remains with its domain owner; operations may observe and recover state but must not invent business facts. |
+
 ## Dependency direction
 
 ```text
@@ -49,6 +62,8 @@ Forbidden directions:
 
 | Data | Authority |
 |---|---|
+| Served research observations and history | Platform research schemas, cache/store and upstream provenance |
+| AI-generated analysis | reviewable research draft with its input context; never an execution or accounting authority |
 | Strategy, account and instrument identity | Platform reference/master tables |
 | Command acceptance and Platform order state | Platform command persistence |
 | External execution result | Runtime journal and normalized venue evidence |
@@ -56,6 +71,30 @@ Forbidden directions:
 | Auditable economic truth | immutable `financial_facts` |
 | Formal position/PnL/NAV | rebuildable formal projections |
 | Safety and approval | risk and Live Trading Session modules |
+
+## Key data flows
+
+```text
+Research sources/local canonical store
+  -> Platform research adapters, quality metadata and cache
+     |-> Hedge Board presentation
+     `-> optional authorized context for Financial AI
+           `-> reviewable analysis draft
+
+User strategy action
+  -> Platform authorization, risk and StrategyInstruction
+  -> immutable execution plan and batch/command persistence
+  -> versioned Runtime command
+  -> Runtime journal and venue evidence
+     |-> operational projections (monitoring only)
+     `-> reconciliation
+
+Authoritative venue evidence / imported statements
+  -> immutable financial facts
+  -> formal projections
+```
+
+Research freshness, model output and operational projections are deliberately separate. Formal projections are rebuilt only from immutable financial facts; operational projections are never accounting inputs. Reusing research data in another module does not transfer authority: the receiving module must authenticate the user and apply its own contract. Only the trading flow may reach `execution-runtime`, and only through the versioned command boundary and existing Live Write gates.
 
 ## Convergence rules
 

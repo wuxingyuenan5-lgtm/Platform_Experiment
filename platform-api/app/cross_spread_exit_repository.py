@@ -70,6 +70,26 @@ def load_batch_fill_summaries(batch_id: str) -> dict[str, BatchFillSummary]:
     return summaries
 
 
+def load_batch_leg_external_order_id(batch_id: str, role: str) -> str:
+    with connection() as db:
+        row = db.execute(
+            """
+            SELECT o.external_order_id
+            FROM execution_batch_legs ebl
+            JOIN orders o ON o.id = ebl.order_id
+            WHERE ebl.batch_id = ? AND ebl.role = ?
+            """,
+            (batch_id, role),
+        ).fetchone()
+    external_order_id = str(row["external_order_id"] or "") if row is not None else ""
+    if not external_order_id:
+        raise HTTPException(
+            status_code=409,
+            detail="Completed execution leg has no external order identity",
+        )
+    return external_order_id
+
+
 def count_non_closed_exit_plans() -> int:
     with connection() as db:
         row = db.execute(
@@ -339,7 +359,7 @@ def release_exit_plan_claim(plan_id: str) -> CrossSpreadExitPlanResponse:
             UPDATE cross_spread_exit_plans
             SET status = 'active', trigger_reason = NULL, trigger_spread = NULL,
                 triggered_at = NULL, updated_at = ?
-            WHERE id = ? AND status = 'triggered' AND close_batch_id IS NULL
+            WHERE id = ? AND status = 'triggered'
             """,
             (updated_at, plan_id),
         )
@@ -364,16 +384,42 @@ def mark_plan_closing(plan_id: str, close_batch_id: str) -> CrossSpreadExitPlanR
     return get_exit_plan(plan_id)
 
 
-def mark_plan_closed(plan_id: str, close_batch_id: str) -> CrossSpreadExitPlanResponse:
+def mark_plan_closed(
+    plan_id: str,
+    close_batch_id: str,
+    closed_quantity_oz: Decimal | None = None,
+) -> CrossSpreadExitPlanResponse:
     closed_at = now_iso()
     with connection() as db:
+        row = db.execute(
+            (
+                "SELECT quantity_oz FROM cross_spread_exit_plans "
+                "WHERE id = ? AND status IN ('triggered', 'closing')"
+            ),
+            (plan_id,),
+        ).fetchone()
+        if row is None:
+            raise HTTPException(status_code=409, detail="Exit plan is not ready to settle")
+        before = Decimal(row["quantity_oz"])
+        closed = closed_quantity_oz or before
+        if closed <= 0 or closed > before:
+            raise HTTPException(
+                status_code=422,
+                detail="Close quantity exceeds remaining group quantity",
+            )
+        remaining = before - closed
         db.execute(
             """
             UPDATE cross_spread_exit_plans
-            SET status = 'closed', close_batch_id = ?, updated_at = ?, closed_at = ?
+            SET quantity_oz = ?,
+                status = CASE WHEN CAST(? AS NUMERIC) = 0 THEN 'closed' ELSE 'active' END,
+                close_batch_id = ?, trigger_reason = NULL, trigger_spread = NULL,
+                triggered_at = NULL, updated_at = ?,
+                closed_at = CASE WHEN CAST(? AS NUMERIC) = 0 THEN ? ELSE NULL END
             WHERE id = ? AND status IN ('triggered', 'closing')
             """,
-            (close_batch_id, closed_at, closed_at, plan_id),
+            (format(remaining, "f"), format(remaining, "f"), close_batch_id,
+             closed_at, format(remaining, "f"), closed_at, plan_id),
         )
     return get_exit_plan(plan_id)
 

@@ -1,8 +1,8 @@
 # 策略模块架构工作流
 
-状态：Cross 首个最小实盘及策略管理读模型已闭环；正在进行 Cross 反向与 Funding 连续手动验收
+状态：Cross 首个最小实盘及策略管理读模型已闭环；执行底层已离线收口，维持现有对冲仓位并等待 MT5 开市后的受控验收
 
-更新日期：2026-09-04
+更新日期：2026-09-05
 
 ## 阶段目标与范围
 
@@ -27,18 +27,22 @@
 - 策略管理的 Cross 订单按 Batch/TradeCommand 身份归属，开平仓四张真实订单均可读取；损益按 canonical Fill 与合约乘数计算，账户净值曲线来自双腿权威余额快照。共享账户不再依靠账户与 symbol 猜测策略归属。
 - 开仓和平仓端到端各约 10 秒，主要由双腿顺序执行、Venue 终态确认及预检构成；顺序对冲不并行，后续只优化无副作用读取和页面阶段反馈。
 - 最新 Cross 反向开仓实测约 11.3 秒，其中真实 Venue 提交/确认不足 1 秒，主要延迟来自指令后的重复规格、报价、保证金读取以及 Bybit/MT5 冷启动。代码已将两腿只读 admission 移到最终确认前并行完成，Runtime 在 live ready 前预热 Bybit 与固定 MT5 Worker，短时复用规格/报价/保证金结果；真实持仓尚未归零，因此新版本只完成离线验证，未重启部署。
+- 2026-09-05 只读现场复核仍确认 Bybit `XAUTUSDT` 空 1 与 MT5 `XAUUSD.S` 多 0.01 lot 的对冲仓位存在；未发现活动 resource claim、余额 reservation 或 Runtime `result_unknown`。Platform Live Write 与 Founder local self-approval 均为 `false`，但运行中的 Runtime 早于 admission/预热提交启动且 Live Write 仍为 `true`；两条持久化 Cross session 已越过到期时间但状态尚未被惰性过期处理。持仓未归零前不得重启、部署或改变门控，须由 Owner 明确授权具体平仓操作。
+- 2026-09-05 已将多仓执行收敛为常数时间的方向增量热路径：受控生命周期支持任意多空交错与按计划剩余量部分／全部平仓，下单前不遍历历史仓位或 Fill。当前 MT5 账户只读快照确认 `marginMode=2`，因此 Bybit 使用净额方向增量，MT5 使用本地已确认开仓订单的外部 Ticket 做精确平仓。Fake Runtime 已验证 `多1 → 空1 → 多1` 及按不同计划依次平仓的双端净仓变化并最终归零；核心市价、FOK/Limit、统一 TP/SL Close Action 与部分平仓测试共 37 项通过。该离线证据不代表已部署或取得新实盘授权。
+- 交易平台不设置 1 盎司产品上限；`cross_spread_acceptance_max_quantity_oz=0` 表示不施加平台旧验收上限，实际数量继续受 Venue 最小量、步长、保证金和既有风险门控约束。页面已将单笔操作拆为“全平／部分平仓”，底部统一为“全部平仓”；部分数量沿用同一预检、确认、幂等草稿和恢复链路。本地浏览器仅验证展开与取消，未提交任何真实交易。
 
 ## 尚未满足的验收
 
+- Platform 仍保留通用 ExecutionBatch、旧 Strategy Run、单腿 TradeCommand 和 deprecated Order 写入口；受控 Cross/Funding 实例必须在下一次部署前拒绝这些旁路，并让 lifecycle open/close 使用与正式 market-command 相同的 CEO 权限硬门。兼容 Cross market-command 已收敛到 Instruction 主链，不在封堵范围。
 - Cross 通过后，Funding 尚需使用共享 UTA 的最小可成交数量完成开仓、双腿对冲、平仓和对账。
 - 任一身份不一致、查询不可用、累计成交冲突、外部持仓差异或 `result_unknown` 都会停止扩展并保持 fail-closed。
 
 ## 下一动作
 
-1. Owner 先用当前仍在运行的旧进程手动平掉 Cross 反向仓位并确认双腿归零；持仓期间不得重启 Runtime。
-2. 归零后重启部署已离线验证的 admission/预热优化，再以相同最小指令复测端到端延迟。
-3. 延迟和双腿闭环通过后，以共享 UTA 的最小可成交数量手动验收 Funding；异常、未知结果或会话到期时停止继续下单并核对外部权威状态。
-4. Funding 闭环取得外部权威证据后，将最终状态回填 `docs/PROJECT.md` 与对应长期权威，完成本阶段并删除本文件。
+1. Owner 已决定在 MT5 休市期间维持现有 Cross 对冲仓位；持仓期间不得重启 Runtime、部署或改变门控，也不自动平仓。
+2. 在只读与本地 Fake Gateway 下继续收口现有执行主链：对受控 Cross/Funding 实例封堵通用及旧写入旁路并补拒绝测试；限价开平仓、TP/SL、部分平仓、恢复和对账均复用同一 Instruction/Plan/Batch 合同；保持方向增量热路径，不新增同步仓位遍历或平行执行架构。
+3. MT5 开市且 Owner 对具体实盘操作另行授权后，再决定现有仓位处置与包含 admission/预热优化版本的部署；其后按既有顺序验收限价与多分组真实闭环。
+4. Funding 继续在 Cross 限价、多分组、恢复与对账取得外部权威证据后进行；异常、未知结果或会话到期时停止继续下单并核对外部权威状态。
 
 ## 长期权威
 

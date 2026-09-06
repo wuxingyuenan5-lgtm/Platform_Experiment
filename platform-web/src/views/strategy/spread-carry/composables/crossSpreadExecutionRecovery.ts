@@ -11,6 +11,7 @@ interface StorageLike {
 }
 
 export interface CloseExecutionDraftPayload {
+  quantityOz?: string;
   executionMode: CrossSpreadExecutionMode;
   limitSpread?: string;
   limitStrategy: CrossSpreadLimitStrategy;

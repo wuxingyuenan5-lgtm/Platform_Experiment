@@ -167,6 +167,7 @@ def test_lifecycle_routes_delegate_to_limit_capable_service(
             "execution_mode": "limit",
             "limit_spread": request_model.limit_spread,
             "limit_strategy": "post_only_chase",
+            "quantity_oz": None,
         }
 
 
@@ -215,6 +216,7 @@ def test_manual_close_passes_limit_template_to_close_execution(
         "execution_mode": "limit",
         "limit_strategy": "post_only_chase",
         "limit_execution": pricing_result,
+        "quantity_oz": Decimal("1"),
     }
 
 

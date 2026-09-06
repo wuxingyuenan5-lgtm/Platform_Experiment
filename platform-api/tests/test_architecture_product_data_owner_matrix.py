@@ -35,8 +35,8 @@ def test_current_product_data_owner_matrix_is_closed_and_covers_formal_views() -
     assert result["status"] == "ok"
     assert result["formal_routes"] == 30
     assert result["route_names"] == 30
-    assert result["entries"] == 19
-    assert result["unique_views"] == 19
+    assert result["entries"] == 21
+    assert result["unique_views"] == 21
     assert result["closure"].get("gap", 0) == 0
     assert "evidence_debt" not in result
 

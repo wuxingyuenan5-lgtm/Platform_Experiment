@@ -69,6 +69,43 @@ function inferDomain(url) {
   }
 }
 
+function validateMarkdown(markdown) {
+  const errors = [];
+  const seenUrls = new Map();
+
+  markdown.split(/\r?\n/).forEach((rawLine, index) => {
+    const line = rawLine.trim();
+    if (!line.startsWith('- [')) return;
+
+    const linkMatch = line.match(/^-\s+\[(.+?)\]\((.+?)\)\s*$/);
+    if (!linkMatch) {
+      errors.push(`line ${index + 1}: malformed Markdown link`);
+      return;
+    }
+
+    const url = linkMatch[2].trim();
+    try {
+      const parsed = new URL(url);
+      if (!['http:', 'https:'].includes(parsed.protocol)) {
+        errors.push(`line ${index + 1}: unsupported URL protocol (${parsed.protocol})`);
+      }
+    } catch {
+      errors.push(`line ${index + 1}: invalid URL (${url})`);
+    }
+
+    const previousLine = seenUrls.get(url);
+    if (previousLine) {
+      errors.push(`line ${index + 1}: duplicate URL (first declared on line ${previousLine})`);
+    } else {
+      seenUrls.set(url, index + 1);
+    }
+  });
+
+  if (errors.length > 0) {
+    throw new Error(`Trading tool source validation failed:\n- ${errors.join('\n- ')}`);
+  }
+}
+
 function parseMarkdown(markdown) {
   const lines = markdown.split(/\r?\n/);
   const categories = [];
@@ -225,6 +262,7 @@ export const tradingToolCategoryMap = tradingToolCategories.reduce(
 }
 
 const markdown = readMarkdown(sourcePath);
+validateMarkdown(markdown);
 const categories = parseMarkdown(markdown);
 fs.writeFileSync(targetPath, buildModule(categories), 'utf8');
 console.log(`Synced trading tools from ${path.relative(repoRoot, sourcePath)} -> ${path.relative(repoRoot, targetPath)}`);

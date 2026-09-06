@@ -162,6 +162,7 @@ def test_market_open_uses_normalized_intent_without_changing_legacy_action(
         "_create_exit_plan_for_open_batch",
         lambda *_args, **_kwargs: plan,
     )
+    monkeypatch.setattr(synthetic_service, "find_plan_by_open_batch", lambda *_args: None)
     monkeypatch.setattr(
         synthetic_service,
         "configure_exit_plan_execution_modes",
@@ -261,16 +262,11 @@ def test_manual_close_and_take_profit_close_share_close_action(monkeypatch) -> N
         "submit_cross_spread_market_command",
         fake_submit,
     )
-    monkeypatch.setattr(
-        synthetic_service.market_helpers,
-        "_verify_flat_positions",
-        lambda **_: None,
-    )
     monkeypatch.setattr(synthetic_service, "mark_plan_closing", lambda *_args: None)
     monkeypatch.setattr(
         synthetic_service,
         "mark_plan_closed",
-        lambda plan_id, batch_id: exit_plan(status="closed"),
+        lambda *_args: exit_plan(status="closed"),
     )
     monkeypatch.setattr(synthetic_service, "get_exit_plan", lambda _plan_id: active_plan)
     monkeypatch.setattr(
@@ -303,6 +299,47 @@ def test_manual_close_and_take_profit_close_share_close_action(monkeypatch) -> N
     assert take_profit_result.order_intent.trigger_reason == "TAKE_PROFIT"
     assert manual_result.order_intent.action == "CLOSE_LONG_SPREAD"
     assert take_profit_result.order_intent.action == "CLOSE_LONG_SPREAD"
+
+
+def test_partial_close_submits_only_the_requested_delta(monkeypatch) -> None:
+    active = exit_plan().model_copy(update={"quantity_oz": Decimal("2")})
+    triggered = active.model_copy(update={"status": "triggered"})
+    residual = active.model_copy(update={"quantity_oz": Decimal("1")})
+    captured = {}
+
+    monkeypatch.setattr(synthetic_service, "get_exit_plan", lambda _plan_id: active)
+    monkeypatch.setattr(
+        synthetic_service,
+        "claim_exit_plan",
+        lambda *_args, **_kwargs: triggered,
+    )
+    monkeypatch.setattr(
+        synthetic_service,
+        "submit_cross_spread_market_command",
+        lambda request, **kwargs: (
+            captured.update(request=request, kwargs=kwargs)
+            or batch_response("partial-close", direction=request.action)
+        ),
+    )
+    monkeypatch.setattr(synthetic_service, "mark_plan_closing", lambda *_args: None)
+    monkeypatch.setattr(
+        synthetic_service,
+        "mark_plan_closed",
+        lambda *_args: residual,
+    )
+
+    result = synthetic_service.close_cross_spread_market(
+        active.plan_id,
+        execution_mode="market",
+        quantity_oz=Decimal("1"),
+    )
+
+    assert captured["request"].quantity_oz == Decimal("1")
+    assert captured["kwargs"]["allow_netting_close"] is True
+    assert captured["kwargs"]["mt5_reduce_only"] is True
+    assert captured["kwargs"]["mt5_position_id"] == "778899"
+    assert result.exit_plan.quantity_oz == Decimal("1")
+    assert result.exit_plan.status == "active"
 
 
 def test_manual_close_reuses_existing_close_batch_by_client_idempotency_key(monkeypatch) -> None:
@@ -414,6 +451,7 @@ def test_limit_open_routes_only_to_fok_executor(monkeypatch) -> None:
         "_create_exit_plan_for_open_batch",
         lambda *_args, **_kwargs: plan,
     )
+    monkeypatch.setattr(synthetic_service, "find_plan_by_open_batch", lambda *_args: None)
     monkeypatch.setattr(
         synthetic_service,
         "configure_exit_plan_execution_modes",

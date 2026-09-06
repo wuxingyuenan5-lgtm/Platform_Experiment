@@ -192,8 +192,7 @@ def assurance_for_request(method: str, path: str, settings: Settings) -> Authent
     if path in PUBLIC_PATHS:
         return AuthenticationAssurance.PUBLIC
     is_human_prefix = any(
-        path == prefix or path.startswith(f"{prefix}/")
-        for prefix in HUMAN_SESSION_PREFIXES
+        path == prefix or path.startswith(f"{prefix}/") for prefix in HUMAN_SESSION_PREFIXES
     )
     if path in HUMAN_SESSION_PATHS or is_human_prefix:
         return AuthenticationAssurance.HUMAN_SESSION
@@ -336,9 +335,11 @@ def permission_for_request(method: str, path: str) -> str:
     # the narrower CEO/demo-CEO authority check.  Keeping those two checks
     # separate prevents a technical lead from acquiring order authority merely
     # through the shared `trading.write` capability.
-    if path.endswith("/trading/funding/market-command") or path.endswith(
-        "/trading/cross-spread/market-command"
-    ) or path.endswith("/trading/cross-spread/funding-transfer"):
+    if (
+        path.endswith("/trading/funding/market-command")
+        or path.endswith("/trading/cross-spread/market-command")
+        or path.endswith("/trading/cross-spread/funding-transfer")
+    ):
         return "trading.write"
     if path.endswith("/trading/cross-spread/lifecycle/open"):
         return "trading.write"
@@ -402,9 +403,8 @@ async def requires_ceo_trade_authority(request: Request) -> bool:
         return False
     if request.url.path in CEO_TRADE_WRITE_PATHS:
         return True
-    if (
-        request.url.path.startswith("/api/v1/strategies/")
-        and request.url.path.endswith("/instructions")
+    if request.url.path.startswith("/api/v1/strategies/") and request.url.path.endswith(
+        "/instructions"
     ):
         instance_id = request.url.path.split("/")[4]
         return instance_id in CEO_TRADE_STRATEGY_INSTANCE_IDS
@@ -415,8 +415,7 @@ async def requires_ceo_trade_authority(request: Request) -> bool:
     except (UnicodeDecodeError, json.JSONDecodeError):
         return False
     return (
-        isinstance(body, dict)
-        and body.get("strategyInstanceId") in CEO_TRADE_STRATEGY_INSTANCE_IDS
+        isinstance(body, dict) and body.get("strategyInstanceId") in CEO_TRADE_STRATEGY_INSTANCE_IDS
     )
 
 
@@ -523,9 +522,8 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
                     "permission_denied",
                     "Authenticated identity lacks required permission",
                 )
-            if (
-                await requires_ceo_trade_authority(request)
-                and not has_ceo_trade_authority(principal, settings)
+            if await requires_ceo_trade_authority(request) and not has_ceo_trade_authority(
+                principal, settings
             ):
                 raise AuthenticationError(
                     403,

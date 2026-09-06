@@ -70,9 +70,22 @@ Free browser access is not evidence of redistribution rights. Third-party login 
 
 ## Persistence and recovery
 
-The local research-data store owns refreshable canonical history and last-known-good snapshots. The application repository consumes the serving representation and does not treat source-control history, a local binary database, a workflow run or a machine-specific path as a product contract.
+Research persistence is dataset-specific: only the explicit stores listed below are durable. In-process last-known-good caches provide bounded recovery within one process but are not persistent snapshots. The application repository consumes the serving representation and does not treat source-control history, a local binary database, a workflow run or a machine-specific path as a product contract.
 
 Refresh failure, schema drift or validation failure must preserve the last meaningful observation where available, expose its staleness, and retain a bounded error state. A successful empty response does not erase a meaningful prior value without an explicit source-level rule.
+
+### Current implementation map
+
+The current implementation mixes persisted inputs with bounded runtime caches; it is not yet a single persistent research warehouse or a deployed scheduler.
+
+| Dataset and identity | Current source and storage | Update owner and consumers | Time, failure and repeat semantics |
+|---|---|---|---|
+| Macro, Commodity and Crypto dashboard series; keyed by domain, series/row identity and observation time | Operator-produced canonical JSON under `HEDGE_BOARD_DATA_ROOT/public/v1/`; served by the corresponding research provider adapters | No in-repository producer or scheduler is established; an operator-managed upstream process owns file updates, while Platform API reads them for Hedge Board and authorized analysis inputs | Payload timestamps and quality fields remain authoritative. The API does not schedule refreshes; missing, invalid or empty files produce an explicit unavailable state rather than synthetic values |
+| A-share dashboard, Shenwan membership and stock snapshots; keyed by threshold, classification identity or six-digit stock code | Public upstream adapters with in-process LKG caches: dashboard 5 minutes, membership 24 hours, stock 15 minutes | `research_service.py` refreshes on authenticated requests; Hedge Board and Financial AI stock/news views consume the serving contract | Cache is lost on restart and is not durable history. Per-key locks collapse concurrent refreshes; a failed refresh may return labelled stale LKG but cannot overwrite it with empty data |
+| Macro event probability history; keyed by provider event identity and minute observation | Public prediction source, 15-minute process cache and bounded JSON history at `RESEARCH_MACRO_HISTORY_PATH` (default `data/research/macro_probability_history.json`) | `research_service.py` updates it when the macro endpoint is requested; the Macro page consumes the 90-day curve | Entries older than 90 days are removed and duplicate observations within one minute collapse. Request-driven updates are not evidence of a scheduled collector |
+| Account research watchlist; keyed by authenticated `user_id` with ordered item payload | Platform SQLite table `user_research_watchlists` | Explicit account GET/PUT through the watchlist service; the A-share page keeps a browser offline copy for recovery | `row_version` rejects concurrent replacement. An empty list is a valid persisted value; browser fallback is not the account authority |
+
+Source selection and rights decisions remain in the [Macro](../hedge-board/specs/MACRO_DATA_SOURCE_MAP.md), [Commodity](../hedge-board/specs/COMMODITY_DATA_SOURCE_MAP.md) and [Crypto](../hedge-board/specs/CRYPTO_DATA_SOURCE_MAP.md) source maps. New persistent history or automated collection is introduced only after its identity, retention, revision and replay behavior are defined; a cache or request-triggered refresh must never be described as that future capability.
 
 ## A-share definitions
 

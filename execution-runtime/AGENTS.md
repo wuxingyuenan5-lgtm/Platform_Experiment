@@ -8,10 +8,10 @@ Scope: `execution-runtime/`.
 - Do not import Platform business services or persist formal accounting truth.
 - Live Write remains disabled unless a dedicated approved operational task changes it.
 
-Checks:
+Runtime changes are Critical, so select directly relevant tests first and expand to this broader set whenever the affected safety or adapter boundary requires it:
 
 ```powershell
-python -m ruff check app tests
-python -m pyright
-python -m pytest -m "unit or integration or live_safety"
+.\.venv\Scripts\python.exe -m ruff check app tests
+.\.venv\Scripts\python.exe -m pyright
+.\.venv\Scripts\python.exe -m pytest -m "unit or integration or live_safety"
 ```

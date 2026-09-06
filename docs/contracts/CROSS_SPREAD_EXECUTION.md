@@ -83,9 +83,9 @@ Submitted Sell Limit = ceil(Raw Price / Tick Size) × Tick Size
 - ACK 不等于 Fill。
 - Bybit 主腿确认真实成交后，才能提交 MT5。
 - MT5 数量依据实际 Bybit Fill 与当前 Contract Size、Minimum、Step 计算。
-- Bybit Close 使用 `reduceOnly=true` 和匹配的 `positionIdx`。
-- MT5 Close 绑定目标 Position Ticket。
-- 开仓后必须验证双边目标持仓；平仓后必须验证双边归零。
+- 执行热路径采用净额账户的方向增量语义；每条指令只携带方向、数量、订单类型、价格策略与稳定幂等键，不在下单前遍历历史仓位或 Fill。
+- 受 Exit Plan 约束的逻辑平仓在 Bybit 提交普通反向增量，以支持多空交错和穿越净仓；MT5 hedging 账户必须对该计划开仓产生的 Position Ticket 做 `reduceOnly` 精确平仓。绕过 Exit Plan 的底层 Close 仍必须使用双边 `reduceOnly` 并提供 MT5 Position Ticket。
+- ExecutionBatch 必须以双腿 canonical Fill 确认完成；外部净仓差异由独立对账边界发现并冻结后续写入，不进入每笔订单的同步热路径。
 - 明确失败、已受理、处理中、结果未知和外部仓位不一致使用不同处置。
 - `result_unknown` 不允许盲目重试、回滚或生成第二个业务意图。
 - Platform 与 Runtime Live Write、退出监控和单指令／单批次生命周期限制保持独立且默认关闭／受限。数量由 CEO 指令明确给定，双腿累计外部成交不得超过各自指令数量。
@@ -123,6 +123,7 @@ stopLossLimitStrategy   = fok | post_only_chase
 - TP 与 SL 可独立选择执行方式和 Limit 策略；
 - Stop Loss 默认 Market；
 - 人工平仓、自动 TP 和自动 SL 调用同一个 claimed-plan Close Action。
+- 人工平仓可提供不超过计划剩余量的 `quantityOz`；成功后以一次原子更新扣减剩余量，剩余量大于零时计划回到 `active`，等于零时才进入 `closed`。
 
 自动 Limit 使用原子 Claim 保存的 `triggerSpread` 作为价差限制，不静默回退到 Market。干净零成交或下单前行情失效可以释放 Claim；部分成交、数量不一致、提交后超时或结果未知不能释放 Claim。
 

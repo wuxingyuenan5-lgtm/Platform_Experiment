@@ -46,6 +46,7 @@ def submit_cross_spread_limit_command(
     bybit_reduce_only: bool = False,
     mt5_reduce_only: bool = False,
     mt5_position_id: str | None = None,
+    allow_netting_close: bool = False,
 ) -> ExecutionBatchResponse:
     settings = get_settings()
     if not settings.live_trading_enabled:
@@ -59,15 +60,19 @@ def submit_cross_spread_limit_command(
         raise HTTPException(status_code=422, detail="Unsupported cross-spread Limit strategy")
 
     is_close = request.action.startswith("CLOSE_")
-    if is_close and not (
+    strict_reduce_close = (
         bybit_reduce_only and mt5_reduce_only and mt5_position_id is not None
-    ):
+    )
+    position_group_close = (
+        allow_netting_close
+        and not bybit_reduce_only
+        and mt5_reduce_only
+        and mt5_position_id is not None
+    )
+    if is_close and not (strict_reduce_close or position_group_close):
         raise HTTPException(
             status_code=422,
-            detail=(
-                "Cross-spread close requires reduce-only venue intents "
-                "and an MT5 Position Ticket"
-            ),
+            detail="Cross-spread close intent is incomplete",
         )
     if not is_close and (
         bybit_reduce_only or mt5_reduce_only or mt5_position_id is not None
@@ -139,6 +144,7 @@ def submit_cross_spread_fok_command(
     bybit_reduce_only: bool = False,
     mt5_reduce_only: bool = False,
     mt5_position_id: str | None = None,
+    allow_netting_close: bool = False,
 ) -> ExecutionBatchResponse:
     return submit_cross_spread_limit_command(
         request,
@@ -148,6 +154,7 @@ def submit_cross_spread_fok_command(
         bybit_reduce_only=bybit_reduce_only,
         mt5_reduce_only=mt5_reduce_only,
         mt5_position_id=mt5_position_id,
+        allow_netting_close=allow_netting_close,
     )
 
 
@@ -159,6 +166,7 @@ def submit_cross_spread_postonly_command(
     bybit_reduce_only: bool = False,
     mt5_reduce_only: bool = False,
     mt5_position_id: str | None = None,
+    allow_netting_close: bool = False,
 ) -> ExecutionBatchResponse:
     return submit_cross_spread_limit_command(
         request,
@@ -168,4 +176,5 @@ def submit_cross_spread_postonly_command(
         bybit_reduce_only=bybit_reduce_only,
         mt5_reduce_only=mt5_reduce_only,
         mt5_position_id=mt5_position_id,
+        allow_netting_close=allow_netting_close,
     )

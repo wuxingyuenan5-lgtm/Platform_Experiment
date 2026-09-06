@@ -39,43 +39,12 @@
       "required_markers": ["FakeGateway"],
       "consumer_path": "execution-runtime/app/gateway_factory.py",
       "consumer_required_markers": ["fake", "live_write_enabled"]
-    },
-    {
-      "path": "platform-web/src/views/hedgeBoard/nativeData/dashboardClean.ts",
-      "owner": "Hedge Board static design registry",
-      "required_markers": ["静态设计稿"],
-      "consumer_path": "platform-web/src/views/hedgeBoard/composables/useHedgeBoardPage.ts",
-      "consumer_required_markers": ["isStaticDesignWidget", "withoutStaticDesignWidgets"]
     }
   ],
   "explicit_unavailable_views": [
     {
       "path": "platform-web/src/views/dashboard/index.vue",
       "required_markers": ["RestoredProductSurface", "@/data/sample/dashboard", "dashboard-original-structure"]
-    },
-    {
-      "path": "platform-web/src/views/financialAi/index.vue",
-      "required_markers": ["RestoredProductSurface", "not-configured:financial-ai-provider", ":actionable=\"false\""]
-    },
-    {
-      "path": "platform-web/src/views/strategy/management/index.vue",
-      "required_markers": ["RestoredProductSurface", "@/data/sample/strategy", "strategy-management-original-structure"]
-    },
-    {
-      "path": "platform-web/src/views/strategy/funding-carry/index.vue",
-      "required_markers": ["RestoredProductSurface", "@/data/sample/funding", "funding-original-structure"]
-    },
-    {
-      "path": "platform-web/src/views/strategy/spread-carry/index.vue",
-      "required_markers": ["RestoredProductSurface", "CrossVenueExecutionWorkspace", "@/data/sample/spread"]
-    },
-    {
-      "path": "platform-web/src/views/newsCalendar/index.vue",
-      "required_markers": ["TradingView Economic Calendar", "@/data/sample/news", "news-calendar-original-structure"]
-    },
-    {
-      "path": "platform-web/src/views/settings/index.vue",
-      "required_markers": ["RestoredProductSurface", "not-configured:settings-write-owner", "进入个人账号"]
     }
   ]
 }

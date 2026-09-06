@@ -230,6 +230,7 @@ def test_cross_spread_local_closed_loop_blocks_second_open_while_plan_is_active(
     settings.runtime_base_url = runtime_url
     settings.live_trading_enabled = True
     settings.cross_spread_acceptance_max_quantity_oz = Decimal("1")
+    settings.cross_spread_acceptance_max_active_plans = 1
 
     with TestClient(app) as client:
         _seed_cross_spread_environment(tmp_path, "platform-closed-loop-idem.db")
@@ -264,3 +265,112 @@ def test_cross_spread_local_closed_loop_blocks_second_open_while_plan_is_active(
             "A live Bybit gold position already exists",
         }
         assert first_batch_id
+
+        cleanup = client.post(
+            f"/api/v1/trading/cross-spread/exit-plans/{first.json()['exitPlan']['planId']}/close",
+            json={},
+        )
+        assert cleanup.status_code == 200, cleanup.text
+        assert all(
+            Decimal(position["netQuantity"]) == 0
+            for position in _venue_positions(runtime_url, BYBIT_ACCOUNT_ID)
+        )
+        assert all(
+            Decimal(position["netQuantity"]) == 0
+            for position in _venue_positions(runtime_url, MT5_ACCOUNT_ID)
+        )
+
+
+def test_cross_spread_local_closed_loop_tracks_alternating_position_groups(
+    runtime_url: str,
+    tmp_path: Path,
+) -> None:
+    _seed_cross_spread_environment(tmp_path, "platform-closed-loop-multiple.db")
+    settings = get_settings()
+    settings.runtime_base_url = runtime_url
+    settings.live_trading_enabled = True
+    settings.cross_spread_acceptance_max_quantity_oz = Decimal("1")
+    settings.cross_spread_acceptance_max_active_plans = 0
+
+    payload = {
+        "quantityOz": "1",
+        "executionMode": "market",
+    }
+    with TestClient(app) as client:
+        _seed_cross_spread_environment(tmp_path, "platform-closed-loop-multiple.db")
+        first = client.post(
+            LIFECYCLE_OPEN_ENDPOINT,
+            json={
+                **payload,
+                "direction": "LONG_SPREAD",
+                "idempotencyKey": "cross-local-multiple-open-1",
+            },
+        )
+        assert first.status_code == 200, first.text
+        second = client.post(
+            LIFECYCLE_OPEN_ENDPOINT,
+            json={
+                **payload,
+                "direction": "SHORT_SPREAD",
+                "idempotencyKey": "cross-local-multiple-open-2",
+            },
+        )
+        assert second.status_code == 200, second.text
+        third = client.post(
+            LIFECYCLE_OPEN_ENDPOINT,
+            json={
+                **payload,
+                "direction": "LONG_SPREAD",
+                "idempotencyKey": "cross-local-multiple-open-3",
+            },
+        )
+        assert third.status_code == 200, third.text
+        first_plan = first.json()["exitPlan"]
+        second_plan = second.json()["exitPlan"]
+        third_plan = third.json()["exitPlan"]
+        assert first_plan is not None and second_plan is not None and third_plan is not None
+
+        bybit_open = _venue_positions(runtime_url, BYBIT_ACCOUNT_ID)
+        mt5_open = _venue_positions(runtime_url, MT5_ACCOUNT_ID)
+        assert [Decimal(position["netQuantity"]) for position in bybit_open] == [Decimal("1")]
+        assert [Decimal(position["netQuantity"]) for position in mt5_open] == [Decimal("-0.01")]
+
+        first_close = client.post(
+            f"/api/v1/trading/cross-spread/exit-plans/{second_plan['planId']}/close",
+            json={},
+        )
+        assert first_close.status_code == 200, first_close.text
+        assert first_close.json()["exitPlan"]["status"] == "closed"
+        bybit_after_first_close = _venue_positions(runtime_url, BYBIT_ACCOUNT_ID)
+        mt5_after_first_close = _venue_positions(runtime_url, MT5_ACCOUNT_ID)
+        assert [Decimal(position["netQuantity"]) for position in bybit_after_first_close] == [
+            Decimal("2")
+        ]
+        assert [Decimal(position["netQuantity"]) for position in mt5_after_first_close] == [
+            Decimal("-0.02")
+        ]
+
+        second_close = client.post(
+            f"/api/v1/trading/cross-spread/exit-plans/{first_plan['planId']}/close",
+            json={},
+        )
+        assert second_close.status_code == 200, second_close.text
+        assert second_close.json()["exitPlan"]["status"] == "closed"
+        assert [
+            Decimal(position["netQuantity"])
+            for position in _venue_positions(runtime_url, BYBIT_ACCOUNT_ID)
+        ] == [Decimal("1")]
+        third_close = client.post(
+            f"/api/v1/trading/cross-spread/exit-plans/{third_plan['planId']}/close",
+            json={},
+        )
+        assert third_close.status_code == 200, third_close.text
+        assert third_close.json()["exitPlan"]["status"] == "closed"
+        assert all(
+            Decimal(position["netQuantity"]) == 0
+            for position in _venue_positions(runtime_url, BYBIT_ACCOUNT_ID)
+        )
+        assert all(
+            Decimal(position["netQuantity"]) == 0
+            for position in _venue_positions(runtime_url, MT5_ACCOUNT_ID)
+        )

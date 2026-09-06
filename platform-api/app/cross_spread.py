@@ -138,6 +138,7 @@ def submit_cross_spread_market_command(
     bybit_reduce_only: bool = False,
     mt5_reduce_only: bool = False,
     mt5_position_id: str | None = None,
+    allow_netting_close: bool = False,
 ) -> ExecutionBatchResponse:
     settings = get_settings()
     if not _cross_spread_live_execution_gate_allows_write(settings):
@@ -147,15 +148,19 @@ def submit_cross_spread_market_command(
         )
 
     is_close = request.action.startswith("CLOSE_")
-    if is_close and not (
+    strict_reduce_close = (
         bybit_reduce_only and mt5_reduce_only and mt5_position_id is not None
-    ):
+    )
+    position_group_close = (
+        allow_netting_close
+        and not bybit_reduce_only
+        and mt5_reduce_only
+        and mt5_position_id is not None
+    )
+    if is_close and not (strict_reduce_close or position_group_close):
         raise HTTPException(
             status_code=422,
-            detail=(
-                "Cross-spread close requires reduce-only venue intents "
-                "and an MT5 Position Ticket"
-            ),
+            detail="Cross-spread close intent is incomplete",
         )
     if not is_close and (
         bybit_reduce_only or mt5_reduce_only or mt5_position_id is not None

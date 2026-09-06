@@ -1,6 +1,9 @@
 <template>
   <section id="news-digest" class="news-panel" data-testid="financial-ai-news-digest">
-    <header><h2>新闻整理</h2></header>
+    <header>
+      <h2>资讯摘要样例</h2>
+      <p>用于确认雷达的信息结构和复核字段；不代表实时资讯。</p>
+    </header>
     <nav class="asset-tabs" aria-label="新闻资产分类">
       <button
         v-for="asset in newsDigestSections"

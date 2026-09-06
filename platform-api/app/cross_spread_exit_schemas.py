@@ -75,6 +75,7 @@ class CrossSpreadMarketCloseRequest(BaseModel):
     execution_mode: ExecutionMode = Field(default="market", alias="executionMode")
     limit_spread: Decimal | None = Field(default=None, alias="limitSpread")
     limit_strategy: LimitStrategy = Field(default="fok", alias="limitStrategy")
+    quantity_oz: Decimal | None = Field(default=None, alias="quantityOz", gt=0)
 
     @model_validator(mode="after")
     def validate_request(self) -> CrossSpreadMarketCloseRequest:

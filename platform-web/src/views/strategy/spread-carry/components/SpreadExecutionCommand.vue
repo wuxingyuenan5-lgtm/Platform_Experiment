@@ -327,13 +327,45 @@
                 {{ formatNullableSigned(position.stopLoss) }}</td
               >
               <td>{{ position.execution }}</td>
-              <td>
-                <button
-                  class="row-btn"
-                  :disabled="submitLoading"
-                  @click="$emit('openConfirm', `CLOSE:${position.id}`)"
-                  >手动平仓</button
-                >
+              <td class="position-actions-cell">
+                <div class="position-actions">
+                  <button
+                    class="row-btn"
+                    :disabled="submitLoading"
+                    @click="$emit('openConfirm', `CLOSE:${position.id}`)"
+                    >全平</button
+                  >
+                  <button
+                    class="row-btn"
+                    :disabled="submitLoading"
+                    @click="beginPartialClose(position)"
+                    >部分平仓</button
+                  >
+                </div>
+                <div v-if="partialClosePlanId === position.id" class="partial-close-editor">
+                  <label>
+                    <span>平仓数量</span>
+                    <input
+                      v-model="partialCloseQuantityInput"
+                      inputmode="decimal"
+                      :placeholder="`小于 ${formatNumber(position.qtyOz, 2)}`"
+                      aria-label="部分平仓数量（盎司）"
+                      @keydown.enter.prevent="submitPartialClose(position)"
+                    />
+                    <em>盎司</em>
+                  </label>
+                  <p v-if="partialCloseError" class="field-error">{{ partialCloseError }}</p>
+                  <div class="partial-close-editor__actions">
+                    <button type="button" class="row-btn" @click="cancelPartialClose">取消</button>
+                    <button
+                      type="button"
+                      class="row-btn row-btn--danger"
+                      :disabled="submitLoading"
+                      @click="submitPartialClose(position)"
+                      >确认</button
+                    >
+                  </div>
+                </div>
               </td>
             </tr>
             <tr v-if="!closeOrders.length">
@@ -346,7 +378,7 @@
           class="submit-btn submit-btn--red submit-btn--full"
           :disabled="submitLoading || !closeOrders.length"
           @click="$emit('openConfirm', 'CLOSE_ALL')"
-          >手动全平</button
+          >全部平仓</button
         >
 
         <div v-if="executionMessage || limitEvidence" class="execution-feedback">
@@ -567,11 +599,15 @@
     (event: 'commitSpreadInput', value: SpreadInputField): void;
     (event: 'prepareOpenDraft', value: 'long' | 'short'): void;
     (event: 'openConfirm', value: string): void;
+    (event: 'openPartialClose', planId: string, quantityOz: number): void;
   }>();
 
   const bybitLeverageInput = ref('20');
   const leverageLoading = ref(false);
   const leverageMessage = ref('');
+  const partialClosePlanId = ref<string | null>(null);
+  const partialCloseQuantityInput = ref('');
+  const partialCloseError = ref('');
   const {
     amountError,
     amountInput,
@@ -591,6 +627,28 @@
     transfer,
     updateAmount,
   } = useCrossSpreadFundingTransfer();
+
+  function beginPartialClose(position: CloseOrder) {
+    partialClosePlanId.value = position.id;
+    partialCloseQuantityInput.value = '';
+    partialCloseError.value = '';
+  }
+
+  function cancelPartialClose() {
+    partialClosePlanId.value = null;
+    partialCloseQuantityInput.value = '';
+    partialCloseError.value = '';
+  }
+
+  function submitPartialClose(position: CloseOrder) {
+    const quantityOz = Number(partialCloseQuantityInput.value);
+    if (!Number.isFinite(quantityOz) || quantityOz <= 0 || quantityOz >= position.qtyOz) {
+      partialCloseError.value = `请输入大于 0 且小于 ${formatNumber(position.qtyOz, 2)} 的数量`;
+      return;
+    }
+    emit('openPartialClose', position.id, quantityOz);
+    cancelPartialClose();
+  }
   async function applyBybitLeverage() {
     const leverage = Number(bybitLeverageInput.value);
     if (!Number.isFinite(leverage) || leverage <= 0 || leverage > 100) {
@@ -757,6 +815,82 @@
     font-size: 14px;
     font-weight: 700;
     cursor: pointer;
+  }
+
+  .position-actions-cell {
+    min-width: 230px;
+  }
+
+  .position-actions,
+  .partial-close-editor__actions {
+    display: flex;
+    gap: 8px;
+  }
+
+  .position-actions .row-btn {
+    min-width: 88px;
+  }
+
+  .partial-close-editor {
+    display: grid;
+    gap: 8px;
+    width: 220px;
+    margin-top: 10px;
+    padding: 10px;
+    border: 1px solid #e7ebf0;
+    border-radius: 10px;
+    background: #f8fbff;
+  }
+
+  .partial-close-editor label {
+    display: grid;
+    grid-template-columns: 1fr 52px;
+    overflow: hidden;
+    border: 1px solid #d7e2ef;
+    border-radius: 8px;
+    background: #fff;
+  }
+
+  .partial-close-editor label span {
+    grid-column: 1 / -1;
+    padding: 0 8px 6px;
+    color: #47617f;
+    font-family: var(--strategy-font-body);
+    font-size: 12px;
+  }
+
+  .partial-close-editor input {
+    min-width: 0;
+    height: 36px;
+    padding: 0 8px;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    color: #1a2a48;
+    font-family: var(--strategy-font-data);
+    font-weight: 700;
+  }
+
+  .partial-close-editor em {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-left: 1px solid #e7ebf0;
+    color: #47617f;
+    font-family: var(--strategy-font-body);
+    font-size: 12px;
+    font-style: normal;
+  }
+
+  .partial-close-editor__actions .row-btn {
+    flex: 1;
+    min-width: 0;
+    height: 34px;
+  }
+
+  .row-btn--danger {
+    border-color: #ef4444;
+    color: #df2d2d;
   }
 
   .stage-tabs button {

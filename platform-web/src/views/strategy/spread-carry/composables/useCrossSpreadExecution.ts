@@ -66,7 +66,7 @@ interface UseCrossSpreadExecutionOptions {
 
 type PendingAction =
   | { kind: 'OPEN'; direction: 'LONG_SPREAD' | 'SHORT_SPREAD' }
-  | { kind: 'CLOSE'; planId: string }
+  | { kind: 'CLOSE'; planId: string; quantityOz?: number }
   | { kind: 'CLOSE_ALL' };
 
 function requestErrorMessage(error: unknown, fallback: string): string {
@@ -128,7 +128,10 @@ export function useCrossSpreadExecution(options: UseCrossSpreadExecutionOptions)
         : action?.kind === 'CLOSE_ALL'
         ? options.closeOrders.value
         : [];
-    const closeQuantityOz = closeOrders.reduce((total, order) => total + order.qtyOz, 0);
+    const closeQuantityOz =
+      action?.kind === 'CLOSE' && action.quantityOz !== undefined
+        ? action.quantityOz
+        : closeOrders.reduce((total, order) => total + order.qtyOz, 0);
     const mt5LotPerOz =
       options.qtyOz.value > 0 && options.mt5Lot.value !== null
         ? options.mt5Lot.value / options.qtyOz.value
@@ -147,7 +150,9 @@ export function useCrossSpreadExecution(options: UseCrossSpreadExecutionOptions)
         ? action.direction === 'LONG_SPREAD'
           ? '开多价差'
           : '开空价差'
-        : '平仓价差';
+        : action?.kind === 'CLOSE' && action.quantityOz !== undefined
+        ? '部分平仓'
+        : '全部平仓';
     const closeMarketSpread =
       action?.kind === 'CLOSE'
         ? options.closeOrders.value.find((order) => order.id === action.planId)?.direction ===
@@ -222,7 +227,11 @@ export function useCrossSpreadExecution(options: UseCrossSpreadExecutionOptions)
           orders.map((order) =>
             prepareCrossSpreadExecution({
               action: order.direction === 'LONG_SPREAD' ? 'CLOSE_LONG' : 'CLOSE_SHORT',
-              quantityOz: String(order.qtyOz),
+              quantityOz: String(
+                action.kind === 'CLOSE' && action.quantityOz !== undefined
+                  ? action.quantityOz
+                  : order.qtyOz,
+              ),
             }),
           ),
         );
@@ -246,6 +255,18 @@ export function useCrossSpreadExecution(options: UseCrossSpreadExecutionOptions)
     confirmVisible.value = true;
     setExecutionMessage('', 'is-warn');
     if (pendingAction.value) void prepareAction(pendingAction.value);
+  }
+
+  function openPartialClose(planId: string, quantityOz: number) {
+    const order = options.closeOrders.value.find((candidate) => candidate.id === planId);
+    if (!order || !Number.isFinite(quantityOz) || quantityOz <= 0 || quantityOz >= order.qtyOz) {
+      setExecutionMessage('部分平仓数量必须大于 0 且小于该笔剩余数量', 'is-warn');
+      return;
+    }
+    pendingAction.value = { kind: 'CLOSE', planId, quantityOz };
+    confirmVisible.value = true;
+    setExecutionMessage('', 'is-warn');
+    void prepareAction(pendingAction.value);
   }
 
   function prepareOpenDraft(direction: 'long' | 'short') {
@@ -333,6 +354,7 @@ export function useCrossSpreadExecution(options: UseCrossSpreadExecutionOptions)
           idempotencyKey: crypto.randomUUID(),
           planId: action.planId,
           payload: {
+            ...(action.quantityOz === undefined ? {} : { quantityOz: String(action.quantityOz) }),
             executionMode: options.closeExecutionMode.value,
             limitSpread:
               options.closeExecutionMode.value === 'limit'
@@ -465,6 +487,7 @@ export function useCrossSpreadExecution(options: UseCrossSpreadExecutionOptions)
     executionMessageTone,
     limitEvidence,
     openConfirm,
+    openPartialClose,
     prepareOpenDraft,
     resumePendingExecution,
     setExecutionMessage,

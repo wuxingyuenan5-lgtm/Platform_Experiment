@@ -31,6 +31,10 @@ function computed(getter) {
   };
 }
 
+function settleAsyncWork() {
+  return new Promise((resolve) => setImmediate(resolve));
+}
+
 function loadTsModule(modulePath, stubs) {
   const source = fs.readFileSync(modulePath, 'utf8');
   const compiled = ts.transpileModule(source, {
@@ -125,6 +129,9 @@ async function main() {
   const closeResponses = [];
 
   const lifecycleStub = {
+    async prepareCrossSpreadExecution() {
+      return { status: 'ready', preparedAt: new Date().toISOString() };
+    },
     async openCrossSpreadMarket(payload) {
       openCalls.push(payload);
       assert.ok(openResponses.length > 0, 'missing open response');
@@ -151,6 +158,7 @@ async function main() {
 
   openResponses.push({ executionBatch: { status: 'executing' }, limitExecution: null });
   execution.prepareOpenDraft('long');
+  await settleAsyncWork();
   await execution.confirmOrder();
   const openDraft = readExecutionDraft(storage);
   assert.equal(openCalls.length, 1);
@@ -170,6 +178,30 @@ async function main() {
   assert.equal(openCalls[2].idempotencyKey, openDraft.idempotencyKey);
   assert.equal(readExecutionDraft(storage), null);
 
+  closeResponses.push({
+    exitPlan: { planId: 'plan-b', status: 'result_unknown', quantityOz: '2' },
+    executionBatch: { status: 'result_unknown' },
+    limitExecution: null,
+  });
+  execution.openPartialClose('plan-b', 0.5);
+  await settleAsyncWork();
+  await execution.confirmOrder();
+  assert.equal(closeCalls.length, 1);
+  assert.equal(closeCalls[0].planId, 'plan-b');
+  assert.equal(closeCalls[0].payload.quantityOz, '0.5');
+  const partialCloseDraft = readExecutionDraft(storage);
+  assert.equal(partialCloseDraft.payload.quantityOz, '0.5');
+  closeResponses.push({
+    exitPlan: { planId: 'plan-b', status: 'active', quantityOz: '1.5' },
+    executionBatch: { status: 'hedged' },
+    limitExecution: null,
+  });
+  await execution.resumePendingExecution();
+  assert.equal(closeCalls.length, 2);
+  assert.equal(closeCalls[1].payload.quantityOz, '0.5');
+  assert.equal(closeCalls[1].payload.idempotencyKey, partialCloseDraft.idempotencyKey);
+  assert.equal(readExecutionDraft(storage), null);
+
   closeResponses.push(
     {
       exitPlan: { planId: 'plan-a', status: 'result_unknown' },
@@ -183,13 +215,14 @@ async function main() {
     },
   );
   execution.openConfirm('CLOSE_ALL');
+  await settleAsyncWork();
   await execution.confirmOrder();
   const closeAllDraft = readExecutionDraft(storage);
-  assert.equal(closeCalls.length, 2);
+  assert.equal(closeCalls.length, 4);
   assert.equal(closeAllDraft.plans.length, 2);
   assert.notEqual(closeAllDraft.plans[0].idempotencyKey, closeAllDraft.plans[1].idempotencyKey);
   assert.deepEqual(
-    closeCalls.map((entry) => entry.payload.idempotencyKey),
+    closeCalls.slice(2).map((entry) => entry.payload.idempotencyKey),
     closeAllDraft.plans.map((plan) => plan.idempotencyKey),
   );
   assert.deepEqual(readExecutionDraft(storage).plans, closeAllDraft.plans);
@@ -207,9 +240,9 @@ async function main() {
     },
   );
   await execution.resumePendingExecution();
-  assert.equal(closeCalls.length, 4);
+  assert.equal(closeCalls.length, 6);
   assert.deepEqual(
-    closeCalls.slice(2).map((entry) => entry.payload.idempotencyKey),
+    closeCalls.slice(4).map((entry) => entry.payload.idempotencyKey),
     closeAllDraft.plans.map((plan) => plan.idempotencyKey),
   );
   assert.equal(readExecutionDraft(storage), null);

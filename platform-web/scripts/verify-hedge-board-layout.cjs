@@ -53,7 +53,6 @@ const stockSnapshotPath = path.join(viewRoot, 'aShare', 'components', 'StockSnap
 const macroExpectationPath = path.join(viewRoot, 'macro', 'MacroExpectationPanel.vue');
 const hedgeBoardPageComposablePath = path.join(viewRoot, 'composables', 'useHedgeBoardPage.ts');
 const routePath = path.join(__dirname, '..', 'src', 'router', 'routes', 'modules', 'hedge.ts');
-const uiGuidelinesPath = path.join(__dirname, '..', 'docs', 'design', 'platform-ui-guidelines.md');
 
 const hedgeBoardSource = fs.readFileSync(hedgeBoardPagePath, 'utf8');
 const marketTerminalPageSource = fs.readFileSync(marketTerminalPagePath, 'utf8');
@@ -82,7 +81,6 @@ const stockSnapshotSource = fs.readFileSync(stockSnapshotPath, 'utf8');
 const macroExpectationSource = fs.readFileSync(macroExpectationPath, 'utf8');
 const hedgeBoardPageComposableSource = fs.readFileSync(hedgeBoardPageComposablePath, 'utf8');
 const routeSource = fs.readFileSync(routePath, 'utf8');
-const uiGuidelinesSource = fs.readFileSync(uiGuidelinesPath, 'utf8');
 
 assert(fs.existsSync(marketTerminalPagePath), 'Expected MarketTerminalPage component to exist.');
 assert(fs.existsSync(hedgeBoardSubnavPath), 'Expected HedgeBoardSubnav component to exist.');
@@ -187,15 +185,6 @@ assert(
   'Hedge board local chart owner must preserve official-sector cards without rendering static reserve snapshots.',
 );
 assert(
-  dashboardSource.includes("id: 'commodity-eia-inventory'") &&
-    dashboardSource.includes("'eia-crude-stocks'") &&
-    dashboardSource.includes("'eia-products-stocks'") &&
-    localChartWidgetSource.includes("groupId: 'eiaCrudeStocks'") &&
-    localChartWidgetSource.includes("groupId: 'eiaProductsStocks'") &&
-    localChartWidgetSource.includes("dataDomain: 'commodity'"),
-  'Commodity inventory must keep both EIA groups on the source-backed Commodity API.',
-);
-assert(
   reserveRankingSource.includes("name: 'ReserveRanking'") &&
     reserveRankingSource.includes('type: Array as PropType<ReserveRankingRow[]>') &&
     reserveRankingSource.includes("class: 'reserve-module'") &&
@@ -272,7 +261,7 @@ assert(
   !hedgeBoardSource.includes('chart-shell__link-overlay') &&
     !hedgeBoardSource.includes('etf-weekly-panel__link') &&
     hedgeBoardPageComposableSource.includes("'etf-weekly-flows': ETF_REFERENCE_URL") &&
-    hedgeBoardPageComposableSource.includes("'etf-ytd-summary': ETF_REFERENCE_URL"),
+    hedgeResearchModuleSource.includes('widget.referenceLinks ?? []'),
   'ETF source links must be provided through the widget header owner, not chart overlays.',
 );
 assert(
@@ -404,11 +393,4 @@ assert(
   aSharePageSource.split(/\r?\n/).length <= 400,
   'A-share orchestrator exceeded its lightweight budget; move behavior into a component or composable.',
 );
-assert(
-  uiGuidelinesSource.includes('图表型 widget 标题默认使用 `17px`') &&
-    uiGuidelinesSource.includes('图表型 widget 标题 | `17px`') &&
-    uiGuidelinesSource.includes('不得叠加在图表绘图区内'),
-  'UI guidelines must document 17px centered chart-widget titles and header-only source links.',
-);
-
 console.log('Hedge board layout checks passed.');

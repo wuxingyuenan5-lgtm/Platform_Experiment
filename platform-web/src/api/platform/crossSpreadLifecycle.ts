@@ -102,6 +102,7 @@ export interface CrossSpreadMarketCloseResult {
 
 export interface CrossSpreadMarketCloseInput {
   idempotencyKey?: string;
+  quantityOz?: string;
   executionMode: CrossSpreadExecutionMode;
   limitSpread?: string;
   limitStrategy?: CrossSpreadLimitStrategy;
@@ -170,6 +171,7 @@ export async function closeCrossSpreadMarket(
       executionMode: input.executionMode,
       limitStrategy: input.limitStrategy ?? 'fok',
       ...(input.idempotencyKey ? { idempotencyKey: input.idempotencyKey } : {}),
+      ...(input.quantityOz === undefined ? {} : { quantityOz: input.quantityOz }),
       ...(input.limitSpread === undefined ? {} : { limitSpread: input.limitSpread }),
     },
   );

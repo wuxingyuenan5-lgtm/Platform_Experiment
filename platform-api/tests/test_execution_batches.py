@@ -4,8 +4,8 @@ from decimal import Decimal
 from pathlib import Path
 from sqlite3 import OperationalError
 from threading import Barrier, Lock, local
-from typing import Any, cast
 from types import SimpleNamespace
+from typing import Any, cast
 from uuid import uuid4
 
 import httpx

@@ -16,6 +16,64 @@ Expected local endpoints:
 
 Default state is Simulation/Fake Gateway with Platform and Runtime Live Write disabled.
 
+## Safe local verification
+
+The following focused checks run from the repository root, do not start long-running services or external connections and do not require credentials or Live Write. They use repository files, temporary paths and mocked or synthetic inputs; install each package's declared development dependencies first.
+
+Documentation links and authority consistency:
+
+```powershell
+.\platform-api\.venv\Scripts\python.exe .\scripts\check-documentation-consistency.py
+```
+
+Financial AI API contracts, local secret-file isolation and permissions:
+
+```powershell
+$previousDatabasePath = $env:VG_DATABASE_PATH
+$temporaryDatabasePath = Join-Path ([System.IO.Path]::GetTempPath()) ("vg-financial-ai-test-{0}.db" -f [guid]::NewGuid())
+$temporaryWalPath = "$temporaryDatabasePath-wal"
+$temporaryShmPath = "$temporaryDatabasePath-shm"
+$testExitCode = 0
+try {
+  $env:VG_DATABASE_PATH = $temporaryDatabasePath
+  Push-Location .\platform-api
+  try {
+    .\.venv\Scripts\python.exe -m pytest tests/test_financial_ai_routes.py -q
+    $testExitCode = $LASTEXITCODE
+  } finally {
+    Pop-Location
+  }
+} finally {
+  if ($null -eq $previousDatabasePath) {
+    Remove-Item Env:VG_DATABASE_PATH -ErrorAction SilentlyContinue
+  } else {
+    $env:VG_DATABASE_PATH = $previousDatabasePath
+  }
+  if (Test-Path -LiteralPath $temporaryDatabasePath) { Remove-Item -LiteralPath $temporaryDatabasePath }
+  if (Test-Path -LiteralPath $temporaryWalPath) { Remove-Item -LiteralPath $temporaryWalPath }
+  if (Test-Path -LiteralPath $temporaryShmPath) { Remove-Item -LiteralPath $temporaryShmPath }
+}
+if ($testExitCode -ne 0) { throw "Financial AI tests failed with exit code $testExitCode" }
+```
+
+Hedge Board research orchestration, last-known-good behavior and local-data path isolation:
+
+```powershell
+Push-Location .\platform-api
+.\.venv\Scripts\python.exe -m pytest tests/test_research_service.py tests/test_research_local_data.py -q
+Pop-Location
+```
+
+Hedge Board frontend market-detail transformation:
+
+```powershell
+Push-Location .\platform-web
+corepack pnpm test:hedge-board-market-detail
+Pop-Location
+```
+
+These checks do not prove an upstream provider is reachable or current. Provider availability and browser-level review are separate validations and must not be inferred from an isolated pass.
+
 ## Health checks
 
 ```powershell

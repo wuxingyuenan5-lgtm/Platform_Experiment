@@ -9,10 +9,10 @@ Scope: `platform-api/`.
 - Trading, risk, auth, database, migration, formal accounting and Runtime-contract changes are Critical.
 - Avoid new Policy/Repository/Service modules unless a real second responsibility or test boundary exists.
 
-Checks:
+Select focused checks according to the root risk-based validation rule. Run the broader set for Critical or shared-contract changes rather than treating it as mandatory for every local edit:
 
 ```powershell
-python -m ruff check app tests
-python -m pyright
-python -m pytest -m "architecture or unit or integration or live_safety"
+.\.venv\Scripts\python.exe -m ruff check app tests
+.\.venv\Scripts\python.exe -m pyright
+.\.venv\Scripts\python.exe -m pytest -m "architecture or unit or integration or live_safety"
 ```

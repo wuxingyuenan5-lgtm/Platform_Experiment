@@ -36,15 +36,6 @@
       "closure_status": "verified",
       "gap_reason": null
     },
-    "financial-ai": {
-      "repository_or_provider": ["platform-web/src/views/financialAi/index.vue"],
-      "real_data_source": "not-configured: financial-ai-provider",
-      "permissions": ["financial_ai.read"],
-      "roles": ["ceo", "tech_lead", "employee", "member"],
-      "fallback": "unavailable state; no generated answer; actionable=false",
-      "closure_status": "explicit_unavailable",
-      "gap_reason": null
-    },
     "hedge-macro": {
       "frontend_services": ["platform-web/src/api/hedgeResearch.ts"],
       "permissions": ["research.read"],
@@ -84,18 +75,6 @@
       "refresh": "on-mount and manual",
       "as_of": "provider health timestamp",
       "unavailable_state": "provider_unavailable",
-      "closure_status": "verified",
-      "gap_reason": null
-    },
-    "news-calendar": {
-      "repository_or_provider": ["external:tradingview-economic-calendar", "platform-web/src/views/newsCalendar/index.vue"],
-      "real_data_source": "TradingView macro calendar; news and wealth use disclosed sample states",
-      "permissions": ["news.read"],
-      "roles": ["ceo", "tech_lead", "employee", "member"],
-      "fallback": "sample:news-digest and sample:wealth-campaigns; visible; actionable=false",
-      "refresh": "provider widget refresh; sample content static",
-      "as_of": "provider-defined or explicit sample timestamp",
-      "timezone": "provider-defined",
       "closure_status": "verified",
       "gap_reason": null
     },

@@ -279,11 +279,14 @@ PostOnly Chase Open 请求使用同一 Limit 合同：
 
 ```json
 {
+  "quantityOz": "0.5",
   "executionMode": "limit",
   "limitStrategy": "post_only_chase",
   "limitSpread": "-1.1"
 }
 ```
+
+`quantityOz` 可省略；省略表示平掉该 Exit Plan 的全部剩余量，提供时表示本次部分平仓量，必须大于零且不超过计划剩余量。平台不把 1 盎司作为产品上限；实际可下数量仍由 Venue 规格、保证金和风险门控决定。
 
 请求约束：
 
