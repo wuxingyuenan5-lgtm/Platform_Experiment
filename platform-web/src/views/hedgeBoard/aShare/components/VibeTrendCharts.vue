@@ -531,6 +531,7 @@
     pointer-events: none;
     inset: 0;
     appearance: none;
+    appearance: none;
   }
 
   .vibe-time-range input::-webkit-slider-runnable-track {
@@ -553,6 +554,7 @@
     background: var(--strategy-accent-strong);
     cursor: pointer;
     pointer-events: auto;
+    appearance: none;
     appearance: none;
   }
 
