@@ -17,6 +17,8 @@
         </button>
       </section>
 
+      <AShareLegacyTerminalSection />
+
       <nav class="research-subnav" aria-label="A股研究模块导航">
         <button
           v-for="(item, index) in sectionNav"
@@ -30,45 +32,6 @@
       </nav>
 
       <div v-if="dashboardError" class="dashboard-error">{{ dashboardError }}</div>
-
-      <section id="a-share-overview" class="overview-card">
-        <header class="section-header">
-          <div><p>MARKET OVERVIEW</p><h2>市场总览</h2></div>
-          <ResearchSourceState v-if="dashboard?.marketDetail" :meta="dashboard.marketDetail.meta" />
-        </header>
-        <div class="overview-grid">
-          <article v-for="row in coreIndexRows" :key="row.code">
-            <div class="overview-card__head"
-              ><span>{{ row.code }}</span
-              ><b :class="toneClass(row.return1dPct)">{{ formatPct(row.return1dPct) }}</b></div
-            >
-            <strong>{{ row.name }}</strong>
-            <em>{{ formatNumber(row.close) }}</em>
-            <svg viewBox="0 0 100 28" preserveAspectRatio="none">
-              <polyline :points="sparkPoints(row.spark)" :class="toneClass(row.return1dPct)" />
-            </svg>
-          </article>
-        </div>
-      </section>
-
-      <section id="a-share-theme-index" class="overview-card">
-        <header class="section-header">
-          <div><p>THEME BASKET</p><h2>主题指数</h2></div>
-          <ResearchSourceState v-if="dashboard?.marketDetail" :meta="dashboard.marketDetail.meta" />
-        </header>
-        <div class="overview-grid">
-          <article v-for="row in themeIndexRows" :key="row.code">
-            <div class="overview-card__head"
-              ><span>{{ row.code }}</span
-              ><b :class="toneClass(row.return1dPct)">{{ formatPct(row.return1dPct) }}</b></div
-            ><strong>{{ row.name }}</strong>
-            <em>{{ formatNumber(row.close) }}</em>
-            <svg viewBox="0 0 100 28" preserveAspectRatio="none">
-              <polyline :points="sparkPoints(row.spark)" :class="toneClass(row.return1dPct)" />
-            </svg>
-          </article>
-        </div>
-      </section>
 
       <AShareBreadthSection :module="dashboard?.breadth" />
       <ShenwanIndustrySection
@@ -103,11 +66,11 @@
 </template>
 
 <script setup lang="ts">
-  import { computed, nextTick, onActivated, onMounted } from 'vue';
+  import { nextTick, onActivated, onMounted } from 'vue';
   import { useRouter } from 'vue-router';
   import { PageWrapper } from '@/components/Page';
   import CompactSegmentTabs from '@/views/strategy/shared/CompactSegmentTabs.vue';
-  import ResearchSourceState from '../research/components/ResearchSourceState.vue';
+  import AShareLegacyTerminalSection from './components/AShareLegacyTerminalSection.vue';
   import AShareBreadthSection from './components/AShareBreadthSection.vue';
   import AShareWatchlistSection from './components/AShareWatchlistSection.vue';
   import ShenwanIndustrySection from './components/ShenwanIndustrySection.vue';
@@ -174,32 +137,6 @@
 
   onMounted(resetPageScroll);
   onActivated(resetPageScroll);
-
-  const overviewRows = computed(() => dashboard.value?.marketDetail.data || []);
-  const expectedIndexRows = [
-    ['000300', '沪深300'],
-    ['000852', '中证1000'],
-    ['399006', '创业板指'],
-    ['000688', '科创50'],
-    ['931071', 'AI'],
-    ['931238', '金股'],
-    ['932082', '医药'],
-    ['H30590', '机器人'],
-  ] as const;
-  const displayIndexRows = computed(() =>
-    expectedIndexRows.map(
-      ([code, name]) =>
-        overviewRows.value.find((row) => row.code === code) || {
-          code,
-          name,
-          close: null,
-          return1dPct: null,
-          spark: [],
-        },
-    ),
-  );
-  const coreIndexRows = computed(() => displayIndexRows.value.slice(0, 4));
-  const themeIndexRows = computed(() => displayIndexRows.value.slice(4, 8));
 
   function navigateMarket(value: string) {
     const path = routeByMarket[value];

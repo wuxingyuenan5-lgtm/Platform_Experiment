@@ -1,6 +1,6 @@
 ﻿<template>
   <div class="market-terminal">
-    <section v-if="config.overviewCards?.length" class="market-terminal__overview-strip">
+    <section v-if="displayOverviewCards.length" class="market-terminal__overview-strip">
       <article class="market-terminal__overview-panel">
         <div class="market-terminal__panel-head">
           <h3>大盘表现</h3>
@@ -11,7 +11,7 @@
 
         <div class="market-terminal__market-grid">
           <button
-            v-for="item in config.overviewCards"
+            v-for="item in displayOverviewCards"
             :key="item.id"
             type="button"
             class="market-terminal__market-card"
@@ -36,11 +36,11 @@
           </button>
         </div>
 
-        <div class="market-terminal__subhead">当日最大波动</div>
+        <div class="market-terminal__subhead">主题指数</div>
 
         <div class="market-terminal__market-grid">
           <button
-            v-for="item in config.moverCards"
+            v-for="item in displayMoverCards"
             :key="item.id"
             type="button"
             class="market-terminal__market-card market-terminal__market-card--mover"
@@ -283,7 +283,8 @@
 </template>
 
 <script setup lang="ts">
-  import { computed, nextTick, onBeforeUnmount, ref } from 'vue';
+  import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
+  import { getAShareDashboard, type AShareIndexSnapshot } from '@/api/hedgeResearch';
   import TerminalDetailPanel from './TerminalDetailPanel.vue';
   import type {
     MarketTerminalPageConfig,
@@ -335,6 +336,76 @@
     name: '',
     tvSymbol: '',
     error: '',
+  });
+  const aShareSnapshots = ref<AShareIndexSnapshot[]>([]);
+
+  const aShareCoreCodes = ['000300', '000852', '399006', '000688'];
+  const aShareThemeCodes = ['931071', '931238', '932082', 'H30590'];
+  const asNumber = (value: string | number | null | undefined) => {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  };
+  const asChange = (value: string | number | null | undefined) => {
+    const parsed = asNumber(value);
+    return parsed == null ? '—' : `${parsed > 0 ? '+' : ''}${parsed.toFixed(2)}%`;
+  };
+  const toOverviewCard = (
+    row: AShareIndexSnapshot | undefined,
+    code: string,
+    fallback: string,
+  ): OverviewCard => {
+    const value = asNumber(row?.return1dPct);
+    return {
+      id: `a-live-${code}`,
+      symbol: code,
+      label: row?.name || fallback,
+      change: asChange(row?.return1dPct),
+      price: row?.close == null ? undefined : String(row.close),
+      spark: (row?.spark || []).map(Number).filter(Number.isFinite),
+      tone: value == null ? 'neutral' : value > 0 ? 'positive' : value < 0 ? 'negative' : 'neutral',
+    };
+  };
+  const displayOverviewCards = computed(() => {
+    if (props.config.id !== 'aShare') return props.config.overviewCards || [];
+    const labels: Record<string, string> = {
+      '000300': '沪深300',
+      '000852': '中证1000',
+      '399006': '创业板指',
+      '000688': '科创50',
+    };
+    return aShareCoreCodes.map((code) =>
+      toOverviewCard(
+        aShareSnapshots.value.find((row) => row.code === code),
+        code,
+        labels[code],
+      ),
+    );
+  });
+  const displayMoverCards = computed(() => {
+    if (props.config.id !== 'aShare') return props.config.moverCards || [];
+    const labels: Record<string, string> = {
+      '931071': 'AI',
+      '931238': '金股',
+      '932082': '医药',
+      H30590: '机器人',
+    };
+    return aShareThemeCodes.map((code) =>
+      toOverviewCard(
+        aShareSnapshots.value.find((row) => row.code === code),
+        code,
+        labels[code],
+      ),
+    );
+  });
+
+  onMounted(async () => {
+    if (props.config.id !== 'aShare') return;
+    try {
+      const response = await getAShareDashboard();
+      aShareSnapshots.value = response.marketDetail.data || [];
+    } catch {
+      aShareSnapshots.value = [];
+    }
   });
 
   const marketDetailTitle = computed(
