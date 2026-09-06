@@ -42,32 +42,6 @@
       </article>
     </div>
 
-    <article class="panel wide-panel">
-      <div class="panel-title"
-        ><div
-          ><h3>市场涨跌结构与宽度</h3><p>采用当前研究数据接口；来源不可用时明确显示空态。</p></div
-        ><ResearchSourceState v-if="dashboard?.breadth" :meta="dashboard.breadth.meta"
-      /></div>
-      <div v-if="indexRows.length" class="index-chart-grid">
-        <button
-          v-for="row in indexRows"
-          :key="row.code"
-          type="button"
-          class="index-chart"
-          @click="$emit('open-chart', row.code, row.name)"
-        >
-          <div
-            ><span>{{ row.code }}</span
-            ><strong>{{ row.name }}</strong></div
-          ><em :class="tone(row.return1dPct)">{{ formatPct(row.return1dPct) }}</em>
-          <svg viewBox="0 0 180 42" preserveAspectRatio="none">
-            <polyline :points="points(row.spark)" />
-          </svg>
-        </button>
-      </div>
-      <div v-else class="empty">暂无指数历史数据，已避免使用静态或伪造曲线。</div>
-    </article>
-
     <div class="overview-grid">
       <article class="panel">
         <div class="panel-title"
@@ -126,7 +100,7 @@
 
 <script setup lang="ts">
   import { computed, onMounted, ref } from 'vue';
-  import type { AShareDashboardResponse, AShareIndexSnapshot } from '@/api/hedgeResearch';
+  import type { AShareDashboardResponse } from '@/api/hedgeResearch';
   import ResearchSourceState from '../../research/components/ResearchSourceState.vue';
 
   const props = defineProps<{ dashboard: AShareDashboardResponse | null }>();
@@ -213,16 +187,6 @@
             leaders: [],
           }
         : null),
-  );
-  const indexRows = computed(
-    () =>
-      props.dashboard?.marketDetail.data?.slice(0, 8) ||
-      (vibe.value?.indices || []).map((row) => ({
-        code: row.name,
-        name: row.name,
-        return1dPct: row.change_pct,
-        spark: [],
-      })),
   );
   const topSectors = computed(
     () =>
@@ -345,21 +309,6 @@
     const n = numeric(value);
     return n == null ? '' : n > 0 ? 'up' : n < 0 ? 'down' : '';
   }
-  function points(series: AShareIndexSnapshot['spark']) {
-    const values = series.map(Number).filter(Number.isFinite);
-    if (!values.length) return '';
-    const min = Math.min(...values);
-    const range = Math.max(...values) - min || 1;
-    return values
-      .map(
-        (v, i) =>
-          `${((i / Math.max(1, values.length - 1)) * 180).toFixed(1)},${(
-            40 -
-            ((v - min) / range) * 36
-          ).toFixed(1)}`,
-      )
-      .join(' ');
-  }
   function formatDate(value: string) {
     return new Date(value).toLocaleString('zh-CN', { hour12: false });
   }
@@ -473,52 +422,6 @@
     gap: 12px;
   }
 
-  .index-chart-grid {
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 10px;
-  }
-
-  .index-chart {
-    display: grid;
-    grid-template-columns: 1fr auto;
-    gap: 4px;
-    padding: 11px;
-    border: 1px solid var(--strategy-border);
-    border-radius: 10px;
-    background: var(--strategy-surface-2);
-    color: var(--strategy-text-1);
-    text-align: left;
-    cursor: pointer;
-  }
-
-  .index-chart span,
-  .index-chart strong {
-    display: block;
-  }
-
-  .index-chart span {
-    color: var(--strategy-text-4);
-    font-size: 11px;
-  }
-
-  .index-chart em {
-    font-style: normal;
-    font-weight: 700;
-  }
-
-  .index-chart svg {
-    grid-column: 1/-1;
-    width: 100%;
-    height: 42px;
-  }
-
-  .index-chart polyline {
-    stroke-width: 2;
-    stroke: var(--strategy-accent-strong);
-    fill: none;
-  }
-
   .sector-list {
     display: grid;
     margin-top: 10px;
@@ -592,10 +495,6 @@
       grid-template-columns: 1fr;
     }
 
-    .index-chart-grid {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-
     .metric-grid {
       grid-template-columns: repeat(2, minmax(0, 1fr));
     }
@@ -606,10 +505,6 @@
   }
 
   @media (max-width: 560px) {
-    .index-chart-grid {
-      grid-template-columns: 1fr;
-    }
-
     .metric-grid {
       grid-template-columns: 1fr;
     }

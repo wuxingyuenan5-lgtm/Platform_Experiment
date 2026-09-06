@@ -3,36 +3,13 @@
     <header class="pool-head"
       ><div
         ><p class="eyebrow">STOCK POOL</p><h2>自选股与核心股票池</h2
-        ><p class="sub"
-          >沿用 vibe-research 的日更股票池数据与筛选、排序、涨跌宽度和强弱排行。</p
-        ></div
+        ><p class="sub">沿用 vibe-research 的日更股票池数据、筛选排序、强弱排行与矩阵分析。</p></div
       ><button type="button" class="toolbar" :disabled="loading" @click="load">{{
         loading ? '刷新中…' : '刷新数据'
       }}</button></header
     >
     <div v-if="error" class="error">{{ error }}</div>
     <template v-if="data">
-      <div class="kpis"
-        ><div v-for="item in kpis" :key="item.label" class="kpi"
-          ><span>{{ item.label }}</span
-          ><strong :class="item.tone">{{ item.value }}</strong
-          ><small>{{ item.unit }}</small></div
-        ></div
-      >
-      <div class="breadth"
-        ><h3>股票池涨跌宽度</h3
-        ><div class="breadth-bar"
-          ><i
-            v-for="(n, i) in breadth"
-            :key="i"
-            :class="`bin-${i}`"
-            :style="{ width: `${(n / breadthTotal) * 100}%` }"
-          ></i></div
-        ><div class="breadth-labels"
-          ><span>≤ -5%</span><span>-5% ~ -1%</span><span>-1% ~ +1%</span><span>+1% ~ +5%</span
-          ><span>≥ +5%</span></div
-        ></div
-      >
       <div class="pool-grid">
         <section class="sub-panel"
           ><div class="sub-panel-head"
@@ -93,6 +70,69 @@
           ></section
         >
       </div>
+      <section class="leader-grid">
+        <section v-for="group in leaderGroups" :key="group.key" class="sub-panel leader-panel">
+          <h3>{{ group.label }}</h3>
+          <div class="leader-columns">
+            <div>
+              <h4>最强</h4>
+              <button
+                v-for="row in group.up"
+                :key="row.instrument_id"
+                type="button"
+                class="leader-row"
+                @click="emit('query', row.code || '')"
+              >
+                <span>{{ row.name }}</span
+                ><small>{{ row.industry || '—' }}</small
+                ><b class="up">{{ formatPct(row[group.field]) }}</b>
+              </button>
+            </div>
+            <div>
+              <h4>最弱</h4>
+              <button
+                v-for="row in group.down"
+                :key="row.instrument_id"
+                type="button"
+                class="leader-row"
+                @click="emit('query', row.code || '')"
+              >
+                <span>{{ row.name }}</span
+                ><small>{{ row.industry || '—' }}</small
+                ><b class="down">{{ formatPct(row[group.field]) }}</b>
+              </button>
+            </div>
+          </div>
+        </section>
+      </section>
+      <section class="sub-panel matrix-panel">
+        <div class="sub-panel-head">
+          <div><h3>强弱矩阵</h3><p>今日涨幅 × 20日涨幅；点击标的查看个股数据。</p></div>
+          <span class="matrix-legend">红色上涨 · 绿色下跌 · 灰色为混合信号</span>
+        </div>
+        <div class="matrix-grid">
+          <div
+            v-for="bucket in matrixBuckets"
+            :key="bucket.key"
+            class="matrix-quadrant"
+            :class="bucket.key"
+          >
+            <h4
+              >{{ bucket.label }}<small>{{ bucket.rows.length }}只</small></h4
+            >
+            <button
+              v-for="row in bucket.rows.slice(0, 12)"
+              :key="row.instrument_id"
+              type="button"
+              @click="emit('query', row.code || '')"
+            >
+              <span>{{ row.name }}</span
+              ><b :class="tone(row.change)">{{ formatPct(row.change) }}</b>
+            </button>
+            <p v-if="!bucket.rows.length" class="empty">暂无数据</p>
+          </div>
+        </div>
+      </section>
       <section class="sub-panel heat-panel"
         ><div class="sub-panel-head"
           ><h3>股票池热力图</h3
@@ -222,7 +262,11 @@
     stocks: Stock[];
     indices?: Array<Stock & { code: string }>;
     heatmap?: Array<Stock & { weight?: number }>;
-    leaders?: { today?: { up: Stock[]; down: Stock[] } };
+    leaders?: {
+      today?: { up: Stock[]; down: Stock[] };
+      '5d'?: { up: Stock[]; down: Stock[] };
+      '20d'?: { up: Stock[]; down: Stock[] };
+    };
     definitions?: { research_baskets?: Array<{ key: string; name: string; count: number }> };
   }
   const emit = defineEmits<{ (event: 'query', code: string): void }>();
@@ -279,25 +323,6 @@
     }
     return rows;
   });
-  const breadth = computed(() => {
-    const bins = [0, 0, 0, 0, 0];
-    (data.value?.stocks || []).forEach((x) => {
-      const n = Number(x.change);
-      if (!Number.isFinite(n)) return;
-      if (n <= -0.05) bins[0]++;
-      else if (n < -0.01) bins[1]++;
-      else if (n <= 0.01) bins[2]++;
-      else if (n < 0.05) bins[3]++;
-      else bins[4]++;
-    });
-    return bins;
-  });
-  const breadthTotal = computed(() =>
-    Math.max(
-      1,
-      breadth.value.reduce((a, b) => a + b, 0),
-    ),
-  );
   const rankingRows = computed(() => {
     const rows = (data.value?.indices || []).filter((x) =>
       Number.isFinite(Number(x[rankingPeriod.value])),
@@ -312,28 +337,74 @@
       0.0001,
     ),
   );
-  const leaders = computed(() => data.value?.leaders || { today: { up: [], down: [] } });
+  const leaders = computed(
+    () =>
+      data.value?.leaders || {
+        today: { up: [], down: [] },
+        '5d': { up: [], down: [] },
+        '20d': { up: [], down: [] },
+      },
+  );
+  const leaderGroups = computed(() => [
+    {
+      key: '5d',
+      label: '5日强弱排行',
+      field: 'change_5d' as const,
+      up: leaders.value['5d']?.up || [],
+      down: leaders.value['5d']?.down || [],
+    },
+    {
+      key: '20d',
+      label: '20日强弱排行',
+      field: 'change_20d' as const,
+      up: leaders.value['20d']?.up || [],
+      down: leaders.value['20d']?.down || [],
+    },
+  ]);
+  const matrixBuckets = computed(() => {
+    const rows = (data.value?.stocks || []).filter(
+      (row) => Number.isFinite(Number(row.change)) && Number.isFinite(Number(row.change_20d)),
+    );
+    const byStrength = (a: Stock, b: Stock) =>
+      Math.abs(Number(b.change)) +
+      Math.abs(Number(b.change_20d)) -
+      (Math.abs(Number(a.change)) + Math.abs(Number(a.change_20d)));
+    return [
+      {
+        key: 'improving',
+        label: '改善（今日涨 / 20日跌）',
+        rows: rows
+          .filter((row) => Number(row.change) >= 0 && Number(row.change_20d) < 0)
+          .sort(byStrength),
+      },
+      {
+        key: 'leading',
+        label: '领涨（今日涨 / 20日涨）',
+        rows: rows
+          .filter((row) => Number(row.change) >= 0 && Number(row.change_20d) >= 0)
+          .sort(byStrength),
+      },
+      {
+        key: 'lagging',
+        label: '领跌（今日跌 / 20日跌）',
+        rows: rows
+          .filter((row) => Number(row.change) < 0 && Number(row.change_20d) < 0)
+          .sort(byStrength),
+      },
+      {
+        key: 'weakening',
+        label: '转弱（今日跌 / 20日涨）',
+        rows: rows
+          .filter((row) => Number(row.change) < 0 && Number(row.change_20d) >= 0)
+          .sort(byStrength),
+      },
+    ];
+  });
   const heatTiles = computed(() =>
     [...(data.value?.heatmap || [])]
       .sort((a, b) => Number(b.weight || 0) - Number(a.weight || 0))
       .slice(0, 80),
   );
-  const kpis = computed(() => {
-    const s = data.value?.summary;
-    if (!s) return [];
-    return [
-      { label: '股票池', value: s.tracked_count, unit: '只', tone: '' },
-      { label: '上涨', value: s.breadth.up, unit: '只', tone: 'up' },
-      { label: '下跌', value: s.breadth.down, unit: '只', tone: 'down' },
-      {
-        label: '平均涨幅',
-        value: formatPct(s.avg_change),
-        unit: '日更缓存',
-        tone: tone(s.avg_change),
-      },
-      { label: '成交额', value: formatNumber(s.total_amount_yi), unit: '亿元', tone: '' },
-    ];
-  });
   async function load() {
     loading.value = true;
     error.value = '';
@@ -369,11 +440,11 @@
   }
   function heatColor(value: unknown) {
     const n = Number(value);
-    if (!Number.isFinite(n)) return 'var(--strategy-surface-2)';
+    if (!Number.isFinite(n)) return '#334155';
     const x = Math.min(1, Math.abs(n) / 0.08);
     return n >= 0
-      ? `rgb(${Math.round(190 + 55 * x)},${Math.round(235 - 90 * x)},${Math.round(205 - 90 * x)})`
-      : `rgb(${Math.round(205 - 90 * x)},${Math.round(235 - 15 * x)},${Math.round(220 - 35 * x)})`;
+      ? `rgb(${Math.round(138 + 84 * x)},${Math.round(56 - 18 * x)},${Math.round(56 - 16 * x)})`
+      : `rgb(28,${Math.round(108 + 62 * x)},${Math.round(70 + 8 * x)})`;
   }
   function formatNumber(value: unknown) {
     const n = Number(value);
@@ -450,85 +521,6 @@
     border-radius: 8px;
     background: #fef2f2;
     color: #dc2626;
-  }
-
-  .kpis {
-    display: grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
-    gap: 10px;
-  }
-
-  .kpi {
-    padding: 12px;
-    border: 1px solid var(--strategy-border);
-    border-radius: 10px;
-    background: var(--strategy-surface-2);
-  }
-
-  .kpi span,
-  .kpi small {
-    display: block;
-    color: var(--strategy-text-3);
-    font-size: 11px;
-  }
-
-  .kpi strong {
-    display: inline-block;
-    margin: 5px 3px 0 0;
-    color: var(--strategy-text-1);
-    font-size: 22px;
-  }
-
-  .breadth {
-    padding: 14px;
-    border: 1px solid var(--strategy-border);
-    border-radius: 10px;
-    background: var(--strategy-surface-2);
-  }
-
-  .breadth h3 {
-    margin: 0 0 10px;
-    color: var(--strategy-text-1);
-    font-size: 15px;
-  }
-
-  .breadth-bar {
-    display: flex;
-    height: 18px;
-    overflow: hidden;
-    border-radius: 999px;
-  }
-
-  .breadth-bar i {
-    min-width: 1px;
-  }
-
-  .bin-0 {
-    background: #168b53;
-  }
-
-  .bin-1 {
-    background: #4ade80;
-  }
-
-  .bin-2 {
-    background: #94a3b8;
-  }
-
-  .bin-3 {
-    background: #f58a84;
-  }
-
-  .bin-4 {
-    background: #dc2626;
-  }
-
-  .breadth-labels {
-    display: flex;
-    justify-content: space-between;
-    margin-top: 7px;
-    color: var(--strategy-text-3);
-    font-size: 11px;
   }
 
   .pool-grid {
@@ -638,6 +630,85 @@
     grid-row: 1 / span 2;
     align-self: center;
     font-size: 12px;
+  }
+
+  .leader-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+  }
+
+  .leader-panel {
+    min-width: 0;
+  }
+
+  .sub-panel-head p {
+    margin: 3px 0 0;
+    color: var(--strategy-text-4);
+    font-size: 11px;
+  }
+
+  .matrix-legend {
+    color: var(--strategy-text-4);
+    font-size: 11px;
+    white-space: nowrap;
+  }
+
+  .matrix-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .matrix-quadrant {
+    min-width: 0;
+    padding: 9px;
+    border: 1px solid var(--strategy-border);
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--strategy-surface) 92%, #64748b 8%);
+  }
+
+  .matrix-quadrant h4 {
+    display: flex;
+    justify-content: space-between;
+    gap: 4px;
+    margin: 0 0 5px;
+    color: var(--strategy-text-2);
+    font-size: 11px;
+  }
+
+  .matrix-quadrant h4 small {
+    color: var(--strategy-text-4);
+    font-size: 10px;
+    font-weight: 400;
+  }
+
+  .matrix-quadrant button {
+    display: flex;
+    justify-content: space-between;
+    width: 100%;
+    padding: 4px 0;
+    border: 0;
+    border-bottom: 1px solid color-mix(in srgb, var(--strategy-border) 70%, transparent);
+    background: transparent;
+    color: var(--strategy-text-2);
+    font-size: 11px;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .matrix-quadrant button:last-of-type {
+    border-bottom: 0;
+  }
+
+  .matrix-quadrant.improving,
+  .matrix-quadrant.leading {
+    box-shadow: inset 3px 0 0 var(--strategy-up, #ef4444);
+  }
+
+  .matrix-quadrant.lagging,
+  .matrix-quadrant.weakening {
+    box-shadow: inset 3px 0 0 var(--strategy-down, #10b981);
   }
 
   .heat-panel {
@@ -773,10 +844,6 @@
   }
 
   @media (max-width: 900px) {
-    .kpis {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-
     .pool-head {
       flex-direction: column;
     }
@@ -787,6 +854,11 @@
 
     .heatmap {
       grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+
+    .leader-grid,
+    .matrix-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
     }
   }
 </style>
