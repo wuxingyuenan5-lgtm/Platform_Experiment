@@ -21,30 +21,8 @@
 
       <AShareMarketOverviewSection :dashboard="dashboard" />
 
-      <nav class="research-subnav" aria-label="A股研究模块导航">
-        <button
-          v-for="(item, index) in sectionNav"
-          :key="item.id"
-          type="button"
-          @click="jumpTo(item.id)"
-        >
-          <span>{{ String(index + 1).padStart(2, '0') }}</span
-          ><strong>{{ item.label }}</strong>
-        </button>
-      </nav>
-
       <div v-if="dashboardError" class="dashboard-error">{{ dashboardError }}</div>
 
-      <AShareWatchlistSection
-        :groups="watchlistGroups"
-        :sync-state="watchlistSyncState"
-        :last-synced-at="watchlistLastSyncedAt"
-        @add="addToWatchlist"
-        @remove="removeFromWatchlist"
-        @move="moveWatchlistItem"
-        @set-group="setWatchlistGroup"
-        @query="queryStockAndJump"
-      />
       <VibeStockPoolSection @query="queryStockAndJump" />
       <StockSnapshotSection
         v-model:code="stockCode"
@@ -65,7 +43,6 @@
   import CompactSegmentTabs from '@/views/strategy/shared/CompactSegmentTabs.vue';
   import AShareLegacyTerminalSection from './components/AShareLegacyTerminalSection.vue';
   import AShareMarketOverviewSection from './components/AShareMarketOverviewSection.vue';
-  import AShareWatchlistSection from './components/AShareWatchlistSection.vue';
   import VibeStockPoolSection from './components/VibeStockPoolSection.vue';
   import StockSnapshotSection from './components/StockSnapshotSection.vue';
   import { useAShareResearch } from './useAShareResearch';
@@ -89,13 +66,6 @@
     global: '/hedge-board/global',
     tradingTools: '/hedge-board/trading-tools/macro',
   };
-  const sectionNav = [
-    { id: 'a-share-market-overview', label: '市场总览' },
-    { id: 'a-share-market-detail', label: '市场明细' },
-    { id: 'a-share-watchlist', label: '自选股' },
-    { id: 'a-share-stock-snapshot', label: '一键个股数据' },
-  ];
-
   const {
     dashboard,
     dashboardLoading,
@@ -104,15 +74,9 @@
     stockSnapshot,
     stockLoading,
     stockError,
-    watchlistGroups,
-    watchlistSyncState,
-    watchlistLastSyncedAt,
     loadDashboard,
     queryStock,
     addToWatchlist,
-    removeFromWatchlist,
-    moveWatchlistItem,
-    setWatchlistGroup,
   } = useAShareResearch();
 
   function resetPageScroll() {
@@ -261,38 +225,6 @@
   .refresh-button:disabled {
     opacity: 0.65;
     cursor: wait;
-  }
-
-  .research-subnav {
-    display: flex;
-    position: sticky;
-    z-index: 5;
-    top: 0;
-    padding: 8px 0;
-    overflow-x: auto;
-    background: var(--strategy-bg);
-    gap: 8px;
-  }
-
-  .research-subnav button {
-    display: inline-flex;
-    align-items: center;
-    min-width: max-content;
-    padding: 9px 12px;
-    border: 1px solid var(--strategy-border);
-    border-radius: 999px;
-    background: var(--strategy-surface);
-    box-shadow: var(--strategy-shadow-soft);
-    color: #111827;
-    cursor: pointer;
-    gap: 7px;
-  }
-
-  .research-subnav span,
-  .research-subnav strong {
-    color: #111827;
-    font-size: 14px;
-    font-weight: 800;
   }
 
   .dashboard-error {

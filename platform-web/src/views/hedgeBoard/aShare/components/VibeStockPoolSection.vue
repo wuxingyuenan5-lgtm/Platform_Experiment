@@ -1,9 +1,7 @@
 <template>
   <section id="a-share-watchlist-pool" class="pool-card">
     <header class="pool-head"
-      ><div
-        ><p class="eyebrow">STOCK POOL</p><h2>自选股与核心股票池</h2
-        ><p class="sub">沿用 vibe-research 的日更股票池数据、筛选排序、强弱排行与矩阵分析。</p></div
+      ><div><h2>自选股与核心股票池</h2></div
       ><button type="button" class="toolbar" :disabled="loading" @click="load">{{
         loading ? '刷新中…' : '刷新数据'
       }}</button></header
@@ -478,24 +476,10 @@
     gap: 14px;
   }
 
-  .eyebrow {
-    margin: 0 0 3px;
-    color: var(--strategy-text-4);
-    font-size: 11px;
-    font-weight: 800;
-    letter-spacing: 0.12em;
-  }
-
   .pool-head h2 {
     margin: 0;
     color: var(--strategy-text-1);
     font-size: 20px;
-  }
-
-  .sub {
-    margin: 4px 0 0;
-    color: var(--strategy-text-3);
-    font-size: 12px;
   }
 
   .toolbar,

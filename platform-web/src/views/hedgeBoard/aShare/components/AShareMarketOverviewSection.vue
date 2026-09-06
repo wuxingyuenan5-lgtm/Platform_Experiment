@@ -81,9 +81,7 @@
 
     <article class="panel wide-panel">
       <div class="panel-title"
-        ><div
-          ><h3>全市场成交额榜</h3><p>当前接口返回的成交额阈值明细，按成交额降序展示。</p></div
-        ></div
+        ><div><h3>全市场成交额榜</h3></div></div
       >
       <div v-if="turnoverRows.length" class="turnover-grid"
         ><div v-for="row in turnoverRows" :key="row.securityCode" class="turnover-row"
