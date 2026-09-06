@@ -207,6 +207,26 @@
 </script>
 
 <style scoped lang="less">
+
+
+  @media (max-width: 1150px) {
+    .overview-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  @media (max-width: 680px) {
+    .board-toolbar,
+    .section-header {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+
+    .overview-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+
   .a-share-board {
     --strategy-bg: #f4f6f8;
     --strategy-surface: #fff;
@@ -233,6 +253,19 @@
     min-width: 0;
     padding-bottom: 32px;
     background: var(--strategy-bg);
+  }
+
+  // PageWrapper clips horizontal overflow.  Keep the shared terminal within
+  // its available viewport; individual data tables manage their own scroll.
+  .a-share-board :deep(.market-terminal) {
+    width: min(100%, calc(100vw - 32px));
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+  }
+
+  .a-share-board :deep(.market-terminal__overview-strip) {
+    grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
   }
 
   .board-toolbar {
@@ -394,23 +427,5 @@
 
   .is-negative {
     color: var(--strategy-down) !important;
-  }
-
-  @media (max-width: 1150px) {
-    .overview-grid {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-  }
-
-  @media (max-width: 680px) {
-    .board-toolbar,
-    .section-header {
-      flex-direction: column;
-      align-items: flex-start;
-    }
-
-    .overview-grid {
-      grid-template-columns: 1fr;
-    }
   }
 </style>

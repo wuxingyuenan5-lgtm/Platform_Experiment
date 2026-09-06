@@ -1084,16 +1084,42 @@
   .market-terminal__detail-section {
     display: grid;
     min-width: 0;
-    gap: 12px;
-    padding: 18px;
-    border: 1px solid var(--terminal-border);
-    border-radius: 18px;
-    background: var(--terminal-panel-bg), #fff;
-    box-shadow: var(--terminal-shadow);
+    gap: 18px;
+    padding: 22px;
+    border: 1px solid rgb(193 207 220 / 88%);
+    border-radius: 24px;
+    background: linear-gradient(180deg, rgb(255 255 255 / 95%), rgb(243 248 252 / 96%)), #fff;
+    box-shadow: 0 18px 45px rgb(31 41 55 / 5%);
   }
 
   .market-terminal__panel-head--detail-toggle {
     margin-bottom: 0;
+  }
+
+  .market-terminal__panel-head--detail-toggle h3 {
+    color: #18313c;
+    font-size: 22px;
+    font-weight: 800;
+  }
+
+  .market-terminal__panel-head--detail-toggle .market-terminal__toolbar-btn {
+    min-height: 32px;
+    padding: 5px 12px;
+    border: 1px solid rgb(109 130 147 / 28%);
+    border-radius: 999px;
+    background: #fff;
+    color: #526b7d;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  .market-terminal__panel-head--detail-toggle .market-terminal__toolbar-btn:hover,
+  .market-terminal__panel-head--detail-toggle .market-terminal__toolbar-btn:focus-visible {
+    border-color: rgb(22 93 255 / 42%);
+    outline: none;
+    background: rgb(22 93 255 / 6%);
+    color: #165dff;
   }
 
   .market-terminal__overview-strip {
