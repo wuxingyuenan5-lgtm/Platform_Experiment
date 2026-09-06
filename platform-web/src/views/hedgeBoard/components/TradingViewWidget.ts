@@ -17,6 +17,7 @@ const TradingViewWidget = defineComponent({
     let renderTimer: number | null = null;
     let frameToken = 0;
     let lastSizeKey = '';
+    let isVisible = false;
 
     const clearRenderTimers = () => {
       if (renderTimer) window.clearTimeout(renderTimer);
@@ -86,16 +87,9 @@ const TradingViewWidget = defineComponent({
     };
 
     onMounted(() => {
-      scheduleRender();
-      frameToken = window.requestAnimationFrame(() => {
-        frameToken = window.requestAnimationFrame(() => {
-          scheduleRender();
-        });
-      });
-
       if (typeof ResizeObserver !== 'undefined' && mountRef.value) {
         resizeObserver = new ResizeObserver(() => {
-          if (!mountRef.value?.childElementCount) scheduleRender();
+          if (isVisible && !mountRef.value?.childElementCount) scheduleRender();
         });
         resizeObserver.observe(mountRef.value);
       }
@@ -103,22 +97,25 @@ const TradingViewWidget = defineComponent({
       if (typeof IntersectionObserver !== 'undefined' && mountRef.value) {
         intersectionObserver = new IntersectionObserver(
           (entries) => {
-            if (
-              entries.some((entry) => entry.isIntersecting) &&
-              !mountRef.value?.childElementCount
-            ) {
+            isVisible = entries.some((entry) => entry.isIntersecting);
+            if (isVisible && !mountRef.value?.childElementCount) {
               scheduleRender();
             }
           },
-          { threshold: 0.2 },
+          { rootMargin: '160px 0px', threshold: 0.01 },
         );
         intersectionObserver.observe(mountRef.value);
+      } else {
+        isVisible = true;
+        frameToken = window.requestAnimationFrame(() => scheduleRender());
       }
     });
 
     watch(
       () => props.widget,
-      () => scheduleRender(true),
+      () => {
+        if (isVisible) scheduleRender(true);
+      },
       { deep: true },
     );
     onBeforeUnmount(() => {

@@ -207,8 +207,6 @@
 </script>
 
 <style scoped lang="less">
-
-
   @media (max-width: 1150px) {
     .overview-grid {
       grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -249,10 +247,17 @@
     --strategy-shadow-soft: 0 4px 16px rgb(15 23 42 / 4.5%);
 
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
     gap: 14px;
     min-width: 0;
+    max-width: 100%;
     padding-bottom: 32px;
     background: var(--strategy-bg);
+  }
+
+  .a-share-board > * {
+    min-width: 0;
+    max-width: 100%;
   }
 
   // PageWrapper clips horizontal overflow.  Keep the shared terminal within
