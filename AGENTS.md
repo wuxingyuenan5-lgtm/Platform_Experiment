@@ -12,6 +12,16 @@ Read this file first. Read a module `AGENTS.md`, Context Pack, task card, govern
 
 Mode 2/3, task cards, branches, Worktrees, locks, monitors, and structured delivery receipts are never prerequisites for ordinary work.
 
+## Execution behavior
+
+- For an execution request, complete reversible local work within scope by default. Make ordinary technical choices from the current code, contracts, and tests; do not stop at a plan, status update, first error, or partial implementation.
+- Ask the Owner only when ambiguity would materially change the user experience, an external fact cannot be inferred safely, concurrent changes cannot be merged safely, or the work requires credentials, external writes, real trading, or an irreversible action.
+- Implement only the requested product result. Do not add product states, parallel flows, compatibility layers, configuration switches, authorization mechanisms, or future architecture without evidence that the current requirement needs them.
+- Select validation by impact and risk: keep narrow changes focused, and expand regression coverage for shared contracts, cross-module behavior, permissions, persistence, and trading safety.
+- The Owner's latest explicit request determines current intent. If it conflicts with an active contract or safety rule, surface the conflict and update the owning authority when approved; never bypass it silently.
+
+When work fails, reproduce and locate the root cause from the error, logs, and existing call path, then make the smallest complete fix in the layer that owns the problem. Do not mask failure with a parallel path, duplicate state, silent fallback, temporary switch, swallowed error, or open-ended compatibility layer, and do not bypass contracts, consistency, or safety boundaries. Limit systemic changes to the reproduced cause, avoid unrelated redesign, remove only failed experimental code introduced by the current task, and continue through directly relevant verification.
+
 ## Documentation maintenance
 
 Before finishing any non-trivial task, perform a documentation-impact check:
@@ -35,7 +45,7 @@ Use an active stage file only when the Owner defines a stage, or when one indepe
 - Multiple stages may be active when they can be progressed, paused and accepted independently. Closely coupled features that share one acceptance outcome or repeatedly change the same core contract should remain work lines in one stage rather than duplicate state across files.
 - A stage file is a concise continuation snapshot, not a product or architecture authority. It should contain enough current scope, result, acceptance, blocker or decision, next action and authority links for another task to continue, but it has no mandatory template, status vocabulary or receipt format.
 - Before continuing a stage, read `AGENTS.md`, `docs/PROJECT.md`, the relevant stage file and only its directly relevant durable authorities. Chat provides the Owner's latest intent and reasoning but must not be the only handoff source. When a new explicit Owner request conflicts with the stage file, point out the change and update the file; do not silently choose either version.
-- At task start, notice other active stages listed in `docs/PROJECT.md`. Read another stage file only when the intended change touches its current code, data or contract boundary. Shared facts must have one durable owner and must not be maintained independently in two stage files.
+- When continuing a stage or changing a shared contract, notice other active stages listed in `docs/PROJECT.md`. Read another stage file only when the intended change touches its current code, data or contract boundary. Shared facts must have one durable owner and must not be maintained independently in two stage files.
 - AI may update evidence-backed progress, verified results, technical blockers, acceptance and next technical action. AI must not change confirmed product scope, priority, risk tolerance or authorization. New product needs remain explicitly unconfirmed until the Owner says `确认进入范围`.
 - Task replies should briefly communicate the actual result, important verification, real blocker and documentation impact. Do not use a rigid receipt schema or depend on a long chat receipt for continuation.
 - At stage close, merge durable facts into their owning documents, update `docs/PROJECT.md`, and delete the single stage file. Git retains history; do not archive completed stage files. A blocked stage remains active, while cancellation or milestone changes require an Owner decision.
