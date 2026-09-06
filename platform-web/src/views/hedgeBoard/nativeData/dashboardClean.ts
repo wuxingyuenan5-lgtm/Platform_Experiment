@@ -727,9 +727,14 @@ export const researchModules: ResearchModule[] = [
         layout: 'two',
         widgets: [
           localChart(
-            'BTC / ETH Open Interest · Binance Venue',
+            '实时持仓资费分析',
             'USD-M 日末名义价值 · not Aggregate',
             'crypto-binance-open-interest',
+            {
+              referenceLinks: [
+                { label: 'TradingView 模板', href: 'https://cn.tradingview.com/chart/UPwf4Qx8/' },
+              ],
+            },
           ),
           externalReference(
             '全市场期货未平仓量',
