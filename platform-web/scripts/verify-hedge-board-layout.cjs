@@ -281,12 +281,10 @@ assert(
   'A-share and macro routes must use the upgraded research pages.',
 );
 assert(
-  aSharePageSource.includes('<AShareBreadthSection') &&
+  aSharePageSource.includes('<AShareMarketOverviewSection') &&
     aSharePageSource.includes('<AShareLegacyTerminalSection') &&
-    aSharePageSource.includes('<ShenwanIndustrySection') &&
-    aSharePageSource.includes('<ShortTermEmotionSection') &&
     aSharePageSource.includes('<StockSnapshotSection'),
-  'A-share page must orchestrate each natural research boundary through a child component.',
+  'A-share page must orchestrate the market overview, market detail and stock snapshot through child components.',
 );
 assert(
   marketTerminalPageSource.includes('detailSectionId') &&
@@ -341,9 +339,8 @@ assert(
     aShareResearchComposableSource.includes('replaceAccountResearchWatchlist') &&
     aShareWatchlistLocalStateSource.includes('WATCHLIST_DIRTY_STORAGE_KEY') &&
     aShareResearchComposableSource.includes("error.code !== 'watchlist_version_conflict'") &&
-    aSharePageSource.includes(':sync-state="watchlistSyncState"') &&
-    aSharePageSource.includes(':last-synced-at="watchlistLastSyncedAt"'),
-  'A-share watchlists must sync through the authenticated account API with CSRF, offline cache and conflict recovery.',
+    !aSharePageSource.includes('AShareWatchlistSection'),
+  'A-share watchlist persistence remains available in the research composable while the standalone watchlist panel is not rendered.',
 );
 assert(
   aShareWatchlistSource.includes('空列表会被正常保留') &&

@@ -23,7 +23,6 @@
 
       <div v-if="dashboardError" class="dashboard-error">{{ dashboardError }}</div>
 
-      <VibeStockPoolSection @query="queryStockAndJump" />
       <StockSnapshotSection
         v-model:code="stockCode"
         :snapshot="stockSnapshot"
@@ -37,13 +36,12 @@
 </template>
 
 <script setup lang="ts">
-  import { nextTick, onActivated, onMounted } from 'vue';
+  import { onActivated, onMounted } from 'vue';
   import { useRouter } from 'vue-router';
   import { PageWrapper } from '@/components/Page';
   import CompactSegmentTabs from '@/views/strategy/shared/CompactSegmentTabs.vue';
   import AShareLegacyTerminalSection from './components/AShareLegacyTerminalSection.vue';
-  import AShareMarketOverviewSection from './components/AShareMarketOverviewSection.vue';
-  import VibeStockPoolSection from './components/VibeStockPoolSection.vue';
+  import AShareMarketOverviewSection from './components/AShareMarketOverviewParitySection.vue';
   import StockSnapshotSection from './components/StockSnapshotSection.vue';
   import { useAShareResearch } from './useAShareResearch';
 
@@ -89,52 +87,6 @@
   function navigateMarket(value: string) {
     const path = routeByMarket[value];
     if (path) void router.push(path);
-  }
-
-  function jumpTo(id: string) {
-    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }
-
-  async function queryStockAndJump(code: string) {
-    await queryStock(code);
-    await nextTick();
-    jumpTo('a-share-stock-snapshot');
-  }
-
-  function numeric(value: string | number | null | undefined) {
-    const result = Number(value);
-    return Number.isFinite(result) ? result : null;
-  }
-
-  function formatNumber(value: string | number | null | undefined) {
-    const result = numeric(value);
-    return result == null ? '—' : result.toLocaleString('zh-CN', { maximumFractionDigits: 2 });
-  }
-
-  function formatPct(value: string | number | null | undefined) {
-    const result = numeric(value);
-    return result == null ? '—' : `${result > 0 ? '+' : ''}${result.toFixed(2)}%`;
-  }
-
-  function toneClass(value: string | number | null | undefined) {
-    const result = numeric(value);
-    return result == null ? '' : result > 0 ? 'is-positive' : result < 0 ? 'is-negative' : '';
-  }
-
-  function sparkPoints(values: Array<string | number>) {
-    const series = values.map(Number).filter(Number.isFinite);
-    if (!series.length) return '';
-    const min = Math.min(...series);
-    const range = Math.max(...series) - min || 1;
-    return series
-      .map(
-        (value, index) =>
-          `${((index / Math.max(series.length - 1, 1)) * 100).toFixed(2)},${(
-            26 -
-            ((value - min) / range) * 22
-          ).toFixed(2)}`,
-      )
-      .join(' ');
   }
 </script>
 
