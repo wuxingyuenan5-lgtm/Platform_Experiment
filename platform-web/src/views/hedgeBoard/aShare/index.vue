@@ -17,8 +17,6 @@
         </button>
       </section>
 
-      <AShareLegacyTerminalSection />
-
       <nav class="research-subnav" aria-label="A股研究模块导航">
         <button
           v-for="(item, index) in sectionNav"
@@ -100,6 +98,7 @@
         @query="queryStock"
         @add-watchlist="addToWatchlist"
       />
+      <AShareLegacyTerminalSection />
     </div>
   </PageWrapper>
 </template>
