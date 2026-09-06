@@ -466,11 +466,16 @@
     width: 100%;
     min-width: 720px;
     height: auto;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    box-shadow: none;
   }
 
   .vibe-chart-grid {
     stroke-dasharray: 3 4;
     stroke: var(--strategy-border);
+    fill: none;
   }
 
   .vibe-axis-label {
@@ -505,15 +510,39 @@
     background: var(--strategy-surface);
   }
 
+  .vibe-time-range {
+    display: grid;
+    position: relative;
+    grid-template-columns: 1fr;
+    align-items: center;
+    padding: 4px 8px;
+    gap: 7px;
+  }
+
   .vibe-time-range input {
     position: absolute;
     width: 100%;
     height: 18px;
     margin: 0;
+    border: 0;
+    outline: 0;
     background: transparent;
+    box-shadow: none;
     pointer-events: none;
     inset: 0;
     appearance: none;
+  }
+
+  .vibe-time-range input::-webkit-slider-runnable-track {
+    height: 18px;
+    border: 0;
+    background: transparent;
+  }
+
+  .vibe-time-range input::-moz-range-track {
+    height: 18px;
+    border: 0;
+    background: transparent;
   }
 
   .vibe-time-range input::-webkit-slider-thumb {
@@ -525,6 +554,16 @@
     cursor: pointer;
     pointer-events: auto;
     appearance: none;
+  }
+
+  .vibe-time-range input::-moz-range-thumb {
+    width: 6px;
+    height: 18px;
+    border: 1px solid var(--strategy-accent-strong);
+    border-radius: 3px;
+    background: var(--strategy-accent-strong);
+    cursor: pointer;
+    pointer-events: auto;
   }
 
   .vibe-time-range-end {
@@ -544,5 +583,26 @@
     background: var(--strategy-border);
     color: var(--strategy-text-1);
     cursor: pointer;
+  }
+
+  /* VibeTimeChart is rendered with h() instead of the SFC template, so keep
+     the chart primitives explicitly scoped through the host wrapper as well.
+     This also removes the browser's default black range track/border. */
+  .vibe-trend-charts :deep(.vibe-chart-svg),
+  .vibe-trend-charts :deep(.vibe-chart-stage),
+  .vibe-trend-charts :deep(.vibe-time-range input) {
+    border: 0;
+    outline: 0;
+    box-shadow: none;
+  }
+
+  .vibe-trend-charts :deep(.vibe-chart-svg) {
+    background: transparent;
+  }
+
+  .vibe-trend-charts :deep(.vibe-time-range input::-webkit-slider-runnable-track),
+  .vibe-trend-charts :deep(.vibe-time-range input::-moz-range-track) {
+    border: 0;
+    background: transparent;
   }
 </style>
