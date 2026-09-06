@@ -664,6 +664,10 @@ export const researchModules: ResearchModule[] = [
                 label: '30日均线',
                 href: 'https://studio.glassnode.com/charts/institutions.UsSpotEtfFlowsNet?a=BTC&mAvg=30&resolution=24h&s=1704657272&u=1788393600&zoom=',
               },
+              {
+                label: '各ETF细节',
+                href: 'https://studio.glassnode.com/charts/institutions.UsSpotEtfFlowsAll?a=BTC&mAvg=30&resolution=24h&s=1757139104&u=1788675104&zoom=365',
+              },
             ],
           }),
           localChart('ETH ETF 日流量', 'SoSoValue', 'crypto-eth-etf-flow', {
