@@ -23,16 +23,7 @@
 
       <div v-if="dashboardError" class="dashboard-error">{{ dashboardError }}</div>
 
-      <StockSnapshotSection
-        v-model:code="stockCode"
-        :snapshot="stockSnapshot"
-        :loading="stockLoading"
-        :error="stockError"
-        @query="queryStock"
-        @add-watchlist="addToWatchlist"
-      />
-
-      <VibeStockPoolSection @query="queryStock" />
+      <VibeStockPoolSection />
     </div>
   </PageWrapper>
 </template>
@@ -44,7 +35,6 @@
   import CompactSegmentTabs from '@/views/strategy/shared/CompactSegmentTabs.vue';
   import AShareLegacyTerminalSection from './components/AShareLegacyTerminalSection.vue';
   import AShareMarketOverviewSection from './components/AShareMarketOverviewParitySection.vue';
-  import StockSnapshotSection from './components/StockSnapshotSection.vue';
   import VibeStockPoolSection from './components/VibeStockPoolSection.vue';
   import { useAShareResearch } from './useAShareResearch';
 
@@ -67,18 +57,7 @@
     global: '/hedge-board/global',
     tradingTools: '/hedge-board/trading-tools/macro',
   };
-  const {
-    dashboard,
-    dashboardLoading,
-    dashboardError,
-    stockCode,
-    stockSnapshot,
-    stockLoading,
-    stockError,
-    loadDashboard,
-    queryStock,
-    addToWatchlist,
-  } = useAShareResearch();
+  const { dashboard, dashboardLoading, dashboardError, loadDashboard } = useAShareResearch();
 
   function resetPageScroll() {
     window.scrollTo({ top: 0, left: 0, behavior: 'auto' });

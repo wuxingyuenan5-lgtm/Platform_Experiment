@@ -283,7 +283,7 @@ assert(
 assert(
   aSharePageSource.includes('<AShareMarketOverviewSection') &&
     aSharePageSource.includes('<AShareLegacyTerminalSection') &&
-    aSharePageSource.includes('<StockSnapshotSection') &&
+    !aSharePageSource.includes('<StockSnapshotSection') &&
     aSharePageSource.includes('<VibeStockPoolSection') &&
     vibeStockPoolSource.includes('/vibe-research/api/stock-pool') &&
     vibeStockPoolSource.includes('/vibe-research/api/stock-pool/focus') &&
@@ -291,7 +291,7 @@ assert(
     vibeStockPoolSource.includes('matrixPoints') &&
     vibeStockPoolSource.includes('heatMaxAbs') &&
     !vibeStockPoolSource.includes('localStorage'),
-  'A-share page must orchestrate the market overview, market detail, stock snapshot and functional stock pool through child components.',
+  'A-share page must orchestrate the market overview, market detail and functional stock pool without the removed one-click stock data section.',
 );
 assert(
   marketTerminalPageSource.includes('detailSectionId') &&
