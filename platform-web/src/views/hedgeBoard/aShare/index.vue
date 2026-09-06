@@ -98,7 +98,6 @@
         @query="queryStock"
         @add-watchlist="addToWatchlist"
       />
-      <AShareLegacyTerminalSection />
     </div>
   </PageWrapper>
 </template>
@@ -109,7 +108,6 @@
   import { PageWrapper } from '@/components/Page';
   import CompactSegmentTabs from '@/views/strategy/shared/CompactSegmentTabs.vue';
   import ResearchSourceState from '../research/components/ResearchSourceState.vue';
-  import AShareLegacyTerminalSection from './components/AShareLegacyTerminalSection.vue';
   import AShareBreadthSection from './components/AShareBreadthSection.vue';
   import AShareWatchlistSection from './components/AShareWatchlistSection.vue';
   import ShenwanIndustrySection from './components/ShenwanIndustrySection.vue';
@@ -178,8 +176,30 @@
   onActivated(resetPageScroll);
 
   const overviewRows = computed(() => dashboard.value?.marketDetail.data || []);
-  const coreIndexRows = computed(() => overviewRows.value.slice(0, 4));
-  const themeIndexRows = computed(() => overviewRows.value.slice(4, 8));
+  const expectedIndexRows = [
+    ['000300', '沪深300'],
+    ['000852', '中证1000'],
+    ['399006', '创业板指'],
+    ['000688', '科创50'],
+    ['931071', 'AI'],
+    ['931238', '金股'],
+    ['932082', '医药'],
+    ['H30590', '机器人'],
+  ] as const;
+  const displayIndexRows = computed(() =>
+    expectedIndexRows.map(
+      ([code, name]) =>
+        overviewRows.value.find((row) => row.code === code) || {
+          code,
+          name,
+          close: null,
+          return1dPct: null,
+          spark: [],
+        },
+    ),
+  );
+  const coreIndexRows = computed(() => displayIndexRows.value.slice(0, 4));
+  const themeIndexRows = computed(() => displayIndexRows.value.slice(4, 8));
 
   function navigateMarket(value: string) {
     const path = routeByMarket[value];
