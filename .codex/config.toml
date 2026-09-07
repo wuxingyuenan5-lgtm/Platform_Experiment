@@ -1,2 +1,4 @@
 # Project configuration is intentionally minimal.
 # Runtime hooks and project-scoped agent profiles are not enabled here.
+[features.context_management]
+experimental_mode = true

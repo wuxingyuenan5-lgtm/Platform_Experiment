@@ -219,8 +219,8 @@ function positionRows(
 
 const crossSpreadTabs: StrategyTableTab[] = [
   { key: 'positions', label: '当前持仓' },
-  { key: 'history', label: '历史订单' },
   { key: 'fills', label: '成交记录' },
+  { key: 'history', label: '历史订单' },
   { key: 'logs', label: '执行记录' },
 ];
 
@@ -318,8 +318,8 @@ export function useCrossSpreadRecords() {
     error.value = '';
     try {
       const [orderRows, fillRows, batchRows, observability] = await Promise.all([
-        getOrders(),
-        getFills(),
+        getOrders(STRATEGY_INSTANCE_ID),
+        getFills(STRATEGY_INSTANCE_ID),
         getExecutionBatches(STRATEGY_INSTANCE_ID),
         getCrossSpreadObservability(24, 50, 'audit'),
       ]);

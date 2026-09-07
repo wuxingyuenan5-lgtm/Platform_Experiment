@@ -3,11 +3,13 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
+from concurrent.futures import ThreadPoolExecutor
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 from decimal import Decimal
 from sqlite3 import Row
+from threading import Lock
 
 from fastapi import APIRouter, FastAPI, HTTPException
 from pydantic import BaseModel, Field
@@ -17,6 +19,9 @@ from app.database import connection
 from app.venue_reconciliation import runtime_get
 
 SNAPSHOT_SYNC_INTERVAL_SECONDS = 30.0
+_SNAPSHOT_SYNC_LOCK = Lock()
+_SYNC_SCHEMA_LOCK = Lock()
+_SYNC_SCHEMA_DATABASES: set[str] = set()
 SYNC_SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS account_sync_status (
     account_id TEXT PRIMARY KEY,
@@ -78,8 +83,15 @@ class EquityHistoryPoint(BaseModel):
 
 
 def ensure_sync_schema() -> None:
-    with connection() as db:
-        db.executescript(SYNC_SCHEMA_SQL)
+    database_path = str(get_settings().database_path)
+    if database_path in _SYNC_SCHEMA_DATABASES:
+        return
+    with _SYNC_SCHEMA_LOCK:
+        if database_path in _SYNC_SCHEMA_DATABASES:
+            return
+        with connection() as db:
+            db.executescript(SYNC_SCHEMA_SQL)
+        _SYNC_SCHEMA_DATABASES.add(database_path)
 
 
 def _iso_now() -> str:
@@ -647,7 +659,38 @@ def _sync_one_account(account_id: str) -> dict[str, int]:
     }
 
 
-def sync_venue_snapshots(account_id: str | None = None) -> VenueSnapshotSyncResponse:
+def _sync_account_result(
+    account_id: str,
+) -> tuple[str, dict[str, int] | None, AccountSyncStatusResponse | None]:
+    try:
+        return account_id, _sync_one_account(account_id), None
+    except HTTPException as exc:
+        status = _status_row(account_id)
+        return account_id, None, AccountSyncStatusResponse(
+            accountId=account_id,
+            status=(str(status["status"]) if status is not None else "failed"),
+            errorCode=(str(status["error_code"]) if status is not None else str(exc.detail)),
+            lastAttemptAt=(str(status["last_attempt_at"]) if status is not None else None),
+            lastSuccessAt=(str(status["last_success_at"]) if status is not None else None),
+            updatedAt=(str(status["updated_at"]) if status is not None else _iso_now()),
+        )
+    except Exception:
+        status = _status_row(account_id)
+        return account_id, None, AccountSyncStatusResponse(
+            accountId=account_id,
+            status=(str(status["status"]) if status is not None else "failed"),
+            errorCode=(
+                str(status["error_code"])
+                if status is not None
+                else "runtime_unavailable"
+            ),
+            lastAttemptAt=(str(status["last_attempt_at"]) if status is not None else None),
+            lastSuccessAt=(str(status["last_success_at"]) if status is not None else None),
+            updatedAt=(str(status["updated_at"]) if status is not None else _iso_now()),
+        )
+
+
+def _sync_venue_snapshots(account_id: str | None = None) -> VenueSnapshotSyncResponse:
     account_ids = [account_id] if account_id is not None else discover_live_accounts()
     if account_id is not None and account_id not in discover_live_accounts():
         raise HTTPException(
@@ -664,42 +707,16 @@ def sync_venue_snapshots(account_id: str | None = None) -> VenueSnapshotSyncResp
     synced: list[str] = []
     failed: list[AccountSyncStatusResponse] = []
     skipped: list[AccountSyncStatusResponse] = []
-    for current in account_ids:
-        try:
-            result = _sync_one_account(current)
-        except HTTPException as exc:
-            status = _status_row(current)
-            failed.append(
-                AccountSyncStatusResponse(
-                    accountId=current,
-                    status=(str(status["status"]) if status is not None else "failed"),
-                    errorCode=(str(status["error_code"]) if status is not None else exc.detail),
-                    lastAttemptAt=(str(status["last_attempt_at"]) if status is not None else None),
-                    lastSuccessAt=(str(status["last_success_at"]) if status is not None else None),
-                    updatedAt=(str(status["updated_at"]) if status is not None else _iso_now()),
-                )
-            )
-            continue
-        except Exception:
-            status = _status_row(current)
-            failed.append(
-                AccountSyncStatusResponse(
-                    accountId=current,
-                    status=(str(status["status"]) if status is not None else "failed"),
-                    errorCode=(
-                        str(status["error_code"])
-                        if status is not None
-                        else "runtime_unavailable"
-                    ),
-                    lastAttemptAt=(str(status["last_attempt_at"]) if status is not None else None),
-                    lastSuccessAt=(str(status["last_success_at"]) if status is not None else None),
-                    updatedAt=(str(status["updated_at"]) if status is not None else _iso_now()),
-                )
-            )
-            continue
-        synced.append(current)
-        for key, value in result.items():
-            totals[key] += value
+    with ThreadPoolExecutor(max_workers=max(1, min(len(account_ids), 4))) as executor:
+        results = executor.map(_sync_account_result, account_ids)
+        for current, result, failure in results:
+            if failure is not None:
+                failed.append(failure)
+                continue
+            assert result is not None
+            synced.append(current)
+            for key, value in result.items():
+                totals[key] += value
     if synced and failed:
         overall_status = "partial"
     elif failed:
@@ -722,14 +739,58 @@ def sync_venue_snapshots(account_id: str | None = None) -> VenueSnapshotSyncResp
     )
 
 
+def sync_venue_snapshots(account_id: str | None = None) -> VenueSnapshotSyncResponse:
+    if not _SNAPSHOT_SYNC_LOCK.acquire(blocking=False):
+        raise HTTPException(status_code=409, detail="Venue snapshot sync already running")
+    try:
+        return _sync_venue_snapshots(account_id)
+    finally:
+        _SNAPSHOT_SYNC_LOCK.release()
+
+
 def load_equity_history(account_id: str, currency: str | None = None) -> list[EquityHistoryPoint]:
     with connection() as db:
+        latest_risk = db.execute(
+            """
+            SELECT currency
+            FROM account_risk_snapshots
+            WHERE account_id = ?
+            ORDER BY as_of DESC
+            LIMIT 1
+            """,
+            (account_id,),
+        ).fetchone()
+        risk_currency = currency or (str(latest_risk["currency"]) if latest_risk else None)
+        if risk_currency:
+            rows = db.execute(
+                """
+                SELECT as_of, equity
+                FROM (
+                    SELECT as_of, equity
+                    FROM account_risk_snapshots
+                    WHERE account_id = ?
+                      AND currency = ?
+                      AND equity IS NOT NULL
+                    ORDER BY as_of DESC
+                    LIMIT 1000
+                )
+                ORDER BY as_of ASC
+                """,
+                (account_id, risk_currency),
+            ).fetchall()
+            if rows:
+                return [
+                    EquityHistoryPoint(asOf=row["as_of"], equity=str(row["equity"]))
+                    for row in rows
+                ]
+
         if currency:
             rows = db.execute(
                 """
                 SELECT as_of, equity FROM balance_snapshots
                 WHERE account_id = ? AND currency = ?
-                ORDER BY as_of ASC
+                ORDER BY as_of DESC
+                LIMIT 1000
                 """,
                 (account_id, currency),
             ).fetchall()
@@ -738,15 +799,19 @@ def load_equity_history(account_id: str, currency: str | None = None) -> list[Eq
                 """
                 SELECT as_of, equity FROM balance_snapshots
                 WHERE account_id = ?
-                ORDER BY as_of ASC
+                ORDER BY as_of DESC
+                LIMIT 1000
                 """,
                 (account_id,),
             ).fetchall()
     if currency:
-        return [EquityHistoryPoint(asOf=row["as_of"], equity=str(row["equity"])) for row in rows]
+        return [
+            EquityHistoryPoint(asOf=row["as_of"], equity=str(row["equity"]))
+            for row in reversed(rows)
+        ]
     aggregated: dict[str, Decimal] = {}
     ordered_as_of: list[str] = []
-    for row in rows:
+    for row in reversed(rows):
         as_of = str(row["as_of"])
         if as_of not in aggregated:
             aggregated[as_of] = Decimal("0")

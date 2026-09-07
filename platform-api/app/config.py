@@ -32,7 +32,15 @@ class Settings(BaseSettings):
     # operations explicitly enables it on a controlled host; Live Write gates still apply.
     cross_spread_exit_monitor_enabled: bool = False
     cross_spread_exit_monitor_interval_seconds: float = 1.0
+    # Persist a low-frequency read-only market series independently of page visits.
+    # The snapshot contains executable spread, funding rate and inventory-fee inputs.
+    cross_spread_market_snapshot_interval_seconds: float = 60.0
     cross_spread_preferred_account_environment: str = "simulation"
+
+    # A-share research is refreshed out-of-band and persisted before the page reads it.
+    # Disable only for isolated tests or an explicitly paused local environment.
+    research_refresh_enabled: bool = True
+    research_refresh_interval_seconds: float = 900.0
 
     # Synthetic FOK pricing reserves a fixed MT5 price amount before deriving the
     # Bybit limit. Zero is the safe default until the controlled host sets evidence-based

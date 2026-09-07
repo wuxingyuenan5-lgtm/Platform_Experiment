@@ -68,6 +68,9 @@ class FakeBybitObservabilityClient:
             },
         }
 
+    def get_asset_overview(self, **kwargs):
+        return {"retCode": 0, "result": {"totalEquity": "1000"}}
+
     def get_account_info(self):
         return {"retCode": 0, "result": {"marginMode": "REGULAR_MARGIN"}}
 

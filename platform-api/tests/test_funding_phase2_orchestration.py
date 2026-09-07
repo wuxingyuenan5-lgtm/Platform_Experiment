@@ -1010,6 +1010,10 @@ def test_controlled_live_funding_path_uses_single_postonly_attempt_when_ready(
         lambda **_: Decimal("100"),
     )
     monkeypatch.setattr(
+        "app.execution_batches._reservation_margin_estimate",
+        lambda **_: ("USDT", Decimal("100")),
+    )
+    monkeypatch.setattr(
         "app.strategies.funding_orchestration._authoritative_quote",
         lambda **_: {"bid": Decimal("100"), "ask": Decimal("100.1")},
     )

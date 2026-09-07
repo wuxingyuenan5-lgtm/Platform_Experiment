@@ -19,6 +19,44 @@ export interface ResearchModuleResult<T = unknown> {
   data: T;
 }
 
+export interface AShareLiveSectorFundFlowRow {
+  sectorCode: string;
+  name: string;
+  returnPct?: string | number | null;
+  netInflowYuan: string | number;
+  inflowYuan: string | number;
+  outflowYuan: string | number;
+  firmCount?: number | null;
+}
+
+export interface AShareLiveSectorFundFlowResponse {
+  fetchedAt: string;
+  source: string;
+  rows: AShareLiveSectorFundFlowRow[];
+}
+
+export interface AShareMarketTurnoverRow {
+  securityCode: string;
+  securityName: string;
+  price?: number | null;
+  returnPct?: number | null;
+  turnoverYuan: number;
+  marketCapYuan?: number | null;
+  industry?: string | null;
+}
+
+export interface AShareMarketTurnoverResponse {
+  fetchedAt: string;
+  source: string;
+  highTurnoverCount?: number | null;
+  highTurnoverRows?: AShareMarketTurnoverRow[];
+  historyDates?: string[];
+  historyCounts?: number[];
+  historyIndustries?: Array<{ industry: string; counts: number[]; historyTotal: number }>;
+  historicalRows?: Array<AShareMarketTurnoverRow & { observedAt: string }>;
+  rows: AShareMarketTurnoverRow[];
+}
+
 export interface AShareIndexSnapshot {
   code: string;
   name: string;
@@ -38,6 +76,11 @@ export interface AShareIndexSnapshot {
   signal3d?: string | null;
   signalWeekly?: string | null;
   spark: Array<string | number>;
+  history?: Array<{
+    observedAt: string;
+    close: string | number;
+    turnoverYuan?: string | number | null;
+  }>;
 }
 
 export interface AShareBreadthSnapshot {
@@ -130,6 +173,40 @@ export interface AShareDashboardResponse {
   breadth: ResearchModuleResult<AShareBreadthSnapshot>;
   shenwan: ResearchModuleResult<AShareResearchAggregation>;
   emotion: ResearchModuleResult<ShortTermEmotionSnapshot>;
+  crowding?: ResearchModuleResult<{
+    history?: Array<{
+      date: string;
+      targets: Record<
+        string,
+        { amount100m?: number | null; amountShareOfA?: number | null; turnoverPct?: number | null }
+      >;
+      combined?: { amount100m?: number | null; amountShareOfA?: number | null };
+    }>;
+    latest?: {
+      date: string;
+      targets: Record<
+        string,
+        { amount100m?: number | null; amountShareOfA?: number | null; turnoverPct?: number | null }
+      >;
+      combined?: { amount100m?: number | null; amountShareOfA?: number | null };
+    };
+    innovationHistory?: Array<{
+      date: string;
+      amount100m?: number | null;
+      amountShareOfA?: number | null;
+      turnoverPct?: number | null;
+    }>;
+  }> | null;
+  marketHistory?: Array<{
+    observedAt: string;
+    up?: number | null;
+    down?: number | null;
+    flat?: number | null;
+    limitUp?: number | null;
+    limitDown?: number | null;
+    totalAmountYuan?: string | number | null;
+    marketBreadthPct?: string | number | null;
+  }>;
 }
 
 export interface StockSnapshotResponse {
@@ -276,11 +353,28 @@ async function request<T>(config: AxiosRequestConfig): Promise<T> {
   return response.data;
 }
 
-export const getAShareDashboard = (thresholdYuan = 10_000_000_000) =>
+export const getAShareDashboard = () =>
   request<AShareDashboardResponse>({
     method: 'GET',
     url: '/research/a-share/dashboard',
-    params: { thresholdYuan },
+  });
+
+export const getAShareLiveSectorFundFlow = () =>
+  request<AShareLiveSectorFundFlowResponse>({
+    method: 'GET',
+    url: '/research/a-share/live-sector-flow',
+  });
+
+export const getAShareLiveMarketTurnover = () =>
+  request<AShareMarketTurnoverResponse>({
+    method: 'GET',
+    url: '/research/a-share/live-market-turnover',
+  });
+
+export const refreshAShareResearch = () =>
+  request<{ data: { status: string } }>({
+    method: 'POST',
+    url: '/research/a-share/refresh',
   });
 
 export const getStockSnapshot = (code: string) =>

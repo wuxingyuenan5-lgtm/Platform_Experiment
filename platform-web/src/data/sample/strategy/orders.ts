@@ -17,24 +17,24 @@ export const strategyDeskOrder: StrategyDeskKey[] = [
 
 const commonTabs: StrategyTableTab[] = [
   { key: 'positions', label: '当前持仓' },
-  { key: 'history', label: '历史订单' },
   { key: 'fills', label: '成交记录' },
+  { key: 'history', label: '历史订单' },
   { key: 'logs', label: '执行记录' },
 ];
 
 const fundingTabs: StrategyTableTab[] = [
   { key: 'positions', label: '当前持仓' },
+  { key: 'fills', label: '成交记录' },
   { key: 'spotHistory', label: '历史订单-现货' },
   { key: 'contractHistory', label: '历史订单-合约' },
-  { key: 'fills', label: '成交记录' },
   { key: 'logs', label: '执行记录' },
 ];
 
 const twoLegTabs: StrategyTableTab[] = [
   { key: 'positions', label: '当前持仓' },
+  { key: 'fills', label: '成交记录' },
   { key: 'leftHistory', label: '历史订单-左腿' },
   { key: 'rightHistory', label: '历史订单-右腿' },
-  { key: 'fills', label: '成交记录' },
   { key: 'logs', label: '执行记录' },
 ];
 
@@ -579,14 +579,14 @@ export const strategyOrderProfiles = {
     tables: dipTables,
   },
   shortLineTraderL: {
-    label: '短线交易员A',
+    label: '短线交易员WW',
     tabs: commonTabs,
     tables: shortLineTables,
   },
 } as unknown as Record<StrategyDeskKey, StrategyOrderProfile>;
 
 strategyOrderProfiles.shortLineTraderW = {
-  label: '短线交易员B',
+  label: '短线交易员BL',
   tabs: commonTabs,
   tables: {
     positions: {

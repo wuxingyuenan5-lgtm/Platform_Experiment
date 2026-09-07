@@ -955,40 +955,40 @@ export function useCrossSpreadFinance() {
     };
   });
 
-  async function refresh() {
+  type FinanceSection = 'pnl' | 'capital';
+
+  async function refresh(section: FinanceSection = 'pnl') {
     loading.value = true;
     try {
-      const [
-        nextBindings,
-        nextObservability,
-        nextFills,
-        nextOrders,
-        nextBatches,
-        nextInstruments,
-        nextStrategyPnl,
-        nextMarketSnapshot,
-      ] = await Promise.all([
+      const [nextBindings, nextObservability, nextMarketSnapshot, records] = await Promise.all([
         getStrategyAccountBindings(STRATEGY_INSTANCE_ID),
         getCrossSpreadObservability(1, 20, 'fast'),
-        getFills(),
-        getOrders(),
-        getExecutionBatches(STRATEGY_INSTANCE_ID),
-        getInstruments(),
-        getStrategyPnl(STRATEGY_INSTANCE_ID),
         getCrossSpreadSnapshot(),
+        section === 'pnl'
+          ? Promise.all([
+              getFills(STRATEGY_INSTANCE_ID),
+              getOrders(STRATEGY_INSTANCE_ID),
+              getExecutionBatches(STRATEGY_INSTANCE_ID),
+              getInstruments(),
+              getStrategyPnl(STRATEGY_INSTANCE_ID),
+            ])
+          : Promise.resolve(null),
       ]);
 
       bindings.value = nextBindings;
       observability.value = nextObservability;
       marketSnapshot.value = nextMarketSnapshot;
-      fills.value = nextFills.filter(
-        (fill) =>
-          fill.instrumentId === BYBIT_INSTRUMENT_ID || fill.instrumentId === MT5_INSTRUMENT_ID,
-      );
-      orders.value = nextOrders;
-      batches.value = nextBatches;
-      instruments.value = nextInstruments;
-      strategyPnl.value = nextStrategyPnl;
+      if (records) {
+        const [nextFills, nextOrders, nextBatches, nextInstruments, nextStrategyPnl] = records;
+        fills.value = nextFills.filter(
+          (fill) =>
+            fill.instrumentId === BYBIT_INSTRUMENT_ID || fill.instrumentId === MT5_INSTRUMENT_ID,
+        );
+        orders.value = nextOrders;
+        batches.value = nextBatches;
+        instruments.value = nextInstruments;
+        strategyPnl.value = nextStrategyPnl;
+      }
 
       const nextBybitBinding = firstActiveBinding(
         nextBindings,

@@ -21,3 +21,6 @@ The local Platform API currently stores state in SQLite at `platform-api/data/pl
 - Corrections append facts, differences or audited adjustments; they do not rewrite accepted history.
 
 SQL reference snapshots under `references/database/` are evidence, not an alternate schema owner.
+### A-share research read model
+
+`research_a_share_refresh_runs` records each background collection attempt. The latest normalized module payloads live in `research_a_share_dataset_snapshots`; chart, hot-stock and Shenwan history is append/upserted in `research_a_share_history`. These tables are a read-only research projection with source, fetched time, status and refresh-run provenance. They are not trading, risk, accounting or execution facts. The web client must consume the projection through Platform API routes and never invoke upstream providers directly.

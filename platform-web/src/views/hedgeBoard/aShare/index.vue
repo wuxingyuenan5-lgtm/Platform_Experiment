@@ -11,13 +11,13 @@
           type="button"
           class="refresh-button"
           :disabled="dashboardLoading"
-          @click="loadDashboard"
+          @click="loadDashboard(true)"
         >
           {{ dashboardLoading ? '刷新中…' : '刷新数据' }}
         </button>
       </section>
 
-      <AShareLegacyTerminalSection />
+      <AShareLegacyTerminalSection :dashboard="dashboard" />
 
       <AShareMarketOverviewSection :dashboard="dashboard" />
 
@@ -29,7 +29,6 @@
 </template>
 
 <script setup lang="ts">
-  import { onActivated, onMounted } from 'vue';
   import { useRouter } from 'vue-router';
   import { PageWrapper } from '@/components/Page';
   import CompactSegmentTabs from '@/views/strategy/shared/CompactSegmentTabs.vue';
@@ -59,13 +58,6 @@
   };
   const { dashboard, dashboardLoading, dashboardError, loadDashboard } = useAShareResearch();
 
-  function resetPageScroll() {
-    window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
-  }
-
-  onMounted(resetPageScroll);
-  onActivated(resetPageScroll);
-
   function navigateMarket(value: string) {
     const path = routeByMarket[value];
     if (path) void router.push(path);
@@ -92,33 +84,38 @@
   }
 
   .a-share-board {
-    --strategy-bg: #f4f6f8;
-    --strategy-surface: #fff;
-    --strategy-surface-2: #f8fafc;
-    --strategy-border: #e2e8f0;
-    --strategy-text-1: #111827;
-    --strategy-text-2: #334155;
-    --strategy-text-3: #64748b;
-    --strategy-text-4: #94a3b8;
-    --strategy-accent-soft: #eef2ff;
-    --strategy-accent-strong: #4338ca;
-    --strategy-accent-ring: rgb(67 56 202 / 18%);
-    --strategy-up: #ef4444;
-    --strategy-down: #10b981;
-    --strategy-radius-card: 14px;
-    --strategy-radius-control: 9px;
-    --strategy-tab-height: 34px;
+    --strategy-bg: #eef3f8;
+    --strategy-surface: #ffffff;
+    --strategy-surface-2: #f7f9fc;
+    --strategy-border: #d9e3ee;
+    --strategy-text-1: #10233d;
+    --strategy-text-2: #354d68;
+    --strategy-text-3: #60758f;
+    --strategy-text-4: #8a9ab0;
+    --strategy-accent: #1d4ed8;
+    --strategy-accent-soft: #eaf2ff;
+    --strategy-accent-strong: #1d4ed8;
+    --strategy-accent-ring: rgb(29 78 216 / 16%);
+    --strategy-up: #df4b47;
+    --strategy-down: #0e9f78;
+    --strategy-radius-card: 16px;
+    --strategy-radius-control: 8px;
+    --strategy-tab-height: 36px;
     --strategy-font-base: 13px;
-    --strategy-shadow: 0 8px 24px rgb(15 23 42 / 6%);
-    --strategy-shadow-soft: 0 4px 16px rgb(15 23 42 / 4.5%);
+    --strategy-shadow: 0 16px 34px rgb(26 54 93 / 8%);
+    --strategy-shadow-soft: 0 6px 18px rgb(26 54 93 / 5%);
 
     display: grid;
     grid-template-columns: minmax(0, 1fr);
-    gap: 14px;
+    gap: 18px;
     min-width: 0;
     max-width: 100%;
     padding-bottom: 32px;
-    background: var(--strategy-bg);
+    background: linear-gradient(180deg, rgb(255 255 255 / 72%), transparent 340px),
+      var(--strategy-bg);
+    color: var(--strategy-text-2);
+    font-family: Inter, 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
+    font-variant-numeric: tabular-nums;
   }
 
   .a-share-board > * {
@@ -144,16 +141,32 @@
     align-items: center;
     justify-content: space-between;
     gap: 12px;
+    min-height: 42px;
+    padding: 4px 4px 4px 8px;
+    border: 1px solid rgb(217 227 238 / 88%);
+    border-radius: 12px;
+    background: rgb(255 255 255 / 82%);
+    box-shadow: 0 3px 12px rgb(26 54 93 / 3%);
   }
 
   .refresh-button {
     min-height: 36px;
-    padding: 0 13px;
-    border: 1px solid var(--strategy-border);
-    border-radius: 9px;
-    background: var(--strategy-surface);
-    color: var(--strategy-text-2);
+    padding: 0 16px;
+    border: 1px solid #1d4ed8;
+    border-radius: var(--strategy-radius-control);
+    background: #1d4ed8;
+    color: #fff;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
     cursor: pointer;
+    transition: background 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+  }
+
+  .refresh-button:hover:not(:disabled) {
+    background: #1741b4;
+    box-shadow: 0 7px 15px rgb(29 78 216 / 18%);
+    transform: translateY(-1px);
   }
 
   .refresh-button:disabled {
@@ -169,7 +182,7 @@
   }
 
   .overview-card {
-    padding: 18px;
+    padding: 20px;
     border: 1px solid var(--strategy-border);
     border-radius: var(--strategy-radius-card);
     background: var(--strategy-surface);
@@ -195,7 +208,8 @@
   .section-header h2 {
     margin: 0;
     color: var(--strategy-text-1);
-    font-size: 18px;
+    font-size: 19px;
+    letter-spacing: -0.02em;
   }
 
   .overview-grid {
@@ -210,6 +224,12 @@
     border: 1px solid var(--strategy-border);
     border-radius: 11px;
     background: var(--strategy-surface-2);
+    transition: border-color 160ms ease, background 160ms ease;
+  }
+
+  .overview-grid article:hover {
+    border-color: #b9ceea;
+    background: #fff;
   }
 
   .overview-card__head {
@@ -266,5 +286,126 @@
 
   .is-negative {
     color: var(--strategy-down) !important;
+  }
+
+  // The following cross-component rules establish one dense "trading sheet"
+  // treatment for live data, rather than letting every module look unrelated.
+  .a-share-board :deep(.market-terminal__overview-panel),
+  .a-share-board :deep(.market-terminal__side-panel),
+  .a-share-board :deep(.overview-card),
+  .a-share-board :deep(.pool-card) {
+    border-color: #d7e2ee;
+    box-shadow: var(--strategy-shadow-soft);
+  }
+
+  .a-share-board :deep(.market-terminal__overview-panel),
+  .a-share-board :deep(.overview-card),
+  .a-share-board :deep(.pool-card) {
+    border-top: 3px solid #1d4ed8;
+  }
+
+  .a-share-board :deep(.market-terminal__panel-head),
+  .a-share-board :deep(.overview-header),
+  .a-share-board :deep(.pool-head) {
+    padding-bottom: 11px;
+    border-bottom: 1px solid #e5ebf3;
+  }
+
+  .a-share-board :deep(.market-terminal__panel-head h3),
+  .a-share-board :deep(.overview-header h2),
+  .a-share-board :deep(.pool-head h2) {
+    color: #10233d;
+    font-size: 20px;
+    font-weight: 760;
+    letter-spacing: -0.025em;
+  }
+
+  .a-share-board :deep(.eyebrow),
+  .a-share-board :deep(.stock-filter-copy > span),
+  .a-share-board :deep(.matrix-kicker) {
+    color: #1d4ed8;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.14em;
+  }
+
+  .a-share-board :deep(.market-terminal__market-card),
+  .a-share-board :deep(.metric-cell),
+  .a-share-board :deep(.pool-kpi),
+  .a-share-board :deep(.breadth-card),
+  .a-share-board :deep(.sub-panel) {
+    border-color: #dce5ef;
+    background: #f9fbfd;
+  }
+
+  .a-share-board :deep(.market-terminal__market-card:hover),
+  .a-share-board :deep(.metric-cell:hover),
+  .a-share-board :deep(.pool-kpi:hover) {
+    border-color: #b7cdea;
+    background: #fff;
+  }
+
+  .a-share-board :deep(.panel h3),
+  .a-share-board :deep(.sub-panel h3),
+  .a-share-board :deep(.stock-filter-copy h3) {
+    color: #173353;
+    font-weight: 750;
+    letter-spacing: -0.015em;
+  }
+
+  .a-share-board :deep(.metric-cell strong),
+  .a-share-board :deep(.pool-kpi strong),
+  .a-share-board :deep(.market-terminal__market-head strong) {
+    font-weight: 780;
+    letter-spacing: -0.025em;
+  }
+
+  .a-share-board :deep(.table-shell),
+  .a-share-board :deep(.market-terminal__rotation-heatmap) {
+    border-color: #d6e1ed;
+    border-radius: 10px;
+    background: #fff;
+  }
+
+  .a-share-board :deep(table thead th) {
+    background: #f1f5fa;
+    color: #526982;
+    font-size: 11px;
+    font-weight: 750;
+  }
+
+  .a-share-board :deep(table tbody tr:hover td) {
+    background: #f3f7fd;
+  }
+
+  .a-share-board :deep(input),
+  .a-share-board :deep(select) {
+    border-color: #ccd9e7;
+    border-radius: 7px;
+    background: #fff;
+    color: #263f5e;
+  }
+
+  .a-share-board :deep(button.toolbar),
+  .a-share-board :deep(button.meta-action),
+  .a-share-board :deep(.hot-history-dates button) {
+    border-color: #cad8e8;
+    background: #fff;
+    color: #294663;
+    font-weight: 650;
+  }
+
+  .a-share-board :deep(button.toolbar:hover:not(:disabled)),
+  .a-share-board :deep(button.meta-action:hover:not(:disabled)) {
+    border-color: #82a9db;
+    background: #edf5ff;
+    color: #1649a5;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .refresh-button,
+    .overview-grid article {
+      transition: none;
+    }
   }
 </style>

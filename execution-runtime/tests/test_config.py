@@ -39,3 +39,16 @@ def test_mt5_bridge_path_preserves_explicit_operator_override(
     monkeypatch.setenv("VG_RUNTIME_MT5_BRIDGE_FILE_PATH", str(override))
 
     assert Settings(_env_file=None).mt5_bridge_file_path == str(override)
+
+
+def test_mt5_terminal_portable_mode_can_be_isolated_per_account() -> None:
+    settings = Settings(
+        _env_file=None,
+        mt5_terminal_portable=False,
+        mt5_account_portable_modes=(
+            "mt5-live-main=false,account_mt5_short_term_a=true"
+        ),
+    )
+
+    assert settings.mt5_terminal_portable_for_account("mt5-live-main") is False
+    assert settings.mt5_terminal_portable_for_account("account_mt5_short_term_a") is True

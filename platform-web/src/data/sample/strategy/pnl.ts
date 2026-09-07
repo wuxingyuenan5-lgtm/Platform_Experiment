@@ -399,7 +399,7 @@ export const strategyPnlProfiles = {
     ],
   },
   shortLineTraderL: {
-    title: '短线交易员A损益总览',
+    title: '短线交易员WW损益总览',
     totalFund: '6,842,190.50 CNY',
     period: '2026-06-19 - 2026-06-25',
     xLabels: labels,
@@ -464,7 +464,7 @@ export const strategyPnlProfiles = {
 strategyPnlProfiles.shortLineTraderW = JSON.parse(
   JSON.stringify(strategyPnlProfiles.shortLineTraderL),
 ) as StrategyPnlProfile;
-strategyPnlProfiles.shortLineTraderW.title = '短线交易员B损益总览';
+strategyPnlProfiles.shortLineTraderW.title = '短线交易员BL损益总览';
 strategyPnlProfiles.shortLineTraderW.dailyReturns = [10, -6, 18, 22, -8, 30, 26];
 strategyPnlProfiles.shortLineTraderW.netValues = [1.0, 1.003, 1.007, 1.011, 1.008, 1.016, 1.021];
 strategyPnlProfiles.shortLineTraderW.metrics = [

@@ -37,6 +37,14 @@ Platform aggregate:
 GET /api/v1/trading/cross-spread/observability?historyHours=24&limit=20
 ```
 
+The Platform API also records a low-frequency Cross market snapshot independently
+of browser page visits. The default interval is 60 seconds and the persisted
+snapshot includes both executable long/short spread, funding-rate input and the
+buyer/seller inventory-fee inputs. This is a monitoring/read-model series, not a
+settled accounting fact. Actual funding, swap and fee cash events remain in the
+economic-event/financial-fact import path and must not be inferred from a quote
+snapshot.
+
 The aggregate reads the configured Bybit and MT5 accounts independently. A failed section is marked `unavailable`; it is never converted into a healthy empty list or zero balance.
 
 ## 3. History query rules

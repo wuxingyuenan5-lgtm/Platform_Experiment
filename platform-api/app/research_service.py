@@ -13,6 +13,9 @@ from app.research_data_schemas import (
     AShareBreadthSnapshot,
     AShareDashboardResponse,
     AShareIndexSnapshot,
+    AShareLiveSectorFundFlow,
+    AShareLiveSectorFundFlowResponse,
+    AShareMarketTurnoverResponse,
     AShareResearchAggregation,
     AShareTurnoverStock,
     MacroExpectationEvent,
@@ -26,6 +29,7 @@ from app.research_data_schemas import (
 )
 from app.research_macro_history import MacroProbabilityHistoryStore
 from app.research_providers import FreeResearchProvider
+from app.research_a_share_repository import read_dashboard, read_dataset, read_hot_stock_history
 
 DEFAULT_THRESHOLD_YUAN = Decimal("10000000000")
 PCT_QUANT = Decimal("0.01")
@@ -35,6 +39,14 @@ _PROVIDER = FreeResearchProvider()
 _DASHBOARD_CACHE = LastKnownGoodResearchCache[AShareDashboardResponse](
     ttl=timedelta(minutes=5),
     is_meaningful=lambda value: bool(value.market_detail.data or value.breadth.data),
+)
+_LIVE_SECTOR_FLOW_CACHE = LastKnownGoodResearchCache[AShareLiveSectorFundFlowResponse](
+    ttl=timedelta(minutes=5),
+    is_meaningful=lambda value: bool(value.rows),
+)
+_LIVE_TURNOVER_CACHE = LastKnownGoodResearchCache[AShareMarketTurnoverResponse](
+    ttl=timedelta(minutes=5),
+    is_meaningful=lambda value: bool(value.rows),
 )
 _MEMBERSHIP_CACHE = LastKnownGoodResearchCache[list[ShenwanMembership]](
     ttl=timedelta(hours=24),
@@ -49,6 +61,8 @@ _MACRO_CACHE = LastKnownGoodResearchCache[MacroExpectationResponse](
     is_meaningful=lambda value: bool(value.events.data),
 )
 _DASHBOARD_LOCK = asyncio.Lock()
+_LIVE_SECTOR_FLOW_LOCK = asyncio.Lock()
+_LIVE_TURNOVER_LOCK = asyncio.Lock()
 _MEMBERSHIP_LOCK = asyncio.Lock()
 _STOCK_LOCKS: dict[str, asyncio.Lock] = {}
 _MACRO_LOCK = asyncio.Lock()
@@ -225,7 +239,7 @@ async def get_a_share_dashboard(
             lambda value: _require_model_list(
                 value,
                 AShareIndexSnapshot,
-                "东方财富指数历史行情（AKShare适配）",
+                "Platform 公开指数日线适配",
             ),
         )
         breadth = _validated_result(
@@ -261,10 +275,25 @@ async def get_a_share_dashboard(
             ),
         )
 
+        # The complete all-A snapshot owns advance/decline breadth, while the
+        # official Eastmoney limit pools own board counts. Join only two
+        # observations from the same collection run; never infer limits from
+        # rounded daily returns.
+        if isinstance(breadth, AShareBreadthSnapshot) and isinstance(emotion, ShortTermEmotionSnapshot):
+            breadth = breadth.model_copy(
+                update={
+                    "limit_up": emotion.limit_up_count,
+                    "real_limit_up": emotion.limit_up_count,
+                    "limit_down": emotion.limit_down_count,
+                    "real_limit_down": emotion.limit_down_count,
+                    "trade_date": emotion.trade_date or breadth.trade_date,
+                }
+            )
+
         market_module = (
-            _error_module("东方财富指数历史行情（AKShare适配）", indices)
+            _error_module("Platform 公开指数日线适配", indices)
             if isinstance(indices, BaseException)
-            else _module(source="东方财富指数历史行情（AKShare适配）", data=indices)
+            else _module(source="Platform 公开指数日线适配", data=indices)
         )
         breadth_module = (
             _error_module("乐咕乐股赚钱效应（AKShare适配）", breadth)
@@ -317,6 +346,127 @@ async def get_a_share_dashboard(
         if stale is not None:
             return _mark_dashboard_stale(stale.value)
         return response
+
+
+# Explicit name for the only provider-facing path. API routes use
+# ``get_persisted_a_share_dashboard`` below and never call this collector.
+collect_a_share_dashboard = get_a_share_dashboard
+
+
+async def get_live_a_share_sector_fund_flow() -> AShareLiveSectorFundFlowResponse:
+    """Return a five-minute live industry-flow projection without touching SQLite."""
+    cache_key = "a-share-live-sector-fund-flow"
+    cached = _LIVE_SECTOR_FLOW_CACHE.get_fresh(cache_key)
+    if cached is not None:
+        return cached.value.model_copy(deep=True)
+    async with _LIVE_SECTOR_FLOW_LOCK:
+        cached = _LIVE_SECTOR_FLOW_CACHE.get_fresh(cache_key)
+        if cached is not None:
+            return cached.value.model_copy(deep=True)
+        try:
+            raw_rows = await _provider_call(_PROVIDER.a_share_sector_fund_flow())
+            rows = [AShareLiveSectorFundFlow.model_validate(row) for row in raw_rows]
+            if not rows:
+                raise ResearchServiceError("live_sector_flow_empty", "实时板块资金流未返回有效数据")
+            result = AShareLiveSectorFundFlowResponse(
+                fetched_at=_now(),
+                source="东方财富板块资金流（实时）",
+                rows=rows,
+            )
+            _LIVE_SECTOR_FLOW_CACHE.store(cache_key, result)
+            return result
+        except ResearchServiceError:
+            stale = _LIVE_SECTOR_FLOW_CACHE.get(cache_key)
+            if stale is not None:
+                return stale.value.model_copy(deep=True)
+            raise
+        except Exception as exc:
+            stale = _LIVE_SECTOR_FLOW_CACHE.get(cache_key)
+            if stale is not None:
+                return stale.value.model_copy(deep=True)
+            raise ResearchServiceError(
+                "live_sector_flow_unavailable",
+                "实时板块资金流暂不可用",
+            ) from exc
+
+
+async def get_live_a_share_market_turnover() -> AShareMarketTurnoverResponse:
+    """A five-minute, backend-owned Top20 board plus daily >100bn count."""
+    cache_key = "a-share-live-market-turnover"
+    cached = _LIVE_TURNOVER_CACHE.get_fresh(cache_key)
+    if cached is not None:
+        return cached.value.model_copy(deep=True)
+    async with _LIVE_TURNOVER_LOCK:
+        cached = _LIVE_TURNOVER_CACHE.get_fresh(cache_key)
+        if cached is not None:
+            return cached.value.model_copy(deep=True)
+        try:
+            rows = await _provider_call(_PROVIDER.a_share_market_turnover())
+            persisted = await asyncio.to_thread(read_dataset, "stocks")
+            history = await asyncio.to_thread(read_hot_stock_history)
+            high_count: int | None = None
+            high_rows = []
+            if isinstance(persisted, list):
+                high_rows = [
+                    item for item in persisted
+                    if isinstance(item, dict)
+                    and str(item.get("securityCode", item.get("security_code", ""))).isdigit()
+                    and len(str(item.get("securityCode", item.get("security_code", "")))) == 6
+                    and Decimal(str(item.get("turnoverYuan", item.get("turnover_yuan", 0)) or 0)) > DEFAULT_THRESHOLD_YUAN
+                ]
+                high_count = len(high_rows)
+            result = AShareMarketTurnoverResponse(
+                fetched_at=_now(), source="东方财富A股实时行情", high_turnover_count=high_count,
+                high_turnover_rows=[
+                    {
+                        "securityCode": item.get("securityCode", item.get("security_code")),
+                        "securityName": item.get("securityName", item.get("security_name")),
+                        "returnPct": item.get("returnPct", item.get("return_pct")),
+                        "turnoverYuan": item.get("turnoverYuan", item.get("turnover_yuan")),
+                    }
+                    for item in sorted(high_rows, key=lambda item: Decimal(str(item.get("turnoverYuan", item.get("turnover_yuan", 0)) or 0)), reverse=True)
+                ],
+                history_dates=history["dates"],
+                history_counts=history["counts"],
+                history_industries=history["industries"],
+                historical_rows=history["rows"],
+                rows=rows,
+            )
+            _LIVE_TURNOVER_CACHE.store(cache_key, result)
+            return result
+        except ResearchServiceError:
+            stale = _LIVE_TURNOVER_CACHE.get(cache_key)
+            if stale is not None:
+                return stale.value.model_copy(deep=True)
+            raise
+        except Exception as exc:
+            stale = _LIVE_TURNOVER_CACHE.get(cache_key)
+            if stale is not None:
+                return stale.value.model_copy(deep=True)
+            raise ResearchServiceError("live_market_turnover_unavailable", "实时成交额榜暂不可用") from exc
+
+
+async def get_persisted_a_share_dashboard() -> AShareDashboardResponse:
+    """Read the last completed A-share snapshot; never invokes an upstream provider."""
+    snapshot = await asyncio.to_thread(read_dashboard)
+    if snapshot is not None:
+        return snapshot
+    now = _now()
+    no_data = _module(
+        source="platform-research-snapshot",
+        data=None,
+        status="no_data",
+        message="后台研究刷新尚未生成可用快照",
+        fetched_at=now,
+    )
+    return AShareDashboardResponse(
+        generated_at=now,
+        market_detail=no_data,
+        breadth=no_data.model_copy(deep=True),
+        shenwan=no_data.model_copy(deep=True),
+        emotion=no_data.model_copy(deep=True),
+        market_history=[],
+    )
 
 
 def _mark_dashboard_stale(value: AShareDashboardResponse) -> AShareDashboardResponse:

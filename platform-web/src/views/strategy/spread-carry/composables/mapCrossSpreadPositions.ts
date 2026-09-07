@@ -35,6 +35,11 @@ export interface CloseOrder {
 
 export interface OverviewRow {
   id: string;
+  exitPlanId: string | null;
+  takeProfitExecutionMode: CrossSpreadExecutionMode | null;
+  stopLossExecutionMode: CrossSpreadExecutionMode | null;
+  takeProfitLimitStrategy: CrossSpreadLimitStrategy | null;
+  stopLossLimitStrategy: CrossSpreadLimitStrategy | null;
   direction: string;
   qty: number;
   entrySpread: string;
@@ -104,6 +109,11 @@ export function mapOverviewRows(options: MapOverviewRowsOptions) {
       const direction = plan.direction === 'LONG_SPREAD' ? '多头' : '空头';
       return {
         id: plan.planId,
+        exitPlanId: plan.planId,
+        takeProfitExecutionMode: plan.takeProfitExecutionMode,
+        stopLossExecutionMode: plan.stopLossExecutionMode,
+        takeProfitLimitStrategy: plan.takeProfitLimitStrategy,
+        stopLossLimitStrategy: plan.stopLossLimitStrategy,
         direction,
         qty: Number(plan.quantityOz) || 0,
         entrySpread: formatPlanEntrySpread(plan.entrySpread, bybitLive, mt5Live),
@@ -162,11 +172,16 @@ export function mapOverviewRows(options: MapOverviewRowsOptions) {
     } else {
       direction = '--';
     }
-    const matchedPlan = matchActivePlan(activePlans, direction, qty);
+    const matchedPlan = matchActivePlan(activePlans, direction, qty, mt5?.externalId);
     rows.push({
       id: `${bybit?.externalId || bybit?.symbol || 'bybit'}-${
         mt5?.externalId || mt5?.symbol || 'mt5'
       }-${index}`,
+      exitPlanId: matchedPlan?.planId ?? null,
+      takeProfitExecutionMode: matchedPlan?.takeProfitExecutionMode ?? null,
+      stopLossExecutionMode: matchedPlan?.stopLossExecutionMode ?? null,
+      takeProfitLimitStrategy: matchedPlan?.takeProfitLimitStrategy ?? null,
+      stopLossLimitStrategy: matchedPlan?.stopLossLimitStrategy ?? null,
       direction,
       qty,
       entrySpread: matchedPlan
@@ -194,8 +209,8 @@ export function mapOverviewRows(options: MapOverviewRowsOptions) {
       legPnl: `BY: ${formatNullableSigned(
         parseOptionalNumber(bybit?.unrealizedPnl),
       )} | MT5: ${formatNullableSigned(parseOptionalNumber(mt5?.unrealizedPnl))}`,
-      takeProfit: formatExitSpread(options.exitPlans, 'takeProfit'),
-      stopLoss: formatExitSpread(options.exitPlans, 'stopLoss'),
+      takeProfit: formatNullableSigned(parseOptionalNumber(matchedPlan?.takeProfitSpread)),
+      stopLoss: formatNullableSigned(parseOptionalNumber(matchedPlan?.stopLossSpread)),
       liquidation: `BY: ${formatObservedLiquidation(
         options.observability?.bybit,
         bybitLive,
@@ -241,19 +256,25 @@ function matchObservedPlanPosition(
   );
 }
 
-function matchActivePlan(plans: CrossSpreadExitPlanResult[], direction: string, qty: number) {
+function matchActivePlan(
+  plans: CrossSpreadExitPlanResult[],
+  direction: string,
+  qty: number,
+  mt5PositionId?: string | null,
+) {
   const normalizedDirection =
     direction === '多头' ? 'LONG_SPREAD' : direction === '空头' ? 'SHORT_SPREAD' : null;
   if (!normalizedDirection) return null;
-  return (
-    plans.find(
-      (plan) =>
-        plan.direction === normalizedDirection &&
-        Math.abs((Number(plan.quantityOz) || 0) - qty) < 1e-8,
-    ) ||
-    plans.find((plan) => plan.direction === normalizedDirection) ||
-    null
+  const directionPlans = plans.filter((plan) => plan.direction === normalizedDirection);
+  if (mt5PositionId) {
+    const ticketMatch = directionPlans.find((plan) => plan.mt5PositionId === mt5PositionId);
+    if (ticketMatch) return ticketMatch;
+  }
+  const quantityMatches = directionPlans.filter(
+    (plan) => Math.abs((Number(plan.quantityOz) || 0) - qty) < 1e-8,
   );
+  if (quantityMatches.length === 1) return quantityMatches[0];
+  return directionPlans.length === 1 ? directionPlans[0] : null;
 }
 
 function isSyntheticObservedPrice(position: VenuePositionSnapshot | null) {
@@ -321,16 +342,6 @@ function formatPlanEntrySpread(
 function formatObservedAveragePrice(position: VenuePositionSnapshot | null) {
   if (!position || isSyntheticObservedPrice(position)) return '';
   return formatNullablePrice(position.averagePrice);
-}
-
-function formatExitSpread(
-  exitPlans: CrossSpreadExitPlanResult[],
-  kind: 'takeProfit' | 'stopLoss',
-): string {
-  const active = exitPlans.find((plan) => plan.status === 'active');
-  if (!active) return '--';
-  const value = kind === 'takeProfit' ? active.takeProfitSpread : active.stopLossSpread;
-  return formatNullableSigned(parseOptionalNumber(value));
 }
 
 function formatOpenTime(

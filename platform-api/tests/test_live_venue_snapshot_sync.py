@@ -77,7 +77,20 @@ def bootstrap(tmp_path: Path) -> None:
         pass
 
 
-def test_discover_live_accounts_deduplicates_shared_uta_and_excludes_short_b(
+def activate_legacy_monitor_fixture() -> None:
+    """Opt a test into the retired WW monitor binding for sync-isolation tests."""
+    with connection() as db:
+        db.execute(
+            """
+            UPDATE strategy_account_bindings
+            SET status = 'active'
+            WHERE strategy_instance_id = 'strategy_short_term_l_instance_default'
+              AND account_id = 'account_mt5_short_term_a'
+            """
+        )
+
+
+def test_discover_live_accounts_deduplicates_shared_uta_and_includes_ww_mt5(
     tmp_path: Path,
 ) -> None:
     bootstrap(tmp_path)
@@ -233,6 +246,7 @@ def test_sync_failure_isolated_and_does_not_commit_partial_rows(
     tmp_path: Path,
 ) -> None:
     bootstrap(tmp_path)
+    activate_legacy_monitor_fixture()
 
     def fake_runtime_get(path, params=None):
         account_id = params["accountId"]
@@ -307,13 +321,13 @@ def test_strategy_account_snapshot_returns_ready_sync_status_and_account_risk(
     tmp_path: Path,
 ) -> None:
     bootstrap(tmp_path)
-    monkeypatch.setattr(
-        "app.live_venue_snapshot_sync.runtime_get",
-        lambda path, params=None: StubResponse(base_snapshot("account_mt5_short_term_a")),
-    )
-    sync_venue_snapshots("account_mt5_short_term_a")
-
     with TestClient(app) as client:
+        activate_legacy_monitor_fixture()
+        monkeypatch.setattr(
+            "app.live_venue_snapshot_sync.runtime_get",
+            lambda path, params=None: StubResponse(base_snapshot("account_mt5_short_term_a")),
+        )
+        sync_venue_snapshots("account_mt5_short_term_a")
         response = client.get(
             "/api/v1/strategies/instances/strategy_short_term_l_instance_default/account-snapshot"
         )
@@ -325,6 +339,7 @@ def test_strategy_account_snapshot_returns_ready_sync_status_and_account_risk(
     assert body["accountCode"] == "MT5-SHORT-TERM-A"
 
     with TestClient(app) as client:
+        activate_legacy_monitor_fixture()
         overview = client.get("/api/v1/strategies/management-overview")
 
     assert overview.status_code == 200
@@ -489,6 +504,7 @@ def test_sync_persists_unmapped_mt5_monitoring_identity_without_duplicates(
         lambda path, params=None: StubResponse(snapshot),
     )
 
+    activate_legacy_monitor_fixture()
     first = sync_venue_snapshots("account_mt5_short_term_a")
     second = sync_venue_snapshots("account_mt5_short_term_a")
 

@@ -6,6 +6,7 @@ from typing import Any
 from app.research_data_schemas import (
     AShareBreadthSnapshot,
     AShareIndexSnapshot,
+    AShareMarketTurnoverRow,
     AShareTurnoverStock,
     MacroExpectationEvent,
     ShenwanMembership,
@@ -70,6 +71,14 @@ class FreeResearchProvider:
 
     async def a_share_spot(self) -> list[AShareTurnoverStock]:
         return await self._a_share.a_share_spot()
+
+    async def a_share_sector_fund_flow(self) -> list[dict[str, Any]]:
+        return await self._a_share.sector_fund_flow()
+
+    async def a_share_market_turnover(self) -> list[AShareMarketTurnoverRow]:
+        # One lightweight 50-row quote page covers the expandable >100bn
+        # detail while the visible board remains Top10/Top20.
+        return await self._a_share.market_turnover_top(50)
 
     async def market_activity(self) -> AShareBreadthSnapshot:
         return await self._a_share.market_activity()

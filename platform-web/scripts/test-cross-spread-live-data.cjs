@@ -123,3 +123,41 @@ test('cross spread execution records preserve result-unknown and leg evidence', 
   assert.equal(source.includes("{ key: 'legStatus', label: '双腿状态' }"), true);
   assert.equal(source.includes("{ key: 'failureReason', label: '失败/未知原因' }"), true);
 });
+
+test('strategy order-information tabs place fills before historical orders', () => {
+  const blocks = [
+    [
+      read('src/views/strategy/management/composables/useCrossSpreadRecords.ts'),
+      'const crossSpreadTabs',
+    ],
+    [
+      read('src/views/strategy/management/composables/useStrategyAccountSnapshots.ts'),
+      'label: `${labels[desk]}订单信息`',
+    ],
+    [
+      read('src/views/strategy/management/index.vue'),
+      'label: `${overview?.strategyName || desk}订单信息`',
+    ],
+    [read('src/data/sample/strategy/orders.ts'), 'const commonTabs'],
+    [read('src/data/sample/strategy/orders.ts'), 'const fundingTabs'],
+    [read('src/data/sample/strategy/orders.ts'), 'const twoLegTabs'],
+    [
+      read('src/views/strategy/spread-carry/components/DomesticOverseasExecutionWorkspace.vue'),
+      'const tableTabs',
+    ],
+  ];
+  for (const [source, marker] of blocks) {
+    const block = source.slice(source.indexOf(marker), source.indexOf(marker) + 800);
+    const fillsIndex = block.indexOf("key: 'fills'");
+    const historyIndex = Math.min(
+      ...['history', 'orders', 'spotHistory', 'leftHistory', 'contractHistory', 'rightHistory'].map(
+        (key) => {
+          const index = block.indexOf(`key: '${key}'`);
+          return index < 0 ? Number.POSITIVE_INFINITY : index;
+        },
+      ),
+    );
+    assert.ok(fillsIndex >= 0, `${marker} must expose fills`);
+    assert.ok(fillsIndex < historyIndex, `${marker} must place fills before historical orders`);
+  }
+});

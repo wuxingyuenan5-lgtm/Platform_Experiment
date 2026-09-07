@@ -287,8 +287,8 @@
 </template>
 
 <script setup lang="ts">
-  import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
-  import { getAShareDashboard, type AShareIndexSnapshot } from '@/api/hedgeResearch';
+  import { computed, nextTick, onBeforeUnmount, ref } from 'vue';
+  import type { AShareDashboardResponse, AShareIndexSnapshot } from '@/api/hedgeResearch';
   import TerminalDetailPanel from './TerminalDetailPanel.vue';
   import type {
     MarketTerminalPageConfig,
@@ -323,6 +323,7 @@
     config: MarketTerminalPageConfig;
     marketTabs: MarketTab[];
     detailSectionId?: string;
+    dashboard?: AShareDashboardResponse | null;
   }>();
 
   const expandedGroups = ref<Record<string, boolean>>(
@@ -341,7 +342,9 @@
     tvSymbol: '',
     error: '',
   });
-  const aShareSnapshots = ref<AShareIndexSnapshot[]>([]);
+  const aShareSnapshots = computed<AShareIndexSnapshot[]>(() =>
+    props.config.id === 'aShare' ? props.dashboard?.marketDetail.data || [] : [],
+  );
 
   const aShareCoreCodes = ['000300', '000852', '399006', '000688'];
   const aShareThemeCodes = ['931071', '931238', '932082', 'H30590'];
@@ -400,73 +403,6 @@
         labels[code],
       ),
     );
-  });
-
-  onMounted(async () => {
-    if (props.config.id !== 'aShare') return;
-    const fallback = async () => {
-      try {
-        const response = await getAShareDashboard();
-        return response.marketDetail.data || [];
-      } catch {
-        return [];
-      }
-    };
-    // The reference vibe-research service exposes the same A-share K-line
-    // feed used by its asset overview. Prefer it for the eight cards, while
-    // retaining the platform API as a local fallback when the service is off.
-    const vibeSymbols: Record<string, string> = {
-      '000300': 'sh000300',
-      '000852': 'sh000852',
-      '399006': 'sz399006',
-      '000688': 'sh000688',
-      '931071': 'sh931071',
-      '931238': 'sh931238',
-      '932082': 'sh932082',
-      H30590: 'shH30590',
-    };
-    try {
-      const entries = await Promise.all(
-        [...aShareCoreCodes, ...aShareThemeCodes].map(async (code) => {
-          const response = await fetch(
-            `/vibe-research/api/kline?code=${encodeURIComponent(
-              vibeSymbols[code],
-            )}&period=day&offset=180`,
-            { cache: 'no-store' },
-          );
-          if (!response.ok) return null;
-          const payload = (await response.json()) as {
-            data?: Array<{ close?: number; date?: string }>;
-          };
-          const values = (payload.data || [])
-            .map((item) => Number(item.close))
-            .filter(Number.isFinite);
-          if (values.length < 2) return null;
-          const last = values[values.length - 1];
-          const previous = values[values.length - 2];
-          return {
-            code,
-            name: '',
-            sourceSymbol: vibeSymbols[code],
-            close: last,
-            return1dPct: previous ? ((last - previous) / previous) * 100 : null,
-            spark: values.slice(-30),
-          } satisfies AShareIndexSnapshot;
-        }),
-      );
-      const vibeRows = entries.filter((row): row is AShareIndexSnapshot => Boolean(row));
-      const platformRows = await fallback();
-      aShareSnapshots.value = vibeRows.length
-        ? [...vibeRows, ...platformRows].reduce<AShareIndexSnapshot[]>((rows, row) => {
-            // Vibe is the primary K-line source; retain the platform snapshot
-            // only for symbols that Vibe does not cover.
-            if (!rows.some((item) => item.code === row.code)) rows.push(row);
-            return rows;
-          }, [])
-        : platformRows;
-    } catch {
-      aShareSnapshots.value = await fallback();
-    }
   });
 
   const marketDetailTitle = computed(

@@ -3,6 +3,7 @@
 const localPlatformBackend = process.env.VITE_PLATFORM_BACKEND_TARGET || 'http://127.0.0.1:8000';
 const localAuthService = 'http://127.0.0.1:8080';
 const localDataService = 'http://127.0.0.1:8082';
+const useFilePolling = process.env.VITE_USE_FILE_POLLING === 'true';
 
 export default defineApplicationConfig({
   overrides: {
@@ -26,18 +27,15 @@ export default defineApplicationConfig({
     server: {
       port: 4373,
       strictPort: true,
-      watch: {
-        usePolling: true,
-      },
+      // Native filesystem events are substantially cheaper on Windows. Enable
+      // polling only for network/Docker-mounted workspaces that need it.
+      watch: useFilePolling
+        ? {
+            usePolling: true,
+            interval: 1000,
+          }
+        : undefined,
       proxy: {
-        // Local vibe-research data service used by the A-share market overview
-        // and stock-pool adapters. The platform falls back to its own API when
-        // this optional reference service is unavailable.
-        '/vibe-research': {
-          target: 'http://127.0.0.1:8900',
-          changeOrigin: true,
-          rewrite: (path) => path.replace(/^\/vibe-research/, ''),
-        },
         '/login': {
           target: localPlatformBackend,
           changeOrigin: true,

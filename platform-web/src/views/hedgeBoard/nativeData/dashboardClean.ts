@@ -188,7 +188,6 @@ function treasuryYieldOverview(): WidgetConfig {
     subtitle: '3M / 2Y / 10Y / 30Y U.S. Treasury yields',
     height: 500,
     scriptSrc: 'https://s3.tradingview.com/external-embedding/embed-widget-symbol-overview.js',
-    sourceUrl: 'https://www.tradingview.com/markets/bonds/prices-usa/',
     config: {
       ...tvBase,
       symbols: [
@@ -255,15 +254,18 @@ export const researchModules: ResearchModule[] = [
             sourceNote: 'Native proxy · reference methodology: MacroMicro',
           }),
           withReferenceLinks(
-            advancedChart(
-              '美元净流动性',
-              'Formula: WALCL - WDTGAL - RRPONTTLD',
-              'FRED:WALCL-FRED:WDTGAL-FRED:RRPONTTLD',
-              {
-                height: 420,
-                hide_side_toolbar: false,
-              },
-            ),
+            {
+              ...advancedChart(
+                '美元净流动性',
+                'Formula: WALCL - WDTGAL - RRPONTTLD',
+                'FRED:WALCL-FRED:WDTGAL-FRED:RRPONTTLD',
+                {
+                  height: 420,
+                  hide_side_toolbar: false,
+                },
+              ),
+              sourceUrl: undefined,
+            },
             [
               {
                 label: 'TradingView 模板',
@@ -432,7 +434,12 @@ export const researchModules: ResearchModule[] = [
         layout: 'two',
         widgets: [
           withReferenceLinks(
-            advancedChart('VIX 波动率', 'Equity volatility regime', 'TVC:VIX', { height: 360 }),
+            {
+              ...advancedChart('VIX 波动率', 'Equity volatility regime', 'TVC:VIX', {
+                height: 360,
+              }),
+              sourceUrl: undefined,
+            },
             [
               {
                 label: 'TradingView 模板',
@@ -630,6 +637,7 @@ export const researchModules: ResearchModule[] = [
           }),
           advancedChart('BTC IV (DERIBIT DVOL)', '', 'DERIBIT:DVOL', {
             height: 320,
+            sourceUrl: undefined,
           }),
         ],
       },
@@ -838,6 +846,12 @@ export const researchModules: ResearchModule[] = [
             'Glassnode Week On-chain',
             '周度链上市场研究',
             'https://research.glassnode.com/the-week-onchain-week-18-2026/',
+          ),
+          externalReference('Murphy Chen', 'X · 链上与周期研究跟踪', 'https://x.com/Murphychen888'),
+          externalReference(
+            'Market Beggar 市场观点',
+            'X · 指定市场研究帖',
+            'https://x.com/market_beggar/status/2096487388092698821?s=20',
           ),
           externalReference(
             'Unbias Analysts',

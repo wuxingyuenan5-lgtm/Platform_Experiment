@@ -51,6 +51,7 @@ const shenwanSectionPath = path.join(
 );
 const stockSnapshotPath = path.join(viewRoot, 'aShare', 'components', 'StockSnapshotSection.vue');
 const vibeStockPoolPath = path.join(viewRoot, 'aShare', 'components', 'VibeStockPoolSection.vue');
+const aShareMarketOverviewParityPath = path.join(viewRoot, 'aShare', 'components', 'AShareMarketOverviewParitySection.vue');
 const macroExpectationPath = path.join(viewRoot, 'macro', 'MacroExpectationPanel.vue');
 const hedgeBoardPageComposablePath = path.join(viewRoot, 'composables', 'useHedgeBoardPage.ts');
 const routePath = path.join(__dirname, '..', 'src', 'router', 'routes', 'modules', 'hedge.ts');
@@ -80,6 +81,7 @@ const aShareWatchlistSource = fs.readFileSync(aShareWatchlistPath, 'utf8');
 const shenwanSectionSource = fs.readFileSync(shenwanSectionPath, 'utf8');
 const stockSnapshotSource = fs.readFileSync(stockSnapshotPath, 'utf8');
 const vibeStockPoolSource = fs.readFileSync(vibeStockPoolPath, 'utf8');
+const aShareMarketOverviewParitySource = fs.readFileSync(aShareMarketOverviewParityPath, 'utf8');
 const macroExpectationSource = fs.readFileSync(macroExpectationPath, 'utf8');
 const hedgeBoardPageComposableSource = fs.readFileSync(hedgeBoardPageComposablePath, 'utf8');
 const routeSource = fs.readFileSync(routePath, 'utf8');
@@ -285,9 +287,8 @@ assert(
     aSharePageSource.includes('<AShareLegacyTerminalSection') &&
     !aSharePageSource.includes('<StockSnapshotSection') &&
     aSharePageSource.includes('<VibeStockPoolSection') &&
-    vibeStockPoolSource.includes('/vibe-research/api/stock-pool') &&
-    vibeStockPoolSource.includes('/vibe-research/api/stock-pool/focus') &&
-    vibeStockPoolSource.includes('/vibe-research/api/stock-pool/add-batch') &&
+    vibeStockPoolSource.includes('/api/v1/research/a-share/stock-pool') &&
+    !vibeStockPoolSource.includes('/vibe-research/api/') &&
     vibeStockPoolSource.includes('matrixPoints') &&
     vibeStockPoolSource.includes('heatMaxAbs') &&
     !vibeStockPoolSource.includes('localStorage'),
@@ -297,6 +298,13 @@ assert(
   marketTerminalPageSource.includes('detailSectionId') &&
     aSharePageSource.includes('AShareLegacyTerminalSection'),
   'A-share market detail must reuse the shared market terminal with a navigable section anchor.',
+);
+assert(
+  !aSharePageSource.includes('window.scrollTo') &&
+    !marketTerminalPageSource.includes('/vibe-research/') &&
+    !aShareMarketOverviewParitySource.includes('/vibe-research/') &&
+    !vibeStockPoolSource.includes('/vibe-research/'),
+  'A-share pages must read Platform snapshots and must not force scroll or call the reference service.',
 );
 assert(
   shenwanSectionSource.includes('申万二级成交额 Top 10') &&

@@ -22,8 +22,8 @@ const instanceIds: Record<AccountStrategyDesk, string> = {
 const labels: Record<AccountStrategyDesk, string> = {
   funding: '资费套利',
   dip: '抄底',
-  shortLineTraderL: '短线交易员 A',
-  shortLineTraderW: '短线交易员 B',
+  shortLineTraderL: '短线交易员 WW',
+  shortLineTraderW: '短线交易员 BL',
 };
 
 const statusLabels: Record<string, string> = {
@@ -129,7 +129,7 @@ function pnlProfile(
         tone: tone(pnl?.fees),
       },
       {
-        label: '账户净值',
+        label: '账户总资产',
         value: money(snapshot?.balance?.equity, currency),
         ratio: reason,
         tone: 'neutral',
@@ -210,10 +210,26 @@ function capitalProfile(
   const currency = snapshot?.balance?.currency || 'USDT';
   const pnl = snapshot?.pnl;
   const reason = unavailableReason(snapshot);
+  const equityHistory = snapshot?.equityHistory || [];
+  let peak = 0;
+  const netValueData = equityHistory.map((point) => {
+    const value = Number(point.equity);
+    if (!Number.isFinite(value)) return 0;
+    peak = Math.max(peak, value);
+    return value;
+  });
+  let rollingPeak = 0;
+  const drawdownData = equityHistory.map((point) => {
+    const value = Number(point.equity);
+    if (!Number.isFinite(value)) return 0;
+    rollingPeak = Math.max(rollingPeak, value);
+    if (rollingPeak <= 0) return 0;
+    return Number((((value - rollingPeak) / rollingPeak) * 100).toFixed(4));
+  });
   return {
     overview: [
       {
-        label: '账户净值',
+        label: '账户总资产',
         value: money(snapshot?.balance?.equity, currency),
         note: snapshot?.accountCode || reason,
         tone: 'neutral',
@@ -276,17 +292,17 @@ function capitalProfile(
     comparisonCards: [],
     metricCurves: [],
     curve: {
-      title: `${labels[desk]}账户净值曲线`,
+      title: `${labels[desk]}账户总资产曲线`,
       subtitle: reason,
-      metricOptions: [{ key: 'equity', label: '账户净值' }],
+      metricOptions: [{ key: 'equity', label: '账户总资产' }],
       periodOptions: [{ key: 'all', label: '全部' }],
       defaultMetric: 'equity',
       defaultPeriod: 'all',
-      xLabels: [],
-      netValueData: [],
-      drawdownData: [],
+      xLabels: equityHistory.map((point) => formatTime(point.asOf)),
+      netValueData,
+      drawdownData,
       summaries: [
-        { label: '账户净值', value: money(snapshot?.balance?.equity, currency), tone: 'neutral' },
+        { label: '账户总资产', value: money(snapshot?.balance?.equity, currency), tone: 'neutral' },
         {
           label: '可用资金',
           value: money(snapshot?.balance?.availableBalance, currency),
@@ -355,8 +371,8 @@ function orderProfile(
     label: `${labels[desk]}订单信息`,
     tabs: [
       { key: 'positions', label: '当前持仓' },
-      { key: 'orders', label: '历史订单' },
       { key: 'fills', label: '成交记录' },
+      { key: 'orders', label: '历史订单' },
     ],
     tables,
   };

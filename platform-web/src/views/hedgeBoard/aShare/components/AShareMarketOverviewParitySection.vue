@@ -8,13 +8,8 @@
       <article class="metric-panel">
         <div class="panel-title"
           ><h3>市场情绪</h3
-          ><ResearchSourceState
-            v-if="!vibe?.sentiment && dashboard?.breadth"
-            :meta="dashboard.breadth.meta"
+          ><ResearchSourceState v-if="dashboard?.breadth" :meta="dashboard.breadth.meta"
         /></div>
-        <p v-if="vibe?.sentiment" class="source-note"
-          >vibe-research 实时聚合 · {{ formatDate(vibe.sentiment.date) }}</p
-        >
         <div v-if="breadth" class="metric-grid"
           ><div v-for="item in breadthMetrics" :key="item.label" class="metric-cell"
             ><span>{{ item.label }}</span
@@ -30,7 +25,7 @@
           <button
             type="button"
             class="meta-action"
-            :disabled="!hotMatrixRows.length"
+            :disabled="!turnoverData?.rows.length"
             @click="hotMatrixOpen = true"
             ><span>百亿成交股</span
             ><strong>{{ hotStockCount == null ? '—' : `${hotStockCount}只` }}</strong></button
@@ -45,13 +40,8 @@
       <article class="metric-panel">
         <div class="panel-title"
           ><h3>短线情绪</h3
-          ><ResearchSourceState
-            v-if="!vibe?.emotion && dashboard?.emotion"
-            :meta="dashboard.emotion.meta"
+          ><ResearchSourceState v-if="dashboard?.emotion" :meta="dashboard.emotion.meta"
         /></div>
-        <p v-if="vibe?.emotion" class="source-note"
-          >vibe-research 实时聚合 · {{ vibe.emotion.date || '最新交易日' }}</p
-        >
         <div v-if="emotion" class="metric-grid"
           ><div v-for="item in emotionMetrics" :key="item.label" class="metric-cell"
             ><span>{{ item.label }}</span
@@ -82,18 +72,15 @@
               >
             </span>
           </button>
-          <article class="emotion-subpanel emotion-summary-panel">
-            <h4>连板股明细</h4>
-            <p>{{
-              emotionLeaders.length
-                ? `共 ${emotionLeaders.length} 只，点击左侧连板梯队查看完整清单`
-                : '暂无二板及以上个股'
-            }}</p>
-          </article>
         </div>
       </article>
     </div>
-    <VibeTrendCharts v-if="allHistoryRows.length" :rows="allHistoryRows" />
+    <VibeTrendCharts
+      v-if="allHistoryRows.length > 1"
+      :rows="allHistoryRows"
+      :crowding-rows="dashboard?.crowding?.data?.history"
+      :innovation-rows="dashboard?.crowding?.data?.innovationHistory"
+    />
     <article v-if="false && historyRows.length" class="panel history-panel">
       <div class="panel-title">
         <h3>市场涨跌结构与宽度</h3>
@@ -219,9 +206,7 @@
       <article class="panel">
         <div class="panel-title"
           ><div><h3>板块资金趋势榜</h3></div
-          ><ResearchSourceState
-            v-if="!vibe?.sectors?.length && dashboard?.shenwan"
-            :meta="dashboard.shenwan.meta"
+          ><ResearchSourceState :meta="sectorFlowMeta"
         /></div>
         <button
           v-if="sectorRows.length > 7"
@@ -277,7 +262,6 @@
       ><div class="panel-title"
         ><div><h3>全市场成交额榜</h3></div
         ><div class="turnover-actions"
-          ><span class="top-count">Top {{ topN }}</span
           ><button
             v-for="n in [10, 20]"
             :key="n"
@@ -317,35 +301,80 @@
     <div v-if="hotMatrixOpen" class="detail-modal-mask" @click.self="hotMatrixOpen = false">
       <article class="detail-modal panel matrix-panel">
         <div class="panel-title"
-          ><h3>百亿成交 · 行业分布</h3
+          ><h3>百亿成交股 · 当日明细</h3
           ><button type="button" class="modal-close" @click="hotMatrixOpen = false"
             >关闭</button
           ></div
         >
-        <div class="table-shell matrix-shell">
-          <table
-            ><thead
-              ><tr
-                ><th class="is-left">行业</th
-                ><th v-for="date in hotMatrixDates" :key="date">{{ date.slice(5) }}</th
-                ><th>历史累计</th></tr
-              ></thead
-            >
-            <tbody
-              ><tr class="matrix-total"
-                ><td class="is-left"><strong>合计</strong></td
-                ><td v-for="(total, index) in hotMatrixTotals" :key="index">{{ total || '' }}</td
-                ><td>{{ hotMatrixTotal }}</td></tr
-              >
-              <tr v-for="row in hotMatrixRows" :key="row.industry"
-                ><td class="is-left"
-                  ><strong>{{ row.industry }}</strong></td
-                ><td v-for="(count, index) in row.counts" :key="index">{{ count || '' }}</td
-                ><td>{{ row.historyTotal }}</td></tr
-              ></tbody
-            >
-          </table>
+        <div class="hot-stock-summary" v-if="turnoverData">
+          <strong>{{ hotStockCount == null ? '—' : `${hotStockCount}只` }}</strong>
+          <span>成交额严格大于 100 亿元；日度统计</span>
         </div>
+        <div
+          v-if="highTurnoverRows.length"
+          class="hot-stock-bars"
+          aria-label="百亿成交股成交额对比图"
+        >
+          <button
+            v-for="row in highTurnoverRows"
+            :key="`bar-${row.securityCode}`"
+            type="button"
+            class="hot-stock-bar"
+            @click="emit('query', row.securityCode)"
+          >
+            <span>{{ row.securityName }}</span
+            ><i><b :style="{ width: `${hotStockBarWidth(row.turnoverYi)}%` }"></b></i
+            ><strong>{{ formatYi(row.turnoverYi) }}</strong>
+          </button>
+        </div>
+        <section v-if="turnoverData?.historyDates?.length" class="hot-history-panel">
+          <div class="hot-history-head"
+            ><div><h4>百亿成交 · 历史统计</h4><span>点击日期查看当日百亿成交股</span></div
+            ><b>近 {{ turnoverData.historyDates.length }} 个交易日</b></div
+          >
+          <div class="hot-history-dates"
+            ><button
+              v-for="(date, index) in turnoverData.historyDates"
+              :key="date"
+              type="button"
+              :class="{ active: selectedHotDate === date }"
+              @click="selectedHotDate = date"
+              ><span>{{ date.slice(5) }}</span
+              ><strong>{{ turnoverData.historyCounts?.[index] || 0 }}</strong></button
+            ></div
+          >
+          <div class="table-shell hot-history-matrix"
+            ><table
+              ><thead
+                ><tr
+                  ><th class="is-left">行业</th
+                  ><th v-for="date in turnoverData.historyDates" :key="date">{{ date.slice(5) }}</th
+                  ><th>累计</th></tr
+                ></thead
+              ><tbody
+                ><tr v-for="row in turnoverData.historyIndustries" :key="row.industry"
+                  ><td class="is-left"
+                    ><strong>{{ row.industry }}</strong></td
+                  ><td v-for="(count, index) in row.counts" :key="index">{{ count || '' }}</td
+                  ><td>{{ row.historyTotal }}</td></tr
+                ></tbody
+              ></table
+            ></div
+          >
+          <div v-if="selectedHistoricalHotRows.length" class="hot-history-day"
+            ><strong>{{ selectedHotDate }} · {{ selectedHistoricalHotRows.length }}只</strong
+            ><button
+              v-for="row in selectedHistoricalHotRows"
+              :key="`${row.observedAt}-${row.securityCode}`"
+              type="button"
+              @click="emit('query', row.securityCode)"
+              >{{ row.securityName }}
+              <span>{{
+                formatYi(row.turnoverYuan == null ? null : Number(row.turnoverYuan) / 1e8)
+              }}</span></button
+            ></div
+          >
+        </section>
       </article>
     </div>
     <div v-if="ladderOpen" class="detail-modal-mask" @click.self="ladderOpen = false">
@@ -385,8 +414,15 @@
 </template>
 
 <script setup lang="ts">
-  import { computed, onMounted, ref } from 'vue';
-  import type { AShareDashboardResponse } from '@/api/hedgeResearch';
+  import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+  import {
+    getAShareLiveSectorFundFlow,
+    getAShareLiveMarketTurnover,
+    type AShareDashboardResponse,
+    type AShareLiveSectorFundFlowResponse,
+    type AShareMarketTurnoverResponse,
+    type ResearchSourceMeta,
+  } from '@/api/hedgeResearch';
   import ResearchSourceState from '../../research/components/ResearchSourceState.vue';
   import VibeTrendCharts from './VibeTrendCharts.vue';
 
@@ -497,42 +533,34 @@
     marketCapYi: number | null;
     industry?: string | null;
   };
-  const vibe = ref<VibeOverview | null>(null);
-  const vibeMonitor = ref<VibeMonitor | null>(null);
   const sectorsExpanded = ref(false);
+  const liveSectorFlow = ref<AShareLiveSectorFundFlowResponse | null>(null);
+  const turnoverData = ref<AShareMarketTurnoverResponse | null>(null);
+  const liveSectorFlowError = ref('');
+  const liveSectorFlowLoading = ref(false);
+  let liveSectorFlowTimer: number | undefined;
+  let liveTurnoverTimer: number | undefined;
   const topN = ref<10 | 20>(10);
   const ladderOpen = ref(false);
   const hotMatrixOpen = ref(false);
+  const selectedHotDate = ref('');
   const historyRange = ref<'recent' | '90' | 'all'>('recent');
   const historyRangeOptions = [
     { key: 'recent' as const, label: '近60日' },
     { key: '90' as const, label: '近90日' },
     { key: 'all' as const, label: '全部' },
   ];
-  onMounted(async () => {
-    const [overviewResponse, monitorResponse] = await Promise.allSettled([
-      fetch('/vibe-research/api/market/overview-v2', { cache: 'no-store' }),
-      fetch('/vibe-research/api/market-monitor', { cache: 'no-store' }),
-    ]);
-    if (overviewResponse.status === 'fulfilled' && overviewResponse.value.ok) {
-      try {
-        vibe.value =
-          ((await overviewResponse.value.json()) as { data?: VibeOverview }).data || null;
-      } catch {
-        /* platform contract remains the fallback */
-      }
-    }
-    if (monitorResponse.status === 'fulfilled' && monitorResponse.value.ok) {
-      try {
-        vibeMonitor.value =
-          ((await monitorResponse.value.json()) as { data?: VibeMonitor }).data || null;
-      } catch {
-        /* historical charts remain explicitly absent */
-      }
-    }
-  });
   const allHistoryRows = computed(() =>
-    (vibeMonitor.value?.market_history || []).filter((row) => row.date),
+    (props.dashboard?.marketHistory || []).map((row) => ({
+      date: row.observedAt,
+      advance: row.up,
+      decline: row.down,
+      flat: row.flat,
+      limit_up: row.limitUp,
+      limit_down: row.limitDown,
+      total_amount_100m: row.totalAmountYuan == null ? null : Number(row.totalAmountYuan) / 1e8,
+      market_breadth: row.marketBreadthPct == null ? null : Number(row.marketBreadthPct) / 100,
+    })),
   );
   const historyRows = computed(() => {
     const rows = allHistoryRows.value;
@@ -555,8 +583,10 @@
     return chartTicks.map((fraction) => min + (max - min) * fraction);
   });
   const breadthTicks = [-1, -0.5, 0, 0.5, 1];
-  const hotMatrixDates = computed(() => vibeMonitor.value?.hot_stock_matrix?.dates || []);
-  const hotMatrixRows = computed(() => vibeMonitor.value?.hot_stock_matrix?.rows || []);
+  const hotMatrixDates = computed(() => [] as string[]);
+  const hotMatrixRows = computed(
+    () => [] as Array<{ industry: string; counts: number[]; history_total: number }>,
+  );
   const hotMatrixTotals = computed(() =>
     hotMatrixDates.value.map((_, index) =>
       hotMatrixRows.value.reduce((total, row) => total + Number(row.counts[index] || 0), 0),
@@ -566,60 +596,15 @@
     hotMatrixRows.value.reduce((total, row) => total + Number(row.history_total || 0), 0),
   );
   const latestHistory = computed(() => allHistoryRows.value.at(-1) || null);
-  const hotStockCount = computed(() => vibeMonitor.value?.hot_stocks_latest?.length ?? null);
-  const updatedAt = computed(() => vibe.value?.updated || props.dashboard?.generatedAt || '');
+  const hotStockCount = computed(() => turnoverData.value?.highTurnoverCount ?? null);
+  const updatedAt = computed(() => props.dashboard?.generatedAt || '');
   const breadth = computed(() => {
-    const v = vibe.value?.sentiment;
-    if (v)
-      return {
-        up: v.up,
-        down: v.down,
-        flat: v.flat,
-        limitUp: v.zt,
-        realLimitUp: v.zt_real,
-        limitDown: v.dt,
-        realLimitDown: v.dt_real,
-        activityPct: v.active,
-        breadthState: v.breadth || '—',
-        speculationState: v.speculation || '—',
-        tradeDate: v.date,
-      };
     return props.dashboard?.breadth.data || null;
   });
   const emotion = computed(() => {
-    const v = vibe.value?.emotion;
-    if (v)
-      return {
-        limitUpCount: v.zt_count,
-        brokenBoardCount: v.zb_count,
-        limitDownCount: v.dt_count,
-        highestBoardCount: v.max_boards,
-        consecutiveBoardCount: v.lianban_count,
-        sealRatePct: v.seal_rate == null ? null : v.seal_rate * 100,
-        breakRatePct: v.break_rate == null ? null : v.break_rate * 100,
-        promotionRatePct: v.promotion_rate == null ? null : v.promotion_rate * 100,
-        tradeDate: v.date,
-        ladder: (v.ladder || []).map((r) => ({
-          boardCount: `${r.boards}${r.plus ? '+' : ''}板`,
-          stockCount: r.count,
-        })),
-        leaders: [],
-      };
     return props.dashboard?.emotion.data || null;
   });
   const emotionLeaders = computed<EmotionLeader[]>(() => {
-    const rows = vibe.value?.emotion?.lianban_stocks;
-    if (rows?.length)
-      return rows.map((r) => ({
-        code: r.code,
-        name: r.name,
-        boards: r.boards,
-        price: r.price,
-        pct: r.pct,
-        amountYi: r.amount == null ? null : r.amount / 1e8,
-        floatCapYi: r.float_cap == null ? null : r.float_cap / 1e8,
-        industry: r.industry,
-      }));
     return (props.dashboard?.emotion.data?.leaders || []).map((r) => ({
       code: r.securityCode,
       name: r.securityName,
@@ -633,27 +618,30 @@
   function ladderWidth(c: number) {
     return Math.max(4, (c / maxLadderCount.value) * 100);
   }
-  const sectorRows = computed<SectorRow[]>(() => {
-    if (vibe.value?.sectors?.length)
-      return vibe.value.sectors.map((r) => ({
-        name: r.name,
-        pct: r.pct,
-        net: r.net,
-        netYi: r.net,
-        inflowYi: r.inflow,
-        outflowYi: r.outflow,
-        firms: r.firms ?? null,
-      }));
-    return (props.dashboard?.shenwan.data?.sw2All || []).map((r) => ({
-      name: r.swL2Name,
-      pct: Number(r.returnPct),
-      net: r.netInflowYuan == null ? null : Number(r.netInflowYuan),
-      netYi: r.netInflowYuan == null ? null : Number(r.netInflowYuan) / 1e8,
-      inflowYi: null,
-      outflowYi: null,
-      firms: null,
-    }));
-  });
+  const sectorFlowMeta = computed<ResearchSourceMeta>(() => ({
+    source: liveSectorFlow.value?.source || '东方财富板块资金流（实时）',
+    fetchedAt: liveSectorFlow.value?.fetchedAt || new Date().toISOString(),
+    status: liveSectorFlowLoading.value
+      ? 'loading'
+      : liveSectorFlowError.value
+      ? 'error'
+      : liveSectorFlow.value
+      ? 'ready'
+      : 'no_data',
+    isStale: false,
+    message: liveSectorFlowError.value || undefined,
+  }));
+  const sectorRows = computed<SectorRow[]>(() =>
+    (liveSectorFlow.value?.rows || []).map((row) => ({
+      name: row.name,
+      pct: row.returnPct == null ? null : Number(row.returnPct),
+      net: Number(row.netInflowYuan),
+      netYi: Number(row.netInflowYuan) / 1e8,
+      inflowYi: Number(row.inflowYuan) / 1e8,
+      outflowYi: Number(row.outflowYuan) / 1e8,
+      firms: row.firmCount ?? null,
+    })),
+  );
   const visibleSectorRows = computed(() =>
     sectorsExpanded.value ? sectorRows.value : sectorRows.value.slice(0, 7),
   );
@@ -672,30 +660,68 @@
       .sort((a, b) => (a.netYi || 0) - (b.netYi || 0))
       .slice(0, 6),
   );
-  const turnoverRows = computed<TurnoverRow[]>(() => {
-    if (vibe.value?.turnover_top?.stocks?.length)
-      return vibe.value.turnover_top.stocks.map((r) => ({
-        securityCode: r.code,
-        securityName: r.name,
-        price: r.price,
-        returnPct: r.pct,
-        turnoverYi: r.amount == null ? null : r.amount / 1e8,
-        marketCapYi: r.mcap == null ? null : r.mcap / 1e8,
-        industry: r.industry,
-      }));
-    return (props.dashboard?.shenwan.data?.threshold?.stocks || [])
-      .slice()
-      .sort((a, b) => Number(b.turnoverYuan) - Number(a.turnoverYuan))
-      .slice(0, 20)
-      .map((r) => ({
-        securityCode: r.securityCode,
-        securityName: r.securityName,
-        returnPct: r.returnPct,
-        turnoverYi: r.turnoverYuan == null ? null : Number(r.turnoverYuan) / 1e8,
-        marketCapYi: null,
-        industry: r.swL2Name,
-      }));
+  async function loadLiveSectorFlow() {
+    liveSectorFlowLoading.value = true;
+    try {
+      liveSectorFlow.value = await getAShareLiveSectorFundFlow();
+      liveSectorFlowError.value = '';
+    } catch (error) {
+      liveSectorFlowError.value = error instanceof Error ? error.message : '实时板块资金流加载失败';
+    } finally {
+      liveSectorFlowLoading.value = false;
+    }
+  }
+  async function loadLiveTurnover() {
+    try {
+      turnoverData.value = await getAShareLiveMarketTurnover();
+      if (!selectedHotDate.value)
+        selectedHotDate.value = turnoverData.value.historyDates?.at(-1) || '';
+    } catch {
+      // Retain the last successful live board if the intraday source times out.
+    }
+  }
+  onMounted(() => {
+    void loadLiveSectorFlow();
+    void loadLiveTurnover();
+    liveSectorFlowTimer = window.setInterval(() => void loadLiveSectorFlow(), 5 * 60 * 1000);
+    liveTurnoverTimer = window.setInterval(() => void loadLiveTurnover(), 5 * 60 * 1000);
   });
+  onBeforeUnmount(() => {
+    if (liveSectorFlowTimer != null) window.clearInterval(liveSectorFlowTimer);
+    if (liveTurnoverTimer != null) window.clearInterval(liveTurnoverTimer);
+  });
+  const turnoverRows = computed<TurnoverRow[]>(() => {
+    return (turnoverData.value?.rows || []).map((r) => ({
+      securityCode: r.securityCode,
+      securityName: r.securityName,
+      price: r.price,
+      returnPct: r.returnPct,
+      turnoverYi: r.turnoverYuan == null ? null : Number(r.turnoverYuan) / 1e8,
+      marketCapYi: r.marketCapYuan == null ? null : Number(r.marketCapYuan) / 1e8,
+      industry: r.industry,
+    }));
+  });
+  const highTurnoverRows = computed<TurnoverRow[]>(() =>
+    (turnoverData.value?.highTurnoverRows || []).map((row) => ({
+      securityCode: row.securityCode,
+      securityName: row.securityName,
+      price: row.price,
+      returnPct: row.returnPct,
+      turnoverYi: row.turnoverYuan == null ? null : Number(row.turnoverYuan) / 1e8,
+      marketCapYi: row.marketCapYuan == null ? null : Number(row.marketCapYuan) / 1e8,
+      industry: row.industry,
+    })),
+  );
+  const selectedHistoricalHotRows = computed(() => {
+    const date = selectedHotDate.value || turnoverData.value?.historyDates?.at(-1);
+    return (turnoverData.value?.historicalRows || []).filter((row) => row.observedAt === date);
+  });
+  const highTurnoverMaxYi = computed(() =>
+    Math.max(1, ...highTurnoverRows.value.map((row) => row.turnoverYi || 0)),
+  );
+  function hotStockBarWidth(value: number | null) {
+    return Math.max(4, ((value || 0) / highTurnoverMaxYi.value) * 100);
+  }
   const breadthMetrics = computed(() => {
     const v = breadth.value;
     if (!v) return [];
@@ -986,9 +1012,7 @@
   }
 
   .emotion-detail {
-    display: grid;
-    grid-template-columns: minmax(220px, 0.7fr) minmax(0, 1.3fr);
-    gap: 12px;
+    display: block;
     margin-top: 12px;
   }
 
@@ -1139,6 +1163,9 @@
   }
 
   .ladder-trigger {
+    display: flex;
+    align-items: center;
+    gap: 18px;
     width: 100%;
     border: 1px solid var(--strategy-border);
     color: inherit;
@@ -1155,7 +1182,8 @@
     display: flex;
     align-items: baseline;
     justify-content: space-between;
-    margin-bottom: 10px;
+    min-width: 180px;
+    margin-bottom: 0;
     gap: 8px;
   }
 
@@ -1168,7 +1196,9 @@
 
   .ladder-list {
     display: grid;
-    gap: 10px;
+    flex: 1;
+    grid-template-columns: repeat(4, minmax(110px, 1fr));
+    gap: 12px;
   }
 
   .ladder-row {
@@ -1181,7 +1211,7 @@
   }
 
   .ladder-row + .ladder-row {
-    margin-top: 10px;
+    margin-top: 0;
   }
 
   .ladder-list > div {
@@ -1205,6 +1235,139 @@
     height: 100%;
     border-radius: inherit;
     background: var(--strategy-accent-strong);
+  }
+
+  .hot-stock-summary {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    padding: 8px 2px 2px;
+    color: var(--strategy-text-3);
+    font-size: 12px;
+  }
+
+  .hot-stock-summary strong {
+    color: var(--strategy-text-1);
+    font-size: 20px;
+  }
+
+  .hot-stock-bars {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px 14px;
+  }
+
+  .hot-stock-bar {
+    display: grid;
+    grid-template-columns: 72px minmax(0, 1fr) 66px;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 0;
+    border: 0;
+    background: transparent;
+    color: var(--strategy-text-2);
+    font-size: 11px;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .hot-stock-bar i {
+    height: 7px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: var(--strategy-border);
+  }
+
+  .hot-stock-bar b {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: linear-gradient(90deg, var(--strategy-accent-strong), var(--strategy-up));
+  }
+
+  .hot-stock-bar strong {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .hot-history-panel {
+    display: grid;
+    gap: 10px;
+    padding-top: 14px;
+    border-top: 1px solid var(--strategy-border);
+  }
+
+  .hot-history-head {
+    display: flex;
+    align-items: end;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .hot-history-head h4 {
+    margin: 0;
+    color: var(--strategy-text-1);
+    font-size: 14px;
+  }
+  .hot-history-head span,
+  .hot-history-head b {
+    color: var(--strategy-text-4);
+    font-size: 11px;
+    font-weight: 500;
+  }
+
+  .hot-history-dates {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(56px, 1fr));
+    gap: 6px;
+  }
+
+  .hot-history-dates button {
+    display: grid;
+    gap: 2px;
+    padding: 6px;
+    border: 1px solid var(--strategy-border);
+    border-radius: 7px;
+    background: var(--strategy-surface-2);
+    color: var(--strategy-text-3);
+    cursor: pointer;
+  }
+
+  .hot-history-dates button strong {
+    color: var(--strategy-text-1);
+    font-size: 15px;
+  }
+  .hot-history-dates button.active {
+    border-color: var(--strategy-accent-strong);
+    background: var(--strategy-accent-soft);
+  }
+  .hot-history-matrix {
+    max-height: 260px;
+  }
+
+  .hot-history-day {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+  }
+  .hot-history-day > strong {
+    margin-right: 4px;
+    color: var(--strategy-text-2);
+    font-size: 12px;
+  }
+  .hot-history-day button {
+    padding: 4px 7px;
+    border: 1px solid var(--strategy-border);
+    border-radius: 999px;
+    background: var(--strategy-surface-2);
+    color: var(--strategy-text-2);
+    font-size: 11px;
+    cursor: pointer;
+  }
+  .hot-history-day button span {
+    margin-left: 4px;
+    color: var(--strategy-text-4);
   }
 
   .table-shell {
@@ -1327,11 +1490,6 @@
   .wide-panel {
     display: grid;
     gap: 12px;
-  }
-
-  .top-count {
-    color: var(--strategy-text-4);
-    font-size: 11px;
   }
 
   .turnover-actions {

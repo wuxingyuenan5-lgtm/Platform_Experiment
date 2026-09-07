@@ -22,6 +22,7 @@ from app.live_venue_snapshot_sync import router as live_venue_snapshot_sync_rout
 from app.member_holding_routes import router as member_holding_router
 from app.production_monitoring import router as production_monitoring_router
 from app.research_routes import router as research_router
+from app.research_a_share_refresh import refresh_a_share_research
 from app.research_watchlist_routes import router as research_watchlist_router
 from app.schema_governance import router as schema_governance_router
 from app.security_ops_routes import create_security_ops_router
@@ -43,7 +44,24 @@ configure_trade_command_port(create_trade_command)
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     initialize_database()
-    yield
+    settings = get_settings()
+    refresh_task = None
+    if settings.research_refresh_enabled:
+        import asyncio
+
+        async def loop() -> None:
+            await refresh_a_share_research()
+            while True:
+                await asyncio.sleep(max(60.0, settings.research_refresh_interval_seconds))
+                await refresh_a_share_research()
+
+        refresh_task = asyncio.create_task(loop())
+    try:
+        yield
+    finally:
+        if refresh_task is not None:
+            refresh_task.cancel()
+            await asyncio.gather(refresh_task, return_exceptions=True)
 
 
 def create_application() -> FastAPI:

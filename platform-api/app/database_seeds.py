@@ -72,7 +72,7 @@ def seed_reference_data(db: sqlite3.Connection) -> None:
         (
             "strategy_short_term_l",
             "short_term_l",
-            "短线交易员A",
+            "短线交易员WW",
             "read_only",
             "active",
             "MT5 只读监控账户：账户、订单、持仓、Deal、费用与风控信息。",
@@ -81,7 +81,7 @@ def seed_reference_data(db: sqlite3.Connection) -> None:
         (
             "strategy_short_term_w",
             "short_term_w",
-            "短线交易员B",
+            "短线交易员BL",
             "read_only",
             "active",
             "未绑定真实账号的只读占位策略。",
@@ -123,12 +123,41 @@ def seed_reference_data(db: sqlite3.Connection) -> None:
                 "simulation",
                 status,
                 capital_base,
-                "USDT",
+                "USD" if key == "bottom_fishing" else "USDT",
                 "complete" if capital_base else "partial",
                 created_at,
             ),
         )
 
+    db.execute(
+        """
+        UPDATE strategy_instances
+        SET base_currency = 'USD'
+        WHERE id = 'strategy_bottom_fishing_instance_default'
+        """
+    )
+    db.execute(
+        """
+        UPDATE strategy_definitions
+        SET name = CASE strategy_key
+            WHEN 'short_term_l' THEN '短线交易员WW'
+            WHEN 'short_term_w' THEN '短线交易员BL'
+            ELSE name
+        END
+        WHERE strategy_key IN ('short_term_l', 'short_term_w')
+        """
+    )
+    db.execute(
+        """
+        UPDATE strategy_instances
+        SET name = CASE strategy_definition_id
+            WHEN 'strategy_short_term_l' THEN '短线交易员WW 默认实例'
+            WHEN 'strategy_short_term_w' THEN '短线交易员BL 默认实例'
+            ELSE name
+        END
+        WHERE strategy_definition_id IN ('strategy_short_term_l', 'strategy_short_term_w')
+        """
+    )
     db.execute(
         """
         UPDATE strategy_definitions
@@ -323,7 +352,7 @@ def seed_reference_data(db: sqlite3.Connection) -> None:
             "抄底账户",
             "crypto",
             "live",
-            "USDT",
+            "USD",
             "secret://environment/bybit-bottom-fishing",
             "active",
             "unavailable",
@@ -332,7 +361,7 @@ def seed_reference_data(db: sqlite3.Connection) -> None:
             "account_mt5_short_term_a",
             "venue_mt5",
             "MT5-SHORT-TERM-A",
-            "短线交易员A监控账户",
+            "短线交易员WW监控账户",
             "mt5",
             "live",
             "USD",
@@ -344,7 +373,7 @@ def seed_reference_data(db: sqlite3.Connection) -> None:
             "account_bybit_short_term_w",
             "venue_bybit",
             "BYBIT-SHORT-TERM-B",
-            "短线交易员B历史占位账户",
+            "短线交易员BL历史占位账户",
             "crypto",
             "live",
             "USDT",
@@ -384,6 +413,25 @@ def seed_reference_data(db: sqlite3.Connection) -> None:
                 created_at,
             ),
         )
+
+    db.execute(
+        """
+        UPDATE accounts
+        SET name = CASE id
+            WHEN 'account_mt5_short_term_a' THEN '短线交易员WW监控账户'
+            WHEN 'account_bybit_short_term_w' THEN '短线交易员BL历史占位账户'
+            ELSE name
+        END
+        WHERE id IN ('account_mt5_short_term_a', 'account_bybit_short_term_w')
+        """
+    )
+    db.execute(
+        """
+        UPDATE accounts
+        SET base_currency = 'USD'
+        WHERE id = 'account_bybit_bottom_fishing'
+        """
+    )
 
     for account_id, currency, available_balance in (
         ("account_crypto_test", "USDT", "100000"),

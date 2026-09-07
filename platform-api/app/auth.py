@@ -343,6 +343,8 @@ def permission_for_request(method: str, path: str) -> str:
         return "trading.write"
     if path.endswith("/trading/cross-spread/lifecycle/open"):
         return "trading.write"
+    if normalized_method == "PATCH" and "/trading/cross-spread/exit-plans/" in path:
+        return "trading.write"
     if "/trading/cross-spread/exit-plans/" in path and path.endswith("/close"):
         return "trading.write"
     if path.endswith("/trading/cross-spread/exit-plans/evaluate"):
@@ -399,8 +401,13 @@ def has_ceo_trade_authority(principal: Principal, settings: Settings) -> bool:
 
 async def requires_ceo_trade_authority(request: Request) -> bool:
     """Classify privileged strategy writes without trusting a client route choice."""
-    if request.method.upper() != "POST":
+    if request.method.upper() not in {"POST", "PATCH"}:
         return False
+    if (
+        request.method.upper() == "PATCH"
+        and request.url.path.startswith("/api/v1/trading/cross-spread/exit-plans/")
+    ):
+        return True
     if request.url.path in CEO_TRADE_WRITE_PATHS:
         return True
     if request.url.path.startswith("/api/v1/strategies/") and request.url.path.endswith(

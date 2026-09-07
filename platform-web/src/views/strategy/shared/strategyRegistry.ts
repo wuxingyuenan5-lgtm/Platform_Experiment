@@ -76,8 +76,8 @@ export const strategyRegistry: readonly StrategyManifest[] = [
   },
   {
     id: 'shortLineTraderL',
-    name: '短线交易员A',
-    shortName: '短线交易员A',
+    name: '短线交易员WW',
+    shortName: '短线交易员WW',
     category: 'intraday',
     order: 50,
     platform: { enabled: false, analysis: false, execution: false },
@@ -86,8 +86,8 @@ export const strategyRegistry: readonly StrategyManifest[] = [
   },
   {
     id: 'shortLineTraderW',
-    name: '短线交易员B',
-    shortName: '短线交易员B',
+    name: '短线交易员BL',
+    shortName: '短线交易员BL',
     category: 'intraday',
     order: 60,
     platform: { enabled: false, analysis: false, execution: false },

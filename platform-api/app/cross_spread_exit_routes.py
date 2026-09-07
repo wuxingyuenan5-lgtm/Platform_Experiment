@@ -7,11 +7,12 @@ from contextlib import asynccontextmanager
 from fastapi import APIRouter, FastAPI, Query
 
 from app.config import get_settings
-from app.cross_spread_exit_repository import list_exit_plans
+from app.cross_spread_exit_repository import list_exit_plans, update_exit_plan_settings
 from app.cross_spread_exit_schemas import (
     CrossSpreadCloseResult,
     CrossSpreadExitEvaluationResponse,
     CrossSpreadExitPlanResponse,
+    CrossSpreadExitPlanUpdateRequest,
     CrossSpreadMarketCloseRequest,
     CrossSpreadMarketOpenRequest,
     CrossSpreadOpenResult,
@@ -66,6 +67,32 @@ def exit_plans(
     status: str | None = Query(default=None),
 ) -> list[CrossSpreadExitPlanResponse]:
     return list_exit_plans(status=status)
+
+
+@router.patch(
+    "/exit-plans/{plan_id}",
+    response_model=CrossSpreadExitPlanResponse,
+    tags=["trading"],
+)
+def update_exit_plan(
+    plan_id: str,
+    request: CrossSpreadExitPlanUpdateRequest,
+) -> CrossSpreadExitPlanResponse:
+    return update_exit_plan_settings(
+        plan_id,
+        take_profit_spread=request.take_profit_spread,
+        stop_loss_spread=request.stop_loss_spread,
+        take_profit_execution_mode=request.take_profit_execution_mode,
+        stop_loss_execution_mode=request.stop_loss_execution_mode,
+        take_profit_limit_strategy=request.take_profit_limit_strategy,
+        stop_loss_limit_strategy=request.stop_loss_limit_strategy,
+        update_take_profit="take_profit_spread" in request.model_fields_set,
+        update_stop_loss="stop_loss_spread" in request.model_fields_set,
+        update_take_profit_execution_mode="take_profit_execution_mode" in request.model_fields_set,
+        update_stop_loss_execution_mode="stop_loss_execution_mode" in request.model_fields_set,
+        update_take_profit_limit_strategy="take_profit_limit_strategy" in request.model_fields_set,
+        update_stop_loss_limit_strategy="stop_loss_limit_strategy" in request.model_fields_set,
+    )
 
 
 @router.post(

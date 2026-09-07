@@ -102,8 +102,8 @@ Data Transfer Object。描述 API、外部系统、导入文件或 Mock 的传�
 | 跨所价差 | `crossSpread` |
 | 海内外价差 | `domesticOverseas` |
 | 抄底 | `dip` |
-| 短线交易员 L | `shortLineTraderL` |
-| 短线交易员 W | `shortLineTraderW` |
+| 短线交易员 WW | `shortLineTraderL` |
+| 短线交易员 BL | `shortLineTraderW` |
 
 ### StrategyDefinition／策略定义
 
@@ -127,7 +127,7 @@ Data Transfer Object。描述 API、外部系统、导入文件或 Mock 的传�
 
 ### 非平台执行策略
 
-不通过当前交易平台下单，但进入策略管理的策略：抄底、短线交易员 L、短线交易员 W。
+不通过当前交易平台下单，但进入策略管理的策略：抄底、短线交易员 WW、短线交易员 BL。
 
 ### 纳管策略
 
@@ -496,7 +496,7 @@ Maker 是操作发起人，Checker 是独立复核人。需要双人复核时，
 - 风险管理，不使用“风控管理”作为正文一级模块名称。
 - 金融AI分析，不使用“金融AI”作为一级模块正式名称。
 - 资费套利，不在正式策略名称中改写为“资金费率套利”。
-- 短线交易员 L／W，不使用未确认的 A／B 命名。
+- 短线交易员 WW／BL 是当前确认的展示名称；内部键 `shortLineTraderL`／`shortLineTraderW` 保持不变。
 - ExecutionBatch 表示执行批次。
 - Fill 表示实际成交。
 - ExecutionBalanceStatus 表示执行配平状态。

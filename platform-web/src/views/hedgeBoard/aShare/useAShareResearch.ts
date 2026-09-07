@@ -2,6 +2,7 @@ import { message } from 'ant-design-vue';
 import { computed, onMounted, ref, watch } from 'vue';
 import {
   getAShareDashboard,
+  refreshAShareResearch,
   getStockSnapshot,
   type AShareDashboardResponse,
   type StockSnapshotResponse,
@@ -44,9 +45,6 @@ export function useAShareResearch() {
   const dashboard = ref<AShareDashboardResponse | null>(null);
   const dashboardLoading = ref(false);
   const dashboardError = ref('');
-  const thresholdYuan = ref(10_000_000_000);
-  const customThresholdYi = ref(100);
-  const thresholdMode = ref<'50' | '100' | '200' | 'custom'>('100');
 
   const stockCode = ref('');
   const stockSnapshot = ref<StockSnapshotResponse | null>(null);
@@ -79,13 +77,13 @@ export function useAShareResearch() {
     return Array.from(groups.entries()).map(([name, items]) => ({ name, items }));
   });
 
-  async function loadDashboard() {
+  async function loadDashboard(force = false) {
     const requestSequence = ++dashboardRequestSequence;
-    const requestedThreshold = thresholdYuan.value;
     dashboardLoading.value = true;
     dashboardError.value = '';
     try {
-      const result = await getAShareDashboard(requestedThreshold);
+      if (force) await refreshAShareResearch();
+      const result = await getAShareDashboard();
       if (requestSequence !== dashboardRequestSequence) return false;
       dashboard.value = result;
       return true;
@@ -235,28 +233,6 @@ export function useAShareResearch() {
     queueWatchlistSync();
   }
 
-  async function applyThresholdMode() {
-    const thresholds = { '50': 50, '100': 100, '200': 200 } as const;
-    const rawYi =
-      thresholdMode.value === 'custom' ? customThresholdYi.value : thresholds[thresholdMode.value];
-    const yi = Number(rawYi);
-    if (!Number.isFinite(yi) || yi <= 0) {
-      message.error('请输入大于0的成交额阈值。');
-      return;
-    }
-    const normalizedYi = Math.max(1, yi);
-    if (thresholdMode.value === 'custom') customThresholdYi.value = normalizedYi;
-    thresholdYuan.value = normalizedYi * 100_000_000;
-    const success = await loadDashboard();
-    if (success) {
-      message.success(
-        `已更新：成交额 > ${normalizedYi}亿元，共 ${thresholdStocks.value.length} 只股票。`,
-      );
-    } else {
-      message.error('阈值统计更新失败，已保留上一份有效数据。');
-    }
-  }
-
   function exportThresholdCsv() {
     const rows = thresholdStocks.value;
     if (!rows.length) {
@@ -308,9 +284,8 @@ export function useAShareResearch() {
       message.warning('当前阈值下没有可复制的行业统计。');
       return;
     }
-    const thresholdYi = thresholdYuan.value / 100_000_000;
     const lines = [
-      `口径：个股成交额 > ${thresholdYi}亿元`,
+      '口径：个股成交额 > 100亿元',
       `合计：${thresholdStocks.value.length}只，覆盖${industries.length}个申万二级行业`,
       ...industries.map((item) => `${item.swL1Name} / ${item.swL2Name}：${item.stockCount}只`),
     ];
@@ -338,9 +313,6 @@ export function useAShareResearch() {
     dashboard,
     dashboardLoading,
     dashboardError,
-    thresholdYuan,
-    thresholdMode,
-    customThresholdYi,
     thresholdStocks,
     thresholdIndustries,
     stockCode,
@@ -357,7 +329,6 @@ export function useAShareResearch() {
     removeFromWatchlist,
     moveWatchlistItem,
     setWatchlistGroup,
-    applyThresholdMode,
     exportThresholdCsv,
     copyThresholdSummary,
   };

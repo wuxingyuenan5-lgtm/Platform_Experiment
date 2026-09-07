@@ -24,6 +24,7 @@ from app.schemas import (
     StrategyAccountBindingResponse,
     StrategyAccountSnapshotResponse,
     StrategyDefinitionResponse,
+    StrategyEquityHistoryPointResponse,
     StrategyInstanceResponse,
     StrategyManagementOverviewResponse,
     StrategyNavSnapshotResponse,
@@ -420,6 +421,7 @@ def get_strategy_account_snapshot(
             dataQualityState="unbound",
             asOf=None,
             balance=None,
+            equityHistory=[],
             positions=[],
             orders=[],
             fills=[],
@@ -439,23 +441,28 @@ def get_strategy_account_snapshot(
         ).fetchone()
         balance_row = db.execute(
             """
-            SELECT id, account_id, currency, equity, available_balance, source,
-                   data_quality_state, as_of
+            SELECT balance_snapshots.id, balance_snapshots.account_id,
+                   balance_snapshots.currency, balance_snapshots.equity,
+                   balance_snapshots.available_balance, balance_snapshots.source,
+                   balance_snapshots.data_quality_state, balance_snapshots.as_of
             FROM balance_snapshots
-            WHERE account_id = ?
-            ORDER BY as_of DESC
+            JOIN accounts a ON a.id = balance_snapshots.account_id
+            WHERE balance_snapshots.account_id = ?
+              AND upper(balance_snapshots.currency) = upper(a.base_currency)
+            ORDER BY balance_snapshots.as_of DESC, balance_snapshots.id ASC
             LIMIT 1
             """,
             (binding.account_id,),
         ).fetchone()
-        pnl_rows = db.execute(
+        strategy_activity = db.execute(
             """
-            SELECT realized_pnl, trading_pnl, fees
-            FROM pnl_results
-            WHERE account_id = ?
+            SELECT 1
+            FROM trade_commands
+            WHERE strategy_instance_id = ? AND account_id = ?
+            LIMIT 1
             """,
-            (binding.account_id,),
-        ).fetchall()
+            (strategy_instance_id, binding.account_id),
+        ).fetchone()
         risk_row = db.execute(
             """
             SELECT account_id, as_of, currency, equity, margin, free_margin, margin_level,
@@ -467,21 +474,80 @@ def get_strategy_account_snapshot(
             """,
             (binding.account_id,),
         ).fetchone()
+        risk_history_rows = db.execute(
+            """
+            SELECT as_of, currency, equity
+            FROM (
+                SELECT as_of, currency, equity
+                FROM account_risk_snapshots
+                WHERE account_id = ?
+                  AND equity IS NOT NULL
+                  AND upper(currency) = upper(
+                      (
+                          SELECT currency
+                          FROM account_risk_snapshots
+                          WHERE account_id = ?
+                          ORDER BY as_of DESC
+                          LIMIT 1
+                      )
+                  )
+                ORDER BY as_of DESC
+                LIMIT 1000
+            )
+            ORDER BY as_of ASC
+            """,
+            (binding.account_id, binding.account_id),
+        ).fetchall()
+        history_rows = db.execute(
+            """
+            SELECT as_of, currency, equity
+            FROM balance_snapshots
+            WHERE account_id = ?
+            ORDER BY as_of ASC
+            """,
+            (binding.account_id,),
+        ).fetchall()
 
-    balance = (
-        BalanceSnapshotResponse(
-            snapshotId=balance_row["id"],
-            accountId=balance_row["account_id"],
-            currency=balance_row["currency"],
-            equity=Decimal(balance_row["equity"]),
-            availableBalance=Decimal(balance_row["available_balance"]),
-            source=balance_row["source"],
-            dataQualityState=balance_row["data_quality_state"],
-            asOf=balance_row["as_of"],
+    account = get_account(binding.account_id)
+    sync_status = str(sync_row["status"]) if sync_row is not None else None
+    snapshot_usable = sync_status in {None, "ready"}
+    display_risk_row = risk_row if snapshot_usable else None
+    if display_risk_row is not None and display_risk_row["equity"] is not None:
+        balance = BalanceSnapshotResponse(
+            snapshotId=f"risk:{binding.account_id}:{display_risk_row['as_of']}",
+            accountId=binding.account_id,
+            currency=account.base_currency,
+            equity=Decimal(str(display_risk_row["equity"])),
+            availableBalance=Decimal(str(display_risk_row["free_margin"] or "0")),
+            source="account_risk",
+            dataQualityState=display_risk_row["data_quality_state"],
+            asOf=display_risk_row["as_of"],
         )
-        if balance_row is not None
-        else None
+    else:
+        balance = (
+            get_latest_balance(binding.account_id)
+            if balance_row is not None and snapshot_usable
+            else None
+        )
+    history_source = (
+        risk_history_rows
+        if snapshot_usable and risk_history_rows
+        else (
+            [
+                row
+                for row in history_rows
+                if str(row["currency"]).upper() == account.base_currency.upper()
+            ]
+            if snapshot_usable
+            else []
+        )
     )
+    equity_history = [
+        StrategyEquityHistoryPointResponse(
+            asOf=row["as_of"], equity=Decimal(str(row["equity"]))
+        )
+        for row in history_source
+    ]
     positions = [
         PositionResponse(
             accountId=row["account_id"],
@@ -491,50 +557,54 @@ def get_strategy_account_snapshot(
         )
         for row in list_positions(binding.account_id)
     ]
-    orders = [item for item in list_orders() if item.account_id == binding.account_id]
-    fills = [item for item in list_fills() if item.account_id == binding.account_id]
+    with connection() as db:
+        strategy_order_ids = {
+            str(row["id"])
+            for row in db.execute(
+                """
+                SELECT o.id
+                FROM trade_commands tc
+                JOIN orders o ON o.command_id = tc.id
+                WHERE tc.strategy_instance_id = ? AND tc.account_id = ?
+                """,
+                (strategy_instance_id, binding.account_id),
+            ).fetchall()
+        }
+    orders = [item for item in list_orders() if item.order_id in strategy_order_ids]
+    fills = [item for item in list_fills() if item.order_id in strategy_order_ids]
+    strategy_pnl = get_strategy_pnl(strategy_instance_id) if strategy_activity else None
     pnl = (
         PnlResponse(
             accountId=binding.account_id,
-            instrumentId="account_total",
-            # SQLite's SUM can coerce DECIMAL text through binary float. Keep
-            # financial aggregation in Decimal from the persisted strings.
-            realizedPnl=sum((Decimal(row["realized_pnl"]) for row in pnl_rows), Decimal("0")),
-            tradingPnl=sum((Decimal(row["trading_pnl"]) for row in pnl_rows), Decimal("0")),
-            fees=sum((Decimal(row["fees"]) for row in pnl_rows), Decimal("0")),
+            instrumentId="strategy_total",
+            realizedPnl=strategy_pnl.realized_pnl,
+            tradingPnl=strategy_pnl.trading_pnl,
+            fees=strategy_pnl.fees,
         )
-        if pnl_rows
+        if strategy_pnl is not None
         else None
     )
     account_risk = (
         AccountRiskSnapshotResponse(
-            accountId=risk_row["account_id"],
-            currency=risk_row["currency"],
-            equity=optional_decimal(risk_row["equity"]),
-            margin=optional_decimal(risk_row["margin"]),
-            freeMargin=optional_decimal(risk_row["free_margin"]),
-            marginLevel=optional_decimal(risk_row["margin_level"]),
-            dataQualityState=risk_row["data_quality_state"],
-            asOf=risk_row["as_of"],
+            accountId=display_risk_row["account_id"],
+            currency=display_risk_row["currency"],
+            equity=optional_decimal(display_risk_row["equity"]),
+            margin=optional_decimal(display_risk_row["margin"]),
+            freeMargin=optional_decimal(display_risk_row["free_margin"]),
+            marginLevel=optional_decimal(display_risk_row["margin_level"]),
+            dataQualityState=display_risk_row["data_quality_state"],
+            asOf=display_risk_row["as_of"],
         )
-        if risk_row is not None
+        if display_risk_row is not None
         else None
     )
-    sync_status = str(sync_row["status"]) if sync_row is not None else "waiting_initial_sync"
+    sync_status = sync_status or "waiting_initial_sync"
     sync_error = (
         str(sync_row["error_code"])
         if sync_row is not None and sync_row["error_code"]
         else None
     )
-    quality = (
-        balance.data_quality_state
-        if balance is not None
-        else (
-            sync_status
-            if sync_status in {"unbound", "waiting_initial_sync", "syncing", "stale"}
-            else "unavailable"
-        )
-    )
+    quality = balance.data_quality_state if balance is not None else sync_status
     return StrategyAccountSnapshotResponse(
         strategyInstanceId=strategy_instance_id,
         accountId=binding.account_id,
@@ -547,6 +617,7 @@ def get_strategy_account_snapshot(
             else (account_risk.as_of if account_risk is not None else None)
         ),
         balance=balance,
+        equityHistory=equity_history,
         accountRisk=account_risk,
         positions=positions,
         orders=orders,
@@ -609,52 +680,29 @@ def account_from_row(row) -> AccountResponse:
 def get_latest_balance(account_id: str) -> BalanceSnapshotResponse:
     account = get_account(account_id)
     with connection() as db:
-        latest = db.execute(
-            """
-            SELECT as_of
-            FROM balance_snapshots
-            WHERE account_id = ?
-            ORDER BY as_of DESC
-            LIMIT 1
-            """,
-            (account_id,),
-        ).fetchone()
-        if latest is None:
-            raise HTTPException(status_code=404, detail="Balance snapshot not found")
-        rows = db.execute(
+        row = db.execute(
             """
             SELECT id, account_id, currency, equity, available_balance, source,
                    data_quality_state, as_of
             FROM balance_snapshots
-            WHERE account_id = ? AND as_of = ?
-            ORDER BY id ASC
+            WHERE account_id = ?
+              AND upper(currency) = upper(?)
+            ORDER BY as_of DESC, id ASC
+            LIMIT 1
             """,
-            (account_id, latest["as_of"]),
-        ).fetchall()
-    if not rows:
+            (account_id, account.base_currency),
+        ).fetchone()
+    if row is None:
         raise HTTPException(status_code=404, detail="Balance snapshot not found")
-    representative = rows[0]
-    currencies = {str(row["currency"]) for row in rows if row["currency"]}
-    equity = sum((Decimal(str(row["equity"])) for row in rows), Decimal("0"))
-    available_balance = max(
-        (Decimal(str(row["available_balance"])) for row in rows),
-        default=Decimal("0"),
-    )
-    data_quality_state = (
-        "partial"
-        if any(str(row["data_quality_state"]) != "complete" for row in rows)
-        else str(representative["data_quality_state"])
-    )
-    currency = next(iter(currencies)) if len(currencies) == 1 else account.base_currency
     return BalanceSnapshotResponse(
-        snapshotId=representative["id"],
-        accountId=representative["account_id"],
-        currency=currency,
-        equity=equity,
-        availableBalance=available_balance,
-        source=representative["source"],
-        dataQualityState=data_quality_state,
-        asOf=representative["as_of"],
+        snapshotId=row["id"],
+        accountId=row["account_id"],
+        currency=row["currency"],
+        equity=Decimal(str(row["equity"])),
+        availableBalance=Decimal(str(row["available_balance"])),
+        source=row["source"],
+        dataQualityState=row["data_quality_state"],
+        asOf=row["as_of"],
     )
 
 
@@ -873,16 +921,30 @@ def trade_command_from_row(row) -> TradeCommandResponse:
     )
 
 
-def list_orders() -> list[OrderDetailResponse]:
+def list_orders(strategy_instance_id: str | None = None) -> list[OrderDetailResponse]:
     with connection() as db:
-        rows = db.execute(
-            """
-            SELECT id, command_id, account_id, instrument_id, symbol, side, order_type,
-                   quantity, price, status, external_order_id, created_at, updated_at
-            FROM orders
-            ORDER BY created_at DESC
-            """
-        ).fetchall()
+        if strategy_instance_id:
+            rows = db.execute(
+                """
+                SELECT o.id, o.command_id, o.account_id, o.instrument_id, o.symbol, o.side,
+                       o.order_type, o.quantity, o.price, o.status, o.external_order_id,
+                       o.created_at, o.updated_at
+                FROM orders o
+                JOIN trade_commands tc ON tc.id = o.command_id
+                WHERE tc.strategy_instance_id = ?
+                ORDER BY o.created_at DESC
+                """,
+                (strategy_instance_id,),
+            ).fetchall()
+        else:
+            rows = db.execute(
+                """
+                SELECT id, command_id, account_id, instrument_id, symbol, side, order_type,
+                       quantity, price, status, external_order_id, created_at, updated_at
+                FROM orders
+                ORDER BY created_at DESC
+                """
+            ).fetchall()
     return [order_from_row(row) for row in rows]
 
 
@@ -920,15 +982,29 @@ def order_from_row(row) -> OrderDetailResponse:
     )
 
 
-def list_fills() -> list[FillResponse]:
+def list_fills(strategy_instance_id: str | None = None) -> list[FillResponse]:
     with connection() as db:
-        rows = db.execute(
-            """
-            SELECT id, order_id, account_id, instrument_id, side, quantity, price, occurred_at
-            FROM fills
-            ORDER BY occurred_at DESC
-            """
-        ).fetchall()
+        if strategy_instance_id:
+            rows = db.execute(
+                """
+                SELECT f.id, f.order_id, f.account_id, f.instrument_id, f.side,
+                       f.quantity, f.price, f.occurred_at
+                FROM fills f
+                JOIN orders o ON o.id = f.order_id
+                JOIN trade_commands tc ON tc.id = o.command_id
+                WHERE tc.strategy_instance_id = ?
+                ORDER BY f.occurred_at DESC
+                """,
+                (strategy_instance_id,),
+            ).fetchall()
+        else:
+            rows = db.execute(
+                """
+                SELECT id, order_id, account_id, instrument_id, side, quantity, price, occurred_at
+                FROM fills
+                ORDER BY occurred_at DESC
+                """
+            ).fetchall()
     return [
         FillResponse(
             fillId=row["id"],

@@ -370,7 +370,7 @@
     {
       id: 'R-260711-08',
       time: '2026-07-11 22:18:39',
-      target: '短线交易员A',
+      target: '短线交易员WW',
       event: '单品种集中度短时超过 30%',
       severity: 'medium',
       status: 'done',

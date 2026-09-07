@@ -88,7 +88,7 @@
           <component :is="widgetErrorBoundary" :widget-title="widget.title">
             <div v-if="widget.kind === 'external-link'" class="external-reference-card">
               <p>{{ widget.subtitle }}</p>
-              <span>点击右上角“参考网页”打开完整工具</span>
+              <span>点击卡片右上角“参考网页”打开完整工具</span>
             </div>
             <component
               :is="localChartWidget"

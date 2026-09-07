@@ -278,6 +278,109 @@ def configure_exit_plan_execution_modes(
     return get_exit_plan(plan_id)
 
 
+def update_exit_plan_settings(
+    plan_id: str,
+    *,
+    take_profit_spread: Decimal | None = None,
+    stop_loss_spread: Decimal | None = None,
+    take_profit_execution_mode: ExecutionMode | None = None,
+    stop_loss_execution_mode: ExecutionMode | None = None,
+    take_profit_limit_strategy: LimitStrategy | None = None,
+    stop_loss_limit_strategy: LimitStrategy | None = None,
+    update_take_profit: bool = False,
+    update_stop_loss: bool = False,
+    update_take_profit_execution_mode: bool = False,
+    update_stop_loss_execution_mode: bool = False,
+    update_take_profit_limit_strategy: bool = False,
+    update_stop_loss_limit_strategy: bool = False,
+) -> CrossSpreadExitPlanResponse:
+    if not any(
+        (
+            update_take_profit,
+            update_stop_loss,
+            update_take_profit_execution_mode,
+            update_stop_loss_execution_mode,
+            update_take_profit_limit_strategy,
+            update_stop_loss_limit_strategy,
+        )
+    ):
+        raise HTTPException(status_code=422, detail="At least one exit setting must be provided")
+
+    current = get_exit_plan(plan_id)
+    if current.status != "active":
+        raise HTTPException(status_code=409, detail="Only active exit plans can be updated")
+
+    next_take_profit = take_profit_spread if update_take_profit else current.take_profit_spread
+    next_stop_loss = stop_loss_spread if update_stop_loss else current.stop_loss_spread
+    next_take_profit_execution_mode = (
+        take_profit_execution_mode
+        if update_take_profit_execution_mode
+        else current.take_profit_execution_mode
+    )
+    next_stop_loss_execution_mode = (
+        stop_loss_execution_mode
+        if update_stop_loss_execution_mode
+        else current.stop_loss_execution_mode
+    )
+    next_take_profit_limit_strategy = (
+        take_profit_limit_strategy
+        if update_take_profit_limit_strategy
+        else current.take_profit_limit_strategy
+    )
+    next_stop_loss_limit_strategy = (
+        stop_loss_limit_strategy
+        if update_stop_loss_limit_strategy
+        else current.stop_loss_limit_strategy
+    )
+    if next_take_profit is not None and next_stop_loss is not None:
+        if current.direction == "LONG_SPREAD" and next_take_profit <= next_stop_loss:
+            raise HTTPException(
+                status_code=422,
+                detail="LONG_SPREAD take-profit exit spread must be above stop-loss exit spread",
+            )
+        if current.direction == "SHORT_SPREAD" and next_take_profit >= next_stop_loss:
+            raise HTTPException(
+                status_code=422,
+                detail="SHORT_SPREAD take-profit exit spread must be below stop-loss exit spread",
+            )
+
+    if (
+        next_take_profit == current.take_profit_spread
+        and next_stop_loss == current.stop_loss_spread
+        and next_take_profit_execution_mode == current.take_profit_execution_mode
+        and next_stop_loss_execution_mode == current.stop_loss_execution_mode
+        and next_take_profit_limit_strategy == current.take_profit_limit_strategy
+        and next_stop_loss_limit_strategy == current.stop_loss_limit_strategy
+    ):
+        return current
+
+    updated_at = now_iso()
+    with connection() as db:
+        cursor = db.execute(
+            """
+            UPDATE cross_spread_exit_plans
+            SET take_profit_spread = ?, stop_loss_spread = ?,
+                take_profit_execution_mode = ?, stop_loss_execution_mode = ?,
+                take_profit_limit_strategy = ?, stop_loss_limit_strategy = ?,
+                updated_at = ?
+            WHERE id = ? AND status = 'active'
+            """,
+            (
+                format(next_take_profit, "f") if next_take_profit is not None else "",
+                format(next_stop_loss, "f") if next_stop_loss is not None else "",
+                next_take_profit_execution_mode,
+                next_stop_loss_execution_mode,
+                next_take_profit_limit_strategy,
+                next_stop_loss_limit_strategy,
+                updated_at,
+                plan_id,
+            ),
+        )
+    if cursor.rowcount != 1:
+        raise HTTPException(status_code=409, detail="Exit plan changed concurrently")
+    return get_exit_plan(plan_id)
+
+
 def get_exit_plan(plan_id: str) -> CrossSpreadExitPlanResponse:
     with connection() as db:
         row = db.execute(_plan_query("id = ?"), (plan_id,)).fetchone()

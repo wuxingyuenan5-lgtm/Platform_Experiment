@@ -577,7 +577,7 @@ export const strategyCapitalProfiles = {
         label: '账户净值',
         value: '6,842,190.50',
         unit: 'CNY',
-        note: '短线交易员A总账户',
+        note: '短线交易员WW总账户',
         tone: 'neutral',
       },
       {
@@ -635,7 +635,7 @@ export const strategyCapitalProfiles = {
       { label: '保护单覆盖', value: '73%', note: '仍需继续补齐', tone: 'negative' },
     ],
     curve: {
-      title: '短线交易员A账户净值曲线',
+      title: '短线交易员WW账户净值曲线',
       subtitle: '统一保留净值与回撤，并支持按品类切换观察。',
       metricOptions: [
         { key: 'total', label: '总账户' },
@@ -674,7 +674,7 @@ export const strategyCapitalProfiles = {
       [1.02, 1.04, 1.03, 1.05, 1.08, 1.09, 1.07, 1.08, 1.1, 1.11],
     ),
     specialRulePanel: {
-      title: '短线交易员A专属风控规则',
+      title: '短线交易员WW专属风控规则',
       status: '正常',
       statusNote: '当前未进入停手或冷静期，规则内容未来可动态调整。',
       tone: 'positive',
@@ -718,16 +718,16 @@ strategyCapitalProfiles.shortLineTraderW = JSON.parse(
 strategyCapitalProfiles.shortLineTraderW.overview =
   strategyCapitalProfiles.shortLineTraderW.overview.map((item) => ({
     ...item,
-    note: item.note.replaceAll('短线交易员A', '短线交易员B'),
+    note: item.note.replaceAll('短线交易员WW', '短线交易员BL'),
   }));
 strategyCapitalProfiles.shortLineTraderW.overview[0] = {
   ...strategyCapitalProfiles.shortLineTraderW.overview[0],
-  note: '短线交易员B总账户',
+  note: '短线交易员BL总账户',
 };
 strategyCapitalProfiles.shortLineTraderW.curve = {
   ...strategyCapitalProfiles.shortLineTraderW.curve,
-  title: '短线交易员B账户净值曲线',
+  title: '短线交易员BL账户净值曲线',
 };
 if (strategyCapitalProfiles.shortLineTraderW.specialRulePanel) {
-  strategyCapitalProfiles.shortLineTraderW.specialRulePanel.title = '短线交易员B专属风控规则';
+  strategyCapitalProfiles.shortLineTraderW.specialRulePanel.title = '短线交易员BL专属风控规则';
 }

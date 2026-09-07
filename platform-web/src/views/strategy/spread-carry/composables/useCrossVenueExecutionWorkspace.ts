@@ -12,6 +12,7 @@ import type {
 } from '@/api/platform/trading.types';
 import type {
   CrossSpreadExecutionMode,
+  CrossSpreadExitPlanThresholdUpdateInput,
   CrossSpreadLimitStrategy,
 } from '@/api/platform/crossSpreadLifecycle';
 
@@ -70,7 +71,12 @@ export function useCrossVenueExecutionWorkspace() {
   const takeProfitSpreadInput = ref(formatEditableNumber(takeProfitSpread.value));
   const stopLossSpreadInput = ref(formatEditableNumber(stopLossSpread.value));
   const closeLimitSpreadInput = ref(formatEditableNumber(closeLimitSpread.value));
-  const { exitPlans, refreshExitPlans: loadExitPlans, upsertExitPlan } = useCrossSpreadExitPlans();
+  const {
+    exitPlans,
+    refreshExitPlans: loadExitPlans,
+    updateExitPlanThresholds: persistExitPlanThresholds,
+    upsertExitPlan,
+  } = useCrossSpreadExitPlans();
   const tradingRuleRows = CROSS_SPREAD_TRADING_RULE_ROWS;
   const openDirection = ref<'long' | 'short'>('long');
   const snapshot = ref<CrossSpreadSnapshotResult | null>(null);
@@ -267,6 +273,36 @@ export function useCrossVenueExecutionWorkspace() {
     }
   }
 
+  function isPageVisible() {
+    return typeof document === 'undefined' || document.visibilityState === 'visible';
+  }
+
+  function stopSnapshotPolling() {
+    if (snapshotTimer) {
+      window.clearInterval(snapshotTimer);
+      snapshotTimer = undefined;
+    }
+  }
+
+  function startSnapshotPolling() {
+    stopSnapshotPolling();
+    if (!isPageVisible()) return;
+    snapshotTimer = window.setInterval(() => {
+      void refreshSnapshot();
+      void refreshObservability();
+    }, 15_000);
+  }
+
+  function handleVisibilityChange() {
+    if (!isPageVisible()) {
+      stopSnapshotPolling();
+      return;
+    }
+    void refreshSnapshot();
+    void refreshObservability();
+    startSnapshotPolling();
+  }
+
   async function refreshInstruments() {
     try {
       instruments.value = await getInstruments();
@@ -332,6 +368,18 @@ export function useCrossVenueExecutionWorkspace() {
     return errorMessage;
   }
 
+  async function updateExitPlanThresholds(
+    planId: string,
+    input: CrossSpreadExitPlanThresholdUpdateInput,
+  ): Promise<void> {
+    const errorMessage = await persistExitPlanThresholds(planId, input);
+    if (errorMessage) {
+      setExecutionMessage(errorMessage, 'is-error');
+      throw new Error(errorMessage);
+    }
+    setExecutionMessage('止盈止损已更新；本次操作未触发平仓。', 'is-success');
+  }
+
   onMounted(async () => {
     await Promise.all([
       refreshInstruments(),
@@ -342,14 +390,13 @@ export function useCrossVenueExecutionWorkspace() {
       refreshObservability(),
       refreshSnapshot(),
     ]);
-    snapshotTimer = window.setInterval(() => {
-      void refreshSnapshot();
-      void refreshObservability();
-    }, 15_000);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    startSnapshotPolling();
   });
 
   onUnmounted(() => {
-    if (snapshotTimer) window.clearInterval(snapshotTimer);
+    stopSnapshotPolling();
+    document.removeEventListener('visibilitychange', handleVisibilityChange);
   });
 
   function latencyMs(value: string | null | undefined) {
@@ -412,5 +459,6 @@ export function useCrossVenueExecutionWorkspace() {
     tradingRuleRows,
     triggerSpreadInput,
     usdtUsdText,
+    updateExitPlanThresholds,
   };
 }

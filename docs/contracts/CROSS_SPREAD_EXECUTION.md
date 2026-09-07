@@ -116,6 +116,8 @@ takeProfitLimitStrategy = fok | post_only_chase
 stopLossLimitStrategy   = fok | post_only_chase
 ```
 
+对仍处于 `active` 的 Exit Plan，CEO 可在持仓总览中补充或修改 `takeProfitSpread`、`stopLossSpread`，以及各自的 `market | limit` 执行方式和 Limit 策略。更新只改变该计划后续触发的设置，不创建 Close Action、不改变已持久化的开仓事实，也不会立即向 Venue 提交订单；`triggered`、`closing`、`manual_intervention` 与 `closed` 计划不可编辑。两项阈值同时存在时，Long 的 TP 必须高于 SL，Short 的 TP 必须低于 SL。触发平仓针对计划的当前剩余数量；人工部分平仓后，原计划以剩余数量继续保持 `active` 并沿用该设置。
+
 迁移规则：
 
 - 旧计划保留 `market / market`；

@@ -4,6 +4,7 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 
+import app.auth as auth_module
 from app.auth import permission_for_request
 from app.config import get_settings
 from app.main import app
@@ -146,6 +147,24 @@ def test_strategy_market_commands_use_ceo_browser_permission_boundary() -> None:
         )
         == "trading.write"
     )
+    assert (
+        permission_for_request(
+            "PATCH", "/api/v1/trading/cross-spread/exit-plans/plan-1"
+        )
+        == "trading.write"
+    )
+
+
+def test_live_api_admin_cannot_edit_cross_exit_thresholds(monkeypatch, tmp_path: Path) -> None:
+    configure_live_auth(monkeypatch, tmp_path)
+    with TestClient(app) as client:
+        response = client.patch(
+            "/api/v1/trading/cross-spread/exit-plans/plan-1",
+            headers=auth_headers("admin-token"),
+            json={"takeProfitSpread": "1"},
+        )
+
+    assert_auth_error(response, status_code=403, code="ceo_trade_authority_required")
 
 
 def test_instruction_post_uses_strategy_permission_and_ceo_trade_boundary() -> None:
@@ -185,6 +204,84 @@ def test_live_api_admin_cannot_bypass_funding_gate_through_generic_command(
         permission_for_request("POST", "/api/v1/trading/cross-spread/market-command")
         == "trading.write"
     )
+
+
+def test_controlled_strategies_reject_public_legacy_write_bypasses(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    configure_live_auth(monkeypatch, tmp_path)
+    monkeypatch.setattr(auth_module, "has_ceo_trade_authority", lambda *_: True)
+    with TestClient(app) as client:
+        command = client.post(
+            "/api/v1/trading/commands",
+            headers=auth_headers("admin-token"),
+            json={
+                "idempotencyKey": "controlled-generic-command",
+                "strategyInstanceId": "strategy_cross_venue_spread_instance_default",
+                "accountId": "account_sim_usdt",
+                "instrumentId": "instrument_btc_usdt",
+                "symbol": "BTCUSDT",
+                "side": "buy",
+                "orderType": "market",
+                "quantity": "1",
+            },
+        )
+        raw_order = client.post(
+            "/api/v1/trading/orders",
+            headers=auth_headers("admin-token"),
+            json={
+                "accountId": "account_sim_usdt",
+                "instrumentId": "instrument_btc_usdt",
+                "symbol": "BTCUSDT",
+                "side": "buy",
+                "orderType": "market",
+                "quantity": "1",
+            },
+        )
+        instruction = client.post(
+            "/api/v1/strategies/strategy_cross_venue_spread_instance_default/instructions",
+            headers=auth_headers("admin-token"),
+            json={
+                "idempotencyKey": "controlled-generic-instruction",
+                "action": "open",
+                "parameters": {},
+            },
+        )
+        run = client.post(
+            "/api/v1/strategies/instances/strategy_funding_arbitrage_instance_default/runs",
+            headers=auth_headers("admin-token"),
+            json={
+                "idempotencyKey": "controlled-generic-run",
+                "direction": "OPEN",
+                "legs": [
+                    {
+                        "role": "perpetual",
+                        "accountId": "account_sim_usdt",
+                        "instrumentId": "instrument_btc_usdt",
+                        "symbol": "BTCUSDT",
+                        "side": "sell",
+                        "orderType": "market",
+                        "quantity": "0.01",
+                    },
+                    {
+                        "role": "spot",
+                        "accountId": "account_sim_usdt",
+                        "instrumentId": "instrument_btc_usdt",
+                        "symbol": "BTCUSDT",
+                        "side": "buy",
+                        "orderType": "market",
+                        "quantity": "0.01",
+                    },
+                ],
+            },
+        )
+
+    for response in (command, instruction, run):
+        assert response.status_code == 403
+        assert "dedicated" in response.json()["detail"]
+    assert raw_order.status_code == 403
+    assert "deprecated raw order" in raw_order.json()["detail"]
 
 
 def test_live_actor_field_cannot_impersonate_another_user(

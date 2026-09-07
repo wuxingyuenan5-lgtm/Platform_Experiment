@@ -1,6 +1,8 @@
 import { ref } from 'vue';
 import {
   getCrossSpreadExitPlans,
+  updateCrossSpreadExitPlanThresholds,
+  type CrossSpreadExitPlanThresholdUpdateInput,
   type CrossSpreadExitPlanResult,
 } from '@/api/platform/crossSpreadLifecycle';
 
@@ -52,9 +54,23 @@ export function useCrossSpreadExitPlans() {
     }
   }
 
+  async function updateExitPlanThresholds(
+    planId: string,
+    input: CrossSpreadExitPlanThresholdUpdateInput,
+  ) {
+    try {
+      const plan = await updateCrossSpreadExitPlanThresholds(planId, input);
+      upsertExitPlan(plan);
+      return '';
+    } catch (error: unknown) {
+      return resolveError(error, '退出计划更新失败');
+    }
+  }
+
   return {
     exitPlans,
     refreshExitPlans,
+    updateExitPlanThresholds,
     upsertExitPlan,
   };
 }

@@ -333,6 +333,31 @@ function Invoke-LoginSmoke {
   }
 }
 
+function Hide-Mt5Terminals {
+  # Keep both read-only monitoring terminals alive without showing their
+  # application windows.  This hides windows only; it never stops a terminal.
+  if (-not ('VariableGlobal.WindowMinimizer' -as [type])) {
+    Add-Type @'
+using System;
+using System.Runtime.InteropServices;
+namespace VariableGlobal {
+  public static class WindowMinimizer {
+    [DllImport("user32.dll")] public static extern bool ShowWindowAsync(IntPtr hWnd, int nCmdShow);
+  }
+}
+'@
+  }
+  $paths = @(
+    'C:\Program Files\Bybit MT5 Terminal\terminal64.exe',
+    'C:\Users\jiuxi\AppData\Local\VariableGlobal\MT5\account_mt5_short_term_a\terminal64.exe'
+  )
+  foreach ($path in $paths) {
+    Get-Process -Name terminal64 -ErrorAction SilentlyContinue |
+      Where-Object { $_.Path -eq $path -and $_.MainWindowHandle -ne 0 } |
+      ForEach-Object { [VariableGlobal.WindowMinimizer]::ShowWindowAsync($_.MainWindowHandle, 0) | Out-Null }
+  }
+}
+
 function Start-ServiceManaged {
   param([hashtable]$Service)
   $safeName = $Service.Name.ToLowerInvariant().Replace(' ', '-')
@@ -419,6 +444,7 @@ function Start-ManagedServices {
   }
   Write-State $records
   Invoke-LoginSmoke -SeedResult $seedResult
+  Hide-Mt5Terminals
   Write-Host 'Platform local services are ready.' -ForegroundColor Green
   Write-Host 'Execution Runtime: http://127.0.0.1:8100/health'
   Write-Host 'Platform API:      http://127.0.0.1:8000/health'

@@ -30,10 +30,10 @@
       </div>
       <div class="overview-summary__item">
         <span>单边总损益</span>
-        <strong :class="legPnlTone"
-          >BY: {{ formatSignedNumber(legPnlByUsdt) }} | MT5:
-          {{ formatSignedNumber(legPnlMt5Usdt) }}</strong
-        >
+        <strong>
+          BY: <em :class="pnlTone(legPnlByUsdt)">{{ formatSignedNumber(legPnlByUsdt) }}</em> | MT5:
+          <em :class="pnlTone(legPnlMt5Usdt)">{{ formatSignedNumber(legPnlMt5Usdt) }}</em>
+        </strong>
       </div>
       <div class="overview-summary__item">
         <span>单边爆仓价</span>
@@ -65,33 +65,122 @@
         <tr v-if="overviewRows.length === 0">
           <td colspan="15">{{ emptyText }}</td>
         </tr>
-        <tr v-for="row in overviewRows" :key="row.id">
-          <td :class="row.direction === '多头' ? 'green' : 'red'">{{ row.direction }}</td>
-          <td>{{ formatNumber(row.qty, 2) }}</td>
-          <td>{{ row.entrySpread }}</td>
-          <td :class="spreadTone(longSpread)">{{ row.currentSpread }}</td>
-          <td>{{ row.detail }}</td>
-          <td>{{ row.pnl }}</td>
-          <td>{{ row.legPnl }}</td>
-          <td>{{ row.takeProfit }}</td>
-          <td>{{ row.stopLoss }}</td>
-          <td>{{ row.liquidation }}</td>
-          <td>{{ row.margin }}</td>
-          <td>{{ row.openTime }}</td>
-          <td>{{ row.accountRisk }}</td>
-          <td>{{ row.holdingTime }}</td>
-          <td>{{ row.status }}</td>
-        </tr>
+        <template v-for="row in overviewRows" :key="row.id">
+          <tr>
+            <td :class="row.direction === '多头' ? 'green' : 'red'">{{ row.direction }}</td>
+            <td>{{ formatNumber(row.qty, 2) }}</td>
+            <td>{{ row.entrySpread }}</td>
+            <td :class="spreadTone(row.currentSpread)">{{ row.currentSpread }}</td>
+            <td>{{ row.detail }}</td>
+            <td>{{ row.pnl }}</td>
+            <td>{{ row.legPnl }}</td>
+            <td>
+              <button
+                v-if="row.exitPlanId"
+                type="button"
+                class="exit-threshold-button"
+                @click="beginExitPlanEdit(row)"
+              >
+                {{ row.takeProfit }}
+              </button>
+              <span v-else>{{ row.takeProfit }}</span>
+            </td>
+            <td>
+              <button
+                v-if="row.exitPlanId"
+                type="button"
+                class="exit-threshold-button"
+                @click="beginExitPlanEdit(row)"
+              >
+                {{ row.stopLoss }}
+              </button>
+              <span v-else>{{ row.stopLoss }}</span>
+            </td>
+            <td>{{ row.liquidation }}</td>
+            <td>{{ row.margin }}</td>
+            <td>{{ row.openTime }}</td>
+            <td>{{ row.accountRisk }}</td>
+            <td>{{ row.holdingTime }}</td>
+            <td>{{ row.status }}</td>
+          </tr>
+          <tr v-if="editingPlanId === row.exitPlanId" class="exit-threshold-editor-row">
+            <td colspan="15">
+              <form class="exit-threshold-editor" @submit.prevent="saveExitPlanEdit">
+                <strong>修改止盈止损</strong>
+                <label>
+                  止盈价差
+                  <input v-model.trim="takeProfitInput" inputmode="decimal" placeholder="不修改" />
+                </label>
+                <label>
+                  止损价差
+                  <input v-model.trim="stopLossInput" inputmode="decimal" placeholder="不修改" />
+                </label>
+                <label>
+                  止盈执行
+                  <select v-model="takeProfitExecutionMode">
+                    <option value="market">市价</option>
+                    <option value="limit">限价</option>
+                  </select>
+                </label>
+                <label v-if="takeProfitExecutionMode === 'limit'">
+                  止盈限价策略
+                  <select v-model="takeProfitLimitStrategy">
+                    <option value="fok">FOK 全成全撤</option>
+                    <option value="post_only_chase">PostOnly Chase</option>
+                  </select>
+                </label>
+                <label>
+                  止损执行
+                  <select v-model="stopLossExecutionMode">
+                    <option value="market">市价</option>
+                    <option value="limit">限价</option>
+                  </select>
+                </label>
+                <label v-if="stopLossExecutionMode === 'limit'">
+                  止损限价策略
+                  <select v-model="stopLossLimitStrategy">
+                    <option value="fok">FOK 全成全撤</option>
+                    <option value="post_only_chase">PostOnly Chase</option>
+                  </select>
+                </label>
+                <span class="exit-threshold-editor__hint">
+                  触发时针对该计划当前剩余
+                  {{
+                    formatNumber(row.qty, 2)
+                  }}
+                  盎司；手动部分平仓后的剩余数量继续沿用本设置。保存不会立即平仓。
+                </span>
+                <p v-if="saveError" class="exit-threshold-editor__error">{{ saveError }}</p>
+                <button type="button" class="exit-threshold-editor__cancel" @click="cancelEdit">
+                  取消
+                </button>
+                <button type="submit" class="exit-threshold-editor__save" :disabled="saving">
+                  {{ saving ? '保存中…' : '保存' }}
+                </button>
+              </form>
+            </td>
+          </tr>
+        </template>
       </tbody>
     </table>
   </section>
 </template>
 
 <script setup lang="ts">
-  import { computed } from 'vue';
+  import { computed, ref } from 'vue';
+  import type {
+    CrossSpreadExecutionMode,
+    CrossSpreadExitPlanThresholdUpdateInput,
+    CrossSpreadLimitStrategy,
+  } from '@/api/platform/crossSpreadLifecycle';
 
   interface OverviewRow {
     id: string;
+    exitPlanId: string | null;
+    takeProfitExecutionMode: CrossSpreadExecutionMode | null;
+    stopLossExecutionMode: CrossSpreadExecutionMode | null;
+    takeProfitLimitStrategy: CrossSpreadLimitStrategy | null;
+    stopLossLimitStrategy: CrossSpreadLimitStrategy | null;
     direction: string;
     qty: number;
     entrySpread: string;
@@ -114,7 +203,79 @@
     overviewRows: OverviewRow[];
     emptyText: string;
     longSpread: string | number | null | undefined;
+    updateExitPlan: (
+      planId: string,
+      input: CrossSpreadExitPlanThresholdUpdateInput,
+    ) => Promise<void>;
   }>();
+
+  const editingPlanId = ref<string | null>(null);
+  const takeProfitInput = ref('');
+  const stopLossInput = ref('');
+  const takeProfitExecutionMode = ref<CrossSpreadExecutionMode>('market');
+  const stopLossExecutionMode = ref<CrossSpreadExecutionMode>('market');
+  const takeProfitLimitStrategy = ref<CrossSpreadLimitStrategy>('fok');
+  const stopLossLimitStrategy = ref<CrossSpreadLimitStrategy>('fok');
+  const saving = ref(false);
+  const saveError = ref('');
+
+  function editableValue(value: string) {
+    return value === '--' ? '' : value.replace(/,/g, '');
+  }
+
+  function beginExitPlanEdit(row: OverviewRow) {
+    if (!row.exitPlanId || saving.value) return;
+    editingPlanId.value = row.exitPlanId;
+    takeProfitInput.value = editableValue(row.takeProfit);
+    stopLossInput.value = editableValue(row.stopLoss);
+    takeProfitExecutionMode.value = row.takeProfitExecutionMode || 'market';
+    stopLossExecutionMode.value = row.stopLossExecutionMode || 'market';
+    takeProfitLimitStrategy.value = row.takeProfitLimitStrategy || 'fok';
+    stopLossLimitStrategy.value = row.stopLossLimitStrategy || 'fok';
+    saveError.value = '';
+  }
+
+  function cancelEdit() {
+    if (saving.value) return;
+    editingPlanId.value = null;
+    takeProfitInput.value = '';
+    stopLossInput.value = '';
+    saveError.value = '';
+  }
+
+  function validThreshold(value: string) {
+    if (!value) return undefined;
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? value : null;
+  }
+
+  async function saveExitPlanEdit() {
+    const planId = editingPlanId.value;
+    if (!planId || saving.value) return;
+    const takeProfitSpread = validThreshold(takeProfitInput.value);
+    const stopLossSpread = validThreshold(stopLossInput.value);
+    if (takeProfitSpread === null || stopLossSpread === null) return;
+    const update: CrossSpreadExitPlanThresholdUpdateInput = {
+      ...(takeProfitSpread === undefined ? {} : { takeProfitSpread }),
+      ...(stopLossSpread === undefined ? {} : { stopLossSpread }),
+      takeProfitExecutionMode: takeProfitExecutionMode.value,
+      stopLossExecutionMode: stopLossExecutionMode.value,
+      takeProfitLimitStrategy: takeProfitLimitStrategy.value,
+      stopLossLimitStrategy: stopLossLimitStrategy.value,
+    };
+    saving.value = true;
+    saveError.value = '';
+    let saved = false;
+    try {
+      await props.updateExitPlan(planId, update);
+      saved = true;
+    } catch (error: unknown) {
+      saveError.value = error instanceof Error ? error.message : '退出计划更新失败';
+    } finally {
+      saving.value = false;
+    }
+    if (saved) cancelEdit();
+  }
 
   function parseOptionalNumber(value: string | number | null | undefined) {
     if (value === null || value === undefined || value === '') return null;
@@ -197,13 +358,13 @@
   });
 
   const liquidationByText = computed<string>(() => {
-    const row = props.overviewRows[0];
-    return row ? extractLegText(row.liquidation, 'BY') : '--';
+    if (props.overviewRows.length !== 1) return props.overviewRows.length ? '详见持仓行' : '--';
+    return extractLegText(props.overviewRows[0].liquidation, 'BY');
   });
 
   const liquidationMt5Text = computed<string>(() => {
-    const row = props.overviewRows[0];
-    return row ? extractLegText(row.liquidation, 'MT5') : '--';
+    if (props.overviewRows.length !== 1) return props.overviewRows.length ? '详见持仓行' : '--';
+    return extractLegText(props.overviewRows[0].liquidation, 'MT5');
   });
 
   const totalPnlTone = computed<string>(() => {
@@ -212,12 +373,10 @@
     return v >= 0 ? 'green' : 'red';
   });
 
-  const legPnlTone = computed<string>(() => {
-    const by = legPnlByUsdt.value ?? 0;
-    const mt5 = legPnlMt5Usdt.value ?? 0;
-    if (legPnlByUsdt.value === null && legPnlMt5Usdt.value === null) return '';
-    return by >= 0 || mt5 >= 0 ? 'green' : 'red';
-  });
+  function pnlTone(value: number | null | undefined) {
+    if (value === null || value === undefined || !Number.isFinite(value)) return '';
+    return value >= 0 ? 'green' : 'red';
+  }
 
   function spreadTone(value: string | number | null | undefined) {
     const parsed = parseOptionalNumber(value);
@@ -352,6 +511,10 @@
     white-space: nowrap;
   }
 
+  .overview-summary__item strong em {
+    font: inherit;
+  }
+
   .overview-table {
     display: block;
     width: 100%;
@@ -367,6 +530,95 @@
     font-size: 13px;
     text-align: left;
     white-space: nowrap;
+  }
+
+  .exit-threshold-button {
+    padding: 0;
+    border: 0;
+    border-bottom: 1px dashed #7f8fa7;
+    color: inherit;
+    background: transparent;
+    cursor: pointer;
+    font: inherit;
+  }
+
+  .exit-threshold-button:hover {
+    border-bottom-color: #276ef1;
+    color: #276ef1;
+  }
+
+  .exit-threshold-editor-row td {
+    padding: 10px;
+    background: #f7faff;
+  }
+
+  .exit-threshold-editor {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .exit-threshold-editor label {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: #52647d;
+  }
+
+  .exit-threshold-editor input {
+    width: 92px;
+    padding: 5px 7px;
+    border: 1px solid #cbd8ea;
+    border-radius: 6px;
+    color: #22324d;
+    background: #fff;
+    font: inherit;
+  }
+
+  .exit-threshold-editor select {
+    padding: 5px 7px;
+    border: 1px solid #cbd8ea;
+    border-radius: 6px;
+    color: #22324d;
+    background: #fff;
+    font: inherit;
+  }
+
+  .exit-threshold-editor__hint {
+    color: #6b7d96;
+    font-size: 12px;
+  }
+
+  .exit-threshold-editor__error {
+    flex-basis: 100%;
+    margin: 0;
+    color: #d9363e;
+    font-size: 12px;
+  }
+
+  .exit-threshold-editor button {
+    padding: 5px 10px;
+    border-radius: 6px;
+    font: inherit;
+    cursor: pointer;
+  }
+
+  .exit-threshold-editor__cancel {
+    border: 1px solid #cbd8ea;
+    color: #52647d;
+    background: #fff;
+  }
+
+  .exit-threshold-editor__save {
+    border: 1px solid #276ef1;
+    color: #fff;
+    background: #276ef1;
+  }
+
+  .exit-threshold-editor__save:disabled {
+    cursor: wait;
+    opacity: 0.7;
   }
 
   .overview-table th {

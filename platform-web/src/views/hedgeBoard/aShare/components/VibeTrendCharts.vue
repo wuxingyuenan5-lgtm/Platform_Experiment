@@ -13,6 +13,30 @@
       :dates="dates"
       :series="breadthSeries"
     />
+    <template v-if="crowdingRows.length">
+      <VibeTimeChart
+        title="通信设备 | 成交额占全A与换手率"
+        y-label="成交额占全A（%）"
+        right-label="换手率（%）"
+        :dates="crowdingDates"
+        :series="communicationSeries"
+      />
+      <VibeTimeChart
+        title="四行业 | 成交额与成交额占比"
+        y-label="成交额（亿元）"
+        right-label="成交额占全A（%）"
+        :dates="crowdingDates"
+        :series="fourIndustrySeries"
+      />
+    </template>
+    <VibeTimeChart
+      v-if="innovationRows.length"
+      title="创新药 | 成交额占全A与换手率"
+      y-label="成交额占全A（%）"
+      right-label="换手率（%）"
+      :dates="innovationDates"
+      :series="innovationSeries"
+    />
   </div>
 </template>
 
@@ -30,14 +54,31 @@
   interface Series {
     name: string;
     values: Array<number | null | undefined>;
-    type: 'bar' | 'line';
+    type: 'bar' | 'line' | 'area';
     axis?: 'left' | 'right';
     color: string;
     sign?: 1 | -1;
     unit?: string;
     percent?: boolean;
   }
-  const props = defineProps<{ rows: HistoryRow[] }>();
+  type CrowdingRow = {
+    date: string;
+    targets?: Record<
+      string,
+      { amount100m?: number | null; amountShareOfA?: number | null; turnoverPct?: number | null }
+    >;
+    combined?: { amount100m?: number | null; amountShareOfA?: number | null };
+  };
+  type InnovationRow = {
+    date: string;
+    amountShareOfA?: number | null;
+    turnoverPct?: number | null;
+  };
+  const props = defineProps<{
+    rows: HistoryRow[];
+    crowdingRows?: CrowdingRow[];
+    innovationRows?: InnovationRow[];
+  }>();
   const dates = computed(() => props.rows.map((row) => row.date));
   const marketSeries = computed<Series[]>(() => [
     {
@@ -82,6 +123,60 @@
       percent: true,
     },
   ]);
+  const crowdingRows = computed(() => props.crowdingRows || []);
+  const crowdingDates = computed(() => crowdingRows.value.map((row) => row.date));
+  const communicationSeries = computed<Series[]>(() => [
+    {
+      name: '通信设备成交额占全A',
+      type: 'area',
+      color: '#2563eb',
+      percent: true,
+      values: crowdingRows.value.map((row) => row.targets?.['通信设备']?.amountShareOfA),
+    },
+    {
+      name: '通信设备换手率',
+      type: 'line',
+      axis: 'right',
+      color: '#ef4444',
+      percent: true,
+      values: crowdingRows.value.map((row) => row.targets?.['通信设备']?.turnoverPct),
+    },
+  ]);
+  const fourIndustrySeries = computed<Series[]>(() => [
+    {
+      name: '四行业合计成交额',
+      type: 'bar',
+      color: '#4f81bd',
+      values: crowdingRows.value.map((row) => row.combined?.amount100m),
+    },
+    {
+      name: '四行业成交额占全A',
+      type: 'line',
+      axis: 'right',
+      color: '#f59e0b',
+      percent: true,
+      values: crowdingRows.value.map((row) => row.combined?.amountShareOfA),
+    },
+  ]);
+  const innovationRows = computed(() => props.innovationRows || []);
+  const innovationDates = computed(() => innovationRows.value.map((row) => row.date));
+  const innovationSeries = computed<Series[]>(() => [
+    {
+      name: '创新药成交额占全A',
+      type: 'area',
+      color: '#2563eb',
+      percent: true,
+      values: innovationRows.value.map((row) => row.amountShareOfA),
+    },
+    {
+      name: '创新药换手率',
+      type: 'line',
+      axis: 'right',
+      color: '#f97316',
+      percent: true,
+      values: innovationRows.value.map((row) => row.turnoverPct),
+    },
+  ]);
 
   const VibeTimeChart = defineComponent({
     name: 'VibeTimeChart',
@@ -94,7 +189,11 @@
     },
     setup(chartProps) {
       const last = computed(() => Math.max(0, chartProps.dates.length - 1));
-      const start = ref(Math.max(0, last.value - 59));
+      // These panels are fixed daily history views.  A miniature draggable
+      // navigator created thousands of unnecessary pointer/layout updates and
+      // repeatedly rendered browser-default tracks, so the chart always shows
+      // its bounded persisted window without a second scroll axis.
+      const start = ref(0);
       const end = ref(last.value);
       const hidden = ref(new Set<number>());
       const hoverIndex = ref<number | null>(null);
@@ -102,7 +201,7 @@
         () => chartProps.dates.length,
         () => {
           end.value = last.value;
-          start.value = Math.max(0, last.value - 59);
+          start.value = 0;
           hoverIndex.value = null;
         },
         { immediate: true },
@@ -194,6 +293,72 @@
           : `${n.toLocaleString('zh-CN', { maximumFractionDigits: 4 })}${
               series.unit ? ` ${series.unit}` : ''
             }`;
+      };
+      type NavigatorDrag = {
+        mode: 'start' | 'end' | 'window';
+        originIndex: number;
+        originStart: number;
+        originEnd: number;
+      };
+      const navigatorDrag = ref<NavigatorDrag | null>(null);
+      const navigatorIndex = (clientX: number, host: HTMLElement) => {
+        const rect = host.getBoundingClientRect();
+        const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / Math.max(rect.width, 1)));
+        return Math.round(ratio * last.value);
+      };
+      const beginNavigatorDrag = (event: PointerEvent, mode: NavigatorDrag['mode']) => {
+        const host = (event.currentTarget as HTMLElement).closest(
+          '.vibe-navigator',
+        ) as HTMLElement | null;
+        if (!host) return;
+        event.preventDefault();
+        event.stopPropagation();
+        host.setPointerCapture?.(event.pointerId);
+        navigatorDrag.value = {
+          mode,
+          originIndex: navigatorIndex(event.clientX, host),
+          originStart: start.value,
+          originEnd: end.value,
+        };
+      };
+      const moveNavigatorDrag = (event: PointerEvent) => {
+        const drag = navigatorDrag.value;
+        if (!drag) return;
+        const host = event.currentTarget as HTMLElement;
+        const index = navigatorIndex(event.clientX, host);
+        if (drag.mode === 'start') start.value = Math.min(index, end.value);
+        else if (drag.mode === 'end') end.value = Math.max(index, start.value);
+        else {
+          const width = drag.originEnd - drag.originStart;
+          const delta = index - drag.originIndex;
+          const nextStart = Math.max(0, Math.min(last.value - width, drag.originStart + delta));
+          start.value = nextStart;
+          end.value = nextStart + width;
+        }
+      };
+      const navigatorSeries = computed(() =>
+        chartProps.series
+          .filter((series) => series.values.some((value) => numeric(value) != null))
+          .slice(0, 2),
+      );
+      const navigatorPathFor = (series: Series) => {
+        const points = series.values
+          .map((value) => numeric(value))
+          .filter((value): value is number => value != null);
+        if (!points.length) return '';
+        const lo = Math.min(...points);
+        const hi = Math.max(...points);
+        const spanY = Math.max(hi - lo, 1e-9);
+        return series.values
+          .map((value, index) => {
+            const numericValue = numeric(value);
+            if (numericValue == null) return null;
+            return `${(index / Math.max(last.value, 1)) * 1200},${
+              34 - ((numericValue - lo) / spanY) * 24
+            }`;
+          })
+          .filter((point): point is string => Boolean(point))
+          .join(' ');
       };
       return () =>
         h('div', { class: 'vibe-time-chart' }, [
@@ -300,14 +465,28 @@
                           .filter(Boolean)
                       : [];
                   const line =
-                    series.type === 'line'
+                    series.type === 'line' || series.type === 'area'
                       ? h('polyline', {
                           points: pathFor(entry),
                           class: 'vibe-chart-line',
                           stroke: series.color,
+                          fill: 'none',
                         })
                       : null;
-                  return [...bars, line];
+                  const area =
+                    series.type === 'area'
+                      ? h('polygon', {
+                          // For positive-only percentage series, y(0) lies outside
+                          // the chart. Anchoring to the visible lower bound prevents
+                          // the browser from painting a full-height dark wedge.
+                          points: `${x(start.value)},${y(Math.max(0, bounds[0]), bounds)} ${pathFor(
+                            entry,
+                          )} ${x(end.value)},${y(Math.max(0, bounds[0]), bounds)}`,
+                          fill: series.color,
+                          opacity: 0.16,
+                        })
+                      : null;
+                  return [...bars, area, line];
                 }),
               ],
             ),
@@ -327,48 +506,77 @@
                 ])
               : null,
           ]),
-          h('div', { class: 'vibe-time-range' }, [
-            h('div', { class: 'vibe-time-range-track' }, [
-              h('input', {
-                type: 'range',
-                min: 0,
-                max: last.value,
-                value: start.value,
-                onInput: (event: Event) => {
-                  start.value = Math.min(
-                    Number((event.target as HTMLInputElement).value),
-                    end.value,
-                  );
+          h(
+            'div',
+            {
+              class: 'vibe-navigator',
+              onPointermove: moveNavigatorDrag,
+              onPointerup: () => {
+                navigatorDrag.value = null;
+              },
+              onPointercancel: () => {
+                navigatorDrag.value = null;
+              },
+            },
+            [
+              h(
+                'svg',
+                {
+                  class: 'vibe-navigator-svg',
+                  viewBox: '0 0 1200 42',
+                  preserveAspectRatio: 'none',
                 },
-              }),
-              h('input', {
-                type: 'range',
-                class: 'vibe-time-range-end',
-                min: 0,
-                max: last.value,
-                value: end.value,
-                onInput: (event: Event) => {
-                  end.value = Math.max(
-                    Number((event.target as HTMLInputElement).value),
-                    start.value,
-                  );
+                [
+                  h('rect', { x: 0, y: 7, width: 1200, height: 28, class: 'vibe-navigator-bg' }),
+                  ...navigatorSeries.value.map((series) =>
+                    h('polyline', {
+                      points: navigatorPathFor(series),
+                      class: 'vibe-navigator-line',
+                      stroke: series.color,
+                    }),
+                  ),
+                ],
+              ),
+              h(
+                'div',
+                {
+                  class: 'vibe-navigator-selection',
+                  style: {
+                    left: `${(start.value / Math.max(last.value, 1)) * 100}%`,
+                    width: `${((end.value - start.value) / Math.max(last.value, 1)) * 100}%`,
+                  },
+                  onPointerdown: (event: PointerEvent) => beginNavigatorDrag(event, 'window'),
                 },
-              }),
+                [
+                  h('button', {
+                    type: 'button',
+                    class: 'vibe-navigator-handle is-start',
+                    'aria-label': '调整起始时间',
+                    onPointerdown: (event: PointerEvent) => beginNavigatorDrag(event, 'start'),
+                  }),
+                  h('button', {
+                    type: 'button',
+                    class: 'vibe-navigator-handle is-end',
+                    'aria-label': '调整结束时间',
+                    onPointerdown: (event: PointerEvent) => beginNavigatorDrag(event, 'end'),
+                  }),
+                ],
+              ),
               h(
                 'button',
                 {
                   type: 'button',
-                  class: 'vibe-time-range-all',
+                  class: 'vibe-navigator-all',
                   onClick: () => {
                     start.value = 0;
                     end.value = last.value;
                   },
-                  title: '全部',
+                  title: '显示全部时间',
                 },
-                '≡',
+                '全部',
               ),
-            ]),
-          ]),
+            ],
+          ),
         ]);
     },
   });
@@ -503,87 +711,82 @@
     pointer-events: none;
   }
 
-  .vibe-time-range-track {
-    position: relative;
-    height: 18px;
-    border-radius: 6px;
+  .vibe-navigator {
+    display: none;
+  }
+
+  .vibe-navigator-svg {
+    position: absolute;
+    inset: 3px 8px;
+    display: block;
+    width: calc(100% - 16px);
+    height: 42px;
+    overflow: visible;
+  }
+
+  .vibe-navigator-bg {
+    fill: color-mix(in srgb, var(--strategy-surface-2) 88%, #94a3b8 12%);
+  }
+
+  .vibe-navigator-line {
+    fill: none;
+    stroke-width: 1.5;
+    opacity: 0.6;
+  }
+
+  .vibe-navigator-selection {
+    position: absolute;
+    top: 3px;
+    bottom: 3px;
+    min-width: 10px;
+    border: 1px solid var(--strategy-accent-strong);
+    background: color-mix(in srgb, var(--strategy-accent-soft) 22%, transparent);
+    cursor: grab;
+  }
+
+  .vibe-navigator-selection:active {
+    cursor: grabbing;
+  }
+
+  .vibe-navigator-handle {
+    position: absolute;
+    top: -1px;
+    bottom: -1px;
+    width: 7px;
+    padding: 0;
+    border: 1px solid var(--strategy-accent-strong);
+    border-radius: 2px;
     background: var(--strategy-surface);
+    cursor: ew-resize;
   }
 
-  .vibe-time-range {
-    display: grid;
-    position: relative;
-    grid-template-columns: 1fr;
-    align-items: center;
-    padding: 4px 8px;
-    gap: 7px;
-  }
-
-  .vibe-time-range input {
-    position: absolute;
-    width: 100%;
-    height: 18px;
-    margin: 0;
-    border: 0;
-    outline: 0;
-    background: transparent;
-    box-shadow: none;
-    pointer-events: none;
-    inset: 0;
-    appearance: none;
-    appearance: none;
-  }
-
-  .vibe-time-range input::-webkit-slider-runnable-track {
-    height: 18px;
-    border: 0;
-    background: transparent;
-  }
-
-  .vibe-time-range input::-moz-range-track {
-    height: 18px;
-    border: 0;
-    background: transparent;
-  }
-
-  .vibe-time-range input::-webkit-slider-thumb {
-    width: 6px;
-    height: 18px;
-    border: 1px solid var(--strategy-accent-strong);
-    border-radius: 3px;
+  .vibe-navigator-handle::after {
+    display: block;
+    width: 1px;
+    height: 16px;
+    margin: auto;
     background: var(--strategy-accent-strong);
-    cursor: pointer;
-    pointer-events: auto;
-    appearance: none;
-    appearance: none;
+    content: '';
   }
 
-  .vibe-time-range input::-moz-range-thumb {
-    width: 6px;
-    height: 18px;
-    border: 1px solid var(--strategy-accent-strong);
-    border-radius: 3px;
-    background: var(--strategy-accent-strong);
-    cursor: pointer;
-    pointer-events: auto;
+  .vibe-navigator-handle.is-start {
+    left: -5px;
   }
 
-  .vibe-time-range-end {
-    z-index: 2;
+  .vibe-navigator-handle.is-end {
+    right: -5px;
   }
 
-  .vibe-time-range-all {
+  .vibe-navigator-all {
     position: absolute;
-    z-index: 3;
-    top: 50%;
-    left: 50%;
-    width: 18px;
-    height: 18px;
-    transform: translate(-50%, -50%);
-    border: 0;
-    border-radius: 4px;
-    background: var(--strategy-border);
-    color: var(--strategy-text-1);
+    right: 10px;
+    bottom: 5px;
+    padding: 1px 5px;
+    border: 1px solid var(--strategy-border);
+    border-radius: 3px;
+    background: var(--strategy-surface);
+    color: var(--strategy-text-3);
+    font-size: 10px;
     cursor: pointer;
   }
 
@@ -592,7 +795,7 @@
      This also removes the browser's default black range track/border. */
   .vibe-trend-charts :deep(.vibe-chart-svg),
   .vibe-trend-charts :deep(.vibe-chart-stage),
-  .vibe-trend-charts :deep(.vibe-time-range input) {
+  .vibe-trend-charts :deep(.vibe-navigator) {
     border: 0;
     outline: 0;
     box-shadow: none;
@@ -602,9 +805,159 @@
     background: transparent;
   }
 
-  .vibe-trend-charts :deep(.vibe-time-range input::-webkit-slider-runnable-track),
-  .vibe-trend-charts :deep(.vibe-time-range input::-moz-range-track) {
-    border: 0;
-    background: transparent;
+  /* VibeTimeChart is a runtime child component. Scoped selectors on this SFC
+     do not reach its internal nodes, so every interactive navigator primitive
+     must be explicitly deep-scoped instead of falling back to browser defaults. */
+  .vibe-trend-charts :deep(.vibe-time-chart) {
+    padding: 10px;
+    border: 1px solid var(--strategy-border);
+    border-radius: 9px;
+    background: var(--strategy-surface-2);
+  }
+
+  .vibe-trend-charts :deep(.vibe-chart-head) {
+    display: flex;
+    justify-content: center;
+  }
+
+  .vibe-trend-charts :deep(.vibe-chart-head h3) {
+    margin: 4px 0 8px;
+    color: var(--strategy-text-1);
+    font-size: 18px;
+    font-weight: 720;
+    text-align: center;
+  }
+
+  .vibe-trend-charts :deep(.vibe-chart-subtitle) {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin: 4px 4px 6px;
+    padding: 7px 12px;
+    border: 1px solid var(--strategy-border);
+    border-radius: 4px;
+    background: var(--strategy-surface);
+    font-size: 12px;
+    gap: 12px;
+  }
+
+  .vibe-trend-charts :deep(.vibe-sub-left),
+  .vibe-trend-charts :deep(.vibe-chart-legend) {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  .vibe-trend-charts :deep(.vibe-sub-left) {
+    gap: 14px;
+    color: var(--strategy-text-3);
+  }
+
+  .vibe-trend-charts :deep(.vibe-legend-btn),
+  .vibe-trend-charts :deep(.vibe-navigator-all) {
+    border: 1px solid var(--strategy-border);
+    background: var(--strategy-surface);
+    color: var(--strategy-text-2);
+    cursor: pointer;
+  }
+
+  .vibe-trend-charts :deep(.vibe-legend-btn) {
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+  }
+
+  .vibe-trend-charts :deep(.vibe-chart-stage) {
+    position: relative;
+    overflow: auto;
+  }
+
+  .vibe-trend-charts :deep(.vibe-axis-label) {
+    fill: var(--strategy-text-4);
+    font-size: 11px;
+  }
+
+  .vibe-trend-charts :deep(.vibe-chart-grid) {
+    fill: none;
+    stroke: var(--strategy-border);
+    stroke-dasharray: 3 4;
+  }
+
+  .vibe-trend-charts :deep(.vibe-chart-line) {
+    fill: none;
+    stroke-width: 2.2;
+  }
+
+  .vibe-trend-charts :deep(.vibe-navigator) {
+    display: none;
+  }
+
+  .vibe-trend-charts :deep(.vibe-navigator-svg) {
+    position: absolute;
+    inset: 3px 8px;
+    display: block;
+    width: calc(100% - 16px);
+    height: 42px;
+    overflow: visible;
+  }
+
+  .vibe-trend-charts :deep(.vibe-navigator-bg) {
+    fill: color-mix(in srgb, var(--strategy-surface-2) 88%, #94a3b8 12%);
+  }
+
+  .vibe-trend-charts :deep(.vibe-navigator-line) {
+    fill: none;
+    stroke-width: 1.5;
+    opacity: 0.6;
+  }
+
+  .vibe-trend-charts :deep(.vibe-navigator-selection) {
+    position: absolute;
+    top: 3px;
+    bottom: 3px;
+    min-width: 10px;
+    border: 1px solid var(--strategy-accent-strong);
+    background: color-mix(in srgb, var(--strategy-accent-soft) 22%, transparent);
+    cursor: grab;
+  }
+
+  .vibe-trend-charts :deep(.vibe-navigator-handle) {
+    position: absolute;
+    top: -1px;
+    bottom: -1px;
+    width: 7px;
+    padding: 0;
+    border: 1px solid var(--strategy-accent-strong);
+    border-radius: 2px;
+    background: var(--strategy-surface);
+    cursor: ew-resize;
+  }
+
+  .vibe-trend-charts :deep(.vibe-navigator-handle::after) {
+    display: block;
+    width: 1px;
+    height: 16px;
+    margin: auto;
+    background: var(--strategy-accent-strong);
+    content: '';
+  }
+
+  .vibe-trend-charts :deep(.vibe-navigator-handle.is-start) {
+    left: -5px;
+  }
+
+  .vibe-trend-charts :deep(.vibe-navigator-handle.is-end) {
+    right: -5px;
+  }
+
+  .vibe-trend-charts :deep(.vibe-navigator-all) {
+    position: absolute;
+    right: 10px;
+    bottom: 5px;
+    padding: 1px 5px;
+    border-radius: 3px;
+    color: var(--strategy-text-3);
+    font-size: 10px;
   }
 </style>

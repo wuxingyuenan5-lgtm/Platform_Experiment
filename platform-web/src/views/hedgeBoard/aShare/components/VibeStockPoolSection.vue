@@ -8,7 +8,7 @@
     >
     <div v-if="error" class="error">{{ error }}</div>
     <template v-if="data">
-      <div class="pool-kpis">
+      <div v-if="false" class="pool-kpis">
         <div class="pool-kpi"
           ><span>股票池</span><strong>{{ data.summary.tracked_count }}</strong
           ><small>只</small></div
@@ -38,7 +38,7 @@
           ><small>亿</small></div
         >
       </div>
-      <section class="breadth-panel">
+      <section v-if="false" class="breadth-panel">
         <h3>股票池涨跌宽度</h3>
         <div class="breadth-track"
           ><i
@@ -148,148 +148,176 @@
           </div>
         </section>
       </section>
-      <section class="sub-panel matrix-panel">
-        <div class="sub-panel-head">
-          <h3>强弱矩阵</h3>
+      <section v-if="false" class="stock-filter-panel" aria-label="股票池筛选">
+        <div class="stock-filter-copy">
+          <span>STOCK UNIVERSE</span>
+          <h3>股票池明细</h3>
+          <p>检索、主题篮子与行业筛选</p>
         </div>
-        <div v-if="matrixPoints.length" class="matrix-wrap">
-          <svg
-            viewBox="0 0 1000 420"
-            preserveAspectRatio="xMidYMid meet"
-            aria-label="股票池强弱矩阵"
-          >
-            <rect
-              x="0"
-              y="0"
-              :width="matrixPoints.length ? 1000 : 0"
-              height="420"
-              class="matrix-bg"
-            />
-            <line
-              :x1="52 + (matrixDomain.x / (2 * matrixDomain.x)) * 896"
-              y1="0"
-              :x2="52 + (matrixDomain.x / (2 * matrixDomain.x)) * 896"
-              y2="420"
-              class="matrix-axis"
-            />
-            <line
-              x1="0"
-              :y1="420 - 52 - (matrixDomain.y / (2 * matrixDomain.y)) * 316"
-              x2="1000"
-              :y2="420 - 52 - (matrixDomain.y / (2 * matrixDomain.y)) * 316"
-              class="matrix-axis"
-            />
-            <text x="65" y="25" class="matrix-quadrant-label">改善</text>
-            <text x="935" y="25" text-anchor="end" class="matrix-quadrant-label">领涨</text>
-            <text x="65" y="405" class="matrix-quadrant-label">领跌</text>
-            <text x="935" y="405" text-anchor="end" class="matrix-quadrant-label">转弱</text>
-            <text x="500" y="414" text-anchor="middle" class="matrix-axis-label">20日涨幅 →</text>
-            <text
-              x="16"
-              y="210"
-              text-anchor="middle"
-              class="matrix-axis-label"
-              transform="rotate(-90 16 210)"
-            >
-              今日涨幅 ↑
-            </text>
-            <g
-              v-for="point in matrixPoints"
-              :key="point.row.instrument_id"
-              class="matrix-point"
-              :class="{ 'is-hover': matrixHoverId === point.row.instrument_id }"
-              @mouseenter="matrixHoverId = point.row.instrument_id"
-              @mouseleave="matrixHoverId = null"
-              @click="openStockData(point.row.code)"
-            >
-              <circle
-                :cx="point.x"
-                :cy="point.y"
-                r="5"
-                :class="
-                  point.positive ? 'is-positive' : point.negative ? 'is-negative' : 'is-mixed'
-                "
-              />
-              <text
-                v-if="matrixHoverId === point.row.instrument_id"
-                :x="point.x + 8"
-                :y="point.y - 8"
-                class="matrix-label"
+        <div class="pool-toolbar pool-toolbar--enhanced">
+          <label class="search-field">
+            <span>搜索</span>
+            <input v-model.trim="query" type="search" placeholder="名称 / 行业 / 代码" />
+          </label>
+          <label class="filter-field">
+            <span>主题篮子</span>
+            <select v-model="basketFilter">
+              <option value="">全部主题篮子</option>
+              <option v-for="basket in baskets" :key="basket.key" :value="basket.key"
+                >{{ basket.name }}（{{ basket.count }}）</option
               >
-                {{ point.row.name }} {{ formatPct(point.row.change) }}
-              </text>
-              <title>
-                {{ point.row.name }} · {{ point.row.code || '—' }} · 今日
-                {{ formatPct(point.row.change) }} · 20日 {{ formatPct(point.row.change_20d) }}
-              </title>
-            </g>
-          </svg>
+            </select>
+          </label>
+          <label class="filter-field">
+            <span>范围</span>
+            <select v-model="filter">
+              <option value="">全部股票</option>
+              <option value="__focus__">★ 近期关注（{{ focusCodes.length }}）</option>
+              <option
+                v-for="industry in industries"
+                :key="industry"
+                :value="`industry:${industry}`"
+                >{{ industry }}</option
+              >
+            </select>
+          </label>
+          <div class="filter-actions">
+            <button
+              v-if="filter === '__focus__'"
+              type="button"
+              class="primary"
+              @click="
+                focusInput = '';
+                focusOpen = true;
+              "
+              >添加关注</button
+            >
+            <template v-else
+              ><button type="button" class="toolbar" @click="editOpen = true">＋ 编辑池子</button
+              ><button type="button" class="toolbar" :disabled="loading" @click="load">{{
+                loading ? '刷新中…' : '刷新'
+              }}</button></template
+            >
+          </div>
         </div>
-        <div v-else class="empty">暂无数据</div>
+        <div class="filter-status">
+          <span>当前 {{ visibleRows.length }} 只</span>
+          <span v-if="basketFilter">主题：{{ selectedBasketName }}</span>
+          <span v-if="filter.startsWith('industry:')">行业：{{ filter.slice(9) }}</span>
+        </div>
       </section>
-      <section class="sub-panel heat-panel"
-        ><div class="sub-panel-head"
-          ><h3>股票池热力图</h3
-          ><select v-model="heatPeriod"
-            ><option value="change">今日</option
-            ><option value="change_5d">5日</option
-            ><option value="change_20d">20日</option
-            ><option value="ytd">YTD</option></select
-          ></div
-        ><div class="heatmap"
-          ><button
-            v-for="tile in heatTiles"
-            :key="tile.instrument_id"
-            type="button"
-            class="heat-tile"
-            :class="[tile.size, { 'group-start': tile.groupStart }]"
-            :style="{ background: heatColor(tile[heatPeriod], heatMaxAbs) }"
-            :title="`${tile.name} · ${tile.industry || '—'} · ${formatPct(tile[heatPeriod])}`"
-            @click="openStockData(tile.code)"
-            ><span>{{ tile.name }}</span
-            ><b>{{ formatPct(tile[heatPeriod]) }}</b
-            ><small>{{ tile.industry }}</small></button
-          ><div v-if="!heatTiles.length" class="empty">暂无数据</div></div
-        ><div v-if="heatTiles.length" class="heat-legend"
-          ><div class="heat-legend-gradient"></div
-          ><div class="heat-legend-scale"
-            ><span>-{{ formatPct(heatMaxAbs) }}</span
-            ><span>0%</span><span>+{{ formatPct(heatMaxAbs) }}</span></div
-          ></div
-        ></section
-      >
-      <div class="detail-head"
-        ><h3>股票池明细</h3
-        ><div class="pool-toolbar"
-          ><input v-model.trim="query" type="search" placeholder="搜索名称 / 行业 / 代码" /><select
-            v-model="filter"
-            ><option value="">全部股票</option
-            ><option value="__focus__">★ 近期关注（{{ focusCodes.length }}）</option
-            ><option v-for="basket in baskets" :key="basket.key" :value="`basket:${basket.key}`"
-              >{{ basket.name }}（{{ basket.count }}）</option
-            ><option
-              v-for="industry in industries"
-              :key="industry"
-              :value="`industry:${industry}`"
-              >{{ industry }}</option
-            ></select
-          ><button
-            v-if="filter === '__focus__'"
-            type="button"
-            class="primary"
-            @click="
-              focusInput = '';
-              focusOpen = true;
-            "
-            >添加关注</button
-          ><template v-else
-            ><button type="button" class="toolbar" @click="editOpen = true">＋ 编辑池子</button
-            ><button type="button" class="toolbar" :disabled="loading" @click="load">{{
-              loading ? '刷新中…' : '刷新'
-            }}</button></template
-          ></div
-        ></div
-      >
+      <div ref="heavyVisualsRoot" class="heavy-visuals-anchor">
+        <template v-if="heavyVisualsReady">
+          <section class="sub-panel matrix-panel">
+            <div class="sub-panel-head">
+              <div class="matrix-heading"><span>STRENGTH MAP</span><h3>强弱矩阵</h3></div>
+              <div class="matrix-legend">
+                <span class="matrix-legend--leader">领涨 {{ matrixQuadrants.leader }}</span>
+                <span class="matrix-legend--improving">改善 {{ matrixQuadrants.improving }}</span>
+                <span class="matrix-legend--weakening">转弱 {{ matrixQuadrants.weakening }}</span>
+                <span class="matrix-legend--lagging">领跌 {{ matrixQuadrants.lagging }}</span>
+              </div>
+            </div>
+            <div v-if="matrixPoints.length" class="matrix-wrap">
+              <svg
+                viewBox="0 0 1000 420"
+                preserveAspectRatio="xMidYMid meet"
+                aria-label="股票池强弱矩阵"
+              >
+                <rect
+                  x="52"
+                  y="52"
+                  width="448"
+                  height="158"
+                  class="matrix-zone matrix-zone--improving"
+                />
+                <rect
+                  x="500"
+                  y="52"
+                  width="448"
+                  height="158"
+                  class="matrix-zone matrix-zone--leader"
+                />
+                <rect
+                  x="52"
+                  y="210"
+                  width="448"
+                  height="158"
+                  class="matrix-zone matrix-zone--lagging"
+                />
+                <rect
+                  x="500"
+                  y="210"
+                  width="448"
+                  height="158"
+                  class="matrix-zone matrix-zone--weakening"
+                />
+                <line
+                  :x1="52 + (matrixDomain.x / (2 * matrixDomain.x)) * 896"
+                  y1="0"
+                  :x2="52 + (matrixDomain.x / (2 * matrixDomain.x)) * 896"
+                  y2="420"
+                  class="matrix-axis"
+                />
+                <line
+                  x1="0"
+                  :y1="420 - 52 - (matrixDomain.y / (2 * matrixDomain.y)) * 316"
+                  x2="1000"
+                  :y2="420 - 52 - (matrixDomain.y / (2 * matrixDomain.y)) * 316"
+                  class="matrix-axis"
+                />
+                <text x="70" y="76" class="matrix-quadrant-label">改善</text>
+                <text x="930" y="76" text-anchor="end" class="matrix-quadrant-label">领涨</text>
+                <text x="70" y="348" class="matrix-quadrant-label">领跌</text>
+                <text x="930" y="348" text-anchor="end" class="matrix-quadrant-label">转弱</text>
+                <text x="500" y="414" text-anchor="middle" class="matrix-axis-label">
+                  20日涨幅 →
+                </text>
+                <text
+                  x="16"
+                  y="210"
+                  text-anchor="middle"
+                  class="matrix-axis-label"
+                  transform="rotate(-90 16 210)"
+                >
+                  今日涨幅 ↑
+                </text>
+                <g
+                  v-for="point in matrixPoints"
+                  :key="point.row.instrument_id"
+                  class="matrix-point"
+                  :class="{ 'is-hover': matrixHoverId === point.row.instrument_id }"
+                  @mouseenter="matrixHoverId = point.row.instrument_id"
+                  @mouseleave="matrixHoverId = null"
+                  @click="openStockData(point.row.code)"
+                >
+                  <circle
+                    :cx="point.x"
+                    :cy="point.y"
+                    :r="point.radius"
+                    :class="
+                      point.positive ? 'is-positive' : point.negative ? 'is-negative' : 'is-mixed'
+                    "
+                  />
+                  <text
+                    v-if="matrixHoverId === point.row.instrument_id"
+                    :x="point.x + 8"
+                    :y="point.y - 8"
+                    class="matrix-label"
+                  >
+                    {{ point.row.name }} {{ formatPct(point.row.change) }}
+                  </text>
+                  <title>
+                    {{ point.row.name }} · {{ point.row.code || '—' }} · 今日
+                    {{ formatPct(point.row.change) }} · 20日 {{ formatPct(point.row.change_20d) }}
+                  </title>
+                </g>
+              </svg>
+            </div>
+            <div v-else class="empty">暂无数据</div>
+          </section>
+        </template>
+      </div>
       <div v-if="operationMessage" class="operation-message">{{ operationMessage }}</div>
       <div v-if="focusOpen" class="focus-form"
         ><input
@@ -299,6 +327,59 @@
         /><button type="button" class="primary" @click="addFocus">保存</button
         ><button type="button" class="toolbar" @click="focusOpen = false">取消</button></div
       >
+      <section class="stock-filter-panel stock-filter-panel--table" aria-label="股票池筛选">
+        <div class="stock-filter-copy"> <span>STOCK UNIVERSE</span><h3>股票池明细</h3> </div>
+        <div class="pool-toolbar pool-toolbar--enhanced">
+          <label class="search-field"
+            ><span>搜索</span
+            ><input v-model.trim="query" type="search" placeholder="名称 / 行业 / 代码"
+          /></label>
+          <label class="filter-field"
+            ><span>主题篮子</span
+            ><select v-model="basketFilter"
+              ><option value="">全部主题篮子</option
+              ><option v-for="basket in baskets" :key="basket.key" :value="basket.key"
+                >{{ basket.name }}（{{ basket.count }}）</option
+              ></select
+            ></label
+          >
+          <label class="filter-field"
+            ><span>范围</span
+            ><select v-model="filter"
+              ><option value="">全部股票</option
+              ><option value="__focus__">★ 近期关注（{{ focusCodes.length }}）</option
+              ><option
+                v-for="industry in industries"
+                :key="industry"
+                :value="`industry:${industry}`"
+                >{{ industry }}</option
+              ></select
+            ></label
+          >
+          <div class="filter-actions"
+            ><button
+              v-if="filter === '__focus__'"
+              type="button"
+              class="primary"
+              @click="
+                focusInput = '';
+                focusOpen = true;
+              "
+              >添加关注</button
+            ><template v-else
+              ><button type="button" class="toolbar" @click="editOpen = true">＋ 编辑池子</button
+              ><button type="button" class="toolbar" :disabled="loading" @click="load">{{
+                loading ? '刷新中…' : '刷新'
+              }}</button></template
+            ></div
+          >
+        </div>
+        <div class="filter-status"
+          ><span>当前 {{ visibleRows.length }} 只</span
+          ><span v-if="basketFilter">主题：{{ selectedBasketName }}</span
+          ><span v-if="filter.startsWith('industry:')">行业：{{ filter.slice(9) }}</span></div
+        >
+      </section>
       <div class="table-shell"
         ><table
           ><thead
@@ -317,7 +398,7 @@
               ><th @click="sortBy('pb')">PB {{ sortIndicator('pb') }}</th
               ><th></th></tr></thead
           ><tbody
-            ><tr v-for="row in visibleRows" :key="row.instrument_id"
+            ><tr v-for="row in renderedRows" :key="row.instrument_id"
               ><td class="left"
                 ><button type="button" class="stock-link" @click="openStockData(row.code)">{{
                   row.name
@@ -357,6 +438,42 @@
             ></tbody
           ></table
         ></div
+      >
+      <div v-if="visibleRows.length > renderedRows.length" class="table-more"
+        ><button type="button" class="toolbar" @click="visibleLimit += 50"
+          >显示更多（剩余 {{ visibleRows.length - renderedRows.length }}）</button
+        ></div
+      >
+      <section v-if="heavyVisualsReady" class="sub-panel heat-panel heat-panel--bottom"
+        ><div class="sub-panel-head"
+          ><h3>股票池热力图</h3
+          ><select v-model="heatPeriod"
+            ><option value="change">今日</option
+            ><option value="change_5d">5日</option
+            ><option value="change_20d">20日</option
+            ><option value="ytd">YTD</option></select
+          ></div
+        ><div class="heatmap"
+          ><button
+            v-for="tile in heatTiles"
+            :key="tile.instrument_id"
+            type="button"
+            class="heat-tile"
+            :class="[tile.size, { 'group-start': tile.groupStart }]"
+            :style="{ background: heatColor(tile[heatPeriod], heatMaxAbs) }"
+            :title="`${tile.name} · ${tile.industry || '—'} · ${formatPct(tile[heatPeriod])}`"
+            @click="openStockData(tile.code)"
+            ><span>{{ tile.name }}</span
+            ><b>{{ formatPct(tile[heatPeriod]) }}</b
+            ><small>{{ tile.industry }}</small></button
+          ><div v-if="!heatTiles.length" class="empty">暂无数据</div></div
+        ><div v-if="heatTiles.length" class="heat-legend"
+          ><div class="heat-legend-gradient"></div
+          ><div class="heat-legend-scale"
+            ><span>-{{ formatPct(heatMaxAbs) }}</span
+            ><span>0%</span><span>+{{ formatPct(heatMaxAbs) }}</span></div
+          ></div
+        ></section
       >
       <div v-if="editOpen" class="modal-mask" @click.self="editOpen = false"
         ><div class="modal"
@@ -428,6 +545,7 @@
   const operationMessage = ref('');
   const query = ref('');
   const filter = ref('');
+  const basketFilter = ref('');
   const sortKey = ref<keyof Stock | null>(null);
   const sortDirection = ref<'asc' | 'desc' | null>(null);
   const focusCodes = ref<string[]>([]);
@@ -437,11 +555,18 @@
   const batchInput = ref('');
   const syncing = ref(false);
   const poolRoot = ref<HTMLElement | null>(null);
+  const heavyVisualsRoot = ref<HTMLElement | null>(null);
   let poolObserver: IntersectionObserver | null = null;
+  let heavyVisualsObserver: IntersectionObserver | null = null;
+  const heavyVisualsReady = ref(false);
+  const visibleLimit = ref(50);
   const matrixHoverId = ref<string | null>(null);
   const rankingPeriod = ref<Period>('change');
   const heatPeriod = ref<Period>('change');
   const baskets = computed(() => data.value?.definitions?.research_baskets || []);
+  const selectedBasketName = computed(
+    () => baskets.value.find((basket) => basket.key === basketFilter.value)?.name || '',
+  );
   const breadthBins = computed(() => {
     const bins = [0, 0, 0, 0, 0];
     for (const row of data.value?.stocks || []) {
@@ -469,8 +594,8 @@
   const visibleRows = computed(() => {
     if (!data.value) return [];
     const q = query.value.toLowerCase();
-    const basketCodes = filter.value.startsWith('basket:')
-      ? new Set(baskets.value.find((basket) => basket.key === filter.value.slice(7))?.codes || [])
+    const basketCodes = basketFilter.value
+      ? new Set(baskets.value.find((basket) => basket.key === basketFilter.value)?.codes || [])
       : null;
     const industry = filter.value.startsWith('industry:') ? filter.value.slice(9) : '';
     let rows = data.value.stocks.filter(
@@ -495,6 +620,7 @@
     }
     return rows;
   });
+  const renderedRows = computed(() => visibleRows.value.slice(0, visibleLimit.value));
   const rankingRows = computed(() => {
     const rows = (data.value?.indices || []).filter((x) =>
       Number.isFinite(Number(x[rankingPeriod.value])),
@@ -588,25 +714,46 @@
     const domain = matrixDomain.value;
     const x = (value: number) => pad + ((value + domain.x) / (2 * domain.x)) * (W - pad * 2);
     const y = (value: number) => H - pad - ((value + domain.y) / (2 * domain.y)) * (H - pad * 2);
+    const maxAmount = Math.max(...matrixRows.value.map((row) => Number(row.amount_yi || 0)), 1);
     return matrixRows.value.map((row) => ({
       row,
       x: x(Number(row.change_20d || 0)),
       y: y(Number(row.change || 0)),
+      radius: 4 + Math.min(5, (Math.max(0, Number(row.amount_yi || 0)) / maxAmount) * 5),
       positive: Number(row.change || 0) >= 0 && Number(row.change_20d || 0) >= 0,
       negative: Number(row.change || 0) < 0 && Number(row.change_20d || 0) < 0,
     }));
+  });
+  const matrixQuadrants = computed(() => {
+    const result = { leader: 0, improving: 0, weakening: 0, lagging: 0 };
+    matrixRows.value.forEach((row) => {
+      const today = Number(row.change || 0);
+      const days20 = Number(row.change_20d || 0);
+      if (today >= 0 && days20 >= 0) result.leader += 1;
+      else if (today >= 0) result.improving += 1;
+      else if (days20 >= 0) result.weakening += 1;
+      else result.lagging += 1;
+    });
+    return result;
   });
   async function load() {
     loading.value = true;
     error.value = '';
     try {
       const [response, focusResponse] = await Promise.all([
-        fetch(`/vibe-research/api/stock-pool?_ts=${Date.now()}`, { cache: 'no-store' }),
-        fetch(`/vibe-research/api/stock-pool/focus?_ts=${Date.now()}`, { cache: 'no-store' }),
+        fetch(`/api/v1/research/a-share/stock-pool?_ts=${Date.now()}`, {
+          cache: 'no-store',
+          credentials: 'include',
+        }),
+        fetch(`/api/v1/research/a-share/stock-pool/focus?_ts=${Date.now()}`, {
+          cache: 'no-store',
+          credentials: 'include',
+        }),
       ]);
       if (!response.ok) throw new Error(`股票池数据请求失败（HTTP ${response.status}）`);
       const payload = (await response.json()) as { data?: PoolPayload };
       data.value = payload.data || null;
+      visibleLimit.value = 50;
       if (!focusCodes.value.length && payload.data?.definitions?.focus_codes) {
         focusCodes.value = [...payload.data.definitions.focus_codes];
       }
@@ -625,7 +772,7 @@
     const previous = [...focusCodes.value];
     focusCodes.value = next;
     try {
-      const response = await fetch('/vibe-research/api/stock-pool/focus', {
+      const response = await fetch('/api/v1/research/a-share/stock-pool/focus', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ codes: next }),
@@ -664,7 +811,7 @@
       return;
     }
     try {
-      const response = await fetch('/vibe-research/api/stock-pool/add-batch', {
+      const response = await fetch('/api/v1/research/a-share/stock-pool/add-batch', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ codes }),
@@ -689,7 +836,7 @@
     if (!window.confirm(`确定将「${row.name}」从核心股票池移除？`)) return;
     try {
       const response = await fetch(
-        `/vibe-research/api/stock-pool/remove?instrument_id=${encodeURIComponent(
+        `/api/v1/research/a-share/stock-pool/remove?instrument_id=${encodeURIComponent(
           row.instrument_id,
         )}`,
         { method: 'DELETE' },
@@ -709,7 +856,7 @@
   async function syncPool() {
     syncing.value = true;
     try {
-      const response = await fetch('/vibe-research/api/stock-pool/sync', { method: 'POST' });
+      const response = await fetch('/api/v1/research/a-share/stock-pool/sync', { method: 'POST' });
       const payload = (await response.json()) as {
         data?: { ok?: boolean; commit?: string };
         error?: string;
@@ -781,8 +928,26 @@
       { rootMargin: '640px 0px' },
     );
     poolObserver.observe(poolRoot.value);
+    if (typeof IntersectionObserver === 'undefined' || !heavyVisualsRoot.value) {
+      heavyVisualsReady.value = true;
+      return;
+    }
+    heavyVisualsObserver = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          heavyVisualsReady.value = true;
+          heavyVisualsObserver?.disconnect();
+          heavyVisualsObserver = null;
+        }
+      },
+      { rootMargin: '240px 0px' },
+    );
+    heavyVisualsObserver.observe(heavyVisualsRoot.value);
   });
-  onBeforeUnmount(() => poolObserver?.disconnect());
+  onBeforeUnmount(() => {
+    poolObserver?.disconnect();
+    heavyVisualsObserver?.disconnect();
+  });
 </script>
 
 <style scoped lang="less">
@@ -800,6 +965,16 @@
     display: flex;
     justify-content: space-between;
     gap: 14px;
+  }
+
+  .heavy-visuals-anchor {
+    display: grid;
+    gap: 14px;
+  }
+
+  .table-more {
+    display: flex;
+    justify-content: center;
   }
 
   .pool-head h2 {
@@ -1046,12 +1221,110 @@
     min-width: 0;
   }
 
+  .stock-filter-panel {
+    display: grid;
+    grid-template-columns: minmax(180px, 0.56fr) minmax(0, 2fr);
+    gap: 12px 20px;
+    align-items: center;
+    padding: 15px 16px 12px;
+    border: 1px solid color-mix(in srgb, var(--strategy-accent-strong) 20%, var(--strategy-border));
+    border-radius: 12px;
+    background: radial-gradient(circle at 0 0, rgb(67 56 202 / 8%), transparent 42%),
+      var(--strategy-surface-2);
+  }
+
+  .stock-filter-copy span,
+  .matrix-heading > span {
+    display: block;
+    margin-bottom: 3px;
+    color: var(--strategy-accent-strong);
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+  }
+
+  .stock-filter-copy h3 {
+    margin: 0;
+    color: var(--strategy-text-1);
+    font-size: 16px;
+    line-height: 1.25;
+  }
+
+  .stock-filter-copy p {
+    margin: 4px 0 0;
+    color: var(--strategy-text-3);
+    font-size: 12px;
+  }
+
+  .pool-toolbar--enhanced {
+    display: grid;
+    grid-template-columns: minmax(180px, 1.35fr) minmax(150px, 1fr) minmax(135px, 0.9fr) auto;
+    gap: 8px;
+    align-items: end;
+  }
+
+  .search-field,
+  .filter-field {
+    display: grid;
+    gap: 4px;
+    min-width: 0;
+  }
+
+  .search-field > span,
+  .filter-field > span {
+    color: var(--strategy-text-3);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+  }
+
+  .search-field input,
+  .filter-field select {
+    width: 100%;
+    height: 34px;
+    min-width: 0;
+    padding: 0 10px;
+    border: 1px solid var(--strategy-border);
+    border-radius: 8px;
+    outline: 0;
+    background: var(--strategy-surface);
+    color: var(--strategy-text-1);
+    font-size: 12px;
+  }
+
+  .search-field input:focus,
+  .filter-field select:focus {
+    border-color: var(--strategy-accent-strong);
+    box-shadow: 0 0 0 3px var(--strategy-accent-ring);
+  }
+
+  .filter-actions {
+    display: flex;
+    gap: 6px;
+    white-space: nowrap;
+  }
+
+  .filter-status {
+    display: flex;
+    grid-column: 2;
+    gap: 7px;
+    color: var(--strategy-text-3);
+    font-size: 11px;
+  }
+
+  .filter-status span {
+    padding: 3px 7px;
+    border-radius: 99px;
+    background: var(--strategy-surface);
+  }
+
   .matrix-wrap {
     overflow: hidden;
     aspect-ratio: 1000 / 420;
-    border: 1px solid var(--strategy-border);
-    border-radius: 8px;
-    background: var(--strategy-surface);
+    border: 1px solid color-mix(in srgb, var(--strategy-border) 70%, #64748b 30%);
+    border-radius: 11px;
+    background: #fbfcfe;
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 80%);
   }
 
   .matrix-wrap svg {
@@ -1060,14 +1333,69 @@
     height: 100%;
   }
 
-  .matrix-bg {
-    fill: color-mix(in srgb, var(--strategy-surface) 94%, #64748b 6%);
+  .matrix-heading h3 {
+    margin: 0;
+  }
+
+  .matrix-legend {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 5px;
+  }
+
+  .matrix-legend span {
+    padding: 4px 7px;
+    border-radius: 99px;
+    font-size: 10px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .matrix-legend--leader {
+    background: #fee2e2;
+    color: #b91c1c;
+  }
+
+  .matrix-legend--improving {
+    background: #fff7ed;
+    color: #c2410c;
+  }
+
+  .matrix-legend--weakening {
+    background: #ecfdf5;
+    color: #047857;
+  }
+
+  .matrix-legend--lagging {
+    background: #eff6ff;
+    color: #1d4ed8;
+  }
+
+  .matrix-zone {
+    stroke: #e2e8f0;
+    stroke-width: 1;
+  }
+
+  .matrix-zone--leader {
+    fill: #fff1f2;
+  }
+
+  .matrix-zone--improving {
+    fill: #fffaf0;
+  }
+
+  .matrix-zone--weakening {
+    fill: #f0fdf4;
+  }
+
+  .matrix-zone--lagging {
+    fill: #f0f7ff;
   }
 
   .matrix-axis {
     stroke-width: 1;
-    stroke-dasharray: 4 4;
-    stroke: var(--strategy-text-4);
+    stroke-dasharray: 3 5;
+    stroke: #94a3b8;
   }
 
   .matrix-axis-label,
@@ -1077,8 +1405,8 @@
   }
 
   .matrix-quadrant-label {
-    fill: var(--strategy-text-4);
-    font-size: 13px;
+    fill: #64748b;
+    font-size: 12px;
     font-weight: 700;
     letter-spacing: 0.08em;
   }
@@ -1088,17 +1416,18 @@
   }
 
   .matrix-point circle {
-    stroke-width: 1.2;
-    stroke: var(--strategy-surface);
-    opacity: 0.82;
+    stroke-width: 1.5;
+    stroke: #fff;
+    opacity: 0.9;
+    filter: drop-shadow(0 1px 1px rgb(15 23 42 / 18%));
   }
 
   .matrix-point circle.is-positive {
-    fill: #22c55e;
+    fill: #ef4444;
   }
 
   .matrix-point circle.is-negative {
-    fill: #ef4444;
+    fill: #10b981;
   }
 
   .matrix-point circle.is-mixed {
@@ -1106,14 +1435,14 @@
   }
 
   .matrix-point.is-hover circle {
-    stroke-width: 2.5;
+    stroke-width: 3;
     stroke: var(--strategy-accent-strong);
     opacity: 1;
   }
 
   .matrix-label {
-    stroke-width: 3px;
-    stroke: var(--strategy-surface);
+    stroke-width: 4px;
+    stroke: #fff;
     fill: var(--strategy-text-1);
     font-size: 11px;
     font-weight: 700;
@@ -1122,6 +1451,10 @@
 
   .heat-panel {
     padding-bottom: 12px;
+  }
+
+  .heat-panel--bottom {
+    margin-top: 14px;
   }
 
   .heatmap {
@@ -1283,15 +1616,15 @@
     margin-top: 16px;
   }
 
-  .pool-toolbar,
+  .pool-toolbar:not(.pool-toolbar--enhanced),
   .focus-form {
     display: flex;
     gap: 8px;
     flex-wrap: wrap;
   }
 
-  .pool-toolbar input,
-  .pool-toolbar select,
+  .pool-toolbar:not(.pool-toolbar--enhanced) input,
+  .pool-toolbar:not(.pool-toolbar--enhanced) select,
   .focus-form input {
     height: 36px;
     padding: 0 10px;
@@ -1301,7 +1634,7 @@
     color: var(--strategy-text-1);
   }
 
-  .pool-toolbar input {
+  .pool-toolbar:not(.pool-toolbar--enhanced) input {
     flex: 1 1 280px;
   }
 
@@ -1398,11 +1731,41 @@
     .matrix-quadrant-label {
       font-size: 10px;
     }
+
+    .stock-filter-panel {
+      grid-template-columns: 1fr;
+    }
+
+    .filter-status {
+      grid-column: 1;
+    }
+
+    .pool-toolbar--enhanced {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
   }
 
   @media (max-width: 560px) {
     .pool-kpis {
       grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .pool-toolbar--enhanced {
+      grid-template-columns: 1fr;
+    }
+
+    .filter-actions {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .matrix-legend {
+      justify-content: flex-start;
+    }
+
+    .matrix-panel .sub-panel-head {
+      align-items: flex-start;
+      flex-direction: column;
     }
   }
 </style>

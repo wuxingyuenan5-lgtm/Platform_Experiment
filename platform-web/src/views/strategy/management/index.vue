@@ -102,6 +102,7 @@
     StrategyOrderProfile,
     StrategyPnlProfile,
   } from '@/data/sample/strategy';
+  import { strategyRegistryMap } from '../shared/strategyRegistry';
 
   const route = useRoute();
   const router = useRouter();
@@ -357,8 +358,8 @@
       label: `${overview?.strategyName || desk}订单信息`,
       tabs: [
         { key: 'positions', label: '当前持仓' },
-        { key: 'orders', label: '历史订单' },
         { key: 'fills', label: '成交记录' },
+        { key: 'orders', label: '历史订单' },
       ],
       tables: {
         positions: emptyTable(note),
@@ -371,7 +372,7 @@
   const deskTabs = computed(() =>
     strategyOverview.value.map((item) => ({
       key: item.deskKey as StrategyDeskKey,
-      label: item.strategyName,
+      label: strategyRegistryMap[item.deskKey as StrategyDeskKey]?.name || item.strategyName,
     })),
   );
 
@@ -406,9 +407,6 @@
 
   onMounted(() => {
     void refreshManagementOverview();
-    void refreshCrossSpreadRecords();
-    void refreshCrossSpreadFinance();
-    void refreshAccountSnapshots();
   });
 
   watch(
@@ -446,14 +444,22 @@
   );
 
   watch(
-    () => activeDesk.value,
-    () => {
-      if (activeDesk.value === 'crossSpread') {
-        void refreshCrossSpreadRecords();
-        void refreshCrossSpreadFinance();
+    () => [activeDesk.value, activeSection.value] as const,
+    ([desk, section], previous) => {
+      const previousDesk = previous?.[0];
+      const previousSection = previous?.[1];
+      if (desk === 'crossSpread') {
+        if (desk !== previousDesk) {
+          void refreshCrossSpreadFinance(section === 'pnl' ? 'pnl' : 'capital');
+        } else if (section === 'pnl' && previousSection !== 'pnl') {
+          void refreshCrossSpreadFinance('pnl');
+        }
+        if (section === 'orders' && (desk !== previousDesk || section !== previousSection)) {
+          void refreshCrossSpreadRecords();
+        }
       }
-      if (isAccountStrategy(activeDesk.value)) {
-        void refreshAccountSnapshots(activeDesk.value);
+      if (isAccountStrategy(desk) && desk !== previousDesk) {
+        void refreshAccountSnapshots(desk);
       }
     },
     { immediate: true },

@@ -1,5 +1,6 @@
 <template>
   <MarketTerminalPage
+    :dashboard="dashboard"
     :config="aShareTerminalConfig"
     :market-tabs="aShareTerminalTabs"
     detail-section-id="a-share-market-detail"
@@ -7,10 +8,12 @@
 </template>
 
 <script setup lang="ts">
+  import type { AShareDashboardResponse } from '@/api/hedgeResearch';
   import MarketTerminalPage from '../../components/MarketTerminalPage.vue';
   import { marketTerminalConfigs, type TerminalMarketId } from '../../nativeData/marketTerminal';
 
   const aShareTerminalConfig = marketTerminalConfigs.aShare;
+  defineProps<{ dashboard: AShareDashboardResponse | null }>();
   const aShareTerminalTabs: Array<{ id: TerminalMarketId; label: string; path: string }> = [
     { id: 'aShare', label: 'A股', path: '/hedge-board/a-share' },
   ];

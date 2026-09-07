@@ -42,7 +42,7 @@ export const tradingToolCategories: TradingToolCategory[] = [
         tools: [
           {
             id: 'macro-tradingeconomics-com-1',
-            name: '经济日历tradingeconomics',
+            name: '经济日历 tradingeconomics',
             url: 'https://tradingeconomics.com/calendar',
             description: '来源：宏观总览',
             domain: 'tradingeconomics.com',
@@ -82,7 +82,7 @@ export const tradingToolCategories: TradingToolCategory[] = [
           },
           {
             id: 'macro-en-macromicro-me-1',
-            name: 'macromicro宏观数据日报',
+            name: 'macromicro 宏观数据日报',
             url: 'https://en.macromicro.me/quickie',
             description: '来源：宏观总览',
             domain: 'en.macromicro.me',
@@ -122,7 +122,7 @@ export const tradingToolCategories: TradingToolCategory[] = [
           },
           {
             id: 'macro-www-haver-com-1',
-            name: 'Haver宏观评论',
+            name: 'Haver 宏观评论',
             url: 'https://www.haver.com/',
             description: '来源：宏观总览',
             domain: 'www.haver.com',
@@ -185,7 +185,7 @@ export const tradingToolCategories: TradingToolCategory[] = [
           },
           {
             id: 'macro-sc-macromicro-me-1',
-            name: '利率&美资产负债表vs.黄金',
+            name: '利率&美资产负债表 vs.黄金',
             url: 'https://sc.macromicro.me/collections/45/mm-gold-price/24057/us-fed-funds-rate-and-total-assets-vs-gold-price',
             description: '来源：美联储、美国经济数据',
             domain: 'sc.macromicro.me',
@@ -217,7 +217,7 @@ export const tradingToolCategories: TradingToolCategory[] = [
           },
           {
             id: 'macro-www-federalreserve-gov-3',
-            name: 'FOMC会议声明/记者会',
+            name: 'FOMC 会议声明/记者会',
             url: 'https://www.federalreserve.gov/videos.htm',
             description: '来源：美联储、美国经济数据',
             domain: 'www.federalreserve.gov',
@@ -241,7 +241,7 @@ export const tradingToolCategories: TradingToolCategory[] = [
           },
           {
             id: 'macro-fred-stlouisfed-org-3',
-            name: '10年期盈亏平衡通胀率 (T10YIE)',
+            name: '10 年期盈亏平衡通胀率 (T10YIE)',
             url: 'https://fred.stlouisfed.org/series/T10YIE',
             description: '来源：美联储、美国经济数据',
             domain: 'fred.stlouisfed.org',
@@ -249,7 +249,7 @@ export const tradingToolCategories: TradingToolCategory[] = [
           },
           {
             id: 'macro-fred-stlouisfed-org-4',
-            name: '10年期固定期限美债收益率DFII10)',
+            name: '10 年期固定期限美债收益率 DFII10)',
             url: 'https://fred.stlouisfed.org/series/DFII10',
             description: '来源：美联储、美国经济数据',
             domain: 'fred.stlouisfed.org',
@@ -329,7 +329,7 @@ export const tradingToolCategories: TradingToolCategory[] = [
           },
           {
             id: 'macro-fred-stlouisfed-org-6',
-            name: '核心PCE',
+            name: '核心 PCE',
             url: 'https://fred.stlouisfed.org/series/DPCCRV1Q225SBEA',
             description: '来源：美联储、美国经济数据',
             domain: 'fred.stlouisfed.org',
@@ -337,7 +337,7 @@ export const tradingToolCategories: TradingToolCategory[] = [
           },
           {
             id: 'macro-www-macromicro-me-1',
-            name: '美国PCE＆corePCE',
+            name: '美国 PCE＆corePCE',
             url: 'https://www.macromicro.me/charts/107685/mei-guo-PCE-corePCE-nian-zeng-lyu',
             description: '来源：美联储、美国经济数据',
             domain: 'www.macromicro.me',
@@ -345,7 +345,7 @@ export const tradingToolCategories: TradingToolCategory[] = [
           },
           {
             id: 'macro-www-clevelandfed-org-1',
-            name: '10年期通胀预期和风险溢价',
+            name: '10 年期通胀预期和风险溢价',
             url: 'https://www.clevelandfed.org/indicators-and-data/inflation-expectations',
             description: '来源：美联储、美国经济数据',
             domain: 'www.clevelandfed.org',
@@ -353,7 +353,7 @@ export const tradingToolCategories: TradingToolCategory[] = [
           },
           {
             id: 'macro-www-newyorkfed-org-4',
-            name: '1/3/5消费者通胀预期',
+            name: '1/3/5 消费者通胀预期',
             url: 'https://www.newyorkfed.org/microeconomics/sce#/inflexp-1',
             description: '来源：美联储、美国经济数据',
             domain: 'www.newyorkfed.org',
@@ -361,7 +361,7 @@ export const tradingToolCategories: TradingToolCategory[] = [
           },
           {
             id: 'macro-www-clevelandfed-org-2',
-            name: 'PCE预测',
+            name: 'PCE 预测',
             url: 'https://www.clevelandfed.org/indicators-and-data/inflation-nowcasting',
             description: '来源：美联储、美国经济数据',
             domain: 'www.clevelandfed.org',
@@ -369,7 +369,7 @@ export const tradingToolCategories: TradingToolCategory[] = [
           },
           {
             id: 'macro-sc-macromicro-me-3',
-            name: '美国CPI',
+            name: '美国 CPI',
             url: 'https://sc.macromicro.me/collections/5/us-price-relative/89/cpi-items-mom',
             description: '来源：美联储、美国经济数据',
             domain: 'sc.macromicro.me',
@@ -377,7 +377,7 @@ export const tradingToolCategories: TradingToolCategory[] = [
           },
           {
             id: 'macro-fred-stlouisfed-org-7',
-            name: '10年期国债-2年期国债利率（T10Y2Y）',
+            name: '10 年期国债-2 年期国债利率（T10Y2Y）',
             url: 'https://fred.stlouisfed.org/series/T10Y2Y',
             description: '来源：美联储、美国经济数据',
             domain: 'fred.stlouisfed.org',
@@ -393,7 +393,7 @@ export const tradingToolCategories: TradingToolCategory[] = [
           },
           {
             id: 'macro-en-macromicro-me-4',
-            name: '美国ADP就业数据',
+            name: '美国 ADP 就业数据',
             url: 'https://en.macromicro.me/collections/4/us-employ-relative/36/adp',
             description: '来源：美联储、美国经济数据',
             domain: 'en.macromicro.me',
@@ -433,7 +433,7 @@ export const tradingToolCategories: TradingToolCategory[] = [
           },
           {
             id: 'macro-fred-stlouisfed-org-12',
-            name: '美国30年期固定利率抵押贷款平均值',
+            name: '美国 30 年期固定利率抵押贷款平均值',
             url: 'https://fred.stlouisfed.org/series/MORTGAGE30US',
             description: '来源：美联储、美国经济数据',
             domain: 'fred.stlouisfed.org',
@@ -504,7 +504,7 @@ export const tradingToolCategories: TradingToolCategory[] = [
           },
           {
             id: 'macro-en-macromicro-me-7',
-            name: '10年期美债买卖比',
+            name: '10 年期美债买卖比',
             url: 'https://en.macromicro.me/collections/51/us-treasury-bond/30431/us-10y-bid-to-cover-ratio',
             description: '来源：美债类',
             domain: 'en.macromicro.me',
@@ -551,7 +551,7 @@ export const tradingToolCategories: TradingToolCategory[] = [
           },
           {
             id: 'macro-worldpopulationreview-com-1',
-            name: '各国债务/GDP占比',
+            name: '各国债务/GDP 占比',
             url: 'https://worldpopulationreview.com/country-rankings/countries-by-national-debt',
             description: '来源：其他',
             domain: 'worldpopulationreview.com',
@@ -575,7 +575,7 @@ export const tradingToolCategories: TradingToolCategory[] = [
           },
           {
             id: 'macro-www-imf-org-1',
-            name: 'IMF全球金融/外汇/债务指标数据库',
+            name: 'IMF 全球金融/外汇/债务指标数据库',
             url: 'https://www.imf.org/en/Data',
             description: '来源：其他',
             domain: 'www.imf.org',
@@ -629,7 +629,7 @@ export const tradingToolCategories: TradingToolCategory[] = [
           },
           {
             id: 'equity-dapanyuntu-com-1',
-            name: 'A股板块走势',
+            name: 'A 股板块走势',
             url: 'https://dapanyuntu.com/',
             description: '来源：股市总览',
             domain: 'dapanyuntu.com',
@@ -637,7 +637,7 @@ export const tradingToolCategories: TradingToolCategory[] = [
           },
           {
             id: 'equity-finviz-com-1',
-            name: '股票筛选器和热力图FINVIZ',
+            name: '股票筛选器和热力图 FINVIZ',
             url: 'https://finviz.com/',
             description: '来源：股市总览',
             domain: 'finviz.com',
@@ -645,7 +645,7 @@ export const tradingToolCategories: TradingToolCategory[] = [
           },
           {
             id: 'equity-finviz-com-2',
-            name: 'finviz财报可视化',
+            name: 'finviz 财报可视化',
             url: 'https://finviz.com/quote.ashx?t=AAPL&ty=ea&p=d&b=1',
             description: '来源：股市总览',
             domain: 'finviz.com',
@@ -669,7 +669,7 @@ export const tradingToolCategories: TradingToolCategory[] = [
           },
           {
             id: 'equity-www-sec-gov-1',
-            name: 'SEC财报',
+            name: 'SEC 财报',
             url: 'https://www.sec.gov/',
             description: '来源：股市总览',
             domain: 'www.sec.gov',
@@ -677,7 +677,7 @@ export const tradingToolCategories: TradingToolCategory[] = [
           },
           {
             id: 'equity-insight-factset-com-1',
-            name: '每季度财报统计及forward EPS/PE',
+            name: '每季度财报统计及 forward EPS/PE',
             url: 'https://insight.factset.com/topic/earnings',
             description: '来源：股市总览',
             domain: 'insight.factset.com',
@@ -709,7 +709,7 @@ export const tradingToolCategories: TradingToolCategory[] = [
           },
           {
             id: 'equity-ark-alien-tomato-com-1',
-            name: 'Ark基金最新动向',
+            name: 'Ark 基金最新动向',
             url: 'https://ark.alien-tomato.com/',
             description: '来源：股市总览',
             domain: 'ark.alien-tomato.com',
@@ -725,7 +725,7 @@ export const tradingToolCategories: TradingToolCategory[] = [
           },
           {
             id: 'equity-www-cninfo-com-cn-1',
-            name: 'A股巨潮资讯网',
+            name: 'A 股巨潮资讯网',
             url: 'https://www.cninfo.com.cn/new/index.jsp',
             description: '来源：股市总览',
             domain: 'www.cninfo.com.cn',
@@ -743,64 +743,64 @@ export const tradingToolCategories: TradingToolCategory[] = [
       },
       {
         id: 'equity-group-2',
-        title: 'ETF总览',
-        description: '来自 Markdown 分组“ETF总览”。',
+        title: 'ETF 总览',
+        description: '来自 Markdown 分组“ETF 总览”。',
         tools: [
           {
             id: 'equity-www-etf-com-1',
             name: 'ETF 比较工具',
             url: 'https://www.etf.com/tools/etf-comparison',
-            description: '来源：ETF总览',
+            description: '来源：ETF 总览',
             domain: 'www.etf.com',
-            tags: ['股市', 'ETF总览'],
+            tags: ['股市', 'ETF 总览'],
           },
           {
             id: 'equity-www-etfrc-com-1',
-            name: 'ETF研究中心',
+            name: 'ETF 研究中心',
             url: 'https://www.etfrc.com/',
-            description: '来源：ETF总览',
+            description: '来源：ETF 总览',
             domain: 'www.etfrc.com',
-            tags: ['股市', 'ETF总览'],
+            tags: ['股市', 'ETF 总览'],
           },
           {
             id: 'equity-etfdb-com-1',
             name: 'ETF 数据库：ETF 原创综合指南',
             url: 'https://etfdb.com/',
-            description: '来源：ETF总览',
+            description: '来源：ETF 总览',
             domain: 'etfdb.com',
-            tags: ['股市', 'ETF总览'],
+            tags: ['股市', 'ETF 总览'],
           },
           {
             id: 'equity-www-etf-com-2',
             name: 'ETF 基金流量工具',
             url: 'https://www.etf.com/etfanalytics/etf-fund-flows-tool',
-            description: '来源：ETF总览',
+            description: '来源：ETF 总览',
             domain: 'www.etf.com',
-            tags: ['股市', 'ETF总览'],
+            tags: ['股市', 'ETF 总览'],
           },
           {
             id: 'equity-www-lazyportfolioetf-com-1',
-            name: '懒惰投资组合和ETF组合',
+            name: '懒惰投资组合和 ETF 组合',
             url: 'https://www.lazyportfolioetf.com/#google_vignette',
-            description: '来源：ETF总览',
+            description: '来源：ETF 总览',
             domain: 'www.lazyportfolioetf.com',
-            tags: ['股市', 'ETF总览'],
+            tags: ['股市', 'ETF 总览'],
           },
           {
             id: 'equity-www-portfoliovisualizer-com-1',
             name: '投资组合可视化工具',
             url: 'https://www.portfoliovisualizer.com/',
-            description: '来源：ETF总览',
+            description: '来源：ETF 总览',
             domain: 'www.portfoliovisualizer.com',
-            tags: ['股市', 'ETF总览'],
+            tags: ['股市', 'ETF 总览'],
           },
           {
             id: 'equity-funddb-cn-1',
             name: '基金配置高手聚集地',
             url: 'https://funddb.cn/',
-            description: '来源：ETF总览',
+            description: '来源：ETF 总览',
             domain: 'funddb.cn',
-            tags: ['股市', 'ETF总览'],
+            tags: ['股市', 'ETF 总览'],
           },
         ],
       },
@@ -914,7 +914,7 @@ export const tradingToolCategories: TradingToolCategory[] = [
           },
           {
             id: 'crypto-members-delphidigital-io-1',
-            name: 'Messari/Delphi前瞻报告',
+            name: 'Messari/Delphi 前瞻报告',
             url: 'https://members.delphidigital.io/reports/the-year-ahead-for-markets-2026#concluding-thoughts-949c',
             description: '来源：研报类',
             domain: 'members.delphidigital.io',
@@ -954,7 +954,7 @@ export const tradingToolCategories: TradingToolCategory[] = [
           },
           {
             id: 'crypto-supersaiyan1957-substack-com-1',
-            name: 'BTC美股周报告',
+            name: 'BTC 美股周报告',
             url: 'https://supersaiyan1957.substack.com/',
             description: '来源：研报类',
             domain: 'supersaiyan1957.substack.com',
@@ -969,7 +969,7 @@ export const tradingToolCategories: TradingToolCategory[] = [
         tools: [
           {
             id: 'crypto-www-macromicro-me-1',
-            name: 'BTC驱动三大因素：流动性＆实际利率＆PE',
+            name: 'BTC 驱动三大因素：流动性＆实际利率＆PE',
             url: 'https://www.macromicro.me/collections/22514/bi-te-bi_418919/111972/bi-te-bi-BTC-qu-dong-san-da-yin-su-liu-dong-xing-shi-ji-li-lyu-GDP',
             description: '来源：交易类',
             domain: 'www.macromicro.me',
@@ -1177,7 +1177,7 @@ export const tradingToolCategories: TradingToolCategory[] = [
           },
           {
             id: 'crypto-arkm-com-1',
-            name: '链上分析｜Arkham',
+            name: '链上分析｜ Arkham',
             url: 'https://arkm.com/',
             description: '来源：交易类',
             domain: 'arkm.com',
@@ -1208,7 +1208,7 @@ export const tradingToolCategories: TradingToolCategory[] = [
         tools: [
           {
             id: 'crypto-www-benjamincowen-com-1',
-            name: 'Benjamin Cowen网站',
+            name: 'Benjamin Cowen 网站',
             url: 'https://www.benjamincowen.com/#services',
             description: '来源：基本面类',
             domain: 'www.benjamincowen.com',
@@ -1248,7 +1248,7 @@ export const tradingToolCategories: TradingToolCategory[] = [
           },
           {
             id: 'crypto-bitcointreasuries-net-1',
-            name: 'BTC分布明细',
+            name: 'BTC 分布明细',
             url: 'https://bitcointreasuries.net/',
             description: '来源：基本面类',
             domain: 'bitcointreasuries.net',
@@ -1312,7 +1312,7 @@ export const tradingToolCategories: TradingToolCategory[] = [
           },
           {
             id: 'crypto-xxi-money-1',
-            name: '21资本官网',
+            name: '21 资本官网',
             url: 'https://xxi.money/',
             description: '来源：基本面类',
             domain: 'xxi.money',
@@ -1320,7 +1320,7 @@ export const tradingToolCategories: TradingToolCategory[] = [
           },
           {
             id: 'crypto-www-ishares-com-1',
-            name: 'IBIT官网',
+            name: 'IBIT 官网',
             url: 'https://www.ishares.com/us/products/333011/ishares-bitcoin-trust-etf#/',
             description: '来源：基本面类',
             domain: 'www.ishares.com',
@@ -1422,7 +1422,7 @@ export const tradingToolCategories: TradingToolCategory[] = [
           },
           {
             id: 'crypto-app-ethena-fi-1',
-            name: 'Ethena信息',
+            name: 'Ethena 信息',
             url: 'https://app.ethena.fi/dashboards/positions',
             description: '来源：理财与其他',
             domain: 'app.ethena.fi',
@@ -1438,7 +1438,7 @@ export const tradingToolCategories: TradingToolCategory[] = [
           },
           {
             id: 'crypto-btc-com-1',
-            name: 'BTC.com与矿池',
+            name: 'BTC.com 与矿池',
             url: 'https://btc.com/zh-CN',
             description: '来源：理财与其他',
             domain: 'btc.com',
@@ -1462,7 +1462,7 @@ export const tradingToolCategories: TradingToolCategory[] = [
           },
           {
             id: 'crypto-miningpoolstats-stream-1',
-            name: '挖矿BTC数据',
+            name: '挖矿 BTC 数据',
             url: 'https://miningpoolstats.stream/bitcoin',
             description: '来源：理财与其他',
             domain: 'miningpoolstats.stream',
@@ -1494,7 +1494,7 @@ export const tradingToolCategories: TradingToolCategory[] = [
           },
           {
             id: 'crypto-app-uniswap-org-1',
-            name: 'Uniswap Ethereum资金池',
+            name: 'Uniswap Ethereum 资金池',
             url: 'https://app.uniswap.org/explore/pools',
             description: '来源：理财与其他',
             domain: 'app.uniswap.org',
@@ -1518,7 +1518,7 @@ export const tradingToolCategories: TradingToolCategory[] = [
           },
           {
             id: 'crypto-www-apeoclock-com-1',
-            name: 'defi项目发布日历',
+            name: 'defi 项目发布日历',
             url: 'https://www.apeoclock.com/',
             description: '来源：理财与其他',
             domain: 'www.apeoclock.com',
@@ -1526,7 +1526,7 @@ export const tradingToolCategories: TradingToolCategory[] = [
           },
           {
             id: 'crypto-stake-lido-fi-1',
-            name: 'ETH质押',
+            name: 'ETH 质押',
             url: 'https://stake.lido.fi/',
             description: '来源：理财与其他',
             domain: 'stake.lido.fi',
@@ -1534,7 +1534,7 @@ export const tradingToolCategories: TradingToolCategory[] = [
           },
           {
             id: 'crypto-cryptorank-io-1',
-            name: '一级和预测市场CryptoRank.io',
+            name: '一级和预测市场 CryptoRank.io',
             url: 'https://cryptorank.io/prediction-markets',
             description: '来源：理财与其他',
             domain: 'cryptorank.io',
@@ -1550,7 +1550,7 @@ export const tradingToolCategories: TradingToolCategory[] = [
           },
           {
             id: 'crypto-www-coincarp-com-1',
-            name: '加密货币活动日历CoinCarp',
+            name: '加密货币活动日历 CoinCarp',
             url: 'https://www.coincarp.com/events/',
             description: '来源：理财与其他',
             domain: 'www.coincarp.com',
@@ -1558,7 +1558,7 @@ export const tradingToolCategories: TradingToolCategory[] = [
           },
           {
             id: 'crypto-gmgn-ai-1',
-            name: '聪明钱追踪｜GMGN.AI',
+            name: '聪明钱追踪｜ GMGN.AI',
             url: 'https://gmgn.ai/?chain=sol',
             description: '来源：理财与其他',
             domain: 'gmgn.ai',
@@ -1574,7 +1574,7 @@ export const tradingToolCategories: TradingToolCategory[] = [
           },
           {
             id: 'crypto-dune-com-1',
-            name: 'Dune社区加密分析',
+            name: 'Dune 社区加密分析',
             url: 'https://dune.com/home',
             description: '来源：理财与其他',
             domain: 'dune.com',
@@ -1636,7 +1636,7 @@ export const tradingToolCategories: TradingToolCategory[] = [
           },
           {
             id: 'metal-www-lbma-org-uk-1',
-            name: '伦敦金库数据LBMA',
+            name: '伦敦金库数据 LBMA',
             url: 'https://www.lbma.org.uk/prices-and-data/london-vault-data',
             description: '来源：黄金总览',
             domain: 'www.lbma.org.uk',
@@ -1652,7 +1652,7 @@ export const tradingToolCategories: TradingToolCategory[] = [
           },
           {
             id: 'metal-china-gold-org-1',
-            name: '黄金ETF的持有量和流量',
+            name: '黄金 ETF 的持有量和流量',
             url: 'https://china.gold.org/goldhub/data/gold-etfs-holdings-and-flows#from-login=1&login-type=wechat',
             description: '来源：黄金总览',
             domain: 'china.gold.org',
@@ -1684,7 +1684,7 @@ export const tradingToolCategories: TradingToolCategory[] = [
           },
           {
             id: 'metal-sc-macromicro-me-1',
-            name: 'SPDR黄金ETF流量',
+            name: 'SPDR 黄金 ETF 流量',
             url: 'https://sc.macromicro.me/collections/45/mm-gold-price/23274/gld-fund-flow',
             description: '来源：黄金总览',
             domain: 'sc.macromicro.me',
@@ -1692,7 +1692,7 @@ export const tradingToolCategories: TradingToolCategory[] = [
           },
           {
             id: 'metal-sc-macromicro-me-2',
-            name: 'SPDR黄金ETF持仓量',
+            name: 'SPDR 黄金 ETF 持仓量',
             url: 'https://sc.macromicro.me/collections/45/mm-gold-price/712/spdr-gold-trust-etf-gold-price',
             description: '来源：黄金总览',
             domain: 'sc.macromicro.me',
@@ -1724,7 +1724,7 @@ export const tradingToolCategories: TradingToolCategory[] = [
           },
           {
             id: 'metal-www-cmegroup-com-3',
-            name: 'COT报告持仓',
+            name: 'COT 报告持仓',
             url: 'https://www.cmegroup.com/tools-information/quikstrike/commitment-of-traders.html?pid=40#cmeloginteaser1',
             description: '来源：黄金总览',
             domain: 'www.cmegroup.com',
@@ -1732,7 +1732,7 @@ export const tradingToolCategories: TradingToolCategory[] = [
           },
           {
             id: 'metal-giresearch-substack-com-1',
-            name: '黄金研究｜Chris 博士｜Substack',
+            name: '黄金研究｜ Chris 博士｜ Substack',
             url: 'https://giresearch.substack.com/',
             description: '来源：黄金总览',
             domain: 'giresearch.substack.com',
@@ -1740,7 +1740,7 @@ export const tradingToolCategories: TradingToolCategory[] = [
           },
           {
             id: 'metal-www-incrementum-li-1',
-            name: '期刊Incrementum',
+            name: '期刊 Incrementum',
             url: 'https://www.incrementum.li/en/journal/',
             description: '来源：黄金总览',
             domain: 'www.incrementum.li',
@@ -1803,7 +1803,7 @@ export const tradingToolCategories: TradingToolCategory[] = [
           },
           {
             id: 'metal-www-1qh-cn-1',
-            name: '期货套利分析_跨期价差查询',
+            name: '期货套利分析\\_跨期价差查询',
             url: 'https://www.1qh.cn/tools/spread.html',
             description: '来源：商品总览',
             domain: 'www.1qh.cn',
@@ -1827,7 +1827,7 @@ export const tradingToolCategories: TradingToolCategory[] = [
           },
           {
             id: 'metal-hq-smm-cn-1',
-            name: '有色金属期货进口盈亏率_上海有色网',
+            name: '有色金属期货进口盈亏率\\_上海有色网',
             url: 'https://hq.smm.cn/data/arbi',
             description: '来源：商品总览',
             domain: 'hq.smm.cn',
@@ -1873,7 +1873,7 @@ export const tradingToolCategories: TradingToolCategory[] = [
           },
           {
             id: 'general-x-com-1',
-            name: '推特X',
+            name: '推特 X',
             url: 'https://x.com/home',
             description: '来源：交易新闻和高手跟踪类总览',
             domain: 'x.com',
@@ -1889,7 +1889,7 @@ export const tradingToolCategories: TradingToolCategory[] = [
           },
           {
             id: 'general-www-financialjuice-com-1',
-            name: 'FinancialJuice适合看实时的',
+            name: 'FinancialJuice 适合看实时的',
             url: 'https://www.financialjuice.com/home',
             description: '来源：交易新闻和高手跟踪类总览',
             domain: 'www.financialjuice.com',
@@ -1929,7 +1929,7 @@ export const tradingToolCategories: TradingToolCategory[] = [
           },
           {
             id: 'general-www-odaily-news-1',
-            name: 'Odaily星球日报',
+            name: 'Odaily 星球日报',
             url: 'https://www.odaily.news/',
             description: '来源：交易新闻和高手跟踪类总览',
             domain: 'www.odaily.news',
@@ -2040,7 +2040,7 @@ export const tradingToolCategories: TradingToolCategory[] = [
           },
           {
             id: 'general-www-sec-gov-1',
-            name: 'SEC13F季度持仓',
+            name: 'SEC13F 季度持仓',
             url: 'https://www.sec.gov/edgar/search/',
             description: '来源：其他总览',
             domain: 'www.sec.gov',
@@ -2096,7 +2096,7 @@ export const tradingToolCategories: TradingToolCategory[] = [
           },
           {
             id: 'general-chartexchange-com-1',
-            name: 'CFEGF股票价格及图表',
+            name: 'CFEGF 股票价格及图表',
             url: 'https://chartexchange.com/symbol/otc-cfegf/',
             description: '来源：其他总览',
             domain: 'chartexchange.com',
@@ -2104,7 +2104,7 @@ export const tradingToolCategories: TradingToolCategory[] = [
           },
           {
             id: 'general-www-tradingster-com-1',
-            name: 'COT报告：美元指数COT图表',
+            name: 'COT 报告：美元指数 COT 图表',
             url: 'https://www.tradingster.com/cot/futures/fin/098662',
             description: '来源：其他总览',
             domain: 'www.tradingster.com',
@@ -2119,7 +2119,7 @@ export const tradingToolCategories: TradingToolCategory[] = [
         tools: [
           {
             id: 'general-www-openvlab-cn-1',
-            name: 'OpenVlab分析平台',
+            name: 'OpenVlab 分析平台',
             url: 'https://www.openvlab.cn/',
             description: '来源：衍生品总览',
             domain: 'www.openvlab.cn',
@@ -2143,7 +2143,7 @@ export const tradingToolCategories: TradingToolCategory[] = [
           },
           {
             id: 'general-www-theblock-co-1',
-            name: '加密期权成交量和IV图表',
+            name: '加密期权成交量和 IV 图表',
             url: 'https://www.theblock.co/data/crypto-markets/options',
             description: '来源：衍生品总览',
             domain: 'www.theblock.co',
@@ -2151,7 +2151,7 @@ export const tradingToolCategories: TradingToolCategory[] = [
           },
           {
             id: 'general-squeezemetrics-com-1',
-            name: 'sqzme股票数据的新视角',
+            name: 'sqzme 股票数据的新视角',
             url: 'https://squeezemetrics.com/monitor',
             description: '来源：衍生品总览',
             domain: 'squeezemetrics.com',
@@ -2173,7 +2173,7 @@ export const tradingToolCategories: TradingToolCategory[] = [
         tools: [
           {
             id: 'quant-www-wolai-com-1',
-            name: '2025年8月 量化金工月度热点研报',
+            name: '2025 年 8 月 量化金工月度热点研报',
             url: 'https://www.wolai.com/ustfinance/uyMty39PGZafSZa2YU93mQ',
             description: '来源：量化总览',
             domain: 'www.wolai.com',
@@ -2189,7 +2189,7 @@ export const tradingToolCategories: TradingToolCategory[] = [
           },
           {
             id: 'quant-blog-csdn-net-1',
-            name: 'CSDN博客',
+            name: 'CSDN 博客',
             url: 'https://blog.csdn.net/weixin_42219751/article/details/93621991',
             description: '来源：量化总览',
             domain: 'blog.csdn.net',
@@ -2213,7 +2213,7 @@ export const tradingToolCategories: TradingToolCategory[] = [
           },
           {
             id: 'quant-www-joinquant-com-2',
-            name: 'JoinQuant聚宽量化投研平台',
+            name: 'JoinQuant 聚宽量化投研平台',
             url: 'https://www.joinquant.com/',
             description: '来源：量化总览',
             domain: 'www.joinquant.com',
@@ -2221,7 +2221,7 @@ export const tradingToolCategories: TradingToolCategory[] = [
           },
           {
             id: 'quant-www-quantconnect-com-1',
-            name: '开源算法交易平台QuantConnect.com',
+            name: '开源算法交易平台 QuantConnect.com',
             url: 'https://www.quantconnect.com/',
             description: '来源：量化总览',
             domain: 'www.quantconnect.com',
@@ -2245,7 +2245,7 @@ export const tradingToolCategories: TradingToolCategory[] = [
           },
           {
             id: 'quant-tushare-pro-1',
-            name: 'Tushare数据',
+            name: 'Tushare 数据',
             url: 'https://tushare.pro/',
             description: '来源：量化总览',
             domain: 'tushare.pro',
@@ -2277,7 +2277,7 @@ export const tradingToolCategories: TradingToolCategory[] = [
           },
           {
             id: 'quant-www-thinktrader-net-1',
-            name: '迅投-以思考的速度交易qmt-（官方）',
+            name: '迅投-以思考的速度交易 qmt-（官方）',
             url: 'https://www.thinktrader.net/',
             description: '来源：量化总览',
             domain: 'www.thinktrader.net',
@@ -2285,7 +2285,7 @@ export const tradingToolCategories: TradingToolCategory[] = [
           },
           {
             id: 'quant-docs-pandas-ai-com-1',
-            name: 'PandasAI简介 - PandasAI',
+            name: 'PandasAI 简介 - PandasAI',
             url: 'https://docs.pandas-ai.com/v2/intro',
             description: '来源：量化总览',
             domain: 'docs.pandas-ai.com',
@@ -2301,7 +2301,7 @@ export const tradingToolCategories: TradingToolCategory[] = [
           },
           {
             id: 'quant-mp-weixin-qq-com-1',
-            name: '「量化界」年度最受欢迎的10篇博客',
+            name: '「量化界」年度最受欢迎的 10 篇博客',
             url: 'https://mp.weixin.qq.com/s/CYZ7tPcNYxGr3pSVkd2NSQ',
             description: '来源：量化总览',
             domain: 'mp.weixin.qq.com',
@@ -2341,7 +2341,7 @@ export const tradingToolCategories: TradingToolCategory[] = [
           },
           {
             id: 'quant-www-vnpy-com-1',
-            name: '开源量化平台vnpy',
+            name: '开源量化平台 vnpy',
             url: 'https://www.vnpy.com/',
             description: '来源：量化总览',
             domain: 'www.vnpy.com',
@@ -2381,7 +2381,7 @@ export const tradingToolCategories: TradingToolCategory[] = [
           },
           {
             id: 'quant-bigquant-com-2',
-            name: 'BigQuant量化交易',
+            name: 'BigQuant 量化交易',
             url: 'https://bigquant.com/wiki/doc/kq9FxV9GUg',
             description: '来源：量化总览',
             domain: 'bigquant.com',
@@ -2428,7 +2428,7 @@ export const tradingToolCategories: TradingToolCategory[] = [
         tools: [
           {
             id: 'quant-bigquant-com-3',
-            name: '金工CTA系列之一：基于基本面多因子模型的黄金交易策略',
+            name: '金工 CTA 系列之一：基于基本面多因子模型的黄金交易策略',
             url: 'https://bigquant.com/wiki/doc/oiVYuLosvU',
             description: '来源：量化类好文章',
             domain: 'bigquant.com',
@@ -2436,7 +2436,7 @@ export const tradingToolCategories: TradingToolCategory[] = [
           },
           {
             id: 'quant-blog-csdn-net-2',
-            name: '统计套利策略的五大主流策略分析与优缺点_',
+            name: '统计套利策略的五大主流策略分析与优缺点\\_',
             url: 'https://blog.csdn.net/zk168_net/article/details/107536782',
             description: '来源：量化类好文章',
             domain: 'blog.csdn.net',
@@ -2451,7 +2451,7 @@ export const tradingToolCategories: TradingToolCategory[] = [
         tools: [
           {
             id: 'quant-tushare-pro-2',
-            name: 'Tushare数据',
+            name: 'Tushare 数据',
             url: 'https://tushare.pro/document/2?doc_id=284',
             description: '来源：接口',
             domain: 'tushare.pro',
@@ -2475,7 +2475,7 @@ export const tradingToolCategories: TradingToolCategory[] = [
           },
           {
             id: 'quant-tushare-pro-3',
-            name: 'Tushare数据',
+            name: 'Tushare 数据',
             url: 'https://tushare.pro/document/2',
             description: '来源：接口',
             domain: 'tushare.pro',
@@ -2483,7 +2483,7 @@ export const tradingToolCategories: TradingToolCategory[] = [
           },
           {
             id: 'quant-www-juejinshuju-com-1',
-            name: '掘金：国内期货历史数据-主连分钟K线-期货主连历史分钟数据下载',
+            name: '掘金：国内期货历史数据-主连分钟 K 线-期货主连历史分钟数据下载',
             url: 'http://www.juejinshuju.com/future_continue_min/',
             description: '来源：接口',
             domain: 'www.juejinshuju.com',
@@ -2555,7 +2555,7 @@ export const tradingToolCategories: TradingToolCategory[] = [
           },
           {
             id: 'quant-ptradeapi-com-1',
-            name: 'Ptrade 量化交易 API接口文档',
+            name: 'Ptrade 量化交易 API 接口文档',
             url: 'https://ptradeapi.com/',
             description: '来源：接口',
             domain: 'ptradeapi.com',

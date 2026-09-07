@@ -222,6 +222,7 @@ GET /api/v1/trading/cross-spread/observability?historyHours=24&limit=20
 
 ```http
 POST /api/v1/trading/cross-spread/lifecycle/open
+PATCH /api/v1/trading/cross-spread/exit-plans/{planId}
 POST /api/v1/trading/cross-spread/exit-plans/{planId}/close
 GET  /api/v1/trading/cross-spread/exit-plans
 POST /api/v1/trading/cross-spread/exit-plans/evaluate

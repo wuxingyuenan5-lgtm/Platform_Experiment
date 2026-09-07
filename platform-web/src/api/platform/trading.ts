@@ -46,6 +46,11 @@ const client: AxiosInstance = axios.create({
   },
 });
 
+const pendingOrdersRequests = new Map<string, Promise<OrderDetailResult[]>>();
+const pendingFillsRequests = new Map<string, Promise<FillResult[]>>();
+const pendingBalanceRequests = new Map<string, Promise<BalanceResult | null>>();
+const pendingEquityHistoryRequests = new Map<string, Promise<EquityHistoryPointResult[]>>();
+
 function isNotFound(error: unknown): boolean {
   return axios.isAxiosError(error) && error.response?.status === 404;
 }
@@ -111,26 +116,38 @@ export async function getTradingPnl(
 }
 
 export async function getAccountBalanceLatest(accountId: string): Promise<BalanceResult | null> {
-  try {
-    const response = await client.get<BalanceResult>(
-      `/accounts/${encodeURIComponent(accountId)}/balances/latest`,
-    );
-    return response.data;
-  } catch (error) {
-    if (isNotFound(error)) return null;
-    throw error;
-  }
+  const pending = pendingBalanceRequests.get(accountId);
+  if (pending) return pending;
+  const request = (async () => {
+    try {
+      const response = await client.get<BalanceResult>(
+        `/accounts/${encodeURIComponent(accountId)}/balances/latest`,
+      );
+      return response.data;
+    } catch (error) {
+      if (isNotFound(error)) return null;
+      throw error;
+    }
+  })().finally(() => pendingBalanceRequests.delete(accountId));
+  pendingBalanceRequests.set(accountId, request);
+  return request;
 }
 
 export async function getEquityHistory(
   accountId: string,
   currency?: string,
 ): Promise<EquityHistoryPointResult[]> {
-  const response = await client.get<EquityHistoryPointResult[]>(
-    `/accounts/${encodeURIComponent(accountId)}/equity-history`,
-    { params: currency ? { currency } : undefined },
-  );
-  return response.data;
+  const requestKey = `${accountId}:${currency || '*'}`;
+  const pending = pendingEquityHistoryRequests.get(requestKey);
+  if (pending) return pending;
+  const request = client
+    .get<EquityHistoryPointResult[]>(`/accounts/${encodeURIComponent(accountId)}/equity-history`, {
+      params: currency ? { currency } : undefined,
+    })
+    .then((response) => response.data)
+    .finally(() => pendingEquityHistoryRequests.delete(requestKey));
+  pendingEquityHistoryRequests.set(requestKey, request);
+  return request;
 }
 
 export async function getTradingSnapshot(
@@ -300,14 +317,32 @@ export async function getInstruments(): Promise<InstrumentResult[]> {
   return response.data;
 }
 
-export async function getOrders(): Promise<OrderDetailResult[]> {
-  const response = await client.get<OrderDetailResult[]>('/trading/orders');
-  return response.data;
+export async function getOrders(strategyInstanceId?: string): Promise<OrderDetailResult[]> {
+  const requestKey = strategyInstanceId || '*';
+  const pending = pendingOrdersRequests.get(requestKey);
+  if (pending) return pending;
+  const request = client
+    .get<OrderDetailResult[]>('/trading/orders', {
+      params: strategyInstanceId ? { strategyInstanceId } : undefined,
+    })
+    .then((response) => response.data)
+    .finally(() => pendingOrdersRequests.delete(requestKey));
+  pendingOrdersRequests.set(requestKey, request);
+  return request;
 }
 
-export async function getFills(): Promise<FillResult[]> {
-  const response = await client.get<FillResult[]>('/trading/fills');
-  return response.data;
+export async function getFills(strategyInstanceId?: string): Promise<FillResult[]> {
+  const requestKey = strategyInstanceId || '*';
+  const pending = pendingFillsRequests.get(requestKey);
+  if (pending) return pending;
+  const request = client
+    .get<FillResult[]>('/trading/fills', {
+      params: strategyInstanceId ? { strategyInstanceId } : undefined,
+    })
+    .then((response) => response.data)
+    .finally(() => pendingFillsRequests.delete(requestKey));
+  pendingFillsRequests.set(requestKey, request);
+  return request;
 }
 
 export async function getStrategyPnl(strategyInstanceId: string): Promise<StrategyPnlResult> {

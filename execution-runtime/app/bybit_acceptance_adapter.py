@@ -268,6 +268,25 @@ class BybitAcceptanceAdapter(BybitFillConfirmingAdapter):
     def get_account_risk(self, account_id: str) -> VenueAccountRiskSnapshot:
         self._assert_account(account_id)
         try:
+            total_assets = None
+            asset_result: dict[str, object] = {}
+            if account_id in self.settings.bybit_total_asset_accounts:
+                asset_overview = self._with_fresh_client_retry(
+                    account_id,
+                    lambda client: client.get_asset_overview(),
+                )
+                self._require_success(asset_overview, "Bybit total-asset query failed")
+                raw_asset_result = asset_overview.get("result") or {}
+                if not isinstance(raw_asset_result, dict):
+                    raise GatewayConfigurationError(
+                        "Bybit total-asset query returned invalid data"
+                    )
+                asset_result = raw_asset_result
+                total_assets = self._optional_decimal(asset_result.get("totalEquity"))
+                if total_assets is None:
+                    raise GatewayConfigurationError(
+                        "Bybit total-asset query returned no totalEquity"
+                    )
             response = self._with_fresh_client_retry(
                 account_id,
                 lambda client: client.get_wallet_balance(accountType="UNIFIED")
@@ -294,12 +313,17 @@ class BybitAcceptanceAdapter(BybitFillConfirmingAdapter):
         account_result = account_response.get("result") if account_response else {}
         if not isinstance(account_result, dict):
             account_result = {}
+        is_total_asset_account = account_id in self.settings.bybit_total_asset_accounts
         return VenueAccountRiskSnapshot(
             source=self.name,
             accountId=account_id,
-            currency="USD",
-            equity=self._optional_decimal(row.get("totalEquity")),
-            walletBalance=self._optional_decimal(row.get("totalWalletBalance")),
+            currency=("USD" if is_total_asset_account else self.settings.bybit_settle_coin).upper(),
+            equity=total_assets if is_total_asset_account else self._optional_decimal(row.get("totalEquity")),
+            walletBalance=(
+                total_assets
+                if is_total_asset_account
+                else self._optional_decimal(row.get("totalWalletBalance"))
+            ),
             marginBalance=self._optional_decimal(row.get("totalMarginBalance")),
             availableBalance=self._optional_decimal(row.get("totalAvailableBalance")),
             initialMargin=self._optional_decimal(row.get("totalInitialMargin")),

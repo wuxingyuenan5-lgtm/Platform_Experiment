@@ -69,6 +69,10 @@ class Settings(BaseSettings):
     # compatible while allowing isolated Bybit subaccounts.
     bybit_account_credential_refs: str = ""
     bybit_account_category_scopes: str = ""
+    # Accounts whose strategy-management balance is the Bybit all-account USD
+    # asset overview. Other Bybit accounts retain the trading-account risk
+    # balance used for venue execution and cross-venue leg accounting.
+    bybit_total_asset_account_ids: str = ""
     bybit_read_only_account_ids: str = ""
     bybit_instrument_map: str = ""
     bybit_category: str = "linear"
@@ -95,6 +99,10 @@ class Settings(BaseSettings):
     mt5_account_ids: str = ""
     mt5_account_credential_refs: str = ""
     mt5_account_terminal_paths: str = ""
+    # Optional per-account isolation mode.  This is needed when a terminal is
+    # also open interactively: portable=True keeps the Runtime worker on its
+    # own terminal data/IPC session instead of attaching to the desktop copy.
+    mt5_account_portable_modes: str = ""
     mt5_primary_account_id: str = ""
     mt5_instrument_map: str = ""
     # Logical gold symbol used as the resolution base. The concrete broker name
@@ -143,6 +151,10 @@ class Settings(BaseSettings):
     @property
     def bybit_read_only_accounts(self) -> set[str]:
         return set(self._csv(self.bybit_read_only_account_ids))
+
+    @property
+    def bybit_total_asset_accounts(self) -> set[str]:
+        return set(self._csv(self.bybit_total_asset_account_ids))
 
     def bybit_credential_for_account(self, account_id: str) -> str:
         return self.bybit_account_credentials.get(account_id, self.bybit_credential_ref)
@@ -211,6 +223,24 @@ class Settings(BaseSettings):
 
     def mt5_terminal_for_account(self, account_id: str) -> str | None:
         return self.mt5_account_terminals.get(account_id)
+
+    @property
+    def mt5_account_portable_settings(self) -> dict[str, bool]:
+        mapping: dict[str, bool] = {}
+        for item in self._csv(self.mt5_account_portable_modes):
+            if "=" not in item:
+                continue
+            account_id, value = item.split("=", 1)
+            normalized = value.strip().lower()
+            if account_id.strip() and normalized in {"true", "false"}:
+                mapping[account_id.strip()] = normalized == "true"
+        return mapping
+
+    def mt5_terminal_portable_for_account(self, account_id: str) -> bool:
+        return self.mt5_account_portable_settings.get(
+            account_id,
+            self.mt5_terminal_portable,
+        )
 
     @property
     def bybit_instruments(self) -> dict[str, str]:

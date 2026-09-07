@@ -14,6 +14,14 @@
         >
           {{ range }}
         </button>
+        <a
+          class="tradingview-template-btn"
+          href="https://cn.tradingview.com/chart/BFtpYPL6/"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          TradingView 模板
+        </a>
         <button class="gear-btn gear-btn--mini" type="button">⤢</button>
       </div>
     </div>
@@ -170,6 +178,26 @@
     background: var(--strategy-accent-soft);
     color: var(--strategy-accent-strong);
     box-shadow: inset 0 0 0 1px rgba(201, 72, 72, 0.08);
+  }
+
+  .tradingview-template-btn {
+    display: inline-flex;
+    align-items: center;
+    height: 32px;
+    padding: 0 12px;
+    border: 1px solid #d7e2ef;
+    border-radius: 10px;
+    color: #47617f;
+    background: #fff;
+    font-size: 14px;
+    font-weight: 700;
+    text-decoration: none;
+    white-space: nowrap;
+  }
+
+  .tradingview-template-btn:hover {
+    border-color: #8fb1ea;
+    color: #276ef1;
   }
 
   .gear-btn {

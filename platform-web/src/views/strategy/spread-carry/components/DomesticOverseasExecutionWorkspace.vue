@@ -484,8 +484,8 @@
 
   const tableTabs: Array<{ key: TableKey; label: string }> = [
     { key: 'positions', label: '当前持仓' },
-    { key: 'orders', label: '历史订单' },
     { key: 'fills', label: '成交记录' },
+    { key: 'orders', label: '历史订单' },
     { key: 'logs', label: '执行记录' },
   ];
 

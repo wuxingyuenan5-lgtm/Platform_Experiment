@@ -97,138 +97,28 @@
 </template>
 
 <script setup lang="ts">
-  import { computed, onMounted, ref } from 'vue';
+  import { computed } from 'vue';
   import type { AShareDashboardResponse } from '@/api/hedgeResearch';
   import ResearchSourceState from '../../research/components/ResearchSourceState.vue';
 
   const props = defineProps<{ dashboard: AShareDashboardResponse | null }>();
   defineEmits<{ (event: 'open-chart', code: string, name: string): void }>();
-  interface VibeOverview {
-    sentiment?: {
-      up: number;
-      down: number;
-      flat: number;
-      zt: number;
-      zt_real: number;
-      dt: number;
-      dt_real: number;
-      active?: string | number;
-      breadth?: string;
-      speculation?: string;
-    };
-    emotion?: {
-      zt_count: number;
-      dt_count: number;
-      zb_count: number;
-      max_boards: number;
-      lianban_count: number;
-      seal_rate?: number;
-      break_rate?: number;
-      promotion_rate?: number;
-      date?: string;
-    };
-    indices?: Array<{ name: string; price: number; change_pct: number }>;
-    sectors?: Array<{ name: string; pct: number; net: number; inflow: number; outflow: number }>;
-    turnover_top?: {
-      stocks?: Array<{ code: string; name: string; price: number; pct: number; amount: number }>;
-    };
-  }
-  const vibe = ref<VibeOverview | null>(null);
-  onMounted(async () => {
-    try {
-      const response = await fetch('/vibe-research/api/market/overview-v2', { cache: 'no-store' });
-      if (response.ok)
-        vibe.value = ((await response.json()) as { data?: VibeOverview }).data || null;
-    } catch {
-      /* platform API remains the source of truth when reference service is unavailable */
-    }
-  });
-  const breadth = computed(
-    () =>
-      props.dashboard?.breadth.data ||
-      (vibe.value?.sentiment
-        ? {
-            up: vibe.value.sentiment.up,
-            down: vibe.value.sentiment.down,
-            flat: vibe.value.sentiment.flat,
-            limitUp: vibe.value.sentiment.zt,
-            realLimitUp: vibe.value.sentiment.zt_real,
-            limitDown: vibe.value.sentiment.dt,
-            realLimitDown: vibe.value.sentiment.dt_real,
-            activityPct: vibe.value.sentiment.active,
-            breadthState: vibe.value.sentiment.breadth || '—',
-            speculationState: vibe.value.sentiment.speculation || '—',
-            tradeDate: undefined,
-          }
-        : null),
-  );
-  const emotion = computed(
-    () =>
-      props.dashboard?.emotion.data ||
-      (vibe.value?.emotion
-        ? {
-            limitUpCount: vibe.value.emotion.zt_count,
-            brokenBoardCount: vibe.value.emotion.zb_count,
-            limitDownCount: vibe.value.emotion.dt_count,
-            highestBoardCount: vibe.value.emotion.max_boards,
-            consecutiveBoardCount: vibe.value.emotion.lianban_count,
-            sealRatePct:
-              vibe.value.emotion.seal_rate == null ? null : vibe.value.emotion.seal_rate * 100,
-            breakRatePct:
-              vibe.value.emotion.break_rate == null ? null : vibe.value.emotion.break_rate * 100,
-            promotionRatePct:
-              vibe.value.emotion.promotion_rate == null
-                ? null
-                : vibe.value.emotion.promotion_rate * 100,
-            tradeDate: vibe.value.emotion.date,
-            ladder: [],
-            leaders: [],
-          }
-        : null),
-  );
-  const topSectors = computed(
-    () =>
-      props.dashboard?.shenwan.data?.sw2Top?.slice(0, 7) ||
-      (vibe.value?.sectors || []).slice(0, 7).map((row, index) => ({
-        rank: index + 1,
-        swL2Code: row.name,
-        swL2Name: row.name,
-        swL1Name: '申万行业',
-        returnPct: row.pct,
-        turnoverYuan: null,
-        marketSharePct: null,
-        netInflowYuan: row.net,
-      })),
-  );
+  const breadth = computed(() => props.dashboard?.breadth.data || null);
+  const emotion = computed(() => props.dashboard?.emotion.data || null);
+  const topSectors = computed(() => props.dashboard?.shenwan.data?.sw2Top?.slice(0, 7) || []);
   const rotationRows = computed(
     () =>
       props.dashboard?.shenwan.data?.sw2All
         ?.filter((row) => row.netInflowYuan != null)
         .sort((a, b) => Math.abs(Number(b.netInflowYuan)) - Math.abs(Number(a.netInflowYuan)))
-        .slice(0, 8) ||
-      (vibe.value?.sectors || [])
-        .slice()
-        .sort((a, b) => Math.abs(b.net) - Math.abs(a.net))
-        .slice(0, 8)
-        .map((row) => ({
-          swL2Code: row.name,
-          swL2Name: row.name,
-          swL1Name: '申万行业',
-          netInflowYuan: row.net,
-        })),
+        .slice(0, 8) || [],
   );
   const turnoverRows = computed(
     () =>
       props.dashboard?.shenwan.data?.threshold?.stocks
         ?.slice()
         .sort((a, b) => Number(b.turnoverYuan) - Number(a.turnoverYuan))
-        .slice(0, 10) ||
-      (vibe.value?.turnover_top?.stocks || []).slice(0, 10).map((row) => ({
-        securityCode: row.code,
-        securityName: row.name,
-        turnoverYuan: row.amount,
-        returnPct: row.pct,
-      })),
+        .slice(0, 10) || [],
   );
   const breadthMetrics = computed(() => {
     const v = breadth.value;

@@ -108,6 +108,15 @@ export interface CrossSpreadMarketCloseInput {
   limitStrategy?: CrossSpreadLimitStrategy;
 }
 
+export interface CrossSpreadExitPlanThresholdUpdateInput {
+  takeProfitSpread?: string;
+  stopLossSpread?: string;
+  takeProfitExecutionMode?: CrossSpreadExecutionMode;
+  stopLossExecutionMode?: CrossSpreadExecutionMode;
+  takeProfitLimitStrategy?: CrossSpreadLimitStrategy;
+  stopLossLimitStrategy?: CrossSpreadLimitStrategy;
+}
+
 export interface CrossSpreadPreflightInput {
   action: 'OPEN_LONG' | 'CLOSE_LONG' | 'OPEN_SHORT' | 'CLOSE_SHORT';
   quantityOz: string;
@@ -157,6 +166,17 @@ export async function getCrossSpreadExitPlans(
   const response = await client.get<CrossSpreadExitPlanResult[]>(
     '/trading/cross-spread/exit-plans',
     { params: status ? { status } : undefined },
+  );
+  return response.data;
+}
+
+export async function updateCrossSpreadExitPlanThresholds(
+  planId: string,
+  input: CrossSpreadExitPlanThresholdUpdateInput,
+): Promise<CrossSpreadExitPlanResult> {
+  const response = await client.patch<CrossSpreadExitPlanResult>(
+    `/trading/cross-spread/exit-plans/${encodeURIComponent(planId)}`,
+    input,
   );
   return response.data;
 }

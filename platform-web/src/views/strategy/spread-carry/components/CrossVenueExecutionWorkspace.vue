@@ -87,6 +87,7 @@
       :overview-rows="overviewRows"
       :empty-text="observabilityError || snapshotError || '暂无真实持仓'"
       :long-spread="longSpread"
+      :update-exit-plan="updateExitPlanThresholds"
     />
 
     <SpreadExecutionConfirmModal
@@ -171,6 +172,7 @@
     tradingRuleRows,
     triggerSpreadInput,
     usdtUsdText,
+    updateExitPlanThresholds,
   } = useCrossVenueExecutionWorkspace();
 </script>
 

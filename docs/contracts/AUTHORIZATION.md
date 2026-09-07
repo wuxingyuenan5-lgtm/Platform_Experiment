@@ -197,6 +197,8 @@ CSRF 原始值只存在于当前浏览器内存；数据库保存哈希。用户
 | `operations:run` | Fact Import、Venue Reconciliation、EOD Run |
 | `reconciliation:review` | Difference Resolution |
 | `eod:review` | EOD Review |
+
+受控的 Cross 与 Funding 实例不接受公共 TradeCommand、ExecutionBatch、旧 Strategy Run、通用 StrategyInstruction 或 deprecated raw Order 入口。前四类请求按策略实例直接拒绝；raw Order 本身不携带策略身份，因此只要账户存在有效的受控策略交易绑定即拒绝。它们必须进入策略专用 lifecycle/instruction 主链；该路由封堵与 CEO 权限检查同时成立，不能以客户端入口选择替代业务授权。
 | `live_session:request` | 申请实盘会话 |
 | `live_session:approve` | 批准实盘会话 |
 | `live_session:revoke` | 撤销实盘会话 |

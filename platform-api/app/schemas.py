@@ -237,6 +237,11 @@ class AccountRiskSnapshotResponse(BaseModel):
     as_of: datetime = Field(alias="asOf")
 
 
+class StrategyEquityHistoryPointResponse(BaseModel):
+    as_of: datetime = Field(alias="asOf")
+    equity: Decimal
+
+
 class ContractSpecificationResponse(BaseModel):
     version: str
     price_tick: Decimal = Field(alias="priceTick")
@@ -366,6 +371,9 @@ class StrategyAccountSnapshotResponse(BaseModel):
     data_quality_state: str = Field(alias="dataQualityState")
     as_of: datetime | None = Field(default=None, alias="asOf")
     balance: BalanceSnapshotResponse | None = None
+    equity_history: list[StrategyEquityHistoryPointResponse] = Field(
+        default_factory=list, alias="equityHistory"
+    )
     account_risk: AccountRiskSnapshotResponse | None = Field(default=None, alias="accountRisk")
     positions: list[PositionResponse] = Field(default_factory=list)
     orders: list[OrderDetailResponse] = Field(default_factory=list)

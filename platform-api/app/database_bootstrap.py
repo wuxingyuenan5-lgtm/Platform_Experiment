@@ -445,6 +445,15 @@ ON strategy_account_bindings(strategy_instance_id);
 CREATE INDEX IF NOT EXISTS idx_balance_snapshots_account
 ON balance_snapshots(account_id, as_of);
 
+CREATE INDEX IF NOT EXISTS idx_trade_commands_strategy_created
+ON trade_commands(strategy_instance_id, created_at);
+
+CREATE INDEX IF NOT EXISTS idx_orders_command_created
+ON orders(command_id, created_at);
+
+CREATE INDEX IF NOT EXISTS idx_fills_order_occurred
+ON fills(order_id, occurred_at);
+
 CREATE INDEX IF NOT EXISTS idx_trade_commands_idempotency
 ON trade_commands(idempotency_key);
 

@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
+import app.auth as auth_module
 import app.cross_spread_exit_service as exit_service
 from app.config import get_settings
 from app.cross_spread_exit_repository import (
@@ -16,6 +17,7 @@ from app.cross_spread_exit_repository import (
     get_exit_plan,
     mark_plan_closed,
     mark_plan_closing,
+    update_exit_plan_settings,
 )
 from app.cross_spread_exit_schemas import CrossSpreadMarketOpenRequest
 from app.cross_spread_live_read_client import LivePosition
@@ -418,6 +420,105 @@ def test_exit_plan_claim_is_atomic(tmp_path: Path) -> None:
 
     assert first is not None
     assert second is None
+
+
+def test_active_exit_plan_thresholds_can_be_added_or_modified(tmp_path: Path) -> None:
+    configure_platform(tmp_path)
+    with TestClient(app):
+        insert_batch_with_fills("open-batch-edit-thresholds")
+        plan = create_exit_plan(
+            strategy_instance_id="strategy_cross_venue_spread_instance_default",
+            open_batch_id="open-batch-edit-thresholds",
+            direction="LONG_SPREAD",
+            quantity_oz=Decimal("1"),
+            mt5_position_id="778899",
+            entry_spread=Decimal("-2"),
+            take_profit_spread=None,
+            stop_loss_spread=None,
+        )
+        updated = update_exit_plan_settings(
+            plan.plan_id,
+            take_profit_spread=Decimal("0.5"),
+            stop_loss_spread=Decimal("-3"),
+            take_profit_execution_mode="limit",
+            stop_loss_execution_mode="market",
+            take_profit_limit_strategy="post_only_chase",
+            stop_loss_limit_strategy="fok",
+            update_take_profit=True,
+            update_stop_loss=True,
+            update_take_profit_execution_mode=True,
+            update_stop_loss_execution_mode=True,
+            update_take_profit_limit_strategy=True,
+            update_stop_loss_limit_strategy=True,
+        )
+
+    assert updated.take_profit_spread == Decimal("0.5")
+    assert updated.stop_loss_spread == Decimal("-3")
+    assert updated.take_profit_execution_mode == "limit"
+    assert updated.take_profit_limit_strategy == "post_only_chase"
+
+
+def test_active_exit_plan_thresholds_can_be_updated_through_lifecycle_route(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    configure_platform(tmp_path)
+    monkeypatch.setattr(auth_module, "has_ceo_trade_authority", lambda *_: True)
+    with TestClient(app) as client:
+        insert_batch_with_fills("open-batch-edit-route")
+        plan = create_exit_plan(
+            strategy_instance_id="strategy_cross_venue_spread_instance_default",
+            open_batch_id="open-batch-edit-route",
+            direction="SHORT_SPREAD",
+            quantity_oz=Decimal("1"),
+            mt5_position_id="778899",
+            entry_spread=Decimal("-2"),
+            take_profit_spread=None,
+            stop_loss_spread=None,
+        )
+        response = client.patch(
+            f"/api/v1/trading/cross-spread/exit-plans/{plan.plan_id}",
+            headers=headers("admin-token"),
+            json={
+                "takeProfitSpread": "-3",
+                "stopLossSpread": "0",
+                "takeProfitExecutionMode": "limit",
+                "takeProfitLimitStrategy": "fok",
+            },
+        )
+
+    assert response.status_code == 200, response.text
+    assert Decimal(response.json()["takeProfitSpread"]) == Decimal("-3")
+    assert response.json()["takeProfitExecutionMode"] == "limit"
+
+
+def test_exit_plan_threshold_update_validates_direction_and_active_status(tmp_path: Path) -> None:
+    configure_platform(tmp_path)
+    with TestClient(app):
+        insert_batch_with_fills("open-batch-invalid-thresholds")
+        plan = create_exit_plan(
+            strategy_instance_id="strategy_cross_venue_spread_instance_default",
+            open_batch_id="open-batch-invalid-thresholds",
+            direction="SHORT_SPREAD",
+            quantity_oz=Decimal("1"),
+            mt5_position_id="778899",
+            entry_spread=Decimal("-2"),
+            take_profit_spread=Decimal("-3"),
+            stop_loss_spread=Decimal("0"),
+        )
+        with pytest.raises(Exception, match="SHORT_SPREAD take-profit"):
+            update_exit_plan_settings(
+                plan.plan_id,
+                take_profit_spread=Decimal("1"),
+                update_take_profit=True,
+            )
+        claim_exit_plan(plan.plan_id, trigger_reason="stop_loss", trigger_spread=Decimal("0"))
+        with pytest.raises(Exception, match="Only active exit plans"):
+            update_exit_plan_settings(
+                plan.plan_id,
+                stop_loss_spread=Decimal("1"),
+                update_stop_loss=True,
+            )
 
 
 def test_market_close_submits_direct_netting_delta(

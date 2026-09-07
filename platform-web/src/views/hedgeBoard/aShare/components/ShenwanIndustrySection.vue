@@ -133,8 +133,8 @@
       <div class="threshold-panel">
         <div class="section-title-row">
           <div>
-            <h3>个股成交额阈值统计</h3>
-            <p>严格按个股当日成交额大于阈值统计，不含等于阈值的个股。</p>
+            <h3>百亿成交个股统计</h3>
+            <p>严格按个股当日成交额大于100亿元统计，不含等于100亿元的个股。</p>
           </div>
           <div class="threshold-actions">
             <button
@@ -153,38 +153,8 @@
             </button>
           </div>
         </div>
-        <div class="threshold-controls">
-          <label v-for="option in thresholdOptions" :key="option.value" class="radio-option">
-            <input
-              type="radio"
-              name="turnover-threshold"
-              :checked="thresholdMode === option.value"
-              @change="$emit('update:thresholdMode', option.value)"
-            />
-            {{ option.label }}
-          </label>
-          <label v-if="thresholdMode === 'custom'" class="custom-threshold">
-            <input
-              type="number"
-              min="1"
-              step="1"
-              :value="customThresholdYi"
-              @input="
-                $emit('update:customThresholdYi', Number(($event.target as HTMLInputElement).value))
-              "
-            />
-            <span>亿元</span>
-          </label>
-          <button type="button" class="primary-button" @click="$emit('applyThreshold')">
-            应用
-          </button>
-        </div>
-
         <div class="threshold-summary">
-          <span>
-            当前口径：成交额 {{ data.threshold.operator }}
-            {{ formatMoney(data.threshold.thresholdYuan) }}
-          </span>
+          <span>当前口径：成交额 &gt; 100亿元</span>
           <span>共 {{ data.threshold.stocks.length }} 只</span>
           <span>覆盖 {{ data.threshold.industries.length }} 个申万二级行业</span>
           <span v-if="data.unmatchedSecurityCodes.length">
@@ -243,7 +213,7 @@
           </table>
         </div>
         <div v-else class="research-empty research-empty--compact">
-          当前阈值下没有超过条件的个股，可降低阈值后重新统计。
+          当前没有成交额超过100亿元的个股。
         </div>
       </div>
     </template>
@@ -262,14 +232,9 @@
 
   const props = defineProps<{
     module?: ResearchModuleResult<AShareResearchAggregation> | null;
-    thresholdMode: '50' | '100' | '200' | 'custom';
-    customThresholdYi: number;
   }>();
 
   defineEmits<{
-    (event: 'update:thresholdMode', value: '50' | '100' | '200' | 'custom'): void;
-    (event: 'update:customThresholdYi', value: number): void;
-    (event: 'applyThreshold'): void;
     (event: 'copy'): void;
     (event: 'export'): void;
   }>();
@@ -281,12 +246,6 @@
   const sortKey = ref<'turnover' | 'return' | 'share'>('turnover');
   const sortDirection = ref<'asc' | 'desc'>('desc');
   const expandedThresholdIndustry = ref('');
-  const thresholdOptions = [
-    { value: '50' as const, label: '50亿元' },
-    { value: '100' as const, label: '100亿元' },
-    { value: '200' as const, label: '200亿元' },
-    { value: 'custom' as const, label: '自定义' },
-  ];
 
   const l1Options = computed(() =>
     Array.from(new Set((data.value?.sw2All || []).map((row) => row.swL1Name))).sort(),

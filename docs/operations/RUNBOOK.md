@@ -104,7 +104,21 @@ When an external result cannot be proven:
 
 ## Hedge Board research data
 
-The Hedge Board is read-only research functionality. Its local refresh service is operator-managed and serves validated canonical data to the Platform API; the web application must not substitute a failed refresh with zeroes, sample curves or a browser-side provider call.
+The Hedge Board is read-only research functionality. A-share data is refreshed by the Platform API lifecycle worker and committed to the SQLite `research_a_share_*` snapshot/history tables. Scheduled production refreshes are eligible only on China-market weekdays after 15:05 Asia/Shanghai. A successful run is not repeated for the same local trade date; a partial/error run remains eligible at the configured cadence until a complete snapshot is available. An authorized manual refresh can be used for repair. The browser reads `/api/v1/research/a-share/*` only; it must not call Vibe Research, AKShare, Eastmoney or other upstream providers.
+
+To pause the worker for an isolated test, set `VG_RESEARCH_REFRESH_ENABLED=false`. To adjust cadence, set `VG_RESEARCH_REFRESH_INTERVAL_SECONDS` (minimum effective interval is 60 seconds). A refresh run is guarded by a process mutex and records `running`, `ready`, `partial` or `error` status in `research_a_share_refresh_runs`. Failed modules never erase an existing meaningful snapshot.
+
+An explicitly authorized operator can trigger one refresh with `POST /api/v1/research/a-share/refresh`; normal page loads use `GET /api/v1/research/a-share/dashboard` and remain read-only. `GET /api/v1/research/a-share/refresh-status` exposes the latest run state.
+
+Historical bootstrap is a one-time operation, not a runtime dependency:
+`platform-api\.venv\Scripts\python.exe scripts\backfill_a_share_history.py --vibe-root <reference-root>`.
+The imported rows are tagged `vibe-research-historical-backfill`; subsequent updates come from Platform-owned adapters.
+
+To explicitly seed or repair the eight dashboard index series, run
+`platform-api\.venv\Scripts\python.exe scripts\collect_a_share_index_history.py` from `platform-api`. The collector uses direct public Tencent daily K-lines for the four broad benchmarks and Eastmoney index K-lines for the four theme indexes, then performs one all-or-nothing SQLite upsert. If any source does not return all eight series, it writes nothing and must be retried after source availability is restored.
+
+To seed the tracked stock-pool history used by the 5-day, 20-day and YTD views, run
+`platform-api\.venv\Scripts\python.exe scripts\backfill_a_share_stock_history.py` from `platform-api`. It reads the Platform-owned pool definition and writes only after every tracked symbol has a usable Tencent adjusted daily series.
 
 When a source is delayed or unavailable, verify the dashboard status and the local refresh logs before intervention. Preserve the last meaningful observation as explicitly stale where the data contract permits it. External research links open at their original provider and are not part of the Platform service health boundary.
 

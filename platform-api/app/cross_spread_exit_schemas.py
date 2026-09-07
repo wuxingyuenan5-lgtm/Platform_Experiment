@@ -83,6 +83,42 @@ class CrossSpreadMarketCloseRequest(BaseModel):
         return self
 
 
+class CrossSpreadExitPlanUpdateRequest(BaseModel):
+    """Editable trigger settings for an already-open, still active plan."""
+
+    take_profit_spread: Decimal | None = Field(default=None, alias="takeProfitSpread")
+    stop_loss_spread: Decimal | None = Field(default=None, alias="stopLossSpread")
+    take_profit_execution_mode: ExecutionMode | None = Field(
+        default=None,
+        alias="takeProfitExecutionMode",
+    )
+    stop_loss_execution_mode: ExecutionMode | None = Field(
+        default=None,
+        alias="stopLossExecutionMode",
+    )
+    take_profit_limit_strategy: LimitStrategy | None = Field(
+        default=None,
+        alias="takeProfitLimitStrategy",
+    )
+    stop_loss_limit_strategy: LimitStrategy | None = Field(
+        default=None,
+        alias="stopLossLimitStrategy",
+    )
+
+    @model_validator(mode="after")
+    def require_an_edit(self) -> CrossSpreadExitPlanUpdateRequest:
+        if not self.model_fields_set:
+            raise ValueError("At least one exit threshold must be provided")
+        if (
+            "take_profit_spread" in self.model_fields_set
+            and self.take_profit_spread is None
+        ) or (
+            "stop_loss_spread" in self.model_fields_set and self.stop_loss_spread is None
+        ):
+            raise ValueError("Exit thresholds cannot be cleared through this endpoint")
+        return self
+
+
 class CrossSpreadOrderIntentResponse(BaseModel):
     action: SyntheticAction
     execution_type: SyntheticExecutionType = Field(alias="executionType")

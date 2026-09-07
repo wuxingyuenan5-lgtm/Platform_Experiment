@@ -154,7 +154,14 @@ class Mt5AccountWorkerClient:
         child.close()
         self._process = process
         self._connection = parent
-        if not parent.poll(15):
+        # A portable terminal may perform a first-run MQL5 rebuild before it
+        # can answer the worker handshake.  The fixed 15s window caused a
+        # false runtime_unavailable on the isolated WW terminal.
+        startup_timeout = max(
+            15.0,
+            float(self.settings.mt5_check_timeout_seconds) + 30.0,
+        )
+        if not parent.poll(startup_timeout):
             self._close_unlocked()
             raise GatewayConfigurationError(
                 f"MT5 worker startup timed out for account {self.account_id}"
@@ -249,7 +256,9 @@ def _run_account_worker(
                 # Every account uses a separately installed Terminal and its own
                 # normal-mode data directory. Portable copies are not a supported
                 # production identity boundary.
-                "mt5_terminal_portable": False,
+                "mt5_terminal_portable": original.mt5_terminal_portable_for_account(
+                    account_id
+                ),
                 "mt5_check_timeout_seconds": max(
                     original.mt5_check_timeout_seconds,
                     30.0 if not is_primary else original.mt5_check_timeout_seconds,

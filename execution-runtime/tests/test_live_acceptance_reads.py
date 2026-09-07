@@ -131,6 +131,10 @@ class AcceptanceBybitClient:
         self.calls.append(("get_account_info", {}))
         return {"retCode": 0, "result": {"marginMode": f"UNIFIED-{self.label}"}}
 
+    def get_asset_overview(self, **kwargs):
+        self.calls.append(("get_asset_overview", kwargs))
+        return {"retCode": 0, "result": {"totalEquity": "1000"}}
+
 
 class AcceptanceMt5:
     TRADE_ACTION_DEAL = 1
@@ -340,6 +344,7 @@ def test_bybit_multi_account_reads_require_and_use_explicit_account_id(tmp_path)
                 "bybit-live-main=secret://environment/bybit-live-001,"
                 "account_bybit_bottom_fishing=secret://environment/bybit-bottom-fishing"
             ),
+            bybit_total_asset_account_ids="account_bybit_bottom_fishing",
             bybit_instrument_map="XAUTUSDT=instrument-xaut",
             bybit_category="linear",
             bybit_settle_coin="USDT",
@@ -360,8 +365,11 @@ def test_bybit_multi_account_reads_require_and_use_explicit_account_id(tmp_path)
     assert [item.account_id for item in funding_orders] == ["bybit-live-main"]
     assert [item.account_id for item in bottom_fills] == ["account_bybit_bottom_fishing"]
     assert risk.account_id == "account_bybit_bottom_fishing"
+    assert risk.currency == "USD"
+    assert risk.equity == Decimal("1000")
     assert {name for name, _ in funding_client.calls} >= {"get_open_orders", "get_order_history"}
     assert {name for name, _ in bottom_client.calls} >= {
+        "get_asset_overview",
         "get_executions",
         "get_wallet_balance",
         "get_account_info",

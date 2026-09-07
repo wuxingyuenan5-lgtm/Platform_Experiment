@@ -598,6 +598,61 @@ PLATFORM_MIGRATIONS: tuple[Migration, ...] = (
             """,
         ),
     ),
+    Migration(
+        # Version 19 is already owned by the deployed capital-transfer
+        # migration.  A-share persistence must be additive and therefore has
+        # its own immutable ledger entry.
+        version=20,
+        name="a-share-research-persistent-snapshots",
+        statements=(
+            """
+            CREATE TABLE IF NOT EXISTS research_a_share_refresh_runs (
+                run_id TEXT PRIMARY KEY,
+                target_trade_date TEXT,
+                started_at TEXT NOT NULL,
+                finished_at TEXT,
+                status TEXT NOT NULL CHECK(status IN ('running','ready','partial','error')),
+                error_code TEXT,
+                message TEXT
+            )
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_research_a_share_refresh_runs_finished
+            ON research_a_share_refresh_runs(finished_at DESC)
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS research_a_share_dataset_snapshots (
+                dataset TEXT PRIMARY KEY,
+                observed_at TEXT,
+                fetched_at TEXT NOT NULL,
+                status TEXT NOT NULL CHECK(status IN ('ready','partial','stale','error','no_data')),
+                source TEXT NOT NULL,
+                payload_json TEXT,
+                error_code TEXT,
+                message TEXT,
+                refresh_run_id TEXT,
+                FOREIGN KEY(refresh_run_id) REFERENCES research_a_share_refresh_runs(run_id)
+            )
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS research_a_share_history (
+                dataset TEXT NOT NULL,
+                observed_at TEXT NOT NULL,
+                entity_code TEXT NOT NULL,
+                payload_json TEXT NOT NULL,
+                source TEXT NOT NULL,
+                fetched_at TEXT NOT NULL,
+                refresh_run_id TEXT,
+                PRIMARY KEY(dataset, observed_at, entity_code),
+                FOREIGN KEY(refresh_run_id) REFERENCES research_a_share_refresh_runs(run_id)
+            )
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_research_a_share_history_lookup
+            ON research_a_share_history(dataset, observed_at DESC)
+            """,
+        ),
+    ),
 )
 
 

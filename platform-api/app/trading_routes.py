@@ -3,6 +3,10 @@ from decimal import Decimal
 from fastapi import APIRouter, Query, Request
 
 from app.auth import require_principal
+from app.controlled_strategy_write_guard import (
+    reject_controlled_account_legacy_order,
+    reject_controlled_strategy_write_bypass,
+)
 from app.catalog import get_order, list_fills, list_orders
 from app.cross_spread import (
     get_cross_spread_history,
@@ -62,6 +66,7 @@ def create_trading_router(api_prefix: str) -> APIRouter:
         summary="Compatibility order endpoint; use TradeCommand or ExecutionBatch",
     )
     def create_order(request: CreateOrderRequest) -> OrderResponse:
+        reject_controlled_account_legacy_order(request.account_id)
         return submit_order(request)
 
     @router.post(
@@ -79,6 +84,7 @@ def create_trading_router(api_prefix: str) -> APIRouter:
         tags=["trading"],
     )
     def create_batch(request: CreateExecutionBatchRequest) -> ExecutionBatchResponse:
+        reject_controlled_strategy_write_bypass(request.strategy_instance_id)
         return create_execution_batch(request)
 
     @router.get(
@@ -248,6 +254,7 @@ def create_trading_router(api_prefix: str) -> APIRouter:
         tags=["trading"],
     )
     def create_command(request: CreateTradeCommandRequest) -> TradeCommandResponse:
+        reject_controlled_strategy_write_bypass(request.strategy_instance_id)
         return create_trade_command(request)
 
     @router.get(
@@ -263,8 +270,13 @@ def create_trading_router(api_prefix: str) -> APIRouter:
         response_model=list[OrderDetailResponse],
         tags=["trading"],
     )
-    def orders() -> list[OrderDetailResponse]:
-        return list_orders()
+    def orders(
+        strategy_instance_id: str | None = Query(
+            default=None,
+            alias="strategyInstanceId",
+        ),
+    ) -> list[OrderDetailResponse]:
+        return list_orders(strategy_instance_id)
 
     @router.get(
         f"{api_prefix}/trading/orders/{{order_id}}",
@@ -279,8 +291,13 @@ def create_trading_router(api_prefix: str) -> APIRouter:
         response_model=list[FillResponse],
         tags=["trading"],
     )
-    def fills() -> list[FillResponse]:
-        return list_fills()
+    def fills(
+        strategy_instance_id: str | None = Query(
+            default=None,
+            alias="strategyInstanceId",
+        ),
+    ) -> list[FillResponse]:
+        return list_fills(strategy_instance_id)
 
     @router.get(
         f"{api_prefix}/trading/execution-batches",

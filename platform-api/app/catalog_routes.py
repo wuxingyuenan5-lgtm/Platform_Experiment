@@ -5,6 +5,7 @@ from fastapi import APIRouter, Request
 from app.account_read_service import get_pnl as read_pnl
 from app.account_read_service import get_position as read_position
 from app.auth import require_principal
+from app.controlled_strategy_write_guard import reject_controlled_strategy_write_bypass
 from app.catalog import (
     get_account,
     get_instrument,
@@ -114,6 +115,7 @@ def create_catalog_router(api_prefix: str) -> APIRouter:
         request: CreateStrategyRunRequest,
         http_request: Request,
     ) -> StrategyRunResponse:
+        reject_controlled_strategy_write_bypass(strategy_instance_id)
         return create_strategy_run(
             strategy_instance_id,
             request,
@@ -136,6 +138,7 @@ def create_catalog_router(api_prefix: str) -> APIRouter:
         request: CreateStrategyInstructionRequest,
         http_request: Request,
     ) -> dict[str, object]:
+        reject_controlled_strategy_write_bypass(strategy_instance_id)
         return create_instruction(
             strategy_instance_id, request, requested_by=require_principal(http_request).user_id
         )

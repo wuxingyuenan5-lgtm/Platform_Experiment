@@ -32,7 +32,7 @@ These are product and supporting capabilities inside the three deployable system
 | Area | User entry | Nature and authority boundary |
 |---|---|---|
 | Home | `/home/index` | Navigation and cross-module presentation. It may summarize other modules but owns no market, position, risk or accounting fact. |
-| Hedge Board | `/hedge-board/**`, `/api/v1/research/**` | Read-only research and source navigation. Platform research contracts own the served representation and provenance; it does not authorize or supply live execution. |
+| Hedge Board | `/hedge-board/**`, `/api/v1/research/**` | Read-only research and source navigation. A-share data is collected by Platform-owned adapters in a background refresh, committed to SQLite snapshots/history, and served through read-only API contracts; browser pages never call reference projects or upstream providers. It does not authorize or supply live execution. |
 | Financial AI | `/financial-ai/**`, `/api/v1/financial-ai/**` | Analysis over authorized research context. Model output remains a reviewable research draft and cannot become a trading, risk or accounting fact. |
 | Strategy | `/strategy/**` and Platform strategy/execution APIs | Strategy definition, instruction and execution orchestration. Platform owns intent and control state; Runtime owns venue side effects and normalized external evidence. |
 | Risk | `/risk/**` and Platform risk/approval APIs | Cross-cutting authorization, risk policy and operational safety controls. It constrains execution but does not replace order, fill or accounting authorities. |
@@ -62,7 +62,7 @@ Forbidden directions:
 
 | Data | Authority |
 |---|---|
-| Served research observations and history | Platform research schemas, cache/store and upstream provenance |
+| Served research observations and history | Platform research schemas, `research_a_share_*` SQLite snapshots/history, refresh-run provenance and upstream adapters |
 | AI-generated analysis | reviewable research draft with its input context; never an execution or accounting authority |
 | Strategy, account and instrument identity | Platform reference/master tables |
 | Command acceptance and Platform order state | Platform command persistence |
@@ -76,7 +76,7 @@ Forbidden directions:
 
 ```text
 Research sources/local canonical store
-  -> Platform research adapters, quality metadata and cache
+  -> Platform background refresh, normalized snapshots/history, quality metadata and read-only API
      |-> Hedge Board presentation
      `-> optional authorized context for Financial AI
            `-> reviewable analysis draft
