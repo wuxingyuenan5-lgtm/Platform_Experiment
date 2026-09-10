@@ -1,10 +1,15 @@
 <template>
   <div class="login-box">
     <div class="login-form py-20">
-      <div class="title">欢迎登录</div>
+      <div class="title">{{ userStore.getHydrationAttempted ? '欢迎登录' : '连接暂不可用' }}</div>
       <div class="title title-platform">全球变量金融平台</div>
 
+      <div v-if="!userStore.getHydrationAttempted" class="session-reconnect" role="status">
+        <p>暂时无法连接服务，尚未确认登录状态。服务恢复后可重试原有会话。</p>
+        <Button type="primary" :loading="loading" @click="retrySession">重试连接</Button>
+      </div>
       <Form
+        v-else
         ref="formRef"
         layout="vertical"
         class="px-20 pt-12"
@@ -121,6 +126,19 @@
     });
   }
 
+  async function retrySession() {
+    if (loading.value) return;
+    loading.value = true;
+    try {
+      if (await userStore.hydrateSession(true)) {
+        const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : '';
+        await router.replace(redirect || userStore.getUserInfo.homePath || '/home/index');
+      }
+    } finally {
+      loading.value = false;
+    }
+  }
+
   async function handleLogin() {
     const params = await validForm();
     if (!params || loading.value) return;
@@ -197,6 +215,13 @@
 
     .ant-form {
       padding-top: 34px !important;
+    }
+
+    .session-reconnect {
+      padding: 34px 40px;
+      color: #475569;
+      line-height: 1.7;
+      text-align: center;
     }
 
     .login-input {

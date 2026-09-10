@@ -43,7 +43,6 @@ class BybitMt5Gateway:
     name = "bybit_mt5"
     _QUOTE_CACHE_SECONDS = 5.0
     _MARGIN_CACHE_SECONDS = 15.0
-    _SPECIFICATION_CACHE_SECONDS = 60.0
 
     def __init__(
         self,
@@ -84,6 +83,23 @@ class BybitMt5Gateway:
 
     def get_account(self, account_id: str) -> VenueAccountSnapshot:
         return self.get_account_snapshot(account_id)
+
+    def get_capital_flows(self, *, account_id, start_time, end_time):
+        return self._adapter_for_account(account_id).get_capital_flows(
+            account_id=account_id, start_time=start_time, end_time=end_time
+        )
+
+    def set_bybit_leverage(
+        self, *, account_id: str, symbol: str, leverage: Decimal
+    ) -> dict[str, object]:
+        try:
+            return self.bybit.set_leverage(account_id=account_id, symbol=symbol, leverage=leverage)
+        finally:
+            # Even an uncertain update invalidates old margin estimates. Reads
+            # must re-query the venue; the setting is never automatically replayed.
+            for key in list(self._execution_read_cache):
+                if len(key) > 1 and key[1] == account_id:
+                    self._execution_read_cache.pop(key, None)
 
     def get_positions(self, account_id: str | None = None) -> list[VenuePositionSnapshot]:
         return self.list_positions(account_id)
@@ -170,8 +186,13 @@ class BybitMt5Gateway:
     ) -> VenueOrderHistoryPage:
         adapter = self._adapter_for_account(account_id)
         return adapter.query_order_history(
-            account_id=account_id, symbol=symbol, start_time=start_time,
-            end_time=end_time, cursor=cursor, limit=limit, scope=scope,
+            account_id=account_id,
+            symbol=symbol,
+            start_time=start_time,
+            end_time=end_time,
+            cursor=cursor,
+            limit=limit,
+            scope=scope,
         )
 
     def list_fills(
@@ -184,7 +205,8 @@ class BybitMt5Gateway:
         if account_id is not None:
             adapter = self._adapter_for_account(account_id)
             return adapter.list_fills(
-                account_id=account_id, external_order_id=external_order_id,
+                account_id=account_id,
+                external_order_id=external_order_id,
                 platform_order_id=platform_order_id,
             )
         if platform_order_id is not None:
@@ -192,12 +214,14 @@ class BybitMt5Gateway:
             if route is None:
                 return []
             return self._adapter_by_name(route.adapter, account_id=route.account_id).list_fills(
+                account_id=route.account_id,
                 platform_order_id=platform_order_id,
             )
         if external_order_id is not None:
             route = get_order_route(external_order_id=external_order_id)
             if route is not None:
                 return self._adapter_by_name(route.adapter, account_id=route.account_id).list_fills(
+                    account_id=route.account_id,
                     external_order_id=external_order_id,
                 )
             if external_order_id.isdigit():
@@ -222,8 +246,12 @@ class BybitMt5Gateway:
     ) -> VenueFillHistoryPage:
         adapter = self._adapter_for_account(account_id)
         return adapter.query_fill_history(
-            account_id=account_id, symbol=symbol, start_time=start_time,
-            end_time=end_time, cursor=cursor, limit=limit,
+            account_id=account_id,
+            symbol=symbol,
+            start_time=start_time,
+            end_time=end_time,
+            cursor=cursor,
+            limit=limit,
         )
 
     def list_positions(self, account_id: str | None = None) -> list[VenuePositionSnapshot]:
@@ -285,18 +313,14 @@ class BybitMt5Gateway:
             command.destination_account_id,
         )
         if "TradFi" in {from_type, to_type}:
-            raise GatewayConfigurationError(
-                "BYBIT_TRADFI_WRITE_API_UNAVAILABLE"
-            )
+            raise GatewayConfigurationError("BYBIT_TRADFI_WRITE_API_UNAVAILABLE")
         if command.source_currency.upper() != "USDT":
             raise GatewayConfigurationError("Bybit TradFi transfer requires USDT")
         if command.destination_currency.upper() not in {"USDT", "USD"}:
             raise GatewayConfigurationError("Bybit TradFi destination currency is unsupported")
         for account_id in (command.source_account_id, command.destination_account_id):
             if account_id not in self.settings.allowed_live_accounts:
-                raise GatewayConfigurationError(
-                    "Transfer account is not in the live allowlist"
-                )
+                raise GatewayConfigurationError("Transfer account is not in the live allowlist")
         ready, transferable, reason = self.bybit.internal_transfer_readiness(
             account_id=bybit_account_id,
             from_account_type=from_type,
@@ -308,9 +332,7 @@ class BybitMt5Gateway:
                 reason or "Bybit TradFi transfer readiness is unavailable"
             )
         if command.amount > transferable:
-            raise GatewayRequestRejectedError(
-                "Bybit TradFi transfer exceeds transferable balance"
-            )
+            raise GatewayRequestRejectedError("Bybit TradFi transfer exceeds transferable balance")
         return self.bybit.transfer_tradfi_capital(
             command,
             account_id=bybit_account_id,
@@ -403,22 +425,14 @@ class BybitMt5Gateway:
         instrument_type: str | None = None,
         category: str | None = None,
     ) -> VenueInstrumentSpecification:
-        key = (
-            "specification",
-            account_id,
-            symbol.upper(),
-            instrument_type or "",
-            category or "",
-        )
-        return self._cached_execution_read(
-            key,
-            self._SPECIFICATION_CACHE_SECONDS,
-            lambda: self._load_instrument_specification(
-                account_id=account_id,
-                symbol=symbol,
-                instrument_type=instrument_type,
-                category=category,
-            ),
+        # The market parser already caches static specifications. The returned
+        # snapshot also contains current account/terminal trading permissions,
+        # which must be reread for pre-dispatch admission.
+        return self._load_instrument_specification(
+            account_id=account_id,
+            symbol=symbol,
+            instrument_type=instrument_type,
+            category=category,
         )
 
     def get_market_quote(
@@ -571,6 +585,9 @@ class BybitMt5Gateway:
         )
 
     def close(self) -> None:
+        close = getattr(self.bybit, "close", None)
+        if close is not None:
+            close()
         if self._mt5_supervisor is not None:
             self._mt5_supervisor.close()
 
@@ -627,7 +644,10 @@ class BybitMt5Gateway:
             ]
             positions = []
             warnings: list[str] = []
-            for row in mt5.positions_get() or ():
+            position_rows = mt5.positions_get()
+            if position_rows is None:
+                raise GatewayConfigurationError("MT5 positions query failed")
+            for row in position_rows:
                 symbol = str(getattr(row, "symbol", "")).upper()
                 mapped_instrument_id = self.settings.mt5_instruments.get(symbol)
                 instrument_id, quality = self.mt5._resolve_read_instrument(
@@ -654,6 +674,9 @@ class BybitMt5Gateway:
                         averagePrice=Decimal(str(getattr(row, "price_open", 0) or 0)),
                         currentPrice=Decimal(str(getattr(row, "price_current", 0) or 0)),
                         unrealizedPnl=Decimal(str(getattr(row, "profit", 0) or 0)),
+                        swap=Decimal(str(getattr(row, "swap", 0) or 0)),
+                        stopLossPrice=Decimal(str(getattr(row, "sl", 0) or 0)) or None,
+                        takeProfitPrice=Decimal(str(getattr(row, "tp", 0) or 0)) or None,
                         currency=currency,
                         asOf=self.mt5._position_time(row),
                         dataQualityState=quality,
@@ -662,7 +685,12 @@ class BybitMt5Gateway:
             start, end = self.mt5._history_window()
             orders: list[VenueOrderSnapshot] = []
             seen_order_ids: set[str] = set()
-            for row in [*(mt5.orders_get() or ()), *(mt5.history_orders_get(start, end) or ())]:
+            active_orders = mt5.orders_get()
+            history_orders = mt5.history_orders_get(start, end)
+            deals = mt5.history_deals_get(start, end)
+            if active_orders is None or history_orders is None or deals is None:
+                raise GatewayConfigurationError("MT5 order or deal history query failed")
+            for row in [*active_orders, *history_orders]:
                 snapshot = self.mt5._snapshot(mt5, row, account_id)
                 if snapshot is None or snapshot.external_order_id in seen_order_ids:
                     continue
@@ -670,7 +698,7 @@ class BybitMt5Gateway:
                 orders.append(snapshot)
             fills: list[VenueFillSnapshot] = []
             seen_fill_ids: set[str] = set()
-            for deal in mt5.history_deals_get(start, end) or ():
+            for deal in deals:
                 if not self.mt5._is_trade_deal(mt5, deal):
                     continue
                 snapshot = self.mt5._fill_snapshot(
@@ -684,10 +712,12 @@ class BybitMt5Gateway:
                     continue
                 seen_fill_ids.add(snapshot.external_fill_id)
                 fills.append(snapshot)
+            economic_events = self.mt5._economic_event_snapshots(mt5, account_id, deals)
             risk = VenueAccountRiskSnapshot(
                 source=self.mt5.name,
                 accountId=account_id,
                 currency=currency,
+                assetScope="mt5_trading",
                 equity=Decimal(str(getattr(info, "equity", 0) or 0)),
                 walletBalance=Decimal(str(getattr(info, "balance", 0) or 0)),
                 marginBalance=Decimal(str(getattr(info, "equity", 0) or 0)),
@@ -743,12 +773,14 @@ class BybitMt5Gateway:
                 positions=positions,
                 orders=orders,
                 fills=fills,
+                economicEvents=economic_events,
+                economicEventsQuality="complete",
+                historyStart=start,
+                historyEnd=end,
                 accountRisk=risk,
                 warnings=sorted(set(warnings)),
                 asOf=as_of,
-                dataQualityState=(
-                    "external_unmapped" if warnings else "complete"
-                ),
+                dataQualityState=("external_unmapped" if warnings else "complete"),
             )
 
         return with_mt5_read_session(

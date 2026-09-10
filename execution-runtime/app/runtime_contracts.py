@@ -23,6 +23,7 @@ class RuntimeSubmitOrderCommandV1(BaseModel):
     strategy_instance_id: str | None = None
     account_id: str
     instrument_id: str
+    instrument_type: str | None = None
     symbol: str = Field(min_length=1)
     side: Literal["buy", "sell"]
     order_type: Literal["market", "limit"] = "market"
@@ -63,10 +64,7 @@ class RuntimeExecutionEventV1(BaseModel):
 
 
 def version_execution_events(events: Sequence[BaseModel]) -> list[RuntimeExecutionEventV1]:
-    return [
-        RuntimeExecutionEventV1.model_validate(event.model_dump())
-        for event in events
-    ]
+    return [RuntimeExecutionEventV1.model_validate(event.model_dump()) for event in events]
 
 
 def runtime_contract_signature() -> dict[str, dict[str, object]]:

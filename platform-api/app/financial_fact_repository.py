@@ -477,9 +477,12 @@ def list_active_account_rows(strategy_instance_id: str) -> list[Row]:
             SELECT DISTINCT sab.account_id
             FROM strategy_account_bindings sab
             JOIN accounts a ON a.id = sab.account_id
+            JOIN strategy_instances si ON si.id = sab.strategy_instance_id
             WHERE sab.strategy_instance_id = ?
               AND sab.status = 'active'
               AND a.status = 'active'
+              AND (si.trading_mode != 'simulation' OR a.environment = 'simulation')
+              AND (si.trading_mode = 'simulation' OR sab.role != 'local_test')
             ORDER BY sab.account_id
             """,
             (strategy_instance_id,),

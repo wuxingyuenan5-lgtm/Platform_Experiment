@@ -231,7 +231,7 @@ def seed_blocking_conditions() -> None:
 
 def test_status_alert_dedup_and_lifecycle(monkeypatch, tmp_path: Path) -> None:
     configure_live(monkeypatch, tmp_path)
-    monkeypatch.setattr("app.production_monitoring.httpx.get", fake_runtime_get)
+    monkeypatch.setattr("app.runtime_transport.get", fake_runtime_get)
     with TestClient(app) as client:
         seed_blocking_conditions()
 
@@ -315,7 +315,7 @@ def test_status_alert_dedup_and_lifecycle(monkeypatch, tmp_path: Path) -> None:
 
 def test_controlled_scheduler_accepts_only_fixed_operations(monkeypatch, tmp_path: Path) -> None:
     configure_live(monkeypatch, tmp_path)
-    monkeypatch.setattr("app.production_monitoring.httpx.get", fake_runtime_get)
+    monkeypatch.setattr("app.runtime_transport.get", fake_runtime_get)
     with TestClient(app) as client:
         scheduled_for = datetime.now(UTC).isoformat()
         scheduled = client.post(

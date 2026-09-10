@@ -22,6 +22,7 @@ class RuntimeSubmitOrderCommandV1(BaseModel):
     strategy_instance_id: str | None = None
     account_id: str
     instrument_id: str
+    instrument_type: str | None = None
     symbol: str = Field(min_length=1)
     side: Literal["buy", "sell"]
     order_type: Literal["market", "limit"] = "market"

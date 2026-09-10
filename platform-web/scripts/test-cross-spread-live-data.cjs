@@ -51,14 +51,20 @@ test('cross spread open command shows both authoritative account balances above 
   const balanceStripIndex = commandSource.indexOf('account-balance-strip');
   const marketModeIndex = commandSource.indexOf('市价开仓');
   assert.ok(balanceStripIndex >= 0 && balanceStripIndex < marketModeIndex);
-  assert.equal(commandSource.includes('Bybit 账户资金'), true);
+  assert.equal(commandSource.includes('Bybit 账户权益'), true);
   assert.equal(commandSource.includes('MT5 账户资金'), true);
   assert.equal(commandSource.includes('可用资金'), true);
-  assert.equal(workspaceSource.includes(':bybit-account-risk="observability?.bybit.accountRisk || null"'), true);
-  assert.equal(workspaceSource.includes(':mt5-account-risk="observability?.mt5.accountRisk || null"'), true);
+  assert.equal(
+    workspaceSource.includes(':bybit-account-risk="observability?.bybit.accountRisk || null"'),
+    true,
+  );
+  assert.equal(
+    workspaceSource.includes(':mt5-account-risk="observability?.mt5.accountRisk || null"'),
+    true,
+  );
 });
 
-test('cross spread does not present a local leverage input as an executable venue setting', () => {
+test('cross spread leverage uses authenticated platform route without a direct runtime URL', () => {
   const commandSource = read(
     'src/views/strategy/spread-carry/components/SpreadExecutionCommand.vue',
   );
@@ -68,7 +74,8 @@ test('cross spread does not present a local leverage input as an executable venu
   const composableSource = read(
     'src/views/strategy/spread-carry/composables/useCrossVenueExecutionWorkspace.ts',
   );
-  assert.equal(commandSource.includes('账户级（只读）'), true);
+  assert.equal(commandSource.includes('setCrossSpreadLeverage'), true);
+  assert.doesNotMatch(commandSource, /127\.0\.0\.1:8100|accountId: 'bybit-live-main'/);
   assert.doesNotMatch(commandSource, /<span>BY 杠杆<\/span>/);
   assert.doesNotMatch(commandSource, /<span>MT5 杠杆<\/span>/);
   assert.doesNotMatch(workspaceSource, /handle-leverage-input/);
@@ -78,13 +85,17 @@ test('cross spread does not present a local leverage input as an executable venu
 test('cross spread finance composable uses dynamic bindings instead of hardcoded live accounts', () => {
   const source = read('src/views/strategy/management/composables/useCrossSpreadFinance.ts');
   assert.equal(source.includes('getStrategyAccountBindings'), true);
-  assert.equal(source.includes('getEquityHistory'), true);
+  assert.equal(source.includes('getStrategyAccountSnapshot'), true);
   assert.equal(source.includes('getStrategyPnl'), true);
-  assert.equal(source.includes('canonicalStrategyFills'), true);
-  assert.equal(source.includes('contractMultipliers'), true);
-  assert.equal(source.includes('getCrossSpreadObservability'), true);
-  assert.equal(source.includes('数据暂不可用'), true);
-  assert.equal(source.includes('跨所总权益（Bybit + MT5，按当前 USDT/USD 折算）'), true);
+  assert.equal(source.includes('financialProfile'), true);
+  assert.equal(source.includes('accountCapitalProfile'), true);
+  assert.equal(source.includes('account?.equityHistory'), true);
+  assert.equal(source.includes('isStale: true'), true);
+  assert.doesNotMatch(
+    source,
+    /canonicalStrategyFills|contractMultipliers|getCrossSpreadObservability/,
+  );
+  assert.doesNotMatch(source, /跨所总权益（Bybit \+ MT5/);
   assert.doesNotMatch(source, /const verifiedHistoryAvailable = computed\(\(\) => false\)/);
   assert.doesNotMatch(source, /const curvePoints = computed<[\s\S]*?>\(\(\) => \[\]\);/);
   assert.doesNotMatch(source, /new Date\(\)\.toISOString\(\)/);
@@ -118,10 +129,77 @@ test('cross spread execution records preserve result-unknown and leg evidence', 
   const source = read('src/views/strategy/management/composables/useCrossSpreadRecords.ts');
   assert.equal(source.includes("result_unknown: '结果未知'"), true);
   assert.equal(source.includes('getExecutionBatches(STRATEGY_INSTANCE_ID)'), true);
-  assert.equal(source.includes('strategyOrderIds.has(order.orderId)'), true);
+  assert.equal(source.includes('getFills(STRATEGY_INSTANCE_ID)'), true);
   assert.equal(source.includes('batchDisplayStatus'), true);
   assert.equal(source.includes("{ key: 'legStatus', label: '双腿状态' }"), true);
   assert.equal(source.includes("{ key: 'failureReason', label: '失败/未知原因' }"), true);
+});
+
+test('management renders canonical fills and native cash exactly across refreshes', async () => {
+  const createLoader = require('./load-strategy-module.cjs');
+  const calls = [];
+  const fills = ['native-one', 'native-two'].map((externalFillId, index) => ({
+    fillId: `scoped-${index}`,
+    externalFillId,
+    orderId: 'full-order-identity',
+    instructionId: 'full-instruction-identity',
+    origin: 'venue_execution',
+    source: 'bybit',
+    instrumentId: 'XAUTUSDT',
+    side: 'buy',
+    quantity: '0.5',
+    price: '100.1',
+    fee: index ? null : '0.123456789123456789',
+    currency: 'USDT',
+  }));
+  const load = createLoader({
+    '@/api/platform/trading': {
+      getOrders: async (id) => {
+        calls.push(id);
+        return [];
+      },
+      getFills: async (id) => {
+        calls.push(id);
+        return fills;
+      },
+      getExecutionBatches: async () => [],
+      getStrategyPnl: async () => ({
+        economicEvents: [
+          {
+            externalEventId: 'native-rebate',
+            orderId: 'full-order-identity',
+            instructionId: 'full-instruction-identity',
+            eventType: 'fee',
+            amount: '0.02',
+            currency: 'USDT',
+            source: 'bybit',
+          },
+        ],
+      }),
+    },
+    '@/api/platform/crossSpreadObservability': {
+      getCrossSpreadObservability: async () => ({ bybit: { fills: [...fills, ...fills] } }),
+    },
+  });
+  const { useCrossSpreadRecords } = load(
+    'src/views/strategy/management/composables/useCrossSpreadRecords.ts',
+  );
+  const records = useCrossSpreadRecords();
+  for (let refresh = 0; refresh < 2; refresh++) {
+    await records.refresh();
+    assert.equal(records.error.value, '');
+    const rows = records.tables.value.fills.rows;
+    assert.equal(rows.length, 2);
+    assert.deepEqual(
+      rows.map((row) => row.fillId),
+      ['native-one', 'native-two'],
+    );
+    assert.equal(rows[0].fee, '0.123456789123456789 USDT');
+    assert.equal(rows[1].fee, '--');
+    assert.equal(rows[0].instructionId, 'full-instruction-identity');
+    assert.equal(records.tables.value.settlements.rows[0].amount, '0.02 USDT');
+  }
+  assert.ok(calls.every((id) => id === 'strategy_cross_venue_spread_instance_default'));
 });
 
 test('strategy order-information tabs place fills before historical orders', () => {

@@ -35,6 +35,9 @@ def test_status_normalization_is_shared_across_venue_adapters() -> None:
         ORDER_STATE_PARTIAL = 3
 
     assert normalize_bybit_order_status("PartiallyFilled") == "partially_filled"
+    assert normalize_bybit_order_status("Untriggered") == "accepted"
+    assert normalize_bybit_order_status("Triggered") == "accepted"
+    assert normalize_bybit_order_status("PartiallyFilledCanceled") == "canceled"
     assert normalize_mt5_order_status(Mt5(), 3) == "partially_filled"
     assert normalize_bybit_order_status("new-venue-state") == "unknown"
 

@@ -4,6 +4,7 @@ The input directory is supplied by the operator and is read only once. The
 result belongs to Platform SQLite and carries a historical-backfill source;
 the running application never imports the reference project.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -12,8 +13,8 @@ import json
 from datetime import UTC, datetime
 from pathlib import Path
 
-from app.database import connection
-from app.research_a_share_repository import ensure_schema, write_dataset, write_stock_pool
+from app.database import connection, initialize_database
+from app.research_a_share_repository import write_dataset, write_stock_pool
 
 
 def read_csv(path: Path) -> list[dict[str, str]]:
@@ -47,8 +48,7 @@ def crowding_history(
         "半导体": "801081",
     }
     all_a_amount = {
-        str(row.get("date") or "")[:10]: number(row.get("total_amount_100m"))
-        for row in market_rows
+        str(row.get("date") or "")[:10]: number(row.get("total_amount_100m")) for row in market_rows
     }
     by_date: dict[str, dict[str, object]] = {}
     by_code = {code: name for name, code in targets.items()}
@@ -68,14 +68,18 @@ def crowding_history(
         }
         by_date.setdefault(observed, {"date": observed, "targets": {}})["targets"][label] = item
     history: list[dict[str, object]] = []
-    for observed, item in sorted(by_date.items()):
+    for _observed, item in sorted(by_date.items()):
         targets_data = item["targets"]
         values = list(targets_data.values())
         item["combined"] = {
-            "amount100m": sum(value["amount100m"] for value in values if value["amount100m"] is not None)
+            "amount100m": sum(
+                value["amount100m"] for value in values if value["amount100m"] is not None
+            )
             if len(values) == 4 and all(value["amount100m"] is not None for value in values)
             else None,
-            "amountShareOfA": sum(value["amountShareOfA"] for value in values if value["amountShareOfA"] is not None)
+            "amountShareOfA": sum(
+                value["amountShareOfA"] for value in values if value["amountShareOfA"] is not None
+            )
             if len(values) == 4 and all(value["amountShareOfA"] is not None for value in values)
             else None,
         }
@@ -86,7 +90,9 @@ def crowding_history(
 def innovation_history(
     rows: list[dict[str, str]], market_rows: list[dict[str, str]]
 ) -> list[dict[str, object]]:
-    denominator = {str(row.get("date") or "")[:10]: number(row.get("total_amount_100m")) for row in market_rows}
+    denominator = {
+        str(row.get("date") or "")[:10]: number(row.get("total_amount_100m")) for row in market_rows
+    }
     history: list[dict[str, object]] = []
     for raw in rows:
         observed = str(raw.get("日期") or "")[:10]
@@ -94,12 +100,14 @@ def innovation_history(
         amount_100m = (number(raw.get("成交额")) or 0) / 1e8
         total = denominator.get(observed)
         if observed:
-            history.append({
-                "date": observed,
-                "amount100m": amount_100m,
-                "amountShareOfA": amount_100m / total if total else None,
-                "turnoverPct": number(raw.get("换手率")),
-            })
+            history.append(
+                {
+                    "date": observed,
+                    "amount100m": amount_100m,
+                    "amountShareOfA": amount_100m / total if total else None,
+                    "turnoverPct": number(raw.get("换手率")),
+                }
+            )
     return history
 
 
@@ -108,16 +116,28 @@ def backfill(root: Path) -> tuple[int, int]:
     stock_path = root / "data" / "stock-pool" / "stocks.csv"
     market_rows = read_csv(history_path)
     hot_rows = read_csv(root / "market-monitor" / "data" / "history" / "hot_stocks.csv")
-    sector_rows = read_csv(root / "market-monitor" / "data" / "history" / "sw_analysis_daily_second.csv")
-    innovation_rows = read_csv(root / "market-monitor" / "data" / "history" / "innovation_drug_eastmoney.csv")
+    sector_rows = read_csv(
+        root / "market-monitor" / "data" / "history" / "sw_analysis_daily_second.csv"
+    )
+    innovation_rows = read_csv(
+        root / "market-monitor" / "data" / "history" / "innovation_drug_eastmoney.csv"
+    )
     stock_rows = read_csv(stock_path) if stock_path.exists() else []
-    ensure_schema()
+    initialize_database()
     run_id = f"historical-backfill-{datetime.now(UTC).strftime('%Y%m%d%H%M%S')}"
     now = datetime.now(UTC).isoformat()
     with connection() as db:
         db.execute(
-            "INSERT OR IGNORE INTO research_a_share_refresh_runs(run_id,target_trade_date,started_at,finished_at,status,message) VALUES (?,?,?,?,?,?)",
-            (run_id, market_rows[-1].get("date") if market_rows else None, now, now, "ready", "explicit historical backfill"),
+            "INSERT OR IGNORE INTO research_a_share_refresh_runs"
+            "(run_id,target_trade_date,started_at,finished_at,status,message) VALUES (?,?,?,?,?,?)",
+            (
+                run_id,
+                market_rows[-1].get("date") if market_rows else None,
+                now,
+                now,
+                "ready",
+                "explicit historical backfill",
+            ),
         )
         for row in market_rows:
             observed = str(row.get("date") or "")[:10]
@@ -129,16 +149,30 @@ def backfill(root: Path) -> tuple[int, int]:
                 "flat": integer(row.get("flat")),
                 "limitUp": integer(row.get("limit_up")),
                 "limitDown": integer(row.get("limit_down")),
-                "totalAmountYuan": float(row["total_amount_100m"]) * 1e8 if row.get("total_amount_100m") else None,
-                "marketBreadthPct": float(row["market_breadth"]) * 100 if row.get("market_breadth") else None,
+                "totalAmountYuan": float(row["total_amount_100m"]) * 1e8
+                if row.get("total_amount_100m")
+                else None,
+                "marketBreadthPct": float(row["market_breadth"]) * 100
+                if row.get("market_breadth")
+                else None,
             }
             db.execute(
                 """INSERT INTO research_a_share_history
                 (dataset,observed_at,entity_code,payload_json,source,fetched_at,refresh_run_id)
-                VALUES (?,?,?,?,?,?,?) ON CONFLICT(dataset,observed_at,entity_code) DO UPDATE SET
-                payload_json=excluded.payload_json,source=excluded.source,fetched_at=excluded.fetched_at,
+                VALUES (?,?,?,?,?,?,?)
+                    ON CONFLICT(dataset,observed_at,entity_code) DO UPDATE SET
+                payload_json=excluded.payload_json,source=excluded.source,
+                    fetched_at=excluded.fetched_at,
                 refresh_run_id=excluded.refresh_run_id""",
-                ("market", observed, "market", json.dumps(payload, ensure_ascii=False), "vibe-research-historical-backfill", now, run_id),
+                (
+                    "market",
+                    observed,
+                    "market",
+                    json.dumps(payload, ensure_ascii=False),
+                    "vibe-research-historical-backfill",
+                    now,
+                    run_id,
+                ),
             )
         for dataset, rows, date_key, code_key in (
             ("hot_stocks", hot_rows, "date", "stock_code"),
@@ -152,19 +186,36 @@ def backfill(root: Path) -> tuple[int, int]:
                 db.execute(
                     """INSERT INTO research_a_share_history
                     (dataset,observed_at,entity_code,payload_json,source,fetched_at,refresh_run_id)
-                    VALUES (?,?,?,?,?,?,?) ON CONFLICT(dataset,observed_at,entity_code) DO UPDATE SET
-                    payload_json=excluded.payload_json,source=excluded.source,fetched_at=excluded.fetched_at,
+                    VALUES (?,?,?,?,?,?,?)
+                    ON CONFLICT(dataset,observed_at,entity_code) DO UPDATE SET
+                    payload_json=excluded.payload_json,source=excluded.source,
+                    fetched_at=excluded.fetched_at,
                     refresh_run_id=excluded.refresh_run_id""",
-                    (dataset, observed, code, json.dumps(row, ensure_ascii=False), "vibe-research-historical-backfill", now, run_id),
+                    (
+                        dataset,
+                        observed,
+                        code,
+                        json.dumps(row, ensure_ascii=False),
+                        "vibe-research-historical-backfill",
+                        now,
+                        run_id,
+                    ),
                 )
     if stock_rows:
         payload = {
             "meta": {"generated_at": now, "source": "vibe-research-historical-backfill"},
-            "summary": {"tracked_count": len(stock_rows), "breadth": {"up": 0, "down": 0, "flat": 0}},
+            "summary": {
+                "tracked_count": len(stock_rows),
+                "breadth": {"up": 0, "down": 0, "flat": 0},
+            },
             "stocks": stock_rows,
             "indices": [],
             "heatmap": stock_rows,
-            "leaders": {"today": {"up": [], "down": []}, "5d": {"up": [], "down": []}, "20d": {"up": [], "down": []}},
+            "leaders": {
+                "today": {"up": [], "down": []},
+                "5d": {"up": [], "down": []},
+                "20d": {"up": [], "down": []},
+            },
             "definitions": {"focus_codes": [], "research_baskets": []},
         }
         write_stock_pool(run_id, payload)

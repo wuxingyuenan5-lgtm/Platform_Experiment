@@ -1,8 +1,4 @@
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const Module = require('node:module');
-const path = require('node:path');
-const ts = require('typescript');
 
 function createMemoryStorage() {
   const values = new Map();
@@ -33,28 +29,6 @@ function computed(getter) {
 
 function settleAsyncWork() {
   return new Promise((resolve) => setImmediate(resolve));
-}
-
-function loadTsModule(modulePath, stubs) {
-  const source = fs.readFileSync(modulePath, 'utf8');
-  const compiled = ts.transpileModule(source, {
-    compilerOptions: {
-      module: ts.ModuleKind.CommonJS,
-      target: ts.ScriptTarget.ES2020,
-      esModuleInterop: true,
-    },
-    fileName: modulePath,
-  }).outputText;
-  const loaded = new Module(modulePath, module);
-  loaded.filename = modulePath;
-  loaded.paths = Module._nodeModulePaths(path.dirname(modulePath));
-  const originalRequire = loaded.require.bind(loaded);
-  loaded.require = (request) => {
-    if (request in stubs) return stubs[request];
-    return originalRequire(request);
-  };
-  loaded._compile(compiled, modulePath);
-  return loaded.exports;
 }
 
 function createOptions() {
@@ -108,149 +82,262 @@ function createOptions() {
   };
 }
 
-async function main() {
-  const root = path.resolve(__dirname, '..');
-  const recoveryPath = path.join(
-    root,
-    'src/views/strategy/spread-carry/composables/crossSpreadExecutionRecovery.ts',
-  );
-  const composablePath = path.join(
-    root,
-    'src/views/strategy/spread-carry/composables/useCrossSpreadExecution.ts',
-  );
+const test = require('node:test');
+const createLoader = require('./load-strategy-module.cjs');
 
-  const storage = createMemoryStorage();
-  global.localStorage = storage;
-
-  const recovery = loadTsModule(recoveryPath, {});
-  const openCalls = [];
-  const closeCalls = [];
-  const openResponses = [];
-  const closeResponses = [];
-
-  const lifecycleStub = {
-    async prepareCrossSpreadExecution() {
-      return { status: 'ready', preparedAt: new Date().toISOString() };
-    },
-    async openCrossSpreadMarket(payload) {
-      openCalls.push(payload);
-      assert.ok(openResponses.length > 0, 'missing open response');
-      return openResponses.shift();
-    },
-    async closeCrossSpreadMarket(planId, payload) {
-      closeCalls.push({ planId, payload });
-      assert.ok(closeResponses.length > 0, 'missing close response');
-      return closeResponses.shift();
+function fixture() {
+  global.localStorage = createMemoryStorage();
+  const writes = [],
+    reads = [];
+  const state = {
+    preflight: async () => ({}),
+    open: async () => ({ executionBatch: { status: 'hedged' } }),
+    close: async () => ({ exitPlan: {}, executionBatch: { status: 'hedged' } }),
+    lookup: async () => null,
+    batch: async () => {
+      throw new Error('Unexpected batch read');
     },
   };
-
-  const composable = loadTsModule(composablePath, {
-    vue: { computed, ref },
-    '@/api/platform/crossSpreadLifecycle': lifecycleStub,
-    './crossSpreadExecutionRecovery': recovery,
+  const load = createLoader({
+    vue: { ref, computed },
+    '@/store/modules/user': { useUserStore: () => ({ authentication: { user: { role: 'ceo' } } }) },
+    '@/api/platform/crossSpreadLifecycle': {
+      prepareCrossSpreadExecution: (...args) => state.preflight(...args),
+      openCrossSpreadMarket: async (payload) => {
+        writes.push({ kind: 'open', payload });
+        return state.open(payload);
+      },
+      closeCrossSpreadMarket: async (planId, payload) => {
+        writes.push({ kind: 'close', planId, payload });
+        return state.close(planId, payload);
+      },
+      getCrossSpreadInstruction: async (key) => {
+        reads.push(key);
+        return state.lookup(key);
+      },
+    },
+    '@/api/platform/trading': { getExecutionBatch: (...args) => state.batch(...args) },
   });
-
-  const { useCrossSpreadExecution } = composable;
-  const { PENDING_EXECUTION_STORAGE_KEY, readExecutionDraft } = recovery;
-
+  const recovery = load(
+    'src/views/strategy/spread-carry/composables/crossSpreadExecutionRecovery.ts',
+  );
+  const { useCrossSpreadExecution } = load(
+    'src/views/strategy/spread-carry/composables/useCrossSpreadExecution.ts',
+  );
   const { options } = createOptions();
   const execution = useCrossSpreadExecution(options);
-
-  openResponses.push({ executionBatch: { status: 'executing' }, limitExecution: null });
-  execution.prepareOpenDraft('long');
-  await settleAsyncWork();
-  await execution.confirmOrder();
-  const openDraft = readExecutionDraft(storage);
-  assert.equal(openCalls.length, 1);
-  assert.ok(openDraft?.idempotencyKey);
-  assert.equal(openCalls[0].idempotencyKey, openDraft.idempotencyKey);
-  assert.notEqual(storage.getItem(PENDING_EXECUTION_STORAGE_KEY), null);
-
-  openResponses.push({ executionBatch: { status: 'manual_intervention' }, limitExecution: null });
-  await execution.resumePendingExecution();
-  assert.equal(openCalls.length, 2);
-  assert.equal(openCalls[1].idempotencyKey, openDraft.idempotencyKey);
-  assert.equal(readExecutionDraft(storage).idempotencyKey, openDraft.idempotencyKey);
-
-  openResponses.push({ executionBatch: { status: 'hedged' }, limitExecution: null });
-  await execution.resumePendingExecution();
-  assert.equal(openCalls.length, 3);
-  assert.equal(openCalls[2].idempotencyKey, openDraft.idempotencyKey);
-  assert.equal(readExecutionDraft(storage), null);
-
-  closeResponses.push({
-    exitPlan: { planId: 'plan-b', status: 'result_unknown', quantityOz: '2' },
-    executionBatch: { status: 'result_unknown' },
-    limitExecution: null,
-  });
-  execution.openPartialClose('plan-b', 0.5);
-  await settleAsyncWork();
-  await execution.confirmOrder();
-  assert.equal(closeCalls.length, 1);
-  assert.equal(closeCalls[0].planId, 'plan-b');
-  assert.equal(closeCalls[0].payload.quantityOz, '0.5');
-  const partialCloseDraft = readExecutionDraft(storage);
-  assert.equal(partialCloseDraft.payload.quantityOz, '0.5');
-  closeResponses.push({
-    exitPlan: { planId: 'plan-b', status: 'active', quantityOz: '1.5' },
-    executionBatch: { status: 'hedged' },
-    limitExecution: null,
-  });
-  await execution.resumePendingExecution();
-  assert.equal(closeCalls.length, 2);
-  assert.equal(closeCalls[1].payload.quantityOz, '0.5');
-  assert.equal(closeCalls[1].payload.idempotencyKey, partialCloseDraft.idempotencyKey);
-  assert.equal(readExecutionDraft(storage), null);
-
-  closeResponses.push(
-    {
-      exitPlan: { planId: 'plan-a', status: 'result_unknown' },
-      executionBatch: { status: 'result_unknown' },
-      limitExecution: null,
-    },
-    {
-      exitPlan: { planId: 'plan-b', status: 'manual_intervention' },
-      executionBatch: { status: 'manual_intervention' },
-      limitExecution: null,
-    },
-  );
-  execution.openConfirm('CLOSE_ALL');
-  await settleAsyncWork();
-  await execution.confirmOrder();
-  const closeAllDraft = readExecutionDraft(storage);
-  assert.equal(closeCalls.length, 4);
-  assert.equal(closeAllDraft.plans.length, 2);
-  assert.notEqual(closeAllDraft.plans[0].idempotencyKey, closeAllDraft.plans[1].idempotencyKey);
-  assert.deepEqual(
-    closeCalls.slice(2).map((entry) => entry.payload.idempotencyKey),
-    closeAllDraft.plans.map((plan) => plan.idempotencyKey),
-  );
-  assert.deepEqual(readExecutionDraft(storage).plans, closeAllDraft.plans);
-
-  closeResponses.push(
-    {
-      exitPlan: { planId: 'plan-a', status: 'completed' },
-      executionBatch: { status: 'completed' },
-      limitExecution: null,
-    },
-    {
-      exitPlan: { planId: 'plan-b', status: 'failed' },
-      executionBatch: { status: 'failed' },
-      limitExecution: null,
-    },
-  );
-  await execution.resumePendingExecution();
-  assert.equal(closeCalls.length, 6);
-  assert.deepEqual(
-    closeCalls.slice(4).map((entry) => entry.payload.idempotencyKey),
-    closeAllDraft.plans.map((plan) => plan.idempotencyKey),
-  );
-  assert.equal(readExecutionDraft(storage), null);
-
-  console.log('cross-spread execution recovery behavior passed');
+  return {
+    writes,
+    reads,
+    state,
+    options,
+    execution,
+    recovery,
+    remount: () => useCrossSpreadExecution(options),
+  };
 }
 
-main().catch((error) => {
-  console.error(error);
-  process.exitCode = 1;
+const rejection = () => ({
+  response: { status: 409, data: { detail: 'Limit not satisfied; no order submitted' } },
+});
+
+test('known filled/rejected close hands off to abnormal handling without locking the browser draft', async () => {
+  const f = fixture();
+  f.state.close = async () => ({ exitPlan: {}, executionBatch: {
+    status: 'manual_intervention', failureReason: 'MT5 rejected',
+    legs: [{ status: 'filled' }, { status: 'failed' }],
+  } });
+  f.execution.openConfirm('CLOSE:plan-a');
+  await settleAsyncWork();
+  await f.execution.confirmOrder();
+  assert.equal(f.recovery.readExecutionDraft(), null);
+  assert.equal(f.execution.executionMessageTone.value, 'is-error');
+  assert.equal(f.writes.length, 1);
+});
+
+test('MT5 recovery confirmation and request retain original identity and describe only remaining leg', async () => {
+  const f = fixture();
+  Object.assign(f.options.closeOrders.value[0], { isAbnormal: true, mt5Only: true,
+    remainingMt5Lots: 0.01, mt5PositionId: 'ticket-target', recoveryIdempotencyKey: 'original-close' });
+  let preflight;
+  f.state.preflight = async (request) => { preflight = request; };
+  f.execution.openConfirm('CLOSE:plan-a');
+  await settleAsyncWork();
+  assert.equal(preflight.exitPlanId, 'plan-a');
+  assert.match(f.execution.confirmSummary.value.legs, /BYBIT 已成交，不再下单/);
+  assert.match(f.execution.confirmSummary.value.legs, /MT5 0.01 手 · Ticket ticket-target/);
+  await f.execution.confirmOrder();
+  assert.equal(f.writes[0].payload.idempotencyKey, 'original-close');
+});
+
+test('normal close-all excludes abnormal groups', async () => {
+  const f = fixture();
+  f.options.closeOrders.value[0].isAbnormal = true;
+  f.execution.openConfirm('CLOSE_ALL');
+  await settleAsyncWork();
+  await f.execution.confirmOrder();
+  assert.deepEqual(f.writes.map((write) => write.planId), ['plan-b']);
+});
+
+test('cancel and late preflight cannot authorize or contaminate the next confirmation', async () => {
+  const f = fixture();
+  let rejectOld;
+  f.state.preflight = () =>
+    new Promise((resolve, reject) => {
+      rejectOld = reject;
+    });
+  f.execution.prepareOpenDraft('long');
+  f.execution.cancelConfirmation();
+  f.state.preflight = async () => ({});
+  f.execution.prepareOpenDraft('short');
+  await settleAsyncWork();
+  rejectOld(rejection());
+  await settleAsyncWork();
+  assert.equal(f.execution.confirmGuardMessage.value, '');
+  f.options.qtyOz.value = 9;
+  assert.equal(f.execution.confirmSummary.value.qty, '1');
+  await Promise.all([f.execution.confirmOrder(), f.execution.confirmOrder()]);
+  assert.equal(f.writes.length, 1);
+  assert.equal(f.writes[0].payload.quantityOz, '1');
+  assert.equal(f.writes[0].payload.direction, 'SHORT_SPREAD');
+});
+
+test('preflight rejection blocks execution and cancel removes its error', async () => {
+  const f = fixture();
+  f.state.preflight = async () => {
+    throw rejection();
+  };
+  f.execution.prepareOpenDraft('long');
+  await settleAsyncWork();
+  await f.execution.confirmOrder();
+  assert.match(f.execution.confirmGuardMessage.value, /Limit not satisfied/);
+  assert.equal(f.writes.length, 0);
+  assert.equal(f.recovery.readExecutionDraft(), null);
+  f.execution.cancelConfirmation();
+  assert.equal(f.execution.confirmGuardMessage.value, '');
+  assert.equal(f.execution.executionMessage.value, '');
+});
+
+test('lost response and remount only read the original identity; unknown and absent remain pending', async () => {
+  const f = fixture();
+  f.state.open = async () => {
+    throw new Error('timeout');
+  };
+  f.execution.prepareOpenDraft('long');
+  await settleAsyncWork();
+  await f.execution.confirmOrder();
+  const key = f.recovery.readExecutionDraft().idempotencyKey;
+  await f.execution.resumePendingExecution();
+  assert.equal(f.recovery.readExecutionDraft().idempotencyKey, key);
+  assert.equal(f.writes.length, 1);
+  f.state.lookup = async () => ({
+    instructionId: 'original',
+    status: 'executing',
+    executionBatchId: 'batch',
+  });
+  f.state.batch = async () => ({
+    batchId: 'batch',
+    strategyInstanceId: 'strategy_cross_venue_spread_instance_default',
+    idempotencyKey: `instruction:${key}`,
+    status: 'manual_intervention',
+  });
+  const recovered = f.remount();
+  await settleAsyncWork();
+  assert.equal(f.recovery.readExecutionDraft().idempotencyKey, key);
+  f.state.batch = async () => ({
+    batchId: 'batch',
+    strategyInstanceId: 'strategy_cross_venue_spread_instance_default',
+    idempotencyKey: `instruction:${key}`,
+    status: 'hedged',
+  });
+  await recovered.resumePendingExecution();
+  assert.equal(f.recovery.readExecutionDraft(), null);
+  assert.equal(f.writes.length, 1);
+  assert.ok(f.reads.every((value) => value === key));
+});
+
+test('only explicit rejection plus authoritative absence releases an unaccepted intent', async () => {
+  const f = fixture();
+  f.state.open = async () => {
+    throw rejection();
+  };
+  f.execution.prepareOpenDraft('long');
+  await settleAsyncWork();
+  await f.execution.confirmOrder();
+  assert.equal(f.recovery.readExecutionDraft(), null);
+  assert.equal(f.reads.length, 1);
+  f.state.lookup = async () => {
+    throw new Error('disconnected');
+  };
+  f.execution.prepareOpenDraft('long');
+  await settleAsyncWork();
+  await f.execution.confirmOrder();
+  assert.ok(f.recovery.readExecutionDraft());
+  f.state.lookup = async () => ({
+    instructionId: 'original',
+    status: 'executing',
+    executionBatchId: 'batch',
+  });
+  f.state.batch = async () => ({
+    batchId: 'wrong-batch',
+    strategyInstanceId: 'strategy_cross_venue_spread_instance_default',
+    status: 'hedged',
+  });
+  await f.execution.resumePendingExecution();
+  assert.ok(f.recovery.readExecutionDraft());
+  assert.match(f.execution.executionMessage.value, /身份不一致/);
+  assert.equal(f.writes.length, 2);
+});
+
+test('partial close recovery preserves quantity and never resubmits the close', async () => {
+  const f = fixture();
+  f.state.close = async () => ({ exitPlan: {}, executionBatch: { status: 'manual_intervention' } });
+  f.execution.openPartialClose('plan-b', 0.5);
+  await settleAsyncWork();
+  await f.execution.confirmOrder();
+  const draft = f.recovery.readExecutionDraft();
+  assert.equal(draft.payload.quantityOz, '0.5');
+  f.state.lookup = async () => ({
+    instructionId: 'close',
+    status: 'completed',
+    executionBatchId: 'batch',
+  });
+  f.state.batch = async () => ({
+    batchId: 'batch',
+    strategyInstanceId: 'strategy_cross_venue_spread_instance_default',
+    idempotencyKey: `instruction:${draft.idempotencyKey}`,
+    status: 'hedged',
+  });
+  await f.execution.resumePendingExecution();
+  assert.equal(f.writes.length, 1);
+  assert.equal(f.writes[0].planId, 'plan-b');
+  assert.equal(f.writes[0].payload.quantityOz, '0.5');
+  assert.equal(f.recovery.readExecutionDraft(), null);
+});
+
+test('batch close interruption does not dispatch later groups during recovery', async () => {
+  const f = fixture();
+  f.state.close = async () => ({ exitPlan: {}, executionBatch: { status: 'manual_intervention' } });
+  f.execution.openConfirm('CLOSE_ALL');
+  await settleAsyncWork();
+  await f.execution.confirmOrder();
+  const draft = f.recovery.readExecutionDraft();
+  assert.equal(f.writes.length, 1);
+  assert.equal(draft.plans[0].submitted, true);
+  assert.equal(draft.plans[1].submitted, false);
+  f.state.lookup = async () => ({
+    instructionId: 'first-close',
+    status: 'completed',
+    executionBatchId: 'batch',
+  });
+  f.state.batch = async () => ({
+    batchId: 'batch',
+    strategyInstanceId: 'strategy_cross_venue_spread_instance_default',
+    idempotencyKey: `instruction:${draft.plans[0].idempotencyKey}`,
+    status: 'hedged',
+  });
+  await f.execution.resumePendingExecution();
+  assert.deepEqual(f.reads, [draft.plans[0].idempotencyKey]);
+  assert.equal(f.writes.length, 1);
+  assert.equal(f.recovery.readExecutionDraft(), null);
 });

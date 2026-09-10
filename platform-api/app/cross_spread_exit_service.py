@@ -54,7 +54,7 @@ from app.schemas import CrossSpreadMarketCommandRequest, ExecutionBatchResponse
 
 def open_cross_spread_market(request: CrossSpreadMarketOpenRequest) -> CrossSpreadOpenResult:
     _require_market_mode(request.execution_mode)
-    _assert_acceptance_open_allowed()
+    _assert_open_execution_resolved()
     action = "OPEN_LONG" if request.direction == "LONG_SPREAD" else "OPEN_SHORT"
     batch = submit_cross_spread_market_command(
         CrossSpreadMarketCommandRequest(
@@ -183,14 +183,7 @@ async def run_cross_spread_exit_monitor() -> None:
         await asyncio.sleep(settings.cross_spread_exit_monitor_interval_seconds)
 
 
-def _assert_acceptance_open_allowed() -> None:
-    settings = get_settings()
-    maximum = settings.cross_spread_acceptance_max_active_plans
-    if maximum > 0 and count_non_closed_exit_plans() >= maximum:
-        raise HTTPException(
-            status_code=409,
-            detail="A non-closed cross-spread lifecycle already exists",
-        )
+def _assert_open_execution_resolved() -> None:
     if count_unresolved_cross_spread_batches(get_bybit_account_id()) > 0:
         raise HTTPException(
             status_code=409,
@@ -231,8 +224,7 @@ def _handle_definitive_open_failure(batch: ExecutionBatchResponse) -> ExecutionB
             batch.batch_id,
             "manual_intervention",
             failure_reason=(
-                f"{original_reason}; pre-rollback position verification failed: "
-                f"{exc.detail}"
+                f"{original_reason}; pre-rollback position verification failed: {exc.detail}"
             ),
             requires_manual_intervention=True,
         )
@@ -333,6 +325,9 @@ def _handle_definitive_open_failure(batch: ExecutionBatchResponse) -> ExecutionB
         ),
         requires_manual_intervention=False,
     )
+    from app.execution_risk_repository import recheck_batch_risk
+
+    recheck_batch_risk(batch.batch_id, reason="Rollback fill and external flat positions verified")
     return get_execution_batch(batch.batch_id)
 
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 import httpx
 from pydantic import ValidationError
 
+from app import runtime_transport
 from app.config import get_settings
 from app.runtime_contracts import RuntimeExecutionEventV1
 
@@ -33,7 +34,7 @@ def recover_and_read_runtime_events(command_id: str) -> list[dict[str, object]]:
     settings = get_settings()
     base_url = settings.runtime_base_url.rstrip("/")
     try:
-        recovery = httpx.post(
+        recovery = runtime_transport.post(
             f"{base_url}/commands/{command_id}/recover",
             timeout=settings.runtime_timeout_seconds,
         )
@@ -41,7 +42,7 @@ def recover_and_read_runtime_events(command_id: str) -> list[dict[str, object]]:
             return []
         recovery.raise_for_status()
 
-        response = httpx.get(
+        response = runtime_transport.get(
             f"{base_url}/commands/{command_id}/events",
             timeout=settings.runtime_timeout_seconds,
         )

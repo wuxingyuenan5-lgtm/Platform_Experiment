@@ -2,10 +2,15 @@ from __future__ import annotations
 
 import httpx
 
+from app import runtime_transport
+
 
 def read_runtime_status(base_url: str, timeout_seconds: float) -> str:
     try:
-        response = httpx.get(f"{base_url}/status", timeout=timeout_seconds)
+        response = runtime_transport.get(
+            f"{base_url}/status",
+            timeout=timeout_seconds,
+        )
         response.raise_for_status()
     except httpx.HTTPError:
         return "not_connected"

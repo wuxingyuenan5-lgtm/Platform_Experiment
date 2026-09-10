@@ -6,7 +6,7 @@ from types import SimpleNamespace
 import pytest
 
 from app.config import Settings, get_settings
-from app.gateway_errors import GatewayConfigurationError
+from app.gateway_errors import GatewayConfigurationError, GatewayResultUnknownError
 from app.journal import initialize_journal
 from app.models import SubmitOrderCommand
 from app.mt5_live_adapter import Mt5LiveAdapter
@@ -47,6 +47,9 @@ class FakeMt5:
 
     def last_error(self):
         return (0, "ok")
+
+    def symbol_info(self, symbol):
+        return SimpleNamespace(currency_profit="USD", currency_base="XAU", trade_contract_size=100)
 
     def symbol_info_tick(self, symbol):
         return SimpleNamespace(ask=2000.0, bid=1999.5)
@@ -135,6 +138,9 @@ class FakeMt5:
             equity=100000.0,
             margin_free=90000.0,
         )
+
+    def terminal_info(self):
+        return SimpleNamespace(connected=True)
 
 
 class FakeRuntimeMt5(FakeMt5):
@@ -267,6 +273,47 @@ def test_strict_mt5_adapter_exposes_market_quote_for_platform_reservation(
     assert quote.currency == "USD"
 
 
+@pytest.mark.parametrize("terminal", [None, SimpleNamespace(connected=False)])
+def test_mt5_quote_rejects_cached_tick_during_terminal_disconnect(monkeypatch, terminal):
+    configure_mt5_secret(monkeypatch)
+    fake = FakeMt5()
+    monkeypatch.setattr(fake, "terminal_info", lambda: terminal)
+    adapter = StrictMt5AcceptanceAdapter(runtime_settings(write_enabled=False), fake)
+    with pytest.raises(GatewayResultUnknownError, match="not connected"):
+        adapter.get_market_quote(account_id="account-mt5", symbol="XAUUSD+")
+    monkeypatch.setattr(fake, "terminal_info", lambda: SimpleNamespace(connected=True))
+    quote = adapter.get_market_quote(account_id="account-mt5", symbol="XAUUSD+")
+    assert quote.bid == Decimal("1999.5")
+    assert fake.requests == []
+
+
+@pytest.mark.parametrize("adapter_type", [Mt5LiveAdapter, StrictMt5AcceptanceAdapter])
+def test_position_snapshot_time_is_read_time_and_preserves_old_open_time(
+    tmp_path, monkeypatch, adapter_type
+) -> None:
+    configure_mt5_secret(monkeypatch)
+    get_settings().journal_path = str(tmp_path / "mt5-position-time.db")
+    initialize_journal()
+    fake = FakeMt5()
+    original = fake.positions_get()[0]
+    original.time_msc = 1784800000000
+    original.profit = 22.81
+    monkeypatch.setattr(fake, "positions_get", lambda: (original,))
+    adapter = adapter_type(runtime_settings(write_enabled=False), fake)
+
+    before = datetime.now(UTC)
+    position = adapter.list_positions("account-mt5")[0]
+    after = datetime.now(UTC)
+
+    assert before <= position.as_of <= after
+    assert position.open_time == datetime.fromtimestamp(1784800000, UTC)
+    assert position.as_of > datetime.fromtimestamp(original.time_update, UTC)
+    assert position.external_position_id == "789"
+    if adapter_type is StrictMt5AcceptanceAdapter:
+        assert position.unrealized_pnl == Decimal("22.81")
+    assert fake.requests == []
+
+
 def test_strict_mt5_adapter_uses_terminal_margin_calculation(tmp_path, monkeypatch) -> None:
     configure_mt5_secret(monkeypatch)
     get_settings().journal_path = str(tmp_path / "mt5-margin.db")
@@ -312,13 +359,17 @@ def test_mt5_reduce_only_recovers_terminal_fill_from_position_deals(
     assert events[-1].fill_price == Decimal("1998.0")
 
 
-def test_mt5_future_server_epoch_is_normalized_to_observation_time() -> None:
+def test_mt5_source_epoch_is_stable_before_and_after_observation_clock(monkeypatch) -> None:
     before = datetime.now(UTC)
     server_local_epoch = (before + timedelta(hours=3)).timestamp()
-
-    normalized = Mt5LiveAdapter._normalized_mt5_time(server_local_epoch)
-
-    assert before <= normalized <= datetime.now(UTC)
+    expected = datetime.fromtimestamp(server_local_epoch, UTC)
+    assert Mt5LiveAdapter._normalized_mt5_time(server_local_epoch) == expected
+    class Later(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return before + timedelta(hours=4)
+    monkeypatch.setattr("app.mt5_live_adapter.datetime", Later)
+    assert Mt5LiveAdapter._normalized_mt5_time(server_local_epoch) == expected
 
 
 def test_mt5_history_window_includes_broker_clocks_ahead_of_utc(
@@ -341,6 +392,11 @@ def test_mt5_live_adapter_sets_terminal_timeouts(tmp_path, monkeypatch) -> None:
     get_settings().journal_path = str(tmp_path / "mt5-timeout.db")
     initialize_journal()
     fake_mt5 = FakeRuntimeMt5()
+    account_info = fake_mt5.account_info
+    monkeypatch.setattr(
+        fake_mt5, "account_info", lambda: account_info() if fake_mt5.login_calls else None
+    )
+    monkeypatch.setattr("app.mt5_connection._ensure_background_terminal", lambda *a, **kw: None)
     monkeypatch.setitem(sys.modules, "MetaTrader5", fake_mt5)
     monkeypatch.setattr("app.mt5_live_adapter.platform.system", lambda: "Windows")
 
@@ -352,11 +408,35 @@ def test_mt5_live_adapter_sets_terminal_timeouts(tmp_path, monkeypatch) -> None:
     assert fake_mt5.login_calls[0]["timeout"] == 8000
 
 
+def test_mt5_restart_reuses_authenticated_terminal_and_rejects_identity_drift(
+    monkeypatch,
+) -> None:
+    configure_mt5_secret(monkeypatch)
+    fake_mt5 = FakeRuntimeMt5()
+    monkeypatch.setattr("app.mt5_connection._ensure_background_terminal", lambda *a, **kw: None)
+    monkeypatch.setitem(sys.modules, "MetaTrader5", fake_mt5)
+    monkeypatch.setattr("app.mt5_live_adapter.platform.system", lambda: "Windows")
+
+    for _ in range(2):
+        adapter = Mt5LiveAdapter(runtime_settings(write_enabled=False))
+        assert adapter._connect() is fake_mt5
+        assert adapter._connect() is fake_mt5
+    assert fake_mt5.login_calls == []
+
+    monkeypatch.setattr(
+        fake_mt5, "account_info", lambda: SimpleNamespace(login=654321, server="Broker-Live")
+    )
+    with pytest.raises(GatewayConfigurationError, match="identity does not match"):
+        adapter._connect()
+    assert fake_mt5.login_calls == []
+
+
 def test_mt5_live_adapter_passes_terminal_path_positionally(tmp_path, monkeypatch) -> None:
     configure_mt5_secret(monkeypatch)
     get_settings().journal_path = str(tmp_path / "mt5-path.db")
     initialize_journal()
     fake_mt5 = FakeRuntimeMt5()
+    monkeypatch.setattr("app.mt5_connection._ensure_background_terminal", lambda *a, **kw: None)
     monkeypatch.setitem(sys.modules, "MetaTrader5", fake_mt5)
     monkeypatch.setattr("app.mt5_live_adapter.platform.system", lambda: "Windows")
     settings = runtime_settings(write_enabled=False)
@@ -381,6 +461,7 @@ def test_mt5_live_adapter_rejects_wrong_runtime_server(tmp_path, monkeypatch) ->
         return SimpleNamespace(**{**vars(info), "server": "Wrong-Broker"})
 
     monkeypatch.setattr(fake_mt5, "account_info", wrong_server_info)
+    monkeypatch.setattr("app.mt5_connection._ensure_background_terminal", lambda *a, **kw: None)
     monkeypatch.setitem(sys.modules, "MetaTrader5", fake_mt5)
     monkeypatch.setattr("app.mt5_live_adapter.platform.system", lambda: "Windows")
 

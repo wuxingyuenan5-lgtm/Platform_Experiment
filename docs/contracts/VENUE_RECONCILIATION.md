@@ -19,7 +19,12 @@ Runtime 返回外部事实快照，不直接修改 Platform API 数据库。Plat
 - 查询、导入事实、投影更新与 Difference 创建必须保持分层；只读查询不得产生外部副作用。
 - `result_unknown` 先读 Runtime Journal，再读外部 Venue；任何恢复路径都不得重新提交原命令。
 - 外部 Order / Fill / Deal / Position / Balance 使用稳定身份导入不可变 FinancialFact；重复导入必须幂等。
+- 已有全量执行回执入账的订单，晚到的逐笔 Venue 成交保留为原生事件与 FinancialFact，并按来源去重比较；不得再次应用到执行持仓。原订单、成交及财务事实不被改写。对账同步旧命令状态与批次腿后，按完整证据重查历史风险并保留审计；数量超限与身份冲突仍须显式处理。
+- Funding 逐次成交同步与正式 Venue 对账共用同一事实导入和投影边界，现货原生费用随成交持久化。部分回执与原生成交数量相同也不能重复投影；数量不同保留显式差异，不把两个来源相加。执行累计数量与终态写入受事务保护，部分成交保持 `partially_filled`；Funding 批次完成与资源释放由其自身编排/风险终结流程拥有。
+- 原生成交的 `currency` 表示手续费资产，Spot 可扣基础币。Trade Fill FinancialFact 的结算币种从合约解析；原生手续费金额和币种原样保留在不可变 payload 与账户事件中，不把基础币手续费解释为交易结算币种。
 - 本地与外部状态、数量、价格、币种或身份不一致时创建显式 Difference，不静默覆盖任一权威视角。
+- 监控合约标识可按同一账户所属 Venue 的唯一活动目录映射解析为正式合约；Bybit 的账户、Symbol、spot/linear/inverse 必须完整匹配。解析只作用于比较和读取，不重写旧回执；多重映射、跨账户或跨市场仍拒绝。
+- 已核实的历史时间错误可在现有 Difference 中记录 `timestamp_mismatch` / `venue_event`，保留完整旧回执与新的原生回执。只有显式 `accepted`、同账户和来源、完整旧回执精确匹配且仅 `occurredAt` 不同，读取与重放比较才采用接受的时间。原始事件保持不可变；接受不能改变金额、归属或豁免后续第三个时间冲突。
 - Fake Venue 的持久化 ID 与查询行为用于 CI 和恢复演练，不是正式交易账本。
 - 当前外部恢复、撤单和 Live Write 仍受 Runtime 能力、权限、生产配置及受控实盘门禁约束。
 
@@ -43,6 +48,8 @@ GET /venue/instruments/{symbol}?accountId=...
 - 自动撤单。
 - 修改外部仓位。
 - 生成新的 External Fill。
+
+Bybit linear 列表/历史查询未指定 symbol 时使用账户的 settleCoin 范围，避免缺少查询范围返回错误；查询失败不能解释为空列表。`Untriggered` 与 `Triggered` 映射为活动的 accepted，`PartiallyFilledCanceled` 映射为 canceled，其余未知枚举继续 unknown。accepted 不代表已经成交，也不自动撤销条件单。原生规则见 [Bybit 查询合同](https://bybit-exchange.github.io/docs/v5/order/open-order) 与 [订单状态](https://bybit-exchange.github.io/docs/v5/enum#orderStatus)。
 
 Cancel Order 是单独命令，必须有幂等键：
 

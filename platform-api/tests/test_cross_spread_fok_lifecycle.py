@@ -111,7 +111,7 @@ def available_snapshot() -> CrossSpreadSnapshotResponse:
 def test_non_executable_limit_rejects_before_any_batch_submission(monkeypatch) -> None:
     monkeypatch.setattr(
         synthetic_service.market_helpers,
-        "_assert_acceptance_open_allowed",
+        "_assert_open_execution_resolved",
         lambda: None,
     )
     monkeypatch.setattr(
@@ -150,6 +150,8 @@ def test_non_executable_limit_rejects_before_any_batch_submission(monkeypatch) -
 
 
 def test_clean_fok_close_no_fill_releases_plan_back_to_active(monkeypatch) -> None:
+    from app.config import get_settings
+    monkeypatch.setattr(get_settings(), "live_trading_enabled", True)
     captured = {}
     active = plan("active")
     triggered = plan("triggered", trigger_reason="manual")
@@ -210,6 +212,8 @@ def test_clean_fok_close_no_fill_releases_plan_back_to_active(monkeypatch) -> No
 
 
 def test_uncertain_fok_close_enters_manual_intervention(monkeypatch) -> None:
+    from app.config import get_settings
+    monkeypatch.setattr(get_settings(), "live_trading_enabled", True)
     active = plan("active")
     triggered = plan("triggered", trigger_reason="manual")
     manual = plan("manual_intervention", trigger_reason="manual")

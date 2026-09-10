@@ -43,7 +43,7 @@ def build_app() -> FastAPI:
     def info(request: Request) -> dict[str, str]:
         return {"user": request.state.principal.user_id}
 
-    @app.post("/api/v1/system/write")
+    @app.post("/api/v1/trading/cross-spread/lifecycle/open")
     def write(request: Request) -> dict[str, str]:
         return {"user": request.state.principal.user_id}
 
@@ -167,7 +167,7 @@ def test_customer_identity_domain_rejects_api_key_wildcard(
     )
 
 
-def test_live_write_rejects_browser_session_but_allows_platform_read(
+def test_live_write_allows_ceo_browser_session_with_csrf(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
@@ -180,17 +180,12 @@ def test_live_write_rejects_browser_session_but_allows_platform_read(
         client.cookies.set(get_settings().session_cookie_name, session_token)
         read_response = client.get("/api/v1/system/info")
         write_response = client.post(
-            "/api/v1/system/write",
+            "/api/v1/trading/cross-spread/lifecycle/open",
             headers={
-                "Origin": "http://localhost:5173",
+                "Origin": get_settings().allowed_cors_origins[0],
                 "X-CSRF-Token": csrf_token,
             },
         )
 
     assert read_response.status_code == 200
-    assert_auth_error(
-        write_response,
-        status_code=403,
-        code="live_api_key_required",
-        message_fragment="API-key",
-    )
+    assert write_response.status_code == 200

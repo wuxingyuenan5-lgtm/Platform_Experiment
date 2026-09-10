@@ -110,7 +110,7 @@ def test_authentication_errors_use_stable_structured_contract() -> None:
     for code in (
         "ambiguous_credentials",
         "human_session_required",
-        "live_api_key_required",
+        "live_authentication_required",
         "permission_denied",
         "request_identity_mismatch",
         "invalid_session",

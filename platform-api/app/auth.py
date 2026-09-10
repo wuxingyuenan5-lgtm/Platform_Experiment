@@ -50,8 +50,12 @@ SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS", "TRACE"})
 CEO_TRADE_WRITE_PATHS = frozenset(
     {
         "/api/v1/trading/funding/market-command",
+        "/api/v1/trading/funding/instructions",
         "/api/v1/trading/cross-spread/market-command",
         "/api/v1/trading/cross-spread/funding-transfer",
+        "/api/v1/trading/cross-spread/leverage",
+        "/api/v1/trading/cross-spread/lifecycle/open",
+        "/api/v1/trading/cross-spread/exit-plans/evaluate",
     }
 )
 CEO_TRADE_STRATEGY_INSTANCE_IDS = frozenset(
@@ -198,7 +202,7 @@ def assurance_for_request(method: str, path: str, settings: Settings) -> Authent
         return AuthenticationAssurance.HUMAN_SESSION
     if normalized_method in SAFE_METHODS:
         return AuthenticationAssurance.PLATFORM_READ
-    if settings.environment.lower() == "live":
+    if settings.environment.lower() == "live" or settings.live_trading_enabled:
         return AuthenticationAssurance.LIVE_WRITE
     return AuthenticationAssurance.SIMULATION_WRITE
 
@@ -269,11 +273,13 @@ def enforce_assurance(
             "human_session_required",
             "Human browser session authentication is required",
         )
-    if assurance == AuthenticationAssurance.LIVE_WRITE and principal.auth_method != "api_key":
+    if assurance == AuthenticationAssurance.LIVE_WRITE and principal.auth_method not in {
+        "api_key", "session"
+    }:
         raise AuthenticationError(
             403,
-            "live_api_key_required",
-            "Live write routes require API-key authentication",
+            "live_authentication_required",
+            "Live writes require an authenticated user session or API key",
         )
     if principal.auth_method == "session":
         browser_session = getattr(request.state, "browser_session", None)
@@ -291,12 +297,23 @@ def enforce_assurance(
 
 def permission_for_request(method: str, path: str) -> str:
     normalized_method = method.upper()
+    if normalized_method == "POST" and path == "/api/v1/research/a-share/stock-pool/focus":
+        return "profile.update_self"
+    if (normalized_method, path) in {
+        ("POST", "/api/v1/research/a-share/refresh"),
+        ("POST", "/api/v1/research/a-share/stock-pool/add-batch"),
+        ("DELETE", "/api/v1/research/a-share/stock-pool/remove"),
+    }:
+        return "research.write"
     if normalized_method in {"GET", "HEAD"}:
+        if path.startswith("/api/v1/research/"):
+            return "research.read"
         audit_read_suffixes = (
             "/security/credential-references",
             "/security/credential-rotations",
             "/ops/audit-events",
             "/ops/production-status",
+            "/ops/metrics",
             "/ops/alerts",
             "/ops/backups",
             "/ops/restore-drills",
@@ -337,8 +354,10 @@ def permission_for_request(method: str, path: str) -> str:
     # through the shared `trading.write` capability.
     if (
         path.endswith("/trading/funding/market-command")
+        or path.endswith("/trading/funding/instructions")
         or path.endswith("/trading/cross-spread/market-command")
         or path.endswith("/trading/cross-spread/funding-transfer")
+        or path.endswith("/trading/cross-spread/leverage")
     ):
         return "trading.write"
     if path.endswith("/trading/cross-spread/lifecycle/open"):
@@ -356,6 +375,14 @@ def permission_for_request(method: str, path: str) -> str:
         return "risk:manage"
 
     if "/venue-reconciliation/differences/" in path and path.endswith("/resolve"):
+        return "reconciliation:review"
+    if (
+        normalized_method == "POST"
+        and path.startswith("/api/v1/trading/orders/")
+        and path.endswith(("/venue-reconcile", "/reconcile"))
+    ):
+        # Re-read an existing order's Venue or Runtime evidence; these endpoints cannot
+        # submit a replacement order or approve a missing-external exception.
         return "reconciliation:review"
     if "/eod-reconciliation/reports/" in path and path.endswith("/review"):
         return "eod:review"
@@ -395,6 +422,8 @@ def has_ceo_trade_authority(principal: Principal, settings: Settings) -> bool:
     return (
         settings.environment.lower() == "development"
         and settings.auth_mode.lower() == "development"
+        and not settings.live_trading_enabled
+        and settings.default_trading_environment.lower() != "live"
         and "admin" in principal.roles
     )
 
@@ -403,13 +432,34 @@ async def requires_ceo_trade_authority(request: Request) -> bool:
     """Classify privileged strategy writes without trusting a client route choice."""
     if request.method.upper() not in {"POST", "PATCH"}:
         return False
-    if (
-        request.method.upper() == "PATCH"
-        and request.url.path.startswith("/api/v1/trading/cross-spread/exit-plans/")
+    if request.url.path.startswith(
+        "/api/v1/trading/execution-batches/"
+    ) and request.url.path.endswith("/risk-actions"):
+        batch_id = request.url.path.split("/")[-2]
+        with connection() as db:
+            batch = db.execute(
+                "SELECT strategy_instance_id FROM execution_batches WHERE id=?", (batch_id,)
+            ).fetchone()
+        return batch is not None and batch["strategy_instance_id"] in CEO_TRADE_STRATEGY_INSTANCE_IDS
+    if request.method.upper() == "PATCH" and request.url.path.startswith(
+        "/api/v1/trading/cross-spread/exit-plans/"
     ):
         return True
     if request.url.path in CEO_TRADE_WRITE_PATHS:
         return True
+    if request.url.path.startswith(
+        "/api/v1/trading/cross-spread/exit-plans/"
+    ) and request.url.path.endswith("/close"):
+        return True
+    if request.url.path.startswith("/api/v1/strategy-instructions/") and request.url.path.endswith(
+        "/execute"
+    ):
+        instruction_id = request.url.path.split("/")[-2]
+        with connection() as db:
+            row = db.execute(
+                "SELECT strategy_instance_id FROM strategy_runs WHERE id=?", (instruction_id,)
+            ).fetchone()
+        return row is not None and row["strategy_instance_id"] in CEO_TRADE_STRATEGY_INSTANCE_IDS
     if request.url.path.startswith("/api/v1/strategies/") and request.url.path.endswith(
         "/instructions"
     ):

@@ -138,7 +138,7 @@ def test_browser_session_profile_devices_and_password_change(
         assert "user.assign_role" in permissions
         assert "member.holding.update" in permissions
         assert "trade:submit" not in permissions
-        assert "risk:manage" not in permissions
+        assert "risk:manage" in permissions
 
         profile = client.get("/api/v1/me")
         assert profile.status_code == 200

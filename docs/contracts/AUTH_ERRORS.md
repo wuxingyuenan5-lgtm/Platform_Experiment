@@ -74,7 +74,7 @@ FastAPI 权限依赖返回相同的 `detail.code/detail.message` 结构。请求
 | Code | HTTP | 含义 |
 |---|---:|---|
 | `human_session_required` | 403 | 客户身份域只允许 Browser Session，API-Key wildcard 不豁免 |
-| `live_api_key_required` | 403 | Live Write 只允许 API-Key Principal |
+| `live_authentication_required` | 403 | Live Write 需要已认证 Browser Session 或 API-Key Principal，仍须满足目标路由的保障等级与权限 |
 | `permission_denied` | 403 | Principal 缺少路由要求的显式权限 |
 | `principal_unavailable` | 401 | 路由依赖没有获得认证中间件建立的 Principal |
 | `request_identity_mismatch` | 403 | 请求体 actor/reviewer 等身份字段与 Principal 不一致 |
@@ -157,7 +157,7 @@ CSRF Token
 
 - Cookie + Bearer 返回 `ambiguous_credentials`；
 - API-Key wildcard 访问 `/me` 返回 `human_session_required`；
-- Browser Session 调用 Live Write 返回 `live_api_key_required`；
+- 无已认证身份调用 Live Write 返回 `live_authentication_required`；有效 Browser Session 继续验证 CSRF、角色与目标账户权限；
 - 无效或过期 Session 返回 `invalid_session`；
 - 缺少/错误 CSRF 分别返回 `csrf_required` / `csrf_invalid`；
 - 响应 `requestId` 与 `X-Request-ID` 一致；

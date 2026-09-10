@@ -3,8 +3,9 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
-from concurrent.futures import ThreadPoolExecutor
+import logging
 from collections.abc import AsyncIterator
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 from decimal import Decimal
@@ -16,37 +17,17 @@ from pydantic import BaseModel, Field
 
 from app.config import get_settings
 from app.database import connection
+from app.venue_identity_repository import (
+    load_order_identities,
+    resolve_snapshot_order,
+    scoped_identity,
+)
 from app.venue_reconciliation import runtime_get
+from app.venue_reconciliation_repository import effective_venue_event
 
 SNAPSHOT_SYNC_INTERVAL_SECONDS = 30.0
 _SNAPSHOT_SYNC_LOCK = Lock()
-_SYNC_SCHEMA_LOCK = Lock()
-_SYNC_SCHEMA_DATABASES: set[str] = set()
-SYNC_SCHEMA_SQL = """
-CREATE TABLE IF NOT EXISTS account_sync_status (
-    account_id TEXT PRIMARY KEY,
-    status TEXT NOT NULL,
-    error_code TEXT,
-    last_attempt_at TEXT,
-    last_success_at TEXT,
-    updated_at TEXT NOT NULL,
-    FOREIGN KEY(account_id) REFERENCES accounts(id)
-);
-
-CREATE TABLE IF NOT EXISTS account_risk_snapshots (
-    account_id TEXT NOT NULL,
-    as_of TEXT NOT NULL,
-    currency TEXT NOT NULL,
-    equity TEXT,
-    margin TEXT,
-    free_margin TEXT,
-    margin_level TEXT,
-    data_quality_state TEXT NOT NULL,
-    created_at TEXT NOT NULL,
-    PRIMARY KEY(account_id, as_of),
-    FOREIGN KEY(account_id) REFERENCES accounts(id)
-);
-"""
+logger = logging.getLogger(__name__)
 
 
 class AccountSyncStatusResponse(BaseModel):
@@ -82,18 +63,6 @@ class EquityHistoryPoint(BaseModel):
     equity: str
 
 
-def ensure_sync_schema() -> None:
-    database_path = str(get_settings().database_path)
-    if database_path in _SYNC_SCHEMA_DATABASES:
-        return
-    with _SYNC_SCHEMA_LOCK:
-        if database_path in _SYNC_SCHEMA_DATABASES:
-            return
-        with connection() as db:
-            db.executescript(SYNC_SCHEMA_SQL)
-        _SYNC_SCHEMA_DATABASES.add(database_path)
-
-
 def _iso_now() -> str:
     return datetime.now(UTC).isoformat()
 
@@ -101,7 +70,10 @@ def _iso_now() -> str:
 def _as_decimal(value: object, *, default: str = "0") -> Decimal:
     if value is None or value == "":
         return Decimal(default)
-    return Decimal(str(value))
+    parsed = Decimal(str(value))
+    if not parsed.is_finite():
+        raise ValueError("Runtime financial value must be finite")
+    return parsed
 
 
 def _canonical_json(payload: object) -> str:
@@ -127,7 +99,6 @@ def _fill_fingerprint(account_id: str, fill: dict[str, object]) -> str | None:
 
 
 def _status_row(account_id: str) -> Row | None:
-    ensure_sync_schema()
     with connection() as db:
         return db.execute(
             """
@@ -147,7 +118,6 @@ def _write_status(
     last_attempt_at: str | None = None,
     last_success_at: str | None = None,
 ) -> None:
-    ensure_sync_schema()
     now = _iso_now()
     with connection() as db:
         existing = db.execute(
@@ -183,13 +153,11 @@ def discover_live_accounts() -> list[str]:
             """
             SELECT DISTINCT a.id
             FROM strategy_account_bindings sab
-            JOIN strategy_instances si ON si.id = sab.strategy_instance_id
-            JOIN strategy_definitions sd ON sd.id = si.strategy_definition_id
             JOIN accounts a ON a.id = sab.account_id
             WHERE sab.status = 'active'
               AND a.status = 'active'
               AND lower(a.environment) = 'live'
-              AND sd.strategy_key != 'short_term_w'
+              AND sab.role != 'local_test'
             ORDER BY a.id
             """
         ).fetchall()
@@ -197,7 +165,6 @@ def discover_live_accounts() -> list[str]:
 
 
 def load_sync_statuses() -> list[AccountSyncStatusResponse]:
-    ensure_sync_schema()
     discovered = discover_live_accounts()
     with connection() as db:
         rows_by_account = {
@@ -256,7 +223,11 @@ def _persist_balances(db, account_id: str, balances: list[dict[str, object]]) ->
                 account_id,
                 currency,
                 str(_as_decimal(balance.get("equity"))),
-                str(_as_decimal(balance.get("availableBalance"))),
+                (
+                    str(_as_decimal(balance["availableBalance"]))
+                    if balance.get("availableBalance") is not None
+                    else None
+                ),
                 str(balance.get("source") or "runtime"),
                 str(balance.get("dataQualityState") or "complete"),
                 as_of,
@@ -285,56 +256,90 @@ def _persist_positions(
         str(row["instrument_id"]): Decimal("0") for row in previously_observed
     }
     db.execute("DELETE FROM positions WHERE account_id = ?", (account_id,))
+    grouped: dict[str, list[dict[str, object]]] = {}
     for position in positions:
-        instrument_id = str(position.get("instrumentId") or "")
-        if not instrument_id:
-            continue
-        unrealized_by_instrument[instrument_id] = _as_decimal(position.get("unrealizedPnl"))
+        grouped.setdefault(str(position["instrumentId"]), []).append(position)
+    for instrument_id, rows in grouped.items():
+        quantities = [_as_decimal(row["netQuantity"]) for row in rows]
+        quantity = sum(quantities, Decimal("0"))
+        known_prices = all(row.get("averagePrice") is not None for row in rows)
+        same_direction = all(value >= 0 for value in quantities) or all(
+            value <= 0 for value in quantities
+        )
+        average = None
+        if quantity and known_prices and same_direction:
+            average = sum(
+                (
+                    abs(value) * _as_decimal(row["averagePrice"])
+                    for value, row in zip(quantities, rows, strict=True)
+                ),
+                Decimal("0"),
+            ) / abs(quantity)
+        unrealized_by_instrument[instrument_id] = sum(
+            (_as_decimal(row.get("unrealizedPnl")) for row in rows), Decimal("0")
+        )
         db.execute(
-            """
-            INSERT INTO positions (
-                account_id, instrument_id, net_quantity, average_price, updated_at
-            ) VALUES (?, ?, ?, ?, ?)
-            ON CONFLICT(account_id, instrument_id) DO UPDATE SET
-                net_quantity = excluded.net_quantity,
-                average_price = excluded.average_price,
-                updated_at = excluded.updated_at
-            """,
+            "INSERT INTO positions "
+            "(account_id,instrument_id,net_quantity,average_price,updated_at) "
+            "VALUES (?,?,?,?,?)",
             (
                 account_id,
                 instrument_id,
-                str(_as_decimal(position.get("netQuantity"))),
-                (
-                    str(_as_decimal(position.get("averagePrice")))
-                    if position.get("averagePrice") not in {None, ""}
-                    else None
-                ),
-                str(position.get("asOf") or _iso_now()),
+                str(quantity),
+                str(average) if average is not None else None,
+                max(str(row.get("asOf") or _iso_now()) for row in rows),
             ),
         )
-        written += 1
+        written += len(rows)
     return written, unrealized_by_instrument
 
 
 def _persist_orders(db, account_id: str, orders: list[dict[str, object]]) -> int:
     written = 0
+    identities = load_order_identities(db)
     for order in orders:
-        order_id = str(
-            order.get("platformOrderId") or f"external:{order.get('externalOrderId')}"
-        )
         instrument_id = str(order.get("instrumentId") or "")
         if not instrument_id:
             continue
+        order_id = resolve_snapshot_order(db, account_id, order, identities=identities)
+        previous = db.execute(
+            "SELECT o.account_id,o.instrument_id,o.external_order_id,tc.id AS owned_command "
+            "FROM orders o LEFT JOIN trade_commands tc ON tc.id=o.command_id WHERE o.id=?",
+            (order_id,),
+        ).fetchone()
+        if previous is not None and (
+            previous["account_id"] != account_id or previous["instrument_id"] != instrument_id
+        ):
+            raise ValueError("Venue order identity conflicts with existing order ownership")
+        if previous is not None and previous["owned_command"]:
+            # Account monitoring records evidence; execution/reconciliation owns
+            # command status and cumulative quantities, including unknown results.
+            db.execute(
+                "UPDATE orders SET external_order_id=COALESCE(NULLIF(external_order_id,''),?),"
+                "venue_payload_json=? WHERE id=?",
+                (order.get("externalOrderId"), _canonical_json(order), order_id),
+            )
+            if not previous["external_order_id"]:
+                identities = load_order_identities(db)
+            written += 1
+            continue
         db.execute(
             """
-            INSERT OR REPLACE INTO orders (
+            INSERT INTO orders (
                 id, command_id, account_id, instrument_id, symbol, side, order_type,
-                quantity, price, status, external_order_id, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                quantity, price, status, external_order_id, created_at, updated_at,
+                venue_payload_json
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(id) DO UPDATE SET
+                status = excluded.status,
+                external_order_id = excluded.external_order_id,
+                updated_at = excluded.updated_at,
+                venue_payload_json = excluded.venue_payload_json
+            WHERE excluded.updated_at >= orders.updated_at
             """,
             (
                 order_id,
-                str(order.get("commandId") or order_id),
+                order_id,
                 account_id,
                 instrument_id,
                 str(order.get("symbol") or ""),
@@ -350,8 +355,11 @@ def _persist_orders(db, account_id: str, orders: list[dict[str, object]]) -> int
                 str(order.get("externalOrderId") or ""),
                 str(order.get("occurredAt") or _iso_now()),
                 str(order.get("asOf") or _iso_now()),
+                _canonical_json(order),
             ),
         )
+        if previous is None:
+            identities = load_order_identities(db)
         written += 1
     return written
 
@@ -403,19 +411,23 @@ def _persist_fills(
     fills: list[dict[str, object]],
 ) -> tuple[int, dict[str, Decimal], dict[str, Decimal]]:
     written = 0
+    identities = load_order_identities(db)
     fees_by_instrument: dict[str, Decimal] = {}
     realized_by_instrument: dict[str, Decimal] = {}
     for fill in fills:
-        fill_id = str(fill.get("externalFillId") or "")
-        if not fill_id:
+        native_id = str(fill.get("externalFillId") or "")
+        if not native_id:
             fingerprint = _fill_fingerprint(account_id, fill)
             if fingerprint is None:
                 raise ValueError("Runtime fill lacks authoritative identity")
-            fill_id = fingerprint
-        order_id = str(fill.get("platformOrderId") or f"external:{fill.get('externalOrderId')}")
+            native_id = fingerprint
+        fill_id = scoped_identity(
+            "fill", account_id, str(fill.get("source") or "runtime"), native_id
+        )
         instrument_id = str(fill.get("instrumentId") or "")
         if not instrument_id:
             continue
+        order_id = resolve_snapshot_order(db, account_id, fill, identities=identities)
         _ensure_fill_order_row(
             db,
             account_id,
@@ -423,6 +435,8 @@ def _persist_fills(
             order_id,
             instrument_id,
         )
+        if order_id not in identities.rows:
+            identities = load_order_identities(db)
         requested = db.execute(
             """
             SELECT orders.quantity
@@ -432,31 +446,39 @@ def _persist_fills(
             """,
             (order_id,),
         ).fetchone()
-        incoming_quantity = _as_decimal(fill.get("quantity"))
-        if requested is not None:
-            existing_rows = db.execute(
-                "SELECT quantity FROM fills WHERE order_id = ?",
-                (order_id,),
-            ).fetchall()
-            existing_quantity = sum(
-                (_as_decimal(row["quantity"]) for row in existing_rows),
-                Decimal("0"),
-            )
-            if existing_quantity + incoming_quantity > _as_decimal(requested["quantity"]):
-                # Runtime terminal confirmation may already have persisted one
-                # aggregate fill. Later venue sync can observe its component
-                # executions, but must not double-count them operationally.
+        existing = db.execute(
+            "SELECT * FROM fills WHERE id=? OR (id=? AND account_id=?)",
+            (fill_id, native_id, account_id),
+        ).fetchall()
+        for row in existing:
+            if requested is not None and row["origin"] != "venue_execution":
+                # A Runtime/legacy confirmation can carry its own confirmation
+                # time. It is not the native receipt identified by this ticket.
+                # Native replay integrity is enforced in venue_account_events.
                 continue
-        fee = _as_decimal(fill.get("fee"))
-        if fill_id not in fees_by_instrument:
-            fees_by_instrument[instrument_id] = (
-                fees_by_instrument.get(instrument_id, Decimal("0")) + fee
-            )
+            canonical_order = identities.canonical.get(row["order_id"])
+            if (
+                canonical_order != order_id
+                or row["account_id"] != account_id
+                or row["instrument_id"] != instrument_id
+                or row["side"] != fill.get("side")
+                or _as_decimal(row["quantity"]) != _as_decimal(fill.get("quantity"))
+                or _as_decimal(row["price"]) != _as_decimal(fill.get("price"))
+                or datetime.fromisoformat(row["occurred_at"].replace("Z", "+00:00"))
+                != datetime.fromisoformat(str(fill["occurredAt"]).replace("Z", "+00:00"))
+            ):
+                raise ValueError("Venue fill identity conflicts with existing financial data")
+        if existing or requested is not None:
+            # Native receipts are retained in venue_account_events for management.
+            # They must not append deltas to the execution path's confirmations.
+            continue
+        incoming_quantity = _as_decimal(fill.get("quantity"))
         cursor = db.execute(
             """
             INSERT OR IGNORE INTO fills (
-                id, order_id, account_id, instrument_id, side, quantity, price, occurred_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                id, order_id, account_id, instrument_id, side, quantity, price, occurred_at,
+                origin, source, external_fill_id
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'venue_execution', ?, ?)
             """,
             (
                 fill_id,
@@ -467,6 +489,8 @@ def _persist_fills(
                 str(incoming_quantity),
                 str(_as_decimal(fill.get("price"))),
                 str(fill.get("occurredAt") or _iso_now()),
+                str(fill.get("source") or "runtime"),
+                native_id,
             ),
         )
         if cursor.rowcount and cursor.rowcount > 0:
@@ -484,9 +508,7 @@ def _persist_pnl(
 ) -> int:
     written = 0
     instrument_ids = (
-        set(unrealized_by_instrument)
-        | set(realized_by_instrument)
-        | set(fees_by_instrument)
+        set(unrealized_by_instrument) | set(realized_by_instrument) | set(fees_by_instrument)
     )
     for instrument_id in instrument_ids:
         existing = db.execute(
@@ -497,16 +519,8 @@ def _persist_pnl(
             """,
             (account_id, instrument_id),
         ).fetchone()
-        realized = (
-            Decimal(str(existing["realized_pnl"]))
-            if existing is not None
-            else Decimal("0")
-        )
-        trading = (
-            Decimal(str(existing["trading_pnl"]))
-            if existing is not None
-            else Decimal("0")
-        )
+        realized = Decimal(str(existing["realized_pnl"])) if existing is not None else Decimal("0")
+        trading = Decimal(str(existing["trading_pnl"])) if existing is not None else Decimal("0")
         fees = Decimal(str(existing["fees"])) if existing is not None else Decimal("0")
         if instrument_id in realized_by_instrument:
             realized = realized_by_instrument[instrument_id]
@@ -546,8 +560,8 @@ def _persist_account_risk(db, account_id: str, risk: dict[str, object] | None) -
         """
         INSERT OR REPLACE INTO account_risk_snapshots (
             account_id, as_of, currency, equity, margin, free_margin, margin_level,
-            data_quality_state, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            data_quality_state, created_at, payload_json, total_assets, asset_scope
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             account_id,
@@ -575,6 +589,9 @@ def _persist_account_risk(db, account_id: str, risk: dict[str, object] | None) -
             ),
             str(risk.get("dataQualityState") or "complete"),
             _iso_now(),
+            _canonical_json(risk),
+            str(_as_decimal(risk["totalAssets"])) if risk.get("totalAssets") is not None else None,
+            str(risk.get("assetScope") or "unspecified"),
         ),
     )
     return 1
@@ -606,6 +623,166 @@ def _classify_sync_failure(exc: Exception) -> tuple[str, str]:
     return "runtime_unavailable", "runtime_unavailable"
 
 
+def _validate_snapshot(account_id: str, snapshot: object) -> None:
+    if not isinstance(snapshot, dict) or snapshot.get("accountId") != account_id:
+        raise ValueError("Runtime snapshot account identity mismatch")
+    for section in ("balances", "positions", "orders", "fills"):
+        rows = snapshot.get(section)
+        if not isinstance(rows, list):
+            # An absent or malformed section is not an authoritative empty account.
+            raise ValueError(f"Runtime snapshot is missing {section}")
+        for row in rows:
+            if not isinstance(row, dict) or row.get("accountId", account_id) != account_id:
+                raise ValueError(f"Runtime {section} account identity mismatch")
+    for section, required in (
+        ("positions", ("instrumentId", "netQuantity")),
+        ("orders", ("instrumentId", "quantity", "side")),
+        ("fills", ("instrumentId", "quantity", "price", "side")),
+        ("balances", ("currency", "equity", "asOf")),
+    ):
+        for row in snapshot[section]:
+            if any(row.get(key) in (None, "") for key in required):
+                raise ValueError(f"Runtime {section} lacks required financial fields")
+            for key in (
+                "netQuantity",
+                "quantity",
+                "price",
+                "averagePrice",
+                "equity",
+                "availableBalance",
+                "fee",
+                "unrealizedPnl",
+            ):
+                if row.get(key) not in (None, ""):
+                    _as_decimal(row[key])
+            if section in {"orders", "fills"} and (
+                row["side"] not in {"buy", "sell"} or _as_decimal(row["quantity"]) <= 0
+            ):
+                raise ValueError("Runtime trade has invalid side or quantity")
+            for key in ("asOf", "occurredAt"):
+                if (
+                    row.get(key) is not None
+                    and datetime.fromisoformat(str(row[key]).replace("Z", "+00:00")).tzinfo is None
+                ):
+                    raise ValueError("Runtime financial timestamps require timezone")
+    if not snapshot.get("asOf"):
+        raise ValueError("Runtime snapshot requires asOf")
+    risk = snapshot.get("accountRisk")
+    if risk is not None and (
+        not isinstance(risk, dict)
+        or risk.get("accountId") != account_id
+        or not risk.get("currency")
+    ):
+        raise ValueError("Runtime account risk identity mismatch")
+    for key in ("asOf", "historyStart", "historyEnd"):
+        if snapshot.get(key) is not None:
+            stamp = datetime.fromisoformat(str(snapshot[key]).replace("Z", "+00:00"))
+            if stamp.tzinfo is None:
+                raise ValueError("Runtime snapshot timestamps must include timezone")
+    events = snapshot.get("economicEvents", [])
+    if not isinstance(events, list):
+        raise ValueError("Runtime economic events must be a list")
+    for event in events:
+        if not isinstance(event, dict) or event.get("accountId") != account_id:
+            raise ValueError("Runtime economic event account identity mismatch")
+
+
+def _persist_venue_snapshot(db, account_id: str, snapshot: dict[str, object]) -> None:
+    # Keep complete venue position tickets and coin-level fields for monitoring.
+    # Operational positions remain a separate net-position projection.
+    db.execute(
+        """INSERT INTO account_venue_snapshots (
+           account_id, source, venue, as_of, history_start, history_end,
+           data_quality_state, payload_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+           ON CONFLICT(account_id) DO UPDATE SET source=excluded.source,
+           venue=excluded.venue, as_of=excluded.as_of, history_start=excluded.history_start,
+           history_end=excluded.history_end, data_quality_state=excluded.data_quality_state,
+           payload_json=excluded.payload_json""",
+        (
+            account_id,
+            str(snapshot.get("source") or "runtime"),
+            str(snapshot.get("venue") or ""),
+            str(snapshot.get("asOf") or _iso_now()),
+            snapshot.get("historyStart"),
+            snapshot.get("historyEnd"),
+            str(snapshot.get("dataQualityState") or "partial"),
+            _canonical_json(snapshot),
+        ),
+    )
+
+
+def _persist_venue_event(db, account_id: str, event_type: str, event: dict[str, object]) -> None:
+    if event.get("accountId", account_id) != account_id:
+        raise ValueError("Venue event account identity mismatch")
+    if event_type not in {"trade_fill", "funding", "swap", "fee", "realized_pnl"}:
+        raise ValueError("Unknown venue economic event type")
+    external_id = event.get("externalFillId" if event_type == "trade_fill" else "externalEventId")
+    if not external_id and event_type == "trade_fill":
+        external_id = _fill_fingerprint(account_id, event)
+    if not external_id:
+        raise ValueError("Runtime event lacks authoritative identity")
+    if event.get("occurredAt") is None:
+        raise ValueError("Runtime event lacks authoritative occurrence time")
+    identity = (account_id, str(event.get("source") or "runtime"), event_type, str(external_id))
+    existing = db.execute(
+        """SELECT payload_json FROM venue_account_events
+           WHERE account_id=? AND source=? AND event_type=? AND external_id=?""",
+        identity,
+    ).fetchone()
+    if existing is not None:
+        previous = effective_venue_event(
+            db, account_id, event_type, json.loads(existing["payload_json"])
+        )
+        identities = load_order_identities(db)
+        if identities.instrument(account_id, previous.get("instrumentId")) != (
+            identities.instrument(account_id, event.get("instrumentId"))
+        ):
+            raise ValueError("Venue event identity was reused with different instrument")
+        for field in ("quantity", "price", "fee", "amount", "realizedPnl", "swap"):
+            old = previous.get(field)
+            new = event.get(field)
+            if (old is None) != (new is None) or (
+                old is not None and _as_decimal(old) != _as_decimal(new)
+            ):
+                raise ValueError("Venue event identity was reused with different financial data")
+        for field in (
+            "currency",
+            "side",
+            "symbol",
+            "externalOrderId",
+            "positionId",
+        ):
+            if previous.get(field) != event.get(field):
+                raise ValueError("Venue event identity was reused with different financial data")
+        if datetime.fromisoformat(str(previous["occurredAt"]).replace("Z", "+00:00")) != (
+            datetime.fromisoformat(str(event["occurredAt"]).replace("Z", "+00:00"))
+        ):
+            raise ValueError("Venue event identity was reused with different occurrence time")
+        if previous.get("platformOrderId") != event.get("platformOrderId"):
+            old_order = identities.resolve(account_id, previous)
+            new_order = identities.resolve(account_id, event)
+            if old_order != new_order or (old_order is None and not event.get("externalOrderId")):
+                raise ValueError("Venue event identity was reused with different order ownership")
+        return
+    for key in ("quantity", "price", "fee", "amount", "realizedPnl", "swap"):
+        if event.get(key) is not None:
+            _as_decimal(event[key])
+    db.execute(
+        """INSERT INTO venue_account_events (account_id, source, event_type, external_id,
+           instrument_id, platform_order_id, occurred_at, amount, currency, payload_json)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+        (
+            *identity,
+            event.get("instrumentId"),
+            event.get("platformOrderId"),
+            event["occurredAt"],
+            str(_as_decimal(event["amount"])) if event.get("amount") is not None else None,
+            event.get("currency"),
+            _canonical_json(event),
+        ),
+    )
+
+
 def _sync_one_account(account_id: str) -> dict[str, int]:
     last_attempt_at = _iso_now()
     _write_status(account_id, status="syncing", error_code=None, last_attempt_at=last_attempt_at)
@@ -613,7 +790,17 @@ def _sync_one_account(account_id: str) -> dict[str, int]:
         snapshot_response = runtime_get("/venue/account-snapshot", params={"accountId": account_id})
         snapshot_response.raise_for_status()
         snapshot = snapshot_response.json()
+        _validate_snapshot(account_id, snapshot)
         with connection() as db:
+            previous = db.execute(
+                "SELECT as_of FROM account_venue_snapshots WHERE account_id=?", (account_id,)
+            ).fetchone()
+            stamp = datetime.fromisoformat(str(snapshot["asOf"]).replace("Z", "+00:00"))
+            if (stamp - datetime.now(UTC)).total_seconds() > 5 or (
+                previous
+                and stamp < datetime.fromisoformat(previous["as_of"].replace("Z", "+00:00"))
+            ):
+                raise ValueError("Runtime snapshot clock or ordering is invalid")
             balance_count = _persist_balances(db, account_id, list(snapshot.get("balances") or []))
             position_count, unrealized = _persist_positions(
                 db,
@@ -634,6 +821,19 @@ def _sync_one_account(account_id: str) -> dict[str, int]:
                 fees_by_instrument=fees,
             )
             _persist_account_risk(db, account_id, snapshot.get("accountRisk"))
+            _persist_venue_snapshot(db, account_id, snapshot)
+            from app.account_performance import persist_valuation_rates
+            persist_valuation_rates(db, account_id, snapshot)
+            for fill in snapshot["fills"]:
+                _persist_venue_event(db, account_id, "trade_fill", fill)
+            for event in snapshot.get("economicEvents", []):
+                _persist_venue_event(db, account_id, str(event["eventType"]), event)
+            completed = _iso_now()
+            db.execute(
+                """UPDATE account_sync_status SET status='ready', error_code=NULL,
+                   last_success_at=?, updated_at=? WHERE account_id=?""",
+                (completed, completed, account_id),
+            )
     except Exception as exc:
         status, error_code = _classify_sync_failure(exc)
         _write_status(
@@ -643,13 +843,8 @@ def _sync_one_account(account_id: str) -> dict[str, int]:
             last_attempt_at=last_attempt_at,
         )
         raise
-    _write_status(
-        account_id,
-        status="ready",
-        error_code=None,
-        last_attempt_at=last_attempt_at,
-        last_success_at=_iso_now(),
-    )
+    from app.account_performance import sync_capital_history
+    sync_capital_history(account_id)
     return {
         "balanceSnapshots": balance_count,
         "orderRows": order_count,
@@ -666,27 +861,33 @@ def _sync_account_result(
         return account_id, _sync_one_account(account_id), None
     except HTTPException as exc:
         status = _status_row(account_id)
-        return account_id, None, AccountSyncStatusResponse(
-            accountId=account_id,
-            status=(str(status["status"]) if status is not None else "failed"),
-            errorCode=(str(status["error_code"]) if status is not None else str(exc.detail)),
-            lastAttemptAt=(str(status["last_attempt_at"]) if status is not None else None),
-            lastSuccessAt=(str(status["last_success_at"]) if status is not None else None),
-            updatedAt=(str(status["updated_at"]) if status is not None else _iso_now()),
+        return (
+            account_id,
+            None,
+            AccountSyncStatusResponse(
+                accountId=account_id,
+                status=(str(status["status"]) if status is not None else "failed"),
+                errorCode=(str(status["error_code"]) if status is not None else str(exc.detail)),
+                lastAttemptAt=(str(status["last_attempt_at"]) if status is not None else None),
+                lastSuccessAt=(str(status["last_success_at"]) if status is not None else None),
+                updatedAt=(str(status["updated_at"]) if status is not None else _iso_now()),
+            ),
         )
     except Exception:
         status = _status_row(account_id)
-        return account_id, None, AccountSyncStatusResponse(
-            accountId=account_id,
-            status=(str(status["status"]) if status is not None else "failed"),
-            errorCode=(
-                str(status["error_code"])
-                if status is not None
-                else "runtime_unavailable"
+        return (
+            account_id,
+            None,
+            AccountSyncStatusResponse(
+                accountId=account_id,
+                status=(str(status["status"]) if status is not None else "failed"),
+                errorCode=(
+                    str(status["error_code"]) if status is not None else "runtime_unavailable"
+                ),
+                lastAttemptAt=(str(status["last_attempt_at"]) if status is not None else None),
+                lastSuccessAt=(str(status["last_success_at"]) if status is not None else None),
+                updatedAt=(str(status["updated_at"]) if status is not None else _iso_now()),
             ),
-            lastAttemptAt=(str(status["last_attempt_at"]) if status is not None else None),
-            lastSuccessAt=(str(status["last_success_at"]) if status is not None else None),
-            updatedAt=(str(status["updated_at"]) if status is not None else _iso_now()),
         )
 
 
@@ -780,8 +981,7 @@ def load_equity_history(account_id: str, currency: str | None = None) -> list[Eq
             ).fetchall()
             if rows:
                 return [
-                    EquityHistoryPoint(asOf=row["as_of"], equity=str(row["equity"]))
-                    for row in rows
+                    EquityHistoryPoint(asOf=row["as_of"], equity=str(row["equity"])) for row in rows
                 ]
 
         if currency:
@@ -818,8 +1018,7 @@ def load_equity_history(account_id: str, currency: str | None = None) -> list[Eq
             ordered_as_of.append(as_of)
         aggregated[as_of] += _as_decimal(row["equity"])
     return [
-        EquityHistoryPoint(asOf=as_of, equity=str(aggregated[as_of]))
-        for as_of in ordered_as_of
+        EquityHistoryPoint(asOf=as_of, equity=str(aggregated[as_of])) for as_of in ordered_as_of
     ]
 
 
@@ -828,13 +1027,15 @@ async def run_snapshot_sync_monitor() -> None:
         await asyncio.sleep(SNAPSHOT_SYNC_INTERVAL_SECONDS)
         try:
             await asyncio.to_thread(sync_venue_snapshots)
-        except Exception:
-            pass
+        except HTTPException as exc:
+            if exc.status_code != 409:
+                logger.warning("Account snapshot sync failed: http_%s", exc.status_code)
+        except Exception as exc:
+            logger.warning("Account snapshot sync failed: %s", type(exc).__name__)
 
 
 @asynccontextmanager
 async def snapshot_sync_lifespan(_: FastAPI) -> AsyncIterator[None]:
-    ensure_sync_schema()
     task = asyncio.create_task(run_snapshot_sync_monitor())
     try:
         yield

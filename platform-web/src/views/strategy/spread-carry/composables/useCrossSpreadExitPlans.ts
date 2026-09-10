@@ -28,12 +28,14 @@ function resolveError(error: unknown, fallback: string) {
 
 export function useCrossSpreadExitPlans() {
   const exitPlans = ref<CrossSpreadExitPlanResult[]>([]);
+  let revision = 0;
 
   function comparePlans(left: CrossSpreadExitPlanResult, right: CrossSpreadExitPlanResult): number {
     return new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime();
   }
 
   function upsertExitPlan(plan: CrossSpreadExitPlanResult) {
+    revision += 1;
     const nextPlans = [...exitPlans.value];
     const index = nextPlans.findIndex((item) => item.planId === plan.planId);
     if (index >= 0) {
@@ -46,10 +48,13 @@ export function useCrossSpreadExitPlans() {
   }
 
   async function refreshExitPlans() {
+    const requestRevision = ++revision;
     try {
-      exitPlans.value = await getCrossSpreadExitPlans();
+      const plans = await getCrossSpreadExitPlans();
+      if (requestRevision === revision) exitPlans.value = plans;
       return '';
     } catch (error: unknown) {
+      if (requestRevision !== revision) return '';
       return resolveError(error, '退出计划读取失败');
     }
   }

@@ -1,12 +1,14 @@
 from pathlib import Path
 from uuid import uuid4
 
+import pytest
 from fastapi.testclient import TestClient
 
 from app.config import get_settings
 from app.main import app
 
 
+@pytest.mark.usefixtures("generic_trading_instance")
 def test_order_fill_updates_position_and_pnl(monkeypatch, tmp_path: Path) -> None:
     settings = get_settings()
     settings.database_path = str(tmp_path / "platform.db")
@@ -48,7 +50,7 @@ def test_order_fill_updates_position_and_pnl(monkeypatch, tmp_path: Path) -> Non
             ]
 
     monkeypatch.setattr(
-        "app.trade_command_execution.httpx.post",
+        "app.runtime_transport.post",
         lambda *args, **kwargs: FakeResponse(kwargs["json"]),
     )
 
@@ -68,9 +70,7 @@ def test_order_fill_updates_position_and_pnl(monkeypatch, tmp_path: Path) -> Non
         assert order_response.status_code == 200
         assert order_response.json()["status"] == "filled"
 
-        position_response = client.get(
-            f"/api/v1/accounts/{account_id}/positions/{instrument_id}"
-        )
+        position_response = client.get(f"/api/v1/accounts/{account_id}/positions/{instrument_id}")
         assert position_response.status_code == 200
         assert position_response.json()["netQuantity"] == "2"
         assert position_response.json()["averagePrice"] == "100"

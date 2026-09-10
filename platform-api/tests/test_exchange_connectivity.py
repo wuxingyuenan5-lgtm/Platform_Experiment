@@ -15,7 +15,7 @@ def test_exchange_connectivity_proxies_runtime_without_secret_material(
     settings.database_path = str(tmp_path / "exchange-connectivity.db")
     settings.runtime_base_url = "http://runtime.local"
 
-    def fake_get(url: str, timeout: float) -> httpx.Response:
+    def fake_get(url: str, timeout: float, **kwargs) -> httpx.Response:
         assert url == "http://runtime.local/gateway/connectivity"
         assert timeout == settings.runtime_timeout_seconds
         return httpx.Response(
@@ -43,7 +43,7 @@ def test_exchange_connectivity_proxies_runtime_without_secret_material(
             },
         )
 
-    monkeypatch.setattr(httpx, "get", fake_get)
+    monkeypatch.setattr("app.runtime_transport.get", fake_get)
 
     with TestClient(app) as client:
         response = client.get("/api/v1/security/exchange-connectivity")
@@ -63,10 +63,10 @@ def test_exchange_connectivity_reports_runtime_unavailable(monkeypatch, tmp_path
     settings.database_path = str(tmp_path / "exchange-connectivity-down.db")
     settings.runtime_base_url = "http://runtime.local"
 
-    def fake_get(url: str, timeout: float) -> httpx.Response:
+    def fake_get(url: str, timeout: float, **kwargs) -> httpx.Response:
         raise httpx.ConnectError("runtime down")
 
-    monkeypatch.setattr(httpx, "get", fake_get)
+    monkeypatch.setattr("app.runtime_transport.get", fake_get)
 
     with TestClient(app) as client:
         response = client.get("/api/v1/security/exchange-connectivity")
@@ -83,7 +83,7 @@ def test_exchange_venue_readiness_proxies_bybit_and_mt5_symbols(
     settings.database_path = str(tmp_path / "venue-readiness.db")
     settings.runtime_base_url = "http://runtime.local"
 
-    def fake_get(url: str, timeout: float) -> httpx.Response:
+    def fake_get(url: str, timeout: float, **kwargs) -> httpx.Response:
         assert url == "http://runtime.local/gateway/venue-readiness"
         assert timeout == 20.0
         return httpx.Response(
@@ -113,7 +113,7 @@ def test_exchange_venue_readiness_proxies_bybit_and_mt5_symbols(
             },
         )
 
-    monkeypatch.setattr(httpx, "get", fake_get)
+    monkeypatch.setattr("app.runtime_transport.get", fake_get)
 
     with TestClient(app) as client:
         response = client.get("/api/v1/security/exchange-venue-readiness")

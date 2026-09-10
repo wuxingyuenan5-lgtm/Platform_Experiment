@@ -7,6 +7,7 @@ from threading import Event
 from types import SimpleNamespace
 from uuid import uuid4
 
+import httpx
 import pytest
 from fastapi import HTTPException
 
@@ -35,6 +36,26 @@ def _stub_venue_margin_estimate(monkeypatch):
         return currency, Decimal("100")
 
     monkeypatch.setattr("app.execution_batches._reservation_margin_estimate", estimate)
+
+    def specification(url, *, params, **kwargs):
+        assert "/venue/instruments/" in url
+        return httpx.Response(
+            200,
+            request=httpx.Request("GET", url),
+            json={
+                "accountId": params["accountId"],
+                "symbol": url.rsplit("/", 1)[1],
+                "instrumentType": params["instrumentType"],
+                "category": params["category"],
+                "dataQualityState": "complete",
+                "status": "Trading",
+                "minQuantity": "0.001",
+                "quantityStep": "0.001",
+                "priceTick": "0.1",
+            },
+        )
+
+    monkeypatch.setattr("app.runtime_transport.get", specification)
 
 
 class _FilledResponse:
@@ -71,7 +92,7 @@ def _prepare_database(tmp_path, name: str) -> None:
     settings.default_trading_environment = "simulation"
     initialize_database()
     apply_platform_migrations()
-    timestamp = datetime(2026, 8, 31, tzinfo=UTC).isoformat()
+    timestamp = datetime.now(UTC).isoformat()
     with connection() as db:
         db.execute(
             "UPDATE strategy_instances SET status = 'active', trading_mode = 'simulation' "
@@ -130,17 +151,16 @@ def _counts(batch_id: str) -> tuple[int, int, int, str]:
     return int(claims), int(reservations), int(commands), str(status)
 
 
-def test_cross_instruction_claims_resources_once_and_dispatches_once(
-    monkeypatch, tmp_path
-) -> None:
+def test_cross_instruction_claims_resources_once_and_dispatches_once(monkeypatch, tmp_path) -> None:
     _prepare_database(tmp_path, "instruction-resource-once.db")
     monkeypatch.setattr(
         "app.execution_batches._reservation_reference_price", lambda **_kwargs: Decimal("100")
     )
+
     def fake_post(*_args, **kwargs):
         return _FilledResponse(kwargs["json"])
 
-    monkeypatch.setattr("app.trade_command_execution.httpx.post", fake_post)
+    monkeypatch.setattr("app.runtime_transport.post", fake_post)
     instruction = _cross_instruction("cross-resource-once")
     instruction_id = str(instruction["instructionId"])
     batch_id = str(instruction["executionBatchId"])
@@ -160,6 +180,12 @@ def test_concurrent_cross_execute_has_one_dispatch(monkeypatch, tmp_path) -> Non
     monkeypatch.setattr(
         "app.execution_batches._reservation_reference_price", lambda **_kwargs: Decimal("100")
     )
+    import httpx
+
+    def unavailable_runtime(*_args, **_kwargs):
+        raise httpx.ConnectError("Isolated concurrent-dispatch transport failure")
+
+    monkeypatch.setattr("app.runtime_transport.post", unavailable_runtime)
     first_dispatch_started = Event()
     release_first_dispatch = Event()
     calls = 0
@@ -235,13 +261,20 @@ def test_shared_uta_same_symbol_conflicts_but_different_symbol_can_run(tmp_path)
             legs=[_leg(instrument_id="instrument_btc_usdt_perp", symbol="BTCUSDT")],
             default_account_id="account_sim_usdt",
         )
-        assert db.execute(
-            "SELECT COUNT(*) AS count FROM execution_resource_claims WHERE owner_id = 'cross-owner'"
-        ).fetchone()["count"] == 1
-        assert db.execute(
-            "SELECT COUNT(*) AS count FROM execution_balance_reservations "
-            "WHERE owner_id = 'cross-owner'"
-        ).fetchone()["count"] == 1
+        assert (
+            db.execute(
+                "SELECT COUNT(*) AS count FROM execution_resource_claims "
+                "WHERE owner_id = 'cross-owner'"
+            ).fetchone()["count"]
+            == 1
+        )
+        assert (
+            db.execute(
+                "SELECT COUNT(*) AS count FROM execution_balance_reservations "
+                "WHERE owner_id = 'cross-owner'"
+            ).fetchone()["count"]
+            == 1
+        )
 
     with pytest.raises(HTTPException, match="Active execution resource claim"):
         with connection() as db:
@@ -263,9 +296,12 @@ def test_shared_uta_same_symbol_conflicts_but_different_symbol_can_run(tmp_path)
             legs=[_leg(instrument_id="instrument_eth_perp_claim_test", symbol="ETHUSDT")],
             default_account_id="account_sim_usdt",
         )
-        assert db.execute(
-            "SELECT COUNT(*) AS count FROM execution_resource_claims WHERE status = 'active'"
-        ).fetchone()["count"] == 2
+        assert (
+            db.execute(
+                "SELECT COUNT(*) AS count FROM execution_resource_claims WHERE status = 'active'"
+            ).fetchone()["count"]
+            == 2
+        )
 
 
 def test_insufficient_balance_and_account_claim_fail_before_dispatch(monkeypatch, tmp_path) -> None:
@@ -328,11 +364,17 @@ def test_uncertain_and_manual_batches_keep_resources(tmp_path, batch_status: str
 
     _release_batch_claims_and_reservations_if_safe("retained-owner", batch_status)
     with connection() as db:
-        assert db.execute(
-            "SELECT COUNT(*) AS count FROM execution_resource_claims "
-            "WHERE owner_id = 'retained-owner' AND status = 'active'"
-        ).fetchone()["count"] == 1
-        assert db.execute(
-            "SELECT COUNT(*) AS count FROM execution_balance_reservations "
-            "WHERE owner_id = 'retained-owner' AND status = 'active'"
-        ).fetchone()["count"] == 1
+        assert (
+            db.execute(
+                "SELECT COUNT(*) AS count FROM execution_resource_claims "
+                "WHERE owner_id = 'retained-owner' AND status = 'active'"
+            ).fetchone()["count"]
+            == 1
+        )
+        assert (
+            db.execute(
+                "SELECT COUNT(*) AS count FROM execution_balance_reservations "
+                "WHERE owner_id = 'retained-owner' AND status = 'active'"
+            ).fetchone()["count"]
+            == 1
+        )

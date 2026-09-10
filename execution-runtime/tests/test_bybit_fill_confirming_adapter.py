@@ -22,7 +22,13 @@ class FakeBybitConfirmationClient:
         self.place_calls: list[dict[str, object]] = []
 
     def get_tickers(self, **kwargs):
-        return {"retCode": 0, "result": {"list": [{"markPrice": "1000"}]}}
+        return {
+            "retCode": 0,
+            "result": {
+                "category": kwargs.get("category", "linear"),
+                "list": [{"markPrice": "1000"}],
+            },
+        }
 
     def place_order(self, **kwargs):
         self.place_calls.append(kwargs)
@@ -43,17 +49,23 @@ class FakeBybitConfirmationClient:
         return {
             "retCode": 0,
             "result": {
+                "category": kwargs.get("category", "linear"),
                 "list": [
                     {
                         "symbol": "XAUTUSDT",
                         "status": "Trading",
+                        "baseCoin": "XAUT",
+                        "quoteCoin": "USDT",
+                        "settleCoin": "USDT",
+                        "contractType": "LinearPerpetual",
+                        "priceFilter": {"tickSize": "0.1"},
                         "lotSizeFilter": {
                             "minOrderQty": "1",
                             "qtyStep": "1",
                             "maxMktOrderQty": "1000",
                         },
                     }
-                ]
+                ],
             },
         }
 
@@ -84,9 +96,7 @@ def runtime_settings() -> Settings:
         environment="live",
         live_write_enabled=True,
         live_account_allowlist="account-bybit",
-        live_strategy_allowlist=(
-            f"strategy-live,{CROSS_SPREAD_STRATEGY_INSTANCE_ID}"
-        ),
+        live_strategy_allowlist=(f"strategy-live,{CROSS_SPREAD_STRATEGY_INSTANCE_ID}"),
         live_symbol_allowlist="XAUTUSDT",
         live_max_order_notional="200000",
         live_max_daily_notional="500000",
@@ -204,9 +214,7 @@ def test_terminal_partial_fill_emits_only_confirmed_quantity(tmp_path) -> None:
 
 def test_unresolved_market_order_times_out_without_a_fill_event(tmp_path) -> None:
     initialize_runtime_store(tmp_path, "bybit-confirm-timeout.db")
-    client = FakeBybitConfirmationClient(
-        [order_row("New", filled_quantity="0", average_price="")]
-    )
+    client = FakeBybitConfirmationClient([order_row("New", filled_quantity="0", average_price="")])
     settings = runtime_settings()
     settings.bybit_fill_confirmation_timeout_seconds = 0
     adapter = BybitFillConfirmingAdapter(settings, client)
@@ -292,7 +300,7 @@ def test_cross_spread_fok_partial_fill_never_emits_fill_event(tmp_path) -> None:
     assert [event.event_type for event in events] == ["order_acknowledged"]
     assert events[0].reason is not None
     assert "terminal partial fill" in events[0].reason
-    assert "MT5 hedge was not submitted" in events[0].reason
+    assert "dependent hedge was not submitted" in events[0].reason
 
 
 def test_market_acknowledgement_preserves_underlying_place_order_error(tmp_path) -> None:
@@ -304,3 +312,28 @@ def test_market_acknowledgement_preserves_underlying_place_order_error(tmp_path)
         match="Bybit place_order result is unknown: RuntimeError: position check timed out",
     ):
         adapter.submit_order(order_command("explode"))
+
+
+@pytest.mark.parametrize(
+    "status,filled", [("Filled", "100"), ("Canceled", "0"), ("Canceled", "40")]
+)
+def test_funding_explicit_fok_uses_exchange_fok_and_requires_full_confirmation(
+    tmp_path, status, filled
+):
+    initialize_runtime_store(tmp_path, "funding-explicit-fok.db")
+    client = FakeBybitConfirmationClient(
+        [order_row(status, filled_quantity=filled, average_price="1001.4", order_type="Limit")]
+    )
+    command = fok_order_command("funding").model_copy(
+        update={
+            "strategy_instance_id": "strategy_funding_arbitrage_instance_default",
+            "execution_policy": "fok",
+        }
+    )
+    adapter = BybitFillConfirmingAdapter(runtime_settings(), client)
+    events = adapter.submit_order(command)
+    assert len(client.place_calls) == 1
+    assert client.place_calls[0]["timeInForce"] == "FOK"
+    assert any(event.event_type == "order_filled" for event in events) == (status == "Filled")
+    if filled == "40":
+        assert [event.event_type for event in events] == ["order_acknowledged"]

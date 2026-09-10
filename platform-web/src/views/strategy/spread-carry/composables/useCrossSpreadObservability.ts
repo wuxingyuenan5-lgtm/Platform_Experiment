@@ -1,8 +1,11 @@
-﻿import { ref } from 'vue';
+﻿import { computed } from 'vue';
+import { useQuery } from '@tanstack/vue-query';
 import {
-  getCrossSpreadObservability,
-  type CrossSpreadObservabilityResult,
-} from '@/api/platform/crossSpreadObservability';
+  strategyQueryClient,
+  strategyQueryKey,
+  strategySession,
+} from '@/api/platform/strategyQueries';
+import { getCrossSpreadObservability } from '@/api/platform/crossSpreadObservability';
 
 function resolveError(error: unknown, fallback: string) {
   if (typeof error === 'object' && error !== null) {
@@ -12,7 +15,12 @@ function resolveError(error: unknown, fallback: string) {
     };
     const detail = candidate.response?.data?.detail;
     if (Array.isArray(detail)) {
-      return detail.map((item) => item.msg).filter(Boolean).join('; ') || fallback;
+      return (
+        detail
+          .map((item) => item.msg)
+          .filter(Boolean)
+          .join('; ') || fallback
+      );
     }
     return detail || candidate.message || fallback;
   }
@@ -20,21 +28,21 @@ function resolveError(error: unknown, fallback: string) {
 }
 
 export function useCrossSpreadObservability() {
-  const observability = ref<CrossSpreadObservabilityResult | null>(null);
-  const observabilityError = ref('');
-
-  async function refreshObservability() {
-    try {
-      observability.value = await getCrossSpreadObservability(1, 1, 'fast');
-      observabilityError.value = '';
-    } catch (error: unknown) {
-      observabilityError.value = resolveError(error, '实盘只读数据读取失败');
-    }
-  }
-
+  const query = useQuery(
+    {
+      queryKey: computed(() => strategyQueryKey('cross-spread', 'observability', 1, 1, 'fast')),
+      queryFn: ({ signal }) => getCrossSpreadObservability(1, 1, 'fast', signal),
+      enabled: computed(() => !!strategySession.value.userId),
+    },
+    strategyQueryClient,
+  );
   return {
-    observability,
-    observabilityError,
-    refreshObservability,
+    observability: computed(() => query.data.value ?? null),
+    observabilityError: computed(() =>
+      query.error.value ? resolveError(query.error.value, '实盘只读数据读取失败') : '',
+    ),
+    refreshObservability: async () => {
+      await query.refetch({ cancelRefetch: false });
+    },
   };
 }

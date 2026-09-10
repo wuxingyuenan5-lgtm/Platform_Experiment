@@ -71,7 +71,7 @@
         :execution-message="executionMessage"
         :execution-message-tone="executionMessageTone"
         :limit-evidence="limitEvidence"
-        :close-orders="closeOrders"
+        :close-orders="closeOrders.filter((order) => !order.isAbnormal)"
         @commit-qty-input="commitQtyInput"
         @nudge-qty="nudgeQty"
         @commit-spread-input="commitSpreadInput"
@@ -83,8 +83,15 @@
       <CrossVenueSpreadAnalysis />
     </div>
 
+    <SpreadAbnormalOrders
+      :orders="snapshot?.positionOverview?.abnormalOrders || []"
+      :busy="submitLoading"
+      @close-plan="openAbnormalClose"
+      @settled="refreshAbnormalPositions"
+    />
     <SpreadPositionOverview
       :overview-rows="overviewRows"
+      :pnl-overview="overviewPnl"
       :empty-text="observabilityError || snapshotError || '暂无真实持仓'"
       :long-spread="longSpread"
       :update-exit-plan="updateExitPlanThresholds"
@@ -97,13 +104,14 @@
       :right-leg-symbol="rightLegSymbol"
       :summary="confirmSummary"
       :guard-message="confirmGuardMessage"
-      @close="confirmVisible = false"
+      @close="cancelConfirmation"
       @confirm="confirmOrder"
     />
   </section>
 </template>
 
 <script setup lang="ts">
+  import SpreadAbnormalOrders from './SpreadAbnormalOrders.vue';
   import CrossVenueMarketQuotes from './CrossVenueMarketQuotes.vue';
   import CrossVenueSpreadAnalysis from './CrossVenueSpreadAnalysis.vue';
   import CrossVenueSpreadChart from './CrossVenueSpreadChart.vue';
@@ -130,6 +138,7 @@
     closeOrders,
     commitQtyInput,
     commitSpreadInput,
+    cancelConfirmation,
     confirmGuardMessage,
     confirmOrder,
     confirmSummary,
@@ -152,6 +161,8 @@
     openPartialClose,
     openLimitStrategy,
     overviewRows,
+    refreshAbnormalPositions,
+    overviewPnl,
     prepareOpenDraft,
     qtyError,
     qtyInput,
@@ -174,6 +185,10 @@
     usdtUsdText,
     updateExitPlanThresholds,
   } = useCrossVenueExecutionWorkspace();
+  function openAbnormalClose(planId: string) {
+    closeExecutionMode.value = 'market';
+    openConfirm(`CLOSE:${planId}`);
+  }
 </script>
 
 <style scoped lang="less" src="./crossVenueExecutionWorkspace.less"></style>

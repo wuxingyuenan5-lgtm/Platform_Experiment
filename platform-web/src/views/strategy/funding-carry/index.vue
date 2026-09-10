@@ -46,20 +46,29 @@
         :position-groups="positionGroups"
         :pending-draft="pendingDraft"
         :workspace-state="workspaceState"
+        :failure-reason="activeInstruction?.failureReason"
         :submitting="submitting"
         :error="error"
         :quantity-input="quantityInput"
+        :close-quantity-input="closeQuantityInput"
+        :execution-policy="executionPolicy"
+        :perpetual-limit-price-input="perpetualLimitPriceInput"
+        :can-close="canClose"
         :notional-input="notionalInput"
         :selected-close-instruction-id="selectedCloseInstructionId"
         :selected-close-group="selectedCloseGroup"
         :can-submit="canSubmit"
         @update:notional-input="notionalInput = $event"
         @update:quantity-input="quantityInput = $event"
+        @update:close-quantity-input="closeQuantityInput = $event"
+        @update:execution-policy="executionPolicy = $event as FundingExecutionPolicy"
+        @update:perpetual-limit-price-input="perpetualLimitPriceInput = $event"
         @refresh="refreshAll"
         @submit-open="submit('open')"
         @submit-close="submit('close')"
         @select-symbol="handleExecutionSymbolUpdate"
         @select-close-instruction="selectCloseInstruction"
+        @select-close-fraction="selectCloseFraction"
       />
     </template>
   </div>
@@ -72,6 +81,7 @@
   import FundingMarketBoard from './components/FundingMarketBoard.vue';
   import FundingOrderPanel from './components/FundingOrderPanel.vue';
   import { useFundingWorkspace } from './composables/useFundingWorkspace';
+  import type { FundingExecutionPolicy } from './composables/fundingExecutionRecovery';
   import {
     defaultSymbol,
     fundingChartPanel,
@@ -123,16 +133,22 @@
     context,
     positionGroups,
     pendingDraft,
+    activeInstruction,
     workspaceState,
     notionalInput,
     quantityInput,
+    closeQuantityInput,
+    executionPolicy,
+    perpetualLimitPriceInput,
     selectedCloseInstructionId,
     selectedCloseGroup,
     canSubmit,
+    canClose,
     refreshAll,
     submit,
     selectSymbol,
     selectCloseInstruction,
+    selectCloseFraction,
   } = useFundingWorkspace();
 
   function handleChartSymbolUpdate(value: string) {
@@ -145,7 +161,6 @@
 
   function handleExecutionSymbolUpdate(perpetualSymbol: string, spotSymbol: string) {
     selectSymbol(perpetualSymbol, spotSymbol);
-    refreshAll();
   }
 
   watch(

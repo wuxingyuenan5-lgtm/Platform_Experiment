@@ -50,7 +50,8 @@
       </div>
     </section>
 
-    <template v-if="activeSection === 'analysis'">
+    <RestoredProductSurface v-if="activeSection === 'analysis'" v-bind="spreadResearchState">
+      <p role="note">行情分析尚未设计；当前页面为示例数据。</p>
       <section v-if="variant !== 'domesticOverseas'" class="spread-overview">
         <article class="spread-card spread-card--table">
           <header>期限结构</header>
@@ -300,7 +301,7 @@
           </article>
         </div>
       </section>
-    </template>
+    </RestoredProductSurface>
 
     <DomesticOverseasExecutionWorkspace
       v-else-if="variant === 'domesticOverseas'"
@@ -321,6 +322,8 @@
 <script setup lang="ts">
   import { computed, nextTick, onMounted, ref, watch, type Ref } from 'vue';
   import { useECharts } from '@/hooks/web/useECharts';
+  import RestoredProductSurface from '@/components/ProductDataState/RestoredProductSurface.vue';
+  import { spreadResearchState } from '@/data/sample/spread';
   import CrossVenueExecutionWorkspace from './components/CrossVenueExecutionWorkspace.vue';
   import DomesticOverseasExecutionWorkspace from './components/DomesticOverseasExecutionWorkspace.vue';
   import DomesticOverseasMarketInsight from './components/DomesticOverseasMarketInsight.vue';

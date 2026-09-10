@@ -23,20 +23,24 @@
   </Spin>
 </template>
 <script lang="tsx" setup>
-  import { onMounted, ref } from 'vue';
+  import type { PropType } from 'vue';
+  import { useRouter, type LocationQueryRaw } from 'vue-router';
   import { RightOutlined } from '@ant-design/icons-vue';
-  import { getNtification } from '@/api/notifications';
-  import { useGo } from '@/hooks/web/usePage';
   import { diffTime } from '@/utils/dateUtil';
   import { Empty, Spin } from 'ant-design-vue';
 
-  const props = defineProps({
+  interface NoticeItem {
+    id: string | number;
+    content?: string;
+    createTime?: string;
+  }
+  defineProps({
     tabKey: {
       type: [String, Number],
       default: '',
     },
     dataSource: {
-      type: Array,
+      type: Array as PropType<NoticeItem[]>,
       default: () => [],
     },
     loading: {
@@ -45,10 +49,10 @@
     },
   });
   const emit = defineEmits(['close']);
-  const go = useGo();
-  function jump(params?: any) {
+  const router = useRouter();
+  function jump(params?: LocationQueryRaw) {
     emit('close');
-    go({
+    void router.push({
       path: '/log/alarm',
       query: params,
     });

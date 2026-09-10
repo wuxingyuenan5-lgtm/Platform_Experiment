@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Query
 
 from app.config import Settings
 from app.cross_spread_market import build_cross_spread_snapshot
@@ -13,14 +13,6 @@ from app.models import (
 )
 from app.secret_resolver import inspect_credential_reference
 from app.venue_readiness import get_venue_readiness
-
-
-def _preferred_mt5_symbol(settings: Settings) -> str | None:
-    """Return the explicitly mapped MT5 symbol, if any, else None (auto-resolve)."""
-    mapped = settings.mt5_instruments
-    if mapped:
-        return next(iter(mapped))
-    return None
 
 
 def _credential_required_fields(
@@ -89,19 +81,16 @@ def create_gateway_router(*, settings: Settings, gateway: VenueGateway) -> APIRo
         response_model=CrossSpreadSnapshotResponse,
         tags=["gateway"],
     )
-    def cross_spread_snapshot() -> CrossSpreadSnapshotResponse:
+    def cross_spread_snapshot(
+        bybit_account_id: str = Query(alias="bybitAccountId"),
+        mt5_account_id: str = Query(alias="mt5AccountId"),
+    ) -> CrossSpreadSnapshotResponse:
         return build_cross_spread_snapshot(
+            gateway=gateway,
+            bybit_account_id=bybit_account_id,
+            mt5_account_id=mt5_account_id,
             bybit_symbol=settings.bybit_contract_symbol,
             mt5_symbol=settings.mt5_symbol,
-            bybit_credential_ref=settings.bybit_credential_ref,
-            mt5_credential_ref=settings.mt5_credential_ref,
-            bybit_demo=settings.bybit_demo_mode,
-            bybit_recv_window=settings.bybit_recv_window,
-            mt5_terminal_path=settings.mt5_terminal_path,
-            mt5_bridge_file_path=settings.mt5_bridge_file_path,
-            mt5_timeout_seconds=settings.mt5_check_timeout_seconds,
-            mt5_preferred_symbol=_preferred_mt5_symbol(settings),
-            bybit_timestamp_offset_ms=settings.bybit_timestamp_offset_ms,
         )
 
     return router

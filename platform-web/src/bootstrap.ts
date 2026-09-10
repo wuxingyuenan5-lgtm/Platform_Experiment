@@ -1,3 +1,5 @@
+import { VueQueryPlugin } from '@tanstack/vue-query';
+import { strategyQueryClient } from '@/api/platform/strategyQueries';
 import { createApp } from 'vue';
 
 import { registerGlobComp } from '@/components/registerGlobComp';
@@ -15,6 +17,7 @@ async function bootstrap() {
   const app = createApp(App);
 
   setupStore(app);
+  app.use(VueQueryPlugin, { queryClient: strategyQueryClient });
   initAppConfigStore();
   registerGlobComp(app);
   await setupI18n(app);

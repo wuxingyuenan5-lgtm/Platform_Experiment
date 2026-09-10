@@ -5,6 +5,7 @@ from typing import Any
 
 from app.research_data_schemas import (
     AShareBreadthSnapshot,
+    AShareIndexHistoryPoint,
     AShareIndexSnapshot,
     AShareMarketTurnoverRow,
     AShareTurnoverStock,
@@ -21,10 +22,8 @@ from app.research_provider_stock_datacenter import StockDataCenterResearchProvid
 from app.research_provider_stock_http import StockHttpResearchProvider
 
 USER_AGENT = (
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-    "AppleWebKit/537.36 Chrome/150.0 Safari/537.36"
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/150.0 Safari/537.36"
 )
-
 
 
 def _akshare() -> Any:
@@ -33,7 +32,6 @@ def _akshare() -> Any:
     except ImportError as exc:  # pragma: no cover - protected by dependency installation
         raise ResearchProviderError("akshare_dependency_missing") from exc
     return ak
-
 
 
 class FreeResearchProvider:
@@ -72,6 +70,14 @@ class FreeResearchProvider:
     async def a_share_spot(self) -> list[AShareTurnoverStock]:
         return await self._a_share.a_share_spot()
 
+    async def tracked_stock_spot(self, codes: list[str]) -> list[AShareTurnoverStock]:
+        return await self._a_share.tracked_stock_spot(codes)
+
+    async def stock_daily_histories(
+        self, codes: list[str]
+    ) -> dict[str, list[AShareIndexHistoryPoint]]:
+        return await self._a_share.stock_daily_histories(codes)
+
     async def a_share_sector_fund_flow(self) -> list[dict[str, Any]]:
         return await self._a_share.sector_fund_flow()
 
@@ -86,14 +92,11 @@ class FreeResearchProvider:
     async def index_snapshots(self) -> list[AShareIndexSnapshot]:
         return await self._a_share.index_snapshots()
 
-
-
     async def shenwan_memberships(self) -> list[ShenwanMembership]:
         return await self._a_share.shenwan_memberships()
 
     async def short_term_emotion(self) -> ShortTermEmotionSnapshot:
         return await self._a_share.short_term_emotion()
-
 
     async def stock_quote(self, code: str) -> dict[str, Any]:
         return await self._stock_http.stock_quote(code)
@@ -101,27 +104,19 @@ class FreeResearchProvider:
     async def stock_financials(self, code: str) -> dict[str, Any]:
         return await self._stock_akshare.stock_financials(code)
 
-    async def stock_forecast(
-        self, code: str, price: Decimal | None
-    ) -> dict[str, Any]:
+    async def stock_forecast(self, code: str, price: Decimal | None) -> dict[str, Any]:
         return await self._stock_akshare.stock_forecast(code, price)
 
     async def stock_valuation_percentile(self, code: str) -> dict[str, Any]:
         return await self._stock_akshare.stock_valuation_percentile(code)
 
-    async def stock_news(
-        self, code: str, limit: int = 20
-    ) -> list[dict[str, Any]]:
+    async def stock_news(self, code: str, limit: int = 20) -> list[dict[str, Any]]:
         return await self._stock_akshare.stock_news(code, limit=limit)
 
-    async def stock_reports(
-        self, code: str, limit: int = 30
-    ) -> list[dict[str, Any]]:
+    async def stock_reports(self, code: str, limit: int = 30) -> list[dict[str, Any]]:
         return await self._stock_http.stock_reports(code, limit=limit)
 
-    async def stock_announcements(
-        self, code: str, limit: int = 20
-    ) -> list[dict[str, Any]]:
+    async def stock_announcements(self, code: str, limit: int = 20) -> list[dict[str, Any]]:
         return await self._stock_http.stock_announcements(code, limit=limit)
 
     async def datacenter_rows(
@@ -162,12 +157,8 @@ class FreeResearchProvider:
     async def stock_lockup(self, code: str) -> dict[str, Any]:
         return await self._stock_data_center.stock_lockup(code)
 
-    async def stock_investor_qa(
-        self, code: str, limit: int = 30
-    ) -> list[dict[str, Any]]:
+    async def stock_investor_qa(self, code: str, limit: int = 30) -> list[dict[str, Any]]:
         return await self._stock_http.stock_investor_qa(code, limit=limit)
 
-    async def macro_expectation_events(
-        self, limit: int = 12
-    ) -> list[MacroExpectationEvent]:
+    async def macro_expectation_events(self, limit: int = 12) -> list[MacroExpectationEvent]:
         return await self._macro.macro_expectation_events(limit=limit)

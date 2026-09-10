@@ -1,6 +1,8 @@
+from decimal import Decimal
 from pathlib import Path
 
 import httpx
+import pytest
 from fastapi.testclient import TestClient
 
 from app.config import get_settings
@@ -8,7 +10,9 @@ from app.database import connection
 from app.main import app
 from app.venue_reconciliation_repository import update_order_from_external
 
-STRATEGY_ID = "strategy_funding_arbitrage_instance_default"
+pytestmark = pytest.mark.usefixtures("generic_trading_instance")
+
+STRATEGY_ID = "strategy_generic_pipeline_test"
 ACCOUNT_ID = "account_sim_usdt"
 INSTRUMENT_ID = "instrument_btc_usdt"
 
@@ -42,13 +46,15 @@ class FakeResponse:
         return self.payload
 
 
+@pytest.mark.parametrize("preconfirmed", [False, True, "partial"])
 def test_result_unknown_recovers_from_venue_and_imports_facts_once(
     monkeypatch,
     tmp_path: Path,
+    preconfirmed: bool | str,
 ) -> None:
     get_settings().database_path = str(tmp_path / "venue-order-recovery.db")
     monkeypatch.setattr(
-        "app.trade_command_execution.httpx.post",
+        "app.runtime_transport.post",
         lambda *args, **kwargs: (_ for _ in ()).throw(httpx.ConnectError("timeout")),
     )
 
@@ -99,6 +105,35 @@ def test_result_unknown_recovers_from_venue_and_imports_facts_once(
             "occurredAt": "2026-07-23T12:00:00+00:00",
             "dataQualityState": "complete",
         }
+        external_fills = [external_fill]
+        if preconfirmed:
+            from app.trading import apply_execution_events, get_order_row, request_from_order_row
+
+            apply_execution_events(
+                order_id,
+                request_from_order_row(get_order_row(order_id)),
+                [
+                    {
+                        "event_id": "runtime-full-confirmation",
+                        "command_id": command_id,
+                        "platform_order_id": order_id,
+                        "external_order_id": external_order["externalOrderId"],
+                        "event_type": "order_filled",
+                        "fill_quantity": "0.4" if preconfirmed == "partial" else "1",
+                        "fill_price": "100",
+                        "occurred_at": external_fill["occurredAt"],
+                        "reason": None,
+                    }
+                ],
+                expected_command_id=command_id,
+            )
+            external_fills = [
+                {**external_fill, "externalFillId": f"native-part-{i}", "quantity": quantity}
+                for i, quantity in enumerate(("0.4", "0.6"))
+            ]
+            if preconfirmed == "partial":
+                external_fills = external_fills[:1]
+                external_order.update(status="partially_filled", filledQuantity="0.4")
 
         def runtime_get(url, *args, **kwargs):
             if "/commands/" in url and url.endswith("/events"):
@@ -106,20 +141,46 @@ def test_result_unknown_recovers_from_venue_and_imports_facts_once(
             if url.endswith(f"/venue/orders/by-platform/{order_id}"):
                 return FakeResponse(external_order)
             if url.endswith("/venue/fills"):
-                return FakeResponse([external_fill])
+                return FakeResponse(external_fills)
             raise AssertionError(f"unexpected runtime url: {url}")
 
-        monkeypatch.setattr("app.venue_reconciliation_runtime_client.httpx.get", runtime_get)
+        monkeypatch.setattr("app.runtime_transport.get", runtime_get)
         first = client.post(f"/api/v1/trading/orders/{order_id}/venue-reconcile")
         second = client.post(f"/api/v1/trading/orders/{order_id}/venue-reconcile")
 
         assert first.status_code == 200
         assert second.status_code == 200
-        assert first.json()["statusBefore"] == "result_unknown"
+        if preconfirmed == "partial":
+            assert first.json()["differenceIds"] == []
+            assert second.json()["statusAfter"] == "partially_filled"
+            external_fills.append(
+                {**external_fill, "externalFillId": "native-later", "quantity": "0.6"}
+            )
+            external_order.update(
+                status="filled", filledQuantity="1", asOf="2026-07-23T12:00:02+00:00"
+            )
+            later = client.post(f"/api/v1/trading/orders/{order_id}/venue-reconcile")
+            assert later.status_code == 200, later.text
+            assert later.json()["differenceIds"]
+            with connection() as db:
+                rows = db.execute(
+                    "SELECT origin,quantity FROM fills WHERE order_id=?", (order_id,)
+                ).fetchall()
+                assert [(r[0], Decimal(r[1])) for r in rows] == [
+                    ("runtime_confirmation", Decimal("0.4"))
+                ]
+                assert Decimal(
+                    db.execute(
+                        "SELECT net_quantity FROM positions WHERE account_id=? AND instrument_id=?",
+                        (ACCOUNT_ID, INSTRUMENT_ID),
+                    ).fetchone()[0]
+                ) == Decimal("0.4")
+            return
+        assert first.json()["statusBefore"] == ("filled" if preconfirmed else "result_unknown")
         assert first.json()["statusAfter"] == "filled"
-        assert first.json()["recovered"] is True
+        assert first.json()["recovered"] is (not preconfirmed)
         assert first.json()["differenceIds"] == []
-        assert len(first.json()["importedFactIds"]) == 2
+        assert len(first.json()["importedFactIds"]) == 1 + len(external_fills)
         assert second.json()["statusAfter"] == "filled"
 
         with connection() as db:
@@ -132,12 +193,12 @@ def test_result_unknown_recovers_from_venue_and_imports_facts_once(
                 (STRATEGY_ID,),
             ).fetchone()["count"]
         assert fill_count == 1
-        assert fact_count == 2
+        assert fact_count == 1 + len(external_fills)
 
         position = client.get(
             f"/api/v1/strategies/instances/{STRATEGY_ID}/formal-positions"
         ).json()[0]
-        assert position["netQuantity"] == "1"
+        assert Decimal(position["netQuantity"]) == Decimal("1")
 
 
 def test_owner_can_close_absent_standalone_result_unknown_order(
@@ -146,7 +207,7 @@ def test_owner_can_close_absent_standalone_result_unknown_order(
 ) -> None:
     get_settings().database_path = str(tmp_path / "venue-order-absent.db")
     monkeypatch.setattr(
-        "app.trade_command_execution.httpx.post",
+        "app.runtime_transport.post",
         lambda *args, **kwargs: (_ for _ in ()).throw(httpx.ConnectError("timeout")),
     )
 
@@ -157,7 +218,7 @@ def test_owner_can_close_absent_standalone_result_unknown_order(
             return FakeResponse({}, 404)
         raise AssertionError(f"unexpected runtime URL: {url}")
 
-    monkeypatch.setattr("app.venue_reconciliation_runtime_client.httpx.get", runtime_get)
+    monkeypatch.setattr("app.runtime_transport.get", runtime_get)
 
     with TestClient(app) as client:
         created = client.post(
@@ -180,9 +241,7 @@ def test_owner_can_close_absent_standalone_result_unknown_order(
         )
         assert accepted.status_code == 200
 
-        closed = client.post(
-            f"/api/v1/trading/orders/{order_id}/resolve-missing-external"
-        )
+        closed = client.post(f"/api/v1/trading/orders/{order_id}/resolve-missing-external")
         assert closed.status_code == 200
         assert closed.json()["statusAfter"] == "rejected"
 
@@ -226,7 +285,7 @@ def test_account_snapshot_import_is_idempotent_and_difference_is_auditable(
             return FakeResponse([balance])
         raise AssertionError(f"unexpected runtime url: {url}")
 
-    monkeypatch.setattr("app.venue_reconciliation_runtime_client.httpx.get", venue_get)
+    monkeypatch.setattr("app.runtime_transport.get", venue_get)
 
     with TestClient(app) as client:
         payload = {
@@ -300,7 +359,7 @@ def test_reconciliation_idempotency_payload_conflict_returns_409(
 ) -> None:
     get_settings().database_path = str(tmp_path / "venue-conflict.db")
     monkeypatch.setattr(
-        "app.venue_reconciliation_runtime_client.httpx.get",
+        "app.runtime_transport.get",
         lambda url, *args, **kwargs: FakeResponse([]),
     )
     with TestClient(app) as client:
@@ -363,7 +422,13 @@ def test_cross_close_reconciliation_completes_lifecycle_and_releases_resources(
             )
             for order_id, command_id, instrument_id, symbol, status in (
                 ("bybit-close-order", "bybit-close-command", INSTRUMENT_ID, "BTCUSDT", "filled"),
-                ("mt5-close-order", "mt5-close-command", "instrument_xau_usd", "XAUUSD.S", "acknowledged"),
+                (
+                    "mt5-close-order",
+                    "mt5-close-command",
+                    "instrument_xau_usd",
+                    "XAUUSD.S",
+                    "acknowledged",
+                ),
             ):
                 db.execute(
                     """
@@ -446,9 +511,7 @@ def test_cross_close_reconciliation_completes_lifecycle_and_releases_resources(
                 ),
             )
 
-        update_order_from_external(
-            "mt5-close-order", "filled", "external-mt5-order", timestamp
-        )
+        update_order_from_external("mt5-close-order", "filled", "external-mt5-order", timestamp)
 
         with connection() as db:
             batch = db.execute(

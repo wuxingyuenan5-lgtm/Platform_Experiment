@@ -11,6 +11,9 @@ from app.strategies import funding_workspace
 def test_funding_execution_context_uses_explicit_spot_and_perp_runtime_scopes(
     monkeypatch,
 ) -> None:
+    from app.database import initialize_database
+
+    initialize_database()
     calls: list[tuple[str, dict[str, object] | None]] = []
 
     def fake_runtime_get(path: str, *, params=None):
@@ -44,7 +47,7 @@ def test_funding_execution_context_uses_explicit_spot_and_perp_runtime_scopes(
     monkeypatch.setattr(
         funding_workspace,
         "_funding_account_binding",
-        lambda role: {
+        lambda: {
             "account_id": "bybit-live-main",
             "venue_id": "venue-bybit",
             "venue_code": "CRYPTO_TEST",
@@ -115,6 +118,7 @@ def test_funding_execution_context_uses_explicit_spot_and_perp_runtime_scopes(
 
 
 def test_close_summary_and_group_snapshot_track_remaining_closable_quantity(monkeypatch) -> None:
+    monkeypatch.setattr(funding_workspace, "batch_has_verified_flattening", lambda _: False)
     instructions = [
         {
             "instructionId": "open-1",
@@ -155,16 +159,19 @@ def test_close_summary_and_group_snapshot_track_remaining_closable_quantity(monk
         "get_instruction",
         lambda instruction_id: instructions[0],
     )
+
     def workspace_state(instruction):
         if instruction["instructionId"] == "close-1":
             return {
                 "executionState": "completed",
                 "spotReleases": [{"cumulativeSpotQuantity": "0.003"}],
+                "cumulativeSpotFill": "0.003",
                 "cumulativePerpetualFill": "0.003",
             }
         return {
             "executionState": "completed",
             "spotReleases": [{"cumulativeSpotQuantity": "0.020"}],
+            "cumulativeSpotFill": "0.020",
             "cumulativePerpetualFill": "0.020",
         }
 
@@ -233,6 +240,7 @@ def test_close_summary_separates_authoritative_pending_and_uncertain_quantity(
             "executionState": execution_state,
             "attempts": [{"orderId": order_id}] if order_id else [],
             "spotReleases": [{"cumulativeSpotQuantity": spot_fill, "orderId": order_id}],
+            "cumulativeSpotFill": spot_fill,
             "cumulativePerpetualFill": spot_fill,
         },
     )
@@ -243,7 +251,17 @@ def test_close_summary_separates_authoritative_pending_and_uncertain_quantity(
     assert summary["authoritativeClosedQuantity"] == expected_authoritative
     assert summary["pendingCloseQuantity"] == Decimal(expected_pending)
     assert summary["resultUnknownReservedQuantity"] == Decimal(expected_unknown)
-    reserved = sum(summary.values(), Decimal("0"))
+    reserved = sum(
+        (
+            summary[key]
+            for key in (
+                "authoritativeClosedQuantity",
+                "pendingCloseQuantity",
+                "resultUnknownReservedQuantity",
+            )
+        ),
+        Decimal("0"),
+    )
     assert Decimal("0.020") - reserved == Decimal(expected_remaining)
 
 
@@ -292,6 +310,10 @@ def test_workspace_lookup_recovers_instruction_by_idempotency(monkeypatch) -> No
 
 
 def test_submit_close_rejects_quantity_above_remaining(monkeypatch) -> None:
+    def not_found(*args):
+        raise HTTPException(status_code=404, detail="not found")
+
+    monkeypatch.setattr(funding_workspace, "get_instruction_by_idempotency", not_found)
     monkeypatch.setattr(
         funding_workspace,
         "get_instruction",
@@ -322,3 +344,236 @@ def test_submit_close_rejects_quantity_above_remaining(monkeypatch) -> None:
             requested_by="demo_ceo",
             target_open_instruction_id="open-1",
         )
+
+
+def test_quantity_suggestion_respects_non_power_of_ten_step_and_budget():
+    assert funding_workspace._suggest_quantity(
+        notional=Decimal("19"), price=Decimal("10"), step=Decimal("0.25"), minimum=Decimal("0.25")
+    ) == Decimal("1.75")
+    assert (
+        funding_workspace._suggest_quantity(
+            notional=Decimal("1"),
+            price=Decimal("10"),
+            step=Decimal("0.25"),
+            minimum=Decimal("0.25"),
+        )
+        is None
+    )
+
+
+def test_fee_adjusted_close_counts_full_perpetual_close(monkeypatch):
+    monkeypatch.setattr(
+        funding_workspace,
+        "_workspace_state_from_instruction",
+        lambda _: {
+            "executionState": "completed",
+            "cumulativePerpetualFill": "1",
+            "spotReleases": [{"cumulativeSpotQuantity": "0.999"}],
+            "cumulativeSpotFill": "0.999",
+        },
+    )
+    summary = funding_workspace._close_summary_by_open_instruction(
+        [
+            {
+                "action": "close",
+                "requestedParameters": {
+                    "targetOpenInstructionId": "open",
+                    "perpetualQuantity": "1",
+                    "spotQuantity": "0.999",
+                },
+            }
+        ]
+    )["open"]
+    assert summary["authoritativeClosedQuantity"] == Decimal("1")
+    assert summary["resultUnknownReservedQuantity"] == 0
+    assert summary["spotSoldOrReserved"] == Decimal("0.999")
+
+
+@pytest.mark.parametrize(
+    ("state", "perp", "spot", "unknown", "flattened", "expected"),
+    [
+        ("completed", "0.001", "0.001", "0", False, False),
+        ("executing", "0.001", "0", "0", False, False),
+        ("completed", "0.001", "0", "0", False, True),
+        ("completed", "0.001", "0.001", "0.001", False, True),
+        ("manual_intervention", "0.001", "0", "0", False, True),
+        ("manual_intervention", "0.001", "0", "0", True, False),
+    ],
+)
+def test_funding_abnormal_classification_preserves_running_and_resolved_groups(
+    monkeypatch,
+    state,
+    perp,
+    spot,
+    unknown,
+    flattened,
+    expected,
+):
+    from app import execution_risk_repository as risks
+
+    instruction = {
+        "status": state,
+        "updatedAt": "2026-09-10T00:00:00Z",
+        "executionPlan": {
+            "legs": [
+                {
+                    "role": "perpetual_leg",
+                    "externalSymbol": "BTCUSDT",
+                    "side": "sell",
+                    "maximumQuantity": "0.001",
+                },
+                {
+                    "role": "spot_leg",
+                    "externalSymbol": "BTCUSDT",
+                    "side": "buy",
+                    "maximumQuantity": "0.001",
+                },
+            ]
+        },
+    }
+    monkeypatch.setattr(funding_workspace, "get_instruction", lambda _: instruction)
+    monkeypatch.setattr(
+        funding_workspace,
+        "_workspace_state_from_instruction",
+        lambda _: {
+            "executionState": state,
+            "cumulativePerpetualFill": perp,
+            "cumulativeSpotFill": spot,
+        },
+    )
+    monkeypatch.setattr(funding_workspace, "batch_has_verified_flattening", lambda _: flattened)
+    monkeypatch.setattr(funding_workspace, "_funding_fees_for_batch", lambda _: (None, None))
+
+    def unknown_evidence(*args):
+        raise risks.ExecutionRiskRepositoryError("unknown receipt")
+
+    monkeypatch.setattr(risks, "flattening_positions", unknown_evidence)
+    group = funding_workspace._funding_group_snapshot(
+        instruction_id="owned-funding",
+        batch_id="funding-batch",
+        close_summary={"resultUnknownReservedQuantity": Decimal(unknown)},
+    )
+    assert group["isAbnormal"] is expected
+    if expected:
+        assert group["abnormalAction"] == "reconcile"
+
+
+@pytest.mark.parametrize(
+    ("gross", "step", "perp", "net", "residual"),
+    [
+        ("0.001", "0.001", "0", "0.000999", "0.000999"),
+        ("0.001002", "0.001", "0.001", "0.001000998", "0.000000998"),
+        ("0.002", "0.001", "0.001", "0.001998", "0.000998"),
+        ("0.006", "0.002", "0.004", "0.005994", "0.001994"),
+    ],
+)
+def test_fee_aware_open_hedge_floors_actual_coin_inventory(gross, step, perp, net, residual):
+    from app.strategies.adapters.funding_carry import funding_open_quantities
+
+    result = funding_open_quantities(
+        Decimal(gross), fee_rate=Decimal("0.001"), perpetual_step=Decimal(step)
+    )
+    assert result == (Decimal(net), Decimal(perp), Decimal(residual))
+
+
+def test_fee_rounding_below_minimum_blocks_open_before_creating_instruction(monkeypatch):
+    def missing(*args):
+        raise HTTPException(404, "not found")
+
+    monkeypatch.setattr(funding_workspace, "get_instruction_by_idempotency", missing)
+    spec = {"quantityStep": "0.001", "minQuantity": "0.001", "contractMultiplier": "1"}
+    sizing = funding_workspace._open_sizing(
+        Decimal("0.001"),
+        fee_rate=Decimal("0.001"),
+        perp_spec=spec,
+        spot_spec=spec,
+        perp_quote={"mid": "78000"},
+        spot_quote={"mid": "78000"},
+    )
+    monkeypatch.setattr(
+        funding_workspace, "get_funding_execution_context", lambda **kw: {"openSizing": sizing}
+    )
+    monkeypatch.setattr(
+        funding_workspace,
+        "create_instruction",
+        lambda *a, **kw: pytest.fail("must not create an instruction"),
+    )
+    with pytest.raises(HTTPException, match="永续数量"):
+        funding_workspace.submit_funding_instruction(
+            action="open",
+            idempotency_key="tiny",
+            perpetual_symbol="BTCUSDT",
+            spot_symbol="BTCUSDT",
+            quantity=Decimal("0.001"),
+            requested_by="owner",
+        )
+
+
+@pytest.mark.parametrize(
+    ("gross", "perp", "net", "abnormal"),
+    [
+        ("0.001", "0.001", "0.000999", True),
+        ("0.00128", "0.001", "0.00127872", False),
+    ],
+)
+def test_funding_net_delta_distinguishes_fee_error_from_planned_rounding(
+    monkeypatch, gross, perp, net, abnormal
+):
+    from contextlib import contextmanager
+    from types import SimpleNamespace
+
+    import app.strategy_financial_readmodel as financial
+
+    @contextmanager
+    def live_account():
+        yield SimpleNamespace(
+            execute=lambda *args: SimpleNamespace(fetchone=lambda: {"environment": "live"})
+        )
+
+    monkeypatch.setattr(funding_workspace, "connection", live_account)
+    monkeypatch.setattr(funding_workspace, "batch_has_verified_flattening", lambda _: False)
+    monkeypatch.setattr(funding_workspace, "_funding_fees_for_batch", lambda _: (None, None))
+    monkeypatch.setattr(financial, "funding_spot_cash", lambda *args: Decimal(net))
+    monkeypatch.setattr(
+        funding_workspace,
+        "get_instruction",
+        lambda _: {
+            "status": "completed",
+            "updatedAt": "2026-09-10T00:00:00Z",
+            "executionPlan": {
+                "legs": [
+                    {
+                        "role": "perpetual_leg",
+                        "maximumQuantity": perp,
+                        "quantityStep": "0.001",
+                        "externalSymbol": "BTCUSDT",
+                        "side": "sell",
+                    },
+                    {
+                        "role": "spot_leg",
+                        "accountId": "shared",
+                        "maximumQuantity": gross,
+                        "quantityStep": "0.000001",
+                        "externalSymbol": "BTCUSDT",
+                        "side": "buy",
+                    },
+                ]
+            },
+        },
+    )
+    monkeypatch.setattr(
+        funding_workspace,
+        "_workspace_state_from_instruction",
+        lambda _: {
+            "executionState": "completed",
+            "cumulativePerpetualFill": perp,
+            "cumulativeSpotFill": gross,
+        },
+    )
+    row = funding_workspace._funding_group_snapshot(instruction_id="funding", batch_id="batch")
+    assert row["isAbnormal"] is abnormal
+    assert Decimal(row["netDeltaQuantity"]) == Decimal(net) - Decimal(perp)
+    assert row["remainingClosableQuantity"] == perp
+    if abnormal:
+        assert "手续费未配平" in row["abnormalReason"]
+        assert row["abnormalAction"] == "close_group"

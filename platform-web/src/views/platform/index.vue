@@ -110,7 +110,12 @@
   const selectedMainLeg = ref('XAUTUSDT');
   const selectedHedgeLeg = ref('XAUUSD');
   const selectedResolution = ref('\u0033\u0030\u5206\u949f');
-  const activeSection = ref<'analysis' | 'execution'>('analysis');
+  const activeSection = computed<'analysis' | 'execution'>({
+    get: () => (route.query.section === 'analysis' ? 'analysis' : 'execution'),
+    set: (section) => {
+      void router.replace({ query: { ...route.query, section } });
+    },
+  });
 
   const currentKey = computed<DeskKey>(() => {
     if (route.query.desk === 'domesticOverseas') return 'domesticOverseas';
@@ -125,8 +130,6 @@
   watch(
     currentKey,
     (deskKey) => {
-      activeSection.value = 'analysis';
-
       if (deskKey === 'funding') {
         selectedVenue.value = fundingVenueOptions[0];
         return;
@@ -143,7 +146,7 @@
   );
 
   function selectDesk(key: string) {
-    router.replace({ path: '/strategy/platform', query: { desk: key as DeskKey } });
+    router.replace({ path: '/strategy/platform', query: { ...route.query, desk: key as DeskKey } });
   }
 </script>
 

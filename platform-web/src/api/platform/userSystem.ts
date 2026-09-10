@@ -215,6 +215,18 @@ const SESSION_INVALIDATION_CODES = new Set([
   'browser_sessions_disabled',
   'session_timestamp_invalid',
 ]);
+
+export function isUserSystemServiceUnavailable(error: unknown): boolean {
+  return (
+    error instanceof UserSystemApiError &&
+    !SESSION_INVALIDATION_CODES.has(error.code || '') &&
+    (error.status === undefined ||
+      error.status === 408 ||
+      error.status === 429 ||
+      error.status >= 500)
+  );
+}
+
 const client: AxiosInstance = axios.create({
   baseURL: '/api/v1',
   timeout: 15_000,

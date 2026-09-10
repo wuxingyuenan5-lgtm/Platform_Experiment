@@ -10,7 +10,7 @@ import httpx
 from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
-from app import eod_reconciliation
+from app import eod_reconciliation, runtime_transport
 from app.auth import require_principal
 from app.config import get_settings
 from app.database import connection
@@ -179,7 +179,7 @@ def count_rows(db, table_name: str, where: str = "", parameters: tuple[object, .
 def runtime_json(path: str) -> dict[str, object]:
     settings = get_settings()
     try:
-        response = httpx.get(
+        response = runtime_transport.get(
             f"{settings.runtime_base_url}{path}",
             timeout=max(settings.runtime_timeout_seconds, 10.0),
         )

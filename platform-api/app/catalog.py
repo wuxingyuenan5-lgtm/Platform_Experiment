@@ -1,14 +1,14 @@
 from __future__ import annotations
 
+import json
 from datetime import UTC, datetime
 from decimal import Decimal
-from typing import Any, TypedDict
+from typing import TypedDict
 from uuid import uuid4
 
 from fastapi import HTTPException
 
 from app.database import connection
-from app.live_venue_snapshot_sync import ensure_sync_schema
 from app.schemas import (
     AccountResponse,
     AccountRiskSnapshotResponse,
@@ -120,7 +120,6 @@ def list_strategy_instances() -> list[StrategyInstanceResponse]:
 
 
 def list_strategy_management_overview() -> list[StrategyManagementOverviewResponse]:
-    ensure_sync_schema()
     with connection() as db:
         rows = db.execute(
             """
@@ -133,19 +132,22 @@ def list_strategy_management_overview() -> list[StrategyManagementOverviewRespon
                    si.status,
                    si.data_quality_state,
                    sd.v1_scope,
-                   COUNT(sab.id) AS binding_count,
+                   COUNT(CASE WHEN sab.status='active' AND sab.role!='local_test'
+                              AND a.status='active' THEN sab.id END) AS binding_count,
                    latest_run.status AS latest_run_status,
                    latest_run.created_at AS latest_run_at,
                    COALESCE(
                        MAX(
                            CASE
                                WHEN sab.status = 'active' AND sab.capability = 'trade_and_read'
+                                 AND sab.role != 'local_test' AND a.status = 'active'
                                THEN 'trade_and_read'
                            END
                        ),
                        MAX(
                            CASE
                                WHEN sab.status = 'active' AND sab.capability = 'read_only'
+                                 AND sab.role != 'local_test' AND a.status = 'active'
                                THEN 'read_only'
                            END
                        ),
@@ -202,7 +204,9 @@ def list_strategy_management_overview() -> list[StrategyManagementOverviewRespon
                 a.account_code,
                 a.status AS account_status,
                 a.data_quality_state,
+                a.environment,
                 sync.status AS sync_status,
+                sync.last_success_at,
                 (
                     SELECT bs.data_quality_state
                     FROM balance_snapshots bs
@@ -216,11 +220,13 @@ def list_strategy_management_overview() -> list[StrategyManagementOverviewRespon
                     WHERE ars.account_id = a.id
                     ORDER BY ars.as_of DESC
                     LIMIT 1
-                ) AS latest_risk_quality
+                ) AS latest_risk_quality,
+                (SELECT ars.as_of FROM account_risk_snapshots ars
+                 WHERE ars.account_id=a.id ORDER BY ars.as_of DESC LIMIT 1) AS latest_risk_as_of
             FROM strategy_account_bindings sab
             JOIN accounts a ON a.id = sab.account_id
             LEFT JOIN account_sync_status sync ON sync.account_id = a.id
-            WHERE sab.status = 'active'
+            WHERE sab.status = 'active' AND sab.role != 'local_test' AND a.status='active'
             ORDER BY sab.strategy_instance_id,
                      CASE sab.role
                          WHEN 'primary' THEN 1
@@ -236,16 +242,27 @@ def list_strategy_management_overview() -> list[StrategyManagementOverviewRespon
     bindings_by_strategy: dict[str, list[dict[str, str | None]]] = {}
     for binding in binding_rows:
         sync_status = str(binding["sync_status"]) if binding["sync_status"] else None
-        if sync_status == "ready":
+        if sync_status in {"ready", "syncing"}:
             effective_quality = (
-                binding["latest_balance_quality"]
-                or binding["latest_risk_quality"]
-                or "unavailable"
+                binding["latest_risk_quality"] or binding["latest_balance_quality"] or "unavailable"
             )
+            stamp = binding["latest_risk_as_of"] or binding["last_success_at"]
+            if (
+                stamp is None
+                or (
+                    datetime.now(UTC) - datetime.fromisoformat(str(stamp).replace("Z", "+00:00"))
+                ).total_seconds()
+                > 90
+            ):
+                effective_quality = "stale"
         elif sync_status is not None:
             effective_quality = sync_status
         else:
-            effective_quality = binding["data_quality_state"]
+            effective_quality = (
+                "waiting_initial_sync"
+                if binding["environment"] == "live"
+                else binding["data_quality_state"]
+            )
         bindings_by_strategy.setdefault(str(binding["strategy_instance_id"]), []).append(
             {
                 "role": str(binding["role"]),
@@ -256,9 +273,7 @@ def list_strategy_management_overview() -> list[StrategyManagementOverviewRespon
                     else None
                 ),
                 "data_quality_state": (
-                    str(effective_quality)
-                    if effective_quality is not None
-                    else None
+                    str(effective_quality) if effective_quality is not None else None
                 ),
             }
         )
@@ -300,14 +315,12 @@ def list_strategy_management_overview() -> list[StrategyManagementOverviewRespon
                     (
                         binding["data_quality_state"]
                         for binding in non_local_test
-                        if binding["data_quality_state"] is not None
+                        if binding["data_quality_state"] not in {None, "complete"}
                     ),
-                    None,
+                    "complete",
                 )
         execution_readiness = (
-            None
-            if row["v1_scope"] == "read_only"
-            else get_strategy_v1_readiness(row["id"])
+            None if row["v1_scope"] == "read_only" else get_strategy_v1_readiness(row["id"])
         )
         overview.append(
             StrategyManagementOverviewResponse(
@@ -405,11 +418,18 @@ def list_strategy_account_bindings(
 
 def get_strategy_account_snapshot(
     strategy_instance_id: str,
+    *,
+    account_id: str | None = None,
 ) -> StrategyAccountSnapshotResponse:
-    ensure_sync_schema()
     bindings = list_strategy_account_bindings(strategy_instance_id)
     binding = next(
-        (item for item in bindings if item.role == "primary" and item.status == "active"),
+        (
+            item
+            for item in bindings
+            if item.status == "active"
+            and item.role != "local_test"
+            and (item.account_id == account_id if account_id else item.role == "primary")
+        ),
         None,
     )
     if binding is None:
@@ -439,6 +459,11 @@ def get_strategy_account_snapshot(
             """,
             (binding.account_id,),
         ).fetchone()
+        venue_row = db.execute(
+            "SELECT * FROM account_venue_snapshots WHERE account_id=?",
+            (binding.account_id,),
+        ).fetchone()
+        venue_snapshot = json.loads(venue_row["payload_json"]) if venue_row else {}
         balance_row = db.execute(
             """
             SELECT balance_snapshots.id, balance_snapshots.account_id,
@@ -454,19 +479,10 @@ def get_strategy_account_snapshot(
             """,
             (binding.account_id,),
         ).fetchone()
-        strategy_activity = db.execute(
-            """
-            SELECT 1
-            FROM trade_commands
-            WHERE strategy_instance_id = ? AND account_id = ?
-            LIMIT 1
-            """,
-            (strategy_instance_id, binding.account_id),
-        ).fetchone()
         risk_row = db.execute(
             """
             SELECT account_id, as_of, currency, equity, margin, free_margin, margin_level,
-                   data_quality_state
+                   data_quality_state, payload_json, total_assets, asset_scope
             FROM account_risk_snapshots
             WHERE account_id = ?
             ORDER BY as_of DESC
@@ -476,12 +492,16 @@ def get_strategy_account_snapshot(
         ).fetchone()
         risk_history_rows = db.execute(
             """
-            SELECT as_of, currency, equity
+            SELECT as_of, currency, equity, asset_scope, total_assets
             FROM (
-                SELECT as_of, currency, equity
+                SELECT as_of, currency, equity, asset_scope, total_assets
                 FROM account_risk_snapshots
                 WHERE account_id = ?
                   AND equity IS NOT NULL
+                  AND asset_scope = (
+                      SELECT asset_scope FROM account_risk_snapshots WHERE account_id=?
+                      ORDER BY as_of DESC LIMIT 1
+                  )
                   AND upper(currency) = upper(
                       (
                           SELECT currency
@@ -496,29 +516,40 @@ def get_strategy_account_snapshot(
             )
             ORDER BY as_of ASC
             """,
-            (binding.account_id, binding.account_id),
+            (binding.account_id, binding.account_id, binding.account_id),
         ).fetchall()
         history_rows = db.execute(
             """
-            SELECT as_of, currency, equity
-            FROM balance_snapshots
-            WHERE account_id = ?
-            ORDER BY as_of ASC
+            SELECT as_of, currency, equity FROM (
+                SELECT as_of, currency, equity FROM balance_snapshots
+                WHERE account_id = ? AND currency = (
+                    SELECT base_currency FROM accounts WHERE id=?
+                ) ORDER BY as_of DESC LIMIT 1000
+            ) ORDER BY as_of ASC
             """,
-            (binding.account_id,),
+            (binding.account_id, binding.account_id),
         ).fetchall()
 
     account = get_account(binding.account_id)
     sync_status = str(sync_row["status"]) if sync_row is not None else None
-    snapshot_usable = sync_status in {None, "ready"}
+    snapshot_usable = risk_row is not None or balance_row is not None
+    snapshot_time = venue_row["as_of"] if venue_row else risk_row["as_of"] if risk_row else None
+    is_stale = (
+        snapshot_time is None
+        or (
+            datetime.now(UTC) - datetime.fromisoformat(str(snapshot_time).replace("Z", "+00:00"))
+        ).total_seconds()
+        > 90
+        or sync_status not in {"ready", "syncing"}
+    )
     display_risk_row = risk_row if snapshot_usable else None
     if display_risk_row is not None and display_risk_row["equity"] is not None:
         balance = BalanceSnapshotResponse(
             snapshotId=f"risk:{binding.account_id}:{display_risk_row['as_of']}",
             accountId=binding.account_id,
-            currency=account.base_currency,
+            currency=display_risk_row["currency"],
             equity=Decimal(str(display_risk_row["equity"])),
-            availableBalance=Decimal(str(display_risk_row["free_margin"] or "0")),
+            availableBalance=optional_decimal(display_risk_row["free_margin"]),
             source="account_risk",
             dataQualityState=display_risk_row["data_quality_state"],
             asOf=display_risk_row["as_of"],
@@ -544,10 +575,19 @@ def get_strategy_account_snapshot(
     )
     equity_history = [
         StrategyEquityHistoryPointResponse(
-            asOf=row["as_of"], equity=Decimal(str(row["equity"]))
+            asOf=row["as_of"],
+            equity=Decimal(str(row["equity"])),
+            currency=row["currency"],
+            assetScope=row["asset_scope"] if "asset_scope" in row.keys() else "coin",
+            totalAssets=optional_decimal(row["total_assets"])
+            if "total_assets" in row.keys()
+            else None,
         )
         for row in history_source
     ]
+    from app.account_performance import enrich_performance
+
+    enrich_performance(binding.account_id, equity_history)
     positions = [
         PositionResponse(
             accountId=row["account_id"],
@@ -557,33 +597,36 @@ def get_strategy_account_snapshot(
         )
         for row in list_positions(binding.account_id)
     ]
-    with connection() as db:
-        strategy_order_ids = {
-            str(row["id"])
-            for row in db.execute(
-                """
-                SELECT o.id
-                FROM trade_commands tc
-                JOIN orders o ON o.command_id = tc.id
-                WHERE tc.strategy_instance_id = ? AND tc.account_id = ?
-                """,
-                (strategy_instance_id, binding.account_id),
-            ).fetchall()
-        }
-    orders = [item for item in list_orders() if item.order_id in strategy_order_ids]
-    fills = [item for item in list_fills() if item.order_id in strategy_order_ids]
-    strategy_pnl = get_strategy_pnl(strategy_instance_id) if strategy_activity else None
-    pnl = (
-        PnlResponse(
-            accountId=binding.account_id,
-            instrumentId="strategy_total",
-            realizedPnl=strategy_pnl.realized_pnl,
-            tradingPnl=strategy_pnl.trading_pnl,
-            fees=strategy_pnl.fees,
-        )
-        if strategy_pnl is not None
-        else None
+    if binding.capability == "read_only" and venue_snapshot:
+        positions = [PositionResponse.model_validate(row) for row in venue_snapshot["positions"]]
+    account_scope = binding.capability == "read_only"
+    orders = list_orders(
+        None if account_scope else strategy_instance_id, account_id=binding.account_id
     )
+    fills = list_fills(
+        None if account_scope else strategy_instance_id, account_id=binding.account_id
+    )
+    fills_total = len(fills)
+    fills = fills[:200]
+    orders_total = len(orders)
+    orders = orders[:200]
+    from app.strategy_financial_readmodel import get_strategy_financials
+
+    finance = get_strategy_financials(
+        strategy_instance_id, account_id=binding.account_id, account_scope=account_scope
+    )
+    if not account_scope:
+        positions = [PositionResponse.model_validate(row) for row in finance["positions"]]
+    pnl = None
+    if all(finance.get(key) is not None for key in ("realizedPnl", "tradingPnl", "fees")):
+        pnl = PnlResponse(
+            accountId=binding.account_id,
+            instrumentId="account_total" if account_scope else "strategy_total",
+            realizedPnl=finance["realizedPnl"],
+            tradingPnl=finance["tradingPnl"],
+            fees=finance["fees"],
+        )
+    risk_payload = json.loads(display_risk_row["payload_json"]) if display_risk_row else {}
     account_risk = (
         AccountRiskSnapshotResponse(
             accountId=display_risk_row["account_id"],
@@ -594,17 +637,28 @@ def get_strategy_account_snapshot(
             marginLevel=optional_decimal(display_risk_row["margin_level"]),
             dataQualityState=display_risk_row["data_quality_state"],
             asOf=display_risk_row["as_of"],
+            assetScope=display_risk_row["asset_scope"],
+            totalAssets=optional_decimal(display_risk_row["total_assets"]),
+            assetBreakdown=risk_payload.get("assetBreakdown", []),
+            assetOverviewAsOf=risk_payload.get("assetOverviewAsOf"),
+            assetOverviewQuality=risk_payload.get("assetOverviewQuality", "unavailable"),
+            walletBalance=risk_payload.get("walletBalance"),
+            marginBalance=risk_payload.get("marginBalance"),
+            maintenanceMargin=risk_payload.get("maintenanceMargin"),
+            unrealizedPnl=risk_payload.get("unrealizedPnl"),
         )
         if display_risk_row is not None
         else None
     )
     sync_status = sync_status or "waiting_initial_sync"
     sync_error = (
-        str(sync_row["error_code"])
-        if sync_row is not None and sync_row["error_code"]
-        else None
+        str(sync_row["error_code"]) if sync_row is not None and sync_row["error_code"] else None
     )
-    quality = balance.data_quality_state if balance is not None else sync_status
+    quality = (
+        ("stale" if is_stale else balance.data_quality_state)
+        if balance is not None
+        else sync_status
+    )
     return StrategyAccountSnapshotResponse(
         strategyInstanceId=strategy_instance_id,
         accountId=binding.account_id,
@@ -625,6 +679,19 @@ def get_strategy_account_snapshot(
         pnl=pnl,
         syncStatus=sync_status,
         syncErrorCode=sync_error,
+        snapshotScope="account" if account_scope else "strategy",
+        isStale=is_stale,
+        lastSuccessfulSyncAt=sync_row["last_success_at"] if sync_row else None,
+        historyStart=venue_snapshot.get("historyStart"),
+        historyEnd=venue_snapshot.get("historyEnd"),
+        coinBalances=venue_snapshot.get("balances", []),
+        economicEventsQuality=venue_snapshot.get("economicEventsQuality", "unavailable"),
+        economicEvents=venue_snapshot.get("economicEvents", [])
+        if account_scope
+        else finance["economicEvents"],
+        finance=StrategyPnlResponse.model_validate(finance),
+        ordersTotal=orders_total,
+        fillsTotal=fills_total,
     )
 
 
@@ -699,7 +766,7 @@ def get_latest_balance(account_id: str) -> BalanceSnapshotResponse:
         accountId=row["account_id"],
         currency=row["currency"],
         equity=Decimal(str(row["equity"])),
-        availableBalance=Decimal(str(row["available_balance"])),
+        availableBalance=optional_decimal(row["available_balance"]),
         source=row["source"],
         dataQualityState=row["data_quality_state"],
         asOf=row["as_of"],
@@ -921,51 +988,76 @@ def trade_command_from_row(row) -> TradeCommandResponse:
     )
 
 
-def list_orders(strategy_instance_id: str | None = None) -> list[OrderDetailResponse]:
+def list_orders(
+    strategy_instance_id: str | None = None,
+    *,
+    account_id: str | None = None,
+    limit: int | None = None,
+) -> list[OrderDetailResponse]:
+    from app.order_record_readmodel import order_record_links
+    from app.venue_identity_repository import VenueIdentityConflict, load_order_identities
+
+    filters: list[str] = []
+    params: list[object] = []
+    if strategy_instance_id is not None:
+        filters.append("tc.strategy_instance_id = ?")
+        params.append(strategy_instance_id)
+    if account_id is not None:
+        filters.append("o.account_id = ?")
+        params.append(account_id)
+    where = " WHERE " + " AND ".join(filters) if filters else ""
     with connection() as db:
-        if strategy_instance_id:
-            rows = db.execute(
-                """
-                SELECT o.id, o.command_id, o.account_id, o.instrument_id, o.symbol, o.side,
-                       o.order_type, o.quantity, o.price, o.status, o.external_order_id,
-                       o.created_at, o.updated_at
-                FROM orders o
-                JOIN trade_commands tc ON tc.id = o.command_id
-                WHERE tc.strategy_instance_id = ?
-                ORDER BY o.created_at DESC
-                """,
-                (strategy_instance_id,),
-            ).fetchall()
-        else:
-            rows = db.execute(
-                """
-                SELECT id, command_id, account_id, instrument_id, symbol, side, order_type,
-                       quantity, price, status, external_order_id, created_at, updated_at
-                FROM orders
-                ORDER BY created_at DESC
-                """
-            ).fetchall()
-    return [order_from_row(row) for row in rows]
+        rows = db.execute(
+            "SELECT o.*,tc.id AS known_command_id FROM orders o "
+            "LEFT JOIN trade_commands tc ON tc.id=o.command_id"
+            + where
+            + " ORDER BY o.created_at DESC, o.id DESC",
+            params,
+        ).fetchall()
+        try:
+            identities = load_order_identities(db)
+            links = order_record_links(
+                db, identities=identities, accounts={row["account_id"] for row in rows}
+            )
+            if any(identities.canonical[row["id"]] is None for row in rows):
+                raise VenueIdentityConflict("Order has multiple command owners")
+            rows = [row for row in rows if identities.canonical[row["id"]] == row["id"]]
+        except VenueIdentityConflict as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return [order_from_row(row, links.get(row["id"])) for row in rows[:limit]]
 
 
 def get_order(order_id: str) -> OrderDetailResponse:
+    from app.order_record_readmodel import order_record_links
+
     with connection() as db:
         row = db.execute(
             """
-            SELECT id, command_id, account_id, instrument_id, symbol, side, order_type,
-                   quantity, price, status, external_order_id, created_at, updated_at
-            FROM orders
-            WHERE id = ?
+            SELECT o.*,tc.id AS known_command_id FROM orders o
+            LEFT JOIN trade_commands tc ON tc.id=o.command_id
+            WHERE o.id = ?
             """,
             (order_id,),
         ).fetchone()
+        links = order_record_links(db, accounts={row["account_id"]} if row else set())
     if row is None:
         raise HTTPException(status_code=404, detail="Order not found")
-    return order_from_row(row)
+    return order_from_row(row, links.get(order_id))
 
 
-def order_from_row(row) -> OrderDetailResponse:
+def order_from_row(row, record_link=None) -> OrderDetailResponse:
+    venue = (
+        json.loads(row["venue_payload_json"] or "{}") if "venue_payload_json" in row.keys() else {}
+    )
     return OrderDetailResponse(
+        **(record_link or {}),
+        timeQuality=(
+            "platform_submission"
+            if "known_command_id" in row.keys() and row["known_command_id"]
+            else "source_clock_unverified"
+            if "mt5" in row["account_id"].lower()
+            else "venue_time"
+        ),
         orderId=row["id"],
         commandId=row["command_id"],
         status=row["status"],
@@ -979,143 +1071,139 @@ def order_from_row(row) -> OrderDetailResponse:
         price=optional_decimal(row["price"]),
         createdAt=row["created_at"],
         updatedAt=row["updated_at"],
+        filledQuantity=venue.get("filledQuantity"),
+        averageFillPrice=venue.get("averageFillPrice"),
+        reduceOnly=venue.get("reduceOnly"),
+        timeInForce=venue.get("timeInForce"),
+        rejectReason=venue.get("rejectReason"),
+        cancelReason=venue.get("cancelReason"),
     )
 
 
-def list_fills(strategy_instance_id: str | None = None) -> list[FillResponse]:
+def list_fills(
+    strategy_instance_id: str | None = None,
+    *,
+    account_id: str | None = None,
+    limit: int | None = None,
+) -> list[FillResponse]:
+    from collections import defaultdict
+
+    from app.order_record_readmodel import (
+        fill_clock_metadata,
+        mt5_entry_action,
+        order_record_links,
+    )
+    from app.strategy_financial_readmodel import select_management_executions
+    from app.venue_identity_repository import (
+        VenueIdentityConflict,
+        load_order_identities,
+        scoped_identity,
+    )
+    from app.venue_reconciliation_repository import effective_venue_event
+
     with connection() as db:
-        if strategy_instance_id:
-            rows = db.execute(
-                """
-                SELECT f.id, f.order_id, f.account_id, f.instrument_id, f.side,
-                       f.quantity, f.price, f.occurred_at
-                FROM fills f
-                JOIN orders o ON o.id = f.order_id
-                JOIN trade_commands tc ON tc.id = o.command_id
-                WHERE tc.strategy_instance_id = ?
-                ORDER BY f.occurred_at DESC
-                """,
-                (strategy_instance_id,),
-            ).fetchall()
-        else:
-            rows = db.execute(
-                """
-                SELECT id, order_id, account_id, instrument_id, side, quantity, price, occurred_at
-                FROM fills
-                ORDER BY occurred_at DESC
-                """
-            ).fetchall()
-    return [
-        FillResponse(
-            fillId=row["id"],
-            orderId=row["order_id"],
-            accountId=row["account_id"],
-            instrumentId=row["instrument_id"],
-            side=row["side"],
-            quantity=Decimal(row["quantity"]),
-            price=Decimal(row["price"]),
-            occurredAt=row["occurred_at"],
+        identities = load_order_identities(db)
+        orders = {
+            row["id"]: dict(row)
+            for row in db.execute("SELECT * FROM orders")
+            if identities.canonical[row["id"]] == row["id"]
+            and (account_id is None or row["account_id"] == account_id)
+            and (
+                strategy_instance_id is None
+                or identities.rows[row["id"]]["strategy_instance_id"] == strategy_instance_id
+            )
+        }
+        if not orders:
+            return []
+        accounts = sorted({row["account_id"] for row in orders.values()})
+        placeholders = ",".join("?" for _ in accounts)
+        rows = db.execute(
+            "SELECT f.*,f.id AS fill_id,o.quantity AS requested_quantity "
+            "FROM fills f JOIN orders o ON o.id=f.order_id "
+            f"WHERE f.account_id IN ({placeholders})",
+            accounts,
+        ).fetchall()
+        raw: dict[str, list[dict[str, object]]] = defaultdict(list)
+        try:
+            for event in db.execute(
+                "SELECT * FROM venue_account_events WHERE event_type='trade_fill' "
+                f"AND account_id IN ({placeholders})",
+                accounts,
+            ):
+                payload = effective_venue_event(
+                    db, event["account_id"], "trade_fill", json.loads(event["payload_json"])
+                )
+                owner = identities.resolve(event["account_id"], payload)
+                if owner is not None and owner in orders:
+                    raw[owner].append(
+                        {
+                            **payload,
+                            "source": event["source"],
+                            "externalFillId": event["external_id"],
+                        }
+                    )
+            selected, _issues = select_management_executions(orders, rows, raw, identities)
+            links = order_record_links(db, identities=identities, accounts=set(accounts))
+            clocks = fill_clock_metadata(selected, rows, identities)
+        except VenueIdentityConflict as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+    result = []
+    for row, clock in zip(selected, clocks, strict=True):
+        native = row.get("native") or {}
+        order = orders[row["order_id"]]
+        external_id = native.get("externalFillId") or row.get("external_fill_id")
+        source = native.get("source") or row.get("source")
+        record_link = dict(links.get(order["id"], {}))
+        if (
+            source == "mt5_live"
+            and not identities.rows[order["id"]]["strategy_instance_id"]
+            and mt5_entry_action(native)
+        ):
+            record_link["action"] = mt5_entry_action(native)
+        result.append(
+            FillResponse(
+                **clock,
+                fillId=(
+                    scoped_identity("fill", order["account_id"], str(source), str(external_id))
+                    if native
+                    else row["fill_id"]
+                ),
+                orderId=order["id"],
+                accountId=order["account_id"],
+                instrumentId=order["instrument_id"],
+                symbol=order["symbol"],
+                side=row["side"],
+                quantity=row["quantity"],
+                price=row["price"],
+                occurredAt=row["occurred_at"],
+                fee=native.get("fee"),
+                currency=native.get("currency"),
+                realizedPnl=native.get("realizedPnl"),
+                swap=native.get("swap"),
+                origin="venue_execution" if native else row.get("origin", "legacy"),
+                source=source,
+                externalFillId=external_id,
+                externalOrderId=order["external_order_id"],
+                **record_link,
+            )
         )
-        for row in rows
-    ]
+    result.sort(
+        key=lambda row: (
+            row.order_confirmed_at or row.occurred_at
+            if row.time_quality in {"source_clock_conflict", "runtime_confirmation"}
+            else row.occurred_at,
+            row.fill_id,
+        ), reverse=True,
+    )
+    return result[:limit] if limit is not None else result
 
 
 def get_strategy_pnl(strategy_instance_id: str) -> StrategyPnlResponse:
-    instance = get_strategy_instance(strategy_instance_id)
-    with connection() as db:
-        fill_rows = db.execute(
-            """
-            SELECT o.id AS order_id, o.account_id, o.instrument_id,
-                   o.quantity AS requested_quantity, f.id AS fill_id, f.side,
-                   f.quantity, f.price, f.occurred_at,
-                   COALESCE(cs.contract_multiplier, '1') AS contract_multiplier
-            FROM trade_commands tc
-            JOIN orders o ON o.command_id = tc.id
-            JOIN fills f ON f.order_id = o.id
-            LEFT JOIN contract_specifications cs ON cs.instrument_id = o.instrument_id
-            WHERE tc.strategy_instance_id = ?
-            ORDER BY f.occurred_at, f.id
-            """,
-            (strategy_instance_id,),
-        ).fetchall()
-        pnl_rows = db.execute(
-            """
-            SELECT pr.trading_pnl, pr.fees
-            FROM strategy_account_bindings sab
-            JOIN pnl_results pr ON pr.account_id = sab.account_id
-            WHERE sab.strategy_instance_id = ? AND sab.status = 'active'
-              AND pr.instrument_id IN (
-                  SELECT DISTINCT instrument_id
-                  FROM trade_commands
-                  WHERE strategy_instance_id = ?
-              )
-            """,
-            (strategy_instance_id, strategy_instance_id),
-        ).fetchall()
+    from app.strategy_financial_readmodel import get_strategy_financials
 
-    grouped: dict[str, list[Any]] = {}
-    for row in fill_rows:
-        grouped.setdefault(str(row["order_id"]), []).append(row)
-    canonical: list[Any] = []
-    for rows in grouped.values():
-        requested = Decimal(str(rows[0]["requested_quantity"]))
-        exact = next(
-            (row for row in rows if Decimal(str(row["quantity"])) == requested),
-            None,
-        )
-        if exact is not None:
-            canonical.append(exact)
-            continue
-        accepted = Decimal("0")
-        for row in rows:
-            quantity = Decimal(str(row["quantity"]))
-            if quantity <= 0 or accepted + quantity > requested:
-                continue
-            canonical.append(row)
-            accepted += quantity
-
-    positions: dict[tuple[str, str], tuple[Decimal, Decimal | None]] = {}
-    realized_pnl = Decimal("0")
-    for row in canonical:
-        key = (str(row["account_id"]), str(row["instrument_id"]))
-        old_quantity, old_average = positions.get(key, (Decimal("0"), None))
-        multiplier = Decimal(str(row["contract_multiplier"]))
-        quantity = Decimal(str(row["quantity"])) * multiplier
-        price = Decimal(str(row["price"]))
-        signed_fill = quantity if str(row["side"]).lower() == "buy" else -quantity
-        if old_quantity == 0 or old_quantity * signed_fill > 0:
-            new_quantity = old_quantity + signed_fill
-            old_notional = abs(old_quantity) * (old_average or Decimal("0"))
-            new_average = (
-                None
-                if new_quantity == 0
-                else (old_notional + abs(signed_fill) * price) / abs(new_quantity)
-            )
-        else:
-            closing_quantity = min(abs(old_quantity), abs(signed_fill))
-            direction = Decimal("1") if old_quantity > 0 else Decimal("-1")
-            realized_pnl += closing_quantity * (price - (old_average or price)) * direction
-            new_quantity = old_quantity + signed_fill
-            if new_quantity == 0:
-                new_average = None
-            elif old_quantity * new_quantity > 0:
-                new_average = old_average
-            else:
-                new_average = price
-        positions[key] = (new_quantity, new_average)
-
-    trading_pnl = sum(
-        (Decimal(str(row["trading_pnl"])) for row in pnl_rows), Decimal("0")
-    )
-    fees = sum((Decimal(str(row["fees"])) for row in pnl_rows), Decimal("0"))
-    return StrategyPnlResponse(
-        strategyInstanceId=strategy_instance_id,
-        realizedPnl=realized_pnl,
-        tradingPnl=trading_pnl,
-        fees=fees,
-        currency=instance.base_currency,
-        dataQualityState="complete",
-    )
+    get_strategy_instance(strategy_instance_id)
+    return StrategyPnlResponse.model_validate(get_strategy_financials(strategy_instance_id))
 
 
 def list_nav_snapshots(strategy_instance_id: str) -> list[StrategyNavSnapshotResponse]:

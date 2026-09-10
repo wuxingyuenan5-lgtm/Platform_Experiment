@@ -13,6 +13,7 @@ from app.models import SubmitOrderCommand
 from app.mt5_account_worker import (
     Mt5AccountWorkerClient,
     Mt5AccountWorkerSupervisor,
+    _execute_worker_call,
     _prove_worker_ready,
 )
 
@@ -43,9 +44,7 @@ class AccountSupervisor:
     def __init__(self) -> None:
         self.adapters = {
             "mt5-live-main": AccountAdapter("mt5-live-main"),
-            "account_mt5_short_term_a": AccountAdapter(
-                "account_mt5_short_term_a", fail=True
-            ),
+            "account_mt5_short_term_a": AccountAdapter("account_mt5_short_term_a", fail=True),
         }
 
     def adapter(self, account_id: str):
@@ -100,11 +99,82 @@ def test_gateway_routes_accounts_to_independent_workers() -> None:
 
 def test_worker_ready_requires_authoritative_account_identity() -> None:
     class Gateway:
-        def get_account_snapshot(self, account_id: str):
+        def get_account_risk(self, account_id: str):
             return SimpleNamespace(account_id=f"wrong-{account_id}")
 
     with pytest.raises(GatewayConfigurationError, match="account identity mismatch"):
         _prove_worker_ready(Gateway(), "mt5-live-main")
+
+
+@pytest.mark.parametrize("method,retry_count", [("list_positions", 2), ("submit_order", 1)])
+def test_only_read_rpc_retries_after_ipc_recovery(method, retry_count):
+    class Adapter:
+        recoveries = 0
+
+        def recover_read_transport(self):
+            self.recoveries += 1
+            return True
+
+    class Gateway:
+        calls = 0
+        proofs = 0
+        mt5 = Adapter()
+
+        def get_account_risk(self, account_id):
+            self.proofs += 1
+            return SimpleNamespace(account_id=account_id)
+
+        def operation(self):
+            self.calls += 1
+            if self.calls == 1:
+                raise GatewayResultUnknownError("IPC send failed")
+            return "read recovered"
+
+        list_positions = operation
+        submit_order = operation
+
+    gateway = Gateway()
+    if method == "submit_order":
+        with pytest.raises(GatewayResultUnknownError):
+            _execute_worker_call(gateway, "account", method, (), {})
+        assert gateway.mt5.recoveries == 0
+    else:
+        assert _execute_worker_call(gateway, "account", method, (), {}) == "read recovered"
+        assert gateway.proofs == 1
+    assert gateway.calls == retry_count
+
+
+def test_ipc_recovery_is_fixed_to_configured_terminal_and_ignores_auth_failures():
+    from app.mt5_live_adapter import Mt5LiveAdapter
+
+    class Provider:
+        code = -10001
+        shutdowns = 0
+        initializes = []
+
+        def last_error(self):
+            return self.code, "failure"
+
+        def shutdown(self):
+            self.shutdowns += 1
+
+        def initialize(self, *args, **kwargs):
+            self.initializes.append((args, kwargs))
+            return True
+
+    provider = Provider()
+    adapter = Mt5LiveAdapter(
+        Settings(
+            _env_file=None, mt5_account_ids="account", mt5_terminal_path="C:/Fixed/terminal64.exe"
+        ),
+        provider,
+    )
+    assert adapter.recover_read_transport() is True
+    assert provider.initializes[0][0] == ("C:/Fixed/terminal64.exe",)
+    assert provider.shutdowns == 1
+    provider.code = -6
+    assert adapter.recover_read_transport() is False
+    assert provider.shutdowns == 1
 
 
 def test_worker_rpc_surface_is_explicit() -> None:

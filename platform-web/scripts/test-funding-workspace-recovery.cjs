@@ -1,371 +1,336 @@
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const Module = require('node:module');
-const path = require('node:path');
-const ts = require('typescript');
+const test = require('node:test');
+const vue = require('vue');
+const createLoader = require('./load-strategy-module.cjs');
 
-function createMemoryStorage() {
+global.window = new EventTarget();
+const fixtures = new Set();
+test.afterEach(() => {
+  for (const fixture of fixtures) fixture.stop();
+  fixtures.clear();
+});
+
+async function settle() {
+  for (let index = 0; index < 8; index++) {
+    await vue.nextTick();
+    await new Promise(setImmediate);
+  }
+}
+
+function setup({
+  draft = null,
+  failSubmit = false,
+  submitStatus = null,
+  lookupMissing = false,
+} = {}) {
   const values = new Map();
-  return {
-    getItem(key) {
-      return values.has(key) ? values.get(key) : null;
-    },
-    removeItem(key) {
-      values.delete(key);
-    },
-    setItem(key, value) {
-      values.set(key, value);
-    },
+  global.localStorage = {
+    getItem: (key) => values.get(key) ?? null,
+    setItem: (key, value) => values.set(key, value),
+    removeItem: (key) => values.delete(key),
   };
-}
-
-function ref(value) {
-  return { value };
-}
-
-function computed(getter) {
-  return {
-    get value() {
-      return getter();
+  const visibility = vue.ref('visible');
+  const mounted = [],
+    unmounted = [],
+    submissions = [],
+    reads = [];
+  let state = 'executing';
+  let contextError = false;
+  const user = vue.reactive({ authentication: { user: { userId: 'ceo-one', role: 'ceo' } } });
+  const context = {
+    accountId: 'bybit-test',
+    venue: 'test',
+    perpetualSymbol: 'BTCUSDT',
+    spotSymbol: 'BTCUSDT',
+    symbolOptions: [],
+    spotQuote: { mid: '80000' },
+    perpetualQuote: { mid: '79990' },
+    suggestedQuantity: '0.00128',
+    openSizing: {
+      spotQuantity: '0.00128',
+      expectedSpotNetQuantity: '0.00127872',
+      perpetualQuantity: '0.001',
+      roundingResidualQuantity: '0.00027872',
+      spotBaseFeeRate: '0.001',
+      valid: true,
+      reason: null,
     },
+    quantityStep: { spot: '0.000001', perpetual: '0.001' },
+    minimumQuantity: { spot: '0.000001', perpetual: '0.001' },
+    tickSize: { spot: '0.01', perpetual: '0.01' },
+    requestedNotional: '100',
+    controlledLiveReadiness: { ready: true },
+    dataQualityState: 'complete',
   };
-}
-
-function watch(_sources, callback) {
-  callback();
-}
-
-function createFakeTimers() {
-  let now = 0;
-  let nextId = 1;
-  const queue = [];
-
-  function setTimeoutStub(fn, delay = 0) {
-    const id = nextId++;
-    queue.push({ id, at: now + delay, fn });
-    queue.sort((left, right) => left.at - right.at || left.id - right.id);
-    return id;
-  }
-
-  function clearTimeoutStub(id) {
-    const index = queue.findIndex((item) => item.id === id);
-    if (index >= 0) queue.splice(index, 1);
-  }
-
-  async function advance(ms) {
-    now += ms;
-    while (queue.length && queue[0].at <= now) {
-      const item = queue.shift();
-      await item.fn();
-    }
-  }
-
-  return { setTimeoutStub, clearTimeoutStub, advance };
-}
-
-function createEventTarget(initialVisibility = 'visible') {
-  const listeners = new Map();
-  return {
-    visibilityState: initialVisibility,
-    addEventListener(type, handler) {
-      if (!listeners.has(type)) listeners.set(type, new Set());
-      listeners.get(type).add(handler);
-    },
-    removeEventListener(type, handler) {
-      listeners.get(type)?.delete(handler);
-    },
-    dispatch(type) {
-      for (const handler of listeners.get(type) || []) {
-        handler();
-      }
-    },
-    listenerCount(type) {
-      return (listeners.get(type) || new Set()).size;
-    },
+  const group = {
+    instructionId: 'open-one',
+    perpetualSymbol: 'BTCUSDT',
+    spotSymbol: 'BTCUSDT',
+    remainingClosableQuantity: '0.013',
+    lifecycleState: 'active',
   };
-}
-
-function loadTsModule(modulePath, stubs) {
-  const source = fs.readFileSync(modulePath, 'utf8');
-  const compiled = ts.transpileModule(source, {
-    compilerOptions: {
-      module: ts.ModuleKind.CommonJS,
-      target: ts.ScriptTarget.ES2020,
-      esModuleInterop: true,
+  const response = () => ({
+    instruction: { instructionId: 'instruction-one' },
+    executionBatch: null,
+    workspaceState: { executionState: state },
+  });
+  const load = createLoader({
+    vue: {
+      ...vue,
+      onMounted: (fn) => mounted.push(fn),
+      onBeforeUnmount: (fn) => unmounted.push(fn),
     },
-    fileName: modulePath,
-  }).outputText;
-  const loaded = new Module(modulePath, module);
-  loaded.filename = modulePath;
-  loaded.paths = Module._nodeModulePaths(path.dirname(modulePath));
-  const originalRequire = loaded.require.bind(loaded);
-  loaded.require = (request) => {
-    if (request in stubs) return stubs[request];
-    return originalRequire(request);
-  };
-  loaded._compile(compiled, modulePath);
-  return loaded.exports;
-}
-
-async function flushMicrotasks() {
-  await Promise.resolve();
-  await Promise.resolve();
-}
-
-async function main() {
-  const root = path.resolve(__dirname, '..');
-  const recoveryPath = path.join(
-    root,
-    'src/views/strategy/funding-carry/composables/fundingExecutionRecovery.ts',
-  );
-  const composablePath = path.join(
-    root,
+    '@vueuse/core': { useDocumentVisibility: () => visibility, refDebounced: (value) => value },
+    'ant-design-vue': { Modal: { confirm: (options) => options.onOk() } },
+    '@/store/modules/user': { useUserStore: () => user },
+    '@/api/platform/fundingWorkspace': {
+      getFundingExecutionContext: async () => {
+        if (contextError) throw new Error('quote timeout');
+        return context;
+      },
+      getFundingPositionGroups: async () => [
+        {
+          ...group,
+          status: state,
+          cumulativePerpetualFill: state === 'manual_intervention' ? '0.001' : '0',
+          residualQuantity: state === 'manual_intervention' ? '0.001' : '0',
+        },
+      ],
+      submitFundingInstruction: async (input) => {
+        submissions.push(input);
+        if (failSubmit)
+          throw Object.assign(new Error('submit rejected'), {
+            response: submitStatus ? { status: submitStatus } : undefined,
+          });
+        return response();
+      },
+      getFundingInstructionWorkspace: async (id) => {
+        reads.push(['id', id]);
+        return response();
+      },
+      getFundingInstructionWorkspaceByIdempotency: async (id) => {
+        reads.push(['key', id]);
+        if (lookupMissing)
+          throw Object.assign(new Error('not found'), { response: { status: 404 } });
+        return response();
+      },
+    },
+  });
+  const queries = load('src/api/platform/strategyQueries.ts');
+  queries.strategyQueryClient.setDefaultOptions({
+    ...queries.strategyQueryClient.getDefaultOptions(),
+    queries: { ...queries.strategyQueryClient.getDefaultOptions().queries, gcTime: Infinity },
+  });
+  queries.setStrategyQuerySession('ceo-one', 'session-one');
+  const recovery = load('src/views/strategy/funding-carry/composables/fundingExecutionRecovery.ts');
+  if (draft) recovery.writeFundingDraft(draft);
+  const { useFundingWorkspace } = load(
     'src/views/strategy/funding-carry/composables/useFundingWorkspace.ts',
   );
-  const pagePath = path.join(root, 'src/views/strategy/funding-carry/index.vue');
-
-  const pageSource = fs.readFileSync(pagePath, 'utf8');
-  assert.equal(pageSource.includes('@/data/sample/funding'), true);
-  assert.equal(pageSource.includes('fundingOrderPanel'), false);
-  assert.equal(pageSource.includes('useFundingWorkspace'), true);
-
-  const storage = createMemoryStorage();
-  const timers = createFakeTimers();
-  const documentStub = createEventTarget('visible');
-  const windowStub = createEventTarget();
-  const mountedHandlers = [];
-  const unmountedHandlers = [];
-
-  global.localStorage = storage;
-  global.setTimeout = timers.setTimeoutStub;
-  global.clearTimeout = timers.clearTimeoutStub;
-  global.document = documentStub;
-  global.window = windowStub;
-
-  const recovery = loadTsModule(recoveryPath, {});
-  const executionContextCalls = [];
-  const submitCalls = [];
-  const workspaceCalls = [];
-  const groups = [
-    {
-      instructionId: 'open-1',
-      openInstructionId: 'open-1',
-      perpetualSymbol: 'BTCUSDT',
-      spotSymbol: 'BTCUSDT',
-      hedgedQuantity: '0.020',
-      authoritativeClosedQuantity: '0.005',
-      pendingCloseQuantity: '0.002',
-      resultUnknownReservedQuantity: '0',
-      remainingClosableQuantity: '0.013',
-      lifecycleState: 'active',
-      status: 'reconciling',
-      workspaceState: { executionState: 'reconciling' },
+  const scope = vue.effectScope();
+  const workspace = scope.run(useFundingWorkspace);
+  mounted.forEach((fn) => fn());
+  const fixture = {
+    workspace,
+    recovery,
+    queries,
+    visibility,
+    user,
+    submissions,
+    reads,
+    context,
+    setState: (next) => {
+      state = next;
     },
-    {
-      instructionId: 'open-history-1',
-      openInstructionId: 'open-history-1',
-      perpetualSymbol: 'ETHUSDT',
-      spotSymbol: 'ETHUSDT',
-      hedgedQuantity: '1.000',
-      authoritativeClosedQuantity: '1.000',
-      pendingCloseQuantity: '0',
-      resultUnknownReservedQuantity: '0',
-      remainingClosableQuantity: '0',
-      lifecycleState: 'history',
-      status: 'completed',
-      workspaceState: { executionState: 'completed' },
+    failContext: () => {
+      contextError = true;
     },
-  ];
-  const workspaceByInstruction = new Map([
-    [
-      'instruction-open-1',
-      [
-        {
-          instruction: { instructionId: 'instruction-open-1' },
-          workspaceState: { executionState: 'executing' },
-        },
-        {
-          instruction: { instructionId: 'instruction-open-1' },
-          workspaceState: { executionState: 'reconciling' },
-        },
-        {
-          instruction: { instructionId: 'instruction-open-1' },
-          workspaceState: { executionState: 'completed' },
-        },
-      ],
-    ],
-    [
-      'instruction-close-1',
-      [
-        {
-          instruction: { instructionId: 'instruction-close-1' },
-          workspaceState: { executionState: 'result_unknown' },
-        },
-      ],
-    ],
-  ]);
-
-  const apiStub = {
-    async getFundingExecutionContext(params) {
-      executionContextCalls.push(params);
-      return {
-        accountId: 'bybit-live-main',
-        venue: 'CRYPTO_TEST',
-        spotSymbol: 'BTCUSDT',
-        perpetualSymbol: 'BTCUSDT',
-        symbolOptions: [
-          {
-            baseAsset: 'BTC',
-            quoteCurrency: 'USDT',
-            perpetualSymbol: 'BTCUSDT',
-            spotSymbol: 'BTCUSDT',
-            perpetualInstrumentId: 'instrument_btc_perp',
-            spotInstrumentId: 'instrument_btc_spot',
-          },
-        ],
-        spotQuote: { mid: '80000' },
-        perpetualQuote: { mid: '79990' },
-        suggestedQuantity: '0.001',
-        requestedNotional: params?.notional ?? '100',
-        activeReservation: {
-          currency: 'USDT',
-          activeReserved: '0',
-          fundingReserved: '0',
-          crossReserved: '0',
-          fundingAvailable: '1000',
-        },
-        sharedResourceClaims: [],
-        controlledLiveReadiness: { ready: true },
-        runtime: { liveWriteEnabled: false },
-        dataQualityState: 'complete',
-        asOf: '2026-08-25T00:00:00Z',
-      };
-    },
-    async getFundingPositionGroups(scope) {
-      assert.equal(scope, 'all');
-      return groups;
-    },
-    async submitFundingInstruction(payload) {
-      submitCalls.push(payload);
-      if (payload.action === 'open') {
-        return {
-          instruction: { instructionId: 'instruction-open-1' },
-          workspaceState: { executionState: 'executing' },
-        };
-      }
-      return {
-        instruction: { instructionId: 'instruction-close-1' },
-        workspaceState: { executionState: 'result_unknown' },
-      };
-    },
-    async getFundingInstructionWorkspace(instructionId) {
-      workspaceCalls.push(['instruction', instructionId]);
-      const queue = workspaceByInstruction.get(instructionId) || [];
-      return (
-        queue.shift() || {
-          instruction: { instructionId },
-          workspaceState: { executionState: 'completed' },
-        }
-      );
-    },
-    async getFundingInstructionWorkspaceByIdempotency(idempotencyKey) {
-      workspaceCalls.push(['idempotency', idempotencyKey]);
-      return {
-        instruction: { instructionId: 'instruction-open-1' },
-        workspaceState: { executionState: 'executing' },
-      };
+    stop: () => {
+      unmounted.forEach((fn) => fn());
+      scope.stop();
+      queries.strategyQueryClient.clear();
     },
   };
-
-  const composable = loadTsModule(composablePath, {
-    vue: {
-      computed,
-      ref,
-      watch,
-      onMounted: (handler) => mountedHandlers.push(handler),
-      onBeforeUnmount: (handler) => unmountedHandlers.push(handler),
-    },
-    '@/api/platform/fundingWorkspace': apiStub,
-    './fundingExecutionRecovery': recovery,
-  });
-
-  const { useFundingWorkspace } = composable;
-  const { readFundingDraft, writeFundingDraft } = recovery;
-
-  writeFundingDraft(
-    {
-      idempotencyKey: 'funding:recover-open-1',
-      action: 'open',
-      perpetualSymbol: 'BTCUSDT',
-      spotSymbol: 'BTCUSDT',
-      quantity: '0.001',
-      state: 'executing',
-    },
-    storage,
-  );
-
-  const workspace = useFundingWorkspace();
-  for (const handler of mountedHandlers) {
-    handler();
-  }
-  await flushMicrotasks();
-  if (!workspaceCalls.length) {
-    await workspace.refreshAll();
-  }
-
-  assert.equal(workspace.quantityInput.value, '0.001');
-  assert.equal(workspace.selectedCloseInstructionId.value, 'open-1');
-  assert.equal(workspaceCalls[0][0], 'idempotency');
-  assert.equal(workspace.pendingDraft.value.instructionId, 'instruction-open-1');
-
-  await workspace.submit('open');
-  let draft = readFundingDraft(storage);
-  assert.equal(submitCalls[0].action, 'open');
-  assert.match(submitCalls[0].idempotencyKey, /^funding:/);
-  assert.equal(draft.instructionId, 'instruction-open-1');
-  assert.equal(draft.state, 'executing');
-
-  await timers.advance(1000);
-  await flushMicrotasks();
-  draft = readFundingDraft(storage);
-  assert.equal(draft.state, 'reconciling');
-
-  documentStub.visibilityState = 'hidden';
-  documentStub.dispatch('visibilitychange');
-  const callsWhileHidden = workspaceCalls.length;
-  await timers.advance(3000);
-  await flushMicrotasks();
-  assert.equal(workspaceCalls.length, callsWhileHidden);
-
-  documentStub.visibilityState = 'visible';
-  documentStub.dispatch('visibilitychange');
-  await flushMicrotasks();
-  assert.equal(readFundingDraft(storage), null);
-
-  workspace.selectCloseInstruction('open-1');
-  await workspace.submit('close');
-  draft = readFundingDraft(storage);
-  assert.equal(submitCalls[1].action, 'close');
-  assert.equal(submitCalls[1].targetOpenInstructionId, 'open-1');
-  assert.equal(submitCalls[1].quantity, '0.013');
-  assert.equal(draft.state, 'result_unknown');
-
-  windowStub.dispatch('online');
-  await flushMicrotasks();
-  assert.equal(workspace.pendingDraft.value.state, 'result_unknown');
-
-  assert.equal(documentStub.listenerCount('visibilitychange'), 1);
-  assert.equal(windowStub.listenerCount('online'), 1);
-  for (const handler of unmountedHandlers) {
-    handler();
-  }
-  assert.equal(documentStub.listenerCount('visibilitychange'), 0);
-  assert.equal(windowStub.listenerCount('online'), 0);
-
-  console.log('funding workspace recovery behavior passed');
+  fixtures.add(fixture);
+  return fixture;
 }
 
-main().catch((error) => {
-  console.error(error);
-  process.exitCode = 1;
+function pendingDraft() {
+  return {
+    idempotencyKey: 'original-intent',
+    ownerUserId: 'ceo-one',
+    action: 'open',
+    perpetualSymbol: 'BTCUSDT',
+    spotSymbol: 'BTCUSDT',
+    quantity: '0.001',
+    state: 'submitting',
+  };
+}
+
+test('reload recovers the original intent by read and never resubmits it', async () => {
+  const fixture = setup({ draft: pendingDraft() });
+  await settle();
+  assert.deepEqual(fixture.reads[0], ['key', 'original-intent']);
+  assert.equal(fixture.submissions.length, 0);
+  assert.equal(fixture.workspace.pendingDraft.value.instructionId, 'instruction-one');
+  assert.equal(fixture.workspace.canSubmit.value, false);
+  fixture.setState('completed');
+  await fixture.workspace.refreshInstruction();
+  await settle();
+  assert.equal(fixture.recovery.readFundingDraft(), null);
+  assert.equal(fixture.workspace.pendingDraft.value, null);
+});
+
+test('partial close keeps its target and Decimal quantity; unknown result stays pending', async () => {
+  const fixture = setup();
+  await settle();
+  fixture.workspace.selectCloseInstruction('open-one');
+  assert.equal(fixture.workspace.canClose.value, true);
+  fixture.setState('result_unknown');
+  await fixture.workspace.submit('close');
+  await settle();
+  assert.equal(fixture.submissions.length, 1);
+  assert.equal(fixture.submissions[0].targetOpenInstructionId, 'open-one');
+  assert.equal(fixture.submissions[0].quantity, '0.013');
+  assert.equal(fixture.workspace.pendingDraft.value.state, 'result_unknown');
+  await fixture.workspace.submit('close');
+  assert.equal(fixture.submissions.length, 1);
+  window.dispatchEvent(new Event('online'));
+  await settle();
+  assert.equal(fixture.submissions.length, 1);
+  assert.equal(fixture.workspace.pendingDraft.value.state, 'result_unknown');
+});
+
+test('a manual pause refreshes the filled leg and residual without releasing or replaying the draft', async () => {
+  const fixture = setup({ draft: pendingDraft() });
+  await settle();
+  assert.equal(fixture.workspace.positionGroups.value[0].cumulativePerpetualFill, '0');
+  fixture.setState('manual_intervention');
+  await fixture.workspace.refreshInstruction();
+  await settle();
+  assert.equal(fixture.workspace.positionGroups.value[0].status, 'manual_intervention');
+  assert.equal(fixture.workspace.positionGroups.value[0].cumulativePerpetualFill, '0.001');
+  assert.equal(fixture.workspace.positionGroups.value[0].residualQuantity, '0.001');
+  assert.equal(fixture.workspace.pendingDraft.value.state, 'manual_intervention');
+  assert.equal(fixture.workspace.canSubmit.value, false);
+  assert.equal(fixture.submissions.length, 0);
+});
+
+test('a timed-out submit retains one identity and recovers with GET only', async () => {
+  const fixture = setup({ failSubmit: true });
+  await settle();
+  await fixture.workspace.submit('open');
+  await settle();
+  assert.equal(fixture.submissions.length, 1);
+  const identity = fixture.submissions[0].idempotencyKey;
+  assert.equal(fixture.recovery.readFundingDraft().idempotencyKey, identity);
+  await fixture.workspace.refreshInstruction();
+  await settle();
+  assert.equal(fixture.submissions.length, 1);
+  assert.equal(fixture.workspace.pendingDraft.value.idempotencyKey, identity);
+});
+
+test('failed market refresh blocks trading and a new user cannot inherit the draft', async () => {
+  const fixture = setup();
+  await settle();
+  assert.equal(fixture.workspace.canSubmit.value, true);
+  fixture.failContext();
+  await fixture.workspace.refreshContext();
+  await settle();
+  assert.equal(fixture.workspace.canSubmit.value, false);
+  fixture.recovery.writeFundingDraft(pendingDraft());
+  fixture.user.authentication = { user: { userId: 'member-two', role: 'member' } };
+  fixture.queries.setStrategyQuerySession('member-two', 'session-two');
+  await settle();
+  assert.equal(fixture.workspace.pendingDraft.value, null);
+  assert.equal(fixture.workspace.activeInstruction.value, null);
+  assert.equal(fixture.workspace.canSubmit.value, false);
+});
+
+test('background polling stops while hidden and unmount releases its observers', async () => {
+  const fixture = setup({ draft: pendingDraft() });
+  await settle();
+  fixture.visibility.value = 'hidden';
+  await settle();
+  const count = fixture.reads.length;
+  await new Promise((resolve) => setTimeout(resolve, 3_100));
+  await settle();
+  assert.equal(fixture.reads.length, count);
+  fixture.visibility.value = 'visible';
+  await settle();
+  assert.ok(fixture.reads.length > count);
+  fixture.stop();
+  fixtures.delete(fixture);
+  assert.equal(fixture.queries.strategyQueryClient.getQueryCache().getAll().length, 0);
+});
+
+test('a persisted rejection clears the draft and never resubmits', async () => {
+  const fixture = setup({ draft: pendingDraft() });
+  fixture.setState('failed');
+  await settle();
+  await fixture.workspace.refreshInstruction();
+  await settle();
+  assert.equal(fixture.workspace.pendingDraft.value, null);
+  assert.equal(fixture.workspace.workspaceState.value, 'failed');
+  assert.equal(fixture.recovery.readFundingDraft(), null);
+  assert.equal(fixture.submissions.length, 0);
+});
+
+test('an explicit rejection only releases the draft after a read proves no instruction exists', async () => {
+  const fixture = setup({ failSubmit: true, submitStatus: 422, lookupMissing: true });
+  await settle();
+  await fixture.workspace.submit('open');
+  await settle();
+  assert.equal(fixture.submissions.length, 1);
+  assert.ok(fixture.reads.length > 0);
+  assert.equal(fixture.workspace.pendingDraft.value, null);
+});
+
+test('FOK carries the user price while malformed prices and quantities cannot submit', async () => {
+  const fixture = setup();
+  await settle();
+  fixture.workspace.executionPolicy.value = 'fok';
+  assert.equal(fixture.workspace.canSubmit.value, false);
+  fixture.workspace.perpetualLimitPriceInput.value = '80000.001';
+  assert.equal(fixture.workspace.canSubmit.value, false);
+  fixture.workspace.perpetualLimitPriceInput.value = '80000.01';
+  assert.equal(fixture.workspace.canSubmit.value, true);
+  await fixture.workspace.submit('open');
+  assert.equal(fixture.submissions[0].executionPolicy, 'fok');
+  assert.equal(fixture.submissions[0].perpetualLimitPrice, '80000.01');
+});
+
+test('partial close shortcuts round down to the venue step and retain the selected group', async () => {
+  const fixture = setup();
+  await settle();
+  fixture.workspace.selectCloseInstruction('open-one');
+  fixture.workspace.selectCloseFraction(25);
+  assert.equal(fixture.workspace.closeQuantityInput.value, '0.003');
+  fixture.workspace.selectCloseFraction(100);
+  assert.equal(fixture.workspace.closeQuantityInput.value, '0.013');
+  assert.equal(fixture.workspace.selectedCloseInstructionId.value, 'open-one');
+  fixture.workspace.closeQuantityInput.value = '0.0135';
+  assert.equal(fixture.workspace.canClose.value, false);
+});
+
+test('open freezes gross spot and fee-adjusted perpetual quantities separately', async () => {
+  const fixture = setup();
+  await settle();
+  assert.equal(fixture.workspace.quantityInput.value, '0.00128');
+  assert.equal(fixture.workspace.canSubmit.value, true);
+  await fixture.workspace.submit('open');
+  assert.equal(fixture.submissions[0].quantity, '0.00128');
+  assert.equal(fixture.submissions[0].expectedPerpetualQuantity, '0.001');
+  assert.equal(fixture.recovery.readFundingDraft().expectedPerpetualQuantity, '0.001');
+});
+
+test('editing quantity invalidates the old sizing until the matching preview returns', async () => {
+  const fixture = setup();
+  await settle();
+  fixture.workspace.quantityInput.value = '0.001';
+  assert.equal(fixture.workspace.canSubmit.value, false);
+  await settle();
+  assert.equal(fixture.workspace.canSubmit.value, false);
+  await fixture.workspace.submit('open');
+  assert.equal(fixture.submissions.length, 0);
 });

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from decimal import Decimal, localcontext
+from decimal import ROUND_FLOOR, Decimal, localcontext
 
 from app.strategies.domain import (
     ExecutionPlan,
@@ -11,12 +11,37 @@ from app.strategies.domain import (
     StrategyInstructionAction,
 )
 
+SPOT_BASE_FEE_RATE = Decimal("0.001")
+
+
+def funding_open_quantities(
+    spot_quantity: Decimal, *, fee_rate: Decimal, perpetual_step: Decimal
+) -> tuple[Decimal, Decimal, Decimal]:
+    """Hedge the acquired coin inventory; quote-currency fees do not change delta."""
+    if (
+        not all(value.is_finite() for value in (spot_quantity, fee_rate, perpetual_step))
+        or spot_quantity <= 0
+        or perpetual_step <= 0
+        or not 0 <= fee_rate < 1
+    ):
+        raise ValueError("Invalid Funding sizing inputs")
+    with localcontext() as context:
+        context.prec = 50
+        net_spot = spot_quantity * (1 - fee_rate)
+        perpetual_quantity = (net_spot / perpetual_step).to_integral_value(
+            rounding=ROUND_FLOOR
+        ) * perpetual_step
+        return net_spot, perpetual_quantity, net_spot - perpetual_quantity
+
 
 def build_funding_carry_plan(
     *, action: str, parameters: dict[str, object], created_at: datetime
 ) -> ExecutionPlan:
-    if parameters.get("executionPolicy") not in (None, "post_only_chase"):
-        raise ValueError("Funding perpetual execution policy must be post_only_chase")
+    policy = ExecutionPolicy(str(parameters.get("executionPolicy") or "post_only_chase"))
+    raw_price = parameters.get("perpetualLimitPrice")
+    limit_price = Decimal(str(raw_price)) if raw_price is not None else None
+    if (policy == ExecutionPolicy.FOK) != (limit_price is not None):
+        raise ValueError("Only FOK execution requires a perpetual limit price")
     perpetual_quantity = Decimal(str(parameters["perpetualQuantity"]))
     spot_quantity = Decimal(str(parameters["spotQuantity"]))
     if perpetual_quantity <= 0 or spot_quantity <= 0:
@@ -48,14 +73,18 @@ def build_funding_carry_plan(
                 side=perpetual_side,
                 maximum_quantity=perpetual_quantity,
                 sequence=1,
-                execution_policy=ExecutionPolicy.POST_ONLY_CHASE,
+                execution_policy=policy,
+                limit_price=limit_price,
+                reduce_only=action == "close",
                 quantity_step=perp_step,
                 price_tick=Decimal(str(parameters.get("perpetualPriceTick", "0.01"))),
                 contract_multiplier=Decimal(
                     str(parameters.get("perpetualContractMultiplier", "1"))
                 ),
-                minimum_quantity=perp_step,
-                max_mutations=5,
+                minimum_quantity=Decimal(
+                    str(parameters.get("perpetualMinimumQuantity", perp_step))
+                ),
+                max_mutations=5 if policy == ExecutionPolicy.POST_ONLY_CHASE else 0,
             ),
             ExecutionPlanLeg(
                 role="spot_leg",
@@ -77,7 +106,7 @@ def build_funding_carry_plan(
                 quantity_step=spot_step,
                 price_tick=Decimal(str(parameters.get("spotPriceTick", "0.01"))),
                 contract_multiplier=Decimal(str(parameters.get("spotContractMultiplier", "1"))),
-                minimum_quantity=spot_step,
+                minimum_quantity=Decimal(str(parameters.get("spotMinimumQuantity", spot_step))),
             ),
         ),
     )

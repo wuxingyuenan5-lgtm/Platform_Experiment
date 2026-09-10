@@ -62,8 +62,37 @@
       </template>
 
       <template v-else>
+        <p v-if="fundingGroupsError && activeDesk === 'funding'" role="alert">{{
+          fundingGroupsError
+        }}</p>
+        <section v-if="visibleAbnormalOrders.length" class="strategy-abnormal-card">
+          <h3>{{ activeDesk === 'funding' ? '资费' : '跨所价差' }}异常订单</h3>
+          <article v-for="row in visibleAbnormalOrders" :key="row.id">
+            <strong>{{ row.label }}</strong
+            ><p>{{ row.detail }}</p>
+          </article>
+          <router-link
+            :to="{ path: '/strategy/platform', query: { desk: activeDesk, section: 'execution' } }"
+            >前往处理异常平仓</router-link
+          >
+        </section>
         <section class="records-only-grid">
           <StrategyRecordsPanel
+            :key="activeDesk"
+            :loading="
+              activeDesk === 'crossSpread'
+                ? crossRecordsLoading
+                : isAccountStrategy(activeDesk)
+                ? accountRecordsLoading[activeDesk]
+                : false
+            "
+            :error="
+              activeDesk === 'crossSpread'
+                ? crossRecordsError
+                : isAccountStrategy(activeDesk)
+                ? accountRecordsErrors[activeDesk]
+                : undefined
+            "
             :tabs="orderProfile.tabs"
             :tables="orderProfile.tables"
             v-model:activeTab="activeRecordTab"
@@ -75,8 +104,12 @@
 </template>
 
 <script setup lang="ts">
-  import { computed, onMounted, ref, watch } from 'vue';
+  import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
   import { useRoute, useRouter } from 'vue-router';
+  import {
+    getFundingPositionGroups,
+    type FundingPositionGroup,
+  } from '@/api/platform/fundingWorkspace';
   import type { StrategyManagementOverviewResult } from '@/api/platform/trading.types';
   import CompactSegmentTabs from '../shared/CompactSegmentTabs.vue';
   import { useCrossSpreadFinance } from './composables/useCrossSpreadFinance';
@@ -106,9 +139,7 @@
 
   const route = useRoute();
   const router = useRouter();
-  const activeDesk = ref<StrategyDeskKey>('funding');
   const activeRecordTab = ref('positions');
-  const activeSection = ref<'pnl' | 'capital' | 'orders'>('pnl');
 
   const sectionTabs = [
     { key: 'pnl', label: '策略损益' },
@@ -117,6 +148,9 @@
   ];
 
   const {
+    loading: crossRecordsLoading,
+    error: crossRecordsError,
+    abnormalOrders: crossAbnormalOrders,
     tabs: liveCrossSpreadTabs,
     tables: liveCrossSpreadTables,
     refresh: refreshCrossSpreadRecords,
@@ -131,13 +165,30 @@
     byDesk: strategyOverviewByDesk,
     empty: overviewEmpty,
     error: overviewError,
-    hasData: overviewHasData,
     items: strategyOverview,
     loading: overviewLoading,
     refresh: refreshStrategyOverview,
   } = useStrategyManagementOverview();
 
+  const activeDesk = computed<StrategyDeskKey>({
+    get: () => {
+      const desk = resolveManagementDesk(route.query.desk, strategyOverview.value);
+      return isDeskKey(desk) ? desk : 'funding';
+    },
+    set: (desk) => {
+      void router.replace({ query: { ...route.query, desk, section: activeSection.value } });
+    },
+  });
+  const activeSection = computed<'pnl' | 'capital' | 'orders'>({
+    get: () => normalizeManagementSection(route.query.section),
+    set: (section) => {
+      void router.replace({ query: { ...route.query, desk: activeDesk.value, section } });
+    },
+  });
+
   const {
+    loading: accountRecordsLoading,
+    errors: accountRecordsErrors,
     capitalProfiles: accountCapitalProfiles,
     isAccountStrategy,
     orderProfiles: accountOrderProfiles,
@@ -358,11 +409,13 @@
       label: `${overview?.strategyName || desk}订单信息`,
       tabs: [
         { key: 'positions', label: '当前持仓' },
-        { key: 'fills', label: '成交记录' },
-        { key: 'orders', label: '历史订单' },
+        { key: 'activity', label: '开平记录' },
+        { key: 'fills', label: '逐笔成交' },
+        { key: 'orders', label: '委托明细' },
       ],
       tables: {
         positions: emptyTable(note),
+        activity: emptyTable(note),
         orders: emptyTable(note),
         fills: emptyTable(note),
       },
@@ -384,12 +437,74 @@
     return placeholderPnlProfile(activeOverview.value, activeDesk.value);
   });
 
+  const fundingGroups = ref<FundingPositionGroup[]>([]);
+  const fundingGroupsError = ref('');
+  async function refreshFundingGroups() {
+    try {
+      fundingGroups.value = await getFundingPositionGroups('active');
+      fundingGroupsError.value = '';
+    } catch {
+      fundingGroupsError.value = '资费组合状态暂不可用，请刷新核对。';
+    }
+  }
+  const visibleAbnormalOrders = computed(() => {
+    if (activeDesk.value === 'crossSpread')
+      return crossAbnormalOrders.value.map((row) => ({
+        id: row.batchId,
+        label: row.label,
+        detail: `Bybit 剩余 ${row.bybitRemainingQuantity ?? '待核对'} XAUT；MT5 剩余 ${
+          row.mt5RemainingQuantity ?? '待核对'
+        } 手。${row.reason || ''}`,
+      }));
+    if (activeDesk.value === 'funding')
+      return fundingGroups.value
+        .filter((row) => row.isAbnormal)
+        .map((row) => ({
+          id: row.instructionId,
+          label: `${row.perpetualSymbol} · ${row.instructionId}`,
+          detail: row.abnormalReason || '请核对两腿成交',
+        }));
+    return [];
+  });
+
   const orderProfile = computed(() => {
     if (activeDesk.value === 'crossSpread') {
       return {
         label: `${activeOverview.value?.strategyName || '跨所价差'}订单信息`,
+        abnormalOrders: crossAbnormalOrders,
         tabs: liveCrossSpreadTabs,
         tables: liveCrossSpreadTables.value,
+      };
+    }
+    if (activeDesk.value === 'funding') {
+      const profile = accountOrderProfiles.value.funding;
+      return {
+        ...profile,
+        tables: {
+          ...profile.tables,
+          positions: {
+            columns: [
+              { key: 'instructionId', label: '组合' },
+              { key: 'symbol', label: '标的' },
+              { key: 'perpetualQuantity', label: '永续空仓（剩余）' },
+              { key: 'spotQuantity', label: '现货持有（扣费后剩余）' },
+              { key: 'spotFill', label: '现货累计成交' },
+              { key: 'spotFee', label: '现货扣币手续费' },
+              { key: 'status', label: '状态' },
+            ],
+            rows: fundingGroups.value
+              .filter((row) => !row.isAbnormal && row.lifecycleState === 'active')
+              .map((row) => ({
+                instructionId: row.instructionId,
+                symbol: row.perpetualSymbol,
+                perpetualQuantity: row.remainingPerpetualQuantity,
+                spotQuantity: row.remainingSpotHolding ?? '--',
+                spotFill: row.cumulativeSpotFill,
+                spotFee: row.spotFeeResidualQuantity ?? '--',
+                status: row.status === 'completed' ? '双腿已成交' : row.status,
+              })),
+          },
+        },
       };
     }
     if (isAccountStrategy(activeDesk.value)) {
@@ -405,43 +520,27 @@
       : placeholderCapitalProfile(activeOverview.value, activeDesk.value);
   });
 
+  let monitorTimer: ReturnType<typeof setInterval> | null = null;
+  function refreshVisibleAccount() {
+    if (document.visibilityState !== 'visible') return;
+    void refreshStrategyOverview();
+    if (activeDesk.value === 'crossSpread') {
+      void refreshCrossSpreadFinance(activeSection.value === 'pnl' ? 'pnl' : 'capital');
+      if (activeSection.value === 'orders') void refreshCrossSpreadRecords();
+    } else if (isAccountStrategy(activeDesk.value)) {
+      void refreshAccountSnapshots(activeDesk.value);
+      if (activeDesk.value === 'funding') void refreshFundingGroups();
+    }
+  }
   onMounted(() => {
     void refreshManagementOverview();
+    monitorTimer = setInterval(refreshVisibleAccount, 30_000);
+    document.addEventListener('visibilitychange', refreshVisibleAccount);
   });
-
-  watch(
-    () => route.query.section,
-    (section) => {
-      activeSection.value = normalizeManagementSection(section);
-    },
-    { immediate: true },
-  );
-
-  watch(
-    () => [route.query.desk, strategyOverview.value] as const,
-    ([requestedDesk, items]) => {
-      const nextDesk = resolveManagementDesk(requestedDesk, items);
-      if (!isDeskKey(nextDesk)) return;
-      if (activeDesk.value !== nextDesk) activeDesk.value = nextDesk;
-    },
-    { immediate: true, deep: true },
-  );
-
-  watch(
-    () => [activeDesk.value, activeSection.value] as const,
-    ([desk, section]) => {
-      if (!overviewHasData.value) return;
-      if (!deskTabs.value.some((item) => item.key === desk)) return;
-      if (route.query.desk === desk && route.query.section === section) return;
-      void router.replace({
-        query: {
-          ...route.query,
-          desk,
-          section,
-        },
-      });
-    },
-  );
+  onBeforeUnmount(() => {
+    if (monitorTimer) clearInterval(monitorTimer);
+    document.removeEventListener('visibilitychange', refreshVisibleAccount);
+  });
 
   watch(
     () => [activeDesk.value, activeSection.value] as const,
@@ -460,6 +559,7 @@
       }
       if (isAccountStrategy(desk) && desk !== previousDesk) {
         void refreshAccountSnapshots(desk);
+        if (desk === 'funding') void refreshFundingGroups();
       }
     },
     { immediate: true },
@@ -513,6 +613,15 @@
     color: var(--strategy-text-2);
     font-size: 14px;
     font-weight: 600;
+  }
+
+  .strategy-abnormal-card {
+    padding: 20px;
+    margin-bottom: 16px;
+    border: 1px solid #e9bcb6;
+    border-radius: 14px;
+    background: #fffaf8;
+    overflow-wrap: anywhere;
   }
 
   .state-refresh-btn {

@@ -67,7 +67,7 @@ export class Persistent {
 
   static clearLocal(immediate = false): void {
     localMemory.clear();
-    immediate && ls.clear();
+    immediate && ls.remove(APP_LOCAL_CACHE_KEY);
   }
 
   static getSession<T>(key: SessionKeys) {
@@ -90,15 +90,15 @@ export class Persistent {
   }
   static clearSession(immediate = false): void {
     sessionMemory.clear();
-    immediate && ss.clear();
+    immediate && ss.remove(APP_SESSION_CACHE_KEY);
   }
 
   static clearAll(immediate = false) {
     sessionMemory.clear();
     localMemory.clear();
     if (immediate) {
-      ls.clear();
-      ss.clear();
+      ls.remove(APP_LOCAL_CACHE_KEY);
+      ss.remove(APP_SESSION_CACHE_KEY);
     }
   }
 }

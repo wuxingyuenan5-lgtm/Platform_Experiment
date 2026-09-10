@@ -668,5 +668,30 @@ def test_partial_close_retains_the_group_residual_quantity(tmp_path: Path) -> No
             Decimal("1"),
         )
 
-    assert residual.status == "active"
-    assert residual.quantity_oz == Decimal("1")
+        assert residual.status == "active"
+        assert residual.quantity_oz == Decimal("1")
+        assert residual.trigger_reason is None
+        assert residual.triggered_at is None
+        with connection() as db:
+            db.execute(
+                "INSERT INTO execution_batches "
+                "(id, idempotency_key, strategy_instance_id, account_id, strategy_key, "
+                "direction, status, requires_manual_intervention, created_at, updated_at) "
+                "SELECT 'remaining-tp-close', 'key:remaining-tp-close', "
+                "strategy_instance_id, account_id, strategy_key, direction, status, "
+                "requires_manual_intervention, created_at, updated_at "
+                "FROM execution_batches WHERE id='partial-close-1'"
+            )
+        triggered = claim_exit_plan(
+            plan.plan_id, trigger_reason="take_profit", trigger_spread=Decimal("5.1")
+        )
+        assert triggered is not None
+        mark_plan_closing(plan.plan_id, "remaining-tp-close")
+        closed = mark_plan_closed(plan.plan_id, "remaining-tp-close", Decimal("1"))
+
+    assert closed.status == "closed"
+    assert closed.quantity_oz == 0
+    assert closed.trigger_reason == "take_profit"
+    assert closed.trigger_spread == Decimal("5.1")
+    assert closed.triggered_at == triggered.triggered_at
+    assert closed.closed_at is not None

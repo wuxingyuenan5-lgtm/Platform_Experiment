@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import ssl
 from decimal import Decimal
 from typing import Any
 
@@ -69,7 +70,7 @@ def _provider() -> AShareResearchProvider:
 
 
 def test_a_share_spot_preserves_field_normalization() -> None:
-    result = asyncio.run(_provider().a_share_spot())
+    result = asyncio.run(_provider()._akshare_a_share_spot())
 
     assert len(result) == 1
     assert result[0].security_code == "000001"
@@ -91,6 +92,43 @@ def test_index_snapshots_preserve_partial_success(monkeypatch: pytest.MonkeyPatc
     result = asyncio.run(provider.index_snapshots())
 
     assert [item.code for item in result] == ["000001"]
+
+
+def test_tencent_hk_quote_uses_native_amount_and_hk_timestamp(monkeypatch):
+    values = [""] * 78
+    for index, value in {
+        1: "腾讯控股",
+        3: "438.400",
+        4: "442.800",
+        30: "2026/09/07 16:08:17",
+        37: "4591565063.448",
+        38: "0",
+        39: "16.03",
+        45: "39908.2542",
+        46: "TENCENT",
+    }.items():
+        values[index] = value
+
+    class QuoteResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_):
+            pass
+
+        def read(self):
+            return ('v_hk00700="' + "~".join(values) + '";').encode("gbk")
+
+    class Opener:
+        def open(self, *_args, **_kwargs):
+            return QuoteResponse()
+
+    monkeypatch.setattr(a_share, "build_opener", lambda *_: Opener())
+    quote = asyncio.run(_provider().tracked_stock_spot(["00700"]))[0]
+    assert quote.turnover_yuan == Decimal("4591565063.448")
+    assert quote.currency == "HKD"
+    assert quote.observed_at.isoformat() == "2026-09-07T16:08:17+08:00"
+    assert quote.turnover_pct is None and quote.pb is None
 
 
 def test_short_term_emotion_preserves_pool_mapping(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -131,7 +169,13 @@ def test_limit_pool_preserves_eastmoney_http_contract(
     result = asyncio.run(provider._limit_pool("getTopicZTPool", "20260731", "fbt:asc"))
 
     assert result == [{"c": "600000"}]
-    assert _Client.init_kwargs == {"timeout": 7.5, "trust_env": False}
+    assert _Client.init_kwargs == {
+        "timeout": 7.5,
+        "trust_env": False,
+        "verify": a_share._HTTP_SSL_CONTEXT,
+    }
+    assert a_share._HTTP_SSL_CONTEXT.verify_mode == ssl.CERT_REQUIRED
+    assert a_share._HTTP_SSL_CONTEXT.check_hostname is True
     assert _Client.request is not None
     assert _Client.request["url"] == "https://push2ex.eastmoney.com/getTopicZTPool"
     assert _Client.request["params"] == {

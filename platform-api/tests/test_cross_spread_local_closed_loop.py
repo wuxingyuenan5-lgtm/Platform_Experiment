@@ -21,6 +21,7 @@ import sys
 import time
 from decimal import Decimal
 from pathlib import Path
+from types import SimpleNamespace
 
 import httpx
 import pytest
@@ -48,56 +49,77 @@ def _free_port() -> int:
         return sock.getsockname()[1]
 
 
-@pytest.fixture(scope="module")
-def runtime_url(tmp_path_factory: pytest.TempPathFactory) -> str:
+@pytest.fixture
+def runtime_process(tmp_path):
     port = _free_port()
-    journal_dir = tmp_path_factory.mktemp("runtime-journal")
+    journal_dir = tmp_path / "runtime-journal"
+    journal_dir.mkdir()
     env = dict(os.environ)
     env["VG_RUNTIME_GATEWAY_NAME"] = "fake"
     env["VG_RUNTIME_JOURNAL_PATH"] = str(journal_dir / "runtime_journal.db")
     env["VG_RUNTIME_LIVE_WRITE_ENABLED"] = "false"
     log_file = journal_dir / "runtime.log"
-    with log_file.open("ab") as log_out:
-        proc = subprocess.Popen(
-            [
-                str(RUNTIME_PYTHON),
-                "-m",
-                "uvicorn",
-                "app.main:app",
-                "--host",
-                "127.0.0.1",
-                "--port",
-                str(port),
-                "--log-level",
-                "warning",
-            ],
-            cwd=str(RUNTIME_DIR),
-            env=env,
-            stdout=log_out,
-            stderr=subprocess.STDOUT,
-        )
-        base_url = f"http://127.0.0.1:{port}"
+    base_url = f"http://127.0.0.1:{port}"
+    process = None
+
+    def stop():
+        nonlocal process
+        if process is not None:
+            process.terminate()
+            try:
+                process.wait(timeout=10)
+            except subprocess.TimeoutExpired:
+                process.kill()
+                process.wait(timeout=10)
+            process = None
+
+    def start():
+        nonlocal process
+        with log_file.open("ab") as log_out:
+            process = subprocess.Popen(
+                [
+                    str(RUNTIME_PYTHON),
+                    "-m",
+                    "uvicorn",
+                    "app.main:app",
+                    "--host",
+                    "127.0.0.1",
+                    "--port",
+                    str(port),
+                    "--log-level",
+                    "warning",
+                ],
+                cwd=str(RUNTIME_DIR),
+                env=env,
+                stdout=log_out,
+                stderr=subprocess.STDOUT,
+            )
         deadline = time.monotonic() + 45
         while time.monotonic() < deadline:
-            if proc.poll() is not None:
+            if process.poll() is not None:
                 raise RuntimeError(
-                    f"runtime exited early rc={proc.returncode}; log={log_file}"
+                    f"runtime exited early rc={process.returncode}; log={log_file}"
                 )
             try:
-                with httpx.Client(timeout=1.0) as client:
-                    if client.get(f"{base_url}/status").status_code == 200:
-                        break
-            except Exception:
+                with httpx.Client(timeout=1.0, trust_env=False) as client:
+                    response = client.get(f"{base_url}/status")
+                    if response.status_code == 200:
+                        assert response.json()["capabilities"]["liveWriteEnabled"] is False
+                        return process.pid
+            except httpx.HTTPError:
                 time.sleep(0.3)
-        else:
-            proc.terminate()
-            raise RuntimeError("runtime did not become ready; log={log_file}")
-        yield base_url
-        proc.terminate()
-        try:
-            proc.wait(timeout=10)
-        except subprocess.TimeoutExpired:
-            proc.kill()
+        raise RuntimeError(f"runtime did not become ready; log={log_file}")
+
+    try:
+        initial_pid = start()
+        yield SimpleNamespace(url=base_url, stop=stop, start=start, initial_pid=initial_pid)
+    finally:
+        stop()
+
+
+@pytest.fixture
+def runtime_url(runtime_process):
+    return runtime_process.url
 
 
 def _venue_positions(runtime_url: str, account_id: str) -> list[dict]:
@@ -112,6 +134,8 @@ def _seed_cross_spread_environment(tmp_path: Path, database_name: str) -> None:
     settings.environment = "development"
     settings.auth_mode = "development"
     settings.development_roles = "admin"
+    settings.cross_spread_exit_monitor_enabled = False
+    settings.research_refresh_enabled = False
     settings.database_path = str(tmp_path / database_name)
     initialize_database()
     with connection() as db:
@@ -159,7 +183,9 @@ def _seed_cross_spread_environment(tmp_path: Path, database_name: str) -> None:
         )
 
 
-def test_cross_spread_gold_local_closed_loop(runtime_url: str, tmp_path: Path) -> None:
+def test_cross_spread_gold_local_closed_loop(
+    runtime_url: str, tmp_path: Path, authorize_funding_ceo
+) -> None:
     _seed_cross_spread_environment(tmp_path, "platform-closed-loop.db")
     settings = get_settings()
     settings.runtime_base_url = runtime_url
@@ -168,6 +194,7 @@ def test_cross_spread_gold_local_closed_loop(runtime_url: str, tmp_path: Path) -
 
     with TestClient(app) as client:
         _seed_cross_spread_environment(tmp_path, "platform-closed-loop.db")
+        authorize_funding_ceo(client)
         # --- OPEN_LONG: buy Bybit XAUTUSDT, sell MT5 XAUUSD.s ---
         opened = client.post(
             LIFECYCLE_OPEN_ENDPOINT,
@@ -221,9 +248,10 @@ def test_cross_spread_gold_local_closed_loop(runtime_url: str, tmp_path: Path) -
         ), mt5_after
 
 
-def test_cross_spread_local_closed_loop_blocks_second_open_while_plan_is_active(
+def test_cross_spread_local_closed_loop_allows_independent_completed_groups(
     runtime_url: str,
     tmp_path: Path,
+    authorize_funding_ceo,
 ) -> None:
     _seed_cross_spread_environment(tmp_path, "platform-closed-loop-idem.db")
     settings = get_settings()
@@ -234,6 +262,7 @@ def test_cross_spread_local_closed_loop_blocks_second_open_while_plan_is_active(
 
     with TestClient(app) as client:
         _seed_cross_spread_environment(tmp_path, "platform-closed-loop-idem.db")
+        authorize_funding_ceo(client)
         first = client.post(
             LIFECYCLE_OPEN_ENDPOINT,
             json={
@@ -259,18 +288,15 @@ def test_cross_spread_local_closed_loop_blocks_second_open_while_plan_is_active(
                 "idempotencyKey": "cross-local-open-active-2",
             },
         )
-        assert second.status_code == 409, second.text
-        assert second.json()["detail"] in {
-            "A non-closed cross-spread lifecycle already exists",
-            "A live Bybit gold position already exists",
-        }
-        assert first_batch_id
-
-        cleanup = client.post(
-            f"/api/v1/trading/cross-spread/exit-plans/{first.json()['exitPlan']['planId']}/close",
-            json={},
-        )
-        assert cleanup.status_code == 200, cleanup.text
+        assert second.status_code == 200, second.text
+        assert second.json()["executionBatch"]["batchId"] != first_batch_id
+        assert second.json()["exitPlan"]["planId"] != first.json()["exitPlan"]["planId"]
+        for opened in (first, second):
+            cleanup = client.post(
+                f"/api/v1/trading/cross-spread/exit-plans/{opened.json()['exitPlan']['planId']}/close",
+                json={},
+            )
+            assert cleanup.status_code == 200, cleanup.text
         assert all(
             Decimal(position["netQuantity"]) == 0
             for position in _venue_positions(runtime_url, BYBIT_ACCOUNT_ID)
@@ -284,6 +310,7 @@ def test_cross_spread_local_closed_loop_blocks_second_open_while_plan_is_active(
 def test_cross_spread_local_closed_loop_tracks_alternating_position_groups(
     runtime_url: str,
     tmp_path: Path,
+    authorize_funding_ceo,
 ) -> None:
     _seed_cross_spread_environment(tmp_path, "platform-closed-loop-multiple.db")
     settings = get_settings()
@@ -298,6 +325,7 @@ def test_cross_spread_local_closed_loop_tracks_alternating_position_groups(
     }
     with TestClient(app) as client:
         _seed_cross_spread_environment(tmp_path, "platform-closed-loop-multiple.db")
+        authorize_funding_ceo(client)
         first = client.post(
             LIFECYCLE_OPEN_ENDPOINT,
             json={
@@ -373,4 +401,104 @@ def test_cross_spread_local_closed_loop_tracks_alternating_position_groups(
         assert all(
             Decimal(position["netQuantity"]) == 0
             for position in _venue_positions(runtime_url, MT5_ACCOUNT_ID)
+        )
+
+
+@pytest.mark.parametrize("interruption", ["before_mt5_submit", "after_mt5_fill"])
+def test_runtime_and_api_restart_after_first_leg_never_repeat_orders(
+    runtime_process, tmp_path, monkeypatch, authorize_funding_ceo, interruption
+):
+    from app import runtime_transport
+
+    _seed_cross_spread_environment(tmp_path, "platform-interrupted.db")
+    settings = get_settings()
+    settings.runtime_base_url = runtime_process.url
+    settings.live_trading_enabled = True
+    original_post = runtime_transport.post
+    submissions = []
+
+    def interrupted_post(url, **kwargs):
+        assert url.startswith(runtime_process.url + "/")
+        if url.endswith("/commands/orders"):
+            command = kwargs["json"]
+            submissions.append(command)
+            if command["account_id"] == MT5_ACCOUNT_ID:
+                if interruption == "after_mt5_fill":
+                    response = original_post(url, **kwargs)
+                    assert response.status_code == 200, response.text
+                runtime_process.stop()
+                raise httpx.ReadTimeout("isolated Runtime stopped before response was delivered")
+        return original_post(url, **kwargs)
+
+    monkeypatch.setattr(runtime_transport, "post", interrupted_post)
+    payload = {
+        "direction": "LONG_SPREAD", "quantityOz": "1", "executionMode": "market",
+        "idempotencyKey": "interrupted-cross-open",
+    }
+    with TestClient(app) as client:
+        _seed_cross_spread_environment(tmp_path, "platform-interrupted.db")
+        authorize_funding_ceo(client)
+        opened = client.post(LIFECYCLE_OPEN_ENDPOINT, json=payload)
+        assert opened.status_code == 200, opened.text
+        batch = opened.json()["executionBatch"]
+        legs = {leg["role"]: leg for leg in batch["legs"]}
+        assert legs["bybit_leg"]["status"] == "filled"
+        assert legs["mt5_leg"]["status"] == "result_unknown"
+        unknown_order = legs["mt5_leg"]["orderId"]
+        unavailable = client.post(f"/api/v1/trading/orders/{unknown_order}/reconcile")
+        assert unavailable.status_code == 200, unavailable.text
+        assert unavailable.json()["status"] == "result_unknown"
+        cookies, headers = dict(client.cookies), dict(client.headers)
+    restarted_pid = runtime_process.start()
+    assert restarted_pid != runtime_process.initial_pid
+
+    with TestClient(app) as restarted:
+        _seed_cross_spread_environment(tmp_path, "platform-interrupted.db")
+        restarted.cookies.update(cookies)
+        restarted.headers.update(headers)
+        repeated = restarted.post(LIFECYCLE_OPEN_ENDPOINT, json=payload)
+        assert repeated.status_code == 409, repeated.text
+        original = restarted.get(f"/api/v1/trading/execution-batches/{batch['batchId']}")
+        assert original.status_code == 200, original.text
+        assert original.json()["batchId"] == batch["batchId"]
+        refused = restarted.post(
+            LIFECYCLE_OPEN_ENDPOINT, json={**payload, "idempotencyKey": "unsafe-new-intent"}
+        )
+        assert refused.status_code == 409, refused.text
+        for _ in range(2):
+            recovered = restarted.post(f"/api/v1/trading/orders/{unknown_order}/reconcile")
+            assert recovered.status_code == 200, recovered.text
+            assert recovered.json()["status"] == (
+                "filled" if interruption == "after_mt5_fill" else "result_unknown"
+            )
+        native = restarted.post(f"/api/v1/trading/orders/{unknown_order}/venue-reconcile")
+        assert native.status_code == 200, native.text
+        recovered_batch = restarted.get(
+            f"/api/v1/trading/execution-batches/{batch['batchId']}"
+        ).json()
+        if interruption == "after_mt5_fill":
+            assert native.json()["differenceIds"] == []
+            assert recovered_batch["status"] == "hedged"
+            repeated_native = restarted.post(
+                f"/api/v1/trading/orders/{unknown_order}/venue-reconcile"
+            )
+            assert repeated_native.status_code == 200, repeated_native.text
+            assert repeated_native.json()["differenceIds"] == []
+        else:
+            assert native.json()["differenceIds"]
+            assert recovered_batch["status"] == "manual_intervention"
+    assert len(submissions) == 2
+    assert [row["account_id"] for row in submissions] == [BYBIT_ACCOUNT_ID, MT5_ACCOUNT_ID]
+    with httpx.Client(base_url=runtime_process.url, trust_env=False) as runtime:
+        orders = runtime.get("/venue/orders").json()
+        fills = runtime.get("/venue/fills").json()
+        status = runtime.get("/status").json()
+    assert status["capabilities"]["liveWriteEnabled"] is False
+    assert len(orders) == len(fills) == (2 if interruption == "after_mt5_fill" else 1)
+    with connection() as db:
+        assert db.execute("SELECT COUNT(*) FROM orders").fetchone()[0] == 2
+        assert db.execute("SELECT COUNT(*) FROM trade_commands").fetchone()[0] == 2
+        assert db.execute("SELECT COUNT(*) FROM execution_batches").fetchone()[0] == 1
+        assert db.execute("SELECT COUNT(*) FROM fills").fetchone()[0] == (
+            2 if interruption == "after_mt5_fill" else 1
         )

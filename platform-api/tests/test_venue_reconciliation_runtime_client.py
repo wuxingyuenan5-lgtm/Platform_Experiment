@@ -19,11 +19,12 @@ def test_runtime_get_uses_configured_url_params_and_timeout(monkeypatch) -> None
         *,
         params: dict[str, str] | None = None,
         timeout: float | None = None,
+        **kwargs,
     ) -> httpx.Response:
         captured.update(url=url, params=params, timeout=timeout)
         return expected
 
-    monkeypatch.setattr(runtime_client.httpx, "get", fake_get)
+    monkeypatch.setattr(runtime_client.runtime_transport, "get", fake_get)
 
     result = runtime_client.get("/venue/positions", params={"accountId": "account-1"})
 
@@ -39,7 +40,7 @@ def test_runtime_get_wraps_http_transport_errors(monkeypatch) -> None:
     def fail(*args, **kwargs):
         raise httpx.ConnectError("runtime unavailable")
 
-    monkeypatch.setattr(runtime_client.httpx, "get", fail)
+    monkeypatch.setattr(runtime_client.runtime_transport, "get", fail)
 
     with pytest.raises(runtime_client.RuntimeQueryError) as exc_info:
         runtime_client.get("/venue/balances")

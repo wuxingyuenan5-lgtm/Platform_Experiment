@@ -2,7 +2,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Literal
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.execution_schemas import (
     BatchLegRequest as BatchLegRequest,
@@ -36,6 +36,14 @@ from app.execution_schemas import (
 )
 from app.execution_schemas import (
     StrategyV1ReadinessResponse as StrategyV1ReadinessResponse,
+)
+from app.financial_read_schemas import (
+    AssetBreakdownResponse,
+    CoinBalanceResponse,
+    EconomicEventResponse,
+    FinancialAmountsResponse,
+    FinancialCoverageResponse,
+    FinancialTimelinePointResponse,
 )
 
 
@@ -79,9 +87,7 @@ class ExchangeConnectivityResponse(BaseModel):
     status: str
     gateway: str | None = None
     credential_count: int = Field(default=0, alias="credentialCount")
-    configured_credential_count: int = Field(
-        default=0, alias="configuredCredentialCount"
-    )
+    configured_credential_count: int = Field(default=0, alias="configuredCredentialCount")
     credentials: list[ExchangeCredentialInspectionResponse] = []
 
 
@@ -115,6 +121,9 @@ class VenuePositionResponse(BaseModel):
     average_price: Decimal | None = Field(default=None, alias="averagePrice")
     unrealized_pnl: Decimal | None = Field(default=None, alias="unrealizedPnl")
     external_id: str | None = Field(default=None, alias="externalId")
+    account_id: str | None = Field(default=None, alias="accountId")
+    currency: str | None = None
+    as_of: datetime | None = Field(default=None, alias="asOf")
 
 
 class CrossSpreadVenueSnapshotResponse(BaseModel):
@@ -124,6 +133,8 @@ class CrossSpreadVenueSnapshotResponse(BaseModel):
     quote: MarketQuoteResponse | None = None
     positions: list[VenuePositionResponse] = []
     reason: str | None = None
+    fetch_latency_ms: float | None = Field(default=None, alias="fetchLatencyMs")
+    as_of: datetime | None = Field(default=None, alias="asOf")
 
 
 class CrossSpreadMetricsResponse(BaseModel):
@@ -133,6 +144,62 @@ class CrossSpreadMetricsResponse(BaseModel):
     seller_inventory_fee: Decimal | None = Field(default=None, alias="sellerInventoryFee")
 
 
+class CrossSpreadPositionPnlResponse(BaseModel):
+    model_config = ConfigDict(allow_inf_nan=False, json_schema_serialization_defaults_required=True)
+
+    planId: str
+    planUpdatedAt: datetime
+    quantityOz: Decimal
+    direction: str = ""
+    bybitQuantity: Decimal | None = None
+    mt5Quantity: Decimal | None = None
+    mt5PositionId: str | None = None
+    bybitEntryPrice: Decimal | None = None
+    mt5EntryPrice: Decimal | None = None
+    bybitPnlUsdt: Decimal | None = None
+    mt5PnlUsdt: Decimal | None = None
+    totalPnlUsdt: Decimal | None = None
+    openTime: datetime
+    dataQualityState: Literal["complete", "partial", "unavailable"]
+    reason: str | None = None
+
+
+class CrossSpreadUnattributedPositionResponse(VenuePositionResponse):
+    venue: Literal["bybit", "mt5"]
+
+
+class CrossSpreadAbnormalOrderResponse(BaseModel):
+    batchId: str
+    planId: str | None = None
+    label: str
+    direction: str
+    bybitRemainingQuantity: Decimal | None = None
+    mt5RemainingQuantity: Decimal | None = None
+    bybitCloseFilledQuantity: Decimal = Decimal("0")
+    mt5CloseFilledQuantity: Decimal = Decimal("0")
+    mt5PositionId: str | None = None
+    closeQuantityOz: Decimal | None = None
+    mt5PendingCloseQuantity: Decimal | None = None
+    recoveryIdempotencyKey: str | None = None
+    action: Literal["finish_mt5", "close_group", "flatten_open", "reconcile"] = "reconcile"
+    reason: str | None = None
+
+
+class CrossSpreadPositionOverviewResponse(BaseModel):
+    model_config = ConfigDict(allow_inf_nan=False, json_schema_serialization_defaults_required=True)
+
+    groups: list[CrossSpreadPositionPnlResponse] = Field(default_factory=list)
+    abnormalOrders: list[CrossSpreadAbnormalOrderResponse] = Field(default_factory=list)
+    unattributedPositions: list[CrossSpreadUnattributedPositionResponse] = Field(
+        default_factory=list
+    )
+    bybitPnlUsdt: Decimal | None = None
+    mt5PnlUsdt: Decimal | None = None
+    totalPnlUsdt: Decimal | None = None
+    dataQualityState: Literal["complete", "partial", "unavailable"]
+    asOf: datetime
+
+
 class CrossSpreadSnapshotResponse(BaseModel):
     status: str
     bybit: CrossSpreadVenueSnapshotResponse
@@ -140,6 +207,9 @@ class CrossSpreadSnapshotResponse(BaseModel):
     long_spread: Decimal | None = Field(default=None, alias="longSpread")
     short_spread: Decimal | None = Field(default=None, alias="shortSpread")
     metrics: CrossSpreadMetricsResponse = Field(default_factory=CrossSpreadMetricsResponse)
+    position_overview: CrossSpreadPositionOverviewResponse | None = Field(
+        default=None, alias="positionOverview"
+    )
     as_of: datetime = Field(alias="asOf")
 
 
@@ -165,6 +235,7 @@ class CrossSpreadMarketCommandRequest(BaseModel):
 class CrossSpreadPreflightRequest(BaseModel):
     action: Literal["OPEN_LONG", "CLOSE_LONG", "OPEN_SHORT", "CLOSE_SHORT"]
     quantity_oz: Decimal = Field(alias="quantityOz", gt=0)
+    exit_plan_id: str | None = Field(default=None, alias="exitPlanId")
 
 
 class StrategyDefinitionResponse(BaseModel):
@@ -220,7 +291,7 @@ class BalanceSnapshotResponse(BaseModel):
     account_id: str = Field(alias="accountId")
     currency: str
     equity: Decimal
-    available_balance: Decimal = Field(alias="availableBalance")
+    available_balance: Decimal | None = Field(default=None, alias="availableBalance")
     source: str
     data_quality_state: str = Field(alias="dataQualityState")
     as_of: datetime = Field(alias="asOf")
@@ -235,11 +306,31 @@ class AccountRiskSnapshotResponse(BaseModel):
     margin_level: Decimal | None = Field(default=None, alias="marginLevel")
     data_quality_state: str = Field(alias="dataQualityState")
     as_of: datetime = Field(alias="asOf")
+    asset_scope: str = Field(default="unspecified", alias="assetScope")
+    total_assets: Decimal | None = Field(default=None, alias="totalAssets")
+    asset_breakdown: list[AssetBreakdownResponse] = Field(
+        default_factory=list, alias="assetBreakdown"
+    )
+    asset_overview_as_of: datetime | None = Field(default=None, alias="assetOverviewAsOf")
+    asset_overview_quality: str = Field(default="unavailable", alias="assetOverviewQuality")
+    wallet_balance: Decimal | None = Field(default=None, alias="walletBalance")
+    margin_balance: Decimal | None = Field(default=None, alias="marginBalance")
+    maintenance_margin: Decimal | None = Field(default=None, alias="maintenanceMargin")
+    unrealized_pnl: Decimal | None = Field(default=None, alias="unrealizedPnl")
 
 
 class StrategyEquityHistoryPointResponse(BaseModel):
+    equity_drawdown: Decimal | None = Field(default=None, alias="equityDrawdown")
+    total_assets_drawdown: Decimal | None = Field(default=None, alias="totalAssetsDrawdown")
+    equity_drawdown_quality: str = Field(default="unavailable", alias="equityDrawdownQuality")
+    total_assets_drawdown_quality: str = Field(
+        default="unavailable", alias="totalAssetsDrawdownQuality"
+    )
+    total_assets: Decimal | None = Field(default=None, alias="totalAssets")
     as_of: datetime = Field(alias="asOf")
     equity: Decimal
+    currency: str | None = None
+    asset_scope: str = Field(default="unspecified", alias="assetScope")
 
 
 class ContractSpecificationResponse(BaseModel):
@@ -295,6 +386,11 @@ class TradeCommandResponse(BaseModel):
 
 
 class OrderDetailResponse(OrderResponse):
+    instruction_id: str | None = Field(default=None, alias="instructionId")
+    batch_id: str | None = Field(default=None, alias="batchId")
+    action: str | None = None
+    direction: str | None = None
+    time_quality: str = Field(default="legacy", alias="timeQuality")
     account_id: str = Field(alias="accountId")
     instrument_id: str = Field(alias="instrumentId")
     symbol: str
@@ -304,6 +400,12 @@ class OrderDetailResponse(OrderResponse):
     price: Decimal | None
     created_at: datetime = Field(alias="createdAt")
     updated_at: datetime = Field(alias="updatedAt")
+    filled_quantity: Decimal | None = Field(default=None, alias="filledQuantity")
+    average_fill_price: Decimal | None = Field(default=None, alias="averageFillPrice")
+    reduce_only: bool | None = Field(default=None, alias="reduceOnly")
+    time_in_force: str | None = Field(default=None, alias="timeInForce")
+    reject_reason: str | None = Field(default=None, alias="rejectReason")
+    cancel_reason: str | None = Field(default=None, alias="cancelReason")
 
 
 class FillResponse(BaseModel):
@@ -315,15 +417,47 @@ class FillResponse(BaseModel):
     quantity: Decimal
     price: Decimal
     occurred_at: datetime = Field(alias="occurredAt")
+    symbol: str | None = None
+    fee: Decimal | None = None
+    currency: str | None = None
+    realized_pnl: Decimal | None = Field(default=None, alias="realizedPnl")
+    swap: Decimal | None = None
+    origin: str = "legacy"
+    source: str | None = None
+    external_fill_id: str | None = Field(default=None, alias="externalFillId")
+    external_order_id: str | None = Field(default=None, alias="externalOrderId")
+    instruction_id: str | None = Field(default=None, alias="instructionId")
+    batch_id: str | None = Field(default=None, alias="batchId")
+    action: str | None = None
+    direction: str | None = None
+    order_confirmed_at: datetime | None = Field(default=None, alias="orderConfirmedAt")
+    time_quality: str = Field(default="legacy", alias="timeQuality")
 
 
 class StrategyPnlResponse(BaseModel):
+    model_config = ConfigDict(json_schema_serialization_defaults_required=True)
     strategy_instance_id: str = Field(alias="strategyInstanceId")
-    realized_pnl: Decimal = Field(alias="realizedPnl")
-    trading_pnl: Decimal = Field(alias="tradingPnl")
-    fees: Decimal
+    realized_pnl: Decimal | None = Field(alias="realizedPnl")
+    trading_pnl: Decimal | None = Field(alias="tradingPnl")
+    fees: Decimal | None
     currency: str
     data_quality_state: str = Field(alias="dataQualityState")
+    funding_pnl: Decimal | None = Field(default=None, alias="fundingPnl")
+    swap_pnl: Decimal | None = Field(default=None, alias="swapPnl")
+    net_pnl: Decimal | None = Field(default=None, alias="netPnl")
+    by_currency: list[FinancialAmountsResponse] = Field(default_factory=list, alias="byCurrency")
+    by_account: list[FinancialAmountsResponse] = Field(default_factory=list, alias="byAccount")
+    positions: list[dict[str, object]] = Field(default_factory=list)
+    timeline: list[FinancialTimelinePointResponse] = Field(default_factory=list)
+    coverage: list[FinancialCoverageResponse] = Field(default_factory=list)
+    issues: list[str] = Field(default_factory=list)
+    unattributed_events: list[EconomicEventResponse] = Field(
+        default_factory=list, alias="unattributedEvents"
+    )
+    economic_events: list[EconomicEventResponse] = Field(
+        default_factory=list, alias="economicEvents"
+    )
+    scope: str = "strategy"
 
 
 class StrategyNavSnapshotResponse(BaseModel):
@@ -364,6 +498,7 @@ class AuditEventResponse(BaseModel):
 
 
 class StrategyAccountSnapshotResponse(BaseModel):
+    model_config = ConfigDict(json_schema_serialization_defaults_required=True)
     strategy_instance_id: str = Field(alias="strategyInstanceId")
     account_id: str | None = Field(default=None, alias="accountId")
     account_code: str | None = Field(default=None, alias="accountCode")
@@ -379,8 +514,23 @@ class StrategyAccountSnapshotResponse(BaseModel):
     orders: list[OrderDetailResponse] = Field(default_factory=list)
     fills: list[FillResponse] = Field(default_factory=list)
     pnl: PnlResponse | None = None
+    finance: StrategyPnlResponse | None = None
     sync_status: str | None = Field(default=None, alias="syncStatus")
     sync_error_code: str | None = Field(default=None, alias="syncErrorCode")
+    snapshot_scope: Literal["account", "strategy"] = Field(
+        default="strategy", alias="snapshotScope"
+    )
+    is_stale: bool = Field(default=True, alias="isStale")
+    last_successful_sync_at: datetime | None = Field(default=None, alias="lastSuccessfulSyncAt")
+    history_start: datetime | None = Field(default=None, alias="historyStart")
+    history_end: datetime | None = Field(default=None, alias="historyEnd")
+    coin_balances: list[CoinBalanceResponse] = Field(default_factory=list, alias="coinBalances")
+    economic_events: list[EconomicEventResponse] = Field(
+        default_factory=list, alias="economicEvents"
+    )
+    economic_events_quality: str = Field(default="unavailable", alias="economicEventsQuality")
+    orders_total: int = Field(default=0, alias="ordersTotal")
+    fills_total: int = Field(default=0, alias="fillsTotal")
 
 
 class StrategyManagementOverviewResponse(BaseModel):

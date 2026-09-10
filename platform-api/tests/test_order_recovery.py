@@ -13,7 +13,7 @@ from app.trading import apply_execution_events
 def command_payload(idempotency_key: str) -> dict[str, str]:
     return {
         "idempotencyKey": idempotency_key,
-        "strategyInstanceId": "strategy_funding_arbitrage_instance_default",
+        "strategyInstanceId": "strategy_generic_pipeline_test",
         "accountId": "account_sim_usdt",
         "instrumentId": "instrument_btc_usdt",
         "symbol": "BTCUSDT",
@@ -57,7 +57,7 @@ def test_result_unknown_recovers_from_runtime_journal(
 ) -> None:
     get_settings().database_path = str(tmp_path / "recover.db")
     monkeypatch.setattr(
-        "app.trade_command_execution.httpx.post",
+        "app.runtime_transport.post",
         lambda *args, **kwargs: (_ for _ in ()).throw(httpx.ConnectError("timeout")),
     )
 
@@ -82,11 +82,11 @@ def test_result_unknown_recovers_from_runtime_journal(
                 return runtime_events(command_id, order_id)
 
         monkeypatch.setattr(
-            "app.runtime_recovery_client.httpx.post",
+            "app.runtime_transport.post",
             lambda *args, **kwargs: FakeResponse(),
         )
         monkeypatch.setattr(
-            "app.runtime_recovery_client.httpx.get",
+            "app.runtime_transport.get",
             lambda *args, **kwargs: FakeResponse(),
         )
         recovered = client.post(f"/api/v1/trading/orders/{order_id}/reconcile")
@@ -95,9 +95,7 @@ def test_result_unknown_recovers_from_runtime_journal(
         assert recovered.json()["status"] == "filled"
         assert recovered.json()["externalOrderId"] == "external-recovery-001"
 
-        position = client.get(
-            "/api/v1/accounts/account_sim_usdt/positions/instrument_btc_usdt"
-        )
+        position = client.get("/api/v1/accounts/account_sim_usdt/positions/instrument_btc_usdt")
         assert position.status_code == 200
         assert position.json()["netQuantity"] == "1"
 
@@ -132,7 +130,7 @@ def test_result_unknown_remains_unknown_when_runtime_has_no_events(
 ) -> None:
     get_settings().database_path = str(tmp_path / "recover-missing.db")
     monkeypatch.setattr(
-        "app.trade_command_execution.httpx.post",
+        "app.runtime_transport.post",
         lambda *args, **kwargs: (_ for _ in ()).throw(httpx.ConnectError("timeout")),
     )
 
@@ -144,7 +142,7 @@ def test_result_unknown_remains_unknown_when_runtime_has_no_events(
         order_id = created.json()["platformOrderId"]
 
         monkeypatch.setattr(
-            "app.runtime_recovery_client.httpx.post",
+            "app.runtime_transport.post",
             lambda *args, **kwargs: (_ for _ in ()).throw(httpx.ConnectError("offline")),
         )
         recovered = client.post(f"/api/v1/trading/orders/{order_id}/reconcile")
@@ -195,13 +193,13 @@ class _RuntimeResponse:
 
 def _configure_runtime_recovery(monkeypatch, events: list[dict[str, object]]) -> None:
     response = _RuntimeResponse(events)
-    monkeypatch.setattr("app.runtime_recovery_client.httpx.post", lambda *a, **k: response)
-    monkeypatch.setattr("app.runtime_recovery_client.httpx.get", lambda *a, **k: response)
+    monkeypatch.setattr("app.runtime_transport.post", lambda *a, **k: response)
+    monkeypatch.setattr("app.runtime_transport.get", lambda *a, **k: response)
 
 
 def _create_result_unknown(client: TestClient, monkeypatch, payload: dict[str, str]):
     monkeypatch.setattr(
-        "app.trade_command_execution.httpx.post",
+        "app.runtime_transport.post",
         lambda *args, **kwargs: (_ for _ in ()).throw(httpx.ConnectError("timeout")),
     )
     response = client.post("/api/v1/trading/commands", json=payload)
@@ -330,12 +328,10 @@ def test_partial_fill_recovery_is_decimal_exact_and_idempotent(
                 (order_id,),
             ).fetchone()["count"]
 
-    expected_pnl = (Decimal("100.12345678") - Decimal("100.00000000")) * Decimal(
-        "0.33333333"
-    )
-    assert first.json()["status"] == "filled"
+    expected_pnl = (Decimal("100.12345678") - Decimal("100.00000000")) * Decimal("0.33333333")
+    assert first.json()["status"] == "partially_filled"
     assert second.json() == first.json()
-    assert command_after.json()["status"] == "filled"
+    assert command_after.json()["status"] == "partially_filled"
     assert position["net_quantity"] == "0.66666667"
     assert position["average_price"] == "100.00000000"
     assert fill["quantity"] == "0.33333333"
@@ -383,3 +379,68 @@ def test_recovery_rejects_wrong_platform_order_without_pollution(
     assert order_after.json()["status"] == "result_unknown"
     assert command_after.json()["status"] == "result_unknown"
     assert fill_count == 0
+
+
+pytestmark = pytest.mark.usefixtures("generic_trading_instance")
+
+
+@pytest.mark.parametrize("evidence", ["unavailable", "empty", "filled"])
+def test_api_restart_recovers_original_unknown_order_without_resubmission(
+    monkeypatch, tmp_path, evidence
+):
+    from app.database import connection
+
+    settings = get_settings()
+    settings.database_path = str(tmp_path / "restart-unknown.db")
+    settings.research_refresh_enabled = False
+    settings.cross_spread_exit_monitor_enabled = False
+    submitted = []
+    recovered = []
+    original = {}
+
+    def post(url, **kwargs):
+        if url.endswith("/commands/orders"):
+            submitted.append(kwargs["json"])
+            raise httpx.ReadTimeout("isolated response lost after acceptance")
+        assert url.endswith(f"/commands/{original['tradeCommandId']}/recover")
+        recovered.append(url)
+        if evidence == "unavailable":
+            raise httpx.ConnectError("isolated Runtime remains offline")
+        return _RuntimeResponse([])
+
+    def get(url, **kwargs):
+        assert url.endswith(f"/commands/{original['tradeCommandId']}/events")
+        return _RuntimeResponse(
+            runtime_events(original["tradeCommandId"], original["platformOrderId"])
+            if evidence == "filled" else []
+        )
+
+    monkeypatch.setattr("app.runtime_transport.post", post)
+    monkeypatch.setattr("app.runtime_transport.get", get)
+    payload = command_payload("restart-original-identity")
+    with TestClient(app) as client:
+        response = client.post("/api/v1/trading/commands", json=payload)
+        assert response.status_code == 200, response.text
+        original.update(response.json())
+        assert original["status"] == "result_unknown"
+
+    with TestClient(app) as restarted:
+        repeated = restarted.post("/api/v1/trading/commands", json=payload)
+        assert repeated.status_code == 200, repeated.text
+        assert repeated.json()["platformOrderId"] == original["platformOrderId"]
+        assert repeated.json()["tradeCommandId"] == original["tradeCommandId"]
+        for _ in range(2):
+            result = restarted.post(
+                f"/api/v1/trading/orders/{original['platformOrderId']}/reconcile"
+            )
+            assert result.status_code == 200, result.text
+            assert result.json()["status"] == (
+                "filled" if evidence == "filled" else "result_unknown"
+            )
+        assert restarted.post("/api/v1/trading/commands", json=payload).status_code == 200
+    assert len(submitted) == 1
+    assert recovered
+    with connection() as db:
+        assert db.execute("SELECT COUNT(*) FROM trade_commands").fetchone()[0] == 1
+        assert db.execute("SELECT COUNT(*) FROM orders").fetchone()[0] == 1
+        assert db.execute("SELECT COUNT(*) FROM fills").fetchone()[0] == (evidence == "filled")

@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import httpx
+import pytest
 from fastapi.testclient import TestClient
 
 from app.config import get_settings
@@ -52,7 +53,7 @@ def test_seeded_strategy_account_and_instrument_catalog(tmp_path: Path) -> None:
         assert by_desk["dip"]["executionReadiness"] is None
         assert by_desk["shortLineTraderL"]["executionReadiness"] is None
         assert by_desk["shortLineTraderW"]["executionReadiness"] is None
-        assert by_desk["dip"]["primaryAccountDataQualityState"] == "unavailable"
+        assert by_desk["dip"]["primaryAccountDataQualityState"] == "waiting_initial_sync"
         assert by_desk["funding"]["primaryAccountCode"] == "BYBIT-LIVE-MAIN"
         assert by_desk["crossSpread"]["primaryAccountCode"] == "BYBIT-LIVE-MAIN / MT5-LIVE-MAIN"
         assert by_desk["crossSpread"]["primaryAccountStatus"] == "active"
@@ -82,17 +83,18 @@ def test_seeded_strategy_account_and_instrument_catalog(tmp_path: Path) -> None:
         }
 
 
+@pytest.mark.usefixtures("generic_trading_instance")
 def test_trade_command_is_idempotent(monkeypatch, tmp_path: Path) -> None:
     get_settings().database_path = str(tmp_path / "commands.db")
 
     def runtime_unavailable(*args, **kwargs):
         raise httpx.ConnectError("runtime unavailable")
 
-    monkeypatch.setattr("app.trade_command_execution.httpx.post", runtime_unavailable)
+    monkeypatch.setattr("app.runtime_transport.post", runtime_unavailable)
 
     payload = {
         "idempotencyKey": "idem-001",
-        "strategyInstanceId": "strategy_funding_arbitrage_instance_default",
+        "strategyInstanceId": "strategy_generic_pipeline_test",
         "accountId": "account_sim_usdt",
         "instrumentId": "instrument_btc_usdt",
         "symbol": "BTCUSDT",
@@ -133,8 +135,7 @@ def test_strategy_nav_snapshot_uses_seed_balance_and_capital_base(tmp_path: Path
         assert snapshot["dataQualityState"] == "complete"
 
         snapshots = client.get(
-            "/api/v1/strategies/instances/"
-            "strategy_funding_arbitrage_instance_default/nav-snapshots"
+            "/api/v1/strategies/instances/strategy_funding_arbitrage_instance_default/nav-snapshots"
         )
         assert snapshots.status_code == 200
         assert len(snapshots.json()) == 1
@@ -242,7 +243,13 @@ def test_cross_strategy_pnl_uses_canonical_fills_and_contract_multiplier(
         response = client.get(f"/api/v1/strategies/instances/{strategy_id}/pnl")
 
     assert response.status_code == 200
-    assert response.json()["realizedPnl"] == "3.00"
+    result = response.json()
+    assert result["realizedPnl"] is None
+    assert "historical_fx_unavailable" in result["issues"]
+    assert {row["currency"]: row["realizedPnl"] for row in result["byCurrency"]} == {
+        "USDT": "1",
+        "USD": "2.00",
+    }
 
 
 def test_management_overview_exposes_latest_run_freshness_for_closed_loop_and_read_only(

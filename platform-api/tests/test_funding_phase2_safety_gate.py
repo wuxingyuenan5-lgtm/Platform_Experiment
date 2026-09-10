@@ -9,14 +9,17 @@ from app.strategies.funding_orchestration import get_funding_controlled_live_rea
 
 def test_funding_controlled_live_is_rejected_until_phase_2_capability_exists(
     tmp_path: Path,
+    authorize_funding_ceo,
 ) -> None:
     """Removing the Phase 2 gate would turn the legacy two-market-leg path live."""
     settings = get_settings()
     settings.database_path = str(tmp_path / "funding-phase-2-gate.db")
     settings.live_trading_enabled = True
     settings.default_trading_environment = "live"
+    settings.runtime_base_url = "http://127.0.0.1:1"
 
     with TestClient(app) as client:
+        authorize_funding_ceo(client)
         response = client.post(
             "/api/v1/trading/funding/market-command",
             json={

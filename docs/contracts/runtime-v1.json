@@ -12,6 +12,7 @@
       "strategy_instance_id",
       "account_id",
       "instrument_id",
+      "instrument_type",
       "symbol",
       "side",
       "order_type",

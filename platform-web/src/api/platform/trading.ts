@@ -1,4 +1,6 @@
-import axios, { type AxiosInstance } from 'axios';
+import axios from 'axios';
+import { createStrategyApi, strategyData } from './strategyApi';
+import { fetchStrategyQuery } from './strategyQueries';
 
 import type {
   AccountResult,
@@ -33,56 +35,40 @@ import type {
   TradingSnapshot,
 } from './trading.types';
 
-const apiBaseUrl = import.meta.env.VITE_PLATFORM_API_BASE_URL || 'http://127.0.0.1:8000/api/v1';
-
-const platformApiToken = import.meta.env.VITE_PLATFORM_API_TOKEN || '';
-
-const client: AxiosInstance = axios.create({
-  baseURL: apiBaseUrl,
-  timeout: 10_000,
-  headers: {
-    'Content-Type': 'application/json',
-    ...(platformApiToken ? { Authorization: `Bearer ${platformApiToken}` } : {}),
-  },
-});
-
-const pendingOrdersRequests = new Map<string, Promise<OrderDetailResult[]>>();
-const pendingFillsRequests = new Map<string, Promise<FillResult[]>>();
-const pendingBalanceRequests = new Map<string, Promise<BalanceResult | null>>();
-const pendingEquityHistoryRequests = new Map<string, Promise<EquityHistoryPointResult[]>>();
+const api = createStrategyApi();
 
 function isNotFound(error: unknown): boolean {
   return axios.isAxiosError(error) && error.response?.status === 404;
 }
 
 export async function reconcileTradingOrder(orderId: string): Promise<OrderResult> {
-  const response = await client.post<OrderResult>(
-    `/trading/orders/${encodeURIComponent(orderId)}/reconcile`,
-  );
-  return response.data;
+  const response = await api.POST('/api/v1/trading/orders/{order_id}/reconcile', {
+    params: { path: { order_id: orderId } },
+  });
+  return strategyData(response);
 }
 
 export async function createExecutionBatch(
   input: CreateExecutionBatchInput,
 ): Promise<ExecutionBatchResult> {
-  const response = await client.post<ExecutionBatchResult>('/trading/execution-batches', input);
-  return response.data;
+  const response = await api.POST('/api/v1/trading/execution-batches', { body: input });
+  return strategyData(response);
 }
 
 export async function getExecutionBatch(batchId: string): Promise<ExecutionBatchResult> {
-  const response = await client.get<ExecutionBatchResult>(
-    `/trading/execution-batches/${encodeURIComponent(batchId)}`,
-  );
-  return response.data;
+  const response = await api.GET('/api/v1/trading/execution-batches/{batch_id}', {
+    params: { path: { batch_id: batchId } },
+  });
+  return strategyData(response);
 }
 
 export async function getExecutionBatches(
   strategyInstanceId?: string,
 ): Promise<ExecutionBatchResult[]> {
-  const response = await client.get<ExecutionBatchResult[]>('/trading/execution-batches', {
-    params: strategyInstanceId ? { strategyInstanceId } : undefined,
+  const response = await api.GET('/api/v1/trading/execution-batches', {
+    params: { query: strategyInstanceId ? { strategyInstanceId } : undefined },
   });
-  return response.data;
+  return strategyData(response);
 }
 
 export async function getTradingPosition(
@@ -90,10 +76,10 @@ export async function getTradingPosition(
   instrumentId: string,
 ): Promise<PositionResult | null> {
   try {
-    const response = await client.get<PositionResult>(
-      `/accounts/${encodeURIComponent(accountId)}/positions/${encodeURIComponent(instrumentId)}`,
-    );
-    return response.data;
+    const response = await api.GET('/api/v1/accounts/{account_id}/positions/{instrument_id}', {
+      params: { path: { account_id: accountId, instrument_id: instrumentId } },
+    });
+    return strategyData(response);
   } catch (error) {
     if (isNotFound(error)) return null;
     throw error;
@@ -105,10 +91,10 @@ export async function getTradingPnl(
   instrumentId: string,
 ): Promise<PnlResult | null> {
   try {
-    const response = await client.get<PnlResult>(
-      `/accounts/${encodeURIComponent(accountId)}/pnl/${encodeURIComponent(instrumentId)}`,
-    );
-    return response.data;
+    const response = await api.GET('/api/v1/accounts/{account_id}/pnl/{instrument_id}', {
+      params: { path: { account_id: accountId, instrument_id: instrumentId } },
+    });
+    return strategyData(response);
   } catch (error) {
     if (isNotFound(error)) return null;
     throw error;
@@ -116,38 +102,33 @@ export async function getTradingPnl(
 }
 
 export async function getAccountBalanceLatest(accountId: string): Promise<BalanceResult | null> {
-  const pending = pendingBalanceRequests.get(accountId);
-  if (pending) return pending;
-  const request = (async () => {
+  return fetchStrategyQuery(['account-balance', accountId], async (signal) => {
     try {
-      const response = await client.get<BalanceResult>(
-        `/accounts/${encodeURIComponent(accountId)}/balances/latest`,
+      return strategyData(
+        await api.GET('/api/v1/accounts/{account_id}/balances/latest', {
+          params: { path: { account_id: accountId } },
+          signal,
+        }),
       );
-      return response.data;
     } catch (error) {
       if (isNotFound(error)) return null;
       throw error;
     }
-  })().finally(() => pendingBalanceRequests.delete(accountId));
-  pendingBalanceRequests.set(accountId, request);
-  return request;
+  });
 }
 
 export async function getEquityHistory(
   accountId: string,
   currency?: string,
 ): Promise<EquityHistoryPointResult[]> {
-  const requestKey = `${accountId}:${currency || '*'}`;
-  const pending = pendingEquityHistoryRequests.get(requestKey);
-  if (pending) return pending;
-  const request = client
-    .get<EquityHistoryPointResult[]>(`/accounts/${encodeURIComponent(accountId)}/equity-history`, {
-      params: currency ? { currency } : undefined,
-    })
-    .then((response) => response.data)
-    .finally(() => pendingEquityHistoryRequests.delete(requestKey));
-  pendingEquityHistoryRequests.set(requestKey, request);
-  return request;
+  return fetchStrategyQuery(['equity-history', accountId, currency], async (signal) =>
+    strategyData(
+      await api.GET('/api/v1/accounts/{account_id}/equity-history', {
+        params: { path: { account_id: accountId }, query: { currency } },
+        signal,
+      }),
+    ),
+  );
 }
 
 export async function getTradingSnapshot(
@@ -162,107 +143,113 @@ export async function getTradingSnapshot(
 }
 
 export async function getRuntimeReadiness(): Promise<RuntimeReadinessResult> {
-  const response = await client.get<RuntimeReadinessResult>('/system/runtime-readiness');
-  return response.data;
+  const response = await api.GET('/api/v1/system/runtime-readiness');
+  return strategyData(response);
 }
 
 export async function getReconciliationSummary(): Promise<ReconciliationSummaryResult> {
-  const response = await client.get<ReconciliationSummaryResult>('/ops/reconciliation-summary');
-  return response.data;
+  const response = await api.GET('/api/v1/ops/reconciliation-summary');
+  return strategyData(response);
 }
 
 export async function getTradingSafety(): Promise<TradingSafetyResult> {
-  const response = await client.get<TradingSafetyResult>('/security/trading-safety');
-  return response.data;
+  const response = await api.GET('/api/v1/security/trading-safety');
+  return strategyData(response);
 }
 
 export async function getCredentialReferences(): Promise<CredentialReferenceResult[]> {
-  const response = await client.get<CredentialReferenceResult[]>('/security/credential-references');
-  return response.data;
+  const response = await api.GET('/api/v1/security/credential-references');
+  return strategyData(response);
 }
 
 export async function getExchangeConnectivity(): Promise<ExchangeConnectivityResult> {
-  const response = await client.get<ExchangeConnectivityResult>('/security/exchange-connectivity');
-  return response.data;
+  const response = await api.GET('/api/v1/security/exchange-connectivity');
+  return strategyData(response);
 }
 
 export async function getCrossSpreadSnapshot(): Promise<CrossSpreadSnapshotResult> {
-  const response = await client.get<CrossSpreadSnapshotResult>('/trading/cross-spread/snapshot');
-  return response.data;
+  const response = await api.GET('/api/v1/trading/cross-spread/snapshot');
+  return strategyData(response);
 }
 
 export async function getCrossSpreadHistory(limit = 200): Promise<CrossSpreadHistoryPointResult[]> {
-  const response = await client.get<CrossSpreadHistoryPointResult[]>(
-    '/trading/cross-spread/history',
-    { params: { limit } },
-  );
-  return response.data;
+  const response = await api.GET('/api/v1/trading/cross-spread/history', {
+    params: { query: { limit } },
+  });
+  return strategyData(response);
 }
 
 export async function submitCrossSpreadMarketCommand(
   input: CrossSpreadMarketCommandInput,
 ): Promise<ExecutionBatchResult> {
-  const response = await client.post<ExecutionBatchResult>(
-    '/trading/cross-spread/market-command',
-    input,
-  );
-  return response.data;
+  const response = await api.POST('/api/v1/trading/cross-spread/market-command', { body: input });
+  return strategyData(response);
 }
 
 export async function getStrategyDefinitions(): Promise<StrategyDefinitionResult[]> {
-  const response = await client.get<StrategyDefinitionResult[]>('/strategies/definitions');
-  return response.data;
+  const response = await api.GET('/api/v1/strategies/definitions');
+  return strategyData(response);
 }
 
 export async function getStrategyInstances(): Promise<StrategyInstanceResult[]> {
-  const response = await client.get<StrategyInstanceResult[]>('/strategies/instances');
-  return response.data;
+  const response = await api.GET('/api/v1/strategies/instances');
+  return strategyData(response);
 }
 
-export async function getStrategyManagementOverview(): Promise<StrategyManagementOverviewResult[]> {
-  const response = await client.get<StrategyManagementOverviewResult[]>(
-    '/strategies/management-overview',
-  );
-  return response.data;
+export async function getStrategyManagementOverview(
+  signal?: AbortSignal,
+): Promise<StrategyManagementOverviewResult[]> {
+  const response = await api.GET('/api/v1/strategies/management-overview', { signal });
+  return strategyData(response);
 }
 
 export async function getStrategyAccountBindings(
   strategyInstanceId: string,
 ): Promise<StrategyAccountBindingResult[]> {
-  const response = await client.get<StrategyAccountBindingResult[]>(
-    `/strategies/instances/${encodeURIComponent(strategyInstanceId)}/accounts`,
-  );
-  return response.data;
+  const response = await api.GET('/api/v1/strategies/instances/{strategy_instance_id}/accounts', {
+    params: { path: { strategy_instance_id: strategyInstanceId } },
+  });
+  return strategyData(response);
 }
 
 export async function getStrategyAccountSnapshot(
   strategyInstanceId: string,
+  accountId?: string,
+  signal?: AbortSignal,
 ): Promise<StrategyAccountSnapshotResult> {
-  const response = await client.get<StrategyAccountSnapshotResult>(
-    `/strategies/instances/${encodeURIComponent(strategyInstanceId)}/account-snapshot`,
+  const response = await api.GET(
+    '/api/v1/strategies/instances/{strategy_instance_id}/account-snapshot',
+    {
+      params: {
+        path: { strategy_instance_id: strategyInstanceId },
+        query: accountId ? { accountId } : undefined,
+      },
+      signal,
+    },
   );
-  return response.data;
+  return strategyData(response);
 }
 
 export async function getStrategyRuns(strategyInstanceId: string): Promise<StrategyRunResult[]> {
-  const response = await client.get<StrategyRunResult[]>(
-    `/strategies/instances/${encodeURIComponent(strategyInstanceId)}/runs`,
-  );
-  return response.data;
+  const response = await api.GET('/api/v1/strategies/instances/{strategy_instance_id}/runs', {
+    params: { path: { strategy_instance_id: strategyInstanceId } },
+  });
+  return strategyData(response);
 }
 
 export async function getStrategyV1Readiness(
   strategyInstanceId: string,
 ): Promise<StrategyV1ReadinessResult> {
-  const response = await client.get<StrategyV1ReadinessResult>(
-    `/strategies/instances/${encodeURIComponent(strategyInstanceId)}/v1-readiness`,
+  const response = await api.GET(
+    '/api/v1/strategies/instances/{strategy_instance_id}/v1-readiness',
+    { params: { path: { strategy_instance_id: strategyInstanceId } } },
   );
-  return response.data;
+  return strategyData(response);
 }
 
 export async function getLiveTradingSessions(): Promise<LiveTradingSessionResult[]> {
-  const response = await client.get<LiveTradingSessionResult[]>('/live-trading/sessions');
-  return response.data;
+  const response = await api.GET('/api/v1/live-trading/sessions');
+  return strategyData(response);
 }
 
 export async function createLiveTradingSession(input: {
@@ -281,82 +268,77 @@ export async function createLiveTradingSession(input: {
   evidenceReference: string;
   reason: string;
 }): Promise<LiveTradingSessionResult> {
-  const response = await client.post<LiveTradingSessionResult>('/live-trading/sessions', input);
-  return response.data;
+  const response = await api.POST('/api/v1/live-trading/sessions', { body: input });
+  return strategyData(response);
 }
 
 export async function approveLiveTradingSession(
   sessionId: string,
   reason: string,
 ): Promise<LiveTradingSessionResult> {
-  const response = await client.post<LiveTradingSessionResult>(
-    `/live-trading/sessions/${encodeURIComponent(sessionId)}/approve`,
-    { reason },
-  );
-  return response.data;
+  const response = await api.POST('/api/v1/live-trading/sessions/{session_id}/approve', {
+    params: { path: { session_id: sessionId } },
+    body: { reason },
+  });
+  return strategyData(response);
 }
 
 export async function revokeLiveTradingSession(
   sessionId: string,
   reason: string,
 ): Promise<LiveTradingSessionResult> {
-  const response = await client.post<LiveTradingSessionResult>(
-    `/live-trading/sessions/${encodeURIComponent(sessionId)}/revoke`,
-    { reason },
-  );
-  return response.data;
+  const response = await api.POST('/api/v1/live-trading/sessions/{session_id}/revoke', {
+    params: { path: { session_id: sessionId } },
+    body: { reason },
+  });
+  return strategyData(response);
 }
 
 export async function getAccounts(): Promise<AccountResult[]> {
-  const response = await client.get<AccountResult[]>('/accounts');
-  return response.data;
+  const response = await api.GET('/api/v1/accounts');
+  return strategyData(response);
 }
 
 export async function getInstruments(): Promise<InstrumentResult[]> {
-  const response = await client.get<InstrumentResult[]>('/instruments');
-  return response.data;
+  const response = await api.GET('/api/v1/instruments');
+  return strategyData(response);
 }
 
 export async function getOrders(strategyInstanceId?: string): Promise<OrderDetailResult[]> {
-  const requestKey = strategyInstanceId || '*';
-  const pending = pendingOrdersRequests.get(requestKey);
-  if (pending) return pending;
-  const request = client
-    .get<OrderDetailResult[]>('/trading/orders', {
-      params: strategyInstanceId ? { strategyInstanceId } : undefined,
-    })
-    .then((response) => response.data)
-    .finally(() => pendingOrdersRequests.delete(requestKey));
-  pendingOrdersRequests.set(requestKey, request);
-  return request;
+  return fetchStrategyQuery(['orders', strategyInstanceId], async (signal) =>
+    strategyData(
+      await api.GET('/api/v1/trading/orders', {
+        params: { query: { strategyInstanceId } },
+        signal,
+      }),
+    ),
+  );
 }
 
 export async function getFills(strategyInstanceId?: string): Promise<FillResult[]> {
-  const requestKey = strategyInstanceId || '*';
-  const pending = pendingFillsRequests.get(requestKey);
-  if (pending) return pending;
-  const request = client
-    .get<FillResult[]>('/trading/fills', {
-      params: strategyInstanceId ? { strategyInstanceId } : undefined,
-    })
-    .then((response) => response.data)
-    .finally(() => pendingFillsRequests.delete(requestKey));
-  pendingFillsRequests.set(requestKey, request);
-  return request;
+  return fetchStrategyQuery(['fills', strategyInstanceId], async (signal) =>
+    strategyData(
+      await api.GET('/api/v1/trading/fills', {
+        params: { query: { strategyInstanceId } },
+        signal,
+      }),
+    ),
+  );
 }
 
 export async function getStrategyPnl(strategyInstanceId: string): Promise<StrategyPnlResult> {
-  const response = await client.get<StrategyPnlResult>(
-    `/strategies/instances/${encodeURIComponent(strategyInstanceId)}/pnl`,
-  );
-  return response.data;
+  const response = await api.GET('/api/v1/strategies/instances/{strategy_instance_id}/pnl', {
+    params: { path: { strategy_instance_id: strategyInstanceId } },
+  });
+  return strategyData(response);
 }
 
 export async function getStrategyNavSnapshots(
   strategyInstanceId: string,
 ): Promise<StrategyNavSnapshotResult[]> {
-  const response = await client.get<StrategyNavSnapshotResult[]>(
-    `/strategies/instances/${encodeURIComponent(strategyInstanceId)}/nav-snapshots`,
+  const response = await api.GET(
+    '/api/v1/strategies/instances/{strategy_instance_id}/nav-snapshots',
+    { params: { path: { strategy_instance_id: strategyInstanceId } } },
   );
-  return response.data;
+  return strategyData(response);
 }

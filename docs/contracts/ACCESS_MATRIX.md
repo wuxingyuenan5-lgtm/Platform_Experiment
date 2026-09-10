@@ -2,7 +2,7 @@
 
 状态：`active contract`
 
-本矩阵同时约束菜单展示、直接 URL 访问、浏览器 API 权限和个人账号数据范围。角色权限不替代 Live Write、审批、Kill Switch、交易安全与执行门禁。
+本矩阵同时约束菜单展示、直接 URL 访问、浏览器 API 权限和个人账号数据范围。角色权限与账户绑定共同决定正常业务权限，Live Write、Kill Switch 和交易风控继续独立生效。
 
 ## 角色权限
 
@@ -52,13 +52,10 @@ CEO、技术负责人和三个员工演示账号同时保留：
 
 ## Live Write 边界
 
-Platform Live Write 与 Runtime Live Write 均保持关闭。CEO 与技术负责人的产品写权限不代表可以绕过：
+2026-09-09 起，CEO 的有效浏览器登录会话可以通过 CSRF 发起 Cross/Funding 正常交易。技术负责人、员工和会员不能发起这两个策略的交易，API-Key admin 也不自动等同 CEO。具体授权由 [认证授权合同](AUTHORIZATION.md) 统一拥有。
 
-- API-Key Principal；
-- Actor Binding；
-- LiveTradingSession；
-- Kill Switch；
-- 审批与风险门禁；
-- 对账及执行安全检查。
+上述策略批次的风险处置沿用同一 CEO 边界；CEO 具有对应风险管理权限，其他主体不能通过 RiskAction 间接发起策略交易。
 
-本次前端恢复不新增数据库、微服务、消息队列或其他基础设施，不执行部署，不创建 Release 或 Tag。
+单笔订单的 Runtime Journal 恢复 `reconcile` 与原生查询/事实回补 `venue-reconcile` 归现有 `reconciliation:review`；CEO 已有该权限，浏览器请求仍校验 CSRF。两者不创建 Venue 订单，不等同于订单缺失接受、风险平仓或任意管理写权限。
+
+正常开平仓不需要临时 LiveTradingSession、双人验收审批、固定小额额度、限定时间窗口或旧 Strategy/Symbol 白名单。账户交易绑定、真实总开关、Kill Switch、对账、数量精度、可用保证金和执行安全仍须通过。开发身份不能在真实写入开启时提交写请求。

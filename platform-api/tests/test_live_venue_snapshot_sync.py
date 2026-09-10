@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from copy import deepcopy
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any, cast
 
@@ -35,6 +37,7 @@ class StubResponse:
 
 
 def base_snapshot(account_id: str) -> dict[str, object]:
+    now = datetime.now(UTC).isoformat()
     return {
         "source": "runtime-test",
         "accountId": account_id,
@@ -48,7 +51,7 @@ def base_snapshot(account_id: str) -> dict[str, object]:
                 "equity": "1000",
                 "availableBalance": "900",
                 "currency": "USDT" if "bybit" in account_id else "USD",
-                "asOf": "2026-08-24T00:00:00+00:00",
+                "asOf": now,
                 "dataQualityState": "complete",
             }
         ],
@@ -63,10 +66,10 @@ def base_snapshot(account_id: str) -> dict[str, object]:
             "availableBalance": "900",
             "initialMargin": "10",
             "marginLevel": "100",
-            "asOf": "2026-08-24T00:00:00+00:00",
+            "asOf": now,
             "dataQualityState": "complete",
         },
-        "asOf": "2026-08-24T00:00:00+00:00",
+        "asOf": now,
         "dataQualityState": "complete",
     }
 
@@ -239,6 +242,127 @@ def test_sync_persists_risk_and_deduplicates_fill_fingerprint(monkeypatch, tmp_p
         ).fetchone()
     assert fill_count == 1
     assert dict(risk) == {"equity": "1000", "free_margin": "900", "margin_level": "100"}
+
+
+def test_missing_section_or_foreign_account_does_not_clear_positions(monkeypatch, tmp_path):
+    bootstrap(tmp_path)
+    account = "bybit-live-main"
+    snapshot = base_snapshot(account)
+    snapshot["positions"] = [
+        {
+            "accountId": account,
+            "instrumentId": "instrument_btc_usdt",
+            "netQuantity": "1",
+            "averagePrice": "100",
+        }
+    ]
+    monkeypatch.setattr(
+        "app.live_venue_snapshot_sync.runtime_get", lambda path, params=None: StubResponse(snapshot)
+    )
+    assert sync_venue_snapshots(account).overall_status == "synced"
+    del snapshot["positions"]
+    assert sync_venue_snapshots(account).overall_status == "failed"
+    snapshot["positions"] = []
+    snapshot["accountId"] = "account_bybit_bottom_fishing"
+    assert sync_venue_snapshots(account).overall_status == "failed"
+    with connection() as db:
+        assert (
+            db.execute(
+                "SELECT net_quantity FROM positions WHERE account_id=?", (account,)
+            ).fetchone()[0]
+            == "1"
+        )
+
+
+def test_monitor_keeps_last_snapshot_during_sync_and_marks_stale(monkeypatch, tmp_path):
+    from app.catalog import get_strategy_account_snapshot
+
+    bootstrap(tmp_path)
+    account = "account_mt5_short_term_a"
+    snapshot = base_snapshot(account)
+    snapshot["accountRisk"]["availableBalance"] = None
+    monkeypatch.setattr(
+        "app.live_venue_snapshot_sync.runtime_get", lambda path, params=None: StubResponse(snapshot)
+    )
+    sync_venue_snapshots(account)
+    with connection() as db:
+        db.execute("UPDATE account_sync_status SET status='syncing' WHERE account_id=?", (account,))
+    result = get_strategy_account_snapshot("strategy_short_term_l_instance_default")
+    assert result.balance.equity == 1000
+    assert result.balance.available_balance is None
+    assert result.is_stale is False
+    old = (datetime.now(UTC) - timedelta(minutes=10)).isoformat()
+    with connection() as db:
+        db.execute("UPDATE account_venue_snapshots SET as_of=? WHERE account_id=?", (old, account))
+    result = get_strategy_account_snapshot("strategy_short_term_l_instance_default")
+    assert result.balance.equity == 1000
+    assert result.is_stale is True
+    assert result.data_quality_state == "stale"
+
+
+def test_account_risk_currency_does_not_inherit_base_currency(monkeypatch, tmp_path):
+    from app.catalog import get_strategy_account_snapshot
+
+    bootstrap(tmp_path)
+    snapshot = base_snapshot("bybit-live-main")
+    snapshot["accountRisk"].update(
+        currency="USD",
+        assetScope="unified_trading",
+        totalAssets="5000",
+        walletBalance="990",
+        assetOverviewQuality="complete",
+    )
+    monkeypatch.setattr(
+        "app.live_venue_snapshot_sync.runtime_get", lambda path, params=None: StubResponse(snapshot)
+    )
+    sync_venue_snapshots("bybit-live-main")
+    result = get_strategy_account_snapshot("strategy_funding_arbitrage_instance_default")
+    assert result.balance.currency == "USD"
+    assert result.account_risk.total_assets == 5000
+    assert result.account_risk.equity == 1000
+    assert result.account_risk.wallet_balance == 990
+
+
+def test_venue_fee_records_accumulate_and_conflicting_identity_rolls_back(monkeypatch, tmp_path):
+    bootstrap(tmp_path)
+    account = "account_mt5_short_term_a"
+    snapshot = base_snapshot(account)
+    snapshot["economicEvents"] = [
+        {
+            "source": "mt5",
+            "accountId": account,
+            "eventType": "fee",
+            "externalEventId": "fee:1",
+            "amount": "-0.1",
+            "currency": "USD",
+            "occurredAt": "2026-09-07T16:00:00Z",
+        }
+    ]
+    monkeypatch.setattr(
+        "app.live_venue_snapshot_sync.runtime_get", lambda path, params=None: StubResponse(snapshot)
+    )
+    assert sync_venue_snapshots(account).overall_status == "synced"
+    first = deepcopy(snapshot["economicEvents"][0])
+    snapshot["economicEvents"][0].update(externalEventId="fee:2", amount="0.02")
+    assert sync_venue_snapshots(account).overall_status == "synced"
+    assert sync_venue_snapshots(account).overall_status == "synced"
+    first["amount"] = "-9"
+    snapshot["economicEvents"] = [first]
+    snapshot["accountRisk"]["equity"] = "0"
+    assert sync_venue_snapshots(account).overall_status == "failed"
+    with connection() as db:
+        assert (
+            db.execute(
+                "SELECT COUNT(*) FROM venue_account_events WHERE account_id=?", (account,)
+            ).fetchone()[0]
+            == 2
+        )
+        assert (
+            db.execute(
+                "SELECT equity FROM account_risk_snapshots WHERE account_id=?", (account,)
+            ).fetchone()[0]
+            == "1000"
+        )
 
 
 def test_sync_failure_isolated_and_does_not_commit_partial_rows(

@@ -1,24 +1,25 @@
 from __future__ import annotations
 
-from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
 from datetime import datetime
 
-from fastapi import APIRouter, FastAPI
+from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
 from app.config import get_settings
 from app.schema_migrations import (
     PLATFORM_MIGRATIONS,
-    apply_platform_migrations,
     list_applied_migrations,
 )
 from app.user_product_migrations import (
     USER_PRODUCT_MIGRATIONS,
-    apply_user_product_migrations,
 )
 
-ALL_PLATFORM_MIGRATIONS = (*PLATFORM_MIGRATIONS, *USER_PRODUCT_MIGRATIONS)
+ALL_PLATFORM_MIGRATIONS = tuple(
+    sorted(
+        (*PLATFORM_MIGRATIONS, *USER_PRODUCT_MIGRATIONS),
+        key=lambda item: item.version,
+    )
+)
 
 
 class SchemaMigrationStatus(BaseModel):
@@ -34,33 +35,19 @@ class SchemaMigrationStatusResponse(BaseModel):
     migrations: list[SchemaMigrationStatus]
 
 
-@asynccontextmanager
-async def schema_lifespan(_: FastAPI) -> AsyncIterator[None]:
-    apply_platform_migrations()
-    apply_user_product_migrations()
-    yield
-
-
 settings = get_settings()
 router = APIRouter(
     prefix=f"{settings.api_prefix}/ops/schema-migrations",
-    lifespan=schema_lifespan,
 )
 
 
 @router.get("", response_model=SchemaMigrationStatusResponse, tags=["ops"])
 def schema_migration_status() -> SchemaMigrationStatusResponse:
-    applied_by_version = {
-        item["version"]: item for item in list_applied_migrations()
-    }
+    applied_by_version = {item["version"]: item for item in list_applied_migrations()}
     statuses: list[SchemaMigrationStatus] = []
     for migration in ALL_PLATFORM_MIGRATIONS:
         applied = applied_by_version.get(migration.version)
-        applied_at = (
-            datetime.fromisoformat(applied["appliedAt"])
-            if applied is not None
-            else None
-        )
+        applied_at = datetime.fromisoformat(applied["appliedAt"]) if applied is not None else None
         statuses.append(
             SchemaMigrationStatus(
                 version=migration.version,

@@ -26,9 +26,7 @@ class Mt5AcceptanceAdapter(Mt5PositionClosingAdapter):
 
     def _monitoring_instrument_identity(self, account_id: str, symbol: str) -> str:
         normalized_symbol = symbol.strip().upper()
-        digest = hashlib.sha256(
-            f"mt5:{account_id}:{normalized_symbol}".encode()
-        ).hexdigest()[:20]
+        digest = hashlib.sha256(f"mt5:{account_id}:{normalized_symbol}".encode()).hexdigest()[:20]
         return f"monitor:mt5:{account_id}:{digest}"
 
     def _resolve_read_instrument(
@@ -178,17 +176,13 @@ class Mt5AcceptanceAdapter(Mt5PositionClosingAdapter):
         normalized = symbol.upper()
         instrument_id = self.settings.mt5_instruments.get(normalized)
         if instrument_id is None:
-            raise GatewayConfigurationError(
-                "MT5 symbol is not mapped to a Platform instrument"
-            )
+            raise GatewayConfigurationError("MT5 symbol is not mapped to a Platform instrument")
         mt5 = self._connect()
         info = mt5.symbol_info(symbol)
         account = mt5.account_info()
         terminal = mt5.terminal_info()
         if info is None or account is None or terminal is None:
-            raise GatewayResultUnknownError(
-                f"MT5 specification query failed: {mt5.last_error()}"
-            )
+            raise GatewayResultUnknownError(f"MT5 specification query failed: {mt5.last_error()}")
         actual_login = str(getattr(account, "login", ""))
         secret = self._secret_for_account(account_id)
         return VenueInstrumentSpecification(
@@ -202,28 +196,37 @@ class Mt5AcceptanceAdapter(Mt5PositionClosingAdapter):
             priceTick=Decimal(str(getattr(info, "point", 0) or 0)),
             minQuantity=Decimal(str(getattr(info, "volume_min", 0) or 0)),
             quantityStep=Decimal(str(getattr(info, "volume_step", 0) or 0)),
-            maxMarketQuantity=Decimal(
-                str(getattr(info, "volume_max", 0) or 0)
-            ),
-            contractMultiplier=Decimal(
-                str(getattr(info, "trade_contract_size", 0) or 0)
-            ),
-            contractSize=Decimal(
-                str(getattr(info, "trade_contract_size", 0) or 0)
-            ),
+            maxMarketQuantity=Decimal(str(getattr(info, "volume_max", 0) or 0)),
+            contractMultiplier=Decimal(str(getattr(info, "trade_contract_size", 0) or 0)),
+            contractSize=Decimal(str(getattr(info, "trade_contract_size", 0) or 0)),
             trade_mode=str(int(getattr(info, "trade_mode", -1))),
             filling_mode=str(int(getattr(info, "filling_mode", -1))),
             accessChecks={
                 "accountLoginMatched": actual_login == str(secret["LOGIN"]),
-                "accountTradeAllowed": bool(
-                    getattr(account, "trade_allowed", False)
-                ),
-                "terminalTradeAllowed": bool(
-                    getattr(terminal, "trade_allowed", False)
-                ),
+                "accountTradeAllowed": bool(getattr(account, "trade_allowed", False)),
+                "terminalTradeAllowed": bool(getattr(terminal, "trade_allowed", False)),
+                "accountExpertTradeAllowed": bool(getattr(account, "trade_expert", False)),
+                "pythonTradeAllowed": getattr(terminal, "tradeapi_disabled", None) is False,
                 "symbolVisible": bool(getattr(info, "visible", False)),
             },
             asOf=datetime.now(UTC),
+            baseCurrency=str(getattr(info, "currency_base", "") or "") or None,
+            quoteCurrency=str(getattr(info, "currency_profit", "") or "") or None,
+            settlementCurrency=str(getattr(account, "currency", "") or "") or None,
+            rawPayload={
+                key: str(value)
+                for key in (
+                    "volume_min",
+                    "volume_step",
+                    "volume_max",
+                    "trade_contract_size",
+                    "point",
+                    "currency_base",
+                    "currency_profit",
+                    "currency_margin",
+                )
+                if (value := getattr(info, key, None)) is not None
+            },
         )
 
     def _snapshot(
@@ -237,16 +240,14 @@ class Mt5AcceptanceAdapter(Mt5PositionClosingAdapter):
         ticket = str(getattr(row, "ticket", 0))
         if ticket == "0":
             return None
-        route = get_order_route(external_order_id=ticket) or fallback_route
+        route = get_order_route(external_order_id=ticket, account_id=account) or fallback_route
         comment = str(getattr(row, "comment", "") or "")
         if route is None and comment:
-            route = get_order_route(external_client_id=comment)
+            route = get_order_route(external_client_id=comment, account_id=account)
         route_symbol = route.symbol if route is not None else ""
         symbol = str(getattr(row, "symbol", route_symbol)).upper()
         mapped_instrument_id = (
-            route.instrument_id
-            if route is not None
-            else self.settings.mt5_instruments.get(symbol)
+            route.instrument_id if route is not None else self.settings.mt5_instruments.get(symbol)
         )
         instrument_id, quality = self._resolve_read_instrument(
             account_id=route.account_id if route is not None else account,
@@ -268,13 +269,11 @@ class Mt5AcceptanceAdapter(Mt5PositionClosingAdapter):
         }
         initial = Decimal(str(getattr(row, "volume_initial", 0) or 0))
         current = Decimal(str(getattr(row, "volume_current", 0) or 0))
-        external_identity = f"external:{self.name}:{ticket}"
+        external_identity = f"external:{self.name}:{account}:{ticket}"
         return VenueOrderSnapshot(
             source=self.name,
             externalOrderId=ticket,
-            platformOrderId=(
-                route.platform_order_id if route is not None else external_identity
-            ),
+            platformOrderId=(route.platform_order_id if route is not None else external_identity),
             commandId=route.command_id if route is not None else external_identity,
             accountId=route.account_id if route is not None else account,
             instrumentId=instrument_id,
@@ -287,10 +286,7 @@ class Mt5AcceptanceAdapter(Mt5PositionClosingAdapter):
             filledQuantity=initial - current,
             averageFillPrice=None,
             occurredAt=self._seconds(getattr(row, "time_setup", None)),
-            asOf=self._seconds(
-                getattr(row, "time_done", None)
-                or getattr(row, "time_setup", None)
-            ),
+            asOf=datetime.now(UTC),
             dataQualityState=quality,
         )
 
@@ -304,18 +300,18 @@ class Mt5AcceptanceAdapter(Mt5PositionClosingAdapter):
     ) -> VenueOrderSnapshot | None:
         deal_ticket = str(getattr(deal, "ticket", 0))
         order_ticket = str(getattr(deal, "order", 0) or deal_ticket)
-        route = get_order_route(external_order_id=order_ticket)
+        route = get_order_route(external_order_id=order_ticket, account_id=account)
         if route is None:
-            route = get_order_route(external_order_id=deal_ticket) or fallback_route
+            route = (
+                get_order_route(external_order_id=deal_ticket, account_id=account) or fallback_route
+            )
         comment = str(getattr(deal, "comment", "") or "")
         if route is None and comment:
-            route = get_order_route(external_client_id=comment)
+            route = get_order_route(external_client_id=comment, account_id=account)
         route_symbol = route.symbol if route is not None else ""
         symbol = str(getattr(deal, "symbol", route_symbol)).upper()
         mapped_instrument_id = (
-            route.instrument_id
-            if route is not None
-            else self.settings.mt5_instruments.get(symbol)
+            route.instrument_id if route is not None else self.settings.mt5_instruments.get(symbol)
         )
         instrument_id, quality = self._resolve_read_instrument(
             account_id=route.account_id if route is not None else account,
@@ -325,21 +321,18 @@ class Mt5AcceptanceAdapter(Mt5PositionClosingAdapter):
         )
         quantity = Decimal(str(getattr(deal, "volume", 0) or 0))
         price = Decimal(str(getattr(deal, "price", 0) or 0))
-        external_identity = f"external:{self.name}:{order_ticket}"
+        external_identity = f"external:{self.name}:{account}:{order_ticket}"
         return VenueOrderSnapshot(
             source=self.name,
             externalOrderId=order_ticket,
-            platformOrderId=(
-                route.platform_order_id if route is not None else external_identity
-            ),
+            platformOrderId=(route.platform_order_id if route is not None else external_identity),
             commandId=route.command_id if route is not None else external_identity,
             accountId=route.account_id if route is not None else account,
             instrumentId=instrument_id,
             symbol=symbol,
             side=(
                 "buy"
-                if int(getattr(deal, "type", -1))
-                == int(getattr(mt5, "DEAL_TYPE_BUY", 0))
+                if int(getattr(deal, "type", -1)) == int(getattr(mt5, "DEAL_TYPE_BUY", 0))
                 else "sell"
             ),
             orderType="market",
@@ -349,7 +342,7 @@ class Mt5AcceptanceAdapter(Mt5PositionClosingAdapter):
             filledQuantity=quantity,
             averageFillPrice=price,
             occurredAt=self._deal_time(deal),
-            asOf=self._deal_time(deal),
+            asOf=datetime.now(UTC),
             dataQualityState=quality,
         )
 
@@ -368,16 +361,14 @@ class Mt5AcceptanceAdapter(Mt5PositionClosingAdapter):
         if target is not None and target not in {deal_ticket, order_ticket}:
             if fallback_route is None or comment != fallback_route.external_client_id:
                 return None
-        route = get_order_route(external_order_id=order_ticket)
+        route = get_order_route(external_order_id=order_ticket, account_id=account)
         if route is None:
-            route = get_order_route(external_order_id=deal_ticket)
+            route = get_order_route(external_order_id=deal_ticket, account_id=account)
         if route is None and comment:
-            route = get_order_route(external_client_id=comment)
+            route = get_order_route(external_client_id=comment, account_id=account)
         symbol = str(getattr(deal, "symbol", "")).upper()
         mapped_instrument_id = (
-            route.instrument_id
-            if route is not None
-            else self.settings.mt5_instruments.get(symbol)
+            route.instrument_id if route is not None else self.settings.mt5_instruments.get(symbol)
         )
         instrument_id, quality = self._resolve_read_instrument(
             account_id=route.account_id if route is not None else account,
@@ -385,51 +376,35 @@ class Mt5AcceptanceAdapter(Mt5PositionClosingAdapter):
             instrument_id=mapped_instrument_id,
             prefer_route=route is not None,
         )
-        external_identity = f"external:{self.name}:{order_ticket}"
+        external_identity = f"external:{self.name}:{account}:{order_ticket}"
         return VenueFillSnapshot(
             source=self.name,
             externalFillId=deal_ticket,
             externalOrderId=order_ticket,
-            platformOrderId=(
-                route.platform_order_id if route is not None else external_identity
-            ),
+            platformOrderId=(route.platform_order_id if route is not None else external_identity),
             commandId=route.command_id if route is not None else external_identity,
             accountId=route.account_id if route is not None else account,
             instrumentId=instrument_id,
             symbol=symbol,
             side=(
                 "buy"
-                if int(getattr(deal, "type", -1))
-                == int(getattr(mt5, "DEAL_TYPE_BUY", 0))
+                if int(getattr(deal, "type", -1)) == int(getattr(mt5, "DEAL_TYPE_BUY", 0))
                 else "sell"
             ),
             quantity=Decimal(str(getattr(deal, "volume", 0))),
             price=Decimal(str(getattr(deal, "price", 0))),
-            fee=abs(
+            fee=-(
                 Decimal(str(getattr(deal, "commission", 0) or 0))
                 + Decimal(str(getattr(deal, "fee", 0) or 0))
             ),
             currency=self._account_currency(mt5),
+            realizedPnl=Decimal(str(getattr(deal, "profit", 0) or 0)),
+            swap=Decimal(str(getattr(deal, "swap", 0) or 0)),
+            positionId=str(getattr(deal, "position_id", "") or "") or None,
+            entryType=getattr(deal, "entry", None),
             occurredAt=self._deal_time(deal),
             dataQualityState=quality,
         )
-
-    def _assert_no_existing_position(self, symbol: str) -> None:
-        maximum = self.settings.live_acceptance_max_positions_per_symbol
-        if maximum <= 0:
-            # Legacy position-count cap is disabled: zero means "no cap".
-            return
-        mt5 = self._connect()
-        try:
-            rows = mt5.positions_get(symbol=symbol) or ()
-        except Exception as exc:
-            raise GatewayResultUnknownError(
-                "MT5 pre-trade position result is unknown"
-            ) from exc
-        if len(rows) >= maximum:
-            raise GatewayRequestRejectedError(
-                "Live acceptance position limit is already reached"
-            )
 
     @staticmethod
     def _status(mt5, state: int) -> OrderStatus:

@@ -119,9 +119,7 @@ def _seed_funding_environment(tmp_path: Path) -> None:
     settings.default_trading_environment = "simulation"
     initialize_database()
     with connection() as db:
-        db.execute(
-            "UPDATE accounts SET status = 'active' WHERE id = 'account_sim_usdt'"
-        )
+        db.execute("UPDATE accounts SET status = 'active' WHERE id = 'account_sim_usdt'")
         db.execute(
             "UPDATE strategy_instances SET status = 'active' "
             "WHERE id = 'strategy_funding_arbitrage_instance_default'"
@@ -166,6 +164,7 @@ def _venue_positions(runtime_url: str, account_id: str) -> list[dict]:
 def test_funding_local_closed_loop_open_close_and_reconcile(
     runtime: tuple[str, Path],
     tmp_path: Path,
+    authorize_funding_ceo,
 ) -> None:
     runtime_url, _journal_dir = runtime
     _seed_funding_environment(tmp_path)
@@ -174,6 +173,7 @@ def test_funding_local_closed_loop_open_close_and_reconcile(
     settings.live_trading_enabled = True
 
     with TestClient(app) as client:
+        authorize_funding_ceo(client)
         opened = client.post(
             FUNDING_ENDPOINT,
             json={
@@ -211,37 +211,47 @@ def test_funding_local_closed_loop_open_close_and_reconcile(
             assert matches[0]["status"] == "filled", matches[0]
             assert Decimal(matches[0]["filledQuantity"]) == expected_fill[role]
 
-        # CLOSE the pair through the market command.
+        with connection() as db:
+            open_instruction_id = db.execute(
+                "SELECT strategy_instruction_id FROM execution_batches WHERE id=?",
+                (open_batch["batchId"],),
+            ).fetchone()[0]
+        # CLOSE through the same persisted instruction path used by the CEO UI.
         closed = client.post(
-            FUNDING_ENDPOINT,
+            "/api/v1/trading/funding/instructions",
             json={
-                "action": "CLOSE_SHORT_PERP_LONG_SPOT",
+                "action": "close",
+                "idempotencyKey": "funding-closed-loop-close",
+                "targetOpenInstructionId": open_instruction_id,
                 "perpetualSymbol": PERPETUAL_SYMBOL,
                 "spotSymbol": SPOT_SYMBOL,
                 "quantity": "1",
             },
         )
         assert closed.status_code == 200, closed.text
-        close_batch = closed.json()
+        close_batch = closed.json()["executionBatch"]
         assert close_batch["status"] == "hedged", close_batch
+        _reconcile_instruction_for_batch(close_batch["batchId"])
+        with connection() as db:
+            assert (
+                db.execute(
+                    "SELECT status FROM execution_batches WHERE id=?", (close_batch["batchId"],)
+                ).fetchone()[0]
+                == "completed"
+            )
 
         positions_after = _venue_positions(runtime_url, FUNDING_ACCOUNT_ID)
         perp_after = [
             p for p in positions_after if p.get("instrumentId") == "instrument_btc_usdt_perp"
         ]
-        spot_after = [
-            p for p in positions_after if p.get("instrumentId") == "instrument_btc_usdt"
-        ]
-        assert perp_after and all(
-            Decimal(p["netQuantity"]) == 0 for p in perp_after
-        ), perp_after
-        assert spot_after and all(
-            Decimal(p["netQuantity"]) == 0 for p in spot_after
-        ), spot_after
+        spot_after = [p for p in positions_after if p.get("instrumentId") == "instrument_btc_usdt"]
+        assert perp_after and all(Decimal(p["netQuantity"]) == 0 for p in perp_after), perp_after
+        assert spot_after and all(Decimal(p["netQuantity"]) == 0 for p in spot_after), spot_after
 
 
 def test_funding_local_closed_loop_fails_closed_when_runtime_unavailable(
     tmp_path: Path,
+    authorize_funding_ceo,
 ) -> None:
     _seed_funding_environment(tmp_path)
     settings = get_settings()
@@ -249,6 +259,7 @@ def test_funding_local_closed_loop_fails_closed_when_runtime_unavailable(
     settings.live_trading_enabled = True
 
     with TestClient(app) as client:
+        authorize_funding_ceo(client)
         opened = client.post(
             FUNDING_ENDPOINT,
             json={
@@ -279,6 +290,7 @@ def test_funding_local_closed_loop_fails_closed_when_runtime_unavailable(
 def test_funding_local_closed_loop_simulated_funding_settlement(
     runtime: tuple[str, Path],
     tmp_path: Path,
+    authorize_funding_ceo,
 ) -> None:
     runtime_url, journal_dir = runtime
     _seed_funding_environment(tmp_path)
@@ -287,6 +299,7 @@ def test_funding_local_closed_loop_simulated_funding_settlement(
     settings.live_trading_enabled = True
 
     with TestClient(app) as client:
+        authorize_funding_ceo(client)
         opened = client.post(
             FUNDING_ENDPOINT,
             json={

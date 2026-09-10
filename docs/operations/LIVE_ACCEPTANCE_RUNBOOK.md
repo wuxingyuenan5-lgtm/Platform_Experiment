@@ -1,8 +1,18 @@
 # Live Acceptance Runbook
 
-Status: active Platform 0.11.2 controlled-live operational contract.
+Status: active trading validation and operator evidence procedure; normal authorization is owned by AUTHORIZATION.md.
 
-This runbook governs controlled, instruction-bounded live acceptance. It does not authorize production rollout or Live Write activation. Any failed, unavailable or contradictory step immediately returns the system to read-only live mode and requires an accountable operator decision.
+Owner changed the product to normal trading on 2026-09-09. Normal CEO trading does not require acceptance sessions, staged mode approval, temporary windows, small-size/notional caps or temporary strategy/symbol lists. The validation cases below are operator evidence procedures, not extra permission gates. This document itself does not authorize a real order, closing an existing position, activating Live Write, or deployment. Execution uncertainty still stops further side effects and requires reconciliation.
+
+Before explicitly activating both live gates, inspect existing pending instructions, orders and active TP/SL plans: activation can resume their external side effects. Preserve existing positions and plans unless the Owner authorizes their disposition. MT5 must allow algorithmic trading and external Python API trading; Platform cannot override broker or terminal permissions.
+
+## Automated test isolation
+
+Automated tests must not inherit the business Runtime endpoint or reach live venues. A temporary Platform database or a `simulation` strategy label does not establish isolation when its account bindings still point to live accounts. Platform API tests default to an unavailable loopback Runtime and block socket connections to the business service ports and external networks. Integration tests use their own ephemeral loopback Runtime; tests of production venue adapters replace SDK I/O and independently deny external network access. Concurrency tests must explicitly configure their transport outcome.
+
+The default Platform test database is also assigned to a per-test temporary path, including tests that omit an explicit database fixture. Restoring incident records requires an online business backup, offline rehearsal, exact native identity/quantity/price verification, one atomic insertion of the selected original records, and a retained recovery audit. Do not copy test accounts, credentials, reservations or policies into the business database. Restored opening records keep their original caller and failure/incident provenance; recovery is not retroactive authorization for the opening trade.
+
+If a test reaches a business service, stop the test, retain the original test database and native order/fill evidence, and disclose the effect. Further real disposition requires operation-specific Owner authorization; test cleanup must not silently submit offsetting trades or rewrite the original facts.
 
 ## 0.1 Read-only real-account onboarding prerequisites
 
@@ -86,30 +96,21 @@ submits, cancels, transfers or changes venue state.
 
 The sequence is strict. A later step cannot compensate for a failed earlier step. Repository CI, simulation results, an order ACK or an application response cannot replace venue evidence.
 
-For Platform 0.11.1, the controlled execution order is Market in one direction, Market in the reverse direction, FOK, TP/SL, then PostOnly Chase. This explicit step gate controls where the shorthand sequence above is less specific; every later step remains blocked until its predecessor has evidence, reconciliation and forced reset.
+Market in both directions, FOK, TP/SL and PostOnly Chase remain distinct validation cases. Their earlier staged acceptance order is historical and does not gate normal trading.
 
-## 2. Mandatory safety boundaries
+## 2. Normal trading safety boundaries
 
-- Platform Live Write and Runtime Live Write are independent gates; both remain disabled except inside an owner-authorized supervised window.
-- Platform 0.11.1 permits one founder CEO/fund-manager to operate a founder-owned local test account under direct supervision. This is a narrow exception, not a precedent for client funds, multi-person operation, unattended trading, long-lived Live Write, production deployment, or expansion of funds, symbols or concurrency.
-- Each window has a named single responsible operator and a single pre-authorized Account, Strategy, Symbol, direction, quantity and execution mode. It is manually unlocked for one execution batch, must be started within 10 minutes and has an absolute 30-minute expiry.
-- Live and Simulation use different databases, Runtime Journals, Accounts and Credentials.
-- Account, Strategy and Symbol use exact allowlists. Each CEO instruction fixes both leg quantities and creates at most one execution batch; cumulative external fills may not exceed those instruction quantities.
-- ACK is not Fill. External terminal state and fill/deal evidence are authoritative for execution completion.
-- `result_unknown` forbids blind retry, blind rollback and duplicate business intent.
-- Query failure is unavailable evidence, never an empty position, zero balance, zero order or zero history result.
-- External Order, Fill, Deal and Position identities must remain traceable to Platform and Runtime facts.
-- Funds, quantity, symbols, concurrency and automation cannot expand before end-of-day reconciliation is complete.
-- Fixed position, notional, daily-volume, batch-count and loss caps are not part of the founder-owned local test-account contract. This does not relax one-instruction/one-batch identity, instruction quantity ceilings, global one-active-execution serialization, allowlists, bounded chase, Kill Switch, reconciliation or forced read-only reset.
-- Existing Platform and Runtime fixed-notional-cap code remains a controlled-live readiness blocker. It is retained unchanged in this rule-alignment slice for legacy compatibility and cannot be treated as owner-approved risk policy or readiness evidence; a separately authorized behavior change must align it before any Live Write window.
-- A process restart returns both Live Write gates to `false` unless the responsible operator explicitly restarts the managed topology with `scripts/dev-platform.ps1 -EnableLiveWrite` inside a currently authorized supervised window. The flag is a fresh startup choice, not automatic restoration and not order authorization. Connection loss, `result_unknown`, identity mismatch, position mismatch or expiry always returns both gates to `false`.
-- Inside an authorized window, Runtime startup must pay the Bybit client and fixed MT5 Worker connection/identity cost before reporting live execution ready. The first business command must not be used as a Terminal login or client-initialization probe.
-- Cross final confirmation is preceded by a read-only admission preparation that obtains both legs' current specifications, quotes and venue margin estimates. These facts may be reused only through a short Runtime cache; final submit still atomically rechecks persisted available balance and acquires resource claims/reservations. Preparation or cache presence never authorizes an order.
-- Credentials, private values and live evidence are not copied into source control, general logs or ordinary documentation.
+- CEO browser login and CSRF authorize Cross/Funding commands within active `trade_and_read` account bindings. Technical lead, employee/member, development fallback and API-Key admin do not automatically gain CEO trade authority.
+- Platform and Runtime Live Write remain independent, default-off operational controls. Starting with the explicit `-EnableLiveWrite` operator flag enables normal trading; it no longer enables founder-demo self-approval.
+- Runtime writable-account configuration remains authoritative; monitor accounts remain read-only. Temporary Strategy/Symbol acceptance lists and fixed-size/notional/daily/position-count caps no longer apply.
+- One instruction creates at most one batch; cumulative external fills may not exceed its quantities. Resource serialization, bounded chase, Kill Switch and reconciliation remain.
+- ACK is not Fill. Unknown outcomes prohibit blind retry, duplicate intent and blind rollback. Missing reads are unavailable evidence, never zero balances or empty positions.
+- MT5 account login, automated-trade permission, terminal algorithmic-trading permission, Python API permission and native lot specifications must all pass.
+- Opening or closing uses actual venue balances/margin, quantity precision and applicable order constraints. A code test never authorizes an external write.
 
 ## 3. Instruction-bounded execution-mode acceptance
 
-The responsible CEO specifies both leg quantities before each authorized window. Runtime validates current contract multiplier, minimum and quantity step, and cumulative external fills remain bounded by the immutable instruction quantities.
+The responsible CEO specifies the instruction quantities before submission; the frozen plan owns both leg quantities. Runtime validates current contract multiplier, minimum and quantity step, and cumulative external fills remain bounded by the immutable instruction quantities.
 
 ### Market
 
@@ -127,14 +128,14 @@ The responsible CEO specifies both leg quantities before each authorized window.
 
 ### TP/SL
 
-- Validate manual evaluation before any temporary Exit Monitor window.
+- Validate exit evaluation with isolated quotes and a stubbed execution boundary before enabling the monitor; real activation still requires explicit authorization.
 - TP and SL retain their own execution mode and limit strategy but execute the same controlled Close action.
 - Partial fill, post-submit timeout or unknown result does not release the Close claim.
 - No limit path silently falls back to Market or another strategy.
 
 ### PostOnly Chase
 
-- PostOnly Chase is disabled by default and enabled only in a dedicated supervised window after Market, FOK and TP/SL acceptance pass.
+- PostOnly Chase uses the normal live gates; the former acceptance-only enable flag is retired. Its hard limit, private stream health, finite TTL and mutation count still apply.
 - Private order/execution events are the primary state source; REST is bounded reconciliation evidence.
 - Only deduplicated cumulative fill exactly equal to requested quantity releases the second leg.
 - Partial fill, private-stream disconnect, sequence or identity anomaly, and cancel/fill race fail closed: stop Chase, submit no second leg and reconcile terminal state.
@@ -142,20 +143,29 @@ The responsible CEO specifies both leg quantities before each authorized window.
 
 ### Funding carry incremental hedge
 
-Funding controlled-live remains unavailable until the bounded PostOnly Chase
-and authoritative, deduplicated incremental release are proven for the affected build.
-The legacy two-market-leg endpoint is not acceptance evidence and must remain
-fail closed for controlled-live funding during that gap.
+Funding uses the normal authorized trading gates and the persisted perpetual-first
+instruction pipeline. Market, explicit-price FOK and bounded PostOnly Chase are
+separate validation cases for both open and partial/full close. Market submits once;
+FOK requires terminal exact full fill before Spot release. A confirmed zero-fill
+terminal order releases reservations only after all order/fill/release evidence is
+checked. Partial or unknown FOK results require reconciliation and never replay.
+The legacy two-market-leg endpoint is not acceptance evidence.
+
+- Funding quotes and plan creation must resolve the same account binding: live primary or simulation local_test, with matching account environment. Validate the native Spot/Perpetual contract identities, quantity steps, minimum quantities and price ticks before an Owner submits a new instruction. Repairing stale instance mode never changes or replays an existing immutable rejected plan.
+- A persisted rejection displays as failed and leaves active holdings; timeout recovery queries the original idempotency key only. Verify both cases in the UI without placing an additional live test order.
 
 - Funding carry opens and closes perpetual-first. Each newly proven, deduplicated perpetual cumulative-fill increment releases only its proportional Spot quantity rounded down to the current Spot quantity step.
 - Quantization remainder stays explicit until later proven cumulative fill makes another full Spot step releasable. Perpetual and Spot cumulative fills never exceed their respective CEO instruction quantities.
 - Every Spot release remains in the same execution batch and uses a deterministic child identity derived from the batch and cumulative released Spot quantity. Replayed `execId` values release nothing.
 - Disconnect, sequence or identity mismatch, unknown order state, terminal-cancel ambiguity or `result_unknown` freezes new releases and retains reconciliation-required state. A cancel acknowledgement alone is not terminal evidence and cannot authorize repost.
 - These incremental second-leg semantics apply only to funding carry. Cross-venue Market, FOK and PostOnly Chase retain their existing terminal-fill rules.
+- Platform's Funding monitor advances only accepted/executing/reconciling persisted instructions through their existing immutable plan. Browser disconnect does not stop a proven hedge's completion; unknown results and manual-intervention states never enter automatic replay. Reconciliation checks all child Order/Fill identities and cumulative quantities, then account positions. Bybit Spot is checked against actual base-coin cash after native fees, not a nonexistent Spot derivatives position.
+- CEO partial/full close reserves the original group's remaining quantity, uses actual canonical fills for closed quantity, and floors net Spot cash to the venue step. Missing fee evidence or native available cash blocks new closing instructions. Stale live balance evidence (over 90 seconds) also blocks admission.
+- Declaring concurrent Funding closes validates group capacity inside the same SQLite write transaction; their combined reserved quantity cannot exceed proven open fills. Admission rejection before a batch is claimed terminates that intent, so later background ticks cannot unexpectedly dispatch it after balances or claims change. A declared Spot child without a persisted command can resume using its original deterministic identity; any existing command is read idempotently, never replayed as a new order.
 
 ### Shared Bybit account concurrency
 
-Cross-spread and funding carry may use the same real Bybit UTA, logical Platform Account and credential reference. Trading permission may be configured before a controlled-live window, but both Live Write gates remain false outside an authorized scenario.
+Cross-spread and funding carry may use the same real Bybit UTA, logical Platform Account and credential reference. Normal execution follows the existing authorized account bindings and both Live Write gates; test success does not activate either gate.
 
 - Before a Batch may transition to `executing` or emit any `TradeCommand`, the complete resource claims and balance reservations required by its immutable plan must be acquired atomically in one transaction. Conflict, incomplete replay or insufficient balance rolls back the whole acquisition and emits no command.
 - Concurrent writes are permitted only when the immutable plans use disjoint `account + category + symbol` resources and sufficient authoritative available balance remains after active reservations.
@@ -186,7 +196,7 @@ The final disposition must be one of: unfilled legs canceled with proof, filled 
 - Accepted or unknown external orders are not claimed canceled without Venue evidence.
 - Manual intervention records the subject, observed evidence, difference category, responsible owner, next action and decision time.
 - The responsible CEO/fund-manager may trigger Kill Switch alone. It must be triggered automatically or manually on `result_unknown`, duplicate-order risk, first/second-leg quantity mismatch, external/platform position mismatch, Private Stream or critical-query loss, unmatched order/fill/position identity, any hard-limit breach, or inability to prove an external order terminal.
-- Release requires the responsible operator to manually verify external order status, actual positions, residual exposure, Runtime Journal and Platform records. Release never restores trading automatically: it only permits a new, separately authorized time-limited Live Write window.
+- Release requires the responsible operator to manually verify external order status, actual positions, residual exposure, Runtime Journal and Platform records. Release never restores trading automatically; further actions remain subject to the existing normal authorization and live gates.
 
 ## 6. End-of-day reconciliation
 
@@ -204,7 +214,7 @@ Every Difference receives a category, severity, responsible owner, evidence refe
 
 ## 6.1 Authorized step sequence and evidence
 
-Read-only venue/account/order/fill/deal/position verification, Platform/Runtime/database/venue shadow reconciliation, automated tests and fault injection must pass before any Live Write window. Controlled-live steps require separate owner authorization and proceed strictly in this order: Market in one direction, Market in the reverse direction, FOK, TP/SL, then PostOnly Chase. A failed step blocks all later steps.
+Use read-only venue/account/order/fill/deal/position verification, reconciliation and isolated fault tests for the relevant acceptance claim. Market, reverse direction, FOK, TP/SL and PostOnly Chase are independent evidence cases, not a mandatory authorization sequence for normal CEO trading. A failed case remains unverified and any affected live execution must respect the existing risk boundary.
 
 For every step retain the unlock and limits snapshot; operator, account, strategy, symbol and timestamps; pre-submit Bid/Ask, quote age and contract specification; request, correlation and idempotency identifiers; external Order, Fill, Deal and Position identities; acknowledgements, fills, fees and timestamps; before/after account, position, balance and PnL snapshots; Runtime Journal and Platform facts; shadow-reconciliation result; any Kill Switch or exception record; and proof of forced reset. Each step ends with venue-evidence review, end-of-day reconciliation and forced reset.
 
@@ -233,7 +243,7 @@ following in read-only mode:
   [Venue Adapter Contract](../contracts/VENUE_ADAPTERS.md).
 - Platform account binding is correct.
 - `management-overview` returns all six strategies with current status.
-- Reconciliation baseline is captured before any write window.
+- Capture a reconciliation baseline before an authorized live validation.
 - Platform Live Write remains `false`.
 - Runtime Live Write remains `false`.
 - Runtime `/status` must report `capabilities.liveWriteEnabled=false` before
@@ -241,13 +251,58 @@ following in read-only mode:
 - The local startup path must keep Runtime, Platform API and Platform Web
   running independently of transient test processes. `scripts/dev-platform.ps1`
   is the authority for start/status/stop/restart, persistent PID ownership and
-  login smoke verification. Its default startup contract keeps both Live Write
-  gates disabled; `-EnableLiveWrite` is valid only for an active Owner-authorized
-  supervised window. Both Python services must report an active project virtual
+  login smoke verification. Cold startup keeps both Live Write gates disabled;
+  `-EnableLiveWrite` enables explicitly Owner-authorized trading and
+  `-EnableLiveWrite:$false` explicitly disables it. Without an explicit flag,
+  start/restart/status read both running project backends and preserve their
+  matching mode. Partial, unreadable, foreign or inconsistent backend state
+  fails before any service is stopped. Saved process records establish process
+  ownership only; they never confer live permission.
+  Both Python services must report an active project virtual
   environment before the launcher accepts them as healthy.
-- Funding controlled-live still returns `423` until separately authorized and
-  fully ready.
-- No approved `LiveTradingSession` exists.
+- Lifecycle state JSON is read explicitly as UTF-8, including under Windows
+  PowerShell 5 with a non-ASCII repository path. A malformed or mismatched state
+  file must fail explicitly instead of silently reusing old processes during
+  restart. After maintenance, verify new process IDs/start times and the changed
+  API behavior; healthy endpoints alone do not prove that fixes were loaded.
+  The `status-platform.ps1` and `stop-platform.ps1` shortcuts delegate to this
+  same lifecycle owner; they must not maintain another process-state schema.
+- The operator wants both MT5 terminals to run hidden in the background while
+  algorithmic trading continues, matching the existing monitoring terminal.
+  Do not bring them to the foreground for routine reads or service maintenance.
+  A necessary interactive settings adjustment must end by restoring hidden
+  background operation; making the terminal accessible for that adjustment
+  does not change the operator's normal visibility preference.
+  Fixed-account workers must start an absent configured terminal with
+  `SW_HIDE`, wait for GUI initialization, then connect through the SDK. After
+  successful initialization, restore hidden top-level windows for the configured
+  terminal, including reconnection to an existing process, because MT5 can restore
+  its saved window layout during startup.
+  The SDK's default automatic relaunch can otherwise show a foreground window.
+  Initial connection and read-only IPC recovery share this startup path. Match
+  the executable's absolute path and preserve its configured portable mode.
+  The worker checks visibility at its one-second IPC polling boundary and hides
+  reappearing windows only for processes matching the configured absolute path.
+  Visibility maintenance does not reconnect, switch accounts or change trading permissions.
+- A fixed-account MT5 worker reuses an already authenticated matching Login/Server
+  instead of issuing another login during startup. Identity checks continue on
+  subsequent calls. Account/profile-change auto-disable protections remain enabled;
+  the platform must not force the Algorithmic Trading switch back on after a
+  deliberate operator shutdown.
+- Restoring existing Cross TP/SL requires both live gates and the local
+  `VG_CROSS_SPREAD_EXIT_MONITOR_ENABLED=true` setting. Verify the monitor startup
+  log, fresh executable quotes and the unchanged authorized plan thresholds;
+  changing a flag alone does not prove that the monitor is running.
+- Funding checks normal CEO authority, trading bindings, live gates and execution readiness.
+- Legacy `LiveTradingSession` records do not participate in normal trading admission.
+- Browser refresh/logout and backend interruption are separate cases. Follow the
+  [Cross execution contract](../contracts/CROSS_SPREAD_EXECUTION.md) for saved
+  TP/SL lifetime and outage limits. API restart must reuse the same database.
+  Existing-account startup smoke uses an invalid probe, not a new CEO login.
+  Prefer the existing browser session for read-only verification; repeated
+  independent test logins consume the five-session allowance. An isolated
+  authenticated verification must revoke only its own test session when finished.
+  Never revoke the operator session or change expiry limits to make a check pass.
 
 Funding page read-only execution context requirements:
 
@@ -279,16 +334,16 @@ Two states are valid:
   - no state-changing action on account, order, position or funds;
   - acceptance output remains redacted.
 
-## 7. Forced reset
+## 7. Operator-requested shutdown or isolated validation closeout
 
-Before leaving the supervised window, prove all of the following:
+Normal trading has no automatic acceptance-window expiry or after-each-batch reset. When the Owner requests shutdown or the end of an isolated live validation, verify:
 
 - Platform Live Write = `false`;
 - Runtime Live Write = `false`;
 - automatic Exit Monitor = `false`;
-- PostOnly Chase = `false`;
-- temporary Account/Strategy/Symbol allowlists are cleared;
-- the window's immutable instruction quantities and one-batch claim are retained with the evidence record;
+- no new PostOnly writes can pass the closed live gates;
+- normal account permission configuration is preserved;
+- the validation's immutable instruction quantities and one-batch claim are retained with the evidence record;
 - every external pending order has a proven terminal state;
 - every external position matches the Formal Position or has been explicitly transferred to accountable manual ownership;
 - Runtime Journal, Platform facts and EOD reconciliation evidence are retained.

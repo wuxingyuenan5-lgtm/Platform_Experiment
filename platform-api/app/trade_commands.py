@@ -82,7 +82,6 @@ def create_trade_command(request: CreateTradeCommandRequest) -> TradeCommandResp
         return trade_command_from_row(existing)
 
     validate_trade_command_catalog(request)
-    intent = get_order_execution_intent(request.idempotency_key)
     trade_command_id = str(uuid4())
     created_at = now_iso()
     with connection() as db:
@@ -149,6 +148,42 @@ def create_trade_command(request: CreateTradeCommandRequest) -> TradeCommandResp
             ),
         )
 
+    return _submit_claimed_command(request, trade_command_id)
+
+
+def retry_unsubmitted_trade_command(request: CreateTradeCommandRequest) -> TradeCommandResponse:
+    """Explicit recovery only: reuse a rejected command with no allocated order.
+
+    Orders are persisted before Runtime dispatch. An order in any state, or a
+    command already being processed, makes this path unavailable.
+    """
+    validate_trade_command_catalog(request)
+    with connection() as db:
+        db.execute("BEGIN IMMEDIATE")
+        row = find_trade_command_by_idempotency_key(request.idempotency_key, db=db)
+        if row is None:
+            raise HTTPException(409, "Recovery requires the original rejected command")
+        assert_trade_command_request_matches(row, request)
+        if row["status"] != "rejected" or row["order_id"] is not None:
+            raise HTTPException(409, "Command may have reached the venue; reconcile before retry")
+        db.execute(
+            "UPDATE trade_commands SET status='accepted',updated_at=? WHERE id=?",
+            (now_iso(), row["id"]),
+        )
+        db.execute(
+            "INSERT INTO audit_events(id,event_type,subject_type,subject_id,"
+            "details_json,created_at) "
+            "VALUES (?,'unsubmitted_command_reclaimed','trade_command',?,'{}',?)",
+            (str(uuid4()), row["id"], now_iso()),
+        )
+        command_id = row["id"]
+    return _submit_claimed_command(request, command_id)
+
+
+def _submit_claimed_command(
+    request: CreateTradeCommandRequest, trade_command_id: str
+) -> TradeCommandResponse:
+    intent = get_order_execution_intent(request.idempotency_key)
     try:
         order = submit_trade_command_order(
             CreateOrderRequest(

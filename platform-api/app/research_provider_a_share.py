@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Callable
-from datetime import date, datetime, timedelta
-from decimal import Decimal
 import json
+from collections.abc import Callable
+from datetime import UTC, date, datetime, timedelta
+from decimal import Decimal
 from typing import Any
 from urllib.parse import urlencode
 from urllib.request import ProxyHandler, Request, build_opener
+from zoneinfo import ZoneInfo
 
 import httpx
 
@@ -34,6 +35,10 @@ from app.research_provider_normalization import percentage_change as _pct_change
 from app.research_provider_normalization import trend_marker as _trend
 
 AkshareLoader = Callable[[], Any]
+
+# Match HTTPX trust_env=False's trust store without loading it synchronously
+# for every live request on the API event loop (costly on Windows).
+_HTTP_SSL_CONTEXT = httpx.create_ssl_context(trust_env=False)
 
 INDEX_DEFINITIONS: tuple[tuple[str, str, str], ...] = (
     # Market Overview: core benchmarks followed by the fixed theme basket.
@@ -101,7 +106,9 @@ class AShareResearchProvider:
             "Referer": "https://quote.eastmoney.com/center/boardlist.html#boards-BK06561",
         }
         try:
-            async with httpx.AsyncClient(timeout=self._timeout_seconds, trust_env=False) as client:
+            async with httpx.AsyncClient(
+                timeout=self._timeout_seconds, trust_env=False, verify=_HTTP_SSL_CONTEXT
+            ) as client:
                 responses = await asyncio.gather(
                     client.get(_EM_ALL_A_URL, params={**params, "po": "1"}, headers=headers),
                     client.get(_EM_ALL_A_URL, params={**params, "po": "0"}, headers=headers),
@@ -143,13 +150,24 @@ class AShareResearchProvider:
     async def market_turnover_top(self, limit: int = 20) -> list[AShareMarketTurnoverRow]:
         """Small live leaderboard; it never waits for the daily classification refresh."""
         params = {
-            "pn": "1", "pz": str(max(1, min(limit, 50))), "po": "1", "np": "1",
-            "fltt": "2", "invt": "2", "fid": "f6", "fs": _EM_ALL_A_FILTER,
+            "pn": "1",
+            "pz": str(max(1, min(limit, 50))),
+            "po": "1",
+            "np": "1",
+            "fltt": "2",
+            "invt": "2",
+            "fid": "f6",
+            "fs": _EM_ALL_A_FILTER,
             "fields": "f12,f14,f2,f3,f6,f20,f100",
         }
-        headers = {"User-Agent": self._user_agent, "Referer": "https://quote.eastmoney.com/center/gridlist.html#hs_a_board"}
+        headers = {
+            "User-Agent": self._user_agent,
+            "Referer": "https://quote.eastmoney.com/center/gridlist.html#hs_a_board",
+        }
         try:
-            async with httpx.AsyncClient(timeout=self._timeout_seconds, trust_env=False) as client:
+            async with httpx.AsyncClient(
+                timeout=self._timeout_seconds, trust_env=False, verify=_HTTP_SSL_CONTEXT
+            ) as client:
                 response = await client.get(_EM_ALL_A_URL, params=params, headers=headers)
                 response.raise_for_status()
                 diff = (response.json().get("data") or {}).get("diff") or []
@@ -163,11 +181,17 @@ class AShareResearchProvider:
             amount = _decimal(row.get("f6"))
             if len(code) != 6 or not name or amount is None:
                 continue
-            rows.append(AShareMarketTurnoverRow(
-                security_code=code, security_name=name, price=_decimal(row.get("f2")),
-                return_pct=_decimal(row.get("f3")), turnover_yuan=max(amount, Decimal("0")),
-                market_cap_yuan=_decimal(row.get("f20")), industry=str(row.get("f100") or "").strip() or None,
-            ))
+            rows.append(
+                AShareMarketTurnoverRow(
+                    security_code=code,
+                    security_name=name,
+                    price=_decimal(row.get("f2")),
+                    return_pct=_decimal(row.get("f3")),
+                    turnover_yuan=max(amount, Decimal("0")),
+                    market_cap_yuan=_decimal(row.get("f20")),
+                    industry=str(row.get("f100") or "").strip() or None,
+                )
+            )
         if not rows:
             raise ResearchProviderError("market_turnover_top_empty")
         return rows
@@ -189,12 +213,20 @@ class AShareResearchProvider:
             "Referer": "https://quote.eastmoney.com/center/gridlist.html#hs_a_board",
         }
         try:
-            async with httpx.AsyncClient(timeout=self._timeout_seconds, trust_env=False) as client:
-                first = await client.get(_EM_ALL_A_URL, params={**base_params, "pn": "1"}, headers=headers)
+            async with httpx.AsyncClient(
+                timeout=self._timeout_seconds, trust_env=False, verify=_HTTP_SSL_CONTEXT
+            ) as client:
+                first = await client.get(
+                    _EM_ALL_A_URL, params={**base_params, "pn": "1"}, headers=headers
+                )
                 first.raise_for_status()
                 first_data = first.json().get("data") or {}
                 total = int(first_data.get("total") or 0)
-                first_rows = list((first_data.get("diff") or {}).values()) if isinstance(first_data.get("diff"), dict) else list(first_data.get("diff") or [])
+                first_rows = (
+                    list((first_data.get("diff") or {}).values())
+                    if isinstance(first_data.get("diff"), dict)
+                    else list(first_data.get("diff") or [])
+                )
                 if total <= 0 or not first_rows:
                     raise ResearchProviderError("a_share_spot_empty")
                 page_count = (total + 99) // 100
@@ -202,7 +234,9 @@ class AShareResearchProvider:
                 # Vibe limits pagination concurrency to avoid upstream bursts.
                 for start in range(2, page_count + 1, 3):
                     requests = [
-                        client.get(_EM_ALL_A_URL, params={**base_params, "pn": str(page)}, headers=headers)
+                        client.get(
+                            _EM_ALL_A_URL, params={**base_params, "pn": str(page)}, headers=headers
+                        )
                         for page in range(start, min(start + 3, page_count + 1))
                     ]
                     for response in await asyncio.gather(*requests):
@@ -245,7 +279,15 @@ class AShareResearchProvider:
                     security_code=code,
                     security_name=name,
                     turnover_yuan=turnover,
+                    price=price,
                     return_pct=_decimal(row.get("f3")),
+                    observed_at=datetime.fromtimestamp(int(row["f124"]), UTC)
+                    if _decimal(row.get("f124"))
+                    else None,
+                    turnover_pct=_decimal(row.get("f8")),
+                    market_cap_yuan=_decimal(row.get("f20")),
+                    pe_ttm=_decimal(row.get("f9")),
+                    pb=_decimal(row.get("f23")),
                 )
             )
         if len(result) < 4500:
@@ -274,7 +316,9 @@ class AShareResearchProvider:
 
         return await asyncio.to_thread(load)
 
-    async def stock_daily_histories(self, codes: list[str]) -> dict[str, list[AShareIndexHistoryPoint]]:
+    async def stock_daily_histories(
+        self, codes: list[str]
+    ) -> dict[str, list[AShareIndexHistoryPoint]]:
         """Return daily close histories for the tracked pool, with no browser fan-out."""
         unique = [code for code in dict.fromkeys(str(code).strip() for code in codes) if code]
         semaphore = asyncio.Semaphore(4)
@@ -324,15 +368,29 @@ class AShareResearchProvider:
                     try:
                         price = Decimal(values[3])
                         previous = Decimal(values[4])
-                        amount_wan = Decimal(values[37] or "0")
+                        is_hk = key.startswith("hk")
+                        amount = Decimal(values[37] or "0")
+                        market_cap = _decimal(values[45])
+                        observed = datetime.strptime(
+                            values[30], "%Y/%m/%d %H:%M:%S" if is_hk else "%Y%m%d%H%M%S"
+                        ).replace(tzinfo=ZoneInfo("Asia/Shanghai"))
                         if price <= 0 or previous <= 0:
                             continue
                         result.append(
                             AShareTurnoverStock(
                                 security_code=code.zfill(6) if len(code) == 6 else code,
                                 security_name=values[1].strip(),
-                                turnover_yuan=max(amount_wan * Decimal("10000"), Decimal("0")),
+                                price=price,
+                                turnover_yuan=max(amount * (1 if is_hk else 10000), Decimal("0")),
+                                currency="HKD" if is_hk else "CNY",
                                 return_pct=(price / previous - 1) * Decimal("100"),
+                                observed_at=observed,
+                                turnover_pct=_decimal(values[38]) if not is_hk else None,
+                                market_cap_yuan=(market_cap * Decimal("100000000"))
+                                if market_cap is not None
+                                else None,
+                                pe_ttm=_decimal(values[39]),
+                                pb=_decimal(values[46]) if not is_hk else None,
                             )
                         )
                     except (ArithmeticError, ValueError, IndexError):
@@ -353,11 +411,10 @@ class AShareResearchProvider:
                 {"param": f"{symbol},day,,,300,qfq"},
                 headers={"User-Agent": "Mozilla/5.0"},
             )
-            node = ((payload.get("data") or {}).get(symbol) or {})
+            node = (payload.get("data") or {}).get(symbol) or {}
             rows = self._normalize_tencent_history(node.get("qfqday") or node.get("day") or [])
             return [
-                AShareIndexHistoryPoint(observed_at=row["date"], close=row["close"])
-                for row in rows
+                AShareIndexHistoryPoint(observed_at=row["date"], close=row["close"]) for row in rows
             ]
         except ResearchProviderError:
             return []
@@ -434,8 +491,7 @@ class AShareResearchProvider:
 
     async def index_snapshots(self) -> list[AShareIndexSnapshot]:
         tasks = [
-            self._index_snapshot(code, name, symbol)
-            for code, name, symbol in INDEX_DEFINITIONS
+            self._index_snapshot(code, name, symbol) for code, name, symbol in INDEX_DEFINITIONS
         ]
         # The public quote hosts throttle short concurrent bursts.  A bounded
         # sequential collection is eight requests and runs only in the refresh
@@ -444,18 +500,14 @@ class AShareResearchProvider:
         for task in tasks:
             try:
                 results.append(await task)
-            except BaseException as exc:
+            except Exception as exc:
                 results.append(exc)
         snapshots = [item for item in results if isinstance(item, AShareIndexSnapshot)]
-        expected = {code for code, _, _ in INDEX_DEFINITIONS[:4]}
-        missing = expected - {item.code for item in snapshots}
         # A rate-limited theme-index host must not suppress the four benchmark
         # cards. Theme data is retained from the last valid snapshot until its
         # own collector succeeds again.
-        if missing:
-            raise ResearchProviderError(
-                "a_share_index_history_incomplete:" + ",".join(sorted(missing))
-            )
+        if not snapshots:
+            raise ResearchProviderError("a_share_index_history_unavailable")
         return snapshots
 
     async def _index_snapshot(self, code: str, name: str, symbol: str) -> AShareIndexSnapshot:
@@ -526,7 +578,7 @@ class AShareResearchProvider:
                 {"param": f"{symbol},day,,,800,qfq"},
                 headers={"User-Agent": "Mozilla/5.0"},
             )
-            node = ((response.get("data") or {}).get(symbol) or {})
+            node = (response.get("data") or {}).get(symbol) or {}
             rows = node.get("qfqday") or node.get("day") or []
             return self._normalize_tencent_history(rows)
 
@@ -652,7 +704,9 @@ class AShareResearchProvider:
                     "date": observed,
                     "close": close,
                     # CSI reports trading value in CNY hundred-millions.
-                    "amount": turnover_yi * Decimal("100000000") if turnover_yi is not None else None,
+                    "amount": turnover_yi * Decimal("100000000")
+                    if turnover_yi is not None
+                    else None,
                 }
             )
         return history
@@ -677,66 +731,9 @@ class AShareResearchProvider:
             return None
 
     async def shenwan_memberships(self) -> list[ShenwanMembership]:
-        def load() -> list[ShenwanMembership]:
-            ak = self._akshare()
-            frame = ak.stock_industry_clf_hist_sw()
-            records = _records(frame)
-            l1_code_by_name: dict[str, str] = {}
-            l2_code_by_name: dict[str, str] = {}
-            try:
-                for row in _records(ak.sw_index_first_info()):
-                    name = str(_pick(row, "行业名称") or "").strip()
-                    code = str(_pick(row, "行业代码") or "").replace(".SI", "")
-                    if name and code:
-                        l1_code_by_name[name] = code
-                for row in _records(ak.sw_index_second_info()):
-                    name = str(_pick(row, "行业名称") or "").strip()
-                    code = str(_pick(row, "行业代码") or "").replace(".SI", "")
-                    if name and code:
-                        l2_code_by_name[name] = code
-            except Exception:
-                pass
+        from app.research_provider_shenwan import collect_shenwan_memberships
 
-            result: dict[str, ShenwanMembership] = {}
-            today = date.today()
-            version = f"akshare-sw-{today.isoformat()}"
-            for row in records:
-                code = str(
-                    _pick(row, "股票代码", "证券代码", "代码", "stock_code") or ""
-                ).strip()[-6:]
-                l1_name = str(
-                    _pick(row, "申万一级行业名称", "申万一级", "一级行业名称", "一级行业")
-                    or ""
-                ).strip()
-                l2_name = str(
-                    _pick(row, "申万二级行业名称", "申万二级", "二级行业名称", "二级行业")
-                    or ""
-                ).strip()
-                l1_code = str(
-                    _pick(row, "申万一级行业代码", "一级行业代码")
-                    or l1_code_by_name.get(l1_name, "")
-                ).replace(".SI", "")
-                l2_code = str(
-                    _pick(row, "申万二级行业代码", "二级行业代码")
-                    or l2_code_by_name.get(l2_name, "")
-                ).replace(".SI", "")
-                if len(code) != 6 or not l1_name or not l2_name or not l1_code or not l2_code:
-                    continue
-                effective = _date(_pick(row, "纳入时间", "开始日期", "变动日期")) or today
-                result[code] = ShenwanMembership(
-                    security_code=code,
-                    sw_l1_code=l1_code,
-                    sw_l1_name=l1_name,
-                    sw_l2_code=l2_code,
-                    sw_l2_name=l2_name,
-                    classification_version=version,
-                    effective_from=effective,
-                )
-            if not result:
-                raise ResearchProviderError("shenwan_membership_empty")
-            return sorted(result.values(), key=lambda item: item.security_code)
-
-        return await asyncio.to_thread(load)
+        return await collect_shenwan_memberships(timeout=self._timeout_seconds)
 
     async def short_term_emotion(self) -> ShortTermEmotionSnapshot:
         selected_date: date | None = None
@@ -816,7 +813,9 @@ class AShareResearchProvider:
             "date": trade_date,
         }
         try:
-            async with httpx.AsyncClient(timeout=self._timeout_seconds, trust_env=False) as client:
+            async with httpx.AsyncClient(
+                timeout=self._timeout_seconds, trust_env=False, verify=_HTTP_SSL_CONTEXT
+            ) as client:
                 response = await client.get(
                     f"https://push2ex.eastmoney.com/{endpoint}",
                     params=params,
@@ -826,6 +825,6 @@ class AShareResearchProvider:
                     },
                 )
                 response.raise_for_status()
-                return ((response.json().get("data") or {}).get("pool") or [])
+                return (response.json().get("data") or {}).get("pool") or []
         except (httpx.HTTPError, ValueError):
             return []

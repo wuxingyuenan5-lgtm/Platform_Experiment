@@ -4,6 +4,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import httpx
+import pytest
 from fastapi.testclient import TestClient
 
 from app.config import get_settings
@@ -11,7 +12,7 @@ from app.database import connection
 from app.main import app
 from app.user_service import create_initial_ceo, issue_browser_session
 
-STRATEGY_ID = "strategy_funding_arbitrage_instance_default"
+STRATEGY_ID = "strategy_generic_pipeline_test"
 ACCOUNT_ID = "account_sim_usdt"
 INSTRUMENT_ID = "instrument_btc_usdt"
 
@@ -99,7 +100,7 @@ def order_payload(key: str) -> dict[str, str]:
     }
 
 
-def test_two_person_approval_and_live_order_claim(monkeypatch, tmp_path: Path) -> None:
+def test_legacy_session_history_does_not_claim_normal_live_orders(monkeypatch, tmp_path: Path) -> None:
     configure_live(monkeypatch, tmp_path)
     monkeypatch.setattr("app.auth.has_ceo_trade_authority", lambda principal, settings: True)
     with TestClient(app) as client:
@@ -137,7 +138,7 @@ def test_two_person_approval_and_live_order_claim(monkeypatch, tmp_path: Path) -
         def runtime_unavailable(*args, **kwargs):
             raise httpx.ConnectError("runtime unavailable")
 
-        monkeypatch.setattr("app.trade_command_execution.httpx.post", runtime_unavailable)
+        monkeypatch.setattr("app.runtime_transport.post", runtime_unavailable)
         order = client.post(
             "/api/v1/trading/commands",
             headers=headers("trader-token"),
@@ -150,7 +151,7 @@ def test_two_person_approval_and_live_order_claim(monkeypatch, tmp_path: Path) -
             claims = db.execute(
                 "SELECT COUNT(*) AS count FROM live_trading_session_claims"
             ).fetchone()["count"]
-        assert claims == 1
+        assert claims == 0
 
 
 def test_applicant_cannot_self_approve_even_with_admin_role(monkeypatch, tmp_path: Path) -> None:
@@ -220,9 +221,12 @@ def test_founder_demo_ceo_can_request_self_approve_and_revoke_minimum_size_accep
         assert revoked.json()["status"] == "revoked"
 
 
-def test_live_order_without_approved_session_is_rejected(monkeypatch, tmp_path: Path) -> None:
+def test_live_order_without_approved_session_reaches_runtime(monkeypatch, tmp_path: Path) -> None:
     configure_live(monkeypatch, tmp_path)
     monkeypatch.setattr("app.auth.has_ceo_trade_authority", lambda principal, settings: True)
+    def runtime_unavailable(*args, **kwargs):
+        raise httpx.ConnectError("isolated runtime unavailable")
+    monkeypatch.setattr("app.runtime_transport.post", runtime_unavailable)
     with TestClient(app) as client:
         make_account_live()
         response = client.post(
@@ -230,8 +234,8 @@ def test_live_order_without_approved_session_is_rejected(monkeypatch, tmp_path: 
             headers=headers("trader-token"),
             json=order_payload("live-command-without-session"),
         )
-        assert response.status_code == 403
-        assert "LiveTradingSession" in response.json()["detail"]
+        assert response.status_code == 200
+        assert response.json()["status"] == "result_unknown"
 
 
 def test_limit_and_kill_switch_block_session_approval(monkeypatch, tmp_path: Path) -> None:
@@ -327,7 +331,7 @@ def test_live_order_claim_ignores_legacy_session_notional_caps(
         def runtime_unavailable(*args, **kwargs):
             raise httpx.ConnectError("runtime unavailable")
 
-        monkeypatch.setattr("app.trade_command_execution.httpx.post", runtime_unavailable)
+        monkeypatch.setattr("app.runtime_transport.post", runtime_unavailable)
         payload = order_payload("live-command-over-session-cap")
         payload["quantity"] = "2"
         payload["price"] = "100"
@@ -343,4 +347,7 @@ def test_live_order_claim_ignores_legacy_session_notional_caps(
             claims = db.execute(
                 "SELECT COUNT(*) AS count FROM live_trading_session_claims"
             ).fetchone()["count"]
-        assert claims == 1
+        assert claims == 0
+
+
+pytestmark = pytest.mark.usefixtures("generic_trading_instance")

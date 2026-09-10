@@ -130,6 +130,8 @@ CREATE TABLE IF NOT EXISTS fake_venue_order_scripts (
     partial_fill_quantity TEXT,
     partial_fill_price TEXT,
     cancel_terminal_after_queries INTEGER NOT NULL DEFAULT 0,
+    fill_fee TEXT NOT NULL DEFAULT '0',
+    fee_currency TEXT,
     created_at TEXT NOT NULL,
     consumed_at TEXT
 );
@@ -158,13 +160,19 @@ def ensure_store() -> None:
     with connection() as db:
         db.executescript(SCHEMA_SQL)
         _ensure_optional_order_columns(db)
+        script_columns = {
+            row["name"] for row in db.execute("PRAGMA table_info(fake_venue_order_scripts)")
+        }
+        if "fill_fee" not in script_columns:
+            db.execute(
+                "ALTER TABLE fake_venue_order_scripts ADD COLUMN fill_fee TEXT NOT NULL DEFAULT '0'"
+            )
+        if "fee_currency" not in script_columns:
+            db.execute("ALTER TABLE fake_venue_order_scripts ADD COLUMN fee_currency TEXT")
 
 
 def _ensure_optional_order_columns(db) -> None:
-    columns = {
-        row["name"]
-        for row in db.execute("PRAGMA table_info(fake_venue_orders)").fetchall()
-    }
+    columns = {row["name"] for row in db.execute("PRAGMA table_info(fake_venue_orders)").fetchall()}
     if "cancel_requested_at" not in columns:
         db.execute("ALTER TABLE fake_venue_orders ADD COLUMN cancel_requested_at TEXT")
     if "cancel_terminal_after_queries" not in columns:
@@ -199,12 +207,20 @@ def external_fill_id(platform_order_id: str) -> str:
     return f"FAKE-FILL-{platform_order_id}"
 
 
-def persist_filled_order(command: SubmitOrderCommand, fill_price: Decimal) -> tuple[str, str]:
+def persist_filled_order(
+    command: SubmitOrderCommand,
+    fill_price: Decimal,
+    *,
+    fee: Decimal = Decimal("0"),
+    fee_currency: str | None = None,
+) -> tuple[str, str]:
     return persist_order(
         command,
         status="filled",
         fill_price=fill_price,
         fill_quantity=command.quantity,
+        fee=fee,
+        fee_currency=fee_currency,
     )
 
 
@@ -215,12 +231,17 @@ def persist_order(
     fill_price: Decimal | None,
     fill_quantity: Decimal,
     cancel_terminal_after_queries: int = 0,
+    fee: Decimal = Decimal("0"),
+    fee_currency: str | None = None,
 ) -> tuple[str, str]:
     ensure_store()
     order_id = external_order_id(command.platform_order_id)
     fill_id = external_fill_id(command.platform_order_id)
     occurred_at = command.received_at.astimezone(UTC).isoformat()
     currency = quote_currency(command.symbol)
+    fee_currency = fee_currency or currency
+    if not fee.is_finite():
+        raise ValueError("Fake fill fee must be finite")
     with connection() as db:
         existing = db.execute(
             "SELECT external_order_id FROM fake_venue_orders WHERE platform_order_id = ?",
@@ -283,8 +304,8 @@ def persist_order(
                     command.side,
                     decimal_text(fill_quantity),
                     decimal_text(fill_price),
-                    "0",
-                    currency,
+                    decimal_text(fee),
+                    fee_currency,
                     occurred_at,
                 ),
             )
@@ -296,6 +317,40 @@ def persist_order(
                 occurred_at,
                 fill_quantity=fill_quantity,
             )
+            if fee != 0:
+                ensure_balance(db, command.account_id, fee_currency, occurred_at)
+                balance = db.execute(
+                    "SELECT equity,available_balance FROM fake_venue_balances "
+                    "WHERE account_id=? AND currency=?",
+                    (command.account_id, fee_currency),
+                ).fetchone()
+                db.execute(
+                    "UPDATE fake_venue_balances SET equity=?,available_balance=?,updated_at=? "
+                    "WHERE account_id=? AND currency=?",
+                    (
+                        decimal_text(Decimal(balance["equity"]) - fee),
+                        decimal_text(Decimal(balance["available_balance"]) - fee),
+                        occurred_at,
+                        command.account_id,
+                        fee_currency,
+                    ),
+                )
+                db.execute(
+                    "INSERT INTO fake_venue_economic_events "
+                    "(external_event_id,event_type,account_id,instrument_id,symbol,amount,currency,"
+                    "occurred_at,data_quality_state,payload_json) "
+                    "VALUES (?,'fee',?,?,?,?,?,?,'complete',?)",
+                    (
+                        f"FAKE-FEE-{fill_id}",
+                        command.account_id,
+                        command.instrument_id,
+                        command.symbol,
+                        decimal_text(-fee),
+                        fee_currency,
+                        occurred_at,
+                        json.dumps({"orderId": order_id, "fillId": fill_id}),
+                    ),
+                )
         ensure_balance(db, command.account_id, currency, occurred_at)
     return order_id, fill_id
 
@@ -325,7 +380,9 @@ def update_position(
     )
     effective_quantity = fill_quantity if fill_quantity is not None else command.quantity
     signed_fill = effective_quantity if command.side == "buy" else -effective_quantity
-    new_quantity, new_average = calculate_position(old_quantity, old_average, signed_fill, fill_price)
+    new_quantity, new_average = calculate_position(
+        old_quantity, old_average, signed_fill, fill_price
+    )
     db.execute(
         """
         INSERT INTO fake_venue_positions (
@@ -594,7 +651,9 @@ def _seed_configured_balances(db, account_id: str | None) -> None:
         ensure_balance(db, seed_account_id, currency, at)
 
 
-def get_order(*, platform_order_id: str | None = None, external_id: str | None = None) -> VenueOrderSnapshot | None:
+def get_order(
+    *, platform_order_id: str | None = None, external_id: str | None = None
+) -> VenueOrderSnapshot | None:
     ensure_store()
     if platform_order_id is None and external_id is None:
         raise ValueError("platform_order_id or external_id is required")
@@ -616,13 +675,16 @@ def get_market_quote(
     ensure_store()
     normalized = symbol.upper()
     with connection() as db:
-        row = db.execute("SELECT * FROM fake_venue_quotes WHERE symbol = ?", (normalized,)).fetchone()
+        row = db.execute(
+            "SELECT * FROM fake_venue_quotes WHERE symbol = ?", (normalized,)
+        ).fetchone()
         if row is None:
             at = now_iso()
             db.execute(
                 """
                 INSERT INTO fake_venue_quotes (symbol, bid, ask, last, updated_at)
                 VALUES (?, '99', '101', '100', ?)
+                ON CONFLICT(symbol) DO NOTHING
                 """,
                 (normalized, at),
             )
@@ -875,9 +937,7 @@ def order_from_row(row) -> VenueOrderSnapshot:
         filledQuantity=Decimal(row["filled_quantity"]),
         remainingQuantity=Decimal(row["quantity"]) - Decimal(row["filled_quantity"]),
         averageFillPrice=(
-            Decimal(row["average_fill_price"])
-            if row["average_fill_price"] is not None
-            else None
+            Decimal(row["average_fill_price"]) if row["average_fill_price"] is not None else None
         ),
         occurredAt=row["occurred_at"],
         asOf=row["updated_at"],
@@ -885,15 +945,16 @@ def order_from_row(row) -> VenueOrderSnapshot:
     )
 
 
-def claim_order_script(db, symbol: str):
+def claim_order_script(db, symbol: str, *, allow_nonterminal: bool = True):
     row = db.execute(
         """
         SELECT * FROM fake_venue_order_scripts
         WHERE upper(symbol) = upper(?) AND consumed_at IS NULL
+          AND (? OR behavior = 'filled')
         ORDER BY id
         LIMIT 1
         """,
-        (symbol,),
+        (symbol, allow_nonterminal),
     ).fetchone()
     if row is None:
         return None

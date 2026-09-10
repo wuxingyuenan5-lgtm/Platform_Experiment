@@ -1,6 +1,6 @@
 <template>
   <section class="market-terminal__detail">
-    <div class="market-terminal__panel-head market-terminal__panel-head--detail">
+    <div v-if="!readonly" class="market-terminal__panel-head market-terminal__panel-head--detail">
       <div class="market-terminal__detail-actions">
         <button type="button" class="market-terminal__toolbar-btn" @click="toggleEditMode">
           {{ editMode ? '完成编辑' : '编辑标的' }}
@@ -369,6 +369,7 @@
   const props = withDefaults(
     defineProps<{
       title?: string;
+      readonly?: boolean;
       columns: TerminalTableColumn[];
       groups: TerminalTableGroup[];
       marketId?: TerminalMarketId;
@@ -382,6 +383,8 @@
       rotationHeatmap: () => [],
     },
   );
+
+  const emit = defineEmits<{ (event: 'index-chart', code: string, name: string): void }>();
 
   const STORAGE_PREFIX = 'vg_hedge_market_detail_';
   const signalColumnKeys = ['d10', 'd20', 'd50', 'd200', 'x2050'] as const;
@@ -449,7 +452,7 @@
 
   function hydrateGroups() {
     const fallbackGroups = cloneGroups(props.groups);
-    const savedGroups = readSavedGroups();
+    const savedGroups = props.readonly ? null : readSavedGroups();
     editableGroups.value = savedGroups
       ? reconcileSavedGroups(fallbackGroups, savedGroups)
       : fallbackGroups;
@@ -923,6 +926,10 @@
   }
 
   async function openTickerChart(symbol: string, name: string, tvSymbolOverride?: string) {
+    if (props.readonly && props.marketId === 'aShare') {
+      emit('index-chart', symbol, name);
+      return;
+    }
     const tvSymbol = resolveTradingViewSymbol(props.marketId, symbol, tvSymbolOverride);
     if (!tvSymbol) return;
 

@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import atexit
+import logging
 import multiprocessing
 from pathlib import Path
 from threading import Lock
+from time import perf_counter
 from typing import Any
 
 from app.config import Settings
@@ -13,6 +15,8 @@ from app.gateway_errors import (
     GatewayResultUnknownError,
 )
 from app.journal import has_unresolved_command_for_account
+from app.mt5_connection import maintain_background_terminal
+from app.operational_metrics import VENUE_REQUEST_SECONDS, WORKER_READY, WORKER_STARTS
 
 _ERROR_TYPES = {
     "GatewayConfigurationError": GatewayConfigurationError,
@@ -31,6 +35,7 @@ _READ_METHODS = frozenset(
         "get_order",
         "list_balances",
         "list_economic_events",
+        "get_capital_flows",
         "list_fills",
         "list_orders",
         "list_positions",
@@ -56,13 +61,32 @@ class Mt5AccountWorkerClient:
         self._connection: Any | None = None
         self._write_frozen_command_id: str | None = None
         self._write_frozen_without_command = False
+        WORKER_READY.labels(self.account_id).set(0)
 
     def __getattr__(self, method: str):
         if method not in _ALLOWED_METHODS:
             raise AttributeError(method)
 
         def call(*args, **kwargs):
-            return self._call(method, *args, **kwargs)
+            started = perf_counter()
+            outcome = "error"
+            try:
+                result = self._call(method, *args, **kwargs)
+                outcome = "success"
+                return result
+            except GatewayResultUnknownError:
+                outcome = "result_unknown"
+                raise
+            except GatewayConfigurationError:
+                outcome = "configuration_error"
+                raise
+            except GatewayRequestRejectedError:
+                outcome = "rejected"
+                raise
+            finally:
+                VENUE_REQUEST_SECONDS.labels("mt5", method, outcome).observe(
+                    perf_counter() - started
+                )
 
         return call
 
@@ -151,6 +175,7 @@ class Mt5AccountWorkerClient:
             daemon=True,
         )
         process.start()
+        WORKER_STARTS.labels(self.account_id).inc()
         child.close()
         self._process = process
         self._connection = parent
@@ -170,8 +195,10 @@ class Mt5AccountWorkerClient:
         if status != "ready":
             self._close_unlocked()
             raise GatewayConfigurationError(str(payload))
+        WORKER_READY.labels(self.account_id).set_function(lambda: int(process.is_alive()))
 
     def _close_unlocked(self) -> None:
+        WORKER_READY.labels(self.account_id).set_function(lambda: 0)
         connection = self._connection
         process = self._process
         self._connection = None
@@ -256,9 +283,7 @@ def _run_account_worker(
                 # Every account uses a separately installed Terminal and its own
                 # normal-mode data directory. Portable copies are not a supported
                 # production identity boundary.
-                "mt5_terminal_portable": original.mt5_terminal_portable_for_account(
-                    account_id
-                ),
+                "mt5_terminal_portable": original.mt5_terminal_portable_for_account(account_id),
                 "mt5_check_timeout_seconds": max(
                     original.mt5_check_timeout_seconds,
                     30.0 if not is_primary else original.mt5_check_timeout_seconds,
@@ -272,16 +297,26 @@ def _run_account_worker(
         # Login/Server identity has been proven by an authoritative snapshot.
         _prove_worker_ready(gateway, account_id)
         connection.send(("ready", None, {"accountId": account_id}))
+        visibility_failed = False
         while True:
+            try:
+                maintain_background_terminal(terminal_path)
+                visibility_failed = False
+            except Exception:
+                # Window presentation must not interrupt execution or SDK identity.
+                if not visibility_failed:
+                    logging.getLogger(__name__).exception(
+                        "MT5 background window maintenance failed"
+                    )
+                visibility_failed = True
+            if not connection.poll(1.0):
+                continue
             message = connection.recv()
             if message[0] == "close":
                 break
             _, method, args, kwargs = message
             try:
-                if method == "capability":
-                    result = gateway.mt5.capability()
-                else:
-                    result = getattr(gateway, method)(*args, **kwargs)
+                result = _execute_worker_call(gateway, account_id, method, args, kwargs)
                 connection.send(("ok", None, result))
             except Exception as exc:
                 connection.send(("error", type(exc).__name__, str(exc)))
@@ -296,13 +331,31 @@ def _run_account_worker(
         try:
             import MetaTrader5 as mt5
 
-            mt5.shutdown()
+            sdk: Any = mt5
+            sdk.shutdown()
         except Exception:
             pass
         connection.close()
 
 
 def _prove_worker_ready(gateway: Any, account_id: str) -> None:
-    snapshot = gateway.get_account_snapshot(account_id)
+    # Startup needs an authoritative account identity, not a history backfill.
+    snapshot = gateway.get_account_risk(account_id)
     if str(getattr(snapshot, "account_id", "") or "") != account_id:
         raise GatewayConfigurationError("MT5 worker account identity mismatch")
+
+
+def _execute_worker_call(gateway: Any, account_id: str, method: str, args, kwargs):
+    def invoke():
+        if method == "capability":
+            return gateway.mt5.capability()
+        return getattr(gateway, method)(*args, **kwargs)
+
+    try:
+        return invoke()
+    except (GatewayConfigurationError, GatewayResultUnknownError):
+        if method not in _READ_METHODS or not gateway.mt5.recover_read_transport():
+            raise
+        # Read-only recovery does not replay writes or alter unresolved journal state.
+        _prove_worker_ready(gateway, account_id)
+        return invoke()

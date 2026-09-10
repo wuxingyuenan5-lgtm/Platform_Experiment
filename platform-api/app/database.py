@@ -10,6 +10,17 @@ from app.database_seeds import seed_reference_data as seed_reference_data
 
 
 def initialize_database() -> None:
+    from app.schema_migrations import PLATFORM_MIGRATIONS, apply_migrations
+    from app.user_product_migrations import USER_PRODUCT_MIGRATIONS
+
     with connection() as db:
         bootstrap_database(db)
         seed_reference_data(db)
+        apply_migrations(
+            db,
+            tuple(
+                sorted(
+                    (*PLATFORM_MIGRATIONS, *USER_PRODUCT_MIGRATIONS), key=lambda item: item.version
+                )
+            ),
+        )

@@ -7,16 +7,15 @@
 浏览器访问合同：[Browser Access and Product Data](../contracts/BROWSER_ACCESS_AND_PRODUCT_DATA.md)
 角色权限矩阵：[前端访问权限矩阵](ACCESS_MATRIX.md)
 
-## 1. 两类 Session 不是同一概念
+## 1. 正常交易与两类 Session
 
-平台存在两种名称相近但责任完全不同的 Session：
+2026-09-09 Owner 明确要求取消早期测试和初步验收限制，改为常规交易权限及对应风控。
 
-| 类型 | 目的 | 凭证/身份 | 能否授权真实交易 |
-|---|---|---|---|
-| Browser Session | 让会员和内部人员登录网页、访问个人账号和被授权的业务页面 | HttpOnly opaque Cookie → human Principal | 不能替代 API Key，也不能直接授权 Live Write |
-| LiveTradingSession | 对已经通过 API-Key 认证的真实交易 Command 提供限时、限范围、双人审批授权 | API-Key Principal + approved LiveTradingSession claim | 只有继续通过全部 Live 闸门时才可参与授权 |
+Browser Session 是正常网页登录凭证。有效的 CEO 登录会话通过 CSRF、角色权限和账户交易绑定后，可以发起 Cross/Funding 的开仓、平仓及获准管理操作；不需要另建 API Key 或临时实盘审批会话。API Key 继续用于已授权系统调用，API-Key admin 不自动等同人类 CEO。
 
-禁止把 Browser Session ID、Cookie 或 CSRF Token 写入 `LiveTradingSession`，也禁止把 LiveTradingSession ID 当作浏览器登录凭证。
+Cross/Funding 批次的 RiskAction 同样受 CEO 会话边界约束，包括故障后的平仓处置。CEO 的显式权限包含现有风险接口使用的 `risk:manage`；技术负责人、员工、会员和 API-Key admin 不能借通用风险接口绕过这两个策略的交易授权。
+
+旧 LiveTradingSession 的表、公共结构和兼容接口保留历史与审计语义。它的批准、过期、额度、次数、品种集合和验收窗口不参与正常订单授权，也不能绕过其他安全检查。
 
 ## 2. 总体安全边界
 
@@ -28,7 +27,6 @@ HTTP Request
 → Authenticated Principal
 → Actor / Target / Data Scope Binding
 → Business Validation
-→ [Live Write only] LiveTradingSession Claim
 → [Live Write only] Platform Live Gate / Kill Switch
 → [Live Write only] Runtime Live Gate
 → Venue
@@ -75,7 +73,7 @@ API-Key `admin` 保留 `*` 通配符兼容语义，但该通配符只能在 API-
 
 | 浏览器角色 | 正式业务页面 | 风险管理 | 用户管理 | 本人个人账号 | 写入边界 |
 |---|---|---|---|---|---|
-| CEO | 全部正式页面 | 允许 | 允许 | 允许 | 产品业务写权限保留，但仍受 Live Write、审批、Kill Switch 和全部交易安全门禁约束 |
+| CEO | 全部正式页面 | 允许 | 允许 | 允许 | 正常业务写权限；Cross/Funding 交易仅 CEO，仍受账户权限、Live Write、Kill Switch 和交易风控约束 |
 | 技术负责人 | 接近完整或完整的正式页面范围 | 允许 | 允许 | 允许 | 仍受全部正式安全门禁约束 |
 | 员工 | 全部正式业务页面只读 | 只读 | 用户列表只读 | 允许 | 仅本人获准的密码、头像、设备和会话等安全自助；无业务或其他账号写权限 |
 | 会员 | 规定范围内正式业务页面只读 | 禁止 | 禁止 | 必须允许 | 只能访问当前认证会员本人；不得读取其他账号或内部组织数据 |
@@ -86,7 +84,7 @@ API-Key `admin` 保留 `*` 通配符兼容语义，但该通配符只能在 API-
 - 直接 URL 与后端 API 必须独立验证权限和数据范围；
 - 浏览器角色只使用显式权限集；
 - API-Key 角色命名空间继续独立；
-- Browser Session 不能授权 Platform 或 Runtime Live Write；
+- Browser Session 可授权其角色获准的正常交易；Runtime 仍独立检查真实写入开关、交易账户与命令身份；
 - 前端菜单和路由转换不拥有后端授权决策。
 
 人类 CEO 使用显式业务权限集合，不返回或依赖 `*`。API-Key `admin` 不自动等同 CEO，`ceo` 也不是有效 API-Key 配置角色。
@@ -101,29 +99,23 @@ API-Key `admin` 保留 `*` 通配符兼容语义，但该通配符只能在 API-
 | `human_session` | Browser Session only | `/auth/me`、`/auth/logout`、`/auth/reauth`、`/me/**`、`/users/**` |
 | `platform_read` | Browser Session 或 API Key；non-live 可使用显式 Development Identity | 普通平台读取 |
 | `simulation_write` | Browser Session 或 API Key；non-live 可使用显式 Development Identity | 非 Live 模拟写入，仍需权限与领域校验 |
-| `live_write` | API Key only | 真实交易、核心风控和 LiveTradingSession 写操作 |
+| `live_write` | 有效 Browser Session 或 API Key，继续按角色和业务范围验证 | 真实交易及已开启真实写入时的非安全方法；Development Identity 不可用 |
 
 同一请求同时携带 Bearer 和 Browser Session Cookie 时返回歧义认证错误，不静默选择其中一种。
 
 ## 6. 环境规则
 
-### 6.1 Live
+### 6.1 Live 或已开启真实写入
 
-- Development Identity 永远禁用；
-- `live_write` 路由只允许 API Key；
-- Browser Session 可以访问声明为 `human_session` 的用户域接口；
-- Browser Session 可以访问明确允许的 `platform_read` 接口；
-- Browser Session 不能替代 API Key 申请、批准、认领或提交真实交易；
-- 匿名、无效配置、未知角色和无法识别的保障等级全部拒绝。
+- Development Identity 不得提交写请求；本地环境标记不是匿名真实交易的许可。
+- 正常网页写入使用有效 Browser Session、CSRF 和明确业务权限；Cross/Funding 的交易必须通过 CEO 边界。
+- API Key 的角色与权限继续独立解析。API-Key admin 不自动获得 CEO 的策略交易权限。
+- 匿名、无效凭证、过期会话、未知角色、身份冲突和越权账户均拒绝。
+- 真实账户下单继续要求 Platform 与 Runtime 的真实写入总开关。正常登录不自动开启总开关。
 
-现有 `auth_mode=api_key` 是 Live 系统凭证配置要求，但不解释为“生产环境所有网页接口只能 Bearer”。路由保障等级负责区分人类网页访问和真实写入。
+### 6.2 未开启真实写入的本地开发
 
-### 6.2 Non-live
-
-- 可以使用显式 Development Identity 维持本地和 CI 的旧接口流程；
-- Development Identity 的 User ID 和 API-Key 命名空间 Roles 必须配置有效；
-- Browser Session 可测试真实的用户身份边界；
-- 切换到 Live 后 Development Identity 立即失效。
+显式 Development Identity 可用于模拟测试；开启真实写入后不再允许它提交写请求。Browser Session 可在本地验证与正式环境相同的角色边界。
 
 ## 7. Browser Session 安全规则
 
@@ -173,6 +165,10 @@ X-CSRF-Token
 
 CSRF 原始值只存在于当前浏览器内存；数据库保存哈希。用户系统或持仓客户端收到 401 时清除内存 CSRF。API-Key 请求不使用 Browser CSRF 机制。
 
+页面刷新及 API 正常重启通过原 Cookie 重新读取持久化 Session，不创建新会话或延长绝对有效期。`/auth/me` 的网络错误、408、429 和无明确认证失效代码的 5xx 表示暂时无法完成验证：清空受保护的前端状态，显示连接失败及重试入口；重试只读取原会话。明确的 401、账号停用或认证失效继续进入登录流程，不能使用缓存身份放行。30 分钟空闲按成功的认证请求续期，后台策略执行不替浏览器续期。
+
+Browser Session 控制人类发起新操作的权限，不拥有已保存策略指令的生命周期。Cross 自动退出的后台运行与停机边界归 [Cross 执行合同](CROSS_SPREAD_EXECUTION.md)。
+
 ## 8. Password 和初始 CEO
 
 - 密码使用 Argon2id；
@@ -195,7 +191,7 @@ CSRF 原始值只存在于当前浏览器内存；数据库保存哈希。用户
 | `trade:submit` | TradeCommand、ExecutionBatch |
 | `risk:manage` | Kill Switch、Risk Policy、RiskAction |
 | `operations:run` | Fact Import、Venue Reconciliation、EOD Run |
-| `reconciliation:review` | Difference Resolution |
+| `reconciliation:review` | Difference Resolution、单笔订单 `reconcile` / `venue-reconcile` 的证据读取与事实回补 |
 | `eod:review` | EOD Review |
 
 受控的 Cross 与 Funding 实例不接受公共 TradeCommand、ExecutionBatch、旧 Strategy Run、通用 StrategyInstruction 或 deprecated raw Order 入口。前四类请求按策略实例直接拒绝；raw Order 本身不携带策略身份，因此只要账户存在有效的受控策略交易绑定即拒绝。它们必须进入策略专用 lifecycle/instruction 主链；该路由封堵与 CEO 权限检查同时成立，不能以客户端入口选择替代业务授权。
@@ -203,6 +199,8 @@ CSRF 原始值只存在于当前浏览器内存；数据库保存哈希。用户
 | `live_session:approve` | 批准实盘会话 |
 | `live_session:revoke` | 撤销实盘会话 |
 | `admin:write` | 未明确分类的旧管理写操作 |
+
+`POST /api/v1/trading/orders/{orderId}/reconcile` 与 `venue-reconcile` 使用已有 `reconciliation:review`，允许有该权限的 CEO 从 Runtime Journal 或原生证据恢复订单、成交与费用，浏览器 CSRF 仍须通过；两者不能发起新的 Venue 订单。`resolve-missing-external` 的管理权限与显式差异接受要求保持独立，不随该查询/导入接口放宽。
 
 Financial AI 的状态、研究数据、连接检查和普通分析使用 `platform:read`。服务端共享 AI 配置的保存、替换和清除使用现有 `settings.write`；该边界同时适用于 Browser Session 和 API-Key Principal，不得由页面私有角色或按钮可见性放宽。详细语义见 [Financial AI 合同](FINANCIAL_AI.md)。
 
@@ -271,79 +269,21 @@ Audit 写入失败不能使请求 fail-open；原本应拒绝的请求仍然拒�
 
 用户域敏感成功写操作与审计在同一事务提交。审计不保存密码、原始 Token、完整联系方式、头像内容或完整客户持仓快照。
 
-## 12. LiveTradingSession 状态
+## 12. 旧 LiveTradingSession 兼容记录
 
-```text
-pending → approved → expired
-   │          │
-   └──────────┴→ revoked
-```
+原有 pending、approved、revoked、expired 状态、申请/批准人和窗口数据继续保留，不重写既有审计。兼容接口修改这些记录不会启用或撤销正常交易权限。正常交易不再执行 LiveTradingSession Claim，也不受旧的双人审批、只读证据时效、重叠窗口、EOD 放量审批和固定额度控制。
 
-- pending：已申请，未获第二人批准；
-- approved：可在时间、范围和额度内认领 Live Command；
-- revoked：风险人员主动撤销，不可恢复；
-- expired：结束时间已到，由查询或认领流程惰性更新。
+## 13. 正常订单的持续安全边界
 
-## 13. 双人审批
+在已授权请求或既有指令执行链中，真实订单须检查：
 
-Applicant 来自 API-Key 请求 Principal。Approver 来自批准请求 Principal。
+- 完整 StrategyInstance、Command 与账户身份；活动账户及 `trade_and_read` 绑定；
+- Platform 与 Runtime Live Write；Runtime 可交易账户配置和原生账户读写权限；
+- 全局、策略、账户 Kill Switch；尚未处理的对账差异；已确认拒单的 `accepted/missing_external` 记录沿用现有例外；
+- 实际余额与保证金、Venue 数量最小值/步长/最大值、价格精度和 MT5 终端权限；
+- 同一业务意图、命令幂等、资源占用、累计成交不超指令、平仓归属与结果未知时停止副作用。
 
-约束：
-
-- Approver 必须具备 `risk_officer` 或 `admin`；
-- Applicant User ID 与 Approver User ID 必须不同；
-- Approval 只允许 pending → approved；
-- Approval 原因、User ID 和时间不可被后续请求覆盖；
-- 修改 Session Payload 必须使用新 Idempotency Key 新建申请；
-- Browser Session CEO 身份不能替代 API-Key Applicant 或 Approver。
-
-## 14. LiveTradingSession Scope
-
-LiveTradingSession 固化：
-
-- StrategyInstance / Account；
-- Symbol Set；
-- Side Set；
-- Order Type Set；
-- Starts At / Ends At；
-- Per-order Notional；
-- Daily Notional；
-- Read-only Evidence；
-- Session Type。
-
-`minimum_size_acceptance` 是必须保留的 public schema legacy compatibility 标识，不再表示 owner 要求固定最小仓位或 `1 oz` 上限。`existing_limits` 需要最新 Clean EOD。`scale_change` 在独立扩大规模流程落地前始终阻断。当前 Per-order / Daily Notional 字段及校验仍是 legacy fixed-cap 实现；在后续行为对齐完成前，它们是 controlled-live readiness blocker，不是 owner 风险合同。
-
-## 15. Approval Blockers
-
-批准与每次 Command Claim 都必须重新检查：
-
-- Legacy Platform fixed-notional enforcement；当前代码仍检查，但只构成 controlled-live readiness blocker，不构成 owner 要求的固定 cap；
-- Kill Switch；
-- Open / Accepted Reconciliation Difference；
-- Approved Session 时间重叠；
-- Existing-limit EOD Gate；
-- Session Type 规则。
-
-批准后出现 Kill Switch 或 Difference 时，LiveTradingSession 不再可用于新 Command，即使状态仍为 approved。
-
-## 16. Command Claim
-
-LiveTradingSession Claim 使用 Command ID 作为唯一身份：
-
-```text
-Command ID
-+ Strategy / Account / Symbol / Side / Order Type
-+ Quantity / Price
-→ Payload Hash
-→ Atomic Notional Claim
-```
-
-- 相同 Command 与相同 Payload 返回原 LiveTradingSession ID；
-- 相同 Command 与不同 Payload 返回 409；
-- 必须唯一匹配一个 Active Approved LiveTradingSession；
-- 必须使用正数 Price 计算 Notional；当前 Live Market Order 无明确价格时拒绝；
-- Claim 在创建 Platform Order 和调用 Runtime 之前完成；
-- Platform Session Limit 与 Runtime Limit 均需通过。
+历史验收的固定数量、单笔/每日名义额度、持仓组数量、Strategy/Symbol 临时白名单不再参与下单。每条指令自身的数量上限、有限追价次数/时长及真实账户范围继续有效。
 
 ## 17. 失败语义
 
@@ -366,7 +306,7 @@ Command ID
 - 账号、凭证、Provider、Broker 与 Venue 的真实连接和权限；
 - 生产监控、告警、回滚和灾备演练。
 
-当前 API-Key 配置适合单机小型私募的受控部署边界，不等同完整企业身份提供商。认证、审批、代码完成、候选验证和 CI 均不能自动打开 Platform 或 Runtime Live Write。
+当前 API-Key 配置适合单机小型私募的受控部署边界，不等同完整企业身份提供商。认证、代码完成、候选验证和 CI 均不能自动打开 Platform 或 Runtime Live Write。
 
 ## 19. Product authority and scope
 

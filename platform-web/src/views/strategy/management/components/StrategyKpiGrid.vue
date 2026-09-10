@@ -3,7 +3,6 @@
     <article v-for="item in items" :key="item.label" :class="`tone-${item.tone || 'neutral'}`">
       <span>{{ item.label }}</span>
       <strong>{{ item.value }}</strong>
-      <small>{{ item.note }}</small>
     </article>
   </section>
 </template>
@@ -31,8 +30,7 @@
     box-shadow: var(--strategy-shadow, 0 8px 24px rgba(23, 35, 57, 0.05));
   }
 
-  span,
-  small {
+  span {
     color: var(--strategy-text-3, #778396);
   }
 

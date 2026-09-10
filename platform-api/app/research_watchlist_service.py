@@ -43,6 +43,8 @@ def utc_now_iso() -> str:
 
 def normalize_stock_code(value: str) -> str:
     compact = re.sub(r"\s+", "", value.strip().upper())
+    if re.fullmatch(r"\d{5}", compact):
+        return compact
     match = _STOCK_CODE_PATTERN.fullmatch(compact)
     return match.group(1) if match else ""
 

@@ -132,6 +132,7 @@ def get_order_route(
     platform_order_id: str | None = None,
     external_order_id: str | None = None,
     external_client_id: str | None = None,
+    account_id: str | None = None,
 ) -> LiveOrderRoute | None:
     ensure_live_store()
     filters = {
@@ -143,12 +144,25 @@ def get_order_route(
     if len(selected) != 1:
         raise ValueError("Exactly one live order identity is required")
     field, value = selected[0]
+    account_filter = " AND account_id = ?" if account_id is not None else ""
+    params = (value, account_id) if account_id is not None else (value,)
     with connection() as db:
         row = db.execute(
-            f"SELECT * FROM live_order_routes WHERE {field} = ?",
-            (value,),
+            f"SELECT * FROM live_order_routes WHERE {field} = ?" + account_filter,
+            params,
         ).fetchone()
     return route_from_row(row) if row is not None else None
+
+
+def list_instrument_routes(*, account_id: str, symbol: str, adapter: str) -> list[LiveOrderRoute]:
+    """Resolve an account's native instrument identity from persisted order routes."""
+    ensure_live_store()
+    with connection() as db:
+        rows = db.execute(
+            "SELECT * FROM live_order_routes WHERE account_id=? AND symbol=? AND adapter=?",
+            (account_id, symbol.upper(), adapter),
+        ).fetchall()
+    return [route_from_row(row) for row in rows]
 
 
 def claim_live_write(

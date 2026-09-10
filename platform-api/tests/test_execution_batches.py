@@ -24,7 +24,7 @@ from app.execution_batches import (
 from app.main import app
 from app.schemas import CreateExecutionBatchRequest, TradeCommandResponse
 
-STRATEGY_INSTANCE_ID = "strategy_funding_arbitrage_instance_default"
+STRATEGY_INSTANCE_ID = "strategy_generic_pipeline_test"
 
 
 def filled_runtime_response(command: dict[str, object]) -> object:
@@ -106,7 +106,7 @@ def cross_strategy_payload(*, idempotency_key: str) -> dict[str, object]:
     )
     payload.update(
         {
-            "strategyInstanceId": "strategy_cross_venue_spread_instance_default",
+            "strategyInstanceId": "strategy_generic_cross_test",
             "strategyKey": "cross_venue_spread",
             "direction": "close_short_spread",
         }
@@ -191,7 +191,7 @@ def test_execution_batch_becomes_hedged_and_creates_two_commands(
         runtime_calls += 1
         return filled_runtime_response(kwargs["json"])
 
-    monkeypatch.setattr("app.trade_command_execution.httpx.post", runtime_post)
+    monkeypatch.setattr("app.runtime_transport.post", runtime_post)
 
     account_id = "account_sim_usdt"
     spot_id = "instrument_btc_usdt"
@@ -255,7 +255,7 @@ def test_second_leg_unknown_requires_manual_intervention(
             return filled_runtime_response(kwargs["json"])
         raise httpx.ConnectError("runtime unavailable")
 
-    monkeypatch.setattr("app.trade_command_execution.httpx.post", runtime_post)
+    monkeypatch.setattr("app.runtime_transport.post", runtime_post)
 
     account_id = "account_sim_usdt"
     spot_id = "instrument_btc_usdt"
@@ -405,7 +405,7 @@ def test_same_key_swapped_legs_conflict_without_new_effects(
         runtime_calls += 1
         return filled_runtime_response(kwargs["json"])
 
-    monkeypatch.setattr("app.trade_command_execution.httpx.post", runtime_post)
+    monkeypatch.setattr("app.runtime_transport.post", runtime_post)
     payload = batch_payload(
         "account_sim_usdt",
         "instrument_btc_usdt",
@@ -467,7 +467,7 @@ def test_persisted_unresolved_batch_blocks_new_instruction_after_restart(
         runtime_calls += 1
         return filled_runtime_response(kwargs["json"])
 
-    monkeypatch.setattr("app.trade_command_execution.httpx.post", runtime_post)
+    monkeypatch.setattr("app.runtime_transport.post", runtime_post)
     with TestClient(app) as restarted_client:
         response = restarted_client.post(
             "/api/v1/trading/execution-batches",
@@ -508,7 +508,7 @@ def test_unrelated_account_residue_does_not_block_new_instruction(
         runtime_calls += 1
         return filled_runtime_response(kwargs["json"])
 
-    monkeypatch.setattr("app.trade_command_execution.httpx.post", runtime_post)
+    monkeypatch.setattr("app.runtime_transport.post", runtime_post)
     with TestClient(app) as client:
         response = client.post(
             "/api/v1/trading/execution-batches",
@@ -546,7 +546,7 @@ def test_terminal_hedged_batch_with_uncertain_leg_releases_same_account_admissio
         runtime_calls += 1
         return filled_runtime_response(kwargs["json"])
 
-    monkeypatch.setattr("app.trade_command_execution.httpx.post", runtime_post)
+    monkeypatch.setattr("app.runtime_transport.post", runtime_post)
     with TestClient(app) as client:
         response = client.post(
             "/api/v1/trading/execution-batches",
@@ -587,7 +587,7 @@ def test_result_unknown_disposition_retains_lease_after_failed_batch_state(
         runtime_calls += 1
         return filled_runtime_response(kwargs["json"])
 
-    monkeypatch.setattr("app.trade_command_execution.httpx.post", runtime_post)
+    monkeypatch.setattr("app.runtime_transport.post", runtime_post)
     with TestClient(app) as client:
         response = client.post(
             "/api/v1/trading/execution-batches",
@@ -622,7 +622,7 @@ def test_proven_terminal_batch_releases_global_admission(
         leg_status="filled" if terminal_status == "hedged" else "failed",
     )
     monkeypatch.setattr(
-        "app.trade_command_execution.httpx.post",
+        "app.runtime_transport.post",
         lambda *args, **kwargs: filled_runtime_response(kwargs["json"]),
     )
 
@@ -892,7 +892,7 @@ def test_shared_account_claims_allow_different_symbols_and_block_same_resource(
             _claim_batch_execution_resources(
                 db,
                 batch_id="batch-btc-conflict",
-                strategy_instance_id="strategy_cross_venue_spread_instance_default",
+                strategy_instance_id="strategy_generic_cross_test",
                 legs=[
                     SimpleNamespace(
                         account_id="account_sim_usdt",
@@ -938,3 +938,6 @@ def test_shared_account_claims_allow_different_symbols_and_block_same_resource(
         "BTCUSDT",
         "ETHUSDT",
     }
+
+
+pytestmark = pytest.mark.usefixtures("generic_trading_instance")

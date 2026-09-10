@@ -96,6 +96,29 @@ Authoritative venue evidence / imported statements
 
 Research freshness, model output and operational projections are deliberately separate. Formal projections are rebuilt only from immutable financial facts; operational projections are never accounting inputs. Reusing research data in another module does not transfer authority: the receiving module must authenticate the user and apply its own contract. Only the trading flow may reach `execution-runtime`, and only through the versioned command boundary and existing Live Write gates.
 
+## Strategy implementation choice (2026-09-08)
+
+The approved second-version optimization uses route A: retain the current order kernel and replace bounded shared responsibilities with maintained components. Platform still owns strategy policy, immutable plans and reservations; Runtime remains the sole owner of venue side effects and execution evidence. This is a Windows implementation. Future Linux hosting is a separate deployment decision.
+
+The isolated `nautilus_trader==1.231.0` Windows probe ran its actual live execution engine with a mock execution client. Partial fills `0.2/0.1/0.2`, duplicate trade delivery, order-event replay and a late fill after cancellation behaved as recorded by `execution-runtime/scripts/probe_nautilus_fit.py`. However, its installed Quantity type rejected `0.0000000001` (maximum precision 9), and native USDT Money rounded `0.123456789012345678` to `0.12345679`. This fails the platform's lossless financial boundary and is sufficient to end this candidate trial. No production engine dependency or second OMS is introduced. The probe does **not** establish Funding spot-release, MT5 Ticket mapping or external restart/reconciliation acceptance. Reconsideration requires a candidate that preserves the full contract without a core fork or parallel state authority.
+
+To repeat that decision probe, use a separate Python 3.12 environment with `nautilus_trader==1.231.0` and run `execution-runtime/scripts/probe_nautilus_fit.py`. It starts only an in-process mock client, prints the observed results and `native_precision_passed`, and does not read platform credentials or start a terminal. Do not install this optional probe dependency into the production Runtime environment.
+
+Shared responsibilities now have explicit owners:
+
+| Responsibility | Implementation and limit |
+|---|---|
+| Bybit connection, standard market/specification parsing and request budget | Account-owned pybit connection plus CCXT `4.5.78`; CCXT has no separate network/write channel. Native private order, account and economic-event extensions remain in Runtime adapters. |
+| MT5 connection | Existing fixed-account Worker; Cross market reads use the same Gateway and identity boundary. |
+| Platform → Runtime HTTP | One process-owned HTTPX pool; one attempt per write, bounded read retries only where the caller/adapter explicitly owns them. |
+| Browser contracts and reads | FastAPI-generated OpenAPI/TypeScript, openapi-fetch over the existing Axios session/CSRF transport, and TanStack Vue Query with session-scoped keys and no mutation retry. |
+| Venue identity and management finance | Exact account/instrument/native-order resolution in `venue_identity_repository.py`; retained original aliases and native events, explicit fill provenance, and one management read model. Account monitoring cannot advance command execution or resolve unknown outcomes. See [Live Account Observability](../contracts/LIVE_ACCOUNT_OBSERVABILITY.md) and [Database Guide](../database/README.md). |
+| Operational instrumentation | Prometheus client metrics, derived from existing stores and connection calls; no monitoring database, financial ledger or background trading authority. See [Production Operations](../operations/PRODUCTION.md). |
+
+vn.py's active/passive-leg and frozen-close concepts, Hummingbot's duplicate/late-event handling and Freqtrade/LEAN's research reproducibility rules remain references for behavior and acceptance. They do not add strategy plugins, default risk thresholds, new signals or new venue authorization. QuantStats remains downstream of a verified return series; detailed PnL attribution and historical identity reconciliation are not replaced by a statistics library.
+
+Hedge Board keeps the TradingView popup and current market-detail sparklines. The platform-owned production/analysis path runs alongside them; its logical design and current dataset mapping belong solely to [Research Data](../contracts/RESEARCH_DATA.md).
+
 ## Convergence rules
 
 - Split a module only when it separates a real policy, persistence or side-effect boundary.

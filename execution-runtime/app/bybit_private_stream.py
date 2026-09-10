@@ -129,8 +129,6 @@ class BybitPrivateEventSource:
         self._healthy = False
 
     def start(self) -> None:
-        if not self.settings.bybit_postonly_chase_enabled:
-            raise ValueError("Bybit PostOnly Chase private stream is disabled")
         if self._websocket is not None:
             return
         factory = self._websocket_factory or _default_websocket_factory

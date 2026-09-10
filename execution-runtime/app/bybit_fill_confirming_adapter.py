@@ -55,7 +55,7 @@ class BybitFillConfirmingAdapter(BybitLiveAdapter):
             return self._submit_postonly_chase(command)
 
         events = self._submit_acknowledgement(command)
-        is_fok = self._is_cross_spread_fok(command)
+        is_fok = self._is_fok(command)
         if command.order_type != "market" and not is_fok:
             return events
 
@@ -82,7 +82,7 @@ class BybitFillConfirmingAdapter(BybitLiveAdapter):
                 if is_fok and snapshot.filled_quantity != command.quantity:
                     acknowledgement.reason = (
                         "Bybit FOK order reported filled with a quantity mismatch; "
-                        "MT5 hedge was not submitted pending reconciliation"
+                        "dependent hedge was not submitted pending reconciliation"
                     )
                     return events
                 fill_event = self._fill_event(command, snapshot, partial=False)
@@ -93,7 +93,7 @@ class BybitFillConfirmingAdapter(BybitLiveAdapter):
                     if snapshot.filled_quantity > 0:
                         acknowledgement.reason = (
                             "Bybit FOK order reached a terminal partial fill; "
-                            "MT5 hedge was not submitted pending reconciliation"
+                            "dependent hedge was not submitted pending reconciliation"
                         )
                         return events
                     return [
@@ -152,8 +152,6 @@ class BybitFillConfirmingAdapter(BybitLiveAdapter):
         self,
         command: SubmitOrderCommand,
     ) -> list[ExecutionEvent]:
-        if not self.settings.bybit_postonly_chase_enabled:
-            raise GatewayRequestRejectedError("Bybit PostOnly Chase is disabled")
         if command.price is None:
             raise GatewayRequestRejectedError("Bybit PostOnly Chase requires a hard limit price")
 
@@ -283,8 +281,7 @@ class BybitFillConfirmingAdapter(BybitLiveAdapter):
                     )
                 if state.status == ChaseStatus.CANCEL_PENDING:
                     reconcile_deadline = (
-                        monotonic()
-                        + self.settings.bybit_postonly_chase_rest_reconcile_seconds
+                        monotonic() + self.settings.bybit_postonly_chase_rest_reconcile_seconds
                     )
                 if reconcile_deadline is not None and monotonic() >= reconcile_deadline:
                     break
@@ -310,7 +307,9 @@ class BybitFillConfirmingAdapter(BybitLiveAdapter):
     ) -> tuple[ChaseState, int]:
         if action.action_type == ChaseActionType.AMEND:
             if state.active_order_id is None or action.price is None:
-                return self._reconcile_state(state, "PostOnly amend identity is unavailable"), child_index
+                return self._reconcile_state(
+                    state, "PostOnly amend identity is unavailable"
+                ), child_index
             try:
                 response = client.amend_order(
                     category=self.settings.bybit_category,
@@ -347,7 +346,9 @@ class BybitFillConfirmingAdapter(BybitLiveAdapter):
 
         if action.action_type == ChaseActionType.CANCEL:
             if state.active_order_id is None:
-                return self._reconcile_state(state, "PostOnly cancel identity is unavailable"), child_index
+                return self._reconcile_state(
+                    state, "PostOnly cancel identity is unavailable"
+                ), child_index
             try:
                 response = client.cancel_order(
                     category=self.settings.bybit_category,
@@ -364,7 +365,9 @@ class BybitFillConfirmingAdapter(BybitLiveAdapter):
 
         if action.action_type == ChaseActionType.REPOST:
             if action.price is None:
-                return self._reconcile_state(state, "PostOnly repost price is unavailable"), child_index
+                return self._reconcile_state(
+                    state, "PostOnly repost price is unavailable"
+                ), child_index
             child_index += 1
             try:
                 external_order_id, _client_id = self._place_postonly_child(
@@ -439,10 +442,7 @@ class BybitFillConfirmingAdapter(BybitLiveAdapter):
     ) -> list[ExecutionEvent]:
         if acknowledgement is None or state.active_order_id is None:
             raise GatewayResultUnknownError("PostOnly acknowledgement identity is unavailable")
-        if (
-            state.cumulative_fill != command.quantity
-            or state.average_fill_price is None
-        ):
+        if state.cumulative_fill != command.quantity or state.average_fill_price is None:
             acknowledgement.reason = (
                 "Bybit PostOnly cumulative fill is not exact; "
                 "MT5 hedge was not submitted pending reconciliation"
@@ -553,9 +553,7 @@ class BybitFillConfirmingAdapter(BybitLiveAdapter):
         except GatewayRequestRejectedError:
             raise
         except Exception as exc:
-            raise GatewayResultUnknownError(
-                "Bybit PostOnly instrument result is unknown"
-            ) from exc
+            raise GatewayResultUnknownError("Bybit PostOnly instrument result is unknown") from exc
 
     def _private_source(self, symbol: str, prefix: str) -> PrivateEventSource:
         if self._private_source_factory is not None:
@@ -572,6 +570,8 @@ class BybitFillConfirmingAdapter(BybitLiveAdapter):
 
     def _submit_acknowledgement(self, command: SubmitOrderCommand) -> list[ExecutionEvent]:
         self._assert_account(command.account_id)
+        self._assert_write_account(command.account_id)
+        market_fields = self._order_market_fields(command)
         client = self._client(command.account_id)
         reference_price = command.price or self._market_reference_price(client, command)
         validate_live_write(
@@ -583,13 +583,12 @@ class BybitFillConfirmingAdapter(BybitLiveAdapter):
         client_id = stable_external_client_id("VG", command.platform_order_id, length=36)
         record_order_route(command, self.name, client_id)
         payload: dict[str, object] = {
-            "category": self.settings.bybit_category,
+            **market_fields,
             "symbol": command.symbol.upper(),
             "side": "Buy" if command.side == "buy" else "Sell",
             "orderType": "Market" if command.order_type == "market" else "Limit",
             "qty": format(command.quantity, "f"),
             "orderLinkId": client_id,
-            "reduceOnly": command.reduce_only,
         }
         if command.reduce_only:
             payload["positionIdx"] = self._resolve_reduce_position_idx(client, command)
@@ -600,7 +599,7 @@ class BybitFillConfirmingAdapter(BybitLiveAdapter):
             if command.execution_policy == "post_only_single_attempt":
                 payload["timeInForce"] = "PostOnly"
             else:
-                payload["timeInForce"] = "FOK" if self._is_cross_spread_fok(command) else "GTC"
+                payload["timeInForce"] = "FOK" if self._is_fok(command) else "GTC"
         try:
             response = client.place_order(**payload)
         except Exception as exc:
@@ -631,9 +630,7 @@ class BybitFillConfirmingAdapter(BybitLiveAdapter):
         except GatewayRequestRejectedError:
             raise
         except Exception as exc:
-            raise GatewayResultUnknownError(
-                "Bybit close-position query result is unknown"
-            ) from exc
+            raise GatewayResultUnknownError("Bybit close-position query result is unknown") from exc
 
         required_side = "Buy" if command.side == "sell" else "Sell"
         matches = []
@@ -698,11 +695,13 @@ class BybitFillConfirmingAdapter(BybitLiveAdapter):
             reason=reason,
         )
 
-    def _is_cross_spread_fok(self, command: SubmitOrderCommand) -> bool:
-        return (
-            command.order_type == "limit"
-            and command.strategy_instance_id == CROSS_SPREAD_STRATEGY_INSTANCE_ID
-            and command.execution_policy in {"default", "fok"}
+    def _is_fok(self, command: SubmitOrderCommand) -> bool:
+        return command.order_type == "limit" and (
+            command.execution_policy == "fok"
+            or (
+                command.strategy_instance_id == CROSS_SPREAD_STRATEGY_INSTANCE_ID
+                and command.execution_policy == "default"
+            )
         )
 
     @staticmethod

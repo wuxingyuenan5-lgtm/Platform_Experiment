@@ -8,6 +8,7 @@ from typing import cast
 from fastapi import APIRouter, HTTPException
 
 from app import execution_risk_repository as repository
+from app.catalog import get_instrument
 from app.config import get_settings
 from app.execution_exposure import calculate_residual_exposure
 from app.execution_risk_models import (
@@ -32,6 +33,7 @@ from app.execution_risk_policy import (
     opposite_side,
     select_failure_disposition,
 )
+from app.order_execution_intents import register_order_execution_intent
 from app.schemas import CreateTradeCommandRequest
 
 TradeCommandPort = Callable[[CreateTradeCommandRequest], TradeCommandResult]
@@ -157,9 +159,7 @@ def get_batch_risk(batch_id: str) -> BatchRiskResponse:
     return initialize_batch_risk(batch_id, strategy_instance_id)
 
 
-def check_leg_deadline(
-    batch_id: str, at: datetime | None = None
-) -> tuple[bool, str | None]:
+def check_leg_deadline(batch_id: str, at: datetime | None = None) -> tuple[bool, str | None]:
     risk = get_batch_risk(batch_id)
     result = evaluate_leg_deadline(
         risk.first_fill_at,
@@ -275,6 +275,8 @@ def execute_risk_action(
     except repository.ExecutionRiskRepositoryError as exc:
         raise _repository_error(exc) from exc
     if not created:
+        if action.action == "flatten_filled_legs" and action.status == "completed":
+            repository.mark_batch_failed_flattened(batch_id)
         return action
     set_batch_risk_state(
         batch_id,
@@ -292,7 +294,7 @@ def execute_risk_action(
         order_ids = []
         failure_reason = str(exc)
         set_batch_risk_state(batch_id, "escalated", reason=failure_reason)
-    return repository.finish_risk_action(
+    result = repository.finish_risk_action(
         action.risk_action_id,
         batch_id,
         request,
@@ -300,6 +302,22 @@ def execute_risk_action(
         order_ids,
         failure_reason,
     )
+    if request.action == "flatten_filled_legs" and status == "completed":
+        try:
+            repository.mark_batch_failed_flattened(batch_id)
+        except repository.ExecutionRiskRepositoryError as exc:
+            failure_reason = str(exc)
+            set_batch_risk_state(batch_id, "escalated", reason=failure_reason)
+            repository.mark_batch_manual_intervention(batch_id, failure_reason)
+            return repository.finish_risk_action(
+                action.risk_action_id,
+                batch_id,
+                request,
+                "action_required",
+                order_ids,
+                failure_reason,
+            )
+    return result
 
 
 def perform_risk_action(
@@ -373,28 +391,23 @@ def perform_risk_action(
         )
         return "completed", order_ids, None
 
-    legs = repository.filled_legs(batch_id)
+    _reconcile_live_batch_orders(batch_id)
+    with repository.connection() as db:
+        positions, _ = repository.flattening_positions(db, batch_id)
+    legs = [leg for leg in positions if leg["quantity"] > 0]
     if not legs:
-        set_batch_risk_state(
-            batch_id,
-            "resolved",
-            residual=Decimal("0"),
-            currency="UNKNOWN",
-            quality="complete",
-            reason="No filled legs required flattening",
-        )
         return "completed", [], None
 
     order_ids: list[str] = []
     failures: list[str] = []
     for leg in legs:
-        quantity = repository.filled_quantity(
-            leg["order_id"],
-            Decimal(leg["quantity"]),
-        )
+        quantity = leg["quantity"]
+        idempotency_key = f"{request.idempotency_key}:{leg['role']}"
+        if get_instrument(leg["instrument_id"]).instrument_type == "crypto_perp":
+            register_order_execution_intent(idempotency_key, reduce_only=True)
         command = _create_trade_command(
             CreateTradeCommandRequest(
-                idempotencyKey=f"{request.idempotency_key}:{leg['role']}",
+                idempotencyKey=idempotency_key,
                 strategyInstanceId=risk.strategy_instance_id,
                 accountId=leg["account_id"],
                 instrumentId=leg["instrument_id"],
@@ -409,6 +422,8 @@ def perform_risk_action(
             order_ids.append(command.platform_order_id)
         if command.status != "filled":
             failures.append(f"{leg['role']} flatten status {command.status}")
+            break
+        _reconcile_live_batch_orders(batch_id)
 
     if failures:
         failure_reason = "; ".join(failures)
@@ -416,16 +431,18 @@ def perform_risk_action(
         repository.mark_batch_manual_intervention(batch_id, failure_reason)
         return "action_required", order_ids, failure_reason
 
-    repository.mark_batch_failed_flattened(batch_id)
-    set_batch_risk_state(
-        batch_id,
-        "resolved",
-        residual=Decimal("0"),
-        currency="UNKNOWN",
-        quality="complete",
-        reason="All filled legs flattened",
-    )
     return "completed", order_ids, None
+
+
+def _reconcile_live_batch_orders(batch_id: str) -> None:
+    from app.venue_reconciliation_service import reconcile_order_with_venue
+
+    for order_id in repository.live_order_ids_for_batch(batch_id):
+        result = reconcile_order_with_venue(order_id)
+        if result.difference_ids:
+            raise repository.ExecutionRiskRepositoryError(
+                "Risk reduction requires reconciled native orders and fills"
+            )
 
 
 def list_risk_actions(batch_id: str) -> list[RiskActionResponse]:

@@ -5,6 +5,7 @@ import type { CrossSpreadSnapshotResult } from '@/api/platform/trading.types';
 import {
   mapCloseOrders,
   mapOverviewRows,
+  mapOverviewPnlSummary,
   type CloseOrder,
   type OverviewRow,
   type QuantityRules,
@@ -21,7 +22,12 @@ interface UseCrossSpreadPositionsOptions {
 }
 
 export function useCrossSpreadPositions(options: UseCrossSpreadPositionsOptions) {
-  const closeOrders = computed<CloseOrder[]>(() => mapCloseOrders(options.exitPlans.value));
+  const closeOrders = computed<CloseOrder[]>(() =>
+    mapCloseOrders(
+      options.exitPlans.value,
+      options.snapshot.value?.positionOverview?.abnormalOrders,
+    ),
+  );
 
   const overviewRows = computed<OverviewRow[]>(() =>
     mapOverviewRows({
@@ -34,10 +40,14 @@ export function useCrossSpreadPositions(options: UseCrossSpreadPositionsOptions)
       exitPlans: options.exitPlans.value,
     }),
   );
+  const overviewPnl = computed(() =>
+    mapOverviewPnlSummary(options.exitPlans.value, options.snapshot.value?.positionOverview),
+  );
 
   return {
     closeOrders,
     overviewRows,
+    overviewPnl,
   };
 }
 

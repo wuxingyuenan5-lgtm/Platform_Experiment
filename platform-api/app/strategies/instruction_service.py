@@ -28,7 +28,11 @@ from app.strategies.domain import (
     StrategyInstructionStatus,
 )
 from app.strategies.funding_orchestration import execute_funding_instruction
-from app.strategies.plan_service import build_plan, normalize_parameters
+from app.strategies.plan_service import (
+    build_plan,
+    normalize_parameters,
+    validate_funding_close_capacity,
+)
 
 
 class CreateStrategyInstructionRequest(BaseModel):
@@ -245,14 +249,11 @@ def create_instruction(
     strategy_key = str(instance["strategy_key"]) if instance is not None else None
     if request.action is StrategyInstructionAction.RISK_DISPOSITION:
         raise HTTPException(status_code=423, detail="Position Group close planning is unavailable")
-    if (
-        request.action is StrategyInstructionAction.CLOSE
-        and (
-            strategy_key not in {"funding_arbitrage", "cross_venue_spread"}
-            or (
-                strategy_key == "funding_arbitrage"
-                and not str(request.parameters.get("targetOpenInstructionId") or "").strip()
-            )
+    if request.action is StrategyInstructionAction.CLOSE and (
+        strategy_key not in {"funding_arbitrage", "cross_venue_spread"}
+        or (
+            strategy_key == "funding_arbitrage"
+            and not str(request.parameters.get("targetOpenInstructionId") or "").strip()
         )
     ):
         # Funding close still requires an explicit target open instruction.
@@ -283,6 +284,11 @@ def create_instruction(
                     "Idempotency key is already used by a different strategy instruction payload"
                 ),
             )
+        if (
+            strategy_key == "funding_arbitrage"
+            and request.action is StrategyInstructionAction.CLOSE
+        ):
+            validate_funding_close_capacity(db, strategy_instance_id, normalized_parameters)
         plan = build_plan(strategy_instance_id, request.action, normalized_parameters)
         instruction_id, batch_id, timestamp = str(uuid4()), str(uuid4()), _utc_now()
         first_leg = plan.legs[0]
@@ -333,11 +339,7 @@ def create_instruction(
             ),
         )
         for leg in plan.legs:
-            order_type = (
-                "market"
-                if leg.execution_policy is ExecutionPolicy.MARKET
-                else "limit"
-            )
+            order_type = "market" if leg.execution_policy is ExecutionPolicy.MARKET else "limit"
             db.execute(
                 """INSERT INTO execution_batch_legs (
                     id, batch_id, sequence, role, account_id, instrument_id, symbol,
@@ -381,11 +383,15 @@ def execute_instruction(
             raise HTTPException(status_code=404, detail="Strategy instruction not found")
         plan = ExecutionPlan.model_validate_json(instruction["execution_plan_json"])
         if plan.strategy_key == "funding_arbitrage":
-            return execute_funding_instruction(
-                instruction_id,
-                instruction_row=instruction,
-                plan=plan,
-            )
+            try:
+                return execute_funding_instruction(
+                    instruction_id,
+                    instruction_row=instruction,
+                    plan=plan,
+                )
+            except HTTPException as exc:
+                _reject_undispatched_funding_instruction(instruction_id, str(exc.detail))
+                raise
         db.execute(
             """
             UPDATE strategy_runs SET status = ?, updated_at = ?
@@ -412,11 +418,7 @@ def execute_instruction(
                 instrumentId=leg.instrument_id,
                 symbol=leg.external_symbol,
                 side=leg.side,
-                orderType=(
-                    "market"
-                    if leg.execution_policy is ExecutionPolicy.MARKET
-                    else "limit"
-                ),
+                orderType=("market" if leg.execution_policy is ExecutionPolicy.MARKET else "limit"),
                 quantity=leg.maximum_quantity,
                 price=leg.limit_price,
             )
@@ -450,6 +452,25 @@ def execute_instruction(
     }.get(result.status, StrategyInstructionStatus.EXECUTING)
     _update_instruction_result(instruction_id, status, failure_reason=result.failure_reason)
     return result
+
+
+def _reject_undispatched_funding_instruction(instruction_id: str, reason: str) -> None:
+    # A rejected admission must not become a delayed order when the background
+    # runner next sees available funds or a released resource. Never alter an
+    # intent already claimed by another concurrent execution tick.
+    with connection() as db:
+        db.execute("BEGIN IMMEDIATE")
+        changed = db.execute(
+            "UPDATE execution_batches SET status='failed', failure_reason=?, updated_at=? "
+            "WHERE strategy_instruction_id=? AND status='pending'",
+            (reason, _utc_now(), instruction_id),
+        )
+        if changed.rowcount:
+            db.execute(
+                "UPDATE strategy_runs SET status='rejected', failure_reason=?, updated_at=? "
+                "WHERE id=? AND status='accepted'",
+                (reason, _utc_now(), instruction_id),
+            )
 
 
 def _synchronise_instruction_after_dispatch_error(

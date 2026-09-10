@@ -3,11 +3,18 @@ from __future__ import annotations
 import asyncio
 import re
 from collections.abc import Awaitable, Callable
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, time, timedelta
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Any, cast
+from zoneinfo import ZoneInfo
 
 from app.a_share_research_policy import aggregate_shenwan_level2
+from app.research_a_share_repository import (
+    read_dashboard,
+    read_dataset,
+    read_dataset_metadata,
+    read_hot_stock_history,
+)
 from app.research_cache import LastKnownGoodResearchCache
 from app.research_data_schemas import (
     AShareBreadthSnapshot,
@@ -16,6 +23,7 @@ from app.research_data_schemas import (
     AShareLiveSectorFundFlow,
     AShareLiveSectorFundFlowResponse,
     AShareMarketTurnoverResponse,
+    AShareMarketTurnoverRow,
     AShareResearchAggregation,
     AShareTurnoverStock,
     MacroExpectationEvent,
@@ -29,7 +37,6 @@ from app.research_data_schemas import (
 )
 from app.research_macro_history import MacroProbabilityHistoryStore
 from app.research_providers import FreeResearchProvider
-from app.research_a_share_repository import read_dashboard, read_dataset, read_hot_stock_history
 
 DEFAULT_THRESHOLD_YUAN = Decimal("10000000000")
 PCT_QUANT = Decimal("0.01")
@@ -136,6 +143,17 @@ def _validated_result[ResultT](
         return exc
 
 
+def _source_timestamp(data: Any) -> datetime | None:
+    trade_date = getattr(data, "trade_date", None)
+    if isinstance(trade_date, date):
+        return datetime.combine(trade_date, time(15), ZoneInfo("Asia/Shanghai"))
+    if isinstance(data, list):
+        dates = [point.observed_at for item in data for point in getattr(item, "history", [])]
+        if dates:
+            return datetime.combine(max(dates), time(15), ZoneInfo("Asia/Shanghai"))
+    return None
+
+
 def _module(
     *,
     source: str,
@@ -147,12 +165,11 @@ def _module(
     is_stale: bool = False,
 ) -> ResearchModuleResult:
     observed_at = fetched_at or _now()
-    inferred_status: ResearchDataStatus = status or (
-        "ready" if _meaningful(data) else "no_data"
-    )
+    inferred_status: ResearchDataStatus = status or ("ready" if _meaningful(data) else "no_data")
     return ResearchModuleResult(
         meta=ResearchSourceMeta(
             source=source,
+            source_timestamp=_source_timestamp(data),
             fetched_at=observed_at,
             status=inferred_status,
             is_stale=is_stale,
@@ -165,7 +182,9 @@ def _module(
 
 def _error_module(source: str, exc: BaseException) -> ResearchModuleResult:
     error_code = exc.code if isinstance(exc, ResearchServiceError) else type(exc).__name__
-    message = exc.detail if isinstance(exc, ResearchServiceError) else str(exc)
+    message = (
+        exc.detail if isinstance(exc, ResearchServiceError) else "该数据源暂时不可用，请稍后更新"
+    )
     return _module(
         source=source,
         data=None,
@@ -209,6 +228,7 @@ async def _memberships() -> list[ShenwanMembership]:
 async def get_a_share_dashboard(
     *,
     threshold_yuan: Decimal = DEFAULT_THRESHOLD_YUAN,
+    collected_results: list[Any] | None = None,
 ) -> AShareDashboardResponse:
     if threshold_yuan <= 0:
         raise ResearchServiceError(
@@ -218,20 +238,24 @@ async def get_a_share_dashboard(
         )
     cache_key = f"dashboard:{threshold_yuan.normalize()}"
     cached = _DASHBOARD_CACHE.get_fresh(cache_key)
-    if cached is not None:
+    if cached is not None and collected_results is None:
         return cached.value
 
     async with _DASHBOARD_LOCK:
         cached = _DASHBOARD_CACHE.get_fresh(cache_key)
-        if cached is not None:
+        if cached is not None and collected_results is None:
             return cached.value
-        results = await asyncio.gather(
-            _provider_call(_PROVIDER.index_snapshots()),
-            _provider_call(_PROVIDER.market_activity()),
-            _provider_call(_PROVIDER.a_share_spot()),
-            _memberships(),
-            _provider_call(_PROVIDER.short_term_emotion()),
-            return_exceptions=True,
+        results = (
+            collected_results
+            if collected_results is not None
+            else await asyncio.gather(
+                _provider_call(_PROVIDER.index_snapshots()),
+                _provider_call(_PROVIDER.market_activity()),
+                _provider_call(_PROVIDER.a_share_spot()),
+                _memberships(),
+                _provider_call(_PROVIDER.short_term_emotion()),
+                return_exceptions=True,
+            )
         )
         raw_indices, raw_breadth, raw_stocks, raw_memberships, raw_emotion = results
         indices = _validated_result(
@@ -279,7 +303,12 @@ async def get_a_share_dashboard(
         # official Eastmoney limit pools own board counts. Join only two
         # observations from the same collection run; never infer limits from
         # rounded daily returns.
-        if isinstance(breadth, AShareBreadthSnapshot) and isinstance(emotion, ShortTermEmotionSnapshot):
+        if (
+            isinstance(breadth, AShareBreadthSnapshot)
+            and isinstance(emotion, ShortTermEmotionSnapshot)
+            and breadth.trade_date == emotion.trade_date
+            and breadth.trade_date is not None
+        ):
             breadth = breadth.model_copy(
                 update={
                     "limit_up": emotion.limit_up_count,
@@ -340,6 +369,8 @@ async def get_a_share_dashboard(
             shenwan=shenwan_module,
             emotion=emotion_module,
         )
+        if collected_results is not None:
+            return response
         if _DASHBOARD_CACHE.store(cache_key, response):
             return response
         stale = _DASHBOARD_CACHE.get(cache_key)
@@ -378,12 +409,26 @@ async def get_live_a_share_sector_fund_flow() -> AShareLiveSectorFundFlowRespons
         except ResearchServiceError:
             stale = _LIVE_SECTOR_FLOW_CACHE.get(cache_key)
             if stale is not None:
-                return stale.value.model_copy(deep=True)
+                return stale.value.model_copy(
+                    deep=True,
+                    update={
+                        "status": "stale",
+                        "is_stale": True,
+                        "message": "更新暂不可用，显示上次有效数据",
+                    },
+                )
             raise
         except Exception as exc:
             stale = _LIVE_SECTOR_FLOW_CACHE.get(cache_key)
             if stale is not None:
-                return stale.value.model_copy(deep=True)
+                return stale.value.model_copy(
+                    deep=True,
+                    update={
+                        "status": "stale",
+                        "is_stale": True,
+                        "message": "更新暂不可用，显示上次有效数据",
+                    },
+                )
             raise ResearchServiceError(
                 "live_sector_flow_unavailable",
                 "实时板块资金流暂不可用",
@@ -403,28 +448,42 @@ async def get_live_a_share_market_turnover() -> AShareMarketTurnoverResponse:
         try:
             rows = await _provider_call(_PROVIDER.a_share_market_turnover())
             persisted = await asyncio.to_thread(read_dataset, "stocks")
-            history = await asyncio.to_thread(read_hot_stock_history)
+            history = await asyncio.to_thread(read_hot_stock_history, days=None, matrix_days=None)
+            daily_meta = await asyncio.to_thread(read_dataset_metadata, "stocks")
             high_count: int | None = None
             high_rows = []
             if isinstance(persisted, list):
                 high_rows = [
-                    item for item in persisted
+                    item
+                    for item in persisted
                     if isinstance(item, dict)
                     and str(item.get("securityCode", item.get("security_code", ""))).isdigit()
                     and len(str(item.get("securityCode", item.get("security_code", "")))) == 6
-                    and Decimal(str(item.get("turnoverYuan", item.get("turnover_yuan", 0)) or 0)) > DEFAULT_THRESHOLD_YUAN
+                    and Decimal(str(item.get("turnoverYuan", item.get("turnover_yuan", 0)) or 0))
+                    > DEFAULT_THRESHOLD_YUAN
                 ]
                 high_count = len(high_rows)
             result = AShareMarketTurnoverResponse(
-                fetched_at=_now(), source="东方财富A股实时行情", high_turnover_count=high_count,
+                fetched_at=_now(),
+                source="东方财富A股实时行情",
+                high_turnover_count=high_count,
+                daily_observed_at=daily_meta.get("observed_at") if daily_meta else None,
                 high_turnover_rows=[
-                    {
-                        "securityCode": item.get("securityCode", item.get("security_code")),
-                        "securityName": item.get("securityName", item.get("security_name")),
-                        "returnPct": item.get("returnPct", item.get("return_pct")),
-                        "turnoverYuan": item.get("turnoverYuan", item.get("turnover_yuan")),
-                    }
-                    for item in sorted(high_rows, key=lambda item: Decimal(str(item.get("turnoverYuan", item.get("turnover_yuan", 0)) or 0)), reverse=True)
+                    AShareMarketTurnoverRow.model_validate(
+                        {
+                            "securityCode": item.get("securityCode", item.get("security_code")),
+                            "securityName": item.get("securityName", item.get("security_name")),
+                            "returnPct": item.get("returnPct", item.get("return_pct")),
+                            "turnoverYuan": item.get("turnoverYuan", item.get("turnover_yuan")),
+                        }
+                    )
+                    for item in sorted(
+                        high_rows,
+                        key=lambda item: Decimal(
+                            str(item.get("turnoverYuan", item.get("turnover_yuan", 0)) or 0)
+                        ),
+                        reverse=True,
+                    )
                 ],
                 history_dates=history["dates"],
                 history_counts=history["counts"],
@@ -437,13 +496,29 @@ async def get_live_a_share_market_turnover() -> AShareMarketTurnoverResponse:
         except ResearchServiceError:
             stale = _LIVE_TURNOVER_CACHE.get(cache_key)
             if stale is not None:
-                return stale.value.model_copy(deep=True)
+                return stale.value.model_copy(
+                    deep=True,
+                    update={
+                        "status": "stale",
+                        "is_stale": True,
+                        "message": "更新暂不可用，显示上次有效数据",
+                    },
+                )
             raise
         except Exception as exc:
             stale = _LIVE_TURNOVER_CACHE.get(cache_key)
             if stale is not None:
-                return stale.value.model_copy(deep=True)
-            raise ResearchServiceError("live_market_turnover_unavailable", "实时成交额榜暂不可用") from exc
+                return stale.value.model_copy(
+                    deep=True,
+                    update={
+                        "status": "stale",
+                        "is_stale": True,
+                        "message": "更新暂不可用，显示上次有效数据",
+                    },
+                )
+            raise ResearchServiceError(
+                "live_market_turnover_unavailable", "实时成交额榜暂不可用"
+            ) from exc
 
 
 async def get_persisted_a_share_dashboard() -> AShareDashboardResponse:
@@ -578,9 +653,9 @@ async def get_stock_snapshot(code: str) -> StockSnapshotResponse:
             for module in modules.values()
             if module.meta.status == "ready" and _meaningful(module.data)
         )
-        completeness = (
-            Decimal(available) / Decimal(len(modules)) * Decimal("100")
-        ).quantize(PCT_QUANT, rounding=ROUND_HALF_UP)
+        completeness = (Decimal(available) / Decimal(len(modules)) * Decimal("100")).quantize(
+            PCT_QUANT, rounding=ROUND_HALF_UP
+        )
         response = StockSnapshotResponse(
             security_code=normalized,
             security_name=str(quote.get("name") or "") or None,

@@ -1,4 +1,4 @@
-﻿{
+{
   "$schema": "https://json.schemastore.org/tsconfig",
   "extends": "./tsconfig.json",
   "compilerOptions": {
@@ -8,6 +8,7 @@
     "allowJs": true
   },
   "include": [
+    "src/bootstrap.ts",
     "scripts/**/*.cjs",
     "internal/**/*.ts",
     "src/access/**/*.ts",

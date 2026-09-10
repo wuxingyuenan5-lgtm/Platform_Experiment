@@ -1,6 +1,29 @@
-import axios, { type AxiosInstance } from 'axios';
+import { createStrategyApi, strategyData } from './strategyApi';
+import type { components } from './generated/strategy';
 
-import type { ExecutionBatchResult } from './trading.types';
+export type CrossSpreadLeverageResult = components['schemas']['CrossSpreadLeverageResponse'];
+const api = createStrategyApi(30_000);
+export async function closeAbnormalOpen(batchId: string, actor: string) {
+  return strategyData(
+    await api.POST('/api/v1/trading/execution-batches/{batch_id}/risk-actions', {
+      params: { path: { batch_id: batchId } },
+      body: {
+        idempotencyKey: `cross-abnormal-close:${batchId}`,
+        action: 'flatten_filled_legs',
+        actor,
+        reason: 'Owner confirmed closing the abnormal opening fill',
+      },
+    }),
+  );
+}
+export async function getCrossSpreadLeverage(): Promise<CrossSpreadLeverageResult> {
+  return strategyData(await api.GET('/api/v1/trading/cross-spread/leverage'));
+}
+export async function setCrossSpreadLeverage(leverage: string): Promise<CrossSpreadLeverageResult> {
+  return strategyData(
+    await api.POST('/api/v1/trading/cross-spread/leverage', { body: { leverage } }),
+  );
+}
 
 export type CrossSpreadDirection = 'LONG_SPREAD' | 'SHORT_SPREAD';
 export type CrossSpreadExecutionMode = 'market' | 'limit';
@@ -25,175 +48,98 @@ export type CrossSpreadExitPlanStatus =
   | 'closed'
   | 'manual_intervention';
 
-export interface CrossSpreadOrderIntentResult {
-  action: CrossSpreadSyntheticAction;
-  executionType: CrossSpreadSyntheticExecutionType;
-  triggerReason: CrossSpreadTriggerReason;
-  direction: CrossSpreadDirection;
-  isOpen: boolean;
+export type CrossSpreadOrderIntentResult = components['schemas']['CrossSpreadOrderIntentResponse'];
+
+export type CrossSpreadLimitExecutionResult =
+  components['schemas']['CrossSpreadLimitExecutionResponse'];
+
+export type CrossSpreadExitPlanResult = components['schemas']['CrossSpreadExitPlanResponse'];
+
+export type CrossSpreadMarketOpenInput = components['schemas']['CrossSpreadMarketOpenRequest'];
+
+export type CrossSpreadMarketOpenResult = components['schemas']['CrossSpreadOpenResult'];
+
+export type CrossSpreadMarketCloseResult = components['schemas']['CrossSpreadCloseResult'];
+
+export type CrossSpreadMarketCloseInput = components['schemas']['CrossSpreadMarketCloseRequest'];
+
+export type CrossSpreadExitPlanThresholdUpdateInput =
+  components['schemas']['CrossSpreadExitPlanUpdateRequest'];
+
+export type CrossSpreadPreflightInput = components['schemas']['CrossSpreadPreflightRequest'];
+
+export type CrossSpreadPreflightResult = components['schemas']['CrossSpreadPreflightResponse'];
+
+export async function getCrossSpreadInstruction(idempotencyKey: string) {
+  const instructions = strategyData(
+    await api.GET('/api/v1/strategies/{strategy_instance_id}/instructions', {
+      params: { path: { strategy_instance_id: 'strategy_cross_venue_spread_instance_default' } },
+    }),
+  );
+  const instruction = instructions.find((item) => item.idempotencyKey === idempotencyKey);
+  if (!instruction) return null;
+  if (
+    typeof instruction.instructionId !== 'string' ||
+    typeof instruction.status !== 'string' ||
+    !(instruction.executionBatchId === null || typeof instruction.executionBatchId === 'string')
+  ) {
+    throw new Error('价差指令状态数据不完整');
+  }
+  return {
+    instructionId: instruction.instructionId,
+    status: instruction.status,
+    executionBatchId:
+      typeof instruction.executionBatchId === 'string' ? instruction.executionBatchId : null,
+  };
 }
-
-export interface CrossSpreadLimitExecutionResult {
-  direction: 'BUY_BYBIT_SELL_MT5' | 'SELL_BYBIT_BUY_MT5';
-  limitStrategy: CrossSpreadLimitStrategy;
-  limitSpread: string;
-  executableSpread: string;
-  mt5ReferencePrice: string;
-  hedgeReserve: string;
-  bybitTickSize: string;
-  rawBybitLimitPrice: string;
-  bybitLimitPrice: string;
-  currentlyExecutable: boolean;
-  timeInForce: 'FOK' | 'PostOnly';
-}
-
-export interface CrossSpreadExitPlanResult {
-  planId: string;
-  strategyInstanceId: string;
-  openBatchId: string;
-  closeBatchId?: string | null;
-  direction: CrossSpreadDirection;
-  quantityOz: string;
-  mt5PositionId: string;
-  entrySpread: string;
-  takeProfitSpread: string | null;
-  stopLossSpread: string | null;
-  takeProfitExecutionMode: CrossSpreadExecutionMode;
-  stopLossExecutionMode: CrossSpreadExecutionMode;
-  takeProfitLimitStrategy: CrossSpreadLimitStrategy;
-  stopLossLimitStrategy: CrossSpreadLimitStrategy;
-  status: CrossSpreadExitPlanStatus;
-  triggerReason?: string | null;
-  triggerSpread?: string | null;
-  createdAt: string;
-  updatedAt: string;
-  triggeredAt?: string | null;
-  closedAt?: string | null;
-}
-
-export interface CrossSpreadMarketOpenInput {
-  idempotencyKey?: string;
-  direction: CrossSpreadDirection;
-  quantityOz: string;
-  takeProfitSpread?: string;
-  stopLossSpread?: string;
-  executionMode: CrossSpreadExecutionMode;
-  limitSpread?: string;
-  limitStrategy: CrossSpreadLimitStrategy;
-  takeProfitExecutionMode: CrossSpreadExecutionMode;
-  stopLossExecutionMode: CrossSpreadExecutionMode;
-  takeProfitLimitStrategy: CrossSpreadLimitStrategy;
-  stopLossLimitStrategy: CrossSpreadLimitStrategy;
-}
-
-export interface CrossSpreadMarketOpenResult {
-  executionBatch: ExecutionBatchResult;
-  orderIntent: CrossSpreadOrderIntentResult;
-  limitExecution?: CrossSpreadLimitExecutionResult | null;
-  exitPlan?: CrossSpreadExitPlanResult | null;
-}
-
-export interface CrossSpreadMarketCloseResult {
-  executionBatch: ExecutionBatchResult;
-  orderIntent: CrossSpreadOrderIntentResult;
-  limitExecution?: CrossSpreadLimitExecutionResult | null;
-  exitPlan: CrossSpreadExitPlanResult;
-}
-
-export interface CrossSpreadMarketCloseInput {
-  idempotencyKey?: string;
-  quantityOz?: string;
-  executionMode: CrossSpreadExecutionMode;
-  limitSpread?: string;
-  limitStrategy?: CrossSpreadLimitStrategy;
-}
-
-export interface CrossSpreadExitPlanThresholdUpdateInput {
-  takeProfitSpread?: string;
-  stopLossSpread?: string;
-  takeProfitExecutionMode?: CrossSpreadExecutionMode;
-  stopLossExecutionMode?: CrossSpreadExecutionMode;
-  takeProfitLimitStrategy?: CrossSpreadLimitStrategy;
-  stopLossLimitStrategy?: CrossSpreadLimitStrategy;
-}
-
-export interface CrossSpreadPreflightInput {
-  action: 'OPEN_LONG' | 'CLOSE_LONG' | 'OPEN_SHORT' | 'CLOSE_SHORT';
-  quantityOz: string;
-}
-
-export interface CrossSpreadPreflightResult {
-  status: 'ready';
-  preparedAt: string;
-}
-
-const apiBaseUrl = import.meta.env.VITE_PLATFORM_API_BASE_URL || 'http://127.0.0.1:8000/api/v1';
-
-const platformApiToken = import.meta.env.VITE_PLATFORM_API_TOKEN || '';
-
-const client: AxiosInstance = axios.create({
-  baseURL: apiBaseUrl,
-  timeout: 30_000,
-  headers: {
-    'Content-Type': 'application/json',
-    ...(platformApiToken ? { Authorization: `Bearer ${platformApiToken}` } : {}),
-  },
-});
 
 export async function openCrossSpreadMarket(
   input: CrossSpreadMarketOpenInput,
 ): Promise<CrossSpreadMarketOpenResult> {
-  const response = await client.post<CrossSpreadMarketOpenResult>(
-    '/trading/cross-spread/lifecycle/open',
-    input,
-  );
-  return response.data;
+  const response = await api.POST('/api/v1/trading/cross-spread/lifecycle/open', { body: input });
+  return strategyData(response);
 }
 
 export async function prepareCrossSpreadExecution(
   input: CrossSpreadPreflightInput,
 ): Promise<CrossSpreadPreflightResult> {
-  const response = await client.post<CrossSpreadPreflightResult>(
-    '/trading/cross-spread/preflight',
-    input,
-  );
-  return response.data;
+  const response = await api.POST('/api/v1/trading/cross-spread/preflight', { body: input });
+  return strategyData(response);
 }
 
 export async function getCrossSpreadExitPlans(
   status?: CrossSpreadExitPlanStatus,
 ): Promise<CrossSpreadExitPlanResult[]> {
-  const response = await client.get<CrossSpreadExitPlanResult[]>(
-    '/trading/cross-spread/exit-plans',
-    { params: status ? { status } : undefined },
-  );
-  return response.data;
+  const response = await api.GET('/api/v1/trading/cross-spread/exit-plans', {
+    params: { query: status ? { status } : undefined },
+  });
+  return strategyData(response);
 }
 
 export async function updateCrossSpreadExitPlanThresholds(
   planId: string,
   input: CrossSpreadExitPlanThresholdUpdateInput,
 ): Promise<CrossSpreadExitPlanResult> {
-  const response = await client.patch<CrossSpreadExitPlanResult>(
-    `/trading/cross-spread/exit-plans/${encodeURIComponent(planId)}`,
-    input,
-  );
-  return response.data;
+  const response = await api.PATCH('/api/v1/trading/cross-spread/exit-plans/{plan_id}', {
+    params: { path: { plan_id: planId } },
+    body: input,
+  });
+  return strategyData(response);
 }
 
 export async function closeCrossSpreadMarket(
   planId: string,
   input: CrossSpreadMarketCloseInput,
 ): Promise<CrossSpreadMarketCloseResult> {
-  const response = await client.post<CrossSpreadMarketCloseResult>(
-    `/trading/cross-spread/exit-plans/${encodeURIComponent(planId)}/close`,
-    {
+  const response = await api.POST('/api/v1/trading/cross-spread/exit-plans/{plan_id}/close', {
+    params: { path: { plan_id: planId } },
+    body: {
       executionMode: input.executionMode,
       limitStrategy: input.limitStrategy ?? 'fok',
       ...(input.idempotencyKey ? { idempotencyKey: input.idempotencyKey } : {}),
       ...(input.quantityOz === undefined ? {} : { quantityOz: input.quantityOz }),
       ...(input.limitSpread === undefined ? {} : { limitSpread: input.limitSpread }),
     },
-  );
-  return response.data;
+  });
+  return strategyData(response);
 }

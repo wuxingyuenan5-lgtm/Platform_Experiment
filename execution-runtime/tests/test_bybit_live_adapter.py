@@ -27,16 +27,18 @@ class FakeBybitClient:
         return {
             "retCode": 0,
             "result": {
+                "category": kwargs.get("category", "linear"),
                 "list": [
                     {
                         "markPrice": "1000",
+                        "symbol": kwargs["symbol"],
                         "bid1Price": "999.5",
                         "ask1Price": "1000.5",
                         "lastPrice": "1000",
                         "fundingRate": "0.0001",
                         "nextFundingTime": "1784800004000",
                     }
-                ]
+                ],
             },
         }
 
@@ -45,10 +47,16 @@ class FakeBybitClient:
         return {
             "retCode": 0,
             "result": {
+                "category": kwargs.get("category", "linear"),
                 "list": [
                     {
                         "symbol": kwargs["symbol"],
                         "status": "Trading",
+                        "baseCoin": "XAUT",
+                        "quoteCoin": "USDT",
+                        "settleCoin": "USDT",
+                        "contractType": "LinearPerpetual",
+                        "marginTrading": "none",
                         "priceFilter": {"tickSize": "0.1"},
                         "lotSizeFilter": {
                             "minOrderQty": "0.001",
@@ -56,7 +64,7 @@ class FakeBybitClient:
                             "maxMktOrderQty": "10",
                         },
                     }
-                ]
+                ],
             },
         }
 
@@ -194,6 +202,12 @@ class FakeUnifiedBalanceClient(FakeBybitClient):
                                 "equity": "1000",
                                 "walletBalance": "1000",
                                 "availableToWithdraw": "",
+                                "usdValue": "1000",
+                                "locked": "0",
+                                "totalOrderIM": "0",
+                                "totalPositionIM": "0",
+                                "bonus": "0",
+                                "spotBorrow": "0",
                             }
                         ],
                     }
@@ -275,6 +289,57 @@ def runtime_settings(write_enabled: bool = True) -> Settings:
     )
 
 
+def test_leverage_update_is_gated_and_reads_back_exchange_value():
+    class LeverageClient(FakeBybitClient):
+        def __init__(self):
+            super().__init__()
+            self.leverage = "20"
+            self.leverage_calls = []
+
+        def set_leverage(self, **kwargs):
+            self.leverage_calls.append(kwargs)
+            self.leverage = kwargs["buyLeverage"]
+            return {"retCode": 0}
+
+        def get_positions(self, **kwargs):
+            return {
+                "retCode": 0,
+                "result": {"list": [{"symbol": "XAUTUSDT", "leverage": self.leverage}]},
+            }
+
+    client = LeverageClient()
+    settings = runtime_settings(write_enabled=False)
+    adapter = BybitLiveAdapter(settings, client)
+    assert adapter.get_leverage(account_id="account-bybit", symbol="XAUTUSDT")["leverage"] == "20"
+    with pytest.raises(GatewayConfigurationError, match="gate is disabled"):
+        adapter.set_leverage(
+            account_id="account-bybit", symbol="XAUTUSDT", leverage=Decimal("12.5")
+        )
+    assert client.leverage_calls == []
+    settings.live_write_enabled = True
+    result = adapter.set_leverage(
+        account_id="account-bybit", symbol="XAUTUSDT", leverage=Decimal("12.5")
+    )
+    assert result["leverage"] == "12.5"
+    assert client.leverage_calls == [
+        {"category": "linear", "symbol": "XAUTUSDT", "buyLeverage": "12.5", "sellLeverage": "12.5"}
+    ]
+
+
+def test_uncertain_leverage_invalidates_margin_cache_without_replay():
+    class UnknownLeverage:
+        def set_leverage(self, **kwargs):
+            raise GatewayResultUnknownError("response lost")
+
+    gateway = BybitMt5Gateway(settings=runtime_settings(), bybit=UnknownLeverage(), mt5=object())
+    gateway._execution_read_cache[("margin", "account-bybit", "XAUTUSDT")] = (0, object())
+    with pytest.raises(GatewayResultUnknownError):
+        gateway.set_bybit_leverage(
+            account_id="account-bybit", symbol="XAUTUSDT", leverage=Decimal("5")
+        )
+    assert gateway._execution_read_cache == {}
+
+
 def order_command(
     *,
     order_type: str = "market",
@@ -343,6 +408,28 @@ def test_bybit_live_adapter_uses_unified_available_balance(tmp_path) -> None:
 
     assert balance.equity == Decimal("1000")
     assert balance.available_balance == Decimal("888.5")
+
+
+@pytest.mark.parametrize("fee", [None, "", "0", "-0.012345678912345678"])
+def test_bybit_native_fee_preserves_missing_zero_and_rebate(tmp_path, fee) -> None:
+    get_settings().journal_path = str(tmp_path / "native-fee.db")
+    initialize_journal()
+
+    class FeeClient(FakeBybitClient):
+        def get_executions(self, **kwargs):
+            response = super().get_executions(**kwargs)
+            row = response["result"]["list"][0]
+            if fee is None:
+                row.pop("execFee")
+            else:
+                row["execFee"] = fee
+            return response
+
+    adapter = BybitLiveAdapter(runtime_settings(), FeeClient())
+    adapter.submit_order(order_command())
+    fills = adapter.list_fills(platform_order_id="platform-order-bybit-1")
+    assert len(fills) == 1
+    assert fills[0].fee == (None if fee in (None, "") else Decimal(fee))
 
 
 def test_bybit_live_adapter_maps_order_fills_and_economic_events(tmp_path) -> None:
@@ -415,9 +502,18 @@ def test_bybit_account_credential_mapping_isolated_with_legacy_fallback() -> Non
         ),
     )
 
-    assert settings.bybit_credential_for_account("account-funding") == "secret://environment/bybit-funding"
-    assert settings.bybit_credential_for_account("account-bottom") == "secret://environment/bybit-bottom"
-    assert settings.bybit_credential_for_account("legacy-account") == "secret://environment/bybit-default"
+    assert (
+        settings.bybit_credential_for_account("account-funding")
+        == "secret://environment/bybit-funding"
+    )
+    assert (
+        settings.bybit_credential_for_account("account-bottom")
+        == "secret://environment/bybit-bottom"
+    )
+    assert (
+        settings.bybit_credential_for_account("legacy-account")
+        == "secret://environment/bybit-default"
+    )
 
 
 def test_bybit_read_only_account_rejects_submit_before_client_call(tmp_path) -> None:
@@ -590,8 +686,7 @@ def test_bybit_live_adapter_quote_and_spec_use_explicit_category_scope(tmp_path)
             bybit_account_ids="bybit-live-main",
             bybit_account_category_scopes="bybit-live-main=spot|linear",
             bybit_instrument_map=(
-                "BTCUSDT|SPOT=instrument_btc_spot,"
-                "BTCUSDT|LINEAR=instrument_btc_perp"
+                "BTCUSDT|SPOT=instrument_btc_spot,BTCUSDT|LINEAR=instrument_btc_perp"
             ),
             bybit_category="linear",
             bybit_settle_coin="USDT",
@@ -651,6 +746,35 @@ def test_bybit_live_adapter_estimates_margin_from_current_symbol_leverage(tmp_pa
     assert estimate.currency == "USDT"
 
 
+def test_spot_spec_preserves_base_precision_and_minimum_order_amount():
+    class SpotClient(FakeBybitClient):
+        def get_instruments_info(self, **kwargs):
+            response = super().get_instruments_info(**kwargs)
+            response["result"]["list"][0]["lotSizeFilter"] = {
+                "basePrecision": "0.000001",
+                "quotePrecision": "0.00000001",
+                "minOrderQty": "0.000001",
+                "minOrderAmt": "5",
+                "maxMarketOrderQty": "120",
+            }
+            return response
+
+    adapter = BybitAcceptanceAdapter(
+        Settings(
+            bybit_account_ids="bound",
+            bybit_account_category_scopes="bound=spot|linear",
+            bybit_instrument_map="BTCUSDT|SPOT=instrument_btc_spot",
+        ),
+        SpotClient(),
+    )
+    result = adapter.get_instrument_specification(
+        account_id="bound", symbol="BTCUSDT", instrument_type="crypto_spot", category="spot"
+    )
+    assert result.quantity_step == Decimal("0.000001")
+    assert result.min_notional == Decimal("5")
+    assert result.max_market_quantity == Decimal("120")
+
+
 def test_bybit_live_adapter_synchronizes_signature_clock_from_server_time() -> None:
     helpers = SimpleNamespace(generate_timestamp=lambda: 1_000_000)
 
@@ -659,17 +783,10 @@ def test_bybit_live_adapter_synchronizes_signature_clock_from_server_time() -> N
         def get_server_time():
             return {"retCode": 0, "time": 994_500}
 
-    calls: list[dict[str, object]] = []
-
-    def factory(**kwargs):
-        calls.append(kwargs)
-        return PublicClient()
-
     adapter = BybitLiveAdapter(Settings(bybit_timestamp_offset_ms=0), object())
-    adapter._apply_timestamp_offset(helpers, factory)
+    adapter._connections._sync_clock(helpers, PublicClient())
 
     assert helpers.generate_timestamp() == 994_500
-    assert calls == [{"testnet": False, "demo": False}]
 
 
 def test_bybit_live_adapter_rejects_unsafe_signature_clock_offset() -> None:
@@ -683,4 +800,4 @@ def test_bybit_live_adapter_rejects_unsafe_signature_clock_offset() -> None:
     adapter = BybitLiveAdapter(Settings(bybit_timestamp_offset_ms=0), object())
 
     with pytest.raises(GatewayConfigurationError, match="offset exceeds safety limit"):
-        adapter._apply_timestamp_offset(helpers, lambda **_: PublicClient())
+        adapter._connections._sync_clock(helpers, PublicClient())

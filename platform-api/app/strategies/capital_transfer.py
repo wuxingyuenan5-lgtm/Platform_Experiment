@@ -11,6 +11,7 @@ from fastapi import HTTPException
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app import execution_risk_repository as risk_repository
+from app import runtime_transport
 from app.config import get_settings
 from app.database import connection
 
@@ -114,13 +115,12 @@ def _bound_accounts() -> tuple[str, str]:
 
 def _runtime_account_risk(account_id: str) -> dict[str, object]:
     settings = get_settings()
-    with httpx.Client(trust_env=False, timeout=settings.runtime_timeout_seconds) as client:
-        response = client.get(
-            f"{settings.runtime_base_url}/venue/account-risk",
-            params={"accountId": account_id},
-        )
-        response.raise_for_status()
-        payload = response.json()
+    response = runtime_transport.get(
+        f"{settings.runtime_base_url}/venue/account-risk",
+        params={"accountId": account_id},
+    )
+    response.raise_for_status()
+    payload = response.json()
     if not isinstance(payload, dict):
         raise ValueError("Runtime account-risk response is malformed")
     return payload
@@ -164,17 +164,16 @@ def _runtime_transfer_readiness(
 ) -> dict[str, object]:
     settings = get_settings()
     try:
-        with httpx.Client(trust_env=False, timeout=settings.runtime_timeout_seconds) as client:
-            response = client.get(
-                f"{settings.runtime_base_url}/venue/internal-capital-transfers/readiness",
-                params={
-                    "sourceAccountId": source_account_id,
-                    "destinationAccountId": destination_account_id,
-                    "currency": TRANSFER_CURRENCY,
-                },
-            )
-            response.raise_for_status()
-            payload = response.json()
+        response = runtime_transport.get(
+            f"{settings.runtime_base_url}/venue/internal-capital-transfers/readiness",
+            params={
+                "sourceAccountId": source_account_id,
+                "destinationAccountId": destination_account_id,
+                "currency": TRANSFER_CURRENCY,
+            },
+        )
+        response.raise_for_status()
+        payload = response.json()
         if not isinstance(payload, dict):
             raise ValueError("Runtime transfer readiness response is malformed")
         return payload
@@ -262,20 +261,19 @@ def _runtime_transfer_step(
     amount: Decimal,
 ) -> dict[str, object]:
     settings = get_settings()
-    with httpx.Client(trust_env=False, timeout=settings.runtime_timeout_seconds) as client:
-        response = client.post(
-            f"{settings.runtime_base_url}/venue/internal-capital-transfers",
-            json={
-                "idempotencyKey": idempotency_key,
-                "sourceAccountId": source_account_id,
-                "destinationAccountId": destination_account_id,
-                "sourceCurrency": source_currency,
-                "destinationCurrency": destination_currency,
-                "amount": format(amount, "f"),
-            },
-        )
-        response.raise_for_status()
-        payload = response.json()
+    response = runtime_transport.post(
+        f"{settings.runtime_base_url}/venue/internal-capital-transfers",
+        json={
+            "idempotencyKey": idempotency_key,
+            "sourceAccountId": source_account_id,
+            "destinationAccountId": destination_account_id,
+            "sourceCurrency": source_currency,
+            "destinationCurrency": destination_currency,
+            "amount": format(amount, "f"),
+        },
+    )
+    response.raise_for_status()
+    payload = response.json()
     if not isinstance(payload, dict) or payload.get("status") not in {
         "completed",
         "result_unknown",
@@ -288,23 +286,22 @@ def _runtime_transfer_status(row) -> dict[str, object]:
     settings = get_settings()
     source_account_id = str(row["source_account_id"])
     destination_account_id = str(row["destination_account_id"])
-    with httpx.Client(trust_env=False, timeout=settings.runtime_timeout_seconds) as client:
-        response = client.get(
-            (
-                f"{settings.runtime_base_url}/venue/internal-capital-transfers/"
-                f"{row['external_transfer_id']}"
-            ),
-            params={
-                "idempotencyKey": f"{row['idempotency_key']}:step:1",
-                "sourceAccountId": source_account_id,
-                "destinationAccountId": destination_account_id,
-                "sourceCurrency": TRANSFER_CURRENCY,
-                "destinationCurrency": TRANSFER_CURRENCY,
-                "amount": str(row["amount"]),
-            },
-        )
-        response.raise_for_status()
-        payload = response.json()
+    response = runtime_transport.get(
+        (
+            f"{settings.runtime_base_url}/venue/internal-capital-transfers/"
+            f"{row['external_transfer_id']}"
+        ),
+        params={
+            "idempotencyKey": f"{row['idempotency_key']}:step:1",
+            "sourceAccountId": source_account_id,
+            "destinationAccountId": destination_account_id,
+            "sourceCurrency": TRANSFER_CURRENCY,
+            "destinationCurrency": TRANSFER_CURRENCY,
+            "amount": str(row["amount"]),
+        },
+    )
+    response.raise_for_status()
+    payload = response.json()
     if not isinstance(payload, dict) or payload.get("status") not in {
         "completed",
         "result_unknown",

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from decimal import Decimal
@@ -438,16 +439,42 @@ def claim_exit_plan(
 def reclaim_manual_exit_plan(
     plan_id: str,
     *,
-    expected_close_batch_id: str,
+    expected_close_batch_id: str | None,
 ) -> CrossSpreadExitPlanResponse | None:
     reclaimed_at = now_iso()
     with connection() as db:
+        db.execute("BEGIN IMMEDIATE")
+        if expected_close_batch_id is None:
+            plan = db.execute(
+                "SELECT strategy_instance_id,mt5_position_id FROM cross_spread_exit_plans "
+                "WHERE id=? AND status='manual_intervention' AND close_batch_id IS NULL",
+                (plan_id,),
+            ).fetchone()
+            if plan is None:
+                return None
+            if not plan["mt5_position_id"]:
+                raise HTTPException(409, "Close recovery requires a verified MT5 Position Ticket")
+            # Every current close command persists its instruction before dispatch.
+            # A missing batch link is not proof of no dispatch: reject any matching
+            # or unidentifiable close instruction, including one without a batch.
+            runs = db.execute(
+                "SELECT requested_parameters_json FROM strategy_runs "
+                "WHERE strategy_instance_id=? AND action='close'",
+                (plan["strategy_instance_id"],),
+            ).fetchall()
+            for run in runs:
+                parameters = json.loads(run["requested_parameters_json"])
+                ticket = parameters.get("mt5PositionId")
+                if not ticket or str(ticket) == plan["mt5_position_id"]:
+                    raise HTTPException(
+                        409, "Close instruction exists without a linked batch; reconcile it first"
+                    )
         cursor = db.execute(
             """
             UPDATE cross_spread_exit_plans
             SET status = 'triggered', trigger_reason = 'manual', trigger_spread = NULL,
                 triggered_at = ?, updated_at = ?
-            WHERE id = ? AND status = 'manual_intervention' AND close_batch_id = ?
+            WHERE id = ? AND status = 'manual_intervention' AND close_batch_id IS ?
             """,
             (reclaimed_at, reclaimed_at, plan_id, expected_close_batch_id),
         )
@@ -516,13 +543,26 @@ def mark_plan_closed(
             UPDATE cross_spread_exit_plans
             SET quantity_oz = ?,
                 status = CASE WHEN CAST(? AS NUMERIC) = 0 THEN 'closed' ELSE 'active' END,
-                close_batch_id = ?, trigger_reason = NULL, trigger_spread = NULL,
-                triggered_at = NULL, updated_at = ?,
+                close_batch_id = ?,
+                trigger_reason = CASE WHEN ? THEN trigger_reason ELSE NULL END,
+                trigger_spread = CASE WHEN ? THEN trigger_spread ELSE NULL END,
+                triggered_at = CASE WHEN ? THEN triggered_at ELSE NULL END,
+                updated_at = ?,
                 closed_at = CASE WHEN CAST(? AS NUMERIC) = 0 THEN ? ELSE NULL END
             WHERE id = ? AND status IN ('triggered', 'closing')
             """,
-            (format(remaining, "f"), format(remaining, "f"), close_batch_id,
-             closed_at, format(remaining, "f"), closed_at, plan_id),
+            (
+                format(remaining, "f"),
+                format(remaining, "f"),
+                close_batch_id,
+                remaining == 0,
+                remaining == 0,
+                remaining == 0,
+                closed_at,
+                format(remaining, "f"),
+                closed_at,
+                plan_id,
+            ),
         )
     return get_exit_plan(plan_id)
 
@@ -546,6 +586,32 @@ def mark_plan_manual_intervention(
     return get_exit_plan(plan_id)
 
 
+def find_close_batch(
+    plan: CrossSpreadExitPlanResponse,
+    idempotency_key: str,
+    quantity_oz: Decimal,
+) -> str | None:
+    """Recover the persisted result of this exact close intent after an exception."""
+    with connection() as db:
+        row = db.execute(
+            "SELECT execution_batch_id,requested_parameters_json FROM strategy_runs "
+            "WHERE idempotency_key=? AND strategy_instance_id=? AND action='close'",
+            (idempotency_key, plan.strategy_instance_id),
+        ).fetchone()
+    if row is None or not row["execution_batch_id"]:
+        return None
+    parameters = json.loads(row["requested_parameters_json"])
+    if (
+        parameters.get("mt5PositionId") != plan.mt5_position_id
+        or parameters.get("action")
+        != ("CLOSE_LONG" if plan.direction == "LONG_SPREAD" else "CLOSE_SHORT")
+        or Decimal(str(parameters.get("quantityOz"))) != quantity_oz
+        or parameters.get("mt5ReduceOnly") is not True
+    ):
+        return None
+    return str(row["execution_batch_id"])
+
+
 def _plan_query(where_clause: str) -> str:
     return f"""
         SELECT id, strategy_instance_id, open_batch_id, close_batch_id, direction,
@@ -553,7 +619,11 @@ def _plan_query(where_clause: str) -> str:
                stop_loss_spread, take_profit_execution_mode,
                stop_loss_execution_mode, take_profit_limit_strategy,
                stop_loss_limit_strategy, status, trigger_reason, trigger_spread,
-               created_at, updated_at, triggered_at, closed_at
+               created_at, updated_at, triggered_at, closed_at,
+               (SELECT json_extract(a.details_json,'$.originLabel') FROM audit_events a
+                WHERE a.event_type='execution_batch_restored' AND a.subject_type='execution_batch'
+                  AND a.subject_id=cross_spread_exit_plans.open_batch_id
+                ORDER BY a.created_at DESC,a.id DESC LIMIT 1) AS origin_label
         FROM cross_spread_exit_plans
         WHERE {where_clause}
     """
@@ -565,6 +635,7 @@ def _plan_from_row(row) -> CrossSpreadExitPlanResponse:
         strategyInstanceId=row["strategy_instance_id"],
         openBatchId=row["open_batch_id"],
         closeBatchId=row["close_batch_id"],
+        originLabel=row["origin_label"],
         direction=row["direction"],
         quantityOz=Decimal(row["quantity_oz"]),
         mt5PositionId=row["mt5_position_id"],
@@ -572,9 +643,7 @@ def _plan_from_row(row) -> CrossSpreadExitPlanResponse:
         takeProfitSpread=(
             Decimal(row["take_profit_spread"]) if row["take_profit_spread"] else None
         ),
-        stopLossSpread=(
-            Decimal(row["stop_loss_spread"]) if row["stop_loss_spread"] else None
-        ),
+        stopLossSpread=(Decimal(row["stop_loss_spread"]) if row["stop_loss_spread"] else None),
         takeProfitExecutionMode=row["take_profit_execution_mode"],
         stopLossExecutionMode=row["stop_loss_execution_mode"],
         takeProfitLimitStrategy=row["take_profit_limit_strategy"],

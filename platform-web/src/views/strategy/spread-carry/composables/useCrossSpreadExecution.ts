@@ -1,7 +1,10 @@
-﻿import { computed, ref, type Ref } from 'vue';
+import { useUserStore } from '@/store/modules/user';
+import { computed, ref, type Ref } from 'vue';
+import { getExecutionBatch } from '@/api/platform/trading';
 
 import {
   closeCrossSpreadMarket,
+  getCrossSpreadInstruction,
   openCrossSpreadMarket,
   prepareCrossSpreadExecution,
   type CrossSpreadDirection,
@@ -13,6 +16,7 @@ import {
 import type { CloseOrder } from './mapCrossSpreadPositions';
 import {
   clearExecutionDraft,
+  canHandOffAbnormalBatch,
   createCloseAllExecutionDraft,
   isTerminalBatchStatus,
   persistExecutionDraft,
@@ -109,6 +113,47 @@ function optionalNumericText(value: number | null | undefined): string | undefin
 }
 
 export function useCrossSpreadExecution(options: UseCrossSpreadExecutionOptions) {
+  function captureInputs() {
+    return {
+      qtyOz: options.qtyOz.value,
+      bybitQty: options.bybitQty.value,
+      mt5Lot: options.mt5Lot.value,
+      executionMode: options.executionMode.value,
+      closeExecutionMode: options.closeExecutionMode.value,
+      takeProfitExecution: options.takeProfitExecution.value,
+      stopLossExecution: options.stopLossExecution.value,
+      openLimitStrategy: options.openLimitStrategy.value,
+      takeProfitLimitStrategy: options.takeProfitLimitStrategy.value,
+      stopLossLimitStrategy: options.stopLossLimitStrategy.value,
+      closeLimitStrategy: options.closeLimitStrategy.value,
+      triggerSpread: options.triggerSpread.value,
+      acceptableSpread: options.acceptableSpread.value,
+      takeProfitSpread: options.takeProfitSpread.value,
+      stopLossSpread: options.stopLossSpread.value,
+      closeLimitSpread: options.closeLimitSpread.value,
+      longSpread: options.longSpread.value,
+      shortSpread: options.shortSpread.value,
+      closeOrders: options.closeOrders.value.map((item) => ({ ...item })),
+      exitPlans: options.exitPlans.value.map((item) => ({ ...item })),
+    };
+  }
+  const inputs = ref(captureInputs());
+  const userStore = useUserStore();
+  function canStartIntent(): boolean {
+    if (userStore.authentication?.user.role !== 'ceo') {
+      setExecutionMessage('仅 CEO 可下达交易指令', 'is-warn');
+      return false;
+    }
+    if (submitLoading.value || confirmVisible.value) return false;
+    if (readExecutionDraft()) {
+      setExecutionMessage('上一条指令回执尚未确认，请先恢复原指令', 'is-warn');
+      return false;
+    }
+    inputs.value = captureInputs();
+    limitEvidence.value = null;
+    return true;
+  }
+
   const submitLoading = ref(false);
   const confirmVisible = ref(false);
   const executionLogs = ref<LogEntry[]>([]);
@@ -120,29 +165,40 @@ export function useCrossSpreadExecution(options: UseCrossSpreadExecutionOptions)
   const preflightError = ref('');
 
   const confirmGuardMessage = computed(() => preflightError.value);
+  function cancelConfirmation() {
+    if (submitLoading.value && preflightReady.value) return;
+    confirmVisible.value = false;
+    pendingAction.value = null;
+    preflightReady.value = false;
+    preflightError.value = '';
+    submitLoading.value = false;
+    setExecutionMessage('', 'is-warn');
+  }
   const confirmSummary = computed(() => {
     const action = pendingAction.value;
     const closeOrders =
       action?.kind === 'CLOSE'
-        ? options.closeOrders.value.filter((order) => order.id === action.planId)
+        ? inputs.value.closeOrders.filter((order) => order.id === action.planId)
         : action?.kind === 'CLOSE_ALL'
-        ? options.closeOrders.value
+        ? inputs.value.closeOrders.filter((order) => !order.isAbnormal)
         : [];
     const closeQuantityOz =
       action?.kind === 'CLOSE' && action.quantityOz !== undefined
         ? action.quantityOz
         : closeOrders.reduce((total, order) => total + order.qtyOz, 0);
+    const mt5OnlyOrder =
+      action?.kind === 'CLOSE' && closeOrders[0]?.mt5Only ? closeOrders[0] : null;
     const mt5LotPerOz =
-      options.qtyOz.value > 0 && options.mt5Lot.value !== null
-        ? options.mt5Lot.value / options.qtyOz.value
+      inputs.value.qtyOz > 0 && inputs.value.mt5Lot !== null
+        ? inputs.value.mt5Lot / inputs.value.qtyOz
         : null;
     const closeMt5Lot = mt5LotPerOz === null ? null : closeQuantityOz * mt5LotPerOz;
     const mode =
       action?.kind === 'CLOSE' || action?.kind === 'CLOSE_ALL'
-        ? options.closeExecutionMode.value === 'market'
+        ? inputs.value.closeExecutionMode === 'market'
           ? '市价平仓'
           : '限价平仓'
-        : options.executionMode.value === 'market'
+        : inputs.value.executionMode === 'market'
         ? '市价开仓'
         : '限价开仓';
     const directionLabel =
@@ -155,48 +211,53 @@ export function useCrossSpreadExecution(options: UseCrossSpreadExecutionOptions)
         : '全部平仓';
     const closeMarketSpread =
       action?.kind === 'CLOSE'
-        ? options.closeOrders.value.find((order) => order.id === action.planId)?.direction ===
+        ? inputs.value.closeOrders.find((order) => order.id === action.planId)?.direction ===
           'LONG_SPREAD'
-          ? options.longSpread.value
-          : options.shortSpread.value
+          ? inputs.value.shortSpread
+          : inputs.value.longSpread
         : null;
     return {
-      action: directionLabel,
+      action: mt5OnlyOrder ? '完成剩余 MT5 平仓' : directionLabel,
       qty: `${
         action?.kind === 'CLOSE' || action?.kind === 'CLOSE_ALL'
           ? closeQuantityOz
-          : options.qtyOz.value
+          : inputs.value.qtyOz
       }`,
-      legs:
-        action?.kind === 'CLOSE' || action?.kind === 'CLOSE_ALL'
-          ? `BYBIT ${closeQuantityOz.toLocaleString('en-US', { maximumFractionDigits: 2 })} / MT5 ${
-              closeMt5Lot === null
-                ? '--'
-                : closeMt5Lot.toLocaleString('en-US', { maximumFractionDigits: 4 })
-            }`
-          : `BYBIT ${options.bybitQty.value.toLocaleString('en-US', {
-              maximumFractionDigits: 2,
-            })} / MT5 ${
-              options.mt5Lot.value === null
-                ? '--'
-                : options.mt5Lot.value.toLocaleString('en-US', { maximumFractionDigits: 4 })
-            }`,
+      legs: mt5OnlyOrder
+        ? `BYBIT 已成交，不再下单 / MT5 ${mt5OnlyOrder.remainingMt5Lots} 手 · Ticket ${mt5OnlyOrder.mt5PositionId}`
+        : action?.kind === 'CLOSE' || action?.kind === 'CLOSE_ALL'
+        ? `BYBIT ${closeQuantityOz.toLocaleString('en-US', { maximumFractionDigits: 2 })} / MT5 ${
+            closeMt5Lot === null
+              ? '--'
+              : closeMt5Lot.toLocaleString('en-US', { maximumFractionDigits: 4 })
+          }`
+        : `BYBIT ${inputs.value.bybitQty.toLocaleString('en-US', {
+            maximumFractionDigits: 2,
+          })} / MT5 ${
+            inputs.value.mt5Lot === null
+              ? '--'
+              : inputs.value.mt5Lot.toLocaleString('en-US', { maximumFractionDigits: 4 })
+          }`,
       mode,
       marketSpread:
         action?.kind === 'CLOSE' || action?.kind === 'CLOSE_ALL'
           ? closeMarketSpread === null || closeMarketSpread === undefined
             ? '--'
             : formatSigned(closeMarketSpread)
-          : formatNullableSigned(options.longSpread.value),
+          : formatNullableSigned(
+              action?.kind === 'OPEN' && action.direction === 'SHORT_SPREAD'
+                ? inputs.value.shortSpread
+                : inputs.value.longSpread,
+            ),
       spreadRange:
         action?.kind === 'OPEN'
-          ? `${formatNullableSigned(options.triggerSpread.value)} / ${formatNullableSigned(
-              options.acceptableSpread.value,
+          ? `${formatNullableSigned(inputs.value.triggerSpread)} / ${formatNullableSigned(
+              inputs.value.acceptableSpread,
             )}`
           : '--',
       takeProfit:
-        action?.kind === 'OPEN' ? formatNullableSigned(options.takeProfitSpread.value) : '--',
-      stopLoss: action?.kind === 'OPEN' ? formatNullableSigned(options.stopLossSpread.value) : '--',
+        action?.kind === 'OPEN' ? formatNullableSigned(inputs.value.takeProfitSpread) : '--',
+      stopLoss: action?.kind === 'OPEN' ? formatNullableSigned(inputs.value.stopLossSpread) : '--',
     };
   });
 
@@ -213,19 +274,20 @@ export function useCrossSpreadExecution(options: UseCrossSpreadExecutionOptions)
     try {
       const orders =
         action.kind === 'CLOSE'
-          ? options.closeOrders.value.filter((order) => order.id === action.planId)
+          ? inputs.value.closeOrders.filter((order) => order.id === action.planId)
           : action.kind === 'CLOSE_ALL'
-          ? options.closeOrders.value
+          ? inputs.value.closeOrders.filter((order) => !order.isAbnormal)
           : [];
       if (action.kind === 'OPEN') {
         await prepareCrossSpreadExecution({
           action: action.direction === 'LONG_SPREAD' ? 'OPEN_LONG' : 'OPEN_SHORT',
-          quantityOz: String(options.qtyOz.value),
+          quantityOz: String(inputs.value.qtyOz),
         });
       } else {
         await Promise.all(
           orders.map((order) =>
             prepareCrossSpreadExecution({
+              exitPlanId: order.id,
               action: order.direction === 'LONG_SPREAD' ? 'CLOSE_LONG' : 'CLOSE_SHORT',
               quantityOz: String(
                 action.kind === 'CLOSE' && action.quantityOz !== undefined
@@ -236,17 +298,20 @@ export function useCrossSpreadExecution(options: UseCrossSpreadExecutionOptions)
           ),
         );
       }
+      if (pendingAction.value !== action || !confirmVisible.value) return;
       preflightReady.value = true;
       setExecutionMessage('预检完成，可以确认下单', 'is-success');
     } catch (error) {
+      if (pendingAction.value !== action || !confirmVisible.value) return;
       preflightError.value = requestErrorMessage(error, '执行预检失败');
       setExecutionMessage(preflightError.value, 'is-error');
     } finally {
-      submitLoading.value = false;
+      if (pendingAction.value === action) submitLoading.value = false;
     }
   }
 
   function openConfirm(action: string) {
+    if (!canStartIntent()) return;
     if (action.startsWith('CLOSE:')) {
       pendingAction.value = { kind: 'CLOSE', planId: action.slice('CLOSE:'.length) };
     } else if (action === 'CLOSE_ALL') {
@@ -258,7 +323,8 @@ export function useCrossSpreadExecution(options: UseCrossSpreadExecutionOptions)
   }
 
   function openPartialClose(planId: string, quantityOz: number) {
-    const order = options.closeOrders.value.find((candidate) => candidate.id === planId);
+    if (!canStartIntent()) return;
+    const order = inputs.value.closeOrders.find((candidate) => candidate.id === planId);
     if (!order || !Number.isFinite(quantityOz) || quantityOz <= 0 || quantityOz >= order.qtyOz) {
       setExecutionMessage('部分平仓数量必须大于 0 且小于该笔剩余数量', 'is-warn');
       return;
@@ -270,6 +336,7 @@ export function useCrossSpreadExecution(options: UseCrossSpreadExecutionOptions)
   }
 
   function prepareOpenDraft(direction: 'long' | 'short') {
+    if (!canStartIntent()) return;
     pendingAction.value = {
       kind: 'OPEN',
       direction: direction === 'long' ? 'LONG_SPREAD' : 'SHORT_SPREAD',
@@ -285,7 +352,36 @@ export function useCrossSpreadExecution(options: UseCrossSpreadExecutionOptions)
     await Promise.allSettled(jobs);
   }
 
+  async function releaseRejectedDraft(error: unknown) {
+    const response = (error as { response?: { status?: number; data?: { detail?: unknown } } })
+      ?.response;
+    if (!response?.data?.detail || ![400, 401, 403, 409, 422, 423].includes(response.status ?? 0)) {
+      return;
+    }
+    const draft = readExecutionDraft();
+    if (!draft) return;
+    // Only a completed, explicit server rejection followed by an authoritative
+    // absent instruction releases this intent. Timeouts and failed reads do not.
+    try {
+      const keys =
+        draft.kind === 'CLOSE_ALL'
+          ? draft.plans
+              .filter((plan) => plan.submitted !== false)
+              .map((plan) => plan.idempotencyKey)
+          : [draft.idempotencyKey];
+      const instructions = await Promise.all(keys.map(getCrossSpreadInstruction));
+      if (
+        instructions.every((item) => item === null || ['completed', 'failed'].includes(item.status))
+      ) {
+        clearExecutionDraft();
+      }
+    } catch {
+      // Keep the unresolved identity when its existence cannot be established.
+    }
+  }
+
   async function confirmOrder() {
+    if (submitLoading.value || !confirmVisible.value || readExecutionDraft()) return;
     const action = pendingAction.value;
     if (!action) return;
     if (!preflightReady.value) {
@@ -296,25 +392,25 @@ export function useCrossSpreadExecution(options: UseCrossSpreadExecutionOptions)
     setExecutionMessage('', 'is-warn');
     try {
       if (action.kind === 'OPEN') {
-        if (options.executionMode.value === 'limit' && options.triggerSpread.value === null) {
+        if (inputs.value.executionMode === 'limit' && inputs.value.triggerSpread === null) {
           setExecutionMessage('限价开仓必须填写开仓价差', 'is-warn');
           return;
         }
         const payload = {
           direction: action.direction as CrossSpreadDirection,
-          quantityOz: String(options.qtyOz.value),
-          takeProfitSpread: optionalNumericText(options.takeProfitSpread.value),
-          stopLossSpread: optionalNumericText(options.stopLossSpread.value),
-          executionMode: options.executionMode.value,
+          quantityOz: String(inputs.value.qtyOz),
+          takeProfitSpread: optionalNumericText(inputs.value.takeProfitSpread),
+          stopLossSpread: optionalNumericText(inputs.value.stopLossSpread),
+          executionMode: inputs.value.executionMode,
           limitSpread:
-            options.executionMode.value === 'limit'
-              ? numericText(options.triggerSpread.value)
+            inputs.value.executionMode === 'limit'
+              ? numericText(inputs.value.triggerSpread)
               : undefined,
-          limitStrategy: options.openLimitStrategy.value,
-          takeProfitExecutionMode: options.takeProfitExecution.value,
-          stopLossExecutionMode: options.stopLossExecution.value,
-          takeProfitLimitStrategy: options.takeProfitLimitStrategy.value,
-          stopLossLimitStrategy: options.stopLossLimitStrategy.value,
+          limitStrategy: inputs.value.openLimitStrategy,
+          takeProfitExecutionMode: inputs.value.takeProfitExecution,
+          stopLossExecutionMode: inputs.value.stopLossExecution,
+          takeProfitLimitStrategy: inputs.value.takeProfitLimitStrategy,
+          stopLossLimitStrategy: inputs.value.stopLossLimitStrategy,
         };
         const draft: PersistedExecutionDraft = {
           kind: 'OPEN',
@@ -338,29 +434,35 @@ export function useCrossSpreadExecution(options: UseCrossSpreadExecutionOptions)
             'is-warn',
           );
         }
-        if (isTerminalBatchStatus(result.executionBatch?.status)) {
+        if (
+          isTerminalBatchStatus(result.executionBatch?.status) ||
+          canHandOffAbnormalBatch(result.executionBatch)
+        ) {
           clearExecutionDraft();
         }
       } else if (action.kind === 'CLOSE') {
-        if (
-          options.closeExecutionMode.value === 'limit' &&
-          options.closeLimitSpread.value === null
-        ) {
+        if (inputs.value.closeExecutionMode === 'limit' && inputs.value.closeLimitSpread === null) {
           setExecutionMessage('限价平仓必须填写平仓限制价差', 'is-warn');
           return;
         }
         const draft: PersistedExecutionDraft = {
           kind: 'CLOSE',
-          idempotencyKey: crypto.randomUUID(),
+          idempotencyKey:
+            inputs.value.closeOrders.find((order) => order.id === action.planId)
+              ?.recoveryIdempotencyKey || crypto.randomUUID(),
           planId: action.planId,
           payload: {
-            ...(action.quantityOz === undefined ? {} : { quantityOz: String(action.quantityOz) }),
-            executionMode: options.closeExecutionMode.value,
+            quantityOz: String(
+              action.quantityOz ??
+                inputs.value.closeOrders.find((order) => order.id === action.planId)?.qtyOz ??
+                0,
+            ),
+            executionMode: inputs.value.closeExecutionMode,
             limitSpread:
-              options.closeExecutionMode.value === 'limit'
-                ? numericText(options.closeLimitSpread.value)
+              inputs.value.closeExecutionMode === 'limit'
+                ? numericText(inputs.value.closeLimitSpread)
                 : undefined,
-            limitStrategy: options.closeLimitStrategy.value,
+            limitStrategy: inputs.value.closeLimitStrategy,
           },
         };
         persistExecutionDraft(draft);
@@ -370,15 +472,28 @@ export function useCrossSpreadExecution(options: UseCrossSpreadExecutionOptions)
         });
         options.upsertExitPlan?.(result.exitPlan);
         setExecutionMessage(
-          `平仓提交完成，批次状态：${result.executionBatch.status}`,
-          'is-success',
+          result.executionBatch.status === 'manual_intervention'
+            ? `平仓未完成：${result.executionBatch.failureReason || '请在异常订单区处理剩余仓位'}`
+            : `平仓提交完成，批次状态：${result.executionBatch.status}`,
+          result.executionBatch.status === 'manual_intervention' ? 'is-error' : 'is-success',
         );
-        if (isTerminalBatchStatus(result.executionBatch.status)) {
+        if (
+          isTerminalBatchStatus(result.executionBatch.status) ||
+          canHandOffAbnormalBatch(result.executionBatch)
+        ) {
           clearExecutionDraft();
         }
       } else {
-        const closablePlans = options.exitPlans.value.filter(
-          (plan) => plan.status === 'active' || plan.status === 'manual_intervention',
+        if (inputs.value.closeExecutionMode === 'limit' && inputs.value.closeLimitSpread === null) {
+          setExecutionMessage('限价平仓必须填写平仓限制价差', 'is-warn');
+          return;
+        }
+        const closablePlans = inputs.value.exitPlans.filter(
+          (plan) =>
+            (plan.status === 'active' || plan.status === 'manual_intervention') &&
+            inputs.value.closeOrders.some(
+              (order) => order.id === plan.planId && order.qtyOz > 0 && !order.isAbnormal,
+            ),
         );
         if (!closablePlans.length) {
           setExecutionMessage('没有可平仓的退出计划', 'is-warn');
@@ -387,23 +502,33 @@ export function useCrossSpreadExecution(options: UseCrossSpreadExecutionOptions)
         const draft = createCloseAllExecutionDraft(
           closablePlans.map((plan) => plan.planId),
           {
-            executionMode: options.closeExecutionMode.value,
+            executionMode: inputs.value.closeExecutionMode,
             limitSpread:
-              options.closeExecutionMode.value === 'limit'
-                ? numericText(options.closeLimitSpread.value)
+              inputs.value.closeExecutionMode === 'limit'
+                ? numericText(inputs.value.closeLimitSpread)
                 : undefined,
-            limitStrategy: options.closeLimitStrategy.value,
+            limitStrategy: inputs.value.closeLimitStrategy,
           },
         );
+        draft.plans = draft.plans.map((plan) => ({
+          ...plan,
+          quantityOz: String(
+            inputs.value.closeOrders.find((order) => order.id === plan.planId)!.qtyOz,
+          ),
+        }));
         persistExecutionDraft(draft);
         let allTerminal = true;
         for (const planDraft of draft.plans) {
+          planDraft.submitted = true;
+          persistExecutionDraft(draft);
           const result = await closeCrossSpreadMarket(planDraft.planId, {
             idempotencyKey: planDraft.idempotencyKey,
             ...draft.payload,
+            quantityOz: planDraft.quantityOz ?? draft.payload.quantityOz,
           });
           options.upsertExitPlan?.(result.exitPlan);
           allTerminal = allTerminal && isTerminalBatchStatus(result.executionBatch.status);
+          if (!isTerminalBatchStatus(result.executionBatch.status)) break;
         }
         if (allTerminal) {
           clearExecutionDraft();
@@ -412,6 +537,7 @@ export function useCrossSpreadExecution(options: UseCrossSpreadExecutionOptions)
       }
       void refreshExecutionViews();
     } catch (error: unknown) {
+      await releaseRejectedDraft(error);
       setExecutionMessage(requestErrorMessage(error, '价差指令执行失败'), 'is-error');
     } finally {
       submitLoading.value = false;
@@ -421,49 +547,54 @@ export function useCrossSpreadExecution(options: UseCrossSpreadExecutionOptions)
   }
 
   async function resumePendingExecution() {
+    if (userStore.authentication?.user.role !== 'ceo') return;
+    if (submitLoading.value || confirmVisible.value) return;
     const draft = readExecutionDraft();
     if (!draft) return;
     submitLoading.value = true;
     setExecutionMessage('检测到未确认回执的价差指令，正在恢复状态…', 'is-warn');
     try {
-      if (draft.kind === 'OPEN') {
-        const result = await openCrossSpreadMarket({
-          idempotencyKey: draft.idempotencyKey,
-          ...draft.payload,
-        });
-        if (result.exitPlan) options.upsertExitPlan?.(result.exitPlan);
-        limitEvidence.value = result.limitExecution ?? null;
-        setExecutionMessage(`已恢复开仓状态：${result.executionBatch.status}`, 'is-success');
-        if (isTerminalBatchStatus(result.executionBatch.status)) {
-          clearExecutionDraft();
+      const keys =
+        draft.kind === 'CLOSE_ALL'
+          ? draft.plans
+              .filter((plan) => plan.submitted !== false)
+              .map((plan) => plan.idempotencyKey)
+          : [draft.idempotencyKey];
+      const statuses: string[] = [];
+      let allTerminal = true;
+      let allReceived = true;
+      for (const key of keys) {
+        const instruction = await getCrossSpreadInstruction(key);
+        if (instruction === null) {
+          allReceived = false;
+          // Absence during recovery can race an in-flight original request.
+          // Keep its identity and never turn this read into a new submission.
+          allTerminal = false;
+          statuses.push('原指令尚未查到，请稍后刷新核对');
+          continue;
         }
-      } else if (draft.kind === 'CLOSE') {
-        const result = await closeCrossSpreadMarket(draft.planId, {
-          idempotencyKey: draft.idempotencyKey,
-          ...draft.payload,
-        });
-        options.upsertExitPlan?.(result.exitPlan);
-        limitEvidence.value = result.limitExecution ?? null;
-        setExecutionMessage(`已恢复平仓状态：${result.executionBatch.status}`, 'is-success');
-        if (isTerminalBatchStatus(result.executionBatch.status)) {
-          clearExecutionDraft();
+        if (instruction.executionBatchId === null) {
+          allReceived = allReceived && ['failed', 'rejected'].includes(instruction.status);
+          allTerminal = allTerminal && instruction.status === 'failed';
+          statuses.push(instruction.status);
+          continue;
         }
-      } else {
-        let allTerminal = true;
-        for (const planDraft of draft.plans) {
-          const result = await closeCrossSpreadMarket(planDraft.planId, {
-            idempotencyKey: planDraft.idempotencyKey,
-            ...draft.payload,
-          });
-          options.upsertExitPlan?.(result.exitPlan);
-          limitEvidence.value = result.limitExecution ?? null;
-          allTerminal = allTerminal && isTerminalBatchStatus(result.executionBatch.status);
-        }
-        setExecutionMessage(`已恢复批量平仓状态：${draft.plans.length} 个计划已核对`, 'is-success');
-        if (allTerminal) {
-          clearExecutionDraft();
-        }
+        const batch = await getExecutionBatch(instruction.executionBatchId);
+        if (
+          batch.batchId !== instruction.executionBatchId ||
+          batch.strategyInstanceId !== 'strategy_cross_venue_spread_instance_default'
+        )
+          throw new Error('原指令与执行批次身份不一致，请核对');
+        allTerminal = allTerminal && isTerminalBatchStatus(batch.status);
+        allReceived =
+          allReceived && (isTerminalBatchStatus(batch.status) || canHandOffAbnormalBatch(batch));
+        statuses.push(batch.status);
       }
+      if (allReceived) clearExecutionDraft();
+      setExecutionMessage(
+        `已恢复指令状态：${statuses.join('；') || '没有已提交指令'}`,
+        allTerminal ? 'is-success' : 'is-warn',
+      );
       await refreshExecutionViews();
     } catch (error: unknown) {
       setExecutionMessage(
@@ -478,6 +609,7 @@ export function useCrossSpreadExecution(options: UseCrossSpreadExecutionOptions)
   void resumePendingExecution();
 
   return {
+    cancelConfirmation,
     confirmGuardMessage,
     confirmOrder,
     confirmSummary,

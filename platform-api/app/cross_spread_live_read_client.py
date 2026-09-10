@@ -6,6 +6,7 @@ from decimal import Decimal
 
 import httpx
 
+from app import runtime_transport
 from app.config import get_settings
 
 
@@ -13,7 +14,6 @@ class CrossSpreadLiveReadError(RuntimeError):
     """Raised when authoritative live venue evidence is unavailable or invalid."""
 
 
-_RUNTIME_CLIENT = httpx.Client(trust_env=False)
 
 
 @dataclass(frozen=True)
@@ -45,7 +45,7 @@ class LivePosition:
 def runtime_get(path: str, params: dict[str, str] | None = None) -> object:
     settings = get_settings()
     try:
-        response = _RUNTIME_CLIENT.get(
+        response = runtime_transport.get(
             f"{settings.runtime_base_url}{path}",
             params=params,
             timeout=settings.runtime_timeout_seconds,

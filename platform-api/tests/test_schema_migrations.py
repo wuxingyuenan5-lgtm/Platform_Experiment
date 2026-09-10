@@ -41,6 +41,40 @@ def test_schema_migrations_are_idempotent_and_recorded() -> None:
     assert db.execute("SELECT name FROM sqlite_master WHERE name = 'example'").fetchone()
 
 
+def test_fill_provenance_upgrade_preserves_legacy_facts_and_repeated_startup():
+    db = memory_database()
+    bootstrap_database(db)
+    apply_migrations(db, PLATFORM_MIGRATIONS[:-1])
+    db.execute(
+        "INSERT INTO orders (id,command_id,account_id,instrument_id,symbol,side,order_type,"
+        "quantity,status,created_at,updated_at) VALUES "
+        "('old-order','old-command','account','instrument','TEST','buy','market','1',"
+        "'filled','2026-09-08T00:00:00+00:00','2026-09-08T00:00:00+00:00')"
+    )
+    legacy = (
+        "old-fill",
+        "old-order",
+        "account",
+        "instrument",
+        "buy",
+        "0.123456789012345678",
+        "2000.123456789012345678",
+        "2026-09-08T00:00:00+00:00",
+    )
+    db.execute(
+        "INSERT INTO fills "
+        "(id,order_id,account_id,instrument_id,side,quantity,price,occurred_at) "
+        "VALUES (?,?,?,?,?,?,?,?)",
+        legacy,
+    )
+    apply_migrations(db, PLATFORM_MIGRATIONS)
+    apply_migrations(db, PLATFORM_MIGRATIONS)
+    row = db.execute("SELECT * FROM fills").fetchone()
+    assert tuple(row)[:8] == legacy
+    assert (row["origin"], row["source"], row["external_fill_id"]) == ("legacy", None, None)
+    assert db.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
+
+
 def test_applied_migration_cannot_be_rewritten() -> None:
     db = memory_database()
     original = (Migration(version=1, name="baseline"),)
@@ -75,16 +109,12 @@ def test_user_identity_migration_creates_protected_schema() -> None:
     apply_migrations(db, PLATFORM_MIGRATIONS)
     apply_migrations(db, PLATFORM_MIGRATIONS)
 
-    migration = db.execute(
-        "SELECT name FROM schema_migrations WHERE version = 5"
-    ).fetchone()
+    migration = db.execute("SELECT name FROM schema_migrations WHERE version = 5").fetchone()
     assert migration["name"] == "user-identity-sessions-and-audit"
 
     table_names = {
         row["name"]
-        for row in db.execute(
-            "SELECT name FROM sqlite_master WHERE type = 'table'"
-        ).fetchall()
+        for row in db.execute("SELECT name FROM sqlite_master WHERE type = 'table'").fetchall()
     }
     assert {"users", "user_sessions", "password_reset_tickets"} <= table_names
 
@@ -152,6 +182,14 @@ def test_application_startup_applies_platform_migration_baseline(tmp_path: Path)
     assert payload["status"] == "current"
     assert payload["migrations"][0]["version"] == 1
     assert payload["migrations"][0]["status"] == "applied"
-    assert payload["migrations"][-1]["version"] == 8
-    assert payload["migrations"][-1]["name"] == "user-research-watchlist"
+    assert [row["version"] for row in payload["migrations"]] == sorted(
+        row["version"] for row in payload["migrations"]
+    )
+    assert payload["migrations"][-1]["version"] == max(
+        migration.version for migration in PLATFORM_MIGRATIONS
+    )
+    assert (
+        next(item for item in payload["migrations"] if item["version"] == 8)["name"]
+        == "user-research-watchlist"
+    )
     assert payload["migrations"][-1]["status"] == "applied"

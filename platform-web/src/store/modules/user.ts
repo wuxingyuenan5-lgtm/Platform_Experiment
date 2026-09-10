@@ -1,3 +1,4 @@
+import { setStrategyQuerySession } from '@/api/platform/strategyQueries';
 import type { UserInfo } from '#/store';
 import type { ErrorMessageMode } from '#/axios';
 import { defineStore } from 'pinia';
@@ -9,6 +10,7 @@ import {
   clearUserSystemSessionMemory,
   getCurrentAuthentication,
   getUserSystemCsrfToken,
+  isUserSystemServiceUnavailable,
   loginUser,
   logoutUser,
   selfAvatarUrl,
@@ -133,6 +135,14 @@ export const useUserStore = defineStore({
       this.hydrationAttempted = true;
     },
     applyAuthentication(authentication: AuthenticationState) {
+      setStrategyQuerySession(
+        authentication.user.userId,
+        JSON.stringify([
+          authentication.user.role,
+          authentication.permissions,
+          getUserSystemCsrfToken(),
+        ]),
+      );
       clearAuthCache();
       this.authentication = authentication;
       this.authenticated = true;
@@ -144,6 +154,7 @@ export const useUserStore = defineStore({
       permissionStore.setPermCodeList(authentication.permissions);
     },
     resetState() {
+      setStrategyQuerySession();
       this.userInfo = null;
       this.account = null;
       this.roleList = [];
@@ -186,8 +197,10 @@ export const useUserStore = defineStore({
         this.applyAuthentication(authentication);
         return this.userInfo;
       } catch (error) {
-        this.hydrationAttempted = true;
         this.resetState();
+        // An unreachable API has not decided whether the cookie is valid.
+        // Keep protected state cleared, but allow a later read to verify it.
+        this.hydrationAttempted = !isUserSystemServiceUnavailable(error);
         throw error;
       }
     },

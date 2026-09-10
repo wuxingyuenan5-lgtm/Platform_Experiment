@@ -258,7 +258,13 @@ def _assert_tick_aligned(value: str | object, tick: str) -> None:
     assert steps == steps.to_integral_value(), (price, tick_value)
 
 
-def _make_instruction(idempotency_key: str, *, quantity: str = "1") -> str:
+def _make_instruction(
+    idempotency_key: str,
+    *,
+    quantity: str = "1",
+    execution_policy: str = "post_only_chase",
+    spot_quantity: str | None = None,
+) -> str:
     instruction = create_instruction(
         INSTANCE_ID,
         CreateStrategyInstructionRequest(
@@ -268,13 +274,32 @@ def _make_instruction(idempotency_key: str, *, quantity: str = "1") -> str:
                 "perpetualSymbol": "BTCUSDT",
                 "perpetualQuantity": quantity,
                 "spotSymbol": "BTCUSDT",
-                "spotQuantity": quantity,
+                "spotQuantity": spot_quantity or quantity,
+                "executionPolicy": execution_policy,
+                **({"perpetualLimitPrice": "99"} if execution_policy == "fok" else {}),
             },
             reason="phase2 orchestration test",
         ),
         requested_by="ceo-test",
     )
     return str(instruction["instructionId"])
+
+
+def _authorize_ceo_client(client: TestClient) -> str:
+    from app.user_service import create_initial_ceo, issue_browser_session
+
+    user = create_initial_ceo(
+        username="funding-owner", password="isolated funding test password 123!"
+    )
+    issued = issue_browser_session(
+        user_id=user.id, ip_address="127.0.0.1", user_agent="pytest", now=datetime.now(UTC)
+    )
+    settings = get_settings()
+    client.cookies.set(settings.session_cookie_name, issued.session_token)
+    client.headers.update(
+        {"Origin": settings.allowed_cors_origins[0], "X-CSRF-Token": issued.csrf_token}
+    )
+    return user.id
 
 
 def _live_ceo_headers(token: str) -> dict[str, str]:
@@ -399,6 +424,73 @@ def test_partial_fill_releases_first_spot_delta_and_repeat_resume_does_not_dupli
             """
         ).fetchone()
     assert int(spot_commands["count"]) == 1
+
+
+def test_spot_release_without_fill_never_becomes_closable_inventory(runtime, tmp_path, monkeypatch):
+    from app.strategies.funding_workspace import get_funding_instruction_workspace
+
+    runtime_url, journal_dir = runtime
+    _seed_environment(tmp_path, runtime_url)
+    _set_quote(journal_dir, symbol="BTCUSDT", bid="100", ask="100.1")
+    _seed_script(
+        journal_dir,
+        symbol="BTCUSDT",
+        behavior="partial_fill",
+        partial_fill_quantity="0.4",
+        partial_fill_price="100.1",
+    )
+    # Pause delivery after the durable release claim, before any Spot order.
+    from app.strategies import funding_orchestration
+
+    submit_spot = funding_orchestration._submit_spot_release
+    monkeypatch.setattr(funding_orchestration, "_submit_spot_release", lambda **_: None)
+    instruction_id = _make_instruction("phase2-unfilled-spot")
+    execute_instruction(instruction_id)
+    workspace = get_funding_instruction_workspace(instruction_id)["workspaceState"]
+    assert Decimal(workspace["cumulativePerpetualFill"]) == Decimal("0.4")
+    assert Decimal(workspace["spotReleases"][0]["cumulativeSpotQuantity"]) == Decimal("0.4")
+    assert Decimal(workspace["cumulativeSpotFill"]) == Decimal("0")
+    monkeypatch.setattr(funding_orchestration, "_submit_spot_release", submit_spot)
+    execute_instruction(instruction_id)
+    recovered = get_funding_instruction_workspace(instruction_id)["workspaceState"]
+    assert Decimal(recovered["cumulativeSpotFill"]) == Decimal("0.4")
+    assert len(recovered["spotReleases"]) == 1
+
+
+def test_concurrent_close_intents_cannot_reserve_the_same_open_quantity(runtime, tmp_path):
+    runtime_url, journal_dir = runtime
+    _seed_environment(tmp_path, runtime_url)
+    _set_quote(journal_dir, symbol="BTCUSDT", bid="100", ask="100.1")
+    instruction_id = _make_instruction("phase2-close-capacity-open")
+    execute_instruction(instruction_id)
+    execute_instruction(instruction_id)
+
+    def close_intent(key):
+        try:
+            create_instruction(
+                INSTANCE_ID,
+                CreateStrategyInstructionRequest(
+                    idempotencyKey=key,
+                    action="close",
+                    parameters={
+                        "perpetualSymbol": "BTCUSDT",
+                        "spotSymbol": "BTCUSDT",
+                        "perpetualQuantity": "0.7",
+                        "spotQuantity": "0.7",
+                        "targetOpenInstructionId": instruction_id,
+                    },
+                ),
+                requested_by="ceo-test",
+            )
+            return 200
+        except HTTPException as exc:
+            return exc.status_code
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        results = list(
+            pool.map(close_intent, ["phase2-close-capacity-a", "phase2-close-capacity-b"])
+        )
+    assert sorted(results) == [200, 409]
 
 
 def test_second_cumulative_fill_only_releases_new_decimal_delta(
@@ -580,6 +672,9 @@ def test_two_funding_instructions_cannot_hold_execution_lease_concurrently(
 
     assert exc.value.status_code == 409
     assert "Active execution batch blocks new strategy instruction" in str(exc.value.detail)
+    from app.strategies.funding_runner import pending_instruction_ids
+
+    assert second_id not in pending_instruction_ids()
 
 
 def test_result_unknown_keeps_lease_and_creates_no_new_attempt_or_spot(
@@ -720,7 +815,7 @@ def test_max_mutations_exhaustion_stops_reposts_directly(
     for index in range(6):
         result = execute_instruction(instruction_id)
         batch_id = result.batch_id
-        _age_attempt(result.batch_id, 2)
+        _age_attempt(result.batch_id, index + 1)
         execute_instruction(instruction_id)
         _set_quote(
             journal_dir,
@@ -860,6 +955,47 @@ def test_reconciliation_query_unavailable_keeps_instruction_reconciling(
     assert int(active_reservations["count"]) > 0
 
 
+def test_spot_reconciliation_reads_native_cash_after_base_coin_fee(
+    runtime: tuple[str, Path],
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    from app.strategies import funding_orchestration as orchestration
+
+    runtime_url, journal_dir = runtime
+    _seed_environment(tmp_path, runtime_url)
+    _set_quote(journal_dir, symbol="BTCUSDT", bid="100", ask="100.1")
+    instruction_id = _make_instruction("phase2-native-spot")
+    first = execute_instruction(instruction_id)
+    assert first.status == "hedged"
+    original = orchestration._runtime_get
+
+    def bybit_spot_shape(path, *args, **kwargs):
+        if path == "/venue/balances":
+            return [
+                {
+                    "accountId": ACCOUNT_ID,
+                    "currency": "BTC",
+                    "equity": "0.999",
+                    "walletBalance": "0.999",
+                }
+            ]
+        result = original(path, *args, **kwargs)
+        if path == "/venue/positions":
+            return [row for row in result if row["instrumentId"] != "instrument_btc_usdt"]
+        if path == "/venue/fills":
+            return [
+                {**row, "fee": "0.001", "currency": "BTC"}
+                if row["instrumentId"] == "instrument_btc_usdt"
+                else row
+                for row in result
+            ]
+        return result
+
+    monkeypatch.setattr(orchestration, "_runtime_get", bybit_spot_shape)
+    assert execute_instruction(instruction_id).status == "completed"
+
+
 def test_reconciliation_position_mismatch_enters_manual_intervention(
     runtime: tuple[str, Path],
     tmp_path: Path,
@@ -904,6 +1040,7 @@ def test_hedged_batch_leaves_instruction_in_reconciling_and_legacy_route_uses_pr
         )
 
     with TestClient(app) as client:
+        principal_id = _authorize_ceo_client(client)
         response = client.post(
             FUNDING_ENDPOINT,
             json={
@@ -924,21 +1061,27 @@ def test_hedged_batch_leaves_instruction_in_reconciling_and_legacy_route_uses_pr
             ("phase2-requested-by",),
         ).fetchone()
     assert row is not None
-    assert row["requested_by"] == "ceo-principal-1"
+    assert row["requested_by"] == principal_id
     assert row["status"] == "reconciling"
 
 
 def test_controlled_live_funding_still_returns_423_when_readiness_is_missing(
     tmp_path: Path,
+    monkeypatch,
 ) -> None:
     settings = get_settings()
     settings.database_path = str(tmp_path / "funding-phase2-live-gate.db")
+    monkeypatch.setattr(
+        "app.funding.get_funding_controlled_live_readiness", lambda **_: {"ready": False}
+    )
+    settings.runtime_base_url = "http://127.0.0.1:1"
     settings.live_trading_enabled = True
     settings.environment = "development"
     settings.auth_mode = "development"
     settings.default_trading_environment = "live"
 
     with TestClient(app) as client:
+        _authorize_ceo_client(client)
         response = client.post(
             "/api/v1/trading/funding/market-command",
             json={
@@ -949,7 +1092,7 @@ def test_controlled_live_funding_still_returns_423_when_readiness_is_missing(
             },
         )
 
-    assert response.status_code == 423
+    assert response.status_code == 423, response.text
     assert response.json()["detail"] == (
         "Funding controlled-live execution requires Phase 2 post-only "
         "chase and authoritative incremental release"
@@ -989,8 +1132,8 @@ def test_controlled_live_funding_path_uses_single_postonly_attempt_when_ready(
                 "100000",
                 "seed",
                 "complete",
-                "2026-08-23T00:00:00+00:00",
-                "2026-08-23T00:00:00+00:00",
+                datetime.now(UTC).isoformat(),
+                datetime.now(UTC).isoformat(),
             ),
         )
     monkeypatch.setattr(
@@ -1005,6 +1148,9 @@ def test_controlled_live_funding_path_uses_single_postonly_attempt_when_ready(
         "app.trade_command_execution.enforce_order_safety",
         lambda *args, **kwargs: None,
     )
+    # This test isolates the single-attempt command shape; native admission is
+    # exercised end to end in test_funding_bybit_contract.
+    monkeypatch.setattr("app.strategies.plan_service.validate_funding_plan_markets", lambda _: None)
     monkeypatch.setattr(
         "app.execution_batches._reservation_reference_price",
         lambda **_: Decimal("100"),
@@ -1056,15 +1202,16 @@ def test_controlled_live_funding_path_uses_single_postonly_attempt_when_ready(
                 }
             ]
 
-    def runtime_post(url: str, *, json: dict[str, object], timeout: float):
+    def runtime_post(url: str, *, json: dict[str, object], timeout: float, **kwargs):
         assert url.endswith("/commands/orders")
         assert timeout == settings.runtime_timeout_seconds
         captured_payloads.append(json)
         return FakeRuntimeResponse()
 
-    monkeypatch.setattr("app.trade_command_execution.httpx.post", runtime_post)
+    monkeypatch.setattr("app.runtime_transport.post", runtime_post)
 
     with TestClient(app) as client:
+        _authorize_ceo_client(client)
         response = client.post(
             "/api/v1/trading/funding/market-command",
             json={
@@ -1080,3 +1227,234 @@ def test_controlled_live_funding_path_uses_single_postonly_attempt_when_ready(
     assert captured_payloads
     assert captured_payloads[0]["execution_policy"] == "post_only_single_attempt"
     assert response.json()["status"] in {"executing", "manual_intervention"}
+
+
+@pytest.mark.parametrize("policy", ["market", "fok"])
+def test_funding_execution_modes_complete_and_partial_close_without_duplicate_orders(
+    runtime, tmp_path, policy
+):
+    from app.strategies.funding_workspace import (
+        get_funding_instruction_workspace,
+        list_funding_position_groups,
+        submit_funding_instruction,
+    )
+
+    runtime_url, journal_dir = runtime
+    _seed_environment(tmp_path, runtime_url)
+    _set_quote(journal_dir, symbol="BTCUSDT", bid="100", ask="100.1")
+    instruction_id = _make_instruction("funding-new-mode", execution_policy=policy)
+    first = execute_instruction(instruction_id)
+    assert first.status == "hedged", first
+    assert execute_instruction(instruction_id).status == "completed"
+    assert execute_instruction(instruction_id).status == "completed"
+    with connection() as db:
+        commands = db.execute(
+            "SELECT side,order_type,quantity,price FROM trade_commands ORDER BY created_at"
+        ).fetchall()
+    assert len(commands) == 2
+    assert commands[0]["order_type"] == ("market" if policy == "market" else "limit")
+    assert commands[0]["price"] == (None if policy == "market" else "99")
+    assert commands[1]["order_type"] == "market"
+    group = list_funding_position_groups(scope="active")[0]
+    assert Decimal(group["remainingClosableQuantity"]) == 1
+    # The account monitor supplies the coin-balance evidence used by close admission.
+    with connection() as db:
+        db.execute(
+            "INSERT INTO balance_snapshots (id,account_id,currency,equity,available_balance,"
+            "source,data_quality_state,as_of,created_at) VALUES (?,?, 'BTC','1','1',"
+            "'fake_venue_snapshot','complete',?,?)",
+            (
+                "funding-close-btc",
+                ACCOUNT_ID,
+                datetime.now(UTC).isoformat(),
+                datetime.now(UTC).isoformat(),
+            ),
+        )
+    closed = submit_funding_instruction(
+        action="close",
+        idempotency_key="funding-partial-close",
+        perpetual_symbol="BTCUSDT",
+        spot_symbol="BTCUSDT",
+        quantity=Decimal("0.25"),
+        requested_by="ceo-test",
+        target_open_instruction_id=instruction_id,
+        execution_policy="market",
+    )
+    close_id = closed["instruction"]["instructionId"]
+    assert execute_instruction(close_id).status == "completed"
+    group = list_funding_position_groups(scope="active")[0]
+    assert Decimal(group["remainingClosableQuantity"]) == Decimal("0.75")
+    with connection() as db:
+        intent = db.execute(
+            "SELECT i.reduce_only FROM funding_perpetual_attempts a "
+            "JOIN order_execution_intents i ON i.idempotency_key=a.idempotency_key "
+            "WHERE a.batch_id=?",
+            (closed["executionBatch"]["batchId"],),
+        ).fetchone()
+        count_before = db.execute("SELECT count(*) FROM trade_commands").fetchone()[0]
+    assert bool(intent[0])
+    assert count_before == 4
+    for _ in range(3):
+        get_funding_instruction_workspace(close_id)
+        execute_instruction(close_id)
+    with connection() as db:
+        assert db.execute("SELECT count(*) FROM trade_commands").fetchone()[0] == count_before
+
+
+def test_rejected_funding_admission_recovers_as_failed_without_active_position(
+    tmp_path, monkeypatch
+):
+    from app.strategies.funding_workspace import (
+        get_funding_instruction_workspace_by_idempotency,
+        list_funding_position_groups,
+    )
+
+    _seed_environment(tmp_path, "http://127.0.0.1:1")
+    instruction_id = _make_instruction("funding-rejected-price")
+
+    def unavailable(**kwargs):
+        raise HTTPException(409, "Reference price is unavailable for reservation of BTCUSDT")
+
+    monkeypatch.setattr("app.execution_batches._reservation_reference_price", unavailable)
+    with pytest.raises(HTTPException):
+        execute_instruction(instruction_id)
+    workspace = get_funding_instruction_workspace_by_idempotency("funding-rejected-price")
+    assert workspace["instruction"]["status"] == "rejected"
+    assert workspace["workspaceState"]["executionState"] == "failed"
+    assert list_funding_position_groups(scope="active") == []
+    assert list_funding_position_groups(scope="history")[0]["status"] == "failed"
+    with connection() as db:
+        assert db.execute("SELECT count(*) FROM trade_commands").fetchone()[0] == 0
+
+
+@pytest.mark.parametrize(
+    "mode,account_id", [("simulation", ACCOUNT_ID), ("live", "bybit-live-main")]
+)
+def test_funding_context_and_plan_choose_the_same_authoritative_account(
+    tmp_path, monkeypatch, mode, account_id
+):
+    from app.strategies.funding_workspace import _funding_account_binding
+    from app.strategies.instruction_service import get_instruction
+
+    _seed_environment(tmp_path, "http://127.0.0.1:1")
+    monkeypatch.setattr(
+        "app.strategies.plan_service._funding_live_specification",
+        lambda account, spec, kind: dict(spec),
+    )
+    with connection() as db:
+        db.execute("UPDATE strategy_instances SET trading_mode=? WHERE id=?", (mode, INSTANCE_ID))
+        db.execute("UPDATE accounts SET status='active' WHERE id=?", (account_id,))
+    binding = _funding_account_binding()
+    instruction_id = _make_instruction(
+        "funding-binding-consistency",
+        quantity="0.999" if mode == "live" else "1",
+        spot_quantity="1",
+    )
+    plan = get_instruction(instruction_id)["executionPlan"]
+    assert binding["account_id"] == account_id
+    assert {leg["accountId"] for leg in plan["legs"]} == {account_id}
+
+
+def test_live_funding_plan_freezes_native_spot_precision_and_rejects_wrong_market(
+    tmp_path, monkeypatch
+):
+    from app.strategies.instruction_service import get_instruction
+
+    _seed_environment(tmp_path, "http://127.0.0.1:1")
+    with connection() as db:
+        db.execute("UPDATE strategy_instances SET trading_mode='live' WHERE id=?", (INSTANCE_ID,))
+        db.execute("UPDATE accounts SET status='active' WHERE id='bybit-live-main'")
+    invalid = False
+    calls = []
+
+    def native_spec(url, *, params, **kwargs):
+        calls.append(params)
+        spot = params["instrumentType"] == "crypto_spot"
+        return httpx.Response(
+            200,
+            request=httpx.Request("GET", url),
+            json={
+                "accountId": params["accountId"],
+                "symbol": "BTCUSDT",
+                "instrumentType": params["instrumentType"],
+                "category": "wrong" if invalid else params["category"],
+                "dataQualityState": "complete",
+                "status": "Trading",
+                "quantityStep": "0.000001" if spot else "0.001",
+                "minQuantity": "0.000001" if spot else "0.001",
+                "priceTick": "0.1",
+                "contractMultiplier": "1",
+                "accessChecks": {
+                    "readOnly": False,
+                    "ipBound": True,
+                    "orderPermission": True,
+                    "positionPermission": True,
+                },
+            },
+        )
+
+    monkeypatch.setattr("app.runtime_transport.get", native_spec)
+    instruction_id = _make_instruction(
+        "funding-live-native-rules", quantity="0.001", spot_quantity="0.002", execution_policy="fok"
+    )
+    plan = get_instruction(instruction_id)["executionPlan"]
+    assert plan["legs"][0]["priceTick"] == "0.1"
+    assert plan["legs"][1]["quantityStep"] == "0.000001"
+    assert {call["accountId"] for call in calls} == {"bybit-live-main"}
+    invalid = True
+    with pytest.raises(HTTPException, match="交易所交易规则未获确认"):
+        _make_instruction("funding-bad-native-rules", execution_policy="market")
+    with connection() as db:
+        assert db.execute("SELECT count(*) FROM trade_commands").fetchone()[0] == 0
+        assert db.execute("SELECT count(*) FROM strategy_runs").fetchone()[0] == 1
+
+
+def test_fok_partial_fill_never_releases_spot_or_replays_the_order(runtime, tmp_path):
+    runtime_url, journal_dir = runtime
+    _seed_environment(tmp_path, runtime_url)
+    _set_quote(journal_dir, symbol="BTCUSDT", bid="100", ask="100.1")
+    _seed_script(
+        journal_dir, symbol="BTCUSDT", behavior="partial_fill", partial_fill_quantity="0.4"
+    )
+    instruction_id = _make_instruction("funding-fok-partial", execution_policy="fok")
+    result = execute_instruction(instruction_id)
+    assert result.status == "manual_intervention"
+    assert _release_rows(result.batch_id) == []
+    for _ in range(2):
+        execute_instruction(instruction_id)
+    assert len(_attempt_rows(result.batch_id)) == 1
+    with connection() as db:
+        assert db.execute("SELECT count(*) FROM trade_commands").fetchone()[0] == 1
+
+
+def test_fok_terminal_zero_fill_releases_reservations_without_resubmission(runtime, tmp_path):
+    from app.strategies.funding_orchestration import _active_attempt, _request_cancel
+    from app.strategies.funding_workspace import list_funding_position_groups
+
+    runtime_url, journal_dir = runtime
+    _seed_environment(tmp_path, runtime_url)
+    _set_quote(journal_dir, symbol="BTCUSDT", bid="100", ask="100.1")
+    _seed_script(journal_dir, symbol="BTCUSDT", behavior="accepted_no_fill")
+    instruction_id = _make_instruction("funding-fok-zero", execution_policy="fok")
+    first = execute_instruction(instruction_id)
+    # The fake venue exposes a deterministic cancel; the adapter test verifies native FOK.
+    _request_cancel(_active_attempt(first.batch_id))
+    final = execute_instruction(instruction_id)
+    assert final.status == "failed", final
+    assert list_funding_position_groups(scope="active") == []
+    assert list_funding_position_groups(scope="history")[0]["status"] == "failed"
+    execute_instruction(instruction_id)
+    with connection() as db:
+        assert db.execute("SELECT count(*) FROM trade_commands").fetchone()[0] == 1
+        assert (
+            db.execute(
+                "SELECT count(*) FROM execution_resource_claims WHERE status='active'"
+            ).fetchone()[0]
+            == 0
+        )
+        assert (
+            db.execute(
+                "SELECT count(*) FROM execution_balance_reservations WHERE status='active'"
+            ).fetchone()[0]
+            == 0
+        )

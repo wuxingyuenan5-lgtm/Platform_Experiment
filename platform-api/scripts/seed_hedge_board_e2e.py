@@ -1,14 +1,11 @@
 from __future__ import annotations
 
 import os
-import shutil
 from pathlib import Path
 
 from app.config import get_settings
 from app.database import initialize_database
-from app.schema_migrations import apply_platform_migrations
-from app.user_product_migrations import apply_user_product_migrations
-from user_demo_seed import seed_demo_users
+from scripts.user_demo_seed import seed_demo_users
 
 _REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 _E2E_ROOT = _REPOSITORY_ROOT / ".e2e" / "hedge-board"
@@ -29,15 +26,6 @@ def _assert_e2e_path(path: Path, *, label: str) -> Path:
     return resolved_path
 
 
-def _reset_test_data() -> None:
-    if os.environ.get("HEDGE_BOARD_E2E_RESET") != "1":
-        return
-    if _E2E_ROOT.is_symlink():
-        raise RuntimeError("Refusing to reset a symlinked hedge-board E2E root")
-    if _E2E_ROOT.exists():
-        shutil.rmtree(_E2E_ROOT)
-
-
 def main() -> int:
     settings = get_settings()
     database_path = _assert_e2e_path(Path(settings.database_path), label="VG_DATABASE_PATH")
@@ -46,13 +34,12 @@ def main() -> int:
         label="VG_AVATAR_DATA_DIRECTORY",
     )
 
-    _reset_test_data()
+    if settings.environment != "test" or database_path.exists():
+        raise RuntimeError("E2E bootstrap requires test mode and a fresh isolated database path")
     database_path.parent.mkdir(parents=True, exist_ok=True)
     avatar_directory.mkdir(parents=True, exist_ok=True)
 
     initialize_database()
-    apply_platform_migrations()
-    apply_user_product_migrations()
 
     password = _required_environment("E2E_CEO_PASSWORD")
     accounts = seed_demo_users(

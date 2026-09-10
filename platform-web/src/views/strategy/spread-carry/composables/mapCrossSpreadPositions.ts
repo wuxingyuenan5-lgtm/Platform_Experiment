@@ -9,7 +9,11 @@ import type {
   NumericValue,
   VenuePositionSnapshot,
 } from '@/api/platform/crossSpreadObservability';
-import type { CrossSpreadSnapshotResult } from '@/api/platform/trading.types';
+import type {
+  CrossSpreadPositionOverviewResult,
+  CrossSpreadPositionPnlResult,
+  CrossSpreadSnapshotResult,
+} from '@/api/platform/trading.types';
 import {
   formatNullablePrice,
   formatNullableSigned,
@@ -31,6 +35,12 @@ export interface CloseOrder {
   takeProfit: number | null;
   stopLoss: number | null;
   execution: string;
+  originLabel?: string | null;
+  mt5PositionId?: string;
+  isAbnormal?: boolean;
+  mt5Only?: boolean;
+  remainingMt5Lots?: number;
+  recoveryIdempotencyKey?: string | null;
 }
 
 export interface OverviewRow {
@@ -48,6 +58,8 @@ export interface OverviewRow {
   accountStatus: string;
   accountRisk: string;
   pnl: string;
+  pnlUsdt: NumericValue | null;
+  pnlReason: string | null;
   legPnl: string;
   takeProfit: string;
   stopLoss: string;
@@ -68,13 +80,31 @@ interface MapOverviewRowsOptions {
   exitPlans: CrossSpreadExitPlanResult[];
 }
 
-export function mapCloseOrders(exitPlans: CrossSpreadExitPlanResult[]) {
+export function mapCloseOrders(
+  exitPlans: CrossSpreadExitPlanResult[],
+  abnormalOrders: CrossSpreadPositionOverviewResult['abnormalOrders'] = [],
+) {
   return exitPlans
     .filter((plan) => plan.status === 'active' || plan.status === 'manual_intervention')
     .map<CloseOrder>((plan) => ({
       id: plan.planId,
+      originLabel: plan.originLabel,
+      mt5PositionId: plan.mt5PositionId,
       direction: plan.direction,
-      qtyOz: Number(plan.quantityOz) || 0,
+      qtyOz:
+        Number(
+          abnormalOrders.find((row) => row.planId === plan.planId)?.closeQuantityOz ??
+            plan.quantityOz,
+        ) || 0,
+      isAbnormal: !!plan.originLabel || plan.status === 'manual_intervention',
+      mt5Only: abnormalOrders.some(
+        (row) => row.planId === plan.planId && row.action === 'finish_mt5',
+      ),
+      remainingMt5Lots: Number(
+        abnormalOrders.find((row) => row.planId === plan.planId)?.mt5PendingCloseQuantity ?? 0,
+      ),
+      recoveryIdempotencyKey: abnormalOrders.find((row) => row.planId === plan.planId)
+        ?.recoveryIdempotencyKey,
       entrySpread: Number(plan.entrySpread) || 0,
       takeProfit: parseOptionalNumber(plan.takeProfitSpread),
       stopLoss: parseOptionalNumber(plan.stopLossSpread),
@@ -89,8 +119,9 @@ export function mapCloseOrders(exitPlans: CrossSpreadExitPlanResult[]) {
 
 export function mapOverviewRows(options: MapOverviewRowsOptions) {
   const activePlans = options.exitPlans.filter(
-    (plan) => plan.status === 'active' || plan.status === 'manual_intervention',
+    (plan) => plan.status === 'active' && !plan.originLabel,
   );
+  if (activePlans.length === 0) return [];
   const bybitPositions = options.snapshot?.bybit.positions || [];
   const mt5Positions = options.snapshot?.mt5.positions || [];
   const rowCount = Math.max(bybitPositions.length, mt5Positions.length);
@@ -98,14 +129,23 @@ export function mapOverviewRows(options: MapOverviewRowsOptions) {
   if (!options.snapshot && activePlans.length === 0) return [];
   const rows: OverviewRow[] = [];
 
-  if (rowCount === 0 && activePlans.length > 0) {
-    return activePlans.map((plan, index) => {
-      const bybitLive = matchObservedPlanPosition(
-        options.observability?.bybit,
-        plan.direction,
-        'bybit',
-      );
-      const mt5Live = matchObservedPlanPosition(options.observability?.mt5, plan.direction, 'mt5');
+  if (activePlans.length > 0) {
+    return activePlans.map((plan) => {
+      // A shared net position cannot supply each group's cost, margin or PnL.
+      const candidateBybitLive =
+        activePlans.length === 1
+          ? matchObservedPlanPosition(options.observability?.bybit, plan.direction, 'bybit')
+          : null;
+      const bybitLive =
+        candidateBybitLive &&
+        Math.abs(Number(candidateBybitLive.netQuantity)) === Number(plan.quantityOz)
+          ? candidateBybitLive
+          : null;
+      const valuation = matchingGroupValuation(plan, options.snapshot?.positionOverview);
+      const mt5Live =
+        options.observability?.mt5.positions.find(
+          (position) => position.externalPositionId === plan.mt5PositionId,
+        ) ?? null;
       const direction = plan.direction === 'LONG_SPREAD' ? '多头' : '空头';
       return {
         id: plan.planId,
@@ -118,24 +158,23 @@ export function mapOverviewRows(options: MapOverviewRowsOptions) {
         qty: Number(plan.quantityOz) || 0,
         entrySpread: formatPlanEntrySpread(plan.entrySpread, bybitLive, mt5Live),
         currentSpread: formatNullableSigned(
-          direction === '多头' ? options.longSpread : options.shortSpread,
+          direction === '多头' ? options.shortSpread : options.longSpread,
         ),
-        detail: `BY: ${formatObservedAveragePrice(bybitLive)} | MT5: ${formatObservedAveragePrice(
-          mt5Live,
-        )}`,
+        detail: `BY: ${formatNullablePrice(
+          valuation?.bybitEntryPrice,
+        )} | MT5: ${formatNullablePrice(valuation?.mt5EntryPrice)} · Ticket ${plan.mt5PositionId}`,
         accountStatus: `BY: ${venueReadState(options.observability?.bybit)} | MT5: ${venueReadState(
           options.observability?.mt5,
         )}`,
         accountRisk: `BY: ${accountRiskText(options.observability?.bybit)} | MT5: ${accountRiskText(
           options.observability?.mt5,
         )}`,
-        pnl: formatNullableSigned(
-          (parseOptionalNumber(bybitLive?.unrealizedPnl) || 0) +
-            (parseOptionalNumber(mt5Live?.unrealizedPnl) || 0),
-        ),
+        pnl: formatNullableSigned(parseOptionalNumber(valuation?.totalPnlUsdt)),
+        pnlUsdt: valuation?.totalPnlUsdt ?? null,
+        pnlReason: valuation?.reason ?? null,
         legPnl: `BY: ${formatNullableSigned(
-          parseOptionalNumber(bybitLive?.unrealizedPnl),
-        )} | MT5: ${formatNullableSigned(parseOptionalNumber(mt5Live?.unrealizedPnl))}`,
+          parseOptionalNumber(valuation?.bybitPnlUsdt),
+        )} | MT5: ${formatNullableSigned(parseOptionalNumber(valuation?.mt5PnlUsdt))}`,
         takeProfit: formatNullableSigned(parseOptionalNumber(plan.takeProfitSpread)),
         stopLoss: formatNullableSigned(parseOptionalNumber(plan.stopLossSpread)),
         liquidation: `BY: ${formatObservedLiquidation(
@@ -143,9 +182,12 @@ export function mapOverviewRows(options: MapOverviewRowsOptions) {
           bybitLive,
         )} | MT5: ${formatObservedLiquidation(options.observability?.mt5, mt5Live)}`,
         margin: `BY: ${formatObservedMargin(bybitLive)} | MT5: ${formatObservedMargin(mt5Live)}`,
-        openTime: formatOpenTime(bybitLive?.openTime, mt5Live?.openTime, plan.createdAt),
-        holdingTime: '--',
-        status: plan.status === 'manual_intervention' ? '待复核' : '正常',
+        openTime: formatOpenTime(valuation?.openTime ?? plan.createdAt, null),
+        holdingTime: formatHoldingTime(
+          valuation?.openTime ?? plan.createdAt,
+          options.snapshot?.asOf,
+        ),
+        status: plan.originLabel || (plan.status === 'manual_intervention' ? '待复核' : '正常'),
       };
     });
   }
@@ -191,7 +233,7 @@ export function mapOverviewRows(options: MapOverviewRowsOptions) {
             parseOptionalNumber(mt5?.averagePrice),
           ),
       currentSpread: formatNullableSigned(
-        direction === '多头' ? options.longSpread : options.shortSpread,
+        direction === '多头' ? options.shortSpread : options.longSpread,
       ),
       detail: `BY: ${
         formatObservedAveragePrice(bybitLive) || formatNullablePrice(bybit?.averagePrice)
@@ -202,10 +244,12 @@ export function mapOverviewRows(options: MapOverviewRowsOptions) {
       accountRisk: `BY: ${accountRiskText(options.observability?.bybit)} | MT5: ${accountRiskText(
         options.observability?.mt5,
       )}`,
-      pnl: formatNullableSigned(
-        (parseOptionalNumber(bybit?.unrealizedPnl) || 0) +
-          (parseOptionalNumber(mt5?.unrealizedPnl) || 0),
-      ),
+      pnl:
+        bybit?.unrealizedPnl != null && mt5?.unrealizedPnl != null
+          ? formatNullableSigned(Number(bybit.unrealizedPnl) + Number(mt5.unrealizedPnl))
+          : '--',
+      pnlUsdt: null,
+      pnlReason: '成交尚未归属到完整组合',
       legPnl: `BY: ${formatNullableSigned(
         parseOptionalNumber(bybit?.unrealizedPnl),
       )} | MT5: ${formatNullableSigned(parseOptionalNumber(mt5?.unrealizedPnl))}`,
@@ -218,10 +262,48 @@ export function mapOverviewRows(options: MapOverviewRowsOptions) {
       margin: `BY: ${formatObservedMargin(bybitLive)} | MT5: ${formatObservedMargin(mt5Live)}`,
       openTime: formatOpenTime(bybitLive?.openTime, mt5Live?.openTime),
       holdingTime: '--',
-      status: options.snapshot?.status === 'available' ? '正常' : options.snapshotStatusText,
+      status:
+        options.snapshot?.status !== 'available'
+          ? options.snapshotStatusText
+          : !matchedPlan || matchedPlan.status === 'manual_intervention'
+          ? '待复核'
+          : '正常',
     });
   }
   return rows;
+}
+
+function matchingGroupValuation(
+  plan: CrossSpreadExitPlanResult,
+  overview: CrossSpreadPositionOverviewResult | null | undefined,
+): CrossSpreadPositionPnlResult | null {
+  const rows = overview?.groups.filter((group) => group.planId === plan.planId) ?? [];
+  const row = rows.length === 1 ? rows[0] : null;
+  return row &&
+    Number(row.quantityOz) === Number(plan.quantityOz) &&
+    Date.parse(row.planUpdatedAt) === Date.parse(plan.updatedAt)
+    ? row
+    : null;
+}
+
+export function mapOverviewPnlSummary(
+  plans: CrossSpreadExitPlanResult[],
+  overview: CrossSpreadPositionOverviewResult | null | undefined,
+): CrossSpreadPositionOverviewResult | null {
+  const active = plans.filter((plan) => plan.status === 'active' && !plan.originLabel);
+  if (!overview || !active.every((plan) => matchingGroupValuation(plan, overview))) return null;
+  const groups = overview.groups.filter((group) =>
+    active.some((plan) => plan.planId === group.planId),
+  );
+  return { ...overview, groups };
+}
+
+function formatHoldingTime(openTime: string, asOf: string | undefined) {
+  const minutes = Math.floor((Date.parse(asOf ?? '') - Date.parse(openTime)) / 60000);
+  if (!Number.isFinite(minutes) || minutes < 0) return '--';
+  if (minutes < 60) return `${minutes} 分钟`;
+  if (minutes < 1440) return `${Math.floor(minutes / 60)} 小时 ${minutes % 60} 分钟`;
+  return `${Math.floor(minutes / 1440)} 天 ${Math.floor((minutes % 1440) / 60)} 小时`;
 }
 
 function matchObservedPosition(
@@ -249,10 +331,7 @@ function matchObservedPlanPosition(
       const quantity = parseOptionalNumber(position.netQuantity);
       if (quantity === null || quantity === 0) return false;
       return expectedPositive ? quantity > 0 : quantity < 0;
-    }) ||
-    venue.positions.find((position) => position.symbol === venue.symbol) ||
-    venue.positions[0] ||
-    null
+    }) || null
   );
 }
 

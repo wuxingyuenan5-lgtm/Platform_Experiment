@@ -8,6 +8,8 @@ import httpx
 from fastapi import HTTPException
 from pydantic import ValidationError
 
+from app import runtime_transport
+from app.catalog import get_instrument
 from app.config import get_settings
 from app.database import connection
 from app.order_execution_intents import ExecutionPolicy
@@ -63,6 +65,7 @@ def submit_order_through_runtime(
         raise ValueError("FOK and PostOnly Chase policies require a limit order")
 
     settings = get_settings()
+    instrument_type = get_instrument(request.instrument_id).instrument_type
     order_id = str(uuid4())
     created_at = now_iso()
 
@@ -120,6 +123,7 @@ def submit_order_through_runtime(
             strategy_instance_id=strategy_instance_id,
             account_id=request.account_id,
             instrument_id=request.instrument_id,
+            instrument_type=instrument_type,
             symbol=request.symbol,
             side=request.side,
             order_type=request.order_type,
@@ -135,6 +139,7 @@ def submit_order_through_runtime(
             "platform_order_id": order_id,
             "account_id": request.account_id,
             "instrument_id": request.instrument_id,
+            "instrument_type": instrument_type,
             "symbol": request.symbol,
             "side": request.side,
             "order_type": request.order_type,
@@ -143,7 +148,7 @@ def submit_order_through_runtime(
         }
 
     try:
-        response = httpx.post(
+        response = runtime_transport.post(
             f"{settings.runtime_base_url}/commands/orders",
             json=command_payload,
             timeout=settings.runtime_timeout_seconds,
@@ -153,8 +158,7 @@ def submit_order_through_runtime(
             events = [
                 event.model_dump(mode="json")
                 for event in (
-                    RuntimeExecutionEventV1.model_validate(item)
-                    for item in response.json()
+                    RuntimeExecutionEventV1.model_validate(item) for item in response.json()
                 )
             ]
         else:

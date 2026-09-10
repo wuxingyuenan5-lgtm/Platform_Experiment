@@ -22,8 +22,8 @@ def test_trade_command_execution_is_the_single_submission_owner() -> None:
     assert compatibility_source.count("INSERT INTO orders") == 0
     assert owner_source.count("/commands/orders") == 1
     assert compatibility_source.count("/commands/orders") == 0
-    assert owner_source.count("httpx.post(") == 1
-    assert compatibility_source.count("httpx.post(") == 0
+    assert owner_source.count("runtime_transport.post(") == 1
+    assert compatibility_source.count("runtime_transport.post(") == 0
 
 
 def test_legacy_and_v1_entry_points_delegate_to_the_owner() -> None:

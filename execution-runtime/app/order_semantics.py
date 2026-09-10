@@ -18,10 +18,13 @@ type OrderStatus = Literal[
 _BYBIT_ORDER_STATUS: dict[str, OrderStatus] = {
     "New": "accepted",
     "Created": "accepted",
+    "Untriggered": "accepted",
+    "Triggered": "accepted",
     "PartiallyFilled": "partially_filled",
     "Filled": "filled",
     "Cancelled": "canceled",
     "Canceled": "canceled",
+    "PartiallyFilledCanceled": "canceled",
     "Deactivated": "canceled",
     "Rejected": "rejected",
 }

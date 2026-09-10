@@ -15,11 +15,34 @@ from app.schemas import CrossSpreadMarketCommandRequest
 
 
 @pytest.fixture(autouse=True)
-def _isolate_development_auth() -> None:
+def _isolate_development_auth():
     settings = get_settings()
+    original = settings.model_dump()
     settings.environment = "development"
     settings.auth_mode = "development"
     settings.development_roles = "admin"
+    yield
+    for name, value in original.items():
+        setattr(settings, name, value)
+
+
+def authenticate_ceo(client):
+    from datetime import UTC, datetime
+
+    from app.user_service import create_initial_ceo, issue_browser_session
+
+    with connection() as db:
+        row = db.execute("SELECT id FROM users WHERE role_code='ceo' LIMIT 1").fetchone()
+    user_id = row["id"] if row else create_initial_ceo(
+        username="cross_test_owner", password="isolated test password 123!"
+    ).id
+    issued = issue_browser_session(
+        user_id=user_id, ip_address="127.0.0.1", user_agent="pytest", now=datetime.now(UTC)
+    )
+    client.cookies.set(get_settings().session_cookie_name, issued.session_token)
+    client.headers.update({
+        "Origin": get_settings().allowed_cors_origins[0], "X-CSRF-Token": issued.csrf_token
+    })
 
 
 def _live_specification(
@@ -43,6 +66,8 @@ def _live_specification(
                 "accountLoginMatched": True,
                 "accountTradeAllowed": True,
                 "terminalTradeAllowed": terminal_allowed,
+                "accountExpertTradeAllowed": True,
+                "pythonTradeAllowed": True,
             }
             if is_mt5
             else {
@@ -85,7 +110,7 @@ def test_cross_spread_mt5_preflight_failure_creates_no_execution_batch(
     monkeypatch.setattr("app.cross_spread.get_instrument_specification", specification)
     monkeypatch.setattr("app.cross_spread.create_instruction", create_strategy_instruction)
 
-    with pytest.raises(HTTPException, match="MT5 Terminal does not allow trading"):
+    with pytest.raises(HTTPException, match="MT5 算法交易开关已关闭"):
         submit_cross_spread_market_command(
             CrossSpreadMarketCommandRequest(action="OPEN_SHORT", quantityOz=Decimal("1"))
         )
@@ -98,8 +123,9 @@ def test_cross_spread_snapshot_proxies_runtime_market_data(monkeypatch, tmp_path
     settings.database_path = str(tmp_path / "cross-spread-snapshot.db")
     settings.runtime_base_url = "http://runtime.local"
 
-    def fake_get(url: str, timeout: float) -> httpx.Response:
+    def fake_get(url: str, timeout: float, params: dict[str, str]) -> httpx.Response:
         assert url == "http://runtime.local/gateway/cross-spread/snapshot"
+        assert params == {"bybitAccountId": "bybit-live-main", "mt5AccountId": "mt5-live-main"}
         return httpx.Response(
             200,
             json={
@@ -144,9 +170,10 @@ def test_cross_spread_snapshot_proxies_runtime_market_data(monkeypatch, tmp_path
             },
         )
 
-    monkeypatch.setattr("app.cross_spread._RUNTIME_SNAPSHOT_CLIENT.get", fake_get)
+    monkeypatch.setattr("app.runtime_transport.get", fake_get)
 
     with TestClient(app) as client:
+        authenticate_ceo(client)
         response = client.get("/api/v1/trading/cross-spread/snapshot")
 
     assert response.status_code == 200
@@ -168,6 +195,7 @@ def test_cross_spread_snapshot_proxies_runtime_market_data(monkeypatch, tmp_path
     assert row["usdt_usd"] == "0.9998"
 
     with TestClient(app) as client:
+        authenticate_ceo(client)
         history_response = client.get("/api/v1/trading/cross-spread/history?limit=10")
     assert history_response.status_code == 200
     assert history_response.json() == [
@@ -247,11 +275,12 @@ def test_cross_spread_market_command_maps_open_long_to_two_market_legs(
     )
 
     with TestClient(app) as client:
+        authenticate_ceo(client)
         response = client.post(
             "/api/v1/trading/cross-spread/market-command",
             json={
                 "action": "OPEN_LONG",
-                "quantityOz": "1",
+                "quantityOz": "2",
                 "idempotencyKey": "cross-open-1",
             },
         )
@@ -262,7 +291,7 @@ def test_cross_spread_market_command_maps_open_long_to_two_market_legs(
     assert request.action.value == "open"
     assert request.parameters == {
         "action": "OPEN_LONG",
-        "quantityOz": Decimal("1"),
+        "quantityOz": Decimal("2"),
         "bybitReduceOnly": False,
         "mt5ReduceOnly": False,
         "mt5PositionId": None,
@@ -345,6 +374,7 @@ def test_cross_spread_market_command_prefers_live_bindings_when_configured(
     )
 
     with TestClient(app) as client:
+        authenticate_ceo(client)
         response = client.post(
             "/api/v1/trading/cross-spread/market-command",
             json={
@@ -361,22 +391,32 @@ def test_cross_spread_market_command_prefers_live_bindings_when_configured(
     assert request.parameters["action"] == "OPEN_LONG"
 
 
-def test_cross_spread_market_command_rejects_quantity_above_acceptance_cap(
-    tmp_path: Path,
+def test_cross_spread_market_command_rejects_broker_step_mismatch(
+    tmp_path: Path, monkeypatch,
 ) -> None:
     settings = get_settings()
     settings.database_path = str(tmp_path / "cross-spread-command-invalid-qty.db")
     settings.live_trading_enabled = True
     settings.cross_spread_acceptance_max_quantity_oz = Decimal("1")
 
+    monkeypatch.setattr(
+        "app.cross_spread._load_live_cross_spread_sizing",
+        lambda: CrossSpreadLiveSizing(
+            bybit_account_id="account_crypto_test", mt5_account_id="account_mt5_demo",
+            bybit_min=Decimal("0.001"), bybit_step=Decimal("0.001"), bybit_max=Decimal("100"),
+            mt5_min=Decimal("0.01"), mt5_step=Decimal("0.01"), mt5_max=Decimal("100"),
+            mt5_multiplier=Decimal("100"),
+        ),
+    )
     with TestClient(app) as client:
+        authenticate_ceo(client)
         response = client.post(
             "/api/v1/trading/cross-spread/market-command",
             json={"action": "OPEN_LONG", "quantityOz": "1.001"},
         )
 
     assert response.status_code == 422
-    assert "legacy cap" in response.json()["detail"]
+    assert "contract step" in response.json()["detail"]
 
 
 def test_cross_spread_market_command_rejects_when_live_trading_disabled(
@@ -389,6 +429,7 @@ def test_cross_spread_market_command_rejects_when_live_trading_disabled(
     settings.live_trading_enabled = False
 
     with TestClient(app) as client:
+        authenticate_ceo(client)
         response = client.post(
             "/api/v1/trading/cross-spread/market-command",
             json={"action": "OPEN_LONG", "quantityOz": "50"},
@@ -422,6 +463,7 @@ def test_cross_spread_market_command_rejects_development_simulation_without_live
     )
 
     with TestClient(app) as client:
+        authenticate_ceo(client)
         response = client.post(
             "/api/v1/trading/cross-spread/market-command",
             json={"action": "OPEN_LONG", "quantityOz": "1"},
@@ -443,6 +485,7 @@ def test_cross_spread_market_command_still_rejects_live_environment_without_live
     settings.live_trading_enabled = False
 
     with TestClient(app) as client:
+        authenticate_ceo(client)
         response = client.post(
             "/api/v1/trading/cross-spread/market-command",
             json={"action": "OPEN_LONG", "quantityOz": "1"},

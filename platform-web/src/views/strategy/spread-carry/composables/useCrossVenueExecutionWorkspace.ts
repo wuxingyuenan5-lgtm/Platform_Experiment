@@ -152,21 +152,9 @@ export function useCrossVenueExecutionWorkspace() {
     const parsed = parseOptionalNumber(snapshot.value?.metrics?.usdtUsd);
     return parsed === null ? '--' : formatNumber(parsed, 4);
   });
-  const bybitLatencyMs = computed(() => {
-    const asOf =
-      observability.value?.bybit?.accountRisk?.asOf ||
-      observability.value?.bybit?.positions?.[0]?.asOf ||
-      snapshot.value?.asOf;
-    return latencyMs(asOf);
-  });
-  const mt5LatencyMs = computed(() => {
-    const asOf =
-      observability.value?.mt5?.accountRisk?.asOf ||
-      observability.value?.mt5?.positions?.[0]?.asOf ||
-      snapshot.value?.asOf;
-    return latencyMs(asOf);
-  });
-  const { closeOrders, overviewRows } = useCrossSpreadPositions({
+  const bybitLatencyMs = computed(() => snapshot.value?.bybit.fetchLatencyMs ?? null);
+  const mt5LatencyMs = computed(() => snapshot.value?.mt5.fetchLatencyMs ?? null);
+  const { closeOrders, overviewRows, overviewPnl } = useCrossSpreadPositions({
     exitPlans,
     snapshot,
     observability,
@@ -176,6 +164,7 @@ export function useCrossVenueExecutionWorkspace() {
     snapshotStatusText,
   });
   const {
+    cancelConfirmation,
     confirmGuardMessage,
     confirmOrder,
     confirmSummary,
@@ -233,6 +222,7 @@ export function useCrossVenueExecutionWorkspace() {
   });
 
   async function refreshSnapshot() {
+    if (snapshotLoading.value) return;
     snapshotLoading.value = true;
     try {
       const nextSnapshot = await getCrossSpreadSnapshot();
@@ -250,6 +240,7 @@ export function useCrossVenueExecutionWorkspace() {
       }
     } catch (error: unknown) {
       snapshotError.value = requestErrorMessage(error, '跨所行情接口异常');
+      if (snapshot.value) snapshot.value = { ...snapshot.value, positionOverview: null };
     } finally {
       snapshotLoading.value = false;
     }
@@ -290,7 +281,8 @@ export function useCrossVenueExecutionWorkspace() {
     snapshotTimer = window.setInterval(() => {
       void refreshSnapshot();
       void refreshObservability();
-    }, 15_000);
+      void refreshExitPlans();
+    }, 3_000);
   }
 
   function handleVisibilityChange() {
@@ -300,6 +292,7 @@ export function useCrossVenueExecutionWorkspace() {
     }
     void refreshSnapshot();
     void refreshObservability();
+    void refreshExitPlans();
     startSnapshotPolling();
   }
 
@@ -399,13 +392,6 @@ export function useCrossVenueExecutionWorkspace() {
     document.removeEventListener('visibilitychange', handleVisibilityChange);
   });
 
-  function latencyMs(value: string | null | undefined) {
-    if (!value) return null;
-    const parsed = new Date(value).getTime();
-    if (!Number.isFinite(parsed)) return null;
-    return Math.max(0, Date.now() - parsed);
-  }
-
   return {
     acceptableSpreadInput,
     bybitQty,
@@ -417,6 +403,7 @@ export function useCrossVenueExecutionWorkspace() {
     closeOrders,
     commitQtyInput,
     commitSpreadInput,
+    cancelConfirmation,
     confirmGuardMessage,
     confirmOrder,
     confirmSummary,
@@ -439,6 +426,10 @@ export function useCrossVenueExecutionWorkspace() {
     openConfirm,
     openPartialClose,
     overviewRows,
+    refreshAbnormalPositions: async () => {
+      await Promise.allSettled([refreshExitPlans(), refreshSnapshot(), refreshObservability()]);
+    },
+    overviewPnl,
     prepareOpenDraft,
     qtyError,
     qtyInput,

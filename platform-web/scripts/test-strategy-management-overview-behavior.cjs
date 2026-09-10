@@ -1,17 +1,42 @@
 const assert = require('node:assert/strict');
 const test = require('node:test');
 
-let stateModulePromise;
+const createLoader = require('./load-strategy-module.cjs');
+const { effectScope, nextTick } = require('vue');
+const cleanup = [];
+test.afterEach(() => {
+  cleanup.splice(0).forEach((stop) => stop());
+});
 
-function loadStateModule() {
-  if (!stateModulePromise) {
-    const moduleUrl = new URL(
-      '../src/views/strategy/management/composables/strategyManagementOverviewState.ts',
-      `file://${__filename.replace(/\\/g, '/')}`,
-    );
-    stateModulePromise = import(moduleUrl.href);
-  }
-  return stateModulePromise;
+async function loadStateModule() {
+  const state = createLoader()(
+    'src/views/strategy/management/composables/strategyManagementOverviewState.ts',
+  );
+  return {
+    ...state,
+    createStrategyManagementOverviewStore(loader) {
+      const load = createLoader({
+        '@/api/platform/trading': { getStrategyManagementOverview: loader },
+      });
+      const queries = load('src/api/platform/strategyQueries.ts');
+      queries.setStrategyQuerySession('ceo', 'test');
+      const { useStrategyManagementOverview } = load(
+        'src/views/strategy/management/composables/useStrategyManagementOverview.ts',
+      );
+      const scope = effectScope();
+      const store = scope.run(useStrategyManagementOverview);
+      cleanup.push(() => {
+        scope.stop();
+        queries.strategyQueryClient.clear();
+      });
+      const refresh = store.refresh;
+      store.refresh = async () => {
+        await refresh();
+        await nextTick();
+      };
+      return store;
+    },
+  };
 }
 
 function overviewItems() {

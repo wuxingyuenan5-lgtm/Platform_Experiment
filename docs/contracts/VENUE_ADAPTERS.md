@@ -24,15 +24,18 @@
 
 | 模块 | 职责 |
 |---|---|
+| `bybit_connection.py` | 每个逻辑账户持有一个 pybit HTTP 客户端、时钟校验、CCXT 账户/IP 请求预算及关闭责任 |
+| `bybit_market_data.py` | CCXT 4.5.78 标准市场/报价/资金费率解析；复用现有账户读取通道，保留原生扩展 |
 | `bybit_live_adapter.py` | Bybit V5 基础 Query、受控 Submit/Cancel、Funding/Fee 映射 |
 | `bybit_fill_confirming_adapter.py` | Market 提交、reduce-only close、bounded terminal-fill confirmation |
 | `bybit_acceptance_adapter.py` | 无 Route Order／Fill 读取、bounded order list、实时规格和 API Key readiness |
 | `mt5_live_adapter.py` | MT5 Terminal 基础 Query、受控 order_check/order_send、Swap/Fee 映射 |
 | `mt5_position_closing_adapter.py` | Position Ticket 绑定的 reduce-only close |
 | `mt5_acceptance_adapter.py` | 无 Route Order／Deal 读取、Order/Deal Ticket 纠错、实时 Symbol/Terminal 规格 |
-| `strict_live_acceptance_adapters.py` | 旧 1 oz／单仓验收 Gate；仅为 legacy compatibility 保留，其固定 cap 已被 owner 决策取代，是后续代码对齐前的 controlled-live readiness blocker |
+| `strict_live_acceptance_adapters.py` | 正常交易前的场所数量规格、账户与终端交易权限校验；旧数量/持仓数量 cap 已移除 |
 | `bybit_mt5_gateway.py` | 根据 Account 确定性选择适配器，并提供跨 Adapter 只读查询 |
-| `live_safety.py` | Environment、双重写开关、allowlist、单笔限额校验 |
+| `cross_spread_market.py` | 从统一 Gateway 并行聚合固定 Bybit/MT5 账户的行情与持仓，不再直接创建 SDK 或登录 MT5 |
+| `live_safety.py` | Environment、真实写开关、可交易账户范围、命令身份及原子幂等认领 |
 | `live_route_store.py` | 外部 client identity、Order Route、日累计名义金额幂等认领 |
 | `secret_resolver.py` | 从 `secret://...` 映射的环境变量读取凭证 |
 
@@ -51,9 +54,21 @@ Platform Order ID
 - place-order 返回后先生成 `order_acknowledged`。
 - Market Order 通过 bounded polling 等待 terminal state。
 - Execution `execId` 用作 Fill 与 FinancialFact 的自然身份。
+- `VenueFillSnapshot.fee` 可空：Bybit 缺失或空 `execFee` 保持未知，显式 `0` 和负返佣保留原始 Decimal。测试 FakeGateway 的具名费用夹具同时生成同身份原币费用流水，重复命令与快照读取不能重复扣费；该夹具不证明外部场所账单覆盖。
 - Route 缺失时仍可按 `orderId` 读取；结果标记 `external_only` 并使用合成 Platform Identity。
+- 按 Platform Order / 原生 Order 查询成交时，Gateway 将已持久化 Route 的账户显式传入 Adapter；Adapter 也先解析 Route 再确定账户，拒绝调用方账户与 Route 冲突。多账户时没有 Route 或明确账户不能任选账户查询。
+- 新命令携带 Platform 合约目录的 `instrument_type`，Runtime Journal 保留这一市场身份；下单规格、报价、提交、订单确认、成交查询及撤单使用同一市场。现货为 `spot`、现货市价数量明确采用 `marketUnit=baseCoin` 且 `isLeverage=0`；永续继续使用合约市场和 reduce-only 语义。现货检查 `SpotTrade`，不以合约 Order/Position 权限替代现货权限。参数依据 [Bybit 下单文档](https://bybit-exchange.github.io/docs/v5/order/create-order)及 [API 权限文档](https://bybit-exchange.github.io/docs/v5/user/apikey-info)。
+- 无静态合约映射时，账户、原生 symbol 和持久化命令的市场共同解析唯一 Instrument ID，不能把同名现货与永续合并；多个不一致的已知映射拒绝解析，无已知映射继续返回完整市场身份的 monitor 标识。旧命令没有 `instrument_type` 时保留当时默认合约市场的读取语义，不改写原命令。
 
 ### 3.2 Query
+
+标准市场读取使用 CCXT 的精确字符串模式，Spot 与 Perpetual 按市场类别、原生 symbol 和统一 market identity 分开缓存；规范对象同时保留 base/quote/settlement 币种和原始回执。市场目录分页有重复游标检测和最大页数边界。报价和资金费率使用原始来源时间，不能把获取时间当作交易所时间；Bybit 的下一次资金结算时间对应 CCXT `fundingTimestamp`。
+
+CCXT 在当前实现中只负责标准解析、端点成本和限流时序。它的网络入口只允许已登记的公开市场 GET 并委托同一账户连接；私有订单、余额、历史成交和资金变动仍由已有官方 pybit 扩展负责，不并行启用 CCXT 私有写入。连接禁止 SDK 自动下单重试和重定向；显式只读网络失败最多在同一连接上重读一次，业务拒绝和格式错误不重试。
+
+Spot 数量步长/最小名义金额与合约数量步长分别使用场所规格。CCXT 通用 `amount.max` 不能代替 Bybit 原生市价订单上限；平台继续保留 `maxMarketQuantity`。规范化不是丢弃 Venue 证据或降低 Decimal 精度的理由。
+
+静态市场规格可由市场读取器缓存；含账户/终端交易权限的完整规格快照不能整体缓存。下发前重新读取当前权限，避免计划创建后撤销 Spot 权限仍被旧快照判为可交易。Platform 的实盘 Crypto 委托使用已确认的原生最小数量、步长和价格 tick，本地目录 Seed 不替代这些规则。
 
 - `get_open_orders`
 - `get_order_history`
@@ -65,6 +80,8 @@ Platform Order ID
 - `get_api_key_information`
 
 Funding 和 Fee 分别映射为带符号经济贡献。Fee 以负值写入。
+
+Bybit 普通正手续费按收到的币种扣取：Spot Buy 扣基础币、Spot Sell 扣报价币。Funding 的 Spot 市价买入按已确认 0.1% 预估净币量，实际对账仍使用原生每笔手续费；卖出与永续的 USDT 费用不减少 BTC 数量。来源：[Bybit Spot Fee Currency](https://bybit-exchange.github.io/docs/v5/enum#spot-fee-currency-instruction)。
 
 ### 3.3 Market Fill 规则
 
@@ -107,7 +124,13 @@ MT5 非 Windows、Terminal 未连接、登录账号不匹配或交易权限不�
 
 Platform 将 Runtime 的终态聚合 Fill 与后续 Venue component execution 投影到同一 Order 时，累计数量不得超过指令数量；已经存在完整聚合 Fill 时不得再次计入其组成成交。
 
-每个逻辑 `account_id` 必须确定性映射到一个固定 Terminal/Worker 及其 Terminal Path、Login 和 Server。Worker 不得在同一 Python 会话中切换账户，Terminal Path 不得被不同逻辑账户共享；身份不一致时 fail-closed，单个实例故障不得改变其他账户的路由或状态。
+每个逻辑 `account_id` 必须确定性映射到一个固定 Terminal/Worker 及其 Terminal Path、Login 和 Server。Worker 不得在同一 Python 会话中切换账户，Terminal Path 不得被不同逻辑账户共享；身份不一致时 fail-closed，单个实例故障不得改变其他账户的路由或状态。Worker 启动时若终端已登录到配置的 Login/Server，直接复用连接，不重复调用登录；后续每次连接仍复核身份。平台不强制重开操作员关闭的算法交易开关。
+
+固定账户 Worker 初次连接及只读 IPC 恢复时，若配置完整路径对应的终端进程不存在，先以 `SW_HIDE` 启动，等待 GUI 初始化后连接 SDK；连接成功后，再隐藏本次新进程的无 owner 顶层窗口，覆盖 MT5 启动期间恢复已保存窗口布局的行为。仅首次启动提示不足以保证最终后台状态。2026-09-10 Owner 明确要求两个配置终端持续在后台运行：重连已运行终端也执行隐藏，固定账户 Worker 每次处理请求前及空闲时每秒检查并隐藏对应完整路径进程的可见、无 owner 顶层窗口。已隐藏窗口不重复操作，不切换焦点、不关闭进程、不重新登录、不影响其他路径终端或 owned 对话框。窗口维护失败记录日志，不中断交易/读取 IPC；portable 模式与账户路径绑定不变。此规则替代此前“已运行窗口保持不变”的策略。
+
+跨所行情也必须显式传入 `bybitAccountId` 与 `mt5AccountId` 并通过同一 Gateway/Worker 读取，不能选择任意“首个账户”。MT5 行情使用 `symbol_info.currency_profit` 作为报价币，账户现金与结算币来自账户证据；缺失报价币时标注 UNKNOWN/partial。Swap 字段、合约乘数及 Position Ticket 保留原生值，不能从 XAUUSD 名称推断账户现金币。
+
+MT5 报价读取还须确认 `terminal_info.connected`：终端信息缺失或经纪商连接中断时，即使 SDK 留有账户信息和正数缓存 Tick，也不能生成可执行报价；后续读取确认连接恢复后才能继续。观察时间只证明本次读取时刻，不能用来证明经纪商缓存 Tick 的源时钟或停机期间行情。
 
 ### 4.2 实时规格
 
@@ -153,6 +176,8 @@ GET /venue/fills?accountId=...&externalOrderId=...&platformOrderId=...
 4. 无 Route 的结果标记 `dataQualityState=external_only`。
 5. 查询不得创建、撤销或重发订单。
 
+Platform 的监控持久化按账户、合约身份（含市场类别）和原生订单号解析旧、新内部别名；唯一的 TradeCommand 归属是策略依据，不按 symbol 或时间相近推断。不同 MT5 账户的同号 Ticket 不共用监控 Fill 主键。新成交记录来源和原生 Fill ID，旧记录来源不明时保持 legacy，不根据数量大小回填来源。账户快照保留原生成交证据，但不推进指令订单状态、执行数量或解除未知结果；详细投影规则由 [账户观察合同](LIVE_ACCOUNT_OBSERVABILITY.md) 唯一维护。
+
 ## 6. Instrument Specification Query
 
 ```http
@@ -163,6 +188,7 @@ GET /venue/instruments/{symbol}?accountId=...
 
 - `minQuantity`
 - `quantityStep`
+- `minNotional`（Venue 有报告时保留最小名义金额，否则为 null）
 - `maxMarketQuantity`
 - `contractSize`
 - `trade_mode`
@@ -172,6 +198,8 @@ GET /venue/instruments/{symbol}?accountId=...
 
 Platform 跨所价差写入前必须分别查询 Bybit 与 MT5；任一查询失败、规格无效或权限不满足时拒绝开仓。
 
+Bybit 现货的数量步长来自 `lotSizeFilter.basePrecision`，合约来自 `qtyStep`；不得因套用合约字段而把现货步长返回为零。最小名义金额分别保留现货 `minOrderAmt` 与合约 `minNotionalValue`，供 Funding 的数量建议和金额校验使用。来源：[Bybit Instruments Info](https://bybit-exchange.github.io/docs/v5/market/instrument)。
+
 ## 6.1 Order Margin Estimate
 
 ```http
@@ -180,11 +208,9 @@ GET /venue/order-margin-estimate/{symbol}?accountId=...&side=...&quantity=...&re
 
 衍生品余额预约不得用全额名义本金代替保证金。Runtime 在只读边界内返回 Venue 口径的初始保证金估算：Bybit 使用当前 Symbol 实际杠杆，MT5 使用 Terminal `order_calc_margin`。任一杠杆、品种、报价或保证金结果不可用时 fail-closed；Platform 只消费统一结果，不导入 Venue SDK 或自行猜测保证金率。
 
-## 7. 临时 1 盎司 Acceptance Gate
+## 7. 原生数量、权限与执行边界
 
-Runtime 配置：
-
-0.11.1 目标 Gate 不授权写入，只在已有 Live Write 授权之后按不可变 CEO 指令数量继续收紧。当前 legacy adapter 仍编码旧固定 cap；本任务不授权修改该 adapter，因此它不能证明新合同已经具备 Live Write readiness。
+正常交易按不可变 CEO 指令数量、原生合约规格和执行状态约束每条腿；不再使用早期固定 1 盎司验收 cap。以下检查与第 8 节的正常 Live Safety Gate 共同生效。
 
 ### Bybit
 
@@ -201,39 +227,26 @@ Runtime 配置：
 - `lots × contractSize` 与累计外部成交必须不超过 CEO 指令中的 MT5／Spot 腿数量。
 - Lot 必须满足当前 `volume_min`、`volume_step` 和 `volume_max`。
 - Account Login 必须与配置一致。
-- Account 与 Terminal 均必须允许交易。
+- Account 与 Terminal 均必须允许交易；账户须允许自动交易，终端须允许外部 Python API 交易。
 - 新执行批次必须通过全局序列化 claim。
 - 跨 Venue Bybit 只有终态全成交才释放 MT5；funding carry 才允许按去重永续累计成交增量比例、向下量化到 Spot Step 后释放同 Batch Spot 子指令。
+- Funding 显式 `executionPolicy=fok` 同样使用 Bybit 原生 `timeInForce=FOK`：仅终态精确全成交生成执行确认，零成交不释放现货，异常部分成交保持待核对。Funding 市价只提交一次，PostOnly 保留原有有界追价；关闭永续腿传递计划的 reduce-only。
 
 ## 8. Live Safety Gate
 
-Runtime 配置：
+正常交易使用以下 Runtime 配置：
 
 ```text
 VG_RUNTIME_ENVIRONMENT=live
 VG_RUNTIME_LIVE_WRITE_ENABLED=false
-VG_RUNTIME_LIVE_ACCOUNT_ALLOWLIST=...
-VG_RUNTIME_LIVE_STRATEGY_ALLOWLIST=...
-VG_RUNTIME_LIVE_SYMBOL_ALLOWLIST=...
-VG_RUNTIME_LIVE_MAX_ORDER_NOTIONAL=...
-VG_RUNTIME_LIVE_MAX_DAILY_NOTIONAL=...
+VG_RUNTIME_LIVE_ACCOUNT_ALLOWLIST=已批准写入的逻辑账户集合
 ```
 
-`VG_RUNTIME_LIVE_MAX_ORDER_NOTIONAL`、`VG_RUNTIME_LIVE_MAX_DAILY_NOTIONAL` 及对应认领逻辑仅为 legacy compatibility 保留。现行代码仍强制检查它们，因此它们是 controlled-live readiness blocker，不是 owner 要求的永久 cap，也不能作为 Live Write readiness 证据。
+2026-09-09 起，旧 Strategy/Symbol 验收白名单、固定单笔/每日名义额度、数量/持仓数量 cap 及 PostOnly 专用启用开关退出正常执行链；旧配置项不会恢复这些限制。`LIVE_ACCOUNT_ALLOWLIST` 继续表示账户写权限范围，账户必须已配置且不得为只读账户。策略与品种由 Platform 的活动绑定、不可变执行计划和原生合约规格确定。
 
-现行写命令校验顺序如下；第 5、6 步描述未在本切片修改的 legacy 行为，不表示目标 owner 合同：
+写命令依次验证 live 环境、独立 Runtime 写开关、账户写权限、StrategyInstance/Command 身份、正数参考价、原子幂等认领、Venue 实际规格与权限，然后调用 Venue。SQLite 仍保存名义金额供审计，但不据此消耗验收额度。相同 Command/载荷不重复发送，冲突载荷拒绝。
 
-1. Runtime Environment 必须是 live。
-2. Runtime Live Write 必须显式开启。
-3. Account、StrategyInstance 和 Symbol 位于 allowlist。
-4. 取得正数 Reference Price。
-5. 单笔 Notional 不超限。
-6. 在 SQLite `BEGIN IMMEDIATE` 事务中原子认领 Command 与日累计 Notional。
-7. 重复 Command 载荷一致时复用认领；载荷冲突拒绝。
-8. 通过临时 Acceptance Gate 的数量、权限、规格与持仓校验。
-9. 通过后才调用 Venue API。
-
-Platform 原有 `liveTradingEnabled` 与 Kill Switch 仍然必须先通过；Runtime Gate 是第二道独立防线。
+Platform 的登录权限、账户绑定、Live Gate、Kill Switch 和对账检查仍先行生效。PostOnly 仍必须有硬限价、健康私有流、有限追价时长和次数；取消验收开关不豁免它们。
 
 ## 9. 凭证
 
@@ -338,8 +351,8 @@ CI 不能证明：
 - 实盘网络中断、滑点、部分成交和外部账单一致性。
 - 真实 TP／SL exactly-once close。
 
-真实账户运营验收必须按 `../operations/V6-小资金实盘验收手册.md` 独立记录。
+真实账户运营验收按 [交易验收运行手册](../operations/LIVE_ACCEPTANCE_RUNBOOK.md) 独立记录。
 
 ## 14. 受控边界
 
-固定仓位、名义金额、日成交量、批次数和亏损 cap 已从 founder-owned local test-account 合同移除。该决定不允许通过环境变量绕过 CEO 指令数量 ceiling、单指令／单 Batch 身份、全局执行序列化、bounded chase、Kill Switch、强制只读复位或对账。ACK／Fill 区分、`result_unknown` 禁止盲重试、双重写门禁、Position Ticket close 和凭证隔离属于永久安全原则，不随数量变化删除。
+固定仓位、名义金额、日成交量、批次数和亏损 cap 已从 founder-owned local test-account 合同移除。该决定不允许通过环境变量绕过 CEO 指令数量 ceiling、单指令／单 Batch 身份、全局执行序列化、bounded chase、Kill Switch、操作员停机与对账。ACK／Fill 区分、`result_unknown` 禁止盲重试、双重写门禁、Position Ticket close 和凭证隔离属于永久安全原则，不随数量变化删除。

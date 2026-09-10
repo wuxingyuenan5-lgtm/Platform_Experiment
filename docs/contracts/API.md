@@ -22,6 +22,24 @@ GET /health
 
 Live 环境中除 `/health` 外的 Platform API 均进入认证与授权边界。
 
+### 策略接口生成与查询生命周期
+
+FastAPI 的响应模型是 Funding、Cross 和策略管理接口的唯一类型来源。`platform-api/scripts/export_strategy_openapi.py` 在不运行 lifespan、不连接数据库或外部服务的条件下导出可达合同；`docs/contracts/platform-strategy.openapi.json` 与 `platform-web/src/api/platform/generated/strategy.ts` 是派生文件，不手工维护。修改合同后运行 `corepack pnpm generate:strategy-api`，用 `corepack pnpm check:strategy-api` 检查一致性。CI 分别验证 FastAPI→JSON 与 JSON→TypeScript。
+
+前端使用 openapi-fetch 的生成路径/类型，通过既有 Axios 发送请求。Cookie 会话、CSRF、每次调用的超时及 Axios 错误语义保留。Decimal 输入采用后端允许的精确字符串子集，响应金额和数量保持字符串；计数、时间间隔等普通数值不强行改成字符串。动态原生回执保留扩展字段，不假称所有 Venue 私有字段已有强类型定义。
+
+TanStack Vue Query 管理 Funding 上下文、原指令状态、持仓和策略管理读取。查询键包括会话代数、用户、账户/策略和实际参数；注销或身份/权限变化会取消旧查询并清空缓存，迟到响应不得写入新会话。无持久化查询缓存、读取自动重试或 mutation 自动重放；可见页轮询只发 GET。写入成功只使相关读取失效。
+
+交易动作仍由明确操作触发，Funding 在发送前保存原指令幂等身份及所属用户；超时、刷新和重新登录只能查询原身份。登录缓存清理只移除自己的缓存键，不得清空全部浏览器存储而误删待恢复指令。准备请求体前后及收到响应后检查会话是否变化，避免跨登录派发或接收旧交易动作。
+
+Platform→Runtime 请求统一由 `runtime_transport.py` 的进程连接池发出，保留 TLS 校验，不继承环境代理，不跟随重定向，不自动重试 POST；关闭服务时在后台任务退出后释放连接。超时继续交由指令和对账 Owner 处理，连接复用不产生新的重放规则。
+
+管理成交列表与账户快照共用后端财务读取的成交选择和身份归属。`FillResponse` 返回完整 `orderId`、`externalOrderId`、`externalFillId`、`instructionId`、`batchId`、`origin` 和 `source`；没有对应指令的监控记录保留空关联。`fee` 与 `currency` 可空，前端不得把未知费用显示为零。策略损益的 `economicEvents` 和账户快照结算列表保留原币金额、来源及可证明的订单/指令/批次关联，供原币流水页逐笔核对。金额保持精确字符串；读取不创建成交或推进指令。
+
+管理委托与成交返回可空的 `action`、`direction`、`instructionId` 和 `batchId`，根据原指令及已记录执行关联读取，不能从买卖方向推断开平。无明确业务动作的 MT5 监控记录可采用原生 `entryType`：进场为开仓、出场/对向平仓为平仓、反转为反向开平；缺失或冲突的历史标记不猜测，也不据此归属策略。原生 `reduceOnly=true` 明确标为平仓；其他风险处置委托标为 `risk_reduction`（异常处理），不沿用原开仓指令的动作，也不因买卖方向推断其开平。委托列表在分页前按账户、品种和原生订单身份合并历史别名；原行不修改，多个命令归属冲突返回 409，账户快照总数采用相同口径。
+
+`FillResponse.orderConfirmedAt` 仅在同一规范订单的明确 Runtime 确认覆盖全部所选成交数量时提供，表示订单累计成交已被平台确认。它不是逐笔成交时刻。`timeQuality=source_clock_conflict` 表示原始成交时间晚于该确认超过 60 秒；MT5 缺乏确认上界时为 `source_clock_unverified`。`occurredAt` 保留原值，管理列表将冲突记录显示为带标签的订单确认时间，未核实的 MT5 时间留空并在详情保留原值；其他已分类记录使用 `venue_time` / `runtime_confirmation`，历史来源仍标为 `legacy`。委托的 `timeQuality` 区分 `platform_submission`、`venue_time` 及 `source_clock_unverified`，避免把未经核验的 MT5 原生时间称为平台提交时间。该元数据只用于管理展示，不改写财务事件时间或执行状态。
+
 ## 2. Authentication 与 RBAC
 
 ```http
@@ -38,7 +56,7 @@ X-Request-ID: <request-id>
 
 详细合同：`AUTH_RBAC_LIVE_SESSIONS.md`。
 
-## 3. LiveTradingSession
+## 3. LiveTradingSession（历史兼容）
 
 ```http
 POST /api/v1/live-trading/sessions
@@ -47,9 +65,7 @@ POST /api/v1/live-trading/sessions/{sessionId}/approve
 POST /api/v1/live-trading/sessions/{sessionId}/revoke
 ```
 
-申请范围固定 StrategyInstance、Account、Symbol、Side、Order Type、时间窗口、单笔/单日限额和只读证据。Applicant 与 Approver 必须不同。
-
-Live Command 在写入 Order 和调用 Runtime 前，内部执行唯一 Approved Session 的原子额度认领。
+兼容接口保留早期验收记录及审计结构。2026-09-09 起，正常交易不再申请或认领 LiveTradingSession；其范围、时效、审批与额度不影响正常订单。CEO Browser Session 的正常交易权限与安全边界见 [AUTHORIZATION.md](AUTHORIZATION.md)。
 
 ## 4. Credential Rotation Metadata
 
@@ -132,7 +148,9 @@ GET  /api/v1/trading/commands/{tradeCommandId}
 }
 ```
 
-Live Command 依次通过 Authentication、RBAC、Catalog、Platform Live Gate、Kill Switch、LiveTradingSession Claim、Order Insert 和 Runtime Live Gate。
+Live Command 依次通过 Authentication、RBAC/CEO 权限、Catalog 与账户绑定、Platform Live Gate、Kill Switch/对账风险、Order Insert 和 Runtime Live Gate；不再认领验收会话。
+
+发往 Runtime V1 的订单命令由 Platform 从合约目录补入 `instrument_type`，客户端不能自行覆盖。Runtime 将它与原命令一同持久化，保证同名现货和永续的提交及后续原生读取始终使用正确市场；旧 V1 命令省略该可空字段仍可读取。双端字段及序列化样例由 `runtime-v1.json`、`runtime-v1-golden.json` 共同约束，具体 Bybit 行为见 [Venue Adapter](VENUE_ADAPTERS.md)。
 
 ## 8. ExecutionBatch 与风险
 
@@ -157,9 +175,10 @@ POST /api/v1/trading/orders/{orderId}/reconcile
 POST /api/v1/trading/orders/{orderId}/venue-reconcile
 ```
 
-- Journal Reconcile 只查 Runtime Journal。
+- Journal Reconcile 请求 Runtime 核对原订单证据并读取持久化 Journal；Runtime 可能执行原生只读查询，不重提订单。
 - Venue Reconcile 查询外部 Order 与 Fill/Deal。
 - 两者都不得重提原订单。
+- 两种恢复使用 `reconciliation:review`；CEO 可执行，浏览器 CSRF 及订单缺失接受的独立管理边界保持有效。
 - 网络结果不确定时保持 `result_unknown`。
 - Deprecated `POST /api/v1/trading/orders` 不得用于 Live。
 
@@ -217,6 +236,10 @@ GET /api/v1/trading/cross-spread/observability?historyHours=24&limit=20
 该接口分别读取 Bybit 与 MT5 的 Account Risk、Position、Active Order、Recent Order 和 Recent Fill。每个区块都有独立状态，部分失败返回 `partial`，不伪造零值。
 
 完整字段和数据质量语义见 `LIVE_ACCOUNT_OBSERVABILITY.md`。
+
+`GET /api/v1/trading/cross-spread/snapshot` 的 `positionOverview` 返回当前活动组的剩余浮盈亏：`groups` 按 `planId`、`planUpdatedAt` 与 `quantityOz` 关联 Exit Plan，包含双腿入场价、`bybitPnlUsdt`、`mt5PnlUsdt`、`totalPnlUsdt`、`openTime`、质量及缺失原因；总览携带同名汇总、质量和 `asOf`。金额为精确 Decimal 字符串或 null。费用、已实现及结算不混入该字段，计算边界由 [Cross 合同](CROSS_SPREAD_EXECUTION.md) 维护。Snapshot 的 Venue Position 保留 `accountId`、`currency` 与 `asOf`，用于核对原生票据、币种及新鲜度。
+
+`positionOverview.unattributedPositions` 保留没有归属的 MT5 Ticket 和 Bybit 净仓差额，返回 Venue、账户、Symbol、原生有符号数量及可证明的原生字段，不生成虚构组合或交易操作。Exit Plan 的可选 `originLabel` 来自恢复审计，供持仓和退出入口识别恢复的误单。
 
 ### 11.1 Cross-spread synthetic lifecycle
 
@@ -366,6 +389,20 @@ execution_policy = default | fok | post_only_chase
 - Runtime 在 Gateway 副作用前原子抢占 Command，并独立检查 Environment、Live Write、Account/Strategy/Symbol Allowlist、单笔/单日限额和 Credential Reference。
 - 任一条件失败不得回退 Fake Gateway。
 
+### Funding 执行方式与恢复
+
+执行上下文接受可选 `quantity`（现货毛数量），返回 `openSizing`：毛数量、买入基础币费率、预计净到账、永续数量、取整余量及有效性。实盘按 0.001 费率计算 `floor(grossSpot × (1 − feeRate) / perpetualStep) × perpetualStep`；模拟无费成交使用零费率。开仓 POST 的 `quantity` 为现货毛数量，平仓仍为永续数量；页面提交冻结的 `expectedPerpetualQuantity`，与服务端当前计算不一致时创建前拒绝。两腿数量和费率冻结在计划中，幂等重放读取原计划，不重算历史计划。现货累计释放按冻结两腿数量比例计算，最终全成交可释放完整现货上限。
+
+Funding 持仓返回 `isAbnormal`、`abnormalReason`、`abnormalAction`、`remainingPerpetualQuantity`、`remainingSpotHolding` 和 `netDeltaQuantity`；实际持仓与扣除预约后的可交易数量分离。已完成但实际净现货少于永续，或正敞口达到一个永续步进的活动组标记异常；已结束组退出异常区。Cross 组合返回其归属腿数量、方向及 MT5 Ticket，管理页不得回退到全账户仓位分配。
+
+`POST /api/v1/trading/funding/instructions` 接受 `executionPolicy: market | fok | post_only_chase`，以及仅 FOK 必填的正有限十进制字符串 `perpetualLimitPrice`。省略执行方式仍保持既有 PostOnly Chase 合同，页面新指令默认市价；默认字段规范化不得改变既有幂等指纹。执行方式与价格属于不可变计划，同一幂等键更改它们返回冲突。
+
+开仓与指定组合的部分/全部平仓共用该请求及原执行主链。永续市价和 FOK 只尝试一次；FOK 使用原生全成全撤并要求精确全成交后才释放现货，非 FOK 延续按已证明成交增量释放现货的合同。平仓永续为 reduce-only，现货按净到账及步长量化。
+
+Funding 的报价、执行上下文及计划采用同一活动绑定，实盘 primary、模拟 local_test，校验账户环境和写权限。实盘计划冻结对应账户、symbol、Spot/Perpetual 类别的原生合约规格；缺失、类别不符、数量或价格不符合精度时创建失败。
+
+`GET /api/v1/trading/funding/instructions/{instructionId}` 及按 `idempotencyKey` 查询把持久化 `rejected` 映射为终态 `failed`。零敞口拒单仅进入历史，不占活动持仓。前端在超时或未知时只查询原指令；明确拒绝且查询确认无指令后才能解除旧草稿。原生终态零成交须检查所有本地订单、成交及现货释放证据后才能释放预约。
+
 ## 13. Bybit 与 MT5
 
 ### Bybit
@@ -444,3 +481,9 @@ Rotation、Authentication、Session、Kill Switch、RiskAction、Difference、EO
 - Platform 与 Runtime Live Write 默认关闭。
 - PostOnly Chase 默认关闭。
 - 工程验收不等于真实账户运营验收。
+
+## 账户资金历史的总资产字段
+
+策略账户快照的 `equityHistory[]` 保留 `equity` 的交易账户权益语义，并增加可空 Decimal 字段 `totalAssets`，以字符串或 null 输出。该值来自同一账户、币种和历史快照的 `account_risk_snapshots.total_assets`；无记录时为 null，不能用 equity 代替。历史时间仍为带时区时间。统一交易账户总资产曲线仅使用非空 totalAssets；当前摘要使用 accountRisk.totalAssets。生成的 OpenAPI 与前端类型同步维护。
+
+Strategy account history includes nullable decimal-string `equityDrawdown` and `totalAssetsDrawdown` percentages, with corresponding `*DrawdownQuality` fields. `estimated` is a cash-flow-adjusted Modified Dietz estimate; `baseline`, missing coverage/valuation, unknown classification, invalid capital and downstream gaps do not contain a percentage. Runtime's read-only `/venue/capital-flows?accountId=&startTime=&endTime=` returns account/window identity, covered scopes and deduplicated native movements; seven-day bounds and full pagination apply. Monitoring methodology is owned by `LIVE_ACCOUNT_OBSERVABILITY.md`.

@@ -58,6 +58,9 @@ class AShareLiveSectorFundFlow(ResearchApiModel):
 class AShareLiveSectorFundFlowResponse(ResearchApiModel):
     fetched_at: datetime
     source: str = Field(min_length=1, max_length=128)
+    status: ResearchDataStatus = "ready"
+    is_stale: bool = False
+    message: str | None = None
     rows: list[AShareLiveSectorFundFlow]
 
 
@@ -74,6 +77,10 @@ class AShareMarketTurnoverRow(ResearchApiModel):
 class AShareMarketTurnoverResponse(ResearchApiModel):
     fetched_at: datetime
     source: str = Field(min_length=1, max_length=128)
+    status: ResearchDataStatus = "ready"
+    is_stale: bool = False
+    message: str | None = None
+    daily_observed_at: str | None = None
     high_turnover_count: int | None = Field(default=None, ge=0)
     high_turnover_rows: list[AShareMarketTurnoverRow] = Field(default_factory=list)
     history_dates: list[str] = Field(default_factory=list)
@@ -84,6 +91,7 @@ class AShareMarketTurnoverResponse(ResearchApiModel):
 
 
 class AShareTurnoverStock(ResearchApiModel):
+    currency: Literal["CNY", "HKD"] = "CNY"
     # The A-share core universe is six digits; the user-maintained research
     # pool also contains five-digit HK listings, which share the same read-only
     # quote/history workflow.
@@ -92,6 +100,12 @@ class AShareTurnoverStock(ResearchApiModel):
     turnover_yuan: Decimal = Field(ge=0)
     return_pct: Decimal | None = None
     net_inflow_yuan: Decimal | None = None
+    observed_at: datetime | None = None
+    price: Decimal | None = Field(default=None, ge=0)
+    turnover_pct: Decimal | None = None
+    market_cap_yuan: Decimal | None = Field(default=None, ge=0)
+    pe_ttm: Decimal | None = None
+    pb: Decimal | None = None
 
 
 class ShenwanMembership(ResearchApiModel):
@@ -170,7 +184,7 @@ class AShareIndexSnapshot(ResearchApiModel):
     signal_3d: str | None = None
     signal_weekly: str | None = None
     spark: list[Decimal] = Field(default_factory=list)
-    history: list["AShareIndexHistoryPoint"] = Field(default_factory=list)
+    history: list[AShareIndexHistoryPoint] = Field(default_factory=list)
 
 
 class AShareIndexHistoryPoint(ResearchApiModel):
@@ -180,13 +194,14 @@ class AShareIndexHistoryPoint(ResearchApiModel):
 
 
 class AShareBreadthSnapshot(ResearchApiModel):
+    total_amount_yuan: Decimal | None = Field(default=None, ge=0)
     up: int = Field(ge=0)
     down: int = Field(ge=0)
     flat: int = Field(ge=0)
-    limit_up: int = Field(ge=0)
-    real_limit_up: int = Field(ge=0)
-    limit_down: int = Field(ge=0)
-    real_limit_down: int = Field(ge=0)
+    limit_up: int | None = Field(default=None, ge=0)
+    real_limit_up: int | None = Field(default=None, ge=0)
+    limit_down: int | None = Field(default=None, ge=0)
+    real_limit_down: int | None = Field(default=None, ge=0)
     activity_pct: Decimal | None = None
     breadth_state: str
     speculation_state: str

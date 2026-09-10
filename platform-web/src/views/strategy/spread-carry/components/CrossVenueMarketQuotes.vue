@@ -3,7 +3,7 @@
     <div class="card-head">
       <div>
         <h3>市场报价</h3>
-        <span>实时</span>
+        <span>每 3 秒刷新</span>
       </div>
     </div>
 
@@ -11,7 +11,9 @@
       <article class="quote-card">
         <div class="quote-card__head">
           <strong>BYBIT: {{ leftLegSymbol }}</strong>
-          <span class="live-tag"><i class="online-dot"></i>在线</span>
+          <span class="live-tag">{{
+            bybitStatus === 'available' ? '行情可用' : '行情待更新'
+          }}</span>
         </div>
         <div class="quote-stats">
           <div class="quote-stat">
@@ -30,7 +32,7 @@
             <small>USDT</small>
           </div>
           <div class="quote-stat">
-            <span>延迟</span>
+            <span>读取耗时</span>
             <strong :class="latencyTone(bybitLatencyMs, bybitStatus)">{{
               formatLatencyMs(bybitLatencyMs, bybitStatus)
             }}</strong>
@@ -42,26 +44,26 @@
       <article class="quote-card">
         <div class="quote-card__head">
           <strong>MT5: {{ rightLegSymbol }}</strong>
-          <span class="live-tag"><i class="online-dot"></i>在线</span>
+          <span class="live-tag">{{ mt5Status === 'available' ? '行情可用' : '行情待更新' }}</span>
         </div>
         <div class="quote-stats">
           <div class="quote-stat">
             <span>Bid</span>
             <strong class="green">{{ formatNullablePrice(mt5Quote?.bid) }}</strong>
-            <small>USD</small>
+            <small>{{ mt5Quote?.currency || '--' }}</small>
           </div>
           <div class="quote-stat">
             <span>Mid</span>
             <strong>{{ formatNullablePrice(mt5Quote?.mid) }}</strong>
-            <small>USD</small>
+            <small>{{ mt5Quote?.currency || '--' }}</small>
           </div>
           <div class="quote-stat">
             <span class="red-text">Ask</span>
             <strong class="red">{{ formatNullablePrice(mt5Quote?.ask) }}</strong>
-            <small>USD</small>
+            <small>{{ mt5Quote?.currency || '--' }}</small>
           </div>
           <div class="quote-stat">
-            <span>延迟</span>
+            <span>读取耗时</span>
             <strong :class="latencyTone(mt5LatencyMs, mt5Status)">{{
               formatLatencyMs(mt5LatencyMs, mt5Status)
             }}</strong>

@@ -1,6 +1,6 @@
 # 用户系统架构
 
-用户系统在 Platform API 内保持单一身份权威，统一浏览器用户、API 调用者、角色 Capability、资源范围、Session、审计和个人账号。它不替代 LiveTradingSession、交易风险或 Runtime Live Write 门禁。
+用户系统在 Platform API 内保持单一身份权威，统一浏览器用户、API 调用者、角色 Capability、资源范围、Session、审计和个人账号。正常交易权限见 AUTHORIZATION.md；它不替代交易风险或 Runtime Live Write 门禁。
 
 详细权限与错误合同见 [AUTHORIZATION](../contracts/AUTHORIZATION.md)、[ACCESS_MATRIX](../contracts/ACCESS_MATRIX.md) 和 [AUTH_ERRORS](../contracts/AUTH_ERRORS.md)；会员持仓与净值见 [MEMBER_HOLDINGS](../contracts/MEMBER_HOLDINGS.md)。
 
@@ -17,7 +17,7 @@ Browser credential / API key
 
 - 浏览器业务使用服务端 Session，不在浏览器保存长期身份 JWT。
 - API Key 继续服务明确的程序化接口；它不能自动取得浏览器用户权限。
-- Browser Session、API Key 和 LiveTradingSession 是不同凭证与授权层，不能相互替代。
+- Browser Session 与 API Key 是不同认证凭证，均按角色和范围授权；LiveTradingSession 仅为历史验收兼容记录，不再授权正常交易。
 - Live 路由还必须通过审批、风险、Kill Switch、Allowlist 及 Platform/Runtime 双写入门禁。
 - 无法确认 Principal、Capability 或资源范围时默认拒绝。
 

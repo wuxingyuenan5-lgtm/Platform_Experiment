@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import httpx
+import pytest
 from fastapi.testclient import TestClient
 
 from app.config import get_settings
@@ -8,18 +9,19 @@ from app.database import connection
 from app.main import app
 from app.venue_reconciliation import compare_order
 
-STRATEGY_ID = "strategy_funding_arbitrage_instance_default"
+STRATEGY_ID = "strategy_generic_pipeline_test"
 ACCOUNT_ID = "account_sim_usdt"
 INSTRUMENT_ID = "instrument_btc_usdt"
 
 
+@pytest.mark.usefixtures("generic_trading_instance")
 def test_order_fill_quantity_comparison_preserves_exact_decimal_sum(
     monkeypatch,
     tmp_path: Path,
 ) -> None:
     get_settings().database_path = str(tmp_path / "venue-decimal-quantity.db")
     monkeypatch.setattr(
-        "app.trade_command_execution.httpx.post",
+        "app.runtime_transport.post",
         lambda *args, **kwargs: (_ for _ in ()).throw(httpx.ConnectError("timeout")),
     )
 

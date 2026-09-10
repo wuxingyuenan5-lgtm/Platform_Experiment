@@ -11,15 +11,33 @@
 
       <div class="trade-modal__body">
         <div class="confirm-grid">
-          <div><span>交易对</span><strong>{{ leftLegSymbol }} - {{ rightLegSymbol }}</strong></div>
-          <div><span>动作</span><strong>{{ summary.action }}</strong></div>
-          <div><span>盎司</span><strong>{{ summary.qty }}</strong></div>
-          <div><span>BYBIT / MT5</span><strong>{{ summary.legs }}</strong></div>
-          <div><span>执行方式</span><strong>{{ summary.mode }}</strong></div>
-          <div><span>当前执行价差</span><strong>{{ summary.marketSpread }}</strong></div>
-          <div><span>触发 / 接受</span><strong>{{ summary.spreadRange }}</strong></div>
-          <div><span>止盈</span><strong>{{ summary.takeProfit }}</strong></div>
-          <div><span>止损</span><strong>{{ summary.stopLoss }}</strong></div>
+          <div
+            ><span>交易对</span><strong>{{ leftLegSymbol }} - {{ rightLegSymbol }}</strong></div
+          >
+          <div
+            ><span>动作</span><strong>{{ summary.action }}</strong></div
+          >
+          <div
+            ><span>盎司</span><strong>{{ summary.qty }}</strong></div
+          >
+          <div
+            ><span>BYBIT / MT5</span><strong>{{ summary.legs }}</strong></div
+          >
+          <div
+            ><span>执行方式</span><strong>{{ summary.mode }}</strong></div
+          >
+          <div
+            ><span>当前执行价差</span><strong>{{ summary.marketSpread }}</strong></div
+          >
+          <div
+            ><span>触发 / 接受</span><strong>{{ summary.spreadRange }}</strong></div
+          >
+          <div
+            ><span>止盈</span><strong>{{ summary.takeProfit }}</strong></div
+          >
+          <div
+            ><span>止损</span><strong>{{ summary.stopLoss }}</strong></div
+          >
         </div>
         <div v-if="guardMessage" class="confirm-guard">
           <span>执行前检查</span>
@@ -29,7 +47,11 @@
 
       <div class="trade-modal__footer">
         <button class="modal-btn modal-btn--ghost" @click="$emit('close')">取消</button>
-        <button class="modal-btn modal-btn--primary" :disabled="submitLoading" @click="$emit('confirm')">
+        <button
+          class="modal-btn modal-btn--primary"
+          :disabled="submitLoading || !!guardMessage"
+          @click="$emit('confirm')"
+        >
           {{ submitLoading ? '执行中...' : '确认执行' }}
         </button>
       </div>
@@ -80,7 +102,11 @@
     max-width: 620px;
     border: 1px solid var(--strategy-border);
     border-radius: 20px;
-    background: linear-gradient(180deg, var(--strategy-surface) 0%, var(--strategy-surface-soft) 100%);
+    background: linear-gradient(
+      180deg,
+      var(--strategy-surface) 0%,
+      var(--strategy-surface-soft) 100%
+    );
     box-shadow: var(--strategy-shadow, 0 30px 60px rgba(23, 41, 72, 0.24));
   }
 
@@ -191,10 +217,14 @@
     color: #fff;
   }
 
+  .modal-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+
   @media (max-width: 960px) {
     .trade-modal__dialog {
       width: calc(100vw - 24px);
     }
   }
 </style>
-

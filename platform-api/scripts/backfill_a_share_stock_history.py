@@ -4,16 +4,17 @@ The pool definition is read from Platform SQLite.  This script never calls the
 reference application and only commits when every instrument with a supported
 public symbol has returned a usable series.
 """
+
 from __future__ import annotations
 
 import asyncio
 from datetime import UTC, datetime
 
+from app.database import initialize_database
 from app.research_a_share_repository import (
-    ensure_schema,
+    finish_refresh,
     read_stock_pool,
     start_refresh,
-    finish_refresh,
     write_history_points,
 )
 from app.research_provider_a_share import AShareResearchProvider
@@ -30,6 +31,7 @@ async def _collect(codes: list[str]) -> dict[str, list[object]]:
 
 
 def main() -> None:
+    initialize_database()
     pool = read_stock_pool() or {}
     codes = list(
         dict.fromkeys(
@@ -45,9 +47,7 @@ def main() -> None:
     if missing:
         raise SystemExit(f"stock history incomplete; no rows written: {', '.join(missing[:20])}")
 
-    ensure_schema()
     run_id = f"a-share-stock-history-{datetime.now(UTC).strftime('%Y%m%d%H%M%S')}"
-    now = datetime.now(UTC).isoformat()
     start_refresh(run_id, None)
     rows: list[tuple[str, str, dict[str, object]]] = []
     for code, points in histories.items():
@@ -66,7 +66,9 @@ def main() -> None:
             rows,
             source="tencent-public-adjusted-daily-kline",
         )
-        finish_refresh(run_id, "ready", message=f"historical stock close backfill: {len(rows)} rows")
+        finish_refresh(
+            run_id, "ready", message=f"historical stock close backfill: {len(rows)} rows"
+        )
     except Exception as exc:
         finish_refresh(run_id, "error", error_code=type(exc).__name__, message=str(exc)[:500])
         raise

@@ -22,7 +22,7 @@ def test_runtime_client_is_the_only_reconciliation_http_transport_owner() -> Non
     service_source = SERVICE_PATH.read_text(encoding="utf-8")
     facade_source = FACADE_PATH.read_text(encoding="utf-8")
 
-    assert "httpx.get(" in client_source
+    assert "runtime_transport.get(" in client_source
     assert "settings.runtime_base_url" in client_source
     assert "settings.runtime_timeout_seconds" in client_source
     assert "httpx.get(" not in service_source
@@ -37,7 +37,7 @@ def test_runtime_client_has_only_transport_configuration_dependencies() -> None:
     imports = imported_modules(CLIENT_PATH)
     source = CLIENT_PATH.read_text(encoding="utf-8")
 
-    assert imports <= {"__future__", "httpx", "app.config"}
+    assert imports <= {"__future__", "httpx", "app", "app.config"}
     assert "fastapi" not in imports
     assert "app.database" not in imports
     assert "app.financial_facts" not in imports

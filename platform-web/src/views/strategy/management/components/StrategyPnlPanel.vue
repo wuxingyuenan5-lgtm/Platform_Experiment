@@ -5,12 +5,21 @@
         <div>
           <h3>损益总览</h3>
           <div class="pnl-meta">
-            <em>总资金：{{ profile.totalFund }}</em>
+            <em>{{ profile.totalFund }}</em>
+            <span>{{ profile.period }}</span>
           </div>
         </div>
 
         <div class="pnl-actions">
-          <div class="period-tabs">
+          <label class="precision-control"
+            >时间精度
+            <select v-model="precision" aria-label="收益曲线时间精度">
+              <option v-for="item in curvePrecisions" :key="item.key" :value="item.key">{{
+                item.label
+              }}</option>
+            </select>
+          </label>
+          <div v-if="profile.curveKind !== 'realized'" class="period-tabs">
             <button
               v-for="item in periodTabs"
               :key="item"
@@ -21,13 +30,21 @@
               {{ item }}
             </button>
           </div>
-          <button type="button" class="legend-pill is-return">
+          <button
+            v-if="profile.curveKind !== 'realized'"
+            type="button"
+            class="legend-pill is-return"
+          >
             <span></span>
             日度收益
           </button>
           <button type="button" class="legend-pill is-net">
             <span></span>
-            净值曲线
+            {{
+              profile.curveKind === 'realized'
+                ? `已实现损益 ${profile.curveCurrency || ''}`
+                : '净值曲线'
+            }}
           </button>
         </div>
       </header>
@@ -39,7 +56,9 @@
       <article v-for="item in profile.metrics" :key="item.label" class="metric-card">
         <label>{{ item.label }}</label>
         <strong :class="item.tone ? `is-${item.tone}` : 'is-neutral'">{{ item.value }}</strong>
-        <span :class="item.tone ? `is-${item.tone}` : 'is-neutral'">{{ item.ratio }}</span>
+        <span v-if="item.ratio" :class="item.tone ? `is-${item.tone}` : 'is-neutral'">{{
+          item.ratio
+        }}</span>
       </article>
     </section>
 
@@ -47,26 +66,9 @@
       <article v-for="item in profile.attributions" :key="item.label" class="attribution-card">
         <label>{{ item.label }}</label>
         <strong :class="item.tone ? `is-${item.tone}` : 'is-neutral'">{{ item.value }}</strong>
-        <span :class="item.tone ? `is-${item.tone}` : 'is-neutral'">{{ item.ratio }}</span>
-      </article>
-    </section>
-
-    <section v-if="profile.legSnapshots?.length" class="leg-snapshot-grid">
-      <article v-for="leg in profile.legSnapshots" :key="leg.title" class="leg-snapshot-card">
-        <header>
-          <div>
-            <h3>{{ leg.title }}</h3>
-            <span>{{ leg.venue }}</span>
-          </div>
-          <strong>{{ leg.symbol }}</strong>
-        </header>
-
-        <dl>
-          <div v-for="row in leg.rows" :key="row.label">
-            <dt>{{ row.label }}</dt>
-            <dd :class="row.tone ? `is-${row.tone}` : 'is-neutral'">{{ row.value }}</dd>
-          </div>
-        </dl>
+        <span v-if="item.ratio" :class="item.tone ? `is-${item.tone}` : 'is-neutral'">{{
+          item.ratio
+        }}</span>
       </article>
     </section>
 
@@ -90,6 +92,11 @@
   import type { StrategyDeskKey, StrategyPnlProfile } from '@/data/sample/strategy';
   import StrategyCurveCardChart from './StrategyCurveCardChart.vue';
   import { strategyPnlProfiles } from '@/data/sample/strategy';
+  import {
+    curvePrecisions,
+    samplePnlCurve,
+    type CurvePrecision,
+  } from '../composables/strategyCurvePrecision';
 
   const props = defineProps<{
     activeDesk: StrategyDeskKey;
@@ -98,6 +105,7 @@
 
   const periodTabs = ['日报', '周报', '月报', '自定义'];
   const activePeriod = ref('周报');
+  const precision = ref<CurvePrecision>('day');
   const overviewChartRef = ref<HTMLDivElement | null>(null);
   const breakdownChartRef = ref<HTMLDivElement | null>(null);
   const { setOptions, resize } = useECharts(overviewChartRef as Ref<HTMLDivElement>);
@@ -164,22 +172,23 @@
     })),
   };
 
-  const profile = computed(() => {
+  const sourceProfile = computed(() => {
     const base = strategyPnlProfiles[props.activeDesk];
     if (props.liveProfile) return props.liveProfile;
     if (props.activeDesk !== 'crossSpread') return base;
     if (!props.liveProfile) return emptyCrossSpreadProfile;
     return emptyCrossSpreadProfile;
   });
+  const profile = computed(() => samplePnlCurve(sourceProfile.value, precision.value));
   const detailCurveCards = computed(() =>
     profile.value.detailCurves.map((item) => ({
       title: item.title,
       amount: item.value,
       unit: '',
       tone: item.tone,
-      points: profile.value.xLabels.map((date, index) => ({
-        date,
-        value: item.data[index] ?? item.data[item.data.length - 1] ?? 0,
+      points: item.data.map((value, index) => ({
+        date: profile.value.xLabels[index],
+        value,
       })),
     })),
   );
@@ -199,13 +208,13 @@
       yAxis: [
         {
           type: 'value',
-          name: '日度收益',
+          name: profile.value.curveKind === 'realized' ? '' : '日度收益',
           splitLine: { lineStyle: { color: 'rgba(132, 148, 168, 0.18)', type: 'dashed' } },
           axisLabel: { color: '#8392aa' },
         },
         {
           type: 'value',
-          name: '净值',
+          name: profile.value.curveKind === 'realized' ? '已实现损益' : '净值',
           position: 'right',
           scale: true,
           splitLine: { show: false },
@@ -226,7 +235,7 @@
       ],
       series: [
         {
-          name: '日度收益',
+          name: profile.value.curveKind === 'realized' ? '' : '日度收益',
           type: 'bar',
           barWidth: 14,
           itemStyle: {
@@ -237,10 +246,11 @@
           data: profile.value.dailyReturns,
         },
         {
-          name: '净值曲线',
+          name: profile.value.curveKind === 'realized' ? '已实现损益' : '净值曲线',
           type: 'line',
           yAxisIndex: 1,
-          smooth: true,
+          smooth: profile.value.curveKind !== 'realized',
+          step: profile.value.curveKind === 'realized' ? 'end' : false,
           symbol: 'none',
           lineStyle: { width: 2.8, color: '#5aa7ef' },
           areaStyle: { color: 'rgba(90, 167, 239, 0.08)' },
@@ -327,6 +337,20 @@
 </script>
 
 <style scoped lang="less">
+  .precision-control {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--strategy-text-2);
+    white-space: nowrap;
+  }
+  .precision-control select {
+    padding: 6px 10px;
+    border: 1px solid var(--strategy-border);
+    border-radius: 8px;
+    background: var(--strategy-surface);
+    color: inherit;
+  }
   .pnl-panel {
     display: grid;
     gap: var(--strategy-space-2);

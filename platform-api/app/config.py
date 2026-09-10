@@ -47,20 +47,17 @@ class Settings(BaseSettings):
     # broker slippage. The value must remain non-negative.
     cross_spread_limit_hedge_reserve_price: Decimal = Decimal("0")
 
-    # Legacy-compat acceptance controls. Zero means "no platform cap" (the CEO
-    # instruction quantity is the boundary); a positive value re-enables the
-    # legacy cross-spread acceptance cap.
+    # Deprecated configuration inputs; retained for old operator files only.
+    # Normal trading ignores these acceptance caps, including positive values.
     cross_spread_acceptance_max_quantity_oz: Decimal = Decimal("0")
-    # Zero means "no platform-side active-plan cap". A positive value restores
-    # the legacy acceptance-era singleton limit.
     cross_spread_acceptance_max_active_plans: int = 0
     cross_spread_definitive_failure_rollback_enabled: bool = True
     cross_spread_position_verification_required: bool = True
     bybit_mt5_funding_url: str = "https://www.bybit.com/user/assets/home/account-mt5"
 
-    # Authentication is permissive only in non-live development. A live process
-    # must use api_key mode with SHA-256 token hashes; raw tokens never belong in
-    # settings, source control, logs, database rows, or API responses.
+    # Development fallback cannot authorize actual live writes. Browser sessions
+    # and hashed API keys follow their separate role scopes; raw tokens never
+    # belong in settings, source control, logs, database rows, or API responses.
     auth_mode: str = "development"
     auth_credentials_json: str = "[]"
     development_user_id: str = "development-user"

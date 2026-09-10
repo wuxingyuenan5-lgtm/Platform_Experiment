@@ -65,7 +65,9 @@ class Mt5LiveAdapter:
         if self._provider is None and not self._dependency_available():
             missing.append("METATRADER5_DEPENDENCY")
         missing.extend(COORDINATOR.readiness_suffix())
-        configured = not [item for item in missing if item not in {"WINDOWS_RUNTIME", "METATRADER5_DEPENDENCY"}]
+        configured = not [
+            item for item in missing if item not in {"WINDOWS_RUNTIME", "METATRADER5_DEPENDENCY"}
+        ]
         operational = configured and not missing
         return GatewayAdapterCapability(
             adapter=self.name,
@@ -110,7 +112,9 @@ class Mt5LiveAdapter:
         except Exception as exc:
             raise GatewayConfigurationError("MT5 order_check failed") from exc
         if checked is None:
-            raise GatewayConfigurationError(f"MT5 order_check returned no result: {mt5.last_error()}")
+            raise GatewayConfigurationError(
+                f"MT5 order_check returned no result: {mt5.last_error()}"
+            )
         if int(getattr(checked, "retcode", -1)) != 0:
             raise GatewayRequestRejectedError(
                 f"MT5 order_check rejected request: {getattr(checked, 'comment', 'unknown')}"
@@ -120,7 +124,9 @@ class Mt5LiveAdapter:
         except Exception as exc:
             raise GatewayResultUnknownError("MT5 order_send result is unknown") from exc
         if result is None:
-            raise GatewayResultUnknownError(f"MT5 order_send returned no result: {mt5.last_error()}")
+            raise GatewayResultUnknownError(
+                f"MT5 order_send returned no result: {mt5.last_error()}"
+            )
         retcode = int(getattr(result, "retcode", -1))
         success_codes = {
             int(getattr(mt5, "TRADE_RETCODE_DONE", 10009)),
@@ -220,9 +226,7 @@ class Mt5LiveAdapter:
         total = sum((volume for volume, _price in matching), Decimal("0"))
         if total <= 0 or total > command.quantity:
             return Decimal("0"), Decimal("0")
-        weighted_price = sum(
-            (volume * price for volume, price in matching), Decimal("0")
-        ) / total
+        weighted_price = sum((volume * price for volume, price in matching), Decimal("0")) / total
         return total, weighted_price
 
     def get_order(
@@ -297,8 +301,7 @@ class Mt5LiveAdapter:
                     symbol=symbol,
                     side=(
                         "buy"
-                        if int(getattr(deal, "type", -1))
-                        == int(getattr(mt5, "DEAL_TYPE_BUY", 0))
+                        if int(getattr(deal, "type", -1)) == int(getattr(mt5, "DEAL_TYPE_BUY", 0))
                         else "sell"
                     ),
                     quantity=Decimal(str(getattr(deal, "volume", 0))),
@@ -321,6 +324,7 @@ class Mt5LiveAdapter:
             rows = mt5.positions_get() or ()
         except Exception as exc:
             raise GatewayResultUnknownError("MT5 position query result is unknown") from exc
+        observed_at = datetime.now(UTC)
         currency = self._account_currency(mt5)
         snapshots: list[VenuePositionSnapshot] = []
         for row in rows:
@@ -332,11 +336,7 @@ class Mt5LiveAdapter:
             if int(getattr(row, "type", -1)) == int(getattr(mt5, "POSITION_TYPE_SELL", 1)):
                 volume = -volume
             open_time_msc = int(getattr(row, "time_msc", 0) or 0)
-            open_time = (
-                datetime.fromtimestamp(open_time_msc / 1000, UTC)
-                if open_time_msc
-                else None
-            )
+            open_time = datetime.fromtimestamp(open_time_msc / 1000, UTC) if open_time_msc else None
             snapshots.append(
                 VenuePositionSnapshot(
                     source=self.name,
@@ -349,7 +349,7 @@ class Mt5LiveAdapter:
                     netQuantity=volume,
                     averagePrice=Decimal(str(getattr(row, "price_open", 0))),
                     currency=currency,
-                    asOf=self._position_time(row),
+                    asOf=observed_at,
                     openTime=open_time,
                 )
             )
@@ -368,6 +368,12 @@ class Mt5LiveAdapter:
         try:
             from app.mt5_symbol_resolver import resolve_mt5_symbol
 
+            terminal = mt5.terminal_info()
+            if terminal is None or not bool(getattr(terminal, "connected", False)):
+                # MT5 can retain account information and a positive last tick
+                # after the broker connection drops. A read timestamp does not
+                # make that cached tick executable.
+                raise GatewayResultUnknownError("MT5 market terminal is not connected")
             info = mt5.account_info()
             if info is None:
                 raise GatewayResultUnknownError(
@@ -383,19 +389,33 @@ class Mt5LiveAdapter:
                 ),
             )
             if resolution is None:
-                raise GatewayConfigurationError(
-                    f"MT5 symbol has no live quote: {symbol}"
-                )
+                raise GatewayConfigurationError(f"MT5 symbol has no live quote: {symbol}")
             tick = mt5.symbol_info_tick(resolution.symbol)
             if tick is None:
-                raise GatewayResultUnknownError(
-                    f"MT5 symbol tick unavailable: {mt5.last_error()}"
-                )
+                raise GatewayResultUnknownError(f"MT5 symbol tick unavailable: {mt5.last_error()}")
             bid = Decimal(str(getattr(tick, "bid", 0) or 0))
             ask = Decimal(str(getattr(tick, "ask", 0) or 0))
             if bid <= 0 or ask <= 0:
                 raise GatewayResultUnknownError("MT5 market quote is incomplete")
             last_raw = Decimal(str(getattr(tick, "last", 0) or 0))
+            symbol_info = mt5.symbol_info(resolution.symbol)
+            # The price denomination belongs to the instrument. Account currency
+            # continues to own cash/margin/realized PnL and can be different.
+            quote_currency = str(getattr(symbol_info, "currency_profit", "") or "").upper()
+            market_metadata: dict[str, object] = {
+                key: str(value)
+                for key in (
+                    "swap_long",
+                    "swap_short",
+                    "swap_mode",
+                    "swap_rollover3days",
+                    "trade_contract_size",
+                    "currency_base",
+                    "currency_profit",
+                    "currency_margin",
+                )
+                if (value := getattr(symbol_info, key, None)) is not None
+            }
             return VenueMarketQuoteSnapshot(
                 source=self.name,
                 accountId=account_id,
@@ -406,9 +426,9 @@ class Mt5LiveAdapter:
                 ask=ask,
                 mid=(bid + ask) / Decimal("2"),
                 last=last_raw if last_raw > 0 else None,
-                currency=self._normalize_account_currency(
-                    getattr(info, "currency", "USD")
-                ),
+                currency=quote_currency or "UNKNOWN",
+                dataQualityState="complete" if quote_currency else "partial",
+                rawPayload=market_metadata,
                 # Some brokers expose Terminal/server-local tick epochs. The
                 # normalized quote timestamp is the Runtime observation time.
                 asOf=datetime.now(UTC),
@@ -447,9 +467,7 @@ class Mt5LiveAdapter:
                 ),
             )
             if resolution is None:
-                raise GatewayConfigurationError(
-                    f"MT5 symbol has no margin model: {symbol}"
-                )
+                raise GatewayConfigurationError(f"MT5 symbol has no margin model: {symbol}")
             order_type = mt5.ORDER_TYPE_BUY if side == "buy" else mt5.ORDER_TYPE_SELL
             raw_margin = mt5.order_calc_margin(
                 order_type,
@@ -474,9 +492,7 @@ class Mt5LiveAdapter:
                 quantity=quantity,
                 referencePrice=reference_price,
                 estimatedInitialMargin=margin,
-                currency=self._normalize_account_currency(
-                    getattr(info, "currency", "USD")
-                ),
+                currency=self._normalize_account_currency(getattr(info, "currency", "USD")),
                 asOf=datetime.now(UTC),
                 dataQualityState="venue_calculated",
             )
@@ -512,6 +528,10 @@ class Mt5LiveAdapter:
             )
         ]
 
+    def get_capital_flows(self, *, account_id, start_time, end_time):
+        from app.capital_flows import mt5_capital_flows
+        return mt5_capital_flows(self, account_id, start_time, end_time)
+
     def list_economic_events(
         self,
         *,
@@ -525,14 +545,28 @@ class Mt5LiveAdapter:
         end = datetime.now(UTC)
         start = end - timedelta(days=self.settings.mt5_history_lookback_days)
         try:
-            deals = mt5.history_deals_get(start, end) or ()
+            deals = mt5.history_deals_get(start, end)
+            if deals is None:
+                raise GatewayConfigurationError("MT5 deal query failed")
         except Exception as exc:
             raise GatewayResultUnknownError("MT5 economic event query result is unknown") from exc
+        return self._economic_event_snapshots(mt5, account, deals, instrument_id, event_type)
+
+    def _economic_event_snapshots(
+        self,
+        mt5,
+        account: str,
+        deals,
+        instrument_id: str | None = None,
+        event_type: str | None = None,
+    ) -> list[VenueEconomicEventSnapshot]:
         currency = self._account_currency(mt5)
         events: list[VenueEconomicEventSnapshot] = []
         for deal in deals:
             symbol = str(getattr(deal, "symbol", "")).upper()
             mapped_instrument = self.settings.mt5_instruments.get(symbol)
+            if symbol and mapped_instrument is None:
+                mapped_instrument = f"monitor:mt5:{account}:{symbol}"
             if instrument_id is not None and mapped_instrument != instrument_id:
                 continue
             ticket = str(getattr(deal, "ticket", 0))
@@ -549,7 +583,7 @@ class Mt5LiveAdapter:
                     VenueEconomicEventSnapshot(
                         source=self.name,
                         externalEventId=f"{component_type}:{ticket}",
-                        eventType=component_type,
+                        eventType="swap" if component_type == "swap" else "fee",
                         accountId=account,
                         instrumentId=mapped_instrument,
                         symbol=symbol or None,
@@ -618,6 +652,16 @@ class Mt5LiveAdapter:
         if self._connected:
             self._assert_runtime_identity(mt5, secret)
             return mt5
+        current = mt5.account_info()
+        if (
+            str(getattr(current, "login", "") or "") == str(secret["LOGIN"])
+            and str(getattr(current, "server", "") or "") == str(secret["SERVER"])
+        ):
+            # A fixed-account worker normally attaches to an authenticated
+            # Terminal. Reuse it without another account login on each restart.
+            self._assert_runtime_identity(mt5, secret)
+            self._connected = True
+            return mt5
         timeout_ms = int(self.settings.mt5_check_timeout_seconds * 1000)
         authorized = mt5.login(
             int(secret["LOGIN"]),
@@ -631,21 +675,23 @@ class Mt5LiveAdapter:
         self._connected = True
         return mt5
 
-    def _runtime_mt5(self):
+    def _runtime_mt5(self) -> Any:
         if self._provider is not None:
             return self._provider
         if platform.system() != "Windows":
             raise GatewayConfigurationError("MT5 live adapter requires Windows")
         try:
-            import MetaTrader5 as mt5
+            import MetaTrader5 as sdk
         except ImportError as exc:
             raise GatewayConfigurationError("MetaTrader5 dependency is not installed") from exc
+        mt5: Any = sdk
         if self._initialized:
             return mt5
         timeout_ms = int(self.settings.mt5_check_timeout_seconds * 1000)
         initialized = initialize_mt5(
             mt5,
             terminal_path=self.settings.mt5_terminal_path,
+            background=self._provider is None,
             timeout=timeout_ms,
             portable=self.settings.mt5_terminal_portable,
         )
@@ -654,13 +700,34 @@ class Mt5LiveAdapter:
         self._initialized = True
         return mt5
 
+    def recover_read_transport(self) -> bool:
+        """Reset one broken IPC session inside its serialized, fixed-account worker."""
+        if len(self.settings.mt5_accounts) != 1 or not self.settings.mt5_terminal_path:
+            return False
+        mt5 = self._runtime_mt5()
+        error = mt5.last_error()
+        if not error or int(error[0]) not in {-10000, -10001, -10002, -10003, -10005}:
+            return False
+        mt5.shutdown()
+        self._connected = False
+        self._initialized = False
+        initialized = initialize_mt5(
+            mt5,
+            terminal_path=self.settings.mt5_terminal_path,
+            background=self._provider is None,
+            timeout=int(self.settings.mt5_check_timeout_seconds * 1000),
+            portable=self.settings.mt5_terminal_portable,
+        )
+        if not initialized:
+            raise GatewayConfigurationError("MT5 read IPC recovery failed")
+        self._initialized = True
+        return True
+
     @staticmethod
     def _assert_runtime_identity(mt5, secret: dict[str, str]) -> None:
         info = mt5.account_info()
         if info is None:
-            raise GatewayConfigurationError(
-                f"MT5 account identity unavailable: {mt5.last_error()}"
-            )
+            raise GatewayConfigurationError(f"MT5 account identity unavailable: {mt5.last_error()}")
         actual_login = str(getattr(info, "login", "") or "")
         actual_server = str(getattr(info, "server", "") or "")
         if actual_login != str(secret["LOGIN"]) or actual_server != str(secret["SERVER"]):
@@ -694,7 +761,9 @@ class Mt5LiveAdapter:
             return None
 
     def _secret(self) -> dict[str, str]:
-        return self._secret_for_account(self.settings.mt5_primary_account_id or self._single_account())
+        return self._secret_for_account(
+            self.settings.mt5_primary_account_id or self._single_account()
+        )
 
     def _secret_for_account(self, account_id: str) -> dict[str, str]:
         try:
@@ -810,7 +879,7 @@ class Mt5LiveAdapter:
             - Decimal(str(getattr(row, "volume_current", 0))),
             averageFillPrice=None,
             occurredAt=self._seconds(getattr(row, "time_setup", None)),
-            asOf=self._seconds(getattr(row, "time_done", None) or getattr(row, "time_setup", None)),
+            asOf=datetime.now(UTC),
         )
 
     @staticmethod
@@ -825,18 +894,14 @@ class Mt5LiveAdapter:
         time_msc = int(getattr(deal, "time_msc", 0) or 0)
         if time_msc:
             return Mt5LiveAdapter._normalized_mt5_time(time_msc / 1000)
-        return Mt5LiveAdapter._normalized_mt5_time(
-            int(getattr(deal, "time", 0) or 0)
-        )
+        return Mt5LiveAdapter._normalized_mt5_time(int(getattr(deal, "time", 0) or 0))
 
     @staticmethod
     def _position_time(row) -> datetime:
         time_msc = int(getattr(row, "time_update_msc", 0) or 0)
         if time_msc:
             return Mt5LiveAdapter._normalized_mt5_time(time_msc / 1000)
-        return Mt5LiveAdapter._normalized_mt5_time(
-            int(getattr(row, "time_update", 0) or 0)
-        )
+        return Mt5LiveAdapter._normalized_mt5_time(int(getattr(row, "time_update", 0) or 0))
 
     @staticmethod
     def _seconds(value: object) -> datetime:
@@ -846,16 +911,12 @@ class Mt5LiveAdapter:
 
     @staticmethod
     def _normalized_mt5_time(value: int | float) -> datetime:
-        observed_at = datetime.now(UTC)
         if value <= 0:
-            return observed_at
-        source_time = datetime.fromtimestamp(value, UTC)
-        # Some broker terminals expose server-local epoch values. Preserve
-        # plausible source time, but never let a future broker clock move
-        # Platform lifecycle state into the future.
-        if source_time > observed_at + timedelta(minutes=5):
-            return observed_at
-        return source_time
+            raise GatewayResultUnknownError("MT5 record lacks a source timestamp")
+        # Keep the venue epoch stable across reads. Observation time belongs in
+        # asOf; replacing a future source time with now corrupts immutable deals.
+        # A broker clock offset cannot be inferred from the time of a read.
+        return datetime.fromtimestamp(value, UTC)
 
     def _history_window(self) -> tuple[datetime, datetime]:
         observed_at = datetime.now(UTC)

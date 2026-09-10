@@ -1,11 +1,10 @@
 from decimal import Decimal
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Query, Request
 
 from app.account_read_service import get_pnl as read_pnl
 from app.account_read_service import get_position as read_position
 from app.auth import require_principal
-from app.controlled_strategy_write_guard import reject_controlled_strategy_write_bypass
 from app.catalog import (
     get_account,
     get_instrument,
@@ -23,6 +22,7 @@ from app.catalog import (
     list_strategy_management_overview,
     run_nav_snapshot,
 )
+from app.controlled_strategy_write_guard import reject_controlled_strategy_write_bypass
 from app.schemas import (
     AccountResponse,
     BalanceSnapshotResponse,
@@ -102,8 +102,9 @@ def create_catalog_router(api_prefix: str) -> APIRouter:
     )
     def strategy_account_snapshot(
         strategy_instance_id: str,
+        account_id: str | None = Query(default=None, alias="accountId"),
     ) -> StrategyAccountSnapshotResponse:
-        return get_strategy_account_snapshot(strategy_instance_id)
+        return get_strategy_account_snapshot(strategy_instance_id, account_id=account_id)
 
     @router.post(
         f"{api_prefix}/strategies/instances/{{strategy_instance_id}}/runs",

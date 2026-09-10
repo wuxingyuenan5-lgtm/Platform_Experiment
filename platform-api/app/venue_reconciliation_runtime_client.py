@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import httpx
 
+from app import runtime_transport
 from app.config import get_settings
 
 
@@ -14,11 +15,10 @@ def get(path: str, params: dict[str, str] | None = None) -> httpx.Response:
 
     settings = get_settings()
     try:
-        return httpx.get(
+        return runtime_transport.get(
             f"{settings.runtime_base_url}{path}",
             params=params,
             timeout=settings.runtime_timeout_seconds,
-            trust_env=False,
         )
     except httpx.HTTPError as exc:
         raise RuntimeQueryError("Platform Execution Runtime query failed") from exc

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from datetime import UTC, datetime
 from decimal import Decimal
 
@@ -26,6 +27,13 @@ from app.execution_schemas import ExecutionBatchResponse
 from app.schemas import BatchLegResponse
 
 NOW = datetime(2026, 7, 25, tzinfo=UTC)
+
+
+@pytest.fixture(autouse=True)
+def synthetic_live_gate(monkeypatch):
+    from app.config import get_settings
+
+    monkeypatch.setattr(get_settings(), "live_trading_enabled", True)
 
 
 def batch_response(
@@ -154,7 +162,7 @@ def test_market_open_uses_normalized_intent_without_changing_legacy_action(
     plan = exit_plan()
     monkeypatch.setattr(
         synthetic_service.market_helpers,
-        "_assert_acceptance_open_allowed",
+        "_assert_open_execution_resolved",
         lambda: None,
     )
     monkeypatch.setattr(
@@ -224,7 +232,7 @@ def test_market_open_reuses_existing_batch_by_client_idempotency_key(monkeypatch
     )
     monkeypatch.setattr(
         synthetic_service.market_helpers,
-        "_assert_acceptance_open_allowed",
+        "_assert_open_execution_resolved",
         lambda: pytest.fail("idempotent replay must not re-run acceptance gate"),
     )
     monkeypatch.setattr(
@@ -342,10 +350,13 @@ def test_partial_close_submits_only_the_requested_delta(monkeypatch) -> None:
     assert result.exit_plan.status == "active"
 
 
-def test_manual_close_reuses_existing_close_batch_by_client_idempotency_key(monkeypatch) -> None:
+@pytest.mark.parametrize("batch_prefix", ["", "instruction:"])
+def test_manual_close_reuses_existing_close_batch_by_client_idempotency_key(
+    monkeypatch, batch_prefix
+) -> None:
     plan = exit_plan(status="closing", close_batch_id="close-batch-1")
     existing_batch = batch_response("close-batch-1", direction="CLOSE_LONG")
-    existing_batch.idempotency_key = "client-close-1"
+    existing_batch.idempotency_key = f"{batch_prefix}client-close-1"
 
     monkeypatch.setattr(synthetic_service, "get_exit_plan", lambda _plan_id: plan)
     monkeypatch.setattr(
@@ -370,6 +381,8 @@ def test_manual_close_reuses_existing_close_batch_by_client_idempotency_key(monk
 
 
 def test_manual_close_recovers_a_failed_unsubmitted_exit_batch(monkeypatch) -> None:
+    from app.database import initialize_database
+    initialize_database()
     manual_plan = exit_plan(
         status="manual_intervention",
         close_batch_id="failed-close-1",
@@ -427,13 +440,86 @@ def test_manual_close_recovers_a_failed_unsubmitted_exit_batch(monkeypatch) -> N
     )
 
 
+@pytest.mark.parametrize("mode", ["market", "limit"])
+@pytest.mark.parametrize("other_ticket", [False, True])
+def test_close_exception_retains_only_its_exact_persisted_batch(monkeypatch, mode, other_ticket):
+    from fastapi import HTTPException
+
+    from app.cross_spread_exit_repository import claim_exit_plan, create_exit_plan, get_exit_plan
+    from app.database import connection, initialize_database
+
+    initialize_database()
+    strategy = "strategy_cross_venue_spread_instance_default"
+    with connection() as db:
+        for identity, direction, status in (
+            ("opening", "open", "hedged"),
+            ("failed-close", "close", "failed"),
+        ):
+            db.execute(
+                "INSERT INTO execution_batches(id,idempotency_key,strategy_instance_id,account_id,"
+                "strategy_key,direction,status,created_at,updated_at) "
+                "VALUES (?,?,?,'bybit-live-main','cross_venue_spread',?,?,?,?)",
+                (identity, identity, strategy, direction, status, NOW.isoformat(), NOW.isoformat()),
+            )
+    plan = create_exit_plan(
+        strategy_instance_id=strategy,
+        open_batch_id="opening",
+        direction="LONG_SPREAD",
+        quantity_oz=Decimal("1"),
+        mt5_position_id="778899",
+        entry_spread=Decimal("-2"),
+        take_profit_spread=None,
+        stop_loss_spread=None,
+    )
+    plan = claim_exit_plan(plan.plan_id, trigger_reason="MANUAL", trigger_spread=None)
+    assert plan is not None
+
+    def rejected(request, **kwargs):
+        parameters = {
+            "action": request.action,
+            "quantityOz": str(request.quantity_oz),
+            "mt5PositionId": "another-ticket" if other_ticket else kwargs["mt5_position_id"],
+            "mt5ReduceOnly": kwargs["mt5_reduce_only"],
+        }
+        with connection() as db:
+            db.execute(
+                "INSERT INTO strategy_runs(id,idempotency_key,strategy_instance_id,"
+                "strategy_key,direction,"
+                "status,execution_batch_id,action,requested_parameters_json,created_at,updated_at) "
+                "VALUES ('close-intent',?,?,'cross_venue_spread','close','rejected',"
+                "'failed-close','close',?,?,?)",
+                (
+                    kwargs["idempotency_key"],
+                    strategy,
+                    json.dumps(parameters),
+                    NOW.isoformat(),
+                    NOW.isoformat(),
+                ),
+            )
+        raise HTTPException(409, "Available balance evidence is unavailable")
+
+    monkeypatch.setattr(synthetic_service, "submit_cross_spread_market_command", rejected)
+    monkeypatch.setattr(synthetic_service, "_submit_limit_batch", rejected)
+    with pytest.raises(HTTPException, match="Available balance evidence"):
+        synthetic_service._close_claimed_plan(
+            plan,
+            execution_mode=mode,
+            limit_execution=fok_price() if mode == "limit" else None,
+        )
+    recovered = get_exit_plan(plan.plan_id)
+    assert recovered.status == "manual_intervention"
+    assert recovered.close_batch_id == (None if other_ticket else "failed-close")
+    with connection() as db:
+        assert db.execute("SELECT COUNT(*) FROM trade_commands").fetchone()[0] == 0
+
+
 def test_limit_open_routes_only_to_fok_executor(monkeypatch) -> None:
     captured = {}
     plan = exit_plan()
     pricing = fok_price()
     monkeypatch.setattr(
         synthetic_service.market_helpers,
-        "_assert_acceptance_open_allowed",
+        "_assert_open_execution_resolved",
         lambda: None,
     )
     monkeypatch.setattr(

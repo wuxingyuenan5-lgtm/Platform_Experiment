@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+
 from fastapi import APIRouter, HTTPException
 
 from app.gateway import VenueGateway
@@ -21,6 +23,8 @@ from app.runtime_contracts import (
     RuntimeSubmitOrderCommandV1,
     version_execution_events,
 )
+
+LOGGER = logging.getLogger(__name__)
 
 
 def create_command_router(*, gateway: VenueGateway) -> APIRouter:
@@ -54,11 +58,19 @@ def create_command_router(*, gateway: VenueGateway) -> APIRouter:
             ]
         except GatewayResultUnknownError as exc:
             mark_command_result_unknown(command.command_id)
+            LOGGER.warning(
+                "Runtime command unresolved command_id=%s platform_order_id=%s error=%s",
+                command.command_id, command.platform_order_id, type(exc).__name__,
+            )
             raise HTTPException(status_code=502, detail=str(exc)) from exc
         try:
             save_command_events(command, events)
         except JournalEventError as exc:
             mark_command_result_unknown(command.command_id)
+            LOGGER.warning(
+                "Runtime evidence rejected command_id=%s platform_order_id=%s error=%s",
+                command.command_id, command.platform_order_id, type(exc).__name__,
+            )
             raise HTTPException(
                 status_code=502, detail="Runtime execution evidence is not safely persistable"
             ) from exc

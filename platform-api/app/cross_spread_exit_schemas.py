@@ -146,6 +146,7 @@ class CrossSpreadExitPlanResponse(BaseModel):
     strategy_instance_id: str = Field(alias="strategyInstanceId")
     open_batch_id: str = Field(alias="openBatchId")
     close_batch_id: str | None = Field(default=None, alias="closeBatchId")
+    origin_label: str | None = Field(default=None, alias="originLabel")
     direction: SpreadDirection
     quantity_oz: Decimal = Field(alias="quantityOz")
     mt5_position_id: str = Field(alias="mt5PositionId")

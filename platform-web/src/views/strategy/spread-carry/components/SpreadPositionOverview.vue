@@ -41,6 +41,13 @@
       </div>
     </div>
 
+    <p v-if="overviewRows.length" class="overview-pnl-note">
+      按各组合剩余仓位计算浮动盈亏，未含已平仓收益、手续费、资金费和库存费。
+      <span v-if="pnlOverview?.dataQualityState !== 'complete'"
+        >部分持仓数据待更新，合计暂不可用。</span
+      >
+    </p>
+
     <table class="overview-table">
       <thead>
         <tr>
@@ -72,7 +79,11 @@
             <td>{{ row.entrySpread }}</td>
             <td :class="spreadTone(row.currentSpread)">{{ row.currentSpread }}</td>
             <td>{{ row.detail }}</td>
-            <td>{{ row.pnl }}</td>
+            <td
+              :class="pnlTone(parseOptionalNumber(row.pnlUsdt))"
+              :title="row.pnlReason || undefined"
+              >{{ row.pnl }}</td
+            >
             <td>{{ row.legPnl }}</td>
             <td>
               <button
@@ -103,7 +114,10 @@
             <td>{{ row.holdingTime }}</td>
             <td>{{ row.status }}</td>
           </tr>
-          <tr v-if="editingPlanId === row.exitPlanId" class="exit-threshold-editor-row">
+          <tr
+            v-if="editingPlanId && editingPlanId === row.exitPlanId"
+            class="exit-threshold-editor-row"
+          >
             <td colspan="15">
               <form class="exit-threshold-editor" @submit.prevent="saveExitPlanEdit">
                 <strong>修改止盈止损</strong>
@@ -145,9 +159,7 @@
                 </label>
                 <span class="exit-threshold-editor__hint">
                   触发时针对该计划当前剩余
-                  {{
-                    formatNumber(row.qty, 2)
-                  }}
+                  {{ formatNumber(row.qty, 2) }}
                   盎司；手动部分平仓后的剩余数量继续沿用本设置。保存不会立即平仓。
                 </span>
                 <p v-if="saveError" class="exit-threshold-editor__error">{{ saveError }}</p>
@@ -173,34 +185,12 @@
     CrossSpreadExitPlanThresholdUpdateInput,
     CrossSpreadLimitStrategy,
   } from '@/api/platform/crossSpreadLifecycle';
-
-  interface OverviewRow {
-    id: string;
-    exitPlanId: string | null;
-    takeProfitExecutionMode: CrossSpreadExecutionMode | null;
-    stopLossExecutionMode: CrossSpreadExecutionMode | null;
-    takeProfitLimitStrategy: CrossSpreadLimitStrategy | null;
-    stopLossLimitStrategy: CrossSpreadLimitStrategy | null;
-    direction: string;
-    qty: number;
-    entrySpread: string;
-    currentSpread: string;
-    detail: string;
-    accountStatus: string;
-    accountRisk: string;
-    pnl: string;
-    legPnl: string;
-    takeProfit: string;
-    stopLoss: string;
-    liquidation: string;
-    margin: string;
-    openTime: string;
-    holdingTime: string;
-    status: string;
-  }
+  import type { CrossSpreadPositionOverviewResult } from '@/api/platform/trading.types';
+  import type { OverviewRow } from '../composables/mapCrossSpreadPositions';
 
   const props = defineProps<{
     overviewRows: OverviewRow[];
+    pnlOverview: CrossSpreadPositionOverviewResult | null;
     emptyText: string;
     longSpread: string | number | null | undefined;
     updateExitPlan: (
@@ -295,19 +285,6 @@
     return formatNumber(value, 2);
   }
 
-  function parseLegPart(text: string, prefix: 'BY' | 'MT5'): number | null {
-    if (!text) return null;
-    const parts = text.split(' | ');
-    for (const part of parts) {
-      const t = part.trim();
-      if (t.startsWith(prefix + ': ')) {
-        const num = parseFloat(t.slice((prefix + ': ').length).replace(/,/g, ''));
-        return Number.isFinite(num) ? num : null;
-      }
-    }
-    return null;
-  }
-
   function extractLegText(text: string, prefix: 'BY' | 'MT5'): string {
     if (!text) return '--';
     const parts = text.split(' | ');
@@ -318,44 +295,9 @@
     return '--';
   }
 
-  const totalPnlUsdt = computed<number | null>(() => {
-    let sum = 0;
-    let hasAny = false;
-    for (const row of props.overviewRows) {
-      const v = parseOptionalNumber(row.pnl);
-      if (v !== null) {
-        sum += v;
-        hasAny = true;
-      }
-    }
-    return hasAny ? sum : null;
-  });
-
-  const legPnlByUsdt = computed<number | null>(() => {
-    let sum = 0;
-    let hasAny = false;
-    for (const row of props.overviewRows) {
-      const v = parseLegPart(row.legPnl, 'BY');
-      if (v !== null) {
-        sum += v;
-        hasAny = true;
-      }
-    }
-    return hasAny ? sum : null;
-  });
-
-  const legPnlMt5Usdt = computed<number | null>(() => {
-    let sum = 0;
-    let hasAny = false;
-    for (const row of props.overviewRows) {
-      const v = parseLegPart(row.legPnl, 'MT5');
-      if (v !== null) {
-        sum += v;
-        hasAny = true;
-      }
-    }
-    return hasAny ? sum : null;
-  });
+  const totalPnlUsdt = computed(() => parseOptionalNumber(props.pnlOverview?.totalPnlUsdt));
+  const legPnlByUsdt = computed(() => parseOptionalNumber(props.pnlOverview?.bybitPnlUsdt));
+  const legPnlMt5Usdt = computed(() => parseOptionalNumber(props.pnlOverview?.mt5PnlUsdt));
 
   const liquidationByText = computed<string>(() => {
     if (props.overviewRows.length !== 1) return props.overviewRows.length ? '详见持仓行' : '--';
@@ -411,6 +353,13 @@
 </script>
 
 <style scoped lang="less">
+  .overview-pnl-note {
+    margin: 0 0 12px;
+    color: #68788e;
+    font-size: 12px;
+    line-height: 1.6;
+  }
+
   .cross-card {
     padding: 16px 18px 18px;
     border: 1px solid #e7ebf0;

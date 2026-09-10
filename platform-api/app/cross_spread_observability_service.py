@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime, timedelta
 from typing import Any, Literal
 
@@ -15,6 +16,7 @@ from app.cross_spread_live_read_client import CrossSpreadLiveReadError
 from app.cross_spread_observability_schemas import (
     CrossSpreadObservabilityResponse,
     CrossSpreadVenueObservabilityResponse,
+    SectionState,
 )
 
 ObservabilityMode = Literal["fast", "audit"]
@@ -28,24 +30,28 @@ def get_cross_spread_observability(
 ) -> CrossSpreadObservabilityResponse:
     end_time = datetime.now(UTC)
     start_time = end_time - timedelta(hours=history_hours)
-    bybit = _venue_observability(
-        venue="Bybit",
-        account_id=get_bybit_account_id(),
-        symbol=BYBIT_SYMBOL,
-        start_time=start_time,
-        end_time=end_time,
-        limit=limit,
-        mode=mode,
-    )
-    mt5 = _venue_observability(
-        venue="MT5",
-        account_id=get_mt5_account_id(),
-        symbol=MT5_SYMBOL,
-        start_time=start_time,
-        end_time=end_time,
-        limit=limit,
-        mode=mode,
-    )
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        bybit_future = pool.submit(
+            _venue_observability,
+            venue="Bybit",
+            account_id=get_bybit_account_id(),
+            symbol=BYBIT_SYMBOL,
+            start_time=start_time,
+            end_time=end_time,
+            limit=limit,
+            mode=mode,
+        )
+        mt5_future = pool.submit(
+            _venue_observability,
+            venue="MT5",
+            account_id=get_mt5_account_id(),
+            symbol=MT5_SYMBOL,
+            start_time=start_time,
+            end_time=end_time,
+            limit=limit,
+            mode=mode,
+        )
+        bybit, mt5 = bybit_future.result(), mt5_future.result()
     warnings = [*bybit.warnings, *mt5.warnings]
     if bybit.status == "complete" and mt5.status == "complete":
         status = "complete"
@@ -74,7 +80,7 @@ def _venue_observability(
     mode: ObservabilityMode,
 ) -> CrossSpreadVenueObservabilityResponse:
     warnings: list[str] = []
-    section_states: dict[str, str] = {}
+    section_states: dict[str, SectionState] = {}
 
     account_risk = _read_section(
         venue=venue,
@@ -170,7 +176,7 @@ def _read_section(
     section: str,
     callback: Callable[[], Any],
     fallback: Any,
-    section_states: dict[str, str],
+    section_states: dict[str, SectionState],
     warnings: list[str],
 ) -> Any:
     try:

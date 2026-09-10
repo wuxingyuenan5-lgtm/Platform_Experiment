@@ -1,30 +1,17 @@
-from __future__ import annotations
-
+from datetime import UTC
 from decimal import Decimal
 from types import SimpleNamespace
 
-from app.cross_spread_market import _build_mt5_snapshot, _extract_swap_value
+from app.config import Settings
+from app.mt5_live_adapter import Mt5LiveAdapter
 
 
 class FakeMt5MarketData:
-    ORDER_TYPE_BUY = 0
+    def terminal_info(self):
+        return SimpleNamespace(connected=True)
 
-    def __init__(self) -> None:
-        self.initialize_args: tuple[object, ...] | None = None
-        self.initialize_kwargs: dict[str, object] | None = None
-        self.login_args: tuple[object, ...] | None = None
-        self.login_kwargs: dict[str, object] | None = None
-        self.shutdown_called = False
-
-    def initialize(self, *args, **kwargs):
-        self.initialize_args = args
-        self.initialize_kwargs = kwargs
-        return True
-
-    def login(self, *args, **kwargs):
-        self.login_args = args
-        self.login_kwargs = kwargs
-        return True
+    def account_info(self):
+        return SimpleNamespace(login=123, server="offline", currency="EUR")
 
     def symbol_info_tick(self, symbol):
         return SimpleNamespace(bid=4040.1, ask=4040.4, last=4040.2)
@@ -36,45 +23,24 @@ class FakeMt5MarketData:
             swap_mode=1,
             swap_rollover3days=3,
             trade_contract_size=100.0,
+            currency_base="XAU",
+            currency_profit="USD",
         )
 
-    def positions_get(self, **kwargs):
-        return ()
 
-    def shutdown(self):
-        self.shutdown_called = True
-
-
-def test_direct_mt5_snapshot_exposes_swap_values(monkeypatch) -> None:
-    monkeypatch.setenv("VG_SECRET_MT5_DEMO_001_LOGIN", "123456")
-    monkeypatch.setenv("VG_SECRET_MT5_DEMO_001_PASSWORD", "not-exposed")
-    monkeypatch.setenv("VG_SECRET_MT5_DEMO_001_SERVER", "Broker-Demo")
+def test_mt5_worker_quote_exposes_swap_and_instrument_currency_without_reconnecting(monkeypatch):
+    adapter = Mt5LiveAdapter(Settings(_env_file=None, mt5_account_ids="mt5-1"))
     mt5 = FakeMt5MarketData()
-
-    snapshot = _build_mt5_snapshot(
-        symbol="XAUUSD+",
-        credential_ref="secret://environment/mt5-demo-001",
-        terminal_path="C:/MT5/terminal64.exe",
-        bridge_file_path=None,
-        timeout_seconds=8.0,
-        mt5_module=mt5,
+    monkeypatch.setattr(adapter, "_connect", lambda: mt5)
+    monkeypatch.setattr(
+        "app.mt5_symbol_resolver.resolve_mt5_symbol", lambda **_: SimpleNamespace(symbol="XAUUSD+")
     )
-
-    assert snapshot.status == "available"
-    assert snapshot.quote is not None
-    assert snapshot.quote.bid == Decimal("4040.1")
-    assert _extract_swap_value(snapshot.reason, "swapLong") == Decimal("-78.29")
-    assert _extract_swap_value(snapshot.reason, "swapShort") == Decimal("29.49")
-    assert snapshot.reason is not None
-    assert "swapMode=1" in snapshot.reason
-    assert "swapRollover3Days=3" in snapshot.reason
-    assert "contractSize=100.0" in snapshot.reason
-    assert mt5.initialize_args == ("C:/MT5/terminal64.exe",)
-    assert mt5.initialize_kwargs == {"timeout": 8000}
-    assert mt5.login_args == (123456,)
-    assert mt5.login_kwargs == {
-        "password": "not-exposed",
-        "server": "Broker-Demo",
-        "timeout": 8000,
-    }
-    assert mt5.shutdown_called is True
+    quote = adapter.get_market_quote(account_id="mt5-1", symbol="XAUUSD+")
+    assert quote.bid == Decimal("4040.1")
+    assert quote.currency == "USD"
+    assert quote.raw_payload["swap_long"] == "-78.29"
+    assert quote.raw_payload["swap_short"] == "29.49"
+    assert quote.raw_payload["swap_mode"] == "1"
+    assert quote.raw_payload["swap_rollover3days"] == "3"
+    assert quote.raw_payload["trade_contract_size"] == "100.0"
+    assert quote.as_of.tzinfo == UTC

@@ -12,12 +12,11 @@ def test_unconfigured_bybit_strategy_account_is_explicitly_unavailable(tmp_path:
 
     with TestClient(app) as client:
         response = client.get(
-            "/api/v1/strategies/instances/"
-            "strategy_bottom_fishing_instance_default/account-snapshot"
+            "/api/v1/strategies/instances/strategy_bottom_fishing_instance_default/account-snapshot"
         )
 
     assert response.status_code == 200
-    assert response.json() == {
+    expected = {
         "strategyInstanceId": "strategy_bottom_fishing_instance_default",
         "accountId": "account_bybit_bottom_fishing",
         "accountCode": "BYBIT-BOTTOM-FISHING",
@@ -34,6 +33,8 @@ def test_unconfigured_bybit_strategy_account_is_explicitly_unavailable(tmp_path:
         "syncStatus": "waiting_initial_sync",
         "syncErrorCode": None,
     }
+    assert {key: response.json()[key] for key in expected} == expected
+    assert response.json()["isStale"] is True
 
 
 def test_unbound_strategy_account_snapshot_returns_explicit_unbound_state(tmp_path: Path) -> None:
@@ -41,12 +42,11 @@ def test_unbound_strategy_account_snapshot_returns_explicit_unbound_state(tmp_pa
 
     with TestClient(app) as client:
         response = client.get(
-            "/api/v1/strategies/instances/"
-            "strategy_short_term_w_instance_default/account-snapshot"
+            "/api/v1/strategies/instances/strategy_short_term_w_instance_default/account-snapshot"
         )
 
     assert response.status_code == 200
-    assert response.json() == {
+    expected = {
         "strategyInstanceId": "strategy_short_term_w_instance_default",
         "accountId": None,
         "accountCode": None,
@@ -63,6 +63,8 @@ def test_unbound_strategy_account_snapshot_returns_explicit_unbound_state(tmp_pa
         "syncStatus": "unbound",
         "syncErrorCode": "account_unbound",
     }
+    assert {key: response.json()[key] for key in expected} == expected
+    assert response.json()["finance"] is None
 
 
 def test_strategy_account_snapshot_aggregates_assets_in_account_currency(
@@ -101,8 +103,7 @@ def test_strategy_account_snapshot_aggregates_assets_in_account_currency(
                 ),
             )
         response = client.get(
-            "/api/v1/strategies/instances/"
-            "strategy_bottom_fishing_instance_default/account-snapshot"
+            "/api/v1/strategies/instances/strategy_bottom_fishing_instance_default/account-snapshot"
         )
 
     assert response.status_code == 200
@@ -110,7 +111,9 @@ def test_strategy_account_snapshot_aggregates_assets_in_account_currency(
     assert body["balance"]["currency"] == "USD"
     assert body["balance"]["equity"] == "100"
     assert body["equityHistory"] == [
-        {"asOf": "2026-08-21T00:00:00Z", "equity": "100"}
+        {"asOf": "2026-08-21T00:00:00Z", "equity": "100", "currency": "USD", "assetScope": "coin", "totalAssets": None,
+         "equityDrawdown": None, "totalAssetsDrawdown": None,
+         "equityDrawdownQuality": "baseline", "totalAssetsDrawdownQuality": "baseline"}
     ]
 
 
@@ -150,8 +153,7 @@ def test_strategy_account_snapshot_reports_single_asset_in_account_currency(
                 ),
             )
         response = client.get(
-            "/api/v1/strategies/instances/"
-            "strategy_bottom_fishing_instance_default/account-snapshot"
+            "/api/v1/strategies/instances/strategy_bottom_fishing_instance_default/account-snapshot"
         )
 
     assert response.json()["balance"]["currency"] == "USD"
@@ -222,8 +224,7 @@ def test_strategy_account_snapshot_uses_account_risk_for_live_account_funds(
                 ),
             )
         response = client.get(
-            "/api/v1/strategies/instances/"
-            "strategy_bottom_fishing_instance_default/account-snapshot"
+            "/api/v1/strategies/instances/strategy_bottom_fishing_instance_default/account-snapshot"
         )
 
     assert response.status_code == 200
@@ -232,11 +233,21 @@ def test_strategy_account_snapshot_uses_account_risk_for_live_account_funds(
     assert body["balance"]["equity"] == "100000"
     assert body["balance"]["availableBalance"] == "60000"
     assert body["equityHistory"] == [
-        {"asOf": "2026-08-22T00:00:01Z", "equity": "100000"}
+        {
+            "asOf": "2026-08-22T00:00:01Z",
+            "equity": "100000",
+            "currency": "USD",
+            "assetScope": "unspecified",
+            "totalAssets": None,
+            "equityDrawdown": None, "totalAssetsDrawdown": None,
+            "equityDrawdownQuality": "baseline", "totalAssetsDrawdownQuality": "baseline",
+        }
     ]
 
 
-def test_strategy_account_snapshot_uses_strategy_scoped_pnl_rows(tmp_path: Path) -> None:
+def test_strategy_account_snapshot_does_not_promote_legacy_account_pnl_to_strategy(
+    tmp_path: Path,
+) -> None:
     get_settings().database_path = str(tmp_path / "strategy-account-pnl.db")
 
     with TestClient(app) as client:
@@ -280,15 +291,10 @@ def test_strategy_account_snapshot_uses_strategy_scoped_pnl_rows(tmp_path: Path)
                 ),
             )
         response = client.get(
-            "/api/v1/strategies/instances/"
-            "strategy_bottom_fishing_instance_default/account-snapshot"
+            "/api/v1/strategies/instances/strategy_bottom_fishing_instance_default/account-snapshot"
         )
 
     assert response.status_code == 200
-    assert response.json()["pnl"] == {
-        "accountId": "account_bybit_bottom_fishing",
-        "instrumentId": "strategy_total",
-        "realizedPnl": "0",
-        "tradingPnl": "7.00",
-        "fees": "0.30",
-    }
+    assert response.json()["pnl"] is None
+    assert response.json()["finance"]["realizedPnl"] is None
+    assert "waiting_initial_sync" in response.json()["finance"]["issues"]

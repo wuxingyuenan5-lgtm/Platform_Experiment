@@ -10,7 +10,7 @@ from app.main import app
 from app.schemas import CreateTradeCommandRequest
 from app.trade_commands import create_trade_command
 
-STRATEGY_ID = "strategy_funding_arbitrage_instance_default"
+STRATEGY_ID = "strategy_generic_pipeline_test"
 ACCOUNT_ID = "account_sim_usdt"
 INSTRUMENT_ID = "instrument_btc_usdt"
 
@@ -48,11 +48,11 @@ def test_legacy_order_endpoint_preserves_raw_runtime_payload(
     get_settings().database_path = str(tmp_path / "legacy-submission.db")
     captured: dict[str, object] = {}
 
-    def fake_post(url, json, timeout):
+    def fake_post(url, json, timeout, **kwargs):
         captured.update(json)
         return FakeRuntimeResponse(json, [acknowledged_event(json)])
 
-    monkeypatch.setattr("app.trade_command_execution.httpx.post", fake_post)
+    monkeypatch.setattr("app.runtime_transport.post", fake_post)
 
     with TestClient(app) as client:
         response = client.post(
@@ -75,6 +75,7 @@ def test_legacy_order_endpoint_preserves_raw_runtime_payload(
         "platform_order_id",
         "account_id",
         "instrument_id",
+        "instrument_type",
         "symbol",
         "side",
         "order_type",
@@ -94,11 +95,11 @@ def test_trade_command_keeps_v1_payload_and_marks_invalid_events_unknown(
     get_settings().database_path = str(tmp_path / "v1-submission.db")
     captured: dict[str, object] = {}
 
-    def fake_post(url, json, timeout):
+    def fake_post(url, json, timeout, **kwargs):
         captured.update(json)
         return FakeRuntimeResponse(json, [{"unexpected": "event"}])
 
-    monkeypatch.setattr("app.trade_command_execution.httpx.post", fake_post)
+    monkeypatch.setattr("app.runtime_transport.post", fake_post)
 
     with TestClient(app) as client:
         response = client.post(
@@ -130,7 +131,7 @@ def test_trade_command_surfaces_runtime_http_detail_while_marking_unknown(
 ) -> None:
     get_settings().database_path = str(tmp_path / "runtime-http-detail.db")
 
-    def fake_post(url, json, timeout):
+    def fake_post(url, json, timeout, **kwargs):
         request = httpx.Request("POST", url, json=json)
         response = httpx.Response(
             502,
@@ -139,7 +140,7 @@ def test_trade_command_surfaces_runtime_http_detail_while_marking_unknown(
         )
         raise httpx.HTTPStatusError("runtime 502", request=request, response=response)
 
-    monkeypatch.setattr("app.trade_command_execution.httpx.post", fake_post)
+    monkeypatch.setattr("app.runtime_transport.post", fake_post)
 
     request = CreateTradeCommandRequest(
         idempotencyKey="runtime-http-detail-001",
@@ -156,12 +157,11 @@ def test_trade_command_surfaces_runtime_http_detail_while_marking_unknown(
         with pytest.raises(Exception) as excinfo:
             create_trade_command(request)
 
-    assert "Bybit place_order result is unknown: ReadTimeout: venue timed out" in str(
-        excinfo.value
-    )
+    assert "Bybit place_order result is unknown: ReadTimeout: venue timed out" in str(excinfo.value)
     with connection() as db:
-        order = db.execute(
-            "SELECT status FROM orders ORDER BY created_at DESC LIMIT 1"
-        ).fetchone()
+        order = db.execute("SELECT status FROM orders ORDER BY created_at DESC LIMIT 1").fetchone()
     assert order is not None
     assert order["status"] == "result_unknown"
+
+
+pytestmark = pytest.mark.usefixtures("generic_trading_instance")

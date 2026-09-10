@@ -49,19 +49,19 @@ def test_live_write_is_disabled_by_default(tmp_path) -> None:
         )
 
 
-def test_live_write_requires_all_allowlists(tmp_path) -> None:
+def test_live_write_requires_writable_account(tmp_path) -> None:
     get_settings().journal_path = str(tmp_path / "live-allowlist.db")
     initialize_journal()
-    with pytest.raises(GatewayConfigurationError, match="StrategyInstance"):
+    with pytest.raises(GatewayConfigurationError, match="Account"):
         validate_live_write(
             command(),
             adapter="bybit_live",
             reference_price=Decimal("1000"),
-            settings=settings(live_strategy_allowlist="other-strategy"),
+            settings=settings(live_account_allowlist="other-account"),
         )
 
 
-def test_live_write_claim_is_idempotent_and_enforces_daily_notional(tmp_path) -> None:
+def test_live_write_claim_is_idempotent_without_legacy_daily_cap(tmp_path) -> None:
     get_settings().journal_path = str(tmp_path / "live-claim.db")
     initialize_journal()
     configured = settings()
@@ -81,13 +81,14 @@ def test_live_write_claim_is_idempotent_and_enforces_daily_notional(tmp_path) ->
     assert repeated.already_claimed is True
     assert repeated.notional == Decimal("1000")
 
-    with pytest.raises(GatewayConfigurationError, match="daily notional"):
-        validate_live_write(
-            command(command_id="cmd-live-2", quantity="2"),
-            adapter="bybit_live",
-            reference_price=Decimal("1000"),
-            settings=configured,
-        )
+    next_claim = validate_live_write(
+        command(command_id="cmd-live-2", quantity="20"),
+        adapter="bybit_live",
+        reference_price=Decimal("1000"),
+        settings=configured,
+    )
+    assert next_claim.notional == Decimal("20000")
+    assert not next_claim.already_claimed
 
 
 def test_live_write_without_legacy_notional_caps(tmp_path) -> None:
@@ -104,3 +105,21 @@ def test_live_write_without_legacy_notional_caps(tmp_path) -> None:
     )
     assert claim.already_claimed is False
     assert claim.notional == Decimal("5000")
+
+
+def test_legacy_strategy_and_symbol_lists_do_not_limit_normal_trading(tmp_path):
+    get_settings().journal_path = str(tmp_path / "normal-scope.db")
+    initialize_journal()
+    request = command().model_copy(update={
+        "strategy_instance_id": "strategy_funding_arbitrage_instance_default",
+        "symbol": "BTCUSDT", "instrument_id": "instrument_btc_usdt",
+    })
+    claim = validate_live_write(
+        request, adapter="bybit_live", reference_price=Decimal("60000"), settings=settings()
+    )
+    assert claim.notional == Decimal("60000")
+    with pytest.raises(GatewayConfigurationError, match="payload"):
+        validate_live_write(
+            request.model_copy(update={"quantity": Decimal("2")}),
+            adapter="bybit_live", reference_price=Decimal("60000"), settings=settings(),
+        )

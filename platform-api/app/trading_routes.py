@@ -1,19 +1,27 @@
 from decimal import Decimal
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Query, Request
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.auth import require_principal
+from app.catalog import get_order, list_fills, list_orders
 from app.controlled_strategy_write_guard import (
     reject_controlled_account_legacy_order,
     reject_controlled_strategy_write_bypass,
 )
-from app.catalog import get_order, list_fills, list_orders
 from app.cross_spread import (
+    STRATEGY_INSTANCE_ID as CROSS_SPREAD_STRATEGY_INSTANCE_ID,
+)
+from app.cross_spread import (
+    get_bybit_account_id,
     get_cross_spread_history,
     get_cross_spread_snapshot,
+    get_mt5_account_id,
     prepare_cross_spread_market_command,
     submit_cross_spread_market_command,
 )
+from app.cross_spread_leverage import read_bybit_leverage, update_bybit_leverage
 from app.execution_batches import (
     create_execution_batch,
     get_execution_batch,
@@ -44,6 +52,11 @@ from app.strategies.capital_transfer import (
     get_funding_transfer,
     get_funding_transfer_quote,
 )
+from app.strategies.funding_schemas import (
+    FundingExecutionContextResponse,
+    FundingPositionGroupResponse,
+    FundingWorkspaceResponse,
+)
 from app.strategies.funding_workspace import (
     get_funding_execution_context,
     get_funding_instruction_workspace,
@@ -51,12 +64,66 @@ from app.strategies.funding_workspace import (
     list_funding_position_groups,
     submit_funding_instruction,
 )
+from app.strategy_financial_readmodel import get_cross_spread_position_overview
 from app.trade_commands import create_trade_command, get_trade_command
 from app.trading import reconcile_order, submit_order
 
 
+class CrossSpreadLeverageRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
+    leverage: Decimal = Field(ge=1, le=100)
+
+
+class CrossSpreadLeverageResponse(BaseModel):
+    model_config = ConfigDict(extra="allow")
+    accountId: str
+    symbol: str
+    leverage: Decimal | None
+    source: str
+
+
+class CrossSpreadPreflightResponse(BaseModel):
+    status: Literal["ready"]
+    preparedAt: str
+
+
+class FundingInstructionRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
+    action: Literal["open", "close"]
+    idempotency_key: str = Field(alias="idempotencyKey", min_length=1, max_length=128)
+    perpetual_symbol: str = Field(alias="perpetualSymbol", min_length=1, max_length=64)
+    spot_symbol: str = Field(alias="spotSymbol", min_length=1, max_length=64)
+    quantity: Decimal = Field(gt=0, max_digits=28, decimal_places=18)
+    expected_perpetual_quantity: Decimal | None = Field(
+        default=None, alias="expectedPerpetualQuantity", gt=0, max_digits=28, decimal_places=18
+    )
+    execution_policy: Literal["market", "fok", "post_only_chase"] = Field(
+        default="post_only_chase", alias="executionPolicy"
+    )
+    perpetual_limit_price: Decimal | None = Field(
+        default=None, alias="perpetualLimitPrice", gt=0, max_digits=28, decimal_places=18
+    )
+    target_open_instruction_id: str | None = Field(default=None, alias="targetOpenInstructionId")
+
+
 def create_trading_router(api_prefix: str) -> APIRouter:
     router = APIRouter()
+
+    @router.get(
+        f"{api_prefix}/trading/cross-spread/leverage",
+        response_model=CrossSpreadLeverageResponse,
+        tags=["trading"],
+    )
+    def cross_spread_leverage() -> dict:
+        return read_bybit_leverage()
+
+    @router.post(
+        f"{api_prefix}/trading/cross-spread/leverage",
+        response_model=CrossSpreadLeverageResponse,
+        tags=["trading"],
+    )
+    def set_cross_spread_leverage(request: CrossSpreadLeverageRequest) -> dict:
+        return update_bybit_leverage(request.leverage)
 
     @router.post(
         f"{api_prefix}/trading/orders",
@@ -93,7 +160,17 @@ def create_trading_router(api_prefix: str) -> APIRouter:
         tags=["trading"],
     )
     def cross_spread_snapshot() -> CrossSpreadSnapshotResponse:
-        return get_cross_spread_snapshot()
+        snapshot = get_cross_spread_snapshot()
+        return snapshot.model_copy(
+            update={
+                "position_overview": get_cross_spread_position_overview(
+                    snapshot,
+                    strategy_instance_id=CROSS_SPREAD_STRATEGY_INSTANCE_ID,
+                    bybit_account_id=get_bybit_account_id(),
+                    mt5_account_id=get_mt5_account_id(),
+                )
+            }
+        )
 
     @router.get(
         f"{api_prefix}/trading/cross-spread/history",
@@ -107,6 +184,7 @@ def create_trading_router(api_prefix: str) -> APIRouter:
 
     @router.post(
         f"{api_prefix}/trading/cross-spread/preflight",
+        response_model=CrossSpreadPreflightResponse,
         tags=["trading"],
     )
     def cross_spread_preflight(
@@ -187,21 +265,31 @@ def create_trading_router(api_prefix: str) -> APIRouter:
         principal = require_principal(http_request)
         return submit_funding_market_command(request, requested_by=principal.user_id)
 
-    @router.get(f"{api_prefix}/trading/funding/execution-context", tags=["trading"])
+    @router.get(
+        f"{api_prefix}/trading/funding/execution-context",
+        response_model=FundingExecutionContextResponse,
+        tags=["trading"],
+    )
     def funding_execution_context(
         http_request: Request,
         perpetual_symbol: str | None = Query(default=None, alias="perpetualSymbol"),
         spot_symbol: str | None = Query(default=None, alias="spotSymbol"),
-        notional: str | None = Query(default=None),
+        notional: Annotated[Decimal | None, Query(gt=0, allow_inf_nan=False)] = None,
+        quantity: Annotated[Decimal | None, Query(gt=0, allow_inf_nan=False)] = None,
     ) -> dict[str, object]:
         require_principal(http_request)
         return get_funding_execution_context(
             perpetual_symbol=perpetual_symbol,
             spot_symbol=spot_symbol,
-            notional=Decimal(notional) if notional not in (None, "") else None,
+            notional=notional,
+            quantity=quantity,
         )
 
-    @router.get(f"{api_prefix}/trading/funding/positions", tags=["trading"])
+    @router.get(
+        f"{api_prefix}/trading/funding/positions",
+        response_model=list[FundingPositionGroupResponse],
+        tags=["trading"],
+    )
     def funding_positions(
         http_request: Request,
         scope: str = Query(default="active"),
@@ -209,7 +297,11 @@ def create_trading_router(api_prefix: str) -> APIRouter:
         require_principal(http_request)
         return list_funding_position_groups(scope=scope)
 
-    @router.get(f"{api_prefix}/trading/funding/instructions", tags=["trading"])
+    @router.get(
+        f"{api_prefix}/trading/funding/instructions",
+        response_model=FundingWorkspaceResponse,
+        tags=["trading"],
+    )
     def funding_instruction_by_idempotency(
         http_request: Request,
         idempotency_key: str = Query(alias="idempotencyKey"),
@@ -217,28 +309,32 @@ def create_trading_router(api_prefix: str) -> APIRouter:
         require_principal(http_request)
         return get_funding_instruction_workspace_by_idempotency(idempotency_key)
 
-    @router.post(f"{api_prefix}/trading/funding/instructions", tags=["trading"])
+    @router.post(
+        f"{api_prefix}/trading/funding/instructions",
+        response_model=FundingWorkspaceResponse,
+        tags=["trading"],
+    )
     def funding_instruction_submit(
-        payload: dict[str, object],
+        payload: FundingInstructionRequest,
         http_request: Request,
     ) -> dict[str, object]:
         principal = require_principal(http_request)
         return submit_funding_instruction(
-            action=str(payload["action"]),
-            idempotency_key=str(payload["idempotencyKey"]),
-            perpetual_symbol=str(payload["perpetualSymbol"]),
-            spot_symbol=str(payload["spotSymbol"]),
-            quantity=Decimal(str(payload["quantity"])),
+            action=payload.action,
+            idempotency_key=payload.idempotency_key,
+            perpetual_symbol=payload.perpetual_symbol,
+            spot_symbol=payload.spot_symbol,
+            quantity=payload.quantity,
             requested_by=principal.user_id,
-            target_open_instruction_id=(
-                str(payload["targetOpenInstructionId"])
-                if payload.get("targetOpenInstructionId") not in (None, "")
-                else None
-            ),
+            target_open_instruction_id=payload.target_open_instruction_id,
+            execution_policy=payload.execution_policy,
+            perpetual_limit_price=payload.perpetual_limit_price,
+            expected_perpetual_quantity=payload.expected_perpetual_quantity,
         )
 
     @router.get(
         f"{api_prefix}/trading/funding/instructions/{{instruction_id}}",
+        response_model=FundingWorkspaceResponse,
         tags=["trading"],
     )
     def funding_instruction_workspace(

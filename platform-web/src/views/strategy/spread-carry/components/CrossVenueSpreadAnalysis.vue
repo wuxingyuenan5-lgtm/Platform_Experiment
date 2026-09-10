@@ -3,6 +3,7 @@
     <div class="card-head">
       <div>
         <h3>价差统计分析</h3>
+        <small>示例数据 · 预警尚未接入真实监控</small>
       </div>
     </div>
 
@@ -121,25 +122,31 @@
         <div>
           <span>监控状态</span>
           <strong :class="monitorRunning ? 'green' : 'warning'">
-            {{ monitorRunning ? '运行中' : '已暂停' }}
+            {{ monitorRunning ? '演示运行中' : '演示已暂停' }}
           </strong>
         </div>
         <div>
-          <span>运行时长</span>
+          <span>示例运行时长</span>
           <strong>{{ monitorRuntime }}</strong>
         </div>
         <div>
-          <span>上次触发</span>
+          <span>示例触发时间</span>
           <strong>{{ lastTriggerTime }}</strong>
         </div>
       </div>
 
       <div class="submit-row submit-row--compact">
-        <button class="submit-btn submit-btn--green submit-btn--monitor" @click="toggleMonitor(true)">
-          下达监控
+        <button
+          class="submit-btn submit-btn--green submit-btn--monitor"
+          @click="toggleMonitor(true)"
+        >
+          演示开启
         </button>
-        <button class="submit-btn submit-btn--red submit-btn--monitor" @click="toggleMonitor(false)">
-          停止监控
+        <button
+          class="submit-btn submit-btn--red submit-btn--monitor"
+          @click="toggleMonitor(false)"
+        >
+          演示停止
         </button>
       </div>
     </div>
@@ -203,7 +210,11 @@
     padding: 16px 18px 18px;
     border: 1px solid var(--strategy-border);
     border-radius: 18px;
-    background: linear-gradient(180deg, var(--strategy-surface) 0%, var(--strategy-surface-soft) 100%);
+    background: linear-gradient(
+      180deg,
+      var(--strategy-surface) 0%,
+      var(--strategy-surface-soft) 100%
+    );
     box-shadow: var(--strategy-shadow);
   }
 
@@ -344,7 +355,11 @@
     padding: 12px 14px 10px;
     border: 1px solid #d8e2ec;
     border-radius: 16px;
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(243, 248, 252, 0.98) 100%);
+    background: linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.98) 0%,
+      rgba(243, 248, 252, 0.98) 100%
+    );
   }
 
   .stats-list div,
@@ -367,7 +382,11 @@
     padding: 14px 16px 16px;
     border: 1px solid #d8e2ec;
     border-radius: 16px;
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(243, 248, 252, 0.98) 100%);
+    background: linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.98) 0%,
+      rgba(243, 248, 252, 0.98) 100%
+    );
   }
 
   .monitor-box > .field-block {

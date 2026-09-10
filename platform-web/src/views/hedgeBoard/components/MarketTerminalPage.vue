@@ -1,6 +1,21 @@
 ﻿<template>
   <div class="market-terminal">
+    <HedgeBoardSubnav
+      v-if="config.id === 'us'"
+      :sections="[
+        { id: 'us-market-overview', title: '大盘表现' },
+        { id: detailSectionId, title: '美股市场明细' },
+        ...(config.rotationButtonLabel
+          ? [{ id: 'us-market-rotation', title: config.rotationButtonLabel }]
+          : []),
+      ]"
+      module-label="美股"
+      unified
+      :resolve-title="(_id, title) => title"
+      @jump="jumpToMarketSection"
+    />
     <section
+      :id="`${config.id}-market-overview`"
       v-if="displayOverviewCards.length"
       class="market-terminal__overview-strip"
       :class="{ 'is-single': !(config.breadthCards?.length || config.volatilityCards?.length) }"
@@ -152,10 +167,16 @@
         :market-id="config.id"
         :columns="config.detailColumns"
         :groups="config.detailGroups"
+        :readonly="readonlyDetails"
+        @index-chart="(code, name) => emit('index-chart', code, name)"
       />
     </section>
 
-    <section v-if="config.rotationButtonLabel" class="market-terminal__rotation">
+    <section
+      :id="`${config.id}-market-rotation`"
+      v-if="config.rotationButtonLabel"
+      class="market-terminal__rotation"
+    >
       <button type="button" class="market-terminal__rotation-button" @click="toggleRotation">
         <span>{{ rotationExpanded ? '▼' : '▶' }}</span>
         {{ config.rotationButtonLabel }}
@@ -287,15 +308,23 @@
 </template>
 
 <script setup lang="ts">
+  import HedgeBoardSubnav from './HedgeBoardSubnav.vue';
+  function jumpToMarketSection(id: string) {
+    document
+      .getElementById(id)
+      ?.scrollIntoView({
+        behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+        block: 'start',
+      });
+  }
   import { computed, nextTick, onBeforeUnmount, ref } from 'vue';
   import type { AShareDashboardResponse, AShareIndexSnapshot } from '@/api/hedgeResearch';
   import TerminalDetailPanel from './TerminalDetailPanel.vue';
   import type {
     MarketTerminalPageConfig,
+    OverviewCard,
     RotationHeatmapRow,
     TerminalMarketId,
-    TerminalTableGroup,
-    TerminalTableRow,
     TerminalTone,
   } from '../nativeData/marketTerminal';
 
@@ -324,12 +353,10 @@
     marketTabs: MarketTab[];
     detailSectionId?: string;
     dashboard?: AShareDashboardResponse | null;
+    readonlyDetails?: boolean;
   }>();
 
-  const expandedGroups = ref<Record<string, boolean>>(
-    Object.fromEntries(props.config.detailGroups.map((group) => [group.label, true])),
-  );
-  const tableSortState = ref<SortState | null>(null);
+  const emit = defineEmits<{ (event: 'index-chart', code: string, name: string): void }>();
   const rotationExpanded = ref(true);
   const marketDetailExpanded = ref(false);
   const rotationSortState = ref<SortState | null>(null);
@@ -349,7 +376,7 @@
   const aShareCoreCodes = ['000300', '000852', '399006', '000688'];
   const aShareThemeCodes = ['931071', '931238', '932082', 'H30590'];
   const asNumber = (value: string | number | null | undefined) => {
-    const parsed = Number(value);
+    const parsed = value == null ? NaN : Number(value);
     return Number.isFinite(parsed) ? parsed : null;
   };
   const asChange = (value: string | number | null | undefined) => {
@@ -424,7 +451,6 @@
     { key: 'ytd', label: '年初至今' },
     { key: 'y1', label: '过去1年' },
   ] as const;
-  const signalColumnKeys = ['d10', 'd20', 'd50', 'd200', 'x2050'] as const;
   const sortedRotationRows = computed(() => {
     const rows = [...(props.config.rotationHeatmap ?? [])];
     const state = rotationSortState.value;
@@ -436,200 +462,6 @@
         state.direction,
       ),
     );
-  });
-  const displayGroups = computed<TerminalTableGroup[]>(() => {
-    const baseGroups = props.config.detailGroups.map((group) => ({
-      ...group,
-      rows: group.rows.filter(
-        (row) => !(props.config.id === 'gold' && row.id === 'gold-ratio-row'),
-      ),
-    }));
-
-    if (props.config.id === 'gold') {
-      return [
-        ...baseGroups,
-        {
-          label: '相对比价',
-          rows: [
-            buildRatioRow(
-              'gold-ratio-xs',
-              '金银比',
-              'XAU/XAG',
-              '78.40',
-              '-0.30%',
-              '-1.90%',
-              '-2.40%',
-              '-1.10%',
-              '-2.40%',
-              '-4.60%',
-              '-9.8%',
-              [
-                18, 18, 17, 17, 16, 16, 15, 15, 14, 14, 13, 13, 12, 12, 11, 11, 10, 10, 9, 9, 8, 8,
-                8, 7,
-              ],
-              'OANDA:XAUUSD/OANDA:XAGUSD',
-            ),
-            buildRatioRow(
-              'gold-ratio-xc',
-              '金铜比',
-              'XAU/COPPER',
-              '523.1',
-              '+0.20%',
-              '+1.80%',
-              '+0.90%',
-              '+0.60%',
-              '+0.90%',
-              '+4.60%',
-              '-6.2%',
-              [
-                14, 14, 15, 15, 15, 14, 13, 12, 12, 11, 10, 10, 9, 9, 8, 8, 8, 9, 10, 10, 11, 12,
-                12, 13,
-              ],
-              'OANDA:XAUUSD/VANTAGE:COPPER',
-            ),
-            buildRatioRow(
-              'gold-ratio-xo',
-              '金油比',
-              'XAU/OIL',
-              '28.6',
-              '+0.50%',
-              '-0.40%',
-              '-1.20%',
-              '-0.20%',
-              '-1.20%',
-              '+8.10%',
-              '-7.4%',
-              [
-                10, 10, 11, 11, 12, 13, 13, 14, 14, 14, 13, 12, 12, 11, 11, 10, 10, 10, 11, 11, 12,
-                12, 13, 13,
-              ],
-              'OANDA:XAUUSD/TVC:USOIL',
-            ),
-            buildRatioRow(
-              'gold-ratio-xe',
-              '金股比',
-              'XAU/SPX',
-              '0.42',
-              '+0.80%',
-              '+6.20%',
-              '+3.10%',
-              '+1.10%',
-              '+3.10%',
-              '+9.80%',
-              '-2.9%',
-              [
-                7, 7, 8, 8, 9, 10, 10, 11, 11, 12, 13, 13, 14, 15, 15, 16, 17, 17, 18, 19, 19, 20,
-                20, 21,
-              ],
-              'OANDA:XAUUSD/SP:SPX',
-            ),
-          ],
-        },
-      ];
-    }
-
-    if (props.config.id === 'crypto') {
-      return [
-        ...baseGroups,
-        {
-          label: '相对比价',
-          rows: [
-            buildRatioRow(
-              'crypto-ratio-btc-eth',
-              'BTC / ETH',
-              'BTC/ETH',
-              '18.28',
-              '+0.40%',
-              '+4.90%',
-              '+1.10%',
-              '+0.70%',
-              '+1.10%',
-              '+15.20%',
-              '-3.6%',
-              [
-                12, 12, 12, 13, 13, 14, 14, 15, 15, 16, 16, 16, 17, 17, 18, 18, 18, 18, 19, 19, 19,
-                18, 18, 18,
-              ],
-              'BINANCE:BTCUSDT/BINANCE:ETHUSDT',
-            ),
-            buildRatioRow(
-              'crypto-ratio-btc-spx',
-              'BTC / SPX',
-              'BTC/SPX',
-              '10.43',
-              '+1.10%',
-              '+36.80%',
-              '+7.60%',
-              '+3.20%',
-              '+7.60%',
-              '+76.40%',
-              '-4.9%',
-              [
-                6, 7, 8, 9, 9, 10, 11, 11, 12, 13, 13, 14, 15, 15, 16, 17, 18, 18, 19, 20, 21, 21,
-                22, 23,
-              ],
-              'COINBASE:BTCUSD/SP:SPX',
-            ),
-            buildRatioRow(
-              'crypto-ratio-btc-xau',
-              'BTC / XAU',
-              'BTC/XAU',
-              '26.94',
-              '+0.70%',
-              '+29.10%',
-              '+5.20%',
-              '+2.30%',
-              '+5.20%',
-              '+80.30%',
-              '-3.1%',
-              [
-                8, 8, 9, 10, 10, 11, 12, 12, 13, 14, 14, 15, 15, 16, 17, 18, 18, 19, 20, 20, 21, 22,
-                23, 23,
-              ],
-              'COINBASE:BTCUSD/OANDA:XAUUSD',
-            ),
-            buildRatioRow(
-              'crypto-ratio-mstr-btc',
-              'MSTR / BTC',
-              'MSTR/BTC',
-              '0.0237',
-              '+0.60%',
-              '+11.30%',
-              '+2.80%',
-              '+1.10%',
-              '+2.80%',
-              '+23.40%',
-              '-5.7%',
-              [
-                10, 10, 10, 11, 11, 12, 12, 12, 13, 13, 13, 14, 14, 15, 15, 16, 16, 16, 17, 17, 18,
-                18, 18, 19,
-              ],
-              'NASDAQ:MSTR/COINBASE:BTCUSD',
-            ),
-            buildRatioRow(
-              'crypto-ratio-crcl-btc',
-              'CRCL / BTC',
-              'CRCL/BTC',
-              '0.00189',
-              '+0.90%',
-              '+18.40%',
-              '+4.20%',
-              '+1.90%',
-              '+4.20%',
-              '+41.60%',
-              '-4.4%',
-              [
-                9, 9, 10, 10, 11, 11, 12, 12, 13, 13, 14, 14, 15, 15, 16, 16, 17, 17, 18, 18, 18,
-                19, 19, 20,
-              ],
-              'NYSE:CRCL/COINBASE:BTCUSD',
-            ),
-          ],
-        },
-      ];
-    }
-
-    return baseGroups;
   });
 
   const MACRO_TICKER_TO_TV_SYMBOL: Record<string, string> = {
@@ -664,6 +496,8 @@
     SPY: 'AMEX:SPY',
     QQQ: 'NASDAQ:QQQ',
     DIA: 'AMEX:DIA',
+    DJI: 'TVC:DJI',
+    GDX: 'AMEX:GDX',
     IWM: 'AMEX:IWM',
     MDY: 'AMEX:MDY',
     MAGS: 'NASDAQ:MAGS',
@@ -797,29 +631,8 @@
     RNDR: 'BINANCE:RNDRUSDT',
   };
 
-  function toggleGroup(label: string) {
-    expandedGroups.value[label] = !expandedGroups.value[label];
-  }
-
-  function isGroupExpanded(label: string) {
-    return expandedGroups.value[label] ?? true;
-  }
-
   function toggleRotation() {
     rotationExpanded.value = !rotationExpanded.value;
-  }
-
-  function toggleTableSort(key: string) {
-    const current = tableSortState.value;
-    if (!current || current.key !== key) {
-      tableSortState.value = { key, direction: 'desc' };
-      return;
-    }
-    if (current.direction === 'desc') {
-      tableSortState.value = { key, direction: 'asc' };
-      return;
-    }
-    tableSortState.value = null;
   }
 
   function toggleRotationSort(key: string) {
@@ -838,73 +651,6 @@
   function sortIndicator(state: SortState | null | undefined, key: string) {
     if (!state || state.key !== key) return '⇅';
     return state.direction === 'desc' ? '↓' : '↑';
-  }
-
-  function sortedGroupRows(group: TerminalTableGroup) {
-    const rows = [...group.rows];
-    const state = tableSortState.value;
-    if (!state) return rows;
-    return rows.sort((left, right) =>
-      compareValues(
-        readTableValue(left, state.key),
-        readTableValue(right, state.key),
-        state.direction,
-      ),
-    );
-  }
-
-  function buildRatioRow(
-    id: string,
-    name: string,
-    symbol: string,
-    price: string,
-    d1: string,
-    ytd: string,
-    qtd: string,
-    w1: string,
-    m1: string,
-    y1: string,
-    high: string,
-    spark: number[],
-    tvSymbol: string,
-  ): TerminalTableRow {
-    return {
-      id,
-      name,
-      symbol,
-      tvSymbol,
-      price,
-      d1,
-      ytd,
-      qtd,
-      w1,
-      m1,
-      y1,
-      high,
-      spark,
-      d10: '▲',
-      d20: '▲',
-      d50: '▲',
-      d200: '▲',
-      x2050: '▲',
-      x50200: '▲',
-    };
-  }
-
-  function isSortableColumn(key: string) {
-    return key !== 'spark';
-  }
-
-  function readTableValue(row: TerminalTableRow, key: string) {
-    if (key === 'name') return row.name;
-    if (key === 'symbol') return row.symbol;
-    if (key === 'price') return parseDisplayNumber(row.price);
-    if (key === 'high') return parseDisplayNumber(row.high);
-    if (['d1', 'ytd', 'qtd', 'w1', 'm1', 'y1'].includes(key))
-      return parseDisplayNumber(row[key as keyof TerminalTableRow] as string);
-    if (['d10', 'd20', 'd50', 'd200', 'x2050'].includes(key))
-      return arrowScore(row[key as keyof TerminalTableRow] as string);
-    return String(row[key as keyof TerminalTableRow] ?? '');
   }
 
   function readRotationValue(row: RotationHeatmapRow, key: string) {
@@ -928,10 +674,6 @@
     return Number.parseFloat(normalized);
   }
 
-  function arrowScore(value: string) {
-    return parseTone(value) === 'negative' ? -1 : 1;
-  }
-
   function parseTone(value: string): TerminalTone {
     const normalized = value.trim();
     return normalized.startsWith('-') || normalized.includes('▼') ? 'negative' : 'positive';
@@ -943,24 +685,6 @@
 
   function badgeClass(tone?: TerminalTone) {
     return tone ? `is-badge-${tone}` : 'is-badge-neutral';
-  }
-
-  function chipTone(value: string) {
-    return parseTone(value) === 'negative' ? 'is-down' : 'is-up';
-  }
-
-  function normalizeArrow(value: string) {
-    return parseTone(value) === 'negative' ? '▼' : '▲';
-  }
-
-  function arrowClass(value: string) {
-    return parseTone(value) === 'negative' ? 'is-arrow-down' : 'is-arrow-up';
-  }
-
-  function alignClass(align?: 'left' | 'right' | 'center') {
-    if (align === 'right') return 'is-right';
-    if (align === 'center') return 'is-center';
-    return '';
   }
 
   function compactSparkline(series: number[], width: number, height: number) {
@@ -978,12 +702,6 @@
 
   function sparkStrokeClass(value: string) {
     return parseTone(value) === 'negative' ? 'is-stroke-down' : 'is-stroke-up';
-  }
-
-  function highWidth(value: string) {
-    const numeric = Number.parseFloat(value.replace('%', ''));
-    const distance = Number.isFinite(numeric) ? Math.abs(numeric) : 0;
-    return Math.max(36, Math.min(100, 100 - distance * 1.35));
   }
 
   function parsePercent(value: string) {
@@ -1351,6 +1069,10 @@
   .market-terminal__vol-card strong {
     color: var(--terminal-text);
     font-size: 14px;
+  }
+
+  .market-terminal__vol-top {
+    flex-wrap: wrap;
   }
 
   .market-terminal__breadth-head span {
@@ -1820,6 +1542,8 @@
   .is-badge-negative,
   .is-badge-accent {
     display: inline-flex;
+    flex-shrink: 0;
+    white-space: nowrap;
     align-items: center;
     padding: 4px 8px;
     border: 1px solid rgb(201 213 226 / 72%);

@@ -45,8 +45,10 @@ export type PersistedExecutionDraft =
       kind: 'CLOSE_ALL';
       payload: CloseExecutionDraftPayload;
       plans: Array<{
+        quantityOz?: string;
         planId: string;
         idempotencyKey: string;
+        submitted?: boolean;
       }>;
     };
 
@@ -80,6 +82,24 @@ export function isTerminalBatchStatus(status: string | null | undefined) {
   return status === 'hedged' || status === 'completed' || status === 'failed';
 }
 
+export function canHandOffAbnormalBatch(
+  batch:
+    | {
+        status?: string | null;
+        legs?: Array<{ status: string }>;
+      }
+    | null
+    | undefined,
+) {
+  return (
+    batch?.status === 'manual_intervention' &&
+    !!batch.legs?.length &&
+    batch.legs.every((leg) =>
+      ['filled', 'failed', 'blocked', 'rejected', 'pending', 'canceled'].includes(leg.status),
+    )
+  );
+}
+
 export function createCloseAllExecutionDraft(
   planIds: string[],
   payload: CloseExecutionDraftPayload,
@@ -91,6 +111,7 @@ export function createCloseAllExecutionDraft(
     plans: planIds.map((planId) => ({
       planId,
       idempotencyKey: createId(),
+      submitted: false,
     })),
   };
 }

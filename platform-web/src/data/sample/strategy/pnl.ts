@@ -10,6 +10,9 @@ export interface StrategyPnlAttributionItem {
 }
 
 export interface StrategyPnlProfile {
+  curveKind?: 'nav' | 'realized';
+  curveCurrency?: string;
+  timestamps?: string[];
   title: string;
   totalFund: string;
   period: string;

@@ -3,6 +3,7 @@ import json
 from pathlib import Path
 from uuid import uuid4
 
+import pytest
 from fastapi.testclient import TestClient
 
 from app.config import get_settings
@@ -97,14 +98,13 @@ def test_execution_batch_is_idempotent(monkeypatch, tmp_path: Path) -> None:
         ]
     )
     monkeypatch.setattr(
-        "app.trade_command_execution.httpx.post",
+        "app.runtime_transport.post",
         lambda *args, **kwargs: filled_runtime_response(kwargs["json"]),
     )
-    monkeypatch.setattr("app.auth.has_ceo_trade_authority", lambda principal, current: True)
 
     payload = {
         "idempotencyKey": "cross-venue-001",
-        "strategyInstanceId": "strategy_cross_venue_spread_instance_default",
+        "strategyInstanceId": "strategy_generic_cross_test",
         "strategyKey": "cross_venue_spread",
         "direction": "buy_a_sell_b",
         "legs": [
@@ -139,7 +139,7 @@ def test_execution_batch_is_idempotent(monkeypatch, tmp_path: Path) -> None:
             )
             db.execute(
                 "UPDATE strategy_instances SET status = 'active' WHERE id = ?",
-                ("strategy_cross_venue_spread_instance_default",),
+                ("strategy_generic_cross_test",),
             )
             db.execute(
                 """
@@ -150,7 +150,7 @@ def test_execution_batch_is_idempotent(monkeypatch, tmp_path: Path) -> None:
                 """,
                 (
                     str(uuid4()),
-                    "strategy_cross_venue_spread_instance_default",
+                    "strategy_generic_cross_test",
                     "account_crypto_test",
                     "venue_a",
                     "2026-08-25T00:00:00+00:00",
@@ -165,7 +165,7 @@ def test_execution_batch_is_idempotent(monkeypatch, tmp_path: Path) -> None:
                 """,
                 (
                     str(uuid4()),
-                    "strategy_cross_venue_spread_instance_default",
+                    "strategy_generic_cross_test",
                     "account_crypto_test_b",
                     "venue_b",
                     "2026-08-25T00:00:00+00:00",
@@ -197,9 +197,7 @@ def test_execution_batch_is_idempotent(monkeypatch, tmp_path: Path) -> None:
         assert second.status_code == 200
         assert second.json() == first.json()
         assert first.json()["status"] == "hedged"
-        assert first.json()["strategyInstanceId"] == (
-            "strategy_cross_venue_spread_instance_default"
-        )
+        assert first.json()["strategyInstanceId"] == ("strategy_generic_cross_test")
         assert {leg["accountId"] for leg in first.json()["legs"]} == {
             "account_crypto_test",
             "account_crypto_test_b",
@@ -211,15 +209,10 @@ def test_execution_batch_rejects_mismatched_strategy_instance(tmp_path: Path) ->
     settings.database_path = str(tmp_path / "batch-mismatch.db")
     settings.environment = "live"
     settings.auth_mode = "api_key"
-    settings.auth_credentials_json = json.dumps(
-        [credential("admin-1", "admin-token", ["admin"])]
-    )
-    import app.auth as auth_module
-
-    auth_module.has_ceo_trade_authority = lambda principal, current: True
+    settings.auth_credentials_json = json.dumps([credential("admin-1", "admin-token", ["admin"])])
 
     payload = {
-        "strategyInstanceId": "strategy_funding_arbitrage_instance_default",
+        "strategyInstanceId": "strategy_generic_pipeline_test",
         "strategyKey": "cross_venue_spread",
         "direction": "bad_key",
         "accountId": "account_sim_usdt",
@@ -253,3 +246,6 @@ def test_execution_batch_rejects_mismatched_strategy_instance(tmp_path: Path) ->
         )
 
         assert response.status_code == 422
+
+
+pytestmark = pytest.mark.usefixtures("generic_trading_instance")

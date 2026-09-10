@@ -8,6 +8,7 @@ from decimal import Decimal
 import httpx
 from fastapi import HTTPException
 
+from app import runtime_transport
 from app.config import get_settings
 from app.cross_spread_live_read_client import (
     CrossSpreadLiveReadError,
@@ -47,7 +48,6 @@ BYBIT_SYMBOL = "XAUTUSDT"
 MT5_SYMBOL = "XAUUSD.s"
 BYBIT_LEG_ROLE = "bybit_leg"
 MT5_LEG_ROLE = "mt5_leg"
-_RUNTIME_SNAPSHOT_CLIENT = httpx.Client(trust_env=False)
 
 
 @dataclass(frozen=True, slots=True)
@@ -66,8 +66,9 @@ class CrossSpreadLiveSizing:
 def get_cross_spread_snapshot() -> CrossSpreadSnapshotResponse:
     settings = get_settings()
     try:
-        response = _RUNTIME_SNAPSHOT_CLIENT.get(
+        response = runtime_transport.get(
             f"{settings.runtime_base_url}/gateway/cross-spread/snapshot",
+            params={"bybitAccountId": get_bybit_account_id(), "mt5AccountId": get_mt5_account_id()},
             timeout=max(settings.runtime_timeout_seconds, 20.0),
         )
         if response.status_code >= 400:
@@ -100,7 +101,7 @@ def _mark_stale(snapshot: CrossSpreadSnapshotResponse) -> CrossSpreadSnapshotRes
         bybit=CrossSpreadVenueSnapshotResponse(
             venue=snapshot.bybit.venue,
             symbol=snapshot.bybit.symbol,
-            status=snapshot.bybit.status,
+            status="unavailable",
             quote=snapshot.bybit.quote,
             positions=snapshot.bybit.positions,
             reason=_join_stale_reason(snapshot.bybit.reason),
@@ -108,7 +109,7 @@ def _mark_stale(snapshot: CrossSpreadSnapshotResponse) -> CrossSpreadSnapshotRes
         mt5=CrossSpreadVenueSnapshotResponse(
             venue=snapshot.mt5.venue,
             symbol=snapshot.mt5.symbol,
-            status=snapshot.mt5.status,
+            status="unavailable",
             quote=snapshot.mt5.quote,
             positions=snapshot.mt5.positions,
             reason=_join_stale_reason(snapshot.mt5.reason),
@@ -140,17 +141,10 @@ def submit_cross_spread_market_command(
     mt5_position_id: str | None = None,
     allow_netting_close: bool = False,
 ) -> ExecutionBatchResponse:
-    settings = get_settings()
-    if not _cross_spread_live_execution_gate_allows_write(settings):
-        raise HTTPException(
-            status_code=403,
-            detail="Live cross-spread execution is disabled",
-        )
+    assert_cross_spread_live_execution_enabled()
 
     is_close = request.action.startswith("CLOSE_")
-    strict_reduce_close = (
-        bybit_reduce_only and mt5_reduce_only and mt5_position_id is not None
-    )
+    strict_reduce_close = bybit_reduce_only and mt5_reduce_only and mt5_position_id is not None
     position_group_close = (
         allow_netting_close
         and not bybit_reduce_only
@@ -162,15 +156,12 @@ def submit_cross_spread_market_command(
             status_code=422,
             detail="Cross-spread close intent is incomplete",
         )
-    if not is_close and (
-        bybit_reduce_only or mt5_reduce_only or mt5_position_id is not None
-    ):
+    if not is_close and (bybit_reduce_only or mt5_reduce_only or mt5_position_id is not None):
         raise HTTPException(
             status_code=422,
             detail="Open cross-spread commands cannot carry close-position intent",
         )
 
-    _validate_acceptance_quantity(request.quantity_oz)
     sizing = _load_live_cross_spread_sizing()
     _validate_leg_quantity(
         request.quantity_oz,
@@ -204,9 +195,7 @@ def submit_cross_spread_market_command(
         CreateStrategyInstructionRequest(
             idempotencyKey=batch_key,
             action=(
-                StrategyInstructionAction.CLOSE
-                if is_close
-                else StrategyInstructionAction.OPEN
+                StrategyInstructionAction.CLOSE if is_close else StrategyInstructionAction.OPEN
             ),
             parameters={
                 "action": request.action,
@@ -222,11 +211,29 @@ def submit_cross_spread_market_command(
     return execute_instruction(str(instruction["instructionId"]))
 
 
+def assert_cross_spread_live_execution_enabled() -> None:
+    if not _cross_spread_live_execution_gate_allows_write(get_settings()):
+        raise HTTPException(403, "Live cross-spread execution is disabled")
+
+
 def prepare_cross_spread_market_command(
     request: CrossSpreadPreflightRequest,
 ) -> dict[str, object]:
     """Prepare read-only admission facts before final user confirmation."""
-    _validate_acceptance_quantity(request.quantity_oz)
+    if request.exit_plan_id is not None:
+        from app.cross_spread_close_recovery import prepare_unsubmitted_mt5_close
+        from app.cross_spread_exit_repository import get_exit_plan
+        from app.execution_batches import get_execution_batch
+
+        plan = get_exit_plan(request.exit_plan_id)
+        expected = "CLOSE_LONG" if plan.direction == "LONG_SPREAD" else "CLOSE_SHORT"
+        if request.action != expected:
+            raise HTTPException(409, "Close action does not match the selected position group")
+        if plan.status == "manual_intervention" and plan.close_batch_id:
+            batch = get_execution_batch(plan.close_batch_id)
+            if any(leg.role == "bybit_leg" and leg.status == "filled" for leg in batch.legs):
+                prepare_unsubmitted_mt5_close(plan, request.quantity_oz)
+                return {"status": "ready", "preparedAt": datetime.now(UTC).isoformat()}
     sizing = _load_live_cross_spread_sizing()
     mt5_quantity = request.quantity_oz / sizing.mt5_multiplier
     _validate_leg_quantity(
@@ -308,7 +315,6 @@ def submit_bybit_definitive_failure_rollback(
             status_code=423,
             detail="Cross-spread rollback capability is disabled",
         )
-    _validate_acceptance_quantity(quantity_oz)
     bybit = _load_live_bybit_specification()
     _validate_leg_quantity(
         quantity_oz,
@@ -342,18 +348,6 @@ def _sides_for_action(action: str) -> tuple[str, str]:
     if action in {"OPEN_LONG", "CLOSE_SHORT"}:
         return "buy", "sell"
     return "sell", "buy"
-
-
-def _validate_acceptance_quantity(quantity_oz: Decimal) -> None:
-    maximum = get_settings().cross_spread_acceptance_max_quantity_oz
-    if maximum > 0 and quantity_oz > maximum:
-        raise HTTPException(
-            status_code=422,
-            detail=(
-                "Cross-spread acceptance quantity exceeds the legacy cap of "
-                f"{maximum} oz"
-            ),
-        )
 
 
 def _load_live_bybit_specification() -> LiveInstrumentSpecification:
@@ -495,12 +489,22 @@ def _validate_mt5_live_specification(
     if checks.get("accountTradeAllowed") is not True:
         raise HTTPException(
             status_code=423,
-            detail="MT5 account does not allow trading",
+            detail="MT5 经纪商账户不允许交易，请检查账户交易权限",
         )
     if checks.get("terminalTradeAllowed") is not True:
         raise HTTPException(
             status_code=423,
-            detail="MT5 Terminal does not allow trading",
+            detail="MT5 算法交易开关已关闭，请在对应 MT5 终端开启“算法交易”",
+        )
+    if checks.get("accountExpertTradeAllowed") is not True:
+        raise HTTPException(status_code=423, detail="MT5 经纪商账户不允许自动交易，请检查账户权限")
+    if checks.get("pythonTradeAllowed") is not True:
+        raise HTTPException(
+            status_code=423,
+            detail=(
+                "MT5 禁止 Python 交易，请在工具 → 选项 → 智能交易系统中"
+                "取消“禁用外部 Python API 自动交易”"
+            ),
         )
 
 

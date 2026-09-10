@@ -85,6 +85,9 @@ const aShareMarketOverviewParitySource = fs.readFileSync(aShareMarketOverviewPar
 const macroExpectationSource = fs.readFileSync(macroExpectationPath, 'utf8');
 const hedgeBoardPageComposableSource = fs.readFileSync(hedgeBoardPageComposablePath, 'utf8');
 const routeSource = fs.readFileSync(routePath, 'utf8');
+const poolApiSource = fs.readFileSync(path.join(__dirname, '..', 'src', 'api', 'platform', 'aShareStockPool.ts'), 'utf8');
+const poolStateSource = fs.readFileSync(path.join(viewRoot, 'aShare', 'useStockPool.ts'), 'utf8');
+
 
 assert(fs.existsSync(marketTerminalPagePath), 'Expected MarketTerminalPage component to exist.');
 assert(fs.existsSync(hedgeBoardSubnavPath), 'Expected HedgeBoardSubnav component to exist.');
@@ -287,10 +290,10 @@ assert(
     aSharePageSource.includes('<AShareLegacyTerminalSection') &&
     !aSharePageSource.includes('<StockSnapshotSection') &&
     aSharePageSource.includes('<VibeStockPoolSection') &&
-    vibeStockPoolSource.includes('/api/v1/research/a-share/stock-pool') &&
+    poolApiSource.includes("const root = '/research/a-share'") && poolApiSource.includes('researchRequest') &&
     !vibeStockPoolSource.includes('/vibe-research/api/') &&
     vibeStockPoolSource.includes('matrixPoints') &&
-    vibeStockPoolSource.includes('heatMaxAbs') &&
+    vibeStockPoolSource.includes('heatColor') &&
     !vibeStockPoolSource.includes('localStorage'),
   'A-share page must orchestrate the market overview, market detail and functional stock pool without the removed one-click stock data section.',
 );
@@ -309,24 +312,18 @@ assert(
 assert(
   shenwanSectionSource.includes('申万二级成交额 Top 10') &&
     shenwanSectionSource.includes('全部申万二级行业') &&
-    shenwanSectionSource.includes('个股成交额阈值统计') &&
+    shenwanSectionSource.includes('百亿成交个股统计') &&
     !shenwanSectionSource.includes('成分股数') &&
     !shenwanSectionSource.includes('百亿股数') &&
     !shenwanSectionSource.includes('百亿股占比'),
   'Shenwan section must keep the clean Top-10 table and separate threshold statistics.',
 );
 assert(
-  aShareResearchComposableSource.includes("from './aShareWatchlistLocalState'") &&
-    aShareResearchComposableSource.includes('export { normalizeStockCode };') &&
-    aShareResearchComposableSource.includes('export type { WatchlistItem };') &&
-    aShareResearchComposableSource.includes(
-      "export type WatchlistSyncState = 'local' | 'syncing' | 'synced' | 'offline';",
-    ) &&
-    aShareResearchComposableSource.includes(
-      'const groupIndexes = watchlist.value.reduce<number[]>',
-    ) &&
-    !aShareResearchComposableSource.includes('window.localStorage'),
-  'A-share composable must delegate local watchlist persistence while preserving public types and group moves.',
+  aShareResearchComposableSource.includes('getAShareDashboard') &&
+    aShareResearchComposableSource.includes('if (active) return active;') &&
+    !aShareResearchComposableSource.includes('localStorage') &&
+    !aShareResearchComposableSource.includes('getAccountResearchWatchlist'),
+  'A-share page state must share in-flight dashboard reads and keep personal focus in its account-owned composable.',
 );
 assert(
   aShareWatchlistLocalStateSource.includes('export function normalizeStockCode') &&
@@ -348,14 +345,15 @@ assert(
   'A-share local watchlist adapter must preserve code normalization, empty persistence, storage keys and dirty state.',
 );
 assert(
-  accountWatchlistApiSource.includes("url: '/me/research-watchlist'") &&
-    accountWatchlistApiSource.includes('getUserSystemCsrfToken') &&
-    aShareResearchComposableSource.includes('getAccountResearchWatchlist') &&
-    aShareResearchComposableSource.includes('replaceAccountResearchWatchlist') &&
-    aShareWatchlistLocalStateSource.includes('WATCHLIST_DIRTY_STORAGE_KEY') &&
-    aShareResearchComposableSource.includes("error.code !== 'watchlist_version_conflict'") &&
+  poolApiSource.includes('expectedVersion') &&
+    poolStateSource.includes('savePoolFocus(codes, focusVersion)') &&
+    poolStateSource.includes('cause.status === 409') &&
+    poolStateSource.includes('current !== generation') &&
+    poolStateSource.includes("'research.write'") &&
+    !poolStateSource.includes('localStorage') &&
+    aSharePageSource.includes('<StockResearchDrawer') &&
     !aSharePageSource.includes('AShareWatchlistSection'),
-  'A-share watchlist persistence remains available in the research composable while the standalone watchlist panel is not rendered.',
+  'Account focus must use versioned writes, account change guards and conflict feedback; shared edits require research.write and stock clicks open details.',
 );
 assert(
   aShareWatchlistSource.includes('空列表会被正常保留') &&
@@ -374,14 +372,12 @@ assert(
   'Shenwan complete-industry view must expose sort direction, current result order and empty-filter recovery.',
 );
 assert(
-  aShareResearchComposableSource.includes('let dashboardRequestSequence = 0') &&
-    aShareResearchComposableSource.includes('let activeStockCode =') &&
-    aShareResearchComposableSource.includes('shanghaiDateStamp') &&
-    aShareResearchComposableSource.includes("import { message } from 'ant-design-vue'") &&
-    aShareResearchComposableSource.includes(
-      "import { copyText } from '@/utils/copyTextToClipboard'",
-    ),
-  'A-share interactions must guard stale requests and use platform feedback/copy utilities with China-market dates.',
+  aSharePageSource.includes('refreshAShareResearch()') &&
+    aSharePageSource.includes('if (producing.value || !canProduce.value) return;') &&
+    aSharePageSource.includes('await refreshAll()') &&
+    !vibeStockPoolSource.includes('fetch(') &&
+    !poolApiSource.includes('/sync'),
+  'A-share refresh must call the real producer once, reload every section and use the shared API boundary for pool operations.',
 );
 assert(
   stockSnapshotSource.includes('expanded[item.key] = false') &&

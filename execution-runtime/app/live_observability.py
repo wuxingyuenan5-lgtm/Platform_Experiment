@@ -17,13 +17,13 @@ def bybit_positions(adapter, account_id: str | None = None) -> list[VenuePositio
     account = account_id or adapter._single_account()
     adapter._assert_account(account)
     try:
-        response = adapter._with_fresh_client_retry(
+        response = adapter._read_with_retry(
             account,
             lambda client: client.get_positions(
                 category=adapter.settings.bybit_category,
                 settleCoin=adapter.settings.bybit_settle_coin,
                 limit=200,
-            )
+            ),
         )
         adapter._require_success(response, "Bybit position-risk query failed")
     except Exception as exc:
@@ -83,17 +83,11 @@ def bybit_positions(adapter, account_id: str | None = None) -> list[VenuePositio
                     bool(row.get("isReduceOnly")) if "isReduceOnly" in row else None
                 ),
                 autoAddMargin=(
-                    int(row.get("autoAddMargin") or 0) == 1
-                    if "autoAddMargin" in row
-                    else None
+                    int(row.get("autoAddMargin") or 0) == 1 if "autoAddMargin" in row else None
                 ),
                 currency=adapter.settings.bybit_settle_coin,
                 asOf=adapter._millis(row.get("updatedTime")),
-                openTime=(
-                    adapter._millis(row.get("openTime"))
-                    if row.get("openTime")
-                    else None
-                ),
+                openTime=(adapter._millis(row.get("openTime")) if row.get("openTime") else None),
                 fieldAvailability={
                     "liquidationPrice": (
                         "venue_reported" if liquidation is not None else "not_finite_for_mode"
@@ -114,6 +108,7 @@ def mt5_positions(adapter, account_id: str | None = None) -> list[VenuePositionS
         rows = mt5.positions_get() or ()
     except Exception as exc:
         raise GatewayResultUnknownError("MT5 position-risk result is unknown") from exc
+    observed_at = datetime.now(UTC)
     currency = adapter._account_currency(mt5)
     snapshots: list[VenuePositionSnapshot] = []
     for row in rows:
@@ -144,7 +139,7 @@ def mt5_positions(adapter, account_id: str | None = None) -> list[VenuePositionS
                 swap=Decimal(str(getattr(row, "swap", 0) or 0)),
                 positionStatus="open",
                 currency=currency,
-                asOf=adapter._position_time(row),
+                asOf=observed_at,
                 openTime=(
                     datetime.fromtimestamp(int(getattr(row, "time_msc", 0)) / 1000, UTC)
                     if int(getattr(row, "time_msc", 0) or 0)

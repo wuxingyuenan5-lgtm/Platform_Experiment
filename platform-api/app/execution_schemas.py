@@ -150,6 +150,18 @@ class PositionResponse(BaseModel):
     instrument_id: str = Field(alias="instrumentId")
     net_quantity: Decimal = Field(alias="netQuantity")
     average_price: Decimal | None = Field(alias="averagePrice")
+    external_position_id: str | None = Field(default=None, alias="externalPositionId")
+    symbol: str | None = None
+    instrument_type: str | None = Field(default=None, alias="instrumentType")
+    category: str | None = None
+    currency: str | None = None
+    current_price: Decimal | None = Field(default=None, alias="currentPrice")
+    unrealized_pnl: Decimal | None = Field(default=None, alias="unrealizedPnl")
+    stop_loss_price: Decimal | None = Field(default=None, alias="stopLossPrice")
+    take_profit_price: Decimal | None = Field(default=None, alias="takeProfitPrice")
+    liquidation_price: Decimal | None = Field(default=None, alias="liquidationPrice")
+    swap: Decimal | None = None
+    as_of: datetime | None = Field(default=None, alias="asOf")
 
 
 class PnlResponse(BaseModel):

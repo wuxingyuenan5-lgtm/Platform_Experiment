@@ -11,7 +11,6 @@ from app.bybit_fill_confirming_adapter import (
 )
 from app.bybit_postonly_chase import PrivateChaseEvent
 from app.config import Settings, get_settings
-from app.gateway_errors import GatewayRequestRejectedError
 from app.journal import initialize_journal
 from app.models import SubmitOrderCommand
 
@@ -137,17 +136,21 @@ def initialize_runtime_store(tmp_path, name: str) -> None:
     initialize_journal()
 
 
-def test_postonly_disabled_rejects_before_place(tmp_path) -> None:
+def test_postonly_global_live_gate_rejects_before_place(tmp_path) -> None:
     initialize_runtime_store(tmp_path, "postonly-disabled.db")
     client = FakePostOnlyClient()
     source = FakePrivateSource([])
+    settings = runtime_settings(enabled=False)
+    settings.live_write_enabled = False
     adapter = BybitFillConfirmingAdapter(
-        runtime_settings(enabled=False),
+        settings,
         client,
         private_source_factory=lambda _symbol, _prefix: source,
     )
 
-    with pytest.raises(GatewayRequestRejectedError, match="disabled"):
+    from app.gateway_errors import GatewayConfigurationError
+
+    with pytest.raises(GatewayConfigurationError, match="disabled"):
         adapter.submit_order(command("disabled"))
 
     assert client.place_calls == []

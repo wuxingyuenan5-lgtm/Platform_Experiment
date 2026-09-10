@@ -2,9 +2,49 @@ import sqlite3
 from datetime import UTC, datetime
 from decimal import Decimal
 
+import pytest
+
 from app.config import get_settings
 from app.fake_gateway import FakeGateway
 from app.models import InternalCapitalTransferStepCommand, SubmitOrderCommand
+from app.venue_store import ensure_store
+
+
+@pytest.mark.parametrize("fee", [Decimal("0.123456789123456789"), Decimal("-0.02")])
+def test_native_fee_cash_and_snapshot_are_exact_and_not_repeated(tmp_path, fee) -> None:
+    get_settings().journal_path = str(tmp_path / "native-fee.db")
+    ensure_store()
+    with sqlite3.connect(get_settings().journal_path) as db:
+        db.execute(
+            "INSERT INTO fake_venue_order_scripts "
+            "(symbol,behavior,fill_fee,fee_currency,created_at) VALUES (?,?,?,?,?)",
+            ("BTCUSDT", "filled", str(fee), "USDT", datetime.now(UTC).isoformat()),
+        )
+    gateway = FakeGateway()
+    before = gateway.list_balances("account_crypto_test")[0].available_balance
+    command = SubmitOrderCommand(
+        command_id="fee-command",
+        platform_order_id="fee-order",
+        account_id="account_crypto_test",
+        instrument_id="btc",
+        symbol="BTCUSDT",
+        side="buy",
+        quantity=Decimal("0.01"),
+        price=Decimal("100"),
+        order_type="market",
+    )
+    gateway.submit_order(command)
+    gateway.submit_order(command)
+    first = gateway.get_account_snapshot("account_crypto_test")
+    second = gateway.get_account_snapshot("account_crypto_test")
+    assert len(first.fills) == len(second.fills) == 1
+    assert first.fills[0].fee == fee
+    assert first.fills[0].currency == "USDT"
+    assert len(first.economic_events) == len(second.economic_events) == 1
+    assert first.economic_events[0].amount == -fee
+    assert first.economic_events[0].payload["fillId"] == first.fills[0].external_fill_id
+    assert first.economic_events_quality == "complete"
+    assert gateway.list_balances("account_crypto_test")[0].available_balance == before - fee
 
 
 def test_fake_gateway_acknowledges_and_fills() -> None:

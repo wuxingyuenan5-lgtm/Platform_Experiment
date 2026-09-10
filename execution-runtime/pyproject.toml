@@ -9,12 +9,15 @@ description = "Platform execution runtime"
 requires-python = ">=3.12"
 dependencies = [
   "fastapi>=0.116,<1.0",
+  "prometheus-client==0.26.0",
   "pydantic-settings>=2.10,<3.0",
   "uvicorn[standard]>=0.35,<1.0",
 ]
 
 [project.optional-dependencies]
 dev = [
+  "ccxt==4.5.78",
+  "pybit>=5.17,<6.0",
   "httpx>=0.28,<1.0",
   "pyright>=1.1,<2.0",
   "pytest>=8.4,<9.0",
@@ -22,13 +25,17 @@ dev = [
 ]
 crypto = [
   "pybit>=5.17,<6.0",
+  "ccxt==4.5.78",
 ]
 mt5 = [
   "MetaTrader5>=5.0,<6.0",
+  "psutil==7.2.2; sys_platform == 'win32'",
 ]
 all-gateways = [
   "pybit>=5.17,<6.0",
+  "ccxt==4.5.78",
   "MetaTrader5>=5.0,<6.0",
+  "psutil==7.2.2; sys_platform == 'win32'",
 ]
 
 [tool.setuptools.packages.find]
@@ -51,6 +58,13 @@ venvPath = "."
 venv = ".venv"
 typeCheckingMode = "standard"
 include = [
+  "app/bybit_connection.py",
+  "app/bybit_market_data.py",
+  "app/bybit_live_adapter.py",
+  "app/cross_spread_market.py",
+  "app/mt5_account_worker.py",
+  "app/mt5_live_adapter.py",
+  "app/operational_metrics.py",
   "app/models.py",
   "app/runtime_contracts.py",
   "app/gateway.py",

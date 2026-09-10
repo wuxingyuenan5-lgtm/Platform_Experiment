@@ -1,14 +1,18 @@
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
 from decimal import ROUND_FLOOR, Decimal
 from typing import Any
 
 import httpx
 from fastapi import HTTPException
 
+from app import runtime_transport
 from app.config import get_settings
 from app.database import connection
 from app.execution_batches import get_execution_batch
+from app.execution_risk_repository import batch_has_verified_flattening
+from app.strategies.adapters.funding_carry import SPOT_BASE_FEE_RATE, funding_open_quantities
 from app.strategies.domain import StrategyInstructionAction
 from app.strategies.funding_orchestration import get_funding_controlled_live_readiness
 from app.strategies.instruction_service import (
@@ -19,13 +23,15 @@ from app.strategies.instruction_service import (
     get_instruction_by_idempotency,
     list_instructions,
 )
+from app.strategies.plan_service import funding_account_binding, funding_market_access_ready
+from app.strategy_financial_readmodel import canonical_fills
 
 STRATEGY_INSTANCE_ID = "strategy_funding_arbitrage_instance_default"
 QUOTE_CURRENCY = "USDT"
 
 
 def list_funding_pairs() -> list[dict[str, str]]:
-    account = _funding_account_binding(role="primary")
+    account = _funding_account_binding()
     with connection() as db:
         rows = db.execute(
             """
@@ -80,69 +86,84 @@ def get_funding_execution_context(
     perpetual_symbol: str | None,
     spot_symbol: str | None,
     notional: Decimal | None,
-) -> dict[str, object]:
-    account = _funding_account_binding(role="primary")
+    quantity: Decimal | None = None,
+) -> dict[str, Any]:
+    account = _funding_account_binding()
     pair = _resolve_pair(perpetual_symbol=perpetual_symbol, spot_symbol=spot_symbol)
     perp_symbol = str(pair["perpetualSymbol"])
     spot_symbol = str(pair["spotSymbol"])
-    perp_quote = _runtime_get(
-        f"/venue/quotes/{perp_symbol}",
-        params={
-            "accountId": account["account_id"],
-            "instrumentType": "crypto_perp",
-            "category": "linear",
-        },
-    )
-    spot_quote = _runtime_get(
-        f"/venue/quotes/{spot_symbol}",
-        params={
-            "accountId": account["account_id"],
-            "instrumentType": "crypto_spot",
-            "category": "spot",
-        },
-    )
-    perp_spec = _runtime_get(
-        f"/venue/instruments/{perp_symbol}",
-        params={
-            "accountId": account["account_id"],
-            "instrumentType": "crypto_perp",
-            "category": "linear",
-        },
-    )
-    spot_spec = _runtime_get(
-        f"/venue/instruments/{spot_symbol}",
-        params={
-            "accountId": account["account_id"],
-            "instrumentType": "crypto_spot",
-            "category": "spot",
-        },
-    )
-    funding_events = _runtime_get(
-        "/venue/economic-events",
-        params={"accountId": account["account_id"], "eventType": "funding"},
-    )
+    requests = [
+        (f"/venue/quotes/{perp_symbol}", "crypto_perp", "linear"),
+        (f"/venue/quotes/{spot_symbol}", "crypto_spot", "spot"),
+        (f"/venue/instruments/{perp_symbol}", "crypto_perp", "linear"),
+        (f"/venue/instruments/{spot_symbol}", "crypto_spot", "spot"),
+    ]
+    with ThreadPoolExecutor(max_workers=4, thread_name_prefix="funding-context") as pool:
+        futures = [
+            pool.submit(
+                _runtime_get,
+                path,
+                params={
+                    "accountId": account["account_id"],
+                    "instrumentType": instrument_type,
+                    "category": category,
+                },
+            )
+            for path, instrument_type, category in requests
+        ]
+        values: list[dict[str, Any]] = []
+        for future in futures:
+            payload = future.result()
+            if not isinstance(payload, dict):
+                raise HTTPException(status_code=502, detail="Funding market response is malformed")
+            values.append(payload)
+        perp_quote, spot_quote, perp_spec, spot_spec = values
     active_balance = _balance_snapshot(account["account_id"], QUOTE_CURRENCY)
     reservation_summary = _reservation_summary(account["account_id"], QUOTE_CURRENCY)
     readiness = get_funding_controlled_live_readiness(
         strategy_instance_id=STRATEGY_INSTANCE_ID,
         account_id=account["account_id"],
     )
+    with connection() as db:
+        live_account = db.execute(
+            "SELECT environment FROM accounts WHERE id=?", (account["account_id"],)
+        ).fetchone()
+    if live_account is not None and live_account["environment"] == "live":
+        readiness["bothMarketsTradeAllowed"] = funding_market_access_ready(
+            perp_spec, "crypto_perp"
+        ) and funding_market_access_ready(spot_spec, "crypto_spot")
+        readiness["ready"] = readiness["ready"] and readiness["bothMarketsTradeAllowed"]
     runtime_status = _runtime_status()
-    quantity = _suggest_quantity(
+    suggested_quantity = _suggest_quantity(
         notional=notional,
-        price=Decimal(str(perp_quote["mid"])),
-        step=Decimal(str(perp_spec["quantityStep"])),
-        minimum=Decimal(str(perp_spec["minQuantity"])),
+        price=Decimal(str(spot_quote["mid"])),
+        step=Decimal(str(spot_spec["quantityStep"])),
+        minimum=Decimal(str(spot_spec["minQuantity"])),
     )
-    funding_rate = _funding_rate_from_quote_or_events(
-        quote_payload=perp_quote,
-        funding_events=funding_events,
-        perpetual_symbol=perp_symbol,
+    fee_rate = (
+        SPOT_BASE_FEE_RATE
+        if live_account is not None and live_account["environment"] == "live"
+        else Decimal("0")
+    )
+    sizing = _open_sizing(
+        quantity if quantity is not None else suggested_quantity,
+        fee_rate=fee_rate,
+        perp_spec=perp_spec,
+        spot_spec=spot_spec,
+        perp_quote=perp_quote,
+        spot_quote=spot_quote,
+    )
+    funding_rate = (
+        _decimal_text(Decimal(str(perp_quote["fundingRate"])))
+        if perp_quote.get("fundingRate") not in (None, "")
+        else None
     )
     next_funding_time = perp_quote.get("nextFundingTime")
     basis = Decimal(str(perp_quote["mid"])) - Decimal(str(spot_quote["mid"]))
     active_available_balance = (
-        Decimal(str(active_balance["availableBalance"])) if active_balance is not None else None
+        Decimal(str(active_balance["availableBalance"]))
+        if active_balance is not None and active_balance["availableBalance"] is not None
+        else None
     )
     funding_available = (
         active_available_balance - reservation_summary["activeReserved"]
@@ -176,7 +197,8 @@ def get_funding_execution_context(
             "spot": spot_spec["contractMultiplier"],
             "perpetual": perp_spec["contractMultiplier"],
         },
-        "suggestedQuantity": _decimal_text(quantity),
+        "suggestedQuantity": _decimal_text(suggested_quantity),
+        "openSizing": sizing,
         "requestedNotional": _decimal_text(notional),
         "availableBalance": active_balance,
         "activeReservation": {
@@ -196,7 +218,7 @@ def get_funding_execution_context(
         ),
         "asOf": max(
             [
-                str(active_balance["asOf"]) if active_balance is not None else None,
+                str(active_balance["asOf"]) if active_balance is not None else "",
                 str(perp_quote.get("asOf") or ""),
                 str(spot_quote.get("asOf") or ""),
             ]
@@ -204,12 +226,12 @@ def get_funding_execution_context(
     }
 
 
-def list_funding_position_groups(*, scope: str = "active") -> list[dict[str, object]]:
+def list_funding_position_groups(*, scope: str = "active") -> list[dict[str, Any]]:
     if scope not in {"active", "history", "all"}:
         raise HTTPException(status_code=422, detail="Unsupported Funding position scope")
     instructions = list_instructions(STRATEGY_INSTANCE_ID)
     close_summary = _close_summary_by_open_instruction(instructions)
-    groups: list[dict[str, object]] = []
+    groups: list[dict[str, Any]] = []
     for instruction in instructions:
         if instruction["action"] != StrategyInstructionAction.OPEN.value:
             continue
@@ -239,8 +261,65 @@ def submit_funding_instruction(
     quantity: Decimal,
     requested_by: str,
     target_open_instruction_id: str | None = None,
-) -> dict[str, object]:
+    execution_policy: str = "post_only_chase",
+    perpetual_limit_price: Decimal | None = None,
+    expected_perpetual_quantity: Decimal | None = None,
+) -> dict[str, Any]:
     normalized_action = StrategyInstructionAction(action)
+    try:
+        existing = get_instruction_by_idempotency(STRATEGY_INSTANCE_ID, idempotency_key)
+    except HTTPException as exc:
+        if exc.status_code != 404:
+            raise
+    else:
+        parameters = existing["requestedParameters"]
+        if (
+            existing["action"] != action
+            or not isinstance(parameters, dict)
+            or Decimal(
+                str(parameters.get("spotQuantity" if action == "open" else "perpetualQuantity"))
+            )
+            != quantity
+            or (
+                expected_perpetual_quantity is not None
+                and Decimal(str(parameters.get("perpetualQuantity"))) != expected_perpetual_quantity
+            )
+            or parameters.get("perpetualSymbol") != perpetual_symbol
+            or parameters.get("spotSymbol") != spot_symbol
+            or (parameters.get("targetOpenInstructionId") or None) != target_open_instruction_id
+            or parameters.get("executionPolicy", "post_only_chase") != execution_policy
+            or (
+                Decimal(str(parameters["perpetualLimitPrice"]))
+                if parameters.get("perpetualLimitPrice") is not None
+                else None
+            )
+            != perpetual_limit_price
+        ):
+            raise HTTPException(
+                status_code=409,
+                detail="Funding idempotency key conflicts with original instruction",
+            )
+        return _execute_funding_instruction(existing)
+    spot_quantity = quantity
+    perpetual_quantity = quantity
+    spot_fee_rate: str | None = None
+    if normalized_action is StrategyInstructionAction.OPEN:
+        context = get_funding_execution_context(
+            perpetual_symbol=perpetual_symbol,
+            spot_symbol=spot_symbol,
+            notional=None,
+            quantity=quantity,
+        )
+        sizing = context["openSizing"]
+        if not sizing["valid"]:
+            raise HTTPException(status_code=422, detail=sizing["reason"])
+        perpetual_quantity = Decimal(str(sizing["perpetualQuantity"]))
+        spot_fee_rate = str(sizing["spotBaseFeeRate"])
+        if (
+            expected_perpetual_quantity is not None
+            and perpetual_quantity != expected_perpetual_quantity
+        ):
+            raise HTTPException(status_code=409, detail="配平数量已变化，请刷新后重新确认")
     if normalized_action is StrategyInstructionAction.CLOSE:
         if not target_open_instruction_id:
             raise HTTPException(
@@ -271,6 +350,18 @@ def submit_funding_instruction(
             )
         perpetual_symbol = str(target_group["perpetualSymbol"])
         spot_symbol = str(target_group["spotSymbol"])
+        if target_group.get("spotFeeAdjusted"):
+            net_spot = target_group.get("remainingSpotQuantity")
+            if net_spot is None:
+                raise HTTPException(
+                    status_code=409, detail="现货实际到账和手续费尚未核实，请同步成交后平仓"
+                )
+            step = Decimal(str(target_group["spotQuantityStep"]))
+            spot_quantity = (
+                quantity / remaining * Decimal(str(net_spot)) / step
+            ).to_integral_value(rounding=ROUND_FLOOR) * step
+            if spot_quantity <= 0:
+                raise HTTPException(status_code=409, detail="本次平仓对应的现货数量小于交易步长")
     instruction = create_instruction(
         STRATEGY_INSTANCE_ID,
         CreateStrategyInstructionRequest(
@@ -278,9 +369,12 @@ def submit_funding_instruction(
             action=normalized_action,
             parameters={
                 "perpetualSymbol": perpetual_symbol,
-                "perpetualQuantity": quantity,
+                "perpetualQuantity": perpetual_quantity,
                 "spotSymbol": spot_symbol,
-                "spotQuantity": quantity,
+                "spotQuantity": spot_quantity,
+                "executionPolicy": execution_policy,
+                "perpetualLimitPrice": perpetual_limit_price,
+                **({"spotBaseFeeRate": spot_fee_rate} if spot_fee_rate is not None else {}),
                 **(
                     {"targetOpenInstructionId": target_open_instruction_id}
                     if target_open_instruction_id
@@ -291,6 +385,10 @@ def submit_funding_instruction(
         ),
         requested_by=requested_by,
     )
+    return _execute_funding_instruction(instruction)
+
+
+def _execute_funding_instruction(instruction: dict[str, Any]) -> dict[str, Any]:
     batch = execute_instruction(str(instruction["instructionId"]))
     refreshed = get_instruction(str(instruction["instructionId"]))
     return {
@@ -300,7 +398,7 @@ def submit_funding_instruction(
     }
 
 
-def get_funding_instruction_workspace(instruction_id: str) -> dict[str, object]:
+def get_funding_instruction_workspace(instruction_id: str) -> dict[str, Any]:
     instruction = get_instruction(instruction_id)
     batch_id = instruction.get("executionBatchId")
     batch = get_execution_batch(str(batch_id)).model_dump(by_alias=True) if batch_id else None
@@ -313,16 +411,16 @@ def get_funding_instruction_workspace(instruction_id: str) -> dict[str, object]:
 
 def get_funding_instruction_workspace_by_idempotency(
     idempotency_key: str,
-) -> dict[str, object]:
+) -> dict[str, Any]:
     instruction = get_instruction_by_idempotency(STRATEGY_INSTANCE_ID, idempotency_key)
     return get_funding_instruction_workspace(str(instruction["instructionId"]))
 
 
-def _workspace_state_from_instruction(instruction: dict[str, object]) -> dict[str, object]:
+def _workspace_state_from_instruction(instruction: dict[str, Any]) -> dict[str, Any]:
     batch_id = instruction.get("executionBatchId")
     batch = get_execution_batch(str(batch_id)) if batch_id else None
-    attempts: list[dict[str, object]] = []
-    releases: list[dict[str, object]] = []
+    attempts: list[dict[str, Any]] = []
+    releases: list[dict[str, Any]] = []
     cumulative_fill = Decimal("0")
     if batch_id:
         with connection() as db:
@@ -347,6 +445,22 @@ def _workspace_state_from_instruction(instruction: dict[str, object]) -> dict[st
                 """,
                 (batch_id,),
             ).fetchall()
+            order_ids = {
+                row["order_id"] for row in [*attempt_rows, *release_rows] if row["order_id"]
+            }
+            placeholders = ",".join("?" for _ in order_ids) or "NULL"
+            fill_rows = db.execute(
+                "SELECT f.*, f.id AS fill_id, o.quantity AS requested_quantity "
+                "FROM fills f JOIN orders o ON o.id=f.order_id "
+                f"WHERE o.id IN ({placeholders}) ORDER BY f.occurred_at,f.id",
+                list(order_ids),
+            ).fetchall()
+            filled_by_order: dict[str, Decimal] = {}
+            for fill in canonical_fills(fill_rows):
+                order_id = str(fill["order_id"])
+                filled_by_order[order_id] = filled_by_order.get(order_id, Decimal("0")) + Decimal(
+                    str(fill["quantity"])
+                )
         attempts = [
             {
                 "attemptNumber": int(row["attempt_number"]),
@@ -367,6 +481,7 @@ def _workspace_state_from_instruction(instruction: dict[str, object]) -> dict[st
                 "cumulativePerpetualFill": row["cumulative_perpetual_fill"],
                 "releaseQuantity": row["release_quantity"],
                 "cumulativeSpotQuantity": row["cumulative_spot_quantity"],
+                "filledQuantity": str(filled_by_order.get(row["order_id"], Decimal("0"))),
                 "orderId": row["order_id"],
                 "status": row["status"],
                 "failureReason": row["failure_reason"],
@@ -375,26 +490,28 @@ def _workspace_state_from_instruction(instruction: dict[str, object]) -> dict[st
             }
             for row in release_rows
         ]
-        if releases:
-            cumulative_fill = max(
-                (Decimal(str(row["cumulativePerpetualFill"])) for row in releases),
-                default=Decimal("0"),
-            )
+        cumulative_fill = sum(
+            (filled_by_order.get(row["order_id"], Decimal("0")) for row in attempt_rows),
+            Decimal("0"),
+        )
     return {
         "executionState": _execution_state(instruction, batch, attempts, releases),
         "timeline": _timeline_entries(instruction, batch, attempts, releases),
         "attempts": attempts,
         "spotReleases": releases,
         "cumulativePerpetualFill": _decimal_text(cumulative_fill),
+        "cumulativeSpotFill": str(
+            sum((Decimal(row["filledQuantity"]) for row in releases), Decimal("0"))
+        ),
     }
 
 
 def _timeline_entries(
-    instruction: dict[str, object],
+    instruction: dict[str, Any],
     batch,
-    attempts: list[dict[str, object]],
-    releases: list[dict[str, object]],
-) -> list[dict[str, object]]:
+    attempts: list[dict[str, Any]],
+    releases: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
     entries = [
         {"code": "instruction_accepted", "status": "completed", "at": instruction["createdAt"]},
         {"code": "plan_resolved", "status": "completed", "at": instruction["createdAt"]},
@@ -437,9 +554,7 @@ def _timeline_entries(
             }
         )
     if instruction["status"] == "reconciling":
-        entries.append(
-            {"code": "reconciling", "status": "active", "at": instruction["updatedAt"]}
-        )
+        entries.append({"code": "reconciling", "status": "active", "at": instruction["updatedAt"]})
     if batch is not None and batch.status == "hedged":
         entries.append(
             {"code": "hedged", "status": "completed", "at": batch.updated_at.isoformat()}
@@ -458,7 +573,7 @@ def _timeline_entries(
     return entries
 
 
-def _execution_state(instruction: dict[str, object], batch, attempts, releases) -> str:
+def _execution_state(instruction: dict[str, Any], batch, attempts, releases) -> str:
     if instruction["status"] == "accepted":
         return "accepted"
     if instruction["status"] == "reconciling":
@@ -467,7 +582,7 @@ def _execution_state(instruction: dict[str, object], batch, attempts, releases) 
         return "completed"
     if instruction["status"] == "manual_intervention":
         return "manual_intervention"
-    if instruction["status"] == "failed":
+    if instruction["status"] in {"failed", "rejected"}:
         return "failed"
     if any(row["status"] == "result_unknown" for row in attempts) or any(
         row["status"] == "result_unknown" for row in releases
@@ -485,23 +600,25 @@ def _funding_group_snapshot(
     instruction_id: str,
     batch_id: str,
     close_summary: dict[str, Decimal] | None = None,
-) -> dict[str, object]:
+) -> dict[str, Any]:
     instruction = get_instruction(instruction_id)
     workspace = _workspace_state_from_instruction(instruction)
     plan = instruction["executionPlan"]
+    if not isinstance(plan, dict) or not isinstance(plan.get("legs"), list):
+        raise HTTPException(status_code=409, detail="Funding execution plan is unavailable")
     perp = next(leg for leg in plan["legs"] if leg["role"] == "perpetual_leg")
     spot = next(leg for leg in plan["legs"] if leg["role"] == "spot_leg")
-    releases = workspace["spotReleases"]
-    cumulative_spot = max(
-        (Decimal(str(row["cumulativeSpotQuantity"])) for row in releases),
-        default=Decimal("0"),
-    )
+    cumulative_spot = Decimal(str(workspace["cumulativeSpotFill"]))
     cumulative_perp = Decimal(str(workspace["cumulativePerpetualFill"] or "0"))
-    hedged_quantity = min(cumulative_perp, cumulative_spot)
-    residual = max(Decimal("0"), cumulative_perp - cumulative_spot)
-    authoritative_closed = (close_summary or {}).get(
-        "authoritativeClosedQuantity", Decimal("0")
-    )
+    requested_perp = Decimal(str(perp["maximumQuantity"]))
+    requested_spot = Decimal(str(spot["maximumQuantity"]))
+    hedged_quantity = min(cumulative_perp, cumulative_spot * requested_perp / requested_spot)
+    residual = max(Decimal("0"), cumulative_perp - hedged_quantity)
+    flattened = batch_has_verified_flattening(batch_id)
+    authoritative_closed = (close_summary or {}).get("authoritativeClosedQuantity", Decimal("0"))
+    if flattened:
+        authoritative_closed = cumulative_perp
+        residual = Decimal("0")
     pending_close = (close_summary or {}).get("pendingCloseQuantity", Decimal("0"))
     result_unknown_reserved = (close_summary or {}).get(
         "resultUnknownReservedQuantity", Decimal("0")
@@ -510,14 +627,99 @@ def _funding_group_snapshot(
     remaining_closable = max(Decimal("0"), hedged_quantity - reserved_or_closed)
     lifecycle_state = (
         "history"
-        if hedged_quantity > 0
-        and authoritative_closed >= hedged_quantity
-        and pending_close == 0
-        and result_unknown_reserved == 0
+        if flattened
+        or (
+            hedged_quantity > 0
+            and authoritative_closed >= hedged_quantity
+            and pending_close == 0
+            and result_unknown_reserved == 0
+        )
+        or (
+            instruction["status"] in {"failed", "rejected"}
+            and _workspace_has_confirmed_no_external_side_effects(workspace)
+        )
         else "active"
     )
     funding_fees, trading_fees = _funding_fees_for_batch(batch_id)
+    net_spot = None
+    fee_adjusted = False
+    if spot.get("accountId"):
+        with connection() as db:
+            account = db.execute(
+                "SELECT environment FROM accounts WHERE id=?", (spot["accountId"],)
+            ).fetchone()
+        fee_adjusted = account is not None and str(account["environment"]).lower() == "live"
+        if fee_adjusted:
+            from app.strategy_financial_readmodel import funding_spot_cash
+
+            net_spot = funding_spot_cash(batch_id, cumulative_spot)
+    remaining_spot = (
+        max(Decimal("0"), net_spot - (close_summary or {}).get("spotSoldOrReserved", Decimal("0")))
+        if net_spot is not None
+        else None
+    )
+    if flattened:
+        remaining_spot = Decimal("0")
+    remaining_perp = max(
+        Decimal("0"),
+        cumulative_perp
+        - (close_summary or {}).get("perpetualClosedQuantity", authoritative_closed),
+    )
+    spot_holding = (
+        max(Decimal("0"), net_spot - (close_summary or {}).get("spotSoldQuantity", Decimal("0")))
+        if net_spot is not None
+        else None
+    )
+    if flattened:
+        remaining_perp = Decimal("0")
+        spot_holding = Decimal("0")
+    net_delta = spot_holding - remaining_perp if spot_holding is not None else None
+    step = Decimal(str(perp.get("quantityStep") or "0"))
+    fee_mismatch = (
+        workspace["executionState"] == "completed"
+        and lifecycle_state == "active"
+        and net_delta is not None
+        and remaining_perp > 0
+        and pending_close == 0
+        and result_unknown_reserved == 0
+        and (net_delta < 0 or (step > 0 and net_delta >= step))
+    )
+    is_abnormal = lifecycle_state == "active" and (
+        workspace["executionState"] in {"manual_intervention", "result_unknown", "failed"}
+        or result_unknown_reserved > 0
+        or (workspace["executionState"] == "completed" and residual != 0)
+        or fee_mismatch
+    )
+    abnormal_action = "reconcile"
+    if (
+        is_abnormal
+        and reserved_or_closed == 0
+        and instruction["status"] in {"failed", "manual_intervention"}
+    ):
+        from app.execution_risk_repository import (
+            ExecutionRiskRepositoryError,
+            flattening_positions,
+        )
+
+        try:
+            with connection() as db:
+                residual_positions, _ = flattening_positions(db, batch_id)
+            if any(position["quantity"] > 0 for position in residual_positions):
+                abnormal_action = "flatten_open"
+        except (ExecutionRiskRepositoryError, ValueError, ArithmeticError):
+            pass  # Unconfirmed executions cannot offer a new reduction order.
+    elif is_abnormal and remaining_closable > 0 and result_unknown_reserved == 0 and residual == 0:
+        abnormal_action = "close_group"
     return {
+        "isAbnormal": is_abnormal,
+        "abnormalAction": abnormal_action,
+        "abnormalReason": (
+            f"手续费未配平：现货净持币与永续空仓相差 {_decimal_text(net_delta)}，保留仓位待手动平仓"
+            if fee_mismatch
+            else str(instruction.get("failureReason") or "开平仓执行异常，需核对两腿成交")
+            if is_abnormal
+            else None
+        ),
         "openInstructionId": instruction_id,
         "instructionId": instruction_id,
         "batchId": batch_id,
@@ -531,6 +733,16 @@ def _funding_group_snapshot(
         "cumulativePerpetualFill": _decimal_text(cumulative_perp),
         "cumulativeSpotFill": _decimal_text(cumulative_spot),
         "hedgedQuantity": _decimal_text(hedged_quantity),
+        "spotFeeAdjusted": fee_adjusted,
+        "netSpotAcquired": _decimal_text(net_spot),
+        "spotFeeResidualQuantity": _decimal_text(cumulative_spot - net_spot)
+        if net_spot is not None
+        else None,
+        "remainingSpotQuantity": _decimal_text(remaining_spot),
+        "remainingPerpetualQuantity": _decimal_text(remaining_perp),
+        "remainingSpotHolding": _decimal_text(spot_holding),
+        "netDeltaQuantity": _decimal_text(net_delta),
+        "spotQuantityStep": spot.get("quantityStep"),
         "residualQuantity": _decimal_text(residual),
         "alreadyClosedQuantity": _decimal_text(authoritative_closed),
         "authoritativeClosedQuantity": _decimal_text(authoritative_closed),
@@ -547,7 +759,7 @@ def _funding_group_snapshot(
 
 
 def _close_summary_by_open_instruction(
-    instructions: list[dict[str, object]],
+    instructions: list[dict[str, Any]],
 ) -> dict[str, dict[str, Decimal]]:
     summary: dict[str, dict[str, Decimal]] = {}
     pending_states = {"accepted", "submitting", "executing", "partially_hedged", "reconciling"}
@@ -566,16 +778,12 @@ def _close_summary_by_open_instruction(
         )
         workspace = _workspace_state_from_instruction(instruction)
         perpetual_fill = Decimal(str(workspace.get("cumulativePerpetualFill") or "0"))
-        releases = workspace.get("spotReleases") or []
-        spot_fill = max(
-            (
-                Decimal(str(row.get("cumulativeSpotQuantity") or "0"))
-                for row in releases
-                if isinstance(row, dict)
-            ),
-            default=Decimal("0"),
+        spot_fill = Decimal(str(workspace["cumulativeSpotFill"]))
+        requested_spot = Decimal(str(parameters.get("spotQuantity") or quantity))
+        spot_in_perpetual_units = (
+            spot_fill * quantity / requested_spot if requested_spot > 0 else Decimal("0")
         )
-        authoritative = min(quantity, perpetual_fill, spot_fill)
+        authoritative = min(quantity, perpetual_fill, spot_in_perpetual_units)
         unresolved = max(Decimal("0"), quantity - authoritative)
         execution_state = str(workspace.get("executionState") or instruction["status"])
         pending = unresolved if execution_state in pending_states else Decimal("0")
@@ -600,18 +808,30 @@ def _close_summary_by_open_instruction(
             },
         )
         bucket["authoritativeClosedQuantity"] += authoritative
+        bucket["perpetualClosedQuantity"] = (
+            bucket.get("perpetualClosedQuantity", Decimal("0")) + perpetual_fill
+        )
+        bucket["spotSoldQuantity"] = bucket.get("spotSoldQuantity", Decimal("0")) + spot_fill
+        bucket["spotSoldOrReserved"] = (
+            bucket.get("spotSoldOrReserved", Decimal("0"))
+            + spot_fill
+            + (pending + uncertain) * requested_spot / quantity
+        )
         bucket["pendingCloseQuantity"] += pending
         bucket["resultUnknownReservedQuantity"] += uncertain
     return summary
 
 
-def _workspace_has_confirmed_no_external_side_effects(workspace: dict[str, object]) -> bool:
+def _workspace_has_confirmed_no_external_side_effects(workspace: dict[str, Any]) -> bool:
     if Decimal(str(workspace.get("cumulativePerpetualFill") or "0")) > 0:
         return False
     for row in workspace.get("attempts", []):
         if not isinstance(row, dict):
             continue
-        if row.get("orderId") not in (None, ""):
+        if row.get("orderId") not in (None, "") and row.get("status") not in {
+            "canceled",
+            "rejected",
+        }:
             return False
     for row in workspace.get("spotReleases", []):
         if not isinstance(row, dict):
@@ -623,48 +843,15 @@ def _workspace_has_confirmed_no_external_side_effects(workspace: dict[str, objec
     return True
 
 
-def _funding_fees_for_batch(batch_id: str) -> tuple[Decimal, Decimal]:
-    with connection() as db:
-        row = db.execute(
-            """
-            SELECT
-                COALESCE(
-                    SUM(CASE WHEN ff.fact_type = 'funding_fee' THEN ff.amount ELSE 0 END),
-                    0
-                ) AS funding_fees,
-                COALESCE(
-                    SUM(CASE WHEN ff.fact_type = 'trade_fee' THEN ff.amount ELSE 0 END),
-                    0
-                ) AS trade_fees
-            FROM financial_facts AS ff
-            WHERE ff.strategy_instance_id = ?
-              AND ff.reference_type IN ('order', 'fill', 'economic_event')
-              AND ff.idempotency_key LIKE ?
-            """,
-            (STRATEGY_INSTANCE_ID, f"%{batch_id}%"),
-        ).fetchone()
-    if row is None:
-        return Decimal("0"), Decimal("0")
-    return Decimal(str(row["funding_fees"] or "0")), Decimal(str(row["trade_fees"] or "0"))
+def _funding_fees_for_batch(batch_id: str) -> tuple[Decimal | None, Decimal | None]:
+    from app.strategy_financial_readmodel import batch_fee_totals
+
+    return batch_fee_totals(batch_id)
 
 
-def _funding_account_binding(*, role: str) -> dict[str, str]:
+def _funding_account_binding() -> dict[str, str]:
     with connection() as db:
-        row = db.execute(
-            """
-            SELECT sab.account_id, a.venue_id, v.venue_code AS venue_code
-            FROM strategy_account_bindings AS sab
-            JOIN accounts AS a ON a.id = sab.account_id
-            JOIN venues AS v ON v.id = a.venue_id
-            WHERE sab.strategy_instance_id = ?
-              AND sab.role = ?
-              AND sab.status = 'active'
-            LIMIT 1
-            """,
-            (STRATEGY_INSTANCE_ID, role),
-        ).fetchone()
-    if row is None:
-        raise HTTPException(status_code=423, detail="Funding live account binding is unavailable")
+        row = funding_account_binding(db, STRATEGY_INSTANCE_ID)
     return {
         "account_id": str(row["account_id"]),
         "venue_id": str(row["venue_id"]),
@@ -687,15 +874,16 @@ def _resolve_pair(*, perpetual_symbol: str | None, spot_symbol: str | None) -> d
     raise HTTPException(status_code=404, detail="Funding symbol pair is unavailable")
 
 
-def _runtime_get(
-    path: str, *, params: dict[str, object] | None = None
-) -> dict[str, Any] | list[Any]:
+def _runtime_get(path: str, *, params: dict[str, Any] | None = None) -> dict[str, Any] | list[Any]:
     settings = get_settings()
     try:
-        with httpx.Client(trust_env=False, timeout=settings.runtime_timeout_seconds) as client:
-            response = client.get(f"{settings.runtime_base_url}{path}", params=params)
-            response.raise_for_status()
-            return response.json()
+        response = runtime_transport.get(
+            f"{settings.runtime_base_url}{path}",
+            params=params,
+            timeout=settings.runtime_timeout_seconds,
+        )
+        response.raise_for_status()
+        return response.json()
     except (httpx.HTTPError, ValueError) as exc:
         raise HTTPException(
             status_code=502,
@@ -703,7 +891,7 @@ def _runtime_get(
         ) from exc
 
 
-def _runtime_status() -> dict[str, object]:
+def _runtime_status() -> dict[str, Any]:
     payload = _runtime_get("/status")
     if not isinstance(payload, dict):
         raise HTTPException(status_code=502, detail="Funding runtime status is malformed")
@@ -719,7 +907,7 @@ def _runtime_status() -> dict[str, object]:
     }
 
 
-def _balance_snapshot(account_id: str, currency: str) -> dict[str, object] | None:
+def _balance_snapshot(account_id: str, currency: str) -> dict[str, Any] | None:
     with connection() as db:
         latest = db.execute(
             """
@@ -748,13 +936,17 @@ def _balance_snapshot(account_id: str, currency: str) -> dict[str, object] | Non
     return {
         "currency": str(row["currency"]).upper(),
         "equity": _decimal_text(Decimal(str(row["equity"]))),
-        "availableBalance": _decimal_text(Decimal(str(row["available_balance"]))),
+        "availableBalance": (
+            _decimal_text(Decimal(str(row["available_balance"])))
+            if row["available_balance"] is not None
+            else None
+        ),
         "dataQualityState": row["data_quality_state"],
         "asOf": row["as_of"],
     }
 
 
-def _reservation_summary(account_id: str, currency: str) -> dict[str, object]:
+def _reservation_summary(account_id: str, currency: str) -> dict[str, Any]:
     with connection() as db:
         reservations = db.execute(
             """
@@ -774,9 +966,7 @@ def _reservation_summary(account_id: str, currency: str) -> dict[str, object]:
             (account_id,),
         ).fetchall()
         owner_strategy: dict[tuple[str, str], str | None] = {}
-        owner_pairs = {
-            (str(row["owner_type"]), str(row["owner_id"])) for row in reservations
-        }
+        owner_pairs = {(str(row["owner_type"]), str(row["owner_id"])) for row in reservations}
         for owner_type, owner_id in owner_pairs:
             strategy_key = None
             if owner_type == "batch":
@@ -819,32 +1009,59 @@ def _suggest_quantity(
 ) -> Decimal | None:
     if notional is None or notional <= 0 or price <= 0:
         return None
-    raw = (notional / price).quantize(step, rounding=ROUND_FLOOR)
-    return raw if raw >= minimum else minimum
+    if not all(value.is_finite() for value in (notional, price, step, minimum)) or step <= 0:
+        return None
+    raw = (notional / price / step).to_integral_value(rounding=ROUND_FLOOR) * step
+    return raw if raw >= minimum else None
 
 
-def _funding_rate_from_quote_or_events(
+def _open_sizing(
+    quantity: Decimal | None,
     *,
-    quote_payload: dict[str, object] | list[Any],
-    funding_events: dict[str, object] | list[Any],
-    perpetual_symbol: str,
-) -> str | None:
-    if isinstance(quote_payload, dict):
-        rate = quote_payload.get("fundingRate")
-        if rate not in (None, ""):
-            return _decimal_text(Decimal(str(rate)))
-    if isinstance(funding_events, list):
-        for item in funding_events:
-            if not isinstance(item, dict):
-                continue
-            if str(item.get("symbol") or "").upper() != perpetual_symbol:
-                continue
-            payload = item.get("payload")
-            if isinstance(payload, dict):
-                candidate = payload.get("fundingRate")
-                if candidate not in (None, ""):
-                    return _decimal_text(Decimal(str(candidate)))
-    return None
+    fee_rate: Decimal,
+    perp_spec: dict,
+    spot_spec: dict,
+    perp_quote: dict,
+    spot_quote: dict,
+) -> dict[str, Any]:
+    result: dict[str, Any] = {
+        "spotQuantity": _decimal_text(quantity),
+        "spotBaseFeeRate": _decimal_text(fee_rate),
+        "expectedSpotNetQuantity": None,
+        "perpetualQuantity": None,
+        "roundingResidualQuantity": None,
+        "valid": False,
+        "reason": "请输入有效的现货买入数量",
+    }
+    if quantity is None or quantity <= 0:
+        return result
+    if any(Decimal(str(spec["contractMultiplier"])) != 1 for spec in (perp_spec, spot_spec)):
+        result["reason"] = "当前资费配平只支持币数量乘数为 1 的现货与永续"
+        return result
+    net, perpetual, residual = funding_open_quantities(
+        quantity, fee_rate=fee_rate, perpetual_step=Decimal(str(perp_spec["quantityStep"]))
+    )
+    result.update(
+        expectedSpotNetQuantity=_decimal_text(net),
+        perpetualQuantity=_decimal_text(perpetual),
+        roundingResidualQuantity=_decimal_text(residual),
+    )
+    for label, amount, spec, quote in (
+        ("现货", quantity, spot_spec, spot_quote),
+        ("永续", perpetual, perp_spec, perp_quote),
+    ):
+        step = Decimal(str(spec["quantityStep"]))
+        if amount <= 0 or amount < Decimal(str(spec["minQuantity"])) or amount % step:
+            result["reason"] = f"{label}数量不符合最小下单量或步长；永续按现货扣费净额向下取整"
+            return result
+        minimum_notional = spec.get("minNotional") or spec.get("minNotionalValue")
+        if minimum_notional is not None and amount * Decimal(str(quote["mid"])) < Decimal(
+            str(minimum_notional)
+        ):
+            result["reason"] = f"{label}金额低于交易所最低要求，请增加开仓本金"
+            return result
+    result.update(valid=True, reason=None)
+    return result
 
 
 def _aggregate_quality(*values: str) -> str:

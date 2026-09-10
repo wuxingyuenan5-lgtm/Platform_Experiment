@@ -72,43 +72,17 @@ def funding_run_payload() -> dict[str, object]:
     }
 
 
-def test_strategy_run_creates_idempotent_hedged_batch(
-    monkeypatch,
-    tmp_path: Path,
-) -> None:
+def test_controlled_funding_rejects_legacy_run_without_creating_orders(tmp_path: Path) -> None:
     get_settings().database_path = str(tmp_path / "strategy-run.db")
-    monkeypatch.setattr(
-        "app.trade_command_execution.httpx.post",
-        lambda *args, **kwargs: filled_runtime_response(kwargs["json"]),
-    )
-
     with TestClient(app) as client:
         url = "/api/v1/strategies/instances/strategy_funding_arbitrage_instance_default/runs"
-        first = client.post(url, json=funding_run_payload())
-        second = client.post(url, json=funding_run_payload())
-
-        assert first.status_code == 200
-        assert second.status_code == 200
-        assert second.json() == first.json()
-        assert first.json()["status"] == "completed"
-        assert first.json()["executionBatch"]["status"] == "hedged"
-        assert first.json()["strategyKey"] == "funding_arbitrage"
-
+        response = client.post(url, json=funding_run_payload())
+        assert response.status_code == 403
+        assert "dedicated" in response.json()["detail"]
         with connection() as db:
-            instruction = db.execute(
-                "SELECT execution_plan_json FROM strategy_runs WHERE id = ?",
-                (first.json()["strategyRunId"],),
-            ).fetchone()
-            linked_batch = db.execute(
-                "SELECT strategy_instruction_id FROM execution_batches WHERE id = ?",
-                (first.json()["executionBatchId"],),
-            ).fetchone()
-        assert instruction["execution_plan_json"] is not None
-        assert linked_batch["strategy_instruction_id"] == first.json()["strategyRunId"]
-
-        runs = client.get(url)
-        assert runs.status_code == 200
-        assert len(runs.json()) == 1
+            assert db.execute("SELECT COUNT(*) FROM trade_commands").fetchone()[0] == 0
+            assert db.execute("SELECT COUNT(*) FROM execution_batches").fetchone()[0] == 0
+        assert client.get(url).json() == []
 
 
 def test_strategy_run_rejects_non_closed_loop_strategy(tmp_path: Path) -> None:

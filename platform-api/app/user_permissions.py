@@ -3,11 +3,12 @@ from __future__ import annotations
 from collections.abc import Iterable
 
 API_KEY_ROLE_PERMISSIONS: dict[str, frozenset[str]] = {
-    "viewer": frozenset({"platform:read"}),
-    "researcher": frozenset({"platform:read", "strategy:run"}),
-    "trader": frozenset({"platform:read", "trade:submit", "live_session:request"}),
+    "viewer": frozenset({"platform:read", "research.read"}),
+    "researcher": frozenset({"platform:read", "research.read", "strategy:run"}),
+    "trader": frozenset({"platform:read", "research.read", "trade:submit", "live_session:request"}),
     "risk_officer": frozenset(
         {
+            "research.read",
             "platform:read",
             "audit:read",
             "risk:manage",
@@ -19,6 +20,7 @@ API_KEY_ROLE_PERMISSIONS: dict[str, frozenset[str]] = {
     ),
     "operations": frozenset(
         {
+            "research.read",
             "platform:read",
             "audit:read",
             "operations:run",
@@ -68,6 +70,7 @@ CEO_PERMISSIONS = frozenset(
         "system.manage",
         "risk.read",
         "risk.write",
+        "risk:manage",
         "reconciliation:review",
         "trade.read",
         "strategy.write",

@@ -2,7 +2,7 @@
   <section class="capital-net-value-board">
     <header class="board-header">
       <div>
-        <h3>{{ curve.title }}</h3>
+        <h3>{{ activeSeries.title }}</h3>
       </div>
 
       <div class="board-controls">
@@ -32,7 +32,7 @@
     </header>
 
     <div class="curve-summary">
-      <article v-for="item in curve.summaries" :key="item.label" class="summary-pill">
+      <article v-for="item in activeSeries.summaries" :key="item.label" class="summary-pill">
         <label>{{ item.label }}</label>
         <strong :class="item.tone ? `is-${item.tone}` : 'is-neutral'">{{ item.value }}</strong>
       </article>
@@ -53,6 +53,7 @@
   }>();
 
   const metricKey = ref(props.curve.defaultMetric);
+  const activeSeries = computed(() => props.curve.metricSeries?.[metricKey.value] || props.curve);
   const periodKey = ref(props.curve.defaultPeriod);
   const modeKey = ref(props.curve.defaultMode || props.curve.modeOptions?.[0]?.key || '');
 
@@ -76,14 +77,14 @@
         top: 4,
         itemWidth: 12,
         itemHeight: 12,
-        data: [activeMetricLabel.value, '回撤'],
+        data: [activeMetricLabel.value, '调整后回撤（估算）'],
         textStyle: { color: '#6b7c93', fontSize: 12 },
       },
       grid: { left: 26, right: 36, top: 52, bottom: 72, containLabel: true },
       xAxis: {
         type: 'category',
         boundaryGap: false,
-        data: props.curve.xLabels,
+        data: activeSeries.value.xLabels,
         axisTick: { show: false },
         axisLine: { lineStyle: { color: '#dbe5f1' } },
         axisLabel: { color: '#90a0b5', hideOverlap: true },
@@ -127,17 +128,18 @@
             color:
               modeKey.value === 'fixed' ? 'rgba(138, 99, 210, .08)' : 'rgba(74, 124, 255, .08)',
           },
-          data: props.curve.netValueData,
+          data: activeSeries.value.netValueData,
         },
         {
-          name: '回撤',
+          name: '调整后回撤（估算）',
           type: 'line',
           yAxisIndex: 1,
-          smooth: true,
+          smooth: false,
+          connectNulls: false,
           symbol: 'none',
           lineStyle: { width: 1.8, color: '#db6d6d' },
           areaStyle: { color: 'rgba(219, 109, 109, .14)' },
-          data: props.curve.drawdownData,
+          data: activeSeries.value.drawdownData.map((value) => value ?? '-'),
         },
       ],
     });
@@ -146,7 +148,15 @@
     resize();
   }
 
-  watch(() => props.curve, renderChart, { deep: true });
+  watch(
+    () => props.curve,
+    () => {
+      if (!props.curve.metricOptions.some((item) => item.key === metricKey.value))
+        metricKey.value = props.curve.defaultMetric;
+      void renderChart();
+    },
+    { deep: true },
+  );
   watch([metricKey, periodKey, modeKey], renderChart);
   onMounted(renderChart);
 </script>

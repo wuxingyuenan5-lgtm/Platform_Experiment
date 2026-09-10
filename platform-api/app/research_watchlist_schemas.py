@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 
 
 class ResearchWatchlistItem(BaseModel):
-    code: str = Field(min_length=6, max_length=12)
+    code: str = Field(min_length=5, max_length=12)
     name: str = Field(min_length=1, max_length=128)
     group: str = Field(min_length=1, max_length=128)
 

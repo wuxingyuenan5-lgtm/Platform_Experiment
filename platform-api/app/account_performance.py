@@ -1,0 +1,276 @@
+"""Observed-period, cash-flow-adjusted performance. Never feeds trading/accounting."""
+
+import json
+import logging
+from datetime import UTC, datetime, timedelta
+from decimal import Decimal
+
+from app.database import connection
+from app.venue_reconciliation import runtime_get
+
+log = logging.getLogger(__name__)
+
+
+def stamp(value):
+    result = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    if result.tzinfo is None:
+        raise ValueError("Capital history requires timezone-aware timestamps")
+    return result.astimezone(UTC)
+
+
+def persist_valuation_rates(db, account_id, snapshot):
+    for balance in snapshot.get("balances", []):
+        if balance.get("usdValue") is None or not balance.get("currency"):
+            continue
+        equity = Decimal(str(balance["equity"]))
+        usd = Decimal(str(balance["usdValue"]))
+        if not equity.is_finite() or not usd.is_finite() or equity == 0 or usd / equity <= 0:
+            continue
+        db.execute(
+            "INSERT OR IGNORE INTO account_valuation_rates "
+            "(account_id,currency,as_of,usd_rate) VALUES (?,?,?,?)",
+            (
+                account_id,
+                balance["currency"],
+                stamp(balance["asOf"]).isoformat(),
+                str(usd / equity),
+            ),
+        )
+
+
+def persist_capital_window(db, account_id, payload, start, end):
+    if (
+        payload.get("accountId") != account_id
+        or stamp(payload["startTime"]) != start
+        or stamp(payload["endTime"]) != end
+    ):
+        raise ValueError("Capital history account/window mismatch")
+    scopes = payload["scopes"]
+    if not scopes or any(
+        s not in {"full_account", "unified_trading", "mt5_trading"} for s in scopes
+    ):
+        raise ValueError("Invalid capital history scope")
+    for event in payload["events"]:
+        event_time = stamp(event["occurredAt"])
+        # Funding history has second precision and inclusive endpoints.
+        if event_time < start or event_time > end:
+            continue
+        scope, identity = event["assetScope"], event["externalEventId"]
+        if scope not in scopes or not identity or not event["currency"]:
+            raise ValueError("Invalid capital movement")
+        amount = event["amount"]
+        if amount is not None and not Decimal(amount).is_finite():
+            raise ValueError("Invalid capital movement amount")
+        values = (event_time.isoformat(), event["currency"], amount, event["eventType"])
+        previous = db.execute(
+            "SELECT occurred_at,currency,amount,event_type,payload_json FROM "
+            "account_capital_movements WHERE account_id=? AND asset_scope=? AND "
+            "external_event_id=?",
+            (account_id, scope, identity),
+        ).fetchone()
+        if previous and tuple(previous)[:4] != values:
+            # Resolve an unknown classification only against identical native evidence.
+            prior_raw = json.loads(previous[4]).get("raw")
+            if (
+                previous[2] is None
+                and amount is not None
+                and tuple(previous)[:2] == values[:2]
+                and previous[3] == values[3]
+                and prior_raw is not None
+                and prior_raw == event.get("raw")
+            ):
+                db.execute(
+                    "UPDATE account_capital_movements SET amount=?,payload_json=? "
+                    "WHERE account_id=? AND asset_scope=? AND external_event_id=?",
+                    (amount, json.dumps(event, sort_keys=True), account_id, scope, identity),
+                )
+            else:
+                raise ValueError("Capital movement changed after persistence")
+        db.execute(
+            "INSERT OR IGNORE INTO account_capital_movements VALUES (?,?,?,?,?,?,?,?)",
+            (account_id, identity, scope, *values, json.dumps(event, sort_keys=True)),
+        )
+    for scope in scopes:
+        db.execute(
+            "INSERT INTO account_capital_coverage VALUES (?,?,?,?,?) ON "
+            "CONFLICT(account_id,asset_scope,start_at) DO UPDATE SET "
+            "end_at=excluded.end_at,updated_at=excluded.updated_at",
+            (account_id, scope, start.isoformat(), end.isoformat(), datetime.now(UTC).isoformat()),
+        )
+
+
+def sync_capital_history(account_id, *, force=False):
+    """One bounded window per snapshot cycle; oldest first, then overlapping refresh."""
+    now = datetime.now(UTC)
+    with connection() as db:
+        state = db.execute(
+            "SELECT attempted_at FROM account_capital_sync WHERE account_id=?", (account_id,)
+        ).fetchone()
+        if not force and state and now - stamp(state[0]) < timedelta(seconds=60):
+            return
+        bounds = db.execute(
+            "SELECT min(as_of),max(as_of) FROM account_risk_snapshots WHERE account_id=?",
+            (account_id,),
+        ).fetchone()
+        if not bounds or not bounds[0]:
+            return
+        covered = db.execute(
+            "SELECT max(end_at) FROM account_capital_coverage WHERE account_id=?", (account_id,)
+        ).fetchone()[0]
+        latest = min(stamp(bounds[1]), now - timedelta(seconds=60))
+        start = stamp(covered) - timedelta(minutes=10) if covered else stamp(bounds[0])
+        end = min(start + timedelta(days=7), latest)
+        if end <= start:
+            return
+        db.execute(
+            "INSERT INTO account_capital_sync VALUES (?,?,'syncing',NULL) ON "
+            "CONFLICT(account_id) DO UPDATE SET "
+            "attempted_at=excluded.attempted_at,status='syncing',error_code=NULL",
+            (account_id, now.isoformat()),
+        )
+    try:
+        response = runtime_get(
+            "/venue/capital-flows",
+            params={
+                "accountId": account_id,
+                "startTime": start.isoformat(),
+                "endTime": end.isoformat(),
+            },
+        )
+        response.raise_for_status()
+        with connection() as db:
+            persist_capital_window(db, account_id, response.json(), start, end)
+            db.execute(
+                "UPDATE account_capital_sync SET status='ready',error_code=NULL WHERE account_id=?",
+                (account_id,),
+            )
+    except Exception as exc:
+        # Preserve previous coverage and distinguish a failed read from an empty ledger.
+        code = f"{type(exc).__name__}"
+        if getattr(exc, "response", None) is not None:
+            code += f":{exc.response.status_code}"
+        with connection() as db:
+            db.execute(
+                "UPDATE account_capital_sync SET status='failed',error_code=? WHERE account_id=?",
+                (code, account_id),
+            )
+        log.warning("Capital history sync failed for %s: %s", account_id, code)
+        if force:
+            raise
+
+
+def adjusted_drawdowns(db, account_id, points, scope, value_key):
+    if not points:
+        return []
+    windows = [
+        (stamp(r[0]), stamp(r[1]))
+        for r in db.execute(
+            "SELECT start_at,end_at FROM account_capital_coverage WHERE account_id=? "
+            "AND asset_scope=? ORDER BY start_at",
+            (account_id, scope),
+        )
+    ]
+    events = db.execute(
+        "SELECT occurred_at,currency,amount FROM account_capital_movements WHERE "
+        "account_id=? AND asset_scope=? AND (amount IS NULL OR amount!='0') AND "
+        "occurred_at>=? AND occurred_at<=? ORDER BY occurred_at",
+        (
+            account_id,
+            scope,
+            stamp(points[0].as_of).isoformat(),
+            stamp(points[-1].as_of).isoformat(),
+        ),
+    ).fetchall()
+    rates = db.execute(
+        "SELECT currency,as_of,usd_rate FROM account_valuation_rates WHERE "
+        "account_id=? AND as_of>=? AND as_of<=?",
+        (
+            account_id,
+            (stamp(points[0].as_of) - timedelta(minutes=5)).isoformat(),
+            (stamp(points[-1].as_of) + timedelta(minutes=5)).isoformat(),
+        ),
+    ).fetchall()
+
+    def covered(start, end):
+        cursor = start
+        for a, b in windows:
+            if a > cursor:
+                break
+            if b > cursor:
+                cursor = b
+            if cursor >= end:
+                return True
+        return False
+
+    nav = peak = Decimal(1)
+    result = [(None, "baseline")]
+    broken = False
+    for previous, point in zip(points, points[1:], strict=False):
+        a, b = stamp(previous.as_of), stamp(point.as_of)
+        initial, final = getattr(previous, value_key), getattr(point, value_key)
+        reason = None
+        if initial is None or final is None or initial <= 0 or final < 0 or b <= a:
+            reason = "invalid_equity"
+        elif not covered(a, b):
+            reason = "missing_history"
+        flow = weighted = Decimal(0)
+        for event in events:
+            t = stamp(event[0])
+            if not a < t <= b:
+                continue
+            if event[2] is None:
+                reason = "unclassified_flow"
+                continue
+            amount = Decimal(event[2])
+            if amount and event[1].upper() != (point.currency or "").upper():
+                candidates = [
+                    (abs((stamp(r[1]) - t).total_seconds()), Decimal(r[2]))
+                    for r in rates
+                    if r[0] == event[1]
+                ]
+                nearest = min(candidates, default=None)
+                if point.currency != "USD" or nearest is None or nearest[0] > 300:
+                    reason = "missing_flow_valuation"
+                    continue
+                amount *= nearest[1]
+            flow += amount
+            weighted += (
+                amount
+                * Decimal(str((b - t).total_seconds()))
+                / Decimal(str((b - a).total_seconds()))
+            )
+        denominator = (initial or Decimal(0)) + weighted
+        if denominator <= 0:
+            reason = reason or "invalid_capital"
+        if broken or reason:
+            result.append((None, reason or "history_gap"))
+            broken = True
+            continue
+        nav *= 1 + (final - initial - flow) / denominator
+        if nav < 0:
+            broken = True
+            result.append((None, "invalid_capital"))
+            continue
+        peak = max(peak, nav)
+        result.append(((nav / peak - 1) * 100, "estimated"))
+    return result
+
+
+def enrich_performance(account_id, points):
+    if not points:
+        return
+    with connection() as db:
+        for scope, value_key, field, quality in (
+            (points[-1].asset_scope, "equity", "equity_drawdown", "equity_drawdown_quality"),
+            (
+                "full_account",
+                "total_assets",
+                "total_assets_drawdown",
+                "total_assets_drawdown_quality",
+            ),
+        ):
+            for point, (value, state) in zip(
+                points, adjusted_drawdowns(db, account_id, points, scope, value_key), strict=True
+            ):
+                setattr(point, field, value)
+                setattr(point, quality, state)

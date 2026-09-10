@@ -3,6 +3,7 @@ from __future__ import annotations
 import sqlite3
 from datetime import UTC, datetime
 from decimal import Decimal
+from typing import Literal
 
 from fastapi import HTTPException
 
@@ -62,6 +63,9 @@ def reconcile_order(order_id: str) -> OrderResponse:
         expected_command_id=row["command_id"],
     )
     synchronize_trade_command_status(row["command_id"], order_id)
+    from app.execution_risk_repository import recheck_risks_for_order
+
+    recheck_risks_for_order(order_id, reason="Runtime order recovery completed")
     return get_order_response(order_id)
 
 
@@ -126,6 +130,8 @@ def apply_execution_events(
     events: list[dict[str, object]],
     *,
     expected_command_id: str,
+    fill_origin: Literal["runtime_confirmation", "venue_execution"] = "runtime_confirmation",
+    fill_source: str = "runtime_v1",
 ) -> None:
     validated_events = _validated_execution_events(
         events,
@@ -133,6 +139,7 @@ def apply_execution_events(
         expected_order_id=order_id,
     )
     with connection() as db:
+        db.execute("BEGIN IMMEDIATE")
         for event in validated_events:
             event_type = str(event["event_type"])
             occurred_at = str(event["occurred_at"])
@@ -164,10 +171,28 @@ def apply_execution_events(
                     fill_price=Decimal(str(event["fill_price"])),
                     fill_quantity=Decimal(str(event["fill_quantity"])),
                     occurred_at=occurred_at,
+                    origin=fill_origin,
+                    source=fill_source,
+                    external_fill_id=str(event["event_id"])
+                    if fill_origin == "venue_execution"
+                    else None,
+                )
+                cumulative = sum(
+                    (
+                        Decimal(row[0])
+                        for row in db.execute(
+                            "SELECT quantity FROM fills WHERE order_id=?", (order_id,)
+                        )
+                    ),
+                    Decimal(0),
                 )
                 db.execute(
                     "UPDATE orders SET status = ?, updated_at = ? WHERE id = ?",
-                    ("filled", occurred_at, order_id),
+                    (
+                        "filled" if cumulative == request.quantity else "partially_filled",
+                        occurred_at,
+                        order_id,
+                    ),
                 )
 
 
@@ -199,6 +224,9 @@ def _record_fill_and_update_operational_projections(
     fill_price: Decimal,
     fill_quantity: Decimal,
     occurred_at: str,
+    origin: Literal["runtime_confirmation", "venue_execution"] = "runtime_confirmation",
+    source: str = "runtime_v1",
+    external_fill_id: str | None = None,
 ) -> bool:
     fill_values = (
         order_id,
@@ -223,6 +251,13 @@ def _record_fill_and_update_operational_projections(
             raise HTTPException(status_code=502, detail="Fill identity has conflicting payload")
         return False
 
+    origins = {
+        row[0]
+        for row in db.execute("SELECT DISTINCT origin FROM fills WHERE order_id=?", (order_id,))
+    }
+    if origins and origins != {origin}:
+        raise HTTPException(502, "Execution projection sources overlap; reconcile native evidence")
+
     # Cumulative-fill ceiling (defense-in-depth): total filled quantity must
     # never exceed the instruction quantity. Runtime enforces this precisely;
     # the Platform asserts it fail-closed on the confirmed fill path.
@@ -243,10 +278,11 @@ def _record_fill_and_update_operational_projections(
     db.execute(
         """
         INSERT INTO fills (
-            id, order_id, account_id, instrument_id, side, quantity, price, occurred_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            id, order_id, account_id, instrument_id, side, quantity, price, occurred_at,
+            origin, source, external_fill_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
-        (fill_id, *fill_values),
+        (fill_id, *fill_values, origin, source, external_fill_id),
     )
     signed_fill = fill_quantity if request.side == "buy" else -fill_quantity
 
@@ -354,6 +390,7 @@ def record_fill_and_update_operational_projections(
     occurred_at: str,
 ) -> bool:
     with connection() as db:
+        db.execute("BEGIN IMMEDIATE")
         return _record_fill_and_update_operational_projections(
             db,
             fill_id=fill_id,
@@ -371,46 +408,11 @@ def synchronize_order_with_authoritative_facts(
     external_order: dict[str, object],
     external_fills: list[dict[str, object]],
 ) -> None:
-    row = get_order_row(order_id)
-    request = request_from_order_row(row)
-    status = _mapped_external_order_status(str(external_order.get("status") or "unknown"))
-    external_order_id = external_order.get("externalOrderId")
-    occurred_at = str(external_order.get("asOf") or now_iso())
+    from app.venue_reconciliation_service import reconcile_order_snapshot
 
-    with connection() as db:
-        for fill in external_fills:
-            platform_order_id = str(fill.get("platformOrderId") or "")
-            if platform_order_id != order_id:
-                raise HTTPException(status_code=502, detail="Runtime fill order mismatch")
-            _record_fill_and_update_operational_projections(
-                db,
-                fill_id=str(fill["externalFillId"]),
-                order_id=order_id,
-                request=request,
-                fill_price=Decimal(str(fill["price"])),
-                fill_quantity=Decimal(str(fill["quantity"])),
-                occurred_at=str(fill["occurredAt"]),
-            )
-        db.execute(
-            """
-            UPDATE orders
-            SET status = ?, external_order_id = COALESCE(?, external_order_id), updated_at = ?
-            WHERE id = ?
-            """,
-            (status, external_order_id, occurred_at, order_id),
-        )
-    synchronize_trade_command_status(row["command_id"], order_id)
-
-
-def _mapped_external_order_status(status: str) -> str:
-    return {
-        "accepted": "accepted",
-        "partially_filled": "partially_filled",
-        "filled": "filled",
-        "canceled": "canceled",
-        "rejected": "rejected",
-        "unknown": "result_unknown",
-    }.get(status, "result_unknown")
+    result = reconcile_order_snapshot(order_id, external_order=external_order, fills=external_fills)
+    if result.difference_ids:
+        raise HTTPException(status_code=502, detail="Authoritative order reconciliation differs")
 
 
 def get_order_row(order_id: str):

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from datetime import UTC, datetime
+from decimal import Decimal
 from sqlite3 import Row
 from uuid import uuid4
 
@@ -65,6 +66,43 @@ def now_iso() -> str:
     return datetime.now(UTC).isoformat()
 
 
+def effective_venue_event(db, account_id: str, event_type: str, payload: dict) -> dict:
+    """Apply an explicitly accepted timestamp correction, retaining the raw receipt.
+
+    Acceptance must match the complete old receipt and can change only its time.
+    It cannot approve changed amounts, ownership, or a later third timestamp.
+    """
+    if not db.execute(
+        "SELECT 1 FROM sqlite_master WHERE name='reconciliation_differences'"
+    ).fetchone():
+        return payload
+    external_id = payload.get("externalFillId" if event_type == "trade_fill" else "externalEventId")
+    rows = db.execute(
+        "SELECT d.local_value_json,d.external_value_json FROM reconciliation_differences d "
+        "JOIN venue_reconciliation_runs r ON r.id=d.run_id "
+        "WHERE r.account_id=? AND r.source=? AND d.entity_type='venue_event' "
+        "AND d.difference_type='timestamp_mismatch' AND d.external_reference=? "
+        "AND d.status='accepted' AND d.resolution_actor IS NOT NULL "
+        "AND d.resolved_at IS NOT NULL",
+        (account_id, payload.get("source"), f"{event_type}:{external_id}"),
+    ).fetchall()
+    result = payload
+    for row in rows:
+        original = json.loads(row["local_value_json"])
+        corrected = json.loads(row["external_value_json"])
+        if original != payload:
+            continue
+        if (
+            {**original, "occurredAt": corrected.get("occurredAt")} != corrected
+            or not corrected.get("occurredAt")
+            or datetime.fromisoformat(corrected["occurredAt"].replace("Z", "+00:00")).tzinfo is None
+            or (result != payload and result != corrected)
+        ):
+            raise ValueError("Accepted venue timestamp correction is inconsistent")
+        result = corrected
+    return result
+
+
 def ensure_schema() -> None:
     with connection() as db:
         db.executescript(SCHEMA_SQL)
@@ -105,18 +143,26 @@ def update_order_from_external(
     updated_at: object,
 ) -> None:
     with connection() as db:
+        db.execute("BEGIN IMMEDIATE")
+        requested = db.execute("SELECT quantity FROM orders WHERE id=?", (order_id,)).fetchone()
+        full_projection = requested is not None and has_full_execution_projection(
+            order_id, Decimal(requested["quantity"]), db=db
+        )
         db.execute(
             """
             UPDATE orders
             SET status = ?, external_order_id = ?, updated_at = ?
-            WHERE id = ? AND status != 'filled'
+            WHERE id = ? AND (status != 'filled' OR ? = 0)
             """,
-            (status, external_order_id, updated_at, order_id),
+            (status, external_order_id, updated_at, order_id, int(full_projection)),
         )
         if status != "filled":
             return
         leg = db.execute(
-            "SELECT batch_id FROM execution_batch_legs WHERE order_id = ?", (order_id,)
+            "SELECT l.batch_id FROM execution_batch_legs l "
+            "JOIN execution_batches b ON b.id=l.batch_id "
+            "WHERE l.order_id = ? AND b.strategy_key != 'funding_arbitrage'",
+            (order_id,),
         ).fetchone()
         if leg is None:
             return
@@ -171,21 +217,35 @@ def update_order_from_external(
                     )
                 from app import execution_risk_repository as risk_repository
 
-                risk_repository.release_claims_for_owner(
-                    "batch", batch_id, db=db
-                )
-                risk_repository.release_reservations_for_owner(
-                    "batch", batch_id, db=db
-                )
+                risk_repository.release_claims_for_owner("batch", batch_id, db=db)
+                risk_repository.release_reservations_for_owner("batch", batch_id, db=db)
 
 
 def list_fill_quantities(order_id: str) -> list[object]:
+    from app.venue_identity_repository import order_execution_evidence
+
     with connection() as db:
+        quantity, _, complete, _ = order_execution_evidence(db, order_id)
+        if complete:
+            return [str(quantity)]
         rows = db.execute(
             "SELECT quantity FROM fills WHERE order_id = ?",
             (order_id,),
         ).fetchall()
     return [row["quantity"] for row in rows]
+
+
+def has_full_execution_projection(order_id: str, requested: Decimal, *, db=None) -> bool:
+    """A full operational receipt already applied this order to positions."""
+    if db is None:
+        with connection() as managed:
+            return has_full_execution_projection(order_id, requested, db=managed)
+    rows = db.execute("SELECT origin,quantity FROM fills WHERE order_id=?", (order_id,)).fetchall()
+    return any(
+        sum((Decimal(row["quantity"]) for row in rows if row["origin"] == origin), Decimal(0))
+        == requested
+        for origin in ("runtime_confirmation", "venue_execution")
+    ) or any(row["origin"] == "legacy" and Decimal(row["quantity"]) == requested for row in rows)
 
 
 def ensure_standalone_order_run(

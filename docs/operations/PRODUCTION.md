@@ -48,6 +48,27 @@ Warning 至少包括：
 
 Query Failure 与空集合不同，不得以零值掩盖错误。
 
+本地 Platform→Runtime 的 `VG_RUNTIME_TIMEOUT_SECONDS` 使用现有默认值 `20`，示例配置与实际维护配置保持一致。完整 Bybit 账户快照包含分市场分页订单、成交、资产分类和经济事件，本机实取曾需约 7 秒；旧 5 秒配置会在 Runtime 正常完成读取前令 Platform 报超时。该配置只规定单次 HTTP 等待上限，不增加交易重试；失败仍保留上次成功快照并标记过期。
+
+### Local Prometheus metrics
+
+`prometheus-client==0.26.0` instruments existing processes. Platform serves `GET /api/v1/ops/metrics` under the existing authenticated `audit:read` permission. Runtime serves `GET /metrics` only to loopback clients (`127.0.0.1`/`::1`). These are exports, not an installed Prometheus server, Grafana deployment or new authentication system; remote collection and service installation require a separate deployment decision.
+
+| Metric family | Evidence and interpretation |
+|---|---|
+| `vg_platform_runtime_request_seconds` | Histogram of individual Platform→Runtime HTTP attempts, by GET/POST and outcome. Timeout, transport failure, HTTP class and rate limit remain distinct. |
+| `vg_runtime_venue_request_seconds` | Bybit HTTP or MT5 Worker-call duration by venue, bounded operation and outcome. Bybit HTTP 429 and native rate-limit codes are classified separately; this is not order-to-fill latency. |
+| `vg_platform_pending_instructions`, `vg_platform_pending_batches`, `vg_platform_pending_risks` | Counts from existing Platform rows by strategy/state. Their `*_oldest_seconds` report age since work creation, or since the recorded risk update; they do not invent when a risk first began. |
+| `vg_runtime_pending_commands` and `*_oldest_seconds` | Persisted `processing`/`result_unknown` counts and age since claim, reconstructed from the journal after process restart. |
+| `vg_platform_account_sync`, `*_oldest_success_seconds`, `vg_platform_account_snapshot_oldest_seconds` | Persisted sync result, last successful retrieval age and source snapshot age by venue/state. Missing time evidence remains NaN; `vg_platform_account_evidence_missing` counts absent evidence separately. |
+| `vg_runtime_mt5_worker_starts_total`, `vg_runtime_mt5_worker_ready` | Starts and current process liveness after the fixed-account identity handshake. Logical account labels are limited to configured Workers; zero or absent does not authorize a restart or order replay. |
+
+Scraping uses SQLite `mode=ro`, never invokes schema initialization, starts a Worker, queries a venue, reconciles a command or writes an alert. Unavailable stores export `vg_platform_metrics_snapshot_available=0` or `vg_runtime_metrics_journal_available=0`, with their business counts omitted. An uninitialized optional risk store exports `vg_platform_metrics_risk_store_available=0`. Empty state groups are absent; dashboards must first check store availability before treating missing counts as zero. Invalid or missing timestamps cannot be displayed as fresh.
+
+No financial amounts, PnL, external account numbers, order/client IDs, credentials, arbitrary URLs or raw errors become metric labels. Detailed unresolved-command warnings carry Platform order/command correlation IDs and an error class; original execution evidence stays in its existing journal. Request counters and process metrics reset with the process; persistent work counts come from the stores. Thresholds, alerts and unattended operational actions are not inferred from metric availability. Existing operational alerts continue to own acknowledgment and disposition; Prometheus is not another ledger or trading state authority.
+
+The installed client uses the standard [Prometheus metric types](https://prometheus.github.io/client_python/instrumenting/). Single-process in-memory metrics match the current local topology; future multi-worker/remote deployments must explicitly configure aggregation and collection rather than assuming the local counters cover every process.
+
 ## 3. Alert Identity
 
 Fingerprint：

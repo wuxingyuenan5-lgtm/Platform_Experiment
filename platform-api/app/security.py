@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import json
 from decimal import Decimal
 
 import httpx
 from fastapi import HTTPException
 
+from app import runtime_transport
 from app.config import get_settings
 from app.database import connection
 from app.schemas import (
@@ -24,16 +26,9 @@ def get_trading_safety() -> TradingSafetyResponse:
     return TradingSafetyResponse(
         liveTradingEnabled=settings.live_trading_enabled,
         defaultTradingEnvironment=settings.default_trading_environment,
-        founderDemoLocalSelfApprovalEnabled=(
-            settings.founder_demo_live_acceptance_enabled
-            and settings.environment.lower() == "development"
-            and settings.auth_mode.lower() == "development"
-        ),
+        founderDemoLocalSelfApprovalEnabled=False,
         secretStoragePolicy="database_stores_references_only",
-        liveGuardPolicy=(
-            "all_accounts_fail_closed_live_requires_global_switch_authentication_"
-            "and_two_person_session"
-        ),
+        liveGuardPolicy="authenticated_trading_account_binding_and_risk_checks",
     )
 
 
@@ -66,7 +61,7 @@ def list_credential_references() -> list[CredentialReferenceResponse]:
 def get_exchange_connectivity() -> ExchangeConnectivityResponse:
     settings = get_settings()
     try:
-        response = httpx.get(
+        response = runtime_transport.get(
             f"{settings.runtime_base_url}/gateway/connectivity",
             timeout=settings.runtime_timeout_seconds,
         )
@@ -82,7 +77,7 @@ def get_exchange_connectivity() -> ExchangeConnectivityResponse:
 def get_exchange_venue_readiness() -> ExchangeVenueReadinessResponse:
     settings = get_settings()
     try:
-        response = httpx.get(
+        response = runtime_transport.get(
             f"{settings.runtime_base_url}/gateway/venue-readiness",
             timeout=max(settings.runtime_timeout_seconds, 20.0),
         )
@@ -127,9 +122,54 @@ def enforce_order_safety(
             detail="Instrument has no active contract specification",
         )
 
-    min_order_quantity = Decimal(instrument["min_order_quantity"])
-    quantity_step = Decimal(instrument["quantity_step"])
-    price_tick = Decimal(instrument["price_tick"])
+    specification = dict(instrument)
+    if account["environment"] == LIVE_ENVIRONMENT and instrument["instrument_type"] in {
+        "crypto_spot",
+        "crypto_perp",
+    }:
+        if not get_settings().live_trading_enabled:
+            raise HTTPException(403, "Live trading is disabled by global safety switch")
+        category = "spot" if instrument["instrument_type"] == "crypto_spot" else "linear"
+        try:
+            response = runtime_transport.get(
+                f"{get_settings().runtime_base_url}/venue/instruments/{symbol}",
+                params={
+                    "accountId": account_id,
+                    "instrumentType": instrument["instrument_type"],
+                    "category": category,
+                },
+            )
+            response.raise_for_status()
+            native = response.json()
+            if (
+                any(
+                    native.get(field) != value
+                    for field, value in (
+                        ("accountId", account_id),
+                        ("symbol", symbol),
+                        ("instrumentType", instrument["instrument_type"]),
+                        ("category", category),
+                        ("dataQualityState", "complete"),
+                    )
+                )
+                or str(native.get("status", "")).lower() != "trading"
+            ):
+                raise ValueError("Native specification identity or state is invalid")
+            for target, field in (
+                ("min_order_quantity", "minQuantity"),
+                ("quantity_step", "quantityStep"),
+                ("price_tick", "priceTick"),
+            ):
+                value = Decimal(str(native[field]))
+                if not value.is_finite() or value <= 0:
+                    raise ValueError("Native specification quantity or price is invalid")
+                specification[target] = value
+        except (httpx.HTTPError, KeyError, TypeError, ValueError, ArithmeticError) as exc:
+            raise HTTPException(409, "Native order specification is unavailable") from exc
+
+    min_order_quantity = Decimal(specification["min_order_quantity"])
+    quantity_step = Decimal(specification["quantity_step"])
+    price_tick = Decimal(specification["price_tick"])
 
     if quantity < min_order_quantity:
         raise HTTPException(status_code=422, detail="Order quantity is below minimum")
@@ -153,39 +193,83 @@ def enforce_order_safety(
             status_code=403,
             detail="Live trading is disabled by global safety switch",
         )
-    founder_demo_acceptance = (
-        settings.founder_demo_live_acceptance_enabled
-        and settings.environment.lower() == "development"
-        and settings.auth_mode.lower() == "development"
-    )
-    if settings.auth_mode.lower() != "api_key" and not founder_demo_acceptance:
-        raise HTTPException(
-            status_code=503,
-            detail="Live trading requires production authentication",
-        )
-    if not settings.require_live_trading_session:
-        raise HTTPException(
-            status_code=503,
-            detail="LiveTradingSession enforcement cannot be disabled in live trading",
-        )
     if None in {strategy_instance_id, symbol, side, order_type, command_id}:
         raise HTTPException(
             status_code=403,
-            detail="Live order lacks an approved-session identity boundary",
+            detail="Live order lacks a strategy and command identity boundary",
         )
 
-    from app.live_session_claims import validate_and_claim_live_session_atomic
+    assert_live_account_execution_allowed(account_id, str(strategy_instance_id))
 
-    validate_and_claim_live_session_atomic(
-        command_id=str(command_id),
-        strategy_instance_id=str(strategy_instance_id),
-        account_id=account_id,
-        symbol=str(symbol),
-        side=str(side),
-        order_type=str(order_type),
-        quantity=quantity,
-        price=price,
-    )
+
+def assert_live_account_execution_allowed(account_id: str, strategy_instance_id: str) -> None:
+    """Shared batch preflight and last-moment per-order live account checks."""
+    account = get_account_security_row(account_id)
+    if account is None:
+        raise HTTPException(404, "Account not found")
+    if account["environment"] != LIVE_ENVIRONMENT:
+        return
+    if not get_settings().live_trading_enabled:
+        raise HTTPException(403, "Live trading is disabled by global safety switch")
+    from app.execution_risk import assert_execution_allowed
+    from app.venue_reconciliation_repository import effective_venue_event
+    from app.venue_reconciliation_repository import ensure_schema as ensure_reconciliation_schema
+
+    assert_execution_allowed(str(strategy_instance_id), [account_id])
+    ensure_reconciliation_schema()
+    with connection() as db:
+        binding = db.execute(
+            """
+            SELECT 1 FROM strategy_account_bindings
+            WHERE strategy_instance_id = ? AND account_id = ?
+              AND status = 'active' AND capability = 'trade_and_read'
+            """,
+            (strategy_instance_id, account_id),
+        ).fetchone()
+        if binding is None:
+            raise HTTPException(
+                status_code=403, detail="Account has no active strategy trading binding"
+            )
+        differences = db.execute(
+            """
+            SELECT rd.* FROM reconciliation_differences rd
+            JOIN venue_reconciliation_runs vr ON vr.id = rd.run_id
+            WHERE vr.strategy_instance_id = ? AND vr.account_id = ?
+              AND rd.status IN ('open', 'accepted')
+              AND NOT (
+                  rd.status = 'accepted' AND rd.difference_type = 'missing_external'
+                  AND EXISTS (
+                      SELECT 1 FROM orders o
+                      WHERE o.id = rd.local_reference AND o.status = 'rejected'
+                  )
+              )
+            """,
+            (strategy_instance_id, account_id),
+        ).fetchall()
+        for difference in differences:
+            if (
+                difference["status"] == "accepted"
+                and difference["difference_type"] == "timestamp_mismatch"
+                and difference["entity_type"] == "venue_event"
+            ):
+                # Use the same exact-receipt, time-only evidence as ingestion.
+                # Acceptance alone never waives an amount or identity conflict.
+                try:
+                    original = json.loads(difference["local_value_json"])
+                    corrected = json.loads(difference["external_value_json"])
+                    event_type = str(difference["external_reference"]).split(":", 1)[0]
+                    if (
+                        original.get("accountId") == account_id
+                        and original != corrected
+                        and effective_venue_event(db, account_id, event_type, original) == corrected
+                    ):
+                        continue
+                except (ValueError, TypeError, AttributeError):
+                    pass  # Invalid accepted evidence remains a blocking difference.
+            raise HTTPException(
+                status_code=423,
+                detail="Outstanding open or accepted reconciliation differences exist",
+            )
 
 
 def _account_is_order_eligible(status: str, environment: str) -> bool:
@@ -210,7 +294,7 @@ def get_instrument_security_row(instrument_id: str):
     with connection() as db:
         return db.execute(
             """
-            SELECT i.id,
+            SELECT i.id, i.instrument_type,
                    cs.version AS contract_version,
                    cs.price_tick,
                    cs.min_order_quantity,

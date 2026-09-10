@@ -8,6 +8,7 @@
     "strategy_instance_id": "strategy-golden-001",
     "account_id": "account-golden-001",
     "instrument_id": "instrument-golden-001",
+    "instrument_type": null,
     "symbol": "BTCUSDT",
     "side": "buy",
     "order_type": "limit",

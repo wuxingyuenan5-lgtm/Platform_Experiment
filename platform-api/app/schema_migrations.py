@@ -487,9 +487,7 @@ PLATFORM_MIGRATIONS: tuple[Migration, ...] = (
     Migration(
         version=14,
         name="funding-attempt-requested-quantity",
-        statements=(
-            "ALTER TABLE funding_perpetual_attempts ADD COLUMN requested_quantity TEXT",
-        ),
+        statements=("ALTER TABLE funding_perpetual_attempts ADD COLUMN requested_quantity TEXT",),
     ),
     Migration(
         version=15,
@@ -653,6 +651,180 @@ PLATFORM_MIGRATIONS: tuple[Migration, ...] = (
             """,
         ),
     ),
+    Migration(
+        version=21,
+        name="a-share-enforced-schema-and-pool-configuration",
+        statements=(
+            # Repair databases created by the former repository DDL guard.
+            # That guard allowed orphaned refresh IDs, so preserve the snapshot
+            # while dropping only an unverifiable legacy provenance reference.
+            """CREATE TABLE research_a_share_refresh_runs_v21 (
+                run_id TEXT PRIMARY KEY, target_trade_date TEXT, started_at TEXT NOT NULL,
+                finished_at TEXT, status TEXT NOT NULL
+                    CHECK(status IN ('running','ready','partial','error')),
+                error_code TEXT, message TEXT)""",
+            "INSERT INTO research_a_share_refresh_runs_v21 "
+            "SELECT * FROM research_a_share_refresh_runs",
+            """CREATE TABLE research_a_share_dataset_snapshots_v21 (
+                dataset TEXT PRIMARY KEY, observed_at TEXT, fetched_at TEXT NOT NULL,
+                status TEXT NOT NULL CHECK(status IN ('ready','partial','stale','error','no_data')),
+                source TEXT NOT NULL, payload_json TEXT, error_code TEXT, message TEXT,
+                refresh_run_id TEXT REFERENCES research_a_share_refresh_runs_v21(run_id))""",
+            """INSERT INTO research_a_share_dataset_snapshots_v21
+                SELECT dataset, observed_at, fetched_at, status, source, payload_json,
+                    error_code, message,
+                    CASE WHEN refresh_run_id IS NULL OR EXISTS (
+                        SELECT 1 FROM research_a_share_refresh_runs_v21 run
+                        WHERE run.run_id = research_a_share_dataset_snapshots.refresh_run_id
+                    ) THEN refresh_run_id ELSE NULL END
+                FROM research_a_share_dataset_snapshots""",
+            """CREATE TABLE research_a_share_history_v21 (
+                dataset TEXT NOT NULL, observed_at TEXT NOT NULL, entity_code TEXT NOT NULL,
+                payload_json TEXT NOT NULL, source TEXT NOT NULL, fetched_at TEXT NOT NULL,
+                refresh_run_id TEXT REFERENCES research_a_share_refresh_runs_v21(run_id),
+                PRIMARY KEY(dataset, observed_at, entity_code))""",
+            """INSERT INTO research_a_share_history_v21
+                SELECT dataset, observed_at, entity_code, payload_json, source, fetched_at,
+                    CASE WHEN refresh_run_id IS NULL OR EXISTS (
+                        SELECT 1 FROM research_a_share_refresh_runs_v21 run
+                        WHERE run.run_id = research_a_share_history.refresh_run_id
+                    ) THEN refresh_run_id ELSE NULL END
+                FROM research_a_share_history""",
+            "DROP TABLE research_a_share_history",
+            "DROP TABLE research_a_share_dataset_snapshots",
+            "DROP TABLE research_a_share_refresh_runs",
+            "ALTER TABLE research_a_share_refresh_runs_v21 RENAME TO research_a_share_refresh_runs",
+            (
+                "ALTER TABLE research_a_share_dataset_snapshots_v21 RENAME TO research_a_shar"
+                "e_dataset_snapshots"
+            ),
+            "ALTER TABLE research_a_share_history_v21 RENAME TO research_a_share_history",
+            (
+                "CREATE INDEX idx_research_a_share_refresh_runs_finished ON research_a_share_"
+                "refresh_runs(finished_at DESC)"
+            ),
+            (
+                "CREATE INDEX idx_research_a_share_history_lookup ON research_a_share_history"
+                "(dataset, observed_at DESC)"
+            ),
+            """CREATE TABLE research_a_share_pool_config (
+                id INTEGER PRIMARY KEY CHECK(id=1), codes_json TEXT NOT NULL,
+                row_version INTEGER NOT NULL CHECK(row_version>=1), updated_at TEXT NOT NULL)""",
+            """INSERT INTO research_a_share_pool_config (id,codes_json,row_version,updated_at)
+                SELECT 1, (SELECT json_group_array(json_extract(value,'$.code'))
+                    FROM json_each(payload_json,'$.stocks')), 1, fetched_at
+                FROM research_a_share_dataset_snapshots WHERE dataset='stock_pool'
+                    AND json_type(payload_json,'$.stocks')='array'""",
+        ),
+    ),
+    Migration(
+        version=22,
+        name="strategy-account-snapshot-scope-and-venue-events",
+        statements=(
+            """CREATE TABLE IF NOT EXISTS financial_facts (
+                id TEXT PRIMARY KEY, idempotency_key TEXT NOT NULL UNIQUE,
+                content_hash TEXT NOT NULL, fact_type TEXT NOT NULL, source TEXT NOT NULL,
+                external_id TEXT NOT NULL, strategy_instance_id TEXT NOT NULL,
+                account_id TEXT, instrument_id TEXT, side TEXT, quantity TEXT,
+                quantity_unit TEXT, price TEXT, contract_multiplier TEXT, amount TEXT,
+                currency TEXT, base_currency TEXT NOT NULL, fx_rate_to_base TEXT,
+                converted_amount TEXT, available_balance TEXT, occurred_at TEXT NOT NULL,
+                payload_json TEXT NOT NULL, data_quality_state TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                UNIQUE(source, external_id, fact_type, strategy_instance_id),
+                FOREIGN KEY(strategy_instance_id) REFERENCES strategy_instances(id),
+                FOREIGN KEY(account_id) REFERENCES accounts(id),
+                FOREIGN KEY(instrument_id) REFERENCES instruments(id))""",
+            """CREATE INDEX IF NOT EXISTS idx_financial_facts_strategy_time
+                ON financial_facts(strategy_instance_id, occurred_at)""",
+            """CREATE INDEX IF NOT EXISTS idx_financial_facts_account_instrument
+                ON financial_facts(account_id, instrument_id, occurred_at)""",
+            """CREATE TABLE IF NOT EXISTS account_sync_status (
+                account_id TEXT PRIMARY KEY, status TEXT NOT NULL, error_code TEXT,
+                last_attempt_at TEXT, last_success_at TEXT, updated_at TEXT NOT NULL,
+                FOREIGN KEY(account_id) REFERENCES accounts(id))""",
+            """CREATE TABLE IF NOT EXISTS account_risk_snapshots (
+                account_id TEXT NOT NULL, as_of TEXT NOT NULL, currency TEXT NOT NULL,
+                equity TEXT, margin TEXT, free_margin TEXT, margin_level TEXT,
+                data_quality_state TEXT NOT NULL, created_at TEXT NOT NULL,
+                PRIMARY KEY(account_id, as_of), FOREIGN KEY(account_id) REFERENCES accounts(id))""",
+            "ALTER TABLE account_risk_snapshots ADD COLUMN payload_json TEXT NOT NULL DEFAULT '{}'",
+            "ALTER TABLE account_risk_snapshots ADD COLUMN total_assets TEXT",
+            (
+                "ALTER TABLE account_risk_snapshots ADD COLUMN asset_scope "
+                "TEXT NOT NULL DEFAULT 'unspecified'"
+            ),
+            """CREATE TABLE account_venue_snapshots (
+                account_id TEXT PRIMARY KEY, source TEXT NOT NULL, venue TEXT NOT NULL,
+                as_of TEXT NOT NULL, history_start TEXT, history_end TEXT,
+                data_quality_state TEXT NOT NULL, payload_json TEXT NOT NULL,
+                FOREIGN KEY(account_id) REFERENCES accounts(id))""",
+            """CREATE TABLE venue_account_events (
+                account_id TEXT NOT NULL, source TEXT NOT NULL, event_type TEXT NOT NULL,
+                external_id TEXT NOT NULL, instrument_id TEXT, platform_order_id TEXT,
+                occurred_at TEXT NOT NULL, amount TEXT, currency TEXT, payload_json TEXT NOT NULL,
+                PRIMARY KEY(account_id, source, event_type, external_id),
+                FOREIGN KEY(account_id) REFERENCES accounts(id))""",
+            (
+                "CREATE INDEX idx_venue_account_events_time "
+                "ON venue_account_events(account_id, occurred_at DESC)"
+            ),
+            (
+                "CREATE INDEX idx_venue_account_events_order "
+                "ON venue_account_events(platform_order_id, event_type)"
+            ),
+            "ALTER TABLE orders ADD COLUMN venue_payload_json TEXT",
+            """CREATE TABLE balance_snapshots_v22 (
+                id TEXT PRIMARY KEY, account_id TEXT NOT NULL, currency TEXT NOT NULL,
+                equity TEXT NOT NULL, available_balance TEXT, source TEXT NOT NULL,
+                data_quality_state TEXT NOT NULL, as_of TEXT NOT NULL, created_at TEXT NOT NULL,
+                FOREIGN KEY(account_id) REFERENCES accounts(id))""",
+            "INSERT INTO balance_snapshots_v22 SELECT * FROM balance_snapshots",
+            "DROP TABLE balance_snapshots",
+            "ALTER TABLE balance_snapshots_v22 RENAME TO balance_snapshots",
+            "CREATE INDEX idx_balance_snapshots_account ON balance_snapshots(account_id, as_of)",
+        ),
+    ),
+    Migration(
+        version=23,
+        name="operational-fill-provenance",
+        statements=(
+            "ALTER TABLE fills ADD COLUMN origin TEXT NOT NULL DEFAULT 'legacy' "
+            "CHECK(origin IN ('legacy','runtime_confirmation','venue_execution'))",
+            "ALTER TABLE fills ADD COLUMN source TEXT",
+            "ALTER TABLE fills ADD COLUMN external_fill_id TEXT",
+        ),
+    ),
+)
+
+
+PLATFORM_MIGRATIONS += (
+    Migration(version=24, name="account-capital-movements", statements=(
+        """CREATE TABLE account_capital_movements (
+            account_id TEXT NOT NULL REFERENCES accounts(id), external_event_id TEXT NOT NULL,
+            asset_scope TEXT NOT NULL, occurred_at TEXT NOT NULL, currency TEXT NOT NULL,
+            amount TEXT, event_type TEXT NOT NULL, payload_json TEXT NOT NULL,
+            PRIMARY KEY(account_id, asset_scope, external_event_id))""",
+        "CREATE INDEX ix_capital_movement_time ON account_capital_movements(account_id, asset_scope, occurred_at)",
+        """CREATE TABLE account_capital_coverage (
+            account_id TEXT NOT NULL REFERENCES accounts(id), asset_scope TEXT NOT NULL,
+            start_at TEXT NOT NULL, end_at TEXT NOT NULL, updated_at TEXT NOT NULL,
+            PRIMARY KEY(account_id, asset_scope, start_at))""",
+        """CREATE TABLE account_capital_sync (
+            account_id TEXT PRIMARY KEY REFERENCES accounts(id), attempted_at TEXT NOT NULL,
+            status TEXT NOT NULL, error_code TEXT)""",
+        """CREATE TABLE account_valuation_rates (
+            account_id TEXT NOT NULL REFERENCES accounts(id), currency TEXT NOT NULL,
+            as_of TEXT NOT NULL, usd_rate TEXT NOT NULL,
+            PRIMARY KEY(account_id, currency, as_of))""",
+    )),
+)
+
+
+PLATFORM_MIGRATIONS += (
+    Migration(version=25, name="capital-valuation-provenance", statements=(
+        "ALTER TABLE account_valuation_rates ADD COLUMN source TEXT NOT NULL DEFAULT 'bybit_wallet'",
+    )),
 )
 
 
@@ -690,15 +862,22 @@ def apply_migrations(
                 )
             continue
 
-        for statement in migration.statements:
-            db.execute(statement)
-        db.execute(
-            """
-            INSERT INTO schema_migrations (version, name, checksum, applied_at)
-            VALUES (?, ?, ?, ?)
-            """,
-            (migration.version, migration.name, migration.checksum, utc_now_iso()),
-        )
+        db.execute("SAVEPOINT schema_migration")
+        try:
+            for statement in migration.statements:
+                db.execute(statement)
+            db.execute(
+                """
+                INSERT INTO schema_migrations (version, name, checksum, applied_at)
+                VALUES (?, ?, ?, ?)
+                """,
+                (migration.version, migration.name, migration.checksum, utc_now_iso()),
+            )
+        except Exception:
+            db.execute("ROLLBACK TO SAVEPOINT schema_migration")
+            db.execute("RELEASE SAVEPOINT schema_migration")
+            raise
+        db.execute("RELEASE SAVEPOINT schema_migration")
 
 
 def apply_platform_migrations() -> None:

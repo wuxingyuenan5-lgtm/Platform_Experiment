@@ -2,12 +2,13 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
 from fastapi.testclient import TestClient
 
 from app.config import get_settings
 from app.main import app
 
-STRATEGY_ID = "strategy_funding_arbitrage_instance_default"
+STRATEGY_ID = "strategy_generic_pipeline_test"
 ACCOUNT_ID = "account_sim_usdt"
 INSTRUMENT_ID = "instrument_btc_usdt"
 
@@ -45,7 +46,7 @@ def test_incompatible_runtime_event_keeps_order_result_unknown(
 ) -> None:
     get_settings().database_path = str(tmp_path / "contract-failure.db")
 
-    def fake_post(url, json, timeout):
+    def fake_post(url, json, timeout, **kwargs):
         assert url.endswith("/commands/orders")
         assert timeout > 0
         return FakeResponse(
@@ -63,7 +64,7 @@ def test_incompatible_runtime_event_keeps_order_result_unknown(
             ]
         )
 
-    monkeypatch.setattr("app.trade_command_execution.httpx.post", fake_post)
+    monkeypatch.setattr("app.runtime_transport.post", fake_post)
 
     with TestClient(app) as client:
         response = client.post(
@@ -81,7 +82,7 @@ def test_fill_before_ack_remains_filled_and_projects_once(
 ) -> None:
     get_settings().database_path = str(tmp_path / "out-of-order.db")
 
-    def fake_post(url, json, timeout):
+    def fake_post(url, json, timeout, **kwargs):
         assert url.endswith("/commands/orders")
         assert timeout > 0
         shared = {
@@ -122,7 +123,7 @@ def test_fill_before_ack_remains_filled_and_projects_once(
             ]
         )
 
-    monkeypatch.setattr("app.trade_command_execution.httpx.post", fake_post)
+    monkeypatch.setattr("app.runtime_transport.post", fake_post)
 
     with TestClient(app) as client:
         response = client.post(
@@ -153,7 +154,7 @@ def _latest_order_state() -> tuple[str, str | None, int, int]:
 def test_late_invalid_event_rolls_back_earlier_ack(tmp_path: Path, monkeypatch) -> None:
     get_settings().database_path = str(tmp_path / "atomic-event-batch.db")
 
-    def fake_post(url, json, timeout):
+    def fake_post(url, json, timeout, **kwargs):
         assert url.endswith("/commands/orders")
         shared = {
             "contract_name": "runtime-event",
@@ -186,7 +187,7 @@ def test_late_invalid_event_rolls_back_earlier_ack(tmp_path: Path, monkeypatch) 
             ]
         )
 
-    monkeypatch.setattr("app.trade_command_execution.httpx.post", fake_post)
+    monkeypatch.setattr("app.runtime_transport.post", fake_post)
     with TestClient(app) as client:
         response = client.post(
             "/api/v1/trading/commands",
@@ -203,7 +204,7 @@ def test_conflicting_duplicate_runtime_event_rolls_back_batch(
 ) -> None:
     get_settings().database_path = str(tmp_path / "conflicting-event-batch.db")
 
-    def fake_post(url, json, timeout):
+    def fake_post(url, json, timeout, **kwargs):
         assert url.endswith("/commands/orders")
         shared = {
             "contract_name": "runtime-event",
@@ -225,7 +226,7 @@ def test_conflicting_duplicate_runtime_event_rolls_back_batch(
             ]
         )
 
-    monkeypatch.setattr("app.trade_command_execution.httpx.post", fake_post)
+    monkeypatch.setattr("app.runtime_transport.post", fake_post)
     with TestClient(app) as client:
         response = client.post(
             "/api/v1/trading/commands",
@@ -242,7 +243,7 @@ def test_reject_and_fill_batch_fails_closed_without_projection(
 ) -> None:
     get_settings().database_path = str(tmp_path / "conflicting-outcome-batch.db")
 
-    def fake_post(url, json, timeout):
+    def fake_post(url, json, timeout, **kwargs):
         assert url.endswith("/commands/orders")
         shared = {
             "contract_name": "runtime-event",
@@ -274,7 +275,7 @@ def test_reject_and_fill_batch_fails_closed_without_projection(
             ]
         )
 
-    monkeypatch.setattr("app.trade_command_execution.httpx.post", fake_post)
+    monkeypatch.setattr("app.runtime_transport.post", fake_post)
     with TestClient(app) as client:
         response = client.post(
             "/api/v1/trading/commands",
@@ -283,3 +284,6 @@ def test_reject_and_fill_batch_fails_closed_without_projection(
 
     assert response.status_code == 502
     assert _latest_order_state() == ("result_unknown", None, 0, 0)
+
+
+pytestmark = pytest.mark.usefixtures("generic_trading_instance")

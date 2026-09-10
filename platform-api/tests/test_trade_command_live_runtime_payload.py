@@ -1,11 +1,12 @@
 from pathlib import Path
 
+import pytest
 from fastapi.testclient import TestClient
 
 from app.config import get_settings
 from app.main import app
 
-STRATEGY_ID = "strategy_funding_arbitrage_instance_default"
+STRATEGY_ID = "strategy_generic_pipeline_test"
 ACCOUNT_ID = "account_sim_usdt"
 INSTRUMENT_ID = "instrument_btc_usdt"
 
@@ -37,11 +38,11 @@ def test_trade_command_sends_strategy_identity_to_runtime(tmp_path: Path, monkey
     get_settings().database_path = str(tmp_path / "trade-command-live.db")
     captured: dict[str, object] = {}
 
-    def fake_post(url, json, timeout):
+    def fake_post(url, json, timeout, **kwargs):
         captured.update(json)
         return FakeRuntimeResponse(json)
 
-    monkeypatch.setattr("app.trade_command_execution.httpx.post", fake_post)
+    monkeypatch.setattr("app.runtime_transport.post", fake_post)
     payload = {
         "idempotencyKey": "live-command-payload-1",
         "strategyInstanceId": STRATEGY_ID,
@@ -60,4 +61,8 @@ def test_trade_command_sends_strategy_identity_to_runtime(tmp_path: Path, monkey
     assert captured["strategy_instance_id"] == STRATEGY_ID
     assert captured["account_id"] == ACCOUNT_ID
     assert captured["instrument_id"] == INSTRUMENT_ID
+    assert captured["instrument_type"] == "crypto_spot"
     assert captured["reduce_only"] is False
+
+
+pytestmark = pytest.mark.usefixtures("generic_trading_instance")

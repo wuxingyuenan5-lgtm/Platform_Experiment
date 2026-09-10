@@ -1,35 +1,42 @@
-import { computed, ref } from 'vue';
-
+import { computed } from 'vue';
+import { useQuery } from '@tanstack/vue-query';
+import {
+  strategyQueryClient,
+  strategyQueryKey,
+  strategySession,
+} from '@/api/platform/strategyQueries';
 import { getStrategyManagementOverview } from '@/api/platform/trading';
 import type { StrategyManagementOverviewResult } from '@/api/platform/trading.types';
 import type { StrategyDeskKey } from '@/data/sample/strategy';
-import { createStrategyManagementOverviewStore } from './strategyManagementOverviewState';
 
 export function useStrategyManagementOverview() {
-  const store = createStrategyManagementOverviewStore<StrategyManagementOverviewResult>(
-    getStrategyManagementOverview,
+  const query = useQuery(
+    {
+      queryKey: computed(() => strategyQueryKey('management-overview')),
+      queryFn: ({ signal }) => getStrategyManagementOverview(signal),
+      enabled: computed(() => !!strategySession.value.userId),
+    },
+    strategyQueryClient,
   );
-  const items = ref<StrategyManagementOverviewResult[]>([]);
-
-  async function refresh() {
-    await store.refresh();
-    items.value = store.items.value;
-  }
-
+  const items = computed(() =>
+    query.isError.value
+      ? []
+      : [...(query.data.value ?? [])].sort((left, right) => left.sortOrder - right.sortOrder),
+  );
+  const error = computed(() => (query.isError.value ? '策略管理总览暂不可用' : null));
   const byDesk = computed(
     () =>
       Object.fromEntries(items.value.map((item) => [item.deskKey, item])) as Partial<
         Record<StrategyDeskKey, StrategyManagementOverviewResult>
       >,
   );
-
   return {
     items,
     byDesk,
-    loading: store.loading,
-    error: store.error,
-    empty: store.empty,
-    hasData: store.hasData,
-    refresh,
+    loading: query.isFetching,
+    error,
+    empty: computed(() => !query.isFetching.value && !error.value && !items.value.length),
+    hasData: computed(() => !query.isFetching.value && !error.value && !!items.value.length),
+    refresh: () => query.refetch({ cancelRefetch: false }),
   };
 }

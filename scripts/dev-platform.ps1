@@ -1,4 +1,4 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param(
   [ValidateSet('start', 'status', 'stop', 'restart')][string]$Action = 'start',
   [ValidateRange(1, 180)][int]$HealthTimeoutSeconds = 90,
@@ -28,6 +28,7 @@ $Services = @(
       @{ Url = 'http://127.0.0.1:8000/api/v1/auth/login'; AcceptStatus = @(200, 401, 405, 422) },
       @{ Url = 'http://127.0.0.1:8000/api/v1/strategies/management-overview'; AcceptStatus = @(200) },
       @{ Url = 'http://127.0.0.1:8000/api/v1/ops/venue-snapshots/status'; AcceptStatus = @(200) }
+      @{ Url = 'http://127.0.0.1:8000/api/v1/security/trading-safety'; JsonField = 'liveTradingEnabled'; Expected = [bool]$EnableLiveWrite }
     )
   },
   @{
@@ -217,9 +218,46 @@ function Wait-ForHealth {
   throw "$($Service.Name) failed startup contract checks on port $($Service.Port)"
 }
 
+function Get-ExistingLiveWrite {
+  # Preserve an already running mode; never infer permission from a saved file.
+  $backends = @($Services | Where-Object { $_.Key -in @('runtime', 'api') })
+  $running = @()
+  foreach ($service in $backends) {
+    $listener = Get-PortListener $service.Port
+    if ($listener) {
+      if (-not (Test-ProjectProcess ([int]$listener.OwningProcess) $service.WorkingDirectory)) {
+        # Relative uvicorn commands omit the repository path. Verify their
+        # listener against this repository's managed process record instead.
+        $state = Read-State
+        $record = @($state.services | Where-Object {
+          $_.key -eq $service.Key -and $_.pid -eq $listener.OwningProcess -and
+          $_.workingDirectory -eq $service.WorkingDirectory
+        })
+        if ($null -eq $state -or $state.repoRoot -ne $RepoRoot -or $record.Count -ne 1 -or
+            -not (Test-ServiceSignature $service ([int]$listener.OwningProcess))) {
+          throw 'Cannot preserve trading mode from a non-project backend.'
+        }
+      }
+      $running += $service
+    }
+  }
+  if ($running.Count -eq 0) { return $false }
+  if ($running.Count -ne 2) {
+    throw 'Backend state is incomplete. Specify -EnableLiveWrite:$true or :$false explicitly before restarting.'
+  }
+  $runtime = Invoke-RestMethod -Uri 'http://127.0.0.1:8100/status' -TimeoutSec 5
+  $platform = Invoke-RestMethod -Uri 'http://127.0.0.1:8000/api/v1/security/trading-safety' -TimeoutSec 5
+  $runtimeFlag = $runtime.capabilities.liveWriteEnabled
+  $platformFlag = $platform.liveTradingEnabled
+  if ($runtimeFlag -isnot [bool] -or $platformFlag -isnot [bool] -or $runtimeFlag -ne $platformFlag) {
+    throw 'Backend trading modes are unavailable or inconsistent. Resolve before restarting.'
+  }
+  return $platformFlag
+}
+
 function Read-State {
   if (-not (Test-Path $StatePath)) { return $null }
-  try { return Get-Content -LiteralPath $StatePath -Raw | ConvertFrom-Json } catch { return $null }
+  try { return Get-Content -LiteralPath $StatePath -Raw -Encoding UTF8 | ConvertFrom-Json } catch { throw "Cannot read Platform service state: $($_.Exception.Message)" }
 }
 
 function Write-State {
@@ -247,7 +285,8 @@ function Stop-ManagedPid {
 
 function Stop-ManagedServices {
   $state = Read-State
-  if ($null -eq $state -or $state.repoRoot -ne $RepoRoot) { return }
+  if ($null -eq $state) { return }
+  if ($state.repoRoot -ne $RepoRoot) { throw 'Platform service state belongs to another repository.' }
   foreach ($record in @($state.services)) {
     $definition = @($Services | Where-Object { $_.Key -eq $record.key })[0]
     if ($null -eq $definition) { continue }
@@ -333,31 +372,6 @@ function Invoke-LoginSmoke {
   }
 }
 
-function Hide-Mt5Terminals {
-  # Keep both read-only monitoring terminals alive without showing their
-  # application windows.  This hides windows only; it never stops a terminal.
-  if (-not ('VariableGlobal.WindowMinimizer' -as [type])) {
-    Add-Type @'
-using System;
-using System.Runtime.InteropServices;
-namespace VariableGlobal {
-  public static class WindowMinimizer {
-    [DllImport("user32.dll")] public static extern bool ShowWindowAsync(IntPtr hWnd, int nCmdShow);
-  }
-}
-'@
-  }
-  $paths = @(
-    'C:\Program Files\Bybit MT5 Terminal\terminal64.exe',
-    'C:\Users\jiuxi\AppData\Local\VariableGlobal\MT5\account_mt5_short_term_a\terminal64.exe'
-  )
-  foreach ($path in $paths) {
-    Get-Process -Name terminal64 -ErrorAction SilentlyContinue |
-      Where-Object { $_.Path -eq $path -and $_.MainWindowHandle -ne 0 } |
-      ForEach-Object { [VariableGlobal.WindowMinimizer]::ShowWindowAsync($_.MainWindowHandle, 0) | Out-Null }
-  }
-}
-
 function Start-ServiceManaged {
   param([hashtable]$Service)
   $safeName = $Service.Name.ToLowerInvariant().Replace(' ', '-')
@@ -387,7 +401,7 @@ function Start-ServiceManaged {
       }
       if ($Service.Key -in @('runtime', 'api')) {
         $env:VG_LIVE_TRADING_ENABLED = $liveWriteValue
-        $env:VG_FOUNDER_DEMO_LIVE_ACCEPTANCE_ENABLED = $liveWriteValue
+        $env:VG_FOUNDER_DEMO_LIVE_ACCEPTANCE_ENABLED = 'false'
       }
       Start-Process $Service.PythonPath -ArgumentList @('-m', 'uvicorn', 'app.main:app', '--host', '127.0.0.1', '--port', "$($Service.Port)") `
         -WorkingDirectory $Service.WorkingDirectory -RedirectStandardOutput $stdout -RedirectStandardError $stderr `
@@ -444,13 +458,23 @@ function Start-ManagedServices {
   }
   Write-State $records
   Invoke-LoginSmoke -SeedResult $seedResult
-  Hide-Mt5Terminals
   Write-Host 'Platform local services are ready.' -ForegroundColor Green
   Write-Host 'Execution Runtime: http://127.0.0.1:8100/health'
   Write-Host 'Platform API:      http://127.0.0.1:8000/health'
   Write-Host 'Platform Web:      http://127.0.0.1:4373/index.html'
   Write-Host 'Platform Web API:  http://127.0.0.1:8000/api/v1'
-  Write-Host "Live Write:        $(if ($EnableLiveWrite) { 'enabled by explicit operator flag' } else { 'disabled' })"
+  Write-Host "Live Write:        $(if ($EnableLiveWrite) { 'enabled (explicit or preserved running mode)' } else { 'disabled' })"
+}
+
+if ($Action -in @('start', 'restart', 'status') -and -not $PSBoundParameters.ContainsKey('EnableLiveWrite')) {
+  $EnableLiveWrite = Get-ExistingLiveWrite
+}
+foreach ($service in $Services) {
+  foreach ($check in $service.ContractChecks) {
+    if ($check.JsonField -in @('capabilities.liveWriteEnabled', 'liveTradingEnabled')) {
+      $check.Expected = [bool]$EnableLiveWrite
+    }
+  }
 }
 
 switch ($Action) {

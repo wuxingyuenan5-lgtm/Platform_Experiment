@@ -728,46 +728,10 @@ const usOverviewCards: OverviewCard[] = [
     ],
     'negative',
   ),
-  overview(
-    'mags',
-    'MAGS',
-    '前七大科技',
-    '-1.37%',
-    [
-      5, 6, 2, 1, 4, 5, 7, 4, 4, 5, 4, 2, 1, 2, 4, 5, 7, 5, 13, 12, 14, 18, 16, 16, 12, 13, 17, 15,
-      21,
-    ],
-    'negative',
-  ),
+  overview('dji', 'DJI', '道琼斯工业指数', '—', [], 'neutral'),
 ];
 
 const usMoverCards: OverviewCard[] = [
-  overview(
-    'us-qqq',
-    'QQQ',
-    '纳指',
-    '-3.29%',
-    [
-      14, 16, 13, 11, 15, 16, 18, 14, 13, 12, 8, 8, 6, 5, 2, 1, 3, 15, 11, 14, 21, 12, 10, 2, 7, 10,
-      3, 4, 14,
-    ],
-    'negative',
-    '$713.65',
-    '指数',
-  ),
-  overview(
-    'us-xlk',
-    'XLK',
-    '科技',
-    '-4.14%',
-    [
-      17, 19, 18, 16, 18, 20, 21, 18, 17, 15, 11, 12, 10, 6, 3, 1, 2, 5, 15, 12, 15, 18, 13, 11, 6,
-      10, 10, 6, 12,
-    ],
-    'negative',
-    '$184.19',
-    '板块',
-  ),
   overview(
     'us-soxx',
     'SOXX',
@@ -781,19 +745,9 @@ const usMoverCards: OverviewCard[] = [
     '$603.39',
     '行业',
   ),
-  overview(
-    'us-slv',
-    'SLV',
-    '白银',
-    '-5.40%',
-    [
-      2, 1, 1, 4, 9, 9, 11, 10, 9, 10, 9, 10, 10, 10, 11, 10, 12, 11, 16, 16, 18, 19, 16, 16, 14,
-      14, 16, 18, 21,
-    ],
-    'negative',
-    '$55.73',
-    '商品',
-  ),
+  overview('us-gdx', 'GDX', '黄金矿业', '—', [], 'neutral', undefined, '行业'),
+  overview('us-xlv', 'XLV', '医疗保健', '—', [], 'neutral', undefined, '板块'),
+  overview('us-xlf', 'XLF', '金融', '—', [], 'neutral', undefined, '板块'),
 ];
 
 const usBreadthCards: BreadthCard[] = [

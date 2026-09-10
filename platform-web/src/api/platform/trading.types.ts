@@ -1,3 +1,5 @@
+import type { components } from './generated/strategy';
+
 export type TradingSide = 'buy' | 'sell';
 export type TradingOrderType = 'market' | 'limit';
 export type TradingOrderStatus =
@@ -16,12 +18,10 @@ export type ExecutionBatchStatus =
   | 'failed'
   | 'manual_intervention';
 
-export interface OrderResult {
-  orderId: string;
-  commandId: string;
-  status: TradingOrderStatus;
-  externalOrderId?: string | null;
-}
+export type OrderResult = components['schemas']['OrderResponse'];
+export type CrossSpreadPositionOverviewResult =
+  components['schemas']['CrossSpreadPositionOverviewResponse'];
+export type CrossSpreadPositionPnlResult = components['schemas']['CrossSpreadPositionPnlResponse'];
 
 export interface CreateExecutionBatchLegInput {
   role: string;
@@ -51,20 +51,7 @@ export interface ExecutionBatchLegResult {
   failureReason?: string | null;
 }
 
-export interface ExecutionBatchResult {
-  batchId: string;
-  idempotencyKey?: string | null;
-  strategyInstanceId?: string | null;
-  accountId?: string | null;
-  strategyKey: string;
-  direction: string;
-  status: ExecutionBatchStatus;
-  requiresManualIntervention: boolean;
-  failureReason?: string | null;
-  legs: ExecutionBatchLegResult[];
-  createdAt: string;
-  updatedAt: string;
-}
+export type ExecutionBatchResult = components['schemas']['ExecutionBatchResponse'];
 
 export type StrategyRunStatus =
   | 'pending'
@@ -73,134 +60,36 @@ export type StrategyRunStatus =
   | 'failed'
   | 'manual_intervention';
 
-export interface StrategyRunResult {
-  strategyRunId: string;
-  idempotencyKey: string;
-  strategyInstanceId: string;
-  strategyKey: string;
-  direction: string;
-  status: StrategyRunStatus;
-  executionBatchId?: string | null;
-  executionBatch?: ExecutionBatchResult | null;
-  reason?: string | null;
-  failureReason?: string | null;
-  createdAt: string;
-  updatedAt: string;
-}
+export type StrategyRunResult = components['schemas']['StrategyRunResponse'];
 
-export interface StrategyV1ReadinessResult {
-  strategyInstanceId: string;
-  strategyKey: string;
-  runnable: boolean;
-  blockers: string[];
-  warnings: string[];
-  latestRunStatus?: string | null;
-  manualInterventionCount: number;
-  resultUnknownOrderCount: number;
-}
+export type StrategyV1ReadinessResult = components['schemas']['StrategyV1ReadinessResponse'];
 
-export interface ReconciliationIssueResult {
-  issueType: string;
-  subjectType: string;
-  subjectId: string;
-  strategyInstanceId?: string | null;
-  severity: 'warning' | 'action_required';
-  message: string;
-  detectedAt: string;
-}
+export type ReconciliationIssueResult = components['schemas']['ReconciliationIssueResponse'];
 
-export interface ReconciliationSummaryResult {
-  status: 'ok' | 'action_required';
-  manualInterventionBatchCount: number;
-  resultUnknownOrderCount: number;
-  issues: ReconciliationIssueResult[];
-}
+export type ReconciliationSummaryResult = components['schemas']['ReconciliationSummaryResponse'];
 
-export interface TradingSafetyResult {
-  liveTradingEnabled: boolean;
-  defaultTradingEnvironment: string;
-  founderDemoLocalSelfApprovalEnabled: boolean;
-  secretStoragePolicy: string;
-  liveGuardPolicy: string;
-}
+export type TradingSafetyResult = components['schemas']['TradingSafetyResponse'];
 
-export interface CredentialReferenceResult {
-  credentialId: string;
-  credentialRef: string;
-  venueId: string;
-  venueCode: string;
-  environment: string;
-  purpose: string;
-  status: string;
-  createdAt: string;
-}
+export type CredentialReferenceResult = components['schemas']['CredentialReferenceResponse'];
 
-export interface ExchangeCredentialInspectionResult {
-  credentialRef: string;
-  envPrefix: string;
-  configured: boolean;
-  availableFields: string[];
-  missingFields: string[];
-}
+export type ExchangeCredentialInspectionResult =
+  components['schemas']['ExchangeCredentialInspectionResponse'];
 
-export interface ExchangeConnectivityResult {
-  status: string;
-  gateway?: string | null;
-  credentialCount: number;
-  configuredCredentialCount: number;
-  credentials: ExchangeCredentialInspectionResult[];
-}
+export type ExchangeConnectivityResult = components['schemas']['ExchangeConnectivityResponse'];
 
-export interface MarketQuoteResult {
-  bid: string;
-  ask: string;
-  mid: string;
-  last?: string | null;
-  currency: string;
-}
+export type MarketQuoteResult = components['schemas']['MarketQuoteResponse'];
 
-export interface VenuePositionResult {
-  symbol: string;
-  side: string;
-  quantity: string;
-  averagePrice?: string | null;
-  unrealizedPnl?: string | null;
-  externalId?: string | null;
-}
+export type VenuePositionResult = components['schemas']['VenuePositionResponse'];
 
-export interface CrossSpreadVenueSnapshotResult {
-  venue: string;
-  symbol: string;
-  status: string;
-  quote?: MarketQuoteResult | null;
-  positions: VenuePositionResult[];
-  reason?: string | null;
-}
+export type CrossSpreadVenueSnapshotResult =
+  components['schemas']['CrossSpreadVenueSnapshotResponse'];
 
-export interface CrossSpreadSnapshotResult {
-  status: string;
-  bybit: CrossSpreadVenueSnapshotResult;
-  mt5: CrossSpreadVenueSnapshotResult;
-  longSpread?: string | null;
-  shortSpread?: string | null;
-  metrics: CrossSpreadMetricsResult;
-  asOf: string;
-}
+export type CrossSpreadSnapshotResult = components['schemas']['CrossSpreadSnapshotResponse'];
 
-export interface CrossSpreadMetricsResult {
-  fundingRate?: string | null;
-  usdtUsd?: string | null;
-  buyerInventoryFee?: string | null;
-  sellerInventoryFee?: string | null;
-}
+export type CrossSpreadMetricsResult = components['schemas']['CrossSpreadMetricsResponse'];
 
-export interface CrossSpreadHistoryPointResult {
-  asOf: string;
-  longSpread?: string | null;
-  shortSpread?: string | null;
-  bybitMid?: string | null;
-  mt5Mid?: string | null;
-}
+export type CrossSpreadHistoryPointResult =
+  components['schemas']['CrossSpreadHistoryPointResponse'];
 
 export type CrossSpreadMarketAction = 'OPEN_LONG' | 'CLOSE_LONG' | 'OPEN_SHORT' | 'CLOSE_SHORT';
 
@@ -219,25 +108,32 @@ export interface AuditEventResult {
   createdAt: string;
 }
 
-export interface PositionResult {
-  accountId: string;
-  instrumentId: string;
-  netQuantity: string;
-  averagePrice?: string | null;
-}
+export type PositionResult = components['schemas']['PositionResponse'];
 
-export interface BalanceResult {
-  snapshotId: string;
-  accountId: string;
-  currency: string;
-  equity: string;
-  availableBalance: string;
-  source: string;
-  dataQualityState: string;
-  asOf: string;
+export type BalanceResult = components['schemas']['BalanceSnapshotResponse'];
+
+export interface AssetBreakdownResult {
+  totalEquity?: string;
+  valuationCurrency?: string;
+  categories?: Array<{ category: string; equity: string }>;
+  accountType?: string;
+  category?: string;
+  equity?: string;
+  usdValue?: string;
+  currency?: string;
+  [key: string]: unknown;
 }
 
 export interface AccountRiskResult {
+  assetScope?: string;
+  totalAssets?: string | null;
+  assetBreakdown?: AssetBreakdownResult[];
+  assetOverviewAsOf?: string | null;
+  assetOverviewQuality?: string;
+  walletBalance?: string | null;
+  marginBalance?: string | null;
+  maintenanceMargin?: string | null;
+  unrealizedPnl?: string | null;
   accountId: string;
   currency: string;
   equity?: string | null;
@@ -248,218 +144,61 @@ export interface AccountRiskResult {
   asOf: string;
 }
 
-export interface StrategyEquityHistoryPointResult {
-  asOf: string;
-  equity: string;
-}
+export type StrategyEquityHistoryPointResult =
+  components['schemas']['StrategyEquityHistoryPointResponse'];
 
 export interface EquityHistoryPointResult {
   asOf: string;
   equity: string;
 }
 
-export interface PnlResult {
-  accountId: string;
-  instrumentId: string;
-  realizedPnl: string;
-  tradingPnl: string;
-  fees: string;
-}
+export type PnlResult = components['schemas']['PnlResponse'];
 
 export interface TradingSnapshot {
   position: PositionResult | null;
   pnl: PnlResult | null;
 }
 
-export interface RuntimeReadinessResult {
-  backendStatus: string;
-  databaseStatus: string;
-  runtimeStatus: string;
-  defaultTradingMode: string;
-}
+export type RuntimeReadinessResult = components['schemas']['RuntimeReadinessResponse'];
 
-export interface StrategyDefinitionResult {
-  strategyId: string;
-  strategyKey: string;
-  name: string;
-  v1Scope: 'closed_loop' | 'reserved' | 'placeholder' | string;
-  status: string;
-  description: string;
-}
+export type StrategyDefinitionResult = components['schemas']['StrategyDefinitionResponse'];
 
-export interface StrategyInstanceResult {
-  strategyInstanceId: string;
-  strategyId: string;
-  strategyKey: string;
-  strategyName: string;
-  version: string;
-  name: string;
-  tradingMode: string;
-  status: string;
-  capitalBase?: string | null;
-  baseCurrency: string;
-  dataQualityState: string;
-}
+export type StrategyInstanceResult = components['schemas']['StrategyInstanceResponse'];
 
-export interface StrategyManagementOverviewResult {
-  deskKey: string;
-  sortOrder: number;
-  strategyInstanceId: string;
-  strategyId: string;
-  strategyKey: string;
-  strategyName: string;
-  instanceName: string;
-  category: string;
-  v1Scope: 'closed_loop' | 'reserved' | 'read_only' | string;
-  operatingStatus: string;
-  tradingMode: string;
-  dataQualityState: string;
-  activeCapability: 'trade_and_read' | 'read_only' | 'unbound' | string;
-  bindingCount: number;
-  latestRunStatus?: string | null;
-  latestRunAt?: string | null;
-  primaryAccountCode?: string | null;
-  primaryAccountStatus?: string | null;
-  primaryAccountDataQualityState?: string | null;
-  executionReadiness?: StrategyV1ReadinessResult | null;
-}
+export type StrategyManagementOverviewResult =
+  components['schemas']['StrategyManagementOverviewResponse'];
 
-export interface LiveTradingSessionResult {
-  sessionId: string;
-  idempotencyKey: string;
-  sessionType: 'minimum_size_acceptance' | 'existing_limits' | 'scale_change';
-  strategyInstanceId: string;
-  accountId: string;
-  symbols: string[];
-  sides: string[];
-  orderTypes: string[];
-  startsAt: string;
-  endsAt: string;
-  maxOrderNotional: string;
-  maxDailyNotional: string;
-  readOnlyVerifiedAt: string;
-  evidenceReference: string;
-  reason: string;
-  applicantUserId: string;
-  approverUserId?: string | null;
-  approvalReason?: string | null;
-  approvedAt?: string | null;
-  revokedBy?: string | null;
-  revocationReason?: string | null;
-  revokedAt?: string | null;
-  status: 'pending' | 'approved' | 'revoked' | 'expired';
-  createdAt: string;
-  updatedAt: string;
-}
+export type LiveTradingSessionResult = components['schemas']['LiveTradingSessionResponse'];
 
-export interface AccountResult {
-  accountId: string;
-  accountCode: string;
-  name: string;
-  venueId: string;
-  venueCode: string;
-  accountType: string;
-  environment: string;
-  baseCurrency: string;
-  credentialRef?: string | null;
-  status: string;
-  dataQualityState: string;
-}
+export type AccountResult = components['schemas']['AccountResponse'];
 
-export interface StrategyAccountBindingResult {
-  bindingId: string;
-  strategyInstanceId: string;
-  accountId: string;
-  accountCode: string;
-  capability: 'trade_and_read' | 'read_only';
-  role: string;
-  maxNotional?: string | null;
-  status: string;
-}
+export type StrategyAccountBindingResult = components['schemas']['StrategyAccountBindingResponse'];
 
-export interface StrategyAccountSnapshotResult {
-  strategyInstanceId: string;
-  accountId?: string | null;
-  accountCode?: string | null;
-  capability?: 'trade_and_read' | 'read_only' | null;
-  dataQualityState: string;
-  asOf?: string | null;
-  balance?: BalanceResult | null;
-  equityHistory: StrategyEquityHistoryPointResult[];
-  accountRisk?: AccountRiskResult | null;
-  positions: PositionResult[];
-  orders: OrderDetailResult[];
-  fills: FillResult[];
-  pnl?: PnlResult | null;
-  syncStatus?: string | null;
-  syncErrorCode?: string | null;
-}
+export type StrategyAccountSnapshotResult =
+  components['schemas']['StrategyAccountSnapshotResponse'];
 
-export interface InstrumentResult {
-  instrumentId: string;
-  instrumentCode: string;
-  name: string;
-  instrumentType: string;
-  baseCurrency: string;
-  quoteCurrency: string;
-  settleCurrency: string;
-  quantityUnit: string;
-  dataQualityState: string;
-  contract?: ContractSpecificationResult | null;
-}
+export type InstrumentResult = components['schemas']['InstrumentResponse'];
 
-export interface ContractSpecificationResult {
-  version: string;
-  priceTick: string;
-  minOrderQuantity: string;
-  quantityStep: string;
-  contractMultiplier: string;
-  dataQualityState: string;
-}
+export type ContractSpecificationResult = components['schemas']['ContractSpecificationResponse'];
 
 // The detail endpoint is a read model and deliberately preserves every venue
 // terminal state (for example `canceled` and `result_unknown`).  A submit
 // response remains constrained by TradingOrderStatus above.
-export interface OrderDetailResult extends Omit<OrderResult, 'status'> {
-  status: string;
-  accountId: string;
-  instrumentId: string;
-  symbol: string;
-  side: TradingSide;
-  orderType: TradingOrderType;
-  quantity: string;
-  price?: string | null;
-  createdAt: string;
-  updatedAt: string;
-}
+export type OrderDetailResult = components['schemas']['OrderDetailResponse'];
 
-export interface FillResult {
-  fillId: string;
-  orderId: string;
-  accountId: string;
-  instrumentId: string;
-  side: TradingSide;
-  quantity: string;
-  price: string;
-  occurredAt: string;
-}
+export type FillResult = components['schemas']['FillResponse'];
 
-export interface StrategyPnlResult {
-  strategyInstanceId: string;
-  realizedPnl: string;
-  tradingPnl: string;
-  fees: string;
+export interface FinancialAmountsResult {
+  realizedPnl: string | null;
+  tradingPnl: string | null;
+  fees: string | null;
+  fundingPnl?: string | null;
+  swapPnl?: string | null;
+  netPnl?: string | null;
   currency: string;
-  dataQualityState: string;
+  accountId?: string;
 }
 
-export interface StrategyNavSnapshotResult {
-  snapshotId: string;
-  strategyInstanceId: string;
-  valuationTime: string;
-  equity: string;
-  capitalBase: string;
-  nav: string;
-  currency: string;
-  dataQualityState: string;
-}
+export type StrategyPnlResult = components['schemas']['StrategyPnlResponse'];
+
+export type StrategyNavSnapshotResult = components['schemas']['StrategyNavSnapshotResponse'];

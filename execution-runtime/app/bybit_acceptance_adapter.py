@@ -55,7 +55,7 @@ class BybitAcceptanceAdapter(BybitFillConfirmingAdapter):
             return None
         account = route.account_id if route is not None else self._single_account()
         self._assert_account(account)
-        query: dict[str, object] = {"category": self.settings.bybit_category}
+        query: dict[str, object] = {"category": self._route_category(route)}
         if route is not None:
             query["symbol"] = route.symbol
             if route.external_order_id:
@@ -87,15 +87,15 @@ class BybitAcceptanceAdapter(BybitFillConfirmingAdapter):
         }
         if symbol:
             query["symbol"] = symbol.upper()
+        elif self.settings.bybit_category == "linear":
+            query["settleCoin"] = self.settings.bybit_settle_coin
         try:
-            active = self._with_fresh_client_retry(
-                account,
-                lambda client: client.get_open_orders(openOnly=0, **query)
+            active = self._read_with_retry(
+                account, lambda client: client.get_open_orders(openOnly=0, **query)
             )
             self._require_success(active, "Bybit active-order query failed")
-            history = self._with_fresh_client_retry(
-                account,
-                lambda client: client.get_order_history(**query)
+            history = self._read_with_retry(
+                account, lambda client: client.get_order_history(**query)
             )
             self._require_success(history, "Bybit order-history query failed")
         except GatewayRequestRejectedError:
@@ -135,21 +135,21 @@ class BybitAcceptanceAdapter(BybitFillConfirmingAdapter):
         }
         if symbol:
             query["symbol"] = symbol.upper()
+        elif self.settings.bybit_category == "linear":
+            query["settleCoin"] = self.settings.bybit_settle_coin
         if cursor:
             query["cursor"] = cursor
         try:
             if scope == "active":
-                response = self._with_fresh_client_retry(
-                    account_id,
-                    lambda client: client.get_open_orders(openOnly=0, **query)
+                response = self._read_with_retry(
+                    account_id, lambda client: client.get_open_orders(openOnly=0, **query)
                 )
                 quality = "complete"
             else:
                 query["startTime"] = int(start_time.timestamp() * 1000)
                 query["endTime"] = int(end_time.timestamp() * 1000)
-                response = self._with_fresh_client_retry(
-                    account_id,
-                    lambda client: client.get_order_history(**query)
+                response = self._read_with_retry(
+                    account_id, lambda client: client.get_order_history(**query)
                 )
                 quality = "venue_windowed"
             self._require_success(response, "Bybit paged order query failed")
@@ -179,8 +179,6 @@ class BybitAcceptanceAdapter(BybitFillConfirmingAdapter):
         external_order_id: str | None = None,
         platform_order_id: str | None = None,
     ) -> list[VenueFillSnapshot]:
-        account = account_id or self._single_account()
-        self._assert_account(account)
         route = None
         if platform_order_id is not None or external_order_id is not None:
             route = self._resolve_route(
@@ -189,8 +187,12 @@ class BybitAcceptanceAdapter(BybitFillConfirmingAdapter):
             )
             if route is None and platform_order_id is not None:
                 return []
+        account = account_id or (route.account_id if route is not None else self._single_account())
+        self._assert_account(account)
+        if route is not None and route.account_id != account:
+            raise GatewayConfigurationError("Bybit order route belongs to a different account")
         query: dict[str, object] = {
-            "category": self.settings.bybit_category,
+            "category": self._route_category(route),
             "limit": 100,
         }
         if route is not None:
@@ -202,10 +204,7 @@ class BybitAcceptanceAdapter(BybitFillConfirmingAdapter):
         elif external_order_id is not None:
             query["orderId"] = external_order_id
         try:
-            response = self._with_fresh_client_retry(
-                account,
-                lambda client: client.get_executions(**query)
-            )
+            response = self._read_with_retry(account, lambda client: client.get_executions(**query))
             self._require_success(response, "Bybit execution query failed")
         except GatewayRequestRejectedError:
             raise
@@ -214,7 +213,7 @@ class BybitAcceptanceAdapter(BybitFillConfirmingAdapter):
 
         snapshots: list[VenueFillSnapshot] = []
         for row in self._result_list(response):
-            snapshot = self._fill_snapshot(row, account)
+            snapshot = self._fill_snapshot(row, account, category=str(query["category"]))
             if snapshot is not None:
                 snapshots.append(snapshot)
         return snapshots
@@ -241,9 +240,8 @@ class BybitAcceptanceAdapter(BybitFillConfirmingAdapter):
         if cursor:
             query["cursor"] = cursor
         try:
-            response = self._with_fresh_client_retry(
-                account_id,
-                lambda client: client.get_executions(**query)
+            response = self._read_with_retry(
+                account_id, lambda client: client.get_executions(**query)
             )
             self._require_success(response, "Bybit paged execution query failed")
         except GatewayRequestRejectedError:
@@ -265,43 +263,33 @@ class BybitAcceptanceAdapter(BybitFillConfirmingAdapter):
             dataQualityState="venue_windowed",
         )
 
-    def get_account_risk(self, account_id: str) -> VenueAccountRiskSnapshot:
+    def get_account_risk(
+        self,
+        account_id: str,
+        *,
+        wallet_response: dict[str, object] | None = None,
+        include_asset_overview: bool = False,
+    ) -> VenueAccountRiskSnapshot:
         self._assert_account(account_id)
         try:
-            total_assets = None
-            asset_result: dict[str, object] = {}
-            if account_id in self.settings.bybit_total_asset_accounts:
-                asset_overview = self._with_fresh_client_retry(
-                    account_id,
-                    lambda client: client.get_asset_overview(),
+            response = (
+                wallet_response
+                if wallet_response is not None
+                else self._read_with_retry(
+                    account_id, lambda client: client.get_wallet_balance(accountType="UNIFIED")
                 )
-                self._require_success(asset_overview, "Bybit total-asset query failed")
-                raw_asset_result = asset_overview.get("result") or {}
-                if not isinstance(raw_asset_result, dict):
-                    raise GatewayConfigurationError(
-                        "Bybit total-asset query returned invalid data"
-                    )
-                asset_result = raw_asset_result
-                total_assets = self._optional_decimal(asset_result.get("totalEquity"))
-                if total_assets is None:
-                    raise GatewayConfigurationError(
-                        "Bybit total-asset query returned no totalEquity"
-                    )
-            response = self._with_fresh_client_retry(
-                account_id,
-                lambda client: client.get_wallet_balance(accountType="UNIFIED")
             )
             self._require_success(response, "Bybit account-risk query failed")
             rows = self._result_list(response)
             if not rows:
                 raise GatewayConfigurationError("Bybit account-risk query returned no data")
-            account_response = self._with_fresh_client_retry(
+            account_response = self._read_with_retry(
                 account_id,
                 lambda client: (
                     client.get_account_info()
                     if callable(getattr(client, "get_account_info", None))
                     else {}
-                )
+                ),
             )
             if account_response:
                 self._require_success(account_response, "Bybit margin-mode query failed")
@@ -313,17 +301,50 @@ class BybitAcceptanceAdapter(BybitFillConfirmingAdapter):
         account_result = account_response.get("result") if account_response else {}
         if not isinstance(account_result, dict):
             account_result = {}
-        is_total_asset_account = account_id in self.settings.bybit_total_asset_accounts
+        total_assets = None
+        asset_rows: list[dict[str, object]] = []
+        asset_as_of = None
+        asset_quality = "not_requested"
+        if include_asset_overview or account_id in self.settings.bybit_total_asset_accounts:
+            try:
+                asset_overview = self._read_with_retry(
+                    account_id,
+                    lambda client: client.get_asset_overview(valuationCurrency="USD"),
+                )
+                self._require_success(asset_overview, "Bybit total-asset query failed")
+                asset_result = asset_overview.get("result") or {}
+                total_assets = self._optional_decimal(asset_result.get("totalEquity"))
+                asset_rows = asset_result.get("list") or []
+                if (
+                    total_assets is None
+                    or not total_assets.is_finite()
+                    or not isinstance(asset_rows, list)
+                ):
+                    raise ValueError("Invalid asset overview")
+                for item in asset_rows:
+                    if not isinstance(item, dict) or item.get("valuationCurrency") != "USD":
+                        raise ValueError("Asset overview currency mismatch")
+                times = [
+                    self._millis(item["snapshotTime"])
+                    for item in asset_rows
+                    if item.get("snapshotTime")
+                ]
+                asset_as_of = min(times) if times else datetime.now(UTC)
+                asset_quality = "complete" if asset_rows else "partial"
+            except Exception:
+                # Overview availability is independent of authoritative trading margin.
+                total_assets, asset_rows, asset_as_of, asset_quality = None, [], None, "unavailable"
         return VenueAccountRiskSnapshot(
             source=self.name,
             accountId=account_id,
-            currency=("USD" if is_total_asset_account else self.settings.bybit_settle_coin).upper(),
-            equity=total_assets if is_total_asset_account else self._optional_decimal(row.get("totalEquity")),
-            walletBalance=(
-                total_assets
-                if is_total_asset_account
-                else self._optional_decimal(row.get("totalWalletBalance"))
-            ),
+            currency="USD",
+            assetScope="unified_trading",
+            totalAssets=total_assets,
+            assetBreakdown=asset_rows,
+            assetOverviewAsOf=asset_as_of,
+            assetOverviewQuality=asset_quality,
+            equity=self._optional_decimal(row.get("totalEquity")),
+            walletBalance=self._optional_decimal(row.get("totalWalletBalance")),
             marginBalance=self._optional_decimal(row.get("totalMarginBalance")),
             availableBalance=self._optional_decimal(row.get("totalAvailableBalance")),
             initialMargin=self._optional_decimal(row.get("totalInitialMargin")),
@@ -335,6 +356,7 @@ class BybitAcceptanceAdapter(BybitFillConfirmingAdapter):
             tradeAllowed=True,
             expertTradingAllowed=True,
             fieldAvailability={
+                "availableBalance": "unified_margin_usd_not_spot_cash_or_transferable",
                 "marginCallLevel": "not_reported_by_bybit_uta",
                 "stopOutLevel": "not_reported_by_bybit_uta",
                 "liquidationPrice": "reported_per_position_when_finite",
@@ -365,37 +387,29 @@ class BybitAcceptanceAdapter(BybitFillConfirmingAdapter):
             category=resolved_category,
         )
         try:
-            response = self._with_fresh_client_retry(
-                account_id,
-                lambda client: client.get_instruments_info(
-                    category=resolved_category,
-                    symbol=normalized,
-                )
-            )
-            self._require_success(response, "Bybit instrument query failed")
-            rows = self._result_list(response)
-            if not rows:
-                raise GatewayConfigurationError(
-                    "Bybit instrument query returned no data"
-                )
-            api_response = self._with_fresh_client_retry(
-                account_id,
-                lambda client: client.get_api_key_information()
+            market = self._market_data(account_id).market(resolved_category, normalized)
+            api_response = self._read_with_retry(
+                account_id, lambda client: client.get_api_key_information()
             )
             self._require_success(api_response, "Bybit API-key readiness query failed")
         except (GatewayConfigurationError, GatewayRequestRejectedError):
             raise
         except Exception as exc:
-            raise GatewayResultUnknownError(
-                "Bybit instrument query result is unknown"
-            ) from exc
+            raise GatewayResultUnknownError("Bybit instrument query result is unknown") from exc
 
-        row = rows[0]
+        row = market["info"]
         lot = row.get("lotSizeFilter") or {}
+        if not isinstance(lot, dict):
+            raise GatewayConfigurationError("Bybit instrument filters are malformed")
         api_result = api_response.get("result") or {}
         permissions = api_result.get("permissions") or {}
         contract_permissions = permissions.get("ContractTrade") or []
         maximum = lot.get("maxMktOrderQty") or lot.get("maxMarketOrderQty")
+        quantity_step = self._optional_decimal(market["precision"]["amount"])
+        if quantity_step is None or not quantity_step.is_finite() or quantity_step <= 0:
+            raise GatewayConfigurationError("Bybit instrument quantity step is unavailable")
+        minimum_notional = market["limits"]["cost"]["min"]
+        multiplier = self._optional_decimal(market.get("contractSize")) or Decimal("1")
         return VenueInstrumentSpecification(
             source=self.name,
             accountId=account_id,
@@ -404,18 +418,26 @@ class BybitAcceptanceAdapter(BybitFillConfirmingAdapter):
             category=resolved_category,
             symbol=normalized,
             status=str(row.get("status") or "unknown"),
-            priceTick=Decimal(str((row.get("priceFilter") or {}).get("tickSize") or "0")),
-            minQuantity=Decimal(str(lot.get("minOrderQty") or "0")),
-            quantityStep=Decimal(str(lot.get("qtyStep") or "0")),
+            priceTick=Decimal(str(market["precision"]["price"] or "0")),
+            minQuantity=Decimal(str(market["limits"]["amount"]["min"] or "0")),
+            quantityStep=quantity_step,
+            minNotional=self._optional_decimal(minimum_notional),
             maxMarketQuantity=self._optional_decimal(maximum),
-            contractMultiplier=Decimal("1"),
-            contractSize=Decimal("1"),
+            contractMultiplier=multiplier,
+            contractSize=multiplier,
+            marketSymbol=market["symbol"],
+            baseCurrency=market["base"],
+            quoteCurrency=market["quote"],
+            settlementCurrency=market.get("settle"),
+            rawPayload=row,
             trade_mode=resolved_category,
             filling_mode="market",
             accessChecks={
                 "readOnly": int(api_result.get("readOnly") or 0) == 1,
                 "ipBound": bool(api_result.get("ips") or []),
-                "orderPermission": "Order" in contract_permissions,
+                "orderPermission": "SpotTrade" in (permissions.get("Spot") or [])
+                if resolved_category == "spot"
+                else "Order" in contract_permissions,
                 "positionPermission": "Position" in contract_permissions,
             },
             asOf=datetime.now(UTC),
@@ -427,16 +449,14 @@ class BybitAcceptanceAdapter(BybitFillConfirmingAdapter):
         query: dict[str, object],
     ) -> list[dict[str, object]]:
         try:
-            realtime = self._with_fresh_client_retry(
-                account_id,
-                lambda client: client.get_open_orders(**query)
+            realtime = self._read_with_retry(
+                account_id, lambda client: client.get_open_orders(**query)
             )
             self._require_success(realtime, "Bybit order query failed")
             rows = self._result_list(realtime)
             if not rows:
-                history = self._with_fresh_client_retry(
-                    account_id,
-                    lambda client: client.get_order_history(**query)
+                history = self._read_with_retry(
+                    account_id, lambda client: client.get_order_history(**query)
                 )
                 self._require_success(history, "Bybit order history query failed")
                 rows = self._result_list(history)
@@ -476,17 +496,13 @@ class BybitAcceptanceAdapter(BybitFillConfirmingAdapter):
         return VenueOrderSnapshot(
             source=self.name,
             externalOrderId=order_id,
-            platformOrderId=(
-                route.platform_order_id if route is not None else external_identity
-            ),
+            platformOrderId=(route.platform_order_id if route is not None else external_identity),
             commandId=route.command_id if route is not None else external_identity,
             accountId=route.account_id if route is not None else account,
             instrumentId=instrument_id,
             symbol=symbol,
             side="buy" if str(row.get("side")) == "Buy" else "sell",
-            orderType=(
-                "market" if str(row.get("orderType")) == "Market" else "limit"
-            ),
+            orderType=("market" if str(row.get("orderType")) == "Market" else "limit"),
             quantity=quantity,
             price=self._optional_decimal(row.get("price")),
             status=normalize_bybit_order_status(row.get("orderStatus")),
@@ -495,7 +511,7 @@ class BybitAcceptanceAdapter(BybitFillConfirmingAdapter):
             averageFillPrice=self._optional_decimal(row.get("avgPrice")),
             externalClientId=str(row.get("orderLinkId") or "") or None,
             reduceOnly=(bool(row.get("reduceOnly")) if "reduceOnly" in row else None),
-            positionIndex=(int(position_index) if position_index is not None else None),
+            positionIndex=(int(str(position_index)) if position_index is not None else None),
             timeInForce=str(row.get("timeInForce") or "") or None,
             rejectReason=str(row.get("rejectReason") or "") or None,
             cancelReason=str(row.get("cancelType") or "") or None,
@@ -508,13 +524,15 @@ class BybitAcceptanceAdapter(BybitFillConfirmingAdapter):
         self,
         row: dict[str, object],
         account: str,
+        *,
+        category: str | None = None,
     ) -> VenueFillSnapshot | None:
         order_id = str(row.get("orderId") or "unknown")
-        route = get_order_route(external_order_id=order_id)
+        route = get_order_route(external_order_id=order_id, account_id=account)
         if route is None:
             link_id = str(row.get("orderLinkId") or "")
             if link_id:
-                route = get_order_route(external_client_id=link_id)
+                route = get_order_route(external_client_id=link_id, account_id=account)
         symbol = str(row.get("symbol") or "").upper()
         instrument_id = (
             route.instrument_id
@@ -526,13 +544,9 @@ class BybitAcceptanceAdapter(BybitFillConfirmingAdapter):
         external_identity = f"external:{self.name}:{order_id}"
         return VenueFillSnapshot(
             source=self.name,
-            externalFillId=str(
-                row.get("execId") or f"{order_id}:{row.get('execTime')}"
-            ),
+            externalFillId=str(row.get("execId") or f"{order_id}:{row.get('execTime')}"),
             externalOrderId=order_id,
-            platformOrderId=(
-                route.platform_order_id if route is not None else external_identity
-            ),
+            platformOrderId=(route.platform_order_id if route is not None else external_identity),
             commandId=route.command_id if route is not None else external_identity,
             accountId=route.account_id if route is not None else account,
             instrumentId=instrument_id,
@@ -540,8 +554,16 @@ class BybitAcceptanceAdapter(BybitFillConfirmingAdapter):
             side="buy" if str(row.get("side")) == "Buy" else "sell",
             quantity=Decimal(str(row.get("execQty") or "0")),
             price=Decimal(str(row.get("execPrice") or "0")),
-            fee=Decimal(str(row.get("execFee") or "0")),
-            currency=str(row.get("feeCurrency") or self.settings.bybit_settle_coin),
+            fee=Decimal(str(row["execFee"])) if row.get("execFee") not in (None, "") else None,
+            currency=str(
+                row.get("feeCurrency")
+                or ("UNKNOWN" if category == "spot" else self.settings.bybit_settle_coin)
+            ),
+            feeCurrencyQuality="reported"
+            if row.get("feeCurrency")
+            else "unavailable"
+            if category == "spot"
+            else "inferred_settlement",
             occurredAt=self._millis(row.get("execTime")),
             dataQualityState="complete" if route is not None else "external_only",
         )
@@ -553,32 +575,3 @@ class BybitAcceptanceAdapter(BybitFillConfirmingAdapter):
             return None
         cursor = str(result.get("nextPageCursor") or "")
         return cursor or None
-
-    def _assert_no_existing_position(self, symbol: str) -> None:
-        maximum = self.settings.live_acceptance_max_positions_per_symbol
-        if maximum <= 0:
-            # Legacy position-count cap is disabled: zero means "no cap".
-            return
-        try:
-            response = self._with_fresh_client_retry(
-                lambda client: client.get_positions(
-                    category=self.settings.bybit_category,
-                    symbol=symbol.upper(),
-                )
-            )
-            self._require_success(response, "Bybit pre-trade position query failed")
-        except GatewayRequestRejectedError:
-            raise
-        except Exception as exc:
-            raise GatewayResultUnknownError(
-                "Bybit pre-trade position result is unknown"
-            ) from exc
-        active = sum(
-            1
-            for row in self._result_list(response)
-            if Decimal(str(row.get("size") or "0")) != 0
-        )
-        if active >= maximum:
-            raise GatewayRequestRejectedError(
-                "Live acceptance position limit is already reached"
-            )

@@ -3,6 +3,7 @@ import json
 from pathlib import Path
 from uuid import uuid4
 
+import pytest
 from fastapi.testclient import TestClient
 
 from app.config import get_settings
@@ -49,7 +50,7 @@ def headers(token: str) -> dict[str, str]:
 def trade_command_payload(quantity: str) -> dict[str, str]:
     return {
         "idempotencyKey": "command-collision-001",
-        "strategyInstanceId": "strategy_funding_arbitrage_instance_default",
+        "strategyInstanceId": "strategy_generic_pipeline_test",
         "accountId": "account_sim_usdt",
         "instrumentId": "instrument_btc_usdt",
         "symbol": "BTCUSDT",
@@ -63,7 +64,7 @@ def trade_command_payload(quantity: str) -> dict[str, str]:
 def batch_payload(direction: str) -> dict[str, object]:
     return {
         "idempotencyKey": "batch-collision-001",
-        "strategyInstanceId": "strategy_funding_arbitrage_instance_default",
+        "strategyInstanceId": "strategy_generic_pipeline_test",
         "accountId": "account_sim_usdt",
         "strategyKey": "funding_arbitrage",
         "direction": direction,
@@ -96,10 +97,12 @@ def test_trade_command_key_cannot_be_reused_for_different_payload(
 ) -> None:
     settings = get_settings()
     settings.database_path = str(tmp_path / "command-collision.db")
-    settings.environment = "live"
-    settings.auth_mode = "api_key"
-    settings.auth_credentials_json = json.dumps(
-        [credential("admin-1", "admin-token", ["admin"])]
+    monkeypatch.setattr(settings, "environment", "live")
+    monkeypatch.setattr(settings, "auth_mode", "api_key")
+    monkeypatch.setattr(
+        settings,
+        "auth_credentials_json",
+        json.dumps([credential("admin-1", "admin-token", ["admin"])]),
     )
     runtime_calls = 0
 
@@ -108,7 +111,7 @@ def test_trade_command_key_cannot_be_reused_for_different_payload(
         runtime_calls += 1
         return filled_runtime_response(kwargs["json"])
 
-    monkeypatch.setattr("app.trade_command_execution.httpx.post", runtime_post)
+    monkeypatch.setattr("app.runtime_transport.post", runtime_post)
     monkeypatch.setattr("app.auth.has_ceo_trade_authority", lambda principal, current: True)
 
     with TestClient(app) as client:
@@ -135,10 +138,12 @@ def test_execution_batch_key_cannot_be_reused_for_different_payload(
 ) -> None:
     settings = get_settings()
     settings.database_path = str(tmp_path / "batch-collision.db")
-    settings.environment = "live"
-    settings.auth_mode = "api_key"
-    settings.auth_credentials_json = json.dumps(
-        [credential("admin-1", "admin-token", ["admin"])]
+    monkeypatch.setattr(settings, "environment", "live")
+    monkeypatch.setattr(settings, "auth_mode", "api_key")
+    monkeypatch.setattr(
+        settings,
+        "auth_credentials_json",
+        json.dumps([credential("admin-1", "admin-token", ["admin"])]),
     )
     runtime_calls = 0
 
@@ -147,7 +152,7 @@ def test_execution_batch_key_cannot_be_reused_for_different_payload(
         runtime_calls += 1
         return filled_runtime_response(kwargs["json"])
 
-    monkeypatch.setattr("app.trade_command_execution.httpx.post", runtime_post)
+    monkeypatch.setattr("app.runtime_transport.post", runtime_post)
     monkeypatch.setattr("app.auth.has_ceo_trade_authority", lambda principal, current: True)
 
     with TestClient(app) as client:
@@ -166,3 +171,6 @@ def test_execution_batch_key_cannot_be_reused_for_different_payload(
     assert conflict.status_code == 409
     assert "different execution batch payload" in conflict.json()["detail"]
     assert runtime_calls == 2
+
+
+pytestmark = pytest.mark.usefixtures("generic_trading_instance")

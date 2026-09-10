@@ -80,10 +80,12 @@ class FakeGateway:
 
     def submit_order(self, command: SubmitOrderCommand) -> list[ExecutionEvent]:
         ensure_store()
-        script = None
-        if command.order_type == "limit":
-            with connection() as db:
-                script = claim_order_script(db, command.symbol.upper())
+        with connection() as db:
+            script = claim_order_script(
+                db, command.symbol.upper(), allow_nonterminal=command.order_type == "limit"
+            )
+        fee = Decimal(str(script["fill_fee"])) if script is not None else Decimal("0")
+        fee_currency = script["fee_currency"] if script is not None else None
         if script is not None and script["behavior"] == "result_unknown":
             from app.gateway_errors import GatewayResultUnknownError
 
@@ -116,10 +118,18 @@ class FakeGateway:
                 fill_quantity = Decimal("0")
             external_order_id, _ = persist_order(
                 command,
-                status="partially_filled" if fill_quantity > 0 else "accepted",
+                status=(
+                    "filled"
+                    if fill_quantity == command.quantity
+                    else "partially_filled"
+                    if fill_quantity > 0
+                    else "accepted"
+                ),
                 fill_price=fill_price,
                 fill_quantity=fill_quantity,
                 cancel_terminal_after_queries=int(script["cancel_terminal_after_queries"]),
+                fee=fee,
+                fee_currency=fee_currency,
             )
             return [
                 ExecutionEvent(
@@ -132,7 +142,9 @@ class FakeGateway:
                 )
             ]
         fill_price = command.price or self._estimate_market_fill_price(command)
-        external_order_id, _ = persist_filled_order(command, fill_price)
+        external_order_id, _ = persist_filled_order(
+            command, fill_price, fee=fee, fee_currency=fee_currency
+        )
         return [
             ExecutionEvent(
                 event_id=f"FAKE-ACK-{command.platform_order_id}",
@@ -375,9 +387,7 @@ class FakeGateway:
         orders = self.list_orders(account_id=account_id, limit=100)
         fills = self.list_fills(account_id=account_id)
         risk = self.get_account_risk(account_id)
-        as_of = max(
-            [risk.as_of, *(balance.as_of for balance in balances)] or [datetime.now(UTC)]
-        )
+        as_of = max([risk.as_of, *(balance.as_of for balance in balances)] or [datetime.now(UTC)])
         return VenueAccountSnapshot(
             source=self.name,
             accountId=account_id,
@@ -387,6 +397,8 @@ class FakeGateway:
             positions=positions,
             orders=orders,
             fills=fills,
+            economicEvents=self.list_economic_events(account_id=account_id),
+            economicEventsQuality="complete",
             accountRisk=risk,
             asOf=as_of,
             dataQualityState="complete",

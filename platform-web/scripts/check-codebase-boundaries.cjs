@@ -81,6 +81,7 @@ const hedgeBoardOwners = [
   'src/views/hedgeBoard/charts/EtfResearchPanels.ts',
   'src/views/hedgeBoard/charts/LocalChartWidget.ts',
   'src/views/hedgeBoard/hedgeBoard.less',
+  'src/views/hedgeBoard/charts/etfResearchPanels.less',
 ];
 assert(lineCount(hedgeBoardShell) <= 700, 'Hedge Board page shell exceeds 700 lines');
 for (const relative of hedgeBoardOwners) {

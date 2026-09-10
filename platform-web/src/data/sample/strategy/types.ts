@@ -50,6 +50,15 @@ export interface StrategyTableRow {
 export interface StrategyTableSection {
   columns: StrategyTableColumn[];
   rows: StrategyTableRow[];
+  description?: string;
+  emptyMessage?: string;
+  details?: Record<
+    string,
+    {
+      fields: Array<{ label: string; value: string }>;
+      sections?: Array<{ title: string; columns: StrategyTableColumn[]; rows: StrategyTableRow[] }>;
+    }
+  >;
 }
 
 export interface StrategyCapitalRiskCard {
@@ -86,6 +95,16 @@ export interface StrategyCapitalCurveSummary {
 }
 
 export interface StrategyCapitalCurveConfig {
+  metricSeries?: Record<
+    string,
+    {
+      title: string;
+      xLabels: string[];
+      netValueData: number[];
+      drawdownData: (number | null)[];
+      summaries: StrategyCapitalCurveSummary[];
+    }
+  >;
   title: string;
   subtitle: string;
   metricOptions: StrategyCapitalCurveOption[];
@@ -96,7 +115,7 @@ export interface StrategyCapitalCurveConfig {
   defaultMode?: string;
   xLabels: string[];
   netValueData: number[];
-  drawdownData: number[];
+  drawdownData: (number | null)[];
   summaries: StrategyCapitalCurveSummary[];
 }
 

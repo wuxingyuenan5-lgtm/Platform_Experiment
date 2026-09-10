@@ -1,15 +1,22 @@
 import path from 'node:path';
+import { randomUUID } from 'node:crypto';
 
 import { defineConfig, devices } from '@playwright/test';
 
 const frontendRoot = process.cwd();
 const repositoryRoot = path.resolve(frontendRoot, '..');
 const backendRoot = path.join(repositoryRoot, 'platform-api');
-const e2eRoot = path.join(repositoryRoot, '.e2e', 'hedge-board');
-const frontendOrigin = 'http://127.0.0.1:4373';
-const backendOrigin = 'http://127.0.0.1:8000';
+process.env.HEDGE_BOARD_E2E_RUN ||= randomUUID();
+process.env.E2E_CEO_PASSWORD ||= 'Isolated-E2E-2026#only';
+const run = process.env.HEDGE_BOARD_E2E_RUN;
+const e2eRoot = path.join(repositoryRoot, '.e2e', 'hedge-board', run);
+const python = path.join(backendRoot, '.venv', 'Scripts', 'python.exe');
+const frontendOrigin = 'http://127.0.0.1:4437';
+const backendOrigin = 'http://127.0.0.1:8437';
 const inheritedEnvironment = Object.fromEntries(
-  Object.entries(process.env).filter((entry): entry is [string, string] => typeof entry[1] === 'string'),
+  Object.entries(process.env).filter(
+    (entry): entry is [string, string] => typeof entry[1] === 'string',
+  ),
 );
 
 export default defineConfig({
@@ -23,12 +30,9 @@ export default defineConfig({
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI
-    ? [
-        ['list'],
-        ['html', { open: 'never', outputFolder: 'playwright-report/hedge-board' }],
-      ]
+    ? [['list'], ['html', { open: 'never', outputFolder: 'playwright-report/hedge-board' }]]
     : [['list']],
-  outputDir: 'test-results/hedge-board',
+  outputDir: `test-results/hedge-board/${run}`,
   use: {
     ...devices['Desktop Chrome'],
     actionTimeout: 15_000,
@@ -41,17 +45,19 @@ export default defineConfig({
   },
   webServer: [
     {
-      command:
-        'python scripts/seed_hedge_board_e2e.py && python -m uvicorn app.main:app --host 127.0.0.1 --port 8000',
+      command: `"${python}" -m uvicorn a_share_test_server:app --app-dir tests --host 127.0.0.1 --port 8437`,
       cwd: backendRoot,
       url: `${backendOrigin}/health`,
       timeout: 120_000,
-      reuseExistingServer: !process.env.CI,
+      reuseExistingServer: false,
       stdout: 'pipe',
       stderr: 'pipe',
       env: {
         ...inheritedEnvironment,
-        HEDGE_BOARD_E2E_RESET: '1',
+        PYTHONPATH: backendRoot,
+        PYTHONIOENCODING: 'utf-8',
+        VG_RESEARCH_REFRESH_ENABLED: 'false',
+        VG_RUNTIME_BASE_URL: 'http://127.0.0.1:1',
         VG_ENVIRONMENT: 'test',
         VG_AUTH_MODE: 'development',
         VG_DATABASE_PATH: path.join(e2eRoot, 'platform.db'),
@@ -64,14 +70,14 @@ export default defineConfig({
       },
     },
     {
-      command: 'pnpm sync:trading-tools && pnpm exec vite --host 127.0.0.1',
+      command: 'node node_modules/vite/bin/vite.js --host 127.0.0.1 --port 4437 --strictPort',
       cwd: frontendRoot,
-      url: `${frontendOrigin}/login`,
+      url: `${frontendOrigin}/`,
       timeout: 120_000,
-      reuseExistingServer: !process.env.CI,
+      reuseExistingServer: false,
       stdout: 'pipe',
       stderr: 'pipe',
-      env: inheritedEnvironment,
+      env: { ...inheritedEnvironment, VITE_PLATFORM_BACKEND_TARGET: backendOrigin },
     },
   ],
 });

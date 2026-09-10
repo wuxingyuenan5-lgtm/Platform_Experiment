@@ -1,19 +1,18 @@
+import { buildTradeRecords, recordTime } from './strategyTradeRecords';
 import { computed, ref } from 'vue';
+import { nativeAmount, settlementLabel } from './strategyRecordPresentation';
 
-import {
-  getCrossSpreadObservability,
-  type CrossSpreadObservabilityResult,
-} from '@/api/platform/crossSpreadObservability';
-import { getExecutionBatches, getFills, getOrders } from '@/api/platform/trading';
+import { getCrossSpreadSnapshot } from '@/api/platform/trading';
+import { getExecutionBatches, getFills, getOrders, getStrategyPnl } from '@/api/platform/trading';
 import type {
   ExecutionBatchResult,
   FillResult,
   OrderDetailResult,
+  StrategyPnlResult,
+  CrossSpreadPositionOverviewResult,
 } from '@/api/platform/trading.types';
 import type { StrategyTableSection, StrategyTableTab } from '@/data/sample/strategy';
 
-const CROSS_SPREAD_SYMBOLS = new Set(['XAUTUSDT', 'XAUUSD', 'XAUUSD.S']);
-const CROSS_SPREAD_INSTRUMENT_IDS = new Set(['instrument_xau_usdt_perp', 'instrument_xau_usd']);
 const STRATEGY_INSTANCE_ID = 'strategy_cross_venue_spread_instance_default';
 
 const statusLabelMap: Record<string, string> = {
@@ -53,14 +52,6 @@ function legStatusText(batch: ExecutionBatchResult): string {
   );
 }
 
-function sideLabel(side: string | null | undefined): string {
-  if (!side) return '--';
-  const normalized = side.toLowerCase();
-  if (normalized === 'buy') return '买入';
-  if (normalized === 'sell') return '卖出';
-  return side;
-}
-
 function directionLabel(direction: string | null | undefined): string {
   if (!direction) return '--';
   const map: Record<string, string> = {
@@ -84,210 +75,70 @@ function venueLabel(accountId: string | null | undefined): string {
   return accountId;
 }
 
-function formatTime(value: string | null | undefined): string {
-  if (!value) return '--';
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return value;
-  return parsed.toLocaleString('zh-CN', { hour12: false });
-}
-
-function isCrossSpreadSymbol(symbol: string | null | undefined): boolean {
-  return CROSS_SPREAD_SYMBOLS.has(String(symbol ?? '').toUpperCase());
-}
-
-function isCrossSpreadInstrument(instrumentId: string | null | undefined): boolean {
-  return CROSS_SPREAD_INSTRUMENT_IDS.has(String(instrumentId ?? ''));
-}
-
-function instrumentIdFromSymbol(symbol: string | null | undefined): string {
-  return String(symbol ?? '').toUpperCase() === 'XAUTUSDT'
-    ? 'instrument_xau_usdt_perp'
-    : 'instrument_xau_usd';
-}
-
-function mergeOrders(
-  platformOrders: OrderDetailResult[],
-  observability: CrossSpreadObservabilityResult,
-  currentAccountIds: Set<string>,
-  strategyOrderIds: Set<string>,
-) {
-  const merged = new Map<string, OrderDetailResult>();
-  for (const order of platformOrders) {
-    merged.set(order.externalOrderId || order.orderId, order);
-  }
-  for (const venue of [observability.bybit, observability.mt5]) {
-    for (const order of venue.recentOrders ?? []) {
-      if (!currentAccountIds.has(order.accountId) || !isCrossSpreadSymbol(order.symbol)) continue;
-      if (!order.platformOrderId || !strategyOrderIds.has(order.platformOrderId)) continue;
-      const key = String(
-        order.externalOrderId ||
-          order.platformOrderId ||
-          `${order.accountId}:${order.symbol}:${order.asOf}`,
-      );
-      if (merged.has(key)) continue;
-      merged.set(key, {
-        orderId: String(order.platformOrderId || order.externalOrderId || key),
-        commandId: String(order.platformOrderId || order.externalOrderId || key),
-        status: order.status,
-        externalOrderId: String(order.externalOrderId || ''),
-        accountId: order.accountId,
-        instrumentId: instrumentIdFromSymbol(order.symbol),
-        symbol: order.symbol,
-        side: order.side,
-        orderType: order.orderType,
-        quantity: String(order.quantity ?? '0'),
-        price: order.price == null ? null : String(order.price),
-        createdAt: order.asOf,
-        updatedAt: order.asOf,
-      });
-    }
-  }
-  return [...merged.values()].sort(
-    (left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime(),
-  );
-}
-
-function mergeFills(
-  platformFills: FillResult[],
-  observability: CrossSpreadObservabilityResult,
-  currentAccountIds: Set<string>,
-  strategyExternalOrderIds: Set<string>,
-) {
-  const merged = new Map<string, FillResult>();
-  for (const fill of platformFills) {
-    const key = [
-      fill.accountId,
-      fill.instrumentId,
-      fill.side,
-      fill.quantity,
-      fill.price,
-      fill.occurredAt,
-    ].join('|');
-    merged.set(key, fill);
-  }
-  for (const venue of [observability.bybit, observability.mt5]) {
-    for (const fill of venue.recentFills ?? []) {
-      if (!currentAccountIds.has(fill.accountId) || !isCrossSpreadSymbol(fill.symbol)) continue;
-      if (!strategyExternalOrderIds.has(fill.externalOrderId)) continue;
-      const instrumentId = instrumentIdFromSymbol(fill.symbol);
-      const key = [
-        fill.accountId,
-        instrumentId,
-        fill.side,
-        String(fill.quantity ?? '0'),
-        String(fill.price ?? '0'),
-        fill.occurredAt,
-      ].join('|');
-      if (merged.has(key)) continue;
-      merged.set(key, {
-        fillId: String(fill.externalFillId || key),
-        orderId: String(fill.externalOrderId || ''),
-        accountId: fill.accountId,
-        instrumentId,
-        side: fill.side,
-        quantity: String(fill.quantity ?? '0'),
-        price: String(fill.price ?? '0'),
-        occurredAt: fill.occurredAt,
-      });
-    }
-  }
-  return [...merged.values()].sort(
-    (left, right) => new Date(right.occurredAt).getTime() - new Date(left.occurredAt).getTime(),
-  );
-}
-
-function positionRows(
-  venue: 'bybit' | 'mt5',
-  positions: Array<{
-    symbol: string;
-    netQuantity: string | number | null | undefined;
-    averagePrice?: string | number | null;
-    unrealizedPnl?: string | number | null;
-    positionStatus?: string | null;
-  }>,
-): Array<Record<string, string>> {
-  return positions.map((position) => ({
-    symbol: position.symbol || '--',
-    venue: venue === 'bybit' ? 'Bybit' : 'MT5',
-    side: parseFloat(String(position.netQuantity ?? '0')) < 0 ? '空头' : '多头',
-    quantity: String(position.netQuantity ?? '--'),
-    averagePrice: String(position.averagePrice ?? '--'),
-    unrealizedPnl: String(position.unrealizedPnl ?? '--'),
-    status: position.positionStatus === 'Normal' ? '正常' : position.positionStatus ?? '--',
-  }));
-}
+const formatTime = recordTime;
 
 const crossSpreadTabs: StrategyTableTab[] = [
   { key: 'positions', label: '当前持仓' },
-  { key: 'fills', label: '成交记录' },
-  { key: 'history', label: '历史订单' },
+  { key: 'activity', label: '开平记录' },
+  { key: 'fills', label: '逐笔成交' },
+  { key: 'history', label: '委托明细' },
   { key: 'logs', label: '执行记录' },
+  { key: 'settlements', label: '原币结算流水' },
 ];
 
 export function useCrossSpreadRecords() {
   const loading = ref(false);
   const error = ref('');
+  const abnormalOrders = ref<CrossSpreadPositionOverviewResult['abnormalOrders']>([]);
 
   const orders = ref<OrderDetailResult[]>([]);
   const fills = ref<FillResult[]>([]);
   const batches = ref<ExecutionBatchResult[]>([]);
+  const finance = ref<StrategyPnlResult | null>(null);
   const bybitPositions = ref<Array<Record<string, string>>>([]);
   const mt5Positions = ref<Array<Record<string, string>>>([]);
 
   const tables = computed<Record<string, StrategyTableSection>>(() => {
-    const orderSymbolById = new Map(orders.value.map((order) => [order.orderId, order.symbol]));
+    const records = buildTradeRecords(orders.value, fills.value);
 
     return {
       positions: {
         columns: [
           { key: 'symbol', label: '标的' },
+          { key: 'planId', label: '组合' },
+          { key: 'ticket', label: 'MT5 Ticket' },
           { key: 'venue', label: '场所' },
           { key: 'side', label: '方向' },
           { key: 'quantity', label: '数量' },
           { key: 'averagePrice', label: '均价' },
-          { key: 'unrealizedPnl', label: '未实现盈亏' },
+          { key: 'unrealizedPnl', label: '未实现盈亏（USDT）' },
           { key: 'status', label: '状态' },
         ],
         rows: [...bybitPositions.value, ...mt5Positions.value],
       },
-      history: {
+      activity: records.activity,
+      history: records.orders,
+      fills: records.fills,
+      settlements: {
         columns: [
+          { key: 'eventId', label: '流水ID' },
           { key: 'orderId', label: '订单ID' },
+          { key: 'instructionId', label: '指令ID' },
+          { key: 'kind', label: '类型' },
           { key: 'symbol', label: '标的' },
-          { key: 'venue', label: '场所' },
-          { key: 'side', label: '方向' },
-          { key: 'orderType', label: '类型' },
-          { key: 'quantity', label: '数量' },
-          { key: 'status', label: '状态' },
-          { key: 'orderTime', label: '时间' },
+          { key: 'amount', label: '原币收支' },
+          { key: 'source', label: '来源' },
+          { key: 'time', label: '时间' },
         ],
-        rows: orders.value.map((order) => ({
-          orderId: String(order.orderId ?? '--').slice(0, 12),
-          symbol: order.symbol ?? '--',
-          venue: venueLabel(order.accountId),
-          side: sideLabel(order.side),
-          orderType: order.orderType === 'market' ? '市价' : order.orderType ?? '--',
-          quantity: String(order.quantity ?? '--'),
-          status: statusLabel(order.status),
-          orderTime: formatTime(order.createdAt),
-        })),
-      },
-      fills: {
-        columns: [
-          { key: 'fillId', label: '成交ID' },
-          { key: 'symbol', label: '标的' },
-          { key: 'side', label: '方向' },
-          { key: 'quantity', label: '数量' },
-          { key: 'price', label: '价格' },
-          { key: 'fillTime', label: '时间' },
-        ],
-        rows: fills.value.map((fill) => ({
-          fillId: String(fill.fillId ?? '--').slice(0, 12),
-          symbol: orderSymbolById.get(fill.orderId) ?? fill.instrumentId ?? '--',
-          side: sideLabel(fill.side),
-          quantity: String(fill.quantity ?? '--'),
-          price: String(fill.price ?? '--'),
-          fillTime: formatTime(fill.occurredAt),
+        rows: (finance.value?.economicEvents ?? []).map((event) => ({
+          eventId: event.externalEventId,
+          orderId: event.orderId || '--',
+          instructionId: event.instructionId || '--',
+          kind: settlementLabel(event.eventType),
+          symbol: event.symbol || '--',
+          amount: nativeAmount(event.amount, event.currency),
+          source: event.source || '--',
+          time: formatTime(event.occurredAt),
         })),
       },
       logs: {
@@ -301,7 +152,7 @@ export function useCrossSpreadRecords() {
           { key: 'executionTime', label: '时间' },
         ],
         rows: batches.value.map((batch) => ({
-          batchId: String(batch.batchId ?? '--').slice(0, 12),
+          batchId: String(batch.batchId ?? '--'),
           direction: directionLabel(batch.direction),
           status: statusLabel(batchDisplayStatus(batch)),
           accountId: venueLabel(batch.accountId),
@@ -317,71 +168,37 @@ export function useCrossSpreadRecords() {
     loading.value = true;
     error.value = '';
     try {
-      const [orderRows, fillRows, batchRows, observability] = await Promise.all([
+      const [orderRows, fillRows, batchRows, snapshot, financials] = await Promise.all([
         getOrders(STRATEGY_INSTANCE_ID),
         getFills(STRATEGY_INSTANCE_ID),
         getExecutionBatches(STRATEGY_INSTANCE_ID),
-        getCrossSpreadObservability(24, 50, 'audit'),
+        getCrossSpreadSnapshot(),
+        getStrategyPnl(STRATEGY_INSTANCE_ID),
       ]);
-      const currentAccountIds = new Set(
-        [observability?.bybit?.accountId, observability?.mt5?.accountId].filter(
-          (value): value is string => Boolean(value),
-        ),
-      );
-      const strategyOrderIds = new Set(
-        batchRows.flatMap(
-          (batch) => batch.legs.map((leg) => leg.orderId).filter(Boolean) as string[],
-        ),
-      );
-      const selectedPlatformOrders = orderRows.filter(
-        (order) =>
-          strategyOrderIds.has(order.orderId) &&
-          currentAccountIds.has(order.accountId) &&
-          (isCrossSpreadSymbol(order.symbol) || isCrossSpreadInstrument(order.instrumentId)),
-      );
-      const strategyExternalOrderIds = new Set(
-        selectedPlatformOrders
-          .map((order) => order.externalOrderId)
-          .filter((value): value is string => Boolean(value)),
-      );
-      const selectedPlatformFills = fillRows.filter(
-        (fill) =>
-          strategyOrderIds.has(fill.orderId) &&
-          currentAccountIds.has(fill.accountId) &&
-          isCrossSpreadInstrument(fill.instrumentId),
-      );
-      orders.value = mergeOrders(
-        selectedPlatformOrders,
-        observability,
-        currentAccountIds,
-        strategyOrderIds,
-      );
-      fills.value = mergeFills(
-        selectedPlatformFills,
-        observability,
-        currentAccountIds,
-        strategyExternalOrderIds,
-      );
-      batches.value = batchRows.filter(
-        (batch) =>
-          batch.strategyKey === 'cross_venue_spread' &&
-          batch.legs.some((leg) => {
-            const accountId = leg.accountId;
-            return typeof accountId === 'string' && currentAccountIds.has(accountId);
-          }),
-      );
-      bybitPositions.value = positionRows(
-        'bybit',
-        (observability?.bybit?.positions ?? []).filter(
-          (position) => Math.abs(parseFloat(String(position.netQuantity ?? '0'))) > 0,
-        ),
-      );
-      mt5Positions.value = positionRows(
-        'mt5',
-        (observability?.mt5?.positions ?? []).filter(
-          (position) => Math.abs(parseFloat(String(position.netQuantity ?? '0'))) > 0,
-        ),
-      );
+      orders.value = orderRows;
+      fills.value = fillRows;
+      batches.value = batchRows.filter((batch) => batch.strategyKey === 'cross_venue_spread');
+      finance.value = financials;
+      const overview = snapshot.positionOverview;
+      abnormalOrders.value = overview?.abnormalOrders ?? [];
+      const abnormal = new Set((overview?.abnormalOrders ?? []).map((row) => row.planId));
+      const groups = (overview?.groups ?? []).filter((row) => !abnormal.has(row.planId));
+      const rows = (venue: 'bybit' | 'mt5') =>
+        groups.map((row) => ({
+          symbol: venue === 'bybit' ? snapshot.bybit.symbol : snapshot.mt5.symbol,
+          venue: venue === 'bybit' ? 'Bybit' : 'MT5',
+          side: (row.direction === 'LONG_SPREAD') === (venue === 'bybit') ? '多头' : '空头',
+          quantity: String((venue === 'bybit' ? row.bybitQuantity : row.mt5Quantity) ?? '--'),
+          averagePrice: String(
+            (venue === 'bybit' ? row.bybitEntryPrice : row.mt5EntryPrice) ?? '--',
+          ),
+          unrealizedPnl: String((venue === 'bybit' ? row.bybitPnlUsdt : row.mt5PnlUsdt) ?? '--'),
+          status: row.reason || '正常',
+          planId: row.planId,
+          ticket: venue === 'mt5' ? row.mt5PositionId || '--' : '--',
+        }));
+      bybitPositions.value = rows('bybit');
+      mt5Positions.value = rows('mt5');
     } catch (caught: unknown) {
       error.value =
         typeof caught === 'object' && caught !== null
@@ -395,6 +212,7 @@ export function useCrossSpreadRecords() {
   return {
     loading,
     error,
+    abnormalOrders,
     tabs: crossSpreadTabs,
     tables,
     refresh,

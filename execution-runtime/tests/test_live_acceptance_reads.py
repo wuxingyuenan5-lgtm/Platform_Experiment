@@ -71,10 +71,16 @@ class AcceptanceBybitClient:
         return {
             "retCode": 0,
             "result": {
+                "category": kwargs.get("category", "linear"),
                 "list": [
                     {
                         "symbol": "XAUTUSDT",
                         "status": "Trading",
+                        "baseCoin": "XAUT",
+                        "quoteCoin": "USDT",
+                        "settleCoin": "USDT",
+                        "contractType": "LinearPerpetual",
+                        "priceFilter": {"tickSize": "0.1"},
                         "lotSizeFilter": {
                             "minOrderQty": "0.001",
                             "qtyStep": "0.001",
@@ -191,10 +197,11 @@ class AcceptanceMt5:
             equity=1000.0,
             margin_free=900.0,
             trade_allowed=True,
+            trade_expert=True,
         )
 
     def terminal_info(self):
-        return SimpleNamespace(trade_allowed=True)
+        return SimpleNamespace(trade_allowed=True, tradeapi_disabled=False)
 
     def orders_get(self, **kwargs):
         return ()
@@ -289,7 +296,8 @@ def mt5_command(quantity: str) -> SubmitOrderCommand:
 def test_bybit_external_order_and_fill_are_readable_without_route(tmp_path) -> None:
     get_settings().journal_path = str(tmp_path / "bybit-acceptance.db")
     initialize_journal()
-    adapter = BybitAcceptanceAdapter(bybit_settings(), AcceptanceBybitClient())
+    sdk = AcceptanceBybitClient()
+    adapter = BybitAcceptanceAdapter(bybit_settings(), sdk)
 
     snapshot = adapter.get_order(external_order_id="BYBIT-EXTERNAL-1")
     assert snapshot is not None
@@ -298,6 +306,8 @@ def test_bybit_external_order_and_fill_are_readable_without_route(tmp_path) -> N
     assert snapshot.data_quality_state == "external_only"
 
     listed = adapter.list_orders(account_id="account-bybit")
+    assert sdk.calls[-2][1]["settleCoin"] == "USDT"
+    assert sdk.calls[-1][1]["settleCoin"] == "USDT"
     assert [item.external_order_id for item in listed] == ["BYBIT-EXTERNAL-1"]
     fills = adapter.list_fills(external_order_id="BYBIT-EXTERNAL-1")
     assert fills[0].external_fill_id == "BYBIT-EXEC-1"
@@ -397,22 +407,15 @@ def test_mt5_deal_ticket_resolves_to_filled_order_without_route(
     assert fills[0].external_order_id == "123"
 
 
-def test_mt5_runtime_cap_converts_lots_to_ounces(tmp_path, monkeypatch) -> None:
+def test_mt5_legacy_cap_cannot_block_broker_valid_quantity(tmp_path, monkeypatch) -> None:
     configure_mt5_secret(monkeypatch)
     get_settings().journal_path = str(tmp_path / "mt5-cap.db")
     initialize_journal()
     provider = AcceptanceMt5()
     adapter = StrictMt5AcceptanceAdapter(mt5_settings(), provider)
-
-    events = adapter.submit_order(mt5_command("0.01"))
-    assert [event.event_type for event in events] == [
-        "order_acknowledged",
-        "order_filled",
-    ]
-    assert provider.requests[0]["volume"] == 0.01
-
-    with pytest.raises(GatewayRequestRejectedError, match="one-ounce limit"):
-        adapter.submit_order(mt5_command("0.02"))
+    events = adapter.submit_order(mt5_command("0.02"))
+    assert [event.event_type for event in events] == ["order_acknowledged", "order_filled"]
+    assert provider.requests[0]["volume"] == 0.02
 
 
 def test_mt5_legacy_one_ounce_cap_is_disabled_by_default(tmp_path, monkeypatch) -> None:
@@ -429,3 +432,24 @@ def test_mt5_legacy_one_ounce_cap_is_disabled_by_default(tmp_path, monkeypatch) 
         "order_filled",
     ]
     assert provider.requests[0]["volume"] == 0.02
+
+
+@pytest.mark.parametrize("permission", ["terminal", "python", "account_expert"])
+def test_mt5_native_trading_permissions_fail_before_order_send(tmp_path, monkeypatch, permission):
+    configure_mt5_secret(monkeypatch)
+    get_settings().journal_path = str(tmp_path / "mt5-permissions.db")
+    initialize_journal()
+    provider = AcceptanceMt5()
+    if permission == "account_expert":
+        info = provider.account_info()
+        info.trade_expert = False
+        monkeypatch.setattr(provider, "account_info", lambda: info)
+    else:
+        terminal = SimpleNamespace(
+            trade_allowed=permission != "terminal", tradeapi_disabled=permission == "python"
+        )
+        monkeypatch.setattr(provider, "terminal_info", lambda: terminal)
+    adapter = StrictMt5AcceptanceAdapter(mt5_settings(), provider)
+    with pytest.raises(GatewayRequestRejectedError):
+        adapter.submit_order(mt5_command("0.02"))
+    assert provider.requests == []

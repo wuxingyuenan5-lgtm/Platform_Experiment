@@ -27,14 +27,26 @@
     <template v-if="executionStage === 'open'">
       <div class="account-balance-strip">
         <article class="metric-card account-balance-card">
-          <small>Bybit 账户资金</small>
-          <strong>{{ accountEquityText(bybitAccountRisk) }}</strong>
-          <span>可用资金 {{ accountAvailableText(bybitAccountRisk) }}</span>
+          <div class="account-balance-heading"
+            ><small>Bybit 账户权益</small
+            ><strong>{{ accountEquityText(bybitAccountRisk) }}</strong></div
+          >
+          <div class="account-balance-details"
+            ><span>可用保证金（估值）{{ accountAvailableText(bybitAccountRisk) }}</span>
+            <span
+              >账户保证金占用 {{ accountMoneyText(bybitAccountRisk, 'initialMargin') }}</span
+            ></div
+          >
         </article>
         <article class="metric-card account-balance-card">
-          <small>MT5 账户资金</small>
-          <strong>{{ accountEquityText(mt5AccountRisk) }}</strong>
-          <span>可用资金 {{ accountAvailableText(mt5AccountRisk) }}</span>
+          <div class="account-balance-heading"
+            ><small>MT5 账户资金</small
+            ><strong>{{ accountEquityText(mt5AccountRisk) }}</strong></div
+          >
+          <div class="account-balance-details"
+            ><span>可用资金 {{ accountAvailableText(mt5AccountRisk) }}</span>
+            <span>账户保证金占用 {{ accountMoneyText(mt5AccountRisk, 'initialMargin') }}</span></div
+          >
         </article>
       </div>
 
@@ -70,19 +82,27 @@
             </div>
           </div>
 
-          <label class="field-block">
+          <div class="field-block">
             <span>Bybit 杠杆（XAUTUSDT）</span>
             <div class="input-row">
               <input v-model="bybitLeverageInput" inputmode="decimal" aria-label="Bybit 杠杆" />
               <em>x</em>
-              <button type="button" :disabled="leverageLoading" @click="applyBybitLeverage">{{
-                leverageLoading ? '设置中' : '应用到交易所'
-              }}</button>
             </div>
-            <p class="execution-note">{{
-              leverageMessage || '账户级真实设置：仅在 Bybit 回执成功后生效。MT5 杠杆由账户管理。'
-            }}</p>
-          </label>
+            <button
+              type="button"
+              class="row-btn"
+              :disabled="leverageLoading || !isCeo"
+              @click="applyBybitLeverage"
+              >{{ leverageLoading ? '设置中' : '应用到交易所' }}</button
+            >
+            <p class="execution-note"
+              >当前杠杆 {{ currentLeverage ? `${currentLeverage}x` : '--' }} ·
+              <button type="button" :disabled="leverageLoading" @click="refreshLeverage"
+                >刷新</button
+              >
+            </p>
+            <p class="execution-note">{{ leverageMessage || 'MT5 杠杆由账户管理。' }}</p>
+          </div>
         </div>
 
         <div class="execution-column execution-column--pricing">
@@ -263,14 +283,14 @@
         <div class="close-market-strip">
           <article>
             <span>平多当前价差</span>
-            <strong :class="spreadTone(longSpread)"
-              >{{ formatNullableSigned(longSpread) }} USDT</strong
+            <strong :class="spreadTone(shortSpread)"
+              >{{ formatNullableSigned(shortSpread) }} USDT</strong
             >
           </article>
           <article>
             <span>平空当前价差</span>
-            <strong :class="spreadTone(shortSpread)"
-              >{{ formatNullableSigned(shortSpread) }} USDT</strong
+            <strong :class="spreadTone(longSpread)"
+              >{{ formatNullableSigned(longSpread) }} USDT</strong
             >
           </article>
         </div>
@@ -315,6 +335,8 @@
             <tr v-for="position in closeOrders" :key="position.id">
               <td :class="position.direction === 'LONG_SPREAD' ? 'green' : 'red'">
                 {{ position.direction === 'LONG_SPREAD' ? '多头' : '空头' }}
+                <div v-if="position.originLabel">{{ position.originLabel }}</div>
+                <div v-if="position.mt5PositionId">Ticket {{ position.mt5PositionId }}</div>
               </td>
               <td>{{ formatNumber(position.qtyOz, 2) }}</td>
               <td>账户级（只读）</td>
@@ -513,13 +535,20 @@
 </template>
 
 <script setup lang="ts">
-  import { ref } from 'vue';
+  import { Modal } from 'ant-design-vue';
+  import { computed, onMounted, ref } from 'vue';
+  import { useUserStore } from '@/store/modules/user';
+  import {
+    getCrossSpreadLeverage,
+    setCrossSpreadLeverage,
+  } from '@/api/platform/crossSpreadLifecycle';
   import type {
     CrossSpreadExecutionMode,
     CrossSpreadLimitExecutionResult,
     CrossSpreadLimitStrategy,
   } from '@/api/platform/crossSpreadLifecycle';
   import type { VenueAccountRiskSnapshot } from '@/api/platform/crossSpreadObservability';
+  import type { CloseOrder } from '../composables/mapCrossSpreadPositions';
   import { useCrossSpreadFundingTransfer } from '../composables/useCrossSpreadFundingTransfer';
 
   type SpreadInputField = 'trigger' | 'acceptable' | 'takeProfit' | 'stopLoss' | 'closeLimit';
@@ -537,16 +566,6 @@
     | 'stopLossExecution'
     | 'stopLossLimitStrategy'
     | 'closeLimitStrategy';
-
-  interface CloseOrder {
-    id: string;
-    direction: 'LONG_SPREAD' | 'SHORT_SPREAD';
-    qtyOz: number;
-    entrySpread: number;
-    takeProfit: number | null;
-    stopLoss: number | null;
-    execution: string;
-  }
 
   const props = defineProps<{
     executionStage: 'open' | 'close' | 'funding';
@@ -602,7 +621,10 @@
     (event: 'openPartialClose', planId: string, quantityOz: number): void;
   }>();
 
-  const bybitLeverageInput = ref('20');
+  const bybitLeverageInput = ref('50');
+  const currentLeverage = ref<string | null>(null);
+  const userStore = useUserStore();
+  const isCeo = computed(() => userStore.authentication?.user.role === 'ceo');
   const leverageLoading = ref(false);
   const leverageMessage = ref('');
   const partialClosePlanId = ref<string | null>(null);
@@ -650,28 +672,53 @@
     cancelPartialClose();
   }
   async function applyBybitLeverage() {
+    if (!isCeo.value || leverageLoading.value) return;
     const leverage = Number(bybitLeverageInput.value);
-    if (!Number.isFinite(leverage) || leverage <= 0 || leverage > 100) {
-      leverageMessage.value = '请输入 0–100 的有效杠杆。';
+    if (!Number.isFinite(leverage) || leverage < 1 || leverage > 100) {
+      leverageMessage.value = '请输入 1–100 的有效杠杆，最终以该合约限制为准。';
       return;
     }
+    const confirmed = await new Promise<boolean>((resolve) => {
+      Modal.confirm({
+        title: '确认修改 Bybit 杠杆',
+        content: `将共享账户 XAUTUSDT 杠杆设为 ${leverage}x，已有仓位保证金占用也可能变化。`,
+        okText: '应用到交易所',
+        cancelText: '取消',
+        onOk: () => resolve(true),
+        onCancel: () => resolve(false),
+      });
+    });
+    if (!confirmed) return;
     leverageLoading.value = true;
     leverageMessage.value = '';
     try {
-      const response = await fetch('http://127.0.0.1:8100/venue/bybit/leverage', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ accountId: 'bybit-live-main', symbol: 'XAUTUSDT', leverage }),
-      });
-      const body = await response.json();
-      if (!response.ok) throw new Error(body.detail || '交易所未接受杠杆设置');
+      const body = await setCrossSpreadLeverage(String(leverage));
+      currentLeverage.value = body.leverage;
       leverageMessage.value = `交易所已确认 ${body.symbol} 为 ${body.leverage}x。`;
     } catch (error) {
-      leverageMessage.value = error instanceof Error ? `设置失败：${error.message}` : '设置失败。';
+      const detail = (error as { response?: { data?: { detail?: string } } }).response?.data
+        ?.detail;
+      leverageMessage.value = detail || '设置未确认，请刷新查询当前杠杆；不会自动重试。';
     } finally {
       leverageLoading.value = false;
     }
   }
+
+  async function refreshLeverage() {
+    if (leverageLoading.value) return;
+    leverageLoading.value = true;
+    try {
+      const result = await getCrossSpreadLeverage();
+      currentLeverage.value = result.leverage;
+      if (!bybitLeverageInput.value) bybitLeverageInput.value = result.leverage || '';
+      leverageMessage.value = result.leverage ? '' : '该账户模式未返回合约杠杆';
+    } catch {
+      leverageMessage.value = '当前杠杆读取失败，可刷新重试';
+    } finally {
+      leverageLoading.value = false;
+    }
+  }
+  onMounted(refreshLeverage);
 
   function emitInput(name: EditableInputName, event: Event) {
     const value = (event.target as HTMLInputElement).value;
@@ -713,7 +760,7 @@
 
   function accountMoneyText(
     risk: VenueAccountRiskSnapshot | null,
-    field: 'equity' | 'availableBalance',
+    field: 'equity' | 'availableBalance' | 'initialMargin',
   ) {
     if (!risk || risk.dataQualityState !== 'complete') return '--';
     const value = parseOptionalNumber(risk[field]);
@@ -735,7 +782,7 @@
   }
 
   function closeMarketSpread(direction: CloseOrder['direction']) {
-    return direction === 'LONG_SPREAD' ? props.longSpread : props.shortSpread;
+    return direction === 'LONG_SPREAD' ? props.shortSpread : props.longSpread;
   }
 
   function limitStrategyLabel(strategy: CrossSpreadLimitStrategy) {
@@ -931,11 +978,25 @@
     margin-bottom: 14px;
   }
 
+  .account-balance-heading {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    white-space: nowrap;
+  }
+
   .account-balance-card {
     min-height: 84px;
   }
 
-  .account-balance-card span {
+  .account-balance-details {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0 14px;
+  }
+
+  .account-balance-details span {
+    white-space: nowrap;
     display: block;
     margin-top: 6px;
     color: #667891;

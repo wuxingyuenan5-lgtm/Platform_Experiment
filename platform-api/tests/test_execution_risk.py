@@ -3,6 +3,7 @@ from pathlib import Path
 from uuid import uuid4
 
 import httpx
+import pytest
 from fastapi.testclient import TestClient
 
 from app.config import get_settings
@@ -10,7 +11,7 @@ from app.database import connection
 from app.execution_risk import check_leg_deadline
 from app.main import app
 
-STRATEGY_INSTANCE_ID = "strategy_funding_arbitrage_instance_default"
+STRATEGY_INSTANCE_ID = "strategy_generic_pipeline_test"
 ACCOUNT_ID = "account_sim_usdt"
 SPOT_ID = "instrument_btc_usdt"
 PERP_ID = "instrument_btc_usdt_perp"
@@ -142,21 +143,35 @@ def test_global_kill_switch_blocks_before_batch_claim(tmp_path: Path) -> None:
         assert conflict.status_code == 409
 
 
-def test_auto_flatten_resolves_first_leg_exposure_idempotently(
+@pytest.mark.parametrize("perpetual_first", [False, True])
+@pytest.mark.parametrize("second_outcome", ["rejected", "unknown"])
+def test_auto_flatten_requires_terminal_evidence_and_is_idempotent(
     monkeypatch,
     tmp_path: Path,
+    perpetual_first: bool,
+    second_outcome: str,
 ) -> None:
     get_settings().database_path = str(tmp_path / "auto-flatten.db")
     call_count = 0
+    runtime_payloads = []
 
     def runtime_post(*args, **kwargs):
         nonlocal call_count
         call_count += 1
+        runtime_payloads.append(kwargs["json"])
         if call_count == 2:
-            raise httpx.ConnectError("runtime unavailable")
+            if second_outcome == "unknown":
+                raise httpx.ConnectError("runtime unavailable")
+            event = filled_runtime_response(kwargs["json"]).json()[0]
+            event.update(
+                event_type="order_rejected", external_order_id=None, reason="Venue rejected"
+            )
+            return httpx.Response(
+                200, json=[event], request=httpx.Request("POST", "http://runtime/commands")
+            )
         return filled_runtime_response(kwargs["json"])
 
-    monkeypatch.setattr("app.trade_command_execution.httpx.post", runtime_post)
+    monkeypatch.setattr("app.runtime_transport.post", runtime_post)
 
     with TestClient(app) as client:
         set_policy(
@@ -164,26 +179,50 @@ def test_auto_flatten_resolves_first_leg_exposure_idempotently(
             key="policy-auto-flatten-001",
             failure_action="auto_flatten",
         )
+        payload = batch_payload("auto-flatten-batch-001")
+        if perpetual_first:
+            payload["legs"].reverse()
         response = client.post(
             "/api/v1/trading/execution-batches",
-            json=batch_payload("auto-flatten-batch-001"),
+            json=payload,
         )
         assert response.status_code == 200
         batch = response.json()
+        if second_outcome == "unknown":
+            assert batch["status"] == "manual_intervention"
+            assert call_count == 2
+            risk = client.get(f"/api/v1/trading/execution-batches/{batch['batchId']}/risk").json()
+            assert risk["riskStatus"] == "escalated"
+            assert client.post(
+                f"/api/v1/trading/execution-batches/{batch['batchId']}/risk-actions",
+                json={"idempotencyKey": "unknown-retry", "action": "flatten_filled_legs",
+                      "actor": "risk-test"},
+            ).json()["status"] == "failed"
+            assert call_count == 2
+            return
         assert batch["status"] == "failed"
         assert batch["requiresManualIntervention"] is False
         assert call_count == 3
 
-        risk = client.get(
-            f"/api/v1/trading/execution-batches/{batch['batchId']}/risk"
-        ).json()
+        another = client.post(
+            f"/api/v1/trading/execution-batches/{batch['batchId']}/risk-actions",
+            json={"idempotencyKey": "already-flat-new-key", "action": "flatten_filled_legs",
+                  "actor": "risk-test"},
+        )
+        assert another.status_code == 200
+        assert another.json()["status"] == "completed"
+        assert another.json()["generatedOrderIds"] == []
+        assert call_count == 3
+        assert runtime_payloads[-1]["reduce_only"] is perpetual_first
+
+        risk = client.get(f"/api/v1/trading/execution-batches/{batch['batchId']}/risk").json()
         assert risk["riskStatus"] == "resolved"
         assert risk["residualExposureNotional"] == "0"
 
         actions = client.get(
             f"/api/v1/trading/execution-batches/{batch['batchId']}/risk-actions"
         ).json()
-        assert len(actions) == 1
+        assert len(actions) == 2
         assert actions[0]["action"] == "flatten_filled_legs"
         assert actions[0]["status"] == "completed"
         assert len(actions[0]["generatedOrderIds"]) == 1
@@ -201,7 +240,8 @@ def test_auto_flatten_resolves_first_leg_exposure_idempotently(
         assert replay.json()["riskActionId"] == actions[0]["riskActionId"]
         assert call_count == 3
 
-        position = client.get(f"/api/v1/accounts/{ACCOUNT_ID}/positions/{SPOT_ID}")
+        instrument = PERP_ID if perpetual_first else SPOT_ID
+        position = client.get(f"/api/v1/accounts/{ACCOUNT_ID}/positions/{instrument}")
         assert position.status_code == 200
         assert position.json()["netQuantity"] == "0"
 
@@ -218,7 +258,7 @@ def test_residual_limit_stops_second_leg_and_manual_action_is_idempotent(
         call_count += 1
         return filled_runtime_response(kwargs["json"])
 
-    monkeypatch.setattr("app.trade_command_execution.httpx.post", runtime_post)
+    monkeypatch.setattr("app.runtime_transport.post", runtime_post)
 
     with TestClient(app) as client:
         set_policy(
@@ -236,9 +276,7 @@ def test_residual_limit_stops_second_leg_and_manual_action_is_idempotent(
         assert batch["requiresManualIntervention"] is True
         assert call_count == 1
 
-        risk = client.get(
-            f"/api/v1/trading/execution-batches/{batch['batchId']}/risk"
-        ).json()
+        risk = client.get(f"/api/v1/trading/execution-batches/{batch['batchId']}/risk").json()
         assert risk["riskStatus"] == "escalated"
         assert risk["residualExposureNotional"] == "100"
         assert risk["residualCurrency"] == "USDT"
@@ -280,7 +318,7 @@ def test_leg_deadline_uses_first_fill_timestamp(monkeypatch, tmp_path: Path) -> 
             raise httpx.ConnectError("runtime unavailable")
         return filled_runtime_response(kwargs["json"])
 
-    monkeypatch.setattr("app.trade_command_execution.httpx.post", runtime_post)
+    monkeypatch.setattr("app.runtime_transport.post", runtime_post)
 
     with TestClient(app) as client:
         set_policy(
@@ -292,9 +330,7 @@ def test_leg_deadline_uses_first_fill_timestamp(monkeypatch, tmp_path: Path) -> 
             "/api/v1/trading/execution-batches",
             json=batch_payload("leg-delay-batch-001"),
         ).json()
-        risk = client.get(
-            f"/api/v1/trading/execution-batches/{batch['batchId']}/risk"
-        ).json()
+        risk = client.get(f"/api/v1/trading/execution-batches/{batch['batchId']}/risk").json()
         first_fill_at = datetime.fromisoformat(risk["firstFillAt"])
         allowed, reason = check_leg_deadline(
             batch["batchId"],
@@ -303,3 +339,6 @@ def test_leg_deadline_uses_first_fill_timestamp(monkeypatch, tmp_path: Path) -> 
         assert allowed is False
         assert reason is not None
         assert "exceeded policy limit" in reason
+
+
+pytestmark = pytest.mark.usefixtures("generic_trading_instance")

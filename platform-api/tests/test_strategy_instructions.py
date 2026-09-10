@@ -11,6 +11,7 @@ from pathlib import Path
 from threading import Event
 from uuid import uuid4
 
+import pytest
 from fastapi.testclient import TestClient
 
 from app.config import get_settings
@@ -19,12 +20,47 @@ from app.main import app
 from app.schema_migrations import apply_platform_migrations
 from app.strategies.instruction_service import execute_instruction
 
-FUNDING_INSTANCE = "strategy_funding_arbitrage_instance_default"
+FUNDING_INSTANCE = "strategy_funding_instruction_unit_test"
 REPO_ROOT = Path(os.environ.get("VG_REPO_ROOT") or Path(__file__).resolve().parents[2])
 RUNTIME_DIR = Path(os.environ.get("VG_RUNTIME_DIR") or REPO_ROOT / "execution-runtime")
 RUNTIME_PYTHON = RUNTIME_DIR / ".venv" / "Scripts" / "python.exe"
 if not RUNTIME_PYTHON.exists():
     RUNTIME_PYTHON = Path(sys.executable)
+
+
+@pytest.fixture(autouse=True)
+def generic_instruction_fixture(monkeypatch):
+    """Exercise the generic engine on a test instance; controlled desks use dedicated routes."""
+    from app import application
+
+    initialize = application.initialize_database
+
+    def initialize_test_instance():
+        initialize()
+        original = "strategy_funding_arbitrage_instance_default"
+        with connection() as db:
+            row = dict(
+                db.execute("SELECT * FROM strategy_instances WHERE id=?", (original,)).fetchone()
+            )
+            row.update(id=FUNDING_INSTANCE, status="active", trading_mode="simulation")
+            columns = ",".join(row)
+            placeholders = ",".join("?" for _ in row)
+            db.execute(
+                f"INSERT OR IGNORE INTO strategy_instances ({columns}) VALUES ({placeholders})",
+                tuple(row.values()),
+            )
+            for binding in db.execute(
+                "SELECT * FROM strategy_account_bindings WHERE strategy_instance_id=?", (original,)
+            ).fetchall():
+                values = dict(binding)
+                values.update(id="unit:" + values["id"], strategy_instance_id=FUNDING_INSTANCE)
+                db.execute(
+                    f"INSERT OR IGNORE INTO strategy_account_bindings ({','.join(values)}) "
+                    f"VALUES ({','.join('?' for _ in values)})",
+                    tuple(values.values()),
+                )
+
+    monkeypatch.setattr(application, "initialize_database", initialize_test_instance)
 
 
 def _payload(*, key: str, quantity: str = "1") -> dict[str, object]:
@@ -296,7 +332,7 @@ def test_pending_instruction_batch_is_claimed_once_and_replay_does_not_duplicate
             assert release_first_submit.wait(timeout=5)
         return FilledResponse(kwargs["json"])
 
-    monkeypatch.setattr("app.trade_command_execution.httpx.post", fake_post)
+    monkeypatch.setattr("app.runtime_transport.post", fake_post)
 
     with _runtime_server(tmp_path) as (runtime_url, journal_dir):
         settings.runtime_base_url = runtime_url

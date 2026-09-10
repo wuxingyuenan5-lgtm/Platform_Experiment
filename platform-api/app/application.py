@@ -1,8 +1,10 @@
+import asyncio
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app import runtime_transport
 from app.auth import AuthenticationMiddleware
 from app.catalog_routes import create_catalog_router
 from app.config import get_settings
@@ -20,12 +22,14 @@ from app.live_trading_sessions import router as live_trading_sessions_router
 from app.live_venue_accounting import router as live_venue_accounting_router
 from app.live_venue_snapshot_sync import router as live_venue_snapshot_sync_router
 from app.member_holding_routes import router as member_holding_router
+from app.operational_metrics import router as operational_metrics_router
 from app.production_monitoring import router as production_monitoring_router
+from app.research_a_share_refresh import lifespan as research_lifespan
 from app.research_routes import router as research_router
-from app.research_a_share_refresh import refresh_a_share_research
 from app.research_watchlist_routes import router as research_watchlist_router
 from app.schema_governance import router as schema_governance_router
 from app.security_ops_routes import create_security_ops_router
+from app.strategies import funding_runner
 from app.system_routes import create_system_router
 from app.trade_commands import create_trade_command
 from app.trading_routes import create_trading_router
@@ -44,24 +48,17 @@ configure_trade_command_port(create_trade_command)
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     initialize_database()
-    settings = get_settings()
-    refresh_task = None
-    if settings.research_refresh_enabled:
-        import asyncio
-
-        async def loop() -> None:
-            await refresh_a_share_research()
-            while True:
-                await asyncio.sleep(max(60.0, settings.research_refresh_interval_seconds))
-                await refresh_a_share_research()
-
-        refresh_task = asyncio.create_task(loop())
+    stop = asyncio.Event()
+    runner = asyncio.create_task(funding_runner.run_funding_instruction_monitor(stop))
     try:
-        yield
+        async with research_lifespan(_):
+            yield
     finally:
-        if refresh_task is not None:
-            refresh_task.cancel()
-            await asyncio.gather(refresh_task, return_exceptions=True)
+        stop.set()
+        try:
+            await runner
+        finally:
+            runtime_transport.close()
 
 
 def create_application() -> FastAPI:
@@ -94,6 +91,7 @@ def create_application() -> FastAPI:
     application.include_router(live_trading_sessions_router)
     application.include_router(credential_security_router)
     application.include_router(production_monitoring_router)
+    application.include_router(operational_metrics_router)
     application.include_router(disaster_recovery_router)
     application.include_router(schema_governance_router)
     application.include_router(cross_spread_exit_router)

@@ -3,6 +3,8 @@ from __future__ import annotations
 import hashlib
 import json
 from datetime import UTC, datetime
+from decimal import Decimal
+from typing import Any
 from uuid import uuid4
 
 from app import venue_reconciliation_repository as repository
@@ -88,7 +90,7 @@ def reconcile_order_with_venue(order_id: str) -> OrderVenueReconciliationRespons
     if status_before == "result_unknown":
         reconcile_order(order_id)
     row = get_order_row(order_id)
-    strategy_instance_id = strategy_for_order(row)
+    strategy_for_order(row)
 
     response = runtime_get(f"/venue/orders/by-platform/{order_id}")
     if response.status_code == 404:
@@ -112,7 +114,37 @@ def reconcile_order_with_venue(order_id: str) -> OrderVenueReconciliationRespons
         )
     response.raise_for_status()
     external_order = response.json()
+    fill_response = runtime_get("/venue/fills", params={"platformOrderId": order_id})
+    fill_response.raise_for_status()
+    return reconcile_order_snapshot(
+        order_id,
+        external_order=external_order,
+        fills=fill_response.json(),
+        status_before=status_before,
+    )
+
+
+def reconcile_order_snapshot(
+    order_id: str,
+    *,
+    external_order: dict[str, Any],
+    fills: list[dict[str, Any]],
+    status_before: str | None = None,
+) -> OrderVenueReconciliationResponse:
+    """Import one native snapshot through the same identity and projection boundary."""
+    row = get_order_row(order_id)
+    strategy_instance_id = strategy_for_order(row)
+    status_before = status_before or str(row["status"])
     source = str(external_order["source"])
+    for field, column in (
+        ("accountId", "account_id"),
+        ("instrumentId", "instrument_id"),
+        ("side", "side"),
+    ):
+        if external_order[field] != row[column]:
+            raise ReconciliationServiceError("Venue order identity conflicts with local order")
+    if row["external_order_id"] and row["external_order_id"] != external_order["externalOrderId"]:
+        raise ReconciliationServiceError("Venue native order identity conflicts with local order")
 
     imported_fact_ids: list[str] = []
     order_fact = record_financial_fact(
@@ -132,12 +164,31 @@ def reconcile_order_with_venue(order_id: str) -> OrderVenueReconciliationRespons
     )
     imported_fact_ids.append(order_fact.fact_id)
 
-    fill_response = runtime_get(
-        "/venue/fills",
-        params={"platformOrderId": order_id},
-    )
-    fill_response.raise_for_status()
-    fills = fill_response.json()
+    from app.live_venue_snapshot_sync import _persist_venue_event
+    from app.venue_identity_repository import load_order_identities
+
+    with connection() as db:
+        identities = load_order_identities(db)
+        confirmed = sum(
+            (
+                Decimal(row[0])
+                for row in db.execute(
+                    "SELECT quantity FROM fills WHERE order_id=? AND origin='runtime_confirmation'",
+                    (order_id,),
+                )
+            ),
+            Decimal(0),
+        )
+        for fill in fills:
+            if (
+                fill["externalOrderId"] != external_order["externalOrderId"]
+                or fill["source"] != source
+                or identities.resolve(row["account_id"], fill) != order_id
+            ):
+                raise ReconciliationServiceError(
+                    "Venue execution identity conflicts with local order"
+                )
+            _persist_venue_event(db, row["account_id"], "trade_fill", fill)
     request = request_from_order_row(row)
     events: list[dict[str, object]] = []
     for fill in fills:
@@ -153,7 +204,9 @@ def reconcile_order_with_venue(order_id: str) -> OrderVenueReconciliationRespons
                 side=fill["side"],
                 quantity=fill["quantity"],
                 price=fill["price"],
-                currency=fill["currency"],
+                # Native fill currency denotes the fee asset (Spot may charge
+                # BTC); trade settlement is resolved from the instrument.
+                # Preserve the exact fee currency in the immutable payload.
                 occurredAt=fill["occurredAt"],
                 payload=fill,
             )
@@ -173,19 +226,48 @@ def reconcile_order_with_venue(order_id: str) -> OrderVenueReconciliationRespons
             }
         )
 
-    if events:
+    native_quantity = sum((Decimal(str(fill["quantity"])) for fill in fills), Decimal(0))
+    confirmation_differs = confirmed > 0 and confirmed != native_quantity
+    already_projected = confirmed > 0 or (
+        row["status"] == "filled"
+        and repository.has_full_execution_projection(order_id, Decimal(row["quantity"]))
+    )
+    if events and not already_projected:
         apply_execution_events(
             order_id,
             request,
             events,
             expected_command_id=row["command_id"],
+            fill_origin="venue_execution",
+            fill_source=source,
         )
+    if events:
         synchronize_trade_command_status(row["command_id"], order_id)
-    elif external_order["status"] in {"accepted", "filled", "rejected", "canceled"}:
+    if not confirmation_differs and external_order["status"] in {
+        "accepted",
+        "partially_filled",
+        "filled",
+        "rejected",
+        "canceled",
+    }:
         update_order_from_external(row, external_order)
 
     final = get_order_row(order_id)
     differences = compare_order(order_id, final, external_order, fills)
+    if confirmation_differs:
+        difference = standalone_order_difference(
+            order_id,
+            "quantity_mismatch",
+            {"filledQuantity": str(confirmed)},
+            {"filledQuantity": str(native_quantity)},
+        )
+        differences = list(dict.fromkeys([*differences, difference]))
+    if not differences:
+        from app.execution_risk_repository import recheck_risks_for_order
+
+        recheck_risks_for_order(
+            order_id, reason="Venue order and fills reconciled without differences"
+        )
     repository.audit(
         "venue_order_reconciled",
         "order",

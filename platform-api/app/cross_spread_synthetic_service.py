@@ -7,7 +7,11 @@ from fastapi import HTTPException
 
 from app import cross_spread_exit_service as market_helpers
 from app.config import get_settings
-from app.cross_spread import get_cross_spread_snapshot, submit_cross_spread_market_command
+from app.cross_spread import (
+    assert_cross_spread_live_execution_enabled,
+    get_cross_spread_snapshot,
+    submit_cross_spread_market_command,
+)
 from app.cross_spread_exit_policy import (
     evaluate_exit_threshold,
     select_executable_close_spread,
@@ -15,6 +19,7 @@ from app.cross_spread_exit_policy import (
 from app.cross_spread_exit_repository import (
     claim_exit_plan,
     configure_exit_plan_execution_modes,
+    find_close_batch,
     find_plan_by_open_batch,
     get_exit_plan,
     has_accepted_missing_external_order_difference,
@@ -64,7 +69,7 @@ def open_cross_spread_market(request: CrossSpreadMarketOpenRequest) -> CrossSpre
     recovered = _recover_open_by_idempotency(request, intent)
     if recovered is not None:
         return recovered
-    market_helpers._assert_acceptance_open_allowed()
+    market_helpers._assert_open_execution_resolved()
     limit_execution = _prepare_limit_execution(intent, request.limit_spread)
     command_request = CrossSpreadMarketCommandRequest(
         action=command_action(intent),
@@ -158,7 +163,15 @@ def close_cross_spread_market(
     if (
         idempotency_key is not None
         and current_plan.close_batch_id is not None
-        and get_execution_batch(current_plan.close_batch_id).idempotency_key == idempotency_key
+        and get_execution_batch(current_plan.close_batch_id).idempotency_key
+        in {idempotency_key, f"instruction:{idempotency_key}"}
+        and not (
+            current_plan.status == "manual_intervention"
+            and any(
+                leg.role == "bybit_leg" and leg.status == "filled"
+                for leg in get_execution_batch(current_plan.close_batch_id).legs
+            )
+        )
     ):
         return CrossSpreadCloseResult(
             executionBatch=get_execution_batch(current_plan.close_batch_id),
@@ -182,6 +195,7 @@ def close_cross_spread_market(
             ),
             exitPlan=current_plan,
         )
+    assert_cross_spread_live_execution_enabled()
     intent = build_close_intent(
         current_plan.direction,
         execution_mode,
@@ -190,16 +204,38 @@ def close_cross_spread_market(
     limit_execution = _prepare_limit_execution(intent, limit_spread)
     if current_plan.status == "manual_intervention":
         previous_batch_id = current_plan.close_batch_id
-        if previous_batch_id is None:
-            raise HTTPException(
-                status_code=409,
-                detail="Manual intervention plan has no prior close batch to reconcile",
+        previous_batch = get_execution_batch(previous_batch_id) if previous_batch_id else None
+        if previous_batch_id is not None:
+            from app.database import connection
+
+            with connection() as db:
+                unlinked = db.execute(
+                    "SELECT 1 FROM execution_batch_legs l "
+                    "JOIN execution_batches b ON b.id=l.batch_id "
+                    "JOIN trade_commands c ON c.idempotency_key=b.idempotency_key || ':' || l.role "
+                    "LEFT JOIN orders o ON o.command_id=c.id WHERE b.id=? AND l.order_id IS NULL "
+                    "AND (c.status!='rejected' OR o.id IS NOT NULL) LIMIT 1",
+                    (previous_batch_id,),
+                ).fetchone()
+            if unlinked:
+                raise HTTPException(409, "An unlinked close command requires reconciliation")
+        if previous_batch is not None and any(
+            leg.role == "bybit_leg" and leg.status == "filled" for leg in previous_batch.legs
+        ):
+            from app.cross_spread_close_recovery import recover_unsubmitted_mt5_close
+
+            if execution_mode != "market":
+                raise HTTPException(
+                    409, "Bybit already filled; finish the remaining MT5 close at market"
+                )
+            batch, updated = recover_unsubmitted_mt5_close(current_plan, close_quantity)
+            return CrossSpreadCloseResult(
+                executionBatch=batch,
+                orderIntent=_intent_response(intent),
+                exitPlan=updated,
             )
-        previous_batch = get_execution_batch(previous_batch_id)
-        retryable_leg_statuses = {
-            "pending", "blocked", "failed", "rejected", "result_unknown"
-        }
-        if (
+        retryable_leg_statuses = {"pending", "blocked", "failed", "rejected", "result_unknown"}
+        if previous_batch is not None and (
             previous_batch.status not in {"failed", "manual_intervention"}
             or any(
                 # A platform order id is allocated before the Runtime accepts a
@@ -214,10 +250,7 @@ def close_cross_spread_market(
                         or not has_accepted_missing_external_order_difference(leg.order_id)
                     )
                 )
-                or (
-                    leg.order_id is not None
-                    and leg.status not in {"rejected", "result_unknown"}
-                )
+                or (leg.order_id is not None and leg.status not in {"rejected", "result_unknown"})
                 for leg in previous_batch.legs
             )
         ):
@@ -232,9 +265,8 @@ def close_cross_spread_market(
             plan_id,
             expected_close_batch_id=previous_batch_id,
         )
-        idempotency_key = (
-            f"cross-spread-exit-recovery:{plan_id}:{previous_batch_id}"
-        )
+        if previous_batch_id is not None:
+            idempotency_key = f"cross-spread-exit-recovery:{plan_id}:{previous_batch_id}"
     else:
         claimed = claim_exit_plan(
             plan_id,
@@ -364,8 +396,7 @@ def evaluate_cross_spread_exit_plans() -> CrossSpreadExitEvaluationResponse:
 async def run_cross_spread_exit_monitor() -> None:
     settings = get_settings()
     print(
-        "[exit-monitor] started, interval="
-        f"{settings.cross_spread_exit_monitor_interval_seconds}s",
+        f"[exit-monitor] started, interval={settings.cross_spread_exit_monitor_interval_seconds}s",
         flush=True,
     )
     while True:
@@ -437,17 +468,16 @@ def _close_claimed_plan(
         action=command_action(intent),
         quantityOz=close_quantity,
     )
+    command_key = idempotency_key or (
+        f"cross-spread-exit:{plan.plan_id}:{plan.quantity_oz}:{close_quantity}"
+        if intent.execution_type == "MARKET"
+        else _limit_exit_idempotency_key(plan, limit_strategy)
+    )
     try:
         if intent.execution_type == "MARKET":
             batch = submit_cross_spread_market_command(
                 command_request,
-                idempotency_key=(
-                    idempotency_key
-                    or (
-                        f"cross-spread-exit:{plan.plan_id}:"
-                        f"{plan.quantity_oz}:{close_quantity}"
-                    )
-                ),
+                idempotency_key=command_key,
                 mt5_reduce_only=True,
                 mt5_position_id=plan.mt5_position_id,
                 allow_netting_close=True,
@@ -458,13 +488,16 @@ def _close_claimed_plan(
                 command_request,
                 limit_strategy=limit_strategy,
                 bybit_limit_price=limit_execution.bybit_limit_price,
-                idempotency_key=_limit_exit_idempotency_key(plan, limit_strategy),
+                idempotency_key=command_key,
                 mt5_reduce_only=True,
                 mt5_position_id=plan.mt5_position_id,
                 allow_netting_close=True,
             )
     except Exception:
-        mark_plan_manual_intervention(plan.plan_id, close_batch_id=None)
+        mark_plan_manual_intervention(
+            plan.plan_id,
+            close_batch_id=find_close_batch(plan, command_key, close_quantity),
+        )
         raise
 
     if (
@@ -529,10 +562,7 @@ def _limit_exit_idempotency_key(
 ) -> str:
     if plan.triggered_at is None:
         raise HTTPException(status_code=409, detail="Limit exit claim timestamp is unavailable")
-    return (
-        f"cross-spread-{limit_strategy}-exit:{plan.plan_id}:"
-        f"{plan.triggered_at.isoformat()}"
-    )
+    return f"cross-spread-{limit_strategy}-exit:{plan.plan_id}:{plan.triggered_at.isoformat()}"
 
 
 def _fok_exit_idempotency_key(plan: CrossSpreadExitPlanResponse) -> str:
@@ -548,11 +578,7 @@ def _prepare_limit_execution(
     if limit_spread is None:
         raise HTTPException(status_code=422, detail="Limit execution requires limitSpread")
     snapshot = get_cross_spread_snapshot()
-    if (
-        snapshot.status != "available"
-        or snapshot.bybit.quote is None
-        or snapshot.mt5.quote is None
-    ):
+    if snapshot.status != "available" or snapshot.bybit.quote is None or snapshot.mt5.quote is None:
         raise HTTPException(
             status_code=503,
             detail="Executable cross-spread quotes are unavailable",

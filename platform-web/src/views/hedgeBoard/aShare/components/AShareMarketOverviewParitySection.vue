@@ -17,22 +17,22 @@
             ><small>{{ item.note }}</small></div
           ></div
         >
-        <div v-if="latestHistory" class="overview-meta-grid">
+        <div v-if="latestHistory || turnoverData" class="overview-meta-grid">
           <div
             ><span>全A成交额</span
-            ><strong>{{ formatHundredMillion(latestHistory.total_amount_100m) }}</strong></div
+            ><strong>{{ formatHundredMillion(latestHistory?.total_amount_100m) }}</strong></div
           >
           <button
             type="button"
             class="meta-action"
-            :disabled="!turnoverData?.rows.length"
+            :disabled="hotStockCount == null"
             @click="hotMatrixOpen = true"
             ><span>百亿成交股</span
             ><strong>{{ hotStockCount == null ? '—' : `${hotStockCount}只` }}</strong></button
           >
           <div
             ><span>市场宽度</span
-            ><strong>{{ formatPct(latestHistory.market_breadth, true) }}</strong></div
+            ><strong>{{ formatPct(latestHistory?.market_breadth, true) }}</strong></div
           >
         </div>
         <div v-if="!breadth" class="empty">暂无市场情绪数据</div>
@@ -81,127 +81,7 @@
       :crowding-rows="dashboard?.crowding?.data?.history"
       :innovation-rows="dashboard?.crowding?.data?.innovationHistory"
     />
-    <article v-if="false && historyRows.length" class="panel history-panel">
-      <div class="panel-title">
-        <h3>市场涨跌结构与宽度</h3>
-        <div class="history-actions" role="group" aria-label="历史范围">
-          <button
-            v-for="option in historyRangeOptions"
-            :key="option.key"
-            type="button"
-            :class="{ active: historyRange === option.key }"
-            @click="historyRange = option.key"
-            >{{ option.label }}</button
-          >
-        </div>
-      </div>
-      <div class="history-charts">
-        <div class="history-chart">
-          <div class="chart-title"
-            ><strong>市场涨跌结构</strong><span>上涨 / 下跌家数（家）</span></div
-          >
-          <svg viewBox="0 0 720 220" preserveAspectRatio="none" aria-label="市场涨跌结构历史图">
-            <line
-              v-for="tick in marketTicks"
-              :key="`market-${tick}`"
-              x1="44"
-              :y1="chartY(tick, marketDomain)"
-              x2="706"
-              :y2="chartY(tick, marketDomain)"
-              class="chart-grid"
-            />
-            <polyline
-              :points="
-                chartPoints(
-                  historyRows.map((row) => row.advance),
-                  marketDomain,
-                )
-              "
-              class="chart-line chart-line--up"
-            />
-            <polyline
-              :points="
-                chartPoints(
-                  historyRows.map((row) => row.decline),
-                  marketDomain,
-                )
-              "
-              class="chart-line chart-line--down"
-            />
-            <text x="44" y="211" class="chart-label">{{ historyRows[0]?.date?.slice(5) }}</text>
-            <text x="706" y="211" text-anchor="end" class="chart-label">
-              {{ historyRows.at(-1)?.date?.slice(5) }}
-            </text>
-          </svg>
-          <div class="chart-legend"
-            ><span><i class="legend-dot legend-dot--up"></i>上涨家数</span
-            ><span><i class="legend-dot legend-dot--down"></i>下跌家数</span></div
-          >
-        </div>
-        <div class="history-chart">
-          <div class="chart-title"
-            ><strong>市场宽度</strong><span>（上涨 − 下跌）/ 有效股票数</span></div
-          >
-          <svg viewBox="0 0 720 220" preserveAspectRatio="none" aria-label="市场宽度历史图">
-            <line
-              v-for="tick in breadthTicks"
-              :key="`breadth-${tick}`"
-              x1="44"
-              :y1="chartY(tick, breadthDomain)"
-              x2="706"
-              :y2="chartY(tick, breadthDomain)"
-              class="chart-grid"
-            />
-            <polyline
-              :points="
-                chartPoints(
-                  historyRows.map((row) => row.market_breadth),
-                  breadthDomain,
-                )
-              "
-              class="chart-line chart-line--breadth"
-            />
-            <text x="44" y="211" class="chart-label">{{ historyRows[0]?.date?.slice(5) }}</text>
-            <text x="706" y="211" text-anchor="end" class="chart-label">
-              {{ historyRows.at(-1)?.date?.slice(5) }}
-            </text>
-          </svg>
-          <div class="chart-legend"
-            ><span><i class="legend-dot legend-dot--breadth"></i>市场宽度</span
-            ><span>最新 {{ formatPct(historyRows.at(-1)?.market_breadth, true) }}</span></div
-          >
-        </div>
-      </div>
-    </article>
-    <article v-if="false && hotMatrixRows.length" class="panel matrix-panel">
-      <div class="panel-title"
-        ><div><h3>百亿成交 · 行业分布</h3></div></div
-      >
-      <div class="table-shell matrix-shell">
-        <table>
-          <thead
-            ><tr
-              ><th class="is-left">行业</th
-              ><th v-for="date in hotMatrixDates" :key="date">{{ date.slice(5) }}</th
-              ><th>历史累计</th></tr
-            ></thead
-          >
-          <tbody>
-            <tr class="matrix-total"
-              ><td class="is-left"><strong>合计</strong></td
-              ><td v-for="(total, index) in hotMatrixTotals" :key="index">{{ total || '' }}</td
-              ><td>{{ hotMatrixTotal }}</td></tr
-            >
-            <tr v-for="row in hotMatrixRows" :key="row.industry"
-              ><td class="is-left"
-                ><strong>{{ row.industry }}</strong></td
-              ><td v-for="(count, index) in row.counts" :key="index">{{ count || '' }}</td
-              ><td>{{ row.historyTotal }}</td></tr
-            >
-          </tbody>
-        </table>
-      </div>
-    </article>
+
     <div class="overview-grid">
       <article class="panel">
         <div class="panel-title"
@@ -219,8 +99,7 @@
           ><table
             ><thead
               ><tr
-                ><th class="is-left">行业</th><th>涨跌%</th><th>今日净流入</th><th>流入</th
-                ><th>流出</th><th>家数</th></tr
+                ><th class="is-left">行业</th><th>涨跌%</th><th>今日主力净流入</th><th>家数</th></tr
               ></thead
             ><tbody
               ><tr v-for="row in visibleSectorRows" :key="row.name"
@@ -228,8 +107,6 @@
                   ><strong>{{ row.name }}</strong></td
                 ><td :class="tone(row.pct)">{{ formatPct(row.pct) }}</td
                 ><td :class="tone(row.net)">{{ formatYi(row.netYi) }}</td
-                ><td>{{ formatYi(row.inflowYi) }}</td
-                ><td>{{ formatYi(row.outflowYi) }}</td
                 ><td>{{ row.firms ?? '—' }}</td></tr
               ></tbody
             ></table
@@ -260,7 +137,7 @@
     </div>
     <article class="panel wide-panel"
       ><div class="panel-title"
-        ><div><h3>全市场成交额榜</h3></div
+        ><div><h3>全市场成交额榜</h3><ResearchSourceState :meta="turnoverMeta" /></div
         ><div class="turnover-actions"
           ><button
             v-for="n in [10, 20]"
@@ -296,19 +173,37 @@
             ></tbody
           ></table
         ></div
-      ><div v-else class="empty">暂无成交额榜数据</div></article
+      ><div v-else class="empty"
+        >{{ turnoverError || '暂无成交额榜数据'
+        }}<button
+          type="button"
+          class="link-button"
+          :disabled="turnoverLoading"
+          @click="loadLiveTurnover"
+          >重试</button
+        ></div
+      ></article
     >
-    <div v-if="hotMatrixOpen" class="detail-modal-mask" @click.self="hotMatrixOpen = false">
-      <article class="detail-modal panel matrix-panel">
+    <Modal
+      v-model:open="hotMatrixOpen"
+      title="百亿成交股"
+      :footer="null"
+      width="min(1000px, calc(100vw - 32px))"
+      :get-container="false"
+    >
+      <article class="panel matrix-panel">
         <div class="panel-title"
-          ><h3>百亿成交股 · 当日明细</h3
+          ><h3>百亿成交股 · 最近收盘明细</h3
           ><button type="button" class="modal-close" @click="hotMatrixOpen = false"
             >关闭</button
           ></div
         >
         <div class="hot-stock-summary" v-if="turnoverData">
           <strong>{{ hotStockCount == null ? '—' : `${hotStockCount}只` }}</strong>
-          <span>成交额严格大于 100 亿元；日度统计</span>
+          <span
+            >成交额严格大于 100 亿元 ·
+            {{ turnoverData.dailyObservedAt?.slice(0, 10) || '交易日待确认' }}</span
+          >
         </div>
         <div
           v-if="highTurnoverRows.length"
@@ -330,11 +225,18 @@
         <section v-if="turnoverData?.historyDates?.length" class="hot-history-panel">
           <div class="hot-history-head"
             ><div><h4>百亿成交 · 历史统计</h4><span>点击日期查看当日百亿成交股</span></div
-            ><b>近 {{ turnoverData.historyDates.length }} 个交易日</b></div
+            ><label
+              >时间范围
+              <select v-model="hotHistoryRange" aria-label="百亿成交历史时间范围"
+                ><option :value="10">近10</option
+                ><option :value="30">近30</option
+                ><option value="all">全部</option></select
+              ></label
+            ></div
           >
           <div class="hot-history-dates"
             ><button
-              v-for="(date, index) in turnoverData.historyDates"
+              v-for="{ date, index } in visibleHotDates"
               :key="date"
               type="button"
               :class="{ active: selectedHotDate === date }"
@@ -348,14 +250,16 @@
               ><thead
                 ><tr
                   ><th class="is-left">行业</th
-                  ><th v-for="date in turnoverData.historyDates" :key="date">{{ date.slice(5) }}</th
-                  ><th>累计</th></tr
+                  ><th v-for="{ date } in visibleHotDates" :key="date">{{ date.slice(5) }}</th
+                  ><th>近90日累计</th></tr
                 ></thead
               ><tbody
                 ><tr v-for="row in turnoverData.historyIndustries" :key="row.industry"
                   ><td class="is-left"
                     ><strong>{{ row.industry }}</strong></td
-                  ><td v-for="(count, index) in row.counts" :key="index">{{ count || '' }}</td
+                  ><td v-for="{ date, index } in visibleHotDates" :key="date">{{
+                    row.counts[index] || ''
+                  }}</td
                   ><td>{{ row.historyTotal }}</td></tr
                 ></tbody
               ></table
@@ -376,9 +280,15 @@
           >
         </section>
       </article>
-    </div>
-    <div v-if="ladderOpen" class="detail-modal-mask" @click.self="ladderOpen = false">
-      <article class="detail-modal panel">
+    </Modal>
+    <Modal
+      v-model:open="ladderOpen"
+      title="连板股清单"
+      :footer="null"
+      width="min(900px, calc(100vw - 32px))"
+      :get-container="false"
+    >
+      <article class="panel">
         <div class="panel-title"
           ><h3>连板股清单</h3
           ><button type="button" class="modal-close" @click="ladderOpen = false">关闭</button></div
@@ -409,12 +319,12 @@
           </table>
         </div>
       </article>
-    </div>
+    </Modal>
   </section>
 </template>
 
 <script setup lang="ts">
-  import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+  import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue';
   import {
     getAShareLiveSectorFundFlow,
     getAShareLiveMarketTurnover,
@@ -423,88 +333,12 @@
     type AShareMarketTurnoverResponse,
     type ResearchSourceMeta,
   } from '@/api/hedgeResearch';
+  import { Modal } from 'ant-design-vue';
   import ResearchSourceState from '../../research/components/ResearchSourceState.vue';
   import VibeTrendCharts from './VibeTrendCharts.vue';
 
-  const props = defineProps<{ dashboard: AShareDashboardResponse | null }>();
+  const props = defineProps<{ dashboard: AShareDashboardResponse | null; refreshKey?: number }>();
   const emit = defineEmits<{ (event: 'query', code: string): void }>();
-  interface VibeSector {
-    name: string;
-    pct: number;
-    net: number;
-    inflow: number;
-    outflow: number;
-    firms?: number;
-  }
-  interface VibeLeader {
-    code: string;
-    name: string;
-    boards: number;
-    price?: number;
-    pct?: number;
-    amount?: number;
-    float_cap?: number;
-    industry?: string;
-  }
-  interface VibeOverview {
-    updated?: string;
-    sentiment?: {
-      up: number;
-      down: number;
-      flat: number;
-      zt: number;
-      zt_real: number;
-      dt: number;
-      dt_real: number;
-      active?: string | number;
-      breadth?: string;
-      speculation?: string;
-      date?: string;
-    };
-    emotion?: {
-      zt_count: number;
-      dt_count: number;
-      zb_count: number;
-      max_boards: number;
-      lianban_count: number;
-      seal_rate?: number;
-      break_rate?: number;
-      promotion_rate?: number;
-      date?: string;
-      ladder?: Array<{ boards: number; count: number; plus?: boolean }>;
-      lianban_stocks?: VibeLeader[];
-    };
-    sectors?: VibeSector[];
-    turnover_top?: {
-      stocks?: Array<{
-        code: string;
-        name: string;
-        price?: number;
-        pct?: number;
-        amount: number;
-        mcap?: number;
-        industry?: string;
-      }>;
-    };
-  }
-  interface VibeMonitor {
-    market_history?: Array<{
-      date: string;
-      advance?: number | null;
-      decline?: number | null;
-      flat?: number | null;
-      limit_up?: number | null;
-      limit_down?: number | null;
-      effective_stocks?: number | null;
-      total_amount_100m?: number | null;
-      market_breadth?: number | null;
-    }>;
-    hot_stock_matrix?: {
-      dates?: string[];
-      rows?: Array<{ industry: string; counts: number[]; history_total: number }>;
-    };
-    hot_stocks_latest?: unknown[];
-  }
   type EmotionLeader = {
     code: string;
     name: string;
@@ -534,22 +368,29 @@
     industry?: string | null;
   };
   const sectorsExpanded = ref(false);
-  const liveSectorFlow = ref<AShareLiveSectorFundFlowResponse | null>(null);
-  const turnoverData = ref<AShareMarketTurnoverResponse | null>(null);
+  const liveSectorFlow = shallowRef<AShareLiveSectorFundFlowResponse | null>(null);
+  const turnoverData = shallowRef<AShareMarketTurnoverResponse | null>(null);
   const liveSectorFlowError = ref('');
   const liveSectorFlowLoading = ref(false);
-  let liveSectorFlowTimer: number | undefined;
-  let liveTurnoverTimer: number | undefined;
+  let liveTimer: number | undefined;
+  let lastLiveLoad = 0;
+  const turnoverLoading = ref(false);
+  const turnoverError = ref('');
   const topN = ref<10 | 20>(10);
   const ladderOpen = ref(false);
   const hotMatrixOpen = ref(false);
   const selectedHotDate = ref('');
-  const historyRange = ref<'recent' | '90' | 'all'>('recent');
-  const historyRangeOptions = [
-    { key: 'recent' as const, label: '近60日' },
-    { key: '90' as const, label: '近90日' },
-    { key: 'all' as const, label: '全部' },
-  ];
+  const hotHistoryRange = ref<10 | 30 | 'all'>(10);
+  const visibleHotDates = computed(() => {
+    const dates = (turnoverData.value?.historyDates || [])
+      .map((date, index) => ({ date, index }))
+      .sort((a, b) => b.date.localeCompare(a.date));
+    return hotHistoryRange.value === 'all' ? dates : dates.slice(0, hotHistoryRange.value);
+  });
+  watch(visibleHotDates, (dates) => {
+    if (!dates.some(({ date }) => date === selectedHotDate.value))
+      selectedHotDate.value = dates[0]?.date || '';
+  });
   const allHistoryRows = computed(() =>
     (props.dashboard?.marketHistory || []).map((row) => ({
       date: row.observedAt,
@@ -561,39 +402,6 @@
       total_amount_100m: row.totalAmountYuan == null ? null : Number(row.totalAmountYuan) / 1e8,
       market_breadth: row.marketBreadthPct == null ? null : Number(row.marketBreadthPct) / 100,
     })),
-  );
-  const historyRows = computed(() => {
-    const rows = allHistoryRows.value;
-    if (historyRange.value === 'all') return rows;
-    const size = historyRange.value === '90' ? 90 : 60;
-    return rows.slice(Math.max(0, rows.length - size));
-  });
-  const marketDomain = computed<[number, number]>(() =>
-    domainFor(historyRows.value.flatMap((row) => [row.advance, row.decline])),
-  );
-  const breadthDomain = computed<[number, number]>(() =>
-    domainFor(
-      historyRows.value.map((row) => row.market_breadth),
-      true,
-    ),
-  );
-  const chartTicks = [0, 0.25, 0.5, 0.75, 1];
-  const marketTicks = computed(() => {
-    const [min, max] = marketDomain.value;
-    return chartTicks.map((fraction) => min + (max - min) * fraction);
-  });
-  const breadthTicks = [-1, -0.5, 0, 0.5, 1];
-  const hotMatrixDates = computed(() => [] as string[]);
-  const hotMatrixRows = computed(
-    () => [] as Array<{ industry: string; counts: number[]; history_total: number }>,
-  );
-  const hotMatrixTotals = computed(() =>
-    hotMatrixDates.value.map((_, index) =>
-      hotMatrixRows.value.reduce((total, row) => total + Number(row.counts[index] || 0), 0),
-    ),
-  );
-  const hotMatrixTotal = computed(() =>
-    hotMatrixRows.value.reduce((total, row) => total + Number(row.history_total || 0), 0),
   );
   const latestHistory = computed(() => allHistoryRows.value.at(-1) || null);
   const hotStockCount = computed(() => turnoverData.value?.highTurnoverCount ?? null);
@@ -619,17 +427,32 @@
     return Math.max(4, (c / maxLadderCount.value) * 100);
   }
   const sectorFlowMeta = computed<ResearchSourceMeta>(() => ({
-    source: liveSectorFlow.value?.source || '东方财富板块资金流（实时）',
-    fetchedAt: liveSectorFlow.value?.fetchedAt || new Date().toISOString(),
+    source: liveSectorFlow.value?.source || '板块资金流',
+    fetchedAt: liveSectorFlow.value?.fetchedAt || '',
     status: liveSectorFlowLoading.value
       ? 'loading'
       : liveSectorFlowError.value
-      ? 'error'
-      : liveSectorFlow.value
-      ? 'ready'
-      : 'no_data',
-    isStale: false,
-    message: liveSectorFlowError.value || undefined,
+      ? liveSectorFlow.value
+        ? 'stale'
+        : 'error'
+      : liveSectorFlow.value?.status || 'no_data',
+    isStale: Boolean(
+      liveSectorFlow.value?.isStale || (liveSectorFlowError.value && liveSectorFlow.value),
+    ),
+    message: liveSectorFlowError.value || liveSectorFlow.value?.message,
+  }));
+  const turnoverMeta = computed<ResearchSourceMeta>(() => ({
+    source: turnoverData.value?.source || '成交额榜',
+    fetchedAt: turnoverData.value?.fetchedAt || '',
+    status: turnoverLoading.value
+      ? 'loading'
+      : turnoverError.value
+      ? turnoverData.value
+        ? 'stale'
+        : 'error'
+      : turnoverData.value?.status || 'no_data',
+    isStale: Boolean(turnoverData.value?.isStale || (turnoverError.value && turnoverData.value)),
+    message: turnoverError.value || turnoverData.value?.message,
   }));
   const sectorRows = computed<SectorRow[]>(() =>
     (liveSectorFlow.value?.rows || []).map((row) => ({
@@ -661,6 +484,7 @@
       .slice(0, 6),
   );
   async function loadLiveSectorFlow() {
+    if (liveSectorFlowLoading.value) return;
     liveSectorFlowLoading.value = true;
     try {
       liveSectorFlow.value = await getAShareLiveSectorFundFlow();
@@ -672,23 +496,39 @@
     }
   }
   async function loadLiveTurnover() {
+    if (turnoverLoading.value) return;
+    turnoverLoading.value = true;
     try {
       turnoverData.value = await getAShareLiveMarketTurnover();
-      if (!selectedHotDate.value)
+      turnoverError.value = '';
+      if (!turnoverData.value.historyDates?.includes(selectedHotDate.value))
         selectedHotDate.value = turnoverData.value.historyDates?.at(-1) || '';
-    } catch {
-      // Retain the last successful live board if the intraday source times out.
+    } catch (error) {
+      turnoverError.value = error instanceof Error ? error.message : '成交额榜加载失败';
+    } finally {
+      turnoverLoading.value = false;
     }
   }
+  async function loadLive() {
+    if (document.visibilityState === 'hidden') return;
+    lastLiveLoad = Date.now();
+    await Promise.allSettled([loadLiveSectorFlow(), loadLiveTurnover()]);
+  }
+  function resumeLive() {
+    if (Date.now() - lastLiveLoad >= 5 * 60 * 1000) void loadLive();
+  }
+  watch(
+    () => props.refreshKey,
+    () => void loadLive(),
+  );
   onMounted(() => {
-    void loadLiveSectorFlow();
-    void loadLiveTurnover();
-    liveSectorFlowTimer = window.setInterval(() => void loadLiveSectorFlow(), 5 * 60 * 1000);
-    liveTurnoverTimer = window.setInterval(() => void loadLiveTurnover(), 5 * 60 * 1000);
+    void loadLive();
+    liveTimer = window.setInterval(resumeLive, 5 * 60 * 1000);
+    document.addEventListener('visibilitychange', resumeLive);
   });
   onBeforeUnmount(() => {
-    if (liveSectorFlowTimer != null) window.clearInterval(liveSectorFlowTimer);
-    if (liveTurnoverTimer != null) window.clearInterval(liveTurnoverTimer);
+    if (liveTimer != null) window.clearInterval(liveTimer);
+    document.removeEventListener('visibilitychange', resumeLive);
   });
   const turnoverRows = computed<TurnoverRow[]>(() => {
     return (turnoverData.value?.rows || []).map((r) => ({
@@ -731,13 +571,13 @@
       { label: '平盘', value: v.flat, note: '当日平盘家数', tone: '' },
       {
         label: '涨停 / 真实涨停',
-        value: `${v.limitUp} / ${v.realLimitUp}`,
+        value: `${v.limitUp ?? '—'} / ${v.realLimitUp ?? '—'}`,
         note: '来源原始口径',
         tone: 'up',
       },
       {
         label: '跌停 / 真实跌停',
-        value: `${v.limitDown} / ${v.realLimitDown}`,
+        value: `${v.limitDown ?? '—'} / ${v.realLimitDown ?? '—'}`,
         note: '来源原始口径',
         tone: 'down',
       },
@@ -815,39 +655,6 @@
     if (!v) return '最新交易日';
     const d = new Date(v);
     return Number.isNaN(d.getTime()) ? v : d.toLocaleString('zh-CN', { hour12: false });
-  }
-  function domainFor(
-    values: Array<number | null | undefined>,
-    includeZero = false,
-  ): [number, number] {
-    const finite = values.map((value) => Number(value)).filter(Number.isFinite);
-    if (!finite.length) return includeZero ? [-1, 1] : [0, 1];
-    let min = Math.min(...finite);
-    let max = Math.max(...finite);
-    if (includeZero) {
-      min = Math.min(0, min);
-      max = Math.max(0, max);
-    }
-    if (min === max) {
-      const padding = Math.max(1, Math.abs(min) * 0.1);
-      return [min - padding, max + padding];
-    }
-    const padding = (max - min) * 0.08;
-    return [min - padding, max + padding];
-  }
-  function chartY(value: number, domain: [number, number]) {
-    const [min, max] = domain;
-    return 18 + (1 - (value - min) / Math.max(max - min, 1e-9)) * 170;
-  }
-  function chartPoints(values: Array<number | null | undefined>, domain: [number, number]) {
-    const last = Math.max(1, values.length - 1);
-    return values
-      .map((value, index) => {
-        const n = numeric(value);
-        return n == null ? null : `${44 + (index / last) * 662},${chartY(n, domain)}`;
-      })
-      .filter((point): point is string => point != null)
-      .join(' ');
   }
 </script>
 
@@ -1318,7 +1125,10 @@
 
   .hot-history-dates {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(56px, 1fr));
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(80px, 1fr);
+    overflow-x: auto;
+    padding-bottom: 6px;
     gap: 6px;
   }
 
@@ -1341,7 +1151,22 @@
     border-color: var(--strategy-accent-strong);
     background: var(--strategy-accent-soft);
   }
+  .hot-history-matrix table {
+    min-width: 100%;
+    width: max-content;
+  }
+  .hot-history-matrix th,
+  .hot-history-matrix td {
+    min-width: 68px;
+  }
+  .hot-history-matrix .is-left {
+    position: sticky;
+    left: 0;
+    background: var(--strategy-surface-2);
+    min-width: 130px;
+  }
   .hot-history-matrix {
+    overflow: auto;
     max-height: 260px;
   }
 

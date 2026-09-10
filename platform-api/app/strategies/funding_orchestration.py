@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from decimal import ROUND_CEILING, ROUND_FLOOR, Decimal, localcontext
@@ -12,6 +13,7 @@ import httpx
 from fastapi import HTTPException
 
 from app import execution_risk_repository as risk_repository
+from app import runtime_transport
 from app.config import get_settings
 from app.database import connection
 from app.execution_batches import (
@@ -34,10 +36,13 @@ from app.schemas import CreateTradeCommandRequest
 from app.strategies.domain import (
     ExecutionPlan,
     ExecutionPlanLeg,
+    ExecutionPolicy,
     StrategyInstructionStatus,
 )
+from app.strategy_financial_readmodel import canonical_fills
 from app.trade_commands import create_trade_command
 from app.trading import get_order_row, synchronize_order_with_authoritative_facts
+from app.venue_identity_repository import canonical_operational_rows, load_order_identities
 
 PERPETUAL_ROLE = "perpetual_leg"
 SPOT_ROLE = "spot_leg"
@@ -101,16 +106,9 @@ def execute_funding_instruction(
 ) -> ExecutionBatchResponse:
     strategy_instance_id = str(instruction_row["strategy_instance_id"])
     trading_mode = _strategy_trading_mode(strategy_instance_id)
-    if trading_mode != "simulation":
-        readiness = get_funding_controlled_live_readiness(
-            strategy_instance_id=strategy_instance_id,
-            account_id=_leg(plan, PERPETUAL_ROLE).account_id,
-        )
-        if not readiness["ready"]:
-            raise HTTPException(status_code=423, detail=PHASE_2_CAPABILITY_MESSAGE)
-
     perpetual_leg = _leg(plan, PERPETUAL_ROLE)
     spot_leg = _leg(plan, SPOT_ROLE)
+    is_chase = perpetual_leg.execution_policy == ExecutionPolicy.POST_ONLY_CHASE
     batch_id = str(instruction_row["execution_batch_id"])
     batch_status = _batch_status(batch_id)
     instruction_status = str(instruction_row["status"])
@@ -122,6 +120,18 @@ def execute_funding_instruction(
         or instruction_status == StrategyInstructionStatus.RECONCILING.value
     ):
         return _complete_reconciliation(instruction_id, batch_id, perpetual_leg, spot_leg)
+
+    if trading_mode != "simulation":
+        readiness = get_funding_controlled_live_readiness(
+            strategy_instance_id=strategy_instance_id,
+            account_id=perpetual_leg.account_id,
+        )
+        if not readiness["ready"]:
+            raise HTTPException(status_code=423, detail=PHASE_2_CAPABILITY_MESSAGE)
+        if _latest_attempt_number(batch_id) is None:
+            from app.strategies.plan_service import validate_funding_plan_markets
+
+            validate_funding_plan_markets(plan)
 
     _claim_funding_batch(
         instruction_id=instruction_id,
@@ -142,8 +152,10 @@ def execute_funding_instruction(
             return _manual_intervention(
                 instruction_id,
                 batch_id,
-                "Funding perpetual PostOnly result is unknown",
+                "Funding perpetual order result is unknown",
             )
+        if active_attempt is None and latest_attempt is not None and not is_chase:
+            active_attempt = latest_attempt
         created_attempt = False
         if active_attempt is None:
             next_number = (_latest_attempt_number(batch_id) or 0) + 1
@@ -173,13 +185,13 @@ def execute_funding_instruction(
                     return _manual_intervention(
                         instruction_id,
                         batch_id,
-                        "Funding perpetual PostOnly result is unknown",
+                        "Funding perpetual order result is unknown",
                     )
                 if (
-                        latest_attempt is not None
-                        and latest_attempt.status in TERMINAL_ATTEMPT_STATUSES
-                    ):
-                        active_attempt = latest_attempt
+                    latest_attempt is not None
+                    and latest_attempt.status in TERMINAL_ATTEMPT_STATUSES
+                ):
+                    active_attempt = latest_attempt
 
         assert active_attempt is not None
         synced = _synchronize_attempt_from_authority(active_attempt)
@@ -190,7 +202,18 @@ def execute_funding_instruction(
             return _manual_intervention(
                 instruction_id,
                 batch_id,
-                "Funding perpetual PostOnly result is unknown",
+                "Funding perpetual order result is unknown",
+            )
+
+        if (
+            perpetual_leg.execution_policy == ExecutionPolicy.FOK
+            and total_cumulative_fill > 0
+            and (
+                synced.status != "filled" or total_cumulative_fill != perpetual_leg.maximum_quantity
+            )
+        ):
+            return _manual_intervention(
+                instruction_id, batch_id, "FOK 永续成交数量异常，现货对冲已暂停，请核对成交"
             )
 
         if synced.order_id is not None:
@@ -203,7 +226,8 @@ def execute_funding_instruction(
             )
 
         if (
-            synced.status in {"declared", "acknowledged", "accepted", "partially_filled"}
+            is_chase
+            and synced.status in {"declared", "acknowledged", "accepted", "partially_filled"}
             and synced.attempt_number >= perpetual_leg.max_mutations + 1
             and _quote_move_requires_new_attempt(synced, perpetual_leg)
         ):
@@ -244,6 +268,12 @@ def execute_funding_instruction(
             return _refresh_batch_after_release(instruction_id, batch_id, perpetual_leg, spot_leg)
 
         if synced.status in {"canceled", "rejected"}:
+            if not is_chase:
+                if total_cumulative_fill == 0 and not _release_rows(batch_id):
+                    return _finish_confirmed_zero_fill(instruction_id, batch_id)
+                return _manual_intervention(
+                    instruction_id, batch_id, "永续委托部分成交，已按成交量对冲，请核对剩余数量"
+                )
             if _ttl_expired(batch_id, perpetual_leg):
                 return _bounded_stop(
                     instruction_id,
@@ -266,6 +296,13 @@ def execute_funding_instruction(
             )
             update_batch_status(batch_id, "executing")
             return get_execution_batch(batch_id)
+
+        if not is_chase:
+            if _ttl_expired(batch_id, perpetual_leg):
+                return _manual_intervention(
+                    instruction_id, batch_id, "永续委托结果尚未确认，请核对原订单；不会重复下单"
+                )
+            return _refresh_batch_after_release(instruction_id, batch_id, perpetual_leg, spot_leg)
 
         if created_attempt:
             update_batch_status(batch_id, "executing")
@@ -335,7 +372,7 @@ def _claim_funding_batch(
                     instrument_id=leg.instrument_id,
                     symbol=leg.external_symbol,
                     side=leg.side,
-                    price=None,
+                    price=leg.limit_price,
                     quantity=leg.maximum_quantity,
                 )
                 for leg in legs
@@ -364,16 +401,15 @@ def _refresh_batch_after_release(
     spot_leg: ExecutionPlanLeg,
 ) -> ExecutionBatchResponse:
     cumulative_fill = _latest_perpetual_cumulative_fill(batch_id)
-    cumulative_spot = _declared_cumulative_spot(batch_id)
+    cumulative_spot = _filled_cumulative_spot(batch_id)
     if _has_release_side_effect_failure(batch_id):
         return _manual_intervention(
             instruction_id,
             batch_id,
             "Funding Spot release requires manual intervention",
         )
-    if (
-        cumulative_fill == perpetual_leg.maximum_quantity
-        and cumulative_spot == (spot_leg.release_cap or Decimal("0"))
+    if cumulative_fill == perpetual_leg.maximum_quantity and cumulative_spot == (
+        spot_leg.release_cap or Decimal("0")
     ):
         update_batch_status(batch_id, "hedged")
         complete_batch_risk(batch_id)
@@ -402,7 +438,7 @@ def _create_attempt(
     if requested_quantity < leg.minimum_quantity:
         return False
     quote = _authoritative_quote(account_id=leg.account_id, symbol=leg.external_symbol)
-    limit_price = _aligned_limit_price(leg, bid=quote["bid"], ask=quote["ask"])
+    limit_price = leg.limit_price or _aligned_limit_price(leg, bid=quote["bid"], ask=quote["ask"])
     latest_attempt = _latest_attempt(batch_id)
     if (
         latest_attempt is not None
@@ -457,8 +493,14 @@ def _create_attempt(
     )
     register_order_execution_intent(
         idempotency_key,
-        reduce_only=False,
-        execution_policy="post_only_single_attempt",
+        reduce_only=leg.reduce_only,
+        execution_policy=(
+            "post_only_single_attempt"
+            if leg.execution_policy == ExecutionPolicy.POST_ONLY_CHASE
+            else "fok"
+            if leg.execution_policy == ExecutionPolicy.FOK
+            else "default"
+        ),
     )
     try:
         command = create_trade_command(
@@ -469,9 +511,9 @@ def _create_attempt(
                 instrumentId=leg.instrument_id,
                 symbol=leg.external_symbol,
                 side=leg.side,
-                orderType="limit",
+                orderType="market" if leg.execution_policy == ExecutionPolicy.MARKET else "limit",
                 quantity=requested_quantity,
-                price=limit_price,
+                price=None if leg.execution_policy == ExecutionPolicy.MARKET else limit_price,
             )
         )
         with connection() as db:
@@ -543,9 +585,7 @@ def _synchronize_attempt_from_authority(attempt: FundingAttemptRow) -> FundingAt
     local = get_order_row(str(attempt.order_id))
     normalized = _attempt_status_from_order_status(str(local["status"]))
     cancel_terminal_at = (
-        _utc_now()
-        if normalized in {"canceled", "rejected"}
-        else attempt.cancel_terminal_at
+        _utc_now() if normalized in {"canceled", "rejected"} else attempt.cancel_terminal_at
     )
     with connection() as db:
         db.execute(
@@ -624,6 +664,7 @@ def _claim_spot_release(
         )
     allowed_cumulative_spot = _allowed_cumulative_spot(
         perpetual_cumulative_fill=cumulative_perpetual_fill,
+        perpetual_maximum_quantity=perpetual_leg.maximum_quantity,
         spot_leg=spot_leg,
     )
     child_id = f"{batch_id}:spot:{_decimal_key(allowed_cumulative_spot)}"
@@ -648,7 +689,7 @@ def _claim_spot_release(
             )
         existing = db.execute(
             """
-            SELECT child_id, release_quantity
+            SELECT child_id, release_quantity, status, trade_command_id
             FROM funding_spot_release_commands
             WHERE child_id = ?
             """,
@@ -656,7 +697,11 @@ def _claim_spot_release(
         ).fetchone()
         if existing is not None:
             return ReleaseClaim(
-                status="existing",
+                status=(
+                    "claimed"
+                    if existing["status"] == "declared" and existing["trade_command_id"] is None
+                    else "existing"
+                ),
                 child_id=str(existing["child_id"]),
                 release_quantity=Decimal(str(existing["release_quantity"])),
             )
@@ -800,6 +845,8 @@ def _manual_intervention(instruction_id: str, batch_id: str, reason: str):
         StrategyInstructionStatus.MANUAL_INTERVENTION,
         failure_reason=reason,
     )
+    # Native read failure must not leave an already filled leg labelled risk-clear.
+    risk_repository.recheck_batch_risk(batch_id, reason=reason)
     return get_execution_batch(batch_id)
 
 
@@ -812,6 +859,51 @@ def _failed_without_side_effects(instruction_id: str, batch_id: str, reason: str
         StrategyInstructionStatus.FAILED,
         failure_reason=reason,
     )
+    return get_execution_batch(batch_id)
+
+
+def _finish_confirmed_zero_fill(instruction_id: str, batch_id: str) -> ExecutionBatchResponse:
+    """Release only an authoritatively terminal, zero-fill single-attempt instruction."""
+    with connection() as db:
+        db.execute("BEGIN IMMEDIATE")
+        attempts = db.execute(
+            "SELECT a.status, o.status AS order_status FROM funding_perpetual_attempts a "
+            "LEFT JOIN orders o ON o.id=a.order_id WHERE a.batch_id=?",
+            (batch_id,),
+        ).fetchall()
+        fills = db.execute(
+            "SELECT 1 FROM fills WHERE order_id IN "
+            "(SELECT order_id FROM funding_perpetual_attempts WHERE batch_id=?) LIMIT 1",
+            (batch_id,),
+        ).fetchone()
+        releases = db.execute(
+            "SELECT 1 FROM funding_spot_release_commands WHERE batch_id=? LIMIT 1", (batch_id,)
+        ).fetchone()
+        if (
+            not attempts
+            or any(
+                row["status"] not in {"canceled", "rejected"}
+                or row["order_status"] not in {"canceled", "rejected"}
+                for row in attempts
+            )
+            or fills is not None
+            or releases is not None
+        ):
+            raise HTTPException(409, "委托未成交的结果尚未核实，保留资金预约")
+        reason = "永续委托未成交，现货未下单"
+        changed = db.execute(
+            "UPDATE strategy_runs SET status='failed',failure_reason=?,updated_at=? "
+            "WHERE id=? AND execution_batch_id=? AND status='executing'",
+            (reason, _utc_now(), instruction_id, batch_id),
+        )
+        if changed.rowcount != 1:
+            raise HTTPException(409, "Funding instruction changed before terminal confirmation")
+        db.execute(
+            "UPDATE execution_batches SET status='failed',failure_reason=?,updated_at=? WHERE id=?",
+            (reason, _utc_now(), batch_id),
+        )
+        risk_repository.release_claims_for_owner("batch", batch_id, db=db)
+        risk_repository.release_reservations_for_owner("batch", batch_id, db=db)
     return get_execution_batch(batch_id)
 
 
@@ -854,13 +946,9 @@ def get_funding_controlled_live_readiness(
     )
     adapter: dict[str, Any] | None = None
     try:
-        with httpx.Client(
-            trust_env=False,
-            timeout=settings.runtime_timeout_seconds,
-        ) as client:
-            response = client.get(f"{settings.runtime_base_url}/gateway/capabilities")
-            response.raise_for_status()
-            payload = response.json()
+        response = runtime_transport.get(f"{settings.runtime_base_url}/gateway/capabilities")
+        response.raise_for_status()
+        payload = response.json()
     except (httpx.HTTPError, ValueError):
         payload = None
     if isinstance(payload, dict):
@@ -886,9 +974,7 @@ def get_funding_controlled_live_readiness(
         )
         return checks
     runtime_capabilities = {
-        str(item)
-        for item in adapter.get("capabilities", [])
-        if isinstance(item, str)
+        str(item) for item in adapter.get("capabilities", []) if isinstance(item, str)
     }
     checks["adapterConfigured"] = bool(adapter.get("configured"))
     checks["adapterOperational"] = bool(adapter.get("operational"))
@@ -1041,7 +1127,7 @@ def _complete_reconciliation(
     spot_leg: ExecutionPlanLeg,
 ) -> ExecutionBatchResponse:
     cumulative_fill = _latest_perpetual_cumulative_fill(batch_id)
-    cumulative_spot = _declared_cumulative_spot(batch_id)
+    cumulative_spot = _filled_cumulative_spot(batch_id)
     expected_spot = spot_leg.release_cap or Decimal("0")
     if _has_release_side_effect_failure(batch_id):
         return _manual_intervention(
@@ -1081,83 +1167,162 @@ def _authoritative_reconciliation_status(
     attempts = _attempts(batch_id)
     if not attempts or any(attempt.order_id is None for attempt in attempts):
         return "unavailable"
+    raw_fills: list[dict[str, Any]] = []
     try:
-        for attempt in attempts:
-            order_id = attempt.order_id
-            assert order_id is not None
-            order = _runtime_get(f"/venue/orders/by-platform/{order_id}")
-            fills = _runtime_get("/venue/fills", params={"platformOrderId": order_id})
-            if not isinstance(order, dict) or not isinstance(fills, list):
+        for leg, order_ids in (
+            (perpetual_leg, [attempt.order_id for attempt in attempts]),
+            (spot_leg, [row.order_id for row in _release_rows(batch_id)]),
+        ):
+            if not order_ids or any(order_id is None for order_id in order_ids):
                 return "unavailable"
-        release_orders = [
-            row.order_id for row in _release_rows(batch_id) if row.order_id is not None
-        ]
-        for order_id in release_orders:
-            order = _runtime_get(f"/venue/orders/by-platform/{order_id}")
-            fills = _runtime_get("/venue/fills", params={"platformOrderId": order_id})
-            if not isinstance(order, dict) or not isinstance(fills, list):
-                return "unavailable"
-        positions = _runtime_get(
-            "/venue/positions",
-            params={"accountId": perpetual_leg.account_id},
-        )
-        if not isinstance(positions, list):
-            return "unavailable"
+            for order_id in order_ids:
+                assert order_id is not None
+                order = _runtime_get(f"/venue/orders/by-platform/{order_id}")
+                fills = _runtime_get("/venue/fills", params={"platformOrderId": order_id})
+                if not isinstance(order, dict) or not isinstance(fills, list):
+                    return "unavailable"
+                if order.get("status") not in {"filled", "canceled", "rejected"}:
+                    return "unavailable"
+                for record in [order, *fills]:
+                    if (
+                        not isinstance(record, dict)
+                        or record.get("accountId") != leg.account_id
+                        or record.get("instrumentId") != leg.instrument_id
+                        or record.get("platformOrderId") != order_id
+                    ):
+                        return "mismatch"
+                observed = sum((Decimal(str(fill["quantity"])) for fill in fills), Decimal("0"))
+                if observed != Decimal(
+                    str(order["filledQuantity"])
+                ) or observed != _order_cumulative_fill(str(order_id)):
+                    return "mismatch"
+                synchronize_order_with_authoritative_facts(
+                    order_id, external_order=order, external_fills=fills
+                )
+                raw_fills.extend(fills)
+        positions = _runtime_get("/venue/positions", params={"accountId": perpetual_leg.account_id})
         account_risk = _runtime_get(
-            "/venue/account-risk",
-            params={"accountId": perpetual_leg.account_id},
+            "/venue/account-risk", params={"accountId": perpetual_leg.account_id}
         )
-        if not isinstance(account_risk, dict) or account_risk.get("dataQualityState") != "complete":
+        if (
+            not isinstance(positions, list)
+            or not isinstance(account_risk, dict)
+            or account_risk.get("accountId") != perpetual_leg.account_id
+            or account_risk.get("dataQualityState") != "complete"
+        ):
             return "unavailable"
-    except HTTPException:
-        return "unavailable"
-
-    expected_positions = {
-        perpetual_leg.instrument_id: _signed_fill_quantity(
-            account_id=perpetual_leg.account_id,
-            instrument_id=perpetual_leg.instrument_id,
-            side=perpetual_leg.side,
-            order_ids=[attempt.order_id for attempt in attempts if attempt.order_id is not None],
-        ),
-        spot_leg.instrument_id: _signed_fill_quantity(
-            account_id=spot_leg.account_id,
-            instrument_id=spot_leg.instrument_id,
-            side=spot_leg.side,
-            order_ids=release_orders,
-        ),
-    }
-    actual_positions = {
-        str(position.get("instrumentId")): Decimal(str(position.get("netQuantity", "0")))
-        for position in positions
-        if isinstance(position, dict)
-    }
-    for instrument_id, expected_quantity in expected_positions.items():
-        if actual_positions.get(instrument_id, Decimal("0")) != expected_quantity:
+        actual: dict[str, Decimal] = {}
+        for position in positions:
+            if (
+                not isinstance(position, dict)
+                or position.get("accountId") != perpetual_leg.account_id
+            ):
+                return "mismatch"
+            instrument = str(position["instrumentId"])
+            actual[instrument] = actual.get(instrument, Decimal("0")) + Decimal(
+                str(position["netQuantity"])
+            )
+        # Position snapshots describe the account's remaining position, not the
+        # current batch's buy/sell delta. Include prior opens and partial closes.
+        expected_perp, _, _ = _account_fill_position(perpetual_leg, raw_fills)
+        if actual.get(perpetual_leg.instrument_id, Decimal("0")) != expected_perp:
             return "mismatch"
+        expected_spot, base_fees, base_currency = _account_fill_position(spot_leg, raw_fills)
+        if spot_leg.side == "buy":
+            with connection() as db:
+                live_account = db.execute(
+                    "SELECT environment FROM accounts WHERE id=?", (spot_leg.account_id,)
+                ).fetchone()
+            if live_account is not None and live_account["environment"] == "live":
+                spot_fills = [
+                    fill for fill in raw_fills if fill["instrumentId"] == spot_leg.instrument_id
+                ]
+                if any(fill.get("fee") is None or not fill.get("currency") for fill in spot_fills):
+                    return "unavailable"
+                # Opening hedge follows actual received inventory, not gross
+                # execution quantity. USDT fees never reduce the coin hedge.
+                net_spot = sum(
+                    (
+                        Decimal(str(fill["quantity"]))
+                        - (
+                            Decimal(str(fill["fee"]))
+                            if fill["currency"] == base_currency
+                            else Decimal("0")
+                        )
+                        for fill in spot_fills
+                    ),
+                    Decimal("0"),
+                )
+                hedged_perp = (net_spot / perpetual_leg.quantity_step).to_integral_value(
+                    rounding=ROUND_FLOOR
+                ) * perpetual_leg.quantity_step
+                if hedged_perp != perpetual_leg.maximum_quantity:
+                    return "mismatch"
+        if spot_leg.instrument_id in actual:
+            if actual[spot_leg.instrument_id] != expected_spot:
+                return "mismatch"
+        else:
+            # Bybit spot holdings are wallet coins; the derivatives Position API
+            # intentionally has no Spot row. Existing unrelated cash may coexist.
+            balances = _runtime_get("/venue/balances", params={"accountId": spot_leg.account_id})
+            if not isinstance(balances, list) or base_fees is None:
+                return "unavailable"
+            cash = Decimal("0")
+            for coin in balances:
+                if not isinstance(coin, dict) or coin.get("accountId") != spot_leg.account_id:
+                    return "mismatch"
+                if coin.get("currency") == base_currency:
+                    cash = Decimal(str(coin.get("walletBalance") or coin["equity"]))
+            if cash < max(Decimal("0"), expected_spot - base_fees):
+                return "mismatch"
+    except (HTTPException, KeyError, TypeError, ValueError, ArithmeticError):
+        return "unavailable"
     return "ready"
 
 
-def _signed_fill_quantity(
-    *,
-    account_id: str,
-    instrument_id: str,
-    side: str,
-    order_ids: list[str],
-) -> Decimal:
-    if not order_ids:
-        return Decimal("0")
-    placeholders = ", ".join("?" for _ in order_ids)
+def _account_fill_position(
+    leg: ExecutionPlanLeg,
+    current_fills: list[dict[str, Any]],
+) -> tuple[Decimal, Decimal | None, str]:
     with connection() as db:
         rows = db.execute(
-            f"""
-            SELECT quantity
-            FROM fills
-            WHERE account_id = ? AND instrument_id = ? AND order_id IN ({placeholders})
-            """,
-            (account_id, instrument_id, *order_ids),
+            "SELECT f.*, f.id AS fill_id, o.quantity AS requested_quantity "
+            "FROM fills f JOIN orders o ON o.id=f.order_id "
+            "WHERE f.account_id=? AND f.instrument_id=? ORDER BY f.occurred_at,f.id",
+            (leg.account_id, leg.instrument_id),
         ).fetchall()
-    quantity = _sum_decimal_rows(rows, key="quantity")
-    return quantity if side == "buy" else -quantity
+        base = db.execute(
+            "SELECT base_currency FROM instruments WHERE id=?", (leg.instrument_id,)
+        ).fetchone()[0]
+        events = db.execute(
+            "SELECT payload_json FROM venue_account_events WHERE account_id=? "
+            "AND instrument_id=? AND event_type='trade_fill'",
+            (leg.account_id, leg.instrument_id),
+        ).fetchall()
+        rows = canonical_operational_rows(rows, load_order_identities(db))
+    quantity = sum(
+        (
+            Decimal(row["quantity"]) * (1 if row["side"] == "buy" else -1)
+            for row in canonical_fills(rows)
+        ),
+        Decimal("0"),
+    )
+    native = {json.loads(row[0])["externalFillId"]: json.loads(row[0]) for row in events}
+    native.update(
+        {
+            row["externalFillId"]: row
+            for row in current_fills
+            if row["instrumentId"] == leg.instrument_id
+        }
+    )
+    fees = Decimal("0")
+    for fill in native.values():
+        fee = Decimal(str(fill.get("fee") or "0"))
+        if fee and fill.get("currency") in {None, "UNKNOWN"}:
+            return quantity, None, base
+        if fill.get("currency") == base:
+            fees += fee
+    return quantity, fees, base
 
 
 def _attempts(batch_id: str) -> list[FundingAttemptRow]:
@@ -1198,13 +1363,16 @@ def _latest_perpetual_cumulative_fill(batch_id: str) -> Decimal:
 def _allowed_cumulative_spot(
     *,
     perpetual_cumulative_fill: Decimal,
+    perpetual_maximum_quantity: Decimal,
     spot_leg: ExecutionPlanLeg,
 ) -> Decimal:
     assert spot_leg.release_ratio is not None
     assert spot_leg.release_cap is not None
     with localcontext() as context:
         context.prec = 28
-        proportional = perpetual_cumulative_fill * spot_leg.release_ratio
+        # Divide last using the frozen quantities. A rounded ratio (e.g. 1/3)
+        # must not strand a whole Spot step when the perpetual leg fills fully.
+        proportional = perpetual_cumulative_fill * spot_leg.release_cap / perpetual_maximum_quantity
         steps = (proportional / spot_leg.quantity_step).to_integral_value(rounding=ROUND_FLOOR)
         releasable = steps * spot_leg.quantity_step
     return min(releasable, spot_leg.release_cap)
@@ -1237,11 +1405,16 @@ def _release_rows(batch_id: str) -> list[FundingReleaseRow]:
     ]
 
 
-def _declared_cumulative_spot(batch_id: str) -> Decimal:
-    releases = _release_rows(batch_id)
-    if not releases:
-        return Decimal("0")
-    return max((row.cumulative_spot_quantity for row in releases), default=Decimal("0"))
+def _filled_cumulative_spot(batch_id: str) -> Decimal:
+    with connection() as db:
+        rows = db.execute(
+            "SELECT f.*, f.id AS fill_id, o.quantity AS requested_quantity "
+            "FROM fills f JOIN orders o ON o.id=f.order_id WHERE o.id IN "
+            "(SELECT order_id FROM funding_spot_release_commands WHERE batch_id=?) "
+            "ORDER BY f.occurred_at,f.id",
+            (batch_id,),
+        ).fetchall()
+    return sum((Decimal(str(row["quantity"])) for row in canonical_fills(rows)), Decimal("0"))
 
 
 def _mark_release_status(
@@ -1344,7 +1517,7 @@ def _ttl_expired(batch_id: str, leg: ExecutionPlanLeg) -> bool:
     with connection() as db:
         row = db.execute(
             """
-            SELECT MAX(created_at) AS created_at
+            SELECT MIN(created_at) AS created_at
             FROM funding_perpetual_attempts
             WHERE batch_id = ?
             """,
@@ -1438,10 +1611,9 @@ def _runtime_get(
 ) -> object | None:
     settings = get_settings()
     try:
-        with httpx.Client(trust_env=False, timeout=settings.runtime_timeout_seconds) as client:
-            response = client.get(f"{settings.runtime_base_url}{path}", params=params)
-            response.raise_for_status()
-            return response.json()
+        response = runtime_transport.get(f"{settings.runtime_base_url}{path}", params=params)
+        response.raise_for_status()
+        return response.json()
     except httpx.HTTPStatusError as exc:
         if allow_not_found and exc.response.status_code == 404:
             return None
@@ -1456,10 +1628,9 @@ def _runtime_get(
 def _runtime_post(path: str, payload: dict[str, object]) -> object:
     settings = get_settings()
     try:
-        with httpx.Client(trust_env=False, timeout=settings.runtime_timeout_seconds) as client:
-            response = client.post(f"{settings.runtime_base_url}{path}", json=payload)
-            response.raise_for_status()
-            return response.json()
+        response = runtime_transport.post(f"{settings.runtime_base_url}{path}", json=payload)
+        response.raise_for_status()
+        return response.json()
     except httpx.HTTPStatusError as exc:
         raise HTTPException(status_code=502, detail=_runtime_error_detail(exc.response)) from exc
     except httpx.HTTPError as exc:

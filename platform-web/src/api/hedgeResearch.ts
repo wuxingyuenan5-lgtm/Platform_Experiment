@@ -1,6 +1,10 @@
 import axios, { AxiosError, type AxiosInstance, type AxiosRequestConfig } from 'axios';
 
-import { clearUserSystemSessionMemory, UserSystemApiError } from '@/api/platform/userSystem';
+import {
+  clearUserSystemSessionMemory,
+  getUserSystemCsrfToken,
+  UserSystemApiError,
+} from '@/api/platform/userSystem';
 
 export type ResearchDataStatus = 'loading' | 'ready' | 'partial' | 'no_data' | 'stale' | 'error';
 
@@ -30,6 +34,9 @@ export interface AShareLiveSectorFundFlowRow {
 }
 
 export interface AShareLiveSectorFundFlowResponse {
+  status: ResearchDataStatus;
+  isStale: boolean;
+  message?: string | null;
   fetchedAt: string;
   source: string;
   rows: AShareLiveSectorFundFlowRow[];
@@ -46,8 +53,12 @@ export interface AShareMarketTurnoverRow {
 }
 
 export interface AShareMarketTurnoverResponse {
+  status: ResearchDataStatus;
+  isStale: boolean;
+  message?: string | null;
   fetchedAt: string;
   source: string;
+  dailyObservedAt?: string | null;
   highTurnoverCount?: number | null;
   highTurnoverRows?: AShareMarketTurnoverRow[];
   historyDates?: string[];
@@ -87,10 +98,10 @@ export interface AShareBreadthSnapshot {
   up: number;
   down: number;
   flat: number;
-  limitUp: number;
-  realLimitUp: number;
-  limitDown: number;
-  realLimitDown: number;
+  limitUp: number | null;
+  realLimitUp: number | null;
+  limitDown: number | null;
+  realLimitDown: number | null;
   activityPct?: string | number | null;
   breadthState: string;
   speculationState: string;
@@ -325,6 +336,14 @@ const client: AxiosInstance = axios.create({
   withCredentials: true,
 });
 
+client.interceptors.request.use((config) => {
+  const csrf = getUserSystemCsrfToken();
+  if (!['get', 'head', 'options'].includes((config.method || 'get').toLowerCase()) && csrf) {
+    config.headers.set('X-CSRF-Token', csrf);
+  }
+  return config;
+});
+
 client.interceptors.response.use(
   (response) => response,
   (error: AxiosError) => {
@@ -348,67 +367,68 @@ client.interceptors.response.use(
   },
 );
 
-async function request<T>(config: AxiosRequestConfig): Promise<T> {
+export async function researchRequest<T>(config: AxiosRequestConfig): Promise<T> {
   const response = await client.request<T>(config);
   return response.data;
 }
 
 export const getAShareDashboard = () =>
-  request<AShareDashboardResponse>({
+  researchRequest<AShareDashboardResponse>({
     method: 'GET',
     url: '/research/a-share/dashboard',
   });
 
 export const getAShareLiveSectorFundFlow = () =>
-  request<AShareLiveSectorFundFlowResponse>({
+  researchRequest<AShareLiveSectorFundFlowResponse>({
     method: 'GET',
     url: '/research/a-share/live-sector-flow',
   });
 
 export const getAShareLiveMarketTurnover = () =>
-  request<AShareMarketTurnoverResponse>({
+  researchRequest<AShareMarketTurnoverResponse>({
     method: 'GET',
     url: '/research/a-share/live-market-turnover',
   });
 
 export const refreshAShareResearch = () =>
-  request<{ data: { status: string } }>({
+  researchRequest<{ data: { status: string } }>({
     method: 'POST',
     url: '/research/a-share/refresh',
+    timeout: 360_000,
   });
 
 export const getStockSnapshot = (code: string) =>
-  request<StockSnapshotResponse>({
+  researchRequest<StockSnapshotResponse>({
     method: 'GET',
     url: `/research/a-share/stocks/${code}/snapshot`,
   });
 
 export const getMacroExpectations = () =>
-  request<MacroExpectationResponse>({
+  researchRequest<MacroExpectationResponse>({
     method: 'GET',
     url: '/research/macro/expectations',
   });
 
 export const getMarketDetail = (marketId: 'macro' | 'gold' | 'crypto') =>
-  request<MarketDetailResponse>({
+  researchRequest<MarketDetailResponse>({
     method: 'GET',
     url: `/research/market-detail/${marketId}`,
   });
 
 export const getMacroDashboardV1 = () =>
-  request<MacroDashboardResponse>({
+  researchRequest<MacroDashboardResponse>({
     method: 'GET',
     url: '/research/macro/dashboard-v1',
   });
 
 export const getCommodityDashboardV1 = () =>
-  request<MacroDashboardResponse>({
+  researchRequest<MacroDashboardResponse>({
     method: 'GET',
     url: '/research/commodity/dashboard-v1',
   });
 
 export const getCryptoDashboardV1 = () =>
-  request<MacroDashboardResponse>({
+  researchRequest<MacroDashboardResponse>({
     method: 'GET',
     url: '/research/crypto/dashboard-v1',
   });

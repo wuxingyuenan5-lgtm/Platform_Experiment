@@ -38,21 +38,44 @@ from app.route_errors import history_window, query_gateway
 class BybitLeverageRequest(BaseModel):
     account_id: str = Field(alias="accountId")
     symbol: str
-    leverage: Decimal = Field(gt=0, le=100)
+    leverage: Decimal = Field(ge=1, le=100, allow_inf_nan=False)
 
 
 def create_venue_query_router(*, gateway: VenueGateway) -> APIRouter:
     router = APIRouter()
 
+    @router.get("/venue/capital-flows", tags=["venue-query"])
+    def capital_flows(
+        account_id: str = Query(alias="accountId"),
+        start_time: datetime = Query(alias="startTime"),
+        end_time: datetime = Query(alias="endTime"),
+    ) -> dict:
+        start, end = history_window(start_time, end_time)
+        reader = getattr(gateway, "get_capital_flows", None)
+        if reader is None:
+            raise HTTPException(status_code=501, detail="Capital history unavailable")
+        return query_gateway(lambda: reader(account_id=account_id, start_time=start, end_time=end))
+
+    @router.get("/venue/bybit/leverage", tags=["venue-query"])
+    def get_bybit_leverage(
+        account_id: str = Query(alias="accountId"), symbol: str = "XAUTUSDT"
+    ) -> dict[str, object]:
+        adapter = getattr(gateway, "bybit", None)
+        if adapter is None or not hasattr(adapter, "get_leverage"):
+            raise HTTPException(status_code=501, detail="Bybit leverage query is unavailable")
+        return query_gateway(lambda: adapter.get_leverage(account_id=account_id, symbol=symbol))
+
     @router.post("/venue/bybit/leverage", tags=["venue-write"])
     def set_bybit_leverage(request: BybitLeverageRequest) -> dict[str, object]:
-        adapter = getattr(gateway, "bybit", None)
-        if adapter is None or not hasattr(adapter, "set_leverage"):
+        setter = getattr(gateway, "set_bybit_leverage", None)
+        if setter is None:
             raise HTTPException(status_code=501, detail="Bybit leverage update is unavailable")
-        return adapter.set_leverage(
-            account_id=request.account_id,
-            symbol=request.symbol,
-            leverage=request.leverage,
+        return query_gateway(
+            lambda: setter(
+                account_id=request.account_id,
+                symbol=request.symbol,
+                leverage=request.leverage,
+            )
         )
 
     @router.get("/venue/orders", response_model=list[VenueOrderSnapshot], tags=["venue-query"])
@@ -308,9 +331,7 @@ def create_venue_query_router(*, gateway: VenueGateway) -> APIRouter:
         account_id: Annotated[str, Query(alias="accountId")],
         side: Annotated[Literal["buy", "sell"], Query()],
         quantity: Annotated[Decimal, Query(gt=0)],
-        reference_price: Annotated[
-            Decimal, Query(alias="referencePrice", gt=0)
-        ],
+        reference_price: Annotated[Decimal, Query(alias="referencePrice", gt=0)],
     ) -> VenueOrderMarginEstimate:
         return query_gateway(
             lambda: gateway.estimate_order_margin(

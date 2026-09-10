@@ -6,15 +6,14 @@ from typing import Literal
 from fastapi import HTTPException
 
 from app.catalog import get_instrument
-from app.config import get_settings
 from app.cross_spread import (
     BYBIT_INSTRUMENT_ID,
     BYBIT_SYMBOL,
     MT5_SYMBOL,
     STRATEGY_INSTANCE_ID,
     _load_live_cross_spread_sizing,
-    _validate_acceptance_quantity,
     _validate_leg_quantity,
+    assert_cross_spread_live_execution_enabled,
 )
 from app.schemas import CrossSpreadMarketCommandRequest, ExecutionBatchResponse
 from app.strategies.domain import StrategyInstructionAction
@@ -48,12 +47,7 @@ def submit_cross_spread_limit_command(
     mt5_position_id: str | None = None,
     allow_netting_close: bool = False,
 ) -> ExecutionBatchResponse:
-    settings = get_settings()
-    if not settings.live_trading_enabled:
-        raise HTTPException(
-            status_code=403,
-            detail="Live cross-spread execution is disabled",
-        )
+    assert_cross_spread_live_execution_enabled()
     if bybit_limit_price <= 0:
         raise HTTPException(status_code=422, detail="Bybit Limit price must be positive")
     if limit_strategy not in {"fok", "post_only_chase"}:
@@ -82,7 +76,6 @@ def submit_cross_spread_limit_command(
             detail="Open cross-spread commands cannot carry close-position intent",
         )
 
-    _validate_acceptance_quantity(request.quantity_oz)
     sizing = _load_live_cross_spread_sizing()
     _validate_leg_quantity(
         request.quantity_oz,

@@ -12,6 +12,7 @@ DifferenceType = Literal[
     "price_mismatch",
     "currency_mismatch",
     "status_mismatch",
+    "timestamp_mismatch",
 ]
 DifferenceStatus = Literal["open", "resolved", "accepted"]
 

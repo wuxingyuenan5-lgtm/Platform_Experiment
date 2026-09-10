@@ -1,66 +1,55 @@
 # 策略模块架构工作流
 
-状态：Cross 首个最小实盘及策略管理读模型已闭环；执行底层已离线收口，维持现有对冲仓位并等待 MT5 开市后的受控验收
+更新时间：2026-09-10。状态：正常交易已加载，仍待部分外部成交与结算验收。本文件只保留当前接续；产品、执行及运维规则以末尾权威为准。
 
-更新日期：2026-09-06
+## 当前仓位与操作边界
 
-## 阶段目标与范围
+| 对象 | 当前事实 | 下一动作 |
+|---|---|---|
+| Cross 误单 Ticket `10019629866` | Owner 11:05 完成平仓；计划 `45df65fd-5312-4711-aed9-91e3089b81cd` closed，剩余 0 | 保留事故来源、恢复审计和实际成交证据，不再列为待平仓 |
+| Cross 原短组 Ticket `10019467427` | Owner 11:06 完成平仓；计划 `667e43d8-4f49-48b4-925e-c5b38fa8c0c5` closed，剩余 0 | 保留原失败及恢复链，不重启旧退出计划 |
+| Cross 正常黄金组 Ticket `10019612937` | 计划 `788eb0ea-c70c-4832-86e7-66c1fbc6d766` active，剩余 1 盎司，TP 6 / SL -30 | 保持既有参数和授权，不为验证额外交易 |
+| Funding 开仓指令 `c15f5534-9ec5-4e9a-b4b3-ca88e4f4bf40` | 现货净持币 0.000999 BTC、永续空 0.001 BTC，净空 0.000001 BTC | 按 Owner 要求作为 Funding 异常保留，之后本人手动处理；不得自动补单或平仓 |
 
-本阶段把 Cross 与 Funding 收敛到一套简洁、统一且可恢复的策略执行框架，并以真实账户最小开仓、双腿核对、平仓和对账闭环作为阶段验收。Platform 负责策略意图、账户绑定、不可变计划、风险编排和页面状态；Execution Runtime 独占 Venue SDK、账户连接与订单副作用。
+业务核查时 72 条命令、331 个订单、447 条成交、47 个批次、14 个指令；Runtime 73 条命令，最后派单为 11:06。本轮订单整理及文档/会话核查未新增交易；此前 01:02 的测试误单是真实事故，不能改称授权测试。它的原始记录、恢复审计和原生回执保存在既有 `platform-api/data/backups/20260909-normal-trading-enable/funding-remediation-*`。
 
-阶段不授权真实交易、资金划转、外部部署或凭据变更，也不扩展海内外价差、抄底、短线交易员 BL 等产品范围。Live Write 继续默认关闭，任何真实写入仍需 Owner 提供新的、操作明确且有时限的授权。
+## 已加载结果
 
-## 当前已经成立
+- MT5 只处理配置绝对路径对应的终端。启动与重连恢复隐藏，Worker 在一秒 IPC 轮询边界检查可见窗口；不修改自动交易权限或重复登录同一账号。
+- 普通维护从两个运行后端读取一致交易模式并保留；不一致或读取失败在停止服务前报错，冷启动默认只读。现有授权下两开关保持开启，Cross 退出监控启动日志为 1 秒。
+- Cross 领取退出计划前检查开关，异常路径保留实际 Close Batch；历史未派单计划仅在事务证明没有指令/订单后人工恢复。已成交 Bybit、未派单 MT5 的恢复沿原指令、命令和幂等键完成，未知结果禁止重放。
+- Funding/Cross 的正常持仓、订单、成交和异常按开仓指令及批次归属；共享账户或同一品种不改变策略归属。异常卡无内容时隐藏，正常一键全平排除异常组；损益缺失不补零。
+- Funding 新开仓以现货毛数量扣除已确认的 0.1% 基础币费率，再向下取永续步进；确认页冻结两腿数量，低于最小数量时拒绝。累计现货释放按冻结比例，实际净币量继续按原生费用核对。卖出及永续 USDT 费用不再次扣 BTC；既有异常组不按新规则重算。
+- 各策略订单共用开平汇总、逐笔成交、委托、筛选和展开详情；策略选择以 URL 为单一来源，加载中、未绑定和历史载入范围明确展示。开平优先取业务指令、只减仓或原生 MT5 进出场标记；旧无依据记录继续待核对。
+- Bybit 订单读写保持明确账户及市场；MT5 原生源时间稳定保存、观察时间独立。已接受的历史时间差异只影响有效读取，原始回执不改写。账户同步最近成功数据持续更新，失败保留旧快照并标注过期。
+- MT5 报价在读取时核对终端的经纪商连接，断线/信息缺失时拒绝 SDK 留存的正数 Tick；连接恢复后的读取可继续。CEO 的 Runtime Journal 恢复与 Venue 对账共用既有复核权限，保留 CSRF、禁止重提订单及缺失订单接受边界。
+- 第二版采用现有执行引擎与公共组件；NautilusTrader 试点因精度合同不满足已结束。CCXT 只负责标准行情/规格，Runtime 独占订单副作用。生成 API、共享连接、指令缓存及策略财务归属已接入，详见系统地图及执行合同。
 
-- Cross 与 Funding 共用主链：`Strategy Action → StrategyInstruction → immutable ExecutionPlan → ExecutionBatch / TradeCommand → VenueGateway → authoritative Order / Fill → Position → Reconciliation → 页面状态`。
-- Cross 的新旧入口均进入同一 Instruction/Plan 路径；两腿账户、品种、权限和 readiness 必须在创建执行意图前通过，MT5 不可执行时不得先开 Bybit 腿。
-- Funding 保留平台侧有界 PostOnly 编排，Runtime 每次只执行一个 PostOnly attempt；两种策略共用订单身份、累计成交、恢复、对账及账户资源保护。
-- Funding 与 Cross 可绑定同一逻辑 Bybit UTA；资源 claim 与余额 reservation 在 dispatch 前原子取得。同一账户同一市场资源互斥，不同 symbol 仅在权威可用余额足够时并行。
-- MT5 使用“一逻辑账户一固定 Terminal/Worker”；Cross 使用独立固定实例，禁止在同一 Python 会话中切换账户；短线交易员 WW 绑定 `account_mt5_short_term_a` 只读监控，BL 保持未绑定。
-- `result_unknown`、人工介入和 Funding 对账中状态继续保留相应写入冻结、资源与余额预约；恢复只查询和对账，不重发不确定命令。
-- 历史 Cross orphan 已在保留原始事实的前提下完成责任处置，当前没有遗留 unknown 计数；该结论不构成新的交易授权。
-- 2026-09-04 只读预检确认 Bybit `XAUTUSDT` 与 MT5 `XAUUSD.s` 的账户身份、品种和交易权限可用，双端均无该策略持仓或挂单；标准持久配置默认 `Live Write=false`，当前仅在 Owner 授权窗口内临时启用。
-- Owner 已给出截至北京时间 2026-09-07 00:00 的新窗口；该窗口不自动开启写入，且不得超出本阶段 Cross → Funding 最小闭环范围。
-- Cross 已按 Owner 指定的 `market`、1 盎司完成过一轮真实双腿开仓、持仓核对、双腿平仓、归零与权威对账；随后进行的反方向延迟测试目前仍有一组已对冲真实持仓，尚未平仓。
-- Owner 要求在既有授权期内连续测试实际操作，不再每完成一笔就人工重启整套门控。当前为 Cross 两腿及 Funding 共享账户建立了短时、品种限定的受控会话并开启双层 Live Write；自动到期、Kill Switch、幂等、防重复、数量上限和异常 fail-closed 继续生效。
-- 本次闭环暴露两个恢复缺口：MT5 平仓成功时可能返回不含成交量/价格的稀疏 `DONE`，以及终态聚合 Fill 与后续 component execution 可能重复投影。两项均已按订单身份和累计数量上限修复。
-- 策略管理的 Cross 订单按 Batch/TradeCommand 身份归属，开平仓四张真实订单均可读取；损益按 canonical Fill 与合约乘数计算，账户净值曲线来自双腿权威余额快照。共享账户不再依靠账户与 symbol 猜测策略归属。
-- 策略管理的账户资金与净值曲线读取账户级 `account_risk_snapshots`；抄底账户使用 Bybit `asset overview.totalEquity` 的 USD 全账户估值，纳入 Unified Trading、Earn/RWA、Alpha、TradFi 等账户结构；Cross/Funding 的 Bybit 账户继续使用 Unified Trading `wallet-balance` 的 USDT 站内交易口径。Cross 的 MT5 账户独立读取，禁止从 Bybit 全账户汇总中重复计入。BYUSDT、XPL 等资产明细不作为账户净值。同步非 `ready` 时不展示旧快照，避免把过期 MT5 资金当作当前资金；净值曲线仅返回最近 1000 个展示点，原始快照保留。
-- Platform API 已具备后台只读同步：每 30 秒从 Runtime 采集已绑定账户，账户间并发、单次同步互斥，页面只读取数据库投影；后台同步失败不会触发任何订单或资金写入。本地 Runtime 所需的 Cross/WW MT5 终端保持运行但由 `scripts/dev-platform.ps1` 自动隐藏窗口；WW 使用独立 portable 副本和 MCP `22347`，Cross 使用 `22346`，不得重新切回原共享终端实例。
-- 策略管理首屏不再预加载 Cross 的订单审计模块；订单/成交/批次及 audit 观测仅在进入“订单信息”子页时加载，避免与损益/账户资金首屏重复读取。
-- Cross 订单与成交列表现在由 Platform API 按 `strategyInstanceId` 在数据库查询阶段过滤，保留无参数全量接口兼容；`trade_commands(strategy_instance_id, created_at)`、`orders(command_id, created_at)` 与 `fills(order_id, occurred_at)` 已补齐查询索引，页面不再为 Cross 拉取全局历史后本地筛选。
-- 管理概览的同步表结构检查已收敛为每个数据库进程/路径一次；本地实测首个请求约 235ms，后续请求约 13–19ms。剩余首请求耗时主要来自少数可交易策略的 readiness 组装，后续可在不改变交易门禁的前提下改为后台只读投影。
-- Cross 市场数据已增加独立的低频后台采集：默认每 60 秒写入价差、资金费率输入及买卖两侧库存费输入，页面访问不再是记录这些数据的前提；已结算的 funding/swap/fee 仍走经济事件与 financial fact 链路，不能由行情快照代替。
-- 前端行为保持不变但降低资源占用：Vite Windows 文件轮询默认关闭（网络盘/Docker 场景可用 `VITE_USE_FILE_POLLING=true` 且 1 秒间隔显式启用）；Cross 展示页隐藏时暂停 15 秒展示刷新、恢复可见立即补拉；订单、成交、最新账户余额和权益历史同时请求时按策略/账户键做请求去重。TradingView 组件原已有可视区域懒加载，本轮不重复改造。
-- Cross 策略管理按子页拆分读取：进入“账户资金”只读取绑定、账户风险、当前行情和资金历史；进入“策略损益”后才读取成交、订单、批次、品种和策略 PnL；“订单信息”继续由订单模块按需读取。交易数据口径不变，只减少首屏无关读取。
-- 开仓和平仓端到端各约 10 秒，主要由双腿顺序执行、Venue 终态确认及预检构成；顺序对冲不并行，后续只优化无副作用读取和页面阶段反馈。
-- 最新 Cross 反向开仓实测约 11.3 秒，其中真实 Venue 提交/确认不足 1 秒，主要延迟来自指令后的重复规格、报价、保证金读取以及 Bybit/MT5 冷启动。代码已将两腿只读 admission 移到最终确认前并行完成，Runtime 在 live ready 前预热 Bybit 与固定 MT5 Worker，短时复用规格/报价/保证金结果；真实持仓尚未归零，因此新版本只完成离线验证，未重启部署。
-- 2026-09-05 只读现场复核仍确认 Bybit `XAUTUSDT` 空 1 与 MT5 `XAUUSD.S` 多 0.01 lot 的对冲仓位存在；未发现活动 resource claim、余额 reservation 或 Runtime `result_unknown`。Platform Live Write 与 Founder local self-approval 均为 `false`，但运行中的 Runtime 早于 admission/预热提交启动且 Live Write 仍为 `true`；两条持久化 Cross session 已越过到期时间但状态尚未被惰性过期处理。持仓未归零前不得重启、部署或改变门控，须由 Owner 明确授权具体平仓操作。
-- 2026-09-06 WW 的 MT5 终端底层问题已修复：原桌面终端、Cross Bybit 终端和 Runtime worker 争用 MT5 MCP `22346`，且 portable 终端首次编译超过 worker 固定 15 秒启动窗口，造成 `(-10005, IPC timeout)`/`runtime_unavailable`。已为 WW 创建独立 portable 终端副本，改用 MCP `22347`，并将 worker 启动等待改为动态窗口；当前 `account_mt5_short_term_a` 已恢复 `ready`，只读快照已返回 `233089709 / Exness-MT5Real5`、USD 资金、订单和成交。
-- 2026-09-05 已将多仓执行收敛为常数时间的方向增量热路径：受控生命周期支持任意多空交错与按计划剩余量部分／全部平仓，下单前不遍历历史仓位或 Fill。当前 MT5 账户只读快照确认 `marginMode=2`，因此 Bybit 使用净额方向增量，MT5 使用本地已确认开仓订单的外部 Ticket 做精确平仓。Fake Runtime 已验证 `多1 → 空1 → 多1` 及按不同计划依次平仓的双端净仓变化并最终归零；核心市价、FOK/Limit、统一 TP/SL Close Action 与部分平仓测试共 37 项通过。该离线证据不代表已部署或取得新实盘授权。
-- 交易平台不设置 1 盎司产品上限；`cross_spread_acceptance_max_quantity_oz=0` 表示不施加平台旧验收上限，实际数量继续受 Venue 最小量、步长、保证金和既有风险门控约束。页面已将单笔操作拆为“全平／部分平仓”，底部统一为“全部平仓”；部分数量沿用同一预检、确认、幂等草稿和恢复链路。本地浏览器仅验证展开与取消，未提交任何真实交易。
-- 已为既有 Cross 持仓组补齐 Exit Plan 编辑：持仓总览的 TP/SL 单元格只绑定其匹配的 `active` Exit Plan，CEO 可补充或修改阈值、TP/SL 的市价／限价执行方式及限价策略；该 PATCH 只更新 Platform 内的计划，不会立即平仓或触发外部写入。自动触发使用该计划当前剩余数量；既有人工部分平仓会原子扣减剩余数量并沿用设置。页面不再将全局第一条 Exit Plan 错投影到其他持仓行；有 MT5 Ticket 时优先按 Ticket 绑定，多个同向／同量候选仍无法唯一确认时不显示可编辑计划，避免将其他订单错误关联到 TP/SL。
-- Cross 持仓概览现按每一行实际价差决定颜色；多持仓组时顶部爆仓价不再误取第一行，改为提示查看各持仓行；Bybit 与 MT5 单边损益分别显示正负颜色。
-- 受控 Cross/Funding 公开旁路已在路由边界封堵：通用 TradeCommand、ExecutionBatch、旧 Strategy Run、通用 StrategyInstruction 对两条受控策略直接返回 403；无策略身份的 deprecated raw Order 对任一有效受控交易账户返回 403。专用 lifecycle/instruction 仍走同一 StrategyInstruction → ExecutionPlan → ExecutionBatch 链与 CEO 权限边界。该源码变更尚待 Platform API 重启加载，未触碰 Runtime。
+## 当前验证
 
-## 尚未满足的验收
+订单读取在分页前合并精确原生订单别名，保留原行与未知归属；同一指令可展开各腿委托和成交。两笔 09-10 MT5 平仓原始时间约快 3 小时，管理列表现按可核实的 11:05:58 / 11:06:07 平台订单确认时间显示并标注时间冲突，完整原始时间仍在详情。未验证的经纪商时钟不能由此宣称已归一；API 与账户观测合同拥有该边界。
 
-- 本地运行中的 Platform API 尚未加载 ExitPlan 编辑及公开旁路封堵路由；需在不重启 Runtime 的前提下重启 API 后，以 OpenAPI 与拒绝测试复核。兼容 Cross market-command 已收敛到 Instruction 主链，不在封堵范围。
-- Cross 通过后，Funding 尚需使用共享 UTA 的最小可成交数量完成开仓、双腿对冲、平仓和对账。
-- 任一身份不一致、查询不可用、累计成交冲突、外部持仓差异或 `result_unknown` 都会停止扩展并保持 fail-closed。
+订单时间、开平、归属、去重和账户快照已做隔离回归，共用前端的时间/筛选/归组/渲染、类型及生产构建通过。实际浏览器验证了六个策略入口、Cross 平仓时间及双腿详情、Funding 数据、抄底和 WW 监控数据、BL 未绑定、日期/开平筛选和窄视口；浏览器仅允许读取及自己的认证请求，没有交易提交。证据位于既有 `platform-api/data/backups/20260909-normal-trading-enable/orders-redesign-*`。
 
-## 下一动作
+此前登录核查已修复 `/auth/me` 暂时不可达被当成退出的问题；维护保留持久化会话和既有交易模式。明确认证失效、30 分钟空闲及绝对有效期仍生效。既有 Cross 退出计划不依赖浏览器，隔离测试覆盖无会话及应用重启后只领取一次；持续存活告警与真实 TP/SL 触发仍未验收，停机等边界归 Cross 执行合同。
 
-1. Owner 已决定在 MT5 休市期间维持现有 Cross 对冲仓位；持仓期间不得重启 Runtime、部署或改变门控，也不自动平仓。
-2. 在只读与本地 Fake Gateway 下继续收口现有执行主链：对受控 Cross/Funding 实例封堵通用及旧写入旁路并补拒绝测试；限价开平仓、TP/SL、部分平仓、恢复和对账均复用同一 Instruction/Plan/Batch 合同；保持方向增量热路径，不新增同步仓位遍历或平行执行架构。
-3. MT5 开市且 Owner 对具体实盘操作另行授权后，再决定现有仓位处置与包含 admission/预热优化版本的部署；其后按既有顺序验收限价与多分组真实闭环。
-4. Funding 继续在 Cross 限价、多分组、恢复与对账取得外部权威证据后进行；异常、未知结果或会话到期时停止继续下单并核对外部权威状态。
+本轮追加故障验证：行情不可用/读取异常期间不领取退出计划，恢复后只按当前阈值判断；人工平仓与后台触发在两种抢先顺序下只派发一组；Limit 领取后报价失效可安全释放并在恢复后执行。独立 Fake Runtime 进程在第一腿成交、第二腿提交前或成交回执返回前停止，重启 Runtime 与 API 后仍复用原订单，缺失证据继续未知，完整 Journal/Venue 证据恢复不重复成交。已修正旧闭环夹具的开发身份、单组限制和测试间共享状态。API 125 项、Runtime 79 项、两端类型与相关静态检查通过；真实加载核对了正常 MT5 报价、CEO 恢复接口、缺少 CSRF 拒绝及测试会话正常退出。业务交易数量和原计划保持不变，证据保存在既有 `resilience-*-20260910.json`。
+
+## 验收边界与下一步
+
+此前 Funding/Bybit 适配、净额、费用及持仓 65 项，共享执行/恢复 56 项，前端 15 项及类型/合同/构建已有验证，证据位于既有 `funding-net-hedge-*`。新净额规则尚无真实成交证明；隔离通过不代表外部交易所或经纪商验收完成。
+
+1. 新 Funding 最小净额开平已完成生产适配器的隔离验证：现货毛买入 0.001002 BTC、预计净到账 0.001000998 BTC、永续空 0.001 BTC，全部平仓后可保留不足步长的 0.000000998 BTC。真实服务预校验可用；对应真实订单的数量授权等待 Owner 回复，现货预算上限 80 USDT，当前异常组继续保留，不代平。交易所返回 BTCUSDT 下次结算为 09-10 16:00，已安排 16:05 在本任务继续只读核验（提醒 `funding`）；结算回执未到达前不标为通过，其他品种/账户的资金费不能替代。
+2. Cross 的多组指定 Ticket 退出、限价/FOK/PostOnly 和 TP/SL 真实成交仍按具体使用取得证据，不为测试新增真实交易。正常黄金组保留现有计划。
+3. 报价中断/恢复、Runtime/API 重启、未知结果防重及手动/后台竞争已有上述隔离证据；不通过中断当前业务行情或新增真实订单重做故障注入。尚未取得的经纪商真实故障与 TP/SL 成交不能由隔离测试推定。
+4. 最近退出评估时间及持续存活告警尚未实现，已放入驾驶舱发现箱并明确未确认；不以示例预警或启动日志冒充持续健康。
+5. 完整损益分类算法、历史来源/汇率和完整结算覆盖继续待后续范围；研究数据与 TradingView 通路保持分离。抄底/WW 仅监控，BL 未绑定，海内外价差暂停；Linux 部署及外部生产运维是独立工作。
 
 ## 长期权威
 
-- 项目状态与下一步：[项目驾驶舱](../PROJECT.md)
-- Platform/Runtime、VenueGateway、账户路由与 `result_unknown` 边界：[Venue Adapter Contract](../contracts/VENUE_ADAPTERS.md)
-- Cross 指令、不可变计划与双腿执行语义：[Cross-Spread Execution Contract](../contracts/CROSS_SPREAD_EXECUTION.md)
-- 真实账户只读观测：[Live Account Observability Contract](../contracts/LIVE_ACCOUNT_OBSERVABILITY.md)
-- 恢复与日终对账：[EOD Reconciliation Contract](../contracts/EOD_RECONCILIATION.md)
-- 授权、共享账户资源与受控验收：[Live Acceptance Runbook](../operations/LIVE_ACCEPTANCE_RUNBOOK.md)
+- [项目驾驶舱](../PROJECT.md)与[系统地图](../architecture/SYSTEM_MAP.md)：当前重点与执行引擎/公共组件取舍。
+- [策略模块](../product/modules/策略.md)与[资金费率套利](../product/strategies/资金费率套利.md)：已确认产品范围。
+- [API](../contracts/API.md)、[Cross 执行](../contracts/CROSS_SPREAD_EXECUTION.md)、[执行风险](../contracts/EXECUTION_RISK.md)、[Venue Adapter](../contracts/VENUE_ADAPTERS.md)：数量、执行、归属及异常恢复。
+- [认证授权](../contracts/AUTHORIZATION.md)与[认证错误](../contracts/AUTH_ERRORS.md)：浏览器会话、安全与错误语义。
+- [账户观测](../contracts/LIVE_ACCOUNT_OBSERVABILITY.md)、[Venue 对账](../contracts/VENUE_RECONCILIATION.md)与[数据库](../database/README.md)：原生事实、财务投影和迁移。
+- [运行手册](../operations/RUNBOOK.md)、[交易验收与维护](../operations/LIVE_ACCEPTANCE_RUNBOOK.md)、[运行监控](../operations/PRODUCTION.md)：进程、隐藏终端、备份与外部证据边界。

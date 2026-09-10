@@ -61,3 +61,8 @@ export const spreadScenarios = [
     result: '状态：等待确认',
   },
 ];
+export const spreadResearchState = {
+  state: 'sample' as const,
+  source: 'sample:spread-research',
+  actionable: false,
+};

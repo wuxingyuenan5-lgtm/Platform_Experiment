@@ -16,11 +16,15 @@ Financial Facts → auditable post-trade economic truth
 
 Risk actions never bypass TradeCommand. Kill Switch does not rewrite historical orders, fills or financial facts.
 
-## Controlled live acceptance
+## Normal trading
 
-Operational validation of CEO-instruction-bounded Market/FOK, TP/SL, PostOnly Chase, second-leg failure and forced reset follows [`../operations/LIVE_ACCEPTANCE_RUNBOOK.md`](../operations/LIVE_ACCEPTANCE_RUNBOOK.md). Fixed position, notional, daily-volume, batch-count and loss caps are not part of the founder-owned local test-account contract. This does not relax instruction quantity ceilings, one-instruction/one-batch identity, global execution serialization, Kill Switch, fail-closed unknown handling, reconciliation or forced read-only reset. Risk actions cannot bypass that procedure.
+Owner confirmed normal trading on 2026-09-09. Browser CEO authorization, active trading bindings, live gates, balance/margin checks and venue specifications replace acceptance sessions, temporary windows and fixed-size/notional/position-count caps. Every live order checks Kill Switch and unresolved venue reconciliation directly; these checks must not depend on a legacy session having initialized or claimed anything.
+
+Instruction quantity ceilings, one-instruction/one-batch identity, resource serialization, bounded chase, fail-closed unknown handling and reconciliation remain mandatory. The [acceptance runbook](../operations/LIVE_ACCEPTANCE_RUNBOOK.md) supplies evidence procedures, not additional normal-trading permission gates.
 
 ## Persisted objects
+
+Batch admission checks every live leg's account binding, gate and reconciliation before dispatching the first leg; per-order checks still run immediately before dispatch. A formally accepted native timestamp correction is non-blocking only when the exact old/new receipts satisfy the same time-only acceptance rules used by venue-event ingestion. Other open/accepted differences still block. This prevents a known second-account blocker from first being discovered after the first fill.
 
 - `trading_kill_switches` and `kill_switch_commands`;
 - `execution_risk_policies` and idempotency commands;
@@ -45,13 +49,18 @@ Kill Switch and leg deadline are checked again before later legs.
 
 ## Residual exposure
 
-For each fill:
+Use exact command-owned orders from all batch legs, including partial fills,
+every Funding perpetual attempt and Spot release, the persisted Cross rollback
+command and generated risk-action order IDs. Persisted action/leg idempotency
+keys retain ownership even if a later exception interrupts the action response.
+Unrelated orders in a shared account do not belong to the batch. For each
+proven execution:
 
 ```text
 signed contract delta = side sign × fill quantity × contract multiplier
 ```
 
-Within one base/settlement group:
+Within one base-currency group:
 
 ```text
 net contract delta = sum(signed contract delta)
@@ -59,11 +68,35 @@ reference price = maximum valid fill price
 residual = abs(net contract delta) × reference price
 ```
 
-Mixed currency without a risk-FX snapshot is conservative and incomplete. This metric is an execution-risk gate, not formal PnL or accounting input.
+Runtime confirmations and native executions describe overlapping evidence;
+never add their quantities together. Native executions are deduplicated by
+source and native fill ID within the exact account, instrument and order.
+Unclassified legacy fills remain immutable and cannot prove closure without
+full native execution coverage. Conflicting identity, excess execution,
+unresolved order/command outcome or missing contract metadata remains incomplete.
+
+Net quantity is calculated before applying a price. A proven zero quantity
+across USD/USDT legs is zero residual execution exposure; differing fill prices
+are not an unhedged position. Nonzero mixed-currency exposure without a risk-FX
+snapshot remains incomplete. This metric is an execution-risk gate, not formal
+PnL, full market-risk equivalence or accounting input.
+
+## Evidence-based recheck
+
+Late Runtime recovery, successful formal Venue reconciliation and a filled,
+verified Cross rollback recheck the finished batch's persisted risk. The recheck
+shares one database transaction with its `execution_batch_risk_reconciled` audit,
+which retains the prior state, exact order/fill IDs, quantities and evidence
+quality. Only complete zero-residual evidence resolves a prior risk; incomplete
+evidence stays escalated. Repeated identical rechecks do not create another audit.
+This operation does not submit orders or rewrite fills, financial facts, positions
+or exit plans. Background account monitoring alone cannot resolve an unknown command.
 
 ## States and actions
 
 Risk states remain `clear`, `residual_exposure`, `disposition_in_progress`, `resolved` and `escalated`.
+
+Live Spot exposure uses executed base quantity less verified native base-currency fees. Quote-currency fees affect costs, not coin quantity. Missing or incomplete native fee coverage keeps evidence incomplete. Funding's planned positive rounding remainder remains real residual exposure; it is never reported as zero merely because it is smaller than a perpetual quantity step.
 
 Supported actions remain:
 
@@ -72,7 +105,11 @@ Supported actions remain:
 - `cancel_open_legs`;
 - `substitute_hedge`.
 
-Auto-flatten creates an opposite TradeCommand for each filled original leg. Substitute hedge also uses an independent idempotent TradeCommand. A non-filled or Result Unknown risk-reduction command cannot be declared resolved.
+Flattening requires a failed or manually paused batch and complete terminal execution evidence. Reconcile live owned orders and native fills before calculating remaining quantity. Sum every original attempt, release and previous reduction by account and instrument; a zero directional hedge is not proof that both instruments are flat. Spot base-currency fees reduce sellable inventory; missing fee coverage and untradeable dust remain explicit blockers. Funding uses its frozen quantity steps, and live order admission revalidates current native specifications. Crypto perpetual reductions are reduce-only; a position needing a venue-specific close target cannot use the generic reduction path.
+
+Create an opposite TradeCommand only for a proven remaining position. A non-filled or Result Unknown reduction stops further leg dispatch and keeps the risk unresolved. Retain any generated order IDs when a later operation fails. A new action key after verified closure produces no additional orders. Substitute hedge continues to use an independent idempotent TradeCommand.
+
+Only proof that every owned instrument is flat can finalize a flatten action. Finalization atomically resolves risk, closes the failed Funding instruction, cancels unsubmitted legs, releases claims/reservations, and records exact execution evidence plus the previous failure reasons. Replaying an already completed action may finish this local bookkeeping from existing evidence; it cannot resubmit trades. Original orders, fills and economic facts remain immutable. Funding enters manual intervention with a refreshed residual-risk calculation even when its first fill query failed.
 
 ## Idempotency
 
@@ -84,10 +121,10 @@ Auto-flatten creates an opposite TradeCommand for each filled original leg. Subs
 | Auto-flatten leg | `<risk-action-key>:<leg-role>` |
 | Substitute hedge | `<risk-action-key>:replacement` |
 
-Reusing a key with a different payload returns 409.
+Reusing a key with a different batch or payload returns 409. Risk actions are claimed atomically and serialized within one batch, including requests with different keys.
 
 ## Safety limits
 
 - Accepted or Result Unknown external orders are not claimed canceled without venue evidence.
 - Multi-currency residual comparison remains fail-closed without a risk-FX snapshot.
-- Live Write remains disabled by default and continues to require a separately authorized, time-limited window with one named responsible CEO/operator plus the independent Platform and Runtime safety gates.
+- Live Write remains disabled by default. Existing explicit Owner authorization governs the current operating period; CEO/account authorization and independent Platform/Runtime safety gates remain required. Local validation never grants real-trading permission.

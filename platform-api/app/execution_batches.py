@@ -10,6 +10,7 @@ import httpx
 from fastapi import HTTPException
 
 from app import execution_risk_repository as risk_repository
+from app import runtime_transport
 from app.config import get_settings
 from app.database import connection
 from app.execution_risk import (
@@ -26,6 +27,7 @@ from app.schemas import (
     CreateTradeCommandRequest,
     ExecutionBatchResponse,
 )
+from app.security import assert_live_account_execution_allowed
 from app.trade_commands import create_trade_command, validate_trade_command_catalog
 
 CROSS_SPREAD_STRATEGY_KEY = "cross_venue_spread"
@@ -170,6 +172,8 @@ def create_execution_batch(request: CreateExecutionBatchRequest) -> ExecutionBat
         account_ids.append(leg_account_id)
 
     assert_execution_allowed(request.strategy_instance_id, account_ids)
+    for account_id in set(account_ids):
+        assert_live_account_execution_allowed(account_id, request.strategy_instance_id)
 
     batch_id = str(uuid4())
     created_at = now_iso()
@@ -330,9 +334,7 @@ def create_execution_batch(request: CreateExecutionBatchRequest) -> ExecutionBat
             command = create_trade_command(command_request)
         except HTTPException as exc:
             reason = str(exc.detail)
-            unknown_order_id = _result_unknown_order_for_command(
-                command_request.idempotency_key
-            )
+            unknown_order_id = _result_unknown_order_for_command(command_request.idempotency_key)
             if unknown_order_id is not None:
                 update_leg_status(
                     batch_id,
@@ -377,9 +379,7 @@ def create_execution_batch(request: CreateExecutionBatchRequest) -> ExecutionBat
                     command_requests = resize_cross_spread_mt5_hedge(
                         command_requests,
                         bybit_index=index,
-                        bybit_filled_quantity=get_order_filled_quantity(
-                            command.platform_order_id
-                        ),
+                        bybit_filled_quantity=get_order_filled_quantity(command.platform_order_id),
                     )
                 except ValueError as exc:
                     reason = str(exc)
@@ -560,8 +560,7 @@ def _find_blocking_batch_for_resources(
             ):
                 return batch
             if any(
-                str(leg["leg_status"]) == "result_unknown"
-                and account_id == account
+                str(leg["leg_status"]) == "result_unknown" and account_id == account
                 for account, _symbol in requested
                 for leg in legs
             ):
@@ -665,9 +664,7 @@ def _claim_batch_execution_resources(
             )
             for row in existing_claims
         }
-        expected_claims = {
-            key: (*value, "active") for key, value in resources.items()
-        }
+        expected_claims = {key: (*value, "active") for key, value in resources.items()}
         persisted_reservations = {
             (str(row["account_id"]), str(row["currency"])): (
                 str(row["strategy_instance_id"]),
@@ -675,18 +672,13 @@ def _claim_batch_execution_resources(
             )
             for row in existing_reservations
         }
-        expected_reservations = {
-            key: (strategy_instance_id, "active") for key in reservation_keys
-        }
+        expected_reservations = {key: (strategy_instance_id, "active") for key in reservation_keys}
         if (
             len(existing_claims) == len(expected_claims)
             and len(existing_reservations) == len(expected_reservations)
             and persisted_claims == expected_claims
             and persisted_reservations == expected_reservations
-            and all(
-                Decimal(str(row["reserved_amount"])) > 0
-                for row in existing_reservations
-            )
+            and all(Decimal(str(row["reserved_amount"])) > 0 for row in existing_reservations)
         ):
             return
         raise HTTPException(
@@ -799,6 +791,7 @@ def _reservation_requirement_for_leg(
         account_id=account_id,
         symbol=leg.symbol,
         side=leg.side,
+        instrument_type=normalized_type,
     )
     if normalized_type == "crypto_spot":
         return (account_id, quote_currency), leg.quantity * reference_price
@@ -820,19 +813,19 @@ def _reservation_reference_price(
     account_id: str,
     symbol: str,
     side: str,
+    instrument_type: str | None = None,
 ) -> Decimal:
     settings = get_settings()
     try:
-        with httpx.Client(
-            trust_env=False,
-            timeout=settings.runtime_timeout_seconds,
-        ) as client:
-            response = client.get(
-                f"{settings.runtime_base_url}/venue/quotes/{symbol}",
-                params={"accountId": account_id},
-            )
-            response.raise_for_status()
-            payload = response.json()
+        response = runtime_transport.get(
+            f"{settings.runtime_base_url}/venue/quotes/{symbol}",
+            params={
+                "accountId": account_id,
+                **({"instrumentType": instrument_type} if instrument_type else {}),
+            },
+        )
+        response.raise_for_status()
+        payload = response.json()
     except httpx.HTTPError as exc:
         raise HTTPException(
             status_code=409,
@@ -855,7 +848,7 @@ def _reservation_reference_price(
             status_code=409,
             detail=f"Reference price is unavailable for reservation of {symbol}",
         ) from exc
-    if price <= 0:
+    if not price.is_finite() or price <= 0:
         raise HTTPException(
             status_code=409,
             detail=f"Reference price is unavailable for reservation of {symbol}",
@@ -873,21 +866,17 @@ def _reservation_margin_estimate(
 ) -> tuple[str, Decimal]:
     settings = get_settings()
     try:
-        with httpx.Client(
-            trust_env=False,
-            timeout=settings.runtime_timeout_seconds,
-        ) as client:
-            response = client.get(
-                f"{settings.runtime_base_url}/venue/order-margin-estimate/{symbol}",
-                params={
-                    "accountId": account_id,
-                    "side": side,
-                    "quantity": format(quantity, "f"),
-                    "referencePrice": format(reference_price, "f"),
-                },
-            )
-            response.raise_for_status()
-            payload = response.json()
+        response = runtime_transport.get(
+            f"{settings.runtime_base_url}/venue/order-margin-estimate/{symbol}",
+            params={
+                "accountId": account_id,
+                "side": side,
+                "quantity": format(quantity, "f"),
+                "referencePrice": format(reference_price, "f"),
+            },
+        )
+        response.raise_for_status()
+        payload = response.json()
     except httpx.HTTPError as exc:
         raise HTTPException(
             status_code=409,
@@ -922,16 +911,23 @@ def _latest_available_balance(
 ) -> Decimal | None:
     row = db.execute(
         """
-        SELECT available_balance
+        SELECT available_balance, data_quality_state, as_of
         FROM balance_snapshots
-        WHERE account_id = ? AND currency = ? AND data_quality_state = 'complete'
+        WHERE account_id = ? AND currency = ?
         ORDER BY as_of DESC
         LIMIT 1
         """,
         (account_id, currency),
     ).fetchone()
-    if row is None:
+    if row is None or row["available_balance"] is None or row["data_quality_state"] != "complete":
         return None
+    account = db.execute("SELECT environment FROM accounts WHERE id=?", (account_id,)).fetchone()
+    if account is not None and str(account["environment"]).lower() == "live":
+        age = (
+            datetime.now(UTC) - datetime.fromisoformat(str(row["as_of"]).replace("Z", "+00:00"))
+        ).total_seconds()
+        if age > 90 or age < -5:
+            return None
     return Decimal(str(row["available_balance"]))
 
 
@@ -1121,20 +1117,14 @@ def resize_cross_spread_mt5_hedge(
         )
 
     mt5_index = next(
-        (
-            index
-            for index, (role, _) in enumerate(command_requests)
-            if role == MT5_LEG_ROLE
-        ),
+        (index for index, (role, _) in enumerate(command_requests) if role == MT5_LEG_ROLE),
         None,
     )
     if mt5_index is None or mt5_index <= bybit_index:
         raise ValueError("Cross-spread MT5 hedge leg is missing or ordered before Bybit")
 
     mt5_role, mt5_request = command_requests[mt5_index]
-    adjusted_quantity = (
-        bybit_filled_quantity * mt5_request.quantity / bybit_request.quantity
-    )
+    adjusted_quantity = bybit_filled_quantity * mt5_request.quantity / bybit_request.quantity
     validate_contract_quantity(
         adjusted_quantity,
         instrument_id=mt5_request.instrument_id,

@@ -1,10 +1,14 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from concurrent.futures import ThreadPoolExecutor
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
+from threading import RLock
 from typing import Any, Literal, cast
 from uuid import NAMESPACE_URL, uuid5
 
+from app.bybit_connection import BybitConnections
+from app.bybit_market_data import BybitMarketData
 from app.config import Settings
 from app.gateway_errors import (
     GatewayConfigurationError,
@@ -36,7 +40,7 @@ from app.models import (
     VenuePositionSnapshot,
 )
 from app.order_semantics import normalize_bybit_order_status
-from app.secret_resolver import inspect_credential_reference, resolve_secret_reference
+from app.secret_resolver import inspect_credential_reference
 
 
 class BybitLiveAdapter:
@@ -45,7 +49,9 @@ class BybitLiveAdapter:
     def __init__(self, settings: Settings, client: Any | None = None) -> None:
         self.settings = settings
         self._injected_client = client
-        self._resolved_clients: dict[str, Any] = {}
+        self._connections = BybitConnections(settings)
+        self._market_readers: dict[str, BybitMarketData] = {}
+        self._market_reader_lock = RLock()
 
     def capability(self) -> GatewayAdapterCapability:
         missing: list[str] = []
@@ -98,22 +104,19 @@ class BybitLiveAdapter:
         client_id = stable_external_client_id("VG", command.platform_order_id, length=36)
         record_order_route(command, self.name, client_id)
         payload: dict[str, object] = {
-            "category": self.settings.bybit_category,
+            **self._order_market_fields(command),
             "symbol": command.symbol.upper(),
             "side": "Buy" if command.side == "buy" else "Sell",
             "orderType": "Market" if command.order_type == "market" else "Limit",
             "qty": format(command.quantity, "f"),
             "orderLinkId": client_id,
-            "reduceOnly": command.reduce_only,
         }
         if command.order_type == "limit":
             if command.price is None:
                 raise GatewayRequestRejectedError("Bybit limit order requires price")
             payload["price"] = format(command.price, "f")
             payload["timeInForce"] = (
-                "PostOnly"
-                if command.execution_policy == "post_only_single_attempt"
-                else "GTC"
+                "PostOnly" if command.execution_policy == "post_only_single_attempt" else "GTC"
             )
         try:
             response = client.place_order(**payload)
@@ -138,8 +141,12 @@ class BybitLiveAdapter:
     def set_leverage(self, *, account_id: str, symbol: str, leverage: Decimal) -> dict[str, object]:
         self._assert_account(account_id)
         self._assert_write_account(account_id)
-        if leverage <= 0 or leverage > Decimal("100"):
-            raise GatewayRequestRejectedError("Bybit leverage must be between 0 and 100")
+        if self.settings.environment.lower() != "live" or not self.settings.live_write_enabled:
+            raise GatewayConfigurationError("Runtime live write gate is disabled")
+        if account_id not in self.settings.allowed_live_accounts:
+            raise GatewayConfigurationError("Account is not enabled for live trading")
+        if not leverage.is_finite() or leverage < 1 or leverage > Decimal("100"):
+            raise GatewayRequestRejectedError("Bybit leverage must be between 1 and 100")
         try:
             response = self._client(account_id).set_leverage(
                 category=self.settings.bybit_category,
@@ -147,12 +154,46 @@ class BybitLiveAdapter:
                 buyLeverage=format(leverage, "f"),
                 sellLeverage=format(leverage, "f"),
             )
-            self._require_success(response, "Bybit rejected leverage update")
+            if response.get("retCode") != 110043:
+                self._require_success(response, "Bybit rejected leverage update")
         except GatewayRequestRejectedError:
             raise
         except Exception as exc:
-            raise self._unknown_error("Bybit leverage update result is unknown", exc) from exc
-        return {"accountId": account_id, "symbol": symbol.upper(), "leverage": str(leverage), "source": self.name}
+            if getattr(exc, "status_code", None) != 110043:
+                raise self._unknown_error("Bybit leverage update result is unknown", exc) from exc
+        result = self.get_leverage(account_id=account_id, symbol=symbol)
+        if result.get("leverage") != str(leverage):
+            if Decimal(str(result.get("leverage") or "0")) != leverage:
+                raise GatewayResultUnknownError(
+                    "Bybit leverage update is not yet confirmed; query before retry"
+                )
+        return result
+
+    def get_leverage(self, *, account_id: str, symbol: str) -> dict[str, object]:
+        self._assert_account(account_id)
+        try:
+            response = self._client(account_id).get_positions(
+                category=self.settings.bybit_category, symbol=symbol.upper()
+            )
+            self._require_success(response, "Bybit leverage query failed")
+            values = {
+                Decimal(str(row["leverage"]))
+                for row in self._result_list(response)
+                if str(row.get("symbol", "")).upper() == symbol.upper() and row.get("leverage")
+            }
+            leverage = next(iter(values)) if len(values) == 1 else None
+            if leverage is not None and (not leverage.is_finite() or leverage < 1):
+                leverage = None
+        except GatewayRequestRejectedError:
+            raise
+        except Exception as exc:
+            raise self._unknown_error("Bybit leverage query result is unknown", exc) from exc
+        return {
+            "accountId": account_id,
+            "symbol": symbol.upper(),
+            "leverage": str(leverage) if leverage is not None else None,
+            "source": self.name,
+        }
 
     def estimate_order_margin(
         self,
@@ -216,7 +257,7 @@ class BybitLiveAdapter:
             return None
         client = self._client(route.account_id)
         query: dict[str, object] = {
-            "category": self.settings.bybit_category,
+            "category": self._route_category(route),
             "symbol": route.symbol,
         }
         if route.external_order_id:
@@ -258,7 +299,7 @@ class BybitLiveAdapter:
         if resolved_account is None:
             resolved_account = self._single_account()
         self._assert_account(resolved_account)
-        query: dict[str, object] = {"category": self.settings.bybit_category, "limit": 100}
+        query: dict[str, object] = {"category": self._route_category(route), "limit": 100}
         if route is not None:
             query["symbol"] = route.symbol
             if route.external_order_id:
@@ -274,11 +315,16 @@ class BybitLiveAdapter:
             raise self._unknown_error("Bybit execution query result is unknown", exc) from exc
         snapshots: list[VenueFillSnapshot] = []
         for row in self._result_list(response):
+            if str(row.get("execType") or "Trade") != "Trade":
+                continue
+            row_category = str(query["category"])
             symbol = str(row.get("symbol") or "").upper()
             instrument_id = self.settings.bybit_instruments.get(symbol)
             if instrument_id is None:
                 continue
-            row_route = get_order_route(external_order_id=str(row.get("orderId") or ""))
+            row_route = get_order_route(
+                external_order_id=str(row.get("orderId") or ""), account_id=resolved_account
+            )
             order_id = str(row.get("orderId") or "unknown")
             snapshots.append(
                 VenueFillSnapshot(
@@ -286,17 +332,37 @@ class BybitLiveAdapter:
                     externalFillId=str(row.get("execId") or f"{order_id}:{row.get('execTime')}"),
                     externalOrderId=order_id,
                     platformOrderId=(
-                        row_route.platform_order_id if row_route else f"external:{order_id}"
+                        row_route.platform_order_id
+                        if row_route
+                        else f"external:{self.name}:{resolved_account}:{order_id}"
                     ),
-                    commandId=(row_route.command_id if row_route else f"external:{order_id}"),
+                    commandId=(
+                        row_route.command_id
+                        if row_route
+                        else f"external:{self.name}:{resolved_account}:{order_id}"
+                    ),
                     accountId=(row_route.account_id if row_route else resolved_account),
                     instrumentId=(row_route.instrument_id if row_route else instrument_id),
                     symbol=symbol,
                     side="buy" if str(row.get("side")) == "Buy" else "sell",
                     quantity=Decimal(str(row.get("execQty") or "0")),
                     price=Decimal(str(row.get("execPrice") or "0")),
-                    fee=Decimal(str(row.get("execFee") or "0")),
-                    currency=str(row.get("feeCurrency") or self.settings.bybit_settle_coin),
+                    fee=Decimal(str(row["execFee"]))
+                    if row.get("execFee") not in (None, "")
+                    else None,
+                    currency=str(
+                        row.get("feeCurrency")
+                        or (
+                            self.settings.bybit_settle_coin
+                            if row_category == "linear"
+                            else "UNKNOWN"
+                        )
+                    ),
+                    feeCurrencyQuality="reported"
+                    if row.get("feeCurrency")
+                    else "inferred_settlement"
+                    if row_category == "linear"
+                    else "unavailable",
                     occurredAt=self._millis(row.get("execTime")),
                 )
             )
@@ -306,11 +372,12 @@ class BybitLiveAdapter:
         account = account_id or self._single_account()
         self._assert_account(account)
         try:
-            response = self._with_fresh_client_retry(account,
+            response = self._read_with_retry(
+                account,
                 lambda client: client.get_positions(
                     category=self.settings.bybit_category,
                     settleCoin=self.settings.bybit_settle_coin,
-                )
+                ),
             )
             self._require_success(response, "Bybit position query failed")
         except GatewayRequestRejectedError:
@@ -363,28 +430,17 @@ class BybitLiveAdapter:
             category=category,
         )
         try:
-            response = self._with_fresh_client_retry(
-                account_id,
-                lambda client: client.get_tickers(
-                    category=resolved_category,
-                    symbol=normalized_symbol,
-                ),
+            market, ticker, funding, response = self._market_data(account_id).ticker(
+                resolved_category, normalized_symbol
             )
-            self._require_success(response, "Bybit ticker query failed")
-            rows = self._result_list(response)
-            if not rows:
-                raise GatewayConfigurationError("Bybit ticker query returned no data")
-            row = rows[0]
-            bid = Decimal(str(row.get("bid1Price") or "0"))
-            ask = Decimal(str(row.get("ask1Price") or "0"))
-            if bid <= 0 or ask <= 0:
+            bid = Decimal(str(ticker.get("bid") or "0"))
+            ask = Decimal(str(ticker.get("ask") or "0"))
+            if not bid.is_finite() or not ask.is_finite() or bid <= 0 or ask <= 0:
                 raise GatewayConfigurationError("Bybit ticker query returned an incomplete quote")
-            funding_time_raw = row.get("nextFundingTime")
-            funding_time = (
-                self._millis(funding_time_raw)
-                if funding_time_raw not in (None, "", 0, "0")
-                else None
-            )
+            # CCXT's current fundingTimestamp is Bybit's nextFundingTime;
+            # nextFundingTimestamp would refer to the following funding period.
+            funding_time_raw = funding.get("fundingTimestamp")
+            funding_time = self._millis(funding_time_raw) if funding_time_raw else None
             return VenueMarketQuoteSnapshot(
                 source=self.name,
                 accountId=account_id,
@@ -394,16 +450,18 @@ class BybitLiveAdapter:
                 bid=bid,
                 ask=ask,
                 mid=(bid + ask) / Decimal("2"),
-                last=self._optional_decimal(row.get("lastPrice")),
+                last=self._optional_decimal(ticker.get("last")),
                 fundingRate=(
-                    self._optional_decimal(row.get("fundingRate"))
+                    self._optional_decimal(funding.get("fundingRate"))
                     if resolved_instrument_type == "crypto_perp"
                     else None
                 ),
                 nextFundingTime=(
                     funding_time if resolved_instrument_type == "crypto_perp" else None
                 ),
-                currency=self.settings.bybit_settle_coin,
+                currency=str(market["quote"]),
+                sourceAsOf=self._millis(response["time"]) if response.get("time") else None,
+                rawPayload=response,
                 asOf=datetime.now(UTC),
             )
         except GatewayConfigurationError:
@@ -416,15 +474,27 @@ class BybitLiveAdapter:
     def list_balances(self, account_id: str | None = None) -> list[VenueBalanceSnapshot]:
         account = account_id or self._single_account()
         self._assert_account(account)
+        return self._balances_from_wallet_response(account, self._wallet_response(account))
+
+    def _wallet_response(self, account: str) -> dict[str, object]:
         try:
-            response = self._with_fresh_client_retry(account,
-                lambda client: client.get_wallet_balance(accountType="UNIFIED")
+            response = self._read_with_retry(
+                account, lambda client: client.get_wallet_balance(accountType="UNIFIED")
             )
             self._require_success(response, "Bybit wallet query failed")
         except GatewayRequestRejectedError:
             raise
         except Exception as exc:
             raise self._unknown_error("Bybit wallet query result is unknown", exc) from exc
+        if not self._result_list(response):
+            raise GatewayConfigurationError("Bybit wallet query returned no data")
+        return response
+
+    def _balances_from_wallet_response(
+        self,
+        account: str,
+        response: dict[str, object],
+    ) -> list[VenueBalanceSnapshot]:
         result_rows = self._result_list(response)
         if not result_rows:
             return []
@@ -442,6 +512,7 @@ class BybitLiveAdapter:
             wallet = Decimal(str(coin.get("walletBalance") or "0"))
             if equity == 0 and wallet == 0:
                 continue
+            available = self._available_balance(coin, account_available=account_available)
             snapshots.append(
                 VenueBalanceSnapshot(
                     source=self.name,
@@ -451,11 +522,11 @@ class BybitLiveAdapter:
                     category="spot",
                     equity=equity,
                     walletBalance=wallet,
-                    availableToWithdraw=self._optional_decimal(coin.get("availableToWithdraw")),
-                    availableBalance=self._available_balance(
-                        coin,
-                        account_available=account_available,
-                    ),
+                    locked=self._optional_decimal(coin.get("locked")),
+                    usdValue=self._optional_decimal(coin.get("usdValue")),
+                    availableBalance=available,
+                    availableBalanceBasis="unborrowed_cash_capped_by_margin",
+                    dataQualityState="complete" if available is not None else "partial",
                     currency=currency,
                     asOf=as_of,
                 )
@@ -545,9 +616,7 @@ class BybitLiveAdapter:
             if recovered is not None:
                 return self._internal_transfer_response(command, transfer_id, recovered)
             if exc.__class__.__name__ in {"InvalidRequestError", "FailedRequestError"}:
-                raise GatewayRequestRejectedError(
-                    f"Bybit TradFi transfer rejected: {exc}"
-                ) from exc
+                raise GatewayRequestRejectedError(f"Bybit TradFi transfer rejected: {exc}") from exc
             raise self._unknown_error("Bybit TradFi transfer result is unknown", exc) from exc
         # Bybit's create response guarantees the transfer identity, not a final
         # settlement state. Resolve status through the authoritative record API;
@@ -622,9 +691,7 @@ class BybitLiveAdapter:
                 amount=command.amount,
                 completedAt=None,
             )
-        raise GatewayResultUnknownError(
-            f"Bybit TradFi transfer returned unknown status: {status}"
-        )
+        raise GatewayResultUnknownError(f"Bybit TradFi transfer returned unknown status: {status}")
 
     def list_economic_events(
         self,
@@ -635,40 +702,79 @@ class BybitLiveAdapter:
     ) -> list[VenueEconomicEventSnapshot]:
         account = account_id or self._single_account()
         self._assert_account(account)
-        if event_type not in {None, "funding", "fee"}:
+        if event_type not in {None, "funding", "fee", "realized_pnl"}:
             return []
+        end = datetime.now(UTC)
+        start = end - timedelta(days=7) + timedelta(milliseconds=1)
         try:
-            response = self._client(account).get_transaction_log(
-                accountType="UNIFIED",
-                category=self.settings.bybit_category,
-                limit=50,
+            rows = self._snapshot_pages(
+                account,
+                "get_transaction_log",
+                {
+                    "accountType": "UNIFIED",
+                    "limit": 50,
+                    "startTime": int(start.timestamp() * 1000),
+                    "endTime": int(end.timestamp() * 1000),
+                },
             )
-            self._require_success(response, "Bybit transaction log query failed")
         except GatewayRequestRejectedError:
             raise
         except Exception as exc:
             raise self._unknown_error("Bybit transaction log result is unknown", exc) from exc
         events: list[VenueEconomicEventSnapshot] = []
-        for row in self._result_list(response):
+        for row in rows:
             symbol = str(row.get("symbol") or "").upper()
-            mapped_instrument = self.settings.bybit_instruments.get(symbol)
+            category = str(row.get("category") or self.settings.bybit_category)
+            mapped_instrument = (
+                self._instrument_id_for_symbol(
+                    account_id=account,
+                    symbol=symbol,
+                    instrument_type=self._instrument_type_for_category(category),
+                    category=category,
+                )
+                if symbol
+                else None
+            )
             if instrument_id is not None and mapped_instrument != instrument_id:
                 continue
             occurred_at = self._millis(row.get("transactionTime"))
+            identity = row.get("id") or row.get("tradeId")
+            if not identity:
+                raise GatewayConfigurationError("Bybit transaction lacks authoritative identity")
+            currency = str(row.get("currency") or "UNKNOWN")
+            realized = Decimal(str(row.get("cashFlow") or "0"))
+            if (
+                category in {"linear", "inverse"}
+                and row.get("type") == "TRADE"
+                and realized != 0
+                and event_type in {None, "realized_pnl"}
+            ):
+                events.append(
+                    VenueEconomicEventSnapshot(
+                        source=self.name,
+                        externalEventId=f"realized:{identity}",
+                        eventType="realized_pnl",
+                        accountId=account,
+                        instrumentId=mapped_instrument,
+                        symbol=symbol or None,
+                        amount=realized,
+                        currency=currency,
+                        occurredAt=occurred_at,
+                        payload=dict(row),
+                    )
+                )
             funding = Decimal(str(row.get("funding") or "0"))
             if funding != 0 and event_type in {None, "funding"}:
                 events.append(
                     VenueEconomicEventSnapshot(
                         source=self.name,
-                        externalEventId=(
-                            f"funding:{row.get('id') or row.get('tradeId') or row.get('transactionTime')}"
-                        ),
+                        externalEventId=(f"funding:{identity}"),
                         eventType="funding",
                         accountId=account,
                         instrumentId=mapped_instrument,
                         symbol=symbol or None,
                         amount=funding,
-                        currency=str(row.get("currency") or self.settings.bybit_settle_coin),
+                        currency=currency,
                         occurredAt=occurred_at,
                         payload=dict(row),
                     )
@@ -678,15 +784,13 @@ class BybitLiveAdapter:
                 events.append(
                     VenueEconomicEventSnapshot(
                         source=self.name,
-                        externalEventId=(
-                            f"fee:{row.get('id') or row.get('tradeId') or row.get('transactionTime')}"
-                        ),
+                        externalEventId=(f"fee:{identity}"),
                         eventType="fee",
                         accountId=account,
                         instrumentId=mapped_instrument,
                         symbol=symbol or None,
                         amount=-fee,
-                        currency=str(row.get("currency") or self.settings.bybit_settle_coin),
+                        currency=currency,
                         occurredAt=occurred_at,
                         payload=dict(row),
                     )
@@ -713,7 +817,7 @@ class BybitLiveAdapter:
         validate_live_cancel(route, self.settings)
         try:
             response = self._client(route.account_id).cancel_order(
-                category=self.settings.bybit_category,
+                category=self._route_category(route),
                 symbol=route.symbol,
                 orderId=external_order_id,
                 orderLinkId=route.external_client_id,
@@ -732,23 +836,42 @@ class BybitLiveAdapter:
 
     def get_account_snapshot(self, account_id: str) -> VenueAccountSnapshot:
         self._assert_account(account_id)
-        balances = self.list_balances(account_id)
+        wallet_response = self._wallet_response(account_id)
+        balances = self._balances_from_wallet_response(account_id, wallet_response)
+        history_end = datetime.now(UTC)
+        history_start = history_end - timedelta(days=7) + timedelta(milliseconds=1)
         categories = self.settings.bybit_categories_for_account(account_id)
+        queries: dict[tuple[str, str], dict[str, object]] = {}
+        for category in categories:
+            if category in {"linear", "inverse"}:
+                position_query: dict[str, object] = {"category": category, "limit": 200}
+                if category == "linear":
+                    position_query["settleCoin"] = self.settings.bybit_settle_coin
+                queries[category, "get_positions"] = position_query
+            for method, limit in (
+                ("get_open_orders", 50),
+                ("get_order_history", 50),
+                ("get_executions", 100),
+            ):
+                query = self._account_snapshot_order_query_kwargs(category, limit=limit)
+                if method != "get_open_orders":
+                    query.update(
+                        startTime=int(history_start.timestamp() * 1000),
+                        endTime=int(history_end.timestamp() * 1000),
+                    )
+                queries[category, method] = query
+        with ThreadPoolExecutor(max_workers=4, thread_name_prefix="bybit-account-read") as pool:
+            futures = {
+                key: pool.submit(self._snapshot_pages, account_id, key[1], query)
+                for key, query in queries.items()
+            }
+            sections = {key: future.result() for key, future in futures.items()}
         positions: list[VenuePositionSnapshot] = []
         orders_by_id: dict[str, VenueOrderSnapshot] = {}
         fills_by_id: dict[str, VenueFillSnapshot] = {}
         for category in categories:
             if category in {"linear", "inverse"}:
-                position_response = self._with_fresh_client_retry(
-                    account_id,
-                    lambda refreshed, current_category=category: refreshed.get_positions(
-                        category=current_category,
-                        settleCoin=self.settings.bybit_settle_coin,
-                        limit=200,
-                    ),
-                )
-                self._require_success(position_response, "Bybit position query failed")
-                for row in self._result_list(position_response):
+                for row in sections[category, "get_positions"]:
                     size = Decimal(str(row.get("size") or "0"))
                     if size == 0:
                         continue
@@ -774,22 +897,19 @@ class BybitLiveAdapter:
                             currentPrice=self._optional_decimal(row.get("markPrice")),
                             markPrice=self._optional_decimal(row.get("markPrice")),
                             unrealizedPnl=self._optional_decimal(row.get("unrealisedPnl")),
-                            currency=self.settings.bybit_settle_coin,
+                            currency=(
+                                self.settings.bybit_settle_coin
+                                if category == "linear"
+                                else symbol.removesuffix("USD")
+                            ),
+                            stopLossPrice=self._optional_decimal(row.get("stopLoss")),
+                            takeProfitPrice=self._optional_decimal(row.get("takeProfit")),
+                            liquidationPrice=self._optional_decimal(row.get("liqPrice")),
                             asOf=self._millis(row.get("updatedTime")),
                         )
                     )
             for query_name in ("get_open_orders", "get_order_history"):
-                response = self._with_fresh_client_retry(
-                    account_id,
-                    lambda refreshed, method_name=query_name, current_category=category: getattr(
-                        refreshed,
-                        method_name,
-                    )(
-                        **self._account_snapshot_order_query_kwargs(current_category, limit=100),
-                    ),
-                )
-                self._require_success(response, "Bybit order snapshot query failed")
-                for row in self._result_list(response):
+                for row in sections[category, query_name]:
                     symbol = str(row.get("symbol") or "").upper()
                     row_category = str(row.get("category") or category).lower()
                     instrument_type = self._instrument_type_for_category(row_category)
@@ -800,13 +920,19 @@ class BybitLiveAdapter:
                         category=row_category,
                     )
                     external_order_id = str(row.get("orderId") or "")
-                    route = get_order_route(external_order_id=external_order_id) or get_order_route(
-                        external_client_id=str(row.get("orderLinkId") or "")
+                    route = get_order_route(
+                        external_order_id=external_order_id, account_id=account_id
+                    ) or get_order_route(
+                        external_client_id=str(row.get("orderLinkId") or ""), account_id=account_id
                     )
+                    if route is not None and route.account_id != account_id:
+                        raise GatewayConfigurationError(
+                            "Bybit order route account identity mismatch"
+                        )
                     platform_order_id = (
                         route.platform_order_id
                         if route is not None
-                        else f"external:{self.name}:{external_order_id}"
+                        else f"external:{self.name}:{account_id}:{external_order_id}"
                     )
                     command_id = route.command_id if route is not None else platform_order_id
                     orders_by_id[external_order_id] = VenueOrderSnapshot(
@@ -823,19 +949,20 @@ class BybitLiveAdapter:
                         price=self._optional_decimal(row.get("price")),
                         status=normalize_bybit_order_status(row.get("orderStatus")),
                         filledQuantity=Decimal(str(row.get("cumExecQty") or "0")),
+                        remainingQuantity=Decimal(str(row.get("leavesQty") or "0")),
                         averageFillPrice=self._optional_decimal(row.get("avgPrice")),
+                        reduceOnly=bool(row["reduceOnly"]) if "reduceOnly" in row else None,
+                        timeInForce=str(row.get("timeInForce") or "") or None,
+                        rejectReason=str(row.get("rejectReason") or "") or None,
+                        cancelReason=str(row.get("cancelType") or "") or None,
                         occurredAt=self._millis(row.get("createdTime")),
                         asOf=self._millis(row.get("updatedTime")),
                         dataQualityState="complete" if route is not None else "external_only",
                     )
-            execution_response = self._with_fresh_client_retry(
-                account_id,
-                lambda refreshed, current_category=category: refreshed.get_executions(
-                    **self._account_snapshot_order_query_kwargs(current_category, limit=200),
-                ),
-            )
-            self._require_success(execution_response, "Bybit execution query failed")
-            for row in self._result_list(execution_response):
+            for row in sections[category, "get_executions"]:
+                # Funding settlements share the executions endpoint but are not fills.
+                if str(row.get("execType") or "Trade") != "Trade":
+                    continue
                 symbol = str(row.get("symbol") or "").upper()
                 row_category = str(row.get("category") or category).lower()
                 instrument_type = self._instrument_type_for_category(row_category)
@@ -846,12 +973,16 @@ class BybitLiveAdapter:
                     category=row_category,
                 )
                 external_order_id = str(row.get("orderId") or "unknown")
-                external_fill_id = str(row.get("execId") or f"{external_order_id}:{row.get('execTime')}")
-                route = get_order_route(external_order_id=external_order_id)
+                external_fill_id = str(
+                    row.get("execId") or f"{external_order_id}:{row.get('execTime')}"
+                )
+                route = get_order_route(external_order_id=external_order_id, account_id=account_id)
+                if route is not None and route.account_id != account_id:
+                    raise GatewayConfigurationError("Bybit fill route account identity mismatch")
                 platform_order_id = (
                     route.platform_order_id
                     if route is not None
-                    else f"external:{self.name}:{external_order_id}"
+                    else f"external:{self.name}:{account_id}:{external_order_id}"
                 )
                 command_id = route.command_id if route is not None else platform_order_id
                 fills_by_id[external_fill_id] = VenueFillSnapshot(
@@ -866,24 +997,50 @@ class BybitLiveAdapter:
                     side="buy" if str(row.get("side")) == "Buy" else "sell",
                     quantity=Decimal(str(row.get("execQty") or "0")),
                     price=Decimal(str(row.get("execPrice") or "0")),
-                    fee=Decimal(str(row.get("execFee") or "0")),
-                    currency=str(row.get("feeCurrency") or self.settings.bybit_settle_coin),
+                    fee=Decimal(str(row["execFee"]))
+                    if row.get("execFee") not in (None, "")
+                    else None,
+                    currency=str(
+                        row.get("feeCurrency")
+                        or (
+                            self.settings.bybit_settle_coin
+                            if row_category == "linear"
+                            else "UNKNOWN"
+                        )
+                    ),
+                    feeCurrencyQuality="reported"
+                    if row.get("feeCurrency")
+                    else "inferred_settlement"
+                    if row_category == "linear"
+                    else "unavailable",
                     occurredAt=self._millis(row.get("execTime")),
                     dataQualityState="complete" if route is not None else "external_only",
                 )
         risk = (
-            cast(Any, self).get_account_risk(account_id)
+            cast(Any, self).get_account_risk(
+                account_id, wallet_response=wallet_response, include_asset_overview=True
+            )
             if hasattr(self, "get_account_risk")
             else VenueAccountRiskSnapshot(
                 source=self.name,
                 accountId=account_id,
-                currency=self.settings.bybit_settle_coin,
-                equity=balances[0].equity if balances else None,
-                availableBalance=balances[0].available_balance if balances else None,
+                currency="USD",
+                equity=self._optional_decimal(
+                    self._result_list(wallet_response)[0].get("totalEquity")
+                ),
+                availableBalance=self._optional_decimal(
+                    self._result_list(wallet_response)[0].get("totalAvailableBalance")
+                ),
                 asOf=datetime.now(UTC),
                 dataQualityState="partial",
             )
         )
+        economic_events: list[VenueEconomicEventSnapshot] = []
+        economic_quality = "complete"
+        try:
+            economic_events = self.list_economic_events(account_id=account_id)
+        except Exception:
+            economic_quality = "unavailable"
         return VenueAccountSnapshot(
             source=self.name,
             accountId=account_id,
@@ -891,16 +1048,49 @@ class BybitLiveAdapter:
             identity={
                 "accountId": account_id,
                 "categories": "|".join(categories),
-                "credentialRef": self.settings.bybit_credential_for_account(account_id),
             },
             balances=balances,
             positions=positions,
             orders=sorted(orders_by_id.values(), key=lambda item: item.as_of, reverse=True),
             fills=sorted(fills_by_id.values(), key=lambda item: item.occurred_at, reverse=True),
             accountRisk=risk,
+            historyStart=history_start,
+            historyEnd=history_end,
+            economicEvents=economic_events,
+            economicEventsQuality=economic_quality,
             asOf=risk.as_of,
             dataQualityState=risk.data_quality_state,
         )
+
+    def get_capital_flows(self, *, account_id, start_time, end_time):
+        from app.capital_flows import bybit_capital_flows
+
+        return bybit_capital_flows(self, account_id, start_time, end_time)
+
+    def _snapshot_pages(
+        self,
+        account_id: str,
+        method_name: str,
+        query: dict[str, object],
+    ) -> list[dict[str, object]]:
+        rows: list[dict[str, object]] = []
+        cursors: set[str] = set()
+        current = dict(query)
+        for _ in range(100):
+            response = self._read_with_retry(
+                account_id,
+                lambda client: getattr(client, method_name)(**current),
+            )
+            self._require_success(response, f"Bybit {method_name} query failed")
+            rows.extend(self._result_list(response))
+            cursor = str((response.get("result") or {}).get("nextPageCursor") or "")
+            if not cursor:
+                return rows
+            if cursor in cursors:
+                raise GatewayConfigurationError("Bybit snapshot pagination did not advance")
+            cursors.add(cursor)
+            current["cursor"] = cursor
+        raise GatewayConfigurationError("Bybit snapshot pagination limit exceeded")
 
     def _account_snapshot_order_query_kwargs(
         self,
@@ -912,7 +1102,7 @@ class BybitLiveAdapter:
             "category": category,
             "limit": limit,
         }
-        if category in {"linear", "inverse"}:
+        if category == "linear":
             kwargs["settleCoin"] = self.settings.bybit_settle_coin
         return kwargs
 
@@ -940,9 +1130,7 @@ class BybitLiveAdapter:
             )
         resolved_type = self._instrument_type_for_category(normalized_category)
         if normalized_type and normalized_type not in {resolved_type, normalized_category}:
-            raise GatewayConfigurationError(
-                f"Bybit instrumentType/category mismatch for {symbol}"
-            )
+            raise GatewayConfigurationError(f"Bybit instrumentType/category mismatch for {symbol}")
         return resolved_type, normalized_category
 
     def _instrument_type_for_category(self, category: str) -> str:
@@ -970,76 +1158,96 @@ class BybitLiveAdapter:
             if candidate == normalized and len(categories) > 1:
                 break
             return instrument_id
+        from app.live_route_store import list_instrument_routes
+
+        # A symbol alone cannot join Spot and Perpetual. The account and the
+        # original command's market together identify the native instrument.
+        routed_ids = {
+            route.instrument_id
+            for route in list_instrument_routes(
+                account_id=account_id, symbol=normalized, adapter=self.name
+            )
+            if self._route_category(route) == category
+        }
+        if len(routed_ids) > 1:
+            raise GatewayConfigurationError(
+                "Bybit account market has conflicting instrument routes"
+            )
+        if routed_ids:
+            return next(iter(routed_ids))
         return f"monitor:bybit:{account_id}:{category}:{normalized}"
 
-    def _client(self, account_id: str | None = None):
+    def _command_category(self, command: SubmitOrderCommand) -> str:
+        _, category = self._market_identity(
+            account_id=command.account_id,
+            symbol=command.symbol,
+            instrument_type=command.instrument_type,
+            category=None,
+        )
+        return category
+
+    def _route_category(self, route) -> str:
+        if route is not None:
+            from app.journal import get_command
+
+            record = get_command(route.command_id)
+            if record is not None:
+                return self._command_category(record.command)
+        return self.settings.bybit_category
+
+    def _order_market_fields(self, command: SubmitOrderCommand) -> dict[str, object]:
+        category = self._command_category(command)
+        if category == "spot":
+            if command.reduce_only or command.execution_policy == "post_only_chase":
+                raise GatewayRequestRejectedError("Bybit spot order has derivative-only settings")
+            fields: dict[str, object] = {"category": "spot", "isLeverage": 0}
+            if command.order_type == "market":
+                fields["marketUnit"] = "baseCoin"
+            return fields
+        return {"category": category, "reduceOnly": command.reduce_only}
+
+    def _client(self, account_id: str | None = None) -> Any:
         if self._injected_client is not None:
             return self._injected_client
-        account = account_id or self._single_account()
-        if account in self._resolved_clients:
-            return self._resolved_clients[account]
-        try:
-            from pybit import _helpers
-            from pybit.unified_trading import HTTP
-        except ImportError as exc:
-            raise GatewayConfigurationError("pybit dependency is not installed") from exc
-        self._apply_timestamp_offset(_helpers, HTTP)
-        try:
-            secret = resolve_secret_reference(
-                self.settings.bybit_credential_for_account(account),
-                required_fields=("API_KEY", "SECRET"),
-            )
-        except ValueError as exc:
-            raise GatewayConfigurationError(str(exc)) from exc
-        self._resolved_clients[account] = HTTP(
-            testnet=False,
-            demo=False,
-            api_key=secret["API_KEY"],
-            api_secret=secret["SECRET"],
-            recv_window=self.settings.bybit_recv_window,
-        )
-        return self._resolved_clients[account]
+        return self._connections.client(account_id or self._single_account())
 
-    def _with_fresh_client_retry(self, account_id_or_operation, operation=None):
+    def _read_with_retry(self, account_id_or_operation, operation=None):
+        from requests.exceptions import ConnectionError, Timeout
+
         if operation is None:
             account_id = self._single_account()
             operation = account_id_or_operation
         else:
-            account_id = account_id_or_operation
-        if account_id is None:
-            account_id = self._single_account()
+            account_id = account_id_or_operation or self._single_account()
         try:
             return operation(self._client(account_id))
-        except Exception:
-            if self._injected_client is not None:
-                raise
-            self._resolved_clients.pop(account_id, None)
+        except (ConnectionError, Timeout):
+            # Exactly one read retry over the same owned connection. Invalid
+            # credentials, malformed facts and venue rejections are not retried.
             return operation(self._client(account_id))
 
-    def _apply_timestamp_offset(self, helpers, http_factory=None) -> None:
-        raw_offset = getattr(self.settings, "bybit_timestamp_offset_ms", 0)
-        offset_ms = int(cast(str | int | float, raw_offset or 0))
-        original = getattr(helpers, "_vg_original_generate_timestamp", None)
-        if original is None:
-            original = helpers.generate_timestamp
-            helpers._vg_original_generate_timestamp = original
-        if offset_ms == 0:
-            if http_factory is None:
-                return
-            try:
-                response = http_factory(testnet=False, demo=False).get_server_time()
-                self._require_success(response, "Bybit server-time query failed")
-                server_ms = int(response.get("time") or 0)
-                if server_ms <= 0:
-                    raise ValueError("Bybit server time is unavailable")
-                offset_ms = server_ms - int(original())
-            except Exception as exc:
-                raise GatewayConfigurationError(
-                    f"Bybit server-time synchronization failed: {type(exc).__name__}"
-                ) from exc
-        if abs(offset_ms) > 60_000:
-            raise GatewayConfigurationError("Bybit server-time offset exceeds safety limit")
-        helpers.generate_timestamp = lambda: original() + offset_ms
+    def _market_data(self, account_id: str) -> BybitMarketData:
+        with self._market_reader_lock:
+            reader = self._market_readers.get(account_id)
+            if reader is None:
+
+                def read(method: str, **params):
+                    response = self._read_with_retry(
+                        account_id, lambda client: getattr(client, method)(**params)
+                    )
+                    self._require_success(response, "Bybit market read failed")
+                    return response
+
+                reader = BybitMarketData(read)
+                self._market_readers[account_id] = reader
+            return reader
+
+    def close(self) -> None:
+        with self._market_reader_lock:
+            for reader in self._market_readers.values():
+                reader.close()
+            self._market_readers.clear()
+        self._connections.close()
 
     def _assert_account(self, account_id: str) -> None:
         if account_id not in self.settings.bybit_accounts:
@@ -1074,7 +1282,7 @@ class BybitLiveAdapter:
     def _market_reference_price(self, client, command: SubmitOrderCommand) -> Decimal:
         try:
             response = client.get_tickers(
-                category=self.settings.bybit_category,
+                category=self._command_category(command),
                 symbol=command.symbol.upper(),
             )
             self._require_success(response, "Bybit ticker query failed")
@@ -1121,9 +1329,7 @@ class BybitLiveAdapter:
     def _unknown_error(message: str, exc: Exception) -> GatewayResultUnknownError:
         detail = str(exc).strip()
         if detail:
-            return GatewayResultUnknownError(
-                f"{message}: {exc.__class__.__name__}: {detail}"
-            )
+            return GatewayResultUnknownError(f"{message}: {exc.__class__.__name__}: {detail}")
         return GatewayResultUnknownError(f"{message}: {exc.__class__.__name__}")
 
     @staticmethod
@@ -1143,15 +1349,32 @@ class BybitLiveAdapter:
         coin: dict[str, object],
         *,
         account_available: Decimal | None,
-    ) -> Decimal:
-        coin_available = coin.get("availableToWithdraw") or coin.get("availableToBorrow")
-        if coin_available in {None, ""} and account_available is not None:
-            return account_available
-        coin_available = coin_available or coin.get("walletBalance") or "0"
-        parsed = Decimal(str(coin_available))
-        if parsed == 0 and account_available is not None:
-            return account_available
-        return parsed
+    ) -> Decimal | None:
+        # Deprecated withdraw/borrow fields and account-wide USD are not coin cash.
+        fields = (
+            "walletBalance",
+            "locked",
+            "totalOrderIM",
+            "totalPositionIM",
+            "bonus",
+            "spotBorrow",
+        )
+        if any(coin.get(field) in {None, ""} for field in fields):
+            return None
+        cash = Decimal(str(coin["walletBalance"])) - sum(
+            (Decimal(str(coin[field])) for field in fields[1:]),
+            Decimal("0"),
+        )
+        if cash <= 0:
+            return Decimal("0")
+        if account_available is None:
+            # Isolated margin exposes the coin-level initial margins above.
+            return cash
+        equity = Decimal(str(coin.get("equity") or "0"))
+        usd_value = Decimal(str(coin.get("usdValue") or "0"))
+        if equity <= 0 or usd_value <= 0:
+            return None
+        return max(Decimal("0"), min(cash, account_available * equity / usd_value))
 
     @staticmethod
     def _millis(value: object) -> datetime:

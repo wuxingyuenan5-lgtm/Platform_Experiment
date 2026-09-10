@@ -138,19 +138,29 @@ def test_live_api_admin_is_not_a_ceo_trade_authority(monkeypatch, tmp_path: Path
 
 
 def test_strategy_market_commands_use_ceo_browser_permission_boundary() -> None:
+    assert permission_for_request("POST", "/api/v1/trading/funding/instructions") == "trading.write"
     assert (
         permission_for_request("POST", "/api/v1/trading/funding/market-command") == "trading.write"
     )
+
+
+def test_live_technical_admin_cannot_submit_funding_or_cross_lifecycle(monkeypatch, tmp_path: Path):
+    configure_live_auth(monkeypatch, tmp_path)
+    with TestClient(app) as client:
+        for path in (
+            "/api/v1/trading/funding/instructions",
+            "/api/v1/trading/cross-spread/lifecycle/open",
+            "/api/v1/trading/cross-spread/leverage",
+            "/api/v1/trading/cross-spread/exit-plans/plan-1/close",
+        ):
+            response = client.post(path, headers=auth_headers("admin-token"), json={})
+            assert_auth_error(response, status_code=403, code="ceo_trade_authority_required")
     assert (
-        permission_for_request(
-            "POST", "/api/v1/trading/cross-spread/funding-transfer"
-        )
+        permission_for_request("POST", "/api/v1/trading/cross-spread/funding-transfer")
         == "trading.write"
     )
     assert (
-        permission_for_request(
-            "PATCH", "/api/v1/trading/cross-spread/exit-plans/plan-1"
-        )
+        permission_for_request("PATCH", "/api/v1/trading/cross-spread/exit-plans/plan-1")
         == "trading.write"
     )
 

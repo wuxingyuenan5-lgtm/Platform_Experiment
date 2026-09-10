@@ -8,13 +8,13 @@
   },
   "include": [
     "playwright.platform-visual.config.ts",
+    "playwright.hedge-board.config.ts",
+    "playwright.strategy.config.ts",
     "e2e/platform-visual/**/*.ts",
-    "e2e/hedge-board/researchFixtures.ts",
+    "e2e/hedge-board/**/*.ts",
+    "e2e/strategy/**/*.ts",
     "types/**/*.d.ts",
     "types/**/*.ts"
   ],
-  "exclude": [
-    "node_modules",
-    "dist"
-  ]
+  "exclude": ["node_modules", "dist"]
 }
