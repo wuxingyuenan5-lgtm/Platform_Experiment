@@ -1,4 +1,4 @@
-﻿import type { StrategyDeskKey } from './types';
+﻿import type { StrategyDeskKey, StrategyPnlDayPoint, StrategyPositionDistribution } from './types';
 
 type Tone = 'positive' | 'negative' | 'neutral';
 
@@ -42,6 +42,10 @@ export interface StrategyPnlProfile {
     tone?: Tone;
     data: number[];
   }>;
+  positionDistribution?: StrategyPositionDistribution;
+  /** 逐日盈亏序列（账户口径，已剔除出入金）；缺省时日历显示待接入 */
+  dailyPnl?: StrategyPnlDayPoint[];
+  dailyPnlCurrency?: string;
 }
 
 const labels = ['06-19', '06-20', '06-21', '06-22', '06-23', '06-24', '06-25'];
