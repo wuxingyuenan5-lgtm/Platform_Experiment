@@ -2,7 +2,7 @@
 
 ## Branch and review
 
-- Work on a named branch; never commit directly to `main`.
+- Work on a named branch by default. If the Owner explicitly asks to make the current local snapshot the latest `main`, a direct local commit on `main` is allowed; that instruction still does not authorize pushing or rewriting history.
 - Use one pull request for one coherent outcome.
 - Keep non-trivial work Draft until implementation and validation are complete.
 - Do not merge, tag, release or deploy without an explicit owner decision.
@@ -40,6 +40,19 @@ python scripts/check-version-consistency.py
 ```
 
 A product version change does not change Runtime contract versions, database migration versions or Live Write gates.
+
+## Local commit and recovery procedure
+
+For a local release or version-promotion request:
+
+1. Check `git status --short --branch`, active `git` processes, `.git/index.lock`, `git diff --check`, the diff summary, recent log and repository connectivity. Check important ignored files with `git check-ignore -v`.
+2. Preserve all current worktree changes. `git add -A` is allowed only after the Owner has scoped the current local changes for inclusion; ignored runtime databases remain untracked unless explicitly requested.
+3. Run staged diff checks before committing. Run the repository hook in its supported native shell; never bypass it or modify hook/configuration files to make it pass.
+4. After committing, verify status, the new commit summary and repository connectivity. Push is a separate operation requiring an explicit request.
+
+If Git metadata is corrupt (`bad HEAD`, missing objects, invalid refs/index or pack errors), do not hand-edit `.git` or retry writes. After explicit Owner authorization to restore Git, create a clean clone from the verified remote, retain the old worktree and recovery copy, copy the worktree content without `.git` or local runtime data, install the clean repository metadata as one operation, and verify the result with `status`, `log`, `fsck --full --no-reflogs --connectivity-only` and the complete diff. Do not run `gc`, `repack`, `prune`, force push or history rewriting as part of recovery.
+
+External-data code has a separate boundary: inspecting it and running mocked tests is local work; executing public endpoints, using hard-coded proxies or disabling TLS verification requires explicit scope and must be stopped until corrected.
 
 ## Pull-request description
 

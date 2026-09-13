@@ -23,6 +23,16 @@ Mode 2/3, task cards, branches, Worktrees, locks, monitors, and structured deliv
 
 When work fails, reproduce and locate the root cause from the error, logs, and existing call path, then make the smallest complete fix in the layer that owns the problem. Do not mask failure with a parallel path, duplicate state, silent fallback, temporary switch, swallowed error, or open-ended compatibility layer, and do not bypass contracts, consistency, or safety boundaries. Limit systemic changes to the reproduced cause, avoid unrelated redesign, remove only failed experimental code introduced by the current task, and continue through directly relevant verification.
 
+## Git and repository recovery
+
+- Treat the current worktree as user-owned. A request to make the current local version the latest `main` authorizes a local commit of the in-scope current worktree; it does not authorize a push, force push, history rewrite or branch deletion.
+- Before any Git write, check for another `git` process, `.git/index.lock`, ref/object errors and unexpected concurrent work. A normal dirty worktree is not itself a Git failure; inspect and preserve its changes.
+- If Git reports a bad `HEAD`, missing objects, broken refs, invalid index or pack corruption, stop ordinary writes. Do not hand-edit refs, the index, packs or objects. When the Owner explicitly authorizes restoring Git functionality, the approved recovery is to make a clean clone from the verified remote, preserve the existing worktree, replace repository metadata as one operation, and then verify `status`, `log`, `fsck --full --no-reflogs --connectivity-only` and the complete worktree diff. Keep the recovery copy until the Owner accepts the result.
+- A hook or toolchain failure is an environment problem, not permission to bypass validation. Retry in the repository's supported native shell/runtime; never use `--no-verify`, disable Husky, edit hooks or change Git configuration to force a commit. If the supported environment is unavailable, report the exact blocker after completing read-only checks.
+- `platform-api/app.db` is a local runtime database and is intentionally ignored. Use `git check-ignore -v` to explain it; do not stage or delete it unless the Owner explicitly changes that decision. Other ignored files still require inspection when they are important local inputs.
+- Version promotion is separate from Git repair: update the authoritative `VERSION`, synchronized declarations and baseline/candidate documentation, then run the version-consistency tool before committing.
+- Static review, mock tests and local commits do not authorize external network calls, deployment or real trading. Public research refreshes may be tested with mocked transport; live external connectivity needs explicit Owner scope and must preserve TLS verification and proxy policy.
+
 ## Documentation maintenance
 
 Before finishing any non-trivial task, perform a documentation-impact check:
