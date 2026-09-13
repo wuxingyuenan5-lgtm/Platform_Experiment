@@ -175,6 +175,7 @@ def store_financial_fact(
     created_at: str,
 ) -> tuple[FinancialFactWriteStatus, FinancialFactResponse]:
     with connection() as db:
+        db.execute("BEGIN IMMEDIATE")
         existing = db.execute(
             """
             SELECT * FROM financial_facts

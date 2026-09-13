@@ -134,5 +134,5 @@ test('URL desk and section restoration remains effective', async () => {
   assert.equal(resolveManagementDesk('missingDesk', items), 'funding');
   assert.equal(normalizeManagementSection('orders'), 'orders');
   assert.equal(normalizeManagementSection('capital'), 'capital');
-  assert.equal(normalizeManagementSection('something-else'), 'pnl');
+  assert.equal(normalizeManagementSection('something-else'), 'capital');
 });

@@ -23,6 +23,7 @@ class LiveInstrumentSpecification:
     instrument_id: str
     symbol: str
     status: str
+    price_tick: Decimal
     min_quantity: Decimal
     quantity_step: Decimal
     max_market_quantity: Decimal | None
@@ -30,6 +31,7 @@ class LiveInstrumentSpecification:
     trade_mode: str
     filling_mode: str
     access_checks: dict[str, object]
+    as_of: datetime
 
 
 @dataclass(frozen=True)
@@ -85,6 +87,7 @@ def get_instrument_specification(
             instrument_id=str(payload["instrumentId"]),
             symbol=str(payload["symbol"]).upper(),
             status=str(payload["status"]),
+            price_tick=Decimal(str(payload["priceTick"])),
             min_quantity=Decimal(str(payload["minQuantity"])),
             quantity_step=Decimal(str(payload["quantityStep"])),
             max_market_quantity=Decimal(str(maximum)) if maximum is not None else None,
@@ -92,6 +95,7 @@ def get_instrument_specification(
             trade_mode=str(payload["trade_mode"]),
             filling_mode=str(payload["filling_mode"]),
             access_checks=dict(access_checks),
+            as_of=datetime.fromisoformat(str(payload["asOf"]).replace("Z", "+00:00")),
         )
     except (KeyError, TypeError, ValueError) as exc:
         raise CrossSpreadLiveReadError("Runtime instrument specification is incomplete") from exc
@@ -218,5 +222,4 @@ def _response_detail(response: httpx.Response) -> str:
     if isinstance(payload, dict) and payload.get("detail"):
         return str(payload["detail"])
     return f"HTTP {response.status_code}"
-
 

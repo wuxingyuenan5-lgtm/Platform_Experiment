@@ -23,6 +23,7 @@ from app.schemas import (
     PositionResponse,
     StrategyAccountBindingResponse,
     StrategyAccountSnapshotResponse,
+    StrategyDailyPnlPointResponse,
     StrategyDefinitionResponse,
     StrategyEquityHistoryPointResponse,
     StrategyInstanceResponse,
@@ -416,6 +417,66 @@ def list_strategy_account_bindings(
     ]
 
 
+_LINEAR_INSTRUMENT_TYPES = frozenset({"crypto_perp", "crypto_spot"})
+
+
+def monitor_position_valued(
+    positions: list[PositionResponse],
+) -> tuple[list[PositionResponse], dict[str, object]]:
+    """Value monitored legs and settle their account-level exposure.
+
+    A monitoring account reports venue position tickets instead of a platform
+    projection, so both the displayed legs and the account aggregate are settled
+    here. The venue value wins; a leg without one is rebuilt from its mark price
+    and contract multiplier, and a leg whose multiplier is unknown stays unvalued
+    rather than guessed. Currencies are never mixed and no FX rate is invented.
+    """
+
+    from app.strategy_financial_readmodel import position_exposure, position_notional
+
+    managed = sorted({item.instrument_id for item in positions if item.instrument_id})
+    published: dict[str, str] = {}
+    if managed:
+        with connection() as db:
+            published = {
+                str(row["instrument_id"]): str(row["contract_multiplier"])
+                for row in db.execute(
+                    "SELECT instrument_id, contract_multiplier FROM contract_specifications "
+                    f"WHERE instrument_id IN ({','.join('?' * len(managed))})",
+                    tuple(managed),
+                ).fetchall()
+            }
+    valued: list[PositionResponse] = []
+    rows: list[dict[str, object]] = []
+    for item in positions:
+        multiplier = published.get(item.instrument_id)
+        if multiplier is None and item.instrument_type in _LINEAR_INSTRUMENT_TYPES:
+            multiplier = "1"
+        value = position_notional(
+            mark={"positionValue": item.position_value, "netQuantity": item.net_quantity},
+            quantity=item.net_quantity,
+            price=item.current_price if multiplier is not None else None,
+            multiplier=multiplier,
+        )
+        currency = item.position_value_currency or item.currency
+        valued.append(
+            item.model_copy(
+                update={
+                    "position_value": value,
+                    "position_value_currency": currency if value is not None else None,
+                }
+            )
+        )
+        rows.append(
+            {
+                "netQuantity": item.net_quantity,
+                "positionValue": value,
+                "positionValueCurrency": currency,
+            }
+        )
+    return valued, position_exposure(rows)
+
+
 def get_strategy_account_snapshot(
     strategy_instance_id: str,
     *,
@@ -529,6 +590,36 @@ def get_strategy_account_snapshot(
             """,
             (binding.account_id, binding.account_id),
         ).fetchall()
+        # One closing per UTC day on the account's current measurement scope and
+        # currency, so day-over-day P&L never spans a scope or currency change.
+        daily_rows = db.execute(
+            """
+            SELECT as_of, currency, equity, asset_scope FROM (
+                SELECT as_of, currency, equity, asset_scope,
+                       ROW_NUMBER() OVER (
+                           PARTITION BY substr(as_of, 1, 10)
+                           ORDER BY as_of DESC, created_at DESC
+                       ) AS day_rank
+                FROM account_risk_snapshots
+                WHERE account_id = ?
+                  AND equity IS NOT NULL
+                  AND as_of >= date('now', '-400 days')
+                  AND asset_scope = (
+                      SELECT asset_scope FROM account_risk_snapshots WHERE account_id=?
+                      ORDER BY as_of DESC LIMIT 1
+                  )
+                  AND upper(currency) = upper(
+                      (
+                          SELECT currency
+                          FROM account_risk_snapshots
+                          WHERE account_id = ?
+                          ORDER BY as_of DESC LIMIT 1
+                      )
+                  )
+            ) WHERE day_rank = 1 ORDER BY as_of ASC
+            """,
+            (binding.account_id, binding.account_id, binding.account_id),
+        ).fetchall()
 
     account = get_account(binding.account_id)
     sync_status = str(sync_row["status"]) if sync_row is not None else None
@@ -588,6 +679,41 @@ def get_strategy_account_snapshot(
     from app.account_performance import enrich_performance
 
     enrich_performance(binding.account_id, equity_history)
+    daily_points = [
+        StrategyEquityHistoryPointResponse(
+            asOf=row["as_of"],
+            equity=Decimal(str(row["equity"])),
+            currency=row["currency"],
+            assetScope=row["asset_scope"],
+        )
+        for row in daily_rows
+    ]
+    daily_pnl_points: list[StrategyDailyPnlPointResponse] = []
+    if len(daily_points) > 1:
+        from app.account_performance import daily_pnl as daily_pnl_series
+
+        with connection() as db:
+            series = daily_pnl_series(
+                db,
+                binding.account_id,
+                daily_points,
+                daily_points[-1].asset_scope,
+                "equity",
+            )
+        for index, (point, (amount, rate, quality)) in enumerate(
+            zip(daily_points, series, strict=True)
+        ):
+            daily_pnl_points.append(
+                StrategyDailyPnlPointResponse(
+                    date=str(point.as_of)[:10],
+                    currency=point.currency or "",
+                    pnl=amount,
+                    returnRate=rate,
+                    equityOpen=daily_points[index - 1].equity if index else None,
+                    equityClose=point.equity,
+                    quality=quality,
+                )
+            )
     positions = [
         PositionResponse(
             accountId=row["account_id"],
@@ -627,6 +753,17 @@ def get_strategy_account_snapshot(
             fees=finance["fees"],
         )
     risk_payload = json.loads(display_risk_row["payload_json"]) if display_risk_row else {}
+    if account_scope:
+        positions, exposure = monitor_position_valued(positions)
+    else:
+        exposure = finance.get("exposure") or {}
+    position_value = optional_decimal(exposure.get("positionValue"))
+    equity_for_leverage = optional_decimal(balance.equity) if balance is not None else None
+    leverage = (
+        position_value / equity_for_leverage
+        if position_value is not None and equity_for_leverage
+        else None
+    )
     account_risk = (
         AccountRiskSnapshotResponse(
             accountId=display_risk_row["account_id"],
@@ -672,8 +809,14 @@ def get_strategy_account_snapshot(
         ),
         balance=balance,
         equityHistory=equity_history,
+        dailyPnl=daily_pnl_points,
         accountRisk=account_risk,
         positions=positions,
+        positionValue=position_value,
+        positionValueNet=optional_decimal(exposure.get("positionValueNet")),
+        positionValueCurrency=exposure.get("positionValueCurrency"),
+        leverage=leverage,
+        venueLeverage=optional_decimal(risk_payload.get("leverage")),
         orders=orders,
         fills=fills,
         pnl=pnl,

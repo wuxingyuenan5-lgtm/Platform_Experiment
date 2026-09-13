@@ -203,6 +203,7 @@ def available_snapshot() -> CrossSpreadSnapshotResponse:
     return CrossSpreadSnapshotResponse.model_validate(
         {
             "status": "available",
+            "executionState": "executable",
             "bybit": {
                 "venue": "bybit",
                 "symbol": "XAUTUSDT",
@@ -214,6 +215,8 @@ def available_snapshot() -> CrossSpreadSnapshotResponse:
                     "currency": "USDT",
                 },
                 "positions": [],
+                "openAllowed": True,
+                "closeAllowed": True,
             },
             "mt5": {
                 "venue": "mt5",
@@ -234,6 +237,8 @@ def available_snapshot() -> CrossSpreadSnapshotResponse:
                         "externalId": "778899",
                     }
                 ],
+                "openAllowed": True,
+                "closeAllowed": True,
             },
             "longSpread": "-0.8",
             "shortSpread": "-1.2",

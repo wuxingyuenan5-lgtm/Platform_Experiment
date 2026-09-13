@@ -15,6 +15,7 @@ from threading import Lock
 from fastapi import APIRouter, FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
+from app import monitor_health
 from app.config import get_settings
 from app.database import connection
 from app.venue_identity_repository import (
@@ -823,6 +824,7 @@ def _sync_one_account(account_id: str) -> dict[str, int]:
             _persist_account_risk(db, account_id, snapshot.get("accountRisk"))
             _persist_venue_snapshot(db, account_id, snapshot)
             from app.account_performance import persist_valuation_rates
+
             persist_valuation_rates(db, account_id, snapshot)
             for fill in snapshot["fills"]:
                 _persist_venue_event(db, account_id, "trade_fill", fill)
@@ -834,6 +836,9 @@ def _sync_one_account(account_id: str) -> dict[str, int]:
                    last_success_at=?, updated_at=? WHERE account_id=?""",
                 (completed, completed, account_id),
             )
+        from app.funding_settlement_accounting import sync_funding_settlements
+
+        sync_funding_settlements(account_id)
     except Exception as exc:
         status, error_code = _classify_sync_failure(exc)
         _write_status(
@@ -844,6 +849,7 @@ def _sync_one_account(account_id: str) -> dict[str, int]:
         )
         raise
     from app.account_performance import sync_capital_history
+
     sync_capital_history(account_id)
     return {
         "balanceSnapshots": balance_count,
@@ -1024,27 +1030,29 @@ def load_equity_history(account_id: str, currency: str | None = None) -> list[Eq
 
 async def run_snapshot_sync_monitor() -> None:
     while True:
-        await asyncio.sleep(SNAPSHOT_SYNC_INTERVAL_SECONDS)
+        monitor_health.begin("account_sync")
         try:
-            await asyncio.to_thread(sync_venue_snapshots)
+            result = await asyncio.to_thread(sync_venue_snapshots)
+            monitor_health.finish(
+                "account_sync", None if not result.failed_accounts else "account_read_failed"
+            )
         except HTTPException as exc:
+            monitor_health.finish("account_sync", f"http_{exc.status_code}")
             if exc.status_code != 409:
                 logger.warning("Account snapshot sync failed: http_%s", exc.status_code)
         except Exception as exc:
+            monitor_health.finish("account_sync", type(exc).__name__)
             logger.warning("Account snapshot sync failed: %s", type(exc).__name__)
+        # Run again after a bounded delay so a transient venue/runtime outage is
+        # retried automatically and stale snapshots do not depend on a page visit.
+        await asyncio.sleep(SNAPSHOT_SYNC_INTERVAL_SECONDS)
 
 
 @asynccontextmanager
 async def snapshot_sync_lifespan(_: FastAPI) -> AsyncIterator[None]:
-    task = asyncio.create_task(run_snapshot_sync_monitor())
-    try:
-        yield
-    finally:
-        task.cancel()
-        try:
-            await task
-        except asyncio.CancelledError:
-            pass
+    # The application owns the monitor lifecycle. Keep this router lifespan as
+    # a compatibility no-op for isolated router tests and mounted applications.
+    yield
 
 
 router = APIRouter(prefix=get_settings().api_prefix, lifespan=snapshot_sync_lifespan)

@@ -6,8 +6,11 @@ from decimal import Decimal
 from fastapi import HTTPException
 
 from app import cross_spread_exit_service as market_helpers
+from app import monitor_health
 from app.config import get_settings
 from app.cross_spread import (
+    assert_cross_spread_market_executable,
+    assert_cross_spread_native_trading_rules,
     assert_cross_spread_live_execution_enabled,
     get_cross_spread_snapshot,
     submit_cross_spread_market_command,
@@ -234,6 +237,8 @@ def close_cross_spread_market(
                 orderIntent=_intent_response(intent),
                 exitPlan=updated,
             )
+        assert_cross_spread_market_executable(is_close=True)
+        assert_cross_spread_native_trading_rules()
         retryable_leg_statuses = {"pending", "blocked", "failed", "rejected", "result_unknown"}
         if previous_batch is not None and (
             previous_batch.status not in {"failed", "manual_intervention"}
@@ -268,6 +273,8 @@ def close_cross_spread_market(
         if previous_batch_id is not None:
             idempotency_key = f"cross-spread-exit-recovery:{plan_id}:{previous_batch_id}"
     else:
+        assert_cross_spread_market_executable(is_close=True)
+        assert_cross_spread_native_trading_rules()
         claimed = claim_exit_plan(
             plan_id,
             trigger_reason="manual",
@@ -347,11 +354,22 @@ def evaluate_cross_spread_exit_plans() -> CrossSpreadExitEvaluationResponse:
         )
 
     snapshot = get_cross_spread_snapshot()
-    if snapshot.status != "available":
+    if snapshot.status != "available" or not (
+        snapshot.bybit.close_allowed and snapshot.mt5.close_allowed
+    ):
         return CrossSpreadExitEvaluationResponse(
             evaluatedCount=len(active),
             triggeredCount=0,
-            skippedReason="Executable cross-spread quotes are unavailable",
+            skippedReason="Cross-spread exit is monitor-only because both venues are not executable",
+        )
+
+    try:
+        assert_cross_spread_native_trading_rules()
+    except HTTPException as exc:
+        return CrossSpreadExitEvaluationResponse(
+            evaluatedCount=len(active),
+            triggeredCount=0,
+            skippedReason=f"Native venue trading rules block execution: {exc.detail}",
         )
 
     triggered_count = 0
@@ -400,10 +418,12 @@ async def run_cross_spread_exit_monitor() -> None:
         flush=True,
     )
     while True:
+        monitor_health.begin("cross_exit")
         try:
             await asyncio.to_thread(evaluate_cross_spread_exit_plans)
-        except Exception:
-            pass
+            monitor_health.finish("cross_exit")
+        except Exception as exc:
+            monitor_health.finish("cross_exit", type(exc).__name__)
         await asyncio.sleep(settings.cross_spread_exit_monitor_interval_seconds)
 
 
@@ -578,7 +598,16 @@ def _prepare_limit_execution(
     if limit_spread is None:
         raise HTTPException(status_code=422, detail="Limit execution requires limitSpread")
     snapshot = get_cross_spread_snapshot()
-    if snapshot.status != "available" or snapshot.bybit.quote is None or snapshot.mt5.quote is None:
+    if (
+        snapshot.status != "available"
+        or not (
+            (snapshot.bybit.close_allowed and snapshot.mt5.close_allowed)
+            if intent.is_close
+            else (snapshot.bybit.open_allowed and snapshot.mt5.open_allowed)
+        )
+        or snapshot.bybit.quote is None
+        or snapshot.mt5.quote is None
+    ):
         raise HTTPException(
             status_code=503,
             detail="Executable cross-spread quotes are unavailable",

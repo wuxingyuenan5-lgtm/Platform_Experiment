@@ -18,6 +18,11 @@ A-share scheduled / authorized manual refresh
 A-share live sector flow / turnover rankings
   -> bounded provider calls + five-minute last-known-good cache
   -> research routes -> visible-page polling
+
+Overseas research (FedWatch / BTC spot ETF flow / Deribit IV)
+  -> daily after 06:00 Asia/Shanghai or authorized manual refresh
+  -> public-source adapters -> per-dataset SQLite history
+  -> read-only research routes -> dashboard consumers
 ```
 
 Platform-owned research collection does not fan out from the browser to market-data sources. Existing official chart embeds retain their independent display path. `execution-runtime` is not imported or invoked by the research production flow.
@@ -32,10 +37,14 @@ Platform-owned research collection does not fan out from the browser to market-d
 | Free-source adapters and field normalization | `platform-api/app/research_providers.py` |
 | Dashboard assembly and live-query partial-failure semantics | `platform-api/app/research_service.py` |
 | Daily production and atomic publication | `platform-api/app/research_a_share_refresh.py` and `research_a_share_repository.py` |
+| Overseas public-source adapters (FedWatch / Farside UK / Deribit) | `platform-api/app/research_provider_overseas.py` |
+| Overseas refresh scheduling and failure retention | `platform-api/app/research_overseas_refresh.py` and `research_overseas_repository.py` |
 | Authenticated HTTP routes | `platform-api/app/research_routes.py` |
 | Frontend API contract | `platform-web/src/api/hedgeResearch.ts` |
 | A-share page orchestration | `platform-web/src/views/hedgeBoard/aShare/index.vue` |
 | Macro event-probability presentation | `platform-web/src/views/hedgeBoard/macro/MacroExpectationPanel.vue` |
+| Overseas public-source adapters and refresh | `platform-api/app/research_provider_overseas.py` and `research_overseas_refresh.py` |
+| Overseas history storage and read routes | `platform-api/app/research_overseas_repository.py` and `research_routes.py` |
 
 ## Data-quality contract
 
@@ -60,6 +69,8 @@ A reusable research series has a stable identity and carries the metadata needed
 - freshness, quality flags, status and rights scope.
 
 Derived values retain their input identities, alignment rule and methodology version. Calendar-aware market data, low-frequency macro observations and continuous crypto markets must not share an assumed session calendar. Missing history, a pending release or an unavailable field remains unavailable; it is never converted to zero or a synthetic trend.
+
+The overseas routes currently expose FedWatch probabilities, BTC spot ETF flows, BTC ATM IV term structure/snapshots and Deribit DVOL history. They are read-only and public-source backed; each dataset has an independent refresh status and failure boundary. A failed refresh must retain the last valid dataset, and missing settlement/IV/flow values remain null or unavailable. These additions are API/provider work until each panel is explicitly wired into its owning Hedge Board page and receives browser and source-quality verification; the product status must not claim the panels are live solely because their files exist.
 
 ## Delivery and source boundary
 
@@ -116,6 +127,82 @@ The A-share read model now has a persistent snapshot/history path and lifecycle 
 | Account research watchlist; keyed by authenticated `user_id` with ordered item payload | Platform SQLite table `user_research_watchlists` | Account watchlist service, also used by the A-share recent-focus GET/POST routes; there is no shared browser fallback | `row_version` rejects concurrent replacement with 409. The UI reloads and asks the user to review rather than overwriting the newer list. Empty lists persist and user changes clear prior in-memory state |
 
 Source selection and rights decisions remain in the [Macro](../hedge-board/specs/MACRO_DATA_SOURCE_MAP.md), [Commodity](../hedge-board/specs/COMMODITY_DATA_SOURCE_MAP.md) and [Crypto](../hedge-board/specs/CRYPTO_DATA_SOURCE_MAP.md) source maps. New persistent history or automated collection is introduced only after its identity, retention, revision and replay behavior are defined; a cache or request-triggered refresh must never be described as that future capability.
+
+## Overseas public research data
+
+The overseas capability covers four read-only public sources: CME FedWatch (30-Day Fed Funds
+Futures implied probabilities), Farside UK BTC spot-ETF daily flows, and Deribit BTC options ATM
+implied volatility (both a legacy term structure and a 1M/3M/6M/1Y daily snapshot). These are
+research observations. They are not platform forecasts, not trade signals, and never an
+execution, position, risk or accounting input.
+
+### Sources and identifiers
+
+| Dataset | Entity identity | Upstream source name recorded on every row | Observation date |
+|---|---|---|---|
+| `macro_fedwatch` | FOMC meeting date; one `__meta__` row carries EFFR, current target, `observedAt` and ZQ pricing | `CME FedWatch (30-Day Fed Funds Futures)` | Platform China-calendar date of the fetch |
+| `crypto_etf_flow` | ETF ticker; one `__meta__` row carries the ticker column order and unit `US$m` | `Farside UK BTC Spot ETF Flows (US$m)` | Upstream flow date (a 14-day window is written per run) |
+| `crypto_iv_term` | Expiry code; payload carries `daysToExpiry`, standardized `tenor` and `iv` | `Deribit BTC Options ATM IV` | Platform China-calendar date of the fetch |
+| `crypto_iv_snapshot` | Tenor name (`1M`/`3M`/`6M`/`1Y`); one `__meta__` row carries index price, DVOL and `observedAt` | `Deribit BTC Options ATM IV` | Platform China-calendar date of the fetch |
+
+All four datasets are stored in the existing generic time-series container
+`research_a_share_history`, keyed by `(dataset, observed_at, entity_code)`. The table name is
+historical — its structure is a dataset-agnostic series container, and the dataset name is what
+separates data domains. No overseas-specific table exists and none is required.
+
+### Refresh scheduling
+
+The overseas worker uses the same in-process `lifespan` + periodic-poll shape as the A-share
+worker. It is a bounded in-process task, not an independently deployed scheduler, and it is
+enabled only while `research_refresh_enabled` is set.
+
+- The worker refreshes at most once per dataset per China-calendar day, and only at or after
+  **06:00 Asia/Shanghai** (after the US close). Before that window `refresh_overseas` returns
+  `not_due` and performs no network call.
+- Idempotency is evaluated per dataset from the latest `fetched_at`; an already-refreshed dataset
+  returns `up_to_date` and is skipped.
+- A corrupt or unparseable `fetched_at` does not block future refreshes; it is treated as
+  not-yet-refreshed.
+- Sources are collected concurrently with exception isolation: one failed source does not prevent
+  the others from writing. A run returns `ready`, `up_to_date`, `not_due`, `busy` or `error`.
+- `POST /api/v1/research/overseas/refresh` triggers an authorized manual refresh (`research.write`)
+  and bypasses the time window via `force`.
+
+### Data quality and failure semantics
+
+Read routes return the last valid values together with an explicit health block, so a failed
+refresh is never silently presented as current data:
+
+- `observedAt` and `fetchedAt` — the last successfully persisted observation and platform fetch
+  times; `null` when no data exists.
+- `lastError` — `{code, message, startedAt, finishedAt}` from the most recent failed run; `null`
+  after a successful run.
+- `status` — `no_data` when no history exists; `stale` when the most recent run failed and the
+  history predates it; `ready` otherwise.
+
+A refresh failure must retain the previous meaningful rows. The cleanup DELETE and the INSERT for
+one `observed_at` execute inside a single `BEGIN IMMEDIATE` transaction, so a failure anywhere in
+the write rolls the whole statement group back and the existing rows survive. A failed refresh
+records an `error` run and leaves the last valid publication readable. An empty upstream response
+does not erase a meaningful prior value without an explicit source-level rule.
+
+`POST /overseas/refresh` returns HTTP 503 with per-source health in the detail when the run fails
+outright; a partially failing run reports per-source status so the UI can mark only the affected
+panels.
+
+### Network and source boundary
+
+Overseas providers are fetched with the project's declared safe client — `httpx` with
+`truststore`'s operating-system trust context — and certificate verification stays on by default.
+The client sets `trust_env=False` so ambient/system proxy configuration cannot redirect the
+request. Providers must not disable TLS verification, pin a loopback proxy, impersonate a browser
+fingerprint, or depend on an undeclared HTTP client. The browser never fans out to these sources;
+only the Platform API fetches, normalizes and persists them.
+
+Refresh runs and history points are written through the shared
+`research_a_share_refresh_runs` / `research_a_share_history` owners; the overseas modules do not
+create a parallel run or history store. Tests for this capability fully mock the network and must
+never contact CME, Farside UK or Deribit.
 
 ## A-share board production and interaction
 

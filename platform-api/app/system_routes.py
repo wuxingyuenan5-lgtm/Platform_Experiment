@@ -2,6 +2,7 @@ import sys
 
 from fastapi import APIRouter
 
+from app import monitor_health
 from app.config import Settings
 from app.schemas import RuntimeReadinessResponse
 from app.system_service import get_runtime_readiness
@@ -17,6 +18,24 @@ def create_system_router(settings: Settings, platform_version: str) -> APIRouter
             "service": "platform-api",
             "environment": settings.environment,
             "pythonVirtualEnvironment": sys.prefix != sys.base_prefix,
+        }
+
+    @router.get(f"{settings.api_prefix}/system/monitor-health", tags=["system"])
+    @router.get("/health/monitors", tags=["system"])
+    async def monitors() -> dict:
+        # Async route remains responsive when blocking venue calls occupy workers.
+        return {
+            "watchdog": monitor_health.watchdog_snapshot(),
+            "accountSync": monitor_health.snapshot("account_sync", enabled=True, deadline=180),
+            "crossExit": monitor_health.snapshot(
+                "cross_exit",
+                enabled=settings.cross_spread_exit_monitor_enabled,
+                deadline=60,
+            ),
+            "crossExitExecutionEnabled": (
+                settings.cross_spread_exit_monitor_enabled and settings.live_trading_enabled
+            ),
+            "liveTradingEnabled": settings.live_trading_enabled,
         }
 
     @router.get(f"{settings.api_prefix}/system/info", tags=["system"])

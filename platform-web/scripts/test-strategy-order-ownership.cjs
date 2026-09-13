@@ -151,3 +151,23 @@ test('Funding abnormal card appears only for active Funding errors and shows dis
   assert.match(html, /处理该组合平仓/);
   assert.doesNotMatch(html, /跨所价差异常订单/);
 });
+
+test('P&L calendar marks period return unavailable when any day lacks valuation', () => {
+  const load = loadModule({});
+  const { buildPnlCalendar } = load(
+    'src/views/strategy/management/composables/strategyPnlCalendar.ts',
+  );
+  const points = [
+    { date: '2026-09-01', pnl: 10, rate: 10, quality: 'estimated' },
+    { date: '2026-09-02', pnl: null, rate: null, quality: 'missing_history' },
+    { date: '2026-09-03', pnl: 5, rate: 5, quality: 'estimated' },
+  ];
+  assert.equal(
+    buildPnlCalendar(points, 'USD', 'daily', { year: 2026, month: 9 }).summaryRateText,
+    '--',
+  );
+  assert.equal(
+    buildPnlCalendar(points, 'USD', 'monthly', { year: 2026, month: 9 }).summaryRateText,
+    '--',
+  );
+});

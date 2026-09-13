@@ -61,6 +61,8 @@ class OrderIdentities:
         return row["account_id"], row["instrument_id"], row["external_order_id"]
 
     def instrument(self, account_id: str, instrument_id: Any) -> Any:
+        if instrument_id is None:
+            return None  # Account-level cash events legitimately have no instrument.
         if str(instrument_id).startswith("monitor:bybit:") and not str(instrument_id).startswith(
             f"monitor:bybit:{account_id}:"
         ):

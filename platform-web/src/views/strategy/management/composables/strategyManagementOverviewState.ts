@@ -6,7 +6,7 @@ export interface StrategyManagementOverviewLike {
 }
 
 export function normalizeManagementSection(value: unknown): ManagementSection {
-  return value === 'capital' || value === 'orders' ? value : 'pnl';
+  return value === 'pnl' || value === 'orders' ? value : 'capital';
 }
 
 export function resolveManagementDesk<T extends StrategyManagementOverviewLike>(

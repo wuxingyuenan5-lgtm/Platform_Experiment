@@ -8,7 +8,7 @@
       </header>
 
       <div class="risk-grid">
-        <article v-for="item in riskCards" :key="item.label" class="risk-item">
+        <article v-for="item in visibleRiskCards" :key="item.label" class="risk-item">
           <label>{{ item.label }}</label>
           <strong :class="item.tone ? `is-${item.tone}` : 'is-neutral'">{{ item.value }}</strong>
         </article>
@@ -28,17 +28,24 @@
           <strong :class="item.tone ? `is-${item.tone}` : 'is-neutral'">{{ item.value }}</strong>
         </article>
       </div>
+
+      <slot name="position-distribution" />
     </article>
   </section>
 </template>
 
 <script setup lang="ts">
+  import { computed } from 'vue';
   import type { StrategyAccountBreakdown, StrategyCapitalRiskCard } from '@/data/sample/strategy';
 
-  defineProps<{
+  const props = defineProps<{
     riskCards: StrategyCapitalRiskCard[];
     structureCards: StrategyAccountBreakdown[];
   }>();
+
+  const visibleRiskCards = computed(() =>
+    props.riskCards.filter((item) => !item.label.includes('持仓价值')),
+  );
 </script>
 
 <style scoped lang="less">
@@ -61,14 +68,27 @@
     align-items: flex-start;
     justify-content: space-between;
     gap: 16px;
-    margin-bottom: 14px;
+    margin-bottom: 18px;
   }
 
   .insight-card__header h3 {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
     margin: 0;
-    font-size: var(--strategy-font-card-title);
-    font-weight: 800;
+    font-size: 20px;
+    line-height: 1.2;
+    font-weight: 900;
+    letter-spacing: 0.02em;
     color: var(--strategy-text-1);
+  }
+
+  .insight-card__header h3::before {
+    width: 4px;
+    height: 18px;
+    border-radius: 999px;
+    background: linear-gradient(180deg, var(--strategy-accent), var(--strategy-accent-strong));
+    content: '';
   }
 
   .risk-grid,

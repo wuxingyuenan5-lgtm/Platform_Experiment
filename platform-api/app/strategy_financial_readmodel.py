@@ -54,6 +54,67 @@ def _finish(row: dict[str, Any]) -> dict[str, Any]:
     return {key: str(value) if isinstance(value, Decimal) else value for key, value in row.items()}
 
 
+def position_notional(
+    *,
+    mark: dict[str, Any],
+    quantity: Decimal,
+    price: Decimal | None,
+    multiplier: str | None,
+) -> Decimal | None:
+    """Position notional for one leg, in the instrument quote currency.
+
+    The venue report wins while it still describes the projected quantity;
+    otherwise the notional is rebuilt from mark price and contract multiplier so
+    the value always matches the quantity this projection reports. A leg whose
+    contract multiplier is unknown stays unvalued rather than guessed.
+    """
+
+    reported = mark.get("positionValue")
+    if reported is not None:
+        venue_quantity = mark.get("netQuantity")
+        if venue_quantity is None or quantity == _amount(venue_quantity):
+            return abs(_amount(reported))
+    if price is None or multiplier is None:
+        return None
+    return abs(quantity * _amount(price) * _amount(multiplier))
+
+
+def position_exposure(positions: list[dict[str, Any]]) -> dict[str, Any]:
+    """Gross and net position notional for one projection scope.
+
+    Returns nulls when no leg carries a value, or when legs are valued in more
+    than one currency. This projection never mixes currencies or invents FX.
+    """
+
+    gross = ZERO
+    net = ZERO
+    currency: str | None = None
+    for position in positions:
+        raw = position.get("positionValue")
+        if raw is None:
+            continue
+        leg_currency = position.get("positionValueCurrency")
+        if currency is None:
+            currency = leg_currency
+        elif leg_currency != currency:
+            return _empty_exposure()
+        amount = _amount(raw)
+        sign = Decimal("-1") if _amount(position.get("netQuantity")) < 0 else Decimal("1")
+        gross += amount
+        net += amount * sign
+    if currency is None:
+        return _empty_exposure()
+    return {
+        "positionValue": str(gross),
+        "positionValueNet": str(abs(net)),
+        "positionValueCurrency": currency,
+    }
+
+
+def _empty_exposure() -> dict[str, Any]:
+    return {"positionValue": None, "positionValueNet": None, "positionValueCurrency": None}
+
+
 def canonical_fills(rows: list[Any]) -> list[dict[str, Any]]:
     grouped: dict[str, list[Any]] = defaultdict(list)
     for row in rows:
@@ -667,22 +728,19 @@ def get_strategy_financials(
             f"SELECT * FROM account_venue_snapshots WHERE account_id IN ({placeholders})",
             accounts,
         ).fetchall()
-        assigned = {
-            (
+        identities = load_order_identities(db)
+        assignments: dict[tuple, list[dict[str, Any]]] = defaultdict(list)
+        for row in db.execute(
+            "SELECT account_id, instrument_id, source, external_id, fact_type, "
+            "strategy_instance_id, payload_json FROM financial_facts"
+        ):
+            assignments[(
                 row["account_id"],
-                row["instrument_id"],
+                identities.instrument(row["account_id"], row["instrument_id"]),
                 row["source"],
                 row["external_id"],
                 row["fact_type"],
-            )
-            for row in db.execute(
-                "SELECT account_id, instrument_id, source, external_id, fact_type "
-                "FROM financial_facts "
-                "WHERE strategy_instance_id=?",
-                (strategy_instance_id,),
-            )
-        }
-        identities = load_order_identities(db)
+            )].append(dict(row))
         execution_links = load_order_execution_links(db)
 
     mt5_currencies = {
@@ -704,6 +762,8 @@ def get_strategy_financials(
     raw_fills: dict[str, list[dict[str, Any]]] = defaultdict(list)
     economic = []
     unattributed = []
+    unassigned_candidates = []
+    settlement_links: dict[str, dict[str, str]] = {}
 
     def component(account: str, currency: str) -> dict[str, Any]:
         key = (account, currency)
@@ -722,25 +782,56 @@ def get_strategy_financials(
             if account_scope or order_id in order_map:
                 raw_fills[str(order_id)].append(payload)
             continue
-        explicit = (
+        assignments_for_event = assignments.get((
             event["account_id"],
-            event["instrument_id"],
+            identities.instrument(event["account_id"], event["instrument_id"]),
             event["source"],
             event["external_id"],
             event["event_type"],
-        ) in assigned
+        ), [])
+        assigned_owners = {row["strategy_instance_id"] for row in assignments_for_event}
+        explicit = assigned_owners == {strategy_instance_id}
         owner = identities.rows[order_id]["strategy_instance_id"] if order_id else None
         if not account_scope and owner and owner != strategy_instance_id:
             continue
+        if not account_scope and assigned_owners and strategy_instance_id not in assigned_owners:
+            continue
+        if not account_scope and len(assigned_owners) > 1:
+            issues.add("conflicting_settlement_ownership")
+            unassigned_candidates.append(payload)
+            continue
+        if explicit:
+            assignment = json.loads(assignments_for_event[0]["payload_json"])
+            settlement_links[event["external_id"]] = {
+                key: assignment[key] for key in ("batchId", "instructionId") if assignment.get(key)
+            }
         if account_scope or order_id in order_map or explicit:
             economic.append((event, payload, order_id))
         elif orders and event["event_type"] in {"funding", "swap"}:
-            unattributed.append(payload)
+            unassigned_candidates.append(payload)
 
     enriched, execution_issues = select_management_executions(
         order_map, fill_rows, raw_fills, identities
     )
     issues.update(execution_issues)
+
+    for event in unassigned_candidates:
+        # An unrelated symbol or settlement before/after this strategy's native
+        # exposure must not invalidate its funding totals merely by account.
+        at = datetime.fromisoformat(event["occurredAt"].replace("Z", "+00:00"))
+        exposure = sum(
+            (
+                _amount(fill["quantity"]) * (1 if fill["side"] == "buy" else -1)
+                for fill in enriched
+                if fill["account_id"] == event["accountId"]
+                and fill["instrument_id"] == identities.instrument(
+                    event["accountId"], event.get("instrumentId")
+                )
+                and datetime.fromisoformat(fill["occurred_at"].replace("Z", "+00:00")) <= at
+            ), ZERO,
+        )
+        if exposure:
+            unattributed.append(event)
 
     for row in sorted(enriched, key=lambda value: value["occurred_at"]):
         order = order_map[row["order_id"]]
@@ -922,6 +1013,12 @@ def get_strategy_financials(
         elif unrealized is None and not account_scope:
             issues.add("mark_price_unavailable")
             missing_marks.add((account, order["settle_currency"]))
+        position_value = position_notional(
+            mark=mark,
+            quantity=quantity,
+            price=price,
+            multiplier=order["multiplier"],
+        )
         projected_positions.append(
             {
                 "accountId": account,
@@ -933,6 +1030,10 @@ def get_strategy_financials(
                 "averagePrice": str(average) if average is not None else None,
                 "unrealizedPnl": str(unrealized) if unrealized is not None else None,
                 "currency": order["settle_currency"],
+                "positionValue": str(position_value) if position_value is not None else None,
+                "positionValueCurrency": (
+                    order["quote_currency"] if position_value is not None else None
+                ),
             }
         )
 
@@ -956,7 +1057,13 @@ def get_strategy_financials(
         issues.add("waiting_initial_sync")
         totals.update(dict.fromkeys((*FIELDS, "netPnl")))
     if nonzero_foreign:
-        totals.update(dict.fromkeys((*FIELDS, "netPnl")))
+        for field in FIELDS:
+            if any(
+                currency != base_currency and row[field] != 0
+                for currency, row in by_currency.items()
+            ):
+                totals[field] = None
+        totals["netPnl"] = None
     if "mark_price_unavailable" in issues:
         totals.update(tradingPnl=None, netPnl=None)
     if unattributed:
@@ -1004,6 +1111,7 @@ def get_strategy_financials(
         "byCurrency": currency_rows,
         "byAccount": by_account,
         "positions": projected_positions,
+        "exposure": position_exposure(projected_positions),
         "timeline": timeline[-1000:],
         "coverage": coverage,
         "unattributedEvents": unattributed[-200:],
@@ -1015,6 +1123,7 @@ def get_strategy_financials(
                 if order_id
                 else payload.get("externalOrderId"),
                 **execution_links.get(str(order_id), {}),
+                **settlement_links.get(str(payload.get("externalEventId")), {}),
             }
             for _, payload, order_id in economic
         ][-200:],

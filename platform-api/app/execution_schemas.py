@@ -157,6 +157,8 @@ class PositionResponse(BaseModel):
     currency: str | None = None
     current_price: Decimal | None = Field(default=None, alias="currentPrice")
     unrealized_pnl: Decimal | None = Field(default=None, alias="unrealizedPnl")
+    position_value: Decimal | None = Field(default=None, alias="positionValue")
+    position_value_currency: str | None = Field(default=None, alias="positionValueCurrency")
     stop_loss_price: Decimal | None = Field(default=None, alias="stopLossPrice")
     take_profit_price: Decimal | None = Field(default=None, alias="takeProfitPrice")
     liquidation_price: Decimal | None = Field(default=None, alias="liquidationPrice")

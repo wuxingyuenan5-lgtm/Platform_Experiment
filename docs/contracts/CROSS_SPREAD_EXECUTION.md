@@ -156,6 +156,10 @@ Close Action 在领取 Exit Plan 或建立执行意图前检查交易开关，�
 
 2026-09-09 起，CEO 有效登录与 CSRF、活动账户交易绑定、双层 Live Gate、余额/保证金、Venue 数量规格、MT5 原生交易权限和风险检查构成正常准入。市价和限价开平仓均不需要 LiveTradingSession、临时验收窗口、固定一盎司/名义额度或单组持仓限制。已完成开仓的持仓组不阻止新增独立组；未解决的执行批次仍阻止不安全的新开仓。平仓继续绑定目标组和 MT5 Position Ticket，累计成交不能超过指令数量。
 
+正常 Cross 开仓、人工双腿平仓和自动 TP/SL 必须在创建指令或原子领取 Exit Plan 前，取得两腿当前可执行证据。行情可见不等于可交易：Runtime 保留报价供价差和账户风险监控，同时以 Venue 原生报价时间、品种交易模式、账户/终端/EA/Python 权限及真实合约规格分别给出 `openAllowed`、`closeAllowed`。任一腿报价超过 30 秒未更新、原生时间缺失、品种休市/禁用或权限不满足时，快照进入 `monitor_only`；价差仍可展示，但不得参与正常开平仓或 TP/SL 触发，也不得领取 Exit Plan。异常批次已形成的单腿暴露仍沿原 Instruction、Ticket、幂等与对账合同处置，不能因正常双腿市场门而失去恢复路径。
+
+策略页的交易规则保留原有五行表格，只把可确认的用户规则接到当前绑定账户的 Runtime 原生 Instrument Specification 与当前会话状态：交易时间显示 Bybit 24H 和 MT5 当前开市、休市或仅可平仓，其他限制显示双腿共同的最小下单量、数量步长和市价上限。报价时间、交易模式、权限和来源时间仅作为后台准入证据，不在普通交易规则表中展开。没有 Venue 证据的手续费、杠杆上限或每日回撤不得以硬编码、Catalog Seed 或 UI Fixture 冒充真实规则，保持 `—`。
+
 ## 6. PostOnly Chase 合同
 
 PostOnly Chase 是 `LIMIT` 的内部策略：

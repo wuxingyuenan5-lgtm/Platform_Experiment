@@ -1,3 +1,3 @@
 from __future__ import annotations
 
-PLATFORM_VERSION = "0.11.1"
+PLATFORM_VERSION = "0.11.2"

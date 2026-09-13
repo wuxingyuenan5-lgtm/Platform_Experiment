@@ -117,6 +117,16 @@ test('strategy management wires full cross spread live profiles into pnl and cap
   assert.doesNotMatch(pnlSource, /liveTotalFund\?: string \| null;/);
 });
 
+test('cross spread daily P&L combines the two strategy legs by date', () => {
+  const source = read(
+    'src/views/strategy/management/composables/useCrossSpreadFinance.ts',
+  );
+  assert.equal(source.includes('export function mergeCrossDailyPnl'), true);
+  assert.equal(source.includes('dailyPnl: mergeCrossDailyPnl(accounts.value)'), true);
+  assert.equal(source.includes('const complete = rows.length === snapshots.length'), true);
+  assert.equal(source.includes('returnRate:'), true);
+});
+
 test('strategy management honors the cross-spread route context before rendering profile data', () => {
   const source = read('src/views/strategy/management/index.vue');
   assert.equal(source.includes('useRoute'), true);
@@ -163,6 +173,13 @@ test('management renders canonical fills and native cash exactly across refreshe
         return fills;
       },
       getExecutionBatches: async () => [],
+      // 记录刷新会同时读取跨所快照；本用例只校验成交与原生现金口径，
+      // 因此返回结构完整但空仓位的快照，不引入额外持仓行。
+      getCrossSpreadSnapshot: async () => ({
+        bybit: { symbol: 'XAUTUSDT', positions: [] },
+        mt5: { symbol: 'XAUUSD.S', positions: [] },
+        positionOverview: { abnormalOrders: [], groups: [] },
+      }),
       getStrategyPnl: async () => ({
         economicEvents: [
           {

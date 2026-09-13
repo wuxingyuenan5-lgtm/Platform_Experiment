@@ -1,4 +1,5 @@
 from decimal import Decimal
+from datetime import UTC, datetime
 from pathlib import Path
 
 import httpx
@@ -7,7 +8,12 @@ from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
 from app.config import get_settings
-from app.cross_spread import CrossSpreadLiveSizing, submit_cross_spread_market_command
+from app.cross_spread import (
+    CrossSpreadLiveSizing,
+    get_cross_spread_trading_rules,
+    submit_cross_spread_market_command,
+)
+from tests.test_cross_spread_market_lifecycle import available_snapshot
 from app.cross_spread_live_read_client import LiveInstrumentSpecification
 from app.database import connection
 from app.main import app
@@ -24,6 +30,13 @@ def _isolate_development_auth():
     yield
     for name, value in original.items():
         setattr(settings, name, value)
+
+
+@pytest.fixture(autouse=True)
+def _allow_executable_cross_market(monkeypatch):
+    monkeypatch.setattr(
+        "app.cross_spread.assert_cross_spread_market_executable", lambda *, is_close: None
+    )
 
 
 def authenticate_ceo(client):
@@ -55,6 +68,7 @@ def _live_specification(
         instrument_id=("instrument_xau_usd_mt5" if is_mt5 else "instrument_xaut_usdt"),
         symbol=symbol,
         status="available" if is_mt5 else "Trading",
+        price_tick=Decimal("0.01"),
         min_quantity=Decimal("0.01" if is_mt5 else "0.001"),
         quantity_step=Decimal("0.01" if is_mt5 else "0.001"),
         max_market_quantity=Decimal("100"),
@@ -77,6 +91,7 @@ def _live_specification(
                 "positionPermission": True,
             }
         ),
+        as_of=datetime.now(UTC),
     )
 
 
@@ -116,6 +131,33 @@ def test_cross_spread_mt5_preflight_failure_creates_no_execution_batch(
         )
 
     assert created == 0
+
+
+def test_cross_spread_trading_rules_come_from_native_specifications(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "app.cross_spread._bound_cross_spread_account_id",
+        lambda role: "bybit-live-main" if role == "bybit_leg" else "mt5-live-main",
+    )
+
+    def specification(*, account_id: str, symbol: str):
+        return _live_specification(
+            account_id=account_id,
+            symbol=symbol,
+            venue="mt5_live" if account_id == "mt5-live-main" else "bybit_live",
+        )
+
+    current = available_snapshot()
+    monkeypatch.setattr("app.cross_spread.get_instrument_specification", specification)
+    monkeypatch.setattr("app.cross_spread.get_cross_spread_snapshot", lambda: current)
+
+    rules = get_cross_spread_trading_rules()
+
+    assert rules.execution_state == "executable"
+    assert rules.bybit.source == "bybit_live"
+    assert rules.bybit.min_quantity == Decimal("0.001")
+    assert rules.mt5.source == "mt5_live"
+    assert rules.mt5.contract_size == Decimal("100")
+    assert rules.mt5.close_allowed is True
 
 
 def test_cross_spread_snapshot_proxies_runtime_market_data(monkeypatch, tmp_path: Path) -> None:

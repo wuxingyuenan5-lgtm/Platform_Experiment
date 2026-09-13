@@ -28,6 +28,8 @@ from app.schemas import (
     CrossSpreadMarketCommandRequest,
     CrossSpreadPreflightRequest,
     CrossSpreadSnapshotResponse,
+    CrossSpreadTradingRulesResponse,
+    CrossSpreadVenueTradingRuleResponse,
     CrossSpreadVenueSnapshotResponse,
     ExecutionBatchResponse,
     TradeCommandResponse,
@@ -105,6 +107,9 @@ def _mark_stale(snapshot: CrossSpreadSnapshotResponse) -> CrossSpreadSnapshotRes
             quote=snapshot.bybit.quote,
             positions=snapshot.bybit.positions,
             reason=_join_stale_reason(snapshot.bybit.reason),
+            openAllowed=False,
+            closeAllowed=False,
+            executionBlockReason="runtime_snapshot_stale",
         ),
         mt5=CrossSpreadVenueSnapshotResponse(
             venue=snapshot.mt5.venue,
@@ -113,10 +118,14 @@ def _mark_stale(snapshot: CrossSpreadSnapshotResponse) -> CrossSpreadSnapshotRes
             quote=snapshot.mt5.quote,
             positions=snapshot.mt5.positions,
             reason=_join_stale_reason(snapshot.mt5.reason),
+            openAllowed=False,
+            closeAllowed=False,
+            executionBlockReason="runtime_snapshot_stale",
         ),
         longSpread=snapshot.long_spread,
         shortSpread=snapshot.short_spread,
         metrics=snapshot.metrics,
+        executionState="unavailable",
         asOf=snapshot.as_of,
     )
 
@@ -130,6 +139,57 @@ def _join_stale_reason(reason: str | None) -> str | None:
 
 def get_cross_spread_history(limit: int = 200) -> list[CrossSpreadHistoryPointResponse]:
     return list_cross_spread_market_history(strategy_key=STRATEGY_KEY, limit=limit)
+
+
+def get_cross_spread_trading_rules() -> CrossSpreadTradingRulesResponse:
+    """Return native Venue specifications plus the current executable session state."""
+    bybit_account_id = _bound_cross_spread_account_id(BYBIT_LEG_ROLE)
+    mt5_account_id = _bound_cross_spread_account_id(MT5_LEG_ROLE)
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        bybit_future = executor.submit(
+            get_instrument_specification,
+            account_id=bybit_account_id,
+            symbol=BYBIT_SYMBOL,
+        )
+        mt5_future = executor.submit(
+            get_instrument_specification,
+            account_id=mt5_account_id,
+            symbol=MT5_SYMBOL,
+        )
+        try:
+            bybit_spec, mt5_spec = bybit_future.result(), mt5_future.result()
+        except CrossSpreadLiveReadError as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+    snapshot = get_cross_spread_snapshot()
+
+    def venue_rule(venue: str, spec, state) -> CrossSpreadVenueTradingRuleResponse:
+        return CrossSpreadVenueTradingRuleResponse(
+            venue=venue,
+            source=spec.source,
+            accountId=spec.account_id,
+            symbol=spec.symbol,
+            status=spec.status,
+            priceTick=spec.price_tick,
+            minQuantity=spec.min_quantity,
+            quantityStep=spec.quantity_step,
+            maxMarketQuantity=spec.max_market_quantity,
+            contractSize=spec.contract_size,
+            tradeMode=spec.trade_mode,
+            fillingMode=spec.filling_mode,
+            accessChecks=spec.access_checks,
+            openAllowed=state.open_allowed,
+            closeAllowed=state.close_allowed,
+            executionBlockReason=state.execution_block_reason,
+            quoteSourceAsOf=state.quote_source_as_of,
+            asOf=spec.as_of,
+        )
+
+    return CrossSpreadTradingRulesResponse(
+        bybit=venue_rule("bybit", bybit_spec, snapshot.bybit),
+        mt5=venue_rule("mt5", mt5_spec, snapshot.mt5),
+        executionState=snapshot.execution_state,
+        asOf=datetime.now(UTC),
+    )
 
 
 def submit_cross_spread_market_command(
@@ -161,6 +221,8 @@ def submit_cross_spread_market_command(
             status_code=422,
             detail="Open cross-spread commands cannot carry close-position intent",
         )
+
+    assert_cross_spread_market_executable(is_close=is_close)
 
     sizing = _load_live_cross_spread_sizing()
     _validate_leg_quantity(
@@ -216,6 +278,38 @@ def assert_cross_spread_live_execution_enabled() -> None:
         raise HTTPException(403, "Live cross-spread execution is disabled")
 
 
+def assert_cross_spread_market_executable(*, is_close: bool) -> CrossSpreadSnapshotResponse:
+    """Require both normal legs to be executable before creating an instruction.
+
+    This gate intentionally does not sit in the single-leg reconciliation and
+    recovery paths. Those paths own an already-unhedged exposure and retain
+    their stricter ticket/idempotency checks.
+    """
+    snapshot = get_cross_spread_snapshot()
+    capability = "close_allowed" if is_close else "open_allowed"
+    blocked = [
+        venue
+        for venue in (snapshot.bybit, snapshot.mt5)
+        if not getattr(venue, capability)
+    ]
+    if blocked:
+        details = "; ".join(
+            f"{venue.venue}: {venue.execution_block_reason or 'execution_not_allowed'}"
+            for venue in blocked
+        )
+        action = "close" if is_close else "open"
+        raise HTTPException(
+            status_code=423,
+            detail=f"Cross-spread {action} is monitor-only because both venues are not executable ({details})",
+        )
+    return snapshot
+
+
+def assert_cross_spread_native_trading_rules() -> None:
+    """Refresh and validate both authoritative Venue specifications."""
+    _load_live_cross_spread_sizing()
+
+
 def prepare_cross_spread_market_command(
     request: CrossSpreadPreflightRequest,
 ) -> dict[str, object]:
@@ -234,6 +328,7 @@ def prepare_cross_spread_market_command(
             if any(leg.role == "bybit_leg" and leg.status == "filled" for leg in batch.legs):
                 prepare_unsubmitted_mt5_close(plan, request.quantity_oz)
                 return {"status": "ready", "preparedAt": datetime.now(UTC).isoformat()}
+    assert_cross_spread_market_executable(is_close=request.action.startswith("CLOSE_"))
     sizing = _load_live_cross_spread_sizing()
     mt5_quantity = request.quantity_oz / sizing.mt5_multiplier
     _validate_leg_quantity(

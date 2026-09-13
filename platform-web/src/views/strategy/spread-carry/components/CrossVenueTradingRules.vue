@@ -19,9 +19,25 @@
       </div>
 
       <div class="status-mini-log__list">
+        <p v-if="executionMessage">
+          <i :class="['status-mini-log__dot', feedbackToneClass]"></i>
+          <span>{{ executionMessage }}</span>
+        </p>
         <p v-for="item in executionLogs.slice(0, 4)" :key="item.id">
-          <i :class="['status-mini-log__dot', item.status === '成功' ? 'is-success' : item.status === '待确认' ? 'is-warn' : 'is-info']"></i>
+          <i
+            :class="[
+              'status-mini-log__dot',
+              item.status === '成功'
+                ? 'is-success'
+                : item.status === '待确认'
+                ? 'is-warn'
+                : 'is-info',
+            ]"
+          ></i>
           <span>{{ item.time }}: {{ item.direction }} {{ item.type }}</span>
+        </p>
+        <p v-if="!executionMessage && executionLogs.length === 0" class="status-mini-log__empty">
+          暂无执行反馈
         </p>
       </div>
     </div>
@@ -29,6 +45,8 @@
 </template>
 
 <script setup lang="ts">
+  import { computed } from 'vue';
+
   interface TradingRuleRow {
     label: string;
     value: string;
@@ -42,10 +60,18 @@
     status: string;
   }
 
-  defineProps<{
+  const props = defineProps<{
     tradingRuleRows: readonly TradingRuleRow[];
     executionLogs: readonly ExecutionLogRow[];
+    executionMessage: string;
+    executionMessageTone: 'is-success' | 'is-error' | 'is-warn';
   }>();
+
+  const feedbackToneClass = computed(() => {
+    if (props.executionMessageTone === 'is-success') return 'is-success';
+    if (props.executionMessageTone === 'is-error') return 'is-error';
+    return 'is-warn';
+  });
 </script>
 
 <style scoped lang="less">
@@ -156,5 +182,13 @@
 
   .status-mini-log__dot.is-info {
     background: #60a5fa;
+  }
+
+  .status-mini-log__dot.is-error {
+    background: #ef4444;
+  }
+
+  .status-mini-log__empty {
+    color: #98a2b3;
   }
 </style>

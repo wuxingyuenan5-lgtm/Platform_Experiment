@@ -462,8 +462,12 @@ class CrossSpreadVenueSnapshot(BaseModel):
     quote: MarketQuote | None = None
     positions: list[VenuePosition] = Field(default_factory=list)
     reason: str | None = None
+    open_allowed: bool = Field(default=False, alias="openAllowed")
+    close_allowed: bool = Field(default=False, alias="closeAllowed")
+    execution_block_reason: str | None = Field(default=None, alias="executionBlockReason")
     fetch_latency_ms: float | None = Field(default=None, alias="fetchLatencyMs")
     as_of: datetime | None = Field(default=None, alias="asOf")
+    quote_source_as_of: datetime | None = Field(default=None, alias="quoteSourceAsOf")
 
 
 class CrossSpreadMetrics(BaseModel):
@@ -488,4 +492,5 @@ class CrossSpreadSnapshotResponse(BaseModel):
     long_spread: Decimal | None = Field(default=None, alias="longSpread")
     short_spread: Decimal | None = Field(default=None, alias="shortSpread")
     metrics: CrossSpreadMetrics = Field(default_factory=CrossSpreadMetrics)
+    execution_state: str = Field(default="unavailable", alias="executionState")
     as_of: datetime = Field(default_factory=lambda: datetime.now(UTC), alias="asOf")

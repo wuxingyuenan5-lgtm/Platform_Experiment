@@ -2,6 +2,8 @@ import { createStrategyApi, strategyData } from './strategyApi';
 import type { components } from './generated/strategy';
 
 export type CrossSpreadLeverageResult = components['schemas']['CrossSpreadLeverageResponse'];
+export type CrossSpreadTradingRulesResult =
+  components['schemas']['CrossSpreadTradingRulesResponse'];
 const api = createStrategyApi(30_000);
 export async function closeAbnormalOpen(batchId: string, actor: string) {
   return strategyData(
@@ -18,6 +20,9 @@ export async function closeAbnormalOpen(batchId: string, actor: string) {
 }
 export async function getCrossSpreadLeverage(): Promise<CrossSpreadLeverageResult> {
   return strategyData(await api.GET('/api/v1/trading/cross-spread/leverage'));
+}
+export async function getCrossSpreadTradingRules(): Promise<CrossSpreadTradingRulesResult> {
+  return strategyData(await api.GET('/api/v1/trading/cross-spread/trading-rules'));
 }
 export async function setCrossSpreadLeverage(leverage: string): Promise<CrossSpreadLeverageResult> {
   return strategyData(

@@ -133,6 +133,10 @@ class CrossSpreadVenueSnapshotResponse(BaseModel):
     quote: MarketQuoteResponse | None = None
     positions: list[VenuePositionResponse] = []
     reason: str | None = None
+    open_allowed: bool = Field(default=False, alias="openAllowed")
+    close_allowed: bool = Field(default=False, alias="closeAllowed")
+    execution_block_reason: str | None = Field(default=None, alias="executionBlockReason")
+    quote_source_as_of: datetime | None = Field(default=None, alias="quoteSourceAsOf")
     fetch_latency_ms: float | None = Field(default=None, alias="fetchLatencyMs")
     as_of: datetime | None = Field(default=None, alias="asOf")
 
@@ -207,8 +211,41 @@ class CrossSpreadSnapshotResponse(BaseModel):
     long_spread: Decimal | None = Field(default=None, alias="longSpread")
     short_spread: Decimal | None = Field(default=None, alias="shortSpread")
     metrics: CrossSpreadMetricsResponse = Field(default_factory=CrossSpreadMetricsResponse)
+    execution_state: Literal["executable", "monitor_only", "unavailable"] = Field(
+        default="unavailable", alias="executionState"
+    )
     position_overview: CrossSpreadPositionOverviewResponse | None = Field(
         default=None, alias="positionOverview"
+    )
+    as_of: datetime = Field(alias="asOf")
+
+
+class CrossSpreadVenueTradingRuleResponse(BaseModel):
+    venue: Literal["bybit", "mt5"]
+    source: str
+    account_id: str = Field(alias="accountId")
+    symbol: str
+    status: str
+    price_tick: Decimal = Field(alias="priceTick")
+    min_quantity: Decimal = Field(alias="minQuantity")
+    quantity_step: Decimal = Field(alias="quantityStep")
+    max_market_quantity: Decimal | None = Field(default=None, alias="maxMarketQuantity")
+    contract_size: Decimal = Field(alias="contractSize")
+    trade_mode: str = Field(alias="tradeMode")
+    filling_mode: str = Field(alias="fillingMode")
+    access_checks: dict[str, object] = Field(default_factory=dict, alias="accessChecks")
+    open_allowed: bool = Field(alias="openAllowed")
+    close_allowed: bool = Field(alias="closeAllowed")
+    execution_block_reason: str | None = Field(default=None, alias="executionBlockReason")
+    quote_source_as_of: datetime | None = Field(default=None, alias="quoteSourceAsOf")
+    as_of: datetime = Field(alias="asOf")
+
+
+class CrossSpreadTradingRulesResponse(BaseModel):
+    bybit: CrossSpreadVenueTradingRuleResponse
+    mt5: CrossSpreadVenueTradingRuleResponse
+    execution_state: Literal["executable", "monitor_only", "unavailable"] = Field(
+        alias="executionState"
     )
     as_of: datetime = Field(alias="asOf")
 
@@ -497,6 +534,25 @@ class AuditEventResponse(BaseModel):
     created_at: datetime = Field(alias="createdAt")
 
 
+class StrategyDailyPnlPointResponse(BaseModel):
+    """One cash-flow-adjusted daily result of the account behind a strategy.
+
+    ``pnl`` is the account's equity move between two same-scope daily closings
+    with deposits and withdrawals removed, so trading result, funding, fees,
+    swap and the day's unrealised mark are all inside it. A day that cannot be
+    valued carries no amount and names the reason in ``quality`` instead of
+    reporting a zero.
+    """
+
+    date: str
+    currency: str
+    pnl: Decimal | None = None
+    return_rate: Decimal | None = Field(default=None, alias="returnRate")
+    equity_open: Decimal | None = Field(default=None, alias="equityOpen")
+    equity_close: Decimal | None = Field(default=None, alias="equityClose")
+    quality: str = "unavailable"
+
+
 class StrategyAccountSnapshotResponse(BaseModel):
     model_config = ConfigDict(json_schema_serialization_defaults_required=True)
     strategy_instance_id: str = Field(alias="strategyInstanceId")
@@ -509,8 +565,14 @@ class StrategyAccountSnapshotResponse(BaseModel):
     equity_history: list[StrategyEquityHistoryPointResponse] = Field(
         default_factory=list, alias="equityHistory"
     )
+    daily_pnl: list[StrategyDailyPnlPointResponse] = Field(default_factory=list, alias="dailyPnl")
     account_risk: AccountRiskSnapshotResponse | None = Field(default=None, alias="accountRisk")
     positions: list[PositionResponse] = Field(default_factory=list)
+    position_value: Decimal | None = Field(default=None, alias="positionValue")
+    position_value_net: Decimal | None = Field(default=None, alias="positionValueNet")
+    position_value_currency: str | None = Field(default=None, alias="positionValueCurrency")
+    leverage: Decimal | None = None
+    venue_leverage: Decimal | None = Field(default=None, alias="venueLeverage")
     orders: list[OrderDetailResponse] = Field(default_factory=list)
     fills: list[FillResponse] = Field(default_factory=list)
     pnl: PnlResponse | None = None

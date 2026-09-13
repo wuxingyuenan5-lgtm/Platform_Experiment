@@ -459,3 +459,170 @@ def test_native_receipt_controls_close_quantity_and_missing_fee_blocks_submissio
     )
     assert remainder["remainingClosableQuantity"] == "0.5"
     assert remainder["remainingSpotQuantity"] == "0.500"
+
+
+def test_mt5_position_exposure_prefers_venue_notional_and_restores_lot_contracts():
+    """A matching venue notional wins; otherwise LOT quantity is restored through the multiplier."""
+
+    for identity, side, price, ticket in (
+        ("a", "buy", "2000", "101"),
+        ("b", "sell", "2100", "102"),
+    ):
+        order(identity, CROSS, side, "0.01", price)
+        with connection() as db:
+            for table in ("orders", "trade_commands", "fills"):
+                db.execute(
+                    f"UPDATE {table} SET account_id='mt5-live-main', "
+                    "instrument_id='instrument_xau_usd' WHERE id=?",
+                    (identity,),
+                )
+            _persist_venue_event(
+                db,
+                "mt5-live-main",
+                "trade_fill",
+                {
+                    "source": "mt5_live",
+                    "externalFillId": identity,
+                    "platformOrderId": identity,
+                    "accountId": "mt5-live-main",
+                    "instrumentId": "instrument_xau_usd",
+                    "symbol": "XAUUSD",
+                    "positionId": ticket,
+                    "side": side,
+                    "quantity": "0.01",
+                    "price": price,
+                    "fee": "0",
+                    "realizedPnl": "0",
+                    "swap": "0",
+                    "currency": "USD",
+                    "occurredAt": NOW,
+                },
+            )
+    with connection() as db:
+        _persist_venue_snapshot(
+            db,
+            "mt5-live-main",
+            {
+                "accountId": "mt5-live-main",
+                "venue": "mt5",
+                "source": "mt5_live",
+                "asOf": NOW,
+                "economicEventsQuality": "complete",
+                "balances": [],
+                "positions": [
+                    {
+                        "instrumentId": "instrument_xau_usd",
+                        "externalPositionId": "101",
+                        "netQuantity": "0.01",
+                        "currentPrice": "2000",
+                        "positionValue": "1980",
+                        "currency": "USD",
+                    },
+                    {
+                        "instrumentId": "instrument_xau_usd",
+                        "externalPositionId": "102",
+                        "netQuantity": "-0.01",
+                        "currentPrice": "2100",
+                        "currency": "USD",
+                    },
+                ],
+            },
+        )
+    result = get_strategy_financials(CROSS)
+    # Gross keeps both hedged legs; net keeps only the residual directional exposure.
+    exposure = result["exposure"]
+    assert Decimal(exposure["positionValue"]) == Decimal("4080")
+    assert Decimal(exposure["positionValueNet"]) == Decimal("120")
+    assert exposure["positionValueCurrency"] == "USD"
+    legs = {row["externalPositionId"]: row for row in result["positions"]}
+    # 101 has a matching venue notional (1980), so the mark price 2000 is not used.
+    assert Decimal(legs["101"]["positionValue"]) == Decimal("1980")
+    # 102 has no venue notional, so LOT 0.01 is restored as 0.01 x 2100 x 100.
+    assert Decimal(legs["102"]["positionValue"]) == Decimal("2100")
+    assert {row["positionValueCurrency"] for row in legs.values()} == {"USD"}
+
+
+def test_mixed_currency_positions_never_combine_into_one_exposure():
+    """Legs valued in different currencies stay separate; no FX rate is invented."""
+
+    order("a", CROSS, "buy", "0.01", "2000")
+    order("b", CROSS, "buy", "1", "50000")
+    with connection() as db:
+        for table in ("orders", "trade_commands", "fills"):
+            db.execute(
+                f"UPDATE {table} SET account_id='mt5-live-main', "
+                "instrument_id='instrument_xau_usd' WHERE id='a'",
+            )
+            db.execute(
+                f"UPDATE {table} SET instrument_id='instrument_btc_usdt' WHERE id='b'",
+            )
+        _persist_venue_event(
+            db,
+            "mt5-live-main",
+            "trade_fill",
+            {
+                "source": "mt5_live",
+                "externalFillId": "a",
+                "platformOrderId": "a",
+                "accountId": "mt5-live-main",
+                "instrumentId": "instrument_xau_usd",
+                "symbol": "XAUUSD",
+                "positionId": "101",
+                "side": "buy",
+                "quantity": "0.01",
+                "price": "2000",
+                "fee": "0",
+                "realizedPnl": "0",
+                "swap": "0",
+                "currency": "USD",
+                "occurredAt": NOW,
+            },
+        )
+        _persist_venue_snapshot(
+            db,
+            "mt5-live-main",
+            {
+                "accountId": "mt5-live-main",
+                "venue": "mt5",
+                "source": "mt5_live",
+                "asOf": NOW,
+                "economicEventsQuality": "complete",
+                "balances": [],
+                "positions": [
+                    {
+                        "instrumentId": "instrument_xau_usd",
+                        "externalPositionId": "101",
+                        "netQuantity": "0.01",
+                        "currentPrice": "2000",
+                        "currency": "USD",
+                    }
+                ],
+            },
+        )
+        _persist_venue_snapshot(
+            db,
+            ACCOUNT,
+            {
+                "accountId": ACCOUNT,
+                "venue": "bybit",
+                "source": "bybit_live",
+                "asOf": NOW,
+                "economicEventsQuality": "complete",
+                "balances": [],
+                "positions": [
+                    {
+                        "instrumentId": "instrument_btc_usdt",
+                        "netQuantity": "1",
+                        "currentPrice": "50000",
+                        "currency": "USDT",
+                    }
+                ],
+            },
+        )
+    result = get_strategy_financials(CROSS)
+    assert result["exposure"] == {
+        "positionValue": None,
+        "positionValueNet": None,
+        "positionValueCurrency": None,
+    }
+    assert {row["positionValueCurrency"] for row in result["positions"]} == {"USD", "USDT"}

@@ -25,6 +25,8 @@ from tests.test_cross_spread_market_lifecycle import (
 def saved_exit(tmp_path, monkeypatch):
     configure_platform(tmp_path)
     monkeypatch.setattr(get_settings(), "research_refresh_enabled", False)
+    monkeypatch.setattr(service, "assert_cross_spread_native_trading_rules", lambda: None)
+    monkeypatch.setattr(service, "assert_cross_spread_market_executable", lambda *, is_close: None)
     with TestClient(app):
         insert_batch_with_fills("fault-open")
         plan = create_exit_plan(
@@ -192,6 +194,38 @@ def test_limit_trigger_loses_quote_before_dispatch_then_recovers(saved_exit, mon
     monkeypatch.setattr(
         service, "_submit_limit_batch", service.submit_cross_spread_market_command
     )
+    monkeypatch.setattr(
+        "app.cross_spread.assert_cross_spread_market_executable", lambda *, is_close: None
+    )
     assert service.evaluate_cross_spread_exit_plans().triggered_count == 1
     assert get_exit_plan(saved_exit.plan_id).status == "closed"
     assert len(submissions) == 1
+
+
+def test_monitor_only_snapshot_never_claims_exit_plan(saved_exit, monkeypatch):
+    current = available_snapshot()
+    current = current.model_copy(
+        update={
+            "execution_state": "monitor_only",
+            "mt5": current.mt5.model_copy(
+                update={
+                    "open_allowed": False,
+                    "close_allowed": False,
+                    "execution_block_reason": "quote_stale",
+                }
+            ),
+        }
+    )
+    claims = []
+    monkeypatch.setattr(service, "get_cross_spread_snapshot", lambda: current)
+    monkeypatch.setattr(service, "claim_exit_plan", lambda *args, **kwargs: claims.append((args, kwargs)))
+
+    result = service.evaluate_cross_spread_exit_plans()
+
+    assert result.evaluated_count == 1
+    assert result.triggered_count == 0
+    assert result.skipped_reason == (
+        "Cross-spread exit is monitor-only because both venues are not executable"
+    )
+    assert claims == []
+    assert get_exit_plan(saved_exit.plan_id).status == "active"

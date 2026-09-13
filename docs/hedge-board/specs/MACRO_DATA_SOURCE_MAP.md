@@ -20,7 +20,7 @@
 |---|---|---|
 | 市场明细、增长、通胀、短端利率走廊、美元流动性、全球 M2 | Native | 低频数据保持原观察日期；缺历史不补齐。 |
 | VIX、信用/跨资产风险观察 | Native 或明确来源的研究入口 | 来源不足时不生成本地替代曲线。 |
-| CME FedWatch、预测市场利率路径 | External link | 平台不复制受限概率历史或将其解释为预测。 |
+| CME FedWatch、预测市场利率路径 | Native read-only snapshot | 概率由 CME 30-Day Fed Funds Futures 结算价与 FRED EFFR 计算；缺少结算价时保持不可用，不填充为零。 |
 | TradingView 布局、MacroMicro、金十、美元流动性网站 | External link | 仅提供精确研究入口，不依赖个人登录态。 |
 
 ## 特别口径

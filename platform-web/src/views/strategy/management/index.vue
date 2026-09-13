@@ -1,5 +1,8 @@
 ﻿<template>
   <div class="strategy-management-page" data-testid="strategy-management-original-structure">
+    <section v-if="monitorWarning" class="strategy-sync-alert" role="alert">
+      <strong>后台监控告警</strong><span>{{ monitorWarning }}</span>
+    </section>
     <section v-if="overviewLoading" class="strategy-overview-state" data-testid="overview-loading">
       <p>策略管理总览加载中</p>
     </section>
@@ -29,8 +32,22 @@
         </div>
       </section>
 
+      <section v-if="activeSyncAlert" class="strategy-sync-alert" role="alert">
+        <strong>账户数据同步中断</strong>
+        <span
+          >{{ activeSyncAlert.label }}：{{ activeSyncAlert.value }}；后台定时重试同步。{{
+            activeSyncAlert.note
+          }}</span
+        >
+        <button type="button" @click="refreshVisibleAccount">刷新状态</button>
+      </section>
+
       <template v-if="activeSection === 'pnl'">
-        <StrategyPnlPanel :active-desk="activeDesk" :live-profile="activePnlProfile" />
+        <StrategyPnlPanel
+          view="overview"
+          :active-desk="activeDesk"
+          :live-profile="activePnlProfile"
+        />
       </template>
 
       <template v-else-if="activeSection === 'capital'">
@@ -39,6 +56,22 @@
         <StrategyCapitalFinanceBoard
           :risk-cards="capitalProfile.riskCards"
           :structure-cards="capitalProfile.structureCards"
+        >
+          <template #position-distribution>
+            <StrategyPnlPanel
+              view="daily-position"
+              :active-desk="activeDesk"
+              :live-profile="activePnlProfile"
+              distribution-only
+            />
+          </template>
+        </StrategyCapitalFinanceBoard>
+
+        <StrategyPnlPanel
+          view="daily-position"
+          :active-desk="activeDesk"
+          :live-profile="activePnlProfile"
+          hide-distribution
         />
 
         <StrategyCapitalRulePanel
@@ -106,6 +139,7 @@
 <script setup lang="ts">
   import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
   import { useRoute, useRouter } from 'vue-router';
+  import { createStrategyClient } from '@/api/platform/strategyClient';
   import {
     getFundingPositionGroups,
     type FundingPositionGroup,
@@ -142,8 +176,8 @@
   const activeRecordTab = ref('positions');
 
   const sectionTabs = [
-    { key: 'pnl', label: '策略损益' },
     { key: 'capital', label: '账户资金' },
+    { key: 'pnl', label: '策略损益' },
     { key: 'orders', label: '订单信息' },
   ];
 
@@ -520,9 +554,48 @@
       : placeholderCapitalProfile(activeOverview.value, activeDesk.value);
   });
 
+  const activeSyncAlert = computed(() =>
+    capitalProfile.value.riskCards.find(
+      (card) => card.label.endsWith('数据状态') && card.tone === 'negative',
+    ),
+  );
+
+  const monitorWarning = ref('');
+  const monitorClient = createStrategyClient(5000);
+  let monitorReadPending = false;
+  async function refreshMonitorHealth() {
+    if (monitorReadPending) return;
+    monitorReadPending = true;
+    try {
+      const { data } = await monitorClient.get('/system/monitor-health');
+      const warnings: string[] = [];
+      if (['stalled', 'degraded'].includes(data.accountSync?.status))
+        warnings.push('账户后台同步异常，保留最后成功数据');
+      if (['stalled', 'degraded', 'starting'].includes(data.crossExit?.status))
+        warnings.push('止盈止损监控尚未完成有效评估，请核对退出计划');
+      if (data.crossExit?.status === 'disabled') warnings.push('自动止盈止损后台监控进程未启用');
+      else if (data.crossExitExecutionEnabled === false)
+        warnings.push('止盈止损监控运行中；实盘执行闸门关闭，仅监控不下单');
+      if (
+        ['blocked', 'stalled', 'unavailable', 'degraded', 'recovering'].includes(
+          data.watchdog?.status,
+        )
+      )
+        warnings.push(
+          data.watchdog.status === 'recovering' ? '后台服务正在恢复' : '服务看护异常或需要人工处理',
+        );
+      monitorWarning.value = warnings.join('；');
+    } catch {
+      monitorWarning.value = '无法读取后台健康状态，请勿将旧数据视为实时数据';
+    } finally {
+      monitorReadPending = false;
+    }
+  }
+
   let monitorTimer: ReturnType<typeof setInterval> | null = null;
   function refreshVisibleAccount() {
     if (document.visibilityState !== 'visible') return;
+    void refreshMonitorHealth();
     void refreshStrategyOverview();
     if (activeDesk.value === 'crossSpread') {
       void refreshCrossSpreadFinance(activeSection.value === 'pnl' ? 'pnl' : 'capital');
@@ -533,6 +606,7 @@
     }
   }
   onMounted(() => {
+    void refreshMonitorHealth();
     void refreshManagementOverview();
     monitorTimer = setInterval(refreshVisibleAccount, 30_000);
     document.addEventListener('visibilitychange', refreshVisibleAccount);
@@ -613,6 +687,32 @@
     color: var(--strategy-text-2);
     font-size: 14px;
     font-weight: 600;
+  }
+
+  .strategy-sync-alert {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px;
+    border: 1px solid #efb4b4;
+    border-radius: 12px;
+    background: #fff5f5;
+    color: #a83232;
+    font-size: 13px;
+  }
+
+  .strategy-sync-alert span {
+    flex: 1;
+  }
+
+  .strategy-sync-alert button {
+    padding: 6px 12px;
+    border: 1px solid #df8d8d;
+    border-radius: 8px;
+    background: #fff;
+    color: #a83232;
+    font-weight: 700;
+    cursor: pointer;
   }
 
   .strategy-abnormal-card {

@@ -924,6 +924,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/trading/cross-spread/trading-rules': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Trading Rules */
+    get: operations['trading_rules_api_v1_trading_cross_spread_trading_rules_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/trading/execution-batches': {
     parameters: {
       query?: never;
@@ -2048,6 +2065,12 @@ export interface components {
        */
       asOf: string;
       bybit: components['schemas']['CrossSpreadVenueSnapshotResponse'];
+      /**
+       * Executionstate
+       * @default unavailable
+       * @enum {string}
+       */
+      executionState: 'executable' | 'monitor_only' | 'unavailable';
       /** Longspread */
       longSpread?: string | null;
       metrics?: components['schemas']['CrossSpreadMetricsResponse'];
@@ -2057,6 +2080,21 @@ export interface components {
       shortSpread?: string | null;
       /** Status */
       status: string;
+    };
+    /** CrossSpreadTradingRulesResponse */
+    CrossSpreadTradingRulesResponse: {
+      /**
+       * Asof
+       * Format: date-time
+       */
+      asOf: string;
+      bybit: components['schemas']['CrossSpreadVenueTradingRuleResponse'];
+      /**
+       * Executionstate
+       * @enum {string}
+       */
+      executionState: 'executable' | 'monitor_only' | 'unavailable';
+      mt5: components['schemas']['CrossSpreadVenueTradingRuleResponse'];
     };
     /** CrossSpreadUnattributedPositionResponse */
     CrossSpreadUnattributedPositionResponse: {
@@ -2117,14 +2155,28 @@ export interface components {
     CrossSpreadVenueSnapshotResponse: {
       /** Asof */
       asOf?: string | null;
+      /**
+       * Closeallowed
+       * @default false
+       */
+      closeAllowed: boolean;
+      /** Executionblockreason */
+      executionBlockReason?: string | null;
       /** Fetchlatencyms */
       fetchLatencyMs?: number | null;
+      /**
+       * Openallowed
+       * @default false
+       */
+      openAllowed: boolean;
       /**
        * Positions
        * @default []
        */
       positions: components['schemas']['VenuePositionResponse'][];
       quote?: components['schemas']['MarketQuoteResponse'] | null;
+      /** Quotesourceasof */
+      quoteSourceAsOf?: string | null;
       /** Reason */
       reason?: string | null;
       /** Status */
@@ -2133,6 +2185,53 @@ export interface components {
       symbol: string;
       /** Venue */
       venue: string;
+    };
+    /** CrossSpreadVenueTradingRuleResponse */
+    CrossSpreadVenueTradingRuleResponse: {
+      /** Accesschecks */
+      accessChecks?: {
+        [key: string]: unknown;
+      };
+      /** Accountid */
+      accountId: string;
+      /**
+       * Asof
+       * Format: date-time
+       */
+      asOf: string;
+      /** Closeallowed */
+      closeAllowed: boolean;
+      /** Contractsize */
+      contractSize: string;
+      /** Executionblockreason */
+      executionBlockReason?: string | null;
+      /** Fillingmode */
+      fillingMode: string;
+      /** Maxmarketquantity */
+      maxMarketQuantity?: string | null;
+      /** Minquantity */
+      minQuantity: string;
+      /** Openallowed */
+      openAllowed: boolean;
+      /** Pricetick */
+      priceTick: string;
+      /** Quantitystep */
+      quantityStep: string;
+      /** Quotesourceasof */
+      quoteSourceAsOf?: string | null;
+      /** Source */
+      source: string;
+      /** Status */
+      status: string;
+      /** Symbol */
+      symbol: string;
+      /** Trademode */
+      tradeMode: string;
+      /**
+       * Venue
+       * @enum {string}
+       */
+      venue: 'bybit' | 'mt5';
     };
     /** EconomicEventResponse */
     EconomicEventResponse: {
@@ -3198,6 +3297,10 @@ export interface components {
       liquidationPrice?: string | null;
       /** Netquantity */
       netQuantity: string;
+      /** Positionvalue */
+      positionValue?: string | null;
+      /** Positionvaluecurrency */
+      positionValueCurrency?: string | null;
       /** Stoplossprice */
       stopLossPrice?: string | null;
       /** Swap */
@@ -3372,6 +3475,8 @@ export interface components {
       capability: ('trade_and_read' | 'read_only') | null;
       /** Coinbalances */
       coinBalances: components['schemas']['CoinBalanceResponse'][];
+      /** Dailypnl */
+      dailyPnl: components['schemas']['StrategyDailyPnlPointResponse'][];
       /** Dataqualitystate */
       dataQualityState: string;
       /** Economicevents */
@@ -3402,6 +3507,8 @@ export interface components {
       isStale: boolean;
       /** Lastsuccessfulsyncat */
       lastSuccessfulSyncAt: string | null;
+      /** Leverage */
+      leverage: string | null;
       /** Orders */
       orders: components['schemas']['OrderDetailResponse'][];
       /**
@@ -3410,6 +3517,12 @@ export interface components {
        */
       ordersTotal: number;
       pnl: components['schemas']['PnlResponse'] | null;
+      /** Positionvalue */
+      positionValue: string | null;
+      /** Positionvaluecurrency */
+      positionValueCurrency: string | null;
+      /** Positionvaluenet */
+      positionValueNet: string | null;
       /** Positions */
       positions: components['schemas']['PositionResponse'][];
       /**
@@ -3424,6 +3537,37 @@ export interface components {
       syncErrorCode: string | null;
       /** Syncstatus */
       syncStatus: string | null;
+      /** Venueleverage */
+      venueLeverage: string | null;
+    };
+    /**
+     * StrategyDailyPnlPointResponse
+     * @description One cash-flow-adjusted daily result of the account behind a strategy.
+     *
+     *     ``pnl`` is the account's equity move between two same-scope daily closings
+     *     with deposits and withdrawals removed, so trading result, funding, fees,
+     *     swap and the day's unrealised mark are all inside it. A day that cannot be
+     *     valued carries no amount and names the reason in ``quality`` instead of
+     *     reporting a zero.
+     */
+    StrategyDailyPnlPointResponse: {
+      /** Currency */
+      currency: string;
+      /** Date */
+      date: string;
+      /** Equityclose */
+      equityClose?: string | null;
+      /** Equityopen */
+      equityOpen?: string | null;
+      /** Pnl */
+      pnl?: string | null;
+      /**
+       * Quality
+       * @default unavailable
+       */
+      quality: string;
+      /** Returnrate */
+      returnRate?: string | null;
     };
     /** StrategyDefinitionResponse */
     StrategyDefinitionResponse: {
@@ -5676,6 +5820,26 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['CrossSpreadSnapshotResponse'];
+        };
+      };
+    };
+  };
+  trading_rules_api_v1_trading_cross_spread_trading_rules_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CrossSpreadTradingRulesResponse'];
         };
       };
     };

@@ -43,6 +43,8 @@
       <CrossVenueTradingRules
         :trading-rule-rows="tradingRuleRows"
         :execution-logs="executionLogs"
+        :execution-message="executionMessage"
+        :execution-message-tone="executionMessageTone"
       />
       <SpreadExecutionCommand
         v-model:execution-stage="executionStage"

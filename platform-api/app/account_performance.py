@@ -159,9 +159,14 @@ def sync_capital_history(account_id, *, force=False):
             raise
 
 
-def adjusted_drawdowns(db, account_id, points, scope, value_key):
-    if not points:
-        return []
+def _classified_intervals(db, account_id, points, scope, value_key):
+    """Yield the classified facts of every consecutive interval, oldest first.
+
+    Each item is ``(initial, final, flow, denominator, reason)``. The capital-flow
+    classification, coverage window, unclassified-flow handling, currency
+    valuation and non-positive-capital rule live here so the drawdown series and
+    the daily P&L series can never drift apart.
+    """
     windows = [
         (stamp(r[0]), stamp(r[1]))
         for r in db.execute(
@@ -202,9 +207,6 @@ def adjusted_drawdowns(db, account_id, points, scope, value_key):
                 return True
         return False
 
-    nav = peak = Decimal(1)
-    result = [(None, "baseline")]
-    broken = False
     for previous, point in zip(points, points[1:], strict=False):
         a, b = stamp(previous.as_of), stamp(point.as_of)
         initial, final = getattr(previous, value_key), getattr(point, value_key)
@@ -242,6 +244,18 @@ def adjusted_drawdowns(db, account_id, points, scope, value_key):
         denominator = (initial or Decimal(0)) + weighted
         if denominator <= 0:
             reason = reason or "invalid_capital"
+        yield initial, final, flow, denominator, reason
+
+
+def adjusted_drawdowns(db, account_id, points, scope, value_key):
+    if not points:
+        return []
+    nav = peak = Decimal(1)
+    result = [(None, "baseline")]
+    broken = False
+    for initial, final, flow, denominator, reason in _classified_intervals(
+        db, account_id, points, scope, value_key
+    ):
         if broken or reason:
             result.append((None, reason or "history_gap"))
             broken = True
@@ -253,6 +267,33 @@ def adjusted_drawdowns(db, account_id, points, scope, value_key):
             continue
         peak = max(peak, nav)
         result.append(((nav / peak - 1) * 100, "estimated"))
+    return result
+
+
+def daily_pnl(db, account_id, points, scope, value_key):
+    """Cash-flow-adjusted P&L per interval between same-scope daily closings.
+
+    The reported amount is the same ``final - initial - flow`` the drawdown series
+    uses, so a day's trading result, funding, fees, swap and unrealised mark far
+    are all inside it while deposits and withdrawals are not. The companion rate
+    is that amount over the capital actually at work during the day.
+
+    An interval whose history was never queried, whose flow is unclassified, or
+    whose capital went non-positive is reported as unavailable rather than as a
+    zero. Intervals do not chain: a day that cannot be valued does not suppress
+    the next day, because each interval is measured against its own closings.
+    """
+    if not points:
+        return []
+    result = [(None, None, "baseline")]
+    for initial, final, flow, denominator, reason in _classified_intervals(
+        db, account_id, points, scope, value_key
+    ):
+        if reason:
+            result.append((None, None, reason))
+            continue
+        pnl = final - initial - flow
+        result.append((pnl, pnl / denominator * 100, "estimated"))
     return result
 
 

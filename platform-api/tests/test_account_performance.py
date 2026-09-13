@@ -1,12 +1,12 @@
+import sqlite3
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
-import sqlite3
 
 import pytest
 
-from app.account_performance import adjusted_drawdowns, persist_capital_window
-from app.schemas import StrategyEquityHistoryPointResponse as Point
+from app.account_performance import adjusted_drawdowns, daily_pnl, persist_capital_window
 from app.schema_migrations import PLATFORM_MIGRATIONS
+from app.schemas import StrategyEquityHistoryPointResponse as Point
 
 
 @pytest.fixture
@@ -140,3 +140,39 @@ def test_nonpositive_capital_is_unavailable(db):
         None,
         "invalid_capital",
     )
+
+
+def test_daily_pnl_excludes_withdrawals_and_deposits(db):
+    window(db, [(1, "USD", "-50"), (2, "USD", "100")])
+    series = daily_pnl(db, "a", points([100, 50, 150, 135]), "mt5_trading", "equity")
+    assert [x[0] for x in series] == [None, Decimal(0), Decimal(0), Decimal(-15)]
+
+
+def test_daily_pnl_rate_uses_the_capital_at_work(db):
+    window(db, [(0.5, "USD", "100")])
+    series = daily_pnl(db, "a", points([100, 215, 193.5]), "mt5_trading", "equity")
+    assert series[2][:2] == (Decimal("-21.5"), Decimal("-10.0"))
+
+
+def test_daily_pnl_unqueried_history_is_not_zero(db):
+    assert daily_pnl(db, "a", points([100, 90]), "mt5_trading", "equity")[-1] == (
+        None,
+        None,
+        "missing_history",
+    )
+
+
+def test_daily_pnl_reports_an_unclassified_day_without_suppressing_the_next(db):
+    window(db, [(1, "USD", None)])
+    series = daily_pnl(db, "a", points([100, 100, 110]), "mt5_trading", "equity")
+    assert series[1] == (None, None, "unclassified_flow")
+    assert series[2][0] == Decimal(10)
+
+
+def test_daily_pnl_never_guesses_a_flow_valuation(db):
+    window(db, [(0.5, "USDT", "100")])
+    series = daily_pnl(db, "a", points([100, 200, 180]), "mt5_trading", "equity")
+    assert series[1] == (None, None, "missing_flow_valuation")
+    # The unvaluable interval carries no amount, and the next day is still read
+    # against its own closings rather than inheriting the gap.
+    assert series[2] == (Decimal(-20), Decimal(-10.0), "estimated")

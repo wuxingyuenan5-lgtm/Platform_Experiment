@@ -1,87 +1,133 @@
 ﻿<template>
   <section class="pnl-panel">
-    <article class="pnl-overview-card">
-      <header class="pnl-overview-header">
-        <div>
-          <h3>损益总览</h3>
-          <div class="pnl-meta">
-            <em>{{ profile.totalFund }}</em>
-            <span>{{ profile.period }}</span>
+    <template v-if="view === 'overview'">
+      <article class="pnl-overview-card">
+        <header class="pnl-overview-header">
+          <div>
+            <h3>损益总览</h3>
+            <div class="pnl-meta">
+              <em>{{ profile.totalFund }}</em>
+              <span>{{ profile.period }}</span>
+            </div>
           </div>
-        </div>
 
-        <div class="pnl-actions">
-          <label class="precision-control"
-            >时间精度
-            <select v-model="precision" aria-label="收益曲线时间精度">
-              <option v-for="item in curvePrecisions" :key="item.key" :value="item.key">{{
-                item.label
-              }}</option>
-            </select>
-          </label>
-          <div v-if="profile.curveKind !== 'realized'" class="period-tabs">
+          <div class="pnl-actions">
+            <label class="precision-control"
+              >时间精度
+              <select v-model="precision" aria-label="收益曲线时间精度">
+                <option v-for="item in curvePrecisions" :key="item.key" :value="item.key">{{
+                  item.label
+                }}</option>
+              </select>
+            </label>
+            <div v-if="profile.curveKind !== 'realized'" class="period-tabs">
+              <button
+                v-for="item in periodTabs"
+                :key="item"
+                type="button"
+                :class="{ 'is-active': activePeriod === item }"
+                @click="activePeriod = item"
+              >
+                {{ item }}
+              </button>
+            </div>
             <button
-              v-for="item in periodTabs"
-              :key="item"
+              v-if="profile.curveKind !== 'realized'"
               type="button"
-              :class="{ 'is-active': activePeriod === item }"
-              @click="activePeriod = item"
+              class="legend-pill is-return"
             >
-              {{ item }}
+              <span></span>
+              日度收益
+            </button>
+            <button type="button" class="legend-pill is-net">
+              <span></span>
+              {{
+                profile.curveKind === 'realized'
+                  ? `已实现损益 ${profile.curveCurrency || ''}`
+                  : '净值曲线'
+              }}
             </button>
           </div>
-          <button
-            v-if="profile.curveKind !== 'realized'"
-            type="button"
-            class="legend-pill is-return"
-          >
-            <span></span>
-            日度收益
-          </button>
-          <button type="button" class="legend-pill is-net">
-            <span></span>
-            {{
-              profile.curveKind === 'realized'
-                ? `已实现损益 ${profile.curveCurrency || ''}`
-                : '净值曲线'
-            }}
-          </button>
+        </header>
+
+        <div ref="overviewChartRef" class="overview-chart"></div>
+      </article>
+
+      <section class="metric-grid">
+        <article v-for="item in profile.metrics" :key="item.label" class="metric-card">
+          <label>{{ item.label }}</label>
+          <strong :class="item.tone ? `is-${item.tone}` : 'is-neutral'">{{ item.value }}</strong>
+          <span v-if="item.ratio" :class="item.tone ? `is-${item.tone}` : 'is-neutral'">{{
+            item.ratio
+          }}</span>
+        </article>
+      </section>
+
+      <section class="attribution-board">
+        <article v-for="item in profile.attributions" :key="item.label" class="attribution-card">
+          <label>{{ item.label }}</label>
+          <strong :class="item.tone ? `is-${item.tone}` : 'is-neutral'">{{ item.value }}</strong>
+          <span v-if="item.ratio" :class="item.tone ? `is-${item.tone}` : 'is-neutral'">{{
+            item.ratio
+          }}</span>
+        </article>
+      </section>
+    </template>
+
+    <StrategyPnlCalendar
+      v-if="view === 'daily-position' && !distributionOnly"
+      :points="profile.dailyPnl ?? []"
+      :currency="profile.dailyPnlCurrency || profile.curveCurrency || ''"
+      :load-error="profile.totalFund"
+    />
+
+    <article
+      v-if="view === 'daily-position' && !hideDistribution"
+      :class="['position-distribution-card', { 'is-embedded': distributionOnly }]"
+    >
+      <header class="position-distribution-header">
+        <h3>{{ positionDistribution.title }}</h3>
+        <div class="position-distribution-meta">
+          <span>
+            <em>{{ positionDistribution.grossLabel }}</em>
+            {{ positionDistribution.gross }}
+          </span>
         </div>
       </header>
 
-      <div ref="overviewChartRef" class="overview-chart"></div>
+      <div v-if="positionDistribution.slices.length" class="position-distribution-body">
+        <div ref="distributionChartRef" class="position-distribution-chart"></div>
+        <div class="position-distribution-legend">
+          <header class="legend-header">
+            <span>仓位详情</span>
+            <strong>总名义 {{ positionDistribution.gross }}</strong>
+          </header>
+          <ul>
+            <li v-for="(leg, legIndex) in positionDistribution.slices" :key="leg.label">
+              <i class="legend-dot" :style="{ background: sliceColor(legIndex) }"></i>
+              <span class="legend-name">{{ leg.label }}</span>
+              <span class="legend-amount">{{ leg.amount }}</span>
+              <span class="legend-share">{{ leg.share }}</span>
+            </li>
+          </ul>
+        </div>
+      </div>
+
+      <p v-else class="position-distribution-empty">{{ positionDistribution.emptyMessage }}</p>
     </article>
 
-    <section class="metric-grid">
-      <article v-for="item in profile.metrics" :key="item.label" class="metric-card">
-        <label>{{ item.label }}</label>
-        <strong :class="item.tone ? `is-${item.tone}` : 'is-neutral'">{{ item.value }}</strong>
-        <span v-if="item.ratio" :class="item.tone ? `is-${item.tone}` : 'is-neutral'">{{
-          item.ratio
-        }}</span>
+    <template v-if="view === 'overview'">
+      <article class="breakdown-curve-card">
+        <header class="breakdown-curve-header">
+          <h3>损益细分总图</h3>
+        </header>
+        <div ref="breakdownChartRef" class="breakdown-chart"></div>
       </article>
-    </section>
 
-    <section class="attribution-board">
-      <article v-for="item in profile.attributions" :key="item.label" class="attribution-card">
-        <label>{{ item.label }}</label>
-        <strong :class="item.tone ? `is-${item.tone}` : 'is-neutral'">{{ item.value }}</strong>
-        <span v-if="item.ratio" :class="item.tone ? `is-${item.tone}` : 'is-neutral'">{{
-          item.ratio
-        }}</span>
-      </article>
-    </section>
-
-    <article class="breakdown-curve-card">
-      <header class="breakdown-curve-header">
-        <h3>损益细分总图</h3>
-      </header>
-      <div ref="breakdownChartRef" class="breakdown-chart"></div>
-    </article>
-
-    <section class="detail-curve-grid">
-      <StrategyCurveCardChart v-for="item in detailCurveCards" :key="item.title" :item="item" />
-    </section>
+      <section class="detail-curve-grid">
+        <StrategyCurveCardChart v-for="item in detailCurveCards" :key="item.title" :item="item" />
+      </section>
+    </template>
   </section>
 </template>
 
@@ -89,9 +135,14 @@
   import type { Ref } from 'vue';
   import { computed, nextTick, onMounted, ref, watch } from 'vue';
   import { useECharts } from '@/hooks/web/useECharts';
-  import type { StrategyDeskKey, StrategyPnlProfile } from '@/data/sample/strategy';
+  import {
+    strategyPnlProfiles,
+    type StrategyDeskKey,
+    type StrategyPnlProfile,
+    type StrategyPositionDistribution,
+  } from '@/data/sample/strategy';
   import StrategyCurveCardChart from './StrategyCurveCardChart.vue';
-  import { strategyPnlProfiles } from '@/data/sample/strategy';
+  import StrategyPnlCalendar from './StrategyPnlCalendar.vue';
   import {
     curvePrecisions,
     samplePnlCurve,
@@ -101,16 +152,27 @@
   const props = defineProps<{
     activeDesk: StrategyDeskKey;
     liveProfile?: StrategyPnlProfile | null;
+    view?: 'overview' | 'daily-position';
+    distributionOnly?: boolean;
+    hideDistribution?: boolean;
   }>();
+
+  const view = computed(() => props.view ?? 'overview');
+  const distributionOnly = computed(() => props.distributionOnly ?? false);
+  const hideDistribution = computed(() => props.hideDistribution ?? false);
 
   const periodTabs = ['日报', '周报', '月报', '自定义'];
   const activePeriod = ref('周报');
   const precision = ref<CurvePrecision>('day');
   const overviewChartRef = ref<HTMLDivElement | null>(null);
   const breakdownChartRef = ref<HTMLDivElement | null>(null);
+  const distributionChartRef = ref<HTMLDivElement | null>(null);
   const { setOptions, resize } = useECharts(overviewChartRef as Ref<HTMLDivElement>);
   const { setOptions: setBreakdownOptions, resize: resizeBreakdown } = useECharts(
     breakdownChartRef as Ref<HTMLDivElement>,
+  );
+  const { setOptions: setDistributionOptions, resize: resizeDistribution } = useECharts(
+    distributionChartRef as Ref<HTMLDivElement>,
   );
 
   const emptyCrossSpreadProfile: StrategyPnlProfile = {
@@ -192,6 +254,104 @@
       })),
     })),
   );
+
+  const emptyDistribution: StrategyPositionDistribution = {
+    title: '仓位分布',
+    currency: '',
+    mixedCurrency: false,
+    grossLabel: '持仓价值（双边）',
+    gross: '--',
+    netLabel: '净敞口（对冲后）',
+    net: '--',
+    groups: [],
+    slices: [],
+    emptyMessage: '接口待接入',
+  };
+  const positionDistribution = computed(
+    () => profile.value.positionDistribution ?? emptyDistribution,
+  );
+
+  const distributionPalette = [
+    '#3498db',
+    '#55d6d9',
+    '#f4bf45',
+    '#ee746f',
+    '#d05caa',
+    '#7aa7ff',
+    '#2fa86e',
+    '#d8585f',
+    '#8b6bd8',
+  ];
+  function sliceColor(legIndex: number): string {
+    return distributionPalette[legIndex % distributionPalette.length];
+  }
+
+  async function renderDistributionChart() {
+      const distribution = positionDistribution.value;
+    if (!distribution.slices.length) return;
+    await setDistributionOptions({
+      tooltip: {
+        trigger: 'item',
+        formatter: (params: any) =>
+          `${params.name}<br/>${params.marker} ${Number(params.value).toLocaleString('en-US', {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+          })}<br/>${params.percent ? `${params.percent.toFixed(2)}%` : ''}`,
+        borderWidth: 0,
+      },
+      series: [
+        {
+          name: '净仓位',
+          type: 'pie',
+          radius: ['50%', '80%'],
+          center: ['50%', '50%'],
+          minAngle: 8,
+          avoidLabelOverlap: true,
+          silent: false,
+          label: {
+            show: true,
+            formatter: (params: any) => `${params.name}`,
+            position: 'outside',
+            fontSize: 11,
+            color: '#42526b',
+            lineHeight: 14,
+            distance: 8,
+          },
+          labelLine: {
+            show: true,
+            length: 8,
+            length2: 8,
+            lineStyle: { color: 'rgba(66, 82, 107, 0.35)', width: 1 },
+          },
+          itemStyle: {
+            borderColor: 'var(--strategy-surface)',
+            borderWidth: 2,
+            borderRadius: 8,
+            shadowColor: 'rgba(28, 58, 91, 0.18)',
+            shadowBlur: 16,
+          },
+          emphasis: {
+            scale: true,
+            scaleSize: 6,
+            focus: 'self',
+            itemStyle: {
+              shadowBlur: 20,
+              shadowColor: 'rgba(52, 74, 102, 0.24)',
+              shadowOffsetX: 0,
+              shadowOffsetY: 6,
+            },
+          },
+          data: distribution.slices.map((slice, index) => ({
+            name: `${slice.label}${distribution.mixedCurrency ? ` · ${slice.currency}` : ''}`,
+            value: slice.value,
+            itemStyle: { color: sliceColor(index) },
+          })),
+        },
+      ] as any,
+    });
+    await nextTick();
+    resizeDistribution();
+  }
 
   async function renderOverviewChart() {
     await setOptions({
@@ -328,11 +488,18 @@
   }
 
   function renderCharts() {
-    renderOverviewChart();
-    renderBreakdownChart();
+    if (view.value === 'overview') {
+      renderOverviewChart();
+      renderBreakdownChart();
+    } else {
+      renderDistributionChart();
+    }
   }
 
-  watch(() => [props.activeDesk, profile.value], renderCharts, { deep: true });
+  watch(() => [props.activeDesk, props.view, profile.value], renderCharts, {
+    deep: true,
+    flush: 'post',
+  });
   onMounted(renderCharts);
 </script>
 
@@ -344,6 +511,7 @@
     color: var(--strategy-text-2);
     white-space: nowrap;
   }
+
   .precision-control select {
     padding: 6px 10px;
     border: 1px solid var(--strategy-border);
@@ -351,6 +519,7 @@
     background: var(--strategy-surface);
     color: inherit;
   }
+
   .pnl-panel {
     display: grid;
     gap: var(--strategy-space-2);
@@ -361,6 +530,7 @@
   .attribution-card,
   .detail-curve-card,
   .breakdown-curve-card,
+  .position-distribution-card,
   .leg-snapshot-card {
     border: 1px solid var(--strategy-border);
     background: var(--strategy-surface);
@@ -552,6 +722,165 @@
     height: 300px;
   }
 
+  .position-distribution-card {
+    display: grid;
+    gap: 14px;
+    padding: 18px 20px;
+    border-radius: var(--strategy-radius-panel);
+  }
+
+  .position-distribution-card.is-embedded {
+    padding: 0;
+    margin-top: 16px;
+    border: none;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .position-distribution-header {
+    display: grid;
+    gap: 14px;
+  }
+
+  .position-distribution-header h3 {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    margin: 0;
+    color: var(--strategy-text-1);
+    font-size: 20px;
+    line-height: 1.2;
+    font-weight: 900;
+    letter-spacing: 0.02em;
+  }
+
+  .position-distribution-header h3::before {
+    width: 4px;
+    height: 18px;
+    border-radius: 999px;
+    background: linear-gradient(180deg, var(--strategy-accent), var(--strategy-accent-strong));
+    content: '';
+  }
+
+  .position-distribution-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 18px;
+    margin-top: 4px;
+    color: var(--strategy-text-1);
+    font-size: 15px;
+    font-weight: 800;
+    line-height: 1.65;
+  }
+
+  .position-distribution-meta em {
+    display: inline;
+    margin-right: 8px;
+    margin-bottom: 0;
+    color: var(--strategy-text-3);
+    font-style: normal;
+    font-weight: 700;
+  }
+
+  .position-distribution-body {
+    display: grid;
+    grid-template-columns: minmax(0, 300px) minmax(0, 1fr);
+    align-items: center;
+    gap: 18px;
+  }
+
+  .position-distribution-chart {
+    height: 260px;
+  }
+
+  .position-distribution-legend {
+    display: grid;
+    gap: 12px;
+    padding: 12px;
+    border: 1px solid var(--strategy-border-soft);
+    border-radius: var(--strategy-radius-card);
+    background: linear-gradient(
+      180deg,
+      rgba(250, 253, 255, 0.9),
+      rgba(243, 248, 255, 0.45)
+    );
+  }
+
+  .position-distribution-legend ul {
+    display: grid;
+    gap: 8px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .legend-header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--strategy-border-soft);
+    color: var(--strategy-text-3);
+    font-size: var(--strategy-font-xs);
+    font-weight: 700;
+  }
+
+  .legend-header strong {
+    color: var(--strategy-text-1);
+    font-size: var(--strategy-font-base);
+    font-weight: 800;
+  }
+
+  .position-distribution-legend li {
+    display: grid;
+    grid-template-columns: 12px minmax(0, 1fr) auto auto;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    border: 1px solid var(--strategy-border-soft);
+    border-radius: var(--strategy-radius-control);
+    background: var(--strategy-surface);
+    box-shadow: var(--strategy-shadow-soft);
+    font-size: var(--strategy-font-base);
+    font-weight: 700;
+  }
+
+  .legend-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+  }
+
+  .legend-name {
+    color: var(--strategy-text-2);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+  }
+
+  .legend-amount {
+    color: var(--strategy-text-1);
+    font-weight: 800;
+  }
+
+  .legend-share {
+    min-width: 64px;
+    color: var(--strategy-accent-strong);
+    font-weight: 800;
+    text-align: right;
+  }
+
+  .position-distribution-empty {
+    margin: 0;
+    padding: 24px 0;
+    color: var(--strategy-text-3);
+    font-size: var(--strategy-font-base);
+    font-weight: 700;
+    text-align: center;
+  }
+
   .leg-snapshot-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -620,6 +949,10 @@
     .leg-snapshot-grid,
     .detail-curve-grid {
       grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .position-distribution-body {
+      grid-template-columns: 1fr;
     }
   }
 

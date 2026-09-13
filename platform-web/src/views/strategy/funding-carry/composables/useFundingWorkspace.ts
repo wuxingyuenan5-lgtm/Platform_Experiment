@@ -38,6 +38,13 @@ function normalizeWorkspaceState(workspace: Record<string, unknown> | undefined 
   return typeof workspace?.executionState === 'string' ? workspace.executionState : 'loading';
 }
 
+/**
+ * 本次新建的资费草稿。`executionPolicy` 由非可选 ref 写入，必然已选定；
+ * `FundingPendingDraft` 的该字段可选只是为了容忍从本地存储恢复的旧草稿，
+ * 因此提交路径使用本收窄类型，而不是给提交值补一个默认执行方式。
+ */
+type FreshFundingDraft = FundingPendingDraft & { executionPolicy: FundingExecutionPolicy };
+
 export function useFundingWorkspace() {
   const userStore = useUserStore();
   const readCurrentDraft = () =>
@@ -330,7 +337,7 @@ export function useFundingWorkspace() {
     const sessionGeneration = strategySession.value.generation;
     const group = selectedCloseGroup.value;
     const sizing = context.value?.openSizing;
-    const draft: FundingPendingDraft = {
+    const draft: FreshFundingDraft = {
       idempotencyKey: createIdempotencyKey(),
       ownerUserId: userStore.authentication!.user.userId,
       action,

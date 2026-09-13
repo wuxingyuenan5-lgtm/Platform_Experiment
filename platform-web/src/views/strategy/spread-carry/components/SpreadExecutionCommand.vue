@@ -860,7 +860,7 @@
     background: #fff;
     color: #47617f;
     font-size: 14px;
-    font-weight: 700;
+    font-weight: 600;
     cursor: pointer;
   }
 
@@ -1001,7 +1001,7 @@
     margin-top: 6px;
     color: #667891;
     font-size: 12px;
-    font-weight: 700;
+    font-weight: 600;
   }
 
   .execution-column {
@@ -1072,7 +1072,7 @@
     color: #1a2a48;
     font-family: var(--strategy-font-data);
     font-size: 15px;
-    font-weight: 700;
+    font-weight: 600;
   }
 
   .input-row em {
@@ -1084,7 +1084,7 @@
     color: #152646;
     font-size: 13px;
     font-style: normal;
-    font-weight: 700;
+    font-weight: 600;
   }
 
   .input-row--qty {
@@ -1099,7 +1099,7 @@
     border-left: 1px solid #e7ebf0;
     color: #1a2a48;
     font-size: 14px;
-    font-weight: 700;
+    font-weight: 600;
   }
 
   .stacked-select {
@@ -1121,7 +1121,7 @@
     background: #fff;
     color: #152646;
     font-size: 13px;
-    font-weight: 700;
+    font-weight: 600;
     cursor: pointer;
   }
 
@@ -1234,7 +1234,7 @@
   .funding-projection > span {
     color: #47617f;
     font-size: 13px;
-    font-weight: 700;
+    font-weight: 600;
   }
 
   .funding-balance-card strong {
@@ -1271,7 +1271,7 @@
     align-items: center;
     color: #2f3640;
     font-size: 13px;
-    font-weight: 700;
+    font-weight: 600;
   }
 
   .funding-status,
@@ -1332,7 +1332,7 @@
     color: #22324d;
     font-family: var(--strategy-font-data);
     font-size: 13px;
-    font-weight: 700;
+    font-weight: 600;
   }
 
   .row-btn {

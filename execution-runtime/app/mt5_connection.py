@@ -131,16 +131,10 @@ def initialize_mt5(
 ) -> bool:
     """Initialize the explicit Terminal using MetaTrader5's positional path contract."""
     if terminal_path:
-        started_pid = None
-        if background:
-            started_pid = _ensure_background_terminal(
-                terminal_path,
-                portable=bool(kwargs.get("portable", False)),
-                timeout_ms=int(str(kwargs.get("timeout", 60000))),
-            )
         try:
-            return bool(mt5.initialize(terminal_path, **kwargs))
+            initialized = bool(mt5.initialize(terminal_path, **kwargs))
         finally:
-            if started_pid is not None:
-                _finish_background_startup(started_pid)
+            if background:
+                maintain_background_terminal(terminal_path)
+        return initialized
     return bool(mt5.initialize(**kwargs))

@@ -23,6 +23,15 @@ from app.research_data_schemas import (
     AShareMarketTurnoverResponse,
     StockSnapshotResponse,
 )
+from app.research_overseas_refresh import refresh_overseas
+from app.research_overseas_repository import (
+    read_dataset_health,
+    read_etf_flow,
+    read_iv_snapshot_history,
+    read_iv_snapshot_latest,
+    read_latest_observed_at,
+    read_latest_series,
+)
 from app.research_provider_commodity_dashboard import CommodityDashboardProvider
 from app.research_provider_crypto_dashboard import CryptoDashboardProvider
 from app.research_provider_errors import ResearchProviderError
@@ -32,6 +41,7 @@ from app.research_provider_macro import (
 )
 from app.research_provider_macro_dashboard import MacroDashboardProvider, MacroDashboardResponse
 from app.research_provider_market_detail import MarketDetailProvider, MarketDetailResponse
+from app.research_provider_overseas import fetch_deribit_dvol
 from app.research_service import (
     ResearchServiceError,
     get_live_a_share_market_turnover,
@@ -335,3 +345,154 @@ async def crypto_dashboard_v1(response: Response, _: ResearchPrincipal) -> Macro
         ) from exc
     _cache_header(response, 300)
     return result
+
+
+@router.get("/macro/fedwatch", tags=["research"])
+async def macro_fedwatch(response: Response, _: ResearchPrincipal) -> dict[str, object]:
+    response.headers["Cache-Control"] = "no-store"
+    series = await asyncio.to_thread(read_latest_series, "macro_fedwatch")
+    meta = series.pop("__meta__", {})
+    meetings = [
+        {
+            "date": code,
+            "probabilities": payload.get("probabilities", {}),
+            "contract": payload.get("contract"),
+        }
+        for code, payload in sorted(series.items())
+    ]
+    health = await asyncio.to_thread(read_dataset_health, "macro_fedwatch")
+    return {
+        "data": {
+            "effr": meta.get("effr"),
+            "currentTarget": meta.get("currentTarget"),
+            "observedAt": meta.get("observedAt")
+            or await asyncio.to_thread(read_latest_observed_at, "macro_fedwatch"),
+            "zqPricing": meta.get("zqPricing", []),
+            "meetings": meetings,
+            "status": health["status"],
+            "lastError": health["lastError"],
+        }
+    }
+
+
+@router.get("/crypto/etf-flow", tags=["research"])
+async def crypto_etf_flow(response: Response, _: ResearchPrincipal) -> dict[str, object]:
+    response.headers["Cache-Control"] = "no-store"
+    data = await asyncio.to_thread(read_etf_flow, 14)
+    health = await asyncio.to_thread(read_dataset_health, "crypto_etf_flow")
+    return {"data": {**data, "status": health["status"], "lastError": health["lastError"]}}
+
+
+@router.get("/crypto/iv-term", tags=["research"])
+async def crypto_iv_term(response: Response, _: ResearchPrincipal) -> dict[str, object]:
+    response.headers["Cache-Control"] = "no-store"
+    series = await asyncio.to_thread(read_latest_series, "crypto_iv_term")
+    meta = series.pop("__meta__", {})
+    term = [
+        {**payload, "expiry": code}
+        for code, payload in sorted(series.items(), key=lambda kv: kv[1].get("daysToExpiry", 0))
+    ]
+    health = await asyncio.to_thread(read_dataset_health, "crypto_iv_term")
+    return {
+        "data": {
+            "index": meta.get("index"),
+            "observedAt": await asyncio.to_thread(read_latest_observed_at, "crypto_iv_term"),
+            "term": term,
+            "status": health["status"],
+            "lastError": health["lastError"],
+        }
+    }
+
+
+@router.get("/crypto/iv-snapshot", tags=["research"])
+async def crypto_iv_snapshot(response: Response, _: ResearchPrincipal) -> dict[str, object]:
+    """1M/3M/6M/1Y 4 时段当前快照（BTC 指数价 + DVOL + 每时段 IV）。"""
+    response.headers["Cache-Control"] = "no-store"
+    data = await asyncio.to_thread(read_iv_snapshot_latest)
+    health = await asyncio.to_thread(read_dataset_health, "crypto_iv_snapshot")
+    return {"data": {**data, "status": health["status"], "lastError": health["lastError"]}}
+
+
+@router.get("/crypto/iv-history", tags=["research"])
+async def crypto_iv_history(
+    response: Response,
+    _: ResearchPrincipal,
+    tenor: str = Query(..., pattern="^(1M|3M|6M|1Y)$"),
+    days: int = Query(365, ge=1, le=730),
+) -> dict[str, object]:
+    """读单一时段累积历史快照（最多 2 年）。"""
+    response.headers["Cache-Control"] = "no-store"
+    history = await asyncio.to_thread(read_iv_snapshot_history, tenor, days)
+    health = await asyncio.to_thread(read_dataset_health, "crypto_iv_snapshot")
+    if history:
+        ivs = [p["iv"] for p in history if p.get("iv") is not None]
+        stats = {
+            "current": ivs[-1] if ivs else None,
+            "rangeLow": min(ivs) if ivs else None,
+            "rangeHigh": max(ivs) if ivs else None,
+            "historyLow": min(ivs) if ivs else None,
+            "historyHigh": max(ivs) if ivs else None,
+            "count": len(ivs),
+        }
+    else:
+        stats = {
+            "current": None, "rangeLow": None, "rangeHigh": None,
+            "historyLow": None, "historyHigh": None, "count": 0,
+        }
+    return {
+        "data": {
+            "tenor": tenor,
+            "history": history,
+            "stats": stats,
+            "status": health["status"],
+            "lastError": health["lastError"],
+        }
+    }
+
+
+@router.get("/crypto/iv-dvol", tags=["research"])
+async def crypto_iv_dvol(
+    response: Response,
+    _: ResearchPrincipal,
+    days: int = Query(90, ge=7, le=365),
+) -> dict[str, object]:
+    """Deribit BTC DVOL 历史走势（30日 IV 年化），用于 IV 面板「历史走势」图。
+
+    不落库：实时拉取 Deribit 公开接口，命中限速时返回 stale 状态但仍尝试返回最新缓存。
+    """
+    response.headers["Cache-Control"] = "no-store"
+    try:
+        data = await asyncio.to_thread(fetch_deribit_dvol, days)
+    except ResearchProviderError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail={"code": "deribit_dvol_unavailable", "message": str(exc)},
+        ) from exc
+    return {"data": data}
+
+
+@router.post("/overseas/refresh", tags=["research"])
+async def trigger_overseas_refresh(
+    _: Annotated[Principal, Depends(require_permission("research.write"))],
+) -> dict[str, object]:
+    """手动触发海外公开研究数据刷新（需 ``research.write``）。
+
+    失败语义：刷新失败**保留最后一次有效数据**，不返回伪造值。整体失败时返回
+    503 并携带各源状态；部分源失败时返回 200 但 ``status=partial``，由前端
+    按源展示 stale 标记。
+    """
+    status = await refresh_overseas(force=True)
+    health = {
+        dataset: await asyncio.to_thread(read_dataset_health, dataset)
+        for dataset in ("macro_fedwatch", "crypto_etf_flow", "crypto_iv_snapshot")
+    }
+    if status == "error":
+        raise HTTPException(
+            503,
+            detail={
+                "code": "overseas_refresh_failed",
+                "message": "更新未完成，已保留上次有效数据",
+                "sources": health,
+            },
+        )
+    return {"data": {"status": status, "sources": health}}

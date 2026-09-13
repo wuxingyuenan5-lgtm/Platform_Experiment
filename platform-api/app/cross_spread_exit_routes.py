@@ -7,6 +7,7 @@ from contextlib import asynccontextmanager
 from fastapi import APIRouter, FastAPI, Query
 
 from app.config import get_settings
+from app.cross_spread import get_cross_spread_trading_rules
 from app.cross_spread_exit_repository import list_exit_plans, update_exit_plan_settings
 from app.cross_spread_exit_schemas import (
     CrossSpreadCloseResult,
@@ -17,6 +18,7 @@ from app.cross_spread_exit_schemas import (
     CrossSpreadMarketOpenRequest,
     CrossSpreadOpenResult,
 )
+from app.schemas import CrossSpreadTradingRulesResponse
 from app.cross_spread_synthetic_service import (
     close_cross_spread_market,
     evaluate_cross_spread_exit_plans,
@@ -67,6 +69,15 @@ def exit_plans(
     status: str | None = Query(default=None),
 ) -> list[CrossSpreadExitPlanResponse]:
     return list_exit_plans(status=status)
+
+
+@router.get(
+    "/trading-rules",
+    response_model=CrossSpreadTradingRulesResponse,
+    tags=["trading"],
+)
+def trading_rules() -> CrossSpreadTradingRulesResponse:
+    return get_cross_spread_trading_rules()
 
 
 @router.patch(

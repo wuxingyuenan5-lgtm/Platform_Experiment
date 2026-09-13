@@ -416,6 +416,25 @@ class Mt5LiveAdapter:
                 )
                 if (value := getattr(symbol_info, key, None)) is not None
             }
+            # Preserve native execution evidence alongside the quote.  The
+            # Cross monitor uses these fields to distinguish a visible price
+            # from a quote that may be used for a new order or close.
+            market_metadata.update(
+                {
+                    "tradeMode": getattr(symbol_info, "trade_mode", None),
+                    "accountTradeAllowed": bool(getattr(info, "trade_allowed", False)),
+                    "terminalTradeAllowed": bool(getattr(terminal, "trade_allowed", False)),
+                    "accountExpertTradeAllowed": bool(getattr(info, "trade_expert", False)),
+                    "pythonTradeAllowed": getattr(terminal, "tradeapi_disabled", None) is False,
+                    "symbolVisible": bool(getattr(symbol_info, "visible", False)),
+                }
+            )
+            tick_time_msc = int(getattr(tick, "time_msc", 0) or 0)
+            source_as_of = (
+                datetime.fromtimestamp(tick_time_msc / 1000, UTC)
+                if tick_time_msc > 0
+                else None
+            )
             return VenueMarketQuoteSnapshot(
                 source=self.name,
                 accountId=account_id,
@@ -429,8 +448,7 @@ class Mt5LiveAdapter:
                 currency=quote_currency or "UNKNOWN",
                 dataQualityState="complete" if quote_currency else "partial",
                 rawPayload=market_metadata,
-                # Some brokers expose Terminal/server-local tick epochs. The
-                # normalized quote timestamp is the Runtime observation time.
+                sourceAsOf=source_as_of,
                 asOf=datetime.now(UTC),
             )
         except (GatewayConfigurationError, GatewayResultUnknownError):

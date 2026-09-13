@@ -878,6 +878,13 @@ class BybitLiveAdapter:
                     symbol = str(row.get("symbol") or "").upper()
                     side = str(row.get("side") or "")
                     quantity = size if side == "Buy" else -size
+                    # The venue already values the position and reports the margin
+                    # it occupies. Monitoring must carry those figures through
+                    # instead of rebuilding them, so the platform can show the
+                    # authoritative exposure and liquidation distance.
+                    liquidation = self._optional_decimal(row.get("liqPrice"))
+                    if liquidation is not None and liquidation <= 0:
+                        liquidation = None
                     positions.append(
                         VenuePositionSnapshot(
                             source=self.name,
@@ -896,6 +903,14 @@ class BybitLiveAdapter:
                             averagePrice=self._optional_decimal(row.get("avgPrice")),
                             currentPrice=self._optional_decimal(row.get("markPrice")),
                             markPrice=self._optional_decimal(row.get("markPrice")),
+                            positionValue=self._optional_decimal(row.get("positionValue")),
+                            leverage=self._optional_decimal(row.get("leverage")),
+                            initialMargin=self._optional_decimal(
+                                row.get("positionIM") or row.get("positionIMByMp")
+                            ),
+                            maintenanceMargin=self._optional_decimal(
+                                row.get("positionMM") or row.get("positionMMByMp")
+                            ),
                             unrealizedPnl=self._optional_decimal(row.get("unrealisedPnl")),
                             currency=(
                                 self.settings.bybit_settle_coin
@@ -904,7 +919,19 @@ class BybitLiveAdapter:
                             ),
                             stopLossPrice=self._optional_decimal(row.get("stopLoss")),
                             takeProfitPrice=self._optional_decimal(row.get("takeProfit")),
-                            liquidationPrice=self._optional_decimal(row.get("liqPrice")),
+                            liquidationPrice=liquidation,
+                            liquidationPriceSource=(
+                                "venue_reported" if liquidation is not None else "venue_not_finite"
+                            ),
+                            fieldAvailability={
+                                "liquidationPrice": (
+                                    "venue_reported"
+                                    if liquidation is not None
+                                    else "not_finite_for_mode"
+                                ),
+                                "marginCallLevel": "account_level_only",
+                                "stopOutLevel": "account_level_only",
+                            },
                             asOf=self._millis(row.get("updatedTime")),
                         )
                     )

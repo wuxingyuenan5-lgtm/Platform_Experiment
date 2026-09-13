@@ -2,6 +2,8 @@ from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from threading import Barrier
 
+import pytest
+
 from app.cross_spread_market import (
     _SNAPSHOT_CACHE,
     build_cross_spread_snapshot,
@@ -114,10 +116,13 @@ def test_shared_gateway_supplies_quotes_positions_swap_and_valuation():
     assert result.mt5.positions[0].currency == "EUR"
     assert result.mt5.positions[0].as_of == gateway.observed
     assert result.mt5.quote.currency == "USD"  # Price currency; PnL account is EUR.
+    assert result.mt5.quote_source_as_of is None
     assert result.metrics.funding_rate == Decimal("0.0001")
     assert result.metrics.buyer_inventory_fee == Decimal("-78.29")
     assert result.metrics.seller_inventory_fee == Decimal("29.49")
     assert result.metrics.usdt_usd == Decimal("0.999")
+    assert result.execution_state == "monitor_only"
+    assert result.mt5.open_allowed is False
     assert sorted(gateway.calls) == sorted(
         [
             ("quote", "bybit-1"),
@@ -156,6 +161,129 @@ def test_position_failure_keeps_the_available_quote():
     assert result.bybit.quote is not None
     assert result.bybit.positions == []
     assert "position endpoint rejected" in result.bybit.reason
+
+
+def test_cross_exposes_executable_only_when_both_venues_have_fresh_native_evidence():
+    gateway = ReadGateway()
+    gateway.observed = datetime.now(UTC) - timedelta(seconds=1)
+    original = gateway.get_market_quote
+
+    def quote_with_evidence(*, account_id, symbol, category=None):
+        quote = original(account_id=account_id, symbol=symbol, category=category)
+        if account_id.startswith("bybit"):
+            quote.raw_payload = {"serverTime": "fresh"}
+            quote.source_as_of = datetime.now(UTC)
+        else:
+            quote.raw_payload = {
+                "tradeMode": 4,
+                "accountTradeAllowed": True,
+                "terminalTradeAllowed": True,
+                "accountExpertTradeAllowed": True,
+                "pythonTradeAllowed": True,
+                "symbolVisible": True,
+            }
+            quote.source_as_of = datetime.now(UTC)
+        return quote
+
+    gateway.get_market_quote = quote_with_evidence
+    result = snapshot(gateway)
+    assert result.execution_state == "executable"
+    assert result.bybit.open_allowed and result.bybit.close_allowed
+    assert result.mt5.open_allowed and result.mt5.close_allowed
+
+
+def test_cross_keeps_stale_quotes_for_monitoring_but_blocks_execution():
+    gateway = ReadGateway()
+    gateway.observed = datetime.now(UTC) - timedelta(seconds=90)
+    original = gateway.get_market_quote
+
+    def quote_with_evidence(*, account_id, symbol, category=None):
+        quote = original(account_id=account_id, symbol=symbol, category=category)
+        quote.raw_payload = (
+            {"serverTime": "stale"}
+            if account_id.startswith("bybit")
+            else {
+                "tradeMode": 4,
+                "accountTradeAllowed": True,
+                "terminalTradeAllowed": True,
+                "accountExpertTradeAllowed": True,
+                "pythonTradeAllowed": True,
+                "symbolVisible": True,
+            }
+        )
+        quote.source_as_of = gateway.observed
+        return quote
+
+    gateway.get_market_quote = quote_with_evidence
+    result = snapshot(gateway)
+    assert result.execution_state == "monitor_only"
+    assert result.bybit.quote is not None and result.mt5.quote is not None
+    assert result.bybit.execution_block_reason == "quote_stale"
+    assert result.mt5.execution_block_reason == "quote_stale"
+
+
+def test_mt5_close_only_allows_close_but_not_open():
+    gateway = ReadGateway()
+    gateway.observed = datetime.now(UTC) - timedelta(seconds=1)
+    original = gateway.get_market_quote
+
+    def quote_with_close_only(*, account_id, symbol, category=None):
+        quote = original(account_id=account_id, symbol=symbol, category=category)
+        quote.source_as_of = datetime.now(UTC)
+        quote.raw_payload = (
+            {"serverTime": "fresh"}
+            if account_id.startswith("bybit")
+            else {
+                "tradeMode": 3,
+                "accountTradeAllowed": True,
+                "terminalTradeAllowed": True,
+                "accountExpertTradeAllowed": True,
+                "pythonTradeAllowed": True,
+                "symbolVisible": True,
+            }
+        )
+        return quote
+
+    gateway.get_market_quote = quote_with_close_only
+    result = snapshot(gateway)
+    assert result.mt5.open_allowed is False
+    assert result.mt5.close_allowed is True
+    assert result.execution_state == "monitor_only"
+
+
+@pytest.mark.parametrize(
+    ("permission", "expected_reason"),
+    [
+        ("accountExpertTradeAllowed", "mt5_expert_trade_not_allowed"),
+        ("pythonTradeAllowed", "mt5_python_trade_not_allowed"),
+    ],
+)
+def test_mt5_permission_evidence_blocks_cross_execution(permission, expected_reason):
+    gateway = ReadGateway()
+    gateway.observed = datetime.now(UTC) - timedelta(seconds=1)
+    original = gateway.get_market_quote
+
+    def quote_with_permission(*, account_id, symbol, category=None):
+        quote = original(account_id=account_id, symbol=symbol, category=category)
+        quote.source_as_of = datetime.now(UTC)
+        quote.raw_payload = {
+            "tradeMode": 4,
+            "accountTradeAllowed": True,
+            "terminalTradeAllowed": True,
+            "accountExpertTradeAllowed": True,
+            "pythonTradeAllowed": True,
+            "symbolVisible": True,
+        }
+        if account_id.startswith("bybit"):
+            quote.raw_payload = {"serverTime": "fresh"}
+        elif permission:
+            quote.raw_payload[permission] = False
+        return quote
+
+    gateway.get_market_quote = quote_with_permission
+    result = snapshot(gateway)
+    assert result.execution_state == "monitor_only"
+    assert result.mt5.execution_block_reason == expected_reason
 
 
 def test_wrong_account_quote_is_never_published():

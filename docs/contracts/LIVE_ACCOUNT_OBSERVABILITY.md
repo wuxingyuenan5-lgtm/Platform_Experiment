@@ -209,6 +209,7 @@ Bybit recent history covers an explicit seven-day UTC interval and follows every
 - Strategy Order and Fill history is attributed through `StrategyInstruction` / `ExecutionBatch` / `TradeCommand` identities, never by account display name or account-plus-symbol filtering. This is required when strategies share one UTA.
 - Platform monitoring resolves legacy order aliases by the exact `(account_id, instrument_id, external_order_id)` tuple. Instrument identity includes the market category; symbol or timestamp similarity is insufficient. A unique command-owned order wins over its monitoring aliases. Multiple command owners remain an identity conflict. Original IDs, rows and native payloads are retained.
 - Order-linked settlements follow the same owner even if an older shared-account projection assigned them elsewhere. The strategy settlement table contains only owned events; unassigned funding/swap stays pending and is not counted in Funding merely because that strategy shares the account.
+- Bybit Funding settlement ownership can also be established by the native flat-to-settlement execution interval under [Financial Facts](FINANCIAL_FACTS.md). The strategy read model displays its formal instruction/batch attribution; other strategies' assigned events and unrelated symbols or periods without strategy exposure do not invalidate that strategy's settlement total. Missing FX invalidates affected components and net PnL, while independently confirmed base-currency funding remains visible.
 - Monitoring does not require every historical symbol to have a trading instrument specification. Such Orders/Fills remain readable with their native receipts; unavailable multiplier or opening basis marks the calculation incomplete instead of failing the account snapshot. A read-model failure is a data-loading error, not proof that configured credentials are disconnected.
 - Account snapshots retain native executions and fees, but cannot advance a command-owned order's status, append its execution quantities, or resolve `result_unknown`. Those transitions remain with the execution/reconciliation path and its cumulative-fill ceiling. Monitor-only fill IDs are scoped by account, source and native fill identity; raw tickets remain available separately.
 - New operational fills explicitly record `runtime_confirmation` or `venue_execution`, their source and any native fill ID. Each row is an increment within its source representation. Known mixed representations or quantities exceeding a business order's ceiling fail closed. Unclassified historical rows retain the old bounded projection and expose `legacy_fill_provenance_pending`; migration does not infer provenance from a quantity equal to the order size.
@@ -226,8 +227,13 @@ Bybit recent history covers an explicit seven-day UTC interval and follows every
 - The strategy history response exposes nullable `equityDrawdown`, `totalAssetsDrawdown` and their quality fields. Frontend account charts, including Cross's three selectable scopes, consume these percentages and show “调整后回撤（估算）”; they do not recalculate raw-asset drawdown. These monitoring results never feed order admission or formal accounting/NAV.
 - Strategy curves show accumulated realized PnL with the stated coverage. Values of different currencies or asset scopes are not summed into a fabricated combined equity.
 - Strategy curve precision defaults to daily and also supports weekly, hourly and five-minute buckets in Asia/Shanghai. Each bucket uses the last available cumulative observation; missing observations and unimplemented category curves remain absent. Historical timestamps must be retained independently from formatted labels.
+- The strategy account snapshot also exposes an account-scoped `dailyPnl` series beside the equity history: each UTC day's closing observation (the last equity of that day within the snapshot's asset scope and currency) differenced against the previous close and reduced by the classified net capital flow of that interval. Owner confirmed on 2026-09-11 that the measure includes unrealized and realized result together with fees, funding and swap, so it is a flow-adjusted reconstruction rather than a venue-reported daily PnL. A day whose interval lacks coverage, flow classification, FX valuation or nonpositive invested capital returns null `pnl`/`returnRate` with a `quality` reason rather than zero, and one unvaluable interval never suppresses the next; the newest day stays pending until the upstream minute is published, so a trailing `missing_history` day is expected rather than a defect. Days and rates cut at UTC, independently of the Platform's localized display time zones. The frontend may only sum intervals and compound the per-day rates for month and year views, marking a period that contains an unvalued day `--`, and never sums or converts across currencies or asset scopes. These results remain read-only observability and never feed order admission or formal accounting.
+- The Cross strategy presentation is an explicit strategy-level exception: it merges the daily series from its active Bybit and MT5 legs by UTC date when both legs report the same currency. The displayed Cross amount is the sum of both legs, and the return rate uses the sum of their daily opening equity; a missing leg or currency mismatch keeps that day's amount/rate unavailable rather than mixing values. This presentation does not change account-level snapshots, order ownership, or formal accounting.
+- Position exposure is projected per snapshot scope. `positionValue` is the gross notional of exactly the positions that projection reports and `positionValueNet` is their signed net, both stated in the single reported currency. Legs reported in more than one currency yield null exposure: the frontend groups by original currency and never sums them or assumes an FX rate. A leg whose venue report does not describe the projected quantity is valued from the mark price and the stored contract multiplier, so an MT5 LOT quantity is never read as a contract count. `leverage` is the local ratio of gross notional to account equity; `venueLeverage` is the venue's own reported account parameter and is never substituted for it. The strategy PnL panel's position distribution consumes these per-leg values and invents no value it cannot source.
 
 Cross market snapshots retain each venue's observation time and request duration (`asOf`, `fetchLatencyMs`). Request duration is not quote age or order execution latency. Independent Bybit, MT5 and valuation reads run concurrently, concurrent requests share one refresh, and the short market cache expires after one second. The page polls every three seconds without overlapping a pending refresh; unavailable/stale quotes cannot be presented as currently available.
+
+The snapshot separately reports quote visibility and execution capability. `quoteSourceAsOf` is the Venue's native last-price time; `openAllowed`, `closeAllowed`, `executionBlockReason` and aggregate `executionState` determine whether the current quote may enter a normal Cross decision. A positive cached MT5 weekend quote remains observable but is `monitor_only` once its native age exceeds 30 seconds. This state continues spread, position, margin and liquidation-risk reads while preventing normal Open, Close and TP/SL claims. Monitor health reports the background loop separately from the Live Write execution gate, so a running read-only loop is not labelled as a stopped monitor.
 
 ## 9. Frontend acceptance panel
 
@@ -281,3 +287,27 @@ The mandatory safeguards above are not candidates for relaxation or removal. A f
 7. Confirm Bybit liquidation values match the venue UI where a finite value exists.
 8. Confirm MT5 shows no fabricated position liquidation price and matches Margin Call / Stop Out settings.
 9. Resolve every unavailable or unexplained section before requesting an owner-authorized, instruction-bounded write window.
+
+
+## Local service and monitor health
+
+`GET /api/v1/system/monitor-health` (and local `/health/monitors`) reports process-local
+account-sync and Cross-exit start/completion/last-success timestamps. Disabled,
+starting, degraded and stalled are distinct; a successful process health check is
+not evidence of a successful account read or exit evaluation. Account sync is
+stalled after 180 seconds without progress; Cross exit after 60 seconds. Restart
+resets process-local evidence. An unavailable quote or evaluation exception is not
+a successful exit evaluation. These reads do not enable TP/SL or Live Write.
+
+The Windows lifecycle starts a separate hidden watchdog. It checks every 15 seconds,
+requires three failed local health probes, and uses a five-minute recovery cooldown
+with at most three attempts per hour. Repeated failed account reads (six probes) or
+stalled monitors may restart the read-only backends. Recovery reuses the existing
+managed-service launcher and is serialized with manual lifecycle operations.
+Foreign listeners, changed trading modes, or enabled Live Write block automatic
+interruption and require operator attention. No saved flag authorizes live startup.
+Manual stop stops the watchdog; machine boot/login does not automatically start it.
+The strategy management page polls health and displays degradation, disabled exit
+monitoring, watchdog failures and health-request failures. This is an in-app alert,
+not email or an off-device notification. The watchdog status is saved in
+`.codex/dev-platform/watchdog.json`; a report older than 180 seconds is stale.

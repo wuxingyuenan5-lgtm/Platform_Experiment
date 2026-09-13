@@ -432,3 +432,129 @@ export const getCryptoDashboardV1 = () =>
     method: 'GET',
     url: '/research/crypto/dashboard-v1',
   });
+
+export interface FedWatchMeeting {
+  date: string;
+  contract?: string;
+  probabilities: Record<string, number>;
+}
+
+export interface FedWatchZqPricing {
+  code: string;
+  month: string;
+  monthISO: string;
+  settle: number | null;
+}
+
+export interface FedWatchData {
+  effr: number | null;
+  currentTarget: string | null;
+  observedAt: string | null;
+  zqPricing: FedWatchZqPricing[];
+  meetings: FedWatchMeeting[];
+}
+
+export interface CryptoEtfFlowData {
+  observedAt: string | null;
+  tickers: string[];
+  days: Array<{
+    date: string;
+    flows: Record<string, number | null>;
+  }>;
+}
+
+export interface CryptoIvTermPoint {
+  expiry: string;
+  daysToExpiry: number;
+  tenor: string;
+  iv: number;
+}
+
+export interface CryptoIvTermData {
+  index: number | null;
+  observedAt: string | null;
+  term: CryptoIvTermPoint[];
+}
+
+export interface CryptoIvDvolPoint {
+  ts: number;
+  value: number;
+}
+
+export interface CryptoIvDvolData {
+  latest: number | null;
+  history: CryptoIvDvolPoint[];
+}
+
+export interface CryptoIvSnapshotTenor {
+  tenor: string;
+  iv: number;
+  expiry: string;
+  daysToExpiry: number;
+  strike?: number | null;
+}
+
+export interface CryptoIvSnapshotData {
+  index: number | null;
+  dvol: number | null;
+  observedAt: string | null;
+  tenors: CryptoIvSnapshotTenor[];
+}
+
+export interface CryptoIvHistoryPoint {
+  observedAt: string;
+  iv: number | null;
+}
+
+export interface CryptoIvHistoryStats {
+  current: number | null;
+  rangeLow: number | null;
+  rangeHigh: number | null;
+  historyLow: number | null;
+  historyHigh: number | null;
+  count: number;
+}
+
+export interface CryptoIvHistoryData {
+  tenor: string;
+  history: CryptoIvHistoryPoint[];
+  stats: CryptoIvHistoryStats;
+}
+
+export const getMacroFedwatch = () =>
+  researchRequest<{ data: FedWatchData }>({
+    method: 'GET',
+    url: '/research/macro/fedwatch',
+  });
+
+export const getCryptoEtfFlow = () =>
+  researchRequest<{ data: CryptoEtfFlowData }>({
+    method: 'GET',
+    url: '/research/crypto/etf-flow',
+  });
+
+export const getCryptoIvTerm = () =>
+  researchRequest<{ data: CryptoIvTermData }>({
+    method: 'GET',
+    url: '/research/crypto/iv-term',
+  });
+
+export const getCryptoIvDvol = (days: number = 30) =>
+  researchRequest<{ data: CryptoIvDvolData }>({
+    method: 'GET',
+    url: '/research/crypto/iv-dvol',
+    params: { days },
+  });
+
+export const getCryptoIvSnapshot = () =>
+  researchRequest<{ data: CryptoIvSnapshotData }>({
+    method: 'GET',
+    url: '/research/crypto/iv-snapshot',
+  });
+
+export const getCryptoIvHistory = (tenor: '1M' | '3M' | '6M' | '1Y', days: number = 365) =>
+  researchRequest<{ data: CryptoIvHistoryData }>({
+    method: 'GET',
+    url: '/research/crypto/iv-history',
+    params: { tenor, days },
+  });

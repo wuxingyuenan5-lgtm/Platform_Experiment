@@ -10,6 +10,9 @@ from app.schemas import CrossSpreadPreflightRequest
 
 def test_cross_spread_preflight_prepares_both_live_legs(monkeypatch) -> None:
     monkeypatch.setattr(
+        "app.cross_spread.assert_cross_spread_market_executable", lambda *, is_close: None
+    )
+    monkeypatch.setattr(
         "app.cross_spread._load_live_cross_spread_sizing",
         lambda: CrossSpreadLiveSizing(
             bybit_account_id="bybit-live-main",

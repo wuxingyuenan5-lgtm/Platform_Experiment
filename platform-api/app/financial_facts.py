@@ -128,10 +128,9 @@ def record_financial_fact(request: CreateFinancialFactRequest) -> FinancialFactR
             status_code=409,
             detail="Financial fact identity was reused with a different payload",
         )
-    if status == "existing":
-        return response
-
     if request.fact_type in PROJECTED_FACT_TYPES:
+        # A prior process can stop after committing the fact but before writing
+        # its rebuildable projection. An identical retry must finish that work.
         rebuild_account_instrument_projection(
             request.strategy_instance_id,
             request.account_id or "",

@@ -16,6 +16,7 @@ import {
 
 import { getStrategyAccountSnapshot } from '@/api/platform/trading';
 import type { StrategyAccountSnapshotResult } from '@/api/platform/trading.types';
+import { strategyRegistryMap } from '@/views/strategy/shared/strategyRegistry';
 import type {
   StrategyCapitalProfile,
   StrategyDeskKey,
@@ -131,6 +132,15 @@ function orderProfile(
   };
 }
 
+function distributionPositions(
+  snapshot: StrategyAccountSnapshotResult | undefined,
+): StrategyAccountSnapshotResult['positions'] {
+  const financePositions = snapshot?.finance?.positions as
+    | StrategyAccountSnapshotResult['positions']
+    | undefined;
+  return financePositions && financePositions.length ? financePositions : snapshot?.positions ?? [];
+}
+
 export function useStrategyAccountSnapshots() {
   const queries = useQueries(
     {
@@ -194,6 +204,12 @@ export function useStrategyAccountSnapshots() {
               snapshots.value[desk]?.finance || null,
               errors.value[desk] || accountState(snapshots.value[desk] || null),
               desk === 'funding' ? 'funding' : undefined,
+              {
+                positions: distributionPositions(snapshots.value[desk]),
+                positionValue: snapshots.value[desk]?.positionValue ?? null,
+                positionValueNet: snapshots.value[desk]?.positionValueNet ?? null,
+                dailyPnl: snapshots.value[desk]?.dailyPnl ?? [],
+              },
             ),
           ]),
         ) as Record<AccountStrategyDesk, StrategyPnlProfile>,
@@ -201,10 +217,21 @@ export function useStrategyAccountSnapshots() {
     capitalProfiles: computed(
       () =>
         Object.fromEntries(
-          (Object.keys(instanceIds) as AccountStrategyDesk[]).map((desk) => [
-            desk,
-            accountCapitalProfile(labels[desk], snapshots.value[desk] || null, errors.value[desk]),
-          ]),
+          (Object.keys(instanceIds) as AccountStrategyDesk[]).map((desk) => {
+            const snapshot = snapshots.value[desk];
+            const capitalSnapshot = snapshot
+              ? { ...snapshot, positions: distributionPositions(snapshot) }
+              : null;
+            return [
+              desk,
+              accountCapitalProfile(
+                labels[desk],
+                capitalSnapshot,
+                errors.value[desk],
+                strategyRegistryMap[desk].category,
+              ),
+            ];
+          }),
         ) as Record<AccountStrategyDesk, StrategyCapitalProfile>,
     ),
     orderProfiles: computed(

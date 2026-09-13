@@ -5,6 +5,7 @@ import {
   getCrossSpreadSnapshot,
   getInstruments,
 } from '@/api/platform/trading';
+import { getCrossSpreadTradingRules } from '@/api/platform/crossSpreadLifecycle';
 import type {
   CrossSpreadSnapshotResult,
   InstrumentResult,
@@ -14,9 +15,10 @@ import type {
   CrossSpreadExecutionMode,
   CrossSpreadExitPlanThresholdUpdateInput,
   CrossSpreadLimitStrategy,
+  CrossSpreadTradingRulesResult,
 } from '@/api/platform/crossSpreadLifecycle';
 
-import { CROSS_SPREAD_RANGES, CROSS_SPREAD_TRADING_RULE_ROWS } from './crossSpreadFixtures';
+import { CROSS_SPREAD_RANGES } from './crossSpreadFixtures';
 import { useCrossSpreadExecution } from './useCrossSpreadExecution';
 import { useCrossSpreadExitPlans } from './useCrossSpreadExitPlans';
 import {
@@ -77,7 +79,8 @@ export function useCrossVenueExecutionWorkspace() {
     updateExitPlanThresholds: persistExitPlanThresholds,
     upsertExitPlan,
   } = useCrossSpreadExitPlans();
-  const tradingRuleRows = CROSS_SPREAD_TRADING_RULE_ROWS;
+  const tradingRules = ref<CrossSpreadTradingRulesResult | null>(null);
+  const tradingRulesError = ref('');
   const openDirection = ref<'long' | 'short'>('long');
   const snapshot = ref<CrossSpreadSnapshotResult | null>(null);
   const snapshotLoading = ref(false);
@@ -85,9 +88,58 @@ export function useCrossVenueExecutionWorkspace() {
   const { observability, observabilityError, refreshObservability } = useCrossSpreadObservability();
   const spreadHistory = ref<{ label: string; value: number }[]>([]);
   let snapshotTimer: number | undefined;
+  let tradingRulePolls = 0;
 
   const bybitQuote = computed<MarketQuoteResult | null>(() => snapshot.value?.bybit.quote || null);
   const mt5Quote = computed<MarketQuoteResult | null>(() => snapshot.value?.mt5.quote || null);
+  const tradingRuleRows = computed(() => {
+    const rules = tradingRules.value;
+    if (!rules) {
+      return [
+        { label: '手续费', value: '—' },
+        { label: '交易时间', value: tradingRulesError.value || '读取中' },
+        { label: '个人最高杠杆', value: '—' },
+        { label: '每日最大回撤', value: '—' },
+        { label: '其他限制', value: '读取中' },
+      ];
+    }
+    const mt5MarketState = rules.mt5.openAllowed
+      ? '当前开市'
+      : rules.mt5.closeAllowed
+      ? '当前仅可平仓'
+      : '当前休市';
+    const bybitMin = parseOptionalNumber(rules.bybit.minQuantity);
+    const bybitStep = parseOptionalNumber(rules.bybit.quantityStep);
+    const bybitMax = parseOptionalNumber(rules.bybit.maxMarketQuantity);
+    const mt5Min = parseOptionalNumber(rules.mt5.minQuantity);
+    const mt5Step = parseOptionalNumber(rules.mt5.quantityStep);
+    const mt5Max = parseOptionalNumber(rules.mt5.maxMarketQuantity);
+    const mt5ContractSize = parseOptionalNumber(rules.mt5.contractSize);
+    const minimum =
+      bybitMin !== null && mt5Min !== null && mt5ContractSize !== null
+        ? Math.max(bybitMin, mt5Min * mt5ContractSize)
+        : null;
+    const step =
+      bybitStep !== null && mt5Step !== null && mt5ContractSize !== null
+        ? Math.max(bybitStep, mt5Step * mt5ContractSize)
+        : null;
+    const maximum =
+      bybitMax !== null && mt5Max !== null && mt5ContractSize !== null
+        ? Math.min(bybitMax, mt5Max * mt5ContractSize)
+        : null;
+    const quantityLimits = [
+      minimum === null ? null : `最小下单 ${formatNumber(minimum, 2)} 盎司`,
+      step === null ? null : `数量步长 ${formatNumber(step, 2)} 盎司`,
+      maximum === null ? null : `市价上限 ${formatNumber(maximum, 2)} 盎司`,
+    ].filter(Boolean);
+    return [
+      { label: '手续费', value: '—' },
+      { label: '交易时间', value: `XAUTUSDT：24H；XAUUSD：${mt5MarketState}` },
+      { label: '个人最高杠杆', value: '—' },
+      { label: '每日最大回撤', value: '—' },
+      { label: '其他限制', value: quantityLimits.join('；') || '—' },
+    ];
+  });
   const bybitInstrument = computed(() =>
     instruments.value.find((instrument) => instrument.instrumentId === BYBIT_INSTRUMENT_ID),
   );
@@ -246,6 +298,16 @@ export function useCrossVenueExecutionWorkspace() {
     }
   }
 
+  async function refreshTradingRules() {
+    try {
+      tradingRules.value = await getCrossSpreadTradingRules();
+      tradingRulesError.value = '';
+    } catch (error: unknown) {
+      tradingRules.value = null;
+      tradingRulesError.value = requestErrorMessage(error, '真实交易规则暂不可用；当前仅行情监控');
+    }
+  }
+
   async function refreshHistory() {
     try {
       const points = await getCrossSpreadHistory(200);
@@ -282,6 +344,11 @@ export function useCrossVenueExecutionWorkspace() {
       void refreshSnapshot();
       void refreshObservability();
       void refreshExitPlans();
+      tradingRulePolls += 1;
+      if (tradingRulePolls >= 10) {
+        tradingRulePolls = 0;
+        void refreshTradingRules();
+      }
     }, 3_000);
   }
 
@@ -291,6 +358,7 @@ export function useCrossVenueExecutionWorkspace() {
       return;
     }
     void refreshSnapshot();
+    void refreshTradingRules();
     void refreshObservability();
     void refreshExitPlans();
     startSnapshotPolling();
@@ -382,6 +450,7 @@ export function useCrossVenueExecutionWorkspace() {
       refreshHistory(),
       refreshObservability(),
       refreshSnapshot(),
+      refreshTradingRules(),
     ]);
     document.addEventListener('visibilitychange', handleVisibilityChange);
     startSnapshotPolling();

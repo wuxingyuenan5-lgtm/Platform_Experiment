@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app import runtime_transport
+from app import live_venue_snapshot_sync, runtime_transport
 from app.auth import AuthenticationMiddleware
 from app.catalog_routes import create_catalog_router
 from app.config import get_settings
@@ -25,6 +25,7 @@ from app.member_holding_routes import router as member_holding_router
 from app.operational_metrics import router as operational_metrics_router
 from app.production_monitoring import router as production_monitoring_router
 from app.research_a_share_refresh import lifespan as research_lifespan
+from app.research_overseas_refresh import lifespan as research_overseas_lifespan
 from app.research_routes import router as research_router
 from app.research_watchlist_routes import router as research_watchlist_router
 from app.schema_governance import router as schema_governance_router
@@ -40,7 +41,7 @@ from app.user_cache_control import UserNoStoreMiddleware
 from app.user_routes import router as user_router
 from app.venue_reconciliation_routes import router as venue_reconciliation_router
 
-PLATFORM_VERSION = "0.11.1"
+PLATFORM_VERSION = "0.11.2"
 
 configure_trade_command_port(create_trade_command)
 
@@ -50,14 +51,20 @@ async def lifespan(_: FastAPI):
     initialize_database()
     stop = asyncio.Event()
     runner = asyncio.create_task(funding_runner.run_funding_instruction_monitor(stop))
+    snapshot_monitor = asyncio.create_task(live_venue_snapshot_sync.run_snapshot_sync_monitor())
     try:
-        async with research_lifespan(_):
+        async with research_lifespan(_), research_overseas_lifespan(_):
             yield
     finally:
         stop.set()
+        snapshot_monitor.cancel()
         try:
             await runner
         finally:
+            try:
+                await snapshot_monitor
+            except asyncio.CancelledError:
+                pass
             runtime_transport.close()
 
 

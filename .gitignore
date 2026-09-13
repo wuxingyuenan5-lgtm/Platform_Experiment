@@ -1,4 +1,5 @@
 ﻿# Local secrets
+platform-api/app.db
 execution-runtime/.env
 platform-web/.env
 projects/risk-control/data-service/bitget-data-service/bybitapi.txt

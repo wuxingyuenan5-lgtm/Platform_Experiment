@@ -1,6 +1,6 @@
 ﻿[CmdletBinding()]
 param(
-  [ValidateSet('start', 'status', 'stop', 'restart')][string]$Action = 'start',
+  [ValidateSet('start', 'status', 'stop', 'restart', 'watch')][string]$Action = 'start',
   [ValidateRange(1, 180)][int]$HealthTimeoutSeconds = 90,
   [switch]$EnableLiveWrite
 )
@@ -50,6 +50,7 @@ function New-ServiceRecord {
     workingDirectory = $Service.WorkingDirectory
     ownership = $Ownership
     pid = $ProcessId
+    processStartedAt = (Get-Process -Id $ProcessId).StartTime.ToUniversalTime().ToString('o')
     startedAt = (Get-Date).ToString('o')
     contractVersion = $ContractVersion
   }
@@ -466,6 +467,15 @@ function Start-ManagedServices {
   Write-Host "Live Write:        $(if ($EnableLiveWrite) { 'enabled (explicit or preserved running mode)' } else { 'disabled' })"
 }
 
+. (Join-Path $PSScriptRoot 'platform-watchdog.ps1')
+
+$lifecycleLock = $null
+if ($Action -in @('start','stop','restart')) {
+  $lifecycleLock = New-LifecycleLock
+  try { $acquired = $lifecycleLock.WaitOne(180000) } catch [Threading.AbandonedMutexException] { $acquired = $true }
+  if (-not $acquired) { throw 'Lifecycle operation already running' }
+}
+try {
 if ($Action -in @('start', 'restart', 'status') -and -not $PSBoundParameters.ContainsKey('EnableLiveWrite')) {
   $EnableLiveWrite = Get-ExistingLiveWrite
 }
@@ -478,22 +488,34 @@ foreach ($service in $Services) {
 }
 
 switch ($Action) {
+  'watch' {
+    Invoke-PlatformWatchdog
+    break
+  }
   'status' {
     Show-Status
     break
   }
   'stop' {
+    Stop-PlatformWatchdog
     Stop-ManagedServices
     Write-Host 'Managed Platform services stopped.' -ForegroundColor Yellow
     break
   }
   'restart' {
+    Stop-PlatformWatchdog
     Stop-ManagedServices
     Start-ManagedServices
+    Start-PlatformWatchdog
     break
   }
   default {
     Start-ManagedServices
+    Start-PlatformWatchdog
     break
   }
+}
+
+} finally {
+  if ($null -ne $lifecycleLock) { $lifecycleLock.ReleaseMutex(); $lifecycleLock.Dispose() }
 }

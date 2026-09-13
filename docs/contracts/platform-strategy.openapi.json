@@ -2656,6 +2656,16 @@
           "bybit": {
             "$ref": "#/components/schemas/CrossSpreadVenueSnapshotResponse"
           },
+          "executionState": {
+            "default": "unavailable",
+            "enum": [
+              "executable",
+              "monitor_only",
+              "unavailable"
+            ],
+            "title": "Executionstate",
+            "type": "string"
+          },
           "longSpread": {
             "anyOf": [
               {
@@ -2708,6 +2718,38 @@
           "asOf"
         ],
         "title": "CrossSpreadSnapshotResponse",
+        "type": "object"
+      },
+      "CrossSpreadTradingRulesResponse": {
+        "properties": {
+          "asOf": {
+            "format": "date-time",
+            "title": "Asof",
+            "type": "string"
+          },
+          "bybit": {
+            "$ref": "#/components/schemas/CrossSpreadVenueTradingRuleResponse"
+          },
+          "executionState": {
+            "enum": [
+              "executable",
+              "monitor_only",
+              "unavailable"
+            ],
+            "title": "Executionstate",
+            "type": "string"
+          },
+          "mt5": {
+            "$ref": "#/components/schemas/CrossSpreadVenueTradingRuleResponse"
+          }
+        },
+        "required": [
+          "bybit",
+          "mt5",
+          "executionState",
+          "asOf"
+        ],
+        "title": "CrossSpreadTradingRulesResponse",
         "type": "object"
       },
       "CrossSpreadUnattributedPositionResponse": {
@@ -2922,6 +2964,22 @@
             ],
             "title": "Asof"
           },
+          "closeAllowed": {
+            "default": false,
+            "title": "Closeallowed",
+            "type": "boolean"
+          },
+          "executionBlockReason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Executionblockreason"
+          },
           "fetchLatencyMs": {
             "anyOf": [
               {
@@ -2932,6 +2990,11 @@
               }
             ],
             "title": "Fetchlatencyms"
+          },
+          "openAllowed": {
+            "default": false,
+            "title": "Openallowed",
+            "type": "boolean"
           },
           "positions": {
             "default": [],
@@ -2950,6 +3013,18 @@
                 "type": "null"
               }
             ]
+          },
+          "quoteSourceAsOf": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quotesourceasof"
           },
           "reason": {
             "anyOf": [
@@ -2981,6 +3056,133 @@
           "status"
         ],
         "title": "CrossSpreadVenueSnapshotResponse",
+        "type": "object"
+      },
+      "CrossSpreadVenueTradingRuleResponse": {
+        "properties": {
+          "accessChecks": {
+            "additionalProperties": true,
+            "title": "Accesschecks",
+            "type": "object"
+          },
+          "accountId": {
+            "title": "Accountid",
+            "type": "string"
+          },
+          "asOf": {
+            "format": "date-time",
+            "title": "Asof",
+            "type": "string"
+          },
+          "closeAllowed": {
+            "title": "Closeallowed",
+            "type": "boolean"
+          },
+          "contractSize": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Contractsize",
+            "type": "string"
+          },
+          "executionBlockReason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Executionblockreason"
+          },
+          "fillingMode": {
+            "title": "Fillingmode",
+            "type": "string"
+          },
+          "maxMarketQuantity": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Maxmarketquantity"
+          },
+          "minQuantity": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Minquantity",
+            "type": "string"
+          },
+          "openAllowed": {
+            "title": "Openallowed",
+            "type": "boolean"
+          },
+          "priceTick": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Pricetick",
+            "type": "string"
+          },
+          "quantityStep": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Quantitystep",
+            "type": "string"
+          },
+          "quoteSourceAsOf": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quotesourceasof"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "symbol": {
+            "title": "Symbol",
+            "type": "string"
+          },
+          "tradeMode": {
+            "title": "Trademode",
+            "type": "string"
+          },
+          "venue": {
+            "enum": [
+              "bybit",
+              "mt5"
+            ],
+            "title": "Venue",
+            "type": "string"
+          }
+        },
+        "required": [
+          "venue",
+          "source",
+          "accountId",
+          "symbol",
+          "status",
+          "priceTick",
+          "minQuantity",
+          "quantityStep",
+          "contractSize",
+          "tradeMode",
+          "fillingMode",
+          "openAllowed",
+          "closeAllowed",
+          "asOf"
+        ],
+        "title": "CrossSpreadVenueTradingRuleResponse",
         "type": "object"
       },
       "EconomicEventResponse": {
@@ -6271,6 +6473,29 @@
             "title": "Netquantity",
             "type": "string"
           },
+          "positionValue": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Positionvalue"
+          },
+          "positionValueCurrency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Positionvaluecurrency"
+          },
           "stopLossPrice": {
             "anyOf": [
               {
@@ -6855,6 +7080,13 @@
             "title": "Coinbalances",
             "type": "array"
           },
+          "dailyPnl": {
+            "items": {
+              "$ref": "#/components/schemas/StrategyDailyPnlPointResponse"
+            },
+            "title": "Dailypnl",
+            "type": "array"
+          },
           "dataQualityState": {
             "title": "Dataqualitystate",
             "type": "string"
@@ -6941,6 +7173,18 @@
             ],
             "title": "Lastsuccessfulsyncat"
           },
+          "leverage": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Leverage"
+          },
           "orders": {
             "items": {
               "$ref": "#/components/schemas/OrderDetailResponse"
@@ -6962,6 +7206,41 @@
                 "type": "null"
               }
             ]
+          },
+          "positionValue": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Positionvalue"
+          },
+          "positionValueCurrency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Positionvaluecurrency"
+          },
+          "positionValueNet": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Positionvaluenet"
           },
           "positions": {
             "items": {
@@ -7004,6 +7283,18 @@
               }
             ],
             "title": "Syncstatus"
+          },
+          "venueLeverage": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Venueleverage"
           }
         },
         "required": [
@@ -7015,8 +7306,14 @@
           "asOf",
           "balance",
           "equityHistory",
+          "dailyPnl",
           "accountRisk",
           "positions",
+          "positionValue",
+          "positionValueNet",
+          "positionValueCurrency",
+          "leverage",
+          "venueLeverage",
           "orders",
           "fills",
           "pnl",
@@ -7035,6 +7332,78 @@
           "fillsTotal"
         ],
         "title": "StrategyAccountSnapshotResponse",
+        "type": "object"
+      },
+      "StrategyDailyPnlPointResponse": {
+        "description": "One cash-flow-adjusted daily result of the account behind a strategy.\n\n``pnl`` is the account's equity move between two same-scope daily closings\nwith deposits and withdrawals removed, so trading result, funding, fees,\nswap and the day's unrealised mark are all inside it. A day that cannot be\nvalued carries no amount and names the reason in ``quality`` instead of\nreporting a zero.",
+        "properties": {
+          "currency": {
+            "title": "Currency",
+            "type": "string"
+          },
+          "date": {
+            "title": "Date",
+            "type": "string"
+          },
+          "equityClose": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Equityclose"
+          },
+          "equityOpen": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Equityopen"
+          },
+          "pnl": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pnl"
+          },
+          "quality": {
+            "default": "unavailable",
+            "title": "Quality",
+            "type": "string"
+          },
+          "returnRate": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Returnrate"
+          }
+        },
+        "required": [
+          "date",
+          "currency"
+        ],
+        "title": "StrategyDailyPnlPointResponse",
         "type": "object"
       },
       "StrategyDefinitionResponse": {
@@ -8782,7 +9151,7 @@
   },
   "info": {
     "title": "Platform API",
-    "version": "0.11.1"
+    "version": "0.11.2"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -11207,6 +11576,27 @@
           }
         },
         "summary": "Cross Spread Snapshot",
+        "tags": [
+          "trading"
+        ]
+      }
+    },
+    "/api/v1/trading/cross-spread/trading-rules": {
+      "get": {
+        "operationId": "trading_rules_api_v1_trading_cross_spread_trading_rules_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CrossSpreadTradingRulesResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Trading Rules",
         "tags": [
           "trading"
         ]
