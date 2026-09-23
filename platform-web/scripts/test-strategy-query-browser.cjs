@@ -43,6 +43,11 @@ async function main() {
       minimumQuantity: { spot: '0.001', perpetual: '0.001' },
       contractMultiplier: { spot: '1', perpetual: '1' },
       suggestedQuantity: '0.001',
+      openSizing: {
+        valid: true,
+        spotQuantity: '0.001',
+        perpetualQuantity: '0.001',
+      },
       requestedNotional: '100',
       availableBalance: null,
       activeReservation: {
@@ -114,7 +119,7 @@ async function main() {
     });
     await page.goto(`${origin}/#/strategy/platform?desk=funding&section=execution`);
     await page.locator('[data-testid="funding-order-panel"]').waitFor({ timeout: 20_000 });
-    const submit = page.getByRole('button', { name: '提交正套开仓', exact: true });
+    const submit = page.locator('[data-testid="funding-order-panel"] .submit-btn--green');
     await submit.waitFor();
     await page.waitForFunction(() => !document.querySelector('.submit-btn--green')?.disabled);
     assert.ok(await page.getByText('80000.123456789012345678', { exact: true }).count());

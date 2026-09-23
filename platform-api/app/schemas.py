@@ -136,6 +136,16 @@ class CrossSpreadVenueSnapshotResponse(BaseModel):
     open_allowed: bool = Field(default=False, alias="openAllowed")
     close_allowed: bool = Field(default=False, alias="closeAllowed")
     execution_block_reason: str | None = Field(default=None, alias="executionBlockReason")
+    market_status: Literal["open", "closed", "buffer", "unknown"] = Field(
+        default="unknown", alias="marketStatus"
+    )
+    trading_hours: str | None = Field(default=None, alias="tradingHours")
+    trading_timezone: str | None = Field(default=None, alias="tradingTimezone")
+    automatic_exit_allowed: bool = Field(default=False, alias="automaticExitAllowed")
+    automatic_exit_block_reason: str | None = Field(default=None, alias="automaticExitBlockReason")
+    automatic_exit_guard_minutes: int | None = Field(
+        default=None, alias="automaticExitGuardMinutes"
+    )
     quote_source_as_of: datetime | None = Field(default=None, alias="quoteSourceAsOf")
     fetch_latency_ms: float | None = Field(default=None, alias="fetchLatencyMs")
     as_of: datetime | None = Field(default=None, alias="asOf")
@@ -237,6 +247,16 @@ class CrossSpreadVenueTradingRuleResponse(BaseModel):
     open_allowed: bool = Field(alias="openAllowed")
     close_allowed: bool = Field(alias="closeAllowed")
     execution_block_reason: str | None = Field(default=None, alias="executionBlockReason")
+    market_status: Literal["open", "closed", "buffer", "unknown"] = Field(
+        default="unknown", alias="marketStatus"
+    )
+    trading_hours: str | None = Field(default=None, alias="tradingHours")
+    trading_timezone: str | None = Field(default=None, alias="tradingTimezone")
+    automatic_exit_allowed: bool = Field(default=False, alias="automaticExitAllowed")
+    automatic_exit_block_reason: str | None = Field(default=None, alias="automaticExitBlockReason")
+    automatic_exit_guard_minutes: int | None = Field(
+        default=None, alias="automaticExitGuardMinutes"
+    )
     quote_source_as_of: datetime | None = Field(default=None, alias="quoteSourceAsOf")
     as_of: datetime = Field(alias="asOf")
 
@@ -472,6 +492,9 @@ class FillResponse(BaseModel):
 
 
 class StrategyPnlResponse(BaseModel):
+    valuation_policy: str = Field(default="continuous", alias="valuationPolicy")
+    valuation_as_of: datetime | None = Field(default=None, alias="valuationAsOf")
+    valuation_market_status: str | None = Field(default=None, alias="valuationMarketStatus")
     model_config = ConfigDict(json_schema_serialization_defaults_required=True)
     strategy_instance_id: str = Field(alias="strategyInstanceId")
     realized_pnl: Decimal | None = Field(alias="realizedPnl")
@@ -493,6 +516,9 @@ class StrategyPnlResponse(BaseModel):
     )
     economic_events: list[EconomicEventResponse] = Field(
         default_factory=list, alias="economicEvents"
+    )
+    strategy_daily_pnl: list[dict[str, object]] = Field(
+        default_factory=list, alias="strategyDailyPnl"
     )
     scope: str = "strategy"
 
@@ -554,6 +580,9 @@ class StrategyDailyPnlPointResponse(BaseModel):
 
 
 class StrategyAccountSnapshotResponse(BaseModel):
+    session_equity_history: list[StrategyEquityHistoryPointResponse] = Field(
+        default_factory=list, alias="sessionEquityHistory"
+    )
     model_config = ConfigDict(json_schema_serialization_defaults_required=True)
     strategy_instance_id: str = Field(alias="strategyInstanceId")
     account_id: str | None = Field(default=None, alias="accountId")
@@ -566,6 +595,9 @@ class StrategyAccountSnapshotResponse(BaseModel):
         default_factory=list, alias="equityHistory"
     )
     daily_pnl: list[StrategyDailyPnlPointResponse] = Field(default_factory=list, alias="dailyPnl")
+    strategy_daily_pnl: list[dict[str, object]] = Field(
+        default_factory=list, alias="strategyDailyPnl"
+    )
     account_risk: AccountRiskSnapshotResponse | None = Field(default=None, alias="accountRisk")
     positions: list[PositionResponse] = Field(default_factory=list)
     position_value: Decimal | None = Field(default=None, alias="positionValue")
@@ -579,6 +611,11 @@ class StrategyAccountSnapshotResponse(BaseModel):
     finance: StrategyPnlResponse | None = None
     sync_status: str | None = Field(default=None, alias="syncStatus")
     sync_error_code: str | None = Field(default=None, alias="syncErrorCode")
+    financial_sync_status: str = Field(default="waiting_initial_sync", alias="financialSyncStatus")
+    financial_sync_error_code: str | None = Field(default=None, alias="financialSyncErrorCode")
+    last_successful_financial_sync_at: datetime | None = Field(
+        default=None, alias="lastSuccessfulFinancialSyncAt"
+    )
     snapshot_scope: Literal["account", "strategy"] = Field(
         default="strategy", alias="snapshotScope"
     )

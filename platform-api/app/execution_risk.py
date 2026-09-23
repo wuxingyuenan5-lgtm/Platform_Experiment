@@ -393,7 +393,13 @@ def perform_risk_action(
 
     _reconcile_live_batch_orders(batch_id)
     with repository.connection() as db:
-        positions, _ = repository.flattening_positions(db, batch_id)
+        batch_key = db.execute(
+            "SELECT strategy_key FROM execution_batches WHERE id=?", (batch_id,)
+        ).fetchone()
+        allow_funding_dust = batch_key is not None and batch_key["strategy_key"] == "funding_arbitrage"
+        positions, _ = repository.flattening_positions(
+            db, batch_id, allow_dust=allow_funding_dust
+        )
     legs = [leg for leg in positions if leg["quantity"] > 0]
     if not legs:
         return "completed", [], None

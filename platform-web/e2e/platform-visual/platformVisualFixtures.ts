@@ -89,46 +89,8 @@ export async function mockPlatformVisualRoutes(page: Page): Promise<void> {
     }),
   );
 
-  const accounts = [
-    {
-      id: 1,
-      name: '组合主账户',
-      account_type: 'fund',
-      account_address: 'DEMO-FUND-001',
-      initial_capital: 1_000_000,
-      arbitrary_flag: false,
-      status: 'active',
-      created_at: FIXED_TIME,
-      updated_at: FIXED_TIME,
-      total_asset: 1_126_800,
-      available_fund: 684_200,
-      asset_updated_at: FIXED_TIME,
-      platform: 'Platform',
-      accountName: '组合主账户',
-    },
-    {
-      id: 2,
-      name: '策略执行账户',
-      account_type: 'strategy',
-      account_address: 'DEMO-STRATEGY-001',
-      initial_capital: 500_000,
-      arbitrary_flag: false,
-      status: 'active',
-      created_at: FIXED_TIME,
-      updated_at: FIXED_TIME,
-      total_asset: 548_600,
-      available_fund: 391_400,
-      asset_updated_at: FIXED_TIME,
-      platform: 'Simulation',
-      accountName: '策略执行账户',
-    },
-  ];
-
-  await page.route(/\/api\/v1\/accounts(?:\?.*)?$/, (route) => {
-    const url = new URL(route.request().url());
-    if (url.port === '8000') return route.continue();
-    return fulfill(route, accounts);
-  });
+  // Account identities come from the isolated seeded Platform API.
+  await page.route(/\/api\/v1\/accounts(?:\?.*)?$/, (route) => route.continue());
   await page.route(/\/api\/v1\/data\/total(?:\?.*)?$/, (route) =>
     fulfill(route, { total_asset: 1_675_400, updated_at: FIXED_TIME }),
   );

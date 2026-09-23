@@ -1,6 +1,6 @@
 ﻿[CmdletBinding()]
 param(
-  [ValidateSet('start', 'status', 'stop', 'restart', 'watch')][string]$Action = 'start',
+[ValidateSet('start', 'status', 'stop', 'restart', 'restart-web', 'restart-api', 'watch', 'supervisor')][string]$Action = 'start',
   [ValidateRange(1, 180)][int]$HealthTimeoutSeconds = 90,
   [switch]$EnableLiveWrite
 )
@@ -10,6 +10,9 @@ $RepoRoot = Split-Path -Parent $PSScriptRoot
 $StateDir = Join-Path $RepoRoot '.codex\dev-platform'
 $StatePath = Join-Path $StateDir 'platform-dev-state.json'
 $LogDir = Join-Path $StateDir 'logs'
+$WebReleaseMarker = Join-Path $RepoRoot '.codex\releases\web\current.json'
+$WebReleaseRoot = Join-Path $RepoRoot '.codex\releases\web'
+$CaddyPath = Join-Path $RepoRoot '.codex\tools\caddy\caddy.exe'
 $ContractVersion = '2026-08-25.dev-platform.v3'
 $DemoUsername = 'demo_ceo'
 $Services = @(
@@ -89,12 +92,33 @@ function Test-ServiceSignature {
   if ($Service.Python) {
     return $commandLine.Contains('uvicorn app.main:app') -and $commandLine.Contains("--port $($Service.Port)")
   }
+  if ($commandLine.Contains('caddy') -and $commandLine.Contains('run') -and $commandLine.Contains($WebReleaseRoot.ToLowerInvariant())) { return $true }
   return $commandLine.Contains('vite') -and $commandLine.Contains("--port $($Service.Port)")
+}
+
+function Get-WebRelease {
+  if (-not (Test-Path -LiteralPath $WebReleaseMarker)) { return $null }
+  try {
+    $release = Get-Content -LiteralPath $WebReleaseMarker -Raw -Encoding UTF8 | ConvertFrom-Json
+    if ([string]::IsNullOrWhiteSpace($release.release) -or [string]::IsNullOrWhiteSpace($release.caddyConfig)) { throw 'Incomplete local Web release marker.' }
+    $releaseBoundary = [IO.Path]::GetFullPath($WebReleaseRoot).TrimEnd('\') + '\'
+    foreach ($releasePath in @($release.release, $release.caddyConfig)) {
+      if (-not [IO.Path]::GetFullPath($releasePath).StartsWith($releaseBoundary, [StringComparison]::OrdinalIgnoreCase)) { throw 'Local Web release path is outside the release directory.' }
+    }
+    if (-not (Test-Path -LiteralPath (Join-Path $release.release 'index.html')) -or
+        -not (Test-Path -LiteralPath $release.caddyConfig)) { throw 'Published local Web files are missing.' }
+    return $release
+  } catch { throw "Cannot load published local Web: $($_.Exception.Message)" }
 }
 
 function Test-ExpectedRuntime {
   param([hashtable]$Service, [int]$ProcessId)
-  if (-not $Service.Python) { return $true }
+  if (-not $Service.Python) {
+    if ($Service.WebMode -eq 'published') {
+      return (Get-ProcessCommandLine $ProcessId).ToLowerInvariant().Contains($Service.CaddyConfig.ToLowerInvariant())
+    }
+    return $true
+  }
   if (-not $Service.PythonPath) { return $false }
   try {
     $health = (Invoke-ServiceRequest $Service.HealthUrl).Content | ConvertFrom-Json
@@ -150,9 +174,18 @@ function Assert-Dependencies {
     if (-not (Get-Command node -ErrorAction SilentlyContinue)) { throw 'Node.js is required for Platform Web' }
     $pnpm = Get-Command corepack -ErrorAction SilentlyContinue
     if ($null -eq $pnpm) { throw 'corepack is required for Platform Web' }
-    $vite = Join-Path $Service.WorkingDirectory 'node_modules\.bin\vite.cmd'
-    if (-not (Test-Path $vite)) { throw "Platform Web dependencies are missing: $vite" }
-    $Service.VitePath = $vite
+    $release = Get-WebRelease
+    if ($null -ne $release) {
+      if (-not (Test-Path -LiteralPath $CaddyPath)) { throw "Caddy executable is missing: $CaddyPath" }
+      $Service.CaddyPath = $CaddyPath
+      $Service.CaddyConfig = [string]$release.caddyConfig
+      $Service.WebMode = 'published'
+    } else {
+      $vite = Join-Path $Service.WorkingDirectory 'node_modules\.bin\vite.cmd'
+      if (-not (Test-Path $vite)) { throw "Platform Web dependencies are missing: $vite" }
+      $Service.VitePath = $vite
+      $Service.WebMode = 'development'
+    }
   }
 }
 
@@ -281,7 +314,32 @@ function Stop-ManagedPid {
     $replaceable = Test-ServiceSignature $Service $ProcessId
   }
   if (-not $replaceable) { return }
+  $children = @{}
+  $allProcesses = @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue)
+  $pending = @($ProcessId)
+  while ($pending.Count -gt 0) {
+    $parentId = [int]$pending[0]
+    $pending = @($pending | Select-Object -Skip 1)
+    foreach ($child in @($allProcesses | Where-Object { [int]$_.ParentProcessId -eq $parentId })) {
+      if (-not $children.ContainsKey([int]$child.ProcessId)) {
+        $children[[int]$child.ProcessId] = $true
+        $pending += [int]$child.ProcessId
+      }
+    }
+  }
+  foreach ($childId in @($children.Keys | Sort-Object -Descending)) {
+    Stop-Process -Id ([int]$childId) -Force -ErrorAction SilentlyContinue
+  }
   Stop-Process -Id $ProcessId -Force -ErrorAction SilentlyContinue
+  if ($null -ne $Service) {
+    $stopDeadline = [DateTime]::UtcNow.AddSeconds(10)
+    do {
+      $remainingListener = Get-PortListener $Service.Port
+      if (-not $remainingListener -or [int]$remainingListener.OwningProcess -ne $ProcessId) { return }
+      Start-Sleep -Milliseconds 200
+    } while ([DateTime]::UtcNow -lt $stopDeadline)
+    throw "Stopped process $ProcessId has not released port $($Service.Port)."
+  }
 }
 
 function Stop-ManagedServices {
@@ -373,11 +431,76 @@ function Invoke-LoginSmoke {
   }
 }
 
+function Invoke-PlatformSupervisor {
+  $supervisorLog = Join-Path $StateDir 'supervisor.log'
+  New-Item -ItemType Directory -Path $StateDir -Force | Out-Null
+  function Write-SupervisorLog { param([string]$Message) Add-Content -LiteralPath $supervisorLog -Value ((Get-Date).ToString('o') + ' ' + $Message) -Encoding UTF8 }
+  function Ensure-SupervisorWatchdog {
+    # A removed state file is an intentional operator stop. The watchdog alone
+    # owns service recovery; the supervisor only keeps that watchdog alive.
+    if (-not (Test-Path -LiteralPath $StatePath)) { return }
+    $watchPath = Join-Path $StateDir 'watchdog.json'
+    $record = $null
+    if (Test-Path -LiteralPath $watchPath) {
+      try { $record = Get-Content -LiteralPath $watchPath -Raw | ConvertFrom-Json } catch {}
+    }
+    $watchProcess = if ($record) { Get-Process -Id ([int]$record.pid) -ErrorAction SilentlyContinue } else { $null }
+    $watchCommand = if ($watchProcess) { Get-ProcessCommandLine ([int]$watchProcess.Id) } else { '' }
+    $fresh = $false
+    if ($record -and $watchProcess -and $watchCommand.Contains((Join-Path $PSScriptRoot 'dev-platform.ps1')) -and $watchCommand.Contains('-Action watch')) {
+      try { $fresh = (([DateTimeOffset]::UtcNow - [DateTimeOffset]::Parse($record.observedAt)).TotalSeconds -lt 180) } catch {}
+    }
+    # The launcher exits after handing durable log handles to the child, so
+    # ParentProcessId is not a stable ownership signal for this process.
+    if ($fresh -and [bool]$record.liveWrite -eq [bool]$EnableLiveWrite) { return }
+    if ($watchProcess -and $watchCommand.Contains((Join-Path $PSScriptRoot 'dev-platform.ps1')) -and $watchCommand.Contains('-Action watch')) {
+      Stop-Process -Id $watchProcess.Id -Force -ErrorAction SilentlyContinue
+    }
+    $args = @('-NoProfile','-ExecutionPolicy','Bypass','-File',(Join-Path $PSScriptRoot 'dev-platform.ps1'),'-Action','watch')
+    if ($EnableLiveWrite) { $args += '-EnableLiveWrite' }
+    Start-PlatformChildProcess -FilePath (Get-Process -Id $PID).Path -ArgumentList $args `
+      -WorkingDirectory $RepoRoot -StandardOutput (Join-Path $LogDir 'supervised-watchdog.out.log') `
+      -StandardError (Join-Path $LogDir 'supervised-watchdog.err.log') | Out-Null
+    Write-SupervisorLog 'watchdog launched and assigned to supervisor'
+  }
+  Write-SupervisorLog ("started pid=$PID liveWrite=$([bool]$EnableLiveWrite)")
+  while ($true) {
+    try {
+      if ((Get-PortListener 8100) -and (Get-PortListener 8000)) {
+        # Adopt only a verified, matching mode from both running backends.
+        $EnableLiveWrite = Get-ExistingLiveWrite
+      }
+      Ensure-SupervisorWatchdog
+    } catch { Write-SupervisorLog ("supervisor error: {0}" -f $_.Exception.Message) }
+    Start-Sleep -Seconds 15
+  }
+}
+
+function Start-PlatformChildProcess {
+  param(
+    [Parameter(Mandatory)][string]$FilePath,
+    [Parameter(Mandatory)][string[]]$ArgumentList,
+    [Parameter(Mandatory)][string]$WorkingDirectory,
+    [Parameter(Mandatory)][string]$StandardOutput,
+    [Parameter(Mandatory)][string]$StandardError
+  )
+  $launcher = Join-Path $PSScriptRoot 'launch-platform-child.py'
+  $python = Join-Path $RepoRoot 'execution-runtime\.venv\Scripts\python.exe'
+  if (-not (Test-Path -LiteralPath $python)) { throw "Platform launcher Python is missing: $python" }
+  $launchOutput = @(& $python $launcher $FilePath $WorkingDirectory $StandardOutput $StandardError @ArgumentList)
+  if ($LASTEXITCODE -ne 0 -or $launchOutput.Count -ne 1 -or [string]$launchOutput[0] -notmatch '^\d+$') {
+    throw "Managed process launch failed: $FilePath"
+  }
+  $childProcess = Get-Process -Id ([int]$launchOutput[0]) -ErrorAction Stop
+  return $childProcess
+}
+
 function Start-ServiceManaged {
   param([hashtable]$Service)
   $safeName = $Service.Name.ToLowerInvariant().Replace(' ', '-')
-  $stdout = Join-Path $LogDir "$safeName.out.log"
-  $stderr = Join-Path $LogDir "$safeName.err.log"
+  $logStamp = [DateTime]::UtcNow.ToString('yyyyMMddTHHmmssfffZ')
+  $stdout = Join-Path $LogDir "$safeName.$logStamp.out.log"
+  $stderr = Join-Path $LogDir "$safeName.$logStamp.err.log"
   $listener = Get-PortListener $Service.Port
   if ($listener) {
     $servicePid = [int]$listener.OwningProcess
@@ -395,6 +518,10 @@ function Start-ServiceManaged {
     $previousLiveWrite = $env:VG_RUNTIME_LIVE_WRITE_ENABLED
     $previousPlatformLiveWrite = $env:VG_LIVE_TRADING_ENABLED
     $previousFounderDemo = $env:VG_FOUNDER_DEMO_LIVE_ACCEPTANCE_ENABLED
+    $previousResearchCapture = $env:VG_RUNTIME_RESEARCH_CAPTURE_ENABLED
+    $previousStrategyResearch = $env:VG_STRATEGY_RESEARCH_ENABLED
+    $previousStrategyWorker = $env:VG_STRATEGY_RESEARCH_WORKER_ENABLED
+    $previousStrategyProjection = $env:VG_STRATEGY_RESEARCH_PROJECTION_ENABLED
     try {
       $liveWriteValue = if ($EnableLiveWrite) { 'true' } else { 'false' }
       if ($Service.Key -eq 'runtime') {
@@ -404,9 +531,20 @@ function Start-ServiceManaged {
         $env:VG_LIVE_TRADING_ENABLED = $liveWriteValue
         $env:VG_FOUNDER_DEMO_LIVE_ACCEPTANCE_ENABLED = 'false'
       }
-      Start-Process $Service.PythonPath -ArgumentList @('-m', 'uvicorn', 'app.main:app', '--host', '127.0.0.1', '--port', "$($Service.Port)") `
-        -WorkingDirectory $Service.WorkingDirectory -RedirectStandardOutput $stdout -RedirectStandardError $stderr `
-        -WindowStyle Hidden | Out-Null
+      if ($Service.Key -eq 'runtime') {
+        # Research capture is the shared high-resolution source for the
+        # strategy and hedge-board producers; ordinary local starts must not
+        # silently launch the venue process without it.
+        $env:VG_RUNTIME_RESEARCH_CAPTURE_ENABLED = 'true'
+      }
+      if ($Service.Key -eq 'api') {
+        $env:VG_STRATEGY_RESEARCH_ENABLED = 'true'
+        $env:VG_STRATEGY_RESEARCH_WORKER_ENABLED = 'true'
+        $env:VG_STRATEGY_RESEARCH_PROJECTION_ENABLED = 'true'
+      }
+      Start-PlatformChildProcess -FilePath $Service.PythonPath `
+        -ArgumentList @('-u', '-m', 'uvicorn', 'app.main:app', '--host', '127.0.0.1', '--port', "$($Service.Port)") `
+        -WorkingDirectory $Service.WorkingDirectory -StandardOutput $stdout -StandardError $stderr | Out-Null
     } finally {
       if ($null -eq $previousLiveWrite) {
         Remove-Item Env:VG_RUNTIME_LIVE_WRITE_ENABLED -ErrorAction SilentlyContinue
@@ -423,11 +561,35 @@ function Start-ServiceManaged {
       } else {
         $env:VG_FOUNDER_DEMO_LIVE_ACCEPTANCE_ENABLED = $previousFounderDemo
       }
+      if ($null -eq $previousResearchCapture) {
+        Remove-Item Env:VG_RUNTIME_RESEARCH_CAPTURE_ENABLED -ErrorAction SilentlyContinue
+      } else {
+        $env:VG_RUNTIME_RESEARCH_CAPTURE_ENABLED = $previousResearchCapture
+      }
+      if ($null -eq $previousStrategyResearch) {
+        Remove-Item Env:VG_STRATEGY_RESEARCH_ENABLED -ErrorAction SilentlyContinue
+      } else {
+        $env:VG_STRATEGY_RESEARCH_ENABLED = $previousStrategyResearch
+      }
+      if ($null -eq $previousStrategyWorker) {
+        Remove-Item Env:VG_STRATEGY_RESEARCH_WORKER_ENABLED -ErrorAction SilentlyContinue
+      } else {
+        $env:VG_STRATEGY_RESEARCH_WORKER_ENABLED = $previousStrategyWorker
+      }
+      if ($null -eq $previousStrategyProjection) {
+        Remove-Item Env:VG_STRATEGY_RESEARCH_PROJECTION_ENABLED -ErrorAction SilentlyContinue
+      } else {
+        $env:VG_STRATEGY_RESEARCH_PROJECTION_ENABLED = $previousStrategyProjection
+      }
     }
+  } elseif ($Service.WebMode -eq 'published') {
+    Start-PlatformChildProcess -FilePath $Service.CaddyPath `
+      -ArgumentList @('run', '--config', $Service.CaddyConfig, '--adapter', 'caddyfile') `
+      -WorkingDirectory $RepoRoot -StandardOutput $stdout -StandardError $stderr | Out-Null
   } else {
-    Start-Process $Service.VitePath -ArgumentList @('--host', '127.0.0.1', '--port', "$($Service.Port)") `
-      -WorkingDirectory $Service.WorkingDirectory -RedirectStandardOutput $stdout -RedirectStandardError $stderr `
-      -WindowStyle Hidden | Out-Null
+    Start-PlatformChildProcess -FilePath $Service.VitePath `
+      -ArgumentList @('--host', '127.0.0.1', '--port', "$($Service.Port)") `
+      -WorkingDirectory $Service.WorkingDirectory -StandardOutput $stdout -StandardError $stderr | Out-Null
   }
   $servicePid = Wait-ForHealth $Service
   return (New-ServiceRecord -Service $Service -Ownership 'started' -ProcessId $servicePid)
@@ -470,13 +632,13 @@ function Start-ManagedServices {
 . (Join-Path $PSScriptRoot 'platform-watchdog.ps1')
 
 $lifecycleLock = $null
-if ($Action -in @('start','stop','restart')) {
+if ($Action -in @('start','stop','restart','restart-web','restart-api')) {
   $lifecycleLock = New-LifecycleLock
   try { $acquired = $lifecycleLock.WaitOne(180000) } catch [Threading.AbandonedMutexException] { $acquired = $true }
   if (-not $acquired) { throw 'Lifecycle operation already running' }
 }
 try {
-if ($Action -in @('start', 'restart', 'status') -and -not $PSBoundParameters.ContainsKey('EnableLiveWrite')) {
+if ($Action -in @('start', 'restart', 'restart-web', 'restart-api', 'status') -and -not $PSBoundParameters.ContainsKey('EnableLiveWrite')) {
   $EnableLiveWrite = Get-ExistingLiveWrite
 }
 foreach ($service in $Services) {
@@ -488,6 +650,10 @@ foreach ($service in $Services) {
 }
 
 switch ($Action) {
+  'supervisor' {
+    Invoke-PlatformSupervisor
+    break
+  }
   'watch' {
     Invoke-PlatformWatchdog
     break
@@ -500,6 +666,23 @@ switch ($Action) {
     Stop-PlatformWatchdog
     Stop-ManagedServices
     Write-Host 'Managed Platform services stopped.' -ForegroundColor Yellow
+    break
+  }
+  { $_ -in @('restart-web', 'restart-api') } {
+    $serviceKey = if ($Action -eq 'restart-web') { 'web' } else { 'api' }
+    $restartDefinition = @($Services | Where-Object { $_.Key -eq $serviceKey })[0]
+    Assert-Dependencies $restartDefinition
+    $existingState = Read-State
+    Stop-PlatformWatchdog
+    try {
+      $restartListener = Get-PortListener $restartDefinition.Port
+      if ($restartListener) {
+        Stop-ManagedPid -ProcessId ([int]$restartListener.OwningProcess) -WorkingDirectory $restartDefinition.WorkingDirectory -Service $restartDefinition
+      }
+      $newRecord = Start-ServiceManaged $restartDefinition
+      $otherRecords = @($existingState.services | Where-Object { $_.key -ne $serviceKey })
+      Write-State ($otherRecords + @($newRecord))
+    } finally { Start-PlatformWatchdog }
     break
   }
   'restart' {

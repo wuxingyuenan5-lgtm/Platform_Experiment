@@ -50,8 +50,18 @@ class FakeGateway:
     def place_order(self, command: SubmitOrderCommand) -> list[ExecutionEvent]:
         return self.submit_order(command)
 
-    def get_account(self, account_id: str) -> VenueAccountSnapshot:
-        return self.get_account_snapshot(account_id)
+    def get_account(
+        self,
+        account_id: str,
+        *,
+        include_history: bool = True,
+        history_start: datetime | None = None,
+    ) -> VenueAccountSnapshot:
+        return self.get_account_snapshot(
+            account_id,
+            include_history=include_history,
+            history_start=history_start,
+        )
 
     def get_positions(self, account_id: str | None = None) -> list[VenuePositionSnapshot]:
         return self.list_positions(account_id)
@@ -381,11 +391,17 @@ class FakeGateway:
             asOf=datetime.now(UTC),
         )
 
-    def get_account_snapshot(self, account_id: str) -> VenueAccountSnapshot:
+    def get_account_snapshot(
+        self,
+        account_id: str,
+        *,
+        include_history: bool = True,
+        history_start: datetime | None = None,
+    ) -> VenueAccountSnapshot:
         balances = self.list_balances(account_id)
         positions = self.list_positions(account_id)
-        orders = self.list_orders(account_id=account_id, limit=100)
-        fills = self.list_fills(account_id=account_id)
+        orders = self.list_orders(account_id=account_id, limit=100) if include_history else []
+        fills = self.list_fills(account_id=account_id) if include_history else []
         risk = self.get_account_risk(account_id)
         as_of = max([risk.as_of, *(balance.as_of for balance in balances)] or [datetime.now(UTC)])
         return VenueAccountSnapshot(
@@ -397,8 +413,10 @@ class FakeGateway:
             positions=positions,
             orders=orders,
             fills=fills,
-            economicEvents=self.list_economic_events(account_id=account_id),
-            economicEventsQuality="complete",
+            economicEvents=(
+                self.list_economic_events(account_id=account_id) if include_history else []
+            ),
+            economicEventsQuality=("complete" if include_history else "not_requested"),
             accountRisk=risk,
             asOf=as_of,
             dataQualityState="complete",

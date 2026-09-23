@@ -369,7 +369,14 @@ def create_execution_batch(request: CreateExecutionBatchRequest) -> ExecutionBat
             order_id=command.platform_order_id,
         )
 
-        if command.status == "filled":
+        terminal_partial = (
+            command.status in {"partially_filled", "canceled"}
+            and strategy_key == CROSS_SPREAD_STRATEGY_KEY
+            and role == BYBIT_LEG_ROLE
+            and command.platform_order_id is not None
+            and _confirmed_terminal_chase_fill(command.platform_order_id)
+        )
+        if command.status == "filled" or terminal_partial:
             if (
                 strategy_key == CROSS_SPREAD_STRATEGY_KEY
                 and role == BYBIT_LEG_ROLE
@@ -398,6 +405,11 @@ def create_execution_batch(request: CreateExecutionBatchRequest) -> ExecutionBat
                     handle_batch_failure(batch_id, reason)
                     return get_execution_batch(batch_id)
 
+            if terminal_partial:
+                # The order retains its actual partial-fill status and original
+                # requested quantity. The batch leg has completed its bounded
+                # execution; only the confirmed quantity releases the hedge.
+                update_leg_status(batch_id, role, "filled", order_id=command.platform_order_id)
             filled_count += 1
             risk_ok, risk_reason = record_filled_leg(batch_id)
             if not risk_ok and filled_count < len(command_requests):
@@ -415,7 +427,13 @@ def create_execution_batch(request: CreateExecutionBatchRequest) -> ExecutionBat
             continue
 
         reason = f"Leg {role} completed with command status {command.status}"
-        uncertain = command.status in {"accepted", "processing", "acknowledged", "result_unknown"}
+        uncertain = command.status in {
+            "accepted",
+            "processing",
+            "acknowledged",
+            "partially_filled",
+            "result_unknown",
+        }
         status = "manual_intervention" if filled_count or uncertain else "failed"
         update_leg_status(
             batch_id,
@@ -446,6 +464,35 @@ def create_execution_batch(request: CreateExecutionBatchRequest) -> ExecutionBat
         )
         handle_batch_failure(batch_id, reason)
     return get_execution_batch(batch_id)
+
+
+def _confirmed_terminal_chase_fill(order_id: str) -> bool:
+    """Only persisted terminal Chase evidence may release a partial hedge."""
+    with connection() as db:
+        row = db.execute(
+            """SELECT terminal.filled_quantity, o.quantity
+            FROM runtime_order_terminals terminal
+            JOIN orders o ON o.id=terminal.order_id
+            JOIN trade_commands command ON command.id=o.command_id
+            JOIN order_execution_intents intent ON intent.idempotency_key=command.idempotency_key
+            WHERE o.id=? AND o.status IN ('partially_filled','canceled')
+              AND command.strategy_instance_id='strategy_cross_venue_spread_instance_default'
+              AND intent.execution_policy='post_only_chase'""",
+            (order_id,),
+        ).fetchone()
+        if row is None:
+            return False
+        actual = sum(
+            (
+                Decimal(r[0])
+                for r in db.execute(
+                    "SELECT quantity FROM fills WHERE order_id=?",
+                    (order_id,),
+                )
+            ),
+            Decimal("0"),
+        )
+        return Decimal(row[0]) == actual and Decimal("0") < actual < Decimal(row[1])
 
 
 def _result_unknown_order_for_command(idempotency_key: str) -> str | None:

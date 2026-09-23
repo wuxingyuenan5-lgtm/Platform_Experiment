@@ -137,7 +137,7 @@ export function useFundingWorkspace() {
       !!selectedPerpetualSymbol.value &&
       context.value?.openSizing?.valid === true &&
       positiveQuantity(quantityInput.value) &&
-      new Decimal(quantityInput.value).eq(context.value.openSizing.spotQuantity ?? '0'),
+      new Decimal(quantityInput.value).eq(context.value.openSizing.perpetualQuantity ?? '0'),
   );
   const canClose = computed(
     () =>
@@ -358,7 +358,7 @@ export function useFundingWorkspace() {
         title: action === 'open' ? '确认资费开仓' : '确认资费平仓',
         content: `${draft.perpetualSymbol} / ${draft.spotSymbol}，${
           action === 'open'
-            ? `现货买入 ${draft.quantity}，预计净到账 ${sizing?.expectedSpotNetQuantity}；永续卖出 ${draft.expectedPerpetualQuantity}，取整余量 ${sizing?.roundingResidualQuantity}`
+            ? `永续卖出 ${draft.expectedPerpetualQuantity}，现货买入 ${sizing?.spotQuantity}（扣费后净到账 ${sizing?.expectedSpotNetQuantity}），配平余量 ${sizing?.roundingResidualQuantity}`
             : `永续平仓数量 ${draft.quantity}`
         }。永续${
           draft.executionPolicy === 'market'

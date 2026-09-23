@@ -2,6 +2,7 @@
 
 import json
 import logging
+from bisect import bisect_left
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
@@ -167,7 +168,7 @@ def _classified_intervals(db, account_id, points, scope, value_key):
     valuation and non-positive-capital rule live here so the drawdown series and
     the daily P&L series can never drift apart.
     """
-    windows = [
+    raw_windows = [
         (stamp(r[0]), stamp(r[1]))
         for r in db.execute(
             "SELECT start_at,end_at FROM account_capital_coverage WHERE account_id=? "
@@ -175,10 +176,19 @@ def _classified_intervals(db, account_id, points, scope, value_key):
             (account_id, scope),
         )
     ]
+    # Coverage is a union of windows. Merge it once so each interval can advance
+    # through the ordered union instead of rescanning every persisted window.
+    windows = []
+    for start, end in sorted(raw_windows):
+        if windows and start <= windows[-1][1]:
+            windows[-1] = (windows[-1][0], max(windows[-1][1], end))
+        else:
+            windows.append((start, end))
     events = db.execute(
         "SELECT occurred_at,currency,amount FROM account_capital_movements WHERE "
         "account_id=? AND asset_scope=? AND (amount IS NULL OR amount!='0') AND "
-        "occurred_at>=? AND occurred_at<=? ORDER BY occurred_at",
+        "julianday(occurred_at)>=julianday(?) AND julianday(occurred_at)<=julianday(?) "
+        "ORDER BY julianday(occurred_at)",
         (
             account_id,
             scope,
@@ -186,51 +196,101 @@ def _classified_intervals(db, account_id, points, scope, value_key):
             stamp(points[-1].as_of).isoformat(),
         ),
     ).fetchall()
-    rates = db.execute(
-        "SELECT currency,as_of,usd_rate FROM account_valuation_rates WHERE "
-        "account_id=? AND as_of>=? AND as_of<=?",
-        (
-            account_id,
-            (stamp(points[0].as_of) - timedelta(minutes=5)).isoformat(),
-            (stamp(points[-1].as_of) + timedelta(minutes=5)).isoformat(),
-        ),
-    ).fetchall()
+    events = [(stamp(row[0]), row[1], row[2]) for row in events]
+    point_currencies = {point.currency.upper() for point in points if point.currency}
+    rate_currencies = {
+        currency
+        for _, currency, amount in events
+        if amount is not None
+        and Decimal(amount) != 0
+        and any(currency.upper() != point_currency for point_currency in point_currencies)
+    }
+    rates = []
+    if rate_currencies:
+        placeholders = ",".join("?" for _ in rate_currencies)
+        event_times = [
+            occurred_at for occurred_at, currency, amount in events if currency in rate_currencies
+        ]
+        rates = db.execute(
+            "SELECT currency,as_of,usd_rate FROM account_valuation_rates WHERE "
+            f"account_id=? AND currency IN ({placeholders}) "
+            "AND julianday(as_of)>=julianday(?) AND julianday(as_of)<=julianday(?)",
+            (
+                account_id,
+                *sorted(rate_currencies),
+                (min(event_times) - timedelta(minutes=5)).isoformat(),
+                (max(event_times) + timedelta(minutes=5)).isoformat(),
+            ),
+        ).fetchall()
+    rates_by_currency = {}
+    for row in rates:
+        rates_by_currency.setdefault(row[0], []).append((stamp(row[1]), row[2]))
+    for currency in rates_by_currency:
+        rates_by_currency[currency].sort(key=lambda item: item[0])
+    rate_times = {
+        currency: [as_of for as_of, _ in values]
+        for currency, values in rates_by_currency.items()
+    }
 
-    def covered(start, end):
-        cursor = start
-        for a, b in windows:
-            if a > cursor:
-                break
-            if b > cursor:
-                cursor = b
-            if cursor >= end:
-                return True
-        return False
+    def nearest_rate(currency, occurred_at):
+        candidates = rates_by_currency.get(currency, ())
+        if not candidates:
+            return None
+        times = rate_times[currency]
+        index = bisect_left(times, occurred_at)
+        nearest = None
+        candidate_indexes = set()
+        for candidate_index in (index - 1, index):
+            if 0 <= candidate_index < len(candidates):
+                candidate_time = candidates[candidate_index][0]
+                left = candidate_index
+                while left >= 0 and candidates[left][0] == candidate_time:
+                    candidate_indexes.add(left)
+                    left -= 1
+                right = candidate_index + 1
+                while right < len(candidates) and candidates[right][0] == candidate_time:
+                    candidate_indexes.add(right)
+                    right += 1
+        nearest = None
+        for candidate_index in candidate_indexes:
+            if 0 <= candidate_index < len(candidates):
+                candidate = candidates[candidate_index]
+                distance = abs((candidate[0] - occurred_at).total_seconds())
+                candidate_value = (distance, Decimal(candidate[1]))
+                if nearest is None or candidate_value < nearest:
+                    nearest = candidate_value
+        return nearest
 
+    coverage_index = 0
+    event_index = 0
     for previous, point in zip(points, points[1:], strict=False):
         a, b = stamp(previous.as_of), stamp(point.as_of)
         initial, final = getattr(previous, value_key), getattr(point, value_key)
         reason = None
         if initial is None or final is None or initial <= 0 or final < 0 or b <= a:
             reason = "invalid_equity"
-        elif not covered(a, b):
-            reason = "missing_history"
+        else:
+            while coverage_index < len(windows) and windows[coverage_index][1] <= a:
+                coverage_index += 1
+            if (
+                coverage_index >= len(windows)
+                or windows[coverage_index][0] > a
+                or windows[coverage_index][1] < b
+            ):
+                reason = "missing_history"
         flow = weighted = Decimal(0)
-        for event in events:
-            t = stamp(event[0])
-            if not a < t <= b:
-                continue
-            if event[2] is None:
+        while event_index < len(events) and events[event_index][0] <= a:
+            event_index += 1
+        interval_event_index = event_index
+        while interval_event_index < len(events) and events[interval_event_index][0] <= b:
+            t, currency, raw_amount = events[interval_event_index]
+            interval_event_index += 1
+            if raw_amount is None:
                 reason = "unclassified_flow"
                 continue
-            amount = Decimal(event[2])
-            if amount and event[1].upper() != (point.currency or "").upper():
-                candidates = [
-                    (abs((stamp(r[1]) - t).total_seconds()), Decimal(r[2]))
-                    for r in rates
-                    if r[0] == event[1]
-                ]
-                nearest = min(candidates, default=None)
+            amount = Decimal(raw_amount)
+            if amount and currency.upper() != (point.currency or "").upper():
+                nearest = nearest_rate(currency, t)
                 if point.currency != "USD" or nearest is None or nearest[0] > 300:
                     reason = "missing_flow_valuation"
                     continue
@@ -241,6 +301,7 @@ def _classified_intervals(db, account_id, points, scope, value_key):
                 * Decimal(str((b - t).total_seconds()))
                 / Decimal(str((b - a).total_seconds()))
             )
+        event_index = interval_event_index
         denominator = (initial or Decimal(0)) + weighted
         if denominator <= 0:
             reason = reason or "invalid_capital"
@@ -252,18 +313,22 @@ def adjusted_drawdowns(db, account_id, points, scope, value_key):
         return []
     nav = peak = Decimal(1)
     result = [(None, "baseline")]
-    broken = False
     for initial, final, flow, denominator, reason in _classified_intervals(
         db, account_id, points, scope, value_key
     ):
-        if broken or reason:
+        if reason:
             result.append((None, reason or "history_gap"))
-            broken = True
+            # Coverage is fetched in bounded windows and can leave a small
+            # interval between two successful windows.  Keep that interval
+            # explicitly unavailable, then establish a fresh baseline from
+            # the first point after the gap so a current drawdown does not
+            # disappear forever because of an old sync hole.
+            nav = peak = Decimal(1)
             continue
         nav *= 1 + (final - initial - flow) / denominator
         if nav < 0:
-            broken = True
             result.append((None, "invalid_capital"))
+            nav = peak = Decimal(1)
             continue
         peak = max(peak, nav)
         result.append(((nav / peak - 1) * 100, "estimated"))
@@ -286,9 +351,11 @@ def daily_pnl(db, account_id, points, scope, value_key):
     if not points:
         return []
     result = [(None, None, "baseline")]
-    for initial, final, flow, denominator, reason in _classified_intervals(
-        db, account_id, points, scope, value_key
+    for index, (initial, final, flow, denominator, reason) in enumerate(
+        _classified_intervals(db, account_id, points, scope, value_key), start=1
     ):
+        if (stamp(points[index].as_of).date() - stamp(points[index - 1].as_of).date()).days > 1:
+            reason = "missing_daily_baseline"
         if reason:
             result.append((None, None, reason))
             continue

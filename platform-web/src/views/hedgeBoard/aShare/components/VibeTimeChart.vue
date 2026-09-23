@@ -7,9 +7,9 @@
           v-for="size in [60, 90, 0]"
           :key="size"
           type="button"
-          :aria-pressed="range === size"
-          :class="{ active: range === size }"
-          @click="range = size"
+          :aria-pressed="preset === size"
+          :class="{ active: preset === size }"
+          @click="setPreset(size)"
           >{{ size ? `近${size}日` : '全部' }}</button
         ></div
       ></header
@@ -116,6 +116,44 @@
         ></div
       >
     </div>
+    <div
+      v-if="dates.length > 1"
+      class="vibe-chart-range"
+      :style="{
+        '--range-start': `${rangeStartPercent}%`,
+        '--range-end': `${rangeEndPercent}%`,
+      }"
+    >
+      <div class="vibe-chart-range__labels" aria-hidden="true">
+        <span>{{ formatDateLabel(dates[start]) }}</span>
+        <span>{{ formatDateLabel(dates[end]) }}</span>
+      </div>
+      <div class="vibe-chart-range__viewport">
+        <svg viewBox="0 0 100 20" preserveAspectRatio="none" aria-hidden="true">
+          <polyline :points="overviewPoints" />
+        </svg>
+        <span class="vibe-chart-range__rail" aria-hidden="true"></span>
+        <span class="vibe-chart-range__selection" aria-hidden="true"></span>
+        <input
+          v-model.number="startIndex"
+          class="vibe-chart-range__thumb vibe-chart-range__thumb--start"
+          type="range"
+          min="0"
+          :max="maxIndex"
+          :aria-label="`${title}起始日期`"
+          @input="onStartInput"
+        />
+        <input
+          v-model.number="endIndex"
+          class="vibe-chart-range__thumb vibe-chart-range__thumb--end"
+          type="range"
+          min="0"
+          :max="maxIndex"
+          :aria-label="`${title}结束日期`"
+          @input="onEndInput"
+        />
+      </div>
+    </div>
     <footer
       >{{ shownDates[0] || '—' }} — {{ shownDates.at(-1) || '—'
       }}<span>{{ shownDates.length }}个交易日 · 空缺数据不连线</span></footer
@@ -143,7 +181,9 @@
     dates: string[];
     series: Series[];
   }>();
-  const range = ref(90);
+  const preset = ref<number | null>(90);
+  const startIndex = ref(0);
+  const endIndex = ref(0);
   const hidden = ref(new Set<number>());
   const hover = ref<number | null>(null);
   const left = 76,
@@ -151,9 +191,17 @@
     top = 22,
     bottom = 302;
   const ticks = [0, 0.25, 0.5, 0.75, 1];
-  const start = computed(() => (range.value ? Math.max(0, props.dates.length - range.value) : 0));
-  const end = computed(() => Math.max(0, props.dates.length - 1));
-  const shownDates = computed(() => props.dates.slice(start.value));
+  const maxIndex = computed(() => Math.max(0, props.dates.length - 1));
+  const start = computed(() =>
+    Math.max(0, Math.min(startIndex.value, Math.max(0, endIndex.value - 1))),
+  );
+  const end = computed(() =>
+    Math.max(
+      start.value + (props.dates.length > 1 ? 1 : 0),
+      Math.min(endIndex.value, maxIndex.value),
+    ),
+  );
+  const shownDates = computed(() => props.dates.slice(start.value, end.value + 1));
   const visible = computed(() =>
     props.series
       .map((item, index) => ({ item, index }))
@@ -163,7 +211,7 @@
     value == null || value === '' || !Number.isFinite(Number(value)) ? null : Number(value);
   const hasValues = computed(() =>
     visible.value.some((entry) =>
-      entry.item.values.slice(start.value).some((value) => numeric(value) != null),
+      entry.item.values.slice(start.value, end.value + 1).some((value) => numeric(value) != null),
     ),
   );
   const dateTicks = computed(() => [
@@ -173,12 +221,34 @@
       ),
     ),
   ]);
+  const rangeStartPercent = computed(() =>
+    maxIndex.value ? (start.value / maxIndex.value) * 100 : 0,
+  );
+  const rangeEndPercent = computed(() =>
+    maxIndex.value ? (end.value / maxIndex.value) * 100 : 100,
+  );
+  const overviewPoints = computed(() => {
+    const item = visible.value[0]?.item || props.series[0];
+    if (!item) return '';
+    const values = item.values.map((raw) => numeric(raw));
+    const finite = values.filter((value): value is number => value != null);
+    if (!finite.length) return '';
+    const min = Math.min(...finite);
+    const max = Math.max(...finite);
+    return values
+      .map((value, index) => {
+        const x = (index / Math.max(values.length - 1, 1)) * 100;
+        const y = value == null || max === min ? 10 : 18 - ((value - min) / (max - min)) * 16;
+        return `${x.toFixed(2)},${y.toFixed(2)}`;
+      })
+      .join(' ');
+  });
   const bounds = computed(() => {
     const domain = (axis: string): [number, number] => {
       const items = visible.value.filter((entry) => (entry.item.axis || 'left') === axis);
       const values = items
         .flatMap((entry) =>
-          entry.item.values.slice(start.value).map((value) => {
+          entry.item.values.slice(start.value, end.value + 1).map((value) => {
             const n = numeric(value);
             return n == null ? null : n * (entry.item.sign || 1);
           }),
@@ -210,7 +280,7 @@
   function segments(item: Series): Point[][] {
     const result: Point[][] = [];
     let current: Point[] = [];
-    item.values.slice(start.value).forEach((raw, offset) => {
+    item.values.slice(start.value, end.value + 1).forEach((raw, offset) => {
       const value = numeric(raw);
       if (value == null) {
         if (current.length) result.push(current);
@@ -228,7 +298,7 @@
   }
   function bars(item: Series) {
     const width = Math.max(0.5, Math.min(10, ((right - left) / shownDates.value.length) * 0.65));
-    return item.values.slice(start.value).flatMap((raw, offset) => {
+    return item.values.slice(start.value, end.value + 1).flatMap((raw, offset) => {
       const value = numeric(raw);
       if (value == null) return [];
       const py = y(value * (item.sign || 1), item),
@@ -279,9 +349,46 @@
   function moveHover(delta: number) {
     hover.value = Math.max(start.value, Math.min(end.value, (hover.value ?? end.value) + delta));
   }
-  watch([range, () => props.dates.length], () => {
+  function setPreset(size: number) {
+    preset.value = size;
+    const max = maxIndex.value;
+    endIndex.value = max;
+    startIndex.value = size ? Math.max(0, max - size + 1) : 0;
+    hover.value = null;
+  }
+  function onStartInput(event: Event) {
+    const value = Number((event.target as HTMLInputElement).value);
+    if (Number.isFinite(value)) startIndex.value = value;
+    preset.value = null;
+    startIndex.value = Math.min(startIndex.value, Math.max(0, endIndex.value - 1));
+    hover.value = null;
+  }
+  function onEndInput(event: Event) {
+    const value = Number((event.target as HTMLInputElement).value);
+    if (Number.isFinite(value)) endIndex.value = value;
+    preset.value = null;
+    endIndex.value = Math.max(endIndex.value, Math.min(maxIndex.value, startIndex.value + 1));
+    hover.value = null;
+  }
+  function formatDateLabel(value: string | undefined) {
+    if (!value) return '—';
+    return value.length > 10 ? value.slice(5, 16).replace('T', ' ') : value.slice(5);
+  }
+  watch([() => props.dates.length, () => props.dates[0], () => props.dates.at(-1)], () => {
+    const max = maxIndex.value;
+    if (preset.value != null) {
+      endIndex.value = max;
+      startIndex.value = preset.value ? Math.max(0, max - preset.value + 1) : 0;
+    } else {
+      startIndex.value = Math.min(startIndex.value, Math.max(0, max - 1));
+      endIndex.value = Math.max(
+        startIndex.value + (max > 0 ? 1 : 0),
+        Math.min(endIndex.value, max),
+      );
+    }
     hover.value = null;
   });
+  setPreset(90);
 </script>
 
 <style scoped lang="less">
@@ -292,55 +399,64 @@
     border-radius: 12px;
     background: var(--strategy-surface, white);
   }
+
   .vibe-chart-head,
   .vibe-chart-subtitle,
   footer {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     justify-content: space-between;
     gap: 12px;
-    flex-wrap: wrap;
   }
+
   h3 {
     margin: 0;
+    color: var(--strategy-text-1, #10233d);
     font-size: 15px;
     font-weight: 650;
-    color: var(--strategy-text-1, #10233d);
   }
+
   .range-buttons,
   .vibe-chart-legend {
     display: flex;
     gap: 5px;
     flex-wrap: wrap;
   }
+
   button {
     padding: 4px 8px;
-    font-size: 12px;
     border: 1px solid var(--strategy-border, #d9e3ee);
     border-radius: 5px;
     background: transparent;
     color: var(--strategy-text-2, #354d68);
+    font-size: 12px;
     cursor: pointer;
   }
+
   button.active {
-    background: var(--strategy-accent-soft, #eaf2ff);
     border-color: #c9dbf7;
+    background: var(--strategy-accent-soft, #eaf2ff);
     color: var(--strategy-accent, #1d4ed8);
   }
+
   button:focus-visible,
   svg:focus-visible {
     outline: 2px solid #1d4ed8;
     outline-offset: 3px;
   }
+
   .vibe-chart-subtitle {
     margin: 9px 0;
     color: var(--strategy-text-3, #60758f);
     font-size: 11px;
   }
+
   .vibe-legend-btn.off {
     opacity: 0.45;
     text-decoration: line-through;
   }
+
   i {
     display: inline-block;
     width: 7px;
@@ -348,34 +464,158 @@
     margin-right: 5px;
     border-radius: 50%;
   }
+
   .vibe-chart-stage {
     position: relative;
-    margin-top: 12px;
     min-width: 0;
+    margin-top: 12px;
   }
+
+  .vibe-chart-range {
+    display: grid;
+    gap: 5px;
+    margin-top: 12px;
+  }
+
+  .vibe-chart-range__labels {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    min-height: 14px;
+    overflow: hidden;
+    color: var(--strategy-text-4, #7b8da4);
+    font-size: 10px;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  .vibe-chart-range__viewport {
+    position: relative;
+    height: 24px;
+    overflow: hidden;
+  }
+
+  .vibe-chart-range__viewport svg {
+    position: absolute;
+    inset: 1px 0;
+    width: 100%;
+    height: calc(100% - 2px);
+    pointer-events: none;
+  }
+
+  .vibe-chart-range__viewport polyline {
+    stroke-width: 1.2;
+    stroke-linecap: round;
+    stroke: rgb(137 167 233 / 80%);
+    fill: none;
+    stroke-linejoin: round;
+  }
+
+  .vibe-chart-range__rail,
+  .vibe-chart-range__selection {
+    position: absolute;
+    top: 50%;
+    height: 12px;
+    transform: translateY(-50%);
+    border-radius: 999px;
+  }
+
+  .vibe-chart-range__rail {
+    right: 0;
+    left: 0;
+    border: 1px solid rgb(192 205 227 / 92%);
+    background: rgb(225 235 252 / 30%);
+    box-shadow: inset 0 1px 1px rgb(255 255 255 / 72%);
+  }
+
+  .vibe-chart-range__selection {
+    left: var(--range-start);
+    width: max(4%, calc(var(--range-end) - var(--range-start)));
+    border: 1px solid rgb(142 171 235 / 88%);
+    background: rgb(202 218 251 / 45%);
+    box-shadow: inset 0 0 0 1px rgb(255 255 255 / 35%);
+    pointer-events: none;
+  }
+
+  .vibe-chart-range__thumb {
+    position: absolute;
+    z-index: 2;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 24px;
+    margin: 0;
+    appearance: none;
+    background: transparent;
+    pointer-events: none;
+  }
+
+  .vibe-chart-range__thumb::-webkit-slider-runnable-track {
+    height: 12px;
+    background: transparent;
+  }
+
+  .vibe-chart-range__thumb::-moz-range-track {
+    height: 12px;
+    background: transparent;
+  }
+
+  .vibe-chart-range__thumb::-webkit-slider-thumb {
+    width: 6px;
+    height: 14px;
+    margin-top: -1px;
+    appearance: none;
+    border: 1px solid rgb(146 171 230 / 90%);
+    border-radius: 999px;
+    background: #fff;
+    box-shadow: 0 1px 2px rgb(124 145 186 / 20%);
+    cursor: ew-resize;
+    pointer-events: auto;
+  }
+
+  .vibe-chart-range__thumb::-moz-range-thumb {
+    width: 6px;
+    height: 14px;
+    border: 1px solid rgb(146 171 230 / 90%);
+    border-radius: 999px;
+    background: #fff;
+    box-shadow: 0 1px 2px rgb(124 145 186 / 20%);
+    cursor: ew-resize;
+    pointer-events: auto;
+  }
+
+  .vibe-chart-range__thumb--start {
+    z-index: 3;
+  }
+
   .vibe-chart-svg {
     display: block;
     width: 100%;
     height: auto;
     min-height: 210px;
   }
+
   svg text {
     fill: var(--strategy-text-3, #60758f);
     font-size: 12px;
     font-variant-numeric: tabular-nums;
   }
+
   .chart-grid {
-    stroke: var(--strategy-border, #d9e3ee);
     stroke-dasharray: 3 5;
+    stroke: var(--strategy-border, #d9e3ee);
   }
+
   .vibe-chart-line {
     stroke-width: 2;
     fill: none;
   }
+
   .hover-line {
-    stroke: #7b8da4;
     stroke-dasharray: 4;
+    stroke: #7b8da4;
   }
+
   .vibe-chart-tooltip {
     position: absolute;
     top: 6px;
@@ -384,29 +624,34 @@
     border: 1px solid #d9e3ee;
     border-radius: 8px;
     background: rgb(255 255 255 / 96%);
+    box-shadow: 0 4px 16px rgb(20 40 70 / 8%);
     color: #354d68;
     font-size: 12px;
-    box-shadow: 0 4px 16px rgb(20 40 70 / 8%);
     pointer-events: none;
   }
+
   .chart-empty {
-    min-height: 140px;
     display: grid;
-    place-content: center;
+    min-height: 140px;
     color: #60758f;
+    place-content: center;
   }
+
   footer {
     margin-top: 4px;
     color: var(--strategy-text-3, #60758f);
     font-size: 11px;
   }
+
   @media (max-width: 680px) {
     .vibe-time-chart {
       padding: 12px;
     }
+
     .vibe-chart-svg {
       min-height: 170px;
     }
+
     footer span {
       display: none;
     }

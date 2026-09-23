@@ -61,6 +61,10 @@ class BybitMt5Gateway:
         # lazily from the explicit account id on the first account-scoped call.
         self.mt5: Any = mt5 or StrictMt5AcceptanceAdapter(self.settings)
         self._execution_read_cache: dict[tuple[object, ...], tuple[float, Any]] = {}
+        if hasattr(self.bybit, "market_quote_reader"):
+            self.bybit.market_quote_reader = lambda **kwargs: self._adapter_for_account(
+                kwargs["account_id"]
+            ).get_market_quote(**kwargs)
 
     def warm_live_execution(self) -> None:
         """Pay connection and identity startup costs before the first order.
@@ -81,8 +85,16 @@ class BybitMt5Gateway:
     def place_order(self, command: SubmitOrderCommand) -> list[ExecutionEvent]:
         return self.submit_order(command)
 
-    def get_account(self, account_id: str) -> VenueAccountSnapshot:
-        return self.get_account_snapshot(account_id)
+    def get_account(
+        self,
+        account_id: str,
+        *,
+        include_history: bool = True,
+        history_start: datetime | None = None,
+    ) -> VenueAccountSnapshot:
+        return self.get_account_snapshot(
+            account_id, include_history=include_history, history_start=history_start
+        )
 
     def get_capital_flows(self, *, account_id, start_time, end_time):
         return self._adapter_for_account(account_id).get_capital_flows(
@@ -273,11 +285,36 @@ class BybitMt5Gateway:
     def get_account_risk(self, account_id: str) -> VenueAccountRiskSnapshot:
         return self._adapter_for_account(account_id).get_account_risk(account_id)
 
-    def get_account_snapshot(self, account_id: str) -> VenueAccountSnapshot:
+    def get_account_snapshot(
+        self,
+        account_id: str,
+        *,
+        include_history: bool = True,
+        history_start: datetime | None = None,
+    ) -> VenueAccountSnapshot:
+        if history_start is not None:
+            if history_start.tzinfo is None or history_start.utcoffset() is None:
+                raise GatewayConfigurationError("historyStart must include a timezone")
+            now = datetime.now(UTC)
+            if history_start > now:
+                raise GatewayConfigurationError("historyStart cannot be in the future")
+            max_days = (
+                7
+                if account_id in self.settings.bybit_accounts
+                else self.settings.mt5_history_lookback_days
+            )
+            if history_start < now - timedelta(days=max_days):
+                raise GatewayConfigurationError("historyStart exceeds the supported history window")
         adapter: Any = self._adapter_for_account(account_id)
         if account_id in self.settings.bybit_accounts:
             if hasattr(adapter, "get_account_snapshot"):
-                return adapter.get_account_snapshot(account_id)
+                if include_history and history_start is None:
+                    return adapter.get_account_snapshot(account_id)
+                return adapter.get_account_snapshot(
+                    account_id,
+                    include_history=include_history,
+                    history_start=history_start,
+                )
             risk = adapter.get_account_risk(account_id)
             balances = adapter.list_balances(account_id)
             return VenueAccountSnapshot(
@@ -287,22 +324,37 @@ class BybitMt5Gateway:
                 identity={"accountId": account_id},
                 balances=balances,
                 positions=adapter.list_positions(account_id),
-                orders=adapter.list_orders(account_id=account_id, limit=100),
-                fills=adapter.query_fill_history(
-                    account_id=account_id,
-                    symbol=None,
-                    start_time=datetime.now(UTC) - timedelta(days=30),
-                    end_time=datetime.now(UTC),
-                    cursor=None,
-                    limit=200,
-                ).items,
+                orders=(
+                    adapter.list_orders(account_id=account_id, limit=100) if include_history else []
+                ),
+                fills=(
+                    adapter.query_fill_history(
+                        account_id=account_id,
+                        symbol=None,
+                        start_time=datetime.now(UTC) - timedelta(days=30),
+                        end_time=datetime.now(UTC),
+                        cursor=None,
+                        limit=200,
+                    ).items
+                    if include_history
+                    else []
+                ),
                 accountRisk=risk,
                 asOf=risk.as_of,
                 dataQualityState=risk.data_quality_state,
+                economicEventsQuality=("unavailable" if include_history else "not_requested"),
             )
         if hasattr(adapter, "get_account_snapshot"):
-            return adapter.get_account_snapshot(account_id)
-        return self._mt5_account_snapshot(account_id)
+            if include_history and history_start is None:
+                return adapter.get_account_snapshot(account_id)
+            return adapter.get_account_snapshot(
+                account_id,
+                include_history=include_history,
+                history_start=history_start,
+            )
+        return self._mt5_account_snapshot(
+            account_id, include_history=include_history, history_start=history_start
+        )
 
     def transfer_internal_capital(
         self,
@@ -435,6 +487,11 @@ class BybitMt5Gateway:
             category=category,
         )
 
+    def get_research_ticks(self, *, account_id, symbol, start, end, historical=False):
+        return self._mt5_adapter(account_id).get_research_ticks(
+            account_id=account_id, symbol=symbol, start=start, end=end, historical=historical
+        )
+
     def get_market_quote(
         self,
         *,
@@ -460,6 +517,15 @@ class BybitMt5Gateway:
                 category=category,
             ),
         )
+
+    def list_funding_markets(
+        self, *, account_id: str, search: str | None = None
+    ) -> list[dict[str, object]]:
+        adapter = self._adapter_for_account(account_id)
+        reader = getattr(adapter, "list_funding_markets", None)
+        if reader is None:
+            raise GatewayConfigurationError("Funding market catalog is unavailable")
+        return reader(account_id=account_id, search=search)
 
     def estimate_order_margin(
         self,
@@ -617,7 +683,13 @@ class BybitMt5Gateway:
             return self._mt5_adapter(account_id)
         raise GatewayConfigurationError(f"Unknown live adapter route: {name}")
 
-    def _mt5_account_snapshot(self, account_id: str) -> VenueAccountSnapshot:
+    def _mt5_account_snapshot(
+        self,
+        account_id: str,
+        *,
+        include_history: bool = True,
+        history_start: datetime | None = None,
+    ) -> VenueAccountSnapshot:
         mt5 = cast(Any, self.mt5._runtime_mt5())
 
         def read(_session) -> VenueAccountSnapshot:
@@ -682,37 +754,40 @@ class BybitMt5Gateway:
                         dataQualityState=quality,
                     )
                 )
-            start, end = self.mt5._history_window()
             orders: list[VenueOrderSnapshot] = []
-            seen_order_ids: set[str] = set()
-            active_orders = mt5.orders_get()
-            history_orders = mt5.history_orders_get(start, end)
-            deals = mt5.history_deals_get(start, end)
-            if active_orders is None or history_orders is None or deals is None:
-                raise GatewayConfigurationError("MT5 order or deal history query failed")
-            for row in [*active_orders, *history_orders]:
-                snapshot = self.mt5._snapshot(mt5, row, account_id)
-                if snapshot is None or snapshot.external_order_id in seen_order_ids:
-                    continue
-                seen_order_ids.add(snapshot.external_order_id)
-                orders.append(snapshot)
             fills: list[VenueFillSnapshot] = []
-            seen_fill_ids: set[str] = set()
-            for deal in deals:
-                if not self.mt5._is_trade_deal(mt5, deal):
-                    continue
-                snapshot = self.mt5._fill_snapshot(
-                    mt5,
-                    deal,
-                    account_id,
-                    target=None,
-                    fallback_route=None,
-                )
-                if snapshot is None or snapshot.external_fill_id in seen_fill_ids:
-                    continue
-                seen_fill_ids.add(snapshot.external_fill_id)
-                fills.append(snapshot)
-            economic_events = self.mt5._economic_event_snapshots(mt5, account_id, deals)
+            economic_events: list[VenueEconomicEventSnapshot] = []
+            requested_history_start = history_start
+            history_start_used = history_end_used = None
+            if include_history:
+                start, end = self.mt5._history_window()
+                if requested_history_start is not None:
+                    start = requested_history_start
+                seen_order_ids: set[str] = set()
+                active_orders = mt5.orders_get()
+                history_orders = mt5.history_orders_get(start, end)
+                deals = mt5.history_deals_get(start, end)
+                if active_orders is None or history_orders is None or deals is None:
+                    raise GatewayConfigurationError("MT5 order or deal history query failed")
+                for row in [*active_orders, *history_orders]:
+                    snapshot = self.mt5._snapshot(mt5, row, account_id)
+                    if snapshot is None or snapshot.external_order_id in seen_order_ids:
+                        continue
+                    seen_order_ids.add(snapshot.external_order_id)
+                    orders.append(snapshot)
+                seen_fill_ids: set[str] = set()
+                for deal in deals:
+                    if not self.mt5._is_trade_deal(mt5, deal):
+                        continue
+                    snapshot = self.mt5._fill_snapshot(
+                        mt5, deal, account_id, target=None, fallback_route=None
+                    )
+                    if snapshot is None or snapshot.external_fill_id in seen_fill_ids:
+                        continue
+                    seen_fill_ids.add(snapshot.external_fill_id)
+                    fills.append(snapshot)
+                economic_events = self.mt5._economic_event_snapshots(mt5, account_id, deals)
+                history_start_used, history_end_used = start, end
             risk = VenueAccountRiskSnapshot(
                 source=self.mt5.name,
                 accountId=account_id,
@@ -774,9 +849,9 @@ class BybitMt5Gateway:
                 orders=orders,
                 fills=fills,
                 economicEvents=economic_events,
-                economicEventsQuality="complete",
-                historyStart=start,
-                historyEnd=end,
+                economicEventsQuality=("complete" if include_history else "not_requested"),
+                historyStart=history_start_used,
+                historyEnd=history_end_used,
                 accountRisk=risk,
                 warnings=sorted(set(warnings)),
                 asOf=as_of,

@@ -88,3 +88,18 @@ def test_read_retries_only_transport_errors_on_the_same_client():
     with pytest.raises(ValueError):
         adapter._read_with_retry("first", invalid)
     assert attempts == [client]
+
+
+def test_clock_calibration_uses_post_response_sample_for_asymmetric_paths():
+    samples = iter([1_000_000])
+
+    class PublicClient:
+        @staticmethod
+        def get_server_time():
+            return {"retCode": 0, "time": 999_950}
+
+    offset = BybitConnections._measure_clock_offset(lambda: next(samples), PublicClient())
+
+    # The latest local sample keeps signed requests behind the venue when the
+    # response path is slower in one direction.
+    assert offset == -50

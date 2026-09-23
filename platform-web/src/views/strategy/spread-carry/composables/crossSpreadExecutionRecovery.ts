@@ -15,6 +15,7 @@ export interface CloseExecutionDraftPayload {
   executionMode: CrossSpreadExecutionMode;
   limitSpread?: string;
   limitStrategy: CrossSpreadLimitStrategy;
+  maxAdverseSpread?: string;
 }
 
 export type PersistedExecutionDraft =
@@ -29,6 +30,9 @@ export type PersistedExecutionDraft =
         executionMode: CrossSpreadExecutionMode;
         limitSpread?: string;
         limitStrategy: CrossSpreadLimitStrategy;
+        maxAdverseSpread?: string;
+        takeProfitMaxAdverseSpread?: string;
+        stopLossMaxAdverseSpread?: string;
         takeProfitExecutionMode: CrossSpreadExecutionMode;
         stopLossExecutionMode: CrossSpreadExecutionMode;
         takeProfitLimitStrategy: CrossSpreadLimitStrategy;

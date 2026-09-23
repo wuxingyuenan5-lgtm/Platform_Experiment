@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
 from threading import Event, Thread
 from types import SimpleNamespace
 
@@ -15,6 +16,7 @@ from app.strict_live_acceptance_adapters import StrictMt5AcceptanceAdapter
 class FakeScopedBybitClient:
     def __init__(self) -> None:
         self.categories: list[str] = []
+        self.history_windows: list[tuple[str, int, int]] = []
 
     def get_wallet_balance(self, **kwargs):
         return {
@@ -49,10 +51,16 @@ class FakeScopedBybitClient:
 
     def get_order_history(self, **kwargs):
         self.categories.append(f"history:{kwargs['category']}")
+        self.history_windows.append(
+            ("orders", kwargs["startTime"], kwargs["endTime"])
+        )
         return {"retCode": 0, "result": {"list": []}}
 
     def get_executions(self, **kwargs):
         self.categories.append(f"fills:{kwargs['category']}")
+        self.history_windows.append(
+            ("fills", kwargs["startTime"], kwargs["endTime"])
+        )
         return {"retCode": 0, "result": {"list": []}}
 
 
@@ -69,6 +77,8 @@ class FakeMt5SnapshotProvider:
         self.current_login = "111111"
         self.current_server = "Broker-Main"
         self.login_calls: list[tuple[str, str]] = []
+        self.history_calls: list[str] = []
+        self.history_windows: list[tuple[str, object, object]] = []
 
     def initialize(self, **kwargs):
         return True
@@ -124,6 +134,7 @@ class FakeMt5SnapshotProvider:
         )
 
     def orders_get(self):
+        self.history_calls.append("orders_get")
         return (
             SimpleNamespace(
                 ticket=2,
@@ -139,9 +150,13 @@ class FakeMt5SnapshotProvider:
         )
 
     def history_orders_get(self, *args, **kwargs):
+        self.history_calls.append("history_orders_get")
+        self.history_windows.append(("orders", args[0], args[1]))
         return ()
 
     def history_deals_get(self, *args, **kwargs):
+        self.history_calls.append("history_deals_get")
+        self.history_windows.append(("deals", args[0], args[1]))
         return (
             SimpleNamespace(
                 ticket=3,
@@ -192,6 +207,53 @@ def test_bybit_account_snapshot_uses_scoped_categories() -> None:
     assert "positions:spot" not in client.categories
 
 
+def test_bybit_account_snapshot_can_skip_history_reads() -> None:
+    client = FakeScopedBybitClient()
+    adapter = BybitLiveAdapter(
+        Settings(
+            bybit_account_ids="bybit-live-main",
+            bybit_instrument_map="BTCUSDT=instrument_btc",
+            bybit_account_category_scopes="bybit-live-main=spot|linear",
+        ),
+        client,
+    )
+
+    snapshot = adapter.get_account_snapshot("bybit-live-main", include_history=False)
+
+    assert snapshot.orders == []
+    assert snapshot.fills == []
+    assert snapshot.economic_events == []
+    assert snapshot.history_start is None
+    assert snapshot.history_end is None
+    assert snapshot.economic_events_quality == "not_requested"
+    assert client.categories == ["positions:linear"]
+
+
+def test_bybit_account_snapshot_forwards_requested_fill_history_start() -> None:
+    client = FakeScopedBybitClient()
+    adapter = BybitLiveAdapter(
+        Settings(
+            bybit_account_ids="bybit-live-main",
+            bybit_instrument_map="BTCUSDT=instrument_btc",
+            bybit_account_category_scopes="bybit-live-main=linear",
+        ),
+        client,
+    )
+    requested = datetime.now(UTC) - timedelta(hours=1)
+
+    snapshot = adapter.get_account_snapshot(
+        "bybit-live-main", history_start=requested
+    )
+
+    assert snapshot.history_start == requested
+    fills = [window for window in client.history_windows if window[0] == "fills"]
+    orders = [window for window in client.history_windows if window[0] == "orders"]
+    assert fills
+    assert all(window[1] == int(requested.timestamp() * 1000) for window in fills)
+    assert orders
+    assert all(window[1] != int(requested.timestamp() * 1000) for window in orders)
+
+
 def test_mt5_instrument_query_does_not_forward_bybit_scope_arguments(monkeypatch) -> None:
     calls: list[dict[str, str]] = []
 
@@ -239,6 +301,55 @@ def test_mt5_account_snapshot_switches_once_and_restores_primary(monkeypatch) ->
 
     assert snapshot.venue == "mt5"
     assert provider.login_calls == [("222222", "Broker-Short"), ("111111", "Broker-Main")]
+
+
+def test_mt5_account_snapshot_can_skip_history_reads(monkeypatch) -> None:
+    COORDINATOR.clear_restore_failure()
+    configure_mt5_refs(monkeypatch)
+    provider = FakeMt5SnapshotProvider()
+    settings = Settings(
+        mt5_account_ids="mt5-live-main",
+        mt5_account_credential_refs="mt5-live-main=secret://environment/mt5-main",
+        mt5_primary_account_id="mt5-live-main",
+        mt5_instrument_map="XAUUSD+=instrument_xau_usd",
+    )
+    gateway = BybitMt5Gateway(settings=settings, bybit=None, mt5=None)
+    gateway.mt5 = StrictMt5AcceptanceAdapter(settings, provider)
+    gateway._injected_mt5 = gateway.mt5
+
+    snapshot = gateway.get_account_snapshot("mt5-live-main", include_history=False)
+
+    assert snapshot.orders == []
+    assert snapshot.fills == []
+    assert snapshot.economic_events == []
+    assert snapshot.history_start is None
+    assert snapshot.history_end is None
+    assert snapshot.economic_events_quality == "not_requested"
+    assert provider.history_calls == []
+
+
+def test_mt5_account_snapshot_forwards_requested_history_start(monkeypatch) -> None:
+    COORDINATOR.clear_restore_failure()
+    configure_mt5_refs(monkeypatch)
+    provider = FakeMt5SnapshotProvider()
+    settings = Settings(
+        mt5_account_ids="mt5-live-main",
+        mt5_account_credential_refs="mt5-live-main=secret://environment/mt5-main",
+        mt5_primary_account_id="mt5-live-main",
+        mt5_instrument_map="XAUUSD+=instrument_xau_usd",
+    )
+    gateway = BybitMt5Gateway(settings=settings, bybit=None, mt5=None)
+    gateway.mt5 = StrictMt5AcceptanceAdapter(settings, provider)
+    gateway._injected_mt5 = gateway.mt5
+    requested = datetime.now(UTC) - timedelta(hours=1)
+
+    snapshot = gateway.get_account_snapshot(
+        "mt5-live-main", history_start=requested
+    )
+
+    assert snapshot.history_start == requested
+    assert provider.history_windows
+    assert all(window[1] == requested for window in provider.history_windows)
 
 
 def test_mt5_explicit_risk_read_uses_fixed_account_worker(monkeypatch) -> None:

@@ -994,6 +994,15 @@ def get_funding_controlled_live_readiness(
         and checks["sharedClaims"]
         and checks["balanceReservations"]
     )
+    if not checks["liveTradingEnabled"] or not checks.get("runtimeLiveWriteEnabled", False):
+        checks["blockedReason"] = "funding_live_write_disabled"
+        checks["blockedMessage"] = "资费实盘写入未启用；与 MT5 休市无关"
+    elif not checks["killSwitchClear"]:
+        checks["blockedReason"] = "kill_switch_active"
+        checks["blockedMessage"] = "风控开关已暂停资费交易"
+    elif not checks["adapterConfigured"] or not checks["adapterOperational"]:
+        checks["blockedReason"] = "funding_adapter_unavailable"
+        checks["blockedMessage"] = "Bybit 资费账户连接或适配器不可用"
     return checks
 
 
@@ -1253,9 +1262,14 @@ def _authoritative_reconciliation_status(
                     ),
                     Decimal("0"),
                 )
-                hedged_perp = (net_spot / perpetual_leg.quantity_step).to_integral_value(
-                    rounding=ROUND_FLOOR
-                ) * perpetual_leg.quantity_step
+                from app.strategies.adapters.funding_carry import funding_open_quantities
+
+                _, hedged_perp, _ = funding_open_quantities(
+                    net_spot,
+                    fee_rate=Decimal(0),
+                    perpetual_step=perpetual_leg.quantity_step,
+                    perpetual_minimum=perpetual_leg.minimum_quantity,
+                )
                 if hedged_perp != perpetual_leg.maximum_quantity:
                     return "mismatch"
         if spot_leg.instrument_id in actual:

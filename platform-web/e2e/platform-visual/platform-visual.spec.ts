@@ -5,8 +5,10 @@ import { expect, test, type Browser, type Page } from '@playwright/test';
 
 import { mockPlatformVisualRoutes } from './platformVisualFixtures';
 
-const FRONTEND_ORIGIN = 'http://127.0.0.1:4373';
+const FRONTEND_ORIGIN = process.env.PLATFORM_VISUAL_FRONTEND_ORIGIN;
+if (!FRONTEND_ORIGIN) throw new Error('Run with playwright.platform-visual.config.ts');
 const EVIDENCE_ROOT = path.resolve(process.cwd(), 'test-results/platform-visual/evidence');
+const browserErrors = new WeakMap<Page, string[]>();
 
 const VIEWPORTS = [
   { name: 'desktop-1440', width: 1440, height: 900 },
@@ -156,6 +158,15 @@ async function loginWithUi(page: Page, username: string, password: string): Prom
 }
 
 async function preparePage(page: Page): Promise<void> {
+  const errors: string[] = [];
+  browserErrors.set(page, errors);
+  page.on('pageerror', (error) => errors.push(error.message));
+  page.on('console', (message) => {
+    // Vue error boundaries swallow pageerror but report the captured render failure here.
+    if (message.type() === 'error' && !message.text().includes('Failed to load resource')) {
+      errors.push(message.text());
+    }
+  });
   await page.route(/^https?:\/\/(?!127\.0\.0\.1(?::\d+)?|localhost(?::\d+)?)/, (route) =>
     route.abort(),
   );
@@ -275,6 +286,8 @@ async function capturePage(
     'utf8',
   );
   expect(pageOverflowPx).toBeLessThanOrEqual(1);
+  expect(browserErrors.get(page) || [], 'uncaught or captured component errors').toEqual([]);
+  await expect(page.getByText(/渲染失败，已自动跳过/)).toHaveCount(0);
 }
 
 for (const viewport of VIEWPORTS) {

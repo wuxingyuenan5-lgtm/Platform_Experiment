@@ -40,6 +40,8 @@ Platform→Runtime 请求统一由 `runtime_transport.py` 的进程连接池发�
 
 `FillResponse.orderConfirmedAt` 仅在同一规范订单的明确 Runtime 确认覆盖全部所选成交数量时提供，表示订单累计成交已被平台确认。它不是逐笔成交时刻。`timeQuality=source_clock_conflict` 表示原始成交时间晚于该确认超过 60 秒；MT5 缺乏确认上界时为 `source_clock_unverified`。`occurredAt` 保留原值，管理列表将冲突记录显示为带标签的订单确认时间，未核实的 MT5 时间留空并在详情保留原值；其他已分类记录使用 `venue_time` / `runtime_confirmation`，历史来源仍标为 `legacy`。委托的 `timeQuality` 区分 `platform_submission`、`venue_time` 及 `source_clock_unverified`，避免把未经核验的 MT5 原生时间称为平台提交时间。该元数据只用于管理展示，不改写财务事件时间或执行状态。
 
+订单管理的开平记录、委托明细和逐笔成交使用同一组已归属的原生数据。每笔委托的展开详情及汇总行显示已实现盈亏、手续费、资金费、库存费和已实现净额；手续费事件按财务读模型的现金流符号转为正的成本后只计一次，原生成交已提供同类字段时不再叠加结算事件。跨币种或缺少订单/指令归属时保留原币分项并显示待核对，不以零或前端汇率补齐。逐笔成交直接展示原币手续费、已实现盈亏和库存费；这些字段只用于观察，不改变正式财务归属。
+
 ## 2. Authentication 与 RBAC
 
 ```http
@@ -238,6 +240,8 @@ GET /api/v1/trading/cross-spread/observability?historyHours=24&limit=20
 完整字段和数据质量语义见 `LIVE_ACCOUNT_OBSERVABILITY.md`。
 
 `GET /api/v1/trading/cross-spread/snapshot` 的 `positionOverview` 返回当前活动组的剩余浮盈亏：`groups` 按 `planId`、`planUpdatedAt` 与 `quantityOz` 关联 Exit Plan，包含双腿入场价、`bybitPnlUsdt`、`mt5PnlUsdt`、`totalPnlUsdt`、`openTime`、质量及缺失原因；总览携带同名汇总、质量和 `asOf`。金额为精确 Decimal 字符串或 null。费用、已实现及结算不混入该字段，计算边界由 [Cross 合同](CROSS_SPREAD_EXECUTION.md) 维护。Snapshot 的 Venue Position 保留 `accountId`、`currency` 与 `asOf`，用于核对原生票据、币种及新鲜度。
+
+`GET /api/v1/trading/cross-spread/trading-rules` 返回当前绑定 Bybit/MT5 账户的两腿合约规格和会话状态。MT5 规则额外返回 `marketStatus`（`open`、`closed`、`buffer`、`unknown`）、`tradingHours`、`tradingTimezone`、`automaticExitAllowed`、`automaticExitBlockReason` 和 `automaticExitGuardMinutes`。`buffer` 只表示后台自动 TP/SL 暂停，人工开平仍由 `openAllowed`/`closeAllowed` 单独控制；`closed` 或 `unknown` 时正常双腿执行 fail-closed。MT5 周期性维护和节假日日期覆盖由 Runtime 配置维护，不能在前端生成或写死。
 
 `positionOverview.unattributedPositions` 保留没有归属的 MT5 Ticket 和 Bybit 净仓差额，返回 Venue、账户、Symbol、原生有符号数量及可证明的原生字段，不生成虚构组合或交易操作。Exit Plan 的可选 `originLabel` 来自恢复审计，供持仓和退出入口识别恢复的误单。
 
@@ -487,3 +491,12 @@ Rotation、Authentication、Session、Kill Switch、RiskAction、Difference、EO
 策略账户快照的 `equityHistory[]` 保留 `equity` 的交易账户权益语义，并增加可空 Decimal 字段 `totalAssets`，以字符串或 null 输出。该值来自同一账户、币种和历史快照的 `account_risk_snapshots.total_assets`；无记录时为 null，不能用 equity 代替。历史时间仍为带时区时间。统一交易账户总资产曲线仅使用非空 totalAssets；当前摘要使用 accountRisk.totalAssets。生成的 OpenAPI 与前端类型同步维护。
 
 Strategy account history includes nullable decimal-string `equityDrawdown` and `totalAssetsDrawdown` percentages, with corresponding `*DrawdownQuality` fields. `estimated` is a cash-flow-adjusted Modified Dietz estimate; `baseline`, missing coverage/valuation, unknown classification, invalid capital and downstream gaps do not contain a percentage. Runtime's read-only `/venue/capital-flows?accountId=&startTime=&endTime=` returns account/window identity, covered scopes and deduplicated native movements; seven-day bounds and full pagination apply. Monitoring methodology is owned by `LIVE_ACCOUNT_OBSERVABILITY.md`.
+
+The account snapshot accepts optional `includeDetails=false` for a lightweight management read. This keeps balances, risk, equity history and current venue-synced positions, but omits orders, fills and the historical `finance` payload. The default remains `true` for callers that need the full account and audit detail.
+
+The management capital tab requests this summary mode. Non-Cross PnL and order tabs request full details with a distinct query key, so a summary cannot satisfy a detail read. Cross account charts always use summaries; its strategy PnL and orders have separate reads, and the capital tab does not wait for strategy PnL. Overlapping refreshes reuse an in-flight request for the same section; results from an old section or unmounted page cannot overwrite the current view.
+
+
+## Pretrade strategy research
+
+The generated strategy OpenAPI includes `/api/v1/research/strategies/` catalog, collection status, single-venue funding board, pair latest/series/distribution, cashflow scenario, persistent experiments/events/replay/cancel and private parameter drafts. Responses preserve source, clock basis, received/published watermarks, coverage, quality warnings and method/data/parameter versions. Detailed scope, numeric and temporal semantics belong to [Research Data](RESEARCH_DATA.md#strategy-pretrade-research-v1); permissions belong to [Authorization](AUTHORIZATION.md#strategy-research-request-permissions). Runtime's separate `market-events.v1` read-only batch transport cannot submit orders or mutate the Platform database.

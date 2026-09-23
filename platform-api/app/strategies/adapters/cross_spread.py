@@ -42,6 +42,11 @@ def build_cross_spread_plan(
             str(parameters["bybitAccountId"]): "trade_and_read",
             str(parameters["mt5AccountId"]): "trade_and_read",
         },
+        cross_spread_guard=(
+            dict(parameters["crossSpreadGuard"])
+            if parameters.get("crossSpreadGuard") is not None
+            else None
+        ),
         legs=(
             ExecutionPlanLeg(
                 role="bybit_leg",

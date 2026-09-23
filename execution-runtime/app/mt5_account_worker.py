@@ -3,6 +3,7 @@ from __future__ import annotations
 import atexit
 import logging
 import multiprocessing
+import time
 from pathlib import Path
 from threading import Lock
 from time import perf_counter
@@ -31,6 +32,7 @@ _READ_METHODS = frozenset(
         "get_account_snapshot",
         "get_instrument_specification",
         "get_market_quote",
+        "get_research_ticks",
         "estimate_order_margin",
         "get_order",
         "list_balances",
@@ -61,6 +63,9 @@ class Mt5AccountWorkerClient:
         self._connection: Any | None = None
         self._write_frozen_command_id: str | None = None
         self._write_frozen_without_command = False
+        self._startup_failures = 0
+        self._startup_failed_at: float | None = None
+        self._startup_failure: GatewayConfigurationError | None = None
         WORKER_READY.labels(self.account_id).set(0)
 
     def __getattr__(self, method: str):
@@ -95,6 +100,10 @@ class Mt5AccountWorkerClient:
             self._close_unlocked()
 
     def _call(self, method: str, *args, **kwargs):
+        if method == "get_research_ticks" and (
+            self._lock.locked() or self.settings.live_write_enabled
+        ):
+            raise GatewayConfigurationError("Research yielded to account operations")
         with self._lock:
             command_id = self._command_id(method, args)
             if method in _WRITE_METHODS:
@@ -161,6 +170,14 @@ class Mt5AccountWorkerClient:
     def _ensure_started(self) -> None:
         if self._process is not None and self._process.is_alive() and self._connection is not None:
             return
+        if self._startup_failure is not None and self._startup_failed_at is not None:
+            cooldown = min(30.0, 2.0 ** min(self._startup_failures - 1, 4))
+            elapsed = time.monotonic() - self._startup_failed_at
+            if elapsed < cooldown:
+                raise GatewayConfigurationError(
+                    f"MT5 worker startup cooling down for account {self.account_id}: "
+                    f"{self._startup_failure}"
+                ) from self._startup_failure
         self._close_unlocked()
         parent, child = multiprocessing.Pipe()
         process = multiprocessing.Process(
@@ -188,14 +205,26 @@ class Mt5AccountWorkerClient:
         )
         if not parent.poll(startup_timeout):
             self._close_unlocked()
-            raise GatewayConfigurationError(
+            error = GatewayConfigurationError(
                 f"MT5 worker startup timed out for account {self.account_id}"
             )
+            self._record_startup_failure(error)
+            raise error
         status, _, payload = parent.recv()
         if status != "ready":
             self._close_unlocked()
-            raise GatewayConfigurationError(str(payload))
+            error = GatewayConfigurationError(str(payload))
+            self._record_startup_failure(error)
+            raise error
+        self._startup_failures = 0
+        self._startup_failed_at = None
+        self._startup_failure = None
         WORKER_READY.labels(self.account_id).set_function(lambda: int(process.is_alive()))
+
+    def _record_startup_failure(self, error: GatewayConfigurationError) -> None:
+        self._startup_failures += 1
+        self._startup_failed_at = time.monotonic()
+        self._startup_failure = error
 
     def _close_unlocked(self) -> None:
         WORKER_READY.labels(self.account_id).set_function(lambda: 0)
@@ -298,7 +327,14 @@ def _run_account_worker(
         _prove_worker_ready(gateway, account_id)
         connection.send(("ready", None, {"accountId": account_id}))
         visibility_failed = False
+        parent = multiprocessing.parent_process()
         while True:
+            # Windows does not automatically terminate a spawned child when
+            # its Runtime parent is force-stopped.  Leaving this worker alive
+            # keeps an MT5 IPC session attached and lets the next Runtime
+            # create a competing session against the same Terminal.
+            if parent is not None and not parent.is_alive():
+                break
             try:
                 maintain_background_terminal(terminal_path)
                 visibility_failed = False
@@ -309,7 +345,7 @@ def _run_account_worker(
                         "MT5 background window maintenance failed"
                     )
                 visibility_failed = True
-            if not connection.poll(1.0):
+            if not connection.poll(0.1):
                 continue
             message = connection.recv()
             if message[0] == "close":

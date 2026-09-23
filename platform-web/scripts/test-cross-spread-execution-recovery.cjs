@@ -143,10 +143,14 @@ const rejection = () => ({
 
 test('known filled/rejected close hands off to abnormal handling without locking the browser draft', async () => {
   const f = fixture();
-  f.state.close = async () => ({ exitPlan: {}, executionBatch: {
-    status: 'manual_intervention', failureReason: 'MT5 rejected',
-    legs: [{ status: 'filled' }, { status: 'failed' }],
-  } });
+  f.state.close = async () => ({
+    exitPlan: {},
+    executionBatch: {
+      status: 'manual_intervention',
+      failureReason: 'MT5 rejected',
+      legs: [{ status: 'filled' }, { status: 'failed' }],
+    },
+  });
   f.execution.openConfirm('CLOSE:plan-a');
   await settleAsyncWork();
   await f.execution.confirmOrder();
@@ -157,10 +161,17 @@ test('known filled/rejected close hands off to abnormal handling without locking
 
 test('MT5 recovery confirmation and request retain original identity and describe only remaining leg', async () => {
   const f = fixture();
-  Object.assign(f.options.closeOrders.value[0], { isAbnormal: true, mt5Only: true,
-    remainingMt5Lots: 0.01, mt5PositionId: 'ticket-target', recoveryIdempotencyKey: 'original-close' });
+  Object.assign(f.options.closeOrders.value[0], {
+    isAbnormal: true,
+    mt5Only: true,
+    remainingMt5Lots: 0.01,
+    mt5PositionId: 'ticket-target',
+    recoveryIdempotencyKey: 'original-close',
+  });
   let preflight;
-  f.state.preflight = async (request) => { preflight = request; };
+  f.state.preflight = async (request) => {
+    preflight = request;
+  };
   f.execution.openConfirm('CLOSE:plan-a');
   await settleAsyncWork();
   assert.equal(preflight.exitPlanId, 'plan-a');
@@ -176,7 +187,10 @@ test('normal close-all excludes abnormal groups', async () => {
   f.execution.openConfirm('CLOSE_ALL');
   await settleAsyncWork();
   await f.execution.confirmOrder();
-  assert.deepEqual(f.writes.map((write) => write.planId), ['plan-b']);
+  assert.deepEqual(
+    f.writes.map((write) => write.planId),
+    ['plan-b'],
+  );
 });
 
 test('cancel and late preflight cannot authorize or contaminate the next confirmation', async () => {
@@ -340,4 +354,37 @@ test('batch close interruption does not dispatch later groups during recovery', 
   assert.deepEqual(f.reads, [draft.plans[0].idempotencyKey]);
   assert.equal(f.writes.length, 1);
   assert.equal(f.recovery.readExecutionDraft(), null);
+});
+
+test('chase confirmation freezes adverse tolerance and exit settings in the original intent', async () => {
+  const f = fixture();
+  f.options.executionMode.value = 'limit';
+  f.options.openLimitStrategy.value = 'post_only_chase';
+  f.options.triggerSpread.value = -10;
+  f.options.acceptableSpread.value = 5;
+  f.execution.prepareOpenDraft('long');
+  await settleAsyncWork();
+  f.options.acceptableSpread.value = 20;
+  await f.execution.confirmOrder();
+  assert.equal(f.writes.length, 1);
+  assert.equal(f.writes[0].payload.limitSpread, '-10');
+  assert.equal(f.writes[0].payload.maxAdverseSpread, '5');
+  assert.equal(f.writes[0].payload.takeProfitMaxAdverseSpread, '5');
+  assert.equal(f.writes[0].payload.stopLossMaxAdverseSpread, '5');
+});
+
+test('spread-triggered market selection retains threshold and is distinct from immediate market', async () => {
+  const f = fixture();
+  f.options.closeExecutionMode.value = 'limit';
+  f.options.closeLimitStrategy.value = 'market';
+  f.options.closeLimitSpread.value = -10;
+  f.options.acceptableSpread.value = 0;
+  f.execution.openConfirm('CLOSE:plan-a');
+  await settleAsyncWork();
+  assert.match(f.execution.confirmSummary.value.mode, /触发后市价/);
+  await f.execution.confirmOrder();
+  assert.equal(f.writes[0].payload.executionMode, 'limit');
+  assert.equal(f.writes[0].payload.limitStrategy, 'market');
+  assert.equal(f.writes[0].payload.limitSpread, '-10');
+  assert.equal(f.writes[0].payload.maxAdverseSpread, '0');
 });

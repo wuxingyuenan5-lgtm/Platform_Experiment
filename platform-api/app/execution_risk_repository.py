@@ -727,7 +727,11 @@ def mark_batch_failed_flattened(batch_id: str) -> None:
     """Finalize only proven flat positions, together with Funding resource release."""
     with connection() as db:
         db.execute("BEGIN IMMEDIATE")
-        positions, proof = flattening_positions(db, batch_id)
+        batch_key = db.execute(
+            "SELECT strategy_key FROM execution_batches WHERE id=?", (batch_id,)
+        ).fetchone()
+        allow_funding_dust = batch_key is not None and batch_key["strategy_key"] == "funding_arbitrage"
+        positions, proof = flattening_positions(db, batch_id, allow_dust=allow_funding_dust)
         if any(item["quantity"] != 0 for item in positions):
             raise ExecutionRiskRepositoryError(
                 "Risk-reduction executions do not prove flat positions"
@@ -826,8 +830,10 @@ def live_order_ids_for_batch(batch_id: str) -> list[str]:
         ]
 
 
-def flattening_positions(db: Connection, batch_id: str) -> tuple[list[dict[str, Any]], list[dict]]:
-    """Calculate remaining positions by exact account and instrument, including prior reductions."""
+def flattening_positions(
+    db: Connection, batch_id: str, allow_dust: bool = False
+) -> tuple[list[dict[str, Any]], list[dict]]:
+    """Calculate remaining positions, optionally flooring Funding fee dust to venue steps."""
     from app.strategies.domain import ExecutionPlan
     from app.strategy_financial_readmodel import _native_fills_for_orders
 
@@ -925,7 +931,10 @@ def flattening_positions(db: Connection, batch_id: str) -> tuple[list[dict[str, 
         if step <= 0 or not step.is_finite():
             raise ExecutionRiskRepositoryError("Risk reduction quantity step is unavailable")
         position["quantity"] = (quantity / step).to_integral_value(rounding=ROUND_FLOOR) * step
-        if position["quantity"] != quantity:
+        dust = quantity - position["quantity"]
+        if dust and allow_dust and spec["instrument_type"] == "crypto_spot":
+            position["dustQuantity"] = str(dust)
+        elif position["quantity"] != quantity:
             raise ExecutionRiskRepositoryError(
                 "Residual quantity requires explicit dust disposition"
             )

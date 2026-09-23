@@ -17,14 +17,16 @@ from app.cross_spread_exit_schemas import (
     CrossSpreadMarketCloseRequest,
     CrossSpreadMarketOpenRequest,
     CrossSpreadOpenResult,
+    CrossSpreadPendingOpenTriggerResponse,
 )
-from app.schemas import CrossSpreadTradingRulesResponse
+from app.cross_spread_open_trigger_repository import list_pending_open_triggers
 from app.cross_spread_synthetic_service import (
     close_cross_spread_market,
     evaluate_cross_spread_exit_plans,
     open_cross_spread_market,
     run_cross_spread_exit_monitor,
 )
+from app.schemas import CrossSpreadTradingRulesResponse
 
 settings = get_settings()
 
@@ -72,6 +74,22 @@ def exit_plans(
 
 
 @router.get(
+    "/open-triggers",
+    response_model=list[CrossSpreadPendingOpenTriggerResponse],
+    tags=["trading"],
+)
+def open_triggers() -> list[CrossSpreadPendingOpenTriggerResponse]:
+    return [
+        CrossSpreadPendingOpenTriggerResponse(
+            triggerId=row["id"], direction=row["direction"], quantityOz=row["quantity_oz"],
+            limitSpread=row["limit_spread"], limitStrategy=row["limit_strategy"],
+            status=row["status"], createdAt=row["created_at"],
+        )
+        for row in list_pending_open_triggers()
+    ]
+
+
+@router.get(
     "/trading-rules",
     response_model=CrossSpreadTradingRulesResponse,
     tags=["trading"],
@@ -103,6 +121,12 @@ def update_exit_plan(
         update_stop_loss_execution_mode="stop_loss_execution_mode" in request.model_fields_set,
         update_take_profit_limit_strategy="take_profit_limit_strategy" in request.model_fields_set,
         update_stop_loss_limit_strategy="stop_loss_limit_strategy" in request.model_fields_set,
+        take_profit_max_adverse_spread=request.take_profit_max_adverse_spread,
+        stop_loss_max_adverse_spread=request.stop_loss_max_adverse_spread,
+        update_take_profit_max_adverse_spread="take_profit_max_adverse_spread"
+        in request.model_fields_set,
+        update_stop_loss_max_adverse_spread="stop_loss_max_adverse_spread"
+        in request.model_fields_set,
     )
 
 
@@ -122,6 +146,7 @@ def close_market_lifecycle(
         limit_strategy=request.limit_strategy,
         idempotency_key=request.idempotency_key,
         quantity_oz=request.quantity_oz,
+        max_adverse_spread=request.max_adverse_spread,
     )
 
 

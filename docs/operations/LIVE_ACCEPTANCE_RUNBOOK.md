@@ -273,17 +273,22 @@ following in read-only mode:
   A necessary interactive settings adjustment must end by restoring hidden
   background operation; making the terminal accessible for that adjustment
   does not change the operator's normal visibility preference.
-  Fixed-account workers must start an absent configured terminal with
-  `SW_HIDE`, wait for GUI initialization, then connect through the SDK. After
-  successful initialization, restore hidden top-level windows for the configured
-  terminal, including reconnection to an existing process, because MT5 can restore
-  its saved window layout during startup.
-  The SDK's default automatic relaunch can otherwise show a foreground window.
+  Fixed-account workers must pass the configured absolute terminal path and
+  portable mode once to the MT5 SDK; the SDK owns the single launch/connect
+  attempt. Runtime must not pre-launch the same terminal with `Popen` before
+  calling the SDK, because recovery then creates duplicate-start attempts and
+  `terminal process already started` noise. After successful initialization,
+  restore hidden top-level windows for the configured terminal, including
+  reconnection to an existing process, because MT5 can restore its saved window
+  layout during startup.
   Initial connection and read-only IPC recovery share this startup path. Match
   the executable's absolute path and preserve its configured portable mode.
   The worker checks visibility at its one-second IPC polling boundary and hides
   reappearing windows only for processes matching the configured absolute path.
   Visibility maintenance does not reconnect, switch accounts or change trading permissions.
+  The two configured fixed-account terminals keep MT5 terminal sounds muted in
+  their local terminal configuration. This is an operator-notification preference
+  only and must not change account, trading, connection or visibility behavior.
 - A fixed-account MT5 worker reuses an already authenticated matching Login/Server
   instead of issuing another login during startup. Identity checks continue on
   subsequent calls. Account/profile-change auto-disable protections remain enabled;
@@ -349,3 +354,9 @@ Normal trading has no automatic acceptance-window expiry or after-each-batch res
 - Runtime Journal, Platform facts and EOD reconciliation evidence are retained.
 
 No operator may treat process exit, service restart or local database state as proof that external orders or positions are absent.
+
+### Service update and clock checks
+
+Before a Cross Chase service update, back up both SQLite databases and apply new schema changes as append-only migrations. Migration 26 retains its original adverse-spread columns; migration 27 adds terminal-fill evidence. Restart managed services with their explicit intended trading mode, then verify HTTP health, monitor health, native account reads and both legs of the executable snapshot. A live-write enable also resumes eligible persisted exit plans; review their actual quantities and thresholds before obtaining operation-specific authorization.
+
+Bybit retCode 10002 with a timestamp ahead of server time is not fixed by increasing `recv_window`. Prefer a synchronized host clock; with `VG_RUNTIME_BYBIT_TIMESTAMP_OFFSET_MS=0`, Runtime calibrates against Bybit server time using a conservative post-response sample and refreshes that offset during long-running processes. A non-zero override is an explicit fixed offset and disables automatic refresh; it must only be used with current evidence. Account snapshots for multiple Bybit accounts are serialized inside the adapter so concurrent history reads do not amplify venue or signing contention. MT5 source clock preservation and independent tick-advancement evidence are defined in the account observability contract.

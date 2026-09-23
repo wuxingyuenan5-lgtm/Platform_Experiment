@@ -56,7 +56,7 @@ def test_funding_execution_context_uses_explicit_spot_and_perp_runtime_scopes(
     monkeypatch.setattr(
         funding_workspace,
         "_resolve_pair",
-        lambda perpetual_symbol, spot_symbol: {
+        lambda perpetual_symbol, spot_symbol, pairs=None: {
             "perpetualSymbol": "BTCUSDT",
             "spotSymbol": "BTCUSDT",
         },
@@ -461,13 +461,13 @@ def test_funding_abnormal_classification_preserves_running_and_resolved_groups(
 @pytest.mark.parametrize(
     ("gross", "step", "perp", "net", "residual"),
     [
-        ("0.001", "0.001", "0", "0.000999", "0.000999"),
+        ("0.001", "0.001", "0.001", "0.000999", "-0.000001"),
         ("0.001002", "0.001", "0.001", "0.001000998", "0.000000998"),
-        ("0.002", "0.001", "0.001", "0.001998", "0.000998"),
-        ("0.006", "0.002", "0.004", "0.005994", "0.001994"),
+        ("0.002", "0.001", "0.002", "0.001998", "-0.000002"),
+        ("0.006", "0.002", "0.006", "0.005994", "-0.000006"),
     ],
 )
-def test_fee_aware_open_hedge_floors_actual_coin_inventory(gross, step, perp, net, residual):
+def test_fee_aware_open_hedge_minimizes_actual_coin_residual(gross, step, perp, net, residual):
     from app.strategies.adapters.funding_carry import funding_open_quantities
 
     result = funding_open_quantities(
@@ -476,11 +476,7 @@ def test_fee_aware_open_hedge_floors_actual_coin_inventory(gross, step, perp, ne
     assert result == (Decimal(net), Decimal(perp), Decimal(residual))
 
 
-def test_fee_rounding_below_minimum_blocks_open_before_creating_instruction(monkeypatch):
-    def missing(*args):
-        raise HTTPException(404, "not found")
-
-    monkeypatch.setattr(funding_workspace, "get_instruction_by_idempotency", missing)
+def test_fee_rounding_keeps_small_hedge_executable():
     spec = {"quantityStep": "0.001", "minQuantity": "0.001", "contractMultiplier": "1"}
     sizing = funding_workspace._open_sizing(
         Decimal("0.001"),
@@ -490,29 +486,56 @@ def test_fee_rounding_below_minimum_blocks_open_before_creating_instruction(monk
         perp_quote={"mid": "78000"},
         spot_quote={"mid": "78000"},
     )
-    monkeypatch.setattr(
-        funding_workspace, "get_funding_execution_context", lambda **kw: {"openSizing": sizing}
+    assert sizing["valid"] is True
+    assert Decimal(sizing["perpetualQuantity"]) == Decimal("0.001")
+
+
+def test_open_sizing_uses_perpetual_target_and_derives_spot_gross_quantity():
+    spec = {"quantityStep": "0.001", "minQuantity": "0.001", "contractMultiplier": "1"}
+    sizing = funding_workspace._open_sizing(
+        Decimal("0.002"),
+        fee_rate=Decimal("0.001"),
+        perp_spec=spec,
+        spot_spec=spec,
+        perp_quote={"mid": "78000"},
+        spot_quote={"mid": "78000"},
     )
-    monkeypatch.setattr(
-        funding_workspace,
-        "create_instruction",
-        lambda *a, **kw: pytest.fail("must not create an instruction"),
+    assert sizing["valid"] is True
+    assert sizing["perpetualQuantity"] == "0.002"
+    assert sizing["spotQuantity"] == "0.002"
+    assert Decimal(sizing["expectedSpotNetQuantity"]) == Decimal("0.001998")
+    assert Decimal(sizing["estimatedNotional"]) == Decimal("156.000")
+
+
+def test_funding_spot_quantity_rounds_up_after_coin_fee():
+    from app.strategies.adapters.funding_carry import funding_spot_quantity_for_perpetual
+
+    gross, net, residual = funding_spot_quantity_for_perpetual(
+        Decimal("0.001"), fee_rate=Decimal("0.001"), spot_step=Decimal("0.000001")
     )
-    with pytest.raises(HTTPException, match="永续数量"):
-        funding_workspace.submit_funding_instruction(
-            action="open",
-            idempotency_key="tiny",
-            perpetual_symbol="BTCUSDT",
-            spot_symbol="BTCUSDT",
-            quantity=Decimal("0.001"),
-            requested_by="owner",
-        )
+    assert gross == Decimal("0.001001")
+    assert net == Decimal("0.000999999")
+    assert residual == Decimal("-0.000000001")
+
+
+def test_executable_spread_uses_crossed_bid_ask_prices():
+    spread = funding_workspace._executable_spread(
+        {"bid": "101", "ask": "102"},
+        {"bid": "99", "ask": "100"},
+    )
+    assert spread["open"] == "1"
+    assert spread["close"] == "-3"
+    assert spread["openPercent"] == "1.00"
 
 
 @pytest.mark.parametrize(
     ("gross", "perp", "net", "abnormal"),
     [
-        ("0.001", "0.001", "0.000999", True),
+        # One spot quantity step is the expected fee dust and counts as paired.
+        ("0.001", "0.001", "0.000999", False),
+        # A deficit larger than one spot step is a real group mismatch.
+        ("0.001", "0.001", "0.000997", False),
+        ("0.001", "0.001", "0.0004", True),
         ("0.00128", "0.001", "0.00127872", False),
     ],
 )

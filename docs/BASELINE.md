@@ -4,7 +4,7 @@ This is the repository authority for the stable engineering baseline, candidate 
 
 ## Delivery
 
-- Stable baseline: Platform `0.11.2`.
+- Stable baseline: Platform `0.11.3`.
 - Current candidate target: Platform `0.11.3`.
 - Platform 0.11.0 is the owner-accepted local engineering baseline. It includes the restored product surfaces from 0.10.3 plus the single-root repository layout, Windows local lifecycle governance, path-stable local data configuration and clean dependency bootstrapping.
 - Platform 0.11.2 is the current local main snapshot. Its completed scope includes final independent acceptance, browser-access regression hardening and Capability alignment; it does not reopen accepted product restoration, business behavior or controlled-live core direction.

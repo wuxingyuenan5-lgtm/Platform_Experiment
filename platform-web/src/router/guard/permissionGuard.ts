@@ -4,6 +4,7 @@ import { usePermissionStoreWithOut } from '@/store/modules/permission';
 
 import { PageEnum } from '@/enums/pageEnum';
 import { useUserStoreWithOut } from '@/store/modules/user';
+import { notification } from 'ant-design-vue';
 
 import { asyncRoutes } from '@/router/routes';
 import { PAGE_NOT_FOUND_ROUTE } from '@/router/routes/basic';
@@ -77,6 +78,23 @@ export function createPermissionGuard(router: Router) {
     // state is presentation state only and cannot survive password or admin revocation.
     const authenticated = await userStore.hydrateSession(true);
     if (!authenticated) {
+      if (userStore.getSessionUnavailable) {
+        notification.warning({
+          message: '登录状态暂不可验证',
+          description: '认证服务暂时不可用，请稍后重试；当前页面状态已保留。',
+          key: 'session-unavailable',
+        });
+        if (userStore.getIsAuthenticated) {
+          next(false);
+        } else {
+          next({
+            path: LOGIN_PATH,
+            replace: true,
+            query: { redirect: to.fullPath },
+          });
+        }
+        return;
+      }
       if (to.meta.ignoreAuth) {
         next();
         return;

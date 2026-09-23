@@ -17,6 +17,7 @@ from app.research_a_share_repository import (
     read_stock_pool,
     update_stock_pool_membership,
 )
+from app.research_cumulative_volatility import read_cumulative_volatility
 from app.research_data_schemas import (
     AShareDashboardResponse,
     AShareLiveSectorFundFlowResponse,
@@ -367,6 +368,7 @@ async def macro_fedwatch(response: Response, _: ResearchPrincipal) -> dict[str, 
             "currentTarget": meta.get("currentTarget"),
             "observedAt": meta.get("observedAt")
             or await asyncio.to_thread(read_latest_observed_at, "macro_fedwatch"),
+            "settlementSource": meta.get("settlementSource"),
             "zqPricing": meta.get("zqPricing", []),
             "meetings": meetings,
             "status": health["status"],
@@ -378,9 +380,30 @@ async def macro_fedwatch(response: Response, _: ResearchPrincipal) -> dict[str, 
 @router.get("/crypto/etf-flow", tags=["research"])
 async def crypto_etf_flow(response: Response, _: ResearchPrincipal) -> dict[str, object]:
     response.headers["Cache-Control"] = "no-store"
-    data = await asyncio.to_thread(read_etf_flow, 14)
+    data = await asyncio.to_thread(read_etf_flow, 3650, "btc")
     health = await asyncio.to_thread(read_dataset_health, "crypto_etf_flow")
     return {"data": {**data, "status": health["status"], "lastError": health["lastError"]}}
+
+
+@router.get("/crypto/eth-etf-flow", tags=["research"])
+async def crypto_eth_etf_flow(response: Response, _: ResearchPrincipal) -> dict[str, object]:
+    response.headers["Cache-Control"] = "no-store"
+    data = await asyncio.to_thread(read_etf_flow, 3650, "eth")
+    health = await asyncio.to_thread(read_dataset_health, "crypto_eth_etf_flow")
+    return {"data": {**data, "status": health["status"], "lastError": health["lastError"]}}
+
+
+@router.get("/cumulative-volatility", tags=["research"])
+async def cumulative_volatility(
+    response: Response,
+    _: ResearchPrincipal,
+    asset: str = Query("btc", pattern="^(btc|gold)$"),
+    days: int = Query(365, ge=1, le=365),
+    interval: str = Query("15m", pattern="^(15m|1h|4h)$"),
+) -> dict[str, object]:
+    """读取共享 Bybit 行情经后端计算的 UTC 盘口累计波动与价格叠加。"""
+    response.headers["Cache-Control"] = "no-store"
+    return {"data": await asyncio.to_thread(read_cumulative_volatility, asset, days, interval)}
 
 
 @router.get("/crypto/iv-term", tags=["research"])
@@ -484,7 +507,12 @@ async def trigger_overseas_refresh(
     status = await refresh_overseas(force=True)
     health = {
         dataset: await asyncio.to_thread(read_dataset_health, dataset)
-        for dataset in ("macro_fedwatch", "crypto_etf_flow", "crypto_iv_snapshot")
+        for dataset in (
+            "macro_fedwatch",
+            "crypto_etf_flow",
+            "crypto_eth_etf_flow",
+            "crypto_iv_snapshot",
+        )
     }
     if status == "error":
         raise HTTPException(

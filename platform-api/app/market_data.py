@@ -2,10 +2,14 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from decimal import Decimal
+from threading import Lock
 from uuid import uuid4
 
+from app.config import get_settings
 from app.database import connection
 from app.schemas import CrossSpreadHistoryPointResponse, CrossSpreadSnapshotResponse
+
+_SNAPSHOT_SAVE_LOCK = Lock()
 
 
 def save_cross_spread_market_snapshot(
@@ -14,7 +18,27 @@ def save_cross_spread_market_snapshot(
     strategy_key: str,
     strategy_instance_id: str,
 ) -> None:
-    with connection() as db:
+    # Browser polling and execution preflights also read this snapshot. They
+    # must not turn a read into an unbounded high-frequency history writer.
+    # The dedicated monitor still samples at the configured interval; this
+    # guard keeps the same behavior for the first read and any later read after
+    # the interval has elapsed.
+    created_at = datetime.now(UTC)
+    interval = max(1.0, get_settings().cross_spread_market_snapshot_interval_seconds)
+    with _SNAPSHOT_SAVE_LOCK, connection() as db:
+        latest = db.execute(
+            "SELECT created_at FROM market_spread_snapshots "
+            "WHERE strategy_key=? AND strategy_instance_id=? "
+            "ORDER BY created_at DESC LIMIT 1",
+            (strategy_key, strategy_instance_id),
+        ).fetchone()
+        if latest is not None:
+            try:
+                previous = datetime.fromisoformat(str(latest[0])).astimezone(UTC)
+            except (TypeError, ValueError):
+                previous = None
+            if previous is not None and (created_at - previous).total_seconds() < interval:
+                return
         db.execute(
             """
             INSERT INTO market_spread_snapshots (
@@ -49,7 +73,7 @@ def save_cross_spread_market_snapshot(
                 _decimal_text(snapshot.metrics.seller_inventory_fee),
                 snapshot.model_dump_json(by_alias=True),
                 snapshot.as_of.isoformat(),
-                datetime.now(UTC).isoformat(),
+                created_at.isoformat(),
             ),
         )
 

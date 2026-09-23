@@ -238,8 +238,11 @@ export interface MacroProbabilityPoint {
 export interface MacroExpectationEvent {
   id: string;
   label: string;
+  originalLabel?: string | null;
   category: 'monetary_policy' | 'macro' | 'geopolitics' | 'election';
   probability: string | number;
+  sourceUrl?: string | null;
+  expiryAt?: string | null;
   history: MacroProbabilityPoint[];
 }
 
@@ -247,6 +250,7 @@ export interface MacroExpectationResponse {
   status: MacroExpectationStatus;
   source: string;
   updatedAt: string;
+  sourceUrl?: string | null;
   events: MacroExpectationEvent[];
 }
 
@@ -320,6 +324,22 @@ export interface MacroDashboardResponse {
   asOf: string;
   groups: Record<string, MacroDashboardSeries[]>;
 }
+
+// Multiple cards on one hedge-board page consume the same dashboard snapshot.
+// Share only the in-flight read so each domain is fetched once per render burst,
+// including consumers outside MacroSeriesChart (for example the CFTC panel),
+// without pinning a stale snapshot for the lifetime of the SPA.
+const dashboardPromises = new Map<string, Promise<MacroDashboardResponse>>();
+
+const loadDashboard = (key: string, url: string) => {
+  const cached = dashboardPromises.get(key);
+  if (cached) return cached;
+  const request = researchRequest<MacroDashboardResponse>({ method: 'GET', url }).finally(() => {
+    dashboardPromises.delete(key);
+  });
+  dashboardPromises.set(key, request);
+  return request;
+};
 
 const SESSION_INVALIDATION_CODES = new Set([
   'invalid_session',
@@ -415,23 +435,12 @@ export const getMarketDetail = (marketId: 'macro' | 'gold' | 'crypto') =>
     url: `/research/market-detail/${marketId}`,
   });
 
-export const getMacroDashboardV1 = () =>
-  researchRequest<MacroDashboardResponse>({
-    method: 'GET',
-    url: '/research/macro/dashboard-v1',
-  });
+export const getMacroDashboardV1 = () => loadDashboard('macro', '/research/macro/dashboard-v1');
 
 export const getCommodityDashboardV1 = () =>
-  researchRequest<MacroDashboardResponse>({
-    method: 'GET',
-    url: '/research/commodity/dashboard-v1',
-  });
+  loadDashboard('commodity', '/research/commodity/dashboard-v1');
 
-export const getCryptoDashboardV1 = () =>
-  researchRequest<MacroDashboardResponse>({
-    method: 'GET',
-    url: '/research/crypto/dashboard-v1',
-  });
+export const getCryptoDashboardV1 = () => loadDashboard('crypto', '/research/crypto/dashboard-v1');
 
 export interface FedWatchMeeting {
   date: string;
@@ -450,6 +459,7 @@ export interface FedWatchData {
   effr: number | null;
   currentTarget: string | null;
   observedAt: string | null;
+  settlementSource?: string | null;
   zqPricing: FedWatchZqPricing[];
   meetings: FedWatchMeeting[];
 }
@@ -457,10 +467,17 @@ export interface FedWatchData {
 export interface CryptoEtfFlowData {
   observedAt: string | null;
   tickers: string[];
+  flowUnit?: 'BTC' | 'ETH' | string;
+  priceSource?: string | null;
   days: Array<{
     date: string;
     flows: Record<string, number | null>;
+    totalFlow?: number | null;
+    cumulativeFlow?: number | null;
+    price?: number | null;
   }>;
+  status?: string;
+  lastError?: string | null;
 }
 
 export interface CryptoIvTermPoint {
@@ -521,16 +538,52 @@ export interface CryptoIvHistoryData {
   stats: CryptoIvHistoryStats;
 }
 
+export type CumulativeVolatilityInterval = '15m' | '1h' | '4h';
+
+export interface CumulativeVolatilityPoint {
+  timestamp: string;
+  session: 'asia' | 'europe' | 'americas';
+  sessionDate: string;
+  value: string | number;
+  /** Backend-derived close used for the price overlay. */
+  price?: string | number | null;
+  /** First valid Americas-session close for this UTC session date. */
+  priceBaseline?: string | number | null;
+  /** Close relative to the Americas baseline, in percent. */
+  priceChangePct?: string | number | null;
+}
+
+export interface CumulativeVolatilityData {
+  schemaVersion: '1.0';
+  asset: 'btc' | 'gold';
+  interval: CumulativeVolatilityInterval;
+  baseInterval: '15m';
+  timezone: 'UTC';
+  source: string;
+  asOf: string | null;
+  availableFrom: string | null;
+  availableTo: string | null;
+  isStale: boolean;
+  message?: string | null;
+  points: CumulativeVolatilityPoint[];
+}
+
+export interface CumulativeVolatilityResponse {
+  data: CumulativeVolatilityData;
+}
+
 export const getMacroFedwatch = () =>
   researchRequest<{ data: FedWatchData }>({
     method: 'GET',
     url: '/research/macro/fedwatch',
   });
 
-export const getCryptoEtfFlow = () =>
+export type CryptoEtfAsset = 'btc' | 'eth';
+
+export const getCryptoEtfFlow = (asset: CryptoEtfAsset = 'btc') =>
   researchRequest<{ data: CryptoEtfFlowData }>({
     method: 'GET',
-    url: '/research/crypto/etf-flow',
+    url: asset === 'eth' ? '/research/crypto/eth-etf-flow' : '/research/crypto/etf-flow',
   });
 
 export const getCryptoIvTerm = () =>
@@ -557,4 +610,15 @@ export const getCryptoIvHistory = (tenor: '1M' | '3M' | '6M' | '1Y', days: numbe
     method: 'GET',
     url: '/research/crypto/iv-history',
     params: { tenor, days },
+  });
+
+export const getCumulativeVolatility = (
+  asset: 'btc' | 'gold',
+  days: number = 7,
+  interval: CumulativeVolatilityInterval = '15m',
+) =>
+  researchRequest<CumulativeVolatilityResponse>({
+    method: 'GET',
+    url: '/research/cumulative-volatility',
+    params: { asset, days, interval },
   });

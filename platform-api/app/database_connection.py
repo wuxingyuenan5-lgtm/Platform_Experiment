@@ -16,9 +16,15 @@ def database_path() -> Path:
 
 @contextmanager
 def connection() -> Iterator[sqlite3.Connection]:
-    db = sqlite3.connect(database_path())
+    # The platform API and its read-only account workers can legitimately
+    # overlap a short writer transaction.  The previous default five-second
+    # SQLite wait turned ordinary contention into failed sync jobs and made
+    # the service look unavailable.  Keep the existing rollback/commit
+    # boundary, but wait long enough for the bounded writer to finish.
+    db = sqlite3.connect(database_path(), timeout=30)
     db.row_factory = sqlite3.Row
     db.execute("PRAGMA foreign_keys = ON")
+    db.execute("PRAGMA busy_timeout = 30000")
     try:
         yield db
         db.commit()

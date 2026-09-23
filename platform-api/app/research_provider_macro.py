@@ -39,8 +39,11 @@ class MacroExpectationFeedPoint(ResearchApiModel):
 class MacroExpectationFeedEvent(ResearchApiModel):
     id: str = Field(min_length=1, max_length=160)
     label: str = Field(min_length=1, max_length=512)
+    original_label: str | None = Field(default=None, max_length=512)
     category: MacroCategory
     probability: float = Field(ge=0, le=100)
+    source_url: str | None = Field(default=None, max_length=512)
+    expiry_at: datetime | None = None
     history: list[MacroExpectationFeedPoint] = Field(default_factory=list)
 
 
@@ -48,6 +51,7 @@ class MacroExpectationFeedResponse(ResearchApiModel):
     status: MacroExpectationFeedStatus
     source: str = Field(min_length=1, max_length=256)
     updated_at: datetime
+    source_url: str | None = Field(default=None, max_length=512)
     events: list[MacroExpectationFeedEvent] = Field(default_factory=list)
 
     @field_validator("updated_at")
@@ -94,6 +98,7 @@ class MacroResearchProvider:
                     status="not_configured",
                     source="local macro expectation feed",
                     updated_at=datetime.now(UTC),
+                    source_url="https://polymarket.com/markets",
                     events=[],
                 )
             if isinstance(exc, ResearchProviderError):

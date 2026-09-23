@@ -126,3 +126,52 @@ def test_repeated_market_cursor_is_bounded_and_never_cached_as_success():
     assert len(calls) == 3
     assert not reader._markets
     reader.close()
+
+
+def test_market_catalog_reads_all_pages_through_same_public_reader():
+    calls = []
+
+    def read(method, **params):
+        calls.append((method, params))
+        return {
+            "retCode": 0,
+            "result": {
+                "category": params["category"],
+                "list": [market_row(params["category"])],
+                "nextPageCursor": "",
+            },
+        }
+
+    reader = BybitMarketData(read)
+    try:
+        markets = reader.markets("spot")
+        assert len(markets) == 1
+        assert markets[0]["id"] == "XAUTUSDT"
+        assert calls[0][0] == "get_instruments_info"
+        assert calls[0][1]["category"] == "spot"
+    finally:
+        reader.close()
+
+
+def test_market_catalog_is_cached_for_the_ttl():
+    calls = []
+
+    def read(method, **params):
+        calls.append((method, params))
+        return {
+            "retCode": 0,
+            "result": {
+                "category": params["category"],
+                "list": [market_row(params["category"])],
+                "nextPageCursor": "",
+            },
+        }
+
+    reader = BybitMarketData(read)
+    try:
+        first = reader.markets("spot")
+        second = reader.markets("spot")
+        assert first == second
+        assert len(calls) == 1
+    finally:
+        reader.close()

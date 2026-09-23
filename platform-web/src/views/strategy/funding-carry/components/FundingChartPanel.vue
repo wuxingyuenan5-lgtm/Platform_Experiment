@@ -5,7 +5,7 @@
         <h2>{{ panelTitle }}</h2>
       </div>
 
-      <div class="toolbar">
+      <div v-if="!contextLocked" class="toolbar">
         <div class="toolbar-group">
           <button
             v-for="item in rangeOptions"
@@ -54,6 +54,7 @@
       <button
         type="button"
         class="legend-pill"
+        v-if="props.data.legendPrice"
         :class="{ 'is-active': showPrice }"
         @click="showPrice = !showPrice"
       >
@@ -62,6 +63,7 @@
       </button>
     </div>
 
+    <p v-if="!filteredPoints.length" role="status">所选窗口暂无该序列的已采集数据</p>
     <div ref="chartRef" class="chart-wrap"></div>
   </section>
 </template>
@@ -73,6 +75,8 @@
   import type { FundingChartPanelData, FundingExchange, FundingMarketRange } from '../types';
 
   const props = defineProps<{
+    contextLocked?: boolean;
+    exactWindow?: boolean;
     data: FundingChartPanelData;
     exchange: FundingExchange;
     symbol: string;
@@ -95,7 +99,7 @@
   const { setOptions, resize } = useECharts(chartRef as Ref<HTMLDivElement>);
   type FundingRangeLabel = '当前' | '7日' | '30日';
   const rangeOptions: FundingRangeLabel[] = ['当前', '7日', '30日'];
-  const exchangeOptions: FundingExchange[] = ['Binance', 'Bybit', 'OKX'];
+  const exchangeOptions: FundingExchange[] = ['Bybit'];
   const rangeToLabelMap: Record<FundingMarketRange, FundingRangeLabel> = {
     current: '当前',
     '1d': '当前',
@@ -108,18 +112,22 @@
     '7日': '7d',
     '30日': '30d',
   };
-  const symbolOptions = ['BTC', 'ETH', 'SOL', 'DOGE', 'XRP', 'XAUT'];
+  const symbolOptions = ['BTC'];
   const resolutionOptions = ['15分钟', '30分钟', '1小时', '4小时'];
   const selectedRange = ref<FundingRangeLabel>(rangeToLabelMap[props.range] ?? '当前');
   const selectedExchange = ref<FundingExchange>(props.exchange);
   const selectedSymbol = ref(props.symbol);
   const selectedResolution = ref(props.resolution);
-  const startDate = ref(props.startDate || props.data.points[0]?.date || '2026-05-28');
+  const startDate = ref(
+    props.startDate || props.data.points[0]?.date || new Date().toISOString().slice(0, 10),
+  );
   const endDate = ref(
-    props.endDate || props.data.points[props.data.points.length - 1]?.date || '2026-06-24',
+    props.endDate ||
+      props.data.points[props.data.points.length - 1]?.date ||
+      new Date().toISOString().slice(0, 10),
   );
   const showFunding = ref(true);
-  const showPrice = ref(true);
+  const showPrice = ref(false);
 
   watch(
     () => props.range,
@@ -177,18 +185,18 @@
   watch(endDate, (value) => emit('update:end-date', value));
 
   const filteredPoints = computed(() => {
-    const start = new Date(startDate.value).getTime();
-    const end = new Date(endDate.value).getTime();
+    if (props.exactWindow) return props.data.points;
+    const start = new Date(startDate.value + 'T00:00:00').getTime();
+    const end = new Date(endDate.value + 'T23:59:59.999').getTime();
     const base = props.data.points.filter((point) => {
       const time = new Date(point.date).getTime();
       return time >= start && time <= end;
     });
-    if (selectedRange.value === '7日') return base.slice(-7);
-    if (selectedRange.value === '30日') return base.slice(-30);
+
     return base;
   });
 
-  const panelTitle = computed(() => '持仓加权资金费率');
+  const panelTitle = computed(() => props.data.title);
 
   async function renderChart() {
     await setOptions({
@@ -209,7 +217,10 @@
         type: 'category',
         data: filteredPoints.value.map((point) => point.date),
         axisTick: { show: false },
-        axisLabel: { color: 'rgba(36,29,21,.55)' },
+        axisLabel: {
+          color: 'rgba(36,29,21,.55)',
+          formatter: (value: string) => new Date(value).toLocaleTimeString(),
+        },
       },
       yAxis: [
         {
@@ -251,16 +262,19 @@
               {
                 name: props.data.legendFunding,
                 type: 'bar' as const,
-                barWidth: 16,
+                step: props.exactWindow ? ('end' as const) : undefined,
+                showSymbol: false,
+                lineStyle: { width: 2 },
+                barMaxWidth: 16,
                 itemStyle: {
                   borderRadius: [4, 4, 0, 0],
-                  color: (params: { value: number }) => (params.value >= 0 ? '#cf3f4f' : '#2db87c'),
+                  color: (params: { value: number }) => (params.value >= 0 ? '#2db87c' : '#cf3f4f'),
                 },
                 data: filteredPoints.value.map((point) => point.funding),
               },
             ]
           : []),
-        ...(showPrice.value
+        ...(showPrice.value && props.data.legendPrice
           ? [
               {
                 name: props.data.legendPrice,
@@ -331,9 +345,9 @@
 
   .toolbar-legend {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: 8px;
-    flex-wrap: wrap;
   }
 
   .toolbar-legend--center {
@@ -350,10 +364,10 @@
     border: 1px solid var(--strategy-border-strong);
     border-radius: var(--strategy-radius-control);
     background: var(--strategy-surface);
+    box-shadow: var(--strategy-shadow-soft);
     color: var(--strategy-text-2);
     font-size: var(--strategy-font-base);
     font-weight: 700;
-    box-shadow: var(--strategy-shadow-soft);
   }
 
   .toolbar-field {
@@ -398,16 +412,16 @@
   }
 
   .toolbar-group .is-active {
-    color: var(--strategy-accent-strong);
     background: var(--strategy-accent-soft);
     box-shadow: inset 0 0 0 1px var(--strategy-accent-ring);
+    color: var(--strategy-accent-strong);
   }
 
   .legend-pill.is-active {
     border-color: var(--strategy-accent-soft);
     background: var(--strategy-accent-soft);
-    color: var(--strategy-accent-strong);
     box-shadow: inset 0 0 0 1px var(--strategy-accent-ring);
+    color: var(--strategy-accent-strong);
   }
 
   .dot {
@@ -432,8 +446,8 @@
 
   @media (max-width: 960px) {
     .chart-panel__header {
-      align-items: flex-start;
       flex-direction: column;
+      align-items: flex-start;
     }
 
     .toolbar {

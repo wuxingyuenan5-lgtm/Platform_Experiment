@@ -238,7 +238,17 @@ export function useCrossSpreadExecution(options: UseCrossSpreadExecutionOptions)
               ? '--'
               : inputs.value.mt5Lot.toLocaleString('en-US', { maximumFractionDigits: 4 })
           }`,
-      mode,
+      mode: `${mode}${
+        mode.startsWith('限价')
+          ? ` · ${
+              (action?.kind === 'OPEN'
+                ? inputs.value.openLimitStrategy
+                : inputs.value.closeLimitStrategy) === 'market'
+                ? '触发后市价'
+                : '追逐限价'
+            }`
+          : ''
+      }`,
       marketSpread:
         action?.kind === 'CLOSE' || action?.kind === 'CLOSE_ALL'
           ? closeMarketSpread === null || closeMarketSpread === undefined
@@ -254,7 +264,9 @@ export function useCrossSpreadExecution(options: UseCrossSpreadExecutionOptions)
           ? `${formatNullableSigned(inputs.value.triggerSpread)} / ${formatNullableSigned(
               inputs.value.acceptableSpread,
             )}`
-          : '--',
+          : `${formatNullableSigned(inputs.value.closeLimitSpread)} / ${
+              inputs.value.acceptableSpread ?? 0
+            }`,
       takeProfit:
         action?.kind === 'OPEN' ? formatNullableSigned(inputs.value.takeProfitSpread) : '--',
       stopLoss: action?.kind === 'OPEN' ? formatNullableSigned(inputs.value.stopLossSpread) : '--',
@@ -407,6 +419,9 @@ export function useCrossSpreadExecution(options: UseCrossSpreadExecutionOptions)
               ? numericText(inputs.value.triggerSpread)
               : undefined,
           limitStrategy: inputs.value.openLimitStrategy,
+          maxAdverseSpread: numericText(inputs.value.acceptableSpread ?? 0),
+          takeProfitMaxAdverseSpread: numericText(inputs.value.acceptableSpread ?? 0),
+          stopLossMaxAdverseSpread: numericText(inputs.value.acceptableSpread ?? 0),
           takeProfitExecutionMode: inputs.value.takeProfitExecution,
           stopLossExecutionMode: inputs.value.stopLossExecution,
           takeProfitLimitStrategy: inputs.value.takeProfitLimitStrategy,
@@ -426,7 +441,9 @@ export function useCrossSpreadExecution(options: UseCrossSpreadExecutionOptions)
           options.upsertExitPlan?.(result.exitPlan);
         }
         limitEvidence.value = result.limitExecution ?? null;
-        if (result.executionBatch?.status === 'hedged') {
+        if (result.pendingTrigger?.status === 'pending') {
+          setExecutionMessage('限价价差指令已挂起，达到目标价差后才会执行', 'is-warn');
+        } else if (result.executionBatch?.status === 'hedged') {
           setExecutionMessage('开仓成功，双边已对冲', 'is-success');
         } else {
           setExecutionMessage(
@@ -463,6 +480,7 @@ export function useCrossSpreadExecution(options: UseCrossSpreadExecutionOptions)
                 ? numericText(inputs.value.closeLimitSpread)
                 : undefined,
             limitStrategy: inputs.value.closeLimitStrategy,
+            maxAdverseSpread: numericText(inputs.value.acceptableSpread ?? 0),
           },
         };
         persistExecutionDraft(draft);
@@ -508,6 +526,7 @@ export function useCrossSpreadExecution(options: UseCrossSpreadExecutionOptions)
                 ? numericText(inputs.value.closeLimitSpread)
                 : undefined,
             limitStrategy: inputs.value.closeLimitStrategy,
+            maxAdverseSpread: numericText(inputs.value.acceptableSpread ?? 0),
           },
         );
         draft.plans = draft.plans.map((plan) => ({

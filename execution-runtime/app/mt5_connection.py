@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import subprocess
 import sys
 from pathlib import Path
 from typing import Any
@@ -8,71 +7,8 @@ from typing import Any
 from app.gateway_errors import GatewayConfigurationError
 
 
-def _wait_for_terminal_startup(process_id: int, timeout_ms: int) -> None:
-    """Wait for the GUI process to initialize before the SDK searches for it."""
-    import ctypes
-    from ctypes import wintypes
-
-    kernel = ctypes.WinDLL("kernel32", use_last_error=True)
-    user = ctypes.WinDLL("user32", use_last_error=True)
-    kernel.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
-    kernel.OpenProcess.restype = wintypes.HANDLE
-    kernel.CloseHandle.argtypes = [wintypes.HANDLE]
-    kernel.CloseHandle.restype = wintypes.BOOL
-    user.WaitForInputIdle.argtypes = [wintypes.HANDLE, wintypes.DWORD]
-    user.WaitForInputIdle.restype = wintypes.DWORD
-    handle = kernel.OpenProcess(0x00101000, False, process_id)  # Synchronize + limited query.
-    if not handle:
-        raise GatewayConfigurationError("Cannot wait for MT5 Terminal startup")
-    try:
-        if user.WaitForInputIdle(handle, timeout_ms) != 0:
-            raise GatewayConfigurationError("MT5 Terminal startup did not become ready")
-    finally:
-        kernel.CloseHandle(handle)
-
-
-def _ensure_background_terminal(
-    terminal_path: str, *, portable: bool, timeout_ms: int
-) -> int | None:
-    """Start an absent, explicitly configured Terminal without taking focus."""
-    if sys.platform != "win32":
-        return
-    import psutil
-
-    terminal = Path(terminal_path).resolve()
-    for process in psutil.process_iter(["name", "exe"]):
-        if str(process.info["name"] or "").casefold() != terminal.name.casefold():
-            continue
-        executable = process.info["exe"]
-        if not executable:
-            raise GatewayConfigurationError("Cannot establish the running MT5 Terminal path")
-        if Path(executable).resolve() == terminal:
-            _wait_for_terminal_startup(process.pid, timeout_ms)
-            return process.pid
-
-    startup = subprocess.STARTUPINFO()
-    startup.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-    startup.wShowWindow = 0  # SW_HIDE: background operation, matching the monitoring Terminal.
-    arguments = [str(terminal)]
-    if portable:
-        arguments.append("/portable")
-    try:
-        process = subprocess.Popen(
-            arguments,
-            cwd=terminal.parent,
-            startupinfo=startup,
-            stdin=subprocess.DEVNULL,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
-    except OSError as exc:
-        raise GatewayConfigurationError("MT5 background startup failed") from exc
-    _wait_for_terminal_startup(process.pid, timeout_ms)
-    return process.pid
-
-
 def _finish_background_startup(process_id: int, *, require_window: bool = True) -> None:
-    """Hide only this configured Terminal's visible, unowned top-level windows."""
+    """Hide every visible top-level window owned by this configured Terminal."""
     import ctypes
     from ctypes import wintypes
 
@@ -96,7 +32,6 @@ def _finish_background_startup(process_id: int, *, require_window: bool = True) 
         user.GetWindowThreadProcessId(window, ctypes.byref(owner))
         if (
             owner.value == process_id
-            and not user.GetWindow(window, 4)  # GW_OWNER: exclude owned dialogs.
         ):
             windows.append(window)
         return True
@@ -138,3 +73,7 @@ def initialize_mt5(
                 maintain_background_terminal(terminal_path)
         return initialized
     return bool(mt5.initialize(**kwargs))
+
+
+
+

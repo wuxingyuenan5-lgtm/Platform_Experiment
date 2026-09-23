@@ -1,7 +1,7 @@
 """Account-owned pybit connections with a shared CCXT request budget."""
 
 from threading import Lock, RLock
-from time import perf_counter
+from time import monotonic, perf_counter
 from typing import Any
 from urllib.parse import urlsplit
 
@@ -12,6 +12,11 @@ from app.secret_resolver import resolve_secret_reference
 
 _ip_lock = Lock()
 _ip_budget: Any = None
+_clock_lock = RLock()
+_clock_offset_ms = 0
+_clock_calibrated_at = 0.0
+_clock_refreshing = False
+_CLOCK_REFRESH_SECONDS = 60.0
 
 
 def _new_budget() -> Any:
@@ -102,6 +107,8 @@ class BybitConnections:
         self.settings = settings
         self._lock = RLock()
         self._clients: dict[str, Any] = {}
+        self._research_sockets: list[Any] = []
+        self._research_lock = Lock()
 
     def client(self, account_id: str) -> Any:
         with self._lock:
@@ -147,24 +154,136 @@ class BybitConnections:
         if original is None:
             original = helpers.generate_timestamp
             helpers._vg_original_generate_timestamp = original
-        offset_ms = int(self.settings.bybit_timestamp_offset_ms or 0)
-        if offset_ms == 0:
-            try:
-                response = client.get_server_time()
-                server_ms = int(response.get("time") or 0)
-                if response.get("retCode") != 0 or server_ms <= 0:
-                    raise ValueError("Bybit server time is unavailable")
-                offset_ms = server_ms - int(original())
-            except Exception as exc:
-                raise GatewayConfigurationError(
-                    f"Bybit server-time synchronization failed: {type(exc).__name__}"
-                ) from exc
+        configured_offset_ms = int(self.settings.bybit_timestamp_offset_ms or 0)
+        auto_sync = configured_offset_ms == 0
+        offset_ms = configured_offset_ms
+        if auto_sync:
+            offset_ms = self._measure_clock_offset(original, client)
         if abs(offset_ms) > 60_000:
             raise GatewayConfigurationError("Bybit server-time offset exceeds safety limit")
-        helpers.generate_timestamp = lambda: original() + offset_ms
+        with _clock_lock:
+            global _clock_offset_ms, _clock_calibrated_at
+            _clock_offset_ms = offset_ms
+            _clock_calibrated_at = monotonic()
+
+        # pybit keeps the timestamp helper at module scope. Install one wrapper
+        # that shares a calibrated offset across account clients and refreshes it
+        # periodically. A one-time startup sample is unsafe on hosts whose clock
+        # drifts during a long-running monitor process.
+        helpers.generate_timestamp = lambda: self._timestamp(
+            original, client, auto_sync=auto_sync
+        )
+
+    @staticmethod
+    def _measure_clock_offset(original, client) -> int:
+        try:
+            response = client.get_server_time()
+            after = int(original())
+            server_ms = int(response.get("time") or 0)
+            if response.get("retCode") != 0 or server_ms <= 0:
+                raise ValueError("Bybit server time is unavailable")
+            # The venue timestamp is produced before the response reaches us.
+            # Using the latest local sample is deliberately conservative: it
+            # can leave a request a little behind the venue, but it cannot push
+            # an authenticated request over Bybit's strict +1000 ms bound when
+            # the proxy/network path is asymmetric.
+            return server_ms - after
+        except Exception as exc:
+            raise GatewayConfigurationError(
+                f"Bybit server-time synchronization failed: {type(exc).__name__}"
+            ) from exc
+
+    @classmethod
+    def _timestamp(cls, original, client, *, auto_sync: bool = True) -> int:
+        global _clock_offset_ms, _clock_calibrated_at, _clock_refreshing
+        should_refresh = False
+        with _clock_lock:
+            stale = auto_sync and monotonic() - _clock_calibrated_at >= _CLOCK_REFRESH_SECONDS
+            if stale and not _clock_refreshing:
+                _clock_refreshing = True
+                should_refresh = True
+        if should_refresh:
+            try:
+                offset = cls._measure_clock_offset(original, client)
+                if abs(offset) <= 60_000:
+                    with _clock_lock:
+                        _clock_offset_ms = offset
+                        _clock_calibrated_at = monotonic()
+            except GatewayConfigurationError:
+                # Keep the last verified offset when the public clock is
+                # temporarily unreachable. The signed request still fails
+                # closed if the venue rejects it, and the next timestamp retries.
+                pass
+            finally:
+                with _clock_lock:
+                    _clock_refreshing = False
+        with _clock_lock:
+            offset = _clock_offset_ms
+        return int(original()) + offset
+
+    def start_research_streams(self, capture) -> None:
+        from pybit.unified_trading import WebSocket
+
+        class RawPublicSocket(WebSocket):
+            # pybit's normal callback rewrites delta into a synthetic snapshot.
+            # This dedicated PUBLIC socket forwards the native message before that merge.
+            def _process_normal_message(ws, message):
+                topic = message["topic"]
+                capture("bybit_message", f"bybit:{ws.research_category}:{topic}", "public",
+                        message, source_ms=message.get("cts", message.get("ts")),
+                        source_layer="native_websocket")
+
+            def _on_open(ws):
+                capture("quality", f"bybit:{ws.research_category}", "public",
+                        {"reason": "connected_wait_snapshot"}, quality=["book_unsynced"])
+                super()._on_open()
+
+            def _on_close(ws):
+                capture("quality", f"bybit:{ws.research_category}", "public",
+                        {"reason": "disconnected"}, quality=["source_gap"])
+                super()._on_close()
+
+        with self._research_lock:
+            if self._research_sockets:
+                return
+            for category, symbols in (("linear", ["XAUTUSDT", "BTCUSDT"]), ("spot", ["BTCUSDT"])):
+                # _on_open may run during construction, so category belongs to a per-socket class.
+                Socket = type(
+                    "ResearchPublicSocket", (RawPublicSocket,), {"research_category": category}
+                )
+                ws = None
+                try:
+                    ws = Socket(channel_type=category, testnet=False, retries=3)
+                    ws.orderbook_stream(depth=50, symbol=symbols, callback=lambda _: None)
+                    if category == "linear":
+                        ws.ticker_stream(symbol=symbols, callback=lambda _: None)
+                    self._research_sockets.append(ws)
+                except Exception:
+                    if ws is not None:
+                        ws.exit()
+                    for existing in self._research_sockets:
+                        existing.exit()
+                    self._research_sockets.clear()
+                    raise
 
     def close(self) -> None:
+        for socket in self._research_sockets:
+            socket.exit()
+        self._research_sockets.clear()
         with self._lock:
             for client in self._clients.values():
                 client.client.close()
             self._clients.clear()
+
+    def reset(self, account_id: str) -> None:
+        """Discard a transport session after a connection reset.
+
+        Requests can leave a pooled TLS connection unusable after a remote
+        reset (Windows reports this as ConnectionResetError/10054). Reusing
+        that session makes every background read fail even though credentials
+        and the venue are still valid.
+        """
+        with self._lock:
+            client = self._clients.pop(account_id, None)
+            if client is not None:
+                client.client.close()

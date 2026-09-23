@@ -21,11 +21,50 @@ function setup() {
   return load('src/store/modules/user.ts').useUserStore(pinia);
 }
 
+for (const loaded of [true, false]) {
+  test(`guard retains a loaded page or exposes cold-start retry: loaded=${loaded}`, async () => {
+    const notifications = [];
+    const store = {
+      getUserInfo: {},
+      getIsAuthenticated: loaded,
+      getSessionUnavailable: true,
+      async hydrateSession(force) { assert.equal(force, true); return false; },
+    };
+    const load = createLoader({
+      '@/store/modules/user': { useUserStoreWithOut: () => store },
+      '@/store/modules/permission': { usePermissionStoreWithOut: () => ({}) },
+      '@/router/routes': { asyncRoutes: [] },
+      '@/router/routes/basic': { PAGE_NOT_FOUND_ROUTE: { name: 'not-found' } },
+      '@/router/constant': { PAGE_NOT_FOUND_NAME: 'not-found' },
+      '@/access/routeAccess': {},
+      'ant-design-vue': { notification: { warning: (value) => notifications.push(value) } },
+    });
+    let guard;
+    load('src/router/guard/permissionGuard.ts').createPermissionGuard({
+      beforeEach(callback) { guard = callback; },
+    });
+    const results = [];
+    await guard(
+      { path: '/strategy/management', fullPath: '/strategy/management?tab=capital', meta: {} },
+      { path: loaded ? '/home/index' : '/' },
+      (value) => results.push(value),
+    );
+    assert.equal(results.length, 1);
+    if (loaded) {
+      assert.equal(results[0], false);
+    } else {
+      assert.equal(results[0].path, '/login');
+      assert.equal(results[0].query.redirect, '/strategy/management?tab=capital');
+    }
+    assert.equal(notifications.length, 1);
+  });
+}
+
 for (const status of [undefined, 503, 429]) {
   test(`temporary auth read failure ${status} can recover the original cookie without login`, async () => {
     const original = axios.defaults.adapter;
     const requests = [];
-    let unavailable = true;
+    let unavailable = false;
     axios.defaults.adapter = async (config) => {
       requests.push([config.method, config.url]);
       if (unavailable) {
@@ -44,13 +83,18 @@ for (const status of [undefined, 503, 429]) {
     };
     try {
       const store = setup();
+      assert.equal(await store.hydrateSession(true), true);
+      assert.equal(store.getIsAuthenticated, true);
+      unavailable = true;
       assert.equal(await store.hydrateSession(true), false);
-      assert.equal(store.getIsAuthenticated, false);
+      assert.equal(store.getIsAuthenticated, true);
+      assert.equal(store.getSessionUnavailable, true);
       assert.equal(store.getHydrationAttempted, false);
       unavailable = false;
       assert.equal(await store.hydrateSession(true), true);
       assert.equal(store.getAuthentication.session.sessionId, 'original');
-      assert.deepEqual(requests, [['get', '/auth/me'], ['get', '/auth/me']]);
+      assert.equal(store.getSessionUnavailable, false);
+      assert.deepEqual(requests, [['get', '/auth/me'], ['get', '/auth/me'], ['get', '/auth/me']]);
     } finally {
       axios.defaults.adapter = original;
     }
@@ -77,6 +121,35 @@ for (const [status, code] of [[401, 'invalid_session'], [403, 'account_inactive'
     } finally {
       axios.defaults.adapter = original;
     }
+  });
+}
+
+for (const [code, expected] of [
+  ['invalid_session', '登录会话已失效，请重新登录后再提交价差指令。'],
+  ['csrf_invalid', '登录校验已失效，请刷新页面或重新登录后再提交。'],
+]) {
+  test(`strategy api presents ${code} as an actionable login message`, () => {
+    let cleared = 0;
+    const load = createLoader({
+      'openapi-fetch': { __esModule: true, default: () => ({ use() {} }) },
+      './strategyClient': { createStrategyClient: () => ({}) },
+      './strategyQueries': {
+        strategyQueryClient: { invalidateQueries() {} },
+        strategyQueryKey: () => ['strategy'],
+        strategySession: { value: { generation: 0 } },
+      },
+      './userSystem': { clearUserSystemSessionMemory: () => { cleared++; } },
+    });
+    const { strategyData } = load('src/api/platform/strategyApi.ts');
+    assert.throws(
+      () => strategyData({ error: { detail: { code, message: 'Browser session is invalid' } } }),
+      (error) => {
+        assert.equal(error.message, expected);
+        assert.doesNotMatch(error.message, /Browser session|invalid_session|csrf_invalid|\{/);
+        return true;
+      },
+    );
+    assert.equal(cleared, 1);
   });
 }
 

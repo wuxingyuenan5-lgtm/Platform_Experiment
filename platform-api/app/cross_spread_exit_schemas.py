@@ -15,7 +15,7 @@ from app.cross_spread_order_intent import (
 from app.execution_schemas import ExecutionBatchResponse
 
 ExecutionMode = Literal["market", "limit"]
-LimitStrategy = Literal["fok", "post_only_chase"]
+LimitStrategy = Literal["fok", "post_only_chase", "market"]
 ExitPlanStatus = Literal[
     "active",
     "triggered",
@@ -34,6 +34,13 @@ class CrossSpreadMarketOpenRequest(BaseModel):
     execution_mode: ExecutionMode = Field(default="market", alias="executionMode")
     limit_spread: Decimal | None = Field(default=None, alias="limitSpread")
     limit_strategy: LimitStrategy = Field(default="fok", alias="limitStrategy")
+    max_adverse_spread: Decimal = Field(default=Decimal("0"), alias="maxAdverseSpread", ge=0)
+    take_profit_max_adverse_spread: Decimal = Field(
+        default=Decimal("0"), alias="takeProfitMaxAdverseSpread", ge=0
+    )
+    stop_loss_max_adverse_spread: Decimal = Field(
+        default=Decimal("0"), alias="stopLossMaxAdverseSpread", ge=0
+    )
     take_profit_execution_mode: ExecutionMode = Field(
         default="market",
         alias="takeProfitExecutionMode",
@@ -53,10 +60,7 @@ class CrossSpreadMarketOpenRequest(BaseModel):
 
     @model_validator(mode="after")
     def validate_request(self) -> CrossSpreadMarketOpenRequest:
-        if (
-            self.take_profit_spread is not None
-            and self.stop_loss_spread is not None
-        ):
+        if self.take_profit_spread is not None and self.stop_loss_spread is not None:
             if self.direction == "LONG_SPREAD":
                 if self.take_profit_spread <= self.stop_loss_spread:
                     raise ValueError(
@@ -75,6 +79,7 @@ class CrossSpreadMarketCloseRequest(BaseModel):
     execution_mode: ExecutionMode = Field(default="market", alias="executionMode")
     limit_spread: Decimal | None = Field(default=None, alias="limitSpread")
     limit_strategy: LimitStrategy = Field(default="fok", alias="limitStrategy")
+    max_adverse_spread: Decimal = Field(default=Decimal("0"), alias="maxAdverseSpread", ge=0)
     quantity_oz: Decimal | None = Field(default=None, alias="quantityOz", gt=0)
 
     @model_validator(mode="after")
@@ -104,15 +109,21 @@ class CrossSpreadExitPlanUpdateRequest(BaseModel):
         default=None,
         alias="stopLossLimitStrategy",
     )
+    take_profit_max_adverse_spread: Decimal | None = Field(
+        default=None, alias="takeProfitMaxAdverseSpread", ge=0
+    )
+    stop_loss_max_adverse_spread: Decimal | None = Field(
+        default=None, alias="stopLossMaxAdverseSpread", ge=0
+    )
 
     @model_validator(mode="after")
     def require_an_edit(self) -> CrossSpreadExitPlanUpdateRequest:
+        for field in ("take_profit_max_adverse_spread", "stop_loss_max_adverse_spread"):
+            if field in self.model_fields_set and getattr(self, field) is None:
+                raise ValueError("Adverse spread tolerance cannot be null")
         if not self.model_fields_set:
             raise ValueError("At least one exit threshold must be provided")
-        if (
-            "take_profit_spread" in self.model_fields_set
-            and self.take_profit_spread is None
-        ) or (
+        if ("take_profit_spread" in self.model_fields_set and self.take_profit_spread is None) or (
             "stop_loss_spread" in self.model_fields_set and self.stop_loss_spread is None
         ):
             raise ValueError("Exit thresholds cannot be cleared through this endpoint")
@@ -138,7 +149,7 @@ class CrossSpreadLimitExecutionResponse(BaseModel):
     raw_bybit_limit_price: Decimal = Field(alias="rawBybitLimitPrice")
     bybit_limit_price: Decimal = Field(alias="bybitLimitPrice")
     currently_executable: bool = Field(alias="currentlyExecutable")
-    time_in_force: Literal["FOK", "PostOnly"] = Field(alias="timeInForce")
+    time_in_force: Literal["FOK", "PostOnly", "Market"] = Field(alias="timeInForce")
 
 
 class CrossSpreadExitPlanResponse(BaseModel):
@@ -153,6 +164,12 @@ class CrossSpreadExitPlanResponse(BaseModel):
     entry_spread: Decimal = Field(alias="entrySpread")
     take_profit_spread: Decimal | None = Field(default=None, alias="takeProfitSpread")
     stop_loss_spread: Decimal | None = Field(default=None, alias="stopLossSpread")
+    take_profit_max_adverse_spread: Decimal = Field(
+        default=Decimal("0"), alias="takeProfitMaxAdverseSpread", ge=0
+    )
+    stop_loss_max_adverse_spread: Decimal = Field(
+        default=Decimal("0"), alias="stopLossMaxAdverseSpread", ge=0
+    )
     take_profit_execution_mode: ExecutionMode = Field(
         default="market",
         alias="takeProfitExecutionMode",
@@ -178,8 +195,18 @@ class CrossSpreadExitPlanResponse(BaseModel):
     closed_at: datetime | None = Field(default=None, alias="closedAt")
 
 
+class CrossSpreadPendingOpenTriggerResponse(BaseModel):
+    trigger_id: str = Field(alias="triggerId")
+    direction: SpreadDirection
+    quantity_oz: Decimal = Field(alias="quantityOz")
+    limit_spread: Decimal = Field(alias="limitSpread")
+    limit_strategy: LimitStrategy = Field(alias="limitStrategy")
+    status: Literal["pending", "triggered", "completed", "failed"]
+    created_at: datetime = Field(alias="createdAt")
+
+
 class CrossSpreadOpenResult(BaseModel):
-    execution_batch: ExecutionBatchResponse = Field(alias="executionBatch")
+    execution_batch: ExecutionBatchResponse | None = Field(default=None, alias="executionBatch")
     order_intent: CrossSpreadOrderIntentResponse | None = Field(
         default=None,
         alias="orderIntent",
@@ -189,6 +216,9 @@ class CrossSpreadOpenResult(BaseModel):
         alias="limitExecution",
     )
     exit_plan: CrossSpreadExitPlanResponse | None = Field(default=None, alias="exitPlan")
+    pending_trigger: CrossSpreadPendingOpenTriggerResponse | None = Field(
+        default=None, alias="pendingTrigger"
+    )
 
 
 class CrossSpreadCloseResult(BaseModel):

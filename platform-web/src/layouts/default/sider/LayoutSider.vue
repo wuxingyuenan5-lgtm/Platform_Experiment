@@ -82,7 +82,7 @@
     return [
       prefixCls,
       {
-        [`${prefixCls}--fixed`]: unref(getMenuFixed),
+        [`${prefixCls}--fixed`]: unref(getMenuFixed) && !unref(getIsMobile),
         [`${prefixCls}--mix`]: unref(getIsMixMode) && !unref(getIsMobile),
       },
     ];
@@ -128,33 +128,33 @@
     }
 
     .ant-layout-sider-children {
-      position: relative;
       display: flex;
+      position: relative;
       flex-direction: column;
       height: 100%;
     }
 
     .sidebar-toggle {
+      display: grid;
       position: absolute;
+      z-index: 12;
       top: 8px;
       right: 8px;
-      z-index: 12;
-      display: grid;
-      place-items: center;
       width: 38px;
       height: 38px;
       padding: 0;
+      transition: 0.2s ease;
       border: 0;
       border-radius: 12px;
       background: transparent;
-      color: #4b5563;
       box-shadow: none;
-      transition: 0.2s ease;
+      color: #4b5563;
+      place-items: center;
 
       &:hover {
-        color: #111827;
-        background: rgba(255, 255, 255, 0.55);
         transform: translateY(-1px);
+        background: rgb(255 255 255 / 55%);
+        color: #111827;
       }
     }
 

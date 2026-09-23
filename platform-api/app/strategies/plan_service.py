@@ -17,6 +17,7 @@ from app.strategies.adapters.funding_carry import (
     SPOT_BASE_FEE_RATE,
     build_funding_carry_plan,
     funding_open_quantities,
+    funding_spot_quantity_for_perpetual,
 )
 from app.strategies.domain import ExecutionPlan, StrategyInstructionAction
 from app.strategy_financial_readmodel import canonical_fills
@@ -44,6 +45,18 @@ class FundingCarryParameters(BaseModel):
         return self
 
 
+class CrossSpreadGuard(BaseModel):
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+    target_spread: Decimal = Field(alias="targetSpread")
+    max_adverse_spread: Decimal = Field(default=Decimal("0"), alias="maxAdverseSpread", ge=0)
+    mt5_account_id: str = Field(alias="mt5AccountId", min_length=1)
+    mt5_symbol: str = Field(alias="mt5Symbol", min_length=1)
+    mt5_close: bool = Field(alias="mt5Close")
+    mt5_min_quantity: Decimal = Field(alias="mt5MinQuantity", gt=0)
+    mt5_quantity_step: Decimal = Field(alias="mt5QuantityStep", gt=0)
+    mt5_contract_multiplier: Decimal = Field(alias="mt5ContractMultiplier", gt=0)
+
+
 class CrossSpreadParameters(BaseModel):
     model_config = ConfigDict(extra="forbid", populate_by_name=True)
     action: Literal["OPEN_LONG", "CLOSE_LONG", "OPEN_SHORT", "CLOSE_SHORT"]
@@ -56,6 +69,8 @@ class CrossSpreadParameters(BaseModel):
         alias="executionPolicy",
     )
     bybit_limit_price: Decimal | None = Field(default=None, alias="bybitLimitPrice", gt=0)
+    max_adverse_spread: Decimal = Field(default=Decimal("0"), alias="maxAdverseSpread", ge=0)
+    cross_spread_guard: CrossSpreadGuard | None = Field(default=None, alias="crossSpreadGuard")
 
 
 def _unprocessable(detail: str) -> HTTPException:
@@ -347,14 +362,25 @@ def build_plan(
                         raise _unprocessable(
                             "Funding fee-aware sizing requires unit coin multipliers"
                         )
+                    expected_spot, _, _ = funding_spot_quantity_for_perpetual(
+                        typed.perpetual_quantity,
+                        fee_rate=fee_rate,
+                        spot_step=Decimal(str(spot["quantity_step"])),
+                        spot_minimum=Decimal(str(spot["min_order_quantity"])),
+                    )
+                    if typed.spot_quantity != expected_spot:
+                        raise _unprocessable(
+                            "现货数量须按永续目标数量和扣费后净额自动配平"
+                        )
                     _, expected_perpetual, _ = funding_open_quantities(
                         typed.spot_quantity,
                         fee_rate=fee_rate,
                         perpetual_step=Decimal(str(perpetual["quantity_step"])),
+                        perpetual_minimum=Decimal(str(perpetual["min_order_quantity"])),
                     )
                     if typed.perpetual_quantity != expected_perpetual or expected_perpetual <= 0:
                         raise _unprocessable(
-                            "永续数量须按现货扣费后的净币数量向下取整，且满足最小下单量"
+                            "永续数量须按现货扣费后的净币数量选择最接近的可下单量"
                         )
             for quantity, specification in (
                 (typed.perpetual_quantity, perpetual),
@@ -406,6 +432,16 @@ def build_plan(
                 external_symbol="XAUTUSDT",
             )
             mt5 = _instrument(db, venue_id=mt5_account["venue_id"], instrument_type="mt5_cfd")
+            guard = typed.cross_spread_guard
+            if guard is not None and (
+                guard.mt5_close != typed.action.startswith("CLOSE_")
+                or guard.mt5_account_id != mt5_account["account_id"]
+                or guard.mt5_symbol != mt5["external_symbol"]
+                or guard.mt5_min_quantity != Decimal(str(mt5["min_order_quantity"]))
+                or guard.mt5_quantity_step != Decimal(str(mt5["quantity_step"]))
+                or guard.mt5_contract_multiplier != Decimal(str(mt5["contract_multiplier"]))
+            ):
+                raise _unprocessable("Cross-spread guard MT5 specification does not match binding")
             return build_cross_spread_plan(
                 action=action.value,
                 parameters={
@@ -428,6 +464,11 @@ def build_plan(
                     "mt5PositionId": typed.mt5_position_id,
                     "executionPolicy": typed.execution_policy,
                     "bybitLimitPrice": typed.bybit_limit_price,
+                    "crossSpreadGuard": (
+                        typed.cross_spread_guard.model_dump(by_alias=True, mode="json")
+                        if typed.cross_spread_guard is not None
+                        else None
+                    ),
                 },
                 created_at=now,
             )

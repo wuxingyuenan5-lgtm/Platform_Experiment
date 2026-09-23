@@ -16,13 +16,19 @@
             item.label
           }}</option>
         </select>
-        <template v-if="curve.modeOptions?.length">
+        <template
+          v-if="
+            curve.modeOptions?.length &&
+            (!curve.modeMetricKeys || curve.modeMetricKeys.includes(metricKey))
+          "
+        >
           <button
             v-for="item in curve.modeOptions"
             :key="item.key"
             type="button"
             class="mode-button"
             :class="{ 'is-active': modeKey === item.key }"
+            :aria-pressed="modeKey === item.key"
             @click="modeKey = item.key"
           >
             {{ item.label }}
@@ -30,7 +36,6 @@
         </template>
       </div>
     </header>
-
     <div class="curve-summary">
       <article v-for="item in activeSeries.summaries" :key="item.label" class="summary-pill">
         <label>{{ item.label }}</label>
@@ -53,9 +58,14 @@
   }>();
 
   const metricKey = ref(props.curve.defaultMetric);
-  const activeSeries = computed(() => props.curve.metricSeries?.[metricKey.value] || props.curve);
   const periodKey = ref(props.curve.defaultPeriod);
   const modeKey = ref(props.curve.defaultMode || props.curve.modeOptions?.[0]?.key || '');
+  const activeSeries = computed(
+    () =>
+      props.curve.metricSeries?.[`${metricKey.value}:${modeKey.value}`] ||
+      props.curve.metricSeries?.[metricKey.value] ||
+      props.curve,
+  );
 
   const activeMetricLabel = computed(
     () => props.curve.metricOptions.find((item) => item.key === metricKey.value)?.label || '净值',
@@ -164,12 +174,12 @@
 <style scoped lang="less">
   .capital-net-value-board {
     display: grid;
-    gap: var(--strategy-space-2);
     padding: 18px 20px 14px;
+    border: 1px solid var(--strategy-border);
     border-radius: var(--strategy-radius-panel);
     background: var(--strategy-surface);
-    border: 1px solid var(--strategy-border);
     box-shadow: var(--strategy-shadow-card);
+    gap: var(--strategy-space-2);
   }
 
   .board-header {
@@ -181,9 +191,9 @@
 
   .board-header h3 {
     margin: 0;
+    color: var(--strategy-text-1);
     font-size: var(--strategy-font-section-title);
     font-weight: 800;
-    color: var(--strategy-text-1);
   }
 
   .board-controls {
@@ -200,10 +210,10 @@
     border: 1px solid var(--strategy-border);
     border-radius: var(--strategy-radius-control);
     background: var(--strategy-surface);
+    box-shadow: var(--strategy-shadow-soft);
     color: var(--strategy-text-3);
     font-size: var(--strategy-font-base);
     font-weight: 600;
-    box-shadow: var(--strategy-shadow-soft);
   }
 
   .mode-button {
@@ -213,8 +223,8 @@
   .mode-button.is-active {
     border-color: transparent;
     background: var(--strategy-accent-soft);
-    color: var(--strategy-accent-strong);
     box-shadow: inset 0 0 0 1px var(--strategy-accent-ring);
+    color: var(--strategy-accent-strong);
   }
 
   .curve-summary {
@@ -226,9 +236,9 @@
   .summary-pill {
     min-width: 180px;
     padding: 10px 12px;
+    border: 1px solid var(--strategy-border-strong);
     border-radius: var(--strategy-radius-card);
     background: var(--strategy-surface-muted);
-    border: 1px solid var(--strategy-border-strong);
     box-shadow: var(--strategy-shadow-soft);
   }
 
@@ -245,8 +255,8 @@
 
   .summary-pill strong {
     margin-top: 6px;
-    font-size: 16px;
     color: var(--strategy-text-1);
+    font-size: 16px;
     font-weight: 700;
   }
 

@@ -2,9 +2,13 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 import pytest
+
+# Business dotenv may enable collection; tests must explicitly opt in with isolated sources.
+os.environ["VG_RUNTIME_RESEARCH_CAPTURE_ENABLED"] = "false"
 
 LIVE_SAFETY_PATTERNS = (
     "atomic_command_claim",

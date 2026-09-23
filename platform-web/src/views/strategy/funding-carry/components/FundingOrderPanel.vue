@@ -47,6 +47,14 @@
             <div
               ><span>期现基差</span><strong>{{ context?.basis ?? '--' }}</strong></div
             >
+            <div class="spread-kpi"
+              ><span>开仓可成交价差</span><strong>{{ executableSpreadOpen }}</strong
+              ><small>{{ executableSpreadOpenPercent }}%</small></div
+            >
+            <div class="spread-kpi"
+              ><span>平仓可成交价差</span><strong>{{ executableSpreadClose }}</strong
+              ><small>{{ executableSpreadClosePercent }}%</small></div
+            >
             <div
               ><span>数据时间</span><strong>{{ formatTime(context?.asOf) }}</strong></div
             >
@@ -54,24 +62,14 @@
         </article>
       </section>
 
-      <section class="panel opportunity-panel">
-        <div class="panel-title"><h3>开仓资金</h3></div>
-        <div class="opportunity-meta">
-          <div><span>套利方向</span><strong>现货买入 + 永续卖出</strong></div>
-          <div
-            ><span>可用开仓资金</span><strong>{{ fundingAvailable }}</strong></div
-          >
-          <div
-            ><span>建议数量</span><strong>{{ context?.suggestedQuantity ?? '--' }}</strong></div
-          >
-        </div>
-        <p class="execution-hint">先确认标的与数量，再提交开仓。可用资金已扣除执行中的预约。</p>
-      </section>
+      <FundingBasisPanel />
     </div>
 
     <div class="funding-lower-grid">
       <section class="panel status-panel">
-        <div class="panel-title"><h3>交易规则</h3></div>
+        <div class="panel-title"
+          ><h3>交易规则 · {{ context?.perpetualSymbol ?? '--' }}</h3></div
+        >
         <div class="rule-list">
           <div class="rule-list__row"
             ><span>永续执行</span><strong>{{ executionPolicyLabel }}</strong></div
@@ -108,6 +106,19 @@
 
       <section class="panel order-panel">
         <div class="panel-title"><h3>套利执行指令</h3></div>
+        <section class="embedded-funding">
+          <div class="panel-title"><h3>开仓资金</h3></div>
+          <div class="opportunity-meta">
+            <div><span>套利方向</span><strong>现货买入 + 永续卖出</strong></div>
+            <div
+              ><span>可用开仓资金</span><strong>{{ fundingAvailable }}</strong></div
+            >
+            <div
+              ><span>建议数量</span><strong>{{ context?.suggestedQuantity ?? '--' }}</strong></div
+            >
+          </div>
+          <p class="execution-hint">先确认标的与数量，再提交开仓。可用资金已扣除执行中的预约。</p>
+        </section>
         <div class="stage-tabs">
           <button type="button" :class="{ active: stage === 'open' }" @click="stage = 'open'"
             >开仓</button
@@ -164,18 +175,29 @@
             <section class="funding-order-column">
               <label class="field">
                 <span>标的</span>
+                <input
+                  v-model="symbolSearch"
+                  type="search"
+                  placeholder="搜索标的：BTC、ETH、XAUT"
+                  aria-label="搜索交易标的"
+                  autocomplete="off"
+                  spellcheck="false"
+                />
                 <select
                   :value="context?.perpetualSymbol"
                   @change="handleSymbolChange(($event.target as HTMLSelectElement).value)"
                 >
                   <option
-                    v-for="item in context?.symbolOptions ?? []"
+                    v-for="item in filteredSymbolOptions"
                     :key="item.perpetualSymbol"
                     :value="item.perpetualSymbol"
                   >
                     {{ item.baseAsset }} · {{ item.perpetualSymbol }}
                   </option>
                 </select>
+                <small
+                  >仅显示 Bybit 同时具备现货和永续的可配平标的；未出现的标的没有可用双腿。</small
+                >
               </label>
               <label class="field">
                 <span>名义本金</span>
@@ -191,7 +213,7 @@
                 </div>
               </label>
               <label class="field">
-                <span>现货买入数量（扣费前）</span>
+                <span>永续目标数量（币）</span>
                 <input
                   :value="quantityInput"
                   type="text"
@@ -204,7 +226,8 @@
             <section class="funding-order-column">
               <div class="funding-leg-grid">
                 <div class="funding-leg-card"
-                  ><span>现货头寸</span><strong>买入 {{ quantityInput || '--' }}</strong
+                  ><span>现货头寸（扣费前）</span
+                  ><strong>买入 {{ context?.openSizing?.spotQuantity ?? '--' }}</strong
                   ><small>{{ context?.spotSymbol ?? '--' }}</small></div
                 >
                 <div class="funding-leg-card"
@@ -215,12 +238,13 @@
               </div>
               <div class="funding-metric-grid">
                 <div class="mini-kpi"
-                  ><span>现货名义金额</span><strong>{{ spotNotional }} USDT</strong></div
+                  ><span>反算永续名义金额</span><strong>{{ estimatedNotional }} USDT</strong></div
                 >
               </div>
               <p class="execution-hint"
-                >现货买入扣币 {{ spotFeePercent }}；预计净到账
-                {{ context?.openSizing?.expectedSpotNetQuantity ?? '--' }}；合约向下取整余量
+                >目标以永续数量为准；现货自动补足手续费和最小步长。现货买入扣币
+                {{ spotFeePercent }}；预计净到账
+                {{ context?.openSizing?.expectedSpotNetQuantity ?? '--' }}；最小单位配平余量
                 {{ context?.openSizing?.roundingResidualQuantity ?? '--' }}。</p
               >
               <p class="execution-hint"
@@ -458,6 +482,7 @@
   import { computed, ref } from 'vue';
   import Decimal from 'decimal.js';
   import { useUserStore } from '@/store/modules/user';
+  import FundingBasisPanel from './FundingBasisPanel.vue';
   import { closeFundingAbnormalOpen } from '@/api/platform/fundingWorkspace';
   import type { FundingExecutionPolicy } from '../composables/fundingExecutionRecovery';
 
@@ -495,6 +520,7 @@
   }>();
 
   const stage = ref<'open' | 'close'>('open');
+  const symbolSearch = ref('');
   const executionMethods: Array<{ value: FundingExecutionPolicy; label: string }> = [
     { value: 'market', label: '市价' },
     { value: 'fok', label: '限价 FOK' },
@@ -519,13 +545,34 @@
     const rate = props.context?.openSizing?.spotBaseFeeRate;
     return rate == null ? '--' : `${new Decimal(rate).times(100).toString()}%`;
   });
-  const spotNotional = computed(() => {
+  const estimatedNotional = computed(() => {
     try {
-      const amount = new Decimal(props.quantityInput).times(String(props.context?.spotQuote?.mid));
+      const amount = new Decimal(String(props.context?.openSizing?.estimatedNotional ?? ''));
       return amount.isFinite() ? amount.toFixed(2) : '--';
     } catch {
       return '--';
     }
+  });
+  const filteredSymbolOptions = computed(() => {
+    const needle = symbolSearch.value.trim().toUpperCase();
+    const options = (props.context?.symbolOptions ?? []) as Array<Record<string, any>>;
+    if (!needle) return options;
+    const matches = options.filter(
+      (item) =>
+        String(item.baseAsset ?? '')
+          .toUpperCase()
+          .includes(needle) ||
+        String(item.perpetualSymbol ?? '')
+          .toUpperCase()
+          .includes(needle) ||
+        String(item.spotSymbol ?? '')
+          .toUpperCase()
+          .includes(needle),
+    );
+    const current = options.find(
+      (item) => String(item.perpetualSymbol ?? '') === String(props.context?.perpetualSymbol ?? ''),
+    );
+    return current && !matches.includes(current) ? [current, ...matches] : matches;
   });
   const activeGroups = computed(() =>
     props.positionGroups.filter((item) => item.lifecycleState !== 'history' && !item.isAbnormal),
@@ -585,12 +632,39 @@
   const fundingRateLabel = computed(() =>
     fundingRateValue.value === null ? '--' : `${fundingRateValue.value.toFixed(4)}%`,
   );
+  function formatFourDecimals(value: unknown) {
+    if (value == null || value === '') return '--';
+    try {
+      const amount = new Decimal(String(value));
+      return amount.isFinite() ? amount.toFixed(4) : '--';
+    } catch {
+      return '--';
+    }
+  }
+  const executableSpreadOpen = computed(() =>
+    formatFourDecimals(props.context?.executableSpread?.open),
+  );
+  const executableSpreadOpenPercent = computed(() =>
+    formatFourDecimals(props.context?.executableSpread?.openPercent),
+  );
+  const executableSpreadClose = computed(() =>
+    formatFourDecimals(props.context?.executableSpread?.close),
+  );
+  const executableSpreadClosePercent = computed(() =>
+    formatFourDecimals(props.context?.executableSpread?.closePercent),
+  );
   const fundingTone = computed(() =>
     fundingRateValue.value !== null && fundingRateValue.value < 0 ? 'red' : 'green',
   );
-  const readinessLabel = computed(() =>
-    props.context?.controlledLiveReadiness?.ready === true ? '可执行' : '未开启',
-  );
+  const readinessLabel = computed(() => {
+    const state = props.context?.controlledLiveReadiness;
+    if (!state) return '正在读取交易状态';
+    if (state.ready === true) return '可执行';
+    if (state.liveTradingEnabled === false || state.runtimeLiveWriteEnabled === false)
+      return '资费实盘写入未启用（与 MT5 休市无关），开仓和平仓均暂停';
+    if (state.killSwitchClear === false) return '风控已暂停交易';
+    return '交易连接或市场状态未就绪';
+  });
 
   function sum(items: Array<Record<string, any>>, key: string) {
     return items
@@ -703,6 +777,15 @@
     display: grid;
     grid-template-columns: 1.45fr 1fr;
     gap: 12px;
+  }
+
+  .embedded-funding {
+    min-width: 0;
+    padding: 16px 18px 18px;
+    border: 1px solid var(--strategy-border);
+    border-radius: 18px;
+    background: #fff;
+    box-shadow: var(--strategy-shadow-soft);
   }
 
   .quote-analysis-link {
@@ -996,10 +1079,12 @@
     border-color: #e9bcb6;
     background: #fffaf8;
   }
+
   .funding-abnormal article {
     padding: 14px 0;
     overflow-wrap: anywhere;
   }
+
   .funding-abnormal button {
     margin-right: 12px;
   }
@@ -1101,24 +1186,27 @@
 
   .execution-controls {
     display: grid;
-    gap: 10px;
-    padding: 14px;
     margin-bottom: 16px;
+    padding: 14px;
     border: 1px solid var(--strategy-border-soft);
     border-radius: 12px;
     background: var(--strategy-bg-soft, #f8faff);
+    gap: 10px;
   }
+
   .execution-controls__label {
     color: var(--strategy-text-2);
     font-size: 12px;
     font-weight: 700;
   }
+
   .execution-methods,
   .close-fractions {
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
   }
+
   .execution-methods button,
   .close-fractions button {
     min-height: 36px;
@@ -1129,22 +1217,26 @@
     color: var(--strategy-text-2);
     cursor: pointer;
   }
+
   .execution-methods button.active {
     border-color: var(--strategy-accent-ring);
     background: var(--strategy-accent-soft);
     color: var(--strategy-accent-strong);
     font-weight: 700;
   }
+
   .execution-methods button:focus-visible,
   .close-fractions button:focus-visible {
     outline: 2px solid var(--strategy-accent-strong);
     outline-offset: 2px;
   }
+
   .execution-methods button:disabled,
   .close-fractions button:disabled {
     opacity: 0.55;
     cursor: not-allowed;
   }
+
   .limit-price-field {
     max-width: 400px;
   }

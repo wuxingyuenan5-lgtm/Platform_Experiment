@@ -193,3 +193,15 @@ def test_application_startup_applies_platform_migration_baseline(tmp_path: Path)
         == "user-research-watchlist"
     )
     assert payload["migrations"][-1]["status"] == "applied"
+
+
+def test_chase_terminal_table_is_an_append_only_upgrade_from_live_migration_26():
+    migration26 = next(m for m in PLATFORM_MIGRATIONS if m.version == 26)
+    assert migration26.checksum == "68e2f141e69d6f6b349254c24ae0e2fb41d2efe3c08d94d0ce220f8696174040"
+    db = memory_database()
+    bootstrap_database(db)
+    apply_migrations(db, tuple(m for m in PLATFORM_MIGRATIONS if m.version <= 26))
+    assert db.execute("SELECT name FROM sqlite_master WHERE name='runtime_order_terminals'").fetchone() is None
+    apply_migrations(db)
+    apply_migrations(db)
+    assert db.execute("SELECT name FROM sqlite_master WHERE name='runtime_order_terminals'").fetchone()

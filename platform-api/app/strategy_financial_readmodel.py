@@ -664,11 +664,16 @@ def select_management_executions(
 
 
 def get_strategy_financials(
-    strategy_instance_id: str, *, account_id: str | None = None, account_scope: bool = False
+    strategy_instance_id: str,
+    *,
+    account_id: str | None = None,
+    account_scope: bool = False,
+    reporting_sessions: dict | None = None,
 ) -> dict[str, Any]:
     with connection() as db:
         instance = db.execute(
-            "SELECT base_currency FROM strategy_instances WHERE id=?", (strategy_instance_id,)
+            "SELECT base_currency,trading_mode FROM strategy_instances WHERE id=?",
+            (strategy_instance_id,),
         ).fetchone()
         base_currency = str(instance["base_currency"])
         where = "o.account_id=?" if account_scope else "tc.strategy_instance_id=?"
@@ -676,6 +681,16 @@ def get_strategy_financials(
         if account_id and not account_scope:
             where += " AND o.account_id=?"
             params.append(account_id)
+        live_binding = db.execute(
+            "SELECT 1 FROM strategy_account_bindings b JOIN accounts a ON a.id=b.account_id "
+            "WHERE b.strategy_instance_id=? AND b.status='active' AND b.role!='local_test' "
+            "AND a.environment='live' LIMIT 1",
+            (strategy_instance_id,),
+        ).fetchone()
+        if not account_scope and (instance["trading_mode"] == "live" or live_binding):
+            # Historical simulation/demo runs are not real strategy returns.
+            # Retain former live accounts: unbinding does not erase realized P&L.
+            where += " AND o.account_id IN (SELECT id FROM accounts WHERE environment='live')"
         orders = db.execute(
             "SELECT o.*, i.settle_currency, i.instrument_type, "
             "i.base_currency AS base_asset, i.quote_currency, "
@@ -728,26 +743,88 @@ def get_strategy_financials(
             f"SELECT * FROM account_venue_snapshots WHERE account_id IN ({placeholders})",
             accounts,
         ).fetchall()
+        valuation_rows = db.execute(
+            "SELECT account_id,currency,as_of,usd_rate FROM account_valuation_rates "
+            f"WHERE account_id IN ({placeholders}) ORDER BY as_of",
+            accounts,
+        ).fetchall()
         identities = load_order_identities(db)
         assignments: dict[tuple, list[dict[str, Any]]] = defaultdict(list)
         for row in db.execute(
             "SELECT account_id, instrument_id, source, external_id, fact_type, "
             "strategy_instance_id, payload_json FROM financial_facts"
         ):
-            assignments[(
-                row["account_id"],
-                identities.instrument(row["account_id"], row["instrument_id"]),
-                row["source"],
-                row["external_id"],
-                row["fact_type"],
-            )].append(dict(row))
+            assignments[
+                (
+                    row["account_id"],
+                    identities.instrument(row["account_id"], row["instrument_id"]),
+                    row["source"],
+                    row["external_id"],
+                    row["fact_type"],
+                )
+            ].append(dict(row))
         execution_links = load_order_execution_links(db)
+        batch_directions = {
+            row["id"]: row["direction"]
+            for row in db.execute("SELECT id,direction FROM execution_batches")
+        }
+        opening_tickets = {
+            row["open_batch_id"]: row["mt5_position_id"]
+            for row in db.execute(
+                "SELECT open_batch_id,mt5_position_id FROM cross_spread_exit_plans "
+                "WHERE mt5_position_id IS NOT NULL"
+            )
+        }
+
+    reporting_observations = (reporting_sessions or {}).get("observations", {})
+    reporting_cutoff = None
+    if reporting_sessions is not None and reporting_observations:
+        from app.account_performance import stamp
+        from app.cross_session_valuation import historical_snapshots
+
+        last_observation = list(reporting_observations.values())[-1]
+        reporting_cutoff = stamp(last_observation["asOf"])
+        events = [e for e in events if stamp(e["occurred_at"]) <= reporting_cutoff]
+        fill_rows = [f for f in fill_rows if stamp(f["occurred_at"]) <= reporting_cutoff]
+        valuation_rows = [r for r in valuation_rows if stamp(r["as_of"]) <= reporting_cutoff]
+        snapshots = historical_snapshots(snapshots, last_observation, orders)
 
     mt5_currencies = {
         row["account_id"]: payload.get("accountRisk", {}).get("currency")
         for row in snapshots
         if (payload := json.loads(row["payload_json"])).get("venue") == "mt5"
     }
+    valuation_rates: dict[tuple[str, str], list[tuple[datetime, Decimal]]] = defaultdict(list)
+    for row in valuation_rows:
+        valuation_rates[(row["account_id"], str(row["currency"]).upper())].append(
+            (
+                datetime.fromisoformat(str(row["as_of"]).replace("Z", "+00:00")),
+                _amount(row["usd_rate"]),
+            )
+        )
+
+    def nearest_rate(account: str, currency: str, occurred_at: str | None) -> Decimal | None:
+        rows = valuation_rates.get((account, currency.upper()), [])
+        if not rows:
+            return None
+        target = (
+            datetime.fromisoformat(str(occurred_at).replace("Z", "+00:00"))
+            if occurred_at
+            else rows[-1][0]
+        )
+        return min(rows, key=lambda row: abs((row[0] - target).total_seconds()))[1]
+
+    def to_base(
+        account: str, currency: str, amount: Decimal, occurred_at: str | None
+    ) -> Decimal | None:
+        if currency.upper() == base_currency.upper():
+            return amount
+        foreign = nearest_rate(account, currency, occurred_at)
+        base = nearest_rate(account, base_currency, occurred_at)
+        if foreign is None or base is None or base <= ZERO:
+            return None
+        return amount * foreign / base
+
     orders = [dict(row) for row in orders if identities.canonical[row["id"]] == row["id"]]
     for order in orders:
         if order["account_id"] in mt5_currencies and mt5_currencies[order["account_id"]]:
@@ -755,7 +832,20 @@ def get_strategy_financials(
             # the instrument name does not turn a USDT cash account into USD.
             order["settle_currency"] = mt5_currencies[order["account_id"]]
     order_map = {row["id"]: row for row in orders}
+    for order in orders:
+        batch = execution_links.get(order["id"], {}).get("batchId")
+        order["execution_direction"] = batch_directions.get(batch, "")
+        order["opening_ticket"] = (
+            opening_tickets.get(batch) if order["account_id"] in mt5_currencies else None
+        )
     components: dict[tuple[str, str], dict[str, Any]] = {}
+    # Strategy P&L is kept separate from the account-wide equity curve.  A
+    # shared account can contain another strategy's positions, so reusing its
+    # daily equity deltas would attribute unrelated moves to this strategy.
+    daily_components: dict[str, dict[str, Decimal]] = defaultdict(
+        lambda: dict.fromkeys(FIELDS, ZERO)
+    )
+    daily_unconverted: set[str] = set()
     issues: set[str] = set()
     positions: dict[tuple[str, str, str], tuple[Decimal, Decimal | None]] = {}
     timeline = []
@@ -764,6 +854,7 @@ def get_strategy_financials(
     unattributed = []
     unassigned_candidates = []
     settlement_links: dict[str, dict[str, str]] = {}
+    unconverted_foreign: set[tuple[str, str]] = set()
 
     def component(account: str, currency: str) -> dict[str, Any]:
         key = (account, currency)
@@ -771,8 +862,64 @@ def get_strategy_financials(
             components[key] = _bucket(currency, account)
         return components[key]
 
+    def daily_add(
+        account: str,
+        currency: str,
+        field: str,
+        amount: Decimal,
+        occurred_at: str | None,
+    ) -> None:
+        if not occurred_at:
+            return
+        day = (
+            datetime.fromisoformat(str(occurred_at).replace("Z", "+00:00"))
+            .astimezone(UTC)
+            .date()
+            .isoformat()
+        )
+        if reporting_sessions is not None:
+            from app.cross_session_valuation import reporting_day
+
+            day = reporting_day(occurred_at, reporting_observations)
+            if day is None:
+                return
+        daily_components[day]
+        converted = (
+            amount
+            if currency.upper() == base_currency.upper()
+            else to_base(account, currency, amount, occurred_at)
+        )
+        if converted is None:
+            daily_unconverted.add(day)
+            return
+        daily_components[day][field] += converted
+
+    def add_component(
+        account: str,
+        currency: str,
+        field: str,
+        amount: Decimal,
+        occurred_at: str | None = None,
+        *,
+        daily: bool = True,
+    ) -> None:
+        component(account, currency)[field] += amount
+        if daily:
+            daily_add(account, currency, field, amount, occurred_at)
+        if currency.upper() == base_currency.upper():
+            return
+        converted = to_base(account, currency, amount, occurred_at)
+        if converted is None:
+            unconverted_foreign.add((account, currency.upper()))
+            return
+        component(account, base_currency)[field] += converted
+
     for event in events:
         payload = json.loads(event["payload_json"])
+        if event["source"] == "mt5_live" and event["event_type"] in {"fee", "swap"}:
+            native_order = payload.get("payload", {}).get("order")
+            if native_order and not payload.get("externalOrderId"):
+                payload["externalOrderId"] = str(native_order)
         try:
             order_id = identities.resolve(event["account_id"], payload)
         except VenueIdentityConflict:
@@ -782,13 +929,16 @@ def get_strategy_financials(
             if account_scope or order_id in order_map:
                 raw_fills[str(order_id)].append(payload)
             continue
-        assignments_for_event = assignments.get((
-            event["account_id"],
-            identities.instrument(event["account_id"], event["instrument_id"]),
-            event["source"],
-            event["external_id"],
-            event["event_type"],
-        ), [])
+        assignments_for_event = assignments.get(
+            (
+                event["account_id"],
+                identities.instrument(event["account_id"], event["instrument_id"]),
+                event["source"],
+                event["external_id"],
+                event["event_type"],
+            ),
+            [],
+        )
         assigned_owners = {row["strategy_instance_id"] for row in assignments_for_event}
         explicit = assigned_owners == {strategy_instance_id}
         owner = identities.rows[order_id]["strategy_instance_id"] if order_id else None
@@ -798,6 +948,7 @@ def get_strategy_financials(
             continue
         if not account_scope and len(assigned_owners) > 1:
             issues.add("conflicting_settlement_ownership")
+            payload["ownershipConflict"] = True
             unassigned_candidates.append(payload)
             continue
         if explicit:
@@ -808,6 +959,9 @@ def get_strategy_financials(
         if account_scope or order_id in order_map or explicit:
             economic.append((event, payload, order_id))
         elif orders and event["event_type"] in {"funding", "swap"}:
+            # A unique historical instrument user is not settlement ownership:
+            # the account may also contain manual or unsynchronized trades.
+            # Require order identity or explicit financial-fact attribution.
             unassigned_candidates.append(payload)
 
     enriched, execution_issues = select_management_executions(
@@ -815,35 +969,31 @@ def get_strategy_financials(
     )
     issues.update(execution_issues)
 
-    for event in unassigned_candidates:
-        # An unrelated symbol or settlement before/after this strategy's native
-        # exposure must not invalidate its funding totals merely by account.
-        at = datetime.fromisoformat(event["occurredAt"].replace("Z", "+00:00"))
-        exposure = sum(
-            (
-                _amount(fill["quantity"]) * (1 if fill["side"] == "buy" else -1)
-                for fill in enriched
-                if fill["account_id"] == event["accountId"]
-                and fill["instrument_id"] == identities.instrument(
-                    event["accountId"], event.get("instrumentId")
-                )
-                and datetime.fromisoformat(fill["occurred_at"].replace("Z", "+00:00")) <= at
-            ), ZERO,
-        )
-        if exposure:
-            unattributed.append(event)
-
-    for row in sorted(enriched, key=lambda value: value["occurred_at"]):
+    position_history = []
+    incomplete_days = {}
+    realized_receipts = {}
+    for event, payload, order_id in economic:
+        trade_id = payload.get("payload", {}).get("tradeId")
+        if event["event_type"] == "realized_pnl" and order_id and trade_id:
+            key = event["account_id"], order_id, str(trade_id)
+            realized_receipts[key] = realized_receipts.get(key, ZERO) + _amount(event["amount"])
+    for row in sorted(
+        enriched,
+        key=lambda value: datetime.fromisoformat(value["occurred_at"].replace("Z", "+00:00")),
+    ):
         order = order_map[row["order_id"]]
         account, instrument = row["account_id"], row["instrument_id"]
         native = row.get("native", {})
+        receipt_key = account, row["order_id"], str(native.get("externalFillId") or "")
+        if native.get("realizedPnl") is None and receipt_key in realized_receipts:
+            native = {**native, "realizedPnl": str(realized_receipts[receipt_key])}
         if order["settle_currency"] is None:
             # Monitor-only symbols need no trading specification. Keep their native
             # fees/realized receipts; never invent a multiplier or opening cost.
             if native.get("realizedPnl") is not None and native.get("currency"):
                 currency = str(native["currency"])
                 realized = _amount(native["realizedPnl"])
-                component(account, currency)["realizedPnl"] += realized
+                add_component(account, currency, "realizedPnl", realized, row["occurred_at"])
                 timeline.append(
                     {
                         "asOf": row["occurred_at"],
@@ -856,17 +1006,57 @@ def get_strategy_financials(
                 issues.add("opening_cost_basis_unavailable")
             continue
         currency = order["settle_currency"]
-        bucket = component(account, currency)
+        component(account, currency)
         quantity = _amount(row["quantity"])
-        position_id = str(native.get("positionId") or "")
+        position_id = str(native.get("positionId") or order.get("opening_ticket") or "")
         old, average = positions.get((account, instrument, position_id), (ZERO, None))
+        closing = native.get("entryType") in {1, 3} or order["execution_direction"].startswith(
+            "CLOSE_"
+        )
+        if closing and (old == ZERO or old * (1 if row["side"] == "buy" else -1) > ZERO):
+            # A close outside retained opening history cannot create the opposite position.
+            if native.get("realizedPnl") is not None:
+                add_component(
+                    account,
+                    currency,
+                    "realizedPnl",
+                    _amount(native["realizedPnl"]),
+                    row["occurred_at"],
+                )
+            else:
+                issues.add("opening_cost_basis_unavailable")
+            incomplete_days[
+                datetime.fromisoformat(row["occurred_at"].replace("Z", "+00:00"))
+                .astimezone(UTC)
+                .date()
+                .isoformat()
+            ] = "opening_cost_basis_unavailable"
+            continue
         new, average, realized = calculate_position_update(
             old_quantity=old,
             old_average=average,
             signed_fill=quantity if row["side"] == "buy" else -quantity,
             fill_price=_amount(row["price"]),
         )
+        if (
+            order["instrument_type"] == "crypto_spot"
+            and native.get("currency") == order["base_asset"]
+        ):
+            new -= _amount(native.get("fee"))
         positions[account, instrument, position_id] = (new, average)
+        position_history.append(
+            (
+                datetime.fromisoformat(row["occurred_at"].replace("Z", "+00:00")).astimezone(UTC),
+                dict(positions),
+            )
+        )
+        if not native:
+            incomplete_days[
+                datetime.fromisoformat(row["occurred_at"].replace("Z", "+00:00"))
+                .astimezone(UTC)
+                .date()
+                .isoformat()
+            ] = "fill_details_pending"
         if native.get("realizedPnl") is not None:
             realized = _amount(native["realizedPnl"])
         elif account_scope or (
@@ -880,7 +1070,7 @@ def get_strategy_financials(
                 issues.add("opening_cost_basis_unavailable")
         else:
             realized *= _amount(order["multiplier"])
-        bucket["realizedPnl"] += realized
+        add_component(account, currency, "realizedPnl", realized, row["occurred_at"])
         timeline.append(
             {
                 "asOf": row["occurred_at"],
@@ -890,6 +1080,44 @@ def get_strategy_financials(
             }
         )
 
+    for event in unassigned_candidates:
+        at = datetime.fromisoformat(event["occurredAt"].replace("Z", "+00:00")).astimezone(UTC)
+        state = next((state for time, state in reversed(position_history) if time <= at), {})
+        instrument = identities.instrument(event["accountId"], event.get("instrumentId"))
+        exposure = sum(
+            (
+                q
+                for (account, item, _), (q, _) in state.items()
+                if account == event["accountId"] and item == instrument
+            ),
+            ZERO,
+        )
+        raw = event.get("payload", {})
+        receipt_quantity = abs(_amount(raw.get("size")))
+        receipt_sign = 1 if str(raw.get("side")).lower() == "buy" else -1
+        # Venue settlement size proves the entire net position at this instant.
+        # Symbol history alone is not evidence, and a partial position cannot own all funding.
+        if (
+            event.get("eventType") == "funding"
+            and not event.get("ownershipConflict")
+            and receipt_quantity > ZERO
+            and exposure == receipt_quantity * receipt_sign
+        ):
+            source = next(
+                (
+                    row
+                    for row in events
+                    if row["external_id"] == event["externalEventId"]
+                    and row["account_id"] == event["accountId"]
+                ),
+                None,
+            )
+            if source is not None:
+                economic.append((source, event, None))
+                continue
+        if exposure:
+            unattributed.append(event)
+
     # Fees come from executions whenever available. Transaction-log fee/swap
     # records for those same deals are retained for audit, but never added twice.
     for order_id, fills in raw_fills.items():
@@ -898,14 +1126,24 @@ def get_strategy_financials(
             account, currency = fill["accountId"], str(fill.get("currency") or "UNKNOWN")
             if fill.get("fee") is None:
                 issues.add("fill_details_pending")
+                if fill.get("occurredAt"):
+                    day = (
+                        datetime.fromisoformat(fill["occurredAt"].replace("Z", "+00:00"))
+                        .astimezone(UTC)
+                        .date()
+                        .isoformat()
+                    )
+                    incomplete_days[day] = "fill_details_pending"
                 continue
             fee = _amount(fill.get("fee"))
             if currency == "UNKNOWN":
                 issues.add("fee_currency_unavailable")
-            component(account, currency)["fees"] += fee
+            add_component(account, currency, "fees", fee, fill.get("occurredAt"))
             if fill.get("swap") is not None:
                 settlement = (order["settle_currency"] if order else None) or currency
-                component(account, settlement)["swapPnl"] += _amount(fill["swap"])
+                add_component(
+                    account, settlement, "swapPnl", _amount(fill["swap"]), fill.get("occurredAt")
+                )
     for event, _payload, order_id in economic:
         kind = event["event_type"]
         if kind in {"fee", "swap"} and raw_fills.get(str(order_id)):
@@ -923,8 +1161,13 @@ def get_strategy_financials(
             "realized_pnl": "realizedPnl",
         }.get(kind)
         if field:
-            component(event["account_id"], event["currency"])[field] += (
-                -_amount(event["amount"]) if kind == "fee" else _amount(event["amount"])
+            amount = -_amount(event["amount"]) if kind == "fee" else _amount(event["amount"])
+            add_component(
+                event["account_id"],
+                event["currency"],
+                field,
+                amount,
+                event["occurred_at"],
             )
             if kind == "realized_pnl":
                 timeline.append(
@@ -938,6 +1181,7 @@ def get_strategy_financials(
 
     mark_rows: dict[tuple[str, str, str], dict[str, Any]] = {}
     coins_by_account: dict[str, dict[str, Any]] = {}
+    latest_snapshot_as_of: dict[str, str] = {}
     missing_marks: set[tuple[str, str]] = set()
     coverage = []
     for snapshot in snapshots:
@@ -945,7 +1189,7 @@ def get_strategy_financials(
         age = (
             datetime.now(UTC) - datetime.fromisoformat(snapshot["as_of"].replace("Z", "+00:00"))
         ).total_seconds()
-        if age > 90:
+        if age > 90 and reporting_sessions is None:
             issues.add("stale_account_snapshot")
         if payload.get("economicEventsQuality") != "complete":
             issues.add("economic_events_pending")
@@ -960,6 +1204,7 @@ def get_strategy_financials(
         coins_by_account[snapshot["account_id"]] = {
             row["currency"]: row for row in payload.get("balances", [])
         }
+        latest_snapshot_as_of[snapshot["account_id"]] = snapshot["as_of"]
         for position in payload.get("positions", []):
             position_id = (
                 str(position.get("externalPositionId") or "")
@@ -969,9 +1214,29 @@ def get_strategy_financials(
             key = snapshot["account_id"], position["instrumentId"], position_id
             mark_rows[key] = position
             if account_scope and position.get("unrealizedPnl") is not None:
-                component(key[0], str(position.get("currency") or base_currency))["tradingPnl"] += (
-                    _amount(position["unrealizedPnl"])
+                add_component(
+                    key[0],
+                    str(position.get("currency") or base_currency),
+                    "tradingPnl",
+                    _amount(position["unrealizedPnl"]),
+                    snapshot["as_of"],
                 )
+
+    if reporting_sessions is not None:
+        for account in mt5_currencies:
+            owned = {k for k, (q, _) in positions.items() if k[0] == account and q != ZERO}
+            observed = {
+                k
+                for k, m in mark_rows.items()
+                if k[0] == account and _amount(m.get("netQuantity")) != ZERO
+            }
+            if owned and (
+                owned != observed
+                or any(mark_rows[k].get("swap") is None for k in owned if k in mark_rows)
+            ):
+                issues.add("historical_carry_unavailable")
+                for k in observed:
+                    mark_rows[k].pop("swap", None)
 
     projected_positions = []
     for (account, instrument, position_id), (quantity, average) in positions.items():
@@ -1002,14 +1267,33 @@ def get_strategy_financials(
         )
         if (
             mark.get("unrealizedPnl") is not None
-            and position_id
+            and (position_id or reporting_sessions is not None)
             and quantity == _amount(mark.get("netQuantity"))
         ):
             unrealized = _amount(mark["unrealizedPnl"])
         elif price is not None and average is not None and not currency_differs:
             unrealized = quantity * (_amount(price) - average) * _amount(order["multiplier"])
         if unrealized is not None and not account_scope:
-            component(account, order["settle_currency"])["tradingPnl"] += unrealized
+            add_component(
+                account,
+                order["settle_currency"],
+                "tradingPnl",
+                unrealized,
+                mark.get("asOf") or latest_snapshot_as_of.get(account),
+            )
+            if (
+                position_id
+                and quantity == _amount(mark.get("netQuantity"))
+                and mark.get("swap") is not None
+            ):
+                add_component(
+                    account,
+                    order["settle_currency"],
+                    "swapPnl",
+                    _amount(mark["swap"]),
+                    latest_snapshot_as_of.get(account),
+                    daily=False,
+                )
         elif unrealized is None and not account_scope:
             issues.add("mark_price_unavailable")
             missing_marks.add((account, order["settle_currency"]))
@@ -1043,8 +1327,10 @@ def get_strategy_financials(
         for field in FIELDS:
             aggregate[field] += row[field]
     nonzero_foreign = any(
-        currency != base_currency and any(row[field] != 0 for field in FIELDS)
-        for currency, row in by_currency.items()
+        currency != base_currency
+        and any(row[field] != 0 for field in FIELDS)
+        and any((account, currency) in unconverted_foreign for account in accounts)
+        for (account, currency), row in components.items()
     )
     if nonzero_foreign:
         issues.add("historical_fx_unavailable")
@@ -1066,6 +1352,8 @@ def get_strategy_financials(
         totals["netPnl"] = None
     if "mark_price_unavailable" in issues:
         totals.update(tradingPnl=None, netPnl=None)
+    if "historical_carry_unavailable" in issues:
+        totals.update(swapPnl=None, netPnl=None)
     if unattributed:
         issues.add("unattributed_economic_events")
         if any(row.get("eventType") == "funding" for row in unattributed):
@@ -1097,11 +1385,79 @@ def get_strategy_financials(
             if any(event.get("eventType") == "swap" for event in unattributed):
                 row.update(swapPnl=None, netPnl=None)
     cumulative: dict[str, Decimal] = defaultdict(lambda: ZERO)
-    timeline.sort(key=lambda row: row["asOf"])
+    timeline.sort(key=lambda row: datetime.fromisoformat(row["asOf"].replace("Z", "+00:00")))
     for point in timeline:
         cumulative[point["currency"]] += _amount(point["realizedPnl"])
         point["realizedPnl"] = str(cumulative[point["currency"]])
     if "opening_cost_basis_unavailable" in issues:
+        timeline = []
+    strategy_daily_pnl = []
+    invalid_days = {day: "historical_fx_unavailable" for day in daily_unconverted}
+    for event in unattributed:
+        day = (
+            datetime.fromisoformat(event["occurredAt"].replace("Z", "+00:00"))
+            .astimezone(UTC)
+            .date()
+            .isoformat()
+        )
+        daily_components[day]
+        invalid_days[day] = "unattributed_economic_events"
+    from app.strategy_daily_valuation import daily_marks
+
+    marks, mark_reasons = (
+        daily_marks(
+            strategy_instance_id,
+            position_history,
+            orders,
+            events,
+            mark_rows,
+            to_base,
+            reporting_sessions=reporting_sessions,
+        )
+        if not account_scope
+        else ({}, {})
+    )
+    previous_mark = ZERO
+    for day, mark in sorted(marks.items()):
+        daily_components[day]["tradingPnl"] = ZERO
+        if mark_reasons.get(day) == "market_closed":
+            invalid_days[day] = "market_closed"
+            continue
+        if mark is None or previous_mark is None:
+            invalid_days[day] = mark_reasons.get(day, "missing_daily_baseline")
+        else:
+            daily_components[day]["tradingPnl"] = mark - previous_mark
+        previous_mark = mark
+    invalid_days.update(incomplete_days)
+    if "venue_order_identity_conflict" in issues:
+        invalid_days.update({day: "venue_order_identity_conflict" for day in daily_components})
+    if "economic_events_pending" in issues:
+        invalid_days.update({day: "economic_events_pending" for day in daily_components})
+    for day in sorted(daily_components):
+        values = daily_components[day]
+        net = (
+            values["realizedPnl"]
+            + values["tradingPnl"]
+            - values["fees"]
+            + values["fundingPnl"]
+            + values["swapPnl"]
+        )
+        strategy_daily_pnl.append(
+            {
+                "date": day,
+                "currency": base_currency,
+                "pnl": None if day in invalid_days else str(net),
+                "returnRate": None,
+                "equityOpen": None,
+                "equityClose": None,
+                "quality": invalid_days.get(day, "estimated" if day in marks else "complete"),
+            }
+        )
+    if reporting_sessions is not None and not reporting_observations:
+        totals = {**totals, **dict.fromkeys((*FIELDS, "netPnl"), None)}
+        issues.add("session_marks_unavailable")
+        currency_rows = []
+        by_account = []
         timeline = []
     return {
         **totals,
@@ -1127,7 +1483,16 @@ def get_strategy_financials(
             }
             for _, payload, order_id in economic
         ][-200:],
+        "strategyDailyPnl": strategy_daily_pnl[-400:],
         "scope": "account" if account_scope else "strategy",
+        "valuationPolicy": "mt5_open" if reporting_sessions is not None else "continuous",
+        "valuationAsOf": reporting_cutoff.isoformat() if reporting_cutoff else None,
+        "valuationMarketStatus": (reporting_sessions or {})
+        .get("latest", {})
+        .get("mt5", {})
+        .get("marketStatus")
+        if (reporting_sessions or {}).get("latest")
+        else None,
     }
 
 

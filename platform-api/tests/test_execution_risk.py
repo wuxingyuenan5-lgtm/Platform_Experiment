@@ -56,7 +56,7 @@ def batch_payload(idempotency_key: str) -> dict[str, object]:
         "idempotencyKey": idempotency_key,
         "strategyInstanceId": STRATEGY_INSTANCE_ID,
         "accountId": ACCOUNT_ID,
-        "strategyKey": "funding_arbitrage",
+        "strategyKey": "strategy_generic_pipeline_test",
         "direction": "collect",
         "legs": [
             {

@@ -42,11 +42,13 @@ export default defineComponent({
 
     onMounted(async () => {
       try {
-        const dashboard = await (props.dataDomain === 'commodity'
-          ? getCommodityDashboardV1
-          : props.dataDomain === 'crypto'
-          ? getCryptoDashboardV1
-          : getMacroDashboardV1)();
+        const loader =
+          props.dataDomain === 'commodity'
+            ? getCommodityDashboardV1
+            : props.dataDomain === 'crypto'
+            ? getCryptoDashboardV1
+            : getMacroDashboardV1;
+        const dashboard = await loader();
         const group = dashboard.groups[props.groupId] ?? [];
         series.value = props.preferredSeriesIds.length
           ? props.preferredSeriesIds

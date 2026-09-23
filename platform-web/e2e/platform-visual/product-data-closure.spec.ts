@@ -2,7 +2,8 @@ import { expect, test, type Page } from '@playwright/test';
 
 import { mockPlatformVisualRoutes } from './platformVisualFixtures';
 
-const FRONTEND_ORIGIN = 'http://127.0.0.1:4373';
+const FRONTEND_ORIGIN = process.env.PLATFORM_VISUAL_FRONTEND_ORIGIN;
+if (!FRONTEND_ORIGIN) throw new Error('Run with playwright.platform-visual.config.ts');
 
 function requiredEnvironment(name: string): string {
   const value = process.env[name]?.trim();

@@ -216,13 +216,17 @@ export async function getStrategyAccountSnapshot(
   strategyInstanceId: string,
   accountId?: string,
   signal?: AbortSignal,
+  options?: { includeDetails?: boolean },
 ): Promise<StrategyAccountSnapshotResult> {
   const response = await api.GET(
     '/api/v1/strategies/instances/{strategy_instance_id}/account-snapshot',
     {
       params: {
         path: { strategy_instance_id: strategyInstanceId },
-        query: accountId ? { accountId } : undefined,
+        query:
+          accountId || options?.includeDetails != null
+            ? { accountId, includeDetails: options?.includeDetails }
+            : undefined,
       },
       signal,
     },

@@ -1,9 +1,15 @@
 import { buildTradeRecords, recordTime } from './strategyTradeRecords';
-import { computed, ref } from 'vue';
+import { computed, onBeforeUnmount, ref } from 'vue';
 import { nativeAmount, settlementLabel } from './strategyRecordPresentation';
 
-import { getCrossSpreadSnapshot } from '@/api/platform/trading';
-import { getExecutionBatches, getFills, getOrders, getStrategyPnl } from '@/api/platform/trading';
+import {
+  getCrossSpreadSnapshot,
+  getExecutionBatches,
+  getFills,
+  getOrders,
+  getStrategyPnl,
+} from '@/api/platform/trading';
+import { fetchStrategyQuery } from '@/api/platform/strategyQueries';
 import type {
   ExecutionBatchResult,
   FillResult,
@@ -97,9 +103,15 @@ export function useCrossSpreadRecords() {
   const finance = ref<StrategyPnlResult | null>(null);
   const bybitPositions = ref<Array<Record<string, string>>>([]);
   const mt5Positions = ref<Array<Record<string, string>>>([]);
+  let disposed = false;
+  let refreshGeneration = 0;
 
   const tables = computed<Record<string, StrategyTableSection>>(() => {
-    const records = buildTradeRecords(orders.value, fills.value);
+    const records = buildTradeRecords(
+      orders.value,
+      fills.value,
+      finance.value?.economicEvents ?? [],
+    );
 
     return {
       positions: {
@@ -164,17 +176,24 @@ export function useCrossSpreadRecords() {
     };
   });
 
-  async function refresh() {
+  async function load() {
+    const generation = refreshGeneration;
+    if (disposed) return;
     loading.value = true;
     error.value = '';
     try {
       const [orderRows, fillRows, batchRows, snapshot, financials] = await Promise.all([
         getOrders(STRATEGY_INSTANCE_ID),
         getFills(STRATEGY_INSTANCE_ID),
-        getExecutionBatches(STRATEGY_INSTANCE_ID),
-        getCrossSpreadSnapshot(),
-        getStrategyPnl(STRATEGY_INSTANCE_ID),
+        fetchStrategyQuery(['cross-spread', 'execution-batches', STRATEGY_INSTANCE_ID], () =>
+          getExecutionBatches(STRATEGY_INSTANCE_ID),
+        ),
+        fetchStrategyQuery(['cross-spread', 'snapshot'], () => getCrossSpreadSnapshot()),
+        fetchStrategyQuery(['cross-spread', 'pnl', STRATEGY_INSTANCE_ID], () =>
+          getStrategyPnl(STRATEGY_INSTANCE_ID),
+        ),
       ]);
+      if (disposed || generation !== refreshGeneration) return;
       orders.value = orderRows;
       fills.value = fillRows;
       batches.value = batchRows.filter((batch) => batch.strategyKey === 'cross_venue_spread');
@@ -200,14 +219,26 @@ export function useCrossSpreadRecords() {
       bybitPositions.value = rows('bybit');
       mt5Positions.value = rows('mt5');
     } catch (caught: unknown) {
-      error.value =
-        typeof caught === 'object' && caught !== null
-          ? (caught as { message?: string }).message ?? '订单数据加载失败'
-          : '订单数据加载失败';
+      if (!disposed && generation === refreshGeneration)
+        error.value =
+          typeof caught === 'object' && caught !== null
+            ? (caught as { message?: string }).message ?? '订单数据加载失败'
+            : '订单数据加载失败';
     } finally {
-      loading.value = false;
+      if (!disposed && generation === refreshGeneration) loading.value = false;
     }
   }
+
+  function refresh(): Promise<void> {
+    if (disposed) return Promise.resolve();
+    refreshGeneration += 1;
+    return load();
+  }
+
+  onBeforeUnmount(() => {
+    disposed = true;
+    refreshGeneration += 1;
+  });
 
   return {
     loading,

@@ -31,6 +31,8 @@ from app.research_watchlist_routes import router as research_watchlist_router
 from app.schema_governance import router as schema_governance_router
 from app.security_ops_routes import create_security_ops_router
 from app.strategies import funding_runner
+from app.strategy_research_ingest import lifespan as strategy_research_lifespan
+from app.strategy_research_routes import router as strategy_research_router
 from app.system_routes import create_system_router
 from app.trade_commands import create_trade_command
 from app.trading_routes import create_trading_router
@@ -41,28 +43,48 @@ from app.user_cache_control import UserNoStoreMiddleware
 from app.user_routes import router as user_router
 from app.venue_reconciliation_routes import router as venue_reconciliation_router
 
-PLATFORM_VERSION = "0.11.2"
+PLATFORM_VERSION = "0.11.3"
 
 configure_trade_command_port(create_trade_command)
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
+    from app.account_history_sync import run_history_sync_monitor
+
     initialize_database()
     stop = asyncio.Event()
     runner = asyncio.create_task(funding_runner.run_funding_instruction_monitor(stop))
     snapshot_monitor = asyncio.create_task(live_venue_snapshot_sync.run_snapshot_sync_monitor())
+    history_monitor = asyncio.create_task(run_history_sync_monitor())
+    from app.strategy_management_projection import run_management_projection_monitor
+
+    management_monitor = asyncio.create_task(run_management_projection_monitor())
     try:
-        async with research_lifespan(_), research_overseas_lifespan(_):
+        async with (
+            research_lifespan(_),
+            research_overseas_lifespan(_),
+            strategy_research_lifespan(_),
+        ):
             yield
     finally:
         stop.set()
         snapshot_monitor.cancel()
+        history_monitor.cancel()
+        management_monitor.cancel()
+        try:
+            await management_monitor
+        except asyncio.CancelledError:
+            pass
         try:
             await runner
         finally:
             try:
                 await snapshot_monitor
+            except asyncio.CancelledError:
+                pass
+            try:
+                await history_monitor
             except asyncio.CancelledError:
                 pass
             runtime_transport.close()
@@ -104,6 +126,7 @@ def create_application() -> FastAPI:
     application.include_router(cross_spread_exit_router)
     application.include_router(cross_spread_observability_router)
     application.include_router(research_router)
+    application.include_router(strategy_research_router)
     application.include_router(research_watchlist_router)
     application.include_router(user_router)
     application.include_router(user_avatar_router)

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from copy import deepcopy
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -9,7 +10,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.config import get_settings
-from app.database import connection
+from app.database import connection, initialize_database
 from app.live_venue_snapshot_sync import (
     _persist_fills,
     discover_live_accounts,
@@ -76,8 +77,7 @@ def base_snapshot(account_id: str) -> dict[str, object]:
 
 def bootstrap(tmp_path: Path) -> None:
     get_settings().database_path = str(tmp_path / "live-venue-sync.db")
-    with TestClient(app):
-        pass
+    initialize_database()
 
 
 def activate_legacy_monitor_fixture() -> None:
@@ -650,3 +650,134 @@ def test_sync_persists_unmapped_mt5_monitoring_identity_without_duplicates(
         "net_quantity": "0.01",
     }
     assert fill_count == 1
+
+
+def test_current_only_sync_skips_history_persistence_and_keeps_existing_history(
+    monkeypatch, tmp_path: Path
+) -> None:
+    bootstrap(tmp_path)
+    account = "bybit-live-main"
+    historical = base_snapshot(account)
+    historical["orders"] = [
+        {
+            "platformOrderId": "history-order-1",
+            "externalOrderId": "history-external-1",
+            "accountId": account,
+            "instrumentId": "instrument_btc_usdt",
+            "symbol": "BTCUSDT",
+            "side": "buy",
+            "orderType": "limit",
+            "quantity": "1",
+            "price": "100",
+            "status": "filled",
+            "occurredAt": historical["asOf"],
+            "asOf": historical["asOf"],
+        }
+    ]
+    historical["fills"] = [
+        {
+            "externalFillId": "history-fill-1",
+            "externalOrderId": "history-external-1",
+            "platformOrderId": "history-order-1",
+            "instrumentId": "instrument_btc_usdt",
+            "symbol": "BTCUSDT",
+            "side": "buy",
+            "quantity": "1",
+            "price": "100",
+            "occurredAt": historical["asOf"],
+        }
+    ]
+    monkeypatch.setattr(
+        "app.live_venue_snapshot_sync.runtime_get",
+        lambda path, params=None: StubResponse(historical),
+    )
+    monkeypatch.setattr(
+        "app.live_venue_snapshot_sync._sync_account_finance", lambda account_id: None
+    )
+    sync_venue_snapshots(account)
+
+    current = base_snapshot(account)
+    current["asOf"] = "2026-09-15T00:00:00+00:00"
+    current["balances"][0]["asOf"] = current["asOf"]
+    current["balances"][0]["equity"] = "1200"
+    current["accountRisk"]["asOf"] = current["asOf"]
+    current["accountRisk"]["equity"] = "1200"
+    current["orders"] = [{**historical["orders"][0], "externalOrderId": "new-order"}]
+    current["fills"] = [{**historical["fills"][0], "externalFillId": "new-fill"}]
+    monkeypatch.setattr(
+        "app.live_venue_snapshot_sync.runtime_get",
+        lambda path, params=None: StubResponse(current),
+    )
+    result = sync_venue_snapshots(account, include_history=False)
+
+    assert result.order_rows == 0
+    assert result.fill_rows == 0
+    with connection() as db:
+        counts = db.execute(
+            "SELECT (SELECT COUNT(*) FROM orders WHERE account_id=?) AS orders, "
+            "(SELECT COUNT(*) FROM fills WHERE account_id=?) AS fills",
+            (account, account),
+        ).fetchone()
+        payload = db.execute(
+            "SELECT payload_json FROM account_venue_snapshots WHERE account_id=?", (account,)
+        ).fetchone()[0]
+    assert dict(counts) == {"orders": 1, "fills": 1}
+    assert json.loads(payload)["orders"][0]["externalOrderId"] == "history-external-1"
+
+
+def test_history_refresh_preserves_newer_current_balance_positions_and_as_of(
+    monkeypatch, tmp_path: Path
+) -> None:
+    bootstrap(tmp_path)
+    account = "bybit-live-main"
+    current = base_snapshot(account)
+    current["asOf"] = "2026-09-15T00:00:00+00:00"
+    current["balances"][0]["asOf"] = current["asOf"]
+    current["balances"][0]["equity"] = "1500"
+    current["accountRisk"]["asOf"] = current["asOf"]
+    current["accountRisk"]["equity"] = "1500"
+    current["positions"] = [
+        {
+            "accountId": account,
+            "instrumentId": "instrument_btc_usdt",
+            "netQuantity": "2",
+            "averagePrice": "100",
+            "asOf": current["asOf"],
+        }
+    ]
+    monkeypatch.setattr(
+        "app.live_venue_snapshot_sync.runtime_get",
+        lambda path, params=None: StubResponse(current),
+    )
+    monkeypatch.setattr(
+        "app.live_venue_snapshot_sync._sync_account_finance", lambda account_id: None
+    )
+    sync_venue_snapshots(account)
+
+    historical = base_snapshot(account)
+    historical["asOf"] = "2026-09-14T00:00:00+00:00"
+    historical["orders"] = []
+    historical["fills"] = []
+    monkeypatch.setattr(
+        "app.account_history_sync.runtime_get",
+        lambda path, params=None: StubResponse(historical),
+    )
+    monkeypatch.setattr("app.account_history_sync._sync_account_finance", lambda account_id: None)
+    from app.account_history_sync import sync_account_history
+
+    sync_account_history(account)
+
+    with connection() as db:
+        snapshot = db.execute(
+            "SELECT as_of, payload_json FROM account_venue_snapshots WHERE account_id=?",
+            (account,),
+        ).fetchone()
+        position = db.execute(
+            "SELECT net_quantity FROM positions WHERE account_id=? AND instrument_id=?",
+            (account, "instrument_btc_usdt"),
+        ).fetchone()
+    payload = json.loads(snapshot["payload_json"])
+    assert snapshot["as_of"] == current["asOf"]
+    assert payload["balances"][0]["equity"] == "1500"
+    assert payload["positions"][0]["netQuantity"] == "2"
+    assert position["net_quantity"] == "2"

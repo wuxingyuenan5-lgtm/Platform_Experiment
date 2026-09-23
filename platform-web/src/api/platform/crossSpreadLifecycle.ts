@@ -32,7 +32,7 @@ export async function setCrossSpreadLeverage(leverage: string): Promise<CrossSpr
 
 export type CrossSpreadDirection = 'LONG_SPREAD' | 'SHORT_SPREAD';
 export type CrossSpreadExecutionMode = 'market' | 'limit';
-export type CrossSpreadLimitStrategy = 'fok' | 'post_only_chase';
+export type CrossSpreadLimitStrategy = 'fok' | 'post_only_chase' | 'market';
 export type CrossSpreadSyntheticAction =
   | 'OPEN_LONG_SPREAD'
   | 'CLOSE_LONG_SPREAD'
@@ -66,7 +66,10 @@ export type CrossSpreadMarketOpenResult = components['schemas']['CrossSpreadOpen
 
 export type CrossSpreadMarketCloseResult = components['schemas']['CrossSpreadCloseResult'];
 
-export type CrossSpreadMarketCloseInput = components['schemas']['CrossSpreadMarketCloseRequest'];
+export type CrossSpreadMarketCloseInput = Omit<
+  components['schemas']['CrossSpreadMarketCloseRequest'],
+  'maxAdverseSpread'
+> & { maxAdverseSpread?: string };
 
 export type CrossSpreadExitPlanThresholdUpdateInput =
   components['schemas']['CrossSpreadExitPlanUpdateRequest'];
@@ -144,6 +147,7 @@ export async function closeCrossSpreadMarket(
       ...(input.idempotencyKey ? { idempotencyKey: input.idempotencyKey } : {}),
       ...(input.quantityOz === undefined ? {} : { quantityOz: input.quantityOz }),
       ...(input.limitSpread === undefined ? {} : { limitSpread: input.limitSpread }),
+      maxAdverseSpread: input.maxAdverseSpread ?? '0',
     },
   });
   return strategyData(response);

@@ -65,7 +65,14 @@ const macroSectionOrder = [
 
 const researchSectionOrder: Partial<Record<HedgeCategory, readonly string[]>> = {
   macro: macroSectionOrder,
-  gold: ['gold-market', 'gold-main', 'gold-flows', 'gold-rates', 'gold-browser-toolbox'],
+  gold: [
+    'gold-market',
+    'gold-main',
+    'gold-flows',
+    'gold-cftc',
+    'gold-rates',
+    'gold-browser-toolbox',
+  ],
   crypto: [
     'crypto-market',
     'crypto-main',
@@ -91,7 +98,7 @@ const widgetSourceLinks: Partial<Record<string, string>> = {
   'macro-fed-balance-structure':
     'https://sc.macromicro.me/collections/4238/us-federal/1320/us-fed-liabilities-structure',
   'macro-fedwatch': 'https://www.cmegroup.com/markets/interest-rates/cme-fedwatch-tool.html',
-  'macro-polymarket-fed': 'https://polymarket.com/zh/event/fed-decision-in-september-762',
+  'macro-polymarket-fed': 'https://polymarket.com/zh/event/another-fed-rate-hike-in-2026',
   'macro-inflation-nowcast':
     'https://www.clevelandfed.org/indicators-and-data/inflation-nowcasting',
   'macro-inflation-expectations': 'https://www.newyorkfed.org/microeconomics/sce#/inflexp-1',

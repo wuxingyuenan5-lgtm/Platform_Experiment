@@ -52,6 +52,8 @@ Query Failure 与空集合不同，不得以零值掩盖错误。
 
 ### Local Prometheus metrics
 
+For the approved local stability observation, `scripts/collect-strategy-stability.py` takes one sample of existing loopback health/metrics, read-only SQLite status counts and native Windows process resources. It appends JSONL evidence in the existing operator evidence directory; scheduling belongs to the current Codex task automation. It is not another daemon, trading-state database, venue client or alert-disposition owner. Hourly samples can show drift, restarts and observed failures but cannot prove absence of short failures between samples; use existing service logs alongside them, and retain version changes and missing intervals as acceptance limitations.
+
 `prometheus-client==0.26.0` instruments existing processes. Platform serves `GET /api/v1/ops/metrics` under the existing authenticated `audit:read` permission. Runtime serves `GET /metrics` only to loopback clients (`127.0.0.1`/`::1`). These are exports, not an installed Prometheus server, Grafana deployment or new authentication system; remote collection and service installation require a separate deployment decision.
 
 | Metric family | Evidence and interpretation |

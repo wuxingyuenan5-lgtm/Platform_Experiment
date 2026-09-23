@@ -117,6 +117,8 @@ Shared responsibilities now have explicit owners:
 
 vn.py's active/passive-leg and frozen-close concepts, Hummingbot's duplicate/late-event handling and Freqtrade/LEAN's research reproducibility rules remain references for behavior and acceptance. They do not add strategy plugins, default risk thresholds, new signals or new venue authorization. QuantStats remains downstream of a verified return series; detailed PnL attribution and historical identity reconciliation are not replaced by a statistics library.
 
+The Owner requested reassessment on 2026-09-15 after recurring strategy-management instability and identified the 2026-09-08 V2 strategy/architecture report as historical reference, not an implementation authority. The report itself and subsequent changes must both be evaluated against current requirements, call paths and reproduced failures; divergence from the report alone is not a defect. The Nautilus precision probe supports rejecting the tested candidate configuration, not a conclusion that the custom kernel is more reliable than maintained alternatives. Reassessment must compare the actual Bybit/MT5 order, partial-fill, cancel/fill race and restart/reconciliation contract against version-pinned candidate code. Browser session handling, account read cost and local release serving remain separate responsibilities and cannot be validated by an OMS comparison. No replacement engine has been selected by this reassessment; findings and unresolved scenarios remain in the existing strategy workstream.
+
 Hedge Board keeps the TradingView popup and current market-detail sparklines. The platform-owned production/analysis path runs alongside them; its logical design and current dataset mapping belong solely to [Research Data](../contracts/RESEARCH_DATA.md).
 
 ## Convergence rules
@@ -126,3 +128,8 @@ Hedge Board keeps the TradingView popup and current market-detail sparklines. Th
 - SQLite remains the current local Platform database.
 - Public contracts and persistent semantics change only through an explicit compatibility decision.
 - Production topology and venue activation require external evidence and are never inferred from repository content.
+
+
+## Pretrade strategy observation boundary
+
+Strategy research uses the same three deployable units. Runtime owns native public Bybit capture and fixed-account MT5 Tick access, recoverable spool and versioned read-only batch export. Platform owns archival Parquet, short SQLite manifest/cursor transactions, background experiment workers and authenticated research APIs. Web renders those APIs and can transfer user-owned parameters to existing execution forms. No queue service, microservice, second ledger or execution kernel is added. Research caches/results cannot become execution prices, fills or risk authority. Detailed temporal, statistical and numeric semantics belong only to [Research Data](../contracts/RESEARCH_DATA.md#strategy-pretrade-research-v1); persistence belongs to the [database guide](../database/README.md#strategy-research-schema-version-30).

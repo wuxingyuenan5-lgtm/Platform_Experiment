@@ -29,6 +29,7 @@ class FundingOpenSizingResponse(BaseModel):
     expectedSpotNetQuantity: Decimal | None
     perpetualQuantity: Decimal | None
     roundingResidualQuantity: Decimal | None
+    estimatedNotional: Decimal | None
     valid: bool
     reason: str | None
 
@@ -45,6 +46,7 @@ class FundingExecutionContextResponse(BaseModel):
     fundingRate: Decimal | None
     nextFundingTime: str | None
     basis: Decimal | None
+    executableSpread: dict[str, Decimal | None]
     tickSize: dict[str, Decimal]
     quantityStep: dict[str, Decimal]
     minimumQuantity: dict[str, Decimal]
@@ -68,6 +70,7 @@ class FundingWorkspaceResponse(BaseModel):
 
 
 class FundingPositionGroupResponse(BaseModel):
+    roundingBalanced: bool = False
     model_config = ConfigDict(allow_inf_nan=False)
     isAbnormal: bool = False
     abnormalReason: str | None = None

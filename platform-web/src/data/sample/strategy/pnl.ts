@@ -11,20 +11,22 @@ export interface StrategyPnlAttributionItem {
 
 export interface StrategyPnlProfile {
   curveKind?: 'nav' | 'realized';
+  curveBarLabel?: string;
+  curveLineLabel?: string;
   curveCurrency?: string;
   timestamps?: string[];
   title: string;
   totalFund: string;
   period: string;
   xLabels: string[];
-  dailyReturns: number[];
-  netValues: number[];
+  dailyReturns: (number | null)[];
+  netValues: (number | null)[];
   metrics: StrategyPnlAttributionItem[];
   attributions: StrategyPnlAttributionItem[];
   breakdownSeries: Array<{
     name: string;
     color: string;
-    data: number[];
+    data: (number | null)[];
   }>;
   legSnapshots?: Array<{
     title: string;

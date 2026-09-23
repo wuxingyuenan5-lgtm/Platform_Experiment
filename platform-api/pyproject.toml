@@ -4,10 +4,11 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "variable-global-platform-api"
-version = "0.11.2"
+version = "0.11.3"
 description = "Platform API modular monolith"
 requires-python = ">=3.12"
 dependencies = [
+  "pyarrow>=20,<24",
   "akshare>=1.18.64,<2.0",
   "argon2-cffi>=25.1,<26.0",
   "fastapi>=0.116,<1.0",
@@ -103,6 +104,7 @@ include = [
   "app/research_provider_stock_datacenter.py",
   "app/research_provider_stock_http.py",
   "app/research_providers.py",
+  "app/research_cumulative_volatility.py",
   "app/research_routes.py",
   "app/research_service.py",
   "app/runtime_contracts.py",

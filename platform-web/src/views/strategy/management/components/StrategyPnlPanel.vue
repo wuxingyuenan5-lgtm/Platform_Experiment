@@ -43,7 +43,7 @@
               <span></span>
               {{
                 profile.curveKind === 'realized'
-                  ? `已实现损益 ${profile.curveCurrency || ''}`
+                  ? `${profile.curveLineLabel || '已实现损益'} ${profile.curveCurrency || ''}`
                   : '净值曲线'
               }}
             </button>
@@ -287,7 +287,7 @@
   }
 
   async function renderDistributionChart() {
-      const distribution = positionDistribution.value;
+    const distribution = positionDistribution.value;
     if (!distribution.slices.length) return;
     await setDistributionOptions({
       tooltip: {
@@ -368,13 +368,19 @@
       yAxis: [
         {
           type: 'value',
-          name: profile.value.curveKind === 'realized' ? '' : '日度收益',
+          name:
+            profile.value.curveKind === 'realized'
+              ? profile.value.curveBarLabel || '每日盈亏'
+              : '日度收益',
           splitLine: { lineStyle: { color: 'rgba(132, 148, 168, 0.18)', type: 'dashed' } },
           axisLabel: { color: '#8392aa' },
         },
         {
           type: 'value',
-          name: profile.value.curveKind === 'realized' ? '已实现损益' : '净值',
+          name:
+            profile.value.curveKind === 'realized'
+              ? profile.value.curveLineLabel || '已实现损益'
+              : '净值',
           position: 'right',
           scale: true,
           splitLine: { show: false },
@@ -406,11 +412,15 @@
           data: profile.value.dailyReturns,
         },
         {
-          name: profile.value.curveKind === 'realized' ? '已实现损益' : '净值曲线',
+          name:
+            profile.value.curveKind === 'realized'
+              ? profile.value.curveLineLabel || '已实现损益'
+              : '净值曲线',
           type: 'line',
           yAxisIndex: 1,
           smooth: profile.value.curveKind !== 'realized',
           step: profile.value.curveKind === 'realized' ? 'end' : false,
+          connectNulls: false,
           symbol: 'none',
           lineStyle: { width: 2.8, color: '#5aa7ef' },
           areaStyle: { color: 'rgba(90, 167, 239, 0.08)' },
@@ -437,7 +447,7 @@
     const series = profile.value.breakdownSeries.map((item, index) => ({
       name: item.name,
       color: palette[index % palette.length],
-      data: item.data,
+      data: item.data.map((value) => value ?? '-'),
     }));
     await setBreakdownOptions({
       color: series.map((item) => item.color),
@@ -730,8 +740,8 @@
   }
 
   .position-distribution-card.is-embedded {
-    padding: 0;
     margin-top: 16px;
+    padding: 0;
     border: none;
     background: transparent;
     box-shadow: none;
@@ -745,21 +755,21 @@
   .position-distribution-header h3 {
     display: inline-flex;
     align-items: center;
-    gap: 10px;
     margin: 0;
     color: var(--strategy-text-1);
     font-size: 20px;
-    line-height: 1.2;
     font-weight: 900;
     letter-spacing: 0.02em;
+    line-height: 1.2;
+    gap: 10px;
   }
 
   .position-distribution-header h3::before {
+    content: '';
     width: 4px;
     height: 18px;
     border-radius: 999px;
     background: linear-gradient(180deg, var(--strategy-accent), var(--strategy-accent-strong));
-    content: '';
   }
 
   .position-distribution-meta {
@@ -799,11 +809,7 @@
     padding: 12px;
     border: 1px solid var(--strategy-border-soft);
     border-radius: var(--strategy-radius-card);
-    background: linear-gradient(
-      180deg,
-      rgba(250, 253, 255, 0.9),
-      rgba(243, 248, 255, 0.45)
-    );
+    background: linear-gradient(180deg, rgb(250 253 255 / 90%), rgb(243 248 255 / 45%));
   }
 
   .position-distribution-legend ul {
@@ -853,11 +859,11 @@
   }
 
   .legend-name {
-    color: var(--strategy-text-2);
+    min-width: 0;
     overflow: hidden;
+    color: var(--strategy-text-2);
     text-overflow: ellipsis;
     white-space: nowrap;
-    min-width: 0;
   }
 
   .legend-amount {

@@ -139,8 +139,11 @@
                 <label v-if="takeProfitExecutionMode === 'limit'">
                   止盈限价策略
                   <select v-model="takeProfitLimitStrategy">
-                    <option value="fok">FOK 全成全撤</option>
-                    <option value="post_only_chase">PostOnly Chase</option>
+                    <option v-if="takeProfitLimitStrategy === 'fok'" value="fok"
+                      >FOK（原设置）</option
+                    >
+                    <option value="market">触发后市价</option>
+                    <option value="post_only_chase">追逐限价</option>
                   </select>
                 </label>
                 <label>
@@ -153,9 +156,37 @@
                 <label v-if="stopLossExecutionMode === 'limit'">
                   止损限价策略
                   <select v-model="stopLossLimitStrategy">
-                    <option value="fok">FOK 全成全撤</option>
-                    <option value="post_only_chase">PostOnly Chase</option>
+                    <option v-if="stopLossLimitStrategy === 'fok'" value="fok"
+                      >FOK（原设置）</option
+                    >
+                    <option value="market">触发后市价</option>
+                    <option value="post_only_chase">追逐限价</option>
                   </select>
+                </label>
+                <label
+                  v-if="
+                    takeProfitExecutionMode === 'limit' &&
+                    takeProfitLimitStrategy === 'post_only_chase'
+                  "
+                >
+                  止盈允许不利偏移
+                  <input
+                    v-model.trim="takeProfitAdverseInput"
+                    inputmode="decimal"
+                    aria-label="止盈允许不利偏移（USDT/盎司）"
+                  />
+                </label>
+                <label
+                  v-if="
+                    stopLossExecutionMode === 'limit' && stopLossLimitStrategy === 'post_only_chase'
+                  "
+                >
+                  止损允许不利偏移
+                  <input
+                    v-model.trim="stopLossAdverseInput"
+                    inputmode="decimal"
+                    aria-label="止损允许不利偏移（USDT/盎司）"
+                  />
                 </label>
                 <span class="exit-threshold-editor__hint">
                   触发时针对该计划当前剩余
@@ -202,6 +233,8 @@
   const editingPlanId = ref<string | null>(null);
   const takeProfitInput = ref('');
   const stopLossInput = ref('');
+  const takeProfitAdverseInput = ref('0');
+  const stopLossAdverseInput = ref('0');
   const takeProfitExecutionMode = ref<CrossSpreadExecutionMode>('market');
   const stopLossExecutionMode = ref<CrossSpreadExecutionMode>('market');
   const takeProfitLimitStrategy = ref<CrossSpreadLimitStrategy>('fok');
@@ -218,6 +251,8 @@
     editingPlanId.value = row.exitPlanId;
     takeProfitInput.value = editableValue(row.takeProfit);
     stopLossInput.value = editableValue(row.stopLoss);
+    takeProfitAdverseInput.value = String(row.takeProfitMaxAdverseSpread ?? 0);
+    stopLossAdverseInput.value = String(row.stopLossMaxAdverseSpread ?? 0);
     takeProfitExecutionMode.value = row.takeProfitExecutionMode || 'market';
     stopLossExecutionMode.value = row.stopLossExecutionMode || 'market';
     takeProfitLimitStrategy.value = row.takeProfitLimitStrategy || 'fok';
@@ -245,7 +280,17 @@
     const takeProfitSpread = validThreshold(takeProfitInput.value);
     const stopLossSpread = validThreshold(stopLossInput.value);
     if (takeProfitSpread === null || stopLossSpread === null) return;
+    if (
+      [takeProfitAdverseInput.value, stopLossAdverseInput.value].some(
+        (value) => !value || !Number.isFinite(Number(value)) || Number(value) < 0,
+      )
+    ) {
+      saveError.value = '允许不利偏移须为非负数（USDT/盎司）';
+      return;
+    }
     const update: CrossSpreadExitPlanThresholdUpdateInput = {
+      takeProfitMaxAdverseSpread: takeProfitAdverseInput.value,
+      stopLossMaxAdverseSpread: stopLossAdverseInput.value,
       ...(takeProfitSpread === undefined ? {} : { takeProfitSpread }),
       ...(stopLossSpread === undefined ? {} : { stopLossSpread }),
       takeProfitExecutionMode: takeProfitExecutionMode.value,
@@ -485,10 +530,10 @@
     padding: 0;
     border: 0;
     border-bottom: 1px dashed #7f8fa7;
-    color: inherit;
     background: transparent;
-    cursor: pointer;
+    color: inherit;
     font: inherit;
+    cursor: pointer;
   }
 
   .exit-threshold-button:hover {
@@ -503,8 +548,8 @@
 
   .exit-threshold-editor {
     display: flex;
-    align-items: center;
     flex-wrap: wrap;
+    align-items: center;
     gap: 10px;
   }
 
@@ -520,8 +565,8 @@
     padding: 5px 7px;
     border: 1px solid #cbd8ea;
     border-radius: 6px;
-    color: #22324d;
     background: #fff;
+    color: #22324d;
     font: inherit;
   }
 
@@ -529,8 +574,8 @@
     padding: 5px 7px;
     border: 1px solid #cbd8ea;
     border-radius: 6px;
-    color: #22324d;
     background: #fff;
+    color: #22324d;
     font: inherit;
   }
 
@@ -555,19 +600,19 @@
 
   .exit-threshold-editor__cancel {
     border: 1px solid #cbd8ea;
-    color: #52647d;
     background: #fff;
+    color: #52647d;
   }
 
   .exit-threshold-editor__save {
     border: 1px solid #276ef1;
-    color: #fff;
     background: #276ef1;
+    color: #fff;
   }
 
   .exit-threshold-editor__save:disabled {
-    cursor: wait;
     opacity: 0.7;
+    cursor: wait;
   }
 
   .overview-table th {

@@ -49,6 +49,8 @@ def isolated_settings(monkeypatch, tmp_path):
         monkeypatch.setattr(settings, name, getattr(settings, name))
     settings.runtime_base_url = "http://127.0.0.1:1"
     settings.database_path = str(tmp_path / "platform.db")
+    settings.strategy_research_enabled = False
+    settings.strategy_research_path = str(tmp_path / "strategy-research")
 
 
 @pytest.fixture(autouse=True)
@@ -123,6 +125,29 @@ def generic_trading_instance(monkeypatch, request):
                     db.execute(
                         "SELECT * FROM strategy_instances WHERE id=?", (original,)
                     ).fetchone()
+                )
+                # A new instance ID does not change strategy authority. Generic
+                # pipeline tests need a genuinely separate strategy definition,
+                # not a renamed Cross/Funding instance that bypasses the gate.
+                definition = dict(db.execute(
+                    "SELECT * FROM strategy_definitions WHERE id=?",
+                    (values["strategy_definition_id"],),
+                ).fetchone())
+                definition.update(id=target + "_definition", strategy_key=target)
+                db.execute(
+                    f"INSERT OR IGNORE INTO strategy_definitions ({','.join(definition)}) "
+                    f"VALUES ({','.join('?' for _ in definition)})", tuple(definition.values()),
+                )
+                version = dict(db.execute(
+                    "SELECT * FROM strategy_versions WHERE id=?", (values["strategy_version_id"],),
+                ).fetchone())
+                version.update(id=target + "_version", strategy_definition_id=definition["id"])
+                db.execute(
+                    f"INSERT OR IGNORE INTO strategy_versions ({','.join(version)}) "
+                    f"VALUES ({','.join('?' for _ in version)})", tuple(version.values()),
+                )
+                values.update(
+                    strategy_definition_id=definition["id"], strategy_version_id=version["id"]
                 )
                 values.update(id=target, status="active", trading_mode="simulation")
                 db.execute(

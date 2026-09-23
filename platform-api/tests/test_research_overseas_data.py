@@ -84,6 +84,121 @@ def test_provider_declares_its_http_client_as_a_direct_dependency() -> None:
 
 
 @pytest.mark.unit
+def test_farside_reader_markdown_parser_keeps_signed_flows_and_total() -> None:
+    markdown = """
+    |  | IBIT | FBTC | Total |
+    | --- | --- | --- | --- |
+    | 17 Sep 2026 | 183.7 | (16.6) | 167.1 |
+    | 18 Sep 2026 | 108.4 | 310.7 | 419.1 |
+    """
+
+    tickers, rows = provider._parse_farside_btc_markdown(markdown)
+
+    assert tickers[-1] == "Total"
+    assert rows == [
+        ["17 Sep 2026", "183.7", "(16.6)", "167.1"],
+        ["18 Sep 2026", "108.4", "310.7", "419.1"],
+    ]
+
+
+@pytest.mark.unit
+def test_farside_all_data_reader_parser_handles_split_cells() -> None:
+    """BTC all-data Reader 输出的逐单元格文本仍应还原为完整日行。"""
+    markdown = """
+Date
+IBIT
+FBTC
+Total
+11 Jan 2024
+111.7
+
+227.0
+
+655.3
+12 Jan 2024
+-
+
+(10.0)
+
+5.0
+"""
+    tickers, rows = provider._parse_farside_all_data_markdown(
+        markdown, ("IBIT", "FBTC", "Total")
+    )
+    assert tickers == ["IBIT", "FBTC", "Total"]
+    assert rows == [
+        ["11 Jan 2024", "111.7", "227.0", "655.3"],
+        ["12 Jan 2024", "-", "(10.0)", "5.0"],
+    ]
+
+
+@pytest.mark.unit
+def test_etf_fetch_falls_back_to_farside_reader_when_direct_page_is_blocked(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class _Response:
+        def __init__(self, text: str, status_code: int = 200) -> None:
+            self.text = text
+            self.status_code = status_code
+
+        def raise_for_status(self) -> None:
+            if self.status_code >= 400:
+                raise provider.httpx.HTTPStatusError(
+                    "blocked", request=provider.httpx.Request("GET", "https://example.invalid"), response=provider.httpx.Response(self.status_code)
+                )
+
+    calls: list[str] = []
+    markdown = "| 18 Sep 2026 | 108.4 | 310.7 | 9.7 | 1.9 | 0 | 0 | 0 | 2.3 | 0 | 0 | 0 | 0 | 433.0 |"
+
+    def fake_get(url: str, **_kwargs):
+        calls.append(url)
+        if url == provider._FARSIDE_BTC_URL:
+            return _Response("blocked", 403)
+        return _Response(markdown)
+
+    monkeypatch.setattr(provider, "_get", fake_get)
+    data = provider.fetch_etf_flow(1)
+
+    assert calls == [provider._FARSIDE_BTC_URL, provider._FARSIDE_BTC_READER_URL]
+    assert data["days"][-1]["flows"]["Total"] == 433.0
+
+
+@pytest.mark.unit
+def test_eth_etf_fetch_uses_eth_page_and_ticker_schema(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class _Response:
+        def __init__(self, text: str, status_code: int = 200) -> None:
+            self.text = text
+            self.status_code = status_code
+
+        def raise_for_status(self) -> None:
+            if self.status_code >= 400:
+                raise provider.httpx.HTTPStatusError(
+                    "blocked",
+                    request=provider.httpx.Request("GET", provider._FARSIDE_ETH_URL),
+                    response=provider.httpx.Response(self.status_code),
+                )
+
+    calls: list[str] = []
+    markdown = "| 18 Sep 2026 | 114.3 | 0 | 26.2 | 1.3 | 0 | 1.9 | 0 | 0 | 0 | 0 | 0 | 143.7 |"
+
+    def fake_get(url: str, **_kwargs):
+        calls.append(url)
+        if url == provider._FARSIDE_ETH_URL:
+            return _Response("blocked", 403)
+        return _Response(markdown)
+
+    monkeypatch.setattr(provider, "_get", fake_get)
+    data = provider.fetch_etf_flow(1, "eth")
+
+    assert calls == [provider._FARSIDE_ETH_URL, provider._FARSIDE_ETH_READER_URL]
+    assert data["tickers"] == list(provider._FARSIDE_ETH_TICKERS)
+    assert data["days"][-1]["flows"]["ETHA"] == 114.3
+    assert data["days"][-1]["flows"]["Total"] == 143.7
+
+
+@pytest.mark.unit
 def test_get_builds_a_scoped_client_with_verification_and_no_env_proxy(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -127,6 +242,46 @@ def test_get_builds_a_scoped_client_with_verification_and_no_env_proxy(
     assert "verify" not in captured.get("get_kwargs", {})
     assert result.text == "ok"
     assert result.json() == {"ok": True}
+
+
+@pytest.mark.unit
+def test_get_retries_configured_proxy_when_direct_upstream_is_blocked(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[bool] = []
+
+    class _FakeResponse:
+        def __init__(self, status_code: int) -> None:
+            self.status_code = status_code
+            self.text = "ok"
+
+        def raise_for_status(self) -> None:
+            return None
+
+        def json(self):  # noqa: ANN201 - 测试替身
+            return {"ok": True}
+
+    class _FakeClient:
+        def __init__(self, **kwargs: object) -> None:
+            calls.append(bool(kwargs["trust_env"]))
+            self.status_code = 403 if not kwargs["trust_env"] else 200
+
+        def __enter__(self) -> _FakeClient:
+            return self
+
+        def __exit__(self, *exc: object) -> bool:
+            return False
+
+        def get(self, url: str, **kwargs: object) -> _FakeResponse:
+            return _FakeResponse(self.status_code)
+
+    monkeypatch.setattr(provider.httpx, "Client", _FakeClient)
+    monkeypatch.setattr(provider.truststore, "SSLContext", lambda *_: "system-trust-store")
+
+    result = provider._get("https://example.invalid/data")
+
+    assert calls == [False, True]
+    assert result.text == "ok"
 
 
 # ---------------------------------------------------------------------------
@@ -179,6 +334,51 @@ def test_already_refreshed_today_is_idempotent_within_the_china_day(
 
 
 @pytest.mark.unit
+def test_fedwatch_refresh_gate_is_hourly_not_daily(monkeypatch: pytest.MonkeyPatch) -> None:
+    now = datetime(2026, 9, 20, 5, 0, tzinfo=UTC)
+    fetched = {"value": "2026-09-20T04:10:00+00:00"}
+    monkeypatch.setattr(refresh, "read_latest_fetched_at", lambda _dataset: fetched["value"])
+
+    assert refresh._already_refreshed_within(
+        "macro_fedwatch", timedelta(hours=1), now=now
+    ) is True
+
+    fetched["value"] = "2026-09-20T03:59:00+00:00"
+    assert refresh._already_refreshed_within(
+        "macro_fedwatch", timedelta(hours=1), now=now
+    ) is False
+
+
+@pytest.mark.unit
+def test_fedwatch_collect_persists_an_hourly_utc_bucket(
+    overseas_db, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    captured: dict[str, object] = {}
+    monkeypatch.setattr(
+        refresh,
+        "fetch_fedwatch",
+        lambda: {
+            "effr": 4.33,
+            "currentTarget": "4.25%-4.50%",
+            "observedAt": "2026-09-20",
+            "zqPricing": [],
+            "meetings": [{"date": "2026-10-28", "probabilities": {}, "contract": "ZQZ6"}],
+        },
+    )
+
+    def capture(_run_id, _dataset, observed_at, series, **_kwargs):
+        captured["observed_at"] = observed_at
+        captured["series"] = series
+
+    monkeypatch.setattr(refresh, "write_overseas_series", capture)
+
+    assert asyncio.run(refresh._collect_fedwatch(force=True))[0] == "ready"
+    observed_at = str(captured["observed_at"])
+    assert observed_at.endswith(":00+00:00")
+    assert captured["series"]["__meta__"]["observedAt"] == observed_at
+
+
+@pytest.mark.unit
 def test_corrupt_fetched_at_does_not_block_future_refreshes(overseas_db, seed_run) -> None:
     """fetched_at 无法解析时按「未刷过」处理，避免永久卡住调度。"""
     seed_run("run-bad", status="error")
@@ -198,15 +398,21 @@ def test_corrupt_fetched_at_does_not_block_future_refreshes(overseas_db, seed_ru
 
 
 @pytest.mark.unit
-def test_refresh_is_not_due_before_0600_and_reports_not_due(overseas_db, monkeypatch) -> None:
-    """早于 06:00 的手动之外调用应直接返回 not_due，且不触碰网络。"""
+def test_refresh_keeps_fedwatch_hourly_cadence_before_0600(
+    overseas_db, monkeypatch
+) -> None:
+    """早于 06:00 仍允许 FedWatch 更新，日度源继续走 China 日门控。"""
     monkeypatch.setattr(refresh, "_overseas_refresh_due", lambda: False)
 
-    def _explode(*_args, **_kwargs):
-        raise AssertionError("must not fetch when not due")
+    called = {"n": 0}
 
-    monkeypatch.setattr(refresh, "fetch_fedwatch", _explode)
-    assert asyncio.run(refresh.refresh_overseas()) == "not_due"
+    async def _fedwatch(_force: bool):
+        called["n"] += 1
+        return "up_to_date", ""
+
+    monkeypatch.setattr(refresh, "_collect_fedwatch", _fedwatch)
+    assert asyncio.run(refresh.refresh_overseas()) == "up_to_date"
+    assert called["n"] == 1
 
 
 # ---------------------------------------------------------------------------
@@ -338,14 +544,14 @@ def test_one_failed_source_does_not_block_the_others(overseas_db, monkeypatch) -
         raise provider.ResearchProviderError("farside_btc_empty")
 
     monkeypatch.setattr(refresh, "fetch_fedwatch", _boom)
-    monkeypatch.setattr(
-        refresh,
-        "fetch_etf_flow",
-        lambda _days=14: {
-            "tickers": ["IBIT"],
-            "days": [{"date": "2026-09-10", "flows": {"IBIT": 12.5}}],
-        },
-    )
+    def _flow(_days=14, _asset="btc"):
+        ticker = "IBIT" if _asset == "btc" else "ETHA"
+        return {
+            "tickers": [ticker],
+            "days": [{"date": "2026-09-10", "flows": {ticker: 12.5}}],
+        }
+
+    monkeypatch.setattr(refresh, "fetch_etf_flow", _flow)
     monkeypatch.setattr(
         refresh,
         "fetch_deribit_iv",
@@ -374,6 +580,7 @@ def test_one_failed_source_does_not_block_the_others(overseas_db, monkeypatch) -
 
     # Ethereum ETF 源成功落库
     assert repository.read_etf_flow(14)["days"][0]["flows"]["IBIT"] == 12.5
+    assert repository.read_etf_flow(14, "eth")["days"][0]["flows"]["ETHA"] == 12.5
     # IV 源成功落库
     assert repository.read_iv_snapshot_latest()["tenors"][0]["iv"] == 36.7
 
@@ -432,6 +639,12 @@ def test_etf_flow_read_returns_meta_tickers_and_ordered_days(overseas_db, seed_r
     # 未发布的一格保持 None，不被伪造成 0
     assert data["days"][0]["flows"]["FBTC"] is None
     assert data["days"][0]["flows"]["IBIT"] == -17.1
+    # 图表所需的日总流量与累计值在后端生成，前端不重算
+    assert data["days"][0]["totalFlow"] == -17.1
+    assert data["days"][0]["cumulativeFlow"] == -17.1
+    assert data["days"][1]["totalFlow"] == 15.7
+    assert data["days"][1]["cumulativeFlow"] == -1.4
+    assert data["days"][0]["price"] is None
 
 
 @pytest.mark.unit

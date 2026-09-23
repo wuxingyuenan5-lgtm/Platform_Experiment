@@ -29,9 +29,13 @@ export type LocalWidgetKey =
   | 'gold-market-detail-table'
   | 'crypto-market-detail-table'
   | 'btc-etf-flow'
+  | 'crypto-atm-iv-term'
   | 'btc-treasury-flow'
   | 'crypto-binance-open-interest'
   | 'crypto-eth-etf-flow'
+  | 'crypto-intraday-cumulative-volatility'
+  | 'gold-intraday-cumulative-volatility'
+  | 'cftc-positioning'
   | 'spdr-daily-flow'
   | 'spdr-holdings-vs-price'
   | 'etf-weekly-flows'
@@ -74,6 +78,9 @@ export interface WidgetConfig {
   localKey?: LocalWidgetKey;
   sourceUrl?: string;
   referenceLinks?: Array<{ label: string; href: string }>;
+  sourceLinkLabel?: string;
+  /** Keep expensive local widgets unmounted until the user explicitly expands them. */
+  deferUntilExpanded?: boolean;
 }
 
 export interface ChartSection {
@@ -152,7 +159,10 @@ function localChart(
   options: {
     height?: number;
     sourceNote?: string;
+    sourceUrl?: string;
+    sourceLinkLabel?: string;
     referenceLinks?: Array<{ label: string; href: string }>;
+    deferUntilExpanded?: boolean;
   } = {},
 ): WidgetConfig {
   return {
@@ -162,7 +172,10 @@ function localChart(
     localKey,
     height: options.height ?? 360,
     sourceNote: options.sourceNote,
+    sourceUrl: options.sourceUrl,
+    sourceLinkLabel: options.sourceLinkLabel,
     referenceLinks: options.referenceLinks,
+    deferUntilExpanded: options.deferUntilExpanded,
   };
 }
 
@@ -173,8 +186,13 @@ function withReferenceLinks(
   return { ...widget, referenceLinks };
 }
 
-function externalReference(title: string, subtitle: string, sourceUrl: string): WidgetConfig {
-  return { kind: 'external-link', title, subtitle, sourceUrl, height: 128 };
+function externalReference(
+  title: string,
+  subtitle: string,
+  sourceUrl: string,
+  sourceLinkLabel?: string,
+): WidgetConfig {
+  return { kind: 'external-link', title, subtitle, sourceUrl, sourceLinkLabel, height: 128 };
 }
 
 function macroMicroReference(href: string) {
@@ -414,10 +432,7 @@ export const researchModules: ResearchModule[] = [
               ],
             },
           ),
-          localChart('CME FedWatch', '期货隐含的 FOMC 利率概率', 'macro-fedwatch', {
-            height: 280,
-            sourceNote: 'External Link · CME Group',
-          }),
+          localChart('CME FedWatch · FOMC 利率概率', '期货隐含的 FOMC 利率概率', 'macro-fedwatch'),
           localChart(
             'Polymarket 美联储利率路径',
             '事件市场对下一次美联储决议的押注',
@@ -610,6 +625,41 @@ export const researchModules: ResearchModule[] = [
             'CME · 期权波动率与策略工具入口',
             'https://cmegroup-sso.quikstrike.net/User/Disclaimer.aspx?ret=%2fUser%2fPartnerRegister.aspx',
           ),
+          externalReference(
+            '黄金 Seasonal Chart',
+            'TradingView · XAUUSD 季节性走势（外部跳转）',
+            'https://www.tradingview.com/chart/?symbol=XAUUSD',
+            '打开 Seasonal Chart ↗',
+          ),
+          localChart(
+            'CFTC 持仓报告',
+            '官方 CFTC PRE 周度持仓；点击后加载历史分位与净头寸。',
+            'cftc-positioning',
+            {
+              height: 620,
+              deferUntilExpanded: true,
+              sourceNote: 'CFTC PRE Disaggregated Futures Only · 周度落库序列',
+              referenceLinks: [
+                {
+                  label: 'CFTC 官方报告',
+                  href: 'https://www.cftc.gov/MarketReports/CommitmentsofTraders/index.htm',
+                },
+              ],
+            },
+          ),
+        ],
+      },
+      {
+        id: 'gold-intraday-cumulative-volatility',
+        eyebrow: 'Intraday Volatility',
+        title: '黄金分时累计波动',
+        description:
+          '后端从共享 Bybit 高精度归档采样，按 UTC 亚洲、欧洲、美洲盘口展示累计波动，并叠加以美洲盘首个有效收盘价为基准的黄金价格线。',
+        layout: 'hero',
+        widgets: [
+          localChart('黄金分时累计波动', '', 'gold-intraday-cumulative-volatility', {
+            height: 420,
+          }),
         ],
       },
     ],
@@ -662,7 +712,7 @@ export const researchModules: ResearchModule[] = [
         eyebrow: 'ETF Flow',
         title: 'BTC ETF 与价格',
         description: '',
-        layout: 'three',
+        layout: 'two',
         widgets: [
           localChart('BTC ETF 日流量 vs BTC 价格', '', 'btc-etf-flow', {
             height: 420,
@@ -678,7 +728,7 @@ export const researchModules: ResearchModule[] = [
               },
             ],
           }),
-          localChart('ETH ETF 日流量', 'SoSoValue', 'crypto-eth-etf-flow', {
+          localChart('ETH ETF 日流量 vs ETH 价格', 'SoSoValue', 'crypto-eth-etf-flow', {
             height: 420,
           }),
           localChart('Bitcoin Treasuries Weekly Net Inflow', '', 'btc-treasury-flow', {
@@ -729,7 +779,7 @@ export const researchModules: ResearchModule[] = [
       {
         id: 'crypto-native-venue',
         eyebrow: 'Derivatives · Native',
-        title: '期货结构',
+        title: '衍生品数据',
         description:
           '本地 Binance 单一 Venue 走势；全市场未平仓量与 Coinbase 溢价保留为外部研究入口。Crypto 数据按 UTC 7×24 日历维护。',
         layout: 'two',
@@ -788,11 +838,10 @@ export const researchModules: ResearchModule[] = [
         description: '受许可或维护边界限制的专题，保留精确数据入口，不复制第三方静态快照。',
         layout: 'three',
         widgets: [
-          externalReference(
-            'Greeks.live BTC Data Lab',
-            'Deribit 期权数据实验室',
-            'https://www.greeks.live/deribit/tools/datalab/BTC',
-          ),
+          localChart('Greeks.live BTC Data Lab', 'Deribit 期权数据实验室', 'crypto-atm-iv-term', {
+            height: 420,
+            sourceUrl: 'https://www.greeks.live/deribit/tools/datalab/BTC',
+          }),
           externalReference(
             'Deribit BTC Options Metrics',
             '期限结构、偏度、Put/Call 与到期分布',
@@ -854,10 +903,29 @@ export const researchModules: ResearchModule[] = [
             'https://x.com/market_beggar/status/2096487388092698821?s=20',
           ),
           externalReference(
+            'BTC Seasonal Chart',
+            'TradingView · BTCUSD 季节性走势（外部跳转）',
+            'https://www.tradingview.com/chart/?symbol=BTCUSD',
+            '打开 Seasonal Chart ↗',
+          ),
+          externalReference(
             'Unbias Analysts',
             '加密研究员与观点聚合',
             'https://unbias.fyi/analysts?source=all',
           ),
+        ],
+      },
+      {
+        id: 'crypto-intraday-cumulative-volatility',
+        eyebrow: 'Intraday Volatility',
+        title: 'BTC 分时累计波动',
+        description:
+          '后端从共享 Bybit 高精度归档采样，按 UTC 亚洲、欧洲、美洲盘口展示累计波动，并叠加以美洲盘首个有效收盘价为基准的 BTC 价格线。',
+        layout: 'hero',
+        widgets: [
+          localChart('BTC 分时累计波动', '', 'crypto-intraday-cumulative-volatility', {
+            height: 420,
+          }),
         ],
       },
     ],

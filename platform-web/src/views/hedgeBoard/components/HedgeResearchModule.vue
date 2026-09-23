@@ -54,7 +54,10 @@
           v-for="widget in section.widgets"
           :key="`${section.id}-${widget.title}`"
           class="widget-card"
-          :class="{ 'widget-card--local-chart': widget.kind === 'local-chart' }"
+          :class="{
+            'widget-card--local-chart': widget.kind === 'local-chart',
+            'widget-card--macro-fedwatch': widget.localKey === 'macro-fedwatch',
+          }"
         >
           <div v-if="!shouldHideWidgetHeader(section.id, widget)" class="widget-card__header">
             <div class="widget-card__header-main">
@@ -62,6 +65,15 @@
                 <h5>{{ resolveWidgetTitle(widget.localKey, widget.title) }}</h5>
               </div>
               <div class="widget-card__actions">
+                <button
+                  v-if="widget.deferUntilExpanded"
+                  type="button"
+                  class="widget-card__defer-toggle"
+                  :aria-expanded="isDeferredWidgetExpanded(section.id, widget)"
+                  @click="toggleDeferredWidget(section.id, widget)"
+                >
+                  {{ isDeferredWidgetExpanded(section.id, widget) ? '收起' : '展开加载' }}
+                </button>
                 <a
                   v-if="resolveWidgetSourceLink(widget)"
                   class="widget-card__link"
@@ -69,7 +81,7 @@
                   target="_blank"
                   rel="noopener noreferrer"
                 >
-                  参考网页 ↗
+                  {{ widget.sourceLinkLabel ?? '参考网页 ↗' }}
                 </a>
                 <a
                   v-for="link in widget.referenceLinks ?? []"
@@ -86,9 +98,16 @@
           </div>
 
           <component :is="widgetErrorBoundary" :widget-title="widget.title">
-            <div v-if="widget.kind === 'external-link'" class="external-reference-card">
+            <div
+              v-if="widget.deferUntilExpanded && !isDeferredWidgetExpanded(section.id, widget)"
+              class="deferred-widget-placeholder"
+            >
+              <strong>默认折叠</strong>
+              <span>点击“展开加载”后读取 CFTC 周度持仓历史</span>
+            </div>
+            <div v-else-if="widget.kind === 'external-link'" class="external-reference-card">
               <p>{{ widget.subtitle }}</p>
-              <span>点击卡片右上角“参考网页”打开完整工具</span>
+              <span>点击卡片右上角打开完整工具</span>
             </div>
             <component
               :is="localChartWidget"
@@ -133,6 +152,22 @@
   ]);
 
   const expandedMarketDetailSectionIds = ref<string[]>([]);
+  const expandedDeferredWidgetIds = ref<string[]>([]);
+
+  function deferredWidgetId(sectionId: string, widget: WidgetConfig) {
+    return `${sectionId}-${widget.localKey ?? widget.title}`;
+  }
+
+  function isDeferredWidgetExpanded(sectionId: string, widget: WidgetConfig) {
+    return expandedDeferredWidgetIds.value.includes(deferredWidgetId(sectionId, widget));
+  }
+
+  function toggleDeferredWidget(sectionId: string, widget: WidgetConfig) {
+    const id = deferredWidgetId(sectionId, widget);
+    expandedDeferredWidgetIds.value = isDeferredWidgetExpanded(sectionId, widget)
+      ? expandedDeferredWidgetIds.value.filter((item) => item !== id)
+      : [...expandedDeferredWidgetIds.value, id];
+  }
 
   function isMarketDetailSection(section: ChartSection) {
     return section.widgets.some((widget) => widget.localKey?.endsWith('-market-detail-table'));
@@ -156,6 +191,29 @@
 <style scoped lang="less">
   @import '../../strategy/shared/strategy-theme.less';
   @import './marketDetailSection.less';
+
+  @media (max-width: 1200px) {
+    .widget-grid--three,
+    .widget-grid--two {
+      grid-template-columns: 1fr;
+    }
+
+    .widget-card--macro-fedwatch {
+      grid-column: auto;
+    }
+  }
+
+  @media (max-width: 768px) {
+    .formula-strip,
+    .chart-section {
+      padding: 18px;
+      border-radius: 20px;
+    }
+
+    .formula-strip {
+      grid-template-columns: 1fr;
+    }
+  }
 
   .research-module {
     display: flex;
@@ -191,6 +249,11 @@
     border: 1px solid var(--hedge-cool-border, rgb(193 207 220 / 88%));
     background: linear-gradient(180deg, rgb(255 255 255 / 95%), rgb(243 248 252 / 96%)), #fff;
     box-shadow: 0 18px 45px rgb(31 41 55 / 5%);
+  }
+
+  /* FedWatch is a full-width matrix; keep Polymarket on the following grid row. */
+  .widget-card--macro-fedwatch {
+    grid-column: 1 / -1;
   }
 
   .formula-strip,
@@ -330,6 +393,45 @@
     gap: 6px;
   }
 
+  .widget-card__defer-toggle {
+    display: inline-flex;
+    align-items: center;
+    min-height: 28px;
+    padding: 4px 9px;
+    border: 1px solid rgb(22 93 255 / 28%);
+    border-radius: 999px;
+    background: rgb(22 93 255 / 5%);
+    color: #165dff;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  .widget-card__defer-toggle:hover,
+  .widget-card__defer-toggle:focus-visible {
+    border-color: rgb(22 93 255 / 52%);
+    outline: none;
+    background: rgb(22 93 255 / 10%);
+  }
+
+  .deferred-widget-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 116px;
+    padding: 18px;
+    color: var(--hedge-cool-muted, #6d8293);
+    font-size: 12px;
+    text-align: center;
+    gap: 7px;
+  }
+
+  .deferred-widget-placeholder strong {
+    color: var(--hedge-cool-text, #18313c);
+    font-size: 14px;
+  }
+
   .widget-card__link {
     display: inline-flex;
     align-items: center;
@@ -362,24 +464,5 @@
     border-radius: 20px;
     background: linear-gradient(180deg, rgb(255 255 255 / 98%), rgb(243 248 252 / 98%)), #fff;
     box-shadow: 0 16px 36px rgb(31 41 55 / 4%);
-  }
-
-  @media (max-width: 1200px) {
-    .widget-grid--three,
-    .widget-grid--two {
-      grid-template-columns: 1fr;
-    }
-  }
-
-  @media (max-width: 768px) {
-    .formula-strip,
-    .chart-section {
-      padding: 18px;
-      border-radius: 20px;
-    }
-
-    .formula-strip {
-      grid-template-columns: 1fr;
-    }
   }
 </style>

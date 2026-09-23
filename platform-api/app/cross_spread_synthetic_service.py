@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 from decimal import Decimal
 
 from fastapi import HTTPException
@@ -9,9 +10,9 @@ from app import cross_spread_exit_service as market_helpers
 from app import monitor_health
 from app.config import get_settings
 from app.cross_spread import (
+    assert_cross_spread_live_execution_enabled,
     assert_cross_spread_market_executable,
     assert_cross_spread_native_trading_rules,
-    assert_cross_spread_live_execution_enabled,
     get_cross_spread_snapshot,
     submit_cross_spread_market_command,
 )
@@ -43,6 +44,13 @@ from app.cross_spread_exit_schemas import (
     CrossSpreadOpenResult,
     CrossSpreadOrderIntentResponse,
     LimitStrategy,
+    CrossSpreadPendingOpenTriggerResponse,
+)
+from app.cross_spread_open_trigger_repository import (
+    claim_open_trigger,
+    create_open_trigger,
+    finish_open_trigger,
+    list_pending_open_triggers,
 )
 from app.cross_spread_limit_execution import (
     get_bybit_catalog_tick_size,
@@ -73,7 +81,36 @@ def open_cross_spread_market(request: CrossSpreadMarketOpenRequest) -> CrossSpre
     if recovered is not None:
         return recovered
     market_helpers._assert_open_execution_resolved()
-    limit_execution = _prepare_limit_execution(intent, request.limit_spread)
+    limit_execution = _prepare_limit_execution(intent, request.limit_spread, allow_unmet=True)
+    if (
+        intent.execution_type != "MARKET"
+        and limit_execution is not None
+        and not limit_execution.currently_executable
+    ):
+        key = request.idempotency_key or (
+            f"open-trigger:{request.direction}:{request.quantity_oz}:"
+            f"{request.limit_spread}:{request.limit_strategy}"
+        )
+        pending = create_open_trigger(
+            idempotency_key=key,
+            direction=request.direction,
+            quantity_oz=str(request.quantity_oz),
+            limit_spread=str(request.limit_spread),
+            limit_strategy=request.limit_strategy,
+            request_json=request.model_dump_json(by_alias=True),
+        )
+        return CrossSpreadOpenResult(
+            executionBatch=None,
+            orderIntent=_intent_response(intent),
+            limitExecution=_limit_response(limit_execution, request.limit_strategy),
+            exitPlan=None,
+            pendingTrigger=CrossSpreadPendingOpenTriggerResponse(
+                triggerId=pending["id"], direction=request.direction,
+                quantityOz=request.quantity_oz, limitSpread=request.limit_spread,
+                limitStrategy=request.limit_strategy, status="pending",
+                createdAt=pending["created_at"],
+            ),
+        )
     command_request = CrossSpreadMarketCommandRequest(
         action=command_action(intent),
         quantityOz=request.quantity_oz,
@@ -89,6 +126,8 @@ def open_cross_spread_market(request: CrossSpreadMarketOpenRequest) -> CrossSpre
             command_request,
             limit_strategy=request.limit_strategy,
             bybit_limit_price=limit_execution.bybit_limit_price,
+            max_adverse_spread=request.max_adverse_spread,
+            target_spread=limit_execution.limit_spread,
             idempotency_key=request.idempotency_key,
         )
 
@@ -123,6 +162,8 @@ def _open_result_from_batch(
                 direction=request.direction,
                 take_profit_spread=request.take_profit_spread,
                 stop_loss_spread=request.stop_loss_spread,
+                take_profit_max_adverse_spread=request.take_profit_max_adverse_spread,
+                stop_loss_max_adverse_spread=request.stop_loss_max_adverse_spread,
             )
         )
         plan = _configure_open_plan(plan, request)
@@ -155,6 +196,7 @@ def close_cross_spread_market(
     limit_strategy: LimitStrategy = "fok",
     idempotency_key: str | None = None,
     quantity_oz: Decimal | None = None,
+    max_adverse_spread: Decimal = Decimal("0"),
 ) -> CrossSpreadCloseResult:
     current_plan = get_exit_plan(plan_id)
     close_quantity = quantity_oz or current_plan.quantity_oz
@@ -300,6 +342,7 @@ def close_cross_spread_market(
         "limit_strategy": limit_strategy,
         "limit_execution": limit_execution,
         "quantity_oz": close_quantity,
+        "max_adverse_spread": max_adverse_spread,
     }
     if idempotency_key is not None:
         close_kwargs["idempotency_key"] = idempotency_key
@@ -333,6 +376,8 @@ def _configure_open_plan(
         stop_loss_execution_mode=request.stop_loss_execution_mode,
         take_profit_limit_strategy=request.take_profit_limit_strategy,
         stop_loss_limit_strategy=request.stop_loss_limit_strategy,
+        take_profit_max_adverse_spread=request.take_profit_max_adverse_spread,
+        stop_loss_max_adverse_spread=request.stop_loss_max_adverse_spread,
     )
 
 
@@ -345,6 +390,7 @@ def evaluate_cross_spread_exit_plans() -> CrossSpreadExitEvaluationResponse:
             skippedReason="Live cross-spread execution is disabled",
         )
 
+    _evaluate_pending_open_triggers()
     active = list_exit_plans(status="active")
     if not active:
         return CrossSpreadExitEvaluationResponse(
@@ -360,7 +406,26 @@ def evaluate_cross_spread_exit_plans() -> CrossSpreadExitEvaluationResponse:
         return CrossSpreadExitEvaluationResponse(
             evaluatedCount=len(active),
             triggeredCount=0,
-            skippedReason="Cross-spread exit is monitor-only because both venues are not executable",
+            skippedReason=(
+                "Cross-spread exit is monitor-only because both venues are not executable"
+            ),
+        )
+    # The MT5 boundary guard is separate from the manual close capability:
+    # during the configured pre/post session window a user may still submit a
+    # deliberate open or close, while the background TP/SL monitor must remain
+    # idle.  Older snapshots without the guard field retain their legacy test
+    # semantics; current Runtime responses always include it.
+    if (
+        snapshot.mt5.automatic_exit_guard_minutes is not None
+        and not snapshot.mt5.automatic_exit_allowed
+    ):
+        return CrossSpreadExitEvaluationResponse(
+            evaluatedCount=len(active),
+            triggeredCount=0,
+            skippedReason=(
+                "Cross-spread automatic TP/SL is paused: "
+                f"{snapshot.mt5.automatic_exit_block_reason or 'MT5 session boundary guard'}"
+            ),
         )
 
     try:
@@ -470,6 +535,7 @@ def _close_claimed_plan(
     limit_execution: CrossSpreadFokPrice | None = None,
     idempotency_key: str | None = None,
     quantity_oz: Decimal | None = None,
+    max_adverse_spread: Decimal = Decimal("0"),
 ) -> CrossSpreadCloseResult:
     intent = build_close_intent(
         plan.direction,
@@ -508,6 +574,14 @@ def _close_claimed_plan(
                 command_request,
                 limit_strategy=limit_strategy,
                 bybit_limit_price=limit_execution.bybit_limit_price,
+                max_adverse_spread=(
+                    plan.take_profit_max_adverse_spread
+                    if plan.trigger_reason == "take_profit"
+                    else plan.stop_loss_max_adverse_spread
+                    if plan.trigger_reason == "stop_loss"
+                    else max_adverse_spread
+                ),
+                target_spread=limit_execution.limit_spread,
                 idempotency_key=command_key,
                 mt5_reduce_only=True,
                 mt5_position_id=plan.mt5_position_id,
@@ -535,7 +609,9 @@ def _close_claimed_plan(
 
     mark_plan_closing(plan.plan_id, batch.batch_id)
     if batch.status == "hedged":
-        updated = mark_plan_closed(plan.plan_id, batch.batch_id, close_quantity)
+        summaries = load_batch_fill_summaries(batch.batch_id)
+        executed_quantity = summaries["bybit_leg"].quantity
+        updated = mark_plan_closed(plan.plan_id, batch.batch_id, executed_quantity)
     else:
         updated = mark_plan_manual_intervention(
             plan.plan_id,
@@ -559,7 +635,18 @@ def _submit_limit_batch(
     mt5_reduce_only: bool = False,
     mt5_position_id: str | None = None,
     allow_netting_close: bool = False,
+    target_spread: Decimal | None = None,
+    max_adverse_spread: Decimal = Decimal("0"),
 ):
+    if limit_strategy == "market":
+        return submit_cross_spread_market_command(
+            command_request,
+            idempotency_key=idempotency_key,
+            bybit_reduce_only=bybit_reduce_only,
+            mt5_reduce_only=mt5_reduce_only,
+            mt5_position_id=mt5_position_id,
+            allow_netting_close=allow_netting_close,
+        )
     submitter = (
         submit_cross_spread_fok_command
         if limit_strategy == "fok"
@@ -568,6 +655,8 @@ def _submit_limit_batch(
     return submitter(
         command_request,
         bybit_limit_price=bybit_limit_price,
+        target_spread=target_spread,
+        max_adverse_spread=max_adverse_spread,
         idempotency_key=idempotency_key,
         bybit_reduce_only=bybit_reduce_only,
         mt5_reduce_only=mt5_reduce_only,
@@ -592,6 +681,8 @@ def _fok_exit_idempotency_key(plan: CrossSpreadExitPlanResponse) -> str:
 def _prepare_limit_execution(
     intent: SyntheticOrderIntent,
     limit_spread: Decimal | None,
+    *,
+    allow_unmet: bool = False,
 ) -> CrossSpreadFokPrice | None:
     if intent.execution_type == "MARKET":
         return None
@@ -631,15 +722,51 @@ def _prepare_limit_execution(
         )
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
-    if not pricing.currently_executable:
+    if not pricing.currently_executable and not allow_unmet:
+        comparison = "at least" if pricing.direction == "SELL_BYBIT_BUY_MT5" else "at most"
         raise HTTPException(
             status_code=409,
             detail=(
-                "Current executable spread does not satisfy the requested Limit; "
-                "no order was submitted"
+                f"Current executable spread is {pricing.executable_spread} USDT; "
+                f"the {pricing.direction} limit requires a spread {comparison} "
+                f"{pricing.limit_spread} USDT. No order was submitted."
             ),
         )
     return pricing
+
+
+def _evaluate_pending_open_triggers() -> None:
+    for row in list_pending_open_triggers():
+        try:
+            request = CrossSpreadMarketOpenRequest.model_validate(
+                json.loads(row["request_json"])
+            )
+            intent = build_open_intent(
+                request.direction, request.execution_mode, trigger_reason="STRATEGY"
+            )
+            pricing = _prepare_limit_execution(intent, request.limit_spread, allow_unmet=True)
+            if (
+                pricing is None
+                or not pricing.currently_executable
+                or not claim_open_trigger(row["id"])
+            ):
+                continue
+            try:
+                result = open_cross_spread_market(
+                    request.model_copy(
+                        update={"idempotency_key": f"{row['idempotency_key']}:triggered"}
+                    )
+                )
+                finish_open_trigger(
+                    row["id"],
+                    execution_batch_id=(
+                        result.execution_batch.batch_id if result.execution_batch else None
+                    ),
+                )
+            except Exception as exc:
+                finish_open_trigger(row["id"], failure_reason=str(exc))
+        except Exception as exc:
+            finish_open_trigger(row["id"], failure_reason=str(exc))
 
 
 def _intent_response(intent: SyntheticOrderIntent) -> CrossSpreadOrderIntentResponse:
@@ -669,5 +796,11 @@ def _limit_response(
         rawBybitLimitPrice=pricing.raw_bybit_limit_price,
         bybitLimitPrice=pricing.bybit_limit_price,
         currentlyExecutable=pricing.currently_executable,
-        timeInForce="FOK" if limit_strategy == "fok" else "PostOnly",
+        timeInForce=(
+            "FOK"
+            if limit_strategy == "fok"
+            else "Market"
+            if limit_strategy == "market"
+            else "PostOnly"
+        ),
     )

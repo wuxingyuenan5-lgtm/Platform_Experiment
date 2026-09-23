@@ -39,6 +39,14 @@ class Settings(BaseSettings):
 
     # A-share research is refreshed out-of-band and persisted before the page reads it.
     # Disable only for isolated tests or an explicitly paused local environment.
+    strategy_research_enabled: bool = False
+    # Research ingestion is an optional worker workload. It must be explicitly
+    # enabled by its dedicated launcher and never starts inside the trading API
+    # merely because a stale environment file contains the legacy flag.
+    strategy_research_worker_enabled: bool = False
+    strategy_research_projection_enabled: bool = False
+    strategy_research_path: str = "./data/strategy-research"
+    strategy_research_min_free_bytes: int = 1_000_000_000
     research_refresh_enabled: bool = True
     research_refresh_interval_seconds: float = 900.0
 

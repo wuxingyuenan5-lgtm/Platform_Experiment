@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
 from decimal import ROUND_FLOOR, Decimal
+from sqlite3 import Error as SqliteError
 from typing import Any
 
 import httpx
@@ -12,7 +13,10 @@ from app.config import get_settings
 from app.database import connection
 from app.execution_batches import get_execution_batch
 from app.execution_risk_repository import batch_has_verified_flattening
-from app.strategies.adapters.funding_carry import SPOT_BASE_FEE_RATE, funding_open_quantities
+from app.strategies.adapters.funding_carry import (
+    SPOT_BASE_FEE_RATE,
+    funding_spot_quantity_for_perpetual,
+)
 from app.strategies.domain import StrategyInstructionAction
 from app.strategies.funding_orchestration import get_funding_controlled_live_readiness
 from app.strategies.instruction_service import (
@@ -30,8 +34,34 @@ STRATEGY_INSTANCE_ID = "strategy_funding_arbitrage_instance_default"
 QUOTE_CURRENCY = "USDT"
 
 
-def list_funding_pairs() -> list[dict[str, str]]:
+def list_funding_pairs(search: str | None = None) -> list[dict[str, str]]:
     account = _funding_account_binding()
+    # The database contains the last venue-discovered catalog.  Use that
+    # persisted snapshot for the normal read path so opening the execution page
+    # does not block on a full Bybit instrument pagination.  Quotes and specs
+    # are still read from Runtime below and therefore remain the execution
+    # authority.  A search miss asks Runtime for a fresh catalog and persists
+    # any newly discovered pair.
+    local_pairs = _list_local_funding_pairs(account["venue_id"], search)
+    if local_pairs or not search:
+        return local_pairs
+    try:
+        payload = _runtime_get(
+            "/venue/funding-markets",
+            params={"accountId": account["account_id"], "search": search or ""},
+        )
+        if isinstance(payload, list):
+            pairs = _persist_funding_market_catalog(account["venue_id"], payload)
+            if pairs:
+                return pairs
+    except (HTTPException, SqliteError):
+        pass
+    return local_pairs
+
+
+def _list_local_funding_pairs(
+    venue_id: str, search: str | None = None
+) -> list[dict[str, str]]:
     with connection() as db:
         rows = db.execute(
             """
@@ -59,7 +89,7 @@ def list_funding_pairs() -> list[dict[str, str]]:
               AND spot_spec.data_quality_state = 'complete'
             ORDER BY perp.base_currency, perp_map.external_symbol
             """,
-            (account["venue_id"],),
+            (venue_id,),
         ).fetchall()
     pairs: list[dict[str, str]] = []
     seen: set[tuple[str, str]] = set()
@@ -78,6 +108,15 @@ def list_funding_pairs() -> list[dict[str, str]]:
                 "spotInstrumentId": str(row["spot_instrument_id"]),
             }
         )
+    if search:
+        needle = search.strip().upper()
+        pairs = [
+            pair
+            for pair in pairs
+            if needle in pair["baseAsset"]
+            or needle in pair["perpetualSymbol"]
+            or needle in pair["spotSymbol"]
+        ]
     return pairs
 
 
@@ -89,7 +128,15 @@ def get_funding_execution_context(
     quantity: Decimal | None = None,
 ) -> dict[str, Any]:
     account = _funding_account_binding()
-    pair = _resolve_pair(perpetual_symbol=perpetual_symbol, spot_symbol=spot_symbol)
+    # Resolve the venue catalog once per context request.  The runtime catalog
+    # is a paginated public read; fetching it once here avoids repeating that
+    # slow operation when the same list is returned as symbolOptions below.
+    symbol_options = list_funding_pairs()
+    pair = _resolve_pair(
+        perpetual_symbol=perpetual_symbol,
+        spot_symbol=spot_symbol,
+        pairs=symbol_options,
+    )
     perp_symbol = str(pair["perpetualSymbol"])
     spot_symbol = str(pair["spotSymbol"])
     requests = [
@@ -129,16 +176,18 @@ def get_funding_execution_context(
             "SELECT environment FROM accounts WHERE id=?", (account["account_id"],)
         ).fetchone()
     if live_account is not None and live_account["environment"] == "live":
-        readiness["bothMarketsTradeAllowed"] = funding_market_access_ready(
+        # Funding is a single-venue hedge: only its spot and perpetual legs
+        # participate in this check. MT5/Cross market hours are unrelated.
+        readiness["fundingLegsTradeAllowed"] = funding_market_access_ready(
             perp_spec, "crypto_perp"
         ) and funding_market_access_ready(spot_spec, "crypto_spot")
-        readiness["ready"] = readiness["ready"] and readiness["bothMarketsTradeAllowed"]
+        readiness["ready"] = readiness["ready"] and readiness["fundingLegsTradeAllowed"]
     runtime_status = _runtime_status()
     suggested_quantity = _suggest_quantity(
         notional=notional,
-        price=Decimal(str(spot_quote["mid"])),
-        step=Decimal(str(spot_spec["quantityStep"])),
-        minimum=Decimal(str(spot_spec["minQuantity"])),
+        price=Decimal(str(perp_quote["mid"])),
+        step=Decimal(str(perp_spec["quantityStep"])),
+        minimum=Decimal(str(perp_spec["minQuantity"])),
     )
     fee_rate = (
         SPOT_BASE_FEE_RATE
@@ -160,6 +209,7 @@ def get_funding_execution_context(
     )
     next_funding_time = perp_quote.get("nextFundingTime")
     basis = Decimal(str(perp_quote["mid"])) - Decimal(str(spot_quote["mid"]))
+    executable_spread = _executable_spread(perp_quote, spot_quote)
     active_available_balance = (
         Decimal(str(active_balance["availableBalance"]))
         if active_balance is not None and active_balance["availableBalance"] is not None
@@ -175,12 +225,13 @@ def get_funding_execution_context(
         "venue": account["venue_code"],
         "spotSymbol": spot_symbol,
         "perpetualSymbol": perp_symbol,
-        "symbolOptions": list_funding_pairs(),
+        "symbolOptions": symbol_options,
         "spotQuote": spot_quote,
         "perpetualQuote": perp_quote,
         "fundingRate": funding_rate,
         "nextFundingTime": next_funding_time,
         "basis": _decimal_text(basis),
+        "executableSpread": executable_spread,
         "tickSize": {
             "spot": spot_spec["priceTick"],
             "perpetual": perp_spec["priceTick"],
@@ -276,9 +327,7 @@ def submit_funding_instruction(
         if (
             existing["action"] != action
             or not isinstance(parameters, dict)
-            or Decimal(
-                str(parameters.get("spotQuantity" if action == "open" else "perpetualQuantity"))
-            )
+            or Decimal(str(parameters.get("perpetualQuantity")))
             != quantity
             or (
                 expected_perpetual_quantity is not None
@@ -300,6 +349,8 @@ def submit_funding_instruction(
                 detail="Funding idempotency key conflicts with original instruction",
             )
         return _execute_funding_instruction(existing)
+    # `quantity` is the user-facing perpetual target for both open and close.
+    # The spot gross amount is derived from the live fee and quantity step.
     spot_quantity = quantity
     perpetual_quantity = quantity
     spot_fee_rate: str | None = None
@@ -314,6 +365,7 @@ def submit_funding_instruction(
         if not sizing["valid"]:
             raise HTTPException(status_code=422, detail=sizing["reason"])
         perpetual_quantity = Decimal(str(sizing["perpetualQuantity"]))
+        spot_quantity = Decimal(str(sizing["spotQuantity"]))
         spot_fee_rate = str(sizing["spotBaseFeeRate"])
         if (
             expected_perpetual_quantity is not None
@@ -674,7 +726,24 @@ def _funding_group_snapshot(
         remaining_perp = Decimal("0")
         spot_holding = Decimal("0")
     net_delta = spot_holding - remaining_perp if spot_holding is not None else None
-    step = Decimal(str(perp.get("quantityStep") or "0"))
+    # Compare against the nearest executable perpetual quantity, not the much
+    # finer spot step. The residual remains visible; missing receipts never pass.
+    perp_step = Decimal(str(perp.get("quantityStep") or "0"))
+    rounding_balanced = False
+    if spot_holding is not None and perp_step > 0:
+        from app.strategies.adapters.funding_carry import funding_open_quantities
+
+        nearest = (
+            funding_open_quantities(
+                spot_holding,
+                fee_rate=Decimal(0),
+                perpetual_step=perp_step,
+                perpetual_minimum=Decimal(str(perp.get("minimumQuantity") or perp_step)),
+            )[1]
+            if spot_holding > 0
+            else Decimal(0)
+        )
+        rounding_balanced = remaining_perp == nearest
     fee_mismatch = (
         workspace["executionState"] == "completed"
         and lifecycle_state == "active"
@@ -682,7 +751,7 @@ def _funding_group_snapshot(
         and remaining_perp > 0
         and pending_close == 0
         and result_unknown_reserved == 0
-        and (net_delta < 0 or (step > 0 and net_delta >= step))
+        and not rounding_balanced
     )
     is_abnormal = lifecycle_state == "active" and (
         workspace["executionState"] in {"manual_intervention", "result_unknown", "failed"}
@@ -703,7 +772,7 @@ def _funding_group_snapshot(
 
         try:
             with connection() as db:
-                residual_positions, _ = flattening_positions(db, batch_id)
+                residual_positions, _ = flattening_positions(db, batch_id, True)
             if any(position["quantity"] > 0 for position in residual_positions):
                 abnormal_action = "flatten_open"
         except (ExecutionRiskRepositoryError, ValueError, ArithmeticError):
@@ -743,6 +812,7 @@ def _funding_group_snapshot(
         "remainingSpotHolding": _decimal_text(spot_holding),
         "netDeltaQuantity": _decimal_text(net_delta),
         "spotQuantityStep": spot.get("quantityStep"),
+        "roundingBalanced": rounding_balanced,
         "residualQuantity": _decimal_text(residual),
         "alreadyClosedQuantity": _decimal_text(authoritative_closed),
         "authoritativeClosedQuantity": _decimal_text(authoritative_closed),
@@ -859,11 +929,22 @@ def _funding_account_binding() -> dict[str, str]:
     }
 
 
-def _resolve_pair(*, perpetual_symbol: str | None, spot_symbol: str | None) -> dict[str, str]:
-    pairs = list_funding_pairs()
+def _resolve_pair(
+    *,
+    perpetual_symbol: str | None,
+    spot_symbol: str | None,
+    pairs: list[dict[str, str]] | None = None,
+) -> dict[str, str]:
+    pairs = list_funding_pairs() if pairs is None else pairs
     if not pairs:
         raise HTTPException(status_code=503, detail="Funding instrument mapping is unavailable")
     if perpetual_symbol is None and spot_symbol is None:
+        preferred = next(
+            (pair for pair in pairs if pair["perpetualSymbol"] == "BTCUSDT"),
+            None,
+        )
+        if preferred is not None:
+            return preferred
         return pairs[0]
     for pair in pairs:
         if perpetual_symbol and pair["perpetualSymbol"] != perpetual_symbol.upper():
@@ -1015,6 +1096,116 @@ def _suggest_quantity(
     return raw if raw >= minimum else None
 
 
+def _persist_funding_market_catalog(
+    venue_id: str, payload: list[object]
+) -> list[dict[str, str]]:
+    """Persist venue-discovered hedgeable pairs for the execution plan resolver."""
+    from datetime import UTC, datetime
+
+    now = datetime.now(UTC).isoformat()
+    resolved_pairs: list[dict[str, str]] = []
+    with connection() as db:
+        for item in payload:
+            if not isinstance(item, dict):
+                continue
+            try:
+                perp = item["perpetual"]
+                spot = item["spot"]
+                if not isinstance(perp, dict) or not isinstance(spot, dict):
+                    continue
+                base = str(item["baseAsset"]).upper()
+                quote = str(item["quoteCurrency"]).upper()
+                perp_symbol = str(item["perpetualSymbol"]).upper()
+                spot_symbol = str(item["spotSymbol"]).upper()
+                perp_id = str(item["perpetualInstrumentId"])
+                spot_id = str(item["spotInstrumentId"])
+                resolved_ids: dict[str, str] = {}
+                for instrument_id, symbol, instrument_type, spec in (
+                    (perp_id, perp_symbol, "crypto_perp", perp),
+                    (spot_id, spot_symbol, "crypto_spot", spot),
+                ):
+                    existing = db.execute(
+                        """
+                        SELECT i.id
+                        FROM instrument_mappings m
+                        JOIN instruments i ON i.id = m.instrument_id
+                        WHERE m.venue_id = ? AND upper(m.external_symbol) = upper(?)
+                          AND m.status = 'active' AND i.instrument_type = ?
+                        LIMIT 1
+                        """,
+                        (venue_id, symbol, instrument_type),
+                    ).fetchone()
+                    if existing is not None:
+                        instrument_id = str(existing["id"])
+                    resolved_ids[instrument_type] = instrument_id
+                    db.execute(
+                        """
+                        INSERT OR IGNORE INTO instruments
+                          (id, instrument_code, name, instrument_type, base_currency,
+                           quote_currency, settle_currency, quantity_unit,
+                           data_quality_state, created_at)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'complete', ?)
+                        """,
+                        (
+                            instrument_id,
+                            f"{symbol}:{instrument_type}",
+                            f"{base}/{quote} {instrument_type}",
+                            instrument_type,
+                            base,
+                            quote,
+                            str(spec.get("settlementCurrency") or quote),
+                            "CONTRACT" if instrument_type == "crypto_perp" else base,
+                            now,
+                        ),
+                    )
+                    db.execute(
+                        """
+                        INSERT OR IGNORE INTO contract_specifications
+                          (id, instrument_id, version, price_tick, min_order_quantity,
+                           quantity_step, contract_multiplier, effective_from,
+                           data_quality_state)
+                        VALUES (?, ?, 'venue-live', ?, ?, ?, ?, ?, 'complete')
+                        """,
+                        (
+                            f"contract_{instrument_id}_venue_live",
+                            instrument_id,
+                            str(spec["priceTick"]),
+                            str(spec["minQuantity"]),
+                            str(spec["quantityStep"]),
+                            str(spec.get("contractMultiplier") or "1"),
+                            now,
+                        ),
+                    )
+                    db.execute(
+                        """
+                        INSERT OR IGNORE INTO instrument_mappings
+                          (id, instrument_id, venue_id, external_symbol, mapping_type,
+                           status, created_at)
+                        VALUES (?, ?, ?, ?, 'exchange_symbol', 'active', ?)
+                        """,
+                        (
+                            f"mapping_{instrument_id}_{venue_id}",
+                            instrument_id,
+                            venue_id,
+                            symbol,
+                            now,
+                        ),
+                    )
+                resolved_pairs.append(
+                    {
+                        "baseAsset": base,
+                        "quoteCurrency": quote,
+                        "perpetualSymbol": perp_symbol,
+                        "spotSymbol": spot_symbol,
+                        "perpetualInstrumentId": resolved_ids["crypto_perp"],
+                        "spotInstrumentId": resolved_ids["crypto_spot"],
+                    }
+                )
+            except (KeyError, TypeError, ValueError, ArithmeticError):
+                continue
+    return resolved_pairs
+
+
 def _open_sizing(
     quantity: Decimal | None,
     *,
@@ -1025,34 +1216,50 @@ def _open_sizing(
     spot_quote: dict,
 ) -> dict[str, Any]:
     result: dict[str, Any] = {
-        "spotQuantity": _decimal_text(quantity),
+        "spotQuantity": None,
         "spotBaseFeeRate": _decimal_text(fee_rate),
         "expectedSpotNetQuantity": None,
         "perpetualQuantity": None,
         "roundingResidualQuantity": None,
+        "estimatedNotional": None,
         "valid": False,
-        "reason": "请输入有效的现货买入数量",
+        "reason": "请输入有效的永续目标数量",
     }
     if quantity is None or quantity <= 0:
         return result
     if any(Decimal(str(spec["contractMultiplier"])) != 1 for spec in (perp_spec, spot_spec)):
         result["reason"] = "当前资费配平只支持币数量乘数为 1 的现货与永续"
         return result
-    net, perpetual, residual = funding_open_quantities(
-        quantity, fee_rate=fee_rate, perpetual_step=Decimal(str(perp_spec["quantityStep"]))
+    perp_step = Decimal(str(perp_spec["quantityStep"]))
+    perp_minimum = Decimal(str(perp_spec["minQuantity"]))
+    spot_step = Decimal(str(spot_spec["quantityStep"]))
+    if quantity < perp_minimum or quantity % perp_step:
+        result["reason"] = "永续目标数量不符合交易所最小下单量或步长"
+        return result
+    spot_quantity, net, residual = funding_spot_quantity_for_perpetual(
+        quantity,
+        fee_rate=fee_rate,
+        spot_step=spot_step,
+        spot_minimum=Decimal(str(spot_spec["minQuantity"])),
     )
+    perpetual = quantity
     result.update(
+        spotQuantity=_decimal_text(spot_quantity),
         expectedSpotNetQuantity=_decimal_text(net),
         perpetualQuantity=_decimal_text(perpetual),
         roundingResidualQuantity=_decimal_text(residual),
+        estimatedNotional=_decimal_text(perpetual * Decimal(str(perp_quote["mid"]))),
     )
+    if abs(residual) > spot_step:
+        result["reason"] = "扣费和最小单位造成的配平误差超过一个现货步长"
+        return result
     for label, amount, spec, quote in (
-        ("现货", quantity, spot_spec, spot_quote),
+        ("现货", spot_quantity, spot_spec, spot_quote),
         ("永续", perpetual, perp_spec, perp_quote),
     ):
         step = Decimal(str(spec["quantityStep"]))
         if amount <= 0 or amount < Decimal(str(spec["minQuantity"])) or amount % step:
-            result["reason"] = f"{label}数量不符合最小下单量或步长；永续按现货扣费净额向下取整"
+            result["reason"] = f"{label}数量不符合最小下单量或步长；按扣费净额最小残差配平"
             return result
         minimum_notional = spec.get("minNotional") or spec.get("minNotionalValue")
         if minimum_notional is not None and amount * Decimal(str(quote["mid"])) < Decimal(
@@ -1066,6 +1273,42 @@ def _open_sizing(
 
 def _aggregate_quality(*values: str) -> str:
     return "complete" if all(value == "complete" for value in values) else "partial"
+
+
+def _executable_spread(
+    perp_quote: dict[str, Any], spot_quote: dict[str, Any]
+) -> dict[str, str | None]:
+    """Show the two-sided spread using executable, not midpoint, prices."""
+    try:
+        perp_bid = Decimal(str(perp_quote["bid"]))
+        perp_ask = Decimal(str(perp_quote["ask"]))
+        spot_bid = Decimal(str(spot_quote["bid"]))
+        spot_ask = Decimal(str(spot_quote["ask"]))
+        open_spread = perp_bid - spot_ask
+        close_spread = spot_bid - perp_ask
+        open_pct = open_spread / spot_ask * 100 if spot_ask > 0 else None
+        close_pct = close_spread / perp_ask * 100 if perp_ask > 0 else None
+        return {
+            "open": _decimal_text(open_spread),
+            "openPercent": _decimal_text(open_pct),
+            "close": _decimal_text(close_spread),
+            "closePercent": _decimal_text(close_pct),
+            "perpetualBid": _decimal_text(perp_bid),
+            "perpetualAsk": _decimal_text(perp_ask),
+            "spotBid": _decimal_text(spot_bid),
+            "spotAsk": _decimal_text(spot_ask),
+        }
+    except (KeyError, TypeError, ValueError, ArithmeticError):
+        return {
+            "open": None,
+            "openPercent": None,
+            "close": None,
+            "closePercent": None,
+            "perpetualBid": None,
+            "perpetualAsk": None,
+            "spotBid": None,
+            "spotAsk": None,
+        }
 
 
 def _decimal_text(value: Decimal | None) -> str | None:

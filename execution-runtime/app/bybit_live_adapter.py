@@ -52,6 +52,11 @@ class BybitLiveAdapter:
         self._connections = BybitConnections(settings)
         self._market_readers: dict[str, BybitMarketData] = {}
         self._market_reader_lock = RLock()
+        # A full account snapshot fans out into several authenticated Bybit
+        # reads. Keep snapshots for different accounts serialized so a shared
+        # pybit timestamp helper and venue rate limits cannot corrupt one read
+        # while another account is being assembled.
+        self._account_snapshot_lock = RLock()
 
     def capability(self) -> GatewayAdapterCapability:
         missing: list[str] = []
@@ -471,6 +476,82 @@ class BybitLiveAdapter:
         except Exception as exc:
             raise self._unknown_error("Bybit ticker result is unknown", exc) from exc
 
+    def list_funding_markets(
+        self, *, account_id: str, search: str | None = None
+    ) -> list[dict[str, object]]:
+        """Return Bybit spot/perpetual pairs that can form a Funding hedge."""
+        self._assert_account(account_id)
+        needle = (search or "").strip().upper()
+        try:
+            spot_markets = self._market_data(account_id).markets("spot")
+            perp_markets = self._market_data(account_id).markets("linear")
+            spots = {
+                (str(row.get("base") or "").upper(), str(row.get("quote") or "").upper()): row
+                for row in spot_markets
+                if str((row.get("info") or {}).get("status") or "Trading").lower()
+                in {"trading", "online"}
+            }
+            pairs: list[dict[str, object]] = []
+            for perp in perp_markets:
+                info = perp.get("info") or {}
+                if not perp.get("swap") or str(info.get("status") or "").lower() not in {
+                    "trading",
+                    "online",
+                }:
+                    continue
+                base = str(perp.get("base") or "").upper()
+                quote = str(perp.get("quote") or "").upper()
+                spot = spots.get((base, quote))
+                if spot is None or quote != self.settings.bybit_settle_coin.upper():
+                    continue
+                perp_symbol = str(perp.get("id") or "").upper()
+                spot_symbol = str(spot.get("id") or "").upper()
+                if needle and needle not in {base, perp_symbol, spot_symbol} and needle not in base:
+                    continue
+
+                def spec(
+                    row: dict[str, object],
+                    fallback_quote: str = quote,
+                ) -> dict[str, object]:
+                    limits = row.get("limits") or {}
+                    amount_limits = limits.get("amount") or {}
+                    precision = row.get("precision") or {}
+                    return {
+                        "priceTick": str(precision.get("price") or "0"),
+                        "minQuantity": str(amount_limits.get("min") or "0"),
+                        "quantityStep": str(precision.get("amount") or "0"),
+                        "contractMultiplier": str(row.get("contractSize") or "1"),
+                        "settlementCurrency": str(row.get("settle") or fallback_quote),
+                    }
+
+                pairs.append(
+                    {
+                        "baseAsset": base,
+                        "quoteCurrency": quote,
+                        "perpetualSymbol": perp_symbol,
+                        "spotSymbol": spot_symbol,
+                        "perpetualInstrumentId": self._instrument_id_for_symbol(
+                            account_id=account_id,
+                            symbol=perp_symbol,
+                            instrument_type="crypto_perp",
+                            category="linear",
+                        ),
+                        "spotInstrumentId": self._instrument_id_for_symbol(
+                            account_id=account_id,
+                            symbol=spot_symbol,
+                            instrument_type="crypto_spot",
+                            category="spot",
+                        ),
+                        "perpetual": spec(perp),
+                        "spot": spec(spot),
+                    }
+                )
+            return sorted(pairs, key=lambda item: (str(item["baseAsset"]), str(item["perpetualSymbol"])))
+        except (GatewayConfigurationError, GatewayRequestRejectedError):
+            raise
+        except Exception as exc:
+            raise self._unknown_error("Bybit funding market catalog is unknown", exc) from exc
+
     def list_balances(self, account_id: str | None = None) -> list[VenueBalanceSnapshot]:
         account = account_id or self._single_account()
         self._assert_account(account)
@@ -699,13 +780,15 @@ class BybitLiveAdapter:
         account_id: str | None = None,
         instrument_id: str | None = None,
         event_type: str | None = None,
+        start_time: datetime | None = None,
+        end_time: datetime | None = None,
     ) -> list[VenueEconomicEventSnapshot]:
         account = account_id or self._single_account()
         self._assert_account(account)
         if event_type not in {None, "funding", "fee", "realized_pnl"}:
             return []
-        end = datetime.now(UTC)
-        start = end - timedelta(days=7) + timedelta(milliseconds=1)
+        end = end_time or datetime.now(UTC)
+        start = start_time or (end - timedelta(days=7) + timedelta(milliseconds=1))
         try:
             rows = self._snapshot_pages(
                 account,
@@ -834,12 +917,37 @@ class BybitLiveAdapter:
             asOf=datetime.now(UTC),
         )
 
-    def get_account_snapshot(self, account_id: str) -> VenueAccountSnapshot:
+    def get_account_snapshot(
+        self,
+        account_id: str,
+        *,
+        include_history: bool = True,
+        history_start: datetime | None = None,
+    ) -> VenueAccountSnapshot:
+        if not include_history:
+            return self._get_account_snapshot(
+                account_id, include_history=False, history_start=history_start
+            )
+        with self._account_snapshot_lock:
+            return self._get_account_snapshot(
+                account_id, include_history=True, history_start=history_start
+            )
+
+    def _get_account_snapshot(
+        self,
+        account_id: str,
+        *,
+        include_history: bool = True,
+        history_start: datetime | None = None,
+    ) -> VenueAccountSnapshot:
         self._assert_account(account_id)
         wallet_response = self._wallet_response(account_id)
         balances = self._balances_from_wallet_response(account_id, wallet_response)
         history_end = datetime.now(UTC)
+        requested_history_start = history_start
         history_start = history_end - timedelta(days=7) + timedelta(milliseconds=1)
+        if requested_history_start is not None:
+            history_start = requested_history_start
         categories = self.settings.bybit_categories_for_account(account_id)
         queries: dict[tuple[str, str], dict[str, object]] = {}
         for category in categories:
@@ -848,18 +956,28 @@ class BybitLiveAdapter:
                 if category == "linear":
                     position_query["settleCoin"] = self.settings.bybit_settle_coin
                 queries[category, "get_positions"] = position_query
-            for method, limit in (
-                ("get_open_orders", 50),
-                ("get_order_history", 50),
-                ("get_executions", 100),
-            ):
-                query = self._account_snapshot_order_query_kwargs(category, limit=limit)
-                if method != "get_open_orders":
-                    query.update(
-                        startTime=int(history_start.timestamp() * 1000),
-                        endTime=int(history_end.timestamp() * 1000),
-                    )
-                queries[category, method] = query
+            if include_history:
+                for method, limit in (
+                    ("get_open_orders", 50),
+                    ("get_order_history", 50),
+                    ("get_executions", 100),
+                ):
+                    query = self._account_snapshot_order_query_kwargs(category, limit=limit)
+                    # Bybit order history uses created-time filtering; keep its
+                    # established seven-day window so recently closed older
+                    # orders remain visible. Fills use the requested window.
+                    if method == "get_order_history":
+                        query["startTime"] = int(
+                            (history_end - timedelta(days=7) + timedelta(milliseconds=1)).timestamp()
+                            * 1000
+                        )
+                        query["endTime"] = int(history_end.timestamp() * 1000)
+                    elif method != "get_open_orders":
+                        query.update(
+                            startTime=int(history_start.timestamp() * 1000),
+                            endTime=int(history_end.timestamp() * 1000),
+                        )
+                    queries[category, method] = query
         with ThreadPoolExecutor(max_workers=4, thread_name_prefix="bybit-account-read") as pool:
             futures = {
                 key: pool.submit(self._snapshot_pages, account_id, key[1], query)
@@ -936,7 +1054,7 @@ class BybitLiveAdapter:
                         )
                     )
             for query_name in ("get_open_orders", "get_order_history"):
-                for row in sections[category, query_name]:
+                for row in sections.get((category, query_name), []):
                     symbol = str(row.get("symbol") or "").upper()
                     row_category = str(row.get("category") or category).lower()
                     instrument_type = self._instrument_type_for_category(row_category)
@@ -986,7 +1104,7 @@ class BybitLiveAdapter:
                         asOf=self._millis(row.get("updatedTime")),
                         dataQualityState="complete" if route is not None else "external_only",
                     )
-            for row in sections[category, "get_executions"]:
+            for row in sections.get((category, "get_executions"), []):
                 # Funding settlements share the executions endpoint but are not fills.
                 if str(row.get("execType") or "Trade") != "Trade":
                     continue
@@ -1064,10 +1182,18 @@ class BybitLiveAdapter:
         )
         economic_events: list[VenueEconomicEventSnapshot] = []
         economic_quality = "complete"
-        try:
-            economic_events = self.list_economic_events(account_id=account_id)
-        except Exception:
-            economic_quality = "unavailable"
+        if include_history:
+            try:
+                economic_events = self.list_economic_events(
+                    account_id=account_id,
+                    start_time=requested_history_start,
+                    end_time=history_end,
+                )
+            except Exception:
+                economic_quality = "unavailable"
+        else:
+            history_start = history_end = None
+            economic_quality = "not_requested"
         return VenueAccountSnapshot(
             source=self.name,
             accountId=account_id,
@@ -1078,8 +1204,16 @@ class BybitLiveAdapter:
             },
             balances=balances,
             positions=positions,
-            orders=sorted(orders_by_id.values(), key=lambda item: item.as_of, reverse=True),
-            fills=sorted(fills_by_id.values(), key=lambda item: item.occurred_at, reverse=True),
+            orders=(
+                sorted(orders_by_id.values(), key=lambda item: item.as_of, reverse=True)
+                if include_history
+                else []
+            ),
+            fills=(
+                sorted(fills_by_id.values(), key=lambda item: item.occurred_at, reverse=True)
+                if include_history
+                else []
+            ),
             accountRisk=risk,
             historyStart=history_start,
             historyEnd=history_end,
@@ -1239,6 +1373,8 @@ class BybitLiveAdapter:
         return self._connections.client(account_id or self._single_account())
 
     def _read_with_retry(self, account_id_or_operation, operation=None):
+        from time import sleep
+
         from requests.exceptions import ConnectionError, Timeout
 
         if operation is None:
@@ -1249,8 +1385,12 @@ class BybitLiveAdapter:
         try:
             return operation(self._client(account_id))
         except (ConnectionError, Timeout):
-            # Exactly one read retry over the same owned connection. Invalid
-            # credentials, malformed facts and venue rejections are not retried.
+            # A reset can poison the requests connection pool. Rebuild the
+            # account-owned session before the single bounded read retry;
+            # invalid credentials and venue rejections are still not retried.
+            if self._injected_client is None:
+                self._connections.reset(account_id)
+                sleep(0.2)
             return operation(self._client(account_id))
 
     def _market_data(self, account_id: str) -> BybitMarketData:

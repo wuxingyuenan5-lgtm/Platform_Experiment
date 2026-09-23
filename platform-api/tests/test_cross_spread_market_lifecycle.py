@@ -63,7 +63,13 @@ def headers(token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
 
 
-def insert_batch_with_fills(batch_id: str, *, direction: str = "OPEN_LONG") -> None:
+def insert_batch_with_fills(
+    batch_id: str,
+    *,
+    direction: str = "OPEN_LONG",
+    record_prefix: str = "",
+) -> None:
+    prefix = f"{record_prefix}-" if record_prefix else ""
     with connection() as db:
         db.execute(
             """
@@ -86,7 +92,7 @@ def insert_batch_with_fills(batch_id: str, *, direction: str = "OPEN_LONG") -> N
         )
         legs = (
             (
-                "bybit-leg-id",
+                f"{prefix}bybit-leg-id",
                 1,
                 "bybit_leg",
                 "account_crypto_test",
@@ -94,10 +100,10 @@ def insert_batch_with_fills(batch_id: str, *, direction: str = "OPEN_LONG") -> N
                 "XAUTUSDT",
                 "buy",
                 "1",
-                "bybit-order-id",
+                f"{prefix}bybit-order-id",
             ),
             (
-                "mt5-leg-id",
+                f"{prefix}mt5-leg-id",
                 2,
                 "mt5_leg",
                 "account_mt5_demo",
@@ -105,7 +111,7 @@ def insert_batch_with_fills(batch_id: str, *, direction: str = "OPEN_LONG") -> N
                 "XAUUSD.s",
                 "sell",
                 "0.01",
-                "mt5-order-id",
+                f"{prefix}mt5-order-id",
             ),
         )
         for leg_id, sequence, role, account_id, instrument_id, symbol, side, qty, order_id in legs:
@@ -119,13 +125,13 @@ def insert_batch_with_fills(batch_id: str, *, direction: str = "OPEN_LONG") -> N
                 """,
                 (
                     order_id,
-                    f"command:{order_id}",
+                    f"command:{prefix}{order_id}",
                     account_id,
                     instrument_id,
                     symbol,
                     side,
                     qty,
-                    f"external:{order_id}",
+                    f"external:{prefix}{order_id}",
                     NOW,
                     NOW,
                 ),
@@ -159,10 +165,10 @@ def insert_batch_with_fills(batch_id: str, *, direction: str = "OPEN_LONG") -> N
                 id, order_id, account_id, instrument_id, side,
                 quantity, price, occurred_at
             )
-            VALUES ('fill-bybit', 'bybit-order-id', 'account_crypto_test',
+            VALUES (?, ?, 'account_crypto_test',
                     'instrument_xau_usdt_perp', 'buy', '1', '2499', ?)
             """,
-            (NOW,),
+            (f"{prefix}fill-bybit", f"{prefix}bybit-order-id", NOW),
         )
         db.execute(
             """
@@ -170,10 +176,10 @@ def insert_batch_with_fills(batch_id: str, *, direction: str = "OPEN_LONG") -> N
                 id, order_id, account_id, instrument_id, side,
                 quantity, price, occurred_at
             )
-            VALUES ('fill-mt5', 'mt5-order-id', 'account_mt5_demo',
+            VALUES (?, ?, 'account_mt5_demo',
                     'instrument_xau_usd', 'sell', '0.01', '2501', ?)
             """,
-            (NOW,),
+            (f"{prefix}fill-mt5", f"{prefix}mt5-order-id", NOW),
         )
 
 

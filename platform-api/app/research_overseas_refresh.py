@@ -1,7 +1,7 @@
 """海外研究数据（FedWatch / ETF Flow / Deribit IV）定时刷新 worker。
 
-调度沿用 A 股的 lifespan + 周期轮询模式：美股收盘后（北京时间 06:00 起）
-每天刷新一次，幂等判断按 dataset 独立（各源同一天只刷一次）。单个数据源
+调度沿用 A 股的 lifespan + 周期轮询模式：FedWatch 全天按 1 小时幂等窗口刷新，
+其他日度数据在北京时间 06:00 后按中国日幂等。单个数据源
 失败不阻塞其他源（return_exceptions 隔离），失败保留上一次有效数据。
 """
 
@@ -10,7 +10,8 @@ from __future__ import annotations
 import asyncio
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from datetime import UTC, datetime, time
+from datetime import UTC, datetime, time, timedelta
+from typing import cast
 from uuid import uuid4
 from zoneinfo import ZoneInfo
 
@@ -18,24 +19,31 @@ from fastapi import FastAPI
 
 from app.config import get_settings
 from app.research_a_share_repository import finish_refresh, start_refresh
+from app.research_cumulative_volatility import refresh_cumulative_volatility
 from app.research_overseas_repository import (
     read_latest_fetched_at,
     write_iv_snapshot,
     write_overseas_points,
     write_overseas_series,
 )
+from app.research_macro_expectations_refresh import refresh_macro_expectations
 from app.research_provider_overseas import (
     fetch_btc_iv_snapshot,
     fetch_deribit_iv,
     fetch_etf_flow,
+    fetch_crypto_daily_prices,
     fetch_fedwatch,
 )
+from app.research_write_lock import RESEARCH_DB_WRITE_LOCK
 
 _CHINA = ZoneInfo("Asia/Shanghai")
 _REFRESH_LOCK = asyncio.Lock()
 
 _SOURCE_FEDWATCH = "CME FedWatch (30-Day Fed Funds Futures)"
-_SOURCE_ETF = "Farside UK BTC Spot ETF Flows (US$m)"
+_SOURCE_ETF = {
+    "btc": "Farside UK BTC Spot ETF Flows; Bybit daily close conversion",
+    "eth": "Farside UK ETH Spot ETF Flows; Bybit daily close conversion",
+}
 _SOURCE_IV = "Deribit BTC Options ATM IV"
 
 
@@ -59,21 +67,48 @@ def _already_refreshed_today(dataset: str) -> bool:
     return dt.astimezone(_CHINA).date() == datetime.now(_CHINA).date()
 
 
+def _already_refreshed_within(
+    dataset: str,
+    window: timedelta,
+    *,
+    now: datetime | None = None,
+) -> bool:
+    """Use fetch age for live datasets instead of the daily overseas gate."""
+    fetched = read_latest_fetched_at(dataset)
+    if not fetched:
+        return False
+    try:
+        dt = datetime.fromisoformat(fetched)
+    except ValueError:
+        return False
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=UTC)
+    age = (now or datetime.now(UTC)) - dt.astimezone(UTC)
+    return timedelta(0) <= age < window
+
+
+def _hourly_observed_at() -> str:
+    """Bucket FedWatch snapshots by UTC hour for idempotent hourly storage."""
+    return datetime.now(UTC).replace(minute=0, second=0, microsecond=0).isoformat()
+
+
 async def _collect_fedwatch(force: bool) -> tuple[str, str]:
     """抓取并落库 FedWatch，返回 (status, message)。"""
     dataset = "macro_fedwatch"
-    if not force and _already_refreshed_today(dataset):
+    if not force and _already_refreshed_within(dataset, timedelta(hours=1)):
         return "up_to_date", ""
     run_id = uuid4().hex
-    today = _today()
-    start_refresh(run_id, None)
+    observed_at = _hourly_observed_at()
+    async with RESEARCH_DB_WRITE_LOCK:
+        await asyncio.to_thread(start_refresh, run_id, None)
     try:
         fedwatch = await asyncio.to_thread(fetch_fedwatch)
         series = {
             "__meta__": {
                 "effr": fedwatch["effr"],
                 "currentTarget": fedwatch["currentTarget"],
-                "observedAt": fedwatch["observedAt"],
+                "observedAt": observed_at,
+                "settlementSource": fedwatch.get("settlementSource"),
                 "zqPricing": fedwatch["zqPricing"],
             }
         }
@@ -82,42 +117,82 @@ async def _collect_fedwatch(force: bool) -> tuple[str, str]:
                 "probabilities": meeting["probabilities"],
                 "contract": meeting.get("contract"),
             }
-        await asyncio.to_thread(
-            write_overseas_series, run_id, dataset, today, series, source=_SOURCE_FEDWATCH
-        )
-        finish_refresh(run_id, "ready")
+        async with RESEARCH_DB_WRITE_LOCK:
+            await asyncio.to_thread(
+                write_overseas_series, run_id, dataset, observed_at, series, source=_SOURCE_FEDWATCH
+            )
+            await asyncio.to_thread(finish_refresh, run_id, "ready")
         return "ready", ""
     except BaseException as exc:
-        finish_refresh(run_id, "error", error_code=type(exc).__name__, message=str(exc)[:500])
+        async with RESEARCH_DB_WRITE_LOCK:
+            await asyncio.to_thread(
+                finish_refresh, run_id, "error", error_code=type(exc).__name__, message=str(exc)[:500]
+            )
         raise
 
 
-async def _collect_etf_flow(force: bool) -> tuple[str, str]:
-    """抓取并落库 BTC ETF 资金流（最近 14 日，逐日逐 ticker 落点）。"""
-    dataset = "crypto_etf_flow"
+async def _collect_etf_flow(force: bool, asset: str = "btc") -> tuple[str, str]:
+    """抓取并落库 BTC/ETH ETF 资金流（源站可提供历史，逐日逐 ticker 落点）。"""
+    asset_key = asset.lower().strip()
+    if asset_key not in {"btc", "eth"}:
+        raise ValueError(f"unsupported_etf_asset:{asset}")
+    # Keep the established BTC dataset identity for existing history and
+    # consumers; ETH gets its own sibling dataset.
+    dataset = "crypto_etf_flow" if asset_key == "btc" else "crypto_eth_etf_flow"
     if not force and _already_refreshed_today(dataset):
         return "up_to_date", ""
     run_id = uuid4().hex
-    start_refresh(run_id, None)
+    async with RESEARCH_DB_WRITE_LOCK:
+        await asyncio.to_thread(start_refresh, run_id, None)
     try:
-        data = await asyncio.to_thread(fetch_etf_flow, 14)
+        # Farside pages expose the historical table. Rewriting this bounded
+        # history on each daily refresh also backfills dates missing before
+        # the long-window contract was enabled.
+        data = await asyncio.to_thread(fetch_etf_flow, 3650, asset_key)
+        try:
+            prices = await asyncio.to_thread(
+                fetch_crypto_daily_prices,
+                asset_key,
+                data["days"][0]["date"],
+                data["days"][-1]["date"],
+            )
+        except Exception:
+            # ETF flow refresh remains usable when the independent price
+            # conversion source is temporarily unavailable. Rows retain the
+            # original USD flow and are converted on the next successful run.
+            prices = {}
+        # Never publish a mixed-unit series: a partial price map would make
+        # some rows BTC/ETH and the remaining rows USD while the card exposes
+        # only one unit label. Wait for a complete daily-close window instead.
+        if prices and not all(day["date"] in prices for day in data["days"]):
+            prices = {}
         tickers = data["tickers"]
         latest = data["days"][-1]["date"]
-        points: list[tuple[str, str, dict]] = [
-            (latest, "__meta__", {"tickers": tickers, "unit": "US$m"})
-        ]
+        meta = {"tickers": tickers, "unit": "US$m"}
+        if prices:
+            meta.update({"coinUnit": asset_key.upper(), "priceSource": "Bybit daily linear close"})
+        points: list[tuple[str, str, dict]] = [(latest, "__meta__", meta)]
         for day in data["days"]:
             for ticker in tickers:
-                points.append(
-                    (day["date"], ticker, {"flow": day["flows"].get(ticker)})
+                usd_flow = day["flows"].get(ticker)
+                price = prices.get(day["date"])
+                coin_flow = (
+                    float(usd_flow) * 1_000_000 / price
+                    if usd_flow is not None and price and price > 0
+                    else None
                 )
-        await asyncio.to_thread(
-            write_overseas_points, run_id, dataset, points, source=_SOURCE_ETF
-        )
-        finish_refresh(run_id, "ready")
+                points.append((day["date"], ticker, {"flow": usd_flow, "coinFlow": coin_flow, "price": price}))
+        async with RESEARCH_DB_WRITE_LOCK:
+            await asyncio.to_thread(
+                write_overseas_points, run_id, dataset, points, source=_SOURCE_ETF[asset_key]
+            )
+            await asyncio.to_thread(finish_refresh, run_id, "ready")
         return "ready", ""
     except BaseException as exc:
-        finish_refresh(run_id, "error", error_code=type(exc).__name__, message=str(exc)[:500])
+        async with RESEARCH_DB_WRITE_LOCK:
+            await asyncio.to_thread(
+                finish_refresh, run_id, "error", error_code=type(exc).__name__, message=str(exc)[:500]
+            )
         raise
 
 
@@ -133,7 +208,8 @@ async def _collect_deribit_iv(force: bool) -> tuple[str, str]:
     if not force and already_done:
         return "up_to_date", ""
     run_id = uuid4().hex
-    start_refresh(run_id, None)
+    async with RESEARCH_DB_WRITE_LOCK:
+        await asyncio.to_thread(start_refresh, run_id, None)
     try:
         # 1. 抓 IV 期限结构（用旧 fetcher，标准化 1W/2W/1M/2M/3M/6M/9M 桶）
         term_data = await asyncio.to_thread(fetch_deribit_iv)
@@ -144,40 +220,66 @@ async def _collect_deribit_iv(force: bool) -> tuple[str, str]:
                 "tenor": point["tenor"],
                 "iv": point["iv"],
             }
-        await asyncio.to_thread(
-            write_overseas_series, run_id, dataset_term, today, series, source=_SOURCE_IV
-        )
+        async with RESEARCH_DB_WRITE_LOCK:
+            await asyncio.to_thread(
+                write_overseas_series, run_id, dataset_term, today, series, source=_SOURCE_IV
+            )
         # 2. 抓 1M/3M/6M/1Y 快照（按日累积）
         snap = await asyncio.to_thread(fetch_btc_iv_snapshot)
-        await asyncio.to_thread(
-            write_iv_snapshot, run_id, today, snap, source=_SOURCE_IV
-        )
-        finish_refresh(run_id, "ready")
+        async with RESEARCH_DB_WRITE_LOCK:
+            await asyncio.to_thread(
+                write_iv_snapshot, run_id, today, snap, source=_SOURCE_IV
+            )
+            await asyncio.to_thread(finish_refresh, run_id, "ready")
         return "ready", ""
     except BaseException as exc:
-        finish_refresh(run_id, "error", error_code=type(exc).__name__, message=str(exc)[:500])
+        async with RESEARCH_DB_WRITE_LOCK:
+            await asyncio.to_thread(
+                finish_refresh, run_id, "error", error_code=type(exc).__name__, message=str(exc)[:500]
+            )
         raise
 
 
 async def refresh_overseas(*, force: bool = False) -> str:
-    """抓取全部海外数据源并落库；返回 ready/up_to_date/not_due/busy/error。"""
+    """抓取海外数据源并落库；返回 ready/up_to_date/busy/error。"""
     if not force and not _overseas_refresh_due():
-        return "not_due"
+        # FedWatch is a live futures curve and must keep its hourly cadence
+        # through the US session (which falls before 06:00 China time). The
+        # daily ETF/IV datasets remain on the China-calendar gate below.
+        if _REFRESH_LOCK.locked():
+            return "busy"
+        async with _REFRESH_LOCK:
+            try:
+                status, _ = await _collect_fedwatch(False)
+                return status
+            except BaseException:
+                return "error"
     if _REFRESH_LOCK.locked():
         return "busy"
 
     async with _REFRESH_LOCK:
         results = await asyncio.gather(
             _collect_fedwatch(force),
-            _collect_etf_flow(force),
+            _collect_etf_flow(force, "btc"),
+            _collect_etf_flow(force, "eth"),
             _collect_deribit_iv(force),
+            _refresh_cumulative_with_lock(force),
             return_exceptions=True,
         )
-        if any(isinstance(r, BaseException) for r in results):
+        # Volatility is an enrichment source; its failure must not hide the
+        # established overseas datasets.
+        primary = [results[0], results[1], results[2], results[3]]
+        if any(isinstance(r, BaseException) for r in primary):
             return "error"
-        if all(r[0] == "up_to_date" for r in results if not isinstance(r, BaseException)):
+        primary_statuses = [cast(tuple[str, str], result) for result in primary]
+        if all(result[0] == "up_to_date" for result in primary_statuses):
             return "up_to_date"
         return "ready"
+
+
+async def _refresh_cumulative_with_lock(force: bool) -> str:
+    async with RESEARCH_DB_WRITE_LOCK:
+        return await asyncio.to_thread(refresh_cumulative_volatility, force=force)
 
 
 @asynccontextmanager
@@ -199,4 +301,21 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
 async def _run_periodic(interval_seconds: float) -> None:
     while True:
         await refresh_overseas()
-        await asyncio.sleep(interval_seconds)
+        # Prediction-market probabilities are short-lived observations.  They
+        # are refreshed on the same bounded five-minute loop as intraday data,
+        # while the page continues to read the local artifact only.
+        try:
+            await asyncio.to_thread(refresh_macro_expectations)
+        except Exception:
+            pass
+        # Intraday candles are a separate five-minute production cadence. The
+        # daily overseas sources still remain gated/idempotent inside
+        # refresh_overseas(), so this does not refetch them on every tick.
+        if not _overseas_refresh_due():
+            try:
+                await _refresh_cumulative_with_lock(False)
+            except Exception:
+                # The cumulative series is an enrichment source; its failure
+                # must not stop the worker from checking the daily datasets.
+                pass
+        await asyncio.sleep(min(interval_seconds, 300.0))

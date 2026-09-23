@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 
-const FRONTEND_ORIGIN = 'http://127.0.0.1:4373';
+const FRONTEND_ORIGIN = process.env.PLATFORM_VISUAL_FRONTEND_ORIGIN;
+if (!FRONTEND_ORIGIN) throw new Error('Run with playwright.platform-visual.config.ts');
 const VIEWPORTS = [
   { name: 'desktop-1440', width: 1440, height: 900 },
   { name: 'laptop-1024', width: 1024, height: 768 },

@@ -1,5 +1,5 @@
 import { buildTradeRecords, recordTime } from './strategyTradeRecords';
-import { computed } from 'vue';
+import { computed, onBeforeUnmount, reactive } from 'vue';
 import { nativeAmount, settlementLabel } from './strategyRecordPresentation';
 import { useQueries } from '@tanstack/vue-query';
 import {
@@ -49,7 +49,11 @@ function orderProfile(
   desk: AccountStrategyDesk,
   snapshot: StrategyAccountSnapshotResult | null,
 ): StrategyOrderProfile {
-  const records = buildTradeRecords(snapshot?.orders || [], snapshot?.fills || []);
+  const records = buildTradeRecords(
+    snapshot?.orders || [],
+    snapshot?.fills || [],
+    snapshot?.economicEvents || [],
+  );
   if (snapshot && snapshot.fillsTotal > snapshot.fills.length) {
     records.fills.description += ` 当前载入最近 ${snapshot.fills.length} / ${snapshot.fillsTotal} 条成交。`;
     records.activity.description += ' 汇总范围为当前已载入的委托和成交。';
@@ -135,22 +139,37 @@ function orderProfile(
 function distributionPositions(
   snapshot: StrategyAccountSnapshotResult | undefined,
 ): StrategyAccountSnapshotResult['positions'] {
-  const financePositions = snapshot?.finance?.positions as
-    | StrategyAccountSnapshotResult['positions']
-    | undefined;
-  return financePositions && financePositions.length ? financePositions : snapshot?.positions ?? [];
+  // The catalog read model already projects Funding strategy positions into
+  // the snapshot. Finance history is not a second current-position source.
+  return snapshot?.positions ?? [];
 }
 
 export function useStrategyAccountSnapshots() {
+  const detailsModes = reactive<Record<AccountStrategyDesk, boolean>>({
+    funding: false,
+    dip: false,
+    shortLineTraderL: false,
+    shortLineTraderW: false,
+  });
+  let disposed = false;
   const queries = useQueries(
     {
       queries: computed(() =>
-        (Object.keys(instanceIds) as AccountStrategyDesk[]).map((desk) => ({
-          queryKey: strategyQueryKey('account-snapshot', instanceIds[desk]),
-          queryFn: ({ signal }: { signal: AbortSignal }) =>
-            getStrategyAccountSnapshot(instanceIds[desk], undefined, signal),
-          enabled: false,
-        })),
+        (Object.keys(instanceIds) as AccountStrategyDesk[]).map((desk) => {
+          const includeDetails = detailsModes[desk];
+          return {
+            queryKey: strategyQueryKey(
+              'account-snapshot',
+              instanceIds[desk],
+              includeDetails ? 'full' : 'summary',
+            ),
+            queryFn: ({ signal }: { signal: AbortSignal }) =>
+              getStrategyAccountSnapshot(instanceIds[desk], undefined, signal, {
+                includeDetails,
+              }),
+            enabled: false,
+          };
+        }),
       ),
     },
     strategyQueryClient,
@@ -174,20 +193,41 @@ export function useStrategyAccountSnapshots() {
         ]),
       ) as Partial<Record<AccountStrategyDesk, string>>,
   );
-  async function refresh(desk?: StrategyDeskKey) {
+  async function refresh(
+    desk?: StrategyDeskKey,
+    section: 'pnl' | 'capital' | 'orders' = 'capital',
+  ) {
+    if (disposed) return;
     const keys = desk && accountDesk(desk) ? [desk] : desks;
+    keys.forEach((key) => {
+      detailsModes[key] = section !== 'capital';
+    });
     await Promise.allSettled(
       keys.map((key) =>
-        fetchStrategyQuery(['account-snapshot', instanceIds[key]], (signal) =>
-          getStrategyAccountSnapshot(instanceIds[key], undefined, signal),
+        fetchStrategyQuery(
+          ['account-snapshot', instanceIds[key], detailsModes[key] ? 'full' : 'summary'],
+          (signal) =>
+            getStrategyAccountSnapshot(instanceIds[key], undefined, signal, {
+              includeDetails: detailsModes[key],
+            }),
         ),
       ),
     );
   }
 
+  onBeforeUnmount(() => {
+    disposed = true;
+  });
+
   return {
     refresh,
     errors,
+    financialSyncFailures: computed(
+      () =>
+        Object.fromEntries(
+          desks.map((desk) => [desk, snapshots.value[desk]?.financialSyncStatus === 'failed']),
+        ) as Record<AccountStrategyDesk, boolean>,
+    ),
     loading: computed(
       () =>
         Object.fromEntries(
@@ -209,6 +249,10 @@ export function useStrategyAccountSnapshots() {
                 positionValue: snapshots.value[desk]?.positionValue ?? null,
                 positionValueNet: snapshots.value[desk]?.positionValueNet ?? null,
                 dailyPnl: snapshots.value[desk]?.dailyPnl ?? [],
+                strategyDailyPnl:
+                  snapshots.value[desk]?.strategyDailyPnl ??
+                  snapshots.value[desk]?.finance?.strategyDailyPnl ??
+                  [],
               },
             ),
           ]),

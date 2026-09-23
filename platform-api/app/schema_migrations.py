@@ -827,6 +827,123 @@ PLATFORM_MIGRATIONS += (
     )),
 )
 
+PLATFORM_MIGRATIONS += (
+    Migration(version=26, name="cross-spread-adverse-spread-guards", statements=(
+        "ALTER TABLE cross_spread_exit_plans ADD COLUMN take_profit_max_adverse_spread TEXT NOT NULL DEFAULT '0'",
+        "ALTER TABLE cross_spread_exit_plans ADD COLUMN stop_loss_max_adverse_spread TEXT NOT NULL DEFAULT '0'",
+    )),
+)
+
+
+PLATFORM_MIGRATIONS += (
+    Migration(version=27, name="cross-spread-terminal-fill-evidence", statements=(
+        "CREATE TABLE runtime_order_terminals (order_id TEXT PRIMARY KEY REFERENCES orders(id), event_id TEXT NOT NULL UNIQUE, filled_quantity TEXT NOT NULL, occurred_at TEXT NOT NULL)",
+    )),
+)
+
+PLATFORM_MIGRATIONS += (
+    Migration(version=28, name="cross-spread-open-triggers", statements=(
+        """CREATE TABLE cross_spread_open_triggers (
+            id TEXT PRIMARY KEY, idempotency_key TEXT NOT NULL UNIQUE,
+            direction TEXT NOT NULL, quantity_oz TEXT NOT NULL, limit_spread TEXT NOT NULL,
+            limit_strategy TEXT NOT NULL, request_json TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT 'pending', created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL, triggered_at TEXT, execution_batch_id TEXT,
+            failure_reason TEXT
+        )""",
+        "CREATE INDEX idx_cross_spread_open_triggers_status ON cross_spread_open_triggers(status, created_at)",
+    )),
+)
+
+
+PLATFORM_MIGRATIONS += (
+    Migration(version=29, name="account-read-job-status", statements=(
+        """CREATE TABLE account_read_jobs (
+            account_id TEXT NOT NULL REFERENCES accounts(id),
+            job TEXT NOT NULL CHECK(job IN ('history','settlements')),
+            status TEXT NOT NULL, last_attempt_at TEXT NOT NULL,
+            last_success_at TEXT, error_code TEXT,
+            PRIMARY KEY(account_id, job)
+        )""",
+    )),
+)
+
+
+PLATFORM_MIGRATIONS += (
+    Migration(version=30, name="strategy-research-archive", statements=(
+        """CREATE TABLE research_strategy_parts (
+            part_id TEXT PRIMARY KEY, start_cursor TEXT, end_cursor TEXT NOT NULL UNIQUE,
+            path TEXT NOT NULL UNIQUE, checksum TEXT NOT NULL, row_count INTEGER NOT NULL,
+            first_at TEXT NOT NULL,last_at TEXT NOT NULL,published_at TEXT NOT NULL)""",
+        """CREATE TABLE research_strategy_capture (
+            id INTEGER PRIMARY KEY CHECK(id=1),cursor TEXT,state_json TEXT NOT NULL,
+            status_json TEXT NOT NULL)""",
+        """CREATE TABLE research_strategy_experiments (
+            run_id TEXT PRIMARY KEY,user_id TEXT NOT NULL,parameters_json TEXT NOT NULL,
+            parts_json TEXT NOT NULL,status TEXT NOT NULL CHECK(status IN
+            ('queued','running','completed','failed','cancelled')),
+            result_json TEXT,error TEXT,created_at TEXT NOT NULL)""",
+        """CREATE TABLE research_strategy_drafts (
+            id TEXT PRIMARY KEY,user_id TEXT NOT NULL,payload_json TEXT NOT NULL,
+            created_at TEXT NOT NULL)""",
+    )),
+)
+
+
+PLATFORM_MIGRATIONS += (
+    Migration(version=31, name="strategy-research-serving-projection", statements=(
+        """CREATE TABLE research_strategy_projection (
+            kind TEXT NOT NULL, entity TEXT NOT NULL, at_ms INTEGER NOT NULL,
+            payload_json TEXT NOT NULL, PRIMARY KEY(kind,entity,at_ms)) WITHOUT ROWID""",
+        """CREATE TABLE research_strategy_projection_cursor (
+            id INTEGER PRIMARY KEY CHECK(id=1), part_rowid INTEGER NOT NULL,
+            state_json TEXT NOT NULL, updated_at TEXT NOT NULL)""",
+    )),
+    Migration(version=32, name="strategy-management-serving-projection", statements=(
+        """CREATE TABLE strategy_management_projection (
+          strategy_instance_id TEXT NOT NULL, account_id TEXT NOT NULL DEFAULT '',
+          kind TEXT NOT NULL, payload_json TEXT, updated_at TEXT, requested_at TEXT NOT NULL,
+          attempted_at TEXT, error_code TEXT,
+          PRIMARY KEY(strategy_instance_id,account_id,kind)) WITHOUT ROWID""",
+    )),
+    Migration(version=33, name="execution-risk-persistence", statements=(
+        """CREATE TABLE IF NOT EXISTS trading_kill_switches (
+          scope_type TEXT NOT NULL, scope_id TEXT NOT NULL, enabled INTEGER NOT NULL,
+          reason TEXT, actor TEXT NOT NULL, version INTEGER NOT NULL, updated_at TEXT NOT NULL,
+          PRIMARY KEY(scope_type, scope_id))""",
+        """CREATE TABLE IF NOT EXISTS kill_switch_commands (
+          idempotency_key TEXT PRIMARY KEY, payload_hash TEXT NOT NULL,
+          scope_type TEXT NOT NULL, scope_id TEXT NOT NULL, created_at TEXT NOT NULL)""",
+        """CREATE TABLE IF NOT EXISTS execution_risk_policies (
+          strategy_instance_id TEXT PRIMARY KEY, max_leg_delay_seconds INTEGER NOT NULL,
+          max_residual_notional TEXT NOT NULL, failure_action TEXT NOT NULL,
+          actor TEXT NOT NULL, updated_at TEXT NOT NULL,
+          FOREIGN KEY(strategy_instance_id) REFERENCES strategy_instances(id))""",
+        """CREATE TABLE IF NOT EXISTS execution_risk_policy_commands (
+          idempotency_key TEXT PRIMARY KEY, payload_hash TEXT NOT NULL,
+          strategy_instance_id TEXT NOT NULL, created_at TEXT NOT NULL,
+          FOREIGN KEY(strategy_instance_id) REFERENCES strategy_instances(id))""",
+        """CREATE TABLE IF NOT EXISTS execution_batch_risk (
+          batch_id TEXT PRIMARY KEY, strategy_instance_id TEXT NOT NULL,
+          max_leg_delay_seconds INTEGER NOT NULL, max_residual_notional TEXT NOT NULL,
+          failure_action TEXT NOT NULL, risk_status TEXT NOT NULL,
+          residual_exposure_notional TEXT NOT NULL, residual_currency TEXT NOT NULL,
+          data_quality_state TEXT NOT NULL, first_fill_at TEXT, last_leg_at TEXT,
+          risk_reason TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
+          FOREIGN KEY(batch_id) REFERENCES execution_batches(id),
+          FOREIGN KEY(strategy_instance_id) REFERENCES strategy_instances(id))""",
+        """CREATE TABLE IF NOT EXISTS execution_risk_actions (
+          id TEXT PRIMARY KEY, idempotency_key TEXT NOT NULL UNIQUE,
+          payload_hash TEXT NOT NULL, batch_id TEXT NOT NULL, action TEXT NOT NULL,
+          status TEXT NOT NULL, actor TEXT NOT NULL, reason TEXT,
+          generated_order_ids_json TEXT NOT NULL, failure_reason TEXT,
+          created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
+          FOREIGN KEY(batch_id) REFERENCES execution_batches(id))""",
+        """CREATE INDEX IF NOT EXISTS idx_execution_risk_actions_batch
+          ON execution_risk_actions(batch_id, created_at)""",
+    )),
+)
+
 
 def utc_now_iso() -> str:
     return datetime.now(UTC).isoformat()

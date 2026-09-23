@@ -8,6 +8,8 @@ from uuid import uuid4
 
 from pydantic import BaseModel, Field, model_validator
 
+from app.models import CrossSpreadGuard
+
 RUNTIME_COMMAND_CONTRACT_NAME = "runtime-command"
 RUNTIME_EVENT_CONTRACT_NAME = "runtime-event"
 RUNTIME_CONTRACT_VERSION = "1.0"
@@ -38,6 +40,7 @@ class RuntimeSubmitOrderCommandV1(BaseModel):
     reduce_only: bool = False
     position_id: str | None = None
     received_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    cross_spread_guard: CrossSpreadGuard | None = None
 
     @model_validator(mode="after")
     def validate_execution_contract(self) -> RuntimeSubmitOrderCommandV1:
@@ -61,6 +64,7 @@ class RuntimeExecutionEventV1(BaseModel):
     fill_quantity: Decimal | None = None
     occurred_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     reason: str | None = None
+    terminal: bool = False
 
 
 def version_execution_events(events: Sequence[BaseModel]) -> list[RuntimeExecutionEventV1]:

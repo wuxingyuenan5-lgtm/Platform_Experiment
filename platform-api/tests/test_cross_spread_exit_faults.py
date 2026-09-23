@@ -50,15 +50,11 @@ def isolated_submitter(monkeypatch, *, before_return=None):
         if before_return:
             before_return()
         result = batch_response("fault-close", direction="CLOSE_LONG")
-        with connection() as db:
-            db.execute(
-                "INSERT INTO execution_batches "
-                "(id,idempotency_key,strategy_instance_id,account_id,strategy_key,direction,"
-                "status,requires_manual_intervention,created_at,updated_at) "
-                "SELECT ?,?,strategy_instance_id,account_id,strategy_key,'CLOSE_LONG',"
-                "'hedged',0,created_at,updated_at FROM execution_batches WHERE id='fault-open'",
-                (result.batch_id, kwargs["idempotency_key"]),
-            )
+        insert_batch_with_fills(
+            result.batch_id,
+            direction="CLOSE_LONG",
+            record_prefix=result.batch_id,
+        )
         return result
 
     monkeypatch.setattr(service, "submit_cross_spread_market_command", submit)
@@ -218,7 +214,11 @@ def test_monitor_only_snapshot_never_claims_exit_plan(saved_exit, monkeypatch):
     )
     claims = []
     monkeypatch.setattr(service, "get_cross_spread_snapshot", lambda: current)
-    monkeypatch.setattr(service, "claim_exit_plan", lambda *args, **kwargs: claims.append((args, kwargs)))
+    monkeypatch.setattr(
+        service,
+        "claim_exit_plan",
+        lambda *args, **kwargs: claims.append((args, kwargs)),
+    )
 
     result = service.evaluate_cross_spread_exit_plans()
 
@@ -226,6 +226,45 @@ def test_monitor_only_snapshot_never_claims_exit_plan(saved_exit, monkeypatch):
     assert result.triggered_count == 0
     assert result.skipped_reason == (
         "Cross-spread exit is monitor-only because both venues are not executable"
+    )
+    assert claims == []
+    assert get_exit_plan(saved_exit.plan_id).status == "active"
+
+
+def test_mt5_boundary_guard_pauses_automatic_exit_without_blocking_manual_intent(
+    saved_exit, monkeypatch
+):
+    current = available_snapshot()
+    current = current.model_copy(
+        update={
+            "mt5": current.mt5.model_copy(
+                update={
+                    "market_status": "buffer",
+                    "trading_hours": "周一至周五 00:00-23:00（Bybit/MT5，UTC+02:00/UTC+03:00）",
+                    "trading_timezone": "Bybit/MT5",
+                    "automatic_exit_allowed": False,
+                    "automatic_exit_block_reason": "mt5_session_boundary_guard",
+                    "automatic_exit_guard_minutes": 15,
+                    "open_allowed": True,
+                    "close_allowed": True,
+                }
+            )
+        }
+    )
+    claims = []
+    monkeypatch.setattr(service, "get_cross_spread_snapshot", lambda: current)
+    monkeypatch.setattr(
+        service,
+        "claim_exit_plan",
+        lambda *args, **kwargs: claims.append((args, kwargs)),
+    )
+
+    result = service.evaluate_cross_spread_exit_plans()
+
+    assert result.evaluated_count == 1
+    assert result.triggered_count == 0
+    assert result.skipped_reason == (
+        "Cross-spread automatic TP/SL is paused: mt5_session_boundary_guard"
     )
     assert claims == []
     assert get_exit_plan(saved_exit.plan_id).status == "active"

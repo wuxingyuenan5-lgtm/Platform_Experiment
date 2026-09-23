@@ -22,6 +22,8 @@
 
 ## 2. Runtime 模块
 
+`GET /venue/account-snapshot` accepts `includeHistory` (default `true`) and optional timezone-aware `historyStart`. Current-only reads skip order, fill and economic-history SDK calls and return empty historical lists with null history bounds and `economicEventsQuality=not_requested`; consumers must preserve prior history rather than treat those lists as proof of zero. A supplied history start must fall within the supported venue window; naive, future or out-of-range input is rejected. Full/default callers retain their existing behavior. Incremental executions/economic events and order-status windows are distinguished under the [account observation contract](LIVE_ACCOUNT_OBSERVABILITY.md).
+
 | 模块 | 职责 |
 |---|---|
 | `bybit_connection.py` | 每个逻辑账户持有一个 pybit HTTP 客户端、时钟校验、CCXT 账户/IP 请求预算及关闭责任 |
@@ -126,11 +128,13 @@ Platform 将 Runtime 的终态聚合 Fill 与后续 Venue component execution �
 
 每个逻辑 `account_id` 必须确定性映射到一个固定 Terminal/Worker 及其 Terminal Path、Login 和 Server。Worker 不得在同一 Python 会话中切换账户，Terminal Path 不得被不同逻辑账户共享；身份不一致时 fail-closed，单个实例故障不得改变其他账户的路由或状态。Worker 启动时若终端已登录到配置的 Login/Server，直接复用连接，不重复调用登录；后续每次连接仍复核身份。平台不强制重开操作员关闭的算法交易开关。
 
-固定账户 Worker 初次连接及只读 IPC 恢复时，若配置完整路径对应的终端进程不存在，先以 `SW_HIDE` 启动，等待 GUI 初始化后连接 SDK；连接成功后，再隐藏本次新进程的无 owner 顶层窗口，覆盖 MT5 启动期间恢复已保存窗口布局的行为。仅首次启动提示不足以保证最终后台状态。2026-09-10 Owner 明确要求两个配置终端持续在后台运行：重连已运行终端也执行隐藏，固定账户 Worker 每次处理请求前及空闲时每秒检查并隐藏对应完整路径进程的可见、无 owner 顶层窗口。已隐藏窗口不重复操作，不切换焦点、不关闭进程、不重新登录、不影响其他路径终端或 owned 对话框。窗口维护失败记录日志，不中断交易/读取 IPC；portable 模式与账户路径绑定不变。此规则替代此前“已运行窗口保持不变”的策略。
+固定账户 Worker 初次连接及只读 IPC 恢复时，必须把配置的完整 Terminal Path 和 portable 参数一次传给 MT5 SDK，由 SDK 负责该终端的一次启动/连接尝试；Runtime 不得先用 `Popen` 预启动同一终端再调用 SDK，否则会产生 `terminal process already started` 并放大断线恢复。SDK 初始化或恢复完成后，Runtime 仅隐藏匹配配置完整路径的可见顶层窗口（含其拥有者对话框），覆盖 MT5 启动期间恢复已保存窗口布局的行为。2026-09-10 Owner 明确要求两个配置终端持续在后台运行：重连已运行终端也执行隐藏，固定账户 Worker 每次处理请求前及空闲时检查并隐藏对应完整路径进程的可见顶层窗口。已隐藏窗口不重复操作，不切换焦点、不关闭进程、不重新登录、不影响其他路径终端。窗口维护失败记录日志，不中断交易/读取 IPC；portable 模式与账户路径绑定不变。Worker 启动失败时按指数退避（2 至 30 秒）拒绝重复拉起，避免每个读取请求重新启动终端。此规则替代此前“已运行窗口保持不变”的策略。
 
 跨所行情也必须显式传入 `bybitAccountId` 与 `mt5AccountId` 并通过同一 Gateway/Worker 读取，不能选择任意“首个账户”。MT5 行情使用 `symbol_info.currency_profit` 作为报价币，账户现金与结算币来自账户证据；缺失报价币时标注 UNKNOWN/partial。Swap 字段、合约乘数及 Position Ticket 保留原生值，不能从 XAUUSD 名称推断账户现金币。
 
 MT5 报价读取还须确认 `terminal_info.connected`：终端信息缺失或经纪商连接中断时，即使 SDK 留有账户信息和正数缓存 Tick，也不能生成可执行报价；后续读取确认连接恢复后才能继续。观察时间只证明本次读取时刻，不能用来证明经纪商缓存 Tick 的源时钟或停机期间行情。
+
+MT5 Python SDK 不提供周历 `SymbolInfoSessionTrade` 窗口，Runtime 不得把 `trade_mode` 或正数缓存 Tick 当作周末/日内开市证据。跨所黄金使用 Runtime 的 `VG_RUNTIME_CROSS_SPREAD_MT5_TRADING_SCHEDULE` 与服务器时区计算周历，`VG_RUNTIME_CROSS_SPREAD_MT5_SESSION_OVERRIDES` 覆盖节假日和临时维护；Bybit 默认时区标识为 `Bybit/MT5`，按其公布的 UTC+2/UTC+3 切换日期计算，不能套用北京时间或 `Europe/Athens` 的夏令时日期。`VG_RUNTIME_CROSS_SPREAD_AUTO_EXIT_GUARD_MINUTES` 只作用于后台自动 TP/SL，边界期间人工开平仍按独立能力门处理。配置应以 [Bybit TradFi FAQ](https://www.cbybit.com/en/help-center/article/FAQ-TradFi-MT5)、[MT5 合约规格](https://www.bybitglobal.com/en/help-center/article/Contracts-Available-on-TradFi-MT5-and-Specifications) 及最新运营通知为准。
 
 ### 4.2 实时规格
 
@@ -356,3 +360,4 @@ CI 不能证明：
 ## 14. 受控边界
 
 固定仓位、名义金额、日成交量、批次数和亏损 cap 已从 founder-owned local test-account 合同移除。该决定不允许通过环境变量绕过 CEO 指令数量 ceiling、单指令／单 Batch 身份、全局执行序列化、bounded chase、Kill Switch、操作员停机与对账。ACK／Fill 区分、`result_unknown` 禁止盲重试、双重写门禁、Position Ticket close 和凭证隔离属于永久安全原则，不随数量变化删除。
+

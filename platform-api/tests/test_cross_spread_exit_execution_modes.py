@@ -168,12 +168,16 @@ def test_lifecycle_routes_delegate_to_limit_capable_service(
             "limit_spread": request_model.limit_spread,
             "limit_strategy": "post_only_chase",
             "quantity_oz": None,
+            "max_adverse_spread": Decimal("0"),
         }
 
 
 def test_manual_close_passes_limit_template_to_close_execution(
     monkeypatch,
 ) -> None:
+    monkeypatch.setattr(synthetic_service, "assert_cross_spread_live_execution_enabled", lambda: None)
+    monkeypatch.setattr(synthetic_service, "assert_cross_spread_market_executable", lambda **_: None)
+    monkeypatch.setattr(synthetic_service, "assert_cross_spread_native_trading_rules", lambda: None)
     plan = triggered_plan("manual")
     pricing_result = pricing()
     captured = {}
@@ -217,6 +221,7 @@ def test_manual_close_passes_limit_template_to_close_execution(
         "limit_strategy": "post_only_chase",
         "limit_execution": pricing_result,
         "quantity_oz": Decimal("1"),
+        "max_adverse_spread": Decimal("0"),
     }
 
 

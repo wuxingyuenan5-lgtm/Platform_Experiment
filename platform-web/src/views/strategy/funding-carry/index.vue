@@ -1,46 +1,13 @@
 <template>
   <div class="funding-page" data-testid="funding-original-structure">
-    <template v-if="localSection === 'analysis'">
-      <FundingMarketBoard
-        :data="fundingMarketBoard"
-        :exchange="selectedExchange"
-        :selected-range="selectedRange"
-        :selected-symbol="selectedSymbol"
-        :selected-resolution="selectedResolution"
-        :range-options="rangeOptions"
-        @update:selected-range="selectedRange = $event"
-        @update:selected-symbol="handleChartSymbolUpdate"
-        @update:selected-resolution="selectedResolution = $event"
-      />
-
-      <FundingChartPanel
-        :data="fundingChartPanel"
-        :exchange="selectedExchange"
-        :symbol="selectedSymbol"
-        :range="selectedRange"
-        :resolution="selectedResolution"
-        :start-date="selectedStartDate"
-        :end-date="selectedEndDate"
-        @update:exchange="handleExchangeUpdate"
-        @update:symbol="handleChartSymbolUpdate"
-        @update:range="selectedRange = $event"
-        @update:resolution="selectedResolution = $event"
-        @update:start-date="selectedStartDate = $event"
-        @update:end-date="selectedEndDate = $event"
-      />
-
-      <FundingDetailPanel
-        :exchange="selectedExchange"
-        :symbol="selectedSymbol"
-        :selected-range="selectedRange"
-        :resolution="selectedResolution"
-        :start-date="selectedStartDate"
-        :end-date="selectedEndDate"
-        :research="currentResearch"
-      />
-    </template>
+    <StrategyResearchWorkspace v-if="localSection === 'analysis'" pair-id="funding-btc" />
 
     <template v-else>
+      <ResearchDraftImport
+        pair-id="funding-btc"
+        :disabled="submitting || !!pendingDraft"
+        @apply="applyResearchDraft"
+      />
       <FundingOrderPanel
         :context="context"
         :position-groups="positionGroups"
@@ -75,21 +42,14 @@
 </template>
 
 <script setup lang="ts">
-  import { computed, ref, watch } from 'vue';
-  import FundingChartPanel from './components/FundingChartPanel.vue';
-  import FundingDetailPanel from './components/FundingDetailPanel.vue';
-  import FundingMarketBoard from './components/FundingMarketBoard.vue';
+  import { ref, watch } from 'vue';
+  import ResearchDraftImport from '../shared/ResearchDraftImport.vue';
+  import type { components } from '@/api/platform/generated/strategy';
+  import StrategyResearchWorkspace from '../shared/StrategyResearchWorkspace.vue';
   import FundingOrderPanel from './components/FundingOrderPanel.vue';
   import { useFundingWorkspace } from './composables/useFundingWorkspace';
   import type { FundingExecutionPolicy } from './composables/fundingExecutionRecovery';
-  import {
-    defaultSymbol,
-    fundingChartPanel,
-    fundingCarryProfiles,
-    fundingMarketBoard,
-    fundingRangeLabels,
-  } from '@/data/sample/funding';
-  import type { FundingExchange, FundingMarketRange, FundingSymbol } from './types';
+  import type { FundingExchange, FundingSymbol } from './types';
 
   const props = withDefaults(
     defineProps<{
@@ -107,26 +67,6 @@
   );
 
   const localSection = ref(props.activeSection);
-  const selectedExchange = ref<FundingExchange>(props.selectedExchange);
-  const selectedSymbol = ref<FundingSymbol>(props.selectedSymbol);
-  const selectedRange = ref<FundingMarketRange>('current');
-  const selectedResolution = ref(props.selectedResolution);
-  const selectedStartDate = ref('2026-05-28');
-  const selectedEndDate = ref('2026-06-24');
-
-  const profile = computed(
-    () => fundingCarryProfiles[selectedExchange.value] ?? fundingCarryProfiles.Bybit,
-  );
-  const currentResearch = computed(
-    () => profile.value.research[selectedSymbol.value] ?? profile.value.research[defaultSymbol],
-  );
-  const rangeOptions = computed(() =>
-    (Object.keys(fundingRangeLabels) as FundingMarketRange[]).map((value) => ({
-      value,
-      label: fundingRangeLabels[value],
-    })),
-  );
-
   const {
     submitting,
     error,
@@ -151,12 +91,11 @@
     selectCloseFraction,
   } = useFundingWorkspace();
 
-  function handleChartSymbolUpdate(value: string) {
-    selectedSymbol.value = value as FundingSymbol;
-  }
-
-  function handleExchangeUpdate(value: FundingExchange) {
-    selectedExchange.value = value;
+  function applyResearchDraft(draft: components['schemas']['DraftRequest']) {
+    if (submitting.value || pendingDraft.value || draft.direction !== 'sell_spread') return;
+    selectSymbol('BTCUSDT', 'BTCUSDT');
+    quantityInput.value = draft.quantity;
+    void refreshAll();
   }
 
   function handleExecutionSymbolUpdate(perpetualSymbol: string, spotSymbol: string) {
@@ -168,41 +107,6 @@
     (value) => {
       localSection.value = value;
       if (value === 'execution') refreshAll();
-    },
-    { immediate: true },
-  );
-
-  watch(
-    () => props.selectedExchange,
-    (value) => {
-      selectedExchange.value = value;
-    },
-    { immediate: true },
-  );
-
-  watch(
-    () => props.selectedSymbol,
-    (value) => {
-      selectedSymbol.value = value;
-    },
-    { immediate: true },
-  );
-
-  watch(
-    () => props.selectedResolution,
-    (value) => {
-      selectedResolution.value = value;
-    },
-    { immediate: true },
-  );
-
-  watch(
-    profile,
-    (nextProfile) => {
-      const nextSymbols = nextProfile.snapshots.map((item) => item.symbol);
-      if (!nextSymbols.includes(selectedSymbol.value)) {
-        selectedSymbol.value = nextSymbols[0] ?? defaultSymbol;
-      }
     },
     { immediate: true },
   );

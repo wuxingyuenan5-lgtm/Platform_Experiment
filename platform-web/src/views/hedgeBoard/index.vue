@@ -23,12 +23,6 @@
         :class="{ 'terminal-content--gold': useUnifiedResearchUi }"
       >
         <MacroCalendarPanel v-if="activeCategory === 'macro'" />
-        <FedWatchPanel v-if="activeCategory === 'macro'" />
-
-        <div v-if="activeCategory === 'crypto'" class="hedge-board__overseas-panels">
-          <BtcEtfFlowPanel />
-          <CryptoIvTermPanel />
-        </div>
 
         <HedgeResearchModule
           :module-id="activeModule.id"
@@ -90,9 +84,6 @@
   import WealthInformationPanel from './components/WealthInformationPanel.vue';
   import TradingViewWidget from './components/TradingViewWidget';
   import WidgetErrorBoundary from './components/WidgetErrorBoundary';
-  import BtcEtfFlowPanel from './components/BtcEtfFlowPanel.vue';
-  import CryptoIvTermPanel from './components/CryptoIvTermPanel.vue';
-  import FedWatchPanel from './components/FedWatchPanel.vue';
   import { useHedgeBoardPage } from './composables/useHedgeBoardPage';
   import ToolGroupSection from './tradingTools/components/ToolGroupSection.vue';
 

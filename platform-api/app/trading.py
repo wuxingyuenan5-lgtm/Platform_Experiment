@@ -150,7 +150,7 @@ def apply_execution_events(
                     """
                     UPDATE orders
                     SET status = ?, external_order_id = ?, updated_at = ?
-                    WHERE id = ? AND status != 'filled'
+                    WHERE id = ? AND status NOT IN ('filled', 'canceled', 'rejected')
                     """,
                     ("acknowledged", external_order_id, occurred_at, order_id),
                 )
@@ -158,7 +158,7 @@ def apply_execution_events(
                 db.execute(
                     """
                     UPDATE orders SET status = ?, updated_at = ?
-                    WHERE id = ? AND status != 'filled'
+                    WHERE id = ? AND status NOT IN ('filled', 'canceled', 'rejected')
                     """,
                     ("rejected", occurred_at, order_id),
                 )
@@ -186,10 +186,28 @@ def apply_execution_events(
                     ),
                     Decimal(0),
                 )
+                previous_terminal = db.execute(
+                    "SELECT filled_quantity FROM runtime_order_terminals WHERE order_id=?",
+                    (order_id,),
+                ).fetchone()
+                if previous_terminal is not None and Decimal(previous_terminal[0]) != cumulative:
+                    raise HTTPException(502, "Terminal order fill quantity changed")
+                if event.get("terminal") is True:
+                    db.execute(
+                        """INSERT OR IGNORE INTO runtime_order_terminals
+                        (order_id,event_id,filled_quantity,occurred_at) VALUES (?,?,?,?)""",
+                        (order_id, str(event["event_id"]), decimal_text(cumulative), occurred_at),
+                    )
                 db.execute(
                     "UPDATE orders SET status = ?, updated_at = ? WHERE id = ?",
                     (
-                        "filled" if cumulative == request.quantity else "partially_filled",
+                        "filled"
+                        if cumulative == request.quantity
+                        else (
+                            "canceled"
+                            if event.get("terminal") is True or previous_terminal is not None
+                            else "partially_filled"
+                        ),
                         occurred_at,
                         order_id,
                     ),

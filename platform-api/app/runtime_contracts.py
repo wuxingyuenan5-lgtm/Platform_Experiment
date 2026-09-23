@@ -5,7 +5,19 @@ from decimal import Decimal
 from typing import Literal
 from uuid import uuid4
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+
+class CrossSpreadGuardV1(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
+    target_spread: Decimal = Field(alias="targetSpread")
+    max_adverse_spread: Decimal = Field(default=Decimal("0"), alias="maxAdverseSpread", ge=0)
+    mt5_account_id: str = Field(alias="mt5AccountId", min_length=1)
+    mt5_symbol: str = Field(alias="mt5Symbol", min_length=1)
+    mt5_close: bool = Field(alias="mt5Close")
+    mt5_min_quantity: Decimal = Field(alias="mt5MinQuantity", gt=0)
+    mt5_quantity_step: Decimal = Field(alias="mt5QuantityStep", gt=0)
+    mt5_contract_multiplier: Decimal = Field(alias="mt5ContractMultiplier", gt=0)
 
 RUNTIME_COMMAND_CONTRACT_NAME = "runtime-command"
 RUNTIME_EVENT_CONTRACT_NAME = "runtime-event"
@@ -37,6 +49,7 @@ class RuntimeSubmitOrderCommandV1(BaseModel):
     reduce_only: bool = False
     position_id: str | None = None
     received_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    cross_spread_guard: CrossSpreadGuardV1 | None = None
 
     @model_validator(mode="after")
     def validate_execution_contract(self) -> RuntimeSubmitOrderCommandV1:
@@ -62,6 +75,7 @@ class RuntimeExecutionEventV1(BaseModel):
     fill_quantity: Decimal | None = None
     occurred_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     reason: str | None = None
+    terminal: bool = False
 
 
 def runtime_contract_signature() -> dict[str, dict[str, object]]:

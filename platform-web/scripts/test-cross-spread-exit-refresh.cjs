@@ -120,7 +120,7 @@ test('the overview renders backend amounts without reparsing rounded row labels'
   assert.doesNotMatch(html, /unattributed-ticket/);
 });
 
-test('an unallocated one-leg fill is excluded from the normal portfolio', () => {
+test('an unallocated one-leg position remains visible for review', () => {
   const { mapOverviewRows } = createLoader()(
     'src/views/strategy/spread-carry/composables/mapCrossSpreadPositions.ts',
   );
@@ -137,7 +137,10 @@ test('an unallocated one-leg fill is excluded from the normal portfolio', () => 
     snapshotStatusText: '双边真实行情',
     exitPlans: [],
   });
-  assert.deepEqual(rows, []);
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].exitPlanId, null);
+  assert.equal(rows[0].qty, 0.4);
+  assert.equal(rows[0].status, '待复核');
 });
 
 test('multiple groups retain their identities and do not inherit shared net-position PnL', () => {

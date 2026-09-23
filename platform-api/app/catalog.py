@@ -418,6 +418,38 @@ def list_strategy_account_bindings(
 
 
 _LINEAR_INSTRUMENT_TYPES = frozenset({"crypto_perp", "crypto_spot"})
+_CROSS_SPREAD_POSITION_INSTRUMENTS = frozenset({"instrument_xau_usdt_perp", "instrument_xau_usd"})
+_CROSS_SPREAD_POSITION_SYMBOLS = frozenset({"XAUTUSDT", "XAUUSD.S"})
+
+
+def _cross_spread_live_positions(
+    venue_snapshot: dict[str, object],
+) -> list[PositionResponse] | None:
+    """Return the venue-synced legs when a snapshot explicitly reports positions.
+
+    Cross-spread account snapshots also contain a historical strategy finance
+    projection.  That projection is useful for P&L, but it cannot establish a
+    current position after a close.  When the venue sync has a positions key,
+    it is the authoritative current position source for this strategy.
+    """
+    if "positions" not in venue_snapshot:
+        return None
+    raw_positions = venue_snapshot.get("positions")
+    if not isinstance(raw_positions, list):
+        return []
+    positions: list[PositionResponse] = []
+    for row in raw_positions:
+        if not isinstance(row, dict):
+            continue
+        instrument_id = str(row.get("instrumentId") or "")
+        symbol = str(row.get("symbol") or "").upper()
+        if (
+            instrument_id not in _CROSS_SPREAD_POSITION_INSTRUMENTS
+            and symbol not in _CROSS_SPREAD_POSITION_SYMBOLS
+        ):
+            continue
+        positions.append(PositionResponse.model_validate(row))
+    return positions
 
 
 def monitor_position_valued(
@@ -481,7 +513,10 @@ def get_strategy_account_snapshot(
     strategy_instance_id: str,
     *,
     account_id: str | None = None,
+    include_details: bool = True,
 ) -> StrategyAccountSnapshotResponse:
+    strategy = get_strategy_instance(strategy_instance_id)
+    is_cross_spread = strategy.strategy_key == "cross_venue_spread"
     bindings = list_strategy_account_bindings(strategy_instance_id)
     binding = next(
         (
@@ -525,6 +560,9 @@ def get_strategy_account_snapshot(
             (binding.account_id,),
         ).fetchone()
         venue_snapshot = json.loads(venue_row["payload_json"]) if venue_row else {}
+        from app.account_read_jobs import financial_sync_state
+
+        financial_sync = financial_sync_state(db, binding.account_id)
         balance_row = db.execute(
             """
             SELECT balance_snapshots.id, balance_snapshots.account_id,
@@ -579,6 +617,19 @@ def get_strategy_account_snapshot(
             """,
             (binding.account_id, binding.account_id, binding.account_id),
         ).fetchall()
+        if is_cross_spread and risk_row is not None:
+            archive = db.execute(
+                "SELECT max(as_of) AS as_of,currency,equity,asset_scope,total_assets "
+                "FROM account_risk_snapshots WHERE account_id=? AND asset_scope=? "
+                "AND currency=? AND equity IS NOT NULL AND as_of>=date('now','-400 days') "
+                "GROUP BY CASE WHEN as_of>=date('now','-14 days') "
+                "THEN substr(as_of,1,13) ELSE substr(as_of,1,10) END ORDER BY as_of",
+                (binding.account_id, risk_row["asset_scope"], risk_row["currency"]),
+            ).fetchall()
+            risk_history_rows = sorted(
+                {r["as_of"]: r for r in [*archive, *risk_history_rows]}.values(),
+                key=lambda r: r["as_of"],
+            )
         history_rows = db.execute(
             """
             SELECT as_of, currency, equity FROM (
@@ -594,32 +645,54 @@ def get_strategy_account_snapshot(
         # currency, so day-over-day P&L never spans a scope or currency change.
         daily_rows = db.execute(
             """
-            SELECT as_of, currency, equity, asset_scope FROM (
-                SELECT as_of, currency, equity, asset_scope,
-                       ROW_NUMBER() OVER (
-                           PARTITION BY substr(as_of, 1, 10)
-                           ORDER BY as_of DESC, created_at DESC
-                       ) AS day_rank
-                FROM account_risk_snapshots
-                WHERE account_id = ?
-                  AND equity IS NOT NULL
-                  AND as_of >= date('now', '-400 days')
-                  AND asset_scope = (
-                      SELECT asset_scope FROM account_risk_snapshots WHERE account_id=?
+            SELECT as_of, currency, equity, asset_scope
+            FROM account_risk_snapshots
+            WHERE account_id = ?
+              AND equity IS NOT NULL
+              AND as_of >= date('now', '-400 days')
+              AND asset_scope = (
+                  SELECT asset_scope FROM account_risk_snapshots WHERE account_id=?
+                  ORDER BY as_of DESC LIMIT 1
+              )
+              AND upper(currency) = upper(
+                  (
+                      SELECT currency
+                      FROM account_risk_snapshots
+                      WHERE account_id = ?
                       ORDER BY as_of DESC LIMIT 1
                   )
-                  AND upper(currency) = upper(
-                      (
-                          SELECT currency
-                          FROM account_risk_snapshots
-                          WHERE account_id = ?
-                          ORDER BY as_of DESC LIMIT 1
-                      )
-                  )
-            ) WHERE day_rank = 1 ORDER BY as_of ASC
+              )
+            ORDER BY as_of ASC, created_at ASC
             """,
             (binding.account_id, binding.account_id, binding.account_id),
         ).fetchall()
+        # Performance values are only comparable through the latest persisted
+        # capital-flow coverage.  A newer risk snapshot may already be visible
+        # while its flow window is still being fetched; keeping it in the
+        # curve would turn the newest drawdown/P&L point into a misleading null.
+        coverage_row = db.execute(
+            "SELECT end_at FROM account_capital_coverage "
+            "WHERE account_id=? AND asset_scope=(SELECT asset_scope FROM account_risk_snapshots "
+            "WHERE account_id=? ORDER BY julianday(as_of) DESC LIMIT 1) "
+            "ORDER BY julianday(end_at) DESC LIMIT 1",
+            (binding.account_id, binding.account_id),
+        ).fetchone()
+        performance_cutoff = coverage_row["end_at"] if coverage_row else None
+        from app.account_performance import stamp
+
+        if performance_cutoff:
+            risk_history_rows = [
+                row for row in risk_history_rows if stamp(row["as_of"]) <= stamp(performance_cutoff)
+            ]
+        daily_by_date = {}
+        for row in daily_rows:
+            if performance_cutoff and stamp(row["as_of"]) > stamp(performance_cutoff):
+                continue
+            day = stamp(row["as_of"]).date().isoformat()
+            current = daily_by_date.get(day)
+            if current is None or stamp(row["as_of"]) > stamp(current["as_of"]):
+                daily_by_date[day] = row
+        daily_rows = [daily_by_date[day] for day in sorted(daily_by_date)]
 
     account = get_account(binding.account_id)
     sync_status = str(sync_row["status"]) if sync_row is not None else None
@@ -679,6 +752,11 @@ def get_strategy_account_snapshot(
     from app.account_performance import enrich_performance
 
     enrich_performance(binding.account_id, equity_history)
+    from app.cross_session_valuation import filter_capital_history
+
+    session_equity_history = filter_capital_history(
+        strategy_instance_id, binding.account_id, equity_history
+    )
     daily_points = [
         StrategyEquityHistoryPointResponse(
             asOf=row["as_of"],
@@ -705,7 +783,7 @@ def get_strategy_account_snapshot(
         ):
             daily_pnl_points.append(
                 StrategyDailyPnlPointResponse(
-                    date=str(point.as_of)[:10],
+                    date=point.as_of.astimezone(UTC).date().isoformat(),
                     currency=point.currency or "",
                     pnl=amount,
                     returnRate=rate,
@@ -714,6 +792,12 @@ def get_strategy_account_snapshot(
                     quality=quality,
                 )
             )
+    account_scope = binding.capability == "read_only"
+    position_rows = (
+        list_positions(binding.account_id)
+        if account_scope or is_cross_spread
+        else list_strategy_positions(binding.account_id, strategy_instance_id)
+    )
     positions = [
         PositionResponse(
             accountId=row["account_id"],
@@ -721,30 +805,49 @@ def get_strategy_account_snapshot(
             netQuantity=Decimal(row["net_quantity"]),
             averagePrice=optional_decimal(row["average_price"]),
         )
-        for row in list_positions(binding.account_id)
+        for row in position_rows
     ]
     if binding.capability == "read_only" and venue_snapshot:
         positions = [PositionResponse.model_validate(row) for row in venue_snapshot["positions"]]
-    account_scope = binding.capability == "read_only"
-    orders = list_orders(
-        None if account_scope else strategy_instance_id, account_id=binding.account_id
-    )
-    fills = list_fills(
-        None if account_scope else strategy_instance_id, account_id=binding.account_id
-    )
-    fills_total = len(fills)
-    fills = fills[:200]
-    orders_total = len(orders)
-    orders = orders[:200]
+    if is_cross_spread:
+        live_positions = _cross_spread_live_positions(venue_snapshot)
+        if live_positions is not None:
+            positions = live_positions
+    if include_details:
+        orders = list_orders(
+            None if account_scope else strategy_instance_id, account_id=binding.account_id
+        )
+        fills = list_fills(
+            None if account_scope else strategy_instance_id, account_id=binding.account_id
+        )
+        fills_total = len(fills)
+        fills = fills[:200]
+        orders_total = len(orders)
+        orders = orders[:200]
+    else:
+        orders, fills, orders_total, fills_total = [], [], 0, 0
     from app.strategy_financial_readmodel import get_strategy_financials
 
-    finance = get_strategy_financials(
-        strategy_instance_id, account_id=binding.account_id, account_scope=account_scope
+    # Funding spot holdings live in the venue balance snapshot rather than the
+    # account-level ``positions`` table.  Use the existing strategy readmodel
+    # to project both owned legs for the summary read too; otherwise the capital
+    # page can only see the perpetual leg and reports a false net short.
+    needs_funding_positions = strategy.strategy_key == "funding_arbitrage" and not account_scope
+    finance = (
+        get_strategy_financials(
+            strategy_instance_id, account_id=binding.account_id, account_scope=account_scope
+        )
+        if include_details or needs_funding_positions
+        else None
     )
-    if not account_scope:
+    if finance is not None and not account_scope and not is_cross_spread:
         positions = [PositionResponse.model_validate(row) for row in finance["positions"]]
     pnl = None
-    if all(finance.get(key) is not None for key in ("realizedPnl", "tradingPnl", "fees")):
+    if (
+        include_details
+        and finance is not None
+        and all(finance.get(key) is not None for key in ("realizedPnl", "tradingPnl", "fees"))
+    ):
         pnl = PnlResponse(
             accountId=binding.account_id,
             instrumentId="account_total" if account_scope else "strategy_total",
@@ -753,11 +856,14 @@ def get_strategy_account_snapshot(
             fees=finance["fees"],
         )
     risk_payload = json.loads(display_risk_row["payload_json"]) if display_risk_row else {}
-    if account_scope:
+    if account_scope or is_cross_spread:
         positions, exposure = monitor_position_valued(positions)
     else:
-        exposure = finance.get("exposure") or {}
+        exposure = finance.get("exposure") if finance is not None else {}
+        if not isinstance(exposure, dict):
+            exposure = {}
     position_value = optional_decimal(exposure.get("positionValue"))
+    exposure_currency = exposure.get("positionValueCurrency")
     equity_for_leverage = optional_decimal(balance.equity) if balance is not None else None
     leverage = (
         position_value / equity_for_leverage
@@ -809,12 +915,14 @@ def get_strategy_account_snapshot(
         ),
         balance=balance,
         equityHistory=equity_history,
+        sessionEquityHistory=session_equity_history,
         dailyPnl=daily_pnl_points,
+        strategyDailyPnl=finance.get("strategyDailyPnl", []) if finance is not None else [],
         accountRisk=account_risk,
         positions=positions,
         positionValue=position_value,
         positionValueNet=optional_decimal(exposure.get("positionValueNet")),
-        positionValueCurrency=exposure.get("positionValueCurrency"),
+        positionValueCurrency=exposure_currency if isinstance(exposure_currency, str) else None,
         leverage=leverage,
         venueLeverage=optional_decimal(risk_payload.get("leverage")),
         orders=orders,
@@ -822,6 +930,7 @@ def get_strategy_account_snapshot(
         pnl=pnl,
         syncStatus=sync_status,
         syncErrorCode=sync_error,
+        **financial_sync,
         snapshotScope="account" if account_scope else "strategy",
         isStale=is_stale,
         lastSuccessfulSyncAt=sync_row["last_success_at"] if sync_row else None,
@@ -831,8 +940,12 @@ def get_strategy_account_snapshot(
         economicEventsQuality=venue_snapshot.get("economicEventsQuality", "unavailable"),
         economicEvents=venue_snapshot.get("economicEvents", [])
         if account_scope
-        else finance["economicEvents"],
-        finance=StrategyPnlResponse.model_validate(finance),
+        else (finance["economicEvents"] if include_details and finance is not None else []),
+        finance=(
+            StrategyPnlResponse.model_validate(finance)
+            if include_details and finance is not None
+            else None
+        ),
         ordersTotal=orders_total,
         fillsTotal=fills_total,
     )
@@ -989,6 +1102,36 @@ def list_positions(account_id: str) -> list:
             ORDER BY instrument_id
             """,
             (account_id,),
+        ).fetchall()
+
+
+def list_strategy_positions(account_id: str, strategy_instance_id: str) -> list:
+    """Return current positions whose owned orders belong to this strategy.
+
+    ``positions`` is an account-level venue projection.  A shared account can
+    therefore contain several strategies on different instruments; using it
+    directly for a strategy summary leaks unrelated legs into net exposure.
+    Ownership is established through the order's strategy command, while
+    unassigned/manual positions remain visible only in account-scoped views.
+    """
+    get_account(account_id)
+    with connection() as db:
+        return db.execute(
+            """
+            SELECT p.account_id, p.instrument_id, p.net_quantity, p.average_price
+            FROM positions p
+            WHERE p.account_id = ?
+              AND EXISTS (
+                  SELECT 1
+                  FROM orders o
+                  JOIN trade_commands tc ON tc.id = o.command_id
+                  WHERE o.account_id = p.account_id
+                    AND o.instrument_id = p.instrument_id
+                    AND tc.strategy_instance_id = ?
+              )
+            ORDER BY p.instrument_id
+            """,
+            (account_id, strategy_instance_id),
         ).fetchall()
 
 
@@ -1337,16 +1480,22 @@ def list_fills(
             if row.time_quality in {"source_clock_conflict", "runtime_confirmation"}
             else row.occurred_at,
             row.fill_id,
-        ), reverse=True,
+        ),
+        reverse=True,
     )
     return result[:limit] if limit is not None else result
 
 
 def get_strategy_pnl(strategy_instance_id: str) -> StrategyPnlResponse:
+    from app.cross_session_valuation import load_sessions
     from app.strategy_financial_readmodel import get_strategy_financials
 
     get_strategy_instance(strategy_instance_id)
-    return StrategyPnlResponse.model_validate(get_strategy_financials(strategy_instance_id))
+    return StrategyPnlResponse.model_validate(
+        get_strategy_financials(
+            strategy_instance_id, reporting_sessions=load_sessions(strategy_instance_id)
+        )
+    )
 
 
 def list_nav_snapshots(strategy_instance_id: str) -> list[StrategyNavSnapshotResponse]:

@@ -72,7 +72,7 @@ def batch_payload(
         "idempotencyKey": idempotency_key,
         "strategyInstanceId": STRATEGY_INSTANCE_ID,
         "accountId": account_id,
-        "strategyKey": "funding_arbitrage",
+        "strategyKey": "strategy_generic_pipeline_test",
         "direction": "collect",
         "legs": [
             {
@@ -107,7 +107,7 @@ def cross_strategy_payload(*, idempotency_key: str) -> dict[str, object]:
     payload.update(
         {
             "strategyInstanceId": "strategy_generic_cross_test",
-            "strategyKey": "cross_venue_spread",
+            "strategyKey": "strategy_generic_cross_test",
             "direction": "close_short_spread",
         }
     )

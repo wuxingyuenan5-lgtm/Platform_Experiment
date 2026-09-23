@@ -9,6 +9,7 @@ from app.cross_spread_market import (
     build_cross_spread_snapshot,
     estimate_cached_fill_price,
 )
+from app.cross_spread_schedule import Mt5SessionState
 from app.fake_gateway import FakeGateway
 from app.models import (
     CrossSpreadSnapshotResponse,
@@ -249,6 +250,50 @@ def test_mt5_close_only_allows_close_but_not_open():
     assert result.mt5.open_allowed is False
     assert result.mt5.close_allowed is True
     assert result.execution_state == "monitor_only"
+
+
+def test_mt5_session_boundary_blocks_automatic_exit_but_keeps_manual_capability(monkeypatch):
+    gateway = ReadGateway()
+    gateway.observed = datetime.now(UTC) - timedelta(seconds=1)
+    original = gateway.get_market_quote
+
+    def quote_with_boundary(*, account_id, symbol, category=None):
+        quote = original(account_id=account_id, symbol=symbol, category=category)
+        quote.source_as_of = datetime.now(UTC)
+        quote.raw_payload = (
+            {"serverTime": "fresh"}
+            if account_id.startswith("bybit")
+            else {
+                "tradeMode": 4,
+                "accountTradeAllowed": True,
+                "terminalTradeAllowed": True,
+                "accountExpertTradeAllowed": True,
+                "pythonTradeAllowed": True,
+                "symbolVisible": True,
+                "mt5ScheduleTracked": True,
+            }
+        )
+        return quote
+
+    monkeypatch.setattr(
+        "app.cross_spread_market.resolve_mt5_session_state",
+        lambda **_: Mt5SessionState(
+            status="buffer",
+            trading_hours="周一至周五 00:00-23:00（Europe/Athens）",
+            timezone="Europe/Athens",
+            automatic_exit_allowed=False,
+            automatic_exit_block_reason="mt5_session_boundary_guard",
+            guard_minutes=15,
+        ),
+    )
+    gateway.get_market_quote = quote_with_boundary
+    result = snapshot(gateway)
+
+    assert result.execution_state == "executable"
+    assert result.mt5.open_allowed and result.mt5.close_allowed
+    assert result.mt5.market_status == "buffer"
+    assert result.mt5.automatic_exit_allowed is False
+    assert result.mt5.automatic_exit_guard_minutes == 15
 
 
 @pytest.mark.parametrize(

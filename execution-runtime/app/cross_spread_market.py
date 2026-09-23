@@ -6,6 +6,8 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from threading import Lock
 
+from app.config import get_settings
+from app.cross_spread_schedule import resolve_mt5_session_state
 from app.gateway import VenueGateway
 from app.models import (
     CrossSpreadMetrics,
@@ -82,7 +84,12 @@ def build_cross_spread_snapshot(
             ),
             executionState=(
                 "executable"
-                if bybit.open_allowed and bybit.close_allowed and mt5.open_allowed and mt5.close_allowed
+                if (
+                    bybit.open_allowed
+                    and bybit.close_allowed
+                    and mt5.open_allowed
+                    and mt5.close_allowed
+                )
                 else "monitor_only"
                 if bybit.quote is not None or mt5.quote is not None
                 else "unavailable"
@@ -145,6 +152,41 @@ def _build_venue_snapshot(
             positions = []
             reasons.append(f"positions unavailable: {redact_text(str(exc))}")
         open_allowed, close_allowed, block_reason = _execution_capability(venue, quote)
+        if venue == "bybit":
+            market_status = "open"
+            trading_hours = "24H"
+            trading_timezone = "UTC"
+            automatic_exit_allowed = True
+            automatic_exit_block_reason = None
+            automatic_exit_guard_minutes = None
+        elif quote.raw_payload.get("mt5ScheduleTracked") is True:
+            settings = get_settings()
+            session_state = resolve_mt5_session_state(
+                schedule=settings.cross_spread_mt5_trading_schedule,
+                timezone=settings.cross_spread_mt5_schedule_timezone,
+                guard_minutes=settings.cross_spread_auto_exit_guard_minutes,
+                overrides=settings.cross_spread_mt5_session_overrides,
+            )
+            market_status = session_state.status
+            trading_hours = session_state.trading_hours
+            trading_timezone = session_state.timezone
+            automatic_exit_allowed = session_state.automatic_exit_allowed
+            automatic_exit_block_reason = session_state.automatic_exit_block_reason
+            automatic_exit_guard_minutes = session_state.guard_minutes
+            if not session_state.manual_execution_allowed:
+                open_allowed = False
+                close_allowed = False
+                block_reason = session_state.automatic_exit_block_reason
+        else:
+            # Simulation adapters do not carry a broker session calendar. Keep
+            # their legacy capability semantics while making the missing
+            # production evidence visible to callers.
+            market_status = "unknown"
+            trading_hours = None
+            trading_timezone = None
+            automatic_exit_allowed = True
+            automatic_exit_block_reason = None
+            automatic_exit_guard_minutes = None
         result = CrossSpreadVenueSnapshot(
             venue=venue,
             symbol=quote.symbol,
@@ -162,14 +204,45 @@ def _build_venue_snapshot(
             openAllowed=open_allowed,
             closeAllowed=close_allowed,
             executionBlockReason=block_reason,
+            marketStatus=market_status,
+            tradingHours=trading_hours,
+            tradingTimezone=trading_timezone,
+            automaticExitAllowed=automatic_exit_allowed,
+            automaticExitBlockReason=automatic_exit_block_reason,
+            automaticExitGuardMinutes=automatic_exit_guard_minutes,
             quoteSourceAsOf=quote.source_as_of,
         )
     except Exception as exc:
+        market_status = "unknown"
+        trading_hours = None
+        trading_timezone = None
+        automatic_exit_allowed = False
+        automatic_exit_block_reason = "mt5_session_state_unknown" if venue == "mt5" else None
+        automatic_exit_guard_minutes = None
+        if venue == "mt5":
+            settings = get_settings()
+            session_state = resolve_mt5_session_state(
+                schedule=settings.cross_spread_mt5_trading_schedule,
+                timezone=settings.cross_spread_mt5_schedule_timezone,
+                guard_minutes=settings.cross_spread_auto_exit_guard_minutes,
+                overrides=settings.cross_spread_mt5_session_overrides,
+            )
+            market_status = session_state.status
+            trading_hours = session_state.trading_hours
+            trading_timezone = session_state.timezone
+            automatic_exit_guard_minutes = session_state.guard_minutes
+            automatic_exit_block_reason = session_state.automatic_exit_block_reason
         result = CrossSpreadVenueSnapshot(
             venue=venue,
             symbol=symbol,
             status="unavailable",
             reason=redact_text(str(exc)),
+            marketStatus=market_status,
+            tradingHours=trading_hours,
+            tradingTimezone=trading_timezone,
+            automaticExitAllowed=automatic_exit_allowed,
+            automaticExitBlockReason=automatic_exit_block_reason,
+            automaticExitGuardMinutes=automatic_exit_guard_minutes,
             asOf=datetime.now(UTC),
         )
     return result.model_copy(
@@ -204,12 +277,34 @@ def _execution_capability(venue: str, quote) -> tuple[bool, bool, str | None]:
     source_time = quote.source_as_of
     if source_time is None:
         return False, False, "quote_source_time_missing"
-    age = (now - source_time).total_seconds()
-    if age < 0 or age > _MAX_SOURCE_AGE_SECONDS:
-        return False, False, "quote_stale"
+    if source_time.tzinfo is None or source_time.utcoffset() is None:
+        return False, False, "quote_source_time_missing"
+    quote_observed_at = quote.as_of
+    if quote_observed_at.tzinfo is None or quote_observed_at.utcoffset() is None:
+        return False, False, "quote_source_time_missing"
+    payload = quote.raw_payload
+    if venue == "mt5" and payload.get("tickFreshnessTracked") is True:
+        quote_age = (now - quote_observed_at).total_seconds()
+        if quote_age < 0 or quote_age > _MAX_SOURCE_AGE_SECONDS:
+            return False, False, "quote_stale"
+        observed_raw = payload.get("lastTickAdvanceObservedAt")
+        if not isinstance(observed_raw, str):
+            return False, False, "quote_stale"
+        try:
+            observed_at = datetime.fromisoformat(observed_raw)
+        except ValueError:
+            return False, False, "quote_stale"
+        if observed_at.tzinfo is None or observed_at.utcoffset() is None:
+            return False, False, "quote_stale"
+        advance_age = (now - observed_at).total_seconds()
+        if advance_age < 0 or advance_age > _MAX_SOURCE_AGE_SECONDS:
+            return False, False, "quote_stale"
+    else:
+        age = (now - source_time).total_seconds()
+        if age < 0 or age > _MAX_SOURCE_AGE_SECONDS:
+            return False, False, "quote_stale"
     if venue == "bybit":
         return True, True, None
-    payload = quote.raw_payload
     account_allowed = payload.get("accountTradeAllowed")
     terminal_allowed = payload.get("terminalTradeAllowed")
     trade_mode = payload.get("tradeMode")

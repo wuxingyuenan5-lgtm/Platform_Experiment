@@ -3,6 +3,37 @@ import axios from 'axios';
 import type { paths } from './generated/strategy';
 import { createStrategyClient } from './strategyClient';
 import { strategyQueryClient, strategyQueryKey, strategySession } from './strategyQueries';
+import { clearUserSystemSessionMemory } from './userSystem';
+
+const SESSION_ERROR_CODES = new Set([
+  'invalid_session',
+  'human_session_required',
+  'csrf_required',
+  'csrf_invalid',
+  'account_inactive',
+  'account_temporarily_locked',
+  'browser_sessions_disabled',
+  'session_timestamp_invalid',
+]);
+
+function readableStrategyError(error: unknown): string {
+  if (!error || typeof error !== 'object') return '策略数据暂不可用';
+  const detail = (error as { detail?: unknown }).detail;
+  if (detail && typeof detail === 'object') {
+    const code = String((detail as { code?: unknown }).code || '');
+    const message = String((detail as { message?: unknown }).message || '');
+    if (SESSION_ERROR_CODES.has(code)) {
+      clearUserSystemSessionMemory();
+      return code === 'csrf_required' || code === 'csrf_invalid'
+        ? '登录校验已失效，请刷新页面或重新登录后再提交。'
+        : '登录会话已失效，请重新登录后再提交价差指令。';
+    }
+    if (message) return message;
+  }
+  if (typeof detail === 'string' && detail) return detail;
+  const message = (error as { message?: unknown }).message;
+  return typeof message === 'string' && message ? message : '策略数据暂不可用';
+}
 
 /** Generated paths/types, with the existing session, CSRF and timeout transport. */
 export function createStrategyApi(timeout = 10_000) {
@@ -57,7 +88,7 @@ export function createStrategyApi(timeout = 10_000) {
   return api;
 }
 
-export function strategyData<T>(response: { data?: T }): T {
-  if (response.data === undefined) throw new Error('策略数据暂不可用');
+export function strategyData<T>(response: { data?: T; error?: unknown }): T {
+  if (response.data === undefined) throw new Error(readableStrategyError(response.error));
   return response.data;
 }

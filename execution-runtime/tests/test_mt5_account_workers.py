@@ -77,6 +77,22 @@ def test_supervisor_requires_distinct_terminal_paths(tmp_path) -> None:
     assert any("MT5_TERMINAL_SHARED_WITH" in item for item in missing)
 
 
+def test_supervisor_rechecks_terminal_presence_without_runtime_restart(tmp_path) -> None:
+    terminal = tmp_path / "terminal64.exe"
+    settings = Settings(
+        mt5_account_ids="account_mt5_short_term_a",
+        mt5_primary_account_id="account_mt5_short_term_a",
+        mt5_account_terminal_paths=f"account_mt5_short_term_a={terminal}",
+    )
+    supervisor = Mt5AccountWorkerSupervisor(settings)
+
+    assert supervisor.missing_requirements() == [
+        "account_mt5_short_term_a:MT5_TERMINAL_NOT_FOUND"
+    ]
+    terminal.write_bytes(b"terminal")
+    assert supervisor.missing_requirements() == []
+
+
 def test_gateway_routes_accounts_to_independent_workers() -> None:
     supervisor = AccountSupervisor()
     settings = Settings(
@@ -186,6 +202,51 @@ def test_worker_rpc_surface_is_explicit() -> None:
 
     with pytest.raises(AttributeError):
         client.delete_everything()
+
+
+def test_worker_start_failure_backoff_prevents_terminal_restart_storm(monkeypatch) -> None:
+    class Connection:
+        def poll(self, _timeout):
+            return True
+
+        def recv(self):
+            return ("error", "GatewayConfigurationError", "terminal unavailable")
+
+        def send(self, _message):
+            return None
+
+        def close(self):
+            return None
+
+    class Process:
+        starts = 0
+
+        def __init__(self, **_kwargs):
+            self.alive = False
+
+        def start(self):
+            type(self).starts += 1
+
+        def is_alive(self):
+            return self.alive
+
+        def join(self, **_kwargs):
+            return None
+
+        def terminate(self):
+            return None
+
+    monkeypatch.setattr("app.mt5_account_worker.multiprocessing.Process", Process)
+    monkeypatch.setattr("app.mt5_account_worker.multiprocessing.Pipe", lambda: (Connection(), Connection()))
+    client = Mt5AccountWorkerClient(
+        settings=Settings(), account_id="mt5-live-main", terminal_path="C:/MT5/terminal64.exe"
+    )
+
+    with pytest.raises(GatewayConfigurationError, match="terminal unavailable"):
+        client._ensure_started()
+    with pytest.raises(GatewayConfigurationError, match="cooling down"):
+        client._ensure_started()
+    assert Process.starts == 1
 
 
 def test_unresolved_account_command_blocks_new_worker_write(tmp_path) -> None:

@@ -11,10 +11,15 @@ from typing import Annotated, cast
 from uuid import uuid4
 
 from fastapi import Depends, HTTPException, Request
+from starlette.concurrency import run_in_threadpool
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.responses import JSONResponse, Response
 
 from app.config import Settings, get_settings
+from app.controlled_strategy_write_guard import (
+    CONTROLLED_STRATEGY_KEYS,
+    is_controlled_strategy_instance,
+)
 from app.database import connection
 from app.user_permissions import ROLE_PERMISSIONS, are_known_roles, has_permission
 from app.user_session_auth import (
@@ -56,12 +61,6 @@ CEO_TRADE_WRITE_PATHS = frozenset(
         "/api/v1/trading/cross-spread/leverage",
         "/api/v1/trading/cross-spread/lifecycle/open",
         "/api/v1/trading/cross-spread/exit-plans/evaluate",
-    }
-)
-CEO_TRADE_STRATEGY_INSTANCE_IDS = frozenset(
-    {
-        "strategy_funding_arbitrage_instance_default",
-        "strategy_cross_venue_spread_instance_default",
     }
 )
 GENERIC_TRADE_WRITE_PATHS = frozenset(
@@ -297,6 +296,13 @@ def enforce_assurance(
 
 def permission_for_request(method: str, path: str) -> str:
     normalized_method = method.upper()
+    if normalized_method == "POST" and path == "/api/v1/research/strategies/scenario":
+        return "research.read"
+    if normalized_method == "POST" and (
+        path in {"/api/v1/research/strategies/experiments", "/api/v1/research/strategies/drafts"}
+        or (path.startswith("/api/v1/research/strategies/experiments/") and path.endswith("/cancel"))
+    ):
+        return "research.write"
     if normalized_method == "POST" and path == "/api/v1/research/a-share/stock-pool/focus":
         return "profile.update_self"
     if (normalized_method, path) in {
@@ -428,6 +434,17 @@ def has_ceo_trade_authority(principal: Principal, settings: Settings) -> bool:
     )
 
 
+def _record_requires_ceo_trade_authority(query: str, record_id: str) -> bool:
+    with connection() as db:
+        row = db.execute(
+            "SELECT sd.strategy_key FROM strategy_instances si "
+            "JOIN strategy_definitions sd ON sd.id=si.strategy_definition_id "
+            f"WHERE si.id=({query})",
+            (record_id,),
+        ).fetchone()
+    return row is not None and row["strategy_key"] in CONTROLLED_STRATEGY_KEYS
+
+
 async def requires_ceo_trade_authority(request: Request) -> bool:
     """Classify privileged strategy writes without trusting a client route choice."""
     if request.method.upper() not in {"POST", "PATCH"}:
@@ -436,11 +453,11 @@ async def requires_ceo_trade_authority(request: Request) -> bool:
         "/api/v1/trading/execution-batches/"
     ) and request.url.path.endswith("/risk-actions"):
         batch_id = request.url.path.split("/")[-2]
-        with connection() as db:
-            batch = db.execute(
-                "SELECT strategy_instance_id FROM execution_batches WHERE id=?", (batch_id,)
-            ).fetchone()
-        return batch is not None and batch["strategy_instance_id"] in CEO_TRADE_STRATEGY_INSTANCE_IDS
+        return await run_in_threadpool(
+            _record_requires_ceo_trade_authority,
+            "SELECT strategy_instance_id FROM execution_batches WHERE id=?",
+            batch_id,
+        )
     if request.method.upper() == "PATCH" and request.url.path.startswith(
         "/api/v1/trading/cross-spread/exit-plans/"
     ):
@@ -455,25 +472,38 @@ async def requires_ceo_trade_authority(request: Request) -> bool:
         "/execute"
     ):
         instruction_id = request.url.path.split("/")[-2]
-        with connection() as db:
-            row = db.execute(
-                "SELECT strategy_instance_id FROM strategy_runs WHERE id=?", (instruction_id,)
-            ).fetchone()
-        return row is not None and row["strategy_instance_id"] in CEO_TRADE_STRATEGY_INSTANCE_IDS
+        return await run_in_threadpool(
+            _record_requires_ceo_trade_authority,
+            "SELECT strategy_instance_id FROM strategy_runs WHERE id=?",
+            instruction_id,
+        )
     if request.url.path.startswith("/api/v1/strategies/") and request.url.path.endswith(
         "/instructions"
     ):
         instance_id = request.url.path.split("/")[4]
-        return instance_id in CEO_TRADE_STRATEGY_INSTANCE_IDS
+        return await run_in_threadpool(is_controlled_strategy_instance, instance_id)
+    if request.url.path.startswith("/api/v1/strategies/instances/") and request.url.path.endswith(
+        "/runs"
+    ):
+        instance_id = request.url.path.split("/")[-2]
+        return await run_in_threadpool(is_controlled_strategy_instance, instance_id)
     if request.url.path not in GENERIC_TRADE_WRITE_PATHS:
         return False
     try:
         body = json.loads((await request.body()).decode("utf-8"))
     except (UnicodeDecodeError, json.JSONDecodeError):
         return False
-    return (
-        isinstance(body, dict) and body.get("strategyInstanceId") in CEO_TRADE_STRATEGY_INSTANCE_IDS
-    )
+    if not isinstance(body, dict):
+        return False
+    if (
+        request.url.path.endswith("/execution-batches")
+        and not body.get("strategyInstanceId")
+        and body.get("strategyKey") in CONTROLLED_STRATEGY_KEYS
+    ):
+        return True
+    if not isinstance(body.get("strategyInstanceId"), str):
+        return False
+    return await run_in_threadpool(is_controlled_strategy_instance, body["strategyInstanceId"])
 
 
 def audit_auth_event(
@@ -571,7 +601,9 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
         )
         principal: Principal | None = None
         try:
-            principal = authenticate_request(request, settings)
+            # Session lookup/touch and credential reads use synchronous storage.
+            # Keep their lock and disk waits off the shared ASGI event loop.
+            principal = await run_in_threadpool(authenticate_request, request, settings)
             enforce_assurance(request, principal, assurance, settings)
             if permission is not None and not principal.has_permission(permission):
                 raise AuthenticationError(
@@ -590,7 +622,8 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
             if settings.environment.lower() == "live" or settings.auth_mode.lower() == "api_key":
                 await validate_body_identity(request, principal)
         except AuthenticationError as exc:
-            audit_auth_event(
+            await run_in_threadpool(
+                audit_auth_event,
                 event_type="authentication_or_authorization_denied",
                 request=request,
                 principal=principal,

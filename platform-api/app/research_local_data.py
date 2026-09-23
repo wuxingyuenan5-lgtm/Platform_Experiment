@@ -31,3 +31,15 @@ def read_local_json(relative_path: str) -> dict[str, Any]:
     if not isinstance(payload, dict):
         raise ResearchProviderError(f"local_data_invalid_payload:{relative_path}")
     return cast(dict[str, Any], payload)
+
+
+def write_local_json(relative_path: str, payload: dict[str, Any]) -> None:
+    """Atomically publish a validated research artifact under the data root."""
+    root = hedge_board_data_root().resolve()
+    path = (root / relative_path).resolve()
+    if root != path and root not in path.parents:
+        raise ResearchProviderError("local_data_path_outside_root")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_suffix(path.suffix + ".tmp")
+    temporary.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    temporary.replace(path)

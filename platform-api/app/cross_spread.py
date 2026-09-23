@@ -29,8 +29,8 @@ from app.schemas import (
     CrossSpreadPreflightRequest,
     CrossSpreadSnapshotResponse,
     CrossSpreadTradingRulesResponse,
-    CrossSpreadVenueTradingRuleResponse,
     CrossSpreadVenueSnapshotResponse,
+    CrossSpreadVenueTradingRuleResponse,
     ExecutionBatchResponse,
     TradeCommandResponse,
 )
@@ -180,6 +180,12 @@ def get_cross_spread_trading_rules() -> CrossSpreadTradingRulesResponse:
             openAllowed=state.open_allowed,
             closeAllowed=state.close_allowed,
             executionBlockReason=state.execution_block_reason,
+            marketStatus=state.market_status,
+            tradingHours=state.trading_hours,
+            tradingTimezone=state.trading_timezone,
+            automaticExitAllowed=state.automatic_exit_allowed,
+            automaticExitBlockReason=state.automatic_exit_block_reason,
+            automaticExitGuardMinutes=state.automatic_exit_guard_minutes,
             quoteSourceAsOf=state.quote_source_as_of,
             asOf=spec.as_of,
         )
@@ -300,7 +306,10 @@ def assert_cross_spread_market_executable(*, is_close: bool) -> CrossSpreadSnaps
         action = "close" if is_close else "open"
         raise HTTPException(
             status_code=423,
-            detail=f"Cross-spread {action} is monitor-only because both venues are not executable ({details})",
+            detail=(
+                f"Cross-spread {action} is monitor-only because both venues are not "
+                f"executable ({details})"
+            ),
         )
     return snapshot
 

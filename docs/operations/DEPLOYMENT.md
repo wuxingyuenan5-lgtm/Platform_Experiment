@@ -23,6 +23,10 @@ powershell -ExecutionPolicy Bypass -File .\scripts\dev-platform.ps1
 
 Simulation/Fake Gateway and disabled Platform/Runtime Live Write remain the default safety state.
 
+## Reversible local web publication
+
+The supported local publication path is `scripts/publish-local-web.ps1`. It builds `platform-web`, copies the verified `index.html`, `assets/` and formal brand configuration into a UTC timestamped `.codex/releases/web/<timestamp>/` directory, validates the generated `deploy/Caddyfile.windows` configuration with the existing portable Caddy binary, and then updates `.codex/releases/web/current.json`. Failed builds or Caddy validation leave the previous marker unchanged. `dev-platform.ps1 -Action restart-web` activates only the Web release; the API and Runtime stay running. Caddy binds to loopback and serves built artifacts, independent of source-file HMR. This is a local release switch only; it does not register Windows services, alter trading mode, accounts or databases, or establish an external deployment. Preparation, rollback and development-port commands are in [RUNBOOK.md](RUNBOOK.md).
+
 ## Live acceptance is separate
 
 A successful deployment or health check does not authorize live trading. Controlled instruction-bounded validation follows [`../operations/LIVE_ACCEPTANCE_RUNBOOK.md`](../operations/LIVE_ACCEPTANCE_RUNBOOK.md), and any failed step returns the system to read-only mode.

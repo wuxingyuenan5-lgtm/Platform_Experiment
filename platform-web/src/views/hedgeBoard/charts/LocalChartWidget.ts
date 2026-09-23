@@ -1,8 +1,14 @@
 import { defineComponent, h, type PropType } from 'vue';
 
 import CryptoMarketDetailPanel from '../components/CryptoMarketDetailPanel.vue';
+import BtcEtfFlowPanel from '../components/BtcEtfFlowPanel.vue';
+import CryptoIvTermPanel from '../components/CryptoIvTermPanel.vue';
+import CftcPositioningPanel from '../components/CftcPositioningPanel.vue';
+import CumulativeVolatilityPanel from '../components/CumulativeVolatilityPanel.vue';
 import GoldMarketDetailPanel from '../components/GoldMarketDetailPanel.vue';
 import MacroMarketDetailPanel from '../components/MacroMarketDetailPanel.vue';
+import FedWatchPanel from '../components/FedWatchPanel.vue';
+import PolymarketFedPanel from '../components/PolymarketFedPanel.vue';
 import { type LocalWidgetKey, type WidgetConfig } from '../nativeData/dashboardClean';
 import MacroSeriesChart from './MacroSeriesChart';
 
@@ -100,20 +106,10 @@ const externalGoldResearch = {
 } as const;
 
 const externalCryptoResearch = {
-  'btc-etf-flow': {
-    provider: 'SoSoValue',
-    description: '美国现货 BTC ETF 每日资金流',
-    href: 'https://sosovalue.com/zh/assets/etf/Total_Crypto_Spot_ETF_Fund_Flow?page=usBTC',
-  },
   'btc-treasury-flow': {
     provider: 'BitcoinTreasuries.net',
     description: '上市公司及机构 Bitcoin 持仓披露',
     href: 'https://bitcointreasuries.net/',
-  },
-  'crypto-eth-etf-flow': {
-    provider: 'SoSoValue',
-    description: '美国现货 ETH ETF 每日资金流',
-    href: 'https://sosovalue.com/zh/assets/etf/Total_Crypto_ETH_ETF_Fund_Flow?page=usETH',
   },
 } as const;
 
@@ -263,13 +259,15 @@ export default defineComponent({
         const key = props.widget.localKey as LocalWidgetKey;
         switch (key) {
           case 'macro-fed-balance-structure':
-          case 'macro-fedwatch':
           case 'macro-polymarket-fed':
+            return h(PolymarketFedPanel);
           case 'macro-inflation-nowcast':
           case 'macro-inflation-expectations':
           case 'macro-gdp-now':
           case 'macro-lending-standards':
             return renderExternalMacroResearch(key);
+          case 'macro-fedwatch':
+            return h(FedWatchPanel);
           case 'spdr-daily-flow':
             return renderExternalGoldResearch(key);
           case 'spdr-holdings-vs-price':
@@ -401,9 +399,25 @@ export default defineComponent({
             });
           case 'crypto-market-detail-table':
             return h(CryptoMarketDetailPanel);
+          case 'crypto-intraday-cumulative-volatility':
+            return h(CumulativeVolatilityPanel, {
+              asset: 'btc',
+              title: props.widget.title,
+            });
+          case 'gold-intraday-cumulative-volatility':
+            return h(CumulativeVolatilityPanel, {
+              asset: 'gold',
+              title: props.widget.title,
+            });
+          case 'cftc-positioning':
+            return h(CftcPositioningPanel);
           case 'btc-etf-flow':
-          case 'btc-treasury-flow':
+            return h(BtcEtfFlowPanel);
           case 'crypto-eth-etf-flow':
+            return h(BtcEtfFlowPanel, { asset: 'eth' });
+          case 'crypto-atm-iv-term':
+            return h(CryptoIvTermPanel);
+          case 'btc-treasury-flow':
             return renderExternalCryptoResearch(key);
           case 'crypto-binance-open-interest':
             return h(MacroSeriesChart, {

@@ -9,6 +9,22 @@ from pathlib import Path
 import pytest
 
 
+def test_web_recovery_and_backend_protection_scenarios():
+    executable = shutil.which("powershell") or shutil.which("pwsh")
+    if not executable:
+        pytest.skip("PowerShell unavailable")
+    harness = Path(__file__).with_name("platform-watchdog-harness.ps1")
+    result = subprocess.run(
+        [executable, "-NoProfile", "-File", str(harness)],
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=30,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert result.stdout.count("PASS ") == 10
+
+
 @pytest.mark.parametrize(
     "live,foreign,expected", [(False, False, 1), (True, False, 0), (False, True, 0)]
 )

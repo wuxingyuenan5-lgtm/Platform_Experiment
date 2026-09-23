@@ -156,9 +156,13 @@ Close Action 在领取 Exit Plan 或建立执行意图前检查交易开关，�
 
 2026-09-09 起，CEO 有效登录与 CSRF、活动账户交易绑定、双层 Live Gate、余额/保证金、Venue 数量规格、MT5 原生交易权限和风险检查构成正常准入。市价和限价开平仓均不需要 LiveTradingSession、临时验收窗口、固定一盎司/名义额度或单组持仓限制。已完成开仓的持仓组不阻止新增独立组；未解决的执行批次仍阻止不安全的新开仓。平仓继续绑定目标组和 MT5 Position Ticket，累计成交不能超过指令数量。
 
-正常 Cross 开仓、人工双腿平仓和自动 TP/SL 必须在创建指令或原子领取 Exit Plan 前，取得两腿当前可执行证据。行情可见不等于可交易：Runtime 保留报价供价差和账户风险监控，同时以 Venue 原生报价时间、品种交易模式、账户/终端/EA/Python 权限及真实合约规格分别给出 `openAllowed`、`closeAllowed`。任一腿报价超过 30 秒未更新、原生时间缺失、品种休市/禁用或权限不满足时，快照进入 `monitor_only`；价差仍可展示，但不得参与正常开平仓或 TP/SL 触发，也不得领取 Exit Plan。异常批次已形成的单腿暴露仍沿原 Instruction、Ticket、幂等与对账合同处置，不能因正常双腿市场门而失去恢复路径。
+正常 Cross 开仓、人工双腿平仓和自动 TP/SL 必须在创建指令或原子领取 Exit Plan 前，取得两腿当前可执行证据。行情可见不等于可交易：Runtime 保留报价供价差和账户风险监控，同时以 Venue 原生报价更新证据、品种交易模式、账户/终端/EA/Python 权限及真实合约规格分别给出 `openAllowed`、`closeAllowed`。任一腿报价超过 30 秒未更新、原生时间缺失、品种休市/禁用或权限不满足时，快照进入 `monitor_only`；价差仍可展示，但不得参与正常开平仓或 TP/SL 触发，也不得领取 Exit Plan。MT5 券商原生时间保留不校正；新鲜度采用账户观测合同规定的连续 Tick 递增证据，首次读取和重连后未确认更新时仅监控。异常批次已形成的单腿暴露仍沿原 Instruction、Ticket、幂等与对账合同处置，不能因正常双腿市场门而失去恢复路径。
 
-策略页的交易规则保留原有五行表格，只把可确认的用户规则接到当前绑定账户的 Runtime 原生 Instrument Specification 与当前会话状态：交易时间显示 Bybit 24H 和 MT5 当前开市、休市或仅可平仓，其他限制显示双腿共同的最小下单量、数量步长和市价上限。报价时间、交易模式、权限和来源时间仅作为后台准入证据，不在普通交易规则表中展开。没有 Venue 证据的手续费、杠杆上限或每日回撤不得以硬编码、Catalog Seed 或 UI Fixture 冒充真实规则，保持 `—`。
+策略页的交易规则保留原有五行表格，只把可确认的用户规则接到当前绑定账户的 Runtime 原生 Instrument Specification 与当前会话状态：交易时间显示 Bybit 24H 和 MT5 配置的服务器时区、周一至周五开市窗口，以及 MT5 当前休市或边界缓冲状态；当前 `00:00-23:00` 服务器窗口对应北京时间每日 04:00-05:00（UTC+03:00，夏令时）或 05:00-06:00（UTC+02:00，冬令时）休市。正常时不追加“正常执行”字样，休市显示“休市”，并始终注明“开收盘前后 N 分钟不自动交易（仅暂停后台自动止盈止损，手动开平仓可用）”；处于边界时再显示当前“不自动执行”状态。N 由 `VG_RUNTIME_CROSS_SPREAD_AUTO_EXIT_GUARD_MINUTES` 配置，不能在页面或执行逻辑中写死。Bybit MT5 默认时区为 Runtime 的 `Bybit/MT5`：UTC+2，并按 Bybit 公布的 3 月第二个周日到 11 月第一个周日切换 UTC+3；不能把北京时间或 `Europe/Athens` 当作服务器时钟。
+
+边界缓冲只暂停后台自动 TP/SL，不撤销人工意图：缓冲期间仍允许用户自行提交开平仓指令；完整休市或时段证据未知时，正常开平及自动 TP/SL 均 fail-closed。MT5 周期性维护、夏冬令时和日期级节假日/临时维护通过 Runtime 的 `VG_RUNTIME_CROSS_SPREAD_MT5_TRADING_SCHEDULE`、`VG_RUNTIME_CROSS_SPREAD_MT5_SCHEDULE_TIMEZONE` 与 `VG_RUNTIME_CROSS_SPREAD_MT5_SESSION_OVERRIDES` 维护，状态随每次快照重新计算。
+
+报价时间、交易模式、权限和来源时间仅作为后台准入证据，不在普通交易规则表中展开。没有 Venue 证据的手续费、杠杆上限或每日回撤不得以硬编码、Catalog Seed 或 UI Fixture 冒充真实规则，保持 `—`。
 
 ## 6. PostOnly Chase 合同
 
@@ -181,41 +185,29 @@ Runtime executionPolicy = post_only_chase
 - 不支持 IOC；
 - 不静默改成 FOK 或 Market。
 
-### 6.2 有界策略
+### 6.2 Bybit 原生追逐限价
 
-- 明确 TTL；
-- 最小改单距离以 Tick 计；
-- 最大 Amend／Cancel-Repost 次数；
-- 变更冷却；
-- 每个子单使用同一 Chase 前缀和唯一子编号；
-- 优先 Amend；Amend 被拒绝时才进入 Cancel/Repost；
-- 只有终态 Cancel 私有事件确认后，才允许 Repost；
-- 达到 TTL、最大次数或人工取消后停止继续追价；
-- 不允许无限循环。
-- 初始仓库参数为 15 秒 TTL、1 秒评估 cadence、最多 5 次 mutation、至少 1 Tick 价格移动；它们是 owner 批准的受控配置，不是交易所事实或永久生产默认值。
+跨所 `post_only_chase` 使用 Bybit `/v5/strategy/create` 的 `chaseOrder`，取代本地 Amend / Cancel-Repost。保留原业务指令、数量、TTL、Live Write、Kill Switch 和未知结果保护，不自动回退到其他执行方式。Funding 的独立追价实现不受此替换影响。
 
-### 6.3 私有事件与竞态
+Cross 适配器中已无入口的旧本地追价动作、旧子单创建及私有流工厂接线已移除；原生 Chase 是此路径唯一追价实现。此清理不改变终态累计成交确认后放行 MT5 的规则，也不删除历史 Journal/Route 证据。
 
-Private Order 和 Private Execution 是主状态来源：
+创建前持久化原 command 与路由，成功后绑定唯一 `strategyId` 及全部真实子 `orderId`。创建超时不重复创建，也不按相同品种、数量或时间猜测归属；缺少 strategyId 时保持 `result_unknown`，需要核对原外部结果。
 
-- Execution 使用稳定 `execId` 去重；
-- 累计成交量单调递增且不能超过请求量；
-- 重复事件不能重复增加 MT5 数量；
-- 序列回退、序列缺口、Malformed Payload、私有流失联或 REST 不一致立即停止 Chase；
-- 失联后只允许一次安全撤单尝试和有界 REST 终态对账；
-- Cancel/Fill 与 Amend/Fill 竞态依据 Execution 累计量和最终 Venue 状态处理；
-- 未确认终态时不重挂，不生成第二个业务意图。
+### 6.3 动态价差与终态核验
+
+原计划冻结目标价差、非负 `maxAdverseSpread`（默认 0）及真实 MT5 账户、品种、最小数量、步长和合约乘数。创建前及等待成交期间读取双边原生报价时间与可交易权限。买 Bybit / 卖 MT5 使用 `BY Ask - MT5 Bid <= target + tolerance`；卖 Bybit / 买 MT5 使用 `BY Bid - MT5 Ask >= target - tolerance`。
+
+价差越界、单边不可交易、TTL 到期，或累计量已足够精确对冲时，停止策略并取消剩余量。`maxChasePrice` 仅是额外单边价格边界，不能代替动态价差保护或撤单确认。止盈止损和人工平仓同样受双边可交易检查约束；休市保留监控和风险提示。
+
+通过有界 REST 读取策略、全部分页子单和真实 executions；按 `execId` 去重并按实际成交价加权，不把子限价当成交价。只有策略及所有子单均终态，且策略、子单、executions 的累计量一致，才输出一次带 `terminal=true` 的累计成交。停止确认失败或证据冲突保持未知，不放行 MT5。取消只能阻止未成交余量，无法取消已经发生的成交。
 
 ### 6.4 Fill 与 MT5
 
-当前安全口径为：
+MT5 沿现有市价执行链按 Bybit 终态实际成交量对冲。原生 Chase 允许终态部分成交：保存已取消余量的订单状态和独立终态证据，按实际数量调整 MT5，不把请求数量当成交量。数量不足 MT5 最小量或不符合步长时保留敞口并进入人工介入。未终态部分成交不放行；FOK 仍要求全成交。
 
-- 只有累计 Bybit 成交量精确等于请求量，才产生一个正常累计 Fill 并进入现有 MT5 路径；
-- 重复 Execution 不会重复累计；
-- 部分成交、无效数量 Step、断线或终态不一致不会提交 MT5；
-- 残余 Bybit 敞口以明确人工介入／补偿证据保留，不能伪装成完整成交。
+这是终态后单次对冲，不是逐笔增量 MT5 子单。REST 轮询、撤余单与核验会带来延迟，不能保证两边同时成交或最终价差无滑点。恢复仅查询原策略并复用相同事件身份，不重建策略或重复对冲。
 
-Funding carry 的增量 Spot 对冲是独立策略语义，不改变上述跨 Venue 合同：每个去重后的永续累计成交增量只释放按 CEO 双腿指令比例、向下量化到 Spot Step 的新增数量；量化余数显式保留，子指令留在同一 Batch 并使用确定性身份。重复 `execId`、累计量回退或超量、断线、身份不一致、未知订单状态或 `result_unknown` 均停止新副作用并进入对账。跨 Venue FOK 与 PostOnly Chase 仍只有终态累计全成交才允许 MT5 第二腿。
+Funding carry 的增量 Spot 对冲是独立策略语义，不改变上述跨 Venue 合同：每个去重后的永续累计成交增量只释放按 CEO 双腿指令比例、向下量化到 Spot Step 的新增数量；量化余数显式保留，子指令留在同一 Batch 并使用确定性身份。重复 `execId`、累计量回退或超量、断线、身份不一致、未知订单状态或 `result_unknown` 均停止新副作用并进入对账。跨 Venue FOK 仍只有终态累计全成交才允许 MT5 第二腿；原生 Chase 按本节终态实际量规则执行。
 
 Funding 平仓绑定原开仓 Instruction，永续腿使用 reduce-only；实际可卖现货须扣除原生币手续费，按剩余永续比例向下取 Spot Step，不自动追加买币。实际已对冲、已平数量只来自 canonical Fill，Spot release 预约不能作为成交。剩余、待平与结果未知预约分别保留；请求数量不能越过原计划和剩余额度。建议开仓量取两腿共同数量步长并向下取整，预算不足最低成交量时返回不可用，不抬高数量。
 
@@ -225,11 +217,11 @@ Funding 页面保留并展示服务端失败原因；人工介入或结果未知
 
 增量 MT5 对冲属于后续可单独讨论的策略扩展；当前实现优先保证不会重复对冲或错误放行第二腿。
 
-### 6.5 当前限制
+### 6.5 当前边界
 
-PostOnly 的 Bybit 硬价格边界由提交前的 MT5 可成交参考价和用户 `limitSpread` 推导。Chase 期间当前只追踪 Bybit Maker 盘口，不动态重估 MT5 参考价。
+页面保留“追逐限价”和“触发后市价”两个选择；历史 FOK 配置可继续读取。普通限价开仓先持久化目标价差，未到价时保持 pending，不提交任何 Venue 订单；后台监控达到目标价差后，按选择触发市价或追逐限价。已保存的 TP/SL 由原后台监控触发。每次新指令及 TP/SL 分别保存允许不利偏移。
 
-因此 PostOnly 继续默认关闭。真实启用必须通过 Issue #39 受控验收。跨 Venue 动态重估是否加入交易保护，留待后续单独讨论。
+原生 API 依据：[Create](https://bybit-exchange.github.io/docs/v5/strategy/create-strategy)、[Strategy List](https://bybit-exchange.github.io/docs/v5/strategy/strategy-list)、[Order List](https://bybit-exchange.github.io/docs/v5/strategy/order-list)。本地测试不代表真实账户的原生策略写权限或成交验收。停止策略与成交发生竞争时，60062/60074 仅允许继续查询原策略及子单，不作为终态或成交证据；其他拒绝仍失败关闭。
 
 ## 7. API 与页面
 
@@ -239,7 +231,8 @@ Open、人工 Close 与 TP/SL 计划支持：
 {
   "executionMode": "limit",
   "limitStrategy": "post_only_chase",
-  "limitSpread": "-0.8"
+  "limitSpread": "-0.8",
+  "maxAdverseSpread": "0"
 }
 ```
 

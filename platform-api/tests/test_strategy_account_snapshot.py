@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 from fastapi.testclient import TestClient
@@ -65,6 +66,84 @@ def test_unbound_strategy_account_snapshot_returns_explicit_unbound_state(tmp_pa
     }
     assert {key: response.json()[key] for key in expected} == expected
     assert response.json()["finance"] is None
+
+
+def test_cross_strategy_account_snapshot_uses_current_venue_positions(
+    tmp_path: Path,
+) -> None:
+    """A closed strategy projection must not resurrect a venue-flat leg."""
+    get_settings().database_path = str(tmp_path / "cross-strategy-current-position.db")
+
+    with TestClient(app) as client:
+        with connection() as db:
+            payload = {
+                "accountId": "bybit-live-main",
+                "source": "bybit_live",
+                "venue": "bybit",
+                "asOf": "2026-08-21T00:00:00+00:00",
+                "positions": [
+                    {
+                        "accountId": "bybit-live-main",
+                        "instrumentId": "instrument_xau_usdt_perp",
+                        "symbol": "XAUTUSDT",
+                        "instrumentType": "crypto_perp",
+                        "category": "linear",
+                        "side": "Buy",
+                        "netQuantity": "1",
+                        "averagePrice": "2000",
+                        "currentPrice": "2010",
+                        "positionValue": "2010",
+                        "currency": "USDT",
+                    },
+                    {
+                        "accountId": "bybit-live-main",
+                        "instrumentId": "instrument_btc_usdt_perp",
+                        "symbol": "BTCUSDT",
+                        "instrumentType": "crypto_perp",
+                        "category": "linear",
+                        "side": "Buy",
+                        "netQuantity": "0.001",
+                        "averagePrice": "100000",
+                        "currentPrice": "100000",
+                        "positionValue": "100",
+                        "currency": "USDT",
+                    },
+                ],
+            }
+            db.execute(
+                """
+                INSERT INTO account_venue_snapshots (
+                    account_id, source, venue, as_of, data_quality_state, payload_json
+                ) VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    "bybit-live-main",
+                    "bybit_live",
+                    "bybit",
+                    payload["asOf"],
+                    "complete",
+                    json.dumps(payload),
+                ),
+            )
+        response = client.get(
+            "/api/v1/strategies/instances/strategy_cross_venue_spread_instance_default/"
+            "account-snapshot?accountId=bybit-live-main"
+        )
+        summary_response = client.get(
+            "/api/v1/strategies/instances/strategy_cross_venue_spread_instance_default/"
+            "account-snapshot?accountId=bybit-live-main&includeDetails=false"
+        )
+
+    assert response.status_code == 200
+    positions = response.json()["positions"]
+    assert [position["symbol"] for position in positions] == ["XAUTUSDT"]
+    assert positions[0]["currentPrice"] == "2010"
+    assert positions[0]["positionValue"] == "2010"
+    assert summary_response.status_code == 200
+    summary = summary_response.json()
+    assert summary["orders"] == []
+    assert summary["fills"] == []
+    assert summary["finance"] is None
 
 
 def test_strategy_account_snapshot_aggregates_assets_in_account_currency(

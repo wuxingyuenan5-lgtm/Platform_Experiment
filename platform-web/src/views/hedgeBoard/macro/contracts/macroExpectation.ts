@@ -8,6 +8,7 @@ export interface MacroExpectationContract {
 export interface MacroExpectationContractEvent {
   id: string;
   label: string;
+  originalLabel?: string | null;
   category: 'monetary_policy' | 'macro' | 'geopolitics' | 'election';
   probability: number;
   history: Array<{

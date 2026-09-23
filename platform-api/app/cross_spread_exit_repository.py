@@ -159,6 +159,8 @@ def create_exit_plan(
     entry_spread: Decimal,
     take_profit_spread: Decimal | None,
     stop_loss_spread: Decimal | None,
+    take_profit_max_adverse_spread: Decimal = Decimal("0"),
+    stop_loss_max_adverse_spread: Decimal = Decimal("0"),
     take_profit_execution_mode: ExecutionMode = "market",
     stop_loss_execution_mode: ExecutionMode = "market",
     take_profit_limit_strategy: LimitStrategy = "fok",
@@ -189,12 +191,13 @@ def create_exit_plan(
             INSERT INTO cross_spread_exit_plans (
                 id, strategy_instance_id, open_batch_id, close_batch_id, direction,
                 quantity_oz, mt5_position_id, entry_spread, take_profit_spread,
-                stop_loss_spread, take_profit_execution_mode,
+                stop_loss_spread, take_profit_max_adverse_spread,
+                stop_loss_max_adverse_spread, take_profit_execution_mode,
                 stop_loss_execution_mode, take_profit_limit_strategy,
                 stop_loss_limit_strategy, status, trigger_reason, trigger_spread,
                 created_at, updated_at, triggered_at, closed_at
             ) VALUES (
-                ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
                 'active', NULL, NULL, ?, ?, NULL, NULL
             )
             """,
@@ -208,6 +211,8 @@ def create_exit_plan(
                 format(entry_spread, "f"),
                 format(take_profit_spread, "f") if take_profit_spread is not None else "",
                 format(stop_loss_spread, "f") if stop_loss_spread is not None else "",
+                format(take_profit_max_adverse_spread, "f"),
+                format(stop_loss_max_adverse_spread, "f"),
                 take_profit_execution_mode,
                 stop_loss_execution_mode,
                 take_profit_limit_strategy,
@@ -226,6 +231,8 @@ def configure_exit_plan_execution_modes(
     stop_loss_execution_mode: ExecutionMode,
     take_profit_limit_strategy: LimitStrategy = "fok",
     stop_loss_limit_strategy: LimitStrategy = "fok",
+    take_profit_max_adverse_spread: Decimal = Decimal("0"),
+    stop_loss_max_adverse_spread: Decimal = Decimal("0"),
 ) -> CrossSpreadExitPlanResponse:
     current = get_exit_plan(plan_id)
     requested = (
@@ -255,6 +262,7 @@ def configure_exit_plan_execution_modes(
             UPDATE cross_spread_exit_plans
             SET take_profit_execution_mode = ?, stop_loss_execution_mode = ?,
                 take_profit_limit_strategy = ?, stop_loss_limit_strategy = ?,
+                take_profit_max_adverse_spread = ?, stop_loss_max_adverse_spread = ?,
                 updated_at = ?
             WHERE id = ? AND status = 'active'
               AND take_profit_execution_mode = 'market'
@@ -267,6 +275,8 @@ def configure_exit_plan_execution_modes(
                 stop_loss_execution_mode,
                 take_profit_limit_strategy,
                 stop_loss_limit_strategy,
+                format(take_profit_max_adverse_spread, "f"),
+                format(stop_loss_max_adverse_spread, "f"),
                 updated_at,
                 plan_id,
             ),
@@ -288,12 +298,16 @@ def update_exit_plan_settings(
     stop_loss_execution_mode: ExecutionMode | None = None,
     take_profit_limit_strategy: LimitStrategy | None = None,
     stop_loss_limit_strategy: LimitStrategy | None = None,
+    take_profit_max_adverse_spread: Decimal | None = None,
+    stop_loss_max_adverse_spread: Decimal | None = None,
     update_take_profit: bool = False,
     update_stop_loss: bool = False,
     update_take_profit_execution_mode: bool = False,
     update_stop_loss_execution_mode: bool = False,
     update_take_profit_limit_strategy: bool = False,
     update_stop_loss_limit_strategy: bool = False,
+    update_take_profit_max_adverse_spread: bool = False,
+    update_stop_loss_max_adverse_spread: bool = False,
 ) -> CrossSpreadExitPlanResponse:
     if not any(
         (
@@ -303,6 +317,8 @@ def update_exit_plan_settings(
             update_stop_loss_execution_mode,
             update_take_profit_limit_strategy,
             update_stop_loss_limit_strategy,
+            update_take_profit_max_adverse_spread,
+            update_stop_loss_max_adverse_spread,
         )
     ):
         raise HTTPException(status_code=422, detail="At least one exit setting must be provided")
@@ -333,6 +349,16 @@ def update_exit_plan_settings(
         if update_stop_loss_limit_strategy
         else current.stop_loss_limit_strategy
     )
+    next_take_profit_max_adverse_spread = (
+        take_profit_max_adverse_spread
+        if update_take_profit_max_adverse_spread
+        else current.take_profit_max_adverse_spread
+    )
+    next_stop_loss_max_adverse_spread = (
+        stop_loss_max_adverse_spread
+        if update_stop_loss_max_adverse_spread
+        else current.stop_loss_max_adverse_spread
+    )
     if next_take_profit is not None and next_stop_loss is not None:
         if current.direction == "LONG_SPREAD" and next_take_profit <= next_stop_loss:
             raise HTTPException(
@@ -352,6 +378,8 @@ def update_exit_plan_settings(
         and next_stop_loss_execution_mode == current.stop_loss_execution_mode
         and next_take_profit_limit_strategy == current.take_profit_limit_strategy
         and next_stop_loss_limit_strategy == current.stop_loss_limit_strategy
+        and next_take_profit_max_adverse_spread == current.take_profit_max_adverse_spread
+        and next_stop_loss_max_adverse_spread == current.stop_loss_max_adverse_spread
     ):
         return current
 
@@ -363,6 +391,7 @@ def update_exit_plan_settings(
             SET take_profit_spread = ?, stop_loss_spread = ?,
                 take_profit_execution_mode = ?, stop_loss_execution_mode = ?,
                 take_profit_limit_strategy = ?, stop_loss_limit_strategy = ?,
+                take_profit_max_adverse_spread = ?, stop_loss_max_adverse_spread = ?,
                 updated_at = ?
             WHERE id = ? AND status = 'active'
             """,
@@ -373,6 +402,8 @@ def update_exit_plan_settings(
                 next_stop_loss_execution_mode,
                 next_take_profit_limit_strategy,
                 next_stop_loss_limit_strategy,
+                format(next_take_profit_max_adverse_spread, "f"),
+                format(next_stop_loss_max_adverse_spread, "f"),
                 updated_at,
                 plan_id,
             ),
@@ -616,7 +647,8 @@ def _plan_query(where_clause: str) -> str:
     return f"""
         SELECT id, strategy_instance_id, open_batch_id, close_batch_id, direction,
                quantity_oz, mt5_position_id, entry_spread, take_profit_spread,
-               stop_loss_spread, take_profit_execution_mode,
+               stop_loss_spread, take_profit_max_adverse_spread,
+               stop_loss_max_adverse_spread, take_profit_execution_mode,
                stop_loss_execution_mode, take_profit_limit_strategy,
                stop_loss_limit_strategy, status, trigger_reason, trigger_spread,
                created_at, updated_at, triggered_at, closed_at,
@@ -644,6 +676,8 @@ def _plan_from_row(row) -> CrossSpreadExitPlanResponse:
             Decimal(row["take_profit_spread"]) if row["take_profit_spread"] else None
         ),
         stopLossSpread=(Decimal(row["stop_loss_spread"]) if row["stop_loss_spread"] else None),
+        takeProfitMaxAdverseSpread=Decimal(row["take_profit_max_adverse_spread"]),
+        stopLossMaxAdverseSpread=Decimal(row["stop_loss_max_adverse_spread"]),
         takeProfitExecutionMode=row["take_profit_execution_mode"],
         stopLossExecutionMode=row["stop_loss_execution_mode"],
         takeProfitLimitStrategy=row["take_profit_limit_strategy"],

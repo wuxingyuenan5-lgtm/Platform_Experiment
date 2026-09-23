@@ -48,6 +48,8 @@ export interface OverviewRow {
   exitPlanId: string | null;
   takeProfitExecutionMode: CrossSpreadExecutionMode | null;
   stopLossExecutionMode: CrossSpreadExecutionMode | null;
+  takeProfitMaxAdverseSpread?: string | number;
+  stopLossMaxAdverseSpread?: string | number;
   takeProfitLimitStrategy: CrossSpreadLimitStrategy | null;
   stopLossLimitStrategy: CrossSpreadLimitStrategy | null;
   direction: string;
@@ -121,7 +123,6 @@ export function mapOverviewRows(options: MapOverviewRowsOptions) {
   const activePlans = options.exitPlans.filter(
     (plan) => plan.status === 'active' && !plan.originLabel,
   );
-  if (activePlans.length === 0) return [];
   const bybitPositions = options.snapshot?.bybit.positions || [];
   const mt5Positions = options.snapshot?.mt5.positions || [];
   const rowCount = Math.max(bybitPositions.length, mt5Positions.length);
@@ -152,6 +153,8 @@ export function mapOverviewRows(options: MapOverviewRowsOptions) {
         exitPlanId: plan.planId,
         takeProfitExecutionMode: plan.takeProfitExecutionMode,
         stopLossExecutionMode: plan.stopLossExecutionMode,
+        takeProfitMaxAdverseSpread: plan.takeProfitMaxAdverseSpread,
+        stopLossMaxAdverseSpread: plan.stopLossMaxAdverseSpread,
         takeProfitLimitStrategy: plan.takeProfitLimitStrategy,
         stopLossLimitStrategy: plan.stopLossLimitStrategy,
         direction,
@@ -222,6 +225,8 @@ export function mapOverviewRows(options: MapOverviewRowsOptions) {
       exitPlanId: matchedPlan?.planId ?? null,
       takeProfitExecutionMode: matchedPlan?.takeProfitExecutionMode ?? null,
       stopLossExecutionMode: matchedPlan?.stopLossExecutionMode ?? null,
+      takeProfitMaxAdverseSpread: matchedPlan?.takeProfitMaxAdverseSpread,
+      stopLossMaxAdverseSpread: matchedPlan?.stopLossMaxAdverseSpread,
       takeProfitLimitStrategy: matchedPlan?.takeProfitLimitStrategy ?? null,
       stopLossLimitStrategy: matchedPlan?.stopLossLimitStrategy ?? null,
       direction,
@@ -452,7 +457,7 @@ function thresholdValue(value: NumericValue | null | undefined, mode?: string | 
 }
 
 function limitStrategyLabel(strategy: CrossSpreadLimitStrategy) {
-  return strategy === 'post_only_chase' ? 'PostOnly Chase' : 'FOK';
+  return strategy === 'post_only_chase' ? '追逐限价' : strategy === 'market' ? '触发后市价' : 'FOK';
 }
 
 function executionSelectionLabel(

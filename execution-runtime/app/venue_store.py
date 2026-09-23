@@ -707,6 +707,10 @@ def get_market_quote(
         last=Decimal(str(row["last"])) if row["last"] is not None else None,
         currency=quote_currency(normalized),
         asOf=row["updated_at"],
+        sourceAsOf=row["updated_at"],
+        rawPayload={"accountTradeAllowed": True, "accountExpertTradeAllowed": True,
+                    "pythonTradeAllowed": True, "symbolVisible": True,
+                    "terminalTradeAllowed": True, "tradeMode": 4},
         dataQualityState="complete",
     )
 

@@ -27,6 +27,12 @@ This document owns current code and data responsibilities. It records present au
 
 Frontend owners present and transform capabilities but do not own backend authorization decisions. Menu hiding is not a security authorization boundary. The sample-data directory does not own realtime market facts. Personal-security child components must not fabricate parent persistence or provider success.
 
+Strategy account presentation is owned by `strategyFinancialPresentation.ts`, `useStrategyAccountSnapshots.ts` and `useCrossSpreadFinance.ts` under `platform-web/src/views/strategy/management/composables/`. The snapshot API owns position scope; the browser must not choose a historical position fallback. Shared query keys and session invalidation remain in `src/api/platform/strategyQueries.ts`.
+
+For this boundary, run `corepack pnpm type:check` in `platform-web` and `corepack pnpm test:strategy-finance` (includes executed function/composable checks and existing source guards); exercise the actual page with `corepack pnpm test:e2e:strategy-accounts`. The latter uses isolated services and synthetic account responses, so live data binding still needs separate read-only API evidence. The visual config owns test process/database identity and rejects reused listeners. Failure traces, screenshots and request summaries are retained under `test-results/platform-visual/`.
+
+`type:check` uses `tsconfig.strategy.json`; use `type:check:full` for Hedge Board components outside that scope. `test:hedge-board-layout` is a source/layout guard, not browser acceptance. Browser checks must also reject captured widget errors and visible rendering-error placeholders.
+
 ## Execution risk
 
 | Boundary | Owner | Responsibility |
@@ -65,6 +71,8 @@ Risk policy must remain deterministic and independently testable. Risk persisten
 | Fixed reference seeds | `app/database_seeds.py` |
 | Ordered additive migrations | `app/schema_migrations.py` |
 | Domain DDL/SQL | the registered repository or persistence owner |
+
+Account snapshot scope and financial read projections are checked by `platform-api/tests/test_strategy_account_snapshot.py`; migrations by `tests/test_schema_migrations.py`. Local service recovery is owned by `scripts/dev-platform.ps1` and `scripts/platform-watchdog.ps1`; `scripts/tests/test_platform_watchdog.py` injects fake process/network failures and checks bounded recovery, foreign-process refusal and Live Write interruption protection. `scripts/tests/test_platform_child_launcher.py` verifies log handles after launcher exit. These isolated checks do not establish long-running venue/Worker stability.
 
 ## Protected invariants
 

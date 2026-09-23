@@ -27,6 +27,12 @@ def create_system_router(settings: Settings, platform_version: str) -> APIRouter
         return {
             "watchdog": monitor_health.watchdog_snapshot(),
             "accountSync": monitor_health.snapshot("account_sync", enabled=True, deadline=180),
+            "accountHistory": monitor_health.snapshot(
+                "account_history", enabled=True, deadline=600
+            ),
+            "managementProjection": monitor_health.snapshot(
+                "management_projection", enabled=True, deadline=120
+            ),
             "crossExit": monitor_health.snapshot(
                 "cross_exit",
                 enabled=settings.cross_spread_exit_monitor_enabled,

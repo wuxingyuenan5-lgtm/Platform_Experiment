@@ -13,6 +13,7 @@ from app.journal import initialize_journal
 from app.live_route_store import ensure_live_store
 from app.operational_metrics import router as operational_metrics_router
 from app.recovery_routes import create_recovery_router
+from app.research_market_capture import ResearchCapture, create_research_market_router
 from app.system_routes import create_system_router
 from app.venue_query_routes import create_venue_query_router
 from app.venue_store import ensure_store
@@ -27,6 +28,8 @@ def create_app(gateway: VenueGateway | None = None) -> FastAPI:
         live_write_enabled=settings.live_write_enabled,
     )
 
+    capture = ResearchCapture(settings, runtime_gateway)
+
     @asynccontextmanager
     async def lifespan(_: FastAPI):
         initialize_journal()
@@ -36,9 +39,11 @@ def create_app(gateway: VenueGateway | None = None) -> FastAPI:
             warm = getattr(runtime_gateway, "warm_live_execution", None)
             if warm is not None:
                 warm()
+        capture.start()
         try:
             yield
         finally:
+            capture.close()
             close = getattr(runtime_gateway, "close", None)
             if close is not None:
                 close()
@@ -61,6 +66,7 @@ def create_app(gateway: VenueGateway | None = None) -> FastAPI:
     application.include_router(create_recovery_router(gateway=runtime_gateway))
     application.include_router(create_venue_query_router(gateway=runtime_gateway))
     application.include_router(operational_metrics_router)
+    application.include_router(create_research_market_router(capture))
     return application
 
 

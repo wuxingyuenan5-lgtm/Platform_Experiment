@@ -105,7 +105,7 @@ def test_execution_batch_is_idempotent(monkeypatch, tmp_path: Path) -> None:
     payload = {
         "idempotencyKey": "cross-venue-001",
         "strategyInstanceId": "strategy_generic_cross_test",
-        "strategyKey": "cross_venue_spread",
+        "strategyKey": "strategy_generic_cross_test",
         "direction": "buy_a_sell_b",
         "legs": [
             {

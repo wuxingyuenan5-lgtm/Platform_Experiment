@@ -13,7 +13,11 @@ from app.catalog import get_instrument
 from app.config import get_settings
 from app.database import connection
 from app.order_execution_intents import ExecutionPolicy
-from app.runtime_contracts import RuntimeExecutionEventV1, RuntimeSubmitOrderCommandV1
+from app.runtime_contracts import (
+    CrossSpreadGuardV1,
+    RuntimeExecutionEventV1,
+    RuntimeSubmitOrderCommandV1,
+)
 from app.schemas import CreateOrderRequest, OrderResponse
 from app.security import enforce_order_safety
 from app.trading import (
@@ -49,6 +53,7 @@ def submit_order_through_runtime(
     reduce_only: bool = False,
     position_id: str | None = None,
     execution_policy: ExecutionPolicy = "default",
+    cross_spread_guard: CrossSpreadGuardV1 | dict[str, object] | None = None,
 ) -> OrderResponse:
     """Create one local Order and submit it through the selected Runtime contract mode."""
 
@@ -132,6 +137,11 @@ def submit_order_through_runtime(
             price=request.price,
             reduce_only=reduce_only,
             position_id=position_id,
+            cross_spread_guard=(
+                cross_spread_guard.model_dump(mode="json")
+                if isinstance(cross_spread_guard, CrossSpreadGuardV1)
+                else cross_spread_guard
+            ),
         ).model_dump(mode="json")
     else:
         command_payload = {
@@ -197,6 +207,7 @@ def submit_trade_command_order(
     reduce_only: bool = False,
     position_id: str | None = None,
     execution_policy: ExecutionPolicy = "default",
+    cross_spread_guard: CrossSpreadGuardV1 | dict[str, object] | None = None,
 ) -> OrderResponse:
     """Submit through the authoritative versioned Runtime contract."""
 
@@ -208,6 +219,7 @@ def submit_trade_command_order(
         reduce_only=reduce_only,
         position_id=position_id,
         execution_policy=execution_policy,
+        cross_spread_guard=cross_spread_guard,
     )
 
 

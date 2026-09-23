@@ -133,7 +133,7 @@
           </label>
 
           <label class="field-block">
-            <span>可接受价差</span>
+            <span>允许不利偏移</span>
             <div class="input-row">
               <input
                 :value="acceptableSpreadInput"
@@ -145,12 +145,16 @@
             </div>
           </label>
 
+          <p class="execution-note"
+            >不利偏移单位为 USDT/盎司，0 表示不放宽；用于本次开仓及其止盈止损追价。</p
+          >
+
           <label v-if="executionMode === 'limit'" class="field-block">
-            <span>开仓限价策略</span>
+            <span>触发后执行</span>
             <div class="input-row input-row--single-select">
               <select :value="openLimitStrategy" @change="emitSelect('openLimitStrategy', $event)">
-                <option value="fok">FOK 全成全撤</option>
-                <option value="post_only_chase">PostOnly Chase</option>
+                <option value="market">触发后市价</option>
+                <option value="post_only_chase">追逐限价</option>
               </select>
             </div>
           </label>
@@ -162,8 +166,8 @@
                 :value="takeProfitLimitStrategy"
                 @change="emitSelect('takeProfitLimitStrategy', $event)"
               >
-                <option value="fok">FOK 全成全撤</option>
-                <option value="post_only_chase">PostOnly Chase</option>
+                <option value="market">触发后市价</option>
+                <option value="post_only_chase">追逐限价</option>
               </select>
             </div>
           </label>
@@ -198,8 +202,8 @@
                   :value="takeProfitLimitStrategy"
                   @change="emitSelect('takeProfitLimitStrategy', $event)"
                 >
-                  <option value="fok">FOK 全成全撤</option>
-                  <option value="post_only_chase">PostOnly Chase</option>
+                  <option value="market">触发后市价</option>
+                  <option value="post_only_chase">追逐限价</option>
                 </select>
               </div>
             </label>
@@ -228,8 +232,8 @@
                   :value="stopLossLimitStrategy"
                   @change="emitSelect('stopLossLimitStrategy', $event)"
                 >
-                  <option value="fok">FOK 全成全撤</option>
-                  <option value="post_only_chase">PostOnly Chase</option>
+                  <option value="market">触发后市价</option>
+                  <option value="post_only_chase">追逐限价</option>
                 </select>
               </div>
             </label>
@@ -309,12 +313,24 @@
         </label>
 
         <label v-if="closeExecutionMode === 'limit'" class="field-block field-block--compact">
-          <span>平仓限价策略</span>
+          <span>触发后执行</span>
           <div class="input-row input-row--single-select">
             <select :value="closeLimitStrategy" @change="emitSelect('closeLimitStrategy', $event)">
-              <option value="fok">FOK 全成全撤</option>
-              <option value="post_only_chase">PostOnly Chase</option>
+              <option value="market">触发后市价</option>
+              <option value="post_only_chase">追逐限价</option>
             </select>
+          </div>
+        </label>
+
+        <label v-if="closeExecutionMode === 'limit'" class="field-block field-block--compact">
+          <span>允许不利偏移（USDT/盎司）</span>
+          <div class="input-row">
+            <input
+              :value="acceptableSpreadInput"
+              inputmode="decimal"
+              @input="emitInput('acceptableSpreadInput', $event)"
+              @blur="$emit('commitSpreadInput', 'acceptable')"
+            />
           </div>
         </label>
 
@@ -786,7 +802,11 @@
   }
 
   function limitStrategyLabel(strategy: CrossSpreadLimitStrategy) {
-    return strategy === 'post_only_chase' ? 'PostOnly Chase' : 'FOK';
+    return strategy === 'post_only_chase'
+      ? '追逐限价'
+      : strategy === 'market'
+      ? '触发后市价'
+      : 'FOK';
   }
 
   function updateFundingAmount(event: Event) {
@@ -996,12 +1016,12 @@
   }
 
   .account-balance-details span {
-    white-space: nowrap;
     display: block;
     margin-top: 6px;
     color: #667891;
     font-size: 12px;
     font-weight: 600;
+    white-space: nowrap;
   }
 
   .execution-column {

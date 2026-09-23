@@ -33,7 +33,8 @@ export function useStrategyManagementOverview() {
   return {
     items,
     byDesk,
-    loading: query.isFetching,
+    // Background refresh must not unmount the desk and reset its metric/calendar controls.
+    loading: computed(() => query.isFetching.value && query.data.value === undefined),
     error,
     empty: computed(() => !query.isFetching.value && !error.value && !items.value.length),
     hasData: computed(() => !query.isFetching.value && !error.value && !!items.value.length),

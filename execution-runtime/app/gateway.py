@@ -168,6 +168,12 @@ class VenueGateway(Protocol):
         """Return one authoritative market quote for the supplied symbol."""
         ...
 
+    def list_funding_markets(
+        self, *, account_id: str, search: str | None = None
+    ) -> list[dict[str, object]]:
+        """Return current spot/perpetual pairs that can form a Funding hedge."""
+        ...
+
     def estimate_order_margin(
         self,
         *,

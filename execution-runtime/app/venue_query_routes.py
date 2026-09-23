@@ -221,8 +221,22 @@ def create_venue_query_router(*, gateway: VenueGateway) -> APIRouter:
     )
     def venue_account_snapshot(
         account_id: str = Query(alias="accountId"),
+        include_history: bool = Query(default=True, alias="includeHistory"),
+        history_start: datetime | None = Query(default=None, alias="historyStart"),  # noqa: B008
     ) -> VenueAccountSnapshot:
-        return query_gateway(lambda: gateway.get_account(account_id))
+        return query_gateway(
+            lambda: (
+                gateway.get_account(
+                    account_id, include_history=False, history_start=history_start
+                )
+                if not include_history
+                else (
+                    gateway.get_account(account_id, history_start=history_start)
+                    if history_start is not None
+                    else gateway.get_account(account_id)
+                )
+            )
+        )
 
     @router.post(
         "/venue/internal-capital-transfers",
@@ -320,6 +334,16 @@ def create_venue_query_router(*, gateway: VenueGateway) -> APIRouter:
                 category=category,
             )
         )
+
+    @router.get("/venue/funding-markets", tags=["venue-query"])
+    def venue_funding_markets(
+        account_id: str = Query(alias="accountId"),
+        search: str | None = Query(default=None, max_length=32),
+    ) -> list[dict[str, object]]:
+        reader = getattr(gateway, "list_funding_markets", None)
+        if reader is None:
+            raise HTTPException(status_code=501, detail="Funding market catalog is unavailable")
+        return query_gateway(lambda: reader(account_id=account_id, search=search))
 
     @router.get(
         "/venue/order-margin-estimate/{symbol}",

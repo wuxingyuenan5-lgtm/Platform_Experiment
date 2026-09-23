@@ -1,4 +1,5 @@
 @import '../strategy/shared/strategy-theme.less';
+@import './charts/etfResearchPanels.less';
 
 .hedge-board {
   --hedge-cool-border: rgb(201 213 226 / 72%);
@@ -239,15 +240,15 @@
 
   .chart-range {
     display: grid;
-    gap: 6px;
-    margin-top: 14px;
+    gap: 4px;
+    margin-top: 10px;
   }
 
   .chart-range__labels {
     position: relative;
-    height: 16px;
-    color: var(--hedge-cool-muted);
-    font-size: 11px;
+    height: 14px;
+    color: #98a2b3;
+    font-size: 10px;
     letter-spacing: 0.01em;
     line-height: 1;
   }
@@ -260,64 +261,45 @@
 
   .chart-range__viewport {
     position: relative;
-    height: 22px;
+    height: 24px;
+    overflow: visible;
     background: transparent;
-  }
-
-  .chart-range__overview {
-    position: absolute;
-    inset: 1px 0;
-    width: 100%;
-    height: calc(100% - 2px);
-  }
-
-  .chart-range__overview-area {
-    fill: rgb(197 214 249 / 70%);
-  }
-
-  .chart-range__overview-line {
-    stroke-width: 1.1;
-    stroke-linecap: round;
-    stroke: rgb(137 167 233 / 95%);
-    fill: none;
-    stroke-linejoin: round;
   }
 
   .chart-range__rail,
   .chart-range__selection {
     position: absolute;
     top: 50%;
-    height: 12px;
+    height: 16px;
     transform: translateY(-50%);
-    border-radius: 999px;
+    border-radius: 3px;
   }
 
   .chart-range__rail {
     right: 0;
     left: 0;
-    border: 1px solid rgb(192 205 227 / 92%);
-    background: rgb(225 235 252 / 28%);
-    box-shadow: inset 0 1px 1px rgb(255 255 255 / 72%);
+    border: 1px solid rgb(205 214 224 / 80%);
+    background: rgb(240 244 248 / 90%);
+    box-shadow: inset 0 1px 1px rgb(148 163 184 / 12%);
   }
 
   .chart-range__selection {
-    border: 1px solid rgb(142 171 235 / 88%);
-    background: rgb(202 218 251 / 34%);
+    border: 1px solid rgb(125 167 255 / 48%);
+    background: rgb(125 167 255 / 12%);
     box-shadow: inset 0 0 0 1px rgb(255 255 255 / 32%);
   }
 
   .chart-range__handle {
     position: absolute;
     top: 50%;
-    width: 2px;
+    width: 12px;
     height: 12px;
     transform: translateY(-50%);
+    border: 2px solid #4f7bf5;
     border-radius: 999px;
     background: rgb(255 255 255 / 98%);
-    box-shadow: 0 0 0 1px rgb(126 151 211 / 30%);
+    box-shadow: 0 1px 3px rgb(79 123 245 / 24%);
   }
-
-  @import './charts/etfResearchPanels.less';
 
   .reserve-module {
     display: grid;

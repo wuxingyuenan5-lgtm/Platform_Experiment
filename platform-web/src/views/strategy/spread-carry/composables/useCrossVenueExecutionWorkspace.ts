@@ -58,15 +58,15 @@ export function useCrossVenueExecutionWorkspace() {
   const qtyInput = ref('1');
   const instruments = ref<InstrumentResult[]>([]);
   const triggerSpread = ref<number | null>(null);
-  const acceptableSpread = ref<number | null>(null);
+  const acceptableSpread = ref<number | null>(0);
   const takeProfitSpread = ref<number | null>(null);
   const stopLossSpread = ref<number | null>(null);
   const takeProfitExecution = ref<CrossSpreadExecutionMode>('limit');
   const stopLossExecution = ref<CrossSpreadExecutionMode>('market');
-  const openLimitStrategy = ref<CrossSpreadLimitStrategy>('fok');
-  const takeProfitLimitStrategy = ref<CrossSpreadLimitStrategy>('fok');
-  const stopLossLimitStrategy = ref<CrossSpreadLimitStrategy>('fok');
-  const closeLimitStrategy = ref<CrossSpreadLimitStrategy>('fok');
+  const openLimitStrategy = ref<CrossSpreadLimitStrategy>('post_only_chase');
+  const takeProfitLimitStrategy = ref<CrossSpreadLimitStrategy>('post_only_chase');
+  const stopLossLimitStrategy = ref<CrossSpreadLimitStrategy>('post_only_chase');
+  const closeLimitStrategy = ref<CrossSpreadLimitStrategy>('post_only_chase');
   const closeLimitSpread = ref<number | null>(null);
   const triggerSpreadInput = ref(formatEditableNumber(triggerSpread.value));
   const acceptableSpreadInput = ref(formatEditableNumber(acceptableSpread.value));
@@ -103,11 +103,31 @@ export function useCrossVenueExecutionWorkspace() {
         { label: '其他限制', value: '读取中' },
       ];
     }
-    const mt5MarketState = rules.mt5.openAllowed
-      ? '当前开市'
-      : rules.mt5.closeAllowed
-      ? '当前仅可平仓'
-      : '当前休市';
+    const mt5Schedule = rules.mt5.tradingHours || '时段未配置';
+    const mt5MarketStatus = rules.mt5.marketStatus;
+    const guardMinutes = rules.mt5.automaticExitGuardMinutes;
+    const beijingBreak =
+      rules.mt5.tradingTimezone?.toLowerCase() === 'bybit/mt5' &&
+      mt5Schedule.includes('00:00-23:00')
+        ? '；北京时间休市：04:00-05:00（UTC+03:00，夏令时）或05:00-06:00（UTC+02:00，冬令时）'
+        : '';
+    const automaticExitRule =
+      guardMinutes === null || guardMinutes === undefined
+        ? ''
+        : `；开收盘前后${guardMinutes}分钟不自动交易（仅暂停后台自动止盈止损，手动开平仓可用）`;
+    const mt5StatusText =
+      mt5MarketStatus === 'closed'
+        ? '休市'
+        : mt5MarketStatus === 'buffer'
+        ? `开收盘前后${guardMinutes ?? '配置'}分钟：不自动执行`
+        : mt5MarketStatus === 'unknown'
+        ? '时段未知'
+        : !rules.mt5.automaticExitAllowed
+        ? '不自动执行'
+        : '';
+    const mt5TradingTime = `XAUTUSDT：24H；XAUUSD：${mt5Schedule}${beijingBreak}${automaticExitRule}${
+      mt5StatusText ? `；状态：${mt5StatusText}` : ''
+    }`;
     const bybitMin = parseOptionalNumber(rules.bybit.minQuantity);
     const bybitStep = parseOptionalNumber(rules.bybit.quantityStep);
     const bybitMax = parseOptionalNumber(rules.bybit.maxMarketQuantity);
@@ -134,7 +154,7 @@ export function useCrossVenueExecutionWorkspace() {
     ].filter(Boolean);
     return [
       { label: '手续费', value: '—' },
-      { label: '交易时间', value: `XAUTUSDT：24H；XAUUSD：${mt5MarketState}` },
+      { label: '交易时间', value: mt5TradingTime },
       { label: '个人最高杠杆', value: '—' },
       { label: '每日最大回撤', value: '—' },
       { label: '其他限制', value: quantityLimits.join('；') || '—' },
@@ -398,7 +418,7 @@ export function useCrossVenueExecutionWorkspace() {
       closeLimit: closeLimitSpread,
     };
     const parsed = parseEditableNumber(inputMap[field].value);
-    if (parsed === null) {
+    if (parsed === null || (field === 'acceptable' && parsed < 0)) {
       inputMap[field].value = formatEditableNumber(valueMap[field].value);
       return;
     }

@@ -13,6 +13,7 @@ def strategy_openapi() -> dict:
     schema = app.openapi()
     prefixes = (
         "/api/v1/trading/",
+        "/api/v1/research/strategies/",
         "/api/v1/strategies/",
         "/api/v1/accounts",
         "/api/v1/instruments",

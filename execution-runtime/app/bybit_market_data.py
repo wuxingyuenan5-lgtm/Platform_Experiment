@@ -13,12 +13,15 @@ from typing import Any
 
 from app.gateway_errors import GatewayConfigurationError
 
+MARKET_CACHE_TTL_SECONDS = 60.0
+
 
 class BybitMarketData:
     def __init__(self, read: Callable[..., dict[str, Any]]) -> None:
         self._read = read
         self._lock = RLock()
         self._markets: dict[tuple[str, str], tuple[float, dict[str, Any]]] = {}
+        self._market_catalogs: dict[str, tuple[float, list[dict[str, Any]]]] = {}
         self._exchange: Any = None
         self._page_requests: set[tuple] = set()
 
@@ -54,7 +57,7 @@ class BybitMarketData:
         key = category, symbol.upper()
         with self._lock:
             cached = self._markets.get(key)
-            if cached is not None and monotonic() - cached[0] < 60:
+            if cached is not None and monotonic() - cached[0] < MARKET_CACHE_TTL_SECONDS:
                 return cached[1]
             exchange = self._ccxt()
             self._page_requests.clear()
@@ -78,6 +81,33 @@ class BybitMarketData:
             self._markets[key] = monotonic(), market
             return market
 
+    def markets(self, category: str) -> list[dict[str, Any]]:
+        """Load the venue's current tradable market catalog through the same reader."""
+        if category not in {"spot", "linear", "inverse"}:
+            raise GatewayConfigurationError("Unsupported Bybit market category")
+        with self._lock:
+            cached = self._market_catalogs.get(category)
+            if cached is not None and monotonic() - cached[0] < MARKET_CACHE_TTL_SECONDS:
+                return list(cached[1])
+            exchange = self._ccxt()
+            self._page_requests.clear()
+            params = {"category": category}
+            markets = (
+                exchange.fetch_spot_markets(params)
+                if category == "spot"
+                else exchange.fetch_future_markets(params)
+            )
+            normalized = [
+                market
+                for market in markets
+                if market.get("id")
+                and market.get("base")
+                and market.get("quote")
+                and market.get("symbol")
+            ]
+            self._market_catalogs[category] = (monotonic(), normalized)
+            return list(normalized)
+
     def ticker(self, category: str, symbol: str) -> tuple[dict, dict, dict, dict]:
         with self._lock:
             market = self.market(category, symbol)
@@ -99,3 +129,4 @@ class BybitMarketData:
                 self._exchange.session.close()
                 self._exchange = None
             self._markets.clear()
+            self._market_catalogs.clear()

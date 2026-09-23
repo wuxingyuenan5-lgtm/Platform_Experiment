@@ -45,6 +45,8 @@ class Mt5LiveAdapter:
         self._provider = provider
         self._initialized = False
         self._connected = False
+        self._tick_freshness: dict[tuple[str, str, str, str], dict[str, object]] = {}
+        self._tick_identity: dict[str, tuple[str, str]] = {}
 
     def capability(self) -> GatewayAdapterCapability:
         missing: list[str] = []
@@ -355,6 +357,10 @@ class Mt5LiveAdapter:
             )
         return snapshots
 
+    def get_research_ticks(self, **kwargs):
+        from app.research_mt5_ticks import read_ticks
+        return read_ticks(self, **kwargs)
+
     def get_market_quote(
         self,
         *,
@@ -364,7 +370,11 @@ class Mt5LiveAdapter:
         category: str | None = None,
     ) -> VenueMarketQuoteSnapshot:
         self._assert_account(account_id)
-        mt5 = self._connect()
+        try:
+            mt5 = self._connect()
+        except Exception:
+            self._reset_tick_freshness(account_id)
+            raise
         try:
             from app.mt5_symbol_resolver import resolve_mt5_symbol
 
@@ -373,12 +383,20 @@ class Mt5LiveAdapter:
                 # MT5 can retain account information and a positive last tick
                 # after the broker connection drops. A read timestamp does not
                 # make that cached tick executable.
+                self._reset_tick_freshness(account_id)
                 raise GatewayResultUnknownError("MT5 market terminal is not connected")
             info = mt5.account_info()
             if info is None:
+                self._reset_tick_freshness(account_id)
                 raise GatewayResultUnknownError(
                     f"MT5 account identity unavailable: {mt5.last_error()}"
                 )
+            login = str(getattr(info, "login", "") or "")
+            server = str(getattr(info, "server", "") or "")
+            previous_identity = self._tick_identity.get(account_id)
+            if previous_identity is not None and previous_identity != (login, server):
+                self._reset_tick_freshness(account_id)
+            self._tick_identity[account_id] = (login, server)
             resolution = resolve_mt5_symbol(
                 mt5_module=mt5,
                 base_symbol=_logical_mt5_symbol(symbol),
@@ -427,6 +445,10 @@ class Mt5LiveAdapter:
                     "accountExpertTradeAllowed": bool(getattr(info, "trade_expert", False)),
                     "pythonTradeAllowed": getattr(terminal, "tradeapi_disabled", None) is False,
                     "symbolVisible": bool(getattr(symbol_info, "visible", False)),
+                    # The Runtime calendar is evaluated from the configured
+                    # broker session schedule; this marker distinguishes that
+                    # production evidence from simulation quote fixtures.
+                    "mt5ScheduleTracked": True,
                 }
             )
             tick_time_msc = int(getattr(tick, "time_msc", 0) or 0)
@@ -434,6 +456,19 @@ class Mt5LiveAdapter:
                 datetime.fromtimestamp(tick_time_msc / 1000, UTC)
                 if tick_time_msc > 0
                 else None
+            )
+            freshness = self._observe_tick(
+                account_id=account_id,
+                symbol=resolution.symbol.upper(),
+                login=login,
+                server=server,
+                time_msc=tick_time_msc,
+            )
+            market_metadata.update(
+                {
+                    "tickFreshnessTracked": True,
+                    "lastTickAdvanceObservedAt": freshness,
+                }
             )
             return VenueMarketQuoteSnapshot(
                 source=self.name,
@@ -455,6 +490,41 @@ class Mt5LiveAdapter:
             raise
         except Exception as exc:
             raise GatewayResultUnknownError("MT5 market quote result is unknown") from exc
+
+    def _observe_tick(
+        self,
+        *,
+        account_id: str,
+        symbol: str,
+        login: str,
+        server: str,
+        time_msc: int,
+    ) -> str | None:
+        key = (account_id, symbol, login, server)
+        now = datetime.now(UTC)
+        state = self._tick_freshness.get(key)
+        if state is None:
+            self._tick_freshness[key] = {"time_msc": time_msc, "advanced_at": None}
+        elif time_msc <= 0:
+            state["time_msc"] = time_msc
+            state["advanced_at"] = None
+        elif int(state["time_msc"]) <= 0:
+            state["time_msc"] = time_msc
+            state["advanced_at"] = None
+        elif time_msc > int(state["time_msc"]):
+            state["time_msc"] = time_msc
+            state["advanced_at"] = now
+        elif time_msc < int(state["time_msc"]):
+            state["time_msc"] = time_msc
+            state["advanced_at"] = None
+        advanced_at = self._tick_freshness[key]["advanced_at"]
+        return advanced_at.isoformat() if isinstance(advanced_at, datetime) else None
+
+    def _reset_tick_freshness(self, account_id: str) -> None:
+        self._tick_freshness = {
+            key: value for key, value in self._tick_freshness.items() if key[0] != account_id
+        }
+        self._tick_identity.pop(account_id, None)
 
     def estimate_order_margin(
         self,

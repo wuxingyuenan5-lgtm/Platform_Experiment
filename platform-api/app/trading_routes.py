@@ -151,7 +151,9 @@ def create_trading_router(api_prefix: str) -> APIRouter:
         tags=["trading"],
     )
     def create_batch(request: CreateExecutionBatchRequest) -> ExecutionBatchResponse:
-        reject_controlled_strategy_write_bypass(request.strategy_instance_id)
+        reject_controlled_strategy_write_bypass(
+            request.strategy_instance_id, strategy_key=request.strategy_key
+        )
         return create_execution_batch(request)
 
     @router.get(

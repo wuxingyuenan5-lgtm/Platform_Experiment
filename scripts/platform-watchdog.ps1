@@ -22,18 +22,23 @@ function Start-PlatformWatchdog {
     $command = Get-ProcessCommandLine ([int]$record.pid)
     if ($command.Contains((Join-Path $PSScriptRoot 'dev-platform.ps1')) -and $command.Contains('-Action watch')) { return }
   }
-  $hostExecutable = (Get-Process -Id $PID).Path
+  $pwshCommand = Get-Command pwsh -ErrorAction SilentlyContinue
+  $hostExecutable = if ($pwshCommand) { $pwshCommand.Source } else { (Get-Process -Id $PID).Path }
   $arguments = @(
     '-NoProfile',
     '-File',
-    ('"' + (Join-Path $PSScriptRoot 'dev-platform.ps1') + '"'),
+    (Join-Path $PSScriptRoot 'dev-platform.ps1'),
     '-Action',
     'watch'
   )
   if ($EnableLiveWrite) { $arguments += '-EnableLiveWrite' }
-  Start-Process $hostExecutable -ArgumentList $arguments -WindowStyle Hidden `
-    -RedirectStandardOutput (Join-Path $LogDir 'watchdog.out.log') `
-    -RedirectStandardError (Join-Path $LogDir 'watchdog.err.log') | Out-Null
+  if (Get-Command Start-PlatformChildProcess -ErrorAction SilentlyContinue) {
+    Start-PlatformChildProcess -FilePath $hostExecutable -ArgumentList $arguments `
+      -WorkingDirectory $RepoRoot -StandardOutput (Join-Path $LogDir 'watchdog.out.log') `
+      -StandardError (Join-Path $LogDir 'watchdog.err.log') | Out-Null
+  } else {
+    Start-Process $hostExecutable -ArgumentList $arguments -WindowStyle Hidden | Out-Null
+  }
 }
 
 function Write-WatchdogStatus {
@@ -43,6 +48,37 @@ function Write-WatchdogStatus {
     observedAt=[DateTimeOffset]::UtcNow.ToString('o'); liveWrite=[bool]$EnableLiveWrite} |
     ConvertTo-Json | Set-Content -LiteralPath $temporary -Encoding UTF8
   Move-Item -LiteralPath $temporary -Destination $WatchPath -Force
+}
+
+function Test-ExecutionInFlight {
+  # A live-write backend may only be interrupted when its durable journal has
+  # no unresolved command.  If the journal cannot be read, fail closed.
+  $runtime = @($Services | Where-Object { $_.Key -eq 'runtime' })[0]
+  if ($null -eq $runtime -or [string]::IsNullOrWhiteSpace($runtime.PythonPath)) { return $true }
+  $journal = Join-Path $runtime.WorkingDirectory 'data\runtime_journal.db'
+  if (-not (Test-Path -LiteralPath $journal)) { return $false }
+  try {
+    $dbPath = [IO.Path]::GetFullPath($journal).Replace('\', '/').Replace("'", "''")
+    $code = "import sqlite3; db=sqlite3.connect(r'$dbPath'); print(db.execute(`"select count(*) from runtime_commands where status in ('processing','result_unknown')`").fetchone()[0])"
+    $count = [int]((& $runtime.PythonPath -c $code 2>$null | Select-Object -Last 1))
+    return $count -gt 0
+  } catch { return $true }
+}
+
+function Reconcile-ManagedServiceRecord {
+  param(
+    [Parameter(Mandatory)]$State,
+    [Parameter(Mandatory)]$Service,
+    [Parameter(Mandatory)]$Listener
+  )
+  $processId = [int]$Listener.OwningProcess
+  if ($processId -le 0 -or -not (Test-ServiceSignature $Service $processId)) { return $null }
+  try {
+    $record = New-ServiceRecord -Service $Service -Ownership 'reconciled' -ProcessId $processId
+    $records = @($State.services | Where-Object { $_.key -ne $Service.Key }) + @($record)
+    Write-State $records
+    return @($records | Where-Object { $_.key -eq $Service.Key })[0]
+  } catch { return $null }
 }
 
 function Invoke-PlatformWatchdog {
@@ -76,35 +112,48 @@ function Invoke-PlatformWatchdog {
       foreach ($service in $Services) {
         $listener = Get-PortListener $service.Port
         $record = @($state.services | Where-Object { $_.key -eq $service.Key })
-        if ($record.Count -ne 1) { $blocked=$true; $reason='Missing managed service identity'; continue }
-        if ($listener -and ([int]$record[0].pid -ne [int]$listener.OwningProcess -or
-            -not (Test-ServiceSignature $service ([int]$listener.OwningProcess)))) {
+        if ($record.Count -ne 1) {
+          if ($listener) {
+            $record = @(Reconcile-ManagedServiceRecord -State $state -Service $service -Listener $listener)
+          }
+          if ($record.Count -ne 1) {
+            if ($listener) { $blocked=$true; $reason='Service ownership changed' }
+            else { $targets += $service; $reason='Managed service missing from state' }
+            continue
+          }
+        }
+        if ($listener -and [int]$record[0].pid -ne [int]$listener.OwningProcess) {
+          $reconciled = Reconcile-ManagedServiceRecord -State $state -Service $service -Listener $listener
+          if ($null -ne $reconciled) { $record = @($reconciled) }
+          else { $blocked=$true; $reason='Service ownership changed'; continue }
+        }
+        if ($listener -and -not (Test-ServiceSignature $service ([int]$listener.OwningProcess))) {
           $blocked=$true; $reason='Service ownership changed'; continue
         }
         if (Test-Health $service) { $failures[$service.Key]=0 }
         else { $failures[$service.Key]=1+[int]$failures[$service.Key] }
         if ($failures[$service.Key] -ge 3) { $targets += $service; $reason='Repeated local health failure' }
       }
-      try {
-        $monitors = Invoke-RestMethod -Uri 'http://127.0.0.1:8000/health/monitors' -TimeoutSec 3
-        $stalled = $monitors.accountSync.status -eq 'stalled' -or $monitors.crossExit.status -eq 'stalled'
-        $failures['reads'] = if ($monitors.accountSync.status -eq 'degraded') { 1+[int]$failures['reads'] } else { 0 }
-        if ($stalled -or $failures['reads'] -ge 6) {
-          $reason='Background reads stalled or repeatedly failed'
-          $targets = @($Services | Where-Object { $_.Key -in @('runtime','api') })
-        }
-      } catch { }
-      if ($EnableLiveWrite -and $targets.Count) {
-        $blocked=$true; $reason='Live execution may be in flight; automatic interruption withheld'
+      # Account and venue read failures are reported by monitor-health. They
+      # must not recycle healthy API/Runtime processes or hide their cause.
+      # Live Write protects the trading backends, while a static web process
+      # is safe to recycle independently. Preserve any earlier mode or
+      # ownership block: it must still prevent all recovery.
+      $backendTargets = @($targets | Where-Object { $_.Key -in @('runtime', 'api') })
+      $webTargets = @($targets | Where-Object { $_.Key -eq 'web' })
+      $allowWebRecovery = $EnableLiveWrite -and $webTargets.Count -gt 0 -and -not $blocked
+      if ($EnableLiveWrite -and $backendTargets.Count -and (Test-ExecutionInFlight)) {
+        $blocked=$true; $reason='Live execution may be in flight; automatic backend interruption withheld'
       }
+      $recoveryTargets = @(if ($EnableLiveWrite) { $webTargets } else { $targets })
       $recoveryTimes = @($recoveryTimes | Where-Object { ($now - $_).TotalHours -lt 1 })
-      if ($targets.Count -and -not $blocked) {
+      if ($recoveryTargets.Count -and (-not $blocked -or $allowWebRecovery)) {
         if ($recoveryTimes.Count -ge 3) { $blocked=$true; $reason='Recovery limit reached; operator attention required' }
         elseif (($now - $lastRecovery).TotalSeconds -ge 300) {
           $lastRecovery=$now; $recoveryTimes += $now
           Write-WatchdogStatus 'recovering' $reason $recoveryTimes.Count
           try {
-            foreach ($service in $targets) {
+            foreach ($service in $recoveryTargets) {
               $record = @($state.services | Where-Object { $_.key -eq $service.Key })[0]
               $listener = Get-PortListener $service.Port
               if ($listener -and [int]$listener.OwningProcess -ne [int]$record.pid) { throw 'Ownership changed during recovery' }
@@ -115,7 +164,7 @@ function Invoke-PlatformWatchdog {
               Stop-ManagedPid -ProcessId ([int]$record.pid) -WorkingDirectory $service.WorkingDirectory -Service $service
             }
             $records = @($state.services)
-            foreach ($service in $targets) {
+            foreach ($service in $recoveryTargets) {
               $newRecord = Start-ServiceManaged $service
               $records = @($records | Where-Object { $_.key -ne $service.Key }) + @($newRecord)
               Write-State $records
@@ -125,6 +174,11 @@ function Invoke-PlatformWatchdog {
       }
       $status = if ($blocked) { 'blocked' } elseif ($targets.Count) { 'degraded' } else { 'healthy' }
       Write-WatchdogStatus $status $reason $recoveryTimes.Count
+      } catch {
+        # Keep the watchdog alive across transient file/network/process errors;
+        # a single uncaught probe exception previously killed the only recovery
+        # process and left all three services down together.
+        try { Write-WatchdogStatus 'degraded' 'Watchdog probe failed; retrying' $recoveryTimes.Count } catch {}
       } finally { $cycleLock.ReleaseMutex(); $cycleLock.Dispose() }
       Start-Sleep -Seconds 15
     }

@@ -17,7 +17,8 @@
     "price": "100.12345678",
     "reduce_only": false,
     "position_id": null,
-    "received_at": "2026-08-02T12:00:00Z"
+    "received_at": "2026-08-02T12:00:00Z",
+    "cross_spread_guard": null
   },
   "event": {
     "contract_name": "runtime-event",
@@ -31,6 +32,7 @@
     "fill_price": "100.12345678",
     "fill_quantity": "1.25000001",
     "occurred_at": "2026-08-02T12:00:01Z",
-    "reason": null
+    "reason": null,
+    "terminal": false
   }
 }

@@ -217,8 +217,10 @@ def test_cross_spread_snapshot_proxies_runtime_market_data(monkeypatch, tmp_path
     with TestClient(app) as client:
         authenticate_ceo(client)
         response = client.get("/api/v1/trading/cross-spread/snapshot")
+        repeat_response = client.get("/api/v1/trading/cross-spread/snapshot")
 
     assert response.status_code == 200
+    assert repeat_response.status_code == 200
     assert response.json()["bybit"]["quote"]["bid"] == "3330.10"
     assert response.json()["longSpread"] == "-0.70"
     assert response.json()["metrics"]["fundingRate"] == "0.0001"
@@ -229,12 +231,16 @@ def test_cross_spread_snapshot_proxies_runtime_market_data(monkeypatch, tmp_path
             FROM market_spread_snapshots
             """
         ).fetchone()
+        snapshot_count = db.execute(
+            "SELECT COUNT(*) FROM market_spread_snapshots"
+        ).fetchone()[0]
     assert row["strategy_key"] == "cross_venue_spread"
     assert row["left_symbol"] == "XAUTUSDT"
     assert row["right_symbol"] == "XAUUSD.s"
     assert row["long_spread"] == "-0.70"
     assert row["funding_rate"] == "0.0001"
     assert row["usdt_usd"] == "0.9998"
+    assert snapshot_count == 1
 
     with TestClient(app) as client:
         authenticate_ceo(client)

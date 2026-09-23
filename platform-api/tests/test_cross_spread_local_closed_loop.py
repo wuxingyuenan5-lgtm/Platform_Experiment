@@ -502,3 +502,47 @@ def test_runtime_and_api_restart_after_first_leg_never_repeat_orders(
         assert db.execute("SELECT COUNT(*) FROM fills").fetchone()[0] == (
             2 if interruption == "after_mt5_fill" else 1
         )
+
+
+@pytest.mark.parametrize("terminal_partial", [False, True])
+def test_native_chase_guard_survives_real_platform_transport(runtime_url, tmp_path, authorize_funding_ceo, monkeypatch, terminal_partial):
+    from app import runtime_transport
+    _seed_cross_spread_environment(tmp_path, "chase-transport.db")
+    settings = get_settings()
+    settings.runtime_base_url = runtime_url
+    settings.live_trading_enabled = True
+    original = runtime_transport.post
+    commands = []
+    def capture(url, **kwargs):
+        if url.endswith("/commands/orders"):
+            commands.append(kwargs["json"])
+        result = original(url, **kwargs)
+        if terminal_partial and url.endswith("/commands/orders") and kwargs["json"]["account_id"] != MT5_ACCOUNT_ID:
+            events = result.json()
+            for event in events:
+                if event["event_type"] == "order_filled":
+                    event["fill_quantity"] = "1"
+                    event["terminal"] = True
+            return httpx.Response(200, json=events, request=result.request)
+        return result
+    monkeypatch.setattr(runtime_transport, "post", capture)
+    with TestClient(app) as client:
+        _seed_cross_spread_environment(tmp_path, "chase-transport.db")
+        authorize_funding_ceo(client)
+        response = client.post(LIFECYCLE_OPEN_ENDPOINT, json={
+            "direction": "LONG_SPREAD", "quantityOz": "2" if terminal_partial else "1", "executionMode": "limit",
+            "limitStrategy": "post_only_chase", "limitSpread": "10", "maxAdverseSpread": "5",
+            "takeProfitMaxAdverseSpread": "3", "stopLossMaxAdverseSpread": "4",
+            "idempotencyKey": "chase-transport"})
+        assert response.status_code == 200, response.text
+        assert response.json()["executionBatch"]["status"] == "hedged", response.text
+        assert len(commands) == 2
+        assert Decimal(commands[1]["quantity"]) == Decimal("0.01")
+        assert Decimal(response.json()["exitPlan"]["quantityOz"]) == Decimal("1")
+        guard = commands[0]["cross_spread_guard"]
+        assert guard["target_spread"] == "10"
+        assert guard["max_adverse_spread"] == "5"
+        assert guard["mt5_account_id"] == MT5_ACCOUNT_ID
+        assert commands[1]["cross_spread_guard"] is None
+        assert response.json()["exitPlan"]["takeProfitMaxAdverseSpread"] == "3"
+        assert response.json()["exitPlan"]["stopLossMaxAdverseSpread"] == "4"

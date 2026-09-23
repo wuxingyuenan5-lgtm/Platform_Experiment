@@ -66,7 +66,7 @@ def batch_payload(direction: str) -> dict[str, object]:
         "idempotencyKey": "batch-collision-001",
         "strategyInstanceId": "strategy_generic_pipeline_test",
         "accountId": "account_sim_usdt",
-        "strategyKey": "funding_arbitrage",
+        "strategyKey": "strategy_generic_pipeline_test",
         "direction": direction,
         "legs": [
             {

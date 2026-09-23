@@ -93,7 +93,7 @@ export interface FundingMarketBoardData {
 
 export interface FundingChartPoint {
   date: string;
-  price: number;
+  price?: number;
   funding: number;
 }
 

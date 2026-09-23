@@ -27,6 +27,7 @@
     "src/hooks/trading/**/*.ts",
     "src/hooks/web/useECharts.ts",
     "src/layouts/default/menu/**/*.vue",
+    "src/layouts/default/sider/LayoutSider.vue",
     "src/layouts/default/header/components/notify/**/*.vue",
     "src/layouts/default/risk/**/*.tsx",
     "src/router/helper/routeHelper.ts",

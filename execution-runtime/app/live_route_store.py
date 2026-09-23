@@ -43,6 +43,26 @@ CREATE TABLE IF NOT EXISTS live_write_claims (
 
 CREATE INDEX IF NOT EXISTS idx_live_write_claims_daily
 ON live_write_claims(business_date, account_id, adapter);
+
+CREATE TABLE IF NOT EXISTS live_strategy_routes (
+    platform_order_id TEXT PRIMARY KEY,
+    strategy_id TEXT NOT NULL UNIQUE,
+    account_id TEXT NOT NULL,
+    symbol TEXT NOT NULL,
+    adapter TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS live_strategy_order_routes (
+    strategy_id TEXT NOT NULL,
+    order_id TEXT NOT NULL UNIQUE,
+    platform_order_id TEXT NOT NULL,
+    account_id TEXT NOT NULL,
+    symbol TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    PRIMARY KEY (strategy_id, order_id)
+);
 """
 
 
@@ -64,6 +84,15 @@ class LiveWriteClaim:
     command_id: str
     notional: Decimal
     already_claimed: bool
+
+
+@dataclass(frozen=True)
+class LiveStrategyRoute:
+    platform_order_id: str
+    strategy_id: str
+    account_id: str
+    symbol: str
+    adapter: str
 
 
 def ensure_live_store() -> None:
@@ -127,6 +156,134 @@ def update_external_order_id(platform_order_id: str, external_order_id: str) -> 
         )
 
 
+def record_strategy_route(command: SubmitOrderCommand, adapter: str, strategy_id: str) -> None:
+    ensure_live_store()
+    at = datetime.now(UTC).isoformat()
+    with connection() as db:
+        existing = db.execute(
+            "SELECT * FROM live_strategy_routes WHERE platform_order_id=? OR strategy_id=?",
+            (command.platform_order_id, strategy_id),
+        ).fetchall()
+        for row in existing:
+            if (
+                row["platform_order_id"],
+                row["strategy_id"],
+                row["account_id"],
+                row["symbol"],
+                row["adapter"],
+            ) != (
+                command.platform_order_id,
+                strategy_id,
+                command.account_id,
+                command.symbol.upper(),
+                adapter,
+            ):
+                raise ValueError("Native strategy identity is already assigned to another route")
+        if existing:
+            return
+        db.execute(
+            """INSERT INTO live_strategy_routes
+               (platform_order_id,strategy_id,account_id,symbol,adapter,created_at,updated_at)
+               VALUES (?,?,?,?,?,?,?)
+               """,
+            (
+                command.platform_order_id,
+                strategy_id,
+                command.account_id,
+                command.symbol.upper(),
+                adapter,
+                at,
+                at,
+            ),
+        )
+
+
+def get_strategy_route(
+    *, platform_order_id: str | None = None, strategy_id: str | None = None
+) -> LiveStrategyRoute | None:
+    ensure_live_store()
+    selected = [("platform_order_id", platform_order_id), ("strategy_id", strategy_id)]
+    selected = [(field, value) for field, value in selected if value is not None]
+    if len(selected) != 1:
+        raise ValueError("Exactly one native strategy identity is required")
+    with connection() as db:
+        row = db.execute(
+            f"SELECT * FROM live_strategy_routes WHERE {selected[0][0]} = ?", (selected[0][1],)
+        ).fetchone()
+    if row is None:
+        return None
+    return LiveStrategyRoute(
+        row["platform_order_id"],
+        row["strategy_id"],
+        row["account_id"],
+        row["symbol"],
+        row["adapter"],
+    )
+
+
+def record_strategy_order_route(
+    *, strategy_id: str, order_id: str, command: SubmitOrderCommand
+) -> None:
+    ensure_live_store()
+    with connection() as db:
+        owner = db.execute(
+            "SELECT * FROM live_strategy_routes WHERE strategy_id=?", (strategy_id,)
+        ).fetchone()
+        if owner is None:
+            raise ValueError("Native strategy route must exist before child order mapping")
+        if (
+            owner["platform_order_id"] != command.platform_order_id
+            or owner["account_id"] != command.account_id
+            or owner["symbol"] != command.symbol.upper()
+        ):
+            raise ValueError("Native child order identity is already assigned to another route")
+        existing = db.execute(
+            "SELECT * FROM live_strategy_order_routes WHERE order_id=? OR (strategy_id=? AND order_id=?)",
+            (order_id, strategy_id, order_id),
+        ).fetchall()
+        for row in existing:
+            if (
+                row["strategy_id"] != strategy_id
+                or row["platform_order_id"] != command.platform_order_id
+            ):
+                raise ValueError("Native child order identity is already assigned to another route")
+        if existing:
+            return
+        db.execute(
+            """INSERT INTO live_strategy_order_routes
+               (strategy_id,order_id,platform_order_id,account_id,symbol,created_at)
+               VALUES (?,?,?,?,?,?)""",
+            (
+                strategy_id,
+                order_id,
+                command.platform_order_id,
+                command.account_id,
+                command.symbol.upper(),
+                datetime.now(UTC).isoformat(),
+            ),
+        )
+
+
+def get_strategy_route_for_order(order_id: str) -> LiveStrategyRoute | None:
+    ensure_live_store()
+    with connection() as db:
+        row = db.execute(
+            """SELECT s.* FROM live_strategy_routes s
+               JOIN live_strategy_order_routes c ON c.strategy_id=s.strategy_id
+               WHERE c.order_id=?""",
+            (order_id,),
+        ).fetchone()
+    if row is None:
+        return None
+    return LiveStrategyRoute(
+        row["platform_order_id"],
+        row["strategy_id"],
+        row["account_id"],
+        row["symbol"],
+        row["adapter"],
+    )
+
+
 def get_order_route(
     *,
     platform_order_id: str | None = None,
@@ -151,6 +308,28 @@ def get_order_route(
             f"SELECT * FROM live_order_routes WHERE {field} = ?" + account_filter,
             params,
         ).fetchone()
+        if row is None and field == "external_order_id":
+            child = db.execute(
+                """SELECT r.*, c.order_id AS child_order_id FROM live_strategy_routes s
+                   JOIN live_order_routes r ON r.platform_order_id=s.platform_order_id
+                   JOIN live_strategy_order_routes c ON c.strategy_id=s.strategy_id
+                   WHERE c.order_id=?"""
+                + (" AND s.account_id=?" if account_id is not None else ""),
+                (value, account_id) if account_id is not None else (value,),
+            ).fetchone()
+            if child is not None:
+                parent = route_from_row(child)
+                return LiveOrderRoute(
+                    platform_order_id=parent.platform_order_id,
+                    external_order_id=child["child_order_id"],
+                    external_client_id=parent.external_client_id,
+                    command_id=parent.command_id,
+                    strategy_instance_id=parent.strategy_instance_id,
+                    account_id=parent.account_id,
+                    instrument_id=parent.instrument_id,
+                    symbol=parent.symbol,
+                    adapter=parent.adapter,
+                )
     return route_from_row(row) if row is not None else None
 
 

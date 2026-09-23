@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from decimal import ROUND_FLOOR, Decimal, localcontext
+from decimal import ROUND_CEILING, ROUND_FLOOR, ROUND_HALF_DOWN, Decimal, localcontext
 
 from app.strategies.domain import (
     ExecutionPlan,
@@ -14,8 +14,47 @@ from app.strategies.domain import (
 SPOT_BASE_FEE_RATE = Decimal("0.001")
 
 
+def funding_spot_quantity_for_perpetual(
+    perpetual_quantity: Decimal,
+    *,
+    fee_rate: Decimal,
+    spot_step: Decimal,
+    spot_minimum: Decimal | None = None,
+) -> tuple[Decimal, Decimal, Decimal]:
+    """Return gross spot, net spot and rounding residual for a perp target.
+
+    The perpetual leg is the hedge authority. Spot is rounded to the nearest
+    executable step so the post-fee residual is minimal.
+    """
+    if not all(value.is_finite() for value in (perpetual_quantity, fee_rate, spot_step)):
+        raise ValueError("Invalid Funding sizing inputs")
+    if perpetual_quantity <= 0 or spot_step <= 0 or not 0 <= fee_rate < 1:
+        raise ValueError("Invalid Funding sizing inputs")
+    minimum = spot_minimum if spot_minimum is not None else spot_step
+    if not minimum.is_finite() or minimum <= 0:
+        raise ValueError("Invalid Funding minimum quantity")
+    with localcontext() as context:
+        context.prec = 50
+        required_gross = perpetual_quantity / (1 - fee_rate)
+        floor = (required_gross / spot_step).to_integral_value(rounding=ROUND_FLOOR) * spot_step
+        ceil = (required_gross / spot_step).to_integral_value(rounding=ROUND_CEILING) * spot_step
+        candidates = [candidate for candidate in {floor, ceil} if candidate >= minimum]
+        if not candidates:
+            raise ValueError("Funding spot quantity is below the venue minimum")
+        gross_spot = min(
+            candidates,
+            key=lambda candidate: abs(candidate * (1 - fee_rate) - perpetual_quantity),
+        )
+        net_spot = gross_spot * (1 - fee_rate)
+        return gross_spot, net_spot, net_spot - perpetual_quantity
+
+
 def funding_open_quantities(
-    spot_quantity: Decimal, *, fee_rate: Decimal, perpetual_step: Decimal
+    spot_quantity: Decimal,
+    *,
+    fee_rate: Decimal,
+    perpetual_step: Decimal,
+    perpetual_minimum: Decimal | None = None,
 ) -> tuple[Decimal, Decimal, Decimal]:
     """Hedge the acquired coin inventory; quote-currency fees do not change delta."""
     if (
@@ -29,8 +68,16 @@ def funding_open_quantities(
         context.prec = 50
         net_spot = spot_quantity * (1 - fee_rate)
         perpetual_quantity = (net_spot / perpetual_step).to_integral_value(
-            rounding=ROUND_FLOOR
+            rounding=ROUND_HALF_DOWN
         ) * perpetual_step
+        minimum = perpetual_minimum if perpetual_minimum is not None else perpetual_step
+        if not minimum.is_finite() or minimum <= 0:
+            raise ValueError("Invalid Funding minimum quantity")
+        minimum = (minimum / perpetual_step).to_integral_value(
+            rounding=ROUND_CEILING
+        ) * perpetual_step
+        if perpetual_quantity < minimum:
+            perpetual_quantity = minimum if abs(minimum - net_spot) < net_spot else Decimal(0)
         return net_spot, perpetual_quantity, net_spot - perpetual_quantity
 
 

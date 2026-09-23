@@ -23,6 +23,8 @@ export interface PnlCalendarCursor {
 const weekdayLabels = ['日', '一', '二', '三', '四', '五', '六'];
 
 const qualityNotes: Record<string, string> = {
+  market_closed: 'MT5 休市，不统计单边波动；开市后衔接上次有效估值',
+  session_marks_unavailable: '缺少双边开市估值，暂不统计',
   baseline: '序列基线，无前一交易日可比',
   missing_history: '资金流核对未覆盖该区间',
   unclassified_flow: '存在未分类资金流水',
@@ -123,7 +125,7 @@ function dayCell(
   return {
     key: date,
     label: String(day),
-    amount: pnl === null ? '--' : compact(pnl),
+    amount: point?.quality === 'market_closed' ? '休市' : pnl === null ? '--' : compact(pnl),
     rateText: pnl === null ? '' : percent(rate),
     tone: toneOf(pnl),
     title,

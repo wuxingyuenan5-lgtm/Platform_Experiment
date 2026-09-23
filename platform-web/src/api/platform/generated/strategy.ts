@@ -222,6 +222,261 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/research/strategies/catalog': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Catalog */
+    get: operations['catalog_api_v1_research_strategies_catalog_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/research/strategies/data-status': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Status */
+    get: operations['status_api_v1_research_strategies_data_status_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/research/strategies/drafts': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Draft */
+    post: operations['draft_api_v1_research_strategies_drafts_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/research/strategies/drafts/{draft_id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Read Draft */
+    get: operations['read_draft_api_v1_research_strategies_drafts__draft_id__get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/research/strategies/experiments': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Create Experiment */
+    post: operations['create_experiment_api_v1_research_strategies_experiments_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/research/strategies/experiments/{run_id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Experiment */
+    get: operations['experiment_api_v1_research_strategies_experiments__run_id__get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/research/strategies/experiments/{run_id}/cancel': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Cancel */
+    post: operations['cancel_api_v1_research_strategies_experiments__run_id__cancel_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/research/strategies/experiments/{run_id}/events': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Events */
+    get: operations['events_api_v1_research_strategies_experiments__run_id__events_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/research/strategies/experiments/{run_id}/events/{event_id}/replay': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Replay */
+    get: operations['replay_api_v1_research_strategies_experiments__run_id__events__event_id__replay_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/research/strategies/funding/board': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Funding Board */
+    get: operations['funding_board_api_v1_research_strategies_funding_board_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/research/strategies/pairs/{pair}/distribution': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get Distribution */
+    get: operations['get_distribution_api_v1_research_strategies_pairs__pair__distribution_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/research/strategies/pairs/{pair}/history': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Historical Prices */
+    get: operations['historical_prices_api_v1_research_strategies_pairs__pair__history_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/research/strategies/pairs/{pair}/latest': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Latest */
+    get: operations['latest_api_v1_research_strategies_pairs__pair__latest_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/research/strategies/pairs/{pair}/series': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Series */
+    get: operations['series_api_v1_research_strategies_pairs__pair__series_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/research/strategies/scenario': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Calculate */
+    post: operations['calculate_api_v1_research_strategies_scenario_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/security/credential-references': {
     parameters: {
       query?: never;
@@ -890,6 +1145,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/trading/cross-spread/open-triggers': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Open Triggers */
+    get: operations['open_triggers_api_v1_trading_cross_spread_open_triggers_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/trading/cross-spread/preflight': {
     parameters: {
       query?: never;
@@ -1411,6 +1683,66 @@ export interface components {
        */
       updatedAt: string;
     };
+    /** BorrowProfile */
+    BorrowProfile: {
+      /**
+       * Billingruleversion
+       * @default bybit-uta-2026-09-03
+       * @constant
+       */
+      billingRuleVersion: 'bybit-uta-2026-09-03';
+      /**
+       * Currency
+       * @default USDT
+       */
+      currency: string;
+      /** Effectivefrom */
+      effectiveFrom?: string | null;
+      /** Hourlyrate */
+      hourlyRate?: (number | string) | null;
+      /**
+       * Liabilitytype
+       * @default spot
+       * @enum {string}
+       */
+      liabilityType: 'spot' | 'derivatives';
+      /** Observedat */
+      observedAt?: string | null;
+      /**
+       * Principal
+       * @default 0
+       */
+      principal: string;
+      /**
+       * Product
+       * @default self_funded
+       * @enum {string}
+       */
+      product: 'self_funded' | 'uta_flexible';
+      /**
+       * Viplevel
+       * @default scenario
+       */
+      vipLevel: string;
+    };
+    /** CaptureState */
+    CaptureState: {
+      /** Error */
+      error?: string | null;
+      /** Lastdurableat */
+      lastDurableAt?: string | null;
+      /** Lastreceivedat */
+      lastReceivedAt?: string | null;
+      runtime?: components['schemas']['CaptureState'] | null;
+      /** Sources */
+      sources?: {
+        [key: string]: components['schemas']['SourceState'];
+      };
+      /** Status */
+      status?: string | null;
+    } & {
+      [key: string]: unknown;
+    };
     /** CoinBalanceResponse */
     CoinBalanceResponse: {
       /** Availablebalance */
@@ -1693,7 +2025,12 @@ export interface components {
        * @default fok
        * @enum {string}
        */
-      stopLossLimitStrategy: 'fok' | 'post_only_chase';
+      stopLossLimitStrategy: 'fok' | 'post_only_chase' | 'market';
+      /**
+       * Stoplossmaxadversespread
+       * @default 0
+       */
+      stopLossMaxAdverseSpread: string;
       /** Stoplossspread */
       stopLossSpread?: string | null;
       /** Strategyinstanceid */
@@ -1709,7 +2046,12 @@ export interface components {
        * @default fok
        * @enum {string}
        */
-      takeProfitLimitStrategy: 'fok' | 'post_only_chase';
+      takeProfitLimitStrategy: 'fok' | 'post_only_chase' | 'market';
+      /**
+       * Takeprofitmaxadversespread
+       * @default 0
+       */
+      takeProfitMaxAdverseSpread: string;
       /** Takeprofitspread */
       takeProfitSpread?: string | null;
       /** Triggerreason */
@@ -1732,13 +2074,17 @@ export interface components {
       /** Stoplossexecutionmode */
       stopLossExecutionMode?: ('market' | 'limit') | null;
       /** Stoplosslimitstrategy */
-      stopLossLimitStrategy?: ('fok' | 'post_only_chase') | null;
+      stopLossLimitStrategy?: ('fok' | 'post_only_chase' | 'market') | null;
+      /** Stoplossmaxadversespread */
+      stopLossMaxAdverseSpread?: string | null;
       /** Stoplossspread */
       stopLossSpread?: string | null;
       /** Takeprofitexecutionmode */
       takeProfitExecutionMode?: ('market' | 'limit') | null;
       /** Takeprofitlimitstrategy */
-      takeProfitLimitStrategy?: ('fok' | 'post_only_chase') | null;
+      takeProfitLimitStrategy?: ('fok' | 'post_only_chase' | 'market') | null;
+      /** Takeprofitmaxadversespread */
+      takeProfitMaxAdverseSpread?: string | null;
       /** Takeprofitspread */
       takeProfitSpread?: string | null;
     };
@@ -1799,7 +2145,7 @@ export interface components {
        * Limitstrategy
        * @enum {string}
        */
-      limitStrategy: 'fok' | 'post_only_chase';
+      limitStrategy: 'fok' | 'post_only_chase' | 'market';
       /** Mt5Referenceprice */
       mt5ReferencePrice: string;
       /** Rawbybitlimitprice */
@@ -1808,7 +2154,7 @@ export interface components {
        * Timeinforce
        * @enum {string}
        */
-      timeInForce: 'FOK' | 'PostOnly';
+      timeInForce: 'FOK' | 'PostOnly' | 'Market';
     };
     /** CrossSpreadMarketCloseRequest */
     CrossSpreadMarketCloseRequest: {
@@ -1827,7 +2173,12 @@ export interface components {
        * @default fok
        * @enum {string}
        */
-      limitStrategy: 'fok' | 'post_only_chase';
+      limitStrategy: 'fok' | 'post_only_chase' | 'market';
+      /**
+       * Maxadversespread
+       * @default 0
+       */
+      maxAdverseSpread: string;
       /** Quantityoz */
       quantityOz?: string | null;
     };
@@ -1865,7 +2216,12 @@ export interface components {
        * @default fok
        * @enum {string}
        */
-      limitStrategy: 'fok' | 'post_only_chase';
+      limitStrategy: 'fok' | 'post_only_chase' | 'market';
+      /**
+       * Maxadversespread
+       * @default 0
+       */
+      maxAdverseSpread: string;
       /** Quantityoz */
       quantityOz: string;
       /**
@@ -1879,7 +2235,12 @@ export interface components {
        * @default fok
        * @enum {string}
        */
-      stopLossLimitStrategy: 'fok' | 'post_only_chase';
+      stopLossLimitStrategy: 'fok' | 'post_only_chase' | 'market';
+      /**
+       * Stoplossmaxadversespread
+       * @default 0
+       */
+      stopLossMaxAdverseSpread: string;
       /** Stoplossspread */
       stopLossSpread?: string | null;
       /**
@@ -1893,7 +2254,12 @@ export interface components {
        * @default fok
        * @enum {string}
        */
-      takeProfitLimitStrategy: 'fok' | 'post_only_chase';
+      takeProfitLimitStrategy: 'fok' | 'post_only_chase' | 'market';
+      /**
+       * Takeprofitmaxadversespread
+       * @default 0
+       */
+      takeProfitMaxAdverseSpread: string;
       /** Takeprofitspread */
       takeProfitSpread?: string | null;
     };
@@ -1929,10 +2295,11 @@ export interface components {
     };
     /** CrossSpreadOpenResult */
     CrossSpreadOpenResult: {
-      executionBatch: components['schemas']['ExecutionBatchResponse'];
+      executionBatch?: components['schemas']['ExecutionBatchResponse'] | null;
       exitPlan?: components['schemas']['CrossSpreadExitPlanResponse'] | null;
       limitExecution?: components['schemas']['CrossSpreadLimitExecutionResponse'] | null;
       orderIntent?: components['schemas']['CrossSpreadOrderIntentResponse'] | null;
+      pendingTrigger?: components['schemas']['CrossSpreadPendingOpenTriggerResponse'] | null;
     };
     /** CrossSpreadOrderIntentResponse */
     CrossSpreadOrderIntentResponse: {
@@ -1964,6 +2331,35 @@ export interface components {
         | 'STOP_LOSS'
         | 'KILL_SWITCH'
         | 'RISK_REDUCTION';
+    };
+    /** CrossSpreadPendingOpenTriggerResponse */
+    CrossSpreadPendingOpenTriggerResponse: {
+      /**
+       * Createdat
+       * Format: date-time
+       */
+      createdAt: string;
+      /**
+       * Direction
+       * @enum {string}
+       */
+      direction: 'LONG_SPREAD' | 'SHORT_SPREAD';
+      /** Limitspread */
+      limitSpread: string;
+      /**
+       * Limitstrategy
+       * @enum {string}
+       */
+      limitStrategy: 'fok' | 'post_only_chase' | 'market';
+      /** Quantityoz */
+      quantityOz: string;
+      /**
+       * Status
+       * @enum {string}
+       */
+      status: 'pending' | 'triggered' | 'completed' | 'failed';
+      /** Triggerid */
+      triggerId: string;
     };
     /** CrossSpreadPositionOverviewResponse */
     CrossSpreadPositionOverviewResponse: {
@@ -2156,6 +2552,15 @@ export interface components {
       /** Asof */
       asOf?: string | null;
       /**
+       * Automaticexitallowed
+       * @default false
+       */
+      automaticExitAllowed: boolean;
+      /** Automaticexitblockreason */
+      automaticExitBlockReason?: string | null;
+      /** Automaticexitguardminutes */
+      automaticExitGuardMinutes?: number | null;
+      /**
        * Closeallowed
        * @default false
        */
@@ -2164,6 +2569,12 @@ export interface components {
       executionBlockReason?: string | null;
       /** Fetchlatencyms */
       fetchLatencyMs?: number | null;
+      /**
+       * Marketstatus
+       * @default unknown
+       * @enum {string}
+       */
+      marketStatus: 'open' | 'closed' | 'buffer' | 'unknown';
       /**
        * Openallowed
        * @default false
@@ -2183,6 +2594,10 @@ export interface components {
       status: string;
       /** Symbol */
       symbol: string;
+      /** Tradinghours */
+      tradingHours?: string | null;
+      /** Tradingtimezone */
+      tradingTimezone?: string | null;
       /** Venue */
       venue: string;
     };
@@ -2199,6 +2614,15 @@ export interface components {
        * Format: date-time
        */
       asOf: string;
+      /**
+       * Automaticexitallowed
+       * @default false
+       */
+      automaticExitAllowed: boolean;
+      /** Automaticexitblockreason */
+      automaticExitBlockReason?: string | null;
+      /** Automaticexitguardminutes */
+      automaticExitGuardMinutes?: number | null;
       /** Closeallowed */
       closeAllowed: boolean;
       /** Contractsize */
@@ -2207,6 +2631,12 @@ export interface components {
       executionBlockReason?: string | null;
       /** Fillingmode */
       fillingMode: string;
+      /**
+       * Marketstatus
+       * @default unknown
+       * @enum {string}
+       */
+      marketStatus: 'open' | 'closed' | 'buffer' | 'unknown';
       /** Maxmarketquantity */
       maxMarketQuantity?: string | null;
       /** Minquantity */
@@ -2227,11 +2657,41 @@ export interface components {
       symbol: string;
       /** Trademode */
       tradeMode: string;
+      /** Tradinghours */
+      tradingHours?: string | null;
+      /** Tradingtimezone */
+      tradingTimezone?: string | null;
       /**
        * Venue
        * @enum {string}
        */
       venue: 'bybit' | 'mt5';
+    };
+    /** DraftRequest */
+    DraftRequest: {
+      /** Costprofileid */
+      costProfileId: string;
+      /**
+       * Direction
+       * @enum {string}
+       */
+      direction: 'buy_spread' | 'sell_spread';
+      /** Entrythreshold */
+      entryThreshold: string;
+      /** Exittarget */
+      exitTarget: string;
+      /**
+       * Methodversion
+       * @constant
+       */
+      methodVersion: 'experiment.v1';
+      /**
+       * Pairid
+       * @enum {string}
+       */
+      pairId: 'cross-gold' | 'funding-btc';
+      /** Quantity */
+      quantity: string;
     };
     /** EconomicEventResponse */
     EconomicEventResponse: {
@@ -2268,6 +2728,23 @@ export interface components {
       asOf: string;
       /** Equity */
       equity: string;
+    };
+    /** EventOutcome */
+    EventOutcome: {
+      /** Entryat */
+      entryAt?: string | null;
+      /** Exitreason */
+      exitReason: string;
+      /** Id */
+      id: string;
+      /** Netpnl */
+      netPnl?: string | null;
+      /** Pricemae */
+      priceMAE?: string | null;
+      /** Pricemfe */
+      priceMFE?: string | null;
+    } & {
+      [key: string]: unknown;
     };
     /** ExchangeConnectivityResponse */
     ExchangeConnectivityResponse: {
@@ -2418,6 +2895,113 @@ export interface components {
       maxLegDelaySeconds: number;
       /** Maxresidualnotional */
       maxResidualNotional: string;
+    };
+    /** Experiment */
+    Experiment: {
+      /**
+       * Clockbasis
+       * @default observed
+       * @constant
+       */
+      clockBasis: 'observed';
+      costProfile: components['schemas']['Scenario'];
+      /**
+       * Cutoff
+       * Format: date-time
+       */
+      cutoff: string;
+      /**
+       * Direction
+       * @enum {string}
+       */
+      direction: 'buy_spread' | 'sell_spread';
+      /** Entrythreshold */
+      entryThreshold: string;
+      /** Entrythresholds */
+      entryThresholds?: (number | string)[];
+      /** Exittarget */
+      exitTarget: string;
+      /** Exittargets */
+      exitTargets?: (number | string)[];
+      /**
+       * From
+       * Format: date-time
+       */
+      from: string;
+      /**
+       * Holdingseconds
+       * @default [
+       *       300,
+       *       900,
+       *       3600,
+       *       14400
+       *     ]
+       */
+      holdingSeconds: number[];
+      /**
+       * Latencyms
+       * @default [
+       *       0,
+       *       100,
+       *       250,
+       *       500,
+       *       1000
+       *     ]
+       */
+      latencyMs: number[];
+      /** Maxholdingseconds */
+      maxHoldingSeconds: number;
+      /**
+       * Maxquoteagems
+       * @default 2000
+       */
+      maxQuoteAgeMs: number;
+      /** Mt5Slippageperunit */
+      mt5SlippagePerUnit?: (number | string) | null;
+      /**
+       * Pairid
+       * @enum {string}
+       */
+      pairId: 'cross-gold' | 'funding-btc';
+      /**
+       * Qualityprofileid
+       * @default research-quality.v2
+       * @constant
+       */
+      qualityProfileId: 'research-quality.v2';
+      /** Quantities */
+      quantities?: (number | string)[];
+      /** Quantity */
+      quantity: string;
+      /** Riskpnl */
+      riskPnl?: (number | string) | null;
+      /**
+       * To
+       * Format: date-time
+       */
+      to: string;
+      /**
+       * Validationfrom
+       * Format: date-time
+       */
+      validationFrom: string;
+    };
+    /** ExperimentResult */
+    ExperimentResult: {
+      /** Events */
+      events: components['schemas']['EventOutcome'][];
+      /** Holdingcurve */
+      holdingCurve: components['schemas']['HoldingPoint'][];
+      /** Latencyscenarios */
+      latencyScenarios: components['schemas']['ScenarioSummary'][];
+      /** Matrix */
+      matrix: components['schemas']['MatrixCell'][];
+      /** Quantityscenarios */
+      quantityScenarios: components['schemas']['ScenarioSummary'][];
+      sampleOutOfTraining: components['schemas']['OutcomeSummary'];
+      summary: components['schemas']['OutcomeSummary'];
+    } & {
+      [key: string]: unknown;
     };
     /** FillResponse */
     FillResponse: {
@@ -2673,6 +3257,39 @@ export interface components {
       /** Reason */
       reason?: string | null;
     };
+    /** FundingEvent */
+    FundingEvent: {
+      /**
+       * At
+       * Format: date-time
+       */
+      at: string;
+      /**
+       * Currency
+       * @default USDT
+       */
+      currency: string;
+      /**
+       * Kind
+       * @enum {string}
+       */
+      kind: 'settled' | 'indicated' | 'scenario';
+      /** Mark */
+      mark?: (number | string) | null;
+      /**
+       * Markquality
+       * @default missing
+       * @enum {string}
+       */
+      markQuality: 'exact' | 'prior_estimate' | 'missing';
+      /**
+       * Observedat
+       * Format: date-time
+       */
+      observedAt: string;
+      /** Rate */
+      rate: string;
+    };
     /** FundingExecutionContextResponse */
     FundingExecutionContextResponse: {
       /** Accountid */
@@ -2696,6 +3313,10 @@ export interface components {
       };
       /** Dataqualitystate */
       dataQualityState: string;
+      /** Executablespread */
+      executableSpread: {
+        [key: string]: string | null;
+      };
       /** Fundingrate */
       fundingRate: string | null;
       /** Minimumquantity */
@@ -2788,6 +3409,8 @@ export interface components {
     };
     /** FundingOpenSizingResponse */
     FundingOpenSizingResponse: {
+      /** Estimatednotional */
+      estimatedNotional: string | null;
       /** Expectedspotnetquantity */
       expectedSpotNetQuantity: string | null;
       /** Perpetualquantity */
@@ -2802,6 +3425,21 @@ export interface components {
       spotQuantity: string | null;
       /** Valid */
       valid: boolean;
+    };
+    /** FundingPayload */
+    FundingPayload: {
+      /** Fundingrate */
+      fundingRate?: string | null;
+      /** Fundingratetimestamp */
+      fundingRateTimestamp?: string | null;
+      /** Markprice */
+      markPrice?: string | null;
+      /** Nextfundingtime */
+      nextFundingTime?: string | null;
+      /** Symbol */
+      symbol?: string | null;
+    } & {
+      [key: string]: unknown;
     };
     /** FundingPositionGroupResponse */
     FundingPositionGroupResponse: {
@@ -2871,6 +3509,11 @@ export interface components {
       residualQuantity: string;
       /** Resultunknownreservedquantity */
       resultUnknownReservedQuantity: string;
+      /**
+       * Roundingbalanced
+       * @default false
+       */
+      roundingBalanced: boolean;
       /** Spotfeeadjusted */
       spotFeeAdjusted: boolean;
       /** Spotfeeresidualquantity */
@@ -2949,6 +3592,46 @@ export interface components {
     HTTPValidationError: {
       /** Detail */
       detail?: components['schemas']['ValidationError'][];
+    };
+    /** HistoricalCandle */
+    HistoricalCandle: {
+      /** Category */
+      category: string;
+      /** Close */
+      close: string;
+      /** Closetimems */
+      closeTimeMs: string;
+      /** Intervalms */
+      intervalMs: string;
+      /** Pricetype */
+      priceType: string;
+      /** Receivedat */
+      receivedAt: string;
+      /** Sourcetimems */
+      sourceTimeMs: string;
+      /** Symbol */
+      symbol: string;
+    } & {
+      [key: string]: unknown;
+    };
+    /** HoldingPoint */
+    HoldingPoint: {
+      /** Entrycohortcount */
+      entryCohortCount: number;
+      /** P10 */
+      p10?: string | null;
+      /** P50 */
+      p50?: string | null;
+      /** P90 */
+      p90?: string | null;
+      /** Samplecount */
+      sampleCount: number;
+      /** Seconds */
+      seconds: number;
+      /** Unknowncount */
+      unknownCount: number;
+    } & {
+      [key: string]: unknown;
     };
     /** InstrumentResponse */
     InstrumentResponse: {
@@ -3163,6 +3846,29 @@ export interface components {
       /** Mid */
       mid: string;
     };
+    /** MatrixCell */
+    MatrixCell: {
+      /** Entry */
+      entry: string;
+      /** Events */
+      events: components['schemas']['EventOutcome'][];
+      summary: components['schemas']['OutcomeSummary'];
+      /** Target */
+      target: string;
+    } & {
+      [key: string]: unknown;
+    };
+    /** OHLC */
+    OHLC: {
+      /** Close */
+      close: string;
+      /** High */
+      high: string;
+      /** Low */
+      low: string;
+      /** Open */
+      open: string;
+    };
     /** OrderDetailResponse */
     OrderDetailResponse: {
       /** Accountid */
@@ -3259,6 +3965,19 @@ export interface components {
       statusAfter: string;
       /** Statusbefore */
       statusBefore: string;
+    };
+    /** OutcomeSummary */
+    OutcomeSummary: {
+      /** Independentevents */
+      independentEvents: number;
+      /** Netp50 */
+      netP50?: string | null;
+      /** Netsamplecount */
+      netSampleCount: number;
+      /** Unknownratio */
+      unknownRatio?: string | null;
+    } & {
+      [key: string]: unknown;
     };
     /** PnlResponse */
     PnlResponse: {
@@ -3368,6 +4087,142 @@ export interface components {
       /** Version */
       version: string;
     };
+    /** ResearchData */
+    ResearchData: {
+      /** Backup */
+      backup?: string | null;
+      /** Board */
+      board?: {
+        [key: string]: unknown;
+      } | null;
+      /** Borrowcash */
+      borrowCash?: string | null;
+      /** Borrowobservations */
+      borrowObservations?: {
+        [key: string]: string;
+      }[];
+      /** Breakevenexitspread */
+      breakEvenExitSpread?: string | null;
+      /** Brokerhistory */
+      brokerHistory?: components['schemas']['ResearchRow'][];
+      /** Bytes */
+      bytes?: string | null;
+      /** Calendarcoverage */
+      calendarCoverage?: string | null;
+      /** Chartseries */
+      chartSeries?: {
+        [key: string]: unknown;
+      }[];
+      consumer?: components['schemas']['CaptureState'] | null;
+      /** Diskfreebytes */
+      diskFreeBytes?: string | null;
+      /** Displayintervalms */
+      displayIntervalMs?: string | null;
+      /** Distribution */
+      distribution?: {
+        [key: string]: unknown;
+      } | null;
+      /** Emptyreason */
+      emptyReason?: string | null;
+      /** Fundingcash */
+      fundingCash?: string | null;
+      /** Fundingchart */
+      fundingChart?: {
+        [key: string]: unknown;
+      } | null;
+      /** History */
+      history?: components['schemas']['ResearchRow'][];
+      /** Id */
+      id?: string | null;
+      /** Netpnl */
+      netPnl?: string | null;
+      /** Parameters */
+      parameters?: {
+        [key: string]: unknown;
+      } | null;
+      /** Parts */
+      parts?: number | null;
+      /** Pricepnl */
+      pricePnl?: string | null;
+      /** Prices */
+      prices?: components['schemas']['HistoricalCandle'][];
+      /** Projectedbytesperday */
+      projectedBytesPerDay?: string | null;
+      /** Projection */
+      projection?: {
+        [key: string]: unknown;
+      } | null;
+      /** Quality */
+      quality?: string[];
+      result?: components['schemas']['ExperimentResult'] | null;
+      /** Rows */
+      rows?: components['schemas']['ResearchRow'][];
+      /** Run Id */
+      run_id?: string | null;
+      runtime?: components['schemas']['CaptureState'] | null;
+      /** Settlements */
+      settlements?: components['schemas']['ResearchRow'][];
+      /** Sourcepricecount */
+      sourcePriceCount?: number | null;
+      /** Swapcash */
+      swapCash?: string | null;
+    } & {
+      [key: string]: unknown;
+    };
+    /** ResearchResponse */
+    ResearchResponse: {
+      /** Clockbasis */
+      clockBasis: string;
+      /** Coverage */
+      coverage: {
+        [key: string]: unknown;
+      };
+      data?: components['schemas']['ResearchData'] | null;
+      /** Dataversion */
+      dataVersion?: string | null;
+      /** Methodversion */
+      methodVersion: string;
+      /** Observedat */
+      observedAt?: string | null;
+      /** Parameterhash */
+      parameterHash?: string | null;
+      /** Publishedthrough */
+      publishedThrough?: string | null;
+      /** Receivedat */
+      receivedAt?: string | null;
+      /** Source */
+      source: string;
+      /** Stale */
+      stale: boolean;
+      /** Status */
+      status: string;
+      /** Warnings */
+      warnings: string[];
+    };
+    /** ResearchRow */
+    ResearchRow: {
+      /** Ohlc */
+      ohlc?: {
+        [key: string]: components['schemas']['OHLC'];
+      };
+      payload?: components['schemas']['FundingPayload'];
+      /** Receivedat */
+      receivedAt?: string | null;
+      /** Stream */
+      stream?: string | null;
+      /**
+       * Timems
+       * @default
+       */
+      timeMs: string;
+      /**
+       * Validdurationms
+       * @default 0
+       */
+      validDurationMs: number;
+    } & {
+      [key: string]: unknown;
+    };
     /** RiskActionRequest */
     RiskActionRequest: {
       /**
@@ -3439,6 +4294,99 @@ export interface components {
       /** Runtimestatus */
       runtimeStatus: string;
     };
+    /** Scenario */
+    Scenario: {
+      /** Additionalexecutioncost */
+      additionalExecutionCost?: (number | string) | null;
+      borrow?: components['schemas']['BorrowProfile'];
+      /**
+       * Closedat
+       * Format: date-time
+       */
+      closedAt: string;
+      /** Costprofileid */
+      costProfileId: string;
+      /**
+       * Currency
+       * @default USDT
+       * @enum {string}
+       */
+      currency: 'USD' | 'USDT';
+      /**
+       * Direction
+       * @enum {string}
+       */
+      direction: 'buy_spread' | 'sell_spread';
+      /** Entryspread */
+      entrySpread: string;
+      /** Exitspread */
+      exitSpread: string;
+      /** Funding */
+      funding?: components['schemas']['FundingEvent'][];
+      /**
+       * Fundingcoverage
+       * @default unknown
+       * @enum {string}
+       */
+      fundingCoverage: 'complete' | 'scenario' | 'unknown';
+      /**
+       * Fxassumption
+       * @default same_currency
+       * @enum {string}
+       */
+      fxAssumption: 'explicit_1_to_1' | 'same_currency';
+      /**
+       * Openedat
+       * Format: date-time
+       */
+      openedAt: string;
+      /** Owncapital */
+      ownCapital?: (number | string) | null;
+      /**
+       * Pairid
+       * @enum {string}
+       */
+      pairId: 'cross-gold' | 'funding-btc';
+      /** Quantity */
+      quantity: string;
+      /** Swap */
+      swap?: components['schemas']['SwapEvent'][];
+      /**
+       * Swapcoverage
+       * @default unknown
+       * @enum {string}
+       */
+      swapCoverage: 'not_applicable' | 'complete' | 'scenario' | 'unknown';
+      /** Tradingfees */
+      tradingFees?: (number | string) | null;
+    };
+    /** ScenarioSummary */
+    ScenarioSummary: {
+      /** Latencyms */
+      latencyMs?: number | null;
+      /** Quantity */
+      quantity?: string | null;
+      summary: components['schemas']['OutcomeSummary'];
+    } & {
+      [key: string]: unknown;
+    };
+    /** SourceState */
+    SourceState: {
+      /** Clock */
+      clock?: string | null;
+      /** Lastreadat */
+      lastReadAt?: string | null;
+      /** Lastreceivedat */
+      lastReceivedAt?: string | null;
+      /** Reason */
+      reason?: string | null;
+      /** Rttns */
+      rttNs?: string | null;
+      /** Status */
+      status?: string | null;
+    } & {
+      [key: string]: unknown;
+    };
     /** StrategyAccountBindingResponse */
     StrategyAccountBindingResponse: {
       /** Accountcode */
@@ -3496,6 +4444,13 @@ export interface components {
        */
       fillsTotal: number;
       finance: components['schemas']['StrategyPnlResponse'] | null;
+      /** Financialsyncerrorcode */
+      financialSyncErrorCode: string | null;
+      /**
+       * Financialsyncstatus
+       * @default waiting_initial_sync
+       */
+      financialSyncStatus: string;
       /** Historyend */
       historyEnd: string | null;
       /** Historystart */
@@ -3505,6 +4460,8 @@ export interface components {
        * @default true
        */
       isStale: boolean;
+      /** Lastsuccessfulfinancialsyncat */
+      lastSuccessfulFinancialSyncAt: string | null;
       /** Lastsuccessfulsyncat */
       lastSuccessfulSyncAt: string | null;
       /** Leverage */
@@ -3525,12 +4482,18 @@ export interface components {
       positionValueNet: string | null;
       /** Positions */
       positions: components['schemas']['PositionResponse'][];
+      /** Sessionequityhistory */
+      sessionEquityHistory: components['schemas']['StrategyEquityHistoryPointResponse'][];
       /**
        * Snapshotscope
        * @default strategy
        * @enum {string}
        */
       snapshotScope: 'account' | 'strategy';
+      /** Strategydailypnl */
+      strategyDailyPnl: {
+        [key: string]: unknown;
+      }[];
       /** Strategyinstanceid */
       strategyInstanceId: string;
       /** Syncerrorcode */
@@ -3744,6 +4707,10 @@ export interface components {
        * @default strategy
        */
       scope: string;
+      /** Strategydailypnl */
+      strategyDailyPnl: {
+        [key: string]: unknown;
+      }[];
       /** Strategyinstanceid */
       strategyInstanceId: string;
       /** Swappnl */
@@ -3754,6 +4721,15 @@ export interface components {
       tradingPnl: string | null;
       /** Unattributedevents */
       unattributedEvents: components['schemas']['EconomicEventResponse'][];
+      /** Valuationasof */
+      valuationAsOf: string | null;
+      /** Valuationmarketstatus */
+      valuationMarketStatus: string | null;
+      /**
+       * Valuationpolicy
+       * @default continuous
+       */
+      valuationPolicy: string;
     };
     /** StrategyRunResponse */
     StrategyRunResponse: {
@@ -3808,6 +4784,41 @@ export interface components {
       strategyKey: string;
       /** Warnings */
       warnings: string[];
+    };
+    /** SwapEvent */
+    SwapEvent: {
+      /**
+       * At
+       * Format: date-time
+       */
+      at: string;
+      /** Contractsize */
+      contractSize: string;
+      /** Currency */
+      currency: string;
+      /**
+       * Effectivefrom
+       * Format: date-time
+       */
+      effectiveFrom: string;
+      /** Longrate */
+      longRate?: string | null;
+      /**
+       * Mode
+       * @enum {string}
+       */
+      mode: 'points' | 'currency_profit' | 'unsupported';
+      /**
+       * Observedat
+       * Format: date-time
+       */
+      observedAt: string;
+      /** Point */
+      point?: (number | string) | null;
+      /** Rollovermultiplier */
+      rolloverMultiplier: number;
+      /** Shortrate */
+      shortRate?: string | null;
     };
     /** TradeCommandResponse */
     TradeCommandResponse: {
@@ -4486,6 +5497,479 @@ export interface operations {
       };
     };
   };
+  catalog_api_v1_research_strategies_catalog_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ResearchResponse'];
+        };
+      };
+    };
+  };
+  status_api_v1_research_strategies_data_status_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ResearchResponse'];
+        };
+      };
+    };
+  };
+  draft_api_v1_research_strategies_drafts_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['DraftRequest'];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ResearchResponse'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  read_draft_api_v1_research_strategies_drafts__draft_id__get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        draft_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ResearchResponse'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  create_experiment_api_v1_research_strategies_experiments_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['Experiment'];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      202: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ResearchResponse'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  experiment_api_v1_research_strategies_experiments__run_id__get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        run_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ResearchResponse'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  cancel_api_v1_research_strategies_experiments__run_id__cancel_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        run_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ResearchResponse'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  events_api_v1_research_strategies_experiments__run_id__events_get: {
+    parameters: {
+      query?: {
+        offset?: number;
+        limit?: number;
+      };
+      header?: never;
+      path: {
+        run_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ResearchResponse'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  replay_api_v1_research_strategies_experiments__run_id__events__event_id__replay_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        run_id: string;
+        event_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ResearchResponse'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  funding_board_api_v1_research_strategies_funding_board_get: {
+    parameters: {
+      query?: {
+        venue?: 'Bybit';
+        symbols?: string;
+        search?: string;
+        sort?: 'default' | 'name' | 'rate_desc' | 'rate_asc';
+        resolution?: '1h' | '8h' | '1d';
+        from?: string | null;
+        to?: string | null;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ResearchResponse'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  get_distribution_api_v1_research_strategies_pairs__pair__distribution_get: {
+    parameters: {
+      query: {
+        from: string;
+        to: string;
+      };
+      header?: never;
+      path: {
+        pair: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ResearchResponse'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  historical_prices_api_v1_research_strategies_pairs__pair__history_get: {
+    parameters: {
+      query: {
+        from: string;
+        to: string;
+        symbol?: string;
+        resolution?: '1h' | '8h' | '1d';
+      };
+      header?: never;
+      path: {
+        pair: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ResearchResponse'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  latest_api_v1_research_strategies_pairs__pair__latest_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        pair: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ResearchResponse'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  series_api_v1_research_strategies_pairs__pair__series_get: {
+    parameters: {
+      query: {
+        from: string;
+        to: string;
+        view?: 'valid' | 'all';
+        resolution?: '1s' | '15m' | '1h' | '8h' | '1d' | 'event';
+        symbol?: string;
+      };
+      header?: never;
+      path: {
+        pair: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ResearchResponse'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  calculate_api_v1_research_strategies_scenario_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['Scenario'];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ResearchResponse'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
   credential_references_api_v1_security_credential_references_get: {
     parameters: {
       query?: never;
@@ -4705,6 +6189,7 @@ export interface operations {
     parameters: {
       query?: {
         accountId?: string | null;
+        includeDetails?: boolean;
       };
       header?: never;
       path: {
@@ -5767,6 +7252,26 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  open_triggers_api_v1_trading_cross_spread_open_triggers_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CrossSpreadPendingOpenTriggerResponse'][];
         };
       };
     };

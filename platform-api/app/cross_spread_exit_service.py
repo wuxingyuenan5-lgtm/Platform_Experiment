@@ -72,6 +72,8 @@ def open_cross_spread_market(request: CrossSpreadMarketOpenRequest) -> CrossSpre
             direction=request.direction,
             take_profit_spread=request.take_profit_spread,
             stop_loss_spread=request.stop_loss_spread,
+            take_profit_max_adverse_spread=request.take_profit_max_adverse_spread,
+            stop_loss_max_adverse_spread=request.stop_loss_max_adverse_spread,
         )
     except HTTPException as exc:
         update_batch_status(
@@ -346,6 +348,8 @@ def _create_exit_plan_for_open_batch(
     direction: SpreadDirection,
     take_profit_spread: Decimal | None,
     stop_loss_spread: Decimal | None,
+    take_profit_max_adverse_spread: Decimal = Decimal("0"),
+    stop_loss_max_adverse_spread: Decimal = Decimal("0"),
 ) -> CrossSpreadExitPlanResponse:
     summaries = load_batch_fill_summaries(batch_id)
     bybit = summaries.get(BYBIT_LEG_ROLE)
@@ -362,6 +366,8 @@ def _create_exit_plan_for_open_batch(
         entry_spread=bybit.average_price - mt5.average_price,
         take_profit_spread=take_profit_spread,
         stop_loss_spread=stop_loss_spread,
+        take_profit_max_adverse_spread=take_profit_max_adverse_spread,
+        stop_loss_max_adverse_spread=stop_loss_max_adverse_spread,
     )
 
 

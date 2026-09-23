@@ -14,7 +14,7 @@ test('cross spread execution workspace clears legacy default spreads', () => {
     'src/views/strategy/spread-carry/composables/useCrossVenueExecutionWorkspace.ts',
   );
   assert.match(source, /const triggerSpread = ref<[^>]+>\(null\);/);
-  assert.match(source, /const acceptableSpread = ref<[^>]+>\(null\);/);
+  assert.match(source, /const acceptableSpread = ref<[^>]+>\(0\);/);
   assert.match(source, /const takeProfitSpread = ref<[^>]+>\(null\);/);
   assert.match(source, /const stopLossSpread = ref<[^>]+>\(null\);/);
   assert.match(source, /const closeLimitSpread = ref<[^>]+>\(null\);/);
@@ -91,6 +91,12 @@ test('cross spread finance composable uses dynamic bindings instead of hardcoded
   assert.equal(source.includes('accountCapitalProfile'), true);
   assert.equal(source.includes('account?.equityHistory'), true);
   assert.equal(source.includes('isStale: true'), true);
+  assert.equal(source.includes('position.instrumentId === config.instrumentId'), true);
+  assert.equal(source.includes('async function load(section: FinanceSection'), true);
+  assert.equal(source.includes('includeDetails: false'), true);
+  assert.equal(source.includes('Promise.allSettled('), true);
+  assert.equal(source.includes('stale_strategy_pnl'), true);
+  assert.doesNotMatch(source, /getTradingPosition/);
   assert.doesNotMatch(
     source,
     /canonicalStrategyFills|contractMultipliers|getCrossSpreadObservability/,
@@ -118,13 +124,113 @@ test('strategy management wires full cross spread live profiles into pnl and cap
 });
 
 test('cross spread daily P&L combines the two strategy legs by date', () => {
-  const source = read(
-    'src/views/strategy/management/composables/useCrossSpreadFinance.ts',
-  );
+  const source = read('src/views/strategy/management/composables/useCrossSpreadFinance.ts');
   assert.equal(source.includes('export function mergeCrossDailyPnl'), true);
   assert.equal(source.includes('dailyPnl: mergeCrossDailyPnl(accounts.value)'), true);
-  assert.equal(source.includes('const complete = rows.length === snapshots.length'), true);
+  assert.equal(source.includes('snapshots.length === CROSS_ACCOUNT_IDS.length'), true);
+  assert.equal(
+    source.includes('new Set(snapshots.map((snapshot) => snapshot.accountId)).size'),
+    true,
+  );
   assert.equal(source.includes('returnRate:'), true);
+});
+
+test('cross spread daily P&L rejects duplicate or non-finite single-leg rows at runtime', () => {
+  const createLoader = require('./load-strategy-module.cjs');
+  const load = createLoader({
+    '@/api/platform/trading': {},
+    '@/api/platform/strategyQueries': {},
+    '@/views/strategy/shared/strategyRegistry': {},
+    './strategyFinancialPresentation': {},
+  });
+  const { mergeCrossDailyPnl } = load(
+    'src/views/strategy/management/composables/useCrossSpreadFinance.ts',
+  );
+  const point = (pnl, accountId) => ({
+    date: '2026-09-19',
+    currency: 'USDT',
+    pnl,
+    equityOpen: '100',
+    equityClose: '101',
+    accountId,
+  });
+  const single = mergeCrossDailyPnl([
+    { accountId: 'bybit-live-main', dailyPnl: [point('1', 'bybit-live-main')] },
+  ]);
+  assert.equal(single[0].pnl, null);
+  const duplicate = mergeCrossDailyPnl([
+    {
+      accountId: 'bybit-live-main',
+      dailyPnl: [point('1', 'bybit-live-main'), point('2', 'bybit-live-main')],
+    },
+    { accountId: 'mt5-live-main', dailyPnl: [] },
+  ]);
+  assert.equal(duplicate[0].pnl, null);
+  const nonFinite = mergeCrossDailyPnl([
+    { accountId: 'bybit-live-main', dailyPnl: [point('NaN', 'bybit-live-main')] },
+    { accountId: 'mt5-live-main', dailyPnl: [point('1', 'mt5-live-main')] },
+  ]);
+  assert.equal(nonFinite[0].pnl, null);
+});
+
+test('cross spread reports strategy P&L failure independently from account reads', async () => {
+  const createLoader = require('./load-strategy-module.cjs');
+  const vue = require('vue');
+  const snapshot = (accountId) => ({
+    accountId,
+    accountCode: accountId === 'bybit-live-main' ? 'BYBIT-LIVE-001' : 'MT5-LIVE-001',
+    positions: [],
+    dailyPnl: [],
+    balance: { equity: '100', currency: 'USDT' },
+    syncStatus: 'ready',
+  });
+  const load = createLoader({
+    vue,
+    '@/api/platform/trading': {
+      getStrategyAccountBindings: async () => [
+        { accountId: 'bybit-live-main', status: 'active', role: 'bybit_leg' },
+        { accountId: 'mt5-live-main', status: 'active', role: 'mt5_leg' },
+      ],
+      getStrategyAccountSnapshot: async (_instanceId, accountId) => snapshot(accountId),
+      getStrategyPnl: async () => {
+        throw new Error('pnl unavailable');
+      },
+    },
+    '@/api/platform/strategyQueries': {
+      fetchStrategyQuery: async (_key, query) => query(new AbortController().signal),
+    },
+    '@/views/strategy/shared/strategyRegistry': {
+      getStrategyManifest: () => ({ category: 'arbitrage' }),
+    },
+    './strategyFinancialPresentation': {
+      accountCapitalProfile: () => ({
+        overview: [],
+        riskCards: [],
+        structureCards: [],
+        metricCurves: [],
+        curve: {},
+      }),
+      accountState: () => '最近同步成功',
+      financialProfile: (_title, _finance, note) => ({ note }),
+      formatTime: () => '--',
+      money: () => '--',
+      netExposureRiskCard: () => null,
+    },
+  });
+  const { useCrossSpreadFinance } = load(
+    'src/views/strategy/management/composables/useCrossSpreadFinance.ts',
+  );
+  const state = useCrossSpreadFinance();
+  await state.refresh('pnl');
+  assert.equal(state.pnlProfile.value.note, '策略损益加载失败，保留最近成功数据');
+});
+
+test('cross spread finance marks first-load and partial-leg failures', () => {
+  const source = read('src/views/strategy/management/composables/useCrossSpreadFinance.ts');
+  assert.equal(source.includes('const refreshFailure = ref(false);'), true);
+  assert.equal(source.includes("'账户数据加载失败，连接状态待核验'"), true);
+  assert.equal(source.includes("'账户绑定不完整'"), true);
+  assert.equal(source.includes('refreshFailure.value || missingCrossLeg'), true);
 });
 
 test('strategy management honors the cross-spread route context before rendering profile data', () => {
@@ -163,6 +269,9 @@ test('management renders canonical fills and native cash exactly across refreshe
     currency: 'USDT',
   }));
   const load = createLoader({
+    '@/api/platform/strategyQueries': {
+      fetchStrategyQuery: async (_key, query) => query(new AbortController().signal),
+    },
     '@/api/platform/trading': {
       getOrders: async (id) => {
         calls.push(id);

@@ -8,6 +8,17 @@ from uuid import uuid4
 from pydantic import BaseModel, Field, model_validator
 
 
+class CrossSpreadGuard(BaseModel):
+    target_spread: Decimal
+    max_adverse_spread: Decimal = Field(default=Decimal("0"), ge=0)
+    mt5_account_id: str = Field(min_length=1)
+    mt5_symbol: str = Field(min_length=1)
+    mt5_close: bool
+    mt5_min_quantity: Decimal = Field(gt=0)
+    mt5_quantity_step: Decimal = Field(gt=0)
+    mt5_contract_multiplier: Decimal = Field(gt=0)
+
+
 class SubmitOrderCommand(BaseModel):
     command_id: str
     platform_order_id: str
@@ -29,6 +40,7 @@ class SubmitOrderCommand(BaseModel):
     reduce_only: bool = False
     position_id: str | None = None
     received_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    cross_spread_guard: CrossSpreadGuard | None = None
 
     @model_validator(mode="after")
     def validate_execution_target(self) -> SubmitOrderCommand:
@@ -40,6 +52,7 @@ class SubmitOrderCommand(BaseModel):
 
 
 class ExecutionEvent(BaseModel):
+    terminal: bool = False
     event_id: str = Field(default_factory=lambda: str(uuid4()))
     command_id: str
     platform_order_id: str
@@ -465,6 +478,18 @@ class CrossSpreadVenueSnapshot(BaseModel):
     open_allowed: bool = Field(default=False, alias="openAllowed")
     close_allowed: bool = Field(default=False, alias="closeAllowed")
     execution_block_reason: str | None = Field(default=None, alias="executionBlockReason")
+    market_status: Literal["open", "closed", "buffer", "unknown"] = Field(
+        default="unknown", alias="marketStatus"
+    )
+    trading_hours: str | None = Field(default=None, alias="tradingHours")
+    trading_timezone: str | None = Field(default=None, alias="tradingTimezone")
+    automatic_exit_allowed: bool = Field(default=False, alias="automaticExitAllowed")
+    automatic_exit_block_reason: str | None = Field(
+        default=None, alias="automaticExitBlockReason"
+    )
+    automatic_exit_guard_minutes: int | None = Field(
+        default=None, alias="automaticExitGuardMinutes"
+    )
     fetch_latency_ms: float | None = Field(default=None, alias="fetchLatencyMs")
     as_of: datetime | None = Field(default=None, alias="asOf")
     quote_source_as_of: datetime | None = Field(default=None, alias="quoteSourceAsOf")

@@ -46,12 +46,16 @@ def submit_cross_spread_limit_command(
     mt5_reduce_only: bool = False,
     mt5_position_id: str | None = None,
     allow_netting_close: bool = False,
+    max_adverse_spread: Decimal = Decimal("0"),
+    target_spread: Decimal | None = None,
 ) -> ExecutionBatchResponse:
     assert_cross_spread_live_execution_enabled()
     if bybit_limit_price <= 0:
         raise HTTPException(status_code=422, detail="Bybit Limit price must be positive")
     if limit_strategy not in {"fok", "post_only_chase"}:
         raise HTTPException(status_code=422, detail="Unsupported cross-spread Limit strategy")
+    if limit_strategy == "post_only_chase" and target_spread is None:
+        raise HTTPException(status_code=422, detail="Chase execution requires target spread")
 
     is_close = request.action.startswith("CLOSE_")
     strict_reduce_close = (
@@ -121,6 +125,22 @@ def submit_cross_spread_limit_command(
                 "mt5PositionId": mt5_position_id,
                 "executionPolicy": limit_strategy,
                 "bybitLimitPrice": bybit_limit_price,
+                **(
+                    {
+                        "crossSpreadGuard": {
+                            "targetSpread": target_spread,
+                            "maxAdverseSpread": max_adverse_spread,
+                            "mt5AccountId": sizing.mt5_account_id,
+                            "mt5Symbol": MT5_SYMBOL,
+                            "mt5Close": is_close,
+                            "mt5MinQuantity": sizing.mt5_min,
+                            "mt5QuantityStep": sizing.mt5_step,
+                            "mt5ContractMultiplier": sizing.mt5_multiplier,
+                        }
+                    }
+                    if limit_strategy == "post_only_chase" and target_spread is not None
+                    else {}
+                ),
             },
             reason="cross spread limit command",
         ),
@@ -138,6 +158,8 @@ def submit_cross_spread_fok_command(
     mt5_reduce_only: bool = False,
     mt5_position_id: str | None = None,
     allow_netting_close: bool = False,
+    max_adverse_spread: Decimal = Decimal("0"),
+    target_spread: Decimal | None = None,
 ) -> ExecutionBatchResponse:
     return submit_cross_spread_limit_command(
         request,
@@ -148,6 +170,8 @@ def submit_cross_spread_fok_command(
         mt5_reduce_only=mt5_reduce_only,
         mt5_position_id=mt5_position_id,
         allow_netting_close=allow_netting_close,
+        max_adverse_spread=max_adverse_spread,
+        target_spread=target_spread,
     )
 
 
@@ -160,6 +184,8 @@ def submit_cross_spread_postonly_command(
     mt5_reduce_only: bool = False,
     mt5_position_id: str | None = None,
     allow_netting_close: bool = False,
+    max_adverse_spread: Decimal = Decimal("0"),
+    target_spread: Decimal | None = None,
 ) -> ExecutionBatchResponse:
     return submit_cross_spread_limit_command(
         request,
@@ -170,4 +196,6 @@ def submit_cross_spread_postonly_command(
         mt5_reduce_only=mt5_reduce_only,
         mt5_position_id=mt5_position_id,
         allow_netting_close=allow_netting_close,
+        max_adverse_spread=max_adverse_spread,
+        target_spread=target_spread,
     )

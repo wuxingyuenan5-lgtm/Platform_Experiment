@@ -21,7 +21,8 @@
       "price",
       "reduce_only",
       "position_id",
-      "received_at"
+      "received_at",
+      "cross_spread_guard"
     ]
   },
   "event": {
@@ -40,7 +41,8 @@
       "fill_price",
       "fill_quantity",
       "occurred_at",
-      "reason"
+      "reason",
+      "terminal"
     ]
   }
 }

@@ -30,7 +30,7 @@
             ><span>当前执行价差</span><strong>{{ summary.marketSpread }}</strong></div
           >
           <div
-            ><span>触发 / 接受</span><strong>{{ summary.spreadRange }}</strong></div
+            ><span>触发 / 允许不利偏移</span><strong>{{ summary.spreadRange }}</strong></div
           >
           <div
             ><span>止盈</span><strong>{{ summary.takeProfit }}</strong></div
@@ -88,13 +88,13 @@
 
 <style scoped lang="less">
   .trade-modal {
-    position: fixed;
-    inset: 0;
-    z-index: 1200;
     display: flex;
+    position: fixed;
+    z-index: 1200;
     align-items: center;
     justify-content: center;
-    background: rgba(11, 21, 42, 0.3);
+    background: rgb(11 21 42 / 30%);
+    inset: 0;
   }
 
   .trade-modal__dialog {
@@ -107,7 +107,7 @@
       var(--strategy-surface) 0%,
       var(--strategy-surface-soft) 100%
     );
-    box-shadow: var(--strategy-shadow, 0 30px 60px rgba(23, 41, 72, 0.24));
+    box-shadow: var(--strategy-shadow, 0 30px 60px rgb(23 41 72 / 24%));
   }
 
   .trade-modal__header,
@@ -177,9 +177,9 @@
   .confirm-guard {
     margin-top: 12px;
     padding: 12px 14px;
-    border: 1px solid rgba(217, 43, 43, 0.22);
+    border: 1px solid rgb(217 43 43 / 22%);
     border-radius: 12px;
-    background: rgba(217, 43, 43, 0.06);
+    background: rgb(217 43 43 / 6%);
   }
 
   .confirm-guard span {

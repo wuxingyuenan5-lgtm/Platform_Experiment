@@ -24,3 +24,9 @@ def test_business_and_external_network_are_blocked_before_socket_io(method, addr
 
 def test_default_runtime_cannot_target_the_business_service():
     assert get_settings().runtime_base_url == "http://127.0.0.1:1"
+
+
+def test_research_lifecycle_cannot_attach_to_business_archive(tmp_path):
+    settings = get_settings()
+    assert settings.strategy_research_enabled is False
+    assert settings.strategy_research_path == str(tmp_path / "strategy-research")

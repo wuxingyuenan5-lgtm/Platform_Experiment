@@ -189,6 +189,55 @@ def _events_from_venue(
     _validate_order(record, order)
     if order.status == "unknown":
         return []
+    if (
+        record.command.cross_spread_guard is not None
+        and record.command.execution_policy == "post_only_chase"
+    ):
+        # Native Chase snapshots aggregate all verified child executions. Never
+        # complete a still-running strategy, and preserve the submission event IDs.
+        from app.live_route_store import get_strategy_route
+
+        route = get_strategy_route(platform_order_id=record.platform_order_id)
+        if route is None or order.status not in {"filled", "canceled"}:
+            return []
+        ack = ExecutionEvent(
+            event_id=f"bybit-chase-ack:{route.strategy_id}",
+            command_id=record.command_id,
+            platform_order_id=record.platform_order_id,
+            event_type="order_acknowledged",
+            external_order_id=order.external_order_id,
+            occurred_at=record.command.received_at,
+        )
+        if order.filled_quantity > 0:
+            if order.average_fill_price is None:
+                return []
+            return [
+                ack,
+                ExecutionEvent(
+                    event_id=f"bybit-chase-fill:{route.strategy_id}",
+                    command_id=record.command_id,
+                    platform_order_id=record.platform_order_id,
+                    event_type="order_filled",
+                    external_order_id=order.external_order_id,
+                    fill_quantity=order.filled_quantity,
+                    fill_price=order.average_fill_price,
+                    occurred_at=order.as_of,
+                    terminal=True,
+                    reason="Native Chase terminal cumulative fill; unfilled remainder canceled",
+                ),
+            ]
+        return [
+            ack,
+            ExecutionEvent(
+                event_id=f"bybit-chase-zero:{route.strategy_id}",
+                command_id=record.command_id,
+                platform_order_id=record.platform_order_id,
+                event_type="order_rejected",
+                external_order_id=order.external_order_id,
+                occurred_at=record.command.received_at,
+                reason="Native Chase terminated without execution",
+            ),
+        ]
     if order.status in {"rejected", "canceled"}:
         if order.filled_quantity > 0:
             raise RecoveryEvidenceMismatchError(
@@ -332,6 +381,14 @@ def dispose_command_as_absent(
         )
     if record.status != "result_unknown":
         raise RecoveryCommandNotReadyError(command_id)
+    if (
+        record.command.cross_spread_guard is not None
+        and record.command.execution_policy == "post_only_chase"
+    ):
+        raise AbsentDispositionEvidenceError(
+            "Native Chase absence cannot be proven by ordinary order history; "
+            "reconcile original strategy"
+        )
     if not request.owner_confirmed_no_external_side_effect:
         raise AbsentDispositionEvidenceError("Explicit Owner confirmation is required")
     if not (request.evidence_start <= record.created_at <= request.evidence_end):
@@ -354,8 +411,7 @@ def dispose_command_as_absent(
     if exact_order is not None:
         raise AbsentDispositionEvidenceError("Exact venue order exists")
     identity_match = any(
-        item.platform_order_id == record.platform_order_id
-        or item.command_id == record.command_id
+        item.platform_order_id == record.platform_order_id or item.command_id == record.command_id
         for item in [*orders, *fills]
     )
     if identity_match:
@@ -363,8 +419,7 @@ def dispose_command_as_absent(
     if any(item.symbol.upper() == record.symbol.upper() for item in open_orders):
         raise AbsentDispositionEvidenceError("Current open order evidence is not empty")
     if any(
-        item.symbol.upper() == record.symbol.upper()
-        and item.net_quantity != Decimal("0")
+        item.symbol.upper() == record.symbol.upper() and item.net_quantity != Decimal("0")
         for item in positions
     ):
         raise AbsentDispositionEvidenceError("Current position evidence is not empty")

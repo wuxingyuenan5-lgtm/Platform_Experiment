@@ -30,6 +30,7 @@ interface UserState {
   lastUpdateTime: number;
   hydrationAttempted: boolean;
   authenticated: boolean;
+  sessionUnavailable: boolean;
   authentication: AuthenticationState | null;
   optionsMap?: Record<string, unknown> | null;
   account?: unknown;
@@ -74,6 +75,7 @@ export const useUserStore = defineStore({
     lastUpdateTime: 0,
     hydrationAttempted: false,
     authenticated: false,
+    sessionUnavailable: false,
     authentication: null,
     optionsMap: null,
     account: null,
@@ -104,6 +106,9 @@ export const useUserStore = defineStore({
     },
     getHydrationAttempted(state): boolean {
       return state.hydrationAttempted;
+    },
+    getSessionUnavailable(state): boolean {
+      return state.sessionUnavailable;
     },
     getAuthentication(state): AuthenticationState | null {
       return state.authentication;
@@ -146,6 +151,7 @@ export const useUserStore = defineStore({
       clearAuthCache();
       this.authentication = authentication;
       this.authenticated = true;
+      this.sessionUnavailable = false;
       this.hydrationAttempted = true;
       this.sessionTimeout = false;
       this.setRoleList([authentication.user.role]);
@@ -162,6 +168,7 @@ export const useUserStore = defineStore({
       this.optionsMap = null;
       this.authentication = null;
       this.authenticated = false;
+      this.sessionUnavailable = false;
       this.lastUpdateTime = 0;
       clearUserSystemSessionMemory();
       clearAuthCache();
@@ -197,10 +204,14 @@ export const useUserStore = defineStore({
         this.applyAuthentication(authentication);
         return this.userInfo;
       } catch (error) {
-        this.resetState();
+        const serviceUnavailable = isUserSystemServiceUnavailable(error);
+        // A loaded browser session remains usable while the auth service is
+        // temporarily unreachable. Only a definitive auth failure may clear it.
+        if (!serviceUnavailable || !this.authenticated) this.resetState();
         // An unreachable API has not decided whether the cookie is valid.
-        // Keep protected state cleared, but allow a later read to verify it.
-        this.hydrationAttempted = !isUserSystemServiceUnavailable(error);
+        // Preserve an already verified page, while refusing new protected navigation.
+        this.sessionUnavailable = serviceUnavailable;
+        this.hydrationAttempted = !serviceUnavailable;
         throw error;
       }
     },

@@ -15,19 +15,22 @@
 
     <div v-if="error" class="error-state">{{ error }}</div>
     <div v-if="loading && !events.length" class="loading-state">正在读取配置化市场预期数据…</div>
-    <div v-else-if="events.length" class="category-list">
+    <div v-else-if="response" class="category-list">
       <section v-for="group in groupedEvents" :key="group.category" class="category-section">
         <header
           ><h3>{{ categoryLabel(group.category) }}</h3
           ><span>{{ group.events.length }}项</span></header
         >
-        <div class="event-grid">
+        <div v-if="!group.events.length" class="category-empty"
+          >当前暂无可用事件，数据源恢复后会自动显示。</div
+        >
+        <div v-else class="event-grid">
           <article v-for="event in group.events" :key="event.id" class="event-card">
             <div class="event-card__header">
               <span>市场隐含概率</span>
               <strong>{{ formatProbability(event.probability) }}</strong>
             </div>
-            <h4>{{ event.label }}</h4>
+            <h4 :title="event.originalLabel || undefined">{{ event.label }}</h4>
             <svg viewBox="0 0 220 72" preserveAspectRatio="none" aria-label="事件概率历史曲线">
               <line x1="0" y1="18" x2="220" y2="18" />
               <line x1="0" y1="36" x2="220" y2="36" />
@@ -51,7 +54,12 @@
             </div>
             <footer>
               <span>{{ formatUpdated(event.history) }}</span>
-              <a :href="dataFileUrl" target="_blank" rel="noopener noreferrer">查看来源</a>
+              <a
+                :href="event.sourceUrl || response?.sourceUrl || dataFileUrl"
+                target="_blank"
+                rel="noopener noreferrer"
+                >查看来源</a
+              >
             </footer>
           </article>
         </div>
@@ -72,14 +80,15 @@
   } from '@/api/hedgeResearch';
   import ResearchSourceState from '../research/components/ResearchSourceState.vue';
 
-  const dataFileUrl =
-    'https://github.com/wuxingyuenan5-lgtm/platform-data/blob/macro-expectations-phase-1a/public/v1/macro/expectations.json';
+  const dataFileUrl = 'https://polymarket.com/markets';
 
   const response = ref<MacroExpectationResponse | null>(null);
   const loading = ref(false);
   const error = ref('');
 
-  const events = computed(() => response.value?.events || []);
+  const events = computed(() =>
+    (response.value?.events || []).filter((event) => event.category !== 'monetary_policy'),
+  );
   const sourceMeta = computed<ResearchSourceMeta | null>(() => {
     if (!response.value) return null;
     const status: ResearchSourceMeta['status'] =
@@ -105,18 +114,11 @@
     }[response.value.status];
   });
   const groupedEvents = computed(() => {
-    const order: MacroExpectationEvent['category'][] = [
-      'monetary_policy',
-      'macro',
-      'geopolitics',
-      'election',
-    ];
-    return order
-      .map((category) => ({
-        category,
-        events: events.value.filter((event) => event.category === category),
-      }))
-      .filter((group) => group.events.length);
+    const order: MacroExpectationEvent['category'][] = ['macro', 'geopolitics', 'election'];
+    return order.map((category) => ({
+      category,
+      events: events.value.filter((event) => event.category === category),
+    }));
   });
 
   async function load() {
@@ -216,13 +218,15 @@
     --strategy-accent-strong: #4338ca;
     --strategy-up: #ef4444;
     --strategy-down: #10b981;
+
     margin: 14px 16px 32px;
     padding: 18px;
     border: 1px solid var(--strategy-border);
     border-radius: 14px;
     background: var(--strategy-surface);
-    box-shadow: 0 4px 16px rgba(15, 23, 42, 0.045);
+    box-shadow: 0 4px 16px rgb(15 23 42 / 4.5%);
   }
+
   .panel-header,
   .panel-actions,
   .category-section > header,
@@ -234,9 +238,11 @@
     justify-content: space-between;
     gap: 10px;
   }
+
   .panel-header {
     align-items: flex-start;
   }
+
   .panel-header p {
     margin: 0 0 3px;
     color: var(--strategy-text-4);
@@ -244,28 +250,34 @@
     font-weight: 800;
     letter-spacing: 0.12em;
   }
+
   h2,
   h3,
   h4 {
     margin: 0;
     color: var(--strategy-text-1);
   }
+
   h2 {
     font-size: 18px;
   }
+
   h3 {
     font-size: 15px;
   }
+
   h4 {
     min-height: 44px;
     margin-top: 10px;
     font-size: 14px;
     line-height: 1.55;
   }
+
   .panel-actions {
     flex-wrap: wrap;
     justify-content: flex-end;
   }
+
   .panel-actions button {
     height: 34px;
     padding: 0 12px;
@@ -275,23 +287,37 @@
     color: var(--strategy-text-2);
     cursor: pointer;
   }
+
   .category-list {
     display: grid;
     gap: 18px;
     margin-top: 18px;
   }
+
   .category-section > header {
     margin-bottom: 10px;
   }
+
   .category-section > header span {
     color: var(--strategy-text-4);
     font-size: 12px;
   }
+
+  .category-empty {
+    padding: 14px;
+    border: 1px dashed var(--strategy-border);
+    border-radius: 10px;
+    background: var(--strategy-surface-2);
+    color: var(--strategy-text-3);
+    font-size: 12px;
+  }
+
   .event-grid {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 11px;
   }
+
   .event-card {
     min-width: 0;
     padding: 13px;
@@ -299,44 +325,53 @@
     border-radius: 11px;
     background: var(--strategy-surface-2);
   }
+
   .event-card__header span {
     overflow: hidden;
     color: var(--strategy-text-3);
     text-overflow: ellipsis;
     white-space: nowrap;
   }
+
   .event-card__header strong {
     color: var(--strategy-accent-strong);
     font-size: 24px;
     font-variant-numeric: tabular-nums;
   }
+
   .event-card svg {
     width: 100%;
     height: 72px;
     margin: 8px 0;
   }
+
   .event-card line {
-    stroke: var(--strategy-border);
     stroke-width: 1;
+    stroke: var(--strategy-border);
   }
+
   .event-card polyline {
-    fill: none;
-    stroke: var(--strategy-accent-strong);
     stroke-width: 2;
+    stroke: var(--strategy-accent-strong);
+    fill: none;
     vector-effect: non-scaling-stroke;
   }
+
   .event-metrics {
-    justify-content: flex-start;
     flex-wrap: wrap;
+    justify-content: flex-start;
   }
+
   .event-metrics span {
     color: var(--strategy-text-4);
     font-size: 12px;
   }
+
   .event-metrics b {
     color: var(--strategy-text-2);
     font-weight: 700;
   }
+
   .event-card footer {
     margin-top: 10px;
     padding-top: 9px;
@@ -344,15 +379,19 @@
     color: var(--strategy-text-4);
     font-size: 12px;
   }
+
   .event-card footer a {
     color: var(--strategy-accent-strong);
   }
+
   .is-positive {
     color: var(--strategy-up) !important;
   }
+
   .is-negative {
     color: var(--strategy-down) !important;
   }
+
   .error-state,
   .loading-state,
   .empty-state {
@@ -363,18 +402,22 @@
     color: var(--strategy-text-3);
     text-align: center;
   }
+
   .error-state {
     color: #dc2626;
   }
+
   @media (max-width: 1150px) {
     .event-grid {
       grid-template-columns: repeat(2, minmax(0, 1fr));
     }
   }
+
   @media (max-width: 720px) {
     .panel-header {
       flex-direction: column;
     }
+
     .event-grid {
       grid-template-columns: 1fr;
     }

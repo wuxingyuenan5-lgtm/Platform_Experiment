@@ -45,6 +45,18 @@ class Settings(BaseSettings):
         "account_mt5_demo:USD:500"
     )
 
+    research_capture_enabled: bool = False
+    research_spool_path: str = "./data/market-spool"
+    research_spool_max_bytes: int = Field(default=2_000_000_000, ge=1_000_000)
+    research_min_free_bytes: int = Field(default=1_000_000_000, ge=0)
+    research_mt5_poll_seconds: float = Field(default=0.2, ge=0.1, le=5)
+    research_bybit_account_id: str = ""
+    research_funding_history_days: int = Field(default=30, ge=1, le=365)
+    # The shared one-minute archive is the source for board-level resampling.
+    # Keep one year available so consumers can request a long default window
+    # without maintaining a second raw-price store.
+    research_price_history_days: int = Field(default=365, ge=1, le=730)
+
     live_write_enabled: bool = False
     live_account_allowlist: str = ""
 
@@ -76,6 +88,28 @@ class Settings(BaseSettings):
     bybit_postonly_chase_max_mutations: int = 5
     bybit_postonly_chase_cooldown_seconds: float = 1.0
     bybit_postonly_chase_rest_reconcile_seconds: float = 3.0
+
+    # Bybit TradFi MT5 contracts follow a broker/server session calendar.  The
+    # Python MT5 integration exposes the current symbol mode but not the
+    # weekly session windows, so the calendar is an explicit, operator-managed
+    # Runtime input.  Times are in the configured MT5 server timezone.
+    cross_spread_mt5_trading_schedule: str = (
+        "mon=00:00-23:00;tue=00:00-23:00;wed=00:00-23:00;"
+        "thu=00:00-23:00;fri=00:00-23:00"
+    )
+    # Bybit publishes a UTC+2/UTC+3 server clock whose DST dates are the
+    # second Sunday of March and first Sunday of November.  ``Bybit/MT5`` is
+    # resolved by Runtime using those rules; it is not the Europe/Athens zone.
+    cross_spread_mt5_schedule_timezone: str = "Bybit/MT5"
+    # Date-specific broker holiday/maintenance overrides replace the weekly
+    # window for that server date. Format: ``YYYY-MM-DD=closed`` or
+    # ``YYYY-MM-DD=00:00-21:30|22:30-24:00``. Keep this list aligned with the
+    # current Bybit MT5 holiday/maintenance notice.
+    cross_spread_mt5_session_overrides: str = ""
+    # The pre/post session guard is deliberately configurable.  It applies to
+    # automatic Cross TP/SL only; manual open/close remains available while a
+    # session boundary is inside this window.
+    cross_spread_auto_exit_guard_minutes: int = Field(default=15, ge=0, le=720)
     # Explicit logical UTA -> MT5/TradFi mapping. Display names or shared
     # credentials must never be used to infer custody identity.
     tradfi_transfer_account_pairs: str = ""

@@ -42,6 +42,15 @@
         <button type="button" @click="refreshVisibleAccount">刷新状态</button>
       </section>
 
+      <section
+        v-if="activeFinancialSyncFailed && activeSection !== 'capital'"
+        class="strategy-sync-alert"
+        role="alert"
+      >
+        <strong>历史成交与费用同步异常</strong>
+        <span>保留最近成功结果，后台会自动重试；当前盈亏和费用可能尚未完整。</span>
+      </section>
+
       <template v-if="activeSection === 'pnl'">
         <StrategyPnlPanel
           view="overview"
@@ -163,6 +172,7 @@
   import StrategyCapitalRulePanel from './components/StrategyCapitalRulePanel.vue';
   import StrategyCapitalRiskOverview from './components/StrategyCapitalRiskOverview.vue';
   import StrategyPnlPanel from './components/StrategyPnlPanel.vue';
+  import { fundingGroupExposureRiskCard } from './composables/strategyFinancialPresentation';
   import type {
     StrategyCapitalProfile,
     StrategyDeskKey,
@@ -194,6 +204,7 @@
     pnlProfile,
     refresh: refreshCrossSpreadFinance,
     liveCapitalProfile,
+    financialSyncFailed: crossFinancialSyncFailed,
   } = useCrossSpreadFinance();
   const {
     byDesk: strategyOverviewByDesk,
@@ -223,6 +234,7 @@
   const {
     loading: accountRecordsLoading,
     errors: accountRecordsErrors,
+    financialSyncFailures: accountFinancialSyncFailures,
     capitalProfiles: accountCapitalProfiles,
     isAccountStrategy,
     orderProfiles: accountOrderProfiles,
@@ -472,12 +484,15 @@
   });
 
   const fundingGroups = ref<FundingPositionGroup[]>([]);
+  const fundingGroupsLoaded = ref(false);
   const fundingGroupsError = ref('');
   async function refreshFundingGroups() {
     try {
       fundingGroups.value = await getFundingPositionGroups('active');
+      fundingGroupsLoaded.value = true;
       fundingGroupsError.value = '';
     } catch {
+      fundingGroupsLoaded.value = false;
       fundingGroupsError.value = '资费组合状态暂不可用，请刷新核对。';
     }
   }
@@ -549,9 +564,18 @@
 
   const capitalProfile = computed(() => {
     if (activeDesk.value === 'crossSpread') return liveCapitalProfile.value;
-    return isAccountStrategy(activeDesk.value)
+    const base = isAccountStrategy(activeDesk.value)
       ? accountCapitalProfiles.value[activeDesk.value]
       : placeholderCapitalProfile(activeOverview.value, activeDesk.value);
+    if (activeDesk.value !== 'funding' || !fundingGroupsLoaded.value) return base;
+    const exposureCard = fundingGroupExposureRiskCard(fundingGroups.value);
+    return {
+      ...base,
+      riskCards: [
+        ...base.riskCards.filter((card) => card.label !== '净敞口'),
+        ...(exposureCard ? [exposureCard] : []),
+      ],
+    };
   });
 
   const activeSyncAlert = computed(() =>
@@ -559,10 +583,16 @@
       (card) => card.label.endsWith('数据状态') && card.tone === 'negative',
     ),
   );
+  const activeFinancialSyncFailed = computed(() =>
+    activeDesk.value === 'crossSpread'
+      ? crossFinancialSyncFailed.value
+      : isAccountStrategy(activeDesk.value) && accountFinancialSyncFailures.value[activeDesk.value],
+  );
 
   const monitorWarning = ref('');
   const monitorClient = createStrategyClient(5000);
   let monitorReadPending = false;
+  let disposed = false;
   async function refreshMonitorHealth() {
     if (monitorReadPending) return;
     monitorReadPending = true;
@@ -594,6 +624,7 @@
 
   let monitorTimer: ReturnType<typeof setInterval> | null = null;
   function refreshVisibleAccount() {
+    if (disposed) return;
     if (document.visibilityState !== 'visible') return;
     void refreshMonitorHealth();
     void refreshStrategyOverview();
@@ -601,17 +632,17 @@
       void refreshCrossSpreadFinance(activeSection.value === 'pnl' ? 'pnl' : 'capital');
       if (activeSection.value === 'orders') void refreshCrossSpreadRecords();
     } else if (isAccountStrategy(activeDesk.value)) {
-      void refreshAccountSnapshots(activeDesk.value);
+      void refreshAccountSnapshots(activeDesk.value, activeSection.value);
       if (activeDesk.value === 'funding') void refreshFundingGroups();
     }
   }
   onMounted(() => {
     void refreshMonitorHealth();
-    void refreshManagementOverview();
     monitorTimer = setInterval(refreshVisibleAccount, 30_000);
     document.addEventListener('visibilitychange', refreshVisibleAccount);
   });
   onBeforeUnmount(() => {
+    disposed = true;
     if (monitorTimer) clearInterval(monitorTimer);
     document.removeEventListener('visibilitychange', refreshVisibleAccount);
   });
@@ -631,8 +662,8 @@
           void refreshCrossSpreadRecords();
         }
       }
-      if (isAccountStrategy(desk) && desk !== previousDesk) {
-        void refreshAccountSnapshots(desk);
+      if (isAccountStrategy(desk) && (desk !== previousDesk || section !== previousSection)) {
+        void refreshAccountSnapshots(desk, section);
         if (desk === 'funding') void refreshFundingGroups();
       }
     },
@@ -652,16 +683,35 @@
 
 <style lang="less">
   @import '../shared/strategy-theme.less';
+
+  // This responsive page must not inherit the legacy desktop-only app minimum.
+  #app:has(.strategy-management-page) {
+    min-width: 0;
+  }
 </style>
 
 <style scoped lang="less">
   .strategy-management-page {
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    min-width: 0;
     padding: 6px 4px 0;
     background: var(--strategy-bg);
     color: var(--strategy-text-1);
+    gap: 12px;
+    overflow-wrap: anywhere;
+  }
+
+  .strategy-management-page :deep(.compact-segment-tabs) {
+    flex-wrap: wrap;
+    max-width: 100%;
+  }
+
+  .strategy-management-page :deep(.insight-card),
+  .strategy-management-page :deep(.risk-item),
+  .strategy-management-page :deep(.board-controls select) {
+    min-width: 0;
+    max-width: 100%;
   }
 
   .records-only-grid {
@@ -691,6 +741,7 @@
 
   .strategy-sync-alert {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: 10px;
     padding: 12px 16px;
@@ -703,6 +754,7 @@
 
   .strategy-sync-alert span {
     flex: 1;
+    min-width: 160px;
   }
 
   .strategy-sync-alert button {
@@ -716,8 +768,8 @@
   }
 
   .strategy-abnormal-card {
-    padding: 20px;
     margin-bottom: 16px;
+    padding: 20px;
     border: 1px solid #e9bcb6;
     border-radius: 14px;
     background: #fffaf8;

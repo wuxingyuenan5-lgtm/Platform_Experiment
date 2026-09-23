@@ -92,6 +92,7 @@ class ExecutionPlan(BaseModel):
     failure_rule: str = "manual_intervention_and_reconcile"
     simulation_compatibility_policy: SimulationCompatibilityPolicy | None = None
     account_capability_snapshot: dict[str, str]
+    cross_spread_guard: dict[str, object] | None = None
     created_at: datetime
 
     @field_validator("created_at")

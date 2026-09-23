@@ -4,16 +4,57 @@
 `dataset + observed_at + entity_code` 的通用时序容器），用 dataset 名区分数据域：
 - macro_fedwatch：entity_code = FOMC 会议日期
 - crypto_etf_flow：entity_code = ETF 代码（IBIT/FBTC/...）
+- crypto_eth_etf_flow：entity_code = ETH ETF 代码（ETHA/ETHB/...）
 - crypto_iv_term：entity_code = 期限（1M/3M/6M/1Y）
 """
 
 from __future__ import annotations
 
 import json
+from datetime import UTC, datetime
+from decimal import Decimal, InvalidOperation
 from typing import Any
 
 from app.database import connection
 from app.research_a_share_repository import write_history_points
+
+
+def _read_shared_daily_prices(asset: str, dates: list[str]) -> dict[str, float]:
+    """Read daily reference closes from the strategy-owned Bybit projection.
+
+    ETF flow rows remain the source-of-record for flow values.  This helper only
+    joins an optional price overlay from the shared strategy archive so the ETF
+    chart can render price on its own right-hand axis without duplicating raw
+    candles in the hedge-board database.
+    """
+    # The current strategy archive owns BTC/XAUT candles.  Never map the XAUT
+    # series onto ETH ETF rows: an unavailable ETH price must stay unavailable.
+    if not dates or asset != "btc":
+        return {}
+    result: dict[str, float] = {}
+    with connection() as db:
+        rows = db.execute(
+            "SELECT payload_json FROM research_a_share_history "
+            "WHERE dataset=? AND entity_code=? AND observed_at>=? "
+            "AND observed_at<=? ORDER BY observed_at ASC",
+            (
+                "cumulative_volatility",
+                "btc:americas:1h",
+                dates[0],
+                dates[-1] + "T23:59:59.999Z",
+            ),
+        ).fetchall()
+    date_set = set(dates)
+    for row in rows:
+        try:
+            payload = json.loads(row["payload_json"] or "{}")
+            date = str(payload.get("sessionDate") or "")
+            close = float(payload["price"])
+        except (KeyError, TypeError, ValueError, OverflowError, json.JSONDecodeError):
+            continue
+        if close > 0 and date in date_set:
+            result[date] = close
+    return result
 
 
 def write_overseas_series(
@@ -282,13 +323,17 @@ def read_series_history(
     return result
 
 
-def read_etf_flow(days: int = 14) -> dict[str, Any]:
-    """读最近 N 日 BTC ETF 资金流矩阵。
+def read_etf_flow(days: int = 3650, asset: str = "btc") -> dict[str, Any]:
+    """读 BTC/ETH ETF 资金流矩阵的历史窗口。
 
-    返回 {"observedAt", "tickers", "days": [{date, flows:{ticker:float}}]}（升序）。
+    返回 {"observedAt", "tickers", "days": [{date, flows, totalFlow, cumulativeFlow}]}（升序）。
     表头列序存于 __meta__ 实体（取最新一次），行内 flow 缺省视为 0。
     """
-    dataset = "crypto_etf_flow"
+    asset_key = asset.lower().strip()
+    if asset_key not in {"btc", "eth"}:
+        raise ValueError(f"unsupported_etf_asset:{asset}")
+    # BTC's original dataset name is part of the public read contract.
+    dataset = "crypto_etf_flow" if asset_key == "btc" else "crypto_eth_etf_flow"
     with connection() as db:
         date_rows = db.execute(
             "SELECT DISTINCT observed_at FROM research_a_share_history "
@@ -307,7 +352,10 @@ def read_etf_flow(days: int = 14) -> dict[str, Any]:
         ).fetchone()
         tickers: list[str] = []
         if meta and meta["payload_json"]:
-            tickers = json.loads(meta["payload_json"]).get("tickers", [])
+            meta_payload = json.loads(meta["payload_json"])
+            tickers = meta_payload.get("tickers", [])
+        else:
+            meta_payload = {}
 
         placeholders = ",".join("?" for _ in dates)
         rows = db.execute(
@@ -322,8 +370,63 @@ def read_etf_flow(days: int = 14) -> dict[str, Any]:
             continue
         cell = by_date.setdefault(r["observed_at"], {})
         if r["payload_json"]:
-            cell[r["entity_code"]] = json.loads(r["payload_json"]).get("flow")
-    days_out = [
-        {"date": d, "flows": by_date.get(d, {})} for d in sorted(dates)
-    ]
-    return {"observedAt": max(dates), "tickers": tickers, "days": days_out}
+            cell[r["entity_code"]] = json.loads(r["payload_json"] or "{}")
+    ordered_dates = sorted(dates)
+    prices = _read_shared_daily_prices(asset_key, ordered_dates)
+    days_out: list[dict[str, Any]] = []
+    cumulative = Decimal("0")
+    for d in ordered_dates:
+        flows = by_date.get(d, {})
+        coin_flows = {
+            ticker: (
+                payload.get("coinFlow")
+                if payload.get("coinFlow") is not None
+                else payload.get("flow")
+            )
+            for ticker, payload in flows.items()
+            if isinstance(payload, dict)
+        }
+        values = [
+            float(value)
+            for ticker, value in coin_flows.items()
+            if ticker != "Total" and value is not None
+        ]
+        total_payload = flows.get("Total") or {}
+        total_flow = (
+            total_payload.get("coinFlow")
+            if total_payload.get("coinFlow") is not None
+            else total_payload.get("flow")
+        )
+        if total_flow is None and values:
+            total_flow = sum(values)
+        total_flow = float(total_flow) if total_flow is not None else None
+        try:
+            if total_flow is not None:
+                cumulative += Decimal(str(total_flow))
+        except (InvalidOperation, ValueError):
+            pass
+        price = next(
+            (payload.get("price") for payload in flows.values() if isinstance(payload, dict) and payload.get("price")),
+            prices.get(d),
+        )
+        days_out.append(
+            {
+                "date": d,
+                "flows": coin_flows,
+                "totalFlow": total_flow,
+                "cumulativeFlow": float(cumulative) if total_flow is not None else None,
+                "price": price,
+            }
+        )
+    has_coin_values = any(
+        isinstance(payload, dict) and payload.get("coinFlow") is not None
+        for day in by_date.values()
+        for payload in day.values()
+    )
+    return {
+        "observedAt": max(dates),
+        "tickers": tickers,
+        "flowUnit": meta_payload.get("coinUnit") or (asset_key.upper() if has_coin_values else "US$m"),
+        "priceSource": meta_payload.get("priceSource"),
+        "days": days_out,
+    }

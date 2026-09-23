@@ -1,33 +1,23 @@
 from __future__ import annotations
 
-from collections.abc import Callable
-from dataclasses import replace
 from datetime import UTC, datetime
 from decimal import Decimal
 from time import monotonic, sleep
 from typing import Any
 
 from app.bybit_live_adapter import BybitLiveAdapter
-from app.bybit_postonly_chase import (
-    ChaseAction,
-    ChaseActionType,
-    ChasePolicy,
-    ChaseState,
-    ChaseStatus,
-    apply_private_event,
-    next_quote_action,
-    request_cancel_repost,
-)
-from app.bybit_private_stream import (
-    BybitPrivateEventSource,
-    PrivateEventSource,
-)
+from app.bybit_native_strategy import create_chase_order, list_strategy_orders, stop_strategy
+from app.cross_spread_market import _execution_capability
 from app.gateway_errors import (
     GatewayRequestRejectedError,
     GatewayResultUnknownError,
 )
 from app.live_route_store import (
+    get_strategy_route,
+    get_strategy_route_for_order,
     record_order_route,
+    record_strategy_order_route,
+    record_strategy_route,
     stable_external_client_id,
     update_external_order_id,
 )
@@ -35,7 +25,6 @@ from app.live_safety import validate_live_write
 from app.models import ExecutionEvent, SubmitOrderCommand, VenueOrderSnapshot
 
 CROSS_SPREAD_STRATEGY_INSTANCE_ID = "strategy_cross_venue_spread_instance_default"
-PrivateSourceFactory = Callable[[str, str], PrivateEventSource]
 
 
 class BybitFillConfirmingAdapter(BybitLiveAdapter):
@@ -45,10 +34,9 @@ class BybitFillConfirmingAdapter(BybitLiveAdapter):
         self,
         settings,
         client: Any | None = None,
-        private_source_factory: PrivateSourceFactory | None = None,
     ) -> None:
         super().__init__(settings, client)
-        self._private_source_factory = private_source_factory
+        self.market_quote_reader = None
 
     def submit_order(self, command: SubmitOrderCommand) -> list[ExecutionEvent]:
         if self._is_postonly_chase(command):
@@ -152,366 +140,453 @@ class BybitFillConfirmingAdapter(BybitLiveAdapter):
         self,
         command: SubmitOrderCommand,
     ) -> list[ExecutionEvent]:
-        if command.price is None:
-            raise GatewayRequestRejectedError("Bybit PostOnly Chase requires a hard limit price")
+        return self._submit_native_postonly_chase(command)
 
+    def _submit_native_postonly_chase(self, command: SubmitOrderCommand) -> list[ExecutionEvent]:
+        if command.price is None or command.cross_spread_guard is None:
+            raise GatewayRequestRejectedError("Cross native Chase requires its frozen spread guard")
         self._assert_account(command.account_id)
+        self._assert_write_account(command.account_id)
         client = self._client(command.account_id)
         validate_live_write(
-            command,
-            adapter=self.name,
-            reference_price=command.price,
-            settings=self.settings,
+            command, adapter=self.name, reference_price=command.price, settings=self.settings
         )
-        tick_size = self._postonly_tick_size(client, command.symbol)
-        best_bid, best_ask = self._postonly_quote(client, command.symbol)
-        policy = ChasePolicy(
-            ttl_seconds=self.settings.bybit_postonly_chase_ttl_seconds,
-            min_amend_ticks=self.settings.bybit_postonly_chase_min_amend_ticks,
-            max_mutations=self.settings.bybit_postonly_chase_max_mutations,
-            cooldown_seconds=self.settings.bybit_postonly_chase_cooldown_seconds,
-        )
-        policy.validate()
-
-        order_link_prefix = stable_external_client_id(
-            "VGP",
-            command.platform_order_id,
-            length=28,
-        )
-        source = self._private_source(command.symbol, order_link_prefix)
-        source.start()
-        state = ChaseState(
-            side=command.side,
-            requested_quantity=command.quantity,
-            hard_limit_price=command.price,
-            tick_size=tick_size,
-            started_at=datetime.now(UTC),
-        )
-        acknowledgement: ExecutionEvent | None = None
-        child_index = 0
-        reconcile_deadline: float | None = None
-
-        try:
-            transition = next_quote_action(
-                state,
-                policy,
-                best_bid=best_bid,
-                best_ask=best_ask,
-                now=datetime.now(UTC),
+        if not self._cross_guard_allows(command):
+            raise GatewayRequestRejectedError(
+                "Cross-spread market/price guard blocked Chase before create"
             )
-            state = transition.state
-            for action in transition.actions:
-                if action.action_type != ChaseActionType.REPOST or action.price is None:
-                    raise GatewayResultUnknownError(
-                        "PostOnly Chase did not produce an initial maker order"
-                    )
-                child_index += 1
-                external_order_id, client_id = self._place_postonly_child(
-                    client,
-                    command,
-                    price=action.price,
-                    order_link_prefix=order_link_prefix,
-                    child_index=child_index,
-                    record_route=True,
-                )
-                state = replace(
-                    state,
-                    active_order_id=external_order_id,
-                    active_price=action.price,
-                )
-                acknowledgement = ExecutionEvent(
-                    command_id=command.command_id,
-                    platform_order_id=command.platform_order_id,
-                    event_type="order_acknowledged",
-                    external_order_id=external_order_id,
-                    occurred_at=datetime.now(UTC),
-                    reason=f"Bybit PostOnly Chase started with {client_id}",
-                )
+        from app.live_route_store import get_order_route
 
-            while state.status not in {
-                ChaseStatus.FILLED,
-                ChaseStatus.UNFILLED,
-                ChaseStatus.MANUAL_STOPPED,
-                ChaseStatus.RECONCILE_REQUIRED,
-            }:
-                private_event = source.next_event(
-                    self.settings.bybit_postonly_chase_event_timeout_seconds
+        if get_order_route(platform_order_id=command.platform_order_id) is not None:
+            raise GatewayResultUnknownError(
+                "Native Chase intent already dispatched; recover without recreating"
+            )
+        position_idx = self._resolve_native_position_idx(client, command)
+        record_order_route(
+            command,
+            self.name,
+            stable_external_client_id("VGP", command.platform_order_id, length=28),
+        )
+        strategy_id = create_chase_order(
+            client,
+            category="UTA_USDT",
+            symbol=command.symbol,
+            side="Buy" if command.side == "buy" else "Sell",
+            size=format(command.quantity, "f"),
+            reduce_only=command.reduce_only,
+            position_idx=position_idx,
+            max_chase_price=format(command.price, "f"),
+        )
+        try:
+            record_strategy_route(command, self.name, strategy_id)
+        except Exception as exc:
+            try:
+                stop_strategy(client, strategy_id)
+            except Exception:
+                pass
+            raise GatewayResultUnknownError(
+                f"Native strategy {strategy_id} could not be persisted; verify original strategy"
+            ) from exc
+        deadline = monotonic() + self.settings.bybit_postonly_chase_ttl_seconds
+        stopped = False
+        reconcile_deadline = None
+        try:
+            while True:
+                strategy, rows, quantity, price, at = self._native_evidence(
+                    client, command, strategy_id
                 )
-                if private_event is not None:
-                    transition = apply_private_event(state, private_event)
-                    state = transition.state
-                    for action in transition.actions:
-                        state, child_index = self._execute_chase_action(
-                            client,
-                            command,
-                            state,
-                            action,
-                            order_link_prefix=order_link_prefix,
-                            child_index=child_index,
-                            policy=policy,
-                        )
-                    if state.status == ChaseStatus.FILLED:
-                        return self._postonly_full_fill_events(
-                            command,
-                            state,
-                            acknowledgement,
-                        )
-                    if state.status == ChaseStatus.RECONCILE_REQUIRED:
-                        break
-                    continue
-
-                best_bid, best_ask = self._postonly_quote(client, command.symbol)
-                transition = next_quote_action(
-                    state,
-                    policy,
-                    best_bid=best_bid,
-                    best_ask=best_ask,
-                    now=datetime.now(UTC),
-                )
-                state = transition.state
-                for action in transition.actions:
-                    state, child_index = self._execute_chase_action(
-                        client,
-                        command,
-                        state,
-                        action,
-                        order_link_prefix=order_link_prefix,
-                        child_index=child_index,
-                        policy=policy,
-                    )
-                if state.status == ChaseStatus.CANCEL_PENDING:
+                terminal = self._native_is_terminal(strategy, rows)
+                if terminal:
+                    return self._native_events(command, strategy_id, rows, quantity, price, at)
+                guard = command.cross_spread_guard
+                lots = quantity / guard.mt5_contract_multiplier
+                hedgeable = lots >= guard.mt5_min_quantity and lots % guard.mt5_quantity_step == 0
+                if not stopped and (
+                    hedgeable or monotonic() >= deadline or not self._cross_guard_allows(command)
+                ):
+                    stopped = True
+                    stop_strategy(client, strategy_id)
                     reconcile_deadline = (
                         monotonic() + self.settings.bybit_postonly_chase_rest_reconcile_seconds
                     )
                 if reconcile_deadline is not None and monotonic() >= reconcile_deadline:
-                    break
-
-            return self._reconcile_postonly_terminal(
-                command,
-                state,
-                acknowledgement,
-            )
-        finally:
-            source.close()
-
-    def _execute_chase_action(
-        self,
-        client,
-        command: SubmitOrderCommand,
-        state: ChaseState,
-        action: ChaseAction,
-        *,
-        order_link_prefix: str,
-        child_index: int,
-        policy: ChasePolicy,
-    ) -> tuple[ChaseState, int]:
-        if action.action_type == ChaseActionType.AMEND:
-            if state.active_order_id is None or action.price is None:
-                return self._reconcile_state(
-                    state, "PostOnly amend identity is unavailable"
-                ), child_index
-            try:
-                response = client.amend_order(
-                    category=self.settings.bybit_category,
-                    symbol=command.symbol.upper(),
-                    orderId=state.active_order_id,
-                    price=format(action.price, "f"),
-                )
-                self._require_success(response, "Bybit rejected PostOnly amend")
-                return state, child_index
-            except GatewayRequestRejectedError:
-                transition = request_cancel_repost(
-                    state,
-                    policy,
-                    replacement_price=action.price,
-                    now=datetime.now(UTC),
-                )
-                next_state = transition.state
-                for fallback in transition.actions:
-                    next_state, child_index = self._execute_chase_action(
-                        client,
-                        command,
-                        next_state,
-                        fallback,
-                        order_link_prefix=order_link_prefix,
-                        child_index=child_index,
-                        policy=policy,
+                    raise GatewayResultUnknownError(
+                        "Native Chase stop remains unconfirmed; reconcile original intent"
                     )
-                return next_state, child_index
-            except Exception:
-                return self._reconcile_state(
-                    state,
-                    "Bybit PostOnly amend result is unknown",
-                ), child_index
-
-        if action.action_type == ChaseActionType.CANCEL:
-            if state.active_order_id is None:
-                return self._reconcile_state(
-                    state, "PostOnly cancel identity is unavailable"
-                ), child_index
-            try:
-                response = client.cancel_order(
-                    category=self.settings.bybit_category,
-                    symbol=command.symbol.upper(),
-                    orderId=state.active_order_id,
-                )
-                self._require_success(response, "Bybit rejected PostOnly cancel")
-                return state, child_index
-            except Exception:
-                return self._reconcile_state(
-                    state,
-                    "Bybit PostOnly cancel result is unknown",
-                ), child_index
-
-        if action.action_type == ChaseActionType.REPOST:
-            if action.price is None:
-                return self._reconcile_state(
-                    state, "PostOnly repost price is unavailable"
-                ), child_index
-            child_index += 1
-            try:
-                external_order_id, _client_id = self._place_postonly_child(
-                    client,
-                    command,
-                    price=action.price,
-                    order_link_prefix=order_link_prefix,
-                    child_index=child_index,
-                    record_route=False,
-                )
-            except Exception:
-                return self._reconcile_state(
-                    state,
-                    "Bybit PostOnly repost result is unknown",
-                ), child_index
-            return replace(
-                state,
-                status=ChaseStatus.ACTIVE,
-                active_order_id=external_order_id,
-                active_price=action.price,
-            ), child_index
-        return state, child_index
-
-    def _place_postonly_child(
-        self,
-        client,
-        command: SubmitOrderCommand,
-        *,
-        price: Decimal,
-        order_link_prefix: str,
-        child_index: int,
-        record_route: bool,
-    ) -> tuple[str, str]:
-        client_id = f"{order_link_prefix}-{child_index}"
-        if len(client_id) > 36:
-            raise GatewayRequestRejectedError("Bybit PostOnly child identity is too long")
-        if record_route:
-            record_order_route(command, self.name, client_id)
-        payload: dict[str, object] = {
-            "category": self.settings.bybit_category,
-            "symbol": command.symbol.upper(),
-            "side": "Buy" if command.side == "buy" else "Sell",
-            "orderType": "Limit",
-            "qty": format(command.quantity, "f"),
-            "price": format(price, "f"),
-            "timeInForce": "PostOnly",
-            "orderLinkId": client_id,
-            "reduceOnly": command.reduce_only,
-        }
-        if command.reduce_only:
-            payload["positionIdx"] = self._resolve_reduce_position_idx(client, command)
-        try:
-            response = client.place_order(**payload)
+                self._sleep_before_retry()
         except Exception as exc:
-            raise self._unknown_error(
-                "Bybit PostOnly place_order result is unknown",
-                exc,
-            ) from exc
-        self._require_success(response, "Bybit rejected PostOnly order")
-        result = response.get("result") or {}
-        external_order_id = str(result.get("orderId") or "")
-        if not external_order_id:
-            raise GatewayResultUnknownError("Bybit accepted PostOnly order without orderId")
-        update_external_order_id(command.platform_order_id, external_order_id)
-        return external_order_id, client_id
+            # A read failure must not leave a known native strategy chasing.
+            # Attempt stop once; no create/repost follows an uncertain result.
+            if not stopped:
+                try:
+                    stop_strategy(client, strategy_id)
+                except Exception:
+                    pass
+            raise GatewayResultUnknownError("Native Chase outcome requires reconciliation") from exc
 
-    def _postonly_full_fill_events(
-        self,
-        command: SubmitOrderCommand,
-        state: ChaseState,
-        acknowledgement: ExecutionEvent | None,
-    ) -> list[ExecutionEvent]:
-        if acknowledgement is None or state.active_order_id is None:
-            raise GatewayResultUnknownError("PostOnly acknowledgement identity is unavailable")
-        if state.cumulative_fill != command.quantity or state.average_fill_price is None:
-            acknowledgement.reason = (
-                "Bybit PostOnly cumulative fill is not exact; "
-                "MT5 hedge was not submitted pending reconciliation"
+    def _resolve_native_position_idx(self, client, command: SubmitOrderCommand) -> int:
+        if command.reduce_only:
+            return self._resolve_reduce_position_idx(client, command)
+        try:
+            response = client.get_positions(
+                category=self._command_category(command), symbol=command.symbol.upper()
             )
-            return [acknowledgement]
+            self._require_success(response, "Bybit position mode query failed")
+            rows = self._result_list(response)
+            if not rows or any(
+                str(row.get("symbol", "")).upper() != command.symbol.upper() for row in rows
+            ):
+                raise ValueError("Position mode evidence missing or mismatched")
+            indexes = {int(row["positionIdx"]) for row in rows}
+            if indexes == {0}:
+                return 0
+            if indexes and indexes <= {1, 2}:
+                return 1 if command.side == "buy" else 2
+            raise ValueError("Position mode evidence is conflicting")
+        except GatewayRequestRejectedError:
+            raise
+        except Exception as exc:
+            raise GatewayResultUnknownError("Bybit position mode is unavailable") from exc
+
+    def _cross_guard_allows(self, command: SubmitOrderCommand) -> bool:
+        guard = command.cross_spread_guard
+        if guard is None or self.market_quote_reader is None:
+            return False
+        try:
+            mt5 = self.market_quote_reader(account_id=guard.mt5_account_id, symbol=guard.mt5_symbol)
+            bybit = self.get_market_quote(
+                account_id=command.account_id,
+                symbol=command.symbol,
+                instrument_type=command.instrument_type,
+                category=self._command_category(command),
+            )
+            for quote, account, symbol in (
+                (mt5, guard.mt5_account_id, guard.mt5_symbol),
+                (bybit, command.account_id, command.symbol),
+            ):
+                if quote.account_id != account or quote.symbol.upper() != symbol.upper():
+                    return False
+                if (
+                    not quote.bid.is_finite()
+                    or not quote.ask.is_finite()
+                    or not (0 < quote.bid <= quote.ask)
+                ):
+                    return False
+            mo, mc, _ = _execution_capability("mt5", mt5)
+            bo, bc, _ = _execution_capability("bybit", bybit)
+            if not ((mc and bc) if guard.mt5_close else (mo and bo)):
+                return False
+            if command.side == "buy":
+                return bybit.ask - mt5.bid <= guard.target_spread + guard.max_adverse_spread
+            return bybit.bid - mt5.ask >= guard.target_spread - guard.max_adverse_spread
+        except Exception:
+            return False
+
+    @staticmethod
+    def _native_is_terminal(strategy, rows):
+        return str(strategy.get("status")) in {"3", "4"} and all(
+            str(row.get("status")) in {"3", "5", "6", "7"} for row in rows
+        )
+
+    def _native_evidence(self, client, command, strategy_id):
+        from app.bybit_native_strategy import get_strategy
+
+        strategy = get_strategy(client, strategy_id)
+        if strategy is None:
+            raise GatewayResultUnknownError("Native strategy identity is not yet visible")
+        if (
+            str(strategy.get("strategyId")) != strategy_id
+            or str(strategy.get("symbol")).upper() != command.symbol.upper()
+            or str(strategy.get("side")).lower() != command.side
+            or str(strategy.get("strategyType")) not in {"chaseOrder", "ChaseOrder"}
+            or str(strategy.get("category")) != "UTA_USDT"
+            or Decimal(str(strategy.get("size"))) != command.quantity
+        ):
+            raise GatewayResultUnknownError("Native strategy identity conflicts with frozen intent")
+        rows = list_strategy_orders(client, strategy_id=strategy_id, symbol=command.symbol)
+        for row in rows:
+            if str(row.get("strategyId")) != strategy_id:
+                raise GatewayResultUnknownError("Native child belongs to a different strategy")
+            order_id = str(row.get("orderId") or "")
+            if not order_id:
+                raise GatewayResultUnknownError("Native child order identity missing")
+            record_strategy_order_route(strategy_id=strategy_id, order_id=order_id, command=command)
+        fills = self._native_executions(client, command, rows)
+        quantity = sum((Decimal(str(fill["execQty"])) for fill in fills), Decimal("0"))
+        child_quantity = sum((Decimal(str(row["executedSize"])) for row in rows), Decimal("0"))
+        aggregate = Decimal(str(strategy["executedSize"]))
+        if not all(
+            q.is_finite() and 0 <= q <= command.quantity
+            for q in (quantity, child_quantity, aggregate)
+        ):
+            raise GatewayResultUnknownError(
+                "Native Chase cumulative quantity invalid or exceeds intent"
+            )
+        if self._native_is_terminal(strategy, rows) and (
+            quantity != child_quantity or quantity != aggregate
+        ):
+            raise GatewayResultUnknownError("Native terminal execution coverage is incomplete")
+        value = sum(
+            (Decimal(str(f["execQty"])) * Decimal(str(f["execPrice"])) for f in fills), Decimal("0")
+        )
+        at = max((self._millis(f["execTime"]) for f in fills), default=command.received_at)
+        return strategy, rows, quantity, value / quantity if quantity else None, at
+
+    def _native_executions(self, client, command, rows):
+        fills = {}
+        for row in rows:
+            order_id = str(row["orderId"])
+            cursor = None
+            cursors = set()
+            for _ in range(100):
+                query = dict(
+                    category=self._command_category(command),
+                    symbol=command.symbol,
+                    orderId=order_id,
+                    limit=100,
+                )
+                if cursor:
+                    query["cursor"] = cursor
+                response = client.get_executions(**query)
+                self._require_success(response, "Native execution query failed")
+                result = response.get("result")
+                if not isinstance(result, dict) or not isinstance(result.get("list"), list):
+                    raise GatewayResultUnknownError("Native execution page malformed")
+                for fill in result["list"]:
+                    if str(fill.get("execType") or "Trade") != "Trade":
+                        continue
+                    if (
+                        str(fill.get("orderId")) != order_id
+                        or str(fill.get("symbol")).upper() != command.symbol.upper()
+                        or str(fill.get("side")).lower() != command.side
+                        or not fill.get("execId")
+                    ):
+                        raise GatewayResultUnknownError("Native execution identity mismatch")
+                    qty, price = Decimal(str(fill["execQty"])), Decimal(str(fill["execPrice"]))
+                    if (
+                        not qty.is_finite()
+                        or not price.is_finite()
+                        or qty <= 0
+                        or price <= 0
+                        or int(fill["execTime"]) <= 0
+                    ):
+                        raise GatewayResultUnknownError(
+                            "Native execution price/quantity/time invalid"
+                        )
+                    key = str(fill["execId"])
+                    previous = fills.get(key)
+                    if previous is not None and any(
+                        previous.get(k) != fill.get(k)
+                        for k in (
+                            "orderId",
+                            "execQty",
+                            "execPrice",
+                            "execTime",
+                            "side",
+                            "symbol",
+                            "execType",
+                            "execFee",
+                            "feeCurrency",
+                        )
+                    ):
+                        raise GatewayResultUnknownError(
+                            "Native execution ID has conflicting payload"
+                        )
+                    fills[key] = fill
+                cursor = result.get("nextPageCursor")
+                if cursor is not None and not isinstance(cursor, str):
+                    raise GatewayResultUnknownError("Native execution cursor malformed")
+                if not cursor:
+                    break
+                if cursor in cursors:
+                    raise GatewayResultUnknownError("Native execution pagination repeated")
+                cursors.add(cursor)
+            else:
+                raise GatewayResultUnknownError("Native execution pagination exceeded bound")
+        return list(fills.values())
+
+    def _native_events(self, command, strategy_id, rows, quantity, price, at):
+        from app.live_route_store import get_order_route
+
+        route = get_order_route(platform_order_id=command.platform_order_id)
+        order_id = route.external_order_id if route else None
+        if order_id is None and rows:
+            order_id = min(str(row["orderId"]) for row in rows)
+            update_external_order_id(command.platform_order_id, order_id)
+        ack = ExecutionEvent(
+            event_id=f"bybit-chase-ack:{strategy_id}",
+            command_id=command.command_id,
+            platform_order_id=command.platform_order_id,
+            event_type="order_acknowledged",
+            external_order_id=order_id,
+            occurred_at=command.received_at,
+        )
+        if quantity == 0:
+            return [
+                ack,
+                ExecutionEvent(
+                    event_id=f"bybit-chase-zero:{strategy_id}",
+                    command_id=command.command_id,
+                    platform_order_id=command.platform_order_id,
+                    event_type="order_rejected",
+                    external_order_id=order_id,
+                    occurred_at=command.received_at,
+                    reason="Native Chase terminated without execution",
+                ),
+            ]
         return [
-            acknowledgement,
+            ack,
             ExecutionEvent(
-                event_id=f"BYBIT-POSTONLY-FILL-{command.platform_order_id}",
+                event_id=f"bybit-chase-fill:{strategy_id}",
                 command_id=command.command_id,
                 platform_order_id=command.platform_order_id,
                 event_type="order_filled",
-                external_order_id=state.active_order_id,
-                fill_price=state.average_fill_price,
-                fill_quantity=state.cumulative_fill,
-                occurred_at=datetime.now(UTC),
-                reason="Bybit PostOnly Chase reached an exact full fill",
+                external_order_id=order_id,
+                fill_quantity=quantity,
+                fill_price=price,
+                occurred_at=at,
+                terminal=True,
+                reason="Native Chase terminal cumulative fill; unfilled remainder canceled",
             ),
         ]
 
-    def _reconcile_postonly_terminal(
-        self,
-        command: SubmitOrderCommand,
-        state: ChaseState,
-        acknowledgement: ExecutionEvent | None,
-    ) -> list[ExecutionEvent]:
-        if acknowledgement is None:
-            raise GatewayResultUnknownError("PostOnly order was not acknowledged")
-        try:
-            snapshot = self.get_order(platform_order_id=command.platform_order_id)
-        except GatewayResultUnknownError as exc:
-            acknowledgement.reason = f"PostOnly reconciliation is unknown: {exc}"
-            return [acknowledgement]
-        if snapshot is not None and snapshot.status == "filled":
-            if (
-                snapshot.filled_quantity == command.quantity
-                and snapshot.average_fill_price is not None
-            ):
-                fill = self._fill_event(command, snapshot, partial=False)
-                return [acknowledgement, fill] if fill is not None else [acknowledgement]
-            acknowledgement.reason = (
-                "Bybit PostOnly REST reconciliation found a quantity mismatch; "
-                "MT5 hedge was not submitted"
+    def get_order(self, *, platform_order_id=None, external_order_id=None):
+        from app.journal import get_command
+        from app.live_route_store import get_order_route
+
+        route = (
+            get_order_route(platform_order_id=platform_order_id)
+            if platform_order_id
+            else get_order_route(external_order_id=external_order_id)
+        )
+        strategy_route = (
+            get_strategy_route(platform_order_id=route.platform_order_id) if route else None
+        )
+        if strategy_route is None:
+            return super().get_order(
+                platform_order_id=platform_order_id, external_order_id=external_order_id
             )
-            return [acknowledgement]
-        if (
-            snapshot is not None
-            and snapshot.status in {"canceled", "rejected"}
-            and snapshot.filled_quantity == 0
-            and state.cumulative_fill == 0
-        ):
-            return [
-                acknowledgement,
-                self._rejected_event(
-                    command,
-                    external_order_id=snapshot.external_order_id,
-                    occurred_at=snapshot.as_of,
-                    reason="Bybit PostOnly Chase ended without a fill",
-                ),
-            ]
-        cumulative = max(
-            state.cumulative_fill,
-            snapshot.filled_quantity if snapshot is not None else Decimal("0"),
+        record = get_command(route.command_id)
+        if record is None:
+            raise GatewayResultUnknownError("Native Chase command evidence unavailable")
+        command = record.command
+        strategy, rows, quantity, price, at = self._native_evidence(
+            self._client(route.account_id), command, strategy_route.strategy_id
         )
-        acknowledgement.reason = (
-            "Bybit PostOnly Chase requires reconciliation; "
-            f"confirmed cumulative fill is {cumulative} and MT5 was not submitted"
+        if not rows:
+            return None
+        primary = route.external_order_id or min(str(row["orderId"]) for row in rows)
+        if route.external_order_id is None:
+            update_external_order_id(route.platform_order_id, primary)
+        terminal = self._native_is_terminal(strategy, rows)
+        status = (
+            ("filled" if quantity == command.quantity else "canceled")
+            if terminal
+            else ("partially_filled" if quantity else "accepted")
         )
-        return [acknowledgement]
+        return VenueOrderSnapshot(
+            source=self.name,
+            externalOrderId=primary,
+            platformOrderId=route.platform_order_id,
+            commandId=route.command_id,
+            accountId=route.account_id,
+            instrumentId=route.instrument_id,
+            symbol=route.symbol,
+            side=command.side,
+            orderType="limit",
+            quantity=command.quantity,
+            price=command.price,
+            status=status,
+            filledQuantity=quantity,
+            remainingQuantity=Decimal("0") if terminal else command.quantity - quantity,
+            averageFillPrice=price,
+            reduceOnly=command.reduce_only,
+            timeInForce="PostOnly",
+            occurredAt=command.received_at,
+            asOf=at,
+        )
+
+    def list_fills(self, *, account_id=None, external_order_id=None, platform_order_id=None):
+        from app.journal import get_command
+        from app.live_route_store import get_order_route
+        from app.models import VenueFillSnapshot
+
+        route = (
+            get_order_route(platform_order_id=platform_order_id)
+            if platform_order_id
+            else get_order_route(external_order_id=external_order_id)
+            if external_order_id
+            else None
+        )
+        strategy = get_strategy_route(platform_order_id=route.platform_order_id) if route else None
+        if strategy is None:
+            return super().list_fills(
+                account_id=account_id,
+                external_order_id=external_order_id,
+                platform_order_id=platform_order_id,
+            )
+        if account_id is not None and account_id != route.account_id:
+            raise GatewayRequestRejectedError("Native fill account does not match route")
+        self._assert_account(route.account_id)
+        record = get_command(route.command_id)
+        if record is None:
+            raise GatewayResultUnknownError("Native command evidence unavailable")
+        client = self._client(route.account_id)
+        _, rows, _, _, _ = self._native_evidence(client, record.command, strategy.strategy_id)
+        fills = self._native_executions(client, record.command, rows)
+        return [
+            VenueFillSnapshot(
+                source=self.name,
+                externalFillId=str(f["execId"]),
+                externalOrderId=str(f["orderId"]),
+                platformOrderId=route.platform_order_id,
+                commandId=route.command_id,
+                accountId=route.account_id,
+                instrumentId=route.instrument_id,
+                symbol=route.symbol,
+                side=record.command.side,
+                quantity=Decimal(str(f["execQty"])),
+                price=Decimal(str(f["execPrice"])),
+                fee=Decimal(str(f["execFee"])) if f.get("execFee") not in (None, "") else None,
+                currency=str(f.get("feeCurrency") or self.settings.bybit_settle_coin),
+                feeCurrencyQuality="reported" if f.get("feeCurrency") else "inferred_settlement",
+                occurredAt=self._millis(f["execTime"]),
+            )
+            for f in fills
+        ]
+
+    def cancel_order(self, external_order_id, idempotency_key, reason):
+        strategy_route = get_strategy_route_for_order(external_order_id)
+        if strategy_route is None:
+            return super().cancel_order(external_order_id, idempotency_key, reason)
+        from app.journal import get_command
+        from app.live_route_store import get_order_route
+        from app.models import CancelOrderResponse
+
+        route = get_order_route(platform_order_id=strategy_route.platform_order_id)
+        record = get_command(route.command_id) if route else None
+        if record is None:
+            raise GatewayResultUnknownError("Native Chase cancel command identity missing")
+        self._assert_write_account(route.account_id)
+        client = self._client(route.account_id)
+        stop_strategy(client, strategy_route.strategy_id)
+        deadline = monotonic() + self.settings.bybit_postonly_chase_rest_reconcile_seconds
+        while True:
+            strategy, rows, quantity, _, _ = self._native_evidence(
+                client, record.command, strategy_route.strategy_id
+            )
+            if self._native_is_terminal(strategy, rows):
+                return CancelOrderResponse(
+                    source=self.name,
+                    externalOrderId=external_order_id,
+                    platformOrderId=route.platform_order_id,
+                    status="already_final" if quantity == record.command.quantity else "canceled",
+                    reason=reason,
+                    asOf=datetime.now(UTC),
+                )
+            if monotonic() >= deadline:
+                raise GatewayResultUnknownError("Native Chase stop remains unconfirmed")
+            self._sleep_before_retry()
 
     def _postonly_quote(self, client, symbol: str) -> tuple[Decimal, Decimal]:
         try:
@@ -554,19 +629,6 @@ class BybitFillConfirmingAdapter(BybitLiveAdapter):
             raise
         except Exception as exc:
             raise GatewayResultUnknownError("Bybit PostOnly instrument result is unknown") from exc
-
-    def _private_source(self, symbol: str, prefix: str) -> PrivateEventSource:
-        if self._private_source_factory is not None:
-            return self._private_source_factory(symbol, prefix)
-        return BybitPrivateEventSource(
-            self.settings,
-            symbol=symbol,
-            order_link_prefix=prefix,
-        )
-
-    @staticmethod
-    def _reconcile_state(state: ChaseState, reason: str) -> ChaseState:
-        return replace(state, status=ChaseStatus.RECONCILE_REQUIRED)
 
     def _submit_acknowledgement(self, command: SubmitOrderCommand) -> list[ExecutionEvent]:
         self._assert_account(command.account_id)

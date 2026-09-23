@@ -85,3 +85,21 @@ The Owner-authorized local maintenance on 2026-09-08 subsequently backed up both
 ## Capital monitoring schema versions 24–25
 
 Version 24 adds `account_capital_movements` (native evidence, scope and nullable classified amount), `account_capital_coverage` (successful bounded reads), `account_capital_sync` (independent attempt/error state), and `account_valuation_rates` (timestamped USD rates). Version 25 records valuation source provenance. Amounts/rates remain decimal strings and timestamps UTC; unknown classification is null. Additive migrations preserve existing account, execution and accounting rows. Bybit UTA/Funding and MT5 history backfill starts at the earliest local equity observation. These tables support monitoring only; calculation semantics belong to `../contracts/LIVE_ACCOUNT_OBSERVABILITY.md`.
+
+
+## Strategy research schema version 30
+
+Migration 30 is additive under the existing initializer and checksum ledger. `strategy_research_repository.py` owns `research_strategy_parts`, `research_strategy_capture`, `research_strategy_experiments` and `research_strategy_drafts`. They are research metadata, not financial facts, commands or a second trading ledger. Runtime never opens the Platform database.
+
+Raw high-frequency observations and derived events live in lossless decimal-text Parquet shards. Runtime has a checksummed append-only spool with a single-process lease; Platform has a separate publisher lease. Compression, fsync, footer/checksum checks and atomic rename occur before a short transaction atomically publishes the shard and matching derivation state/cursor. Rename-before-commit leaves a recoverable orphan; replay verifies identical content. Cursor conflicts fail. Corrupt/incomplete spool tails are retained as gap evidence and recovery proceeds in a new segment. No automatic retention deletion is implemented; storage budget exhaustion pauses capture visibly.
+
+SQLite journal mode and synchronous settings are not weakened. The ingest guard requires FULL or stronger; WAL additionally requires an upstream WAL-reset-fixed SQLite release (3.51.3+, the 3.50.7 branch or the 3.44.6 branch). Check the actually loaded library, not the sqlite CLI version. Existing DELETE/FULL installations need no WAL migration.
+
+Online backup first snapshots SQLite, then copies exactly its sealed shard and experiment-artifact references with checksums. `scripts/strategy_research_ops.py verify-backup` checks integrity and manifest consistency in an isolated read-only restore. It does not copy an active spool as if it were sealed, or roll back a live trading database. Large result payloads remain in Parquet; SQLite keeps task status/summary/reference. Cancellation is checked during bounded computation; interrupted running tasks return to queued on restart. Rollback is disabling the two research lifecycle flags while preserving additive tables/files; original business database restoration requires controlled maintenance.
+
+
+## Strategy research serving projection version 31
+
+Migration 31 adds `research_strategy_projection` and its single replay cursor under the existing migration owner. `strategy_research_projection.py` owns this rebuildable query layer: minute trade-price closes, minute funding indications, settled rates, public borrow observations, latest catalog values, and one-second spread buckets. Raw ticks/events remain in the original Parquet authority. Prices remain decimal text. No trading ledger or Runtime database access is introduced.
+
+The existing Platform research lifecycle incrementally verifies sealed shards and upserts bounded batches of 500 derived rows, then commits the processed-part cursor and trailing spread-event state. A crash before cursor commit replays idempotent upserts. Trailing spread seconds are recomputed with the next shard, including the immediate predecessor, so split-shard durations match whole-sequence derivation. Projection progress is exposed separately; a rebuilding projection must not be described as complete coverage. HTTP reads do no projection writes, migrations, venue calls or Parquet scans for standard minute-history/one-second/chart-board requests. Explicit event-level replay and experiments retain the immutable Parquet path. Online SQLite backup includes the projection and cursor; existing DELETE/FULL durability is preserved.

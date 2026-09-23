@@ -1,5 +1,10 @@
 <template>
   <section class="cross-venue-workspace">
+    <ResearchDraftImport
+      pair-id="cross-gold"
+      :disabled="submitLoading || confirmVisible"
+      @apply="applyResearchDraft"
+    />
     <header class="cross-head">
       <div class="cross-head__controls">
         <label class="select-chip">
@@ -113,6 +118,8 @@
 </template>
 
 <script setup lang="ts">
+  import ResearchDraftImport from '../../shared/ResearchDraftImport.vue';
+  import type { components } from '@/api/platform/generated/strategy';
   import SpreadAbnormalOrders from './SpreadAbnormalOrders.vue';
   import CrossVenueMarketQuotes from './CrossVenueMarketQuotes.vue';
   import CrossVenueSpreadAnalysis from './CrossVenueSpreadAnalysis.vue';
@@ -187,6 +194,13 @@
     usdtUsdText,
     updateExitPlanThresholds,
   } = useCrossVenueExecutionWorkspace();
+  function applyResearchDraft(draft: components['schemas']['DraftRequest']) {
+    if (submitLoading.value || confirmVisible.value) return;
+    qtyInput.value = draft.quantity;
+    triggerSpreadInput.value = draft.entryThreshold;
+    takeProfitSpreadInput.value = draft.exitTarget;
+    prepareOpenDraft(draft.direction === 'buy_spread' ? 'long' : 'short');
+  }
   function openAbnormalClose(planId: string) {
     closeExecutionMode.value = 'market';
     openConfirm(`CLOSE:${planId}`);

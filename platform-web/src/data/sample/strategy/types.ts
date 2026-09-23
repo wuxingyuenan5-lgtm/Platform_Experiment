@@ -110,6 +110,7 @@ export interface StrategyCapitalCurveConfig {
   metricOptions: StrategyCapitalCurveOption[];
   periodOptions: StrategyCapitalCurveOption[];
   modeOptions?: StrategyCapitalCurveOption[];
+  modeMetricKeys?: string[];
   defaultMetric: string;
   defaultPeriod: string;
   defaultMode?: string;

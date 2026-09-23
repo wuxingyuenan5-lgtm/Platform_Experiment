@@ -8,6 +8,7 @@ from fastapi import HTTPException
 
 from app.database import connection
 from app.order_execution_intents import get_order_execution_intent
+from app.runtime_contracts import CrossSpreadGuardV1
 from app.schemas import CreateOrderRequest, CreateTradeCommandRequest, TradeCommandResponse
 from app.trade_command_execution import submit_trade_command_order
 from app.trading import decimal_text
@@ -184,6 +185,27 @@ def _submit_claimed_command(
     request: CreateTradeCommandRequest, trade_command_id: str
 ) -> TradeCommandResponse:
     intent = get_order_execution_intent(request.idempotency_key)
+    cross_spread_guard = None
+    # Cross instructions create per-leg command keys as
+    # ``instruction:<key>:<role>`` while strategy_runs stores ``<key>``.
+    # Resolve the immutable plan using the exact base key and attach the guard
+    # only to the Bybit chase leg; MT5 must never receive it.
+    if request.strategy_instance_id and request.idempotency_key.endswith(":bybit_leg"):
+        instruction_key = request.idempotency_key.removeprefix("instruction:").rsplit(":", 1)[0]
+        with connection() as db:
+            plan_row = db.execute(
+                "SELECT execution_plan_json FROM strategy_runs "
+                "WHERE strategy_instance_id=? AND idempotency_key=? "
+                "ORDER BY created_at DESC LIMIT 1",
+                (request.strategy_instance_id, instruction_key),
+            ).fetchone()
+        if plan_row and plan_row["execution_plan_json"]:
+            import json
+            plan = json.loads(plan_row["execution_plan_json"])
+            raw_guard = plan.get("cross_spread_guard")
+            if raw_guard is not None:
+                if intent.execution_policy == "post_only_chase":
+                    cross_spread_guard = CrossSpreadGuardV1.model_validate(raw_guard)
     try:
         order = submit_trade_command_order(
             CreateOrderRequest(
@@ -200,6 +222,7 @@ def _submit_claimed_command(
             reduce_only=intent.reduce_only,
             position_id=intent.position_id,
             execution_policy=intent.execution_policy,
+            cross_spread_guard=cross_spread_guard,
         )
     except HTTPException:
         update_trade_command_status(trade_command_id, "rejected")

@@ -16,6 +16,7 @@ from fastapi import APIRouter, FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
 from app import monitor_health
+from app.account_read_jobs import record_job
 from app.config import get_settings
 from app.database import connection
 from app.venue_identity_repository import (
@@ -784,11 +785,14 @@ def _persist_venue_event(db, account_id: str, event_type: str, event: dict[str, 
     )
 
 
-def _sync_one_account(account_id: str) -> dict[str, int]:
+def _sync_one_account(account_id: str, *, include_history: bool = True) -> dict[str, int]:
     last_attempt_at = _iso_now()
     _write_status(account_id, status="syncing", error_code=None, last_attempt_at=last_attempt_at)
     try:
-        snapshot_response = runtime_get("/venue/account-snapshot", params={"accountId": account_id})
+        params = {"accountId": account_id}
+        if not include_history:
+            params["includeHistory"] = "false"
+        snapshot_response = runtime_get("/venue/account-snapshot", params=params)
         snapshot_response.raise_for_status()
         snapshot = snapshot_response.json()
         _validate_snapshot(account_id, snapshot)
@@ -808,11 +812,19 @@ def _sync_one_account(account_id: str) -> dict[str, int]:
                 account_id,
                 list(snapshot.get("positions") or []),
             )
-            order_count = _persist_orders(db, account_id, list(snapshot.get("orders") or []))
-            fill_count, realized, fees = _persist_fills(
-                db,
-                account_id,
-                list(snapshot.get("fills") or []),
+            order_count = (
+                _persist_orders(db, account_id, list(snapshot.get("orders") or []))
+                if include_history
+                else 0
+            )
+            fill_count, realized, fees = (
+                _persist_fills(
+                    db,
+                    account_id,
+                    list(snapshot.get("fills") or []),
+                )
+                if include_history
+                else (0, {}, {})
             )
             pnl_count = _persist_pnl(
                 db,
@@ -822,13 +834,34 @@ def _sync_one_account(account_id: str) -> dict[str, int]:
                 fees_by_instrument=fees,
             )
             _persist_account_risk(db, account_id, snapshot.get("accountRisk"))
+            if not include_history:
+                previous_payload = db.execute(
+                    "SELECT payload_json FROM account_venue_snapshots WHERE account_id=?",
+                    (account_id,),
+                ).fetchone()
+                if previous_payload:
+                    historical = json.loads(previous_payload[0])
+                    snapshot = dict(snapshot)
+                    for key in (
+                        "orders",
+                        "fills",
+                        "economicEvents",
+                        "economicEventsQuality",
+                        "historyStart",
+                        "historyEnd",
+                        "historyAuditAt",
+                        "historyObservedAt",
+                        "historyWindowSeconds",
+                    ):
+                        if key in historical:
+                            snapshot[key] = historical[key]
             _persist_venue_snapshot(db, account_id, snapshot)
             from app.account_performance import persist_valuation_rates
 
             persist_valuation_rates(db, account_id, snapshot)
-            for fill in snapshot["fills"]:
+            for fill in snapshot["fills"] if include_history else []:
                 _persist_venue_event(db, account_id, "trade_fill", fill)
-            for event in snapshot.get("economicEvents", []):
+            for event in snapshot.get("economicEvents", []) if include_history else []:
                 _persist_venue_event(db, account_id, str(event["eventType"]), event)
             completed = _iso_now()
             db.execute(
@@ -836,9 +869,6 @@ def _sync_one_account(account_id: str) -> dict[str, int]:
                    last_success_at=?, updated_at=? WHERE account_id=?""",
                 (completed, completed, account_id),
             )
-        from app.funding_settlement_accounting import sync_funding_settlements
-
-        sync_funding_settlements(account_id)
     except Exception as exc:
         status, error_code = _classify_sync_failure(exc)
         _write_status(
@@ -848,9 +878,15 @@ def _sync_one_account(account_id: str) -> dict[str, int]:
             last_attempt_at=last_attempt_at,
         )
         raise
-    from app.account_performance import sync_capital_history
-
-    sync_capital_history(account_id)
+    if include_history:
+        complete = snapshot.get("economicEventsQuality") == "complete"
+        record_job(
+            account_id,
+            "history",
+            "ready" if complete else "failed",
+            None if complete else "economic_events_unavailable",
+        )
+        _sync_account_finance(account_id)
     return {
         "balanceSnapshots": balance_count,
         "orderRows": order_count,
@@ -860,11 +896,40 @@ def _sync_one_account(account_id: str) -> dict[str, int]:
     }
 
 
+def _sync_account_finance(account_id: str) -> None:
+    from app.account_performance import sync_capital_history
+    from app.funding_settlement_accounting import sync_funding_settlements
+
+    record_job(account_id, "settlements", "syncing")
+    try:
+        sync_funding_settlements(account_id)
+    except Exception as exc:
+        record_job(account_id, "settlements", "failed", type(exc).__name__)
+        logger.warning("Account settlement projection failed: %s", type(exc).__name__)
+    else:
+        record_job(account_id, "settlements", "ready")
+    # Capital history owns its existing persisted coverage/error state.
+    try:
+        sync_capital_history(account_id)
+    except Exception as exc:
+        # Even a capital-history setup failure must not change observation health.
+        with connection() as db:
+            db.execute(
+                "INSERT INTO account_capital_sync VALUES (?,?,'failed',?) ON CONFLICT(account_id) "
+                "DO UPDATE SET attempted_at=excluded.attempted_at,status='failed',"
+                "error_code=excluded.error_code",
+                (account_id, _iso_now(), type(exc).__name__),
+            )
+        logger.warning("Capital history preparation failed: %s", type(exc).__name__)
+
+
 def _sync_account_result(
     account_id: str,
+    *,
+    include_history: bool = True,
 ) -> tuple[str, dict[str, int] | None, AccountSyncStatusResponse | None]:
     try:
-        return account_id, _sync_one_account(account_id), None
+        return account_id, _sync_one_account(account_id, include_history=include_history), None
     except HTTPException as exc:
         status = _status_row(account_id)
         return (
@@ -897,7 +962,9 @@ def _sync_account_result(
         )
 
 
-def _sync_venue_snapshots(account_id: str | None = None) -> VenueSnapshotSyncResponse:
+def _sync_venue_snapshots(
+    account_id: str | None = None, *, include_history: bool = True
+) -> VenueSnapshotSyncResponse:
     account_ids = [account_id] if account_id is not None else discover_live_accounts()
     if account_id is not None and account_id not in discover_live_accounts():
         raise HTTPException(
@@ -915,7 +982,10 @@ def _sync_venue_snapshots(account_id: str | None = None) -> VenueSnapshotSyncRes
     failed: list[AccountSyncStatusResponse] = []
     skipped: list[AccountSyncStatusResponse] = []
     with ThreadPoolExecutor(max_workers=max(1, min(len(account_ids), 4))) as executor:
-        results = executor.map(_sync_account_result, account_ids)
+        results = executor.map(
+            lambda current: _sync_account_result(current, include_history=include_history),
+            account_ids,
+        )
         for current, result, failure in results:
             if failure is not None:
                 failed.append(failure)
@@ -946,11 +1016,13 @@ def _sync_venue_snapshots(account_id: str | None = None) -> VenueSnapshotSyncRes
     )
 
 
-def sync_venue_snapshots(account_id: str | None = None) -> VenueSnapshotSyncResponse:
+def sync_venue_snapshots(
+    account_id: str | None = None, *, include_history: bool = True
+) -> VenueSnapshotSyncResponse:
     if not _SNAPSHOT_SYNC_LOCK.acquire(blocking=False):
         raise HTTPException(status_code=409, detail="Venue snapshot sync already running")
     try:
-        return _sync_venue_snapshots(account_id)
+        return _sync_venue_snapshots(account_id, include_history=include_history)
     finally:
         _SNAPSHOT_SYNC_LOCK.release()
 
@@ -1032,7 +1104,7 @@ async def run_snapshot_sync_monitor() -> None:
     while True:
         monitor_health.begin("account_sync")
         try:
-            result = await asyncio.to_thread(sync_venue_snapshots)
+            result = await asyncio.to_thread(sync_venue_snapshots, include_history=False)
             monitor_health.finish(
                 "account_sync", None if not result.failed_accounts else "account_read_failed"
             )

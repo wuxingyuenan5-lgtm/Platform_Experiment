@@ -15,6 +15,17 @@ import type { StrategyCategory } from '@/views/strategy/shared/strategyRegistry'
 
 type SnapshotPosition = StrategyAccountSnapshotResult['positions'][number];
 
+export interface FundingExposureGroup {
+  roundingBalanced?: boolean;
+  instructionId: string;
+  perpetualSymbol?: string | null;
+  netDeltaQuantity?: string | null;
+  spotQuantityStep?: string | null;
+  remainingSpotHolding?: string | null;
+  remainingPerpetualQuantity?: string | null;
+  lifecycleState?: string | null;
+}
+
 /**
  * 损益面板的账户读数：逐腿持仓、后端给出的账户级双边/净名义口径，
  * 以及后端逐日盈亏序列（已剔除出入金，日历只做区间聚合）。
@@ -24,6 +35,7 @@ export interface PnlAccountInput {
   positionValue?: string | null;
   positionValueNet?: string | null;
   dailyPnl?: StrategyAccountSnapshotResult['dailyPnl'];
+  strategyDailyPnl?: StrategyPnlResult['strategyDailyPnl'];
 }
 
 export function money(value: string | null | undefined, currency = ''): string {
@@ -35,8 +47,9 @@ export function money(value: string | null | undefined, currency = ''): string {
 }
 
 /** 合约、盈亏这类字符串型小数：空值保持为空，不折算成 0。 */
-function numeric(value: string | null | undefined): number | null {
-  if (value == null || value === '') return null;
+function numeric(value: unknown): number | null {
+  if (typeof value !== 'string' && typeof value !== 'number') return null;
+  if (typeof value === 'string' && value.trim() === '') return null;
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : null;
 }
@@ -60,6 +73,9 @@ export function accountState(snapshot: StrategyAccountSnapshotResult | null): st
 }
 
 const issueLabels: Record<string, string> = {
+  management_projection_stale: '后台统计更新延迟，保留最近成功结果',
+  session_marks_unavailable: '缺少双边开市估值',
+  historical_carry_unavailable: '缺少开市估值时点的库存费',
   waiting_initial_sync: '等待首次同步',
   fill_details_pending: '部分成交费用仍待同步',
   opening_cost_basis_unavailable: '历史开仓成本不完整',
@@ -119,9 +135,17 @@ function normalizePositionSymbol(value?: string | null): string {
 }
 
 function positionAssetDescriptor(position: SnapshotPosition) {
-  const symbol = normalizePositionSymbol(position.symbol || position.instrumentId || '--').toUpperCase();
+  const symbol = normalizePositionSymbol(
+    position.symbol || position.instrumentId || '--',
+  ).toUpperCase();
   if (symbol.includes('XAU')) return { key: 'XAU', label: '黄金', unit: 'oz' };
-  const coin = symbol.replace(/USDT$|USDC$|USD$|PERP$|永续$/g, '');
+  const instrumentAsset = symbol
+    .replace(/^INSTRUMENT_/, '')
+    .replace(/_(?:SPOT|PERP)$/, '')
+    .split('_')[0];
+  const coin = symbol.startsWith('INSTRUMENT_')
+    ? instrumentAsset
+    : symbol.replace(/USDT$|USDC$|USD$|PERP$|永续$/g, '');
   return { key: coin || symbol || '--', label: coin || symbol || '--', unit: '枚' };
 }
 
@@ -129,8 +153,14 @@ function positionQuantityMultiplier(
   position: SnapshotPosition,
   desk?: 'funding' | 'crossSpread',
 ): number {
-  const symbol = normalizePositionSymbol(position.symbol || position.instrumentId || '--').toUpperCase();
-  if (desk === 'crossSpread' && position.instrumentType === 'mt5_contract' && symbol.includes('XAU'))
+  const symbol = normalizePositionSymbol(
+    position.symbol || position.instrumentId || '--',
+  ).toUpperCase();
+  if (
+    desk === 'crossSpread' &&
+    position.instrumentType === 'mt5_contract' &&
+    symbol.includes('XAU')
+  )
     return 100;
   return 1;
 }
@@ -170,13 +200,70 @@ export function netExposureRiskCard(
   positions: SnapshotPosition[],
   desk?: 'funding' | 'crossSpread',
 ): StrategyCapitalRiskCard | null {
+  // Funding exposure is defined by each order group, not by symbol-level
+  // aggregation. Callers must use fundingGroupExposureRiskCard instead.
+  if (desk === 'funding') return null;
   const summary = netQuantitySummary(positions, desk);
   if (!summary) return null;
   return {
     label: '净敞口',
     value: summary.unbalanced ? `未配平：${summary.value}` : summary.value,
-    note: summary.unbalanced ? '多空标的数量未配平，请核对双腿持仓' : '按标的原币数量相抵，当前已配平',
+    note: summary.unbalanced
+      ? '多空标的数量未配平，请核对双腿持仓'
+      : '按标的原币数量相抵，当前已配平',
     tone: summary.unbalanced ? 'negative' : 'neutral',
+  };
+}
+
+export function fundingGroupExposureRiskCard(
+  groups: FundingExposureGroup[],
+): StrategyCapitalRiskCard | null {
+  const active = groups.filter((group) => group.lifecycleState === 'active');
+  if (!active.length) return null;
+  const rows = active.map((group) => ({
+    label: group.perpetualSymbol || group.instructionId,
+    spot: numeric(group.remainingSpotHolding),
+    perpetual: numeric(group.remainingPerpetualQuantity),
+    net:
+      numeric(group.netDeltaQuantity) ??
+      (numeric(group.remainingSpotHolding) != null &&
+      numeric(group.remainingPerpetualQuantity) != null
+        ? numeric(group.remainingSpotHolding)! - numeric(group.remainingPerpetualQuantity)!
+        : Number.NaN),
+    roundingBalanced: group.roundingBalanced === true,
+    tolerance:
+      Number.isFinite(Number(group.spotQuantityStep)) && Number(group.spotQuantityStep) > 0
+        ? Number(group.spotQuantityStep)
+        : 1e-9,
+  }));
+  const value = rows
+    .map((row) => {
+      const net = Number.isFinite(row.net) && Math.abs(row.net) > row.tolerance ? row.net : 0;
+      const side = net > 0 ? '净多' : net < 0 ? '净空' : '净额';
+      const spot =
+        row.spot != null && Number.isFinite(row.spot)
+          ? formatPositionQuantity(row.spot, '枚')
+          : '--';
+      const perpetual =
+        row.perpetual != null && Number.isFinite(row.perpetual)
+          ? formatPositionQuantity(row.perpetual, '枚')
+          : '--';
+      const netText = Number.isFinite(row.net)
+        ? `${side} ${formatPositionQuantity(Math.abs(row.net), '枚')}`
+        : '待核对';
+      return `${row.label}: 现货 ${spot}；永续 ${perpetual}；${netText}`;
+    })
+    .join('；');
+  const unbalanced = rows.some(
+    (row) => !row.roundingBalanced && Number.isFinite(row.net) && Math.abs(row.net) > row.tolerance,
+  );
+  return {
+    label: '净敞口',
+    value: unbalanced ? `未配平：${value}` : value,
+    note: unbalanced
+      ? '按每个资费订单组的现货与永续两条腿核对'
+      : '各资费订单组已按最小单位配平，实际余差保留展示',
+    tone: unbalanced ? 'negative' : 'neutral',
   };
 }
 
@@ -192,9 +279,9 @@ export function buildPositionDistribution(
   netValue?: string | null,
   desk?: 'funding' | 'crossSpread',
 ): StrategyPositionDistribution {
-  const normalizeCurrency = (value?: string | null) => (value == null ? '' : value.trim().toUpperCase());
+  const normalizeCurrency = (value?: string | null) =>
+    value == null ? '' : value.trim().toUpperCase();
   const resolveCurrency = (position: SnapshotPosition) => {
-    if (desk === 'crossSpread') return 'USD';
     return normalizeCurrency(position.positionValueCurrency);
   };
   const resolveSymbol = (position: SnapshotPosition) =>
@@ -203,8 +290,7 @@ export function buildPositionDistribution(
     const netQuantity = numeric(position.netQuantity);
     if (netQuantity != null && netQuantity !== 0) return netQuantity > 0 ? 'long' : 'short';
     const positionValue = numeric(position.positionValue);
-    if (positionValue != null && positionValue !== 0)
-      return positionValue > 0 ? 'long' : 'short';
+    if (positionValue != null && positionValue !== 0) return positionValue > 0 ? 'long' : 'short';
     return 'long';
   };
   const assetDescriptor = (position: SnapshotPosition) => {
@@ -219,7 +305,11 @@ export function buildPositionDistribution(
     return Math.abs(raw * quantityMultiplier(position));
   };
   const formatQuantity = formatPositionQuantity;
-  const positionIdentityKey = (position: SnapshotPosition, value: number, side: 'long' | 'short') => {
+  const positionIdentityKey = (
+    position: SnapshotPosition,
+    value: number,
+    side: 'long' | 'short',
+  ) => {
     const symbol = resolveSymbol(position);
     const currency = resolveCurrency(position);
     const externalId = normalizePositionSymbol(position.externalPositionId);
@@ -293,7 +383,9 @@ export function buildPositionDistribution(
       currency,
       gross: money(String(total), currency),
       legs: rows.map((row) => ({
-        label: `${normalizePositionSymbol(row.position.symbol || row.position.instrumentId || '--')} · ${sideLabels[row.side]}`,
+        label: `${normalizePositionSymbol(
+          row.position.symbol || row.position.instrumentId || '--',
+        )} · ${sideLabels[row.side]}`,
         side: row.side,
         value: row.value,
         amount: money(String(row.value), currency),
@@ -366,8 +458,8 @@ export function buildPositionDistribution(
       const share = mixedCurrency
         ? '--'
         : mergedTotalAbsNet
-          ? `${((item.net / mergedTotalAbsNet) * 100).toFixed(2)}%`
-          : '--';
+        ? `${((item.net / mergedTotalAbsNet) * 100).toFixed(2)}%`
+        : '--';
       return {
         label: `${item.symbol} · ${sideLabels[item.side]}`,
         side: item.side,
@@ -383,9 +475,7 @@ export function buildPositionDistribution(
     .map((leg) => {
       const currency = resolveCurrency(leg.position);
       const symbol = resolveSymbol(leg.position);
-      const currencyTotal = byCurrency
-        .get(currency)
-        ?.reduce((sum, row) => sum + row.value, 0);
+      const currencyTotal = byCurrency.get(currency)?.reduce((sum, row) => sum + row.value, 0);
       return {
         label: `${symbol} · ${sideLabels[leg.side]}`,
         side: leg.side,
@@ -397,7 +487,10 @@ export function buildPositionDistribution(
       };
     });
   const slices = desk === 'crossSpread' ? mergedSlices : individualSlices;
-  const isEmptyPosition = !slices.length && positions.length > 0;
+  const isEmptyPosition =
+    !slices.length &&
+    legs.length > 0 &&
+    positions.every((position) => numeric(position.positionValue) != null);
   // 只有真实的双腿一多一空才叫“双边对冲”，否则按单向合计表述，不替策略假设口径。
   const hedged =
     legs.some((leg) => leg.side === 'long') && legs.some((leg) => leg.side === 'short');
@@ -442,7 +535,11 @@ export function buildPositionDistribution(
     ),
     groups,
     slices,
-    emptyMessage: isEmptyPosition ? '对冲已平衡，当前净仓位为 0' : positions.length ? '持仓暂无可比名义价值' : '暂无持仓，等待账户上报',
+    emptyMessage: isEmptyPosition
+      ? '对冲已平衡，当前净仓位为 0'
+      : positions.length
+      ? '持仓暂无可比名义价值'
+      : '暂无持仓，等待账户上报',
   };
 }
 
@@ -457,21 +554,41 @@ export function financialProfile(
     finance?.issues?.map((issue) => issueLabels[issue] ?? '数据待核对').join('；') ||
     (finance ? '' : '等待损益数据');
   const currencies = finance?.byCurrency ?? [];
-  const chartCurrency = currencies[0]?.currency ?? finance?.currency;
-  // 逐日盈亏是账户口径读数：后端已剔除出入金并给出当日收益率，这里只做搬运。
-  const dailyPnlPoints: StrategyPnlDayPoint[] = (account.dailyPnl ?? []).map((point) => ({
+  const chartCurrency = finance?.currency;
+  // 策略页的日历与收益曲线共用策略归属序列；账户资金仍保留原始账户权益。
+  const strategyScope = desk === 'funding' || desk === 'crossSpread';
+  const sourceDailyPnl = strategyScope ? account.strategyDailyPnl ?? [] : account.dailyPnl ?? [];
+  const dailyPnlPoints: StrategyPnlDayPoint[] = sourceDailyPnl.map((point) => ({
     date: point.date,
     pnl: numeric(point.pnl),
     rate: numeric(point.returnRate),
-    quality: point.quality,
+    quality: point.quality ?? 'unavailable',
   }));
-  const points = (finance?.timeline ?? []).filter(
+  const curveDailyPoints = dailyPnlPoints.filter((point) => point.quality !== 'market_closed');
+  const valuedDailyPoints = curveDailyPoints;
+  let cumulativeDailyPnl = 0;
+  const dailyCurveValues = valuedDailyPoints.map((point) => {
+    if (
+      point.pnl == null ||
+      !Number.isFinite(point.pnl) ||
+      !['complete', 'estimated'].includes(point.quality)
+    ) {
+      cumulativeDailyPnl = 0;
+      return null;
+    }
+    cumulativeDailyPnl += point.pnl;
+    return cumulativeDailyPnl;
+  });
+  const points = (strategyScope ? [] : finance?.timeline ?? []).filter(
     (point) => point.currency === chartCurrency && Number.isFinite(Number(point.realizedPnl)),
   );
-  const from = finance?.coverage
-    ?.map((item) => item.historyStart)
-    .filter(Boolean)
-    .sort()[0];
+  const liveCurveUsesDaily = dailyCurveValues.some((value) => value != null);
+  const curveTimestamps = liveCurveUsesDaily
+    ? valuedDailyPoints.map((point) => `${point.date}T23:59:59Z`)
+    : points.map((point) => point.asOf);
+  const curveLabels = liveCurveUsesDaily
+    ? valuedDailyPoints.map((point) => point.date)
+    : points.map((point) => formatTime(point.asOf));
   const original = desk ? strategyPnlProfiles[desk] : null;
   const fields: Record<string, keyof FinancialAmountsResult> = {
     累计总损益: 'netPnl',
@@ -495,27 +612,59 @@ export function financialProfile(
   return {
     title,
     curveKind: 'realized',
+    curveBarLabel: liveCurveUsesDaily ? '每日净损益' : '每日已实现损益',
+    curveLineLabel: strategyScope ? '区间累计净损益' : '累计已实现损益',
     curveCurrency: chartCurrency,
-    timestamps: points.map((point) => point.asOf),
+    timestamps: curveTimestamps,
     totalFund: accountNote,
-    period: [from ? `最近拉取覆盖自 ${formatTime(from)}` : '', note].filter(Boolean).join('；'),
-    xLabels: points.map((point) => formatTime(point.asOf)),
-    dailyReturns: [],
-    netValues: points.map((point) => Number(point.realizedPnl)),
-    metrics: original
-      ? original.metrics.map((item) => category(item.label))
-      : amountCards(finance, note),
-    attributions: original
-      ? original.attributions.map((item) => category(item.label))
-      : currencies.length > 1
-      ? currencies.flatMap((item) =>
-          amountCards(item, `${item.currency} 原币口径`).map((card) => ({
-            ...card,
-            label: `${item.currency} · ${card.label}`,
-          })),
+    period: [
+      finance?.valuationPolicy === 'mt5_open'
+        ? `过滤 MT5 休市；有效估值：${formatTime(finance.valuationAsOf)}；开市后衔接上次有效估值`
+        : '',
+      liveCurveUsesDaily
+        ? `自 ${valuedDailyPoints[0].date} 展示已记录历史；缺失处断开，各完整区间单独累计`
+        : '暂无连续完整的每日损益',
+      note,
+    ]
+      .filter(Boolean)
+      .join('；'),
+    xLabels: curveLabels,
+    dailyReturns: liveCurveUsesDaily
+      ? valuedDailyPoints.map((point, index) =>
+          dailyCurveValues[index] == null ? null : point.pnl,
         )
       : [],
-    breakdownSeries: original
+    netValues: liveCurveUsesDaily
+      ? dailyCurveValues
+      : points.map((point) => Number(point.realizedPnl)),
+    metrics: finance
+      ? amountCards(finance, note)
+      : original
+      ? original.metrics.map((item) => category(item.label))
+      : [],
+    attributions: finance
+      ? currencies.length > 1
+        ? currencies.flatMap((item) =>
+            amountCards(item, '').map((card) => ({
+              ...card,
+              label: `${item.currency} · ${card.label}`,
+            })),
+          )
+        : amountCards(finance, note)
+      : original
+      ? original.attributions.map((item) => category(item.label))
+      : [],
+    breakdownSeries: liveCurveUsesDaily
+      ? [{ name: '区间累计净损益', color: '#3498db', data: dailyCurveValues }]
+      : finance
+      ? [
+          {
+            name: '累计已实现损益',
+            color: '#3498db',
+            data: points.map((point) => Number(point.realizedPnl)),
+          },
+        ]
+      : original
       ? original.breakdownSeries.map((item) => ({ ...item, data: [] }))
       : [
           {
@@ -549,7 +698,10 @@ export function financialProfile(
       desk,
     ),
     dailyPnl: dailyPnlPoints,
-    dailyPnlCurrency: account.dailyPnl?.[0]?.currency || chartCurrency || '',
+    dailyPnlCurrency:
+      (typeof sourceDailyPnl[0]?.currency === 'string' ? sourceDailyPnl[0].currency : null) ||
+      chartCurrency ||
+      '',
   };
 }
 
@@ -581,12 +733,17 @@ function exposureRiskCards(
   category: StrategyCategory,
   snapshot: StrategyAccountSnapshotResult | null,
   currency: string,
+  fundingExposureGroups?: FundingExposureGroup[] | null,
 ): StrategyCapitalRiskCard[] {
   if (!snapshot) return [];
   const hedgedPair = category === 'arbitrage' && snapshot.snapshotScope === 'strategy';
   const legCurrency = snapshot.positionValueCurrency || currency;
   const cards: StrategyCapitalRiskCard[] = [];
-  const netExposureCard = hedgedPair ? netExposureRiskCard(snapshot.positions ?? [], 'funding') : null;
+  const netExposureCard = hedgedPair
+    ? fundingExposureGroups != null
+      ? fundingGroupExposureRiskCard(fundingExposureGroups)
+      : null
+    : null;
   if (netExposureCard) cards.push(netExposureCard);
   const leverage = snapshot.leverage == null ? null : Number(snapshot.leverage);
   if (leverage != null && Number.isFinite(leverage)) {
@@ -671,6 +828,7 @@ export function accountCapitalProfile(
   snapshot: StrategyAccountSnapshotResult | null,
   loadError?: string,
   category: StrategyCategory = 'directional',
+  fundingExposureGroups?: FundingExposureGroup[] | null,
 ): StrategyCapitalProfile {
   const risk = snapshot?.accountRisk;
   const currency = risk?.currency || snapshot?.balance?.currency || '';
@@ -691,7 +849,15 @@ export function accountCapitalProfile(
   return {
     overview: [
       ...(risk?.totalAssets != null
-        ? [card('全账户总资产', risk.totalAssets, '多币种统一估值；下方展示原币资产')]
+        ? [
+            card(
+              '全账户总资产',
+              risk.totalAssets,
+              risk.assetBreakdown?.some((asset) => asset.accountType === 'TradFi')
+                ? '已含 MT5/TradFi 与现货资产及浮盈亏；不再另加 MT5 权益'
+                : '账户资产估值，包含浮盈亏；下方展示原币资产',
+            ),
+          ]
         : []),
       card(label, snapshot?.balance?.equity),
       card('可用保证金', risk?.freeMargin, '交易保证金额度'),
@@ -711,7 +877,7 @@ export function accountCapitalProfile(
             ? 'negative'
             : 'neutral',
       },
-      ...exposureRiskCards(category, snapshot, currency),
+      ...exposureRiskCards(category, snapshot, currency, fundingExposureGroups),
       card('账户浮盈亏', risk?.unrealizedPnl, '账户范围，可能包含其他策略'),
     ],
     structureCards: ['FundingAccount', 'UnifiedTradingAccount', 'TradFi', 'Earn'].flatMap(

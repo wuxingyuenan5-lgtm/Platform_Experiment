@@ -5,9 +5,9 @@
   结算价 / FRED / Deribit），与 ``research_provider_shenwan`` 保持一致的安全
   客户端实践。TLS 证书默认校验，使用操作系统信任库；不关闭校验、不改全局 SSL
   设置、不使用浏览器指纹伪装或反爬绕过。
-- 不配置代理：是否经由本机代理属于部署环境的事情，由 ``trust_env`` 之外的
-  运行环境决定，不在源码里硬编码本机端口。``trust_env=False`` 保证不受
-  环境变量里的代理影响，行为可预期。
+- 先直连，再在直连网络不可达时使用部署环境显式配置的 HTTP(S) 代理；源码
+  不硬编码本机端口。直连优先保证默认行为可预期，同时让受限网络中的公开
+  数据 worker 能真正完成生产刷新。TLS 校验在两条路径上都保持开启。
 - 这些源均为只读公开行情，不携带任何凭据；请求只走 HTTPS。
 - FedWatch 计算使用链式期望利率 + 月末改用下月合约，避免原版 calc 对
   月末会议（n_post 过小）的放大失真，使区间连续单调、贴近 CME 官方形态。
@@ -19,7 +19,7 @@ import calendar
 import math
 import re
 import ssl
-from datetime import date, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
 import httpx
@@ -32,6 +32,9 @@ _TIMEOUT_SECONDS = 20.0
 _CME_SETTLEMENTS_URL = (
     "https://www.cmegroup.com/CmeWS/mvc/Settlements/Futures/Settlements/305/FUT"
 )
+_YAHOO_ZQ_SPARK_URL = "https://query1.finance.yahoo.com/v7/finance/spark"
+_YAHOO_CHART_URL = "https://query1.finance.yahoo.com/v8/finance/chart"
+_BYBIT_KLINE_URL = "https://api.bybit.com/v5/market/kline"
 _FRED_CSV_URL = "https://fred.stlouisfed.org/graph/fredgraph.csv"
 
 # FOMC 会议结束日（决议公布日）。来源：
@@ -74,19 +77,32 @@ class _Response:
         self._response.raise_for_status()
 
 
-def _get(url: str, **kwargs: Any) -> _Response:
+def _get(url: str, *, _timeout: float | None = None, **kwargs: Any) -> _Response:
     """对海外公开源发起一次 GET，默认校验 TLS 证书。
 
     使用独立 ``httpx.Client``：作用域限定在单次请求，``verify`` 走
     ``truststore`` 的系统信任库（Windows 上可补齐缺失的中间证书链），
     绝不修改全局 SSL 设置，也不传 ``verify=False``。
     """
-    with httpx.Client(
-        verify=truststore.SSLContext(ssl.PROTOCOL_TLS_CLIENT),
-        trust_env=False,
-        timeout=_TIMEOUT_SECONDS,
-        follow_redirects=True,
-    ) as client:
+    client_kwargs = {
+        "verify": truststore.SSLContext(ssl.PROTOCOL_TLS_CLIENT),
+        "timeout": _timeout or _TIMEOUT_SECONDS,
+        "follow_redirects": True,
+    }
+    try:
+        # Keep direct egress first; do not silently inherit a proxy on normal deployments.
+        with httpx.Client(**client_kwargs, trust_env=False) as client:
+            response = client.get(url, **kwargs)
+        # A direct egress address can be reachable but denied by the upstream
+        # edge (403/429/5xx). In that case the configured deployment proxy is
+        # the only usable route, so retry it before surfacing the response.
+        if response.status_code not in {403, 429, 502, 503, 504}:
+            return _Response(response)
+    except httpx.TransportError:
+        # Restricted Windows deployments may expose approved egress only via
+        # HTTP(S)_PROXY. Retry transport connect failures through that setting.
+        pass
+    with httpx.Client(**client_kwargs, trust_env=True) as client:
         response = client.get(url, **kwargs)
     return _Response(response)
 
@@ -95,6 +111,58 @@ def _recent_business_day(d: date) -> date:
     while d.weekday() >= 5:
         d -= timedelta(days=1)
     return d
+
+
+def fetch_crypto_daily_prices(asset: str, start_date: str, end_date: str) -> dict[str, float]:
+    """Fetch daily BTC/ETH closes used only to convert ETF USD flows to coins."""
+    symbol = {"btc": "BTCUSDT", "eth": "ETHUSDT"}.get(asset.lower().strip())
+    if symbol is None:
+        raise ValueError(f"unsupported_crypto_asset:{asset}")
+    start = date.fromisoformat(start_date)
+    end = date.fromisoformat(end_date) + timedelta(days=1)
+    response = _get(
+        _BYBIT_KLINE_URL,
+        params={
+            "category": "linear",
+            "symbol": symbol,
+            "interval": "D",
+            "start": int(datetime.combine(start, datetime.min.time(), tzinfo=UTC).timestamp() * 1000),
+            "end": int(datetime.combine(end, datetime.min.time(), tzinfo=UTC).timestamp() * 1000) - 1,
+            "limit": 1000,
+        },
+    )
+    response.raise_for_status()
+    payload = response.json()
+    if payload.get("retCode") != 0:
+        raise ResearchProviderError(f"bybit_daily_price_error:{payload.get('retCode')}")
+    prices: dict[str, float] = {}
+    for row in (payload.get("result") or {}).get("list", []):
+        if len(row) < 5:
+            continue
+        observed = datetime.fromtimestamp(int(row[0]) / 1000, tz=UTC).date()
+        prices[observed.isoformat()] = float(row[4])
+    if prices:
+        return prices
+    # Keep a read-only fallback for a temporary Bybit outage.
+    yahoo_response = _get(
+        f"{_YAHOO_CHART_URL}/{symbol.replace('USDT', '-USD')}",
+        params={
+            "period1": int(datetime.combine(start, datetime.min.time(), tzinfo=UTC).timestamp()),
+            "period2": int(datetime.combine(end, datetime.min.time(), tzinfo=UTC).timestamp()),
+            "interval": "1d",
+            "events": "history",
+            "includeAdjustedClose": "true",
+        },
+    )
+    yahoo_response.raise_for_status()
+    result = ((yahoo_response.json().get("chart") or {}).get("result") or [None])[0] or {}
+    timestamps = result.get("timestamp") or []
+    closes = (((result.get("indicators") or {}).get("quote") or [{}])[0]).get("close") or []
+    for timestamp, close in zip(timestamps, closes, strict=False):
+        if close is not None:
+            observed = datetime.fromtimestamp(int(timestamp), tz=UTC).date()
+            prices[observed.isoformat()] = float(close)
+    return prices
 
 
 def _fetch_fred_series(series_id: str) -> float:
@@ -121,7 +189,9 @@ def _fetch_cme_settlements() -> dict[str, float]:
     data: dict[str, Any] | None = None
     for _ in range(2):
         date_str = trade_date.strftime("%m/%d/%Y")
-        resp = _get(_CME_SETTLEMENTS_URL, params={"tradeDate": date_str})
+        # CME's blocked/black-holed endpoint must not hold the hourly worker
+        # for the full generic public-source timeout before Yahoo fallback.
+        resp = _get(_CME_SETTLEMENTS_URL, _timeout=5.0, params={"tradeDate": date_str})
         resp.raise_for_status()
         payload = resp.json()
         if not payload.get("empty"):
@@ -142,6 +212,75 @@ def _fetch_cme_settlements() -> dict[str, float]:
     if not settle_map:
         raise ResearchProviderError("cme_settlements_unparsable")
     return settle_map
+
+
+def _fetch_yahoo_zq_settlements() -> dict[str, float]:
+    """Fetch the same ZQ curve from Yahoo's public delayed quote endpoint.
+
+    CME's browser settlement endpoint blocks automated requests from some
+    deployment IPs. Yahoo exposes the corresponding 30-Day Fed Funds futures
+    contracts in one bounded Spark response, which keeps the hourly worker
+    usable without inventing probabilities or requiring credentials. Values
+    are the latest delayed quote, not CME's official settlement print.
+    """
+    today = date.today()
+    symbols: list[str] = []
+    year, month = today.year, today.month
+    for _ in range(13):
+        symbols.append(f"ZQ{_MONTH_CODES[month]}{year % 100:02d}.CBT")
+        if month == 12:
+            year, month = year + 1, 1
+        else:
+            month += 1
+    response = _get(
+        _YAHOO_ZQ_SPARK_URL,
+        params={"symbols": ",".join(symbols), "range": "5d", "interval": "1d"},
+        headers={
+            "Accept": "application/json",
+            "User-Agent": "Platform-API research worker/1.0",
+        },
+    )
+    response.raise_for_status()
+    payload = response.json()
+    results = ((payload.get("spark") or {}).get("result") or [])
+    settle_map: dict[str, float] = {}
+    for result in results:
+        if not isinstance(result, dict):
+            continue
+        symbol = str(result.get("symbol") or "")
+        match = re.fullmatch(r"ZQ([FGHJKMNQUVXZ])(\d{2})\.CBT", symbol)
+        if not match:
+            continue
+        month_number = next((m for m, code in _MONTH_CODES.items() if code == match.group(1)), None)
+        if month_number is None:
+            continue
+        key = _month_key(2000 + int(match.group(2)), month_number)
+        responses = result.get("response") or []
+        meta = responses[0].get("meta") if responses and isinstance(responses[0], dict) else None
+        if not isinstance(meta, dict):
+            continue
+        value = meta.get("regularMarketPrice")
+        try:
+            if value is not None:
+                settle_map[key] = float(value)
+        except (TypeError, ValueError):
+            continue
+    if not settle_map:
+        raise ResearchProviderError("yahoo_zq_quotes_unavailable")
+    return settle_map
+
+
+def _fetch_fed_fund_settlements() -> tuple[dict[str, float], str]:
+    """Use CME settlement first, then a public delayed ZQ quote fallback."""
+    try:
+        return _fetch_cme_settlements(), "CME official settlements"
+    except Exception as cme_error:
+        try:
+            return _fetch_yahoo_zq_settlements(), "Yahoo Finance delayed ZQ quotes"
+        except Exception as yahoo_error:
+            raise ResearchProviderError(
+                f"fed_funds_curve_unavailable:cme={type(cme_error).__name__}:yahoo={type(yahoo_error).__name__}"
+            ) from yahoo_error
 
 
 def _month_key(year: int, month: int) -> str:
@@ -262,13 +401,14 @@ def fetch_fedwatch() -> dict[str, Any]:
     返回 {
         "effr": float,
         "currentTarget": str,
-        "observedAt": "YYYY-MM-DD",
+        "observedAt": "YYYY-MM-DD" (upstream observation date; the platform
+        stores its own hourly UTC capture bucket),
         "scheduleStatus": str,   # 库原文
         "zqPricing": [{code, month, monthISO, settle}, ...],
         "meetings":  [{date, probabilities, contract}, ...]
     }
     """
-    settle_map = _fetch_cme_settlements()
+    settle_map, settlement_source = _fetch_fed_fund_settlements()
     effr = _fetch_fred_series("EFFR")
     meetings_all = [m for m in _FOMC_MEETINGS if m >= date.today()]
     meetings_probs = _improved_fedwatch(settle_map, meetings_all, effr)
@@ -288,22 +428,36 @@ def fetch_fedwatch() -> dict[str, Any]:
         "effr": effr,
         "currentTarget": _current_target_range(effr),
         "observedAt": _recent_business_day(date.today()).isoformat(),
+        "settlementSource": settlement_source,
         "zqPricing": _build_zq_pricing_table(settle_map),
         "meetings": meetings,
     }
 
 
 # ---------------------------------------------------------------------------
-# BTC ETF Flow（farside.co.uk/btc）
+# BTC / ETH ETF Flow（farside.co.uk/btc、/eth）
 # ---------------------------------------------------------------------------
 
 _FARSIDE_BTC_URL = "https://farside.co.uk/btc/"
+_FARSIDE_BTC_ALL_URL = "https://farside.co.uk/bitcoin-etf-flow-all-data/"
+# Farside's edge currently returns 403 to the platform egress.  Jina Reader
+# returns the same public Farside page as markdown without changing the source
+# or its values, so it is used only as a transport fallback.
+_FARSIDE_BTC_READER_URL = "https://r.jina.ai/https://farside.co.uk/btc/"
+_FARSIDE_BTC_ALL_READER_URL = "https://r.jina.ai/https://farside.co.uk/bitcoin-etf-flow-all-data/"
+_FARSIDE_ETH_URL = "https://farside.co.uk/eth/"
+_FARSIDE_ETH_ALL_URL = "https://farside.co.uk/ethereum-etf-flow-all-data/"
+_FARSIDE_ETH_READER_URL = "https://r.jina.ai/https://farside.co.uk/eth/"
+_FARSIDE_ETH_ALL_READER_URL = "https://r.jina.ai/https://farside.co.uk/ethereum-etf-flow-all-data/"
 
 # farside 表格固定列序（第 1 列为日期，随后 12 列 ETF，末列 Total）。
 # 顺序与页面 thead 一致，供落库时作为稳定列序使用；解析时也会从表头回读。
 _FARSIDE_TICKERS: tuple[str, ...] = (
     "IBIT", "FBTC", "BITB", "ARKB", "BTCO", "EZBC",
     "BRRR", "HODL", "BTCW", "MSBT", "GBTC", "BTC", "Total",
+)
+_FARSIDE_ETH_TICKERS: tuple[str, ...] = (
+    "ETHA", "ETHB", "FETH", "ETHW", "TETH", "ETHV", "QETH", "EZET", "MSSE", "ETHE", "ETH", "Total",
 )
 
 
@@ -313,7 +467,7 @@ def _clean_cell(raw: str) -> str:
 
 
 def _parse_farside_btc(html: str) -> tuple[list[str], list[list[str]]]:
-    """解析 farside 的 BTC ETF 表，返回 (tickers, rows)。
+    """解析 farside 的 BTC/ETH ETF 表，返回 (tickers, rows)。
 
     rows 每行为 [date_str, flow_1..flow_12, total]，date_str 为 "24 Aug 2026"。
     表头 ticker 行的「Total」列 label 为空，据数据行列数自动补齐。
@@ -340,6 +494,55 @@ def _parse_farside_btc(html: str) -> tuple[list[str], list[list[str]]]:
     return tickers, rows
 
 
+def _parse_farside_btc_markdown(markdown: str) -> tuple[list[str], list[list[str]]]:
+    """解析 Jina Reader 返回的同一 Farside 表格 Markdown。"""
+    return _parse_farside_markdown(markdown, _FARSIDE_TICKERS)
+
+
+def _parse_farside_markdown(
+    markdown: str, tickers: tuple[str, ...]
+) -> tuple[list[str], list[list[str]]]:
+    """解析 BTC/ETH Farside 表格的 Markdown 行。"""
+    rows: list[list[str]] = []
+    for line in markdown.splitlines():
+        if not line.lstrip().startswith("|"):
+            continue
+        cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
+        if not cells or not re.fullmatch(r"\d{2} [A-Z][a-z]{2} \d{4}", cells[0]):
+            continue
+        rows.append(cells)
+    return list(tickers), rows
+
+
+def _parse_farside_all_data_markdown(
+    markdown: str, tickers: tuple[str, ...]
+) -> tuple[list[str], list[list[str]]]:
+    """解析 Farside ``all-data`` Reader 页面拆成的逐行表格。
+
+    Reader 对该页不会保留 Markdown 的 ``|`` 行，而是把每个单元格放到
+    单独一行；日期行后紧跟固定数量的 ETF 数值，空行只作为排版分隔。
+    """
+    lines = [line.strip() for line in markdown.splitlines()]
+    rows: list[list[str]] = []
+    date_pattern = re.compile(r"^\d{2} [A-Z][a-z]{2} \d{4}$")
+    width = len(tickers) + 1
+    index = 0
+    while index < len(lines):
+        if not date_pattern.fullmatch(lines[index]):
+            index += 1
+            continue
+        cells = [lines[index]]
+        index += 1
+        while index < len(lines) and len(cells) < width:
+            value = lines[index]
+            index += 1
+            if value:
+                cells.append(value)
+        if len(cells) >= 2:
+            rows.append(cells[:width])
+    return list(tickers), rows
+
+
 def _parse_flow(value: str) -> float | None:
     """解析 farside 资金流单元格。
 
@@ -359,18 +562,52 @@ def _parse_flow(value: str) -> float | None:
     return -parsed if negative else parsed
 
 
-def fetch_etf_flow(days: int = 14) -> dict[str, Any]:
-    """抓取 farside.co.uk/btc 最近 N 日 BTC 现货 ETF 资金流。
+def fetch_etf_flow(days: int = 3650, asset: str = "btc") -> dict[str, Any]:
+    """抓取 Farside 可提供的 BTC/ETH 现货 ETF 资金流历史。
 
-    返回 {"tickers": [...], "days": [{date(ISO), flows: {ticker: float}}]}（升序）。
+    ``days`` 只限制返回窗口；默认覆盖源站可提供的全部历史，避免看板上线
+    后只能看到最近两周。返回 {"tickers": [...], "days": [...]}（升序）。
     """
-    resp = _get(_FARSIDE_BTC_URL)
-    resp.raise_for_status()
-    tickers, rows = _parse_farside_btc(resp.text)
+    asset_key = asset.lower().strip()
+    if asset_key not in {"btc", "eth"}:
+        raise ValueError(f"unsupported_etf_asset:{asset}")
+    all_history = days > 90
+    if asset_key == "btc":
+        page_url = _FARSIDE_BTC_ALL_URL if all_history else _FARSIDE_BTC_URL
+        reader_url = _FARSIDE_BTC_ALL_READER_URL if all_history else _FARSIDE_BTC_READER_URL
+    else:
+        page_url = _FARSIDE_ETH_ALL_URL if all_history else _FARSIDE_ETH_URL
+        reader_url = _FARSIDE_ETH_ALL_READER_URL if all_history else _FARSIDE_ETH_READER_URL
+    tickers_default = _FARSIDE_TICKERS if asset_key == "btc" else _FARSIDE_ETH_TICKERS
+    source_error: Exception | None = None
+    try:
+        resp = _get(
+            page_url,
+            headers={
+                "Accept": "text/html,application/xhtml+xml",
+                "User-Agent": "Platform-API research worker/1.0",
+            },
+        )
+        resp.raise_for_status()
+        tickers, rows = _parse_farside_btc(resp.text)
+    except Exception as exc:
+        source_error = exc
+        reader = _get(
+            reader_url,
+            headers={"Accept": "text/plain", "User-Agent": "Platform-API research worker/1.0"},
+        )
+        reader.raise_for_status()
+        tickers, rows = _parse_farside_markdown(reader.text, tickers_default)
+        if all_history and not rows:
+            tickers, rows = _parse_farside_all_data_markdown(reader.text, tickers_default)
     if not tickers:
-        tickers = list(_FARSIDE_TICKERS)
+        tickers = list(tickers_default)
     if not rows:
-        raise ResearchProviderError("farside_btc_empty")
+        if source_error is not None:
+            raise ResearchProviderError(
+                f"farside_{asset_key}_empty:direct={type(source_error).__name__}"
+            ) from source_error
+        raise ResearchProviderError(f"farside_{asset_key}_empty")
 
     parsed: list[dict[str, Any]] = []
     for cells in rows[-days:]:

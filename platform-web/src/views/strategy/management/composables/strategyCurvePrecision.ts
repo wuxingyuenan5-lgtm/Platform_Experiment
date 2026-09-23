@@ -20,10 +20,14 @@ export function samplePnlCurve(
   const buckets = new Map<number, number>();
   profile.timestamps.forEach((value, index) => {
     const time = Date.parse(value);
-    if (Number.isFinite(time)) buckets.set(Math.floor((time + offset - monday) / period), index);
+    if (Number.isFinite(time)) {
+      const key = Math.floor((time + offset - monday) / period);
+      const previous = buckets.get(key);
+      if (previous === undefined || profile.netValues[previous] != null) buckets.set(key, index);
+    }
   });
   const indices = [...buckets.entries()].sort(([a], [b]) => a - b).map(([, index]) => index);
-  const sample = (data: number[]) =>
+  const sample = <T extends number | null>(data: T[]) =>
     indices.filter((index) => index < data.length).map((index) => data[index]);
   return {
     ...profile,

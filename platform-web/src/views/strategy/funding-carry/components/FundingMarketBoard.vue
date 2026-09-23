@@ -1,5 +1,5 @@
 <template>
-  <section class="market-board">
+  <section class="market-board" :class="{ 'single-venue': !data.inverseExchanges.length }">
     <div class="market-board__context">
       <div class="context-chip">
         <span>交易所</span>
@@ -15,120 +15,152 @@
       </div>
     </div>
 
-    <div class="market-board__top">
-      <div class="summary-grid">
-        <article v-for="item in data.summaryCards" :key="item.title" class="summary-card">
-          <div class="summary-card__title">{{ item.title }}</div>
-          <div class="summary-card__value" :class="`is-${item.tone}`">{{ item.value }}</div>
-          <div class="summary-card__subtitle">{{ item.subtitle }}</div>
-        </article>
+    <div class="market-board__content">
+      <div class="market-board__table-area">
+        <div class="market-board__toolbar">
+          <div class="symbol-controls">
+            <label
+              >筛选关注标的<input
+                :value="search"
+                placeholder="搜索币种"
+                @input="$emit('update:search', ($event.target as HTMLInputElement).value)"
+            /></label>
+            <label
+              >排序<select
+                :value="sort"
+                @change="$emit('update:sort', ($event.target as HTMLSelectElement).value as Sort)"
+                ><option value="default">关注顺序</option
+                ><option value="name">币种名称</option
+                ><option value="rate_desc">资费从高到低</option
+                ><option value="rate_asc">资费从低到高</option></select
+              ></label
+            >
+            <label
+              >添加标的<input
+                v-model="adding"
+                list="funding-symbol-catalog"
+                placeholder="搜索全部标的"
+                @keydown.enter.prevent="addSymbol" /><datalist id="funding-symbol-catalog"
+                ><option
+                  v-for="symbol in data.symbolOptions"
+                  :key="symbol"
+                  :value="symbol"
+                ></option></datalist
+            ></label>
+            <button type="button" :disabled="!canAdd" @click="addSymbol">添加</button>
+          </div>
+          <div class="range-tabs">
+            <button
+              v-for="item in rangeOptions"
+              :key="item.value"
+              type="button"
+              :class="{ 'is-active': item.value === selectedRange }"
+              @click="$emit('update:selectedRange', item.value)"
+            >
+              {{ item.label }}
+            </button>
+          </div>
+        </div>
+
+        <div class="heatmap-shell">
+          <div class="heatmap-table">
+            <div class="heatmap-table__header">
+              <div class="symbol-cell">币种</div>
+              <div
+                class="group-header"
+                :style="{
+                  gridTemplateColumns: `repeat(${data.usdtExchanges.length}, minmax(74px, 1fr))`,
+                }"
+              >
+                <span v-for="venue in data.usdtExchanges" :key="venue">{{ venue }}</span>
+              </div>
+              <div
+                class="group-header group-header--inverse"
+                :style="{
+                  gridTemplateColumns: `repeat(${data.inverseExchanges.length}, minmax(74px, 1fr))`,
+                }"
+              >
+                <span v-for="venue in data.inverseExchanges" :key="venue">{{ venue }}</span>
+              </div>
+            </div>
+
+            <div v-for="row in data.rows" :key="row.symbol" class="heatmap-table__row">
+              <div class="symbol-cell symbol-cell--row"
+                >{{ row.symbol
+                }}<button
+                  type="button"
+                  :aria-label="`移除 ${row.symbol}`"
+                  @click="removeSymbol(row.symbol)"
+                  >×</button
+                ></div
+              >
+              <div
+                class="group-row"
+                :style="{
+                  gridTemplateColumns: `repeat(${data.usdtExchanges.length}, minmax(74px, 1fr))`,
+                }"
+              >
+                <span
+                  v-for="venue in data.usdtExchanges"
+                  :key="`${row.symbol}-${venue}`"
+                  :class="rateClass(row.usdtPerps[venue])"
+                >
+                  {{ displayRate(row.usdtPerps[venue]) }}
+                </span>
+              </div>
+              <div
+                class="group-row group-row--inverse"
+                :style="{
+                  gridTemplateColumns: `repeat(${data.inverseExchanges.length}, minmax(74px, 1fr))`,
+                }"
+              >
+                <span
+                  v-for="venue in data.inverseExchanges"
+                  :key="`${row.symbol}-inverse-${venue}`"
+                  :class="rateClass(row.inversePerps[venue])"
+                >
+                  {{ displayRate(row.inversePerps[venue]) }}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
-      <div class="extrema-grid">
-        <article class="extrema-card">
+      <article class="extrema-card extrema-card--combined">
+        <section>
           <h3>最高资金费率</h3>
           <div class="extrema-list">
             <div v-for="item in data.highest" :key="item.market" class="extrema-row">
               <span>{{ item.market }}</span>
-              <strong class="is-negative">{{ formatRate(item.value) }}</strong>
+              <strong :class="rateClass(item.value)">{{ formatRate(item.value) }}</strong>
             </div>
           </div>
-        </article>
+        </section>
 
-        <article class="extrema-card">
+        <section>
           <h3>最低资金费率</h3>
           <div class="extrema-list">
             <div v-for="item in data.lowest" :key="item.market" class="extrema-row">
               <span>{{ item.market }}</span>
-              <strong class="is-positive">{{ formatRate(item.value) }}</strong>
+              <strong :class="rateClass(item.value)">{{ formatRate(item.value) }}</strong>
             </div>
           </div>
-        </article>
-      </div>
-    </div>
-
-    <div class="market-board__toolbar">
-      <div class="range-tabs">
-        <button
-          v-for="item in rangeOptions"
-          :key="item.value"
-          type="button"
-          :class="{ 'is-active': item.value === selectedRange }"
-          @click="$emit('update:selectedRange', item.value)"
-        >
-          {{ item.label }}
-        </button>
-      </div>
-
-      <div class="board-actions">
-        <button type="button">预测费率</button>
-        <button type="button">显示自选</button>
-        <button type="button">添加自选</button>
-      </div>
-    </div>
-
-    <div class="heatmap-shell">
-      <div class="heatmap-table">
-        <div class="heatmap-table__header">
-          <div class="symbol-cell">币种</div>
-          <div
-            class="group-header"
-            :style="{
-              gridTemplateColumns: `repeat(${data.usdtExchanges.length}, minmax(74px, 1fr))`,
-            }"
-          >
-            <span v-for="venue in data.usdtExchanges" :key="venue">{{ venue }}</span>
-          </div>
-          <div
-            class="group-header group-header--inverse"
-            :style="{
-              gridTemplateColumns: `repeat(${data.inverseExchanges.length}, minmax(74px, 1fr))`,
-            }"
-          >
-            <span v-for="venue in data.inverseExchanges" :key="venue">{{ venue }}</span>
-          </div>
-        </div>
-
-        <div v-for="row in data.rows" :key="row.symbol" class="heatmap-table__row">
-          <div class="symbol-cell symbol-cell--row">{{ row.symbol }}</div>
-          <div
-            class="group-row"
-            :style="{
-              gridTemplateColumns: `repeat(${data.usdtExchanges.length}, minmax(74px, 1fr))`,
-            }"
-          >
-            <span
-              v-for="venue in data.usdtExchanges"
-              :key="`${row.symbol}-${venue}`"
-              :class="rateClass(row.usdtPerps[venue])"
-            >
-              {{ displayRate(row.usdtPerps[venue]) }}
-            </span>
-          </div>
-          <div
-            class="group-row group-row--inverse"
-            :style="{
-              gridTemplateColumns: `repeat(${data.inverseExchanges.length}, minmax(74px, 1fr))`,
-            }"
-          >
-            <span
-              v-for="venue in data.inverseExchanges"
-              :key="`${row.symbol}-inverse-${venue}`"
-              :class="rateClass(row.inversePerps[venue])"
-            >
-              {{ displayRate(row.inversePerps[venue]) }}
-            </span>
-          </div>
-        </div>
-      </div>
+        </section>
+      </article>
     </div>
   </section>
 </template>
 
 <script setup lang="ts">
+  import { computed, ref } from 'vue';
   import type { FundingMarketBoardData, FundingMarketRange } from '../types';
 
-  defineProps<{
+  type Sort = 'default' | 'name' | 'rate_desc' | 'rate_asc';
+  const props = defineProps<{
+    symbols?: string;
+    search?: string;
+    sort?: Sort;
     data: FundingMarketBoardData;
     exchange: string;
     selectedRange: FundingMarketRange;
@@ -137,11 +169,39 @@
     rangeOptions: Array<{ value: FundingMarketRange; label: string }>;
   }>();
 
-  defineEmits<{
+  const emit = defineEmits<{
+    (e: 'update:symbols', value: string): void;
+    (e: 'update:search', value: string): void;
+    (e: 'update:sort', value: Sort): void;
     (e: 'update:selectedRange', value: FundingMarketRange): void;
     (e: 'update:selectedSymbol', value: string): void;
     (e: 'update:selectedResolution', value: string): void;
   }>();
+  const adding = ref('');
+  const canAdd = computed(
+    () =>
+      props.data.symbolOptions.includes(adding.value.trim().toUpperCase()) &&
+      !(props.symbols || '').split(',').includes(adding.value.trim().toUpperCase()),
+  );
+  function addSymbol() {
+    if (!canAdd.value) return;
+    emit(
+      'update:symbols',
+      [...(props.symbols || '').split(',').filter(Boolean), adding.value.trim().toUpperCase()].join(
+        ',',
+      ),
+    );
+    adding.value = '';
+  }
+  function removeSymbol(symbol: string) {
+    emit(
+      'update:symbols',
+      (props.symbols || '')
+        .split(',')
+        .filter((s) => s !== symbol)
+        .join(','),
+    );
+  }
 
   function formatRate(value: number) {
     return `${value.toFixed(4)}%`;
@@ -154,13 +214,61 @@
 
   function rateClass(value: number | null) {
     if (value === null || Number.isNaN(value)) return 'is-empty';
-    if (value > 0.01) return 'is-hot';
-    if (value > 0) return 'is-positive';
+    if (value >= 0) return 'is-positive';
     return 'is-negative';
   }
 </script>
 
 <style scoped lang="less">
+  .symbol-controls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: end;
+    gap: 12px;
+  }
+
+  .symbol-controls label {
+    display: grid;
+    gap: 5px;
+    font-size: 12px;
+  }
+
+  .symbol-controls input,
+  .symbol-controls select,
+  .symbol-controls button {
+    max-width: 180px;
+    padding: 7px;
+    border: 1px solid var(--strategy-border);
+    border-radius: 6px;
+    background: var(--strategy-surface);
+  }
+
+  .symbol-cell--row button {
+    margin-left: 12px;
+    border: 0;
+    background: transparent;
+    color: var(--strategy-text-3);
+    cursor: pointer;
+  }
+
+  .single-venue .heatmap-table__header,
+  .single-venue .heatmap-table__row {
+    grid-template-columns: minmax(120px, 1fr) minmax(140px, 1fr);
+    min-width: 0;
+  }
+
+  .single-venue .group-header--inverse,
+  .single-venue .group-row--inverse {
+    display: none;
+  }
+
+  .heatmap-shell {
+    max-height: 400px;
+    margin-top: 14px;
+    padding-top: 16px;
+    overflow: auto;
+  }
+
   .market-board {
     padding: var(--strategy-space-5);
     border: 1px solid var(--strategy-border);
@@ -196,19 +304,14 @@
     font-weight: 800;
   }
 
-  .market-board__top {
+  .market-board__content {
     display: grid;
-    grid-template-columns: minmax(0, 1.1fr) minmax(420px, 0.9fr);
+    grid-template-columns: minmax(0, 1fr) minmax(220px, 260px);
     gap: 18px;
+    align-items: stretch;
   }
 
-  .summary-grid {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 14px;
-  }
-
-  .summary-card,
+  .market-board__table-area,
   .extrema-card {
     border: 1px solid var(--strategy-border);
     border-radius: var(--strategy-radius-panel);
@@ -216,40 +319,15 @@
     box-shadow: var(--strategy-shadow-soft);
   }
 
-  .summary-card {
+  .market-board__table-area {
+    min-width: 0;
+    padding: 18px;
+  }
+
+  .extrema-card--combined {
     display: grid;
-    gap: 14px;
-    min-height: 140px;
-    padding: 18px 18px 16px;
-  }
-
-  .summary-card__title {
-    padding: 8px 14px;
-    border-radius: var(--strategy-radius-control);
-    background: var(--strategy-surface-muted);
-    color: var(--strategy-text-1);
-    font-size: 16px;
-    font-weight: 800;
-    text-align: center;
-  }
-
-  .summary-card__value {
-    font-size: 24px;
-    font-weight: 800;
-    text-align: center;
-  }
-
-  .summary-card__subtitle {
-    color: var(--strategy-text-3);
-    font-size: var(--strategy-font-sm);
-    font-weight: 600;
-    text-align: center;
-  }
-
-  .extrema-grid {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 14px;
+    align-content: start;
+    gap: 22px;
   }
 
   .extrema-card {
@@ -303,7 +381,6 @@
     align-items: center;
     justify-content: space-between;
     gap: 14px;
-    margin-top: 24px;
   }
 
   .range-tabs,
@@ -320,24 +397,18 @@
     border: 1px solid var(--strategy-border-strong);
     border-radius: var(--strategy-radius-control);
     background: var(--strategy-surface);
+    box-shadow: var(--strategy-shadow-soft);
     color: var(--strategy-text-2);
     font-size: var(--strategy-font-base);
     font-weight: 700;
     cursor: pointer;
-    box-shadow: var(--strategy-shadow-soft);
   }
 
   .range-tabs .is-active {
-    background: var(--strategy-accent-soft);
     border-color: var(--strategy-accent-soft);
-    color: var(--strategy-accent-strong);
+    background: var(--strategy-accent-soft);
     box-shadow: inset 0 0 0 1px var(--strategy-accent-ring);
-  }
-
-  .heatmap-shell {
-    margin-top: 14px;
-    border-top: 1px solid var(--strategy-border);
-    padding-top: 16px;
+    color: var(--strategy-accent-strong);
   }
 
   .heatmap-caption {
@@ -400,7 +471,7 @@
   }
 
   .group-row .is-negative {
-    color: var(--strategy-success);
+    color: var(--strategy-danger);
   }
 
   .group-row .is-hot {
@@ -423,13 +494,12 @@
   }
 
   @media (max-width: 1200px) {
-    .market-board__top {
+    .market-board__content {
       grid-template-columns: 1fr;
     }
   }
 
   @media (max-width: 900px) {
-    .summary-grid,
     .extrema-grid {
       grid-template-columns: 1fr;
     }

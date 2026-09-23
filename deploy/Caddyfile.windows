@@ -1,0 +1,60 @@
+{
+  admin 127.0.0.1:2019
+  auto_https off
+}
+
+http://127.0.0.1:4373 {
+  bind 127.0.0.1
+  encode gzip
+  @platformApi path /api/v1 /api/v1/*
+  handle @platformApi {
+    reverse_proxy 127.0.0.1:8000
+  }
+  @legacyPlatform path /me /logout /getPermCode /health /health/*
+  handle @legacyPlatform {
+    reverse_proxy 127.0.0.1:8000
+  }
+  @legacyLogin {
+    path /login
+    method POST
+  }
+  handle @legacyLogin {
+    reverse_proxy 127.0.0.1:8000
+  }
+  handle /api/auth/* {
+    uri strip_prefix /api/auth
+    reverse_proxy 127.0.0.1:8080
+  }
+  handle /api/data/* {
+    uri strip_prefix /api/data
+    reverse_proxy 127.0.0.1:8082
+  }
+  handle /external-market/usd* {
+    rewrite * /v6/latest/USD
+    reverse_proxy https://open.er-api.com {
+      header_up Host open.er-api.com
+    }
+  }
+  handle /external-market/okx* {
+    uri replace /external-market/okx /v3/c2c/tradingOrders/books
+    reverse_proxy https://www.okx.com {
+      header_up Host www.okx.com
+    }
+  }
+  handle /external-market/barker* {
+    uri replace /external-market/barker /api
+    reverse_proxy https://app.barker.money {
+      header_up Host app.barker.money
+      header_up Accept "application/json, text/plain, */*"
+      header_up Origin https://app.barker.money
+      header_up Referer https://app.barker.money/campaigns
+      header_up User-Agent "Mozilla/5.0"
+    }
+  }
+  handle {
+    root * {$PLATFORM_WEB_RELEASE_DIR}
+    header Cache-Control "no-cache"
+    try_files {path} /index.html
+    file_server
+  }
+}

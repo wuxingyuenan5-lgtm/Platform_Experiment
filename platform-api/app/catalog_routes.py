@@ -9,9 +9,7 @@ from app.catalog import (
     get_account,
     get_instrument,
     get_latest_balance,
-    get_strategy_account_snapshot,
     get_strategy_instance,
-    get_strategy_pnl,
     list_accounts,
     list_instruments,
     list_nav_snapshots,
@@ -103,8 +101,15 @@ def create_catalog_router(api_prefix: str) -> APIRouter:
     def strategy_account_snapshot(
         strategy_instance_id: str,
         account_id: str | None = Query(default=None, alias="accountId"),
+        include_details: bool = Query(default=True, alias="includeDetails"),
     ) -> StrategyAccountSnapshotResponse:
-        return get_strategy_account_snapshot(strategy_instance_id, account_id=account_id)
+        from app.strategy_management_projection import read_projection
+
+        return read_projection(
+            strategy_instance_id,
+            account_id=account_id,
+            kind="detail" if include_details else "summary",
+        )
 
     @router.post(
         f"{api_prefix}/strategies/instances/{{strategy_instance_id}}/runs",
@@ -243,7 +248,9 @@ def create_catalog_router(api_prefix: str) -> APIRouter:
         tags=["pnl"],
     )
     def strategy_pnl(strategy_instance_id: str) -> StrategyPnlResponse:
-        return get_strategy_pnl(strategy_instance_id)
+        from app.strategy_management_projection import read_projection
+
+        return read_projection(strategy_instance_id)
 
     @router.get(
         f"{api_prefix}/strategies/instances/{{strategy_instance_id}}/nav-snapshots",
